@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>THE PRECISION | Architectural Editorial</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "secondary-dim": "#535353",
+              "on-tertiary-container": "#000000",
+              "on-secondary-container": "#515252",
+              "on-secondary-fixed": "#3f3f3f",
+              "tertiary": "#c1000a",
+              "surface-container-lowest": "#ffffff",
+              "tertiary-container": "#f9362c",
+              "outline": "#757c81",
+              "primary-dim": "#525252",
+              "tertiary-dim": "#ab0008",
+              "error-container": "#fe8983",
+              "on-surface": "#2d3338",
+              "on-primary-container": "#525252",
+              "on-surface-variant": "#596065",
+              "primary-fixed-dim": "#d4d4d4",
+              "primary": "#5e5e5e",
+              "surface-bright": "#f9f9fb",
+              "on-primary": "#f8f8f8",
+              "secondary-container": "#e4e2e2",
+              "outline-variant": "#acb3b8",
+              "on-tertiary-fixed": "#000000",
+              "inverse-primary": "#ffffff",
+              "surface-container-high": "#e4e9ee",
+              "inverse-surface": "#0c0e10",
+              "secondary-fixed": "#e4e2e2",
+              "tertiary-fixed-dim": "#e62721",
+              "surface-container": "#ebeef2",
+              "error": "#9f403d",
+              "primary-container": "#e2e2e2",
+              "tertiary-fixed": "#f9362c",
+              "on-background": "#2d3338",
+              "surface": "#f9f9fb",
+              "on-error-container": "#752121",
+              "secondary-fixed-dim": "#d5d4d4",
+              "on-tertiary-fixed-variant": "#150000",
+              "background": "#f9f9fb",
+              "on-primary-fixed-variant": "#5b5b5b",
+              "on-primary-fixed": "#3f3f3f",
+              "on-secondary": "#faf8f8",
+              "on-tertiary": "#fff7f6",
+              "primary-fixed": "#e2e2e2",
+              "surface-variant": "#dde3e9",
+              "secondary": "#5f5f5f",
+              "surface-container-low": "#f2f4f6",
+              "error-dim": "#4e0309",
+              "inverse-on-surface": "#9c9d9f",
+              "surface-container-highest": "#dde3e9",
+              "on-error": "#fff7f6",
+              "on-secondary-fixed-variant": "#5b5b5b",
+              "surface-dim": "#d3dbe2",
+              "surface-tint": "#5e5e5e"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0px", "lg": "0px", "xl": "0px", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f9f9fb; color: #2d3338; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .swiss-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 24px; }
+        .text-justify-swiss { text-align: justify; text-justify: inter-character; }
+    </style>
+</head>
+<body class="antialiased selection:bg-tertiary selection:text-white">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 rounded-none bg-[#f9f9fb]/80 backdrop-blur-xl">
+<div class="flex items-center justify-between px-6 md:px-12 h-20 w-full max-w-[1440px] mx-auto">
+<div class="flex items-center gap-8">
+<button class="text-[#5e5e5e] hover:bg-[#f2f4f6] transition-colors duration-150 p-2">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<nav class="hidden lg:flex gap-6 items-center">
+<a class="text-[#1A1A1A] border-b-2 border-[#c1000a] pb-1 font-['Inter'] font-bold tracking-[-0.02em] uppercase text-xs" href="#">INDEX</a>
+<a class="text-[#757c81] hover:text-[#1A1A1A] transition-colors duration-150 font-['Inter'] font-bold tracking-[-0.02em] uppercase text-xs" href="#">ARCHIVE</a>
+<a class="text-[#757c81] hover:text-[#1A1A1A] transition-colors duration-150 font-['Inter'] font-bold tracking-[-0.02em] uppercase text-xs" href="#">EDITIONS</a>
+</nav>
+</div>
+<h1 class="text-2xl font-black tracking-tighter text-[#1A1A1A] uppercase">THE PRECISION</h1>
+<div class="flex items-center gap-4">
+<button class="text-[#5e5e5e] hover:bg-[#f2f4f6] transition-colors duration-150 p-2">
+<span class="material-symbols-outlined" data-icon="search">search</span>
+</button>
+<button class="hidden md:block bg-primary text-on-primary px-6 py-2 font-bold text-xs tracking-wider uppercase transition-colors duration-150 hover:bg-primary-dim">
+                    SUBSCRIBE
+                </button>
+</div>
+</div>
+</header>
+<main class="pt-20">
+<!-- Hero Section: Typography Heavy -->
+<section class="w-full bg-surface border-b border-outline-variant/10">
+<div class="max-w-[1440px] mx-auto px-6 md:px-12 pt-16 pb-24">
+<div class="swiss-grid">
+<div class="col-span-12 lg:col-span-8">
+<span class="inline-block bg-tertiary text-on-tertiary px-2 py-1 text-[10px] font-bold tracking-widest uppercase mb-6">FEATURED EDITORIAL</span>
+<h2 class="text-6xl md:text-8xl lg:text-9xl font-black tracking-[-0.05em] leading-[0.9] text-on-surface uppercase mb-8">
+                            Rigor In <br/>Digital <br/>Form
+                        </h2>
+</div>
+<div class="col-span-12 lg:col-span-4 flex flex-col justify-end pb-2">
+<p class="text-lg leading-relaxed text-on-surface-variant mb-8 text-justify-swiss">
+                            Exploring the intersection of brutalist architecture and digital interface design. A study on how structural integrity translates from concrete to code.
+                        </p>
+<div class="flex items-center gap-4 border-t border-outline-variant/30 pt-6">
+<span class="text-[10px] font-bold tracking-widest text-outline uppercase">VOL. 04 / ISSUE 12</span>
+<span class="text-[10px] font-bold tracking-widest text-tertiary uppercase">READ THE ESSAY</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Main Content Area with Sidebar -->
+<section class="max-w-[1440px] mx-auto px-6 md:px-12 py-16">
+<div class="swiss-grid">
+<!-- Left Content: The Feed -->
+<div class="col-span-12 lg:col-span-9">
+<div class="flex items-center justify-between mb-12">
+<h3 class="text-3xl font-black tracking-tighter uppercase">Latest Entries</h3>
+<div class="h-[2px] flex-grow mx-8 bg-outline-variant/20"></div>
+<span class="text-[10px] font-bold text-outline tracking-widest uppercase">SORT: CHRONOLOGICAL</span>
+</div>
+<!-- Article Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-y-16 gap-x-12">
+<!-- Article 1 -->
+<article class="group">
+<div class="aspect-[4/5] bg-surface-container-low mb-6 overflow-hidden">
+<img alt="modernist building detail" class="w-full h-full object-cover grayscale transition-transform duration-700 group-hover:scale-105" data-alt="monochromatic low angle shot of a modernist glass and steel skyscraper with geometric patterns and clear sky" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBhTuF8uJuEZv6S5XkPwz_yoqljvr2Bp46uAWHEqgNvR1910L9cmnPxJGsWLq7ir9248-DSeZoON8wSm0l-hClujnxtX2xlKlP3aU9nPD8MkKUhVkSnO276vaBDSD9iogx_-PlsRRV9nuew_1jRKmj3mLtQYbMYNCevUagHsOSyF21zhc2AqlqIKVAQK7E7sCcbgwtCQnaSUQD3Cdrg1ezwDhVYhYEZrgU4QiD1Em8COXpU-OYNYJdFYSNHEVNORbSG2jVhzGxpYs0"/>
+</div>
+<div class="flex flex-col">
+<div class="flex justify-between items-baseline mb-3">
+<span class="text-[10px] font-bold tracking-widest text-tertiary uppercase">ARCHITECTURE</span>
+<span class="text-[10px] font-medium tracking-widest text-outline uppercase">24 OCT 2024</span>
+</div>
+<h4 class="text-2xl font-extrabold tracking-tight uppercase leading-tight mb-4 group-hover:text-tertiary transition-colors">The Weight of Glass: Transparency in Urban Spaces</h4>
+<p class="text-sm leading-relaxed text-on-surface-variant line-clamp-3">
+                                    An analysis of the emotional impact of glass-heavy architecture in dense metropolitan hubs and the evolution of privacy.
+                                </p>
+</div>
+</article>
+<!-- Article 2 -->
+<article class="group">
+<div class="aspect-[4/5] bg-surface-container-low mb-6 overflow-hidden">
+<img alt="minimalist interior" class="w-full h-full object-cover grayscale transition-transform duration-700 group-hover:scale-105" data-alt="high-end minimalist interior with concrete walls, a single black designer chair, and dramatic natural light casting long shadows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAp0aWYdjQybw9tdDjiMjraZoOrY8E9Lu8XgSP7v26pCuH99_3lUgyU_JUdw-qvGixpFyN3HZg_zQwYmdBfbwgmLTq8BsP8thFrNfIdYqIBp9JbILgwitpGSUgOMXZ3RQvYrDX8WOu_HW4pGx0XhyLjSeYJPHu4MEKUmYK2xk7IR7A96q_bcE0WqLTFUEZ30kYQ73tzjyubrbAXSPwbjhWVnv3pLVX8tDWjmqx2NzWhENTj8agRevkYni_-nVxrQG8X2ZZvRaVUpg0"/>
+</div>
+<div class="flex flex-col">
+<div class="flex justify-between items-baseline mb-3">
+<span class="text-[10px] font-bold tracking-widest text-tertiary uppercase">INTERIORS</span>
+<span class="text-[10px] font-medium tracking-widest text-outline uppercase">22 OCT 2024</span>
+</div>
+<h4 class="text-2xl font-extrabold tracking-tight uppercase leading-tight mb-4 group-hover:text-tertiary transition-colors">Concrete Sanctuary: Living with Brutalism</h4>
+<p class="text-sm leading-relaxed text-on-surface-variant line-clamp-3">
+                                    How residents are repurposing once-hated brutalist structures into warm, functional high-end living environments.
+                                </p>
+</div>
+</article>
+<!-- Article 3 -->
+<article class="group">
+<div class="aspect-[4/5] bg-surface-container-low mb-6 overflow-hidden">
+<img alt="geometric structure" class="w-full h-full object-cover grayscale transition-transform duration-700 group-hover:scale-105" data-alt="abstract architectural close-up showing repetitive concrete triangular patterns in bright afternoon sun" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAflBC8grLWVKb1f8c7LAiJQwM8lHzNBYdYCss98rh2Qe2yjBAdGgfhgLEBu0rCHsHVw_MIn_Lzy9wD6Mior9XAgjGUZlR04XaD45u-pFmcJ5UyDubfZvNVIuK89dTw0835ljUGdJacXvxgSST1-FxrtUvfbFIUeLPegjL8tJgtOyShYiPNSOOKCdfFfIRvq9KQPEUPOerKHrdW8TtvvnVjfjq-9TLWthwsJ0Oo1g8P722WQcsMXoSMSvBbot_5y8WVlpGE0Y1Xr54"/>
+</div>
+<div class="flex flex-col">
+<div class="flex justify-between items-baseline mb-3">
+<span class="text-[10px] font-bold tracking-widest text-tertiary uppercase">THEORY</span>
+<span class="text-[10px] font-medium tracking-widest text-outline uppercase">18 OCT 2024</span>
+</div>
+<h4 class="text-2xl font-extrabold tracking-tight uppercase leading-tight mb-4 group-hover:text-tertiary transition-colors">The Grid as a Manifesto</h4>
+<p class="text-sm leading-relaxed text-on-surface-variant line-clamp-3">
+                                    Returning to the mathematical roots of typography and layout to solve modern information density problems.
+                                </p>
+</div>
+</article>
+<!-- Article 4 -->
+<article class="group">
+<div class="aspect-[4/5] bg-surface-container-low mb-6 overflow-hidden">
+<img alt="modern construction" class="w-full h-full object-cover grayscale transition-transform duration-700 group-hover:scale-105" data-alt="cinematic shot of an architectural blueprint lying on a heavy oak table with drafting tools and a single lamp" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA4n_zjZ3ZcTIPbI8MEoWQARx7PnvUK3na84CI6x--t8q8oHiUkRgfzeree4iro2UpPQPExjMmfRlpRd1qsXAjxFaGm_PGBTh6AlsbaybXfMKMCoWSwhPIr57xoujVNi93sb1sMs2limTk1ghXmLM1nsoCXNqhur8pfFaKLWN8lAzVw5h5IBDsbC2E9TQV6LMb9kLOEQEU0FhTj-wTV5-D2jzt2UwS6v09-Mbg6Af7wh_zjpKf2vYDkCDZ-jhdV15GDMbkarP_dV_o"/>
+</div>
+<div class="flex flex-col">
+<div class="flex justify-between items-baseline mb-3">
+<span class="text-[10px] font-bold tracking-widest text-tertiary uppercase">PROCESS</span>
+<span class="text-[10px] font-medium tracking-widest text-outline uppercase">15 OCT 2024</span>
+</div>
+<h4 class="text-2xl font-extrabold tracking-tight uppercase leading-tight mb-4 group-hover:text-tertiary transition-colors">Drafting the Invisible</h4>
+<p class="text-sm leading-relaxed text-on-surface-variant line-clamp-3">
+                                    Behind the scenes of the world's most innovative architectural firms and their digital prototyping methodologies.
+                                </p>
+</div>
+</article>
+</div>
+<!-- CTA Section -->
+<div class="mt-20 p-12 bg-surface-container-low border-l-8 border-tertiary">
+<div class="max-w-2xl">
+<h3 class="text-4xl font-black tracking-tighter uppercase mb-6">Join the Editorial Circle</h3>
+<p class="text-on-surface-variant mb-8">Receive our weekly curation of architectural rigor and digital precision delivered directly to your inbox.</p>
+<form class="flex gap-4">
+<input class="flex-grow bg-white border-none focus:ring-2 focus:ring-tertiary text-xs font-bold tracking-widest p-4" placeholder="EMAIL@ADDRESS.COM" type="email"/>
+<button class="bg-primary text-on-primary px-8 py-4 font-bold text-xs tracking-widest uppercase hover:bg-primary-dim transition-colors" type="submit">SIGN UP</button>
+</form>
+</div>
+</div>
+</div>
+<!-- Sidebar -->
+<aside class="col-span-12 lg:col-span-3 lg:border-l lg:border-outline-variant/20 lg:pl-12">
+<div class="sticky top-32">
+<!-- Search -->
+<div class="mb-12">
+<h5 class="text-[10px] font-bold tracking-widest text-outline uppercase mb-4">ARCHIVE SEARCH</h5>
+<div class="relative">
+<input class="w-full bg-transparent border-b border-outline-variant/50 focus:border-primary focus:ring-0 px-0 py-2 text-sm font-bold placeholder:text-outline-variant/50" placeholder="KEYWORD..." type="text"/>
+<span class="material-symbols-outlined absolute right-0 top-2 text-outline-variant" data-icon="search">search</span>
+</div>
+</div>
+<!-- Categories -->
+<div class="mb-12">
+<h5 class="text-[10px] font-bold tracking-widest text-outline uppercase mb-6">TAXONOMY</h5>
+<ul class="space-y-3">
+<li class="flex justify-between group cursor-pointer">
+<span class="text-sm font-bold uppercase group-hover:text-tertiary transition-colors">Urbanism</span>
+<span class="text-[10px] font-medium text-outline">14</span>
+</li>
+<li class="flex justify-between group cursor-pointer">
+<span class="text-sm font-bold uppercase group-hover:text-tertiary transition-colors">Structuralism</span>
+<span class="text-[10px] font-medium text-outline">08</span>
+</li>
+<li class="flex justify-between group cursor-pointer text-tertiary">
+<span class="text-sm font-bold uppercase">Minimalism</span>
+<span class="text-[10px] font-medium">32</span>
+</li>
+<li class="flex justify-between group cursor-pointer">
+<span class="text-sm font-bold uppercase group-hover:text-tertiary transition-colors">Materials</span>
+<span class="text-[10px] font-medium text-outline">21</span>
+</li>
+<li class="flex justify-between group cursor-pointer">
+<span class="text-sm font-bold uppercase group-hover:text-tertiary transition-colors">Monochrome</span>
+<span class="text-[10px] font-medium text-outline">19</span>
+</li>
+</ul>
+</div>
+<!-- Trending / Featured -->
+<div>
+<h5 class="text-[10px] font-bold tracking-widest text-outline uppercase mb-6">MUST READS</h5>
+<div class="space-y-8">
+<div class="group cursor-pointer">
+<span class="text-[9px] font-bold text-tertiary block mb-2">01. THE ESSAY</span>
+<h6 class="text-sm font-black uppercase leading-tight group-hover:underline">The Death of the Curve: A Return to Linear Form</h6>
+</div>
+<div class="group cursor-pointer">
+<span class="text-[9px] font-bold text-tertiary block mb-2">02. INTERVIEW</span>
+<h6 class="text-sm font-black uppercase leading-tight group-hover:underline">Dialogue with Peter Zumthor on Atmosphere</h6>
+</div>
+<div class="group cursor-pointer">
+<span class="text-[9px] font-bold text-tertiary block mb-2">03. CASE STUDY</span>
+<h6 class="text-sm font-black uppercase leading-tight group-hover:underline">Tokyo: The Concrete Jungle Refined</h6>
+</div>
+</div>
+</div>
+</div>
+</aside>
+</div>
+</section>
+<!-- Full Width Imagery Section -->
+<section class="w-full bg-inverse-surface py-24 overflow-hidden">
+<div class="max-w-[1440px] mx-auto px-6 md:px-12">
+<div class="flex flex-col md:flex-row items-center gap-16">
+<div class="w-full md:w-1/2">
+<img alt="modernist stairway" class="w-full aspect-square object-cover grayscale brightness-75" data-alt="stark white modernist spiral staircase from a top-down perspective, creating a perfect mathematical spiral in a black and white high contrast edit" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB3euo8IMIvmllU0Uk1SlB5LIC9Hlk2mp4rNOZvlu4-IpuV_9utAIbO_sgbYgLB_ExR7udlMFO5WBUxr0myA5tuGhK1SvCgmORbZVNGr7Wn8tGpMnkXGa6N9x8OsSjc4GPTphxbw2coVKMCHT7oaCr2FfjqDKmiOBCpsRf2pLc4KbmyR92vmWO0YTfrXuwu6Cb6RMSRwKmck8bXIDku32uWGgaZ7U0ubbO37XQwFZbn8VJmcBO-t6qbmjPJfc2ALxoLicgyuMA3HWU"/>
+</div>
+<div class="w-full md:w-1/2 text-white">
+<span class="text-[10px] font-bold tracking-[0.2em] text-tertiary uppercase mb-6 block">BEYOND THE GRID</span>
+<h2 class="text-5xl lg:text-7xl font-black uppercase leading-none mb-8">Structural Integrity</h2>
+<p class="text-on-secondary-fixed text-lg leading-relaxed mb-10 max-w-md">
+                            "Architecture should speak of its time and place, but yearn for timelessness." — Frank Gehry. We investigate the permanence of digital structures in a transient era.
+                        </p>
+<a class="inline-flex items-center gap-4 group" href="#">
+<span class="text-xs font-bold tracking-widest uppercase">EXPLORE THE MONOGRAPH</span>
+<span class="material-symbols-outlined transition-transform group-hover:translate-x-2" data-icon="arrow_forward">arrow_forward</span>
+</a>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-[#f2f4f6] dark:bg-[#121212] border-t border-[#acb3b8]/15">
+<div class="flex flex-col md:flex-row justify-between items-center py-16 px-6 md:px-12 w-full max-w-[1440px] mx-auto gap-8">
+<div class="flex flex-col gap-4">
+<span class="text-lg font-black text-[#1A1A1A] dark:text-[#f8f8f8] uppercase tracking-tighter">THE PRECISION</span>
+<p class="text-[10px] font-medium tracking-[0.05em] uppercase font-['Inter'] text-[#757c81] max-w-xs leading-relaxed">
+                    © 2024 THE PRECISION EDITORIAL. ARCHITECTURAL RIGOR IN DIGITAL FORM.
+                </p>
+</div>
+<div class="flex flex-wrap justify-center gap-x-12 gap-y-4">
+<a class="text-[10px] font-medium tracking-[0.05em] uppercase font-['Inter'] text-[#757c81] hover:text-[#1A1A1A] transition-colors duration-150" href="#">INDEX</a>
+<a class="text-[10px] font-medium tracking-[0.05em] uppercase font-['Inter'] text-[#757c81] hover:text-[#1A1A1A] transition-colors duration-150" href="#">PHILOSOPHY</a>
+<a class="text-[10px] font-medium tracking-[0.05em] uppercase font-['Inter'] text-[#757c81] hover:text-[#1A1A1A] transition-colors duration-150" href="#">ARCHIVE</a>
+<a class="text-[10px] font-medium tracking-[0.05em] uppercase font-['Inter'] text-[#757c81] hover:text-[#1A1A1A] transition-colors duration-150" href="#">CONTACT</a>
+</div>
+<div class="flex gap-6">
+<button class="text-[#757c81] hover:text-[#c1000a] transition-colors">
+<span class="material-symbols-outlined" data-icon="share">share</span>
+</button>
+<button class="text-[#757c81] hover:text-[#c1000a] transition-colors">
+<span class="material-symbols-outlined" data-icon="rss_feed">rss_feed</span>
+</button>
+</div>
+</div>
+</footer>
+</body></html>
