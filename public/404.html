@@ -9,8 +9,9 @@
     // GitHub Pages returns this 404.html. We store the intended path in sessionStorage
     // and redirect to the root. The root index.html then reads it back and replaces
     // the history entry so React Router sees the correct path.
+    var base = '/ai-native-article/';
     sessionStorage.setItem('spa_redirect', location.href);
-    location.replace('/');
+    location.replace(base);
   </script>
 </head>
 <body></body>

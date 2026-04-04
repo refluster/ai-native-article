@@ -5,10 +5,11 @@ import Home from './pages/Home'
 import Article from './pages/Article'
 import DesignSystem from './pages/DesignSystem'
 import DesignGuide from './pages/DesignGuide'
+import { routerBaseName } from './lib/paths'
 
 export default function App() {
   return (
-    <BrowserRouter basename="ai-native-article">
+    <BrowserRouter basename={routerBaseName()}>
       <div className="min-h-screen flex flex-col bg-surface">
         <Header />
         <main className="flex-1 pt-16">

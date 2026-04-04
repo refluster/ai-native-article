@@ -1,3 +1,5 @@
+import { withBasePath } from '../lib/paths'
+
 /* -----------------------------------------------------------------------
    Design System — The Precision Editorial
    Living reference for all design tokens and components.
@@ -215,7 +217,7 @@ function ComponentsSection() {
         <div className="max-w-xs">
           <div className="aspect-[4/5] bg-surface-container-low mb-6 overflow-hidden">
             <img
-              src="/assets/images/article-1.jpg"
+              src={withBasePath('assets/images/article-1.jpg')}
               alt="Sample"
               className="w-full h-full object-cover grayscale"
             />

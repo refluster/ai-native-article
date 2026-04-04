@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { ArticleMeta } from '../types/article'
+import { withBasePath } from '../lib/paths'
 
 interface Frontmatter extends ArticleMeta {
   notionId?: string
@@ -24,15 +25,15 @@ function parseFrontmatter(raw: string): { meta: Partial<Frontmatter>; content: s
 }
 
 const IMAGES = [
-  '/assets/images/article-1.jpg',
-  '/assets/images/article-2.jpg',
-  '/assets/images/article-3.jpg',
-  '/assets/images/article-4.jpg',
-  '/assets/images/article-5.jpg',
-  '/assets/images/article-6.jpg',
-  '/assets/images/article-7.jpg',
-  '/assets/images/article-8.jpg',
-  '/assets/images/article-9.jpg',
+  withBasePath('assets/images/article-1.jpg'),
+  withBasePath('assets/images/article-2.jpg'),
+  withBasePath('assets/images/article-3.jpg'),
+  withBasePath('assets/images/article-4.jpg'),
+  withBasePath('assets/images/article-5.jpg'),
+  withBasePath('assets/images/article-6.jpg'),
+  withBasePath('assets/images/article-7.jpg'),
+  withBasePath('assets/images/article-8.jpg'),
+  withBasePath('assets/images/article-9.jpg'),
 ]
 
 export default function Article() {
@@ -49,7 +50,7 @@ export default function Article() {
     setError(false)
 
     // Get index from manifest for image selection
-    fetch('/posts/manifest.json')
+    fetch(withBasePath('posts/manifest.json'))
       .then(r => r.json())
       .then((manifest: ArticleMeta[]) => {
         const idx = manifest.findIndex(a => a.slug === slug)
@@ -57,7 +58,7 @@ export default function Article() {
       })
       .catch(() => {})
 
-    fetch(`/posts/${slug}.md`)
+    fetch(withBasePath(`posts/${slug}.md`))
       .then(r => {
         if (!r.ok) throw new Error('Not found')
         return r.text()

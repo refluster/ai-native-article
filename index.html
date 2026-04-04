@@ -13,11 +13,12 @@
     <script>
       // Restore path after GitHub Pages 404.html SPA redirect
       (function () {
+        var base = '/ai-native-article/';
         var redirect = sessionStorage.getItem('spa_redirect');
         if (redirect) {
           sessionStorage.removeItem('spa_redirect');
           var url = new URL(redirect);
-          if (url.pathname !== '/') {
+          if (url.pathname !== base && url.pathname !== base.slice(0, -1)) {
             history.replaceState(null, '', url.pathname + url.search + url.hash);
           }
         }

@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import ArticleCard from '../components/ArticleCard'
 import type { ArticleMeta } from '../types/article'
+import { withBasePath } from '../lib/paths'
 
 export default function Home() {
   const [articles, setArticles] = useState<ArticleMeta[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/posts/manifest.json')
+    fetch(withBasePath('posts/manifest.json'))
       .then(r => r.json())
       .then((data: ArticleMeta[]) => {
         setArticles(data)
@@ -46,7 +47,7 @@ export default function Home() {
             <div className="swiss-grid">
               <div className="col-span-12 lg:col-span-7 relative overflow-hidden">
                 <img
-                  src="/assets/images/ai-native-transformation.jpg"
+                  src={withBasePath('assets/images/ai-native-transformation.jpg')}
                   alt={featured.title}
                   className="w-full aspect-[16/9] object-cover grayscale"
                 />
