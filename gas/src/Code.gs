@@ -186,12 +186,12 @@ function generateArticleImageWithAzure(title, category, apiKey) {
   const url = `${endpoint}openai/deployments/${deploymentId}/images/generations?api-version=${apiVersion}`;
 
   // Create a descriptive prompt for the image generation
-  const prompt = `Create a professional blog article header image (1200x630px) with Swiss design aesthetic.
+  const prompt = `Create a professional blog article header image with Swiss design aesthetic.
 Title: "${title}"
 Category: ${category}
 Style: Minimalist, geometric, clean typography. Use colors: dark gray (#5e5e5e), red (#c1000a), light surface (#f9f9fb).
 Include the title and category label. Use modern sans-serif font. Add geometric shapes or accent bars in red.
-NO text overlay - just design elements. Professional tech/AI industry look.`;
+Professional tech/AI industry look.`;
 
   const payload = {
     prompt,
@@ -218,16 +218,11 @@ NO text overlay - just design elements. Professional tech/AI industry look.`;
   }
 
   const result = JSON.parse(content);
-  const imageUrl = result.data?.[0]?.url;
+  const base64Image = result.data?.[0]?.b64_json;
 
-  if (!imageUrl) {
-    throw new Error(`No image URL returned from Azure OpenAI. Response: ${JSON.stringify(result)}`);
+  if (!base64Image) {
+    throw new Error(`No image data returned from Azure OpenAI. Response: ${JSON.stringify(result)}`);
   }
-
-  // Fetch the image and convert to base64
-  const imageResponse = UrlFetchApp.fetch(imageUrl);
-  const imageBlob = imageResponse.getBlob();
-  const base64Image = Utilities.base64Encode(imageBlob.getBytes());
 
   return base64Image;
 }
