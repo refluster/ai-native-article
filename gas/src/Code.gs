@@ -11,7 +11,7 @@ function getConfig() {
     notion_api_key: props.getProperty('NOTION_API_KEY') || '',
     azure_openapi_key: props.getProperty('AZURE_OPENAPI_KEY') || '',
     l1_db_id: '32fd0f0b-e61e-80bd-89bf-f94965d05e80',
-    l2_db_id: props.getProperty('L2_DB_ID') || '',
+    l2_db_id: props.getProperty('L2_DB_ID') || '32fd0f0b-e61e-807a-9cde-e9cbb0c3729c',
     l3_db_id: '331d0f0b-e61e-812e-92bf-c1ba92bcd1d9',
     l4_db_id: props.getProperty('L4_DB_ID') || '',
   };
@@ -239,22 +239,35 @@ function handleL2Create(data, config) {
 
   const l1Title = l1Page.properties.Title.title[0]?.plain_text || '';
   const l1Summary = l1Page.properties['Contents Summary'].rich_text[0]?.plain_text || '';
+  const l1Category = l1Page.properties.Category?.rich_text[0]?.plain_text || 'A';
+  const l1SourceUrl = l1Page.properties['Source URL']?.url || '';
 
-  const prompt = `Based on this AI industry news:\n\nTitle: ${l1Title}\nSummary: ${l1Summary}\n\nWrite a comprehensive blog article (800-1200 words) that expands on the topic, explains implications, includes examples, and discusses opportunities and challenges. Suggest a catchy blog title at the beginning. Format as Markdown with # for headings and start with a suggested title like "# Blog Title: ..."`;
+  const prompt = `Based on this AI industry news:\n\nTitle: ${l1Title}\nSummary: ${l1Summary}\n\nWrite a comprehensive blog article (800-1200 words) that expands on the topic, explains implications, includes examples, and discusses opportunities and challenges. Suggest a catchy Japanese blog title at the beginning. Format as Markdown with ## for headings.`;
   const blogContent = azureGenerateText(prompt, config.azure_openapi_key);
 
   // Extract title from the generated content (first line should have the title)
-  const titleMatch = blogContent.match(/^#\s+(.+?)(?:\n|$)/);
-  const blogTitle = titleMatch ? titleMatch[1].replace(/Blog Title:\s*/i, '') : l1Title;
+  const titleMatch = blogContent.match(/^#+\s+(.+?)(?:\n|$)/);
+  const blogTitle = titleMatch ? titleMatch[1] : l1Title;
+
+  // Convert markdown to Notion blocks
+  const blocks = markdownToNotionBlocks(blogContent);
 
   const properties = {
-    'Title': { title: [{ text: { content: blogTitle } }] },
-    'L1 References': { relation: [{ id: data.l1EntryId }] },
-    'Content': { rich_text: [{ text: { content: blogContent.substring(0, 2000) } }] },
-    'Status': { rich_text: [{ text: { content: 'draft' } }] },
+    'Name': { title: [{ text: { content: blogTitle } }] },
+    'Publication Date': { date: { start: new Date().toISOString().split('T')[0] } },
+    'Source URLs': { url: l1SourceUrl },
+    'Sub Category': { rich_text: [{ text: { content: l1Category } }] },
+    'Contents Summary': { rich_text: [{ text: { content: l1Summary } }] },
+    '実務への使い道': { rich_text: [{ text: { content: 'AIのビジネス応用に関する実務的な洞察' } }] },
   };
 
-  const result = notionCreatePage(config.l2_db_id, properties, config.notion_api_key);
+  const pageData = {
+    parent: { database_id: config.l2_db_id },
+    properties: properties,
+    children: blocks,
+  };
+
+  const result = notionRequest('POST', '/pages', config.notion_api_key, pageData);
   return {
     success: true,
     data: {
@@ -262,20 +275,64 @@ function handleL2Create(data, config) {
       title: blogTitle,
       l1EntryId: data.l1EntryId,
       blogContent,
-      status: 'draft',
       notionUrl: result.url,
     },
   };
+}
+
+function markdownToNotionBlocks(mdText) {
+  const blocks = [];
+  const lines = mdText.split('\n');
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    if (trimmed.startsWith('## ')) {
+      blocks.push({
+        object: 'block',
+        type: 'heading_2',
+        heading_2: { rich_text: [{ type: 'text', text: { content: trimmed.substring(3) } }] }
+      });
+    } else if (trimmed.startsWith('### ')) {
+      blocks.push({
+        object: 'block',
+        type: 'heading_3',
+        heading_3: { rich_text: [{ type: 'text', text: { content: trimmed.substring(4) } }] }
+      });
+    } else if (trimmed.startsWith('- ')) {
+      blocks.push({
+        object: 'block',
+        type: 'bulleted_list_item',
+        bulleted_list_item: { rich_text: [{ type: 'text', text: { content: trimmed.substring(2) } }] }
+      });
+    } else if (trimmed.startsWith('* ')) {
+      blocks.push({
+        object: 'block',
+        type: 'bulleted_list_item',
+        bulleted_list_item: { rich_text: [{ type: 'text', text: { content: trimmed.substring(2) } }] }
+      });
+    } else {
+      blocks.push({
+        object: 'block',
+        type: 'paragraph',
+        paragraph: { rich_text: [{ type: 'text', text: { content: trimmed } }] }
+      });
+    }
+  }
+
+  return blocks;
 }
 
 function handleL2List(config) {
   const pages = notionQueryDatabase(config.l2_db_id, config.notion_api_key);
   const entries = pages.map(p => ({
     id: p.id,
-    title: p.properties.Title.title[0]?.plain_text || '',
-    l1EntryId: p.properties['L1 References']?.relation?.[0]?.id || '',
-    blogContent: p.properties.Content?.rich_text[0]?.plain_text || '',
-    status: p.properties.Status?.rich_text[0]?.plain_text || 'draft',
+    title: p.properties.Name.title[0]?.plain_text || '',
+    sourceUrl: p.properties['Source URLs']?.url || '',
+    summary: p.properties['Contents Summary']?.rich_text[0]?.plain_text || '',
+    category: p.properties['Sub Category']?.rich_text[0]?.plain_text || '',
+    publicationDate: p.properties['Publication Date']?.date?.start || '',
     notionUrl: p.url,
   }));
 
@@ -285,10 +342,10 @@ function handleL2List(config) {
 function handleL3Create(data, config) {
   const l2Pages = notionQueryDatabase(config.l2_db_id, config.notion_api_key);
   const selectedL2 = l2Pages.filter(p => data.l2EntryIds.includes(p.id));
-  const l2Titles = selectedL2.map(p => p.properties.Title.title[0]?.plain_text || '');
-  const l2Contents = selectedL2.map(p => p.properties.Content?.rich_text[0]?.plain_text || '');
+  const l2Titles = selectedL2.map(p => p.properties.Name.title[0]?.plain_text || '');
+  const l2Summaries = selectedL2.map(p => p.properties['Contents Summary']?.rich_text[0]?.plain_text || '');
 
-  const sourceList = l2Titles.map((t, i) => `- ${t}: ${l2Contents[i].substring(0, 200)}...`).join('\n');
+  const sourceList = l2Titles.map((t, i) => `- ${t}: ${l2Summaries[i].substring(0, 200)}...`).join('\n');
   const prompt = `Based on these blog articles about AI:\n\n${sourceList}\n\nWrite a deep-dive insight article (1500-2000 words) that synthesizes cross-cutting themes, provides strategic insights, includes concrete examples, and offers actionable recommendations. Category: ${data.category}\n\nFirst line should be abstract (2-3 sentences), rest is the full article. Format as Markdown.`;
   const insightContent = azureGenerateText(prompt, config.azure_openapi_key);
 
