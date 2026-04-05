@@ -197,7 +197,7 @@ NO text overlay - just design elements. Professional tech/AI industry look.`;
     prompt,
     n: 1,
     size: '1200x630',
-    quality: 'hd',
+    quality: 'high',
   };
 
   const response = UrlFetchApp.fetch(url, {
@@ -277,6 +277,64 @@ function githubCreatePost(slug, mdContent, token, title, category, apiKey) {
     slug,
     imageUrl: `/posts/images/${slug}.jpg`,
   };
+}
+
+function rebuildManifestFromNotion(config) {
+  // Rebuild manifest.json from Notion L3 database (source of truth)
+  const l3Pages = notionQueryDatabase(config.l3_db_id, config.notion_api_key);
+
+  const manifest = l3Pages.map(p => ({
+    slug: p.id.replace(/-/g, '').substring(0, 12), // Use shorter ID as slug
+    title: p.properties.Title.title[0]?.plain_text || '',
+    category: p.properties.Category?.rich_text[0]?.plain_text || '',
+    date: new Date().toISOString().split('T')[0],
+    abstract: p.properties.Abstract?.rich_text[0]?.plain_text || '',
+    image: `/posts/images/${p.id.replace(/-/g, '').substring(0, 12)}.jpg`,
+  })).sort((a, b) => b.date.localeCompare(a.date));
+
+  // Write to GitHub with proper UTF-8 encoding
+  try {
+    const token = config.gh_token;
+    const url = `https://api.github.com/repos/refluster/ai-native-article/contents/public/posts/manifest.json?ref=main`;
+
+    const getOptions = {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      muteHttpExceptions: true,
+    };
+
+    const getResponse = UrlFetchApp.fetch(url, getOptions);
+    const sha = getResponse.getResponseCode() === 200 ? JSON.parse(getResponse.getContentText()).sha : null;
+
+    const putOptions = {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json',
+      },
+      payload: JSON.stringify({
+        message: 'Rebuild manifest.json from Notion (fix UTF-8 encoding)',
+        content: Utilities.base64Encode(JSON.stringify(manifest, null, 2), Utilities.Charset.UTF_8),
+        branch: 'main',
+        ...(sha && { sha }),
+      }),
+      muteHttpExceptions: true,
+    };
+
+    const putResponse = UrlFetchApp.fetch(url, putOptions);
+    return {
+      success: putResponse.getResponseCode() < 400,
+      message: `Rebuilt manifest with ${manifest.length} articles`,
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 }
 
 // ─── HANDLERS ────────────────────────────────────────────────────────────────
@@ -602,6 +660,9 @@ function doPost(e) {
         break;
       case 'L4_LIST':
         response = handleL4List(config);
+        break;
+      case 'REBUILD_MANIFEST':
+        response = rebuildManifestFromNotion(config);
         break;
       default:
         response = { success: false, error: `Unknown action: ${action}` };

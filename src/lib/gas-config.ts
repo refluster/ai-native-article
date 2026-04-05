@@ -7,7 +7,7 @@
  * Format: https://script.google.com/macros/s/{DEPLOYMENT_ID}/usercontent
  */
 
-const id = 'AKfycbwXqYjaYhtXOjlKo5AIO6iARRhIm5oOQ6sQsesqD5o';
+const id = 'AKfycbwT9brOVSZqKzpf9-yZ_O8BHKJiFuZxwxawKK4FAhBwq-sdloyv56rDgNec9uQ2N4u-';
 
 export const GAS_URL = `https://script.google.com/macros/s/${id}/exec`
 
