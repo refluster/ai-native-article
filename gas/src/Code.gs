@@ -160,7 +160,7 @@ function githubUpdateManifest(entry, token) {
     const sha = result.sha;
     githubRequest('PUT', '/contents/public/posts/manifest.json', token, {
       message: `Add article: ${entry.title}`,
-      content: Utilities.base64Encode(JSON.stringify(manifest, null, 2)),
+      content: Utilities.base64Encode(JSON.stringify(manifest, null, 2), Utilities.Charset.UTF_8),
       branch: 'main',
       sha,
     });
@@ -169,7 +169,7 @@ function githubUpdateManifest(entry, token) {
     if (e.message && e.message.includes('404')) {
       githubRequest('PUT', '/contents/public/posts/manifest.json', token, {
         message: `Add article: ${entry.title}`,
-        content: Utilities.base64Encode(JSON.stringify(manifest, null, 2)),
+        content: Utilities.base64Encode(JSON.stringify(manifest, null, 2), Utilities.Charset.UTF_8),
         branch: 'main',
       });
     } else {
@@ -235,7 +235,7 @@ NO text overlay - just design elements. Professional tech/AI industry look.`;
 function githubCreatePost(slug, mdContent, token, title, category, apiKey) {
   let payload = {
     message: `Add article: ${slug}`,
-    content: Utilities.base64Encode(mdContent),
+    content: Utilities.base64Encode(mdContent, Utilities.Charset.UTF_8),
     branch: 'main',
   };
 
