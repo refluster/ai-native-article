@@ -138,7 +138,7 @@ function githubRequest(method, path, token, body) {
 
 function githubReadManifest(token) {
   try {
-    const result = githubRequest('GET', '/contents/public/posts/manifest.json?ref=gh-pages', token);
+    const result = githubRequest('GET', '/contents/public/posts/manifest.json?ref=main', token);
     const content = Utilities.newBlob(Utilities.base64Decode(result.content)).getDataAsString();
     return JSON.parse(content);
   } catch (e) {
@@ -156,12 +156,12 @@ function githubUpdateManifest(entry, token) {
   manifest.sort((a, b) => b.date.localeCompare(a.date));
 
   try {
-    const result = githubRequest('GET', '/contents/public/posts/manifest.json?ref=gh-pages', token);
+    const result = githubRequest('GET', '/contents/public/posts/manifest.json?ref=main', token);
     const sha = result.sha;
     githubRequest('PUT', '/contents/public/posts/manifest.json', token, {
       message: `Add article: ${entry.title}`,
       content: Utilities.base64Encode(JSON.stringify(manifest, null, 2)),
-      branch: 'gh-pages',
+      branch: 'main',
       sha,
     });
   } catch (e) {
@@ -170,7 +170,7 @@ function githubUpdateManifest(entry, token) {
       githubRequest('PUT', '/contents/public/posts/manifest.json', token, {
         message: `Add article: ${entry.title}`,
         content: Utilities.base64Encode(JSON.stringify(manifest, null, 2)),
-        branch: 'gh-pages',
+        branch: 'main',
       });
     } else {
       throw e;
@@ -182,12 +182,12 @@ function githubCreatePost(slug, mdContent, token) {
   let payload = {
     message: `Add article: ${slug}`,
     content: Utilities.base64Encode(mdContent),
-    branch: 'gh-pages',
+    branch: 'main',
   };
 
   // Check if file already exists to get SHA
   try {
-    const existingFile = githubRequest('GET', `/contents/public/posts/${slug}.md?ref=gh-pages`, token);
+    const existingFile = githubRequest('GET', `/contents/public/posts/${slug}.md?ref=main`, token);
     payload.sha = existingFile.sha;
   } catch (e) {
     // File doesn't exist, that's fine - no SHA needed for creation
