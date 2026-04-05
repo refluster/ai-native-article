@@ -1,6 +1,7 @@
 /**
  * AI Content Pipeline - Google Apps Script
  * Handles L1→L4 article creation and publishing
+ * V2: Fixed POST body parsing
  */
 
 function getConfig() {
