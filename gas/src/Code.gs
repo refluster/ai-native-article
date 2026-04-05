@@ -178,7 +178,61 @@ function githubUpdateManifest(entry, token) {
   }
 }
 
-function githubCreatePost(slug, mdContent, token) {
+function generateArticleImageWithAzure(title, category, apiKey) {
+  // Generate JPG image using Azure OpenAI gpt-image-1.5 model
+  const endpoint = 'https://rg-phd-openai-uehara.openai.azure.com/';
+  const deploymentId = 'gpt-image-1.5';
+  const apiVersion = '2024-12-01-preview';
+  const url = `${endpoint}openai/deployments/${deploymentId}/images/generations?api-version=${apiVersion}`;
+
+  // Create a descriptive prompt for the image generation
+  const prompt = `Create a professional blog article header image (1200x630px) with Swiss design aesthetic.
+Title: "${title}"
+Category: ${category}
+Style: Minimalist, geometric, clean typography. Use colors: dark gray (#5e5e5e), red (#c1000a), light surface (#f9f9fb).
+Include the title and category label. Use modern sans-serif font. Add geometric shapes or accent bars in red.
+NO text overlay - just design elements. Professional tech/AI industry look.`;
+
+  const payload = {
+    prompt,
+    n: 1,
+    size: '1200x630',
+    quality: 'hd',
+  };
+
+  const response = UrlFetchApp.fetch(url, {
+    method: 'post',
+    headers: {
+      'api-key': apiKey,
+      'Content-Type': 'application/json',
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true,
+  });
+
+  const status = response.getResponseCode();
+  const content = response.getContentText();
+
+  if (status >= 400) {
+    throw new Error(`Azure OpenAI image generation error ${status}: ${content}`);
+  }
+
+  const result = JSON.parse(content);
+  const imageUrl = result.data?.[0]?.url;
+
+  if (!imageUrl) {
+    throw new Error('No image URL returned from Azure OpenAI');
+  }
+
+  // Fetch the image and convert to base64
+  const imageResponse = UrlFetchApp.fetch(imageUrl);
+  const imageBlob = imageResponse.getBlob();
+  const base64Image = Utilities.base64Encode(imageBlob.getBytes());
+
+  return base64Image;
+}
+
+function githubCreatePost(slug, mdContent, token, title, category, apiKey) {
   let payload = {
     message: `Add article: ${slug}`,
     content: Utilities.base64Encode(mdContent),
@@ -198,9 +252,30 @@ function githubCreatePost(slug, mdContent, token) {
 
   const result = githubRequest('PUT', `/contents/public/posts/${slug}.md`, token, payload);
 
+  // Generate and upload article image (JPG using gpt-image-1.5)
+  const base64Image = generateArticleImageWithAzure(title, category, apiKey);
+  const imagePayload = {
+    message: `Add image for article: ${slug}`,
+    content: base64Image,
+    branch: 'main',
+  };
+
+  try {
+    const existingImage = githubRequest('GET', `/contents/public/posts/images/${slug}.jpg?ref=main`, token);
+    imagePayload.sha = existingImage.sha;
+  } catch (e) {
+    // Image doesn't exist, that's fine
+    if (!e.message || !e.message.includes('404')) {
+      throw e;
+    }
+  }
+
+  githubRequest('PUT', `/contents/public/posts/images/${slug}.jpg`, token, imagePayload);
+
   return {
     url: result.content?.html_url || '',
     slug,
+    imageUrl: `/posts/images/${slug}.jpg`,
   };
 }
 
@@ -383,7 +458,7 @@ function handleL3Create(data, config) {
   const sourceList = l2Titles.map((t, i) => `- ${t}: ${l2Summaries[i].substring(0, 200)}...`).join('\n');
 
   // Generate title and category from the blog articles (in Japanese)
-  const titleCategoryPrompt = `以下のAI関連ブログ記事のタイトルを分析してください：\n\n${l2Titles.join('\n')}\n\n複数の記事から共通する深層的なパターンや仮説を見つけ（帰納的推論）、次を日本語で生成してください：\n1. これらの記事が指し示す根底にある共通原理を表現したインサイト記事のタイトル（15-25字）\n2. 「テーマ1 × テーマ2」形式のカテゴリ\n\n回答形式：\nTITLE: [タイトル]\nCATEGORY: [カテゴリ]`;
+  const titleCategoryPrompt = `Based on these blog article titles about AI:\n\n${l2Titles.join('\n')}\n\nGenerate:\n1. A creative insight article title (10-20 words) that synthesizes the common theme\n2. A category in "THEME1 × THEME2" format\n\nFormat your response as:\nTITLE: [title]\nCATEGORY: [category]. Each output should be in Japanese`;
   const titleCategoryResponse = azureGenerateText(titleCategoryPrompt, config.azure_openapi_key);
 
   const titleMatch = titleCategoryResponse.match(/TITLE:\s*(.+?)(?:\n|$)/);
@@ -455,10 +530,10 @@ function handleL4Publish(data, config) {
   const date = new Date().toISOString().split('T')[0];
 
   const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50);
-  const mdContent = `---\ntitle: "${title}"\ncategory: "${category}"\ndate: "${date}"\nabstract: "${abstract}"\nnotionId: "${l3Page.id}"\n---\n\n${abstract}\n`;
+  const mdContent = `---\ntitle: "${title}"\ncategory: "${category}"\ndate: "${date}"\nabstract: "${abstract}"\nimage: "/posts/images/${slug}.jpg"\nnotionId: "${l3Page.id}"\n---\n\n${abstract}\n`;
 
-  const { url } = githubCreatePost(slug, mdContent, config.gh_token);
-  githubUpdateManifest({ slug, title, category, date, abstract }, config.gh_token);
+  const { url, imageUrl } = githubCreatePost(slug, mdContent, config.gh_token, title, category, config.azure_openapi_key);
+  githubUpdateManifest({ slug, title, category, date, abstract, image: imageUrl }, config.gh_token);
 
   return {
     success: true,

@@ -12,7 +12,13 @@ export default function Home() {
     fetch(withBasePath('posts/manifest.json'))
       .then(r => r.json())
       .then((data: ArticleMeta[]) => {
-        setArticles(data)
+        // Sort articles from latest to oldest by date
+        const sorted = [...data].sort((a, b) => {
+          const dateA = new Date(a.date).getTime()
+          const dateB = new Date(b.date).getTime()
+          return dateB - dateA // Descending order (newest first)
+        })
+        setArticles(sorted)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -47,9 +53,9 @@ export default function Home() {
             <div className="swiss-grid">
               <div className="col-span-12 lg:col-span-7 relative overflow-hidden">
                 <img
-                  src={withBasePath('assets/images/ai-native-transformation.jpg')}
+                  src={withBasePath((featured as any).image || '/assets/images/ai-native-transformation.jpg')}
                   alt={featured.title}
-                  className="w-full aspect-[16/9] object-cover grayscale"
+                  className="w-full aspect-[16/9] object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-8">
                   <span className="inline-block bg-tertiary text-on-tertiary px-2 py-1 text-[10px] font-bold tracking-widest uppercase mb-4">
