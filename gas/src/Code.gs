@@ -344,6 +344,7 @@ function handleL3Create(data, config) {
   const selectedL2 = l2Pages.filter(p => data.l2EntryIds.includes(p.id));
   const l2Titles = selectedL2.map(p => p.properties.Name.title[0]?.plain_text || '');
   const l2Summaries = selectedL2.map(p => p.properties['Contents Summary']?.rich_text[0]?.plain_text || '');
+  const l2SourceUrls = selectedL2.map(p => p.properties['Source URLs']?.url || '');
 
   const sourceList = l2Titles.map((t, i) => `- ${t}: ${l2Summaries[i].substring(0, 200)}...`).join('\n');
   const prompt = `Based on these blog articles about AI:\n\n${sourceList}\n\nWrite a deep-dive insight article (1500-2000 words) that synthesizes cross-cutting themes, provides strategic insights, includes concrete examples, and offers actionable recommendations. Category: ${data.category}\n\nFirst line should be abstract (2-3 sentences), rest is the full article. Format as Markdown.`;
@@ -352,16 +353,23 @@ function handleL3Create(data, config) {
   // Extract abstract (first 200 chars)
   const abstract = insightContent.substring(0, 200);
 
+  // Convert markdown to Notion blocks
+  const blocks = markdownToNotionBlocks(insightContent);
+
   const properties = {
     'Title': { title: [{ text: { content: data.title } }] },
-    'L2 References': { relation: data.l2EntryIds.map(id => ({ id })) },
     'Abstract': { rich_text: [{ text: { content: abstract } }] },
     'Category': { rich_text: [{ text: { content: data.category } }] },
-    'Content': { rich_text: [{ text: { content: insightContent.substring(0, 2000) } }] },
-    'Status': { rich_text: [{ text: { content: 'draft' } }] },
+    'Source Article URLs': { rich_text: [{ text: { content: l2SourceUrls.join(', ') } }] },
   };
 
-  const result = notionCreatePage(config.l3_db_id, properties, config.notion_api_key);
+  const pageData = {
+    parent: { database_id: config.l3_db_id },
+    properties: properties,
+    children: blocks,
+  };
+
+  const result = notionRequest('POST', '/pages', config.notion_api_key, pageData);
   return {
     success: true,
     data: {
@@ -370,7 +378,6 @@ function handleL3Create(data, config) {
       l2EntryIds: data.l2EntryIds,
       abstract,
       category: data.category,
-      status: 'draft',
       notionUrl: result.url,
     },
   };
@@ -383,8 +390,7 @@ function handleL3List(config) {
     title: p.properties.Title.title[0]?.plain_text || '',
     abstract: p.properties.Abstract?.rich_text[0]?.plain_text || '',
     category: p.properties.Category?.rich_text[0]?.plain_text || '',
-    l2EntryIds: p.properties['L2 References']?.relation?.map(r => r.id) || [],
-    status: p.properties.Status?.rich_text[0]?.plain_text || 'draft',
+    sourceUrls: p.properties['Source Article URLs']?.rich_text[0]?.plain_text || '',
     notionUrl: p.url,
   }));
 
@@ -409,10 +415,6 @@ function handleL4Publish(data, config) {
 
   const { url } = githubCreatePost(slug, mdContent, config.gh_token);
   githubUpdateManifest({ slug, title, category, date, abstract }, config.gh_token);
-
-  notionUpdatePage(l3Page.id, {
-    'Status': { rich_text: [{ text: { content: 'published' } }] },
-  }, config.notion_api_key);
 
   return {
     success: true,
