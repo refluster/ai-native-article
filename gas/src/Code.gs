@@ -173,18 +173,43 @@ function githubCreatePost(slug, mdContent, token) {
 // ─── HANDLERS ────────────────────────────────────────────────────────────────
 
 function handleL1Save(data, config) {
+  // Extract metadata from URL using Azure OpenAI
+  const url = data.sourceUrl;
+  const prompt = `Analyze this article URL: ${url}\n\nExtract and return ONLY valid JSON (no markdown or extra text) with these fields:\n{\n  "title": "article title",\n  "category": "A-E based on: A=AI Hyper-productivity, B=Role Blurring, C=New Roles/FDE, D=Big Tech Layoffs & AI Pivot, E=Rethinking SDLC",\n  "summary": "2-3 sentence summary",\n  "publicationDate": "YYYY-MM-DD"\n}\n\nIf you cannot access the URL, make reasonable estimates based on URL structure.`;
+
+  const responseText = azureGenerateText(prompt, config.azure_openapi_key);
+
+  // Parse JSON response - handle potential markdown formatting
+  let metadata = { title: 'Untitled', category: 'A', summary: '', publicationDate: new Date().toISOString().split('T')[0] };
+  try {
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      metadata = JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    // Use defaults if parsing fails
+  }
+
   const properties = {
-    'Title': { title: [{ text: { content: data.title } }] },
-    'Source URL': { url: data.sourceUrl },
-    'Category': { rich_text: [{ text: { content: data.category } }] },
-    'Contents Summary': { rich_text: [{ text: { content: data.contentsSummary } }] },
-    'Publication Date': { date: { start: data.publicationDate } },
+    'Title': { title: [{ text: { content: metadata.title } }] },
+    'Source URL': { url: url },
+    'Category': { rich_text: [{ text: { content: metadata.category } }] },
+    'Contents Summary': { rich_text: [{ text: { content: metadata.summary } }] },
+    'Publication Date': { date: { start: metadata.publicationDate } },
   };
 
   const result = notionCreatePage(config.l1_db_id, properties, config.notion_api_key);
   return {
     success: true,
-    data: { ...data, id: result.id, notionUrl: result.url },
+    data: {
+      id: result.id,
+      sourceUrl: url,
+      title: metadata.title,
+      category: metadata.category,
+      contentsSummary: metadata.summary,
+      publicationDate: metadata.publicationDate,
+      notionUrl: result.url
+    },
   };
 }
 
@@ -205,17 +230,25 @@ function handleL1List(config) {
 
 function handleL2Create(data, config) {
   const l1Pages = notionQueryDatabase(config.l1_db_id, config.notion_api_key);
-  const selectedL1 = l1Pages.filter(p => data.l1EntryIds.includes(p.id));
-  const l1Titles = selectedL1.map(p => p.properties.Title.title[0]?.plain_text || '');
-  const l1Summaries = selectedL1.map(p => p.properties['Contents Summary'].rich_text[0]?.plain_text || '');
+  const l1Page = l1Pages.find(p => p.id === data.l1EntryId);
 
-  const sourceList = l1Titles.map((t, i) => `- ${t}: ${l1Summaries[i]}`).join('\n');
-  const prompt = `Based on these AI industry news items:\n\n${sourceList}\n\nWrite a comprehensive blog article (800-1200 words) that synthesizes themes, explains implications, includes examples, and discusses opportunities and challenges. Format as Markdown with # for headings.`;
+  if (!l1Page) {
+    throw new Error('L1 entry not found');
+  }
+
+  const l1Title = l1Page.properties.Title.title[0]?.plain_text || '';
+  const l1Summary = l1Page.properties['Contents Summary'].rich_text[0]?.plain_text || '';
+
+  const prompt = `Based on this AI industry news:\n\nTitle: ${l1Title}\nSummary: ${l1Summary}\n\nWrite a comprehensive blog article (800-1200 words) that expands on the topic, explains implications, includes examples, and discusses opportunities and challenges. Suggest a catchy blog title at the beginning. Format as Markdown with # for headings and start with a suggested title like "# Blog Title: ..."`;
   const blogContent = azureGenerateText(prompt, config.azure_openapi_key);
 
+  // Extract title from the generated content (first line should have the title)
+  const titleMatch = blogContent.match(/^#\s+(.+?)(?:\n|$)/);
+  const blogTitle = titleMatch ? titleMatch[1].replace(/Blog Title:\s*/i, '') : l1Title;
+
   const properties = {
-    'Title': { title: [{ text: { content: data.title } }] },
-    'L1 References': { relation: data.l1EntryIds.map(id => ({ id })) },
+    'Title': { title: [{ text: { content: blogTitle } }] },
+    'L1 References': { relation: [{ id: data.l1EntryId }] },
     'Content': { rich_text: [{ text: { content: blogContent.substring(0, 2000) } }] },
     'Status': { rich_text: [{ text: { content: 'draft' } }] },
   };
@@ -225,8 +258,8 @@ function handleL2Create(data, config) {
     success: true,
     data: {
       id: result.id,
-      title: data.title,
-      l1EntryIds: data.l1EntryIds,
+      title: blogTitle,
+      l1EntryId: data.l1EntryId,
       blogContent,
       status: 'draft',
       notionUrl: result.url,
@@ -234,38 +267,118 @@ function handleL2Create(data, config) {
   };
 }
 
+function handleL2List(config) {
+  const pages = notionQueryDatabase(config.l2_db_id, config.notion_api_key);
+  const entries = pages.map(p => ({
+    id: p.id,
+    title: p.properties.Title.title[0]?.plain_text || '',
+    l1EntryId: p.properties['L1 References']?.relation?.[0]?.id || '',
+    blogContent: p.properties.Content?.rich_text[0]?.plain_text || '',
+    status: p.properties.Status?.rich_text[0]?.plain_text || 'draft',
+    notionUrl: p.url,
+  }));
+
+  return { success: true, data: entries };
+}
+
+function handleL3Create(data, config) {
+  const l2Pages = notionQueryDatabase(config.l2_db_id, config.notion_api_key);
+  const selectedL2 = l2Pages.filter(p => data.l2EntryIds.includes(p.id));
+  const l2Titles = selectedL2.map(p => p.properties.Title.title[0]?.plain_text || '');
+  const l2Contents = selectedL2.map(p => p.properties.Content?.rich_text[0]?.plain_text || '');
+
+  const sourceList = l2Titles.map((t, i) => `- ${t}: ${l2Contents[i].substring(0, 200)}...`).join('\n');
+  const prompt = `Based on these blog articles about AI:\n\n${sourceList}\n\nWrite a deep-dive insight article (1500-2000 words) that synthesizes cross-cutting themes, provides strategic insights, includes concrete examples, and offers actionable recommendations. Category: ${data.category}\n\nFirst line should be abstract (2-3 sentences), rest is the full article. Format as Markdown.`;
+  const insightContent = azureGenerateText(prompt, config.azure_openapi_key);
+
+  // Extract abstract (first 200 chars)
+  const abstract = insightContent.substring(0, 200);
+
+  const properties = {
+    'Title': { title: [{ text: { content: data.title } }] },
+    'L2 References': { relation: data.l2EntryIds.map(id => ({ id })) },
+    'Abstract': { rich_text: [{ text: { content: abstract } }] },
+    'Category': { rich_text: [{ text: { content: data.category } }] },
+    'Content': { rich_text: [{ text: { content: insightContent.substring(0, 2000) } }] },
+    'Status': { rich_text: [{ text: { content: 'draft' } }] },
+  };
+
+  const result = notionCreatePage(config.l3_db_id, properties, config.notion_api_key);
+  return {
+    success: true,
+    data: {
+      id: result.id,
+      title: data.title,
+      l2EntryIds: data.l2EntryIds,
+      abstract,
+      category: data.category,
+      status: 'draft',
+      notionUrl: result.url,
+    },
+  };
+}
+
+function handleL3List(config) {
+  const pages = notionQueryDatabase(config.l3_db_id, config.notion_api_key);
+  const entries = pages.map(p => ({
+    id: p.id,
+    title: p.properties.Title.title[0]?.plain_text || '',
+    abstract: p.properties.Abstract?.rich_text[0]?.plain_text || '',
+    category: p.properties.Category?.rich_text[0]?.plain_text || '',
+    l2EntryIds: p.properties['L2 References']?.relation?.map(r => r.id) || [],
+    status: p.properties.Status?.rich_text[0]?.plain_text || 'draft',
+    notionUrl: p.url,
+  }));
+
+  return { success: true, data: entries };
+}
+
 function handleL4Publish(data, config) {
   const l3Pages = notionQueryDatabase(config.l3_db_id, config.notion_api_key);
-  const selectedL3 = l3Pages.filter(p => data.l3EntryIds.includes(p.id));
+  const l3Page = l3Pages.find(p => p.id === data.l3EntryId);
 
-  const publishedEntries = [];
+  if (!l3Page) {
+    throw new Error('L3 entry not found');
+  }
 
-  selectedL3.forEach(l3Page => {
-    const title = l3Page.properties.Title.title[0]?.plain_text || '';
-    const abstract = l3Page.properties.Abstract?.rich_text[0]?.plain_text || '';
-    const category = l3Page.properties.Category?.rich_text[0]?.plain_text || '';
-    const date = new Date().toISOString().split('T')[0];
+  const title = l3Page.properties.Title.title[0]?.plain_text || '';
+  const abstract = l3Page.properties.Abstract?.rich_text[0]?.plain_text || '';
+  const category = l3Page.properties.Category?.rich_text[0]?.plain_text || '';
+  const date = new Date().toISOString().split('T')[0];
 
-    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50);
-    const mdContent = `---\ntitle: "${title}"\ncategory: "${category}"\ndate: "${date}"\nabstract: "${abstract}"\nnotionId: "${l3Page.id}"\n---\n\n${abstract}\n`;
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50);
+  const mdContent = `---\ntitle: "${title}"\ncategory: "${category}"\ndate: "${date}"\nabstract: "${abstract}"\nnotionId: "${l3Page.id}"\n---\n\n${abstract}\n`;
 
-    const { url } = githubCreatePost(slug, mdContent, config.gh_token);
-    githubUpdateManifest({ slug, title, category, date, abstract }, config.gh_token);
+  const { url } = githubCreatePost(slug, mdContent, config.gh_token);
+  githubUpdateManifest({ slug, title, category, date, abstract }, config.gh_token);
 
-    notionUpdatePage(l3Page.id, {
-      'Status': { rich_text: [{ text: { content: 'published' } }] },
-    }, config.notion_api_key);
+  notionUpdatePage(l3Page.id, {
+    'Status': { rich_text: [{ text: { content: 'published' } }] },
+  }, config.notion_api_key);
 
-    publishedEntries.push({
+  return {
+    success: true,
+    data: {
       id: l3Page.id,
       title,
       slug,
       publishedUrl: url,
       status: 'published',
-    });
-  });
+    },
+  };
+}
 
-  return { success: true, data: publishedEntries };
+function handleL4List(config) {
+  const pages = notionQueryDatabase(config.l4_db_id, config.notion_api_key);
+  const entries = pages.map(p => ({
+    id: p.id,
+    title: p.properties.Title.title[0]?.plain_text || '',
+    slug: p.properties.Slug?.rich_text[0]?.plain_text || '',
+    publishedUrl: p.properties['Published URL']?.url || '',
+    status: p.properties.Status?.rich_text[0]?.plain_text || 'published',
+  }));
+
+  return { success: true, data: entries };
 }
 
 // ─── HTTP ENTRY POINT ────────────────────────────────────────────────────────
@@ -288,8 +401,20 @@ function doPost(e) {
       case 'L2_CREATE':
         response = handleL2Create(data, config);
         break;
+      case 'L2_LIST':
+        response = handleL2List(config);
+        break;
+      case 'L3_CREATE':
+        response = handleL3Create(data, config);
+        break;
+      case 'L3_LIST':
+        response = handleL3List(config);
+        break;
       case 'L4_PUBLISH':
         response = handleL4Publish(data, config);
+        break;
+      case 'L4_LIST':
+        response = handleL4List(config);
         break;
       default:
         response = { success: false, error: `Unknown action: ${action}` };
