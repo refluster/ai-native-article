@@ -382,8 +382,8 @@ function handleL3Create(data, config) {
 
   const sourceList = l2Titles.map((t, i) => `- ${t}: ${l2Summaries[i].substring(0, 200)}...`).join('\n');
 
-  // Generate title and category from the blog articles
-  const titleCategoryPrompt = `Based on these blog article titles about AI:\n\n${l2Titles.join('\n')}\n\nGenerate:\n1. A creative insight article title (10-20 words) that synthesizes the common theme\n2. A category in "THEME1 × THEME2" format\n\nFormat your response as:\nTITLE: [title]\nCATEGORY: [category]`;
+  // Generate title and category from the blog articles (in Japanese)
+  const titleCategoryPrompt = `以下のAI関連ブログ記事のタイトルを分析してください：\n\n${l2Titles.join('\n')}\n\n複数の記事から共通する深層的なパターンや仮説を見つけ（帰納的推論）、次を日本語で生成してください：\n1. これらの記事が指し示す根底にある共通原理を表現したインサイト記事のタイトル（15-25字）\n2. 「テーマ1 × テーマ2」形式のカテゴリ\n\n回答形式：\nTITLE: [タイトル]\nCATEGORY: [カテゴリ]`;
   const titleCategoryResponse = azureGenerateText(titleCategoryPrompt, config.azure_openapi_key);
 
   const titleMatch = titleCategoryResponse.match(/TITLE:\s*(.+?)(?:\n|$)/);
@@ -391,7 +391,7 @@ function handleL3Create(data, config) {
   const generatedTitle = titleMatch ? titleMatch[1].trim() : l2Titles.join(' + ');
   const generatedCategory = categoryMatch ? categoryMatch[1].trim() : l2Categories.join(', ');
 
-  const contentPrompt = `Based on these blog articles about AI:\n\n${sourceList}\n\nWrite a deep-dive insight article (1500-2000 words) that synthesizes cross-cutting themes, provides strategic insights, includes concrete examples, and offers actionable recommendations. Category: ${generatedCategory}\n\nFirst line should be abstract (2-3 sentences), rest is the full article. Format as Markdown.`;
+  const contentPrompt = `以下の複数のAI関連ブログ記事の内容を分析してください：\n\n${sourceList}\n\n【タスク】これらの記事が示す具体的事実を観察し、それらを統一的に説明する最も可能性の高い深層原理（仮説）を帰納的推論で導出してください。その仮説に基づいて、以下の構成で日本語のディープダイブインサイト記事（3000-4000字）を執筆してください：\n\n【記事の構成】\n- 導入（100-200字）：一見無関係な複数の事実を提示し、「実はこれらは同じ原理で説明できる」と宣言\n- 分析セクション（×2-4）：各セクションで異なる視点から事実を深掘りし、L2記事からの具体的引用・数字・事例を含める\n- 共通原理の提示（500-800字）：「Why」から「So What」へ。観察された事実群を統一的に説明する根底原理を論理的に展開\n- 未来予測と示唆（500-800字）：この原理から導出される将来の状況変化と、その確率・根拠、読者への実務的な示唆\n\n【重要な指示】\n- 冒頭50字程度の要旨を含める\n- 各セクションで必ず具体的な数字・引用・事例を複数含める\n- 帰納的推論プロセスを明示的に示す（「これらの事実は～を示唆している」という表現を使用）\n- 単なる要約ではなく、複数記事を横断した新しい洞察を生み出すこと\n- Markdown形式で、##は中見出し、###は小見出しを使用\n\nカテゴリ：${generatedCategory}`;
   const insightContent = azureGenerateText(contentPrompt, config.azure_openapi_key);
 
   // Extract abstract (first 200 chars)
