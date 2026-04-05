@@ -383,6 +383,12 @@ function handleL4List(config) {
 
 // ─── HTTP ENTRY POINT ────────────────────────────────────────────────────────
 
+function createCorsResponse(data) {
+  return ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON)
+    .append('\n');
+}
+
 function doPost(e) {
   try {
     const action = e.parameter.action;
@@ -420,12 +426,15 @@ function doPost(e) {
         response = { success: false, error: `Unknown action: ${action}` };
     }
 
-    return ContentService.createTextOutput(JSON.stringify(response)).setMimeType(
-      ContentService.MimeType.JSON
-    );
+    return createCorsResponse(response);
   } catch (error) {
-    return ContentService.createTextOutput(
-      JSON.stringify({ success: false, error: error.message })
-    ).setMimeType(ContentService.MimeType.JSON);
+    return createCorsResponse({ success: false, error: error.message });
   }
+}
+
+function doOptions(e) {
+  // Handle CORS preflight requests
+  const output = ContentService.createTextOutput();
+  output.setMimeType(ContentService.MimeType.TEXT);
+  return output;
 }
