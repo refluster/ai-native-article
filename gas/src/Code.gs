@@ -439,3 +439,14 @@ function doOptions(e) {
   output.setMimeType(ContentService.MimeType.TEXT);
   return output;
 }
+
+function doGet(e) {
+  // Handle GET requests - redirect to API documentation or return info
+  return ContentService.createTextOutput(
+    JSON.stringify({
+      success: false,
+      error: 'This is a POST-only API. Use POST requests with {"action":"..."}',
+      supportedActions: ['L1_SAVE', 'L1_LIST', 'L2_CREATE', 'L2_LIST', 'L3_CREATE', 'L3_LIST', 'L4_PUBLISH', 'L4_LIST']
+    })
+  ).setMimeType(ContentService.MimeType.JSON);
+}
