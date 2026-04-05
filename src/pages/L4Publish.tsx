@@ -19,8 +19,9 @@ interface L4Entry {
 export default function L4Publish() {
   const [l3Entries, setL3Entries] = useState<L3Entry[]>([])
   const [l4Entries, setL4Entries] = useState<L4Entry[]>([])
-  const [selectedL3Ids, setSelectedL3Ids] = useState<string[]>([])
+  const [selectedL3Id, setSelectedL3Id] = useState<string>('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     loadEntries()
@@ -28,14 +29,14 @@ export default function L4Publish() {
 
   async function loadEntries() {
     try {
-      const l3Response = await fetch('GAS_URL', {
+      const l3Response = await fetch(GAS_URL, {
         method: 'POST',
         body: JSON.stringify({ action: 'L3_LIST' }),
       })
       const l3Data = await l3Response.json()
       if (l3Data.success) setL3Entries(l3Data.data || [])
 
-      const l4Response = await fetch('GAS_URL', {
+      const l4Response = await fetch(GAS_URL, {
         method: 'POST',
         body: JSON.stringify({ action: 'L4_LIST' }),
       })
@@ -47,36 +48,36 @@ export default function L4Publish() {
   }
 
   async function handlePublish() {
-    if (selectedL3Ids.length === 0) {
-      alert('Please select articles to publish')
+    if (!selectedL3Id) {
+      setError('Please select an article to publish')
       return
     }
 
     setLoading(true)
+    setError('')
     try {
-      const response = await fetch('GAS_URL', {
+      const response = await fetch(GAS_URL, {
         method: 'POST',
         body: JSON.stringify({
           action: 'L4_PUBLISH',
-          l3EntryIds: selectedL3Ids,
+          l3EntryId: selectedL3Id,
         }),
       })
       const data = await response.json()
       if (data.success) {
-        setSelectedL3Ids([])
+        setSelectedL3Id('')
         await loadEntries()
-        alert(`Successfully published ${data.data?.length || 0} article(s)!`)
       } else {
-        alert(`Error: ${data.error}`)
+        setError(data.error || 'Failed to publish')
       }
     } catch (error) {
-      alert(`Failed: ${error}`)
+      setError(`Failed: ${error}`)
     } finally {
       setLoading(false)
     }
   }
 
-  const unpublishedL3 = l3Entries.filter(e => !l4Entries.find(l4 => l4.id === e.id))
+  const unpublishedL3 = l3Entries.filter(e => !l4Entries.find(l4 => l4.id === e.id) && e.status !== 'published')
 
   return (
     <>
@@ -89,7 +90,7 @@ export default function L4Publish() {
             L4: Publish Article
           </h1>
           <p className="text-xl text-on-surface-variant max-w-2xl">
-            Publish insight articles to kohuehara.xyz. This updates GitHub and the manifest.
+            Publish insight articles to kohuehara.xyz/ai-native-article. Updates GitHub and the manifest.
           </p>
         </div>
       </section>
@@ -105,16 +106,15 @@ export default function L4Publish() {
               <>
                 <div className="space-y-2 max-h-96 overflow-y-auto mb-8">
                   {unpublishedL3.map(entry => (
-                    <label key={entry.id} className="flex items-start gap-3 p-3 hover:bg-surface cursor-pointer">
+                    <label key={entry.id} className="flex items-start gap-3 p-3 hover:bg-surface cursor-pointer border border-transparent hover:border-outline-variant/50">
                       <input
-                        type="checkbox"
-                        checked={selectedL3Ids.includes(entry.id)}
+                        type="radio"
+                        name="l3-entry"
+                        value={entry.id}
+                        checked={selectedL3Id === entry.id}
                         onChange={e => {
-                          if (e.target.checked) {
-                            setSelectedL3Ids([...selectedL3Ids, entry.id])
-                          } else {
-                            setSelectedL3Ids(selectedL3Ids.filter(id => id !== entry.id))
-                          }
+                          setSelectedL3Id(e.target.value)
+                          setError('')
                         }}
                         className="w-4 h-4 mt-1 shrink-0"
                       />
@@ -128,9 +128,15 @@ export default function L4Publish() {
                   ))}
                 </div>
 
+                {error && (
+                  <div className="p-3 bg-error/10 border border-error text-error text-xs mb-4">
+                    {error}
+                  </div>
+                )}
+
                 <button
                   onClick={handlePublish}
-                  disabled={loading || selectedL3Ids.length === 0}
+                  disabled={loading || !selectedL3Id}
                   className="w-full bg-tertiary text-on-tertiary px-6 py-3 text-xs font-bold tracking-widest uppercase hover:opacity-90 transition-opacity disabled:opacity-50"
                 >
                   {loading ? 'PUBLISHING...' : 'PUBLISH TO WEB'}

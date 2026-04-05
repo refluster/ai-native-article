@@ -12,6 +12,10 @@ interface L1Entry {
   notionUrl?: string
 }
 
+interface L1FormData {
+  sourceUrl: string
+}
+
 const CATEGORIES = [
   { code: 'A', label: 'AI Hyper-productivity' },
   { code: 'B', label: 'Role Blurring' },
@@ -23,13 +27,8 @@ const CATEGORIES = [
 export default function L1Register() {
   const [entries, setEntries] = useState<L1Entry[]>([])
   const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState<L1Entry>({
-    title: '',
-    sourceUrl: '',
-    category: 'A',
-    contentsSummary: '',
-    publicationDate: new Date().toISOString().split('T')[0],
-  })
+  const [sourceUrl, setSourceUrl] = useState('')
+  const [error, setError] = useState('')
 
   useEffect(() => {
     loadEntries()
@@ -50,32 +49,27 @@ export default function L1Register() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.title || !form.sourceUrl) {
-      alert('Please fill in all fields')
+    if (!sourceUrl.trim()) {
+      setError('Please enter a URL')
       return
     }
 
     setLoading(true)
+    setError('')
     try {
       const response = await fetch(GAS_URL, {
         method: 'POST',
-        body: JSON.stringify({ action: 'L1_SAVE', ...form }),
+        body: JSON.stringify({ action: 'L1_SAVE', sourceUrl: sourceUrl.trim() }),
       })
       const data = await response.json()
       if (data.success) {
-        setForm({
-          title: '',
-          sourceUrl: '',
-          category: 'A',
-          contentsSummary: '',
-          publicationDate: new Date().toISOString().split('T')[0],
-        })
+        setSourceUrl('')
         await loadEntries()
       } else {
-        alert(`Error: ${data.error}`)
+        setError(data.error || 'Failed to register article')
       }
     } catch (error) {
-      alert(`Failed to save: ${error}`)
+      setError(`Failed to save: ${error}`)
     } finally {
       setLoading(false)
     }
@@ -108,78 +102,35 @@ export default function L1Register() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <label className="text-[10px] font-bold tracking-widest text-outline uppercase block mb-2">
-                    Title
+                    Article URL
                   </label>
-                  <input
-                    type="text"
-                    placeholder="Article title"
-                    value={form.title}
-                    onChange={e => setForm({ ...form, title: e.target.value })}
-                    className="w-full bg-transparent border-b border-outline pb-2 text-base focus:outline-none focus:border-b-2 focus:border-primary"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold tracking-widest text-outline uppercase block mb-2">
-                    Source URL
-                  </label>
+                  <p className="text-xs text-on-surface-variant mb-3">
+                    Paste the article link. The system will automatically extract the title, summary, category, and publication date.
+                  </p>
                   <input
                     type="url"
-                    placeholder="https://..."
-                    value={form.sourceUrl}
-                    onChange={e => setForm({ ...form, sourceUrl: e.target.value })}
+                    placeholder="https://example.com/article"
+                    value={sourceUrl}
+                    onChange={e => {
+                      setSourceUrl(e.target.value)
+                      setError('')
+                    }}
                     className="w-full bg-transparent border-b border-outline pb-2 text-base focus:outline-none focus:border-b-2 focus:border-primary"
                   />
                 </div>
 
-                <div>
-                  <label className="text-[10px] font-bold tracking-widest text-outline uppercase block mb-2">
-                    Category
-                  </label>
-                  <select
-                    value={form.category}
-                    onChange={e => setForm({ ...form, category: e.target.value as any })}
-                    className="w-full bg-surface px-3 py-2 border border-outline text-base focus:outline-none focus:border-primary"
-                  >
-                    {CATEGORIES.map(c => (
-                      <option key={c.code} value={c.code}>
-                        {c.code}: {c.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold tracking-widest text-outline uppercase block mb-2">
-                    Summary
-                  </label>
-                  <textarea
-                    placeholder="2-3 sentence summary of article contents"
-                    value={form.contentsSummary}
-                    onChange={e => setForm({ ...form, contentsSummary: e.target.value })}
-                    rows={4}
-                    className="w-full bg-transparent border border-outline p-3 text-base focus:outline-none focus:border-primary"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold tracking-widest text-outline uppercase block mb-2">
-                    Publication Date
-                  </label>
-                  <input
-                    type="date"
-                    value={form.publicationDate}
-                    onChange={e => setForm({ ...form, publicationDate: e.target.value })}
-                    className="w-full bg-transparent border-b border-outline pb-2 text-base focus:outline-none focus:border-b-2 focus:border-primary"
-                  />
-                </div>
+                {error && (
+                  <div className="p-3 bg-error/10 border border-error text-error text-xs">
+                    {error}
+                  </div>
+                )}
 
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || !sourceUrl.trim()}
                   className="w-full bg-primary text-on-primary px-6 py-3 text-xs font-bold tracking-widest uppercase hover:bg-primary-dim transition-colors disabled:opacity-50"
                 >
-                  {loading ? 'SAVING...' : 'REGISTER'}
+                  {loading ? 'PROCESSING...' : 'REGISTER'}
                 </button>
               </form>
             </div>

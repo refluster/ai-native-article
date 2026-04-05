@@ -30,14 +30,14 @@ export default function L3Insight() {
 
   async function loadEntries() {
     try {
-      const l2Response = await fetch('GAS_URL', {
+      const l2Response = await fetch(GAS_URL, {
         method: 'POST',
         body: JSON.stringify({ action: 'L2_LIST' }),
       })
       const l2Data = await l2Response.json()
       if (l2Data.success) setL2Entries(l2Data.data || [])
 
-      const l3Response = await fetch('GAS_URL', {
+      const l3Response = await fetch(GAS_URL, {
         method: 'POST',
         body: JSON.stringify({ action: 'L3_LIST' }),
       })
@@ -56,7 +56,7 @@ export default function L3Insight() {
 
     setLoading(true)
     try {
-      const response = await fetch('GAS_URL', {
+      const response = await fetch(GAS_URL, {
         method: 'POST',
         body: JSON.stringify({
           action: 'L3_CREATE',
@@ -92,7 +92,7 @@ export default function L3Insight() {
             L3: Create Insight Article
           </h1>
           <p className="text-xl text-on-surface-variant max-w-2xl">
-            Synthesize multiple blog articles into a deep-dive insight article.
+            Select multiple blog articles and generate a deep-dive insight article.
           </p>
         </div>
       </section>

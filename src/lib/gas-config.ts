@@ -7,4 +7,4 @@
  * Format: https://script.google.com/macros/s/{DEPLOYMENT_ID}/usercontent
  */
 
-export const GAS_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/usercontent'
+export const GAS_URL = 'https://script.google.com/macros/s/AKfycbwXqYjaYhtXOjlKo5AIO6iARRhIm5oOQ6sQsesqD5o/usercontent'

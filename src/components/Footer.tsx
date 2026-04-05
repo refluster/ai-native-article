@@ -12,9 +12,21 @@ export default function Footer() {
             © 2026 L3 INSIGHTS BY HARVEST. AI TRANSFORMATION IN PRECISION.
           </p>
         </div>
-        <div className="flex gap-8">
+        <div className="flex gap-8 flex-wrap justify-center">
           <Link to="/" className="text-[10px] font-medium tracking-[0.05em] uppercase text-outline hover:text-on-surface transition-colors">
             INDEX
+          </Link>
+          <Link to="/l1-register" className="text-[10px] font-medium tracking-[0.05em] uppercase text-outline hover:text-on-surface transition-colors">
+            L1: REGISTER
+          </Link>
+          <Link to="/l2-blog" className="text-[10px] font-medium tracking-[0.05em] uppercase text-outline hover:text-on-surface transition-colors">
+            L2: BLOG
+          </Link>
+          <Link to="/l3-insight" className="text-[10px] font-medium tracking-[0.05em] uppercase text-outline hover:text-on-surface transition-colors">
+            L3: INSIGHT
+          </Link>
+          <Link to="/l4-publish" className="text-[10px] font-medium tracking-[0.05em] uppercase text-outline hover:text-on-surface transition-colors">
+            L4: PUBLISH
           </Link>
           <Link to="/design-system" className="text-[10px] font-medium tracking-[0.05em] uppercase text-outline hover:text-on-surface transition-colors">
             DESIGN SYSTEM
