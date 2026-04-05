@@ -221,7 +221,7 @@ NO text overlay - just design elements. Professional tech/AI industry look.`;
   const imageUrl = result.data?.[0]?.url;
 
   if (!imageUrl) {
-    throw new Error('No image URL returned from Azure OpenAI');
+    throw new Error(`No image URL returned from Azure OpenAI. Response: ${JSON.stringify(result)}`);
   }
 
   // Fetch the image and convert to base64
