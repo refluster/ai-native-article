@@ -186,12 +186,16 @@ function generateArticleImageWithAzure(title, category, apiKey) {
   const url = `${endpoint}openai/deployments/${deploymentId}/images/generations?api-version=${apiVersion}`;
 
   // Create a descriptive prompt for the image generation
-  const prompt = `Create a professional blog article header image with Swiss design aesthetic.
-Title: "${title}"
-Category: ${category}
-Style: Minimalist, geometric, clean typography. Use colors: dark gray (#5e5e5e), red (#c1000a), light surface (#f9f9fb).
-Include the title and category label. Use modern sans-serif font. Add geometric shapes or accent bars in red.
-Professional tech/AI industry look.`;
+  // NO TEXT - pure abstract/artistic representation of the article content
+  const prompt = `Create an abstract artistic representation of this article topic. NO TEXT, NO LABELS, NO WORDS.
+Article title: "${title}"
+Article category: ${category}
+
+Generate a minimalist, geometric abstract image that captures the essence and themes of the article.
+Style: Swiss design aesthetic, geometric shapes, clean lines, abstract photography.
+Colors: Use dark gray (#5e5e5e), red (#c1000a), light surfaces (#f9f9fb), and black.
+Purely visual - use shapes, patterns, geometry, and abstract composition to represent the article's meaning.
+Professional, modern, tech industry aesthetic. No typography, no text overlay, no labels.`;
 
   const payload = {
     prompt,
