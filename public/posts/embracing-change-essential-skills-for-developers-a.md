@@ -1,7 +1,7 @@
 ---
 title: "Embracing Change: Essential Skills for Developers and Designers in the AI-Driven Future"
 category: "AI Impact × Professional Skills"
-date: "2026-04-05"
+date: "2026-04-06"
 abstract: "# Navigating the AI Revolution: Shaping Professional Skills for the Future
 
 As artificial intelligence (AI) continues to permeate various industries, the roles and responsibilities of professionals ac"
