@@ -283,12 +283,12 @@ function rebuildManifestFromNotion(config) {
   const l3Pages = notionQueryDatabase(config.l3_db_id, config.notion_api_key);
 
   const manifest = l3Pages.map(p => ({
-    slug: p.id.replace(/-/g, '').substring(0, 12), // Use shorter ID as slug
+    slug: p.id.replace(/-/g, ''), // Use full Notion page ID (without dashes) as slug
     title: p.properties.Title.title[0]?.plain_text || '',
     category: p.properties.Category?.rich_text[0]?.plain_text || '',
     date: new Date().toISOString().split('T')[0],
     abstract: p.properties.Abstract?.rich_text[0]?.plain_text || '',
-    image: `/posts/images/${p.id.replace(/-/g, '').substring(0, 12)}.jpg`,
+    image: `/posts/images/${p.id.replace(/-/g, '')}.jpg`,
   })).sort((a, b) => b.date.localeCompare(a.date));
 
   // Write to GitHub with proper UTF-8 encoding
@@ -628,7 +628,8 @@ function handleL4Publish(data, config) {
   const blocks = notionReadPageBlocks(l3Page.id, config.notion_api_key);
   const articleContent = notionBlocksToMarkdown(blocks);
 
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50);
+  // Use Notion page ID (without dashes) as slug for uniqueness and consistency
+  const slug = l3Page.id.replace(/-/g, '');
   const mdContent = `---\ntitle: "${title}"\ncategory: "${category}"\ndate: "${date}"\nabstract: "${abstract}"\nimage: "/posts/images/${slug}.jpg"\nnotionId: "${l3Page.id}"\n---\n\n${articleContent}`;
 
   const { url, imageUrl } = githubCreatePost(slug, mdContent, config.gh_token, title, category, config.azure_openapi_key);
