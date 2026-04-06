@@ -8,6 +8,14 @@
     "image": "/posts/images/embracing-change-essential-skills-for-developers-a.jpg"
   },
   {
+    "slug": "ai-claude-code-",
+    "title": "AIネイティブ組織への転換と次世代エンジニアリングの条件：Claude Code流出事件と階層構造の終焉が示す未来",
+    "category": "AI Strategy & Organizational Design",
+    "date": "2026-04-06",
+    "abstract": "Claude Codeのソースコード流出事件と、決済企業Blockが提唱する「インテリジェンス型組織」という2つの全く異なる事象から、「直列・階層型の組織・ガバナンス」から「並列・自律型のAIエージェント・アーキテクチャ」への不可逆な地殻変動を読み解く深い洞察。",
+    "image": "/posts/images/ai-claude-code-.jpg"
+  },
+  {
     "slug": "339d0f0be61e",
     "title": "TEST ARTICLE",
     "category": "TEST CAT",
