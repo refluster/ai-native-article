@@ -700,51 +700,91 @@ function handleL2Batch(_data, config) {
   return { success: true, data: { processed: processed.length, remaining: pending.length - picked.length, items: processed, errors } };
 }
 
-// L3_BATCH: random-sample a set of recent L2s and synthesize one L3 insight.
-// Rules: uniform over last L3_RECENT_DAYS; sample L3_SAMPLE_SIZE; avoid L2s
-// used in the previous L3_AVOID_REUSE_COUNT runs (falls back to full pool if
-// too few remain). Intended cadence: 1 synthesis/day.
+// L3_BATCH: synthesize one L3 insight from a sample of recent L2s.
+//
+// Rules:
+//   1. Skip if no L2 has been created since the last successful L3 run
+//      ("L3_LAST_RUN_AT"). This is the "run only when there's something new"
+//      guarantee for the previous stage.
+//   2. Sample `L3_SAMPLE_SIZE` L2s uniformly from the last L3_RECENT_DAYS.
+//   3. The sample is guaranteed to include AT LEAST ONE new L2 (created
+//      after L3_LAST_RUN_AT). The remaining picks fill from the broader
+//      recent pool.
+//   4. Within both the "new" and "fill" pools we prefer L2s that weren't
+//      used in the previous L3_AVOID_REUSE_COUNT runs; if that starves the
+//      pool, fall back to the full eligible set.
+//
+// Intended cadence: up to 1 synthesis/day, skipping on no-new-input days.
 const L3_RECENT_DAYS = 14;
 const L3_SAMPLE_SIZE = 3;
 const L3_AVOID_REUSE_COUNT = 10;
 const L3_RECENTLY_USED_KEY = 'L3_RECENTLY_USED_L2_IDS';
+const L3_LAST_RUN_KEY = 'L3_LAST_RUN_AT';
 function handleL3Batch(_data, config) {
+  const props = PropertiesService.getScriptProperties();
+  const lastRunAt = props.getProperty(L3_LAST_RUN_KEY) || '';
   const cutoff = new Date(Date.now() - L3_RECENT_DAYS * 86400 * 1000).toISOString();
+
   const l2Pages = notionQueryDatabase(config.l2_db_id, config.notion_api_key);
   const recent = l2Pages.filter(p => (p.created_time || '') >= cutoff);
+  // "New" = arrived since the last L3 run. Empty lastRunAt (first run ever)
+  // treats everything recent as new, so the first invocation isn't blocked.
+  const isNew = (p) => !lastRunAt || (p.created_time || '') > lastRunAt;
+  const freshL2 = recent.filter(isNew);
 
+  if (freshL2.length === 0) {
+    return { success: true, data: { processed: 0, skipped: true, reason: `no new L2 since last L3 run (${lastRunAt || 'never'})` } };
+  }
   if (recent.length < L3_SAMPLE_SIZE) {
-    return { success: true, data: { processed: 0, reason: `only ${recent.length} L2 in last ${L3_RECENT_DAYS}d (need ${L3_SAMPLE_SIZE})` } };
+    return { success: true, data: { processed: 0, skipped: true, reason: `only ${recent.length} L2 in last ${L3_RECENT_DAYS}d (need ${L3_SAMPLE_SIZE})` } };
   }
 
-  const props = PropertiesService.getScriptProperties();
   let recentlyUsed = [];
   try { recentlyUsed = JSON.parse(props.getProperty(L3_RECENTLY_USED_KEY) || '[]'); } catch (_) { recentlyUsed = []; }
   const avoid = new Set(recentlyUsed);
 
-  let pool = recent.filter(p => !avoid.has(p.id));
-  if (pool.length < L3_SAMPLE_SIZE) pool = recent; // fall back: pool starved
+  // Fisher-Yates shuffle in place.
+  const shuffle = (a) => {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  };
 
-  // Fisher-Yates shuffle, then take the first L3_SAMPLE_SIZE.
-  const arr = pool.slice();
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
-  }
-  const picked = arr.slice(0, L3_SAMPLE_SIZE);
+  // Required pick: one L2 from freshL2. Prefer non-reused within fresh.
+  const freshNonReused = freshL2.filter(p => !avoid.has(p.id));
+  const freshPool = freshNonReused.length > 0 ? freshNonReused : freshL2;
+  const required = shuffle(freshPool.slice())[0];
+
+  // Fill the rest from the full recent pool (minus the required pick).
+  const fillCandidates = recent.filter(p => p.id !== required.id);
+  const fillNonReused = fillCandidates.filter(p => !avoid.has(p.id));
+  const fillPool = fillNonReused.length >= L3_SAMPLE_SIZE - 1 ? fillNonReused : fillCandidates;
+  const fills = shuffle(fillPool.slice()).slice(0, L3_SAMPLE_SIZE - 1);
+
+  const picked = [required, ...fills];
   const pickedIds = picked.map(p => p.id);
 
   const result = handleL3Create({ l2EntryIds: pickedIds }, config);
 
-  // Record picks in "recently used" (most-recent first, capped).
+  // Stamp "last run" only on success so retries after a failure still see
+  // the fresh L2 as new.
   const updated = [...pickedIds, ...recentlyUsed].slice(0, L3_AVOID_REUSE_COUNT);
   props.setProperty(L3_RECENTLY_USED_KEY, JSON.stringify(updated));
+  props.setProperty(L3_LAST_RUN_KEY, new Date().toISOString());
 
-  return { success: true, data: { processed: 1, l3Id: result.data.id, title: result.data.title, chosenL2Ids: pickedIds } };
+  return { success: true, data: { processed: 1, l3Id: result.data.id, title: result.data.title, chosenL2Ids: pickedIds, requiredNewL2Id: required.id } };
 }
 
 // L4_BATCH: publish L3s that aren't yet on the site. Source of truth for
 // "published" is manifest.json; slug == L3 page id without dashes.
+//
+// "Pending" here IS the "new on the previous stage" set: an L3 is new to
+// L4 iff it has no corresponding slug in the manifest. If a previous
+// publish failed, the L3 stays pending and gets retried tomorrow.
+// Skip-with-reason when the pending set is empty so the execution log is
+// explicit instead of showing a silent zero-iteration loop.
 const L4_BATCH_MAX = 2;
 function handleL4Batch(_data, config) {
   const manifest = githubReadManifest(config.gh_token);
@@ -754,6 +794,10 @@ function handleL4Batch(_data, config) {
     .slice()
     .sort((a, b) => (a.created_time || '').localeCompare(b.created_time || ''));
   const pending = l3Pages.filter(p => !publishedSlugs.has(p.id.replace(/-/g, '')));
+
+  if (pending.length === 0) {
+    return { success: true, data: { processed: 0, skipped: true, reason: 'no unpublished L3 entries' } };
+  }
 
   const picked = pending.slice(0, L4_BATCH_MAX);
   const processed = [];

@@ -83,14 +83,19 @@ Handler: `handleL4Batch`.
 2. Query L3 DB. Sort ascending by `created_time`.
 3. Pending = L3s whose `id.replace(/-/g, '')` is not in the slug set. (Slugs
    are Notion page IDs without dashes — see `handleL4Publish`.)
-4. Take up to `L4_BATCH_MAX` (2) oldest pending.
-5. Call the existing `handleL4Publish` for each.
+4. **If pending is empty, skip the run** with `{ processed: 0, skipped: true, reason: 'no unpublished L3 entries' }`.
+5. Otherwise take up to `L4_BATCH_MAX` (2) oldest pending and call
+   `handleL4Publish` for each.
 
 `manifest.json` is the only source of truth for "published." No L4 Notion DB
 required (the existing `L4_DB_ID` script property is still unused by default
 and the `L4_LIST` endpoint remains manual-UI-only).
 
-## Step 5 — L3_BATCH (random sample from recent L2s)
+"Pending" doubles as the "new on the previous stage" set — if a previous
+publish failed, its L3 stays pending and gets retried tomorrow. We don't
+use a last-run cursor for L4 so stuck drafts never rot.
+
+## Step 5 — L3_BATCH (random sample from recent L2s, fresh-entry guaranteed)
 
 Handler: `handleL3Batch`. Knobs at the top of the function:
 
@@ -100,23 +105,38 @@ Handler: `handleL3Batch`. Knobs at the top of the function:
 | `L3_SAMPLE_SIZE` | 3 | Number of L2s fed into one L3 synthesis. |
 | `L3_AVOID_REUSE_COUNT` | 10 | Most-recently-used L2 IDs excluded from the pool. |
 
-1. Pool = L2s with `created_time` within the last 14 days.
-2. If pool < sample size → skip, return `{ processed: 0, reason: … }`.
-3. Exclude the last `L3_AVOID_REUSE_COUNT` L2 IDs (stored in
-   `PropertiesService` under `L3_RECENTLY_USED_L2_IDS`).
-4. If filtered pool < sample size → fall back to the full recent pool (prevents
-   starvation).
-5. Fisher-Yates shuffle, take first `L3_SAMPLE_SIZE`.
-6. Call `handleL3Create` with those IDs.
-7. Prepend picks to the recently-used list; trim to `L3_AVOID_REUSE_COUNT`.
+**Two skip rules:**
 
-**Selection rationale.** Uniform-over-14-days gives enough variety without
-sampling stale L2s. Avoid-reuse of the last 10 picks keeps synthesis topics
-fresh without requiring per-L2 bookkeeping. Picking 3 L2s balances signal
-density against prompt cost.
+1. If no L2 has been created since the last successful L3 run
+   (`L3_LAST_RUN_AT` in `PropertiesService`) → skip with reason. This is
+   the "only run when there's something new on the previous stage"
+   guarantee.
+2. If total recent L2s < `L3_SAMPLE_SIZE` → skip with reason (not enough
+   material to synthesize from).
 
-Cap 1/run × 1 run/day = **1 new L3 per day**. That pace is intentional:
-L3s are the "featured" output.
+**Selection (runs only if neither skip rule fires):**
+
+1. `freshL2` = L2s with `created_time > L3_LAST_RUN_AT` (or all recent on
+   the first run ever, when `L3_LAST_RUN_AT` is unset).
+2. **Required pick:** one L2 shuffled from `freshL2`. Prefer the
+   non-reused subset of fresh; fall back to all fresh if reuse-memory
+   eats the pool. The sample always includes ≥1 new L2.
+3. **Fill picks:** `L3_SAMPLE_SIZE − 1` L2s shuffled from the full recent
+   pool (minus the required pick). Same non-reused-first preference.
+4. Call `handleL3Create` with the picked IDs.
+5. On success: prepend picks to `L3_RECENTLY_USED_L2_IDS` (cap
+   `L3_AVOID_REUSE_COUNT`) and stamp `L3_LAST_RUN_AT` to now. The stamp
+   only advances on success, so a synthesis failure doesn't cause the
+   new L2 to be "forgotten" tomorrow.
+
+**Selection rationale.** The fresh-entry guarantee means every L3 carries
+at least one signal the previous L3 didn't see — synthesis never stalls
+on yesterday's pool. The 14-day window + avoid-reuse memory keeps the
+"fill" picks varied without requiring per-L2 bookkeeping. `L3_LAST_RUN_AT`
+is the single piece of state that enables both rules.
+
+Cap 1/run × 1 run/day = **up to 1 new L3 per day**, skipped on days with
+no new L2. That pace is intentional: L3s are the "featured" output.
 
 ## Scheduling
 
@@ -163,7 +183,8 @@ the GAS web app URL with `{ "action": "L2_BATCH" }`, `L3_BATCH`, or
 | --- | --- | --- |
 | Notion L1 / L2 / L3 databases | Content | on write |
 | `public/posts/manifest.json` | Source of truth for published L3s | `L4_BATCH`/`L4_PUBLISH` |
-| PropertiesService `L3_RECENTLY_USED_L2_IDS` | L3 sampling memory | `L3_BATCH` |
+| PropertiesService `L3_RECENTLY_USED_L2_IDS` | L3 sampling memory | `L3_BATCH` (success only) |
+| PropertiesService `L3_LAST_RUN_AT` | "No-new-L2 → skip" cursor + fresh-pick filter | `L3_BATCH` (success only) |
 | Script properties (`GH_TOKEN`, `NOTION_API_KEY`, `AZURE_OPENAPI_KEY`, `L2_DB_ID`) | Secrets + DB routing | manual, set once |
 | Cache `ai-native-l1-v1` (service worker) | Offline shell | bump `CACHE_VERSION` on shell change |
 
