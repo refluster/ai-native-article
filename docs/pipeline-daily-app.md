@@ -170,16 +170,17 @@ the GAS web app URL with `{ "action": "L2_BATCH" }`, `L3_BATCH`, or
 ## Deploying the GAS changes
 
 The React side deploys via the usual `npm run build && git push` (GitHub
-Pages). The GAS side is pushed via clasp:
+Pages). The GAS side:
 
 ```bash
-npx clasp push                    # uploads gas/src/Code.gs + appsscript.json
-# Then in the GAS editor: Deploy → Manage deployments → New version
-# And (one time) Run → setupDailyTriggers
+npm run deploy-gas          # guard + push + retarget public deployment
+# Then in the GAS editor (one time only): Run → setupDailyTriggers
 ```
 
-The client-facing deployment URL doesn't change unless you create a *new*
-deployment; "New version" under the existing deployment is usually right.
+See [`gas/README.md`](../gas/README.md) for the clasp layout and the
+two-manifest trap this repo has guarded against. `npm run check-gas`
+runs before every push and fails if a second `appsscript.json` appears
+anywhere outside `gas/`.
 
 ## Tuning knobs quick reference
 

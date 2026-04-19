@@ -6,7 +6,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "fetch-notion": "node scripts/fetch-notion.mjs"
+    "fetch-notion": "node scripts/fetch-notion.mjs",
+    "check-gas": "node scripts/check-gas-manifest.mjs",
+    "push-gas": "npm run check-gas && clasp push --force",
+    "deploy-gas": "npm run push-gas && clasp deploy -i AKfycbwT9brOVSZqKzpf9-yZ_O8BHKJiFuZxwxawKK4FAhBwq-sdloyv56rDgNec9uQ2N4u-"
   },
   "dependencies": {
     "react": "^18.3.1",
