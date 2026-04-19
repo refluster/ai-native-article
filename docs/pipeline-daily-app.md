@@ -133,10 +133,13 @@ runL4Batch  11:00 JST
 Notion/GitHub writes.
 
 **To install:** open the GAS editor, select `setupDailyTriggers` from the
-function dropdown, **Run** once. (Requires authorizing the new
-`ScriptApp.newTrigger` scope — same authorization flow as the manual
-deploy.) Re-running is safe: it removes existing `runL{2,3,4}Batch` triggers
-before creating new ones.
+function dropdown, **Run** once. Authorize the new
+`https://www.googleapis.com/auth/script.scriptapp` scope when prompted.
+(That scope is declared explicitly in `appsscript.json` under
+`oauthScopes` — GAS's static scope detector misses it otherwise and
+skips the authorization prompt, which would cause a `Specified
+permissions are not sufficient` error on first run.) Re-running is safe:
+it removes existing `runL{2,3,4}Batch` triggers before creating new ones.
 
 **To manually trigger a batch without waiting for the schedule:** POST to
 the GAS web app URL with `{ "action": "L2_BATCH" }`, `L3_BATCH`, or
