@@ -389,6 +389,7 @@ function handleL1List(config) {
     contentsSummary: p.properties['Contents Summary'].rich_text[0]?.plain_text || '',
     publicationDate: p.properties['Publication Date'].date?.start || '',
     notionUrl: p.url,
+    createdAt: p.created_time,
   }));
 
   return { success: true, data: entries };
@@ -660,6 +661,136 @@ function handleL4List(config) {
   return { success: true, data: entries };
 }
 
+// ─── DAILY BATCH HANDLERS ────────────────────────────────────────────────────
+//
+// Three batches run independently on daily triggers. Each is idempotent:
+// re-running yields the same next-day result, because "what's done" is derived
+// from the target DB (L2 source URLs, manifest slugs), not from a cursor.
+// Per-run caps keep each invocation well under the 6-minute GAS timeout.
+
+// L2_BATCH: for each L1 whose source URL isn't yet referenced by any L2,
+// create an L2 blog. Oldest-first, up to L2_BATCH_MAX per run.
+const L2_BATCH_MAX = 3;
+function handleL2Batch(_data, config) {
+  const l2Pages = notionQueryDatabase(config.l2_db_id, config.notion_api_key);
+  const coveredUrls = new Set();
+  for (const p of l2Pages) {
+    const u = p.properties['Source URLs']?.url;
+    if (u) coveredUrls.add(u);
+  }
+  const l1Pages = notionQueryDatabase(config.l1_db_id, config.notion_api_key)
+    .slice()
+    .sort((a, b) => (a.created_time || '').localeCompare(b.created_time || ''));
+  const pending = l1Pages.filter(p => {
+    const u = p.properties['Source URL']?.url;
+    return u && !coveredUrls.has(u);
+  });
+
+  const picked = pending.slice(0, L2_BATCH_MAX);
+  const processed = [];
+  const errors = [];
+  for (const l1 of picked) {
+    try {
+      const result = handleL2Create({ l1EntryId: l1.id }, config);
+      processed.push({ l1Id: l1.id, l2Id: result.data.id, title: result.data.title });
+    } catch (e) {
+      errors.push({ l1Id: l1.id, error: String(e && e.message || e) });
+    }
+  }
+  return { success: true, data: { processed: processed.length, remaining: pending.length - picked.length, items: processed, errors } };
+}
+
+// L3_BATCH: random-sample a set of recent L2s and synthesize one L3 insight.
+// Rules: uniform over last L3_RECENT_DAYS; sample L3_SAMPLE_SIZE; avoid L2s
+// used in the previous L3_AVOID_REUSE_COUNT runs (falls back to full pool if
+// too few remain). Intended cadence: 1 synthesis/day.
+const L3_RECENT_DAYS = 14;
+const L3_SAMPLE_SIZE = 3;
+const L3_AVOID_REUSE_COUNT = 10;
+const L3_RECENTLY_USED_KEY = 'L3_RECENTLY_USED_L2_IDS';
+function handleL3Batch(_data, config) {
+  const cutoff = new Date(Date.now() - L3_RECENT_DAYS * 86400 * 1000).toISOString();
+  const l2Pages = notionQueryDatabase(config.l2_db_id, config.notion_api_key);
+  const recent = l2Pages.filter(p => (p.created_time || '') >= cutoff);
+
+  if (recent.length < L3_SAMPLE_SIZE) {
+    return { success: true, data: { processed: 0, reason: `only ${recent.length} L2 in last ${L3_RECENT_DAYS}d (need ${L3_SAMPLE_SIZE})` } };
+  }
+
+  const props = PropertiesService.getScriptProperties();
+  let recentlyUsed = [];
+  try { recentlyUsed = JSON.parse(props.getProperty(L3_RECENTLY_USED_KEY) || '[]'); } catch (_) { recentlyUsed = []; }
+  const avoid = new Set(recentlyUsed);
+
+  let pool = recent.filter(p => !avoid.has(p.id));
+  if (pool.length < L3_SAMPLE_SIZE) pool = recent; // fall back: pool starved
+
+  // Fisher-Yates shuffle, then take the first L3_SAMPLE_SIZE.
+  const arr = pool.slice();
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  }
+  const picked = arr.slice(0, L3_SAMPLE_SIZE);
+  const pickedIds = picked.map(p => p.id);
+
+  const result = handleL3Create({ l2EntryIds: pickedIds }, config);
+
+  // Record picks in "recently used" (most-recent first, capped).
+  const updated = [...pickedIds, ...recentlyUsed].slice(0, L3_AVOID_REUSE_COUNT);
+  props.setProperty(L3_RECENTLY_USED_KEY, JSON.stringify(updated));
+
+  return { success: true, data: { processed: 1, l3Id: result.data.id, title: result.data.title, chosenL2Ids: pickedIds } };
+}
+
+// L4_BATCH: publish L3s that aren't yet on the site. Source of truth for
+// "published" is manifest.json; slug == L3 page id without dashes.
+const L4_BATCH_MAX = 2;
+function handleL4Batch(_data, config) {
+  const manifest = githubReadManifest(config.gh_token);
+  const publishedSlugs = new Set((manifest || []).map(m => m.slug));
+
+  const l3Pages = notionQueryDatabase(config.l3_db_id, config.notion_api_key)
+    .slice()
+    .sort((a, b) => (a.created_time || '').localeCompare(b.created_time || ''));
+  const pending = l3Pages.filter(p => !publishedSlugs.has(p.id.replace(/-/g, '')));
+
+  const picked = pending.slice(0, L4_BATCH_MAX);
+  const processed = [];
+  const errors = [];
+  for (const l3 of picked) {
+    try {
+      const result = handleL4Publish({ l3EntryId: l3.id }, config);
+      processed.push({ l3Id: l3.id, slug: result.data.slug, title: result.data.title });
+    } catch (e) {
+      errors.push({ l3Id: l3.id, error: String(e && e.message || e) });
+    }
+  }
+  return { success: true, data: { processed: processed.length, remaining: pending.length - picked.length, items: processed, errors } };
+}
+
+// ─── TIME-DRIVEN TRIGGERS ────────────────────────────────────────────────────
+// Run `setupDailyTriggers` ONCE from the GAS editor to install the schedule.
+// Wrappers are what GAS invokes; keep them thin so the handlers stay testable
+// via doPost (L2_BATCH / L3_BATCH / L4_BATCH actions).
+
+function runL2Batch() { return handleL2Batch({}, getConfig()); }
+function runL3Batch() { return handleL3Batch({}, getConfig()); }
+function runL4Batch() { return handleL4Batch({}, getConfig()); }
+
+function setupDailyTriggers() {
+  const wanted = ['runL2Batch', 'runL3Batch', 'runL4Batch'];
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (wanted.indexOf(t.getHandlerFunction()) !== -1) ScriptApp.deleteTrigger(t);
+  });
+  // 1-hour gaps give each batch the full 6-min timeout without overlap.
+  // Hours are in Asia/Tokyo (see appsscript.json).
+  ScriptApp.newTrigger('runL2Batch').timeBased().atHour(9).everyDays(1).create();
+  ScriptApp.newTrigger('runL3Batch').timeBased().atHour(10).everyDays(1).create();
+  ScriptApp.newTrigger('runL4Batch').timeBased().atHour(11).everyDays(1).create();
+  return 'Installed: runL2Batch 09:00 JST, runL3Batch 10:00 JST, runL4Batch 11:00 JST';
+}
+
 // ─── HTTP ENTRY POINT ────────────────────────────────────────────────────────
 
 function createCorsResponse(data) {
@@ -701,6 +832,15 @@ function doPost(e) {
       case 'L4_LIST':
         response = handleL4List(config);
         break;
+      case 'L2_BATCH':
+        response = handleL2Batch(data, config);
+        break;
+      case 'L3_BATCH':
+        response = handleL3Batch(data, config);
+        break;
+      case 'L4_BATCH':
+        response = handleL4Batch(data, config);
+        break;
       case 'REBUILD_MANIFEST':
         response = rebuildManifestFromNotion(config);
         break;
@@ -727,7 +867,7 @@ function doGet(e) {
     JSON.stringify({
       success: false,
       error: 'This is a POST-only API. Use POST requests with {"action":"..."}',
-      supportedActions: ['L1_SAVE', 'L1_LIST', 'L2_CREATE', 'L2_LIST', 'L3_CREATE', 'L3_LIST', 'L4_PUBLISH', 'L4_LIST']
+      supportedActions: ['L1_SAVE', 'L1_LIST', 'L2_CREATE', 'L2_LIST', 'L2_BATCH', 'L3_CREATE', 'L3_LIST', 'L3_BATCH', 'L4_PUBLISH', 'L4_LIST', 'L4_BATCH', 'REBUILD_MANIFEST']
     })
   ).setMimeType(ContentService.MimeType.JSON);
 }
