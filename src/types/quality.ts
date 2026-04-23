@@ -62,7 +62,7 @@ export interface ModelBinding {
   /** Stable id used by rosters. Not the wire-level model name. */
   id: string
   provider: Provider
-  /** Provider-specific model id, e.g. 'gpt-4o' or 'claude-sonnet-4-6'. */
+  /** Provider-specific model id, e.g. 'gpt-5.4' or 'claude-sonnet-4-6'. */
   model: string
   /** Name of the env var (GAS script property) that holds the API key. */
   credentialEnvVar: string
@@ -75,9 +75,9 @@ export interface ModelBinding {
  *  diversity story in GROWTH.md §2a. */
 export const MODEL_REGISTRY: ModelBinding[] = [
   {
-    id: 'azure-gpt4o',
+    id: 'azure-gpt5',
     provider: 'azure_openai',
-    model: 'gpt-4o',
+    model: 'gpt-5.4',
     credentialEnvVar: 'AZURE_OPENAPI_KEY',
     endpointEnvVar: 'AZURE_OPENAPI_ENDPOINT',
   },
@@ -110,7 +110,7 @@ export const MODEL_REGISTRY: ModelBinding[] = [
 export interface JudgeCall {
   judgeId: string                          // e.g. 'editor'
   perspective: JudgePerspective
-  /** Resolved model label for traceability, e.g. 'azure_openai:gpt-4o'.
+  /** Resolved model label for traceability, e.g. 'azure_openai:gpt-5.4'.
    *  Derived from the roster's `modelBinding` at call time. */
   model: string
   rubricVersion: string                    // e.g. 'rubric-l3-editor-2026-04-23'
@@ -124,7 +124,7 @@ export interface Candidate {
   candidateId: string                      // stable id within this ArticleEval
   generator: {
     id: string                             // e.g. 'pattern'
-    /** Resolved model label, e.g. 'azure_openai:gpt-4o'. */
+    /** Resolved model label, e.g. 'azure_openai:gpt-5.4'. */
     model: string
     systemPromptVersion: string            // e.g. 'l3-pattern-2026-04-23a'
   }
@@ -161,7 +161,7 @@ export interface ArticleEval {
 
 // -------- Panel rosters --------
 //
-// Phase 1: all members bind to `azure-gpt4o` and differentiate purely by
+// Phase 1: all members bind to `azure-gpt5` and differentiate purely by
 // system prompt. This lets us ship the ensemble against the one provider
 // already wired. Phase 2 swaps individual `modelBinding` entries to reach
 // real model diversity — the rosters change, nothing else.
@@ -183,15 +183,15 @@ export interface JudgeRosterEntry {
 
 /** Starter generator roster. Zone A. */
 export const GENERATOR_ROSTER: GeneratorRosterEntry[] = [
-  { id: 'pattern', modelBinding: 'azure-gpt4o', systemPromptVersion: 'l3-pattern-2026-04-23a' },
-  { id: 'skeptic', modelBinding: 'azure-gpt4o', systemPromptVersion: 'l3-skeptic-2026-04-23a' },
+  { id: 'pattern', modelBinding: 'azure-gpt5', systemPromptVersion: 'l3-pattern-2026-04-23a' },
+  { id: 'skeptic', modelBinding: 'azure-gpt5', systemPromptVersion: 'l3-skeptic-2026-04-23a' },
 ]
 
 /** Starter judge roster. Weights must sum to 1. Zone A. */
 export const JUDGE_ROSTER: JudgeRosterEntry[] = [
-  { id: 'editor', perspective: 'editor', modelBinding: 'azure-gpt4o', weight: 0.25, rubricVersion: 'rubric-l3-editor-2026-04-23' },
-  { id: 'domain', perspective: 'domain', modelBinding: 'azure-gpt4o', weight: 0.40, rubricVersion: 'rubric-l3-domain-2026-04-23' },
-  { id: 'reader', perspective: 'reader', modelBinding: 'azure-gpt4o', weight: 0.35, rubricVersion: 'rubric-l3-reader-2026-04-23' },
+  { id: 'editor', perspective: 'editor', modelBinding: 'azure-gpt5', weight: 0.25, rubricVersion: 'rubric-l3-editor-2026-04-23' },
+  { id: 'domain', perspective: 'domain', modelBinding: 'azure-gpt5', weight: 0.40, rubricVersion: 'rubric-l3-domain-2026-04-23' },
+  { id: 'reader', perspective: 'reader', modelBinding: 'azure-gpt5', weight: 0.35, rubricVersion: 'rubric-l3-reader-2026-04-23' },
 ]
 
 // -------- Gates --------

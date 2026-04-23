@@ -86,7 +86,7 @@ function expandCategoryCode(code) {
 
 function azureGenerateText(prompt, apiKey) {
   const endpoint = 'https://rg-phd-openai-uehara.openai.azure.com/';
-  const deploymentId = 'gpt-4o-mini';
+  const deploymentId = 'gpt-5.4';
   const apiVersion = '2024-12-01-preview';
   const url = `${endpoint}openai/deployments/${deploymentId}/chat/completions?api-version=${apiVersion}`;
 

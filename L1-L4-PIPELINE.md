@@ -153,4 +153,4 @@ git push origin main  # Triggers GitHub Actions → GitHub Pages
 - **Token credentials in .env**: GAS reads them via script properties (set manually in Apps Script UI)
 - **Notion DB IDs**: L1 and L3 are hardcoded; L2 and L4 must be configured
 - **GitHub branch**: All published files go to `gh-pages`
-- **Azure OpenAI**: Model is `gpt-4o-mini` at endpoint `https://koh-uehara-ai.openai.azure.com/`
+- **Azure OpenAI**: Model is `gpt-5.4` at endpoint `https://koh-uehara-ai.openai.azure.com/`
