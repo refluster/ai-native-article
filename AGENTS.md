@@ -8,7 +8,7 @@ The philosophy: **let machines do everything that is cheap to re-run and safe to
 
 Every file in this repo belongs to one of four zones. The zone determines the approval bar.
 
-### Zone A — Human-owned (design, identity, governance)
+### Zone A — Human-owned (design, identity, governance, prompts)
 
 Agents may propose diffs. Agents may NOT merge without a human on the PR.
 
@@ -20,8 +20,10 @@ Agents may propose diffs. Agents may NOT merge without a human on the PR.
 - [src/index.css](src/index.css) — base and utilities layers
 - [.github/CODEOWNERS](.github/CODEOWNERS)
 - [.github/workflows/*.yml](.github/workflows/)
+- **L2/L3 generator prompts** — [skills/l2-ai-blog/SKILL.md](skills/l2-ai-blog/SKILL.md), [skills/l3-insight/SKILL.md](skills/l3-insight/SKILL.md), and the prompt blocks in [gas/src/Code.gs](gas/src/Code.gs).
+- **Judge rubric text and thresholds** — the rubric tables in [GROWTH.md §3, §4](GROWTH.md), and `JUDGE_GATE` / `DIM_FLOOR` constants in [src/types/quality.ts](src/types/quality.ts).
 
-Rationale: these files encode the brand, the typography, the deployment surface, and the governance itself. A design token change cascades across every article. A workflow change can nuke production. Humans approve.
+Rationale: these files encode the brand, the typography, the deployment surface, and the governance itself. A design-token change cascades across every article. A workflow change can nuke production. A prompt change is an identity change — it shifts what the product *is*. A rubric change invalidates every score that came before it. Humans approve.
 
 ### Zone B — Agent-assisted (product code)
 
@@ -65,6 +67,8 @@ Nobody edits by hand. Agents regenerate via scripts only.
 7. **Idempotent scripts only.** `fetch-notion.mjs`, `generate-sitemap.mjs`, and their peers must be safe to run twice. No "this script assumes fresh state" scripts.
 8. **Secrets stay in `.env` (local) or GitHub Secrets (CI).** An agent that prints a secret to stdout is a bug. CI redaction is a backstop, not a plan.
 9. **When in doubt, file an issue, not a PR.** It is cheaper for a human to redirect an idea than to close a PR.
+10. **Every L2/L3 generation writes a sidecar `.eval.json`** (schema: [src/types/quality.ts](src/types/quality.ts)). No sidecar → no publish. This applies whether the generator is a Claude skill or the GAS pathway — both must tag `promptVersion` and emit the judge result. Articles missing the sidecar are treated as Zone A changes and require human review.
+11. **A prompt-version bump is its own PR.** Do not bundle a prompt change with unrelated work. The outer-loop leaderboard reads git history to attribute reader behavior; mixed PRs corrupt attribution.
 
 ## 3. What machines decide vs. what humans decide
 
@@ -72,7 +76,11 @@ Nobody edits by hand. Agents regenerate via scripts only.
 | ----------------------------------------------------- | ----- | ------------------------------------------------------------------- |
 | Which L1 sources to pull this week                    | Machine | Data-driven; see GROWTH.md §2 feedback loop                        |
 | Which L2 blogs to combine into an L3 insight          | Machine | Same; bias toward top-completion categories                         |
-| Prompt wording for L2/L3 synthesis                    | Mixed   | Machine proposes, human reviews prompt-version bumps                |
+| Prompt wording for L2/L3 synthesis                    | Mixed   | Machine proposes; prompt-version bump requires human merge. The prompt is the model. |
+| Judge rubric text (dims, "10/10 looks like")          | Human   | Changing the rubric invalidates all prior scores; change intentionally, in its own PR |
+| Judge-score gates (L2 ≥ 7.0, L3 ≥ 7.5, dim floor)     | Human   | A product decision about what counts as shippable                    |
+| Judge-scoring code (scoring call, aggregation)         | Machine | Implementation of the rubric; change freely as long as the rubric text doesn't move   |
+| Rolling back a prompt version after outer-loop regress | Mixed   | Data-driven decision but editorially consequential — human on the PR |
 | Design tokens, typography scale, spacing              | Human   | Identity; small changes have broad visual cost                      |
 | Public IA (what appears in header/footer)             | Human   | Navigation is a promise to readers                                  |
 | Internal tool routes (`/l[1-4]-*`)                    | Machine | Operator ergonomics; change freely                                  |

@@ -1,87 +1,174 @@
 # Growth Plan — Software 2.0 for AI NATIVE ARTICLE
 
-This site is a content product. The value it delivers is the *selection* and *synthesis* of AI-industry signal into L3 insights. Growth here is not a marketing funnel — it is a feedback loop that makes next week's L3 articles more read, more shared, and more trusted than this week's. The growth work below is designed so reader behavior flows back into the L1→L4 pipeline as a learned signal, in the Software 2.0 sense: behaviors replace heuristics, measurement replaces taste.
+This site is a content product. Its value is not pageviews, not article count — it is **the quality of synthesis**. L2 compresses disparate L1 sources into a blog post. L3 finds the principle that connects otherwise-unrelated L2s. If that synthesis is shallow, no amount of SEO or GA4 instrumentation matters: readers arrive once and don't come back. So this plan starts at the generation layer, not the distribution layer. Distribution work (GA4, sitemap, SEO, IA cleanup — already shipped) is downstream of whether the articles are worth reading.
 
-## 1. North-star, inputs, guardrails
+## 0. The Software 2.0 thesis, made concrete
 
-- **North-star metric:** weekly L3 read-completions (scroll ≥ 80% of article body). A completion is a stronger quality signal than a click.
-- **Input metrics (leading):** article_view, category_filter_click, share_click, read_time_p50, outbound_click on source L1.
-- **Guardrail metrics:** bounce rate on `/`, time-to-first-paint on `/article/:slug`, broken-link rate, build-fail rate. Regressions here block further growth bets.
-- **What we are NOT optimizing:** pageviews in isolation, session count, "engagement time" without a depth signal. Those have a long history of misleading editorial teams.
+Karpathy's framing: Software 2.0 replaces hand-coded rules with learned parameters. Applied to this pipeline:
 
-## 2. Measurement layer — GA4
+- **The prompt is the model.** L2 and L3 are LLM calls whose behavior is almost entirely determined by prompt text. The prompts in [skills/l2-ai-blog/SKILL.md](skills/l2-ai-blog/SKILL.md), [skills/l3-insight/SKILL.md](skills/l3-insight/SKILL.md), and [gas/src/Code.gs](gas/src/Code.gs) are this product's weights.
+- **The rubric is the proxy loss.** An LLM judge that scores output against a rubric is a fast, cheap signal we can run every generation.
+- **Reader behavior is the true loss.** GA4's `article_read_complete` per prompt version, broken out by category, is the external signal the rubric is calibrated against.
+- **Prompt versioning is gradient descent.** Every new prompt version is a step; the judge decides if it passes local inspection; the reader data decides if it survives.
 
-GA4 is wired opt-in via `VITE_GA_ID`. When unset, analytics is a no-op — no script tag, no network calls. This keeps local dev, preview builds, and forks clean by default.
+Growth on this site, therefore, has two jobs:
 
-### Events emitted
+1. **Improve the prompts.** Better synthesis = better articles = better retention.
+2. **Improve the measurement of the prompts.** Without versioning and a signal, step 1 is vibes.
 
-| Event                     | When it fires                               | Params                                      |
-| ------------------------- | ------------------------------------------- | ------------------------------------------- |
-| `page_view`               | React Router location changes               | `page_path`, `page_title`                   |
-| `article_view`            | Article page loads and meta resolves        | `slug`, `category`, `date`                  |
-| `article_read_25/50/75/90`| Scroll depth thresholds crossed once each   | `slug`, `category`                          |
-| `article_read_complete`   | Reader scrolls ≥ 90% AND dwell ≥ 30s        | `slug`, `category`, `dwell_ms`              |
-| `category_click`          | Sidebar category clicked                    | `category`                                  |
-| `featured_click`          | Hero article clicked                        | `slug`, `category`                          |
-| `internal_link_click`     | In-article internal link click              | `slug`, `href`                              |
-| `outbound_click`          | In-article external link click              | `slug`, `href`, `host`                      |
+GA4 (shipped last round) is part of #2. This revision makes #1 and the coupling between the two first-class.
 
-Privacy posture: we respect `navigator.doNotTrack` and `navigator.globalPrivacyControl` — both short-circuit initialization. IP anonymization is GA4 default. No PII is emitted. No session recording. The `page_title` is the article title, which is already public.
+## 1. North-star — revised
 
-### Feedback loop into content pipeline (planned)
+Previous: *weekly L3 `article_read_complete`*.
 
-The measurement exists to change what we publish. The feedback path:
+Revised: **weekly L3 `article_read_complete` on articles that cleared the quality gate (`judge_score ≥ 7.5 / 10`).** Articles that fail the gate are either regenerated or published with a visible `draft` status and excluded from the numerator. This prevents the metric from rewarding us for shipping work that happens to be clicked on by accident.
 
-1. Weekly GAS trigger (not yet built) pulls a GA4 Data API report: top 20 `(slug, category)` by `article_read_complete`, top 10 `category_click`.
-2. Report lands in a Notion page the L2/L3 skills read before synthesis.
-3. L2 prompts are templated with `PRIORITY_CATEGORIES: [...]` and `UNDERINDEXED_CATEGORIES: [...]`, biasing source selection.
-4. L3 prompts receive the same priority list plus titles of top-performing L3s as "style exemplars."
+Secondary metrics:
 
-This is the Software 2.0 bridge: editorial judgment that used to be hand-coded as "what feels interesting this week" becomes a ranked list derived from readers' actual completions.
+- **Inner-loop first-pass rate** — % of generations that clear the gate without regeneration. A declining trend means the model or the prompt is drifting; an increasing trend may mean the rubric has become too loose.
+- **Outer-loop correlation** — Spearman correlation between `judge_score` bucket and `article_read_complete` rate, rolling 90 days. If this goes negative, the judge is miscalibrated and the rubric needs revision before the prompts do.
 
-## 3. SEO and distribution
+## 2. Two-loop quality model
 
-- `public/robots.txt` and `public/sitemap.xml` are generated at build from the manifest.
-- JSON-LD `Article` structured data is injected on `/article/:slug` via a runtime meta helper. Static OG per slug is deferred: it needs SSG or a prerender step, and the cost/benefit pencils out only once we see meaningful referral traffic.
-- Canonical URLs and `<meta name="description">` are set dynamically on route change.
-- **Known limitation:** Twitter and LinkedIn scrape the static HTML, so per-article OG images require prerender. Tracked as future work below.
+Two feedback loops with different time constants. Each guards the other.
 
-## 4. Design-system consistency
+### Inner loop — minutes, no readers needed
 
-The design system is documented in [DESIGN.md](DESIGN.md) and tokenized in [tailwind.config.ts](tailwind.config.ts). Rules now enforced:
+```
+generate (L2 or L3) ──▶ judge ──▶ score ≥ gate? ──▶ publish
+                          ▲           │ no
+                          └───────────┘ regenerate with critique (≤ 3 attempts)
+```
 
-- **No raw hex in components.** `scripts/lint-design-tokens.mjs` greps `src/**/*.{ts,tsx}` for `#[0-9a-f]{3,8}` and fails the build. Tokens live in one place.
-- **No `rounded-*` classes** (other than `rounded-full` for pills/avatars). The "0px radius" rule is linted, not hoped for.
-- **No `border-*` solid dividers** between content blocks — the "No-Line" rule. Spacing and surface shifts only. This one is advisory (grep-heuristic), not a hard fail.
+1. L2 or L3 skill produces the article.
+2. A separate LLM judge scores the output against the rubric below.
+3. If `judge_score ≥ gate` → candidate for publish.
+4. If `judge_score < gate` → feed the judge's critique into the generator prompt, regenerate, repeat up to N=3.
+5. Every attempt (pass or fail) writes a sidecar `.eval.json` next to the article (schema: [src/types/quality.ts](src/types/quality.ts)). Fails are kept — they are the training data for rubric calibration.
 
-Design tokens (`src/config/site.ts`, `tailwind.config.ts`, `src/index.css` layer `base`/`utilities`) require human review — see CODEOWNERS.
+### Outer loop — weeks, ground truth
 
-## 5. Site IA cleanup
+```
+published articles ──▶ GA4 bucketed by prompt_version
+                            │
+                            ▼
+                   prompt-version leaderboard ──▶ next prompt-version bump
+```
 
-The L1–L4 pipeline pages are *internal operator tools*. Exposing them in the public footer confuses readers and leaks build state. Cleanup:
+1. Weekly GAS job calls the GA4 Data API, bucketed by `(prompt_version, category, slug)`.
+2. Rank prompt versions by `article_read_complete` / `article_view`.
+3. A prompt-version bump is accepted only if the outer-loop rank is **not worse** than its predecessor after ≥ 5 articles shipped under it.
+4. If the inner loop said "great" and the outer loop says "worse," the prompt version is rolled back **and** a failure entry is added to the rubric calibration set.
 
-- Public header: `INDEX`, `DESIGN SYSTEM`, `DESIGN GUIDE`.
-- Public footer: `INDEX`, `DESIGN SYSTEM`, `DESIGN GUIDE` only.
-- Operator pages (`/l1-register`, `/l2-blog`, `/l3-insight`, `/l4-publish`) remain routed and reachable by URL, but are not linked from the public chrome. They should eventually sit behind an auth check; for now, obscurity is documented as a conscious choice.
+The two-loop pattern is deliberate: inner is fast but biased (the judge has its own blind spots); outer is unbiased but slow (needs weeks of reader data). Neither alone is safe to optimize against. Together they form the proxy/true-loss pairing at the heart of any Software 2.0 system.
 
-## 6. Companion apps and integration surface
+## 3. L2 rubric — "Blog synthesis from L1 sources"
 
-Ranked by expected ROI for the current stack:
+L2's job: compress 1–5 L1 articles into a coherent Japanese blog post that stays faithful to sources while producing a readable narrative for software/design engineers at large Japanese manufacturers (per [skills/l2-ai-blog/SKILL.md](skills/l2-ai-blog/SKILL.md)).
 
-1. **GA4 + GA4 Data API (via GAS)** — already the plan above. Closes the measure→generate loop.
-2. **Notion (existing)** — source of truth for L1/L2/L3. No change needed.
-3. **Azure OpenAI (existing)** — synthesis engine. Worth adding prompt-version tagging in the GAS handler so we can A/B prompt revisions against `read_complete`.
-4. **Search Console** — verify domain, submit sitemap, read query impressions. Free, additive to GA4 (GA4 does not show search queries).
-5. **X (Twitter) + LinkedIn scheduled post via GAS** — later. Only once OG images are prerendered; otherwise preview cards are garbage.
-6. **RSS feed** — cheap, high-value for technical readers. Generate at build from manifest. Not in this round.
+| Dim                      | /10 | What 10/10 looks like                                                                          |
+| ------------------------ | --- | ---------------------------------------------------------------------------------------------- |
+| Faithfulness             |     | Every factual claim traces to a specific L1 source; no invented stats, dates, or quotes        |
+| Coverage                 |     | Every selected L1 is drawn on; none left orphaned; weight roughly matches source importance    |
+| Coherence                |     | Sections flow; no internal contradictions; the arc from 導入 to まとめ is legible                |
+| Japanese editorial qual. |     | Natural register for the target reader; terminology consistent; no machine-translated odor     |
+| Structure                |     | 要旨 → 導入 → body with clear subheads → まとめ; length 3,000–4,000 chars per skill spec        |
+| Signal-to-noise          |     | No filler ("important to note," "in conclusion"); each paragraph carries a distinct idea        |
 
-## 7. Roadmap (ranked, not promised)
+`judge_score = mean(dims)`. **Gate: ≥ 7.0.** Failure of any single dim ≤ 4 also blocks publish regardless of mean — "great average, one fatal flaw" is a common LLM failure mode.
 
-- [ ] Weekly GAS trigger that fetches GA4 Data API → Notion. Closes the loop.
-- [ ] Prompt-version tagging on L2/L3 outputs so we can correlate prompt versions with read-completion.
+## 4. L3 rubric — "Insight from L2 corpus"
+
+L3's job: find the principle that connects ostensibly unrelated L2s. A summary fails this rubric by definition. Reference: [skills/l3-insight/SKILL.md](skills/l3-insight/SKILL.md).
+
+| Dim                       | /10 | What 10/10 looks like                                                                             |
+| ------------------------- | --- | ------------------------------------------------------------------------------------------------- |
+| Novel angle               |     | Proposes a principle, not a summary. The title is a claim ("担い手の交代"), not a topic ("AIの影響")  |
+| Disparate-source bridging |     | The selected L2s look unrelated on the surface; the article makes them cohere under one lens      |
+| Claim-source alignment    |     | Each non-trivial claim cites an L2 (by title, category, or inline reference)                       |
+| Actionability             |     | A reader in the target audience could change a decision based on the insight                       |
+| Falsifiability            |     | The stated principle takes a side — the kind of thing that could be wrong, not a truism             |
+| Japanese editorial qual.  |     | Same criterion as L2                                                                                |
+
+`judge_score = mean(dims)`. **Gate: ≥ 7.5** — higher bar than L2 because L3 is the product surface. Falsifiability ≤ 5 blocks publish regardless of mean — an unfalsifiable "insight" is the exact failure mode that makes the product feel hollow.
+
+## 5. Instrumentation
+
+### Sidecar `.eval.json`
+
+One file per generation attempt, written alongside the article in the operator branch (not published). Schema in [src/types/quality.ts](src/types/quality.ts). Fields: `slug`, `level`, `promptVersion`, `model`, `sourceIds[]`, `judge.{score,dims,critique,judgeModel,judgeVersion}`, `regeneratedFrom?`, `createdAt`. Keeps the full history — failed attempts too — so the rubric can be recalibrated against ground truth when outer-loop data lands.
+
+### Article frontmatter — add two fields
+
+The L4 publish step copies two fields into the published Markdown frontmatter:
+
+```yaml
+promptVersion: "l3-2026-04-23a"
+judgeScore: 7.8
+```
+
+These are what GA4 reports group by and what the operator UI filters on. They are NOT shown to public readers — not yet — but the site reads them and can attach `prompt_version` to GA events.
+
+### GA4 — register a custom dimension
+
+Register `prompt_version` as a user-scoped custom dimension in the GA4 property. The [analytics lib](src/lib/analytics.ts) then passes it on `article_view` and `article_read_complete`. Outer-loop reports group by `prompt_version`.
+
+### Notion — add properties
+
+Add `Prompt Version` (rich_text) and `Judge Score` (number) properties to L2 Blog Repository and L3 Insights DBs. The skill/GAS writers fill these at creation time; `fetch-notion.mjs` copies them into the sitewide manifest and per-article frontmatter.
+
+## 6. Where the prompts live
+
+Important for governance: prompts exist in **two** places, and both need to be under the two-loop regime.
+
+- **[skills/l2-ai-blog/SKILL.md](skills/l2-ai-blog/SKILL.md)**, **[skills/l3-insight/SKILL.md](skills/l3-insight/SKILL.md)** — the Claude skill prompts, used for rich interactive generation.
+- **[gas/src/Code.gs](gas/src/Code.gs)** — GAS-side prompts, used by the operator UI (`/l2-blog`, `/l3-insight`, `/l4-publish`).
+
+The same `prompt_version` tag must flow from whichever one generated the article. If the two diverge (skill evolves, GAS doesn't), the outer loop will mis-attribute reader behavior. Keep them in sync or clearly label which is in use; [AGENTS.md §3](AGENTS.md) lists prompt-version bumps as human-reviewed.
+
+## 7. SEO and distribution
+
+Shipped in the prior revision; unchanged here.
+
+- `sitemap.xml` and `robots.txt` generated at build.
+- Dynamic per-article meta (title, description, canonical, OG, JSON-LD `Article`).
+- Known limitation: deep article URLs return HTTP 404 from GitHub Pages before the SPA redirect recovers them. Real scraper-friendly OG and zero-JS article loads need prerender — tracked in the roadmap.
+
+## 8. Design-system consistency
+
+Shipped: `scripts/lint-design-tokens.mjs` in CI blocks raw hex and non-zero border-radius in `src/`. Tokens live only in [tailwind.config.ts](tailwind.config.ts). [DESIGN.md](DESIGN.md) is the spec.
+
+## 9. Site IA cleanup
+
+Shipped: public header/footer show only reader-facing routes. L1–L4 operator pages remain URL-reachable but unlinked; auth is on the roadmap.
+
+## 10. Companion apps — re-ranked by quality leverage
+
+1. **Azure OpenAI** — both generator and judge. Highest leverage because prompts are the product. Add prompt-version tagging first.
+2. **Notion** — host the `Prompt Version` and `Judge Score` columns; operator filters by them pre-publish.
+3. **GA4 + GA4 Data API** — outer-loop signal. Already shipped on the event side; Data API reader not yet built.
+4. **Google Search Console** — unchanged: verify domain, submit sitemap.
+5. **GAS cron scheduler** — weekly report writer, prompt A/B runner host.
+6. **X / LinkedIn scheduled post** — deferred until prerender lands.
+
+## 11. Roadmap — quality layer first
+
+Quality layer (this revision's core work):
+
+- [ ] Add `Prompt Version` + `Judge Score` columns to L2 and L3 Notion DBs. **KPI:** 100% coverage on new articles.
+- [ ] Implement `judgeL2(article)` / `judgeL3(article)` in `gas/src/Code.gs` (Azure OpenAI call with rubric system prompt). **KPI:** median `judge_score` trend over a 30-day window.
+- [ ] Write sidecar `.eval.json` at generation time (operator branch, gitignored from `public/`). **KPI:** 100% of new L4 publishes have a matching sidecar.
+- [ ] Regenerate-on-fail loop (N=3, critique in context) in both the skill and GAS paths. **KPI:** inner-loop first-pass rate, trend over time.
+- [ ] Show `Judge Score` + `Prompt Version` in the L4 publish UI so the operator sees quality before shipping. **KPI:** ratio of flagged-and-regenerated to published.
+- [ ] Weekly cron (GAS) that pulls GA4 Data API and writes `quality/leaderboard.md` on the operator branch. **KPI:** at least one prompt-version decision per month informed by it.
+- [ ] Prompt A/B runner: for N generations, run two prompt variants, judge both, publish the winner; suffix `prompt_version` with `A`/`B` for later separation. **KPI:** one prompt-version accepted by the outer loop per month.
+- [ ] Rubric calibration ritual: every 90 days, sample 20 articles from the `.eval.json` history and re-score by hand; Spearman against the judge; if < 0.5, revise the rubric. **KPI:** rolling 90-day Spearman ≥ 0.5.
+
+Distribution layer (carryover):
+
 - [ ] SSG or per-article prerender for real OG images and zero-JS article loads.
 - [ ] RSS feed from `public/posts/manifest.json`.
-- [ ] Prompt A/B runner in the L2 skill.
 - [ ] Auth gate on `/l[1-4]-*` (GitHub OAuth via GAS).
 
-Each roadmap item has a hypothesis and a metric in its PR description — no unlabeled ships.
+Each roadmap item's PR names its KPI in the description. No unlabeled ships.
