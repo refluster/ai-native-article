@@ -102,7 +102,10 @@ function azureGenerateText(prompt, apiKey) {
       },
     ],
     temperature: 0.7,
-    max_tokens: 2000,
+    // gpt-5.4 rejects the legacy `max_tokens` parameter (400
+    // `unsupported_parameter`) and requires `max_completion_tokens`.
+    // Verified by direct probe of the Azure deployment on 2026-04-23.
+    max_completion_tokens: 2000,
   };
 
   const response = UrlFetchApp.fetch(url, {
