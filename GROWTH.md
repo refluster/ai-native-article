@@ -29,23 +29,37 @@ Secondary metrics:
 - **Inner-loop first-pass rate** — % of generations that clear the gate without regeneration. A declining trend means the model or the prompt is drifting; an increasing trend may mean the rubric has become too loose.
 - **Outer-loop correlation** — Spearman correlation between `judge_score` bucket and `article_read_complete` rate, rolling 90 days. If this goes negative, the judge is miscalibrated and the rubric needs revision before the prompts do.
 
-## 2. Two-loop quality model
+## 2. Two-loop quality model — with panels
 
-Two feedback loops with different time constants. Each guards the other.
+Two feedback loops with different time constants. Each guards the other. Both the generator side and the judge side are **panels** — multiple models, multiple perspectives — not single calls. A single generator and a single judge share blind spots; a panel exposes them to each other.
 
 ### Inner loop — minutes, no readers needed
 
 ```
-generate (L2 or L3) ──▶ judge ──▶ score ≥ gate? ──▶ publish
-                          ▲           │ no
-                          └───────────┘ regenerate with critique (≤ 3 attempts)
+L1/L2 sources
+      │
+      ▼
+generator panel ─▶ candidates[] ─┐
+  (N perspectives)               ▼
+                           judge panel
+                         (M perspectives) ─▶ score each candidate on every dim
+                                                    │
+                                                    ▼
+                                           aggregate → winner
+                                                    │
+                  ┌───────────── pass gate? ────────┘
+                  │ yes                 │ no
+                  ▼                     ▼
+               publish        regen top candidate
+                              with combined critiques
+                              (≤ 3 rounds)
 ```
 
-1. L2 or L3 skill produces the article.
-2. A separate LLM judge scores the output against the rubric below.
-3. If `judge_score ≥ gate` → candidate for publish.
-4. If `judge_score < gate` → feed the judge's critique into the generator prompt, regenerate, repeat up to N=3.
-5. Every attempt (pass or fail) writes a sidecar `.eval.json` next to the article (schema: [src/types/quality.ts](src/types/quality.ts)). Fails are kept — they are the training data for rubric calibration.
+1. The **generator panel** produces N candidates for the same set of source IDs. Each generator has a distinct `(model, systemPromptVersion)`. For L3 the starter panel has two members — "pattern-matcher" (Claude) and "skeptic-editor" (GPT-4o) — so the ensemble has room to disagree.
+2. The **judge panel** scores every candidate on every rubric dimension. Each judge is a distinct `(model, rubricVersion, perspective)`. Starter panel: `editor`, `domain`, `reader` (see §2a below).
+3. For each candidate we compute a weighted aggregate score across judges; winner = highest aggregate that clears both the mean gate (L2 ≥ 7.0, L3 ≥ 7.5) and the per-dimension floor (no dim ≤ 4 across *any* judge — panel disagreement on a single low score still blocks).
+4. If no candidate clears the gate, the top-ranked candidate is regenerated with every judge's critique concatenated as feedback; N=3 rounds total.
+5. Every attempt — all candidates, all judges, all regenerations — is written to a sidecar `.eval.json` (schema: [src/types/quality.ts](src/types/quality.ts)). Losing candidates are training data for the rubric.
 
 ### Outer loop — weeks, ground truth
 
@@ -53,19 +67,50 @@ generate (L2 or L3) ──▶ judge ──▶ score ≥ gate? ──▶ publish
 published articles ──▶ GA4 bucketed by prompt_version
                             │
                             ▼
-                   prompt-version leaderboard ──▶ next prompt-version bump
+                   prompt-version leaderboard ──▶ next bump to a panel member
 ```
 
-1. Weekly GAS job calls the GA4 Data API, bucketed by `(prompt_version, category, slug)`.
+1. Weekly GAS job calls the GA4 Data API, bucketed by `(prompt_version, category, slug)`. `prompt_version` now identifies the *winning candidate's generator*, not a single prompt — e.g., `l3-claude-pattern-2026-04-23a`.
 2. Rank prompt versions by `article_read_complete` / `article_view`.
-3. A prompt-version bump is accepted only if the outer-loop rank is **not worse** than its predecessor after ≥ 5 articles shipped under it.
-4. If the inner loop said "great" and the outer loop says "worse," the prompt version is rolled back **and** a failure entry is added to the rubric calibration set.
+3. A panel member's new prompt version is accepted only if its outer-loop rank is **not worse** than its predecessor after ≥ 5 articles shipped with it as the chosen candidate.
+4. If inner said "great" and outer says "worse," roll back that panel member and add a failure entry to the rubric calibration set.
 
-The two-loop pattern is deliberate: inner is fast but biased (the judge has its own blind spots); outer is unbiased but slow (needs weeks of reader data). Neither alone is safe to optimize against. Together they form the proxy/true-loss pairing at the heart of any Software 2.0 system.
+The panel approach generalizes the proxy/true-loss pairing: the **judge panel** is a higher-fidelity proxy than a single judge (cross-model blind spots cancel), and the **generator panel** is a broader search over the prompt space than a single generator (more candidates to pick from per article).
+
+### 2a. Panels — starter roster
+
+Zone A (see [AGENTS.md](AGENTS.md)). The roster itself — which models, which perspectives, which weights — is a product-shape decision, not an implementation detail.
+
+**Generator panel — starter (both L2 and L3):**
+
+| Id                      | Model                   | System-prompt lens                                    |
+| ----------------------- | ----------------------- | ------------------------------------------------------ |
+| `claude-pattern`        | Claude Sonnet 4.x       | "Find the principle that connects these sources"       |
+| `gpt-skeptic`           | Azure OpenAI GPT-4o     | "Be the senior editor who cuts weak claims"            |
+
+Two is the floor. Adding a third (e.g., Gemini) is one config change once its API key is available.
+
+**Judge panel — starter (both L2 and L3):**
+
+| Id                  | Perspective | Model                    | Weight | Scores which dims             |
+| ------------------- | ----------- | ------------------------ | ------ | ------------------------------ |
+| `editor-claude`     | editor      | Claude Sonnet 4.x        | 0.25   | all dims, as a senior editor   |
+| `domain-gpt4o`      | domain      | Azure OpenAI GPT-4o      | 0.40   | all dims, as a domain expert   |
+| `reader-gpt4o-mini` | reader      | Azure OpenAI GPT-4o-mini | 0.35   | all dims, as a target reader   |
+
+**Design note:** every judge scores every dim. The weight is not which-dim-owns-whom, it is "how much does this perspective count." Domain is weighted highest because factual alignment and falsifiability are the claims most likely to go wrong and least likely to be caught by an editor's eye. The reader judge is deliberately the cheapest model — it simulates skim behavior, and a capable model would read too charitably.
+
+**Critical constraint — model disjointness:**
+- No generator shares a model with any judge in the same run. A generator scoring its own output is a known biased signal ("LLM-as-a-judge" literature, 2023–2025). The roster above respects this at start.
+- When a new panel member is added, a PR must explicitly show it does not violate this.
+
+**Cost envelope:** 2 generators + 3 judges = 5 Azure/Anthropic calls per article. For the current ~2–3 L3/week cadence that is pocket change; for higher throughput the reader judge can be run only on the top-scoring candidate after the first judge round, a standard cascaded-ranker trick. Document when implemented.
 
 ## 3. L2 rubric — "Blog synthesis from L1 sources"
 
 L2's job: compress 1–5 L1 articles into a coherent Japanese blog post that stays faithful to sources while producing a readable narrative for software/design engineers at large Japanese manufacturers (per [skills/l2-ai-blog/SKILL.md](skills/l2-ai-blog/SKILL.md)).
+
+Every judge on the panel scores every dim from its perspective. The per-dim aggregate is the weighted mean across judges.
 
 | Dim                      | /10 | What 10/10 looks like                                                                          |
 | ------------------------ | --- | ---------------------------------------------------------------------------------------------- |
@@ -76,7 +121,7 @@ L2's job: compress 1–5 L1 articles into a coherent Japanese blog post that sta
 | Structure                |     | 要旨 → 導入 → body with clear subheads → まとめ; length 3,000–4,000 chars per skill spec        |
 | Signal-to-noise          |     | No filler ("important to note," "in conclusion"); each paragraph carries a distinct idea        |
 
-`judge_score = mean(dims)`. **Gate: ≥ 7.0.** Failure of any single dim ≤ 4 also blocks publish regardless of mean — "great average, one fatal flaw" is a common LLM failure mode.
+`judge_score = weighted_mean(dim_aggregates)` where dim weights are equal and judge weights follow the roster in §2a. **Gate: ≥ 7.0.** Per-dim floor: if **any** judge on the panel scores a dim ≤ 4, publish is blocked regardless of the aggregate — panel disagreement on a low score is itself the signal.
 
 ## 4. L3 rubric — "Insight from L2 corpus"
 
@@ -91,13 +136,31 @@ L3's job: find the principle that connects ostensibly unrelated L2s. A summary f
 | Falsifiability            |     | The stated principle takes a side — the kind of thing that could be wrong, not a truism             |
 | Japanese editorial qual.  |     | Same criterion as L2                                                                                |
 
-`judge_score = mean(dims)`. **Gate: ≥ 7.5** — higher bar than L2 because L3 is the product surface. Falsifiability ≤ 5 blocks publish regardless of mean — an unfalsifiable "insight" is the exact failure mode that makes the product feel hollow.
+`judge_score = weighted_mean(dim_aggregates)`. **Gate: ≥ 7.5** — higher bar than L2 because L3 is the product surface. Per-dim floor as in L2 (any judge ≤ 4 on any dim blocks). Additionally, **falsifiability** has a hard floor of 5 from *every* judge — an unfalsifiable "insight" is the exact failure mode that makes the product feel hollow, and a single judge catching it is enough.
 
 ## 5. Instrumentation
 
-### Sidecar `.eval.json`
+### Sidecar `.eval.json` — multi-candidate, multi-judge
 
-One file per generation attempt, written alongside the article in the operator branch (not published). Schema in [src/types/quality.ts](src/types/quality.ts). Fields: `slug`, `level`, `promptVersion`, `model`, `sourceIds[]`, `judge.{score,dims,critique,judgeModel,judgeVersion}`, `regeneratedFrom?`, `createdAt`. Keeps the full history — failed attempts too — so the rubric can be recalibrated against ground truth when outer-loop data lands.
+One file per article (not per candidate), written alongside the article in the operator branch (not published). Schema in [src/types/quality.ts](src/types/quality.ts). Shape:
+
+```
+ArticleEval
+├─ slug, level, createdAt, regeneratedFrom?
+├─ sourceIds[]               ← the L1 (for L2) or L2 (for L3) inputs, same for all candidates
+├─ candidates[]              ← one entry per generator, N≥1
+│   ├─ candidateId
+│   ├─ generator: { id, model, systemPromptVersion }
+│   ├─ outputRef             ← Notion page id or local path of the draft
+│   ├─ judges[]              ← one entry per judge on the panel
+│   │   ├─ judgeId, perspective, model, rubricVersion
+│   │   ├─ dims: { [dim]: score }      ← every dim, from this perspective
+│   │   └─ critique
+│   └─ aggregate: { score, dims: { [dim]: score } }
+└─ chosen: { candidateId, reason }
+```
+
+Losing candidates and failing judges are kept — they are the training data. A regenerated run chains via `regeneratedFrom` so the full tree is reconstructible.
 
 ### Article frontmatter — add two fields
 
@@ -145,27 +208,43 @@ Shipped: public header/footer show only reader-facing routes. L1–L4 operator p
 
 ## 10. Companion apps — re-ranked by quality leverage
 
-1. **Azure OpenAI** — both generator and judge. Highest leverage because prompts are the product. Add prompt-version tagging first.
-2. **Notion** — host the `Prompt Version` and `Judge Score` columns; operator filters by them pre-publish.
-3. **GA4 + GA4 Data API** — outer-loop signal. Already shipped on the event side; Data API reader not yet built.
-4. **Google Search Console** — unchanged: verify domain, submit sitemap.
-5. **GAS cron scheduler** — weekly report writer, prompt A/B runner host.
-6. **X / LinkedIn scheduled post** — deferred until prerender lands.
+1. **Anthropic Claude API** — now first-class: one generator (`claude-pattern`) and one judge (`editor-claude`). Needed to respect the model-disjointness rule.
+2. **Azure OpenAI** — one generator (`gpt-skeptic`) and two judges (`domain-gpt4o`, `reader-gpt4o-mini`). Still the biggest single leverage surface because most of the prompts live against it.
+3. **Notion** — host the `Prompt Version`, `Judge Score`, and `Chosen Candidate` columns; operator filters by them pre-publish.
+4. **GA4 + GA4 Data API** — outer-loop signal. Event side shipped; Data API reader not yet built.
+5. **Google Search Console** — unchanged: verify domain, submit sitemap.
+6. **GAS cron scheduler** — weekly report writer, panel A/B runner host.
+7. **X / LinkedIn scheduled post** — deferred until prerender lands.
 
 ## 11. Roadmap — quality layer first
 
-Quality layer (this revision's core work):
+Quality layer is sequenced so the panel ships incrementally — single judge first, then panel, then generator panel, then A/B across members. Each step is independently shippable.
 
-- [ ] Add `Prompt Version` + `Judge Score` columns to L2 and L3 Notion DBs. **KPI:** 100% coverage on new articles.
-- [ ] Implement `judgeL2(article)` / `judgeL3(article)` in `gas/src/Code.gs` (Azure OpenAI call with rubric system prompt). **KPI:** median `judge_score` trend over a 30-day window.
-- [ ] Write sidecar `.eval.json` at generation time (operator branch, gitignored from `public/`). **KPI:** 100% of new L4 publishes have a matching sidecar.
-- [ ] Regenerate-on-fail loop (N=3, critique in context) in both the skill and GAS paths. **KPI:** inner-loop first-pass rate, trend over time.
-- [ ] Show `Judge Score` + `Prompt Version` in the L4 publish UI so the operator sees quality before shipping. **KPI:** ratio of flagged-and-regenerated to published.
-- [ ] Weekly cron (GAS) that pulls GA4 Data API and writes `quality/leaderboard.md` on the operator branch. **KPI:** at least one prompt-version decision per month informed by it.
-- [ ] Prompt A/B runner: for N generations, run two prompt variants, judge both, publish the winner; suffix `prompt_version` with `A`/`B` for later separation. **KPI:** one prompt-version accepted by the outer loop per month.
-- [ ] Rubric calibration ritual: every 90 days, sample 20 articles from the `.eval.json` history and re-score by hand; Spearman against the judge; if < 0.5, revise the rubric. **KPI:** rolling 90-day Spearman ≥ 0.5.
+**Step 1 — one generator, one judge (minimum viable inner loop):**
 
-Distribution layer (carryover):
+- [ ] Add `Prompt Version`, `Judge Score`, `Chosen Candidate` columns to L2 and L3 Notion DBs. **KPI:** 100% coverage on new articles.
+- [ ] Implement `judgeL2` / `judgeL3` in `gas/src/Code.gs` against Azure OpenAI GPT-4o using the rubric system prompt. **KPI:** median `judge_score` trend over a 30-day window.
+- [ ] Write sidecar `.eval.json` at generation time (operator branch, gitignored from `public/`). **KPI:** 100% of L4 publishes have a matching sidecar.
+- [ ] Regenerate-on-fail loop (N=3, critique in context). **KPI:** inner-loop first-pass rate, trend over time.
+- [ ] Show `Judge Score` + `Chosen Candidate` in the L4 publish UI. **KPI:** ratio of flagged-and-regenerated to published.
+
+**Step 2 — judge panel (multi-perspective evaluation):**
+
+- [ ] Add Anthropic Claude API key to GAS script properties; wire `editor-claude` judge. **KPI:** panel disagreement rate (how often judges disagree by ≥ 1.5 on a dim).
+- [ ] Add `reader-gpt4o-mini` judge. **KPI:** fraction of articles blocked by per-dim floor — this should rise initially.
+- [ ] Extend the sidecar writer to emit `candidates[0].judges[]` with 3 entries. **KPI:** schema conformance.
+
+**Step 3 — generator panel (multi-candidate generation):**
+
+- [ ] Add `claude-pattern` generator; run both generators in parallel per article. **KPI:** "chosen candidate" distribution — if it's always the same generator, the panel is degenerate.
+- [ ] Implement aggregate-and-choose logic (`passesGate` over candidates). **KPI:** % of articles where the non-default generator wins.
+
+**Step 4 — outer loop:**
+
+- [ ] Weekly cron (GAS) that pulls GA4 Data API and writes `quality/leaderboard.md` on the operator branch, bucketed by generator `prompt_version`. **KPI:** at least one panel-member decision per month informed by it.
+- [ ] Rubric calibration ritual: every 90 days, sample 20 articles from the `.eval.json` history and re-score by hand; Spearman against the aggregate panel score; if < 0.5, revise the rubric. **KPI:** rolling 90-day Spearman ≥ 0.5.
+
+**Distribution layer (carryover):**
 
 - [ ] SSG or per-article prerender for real OG images and zero-JS article loads.
 - [ ] RSS feed from `public/posts/manifest.json`.
