@@ -1,6 +1,6 @@
 // Minimal service worker to meet PWA install criteria and enable offline shell.
 // Cache is bumped via CACHE_VERSION; bump it whenever the shell changes.
-const CACHE_VERSION = 'v1'
+const CACHE_VERSION = 'v2'
 const CACHE_NAME = `ai-native-l1-${CACHE_VERSION}`
 const SHELL = [
   '/ai-native-article/',
@@ -46,6 +46,24 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(request.url)
   if (url.origin === self.location.origin) {
+    // Network-first for post data (manifest + .md + images) so new L4 publishes
+    // land immediately. Cache-first for the rest of the shell.
+    const isPostData = url.pathname.includes('/posts/')
+    if (isPostData) {
+      event.respondWith(
+        fetch(request)
+          .then(response => {
+            if (response.ok) {
+              const copy = response.clone()
+              caches.open(CACHE_NAME).then(cache => cache.put(request, copy))
+            }
+            return response
+          })
+          .catch(() => caches.match(request))
+      )
+      return
+    }
+
     event.respondWith(
       caches.match(request).then(cached => cached || fetch(request).then(response => {
         if (response.ok) {

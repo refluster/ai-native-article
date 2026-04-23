@@ -540,6 +540,9 @@ function handleL3Create(data, config) {
     'Abstract': { rich_text: [{ text: { content: abstract } }] },
     'Category': { rich_text: [{ text: { content: generatedCategory } }] },
     'Source Article URLs': { rich_text: [{ text: { content: l2SourceUrls.join(', ') } }] },
+    // fetch-notion.mjs reads this for the manifest's date; empty values sink
+    // new entries to the bottom of the home-page sort.
+    'Date': { date: { start: new Date().toISOString().split('T')[0] } },
   };
 
   const pageData = {

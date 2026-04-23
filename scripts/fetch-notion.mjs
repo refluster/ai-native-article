@@ -238,7 +238,10 @@ async function main() {
       const title    = propText(props.Title)
       const abstract = propText(props.Abstract)
       const category = propText(props.Category)
-      const date     = propText(props.Date)
+      // Fall back to Notion's created_time when the Date property is empty
+      // (GAS-created L3 entries don't populate Date). Without this, those
+      // entries sort as `""` and sink below the manually-dated backlog.
+      const date     = propText(props.Date) || page.created_time || ''
       const slug     = slugFromId(page.id)
 
       console.log(`  ↳  ${title || page.id}`)
