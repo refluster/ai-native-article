@@ -85,22 +85,22 @@ Zone A (see [AGENTS.md](AGENTS.md)). The roster — which providers, which persp
 
 **Phase 1 — prompt-only diversity (current):**
 
-All panel members bind to the same `azure-gpt4o` model and differentiate purely by system prompt. This ships the ensemble against the provider already wired; there is no blocker on external API keys.
+All panel members bind to the same `azure-gpt5` model and differentiate purely by system prompt. This ships the ensemble against the provider already wired; there is no blocker on external API keys.
 
 *Generator panel:*
 
 | Id         | Model binding  | System-prompt lens                                  |
 | ---------- | -------------- | ---------------------------------------------------- |
-| `pattern`  | `azure-gpt4o`  | "Find the principle that connects these sources"     |
-| `skeptic`  | `azure-gpt4o`  | "Be the senior editor who cuts weak claims"          |
+| `pattern`  | `azure-gpt5`  | "Find the principle that connects these sources"     |
+| `skeptic`  | `azure-gpt5`  | "Be the senior editor who cuts weak claims"          |
 
 *Judge panel:*
 
 | Id       | Perspective | Model binding | Weight | Lens                                              |
 | -------- | ----------- | ------------- | ------ | -------------------------------------------------- |
-| `editor` | editor      | `azure-gpt4o` | 0.25   | "Senior Japanese editorial director"               |
-| `domain` | domain      | `azure-gpt4o` | 0.40   | "Engineering lead at a large Japanese manufacturer" |
-| `reader` | reader      | `azure-gpt4o` | 0.35   | "Busy target reader skimming in under 3 minutes"   |
+| `editor` | editor      | `azure-gpt5` | 0.25   | "Senior Japanese editorial director"               |
+| `domain` | domain      | `azure-gpt5` | 0.40   | "Engineering lead at a large Japanese manufacturer" |
+| `reader` | reader      | `azure-gpt5` | 0.35   | "Busy target reader skimming in under 3 minutes"   |
 
 Every judge scores every dim. The weight is how much a perspective counts in the aggregate, not which dim it owns. Domain is weighted highest because factual alignment and falsifiability are the claims most likely to go wrong and least likely to be caught by an editor's eye. The reader judge is deliberately terse — its system prompt instructs it to skim, not analyze, because a thorough reader judge is indistinguishable from a domain judge and the panel collapses to one perspective.
 
@@ -244,13 +244,13 @@ Quality layer is sequenced so the panel ships incrementally — single judge fir
 
 **Step 2 — judge panel (multi-perspective evaluation, Azure OpenAI only):**
 
-- [ ] Wire `editor` and `reader` judges alongside `domain`, all against `azure-gpt4o`. Three rubric system prompts, one per perspective. **KPI:** panel disagreement rate (how often judges disagree by ≥ 1.5 on a dim). If near zero, the system prompts are not differentiated enough.
+- [ ] Wire `editor` and `reader` judges alongside `domain`, all against `azure-gpt5`. Three rubric system prompts, one per perspective. **KPI:** panel disagreement rate (how often judges disagree by ≥ 1.5 on a dim). If near zero, the system prompts are not differentiated enough.
 - [ ] Extend the sidecar writer to emit `candidates[0].judges[]` with 3 entries. **KPI:** schema conformance.
 - [ ] Enforce the per-judge per-dim floor and the L3 falsifiability floor. **KPI:** fraction of articles blocked by the floor (should rise initially, settle as prompts mature).
 
 **Step 3 — generator panel (multi-candidate generation, Azure OpenAI only):**
 
-- [ ] Wire `pattern` and `skeptic` generators, both against `azure-gpt4o`, differentiated by system prompt. Run in parallel per article. **KPI:** "chosen candidate" distribution — if one generator always wins, the panel is degenerate and the losing prompt needs revision or retirement.
+- [ ] Wire `pattern` and `skeptic` generators, both against `azure-gpt5`, differentiated by system prompt. Run in parallel per article. **KPI:** "chosen candidate" distribution — if one generator always wins, the panel is degenerate and the losing prompt needs revision or retirement.
 - [ ] Implement aggregate-and-choose logic (`passesGate` + `pickWinner`) over candidates. **KPI:** % of articles where the non-default generator wins (target: neither > 70% over a rolling month).
 
 **Step 4 — outer loop:**
