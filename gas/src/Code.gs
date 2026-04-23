@@ -62,6 +62,26 @@ function notionUpdatePage(pageId, properties, apiKey) {
   return notionRequest('PATCH', `/pages/${pageId}`, apiKey, { properties });
 }
 
+// ─── CATEGORY TAXONOMY ───────────────────────────────────────────────────────
+// L1_SAVE stores a single letter A–E (see handleL1Save prompt). L2/L3 want the
+// human-readable form. Inputs already containing a descriptor (e.g. "B: Trends"
+// from manual edits) pass through unchanged.
+
+const CATEGORY_NAMES = {
+  A: 'A: AI Hyper-productivity',
+  B: 'B: Role Blurring',
+  C: 'C: New Roles/FDE',
+  D: 'D: Big Tech Layoffs & AI Pivot',
+  E: 'E: Rethinking SDLC',
+};
+
+function expandCategoryCode(code) {
+  const trimmed = (code || '').trim();
+  if (!trimmed) return '';
+  if (trimmed.length > 2) return trimmed;
+  return CATEGORY_NAMES[trimmed.toUpperCase()] || trimmed;
+}
+
 // ─── AZURE OPENAI ────────────────────────────────────────────────────────────
 
 function azureGenerateText(prompt, apiKey) {
@@ -418,11 +438,13 @@ function handleL2Create(data, config) {
   // Convert markdown to Notion blocks
   const blocks = markdownToNotionBlocks(blogContent);
 
+  const fullCategory = expandCategoryCode(l1Category);
   const properties = {
     'Name': { title: [{ text: { content: blogTitle } }] },
     'Publication Date': { date: { start: new Date().toISOString().split('T')[0] } },
     'Source URLs': { url: l1SourceUrl },
-    'Sub Category': { rich_text: [{ text: { content: l1Category } }] },
+    'Sub Category': { rich_text: [{ text: { content: fullCategory } }] },
+    'Categories': { multi_select: fullCategory ? [{ name: fullCategory }] : [] },
     'Contents Summary': { rich_text: [{ text: { content: l1Summary } }] },
     '実務への使い道': { rich_text: [{ text: { content: 'AIのビジネス応用に関する実務的な洞察' } }] },
   };
@@ -664,6 +686,28 @@ function handleL4List(config) {
   return { success: true, data: entries };
 }
 
+// ─── MAINTENANCE ─────────────────────────────────────────────────────────────
+
+// One-shot backfill: set Date = created_time (date portion) for L3 rows where
+// Date is empty. Idempotent — re-running only touches rows still blank.
+function handleL3BackfillDate(_data, config) {
+  const pages = notionQueryDatabase(config.l3_db_id, config.notion_api_key);
+  const updated = [];
+  const errors = [];
+  for (const p of pages) {
+    if (p.properties.Date?.date?.start) continue;
+    const createdDate = (p.created_time || '').split('T')[0];
+    if (!createdDate) continue;
+    try {
+      notionUpdatePage(p.id, { 'Date': { date: { start: createdDate } } }, config.notion_api_key);
+      updated.push({ id: p.id, date: createdDate });
+    } catch (e) {
+      errors.push({ id: p.id, error: String(e && e.message || e) });
+    }
+  }
+  return { success: true, data: { updated: updated.length, items: updated, errors } };
+}
+
 // ─── DAILY BATCH HANDLERS ────────────────────────────────────────────────────
 //
 // Three batches run independently on daily triggers. Each is idempotent:
@@ -686,7 +730,10 @@ function handleL2Batch(_data, config) {
     .sort((a, b) => (a.created_time || '').localeCompare(b.created_time || ''));
   const pending = l1Pages.filter(p => {
     const u = p.properties['Source URL']?.url;
-    return u && !coveredUrls.has(u);
+    if (!u || coveredUrls.has(u)) return false;
+    // Test/placeholder fixtures must not flow into L2/L3.
+    if (/^https?:\/\/(www\.)?example\.com(\/|$)/i.test(u)) return false;
+    return true;
   });
 
   const picked = pending.slice(0, L2_BATCH_MAX);
@@ -891,6 +938,9 @@ function doPost(e) {
       case 'REBUILD_MANIFEST':
         response = rebuildManifestFromNotion(config);
         break;
+      case 'L3_BACKFILL_DATE':
+        response = handleL3BackfillDate(data, config);
+        break;
       default:
         response = { success: false, error: `Unknown action: ${action}` };
     }
@@ -914,7 +964,7 @@ function doGet(e) {
     JSON.stringify({
       success: false,
       error: 'This is a POST-only API. Use POST requests with {"action":"..."}',
-      supportedActions: ['L1_SAVE', 'L1_LIST', 'L2_CREATE', 'L2_LIST', 'L2_BATCH', 'L3_CREATE', 'L3_LIST', 'L3_BATCH', 'L4_PUBLISH', 'L4_LIST', 'L4_BATCH', 'REBUILD_MANIFEST']
+      supportedActions: ['L1_SAVE', 'L1_LIST', 'L2_CREATE', 'L2_LIST', 'L2_BATCH', 'L3_CREATE', 'L3_LIST', 'L3_BATCH', 'L3_BACKFILL_DATE', 'L4_PUBLISH', 'L4_LIST', 'L4_BATCH', 'REBUILD_MANIFEST']
     })
   ).setMimeType(ContentService.MimeType.JSON);
 }
