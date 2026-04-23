@@ -22,7 +22,7 @@ Agents may propose diffs. Agents may NOT merge without a human on the PR.
 - [.github/workflows/*.yml](.github/workflows/)
 - **L2/L3 generator prompts** — [skills/l2-ai-blog/SKILL.md](skills/l2-ai-blog/SKILL.md), [skills/l3-insight/SKILL.md](skills/l3-insight/SKILL.md), and the prompt blocks in [gas/src/Code.gs](gas/src/Code.gs). This applies to *every* generator on the panel.
 - **Judge rubric text and thresholds** — the rubric tables in [GROWTH.md §3, §4](GROWTH.md), and `JUDGE_GATE` / `DIM_FLOOR` / `FALSIFIABILITY_FLOOR` constants in [src/types/quality.ts](src/types/quality.ts).
-- **Panel rosters** — `JUDGE_ROSTER` and `GENERATOR_ROSTER` in [src/types/quality.ts](src/types/quality.ts). Adding or removing a panel member, or changing perspective weights, is a product-shape decision.
+- **Panel rosters and model registry** — `JUDGE_ROSTER`, `GENERATOR_ROSTER`, and `MODEL_REGISTRY` in [src/types/quality.ts](src/types/quality.ts). Adding or removing a panel member, changing perspective weights, activating a new provider in the registry, or migrating a roster entry to a new `modelBinding` are all product-shape decisions.
 
 Rationale: these files encode the brand, the typography, the deployment surface, and the governance itself. A design-token change cascades across every article. A workflow change can nuke production. A prompt change is an identity change — it shifts what the product *is*. A rubric change invalidates every score that came before it. Humans approve.
 
@@ -70,7 +70,7 @@ Nobody edits by hand. Agents regenerate via scripts only.
 9. **When in doubt, file an issue, not a PR.** It is cheaper for a human to redirect an idea than to close a PR.
 10. **Every L2/L3 generation writes a sidecar `.eval.json`** with full panel output — every candidate, every judge (schema: [src/types/quality.ts](src/types/quality.ts)). No sidecar → no publish. This applies whether the generator is a Claude skill or the GAS pathway. Articles missing the sidecar are treated as Zone A changes and require human review.
 11. **A prompt-version bump is its own PR.** Do not bundle a prompt change with unrelated work. The outer-loop leaderboard attributes reader behavior by `generator.systemPromptVersion`; mixed PRs corrupt attribution. Bumping two panel members in one PR is also forbidden — bump one at a time so the outer loop can tell which move helped.
-12. **Model disjointness must hold after every roster change.** No generator on the panel shares a model id with any judge on the panel. A PR that changes the roster must include a one-line "disjointness check" in the description.
+12. **Model disjointness — Phase 2 rule.** Once `MODEL_REGISTRY` contains two or more *active* providers, no generator on the panel may share a `modelBinding` with any judge on the panel. In Phase 1 (single provider, all members on `azure-gpt4o`) the rule is inactive by design — see GROWTH.md §2a trade-off. Every PR that activates a second provider or changes a `modelBinding` must include a "disjointness check" line in the description proving the rule holds after the change.
 
 ## 3. What machines decide vs. what humans decide
 

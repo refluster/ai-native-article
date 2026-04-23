@@ -79,32 +79,45 @@ The panel approach generalizes the proxy/true-loss pairing: the **judge panel** 
 
 ### 2a. Panels — starter roster
 
-Zone A (see [AGENTS.md](AGENTS.md)). The roster itself — which models, which perspectives, which weights — is a product-shape decision, not an implementation detail.
+Zone A (see [AGENTS.md](AGENTS.md)). The roster — which providers, which perspectives, which weights — is a product-shape decision, not an implementation detail.
 
-**Generator panel — starter (both L2 and L3):**
+**Provider model registry** lives in [src/types/quality.ts `MODEL_REGISTRY`](src/types/quality.ts) and is the single source of truth for which providers are active. Starting state: **Azure OpenAI only**, using the `AZURE_OPENAPI_KEY` + `AZURE_OPENAPI_ENDPOINT` already configured for the existing L2/L3 GAS calls. Anthropic, OpenAI-direct, and Gemini are pre-shaped in the registry as commented-out stanzas — activating one is a config change (add env var, uncomment, update the relevant roster entry's `modelBinding`).
 
-| Id                      | Model                   | System-prompt lens                                    |
-| ----------------------- | ----------------------- | ------------------------------------------------------ |
-| `claude-pattern`        | Claude Sonnet 4.x       | "Find the principle that connects these sources"       |
-| `gpt-skeptic`           | Azure OpenAI GPT-4o     | "Be the senior editor who cuts weak claims"            |
+**Phase 1 — prompt-only diversity (current):**
 
-Two is the floor. Adding a third (e.g., Gemini) is one config change once its API key is available.
+All panel members bind to the same `azure-gpt4o` model and differentiate purely by system prompt. This ships the ensemble against the provider already wired; there is no blocker on external API keys.
 
-**Judge panel — starter (both L2 and L3):**
+*Generator panel:*
 
-| Id                  | Perspective | Model                    | Weight | Scores which dims             |
-| ------------------- | ----------- | ------------------------ | ------ | ------------------------------ |
-| `editor-claude`     | editor      | Claude Sonnet 4.x        | 0.25   | all dims, as a senior editor   |
-| `domain-gpt4o`      | domain      | Azure OpenAI GPT-4o      | 0.40   | all dims, as a domain expert   |
-| `reader-gpt4o-mini` | reader      | Azure OpenAI GPT-4o-mini | 0.35   | all dims, as a target reader   |
+| Id         | Model binding  | System-prompt lens                                  |
+| ---------- | -------------- | ---------------------------------------------------- |
+| `pattern`  | `azure-gpt4o`  | "Find the principle that connects these sources"     |
+| `skeptic`  | `azure-gpt4o`  | "Be the senior editor who cuts weak claims"          |
 
-**Design note:** every judge scores every dim. The weight is not which-dim-owns-whom, it is "how much does this perspective count." Domain is weighted highest because factual alignment and falsifiability are the claims most likely to go wrong and least likely to be caught by an editor's eye. The reader judge is deliberately the cheapest model — it simulates skim behavior, and a capable model would read too charitably.
+*Judge panel:*
 
-**Critical constraint — model disjointness:**
-- No generator shares a model with any judge in the same run. A generator scoring its own output is a known biased signal ("LLM-as-a-judge" literature, 2023–2025). The roster above respects this at start.
-- When a new panel member is added, a PR must explicitly show it does not violate this.
+| Id       | Perspective | Model binding | Weight | Lens                                              |
+| -------- | ----------- | ------------- | ------ | -------------------------------------------------- |
+| `editor` | editor      | `azure-gpt4o` | 0.25   | "Senior Japanese editorial director"               |
+| `domain` | domain      | `azure-gpt4o` | 0.40   | "Engineering lead at a large Japanese manufacturer" |
+| `reader` | reader      | `azure-gpt4o` | 0.35   | "Busy target reader skimming in under 3 minutes"   |
 
-**Cost envelope:** 2 generators + 3 judges = 5 Azure/Anthropic calls per article. For the current ~2–3 L3/week cadence that is pocket change; for higher throughput the reader judge can be run only on the top-scoring candidate after the first judge round, a standard cascaded-ranker trick. Document when implemented.
+Every judge scores every dim. The weight is how much a perspective counts in the aggregate, not which dim it owns. Domain is weighted highest because factual alignment and falsifiability are the claims most likely to go wrong and least likely to be caught by an editor's eye. The reader judge is deliberately terse — its system prompt instructs it to skim, not analyze, because a thorough reader judge is indistinguishable from a domain judge and the panel collapses to one perspective.
+
+**Phase 1 trade-off (accepted, documented):** All panel members on one provider means the generator and its judges share a model. The LLM-as-judge literature (2023–2025) shows this produces a mild self-favoring bias — a judge scores its own family's outputs ~3–8% higher on subjective dims. We accept this in Phase 1 because (a) single-provider shipping is much faster, (b) the three distinct judge system prompts already discipline against charity (the domain judge is instructed to be adversarial on claims, the reader judge to be adversarial on time-to-insight), and (c) the outer loop will surface the bias if it distorts reader behavior. Rubric calibration (§11 roadmap) also catches it.
+
+**Phase 2 — model diversity (unlock when ready):**
+
+Swap individual `modelBinding` values in the rosters to point at activated registry entries. Suggested sequence:
+1. `editor` → Anthropic (a different family on the judge side, on the highest-prompt-sensitivity perspective).
+2. `pattern` → Anthropic (generator-side diversity; matches the Phase-2 name the previous revision used).
+3. `reader` → Gemini (cheap, skim-oriented, third family).
+
+**Model disjointness rule** is Phase 2-gated: when at least two providers are in the registry, no generator may share a `modelBinding` with any judge. In Phase 1 the rule is inactive because there is only one active binding; AGENTS.md rule 12 is written accordingly.
+
+**Cost envelope:** 2 generators + 3 judges = **5 Azure OpenAI calls per article** (~$0.03–0.10 per L3 at current pricing). At ~2–3 L3/week that is under $2/month. For higher throughput the reader judge can be run only on the top-scoring candidate after an initial judge round — a standard cascaded-ranker trick, deferred until throughput justifies it.
+
+**Prompt-version naming scheme (frozen):** `{level}-{rosterId}-{YYYY-MM-DD}{variant}`. Examples: `l3-pattern-2026-04-23a`, `l2-skeptic-2026-04-24a`, `rubric-l3-editor-2026-04-23`. The outer-loop leaderboard keys on this exact string, so changes to the scheme require a migration.
 
 ## 3. L2 rubric — "Blog synthesis from L1 sources"
 
@@ -208,13 +221,14 @@ Shipped: public header/footer show only reader-facing routes. L1–L4 operator p
 
 ## 10. Companion apps — re-ranked by quality leverage
 
-1. **Anthropic Claude API** — now first-class: one generator (`claude-pattern`) and one judge (`editor-claude`). Needed to respect the model-disjointness rule.
-2. **Azure OpenAI** — one generator (`gpt-skeptic`) and two judges (`domain-gpt4o`, `reader-gpt4o-mini`). Still the biggest single leverage surface because most of the prompts live against it.
-3. **Notion** — host the `Prompt Version`, `Judge Score`, and `Chosen Candidate` columns; operator filters by them pre-publish.
-4. **GA4 + GA4 Data API** — outer-loop signal. Event side shipped; Data API reader not yet built.
-5. **Google Search Console** — unchanged: verify domain, submit sitemap.
-6. **GAS cron scheduler** — weekly report writer, panel A/B runner host.
-7. **X / LinkedIn scheduled post** — deferred until prerender lands.
+1. **Azure OpenAI** — Phase 1 host for the full panel: 2 generators + 3 judges, differentiated by system prompt. Biggest single leverage surface because *every* prompt in the panel lives against it.
+2. **Notion** — host the `Prompt Version`, `Judge Score`, and `Chosen Candidate` columns; operator filters by them pre-publish.
+3. **GA4 + GA4 Data API** — outer-loop signal. Event side shipped; Data API reader not yet built.
+4. **Google Search Console** — unchanged: verify domain, submit sitemap.
+5. **GAS cron scheduler** — weekly report writer, panel A/B runner host.
+6. **Anthropic Claude API** — Phase 2 activator. Adds true model diversity to the panel once its key is available. Already shaped in the model registry.
+7. **Gemini / OpenAI-direct** — further Phase 2 options, pre-shaped in the registry, activated when the bias signal warrants.
+8. **X / LinkedIn scheduled post** — deferred until prerender lands.
 
 ## 11. Roadmap — quality layer first
 
@@ -228,21 +242,28 @@ Quality layer is sequenced so the panel ships incrementally — single judge fir
 - [ ] Regenerate-on-fail loop (N=3, critique in context). **KPI:** inner-loop first-pass rate, trend over time.
 - [ ] Show `Judge Score` + `Chosen Candidate` in the L4 publish UI. **KPI:** ratio of flagged-and-regenerated to published.
 
-**Step 2 — judge panel (multi-perspective evaluation):**
+**Step 2 — judge panel (multi-perspective evaluation, Azure OpenAI only):**
 
-- [ ] Add Anthropic Claude API key to GAS script properties; wire `editor-claude` judge. **KPI:** panel disagreement rate (how often judges disagree by ≥ 1.5 on a dim).
-- [ ] Add `reader-gpt4o-mini` judge. **KPI:** fraction of articles blocked by per-dim floor — this should rise initially.
+- [ ] Wire `editor` and `reader` judges alongside `domain`, all against `azure-gpt4o`. Three rubric system prompts, one per perspective. **KPI:** panel disagreement rate (how often judges disagree by ≥ 1.5 on a dim). If near zero, the system prompts are not differentiated enough.
 - [ ] Extend the sidecar writer to emit `candidates[0].judges[]` with 3 entries. **KPI:** schema conformance.
+- [ ] Enforce the per-judge per-dim floor and the L3 falsifiability floor. **KPI:** fraction of articles blocked by the floor (should rise initially, settle as prompts mature).
 
-**Step 3 — generator panel (multi-candidate generation):**
+**Step 3 — generator panel (multi-candidate generation, Azure OpenAI only):**
 
-- [ ] Add `claude-pattern` generator; run both generators in parallel per article. **KPI:** "chosen candidate" distribution — if it's always the same generator, the panel is degenerate.
-- [ ] Implement aggregate-and-choose logic (`passesGate` over candidates). **KPI:** % of articles where the non-default generator wins.
+- [ ] Wire `pattern` and `skeptic` generators, both against `azure-gpt4o`, differentiated by system prompt. Run in parallel per article. **KPI:** "chosen candidate" distribution — if one generator always wins, the panel is degenerate and the losing prompt needs revision or retirement.
+- [ ] Implement aggregate-and-choose logic (`passesGate` + `pickWinner`) over candidates. **KPI:** % of articles where the non-default generator wins (target: neither > 70% over a rolling month).
 
 **Step 4 — outer loop:**
 
-- [ ] Weekly cron (GAS) that pulls GA4 Data API and writes `quality/leaderboard.md` on the operator branch, bucketed by generator `prompt_version`. **KPI:** at least one panel-member decision per month informed by it.
+- [ ] Weekly cron (GAS) that pulls GA4 Data API and writes `quality/leaderboard.md` on the operator branch, bucketed by the winning candidate's `systemPromptVersion`. **KPI:** at least one panel-member decision per month informed by it.
 - [ ] Rubric calibration ritual: every 90 days, sample 20 articles from the `.eval.json` history and re-score by hand; Spearman against the aggregate panel score; if < 0.5, revise the rubric. **KPI:** rolling 90-day Spearman ≥ 0.5.
+
+**Step 5 — model diversity (Phase 2, unlocks when additional keys are added):**
+
+- [ ] Add Anthropic API key; activate `anthropic-sonnet` in `MODEL_REGISTRY`; migrate `editor` judge to it. **KPI:** change in panel disagreement on subjective dims (expected to rise).
+- [ ] Migrate `pattern` generator to Anthropic. **KPI:** change in chosen-candidate distribution.
+- [ ] Add Gemini; migrate `reader` judge. **KPI:** same as above.
+- [ ] Turn on AGENTS.md rule 12 (model-disjointness) as a hard check in the panel roster linter. **KPI:** zero Phase-2 PRs merge with disjointness violations.
 
 **Distribution layer (carryover):**
 
