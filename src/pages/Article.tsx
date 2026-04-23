@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { ArticleMeta } from '../types/article'
 import { withBasePath } from '../lib/paths'
+import { setArticleSeo, setDefaultSeo } from '../lib/seo'
+import { trackEvent, isOutbound, hrefHost } from '../lib/analytics'
 
 interface Frontmatter extends ArticleMeta {
   notionId?: string
+  image?: string
 }
 
 function parseFrontmatter(raw: string): { meta: Partial<Frontmatter>; content: string } {
@@ -36,6 +39,9 @@ const IMAGES = [
   withBasePath('assets/images/article-9.jpg'),
 ]
 
+// Scroll-depth thresholds we report as distinct events (GROWTH.md §2).
+const DEPTH_STEPS = [25, 50, 75, 90] as const
+
 export default function Article() {
   const { slug } = useParams<{ slug: string }>()
   const [meta, setMeta] = useState<Partial<Frontmatter>>({})
@@ -43,18 +49,34 @@ export default function Article() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [articleIndex, setArticleIndex] = useState(0)
+  const [manifestImage, setManifestImage] = useState<string | undefined>()
+
+  // Refs so the scroll listener closes over mutable state without re-binding.
+  const depthsHit = useRef<Set<number>>(new Set())
+  const completeFired = useRef(false)
+  const mountedAt = useRef<number>(0)
+  const articleRef = useRef<HTMLElement | null>(null)
+  const slugRef = useRef<string | undefined>(slug)
+  const categoryRef = useRef<string>('')
+
+  useEffect(() => {
+    slugRef.current = slug
+    depthsHit.current = new Set()
+    completeFired.current = false
+    mountedAt.current = Date.now()
+  }, [slug])
 
   useEffect(() => {
     if (!slug) return
     setLoading(true)
     setError(false)
 
-    // Get index from manifest for image selection
     fetch(withBasePath('posts/manifest.json'))
       .then(r => r.json())
-      .then((manifest: ArticleMeta[]) => {
+      .then((manifest: (ArticleMeta & { image?: string })[]) => {
         const idx = manifest.findIndex(a => a.slug === slug)
         setArticleIndex(idx >= 0 ? idx : 0)
+        if (idx >= 0 && manifest[idx].image) setManifestImage(manifest[idx].image)
       })
       .catch(() => {})
 
@@ -68,13 +90,115 @@ export default function Article() {
         setMeta(m)
         setContent(c)
         setLoading(false)
-        document.title = m.title ? `${m.title} — AI NATIVE ARTICLE` : 'AI NATIVE ARTICLE'
+        categoryRef.current = m.category || ''
+        setArticleSeo({
+          title: m.title || 'Untitled',
+          description: m.abstract || '',
+          slug,
+          category: m.category,
+          date: m.date,
+          image: m.image,
+        })
+        trackEvent({
+          name: 'article_view',
+          params: {
+            slug,
+            category: m.category || '',
+            date: m.date || '',
+          },
+        })
       })
       .catch(() => {
         setError(true)
         setLoading(false)
       })
+
+    return () => {
+      setDefaultSeo()
+    }
   }, [slug])
+
+  // Re-emit SEO once the manifest image resolves, so og:image points at the
+  // per-article asset rather than nothing.
+  useEffect(() => {
+    if (!slug || !meta.title || !manifestImage) return
+    setArticleSeo({
+      title: meta.title,
+      description: meta.abstract || '',
+      slug,
+      category: meta.category,
+      date: meta.date,
+      image: manifestImage,
+    })
+  }, [manifestImage, meta.title, meta.abstract, meta.category, meta.date, slug])
+
+  // Scroll-depth tracking. We measure relative to the article body, not the
+  // full page, so header/footer don't distort the signal.
+  useEffect(() => {
+    if (!content) return
+
+    function onScroll() {
+      const el = articleRef.current
+      const s = slugRef.current
+      if (!el || !s) return
+
+      const rect = el.getBoundingClientRect()
+      const viewportBottom = window.innerHeight
+      const totalHeight = rect.height
+      const scrolledPast = Math.min(totalHeight, Math.max(0, viewportBottom - rect.top))
+      const pct = totalHeight > 0 ? (scrolledPast / totalHeight) * 100 : 0
+
+      for (const step of DEPTH_STEPS) {
+        if (pct >= step && !depthsHit.current.has(step)) {
+          depthsHit.current.add(step)
+          const name =
+            step === 25 ? 'article_read_25' :
+            step === 50 ? 'article_read_50' :
+            step === 75 ? 'article_read_75' :
+            'article_read_90'
+          trackEvent({
+            name,
+            params: { slug: s, category: categoryRef.current },
+          } as never)
+        }
+      }
+
+      if (pct >= 90 && !completeFired.current) {
+        const dwell = Date.now() - mountedAt.current
+        if (dwell >= 30_000) {
+          completeFired.current = true
+          trackEvent({
+            name: 'article_read_complete',
+            params: { slug: s, category: categoryRef.current, dwell_ms: dwell },
+          })
+        }
+      }
+    }
+
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [content])
+
+  // Link classification: outbound vs internal. Fires one event per click;
+  // does not intercept the navigation.
+  function onBodyClick(e: React.MouseEvent<HTMLElement>) {
+    const target = (e.target as HTMLElement).closest('a')
+    if (!target || !slug) return
+    const href = target.getAttribute('href') || ''
+    if (!href) return
+    if (isOutbound(href)) {
+      trackEvent({
+        name: 'outbound_click',
+        params: { slug, href, host: hrefHost(href) },
+      })
+    } else {
+      trackEvent({
+        name: 'internal_link_click',
+        params: { slug, href },
+      })
+    }
+  }
 
   if (loading) {
     return (
@@ -100,7 +224,7 @@ export default function Article() {
     )
   }
 
-  const heroImage = IMAGES[articleIndex % IMAGES.length]
+  const heroImage = manifestImage ? withBasePath(manifestImage) : IMAGES[articleIndex % IMAGES.length]
 
   return (
     <>
@@ -147,7 +271,11 @@ export default function Article() {
       </div>
 
       {/* Article body */}
-      <article className="max-w-3xl mx-auto px-6 md:px-12 py-16 article-content">
+      <article
+        ref={articleRef}
+        className="max-w-3xl mx-auto px-6 md:px-12 py-16 article-content"
+        onClick={onBodyClick}
+      >
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
       </article>
 

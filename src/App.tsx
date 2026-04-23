@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import Header from './components/Header'
 import Footer from './components/Footer'
 import Home from './pages/Home'
@@ -10,10 +11,20 @@ import L2Blog from './pages/L2Blog'
 import L3Insight from './pages/L3Insight'
 import L4Publish from './pages/L4Publish'
 import { routerBaseName } from './lib/paths'
+import { trackPageView } from './lib/analytics'
+
+function RouteTracker() {
+  const location = useLocation()
+  useEffect(() => {
+    trackPageView(location.pathname + location.search, document.title)
+  }, [location.pathname, location.search])
+  return null
+}
 
 export default function App() {
   return (
     <BrowserRouter basename={routerBaseName()}>
+      <RouteTracker />
       <div className="min-h-screen flex flex-col bg-surface">
         <Header />
         <main className="flex-1 pt-16">

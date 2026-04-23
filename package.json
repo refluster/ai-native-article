@@ -9,7 +9,9 @@
     "fetch-notion": "node scripts/fetch-notion.mjs",
     "check-gas": "node scripts/check-gas-manifest.mjs",
     "push-gas": "npm run check-gas && clasp push --force",
-    "deploy-gas": "npm run push-gas && clasp deploy -i AKfycbwT9brOVSZqKzpf9-yZ_O8BHKJiFuZxwxawKK4FAhBwq-sdloyv56rDgNec9uQ2N4u-"
+    "deploy-gas": "npm run push-gas && clasp deploy -i AKfycbwT9brOVSZqKzpf9-yZ_O8BHKJiFuZxwxawKK4FAhBwq-sdloyv56rDgNec9uQ2N4u-",
+    "lint:tokens": "node scripts/lint-design-tokens.mjs",
+    "sitemap": "node scripts/generate-sitemap.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

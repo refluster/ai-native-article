@@ -1,0 +1,22 @@
+# CODEOWNERS — Zone A approvals enforced here.
+# See AGENTS.md for the full zone model.
+
+# Default: Zone B — any human maintainer can approve.
+*                               @refluster
+
+# Zone A — design identity, tokens, build surface. Humans only.
+/DESIGN.md                      @refluster
+/GROWTH.md                      @refluster
+/AGENTS.md                      @refluster
+/tailwind.config.ts             @refluster
+/src/config/                    @refluster
+/src/index.css                  @refluster
+/.github/CODEOWNERS             @refluster
+/.github/workflows/             @refluster
+/CNAME                          @refluster
+
+# Zone C — content. No approval required (empty owners list means default
+# branch-protection rules still apply, but no CODEOWNERS review is triggered).
+/public/posts/
+/public/sitemap.xml
+/public/robots.txt

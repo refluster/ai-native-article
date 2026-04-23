@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { SITE_BASE_PATH } from './config/site'
+import { initAnalytics } from './lib/analytics'
+
+initAnalytics(import.meta.env.VITE_GA_ID)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

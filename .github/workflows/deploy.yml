@@ -36,7 +36,15 @@ jobs:
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
         run: npm run fetch-notion
 
+      - name: Design-token lint
+        run: npm run lint:tokens
+
+      - name: Generate sitemap + robots
+        run: npm run sitemap
+
       - name: Build
+        env:
+          VITE_GA_ID: ${{ secrets.GA4_MEASUREMENT_ID }}
         run: npm run build
 
       - name: Copy CNAME

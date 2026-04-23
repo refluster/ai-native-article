@@ -1,47 +1,32 @@
 import { NavLink } from 'react-router-dom'
 
+const publicNav = [
+  { to: '/', label: 'INDEX', end: true },
+  { to: '/design-system', label: 'DESIGN SYSTEM' },
+  { to: '/design-guide', label: 'DESIGN GUIDE' },
+]
+
 export default function Header() {
   return (
-    <header className="fixed top-0 left-0 w-full z-50 bg-surface/90 backdrop-blur-xl border-b border-outline-variant/20">
+    <header className="fixed top-0 left-0 w-full z-50 bg-surface/90 backdrop-blur-xl">
       <div className="flex items-center justify-between px-6 md:px-12 h-16 w-full max-w-[1440px] mx-auto">
         <nav className="hidden lg:flex gap-6 items-center">
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) =>
-              `font-bold tracking-[-0.02em] uppercase text-xs transition-colors pb-1 ${
-                isActive
-                  ? 'text-on-surface border-b-2 border-tertiary'
-                  : 'text-outline hover:text-on-surface'
-              }`
-            }
-          >
-            INDEX
-          </NavLink>
-          <NavLink
-            to="/design-system"
-            className={({ isActive }) =>
-              `font-bold tracking-[-0.02em] uppercase text-xs transition-colors pb-1 ${
-                isActive
-                  ? 'text-on-surface border-b-2 border-tertiary'
-                  : 'text-outline hover:text-on-surface'
-              }`
-            }
-          >
-            Design System
-          </NavLink>
-          <NavLink
-            to="/design-guide"
-            className={({ isActive }) =>
-              `font-bold tracking-[-0.02em] uppercase text-xs transition-colors pb-1 ${
-                isActive
-                  ? 'text-on-surface border-b-2 border-tertiary'
-                  : 'text-outline hover:text-on-surface'
-              }`
-            }
-          >
-            Design Guide
-          </NavLink>
+          {publicNav.map(({ to, label, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={({ isActive }) =>
+                `font-bold tracking-[-0.02em] uppercase text-xs transition-colors pb-1 ${
+                  isActive
+                    ? 'text-on-surface border-b-2 border-tertiary'
+                    : 'text-outline hover:text-on-surface'
+                }`
+              }
+            >
+              {label}
+            </NavLink>
+          ))}
         </nav>
 
         <NavLink to="/" className="text-2xl font-black tracking-tighter text-on-surface uppercase">
@@ -54,12 +39,17 @@ export default function Header() {
 
         {/* Mobile nav */}
         <nav className="flex lg:hidden gap-4 items-center">
-          <NavLink to="/design-system" className="text-[10px] font-bold tracking-widest text-outline uppercase hover:text-on-surface">
-            DS
-          </NavLink>
-          <NavLink to="/design-guide" className="text-[10px] font-bold tracking-widest text-outline uppercase hover:text-on-surface">
-            DG
-          </NavLink>
+          {publicNav
+            .filter(n => n.to !== '/')
+            .map(({ to, label }) => (
+              <NavLink
+                key={to}
+                to={to}
+                className="text-[10px] font-bold tracking-widest text-outline uppercase hover:text-on-surface"
+              >
+                {label.split(' ').map(w => w[0]).join('')}
+              </NavLink>
+            ))}
         </nav>
       </div>
     </header>
