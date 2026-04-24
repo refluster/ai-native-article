@@ -115,7 +115,21 @@ Swap individual `modelBinding` values in the rosters to point at activated regis
 
 **Model disjointness rule** is Phase 2-gated: when at least two providers are in the registry, no generator may share a `modelBinding` with any judge. In Phase 1 the rule is inactive because there is only one active binding; AGENTS.md rule 12 is written accordingly.
 
-**Cost envelope:** 2 generators + 3 judges = **5 Azure OpenAI calls per article** (~$0.03–0.10 per L3 at current pricing). At ~2–3 L3/week that is under $2/month. For higher throughput the reader judge can be run only on the top-scoring candidate after an initial judge round — a standard cascaded-ranker trick, deferred until throughput justifies it.
+**Cost envelope:** 2 generators + 3 judges = **5 Azure OpenAI calls per article**. With the reasoning-effort defaults below that puts L3 at roughly $0.10–0.30 per article at current `gpt-5.4` pricing; at ~2–3 L3/week that is under $5/month. For higher throughput the reader judge can be run only on the top-scoring candidate after an initial judge round — a standard cascaded-ranker trick, deferred until throughput justifies it.
+
+**Reasoning-effort defaults per panel member** (verified on this deployment by direct probe 2026-04-23 — `gpt-5.4` accepts the `reasoning_effort` parameter):
+
+| Role       | Id       | Effort    | Why                                                                 |
+| ---------- | -------- | --------- | -------------------------------------------------------------------- |
+| generator  | `pattern`| `high`    | L3's "find the principle across disparate L2s" is the single task on this site where deep multi-step reasoning most clearly pays. This is where the compute buys the most quality. |
+| generator  | `skeptic`| `medium`  | Editorial cutting benefits from some deliberation (weighing alternatives) but isn't deeply multi-step.       |
+| judge      | `editor` | `low`     | Rubric scoring is bounded; higher effort tends to inflate charitable scores.                                 |
+| judge      | `domain` | `low`     | Same.                                                                                                        |
+| judge      | `reader` | `low`     | The reader judge is deliberately shallow — it simulates skim behavior.                                       |
+
+Latency envelope (measured order-of-magnitude, not guaranteed): `low` ≈ 8–20 s, `medium` ≈ 20–40 s, `high` ≈ 40–120 s. GAS has a hard 6-minute per-call ceiling; L3 `pattern` at `high` with 5 source L2s needs measurement before chaining — it is the most-likely member to bump into the ceiling. If it does, the fix is to split the L3 call into "draft" + "refine" or to drop `pattern` to `medium` and re-measure reader-completion impact via the outer loop.
+
+`max_tokens` vs `max_completion_tokens`: `gpt-5.4` and the rest of the reasoning family reject the legacy `max_tokens` parameter and require `max_completion_tokens`. `azureGenerateText` in `gas/src/Code.gs` uses the new name; this is not a per-member tunable and should not be reverted.
 
 **Prompt-version naming scheme (frozen):** `{level}-{rosterId}-{YYYY-MM-DD}{variant}`. Examples: `l3-pattern-2026-04-23a`, `l2-skeptic-2026-04-24a`, `rubric-l3-editor-2026-04-23`. The outer-loop leaderboard keys on this exact string, so changes to the scheme require a migration.
 
