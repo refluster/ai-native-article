@@ -84,22 +84,38 @@ function expandCategoryCode(code) {
 
 // ─── AZURE OPENAI ────────────────────────────────────────────────────────────
 
-function azureGenerateText(prompt, apiKey) {
+/**
+ * Call Azure OpenAI chat completions.
+ *
+ * @param {string} prompt      User message.
+ * @param {string} apiKey      Azure OpenAI API key.
+ * @param {Object} [options]   Optional per-call tunables. Unknown keys are
+ *                             ignored by the API; invalid values cause 400.
+ * @param {string} [options.systemPrompt]
+ *     Overrides the default system prompt. Needed for panel members
+ *     (pattern / skeptic / editor / domain / reader) once roster-aware
+ *     calls land.
+ * @param {('minimal'|'low'|'medium'|'high')} [options.reasoningEffort]
+ *     Maps to OpenAI's `reasoning_effort`. Only applied when set. See
+ *     GROWTH.md §2a for the per-member defaults and the latency /
+ *     cost envelope. `gpt-5.4` supports this parameter (verified by
+ *     direct Azure probe 2026-04-23); older Azure deployments may
+ *     reject it with 400.
+ */
+function azureGenerateText(prompt, apiKey, options) {
+  options = options || {};
   const endpoint = 'https://rg-phd-openai-uehara.openai.azure.com/';
   const deploymentId = 'gpt-5.4';
   const apiVersion = '2024-12-01-preview';
   const url = `${endpoint}openai/deployments/${deploymentId}/chat/completions?api-version=${apiVersion}`;
 
+  const systemPrompt = options.systemPrompt ||
+    'You are a skilled tech writer creating high-quality AI industry insights.';
+
   const payload = {
     messages: [
-      {
-        role: 'system',
-        content: 'You are a skilled tech writer creating high-quality AI industry insights.',
-      },
-      {
-        role: 'user',
-        content: prompt,
-      },
+      { role: 'system', content: systemPrompt },
+      { role: 'user',   content: prompt },
     ],
     temperature: 0.7,
     // gpt-5.4 is reasoning-family and rejects the legacy `max_tokens`
@@ -108,6 +124,13 @@ function azureGenerateText(prompt, apiKey) {
     // of the deployment on 2026-04-23.
     max_completion_tokens: 2000,
   };
+
+  // Only attach reasoning_effort when explicitly requested. Leaving it
+  // unset lets the deployment use its default, which also means current
+  // call sites (L2_CREATE / L3_CREATE) are bit-for-bit unchanged.
+  if (options.reasoningEffort) {
+    payload.reasoning_effort = options.reasoningEffort;
+  }
 
   const response = UrlFetchApp.fetch(url, {
     method: 'post',

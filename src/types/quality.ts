@@ -162,14 +162,23 @@ export interface ArticleEval {
 // -------- Panel rosters --------
 //
 // Phase 1: all members bind to `azure-gpt5` and differentiate purely by
-// system prompt. This lets us ship the ensemble against the one provider
-// already wired. Phase 2 swaps individual `modelBinding` entries to reach
-// real model diversity — the rosters change, nothing else.
+// system prompt + reasoning effort. This lets us ship the ensemble
+// against the one provider already wired. Phase 2 swaps individual
+// `modelBinding` entries to reach real model diversity — the rosters
+// change, nothing else.
+
+/** How much hidden deliberation the model should do before answering.
+ *  Supported by reasoning-family models (o-series, gpt-5.x). Ignored by
+ *  providers / models that don't support it (the scorer should strip
+ *  the field before the wire call in that case). See GROWTH.md §2a. */
+export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high'
 
 export interface GeneratorRosterEntry {
   id: string                      // e.g. 'pattern'
   modelBinding: ModelBinding['id']
   systemPromptVersion: string
+  /** Per-member tunable. Omit to fall back to the scorer default. */
+  reasoningEffort?: ReasoningEffort
 }
 
 export interface JudgeRosterEntry {
@@ -179,19 +188,28 @@ export interface JudgeRosterEntry {
   /** Panel weight; the weights across all judges must sum to 1. */
   weight: number
   rubricVersion: string
+  /** Per-member tunable. Judges generally want 'low' — rubric scoring
+   *  is bounded and high effort tends toward over-charitable reasoning. */
+  reasoningEffort?: ReasoningEffort
 }
 
-/** Starter generator roster. Zone A. */
+/** Starter generator roster. Zone A.
+ *  Effort levels: L3 synthesis is where deep multi-step reasoning pays
+ *  off most (pattern-finding across disparate sources), so `pattern`
+ *  runs high. `skeptic` runs medium — editorial cutting benefits from
+ *  deliberation but isn't deeply multi-step. */
 export const GENERATOR_ROSTER: GeneratorRosterEntry[] = [
-  { id: 'pattern', modelBinding: 'azure-gpt5', systemPromptVersion: 'l3-pattern-2026-04-23a' },
-  { id: 'skeptic', modelBinding: 'azure-gpt5', systemPromptVersion: 'l3-skeptic-2026-04-23a' },
+  { id: 'pattern', modelBinding: 'azure-gpt5', systemPromptVersion: 'l3-pattern-2026-04-23a', reasoningEffort: 'high' },
+  { id: 'skeptic', modelBinding: 'azure-gpt5', systemPromptVersion: 'l3-skeptic-2026-04-23a', reasoningEffort: 'medium' },
 ]
 
-/** Starter judge roster. Weights must sum to 1. Zone A. */
+/** Starter judge roster. Weights must sum to 1. Zone A.
+ *  All judges at 'low' — scoring against a fixed rubric is bounded work;
+ *  higher effort risks over-charitable score inflation. */
 export const JUDGE_ROSTER: JudgeRosterEntry[] = [
-  { id: 'editor', perspective: 'editor', modelBinding: 'azure-gpt5', weight: 0.25, rubricVersion: 'rubric-l3-editor-2026-04-23' },
-  { id: 'domain', perspective: 'domain', modelBinding: 'azure-gpt5', weight: 0.40, rubricVersion: 'rubric-l3-domain-2026-04-23' },
-  { id: 'reader', perspective: 'reader', modelBinding: 'azure-gpt5', weight: 0.35, rubricVersion: 'rubric-l3-reader-2026-04-23' },
+  { id: 'editor', perspective: 'editor', modelBinding: 'azure-gpt5', weight: 0.25, rubricVersion: 'rubric-l3-editor-2026-04-23', reasoningEffort: 'low' },
+  { id: 'domain', perspective: 'domain', modelBinding: 'azure-gpt5', weight: 0.40, rubricVersion: 'rubric-l3-domain-2026-04-23', reasoningEffort: 'low' },
+  { id: 'reader', perspective: 'reader', modelBinding: 'azure-gpt5', weight: 0.35, rubricVersion: 'rubric-l3-reader-2026-04-23', reasoningEffort: 'low' },
 ]
 
 // -------- Gates --------
