@@ -101,6 +101,12 @@ function expandCategoryCode(code) {
  *     cost envelope. `gpt-5.4` supports this parameter (verified by
  *     direct Azure probe 2026-04-23); older Azure deployments may
  *     reject it with 400.
+ * @param {number} [options.maxCompletionTokens]
+ *     Override `max_completion_tokens`. For gpt-5.4 (reasoning family)
+ *     this budget covers reasoning + visible output combined; long
+ *     visible outputs (e.g. L3's 3000–4000 char Japanese insights)
+ *     need headroom or visible content is truncated to empty.
+ *     Defaults to 2000.
  */
 function azureGenerateText(prompt, apiKey, options) {
   options = options || {};
@@ -122,7 +128,7 @@ function azureGenerateText(prompt, apiKey, options) {
     // parameter with HTTP 400 `unsupported_parameter`; use the newer
     // `max_completion_tokens` instead. Verified by direct Azure probe
     // of the deployment on 2026-04-23.
-    max_completion_tokens: 2000,
+    max_completion_tokens: options.maxCompletionTokens || 2000,
   };
 
   // Only attach reasoning_effort when explicitly requested. Leaving it
@@ -150,7 +156,18 @@ function azureGenerateText(prompt, apiKey, options) {
   }
 
   const result = JSON.parse(content);
-  return result.choices?.[0]?.message?.content || '';
+  // gpt-5.4 occasionally returns 200 OK with empty `content` — most often
+  // when reasoning consumes the entire `max_completion_tokens` budget
+  // (finish_reason='length') or when content filters strip the output.
+  // Without this guard the empty string flows downstream and we publish a
+  // zero-byte article. finish_reason in the message helps triage in logs.
+  const choice = result.choices?.[0];
+  const text = choice?.message?.content || '';
+  if (!text) {
+    const reason = choice?.finish_reason || 'unknown';
+    throw new Error(`Azure OpenAI returned empty content (finish_reason=${reason}). Raw: ${JSON.stringify(result).substring(0, 500)}`);
+  }
+  return text;
 }
 
 // ─── GITHUB API ──────────────────────────────────────────────────────────────
@@ -576,13 +593,29 @@ function handleL3Create(data, config) {
   //const contentPrompt = `以下の複数のAI関連ブログ記事の内容を分析してください：\n\n${sourceList}\n\n【タスク】これらの記事が示す具体的事実を観察し、それらを統一的に説明する最も可能性の高い深層原理（仮説）を帰納的推論で導出してください。その仮説に基づいて、以下の構成で日本語のディープダイブインサイト記事（3000-4000字）を執筆してください：\n\n【記事の構成】\n- 導入（100-200字）：一見無関係な複数の事実を提示し、「実はこれらは同じ原理で説明できる」と宣言\n- 分析セクション（×2-4）：各セクションで異なる視点から事実を深掘りし、L2記事からの具体的引用・数字・事例を含める\n- 共通原理の提示（500-800字）：「Why」から「So What」へ。観察された事実群を統一的に説明する根底原理を論理的に展開\n- 未来予測と示唆（500-800字）：この原理から導出される将来の状況変化と、その確率・根拠、読者への実務的な示唆\n\n【重要な指示】\n- 冒頭50字程度の要旨を含める\n- 各セクションで必ず具体的な数字・引用・事例を複数含める\n- 帰納的推論プロセスを明示的に示す（「これらの事実は～を示唆している」という表現を使用）\n- 単なる要約ではなく、複数記事を横断した新しい洞察を生み出すこと\n- Markdown形式で、##は中見出し、###は小見出しを使用\n\nカテゴリ：${generatedCategory}`;
 
   const contentPrompt = `以下の複数のAI関連ブログ記事の内容を分析してください：\n\n${sourceList}\n\n【タスク】これらの記事が示す具体的事実を観察し、それらを統一的に説明する最も可能性の高い深層原理（仮説）を帰納的推論で導出してください。その仮説に基づいて、以下の構成で日本語のディープダイブインサイト記事（3000-4000字）を執筆してください：\n\n【記事の構成】\n- 導入（100-200字）：一見無関係な複数の事実を提示し、「実はこれらは同じ原理で説明できる」と宣言\n- 分析セクション（×2-4）：各セクションで異なる視点から事実を深掘りし、L2記事からの具体的引用・数字・事例を含める\n- 共通原理の提示（500-800字）：「Why」から「So What」へ。観察された事実群を統一的に説明する根底原理を論理的に展開\n- 未来予測と示唆（500-800字）：この原理から導出される将来の状況変化と、その確率・根拠、読者への実務的な示唆\n\n【重要な指示】\n- 冒頭50字程度の要旨を含める\n- 各セクションで必ず具体的な数字・引用・事例を複数含める\n- 帰納的推論プロセスを明示的に示す（「これらの事実は～を示唆している」という表現を使用）\n- 単なる要約ではなく、複数記事を横断した新しい洞察を生み出すこと\n- Markdown形式で、##は中見出し、###は小見出しを使用\n- 【重要】全文を必ず日本語で出力してください\n\nカテゴリ：${generatedCategory}`;
-  const insightContent = azureGenerateText(contentPrompt, config.azure_openapi_key);
+  // 8000 tokens = ~4000 visible (3000-4000 字 Japanese ≈ 1500-2500 tokens)
+  // + reasoning headroom. The 2000-token default exhausted the entire
+  // budget on reasoning and produced empty `content`, which created the
+  // zero-body L3 page f1eee3c4a119 on 2026-04-25.
+  const insightContent = azureGenerateText(contentPrompt, config.azure_openapi_key, {
+    maxCompletionTokens: 8000,
+  });
+
+  // Defense-in-depth: if azureGenerateText's empty-content guard was ever
+  // bypassed (API shape change, wrapper refactor), refuse to create a
+  // page with no usable body.
+  if (!insightContent || insightContent.trim().length < 200) {
+    throw new Error(`L3 content generation produced insufficient output (length=${insightContent ? insightContent.length : 0}). Aborting page creation so handleL3Batch can retry tomorrow.`);
+  }
 
   // Extract abstract (first 200 chars)
   const abstract = insightContent.substring(0, 200);
 
   // Convert markdown to Notion blocks
   const blocks = markdownToNotionBlocks(insightContent);
+  if (blocks.length === 0) {
+    throw new Error(`L3 content yielded zero Notion blocks after markdown conversion. Source length=${insightContent.length}.`);
+  }
 
   const properties = {
     'Title': { title: [{ text: { content: generatedTitle } }] },

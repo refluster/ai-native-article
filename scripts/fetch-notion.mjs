@@ -248,6 +248,17 @@ async function main() {
 
       const bodyMd = await blocksToMd(page.id)
 
+      // Refuse to publish bodyless pages. Upstream (handleL3Create in
+      // gas/src/Code.gs) now throws on empty Azure output, but a
+      // human-created Notion draft with zero blocks would still slip
+      // through to the SPA as a "title only, no content" article.
+      // Skipping at the manifest stage keeps the live site clean even
+      // if upstream guards fail or are bypassed.
+      if (!bodyMd.trim()) {
+        console.warn(`  ⚠  skipping empty page ${page.id} ("${title}") — body has no content`)
+        continue
+      }
+
       const frontmatter = [
         '---',
         `title: "${esc(title)}"`,
