@@ -14,7 +14,22 @@ function getConfig() {
     l2_db_id: props.getProperty('L2_DB_ID') || '32fd0f0b-e61e-807a-9cde-e9cbb0c3729c',
     l3_db_id: '331d0f0b-e61e-812e-92bf-c1ba92bcd1d9',
     l4_db_id: props.getProperty('L4_DB_ID') || '',
+    // Unified Articles DB — set this Script Property to migrate writes
+    // to the new schema. While empty the L2/L3 handlers keep writing to
+    // the legacy DBs so we can roll out without downtime. See
+    // .claude/plans/l2-l3-db-validated-tulip.md §8 for the rollout
+    // sequence.
+    unified_db_id: props.getProperty('UNIFIED_DB_ID') || '',
   };
+}
+
+/**
+ * True when the unified DB is configured. Handlers branch on this so a
+ * partially-configured environment can keep operating against the legacy
+ * DBs.
+ */
+function useUnifiedDb(config) {
+  return !!(config && config.unified_db_id);
 }
 
 // ─── NOTION API ──────────────────────────────────────────────────────────────
@@ -481,23 +496,45 @@ function handleL2Create(data, config) {
 
   // Convert markdown to Notion blocks
   const blocks = markdownToNotionBlocks(blogContent);
-
   const fullCategory = expandCategoryCode(l1Category);
-  const properties = {
-    'Name': { title: [{ text: { content: blogTitle } }] },
-    'Publication Date': { date: { start: new Date().toISOString().split('T')[0] } },
-    'Source URLs': { url: l1SourceUrl },
-    'Sub Category': { rich_text: [{ text: { content: fullCategory } }] },
-    'Categories': { multi_select: fullCategory ? [{ name: fullCategory }] : [] },
-    'Contents Summary': { rich_text: [{ text: { content: l1Summary } }] },
-    '実務への使い道': { rich_text: [{ text: { content: 'AIのビジネス応用に関する実務的な洞察' } }] },
-  };
+  const today = new Date().toISOString().split('T')[0];
 
-  const pageData = {
-    parent: { database_id: config.l2_db_id },
-    properties: properties,
-    children: blocks,
-  };
+  // Branch on UNIFIED_DB_ID so a half-configured rollout still works.
+  // Schema differences vs. the legacy L2 DB:
+  //   - Title prop is `Title` (not `Name`)
+  //   - Type=explanation, Status=published
+  //   - Source URLs/multi-select collapse into rich_text `SourceURLs`.
+  let pageData;
+  if (useUnifiedDb(config)) {
+    pageData = {
+      parent: { database_id: config.unified_db_id },
+      properties: {
+        'Title': { title: [{ text: { content: blogTitle } }] },
+        'Type': { select: { name: 'explanation' } },
+        'Status': { select: { name: 'published' } },
+        'Date': { date: { start: today } },
+        'Abstract': { rich_text: [{ text: { content: l1Summary } }] },
+        'Category': { rich_text: [{ text: { content: fullCategory } }] },
+        'CategoriesMulti': { multi_select: fullCategory ? [{ name: fullCategory }] : [] },
+        'SourceURLs': { rich_text: [{ text: { content: l1SourceUrl } }] },
+      },
+      children: blocks,
+    };
+  } else {
+    pageData = {
+      parent: { database_id: config.l2_db_id },
+      properties: {
+        'Name': { title: [{ text: { content: blogTitle } }] },
+        'Publication Date': { date: { start: today } },
+        'Source URLs': { url: l1SourceUrl },
+        'Sub Category': { rich_text: [{ text: { content: fullCategory } }] },
+        'Categories': { multi_select: fullCategory ? [{ name: fullCategory }] : [] },
+        'Contents Summary': { rich_text: [{ text: { content: l1Summary } }] },
+        '実務への使い道': { rich_text: [{ text: { content: 'AIのビジネス応用に関する実務的な洞察' } }] },
+      },
+      children: blocks,
+    };
+  }
 
   const result = notionRequest('POST', '/pages', config.notion_api_key, pageData);
   return {
@@ -512,48 +549,169 @@ function handleL2Create(data, config) {
   };
 }
 
+// Forward alias matching the new naming scheme. Plan §3.1 calls for
+// renaming the handlers; we keep both names so downstream callers
+// (doPost, batch wrappers) can adopt the new term incrementally.
+function handleExplanationCreate(data, config) { return handleL2Create(data, config); }
+
+// Markdown → Notion blocks. Reasonably comprehensive; intentionally line-based
+// (no nested lists, no inline-link parsing) to keep the converter simple.
+// Inline emphasis (**bold**, *italic*, `code`, [text](url)) IS preserved via
+// the rich-text segmenter below.
 function markdownToNotionBlocks(mdText) {
   const blocks = [];
   const lines = mdText.split('\n');
+  let inCode = false;
+  let codeLang = '';
+  let codeBuf = [];
 
-  for (const line of lines) {
-    const trimmed = line.trim();
+  function pushParagraph(text) {
+    blocks.push({
+      object: 'block',
+      type: 'paragraph',
+      paragraph: { rich_text: mdInlineToRichText(text) },
+    });
+  }
+
+  for (const rawLine of lines) {
+    // Fenced code blocks. We accumulate body lines until the closing fence.
+    if (inCode) {
+      if (rawLine.trim().startsWith('```')) {
+        blocks.push({
+          object: 'block',
+          type: 'code',
+          code: {
+            language: codeLang || 'plain text',
+            rich_text: [{ type: 'text', text: { content: codeBuf.join('\n') } }],
+          },
+        });
+        inCode = false; codeLang = ''; codeBuf = [];
+      } else {
+        codeBuf.push(rawLine);
+      }
+      continue;
+    }
+    if (rawLine.trim().startsWith('```')) {
+      inCode = true;
+      codeLang = rawLine.trim().slice(3).trim();
+      codeBuf = [];
+      continue;
+    }
+
+    const trimmed = rawLine.trim();
     if (!trimmed) continue;
 
-    if (trimmed.startsWith('## ')) {
+    if (trimmed.startsWith('# ')) {
+      blocks.push({
+        object: 'block',
+        type: 'heading_1',
+        heading_1: { rich_text: mdInlineToRichText(trimmed.substring(2)) },
+      });
+    } else if (trimmed.startsWith('## ')) {
       blocks.push({
         object: 'block',
         type: 'heading_2',
-        heading_2: { rich_text: [{ type: 'text', text: { content: trimmed.substring(3) } }] }
+        heading_2: { rich_text: mdInlineToRichText(trimmed.substring(3)) },
       });
     } else if (trimmed.startsWith('### ')) {
       blocks.push({
         object: 'block',
         type: 'heading_3',
-        heading_3: { rich_text: [{ type: 'text', text: { content: trimmed.substring(4) } }] }
+        heading_3: { rich_text: mdInlineToRichText(trimmed.substring(4)) },
       });
-    } else if (trimmed.startsWith('- ')) {
+    } else if (trimmed.startsWith('> ')) {
+      blocks.push({
+        object: 'block',
+        type: 'quote',
+        quote: { rich_text: mdInlineToRichText(trimmed.substring(2)) },
+      });
+    } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
       blocks.push({
         object: 'block',
         type: 'bulleted_list_item',
-        bulleted_list_item: { rich_text: [{ type: 'text', text: { content: trimmed.substring(2) } }] }
+        bulleted_list_item: { rich_text: mdInlineToRichText(trimmed.substring(2)) },
       });
-    } else if (trimmed.startsWith('* ')) {
+    } else if (/^\d+\.\s+/.test(trimmed)) {
       blocks.push({
         object: 'block',
-        type: 'bulleted_list_item',
-        bulleted_list_item: { rich_text: [{ type: 'text', text: { content: trimmed.substring(2) } }] }
+        type: 'numbered_list_item',
+        numbered_list_item: { rich_text: mdInlineToRichText(trimmed.replace(/^\d+\.\s+/, '')) },
       });
     } else {
-      blocks.push({
-        object: 'block',
-        type: 'paragraph',
-        paragraph: { rich_text: [{ type: 'text', text: { content: trimmed } }] }
-      });
+      pushParagraph(trimmed);
     }
   }
 
+  // Unterminated fence: dump what we collected as a code block anyway so
+  // the body isn't silently lost.
+  if (inCode && codeBuf.length) {
+    blocks.push({
+      object: 'block',
+      type: 'code',
+      code: {
+        language: codeLang || 'plain text',
+        rich_text: [{ type: 'text', text: { content: codeBuf.join('\n') } }],
+      },
+    });
+  }
+
   return blocks;
+}
+
+/**
+ * Best-effort inline-markdown → Notion rich_text segmenter.
+ * Handles the common quartet: **bold**, *italic*, `code`, [text](url).
+ * Order matters — code must be parsed before *italic* so backtick-asterisk
+ * collisions don't double-wrap.
+ */
+function mdInlineToRichText(s) {
+  if (!s) return [];
+  const out = [];
+  let buf = '';
+  let i = 0;
+
+  function flushBuf() {
+    if (buf) {
+      out.push({ type: 'text', text: { content: buf } });
+      buf = '';
+    }
+  }
+
+  while (i < s.length) {
+    const rest = s.slice(i);
+    // [text](url)
+    let m = rest.match(/^\[([^\]]+)\]\(([^)]+)\)/);
+    if (m) {
+      flushBuf();
+      out.push({ type: 'text', text: { content: m[1], link: { url: m[2] } } });
+      i += m[0].length; continue;
+    }
+    // `code`
+    m = rest.match(/^`([^`]+)`/);
+    if (m) {
+      flushBuf();
+      out.push({ type: 'text', text: { content: m[1] }, annotations: { code: true } });
+      i += m[0].length; continue;
+    }
+    // **bold**
+    m = rest.match(/^\*\*([^*]+)\*\*/);
+    if (m) {
+      flushBuf();
+      out.push({ type: 'text', text: { content: m[1] }, annotations: { bold: true } });
+      i += m[0].length; continue;
+    }
+    // *italic* — only when not adjacent to another asterisk (handled by **bold** above).
+    m = rest.match(/^\*([^*\n]+)\*/);
+    if (m) {
+      flushBuf();
+      out.push({ type: 'text', text: { content: m[1] }, annotations: { italic: true } });
+      i += m[0].length; continue;
+    }
+    buf += s[i];
+    i += 1;
+  }
+  flushBuf();
+  return out.length ? out : [{ type: 'text', text: { content: '' } }];
 }
 
 function handleL2List(config) {
@@ -572,12 +730,29 @@ function handleL2List(config) {
 }
 
 function handleL3Create(data, config) {
-  const l2Pages = notionQueryDatabase(config.l2_db_id, config.notion_api_key);
-  const selectedL2 = l2Pages.filter(p => data.l2EntryIds.includes(p.id));
-  const l2Titles = selectedL2.map(p => p.properties.Name.title[0]?.plain_text || '');
-  const l2Summaries = selectedL2.map(p => p.properties['Contents Summary']?.rich_text[0]?.plain_text || '');
-  const l2SourceUrls = selectedL2.map(p => p.properties['Source URLs']?.url || '');
-  const l2Categories = selectedL2.map(p => p.properties['Sub Category']?.rich_text[0]?.plain_text || '');
+  // Source DB: post-migration, the explanations live in the unified DB
+  // alongside analyses. Pre-migration, fall back to the legacy L2 DB.
+  const sourceDbId = useUnifiedDb(config) ? config.unified_db_id : config.l2_db_id;
+  const candidatePages = notionQueryDatabase(sourceDbId, config.notion_api_key);
+  // When reading from the unified DB, restrict the candidate pool to
+  // explanation-type entries — analyses shouldn't feed analyses.
+  const eligible = useUnifiedDb(config)
+    ? candidatePages.filter(p => (p.properties.Type?.select?.name || '') === 'explanation')
+    : candidatePages;
+  const selectedL2 = eligible.filter(p => data.l2EntryIds.includes(p.id));
+  // Property names differ between schemas. The helpers below normalise.
+  function _title(p) { return p.properties.Title?.title[0]?.plain_text || p.properties.Name?.title[0]?.plain_text || ''; }
+  function _summary(p) { return p.properties.Abstract?.rich_text[0]?.plain_text || p.properties['Contents Summary']?.rich_text[0]?.plain_text || ''; }
+  function _sourceUrl(p) {
+    return p.properties.SourceURLs?.rich_text[0]?.plain_text
+      || p.properties['Source URLs']?.url
+      || '';
+  }
+  function _category(p) { return p.properties.Category?.rich_text[0]?.plain_text || p.properties['Sub Category']?.rich_text[0]?.plain_text || ''; }
+  const l2Titles = selectedL2.map(_title);
+  const l2Summaries = selectedL2.map(_summary);
+  const l2SourceUrls = selectedL2.map(_sourceUrl);
+  const l2Categories = selectedL2.map(_category);
 
   const sourceList = l2Titles.map((t, i) => `- ${t}: ${l2Summaries[i].substring(0, 200)}...`).join('\n');
 
@@ -617,21 +792,40 @@ function handleL3Create(data, config) {
     throw new Error(`L3 content yielded zero Notion blocks after markdown conversion. Source length=${insightContent.length}.`);
   }
 
-  const properties = {
-    'Title': { title: [{ text: { content: generatedTitle } }] },
-    'Abstract': { rich_text: [{ text: { content: abstract } }] },
-    'Category': { rich_text: [{ text: { content: generatedCategory } }] },
-    'Source Article URLs': { rich_text: [{ text: { content: l2SourceUrls.join(', ') } }] },
-    // fetch-notion.mjs reads this for the manifest's date; empty values sink
-    // new entries to the bottom of the home-page sort.
-    'Date': { date: { start: new Date().toISOString().split('T')[0] } },
-  };
-
-  const pageData = {
-    parent: { database_id: config.l3_db_id },
-    properties: properties,
-    children: blocks,
-  };
+  const today = new Date().toISOString().split('T')[0];
+  // Branch on UNIFIED_DB_ID so writes go to the new schema once it's
+  // provisioned. The legacy L3 DB property names ("Source Article URLs")
+  // collapse to the unified `SourceURLs` rich_text.
+  let pageData;
+  if (useUnifiedDb(config)) {
+    pageData = {
+      parent: { database_id: config.unified_db_id },
+      properties: {
+        'Title': { title: [{ text: { content: generatedTitle } }] },
+        'Type': { select: { name: 'analysis' } },
+        'Status': { select: { name: 'published' } },
+        'Abstract': { rich_text: [{ text: { content: abstract } }] },
+        'Category': { rich_text: [{ text: { content: generatedCategory } }] },
+        'SourceURLs': { rich_text: [{ text: { content: l2SourceUrls.join(', ') } }] },
+        // fetch-notion.mjs reads this for manifest sort order; empty values
+        // sink new entries to the bottom of the home-page list.
+        'Date': { date: { start: today } },
+      },
+      children: blocks,
+    };
+  } else {
+    pageData = {
+      parent: { database_id: config.l3_db_id },
+      properties: {
+        'Title': { title: [{ text: { content: generatedTitle } }] },
+        'Abstract': { rich_text: [{ text: { content: abstract } }] },
+        'Category': { rich_text: [{ text: { content: generatedCategory } }] },
+        'Source Article URLs': { rich_text: [{ text: { content: l2SourceUrls.join(', ') } }] },
+        'Date': { date: { start: today } },
+      },
+      children: blocks,
+    };
+  }
 
   const result = notionRequest('POST', '/pages', config.notion_api_key, pageData);
   return {
@@ -648,16 +842,55 @@ function handleL3Create(data, config) {
 }
 
 function handleL3List(config) {
-  const pages = notionQueryDatabase(config.l3_db_id, config.notion_api_key);
-  const entries = pages.map(p => ({
+  // In unified mode this lists analysis rows; otherwise the legacy L3 DB.
+  const sourceDbId = useUnifiedDb(config) ? config.unified_db_id : config.l3_db_id;
+  const pages = notionQueryDatabase(sourceDbId, config.notion_api_key);
+  const filtered = useUnifiedDb(config)
+    ? pages.filter(p => (p.properties.Type?.select?.name || '') === 'analysis')
+    : pages;
+  const entries = filtered.map(p => ({
     id: p.id,
-    title: p.properties.Title.title[0]?.plain_text || '',
+    title: p.properties.Title?.title[0]?.plain_text || '',
     abstract: p.properties.Abstract?.rich_text[0]?.plain_text || '',
     category: p.properties.Category?.rich_text[0]?.plain_text || '',
-    sourceUrls: p.properties['Source Article URLs']?.rich_text[0]?.plain_text || '',
+    sourceUrls: p.properties.SourceURLs?.rich_text[0]?.plain_text
+      || p.properties['Source Article URLs']?.rich_text[0]?.plain_text
+      || '',
     notionUrl: p.url,
   }));
 
+  return { success: true, data: entries };
+}
+
+// Forward alias matching the new naming scheme.
+function handleAnalysisCreate(data, config) { return handleL3Create(data, config); }
+
+/**
+ * List unified articles, filtered by type when requested.
+ * `data.type` may be 'explanation' | 'analysis' | undefined (= both).
+ * Falls back to the appropriate legacy DB while UNIFIED_DB_ID is unset.
+ */
+function handleArticleList(data, config) {
+  if (!useUnifiedDb(config)) {
+    if (data && data.type === 'explanation') return handleL2List(config);
+    if (data && data.type === 'analysis') return handleL3List(config);
+    return { success: false, error: 'ARTICLE_LIST without UNIFIED_DB_ID requires data.type to be set' };
+  }
+  const pages = notionQueryDatabase(config.unified_db_id, config.notion_api_key);
+  const wanted = data && data.type;
+  const filtered = wanted ? pages.filter(p => (p.properties.Type?.select?.name || '') === wanted) : pages;
+  const entries = filtered.map(p => ({
+    id: p.id,
+    title: p.properties.Title?.title[0]?.plain_text || '',
+    type: p.properties.Type?.select?.name || '',
+    status: p.properties.Status?.select?.name || '',
+    abstract: p.properties.Abstract?.rich_text[0]?.plain_text || '',
+    category: p.properties.Category?.rich_text[0]?.plain_text || '',
+    date: p.properties.Date?.date?.start || '',
+    sourceUrls: p.properties.SourceURLs?.rich_text[0]?.plain_text || '',
+    legacySlug: p.properties.LegacySlug?.rich_text[0]?.plain_text || '',
+    notionUrl: p.url,
+  }));
   return { success: true, data: entries };
 }
 
@@ -698,35 +931,88 @@ function notionReadPageBlocks(pageId, apiKey) {
 }
 
 function handleL4Publish(data, config) {
-  const l3Pages = notionQueryDatabase(config.l3_db_id, config.notion_api_key);
-  const l3Page = l3Pages.find(p => p.id === data.l3EntryId);
+  // Source DB depends on whether the unified rollout is in effect.
+  // Pre-migration: legacy L3 DB. Post-migration: unified DB containing
+  // both explanation and analysis articles.
+  const sourceDbId = useUnifiedDb(config) ? config.unified_db_id : config.l3_db_id;
+  const pages = notionQueryDatabase(sourceDbId, config.notion_api_key);
+  // Accept either parameter name. Older callers send `l3EntryId`; the
+  // type-neutral `articleId` reads better in the unified world.
+  const articleId = data.articleId || data.l3EntryId;
+  const page = pages.find(p => p.id === articleId);
 
-  if (!l3Page) {
-    throw new Error('L3 entry not found');
+  if (!page) {
+    throw new Error('Article entry not found');
   }
 
-  const title = l3Page.properties.Title.title[0]?.plain_text || '';
-  const abstract = l3Page.properties.Abstract?.rich_text[0]?.plain_text || '';
-  const category = l3Page.properties.Category?.rich_text[0]?.plain_text || '';
-  const date = new Date().toISOString().split('T')[0];
+  const title = page.properties.Title?.title[0]?.plain_text
+    || page.properties.Name?.title[0]?.plain_text
+    || '';
+  const abstract = page.properties.Abstract?.rich_text[0]?.plain_text
+    || page.properties['Contents Summary']?.rich_text[0]?.plain_text
+    || '';
+  const category = page.properties.Category?.rich_text[0]?.plain_text
+    || page.properties['Sub Category']?.rich_text[0]?.plain_text
+    || '';
+  const typeProp = page.properties.Type?.select?.name || 'analysis';
+  const dateProp = page.properties.Date?.date?.start
+    || page.properties['Publication Date']?.date?.start
+    || '';
+  const date = (dateProp || new Date().toISOString().split('T')[0]).split('T')[0];
+  const sourceUrls = page.properties.SourceURLs?.rich_text[0]?.plain_text
+    || page.properties['Source Article URLs']?.rich_text[0]?.plain_text
+    || '';
+  const legacySlug = page.properties.LegacySlug?.rich_text[0]?.plain_text || '';
 
-  // Read full article content from Notion blocks
-  const blocks = notionReadPageBlocks(l3Page.id, config.notion_api_key);
+  const blocks = notionReadPageBlocks(page.id, config.notion_api_key);
   const articleContent = notionBlocksToMarkdown(blocks);
 
-  // Use Notion page ID (without dashes) as slug for uniqueness and consistency
-  const slug = l3Page.id.replace(/-/g, '');
-  const mdContent = `---\ntitle: "${title}"\ncategory: "${category}"\ndate: "${date}"\nabstract: "${abstract}"\nimage: "/posts/images/${slug}.jpg"\nnotionId: "${l3Page.id}"\n---\n\n${articleContent}`;
+  // Slug resolution: legacySlug wins (preserves prior URLs); otherwise
+  // 12-char tail of the Notion page id, matching fetch-notion.mjs's
+  // `slugFromId`. The 32-char-UUID format that earlier versions used is
+  // now retired — its only output ever lived in main, never gh-pages.
+  const slug = legacySlug || page.id.replace(/-/g, '').slice(-12);
+
+  const frontmatter = [
+    '---',
+    `title: "${(title || '').replace(/"/g, '\\"')}"`,
+    `type: "${typeProp}"`,
+    `category: "${(category || '').replace(/"/g, '\\"')}"`,
+    `date: "${date}"`,
+    `abstract: "${(abstract || '').replace(/"/g, '\\"')}"`,
+    `image: "/posts/images/${slug}.jpg"`,
+    `notionId: "${page.id}"`,
+  ];
+  if (sourceUrls) frontmatter.push(`sourceUrls: "${sourceUrls.replace(/"/g, '\\"')}"`);
+  if (legacySlug) frontmatter.push(`legacySlug: "${legacySlug}"`);
+  frontmatter.push('---', '');
+  const mdContent = frontmatter.join('\n') + '\n' + articleContent;
 
   const { url, imageUrl } = githubCreatePost(slug, mdContent, config.gh_token, title, category, config.azure_openapi_key);
-  githubUpdateManifest({ slug, title, category, date, abstract, image: imageUrl }, config.gh_token);
+  githubUpdateManifest({ slug, title, type: typeProp, category, date, abstract, image: imageUrl, sourceUrls }, config.gh_token);
+
+  // Stamp PublishedAt back on the unified row so re-runs and audits know
+  // the publish completed. Best-effort: failures here don't undo the publish.
+  if (useUnifiedDb(config)) {
+    try {
+      notionUpdatePage(page.id, {
+        'Status': { select: { name: 'published' } },
+        'PublishedAt': { date: { start: new Date().toISOString().split('T')[0] } },
+      }, config.notion_api_key);
+    } catch (e) {
+      // Common cause: PublishedAt property not yet created on the DB.
+      // Logged but non-fatal.
+      Logger.log('handleL4Publish: failed to update Status/PublishedAt: ' + e.message);
+    }
+  }
 
   return {
     success: true,
     data: {
-      id: l3Page.id,
+      id: page.id,
       title,
       slug,
+      type: typeProp,
       publishedUrl: url,
       status: 'published',
     },
@@ -779,11 +1065,22 @@ function handleL3BackfillDate(_data, config) {
 // create an L2 blog. Oldest-first, up to L2_BATCH_MAX per run.
 const L2_BATCH_MAX = 3;
 function handleL2Batch(_data, config) {
-  const l2Pages = notionQueryDatabase(config.l2_db_id, config.notion_api_key);
+  // Coverage check pulls from wherever explanation articles live now.
+  const sourceDbId = useUnifiedDb(config) ? config.unified_db_id : config.l2_db_id;
+  const existingPages = notionQueryDatabase(sourceDbId, config.notion_api_key);
+  // Filter to explanation-type rows when reading the unified DB so we
+  // don't accidentally treat analyses as covering the same source URL.
+  const explanationPages = useUnifiedDb(config)
+    ? existingPages.filter(p => (p.properties.Type?.select?.name || '') === 'explanation')
+    : existingPages;
   const coveredUrls = new Set();
-  for (const p of l2Pages) {
-    const u = p.properties['Source URLs']?.url;
-    if (u) coveredUrls.add(u);
+  for (const p of explanationPages) {
+    // Schema-aware: legacy `Source URLs` is a url field; unified
+    // `SourceURLs` is rich_text (single URL for explanations).
+    const u = p.properties['Source URLs']?.url
+      || p.properties.SourceURLs?.rich_text[0]?.plain_text
+      || '';
+    if (u) coveredUrls.add(u.trim());
   }
   const l1Pages = notionQueryDatabase(config.l1_db_id, config.notion_api_key)
     .slice()
@@ -835,7 +1132,12 @@ function handleL3Batch(_data, config) {
   const lastRunAt = props.getProperty(L3_LAST_RUN_KEY) || '';
   const cutoff = new Date(Date.now() - L3_RECENT_DAYS * 86400 * 1000).toISOString();
 
-  const l2Pages = notionQueryDatabase(config.l2_db_id, config.notion_api_key);
+  // Source DB & filtering: in unified mode, restrict to explanation rows.
+  const sourceDbId = useUnifiedDb(config) ? config.unified_db_id : config.l2_db_id;
+  const candidatePages = notionQueryDatabase(sourceDbId, config.notion_api_key);
+  const l2Pages = useUnifiedDb(config)
+    ? candidatePages.filter(p => (p.properties.Type?.select?.name || '') === 'explanation')
+    : candidatePages;
   const recent = l2Pages.filter(p => (p.created_time || '') >= cutoff);
   // "New" = arrived since the last L3 run. Empty lastRunAt (first run ever)
   // treats everything recent as new, so the first invocation isn't blocked.
@@ -900,24 +1202,51 @@ function handleL4Batch(_data, config) {
   const manifest = githubReadManifest(config.gh_token);
   const publishedSlugs = new Set((manifest || []).map(m => m.slug));
 
-  const l3Pages = notionQueryDatabase(config.l3_db_id, config.notion_api_key)
+  // Source DB depends on rollout state. Unified DB carries both
+  // explanation and analysis articles; the legacy L3 DB only has analysis.
+  const sourceDbId = useUnifiedDb(config) ? config.unified_db_id : config.l3_db_id;
+  const pages = notionQueryDatabase(sourceDbId, config.notion_api_key)
     .slice()
-    .sort((a, b) => (a.created_time || '').localeCompare(b.created_time || ''));
-  const pending = l3Pages.filter(p => !publishedSlugs.has(p.id.replace(/-/g, '')));
+    // Date asc → fair coverage: oldest unpublished publishes first.
+    .sort((a, b) => {
+      const da = (a.properties.Date?.date?.start || a.created_time || '').split('T')[0];
+      const db = (b.properties.Date?.date?.start || b.created_time || '').split('T')[0];
+      return da.localeCompare(db);
+    });
+
+  // For unified rows, slug-for-publish considers LegacySlug first, then
+  // 12-char tail. Legacy L3 rows only have the tail option.
+  function pendingSlug(p) {
+    const legacy = p.properties.LegacySlug?.rich_text[0]?.plain_text || '';
+    return legacy || p.id.replace(/-/g, '').slice(-12);
+  }
+
+  // For unified rows we additionally honour Status: only publish rows in
+  // 'ready' or with no Status set. Already-'published' rows are skipped
+  // even if the manifest doesn't include them yet (let CI catch up).
+  // Pre-unified runs see no Status property, so this filter is inert.
+  const pending = pages.filter(p => {
+    if (publishedSlugs.has(pendingSlug(p))) return false;
+    if (useUnifiedDb(config)) {
+      const status = p.properties.Status?.select?.name || '';
+      if (status === 'archived' || status === 'draft') return false;
+    }
+    return true;
+  });
 
   if (pending.length === 0) {
-    return { success: true, data: { processed: 0, skipped: true, reason: 'no unpublished L3 entries' } };
+    return { success: true, data: { processed: 0, skipped: true, reason: 'no unpublished entries' } };
   }
 
   const picked = pending.slice(0, L4_BATCH_MAX);
   const processed = [];
   const errors = [];
-  for (const l3 of picked) {
+  for (const page of picked) {
     try {
-      const result = handleL4Publish({ l3EntryId: l3.id }, config);
-      processed.push({ l3Id: l3.id, slug: result.data.slug, title: result.data.title });
+      const result = handleL4Publish({ articleId: page.id }, config);
+      processed.push({ articleId: page.id, slug: result.data.slug, title: result.data.title, type: result.data.type });
     } catch (e) {
-      errors.push({ l3Id: l3.id, error: String(e && e.message || e) });
+      errors.push({ articleId: page.id, error: String(e && e.message || e) });
     }
   }
   return { success: true, data: { processed: processed.length, remaining: pending.length - picked.length, items: processed, errors } };
@@ -968,17 +1297,25 @@ function doPost(e) {
       case 'L1_LIST':
         response = handleL1List(config);
         break;
+      // L2_CREATE / L3_CREATE remain for backward compat. New callers
+      // should send EXPLANATION_CREATE / ANALYSIS_CREATE which read more
+      // naturally now that the legacy L2/L3 distinction is collapsing.
       case 'L2_CREATE':
-        response = handleL2Create(data, config);
+      case 'EXPLANATION_CREATE':
+        response = handleExplanationCreate(data, config);
         break;
       case 'L2_LIST':
         response = handleL2List(config);
         break;
       case 'L3_CREATE':
-        response = handleL3Create(data, config);
+      case 'ANALYSIS_CREATE':
+        response = handleAnalysisCreate(data, config);
         break;
       case 'L3_LIST':
         response = handleL3List(config);
+        break;
+      case 'ARTICLE_LIST':
+        response = handleArticleList(data, config);
         break;
       case 'L4_PUBLISH':
         response = handleL4Publish(data, config);
@@ -1024,7 +1361,7 @@ function doGet(e) {
     JSON.stringify({
       success: false,
       error: 'This is a POST-only API. Use POST requests with {"action":"..."}',
-      supportedActions: ['L1_SAVE', 'L1_LIST', 'L2_CREATE', 'L2_LIST', 'L2_BATCH', 'L3_CREATE', 'L3_LIST', 'L3_BATCH', 'L3_BACKFILL_DATE', 'L4_PUBLISH', 'L4_LIST', 'L4_BATCH', 'REBUILD_MANIFEST']
+      supportedActions: ['L1_SAVE', 'L1_LIST', 'L2_CREATE', 'EXPLANATION_CREATE', 'L2_LIST', 'L2_BATCH', 'L3_CREATE', 'ANALYSIS_CREATE', 'L3_LIST', 'L3_BATCH', 'ARTICLE_LIST', 'L3_BACKFILL_DATE', 'L4_PUBLISH', 'L4_LIST', 'L4_BATCH', 'REBUILD_MANIFEST']
     })
   ).setMimeType(ContentService.MimeType.JSON);
 }

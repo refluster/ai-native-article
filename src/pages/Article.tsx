@@ -2,14 +2,19 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { ArticleMeta } from '../types/article'
+import type { ArticleMeta, ArticleType } from '../types/article'
 import { withBasePath } from '../lib/paths'
 import { setArticleSeo, setDefaultSeo } from '../lib/seo'
 import { trackEvent, isOutbound, hrefHost } from '../lib/analytics'
+import { ARTICLE_TYPE_LABELS, inferType, isArticleType } from '../lib/article-types'
 
 interface Frontmatter extends ArticleMeta {
   notionId?: string
-  image?: string
+}
+
+const TYPE_BADGE_EN: Record<ArticleType, string> = {
+  explanation: 'EXPLANATION',
+  analysis: 'ANALYSIS',
 }
 
 function parseFrontmatter(raw: string): { meta: Partial<Frontmatter>; content: string } {
@@ -254,7 +259,13 @@ export default function Article() {
             <div className="flex items-center gap-6 text-[10px] font-bold tracking-widest text-outline uppercase">
               {meta.date && <span>{meta.date}</span>}
               <span>AI NATIVE ARTICLE</span>
-              <span>L3 INSIGHT</span>
+              {/* Type-driven label. Falls back to ANALYSIS for legacy
+                  manifest entries that predate the unified-DB rollout. */}
+              <span className="text-tertiary">
+                {ARTICLE_TYPE_LABELS[inferType({ type: isArticleType(meta.type) ? meta.type : undefined })]}
+                {' / '}
+                {TYPE_BADGE_EN[inferType({ type: isArticleType(meta.type) ? meta.type : undefined })]}
+              </span>
             </div>
           </div>
         </div>
