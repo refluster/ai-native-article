@@ -202,6 +202,18 @@ function blockToCreateShape(block) {
   delete shape[type].last_edited_time
   delete shape[type].created_by
   delete shape[type].last_edited_by
+
+  // Notion's GET response includes `icon: null` and `cover: null` on some
+  // block types (notably paragraph). The PATCH /blocks/.../children
+  // validator rejects those nulls with
+  //   "body.children[N].<type>.icon should be an object or `undefined`,
+  //    instead was `null`."
+  // So strip any keys whose value is explicitly null. Keys with concrete
+  // objects (e.g. `icon: { type: "emoji", … }`) pass through.
+  for (const k of Object.keys(shape[type])) {
+    if (shape[type][k] === null) delete shape[type][k]
+  }
+
   return shape
 }
 
