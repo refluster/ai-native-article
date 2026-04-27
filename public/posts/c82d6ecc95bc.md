@@ -1,9 +1,12 @@
 ---
 title: "「AIが会社を動かす」日への3つのベクトル——FDE需要急増・Macrohard・SaaSpocalypseに潜む共通の論理"
+type: "analysis"
 category: "Org Transformation × AI Replacement"
-date: "2026-03-28T06:01:00.000+00:00"
+date: "2026-03-28"
 abstract: "FDE職種800%急増・MacrohardによるAI企業エミュレーション・SaaS株2850億ドル消失（SaaSpocalypse）という一見無関係な3つのトレンドは、「誰がタスクを実行するのか」という同一の問いへの3つの異なる角度の答えだ。現在のFDE急増は「AIへの移行の失敗」ではなく、AIが自律的に企業を運営する段階への準備期間として読み解ける。"
 notionId: "331d0f0b-e61e-8186-868c-c82d6ecc95bc"
+image: "/posts/images/c82d6ecc95bc.jpg"
+sourceUrls: "https://review.firstround.com/so-you-want-to-hire-a-forward-deployed-engineer/, https://www.eweek.com/news/elon-musk-macrohard-ai-software-companies/, https://www.indiatoday.in/technology/features/story/hey-anthropic-take-a-break-from-saas-apocalypse-to-dispatch-claude-ai-is-on-a-tear-with-updates-2887840-2026-03-27"
 ---
 
 一見すると、これらはまったく関係のないニュースです。

@@ -1,18 +1,35 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import ArticleCard from '../components/ArticleCard'
-import type { ArticleMeta } from '../types/article'
+import type { ArticleMeta, ArticleType } from '../types/article'
 import { withBasePath } from '../lib/paths'
 import { setDefaultSeo } from '../lib/seo'
 import { trackEvent } from '../lib/analytics'
+import {
+  ARTICLE_TYPE_LABELS,
+  DATE_RANGE_LABELS,
+  DATE_RANGES,
+  type DateRange,
+  inferType,
+  isArticleType,
+  isDateRange,
+  isWithinDateRange,
+} from '../lib/article-types'
+
+type TypeFilter = 'all' | ArticleType
+
+const TYPE_TABS: { value: TypeFilter; label: string }[] = [
+  { value: 'all', label: 'すべて' },
+  { value: 'explanation', label: ARTICLE_TYPE_LABELS.explanation },
+  { value: 'analysis', label: ARTICLE_TYPE_LABELS.analysis },
+]
 
 export default function Home() {
   const [articles, setArticles] = useState<ArticleMeta[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeCategory, setActiveCategory] = useState<string | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
 
   useEffect(() => {
-    setDefaultSeo()
     fetch(withBasePath('posts/manifest.json'))
       .then(r => r.json())
       .then((data: ArticleMeta[]) => {
@@ -27,25 +44,79 @@ export default function Home() {
       .catch(() => setLoading(false))
   }, [])
 
-  const categories = useMemo(
-    () =>
-      Array.from(new Set(articles.map(a => a.category))).map(cat => ({
-        name: cat,
-        count: articles.filter(a => a.category === cat).length,
-      })),
-    [articles],
-  )
+  // URL query params are the single source of truth for filter state.
+  // This makes filtered views shareable and survives back/forward
+  // navigation without re-mounting the component.
+  const activeType: TypeFilter = (() => {
+    const v = searchParams.get('type')
+    if (v === 'all') return 'all'
+    return isArticleType(v) ? v : 'all'
+  })()
 
-  const visible = activeCategory
-    ? articles.filter(a => a.category === activeCategory)
-    : articles
+  const activeRange: DateRange = (() => {
+    const v = searchParams.get('range')
+    return isDateRange(v) ? v : 'all'
+  })()
+
+  const activeCategory: string | null = searchParams.get('category')
+
+  useEffect(() => {
+    setDefaultSeo()
+  }, [])
+
+  const visible = useMemo(() => {
+    return articles.filter(a => {
+      if (activeType !== 'all' && inferType(a) !== activeType) return false
+      if (!isWithinDateRange(a, activeRange)) return false
+      if (activeCategory && a.category !== activeCategory) return false
+      return true
+    })
+  }, [articles, activeType, activeRange, activeCategory])
+
+  // Categories are derived from the *current* type+range filtered set so the
+  // sidebar reflects what's actually selectable. Without this the sidebar
+  // would advertise category counts that drop to 0 once the user switches
+  // tabs.
+  const categories = useMemo(() => {
+    const pool = articles.filter(a => {
+      if (activeType !== 'all' && inferType(a) !== activeType) return false
+      if (!isWithinDateRange(a, activeRange)) return false
+      return true
+    })
+    return Array.from(new Set(pool.map(a => a.category))).map(cat => ({
+      name: cat,
+      count: pool.filter(a => a.category === cat).length,
+    }))
+  }, [articles, activeType, activeRange])
 
   const featured = visible[0]
   const rest = visible.slice(1)
 
+  function updateParam(key: string, value: string | null) {
+    const next = new URLSearchParams(searchParams)
+    if (value === null || value === '' || value === 'all') {
+      next.delete(key)
+    } else {
+      next.set(key, value)
+    }
+    setSearchParams(next, { replace: true })
+  }
+
+  function onTypeClick(value: TypeFilter) {
+    trackEvent({ name: 'type_filter_click', params: { type: value } })
+    updateParam('type', value)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function onRangeClick(value: DateRange) {
+    trackEvent({ name: 'range_filter_click', params: { range: value } })
+    updateParam('range', value)
+  }
+
   function onCategoryClick(name: string) {
     trackEvent({ name: 'category_click', params: { category: name } })
-    setActiveCategory(current => (current === name ? null : name))
+    // Toggle: clicking the active category clears it.
+    updateParam('category', activeCategory === name ? null : name)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -67,6 +138,61 @@ export default function Home() {
     )
   }
 
+  const filterBar = (
+    <div className="flex flex-wrap items-center gap-x-8 gap-y-4 mb-12 border-b border-outline-variant/20 pb-6">
+      {/* Type tabs */}
+      <div className="flex items-center gap-1" role="tablist" aria-label="記事種別">
+        {TYPE_TABS.map(tab => {
+          const active = activeType === tab.value
+          return (
+            <button
+              key={tab.value}
+              role="tab"
+              aria-selected={active}
+              onClick={() => onTypeClick(tab.value)}
+              className={`px-3 py-2 text-[10px] font-bold tracking-widest uppercase transition-colors border ${
+                active
+                  ? 'bg-tertiary text-on-tertiary border-tertiary'
+                  : 'border-outline-variant/40 hover:border-tertiary hover:text-tertiary'
+              }`}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Date range segmented control */}
+      <div
+        className="flex items-center gap-1"
+        role="radiogroup"
+        aria-label="期間"
+      >
+        <span className="text-[10px] font-bold tracking-widest text-outline uppercase mr-2">
+          期間
+        </span>
+        {DATE_RANGES.map(range => {
+          const active = activeRange === range
+          return (
+            <button
+              key={range}
+              role="radio"
+              aria-checked={active}
+              onClick={() => onRangeClick(range)}
+              className={`px-2 py-2 text-[10px] font-bold tracking-widest uppercase transition-colors ${
+                active
+                  ? 'text-tertiary border-b-2 border-tertiary'
+                  : 'text-outline border-b-2 border-transparent hover:text-tertiary'
+              }`}
+            >
+              {DATE_RANGE_LABELS[range]}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+
   return (
     <>
       {/* Hero */}
@@ -76,13 +202,17 @@ export default function Home() {
             <div className="swiss-grid">
               <div className="col-span-12 lg:col-span-7 relative overflow-hidden">
                 <img
-                  src={withBasePath((featured as ArticleMeta & { image?: string }).image || '/assets/images/ai-native-transformation.jpg')}
+                  src={withBasePath(
+                    featured.image || '/assets/images/ai-native-transformation.jpg',
+                  )}
                   alt={featured.title}
                   className="w-full aspect-[16/9] object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-8">
                   <span className="inline-block bg-tertiary text-on-tertiary px-2 py-1 text-[10px] font-bold tracking-widest uppercase mb-4">
-                    {activeCategory ? 'FILTERED' : 'FEATURED INSIGHT'}
+                    {activeCategory || activeType !== 'all' || activeRange !== 'all'
+                      ? 'FILTERED'
+                      : 'FEATURED INSIGHT'}
                   </span>
                   <Link to={`/article/${featured.slug}`} onClick={onFeaturedClick}>
                     <h2 className="text-3xl md:text-4xl font-black tracking-tight leading-tight text-white hover:text-tertiary transition-colors">
@@ -127,6 +257,7 @@ export default function Home() {
       <section className="max-w-[1440px] mx-auto px-6 md:px-12 py-16">
         <div className="swiss-grid">
           <div className="col-span-12 lg:col-span-9">
+            {filterBar}
             <div className="flex items-center justify-between mb-12">
               <h3 className="text-3xl font-black tracking-tighter uppercase">
                 {activeCategory ?? 'All Insights'}
@@ -141,14 +272,22 @@ export default function Home() {
                 onClick={() => onCategoryClick(activeCategory)}
                 className="mb-8 text-[10px] font-bold tracking-widest text-tertiary uppercase hover:underline"
               >
-                × CLEAR FILTER
+                × CLEAR CATEGORY
               </button>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-16 gap-x-12">
-              {rest.map((article, i) => (
-                <ArticleCard key={article.slug} article={article} index={i} />
-              ))}
-            </div>
+            {visible.length === 0 ? (
+              <div className="py-24 text-center">
+                <span className="text-[10px] font-bold tracking-widest text-outline uppercase">
+                  該当する記事はありません
+                </span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-16 gap-x-12">
+                {rest.map((article, i) => (
+                  <ArticleCard key={article.slug} article={article} index={i} />
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Sidebar */}
@@ -162,7 +301,8 @@ export default function Home() {
                   {articles.slice(0, 3).map((article, i) => (
                     <div key={article.slug} className="group cursor-pointer">
                       <span className="text-[9px] font-bold text-tertiary block mb-2">
-                        {String(i + 1).padStart(2, '0')}. INSIGHT
+                        {String(i + 1).padStart(2, '0')}.{' '}
+                        {ARTICLE_TYPE_LABELS[inferType(article)]}
                       </span>
                       <Link
                         to={`/article/${article.slug}`}
@@ -204,3 +344,4 @@ export default function Home() {
     </>
   )
 }
+
