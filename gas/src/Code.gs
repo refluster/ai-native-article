@@ -274,6 +274,38 @@ function githubReadManifest(token) {
   }
 }
 
+/**
+ * List the slugs that already have a committed cover image. Used by
+ * handleL4Batch to decide which Notion rows still need image
+ * generation. Image existence is more reliable than manifest
+ * membership: scheduled fetch-notion runs add rows to the manifest
+ * regardless of whether L4 has imaged them, so manifest-based gating
+ * caused L4 to skip rows that hadn't been imaged yet (the 09:17 JST
+ * cron racing the 11:00 JST L4 batch).
+ *
+ * GitHub's directory listing returns up to 1000 entries per request;
+ * we're far below that. Falls open (returns empty Set) on any error
+ * so L4 errs on the side of attempting publish rather than silently
+ * skipping work — extra publish attempts are idempotent.
+ */
+function githubListImagedSlugs(token) {
+  try {
+    const result = githubRequest('GET', '/contents/public/posts/images?ref=main', token);
+    const slugs = new Set();
+    if (Array.isArray(result)) {
+      for (const item of result) {
+        if (item && item.name && item.name.endsWith('.jpg')) {
+          slugs.add(item.name.slice(0, -4));
+        }
+      }
+    }
+    return slugs;
+  } catch (e) {
+    Logger.log('githubListImagedSlugs: ' + (e.message || e));
+    return new Set();
+  }
+}
+
 function githubUpdateManifest(entry, token) {
   const manifest = githubReadManifest(token);
   manifest.push(entry);
@@ -1262,8 +1294,14 @@ function handleL3Batch(_data, config) {
 // explicit instead of showing a silent zero-iteration loop.
 const L4_BATCH_MAX = 2;
 function handleL4Batch(_data, config) {
-  const manifest = githubReadManifest(config.gh_token);
-  const publishedSlugs = new Set((manifest || []).map(m => m.slug));
+  // Image existence is the source of truth for "this article has been
+  // L4-published." Manifest membership is NOT — scheduled fetch-notion
+  // runs (deploy.yml cron) add rows to the manifest regardless of
+  // whether L4 has imaged them, so manifest-based gating let L4 skip
+  // rows whose images had never been generated. Image filenames are
+  // stable per slug (handleL4Publish writes <slug>.jpg) so existence
+  // is a faithful proxy for "L4 already ran for this article".
+  const imagedSlugs = githubListImagedSlugs(config.gh_token);
 
   // Source DB depends on rollout state. Unified DB carries both
   // explanation and analysis articles; the legacy L3 DB only has analysis.
@@ -1284,12 +1322,12 @@ function handleL4Batch(_data, config) {
     return legacy || p.id.replace(/-/g, '').slice(-12);
   }
 
-  // For unified rows we additionally honour Status: only publish rows in
-  // 'ready' or with no Status set. Already-'published' rows are skipped
-  // even if the manifest doesn't include them yet (let CI catch up).
-  // Pre-unified runs see no Status property, so this filter is inert.
+  // For unified rows we additionally honour Status: rows marked
+  // 'archived' or 'draft' are explicitly out of band and won't get
+  // imaged. Pre-unified runs see no Status property, so this filter
+  // is inert.
   const pending = pages.filter(p => {
-    if (publishedSlugs.has(pendingSlug(p))) return false;
+    if (imagedSlugs.has(pendingSlug(p))) return false;
     if (useUnifiedDb(config)) {
       const status = p.properties.Status?.select?.name || '';
       if (status === 'archived' || status === 'draft') return false;
@@ -1298,7 +1336,7 @@ function handleL4Batch(_data, config) {
   });
 
   if (pending.length === 0) {
-    return { success: true, data: { processed: 0, skipped: true, reason: 'no unpublished entries' } };
+    return { success: true, data: { processed: 0, skipped: true, reason: 'all eligible articles already imaged' } };
   }
 
   const picked = pending.slice(0, L4_BATCH_MAX);

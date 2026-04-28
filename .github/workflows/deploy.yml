@@ -4,15 +4,22 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  # Edits made directly in Notion (e.g. category fixes via the
-  # normalize script, manual title tweaks, or freshly captured
-  # explanations not yet picked up by the next L4 batch) only surface
-  # when something pushes to main. Without a scheduled run, a quiet
-  # day in the publishing pipeline means a quiet day on the live
-  # site even if the Notion DB has changed. Six-hour cadence picks up
-  # those edits fast enough without burning the free-tier minutes.
+  # Edits made directly in Notion (category fixes via the normalize
+  # script, manual title tweaks, captures whose L4 batch hasn't run
+  # yet) only surface when something pushes to main. Without a
+  # scheduled run, a quiet day in the publishing pipeline means a
+  # quiet day on the live site even if the Notion DB has changed.
+  #
+  # Hours chosen to AVOID the 09:00-11:00 JST GAS batch window. The
+  # earlier `*/6` schedule fired at 09:17 JST — between L2_BATCH
+  # (09:00) and L4_BATCH (11:00) — which let fetch-notion add new
+  # explanations to the manifest before L4 had a chance to generate
+  # their images. L4 then saw them as already-published and skipped.
+  # Running cron only at 15:17 / 21:17 / 03:17 JST keeps it strictly
+  # after L4_BATCH finishes for the day. (See Code.gs handleL4Batch
+  # for the matching belt-and-braces image-existence check.)
   schedule:
-    - cron: '17 */6 * * *'
+    - cron: '17 6,12,18 * * *'
 
 permissions:
   contents: write
