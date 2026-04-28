@@ -276,6 +276,14 @@ export default function Article() {
         <img
           src={heroImage}
           alt={meta.title}
+          onError={(e) => {
+            // 404 backstop. Falls back to the rotating placeholder set
+            // (same set used by ArticleCard) so the hero never shows a
+            // broken image when an L4-published image is missing.
+            const t = e.currentTarget
+            const fallback = IMAGES[articleIndex % IMAGES.length]
+            if (t.src !== fallback) t.src = fallback
+          }}
           className="w-full object-cover grayscale"
           style={{ maxHeight: 480, objectPosition: 'center' }}
         />

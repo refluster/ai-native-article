@@ -16,6 +16,49 @@
 import { writeFileSync, mkdirSync, existsSync } from 'fs'
 import { join } from 'path'
 
+/**
+ * Resolve the actual image file for an article, if any exists.
+ *
+ * Image filenames have drifted across the codebase's history:
+ *   - GAS handleL4Publish wrote `<32-char-no-dash-uuid>.jpg` keyed off
+ *     the legacy L2/L3 page id
+ *   - fetch-notion's slugFromId produces 12-char tails
+ *   - A handful of legacy articles use kebab slugs
+ *
+ * We check the most likely candidates in order. If none exist, return
+ * undefined so the writer omits the `image` field — the UI then falls
+ * back to its placeholder set (see ArticleCard.tsx) instead of a broken
+ * `<img>` tag.
+ */
+function resolveImagePath(record, postsDir) {
+  const candidates = []
+  if (record.slug) candidates.push(record.slug)
+  if (record.legacySlug && !candidates.includes(record.legacySlug)) {
+    candidates.push(record.legacySlug)
+  }
+  // Legacy notion id (set by migrate-to-unified-db.mjs on every migrated
+  // row). GAS handleL4Publish wrote images keyed off the **32-char
+  // no-dash form** of the original L2/L3 page id, so this is the most
+  // reliable hit for analysis articles published before the unified-DB
+  // rollout.
+  if (record.legacyNotionId) {
+    const noDash = record.legacyNotionId.replace(/-/g, '')
+    if (!candidates.includes(noDash)) candidates.push(noDash)
+  }
+  // Fallback: the unified-DB page id itself. Only relevant for entries
+  // that were created directly in the new DB (post Phase E).
+  if (record.notionId) {
+    const noDash = record.notionId.replace(/-/g, '')
+    if (!candidates.includes(noDash)) candidates.push(noDash)
+  }
+  for (const cand of candidates) {
+    if (existsSync(join(postsDir, 'images', `${cand}.jpg`))) {
+      return `/posts/images/${cand}.jpg`
+    }
+  }
+  return undefined
+}
+
 function esc(str) {
   return String(str ?? '')
     .replace(/\\/g, '\\\\')
@@ -57,6 +100,7 @@ export async function writePosts(records, options) {
 
   const manifest = []
   let skipped = 0
+  let withImage = 0
 
   for (const record of records) {
     if (!record.bodyMd || !record.bodyMd.trim()) {
@@ -69,7 +113,16 @@ export async function writePosts(records, options) {
       continue
     }
 
-    const md = frontmatter(record) + '\n' + record.bodyMd
+    // Resolve image path against what's actually on disk so missing
+    // images are absent from the manifest (UI falls back to placeholder)
+    // rather than producing 404s. The fetcher's `imagePath` is just the
+    // canonical guess; the writer is the boundary that knows whether
+    // the asset exists in the build context.
+    const imagePath = resolveImagePath(record, postsDir)
+    if (imagePath) withImage += 1
+
+    const recordWithImage = { ...record, imagePath }
+    const md = frontmatter(recordWithImage) + '\n' + record.bodyMd
     writeFileSync(join(postsDir, `${record.slug}.md`), md)
 
     /** Public manifest shape. Keep field names stable — the SPA reads them
@@ -82,7 +135,7 @@ export async function writePosts(records, options) {
       categoriesMulti: record.categoriesMulti,
       date: record.date,
       abstract: record.abstract,
-      image: record.imagePath,
+      image: imagePath,
       sourceUrls: record.sourceUrls,
     })
   }
@@ -95,8 +148,9 @@ export async function writePosts(records, options) {
   )
 
   logger?.(
-    `\n✅  Done. ${manifest.length} articles written, ${skipped} skipped.`,
+    `\n✅  Done. ${manifest.length} articles written, ${skipped} skipped, ` +
+      `${withImage} with image.`,
   )
 
-  return { written: manifest.length, skipped }
+  return { written: manifest.length, skipped, withImage }
 }

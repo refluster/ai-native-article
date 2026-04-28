@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { ArticleMeta } from '../types/article'
 import { withBasePath } from '../lib/paths'
@@ -22,12 +23,15 @@ interface Props {
 
 export default function ArticleCard({ article, index }: Props) {
   // Per-article images are written by the L4 publish step. When the
-  // manifest entry has none (rare, but possible for very old or imported
-  // entries), fall back to the rotating placeholder set so the grid never
-  // shows a broken image.
-  const image = article.image
-    ? withBasePath(article.image)
-    : FALLBACK_IMAGES[index % FALLBACK_IMAGES.length]
+  // manifest entry has none, fall back to the rotating placeholder set
+  // so the grid never shows a broken image.
+  const fallback = FALLBACK_IMAGES[index % FALLBACK_IMAGES.length]
+  const initial = article.image ? withBasePath(article.image) : fallback
+  // Stale manifests written before the image-existence check (PR #9)
+  // can still point at /posts/images/<slug>.jpg files that 404 in
+  // production. The runtime onError swaps in the placeholder — once
+  // per mount, no flicker loop.
+  const [imgSrc, setImgSrc] = useState(initial)
   const type = inferType(article)
   const typeLabel = ARTICLE_TYPE_LABELS[type]
 
@@ -36,8 +40,11 @@ export default function ArticleCard({ article, index }: Props) {
       <Link to={`/article/${article.slug}`}>
         <div className="aspect-[4/5] bg-surface-container-low mb-6 overflow-hidden">
           <img
-            src={image}
+            src={imgSrc}
             alt={article.title}
+            onError={() => {
+              if (imgSrc !== fallback) setImgSrc(fallback)
+            }}
             className="w-full h-full object-cover grayscale transition-transform duration-700 group-hover:scale-105"
           />
         </div>

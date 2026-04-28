@@ -17,6 +17,7 @@
  *  @property {string} bodyMd                // Body Markdown (no frontmatter)
  *  @property {string} sourceUrls            // Comma-separated URLs (display)
  *  @property {string} legacySlug            // '' if unset
+ *  @property {string} legacyNotionId        // '' if unset; original L2/L3 page id (set by migrate script)
  *  @property {string} notionId              // Original page id, for traceability
  *  @property {string} lastEditedAt          // ISO timestamp; for incremental fetch
  *  @property {string} [imagePath]           // e.g. "/posts/images/<slug>.jpg" or undefined

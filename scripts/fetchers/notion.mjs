@@ -240,6 +240,11 @@ async function pageToRecord(page, apiKey, legacyHint) {
     propText(props['Source Article URLs']) ||
     propText(props['Source URLs'])
   const legacySlug = propText(props.LegacySlug)
+  // Migrated rows carry the original L2/L3 page id in `LegacyNotionId`.
+  // The writer needs this to resolve images written by GAS using the
+  // <32-char-no-dash-uuid>.jpg naming convention — those filenames are
+  // derived from the legacy id, not the new unified-DB id.
+  const legacyNotionId = propText(props.LegacyNotionId)
   const type = resolveType(props, legacyHint)
 
   const bodyMd = await blocksToMd(page.id, apiKey)
@@ -256,6 +261,7 @@ async function pageToRecord(page, apiKey, legacyHint) {
     bodyMd,
     sourceUrls,
     legacySlug,
+    legacyNotionId,
     notionId: page.id,
     lastEditedAt: page.last_edited_time || '',
     imagePath: `/posts/images/${slug}.jpg`,
