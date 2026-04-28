@@ -4,6 +4,15 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Edits made directly in Notion (e.g. category fixes via the
+  # normalize script, manual title tweaks, or freshly captured
+  # explanations not yet picked up by the next L4 batch) only surface
+  # when something pushes to main. Without a scheduled run, a quiet
+  # day in the publishing pipeline means a quiet day on the live
+  # site even if the Notion DB has changed. Six-hour cadence picks up
+  # those edits fast enough without burning the free-tier minutes.
+  schedule:
+    - cron: '17 */6 * * *'
 
 permissions:
   contents: write

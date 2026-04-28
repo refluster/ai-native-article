@@ -97,6 +97,51 @@ function expandCategoryCode(code) {
   return CATEGORY_NAMES[trimmed.toUpperCase()] || trimmed;
 }
 
+/**
+ * Recover the canonical "X: Description" label from any of the variants
+ * that have leaked into the data over time:
+ *   - bare letter "B"
+ *   - "B: TRENDS" / "B: Role Blurring" / "B：Trends" (full-width colon)
+ *   - the canonical label itself
+ *   - free-form Japanese / English (returns '' for these)
+ *
+ * Mirrors scripts/normalize-categories.mjs#canonicalFromLetterForm so the
+ * UI sidebar (driven by fetch-notion) and GAS writes stay aligned.
+ */
+function canonicalCategoryFor(text) {
+  const trimmed = (text || '').trim();
+  if (!trimmed) return '';
+  // Bare letter
+  if (/^[A-E]$/i.test(trimmed)) {
+    return CATEGORY_NAMES[trimmed.toUpperCase()] || '';
+  }
+  // "X[:：]<anything>" — discard the variant descriptor; force canonical.
+  const m = trimmed.match(/^([A-E])[\s:：][\s\S]*$/i);
+  if (m) return CATEGORY_NAMES[m[1].toUpperCase()] || '';
+  return '';
+}
+
+/**
+ * For an L3 (analysis) row, choose the canonical A-E bucket that best
+ * represents the synthesis. Uses majority vote across the source L2s'
+ * categories — falls back to the first non-empty when there's no
+ * majority. Returns '' when none of the sources had a canonical label.
+ */
+function pickCanonicalFromSources(l2Categories) {
+  const counts = {};
+  for (const c of l2Categories) {
+    const canonical = canonicalCategoryFor(c);
+    if (!canonical) continue;
+    counts[canonical] = (counts[canonical] || 0) + 1;
+  }
+  let best = '';
+  let bestN = 0;
+  for (const k of Object.keys(counts)) {
+    if (counts[k] > bestN) { best = k; bestN = counts[k]; }
+  }
+  return best;
+}
+
 // ─── AZURE OPENAI ────────────────────────────────────────────────────────────
 
 /**
@@ -506,6 +551,12 @@ function handleL2Create(data, config) {
   //   - Source URLs/multi-select collapse into rich_text `SourceURLs`.
   let pageData;
   if (useUnifiedDb(config)) {
+    // CategoriesMulti uses the *canonical* form so the sidebar always
+    // groups under one of the 5 controlled buckets. fullCategory is
+    // already canonical (expandCategoryCode maps the bare letter), but
+    // we belt-and-brace via canonicalCategoryFor() in case Azure ever
+    // returns a fuller string in l1Category.
+    const canonical = canonicalCategoryFor(fullCategory) || fullCategory;
     pageData = {
       parent: { database_id: config.unified_db_id },
       properties: {
@@ -514,8 +565,8 @@ function handleL2Create(data, config) {
         'Status': { select: { name: 'published' } },
         'Date': { date: { start: today } },
         'Abstract': { rich_text: [{ text: { content: l1Summary } }] },
-        'Category': { rich_text: [{ text: { content: fullCategory } }] },
-        'CategoriesMulti': { multi_select: fullCategory ? [{ name: fullCategory }] : [] },
+        'Category': { rich_text: [{ text: { content: canonical } }] },
+        'CategoriesMulti': { multi_select: canonical ? [{ name: canonical }] : [] },
         'SourceURLs': { rich_text: [{ text: { content: l1SourceUrl } }] },
       },
       children: blocks,
@@ -798,6 +849,17 @@ function handleL3Create(data, config) {
   // collapse to the unified `SourceURLs` rich_text.
   let pageData;
   if (useUnifiedDb(config)) {
+    // CategoriesMulti for analyses carries TWO tags: the canonical A-E
+    // bucket (so the article shows up under one of the 5 main sidebar
+    // entries) plus the free-form × theme as a sub-tag (so the deeper
+    // synthesis theme stays browsable). Canonical is derived by
+    // majority-vote across the source L2 categories.
+    const canonicalBucket = pickCanonicalFromSources(l2Categories);
+    const tags = [];
+    if (canonicalBucket) tags.push(canonicalBucket);
+    if (generatedCategory && tags.indexOf(generatedCategory) === -1) {
+      tags.push(generatedCategory);
+    }
     pageData = {
       parent: { database_id: config.unified_db_id },
       properties: {
@@ -806,6 +868,7 @@ function handleL3Create(data, config) {
         'Status': { select: { name: 'published' } },
         'Abstract': { rich_text: [{ text: { content: abstract } }] },
         'Category': { rich_text: [{ text: { content: generatedCategory } }] },
+        'CategoriesMulti': { multi_select: tags.map(name => ({ name })) },
         'SourceURLs': { rich_text: [{ text: { content: l2SourceUrls.join(', ') } }] },
         // fetch-notion.mjs reads this for manifest sort order; empty values
         // sink new entries to the bottom of the home-page list.
