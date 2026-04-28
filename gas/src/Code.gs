@@ -1274,6 +1274,23 @@ function setupDailyTriggers() {
   return 'Installed: runL2Batch 09:00 JST, runL3Batch 10:00 JST, runL4Batch 11:00 JST';
 }
 
+// ─── ONE-SHOT SETUP (run from GAS editor) ────────────────────────────────────
+//
+// Setting Script Properties via the GAS UI is fiddly (Project Settings →
+// Script Properties → Add → key/value), so we expose a manual-trigger
+// helper. Run `setupUnifiedDbId` once from the editor's "Run" button to
+// stamp the unified DB id, then this function can stay in source as a
+// no-op safety net (it's idempotent — overwriting with the same value
+// is harmless) or be deleted in a later cleanup.
+
+function setupUnifiedDbId() {
+  // Created via Notion API on 2026-04-27 under page
+  // https://www.notion.so/Articles-Unified-container-34fd0f0be61e81d588d5dca96fbadee1
+  const id = '34fd0f0b-e61e-817a-9f6b-dc65b0d5b4cc';
+  PropertiesService.getScriptProperties().setProperty('UNIFIED_DB_ID', id);
+  return 'UNIFIED_DB_ID set to ' + id;
+}
+
 // ─── HTTP ENTRY POINT ────────────────────────────────────────────────────────
 
 function createCorsResponse(data) {

@@ -34,6 +34,14 @@ jobs:
       - name: Fetch articles from Notion
         env:
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          # Unified Articles DB (created 2026-04-27). When unset, fetch-notion
+          # falls back to the legacy L3 DB id (see scripts/fetch-notion.mjs).
+          UNIFIED_DB_ID: ${{ secrets.UNIFIED_DB_ID }}
+          # Bridge mode (Phase B in the rollout plan): when "true",
+          # fetch-notion reads from BOTH the unified DB and the legacy L3 DB
+          # and dedupes by slug. Used to prove parity post-migration; flip
+          # to "false" (or remove the secret) once verified.
+          FETCH_BRIDGE: ${{ secrets.FETCH_BRIDGE }}
         run: npm run fetch-notion
 
       - name: Design-token lint
