@@ -216,5 +216,15 @@
     "abstract": "Spotifyのエンジニアが数ヶ月間一行もコードを書かない、Figmaがデザインプロセスを「誰でも参加できる」ものに変える、DeloitteがSDLCの全工程をAIエージェントが担う未来を描く——これらは別々のニュースではなく、全職種が同じ方向へ同時に移行しているという、一つの現象の三つの断面である。",
     "image": "/posts/images/e523036cb36d.jpg",
     "sourceUrls": "https://www.deloitte.com/us/en/insights/topics/emerging-technology/ai-agents-software-development.html, https://www.figma.com/blog/state-of-design-2026/, https://thenewstack.io/software-engineers-who-stopped-writing-code/"
+  },
+  {
+    "slug": "c82d6ecc95bc",
+    "title": "「AIが会社を動かす」日への3つのベクトル——FDE需要急増・Macrohard・SaaSpocalypseに潜む共通の論理",
+    "type": "analysis",
+    "category": "Org Transformation × AI Replacement",
+    "date": "2026-03-28",
+    "abstract": "FDE職種800%急増・MacrohardによるAI企業エミュレーション・SaaS株2850億ドル消失（SaaSpocalypse）という一見無関係な3つのトレンドは、「誰がタスクを実行するのか」という同一の問いへの3つの異なる角度の答えだ。現在のFDE急増は「AIへの移行の失敗」ではなく、AIが自律的に企業を運営する段階への準備期間として読み解ける。",
+    "image": "/posts/images/c82d6ecc95bc.jpg",
+    "sourceUrls": "https://review.firstround.com/so-you-want-to-hire-a-forward-deployed-engineer/, https://www.eweek.com/news/elon-musk-macrohard-ai-software-companies/, https://www.indiatoday.in/technology/features/story/hey-anthropic-take-a-break-from-saas-apocalypse-to-dispatch-claude-ai-is-on-a-tear-with-updates-2887840-2026-03-27"
   }
 ]
