@@ -202,7 +202,18 @@ function CaptureBody() {
         body: JSON.stringify({ action: 'L1_LIST' }),
       })
       const data = await response.json()
-      if (data.success) setEntries(data.data || [])
+      if (data.success) {
+        const list: CapturedEntry[] = data.data || []
+        // Newest-first by save time (Notion `created_time`). Putting a
+        // freshly-captured entry at the top is the visible confirmation
+        // that the save round-trip succeeded.
+        list.sort((a, b) => {
+          const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0
+          const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0
+          return tb - ta
+        })
+        setEntries(list)
+      }
     } catch (error) {
       console.error('Failed to load entries:', error)
     }
