@@ -206,6 +206,14 @@ export default function Home() {
                     featured.image || '/assets/images/ai-native-transformation.jpg',
                   )}
                   alt={featured.title}
+                  onError={(e) => {
+                    // Same image-404 backstop as ArticleCard — swap in the
+                    // hero placeholder so the featured slot never shows a
+                    // broken icon.
+                    const t = e.currentTarget
+                    const fallback = withBasePath('/assets/images/ai-native-transformation.jpg')
+                    if (t.src !== fallback) t.src = fallback
+                  }}
                   className="w-full aspect-[16/9] object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-8">
