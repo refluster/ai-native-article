@@ -201,6 +201,44 @@ export function slugFromId(id) {
   return id.replace(/-/g, '').slice(-12)
 }
 
+/**
+ * Canonical 5-bucket taxonomy used by L1 capture (see GAS handleL1Save).
+ * The original prompt told Azure to return a single letter A–E and meant
+ * those letters to map onto these labels — but Azure has been free-form
+ * enough to also produce things like bare "B", "B: TRENDS", "A: MACROHARD"
+ * which all leaked downstream and exploded the sidebar into ~30 buckets.
+ *
+ * normalizeCategory collapses every variant of letter X (or "X: anything")
+ * back to its canonical label. Free-form Japanese strings (the L3 analysis
+ * "テーマ × テーマ" form) pass through untouched.
+ */
+const CATEGORY_CANONICAL = {
+  A: 'A: AI Hyper-productivity',
+  B: 'B: Role Blurring',
+  C: 'C: New Roles / FDE',
+  D: 'D: Big Tech Layoffs & AI Pivot',
+  E: 'E: Rethinking SDLC',
+}
+
+function normalizeCategory(raw) {
+  if (!raw) return ''
+  const trimmed = String(raw).trim()
+  // Bare letter "A" / "B" / … (case-insensitive)
+  if (/^[A-E]$/i.test(trimmed)) {
+    return CATEGORY_CANONICAL[trimmed.toUpperCase()]
+  }
+  // "X: anything" / "X：anything" — full-width or half-width colon.
+  // Discard the variant descriptor and force the canonical label so
+  // "B: Trends" / "B: ROLE BLURRING" / "B: Role Blurring" all merge.
+  const m = trimmed.match(/^([A-E])\s*[:：]\s*.+$/i)
+  if (m) {
+    return CATEGORY_CANONICAL[m[1].toUpperCase()]
+  }
+  // Anything else (e.g. "業務基盤進化 × 労働市場変容") is a legitimate
+  // free-form theme — keep as-is.
+  return trimmed
+}
+
 /** Normalise the `Type` property to our internal enum. Defaults to 'analysis'
  *  for legacy rows that have no `Type` (the original L3 DB). */
 function resolveType(props, legacyHint) {
@@ -220,8 +258,9 @@ async function pageToRecord(page, apiKey, legacyHint) {
     propText(props.Title) || propText(props.Name) // L2 used `Name`
   const abstract =
     propText(props.Abstract) || propText(props['Contents Summary'])
-  const category =
-    propText(props.Category) || propText(props['Sub Category'])
+  const category = normalizeCategory(
+    propText(props.Category) || propText(props['Sub Category']),
+  )
   const categoriesMulti = propMultiSelect(props.CategoriesMulti).length
     ? propMultiSelect(props.CategoriesMulti)
     : propMultiSelect(props.Categories)

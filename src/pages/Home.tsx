@@ -132,7 +132,7 @@ export default function Home() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <span className="text-[10px] font-bold tracking-widest text-outline uppercase animate-pulse">
-          LOADING INSIGHTS...
+          LOADING…
         </span>
       </div>
     )
@@ -220,7 +220,7 @@ export default function Home() {
                   <span className="inline-block bg-tertiary text-on-tertiary px-2 py-1 text-[10px] font-bold tracking-widest uppercase mb-4">
                     {activeCategory || activeType !== 'all' || activeRange !== 'all'
                       ? 'FILTERED'
-                      : 'FEATURED INSIGHT'}
+                      : 'FEATURED'}
                   </span>
                   <Link to={`/article/${featured.slug}`} onClick={onFeaturedClick}>
                     <h2 className="text-3xl md:text-4xl font-black tracking-tight leading-tight text-white hover:text-tertiary transition-colors">
@@ -268,7 +268,12 @@ export default function Home() {
             {filterBar}
             <div className="flex items-center justify-between mb-12">
               <h3 className="text-3xl font-black tracking-tighter uppercase">
-                {activeCategory ?? 'All Insights'}
+                {activeCategory ??
+                  (activeType === 'explanation'
+                    ? 'All Explanations'
+                    : activeType === 'analysis'
+                    ? 'All Analyses'
+                    : 'All Articles')}
               </h3>
               <div className="h-[2px] flex-grow mx-8 bg-outline-variant/20" />
               <span className="text-[10px] font-bold text-outline tracking-widest uppercase">

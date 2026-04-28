@@ -15,7 +15,7 @@ export default function Footer() {
             AI NATIVE ARTICLE
           </span>
           <p className="text-[10px] font-medium tracking-[0.05em] uppercase text-outline mt-2">
-            © 2026 L3 INSIGHTS BY HARVEST. AI TRANSFORMATION IN PRECISION.
+            © 2026 BY HARVEST. AI TRANSFORMATION IN PRECISION.
           </p>
         </div>
         <div className="flex gap-8 flex-wrap justify-center">

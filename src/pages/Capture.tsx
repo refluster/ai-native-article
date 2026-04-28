@@ -2,7 +2,22 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { GAS_URL } from '../lib/gas-config'
 
-interface L1Entry {
+/**
+ * Capture — the only page on this site that accepts user input.
+ *
+ * It saves a URL into the source library; downstream batches turn each
+ * captured URL into a 解説 article (single-source explainer) and feed
+ * combinations of them into 分析 articles (multi-source synthesis).
+ *
+ * Because writes hit GAS (which writes to Notion), and because GAS is
+ * authenticated separately, the password gate here is *only* a "don't
+ * show this UI to random visitors" guard, not a real auth boundary.
+ * VITE_CAPTURE_PASSWORD must be set at build time (via .env locally and
+ * GitHub Actions secret in CI) to enable the gate.
+ */
+
+/** A captured source article. Mirrors the GAS L1_LIST wire shape. */
+interface CapturedEntry {
   id?: string
   title: string
   sourceUrl: string
@@ -13,13 +28,13 @@ interface L1Entry {
   createdAt?: string
 }
 
-interface L1Stats {
+interface CaptureStats {
   today: number
   last7: number
   streak: number
 }
 
-function computeStats(entries: L1Entry[]): L1Stats {
+function computeStats(entries: CapturedEntry[]): CaptureStats {
   // Bucket entries by local-calendar day (YYYY-MM-DD via sv-SE locale).
   const dayKey = (d: Date) => d.toLocaleDateString('sv-SE')
   const byDay = new Map<string, number>()
@@ -66,8 +81,98 @@ function extractUrl(params: URLSearchParams): string {
   return match ? match[0] : ''
 }
 
-export default function L1Register() {
-  const [entries, setEntries] = useState<L1Entry[]>([])
+// ── Password gate ──────────────────────────────────────────────────────────
+
+const CAPTURE_PASSWORD = (import.meta.env.VITE_CAPTURE_PASSWORD as string | undefined) ?? ''
+const UNLOCK_KEY = 'capture-unlocked-v1'
+
+function PasswordGate({ children }: { children: React.ReactNode }) {
+  // No password configured at build time → page is open. Show a small
+  // banner so the operator knows the gate isn't active. We deliberately
+  // *don't* hide the page in this case: the operator may have set up
+  // capture before adding the password, and silently 404'ing is worse
+  // UX than a clearly visible warning.
+  const noPasswordSet = !CAPTURE_PASSWORD
+
+  const [unlocked, setUnlocked] = useState<boolean>(() => {
+    if (noPasswordSet) return true
+    try {
+      return localStorage.getItem(UNLOCK_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+  const [input, setInput] = useState('')
+  const [error, setError] = useState('')
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (input === CAPTURE_PASSWORD) {
+      try {
+        localStorage.setItem(UNLOCK_KEY, '1')
+      } catch {
+        // localStorage might be disabled (private mode); fall back to
+        // session-scoped unlock — re-prompt on full reload.
+      }
+      setUnlocked(true)
+      setError('')
+    } else {
+      setError('Incorrect password')
+      setInput('')
+    }
+  }
+
+  if (unlocked) {
+    return (
+      <>
+        {noPasswordSet && (
+          <div className="bg-error/10 border-b border-error text-error text-[10px] font-bold tracking-widest uppercase px-6 py-2 text-center">
+            ⚠ VITE_CAPTURE_PASSWORD is unset — page is unprotected
+          </div>
+        )}
+        {children}
+      </>
+    )
+  }
+
+  return (
+    <section className="min-h-[60vh] flex items-center justify-center px-6">
+      <form onSubmit={handleSubmit} className="w-full max-w-sm">
+        <h1 className="text-3xl font-black tracking-tighter uppercase mb-2">Capture</h1>
+        <p className="text-[11px] text-on-surface-variant mb-8">
+          This page is private. Enter the shared password to continue.
+        </p>
+        <label className="text-[10px] font-bold tracking-widest text-outline uppercase block mb-2">
+          Password
+        </label>
+        <input
+          type="password"
+          autoFocus
+          value={input}
+          onChange={e => {
+            setInput(e.target.value)
+            setError('')
+          }}
+          className="w-full bg-transparent border-b border-outline pb-3 text-base focus:outline-none focus:border-b-2 focus:border-primary"
+        />
+        {error && (
+          <div className="mt-3 text-[11px] text-error">{error}</div>
+        )}
+        <button
+          type="submit"
+          className="mt-6 w-full bg-primary text-on-primary px-6 py-3 text-xs font-bold tracking-widest uppercase hover:bg-primary-dim transition-colors"
+        >
+          Unlock
+        </button>
+      </form>
+    </section>
+  )
+}
+
+// ── Capture form ───────────────────────────────────────────────────────────
+
+function CaptureBody() {
+  const [entries, setEntries] = useState<CapturedEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [sourceUrl, setSourceUrl] = useState('')
   const [error, setError] = useState('')
@@ -116,7 +221,7 @@ export default function L1Register() {
         setSourceUrl('')
         await loadEntries()
       } else {
-        setError(data.error || 'Failed to register article')
+        setError(data.error || 'Failed to capture article')
       }
     } catch (err) {
       setError(`Failed to save: ${err}`)
@@ -144,10 +249,10 @@ export default function L1Register() {
             ← INDEX
           </Link>
           <h1 className="text-3xl md:text-7xl font-black tracking-tighter leading-none mb-2 md:mb-6 uppercase">
-            L1: Register
+            Capture
           </h1>
           <p className="hidden md:block text-xl text-on-surface-variant max-w-2xl leading-relaxed">
-            Register web articles to the AI Transformation Library. These become inputs for creating blog articles in L2.
+            気になった記事の URL を保存します。後ほど自動で 解説記事 と 分析記事 に変換され、サイト上で公開されます。
           </p>
 
           {/* Stats strip — "daily habit" signal */}
@@ -179,7 +284,7 @@ export default function L1Register() {
           {/* Form */}
           <div className="col-span-12 lg:col-span-6">
             <div className="bg-surface-container-low p-5 md:p-8">
-              <h2 className="hidden md:block text-2xl font-black tracking-tighter uppercase mb-8">Register New Article</h2>
+              <h2 className="hidden md:block text-2xl font-black tracking-tighter uppercase mb-8">Save a new article</h2>
               <form onSubmit={handleSubmit} className="space-y-5 md:space-y-6">
                 <div>
                   <label className="text-[10px] font-bold tracking-widest text-outline uppercase block mb-2">
@@ -199,7 +304,7 @@ export default function L1Register() {
                     className="w-full bg-transparent border-b border-outline pb-3 text-base md:text-lg focus:outline-none focus:border-b-2 focus:border-primary"
                   />
                   <p className="text-[11px] text-on-surface-variant mt-3">
-                    Paste a link, or share to <span className="font-bold">L1</span> from your browser. Title, summary, category, and date are extracted automatically.
+                    Paste a link, or share to <span className="font-bold">Capture</span> from your browser. Title, summary, category, and date are extracted automatically.
                   </p>
                 </div>
 
@@ -214,7 +319,7 @@ export default function L1Register() {
                   disabled={loading || !sourceUrl.trim()}
                   className="w-full bg-primary text-on-primary px-6 py-4 md:py-3 text-sm md:text-xs font-bold tracking-widest uppercase hover:bg-primary-dim transition-colors disabled:opacity-50"
                 >
-                  {loading ? 'PROCESSING…' : 'REGISTER'}
+                  {loading ? 'PROCESSING…' : 'CAPTURE'}
                 </button>
               </form>
             </div>
@@ -259,5 +364,13 @@ export default function L1Register() {
         </div>
       </div>
     </>
+  )
+}
+
+export default function Capture() {
+  return (
+    <PasswordGate>
+      <CaptureBody />
+    </PasswordGate>
   )
 }

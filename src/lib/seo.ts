@@ -80,8 +80,9 @@ function removeJsonLd(id: string) {
 }
 
 export function setDefaultSeo() {
-  document.title = `${SITE_NAME} — AI時代のインサイト`
-  const desc = 'AI変革、ソフトウェア開発、組織の未来についての深い洞察。L3 Insights by Harvest.'
+  document.title = `${SITE_NAME} — AI時代の解説と分析`
+  const desc =
+    'AI変革、ソフトウェア開発、組織の未来。一次情報の解説記事と、それらを横断する分析記事を毎日更新。'
   upsertMeta('meta[name="description"]', 'name', 'description', desc)
   upsertLink('canonical', `${SITE_ORIGIN}${SITE_BASE}/`)
   upsertMeta('meta[property="og:title"]', 'property', 'og:title', SITE_NAME)
