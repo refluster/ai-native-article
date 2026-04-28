@@ -64,29 +64,56 @@ export default function Home() {
     setDefaultSeo()
   }, [])
 
+  // Tag set for an article. CategoriesMulti is the canonical source
+  // post-normalize-categories.mjs sweep. Older entries that haven't yet
+  // had CategoriesMulti populated fall back to the singular `category`
+  // string so the sidebar isn't lying about coverage.
+  const tagsOf = (a: ArticleMeta): string[] => {
+    if (a.categoriesMulti && a.categoriesMulti.length > 0) {
+      return a.categoriesMulti
+    }
+    return a.category ? [a.category] : []
+  }
+
   const visible = useMemo(() => {
     return articles.filter(a => {
       if (activeType !== 'all' && inferType(a) !== activeType) return false
       if (!isWithinDateRange(a, activeRange)) return false
-      if (activeCategory && a.category !== activeCategory) return false
+      if (activeCategory && !tagsOf(a).includes(activeCategory)) return false
       return true
     })
   }, [articles, activeType, activeRange, activeCategory])
 
-  // Categories are derived from the *current* type+range filtered set so the
-  // sidebar reflects what's actually selectable. Without this the sidebar
-  // would advertise category counts that drop to 0 once the user switches
-  // tabs.
-  const categories = useMemo(() => {
+  // Sidebar split: canonical A-E buckets at top (always shown in
+  // alphabetical letter order so layout is stable across filter
+  // switches), free-form themes below ranked by count desc. The pool
+  // is the *type+range* filtered set so counts reflect what's actually
+  // selectable; bucket order is stable so users don't lose their place.
+  const { canonical, themes } = useMemo(() => {
     const pool = articles.filter(a => {
       if (activeType !== 'all' && inferType(a) !== activeType) return false
       if (!isWithinDateRange(a, activeRange)) return false
       return true
     })
-    return Array.from(new Set(pool.map(a => a.category))).map(cat => ({
-      name: cat,
-      count: pool.filter(a => a.category === cat).length,
+    const counts = new Map<string, number>()
+    for (const a of pool) {
+      for (const t of tagsOf(a)) {
+        counts.set(t, (counts.get(t) ?? 0) + 1)
+      }
+    }
+    const all = Array.from(counts.entries()).map(([name, count]) => ({
+      name,
+      count,
     }))
+    const isCanonical = (name: string) => /^[A-E][:：]\s/.test(name)
+    return {
+      canonical: all
+        .filter(c => isCanonical(c.name))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+      themes: all
+        .filter(c => !isCanonical(c.name))
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+    }
   }, [articles, activeType, activeRange])
 
   const featured = visible[0]
@@ -328,12 +355,12 @@ export default function Home() {
                 </div>
               </div>
 
-              <div>
+              <div className="mb-12">
                 <h5 className="text-[10px] font-bold tracking-widest text-outline uppercase mb-6">
                   CATEGORIES
                 </h5>
                 <ul className="space-y-3">
-                  {categories.map(cat => (
+                  {canonical.map(cat => (
                     <li key={cat.name}>
                       <button
                         onClick={() => onCategoryClick(cat.name)}
@@ -350,6 +377,38 @@ export default function Home() {
                   ))}
                 </ul>
               </div>
+
+              {/* Themes — free-form analysis × theme tags. Hidden when
+                  none exist (e.g. when the user has filtered to
+                  "explanation" only). The header is rendered as a
+                  divider so the visual hierarchy stays calm even when
+                  the list is long. */}
+              {themes.length > 0 && (
+                <div>
+                  <h5 className="text-[10px] font-bold tracking-widest text-outline uppercase mb-6">
+                    THEMES
+                  </h5>
+                  <ul className="space-y-3">
+                    {themes.map(cat => (
+                      <li key={cat.name}>
+                        <button
+                          onClick={() => onCategoryClick(cat.name)}
+                          className={`w-full flex justify-between group text-left ${
+                            activeCategory === cat.name ? 'text-tertiary' : ''
+                          }`}
+                        >
+                          <span className="text-xs font-medium leading-snug group-hover:text-tertiary transition-colors">
+                            {cat.name}
+                          </span>
+                          <span className="text-[10px] font-medium text-outline shrink-0 ml-3">
+                            {cat.count}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </aside>
         </div>
