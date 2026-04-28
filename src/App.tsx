@@ -6,7 +6,7 @@ import Home from './pages/Home'
 import Article from './pages/Article'
 import DesignSystem from './pages/DesignSystem'
 import DesignGuide from './pages/DesignGuide'
-import L1Register from './pages/L1Register'
+import Capture from './pages/Capture'
 import L2Blog from './pages/L2Blog'
 import L3Insight from './pages/L3Insight'
 import L4Publish from './pages/L4Publish'
@@ -33,7 +33,10 @@ export default function App() {
             <Route path="/article/:slug" element={<Article />} />
             <Route path="/design-system" element={<DesignSystem />} />
             <Route path="/design-guide" element={<DesignGuide />} />
-            <Route path="/l1-register" element={<L1Register />} />
+            <Route path="/capture" element={<Capture />} />
+            {/* Legacy alias — kept so the iOS Share Sheet target keeps
+                working without re-pinning. Drop in a future cleanup. */}
+            <Route path="/l1-register" element={<Capture />} />
             <Route path="/l2-blog" element={<L2Blog />} />
             <Route path="/l3-insight" element={<L3Insight />} />
             <Route path="/l4-publish" element={<L4Publish />} />

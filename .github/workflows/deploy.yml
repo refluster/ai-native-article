@@ -53,6 +53,11 @@ jobs:
       - name: Build
         env:
           VITE_GA_ID: ${{ secrets.GA4_MEASUREMENT_ID }}
+          # Capture (the only write-side route) is gated behind a shared
+          # password baked into the bundle at build time. When unset the
+          # page renders a visible warning and stays open. See the
+          # PasswordGate component in src/pages/Capture.tsx.
+          VITE_CAPTURE_PASSWORD: ${{ secrets.VITE_CAPTURE_PASSWORD }}
         run: npm run build
 
       - name: Copy CNAME
