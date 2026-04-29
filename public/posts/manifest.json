@@ -226,5 +226,15 @@
     "abstract": "FDE職種800%急増・MacrohardによるAI企業エミュレーション・SaaS株2850億ドル消失（SaaSpocalypse）という一見無関係な3つのトレンドは、「誰がタスクを実行するのか」という同一の問いへの3つの異なる角度の答えだ。現在のFDE急増は「AIへの移行の失敗」ではなく、AIが自律的に企業を運営する段階への準備期間として読み解ける。",
     "image": "/posts/images/c82d6ecc95bc.jpg",
     "sourceUrls": "https://review.firstround.com/so-you-want-to-hire-a-forward-deployed-engineer/, https://www.eweek.com/news/elon-musk-macrohard-ai-software-companies/, https://www.indiatoday.in/technology/features/story/hey-anthropic-take-a-break-from-saas-apocalypse-to-dispatch-claude-ai-is-on-a-tear-with-updates-2887840-2026-03-27"
+  },
+  {
+    "slug": "c2357516e41e",
+    "title": "「AIのせいでリストラした」と公言する企業が増えた——なぜ今、正直に言えるようになったのか",
+    "type": "explanation",
+    "category": "D: Big Tech Layoffs & AI Pivot",
+    "date": "2026-03-26",
+    "abstract": "Block、HP、Klarna、IBMなどの企業が「AIによる人員削減」を公言する背景を分析。AIによる職種代替が「PR（広報）リスク」でなくなった時代の転換点と、自社組織へのインプリケーションを論じる。",
+    "image": "/posts/images/c2357516e41e.jpg",
+    "sourceUrls": "https://www.businessinsider.com/list-companies-replacing-human-employees-with-ai-layoffs-workforce-reductions"
   }
 ]
