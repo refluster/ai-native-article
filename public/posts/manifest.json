@@ -246,5 +246,15 @@
     "abstract": "Thoughtworksが提唱するAgentic SDLCの時代において、エンジニアの役割が「コードを書く人」から「AIに何を作らせるかを設計する人」へと転換することを解説。外注依存モデルのリスクとプロセス再設計の必要性を論じる。",
     "image": "/posts/images/ce614c17834d.jpg",
     "sourceUrls": "https://www.thoughtworks.com/en-us/insights/articles/preparing-your-team-for-the-agentic-software-development-life-cycle"
+  },
+  {
+    "slug": "fbe157a3a80a",
+    "title": "Deloitteが描く「制約なきAI時代」の工学——エンジニアが「実行エンジン」から「学習システムの設計者」になる日",
+    "type": "explanation",
+    "category": "E: Rethinking SDLC",
+    "date": "2026-03-26",
+    "abstract": "Deloitteが提唱するソフトウェアエンジニアリングの未来形。AIエージェントがSDLC全体の共創者・乗数効果をもたらす存在になる世界で、人間エンジニアは「方向性の設定・ガードレールの定義・倫理的判断」に昇格することを解説する。",
+    "image": "/posts/images/fbe157a3a80a.jpg",
+    "sourceUrls": "https://www.deloitte.com/us/en/services/consulting/articles/future-of-software-engineering.html"
   }
 ]
