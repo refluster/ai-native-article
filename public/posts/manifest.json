@@ -256,5 +256,15 @@
     "abstract": "Deloitteが提唱するソフトウェアエンジニアリングの未来形。AIエージェントがSDLC全体の共創者・乗数効果をもたらす存在になる世界で、人間エンジニアは「方向性の設定・ガードレールの定義・倫理的判断」に昇格することを解説する。",
     "image": "/posts/images/fbe157a3a80a.jpg",
     "sourceUrls": "https://www.deloitte.com/us/en/services/consulting/articles/future-of-software-engineering.html"
+  },
+  {
+    "slug": "fc0010ff59d9",
+    "title": "「コードを書く」のをやめたエンジニアたちが語る、AI時代の開発者の新しい仕事",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "date": "2026-03-26",
+    "abstract": "Spotifyのシニアエンジニアが数ヶ月コードを書いていない事実、GoogleのAIがコードの半分を生成、DORa 2025で90%の開発者がAI活用——この変化が製造業エンジニアに何を意味するかを論じる。",
+    "image": "/posts/images/fc0010ff59d9.jpg",
+    "sourceUrls": "https://www.businessinsider.com/ai-coding-changing-software-developer-role-2026-3"
   }
 ]
