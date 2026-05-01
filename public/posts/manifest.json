@@ -276,5 +276,15 @@
     "abstract": "2026年Q1に世界で45,000人超が解雇される一方、AI関連職の採用が92%増加。このパラドックスを解読し、外注依存モデルのリスクと内製ケイパビリティ構築の必要性を説く。",
     "image": "/posts/images/c15ea0336aca.jpg",
     "sourceUrls": "https://www.techtimes.com/articles/315282/20260321/tech-layoffs-surge-while-ai-jobs-soar-key-trends-shaping-2026-tech-industry.htm"
+  },
+  {
+    "slug": "d37782c2771e",
+    "title": "AIエージェントにコードを任せる時代に、エンジニアの「本当の仕事」は何か——Thoughtworksが示すAgentic SDLCへの道",
+    "type": "explanation",
+    "category": "E: Rethinking SDLC",
+    "date": "2026-03-26",
+    "abstract": "ThoughtworksのAgentic SDLCレポートを起点に、AIエージェントが開発工程に参入する時代にエンジニアが担うべき新しい役割を解説。コードを書く人から、AIを制御する仕様・テスト・フィードバックループを設計する人への転換と、プロセス全体の再設計の必要性を論じる。",
+    "image": "/posts/images/d37782c2771e.jpg",
+    "sourceUrls": "https://www.thoughtworks.com/en-us/insights/articles/preparing-your-team-for-the-agentic-software-development-life-cycle"
   }
 ]
