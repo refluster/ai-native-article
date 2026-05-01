@@ -266,5 +266,15 @@
     "abstract": "Spotifyのシニアエンジニアが数ヶ月コードを書いていない事実、GoogleのAIがコードの半分を生成、DORa 2025で90%の開発者がAI活用——この変化が製造業エンジニアに何を意味するかを論じる。",
     "image": "/posts/images/fc0010ff59d9.jpg",
     "sourceUrls": "https://www.businessinsider.com/ai-coding-changing-software-developer-role-2026-3"
+  },
+  {
+    "slug": "c15ea0336aca",
+    "title": "レイオフとAI採用が同時に起きる2026年——テック業界の「組み替え」から学ぶ、製造業エンジニアの生存戦略",
+    "type": "explanation",
+    "category": "D: Big Tech Layoffs & AI Pivot",
+    "date": "2026-03-26",
+    "abstract": "2026年Q1に世界で45,000人超が解雇される一方、AI関連職の採用が92%増加。このパラドックスを解読し、外注依存モデルのリスクと内製ケイパビリティ構築の必要性を説く。",
+    "image": "/posts/images/c15ea0336aca.jpg",
+    "sourceUrls": "https://www.techtimes.com/articles/315282/20260321/tech-layoffs-surge-while-ai-jobs-soar-key-trends-shaping-2026-tech-industry.htm"
   }
 ]
