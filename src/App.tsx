@@ -10,6 +10,7 @@ import Capture from './pages/Capture'
 import L2Blog from './pages/L2Blog'
 import L3Insight from './pages/L3Insight'
 import L4Publish from './pages/L4Publish'
+import Sources from './pages/Sources'
 import { routerBaseName } from './lib/paths'
 import { trackPageView } from './lib/analytics'
 
@@ -30,6 +31,7 @@ export default function App() {
         <main className="flex-1 pt-16">
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/sources" element={<Sources />} />
             <Route path="/article/:slug" element={<Article />} />
             <Route path="/design-system" element={<DesignSystem />} />
             <Route path="/design-guide" element={<DesignGuide />} />
