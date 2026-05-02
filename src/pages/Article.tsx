@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -7,6 +7,9 @@ import { withBasePath } from '../lib/paths'
 import { setArticleSeo, setDefaultSeo } from '../lib/seo'
 import { trackEvent, isOutbound, hrefHost } from '../lib/analytics'
 import { ARTICLE_TYPE_LABELS, inferType, isArticleType } from '../lib/article-types'
+import { buildSourceIndex } from '../lib/source-links'
+import SourcesUsedSection from '../components/SourcesUsedSection'
+import AnalysesUsingSection from '../components/AnalysesUsingSection'
 
 interface Frontmatter extends ArticleMeta {
   notionId?: string
@@ -55,6 +58,7 @@ export default function Article() {
   const [error, setError] = useState(false)
   const [articleIndex, setArticleIndex] = useState(0)
   const [manifestImage, setManifestImage] = useState<string | undefined>()
+  const [manifest, setManifest] = useState<ArticleMeta[]>([])
 
   // Refs so the scroll listener closes over mutable state without re-binding.
   const depthsHit = useRef<Set<number>>(new Set())
@@ -78,10 +82,11 @@ export default function Article() {
 
     fetch(withBasePath('posts/manifest.json'))
       .then(r => r.json())
-      .then((manifest: (ArticleMeta & { image?: string })[]) => {
-        const idx = manifest.findIndex(a => a.slug === slug)
+      .then((data: (ArticleMeta & { image?: string })[]) => {
+        setManifest(data)
+        const idx = data.findIndex(a => a.slug === slug)
         setArticleIndex(idx >= 0 ? idx : 0)
-        if (idx >= 0 && manifest[idx].image) setManifestImage(manifest[idx].image)
+        if (idx >= 0 && data[idx].image) setManifestImage(data[idx].image)
       })
       .catch(() => {})
 
@@ -205,6 +210,8 @@ export default function Article() {
     }
   }
 
+  const sourceIndex = useMemo(() => buildSourceIndex(manifest), [manifest])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -230,6 +237,7 @@ export default function Article() {
   }
 
   const heroImage = manifestImage ? withBasePath(manifestImage) : IMAGES[articleIndex % IMAGES.length]
+  const articleType = inferType({ type: isArticleType(meta.type) ? meta.type : undefined })
 
   return (
     <>
@@ -297,6 +305,13 @@ export default function Article() {
       >
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
       </article>
+
+      {slug && articleType === 'analysis' && (
+        <SourcesUsedSection slug={slug} sourceUrls={meta.sourceUrls} index={sourceIndex} />
+      )}
+      {slug && articleType === 'explanation' && (
+        <AnalysesUsingSection slug={slug} sourceUrls={meta.sourceUrls} index={sourceIndex} />
+      )}
 
       {/* Back link */}
       <div className="max-w-3xl mx-auto px-6 md:px-12 pb-24">

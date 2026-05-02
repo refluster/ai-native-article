@@ -93,6 +93,21 @@ export function setDefaultSeo() {
   removeJsonLd('article')
 }
 
+export function setSourcesSeo() {
+  const url = `${SITE_ORIGIN}${SITE_BASE}/sources`
+  const title = `オリジナル記事 — ${SITE_NAME}`
+  const desc = 'このサイトが取り上げた一次情報の一覧。各出典から、解説記事・分析記事・元の外部記事へ移動できます。'
+  document.title = title
+  upsertMeta('meta[name="description"]', 'name', 'description', desc)
+  upsertLink('canonical', url)
+  upsertMeta('meta[property="og:title"]', 'property', 'og:title', 'オリジナル記事')
+  upsertMeta('meta[property="og:description"]', 'property', 'og:description', desc)
+  upsertMeta('meta[property="og:type"]', 'property', 'og:type', 'website')
+  upsertMeta('meta[property="og:url"]', 'property', 'og:url', url)
+  upsertMeta('meta[name="twitter:card"]', 'name', 'twitter:card', 'summary_large_image')
+  removeJsonLd('article')
+}
+
 export function setArticleSeo(article: ArticleSeo) {
   const url = `${SITE_ORIGIN}${SITE_BASE}/article/${article.slug}`
   const title = `${article.title} — ${SITE_NAME}`
