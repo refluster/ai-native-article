@@ -77,6 +77,22 @@ function notionUpdatePage(pageId, properties, apiKey) {
   return notionRequest('PATCH', `/pages/${pageId}`, apiKey, { properties });
 }
 
+// Replace the body of a Notion page with `newBlocks`. Lists existing children,
+// deletes each, then appends the new blocks. Used by handleL2Backfill so the
+// Notion source of truth stays aligned with the regenerated GitHub markdown
+// (otherwise a future L4 republish would re-export the truncated body and
+// regress the backfill).
+function notionReplacePageBody(pageId, newBlocks, apiKey) {
+  const existing = notionRequest('GET', `/blocks/${pageId}/children?page_size=100`, apiKey);
+  const oldBlocks = existing.results || [];
+  for (const b of oldBlocks) {
+    notionRequest('DELETE', `/blocks/${b.id}`, apiKey);
+  }
+  if (newBlocks && newBlocks.length) {
+    notionRequest('PATCH', `/blocks/${pageId}/children`, apiKey, { children: newBlocks });
+  }
+}
+
 // ─── CATEGORY TAXONOMY ───────────────────────────────────────────────────────
 // L1_SAVE stores a single letter A–E (see handleL1Save prompt). L2/L3 want the
 // human-readable form. Inputs already containing a descriptor (e.g. "B: Trends"
@@ -164,9 +180,14 @@ function pickCanonicalFromSources(l2Categories) {
  * @param {number} [options.maxCompletionTokens]
  *     Override `max_completion_tokens`. For gpt-5.4 (reasoning family)
  *     this budget covers reasoning + visible output combined; long
- *     visible outputs (e.g. L3's 3000–4000 char Japanese insights)
- *     need headroom or visible content is truncated to empty.
- *     Defaults to 2000.
+ *     visible outputs (e.g. L2 ~3000字 explanations and L3 ~3000–4000字
+ *     insights) need 8000+ or visible content is truncated mid-sentence
+ *     (or empty when reasoning eats the whole budget). Defaults to 2000
+ *     — only safe for short structured outputs (L1 metadata extraction,
+ *     L3 title/category derivation).
+ *
+ *     This function throws on `finish_reason === 'length'`, so an under-
+ *     sized budget surfaces as an error rather than a truncated publish.
  */
 function azureGenerateText(prompt, apiKey, options) {
   options = options || {};
@@ -223,9 +244,16 @@ function azureGenerateText(prompt, apiKey, options) {
   // zero-byte article. finish_reason in the message helps triage in logs.
   const choice = result.choices?.[0];
   const text = choice?.message?.content || '';
+  const reason = choice?.finish_reason || 'unknown';
   if (!text) {
-    const reason = choice?.finish_reason || 'unknown';
     throw new Error(`Azure OpenAI returned empty content (finish_reason=${reason}). Raw: ${JSON.stringify(result).substring(0, 500)}`);
+  }
+  // finish_reason='length' with partial content used to flow through silently
+  // and ship truncated articles (mid-sentence cut-offs visible at /article/<slug>).
+  // Throw so the L2/L3 batch wrappers retry on the next cron tick instead of
+  // publishing the partial output.
+  if (reason === 'length') {
+    throw new Error(`Azure OpenAI hit max_completion_tokens (visible_length=${text.length}). Raise maxCompletionTokens. Tail: ${text.substring(Math.max(0, text.length - 200))}`);
   }
   return text;
 }
@@ -565,7 +593,14 @@ function handleL2Create(data, config) {
   const l1SourceUrl = l1Page.properties['Source URL']?.url || '';
 
   const prompt = `Based on this AI industry news:\n\nTitle: ${l1Title}\nSummary: ${l1Summary}\n\nWrite a comprehensive blog article (800-1200 words) that expands on the topic, explains implications, includes examples, and discusses opportunities and challenges. Suggest a catchy Japanese blog title at the beginning. Format as Markdown with ## for headings.`;
-  const blogContent = azureGenerateText(prompt, config.azure_openapi_key);
+  // Same reasoning-budget rationale as L3 (see handleL3Create): gpt-5.4
+  // shares max_completion_tokens between hidden reasoning and visible
+  // output. The 2000-token default left ~hundreds of visible tokens after
+  // reasoning and produced articles that ended mid-sentence (e.g.
+  // d17e1d58ec42 cut at "### ベンダーロックイン" with no body).
+  const blogContent = azureGenerateText(prompt, config.azure_openapi_key, {
+    maxCompletionTokens: 8000,
+  });
 
   // Extract title from the generated content (first line should have the title)
   const titleMatch = blogContent.match(/^#+\s+(.+?)(?:\n|$)/);
@@ -636,6 +671,35 @@ function handleL2Create(data, config) {
 // renaming the handlers; we keep both names so downstream callers
 // (doPost, batch wrappers) can adopt the new term incrementally.
 function handleExplanationCreate(data, config) { return handleL2Create(data, config); }
+
+// Heuristic: did the LLM cut off mid-content? Used by handleL2Backfill to
+// decide which already-published L2 articles need to be regenerated.
+//
+// Treats the body (frontmatter stripped) as truncated when EITHER:
+//   1. The last non-empty line is a heading with no content under it
+//      (caught by d17e1d58ec42's "### ベンダーロックイン" with no body),
+//   2. The last non-empty line is prose and doesn't end with a sensible
+//      terminator (Japanese 。！？」）… or ASCII .!?)] or a closing fence).
+//
+// List items / horizontal rules / image-only lines are accepted as-is — a
+// trailing list is a legitimate article ending. Conservative direction is
+// "regenerate slightly fine articles" rather than "leave truncated articles."
+function isTruncatedMarkdown(mdBody) {
+  if (!mdBody) return false;
+  const lines = mdBody.split('\n').map(l => l.replace(/\s+$/, ''));
+  let lastIdx = lines.length - 1;
+  while (lastIdx >= 0 && lines[lastIdx].trim() === '') lastIdx--;
+  if (lastIdx < 0) return false;
+  const last = lines[lastIdx];
+  const trimmed = last.trim();
+  // Heading with no body underneath = truncated.
+  if (/^#{1,6}\s+/.test(trimmed)) return true;
+  // List items / blockquotes / horizontal rules / fenced code closes — accept.
+  if (/^([-*]\s|\d+\.\s|>\s|---|```)/.test(trimmed)) return false;
+  // Prose: must end with a sentence terminator or closing punctuation.
+  const okEnd = /[。！？」）…\.!\?\)\]`>]$/;
+  return !okEnd.test(trimmed);
+}
 
 // Markdown → Notion blocks. Reasonably comprehensive; intentionally line-based
 // (no nested lists, no inline-link parsing) to keep the converter simple.
@@ -1129,6 +1193,96 @@ function handleL4List(config) {
 
 // ─── MAINTENANCE ─────────────────────────────────────────────────────────────
 
+// One-shot backfill: regenerate L2 (explanation) articles whose Notion body
+// was truncated mid-content by the old 2000-token budget. The user-facing
+// site is rebuilt from Notion on every CI deploy (scripts/fetch-notion.mjs
+// writes public/posts/*.md fresh from Notion), so updating the Notion body
+// is sufficient — the next deploy picks it up. No GitHub writes needed.
+//
+// Operator-triggered only — no cron — so this can be paused / sampled
+// mid-run. Invoke `runL2Backfill` from the GAS editor (or POST
+// {"action":"L2_BACKFILL"}) repeatedly. Each call processes up to
+// L2_BACKFILL_MAX rows and reports `remaining`. Idempotent: clean rows are
+// skipped on every pass.
+const L2_BACKFILL_MAX = 5;
+function handleL2Backfill(_data, config) {
+  const sourceDbId = useUnifiedDb(config) ? config.unified_db_id : config.l2_db_id;
+  const pages = notionQueryDatabase(sourceDbId, config.notion_api_key);
+  // Filter to explanation rows when reading the unified DB. The legacy L2 DB
+  // is single-purpose so no filter is needed there.
+  const explanations = useUnifiedDb(config)
+    ? pages.filter(p => (p.properties.Type?.select?.name || '') === 'explanation')
+    : pages;
+
+  function _l2Title(p) { return p.properties.Title?.title[0]?.plain_text || p.properties.Name?.title[0]?.plain_text || ''; }
+  function _l2Summary(p) { return p.properties.Abstract?.rich_text[0]?.plain_text || p.properties['Contents Summary']?.rich_text[0]?.plain_text || ''; }
+  function _slug(p) {
+    const legacy = p.properties.LegacySlug?.rich_text[0]?.plain_text || '';
+    return legacy || p.id.replace(/-/g, '').slice(-12);
+  }
+
+  // Identify truncated rows up front so we can report `remaining` accurately
+  // even after the per-run cap kicks in. Source of truth = Notion blocks
+  // (matches what fetch-notion.mjs reads at deploy time).
+  const truncated = [];
+  for (const p of explanations) {
+    let mdBody;
+    try {
+      const blocks = notionReadPageBlocks(p.id, config.notion_api_key);
+      mdBody = notionBlocksToMarkdown(blocks);
+    } catch (e) {
+      truncated.push({ id: p.id, slug: _slug(p), error: String(e && e.message || e), readFailed: true });
+      continue;
+    }
+    if (!mdBody || !mdBody.trim()) continue; // empty body — handle separately
+    if (isTruncatedMarkdown(mdBody)) {
+      truncated.push({ id: p.id, slug: _slug(p), page: p });
+    }
+  }
+
+  const picked = truncated.filter(t => !t.readFailed).slice(0, L2_BACKFILL_MAX);
+  const processed = [];
+  const errors = [];
+
+  for (const t of picked) {
+    const p = t.page;
+    try {
+      const l1Title = _l2Title(p);
+      const l1Summary = _l2Summary(p);
+
+      // Same prompt shape as handleL2Create. The L1 row is no longer needed —
+      // the L2 row's own Title/Abstract carry forward the title and summary
+      // we'd otherwise re-derive.
+      const prompt = `Based on this AI industry news:\n\nTitle: ${l1Title}\nSummary: ${l1Summary}\n\nWrite a comprehensive blog article (800-1200 words) that expands on the topic, explains implications, includes examples, and discusses opportunities and challenges. Suggest a catchy Japanese blog title at the beginning. Format as Markdown with ## for headings.`;
+      const blogContent = azureGenerateText(prompt, config.azure_openapi_key, {
+        maxCompletionTokens: 8000,
+      });
+
+      const blocks = markdownToNotionBlocks(blogContent);
+      if (blocks.length === 0) {
+        throw new Error(`Regenerated content yielded zero Notion blocks (length=${blogContent.length})`);
+      }
+      notionReplacePageBody(p.id, blocks, config.notion_api_key);
+
+      processed.push({ id: p.id, slug: t.slug, length: blogContent.length });
+    } catch (e) {
+      errors.push({ id: p.id, slug: t.slug, error: String(e && e.message || e) });
+    }
+  }
+
+  return {
+    success: true,
+    data: {
+      processed: processed.length,
+      remaining: truncated.length - picked.length,
+      truncatedFound: truncated.length,
+      explanationCount: explanations.length,
+      items: processed,
+      errors,
+    },
+  };
+}
+
 // One-shot backfill: set Date = created_time (date portion) for L3 rows where
 // Date is empty. Idempotent — re-running only touches rows still blank.
 function handleL3BackfillDate(_data, config) {
@@ -1361,6 +1515,9 @@ function handleL4Batch(_data, config) {
 function runL2Batch() { return handleL2Batch({}, getConfig()); }
 function runL3Batch() { return handleL3Batch({}, getConfig()); }
 function runL4Batch() { return handleL4Batch({}, getConfig()); }
+// Operator entry point for the truncation backfill (manual; no trigger).
+// Re-run until `remaining === 0` or the operator is satisfied.
+function runL2Backfill() { return handleL2Backfill({}, getConfig()); }
 
 function setupDailyTriggers() {
   const wanted = ['runL2Batch', 'runL3Batch', 'runL4Batch'];
@@ -1456,6 +1613,9 @@ function doPost(e) {
       case 'L3_BACKFILL_DATE':
         response = handleL3BackfillDate(data, config);
         break;
+      case 'L2_BACKFILL':
+        response = handleL2Backfill(data, config);
+        break;
       default:
         response = { success: false, error: `Unknown action: ${action}` };
     }
@@ -1479,7 +1639,7 @@ function doGet(e) {
     JSON.stringify({
       success: false,
       error: 'This is a POST-only API. Use POST requests with {"action":"..."}',
-      supportedActions: ['L1_SAVE', 'L1_LIST', 'L2_CREATE', 'EXPLANATION_CREATE', 'L2_LIST', 'L2_BATCH', 'L3_CREATE', 'ANALYSIS_CREATE', 'L3_LIST', 'L3_BATCH', 'ARTICLE_LIST', 'L3_BACKFILL_DATE', 'L4_PUBLISH', 'L4_LIST', 'L4_BATCH', 'REBUILD_MANIFEST']
+      supportedActions: ['L1_SAVE', 'L1_LIST', 'L2_CREATE', 'EXPLANATION_CREATE', 'L2_LIST', 'L2_BATCH', 'L2_BACKFILL', 'L3_CREATE', 'ANALYSIS_CREATE', 'L3_LIST', 'L3_BATCH', 'ARTICLE_LIST', 'L3_BACKFILL_DATE', 'L4_PUBLISH', 'L4_LIST', 'L4_BATCH', 'REBUILD_MANIFEST']
     })
   ).setMimeType(ContentService.MimeType.JSON);
 }
