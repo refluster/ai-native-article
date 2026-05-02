@@ -286,5 +286,15 @@
     "abstract": "ThoughtworksのAgentic SDLCレポートを起点に、AIエージェントが開発工程に参入する時代にエンジニアが担うべき新しい役割を解説。コードを書く人から、AIを制御する仕様・テスト・フィードバックループを設計する人への転換と、プロセス全体の再設計の必要性を論じる。",
     "image": "/posts/images/d37782c2771e.jpg",
     "sourceUrls": "https://www.thoughtworks.com/en-us/insights/articles/preparing-your-team-for-the-agentic-software-development-life-cycle"
+  },
+  {
+    "slug": "c48584895882",
+    "title": "AIスタートアップの秘密兵器「FDE」完全ガイド——なぜ、製品が優れていても導入に失敗するのか",
+    "type": "explanation",
+    "category": "C: New Roles / FDE",
+    "date": "2026-03-26",
+    "abstract": "Rocketlaneによる「Forward Deployed Engineer完全ガイド2026」。FDEが解決するエンタープライズAI導入の「最後の1マイル」問題を詳説し、AIを顧客環境に根付かせるために必要な「現場に入り込むエンジニア」の役割と価値を論じる。",
+    "image": "/posts/images/c48584895882.jpg",
+    "sourceUrls": "https://www.rocketlane.com/blogs/forward-deployed-engineer"
   }
 ]
