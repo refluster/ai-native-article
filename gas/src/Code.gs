@@ -83,13 +83,33 @@ function notionUpdatePage(pageId, properties, apiKey) {
 // (otherwise a future L4 republish would re-export the truncated body and
 // regress the backfill).
 function notionReplacePageBody(pageId, newBlocks, apiKey) {
-  const existing = notionRequest('GET', `/blocks/${pageId}/children?page_size=100`, apiKey);
-  const oldBlocks = existing.results || [];
+  // List existing children. The endpoint paginates at 100; loop until
+  // has_more=false so pages with >100 blocks (long briefings) are fully
+  // captured and don't leave stale tail content behind after replace.
+  const oldBlocks = [];
+  let cursor = '';
+  while (true) {
+    const path = `/blocks/${pageId}/children?page_size=100`
+      + (cursor ? `&start_cursor=${encodeURIComponent(cursor)}` : '');
+    const page = notionRequest('GET', path, apiKey);
+    for (const b of (page.results || [])) oldBlocks.push(b);
+    if (!page.has_more) break;
+    cursor = page.next_cursor || '';
+    if (!cursor) break;
+  }
   for (const b of oldBlocks) {
     notionRequest('DELETE', `/blocks/${b.id}`, apiKey);
   }
+  // PATCH /blocks/{id}/children caps at 100 children per call. Long
+  // briefing-document articles routinely exceed this (the 5-section
+  // template with bullets often emits 100+ blocks), so we chunk and
+  // append each batch in turn. Order is preserved.
   if (newBlocks && newBlocks.length) {
-    notionRequest('PATCH', `/blocks/${pageId}/children`, apiKey, { children: newBlocks });
+    const CHUNK = 100;
+    for (let i = 0; i < newBlocks.length; i += CHUNK) {
+      const slice = newBlocks.slice(i, i + CHUNK);
+      notionRequest('PATCH', `/blocks/${pageId}/children`, apiKey, { children: slice });
+    }
   }
 }
 

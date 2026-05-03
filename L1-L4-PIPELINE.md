@@ -119,8 +119,21 @@ fetch('YOUR_GAS_URL', {
 
 - **L1_SAVE**: Save web article to Notion
 - **L1_LIST**: Fetch all L1 articles
-- **L2_CREATE**: Generate blog from L1 articles
-- **L4_PUBLISH**: Publish L3 articles to GitHub
+- **L2_CREATE** / **EXPLANATION_CREATE**: Generate blog from one L1 article
+- **L2_LIST**: List L2 (explanation) articles
+- **L2_BATCH**: Daily batch — for each uncovered L1, create one L2 (max 3/run)
+- **L2_BACKFILL**: One-shot operator action — sweep Notion for explanation rows whose body was truncated by an undersized LLM budget, regenerate them with the current 8000-token budget. Manual only; max 5/run. See [Operator runbooks](#operator-runbooks) below.
+- **L3_CREATE** / **ANALYSIS_CREATE**: Synthesize one L3 insight from selected L2 articles
+- **L3_LIST**: List L3 (analysis) articles
+- **L3_BATCH**: Daily batch — sample one set of recent L2s and create one L3
+- **L3_BACKFILL_DATE**: One-shot — set Date = created_time on legacy L3 rows
+- **L4_PUBLISH**: Publish one article to GitHub (markdown + cover image)
+- **L4_LIST**: List published articles
+- **L4_BATCH**: Daily batch — image any unimaged published article (max 2/run)
+- **REBUILD_MANIFEST**: Rebuild `manifest.json` from Notion (legacy maintenance)
+- **ARTICLE_LIST**: Unified listing across types (used by `article-health` skill)
+
+Use the [`gas-call` skill](../.claude/skills/gas-call/SKILL.md) to invoke any of these from the terminal — `curl -X POST` does NOT work because GAS redirects POSTs through `script.googleusercontent.com` and that endpoint returns 405.
 
 ## Code Structure
 
@@ -140,17 +153,83 @@ src/
 ## Deployment
 
 ```bash
-# Push GAS code after changes
-npm run push-gas
+# Push GAS code + verify the new version is actually serving
+node .claude/skills/gas-deploy-verify/scripts/gas-deploy-verify.mjs --expect L2_BACKFILL,L3_BATCH
+
+# OR (without the readiness probe):
+npm run deploy-gas
 
 # Build and deploy React app
 npm run build
 git push origin main  # Triggers GitHub Actions → GitHub Pages
 ```
 
+## Deploy cadence and lag
+
+**The user-facing site is rebuilt from Notion on every deploy.** See [docs/architecture-source-of-truth.md](docs/architecture-source-of-truth.md) for the full source-of-truth contract; the practical implications:
+
+| Trigger | What rebuilds | Latency |
+|---|---|---|
+| `git push` to `main` | gh-pages from current Notion content | ~3 min for the workflow |
+| Scheduled cron at **06:17 / 12:17 / 18:17 UTC** (`.github/workflows/deploy.yml`) | gh-pages from current Notion content | up to 6 hours from your Notion edit to live site |
+| `gh workflow run deploy.yml` | gh-pages from current Notion content | ~3 min — the manual lever |
+| `runL2Batch` / `runL3Batch` GAS triggers (09:00 / 10:00 JST) | New Notion rows — **not** the live site | next deploy picks them up |
+
+So when fixing article content: edit Notion (directly or via a GAS handler like `L2_BACKFILL`), then either wait for the next cron tick or run the workflow manually.
+
+## Daily cron triggers (Asia/Tokyo)
+
+Installed via `setupDailyTriggers()` in `gas/src/Code.gs`. Run once from the Apps Script editor after a fresh deploy to install or reset.
+
+| Time | Function | Purpose |
+|---|---|---|
+| 09:00 JST | `runL2Batch` | Fetch any uncovered L1 articles, create up to 3 new L2 explanations |
+| 10:00 JST | `runL3Batch` | Sample recent L2s, synthesize 1 L3 insight if there's a fresh L2 |
+| 11:00 JST | `runL4Batch` | Generate cover images and write markdown for any unimaged article (max 2/run) |
+
+The 1-hour gaps give each batch the full 6-min GAS timeout without overlap.
+
+## Operator runbooks
+
+### Article truncated mid-sentence
+
+User reports an article that ends mid-sentence (e.g. `kohuehara.xyz/.../d17e1d58ec42` cut at `### ベンダーロックイン`).
+
+1. Run the `article-health` skill to see whether the symptom is on gh-pages, in Notion, or both:
+   ```bash
+   node .claude/skills/article-health/scripts/article-health.mjs
+   ```
+2. If status is `TRUNCATED_NOTION` or `TRUNCATED_PUBLISHED`: regenerate via `L2_BACKFILL`. Repeat until `remaining: 0`:
+   ```bash
+   node .claude/skills/gas-call/scripts/gas-call.mjs L2_BACKFILL
+   ```
+3. Trigger a deploy so gh-pages picks up the fixed Notion content:
+   ```bash
+   gh workflow run deploy.yml
+   ```
+4. Re-run `article-health`. Confirm 0 truncated.
+
+The `L2_BACKFILL` action uses the `isTruncatedMarkdown` heuristic in `gas/src/Code.gs` — a heading with no body underneath, or a non-list line that doesn't end with proper punctuation. The same heuristic is mirrored in the `article-health` skill so what the skill flags will also be picked up by `L2_BACKFILL`.
+
+### Adding a new GAS action
+
+1. Add the handler function in `gas/src/Code.gs`.
+2. Add a `case '<NEW_ACTION>':` in `doPost`.
+3. Add `'<NEW_ACTION>'` to the `supportedActions` array in `doGet`.
+4. Deploy + verify in one step:
+   ```bash
+   node .claude/skills/gas-deploy-verify/scripts/gas-deploy-verify.mjs --expect <NEW_ACTION>
+   ```
+5. Smoke-test:
+   ```bash
+   node .claude/skills/gas-call/scripts/gas-call.mjs <NEW_ACTION>
+   ```
+
+If the verify step fails after 90 seconds, the deploy didn't propagate — re-run.
+
 ## Notes
 
 - **Token credentials in .env**: GAS reads them via script properties (set manually in Apps Script UI)
 - **Notion DB IDs**: L1 and L3 are hardcoded; L2 and L4 must be configured
-- **GitHub branch**: All published files go to `gh-pages`
-- **Azure OpenAI**: Model is `gpt-5.4` at endpoint `https://koh-uehara-ai.openai.azure.com/`
+- **GitHub branch**: Markdown is written to both `main` (audit trail; CI overwrites it on next deploy) and `gh-pages` (live site, built from Notion). See [docs/architecture-source-of-truth.md](docs/architecture-source-of-truth.md).
+- **Azure OpenAI**: Model is `gpt-5.4` at endpoint `https://rg-phd-openai-uehara.openai.azure.com/`. Budget sizing rules: [docs/azure-budget-rules.md](docs/azure-budget-rules.md).
