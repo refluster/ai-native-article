@@ -10,9 +10,9 @@ AIの進化は、開発者やデザイナーの仕事を根本的に変える。
 
 ## 導入
 最近の技術進展により、エンジニアがコードを書くことをやめ、デザイナーは新しいスキルを求めら"
-notionId: "339d0f0b-e61e-8169-a7e2-cfcc30ab943c"
-image: "/posts/images/cfcc30ab943c.jpg"
+notionId: "34fd0f0b-e61e-81ea-863c-c91c139d481c"
 sourceUrls: "https://www.businessinsider.com/ai-coding-changing-software-developer-role-2026-3, https://www.figma.com/blog/skills-for-the-ai-era/, https://www.hanwha.com/newsroom/news/feature-stories/from-energy-to-industry-3-ai-trends-set-to-transform-operations-in-2026.do"
+legacySlug: "cfcc30ab943c"
 ---
 
 # AI時代におけるエンジニアとデザイナーの新しい役割

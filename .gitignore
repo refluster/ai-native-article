@@ -3,3 +3,5 @@ dist/
 .env
 *.local
 skills/
+.claude/*
+!.claude/skills/
