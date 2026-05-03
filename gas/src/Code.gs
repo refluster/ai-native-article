@@ -1344,7 +1344,11 @@ function handleL4List(config) {
 // {"action":"L2_BACKFILL"}) repeatedly. Each call processes up to
 // L2_BACKFILL_MAX rows and reports `remaining`. Idempotent: clean rows are
 // skipped on every pass.
-const L2_BACKFILL_MAX = 5;
+// Keep this at 3, not 5, so that mode='all' regenerations stay safely
+// under GAS's 6-minute execution limit. With briefing-document prompts
+// each Azure call runs ~60–90s; at 5/iter we routinely hit timeouts and
+// the client-side retry layer ate the cycles. 3/iter ≈ 4 min worst case.
+const L2_BACKFILL_MAX = 3;
 function handleL2Backfill(data, config) {
   // mode='truncated' (default): only regenerate articles cut off mid-sentence.
   // mode='all': regenerate every L2, used when the prompt itself changes and
