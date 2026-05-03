@@ -306,5 +306,15 @@
     "abstract": "Martin Fowlerブログの「on the loop」論を起点に、AIエージェント時代に人間エンジニアが果たすべき新しい役割を解説。コードを書く・レビューする役割から、AIを導く仕様・テスト・評価パイプラインを設計する役割への転換を製造業エンジニア向けに語る。",
     "image": "/posts/images/c58c4d6f49c8.jpg",
     "sourceUrls": "https://www.infoq.com/news/2026/03/mf-aiassisted-dev/"
+  },
+  {
+    "slug": "cbb2a482868d",
+    "title": "独立研究が暴く「AIで生産性10倍」の真実——なぜAIを使うと「速くなった気がするのに遅くなる」のか",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "date": "2026-03-26",
+    "abstract": "METR、Uplevel、GitClearの独立研究が示す「AI利用で開発者が19%遅くなった」「バグが41%増加」等の反直感的データを紹介。AI生産性神話の解体と「それでも今行動すべき理由」を論じる。",
+    "image": "/posts/images/cbb2a482868d.jpg",
+    "sourceUrls": "https://paddo.dev/blog/ai-developer-productivity-myth/"
   }
 ]
