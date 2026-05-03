@@ -296,5 +296,15 @@
     "abstract": "Rocketlaneによる「Forward Deployed Engineer完全ガイド2026」。FDEが解決するエンタープライズAI導入の「最後の1マイル」問題を詳説し、AIを顧客環境に根付かせるために必要な「現場に入り込むエンジニア」の役割と価値を論じる。",
     "image": "/posts/images/c48584895882.jpg",
     "sourceUrls": "https://www.rocketlane.com/blogs/forward-deployed-engineer"
+  },
+  {
+    "slug": "c58c4d6f49c8",
+    "title": "「コードレビューをやめる」日が来る——マーティン・ファウラーが描く、人間がAIと共存する新しい開発の姿",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "date": "2026-03-26",
+    "abstract": "Martin Fowlerブログの「on the loop」論を起点に、AIエージェント時代に人間エンジニアが果たすべき新しい役割を解説。コードを書く・レビューする役割から、AIを導く仕様・テスト・評価パイプラインを設計する役割への転換を製造業エンジニア向けに語る。",
+    "image": "/posts/images/c58c4d6f49c8.jpg",
+    "sourceUrls": "https://www.infoq.com/news/2026/03/mf-aiassisted-dev/"
   }
 ]
