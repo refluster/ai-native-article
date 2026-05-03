@@ -258,6 +258,131 @@ function azureGenerateText(prompt, apiKey, options) {
   return text;
 }
 
+// ─── SOURCE FETCH (for L2 briefing prompt) ───────────────────────────────────
+// L2 generation needs the actual source text to produce a faithful briefing.
+// Without it the LLM only sees the L1 summary (already abstracted) and fills
+// in generic placeholders. This helper fetches the URL, strips HTML to text,
+// truncates to fit the prompt budget, and returns null on any failure so the
+// caller can fall back to the L1 summary alone.
+
+const L2_SOURCE_TEXT_LIMIT = 30000; // characters fed into the prompt
+
+function fetchSourceText(url) {
+  if (!url || !/^https?:\/\//i.test(url)) return null;
+  let response;
+  try {
+    response = UrlFetchApp.fetch(url, {
+      method: 'get',
+      followRedirects: true,
+      muteHttpExceptions: true,
+      headers: {
+        // A realistic UA reduces the rate at which CDNs serve us a stub /
+        // bot-challenge page. We still gracefully fall back to L1 summary
+        // when JS-only sites (X.com, paywalls, anti-bot) return useless HTML.
+        'User-Agent': 'Mozilla/5.0 (compatible; AI-Native-Article-Briefing/1.0)',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'ja,en;q=0.8',
+      },
+    });
+  } catch (_e) {
+    return null;
+  }
+  const status = response.getResponseCode();
+  if (status >= 400) return null;
+  const html = response.getContentText() || '';
+  if (!html) return null;
+  const text = htmlToPlainText(html);
+  if (!text || text.length < 200) return null; // too short → likely a bot wall
+  return text.length > L2_SOURCE_TEXT_LIMIT
+    ? text.substring(0, L2_SOURCE_TEXT_LIMIT)
+    : text;
+}
+
+// Best-effort HTML→text. GAS has no DOMParser so we strip with regex. The
+// goal is to give the LLM enough article body to ground specifics on; perfect
+// fidelity isn't required because the LLM tolerates noise.
+function htmlToPlainText(html) {
+  let s = String(html || '');
+  // Drop script/style/noscript blocks entirely.
+  s = s.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ');
+  s = s.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ');
+  s = s.replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, ' ');
+  // HTML comments.
+  s = s.replace(/<!--[\s\S]*?-->/g, ' ');
+  // Block-level closers / line breaks → newline so paragraphs survive.
+  s = s.replace(/<br\s*\/?>/gi, '\n');
+  s = s.replace(/<\/(p|div|li|tr|h[1-6]|section|article|header|footer|blockquote|pre)>/gi, '\n');
+  // Strip remaining tags.
+  s = s.replace(/<[^>]+>/g, ' ');
+  // Decode the most common entities.
+  s = s.replace(/&nbsp;/g, ' ')
+       .replace(/&amp;/g, '&')
+       .replace(/&lt;/g, '<')
+       .replace(/&gt;/g, '>')
+       .replace(/&quot;/g, '"')
+       .replace(/&#39;/g, "'")
+       .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+       .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(parseInt(d, 10)));
+  // Collapse whitespace: many spaces → one, many blank lines → at most two.
+  s = s.replace(/[ \t]+/g, ' ');
+  s = s.replace(/\n[ \t]+/g, '\n').replace(/[ \t]+\n/g, '\n');
+  s = s.replace(/\n{3,}/g, '\n\n');
+  return s.trim();
+}
+
+// ─── L2 PROMPT (briefing document format) ────────────────────────────────────
+// The L2 layer is meant to be a faithful explanation of the source article,
+// not a generic op-ed riffing on the theme. The prompt below enforces:
+//   1. Executive Summary up front (concise, surfaces the most critical
+//      takeaways before the reader scrolls).
+//   2. Body sections named after source-specific themes (no "AI's potential"
+//      style placeholder headings) with bullet points carrying the actual
+//      numbers, names, dates, and direct quotations from the source.
+//   3. Objective, incisive tone — no "今後注目される" hedge endings.
+//   4. Hard ban on inventing facts: when the source body couldn't be fetched
+//      (X.com posts, paywalls, JS-only pages) the prompt is told so and
+//      instructed to work from L1 summary only without fabricating.
+function buildL2Prompt(l1Title, l1Summary, l1SourceUrl, sourceText) {
+  const sourceBlock = sourceText
+    ? `【出典本文】\n${sourceText}`
+    : '【出典本文】\n(本文取得不可。下のサマリーのみで構成すること。サマリーに無い事実・数値・固有名詞・引用を補ってはならない。)';
+  return [
+    'あなたは一次情報に忠実なテクニカルライターです。',
+    '',
+    '以下の出典記事に基づき、briefing document 形式の日本語解説を書いてください。',
+    '',
+    '【出典】',
+    `タイトル: ${l1Title}`,
+    `URL: ${l1SourceUrl || '(none)'}`,
+    `L1 サマリー: ${l1Summary}`,
+    '',
+    sourceBlock,
+    '',
+    '【出力フォーマット】',
+    '- 1 行目: # で始まる日本語タイトル (出典の主題に即した具体的な見出し。汎用語は避ける)',
+    '- その直下: ## Executive Summary セクション。リード段落 2〜3 文で、最も重要な takeaway を先出しする',
+    '- 本文: ## 見出しを 2〜5 個。各見出しは出典固有の主題で命名する (「AI の可能性」「変化への対応」のような汎用語 NG)',
+    '- 各セクションは短い段落 + 箇条書きで構成し、エビデンス (出典内の事実) と結論 (そこから言える含意) を分けて示す',
+    '- すべての具体事実 (数値・固有名詞・日付・直接引用) は出典のものをそのまま用い、抽象化・四捨五入・改変しない',
+    '- 出典に存在しない事例・統計・企業名・人物名を作り出さない',
+    '- トーンは客観的・鋭利。「重要だ」「今後注目される」のような評者語りや、ありがちな結語を避ける',
+    '- 冗長な前置きや一般論の枕詞を入れない',
+    '',
+    'Markdown で出力。日本語で。',
+  ].join('\n');
+}
+
+// Wraps the full L2 generation pipeline (fetch source → build prompt → call
+// Azure → return markdown) so handleL2Create and handleL2Backfill stay in
+// lockstep. Returns the raw markdown string.
+function generateL2Markdown(l1Title, l1Summary, l1SourceUrl, config) {
+  const sourceText = fetchSourceText(l1SourceUrl);
+  const prompt = buildL2Prompt(l1Title, l1Summary, l1SourceUrl, sourceText);
+  return azureGenerateText(prompt, config.azure_openapi_key, {
+    maxCompletionTokens: 8000,
+  });
+}
+
 // ─── GITHUB API ──────────────────────────────────────────────────────────────
 
 function githubRequest(method, path, token, body) {
@@ -592,15 +717,10 @@ function handleL2Create(data, config) {
   const l1Category = l1Page.properties.Category?.rich_text[0]?.plain_text || 'A';
   const l1SourceUrl = l1Page.properties['Source URL']?.url || '';
 
-  const prompt = `Based on this AI industry news:\n\nTitle: ${l1Title}\nSummary: ${l1Summary}\n\nWrite a comprehensive blog article (800-1200 words) that expands on the topic, explains implications, includes examples, and discusses opportunities and challenges. Suggest a catchy Japanese blog title at the beginning. Format as Markdown with ## for headings.`;
-  // Same reasoning-budget rationale as L3 (see handleL3Create): gpt-5.4
-  // shares max_completion_tokens between hidden reasoning and visible
-  // output. The 2000-token default left ~hundreds of visible tokens after
-  // reasoning and produced articles that ended mid-sentence (e.g.
-  // d17e1d58ec42 cut at "### ベンダーロックイン" with no body).
-  const blogContent = azureGenerateText(prompt, config.azure_openapi_key, {
-    maxCompletionTokens: 8000,
-  });
+  // Briefing-document prompt: fetches source body when possible so the LLM
+  // has concrete numbers/names/dates to ground on, instead of riffing
+  // generically off the L1 summary. See buildL2Prompt / generateL2Markdown.
+  const blogContent = generateL2Markdown(l1Title, l1Summary, l1SourceUrl, config);
 
   // Extract title from the generated content (first line should have the title)
   const titleMatch = blogContent.match(/^#+\s+(.+?)(?:\n|$)/);
@@ -1205,7 +1325,11 @@ function handleL4List(config) {
 // L2_BACKFILL_MAX rows and reports `remaining`. Idempotent: clean rows are
 // skipped on every pass.
 const L2_BACKFILL_MAX = 5;
-function handleL2Backfill(_data, config) {
+function handleL2Backfill(data, config) {
+  // mode='truncated' (default): only regenerate articles cut off mid-sentence.
+  // mode='all': regenerate every L2, used when the prompt itself changes and
+  // the existing corpus must be refreshed (e.g. the briefing-document rollout).
+  const mode = (data && data.mode) === 'all' ? 'all' : 'truncated';
   const sourceDbId = useUnifiedDb(config) ? config.unified_db_id : config.l2_db_id;
   const pages = notionQueryDatabase(sourceDbId, config.notion_api_key);
   // Filter to explanation rows when reading the unified DB. The legacy L2 DB
@@ -1216,31 +1340,68 @@ function handleL2Backfill(_data, config) {
 
   function _l2Title(p) { return p.properties.Title?.title[0]?.plain_text || p.properties.Name?.title[0]?.plain_text || ''; }
   function _l2Summary(p) { return p.properties.Abstract?.rich_text[0]?.plain_text || p.properties['Contents Summary']?.rich_text[0]?.plain_text || ''; }
+  function _l2SourceUrl(p) {
+    return p.properties['Source URLs']?.url
+      || p.properties.SourceURLs?.rich_text[0]?.plain_text
+      || '';
+  }
   function _slug(p) {
     const legacy = p.properties.LegacySlug?.rich_text[0]?.plain_text || '';
     return legacy || p.id.replace(/-/g, '').slice(-12);
   }
 
-  // Identify truncated rows up front so we can report `remaining` accurately
-  // even after the per-run cap kicks in. Source of truth = Notion blocks
-  // (matches what fetch-notion.mjs reads at deploy time).
-  const truncated = [];
-  for (const p of explanations) {
-    let mdBody;
-    try {
-      const blocks = notionReadPageBlocks(p.id, config.notion_api_key);
-      mdBody = notionBlocksToMarkdown(blocks);
-    } catch (e) {
-      truncated.push({ id: p.id, slug: _slug(p), error: String(e && e.message || e), readFailed: true });
-      continue;
+  // Build the candidate list. In 'truncated' mode we read each page's body
+  // and keep only those flagged by isTruncatedMarkdown. In 'all' mode every
+  // explanation is a candidate; we process oldest-first so progress through
+  // the corpus is visible in the UI.
+  const candidates = [];
+  if (mode === 'truncated') {
+    for (const p of explanations) {
+      let mdBody;
+      try {
+        const blocks = notionReadPageBlocks(p.id, config.notion_api_key);
+        mdBody = notionBlocksToMarkdown(blocks);
+      } catch (e) {
+        candidates.push({ id: p.id, slug: _slug(p), error: String(e && e.message || e), readFailed: true });
+        continue;
+      }
+      if (!mdBody || !mdBody.trim()) continue;
+      if (isTruncatedMarkdown(mdBody)) {
+        candidates.push({ id: p.id, slug: _slug(p), page: p });
+      }
     }
-    if (!mdBody || !mdBody.trim()) continue; // empty body — handle separately
-    if (isTruncatedMarkdown(mdBody)) {
-      truncated.push({ id: p.id, slug: _slug(p), page: p });
+  } else {
+    const sorted = explanations.slice().sort((a, b) =>
+      (a.created_time || '').localeCompare(b.created_time || '')
+    );
+    // Skip pages that have already been refreshed by an earlier 'all' run in
+    // this same prompt-version cohort. We mark refreshed pages by writing
+    // PROMPT_VERSION_TAG into a Notion rich_text property the next time we
+    // touch one — but rather than introduce a new schema field, we use the
+    // page's last_edited_time vs the start-of-rollout timestamp from
+    // Script Property L2_REGEN_ALL_STARTED_AT. If that property is unset,
+    // process every page and set it on the first call.
+    const props = PropertiesService.getScriptProperties();
+    let startedAt = props.getProperty('L2_REGEN_ALL_STARTED_AT') || '';
+    if (!startedAt) {
+      startedAt = new Date().toISOString();
+      props.setProperty('L2_REGEN_ALL_STARTED_AT', startedAt);
+    }
+    // Optional reset: send {mode:'all', resetCohort:true} to start a fresh
+    // rollout (e.g. after another prompt change). The previous startedAt is
+    // overwritten and every page becomes a candidate again.
+    if (data && data.resetCohort) {
+      startedAt = new Date().toISOString();
+      props.setProperty('L2_REGEN_ALL_STARTED_AT', startedAt);
+    }
+    for (const p of sorted) {
+      const lastEdited = p.last_edited_time || '';
+      if (lastEdited && lastEdited >= startedAt) continue; // already refreshed
+      candidates.push({ id: p.id, slug: _slug(p), page: p });
     }
   }
 
-  const picked = truncated.filter(t => !t.readFailed).slice(0, L2_BACKFILL_MAX);
+  const picked = candidates.filter(t => !t.readFailed).slice(0, L2_BACKFILL_MAX);
   const processed = [];
   const errors = [];
 
@@ -1249,14 +1410,11 @@ function handleL2Backfill(_data, config) {
     try {
       const l1Title = _l2Title(p);
       const l1Summary = _l2Summary(p);
-
-      // Same prompt shape as handleL2Create. The L1 row is no longer needed —
-      // the L2 row's own Title/Abstract carry forward the title and summary
-      // we'd otherwise re-derive.
-      const prompt = `Based on this AI industry news:\n\nTitle: ${l1Title}\nSummary: ${l1Summary}\n\nWrite a comprehensive blog article (800-1200 words) that expands on the topic, explains implications, includes examples, and discusses opportunities and challenges. Suggest a catchy Japanese blog title at the beginning. Format as Markdown with ## for headings.`;
-      const blogContent = azureGenerateText(prompt, config.azure_openapi_key, {
-        maxCompletionTokens: 8000,
-      });
+      const sourceUrl = _l2SourceUrl(p);
+      // Same prompt + LLM call as handleL2Create — the helper fetches the
+      // source URL body when reachable so regenerated articles ground on
+      // primary information instead of recycling the L2 row's stale summary.
+      const blogContent = generateL2Markdown(l1Title, l1Summary, sourceUrl, config);
 
       const blocks = markdownToNotionBlocks(blogContent);
       if (blocks.length === 0) {
@@ -1273,9 +1431,10 @@ function handleL2Backfill(_data, config) {
   return {
     success: true,
     data: {
+      mode,
       processed: processed.length,
-      remaining: truncated.length - picked.length,
-      truncatedFound: truncated.length,
+      remaining: candidates.length - picked.length,
+      candidatesFound: candidates.length,
       explanationCount: explanations.length,
       items: processed,
       errors,
