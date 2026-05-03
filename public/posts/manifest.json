@@ -1,237 +1,1009 @@
 [
   {
-    "slug": "34ed0f0be61e81b7baa0c68bc66092ca",
+    "slug": "fd7c99040498",
+    "title": "日本語タイトル案：**AIと生産性革命――ハイパーオートメーションが変える企業競争力の未来**",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-05-03",
+    "abstract": "The article discusses the impact of AI on productivity and how organizations are leveraging hyper-automation to enhance efficiency. It also highlights specific case studies demonstrating the successful integration of AI tools in various industries.",
+    "sourceUrls": "https://x.com/shin_sasaki19/status/2047311810693648399?s=46&t=JLj57N67SbZn6GQzDkxKag"
+  },
+  {
+    "slug": "c9197f05fbf0",
+    "title": "生成AI導入の成否を分ける組織生産性の本質",
+    "type": "analysis",
+    "category": "生成AI活用 × 組織変革",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity",
+      "生成AI活用 × 組織変革"
+    ],
+    "date": "2026-05-03",
+    "abstract": "**要旨：生成AIの成果はモデル性能より、業務文脈への埋め込みと組織再設計で決まる。**\n\n## 導入\n\nIBMが2026年のAI潮流として「製造やヘルスケアのような特定産業向けのagentic AI」に焦点を当てたこと、Fugu Betaが「業務効率化」を前面に掲げて機能拡張を進めていること、そして企業導入の現実を論じた記事が「現場生産性」と「組織変革」を同時に扱っていること。一見すると、未来予",
+    "sourceUrls": "https://www.ibm.com/think/news/ai-tech-trends-predictions-2026, https://sakana.ai/fugu-beta/#Japanese, https://biz-journal.jp/company/post_394441.html"
+  },
+  {
+    "slug": "cd53f55fea45",
+    "title": "2026年初頭のテック人員削減は45,000人超、資金はAI投資へ再配分",
+    "type": "explanation",
+    "category": "D: Big Tech Layoffs & AI Pivot",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot"
+    ],
+    "date": "2026-05-03",
+    "abstract": "42% of layoffs due to restructuring, 39% due to budget realignment for AI. Amazon 14,000 cuts in Oct 2025. 245,000 global tech workers laid off in 2025 with clear pivot from headcount to AI infrastructure.",
+    "sourceUrls": "https://www.techtimes.com/articles/315282/20260321/tech-layoffs-surge-while-ai-jobs-soar-key-trends-shaping-2026-tech-industry.htm"
+  },
+  {
+    "slug": "cda2c84fbf03",
+    "title": "日本発・AIで変わる働き方：Keidanren提言が示す「未来の仕事」と成長戦略",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-05-03",
+    "abstract": "The article discusses the potential of AI to drive hyper-productivity in various sectors and outlines policy recommendations to harness its benefits. It emphasizes the need for collaboration between industries and government to effectively integrate AI technologies into the workforce.",
+    "sourceUrls": "https://www.keidanren.or.jp/policy/2026/016.html"
+  },
+  {
+    "slug": "f8783cd98f5f",
+    "title": "生成AIは業績を変えられるのか？現場生産性と組織変革から読み解く企業導入のリアル",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-05-03",
+    "abstract": "この記事は、企業における生成AI導入が業務効率化や意思決定の迅速化にどう寄与するかを中心に論じているとみられる。あわせて、単なるツール導入にとどまらず、現場運用や組織設計の見直しが成果を左右する点が示されている可能性が高い。",
+    "sourceUrls": "https://biz-journal.jp/company/post_394441.html"
+  },
+  {
+    "slug": "e030792741cd",
+    "title": "日本語タイトル案：**AI時代に揺れるプロダクトマネージャー――「半数が危うい」と言われる本当の理由**",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "categoriesMulti": [
+      "B: Role Blurring"
+    ],
+    "date": "2026-05-02",
+    "abstract": "The article discusses the challenges faced by product managers in the current tech landscape, particularly due to shifting roles and expectations influenced by advancements in AI. It emphasizes the need for product managers to adapt to these changes to remain relevant and effective in their positions.",
+    "sourceUrls": "https://www.lennysnewsletter.com/p/why-half-of-product-managers-are-in-trouble"
+  },
+  {
+    "slug": "d76f8008ca7a",
+    "title": "未来の働き方を変えるAI革命：職場の生産性向上と企業競争力の新時代",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-05-02",
+    "abstract": "The article discusses the transformative impact of AI on workplace productivity, highlighting innovations that enhance efficiency and streamline processes. It emphasizes the necessity for businesses to adapt to these technological advancements to remain competitive.",
+    "sourceUrls": "https://x.com/_mayumayu13/status/2046378245004911056?s=46"
+  },
+  {
+    "slug": "d17e1d58ec42",
+    "title": "サービスがソフトウェアを超える時代：AI時代に再定義されるビジネスの競争力",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "categoriesMulti": [
+      "B: Role Blurring"
+    ],
+    "date": "2026-05-02",
+    "abstract": "The article discusses the evolving landscape of software and services, emphasizing how traditional software models are being replaced by service-oriented solutions. It highlights the implications of this shift for businesses and developers, suggesting that adaptability and integration become crucial in a service-driven economy.",
+    "sourceUrls": "https://sequoiacap.com/article/services-the-new-software/"
+  },
+  {
+    "slug": "d20e091245a9",
+    "title": "AI時代の競争優位は実装で決まる",
+    "type": "analysis",
+    "category": "技術進化 × 事業実装",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity",
+      "技術進化 × 事業実装"
+    ],
+    "date": "2026-05-02",
+    "abstract": "**要旨：AIの価値はモデル性能ではなく、現場に埋め込まれる実装能力へ移っている。**\n\n# AIの次の競争は「賢さ」ではなく「埋め込み力」になる  \n## 一見バラバラな3つの事実は、同じ原理で説明できる\n\nAnthropic CEOダリオ・アモデイは「スケーリングの指数関数は終わりに近い」と語り、Palantir起源のFDE（Forward Deployed Engineer）の求人はAI時代",
+    "sourceUrls": "https://www.dwarkesh.com/p/dario-amodei-2, https://review.firstround.com/so-you-want-to-hire-a-forward-deployed-engineer/, https://sequoiacap.com/article/services-the-new-software/"
+  },
+  {
+    "slug": "e3225d350157",
+    "title": "AI時代の雇用大転換――「81K Economics」が示す仕事・企業・人材戦略の未来",
+    "type": "explanation",
+    "category": "D: Big Tech Layoffs & AI Pivot",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot"
+    ],
+    "date": "2026-05-01",
+    "abstract": "The article discusses the economic implications of AI advancements, specifically focusing on the impact of AI on job markets and employment trends. It highlights the shift in big tech companies towards AI-driven strategies amidst layoffs and workforce restructuring.",
+    "sourceUrls": "https://www.anthropic.com/research/81k-economics"
+  },
+  {
+    "slug": "fb4c6235140e",
+    "title": "フグベータが切り拓くAI生産性革命――業務効率化の新しい波",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-05-01",
+    "abstract": "Fugu Beta introduces innovative features aimed at enhancing productivity through AI-driven solutions. The platform focuses on streamlining workflows and improving efficiency for users in various sectors.",
+    "sourceUrls": "https://sakana.ai/fugu-beta/#Japanese"
+  },
+  {
+    "slug": "c403aec64834",
+    "title": "81K Economicsから見るAI時代の雇用革命――レイオフ、再編、そして新しい仕事のかたち",
+    "type": "explanation",
+    "category": "D: Big Tech Layoffs & AI Pivot",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot"
+    ],
+    "date": "2026-05-01",
+    "abstract": "The article discusses the implications of AI advancements on the job market, particularly in relation to the recent trend of layoffs in big tech companies. It explores how these changes are reshaping the economic landscape and the role of AI in driving productivity and efficiency.",
+    "sourceUrls": "https://www.anthropic.com/research/81k-economics"
+  },
+  {
+    "slug": "da5663db6837",
+    "title": "AI実装競争が再編する産業秩序",
+    "type": "analysis",
+    "category": "AI基盤戦略 × 産業変革・雇用再編",
+    "categoriesMulti": [
+      "B: Role Blurring",
+      "AI基盤戦略 × 産業変革・雇用再編"
+    ],
+    "date": "2026-05-01",
+    "abstract": "**要旨：AIの本質は「賢い道具」から「経済を再配線する運用層」へ移った。**\n\n# AI基盤戦略 × 産業変革・雇用再編  \n# 「AIは機能ではなく運用OSになる」――供給網、知識労働、雇用再編を貫く深層原理\n\n## 導入\n\n富士通はDigital Twinと強化学習を組み合わせ、供給網の混乱に耐えるAI基盤を打ち出した。Anthropicはわずか**50日間**で**Claude Opus ",
+    "sourceUrls": "https://www.crescendo.ai/news/latest-ai-news-and-updates, https://www.indiatoday.in/technology/features/story/hey-anthropic-take-a-break-from-saas-apocalypse-to-dispatch-claude-ai-is-on-a-tear-with-updates-2887840-2026-03-27, https://www.anthropic.com/research/81k-economics"
+  },
+  {
+    "slug": "d3d72ab33c51",
+    "title": "供給網を制するAI覇権の新法則",
+    "type": "analysis",
+    "category": "半導体製造基盤 × AIインフラ戦略",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity",
+      "半導体製造基盤 × AIインフラ戦略"
+    ],
+    "date": "2026-04-29",
+    "abstract": "**要旨：Terafab、Colossus 2、Macrohardは、AI時代の「製造・計算・組織」を一体化する覇権戦略として読むと最も整合的だ。**\n\n## 導入\n\nTerafabの「月産100万枚」、Colossus 2の「400MW」、TeslaとxAIの「ソフトウェア企業を丸ごと自律化するMacrohard」。一見すると、半導体製造、データセンター、企業ソフトウェアという別々の話に見える。",
+    "sourceUrls": "https://mashable.com/article/tesla-terafab-chip-plant, https://www.tomshardware.com/tech-industry/artificial-intelligence/elon-musk-says-xai-will-have-more-ai-compute-than-everyone-else-combined-within-five-years-macrohard-branding-emblazoned-on-the-roof-of-the-colossus-2-data-center-in-nod-to-the-billionaires-ai-project-to-challenge-microsoft, https://www.technology.org/2026/03/12/elon-musk-launches-macrohard-a-tesla-xai-hybrid-built-to-clone-entire-software-companies/"
+  },
+  {
+    "slug": "c68bc66092ca",
     "title": "AI浸透が仕事と対話を再設計する",
+    "type": "analysis",
     "category": "業務基盤進化 × 労働市場変容",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot",
+      "業務基盤進化 × 労働市場変容"
+    ],
     "date": "2026-04-26",
     "abstract": "**要旨：AIは「機能追加」ではなく、業務基盤と人材価値の再定義を同時に進めている。**\n\n# 業務基盤進化 × 労働市場変容  \n## AI導入の本質は「便利化」ではなく、仕事の単位そのものの再設計である\n\n## 導入\n\nGoogle Workspaceの機能追加、ビッグテックのレイオフとAIシフト、そして「AIネイティブ」という新しい人材像。一見すると、これらはプロダクト、雇用、キャリア論とい",
-    "image": "/posts/images/34ed0f0be61e81b7baa0c68bc66092ca.jpg"
+    "image": "/posts/images/34ed0f0be61e81b7baa0c68bc66092ca.jpg",
+    "sourceUrls": "https://workspace.google.com/blog/product-announcements/10-more-announcements-workspace-at-next-2026, https://www.anthropic.com/research/labor-market-impacts, https://sierra.ai/blog/the-ai-native-interview"
   },
   {
-    "slug": "34dd0f0be61e8153b097f1eee3c4a119",
-    "title": "AI実装の再編が導く次世代価値",
-    "category": "エージェント型開発 × 説明可能AI・業務基盤進化",
+    "slug": "e568692c80c7",
+    "title": "Labor Market Impacts",
+    "type": "explanation",
+    "category": "D: Big Tech Layoffs & AI Pivot",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot"
+    ],
     "date": "2026-04-25",
-    "abstract": "",
-    "image": "/posts/images/34dd0f0be61e8153b097f1eee3c4a119.jpg"
+    "abstract": "The article discusses the effects of AI on the labor market, particularly focusing on the recent layoffs in big tech companies and how these firms are pivoting towards AI-driven strategies. It examines the implications for workers and the evolving job landscape as automation and AI technologies reshape traditional roles.",
+    "sourceUrls": "https://www.anthropic.com/research/labor-market-impacts"
   },
   {
-    "slug": "34cd0f0be61e81eea163f95211ca8825",
+    "slug": "e8ac64f2ca85",
+    "title": "10 More Announcements for Workspace at Next 2026",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-04-25",
+    "abstract": "The article outlines ten new features and updates for Google Workspace announced at the Next 2026 event, focusing on enhancing productivity through AI-driven tools. These innovations aim to streamline workflows and improve collaboration across teams, underscoring Google's commitment to leveraging artificial intelligence in its product offerings.",
+    "sourceUrls": "https://workspace.google.com/blog/product-announcements/10-more-announcements-workspace-at-next-2026"
+  },
+  {
+    "slug": "e3c7053141fd",
+    "title": "The AI Native Interview",
+    "type": "explanation",
+    "category": "C: New Roles / FDE",
+    "categoriesMulti": [
+      "C: New Roles / FDE"
+    ],
+    "date": "2026-04-25",
+    "abstract": "The article discusses the concept of 'AI natives' and explores the skills and mindsets that differentiate them in an increasingly AI-driven world. It emphasizes the importance of adaptability and continuous learning in the face of rapidly evolving technology.",
+    "sourceUrls": "https://sierra.ai/blog/the-ai-native-interview"
+  },
+  {
+    "slug": "f95211ca8825",
     "title": "AI革命がもたらす未来のビジネス変革",
+    "type": "analysis",
     "category": "テクノロジー × 未来の働き方",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot",
+      "テクノロジー × 未来の働き方"
+    ],
     "date": "2026-04-24",
     "abstract": "# AI業界の未来を形作る共通原理\n\n**要旨**  \nAI業界は急速に進化しており、さまざまな企業の技術革新とその影響が私たちの働き方を変えています。マクロハード、テスラ、xAIの事例を通じて、これらの進展が示す共通の原理を探ります。\n\n## 導入\n\n現在、AI技術の発展は目覚ましく、特にマクロハードの巨人計画やテスラとxAIの新技術が業界に与える影響は計り知れません。これらは一見無関係な事象に",
-    "image": "/posts/images/34cd0f0be61e81eea163f95211ca8825.jpg"
+    "image": "/posts/images/34cd0f0be61e81eea163f95211ca8825.jpg",
+    "sourceUrls": "https://www.tomshardware.com/tech-industry/artificial-intelligence/elon-musk-says-xai-will-have-more-ai-compute-than-everyone-else-combined-within-five-years-macrohard-branding-emblazoned-on-the-roof-of-the-colossus-2-data-center-in-nod-to-the-billionaires-ai-project-to-challenge-microsoft, https://www.technology.org/2026/03/12/elon-musk-launches-macrohard-a-tesla-xai-hybrid-built-to-clone-entire-software-companies/, https://www.ft.com/content/d23bd03a-92ac-4e81-8460-3b867a833860?syn-25a6b1a6=1"
   },
   {
-    "slug": "34bd0f0be61e81d897eac2f67c76f72d",
+    "slug": "ff2697c88e8c",
+    "title": "デザインプロセスの進化：変革する役割と協力の重要性",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "categoriesMulti": [
+      "B: Role Blurring"
+    ],
+    "date": "2026-04-23",
+    "abstract": "The article discusses how the design process has evolved, highlighting the shift in roles and responsibilities within design teams. It emphasizes the importance of adaptability and collaboration in a rapidly changing digital landscape.",
+    "sourceUrls": "https://medium.com/design-bootcamp/jenny-wen-the-design-process-has-changed-7b3b586ecab0"
+  },
+  {
+    "slug": "fdc5fcbfe12a",
+    "title": "AIと未来の仕事：テクノロジーの風景における変革",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "categoriesMulti": [
+      "B: Role Blurring"
+    ],
+    "date": "2026-04-23",
+    "abstract": "The article discusses the impact of AI on job roles within the tech industry, highlighting the blurring of lines between traditional job functions. It explores how professionals are adapting to new AI tools and the shifting dynamics of collaboration in workplaces.",
+    "sourceUrls": "https://www.ft.com/content/d23bd03a-92ac-4e81-8460-3b867a833860?syn-25a6b1a6=1"
+  },
+  {
+    "slug": "c2f67c76f72d",
     "title": "AIと文化の交差点：進化する技術とチームダイナミクス",
+    "type": "analysis",
     "category": "技術 × 組織文化",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot",
+      "技術 × 組織文化"
+    ],
     "date": "2026-04-23",
     "abstract": "# AI関連の新たな原理：技術と組織文化の融合\n\n## 要旨\n本記事では、AI技術の進化、プロトタイプ文化の重要性、そして規制産業におけるエンジニアリングチームへの教訓を通じて、技術と組織文化の融合がもたらす新たな原理を探求します。これらの事実は、より効果的なイノベーションを促進するための基盤となるでしょう。\n\n## 導入\n近年、AI関連の技術革新と組織文化の変革が進行しています。一見無関係に思え",
-    "image": "/posts/images/34bd0f0be61e81d897eac2f67c76f72d.jpg"
+    "image": "/posts/images/34bd0f0be61e81d897eac2f67c76f72d.jpg",
+    "sourceUrls": "https://www.businessinsider.com/block-ceo-jack-dorsey-bring-prototypes-not-slide-decks-meetings-2026-4, https://systima.ai/blog/claude-code-leak-compliance-implications"
   },
   {
-    "slug": "34ad0f0be61e81b79819c6e2910c9277",
+    "slug": "ff4bbe7eb9c3",
+    "title": "プロトタイプの力：Jack Dorseyが提唱する新しい会議文化",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "categoriesMulti": [
+      "B: Role Blurring"
+    ],
+    "date": "2026-04-23",
+    "abstract": "In a recent statement, Block CEO Jack Dorsey emphasized the importance of bringing prototypes rather than traditional slide decks to meetings. He believes that tangible demonstrations foster better understanding and collaboration among team members.",
+    "sourceUrls": "https://www.businessinsider.com/block-ceo-jack-dorsey-bring-prototypes-not-slide-decks-meetings-2026-4"
+  },
+  {
+    "slug": "f54f71772082",
+    "title": "クロードコード流出がもたらす影響：規制産業におけるエンジニアリングチームへの教訓",
+    "type": "explanation",
+    "category": "AI Development Process",
+    "categoriesMulti": [
+      "E: Rethinking SDLC"
+    ],
+    "date": "2026-04-23",
+    "abstract": "Claude Codeのソースコード流出がコンプライアンス要件のある企業の開発チームに与える影響を分析。Undercover Modeの詳細と開発プロセスへの示唆。",
+    "sourceUrls": "https://systima.ai/blog/claude-code-leak-compliance-implications"
+  },
+  {
+    "slug": "c66efe8dea7f",
+    "title": "AIが変える働き方の未来: 職務の境界線が曖昧になる時代",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "categoriesMulti": [
+      "B: Role Blurring"
+    ],
+    "date": "2026-04-23",
+    "abstract": "The status update discusses recent developments in AI and how they are blurring the lines between traditional job roles. It highlights the impact of AI on workforce dynamics and the necessity for adaptation among professionals.",
+    "sourceUrls": "https://x.com/_mayumayu13/status/2046378245004911056"
+  },
+  {
+    "slug": "dc239e49a094",
+    "title": "グロック-3アーキテクチャの深層解析：xAIのモデル能力の進化",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "categoriesMulti": [
+      "B: Role Blurring"
+    ],
+    "date": "2026-04-23",
+    "abstract": "Evolution of xAI's model capabilities.",
+    "sourceUrls": "https://example.com/grok"
+  },
+  {
+    "slug": "f362cac8f219",
+    "title": "2026年のデータセンターインフラ: AIトレーニングモデルの電力要件",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "categoriesMulti": [
+      "B: Role Blurring"
+    ],
+    "date": "2026-04-22",
+    "abstract": "Power requirements for large scale AI training models.",
+    "sourceUrls": "https://example.com/data"
+  },
+  {
+    "slug": "fd7103d190d0",
+    "title": "製造業におけるAIトレンド2026: スマート工場の未来",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "categoriesMulti": [
+      "B: Role Blurring"
+    ],
+    "date": "2026-04-22",
+    "abstract": "AI agents taking over shop floor scheduling and predictive maintenance.",
+    "sourceUrls": "https://example.com/mfg"
+  },
+  {
+    "slug": "cd6f3c5a58ed",
+    "title": "自律型AIエージェントの台頭：生産性への影響と未来の可能性",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "categoriesMulti": [
+      "B: Role Blurring"
+    ],
+    "date": "2026-04-22",
+    "abstract": "Analysis of multi-agent systems and their impact on productivity.",
+    "sourceUrls": "https://example.com/agents"
+  },
+  {
+    "slug": "c6e2910c9277",
     "title": "AIが変革する製造業とデータセンターの未来",
+    "type": "analysis",
     "category": "製造業 × データセンター",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity",
+      "製造業 × データセンター"
+    ],
     "date": "2026-04-22",
     "abstract": "# AI業界の深層原理：製造業とデータセンターの未来に迫る\n\n## 要旨\n製造業におけるAIトレンド、独立型AIエージェントの影響、そしてデータセンターの電力要件は、一見無関係に見える。しかし、これらはすべて「自動化と効率性の向上」という共通の原理で結びついている。本記事では、これらの事実を統一的に分析し、未来の展望を探る。\n\n## 導入\n近年、製造業とデータセンターの分野で加速するAI技術の進化",
-    "image": "/posts/images/34ad0f0be61e81b79819c6e2910c9277.jpg"
+    "image": "/posts/images/34ad0f0be61e81b79819c6e2910c9277.jpg",
+    "sourceUrls": ""
   },
   {
-    "slug": "349d0f0be61e816591d9f250ef0ce27f",
+    "slug": "d23079dea47d",
+    "title": "ロボティクスとAIの融合：産業自動化の未来",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "categoriesMulti": [
+      "B: Role Blurring"
+    ],
+    "date": "2026-04-21",
+    "abstract": "Integration of LLMs into physical hardware for industrial automation.",
+    "sourceUrls": "https://example.com/robot"
+  },
+  {
+    "slug": "f250ef0ce27f",
     "title": "AIとロボティクスが描く産業革新の未来",
+    "type": "analysis",
     "category": "産業自動化 × テクノロジー革新",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity",
+      "産業自動化 × テクノロジー革新"
+    ],
     "date": "2026-04-21",
     "abstract": "# ロボティクスとAIの融合：産業自動化の未来\n\n## 要旨\nロボティクスとAIの関係は進化を続けており、特に業務自動化の分野でその影響力が増しています。本記事では、異なるブログ記事から得られた情報を統合し、これらの事実が示唆する共通の原理を探ります。\n\n## 導入\n最近のAI関連のブログ記事には、ロボティクスとAIがどのように融合し、産業自動化の未来を形作るのかが描かれています。たとえば、「ロボ",
-    "image": "/posts/images/349d0f0be61e816591d9f250ef0ce27f.jpg"
+    "image": "/posts/images/349d0f0be61e816591d9f250ef0ce27f.jpg",
+    "sourceUrls": "https://www.businessinsider.com/xai-macrohard-project-tesla-ai-agent-stalls-2026-3, https://www.analyticsinsight.net/news/elon-musk-unveils-macrohard-ai-to-run-entire-companies"
   },
   {
-    "slug": "33ad0f0be61e818385cfd0c0c7c8aed0",
-    "title": "AI時代における役割変化と新たな戦略",
-    "category": "組織変革 × 技術革新",
+    "slug": "c9c06e22f1db",
+    "title": "マクロハードAIの時代が到来！エロン・マスクが業務自動化の新たな未来を切り開く",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-04-21",
+    "abstract": "Platform powered by Grok and AI4 chips to automate workflows and emulate full company operations.",
+    "sourceUrls": "https://www.analyticsinsight.net/news/elon-musk-unveils-macrohard-ai-to-run-entire-companies"
+  },
+  {
+    "slug": "fd101ede5ef3",
+    "title": "マクロハードの行き詰まり：XAIの展望と未来の機会",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-04-21",
+    "abstract": "Project stalled amid leadership changes, Tesla shifting focus to Digital Optimus AI agent.",
+    "sourceUrls": "https://www.businessinsider.com/xai-macrohard-project-tesla-ai-agent-stalls-2026-3"
+  },
+  {
+    "slug": "c3c6dd74b40d",
+    "title": "エージェント型ソフトウェア開発ライフサイクルの未来を見据えて",
+    "type": "explanation",
+    "category": "E: Rethinking SDLC",
+    "categoriesMulti": [
+      "E: Rethinking SDLC"
+    ],
     "date": "2026-04-20",
-    "abstract": "# AI時代の新たな原理：組織変革と技術革新が交差する地点\n\n## 要旨\nAI技術の進化は、組織の職務定義やエンジニアの役割、さらには職場の構造を変革する原理を生んでいる。本記事では、異なる視点からの事実を統一的に説明し、今後の組織と技術の未来を予測する。\n\n## 導入\n最近のAI関連の議論では、肩書きの重要性やエンジニアの役割の変化、職場でのレイオフとAI職の増加が取り上げられています。一見無関",
-    "image": "/posts/images/33ad0f0be61e818385cfd0c0c7c8aed0.jpg"
+    "abstract": "Thoughtworks: Agentic SDLC leads to smaller dev teams as AI agents take on coding tasks. Shift from individual productivity to designing specs, tests, and feedback loops for AI execution.",
+    "sourceUrls": "https://www.thoughtworks.com/en-us/insights/articles/preparing-your-team-for-agentic-software-development-life-cycle"
   },
   {
-    "slug": "348d0f0be61e810bbe96daf32ef1132e",
+    "slug": "daf32ef1132e",
     "title": "エージェント型ソフトウェアと未来技術の融合",
+    "type": "analysis",
     "category": "エージェント型ソフトウェア × 未来技術",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity",
+      "エージェント型ソフトウェア × 未来技術"
+    ],
     "date": "2026-04-20",
     "abstract": "# エージェント型ソフトウェアの進化と未来技術の展望\n\n**要旨**  \nエージェント型ソフトウェア開発、データセンターの進化、そして自律的なソフトウェア企業の台頭は、一見無関係に見える。しかし、これらは「AIによる自動化と効率化」という共通の原理で結びついている。この記事では、その深層原理を探り、未来の技術的変化を予測する。\n\n## 導入\n\n近年、AI技術の進化は目覚ましく、特にエージェント型ソ",
-    "image": "/posts/images/348d0f0be61e810bbe96daf32ef1132e.jpg"
+    "image": "/posts/images/348d0f0be61e810bbe96daf32ef1132e.jpg",
+    "sourceUrls": "https://www.thoughtworks.com/en-us/insights/articles/preparing-your-team-for-agentic-software-development-life-cycle, https://www.tomshardware.com/tech-industry/artificial-intelligence/elon-musk-says-xai-will-have-more-ai-compute-than-everyone-else-combined-within-five-years-macrohard-branding-emblazoned-on-the-roof-of-the-colossus-2-data-center-in-nod-to-the-billionaires-ai-project-to-challenge-microsoft, https://www.technology.org/2026/03/12/elon-musk-launches-macrohard-a-tesla-xai-hybrid-built-to-clone-entire-software-companies/"
   },
   {
-    "slug": "33ad0f0be61e81d89656c147314e5e76",
-    "title": "AI時代の職業変革とリーダーシップの再定義",
-    "category": "職業変革 × 技術リーダーシップ",
-    "date": "2026-04-06",
-    "abstract": "# AI時代の職業変革と技術リーダーシップの進化\n\n## 要旨\nAIの急速な進展は、技術業界における職業の変革とリーダーシップのスタイルに深刻な影響を与えています。本記事では、レイオフの背景、技術リーダーの役割の変化、新しいAIモデルの商業的実現を通じて、これらの現象が同じ原理で説明できることを示します。\n\n## 導入\n2025年における技術業界では、245,000人の労働者がレイオフされ、その4",
-    "image": "/posts/images/33ad0f0be61e81d89656c147314e5e76.jpg"
-  },
-  {
-    "slug": "339d0f0be61e818c8f1ad02234d0751a",
-    "title": "TEST ARTICLE",
-    "category": "TEST CAT",
-    "date": "2026-04-06",
-    "abstract": "# The Transition of Developers in the AI Era: Opportunities and Challenges\n\nAs artificial intelligence (AI) continues to evolve, its impact on software development is becoming increasingly profound. W",
-    "image": "/posts/images/339d0f0be61e818c8f1ad02234d0751a.jpg"
-  },
-  {
-    "slug": "339d0f0be61e8169a7e2cfcc30ab943c",
-    "title": "AI時代に求められる新たなスキルセット",
-    "category": "エンジニア × デザイン",
-    "date": "2026-04-06",
-    "abstract": "# AI時代におけるエンジニアとデザイナーの新しい役割\n\n## 要旨\nAIの進化は、開発者やデザイナーの仕事を根本的に変える。その背景には、コード生成AIやデザインプロセスの変革があり、これらは同じ原理で説明できる。この記事では、AIがもたらす新しいスキルセットと職務の変化について深掘りする。\n\n## 導入\n最近の技術進展により、エンジニアがコードを書くことをやめ、デザイナーは新しいスキルを求めら",
-    "image": "/posts/images/339d0f0be61e8169a7e2cfcc30ab943c.jpg"
-  },
-  {
-    "slug": "339d0f0be61e815fb9d1f361845253f2",
-    "title": "Embracing Change: Essential Skills for Developers and Designers in the Age of AI",
-    "category": "AI Transformation × Professional Skills",
-    "date": "2026-04-06",
-    "abstract": "# AI Transformation × Professional Skills: Navigating the Future of Work\n\nAs artificial intelligence (AI) continues to reshape industries, the roles of professionals across various domains—be it softw",
-    "image": "/posts/images/339d0f0be61e815fb9d1f361845253f2.jpg"
-  },
-  {
-    "slug": "339d0f0be61e8145a636fc0152104a0b",
-    "title": "Embracing Change: Essential Skills for Developers and Designers in the AI-Driven Future",
-    "category": "AI Impact × Professional Skills",
-    "date": "2026-04-06",
-    "abstract": "# Navigating the AI Revolution: Shaping Professional Skills for the Future\n\nAs artificial intelligence (AI) continues to permeate various industries, the roles and responsibilities of professionals ac",
-    "image": "/posts/images/339d0f0be61e8145a636fc0152104a0b.jpg"
-  },
-  {
-    "slug": "336d0f0be61e8113be87fa6bbb0c138f",
-    "title": "AIネイティブ組織への転換と次世代エンジニアリングの条件：Claude Code流出事件と階層構造の終焉が示す未来",
-    "category": "AI Strategy & Organizational Design",
-    "date": "2026-04-06",
-    "abstract": "Claude Codeのソースコード流出事件と、決済企業Blockが提唱する「インテリジェンス型組織」という2つの全く異なる事象から、「直列・階層型の組織・ガバナンス」から「並列・自律型のAIエージェント・アーキテクチャ」への不可逆な地殻変動を読み解く深い洞察。",
-    "image": "/posts/images/336d0f0be61e8113be87fa6bbb0c138f.jpg"
-  },
-  {
-    "slug": "334d0f0be61e81219b04f80afc462914",
-    "title": "限界費用ゼロの知能：TerafabとAgentic Scalingが示す「極限の共同設計」の世界",
+    "slug": "e5bac1c10276",
+    "title": "マクロハードの巨人計画：Colossus 2データセンターの展望と影響",
+    "type": "explanation",
     "category": "A: AI Hyper-productivity",
-    "date": "2026-04-06",
-    "abstract": "NVIDIAのAgentic ScalingとTeslaのTerafab。ソフトウェアとハードウェアの両面で進行する「極限の共同設計」が、知能の限界費用をゼロに近づける未来を考察する。",
-    "image": "/posts/images/334d0f0be61e81219b04f80afc462914.jpg"
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-04-20",
+    "abstract": "Colossus 2 data center progress toward 400MW computing power, branding Macrohard as a nod to challenge Microsoft.",
+    "sourceUrls": "https://www.tomshardware.com/tech-industry/artificial-intelligence/elon-musk-says-xai-will-have-more-ai-compute-than-everyone-else-combined-within-five-years-macrohard-branding-emblazoned-on-the-roof-of-the-colossus-2-data-center-in-nod-to-the-billionaires-ai-project-to-challenge-microsoft"
   },
   {
-    "slug": "333d0f0be61e81c9a666ee62d70466ba",
-    "title": "「垂直統合の逆襲」——Terafabが示す、AI時代のコア・コンピタンス再定義",
-    "category": "ORG TRANSFORMATION × AI REPLACEMENT",
-    "date": "2026-04-06",
-    "abstract": "「設計は自社で、製造は外注で」というファブレスモデルへの強烈なアンチテーゼ。Terafabの「設計からパッケージングまでの完全垂直統合」が示すのは、AI時代の勝敗が「製造コスト」ではなく「学習ループのサイクルタイム」で決まるという構造変化である。",
-    "image": "/posts/images/333d0f0be61e81c9a666ee62d70466ba.jpg"
+    "slug": "e110ebf39c7e",
+    "title": "テスラとxAIの新技術「マクロハード」：自律的なソフトウェア企業の未来",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-04-20",
+    "abstract": "Joint Tesla-xAI system using Grok and AI4 chips to emulate entire software companies autonomously.",
+    "sourceUrls": "https://www.technology.org/2026/03/12/elon-musk-launches-macrohard-a-tesla-xai-hybrid-built-to-clone-entire-software-companies/"
   },
   {
-    "slug": "333d0f0be61e8177b2b4d48d4b311df6",
-    "title": "職種名の死と再生——「FDE」と「Legal Engineer」が示す、AI時代の新しい役割",
-    "category": "SDLC RETHINKING × AI PRODUCTIVITY",
-    "date": "2026-04-06",
-    "abstract": "需要が800%急増する「FDE」や「Legal Engineer」といった新職種が示唆するもの。AIの進化により古い職種名が実態を失う中、「タイトル・アービトラージ（肩書きの裁定取引）」が組織変革の強力な武器となる。",
-    "image": "/posts/images/333d0f0be61e8177b2b4d48d4b311df6.jpg"
-  },
-  {
-    "slug": "333d0f0be61e8139a906eb304c5ed20e",
-    "title": "「豊かさの臨界点」——ロボット100億台と1テラワットのAIが崩す労働の前提",
-    "category": "AI HYPER-PRODUCTIVITY × ORG TRANSFORMATION",
-    "date": "2026-04-06",
-    "abstract": "Tesla Optimusが年産100億台に達し、Barclaysがロボット市場2000億ドルを予測する未来。汎用AI搭載ロボットによる「労働の限界の突破」は、経済の「希少性」を崩壊させ、製造業の生産要素のパラダイムを根底から書き換える。",
-    "image": "/posts/images/333d0f0be61e8139a906eb304c5ed20e.jpg"
-  },
-  {
-    "slug": "331d0f0be61e81eaba54ed7acbacc363",
-    "title": "「AIで遅くなる」のは正しい——生産性データの逆説と、259件のリリースノートが描くAI時代の変革の本質",
-    "category": "AI Productivity × SDLC Transformation",
-    "date": "2026-04-06",
-    "abstract": "「AIを使うと開発者が19%遅くなった」（METR研究）と「Claude Codeが259件のリリースノートを持つ」という2つの事実は矛盾しているように見えて、実は同じ変革の異なるフェーズを描いている。個人の生産性は一時的に下がるが、組織としての開発速度は桁違いに上がる——この逆説が「遅くなっている人こそが変革の最前線にいる」という驚愕の結論につながる。",
-    "image": "/posts/images/331d0f0be61e81eaba54ed7acbacc363.jpg"
-  },
-  {
-    "slug": "331d0f0be61e81dca850e745c7ad11a7",
-    "title": "職種名の変化が「産業の変化」を先取りする——Legal Engineer急増・Claude Mythosのセキュリティ参入・役割変換に見る共通構造",
-    "category": "Role Transformation × Title Arbitrage × Market Signal",
-    "date": "2026-04-06",
-    "abstract": "a16zの「タイトル・アービトラージ」論・Claude MythosによるCrowdStrike株5%超下落・マーティン・ファウラーの「コードレビューをやめる」論は一見別物だが、「誰が何を担うべきか」という職務定義の変化が市場・組織・文化を同時に塗り替えるという驚異的な収束を示す。株式市場は「担い手の交代」を、実際の事業変化より先に検知する——製造業はこの先読みを競合分析に活用できる。",
-    "image": "/posts/images/331d0f0be61e81dca850e745c7ad11a7.jpg"
-  },
-  {
-    "slug": "331d0f0be61e81c9b5a8f149902f32fa",
-    "title": "「会社を解雇する」時代の論理——レイオフ×AI採用急増×Macrohardが指し示す、組織設計の根本的転換",
-    "category": "AI Replacement × Org Transformation",
-    "date": "2026-04-06",
-    "abstract": "2026年Q1に45,000人が解雇される一方でAI求人が92%増という「同時進行」は、コスト削減ではなく組織設計の哲学の転換だ。Macrohardはその終着点——「人間が運営する会社」という概念そのものへの挑戦。",
-    "image": "/posts/images/331d0f0be61e81c9b5a8f149902f32fa.jpg"
-  },
-  {
-    "slug": "331d0f0be61e818da6d8e1000c60f43d",
-    "title": "「育てるAI」と「指数関数の跳躍」——ダリオ・アモデイの2つの対談が収束する、一つの恐ろしい事実",
-    "category": "AI Hyper-productivity × Org Transformation",
-    "date": "2026-04-06",
-    "abstract": "Dwarkesh Podcastでは「指数関数の終わりに近い」、CFRでは「AIは育てるもの」と語ったアモデイの2つの発言は、一つの論理に収束する。スケーリング仮説が正しければ、外注依存の組織は「育てるプロセス」そのものを持てないまま、「データセンターの天才集団」の時代を迎える。",
-    "image": "/posts/images/331d0f0be61e818da6d8e1000c60f43d.jpg"
-  },
-  {
-    "slug": "331d0f0be61e8186868cc82d6ecc95bc",
-    "title": "「AIが会社を動かす」日への3つのベクトル——FDE需要急増・Macrohard・SaaSpocalypseに潜む共通の論理",
-    "category": "Org Transformation × AI Replacement",
-    "date": "2026-04-06",
-    "abstract": "FDE職種800%急増・MacrohardによるAI企業エミュレーション・SaaS株2850億ドル消失（SaaSpocalypse）という一見無関係な3つのトレンドは、「誰がタスクを実行するのか」という同一の問いへの3つの異なる角度の答えだ。現在のFDE急増は「AIへの移行の失敗」ではなく、AIが自律的に企業を運営する段階への準備期間として読み解ける。",
-    "image": "/posts/images/331d0f0be61e8186868cc82d6ecc95bc.jpg"
-  },
-  {
-    "slug": "331d0f0be61e812dad5be523036cb36d",
-    "title": "全職種の「同時移行」が始まった——エンジニア・デザイナー・マネージャーが異なる経路で向かう同じ終点",
-    "category": "Role Transformation × AI Productivity",
-    "date": "2026-04-06",
-    "abstract": "Spotifyのエンジニアが数ヶ月間一行もコードを書かない、Figmaがデザインプロセスを「誰でも参加できる」ものに変える、DeloitteがSDLCの全工程をAIエージェントが担う未来を描く——これらは別々のニュースではなく、全職種が同じ方向へ同時に移行しているという、一つの現象の三つの断面である。",
-    "image": "/posts/images/331d0f0be61e812dad5be523036cb36d.jpg"
-  },
-  {
-    "slug": "33ad0f0be61e814c9c5fc5617b890edb",
+    "slug": "c5617b890edb",
     "title": "AI時代のエンジニアリング進化と学びの未来",
+    "type": "analysis",
     "category": "技術革新 × 教育・学習",
+    "categoriesMulti": [
+      "B: Role Blurring",
+      "技術革新 × 教育・学習"
+    ],
     "date": "2026-04-06",
     "abstract": "# AI時代のエンジニアリングと倫理的判断の進化\n\n## 要旨\nAI技術の進化はエンジニアの役割を根本的に変える可能性を秘めている。DeloitteやJensen Huangの見解、Claude Code流出の教訓を通じて、これらの現象は共通の原理に基づいていると考えられる。\n\n## 導入\n最近、Deloitteが提唱した「制約なきAI時代」の工学、NVIDIAのJensen Huang氏のAI進",
-    "image": "/posts/images/33ad0f0be61e814c9c5fc5617b890edb.jpg"
+    "image": "/posts/images/33ad0f0be61e814c9c5fc5617b890edb.jpg",
+    "sourceUrls": "https://www.deloitte.com/us/en/services/consulting/articles/future-of-software-engineering.html, https://lexfridman.com/jensen-huang-transcript/, https://startuphub.ai/ai-news/artificial-intelligence/2026/claude-code-leak-what-developers-can-learn"
   },
   {
-    "slug": "33ad0f0be61e81d89656c147314e5e76",
+    "slug": "d0c0c7c8aed0",
+    "title": "AI時代における役割変化と新たな戦略",
+    "type": "analysis",
+    "category": "組織変革 × 技術革新",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot",
+      "組織変革 × 技術革新"
+    ],
+    "date": "2026-04-06",
+    "abstract": "# AI時代の新たな原理：組織変革と技術革新が交差する地点\n\n## 要旨\nAI技術の進化は、組織の職務定義やエンジニアの役割、さらには職場の構造を変革する原理を生んでいる。本記事では、異なる視点からの事実を統一的に説明し、今後の組織と技術の未来を予測する。\n\n## 導入\n最近のAI関連の議論では、肩書きの重要性やエンジニアの役割の変化、職場でのレイオフとAI職の増加が取り上げられています。一見無関",
+    "image": "/posts/images/33ad0f0be61e818385cfd0c0c7c8aed0.jpg",
+    "sourceUrls": "https://a16z.com/forward-deployed-job-titles/, https://www.thoughtworks.com/en-us/insights/articles/preparing-your-team-for-the-agentic-software-development-life-cycle, https://www.dwarkesh.com/p/dario-amodei-2, https://www.techtimes.com/articles/315282/20260321/tech-layoffs-surge-while-ai-jobs-soar-key-trends-shaping-2026-tech-industry.htm"
+  },
+  {
+    "slug": "dbc6c1cd4119",
+    "title": "AIの時代における技術リーダーシップの変容",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "categoriesMulti": [
+      "B: Role Blurring"
+    ],
+    "date": "2026-04-06",
+    "abstract": "The article discusses the evolving role of technology leaders in the era of AI, emphasizing the blend of product management and engineering roles. It highlights how AI is reshaping responsibilities and expectations within organizations.",
+    "sourceUrls": "https://www.latent.space/p/pmarca"
+  },
+  {
+    "slug": "c202d6ce6555",
+    "title": "1ビットボンサイ：業界を変える1ビットLLMの商業的実現",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-04-06",
+    "abstract": "The article discusses the launch of Bonsai 8B, a new AI model designed to enhance hyper-productivity in various industries. It highlights the innovative features of the model and its potential applications in automating complex tasks.",
+    "sourceUrls": "https://prismml.com/news/bonsai-8b"
+  },
+  {
+    "slug": "c147314e5e76",
     "title": "AI時代の職業変革とリーダーシップの再定義",
+    "type": "analysis",
     "category": "職業変革 × 技術リーダーシップ",
+    "categoriesMulti": [
+      "B: Role Blurring",
+      "職業変革 × 技術リーダーシップ"
+    ],
     "date": "2026-04-06",
     "abstract": "# AI時代の職業変革と技術リーダーシップの進化\n\n## 要旨\nAIの急速な進展は、技術業界における職業の変革とリーダーシップのスタイルに深刻な影響を与えています。本記事では、レイオフの背景、技術リーダーの役割の変化、新しいAIモデルの商業的実現を通じて、これらの現象が同じ原理で説明できることを示します。\n\n## 導入\n2025年における技術業界では、245,000人の労働者がレイオフされ、その4",
-    "image": "/posts/images/33ad0f0be61e81d89656c147314e5e76.jpg"
+    "image": "/posts/images/33ad0f0be61e81d89656c147314e5e76.jpg",
+    "sourceUrls": "https://www.techtimes.com/articles/315282/20260321/tech-layoffs-surge-while-ai-jobs-soar-key-trends-shaping-2026-tech-industry.htm, https://www.latent.space/p/pmarca, https://prismml.com/news/bonsai-8b"
+  },
+  {
+    "slug": "fc0152104a0b",
+    "title": "Embracing Change: Essential Skills for Developers and Designers in the AI-Driven Future",
+    "type": "analysis",
+    "category": "AI Impact × Professional Skills",
+    "categoriesMulti": [
+      "B: Role Blurring",
+      "AI Impact × Professional Skills"
+    ],
+    "date": "2026-04-05",
+    "abstract": "# Navigating the AI Revolution: Shaping Professional Skills for the Future\n\nAs artificial intelligence (AI) continues to permeate various industries, the roles and responsibilities of professionals ac",
+    "sourceUrls": "https://www.businessinsider.com/ai-coding-changing-software-developer-role-2026-3, https://www.figma.com/blog/skills-for-the-ai-era/, https://www.hanwha.com/newsroom/news/feature-stories/from-energy-to-industry-3-ai-trends-set-to-transform-operations-in-2026.do"
+  },
+  {
+    "slug": "e40276bea745",
+    "title": "オープンAIのCEO交代と医療休暇：リーダーシップの変革とその影響",
+    "type": "explanation",
+    "category": "D: Big Tech Layoffs & AI Pivot",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot"
+    ],
+    "date": "2026-04-05",
+    "abstract": "OpenAI's CEO, Fidji Simo, has taken a medical leave of absence as the company undergoes significant executive changes. This transition comes at a time when the tech industry is experiencing major shifts, prompting discussions on leadership stability and strategic direction.",
+    "sourceUrls": "https://www.cnbc.com/2026/04/03/openai-fidji-simo-medical-leave-executive-changes.html"
+  },
+  {
+    "slug": "f361845253f2",
+    "title": "Embracing Change: Essential Skills for Developers and Designers in the Age of AI",
+    "type": "analysis",
+    "category": "AI Transformation × Professional Skills",
+    "categoriesMulti": [
+      "B: Role Blurring",
+      "AI Transformation × Professional Skills"
+    ],
+    "date": "2026-04-05",
+    "abstract": "# AI Transformation × Professional Skills: Navigating the Future of Work\n\nAs artificial intelligence (AI) continues to reshape industries, the roles of professionals across various domains—be it softw",
+    "sourceUrls": "https://www.businessinsider.com/ai-coding-changing-software-developer-role-2026-3, https://www.figma.com/blog/skills-for-the-ai-era/, https://www.hanwha.com/newsroom/news/feature-stories/from-energy-to-industry-3-ai-trends-set-to-transform-operations-in-2026.do"
+  },
+  {
+    "slug": "ecb31b0773df",
+    "title": "AIの時代: 技術業界でのレイオフとAI職の急増",
+    "type": "explanation",
+    "category": "D: Big Tech Layoffs & AI Pivot",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot"
+    ],
+    "date": "2026-04-05",
+    "abstract": "42% of layoffs due to restructuring, 39% due to budget realignment for AI. Amazon 14,000 cuts in Oct 2025. 245,000 global tech workers laid off in 2025 with clear pivot from headcount to AI infrastructure.",
+    "sourceUrls": "https://www.techtimes.com/articles/315282/20260321/tech-layoffs-surge-while-ai-jobs-soar-key-trends-shaping-2026-tech-industry.htm"
+  },
+  {
+    "slug": "d02234d0751a",
+    "title": "TEST ARTICLE",
+    "type": "analysis",
+    "category": "TEST CAT",
+    "categoriesMulti": [
+      "TEST CAT"
+    ],
+    "date": "2026-04-05",
+    "abstract": "# The Transition of Developers in the AI Era: Opportunities and Challenges\n\nAs artificial intelligence (AI) continues to evolve, its impact on software development is becoming increasingly profound. W",
+    "sourceUrls": "https://www.businessinsider.com/ai-coding-changing-software-developer-role-2026-3"
+  },
+  {
+    "slug": "cfcc30ab943c",
+    "title": "AI時代に求められる新たなスキルセット",
+    "type": "analysis",
+    "category": "エンジニア × デザイン",
+    "categoriesMulti": [
+      "B: Role Blurring",
+      "エンジニア × デザイン"
+    ],
+    "date": "2026-04-05",
+    "abstract": "# AI時代におけるエンジニアとデザイナーの新しい役割\n\n## 要旨\nAIの進化は、開発者やデザイナーの仕事を根本的に変える。その背景には、コード生成AIやデザインプロセスの変革があり、これらは同じ原理で説明できる。この記事では、AIがもたらす新しいスキルセットと職務の変化について深掘りする。\n\n## 導入\n最近の技術進展により、エンジニアがコードを書くことをやめ、デザイナーは新しいスキルを求めら",
+    "sourceUrls": "https://www.businessinsider.com/ai-coding-changing-software-developer-role-2026-3, https://www.figma.com/blog/skills-for-the-ai-era/, https://www.hanwha.com/newsroom/news/feature-stories/from-energy-to-industry-3-ai-trends-set-to-transform-operations-in-2026.do"
+  },
+  {
+    "slug": "c107b17195f9",
+    "title": "階層構造からインテリジェンスへ：Blockが描くAI時代の組織デザイン (修正版)",
+    "type": "explanation",
+    "category": "Future of Work",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot"
+    ],
+    "date": "2026-04-01",
+    "abstract": "古代ローマから続く管理スパンの制約を超え、AIによる「カンパニー・ワールドモデル」を中心とした新しい自律的組織のあり方。",
+    "sourceUrls": "https://block.xyz/inside/from-hierarchy-to-intelligence"
+  },
+  {
+    "slug": "d219bc27f86f",
+    "title": "自律型エージェント開発におけるハーネス設計：プランナー・ジェネレーター・エバリュエーターの3層構造",
+    "type": "explanation",
+    "category": "Architecture",
+    "categoriesMulti": [
+      "E: Rethinking SDLC"
+    ],
+    "date": "2026-04-01",
+    "abstract": "AIが長時間の開発タスクを完遂するための「評価者の分離」と、GANライクなマルチエージェント連携（Planner/Generator/Evaluator）による自律的アプリ構築手法の解説。",
+    "sourceUrls": "https://www.anthropic.com/engineering/harness-design-long-running-apps"
+  },
+  {
+    "slug": "da9f093cae98",
+    "title": "開発者が学ぶべきClaude Code流出の教訓：無料の並列処理とフックシステム (修正版)",
+    "type": "explanation",
+    "category": "Best Practices",
+    "categoriesMulti": [
+      "E: Rethinking SDLC"
+    ],
+    "date": "2026-04-01",
+    "abstract": "開発者の視点からClaude Code流出を分析。プロンプトキャッシュ共有による並列処理や権限設定の多層化など、実践的な学びを抽出。",
+    "sourceUrls": "https://startuphub.ai/ai-news/artificial-intelligence/2026/claude-code-leak-what-developers-can-learn"
+  },
+  {
+    "slug": "e18d4e398624",
+    "title": "Claude Code流出：51万2000行のソースコードが明かすAIコーディングのベストプラクティス (修正版)",
+    "type": "explanation",
+    "category": "Architecture",
+    "categoriesMulti": [
+      "E: Rethinking SDLC"
+    ],
+    "date": "2026-04-01",
+    "abstract": "Claude Codeのソースコード流出から判明した10のアーキテクチャの秘密と、AIエージェント開発におけるハーネスの重要性。",
+    "sourceUrls": "https://superframeworks.com/articles/claude-code-source-code-leak"
+  },
+  {
+    "slug": "fa6bbb0c138f",
+    "title": "AIネイティブ組織への転換と次世代エンジニアリングの条件：Claude Code流出事件と階層構造の終焉が示す未来",
+    "type": "analysis",
+    "category": "AI Strategy & Organizational Design",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot",
+      "AI Strategy & Organizational Design"
+    ],
+    "date": "2026-04-01",
+    "abstract": "Claude Codeのソースコード流出事件と、決済企業Blockが提唱する「インテリジェンス型組織」という2つの全く異なる事象から、「直列・階層型の組織・ガバナンス」から「並列・自律型のAIエージェント・アーキテクチャ」への不可逆な地殻変動を読み解く深い洞察。",
+    "sourceUrls": "https://systima.ai/blog/claude-code-leak-compliance-implications, https://superframeworks.com/articles/claude-code-source-code-leak, https://startuphub.ai/ai-news/artificial-intelligence/2026/claude-code-leak-what-developers-can-learn, https://block.xyz/inside/from-hierarchy-to-intelligence"
+  },
+  {
+    "slug": "f80afc462914",
+    "title": "限界費用ゼロの知能：TerafabとAgentic Scalingが示す「極限の共同設計」の世界",
+    "type": "analysis",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-03-31",
+    "abstract": "NVIDIAのAgentic ScalingとTeslaのTerafab。ソフトウェアとハードウェアの両面で進行する「極限の共同設計」が、知能の限界費用をゼロに近づける未来を考察する。",
+    "sourceUrls": "https://lexfridman.com/jensen-huang-transcript/, https://mashable.com/article/tesla-terafab-chip-plant, https://en.wikipedia.org/wiki/Terafab"
+  },
+  {
+    "slug": "d07e3ccc7fb2",
+    "title": "Jensen Huangが定義するAIの未来",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-03-30",
+    "abstract": "Jensen Huang氏の対談から、AI進化の要点を抽出。",
+    "sourceUrls": "https://lexfridman.com/jensen-huang-transcript/"
+  },
+  {
+    "slug": "d48d4b311df6",
+    "title": "職種名の死と再生——「FDE」と「Legal Engineer」が示す、AI時代の新しい役割",
+    "type": "analysis",
+    "category": "SDLC RETHINKING × AI PRODUCTIVITY",
+    "categoriesMulti": [
+      "E: Rethinking SDLC",
+      "SDLC RETHINKING × AI PRODUCTIVITY"
+    ],
+    "date": "2026-03-30",
+    "abstract": "需要が800%急増する「FDE」や「Legal Engineer」といった新職種が示唆するもの。AIの進化により古い職種名が実態を失う中、「タイトル・アービトラージ（肩書きの裁定取引）」が組織変革の強力な武器となる。",
+    "sourceUrls": "https://www.notion.so/Palantir-20-AI-800-FDE-AI-FDE-330d0f0be61e81709ff3e372c2c80651\nhttps://www.notion.so/a16z-330d0f0be61e81aabe1bece745ddbee4"
+  },
+  {
+    "slug": "ee62d70466ba",
+    "title": "「垂直統合の逆襲」——Terafabが示す、AI時代のコア・コンピタンス再定義",
+    "type": "analysis",
+    "category": "ORG TRANSFORMATION × AI REPLACEMENT",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot",
+      "Org Transformation × AI Replacement"
+    ],
+    "date": "2026-03-30",
+    "abstract": "「設計は自社で、製造は外注で」というファブレスモデルへの強烈なアンチテーゼ。Terafabの「設計からパッケージングまでの完全垂直統合」が示すのは、AI時代の勝敗が「製造コスト」ではなく「学習ループのサイクルタイム」で決まるという構造変化である。",
+    "sourceUrls": "https://en.wikipedia.org/wiki/Terafab\nhttps://mashable.com/article/tesla-terafab-chip-plant"
+  },
+  {
+    "slug": "eb304c5ed20e",
+    "title": "「豊かさの臨界点」——ロボット100億台と1テラワットのAIが崩す労働の前提",
+    "type": "analysis",
+    "category": "AI HYPER-PRODUCTIVITY × ORG TRANSFORMATION",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot",
+      "AI Hyper-productivity × Org Transformation"
+    ],
+    "date": "2026-03-30",
+    "abstract": "Tesla Optimusが年産100億台に達し、Barclaysがロボット市場2000億ドルを予測する未来。汎用AI搭載ロボットによる「労働の限界の突破」は、経済の「希少性」を崩壊させ、製造業の生産要素のパラダイムを根底から書き換える。",
+    "sourceUrls": "https://www.cbsnews.com/news/terafab-elon-musk-chips-semiconductors-what-to-know/"
+  },
+  {
+    "slug": "d148b8208d71",
+    "title": "Terafabの「月産100万枚」はどれだけ非常識か——TSMCと比較して数字で理解する、マスクの野望の規模感",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-03-29",
+    "abstract": "Terafabの目標数値（月産100万枚、年間100〜200億枚、宇宙1テラワット）をTSMCなど現実と比較して解説。Battery Day 2020の前例も引きながら「過去のマスクの约束」との乖離も検証。",
+    "sourceUrls": "https://mashable.com/article/tesla-terafab-chip-plant"
+  },
+  {
+    "slug": "e6066f0a6b4b",
+    "title": "「土星旅行が無料になる」——マスクがTerafabで実現しようとしている、AIとロボットが作る「豊かさの臨界点」",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-03-29",
+    "abstract": "Terafabが実現しようとする世界：Optimusロボット年産最大100億台・2035年に最大2000億ドルのロボット市場（Barclays予測）・「想像できるものすべてが無料になる」という豊かさの閾値。SFを「科学的事実」に変えるというマスクのビジョンの論理構造を解説。",
+    "sourceUrls": "https://www.cbsnews.com/news/terafab-elon-musk-chips-semiconductors-what-to-know/"
+  },
+  {
+    "slug": "fd969a54c786",
+    "title": "Terafab完全解説——Tesla・SpaceX・xAI が共同で「世界最大のAIチップ工場」を建設する理由と、その産業的意味",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-03-29",
+    "abstract": "Terafab（Tesla・SpaceX・xAI共同）の全貌：2nmプロセス・年間1テラワット・総額250億ドル。チップ設計からパッケージングまでの垂直統合がNvidiaとTSMCへの依存を断つ戦略と、その製造業への示唆を解説。",
+    "sourceUrls": "https://en.wikipedia.org/wiki/Terafab"
+  },
+  {
+    "slug": "f149902f32fa",
+    "title": "「会社を解雇する」時代の論理——レイオフ×AI採用急増×Macrohardが指し示す、組織設計の根本的転換",
+    "type": "analysis",
+    "category": "AI Replacement × Org Transformation",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot",
+      "AI Replacement × Org Transformation"
+    ],
+    "date": "2026-03-28",
+    "abstract": "2026年Q1に45,000人が解雇される一方でAI求人が92%増という「同時進行」は、コスト削減ではなく組織設計の哲学の転換だ。Macrohardはその終着点——「人間が運営する会社」という概念そのものへの挑戦。",
+    "sourceUrls": "https://techcrunch.com/2026/01/layoffs-ai-shift/, https://www.businessinsider.com/ai-layoffs-corporate-transparency-2026, https://www.eweek.com/news/elon-musk-macrohard-ai-software-companies/"
   },
   {
     "slug": "e523036cb36d",
     "title": "全職種の「同時移行」が始まった——エンジニア・デザイナー・マネージャーが異なる経路で向かう同じ終点",
     "type": "analysis",
     "category": "Role Transformation × AI Productivity",
+    "categoriesMulti": [
+      "B: Role Blurring",
+      "Role Transformation × AI Productivity"
+    ],
     "date": "2026-03-28",
     "abstract": "Spotifyのエンジニアが数ヶ月間一行もコードを書かない、Figmaがデザインプロセスを「誰でも参加できる」ものに変える、DeloitteがSDLCの全工程をAIエージェントが担う未来を描く——これらは別々のニュースではなく、全職種が同じ方向へ同時に移行しているという、一つの現象の三つの断面である。",
     "image": "/posts/images/e523036cb36d.jpg",
     "sourceUrls": "https://www.deloitte.com/us/en/insights/topics/emerging-technology/ai-agents-software-development.html, https://www.figma.com/blog/state-of-design-2026/, https://thenewstack.io/software-engineers-who-stopped-writing-code/"
   },
   {
+    "slug": "db30c1541bc6",
+    "title": "Claude Code+Coworkが「Mac遠隔操作」を実現——OpenClawとの違いと、AIエージェント時代のMacの使い方",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-03-28",
+    "abstract": "MacRumors報道をベースに、Claude CodeとCoworkによるMacリモート操作機能を解説。OpenClawとの安全性比較、コネクター不要のスクリーン操作フォールバック、今月のAnthropicの連続アップデート（ビジュアルコンテンツ・メモリインポート）との文脈を踏まえた分析。",
+    "sourceUrls": "https://www.macrumors.com/2026/03/24/claude-use-mac-remotely-iphone/"
+  },
+  {
+    "slug": "d8a4f22f5c56",
+    "title": "「iPhoneで指示したらMacが動いた」——ClaudeのComputer Use（コンピューター操作）が変える、働き方の常識",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-03-28",
+    "abstract": "AnthropicがClaudeに「Computer Use（コンピューター操作）」機能を実装。iPhoneからタスクを指示すると、Macがアプリを開き、ブラウザを操作し、スプレッドシートを記入し、ファイルを送信する。Dispatchと連携した「タスクの完全自律実行」の実態と製造業組織への影響を解説する。",
+    "sourceUrls": "https://www.cnbc.com/2026/03/24/anthropic-claude-ai-agent-use-computer-finish-tasks.html"
+  },
+  {
+    "slug": "f68f6f8dd389",
+    "title": "50日間で業界を変えた——Anthropicの「異常なアップデートラッシュ」が示す、AIの次の局面",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-03-28",
+    "abstract": "2026年1月〜3月、Anthropicはたった50日間でClaude Opus 4.6/Sonnet 4.6のリリース、Coworkによるマルチステップワークフロー、SaaS企業の株式を2850億ドル吹き飛ばしたSaaSpocalypse、NASA火星探査機との連携、Dispatchリリースを達成。この更新ラッシュが示す「AIは道具でなく同僚になった」という時代転換を解説する。",
+    "sourceUrls": "https://www.indiatoday.in/technology/features/story/hey-anthropic-take-a-break-from-saas-apocalypse-to-dispatch-claude-ai-is-on-a-tear-with-updates-2887840-2026-03-27"
+  },
+  {
     "slug": "c82d6ecc95bc",
     "title": "「AIが会社を動かす」日への3つのベクトル——FDE需要急増・Macrohard・SaaSpocalypseに潜む共通の論理",
     "type": "analysis",
     "category": "Org Transformation × AI Replacement",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot",
+      "Org Transformation × AI Replacement"
+    ],
     "date": "2026-03-28",
     "abstract": "FDE職種800%急増・MacrohardによるAI企業エミュレーション・SaaS株2850億ドル消失（SaaSpocalypse）という一見無関係な3つのトレンドは、「誰がタスクを実行するのか」という同一の問いへの3つの異なる角度の答えだ。現在のFDE急増は「AIへの移行の失敗」ではなく、AIが自律的に企業を運営する段階への準備期間として読み解ける。",
     "image": "/posts/images/c82d6ecc95bc.jpg",
     "sourceUrls": "https://review.firstround.com/so-you-want-to-hire-a-forward-deployed-engineer/, https://www.eweek.com/news/elon-musk-macrohard-ai-software-companies/, https://www.indiatoday.in/technology/features/story/hey-anthropic-take-a-break-from-saas-apocalypse-to-dispatch-claude-ai-is-on-a-tear-with-updates-2887840-2026-03-27"
   },
   {
+    "slug": "c80b9921c5e5",
+    "title": "情報漏洩で明かされた「Claude Mythos」——「劇的に優れた」次世代モデルとサイバーセキュリティの新常識",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-03-28",
+    "abstract": "AnthropicのCMSの設定ミスによって3000件のアセットが公開され、次世代モデル「Claude Mythos（Capybara）」の存在が露呈。Claude 4.6 Opusを「劇的に上回る」と内部評価されたこのモデルの特徴と、サイバーセキュリティ市場への影響（CrowdStrikeらが5%超下落）を分析する。",
+    "sourceUrls": "https://siliconangle.com/2026/03/27/anthropic-launch-new-claude-mythos-model-advanced-reasoning-features/"
+  },
+  {
+    "slug": "e745c7ad11a7",
+    "title": "職種名の変化が「産業の変化」を先取りする——Legal Engineer急増・Claude Mythosのセキュリティ参入・役割変換に見る共通構造",
+    "type": "analysis",
+    "category": "Role Transformation × Title Arbitrage × Market Signal",
+    "categoriesMulti": [
+      "B: Role Blurring",
+      "Role Transformation × Title Arbitrage × Market Signal"
+    ],
+    "date": "2026-03-28",
+    "abstract": "a16zの「タイトル・アービトラージ」論・Claude MythosによるCrowdStrike株5%超下落・マーティン・ファウラーの「コードレビューをやめる」論は一見別物だが、「誰が何を担うべきか」という職務定義の変化が市場・組織・文化を同時に塗り替えるという驚異的な収束を示す。株式市場は「担い手の交代」を、実際の事業変化より先に検知する——製造業はこの先読みを競合分析に活用できる。",
+    "sourceUrls": "https://a16z.com/forward-deployed-job-titles/, https://siliconangle.com/2026/03/27/anthropic-launch-new-claude-mythos-model-advanced-reasoning-features/, https://martinfowler.com/articles/on-the-loop.html"
+  },
+  {
+    "slug": "ed7acbacc363",
+    "title": "「AIで遅くなる」のは正しい——生産性データの逆説と、259件のリリースノートが描くAI時代の変革の本質",
+    "type": "analysis",
+    "category": "AI Productivity × SDLC Transformation",
+    "categoriesMulti": [
+      "E: Rethinking SDLC",
+      "AI Productivity × SDLC Transformation"
+    ],
+    "date": "2026-03-28",
+    "abstract": "「AIを使うと開発者が19%遅くなった」（METR研究）と「Claude Codeが259件のリリースノートを持つ」という2つの事実は矛盾しているように見えて、実は同じ変革の異なるフェーズを描いている。個人の生産性は一時的に下がるが、組織としての開発速度は桁違いに上がる——この逆説が「遅くなっている人こそが変革の最前線にいる」という驚愕の結論につながる。",
+    "sourceUrls": "https://www.uplevel.work/blog/the-ai-coding-productivity-paradox, https://releasebot.io/updates/anthropic, https://www.thoughtworks.com/insights/articles/agentic-sdlc"
+  },
+  {
+    "slug": "eb871fab5e32",
+    "title": "Claude Codeのリリースノートが259件——「異常な開発ペース」が教えてくれる、AI時代のソフトウェアの作り方",
+    "type": "explanation",
+    "category": "E: Rethinking SDLC",
+    "categoriesMulti": [
+      "E: Rethinking SDLC"
+    ],
+    "date": "2026-03-28",
+    "abstract": "ReleasebotのAnthropicリリースノートアーカイブが示す、Claude Codeの259件というリリース履歴。2.1.85ではMCPワークフロー改善、フック条件分岐追加、深リンク拡張など多岐にわたる更新が1週間以内に実施。このペースが示す「AIネイティブな開発サイクル」の実態と製造業への示唆を解説する。",
+    "sourceUrls": "https://releasebot.io/updates/anthropic"
+  },
+  {
+    "slug": "e1000c60f43d",
+    "title": "「育てるAI」と「指数関数の跳躍」——ダリオ・アモデイの2つの対談が収束する、一つの恐ろしい事実",
+    "type": "analysis",
+    "category": "AI Hyper-productivity × Org Transformation",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot",
+      "AI Hyper-productivity × Org Transformation"
+    ],
+    "date": "2026-03-28",
+    "abstract": "Dwarkesh Podcastでは「指数関数の終わりに近い」、CFRでは「AIは育てるもの」と語ったアモデイの2つの発言は、一つの論理に収束する。スケーリング仮説が正しければ、外注依存の組織は「育てるプロセス」そのものを持てないまま、「データセンターの天才集団」の時代を迎える。",
+    "sourceUrls": "https://www.dwarkesh.com/p/dario-amodei-2, https://www.cfr.org/event/ceo-speaker-series-dario-amodei-anthropic"
+  },
+  {
+    "slug": "fe4a1c126e5d",
+    "title": "「指数関数の終わりが近い」——Anthropic CEOダリオ・アモデイが語る、AIの次の臨界点と私たちが気づいていない事実",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-03-28",
+    "abstract": "Anthropic CEOが「スケーリングの指数関数は終わりに近い」と述べた対談の深読み。AGIが近い今、私たちがまだ旧来の問題を議論していることへの警告と、「データセンターの中の天才集団」が現実になる世界を解説。",
+    "sourceUrls": "https://www.dwarkesh.com/p/dario-amodei-2"
+  },
+  {
+    "slug": "de73df48057a",
+    "title": "「AIを育てている、構築しているのではない」——AnthropicがOpenAIを離れた理由と、AI開発の「正しいやり方」をめぐる実験",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-03-28",
+    "abstract": "外交問題評議会（CFR）でのアモデイ講演の深読み。Anthropicがなぜ「ミッションファースト」を標榜するのか、メカニスティック・インタープリタビリティへの投資が示す長期思想、そしてAIの安全性が実は企業競争力と矛盾しない理由。",
+    "sourceUrls": "https://www.cfr.org/event/ceo-speaker-series-dario-amodei-anthropic"
+  },
+  {
+    "slug": "c3de4fa6837b",
+    "title": "解説：Fujitsu's AI Resilience Platform",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "categoriesMulti": [
+      "B: Role Blurring"
+    ],
+    "date": "2026-03-27",
+    "abstract": "New platform using Digital Twin and RL to manage supply chain disruptions.",
+    "sourceUrls": "https://www.crescendo.ai/news/latest-ai-news-and-updates"
+  },
+  {
+    "slug": "cf4470772d0c",
+    "title": "「肩書き」が組織を変える——a16zが語る「タイトル・アービトラージ」という武器",
+    "type": "explanation",
+    "category": "C: New Roles / FDE",
+    "categoriesMulti": [
+      "C: New Roles / FDE"
+    ],
+    "date": "2026-03-27",
+    "abstract": "a16zが分析する「タイトル・アービトラージ」——新しい肩書きは単なるラベルでなく、組織の変革意図と能力の宣言だ。FDEという職種名がPalantirに採用優位をもたらした事例から、AI時代に職種の再定義がなぜ競争力の源泉になるかを論じる。",
+    "sourceUrls": "https://a16z.com/forward-deployed-job-titles/"
+  },
+  {
+    "slug": "d3f883b8cb87",
+    "title": "解説：IBM: AI Trends for 2026",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "categoriesMulti": [
+      "B: Role Blurring"
+    ],
+    "date": "2026-03-27",
+    "abstract": "Focus on agentic AI for specific industrial domains like manufacturing and health.",
+    "sourceUrls": "https://www.ibm.com/think/news/ai-tech-trends-predictions-2026"
+  },
+  {
+    "slug": "c6aadc54ce0d",
+    "title": "解説：Hanwha: Digital Twins in Industrial AI",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "categoriesMulti": [
+      "B: Role Blurring"
+    ],
+    "date": "2026-03-27",
+    "abstract": "Collab robots and digital twins transforming industrial operations.",
+    "sourceUrls": "https://www.hanwha.com/newsroom/news/feature-stories/from-energy-to-industry-3-ai-trends-set-to-transform-operations-in-2026.do"
+  },
+  {
+    "slug": "c9bace041218",
+    "title": "「Macrohard」の衝撃——イーロン・マスクが描く、AIによる「会社そのものの自動化」",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-03-27",
+    "abstract": "イーロン・マスクが発表した「Macrohard」構想——TeslaとxAIが共同で進める、企業運営そのものを自律的に代替するAIエージェントプラットフォームの脅威的な進捗を解説する。",
+    "sourceUrls": "https://www.eweek.com/news/elon-musk-macrohard-ai-software-companies/"
+  },
+  {
     "slug": "c2357516e41e",
     "title": "「AIのせいでリストラした」と公言する企業が増えた——なぜ今、正直に言えるようになったのか",
     "type": "explanation",
     "category": "D: Big Tech Layoffs & AI Pivot",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot"
+    ],
     "date": "2026-03-26",
     "abstract": "Block、HP、Klarna、IBMなどの企業が「AIによる人員削減」を公言する背景を分析。AIによる職種代替が「PR（広報）リスク」でなくなった時代の転換点と、自社組織へのインプリケーションを論じる。",
     "image": "/posts/images/c2357516e41e.jpg",
@@ -242,6 +1014,9 @@
     "title": "「コードを書く」時代の終わりと、エンジニアの新しい価値——Thoughtworksが描くAgentic SDLCの衝撃",
     "type": "explanation",
     "category": "E: Rethinking SDLC",
+    "categoriesMulti": [
+      "E: Rethinking SDLC"
+    ],
     "date": "2026-03-26",
     "abstract": "Thoughtworksが提唱するAgentic SDLCの時代において、エンジニアの役割が「コードを書く人」から「AIに何を作らせるかを設計する人」へと転換することを解説。外注依存モデルのリスクとプロセス再設計の必要性を論じる。",
     "image": "/posts/images/ce614c17834d.jpg",
@@ -252,6 +1027,9 @@
     "title": "Deloitteが描く「制約なきAI時代」の工学——エンジニアが「実行エンジン」から「学習システムの設計者」になる日",
     "type": "explanation",
     "category": "E: Rethinking SDLC",
+    "categoriesMulti": [
+      "E: Rethinking SDLC"
+    ],
     "date": "2026-03-26",
     "abstract": "Deloitteが提唱するソフトウェアエンジニアリングの未来形。AIエージェントがSDLC全体の共創者・乗数効果をもたらす存在になる世界で、人間エンジニアは「方向性の設定・ガードレールの定義・倫理的判断」に昇格することを解説する。",
     "image": "/posts/images/fbe157a3a80a.jpg",
@@ -262,6 +1040,9 @@
     "title": "「コードを書く」のをやめたエンジニアたちが語る、AI時代の開発者の新しい仕事",
     "type": "explanation",
     "category": "B: Role Blurring",
+    "categoriesMulti": [
+      "B: Role Blurring"
+    ],
     "date": "2026-03-26",
     "abstract": "Spotifyのシニアエンジニアが数ヶ月コードを書いていない事実、GoogleのAIがコードの半分を生成、DORa 2025で90%の開発者がAI活用——この変化が製造業エンジニアに何を意味するかを論じる。",
     "image": "/posts/images/fc0010ff59d9.jpg",
@@ -272,6 +1053,9 @@
     "title": "レイオフとAI採用が同時に起きる2026年——テック業界の「組み替え」から学ぶ、製造業エンジニアの生存戦略",
     "type": "explanation",
     "category": "D: Big Tech Layoffs & AI Pivot",
+    "categoriesMulti": [
+      "D: Big Tech Layoffs & AI Pivot"
+    ],
     "date": "2026-03-26",
     "abstract": "2026年Q1に世界で45,000人超が解雇される一方、AI関連職の採用が92%増加。このパラドックスを解読し、外注依存モデルのリスクと内製ケイパビリティ構築の必要性を説く。",
     "image": "/posts/images/c15ea0336aca.jpg",
@@ -282,39 +1066,99 @@
     "title": "AIエージェントにコードを任せる時代に、エンジニアの「本当の仕事」は何か——Thoughtworksが示すAgentic SDLCへの道",
     "type": "explanation",
     "category": "E: Rethinking SDLC",
+    "categoriesMulti": [
+      "E: Rethinking SDLC"
+    ],
     "date": "2026-03-26",
     "abstract": "ThoughtworksのAgentic SDLCレポートを起点に、AIエージェントが開発工程に参入する時代にエンジニアが担うべき新しい役割を解説。コードを書く人から、AIを制御する仕様・テスト・フィードバックループを設計する人への転換と、プロセス全体の再設計の必要性を論じる。",
     "image": "/posts/images/d37782c2771e.jpg",
     "sourceUrls": "https://www.thoughtworks.com/en-us/insights/articles/preparing-your-team-for-the-agentic-software-development-life-cycle"
   },
   {
-    "slug": "c48584895882",
-    "title": "AIスタートアップの秘密兵器「FDE」完全ガイド——なぜ、製品が優れていても導入に失敗するのか",
-    "type": "explanation",
-    "category": "C: New Roles / FDE",
-    "date": "2026-03-26",
-    "abstract": "Rocketlaneによる「Forward Deployed Engineer完全ガイド2026」。FDEが解決するエンタープライズAI導入の「最後の1マイル」問題を詳説し、AIを顧客環境に根付かせるために必要な「現場に入り込むエンジニア」の役割と価値を論じる。",
-    "image": "/posts/images/c48584895882.jpg",
-    "sourceUrls": "https://www.rocketlane.com/blogs/forward-deployed-engineer"
-  },
-  {
     "slug": "c58c4d6f49c8",
     "title": "「コードレビューをやめる」日が来る——マーティン・ファウラーが描く、人間がAIと共存する新しい開発の姿",
     "type": "explanation",
     "category": "B: Role Blurring",
+    "categoriesMulti": [
+      "B: Role Blurring"
+    ],
     "date": "2026-03-26",
     "abstract": "Martin Fowlerブログの「on the loop」論を起点に、AIエージェント時代に人間エンジニアが果たすべき新しい役割を解説。コードを書く・レビューする役割から、AIを導く仕様・テスト・評価パイプラインを設計する役割への転換を製造業エンジニア向けに語る。",
     "image": "/posts/images/c58c4d6f49c8.jpg",
     "sourceUrls": "https://www.infoq.com/news/2026/03/mf-aiassisted-dev/"
   },
   {
+    "slug": "c48584895882",
+    "title": "AIスタートアップの秘密兵器「FDE」完全ガイド——なぜ、製品が優れていても導入に失敗するのか",
+    "type": "explanation",
+    "category": "C: New Roles / FDE",
+    "categoriesMulti": [
+      "C: New Roles / FDE"
+    ],
+    "date": "2026-03-26",
+    "abstract": "Rocketlaneによる「Forward Deployed Engineer完全ガイド2026」。FDEが解決するエンタープライズAI導入の「最後の1マイル」問題を詳説し、AIを顧客環境に根付かせるために必要な「現場に入り込むエンジニア」の役割と価値を論じる。",
+    "image": "/posts/images/c48584895882.jpg",
+    "sourceUrls": "https://www.rocketlane.com/blogs/forward-deployed-engineer"
+  },
+  {
     "slug": "cbb2a482868d",
     "title": "独立研究が暴く「AIで生産性10倍」の真実——なぜAIを使うと「速くなった気がするのに遅くなる」のか",
     "type": "explanation",
     "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
     "date": "2026-03-26",
     "abstract": "METR、Uplevel、GitClearの独立研究が示す「AI利用で開発者が19%遅くなった」「バグが41%増加」等の反直感的データを紹介。AI生産性神話の解体と「それでも今行動すべき理由」を論じる。",
     "image": "/posts/images/cbb2a482868d.jpg",
     "sourceUrls": "https://paddo.dev/blog/ai-developer-productivity-myth/"
+  },
+  {
+    "slug": "c51d2c5f7ded",
+    "title": "Amazon出身の24歳が「AI時代で最もホットな職種」に転身した理由——FDEという働き方が示す、ソフトウェア開発の未来",
+    "type": "explanation",
+    "category": "C: New Roles / FDE",
+    "categoriesMulti": [
+      "C: New Roles / FDE"
+    ],
+    "date": "2026-03-26",
+    "abstract": "Amazonからスタートアップを経てRipplingのFDE（Forward Deployed Engineer）に転身した24歳の体験談を起点に、FDE職の実態と求められるスキルを解説。製造業エンジニアが「コードを書く人」から「顧客課題を解く人」へ転換するための洞察を論じる。",
+    "sourceUrls": "https://www.businessinsider.com/hottest-job-ai-forward-deployed-engineer-skills-need-2026-3"
+  },
+  {
+    "slug": "fe5ff2b57956",
+    "title": "Figmaが「State of the Designer 2026」で明かした、AI時代に生き残るデザイナーの5つのスキル",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "categoriesMulti": [
+      "B: Role Blurring"
+    ],
+    "date": "2026-03-26",
+    "abstract": "Figmaの「State of the Designer 2026」リポートをもとに、AIがデザインプロセスを変革する中でデザイナーに求められる5つのスキルを分析。AIが探索・参入障壁低下・プロセスの民主化をもたらす中で、プロのデザイナーが価値を発揮し続けるための洞察を論じる。",
+    "sourceUrls": "https://www.figma.com/blog/skills-for-the-ai-era/"
+  },
+  {
+    "slug": "dd0f8d9fbf41",
+    "title": "Palantirが20年前に発明し、AI時代に800%急増した職種「FDE」——なぜ今、すべてのAI企業がFDEを雇おうとしているのか",
+    "type": "explanation",
+    "category": "C: New Roles / FDE",
+    "categoriesMulti": [
+      "C: New Roles / FDE"
+    ],
+    "date": "2026-03-26",
+    "abstract": "Palantirが生み出したFDE（Forward Deployed Engineer）というモデルがAI時代に再評価され、求人数が800%急増した背景を、First Round CapitalがPalantir・OpenAI・AIスタートアップへの取材を元に分析。エンタープライズAI導入の「最後の1マイル」問題を解く職種として注目される実態を論じる。",
+    "sourceUrls": "https://review.firstround.com/so-you-want-to-hire-a-forward-deployed-engineer/"
+  },
+  {
+    "slug": "da58f1aa59b0",
+    "title": "「AIで生産性10倍」の幻想と現実——400社の実データが示す、変革のための正しい期待値設定",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "categoriesMulti": [
+      "A: AI Hyper-productivity"
+    ],
+    "date": "2026-03-26",
+    "abstract": "DXが400社の実データを分析。AIの利用量が65%増加する一方、PRスループットの向上はわずか10%。「コード記述がボトルネックではなかった」という重要な洞察と、正しい期待値設定の重要性を論じる。",
+    "sourceUrls": "https://newsletter.getdx.com/p/ai-productivity-gains-are-10-not"
   }
 ]
