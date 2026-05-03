@@ -4,9 +4,9 @@ type: "analysis"
 category: "AI Productivity × SDLC Transformation"
 date: "2026-03-28"
 abstract: "「AIを使うと開発者が19%遅くなった」（METR研究）と「Claude Codeが259件のリリースノートを持つ」という2つの事実は矛盾しているように見えて、実は同じ変革の異なるフェーズを描いている。個人の生産性は一時的に下がるが、組織としての開発速度は桁違いに上がる——この逆説が「遅くなっている人こそが変革の最前線にいる」という驚愕の結論につながる。"
-notionId: "331d0f0b-e61e-81ea-ba54-ed7acbacc363"
-image: "/posts/images/ed7acbacc363.jpg"
+notionId: "34fd0f0b-e61e-819a-9bc9-f1a19d789b47"
 sourceUrls: "https://www.uplevel.work/blog/the-ai-coding-productivity-paradox, https://releasebot.io/updates/anthropic, https://www.thoughtworks.com/insights/articles/agentic-sdlc"
+legacySlug: "ed7acbacc363"
 ---
 
 AIの生産性について、これほど真っ向から対立するデータが同時に存在したことはありません。

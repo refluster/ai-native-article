@@ -10,9 +10,10 @@ AI技術の進化は、組織の職務定義やエンジニアの役割、さら
 
 ## 導入
 最近のAI関連の議論では、肩書きの重要性やエンジニアの役割の変化、職場でのレイオフとAI職の増加が取り上げられています。一見無関"
-notionId: "33ad0f0b-e61e-8183-85cf-d0c0c7c8aed0"
-image: "/posts/images/d0c0c7c8aed0.jpg"
+notionId: "34fd0f0b-e61e-81bd-ae4c-ce977b721c8c"
+image: "/posts/images/33ad0f0be61e818385cfd0c0c7c8aed0.jpg"
 sourceUrls: "https://a16z.com/forward-deployed-job-titles/, https://www.thoughtworks.com/en-us/insights/articles/preparing-your-team-for-the-agentic-software-development-life-cycle, https://www.dwarkesh.com/p/dario-amodei-2, https://www.techtimes.com/articles/315282/20260321/tech-layoffs-surge-while-ai-jobs-soar-key-trends-shaping-2026-tech-industry.htm"
+legacySlug: "d0c0c7c8aed0"
 ---
 
 # AI時代の新たな原理：組織変革と技術革新が交差する地点
