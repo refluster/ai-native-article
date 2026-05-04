@@ -4,11 +4,10 @@ type: "explanation"
 category: "C: New Roles / FDE"
 date: "2026-03-26"
 abstract: "Amazonからスタートアップを経てRipplingのFDE（Forward Deployed Engineer）に転身した24歳の体験談を起点に、FDE職の実態と求められるスキルを解説。製造業エンジニアが「コードを書く人」から「顧客課題を解く人」へ転換するための洞察を論じる。"
+image: "/posts/images/c51d2c5f7ded.jpg"
 notionId: "34fd0f0b-e61e-81c5-9181-c51d2c5f7ded"
 sourceUrls: "https://www.businessinsider.com/hottest-job-ai-forward-deployed-engineer-skills-need-2026-3"
 ---
-
-# Amazon出身24歳のRippling「Forward Deployed Engineer」が示す、顧客実装型エンジニアの実像
 
 ## Executive Summary
 
