@@ -1160,5 +1160,15 @@
     "date": "2026-03-26",
     "abstract": "DXが400社の実データを分析。AIの利用量が65%増加する一方、PRスループットの向上はわずか10%。「コード記述がボトルネックではなかった」という重要な洞察と、正しい期待値設定の重要性を論じる。",
     "sourceUrls": "https://newsletter.getdx.com/p/ai-productivity-gains-are-10-not"
+  },
+  {
+    "slug": "c51d2c5f7ded",
+    "title": "Amazon出身の24歳が「AI時代で最もホットな職種」に転身した理由——FDEという働き方が示す、ソフトウェア開発の未来",
+    "type": "explanation",
+    "category": "C: New Roles / FDE",
+    "date": "2026-03-26",
+    "abstract": "Amazonからスタートアップを経てRipplingのFDE（Forward Deployed Engineer）に転身した24歳の体験談を起点に、FDE職の実態と求められるスキルを解説。製造業エンジニアが「コードを書く人」から「顧客課題を解く人」へ転換するための洞察を論じる。",
+    "image": "/posts/images/c51d2c5f7ded.jpg",
+    "sourceUrls": "https://www.businessinsider.com/hottest-job-ai-forward-deployed-engineer-skills-need-2026-3"
   }
 ]
