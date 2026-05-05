@@ -1190,5 +1190,15 @@
     "abstract": "Palantirが生み出したFDE（Forward Deployed Engineer）というモデルがAI時代に再評価され、求人数が800%急増した背景を、First Round CapitalがPalantir・OpenAI・AIスタートアップへの取材を元に分析。エンタープライズAI導入の「最後の1マイル」問題を解く職種として注目される実態を論じる。",
     "image": "/posts/images/dd0f8d9fbf41.jpg",
     "sourceUrls": "https://review.firstround.com/so-you-want-to-hire-a-forward-deployed-engineer/"
+  },
+  {
+    "slug": "da58f1aa59b0",
+    "title": "「AIで生産性10倍」の幻想と現実——400社の実データが示す、変革のための正しい期待値設定",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "date": "2026-03-26",
+    "abstract": "DXが400社の実データを分析。AIの利用量が65%増加する一方、PRスループットの向上はわずか10%。「コード記述がボトルネックではなかった」という重要な洞察と、正しい期待値設定の重要性を論じる。",
+    "image": "/posts/images/da58f1aa59b0.jpg",
+    "sourceUrls": "https://newsletter.getdx.com/p/ai-productivity-gains-are-10-not"
   }
 ]
