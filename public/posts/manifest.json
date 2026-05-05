@@ -1180,5 +1180,15 @@
     "abstract": "Figmaの「State of the Designer 2026」リポートをもとに、AIがデザインプロセスを変革する中でデザイナーに求められる5つのスキルを分析。AIが探索・参入障壁低下・プロセスの民主化をもたらす中で、プロのデザイナーが価値を発揮し続けるための洞察を論じる。",
     "image": "/posts/images/fe5ff2b57956.jpg",
     "sourceUrls": "https://www.figma.com/blog/skills-for-the-ai-era/"
+  },
+  {
+    "slug": "dd0f8d9fbf41",
+    "title": "Palantirが20年前に発明し、AI時代に800%急増した職種「FDE」——なぜ今、すべてのAI企業がFDEを雇おうとしているのか",
+    "type": "explanation",
+    "category": "C: New Roles / FDE",
+    "date": "2026-03-26",
+    "abstract": "Palantirが生み出したFDE（Forward Deployed Engineer）というモデルがAI時代に再評価され、求人数が800%急増した背景を、First Round CapitalがPalantir・OpenAI・AIスタートアップへの取材を元に分析。エンタープライズAI導入の「最後の1マイル」問題を解く職種として注目される実態を論じる。",
+    "image": "/posts/images/dd0f8d9fbf41.jpg",
+    "sourceUrls": "https://review.firstround.com/so-you-want-to-hire-a-forward-deployed-engineer/"
   }
 ]
