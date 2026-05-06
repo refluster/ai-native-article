@@ -1007,6 +1007,16 @@
     "sourceUrls": "https://www.crescendo.ai/news/latest-ai-news-and-updates"
   },
   {
+    "slug": "cf4470772d0c",
+    "title": "「肩書き」が組織を変える——a16zが語る「タイトル・アービトラージ」という武器",
+    "type": "explanation",
+    "category": "C: New Roles / FDE",
+    "date": "2026-03-27",
+    "abstract": "a16zが分析する「タイトル・アービトラージ」——新しい肩書きは単なるラベルでなく、組織の変革意図と能力の宣言だ。FDEという職種名がPalantirに採用優位をもたらした事例から、AI時代に職種の再定義がなぜ競争力の源泉になるかを論じる。",
+    "image": "/posts/images/cf4470772d0c.jpg",
+    "sourceUrls": "https://a16z.com/forward-deployed-job-titles/"
+  },
+  {
     "slug": "c2357516e41e",
     "title": "「AIのせいでリストラした」と公言する企業が増えた——なぜ今、正直に言えるようになったのか",
     "type": "explanation",
