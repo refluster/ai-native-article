@@ -997,6 +997,16 @@
     "sourceUrls": "https://www.eweek.com/news/elon-musk-macrohard-ai-software-companies/"
   },
   {
+    "slug": "c3de4fa6837b",
+    "title": "解説：Fujitsu's AI Resilience Platform",
+    "type": "explanation",
+    "category": "B: Trends",
+    "date": "2026-03-27",
+    "abstract": "New platform using Digital Twin and RL to manage supply chain disruptions.",
+    "image": "/posts/images/c3de4fa6837b.jpg",
+    "sourceUrls": "https://www.crescendo.ai/news/latest-ai-news-and-updates"
+  },
+  {
     "slug": "c2357516e41e",
     "title": "「AIのせいでリストラした」と公言する企業が増えた——なぜ今、正直に言えるようになったのか",
     "type": "explanation",
