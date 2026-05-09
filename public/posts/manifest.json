@@ -957,6 +957,16 @@
     "sourceUrls": "https://www.macrumors.com/2026/03/24/claude-use-mac-remotely-iphone/"
   },
   {
+    "slug": "d8a4f22f5c56",
+    "title": "「iPhoneで指示したらMacが動いた」——ClaudeのComputer Use（コンピューター操作）が変える、働き方の常識",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "date": "2026-03-28",
+    "abstract": "AnthropicがClaudeに「Computer Use（コンピューター操作）」機能を実装。iPhoneからタスクを指示すると、Macがアプリを開き、ブラウザを操作し、スプレッドシートを記入し、ファイルを送信する。Dispatchと連携した「タスクの完全自律実行」の実態と製造業組織への影響を解説する。",
+    "image": "/posts/images/d8a4f22f5c56.jpg",
+    "sourceUrls": "https://www.cnbc.com/2026/03/24/anthropic-claude-ai-agent-use-computer-finish-tasks.html"
+  },
+  {
     "slug": "c3de4fa6837b",
     "title": "解説：Fujitsu's AI Resilience Platform",
     "type": "explanation",
