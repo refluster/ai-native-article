@@ -947,6 +947,16 @@
     "sourceUrls": "https://techcrunch.com/2026/01/layoffs-ai-shift/, https://www.businessinsider.com/ai-layoffs-corporate-transparency-2026, https://www.eweek.com/news/elon-musk-macrohard-ai-software-companies/"
   },
   {
+    "slug": "db30c1541bc6",
+    "title": "Claude Code+Coworkが「Mac遠隔操作」を実現——OpenClawとの違いと、AIエージェント時代のMacの使い方",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "date": "2026-03-28",
+    "abstract": "MacRumors報道をベースに、Claude CodeとCoworkによるMacリモート操作機能を解説。OpenClawとの安全性比較、コネクター不要のスクリーン操作フォールバック、今月のAnthropicの連続アップデート（ビジュアルコンテンツ・メモリインポート）との文脈を踏まえた分析。",
+    "image": "/posts/images/db30c1541bc6.jpg",
+    "sourceUrls": "https://www.macrumors.com/2026/03/24/claude-use-mac-remotely-iphone/"
+  },
+  {
     "slug": "c3de4fa6837b",
     "title": "解説：Fujitsu's AI Resilience Platform",
     "type": "explanation",
