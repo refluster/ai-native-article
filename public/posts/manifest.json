@@ -977,6 +977,16 @@
     "sourceUrls": "https://www.indiatoday.in/technology/features/story/hey-anthropic-take-a-break-from-saas-apocalypse-to-dispatch-claude-ai-is-on-a-tear-with-updates-2887840-2026-03-27"
   },
   {
+    "slug": "c80b9921c5e5",
+    "title": "情報漏洩で明かされた「Claude Mythos」——「劇的に優れた」次世代モデルとサイバーセキュリティの新常識",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "date": "2026-03-28",
+    "abstract": "AnthropicのCMSの設定ミスによって3000件のアセットが公開され、次世代モデル「Claude Mythos（Capybara）」の存在が露呈。Claude 4.6 Opusを「劇的に上回る」と内部評価されたこのモデルの特徴と、サイバーセキュリティ市場への影響（CrowdStrikeらが5%超下落）を分析する。",
+    "image": "/posts/images/c80b9921c5e5.jpg",
+    "sourceUrls": "https://siliconangle.com/2026/03/27/anthropic-launch-new-claude-mythos-model-advanced-reasoning-features/"
+  },
+  {
     "slug": "c3de4fa6837b",
     "title": "解説：Fujitsu's AI Resilience Platform",
     "type": "explanation",
