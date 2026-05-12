@@ -1017,6 +1017,16 @@
     "sourceUrls": "https://www.dwarkesh.com/p/dario-amodei-2"
   },
   {
+    "slug": "eb871fab5e32",
+    "title": "Claude Codeのリリースノートが259件——「異常な開発ペース」が教えてくれる、AI時代のソフトウェアの作り方",
+    "type": "explanation",
+    "category": "E: Rethinking SDLC",
+    "date": "2026-03-28",
+    "abstract": "ReleasebotのAnthropicリリースノートアーカイブが示す、Claude Codeの259件というリリース履歴。2.1.85ではMCPワークフロー改善、フック条件分岐追加、深リンク拡張など多岐にわたる更新が1週間以内に実施。このペースが示す「AIネイティブな開発サイクル」の実態と製造業への示唆を解説する。",
+    "image": "/posts/images/eb871fab5e32.jpg",
+    "sourceUrls": "https://releasebot.io/updates/anthropic"
+  },
+  {
     "slug": "c3de4fa6837b",
     "title": "解説：Fujitsu's AI Resilience Platform",
     "type": "explanation",
