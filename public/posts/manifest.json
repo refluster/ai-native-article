@@ -1007,6 +1007,16 @@
     "sourceUrls": "https://www.uplevel.work/blog/the-ai-coding-productivity-paradox, https://releasebot.io/updates/anthropic, https://www.thoughtworks.com/insights/articles/agentic-sdlc"
   },
   {
+    "slug": "fe4a1c126e5d",
+    "title": "「指数関数の終わりが近い」——Anthropic CEOダリオ・アモデイが語る、AIの次の臨界点と私たちが気づいていない事実",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "date": "2026-03-28",
+    "abstract": "Anthropic CEOが「スケーリングの指数関数は終わりに近い」と述べた対談の深読み。AGIが近い今、私たちがまだ旧来の問題を議論していることへの警告と、「データセンターの中の天才集団」が現実になる世界を解説。",
+    "image": "/posts/images/fe4a1c126e5d.jpg",
+    "sourceUrls": "https://www.dwarkesh.com/p/dario-amodei-2"
+  },
+  {
     "slug": "c3de4fa6837b",
     "title": "解説：Fujitsu's AI Resilience Platform",
     "type": "explanation",
