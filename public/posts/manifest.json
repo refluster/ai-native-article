@@ -773,6 +773,16 @@
     "sourceUrls": "https://en.wikipedia.org/wiki/Terafab"
   },
   {
+    "slug": "fd969a54c786",
+    "title": "Terafab完全解説——Tesla・SpaceX・xAI が共同で「世界最大のAIチップ工場」を建設する理由と、その産業的意味",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "date": "2026-03-29",
+    "abstract": "Terafab（Tesla・SpaceX・xAI共同）の全貌：2nmプロセス・年間1テラワット・総額250億ドル。チップ設計からパッケージングまでの垂直統合がNvidiaとTSMCへの依存を断つ戦略と、その製造業への示唆を解説。",
+    "image": "/posts/images/fd969a54c786.jpg",
+    "sourceUrls": "https://en.wikipedia.org/wiki/Terafab"
+  },
+  {
     "slug": "f149902f32fa",
     "title": "「会社を解雇する」時代の論理——レイオフ×AI採用急増×Macrohardが指し示す、組織設計の根本的転換",
     "type": "analysis",
