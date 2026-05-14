@@ -793,6 +793,16 @@
     "sourceUrls": "https://www.cbsnews.com/news/terafab-elon-musk-chips-semiconductors-what-to-know/"
   },
   {
+    "slug": "d148b8208d71",
+    "title": "Terafabの「月産100万枚」はどれだけ非常識か——TSMCと比較して数字で理解する、マスクの野望の規模感",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "date": "2026-03-29",
+    "abstract": "Terafabの目標数値（月産100万枚、年間100〜200億枚、宇宙1テラワット）をTSMCなど現実と比較して解説。Battery Day 2020の前例も引きながら「過去のマスクの约束」との乖離も検証。",
+    "image": "/posts/images/d148b8208d71.jpg",
+    "sourceUrls": "https://mashable.com/article/tesla-terafab-chip-plant"
+  },
+  {
     "slug": "f149902f32fa",
     "title": "「会社を解雇する」時代の論理——レイオフ×AI採用急増×Macrohardが指し示す、組織設計の根本的転換",
     "type": "analysis",
