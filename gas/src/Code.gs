@@ -62,8 +62,24 @@ function notionRequest(method, path, apiKey, body) {
 }
 
 function notionQueryDatabase(dbId, apiKey) {
-  const result = notionRequest('POST', `/databases/${dbId}/query`, apiKey, { page_size: 100 });
-  return result.results || [];
+  // Notion's /databases/{id}/query caps at 100 rows per response. Without
+  // pagination we miss content silently once the DB exceeds 100 entries —
+  // which broke L2_BATCH coverage checks (re-creating already-covered L1s)
+  // and L4_BATCH publish gating once the unified Articles DB crossed 100
+  // total rows. Loop on has_more / next_cursor to fetch the full set.
+  const all = [];
+  let cursor = '';
+  while (true) {
+    const body = { page_size: 100 };
+    if (cursor) body.start_cursor = cursor;
+    const result = notionRequest('POST', `/databases/${dbId}/query`, apiKey, body);
+    const results = result.results || [];
+    for (const r of results) all.push(r);
+    if (!result.has_more) break;
+    cursor = result.next_cursor || '';
+    if (!cursor) break;
+  }
+  return all;
 }
 
 function notionCreatePage(dbId, properties, apiKey) {
@@ -71,6 +87,27 @@ function notionCreatePage(dbId, properties, apiKey) {
     parent: { database_id: dbId },
     properties,
   });
+}
+
+// Create a Notion page whose children array may exceed the API's
+// per-request 100-block limit. The /pages POST itself caps `children`
+// at 100 (HTTP 400 `body.children.length should be ≤ 100`), so we
+// post the first 100 inline and append the rest via PATCH
+// /blocks/{pageId}/children (also 100/call). This is the create-time
+// analogue of `notionReplacePageBody`.
+//
+// `pageData` is the full POST body (parent, properties, [children]).
+// Mutates its `children` array length to ≤ 100 before sending.
+function notionCreatePageWithBlocks(pageData, apiKey) {
+  const all = (pageData.children || []).slice();
+  const CHUNK = 100;
+  pageData.children = all.slice(0, CHUNK);
+  const result = notionRequest('POST', '/pages', apiKey, pageData);
+  for (let i = CHUNK; i < all.length; i += CHUNK) {
+    const slice = all.slice(i, i + CHUNK);
+    notionRequest('PATCH', `/blocks/${result.id}/children`, apiKey, { children: slice });
+  }
+  return result;
 }
 
 function notionUpdatePage(pageId, properties, apiKey) {
@@ -794,7 +831,7 @@ function handleL2Create(data, config) {
     };
   }
 
-  const result = notionRequest('POST', '/pages', config.notion_api_key, pageData);
+  const result = notionCreatePageWithBlocks(pageData, config.notion_api_key);
   return {
     success: true,
     data: {
@@ -1126,7 +1163,7 @@ function handleL3Create(data, config) {
     };
   }
 
-  const result = notionRequest('POST', '/pages', config.notion_api_key, pageData);
+  const result = notionCreatePageWithBlocks(pageData, config.notion_api_key);
   return {
     success: true,
     data: {
