@@ -35,18 +35,6 @@ function parseFrontmatter(raw: string): { meta: Partial<Frontmatter>; content: s
   return { meta, content: match[2].trim() }
 }
 
-const IMAGES = [
-  withBasePath('assets/images/article-1.jpg'),
-  withBasePath('assets/images/article-2.jpg'),
-  withBasePath('assets/images/article-3.jpg'),
-  withBasePath('assets/images/article-4.jpg'),
-  withBasePath('assets/images/article-5.jpg'),
-  withBasePath('assets/images/article-6.jpg'),
-  withBasePath('assets/images/article-7.jpg'),
-  withBasePath('assets/images/article-8.jpg'),
-  withBasePath('assets/images/article-9.jpg'),
-]
-
 // Scroll-depth thresholds we report as distinct events (GROWTH.md §2).
 const DEPTH_STEPS = [25, 50, 75, 90] as const
 
@@ -56,8 +44,6 @@ export default function Article() {
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const [articleIndex, setArticleIndex] = useState(0)
-  const [manifestImage, setManifestImage] = useState<string | undefined>()
   const [manifest, setManifest] = useState<ArticleMeta[]>([])
 
   // Refs so the scroll listener closes over mutable state without re-binding.
@@ -82,11 +68,8 @@ export default function Article() {
 
     fetch(withBasePath('posts/manifest.json'))
       .then(r => r.json())
-      .then((data: (ArticleMeta & { image?: string })[]) => {
+      .then((data: ArticleMeta[]) => {
         setManifest(data)
-        const idx = data.findIndex(a => a.slug === slug)
-        setArticleIndex(idx >= 0 ? idx : 0)
-        if (idx >= 0 && data[idx].image) setManifestImage(data[idx].image)
       })
       .catch(() => {})
 
@@ -127,20 +110,6 @@ export default function Article() {
       setDefaultSeo()
     }
   }, [slug])
-
-  // Re-emit SEO once the manifest image resolves, so og:image points at the
-  // per-article asset rather than nothing.
-  useEffect(() => {
-    if (!slug || !meta.title || !manifestImage) return
-    setArticleSeo({
-      title: meta.title,
-      description: meta.abstract || '',
-      slug,
-      category: meta.category,
-      date: meta.date,
-      image: manifestImage,
-    })
-  }, [manifestImage, meta.title, meta.abstract, meta.category, meta.date, slug])
 
   // Scroll-depth tracking. We measure relative to the article body, not the
   // full page, so header/footer don't distort the signal.
@@ -236,7 +205,6 @@ export default function Article() {
     )
   }
 
-  const heroImage = manifestImage ? withBasePath(manifestImage) : IMAGES[articleIndex % IMAGES.length]
   const articleType = inferType({ type: isArticleType(meta.type) ? meta.type : undefined })
 
   return (
@@ -278,24 +246,6 @@ export default function Article() {
           </div>
         </div>
       </section>
-
-      {/* Hero image */}
-      <div className="w-full max-h-[480px] overflow-hidden">
-        <img
-          src={heroImage}
-          alt={meta.title}
-          onError={(e) => {
-            // 404 backstop. Falls back to the rotating placeholder set
-            // (same set used by ArticleCard) so the hero never shows a
-            // broken image when an L4-published image is missing.
-            const t = e.currentTarget
-            const fallback = IMAGES[articleIndex % IMAGES.length]
-            if (t.src !== fallback) t.src = fallback
-          }}
-          className="w-full object-cover grayscale"
-          style={{ maxHeight: 480, objectPosition: 'center' }}
-        />
-      </div>
 
       {/* Article body */}
       <article
