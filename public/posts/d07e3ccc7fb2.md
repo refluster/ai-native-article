@@ -1,14 +1,13 @@
 ---
 title: "Jensen Huangが定義するAIの未来"
 type: "explanation"
-category: "A: AI Hyper-productivity"
+category: "A"
 date: "2026-03-30"
 abstract: "Jensen Huang氏の対談から、AI進化の要点を抽出。"
+image: "/posts/images/d07e3ccc7fb2.jpg"
 notionId: "34fd0f0b-e61e-810f-81cc-d07e3ccc7fb2"
 sourceUrls: "https://lexfridman.com/jensen-huang-transcript/"
 ---
-
-# Jensen Huangが描く「AI factory」への移行：extreme co-design、CUDA、4つのscaling laws
 
 ## Executive Summary
 
