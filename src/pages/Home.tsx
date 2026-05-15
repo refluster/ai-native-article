@@ -225,63 +225,37 @@ export default function Home() {
       {/* Hero */}
       {featured && (
         <section className="w-full bg-surface border-b border-outline-variant/10">
-          <div className="max-w-[1440px] mx-auto px-6 md:px-12 pt-16 pb-24">
-            <div className="swiss-grid">
-              <div className="col-span-12 lg:col-span-7 relative overflow-hidden">
-                <img
-                  src={withBasePath(
-                    featured.image || '/assets/images/ai-native-transformation.jpg',
-                  )}
-                  alt={featured.title}
-                  onError={(e) => {
-                    // Same image-404 backstop as ArticleCard — swap in the
-                    // hero placeholder so the featured slot never shows a
-                    // broken icon.
-                    const t = e.currentTarget
-                    const fallback = withBasePath('/assets/images/ai-native-transformation.jpg')
-                    if (t.src !== fallback) t.src = fallback
-                  }}
-                  className="w-full aspect-[16/9] object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-8">
-                  <span className="inline-block bg-tertiary text-on-tertiary px-2 py-1 text-[10px] font-bold tracking-widest uppercase mb-4">
-                    {activeCategory || activeType !== 'all' || activeRange !== 'all'
-                      ? 'FILTERED'
-                      : 'FEATURED'}
-                  </span>
-                  <Link to={`/article/${featured.slug}`} onClick={onFeaturedClick}>
-                    <h2 className="text-3xl md:text-4xl font-black tracking-tight leading-tight text-white hover:text-tertiary transition-colors">
-                      {featured.title}
-                    </h2>
-                  </Link>
-                </div>
+          <div className="max-w-3xl mx-auto px-6 md:px-12 pt-16 pb-24">
+            <div className="flex flex-col">
+              <div className="flex items-center gap-3 mb-6">
+                <span className="inline-block bg-tertiary text-on-tertiary px-2 py-1 text-[10px] font-bold tracking-widest uppercase">
+                  {activeCategory || activeType !== 'all' || activeRange !== 'all'
+                    ? 'FILTERED'
+                    : 'FEATURED'}
+                </span>
+                <span className="text-[10px] font-bold tracking-widest text-tertiary uppercase">
+                  {featured.category}
+                </span>
               </div>
-              <div className="col-span-12 lg:col-span-5 flex flex-col justify-between py-4">
-                <div>
-                  <span className="text-[10px] font-bold tracking-widest text-tertiary uppercase block mb-4">
-                    {featured.category}
-                  </span>
-                  <Link to={`/article/${featured.slug}`} onClick={onFeaturedClick}>
-                    <h3 className="text-xl font-black tracking-tight leading-tight mb-6 hover:text-tertiary transition-colors">
-                      {featured.title}
-                    </h3>
-                  </Link>
-                  <p className="text-base leading-relaxed text-on-surface-variant mb-8">
-                    {featured.abstract}
-                  </p>
-                </div>
-                <div className="border-t border-outline-variant/30 pt-6 flex items-center justify-between">
-                  <span className="text-[10px] font-bold tracking-widest text-outline uppercase">
-                    {featured.date}
-                  </span>
-                  <Link
-                    to={`/article/${featured.slug}`}
-                    onClick={onFeaturedClick}
-                    className="inline-flex items-center gap-2 text-xs font-bold tracking-widest uppercase hover:text-tertiary transition-colors"
-                  >
-                    READ →
-                  </Link>
-                </div>
+              <Link to={`/article/${featured.slug}`} onClick={onFeaturedClick}>
+                <h2 className="text-3xl md:text-5xl font-black tracking-tight leading-tight mb-6 hover:text-tertiary transition-colors">
+                  {featured.title}
+                </h2>
+              </Link>
+              <p className="text-lg leading-relaxed text-on-surface-variant mb-8">
+                {featured.abstract}
+              </p>
+              <div className="border-t border-outline-variant/30 pt-6 flex items-center justify-between">
+                <span className="text-[10px] font-bold tracking-widest text-outline uppercase">
+                  {featured.date}
+                </span>
+                <Link
+                  to={`/article/${featured.slug}`}
+                  onClick={onFeaturedClick}
+                  className="inline-flex items-center gap-2 text-xs font-bold tracking-widest uppercase hover:text-tertiary transition-colors"
+                >
+                  READ →
+                </Link>
               </div>
             </div>
           </div>
@@ -323,8 +297,8 @@ export default function Home() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-y-16 gap-x-12">
-                {rest.map((article, i) => (
-                  <ArticleCard key={article.slug} article={article} index={i} />
+                {rest.map((article) => (
+                  <ArticleCard key={article.slug} article={article} />
                 ))}
               </div>
             )}
