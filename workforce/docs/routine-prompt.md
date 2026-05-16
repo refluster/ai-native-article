@@ -121,6 +121,13 @@ EXECUTION
      The routine cannot apply the policy itself (no IAM permissions in
      the cloud session) — escalate to the operator with a clear list of
      the missing actions copied from the CFN failure log.
+   - `Stack ... is in ROLLBACK_COMPLETE state and can not be updated`
+     (dry-run or deploy step) — the previous deploy attempt failed and
+     left an empty stack record. Fix: ask the operator to run
+     `aws cloudformation delete-stack --stack-name workforce-<stage>`
+     and wait for completion. Then re-trigger the deploy via
+     `workflow_dispatch`. The routine can't delete stacks (no
+     cloudformation:DeleteStack on the cloud session role) — escalate.
    - Typecheck — read the tsc error, fix at the source, do NOT add
      `@ts-ignore` or `any` to silence it.
    - Token-lint — only fires on `src/**`. If you touched src/, no raw

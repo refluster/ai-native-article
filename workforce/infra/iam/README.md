@@ -30,7 +30,26 @@ aws iam attach-role-policy \
   --policy-arn arn:aws:iam::<ACCOUNT_ID>:policy/workforce-deploy-permissions
 ```
 
-After applying, re-run the failed `Workforce SAM Deploy` workflow run on `main` (Actions tab → failed run → **Re-run failed jobs**), or push any change touching `workforce/**`.
+### Then clean up the failed stack from the previous deploy attempt
+
+PR #22's post-merge deploy left the `workforce-dev` stack in `ROLLBACK_COMPLETE` state (nothing was actually created — DDB/S3 retention policies kept the slate clean, but the empty stack record blocks future creates):
+
+```bash
+aws cloudformation delete-stack --stack-name workforce-dev --region ap-northeast-1
+aws cloudformation wait stack-delete-complete --stack-name workforce-dev --region ap-northeast-1
+```
+
+### Then re-trigger the deploy
+
+After the policy is applied and the failed stack is deleted:
+
+```bash
+# From your laptop, against this repo:
+gh workflow run workforce-deploy.yml --ref main -f stage=dev
+# Or via the Actions UI: Workforce SAM Deploy → Run workflow → stage=dev
+```
+
+The next push to `main` that touches `workforce/infra/sam/**` or `workforce/lambdas/**` will also trigger the deploy automatically. (As of PR #23, changes under `workforce/infra/iam/**` no longer trigger the deploy workflow — only operator-applied infra.)
 
 ## What it grants
 

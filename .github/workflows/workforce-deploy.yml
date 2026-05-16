@@ -3,13 +3,13 @@ name: Workforce SAM Deploy
 on:
   pull_request:
     paths:
-      - 'workforce/infra/**'
+      - 'workforce/infra/sam/**'
       - 'workforce/lambdas/**'
       - '.github/workflows/workforce-deploy.yml'
   push:
     branches: [main]
     paths:
-      - 'workforce/infra/**'
+      - 'workforce/infra/sam/**'
       - 'workforce/lambdas/**'
       - '.github/workflows/workforce-deploy.yml'
   workflow_dispatch:
