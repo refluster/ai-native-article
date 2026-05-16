@@ -1,0 +1,11 @@
+# SAM build output
+.aws-sam/
+samconfig.local.toml
+
+# Per-developer parameter overrides
+infra/sam/parameters/local.json
+
+# Lambda build artifacts (esbuild output landing in PR2)
+lambdas/**/dist/
+lambdas/node_modules/
+lambdas/**/node_modules/
