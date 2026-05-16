@@ -78,19 +78,24 @@ jobs:
           REGION: ${{ vars.AWS_REGION }}
         run: |
           # Skip dry-run if the stack is in a state CFN cannot update.
-          # The operator must `aws cloudformation delete-stack` and the
-          # next push-to-main / workflow_dispatch will recreate it.
+          # Operator must `aws cloudformation delete-stack` to recover.
+          set +e
           STATUS=$(aws cloudformation describe-stacks \
             --stack-name workforce-dev \
             --region "$REGION" \
             --query 'Stacks[0].StackStatus' \
-            --output text 2>/dev/null || echo "NOT_FOUND")
-          case "$STATUS" in
-            ROLLBACK_COMPLETE|UPDATE_ROLLBACK_FAILED|ROLLBACK_FAILED|CREATE_FAILED|DELETE_FAILED)
-              echo "::warning::Stack workforce-dev is in $STATUS — dry-run skipped. Operator must run 'aws cloudformation delete-stack --stack-name workforce-dev --region $REGION' before the next deploy can succeed."
-              exit 0
-              ;;
-          esac
+            --output text 2>&1)
+          DESCRIBE_RC=$?
+          set -e
+          echo "describe-stacks rc=$DESCRIBE_RC status='$STATUS'"
+          if [[ "$DESCRIBE_RC" -ne 0 ]]; then
+            # Stack doesn't exist or no permission — proceed with dry-run
+            # (sam deploy will surface the real error if there is one).
+            echo "Stack info unavailable; proceeding with dry-run."
+          elif [[ "$STATUS" == *ROLLBACK_COMPLETE* || "$STATUS" == *ROLLBACK_FAILED* || "$STATUS" == *CREATE_FAILED* || "$STATUS" == *DELETE_FAILED* ]]; then
+            echo "::warning::Stack workforce-dev is in $STATUS — dry-run skipped. Operator must run 'aws cloudformation delete-stack --stack-name workforce-dev --region $REGION' before the next deploy can succeed."
+            exit 0
+          fi
           sam deploy \
             --no-execute-changeset \
             --no-confirm-changeset \
