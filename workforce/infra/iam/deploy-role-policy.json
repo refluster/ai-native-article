@@ -1,0 +1,189 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CloudFormation",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:CreateStack",
+        "cloudformation:UpdateStack",
+        "cloudformation:DeleteStack",
+        "cloudformation:DescribeStacks",
+        "cloudformation:DescribeStackEvents",
+        "cloudformation:DescribeStackResource",
+        "cloudformation:DescribeStackResources",
+        "cloudformation:GetTemplate",
+        "cloudformation:GetTemplateSummary",
+        "cloudformation:ListStacks",
+        "cloudformation:CreateChangeSet",
+        "cloudformation:DescribeChangeSet",
+        "cloudformation:ExecuteChangeSet",
+        "cloudformation:DeleteChangeSet",
+        "cloudformation:SetStackPolicy",
+        "cloudformation:UpdateTerminationProtection",
+        "cloudformation:ValidateTemplate"
+      ],
+      "Resource": [
+        "arn:aws:cloudformation:*:*:stack/workforce-*/*",
+        "arn:aws:cloudformation:*:*:stack/aws-sam-cli-managed-default/*",
+        "arn:aws:cloudformation:*:*:changeSet/*"
+      ]
+    },
+    {
+      "Sid": "S3BucketLevel",
+      "Effect": "Allow",
+      "Action": [
+        "s3:CreateBucket",
+        "s3:DeleteBucket",
+        "s3:GetBucketLocation",
+        "s3:ListBucket",
+        "s3:ListBucketVersions",
+        "s3:PutBucketVersioning",
+        "s3:GetBucketVersioning",
+        "s3:PutBucketPublicAccessBlock",
+        "s3:GetBucketPublicAccessBlock",
+        "s3:PutLifecycleConfiguration",
+        "s3:GetLifecycleConfiguration",
+        "s3:PutBucketTagging",
+        "s3:GetBucketTagging",
+        "s3:PutBucketPolicy",
+        "s3:GetBucketPolicy",
+        "s3:DeleteBucketPolicy",
+        "s3:PutEncryptionConfiguration",
+        "s3:GetEncryptionConfiguration",
+        "s3:PutBucketOwnershipControls",
+        "s3:GetBucketOwnershipControls"
+      ],
+      "Resource": [
+        "arn:aws:s3:::wf-*",
+        "arn:aws:s3:::aws-sam-cli-managed-default-*"
+      ]
+    },
+    {
+      "Sid": "S3ObjectLevel",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:GetObjectVersion",
+        "s3:DeleteObjectVersion"
+      ],
+      "Resource": [
+        "arn:aws:s3:::wf-*/*",
+        "arn:aws:s3:::aws-sam-cli-managed-default-*/*"
+      ]
+    },
+    {
+      "Sid": "DynamoDB",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:CreateTable",
+        "dynamodb:DescribeTable",
+        "dynamodb:UpdateTable",
+        "dynamodb:DeleteTable",
+        "dynamodb:TagResource",
+        "dynamodb:UntagResource",
+        "dynamodb:ListTagsOfResource",
+        "dynamodb:UpdateContinuousBackups",
+        "dynamodb:DescribeContinuousBackups",
+        "dynamodb:DescribeTimeToLive",
+        "dynamodb:UpdateTimeToLive"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:*:*:table/WorkforceCore-*",
+        "arn:aws:dynamodb:*:*:table/Chat-*",
+        "arn:aws:dynamodb:*:*:table/Memory-*",
+        "arn:aws:dynamodb:*:*:table/WorkforceCore-*/index/*",
+        "arn:aws:dynamodb:*:*:table/Chat-*/index/*",
+        "arn:aws:dynamodb:*:*:table/Memory-*/index/*"
+      ]
+    },
+    {
+      "Sid": "Lambda",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:CreateFunction",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration",
+        "lambda:GetFunction",
+        "lambda:GetFunctionConfiguration",
+        "lambda:GetFunctionCodeSigningConfig",
+        "lambda:DeleteFunction",
+        "lambda:AddPermission",
+        "lambda:RemovePermission",
+        "lambda:GetPolicy",
+        "lambda:TagResource",
+        "lambda:UntagResource",
+        "lambda:ListTags",
+        "lambda:PublishVersion",
+        "lambda:CreateAlias",
+        "lambda:UpdateAlias",
+        "lambda:DeleteAlias",
+        "lambda:GetAlias",
+        "lambda:ListVersionsByFunction"
+      ],
+      "Resource": [
+        "arn:aws:lambda:*:*:function:workforce-*"
+      ]
+    },
+    {
+      "Sid": "IAMForLambdaExecutionRoles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:GetRole",
+        "iam:PassRole",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:GetRolePolicy",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListRolePolicies",
+        "iam:TagRole",
+        "iam:UntagRole",
+        "iam:UpdateAssumeRolePolicy"
+      ],
+      "Resource": [
+        "arn:aws:iam::*:role/workforce-*"
+      ]
+    },
+    {
+      "Sid": "APIGateway",
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:GET",
+        "apigateway:POST",
+        "apigateway:PUT",
+        "apigateway:PATCH",
+        "apigateway:DELETE",
+        "apigateway:TagResource",
+        "apigateway:UntagResource"
+      ],
+      "Resource": [
+        "arn:aws:apigateway:*::/apis",
+        "arn:aws:apigateway:*::/apis/*",
+        "arn:aws:apigateway:*::/tags/*"
+      ]
+    },
+    {
+      "Sid": "CloudWatchLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:DeleteLogGroup",
+        "logs:DescribeLogGroups",
+        "logs:PutRetentionPolicy",
+        "logs:TagResource",
+        "logs:UntagResource",
+        "logs:ListTagsForResource"
+      ],
+      "Resource": [
+        "arn:aws:logs:*:*:log-group:/aws/lambda/workforce-*",
+        "arn:aws:logs:*:*:log-group:/aws/lambda/workforce-*:*"
+      ]
+    }
+  ]
+}

@@ -3,13 +3,13 @@ name: Workforce SAM Deploy
 on:
   pull_request:
     paths:
-      - 'workforce/infra/**'
+      - 'workforce/infra/sam/**'
       - 'workforce/lambdas/**'
       - '.github/workflows/workforce-deploy.yml'
   push:
     branches: [main]
     paths:
-      - 'workforce/infra/**'
+      - 'workforce/infra/sam/**'
       - 'workforce/lambdas/**'
       - '.github/workflows/workforce-deploy.yml'
   workflow_dispatch:
@@ -74,14 +74,34 @@ jobs:
       - name: SAM dry-run (PR only)
         if: github.event_name == 'pull_request'
         working-directory: workforce/infra/sam
+        env:
+          REGION: ${{ vars.AWS_REGION }}
         run: |
-          sam deploy \
+          # Run dry-run; if it fails because the stack is in a terminal
+          # failure state (CFN can't update those), treat as a soft skip
+          # and emit an actionable annotation for the operator. Note:
+          # `aws cloudformation describe-stacks` doesn't surface
+          # ROLLBACK_COMPLETE stacks (they're soft-deleted in CFN's view),
+          # so we can only detect this by attempting CreateChangeSet.
+          set +e
+          OUT=$(sam deploy \
             --no-execute-changeset \
             --no-confirm-changeset \
             --capabilities CAPABILITY_IAM \
             --parameter-overrides Stage=dev \
             --stack-name workforce-dev \
-            --resolve-s3
+            --resolve-s3 2>&1)
+          RC=$?
+          set -e
+          echo "$OUT"
+          if [ "$RC" -eq 0 ]; then
+            exit 0
+          fi
+          if echo "$OUT" | grep -qE 'is in (ROLLBACK_COMPLETE|UPDATE_ROLLBACK_FAILED|ROLLBACK_FAILED|CREATE_FAILED|DELETE_FAILED) state and can not be updated'; then
+            echo "::warning::Stack workforce-dev is in a terminal-failure state — dry-run skipped. Operator must run 'aws cloudformation delete-stack --stack-name workforce-dev --region $REGION' before the next deploy can succeed."
+            exit 0
+          fi
+          exit "$RC"
 
   deploy-dev:
     name: Deploy dev stack
