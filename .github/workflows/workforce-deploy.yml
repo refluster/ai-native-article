@@ -46,6 +46,9 @@ jobs:
         working-directory: workforce/lambdas
         run: npm ci
 
+      - name: Install esbuild globally (SAM esbuild builder needs it on PATH)
+        run: npm install -g esbuild@0.24.2
+
       - name: TypeScript typecheck
         working-directory: workforce/lambdas
         run: npm run typecheck
@@ -101,6 +104,9 @@ jobs:
         working-directory: workforce/lambdas
         run: npm ci
 
+      - name: Install esbuild globally (SAM esbuild builder needs it on PATH)
+        run: npm install -g esbuild@0.24.2
+
       - uses: aws-actions/setup-sam@v2
         with:
           use-installer: true
@@ -146,6 +152,9 @@ jobs:
       - name: Install lambda deps
         working-directory: workforce/lambdas
         run: npm ci
+
+      - name: Install esbuild globally (SAM esbuild builder needs it on PATH)
+        run: npm install -g esbuild@0.24.2
 
       - uses: aws-actions/setup-sam@v2
         with:

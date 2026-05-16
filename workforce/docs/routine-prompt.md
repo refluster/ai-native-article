@@ -97,6 +97,14 @@ EXECUTION
      https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html).
    - `sam validate --lint` E3001/E3002 — required property missing or
      wrong type; read the error, fix, re-run `sam validate --lint`.
+   - `sam build` "Cannot find esbuild. esbuild must be installed on the
+     host machine" — when a Lambda uses `BuildMethod: esbuild`, SAM
+     looks for esbuild at `{CodeUri}/node_modules/.bin/esbuild` or on
+     `PATH`. The workforce deploy workflow handles this with
+     `npm install -g esbuild@<pinned-version>` after `setup-node`. If
+     that step is missing or the version is unavailable, the build
+     fails here. Fix: add/restore the global esbuild install in
+     `.github/workflows/workforce-deploy.yml`.
    - `aws-actions/configure-aws-credentials@v4` AccessDenied — OIDC role
      trust condition doesn't match the branch/event. If the trust is
      pinned to `ref:refs/heads/main`, PR-stage validate from a `claude/`
