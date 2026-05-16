@@ -17,7 +17,7 @@ Parameters:
 
 Globals:
   Function:
-    Runtime: nodejs20.x
+    Runtime: nodejs22.x
     Architectures: [arm64]
     Timeout: 30
     MemorySize: 512
@@ -61,6 +61,7 @@ Resources:
   WorkforceCoreTable:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub WorkforceCore-${Stage}
       BillingMode: PAY_PER_REQUEST
@@ -95,6 +96,7 @@ Resources:
   ChatTable:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub Chat-${Stage}
       BillingMode: PAY_PER_REQUEST
@@ -115,6 +117,7 @@ Resources:
   MemoryTable:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub Memory-${Stage}
       BillingMode: PAY_PER_REQUEST
@@ -135,6 +138,7 @@ Resources:
   WorkforceBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       BucketName: !Sub wf-${AWS::AccountId}-${AWS::Region}-${Stage}
       VersioningConfiguration:
@@ -161,7 +165,7 @@ Resources:
       BuildMethod: esbuild
       BuildProperties:
         Minify: true
-        Target: node20
+        Target: node22
         External:
           - '@aws-sdk/*'
         EntryPoints:
@@ -229,7 +233,7 @@ Resources:
       BuildMethod: esbuild
       BuildProperties:
         Minify: true
-        Target: node20
+        Target: node22
         External:
           - '@aws-sdk/*'
         EntryPoints:
@@ -254,7 +258,7 @@ Resources:
       BuildMethod: esbuild
       BuildProperties:
         Minify: true
-        Target: node20
+        Target: node22
         External:
           - '@aws-sdk/*'
         EntryPoints:
@@ -273,7 +277,7 @@ Resources:
       BuildMethod: esbuild
       BuildProperties:
         Minify: true
-        Target: node20
+        Target: node22
         External:
           - '@aws-sdk/*'
         EntryPoints:
@@ -291,7 +295,7 @@ Resources:
       BuildMethod: esbuild
       BuildProperties:
         Minify: true
-        Target: node20
+        Target: node22
         External:
           - '@aws-sdk/*'
         EntryPoints:

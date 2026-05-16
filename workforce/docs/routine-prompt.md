@@ -56,20 +56,59 @@ EXECUTION
        binding (one prompt-version bump per PR). v0 bulk loads are exempt
        (see ROADMAP PR3a note).
    - Update ROADMAP.md checkboxes for the items you just shipped.
-   - Verify locally before push:
+
+   PRE-PUSH VERIFICATION (run ALL that apply; do NOT push if any fails):
+   - Always:
        npm run build && npm run lint:tokens && npm run check-gas
-     If any of these fail, fix before pushing.
+   - If the diff touched workforce/lambdas/**:
+       cd workforce/lambdas && npm ci && npm run typecheck
+   - If the diff touched workforce/infra/sam/template.yaml:
+       cd workforce/infra/sam && sam validate --lint
+     If `sam` is not in PATH, install it: `pip install aws-sam-cli` (or
+     `pip install cfn-lint` for a faster subset). Without this gate the
+     same CFN-lint errors will fail in CI and waste a push cycle.
+   - If the diff touched workforce/agents/**/agent.json or workforce/skills/**:
+       (PR3 onward) run the JSON Schema validator added in PR3a/b.
 
 3. Open the PR:
      gh pr create --title "{prefix}(workforce): {scope} (PR{N}/6)" \
        --body-file <a file you write summarising the change, with a
                     "Test plan" section and the
                     "🤖 Generated with Claude Code" footer>
-   Then watch CI to completion:
-     gh pr checks {pr_number} --watch
-   If failures arise, apply the same classify-fix loop as in step 1b.
 
-4. After CI passes, leave the PR open and await human merge.
+   THEN WATCH CI UNTIL ALL CHECKS COMPLETE (not just the first one):
+     gh pr checks {pr_number} --watch
+   This blocks until every check on the PR is in a terminal state. The
+   `--watch` exits with status 8 if any check FAILED. Treat any non-zero
+   exit as a failure to fix; do NOT exit the session on success of one
+   workflow if another is still pending.
+
+   This repo has TWO workflows on most PRs:
+     • CI (ci.yml) — npm build + token-lint + check-gas, ~20s
+     • Workforce SAM Deploy (workforce-deploy.yml) — typecheck + sam
+       validate --lint + sam build + dry-run, ~30–90s
+   Both must pass.
+
+4. If CI fails, apply the classify-fix loop from step 1b. Common classes:
+   - `sam validate --lint` W3011 — DynamoDB/S3 with DeletionPolicy needs
+     matching `UpdateReplacePolicy: Retain` on the same resource.
+   - `sam validate --lint` W2531 — deprecated Lambda runtime; bump to the
+     current LTS (`nodejs22.x` as of 2026-05; check
+     https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html).
+   - `sam validate --lint` E3001/E3002 — required property missing or
+     wrong type; read the error, fix, re-run `sam validate --lint`.
+   - `aws-actions/configure-aws-credentials@v4` AccessDenied — OIDC role
+     trust condition doesn't match the branch/event. If the trust is
+     pinned to `ref:refs/heads/main`, PR-stage validate from a `claude/`
+     branch will be denied; broaden trust to `repo:refluster/...:*` or
+     scope per-event.
+   - Typecheck — read the tsc error, fix at the source, do NOT add
+     `@ts-ignore` or `any` to silence it.
+   - Token-lint — only fires on `src/**`. If you touched src/, no raw
+     hex (use tailwind tokens), no `rounded-md|lg|xl|2xl|3xl` (system
+     is 0-radius). See `scripts/lint-design-tokens.mjs`.
+
+5. After ALL CI checks pass, leave the PR open and await human merge.
    NEVER run `gh pr merge` on your own work. C-3 is absolute.
 
 CONSTRAINTS
@@ -81,6 +120,12 @@ CONSTRAINTS
 - Skip if you can't safely do the work: a partial PR is worse than no PR.
 - Do not skip pre-commit/pre-push hooks via --no-verify (governance C-2 in
   ~/.claude/CLAUDE.md; equivalent rule applies in this project).
+- A green `ci.yml` check does NOT mean the routine is done. Wait until
+  every workflow on the PR is in a terminal state before concluding.
+- If you run out of session budget before CI completes, post a status
+  comment with `gh pr comment {n} --body "Routine session ran out
+  mid-watch at $(date -u). Next routine fire will re-check and continue."`
+  and exit cleanly. The next fire will pick up via step 1b.
 
 OUTPUT
 - The session result is the PR URL (or a one-line "no-op, waiting on PR #N").
