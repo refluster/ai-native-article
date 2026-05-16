@@ -1,8 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  AI Agent Workforce — APIGW HTTP API + Lambda + (DynamoDB + S3 added in PR2).
-  Scaffold only. See ../../../ROADMAP.md for the PR sequence that fills this in.
+  AI Agent Workforce — APIGW HTTP API + Lambda + DynamoDB + S3 (PR2 data plane).
 
 Parameters:
   Stage:
@@ -14,7 +13,7 @@ Parameters:
   CorsOrigin:
     Type: String
     Default: https://kohuehara.xyz
-    Description: Allowed CORS origin for the HTTP API (locked down in PR4).
+    Description: Allowed CORS origin (locked to kohuehara.xyz in PR4; permissive until then).
 
 Globals:
   Function:
@@ -26,11 +25,16 @@ Globals:
       Variables:
         STAGE: !Ref Stage
         LOG_LEVEL: info
+        CORE_TABLE: !Ref WorkforceCoreTable
+        CHAT_TABLE: !Ref ChatTable
+        MEMORY_TABLE: !Ref MemoryTable
+        WORKFORCE_BUCKET: !Ref WorkforceBucket
 
 Resources:
-  # ───────────────────────────────────────────────────────────────────────
-  # HTTP API (CORS locked to kohuehara.xyz in PR4; permissive at scaffold)
-  # ───────────────────────────────────────────────────────────────────────
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # HTTP API
+  # ───────────────────────────────────────────────────────────────────────────
   WorkforceHttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
@@ -41,16 +45,146 @@ Resources:
         AllowHeaders: [content-type, x-workforce-api-key]
         MaxAge: 600
 
-  # ───────────────────────────────────────────────────────────────────────
-  # Lambda functions — stubs at scaffold; real handlers land PR2→PR6
-  # ───────────────────────────────────────────────────────────────────────
+  # ───────────────────────────────────────────────────────────────────────────
+  # DynamoDB tables
+  # ───────────────────────────────────────────────────────────────────────────
+
+  # Single-table for agents, skills, runs, deliverables, and link rows.
+  # PK/SK patterns:
+  #   AGENT#{slug}  META              — agent profile
+  #   AGENT#{slug}  SKILL#{name}      — agent→skill assignment
+  #   AGENT#{slug}  RUN#{iso}         — run record
+  #   AGENT#{slug}  DELIV#{iso}       — deliverable record
+  #   SKILL#{name}  META              — skill profile
+  #   SKILL#{name}  AGENT#{slug}      — skill→agent inverse link
+  # GSI1: list-all-agents / list-all-skills via GSI1PK=AGENT|SKILL
+  WorkforceCoreTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub WorkforceCore-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  # Chat threads and messages.
+  # PK: THREAD#{threadId}  SK: META | MSG#{iso}#{seq}
+  ChatTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub Chat-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+
+  # Per-agent memory entries.
+  # PK: AGENT#{slug}  SK: PATH#{path}
+  # Supports optimistic concurrency via `memver` conditional writes.
+  MemoryTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub Memory-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # S3 bucket  (agents/, skills/, deliverables/, memory/ prefixes)
+  # ───────────────────────────────────────────────────────────────────────────
+  WorkforceBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Sub wf-${AWS::AccountId}-${AWS::Region}-${Stage}
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-versions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Lambda functions
+  # ───────────────────────────────────────────────────────────────────────────
+
   AgentsApiFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: node20
+        External:
+          - '@aws-sdk/*'
+        EntryPoints:
+          - handler.ts
     Properties:
       FunctionName: !Sub workforce-agents-api-${Stage}
       CodeUri: ../../lambdas/agents-api/
       Handler: handler.handler
-      Description: CRUD for agents, skills, runs, deliverables. PR2 wires in DDB.
+      Description: GET /agents, /agents/{slug}, /skills, /skills/{name}, /agents/{slug}/deliverables|runs.
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref WorkforceCoreTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref MemoryTable
+        - S3ReadPolicy:
+            BucketName: !Ref WorkforceBucket
+        # GSI reads require the table ARN + /index/* resource
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource:
+                - !Sub ${WorkforceCoreTable.Arn}/index/*
       Events:
         AgentsRoot:
           Type: HttpApi
@@ -64,9 +198,42 @@ Resources:
             ApiId: !Ref WorkforceHttpApi
             Method: GET
             Path: /agents/{slug}
+        AgentDeliverables:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WorkforceHttpApi
+            Method: GET
+            Path: /agents/{slug}/deliverables
+        AgentRuns:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WorkforceHttpApi
+            Method: GET
+            Path: /agents/{slug}/runs
+        SkillsRoot:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WorkforceHttpApi
+            Method: GET
+            Path: /skills
+        SkillByName:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WorkforceHttpApi
+            Method: GET
+            Path: /skills/{name}
 
   ChatApiFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: node20
+        External:
+          - '@aws-sdk/*'
+        EntryPoints:
+          - handler.ts
     Properties:
       FunctionName: !Sub workforce-chat-api-${Stage}
       CodeUri: ../../lambdas/chat-api/
@@ -83,35 +250,80 @@ Resources:
 
   TaskRunnerFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: node20
+        External:
+          - '@aws-sdk/*'
+        EntryPoints:
+          - handler.ts
     Properties:
       FunctionName: !Sub workforce-task-runner-${Stage}
       CodeUri: ../../lambdas/task-runner/
       Handler: handler.handler
-      Description: EventBridge-triggered. Resolves an agent's skills and writes a deliverable. PR6 wires in scheduling.
+      Description: EventBridge-triggered skill executor. PR6 wires in scheduling.
       Timeout: 300
       MemorySize: 1024
 
   SkillOpsReviewerFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: node20
+        External:
+          - '@aws-sdk/*'
+        EntryPoints:
+          - handler.ts
     Properties:
       FunctionName: !Sub workforce-skill-ops-${Stage}
       CodeUri: ../../lambdas/skill-ops-reviewer/
       Handler: handler.handler
-      Description: Weekly review of every skill's run outcomes. Opens GitHub PR with SKILL.md edits.
+      Description: Weekly skill-quality reviewer. Opens GitHub PR with SKILL.md improvements.
       Timeout: 300
 
   SeedFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: node20
+        External:
+          - '@aws-sdk/*'
+        EntryPoints:
+          - handler.ts
     Properties:
       FunctionName: !Sub workforce-seed-${Stage}
       CodeUri: ../../lambdas/seed/
       Handler: handler.handler
-      Description: Manually invoked. Idempotent load of workforce/{agents,skills}/ into DDB+S3. PR2 wires in the real load.
+      Description: Manually invoked. Idempotent load of S3 agents/ + skills/ into DDB.
+      Timeout: 120
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref WorkforceCoreTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MemoryTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ChatTable
+        - S3CrudPolicy:
+            BucketName: !Ref WorkforceBucket
 
 Outputs:
   ApiEndpoint:
     Description: HTTP API endpoint (front with api.kohuehara.xyz CNAME in PR4)
     Value: !Sub https://${WorkforceHttpApi}.execute-api.${AWS::Region}.amazonaws.com
+
+  CoreTableName:
+    Description: WorkforceCore DDB table name
+    Value: !Ref WorkforceCoreTable
+
+  BucketName:
+    Description: Workforce S3 bucket name
+    Value: !Ref WorkforceBucket
 
   StackStage:
     Description: Which stage this stack represents
