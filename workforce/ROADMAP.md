@@ -23,17 +23,17 @@ This file is consumed by the daily `workforce-builder` Claude routine. The routi
 
 ## PR2 — data plane
 
-- [ ] DynamoDB tables in SAM template: `WorkforceCore`, `Chat`, `Memory` (per plan §2.1)
-- [ ] S3 bucket `wf-{account}-{region}` with versioning + lifecycle
-- [ ] IAM: `agents-api` read/write `WorkforceCore` + `Memory`, S3 read; `seed` write all
-- [ ] `lambdas/shared/ddb.ts` — typed DDB client
-- [ ] `lambdas/shared/s3.ts` — S3 client
-- [ ] `lambdas/shared/memory-store.ts` — Managed-Agents-shape memory FS over DDB+S3 with `memver` conditional writes
-- [ ] `lambdas/seed/handler.ts` — idempotent load of `agents/` + `skills/` directories into DDB+S3
-- [ ] `lambdas/agents-api/handler.ts` — GET /agents, GET /agents/{slug}, GET /skills, GET /skills/{name}, GET /agents/{slug}/deliverables, GET /agents/{slug}/runs
-- [ ] `.github/workflows/workforce-deploy.yml` — OIDC-based SAM deploy. Reads `vars.AWS_DEPLOY_ROLE_ARN` + `vars.AWS_REGION`. Triggers: PR → `sam validate` + dry-run; push-to-main → deploy to **dev** stack; `workflow_dispatch` with `stage=prod` → deploy to **prod** stack, gated by the `prod` Environment's required-reviewer rule. Needs `permissions: id-token: write, contents: read`. **Zone A — flag explicitly in PR description for human review.**
+- [x] DynamoDB tables in SAM template: `WorkforceCore`, `Chat`, `Memory` (per plan §2.1)
+- [x] S3 bucket `wf-{account}-{region}` with versioning + lifecycle
+- [x] IAM: `agents-api` read/write `WorkforceCore` + `Memory`, S3 read; `seed` write all
+- [x] `lambdas/shared/ddb.ts` — typed DDB client
+- [x] `lambdas/shared/s3.ts` — S3 client
+- [x] `lambdas/shared/memory-store.ts` — Managed-Agents-shape memory FS over DDB+S3 with `memver` conditional writes
+- [x] `lambdas/seed/handler.ts` — idempotent load of `agents/` + `skills/` directories into DDB+S3
+- [x] `lambdas/agents-api/handler.ts` — GET /agents, GET /agents/{slug}, GET /skills, GET /skills/{name}, GET /agents/{slug}/deliverables, GET /agents/{slug}/runs
+- [x] `.github/workflows/workforce-deploy.yml` — OIDC-based SAM deploy. Reads `vars.AWS_DEPLOY_ROLE_ARN` + `vars.AWS_REGION`. Triggers: PR → `sam validate` + dry-run; push-to-main → deploy to **dev** stack; `workflow_dispatch` with `stage=prod` → deploy to **prod** stack, gated by the `prod` Environment's required-reviewer rule. Needs `permissions: id-token: write, contents: read`. **Zone A — flag explicitly in PR description for human review.**
 - [ ] Smoke: deploy workflow goes green on PR (validate + dry-run). Operator merges; push-to-main workflow deploys dev stack; `seed` Lambda invokes idempotently (empty registry → 0 DDB items).
-- [ ] Open PR `feat(workforce): data plane`
+- [x] Open PR `feat(workforce): data plane`
 
 **Bootstrap preconditions** (confirmed completed before PR2 work begins):
 - AWS IAM OIDC provider + `workforce-deploy` role (trusts `repo:refluster/ai-native-article:*`)
