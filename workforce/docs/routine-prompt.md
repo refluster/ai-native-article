@@ -110,6 +110,17 @@ EXECUTION
      pinned to `ref:refs/heads/main`, PR-stage validate from a `claude/`
      branch will be denied; broaden trust to `repo:refluster/...:*` or
      scope per-event.
+   - `CREATE_FAILED ... is not authorized to perform: <service>:<action>`
+     (CFN deploy step, after OIDC succeeded) — the deploy role lacks the
+     permission CFN needs to create a resource. Fix: append the missing
+     action to the appropriate Sid in
+     `workforce/infra/iam/deploy-role-policy.json`, commit, and ask the
+     operator to re-apply via `aws iam put-role-policy --role-name
+     workforce-deploy --policy-name workforce-deploy-permissions
+     --policy-document file://workforce/infra/iam/deploy-role-policy.json`.
+     The routine cannot apply the policy itself (no IAM permissions in
+     the cloud session) — escalate to the operator with a clear list of
+     the missing actions copied from the CFN failure log.
    - Typecheck — read the tsc error, fix at the source, do NOT add
      `@ts-ignore` or `any` to silence it.
    - Token-lint — only fires on `src/**`. If you touched src/, no raw
