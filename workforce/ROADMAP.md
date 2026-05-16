@@ -31,8 +31,15 @@ This file is consumed by the daily `workforce-builder` Claude routine. The routi
 - [ ] `lambdas/shared/memory-store.ts` — Managed-Agents-shape memory FS over DDB+S3 with `memver` conditional writes
 - [ ] `lambdas/seed/handler.ts` — idempotent load of `agents/` + `skills/` directories into DDB+S3
 - [ ] `lambdas/agents-api/handler.ts` — GET /agents, GET /agents/{slug}, GET /skills, GET /skills/{name}, GET /agents/{slug}/deliverables, GET /agents/{slug}/runs
-- [ ] Smoke: `sam deploy` to a dev stack, invoke `seed` (no-op, empty registry), verify zero items in DDB
+- [ ] `.github/workflows/workforce-deploy.yml` — OIDC-based SAM deploy. Reads `vars.AWS_DEPLOY_ROLE_ARN` + `vars.AWS_REGION`. Triggers: PR → `sam validate` + dry-run; push-to-main → deploy to **dev** stack; `workflow_dispatch` with `stage=prod` → deploy to **prod** stack, gated by the `prod` Environment's required-reviewer rule. Needs `permissions: id-token: write, contents: read`. **Zone A — flag explicitly in PR description for human review.**
+- [ ] Smoke: deploy workflow goes green on PR (validate + dry-run). Operator merges; push-to-main workflow deploys dev stack; `seed` Lambda invokes idempotently (empty registry → 0 DDB items).
 - [ ] Open PR `feat(workforce): data plane`
+
+**Bootstrap preconditions** (confirmed completed before PR2 work begins):
+- AWS IAM OIDC provider + `workforce-deploy` role (trusts `repo:refluster/ai-native-article:*`)
+- GitHub repo variables: `AWS_DEPLOY_ROLE_ARN`, `AWS_REGION` (`ap-northeast-1`)
+- GitHub Environment: `prod` with required reviewer
+- Secrets Manager entries (relevant from PR4 onward): `workforce/azure-openai`, `workforce/anthropic`
 
 ---
 

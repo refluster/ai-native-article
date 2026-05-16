@@ -42,7 +42,9 @@ EXECUTION
    c. If the previous PR is merged → proceed to step 2.
 
 2. Implement the next un-checked PR per workforce/ROADMAP.md.
-   - Branch from latest main: `git checkout -b workforce/pr-{N}-{slug}` off main.
+   - Branch from latest main: `git checkout -b claude/workforce-pr-{N}-{slug}` off main.
+     (Cloud routines can only push to `claude/`-prefixed branches by default —
+     keeping this prefix avoids needing "Allow unrestricted branch pushes".)
    - Touch only files in scope for that PR. If you find yourself wanting to
      edit something outside the PR's scope, write a TODO in ROADMAP.md and
      stop touching it. Cross-zone PRs are forbidden (AGENTS.md §4).
