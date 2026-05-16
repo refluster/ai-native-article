@@ -77,32 +77,31 @@ jobs:
         env:
           REGION: ${{ vars.AWS_REGION }}
         run: |
-          # Skip dry-run if the stack is in a state CFN cannot update.
-          # Operator must `aws cloudformation delete-stack` to recover.
+          # Run dry-run; if it fails because the stack is in a terminal
+          # failure state (CFN can't update those), treat as a soft skip
+          # and emit an actionable annotation for the operator. Note:
+          # `aws cloudformation describe-stacks` doesn't surface
+          # ROLLBACK_COMPLETE stacks (they're soft-deleted in CFN's view),
+          # so we can only detect this by attempting CreateChangeSet.
           set +e
-          STATUS=$(aws cloudformation describe-stacks \
-            --stack-name workforce-dev \
-            --region "$REGION" \
-            --query 'Stacks[0].StackStatus' \
-            --output text 2>&1)
-          DESCRIBE_RC=$?
-          set -e
-          echo "describe-stacks rc=$DESCRIBE_RC status='$STATUS'"
-          if [[ "$DESCRIBE_RC" -ne 0 ]]; then
-            # Stack doesn't exist or no permission — proceed with dry-run
-            # (sam deploy will surface the real error if there is one).
-            echo "Stack info unavailable; proceeding with dry-run."
-          elif [[ "$STATUS" == *ROLLBACK_COMPLETE* || "$STATUS" == *ROLLBACK_FAILED* || "$STATUS" == *CREATE_FAILED* || "$STATUS" == *DELETE_FAILED* ]]; then
-            echo "::warning::Stack workforce-dev is in $STATUS — dry-run skipped. Operator must run 'aws cloudformation delete-stack --stack-name workforce-dev --region $REGION' before the next deploy can succeed."
-            exit 0
-          fi
-          sam deploy \
+          OUT=$(sam deploy \
             --no-execute-changeset \
             --no-confirm-changeset \
             --capabilities CAPABILITY_IAM \
             --parameter-overrides Stage=dev \
             --stack-name workforce-dev \
-            --resolve-s3
+            --resolve-s3 2>&1)
+          RC=$?
+          set -e
+          echo "$OUT"
+          if [ "$RC" -eq 0 ]; then
+            exit 0
+          fi
+          if echo "$OUT" | grep -qE 'is in (ROLLBACK_COMPLETE|UPDATE_ROLLBACK_FAILED|ROLLBACK_FAILED|CREATE_FAILED|DELETE_FAILED) state and can not be updated'; then
+            echo "::warning::Stack workforce-dev is in a terminal-failure state — dry-run skipped. Operator must run 'aws cloudformation delete-stack --stack-name workforce-dev --region $REGION' before the next deploy can succeed."
+            exit 0
+          fi
+          exit "$RC"
 
   deploy-dev:
     name: Deploy dev stack
