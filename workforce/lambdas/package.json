@@ -1,0 +1,15 @@
+{
+  "name": "workforce-lambdas",
+  "version": "0.0.1",
+  "private": true,
+  "description": "AWS Lambda source for the AI Agent Workforce. Built by SAM via esbuild (wired in PR2).",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "@types/node": "^20.16.5",
+    "typescript": "^5.7.2"
+  }
+}

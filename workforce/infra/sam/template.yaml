@@ -1,0 +1,118 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  AI Agent Workforce — APIGW HTTP API + Lambda + (DynamoDB + S3 added in PR2).
+  Scaffold only. See ../../../ROADMAP.md for the PR sequence that fills this in.
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, prod]
+    Description: Deployment stage. Used as a suffix on all resource names.
+
+  CorsOrigin:
+    Type: String
+    Default: https://kohuehara.xyz
+    Description: Allowed CORS origin for the HTTP API (locked down in PR4).
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Architectures: [arm64]
+    Timeout: 30
+    MemorySize: 512
+    Environment:
+      Variables:
+        STAGE: !Ref Stage
+        LOG_LEVEL: info
+
+Resources:
+  # ───────────────────────────────────────────────────────────────────────
+  # HTTP API (CORS locked to kohuehara.xyz in PR4; permissive at scaffold)
+  # ───────────────────────────────────────────────────────────────────────
+  WorkforceHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Stage
+      CorsConfiguration:
+        AllowOrigins: [!Ref CorsOrigin]
+        AllowMethods: [GET, POST, OPTIONS]
+        AllowHeaders: [content-type, x-workforce-api-key]
+        MaxAge: 600
+
+  # ───────────────────────────────────────────────────────────────────────
+  # Lambda functions — stubs at scaffold; real handlers land PR2→PR6
+  # ───────────────────────────────────────────────────────────────────────
+  AgentsApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub workforce-agents-api-${Stage}
+      CodeUri: ../../lambdas/agents-api/
+      Handler: handler.handler
+      Description: CRUD for agents, skills, runs, deliverables. PR2 wires in DDB.
+      Events:
+        AgentsRoot:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WorkforceHttpApi
+            Method: GET
+            Path: /agents
+        AgentBySlug:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WorkforceHttpApi
+            Method: GET
+            Path: /agents/{slug}
+
+  ChatApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub workforce-chat-api-${Stage}
+      CodeUri: ../../lambdas/chat-api/
+      Handler: handler.handler
+      Description: Streaming chat with an agent. PR4 wires in LLM router + streaming.
+      Timeout: 60
+      Events:
+        ChatBySlug:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WorkforceHttpApi
+            Method: POST
+            Path: /chat/{slug}
+
+  TaskRunnerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub workforce-task-runner-${Stage}
+      CodeUri: ../../lambdas/task-runner/
+      Handler: handler.handler
+      Description: EventBridge-triggered. Resolves an agent's skills and writes a deliverable. PR6 wires in scheduling.
+      Timeout: 300
+      MemorySize: 1024
+
+  SkillOpsReviewerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub workforce-skill-ops-${Stage}
+      CodeUri: ../../lambdas/skill-ops-reviewer/
+      Handler: handler.handler
+      Description: Weekly review of every skill's run outcomes. Opens GitHub PR with SKILL.md edits.
+      Timeout: 300
+
+  SeedFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub workforce-seed-${Stage}
+      CodeUri: ../../lambdas/seed/
+      Handler: handler.handler
+      Description: Manually invoked. Idempotent load of workforce/{agents,skills}/ into DDB+S3. PR2 wires in the real load.
+
+Outputs:
+  ApiEndpoint:
+    Description: HTTP API endpoint (front with api.kohuehara.xyz CNAME in PR4)
+    Value: !Sub https://${WorkforceHttpApi}.execute-api.${AWS::Region}.amazonaws.com
+
+  StackStage:
+    Description: Which stage this stack represents
+    Value: !Ref Stage
