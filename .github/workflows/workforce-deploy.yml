@@ -74,7 +74,23 @@ jobs:
       - name: SAM dry-run (PR only)
         if: github.event_name == 'pull_request'
         working-directory: workforce/infra/sam
+        env:
+          REGION: ${{ vars.AWS_REGION }}
         run: |
+          # Skip dry-run if the stack is in a state CFN cannot update.
+          # The operator must `aws cloudformation delete-stack` and the
+          # next push-to-main / workflow_dispatch will recreate it.
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name workforce-dev \
+            --region "$REGION" \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>/dev/null || echo "NOT_FOUND")
+          case "$STATUS" in
+            ROLLBACK_COMPLETE|UPDATE_ROLLBACK_FAILED|ROLLBACK_FAILED|CREATE_FAILED|DELETE_FAILED)
+              echo "::warning::Stack workforce-dev is in $STATUS — dry-run skipped. Operator must run 'aws cloudformation delete-stack --stack-name workforce-dev --region $REGION' before the next deploy can succeed."
+              exit 0
+              ;;
+          esac
           sam deploy \
             --no-execute-changeset \
             --no-confirm-changeset \
