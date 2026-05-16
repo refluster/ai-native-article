@@ -1,0 +1,213 @@
+# ai-native-article Design Policy
+
+**Status:** Draft v1.0
+**Last updated:** 2026-05-16
+**Scope:** every code edit, every prompt change, every model swap, every "do we build this?" decision in this repository
+**Audience:** Claude Code agents acting on this repo, the operator
+
+---
+
+## 0. Why this doc exists
+
+This is the **design-policy axis** of the project — orthogonal to [`docs/governance.md`](governance.md), which is the rules axis.
+
+- Governance answers *"may I do this?"* via invariants (C-1〜C-4), mechanical regulations (R-1〜R-9), and the A/B action-authority matrix. CI and hooks enforce it; violating a C or R turns a build red.
+- Design policy answers *"should I do this, and how?"* via principles (D-1〜D-3), the substrate map, and the iteration loop. **Nothing here is enforced by hook or CI.** A D-principle is a north star, not a tripwire. Violating one does not break the build — it just means an agent has drifted from the project's shape.
+
+When the two axes appear to conflict, the rules axis wins. A D-principle never licenses a C-1 (editorial integrity) or C-4 (fail loud) violation. Design policy operates in the space governance leaves open — and governance leaves a lot of space open, deliberately.
+
+### Reading order for a new session
+
+1. [`CLAUDE.md`](../CLAUDE.md) — orientation
+2. [`docs/governance.md`](governance.md) — rules
+3. This doc — direction
+
+If you only have time for one of (2)/(3): read governance.md before editing existing code; read this doc before proposing new architecture.
+
+### Vocabulary
+
+A few terms recur in this doc — defined once here so they read cleanly later:
+
+- **Reversible** — changeable back by reverting Notion data and redeploying. Almost everything in this project is reversible. Exceptions: published slug changes (C-2 territory), removing a runtime guard, force-pushing `main`.
+- **Shadow / primary** — a shadow run is a parallel invocation whose output is compared but not promoted to the corpus. A primary run is the production path.
+- **Orchestrate vs. compute** — we wire external services together (orchestrate); we do not run inference, host a CMS, or serve traffic ourselves (compute).
+- **Substrate / reinvention** — substrates are the external systems we ride on (Azure OpenAI, Notion, GitHub Actions, gh-pages, Claude Code, GAS). Reinvention is building our own version of any of them.
+
+---
+
+## 1. Design principles
+
+Three principles. Same `D-N. headline` formatting as governance's C-axioms so they look similar at a glance — but read the preamble above: **these are direction, not rules.**
+
+### D-1. Innovation velocity is the first-order value.
+
+Governance exists so we can ship faster, not slower. The default action authority for any **reversible** experiment is **A (auto-execute)** — a prompt tweak, a new skill, an additional batch handler, a shadow run, a new eval, a new external service tried in parallel.
+
+When velocity is in tension with **editorial integrity (governance C-1)** or **fail-loud (governance C-4)**, safety wins. When velocity is in tension with **ceremony or process preference**, velocity wins.
+
+Heuristics for the agent:
+
+- If you have spent more than 30 minutes deciding whether something is A or B, it is A. Ship; revert if wrong.
+- If you are about to ask the operator a question whose answer is "yes, that's reversible — just do it", do not ask. Just do it.
+- If you are about to ask the operator >1 round-trip question on a single feature, you have misread autonomy. Re-read §5 of this doc.
+
+Operationalized in §5.
+
+### D-2. Software 2.0 is the design center.
+
+The "code" of this project is not just TypeScript and GAS. It also includes:
+
+- **Prompts** — the strings passed to `azureGenerateText`. A content-quality bug is more often fixed by editing a prompt than by editing a function.
+- **Dataset** — the L1 web corpus, L2 explanations, and L3 insights. This is an asset that compounds; treat Notion as canonical.
+- **Evaluation** — `article-health`, `finish_reason='length'` throw, future LLM-as-judge skills. Evals are the "compilation" step: they decide whether a prompt change is shippable.
+- **Model selection** — `gpt-5.4` today, something else tomorrow. The choice is an architectural decision, not a config tweak.
+
+These artifacts are **versioned, reviewed, and rolled back** with the same care as code. §2 makes the artifact list explicit, with current state and Software 2.0 commitment per row.
+
+When investigating a content issue, the **first reflex** should be: "is this a prompt problem, an eval gap, or a code problem?" In that order. Most are the first two.
+
+### D-3. External substrate over reinvention.
+
+We orchestrate; we do not compute. Every architectural decision is gated by the question:
+
+> *Can we ride on an existing external substrate instead of building our own?*
+
+If yes, ride it. If no, ask: *do we really need this, or can we live without?* Build only when neither escape exists.
+
+The substrate map in §3 names what we currently ride and — equally important — what we have committed to never reinvent (training, CMS, scheduler, deploy server, AI agent, web server, original journalism).
+
+The architectural payoff:
+
+> **growth = orchestration quality × external substrate quality**
+
+Azure OpenAI gets better → our articles get better, for free. Notion ships a new query API → our pipeline gets a new capability, for free. Claude Code adds skills → our iteration loop tightens, for free. The orchestration layer must stay thin and clean for this multiplication to work; the moment we own infrastructure that a substrate could own, the multiplier breaks.
+
+---
+
+## 2. What counts as "code" here (Software 2.0 artifacts)
+
+| Artifact | Current state (2026-05) | Software 2.0 commitment |
+|---|---|---|
+| **TypeScript / GAS** | git-managed in `gas/src/Code.gs`, `src/`, `scripts/` | unchanged — already first-class code |
+| **Prompts** | inline string literals inside `azureGenerateText` call sites in `gas/src/Code.gs` | **destination:** extract to separate versioned files (e.g. `gas/src/prompts/l2-explanation.txt`) so PRs show prompt diffs cleanly. **Today:** commitment is declared; the migration is a separate task and is itself an A action when undertaken |
+| **Dataset (L1〜L3 corpus)** | lives in Notion (L1, L2, L3 databases) | Notion **is** the dataset. Treat it as a canonical asset: governance C-2 already pins this. Mass mutations require operator approval (governance §8.1 B). Backups out of scope until the corpus is irreplaceable |
+| **Evaluation** | `article-health` heuristic (truncation + drift) + `isTruncatedMarkdown` + `finish_reason==='length'` throw (governance R-3〜R-5) | grow over time: LLM-as-judge for editorial quality, factual-claim spot-check, style consistency. New eval skills live under `.claude/skills/` (adding one is **A**) |
+| **Model selection** | `gpt-5.4` hardcoded inside `azureGenerateText`; budget brackets in [`docs/azure-budget-rules.md`](azure-budget-rules.md) | swapping the primary model requires (a) eval comparison evidence, (b) a design-policy amendment naming the new model and the rationale, (c) operator approval (governance §8.1 B). **Shadow-running** a candidate model in parallel is **A** |
+
+The order matters: prompts are the most fluid layer, dataset is the most precious, evals are the most under-invested, model selection is the rarest decision.
+
+---
+
+## 3. External substrate map
+
+| Substrate | What it gives us | What we have committed never to build |
+|---|---|---|
+| **Azure OpenAI (gpt-5.4)** | LLM inference, content filtering, request/response shape | training, fine-tuning, self-hosted inference, our own content filter |
+| **Notion** | content store, schema, CMS UI, mobile editing, sync, query API, relations | our own DB, our own CMS, our own editor, our own auth |
+| **GitHub Actions** | scheduled jobs (gh-pages deploy cron), CI runners, secret store, workflow logs | our own scheduler, our own deploy server, our own CI runner |
+| **gh-pages** | static-site CDN, TLS, custom domain hosting | our own web server, our own CDN, our own TLS termination |
+| **Claude Code + skills** | code iteration, subagent orchestration, hook system, plan mode | our own AI agent, our own code-editing tooling, our own subagent framework |
+| **GAS (Google Apps Script)** | server runtime, Notion/Azure secret store (script properties), time-based triggers, 6-min execution envelope | a Node server, a Lambda, our own cron, our own secret manager |
+| **Open web** | L1 source articles via manual + AI-assisted research | original journalism, primary reporting |
+
+The mapping above is the **whole infrastructure surface** the project consumes. The contract is:
+
+> **growth = orchestration quality × external substrate quality**
+
+If Azure ships gpt-6, we benefit. If Notion adds a richer relation type, we benefit. If Claude Code adds a new skill primitive, we benefit. The price of this leverage is that our code stays thin around each substrate — no abstraction layers that pretend the substrate is something else, no "what if we swap Notion someday" hedging, no wrappers that exist only to "make testing easier".
+
+A new feature proposal must answer:
+
+1. Is there a substrate above that already does this?
+2. If not, is there an external service we should add to the map?
+3. If neither, is the feature important enough to justify owning the code?
+
+The bias is hard toward (1) and (2). Item (3) requires a strong case.
+
+---
+
+## 4. Iteration loop
+
+```
+edit prompt (versioned)
+  → local probe (gas-call against /exec)
+    → shadow run (parallel call, compare outputs)
+      → operator glance (sample 2-3 outputs)
+        → promote (replace primary prompt)
+          → batch on Notion corpus (L2_BACKFILL, etc.)
+            → article-health sweep
+              → deploy (gh workflow run deploy.yml)
+```
+
+Each step is the friction point candidate for the next skill or automation. Current friction map (2026-05-16):
+
+- **edit prompt (versioned)** — prompts are still inline in `gas/src/Code.gs`. The first Software-2.0 migration is to extract them. Once extracted, the diff in a PR shows exactly what changed about content generation.
+- **local probe** — the `gas-call` skill handles this. ✅
+- **shadow run** — no harness yet. The current ersatz is `L2_BACKFILL` with `mode='all'` against a small slug list. A proper shadow harness (call both old and new prompt, dump pair to disk for comparison) is a worthwhile future skill.
+- **operator glance** — informal; operator opens 2-3 Notion rows in the browser.
+- **promote** — for inline prompts, this is a `gas/src/Code.gs` edit + `gas-deploy-verify`. For extracted prompts, it becomes a file replacement + redeploy.
+- **batch + article-health + deploy** — covered by existing skills (`gas-call`, `article-health`, the `deploy.yml` workflow).
+
+Things that are conspicuously missing and likely worth adding (each is an A action when an agent undertakes it):
+
+- An **LLM-as-judge eval** skill that scores a sample of generated articles against editorial criteria (clarity, completeness, factual sourcing). Could live as `.claude/skills/article-quality/`.
+- A **prompt-diff harness** that runs a candidate prompt and the current prompt on the same input and emits a side-by-side report.
+- A **substrate-readiness probe** that quickly reports the live status of Azure / Notion / GitHub Actions so a session can localize a fault before guessing.
+
+None of these are mandatory. They are the kind of thing an agent should propose-and-ship on a Tuesday afternoon, not wait for permission to consider.
+
+---
+
+## 5. Innovation-velocity discipline (D-1 implementation guide)
+
+The default decision tree for an agent:
+
+| Situation | Default | Rationale |
+|---|---|---|
+| Editing a prompt; reversible by re-edit | **A** | reversible, no governance R touched |
+| Adding a new `.claude/skills/` skill | **A** | additive, reversible, no critical path mutated |
+| Adding a new eval check that flags more things | **A** | L2 tightening per governance §8.1; design policy concurs |
+| Running an existing batch (`L2_BACKFILL`, `L3_BATCH`, etc.) | **A** | idempotent by governance I-3 |
+| Trying a new external service in shadow mode (parallel, output discarded) | **A** | shadow = reversible by definition |
+| Editing an L1 doc (e.g. this file, [`azure-budget-rules.md`](azure-budget-rules.md)) | **A** to draft as a PR; **B** to merge | matches governance §8.1 |
+| Swapping the primary LLM model for production | **B** | governance §8.1 B (spending money / changing critical path) + design-policy §2 (model swap protocol) |
+| Promoting a shadow substrate to primary | **B** | matches governance §8.1 B "spending money outside the existing envelope" |
+| Rewriting >50% of an existing L2/L3 prompt in one diff | **B** | operator should eyeball 2-3 sample outputs before commit |
+| Removing or weakening an R-rule | **B** | governance §8.1 explicit |
+| Merging any PR (including own) | **B** | governance C-3 / §8.1 explicit |
+
+The principle behind the table: **default to A; escalate only when an action is (a) irreversible, (b) outside the agent's branch (push to `main`, merge PRs, external services), (c) about money, or (d) explicitly named B by governance.** Everything else is A.
+
+Symptoms that you have drifted from D-1:
+
+- Asking the operator >1 question on a single feature.
+- Stating a plan that begins with "first I'll ask whether..." for something reversible.
+- Adding a runtime check whose only purpose is to make a reversible action feel less risky.
+- Drafting a PR description that is longer than the diff.
+
+When you notice the drift, just ship. The cost of a wrong A is a revert; the cost of a stalled feature is forever.
+
+---
+
+## 6. Where this doc binds
+
+Citations from other places. The doc is binding (= an agent should cite the relevant section in its reasoning or commit message) in these four moments:
+
+1. **A prompt edit** — cite §1 D-2 and §2 (prompts as versioned code). The commit message tag is fine: `D-2: revise L2 explanation prompt to ...`.
+2. **A model swap or model-related decision** — cite §2 (model selection commitment) and §4 (iteration loop). A primary swap also requires the §8.1 B path in governance.
+3. **A "build it ourselves vs. use a substrate" decision** — cite §1 D-3 and §3 (substrate map). If the answer is "build it ourselves", the rationale lives in the PR description.
+4. **A "should I ask the operator?" moment** — cite §1 D-1 and §5 (velocity discipline + the A/B table). If the answer is A, do not ask.
+
+### Back-references
+
+- This doc is reached from [`docs/governance.md` §0.1](governance.md#01-the-other-axis-design-policy).
+- Governance C-axioms and R-regulations are reachable from each row of §2 and §5 of this doc.
+- The `CLAUDE.md` orientation doc need not change for this axis to take effect; new sessions will discover this doc via governance.md §0.1.
+
+### Amending this doc
+
+D-principles change less often than runbooks but more often than governance C-axioms. Edits are made as a normal PR:
+
+1. Open a PR that edits this file.
+2. PR description names the section being changed and the experience that prompted the change (a friction point, a new substrate, a velocity drag).
+3. Operator approves (this doc is L1-adjacent in spirit — drafting is A, merging is B, per governance §8.1).

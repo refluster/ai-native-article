@@ -19,6 +19,17 @@ This document does three things:
 
 The framework is borrowed from [asp-cloud's governance.md](../../asp-cloud/docs/governance.md) — civil-law-style hierarchy where higher layers constrain lower — and scaled down for a hobby-grade project. **Production security and multi-stakeholder process are explicitly out of scope.**
 
+### 0.1 The other axis: design policy
+
+This document is the **rules axis** of the project: invariants the agent must not violate, mechanical guards CI enforces, and the A/B action-authority matrix. A **separate, orthogonal axis — design policy — lives at [`docs/design-policy.md`](design-policy.md)**: how we build (Software 2.0 commitments, external-substrate leverage, innovation-velocity discipline).
+
+Governance constrains; design policy directs. An agent consults both before acting:
+
+- The **rules axis** answers *"may I do this?"* — pinned C-axioms, R-regulations, A/B matrix.
+- The **design-policy axis** answers *"should I do this, and how?"* — D-principles, substrate map, iteration loop.
+
+A D-principle is **not** enforced by hook or CI; violating it does not make a build red. It shapes judgment in the moments governance leaves open — typically "default to A or B?", "build it ourselves or ride a substrate?", "ask the operator or just ship?". When the two axes appear to conflict, the rules axis wins (a D-principle never licenses a C-1 violation).
+
 ---
 
 ## 1. Layers
