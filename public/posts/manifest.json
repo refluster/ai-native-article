@@ -684,6 +684,16 @@
     "sourceUrls": "https://block.xyz/inside/from-hierarchy-to-intelligence"
   },
   {
+    "slug": "d219bc27f86f",
+    "title": "自律型エージェント開発におけるハーネス設計：プランナー・ジェネレーター・エバリュエーターの3層構造",
+    "type": "explanation",
+    "category": "Architecture",
+    "date": "2026-04-01",
+    "abstract": "AIが長時間の開発タスクを完遂するための「評価者の分離」と、GANライクなマルチエージェント連携（Planner/Generator/Evaluator）による自律的アプリ構築手法の解説。",
+    "image": "/posts/images/d219bc27f86f.jpg",
+    "sourceUrls": "https://www.anthropic.com/engineering/harness-design-long-running-apps"
+  },
+  {
     "slug": "f80afc462914",
     "title": "限界費用ゼロの知能：TerafabとAgentic Scalingが示す「極限の共同設計」の世界",
     "type": "analysis",
