@@ -39,14 +39,20 @@ export interface LoadedSkill {
 
 // task_kind -> required outputs in meta.json:outputs.
 // Hard-coded mapping (RFC-008 Q2 — planner deferred to v2).
+//
+// Values must exactly match a `meta.json:outputs` token on at least one
+// skill. The aliases are deliberately distinct between L1 (`article-markdown`,
+// from article-draft) and weekly synthesis (`synthesis-article-markdown`,
+// from market-research) so pickSkillForTask doesn't conflate them for an
+// agent who owns both.
 const TASK_REQUIRED_OUTPUTS: Record<TaskKind, string[]> = {
   "l0-to-l1": ["article-markdown"],
-  "weekly-synthesis": ["article-markdown"],
+  "weekly-synthesis": ["synthesis-article-markdown"],
   hypothesis: ["plan-markdown"],
   "tech-note": ["article-markdown"],
-  design: ["design-doc-markdown"],
+  design: ["design-note-markdown"],
   launch: ["launch-plan-markdown"],
-  pr: ["pr-brief"],
+  pr: ["task-brief-markdown"],
 };
 
 export async function loadSkill(name: string): Promise<LoadedSkill> {
