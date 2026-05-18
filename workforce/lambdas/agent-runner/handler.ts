@@ -9,9 +9,8 @@
 //   4. Pre-flight budget guard (W-3).
 //   5. Build prompt from system.md + memory + task brief.
 //   6. Call Anthropic. Throws on stop_reason=max_tokens (W-1 / W-4).
-//   7. Article path: persist final.md to S3, insert into Notion.
-//      Other deliverable types are stubbed (PR6b-only ships the
-//      article path; Ren's pr type lands in PR12).
+//   7. Write the artefact to S3 (workforce SoT). For type=article also
+//      insert into Notion (existing GAS L4 picks it up).
 //   8. Append a memory chunk (memver conditional).
 //   9. Record RUN + DELIV rows and roll up BUDGET.
 //
@@ -29,6 +28,7 @@ import { complete } from "../shared/llm-anthropic.js";
 import { assertWithinBudget, recordSpend } from "../shared/budget.js";
 import { readIndex, readChunk, appendChunk } from "../shared/memory.js";
 import { insertArticle } from "../shared/notion.js";
+import { deliverableTargetFor, writeDeliverableArtefact } from "../shared/deliverable.js";
 import {
   newUlid,
   type DelivRow,
@@ -119,11 +119,18 @@ export async function handler(event: RunnerEvent, context: Context): Promise<Run
     return await throwRun(event.agent, runId, startedAt, err);
   }
 
-  // 7. Deliverable: article path only in PR6b. Other types stubbed.
-  let delivRow: DelivRow | undefined;
+  // 7. Deliverable. All non-pr types write the artefact body to S3 first
+  // (workforce SoT); the article type additionally publishes to Notion
+  // (existing GAS L4 picks it up by Author/Kind). Ren's pr type is
+  // dispatched via Claude Code routine on GHA — landing in PR12 —
+  // so until then deliverableTargetFor throws for it.
+  const delivId = newUlid();
+  const target = deliverableTargetFor(event.agent, agent.primary_deliverable_type, delivId);
+  await writeDeliverableArtefact(target, llm.text);
+
   let notionUrl: string | undefined;
-  if (agent.primary_deliverable_type === "article") {
-    const ulid = newUlid();
+  let notionPageId: string | undefined;
+  if (target.hasExternalPublish && agent.primary_deliverable_type === "article") {
     const title = extractTitle(llm.text) ?? `${agent.first_name} ${agent.last_name} — ${event.task_kind} ${startedAt}`;
     const notion = await insertArticle({
       title,
@@ -133,19 +140,21 @@ export async function handler(event: RunnerEvent, context: Context): Promise<Run
       provenance: `${event.agent}-${event.task_kind}`,
     });
     notionUrl = notion.url;
-    delivRow = {
-      pk: agentPk(event.agent),
-      sk: `DELIV#${ulid}`,
-      type: "article",
-      kind: agent.primary_deliverable_kind,
-      project_id: agent.default_project,
-      notion_page_id: notion.pageId,
-      created_at: startedAt,
-      published_at: new Date().toISOString(),
-    };
-    await putItem(delivRow);
+    notionPageId = notion.pageId;
   }
-  // Other deliverable types deliberately not yet supported.
+
+  const delivRow: DelivRow = {
+    pk: agentPk(event.agent),
+    sk: `DELIV#${delivId}`,
+    type: agent.primary_deliverable_type,
+    kind: agent.primary_deliverable_kind,
+    project_id: agent.default_project,
+    s3_key: target.s3Key,
+    notion_page_id: notionPageId,
+    created_at: startedAt,
+    published_at: notionPageId ? new Date().toISOString() : undefined,
+  };
+  await putItem(delivRow);
 
   // 8. Append memory chunk.
   const chunkBody = buildMemoryChunk(event.agent, runId, llm.text, previousChunk);
@@ -171,7 +180,7 @@ export async function handler(event: RunnerEvent, context: Context): Promise<Run
   return {
     status: "ok",
     run_id: runId,
-    deliv_id: delivRow?.sk.replace("DELIV#", ""),
+    deliv_id: delivId,
     notion_page_url: notionUrl,
     tokens_in: llm.tokens_in,
     tokens_out: llm.tokens_out,
