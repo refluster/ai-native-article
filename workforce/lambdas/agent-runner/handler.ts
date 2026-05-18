@@ -29,6 +29,7 @@ import { assertWithinBudget, recordSpend } from "../shared/budget.js";
 import { readIndex, readChunk, appendChunk } from "../shared/memory.js";
 import { insertArticle } from "../shared/notion.js";
 import { deliverableTargetFor, writeDeliverableArtefact } from "../shared/deliverable.js";
+import { dispatchEngineer } from "../shared/github.js";
 import {
   newUlid,
   type DelivRow,
@@ -119,42 +120,49 @@ export async function handler(event: RunnerEvent, context: Context): Promise<Run
     return await throwRun(event.agent, runId, startedAt, err);
   }
 
-  // 7. Deliverable. All non-pr types write the artefact body to S3 first
-  // (workforce SoT); the article type additionally publishes to Notion
-  // (existing GAS L4 picks it up by Author/Kind). Ren's pr type is
-  // dispatched via Claude Code routine on GHA — landing in PR12 —
-  // so until then deliverableTargetFor throws for it.
+  // 7. Deliverable.
+  // - article/plan/design-doc/launch-plan: write artefact body to S3 (SoT),
+  //   article also publishes to Notion (GAS L4 picks up).
+  // - pr (Ren): R-N1 exception. LLM produces a *brief* (not code). Lambda
+  //   writes the brief to S3 + dispatches GHA workflow_dispatch. The
+  //   eventual PR is found asynchronously by the orchestrator's poll step.
   const delivId = newUlid();
-  const target = deliverableTargetFor(event.agent, agent.primary_deliverable_type, delivId);
-  await writeDeliverableArtefact(target, llm.text);
-
+  let delivRow: DelivRow;
   let notionUrl: string | undefined;
-  let notionPageId: string | undefined;
-  if (target.hasExternalPublish && agent.primary_deliverable_type === "article") {
-    const title = extractTitle(llm.text) ?? `${agent.first_name} ${agent.last_name} — ${event.task_kind} ${startedAt}`;
-    const notion = await insertArticle({
-      title,
-      bodyMarkdown: llm.text,
-      author: event.agent,
-      kind: agent.primary_deliverable_kind,
-      provenance: `${event.agent}-${event.task_kind}`,
-    });
-    notionUrl = notion.url;
-    notionPageId = notion.pageId;
-  }
 
-  const delivRow: DelivRow = {
-    pk: agentPk(event.agent),
-    sk: `DELIV#${delivId}`,
-    type: agent.primary_deliverable_type,
-    kind: agent.primary_deliverable_kind,
-    project_id: agent.default_project,
-    s3_key: target.s3Key,
-    notion_page_id: notionPageId,
-    created_at: startedAt,
-    published_at: notionPageId ? new Date().toISOString() : undefined,
-  };
-  await putItem(delivRow);
+  if (agent.code_execution === "claude-code-routine-on-gha" && agent.primary_deliverable_type === "pr") {
+    delivRow = await dispatchPrPath(event.agent, agent, delivId, startedAt, event.task_kind, llm.text);
+  } else {
+    const target = deliverableTargetFor(event.agent, agent.primary_deliverable_type, delivId);
+    await writeDeliverableArtefact(target, llm.text);
+
+    let notionPageId: string | undefined;
+    if (target.hasExternalPublish && agent.primary_deliverable_type === "article") {
+      const title = extractTitle(llm.text) ?? `${agent.first_name} ${agent.last_name} — ${event.task_kind} ${startedAt}`;
+      const notion = await insertArticle({
+        title,
+        bodyMarkdown: llm.text,
+        author: event.agent,
+        kind: agent.primary_deliverable_kind,
+        provenance: `${event.agent}-${event.task_kind}`,
+      });
+      notionUrl = notion.url;
+      notionPageId = notion.pageId;
+    }
+
+    delivRow = {
+      pk: agentPk(event.agent),
+      sk: `DELIV#${delivId}`,
+      type: agent.primary_deliverable_type,
+      kind: agent.primary_deliverable_kind,
+      project_id: agent.default_project,
+      s3_key: target.s3Key,
+      notion_page_id: notionPageId,
+      created_at: startedAt,
+      published_at: notionPageId ? new Date().toISOString() : undefined,
+    };
+    await putItem(delivRow);
+  }
 
   // 8. Append memory chunk.
   const chunkBody = buildMemoryChunk(event.agent, runId, llm.text, previousChunk);
@@ -190,6 +198,75 @@ export async function handler(event: RunnerEvent, context: Context): Promise<Run
 
 function effectiveBudgetCap(agent: AgentMetaRow): number {
   return agent.budget_monthly_usd_override ?? agent.budget_monthly_usd_default;
+}
+
+/**
+ * Ren's R-N1 exception path. The LLM has already produced a *brief*
+ * (governed by Ren's system.md). We:
+ *   1. Persist the brief to S3 (workforce SoT).
+ *   2. workflow_dispatch -> wf-engineer.yml on the target repo, passing
+ *      the brief + dispatch_branch in the workflow inputs.
+ *   3. Write a pending DELIV row. The orchestrator's poll step will
+ *      promote it to ok when the PR appears, or to timeout after 24h.
+ *
+ * Env vars (set on the agent-runner Lambda by SAM):
+ *   ENGINEER_OWNER     GitHub org/user (default "refluster")
+ *   ENGINEER_REPO      Repo name (default "ai-native-article")
+ *   ENGINEER_WORKFLOW  Workflow filename (default "wf-engineer.yml")
+ *   ENGINEER_REF       Ref to dispatch from (default "main")
+ */
+async function dispatchPrPath(
+  slug: string,
+  agent: AgentMetaRow,
+  delivId: string,
+  startedAt: string,
+  taskKind: TaskKind,
+  briefBody: string,
+): Promise<DelivRow> {
+  const owner = process.env.ENGINEER_OWNER ?? "refluster";
+  const repo = process.env.ENGINEER_REPO ?? "ai-native-article";
+  const workflow = process.env.ENGINEER_WORKFLOW ?? "wf-engineer.yml";
+  const ref = process.env.ENGINEER_REF ?? "main";
+
+  // Persist the brief. Note: deliverableTargetFor throws for pr; we use a
+  // dedicated pr-briefs/{slug}/{deliv-id}.md key here, in keeping with the
+  // data-model.md prefix layout (one prefix per artefact-kind).
+  const briefKey = `pr-briefs/${slug}/${delivId}.md`;
+  await writeDeliverableArtefact(
+    { type: "pr", s3Key: briefKey, hasExternalPublish: true },
+    briefBody,
+  );
+
+  const dispatchBranch = `${slug}/${delivId}`;
+
+  await dispatchEngineer({
+    owner,
+    repo,
+    workflow,
+    ref,
+    inputs: {
+      brief: briefBody,
+      task_id: delivId,
+      branch: dispatchBranch,
+    },
+  });
+
+  const row: DelivRow = {
+    pk: agentPk(slug),
+    sk: `DELIV#${delivId}`,
+    type: "pr",
+    kind: agent.primary_deliverable_kind,
+    project_id: agent.default_project,
+    s3_key: briefKey,
+    status: "pending",
+    dispatched_at: new Date().toISOString(),
+    dispatch_branch: dispatchBranch,
+    created_at: startedAt,
+    // pr_url + published_at set when the orchestrator's poll step finds the PR.
+  };
+  await putItem(row);
+  void taskKind; // recorded via the RUN row's task_id; deliv row doesn't carry it
+  return row;
 }
 
 async function loadSystemMd(slug: string): Promise<string> {

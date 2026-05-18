@@ -35,6 +35,22 @@ Parameters:
       Email subscribed to the alarm SNS topic and the budget notifications.
       Operator must confirm the subscription from their inbox.
     AllowedPattern: ".+@.+\\..+"
+  EngineerOwner:
+    Type: String
+    Default: refluster
+    Description: GitHub owner of the repo the engineer routine targets.
+  EngineerRepo:
+    Type: String
+    Default: ai-native-article
+    Description: GitHub repo the engineer routine targets.
+  EngineerWorkflow:
+    Type: String
+    Default: wf-engineer.yml
+    Description: workflow_dispatch target filename.
+  EngineerRef:
+    Type: String
+    Default: main
+    Description: Ref to dispatch the engineer workflow from.
 
 Globals:
   Function:
@@ -390,6 +406,13 @@ Resources:
               Resource:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/anthropic-*
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/notion-*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/github-*
+      Environment:
+        Variables:
+          ENGINEER_OWNER: !Ref EngineerOwner
+          ENGINEER_REPO: !Ref EngineerRepo
+          ENGINEER_WORKFLOW: !Ref EngineerWorkflow
+          ENGINEER_REF: !Ref EngineerRef
       Tags:
         workforce: !Ref Stage
 
@@ -433,17 +456,28 @@ Resources:
         Variables:
           RUNNER_FUNCTION_NAME: !Ref WfAgentRunnerFunction
           TICK_WINDOW_MINUTES: "5"
+          ENGINEER_SLUG: ren
+          ENGINEER_OWNER: !Ref EngineerOwner
+          ENGINEER_REPO: !Ref EngineerRepo
+          ENGINEER_TIMEOUT_MIN: "1440"
       Policies:
         - Statement:
-            - Sid: OrchestratorDdbScan
+            - Sid: OrchestratorDdbAccess
               Effect: Allow
               Action:
                 - dynamodb:Scan
+                - dynamodb:Query
+                - dynamodb:UpdateItem
               Resource: !GetAtt WfTable.Arn
             - Sid: OrchestratorRunnerInvoke
               Effect: Allow
               Action: lambda:InvokeFunction
               Resource: !GetAtt WfAgentRunnerFunction.Arn
+            - Sid: OrchestratorGithubSecret
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/github-*
       Events:
         Tick:
           Type: Schedule

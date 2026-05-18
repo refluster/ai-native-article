@@ -36,6 +36,8 @@ export interface RunRow {
   skip_reason?: string;
 }
 
+export type DelivStatus = "pending" | "ok" | "timeout";
+
 export interface DelivRow {
   pk: `AGENT#${string}`;
   sk: `DELIV#${string}`;
@@ -48,6 +50,21 @@ export interface DelivRow {
   eval_score?: number;
   created_at: string;
   published_at?: string;
+  /**
+   * Synchronous deliverables (article/plan/design-doc/launch-plan) are
+   * undefined here — they finish atomically. Asynchronous deliverables
+   * (Ren's pr via Claude Code routine on GHA) carry a status:
+   *   - pending  dispatched to GHA, waiting for the PR to appear
+   *   - ok       PR found by the orchestrator's poll step
+   *   - timeout  24h passed without a PR (W-4 alarm)
+   */
+  status?: DelivStatus;
+  /** Set when the runner dispatched a long-running job (R-N1 exception). */
+  dispatched_at?: string;
+  /** Branch name the GHA workflow is expected to push to (Ren only). */
+  dispatch_branch?: string;
+  /** Per-row error context surfaced into the row on timeout. */
+  error_message?: string;
 }
 
 export function newUlid(): string {

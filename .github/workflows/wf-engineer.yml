@@ -1,0 +1,78 @@
+name: workforce-engineer
+
+# Triggered by the wf-agent-runner Lambda via workflow_dispatch when Ren is
+# dispatched. Inputs carry the engineering brief; this workflow runs the
+# Claude Code action to produce code and open a draft PR. See:
+#   workforce/docs/governance.md §4 R-N1 (single execution surface +
+#     documented exception)
+#   workforce/lambdas/agent-runner/handler.ts dispatchPrPath()
+#   workforce/docs/runbooks/engineer-pr-timeout.md
+
+on:
+  workflow_dispatch:
+    inputs:
+      brief:
+        description: Engineering brief in markdown (the "what + why + acceptance")
+        required: true
+        type: string
+      task_id:
+        description: DDB DELIV#{ulid} reference written by the runner
+        required: true
+        type: string
+      branch:
+        description: Branch the resulting PR will push to (orchestrator polls this)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: wf-engineer-${{ inputs.task_id }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Configure git
+        run: |
+          git config user.name "Ren Tanaka (workforce engineer)"
+          git config user.email "ren+wf@kohuehara.xyz"
+      - name: Create branch
+        run: |
+          git checkout -b "${{ inputs.branch }}"
+      # Claude Code action — operator may need to adjust the action ref and
+      # input names to match the version they've installed. See
+      # https://github.com/anthropics/claude-code-action for the contract.
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@beta
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        with:
+          direct_prompt: |
+            You are Ren Tanaka, the engineer on the Workforce, working from the
+            brief below. Your job: implement the change on this branch
+            (${{ inputs.branch }}), commit it, and open a draft pull request.
+
+            The PR description MUST include the line:
+              wf-task-id: ${{ inputs.task_id }}
+            on its own line so the orchestrator can correlate the PR back to
+            the workforce DELIV row.
+
+            Follow the repo's AGENTS.md and workforce/docs/governance.md.
+            Do not merge the PR yourself (R-6).
+
+            ---
+            Brief:
+
+            ${{ inputs.brief }}
+      # The PR is opened by Claude Code action itself; nothing further to do.
+      # The wf-orchestrator Lambda polls every 5 minutes for the PR matching
+      # head=${{ inputs.branch }} and promotes the DELIV row from pending to
+      # ok. 24h without a PR -> DELIV status=timeout + alarm (W-4).
