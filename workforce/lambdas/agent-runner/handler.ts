@@ -145,14 +145,26 @@ export async function handler(event: RunnerEvent, context: Context): Promise<Run
   // 7. Deliverable.
   // - article/plan/design-doc/launch-plan: write artefact body to S3 (SoT),
   //   article also publishes to Notion (GAS L4 picks up).
-  // - pr (Ren): R-N1 exception. LLM produces a *brief* (not code). Lambda
-  //   writes the brief to S3 + dispatches GHA workflow_dispatch. The
-  //   eventual PR is found asynchronously by the orchestrator's poll step.
+  // - claude-code-routine Skill (R-N1 exception): LLM produces a *brief*
+  //   (not code). Lambda writes the brief to S3 + dispatches GHA
+  //   workflow_dispatch. The eventual PR is found asynchronously by the
+  //   orchestrator's poll step.
   const delivId = newUlid();
   let delivRow: DelivRow;
   let notionUrl: string | undefined;
 
-  if (agent.code_execution === "claude-code-routine-on-gha" && agent.primary_deliverable_type === "pr") {
+  // RFC-008 R-N1 amendment: the CC-routine exception is selected per-Skill,
+  // not per-agent. When the active Skill's trigger_class is claude-code-routine,
+  // route through dispatchPrPath regardless of which agent is calling. The
+  // legacy agent.code_execution-based path is preserved as a fallback for
+  // runs where no Skill matched (so Ren's pre-Skills behaviour is unchanged).
+  const ccRouteBySkill = activeSkill?.meta.trigger_class === "claude-code-routine";
+  const ccRouteByLegacy =
+    !activeSkill &&
+    agent.code_execution === "claude-code-routine-on-gha" &&
+    agent.primary_deliverable_type === "pr";
+
+  if (ccRouteBySkill || ccRouteByLegacy) {
     delivRow = await dispatchPrPath(event.agent, agent, delivId, startedAt, event.task_kind, llm.text, activeSkill);
   } else {
     const target = deliverableTargetFor(event.agent, agent.primary_deliverable_type, delivId);
