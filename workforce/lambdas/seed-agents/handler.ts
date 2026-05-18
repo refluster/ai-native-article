@@ -24,7 +24,9 @@ import { identityHash } from "../shared/identity-hash.js";
 // suffixes (the file fields are the defaults). Map file shape -> DDB row.
 interface AgentJsonOnDisk {
   slug: string;
-  name: string;
+  first_name: string;
+  last_name: string;
+  residence: string;
   role: string;
   model: string;
   schedule_cron: string;
@@ -95,7 +97,9 @@ async function seedOne(slug: string): Promise<"created" | "updated" | "noop"> {
 
   const identity: AgentIdentity = {
     slug: cfg.slug,
-    name: cfg.name,
+    first_name: cfg.first_name,
+    last_name: cfg.last_name,
+    residence: cfg.residence,
     role: cfg.role,
     model: cfg.model,
     primary_deliverable_type: cfg.primary_deliverable_type,

@@ -24,7 +24,9 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const REQUIRED_KEYS = [
   "slug",
-  "name",
+  "first_name",
+  "last_name",
+  "residence",
   "role",
   "model",
   "schedule_cron",
@@ -105,8 +107,14 @@ for (const slug of slugDirs) {
   if (parsed.slug !== slug) {
     v("S2-slug-match", cfg, `slug "${parsed.slug}" does not match directory "${slug}"`);
   }
-  if (typeof parsed.name !== "string" || parsed.name.length === 0) {
-    v("S3-name", cfg, "name must be non-empty string");
+  if (typeof parsed.first_name !== "string" || parsed.first_name.length === 0) {
+    v("S3-first-name", cfg, "first_name must be non-empty string");
+  }
+  if (typeof parsed.last_name !== "string" || parsed.last_name.length === 0) {
+    v("S3-last-name", cfg, "last_name must be non-empty string");
+  }
+  if (typeof parsed.residence !== "string" || !/^.+,\s*.+$/.test(parsed.residence)) {
+    v("S3-residence", cfg, `residence "${parsed.residence}" must be "City, Country/Region" form`);
   }
   if (typeof parsed.role !== "string" || parsed.role.length === 0) {
     v("S4-role", cfg, "role must be non-empty string");

@@ -8,7 +8,9 @@ import type { AgentIdentity } from "./agent.js";
 
 const IDENTITY_KEYS = [
   "slug",
-  "name",
+  "first_name",
+  "last_name",
+  "residence",
   "role",
   "model",
   "primary_deliverable_type",
