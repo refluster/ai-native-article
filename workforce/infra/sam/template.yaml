@@ -345,6 +345,73 @@ Resources:
       AlarmActions:
         - !Ref WfAlarmTopic
 
+  # --- Agent runner Lambda (PR6b) -------------------------------------------
+  # Invoked async by the orchestrator (PR6c) with { agent, task_kind, ... }.
+  # Composes shared/* libs into the per-agent execution loop:
+  # load META -> memory -> budget guard -> LLM -> Notion -> memory append ->
+  # RUN + DELIV rows + BUDGET roll-up.
+  #
+  # Reads workforce/agents/{slug}/system.md from the bundle (Makefile build
+  # copies the tree, same pattern as seed-agents).
+  WfAgentRunnerFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-agent-runner-${Stage}
+      CodeUri: ../../lambdas/agent-runner
+      Handler: handler.handler
+      Description: Workforce agent execution loop. PR6b.
+      MemorySize: 1024
+      Timeout: 300
+      Policies:
+        - Statement:
+            - Sid: RunnerDdbRw
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt WfTable.Arn
+            - Sid: RunnerS3Rw
+              Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/memory/*
+                - !Sub ${WfBucket.Arn}/articles/*
+                - !Sub ${WfBucket.Arn}/plans/*
+                - !Sub ${WfBucket.Arn}/design-docs/*
+                - !Sub ${WfBucket.Arn}/launches/*
+            - Sid: RunnerSecretsRead
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/anthropic-*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/notion-*
+      Tags:
+        workforce: !Ref Stage
+
+  WfAgentRunnerErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-agent-runner-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-agent-runner-${Stage} over 5 minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfAgentRunnerFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
 Outputs:
   TableName:
     Description: DynamoDB table name (consumed by PR5/PR6 Lambdas).
