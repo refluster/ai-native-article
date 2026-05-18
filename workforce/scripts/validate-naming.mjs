@@ -64,22 +64,20 @@ const walkTs = (dir) => {
 };
 walkTs(join(WORKFORCE_ROOT, "lambdas"));
 
-// Rule 4: markdown files in docs/ are kebab-case
-for (const e of listDir(join(WORKFORCE_ROOT, "docs"))) {
-  if (!e.stat.isFile()) continue;
-  if (extname(e.name) !== ".md") continue;
-  if (!KEBAB_MD.test(e.name)) {
-    report("R4-kebab-md", e.full, `doc "${e.name}" must be kebab-case.md`);
+// Rule 4: markdown files anywhere under docs/ are kebab-case
+const walkMd = (dir) => {
+  for (const e of listDir(dir)) {
+    if (e.stat.isDirectory()) {
+      walkMd(e.full);
+    } else if (extname(e.name) === ".md") {
+      const allowed = e.name === "README.md" || KEBAB_MD.test(e.name);
+      if (!allowed) {
+        report("R4-kebab-md", e.full, `doc "${e.name}" must be kebab-case.md (or README.md)`);
+      }
+    }
   }
-}
-// Runbooks subdirectory (when present)
-for (const e of listDir(join(WORKFORCE_ROOT, "docs", "runbooks"))) {
-  if (!e.stat.isFile()) continue;
-  if (extname(e.name) !== ".md") continue;
-  if (!KEBAB_MD.test(e.name)) {
-    report("R4-kebab-md", e.full, `doc "${e.name}" must be kebab-case.md`);
-  }
-}
+};
+walkMd(join(WORKFORCE_ROOT, "docs"));
 
 // Rule 5: SAM template — *Name properties must start with wf- and end with -{stage} token
 const samPath = join(WORKFORCE_ROOT, "infra", "sam", "template.yaml");
