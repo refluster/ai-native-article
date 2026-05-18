@@ -2,7 +2,7 @@ node_modules/
 dist/
 .env
 *.local
-skills/
+/skills/
 .claude/*
 !.claude/skills/
 public/workforce-agents.json
