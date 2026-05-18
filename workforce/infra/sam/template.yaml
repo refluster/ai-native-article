@@ -1,0 +1,221 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Description: |
+  Workforce data plane (PR4).
+
+  Carries the persistent surface every later workforce PR depends on:
+    - DynamoDB single-table (wf-table-{Stage}) per R-N2 / data-model.md.
+    - S3 bucket (wf-bucket-{AccountId}-{Stage}) per R-N2 / data-model.md.
+    - SNS topic (wf-alarm-topic-{Stage}) for Lambda failure alarms once
+      Lambdas land in PR5/PR6.
+    - AWS Budgets monthly cap (W-3) with email + SNS notifications.
+
+  No Lambda functions yet — those land in PR5 (agents-api + seed) and
+  PR6 (orchestrator + agent-runner). Globals are pre-set to nodejs24.x
+  per operator direction (PR #28 comment).
+
+Parameters:
+  Stage:
+    Type: String
+    AllowedValues: [dev, prod]
+    Default: dev
+    Description: Deployment stage. Drives all resource suffixes (R-N7).
+  MonthlyBudgetUsd:
+    Type: Number
+    Default: 50
+    MinValue: 5
+    Description: |
+      Monthly USD cap (W-3 ceiling) for this stack. AWS Budgets fires at
+      80% and 100% of this value. Raising it is a Zone A change to
+      workforce/docs/governance.md §2.
+  AlarmEmail:
+    Type: String
+    Description: |
+      Email subscribed to the alarm SNS topic and the budget notifications.
+      Operator must confirm the subscription from their inbox.
+    AllowedPattern: ".+@.+\\..+"
+
+Globals:
+  Function:
+    Runtime: nodejs24.x
+    MemorySize: 1024
+    Timeout: 300
+    Architectures: [arm64]
+    Environment:
+      Variables:
+        STAGE: !Ref Stage
+        TABLE_NAME: !Ref WfTable
+        BUCKET_NAME: !Ref WfBucket
+        ALARM_TOPIC_ARN: !Ref WfAlarmTopic
+        AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1"
+
+Resources:
+
+  # --- DynamoDB single-table -------------------------------------------------
+  # PK/SK schema: see workforce/docs/data-model.md.
+  # GSI1 reserved for status-keyed lookups (pending TASKs in PR6+).
+  WfTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub wf-table-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: gsi1pk
+          AttributeType: S
+        - AttributeName: gsi1sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: gsi1pk
+              KeyType: HASH
+            - AttributeName: gsi1sk
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: workforce
+          Value: !Ref Stage
+
+  # --- S3 bucket -------------------------------------------------------------
+  # Layout: memory/{slug}/, articles/{slug}/, plans/{slug}/, design-docs/, launches/.
+  # See workforce/docs/data-model.md.
+  WfBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub wf-bucket-${AWS::AccountId}-${Stage}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: memory-ia-after-90d
+            Status: Enabled
+            Prefix: memory/
+            Transitions:
+              - StorageClass: STANDARD_IA
+                TransitionInDays: 90
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: workforce
+          Value: !Ref Stage
+
+  # --- Alarm topic -----------------------------------------------------------
+  # Lambdas in PR5/PR6 publish their Errors/Throttles/DLQ-depth alarms here.
+  # Also receives the AWS Budgets notifications below.
+  WfAlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub wf-alarm-topic-${Stage}
+
+  WfAlarmTopicEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref WfAlarmTopic
+      Protocol: email
+      Endpoint: !Ref AlarmEmail
+
+  # SNS policy permitting AWS Budgets to publish notifications.
+  WfAlarmTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref WfAlarmTopic
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowBudgetsPublish
+            Effect: Allow
+            Principal:
+              Service: budgets.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref WfAlarmTopic
+
+  # --- W-3 monthly budget cap -----------------------------------------------
+  # AWS Budgets are account-scoped, so this resource is filtered by the
+  # `workforce` tag (applied to WfTable + WfBucket above) to only count
+  # this stack's spend.
+  WfBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub wf-budget-${Stage}
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: !Ref MonthlyBudgetUsd
+          Unit: USD
+        CostFilters:
+          TagKeyValue:
+            - !Sub "user:workforce$${Stage}"
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: SNS
+              Address: !Ref WfAlarmTopic
+            - SubscriptionType: EMAIL
+              Address: !Ref AlarmEmail
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: SNS
+              Address: !Ref WfAlarmTopic
+            - SubscriptionType: EMAIL
+              Address: !Ref AlarmEmail
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref AlarmEmail
+
+Outputs:
+  TableName:
+    Description: DynamoDB table name (consumed by PR5/PR6 Lambdas).
+    Value: !Ref WfTable
+    Export:
+      Name: !Sub wf-table-name-${Stage}
+  TableArn:
+    Value: !GetAtt WfTable.Arn
+    Export:
+      Name: !Sub wf-table-arn-${Stage}
+  BucketName:
+    Description: S3 bucket name (consumed by PR5/PR6 Lambdas).
+    Value: !Ref WfBucket
+    Export:
+      Name: !Sub wf-bucket-name-${Stage}
+  AlarmTopicArn:
+    Description: SNS topic that receives all stack alarms.
+    Value: !Ref WfAlarmTopic
+    Export:
+      Name: !Sub wf-alarm-topic-arn-${Stage}
