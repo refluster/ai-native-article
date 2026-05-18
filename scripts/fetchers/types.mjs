@@ -21,6 +21,7 @@
  *  @property {string} notionId              // Original page id, for traceability
  *  @property {string} lastEditedAt          // ISO timestamp; for incremental fetch
  *  @property {string} [imagePath]           // e.g. "/posts/images/<slug>.jpg" or undefined
+ *  @property {string} [author]              // Workforce persona slug (sora/maya/…). Optional; pre-workforce rows omit it.
  */
 
 /**

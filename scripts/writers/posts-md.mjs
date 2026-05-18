@@ -79,6 +79,7 @@ function frontmatter(record) {
   if (record.imagePath) lines.push(`image: "${esc(record.imagePath)}"`)
   if (record.sourceUrls) lines.push(`sourceUrls: "${esc(record.sourceUrls)}"`)
   if (record.legacySlug) lines.push(`legacySlug: "${esc(record.legacySlug)}"`)
+  if (record.author) lines.push(`author: "${esc(record.author)}"`)
   lines.push('---', '')
   return lines.join('\n')
 }
@@ -137,6 +138,7 @@ export async function writePosts(records, options) {
       abstract: record.abstract,
       image: imagePath,
       sourceUrls: record.sourceUrls,
+      author: record.author,
     })
   }
 

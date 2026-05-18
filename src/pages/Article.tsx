@@ -10,6 +10,7 @@ import { ARTICLE_TYPE_LABELS, inferType, isArticleType } from '../lib/article-ty
 import { buildSourceIndex } from '../lib/source-links'
 import SourcesUsedSection from '../components/SourcesUsedSection'
 import AnalysesUsingSection from '../components/AnalysesUsingSection'
+import AuthorChip from '../components/workforce/AuthorChip'
 
 interface Frontmatter extends ArticleMeta {
   notionId?: string
@@ -227,6 +228,11 @@ export default function Article() {
             <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-tight mb-8">
               {meta.title}
             </h1>
+            {meta.author && (
+              <div className="mb-6">
+                <AuthorChip slug={meta.author} size={32} />
+              </div>
+            )}
             {meta.abstract && (
               <p className="text-xl leading-relaxed text-on-surface-variant mb-8 border-l-4 border-tertiary pl-6">
                 {meta.abstract}
