@@ -36,13 +36,8 @@ Agents may author and merge, subject to CI passing and one human review *unless*
 - `src/types/**`
 - `scripts/**` (except GAS deploy target)
 - `gas/src/**`
-- `workforce/infra/**` — SAM template, samconfig
-- `workforce/lambdas/**` — Lambda handler source (except `workforce/lambdas/*/SKILL.md` if any — those are prompts, Zone A)
-- `workforce/seed/**` — bootstrap input (assignments table, no prompts)
-- `workforce/docs/**` — operator docs for the workforce subsystem
-- `src/components/workforce/**`, `src/pages/workforce/**` — talent-directory UI (added PR5)
 
-**Workforce prompts** — `workforce/agents/**/*.{json,md}` and `workforce/skills/**` carry agent and skill prompts. They are Zone B with **Rule 11 (prompt-version bump = own PR) applied**: a single PR may not bump more than one agent's system prompt or more than one skill's instructions. The v0 bulk-load PR (PR3a/PR3b in [`workforce/ROADMAP.md`](workforce/ROADMAP.md)) is the documented exception — it is the first version of every prompt, not a bump.
+**Workforce subsystem** — the `workforce/` subtree is being rebuilt. Its zone classifications (including the prompt-version-bump-per-PR rule for `agents/**` and `skills/**`) will be reintroduced in [workforce/docs/governance.md](workforce/docs/governance.md), added in PR1 of the rebuild sequence. Until then, no agent may author PRs that touch `workforce/**` outside of the planned rebuild PRs.
 
 ### Zone C — Agent-generated (content)
 
@@ -63,8 +58,6 @@ Nobody edits by hand. Agents regenerate via scripts only.
 - `dist/**`
 - `package-lock.json` (only `npm install` touches it)
 - `public/manifest.webmanifest`
-- `workforce/ROADMAP.md` — checkbox state is machine-written by the `workforce-builder` routine. Humans may edit headers / descriptions; checkbox flips belong to the routine.
-- `workforce/.aws-sam/**` — SAM build output (also `.gitignore`'d)
 
 ## 2. The rules agents must follow
 
