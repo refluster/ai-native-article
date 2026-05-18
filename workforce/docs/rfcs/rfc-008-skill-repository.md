@@ -3,7 +3,7 @@
 - **Status**: In-progress (2026-05-18)
 - **Owner**: Maya
 - **Created**: 2026-05-18
-- **Implemented by**: PR-A + PR-B combined as a single landing PR for the `article-draft` pilot. PR-C (RUN/DELIV traceability fields) folded into the same PR. PR-D (skill seed Lambda + DDB mirror) remains for a follow-up.
+- **Implemented by**: PR-A (substrate + 7 pilots, validators) + PR-B (runner integration) + PR-C (RUN/DELIV traceability) + PR-D (skill seed Lambda + DDB mirror + `/skills` endpoints on agents-api) all landed.
 
 ## Problem
 
