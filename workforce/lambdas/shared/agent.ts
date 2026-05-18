@@ -17,7 +17,9 @@ export type DeliverableType =
 /** Identity fields — sourced from workforce/agents/{slug}/agent.json (git SoT). */
 export interface AgentIdentity {
   slug: AgentSlug;
-  name: string;
+  first_name: string;
+  last_name: string;
+  residence: string;
   role: string;
   model: string;
   primary_deliverable_type: DeliverableType;

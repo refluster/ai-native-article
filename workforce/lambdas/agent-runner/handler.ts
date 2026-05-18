@@ -124,7 +124,7 @@ export async function handler(event: RunnerEvent, context: Context): Promise<Run
   let notionUrl: string | undefined;
   if (agent.primary_deliverable_type === "article") {
     const ulid = newUlid();
-    const title = extractTitle(llm.text) ?? `${agent.name} — ${event.task_kind} ${startedAt}`;
+    const title = extractTitle(llm.text) ?? `${agent.first_name} ${agent.last_name} — ${event.task_kind} ${startedAt}`;
     const notion = await insertArticle({
       title,
       bodyMarkdown: llm.text,
