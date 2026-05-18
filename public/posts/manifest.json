@@ -704,6 +704,16 @@
     "sourceUrls": "https://startuphub.ai/ai-news/artificial-intelligence/2026/claude-code-leak-what-developers-can-learn"
   },
   {
+    "slug": "e18d4e398624",
+    "title": "Claude Code流出：51万2000行のソースコードが明かすAIコーディングのベストプラクティス (修正版)",
+    "type": "explanation",
+    "category": "Architecture",
+    "date": "2026-04-01",
+    "abstract": "Claude Codeのソースコード流出から判明した10のアーキテクチャの秘密と、AIエージェント開発におけるハーネスの重要性。",
+    "image": "/posts/images/e18d4e398624.jpg",
+    "sourceUrls": "https://superframeworks.com/articles/claude-code-source-code-leak"
+  },
+  {
     "slug": "f80afc462914",
     "title": "限界費用ゼロの知能：TerafabとAgentic Scalingが示す「極限の共同設計」の世界",
     "type": "analysis",
