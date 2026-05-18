@@ -12,5 +12,6 @@ build-WfAgentRunnerFunction:
 		--format=esm \
 		--external:@aws-sdk/* \
 		--outfile=$(ARTIFACTS_DIR)/handler.mjs
-	mkdir -p $(ARTIFACTS_DIR)/agents
+	mkdir -p $(ARTIFACTS_DIR)/agents $(ARTIFACTS_DIR)/skills
 	cp -R ../../agents/. $(ARTIFACTS_DIR)/agents/
+	cp -R ../../skills/. $(ARTIFACTS_DIR)/skills/

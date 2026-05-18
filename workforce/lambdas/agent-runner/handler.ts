@@ -31,6 +31,12 @@ import { insertArticle } from "../shared/notion.js";
 import { deliverableTargetFor, writeDeliverableArtefact } from "../shared/deliverable.js";
 import { dispatchEngineer } from "../shared/github.js";
 import {
+  type LoadedSkill,
+  loadSkillsForAgent,
+  pickSkillForTask,
+  composeSystemPrompt,
+} from "../shared/skill.js";
+import {
   newUlid,
   type DelivRow,
   type RunRow,
@@ -93,9 +99,25 @@ export async function handler(event: RunnerEvent, context: Context): Promise<Run
   const cap = effectiveBudgetCap(agent);
   await assertWithinBudget(event.agent, cap, PROJECTED_RUN_COST_USD);
 
-  // 5. Build prompt.
-  const system = await loadSystemMd(event.agent);
-  const userPrompt = buildUserPrompt(event, previousChunk);
+  // 5. Build prompt. If an active skill matches the task (RFC-008), the
+  // skill body is appended to the system prompt and the user prompt
+  // becomes minimal — "apply the active skill". When no skill matches,
+  // fall back to the hard-coded defaultBriefFor in the user prompt.
+  const baseSystem = await loadSystemMd(event.agent);
+  const skills = await loadSkillsForAgent(agent);
+  const activeSkill = pickSkillForTask(event.task_kind, skills);
+  const system = activeSkill ? composeSystemPrompt(baseSystem, activeSkill) : baseSystem;
+  const userPrompt = buildUserPrompt(event, previousChunk, activeSkill);
+  if (!activeSkill) {
+    console.warn(
+      JSON.stringify({
+        event: "skill-fallback",
+        agent: event.agent,
+        task_kind: event.task_kind,
+        note: "no active skill matched; using defaultBriefFor (RFC-008 fallback)",
+      }),
+    );
+  }
 
   if (event.dryRun) {
     return {
@@ -131,7 +153,7 @@ export async function handler(event: RunnerEvent, context: Context): Promise<Run
   let notionUrl: string | undefined;
 
   if (agent.code_execution === "claude-code-routine-on-gha" && agent.primary_deliverable_type === "pr") {
-    delivRow = await dispatchPrPath(event.agent, agent, delivId, startedAt, event.task_kind, llm.text);
+    delivRow = await dispatchPrPath(event.agent, agent, delivId, startedAt, event.task_kind, llm.text, activeSkill);
   } else {
     const target = deliverableTargetFor(event.agent, agent.primary_deliverable_type, delivId);
     await writeDeliverableArtefact(target, llm.text);
@@ -160,6 +182,8 @@ export async function handler(event: RunnerEvent, context: Context): Promise<Run
       notion_page_id: notionPageId,
       created_at: startedAt,
       published_at: notionPageId ? new Date().toISOString() : undefined,
+      skill_name: activeSkill?.meta.name,
+      skill_version: activeSkill?.meta.version,
     };
     await putItem(delivRow);
   }
@@ -180,6 +204,8 @@ export async function handler(event: RunnerEvent, context: Context): Promise<Run
     cost_usd: llm.cost_usd,
     started_at: startedAt,
     ended_at: endedAt,
+    skill_name: activeSkill?.meta.name,
+    skill_version: activeSkill?.meta.version,
   };
   await putItem(runRow);
   await recordSpend(event.agent, llm.tokens_in, llm.tokens_out, llm.cost_usd);
@@ -222,6 +248,7 @@ async function dispatchPrPath(
   startedAt: string,
   taskKind: TaskKind,
   briefBody: string,
+  activeSkill: LoadedSkill | undefined,
 ): Promise<DelivRow> {
   const owner = process.env.ENGINEER_OWNER ?? "refluster";
   const repo = process.env.ENGINEER_REPO ?? "ai-native-article";
@@ -262,6 +289,8 @@ async function dispatchPrPath(
     dispatched_at: new Date().toISOString(),
     dispatch_branch: dispatchBranch,
     created_at: startedAt,
+    skill_name: activeSkill?.meta.name,
+    skill_version: activeSkill?.meta.version,
     // pr_url + published_at set when the orchestrator's poll step finds the PR.
   };
   await putItem(row);
@@ -280,11 +309,23 @@ async function loadSystemMd(slug: string): Promise<string> {
   return await readFile(join(here, "agents", slug, "system.md"), "utf8");
 }
 
-function buildUserPrompt(event: RunnerEvent, previousChunk: string): string {
-  const brief = event.brief ?? defaultBriefFor(event.task_kind);
+function buildUserPrompt(
+  event: RunnerEvent,
+  previousChunk: string,
+  activeSkill?: LoadedSkill,
+): string {
   const memorySection = previousChunk
     ? `\n## Your memory from the previous run\n\n${previousChunk}\n`
     : "";
+  if (activeSkill) {
+    // RFC-008 path: skill body sits in the system prompt; the user
+    // prompt is the minimal "go" — task kind + memory + the
+    // operator-supplied free-form brief if any.
+    const operatorBrief = event.brief ? `\n\n## Operator brief\n\n${event.brief}\n` : "";
+    return `# Task: ${event.task_kind}${operatorBrief}${memorySection}\n\nApply the active skill described in your system prompt and produce the deliverable.`;
+  }
+  // Fallback path: hard-coded brief.
+  const brief = event.brief ?? defaultBriefFor(event.task_kind);
   return `# Task: ${event.task_kind}\n\n${brief}${memorySection}\n\nProduce the deliverable. Begin with a clear title on the first line.`;
 }
 
