@@ -199,6 +199,112 @@ Resources:
             - SubscriptionType: EMAIL
               Address: !Ref AlarmEmail
 
+  # --- Agents CRUD API (RFC-007) --------------------------------------------
+  # HTTP API + Lambda + IAM. GET endpoints are public; PATCH/DELETE require
+  # AWS_IAM auth (operator only). Creates via API are deliberately not
+  # exposed — new personas come from PRs that add agents/{slug}/ files.
+  WfAgentsHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Stage
+      CorsConfiguration:
+        AllowOrigins:
+          - https://kohuehara.xyz
+          - http://localhost:5173
+        AllowMethods: [GET, OPTIONS]
+        AllowHeaders: [content-type]
+      Auth:
+        EnableIamAuthorizer: true
+      Tags:
+        workforce: !Ref Stage
+
+  WfAgentsApiFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: esm
+        Minify: false
+        OutExtension:
+          - .js=.mjs
+        Target: node24
+        Sourcemap: false
+        EntryPoints:
+          - handler.ts
+        External:
+          - "@aws-sdk/*"
+    Properties:
+      FunctionName: !Sub wf-agents-api-${Stage}
+      CodeUri: ../../lambdas/agents-api
+      Handler: handler.handler
+      Description: Workforce agents CRUD API. See workforce/docs/rfcs/rfc-007-agent-management-api.md.
+      MemorySize: 512
+      Timeout: 10
+      Policies:
+        - Statement:
+            - Sid: AgentsApiTableAccess
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+                - dynamodb:Scan
+                - dynamodb:DeleteItem
+              Resource:
+                - !GetAtt WfTable.Arn
+                - !Sub ${WfTable.Arn}/index/*
+      Events:
+        ListAgents:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents
+            Method: GET
+        GetAgent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}
+            Method: GET
+        PatchAgent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}
+            Method: PATCH
+            Auth:
+              Authorizer: AWS_IAM
+        DeleteAgent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}
+            Method: DELETE
+            Auth:
+              Authorizer: AWS_IAM
+      Tags:
+        workforce: !Ref Stage
+
+  # CloudWatch alarm: any Errors metric on the agents-api function
+  # publishes to the workforce alarm topic.
+  WfAgentsApiErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-agents-api-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-agents-api-${Stage} over 5 minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfAgentsApiFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
 Outputs:
   TableName:
     Description: DynamoDB table name (consumed by PR5/PR6 Lambdas).
@@ -219,3 +325,8 @@ Outputs:
     Value: !Ref WfAlarmTopic
     Export:
       Name: !Sub wf-alarm-topic-arn-${Stage}
+  AgentsApiUrl:
+    Description: Base URL of the agents HTTP API.
+    Value: !Sub https://${WfAgentsHttpApi}.execute-api.${AWS::Region}.amazonaws.com
+    Export:
+      Name: !Sub wf-agents-api-url-${Stage}

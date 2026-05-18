@@ -31,10 +31,12 @@ const listDir = (path) => {
 };
 
 // Rule 1: kebab-case for directories under workforce/{agents,lambdas,skills}/
+const SKIP_DIR_NAMES = new Set(["node_modules", "dist", ".aws-sam"]);
 for (const parent of ["agents", "lambdas", "skills"]) {
   const dir = join(WORKFORCE_ROOT, parent);
   for (const e of listDir(dir)) {
     if (!e.stat.isDirectory()) continue;
+    if (SKIP_DIR_NAMES.has(e.name)) continue;
     if (!KEBAB.test(e.name)) {
       report("R1-kebab-dir", e.full, `directory name "${e.name}" must match ${KEBAB}`);
     }
