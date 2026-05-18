@@ -1,6 +1,6 @@
 # RFC-004 — Skill catalog + utilization
 
-- **Status**: Proposed
+- **Status**: Draft
 - **Owner**: Maya
 - **Created**: 2026-05-18
 - **Implemented by**: —
