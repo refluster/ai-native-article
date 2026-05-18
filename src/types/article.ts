@@ -25,4 +25,12 @@ export interface ArticleMeta {
    * articles (L2 origin), multiple for analysis articles (L3 origin).
    */
   sourceUrls?: string
+  /**
+   * Workforce persona slug that authored the article (`sora`, `maya`, …)
+   * or `anonymous` for the legacy unnamed-narrator articles. Optional
+   * during the agent rollout — older entries lack this field; the
+   * AuthorChip falls back to a quiet placeholder for missing/unknown
+   * values. See workforce/docs/rfcs/rfc-002-agent-profile.md.
+   */
+  author?: string
 }

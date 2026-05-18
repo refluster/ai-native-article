@@ -11,6 +11,8 @@ import L2Blog from './pages/L2Blog'
 import L3Insight from './pages/L3Insight'
 import L4Publish from './pages/L4Publish'
 import Sources from './pages/Sources'
+import AgentDirectory from './pages/workforce/AgentDirectory'
+import AgentProfile from './pages/workforce/AgentProfile'
 import { routerBaseName } from './lib/paths'
 import { trackPageView } from './lib/analytics'
 
@@ -42,6 +44,8 @@ export default function App() {
             <Route path="/l2-blog" element={<L2Blog />} />
             <Route path="/l3-insight" element={<L3Insight />} />
             <Route path="/l4-publish" element={<L4Publish />} />
+            <Route path="/workforce/agents" element={<AgentDirectory />} />
+            <Route path="/workforce/agents/:slug" element={<AgentProfile />} />
           </Routes>
         </main>
         <Footer />

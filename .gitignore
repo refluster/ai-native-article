@@ -5,3 +5,4 @@ dist/
 skills/
 .claude/*
 !.claude/skills/
+public/workforce-agents.json
