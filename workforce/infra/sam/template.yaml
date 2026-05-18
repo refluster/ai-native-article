@@ -286,6 +286,21 @@ Resources:
             Method: DELETE
             Auth:
               Authorizer: AWS_IAM
+        # RFC-008 PR-D: skills read-only routes on the same HTTP API.
+        # GET /skills + GET /skills/{name}. No PATCH/DELETE on skills at
+        # v1 — operational mutations go through PRs that edit meta.json.
+        ListSkills:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /skills
+            Method: GET
+        GetSkill:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /skills/{name}
+            Method: GET
       Tags:
         workforce: !Ref Stage
 
@@ -375,6 +390,72 @@ Resources:
       Dimensions:
         - Name: FunctionName
           Value: !Ref WfSeedAgentsFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  # --- Skills seed Lambda (RFC-008 PR-D) ------------------------------------
+  # Mirror of WfSeedAgentsFunction for the skill repository. Reads
+  # workforce/skills/{name}/{SKILL.md, meta.json} from the deployed bundle
+  # (Makefile builder copies the tree) and upserts SKILL#{name}/META rows.
+  # Identity_hash gates idempotency; operational fields preserved on re-seed.
+  WfSeedSkillsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-seed-skills-${Stage}
+      CodeUri: ../../lambdas/seed-skills
+      Handler: handler.handler
+      Description: Workforce skill seed. Files -> DDB SKILL#{name}/META. See RFC-008 PR-D.
+      MemorySize: 512
+      Timeout: 60
+      Policies:
+        - Statement:
+            - Sid: SeedSkillsTableAccess
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+              Resource:
+                - !GetAtt WfTable.Arn
+      Events:
+        PostDeploy:
+          # Mirror of WfSeedAgentsFunction.Events.PostDeploy. Fires on
+          # CREATE_COMPLETE / UPDATE_COMPLETE of this stack.
+          Type: EventBridgeRule
+          Properties:
+            RuleName: !Sub wf-seed-skills-postdeploy-${Stage}
+            Pattern:
+              source:
+                - aws.cloudformation
+              detail-type:
+                - CloudFormation Stack Status Change
+              detail:
+                stack-id:
+                  - prefix: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/wf-data-plane-${Stage}/
+                status-details:
+                  status:
+                    - CREATE_COMPLETE
+                    - UPDATE_COMPLETE
+      Tags:
+        workforce: !Ref Stage
+
+  WfSeedSkillsErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-seed-skills-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-seed-skills-${Stage} over 5 minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfSeedSkillsFunction
       Statistic: Sum
       Period: 300
       EvaluationPeriods: 1

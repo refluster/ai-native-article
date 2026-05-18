@@ -4,8 +4,11 @@
 //   GET    /agents/{slug}       single agent
 //   PATCH  /agents/{slug}       operational fields only (IAM-auth at API GW)
 //   DELETE /agents/{slug}       soft delete -> archived=true (IAM-auth at API GW)
+//   GET    /skills              list of skills (paginated, filterable)
+//   GET    /skills/{name}       single skill
 //
-// See workforce/docs/rfcs/rfc-007-agent-management-api.md for the
+// See workforce/docs/rfcs/rfc-007-agent-management-api.md (agents) and
+// workforce/docs/rfcs/rfc-008-skill-repository.md (skills) for the
 // source-of-truth split and the IAM-auth boundary.
 
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
@@ -16,6 +19,11 @@ import {
   agentPk,
   toApiView,
 } from "../shared/agent.js";
+import {
+  type SkillMetaRow,
+  skillPk,
+  toSkillApiView,
+} from "../shared/skill-row.js";
 import { getItem, scanPrefix, updateOperational } from "../shared/ddb.js";
 
 const PAGE_SIZE_DEFAULT = 25;
@@ -35,8 +43,11 @@ export async function handler(
     const method = event.requestContext.http.method;
     const path = event.requestContext.http.path;
     const slug = event.pathParameters?.slug;
+    const skillName = event.pathParameters?.name;
 
     if (method === "GET" && path === "/agents") return listAgents(event);
+    if (method === "GET" && path === "/skills") return listSkills(event);
+    if (method === "GET" && skillName) return getSkill(skillName);
     if (method === "GET" && slug) return getAgent(slug);
     if (method === "PATCH" && slug) return patchAgent(slug, event.body);
     if (method === "DELETE" && slug) return deleteAgent(slug);
@@ -134,6 +145,34 @@ async function deleteAgent(slug: string): Promise<APIGatewayProxyResultV2> {
     existing.identity_hash,
   );
   return reply(200, toApiView(updated));
+}
+
+// ----- Skills (RFC-008 PR-D) -----
+
+async function listSkills(
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const qs = event.queryStringParameters ?? {};
+  const filterStatus = qs.status as "active" | "stale" | "deprecated" | undefined;
+  const filterOwner = qs.owner; // agent slug — show skills the given agent owns
+  const pageSize = Math.min(
+    Math.max(parseInt(qs.page_size ?? `${PAGE_SIZE_DEFAULT}`, 10) || PAGE_SIZE_DEFAULT, 1),
+    PAGE_SIZE_MAX,
+  );
+
+  const page = await scanPrefix<SkillMetaRow>("SKILL#", "META", pageSize, qs.cursor);
+  const items = page.items
+    .filter((r) => !filterStatus || r.status === filterStatus)
+    .filter((r) => !filterOwner || r.owners.includes(filterOwner))
+    .map(toSkillApiView);
+
+  return reply(200, { items, next_cursor: page.cursor });
+}
+
+async function getSkill(name: string): Promise<APIGatewayProxyResultV2> {
+  const row = await getItem<SkillMetaRow>(skillPk(name), "META");
+  if (!row) return reply(404, { error: "not_found", name });
+  return reply(200, toSkillApiView(row));
 }
 
 function reply(statusCode: number, body: unknown): APIGatewayProxyResultV2 {
