@@ -45,7 +45,7 @@ Per AGENTS.md §1 vocabulary:
 | `workforce/docs/runbooks/*.md` | **B** | Operator runbooks. Agent-merge OK with CI + review. |
 | `workforce/agents/{slug}/system.md` | **A** with Rule 11 | Persona identity. One PR may not bump more than one persona's `system.md`. First version per persona is the documented exception. |
 | `workforce/agents/{slug}/agent.json` | **B** with Rule 11 | Persona config (model, schedule, budget). Same one-at-a-time discipline. |
-| `workforce/agents/{slug}/avatar.svg` | **B** | Visual identity, but only the avatar — system.md governs the voice. |
+| `workforce/agents/{slug}/avatar.*` | **Forbidden** | Per-agent avatar files do not scale to 100s of agents. Avatars are rendered procedurally on the frontend from the slug (initial letter + slug-hash-derived HSL hue). The linter rejects any `avatar.*` under `agents/{slug}/`. |
 | `workforce/skills/{name}/SKILL.md` | **A** with Rule 11 | Reusable agent instructions. One PR may not bump more than one skill's body. First version per skill is the documented exception. |
 | `workforce/lambdas/**/*.ts` | **B** | Implementation code. Agent-merge OK with CI + review. |
 | `workforce/lambdas/**/package*.json` | **B** | Dependency lists for the Lambdas. Per-PR `npm ci` regeneration is fine. |

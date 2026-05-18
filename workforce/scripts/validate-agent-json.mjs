@@ -83,7 +83,12 @@ for (const slug of slugDirs) {
     continue;
   }
   if (!existsSync(sys)) v("F2-system-md-missing", dir, "system.md missing");
-  if (!existsSync(avatar)) v("F3-avatar-svg-missing", dir, "avatar.svg missing");
+  // F3 removed: per-agent avatar files don't scale to 100s of agents.
+  // Avatars are rendered procedurally from the slug (initial + slug-hash hue).
+  // If an avatar.svg sneaks in, flag it as an unused asset.
+  if (existsSync(avatar)) {
+    v("F3-avatar-asset-forbidden", avatar, "per-agent avatar.svg is forbidden; avatars are rendered procedurally from the slug — remove this file");
+  }
 
   let parsed;
   try {
