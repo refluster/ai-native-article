@@ -35,8 +35,8 @@ aws iam attach-role-policy \
 PR #22's post-merge deploy left the `workforce-dev` stack in `ROLLBACK_COMPLETE` state (nothing was actually created — DDB/S3 retention policies kept the slate clean, but the empty stack record blocks future creates):
 
 ```bash
-aws cloudformation delete-stack --stack-name workforce-dev --region ap-northeast-1
-aws cloudformation wait stack-delete-complete --stack-name workforce-dev --region ap-northeast-1
+aws cloudformation delete-stack --stack-name workforce-dev --region us-west-2
+aws cloudformation wait stack-delete-complete --stack-name workforce-dev --region us-west-2
 ```
 
 ### Then re-trigger the deploy

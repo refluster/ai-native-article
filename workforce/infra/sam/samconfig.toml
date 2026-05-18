@@ -2,7 +2,7 @@ version = 0.1
 
 [default.global.parameters]
 stack_name = "workforce-dev"
-region = "ap-northeast-1"
+region = "us-west-2"
 
 [default.deploy.parameters]
 capabilities = "CAPABILITY_IAM"
@@ -13,7 +13,7 @@ disable_rollback = false
 
 [prod.deploy.parameters]
 stack_name = "workforce-prod"
-region = "ap-northeast-1"
+region = "us-west-2"
 capabilities = "CAPABILITY_IAM"
 confirm_changeset = true
 resolve_s3 = true

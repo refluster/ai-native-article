@@ -37,7 +37,7 @@ This file is consumed by the daily `workforce-builder` Claude routine. The routi
 
 **Bootstrap preconditions** (confirmed completed before PR2 work begins):
 - AWS IAM OIDC provider + `workforce-deploy` role (trusts `repo:refluster/ai-native-article:*`)
-- GitHub repo variables: `AWS_DEPLOY_ROLE_ARN`, `AWS_REGION` (`ap-northeast-1`)
+- GitHub repo variables: `AWS_DEPLOY_ROLE_ARN`, `AWS_REGION` (`us-west-2`)
 - GitHub Environment: `prod` with required reviewer
 - Secrets Manager entries (relevant from PR4 onward): `workforce/azure-openai`, `workforce/anthropic`
 
