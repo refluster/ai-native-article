@@ -65,6 +65,7 @@ A new RFC is `rfc-NNN-<kebab-case-slug>.md`, where `NNN` is the next zero-padded
 | [004](rfc-004-skill-catalog.md) | Skill catalog + utilization | Proposed | Maya |
 | [005](rfc-005-agent-authored-article-pipeline.md) | Agent-authored L0→L1 article pipeline | Proposed | Maya |
 | [006](rfc-006-scalability.md) | Workforce scalability to 100+ agents | Proposed | Maya |
+| [007](rfc-007-agent-management-api.md) | Agent management surface (DDB + CRUD API, SAM, nodejs24.x) | Proposed | Maya |
 
 ## Why RFCs, not just issues
 
