@@ -1,9 +1,9 @@
 # RFC-008 — Skill repository as the execution unit
 
-- **Status**: Draft
+- **Status**: In-progress (2026-05-18)
 - **Owner**: Maya
 - **Created**: 2026-05-18
-- **Implemented by**: —
+- **Implemented by**: PR-A + PR-B combined as a single landing PR for the `article-draft` pilot. PR-C (RUN/DELIV traceability fields) folded into the same PR. PR-D (skill seed Lambda + DDB mirror) remains for a follow-up.
 
 ## Problem
 

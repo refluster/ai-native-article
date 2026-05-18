@@ -34,6 +34,11 @@ export interface RunRow {
   ended_at: string;
   error_message?: string;
   skip_reason?: string;
+  /** RFC-008 traceability: the skill that drove this run, or undefined
+   * when the runner's defaultBriefFor fallback fired. */
+  skill_name?: string;
+  /** meta.json:version at the time of the run. */
+  skill_version?: string;
 }
 
 export type DelivStatus = "pending" | "ok" | "timeout";
@@ -65,6 +70,9 @@ export interface DelivRow {
   dispatch_branch?: string;
   /** Per-row error context surfaced into the row on timeout. */
   error_message?: string;
+  /** RFC-008 traceability: mirrors the parent RUN row for one-hop lookup. */
+  skill_name?: string;
+  skill_version?: string;
 }
 
 export function newUlid(): string {
