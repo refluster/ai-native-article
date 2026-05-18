@@ -1,0 +1,13 @@
+{
+  "name": "plan-write",
+  "version": "0.1.0",
+  "status": "active",
+  "trigger_class": "lambda",
+  "cost_class": "medium",
+  "owners": ["maya"],
+  "improvement_agent": null,
+  "inputs": ["context-summary"],
+  "outputs": ["plan-markdown"],
+  "created_at": "2026-05-18",
+  "deprecated_replacement": null
+}

@@ -37,3 +37,6 @@ jobs:
 
       - name: Workforce agent.json schema
         run: npm run workforce:agents
+
+      - name: Workforce skill schema
+        run: npm run workforce:skills

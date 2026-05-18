@@ -16,7 +16,8 @@
     "lint:tokens": "node scripts/lint-design-tokens.mjs",
     "sitemap": "node scripts/generate-sitemap.mjs",
     "workforce:naming": "node workforce/scripts/validate-naming.mjs",
-    "workforce:agents": "node workforce/scripts/validate-agent-json.mjs"
+    "workforce:agents": "node workforce/scripts/validate-agent-json.mjs",
+    "workforce:skills": "node workforce/scripts/validate-skills.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

@@ -11,6 +11,7 @@ const HERE = fileURLToPath(new URL(".", import.meta.url));
 const WORKFORCE_ROOT = join(HERE, "..");
 const REPO_ROOT = join(WORKFORCE_ROOT, "..");
 const AGENTS_DIR = join(WORKFORCE_ROOT, "agents");
+const SKILLS_DIR = join(WORKFORCE_ROOT, "skills");
 
 const violations = [];
 const v = (rule, path, msg) =>
@@ -68,6 +69,25 @@ if (slugDirs.length === 0) {
 
 let totalBudget = 0;
 const W3_CAP = 50;
+
+// Build a snapshot of available skills + their owner lists for R8-* checks.
+// Skipped silently when workforce/skills/ doesn't exist yet (PR-A onwards always exists).
+const skillsIndex = new Map(); // name → { owners: Set<slug> }
+if (existsSync(SKILLS_DIR)) {
+  for (const name of readdirSync(SKILLS_DIR)) {
+    const dir = join(SKILLS_DIR, name);
+    if (!statSync(dir).isDirectory()) continue;
+    const metaPath = join(dir, "meta.json");
+    if (!existsSync(metaPath)) continue; // validate-skills.mjs flags this; don't double-report
+    try {
+      const meta = JSON.parse(readFileSync(metaPath, "utf8"));
+      const owners = new Set(Array.isArray(meta.owners) ? meta.owners : []);
+      skillsIndex.set(name, { owners });
+    } catch {
+      // validate-skills.mjs reports the parse error; we just skip the cross-check.
+    }
+  }
+}
 
 for (const slug of slugDirs) {
   const dir = join(AGENTS_DIR, slug);
@@ -139,6 +159,22 @@ for (const slug of slugDirs) {
     for (const s of parsed.skills) {
       if (typeof s !== "string" || !/^[a-z][a-z0-9-]*$/.test(s)) {
         v("S9-skill-name", cfg, `skill name "${s}" must be kebab-case`);
+        continue;
+      }
+      // R8-* cross-checks: only run when the skills index built above is populated
+      // (i.e. workforce/skills/ exists with at least one valid skill).
+      if (skillsIndex.size === 0) continue;
+      const entry = skillsIndex.get(s);
+      if (!entry) {
+        v("R8-skills-exist", cfg, `skill "${s}" has no workforce/skills/${s}/ directory`);
+        continue;
+      }
+      if (!entry.owners.has(slug)) {
+        v(
+          "R8-skills-owner",
+          cfg,
+          `agent "${slug}" declares skill "${s}" but is not listed in workforce/skills/${s}/meta.json:owners`,
+        );
       }
     }
   }
