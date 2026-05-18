@@ -317,8 +317,10 @@ Resources:
   # an unchanged file set is a no-op. Operational fields preserved on
   # re-seed.
   #
-  # Invoked manually via `aws lambda invoke` for now. The post-deploy
-  # auto-trigger (RFC-007 Q1) lands in a follow-up.
+  # Invoked automatically on every successful stack CREATE/UPDATE via the
+  # PostDeploy EventBridge rule below (RFC-007 Q1 default-(b): EventBridge
+  # rule on CloudFormation Stack Status Change). The Lambda is idempotent
+  # via identity_hash, so over-firing is harmless.
   WfSeedAgentsFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -339,6 +341,27 @@ Resources:
                 - dynamodb:PutItem
               Resource:
                 - !GetAtt WfTable.Arn
+      Events:
+        PostDeploy:
+          # Fires after every successful stack CREATE/UPDATE of *this*
+          # data-plane stack. Stack-id is a prefix filter because the
+          # full ARN includes a UUID suffix. The seed Lambda is
+          # idempotent, so any spurious match is a cheap no-op.
+          Type: EventBridgeRule
+          Properties:
+            RuleName: !Sub wf-seed-agents-postdeploy-${Stage}
+            Pattern:
+              source:
+                - aws.cloudformation
+              detail-type:
+                - CloudFormation Stack Status Change
+              detail:
+                stack-id:
+                  - prefix: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/wf-data-plane-${Stage}/
+                status-details:
+                  status:
+                    - CREATE_COMPLETE
+                    - UPDATE_COMPLETE
       Tags:
         workforce: !Ref Stage
 

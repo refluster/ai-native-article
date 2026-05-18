@@ -136,12 +136,7 @@ curl https://<api>/agents/sora     → new prompt_version, paused still true
 
 ## Open questions
 
-- Q1. Seed trigger — three options:
-  - (a) Add a step to `.github/workflows/deploy.yml` that calls `aws lambda invoke` after SAM deploy.
-  - (b) An EventBridge rule that fires on CloudFormation stack-update-complete (zero CI surface).
-  - (c) Manual only — operator runs the invoke after each main merge.
-  
-  Default: (a). It's explicit in CI and visible to anyone reading the workflow. Operator confirm.
+- Q1. Seed trigger — **resolved**: option (b) chosen. The SAM template wires an EventBridge rule `wf-seed-agents-postdeploy-{stage}` that fires on `CREATE_COMPLETE` / `UPDATE_COMPLETE` of the `wf-data-plane-{stage}` stack and invokes the seed Lambda. Zero CI / OIDC-role surface. The Lambda is idempotent via `identity_hash`, so spurious matches are harmless. Operator may still invoke the CLI on demand for recovery.
 
 - Q2. `PATCH`-able field list — should `model` (e.g. flipping Sora from Sonnet to Opus) be operational or identity? Default: **identity** — model choice is part of voice, changing it warrants prompt-review. Operator confirms.
 
