@@ -7,7 +7,7 @@
   "owners": ["sora"],
   "improvement_agent": null,
   "inputs": ["memory-recent", "l0-sources-recent"],
-  "outputs": ["article-markdown"],
+  "outputs": ["synthesis-article-markdown"],
   "created_at": "2026-05-18",
   "deprecated_replacement": null
 }
