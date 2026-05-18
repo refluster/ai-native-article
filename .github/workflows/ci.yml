@@ -31,3 +31,6 @@ jobs:
 
       - name: GAS manifest check
         run: npm run check-gas
+
+      - name: Workforce naming lint (R-N7)
+        run: npm run workforce:naming
