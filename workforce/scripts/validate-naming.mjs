@@ -86,7 +86,9 @@ if (existsSync(samPath)) {
   // Match lines like:   FunctionName: wf-foo-${Stage}
   //   or  FunctionName: !Sub wf-foo-${Stage}
   //   or  FunctionName: "wf-foo-${Stage}"
-  const nameProp = /^(\s*)(FunctionName|TableName|BucketName|RuleName|TopicName|QueueName|StateMachineName|LogGroupName|AlarmName):\s*(?:!Sub\s+)?["']?([^\s"'#]+)["']?/gm;
+  // [ \t]+ (not \s+) so we don't match a bare YAML key on its own line —
+  // those are Outputs/parameter-block headers, not deployed-resource-name properties.
+  const nameProp = /^(\s*)(FunctionName|TableName|BucketName|RuleName|TopicName|QueueName|StateMachineName|LogGroupName|AlarmName):[ \t]+(?:!Sub[ \t]+)?["']?([^\s"'#]+)["']?/gm;
   let m;
   while ((m = nameProp.exec(yaml)) !== null) {
     const [, , prop, value] = m;

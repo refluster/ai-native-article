@@ -1,0 +1,40 @@
+version = 0.1
+
+# Shared defaults applied to every env. Stage-specific overrides below.
+[default.global.parameters]
+stack_name = "wf-data-plane-dev"
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+region = "ap-northeast-1"
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
+confirm_changeset = true
+fail_on_empty_changeset = false
+resolve_s3 = true
+
+# ----- dev -----
+[dev.global.parameters]
+stack_name = "wf-data-plane-dev"
+
+[dev.deploy.parameters]
+region = "ap-northeast-1"
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
+parameter_overrides = "Stage=dev MonthlyBudgetUsd=10 AlarmEmail=replace-me@example.com"
+confirm_changeset = true
+fail_on_empty_changeset = false
+resolve_s3 = true
+
+# ----- prod -----
+[prod.global.parameters]
+stack_name = "wf-data-plane-prod"
+
+[prod.deploy.parameters]
+region = "ap-northeast-1"
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
+parameter_overrides = "Stage=prod MonthlyBudgetUsd=50 AlarmEmail=replace-me@example.com"
+confirm_changeset = true
+fail_on_empty_changeset = false
+resolve_s3 = true
