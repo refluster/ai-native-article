@@ -1,0 +1,18 @@
+{
+  "slug": "ren",
+  "name": "Ren",
+  "role": "Engineer",
+  "model": "anthropic:claude-sonnet-4-6",
+  "schedule_cron": "cron(0 0 ? * MON-FRI *)",
+  "schedule_note": "Weekdays 09:00 JST",
+  "prompt_version": "0.1.0",
+  "budget_monthly_usd": 15,
+  "skills": ["code-task-brief", "article-draft", "notion-publish"],
+  "default_project": "workforce-self",
+  "streams": ["internal", "client", "editorial"],
+  "primary_deliverable_type": "pr",
+  "primary_deliverable_kind": "tech-note",
+  "code_execution": "claude-code-routine-on-gha",
+  "owner_email": null,
+  "created_at": "2026-05-18"
+}

@@ -12,7 +12,8 @@
     "deploy-gas": "npm run push-gas && clasp deploy -i AKfycbwT9brOVSZqKzpf9-yZ_O8BHKJiFuZxwxawKK4FAhBwq-sdloyv56rDgNec9uQ2N4u-",
     "lint:tokens": "node scripts/lint-design-tokens.mjs",
     "sitemap": "node scripts/generate-sitemap.mjs",
-    "workforce:naming": "node workforce/scripts/validate-naming.mjs"
+    "workforce:naming": "node workforce/scripts/validate-naming.mjs",
+    "workforce:agents": "node workforce/scripts/validate-agent-json.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
