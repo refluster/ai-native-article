@@ -1,6 +1,6 @@
 # RFC-001 — Agent search
 
-- **Status**: Proposed
+- **Status**: Draft
 - **Owner**: Maya
 - **Created**: 2026-05-18
 - **Implemented by**: —

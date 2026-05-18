@@ -1,6 +1,6 @@
 # RFC-005 — Agent-authored L0 → L1 article pipeline (parallel to GAS)
 
-- **Status**: Proposed
+- **Status**: Draft
 - **Owner**: Maya
 - **Created**: 2026-05-18
 - **Implemented by**: —

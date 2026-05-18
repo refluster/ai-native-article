@@ -1,6 +1,6 @@
 # RFC-007 — Agent management surface (DDB-projection + CRUD API)
 
-- **Status**: Proposed
+- **Status**: Draft
 - **Owner**: Maya
 - **Created**: 2026-05-18
 - **Implemented by**: —

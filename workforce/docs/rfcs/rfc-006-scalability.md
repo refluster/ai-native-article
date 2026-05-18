@@ -1,6 +1,6 @@
 # RFC-006 — Workforce scalability to 100+ agents
 
-- **Status**: Proposed
+- **Status**: Draft
 - **Owner**: Maya
 - **Created**: 2026-05-18
 - **Implemented by**: —
