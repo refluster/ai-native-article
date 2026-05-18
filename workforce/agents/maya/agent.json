@@ -1,0 +1,17 @@
+{
+  "slug": "maya",
+  "name": "Maya",
+  "role": "PM / Founder",
+  "model": "anthropic:claude-opus-4-7",
+  "schedule_cron": "cron(0 1 ? * WED *)",
+  "schedule_note": "Wednesday 10:00 JST (runner enforces biweekly cadence)",
+  "prompt_version": "0.1.0",
+  "budget_monthly_usd": 10,
+  "skills": ["plan-write", "article-draft", "notion-publish"],
+  "default_project": "workforce-self",
+  "streams": ["internal", "client", "editorial"],
+  "primary_deliverable_type": "plan",
+  "primary_deliverable_kind": "hypothesis",
+  "owner_email": null,
+  "created_at": "2026-05-18"
+}

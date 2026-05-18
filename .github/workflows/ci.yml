@@ -34,3 +34,6 @@ jobs:
 
       - name: Workforce naming lint (R-N7)
         run: npm run workforce:naming
+
+      - name: Workforce agent.json schema
+        run: npm run workforce:agents
