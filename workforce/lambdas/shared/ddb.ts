@@ -8,6 +8,7 @@ import {
   PutCommand,
   UpdateCommand,
   ScanCommand,
+  QueryCommand,
   DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
 
@@ -118,4 +119,25 @@ export async function scanPrefix<T extends object>(
 
 export async function deleteItem(pk: string, sk: string): Promise<void> {
   await ddb.send(new DeleteCommand({ TableName: tableName, Key: { pk, sk } }));
+}
+
+/**
+ * Query rows under a single partition by SK prefix. More efficient than
+ * Scan when the access pattern is "all DELIV#* rows under AGENT#ren" etc.
+ */
+export async function queryBySkPrefix<T extends object>(
+  pk: string,
+  skPrefix: string,
+  limit = 100,
+): Promise<T[]> {
+  const res = await ddb.send(
+    new QueryCommand({
+      TableName: tableName,
+      KeyConditionExpression: "#pk = :pk AND begins_with(#sk, :skp)",
+      ExpressionAttributeNames: { "#pk": "pk", "#sk": "sk" },
+      ExpressionAttributeValues: { ":pk": pk, ":skp": skPrefix },
+      Limit: limit,
+    }),
+  );
+  return (res.Items ?? []) as T[];
 }

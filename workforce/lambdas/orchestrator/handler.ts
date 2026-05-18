@@ -1,28 +1,31 @@
 // wf-orchestrator Lambda handler.
 //
 // Driven by a single EventBridge rule wf-orchestrator-tick-{stage} that
-// fires every 5 minutes. On each tick:
+// fires every 5 minutes. On each tick (in order):
 //
-//   1. Scan all AGENT#*/META rows.
-//   2. For each non-archived agent, evaluate its effective cron against
+//   A. Poll Ren's pending pr DELIV rows. For each one:
+//        - findRecentPRs(owner, repo, dispatch_branch, dispatched_at)
+//        - On match: update DELIV pr_url + status=ok + published_at.
+//        - 24h elapsed without match: status=timeout + error_message.
+//        The 24h timeout is the W-4 mechanical guard against silent
+//        Claude-Code-routine failures.
+//
+//   B. Scan all AGENT#*/META rows.
+//   C. For each non-archived agent, evaluate its effective cron against
 //      a 5-minute window. If matchesNow returns true, async-invoke
 //      wf-agent-runner-{stage} with { agent, task_kind }.
-//   3. Skip an agent if its last_run_at is within a per-cadence
-//      dedup window (defaults below) — guards against same-window
-//      double-fire.
+//   D. Skip an agent if its last_run_at is within a per-cadence dedup
+//      window — guards against same-window double-fire.
 //
 // Paused/archived agents are skipped without invoking the runner.
-// Ren (code_execution=claude-code-routine-on-gha) is invoked as well —
-// the runner's dispatch on code_execution lands in PR12; until then his
-// invocation will fall through the runner's article path and write a
-// noop RUN row. Operator can disable Ren in DDB (PATCH paused=true)
-// while waiting.
 
 import type { Context } from "aws-lambda";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { agentPk, type AgentMetaRow, type DeliverableType } from "../shared/agent.js";
-import { scanPrefix } from "../shared/ddb.js";
+import { scanPrefix, queryBySkPrefix, updateOperational } from "../shared/ddb.js";
 import { matchesNow } from "../shared/cron-match.js";
+import { findRecentPRs } from "../shared/github.js";
+import type { DelivRow } from "../shared/task.js";
 
 const STAGE = process.env.STAGE;
 const TICK_WINDOW_MINUTES = parseInt(process.env.TICK_WINDOW_MINUTES ?? "5", 10);
@@ -44,11 +47,22 @@ const DEDUP_MINUTES_BY_TYPE: Record<DeliverableType, number> = {
   "launch-plan": 60 * 24 * 6,
 };
 
+// Polling Ren's pending PR DELIVs.
+const ENGINEER_SLUG = process.env.ENGINEER_SLUG ?? "ren";
+const ENGINEER_OWNER = process.env.ENGINEER_OWNER ?? "refluster";
+const ENGINEER_REPO = process.env.ENGINEER_REPO ?? "ai-native-article";
+const ENGINEER_TIMEOUT_MIN = parseInt(process.env.ENGINEER_TIMEOUT_MIN ?? "1440", 10); // 24h default
+
 export interface OrchestratorResult {
   ticked_at: string;
   scanned: number;
   dispatched: Array<{ slug: string; task_kind: string }>;
   skipped: Array<{ slug: string; reason: string }>;
+  pr_polls: {
+    pending_seen: number;
+    promoted_ok: Array<{ deliv_id: string; pr_url: string }>;
+    timed_out: Array<{ deliv_id: string }>;
+  };
 }
 
 export async function handler(_event: unknown, _context: Context): Promise<OrchestratorResult> {
@@ -57,8 +71,12 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
   const dispatched: OrchestratorResult["dispatched"] = [];
   const skipped: OrchestratorResult["skipped"] = [];
 
-  // Walk all AGENT#*/META rows. At N < 200 a single scan is fine; cursor
-  // loop here would only matter at multi-thousand-agent scale.
+  // A. Poll Ren's pending PR DELIVs first. Doing it before dispatch means
+  // a just-dispatched DELIV (which we'd write later in this same tick)
+  // can't be re-checked too eagerly.
+  const pr_polls = await pollEngineerPRs(now);
+
+  // B/C/D. Cron-driven dispatch.
   let cursor: string | undefined;
   let scanned = 0;
   do {
@@ -76,9 +94,66 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
     }
   } while (cursor);
 
-  const result: OrchestratorResult = { ticked_at: tickedAt, scanned, dispatched, skipped };
+  const result: OrchestratorResult = { ticked_at: tickedAt, scanned, dispatched, skipped, pr_polls };
   console.log(JSON.stringify({ event: "tick-complete", result }));
   return result;
+}
+
+async function pollEngineerPRs(now: Date): Promise<OrchestratorResult["pr_polls"]> {
+  const promoted_ok: OrchestratorResult["pr_polls"]["promoted_ok"] = [];
+  const timed_out: OrchestratorResult["pr_polls"]["timed_out"] = [];
+
+  const rows = await queryBySkPrefix<DelivRow>(agentPk(ENGINEER_SLUG), "DELIV#", 100);
+  const pending = rows.filter((r) => r.status === "pending" && r.type === "pr");
+
+  if (pending.length === 0) {
+    return { pending_seen: 0, promoted_ok, timed_out };
+  }
+
+  // One GitHub list-PRs call covers all pending rows — we filter client-side
+  // by dispatch_branch. Earliest dispatched_at scopes the `since` filter.
+  const earliest = pending.reduce(
+    (acc, r) => (r.dispatched_at && r.dispatched_at < acc ? r.dispatched_at : acc),
+    now.toISOString(),
+  );
+  let recentPRs: Awaited<ReturnType<typeof findRecentPRs>> = [];
+  try {
+    recentPRs = await findRecentPRs(ENGINEER_OWNER, ENGINEER_REPO, `${ENGINEER_SLUG}/`, earliest);
+  } catch (err) {
+    console.warn("findRecentPRs failed:", err instanceof Error ? err.message : String(err));
+    // Don't fail the whole tick — pending rows stay pending; next tick retries.
+    return { pending_seen: pending.length, promoted_ok, timed_out };
+  }
+
+  for (const row of pending) {
+    const delivId = row.sk.replace("DELIV#", "");
+    const branch = row.dispatch_branch ?? `${ENGINEER_SLUG}/${delivId}`;
+    const match = recentPRs.find((p) => p.branch === branch);
+    if (match) {
+      await updateOperational(row.pk, row.sk, {
+        pr_url: match.url,
+        status: "ok",
+        published_at: now.toISOString(),
+      });
+      promoted_ok.push({ deliv_id: delivId, pr_url: match.url });
+      continue;
+    }
+    // Timeout?
+    const dispatchedAt = row.dispatched_at ?? row.created_at;
+    const ageMin = (now.getTime() - Date.parse(dispatchedAt)) / 60_000;
+    if (ageMin > ENGINEER_TIMEOUT_MIN) {
+      await updateOperational(row.pk, row.sk, {
+        status: "timeout",
+        error_message: `no PR appeared within ${ENGINEER_TIMEOUT_MIN}min`,
+      });
+      // Log loudly — alarm on Errors metric will catch the orchestrator
+      // *throw*, but timeouts are within-bound state transitions. Surface
+      // via console for now; a dedicated CloudWatch metric is a follow-up.
+      console.warn(JSON.stringify({ event: "engineer-pr-timeout", deliv_id: delivId, branch, age_min: Math.round(ageMin) }));
+      timed_out.push({ deliv_id: delivId });
+    }
+  }
+  return { pending_seen: pending.length, promoted_ok, timed_out };
 }
 
 type Decision =
