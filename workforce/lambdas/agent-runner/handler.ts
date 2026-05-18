@@ -31,6 +31,11 @@ import { insertArticle } from "../shared/notion.js";
 import { deliverableTargetFor, writeDeliverableArtefact } from "../shared/deliverable.js";
 import { dispatchEngineer } from "../shared/github.js";
 import {
+  composeSystemPrompt,
+  loadActiveSkillsForAgent,
+  pickSkillForTask,
+} from "../shared/skill.js";
+import {
   newUlid,
   type DelivRow,
   type RunRow,
@@ -93,8 +98,17 @@ export async function handler(event: RunnerEvent, context: Context): Promise<Run
   const cap = effectiveBudgetCap(agent);
   await assertWithinBudget(event.agent, cap, PROJECTED_RUN_COST_USD);
 
-  // 5. Build prompt.
-  const system = await loadSystemMd(event.agent);
+  // 5. Build prompt. RFC-008: load assigned skills, pick one for this task_kind,
+  // and compose its body onto system.md. When no Skill matches we keep the
+  // defaultBriefFor fallback and emit a WARN so operators can spot tasks that
+  // need a new Skill.
+  const baseSystem = await loadSystemMd(event.agent);
+  const assignedSkills = await loadActiveSkillsForAgent(event.agent, agent.skills);
+  const selectedSkill = pickSkillForTask(event.task_kind, assignedSkills);
+  if (!selectedSkill) {
+    console.warn(`agent-runner(${event.agent}): no Skill matched task_kind=${event.task_kind}; falling back to defaultBriefFor`);
+  }
+  const system = composeSystemPrompt(baseSystem, selectedSkill);
   const userPrompt = buildUserPrompt(event, previousChunk);
 
   if (event.dryRun) {
@@ -130,7 +144,18 @@ export async function handler(event: RunnerEvent, context: Context): Promise<Run
   let delivRow: DelivRow;
   let notionUrl: string | undefined;
 
-  if (agent.code_execution === "claude-code-routine-on-gha" && agent.primary_deliverable_type === "pr") {
+  // RFC-008 R-N1 amendment: the CC-routine exception is dispatched per-Skill,
+  // not per-agent. When the selected Skill's trigger_class is claude-code-routine,
+  // route through dispatchPrPath regardless of which agent is calling. The
+  // legacy agent.code_execution-based path is kept as a fallback for runs
+  // where no Skill matched (preserves Ren's current behaviour pre-Skills).
+  const ccRouteBySkill = selectedSkill?.meta.trigger_class === "claude-code-routine";
+  const ccRouteByLegacy =
+    !selectedSkill &&
+    agent.code_execution === "claude-code-routine-on-gha" &&
+    agent.primary_deliverable_type === "pr";
+
+  if (ccRouteBySkill || ccRouteByLegacy) {
     delivRow = await dispatchPrPath(event.agent, agent, delivId, startedAt, event.task_kind, llm.text);
   } else {
     const target = deliverableTargetFor(event.agent, agent.primary_deliverable_type, delivId);
