@@ -412,6 +412,68 @@ Resources:
       AlarmActions:
         - !Ref WfAlarmTopic
 
+  # --- Orchestrator Lambda + tick rule (PR6c, RFC-006 S1) -------------------
+  # One EventBridge rule fires every 5 minutes. The orchestrator scans all
+  # AGENT#*/META rows, evaluates each agent's schedule_cron against the
+  # 5-minute window, and async-invokes wf-agent-runner-{stage} for the
+  # ones that fire. No per-agent CFN rules — workforce scales by adding
+  # data rows, not template resources.
+  WfOrchestratorFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-orchestrator-${Stage}
+      CodeUri: ../../lambdas/orchestrator
+      Handler: handler.handler
+      Description: Workforce dispatcher. Reads cron from DDB, async-invokes runner.
+      MemorySize: 512
+      Timeout: 60
+      Environment:
+        Variables:
+          RUNNER_FUNCTION_NAME: !Ref WfAgentRunnerFunction
+          TICK_WINDOW_MINUTES: "5"
+      Policies:
+        - Statement:
+            - Sid: OrchestratorDdbScan
+              Effect: Allow
+              Action:
+                - dynamodb:Scan
+              Resource: !GetAtt WfTable.Arn
+            - Sid: OrchestratorRunnerInvoke
+              Effect: Allow
+              Action: lambda:InvokeFunction
+              Resource: !GetAtt WfAgentRunnerFunction.Arn
+      Events:
+        Tick:
+          Type: Schedule
+          Properties:
+            Name: !Sub wf-orchestrator-tick-${Stage}
+            Description: Drives the workforce dispatch loop every 5 minutes.
+            Schedule: rate(5 minutes)
+            Enabled: false
+      Tags:
+        workforce: !Ref Stage
+
+  WfOrchestratorErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-orchestrator-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-orchestrator-${Stage} over 5 minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfOrchestratorFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
 Outputs:
   TableName:
     Description: DynamoDB table name (consumed by PR5/PR6 Lambdas).
