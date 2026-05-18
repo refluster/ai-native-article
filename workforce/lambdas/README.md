@@ -48,29 +48,35 @@ npm run typecheck   # tsc --noEmit
 
 ## Build + deploy
 
-From [`../infra/sam`](../infra/sam):
+Both Lambdas use SAM's **Makefile builder** (per-function `Makefile`). The Makefiles call `../node_modules/.bin/esbuild`, so the **dependencies must be installed once** in the shared `workforce/lambdas/node_modules/` before `sam build`:
 
 ```bash
-sam build           # esbuild compiles handler.ts -> handler.mjs per function
+# 1. Install lambda deps (one-time per checkout / on package.json change)
+cd workforce/lambdas
+npm ci
+
+# 2. Build + deploy
+cd ../infra/sam
+sam build      # runs each function's Makefile -> ARTIFACTS_DIR/handler.mjs
 sam deploy --config-env dev --parameter-overrides "Stage=dev MonthlyBudgetUsd=10 AlarmEmail=YOU"
 ```
 
+R-N8 (data-shape uniformity) holds at the build layer — both functions share the same toolchain, the same `node_modules`, the same Makefile shape. The seed-agents Makefile additionally `cp -R ../../agents/. $(ARTIFACTS_DIR)/agents/` so the handler can read the persona files at runtime.
+
 The CloudFormation output `AgentsApiUrl` gives the base URL of the HTTP API. The API has **no custom domain in v1** — the AWS-generated URL is the contract.
 
-## Seeding DDB with the 5 agents (until PR5.1)
+## Seeding DDB
 
-Until [`seed-agents/handler.ts`](seed-agents/handler.ts) is wired into SAM (Makefile build that copies `workforce/agents/**` into the bundle), the operator seeds manually after the first deploy. From the repo root:
+After the first `sam deploy`, run the seed CLI to populate `AGENT#{slug}/META` rows from the file tree:
 
 ```bash
-for slug in sora maya ren aoi yuki; do
-  agent=$(cat workforce/agents/$slug/agent.json)
-  # Convert to the AGENT#{slug}/META row shape and put.
-  # See workforce/docs/data-model.md for the full row schema.
-  echo "TODO: aws dynamodb put-item for $slug — script lands in PR5.1"
-done
+node workforce/scripts/seed-agents.mjs dev    # default stage
+node workforce/scripts/seed-agents.mjs prod
 ```
 
-A one-shot seed CLI (`workforce/scripts/seed-agents.mjs`) is in scope for **PR5.1**, along with wiring `seed-agents/handler.ts` into SAM (Makefile builder copies the agents tree into the artifact). The Lambda code is already committed in this PR so the wiring change can be small.
+The CLI is a thin wrapper that invokes `wf-seed-agents-{stage}` via `aws lambda invoke` and pretty-prints the result. The Lambda itself is **idempotent** — an unchanged file set is a no-op (identity-hash matches), and operational fields set via the API (`paused`, `archived`, `*_override`) are preserved on re-seed.
+
+Re-seeding happens automatically whenever the operator re-deploys with `sam deploy` if a post-deploy trigger is wired up (RFC-007 Q1, deferred). Until then, run the CLI manually after each deploy that touches `workforce/agents/{slug}/`.
 
 ## Invocation (after seeding)
 

@@ -221,18 +221,7 @@ Resources:
   WfAgentsApiFunction:
     Type: AWS::Serverless::Function
     Metadata:
-      BuildMethod: esbuild
-      BuildProperties:
-        Format: esm
-        Minify: false
-        OutExtension:
-          - .js=.mjs
-        Target: node24
-        Sourcemap: false
-        EntryPoints:
-          - handler.ts
-        External:
-          - "@aws-sdk/*"
+      BuildMethod: makefile
     Properties:
       FunctionName: !Sub wf-agents-api-${Stage}
       CodeUri: ../../lambdas/agents-api
@@ -296,6 +285,57 @@ Resources:
       Dimensions:
         - Name: FunctionName
           Value: !Ref WfAgentsApiFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  # --- Agents seed Lambda (RFC-007) -----------------------------------------
+  # Reads workforce/agents/{slug}/{agent.json, system.md} from the deployed
+  # bundle (the Makefile builder copies the tree into ARTIFACTS_DIR/agents/)
+  # and upserts AGENT#{slug}/META rows. Identity-hash gates idempotency:
+  # an unchanged file set is a no-op. Operational fields preserved on
+  # re-seed.
+  #
+  # Invoked manually via `aws lambda invoke` for now. The post-deploy
+  # auto-trigger (RFC-007 Q1) lands in a follow-up.
+  WfSeedAgentsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-seed-agents-${Stage}
+      CodeUri: ../../lambdas/seed-agents
+      Handler: handler.handler
+      Description: Workforce agents seed. Files -> DDB AGENT#{slug}/META. See RFC-007.
+      MemorySize: 512
+      Timeout: 60
+      Policies:
+        - Statement:
+            - Sid: SeedAgentsTableAccess
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+              Resource:
+                - !GetAtt WfTable.Arn
+      Tags:
+        workforce: !Ref Stage
+
+  WfSeedAgentsErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-seed-agents-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-seed-agents-${Stage} over 5 minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfSeedAgentsFunction
       Statistic: Sum
       Period: 300
       EvaluationPeriods: 1
