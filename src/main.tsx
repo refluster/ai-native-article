@@ -5,7 +5,9 @@ import App from './App.tsx'
 import { SITE_BASE_PATH } from './config/site'
 import { initAnalytics } from './lib/analytics'
 
-initAnalytics(import.meta.env.VITE_GA_ID)
+// Default GA4 ID for kohuehara.xyz. VITE_GA_ID still wins when set (e.g. a
+// staging build with a different property), but unset → analytics is on, not off.
+initAnalytics(import.meta.env.VITE_GA_ID || 'G-Q5VF5YLLDL')
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
