@@ -253,6 +253,7 @@ Resources:
                 - dynamodb:GetItem
                 - dynamodb:UpdateItem
                 - dynamodb:Scan
+                - dynamodb:Query
                 - dynamodb:DeleteItem
               Resource:
                 - !GetAtt WfTable.Arn
@@ -300,6 +301,12 @@ Resources:
           Properties:
             ApiId: !Ref WfAgentsHttpApi
             Path: /skills/{name}
+            Method: GET
+        ListAgentDeliverables:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}/deliverables
             Method: GET
       Tags:
         workforce: !Ref Stage

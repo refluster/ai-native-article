@@ -1,11 +1,12 @@
 // wf-agents-api Lambda handler.
 // Routes:
-//   GET    /agents              list (paginated, filterable)
-//   GET    /agents/{slug}       single agent
-//   PATCH  /agents/{slug}       operational fields only (IAM-auth at API GW)
-//   DELETE /agents/{slug}       soft delete -> archived=true (IAM-auth at API GW)
-//   GET    /skills              list of skills (paginated, filterable)
-//   GET    /skills/{name}       single skill
+//   GET    /agents                          list (paginated, filterable)
+//   GET    /agents/{slug}                   single agent
+//   GET    /agents/{slug}/deliverables      recent DELIV rows (paginated)
+//   PATCH  /agents/{slug}                   operational fields only (IAM-auth at API GW)
+//   DELETE /agents/{slug}                   soft delete -> archived=true (IAM-auth at API GW)
+//   GET    /skills                          list of skills (paginated, filterable)
+//   GET    /skills/{name}                   single skill
 //
 // See workforce/docs/rfcs/rfc-007-agent-management-api.md (agents) and
 // workforce/docs/rfcs/rfc-008-skill-repository.md (skills) for the
@@ -24,7 +25,8 @@ import {
   skillPk,
   toSkillApiView,
 } from "../shared/skill-row.js";
-import { getItem, scanPrefix, updateOperational } from "../shared/ddb.js";
+import type { DelivRow } from "../shared/task.js";
+import { getItem, queryBySkPrefix, scanPrefix, updateOperational } from "../shared/ddb.js";
 
 const PAGE_SIZE_DEFAULT = 25;
 const PAGE_SIZE_MAX = 100;
@@ -48,6 +50,7 @@ export async function handler(
     if (method === "GET" && path === "/agents") return listAgents(event);
     if (method === "GET" && path === "/skills") return listSkills(event);
     if (method === "GET" && skillName) return getSkill(skillName);
+    if (method === "GET" && slug && path.endsWith("/deliverables")) return listAgentDeliverables(slug, event);
     if (method === "GET" && slug) return getAgent(slug);
     if (method === "PATCH" && slug) return patchAgent(slug, event.body);
     if (method === "DELETE" && slug) return deleteAgent(slug);
@@ -173,6 +176,25 @@ async function getSkill(name: string): Promise<APIGatewayProxyResultV2> {
   const row = await getItem<SkillMetaRow>(skillPk(name), "META");
   if (!row) return reply(404, { error: "not_found", name });
   return reply(200, toSkillApiView(row));
+}
+
+async function listAgentDeliverables(
+  slug: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const qs = event.queryStringParameters ?? {};
+  const limit = Math.min(
+    Math.max(parseInt(qs.limit ?? "20", 10) || 20, 1),
+    PAGE_SIZE_MAX,
+  );
+  // DDB Query under AGENT#{slug} with SK begins_with DELIV# returns rows
+  // sorted by SK lex order, i.e. by ulid which encodes time. Limit is the
+  // page size; v1 returns most-recent-first by reversing client-side.
+  const rows = await queryBySkPrefix<DelivRow>(agentPk(slug), "DELIV#", limit);
+  // Sort by created_at desc (the ULID ordering already gives chronology,
+  // but explicit sort handles any operator-inserted out-of-order rows).
+  rows.sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+  return reply(200, { items: rows });
 }
 
 function reply(statusCode: number, body: unknown): APIGatewayProxyResultV2 {
