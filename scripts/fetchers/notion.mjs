@@ -285,6 +285,11 @@ async function pageToRecord(page, apiKey, legacyHint) {
   // derived from the legacy id, not the new unified-DB id.
   const legacyNotionId = propText(props.LegacyNotionId)
   const type = resolveType(props, legacyHint)
+  // RFC-002 / RFC-005: agent-authored articles carry an Author select
+  // property whose value is the persona slug ("sora", "maya", …). Pre-
+  // workforce rows have no Author property and resolve to undefined,
+  // which the front-end renders as a quiet placeholder (anonymous).
+  const author = propText(props.Author) || undefined
 
   const bodyMd = await blocksToMd(page.id, apiKey)
   const slug = legacySlug || slugFromId(page.id)
@@ -304,6 +309,7 @@ async function pageToRecord(page, apiKey, legacyHint) {
     notionId: page.id,
     lastEditedAt: page.last_edited_time || '',
     imagePath: `/posts/images/${slug}.jpg`,
+    author,
   }
 }
 
