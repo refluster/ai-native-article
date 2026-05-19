@@ -1533,7 +1533,20 @@ function handleL3BackfillDate(_data, config) {
 // L2_BATCH: for each L1 whose source URL isn't yet referenced by any L2,
 // create an L2 blog. Oldest-first, up to L2_BATCH_MAX per run.
 const L2_BATCH_MAX = 3;
+// GAS kills a triggered function at 360s. Each handleL2Create issues one
+// reasoning-budget azureGenerateText (gpt-5.4, max_completion_tokens=8000)
+// plus a UrlFetchApp source fetch and the Notion page write, which has
+// been observed to take ~90-150s per item. Three back-to-back iterations
+// can clip the hard cap and lose the whole run (trigger reports "Timed
+// Out" / "Exceeded maximum execution time", and partial Notion writes
+// are not reported back). The budget check below skips remaining items
+// once there isn't enough wall-clock budget to safely complete another
+// one, so the function returns cleanly with the items already created
+// and `remaining` set to whatever didn't fit.
+const L2_BATCH_DEADLINE_MS = 330 * 1000;   // 30s safety margin under 360
+const L2_BATCH_ITEM_RESERVE_MS = 180 * 1000; // typical handleL2Create headroom
 function handleL2Batch(_data, config) {
+  const startMs = Date.now();
   // Coverage check pulls from wherever explanation articles live now.
   const sourceDbId = useUnifiedDb(config) ? config.unified_db_id : config.l2_db_id;
   const existingPages = notionQueryDatabase(sourceDbId, config.notion_api_key);
@@ -1565,7 +1578,16 @@ function handleL2Batch(_data, config) {
   const picked = pending.slice(0, L2_BATCH_MAX);
   const processed = [];
   const errors = [];
+  let skippedForBudget = 0;
   for (const l1 of picked) {
+    const elapsedMs = Date.now() - startMs;
+    if (elapsedMs + L2_BATCH_ITEM_RESERVE_MS > L2_BATCH_DEADLINE_MS) {
+      // No room to safely run another iteration. Stop here so what we've
+      // already created in Notion is reported back instead of the whole
+      // function being killed at the 360s cap.
+      skippedForBudget = picked.length - (processed.length + errors.length);
+      break;
+    }
     try {
       const result = handleL2Create({ l1EntryId: l1.id }, config);
       processed.push({ l1Id: l1.id, l2Id: result.data.id, title: result.data.title });
@@ -1573,7 +1595,17 @@ function handleL2Batch(_data, config) {
       errors.push({ l1Id: l1.id, error: String(e && e.message || e) });
     }
   }
-  return { success: true, data: { processed: processed.length, remaining: pending.length - picked.length, items: processed, errors } };
+  return {
+    success: true,
+    data: {
+      processed: processed.length,
+      remaining: pending.length - (processed.length + errors.length),
+      items: processed,
+      errors,
+      skippedForBudget,
+      elapsedMs: Date.now() - startMs,
+    },
+  };
 }
 
 // L3_BATCH: synthesize one L3 insight from a sample of recent L2s.
