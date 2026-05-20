@@ -11,11 +11,13 @@ interface Props {
   slug: string;
   /** Pixel size of the square (default 56). Cells scale to fit. */
   size?: number;
-  /** Optional accent colour for ink cells. Defaults to wf-on-surface (#0b0b14). */
+  /** Optional accent colour for ink cells. Defaults to the wf-on-surface
+   *  token, exposed as the --wf-sigil-ink CSS variable in src/index.css.
+   *  Hex values are kept out of this file so lint:tokens stays green. */
   ink?: string;
   /** Background colour. Defaults to a slug-derived pale tint. */
   bg?: string;
-  /** Border colour. Defaults to wf-outline. */
+  /** Border colour. Defaults to the wf-outline token via --wf-sigil-border. */
   border?: string;
 }
 
@@ -65,7 +67,13 @@ function slugTint(slug: string): string {
   return `hsl(${h % 360} 70% 94%)`;
 }
 
-export default function Sigil({ slug, size = 56, ink = '#0b0b14', bg, border = '#c8c4d4' }: Props) {
+export default function Sigil({
+  slug,
+  size = 56,
+  ink = 'var(--wf-sigil-ink)',
+  bg,
+  border = 'var(--wf-sigil-border)',
+}: Props) {
   const cells = bitPattern(slug);
   const fill = bg ?? slugTint(slug);
   const cell = size / GRID;
