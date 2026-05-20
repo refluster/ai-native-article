@@ -36,12 +36,17 @@
   }
 
   /* CSS variables for SVG fill/stroke values that cannot reach the
-     Tailwind layer (Sigil renders <rect fill="..."/> inline). Mirrors the
-     wf-on-surface / wf-outline tokens. Keeping hex centralised here keeps
-     lint:tokens green — see scripts/lint-design-tokens.mjs. */
+     Tailwind layer (Sigil renders <rect fill="..."/> inline, and the Org
+     DAG paints nodes + edges in raw SVG). Mirrors the corresponding
+     wf-* tokens. Keeping hex centralised here keeps lint:tokens green —
+     see scripts/lint-design-tokens.mjs. */
   :root {
     --wf-sigil-ink: #0b0b14;
     --wf-sigil-border: #c8c4d4;
+    --wf-svg-surface: #faf9ff;
+    --wf-svg-on-surface: #0b0b14;
+    --wf-svg-on-surface-variant: #4f4d57;
+    --wf-svg-tertiary: #954500;
   }
 }
 

@@ -1,298 +1,367 @@
-// /workforce/agents/:slug — LinkedIn-style profile page.
-// RFC-002 implementation, v1 minimum: header + about + skills + identity
-// + bias-disclosure note. Stats card (runs / tokens / spend) wired in a
-// follow-up once the agents-api is fronted by the SPA.
+// /workforce/agents/:slug — agent profile in the workforce console
+// language. Hero with sigil + name + status, KPI strip, per-agent heat
+// strip, recent runs, skills, identity, and reporting graph card.
+//
+// Data sources:
+//   - manifest (workforce-agents.json) → static persona record + topology
+//   - mock-stats (workforce-mock-stats.json) → fallback shape when
+//     WORKFORCE_AGENTS_API_BASE is unset
+//   - live agents-api (fetchAgentLive / fetchAgentDeliverables) → preferred
+//     when configured; supplants mock for THIS-MONTH numbers and the
+//     deliverables list. The heat strip stays mock-driven for now (no
+//     live endpoint exists yet).
 
-import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import WorkforceLayout from '../../components/workforce/WorkforceLayout';
+import Typeplate from '../../components/workforce/Typeplate';
+import Sigil from '../../components/workforce/Sigil';
+import StatusPill, { deriveStatus } from '../../components/workforce/StatusPill';
+import KPIReadout from '../../components/workforce/KPIReadout';
+import HeatStrip from '../../components/workforce/HeatStrip';
+import ReportingCard from '../../components/workforce/ReportingCard';
 import {
   apiConfigured,
   fetchAgentDeliverables,
   fetchAgentLive,
   findAgent,
   fullName,
+  loadWorkforceManifest,
+  loadWorkforceMockStats,
   type AgentDeliverable,
   type AgentLiveRecord,
-} from '../../lib/workforce-agents'
-import type { WorkforceAgent } from '../../types/workforce-agent'
-import AgentAvatar from '../../components/workforce/AgentAvatar'
+} from '../../lib/workforce-agents';
+import type { WorkforceAgent } from '../../types/workforce-agent';
+import type { AgentMockStats, WorkforceMockStats } from '../../types/workforce-stats';
 
 const STREAM_LABEL: Record<WorkforceAgent['streams'][number], string> = {
   internal: 'workforce',
   client: 'client work',
   editorial: 'editorial',
+};
+
+function formatRelative(iso: string): string {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return iso;
+  const mins = Math.round((Date.now() - t) / 60_000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 48) return `${hrs}h ago`;
+  const days = Math.round(hrs / 24);
+  return `${days}d ago`;
+}
+
+function nextRunLabel(iso: string | undefined): string {
+  if (!iso) return '—';
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return iso;
+  const diffMin = Math.round((t - Date.now()) / 60_000);
+  if (diffMin <= 0) return 'queued';
+  if (diffMin < 60) return `in ${diffMin}m`;
+  const hrs = Math.round(diffMin / 60);
+  if (hrs < 48) return `in ${hrs}h`;
+  return `in ${Math.round(hrs / 24)}d`;
 }
 
 export default function AgentProfile() {
-  const { slug } = useParams<{ slug: string }>()
-  const [agent, setAgent] = useState<WorkforceAgent | null | undefined>(undefined)
-  const [live, setLive] = useState<AgentLiveRecord | null | undefined>(undefined)
-  const [delivs, setDelivs] = useState<AgentDeliverable[] | null>(null)
-  const [liveError, setLiveError] = useState<string | null>(null)
+  const { slug } = useParams<{ slug: string }>();
+  const [agent, setAgent] = useState<WorkforceAgent | null | undefined>(undefined);
+  const [roster, setRoster] = useState<WorkforceAgent[]>([]);
+  const [mock, setMock] = useState<WorkforceMockStats | null>(null);
+  const [live, setLive] = useState<AgentLiveRecord | null | undefined>(undefined);
+  const [delivs, setDelivs] = useState<AgentDeliverable[] | null>(null);
+  const [liveError, setLiveError] = useState<string | null>(null);
 
+  // Load persona + mock stats up front.
   useEffect(() => {
-    if (!slug) return
-    findAgent(slug)
-      .then((a) => setAgent(a ?? null))
-      .catch(() => setAgent(null))
-  }, [slug])
+    if (!slug) return;
+    let cancelled = false;
+    Promise.all([findAgent(slug), loadWorkforceManifest(), loadWorkforceMockStats()])
+      .then(([a, m, s]) => {
+        if (cancelled) return;
+        setAgent(a ?? null);
+        setRoster(m.agents);
+        setMock(s);
+      })
+      .catch(() => {
+        if (!cancelled) setAgent(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
 
+  // Layer live data on top when the API is wired.
   useEffect(() => {
     if (!slug || !apiConfigured()) {
-      setLive(null)
-      setDelivs([])
-      return
+      setLive(null);
+      setDelivs([]);
+      return;
     }
-    let cancelled = false
+    let cancelled = false;
     Promise.all([fetchAgentLive(slug), fetchAgentDeliverables(slug, 20)])
       .then(([l, d]) => {
-        if (cancelled) return
-        setLive(l ?? null)
-        setDelivs(d)
+        if (cancelled) return;
+        setLive(l ?? null);
+        setDelivs(d);
       })
       .catch((err) => {
-        if (cancelled) return
-        setLive(null)
-        setDelivs([])
-        setLiveError(err instanceof Error ? err.message : String(err))
-      })
+        if (cancelled) return;
+        setLive(null);
+        setDelivs([]);
+        setLiveError(err instanceof Error ? err.message : String(err));
+      });
     return () => {
-      cancelled = true
-    }
-  }, [slug])
+      cancelled = true;
+    };
+  }, [slug]);
 
   useEffect(() => {
-    if (agent) document.title = `${fullName(agent)} — Workforce`
-  }, [agent])
+    if (agent) document.title = `${fullName(agent)} — Workforce`;
+  }, [agent]);
+
+  const mockForSlug: AgentMockStats | undefined = useMemo(
+    () => (mock && slug ? mock.agents[slug] : undefined),
+    [mock, slug],
+  );
 
   if (agent === undefined) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-12">
-        <p className="text-muted">Loading…</p>
-      </div>
-    )
+      <WorkforceLayout>
+        <div className="font-wfmono text-xs uppercase tracking-[0.14em] text-wf-on-surface-variant">Loading…</div>
+      </WorkforceLayout>
+    );
   }
-
   if (agent === null) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-12">
-        <h1 className="text-2xl font-bold mb-4">Not found</h1>
-        <p className="text-muted">
-          No agent named "{slug}". <Link to="/workforce/agents" className="underline">Back to the directory</Link>.
-        </p>
+      <WorkforceLayout>
+        <Typeplate label="ERROR" value="AGENT NOT FOUND" />
+        <h1 className="font-headline text-3xl font-black tracking-tighter mt-3 text-wf-on-surface">
+          No agent named "{slug}".
+        </h1>
+        <Link to="/workforce/agents" className="mt-4 inline-block font-wfmono text-xs uppercase tracking-[0.14em] text-wf-primary hover:underline">
+          ← BACK TO CREW
+        </Link>
+      </WorkforceLayout>
+    );
+  }
+
+  // KPI source preference: live → mock → '—'
+  const runsMTD = live?.runs_this_month ?? mockForSlug?.runs_this_month;
+  const spendMTD = live?.cost_this_month_usd ?? mockForSlug?.cost_this_month_usd;
+  const delivTotal = live?.deliv_count_total ?? mockForSlug?.deliv_count_total;
+  const nextRun = mockForSlug?.next_run_at;
+  const lastRunAt = live?.last_run_at ?? mockForSlug?.last_run_at;
+  const lastRunStatus = live?.last_run_status ?? mockForSlug?.last_run_status ?? 'ok';
+  const isPaused = live?.paused ?? mockForSlug?.paused ?? false;
+  const isArchived = live?.archived ?? mockForSlug?.archived ?? false;
+  const status = deriveStatus({ paused: isPaused, archived: isArchived, last_run_status: lastRunStatus });
+
+  const budgetCap = agent.budget_monthly_usd;
+  const spendPct = budgetCap > 0 && spendMTD !== undefined
+    ? Math.min(100, Math.round((spendMTD / budgetCap) * 100))
+    : 0;
+
+  const kpis = [
+    { cap: 'RUNS · MTD',  value: runsMTD !== undefined ? String(runsMTD) : '—',                     sub: 'this month' },
+    { cap: 'SPEND · MTD', value: spendMTD !== undefined ? `$${spendMTD.toFixed(2)}` : '—',           sub: `of $${budgetCap} cap · ${spendPct}%` },
+    { cap: 'DELIV',       value: delivTotal !== undefined ? String(delivTotal) : '—',                sub: 'lifetime total' },
+    { cap: 'NEXT RUN',    value: nextRunLabel(nextRun),                                              sub: agent.schedule_note, alarm: status === 'throwing' },
+  ];
+
+  return (
+    <WorkforceLayout>
+      {/* Breadcrumb */}
+      <div className="mb-4 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+        <Link to="/workforce" className="hover:text-wf-on-surface">DASHBOARD</Link>
+        <span className="mx-2">/</span>
+        <Link to="/workforce/agents" className="hover:text-wf-on-surface">CREW</Link>
+        <span className="mx-2">/</span>
+        <span className="text-wf-on-surface">{agent.slug.toUpperCase()}</span>
       </div>
-    )
-  }
 
-  return (
-    <div className="max-w-3xl mx-auto px-4 py-12">
-      <Link to="/workforce/agents" className="text-sm text-muted hover:underline">
-        ← Workforce
-      </Link>
-
-      <header className="mt-4 flex items-start gap-4">
-        <AgentAvatar slug={agent.slug} size={80} />
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold">{fullName(agent)}</h1>
-          <p className="text-lg text-muted">{agent.role}</p>
-          <p className="text-sm text-muted">
-            {agent.residence} · {agent.default_project}
+      {/* HERO */}
+      <section className="mb-8 sm:mb-10 flex flex-col md:flex-row md:items-start gap-4 sm:gap-6">
+        <Sigil slug={agent.slug} size={88} />
+        <div className="flex-1 min-w-0">
+          <div className="mb-2 flex flex-wrap items-center gap-3">
+            <Typeplate label="AGENT" value={`${agent.slug.toUpperCase()} · ${agent.tier.toUpperCase()}`} />
+            <StatusPill status={status} />
+          </div>
+          <h1 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-[1.04] text-wf-on-surface mb-1">
+            {fullName(agent)}
+          </h1>
+          <p className="font-wfmono text-xs sm:text-sm uppercase tracking-[0.12em] text-wf-on-surface-variant">
+            {agent.role} · {agent.residence}
           </p>
+          {agent.about && (
+            <p className="mt-3 max-w-prose text-sm sm:text-base text-wf-on-surface-variant leading-relaxed">
+              {agent.about}
+            </p>
+          )}
         </div>
-      </header>
+      </section>
 
-      {agent.about && (
-        <section className="mt-6">
-          <h2 className="sr-only">About</h2>
-          <p className="text-base">{agent.about}</p>
-        </section>
-      )}
-
-      <section className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
-        <Stat label="Model" value={agent.model} />
-        <Stat label="Monthly budget" value={`USD ${agent.budget_monthly_usd}`} />
-        <Stat label="Cadence" value={agent.schedule_note} />
-        <Stat label="Prompt version" value={`v${agent.prompt_version}`} />
-        <Stat label="Primary deliverable" value={`${agent.primary_deliverable_type} (${agent.primary_deliverable_kind})`} />
-        <Stat
-          label="Streams"
-          value={agent.streams.map((s) => STREAM_LABEL[s]).join(', ')}
-        />
-        {agent.code_execution === 'claude-code-routine-on-gha' && (
-          <Stat
-            label="Code execution"
-            value="Claude Code routine on GitHub Actions (R-N1 exception)"
-          />
+      {/* KPIs */}
+      <section className="mb-8 sm:mb-10">
+        <KPIReadout items={kpis} />
+        {!apiConfigured() && (
+          <p className="mt-2 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+            * mocked — wire WORKFORCE_AGENTS_API_BASE for live data
+          </p>
+        )}
+        {liveError && (
+          <p className="mt-2 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary">
+            agents-api error: {liveError}
+          </p>
         )}
       </section>
 
-      <section className="mt-8">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted mb-2">Skills</h2>
-        <ul className="flex flex-wrap gap-2">
-          {agent.skills.map((skill) => (
-            <li
-              key={skill}
-              className="px-2 py-1 text-xs border border-surface-2 text-muted"
-            >
-              {skill}
-            </li>
-          ))}
-        </ul>
-      </section>
+      {/* TWO COLUMN: main / sidebar */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6 sm:space-y-8">
 
-      <section className="mt-8 text-sm text-muted">
-        <p>
-          {fullName(agent)} is an LLM-driven persona on the Workforce platform. Articles bylined to{' '}
-          {agent.first_name} are produced by an Anthropic Claude model running on AWS Lambda;{' '}
-          the persona's voice, biases, and limitations are described in their{' '}
-          <a
-            href={`https://github.com/refluster/ai-native-article/blob/main/workforce/agents/${agent.slug}/system.md`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline"
-          >
-            system prompt
-          </a>{' '}
-          and acknowledged in every article footer.
-        </p>
-      </section>
+          {/* HEAT STRIP */}
+          {mock && mock.activity.by_slug[agent.slug] && (
+            <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
+              <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
+                <Typeplate label="HEAT · 30D" value={agent.slug.toUpperCase()} />
+                <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+                  {mock.activity.days[0]} → {mock.activity.days[mock.activity.days.length - 1]}
+                </span>
+              </div>
+              <div className="p-4">
+                <HeatStrip activity={mock.activity} slug={agent.slug} />
+              </div>
+            </section>
+          )}
 
-      <LiveSection live={live} delivs={delivs} liveError={liveError} agent={agent} />
-    </div>
-  )
-}
+          {/* SCHEDULE + MODEL — facts grid */}
+          <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
+            <div className="border-b border-wf-outline-variant px-4 py-3">
+              <Typeplate label="DECK · CONFIG" value="PERSONA · MODEL · SCHEDULE" />
+            </div>
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-4 text-sm">
+              <Fact label="MODEL" value={agent.model} />
+              <Fact label="PROMPT" value={`v${agent.prompt_version}`} />
+              <Fact label="CADENCE" value={agent.schedule_note} />
+              <Fact label="MONTHLY BUDGET" value={`USD ${agent.budget_monthly_usd}`} />
+              <Fact label="PROJECT" value={agent.default_project} />
+              <Fact label="PRIMARY DELIVERABLE" value={`${agent.primary_deliverable_type} · ${agent.primary_deliverable_kind}`} />
+              <Fact label="STREAMS" value={agent.streams.map((s) => STREAM_LABEL[s]).join(' · ')} />
+              {lastRunAt && (
+                <Fact label="LAST RUN" value={`${formatRelative(lastRunAt)} (${lastRunStatus})`} />
+              )}
+              {agent.code_execution === 'claude-code-routine-on-gha' && (
+                <Fact label="CODE EXEC" value="Claude Code on GHA (R-N1 exception)" wide />
+              )}
+            </dl>
+          </section>
 
-function LiveSection({
-  live,
-  delivs,
-  liveError,
-  agent,
-}: {
-  live: AgentLiveRecord | null | undefined
-  delivs: AgentDeliverable[] | null
-  liveError: string | null
-  agent: WorkforceAgent
-}) {
-  if (!apiConfigured()) {
-    return (
-      <section className="mt-8 text-xs text-muted">
-        <p>
-          Live runs, spend, and deliverables would appear here once the operator wires the workforce agents-api URL
-          into <code>src/config/workforce.ts</code>.
-        </p>
-      </section>
-    )
-  }
-  if (liveError) {
-    return (
-      <section className="mt-8 text-xs text-muted">
-        <p>Could not reach the agents API: {liveError}</p>
-      </section>
-    )
-  }
-  if (live === undefined || delivs === null) {
-    return (
-      <section className="mt-8 text-xs text-muted">
-        <p>Loading live data…</p>
-      </section>
-    )
-  }
-
-  const monthBudget = agent.budget_monthly_usd
-  const spend = live?.cost_this_month_usd ?? 0
-  const spendPct = monthBudget > 0 ? Math.min(100, Math.round((spend / monthBudget) * 100)) : 0
-
-  return (
-    <>
-      <section className="mt-10">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted mb-3">This month</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-          <LiveStat label="Runs" value={live ? String(live.runs_this_month) : '—'} />
-          <LiveStat
-            label="Spend"
-            value={live ? `$${spend.toFixed(2)} / $${monthBudget}` : '—'}
-            hint={live ? `${spendPct}% of cap` : undefined}
-          />
-          <LiveStat
-            label="Last run"
-            value={live?.last_run_at ? formatRelative(live.last_run_at) : '—'}
-            hint={live?.last_run_status}
-          />
-          <LiveStat label="Status" value={statusLabel(live)} />
-        </div>
-      </section>
-
-      <section className="mt-10">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted mb-3">Recent deliverables</h2>
-        {delivs.length === 0 ? (
-          <p className="text-sm text-muted">No deliverables yet. Either the persona hasn't fired since deploy or the
-          orchestrator tick is still disabled.</p>
-        ) : (
-          <ul className="divide-y divide-surface-2">
-            {delivs.map((d) => {
-              const id = d.sk.replace(/^DELIV#/, '')
-              const link = d.pr_url ?? (d.notion_page_id ? `https://www.notion.so/${d.notion_page_id.replace(/-/g, '')}` : undefined)
-              return (
-                <li key={id} className="py-3 flex items-baseline gap-3 text-sm">
-                  <span className="text-xs text-muted shrink-0 w-28">{d.created_at?.slice(0, 10)}</span>
-                  <span className="text-xs uppercase tracking-wide text-muted shrink-0 w-24">{d.type}</span>
-                  <span className="flex-1">
-                    {link ? (
-                      <a href={link} target="_blank" rel="noopener noreferrer" className="underline">
-                        {d.kind} · {id.slice(0, 8)}
-                      </a>
-                    ) : (
-                      <>{d.kind} · {id.slice(0, 8)}</>
-                    )}
-                    {d.skill_name && (
-                      <span className="ml-2 text-xs text-muted">via {d.skill_name}@{d.skill_version}</span>
-                    )}
-                    {d.status === 'pending' && <span className="ml-2 text-xs text-muted">(pending)</span>}
-                    {d.status === 'timeout' && <span className="ml-2 text-xs text-muted">(timeout)</span>}
-                  </span>
+          {/* SKILLS */}
+          <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
+            <div className="border-b border-wf-outline-variant px-4 py-3">
+              <Typeplate label="DECK · SKILLS" value={`${agent.skills.length}`} />
+            </div>
+            <ul className="flex flex-wrap gap-2 p-4">
+              {agent.skills.map((skill) => (
+                <li
+                  key={skill}
+                  className="font-wfmono text-xs px-2.5 py-1.5 border border-wf-outline-variant text-wf-on-surface bg-wf-surface-container rounded-wf-sm"
+                >
+                  {skill}
                 </li>
-              )
-            })}
-          </ul>
-        )}
-      </section>
-    </>
-  )
+              ))}
+            </ul>
+          </section>
+
+          {/* DELIVERABLES (live API only) */}
+          {apiConfigured() && (
+            <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
+              <div className="border-b border-wf-outline-variant px-4 py-3">
+                <Typeplate label="DECK · DELIV" value="RECENT" />
+              </div>
+              <div className="p-4">
+                {delivs === null ? (
+                  <p className="font-wfmono text-xs text-wf-on-surface-variant">Loading…</p>
+                ) : delivs.length === 0 ? (
+                  <p className="font-wfmono text-xs text-wf-on-surface-variant">
+                    no deliverables yet — orchestrator hasn't fired since deploy.
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-wf-outline-variant">
+                    {delivs.map((d) => {
+                      const id = d.sk.replace(/^DELIV#/, '');
+                      const link =
+                        d.pr_url ??
+                        (d.notion_page_id
+                          ? `https://www.notion.so/${d.notion_page_id.replace(/-/g, '')}`
+                          : undefined);
+                      return (
+                        <li key={id} className="py-2.5 flex items-baseline gap-3 text-sm">
+                          <span className="font-wfmono text-xs text-wf-on-surface-variant shrink-0 w-24">
+                            {d.created_at?.slice(0, 10)}
+                          </span>
+                          <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant shrink-0 w-20">
+                            {d.type}
+                          </span>
+                          <span className="flex-1">
+                            {link ? (
+                              <a href={link} target="_blank" rel="noopener noreferrer" className="text-wf-primary hover:underline">
+                                {d.kind} · {id.slice(0, 8)}
+                              </a>
+                            ) : (
+                              <>{d.kind} · {id.slice(0, 8)}</>
+                            )}
+                            {d.skill_name && (
+                              <span className="ml-2 font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant">
+                                via {d.skill_name}@{d.skill_version}
+                              </span>
+                            )}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* IDENTITY / BIAS DISCLOSURE */}
+          <section className="border border-wf-outline-variant bg-wf-surface-container rounded-wf-md p-4">
+            <Typeplate label="DECK · IDENTITY" value="LLM-DRIVEN PERSONA" className="mb-2" />
+            <p className="text-sm text-wf-on-surface-variant leading-relaxed">
+              {fullName(agent)} is an LLM-driven persona on the Workforce platform. Articles bylined to{' '}
+              {agent.first_name} are produced by an Anthropic Claude model running on AWS Lambda; the persona's
+              voice, biases, and limitations are described in their{' '}
+              <a
+                href={`https://github.com/refluster/ai-native-article/blob/main/workforce/agents/${agent.slug}/system.md`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-wf-primary hover:underline"
+              >
+                system prompt
+              </a>{' '}
+              and acknowledged in every article footer.
+            </p>
+          </section>
+        </div>
+
+        {/* SIDEBAR */}
+        <aside className="lg:col-span-1 space-y-6">
+          {roster.length > 0 && <ReportingCard agent={agent} roster={roster} />}
+        </aside>
+      </div>
+    </WorkforceLayout>
+  );
 }
 
-function LiveStat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Fact({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
   return (
-    <div>
-      <div className="text-xs uppercase tracking-wide text-muted">{label}</div>
-      <div className="font-medium">{value}</div>
-      {hint && <div className="text-xs text-muted">{hint}</div>}
+    <div className={wide ? 'sm:col-span-2' : ''}>
+      <dt className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-0.5">{label}</dt>
+      <dd className="text-sm text-wf-on-surface">{value}</dd>
     </div>
-  )
-}
-
-function statusLabel(live: AgentLiveRecord | null): string {
-  if (!live) return '—'
-  if (live.archived) return 'archived'
-  if (live.paused) return 'paused'
-  return 'active'
-}
-
-function formatRelative(iso: string): string {
-  const t = Date.parse(iso)
-  if (!Number.isFinite(t)) return iso
-  const mins = Math.round((Date.now() - t) / 60_000)
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.round(mins / 60)
-  if (hrs < 48) return `${hrs}h ago`
-  const days = Math.round(hrs / 24)
-  return `${days}d ago`
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-xs uppercase tracking-wide text-muted">{label}</div>
-      <div className="font-medium">{value}</div>
-    </div>
-  )
+  );
 }

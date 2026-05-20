@@ -14,6 +14,7 @@ import Sources from './pages/Sources'
 import Dashboard from './pages/workforce/Dashboard'
 import AgentDirectory from './pages/workforce/AgentDirectory'
 import AgentProfile from './pages/workforce/AgentProfile'
+import OrgDAG from './pages/workforce/OrgDAG'
 import { routerBaseName } from './lib/paths'
 import { trackPageView } from './lib/analytics'
 
@@ -50,6 +51,7 @@ export default function App() {
             <Route path="/l3-insight" element={<L3Insight />} />
             <Route path="/l4-publish" element={<L4Publish />} />
             <Route path="/workforce" element={<Dashboard />} />
+            <Route path="/workforce/org" element={<OrgDAG />} />
             <Route path="/workforce/agents" element={<AgentDirectory />} />
             <Route path="/workforce/agents/:slug" element={<AgentProfile />} />
           </Routes>
