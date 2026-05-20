@@ -67,7 +67,23 @@ async function main () {
   try {
     res = await fetch(url, init)
   } catch (e) {
-    console.error(`fetch failed: ${e.name} ${e.message}`)
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1)
+    // Node's undici fold every socket-level failure into "TypeError: fetch
+    // failed" — the actual reason (closed socket, ECONNRESET, abort, TLS
+    // error, …) lives on `cause`. Surface both so a fetch failure is
+    // legible without the user having to add console.log themselves.
+    console.error(`fetch failed after ${elapsed}s: ${e.name} ${e.message}`)
+    if (e.cause) {
+      const c = e.cause
+      console.error(`  cause: ${c.name || ''} ${c.code || ''} ${c.message || c}`.trim())
+    }
+    // The most common shape of this failure on long actions (L2_BATCH /
+    // L3_BATCH) is GAS killing the function at the 360s execution cap,
+    // which the client sees as a closed socket. If we got close to 360s,
+    // call that out so the user doesn't waste time on TLS/DNS rabbit holes.
+    if ((Date.now() - t0) > 300 * 1000) {
+      console.error(`  hint: ${elapsed}s is near GAS's 360s execution cap — likely the function timed out server-side. Check the Apps Script Executions tab for "Timed out" / "Exceeded maximum execution time".`)
+    }
     process.exit(1)
   } finally {
     clearTimeout(timer)
