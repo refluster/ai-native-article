@@ -70,12 +70,16 @@ export function initAnalytics(id: string | undefined): void {
   window.gtag('config', id, { send_page_view: false, anonymize_ip: true })
 }
 
-export function trackPageView(path: string, title: string): void {
+export function trackPageView(): void {
   if (!initialized || !measurementId || !window.gtag) return
+  // Read live from window.* so the SITE_BASE_PATH ("/ai-native-article/...")
+  // is present in page_path and the full URL — including query + hash — lands
+  // in page_location. Passing useLocation() values would drop the basename
+  // and collapse every route under the base into "/" in GA4.
   window.gtag('event', 'page_view', {
-    page_path: path,
-    page_title: title,
-    page_location: window.location.origin + path,
+    page_path: window.location.pathname + window.location.search,
+    page_title: document.title,
+    page_location: window.location.href,
   })
 }
 
