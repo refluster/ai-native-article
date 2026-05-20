@@ -15,14 +15,15 @@ import { dirname, resolve } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(__dirname, '..', '..', '..', '..')
-const GAS_CONFIG_PATH = resolve(REPO_ROOT, 'src', 'lib', 'gas-config.ts')
+// PR #60 moved the React app from src/ to apps/article/src/.
+const GAS_CONFIG_PATH = resolve(REPO_ROOT, 'apps', 'article', 'src', 'lib', 'gas-config.ts')
 // 6 minutes — GAS's own maxExecutionTime upper bound, so we never give up
 // before the server does.
 const TIMEOUT_MS = 6 * 60 * 1000
 
 function loadDeploymentId () {
-  // Single-line `const id = '...'` in src/lib/gas-config.ts. Re-deriving keeps
-  // the React app and this skill aligned automatically.
+  // Single-line `const id = '...'` in apps/article/src/lib/gas-config.ts.
+  // Re-deriving keeps the React app and this skill aligned automatically.
   const txt = readFileSync(GAS_CONFIG_PATH, 'utf8')
   const m = txt.match(/const\s+id\s*=\s*['"]([^'"]+)['"]/)
   if (!m) throw new Error(`Could not parse deployment id from ${GAS_CONFIG_PATH}`)
