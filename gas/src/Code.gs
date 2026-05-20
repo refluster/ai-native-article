@@ -1759,6 +1759,108 @@ function handleL4Batch(_data, config) {
   return { success: true, data: { processed: processed.length, remaining: pending.length - picked.length, items: processed, errors } };
 }
 
+// PIPELINE_STATUS: read-only diagnostic snapshot. Surfaces the state that
+// makes the L1→L4 batches' silent skips legible from the outside.
+//
+// Why this exists: when no new article appears on the site for days, the
+// only signal from a healthy pipeline is "L2_BATCH ran, processed: 0,
+// remaining: 0" — which is indistinguishable from "L2_BATCH never ran"
+// in the absence of a fresh execution log dump. This action returns
+// counts + last-run timestamps + trigger inventory in one shot so an
+// operator can localise the stall to (a) L1 starvation, (b) L2/L3
+// gating, or (c) missing triggers in seconds.
+//
+// Cheap by design: one notion query per DB (no per-page block reads, no
+// LLM calls). Safe to call on demand; budget < 30s typical.
+function handlePipelineStatus(_data, config) {
+  const props = PropertiesService.getScriptProperties();
+
+  // ── L1 ────────────────────────────────────────────────────────────────────
+  // Mirror handleL2Batch's coverage check so "uncovered" matches what
+  // L2_BATCH would actually pick up next run. Test/placeholder URLs are
+  // excluded from `uncovered` the same way L2_BATCH excludes them.
+  const sourceDbId = useUnifiedDb(config) ? config.unified_db_id : config.l2_db_id;
+  const allArticlePages = notionQueryDatabase(sourceDbId, config.notion_api_key);
+  const explanationPages = useUnifiedDb(config)
+    ? allArticlePages.filter(p => (p.properties.Type?.select?.name || '') === 'explanation')
+    : allArticlePages;
+  const analysisPages = useUnifiedDb(config)
+    ? allArticlePages.filter(p => (p.properties.Type?.select?.name || '') === 'analysis')
+    : []; // legacy mode keeps L3 in a separate DB; counted below
+
+  const coveredUrls = new Set();
+  for (const p of explanationPages) {
+    const u = p.properties['Source URLs']?.url
+      || p.properties.SourceURLs?.rich_text[0]?.plain_text
+      || '';
+    if (u) coveredUrls.add(u.trim());
+  }
+  const l1Pages = notionQueryDatabase(config.l1_db_id, config.notion_api_key);
+  let l1Uncovered = 0;
+  let l1Latest = '';
+  for (const p of l1Pages) {
+    const u = p.properties['Source URL']?.url || '';
+    const isTest = /^https?:\/\/(www\.)?example\.com(\/|$)/i.test(u);
+    if (u && !coveredUrls.has(u) && !isTest) l1Uncovered++;
+    if ((p.created_time || '') > l1Latest) l1Latest = p.created_time || '';
+  }
+
+  // ── L2 (explanation) ──────────────────────────────────────────────────────
+  let l2Latest = '';
+  let l2In7d = 0;
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86400 * 1000).toISOString();
+  for (const p of explanationPages) {
+    const c = p.created_time || '';
+    if (c > l2Latest) l2Latest = c;
+    if (c >= sevenDaysAgo) l2In7d++;
+  }
+
+  // ── L3 (analysis) ─────────────────────────────────────────────────────────
+  // Legacy mode reads from l3_db_id; unified mode uses the already-filtered
+  // analysisPages from above.
+  const l3Pages = useUnifiedDb(config)
+    ? analysisPages
+    : notionQueryDatabase(config.l3_db_id, config.notion_api_key);
+  let l3Latest = '';
+  let l3In7d = 0;
+  for (const p of l3Pages) {
+    const c = p.created_time || '';
+    if (c > l3Latest) l3Latest = c;
+    if (c >= sevenDaysAgo) l3In7d++;
+  }
+
+  // ── Triggers ──────────────────────────────────────────────────────────────
+  // Triggers carry no last-run timestamp in the API, but listing handler
+  // names + types is enough to spot a missing or duplicate install.
+  const triggers = ScriptApp.getProjectTriggers().map(t => ({
+    handler: t.getHandlerFunction(),
+    type: String(t.getEventType()),
+    source: String(t.getTriggerSource()),
+  }));
+
+  // ── Persisted script-property state used by L3_BATCH gating ───────────────
+  const scriptProps = {
+    L3_LAST_RUN_AT: props.getProperty(L3_LAST_RUN_KEY) || null,
+    L3_RECENTLY_USED_L2_IDS_count: (() => {
+      try { return (JSON.parse(props.getProperty(L3_RECENTLY_USED_KEY) || '[]') || []).length; }
+      catch (_) { return 0; }
+    })(),
+  };
+
+  return {
+    success: true,
+    data: {
+      mode: useUnifiedDb(config) ? 'unified' : 'legacy',
+      l1: { total: l1Pages.length, uncovered: l1Uncovered, latestCreated: l1Latest || null },
+      l2: { total: explanationPages.length, latestCreated: l2Latest || null, createdLast7d: l2In7d },
+      l3: { total: l3Pages.length, latestCreated: l3Latest || null, createdLast7d: l3In7d },
+      triggers,
+      scriptProps,
+      asOf: new Date().toISOString(),
+    },
+  };
+}
+
 // ─── TIME-DRIVEN TRIGGERS ────────────────────────────────────────────────────
 // Run `setupDailyTriggers` ONCE from the GAS editor to install the schedule.
 // Wrappers are what GAS invokes; keep them thin so the handlers stay testable
@@ -1868,6 +1970,9 @@ function doPost(e) {
       case 'L2_BACKFILL':
         response = handleL2Backfill(data, config);
         break;
+      case 'PIPELINE_STATUS':
+        response = handlePipelineStatus(data, config);
+        break;
       default:
         response = { success: false, error: `Unknown action: ${action}` };
     }
@@ -1891,7 +1996,7 @@ function doGet(e) {
     JSON.stringify({
       success: false,
       error: 'This is a POST-only API. Use POST requests with {"action":"..."}',
-      supportedActions: ['L1_SAVE', 'L1_LIST', 'L2_CREATE', 'EXPLANATION_CREATE', 'L2_LIST', 'L2_BATCH', 'L2_BACKFILL', 'L3_CREATE', 'ANALYSIS_CREATE', 'L3_LIST', 'L3_BATCH', 'ARTICLE_LIST', 'L3_BACKFILL_DATE', 'L4_PUBLISH', 'L4_LIST', 'L4_BATCH', 'REBUILD_MANIFEST']
+      supportedActions: ['L1_SAVE', 'L1_LIST', 'L2_CREATE', 'EXPLANATION_CREATE', 'L2_LIST', 'L2_BATCH', 'L2_BACKFILL', 'L3_CREATE', 'ANALYSIS_CREATE', 'L3_LIST', 'L3_BATCH', 'ARTICLE_LIST', 'L3_BACKFILL_DATE', 'L4_PUBLISH', 'L4_LIST', 'L4_BATCH', 'REBUILD_MANIFEST', 'PIPELINE_STATUS']
     })
   ).setMimeType(ContentService.MimeType.JSON);
 }
