@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Mobile Crew Index</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700&amp;family=Jetbrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom scrollbar for live trace */
+        .live-trace-scroll::-webkit-scrollbar {
+            height: 2px;
+        }
+        .live-trace-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .live-trace-scroll::-webkit-scrollbar-thumb {
+            background: rgba(0,0,0,0.1);
+        }
+    </style>
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"on-primary-fixed-variant": "#00419d", "on-primary-container": "#fefcff", "surface-container-highest": "#e1e2ec", "surface-tint": "#0057cd", "primary-fixed-dim": "#b1c5ff", "tertiary-fixed": "#ffdbc8", tertiary: "#954500", "on-tertiary-container": "#fffbff", "outline-variant": "#c2c6d6", surface: "#faf9ff", "on-surface-variant": "#424654", "on-background": "#191b23", "on-secondary-fixed": "#021944", "error-container": "#ffdad6", "surface-dim": "#d8d9e4", secondary: "#4b5d8c", "secondary-fixed": "#dae2ff", "tertiary-fixed-dim": "#ffb68a", outline: "#737785", "on-error-container": "#93000a", "on-primary-fixed": "#001946", "on-primary": "#ffffff", "primary-container": "#306fe6", "on-tertiary-fixed-variant": "#743500", "tertiary-container": "#bb5800", "on-secondary-fixed-variant": "#334572", "inverse-primary": "#b1c5ff", "on-secondary-container": "#415381", primary: "#0055c8", "on-tertiary-fixed": "#321300", "surface-container-lowest": "#ffffff", error: "#ba1a1a", "on-error": "#ffffff", "on-secondary": "#ffffff", "on-surface": "#191b23", "surface-bright": "#faf9ff", "inverse-on-surface": "#eff0fa", "secondary-container": "#b6c8fd", "inverse-surface": "#2e3038", "secondary-fixed-dim": "#b3c5fa", "primary-fixed": "#d9e2ff", "surface-container-high": "#e7e7f2", "surface-container-low": "#f2f3fd", "surface-container": "#ecedf8", "surface-variant": "#e1e2ec", "on-tertiary": "#ffffff", background: "#faf9ff"}, borderRadius: {DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px"}, spacing: {base: "4px", gutter: "1rem", sm: "0.5rem", margin: "1.5rem", xl: "2rem", xs: "0.25rem", lg: "1.5rem", md: "1rem"}, fontFamily: {"headline-lg-mobile": ["Geist"], "body-md": ["Geist"], "label-mono-sm": ["JetBrains Mono"], "headline-lg": ["Geist"], "display-lg": ["Geist"], "label-mono": ["JetBrains Mono"], "typeplate-mobile": ["JetBrains Mono", "monospace"], "mono-data": ["JetBrains Mono", "monospace"], "headline-sm": ["Geist", "sans-serif"], "display-hero": ["JetBrains Mono", "monospace"], "typeplate-label": ["JetBrains Mono", "monospace"], headline: ["Geist"], display: ["Geist"], body: ["Geist"], label: ["Jetbrains Mono"]}, fontSize: {"headline-lg-mobile": ["24px", {lineHeight: "1.2", fontWeight: "600"}], "body-md": ["16px", {lineHeight: "1.5", fontWeight: "400"}], "label-mono-sm": ["11px", {lineHeight: "1.2", fontWeight: "500"}], "headline-lg": ["32px", {lineHeight: "1.2", letterSpacing: "-0.01em", fontWeight: "600"}], "display-lg": ["48px", {lineHeight: "1.1", letterSpacing: "-0.02em", fontWeight: "600"}], "label-mono": ["13px", {lineHeight: "1.4", letterSpacing: "0.02em", fontWeight: "500"}], "typeplate-mobile": ["9px", {lineHeight: "10px", letterSpacing: "0.05em", fontWeight: "500"}], "mono-data": ["12px", {lineHeight: "16px", fontWeight: "400"}], "headline-sm": ["18px", {lineHeight: "24px", fontWeight: "600"}], "display-hero": ["72px", {lineHeight: "72px", letterSpacing: "-0.04em", fontWeight: "500"}], "typeplate-label": ["10px", {lineHeight: "12px", letterSpacing: "0.08em", fontWeight: "500"}]}}}};</script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-container-lowest text-on-surface font-body-md antialiased md:hidden pb-16">
+<!-- TopAppBar Semantic Shell -->
+<header class="bg-surface-container-lowest text-primary w-full top-0 sticky z-40 px-gutter h-16 mx-auto flex justify-between items-center shadow-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px]" data-icon="terminal">terminal</span>
+<span class="font-headline-sm text-headline-sm tracking-tighter">AGENT_COMMAND_CONSOLE</span>
+</div>
+<div class="w-8 h-8 bg-surface-container-highest rounded-lg flex items-center justify-center border border-outline-variant overflow-hidden">
+<!-- Placeholder for OPERATOR_SIGIL_01 -->
+<span class="font-mono-data text-mono-data text-on-surface-variant">OP</span>
+</div>
+</header>
+<!-- Header Band -->
+<section class="bg-surface-container-lowest px-gutter pt-6 pb-4 flex flex-col gap-unit border-b-2 border-surface-container-highest">
+<p class="font-typeplate-label text-typeplate-label uppercase text-on-surface-variant">WORKFORCE · CREW</p>
+<h1 class="font-headline-lg text-headline-lg">12 instruments in service</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Sorted by output this month</p>
+<!-- Compact mini live-trace -->
+<div class="mt-4 flex flex-col gap-1">
+<p class="font-typeplate-mobile text-typeplate-mobile text-outline">LIVE TRACE</p>
+<div class="flex gap-1 overflow-x-auto live-trace-scroll pb-1">
+<!-- Trace dots -->
+<div class="w-1.5 h-1.5 bg-primary shrink-0 rounded-sm"></div>
+<div class="w-1.5 h-1.5 bg-primary shrink-0 rounded-sm"></div>
+<div class="w-1.5 h-1.5 bg-surface-container-highest shrink-0 rounded-sm"></div>
+<div class="w-1.5 h-1.5 bg-primary shrink-0 rounded-sm"></div>
+<div class="w-1.5 h-1.5 bg-tertiary shrink-0 rounded-sm"></div>
+<div class="w-1.5 h-1.5 bg-primary shrink-0 rounded-sm"></div>
+<div class="w-1.5 h-1.5 bg-primary shrink-0 rounded-sm"></div>
+<div class="w-1.5 h-1.5 bg-surface-container-highest shrink-0 rounded-sm"></div>
+<div class="w-1.5 h-1.5 bg-primary shrink-0 rounded-sm"></div>
+<div class="w-1.5 h-1.5 bg-primary shrink-0 rounded-sm"></div>
+<div class="w-1.5 h-1.5 bg-primary shrink-0 rounded-sm"></div>
+<div class="w-1.5 h-1.5 bg-primary shrink-0 rounded-sm"></div>
+<div class="w-1.5 h-1.5 bg-tertiary shrink-0 rounded-sm"></div>
+<div class="w-1.5 h-1.5 bg-primary shrink-0 rounded-sm"></div>
+<div class="w-1.5 h-1.5 bg-surface-container-highest shrink-0 rounded-sm"></div>
+</div>
+</div>
+</section>
+<!-- Controls -->
+<section class="bg-surface-container-lowest px-gutter py-2 flex items-center justify-between border-b-2 border-surface-container-highest">
+<div class="flex gap-4">
+<button class="flex items-center gap-1 text-on-surface-variant hover:text-on-surface rounded-lg px-2 py-1 -ml-2">
+<span class="font-typeplate-label text-typeplate-label uppercase">STREAM</span>
+<span class="material-symbols-outlined text-[14px]">arrow_drop_down</span>
+</button>
+<button class="flex items-center gap-1 text-on-surface-variant hover:text-on-surface rounded-lg px-2 py-1 -ml-2">
+<span class="font-typeplate-label text-typeplate-label uppercase">STATUS</span>
+<span class="material-symbols-outlined text-[14px]">arrow_drop_down</span>
+</button>
+</div>
+<button class="flex items-center gap-1 text-on-surface-variant hover:text-on-surface rounded-lg px-2 py-1 -mr-2">
+<span class="font-typeplate-label text-typeplate-label uppercase">SORT</span>
+<span class="material-symbols-outlined text-[14px]">sort</span>
+</button>
+</section>
+<!-- Crew List -->
+<main class="flex flex-col w-full pb-20 px-gutter gap-2 pt-4">
+<!-- Row 1: Mira Nakatani -->
+<div class="bg-surface-container-lowest h-[96px] px-4 flex items-center justify-between w-full rounded-lg shadow-sm border border-surface-container-highest">
+<div class="flex items-center gap-3">
+<!-- Sigil -->
+<div class="w-10 h-10 bg-primary/10 flex flex-wrap content-start overflow-hidden rounded-lg">
+<div class="w-[33%] h-[33%] bg-primary"></div>
+<div class="w-[33%] h-[33%]"></div>
+<div class="w-[33%] h-[33%] bg-primary/40"></div>
+<div class="w-[33%] h-[33%]"></div>
+<div class="w-[33%] h-[33%] bg-primary"></div>
+<div class="w-[33%] h-[33%]"></div>
+<div class="w-[33%] h-[33%] bg-primary/70"></div>
+<div class="w-[33%] h-[33%] bg-primary"></div>
+<div class="w-[33%] h-[33%]"></div>
+</div>
+<!-- Info -->
+<div class="flex flex-col justify-center">
+<div class="flex items-baseline gap-2">
+<span class="font-headline-sm text-headline-sm text-on-surface">Mira Nakatani</span>
+<span class="font-typeplate-mobile text-typeplate-mobile text-on-surface-variant uppercase">ID // M-01</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface-variant leading-tight">Data Harvester // Server A</span>
+</div>
+</div>
+<!-- Readout & Status -->
+<div class="flex flex-col items-end justify-center">
+<div class="flex items-center gap-1.5 mb-1">
+<div class="w-1.5 h-1.5 bg-primary rounded-sm"></div>
+<span class="font-typeplate-label text-typeplate-label uppercase text-primary">RUNNING</span>
+</div>
+<div class="text-right">
+<div class="font-mono-data text-mono-data text-on-surface">28 ships</div>
+<div class="font-mono-data text-mono-data text-on-surface-variant">$7.10</div>
+</div>
+</div>
+</div>
+<!-- Row 2: Theo Okafor -->
+<div class="bg-surface-container-low h-[96px] px-4 flex items-center justify-between w-full rounded-lg shadow-sm border border-surface-container-highest">
+<div class="flex items-center gap-3">
+<!-- Sigil -->
+<div class="w-10 h-10 bg-tertiary/10 flex flex-wrap content-start overflow-hidden rounded-lg">
+<div class="w-[33%] h-[33%] bg-tertiary"></div>
+<div class="w-[33%] h-[33%] bg-tertiary/40"></div>
+<div class="w-[33%] h-[33%]"></div>
+<div class="w-[33%] h-[33%]"></div>
+<div class="w-[33%] h-[33%] bg-tertiary"></div>
+<div class="w-[33%] h-[33%] bg-tertiary"></div>
+<div class="w-[33%] h-[33%]"></div>
+<div class="w-[33%] h-[33%]"></div>
+<div class="w-[33%] h-[33%] bg-tertiary/70"></div>
+</div>
+<!-- Info -->
+<div class="flex flex-col justify-center">
+<div class="flex items-baseline gap-2">
+<span class="font-headline-sm text-headline-sm text-on-surface">Theo Okafor</span>
+<span class="font-typeplate-mobile text-typeplate-mobile text-on-surface-variant uppercase">ID // T-04</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface-variant leading-tight">Logic Processor // Node B</span>
+</div>
+</div>
+<!-- Readout & Status -->
+<div class="flex flex-col items-end justify-center">
+<div class="flex items-center gap-1.5 mb-1">
+<div class="w-1.5 h-1.5 bg-tertiary rounded-sm"></div>
+<span class="font-typeplate-label text-typeplate-label uppercase text-tertiary">THROWING</span>
+</div>
+<div class="text-right">
+<div class="font-mono-data text-mono-data text-on-surface">24 ships</div>
+<div class="font-mono-data text-mono-data text-on-surface-variant">$9.40</div>
+</div>
+</div>
+</div>
+<!-- Row 3: Paused -->
+<div class="bg-surface-container-lowest h-[96px] px-4 flex items-center justify-between w-full opacity-70 grayscale-[50%] rounded-lg shadow-sm border border-surface-container-highest">
+<div class="flex items-center gap-3">
+<!-- Sigil -->
+<div class="w-10 h-10 bg-outline-variant/20 flex flex-wrap content-start overflow-hidden border border-surface-container-highest rounded-lg">
+<div class="w-[33%] h-[33%]"></div>
+<div class="w-[33%] h-[33%] bg-outline-variant"></div>
+<div class="w-[33%] h-[33%]"></div>
+<div class="w-[33%] h-[33%] bg-outline-variant/40"></div>
+<div class="w-[33%] h-[33%]"></div>
+<div class="w-[33%] h-[33%] bg-outline-variant"></div>
+<div class="w-[33%] h-[33%]"></div>
+<div class="w-[33%] h-[33%]"></div>
+<div class="w-[33%] h-[33%] bg-outline-variant"></div>
+</div>
+<!-- Info -->
+<div class="flex flex-col justify-center">
+<div class="flex items-baseline gap-2">
+<span class="font-headline-sm text-headline-sm text-on-surface-variant">Unit 007</span>
+<span class="font-typeplate-mobile text-typeplate-mobile text-outline uppercase">ID // U-07</span>
+</div>
+<span class="font-body-md text-body-md text-outline leading-tight">Query Resolver // Server C</span>
+</div>
+</div>
+<!-- Readout & Status -->
+<div class="flex flex-col items-end justify-center">
+<div class="flex items-center gap-1.5 mb-1">
+<div class="w-1.5 h-1.5 bg-outline rounded-sm"></div>
+<span class="font-typeplate-label text-typeplate-label uppercase text-outline">PAUSED 5d AGO</span>
+</div>
+<div class="text-right">
+<div class="font-mono-data text-mono-data text-outline">-- ships</div>
+<div class="font-mono-data text-mono-data text-outline">--</div>
+</div>
+</div>
+</div>
+<!-- Spacer for Archived -->
+<div class="h-8 bg-surface-container-highest flex items-center justify-center rounded-lg mt-2">
+<span class="font-typeplate-mobile text-typeplate-mobile text-outline uppercase tracking-widest">ARCHIVED ENTITIES</span>
+</div>
+<!-- Row 4: Archived -->
+<div class="bg-surface-container-low h-[96px] px-4 flex items-center justify-between w-full opacity-50 grayscale rounded-lg shadow-sm border border-surface-container-highest">
+<div class="flex items-center gap-3">
+<!-- Sigil -->
+<div class="w-10 h-10 bg-surface-container-highest flex flex-wrap content-start overflow-hidden rounded-lg">
+<div class="w-[33%] h-[33%] bg-outline/20"></div>
+<div class="w-[33%] h-[33%]"></div>
+<div class="w-[33%] h-[33%] bg-outline/20"></div>
+<div class="w-[33%] h-[33%]"></div>
+<div class="w-[33%] h-[33%]"></div>
+<div class="w-[33%] h-[33%]"></div>
+<div class="w-[33%] h-[33%] bg-outline/20"></div>
+<div class="w-[33%] h-[33%]"></div>
+<div class="w-[33%] h-[33%] bg-outline/20"></div>
+</div>
+<!-- Info -->
+<div class="flex flex-col justify-center">
+<div class="flex items-baseline gap-2">
+<span class="font-headline-sm text-headline-sm text-on-surface-variant line-through decoration-outline">Legacy Bot</span>
+<span class="font-typeplate-mobile text-typeplate-mobile text-outline uppercase">ID // L-X</span>
+</div>
+<span class="font-body-md text-body-md text-outline leading-tight">Deprecated // Offline</span>
+</div>
+</div>
+<!-- Readout & Status -->
+<div class="flex flex-col items-end justify-center">
+<div class="flex items-center gap-1.5 mb-1">
+<div class="w-[4px] h-[4px] bg-outline rounded-full"></div>
+<span class="font-typeplate-label text-typeplate-label uppercase text-outline">ARCHIVED · last active 2025-12-12</span>
+</div>
+<div class="text-right">
+<div class="font-mono-data text-mono-data text-outline opacity-0">0</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar Semantic Shell -->
+<nav class="bg-surface-container-lowest text-tertiary w-full fixed bottom-0 left-0 z-50 flex justify-around items-center h-16 px-gutter shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] pb-4">
+<!-- Inactive -->
+<button class="text-outline flex flex-col items-center justify-center p-unit hover:text-primary transition-colors cursor-crosshair rounded-lg">
+<span class="material-symbols-outlined text-[20px]" data-icon="history">history</span>
+<span class="font-typeplate-mobile text-typeplate-mobile mt-0.5">LIVE_TRACE</span>
+</button>
+<!-- Inactive -->
+<button class="text-outline flex flex-col items-center justify-center p-unit hover:text-primary transition-colors cursor-crosshair rounded-lg">
+<span class="material-symbols-outlined text-[20px]" data-icon="biotech">biotech</span>
+<span class="font-typeplate-mobile text-typeplate-mobile mt-0.5">DIAGNOSTICS</span>
+</button>
+<!-- Active Nav Map based on intent -->
+<button class="bg-secondary-container text-on-secondary-container rounded-lg flex flex-col items-center justify-center p-unit cursor-crosshair px-4 py-1">
+<span class="material-symbols-outlined text-[20px]" data-icon="shield_lock">shield_lock</span>
+<span class="font-typeplate-mobile text-typeplate-mobile mt-0.5">SECURITY</span>
+</button>
+<!-- Inactive -->
+<button class="text-outline flex flex-col items-center justify-center p-unit hover:text-primary transition-colors cursor-crosshair rounded-lg">
+<span class="material-symbols-outlined text-[20px]" data-icon="description">description</span>
+<span class="font-typeplate-mobile text-typeplate-mobile mt-0.5">REPORTS</span>
+</button>
+<!-- Inactive -->
+<button class="text-outline flex flex-col items-center justify-center p-unit hover:text-primary transition-colors cursor-crosshair rounded-lg">
+<span class="material-symbols-outlined text-[20px]" data-icon="settings">settings</span>
+<span class="font-typeplate-mobile text-typeplate-mobile mt-0.5">SETTINGS</span>
+</button>
+</nav>
+</body></html>

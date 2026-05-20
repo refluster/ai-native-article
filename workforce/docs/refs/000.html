@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Workforce Dashboard // OP-882</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700&amp;family=Jetbrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&amp;family=Geist:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"on-primary-fixed-variant": "#00419d", "on-primary-container": "#fefcff", "surface-container-highest": "#e1e2ec", "surface-tint": "#0057cd", "primary-fixed-dim": "#b1c5ff", "tertiary-fixed": "#ffdbc8", tertiary: "#954500", "on-tertiary-container": "#fffbff", "outline-variant": "#c2c6d6", surface: "#faf9ff", "on-surface-variant": "#424654", "on-background": "#191b23", "on-secondary-fixed": "#021944", "error-container": "#ffdad6", "surface-dim": "#d8d9e4", secondary: "#4b5d8c", "secondary-fixed": "#dae2ff", "tertiary-fixed-dim": "#ffb68a", outline: "#737785", "on-error-container": "#93000a", "on-primary-fixed": "#001946", "on-primary": "#ffffff", "primary-container": "#306fe6", "on-tertiary-fixed-variant": "#743500", "tertiary-container": "#bb5800", "on-secondary-fixed-variant": "#334572", "inverse-primary": "#b1c5ff", "on-secondary-container": "#415381", primary: "#0055c8", "on-tertiary-fixed": "#321300", "surface-container-lowest": "#ffffff", error: "#ba1a1a", "on-error": "#ffffff", "on-secondary": "#ffffff", "on-surface": "#191b23", "surface-bright": "#faf9ff", "inverse-on-surface": "#eff0fa", "secondary-container": "#b6c8fd", "inverse-surface": "#2e3038", "secondary-fixed-dim": "#b3c5fa", "primary-fixed": "#d9e2ff", "surface-container-high": "#e7e7f2", "surface-container-low": "#f2f3fd", "surface-container": "#ecedf8", "surface-variant": "#e1e2ec", "on-tertiary": "#ffffff", background: "#faf9ff", "throwing-accent": "#E2691A", "surface-secondary": "#f8f9fa", "background-paper": "#ffffff"}, borderRadius: {DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px"}, spacing: {"max-width": "1440px", gutter: "16px", "tier-padding-x": "24px", unit: "4px", "tier-padding-y": "20px", "margin-desktop": "64px"}, fontFamily: {"body-md": ["Geist"], "headline-sm": ["Geist"], "headline-lg": ["Geist"], "display-hero": ["JetBrains Mono"], "typeplate-label": ["JetBrains Mono"], "mono-data": ["JetBrains Mono"], headline: ["Geist"], display: ["Geist"], body: ["Geist"], label: ["Jetbrains Mono"]}, fontSize: {"body-md": ["14px", {lineHeight: "20px", fontWeight: "400"}], "headline-sm": ["18px", {lineHeight: "24px", fontWeight: "600"}], "headline-lg": ["32px", {lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "600"}], "display-hero": ["72px", {lineHeight: "72px", letterSpacing: "-0.04em", fontWeight: "500"}], "typeplate-label": ["10px", {lineHeight: "12px", letterSpacing: "0.08em", fontWeight: "500"}], "mono-data": ["12px", {lineHeight: "16px", fontWeight: "400"}]}}}};</script>
+<style>
+        /* Custom scrollbar to hide for live trace */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        /* Procedural sigil generation helpers */
+        .sigil-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            grid-template-rows: repeat(6, 1fr);
+            gap: 1px;
+        }
+        
+        .live-trace-animation {
+            animation: scrollLeft 60s linear infinite;
+        }
+        
+        @keyframes scrollLeft {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+    </style>
+</head>
+<body class="text-on-surface bg-surface antialiased min-h-screen font-body-md flex flex-col items-center">
+<!-- TopAppBar from JSON -->
+<header class="bg-surface-container border-b border-outline-variant docked full-width top-0 w-full px-margin-desktop h-16 max-w-max-width flex justify-between items-center z-50">
+<div class="flex items-center gap-6">
+<div class="font-jetbrainsMono text-mono-data font-bold uppercase tracking-widest text-on-surface">WF_CONSOLE // OP-882</div>
+<nav class="hidden md:flex items-center gap-6 h-full">
+<a class="text-primary border-b-2 border-primary pb-1 h-16 flex items-center opacity-80 scale-98 transition-all hover:bg-surface-container-highest transition-colors duration-150" href="#">FLEET</a>
+<a class="text-on-surface-variant font-mono-data text-mono-data h-16 flex items-center hover:bg-surface-container-highest transition-colors duration-150" href="#">COMMAND</a>
+<a class="text-on-surface-variant font-mono-data text-mono-data h-16 flex items-center hover:bg-surface-container-highest transition-colors duration-150" href="#">LOGS</a>
+<a class="text-on-surface-variant font-mono-data text-mono-data h-16 flex items-center hover:bg-surface-container-highest transition-colors duration-150" href="#">NETWORK</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-3">
+<button class="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest rounded-lg transition-colors duration-150">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">terminal</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest rounded-lg transition-colors duration-150">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">notifications</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest rounded-lg transition-colors duration-150">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">settings</span>
+</button>
+</div>
+<div aria-label="OPERATOR_SIGIL_PRIMARY" class="w-8 h-8 bg-outline-variant rounded-lg flex items-center justify-center overflow-hidden">
+<div class="sigil-grid w-full h-full bg-primary/20 p-[2px]">
+<div class="bg-primary col-span-2 row-span-2 rounded-sm"></div>
+<div class="bg-primary col-start-4 col-span-3 row-span-1 rounded-sm"></div>
+<div class="bg-primary col-start-1 row-start-4 col-span-2 row-span-3 rounded-sm"></div>
+<div class="bg-primary col-start-5 row-start-5 col-span-2 row-span-2 rounded-sm"></div>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="w-full max-w-max-width bg-surface min-h-screen pb-24 shadow-sm relative">
+<!-- SECTION 1: LIVE TRACE RIBBON -->
+<div class="w-full h-6 bg-surface-container flex items-center overflow-hidden border-b border-surface-dim relative">
+<div class="flex whitespace-nowrap live-trace-animation gap-1 px-4">
+<!-- Generating repeating trace elements -->
+<script>
+                    for(let i=0; i<100; i++) {
+                        const isThrowing = Math.random() > 0.95;
+                        const isActive = Math.random() > 0.8;
+                        const color = isThrowing ? 'bg-throwing-accent' : (isActive ? 'bg-primary' : 'bg-outline-variant');
+                        const halo = isActive && !isThrowing ? 'shadow-[0_0_8px_rgba(79,59,255,0.6)]' : '';
+                        document.write(`<div class="w-[6px] h-[6px] rounded-sm ${color} ${halo} opacity-${Math.floor(Math.random()*60 + 40)}"></div>`);
+                    }
+                </script>
+</div>
+<div class="absolute inset-0 bg-gradient-to-r from-surface-container via-transparent to-surface-container pointer-events-none"></div>
+</div>
+<div class="w-full px-margin-desktop py-2 bg-surface flex items-center">
+<span class="font-mono-data text-[11px] text-on-surface-variant uppercase tracking-wide">
+                60 events / last 6 hours · 11 agents active · <span class="text-throwing-accent font-bold">1 throwing</span>
+</span>
+</div>
+<div class="px-margin-desktop py-8 flex flex-col gap-8">
+<!-- SECTION 2: HEADER -->
+<section class="w-full flex justify-between items-end border-b border-surface-dim pb-6">
+<div class="flex flex-col gap-2">
+<span class="font-typeplate-label text-typeplate-label text-outline uppercase">WORKFORCE · OPERATOR CONSOLE</span>
+<h1 class="text-[48px] leading-[48px] tracking-[-0.02em] font-sans font-medium text-on-surface">11 of 12 instruments online.</h1>
+<p class="font-body-md text-[16px] text-on-surface-variant mt-1">Today's shift, in numbers.</p>
+</div>
+<div class="flex flex-col items-end gap-1">
+<div class="font-typeplate-label text-typeplate-label bg-surface-container rounded-lg px-3 py-1.5 text-on-surface">
+                        OPERATOR · KOHEI · LOCAL 09:14 JST · 2026-05-19
+                    </div>
+</div>
+</section>
+<!-- SECTION 3: BAND 1 - FLEET READOUT -->
+<section class="grid grid-cols-4 gap-4">
+<!-- Tile 1 -->
+<div class="bg-surface-container p-6 flex flex-col justify-between h-[180px] rounded-lg">
+<div class="font-display-hero text-display-hero text-on-surface">137</div>
+<div class="flex flex-col gap-2">
+<div class="w-full h-1 bg-surface-dim rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[65%] rounded-full"></div>
+</div>
+<div class="font-typeplate-label text-[9px] uppercase text-on-surface-variant">DELIVERABLES MTD</div>
+</div>
+</div>
+<!-- Tile 2 -->
+<div class="bg-surface-container p-6 flex flex-col justify-between h-[180px] rounded-lg">
+<div class="font-display-hero text-display-hero text-on-surface">518</div>
+<div class="flex flex-col gap-2">
+<div class="w-full h-1 bg-surface-dim rounded-full overflow-hidden">
+<div class="h-full bg-outline-variant w-[100%] rounded-full"></div>
+</div>
+<div class="font-typeplate-label text-[9px] uppercase text-on-surface-variant">RUNS MTD</div>
+</div>
+</div>
+<!-- Tile 3 -->
+<div class="bg-surface-container p-6 flex flex-col justify-between h-[180px] rounded-lg">
+<div class="font-display-hero text-display-hero text-on-surface tracking-tighter">84<span class="text-[32px] text-on-surface-variant">.20</span></div>
+<div class="flex flex-col gap-2">
+<div class="w-full h-1 bg-surface-dim rounded-full overflow-hidden">
+<div class="h-full bg-throwing-accent w-[85%] rounded-full"></div>
+</div>
+<div class="font-typeplate-label text-[9px] uppercase text-on-surface-variant">$ SPEND MTD</div>
+</div>
+</div>
+<!-- Tile 4 -->
+<div class="bg-surface-container p-6 flex flex-col justify-between h-[180px] rounded-lg">
+<div class="font-display-hero text-display-hero text-on-surface">14<span class="text-[32px] text-on-surface-variant">m</span></div>
+<div class="flex flex-col gap-2">
+<div class="w-full h-1 bg-transparent"></div>
+<div class="font-typeplate-label text-[9px] uppercase text-on-surface-variant">SINCE LAST SHIP</div>
+</div>
+</div>
+</section>
+<!-- SECTION 4: BAND 2 -->
+<section class="grid grid-cols-12 gap-6">
+<!-- Heatmap (8/12) -->
+<div class="col-span-8 flex flex-col gap-4">
+<div class="flex justify-between items-center bg-surface-container rounded-lg px-4 py-3">
+<h2 class="font-typeplate-label text-typeplate-label uppercase">Shipment heatmap, last 30 days</h2>
+<span class="font-typeplate-label text-[9px] text-outline">DENSITY VIEW</span>
+</div>
+<div class="w-full bg-surface-container rounded-lg p-5 flex flex-col gap-1">
+<!-- Heatmap Grid Container -->
+<div class="grid grid-cols-[auto_1fr] gap-3 items-start">
+<!-- Y-axis labels -->
+<div class="flex flex-col justify-between h-full py-1 gap-1">
+<span class="font-typeplate-label text-[9px] text-on-surface-variant leading-none flex-1">AG-1</span>
+<span class="font-typeplate-label text-[9px] text-on-surface-variant leading-none flex-1">AG-2</span>
+<span class="font-typeplate-label text-[9px] text-on-surface-variant leading-none flex-1">AG-3</span>
+<span class="font-typeplate-label text-[9px] text-on-surface-variant leading-none flex-1">AG-4</span>
+</div>
+<!-- 30x4 Cells Grid (simplified visual representation of 30x12) -->
+<div class="grid grid-cols-[repeat(30,minmax(0,1fr))] gap-[2px]">
+<script>
+                                    for(let r=0; r<4; r++) {
+                                        for(let c=0; c<30; c++) {
+                                            const intensity = Math.random();
+                                            let bgClass = 'bg-surface-dim';
+                                            if(intensity > 0.9) bgClass = 'bg-primary';
+                                            else if(intensity > 0.6) bgClass = 'bg-primary opacity-60';
+                                            else if(intensity > 0.3) bgClass = 'bg-primary opacity-30';
+                                            
+                                            if(r === 2 && c === 24) bgClass = 'bg-throwing-accent'; // Anomalous spot
+                                            
+                                            document.write(`<div class="aspect-square w-full rounded-sm ${bgClass}"></div>`);
+                                        }
+                                    }
+                                </script>
+</div>
+</div>
+<!-- X-axis markers -->
+<div class="grid grid-cols-[repeat(30,minmax(0,1fr))] gap-[2px] pl-[32px] mt-2">
+<span class="font-typeplate-label text-[8px] text-outline col-span-5">-30d</span>
+<span class="font-typeplate-label text-[8px] text-outline col-span-5 text-center">-25d</span>
+<span class="font-typeplate-label text-[8px] text-outline col-span-5 text-center">-20d</span>
+<span class="font-typeplate-label text-[8px] text-outline col-span-5 text-center">-15d</span>
+<span class="font-typeplate-label text-[8px] text-outline col-span-5 text-center">-10d</span>
+<span class="font-typeplate-label text-[8px] text-outline col-span-5 text-right">-5d</span>
+</div>
+</div>
+</div>
+<!-- Active List (4/12) -->
+<div class="col-span-4 flex flex-col gap-4">
+<div class="flex justify-between items-center bg-surface-container rounded-lg px-4 py-3">
+<h2 class="font-typeplate-label text-typeplate-label uppercase">Currently Active</h2>
+<span class="font-typeplate-label text-[9px] text-outline">11 UNITS</span>
+</div>
+<div class="flex flex-col gap-2 bg-surface-container rounded-lg p-2">
+<!-- Agent Item 1 -->
+<div class="bg-surface rounded-lg p-3 flex items-center justify-between border-l-4 border-primary">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-surface-dim rounded-lg p-[2px] overflow-hidden">
+<div class="sigil-grid w-full h-full bg-primary/10">
+<div class="bg-primary col-span-3 row-span-2 rounded-[1px]"></div>
+<div class="bg-primary col-start-2 row-start-4 col-span-4 row-span-2 rounded-[1px]"></div>
+</div>
+</div>
+<div class="flex flex-col">
+<span class="font-mono-data text-[11px] text-on-surface uppercase">A-01 // THEO OKAFOR</span>
+<span class="font-sans text-[12px] text-on-surface-variant leading-none mt-1">Processing queue</span>
+</div>
+</div>
+<span class="font-mono-data text-[10px] text-outline">04:12:01</span>
+</div>
+<!-- Agent Item 2 -->
+<div class="bg-surface rounded-lg p-3 flex items-center justify-between border-l-4 border-throwing-accent">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-surface-dim rounded-lg p-[2px] overflow-hidden">
+<div class="sigil-grid w-full h-full bg-throwing-accent/10">
+<div class="bg-throwing-accent col-span-6 row-span-1 rounded-[1px]"></div>
+<div class="bg-throwing-accent col-start-3 row-start-3 col-span-2 row-span-4 rounded-[1px]"></div>
+</div>
+</div>
+<div class="flex flex-col">
+<span class="font-mono-data text-[11px] text-throwing-accent uppercase">A-04 // HANA VOLKOV</span>
+<span class="font-sans text-[12px] text-throwing-accent leading-none mt-1">Stalled - API Rate Limit</span>
+</div>
+</div>
+<span class="font-mono-data text-[10px] text-throwing-accent">00:45:12</span>
+</div>
+<!-- Agent Item 3 -->
+<div class="bg-surface rounded-lg p-3 flex items-center justify-between border-l-4 border-surface-dim opacity-70">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-surface-dim rounded-lg p-[2px] overflow-hidden">
+<div class="sigil-grid w-full h-full bg-outline-variant/20">
+<div class="bg-outline-variant col-span-2 row-span-6 rounded-[1px]"></div>
+<div class="bg-outline-variant col-start-4 row-start-1 col-span-2 row-span-6 rounded-[1px]"></div>
+</div>
+</div>
+<div class="flex flex-col">
+<span class="font-mono-data text-[11px] text-on-surface-variant uppercase">A-07 // SILAS VANE</span>
+<span class="font-sans text-[12px] text-outline leading-none mt-1">Idle</span>
+</div>
+</div>
+<span class="font-mono-data text-[10px] text-outline">--:--:--</span>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 5: BAND 3 -->
+<section class="grid grid-cols-2 gap-6">
+<!-- Recent Throws -->
+<div class="flex flex-col gap-4">
+<div class="flex justify-between items-center bg-surface-container rounded-lg px-4 py-3">
+<h2 class="font-typeplate-label text-typeplate-label uppercase">Recent Throws</h2>
+<span class="font-typeplate-label text-[9px] text-outline">LOG TAIL</span>
+</div>
+<div class="bg-surface-container rounded-lg p-2 flex flex-col gap-1">
+<div class="bg-surface rounded-lg p-3 flex items-center gap-3">
+<div class="w-[8px] h-[8px] rounded-full bg-throwing-accent flex-shrink-0"></div>
+<span class="font-mono-data text-[11px] text-on-surface truncate">
+<span class="text-outline mr-2">03:14</span> THEO OKAFOR finish_reason='length' on l3-insight
+                            </span>
+</div>
+<div class="bg-surface rounded-lg p-3 flex items-center gap-3">
+<div class="w-[8px] h-[8px] rounded-full bg-outline-variant flex-shrink-0"></div>
+<span class="font-mono-data text-[11px] text-on-surface-variant truncate">
+<span class="text-outline mr-2">02:45</span> SYSTEM node_restart triggered by supervisor
+                            </span>
+</div>
+<div class="bg-surface rounded-lg p-3 flex items-center gap-3">
+<div class="w-[8px] h-[8px] rounded-full bg-throwing-accent flex-shrink-0"></div>
+<span class="font-mono-data text-[11px] text-on-surface truncate">
+<span class="text-outline mr-2">01:12</span> HANA VOLKOV context_window_exceeded at block 409
+                            </span>
+</div>
+</div>
+</div>
+<!-- Crew Needing Attention -->
+<div class="flex flex-col gap-4">
+<div class="flex justify-between items-center bg-surface-container rounded-lg px-4 py-3">
+<h2 class="font-typeplate-label text-typeplate-label uppercase text-throwing-accent">Crew Needing Attention</h2>
+<span class="material-symbols-outlined text-[16px] text-throwing-accent" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<div class="bg-surface-container rounded-lg p-5 flex flex-col gap-3">
+<div class="flex items-start gap-4">
+<div class="w-10 h-10 bg-surface-dim rounded-lg p-[2px] overflow-hidden">
+<div class="sigil-grid w-full h-full bg-throwing-accent/10">
+<div class="bg-throwing-accent col-span-6 row-span-1 rounded-[1px]"></div>
+<div class="bg-throwing-accent col-start-3 row-start-3 col-span-2 row-span-4 rounded-[1px]"></div>
+</div>
+</div>
+<div class="flex flex-col w-full">
+<div class="flex justify-between items-center bg-throwing-accent/10 rounded-md px-3 py-1.5 mb-2">
+<span class="font-mono-data text-[11px] text-throwing-accent font-bold uppercase">HANA VOLKOV</span>
+<span class="font-typeplate-label text-[9px] text-throwing-accent uppercase">OVER BUDGET</span>
+</div>
+<span class="font-body-md text-[13px] text-on-surface-variant">Consumed $42.50 in last hour. Recommend pausing sequence.</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+</body></html>
