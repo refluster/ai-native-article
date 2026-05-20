@@ -132,6 +132,7 @@ fetch('YOUR_GAS_URL', {
 - **L4_BATCH**: Daily batch — image any unimaged published article (max 2/run)
 - **REBUILD_MANIFEST**: Rebuild `manifest.json` from Notion (legacy maintenance)
 - **ARTICLE_LIST**: Unified listing across types (used by `article-health` skill)
+- **PIPELINE_STATUS**: Read-only diagnostic — counts (L1 total/uncovered, L2/L3 total + 7d), latest `created_time` per layer, installed triggers, and `L3_LAST_RUN_AT`. Use when `kohuehara.xyz` has gone quiet to localise whether the stall is L1 starvation, L3 gating, or missing triggers. See the [Pipeline has gone quiet](#pipeline-has-gone-quiet) runbook.
 
 Use the [`gas-call` skill](../.claude/skills/gas-call/SKILL.md) to invoke any of these from the terminal — `curl -X POST` does NOT work because GAS redirects POSTs through `script.googleusercontent.com` and that endpoint returns 405.
 
@@ -210,6 +211,41 @@ User reports an article that ends mid-sentence (e.g. `kohuehara.xyz/.../d17e1d58
 4. Re-run `article-health`. Confirm 0 truncated.
 
 The `L2_BACKFILL` action uses the `isTruncatedMarkdown` heuristic in `gas/src/Code.gs` — a heading with no body underneath, or a non-list line that doesn't end with proper punctuation. The same heuristic is mirrored in the `article-health` skill so what the skill flags will also be picked up by `L2_BACKFILL`.
+
+### Pipeline has gone quiet
+
+`kohuehara.xyz` hasn't shown a new article for several days even though the daily triggers should be running. The visible signal is the home-page list: its newest `date` is older than ~yesterday.
+
+1. Snapshot the pipeline state from the deployed GAS:
+   ```bash
+   node .claude/skills/gas-call/scripts/gas-call.mjs PIPELINE_STATUS
+   ```
+   The response shape:
+   ```json
+   {
+     "mode": "unified",
+     "l1": { "total": 412, "uncovered": 0,  "latestCreated": "2026-05-15T03:11:00.000Z" },
+     "l2": { "total": 187, "latestCreated": "2026-05-15T01:02:00.000Z", "createdLast7d": 0 },
+     "l3": { "total": 53,  "latestCreated": "2026-05-15T02:14:00.000Z", "createdLast7d": 0 },
+     "triggers": [
+       { "handler": "runL2Batch", "type": "CLOCK", "source": "CLOCK" },
+       { "handler": "runL3Batch", "type": "CLOCK", "source": "CLOCK" },
+       { "handler": "runL4Batch", "type": "CLOCK", "source": "CLOCK" }
+     ],
+     "scriptProps": { "L3_LAST_RUN_AT": "2026-05-15T01:00:11.483Z", "L3_RECENTLY_USED_L2_IDS_count": 10 }
+   }
+   ```
+2. Read the diagnosis off the snapshot:
+
+   | What you see | Diagnosis | Fix |
+   |---|---|---|
+   | `l1.uncovered === 0` | **L1 starvation.** `L2_BATCH` had nothing to do; `L3_BATCH` then skipped per its "no new L2 since last run" rule. | Add new L1 sources via the Capture page (`/capture`) or `L1_SAVE`. Within 24h the next `runL2Batch` will pick them up. To unblock immediately, `gas-call L2_BATCH` once L1 is fed. |
+   | `l1.uncovered > 0` but `l2.createdLast7d === 0` | `L2_BATCH` is not making progress despite work being available. Either the trigger isn't installed (see `triggers` row), the daily run is hitting an exception, or every L2_CREATE attempt is throwing. | Check the Apps Script `Executions` log. If the trigger is missing from the snapshot, re-run `setupDailyTriggers()` from the editor (it's idempotent). If runs are erroring, the most common cause is Azure OpenAI / Notion auth — confirm script properties are still set. |
+   | `triggers` does not list all of `runL2Batch`, `runL3Batch`, `runL4Batch` | Triggers were dropped (e.g. a project copy/restore). | Open the Apps Script editor and run `setupDailyTriggers()` once. |
+   | `l2.createdLast7d > 0` but `l3.createdLast7d === 0` | L3 is gated. Either `L3_LAST_RUN_AT > newest L2` (legitimate skip), or the recent pool has < `L3_SAMPLE_SIZE` items (legitimate too). | If you want one anyway: `gas-call L3_BATCH`. The gate releases as soon as `L3_LAST_RUN_AT` is older than at least one L2 in the recent window. |
+   | `l3.createdLast7d > 0` but site still stale | Deploy lag. gh-pages cron runs `06:17 / 12:17 / 18:17 UTC`. | `gh workflow run deploy.yml`. |
+
+3. After the fix, re-run `PIPELINE_STATUS` to confirm the next day's `createdLast7d` is non-zero.
 
 ### Adding a new GAS action
 
