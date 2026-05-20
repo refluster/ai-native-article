@@ -4,33 +4,42 @@
  *
  * Enforces the design-system rules from DESIGN.md that cost the most when
  * violated silently:
- *   1. No raw hex colors in src/ — tokens live in tailwind.config.ts.
- *   2. No rounded-[px] or rounded-(sm|md|lg|xl|2xl|3xl) classes — the system
- *      is 0px radius. `rounded-full` is allowed for pills/avatars.
+ *   1. No raw hex colors in apps/*\/src — tokens live in tailwind.config.ts.
+ *   2. No rounded-[px] or rounded-(sm|md|lg|xl|2xl|3xl) classes — the
+ *      article system is 0px radius. `rounded-full` is allowed for pills.
+ *      Workforce uses prefixed `rounded-wf-*` classes which fall through
+ *      the regex below.
  *
  * Exits 1 on violation so CI blocks the merge. See AGENTS.md §2.3.
  */
 
-import { readFileSync, readdirSync, statSync } from 'fs'
+import { readFileSync, readdirSync, statSync, existsSync } from 'fs'
 import { join, relative } from 'path'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const SRC = join(ROOT, 'src')
 
-// Files that legitimately reference hex — the token surface itself.
-// Relative to repo root.
+// Roots to scan. apps/* and packages/shared. Each app's index.css and
+// config/site.ts are token surfaces (allowlisted hex). Workforce stores
+// raw hex inside .css custom properties so SVG fill/stroke can reference
+// var(--wf-svg-*) — see PR #57.
+const ROOTS = [
+  join(ROOT, 'apps', 'article', 'src'),
+  join(ROOT, 'apps', 'workforce', 'src'),
+  join(ROOT, 'packages', 'shared', 'src'),
+]
+
 const ALLOWLIST = new Set([
-  'src/config/site.ts',
-  'src/index.css',
+  'apps/article/src/config/site.ts',
+  'apps/article/src/index.css',
+  'apps/workforce/src/config/site.ts',
+  'apps/workforce/src/index.css',
 ])
 
-// Colour tokens on the DesignSystem/DesignGuide pages are demonstrating the
-// palette itself; inline hex is expected there.
 const PALETTE_DEMO_FILES = new Set([
-  'src/pages/DesignSystem.tsx',
-  'src/pages/DesignGuide.tsx',
+  'apps/article/src/pages/design/DesignSystem.tsx',
+  'apps/article/src/pages/design/DesignGuide.tsx',
 ])
 
 const HEX_RE = /#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/g
@@ -48,12 +57,12 @@ function walk(dir) {
     }
     if (!/\.(ts|tsx|css)$/.test(entry)) continue
 
-    const rel = relative(ROOT, p)
+    // Normalise path separators for cross-platform allowlist matching.
+    const rel = relative(ROOT, p).split(/\\+/).join('/')
     if (ALLOWLIST.has(rel)) continue
 
     const text = readFileSync(p, 'utf8')
 
-    // Rule 1 — no raw hex (skip palette demo files).
     if (!PALETTE_DEMO_FILES.has(rel)) {
       const hex = text.match(HEX_RE)
       if (hex) {
@@ -62,7 +71,6 @@ function walk(dir) {
       }
     }
 
-    // Rule 2 — no non-zero rounded (always enforced).
     const rounded = text.match(ROUNDED_RE)
     if (rounded) {
       violations += rounded.length
@@ -71,8 +79,10 @@ function walk(dir) {
   }
 }
 
-console.log('Linting design tokens in src/ …')
-walk(SRC)
+console.log('Linting design tokens in apps/* and packages/*/src …')
+for (const root of ROOTS) {
+  if (existsSync(root)) walk(root)
+}
 
 if (violations > 0) {
   console.error(`\n❌ ${violations} design-token violation(s). See DESIGN.md and AGENTS.md §2.3.`)

@@ -65,7 +65,7 @@ if (FETCHER !== 'notion') {
   process.exit(1)
 }
 
-const POSTS_DIR = join(ROOT, 'public', 'posts')
+const POSTS_DIR = join(ROOT, 'apps', 'article', 'public', 'posts')
 
 console.log('🔍  Querying Notion database …')
 console.log(`    primary: ${UNIFIED_DB_ID}`)

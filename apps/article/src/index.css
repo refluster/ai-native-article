@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f9f9fb;
+    color: #2d3338;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: #c1000a;
+    color: #fff7f6;
+  }
+}
+
+@layer utilities {
+  .swiss-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 24px;
+  }
+}
+
+/* Article markdown content styles */
+.article-content h1 {
+  @apply text-3xl font-black tracking-tighter uppercase mt-12 mb-6 leading-tight;
+}
+.article-content h2 {
+  @apply text-2xl font-black tracking-tighter uppercase mt-10 mb-5 leading-tight;
+}
+.article-content h3 {
+  @apply text-xl font-black tracking-tighter uppercase mt-8 mb-4;
+}
+.article-content p {
+  @apply text-base leading-relaxed text-on-surface-variant mb-5;
+}
+.article-content ul {
+  @apply mb-5 space-y-2;
+}
+.article-content ul li {
+  @apply text-base leading-relaxed text-on-surface-variant pl-4 relative;
+}
+.article-content ul li::before {
+  content: '—';
+  @apply absolute left-0 text-tertiary font-bold;
+}
+.article-content ol {
+  @apply mb-5 space-y-2 list-decimal list-inside;
+}
+.article-content ol li {
+  @apply text-base leading-relaxed text-on-surface-variant;
+}
+.article-content blockquote {
+  @apply border-l-4 border-tertiary pl-6 my-8;
+}
+.article-content blockquote p {
+  @apply text-lg font-medium text-on-surface italic mb-0;
+}
+.article-content code {
+  @apply font-mono text-sm bg-surface-container-low px-1.5 py-0.5 text-on-surface;
+}
+.article-content pre {
+  @apply bg-inverse-surface text-on-primary p-6 my-6 overflow-x-auto;
+}
+.article-content pre code {
+  @apply bg-transparent p-0 text-on-primary text-sm;
+}
+.article-content strong {
+  @apply font-black text-on-surface;
+}
+.article-content em {
+  @apply italic;
+}
+.article-content hr {
+  @apply border-0 border-t border-outline-variant/20 my-12;
+}
+.article-content a {
+  @apply text-tertiary underline underline-offset-2 hover:no-underline;
+}
