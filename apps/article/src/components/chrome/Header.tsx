@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { WORKFORCE_BASE_URL } from '../../config/site'
 
 const publicNav = [
   { to: '/', label: 'INDEX', end: true },
@@ -33,6 +34,18 @@ export default function Header() {
               {label}
             </NavLink>
           ))}
+          {/* External cross-link to the workforce console. Cognito gates
+              the destination so non-operator clicks land on the Hosted
+              UI sign-in page. New tab so readers don't lose their
+              place. */}
+          <a
+            href={WORKFORCE_BASE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-bold tracking-[-0.02em] uppercase text-xs transition-colors pb-1 text-outline hover:text-on-surface"
+          >
+            WORKFORCE ↗
+          </a>
         </nav>
 
         <NavLink to="/" className="text-2xl font-black tracking-tighter text-on-surface uppercase">
