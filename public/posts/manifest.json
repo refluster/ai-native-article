@@ -633,6 +633,16 @@
     "sourceUrls": "https://www.cnbc.com/2026/04/03/openai-fidji-simo-medical-leave-executive-changes.html"
   },
   {
+    "slug": "d02234d0751a",
+    "title": "TEST ARTICLE",
+    "type": "analysis",
+    "category": "TEST CAT",
+    "date": "2026-04-05",
+    "abstract": "# The Transition of Developers in the AI Era: Opportunities and Challenges\n\nAs artificial intelligence (AI) continues to evolve, its impact on software development is becoming increasingly profound. W",
+    "image": "/posts/images/d02234d0751a.jpg",
+    "sourceUrls": "https://www.businessinsider.com/ai-coding-changing-software-developer-role-2026-3"
+  },
+  {
     "slug": "c107b17195f9",
     "title": "階層構造からインテリジェンスへ：Blockが描くAI時代の組織デザイン (修正版)",
     "type": "explanation",
