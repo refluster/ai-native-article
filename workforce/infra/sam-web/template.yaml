@@ -1,0 +1,336 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Description: |
+  Workforce console — hosting + auth.
+
+  Three components, one stack:
+
+    1. S3 bucket (private, OAC-only) — holds the apps/workforce dist/
+       bundle. No public ACLs, no public policy. CloudFront is the only
+       reader, via Origin Access Control.
+
+    2. CloudFront distribution — terminates TLS for
+       workforce.kohuehara.xyz using the us-east-1 ACM cert that the
+       sibling wf-web-cert stack issues. SPA fallback rewrites 403 / 404
+       to /index.html so React Router handles deep links.
+
+    3. Cognito User Pool — the auth identity provider. Federates with
+       Google so the operator signs in with their kohuehara.xyz Google
+       account. Hosted UI lives on the AWS-managed
+       wf-auth-{random}.auth.ap-northeast-1.amazoncognito.com subdomain
+       (no extra DNS / cert needed).
+
+  No Lambda, no API Gateway here — the workforce SPA is presently
+  mock-data-only, gated at sign-in. A future PR adds the agents-api +
+  Cognito-aware authorizer.
+
+  Operator runbook lives at workforce/infra/sam-web/README.md. Required
+  bootstrap (Google OAuth client, Cloudflare CNAMEs) is documented there.
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: workforce.kohuehara.xyz
+    Description: FQDN the CloudFront distribution serves under. Must
+      match the Cloudflare DNS-only CNAME and the cert's DomainName.
+
+  CertificateArn:
+    Type: String
+    Description: |
+      ARN of the ACM certificate in us-east-1 (output of the
+      wf-web-cert-prod stack). e.g.,
+        arn:aws:acm:us-east-1:123456789012:certificate/abcd…
+    AllowedPattern: "^arn:aws:acm:us-east-1:\\d{12}:certificate/.+$"
+
+  GoogleClientId:
+    Type: String
+    Description: Google OAuth 2.0 client ID. Obtain from
+      https://console.cloud.google.com/apis/credentials. Authorised
+      redirect URI must be the Cognito Hosted UI endpoint
+      `https://{userPoolDomain}.auth.ap-northeast-1.amazoncognito.com/oauth2/idpresponse`.
+    NoEcho: false
+
+  GoogleClientSecret:
+    Type: String
+    Description: Google OAuth 2.0 client secret.
+    NoEcho: true
+
+  OperatorEmail:
+    Type: String
+    Description: Operator Google account email. Used as a Cognito
+      User Pool attribute restriction so other Google identities cannot
+      complete the federation step.
+    AllowedPattern: ".+@.+\\..+"
+
+Resources:
+
+  # ─── S3 bucket: private, OAC-only origin for the SPA ────────────────
+  WebBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub "wf-web-${AWS::AccountId}-prod"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+
+  WebBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebBucket
+      PolicyDocument:
+        Statement:
+          - Sid: AllowCloudFrontServicePrincipal
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${WebBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                "AWS:SourceArn": !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${WebDistribution}"
+
+  # ─── CloudFront distribution + OAC + SPA fallback ───────────────────
+  WebOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "wf-web-oac-prod"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  WebDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases:
+          - !Ref DomainName
+        Enabled: true
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_200
+        DefaultRootObject: index.html
+        Origins:
+          - Id: S3WebOrigin
+            DomainName: !GetAtt WebBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+            OriginAccessControlId: !Ref WebOAC
+        DefaultCacheBehavior:
+          TargetOriginId: S3WebOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          # AWS managed policies:
+          #   CachingOptimized: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          #   SecurityHeadersPolicy: 67f7725c-6f97-4210-82d7-5512b31e9d03
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03
+        CustomErrorResponses:
+          # SPA deep links: any non-existent object → React Router takes over.
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 10
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 10
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CertificateArn
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+
+  # ─── Cognito User Pool + Google federation + Hosted UI ─────────────
+  WfUserPool:
+    Type: AWS::Cognito::UserPool
+    DependsOn: PreSignUpFnPermission
+    Properties:
+      UserPoolName: wf-user-pool-prod
+      # Federated-only: we don't issue passwords or accept email signup.
+      # The operator's identity comes from Google; Cognito stores the
+      # federated profile and issues OIDC tokens.
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      AutoVerifiedAttributes: [email]
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Required: true
+          Mutable: true
+      MfaConfiguration: "OFF"
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      LambdaConfig:
+        PreSignUp: !GetAtt PreSignUpFn.Arn
+
+  WfUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Sub "wf-auth-${AWS::AccountId}"
+      UserPoolId: !Ref WfUserPool
+
+  WfGoogleIdp:
+    Type: AWS::Cognito::UserPoolIdentityProvider
+    Properties:
+      UserPoolId: !Ref WfUserPool
+      ProviderName: Google
+      ProviderType: Google
+      ProviderDetails:
+        client_id: !Ref GoogleClientId
+        client_secret: !Ref GoogleClientSecret
+        authorize_scopes: "openid email profile"
+      AttributeMapping:
+        email: email
+        email_verified: email_verified
+        name: name
+        picture: picture
+
+  WfUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: WfGoogleIdp
+    Properties:
+      UserPoolId: !Ref WfUserPool
+      ClientName: wf-console-spa
+      GenerateSecret: false
+      # Auth code + PKCE only — SPA-handled, no server-side exchange.
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email, profile]
+      AllowedOAuthFlowsUserPoolClient: true
+      SupportedIdentityProviders:
+        - Google
+      CallbackURLs:
+        - !Sub "https://${DomainName}/auth/callback"
+      LogoutURLs:
+        - !Sub "https://${DomainName}/"
+      ExplicitAuthFlows:
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      # ID-token claim transformation — restrict the User Pool to a
+      # single operator email. Cognito returns an "Unauthorized" error
+      # on the federation callback when the Google identity's email
+      # doesn't match.
+      PreventUserExistenceErrors: ENABLED
+      ReadAttributes: [email, email_verified, name, picture]
+      WriteAttributes: [email, name, picture]
+
+  # ─── Pre-sign-up trigger: gate to OperatorEmail ─────────────────────
+  # Cognito calls this once per federated sign-up to decide whether to
+  # create the user. We reject any Google identity whose email doesn't
+  # match the OperatorEmail parameter — that's the practical "1 user"
+  # restriction for a single-operator console.
+  PreSignUpFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: wf-pre-signup-prod
+      Runtime: nodejs20.x
+      Architectures: [arm64]
+      MemorySize: 256
+      Timeout: 10
+      Handler: index.handler
+      Environment:
+        Variables:
+          ALLOWED_EMAIL: !Ref OperatorEmail
+      InlineCode: |
+        // Pre-sign-up trigger — reject any federated identity whose
+        // email != ALLOWED_EMAIL. Auto-confirm + auto-verify when it
+        // matches so the operator skips the email-confirmation step
+        // (their Google identity is already verified).
+        export const handler = async (event) => {
+          const allowed = (process.env.ALLOWED_EMAIL || '').toLowerCase();
+          const email = (event.request?.userAttributes?.email || '').toLowerCase();
+          if (!allowed || !email || email !== allowed) {
+            throw new Error('not an authorised operator');
+          }
+          event.response.autoConfirmUser = true;
+          event.response.autoVerifyEmail = true;
+          return event;
+        };
+
+  # SourceArn is left wildcard here. Pinning to the User Pool ARN would
+  # create a synthesis-time cycle (UserPool → Lambda → Permission → UserPool).
+  # The Lambda is dedicated to this stack — no other invoker exists — so
+  # the open SourceArn is a deliberate trade for a clean dependency graph.
+  PreSignUpFnPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt PreSignUpFn.Arn
+      Principal: cognito-idp.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+
+Outputs:
+  WebBucketName:
+    Description: S3 bucket where the SPA dist/ is synced.
+    Value: !Ref WebBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-WebBucketName"
+
+  DistributionId:
+    Description: CloudFront distribution id. Use with
+      `aws cloudfront create-invalidation` after every deploy.
+    Value: !Ref WebDistribution
+    Export:
+      Name: !Sub "${AWS::StackName}-DistributionId"
+
+  DistributionDomain:
+    Description: CloudFront default domain. Point Cloudflare CNAME at
+      this hostname (DNS-only / gray cloud).
+    Value: !GetAtt WebDistribution.DomainName
+    Export:
+      Name: !Sub "${AWS::StackName}-DistributionDomain"
+
+  UserPoolId:
+    Description: Cognito User Pool ID. Pass to the SPA build as
+      VITE_COGNITO_USER_POOL_ID.
+    Value: !Ref WfUserPool
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolId"
+
+  UserPoolClientId:
+    Description: Cognito User Pool Client ID. Pass to the SPA build as
+      VITE_COGNITO_CLIENT_ID.
+    Value: !Ref WfUserPoolClient
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolClientId"
+
+  UserPoolDomain:
+    Description: Cognito Hosted UI domain prefix (full domain is
+      "{prefix}.auth.ap-northeast-1.amazoncognito.com"). Pass to the SPA
+      build as VITE_COGNITO_DOMAIN.
+    Value: !Ref WfUserPoolDomain
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolDomain"
+
+  HostedUiUrl:
+    Description: Full Hosted UI base URL. Add this exact URL to the
+      Google OAuth client's "Authorised redirect URIs" with /oauth2/idpresponse
+      appended.
+    Value: !Sub "https://${WfUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com"

@@ -5,6 +5,8 @@
 import { type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import WorkforceSubnav from './WorkforceSubnav';
+import { AUTH_IS_CONFIGURED } from '../config/auth';
+import { signOut } from '../lib/auth';
 
 interface Props {
   children: ReactNode;
@@ -24,12 +26,23 @@ export default function WorkforceLayout({ children, subnavRight }: Props) {
             <span className="inline-block w-1.5 h-1.5 bg-wf-tertiary mr-2 align-middle" />
             WORKFORCE · CONSOLE
           </Link>
-          <a
-            href="https://kohuehara.xyz/"
-            className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant hover:text-wf-on-surface"
-          >
-            ← KOHUEHARA.XYZ
-          </a>
+          <div className="flex items-center gap-4">
+            <a
+              href="https://kohuehara.xyz/"
+              className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant hover:text-wf-on-surface"
+            >
+              ← KOHUEHARA.XYZ
+            </a>
+            {AUTH_IS_CONFIGURED && (
+              <button
+                type="button"
+                onClick={() => { void signOut(); }}
+                className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant hover:text-wf-tertiary border border-transparent hover:border-wf-outline-variant px-2 py-0.5"
+              >
+                SIGN OUT
+              </button>
+            )}
+          </div>
         </div>
       </header>
       <WorkforceSubnav right={subnavRight} />
