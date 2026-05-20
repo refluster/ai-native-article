@@ -19,7 +19,11 @@ import { trackPageView } from './lib/analytics'
 function RouteTracker() {
   const location = useLocation()
   useEffect(() => {
-    trackPageView(location.pathname + location.search, document.title)
+    // Read from window.location so page_path includes the SITE_BASE_PATH
+    // (e.g. "/ai-native-article/..."). useLocation() returns paths relative
+    // to BrowserRouter's basename, which would land in GA4 as "/" for the
+    // landing page and collapse every route under the base into the origin.
+    trackPageView()
   }, [location.pathname, location.search])
   return null
 }
