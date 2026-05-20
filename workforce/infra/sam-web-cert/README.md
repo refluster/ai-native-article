@@ -2,7 +2,7 @@
 
 ACM certificate for `workforce.kohuehara.xyz`, deployed to us-east-1
 because CloudFront only accepts custom-domain certs from that region.
-The main web stack (`wf-web-prod`, ap-northeast-1) reads the ARN as a
+The main web stack (`wf-web-prod`, us-west-2) reads the ARN as a
 parameter.
 
 See [../sam-web/README.md](../sam-web/README.md) for the end-to-end

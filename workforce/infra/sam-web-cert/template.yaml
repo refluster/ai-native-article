@@ -5,8 +5,7 @@ Description: |
 
   CloudFront only accepts custom-domain certificates from us-east-1, so
   this stack is split out from the main wf-web stack (which lives in
-  ap-northeast-1 alongside the data plane). The cert ARN is consumed by
-  wf-web-prod as a parameter.
+  us-west-2). The cert ARN is consumed by wf-web-prod as a parameter.
 
   DNS-01 validation produces a CNAME record that must be added to the
   Cloudflare zone for kohuehara.xyz manually — see the operator runbook

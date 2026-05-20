@@ -8,7 +8,7 @@
 // That lets `npm run dev` work locally without a real Cognito pool;
 // every protected page just shows the "configure auth" message.
 
-const REGION = 'ap-northeast-1';
+const REGION = 'us-west-2';
 
 const USER_POOL_ID = (import.meta.env.VITE_COGNITO_USER_POOL_ID ?? '').trim();
 const CLIENT_ID = (import.meta.env.VITE_COGNITO_CLIENT_ID ?? '').trim();
