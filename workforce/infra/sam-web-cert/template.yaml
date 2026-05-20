@@ -1,0 +1,35 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: |
+  ACM certificate for workforce.kohuehara.xyz, deployed to us-east-1.
+
+  CloudFront only accepts custom-domain certificates from us-east-1, so
+  this stack is split out from the main wf-web stack (which lives in
+  ap-northeast-1 alongside the data plane). The cert ARN is consumed by
+  wf-web-prod as a parameter.
+
+  DNS-01 validation produces a CNAME record that must be added to the
+  Cloudflare zone for kohuehara.xyz manually — see the operator runbook
+  at workforce/infra/sam-web/README.md.
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: workforce.kohuehara.xyz
+    Description: Fully qualified domain name the CloudFront distribution
+      serves under. Match the Cloudflare CNAME the operator points at the
+      distribution's d{xxx}.cloudfront.net hostname.
+
+Resources:
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      ValidationMethod: DNS
+
+Outputs:
+  CertificateArn:
+    Description: ARN of the certificate. Pass to wf-web stack as CertificateArn.
+    Value: !Ref Certificate
+    Export:
+      Name: !Sub "${AWS::StackName}-CertificateArn"

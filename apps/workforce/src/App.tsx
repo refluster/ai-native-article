@@ -1,5 +1,8 @@
 // Workforce console SPA router. All routes mount under the root of the
 // CloudFront-hosted workforce.kohuehara.xyz origin in production.
+//
+// /auth/callback bypasses AuthBoundary — that route IS the sign-in
+// completion handler; gating it behind authentication would deadlock.
 
 import { useEffect } from 'react';
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
@@ -7,6 +10,8 @@ import Dashboard from './pages/Dashboard';
 import AgentDirectory from './pages/AgentDirectory';
 import AgentProfile from './pages/AgentProfile';
 import OrgDAG from './pages/OrgDAG';
+import AuthCallback from './pages/AuthCallback';
+import AuthBoundary from './components/AuthBoundary';
 import { routerBaseName } from './lib/paths';
 import { trackPageView } from '@kohuehara/shared/analytics';
 
@@ -18,10 +23,9 @@ function RouteTracker() {
   return null;
 }
 
-export default function App() {
+function ProtectedRoutes() {
   return (
-    <BrowserRouter basename={routerBaseName()}>
-      <RouteTracker />
+    <AuthBoundary>
       <div className="min-h-screen flex flex-col bg-wf-surface">
         <main className="flex-1">
           <Routes>
@@ -32,6 +36,18 @@ export default function App() {
           </Routes>
         </main>
       </div>
+    </AuthBoundary>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter basename={routerBaseName()}>
+      <RouteTracker />
+      <Routes>
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="*" element={<ProtectedRoutes />} />
+      </Routes>
     </BrowserRouter>
   );
 }

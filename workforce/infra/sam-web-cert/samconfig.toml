@@ -1,0 +1,20 @@
+version = 0.1
+
+# us-east-1 is non-negotiable: CloudFront only accepts custom-domain certs
+# issued in that region. Everything else for the workforce console lives
+# in ap-northeast-1; this is the one cross-region resource.
+
+[default.global.parameters]
+stack_name = "wf-web-cert-prod"
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+fail_on_empty_changeset = false
+resolve_s3 = true
+parameter_overrides = "DomainName=workforce.kohuehara.xyz"
