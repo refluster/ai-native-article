@@ -1,0 +1,57 @@
+/* JetBrains Mono — typeplate / KPI mono. Loaded via Google Fonts CDN
+   so the workforce console has the maker's-mark mono treatment without
+   a self-hosted file in this repo. Must precede @tailwind directives
+   per the CSS spec. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: #faf9ff;
+    color: #0b0b14;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: #954500;
+    color: #fff5ec;
+  }
+
+  /* Section wrapper kept for compat with components written before the
+     split (.workforce-section was used to scope the palette under a
+     larger app that also rendered article routes). Workforce app sets
+     these colours on body already; the class becomes a no-op but stays
+     to avoid touching every page. */
+  .workforce-section {
+    background-color: #faf9ff;
+    color: #0b0b14;
+  }
+
+  /* CSS variables for SVG fill/stroke values that cannot reach the
+     Tailwind layer (Sigil renders <rect fill="..."/> inline, and the Org
+     DAG paints nodes + edges in raw SVG). Mirrors the corresponding
+     wf-* tokens. Keeping hex centralised here keeps lint:tokens green —
+     see scripts/lint-design-tokens.mjs. */
+  :root {
+    --wf-sigil-ink: #0b0b14;
+    --wf-sigil-border: #c8c4d4;
+    --wf-svg-surface: #faf9ff;
+    --wf-svg-on-surface: #0b0b14;
+    --wf-svg-on-surface-variant: #4f4d57;
+    --wf-svg-tertiary: #954500;
+  }
+}
+
+@layer utilities {
+  /* Subtle vertical-rule background used behind hero typeplates.
+     Tailwind-only equivalent would be heavy; one custom utility is cheaper. */
+  .wf-rule-bg {
+    background-image: linear-gradient(to right, #ddd9e6 1px, transparent 1px);
+    background-size: 48px 100%;
+  }
+}

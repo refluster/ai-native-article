@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy article site to GitHub Pages
 
 on:
   push:
@@ -66,23 +66,28 @@ jobs:
       - name: Generate sitemap + robots
         run: npm run sitemap
 
-      - name: Build
+      - name: Build agent manifest
+        # Article-side AuthorChip reads /workforce-agents.json from its own
+        # public/ dir, so the manifest must exist before vite build copies
+        # public/* into the dist/ output. (The workforce app does this in its
+        # own prebuild hook; we mirror it explicitly for the article-only
+        # gh-pages deploy.)
+        run: npm run build:agents
+
+      - name: Build article app
         env:
           VITE_GA_ID: ${{ secrets.GA4_MEASUREMENT_ID }}
           # Capture (the only write-side route) is gated behind a shared
           # password baked into the bundle at build time. When unset the
           # page renders a visible warning and stays open. See the
-          # PasswordGate component in src/pages/Capture.tsx.
+          # PasswordGate component in apps/article/src/pages/pipeline/Capture.tsx.
           VITE_CAPTURE_PASSWORD: ${{ secrets.VITE_CAPTURE_PASSWORD }}
-        run: npm run build
-
-      - name: Copy CNAME
-        run: cp CNAME dist/CNAME
+        run: npm run build:article
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
+          publish_dir: ./apps/article/dist
           force_orphan: true
           cname: kohuehara.xyz

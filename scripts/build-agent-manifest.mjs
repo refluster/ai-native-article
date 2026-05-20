@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 // Build-time manifest of workforce personas — reads workforce/agents/{slug}/
-// and emits public/workforce-agents.json that the SPA fetches at runtime.
+// and emits workforce-agents.json into each SPA's public/ directory.
+//
+// Why both apps? The workforce SPA renders the manifest in full; the
+// article SPA reads a small subset (slug / name / role) to power the
+// AuthorChip byline on article pages. PR-C may collapse this to a build-
+// time bake for article-side and stop emitting the article copy.
 //
 // Run automatically before `npm run dev` and `npm run build` via the
-// `predev` / `prebuild` lifecycle hooks in package.json.
+// per-app `predev` / `prebuild` lifecycle hooks in each app's package.json.
 
 import { readdirSync, readFileSync, statSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -13,8 +18,10 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..");
 const AGENTS_DIR = join(REPO_ROOT, "workforce", "agents");
 const ORG_PATH = join(AGENTS_DIR, "_org.json");
-const OUT_DIR = join(REPO_ROOT, "public");
-const OUT_PATH = join(OUT_DIR, "workforce-agents.json");
+const OUT_PATHS = [
+  join(REPO_ROOT, "apps", "article", "public", "workforce-agents.json"),
+  join(REPO_ROOT, "apps", "workforce", "public", "workforce-agents.json"),
+];
 
 function listSlugDirs() {
   if (!existsSync(AGENTS_DIR)) return [];
@@ -102,6 +109,10 @@ const manifest = {
   agents,
 };
 
-if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
-writeFileSync(OUT_PATH, JSON.stringify(manifest, null, 2) + "\n");
-console.log(`build-agent-manifest: wrote ${agents.length} agent(s) -> ${OUT_PATH.replace(REPO_ROOT + "/", "")}`);
+const body = JSON.stringify(manifest, null, 2) + "\n";
+for (const out of OUT_PATHS) {
+  const dir = dirname(out);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(out, body);
+  console.log(`build-agent-manifest: wrote ${agents.length} agent(s) -> ${out.replace(REPO_ROOT + "/", "")}`);
+}

@@ -14,11 +14,12 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+const ARTICLE_PUBLIC = join(ROOT, 'apps', 'article', 'public')
 const ORIGIN = 'https://kohuehara.xyz'
 const BASE = '/ai-native-article'
-const MANIFEST = join(ROOT, 'public', 'posts', 'manifest.json')
-const SITEMAP = join(ROOT, 'public', 'sitemap.xml')
-const ROBOTS = join(ROOT, 'public', 'robots.txt')
+const MANIFEST = join(ARTICLE_PUBLIC, 'posts', 'manifest.json')
+const SITEMAP = join(ARTICLE_PUBLIC, 'sitemap.xml')
+const ROBOTS = join(ARTICLE_PUBLIC, 'robots.txt')
 
 const today = new Date().toISOString().slice(0, 10)
 
