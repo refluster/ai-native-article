@@ -39,6 +39,6 @@ The script:
 
 ## Pitfalls
 
-- **The deployment ID is fixed** (matches `clasp deploy -i <id>` in `package.json`). The skill assumes you're pushing into the same slot. If you create a new deployment instead, update both `package.json` and `src/lib/gas-config.ts` together — see [docs/architecture-source-of-truth.md](../../../docs/architecture-source-of-truth.md).
+- **The deployment ID is fixed** (matches `clasp deploy -i <id>` in `package.json`). The skill assumes you're pushing into the same slot. If you create a new deployment instead, update both `package.json` and `apps/article/src/lib/gas-config.ts` together — see [docs/architecture-source-of-truth.md](../../../docs/architecture-source-of-truth.md).
 - **GAS web apps cache the version briefly** — there's a 60–90s window between `clasp deploy` returning and the new code actually serving on `/exec`. The 90s poll budget is sized for that; if it expires, the deploy itself probably succeeded but propagation is stuck.
 - **`--probe-only`** is useful for checking the live endpoint without pushing anything (e.g. "is what's already deployed actually current?"). Doesn't touch clasp.

@@ -10,7 +10,8 @@ import { dirname, resolve } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(__dirname, '..', '..', '..', '..')
-const GAS_CONFIG_PATH = resolve(REPO_ROOT, 'src', 'lib', 'gas-config.ts')
+// PR #60 moved the React app from src/ to apps/article/src/.
+const GAS_CONFIG_PATH = resolve(REPO_ROOT, 'apps', 'article', 'src', 'lib', 'gas-config.ts')
 const POLL_BUDGET_MS = 90 * 1000
 const POLL_INTERVAL_MS = 3 * 1000
 

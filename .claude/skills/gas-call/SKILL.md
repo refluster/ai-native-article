@@ -13,7 +13,7 @@ POST a JSON action to this project's deployed GAS web app and print the response
 
 ## Deployment ID
 
-Read live from `src/lib/gas-config.ts` (the React app's source of truth). If that file ever moves, update the script below and this section together — they must agree.
+Read live from `apps/article/src/lib/gas-config.ts` (the article app's source of truth — moved here from `src/lib/` in PR #60). If that file ever moves again, update the script below and this section together — they must agree.
 
 Current value (also visible from `npx clasp deployments`):
 ```

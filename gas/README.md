@@ -29,7 +29,7 @@ clasp deploy -i <id>       # retarget a deployment to the latest HEAD
 
 The public deployment ID (what the React app's `GAS_URL` points at) is
 baked into `npm run deploy-gas`. If it ever changes, update both
-`package.json` and `src/lib/gas-config.ts`.
+`package.json` and `apps/article/src/lib/gas-config.ts`.
 
 ## Adding a new API scope
 
