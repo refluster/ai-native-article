@@ -1,0 +1,30 @@
+{
+  "$comment": "Static org topology consumed by build-agent-manifest.mjs. Authoritative reporting graph for the /workforce DAG view. Slugs reference workforce/agents/{slug}/agent.json. Edit here; the manifest is regenerated on next predev/prebuild.",
+  "topology": {
+    "maya": {
+      "tier": "founder",
+      "reports_to": [],
+      "lateral": []
+    },
+    "aoi": {
+      "tier": "ic",
+      "reports_to": ["maya"],
+      "lateral": ["ren"]
+    },
+    "ren": {
+      "tier": "ic",
+      "reports_to": ["maya"],
+      "lateral": ["aoi"]
+    },
+    "sora": {
+      "tier": "ic",
+      "reports_to": ["maya"],
+      "lateral": ["yuki"]
+    },
+    "yuki": {
+      "tier": "ic",
+      "reports_to": ["maya"],
+      "lateral": ["sora"]
+    }
+  }
+}
