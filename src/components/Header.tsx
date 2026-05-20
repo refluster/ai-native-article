@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom'
 const publicNav = [
   { to: '/', label: 'INDEX', end: true },
   { to: '/sources', label: 'ORIGINAL SOURCES' },
+  { to: '/workforce', label: 'WORKFORCE' },
   { to: '/design-system', label: 'DESIGN SYSTEM' },
   { to: '/design-guide', label: 'DESIGN GUIDE' },
 ]

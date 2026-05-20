@@ -4,6 +4,7 @@
 //   - fetch live agent record / deliverables from wf-agents-api (when configured)
 
 import type { WorkforceAgent, WorkforceAgentManifest } from '../types/workforce-agent'
+import type { WorkforceMockStats } from '../types/workforce-stats'
 import { withBasePath } from './paths'
 import { WORKFORCE_AGENTS_API_BASE } from '../config/workforce'
 
@@ -22,6 +23,30 @@ export function loadWorkforceManifest(): Promise<WorkforceAgentManifest> {
       })
   }
   return cache
+}
+
+let mockStatsCache: Promise<WorkforceMockStats> | null = null
+
+/**
+ * Loads the mock stats JSON used when the live agents-api is not
+ * configured (e.g. gh-pages). When the API is wired up, prefer
+ * fetchAgentLive over these mocks at the per-agent layer; the
+ * Dashboard still uses these for the aggregate totals + heat strip
+ * until a corresponding live endpoint exists.
+ */
+export function loadWorkforceMockStats(): Promise<WorkforceMockStats> {
+  if (!mockStatsCache) {
+    mockStatsCache = fetch(withBasePath('/workforce-mock-stats.json'))
+      .then((res) => {
+        if (!res.ok) throw new Error(`failed to load workforce-mock-stats.json (${res.status})`)
+        return res.json() as Promise<WorkforceMockStats>
+      })
+      .catch((err) => {
+        mockStatsCache = null
+        throw err
+      })
+  }
+  return mockStatsCache
 }
 
 export async function findAgent(slug: string): Promise<WorkforceAgent | undefined> {

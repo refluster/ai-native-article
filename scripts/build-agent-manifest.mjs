@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..");
 const AGENTS_DIR = join(REPO_ROOT, "workforce", "agents");
+const ORG_PATH = join(AGENTS_DIR, "_org.json");
 const OUT_DIR = join(REPO_ROOT, "public");
 const OUT_PATH = join(OUT_DIR, "workforce-agents.json");
 
@@ -21,6 +22,11 @@ function listSlugDirs() {
     .filter((name) => /^[a-z]+$/.test(name))
     .filter((name) => statSync(join(AGENTS_DIR, name)).isDirectory())
     .sort();
+}
+
+function loadOrgTopology() {
+  if (!existsSync(ORG_PATH)) return { topology: {} };
+  return JSON.parse(readFileSync(ORG_PATH, "utf8"));
 }
 
 function loadOne(slug) {
@@ -70,6 +76,27 @@ function pickAboutSnippet(md) {
 
 const slugs = listSlugDirs();
 const agents = slugs.map(loadOne);
+
+// Merge org topology (reports_to / lateral / tier) and compute direct_reports
+// as the inverse of reports_to. This means agent.json stays focused on
+// per-agent config; relationships live in _org.json so they're auditable
+// as a single graph.
+const org = loadOrgTopology();
+const topology = org.topology ?? {};
+const directReports = Object.fromEntries(slugs.map((s) => [s, []]));
+for (const [child, edges] of Object.entries(topology)) {
+  for (const parent of edges.reports_to ?? []) {
+    if (directReports[parent]) directReports[parent].push(child);
+  }
+}
+for (const a of agents) {
+  const node = topology[a.slug] ?? {};
+  a.tier = node.tier ?? "ic";
+  a.reports_to = node.reports_to ?? [];
+  a.lateral = node.lateral ?? [];
+  a.direct_reports = directReports[a.slug] ?? [];
+}
+
 const manifest = {
   generated_at: new Date().toISOString(),
   agents,

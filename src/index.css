@@ -1,3 +1,10 @@
+/* JetBrains Mono — typeplate / KPI mono. Loaded via Google Fonts CDN
+   so the workforce console has the maker's-mark mono treatment without
+   a self-hosted file in this repo. Article site is unaffected because
+   it never reaches for font-wfmono. Must precede @tailwind directives
+   per the CSS spec (@import → other at-rules). */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -15,6 +22,18 @@
     background-color: #c1000a;
     color: #fff7f6;
   }
+
+  /* Workforce console background — applied to the .workforce-section
+     wrapper so it can repaint the page below the global Header without
+     bleeding onto article routes. */
+  .workforce-section {
+    background-color: #faf9ff;
+    color: #0b0b14;
+  }
+  .workforce-section ::selection {
+    background-color: #954500;
+    color: #fff5ec;
+  }
 }
 
 @layer utilities {
@@ -22,6 +41,13 @@
     display: grid;
     grid-template-columns: repeat(12, 1fr);
     gap: 24px;
+  }
+  /* Subtle vertical-rule background used in WorkforceHeader and behind
+     hero typeplates. Tailwind-only equivalent would be heavy; one
+     custom utility is cheaper. */
+  .wf-rule-bg {
+    background-image: linear-gradient(to right, #ddd9e6 1px, transparent 1px);
+    background-size: 48px 100%;
   }
 }
 
