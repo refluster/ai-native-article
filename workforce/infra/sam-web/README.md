@@ -22,7 +22,7 @@ setup and Cloudflare DNS changes that only the operator can do.
     │  no token → redirect to Hosted UI
     ▼
 [ Cognito Hosted UI ]──federates──▶[ Google OAuth ]
-   wf-auth-{acct}.auth.ap-northeast-1.amazoncognito.com
+   wf-auth-{acct}.auth.us-west-2.amazoncognito.com
                                           │
                                           ▼
                                   [ pre-signup Lambda ]
@@ -70,7 +70,7 @@ After deploy:
 Once issued, capture the cert ARN — it's both an output of the stack
 (`CertificateArn`) and visible in the ACM console.
 
-### 3. Deploy the ap-northeast-1 web stack (~10 min)
+### 3. Deploy the us-west-2 web stack (~10 min)
 
 ```bash
 cd workforce/infra/sam-web
@@ -119,7 +119,7 @@ Back in Google Cloud Console → Credentials → wf-console client → edit:
   - `https://workforce.kohuehara.xyz`
 - **Authorised redirect URIs**:
   - `{HostedUiUrl}/oauth2/idpresponse`
-    e.g. `https://wf-auth-123456789012.auth.ap-northeast-1.amazoncognito.com/oauth2/idpresponse`
+    e.g. `https://wf-auth-123456789012.auth.us-west-2.amazoncognito.com/oauth2/idpresponse`
 
 Save.
 
@@ -131,7 +131,7 @@ In **Settings → Secrets and variables → Actions**, add:
 |---|---|
 | `AWS_ACCESS_KEY_ID`              | IAM user with `s3:PutObject` on the bucket + `cloudfront:CreateInvalidation` on the distribution |
 | `AWS_SECRET_ACCESS_KEY`          | (pair) |
-| `AWS_REGION`                     | `ap-northeast-1` |
+| `AWS_REGION`                     | `us-west-2` |
 | `AWS_S3_BUCKET`                  | stack output `WebBucketName` |
 | `AWS_CLOUDFRONT_DISTRIBUTION_ID` | stack output `DistributionId` |
 | `VITE_COGNITO_USER_POOL_ID`      | stack output `UserPoolId` |
@@ -181,7 +181,7 @@ Hosted UI, then Google, then back to the dashboard.
   `OperatorEmail` to a comma-separated list and rewrite the pre-sign-up
   Lambda. This is a C-3 (`single-operator scale`) violation and should
   trigger a governance update first.
-- **Tearing down**: `sam delete --stack-name wf-web-prod` (ap-northeast-1)
+- **Tearing down**: `sam delete --stack-name wf-web-prod` (us-west-2)
   then `sam delete --stack-name wf-web-cert-prod` (us-east-1). The S3
   bucket has `Retain` policy; delete it manually after confirming you
   don't need the SPA bundle history.

@@ -2,7 +2,7 @@ version = 0.1
 
 # us-east-1 is non-negotiable: CloudFront only accepts custom-domain certs
 # issued in that region. Everything else for the workforce console lives
-# in ap-northeast-1; this is the one cross-region resource.
+# in us-west-2; this is the one cross-region resource.
 
 [default.global.parameters]
 stack_name = "wf-web-cert-prod"

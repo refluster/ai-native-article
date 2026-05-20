@@ -2,31 +2,11 @@ AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 
 Description: |
-  Workforce console — hosting + auth.
-
-  Three components, one stack:
-
-    1. S3 bucket (private, OAC-only) — holds the apps/workforce dist/
-       bundle. No public ACLs, no public policy. CloudFront is the only
-       reader, via Origin Access Control.
-
-    2. CloudFront distribution — terminates TLS for
-       workforce.kohuehara.xyz using the us-east-1 ACM cert that the
-       sibling wf-web-cert stack issues. SPA fallback rewrites 403 / 404
-       to /index.html so React Router handles deep links.
-
-    3. Cognito User Pool — the auth identity provider. Federates with
-       Google so the operator signs in with their kohuehara.xyz Google
-       account. Hosted UI lives on the AWS-managed
-       wf-auth-{random}.auth.ap-northeast-1.amazoncognito.com subdomain
-       (no extra DNS / cert needed).
-
-  No Lambda, no API Gateway here — the workforce SPA is presently
-  mock-data-only, gated at sign-in. A future PR adds the agents-api +
-  Cognito-aware authorizer.
-
-  Operator runbook lives at workforce/infra/sam-web/README.md. Required
-  bootstrap (Google OAuth client, Cloudflare CNAMEs) is documented there.
+  Workforce console hosting + auth: private S3 (OAC-only) origin,
+  CloudFront with SPA fallback (403/404 → /index.html), and a Cognito
+  User Pool with Google federation + Hosted UI on the AWS-managed
+  subdomain. ACM cert is in the sibling wf-web-cert-prod stack
+  (us-east-1). Operator runbook at workforce/infra/sam-web/README.md.
 
 Parameters:
   DomainName:
@@ -48,7 +28,7 @@ Parameters:
     Description: Google OAuth 2.0 client ID. Obtain from
       https://console.cloud.google.com/apis/credentials. Authorised
       redirect URI must be the Cognito Hosted UI endpoint
-      `https://{userPoolDomain}.auth.ap-northeast-1.amazoncognito.com/oauth2/idpresponse`.
+      `https://{userPoolDomain}.auth.us-west-2.amazoncognito.com/oauth2/idpresponse`.
     NoEcho: false
 
   GoogleClientSecret:
@@ -250,7 +230,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: wf-pre-signup-prod
-      Runtime: nodejs20.x
+      Runtime: nodejs24.x
       Architectures: [arm64]
       MemorySize: 256
       Timeout: 10
@@ -323,7 +303,7 @@ Outputs:
 
   UserPoolDomain:
     Description: Cognito Hosted UI domain prefix (full domain is
-      "{prefix}.auth.ap-northeast-1.amazoncognito.com"). Pass to the SPA
+      "{prefix}.auth.us-west-2.amazoncognito.com"). Pass to the SPA
       build as VITE_COGNITO_DOMAIN.
     Value: !Ref WfUserPoolDomain
     Export:
