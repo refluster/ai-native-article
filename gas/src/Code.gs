@@ -1532,19 +1532,19 @@ function handleL3BackfillDate(_data, config) {
 
 // L2_BATCH: for each L1 whose source URL isn't yet referenced by any L2,
 // create an L2 blog. Oldest-first, up to L2_BATCH_MAX per run.
-const L2_BATCH_MAX = 3;
+const L2_BATCH_MAX = 2;
 // GAS kills a triggered function at 360s. Each handleL2Create issues one
 // reasoning-budget azureGenerateText (gpt-5.4, max_completion_tokens=8000)
-// plus a UrlFetchApp source fetch and the Notion page write, which has
-// been observed to take ~90-150s per item. Three back-to-back iterations
-// can clip the hard cap and lose the whole run (trigger reports "Timed
-// Out" / "Exceeded maximum execution time", and partial Notion writes
-// are not reported back). The budget check below skips remaining items
-// once there isn't enough wall-clock budget to safely complete another
-// one, so the function returns cleanly with the items already created
-// and `remaining` set to whatever didn't fit.
+// plus a UrlFetchApp source fetch and the Notion page write. Historically
+// observed at ~90-150s; the 2026-05-19 trigger run timed out at 360.854s,
+// which implies a worst-case single-item cost north of 240s. The budget
+// check below skips remaining items once there isn't enough wall-clock
+// budget to safely complete another one, so the function returns cleanly
+// with the items already created and `remaining` set to whatever didn't
+// fit. The reserve is sized to the worst-case observed item, NOT the
+// typical one — under-reserving here is what killed the 5/19 run.
 const L2_BATCH_DEADLINE_MS = 330 * 1000;   // 30s safety margin under 360
-const L2_BATCH_ITEM_RESERVE_MS = 180 * 1000; // typical handleL2Create headroom
+const L2_BATCH_ITEM_RESERVE_MS = 250 * 1000; // worst-case handleL2Create headroom (5/19: 240s+)
 function handleL2Batch(_data, config) {
   const startMs = Date.now();
   // Coverage check pulls from wherever explanation articles live now.
@@ -1878,12 +1878,29 @@ function setupDailyTriggers() {
   ScriptApp.getProjectTriggers().forEach(t => {
     if (wanted.indexOf(t.getHandlerFunction()) !== -1) ScriptApp.deleteTrigger(t);
   });
-  // 1-hour gaps give each batch the full 6-min timeout without overlap.
   // Hours are in Asia/Tokyo (see appsscript.json).
-  ScriptApp.newTrigger('runL2Batch').timeBased().atHour(9).everyDays(1).create();
-  ScriptApp.newTrigger('runL3Batch').timeBased().atHour(10).everyDays(1).create();
+  //
+  // L2 / L3 fire every 4 hours so a one-off stall (timeout, transient
+  // Azure error) gets up to 5 retries the same day instead of waiting
+  // for tomorrow. With L2_BATCH_MAX = 2 this caps daily throughput at
+  // 12 explanations — enough to drain a ~30-row backlog inside a week
+  // without exceeding the ~$15/day Azure spend ceiling. L3 fires one
+  // hour after each L2 cycle so it sees the freshly-created rows.
+  //
+  // L4 stays daily — it's the publish + image step; the bottleneck in
+  // the 2026-05 stall was at L2, not L4, so increasing L4's cadence
+  // would only spend OpenAI image credit without changing the user-
+  // visible result.
+  //
+  // The hour set avoids the deploy.yml cron window (15:17 / 21:17 /
+  // 03:17 JST) by at least ~17 minutes either side, well outside
+  // L2/L3 worst-case runtimes (~5 min + the 6-min GAS cap).
+  const L2_HOURS = [9, 13, 17, 21, 1, 5];
+  const L3_HOURS = [10, 14, 18, 22, 2, 6];
+  for (const h of L2_HOURS) ScriptApp.newTrigger('runL2Batch').timeBased().atHour(h).everyDays(1).create();
+  for (const h of L3_HOURS) ScriptApp.newTrigger('runL3Batch').timeBased().atHour(h).everyDays(1).create();
   ScriptApp.newTrigger('runL4Batch').timeBased().atHour(11).everyDays(1).create();
-  return 'Installed: runL2Batch 09:00 JST, runL3Batch 10:00 JST, runL4Batch 11:00 JST';
+  return `Installed: runL2Batch ${L2_HOURS.join('/')} JST, runL3Batch ${L3_HOURS.join('/')} JST, runL4Batch 11 JST`;
 }
 
 // ─── ONE-SHOT SETUP (run from GAS editor) ────────────────────────────────────
