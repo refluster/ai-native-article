@@ -9,6 +9,8 @@ import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import AgentDirectory from './pages/AgentDirectory';
 import AgentProfile from './pages/AgentProfile';
+import SkillDirectory from './pages/SkillDirectory';
+import SkillProfile from './pages/SkillProfile';
 import OrgDAG from './pages/OrgDAG';
 import AuthCallback from './pages/AuthCallback';
 import AuthBoundary from './components/AuthBoundary';
@@ -33,6 +35,8 @@ function ProtectedRoutes() {
             <Route path="/org" element={<OrgDAG />} />
             <Route path="/agents" element={<AgentDirectory />} />
             <Route path="/agents/:slug" element={<AgentProfile />} />
+            <Route path="/skills" element={<SkillDirectory />} />
+            <Route path="/skills/:name" element={<SkillProfile />} />
           </Routes>
         </main>
       </div>
