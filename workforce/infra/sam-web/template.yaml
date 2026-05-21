@@ -243,7 +243,11 @@ Resources:
         // email != ALLOWED_EMAIL. Auto-confirm + auto-verify when it
         // matches so the operator skips the email-confirmation step
         // (their Google identity is already verified).
-        export const handler = async (event) => {
+        //
+        // CommonJS (exports.handler) is mandatory: SAM InlineCode emits
+        // a bare index.js with no package.json, so Node treats it as
+        // CJS and `export` would throw SyntaxError at PreSignUp time.
+        exports.handler = async (event) => {
           const allowed = (process.env.ALLOWED_EMAIL || '').toLowerCase();
           const email = (event.request?.userAttributes?.email || '').toLowerCase();
           if (!allowed || !email || email !== allowed) {
