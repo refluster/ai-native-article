@@ -10,14 +10,16 @@ on:
   # scheduled run, a quiet day in the publishing pipeline means a
   # quiet day on the live site even if the Notion DB has changed.
   #
-  # Hours chosen to AVOID the 09:00-11:00 JST GAS batch window. The
-  # earlier `*/6` schedule fired at 09:17 JST — between L2_BATCH
-  # (09:00) and L4_BATCH (11:00) — which let fetch-notion add new
-  # explanations to the manifest before L4 had a chance to generate
-  # their images. L4 then saw them as already-published and skipped.
-  # Running cron only at 15:17 / 21:17 / 03:17 JST keeps it strictly
-  # after L4_BATCH finishes for the day. (See Code.gs handleL4Batch
-  # for the matching belt-and-braces image-existence check.)
+  # Hours chosen to AVOID the GAS batch trigger window. The earlier
+  # `*/6` schedule fired at 09:17 JST — between L2_BATCH (09:00) and
+  # L4_BATCH (11:00) — which let fetch-notion add new explanations to
+  # the manifest before L4 had a chance to generate their images. L4
+  # then saw them as already-published and skipped. Running cron at
+  # 15:17 / 21:17 / 03:17 JST keeps it strictly after L4_BATCH (11
+  # JST daily) and ≥17 min outside every L2/L3 every-4h slot
+  # (L2: 09/13/17/21/01/05, L3: 10/14/18/22/02/06 JST). (See
+  # Code.gs handleL4Batch for the matching belt-and-braces image-
+  # existence check.)
   schedule:
     - cron: '17 6,12,18 * * *'
 

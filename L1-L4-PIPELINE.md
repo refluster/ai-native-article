@@ -178,17 +178,19 @@ git push origin main  # Triggers GitHub Actions → GitHub Pages
 
 So when fixing article content: edit Notion (directly or via a GAS handler like `L2_BACKFILL`), then either wait for the next cron tick or run the workflow manually.
 
-## Daily cron triggers (Asia/Tokyo)
+## Cron triggers (Asia/Tokyo)
 
 Installed via `setupDailyTriggers()` in `gas/src/Code.gs`. Run once from the Apps Script editor after a fresh deploy to install or reset.
 
-| Time | Function | Purpose |
+| Time (JST) | Function | Purpose |
 |---|---|---|
-| 09:00 JST | `runL2Batch` | Fetch any uncovered L1 articles, create up to 3 new L2 explanations |
-| 10:00 JST | `runL3Batch` | Sample recent L2s, synthesize 1 L3 insight if there's a fresh L2 |
-| 11:00 JST | `runL4Batch` | Generate cover images and write markdown for any unimaged article (max 2/run) |
+| 09 / 13 / 17 / 21 / 01 / 05 (every 4h) | `runL2Batch` | Fetch any uncovered L1 articles, create up to **2** new L2 explanations per run |
+| 10 / 14 / 18 / 22 / 02 / 06 (every 4h, +1h after L2) | `runL3Batch` | Sample recent L2s, synthesize 1 L3 insight if there's a fresh L2 |
+| 11 (daily) | `runL4Batch` | Generate cover images and write markdown for any unimaged article (max 2/run) |
 
-The 1-hour gaps give each batch the full 6-min GAS timeout without overlap.
+L2 / L3 run every 4 hours so a single stalled cycle (timeout, transient Azure error) doesn't cost a whole day's throughput. With `L2_BATCH_MAX = 2` the daily ceiling is 12 explanations — enough to drain a ~30-row backlog inside a week. L4 stays daily because the publish step has historically not been the bottleneck.
+
+The hour set avoids the `deploy.yml` cron window (15:17 / 21:17 / 03:17 JST) by ≥17 minutes either side — comfortable margin against the 6-min GAS execution cap.
 
 ## Operator runbooks
 
