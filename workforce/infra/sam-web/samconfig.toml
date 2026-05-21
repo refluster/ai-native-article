@@ -24,6 +24,10 @@ stack_name = "wf-web-prod"
 [default.build.parameters]
 cached = true
 parallel = true
+# Required: the wf-pre-signup Makefile references ../node_modules/.bin/esbuild
+# relative to the original source. Without build_in_source, SAM copies the
+# lambda dir to .aws-sam/build/ and the relative path no longer resolves.
+build_in_source = true
 
 [default.deploy.parameters]
 region = "us-west-2"
