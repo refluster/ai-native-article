@@ -72,6 +72,17 @@ Once issued, capture the cert ARN — it's both an output of the stack
 
 ### 3. Deploy the us-west-2 web stack (~10 min)
 
+The PreSignUp Lambda esbuilds `handler.ts → handler.mjs` against the
+shared `workforce/lambdas/node_modules`, so seed those once:
+
+```bash
+cd workforce/lambdas && npm ci && cd -
+```
+
+Then build + deploy. `samconfig.toml` pins `build_in_source = true`
+so the Makefile's `../node_modules/.bin/esbuild` resolves against
+the original source tree instead of a SAM-copied scratch dir.
+
 ```bash
 cd workforce/infra/sam-web
 sam build
