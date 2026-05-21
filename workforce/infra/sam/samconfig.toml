@@ -7,6 +7,11 @@ stack_name = "wf-data-plane-dev"
 [default.build.parameters]
 cached = true
 parallel = true
+# Required: every Makefile-built Lambda here references
+# ../node_modules/.bin/esbuild relative to the original source dir.
+# Without build_in_source, SAM copies the lambda into .aws-sam/build/
+# and that relative path no longer resolves.
+build_in_source = true
 
 [default.deploy.parameters]
 region = "ap-northeast-1"
@@ -19,10 +24,18 @@ resolve_s3 = true
 [dev.global.parameters]
 stack_name = "wf-data-plane-dev"
 
+[dev.build.parameters]
+cached = true
+parallel = true
+# See build_in_source rationale under [default.build.parameters].
+# Repeated here because --config-env <env> loads [<env>.build.parameters]
+# without falling back to [default.build.parameters].
+build_in_source = true
+
 [dev.deploy.parameters]
 region = "ap-northeast-1"
 capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
-parameter_overrides = "Stage=dev MonthlyBudgetUsd=10 AlarmEmail=replace-me@example.com"
+parameter_overrides = "Stage=dev MonthlyBudgetUsd=10 AlarmEmail=refluster@gmail.com"
 confirm_changeset = true
 fail_on_empty_changeset = false
 resolve_s3 = true
@@ -31,10 +44,15 @@ resolve_s3 = true
 [prod.global.parameters]
 stack_name = "wf-data-plane-prod"
 
+[prod.build.parameters]
+cached = true
+parallel = true
+build_in_source = true
+
 [prod.deploy.parameters]
 region = "ap-northeast-1"
 capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
-parameter_overrides = "Stage=prod MonthlyBudgetUsd=50 AlarmEmail=replace-me@example.com"
+parameter_overrides = "Stage=prod MonthlyBudgetUsd=50 AlarmEmail=refluster@gmail.com"
 confirm_changeset = true
 fail_on_empty_changeset = false
 resolve_s3 = true

@@ -42,20 +42,26 @@ export async function handler(
   event: APIGatewayProxyEventV2,
 ): Promise<APIGatewayProxyResultV2> {
   try {
+    const routeKey = event.routeKey;
     const method = event.requestContext.http.method;
     const path = event.requestContext.http.path;
     const slug = event.pathParameters?.slug;
     const skillName = event.pathParameters?.name;
 
-    if (method === "GET" && path === "/agents") return listAgents(event);
-    if (method === "GET" && path === "/skills") return listSkills(event);
-    if (method === "GET" && skillName) return getSkill(skillName);
-    if (method === "GET" && slug && path.endsWith("/deliverables")) return listAgentDeliverables(slug, event);
-    if (method === "GET" && slug) return getAgent(slug);
-    if (method === "PATCH" && slug) return patchAgent(slug, event.body);
-    if (method === "DELETE" && slug) return deleteAgent(slug);
+    // Dispatch on routeKey (e.g. "GET /agents") rather than the raw
+    // requestContext.http.path. The latter carries the stage prefix
+    // when the API isn't on the $default stage — path becomes
+    // "/prod/agents" — which would silently break list endpoints.
+    // routeKey is the API GW HTTP API v2 route as configured.
+    if (routeKey === "GET /agents") return listAgents(event);
+    if (routeKey === "GET /skills") return listSkills(event);
+    if (routeKey === "GET /skills/{name}" && skillName) return getSkill(skillName);
+    if (routeKey === "GET /agents/{slug}/deliverables" && slug) return listAgentDeliverables(slug, event);
+    if (routeKey === "GET /agents/{slug}" && slug) return getAgent(slug);
+    if (routeKey === "PATCH /agents/{slug}" && slug) return patchAgent(slug, event.body);
+    if (routeKey === "DELETE /agents/{slug}" && slug) return deleteAgent(slug);
 
-    return reply(404, { error: "route_not_found", path, method });
+    return reply(404, { error: "route_not_found", routeKey, path, method });
   } catch (err) {
     return reply(500, {
       error: "internal",
