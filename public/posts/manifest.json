@@ -8,5 +8,15 @@
     "abstract": "Block、HP、Klarna、IBMなどの企業が「AIによる人員削減」を公言する背景を分析。AIによる職種代替が「PR（広報）リスク」でなくなった時代の転換点と、自社組織へのインプリケーションを論じる。",
     "image": "/posts/images/c2357516e41e.jpg",
     "sourceUrls": "https://www.businessinsider.com/list-companies-replacing-human-employees-with-ai-layoffs-workforce-reductions"
+  },
+  {
+    "slug": "d37782c2771e",
+    "title": "AIエージェントにコードを任せる時代に、エンジニアの「本当の仕事」は何か——Thoughtworksが示すAgentic SDLCへの道",
+    "type": "explanation",
+    "category": "E: Rethinking SDLC",
+    "date": "2026-03-26",
+    "abstract": "ThoughtworksのAgentic SDLCレポートを起点に、AIエージェントが開発工程に参入する時代にエンジニアが担うべき新しい役割を解説。コードを書く人から、AIを制御する仕様・テスト・フィードバックループを設計する人への転換と、プロセス全体の再設計の必要性を論じる。",
+    "image": "/posts/images/d37782c2771e.jpg",
+    "sourceUrls": "https://www.thoughtworks.com/en-us/insights/articles/preparing-your-team-for-the-agentic-software-development-life-cycle"
   }
 ]
