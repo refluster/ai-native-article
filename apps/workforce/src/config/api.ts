@@ -1,17 +1,14 @@
 // Workforce agents-api endpoint configuration.
 //
-// The agents-api lives on an AWS-generated API Gateway URL after the SAM
-// stack deploys. Operator drops the URL into the env var below (or edits
-// this file in a follow-up PR when a custom domain lands). When unset,
-// the SPA shows static metadata only and the live-stats section
-// degrades gracefully to "stats unavailable".
+// Resolved at build time from VITE_WORKFORCE_AGENTS_API_BASE (the SAM
+// stack output AgentsApiUrl, suffixed with the stage path — for prod:
+// https://{apiId}.execute-api.{region}.amazonaws.com/prod). When the
+// var is unset the SPA shows static manifest data only and falls back
+// to mock-stats for the live-stats sections.
+//
+// Trailing slashes are stripped so callers can always concatenate
+// "/agents/foo" without worrying about double slashes.
 
-/**
- * Base URL of the wf-agents-api HTTP API for the current stage, with no
- * trailing slash. Empty string disables the API client.
- *
- * To set, edit this constant when the operator gets the dev/prod URL from
- * `aws cloudformation describe-stacks --stack-name wf-data-plane-<stage>
- *  --query 'Stacks[0].Outputs[?OutputKey==\`AgentsApiUrl\`].OutputValue'`.
- */
-export const WORKFORCE_AGENTS_API_BASE = '' as const
+const raw = (import.meta.env.VITE_WORKFORCE_AGENTS_API_BASE ?? '') as string
+
+export const WORKFORCE_AGENTS_API_BASE: string = raw.replace(/\/+$/, '')

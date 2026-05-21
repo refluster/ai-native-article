@@ -226,6 +226,7 @@ Resources:
       CorsConfiguration:
         AllowOrigins:
           - https://kohuehara.xyz
+          - https://workforce.kohuehara.xyz
           - http://localhost:5173
         AllowMethods: [GET, OPTIONS]
         AllowHeaders: [content-type]

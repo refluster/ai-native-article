@@ -265,11 +265,13 @@ export default function AgentProfile() {
             </div>
             <ul className="flex flex-wrap gap-2 p-4">
               {agent.skills.map((skill) => (
-                <li
-                  key={skill}
-                  className="font-wfmono text-xs px-2.5 py-1.5 border border-wf-outline-variant text-wf-on-surface bg-wf-surface-container rounded-wf-sm"
-                >
-                  {skill}
+                <li key={skill}>
+                  <Link
+                    to={`/skills/${skill}`}
+                    className="inline-block font-wfmono text-xs px-2.5 py-1.5 border border-wf-outline-variant text-wf-on-surface bg-wf-surface-container hover:border-wf-on-surface-variant hover:bg-wf-surface-container-hi rounded-wf-sm transition-colors"
+                  >
+                    {skill}
+                  </Link>
                 </li>
               ))}
             </ul>
