@@ -226,37 +226,27 @@ Resources:
   # create the user. We reject any Google identity whose email doesn't
   # match the OperatorEmail parameter — that's the practical "1 user"
   # restriction for a single-operator console.
+  #
+  # Built via the workforce/lambdas Makefile convention (esbuild → ESM
+  # handler.mjs) — mirrors the data-plane stack. `InlineCode` would be
+  # shorter but can only emit a single CJS index.js, so we'd lose the
+  # `import type` / `export const` ergonomics every other Lambda in
+  # this repo enjoys.
   PreSignUpFn:
     Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
     Properties:
       FunctionName: wf-pre-signup-prod
       Runtime: nodejs24.x
       Architectures: [arm64]
       MemorySize: 256
       Timeout: 10
-      Handler: index.handler
+      Handler: handler.handler
+      CodeUri: ../../lambdas/wf-pre-signup
       Environment:
         Variables:
           ALLOWED_EMAIL: !Ref OperatorEmail
-      InlineCode: |
-        // Pre-sign-up trigger — reject any federated identity whose
-        // email != ALLOWED_EMAIL. Auto-confirm + auto-verify when it
-        // matches so the operator skips the email-confirmation step
-        // (their Google identity is already verified).
-        //
-        // CommonJS (exports.handler) is mandatory: SAM InlineCode emits
-        // a bare index.js with no package.json, so Node treats it as
-        // CJS and `export` would throw SyntaxError at PreSignUp time.
-        exports.handler = async (event) => {
-          const allowed = (process.env.ALLOWED_EMAIL || '').toLowerCase();
-          const email = (event.request?.userAttributes?.email || '').toLowerCase();
-          if (!allowed || !email || email !== allowed) {
-            throw new Error('not an authorised operator');
-          }
-          event.response.autoConfirmUser = true;
-          event.response.autoVerifyEmail = true;
-          return event;
-        };
 
   # SourceArn is left wildcard here. Pinning to the User Pool ARN would
   # create a synthesis-time cycle (UserPool → Lambda → Permission → UserPool).
