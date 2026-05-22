@@ -276,6 +276,7 @@ function azureGenerateText(prompt, apiKey, options) {
     payload.reasoning_effort = options.reasoningEffort;
   }
 
+  const tAzureFetch0 = Date.now();
   const response = UrlFetchApp.fetch(url, {
     method: 'post',
     headers: {
@@ -285,11 +286,13 @@ function azureGenerateText(prompt, apiKey, options) {
     payload: JSON.stringify(payload),
     muteHttpExceptions: true,
   });
+  const azureFetchMs = Date.now() - tAzureFetch0;
 
   const status = response.getResponseCode();
   const content = response.getContentText();
 
   if (status >= 400) {
+    Logger.log(`[AZURE] error ${status} after ${azureFetchMs}ms`);
     throw new Error(`Azure OpenAI error ${status}: ${content}`);
   }
 
@@ -302,6 +305,13 @@ function azureGenerateText(prompt, apiKey, options) {
   const choice = result.choices?.[0];
   const text = choice?.message?.content || '';
   const reason = choice?.finish_reason || 'unknown';
+  // Dump usage so we can verify reasoning_effort is being honored. If
+  // reasoning_tokens stays high after passing reasoning_effort='low', the
+  // Azure deployment is ignoring the parameter and we need a different
+  // lever (api-version bump, different deployment, or restructured prompt).
+  const usage = result.usage || {};
+  const reasoningTok = usage.completion_tokens_details?.reasoning_tokens;
+  Logger.log(`[AZURE] ${azureFetchMs}ms, finish=${reason}, prompt_tok=${usage.prompt_tokens}, completion_tok=${usage.completion_tokens}, reasoning_tok=${reasoningTok ?? 'n/a'}, effort=${payload.reasoning_effort || 'unset'}`);
   if (!text) {
     throw new Error(`Azure OpenAI returned empty content (finish_reason=${reason}). Raw: ${JSON.stringify(result).substring(0, 500)}`);
   }
@@ -322,13 +332,18 @@ function azureGenerateText(prompt, apiKey, options) {
 // truncates to fit the prompt budget, and returns null on any failure so the
 // caller can fall back to the L1 summary alone.
 
-// Reasoning-model latency scales with input size. 30k chars (~7.5k input
-// tokens) was empirically driving single-call wall-clock past 360s on
-// gpt-5.4, killing runL2Batch at the GAS execution cap. 12k chars (~3k
-// tokens) is still well past what a ~3000-字 Japanese briefing needs to
-// ground on, and keeps single-call wall-clock comfortably under the
-// 180s envelope we rely on in handleL2Batch.
-const L2_SOURCE_TEXT_LIMIT = 12000; // characters fed into the prompt
+// Reasoning-model latency scales with input size. 30k chars hit the 360s
+// cap (pre PR #71); 12k chars (PR #71) ALSO hit the 360s cap (5 consecutive
+// timeouts 2026-05-22). reasoning_effort='low' alone wasn't enough — either
+// Azure isn't honoring it on this gpt-5.4 deployment, or the floor latency
+// is still north of the budget. 4k chars (~1k tokens) is the floor: still
+// enough to ground a ~3000-字 Japanese briefing on the opening sections of
+// a source article, and small enough that even an ignored reasoning_effort
+// can't blow the budget. The Logger.log dump in azureGenerateText (look for
+// `reasoning_tokens` in the usage line) will tell us if reasoning_effort
+// is actually being applied; if it is and we're STILL slow, the next lever
+// is api-version or a different deployment, not more input cuts.
+const L2_SOURCE_TEXT_LIMIT = 4000; // characters fed into the prompt
 
 function fetchSourceText(url) {
   if (!url || !/^https?:\/\//i.test(url)) return null;
@@ -450,19 +465,24 @@ function generateL2Markdown(l1Title, l1Summary, l1SourceUrl, config) {
   const t0 = Date.now();
   const sourceText = fetchSourceText(l1SourceUrl);
   const fetchMs = Date.now() - t0;
+  Logger.log(`[L2_MD] source fetch: ${fetchMs}ms (${sourceText ? sourceText.length : 0} chars)`);
   if (fetchMs > L2_PRE_AZURE_BUDGET_MS) {
     throw new Error(`source fetch took ${(fetchMs/1000).toFixed(1)}s (>${L2_PRE_AZURE_BUDGET_MS/1000}s); skipping Azure call to avoid 360s timeout`);
   }
   const prompt = buildL2Prompt(l1Title, l1Summary, l1SourceUrl, sourceText);
+  Logger.log(`[L2_MD] prompt built: ${prompt.length} chars`);
   // reasoning_effort='low': L2 is faithful summarization of an existing
   // source, not novel synthesis. Heavy reasoning was driving single-call
   // wall-clock past the 360s GAS cap. The finish_reason='length' guard in
   // azureGenerateText still catches under-budgeted output, so a quality
   // regression surfaces as a thrown error, not a silently-truncated publish.
-  return azureGenerateText(prompt, config.azure_openapi_key, {
+  const tAzure0 = Date.now();
+  const out = azureGenerateText(prompt, config.azure_openapi_key, {
     maxCompletionTokens: 8000,
     reasoningEffort: 'low',
   });
+  Logger.log(`[L2_MD] azure call: ${Date.now() - tAzure0}ms (output ${out.length} chars)`);
+  return out;
 }
 
 // ─── GITHUB API ──────────────────────────────────────────────────────────────
@@ -787,8 +807,18 @@ function handleL1List(config) {
 }
 
 function handleL2Create(data, config) {
-  const l1Pages = notionQueryDatabase(config.l1_db_id, config.notion_api_key);
-  const l1Page = l1Pages.find(p => p.id === data.l1EntryId);
+  const t0 = Date.now();
+  // Fast path: handleL2Batch already has the L1 page in memory and passes
+  // it directly via data.l1Page. The fallback (doPost {action:'L2_CREATE',
+  // l1EntryId}) still re-queries the full L1 DB to find the row by id.
+  // Re-querying inside the per-item loop was costing 5–20s of redundant
+  // Notion pagination per call.
+  let l1Page = data.l1Page;
+  if (!l1Page) {
+    const l1Pages = notionQueryDatabase(config.l1_db_id, config.notion_api_key);
+    l1Page = l1Pages.find(p => p.id === data.l1EntryId);
+    Logger.log(`[L2_CREATE] l1 lookup (cold path): ${Date.now() - t0}ms`);
+  }
 
   if (!l1Page) {
     throw new Error('L1 entry not found');
@@ -802,7 +832,9 @@ function handleL2Create(data, config) {
   // Briefing-document prompt: fetches source body when possible so the LLM
   // has concrete numbers/names/dates to ground on, instead of riffing
   // generically off the L1 summary. See buildL2Prompt / generateL2Markdown.
+  const tMarkdown0 = Date.now();
   const blogContent = generateL2Markdown(l1Title, l1Summary, l1SourceUrl, config);
+  Logger.log(`[L2_CREATE] generateL2Markdown: ${Date.now() - tMarkdown0}ms (${blogContent.length} chars)`);
 
   // Extract title from the generated content (first line should have the title)
   const titleMatch = blogContent.match(/^#+\s+(.+?)(?:\n|$)/);
@@ -856,13 +888,16 @@ function handleL2Create(data, config) {
     };
   }
 
+  const tNotion0 = Date.now();
   const result = notionCreatePageWithBlocks(pageData, config.notion_api_key);
+  Logger.log(`[L2_CREATE] notionCreatePageWithBlocks: ${Date.now() - tNotion0}ms (${blocks.length} blocks)`);
+  Logger.log(`[L2_CREATE] total: ${Date.now() - t0}ms`);
   return {
     success: true,
     data: {
       id: result.id,
       title: blogTitle,
-      l1EntryId: data.l1EntryId,
+      l1EntryId: data.l1EntryId || l1Page.id,
       blogContent,
       notionUrl: result.url,
     },
@@ -1557,24 +1592,25 @@ function handleL3BackfillDate(_data, config) {
 
 // L2_BATCH: for each L1 whose source URL isn't yet referenced by any L2,
 // create an L2 blog. Oldest-first, up to L2_BATCH_MAX per run.
-const L2_BATCH_MAX = 2;
-// GAS kills a triggered function at 360s. Each handleL2Create issues one
-// reasoning-budget azureGenerateText (gpt-5.4, max_completion_tokens=8000)
-// plus a UrlFetchApp source fetch and the Notion page write. Historically
-// observed at ~90-150s; the 2026-05-19 trigger run timed out at 360.854s,
-// which implies a worst-case single-item cost north of 240s. The budget
-// check below skips remaining items once there isn't enough wall-clock
-// budget to safely complete another one, so the function returns cleanly
-// with the items already created and `remaining` set to whatever didn't
-// fit. The reserve is sized to the worst-case observed item, NOT the
-// typical one — under-reserving here is what killed the 5/19 run.
+//
+// MAX=1 is intentional. The 2026-05-22 incident (5 consecutive 360s
+// "Timed Out" runs after PR #71's reasoning_effort='low' fix) showed
+// that a single handleL2Create call can still exhaust the 360s GAS cap
+// even with the Azure budget tightened. Until per-call wall-clock is
+// proven back under ~150s by the Logger.log traces this PR adds, we
+// process exactly one L1 per run — at worst one item completes, at
+// worst-worst one item fails, but the batch always returns a response
+// rather than dying mid-iteration with no observability.
+const L2_BATCH_MAX = 1;
 const L2_BATCH_DEADLINE_MS = 330 * 1000;   // 30s safety margin under 360
 const L2_BATCH_ITEM_RESERVE_MS = 250 * 1000; // worst-case handleL2Create headroom (5/19: 240s+)
 function handleL2Batch(_data, config) {
   const startMs = Date.now();
   // Coverage check pulls from wherever explanation articles live now.
   const sourceDbId = useUnifiedDb(config) ? config.unified_db_id : config.l2_db_id;
+  const tCoverage0 = Date.now();
   const existingPages = notionQueryDatabase(sourceDbId, config.notion_api_key);
+  Logger.log(`[L2_BATCH] coverage query: ${Date.now() - tCoverage0}ms (${existingPages.length} pages)`);
   // Filter to explanation-type rows when reading the unified DB so we
   // don't accidentally treat analyses as covering the same source URL.
   const explanationPages = useUnifiedDb(config)
@@ -1589,9 +1625,11 @@ function handleL2Batch(_data, config) {
       || '';
     if (u) coveredUrls.add(u.trim());
   }
+  const tL1Query0 = Date.now();
   const l1Pages = notionQueryDatabase(config.l1_db_id, config.notion_api_key)
     .slice()
     .sort((a, b) => (a.created_time || '').localeCompare(b.created_time || ''));
+  Logger.log(`[L2_BATCH] l1 query: ${Date.now() - tL1Query0}ms (${l1Pages.length} pages)`);
   const pending = l1Pages.filter(p => {
     const u = p.properties['Source URL']?.url;
     if (!u || coveredUrls.has(u)) return false;
@@ -1599,6 +1637,7 @@ function handleL2Batch(_data, config) {
     if (/^https?:\/\/(www\.)?example\.com(\/|$)/i.test(u)) return false;
     return true;
   });
+  Logger.log(`[L2_BATCH] pending: ${pending.length}, processing up to L2_BATCH_MAX=${L2_BATCH_MAX}`);
 
   const picked = pending.slice(0, L2_BATCH_MAX);
   const processed = [];
@@ -1611,15 +1650,20 @@ function handleL2Batch(_data, config) {
       // already created in Notion is reported back instead of the whole
       // function being killed at the 360s cap.
       skippedForBudget = picked.length - (processed.length + errors.length);
+      Logger.log(`[L2_BATCH] budget exhausted at ${elapsedMs}ms, skipping ${skippedForBudget} remaining`);
       break;
     }
+    Logger.log(`[L2_BATCH] item ${processed.length + errors.length + 1}/${picked.length}: l1=${l1.id} (elapsed=${elapsedMs}ms)`);
     try {
-      const result = handleL2Create({ l1EntryId: l1.id }, config);
+      // Pass the L1 page directly so handleL2Create doesn't re-paginate
+      // the entire L1 DB just to find this single row.
+      const result = handleL2Create({ l1EntryId: l1.id, l1Page: l1 }, config);
       processed.push({ l1Id: l1.id, l2Id: result.data.id, title: result.data.title });
     } catch (e) {
       errors.push({ l1Id: l1.id, error: String(e && e.message || e) });
     }
   }
+  Logger.log(`[L2_BATCH] total: ${Date.now() - startMs}ms, processed=${processed.length}, errors=${errors.length}, skipped=${skippedForBudget}`);
   return {
     success: true,
     data: {
