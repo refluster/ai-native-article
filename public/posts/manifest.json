@@ -18,5 +18,15 @@
     "abstract": "ThoughtworksのAgentic SDLCレポートを起点に、AIエージェントが開発工程に参入する時代にエンジニアが担うべき新しい役割を解説。コードを書く人から、AIを制御する仕様・テスト・フィードバックループを設計する人への転換と、プロセス全体の再設計の必要性を論じる。",
     "image": "/posts/images/d37782c2771e.jpg",
     "sourceUrls": "https://www.thoughtworks.com/en-us/insights/articles/preparing-your-team-for-the-agentic-software-development-life-cycle"
+  },
+  {
+    "slug": "ce614c17834d",
+    "title": "「コードを書く」時代の終わりと、エンジニアの新しい価値——Thoughtworksが描くAgentic SDLCの衝撃",
+    "type": "explanation",
+    "category": "E: Rethinking SDLC",
+    "date": "2026-03-26",
+    "abstract": "Thoughtworksが提唱するAgentic SDLCの時代において、エンジニアの役割が「コードを書く人」から「AIに何を作らせるかを設計する人」へと転換することを解説。外注依存モデルのリスクとプロセス再設計の必要性を論じる。",
+    "image": "/posts/images/ce614c17834d.jpg",
+    "sourceUrls": "https://www.thoughtworks.com/en-us/insights/articles/preparing-your-team-for-the-agentic-software-development-life-cycle"
   }
 ]
