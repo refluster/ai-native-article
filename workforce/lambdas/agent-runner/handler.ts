@@ -30,6 +30,7 @@ import { readIndex, readChunk, appendChunk } from "../shared/memory.js";
 import { insertArticle } from "../shared/notion.js";
 import { deliverableTargetFor, writeDeliverableArtefact } from "../shared/deliverable.js";
 import { dispatchEngineer } from "../shared/github.js";
+import { postToWebhook } from "../shared/webhook.js";
 import {
   type LoadedSkill,
   loadSkillsForAgent,
@@ -164,8 +165,15 @@ export async function handler(event: RunnerEvent, context: Context): Promise<Run
     agent.code_execution === "claude-code-routine-on-gha" &&
     agent.primary_deliverable_type === "pr";
 
+  // Per-Skill side-effect router. trigger_class drives the post-LLM step,
+  // independent of agent.primary_deliverable_type so we can reuse the same
+  // persona across deliverable shapes (RFC-008 §3).
+  const webhookRouteBySkill = activeSkill?.meta.trigger_class === "webhook";
+
   if (ccRouteBySkill || ccRouteByLegacy) {
     delivRow = await dispatchPrPath(event.agent, agent, delivId, startedAt, event.task_kind, llm.text, activeSkill);
+  } else if (webhookRouteBySkill) {
+    delivRow = await dispatchWebhookPath(event.agent, agent, delivId, startedAt, llm.text, activeSkill);
   } else {
     const target = deliverableTargetFor(event.agent, agent.primary_deliverable_type, delivId);
     await writeDeliverableArtefact(target, llm.text);
@@ -310,6 +318,55 @@ async function dispatchPrPath(
   return row;
 }
 
+/**
+ * Webhook side-effect path for skills with meta.trigger_class=webhook.
+ * The LLM already produced the message body (per the skill's instructions
+ * in SKILL.md, which stays Claude-Skill-compatible). We:
+ *   1. Persist the posted body to S3 for replay/audit.
+ *   2. POST to the configured webhook secret.
+ *   3. Write a DELIV row with type=notification, published_at=now.
+ *
+ * Env vars (set on the agent-runner Lambda by SAM):
+ *   DISCORD_WEBHOOK_SECRET  Secrets Manager id for {webhookUrl}
+ *                          (default "wf/discord-pulse-{stage}")
+ */
+async function dispatchWebhookPath(
+  slug: string,
+  agent: AgentMetaRow,
+  delivId: string,
+  startedAt: string,
+  body: string,
+  activeSkill: LoadedSkill | undefined,
+): Promise<DelivRow> {
+  const secretName = process.env.DISCORD_WEBHOOK_SECRET;
+  if (!secretName) {
+    throw new Error("DISCORD_WEBHOOK_SECRET env var is required for webhook-class skills");
+  }
+
+  const target = deliverableTargetFor(slug, "notification", delivId);
+  // S3 record of exactly what was POSTed — single line per the skill's
+  // instructions, but we don't trim here so a non-compliant message is
+  // visible verbatim in the audit trail.
+  await writeDeliverableArtefact(target, body);
+
+  await postToWebhook(secretName, body);
+
+  const row: DelivRow = {
+    pk: agentPk(slug),
+    sk: `DELIV#${delivId}`,
+    type: "notification",
+    kind: agent.primary_deliverable_kind,
+    project_id: agent.default_project,
+    s3_key: target.s3Key,
+    created_at: startedAt,
+    published_at: new Date().toISOString(),
+    skill_name: activeSkill?.meta.name,
+    skill_version: activeSkill?.meta.version,
+  };
+  await putItem(row);
+  return row;
+}
+
 async function loadSystemMd(slug: string): Promise<string> {
   // The runner Lambda's Makefile (PR6b SAM addition) copies
   // workforce/agents/{slug}/system.md into the bundle alongside
@@ -357,6 +414,8 @@ function defaultBriefFor(kind: TaskKind): string {
       return "Produce one launch artefact: positioning, audience, channel, success metric, retraction trigger.";
     case "pr":
       return "Produce a task brief for the engineer routine: what to change, why, and acceptance criteria. (R-N1 exception path.)";
+    case "ping":
+      return "Produce exactly one line in the format: [wf-pulse] {slug} alive at {ISO-8601 UTC timestamp}. No prose around it.";
     default:
       return "Produce the deliverable appropriate to your role.";
   }
