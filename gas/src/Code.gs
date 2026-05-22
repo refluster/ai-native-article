@@ -322,7 +322,13 @@ function azureGenerateText(prompt, apiKey, options) {
 // truncates to fit the prompt budget, and returns null on any failure so the
 // caller can fall back to the L1 summary alone.
 
-const L2_SOURCE_TEXT_LIMIT = 30000; // characters fed into the prompt
+// Reasoning-model latency scales with input size. 30k chars (~7.5k input
+// tokens) was empirically driving single-call wall-clock past 360s on
+// gpt-5.4, killing runL2Batch at the GAS execution cap. 12k chars (~3k
+// tokens) is still well past what a ~3000-字 Japanese briefing needs to
+// ground on, and keeps single-call wall-clock comfortably under the
+// 180s envelope we rely on in handleL2Batch.
+const L2_SOURCE_TEXT_LIMIT = 12000; // characters fed into the prompt
 
 function fetchSourceText(url) {
   if (!url || !/^https?:\/\//i.test(url)) return null;
@@ -432,11 +438,30 @@ function buildL2Prompt(l1Title, l1Summary, l1SourceUrl, sourceText) {
 // Wraps the full L2 generation pipeline (fetch source → build prompt → call
 // Azure → return markdown) so handleL2Create and handleL2Backfill stay in
 // lockstep. Returns the raw markdown string.
+//
+// Soft deadline: if fetchSourceText alone consumed >60s (slow source server),
+// throw before starting the Azure call. The Azure call typically needs
+// 90–150s on gpt-5.4 even with reasoning_effort='low', so starting it past
+// the 60s mark risks the whole handler hitting the 360s GAS execution cap.
+// The thrown error is caught by handleL2Batch and reported as a per-item
+// error; the next cron tick will retry the same L1.
+const L2_PRE_AZURE_BUDGET_MS = 60 * 1000;
 function generateL2Markdown(l1Title, l1Summary, l1SourceUrl, config) {
+  const t0 = Date.now();
   const sourceText = fetchSourceText(l1SourceUrl);
+  const fetchMs = Date.now() - t0;
+  if (fetchMs > L2_PRE_AZURE_BUDGET_MS) {
+    throw new Error(`source fetch took ${(fetchMs/1000).toFixed(1)}s (>${L2_PRE_AZURE_BUDGET_MS/1000}s); skipping Azure call to avoid 360s timeout`);
+  }
   const prompt = buildL2Prompt(l1Title, l1Summary, l1SourceUrl, sourceText);
+  // reasoning_effort='low': L2 is faithful summarization of an existing
+  // source, not novel synthesis. Heavy reasoning was driving single-call
+  // wall-clock past the 360s GAS cap. The finish_reason='length' guard in
+  // azureGenerateText still catches under-budgeted output, so a quality
+  // regression surfaces as a thrown error, not a silently-truncated publish.
   return azureGenerateText(prompt, config.azure_openapi_key, {
     maxCompletionTokens: 8000,
+    reasoningEffort: 'low',
   });
 }
 
