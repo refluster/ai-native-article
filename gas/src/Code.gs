@@ -345,8 +345,25 @@ function azureGenerateText(prompt, apiKey, options) {
 // is api-version or a different deployment, not more input cuts.
 const L2_SOURCE_TEXT_LIMIT = 4000; // characters fed into the prompt
 
+// Hosts where UrlFetchApp is known to either return useless JS-only HTML
+// or — worse — stall the response stream until the 360s GAS execution cap
+// kills the whole function (no JS-level timeout is available on
+// UrlFetchApp). For these hosts we skip the fetch entirely and let the
+// downstream prompt fall back to the L1 summary alone (buildL2Prompt's
+// "本文取得不可" branch tells the model not to fabricate). Grow this list
+// as new hang-prone hosts surface in the operator's "L2 Skip" Notion view.
+const L2_SOURCE_FETCH_HOST_BLOCKLIST = [
+  /(?:^|\.)x\.com$/i,
+  /(?:^|\.)twitter\.com$/i,
+];
+
 function fetchSourceText(url) {
   if (!url || !/^https?:\/\//i.test(url)) return null;
+  const host = (url.match(/^https?:\/\/([^\/]+)/) || [])[1] || '';
+  if (L2_SOURCE_FETCH_HOST_BLOCKLIST.some(re => re.test(host))) {
+    Logger.log(`[L2_MD] source fetch SKIPPED (blocklisted host): ${host}`);
+    return null;
+  }
   let response;
   try {
     response = UrlFetchApp.fetch(url, {
@@ -822,6 +839,23 @@ function handleL2Create(data, config) {
 
   if (!l1Page) {
     throw new Error('L1 entry not found');
+  }
+
+  // Write-ahead skip flag. The L2 hang failure mode is fetchSourceText's
+  // UrlFetchApp.fetch stalling on a source URL whose server never closes
+  // the response stream — GAS kills the whole function at 360s before we
+  // can write any "this failed" marker. We pre-mark the L1 row as "tried"
+  // BEFORE entering generateL2Markdown, so even when GAS kills us mid-fetch
+  // the next L2_BATCH excludes this row. Permanent until the operator
+  // unchecks "L2 Skip" in the Notion app. See L1-L4-PIPELINE.md runbook.
+  try {
+    notionUpdatePage(l1Page.id, { 'L2 Skip': { checkbox: true } }, config.notion_api_key);
+    Logger.log(`[L2_CREATE] write-ahead L2 Skip=true on ${l1Page.id}`);
+  } catch (e) {
+    // Most likely cause: the "L2 Skip" property hasn't been added to the
+    // L1 DB schema yet. Log loudly but don't abort — we still want the
+    // attempt, just without the safety net.
+    Logger.log(`[L2_CREATE] WARNING: write-ahead L2 Skip failed (add 'L2 Skip' checkbox to L1 DB): ${e && e.message || e}`);
   }
 
   const l1Title = l1Page.properties.Title.title[0]?.plain_text || '';
@@ -1630,14 +1664,20 @@ function handleL2Batch(_data, config) {
     .slice()
     .sort((a, b) => (a.created_time || '').localeCompare(b.created_time || ''));
   Logger.log(`[L2_BATCH] l1 query: ${Date.now() - tL1Query0}ms (${l1Pages.length} pages)`);
+  let skippedCount = 0;
   const pending = l1Pages.filter(p => {
     const u = p.properties['Source URL']?.url;
     if (!u || coveredUrls.has(u)) return false;
     // Test/placeholder fixtures must not flow into L2/L3.
     if (/^https?:\/\/(www\.)?example\.com(\/|$)/i.test(u)) return false;
+    // "L2 Skip" checkbox on the L1 row. Set automatically when L2
+    // generation is attempted (see handleL2Create write-ahead); the
+    // operator can uncheck in the Notion app to retry. Permanent skip
+    // until manually cleared.
+    if (p.properties['L2 Skip']?.checkbox === true) { skippedCount++; return false; }
     return true;
   });
-  Logger.log(`[L2_BATCH] pending: ${pending.length}, processing up to L2_BATCH_MAX=${L2_BATCH_MAX}`);
+  Logger.log(`[L2_BATCH] pending: ${pending.length}, skipped (L2 Skip=true): ${skippedCount}, processing up to L2_BATCH_MAX=${L2_BATCH_MAX}`);
 
   const picked = pending.slice(0, L2_BATCH_MAX);
   const processed = [];

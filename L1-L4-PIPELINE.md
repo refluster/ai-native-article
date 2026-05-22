@@ -249,6 +249,33 @@ The `L2_BACKFILL` action uses the `isTruncatedMarkdown` heuristic in `gas/src/Co
 
 3. After the fix, re-run `PIPELINE_STATUS` to confirm the next day's `createdLast7d` is non-zero.
 
+### L2_BATCH stuck — same L1 keeps timing out
+
+Symptom: `runL2Batch` / `doPost` repeatedly hits `Exceeded maximum execution time` (360s) on the same first item. Apps Script Executions logs show `[L2_BATCH] item 1/1: l1=...` then a 6-minute gap until the kill — i.e. `fetchSourceText` hung. `UrlFetchApp.fetch` has no JS-level timeout so we can't cancel mid-flight.
+
+The mitigation already runs automatically: `handleL2Create` writes `L2 Skip = true` on the L1 row BEFORE entering `generateL2Markdown`, so even when GAS kills the function mid-fetch, the next `L2_BATCH` excludes the row. But you may want to inspect or recover.
+
+**See what's skipped:**
+
+1. Open the L1 DB in Notion.
+2. Filter view: `L2 Skip` is checked.
+3. Each row's `Source URL` is a URL that either hung the fetch or threw downstream of it.
+
+**Retry one:**
+
+1. In the Notion app, uncheck the row's `L2 Skip`.
+2. Wait for the next `runL2Batch` tick (every 4h JST) or trigger now: `gas-call L2_BATCH`.
+
+**Permanently exclude a host (e.g. JS-only / paywall / anti-bot):**
+
+1. Identify the host pattern from the skipped rows.
+2. Add it to `L2_SOURCE_FETCH_HOST_BLOCKLIST` in `gas/src/Code.gs` (near `fetchSourceText`).
+3. Deploy + verify.
+
+**One-time setup if the property doesn't exist yet:**
+
+Open the L1 DB → add a Checkbox property named exactly `L2 Skip` (default unchecked). If the property is missing, you'll see `[L2_CREATE] WARNING: write-ahead L2 Skip failed` in the logs and the safety net is off — every hang costs another 6-minute timeout.
+
 ### Adding a new GAS action
 
 1. Add the handler function in `gas/src/Code.gs`.
