@@ -49,6 +49,7 @@ const ALLOWED_DELIVERABLE_TYPES = new Set([
   "plan",
   "design-doc",
   "launch-plan",
+  "notification",
 ]);
 
 const ALLOWED_STREAMS = new Set(["internal", "client", "editorial"]);

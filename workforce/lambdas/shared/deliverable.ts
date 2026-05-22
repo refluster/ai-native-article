@@ -55,6 +55,15 @@ export function deliverableTargetFor(
         s3Key: `launches/${slug}/${delivId}/launch.md`,
         hasExternalPublish: false,
       };
+    case "notification":
+      // Webhook side-effect deliverable. The runner records the posted body
+      // in S3 for audit (so we can replay what was sent) and POSTs the LLM
+      // text to the channel via the trigger_class=webhook post-step.
+      return {
+        type,
+        s3Key: `notifications/${slug}/${delivId}.txt`,
+        hasExternalPublish: true,
+      };
     case "pr":
       // Ren's path. The R-N1 exception is dispatched via GHA workflow_dispatch;
       // the runner does NOT write the artefact itself — it triggers Claude Code

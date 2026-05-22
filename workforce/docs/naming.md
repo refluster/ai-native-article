@@ -22,7 +22,7 @@ The point of R-N7 isn't aesthetics — it's that a single naming convention make
 | Lambda CFN Logical ID | `PascalCase` (CloudFormation requirement) — workforce names start with `Wf` for grep-ability | `WfAgentRunnerFunction`, `WfOrchestratorFunction` |
 | EventBridge rule name | `wf-{agent}-{cadence}-{stage}` | `wf-sora-weekly-prod`, `wf-engineer-poll-prod` |
 | EventBridge rule CFN Logical ID | `PascalCase` — `Wf{Agent}{Cadence}Rule` | `WfSoraWeeklyRule`, `WfEngineerPollRule` |
-| Secrets Manager secret name | `wf/{provider}` — slash separator, lowercase | `wf/anthropic`, `wf/azure-openai`, `wf/notion`, `wf/github` |
+| Secrets Manager secret name | `wf/{provider}` — slash separator, lowercase. Webhook-class skills append a `-{purpose}-{stage}` suffix so per-channel rotation doesn't require IAM changes. | `wf/anthropic`, `wf/azure-openai`, `wf/notion`, `wf/github`, `wf/discord-pulse-dev` |
 | Lambda TS source file | `kebab-case.ts` | `agent-runner.ts`, `llm-anthropic.ts`, `notion.ts` |
 | Frontend React component file | `PascalCase.tsx` | `AuthorChip.tsx`, `AgentDirectory.tsx` |
 | Type / interface / class | `PascalCase` | `AgentMeta`, `TaskRow`, `DelivRow` |

@@ -512,6 +512,8 @@ Resources:
                 - !Sub ${WfBucket.Arn}/plans/*
                 - !Sub ${WfBucket.Arn}/design-docs/*
                 - !Sub ${WfBucket.Arn}/launches/*
+                - !Sub ${WfBucket.Arn}/notifications/*
+                - !Sub ${WfBucket.Arn}/pr-briefs/*
             - Sid: RunnerSecretsRead
               Effect: Allow
               Action: secretsmanager:GetSecretValue
@@ -519,12 +521,14 @@ Resources:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/anthropic-*
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/notion-*
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/github-*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/discord-*
       Environment:
         Variables:
           ENGINEER_OWNER: !Ref EngineerOwner
           ENGINEER_REPO: !Ref EngineerRepo
           ENGINEER_WORKFLOW: !Ref EngineerWorkflow
           ENGINEER_REF: !Ref EngineerRef
+          DISCORD_WEBHOOK_SECRET: !Sub wf/discord-pulse-${Stage}
       Tags:
         workforce: !Ref Stage
 
