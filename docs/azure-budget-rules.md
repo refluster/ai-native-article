@@ -36,7 +36,7 @@ Both must be sized so a **single call** completes well under the **GAS hard exec
 | Stage | `reasoning_effort` | Input cap | Rationale |
 |---|---|---|---|
 | L1_SAVE | (unset / `low`) | full L1 payload | Short structured output; reasoning cost negligible |
-| **L2_CREATE / L2_BACKFILL** | **`low`** | **`L2_SOURCE_TEXT_LIMIT = 12000` chars** | Faithful summarization of an existing source — mechanical, not novel synthesis. 12k chars (~3k tokens) is enough context for a ~3000-字 briefing; 30k drove single calls past 360s |
+| **L2_CREATE / L2_BACKFILL** | **`low`** | **`L2_SOURCE_TEXT_LIMIT = 4000` chars** | Faithful summarization of an existing source — mechanical, not novel synthesis. 30k chars hit the 360s cap; 12k chars also hit it (reasoning_effort apparently not honored on the current `gpt-5.4` deployment / api-version). 4k chars is the floor at which an ignored `reasoning_effort` cannot blow the budget. The `[AZURE]` Logger.log line in `azureGenerateText` dumps `reasoning_tokens`; if that drops with `reasoning_effort='low'`, the param is honored and we can revisit the input cap upward |
 | L3_CREATE / L3_BATCH | (unset for now) | 3 L2s × full body | Novel synthesis across multiple inputs; reasoning is the value-add. If L3 ever starts timing out, add `reasoning_effort: 'medium'` and revisit input cap |
 | Panel / future Heavy | `medium`+ ok | TBD | Reserved |
 
