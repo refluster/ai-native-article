@@ -17,7 +17,7 @@ export interface WorkforceAgent {
   skills: string[];
   default_project: string;
   streams: Array<'internal' | 'client' | 'editorial'>;
-  primary_deliverable_type: 'article' | 'pr' | 'plan' | 'design-doc' | 'launch-plan';
+  primary_deliverable_type: 'article' | 'pr' | 'plan' | 'design-doc' | 'launch-plan' | 'notification';
   primary_deliverable_kind: string;
   code_execution: 'lambda' | 'claude-code-routine-on-gha' | null;
   created_at: string;

@@ -21,7 +21,7 @@ export interface SkillMeta {
   name: string;
   version: string;
   status: "active" | "stale" | "deprecated";
-  trigger_class: "lambda" | "claude-code-routine";
+  trigger_class: "lambda" | "claude-code-routine" | "webhook";
   cost_class: "small" | "medium" | "large";
   owners: string[];
   improvement_agent: string | null;
@@ -53,6 +53,7 @@ const TASK_REQUIRED_OUTPUTS: Record<TaskKind, string[]> = {
   design: ["design-note-markdown"],
   launch: ["launch-plan-markdown"],
   pr: ["task-brief-markdown"],
+  ping: ["discord-notification"],
 };
 
 export async function loadSkill(name: string): Promise<LoadedSkill> {

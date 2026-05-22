@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-21T07:00:07.845Z",
+  "generated_at": "2026-05-22T21:54:45.833Z",
   "skills": [
     {
       "name": "article-draft",
@@ -64,6 +64,27 @@
       "created_at": "2026-05-18",
       "deprecated_replacement": null,
       "description": "Produce one design note in Japanese — intent, information architecture, components, and acceptance criteria — for a UI or visual-system change. Use when the Designer persona needs to capture a design decision in a reviewable form before any implementation PR opens."
+    },
+    {
+      "name": "discord-ping",
+      "version": "0.1.0",
+      "status": "active",
+      "trigger_class": "webhook",
+      "cost_class": "small",
+      "owners": [
+        "yuki"
+      ],
+      "improvement_agent": null,
+      "inputs": [
+        "agent-slug",
+        "wall-clock"
+      ],
+      "outputs": [
+        "discord-notification"
+      ],
+      "created_at": "2026-05-22",
+      "deprecated_replacement": null,
+      "description": "Post a one-line liveness ping to the team Discord channel. Use to confirm the cron → orchestrator → runner → external-side-effect path is alive end-to-end without committing real generation tokens. Triggers on task_kind=ping. Body is intentionally trivial — this is a heartbeat, not a deliverable."
     },
     {
       "name": "market-research",

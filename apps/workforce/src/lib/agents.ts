@@ -96,7 +96,7 @@ export interface AgentLiveRecord {
 export interface AgentDeliverable {
   /** AGENT#{slug}/DELIV#{ulid} pk/sk; surfaced here for de-dupe + linking. */
   sk: string
-  type: 'article' | 'pr' | 'plan' | 'design-doc' | 'launch-plan'
+  type: 'article' | 'pr' | 'plan' | 'design-doc' | 'launch-plan' | 'notification'
   kind: string
   project_id: string
   notion_page_id?: string

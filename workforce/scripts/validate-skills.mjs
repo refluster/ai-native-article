@@ -46,7 +46,7 @@ const META_REQUIRED = [
   "deprecated_replacement",
 ];
 const STATUSES = new Set(["active", "stale", "deprecated"]);
-const TRIGGER_CLASSES = new Set(["lambda", "claude-code-routine"]);
+const TRIGGER_CLASSES = new Set(["lambda", "claude-code-routine", "webhook"]);
 const COST_CLASSES = new Set(["small", "medium", "large"]);
 
 if (!existsSync(SKILLS_DIR)) {
@@ -177,7 +177,7 @@ for (const name of skillDirs) {
     v("J4-status", metaJson, `status "${meta.status}" not in {active, stale, deprecated}`);
   }
   if (!TRIGGER_CLASSES.has(meta.trigger_class)) {
-    v("J5-trigger-class", metaJson, `trigger_class "${meta.trigger_class}" not in {lambda, claude-code-routine}`);
+    v("J5-trigger-class", metaJson, `trigger_class "${meta.trigger_class}" not in {lambda, claude-code-routine, webhook}`);
   }
   if (!COST_CLASSES.has(meta.cost_class)) {
     v("J6-cost-class", metaJson, `cost_class "${meta.cost_class}" not in {small, medium, large}`);

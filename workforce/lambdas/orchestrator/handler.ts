@@ -45,6 +45,7 @@ const DEDUP_MINUTES_BY_TYPE: Record<DeliverableType, number> = {
   pr: 60 * 12,        // 12h — Ren's daily, give half a day's slack
   "design-doc": 60 * 24 * 6,
   "launch-plan": 60 * 24 * 6,
+  notification: 150,  // 2.5h — under the 3h pulse cadence, blocks 5-min tick double-fire
 };
 
 // Polling Ren's pending PR DELIVs.
@@ -203,6 +204,8 @@ function defaultTaskKindFor(agent: AgentMetaRow): string {
       return "design";
     case "launch-plan":
       return "launch";
+    case "notification":
+      return "ping";
     default:
       return "weekly-synthesis";
   }

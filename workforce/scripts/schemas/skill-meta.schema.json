@@ -36,8 +36,8 @@
     },
     "trigger_class": {
       "type": "string",
-      "enum": ["lambda", "claude-code-routine"],
-      "description": "Where the Skill's scripts/ can actually execute. 'lambda' Skills are prompt-only at v1."
+      "enum": ["lambda", "claude-code-routine", "webhook"],
+      "description": "Where the Skill's scripts/ can actually execute. 'lambda' Skills are prompt-only at v1; 'webhook' adds a runner-side POST step after the LLM call (e.g. Discord notification)."
     },
     "cost_class": {
       "type": "string",

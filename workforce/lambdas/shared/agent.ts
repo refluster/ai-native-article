@@ -12,7 +12,8 @@ export type DeliverableType =
   | "pr"
   | "plan"
   | "design-doc"
-  | "launch-plan";
+  | "launch-plan"
+  | "notification";
 
 /** Identity fields — sourced from workforce/agents/{slug}/agent.json (git SoT). */
 export interface AgentIdentity {

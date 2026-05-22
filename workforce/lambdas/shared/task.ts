@@ -2,7 +2,7 @@
 
 import type { DeliverableType } from "./agent.js";
 
-export type TaskKind = "l0-to-l1" | "weekly-synthesis" | "hypothesis" | "tech-note" | "design" | "launch" | "pr";
+export type TaskKind = "l0-to-l1" | "weekly-synthesis" | "hypothesis" | "tech-note" | "design" | "launch" | "pr" | "ping";
 
 export type TaskStatus = "pending" | "claimed" | "ok" | "failed";
 
