@@ -266,11 +266,16 @@ The mitigation already runs automatically: `handleL2Create` writes `L2 Skip = tr
 1. In the Notion app, uncheck the row's `L2 Skip`.
 2. Wait for the next `runL2Batch` tick (every 4h JST) or trigger now: `gas-call L2_BATCH`.
 
-**Permanently exclude a host (e.g. JS-only / paywall / anti-bot):**
+**Route a host through Jina Reader (preferred — actually reads the article):**
 
-1. Identify the host pattern from the skipped rows.
-2. Add it to `L2_SOURCE_FETCH_HOST_BLOCKLIST` in `gas/src/Code.gs` (near `fetchSourceText`).
+For hosts where direct `UrlFetchApp.fetch` hangs or returns useless JS-only HTML (consent-walled CDN-served articles like McKinsey, JS-only feeds like X/Twitter, soft-paywall sites like FT/NYT/WSJ/Bloomberg/LinkedIn), proxy the request through [Jina Reader](https://jina.ai/reader/) (`https://r.jina.ai/<url>`) which returns pre-extracted clean Markdown:
+
+1. Identify the host pattern from a row whose `L2 Skip` was set.
+2. Add the pattern to `L2_SOURCE_FETCH_VIA_READER` in `gas/src/Code.gs` (near `fetchSourceText`).
 3. Deploy + verify.
+4. Uncheck the skipped row's `L2 Skip` in the Notion app so the next `L2_BATCH` retries it through the reader.
+
+Anonymous Jina access is rate-limited (~20 RPM); fine for our ~6 runs/day cadence. If a large backfill ever hits the cap, set `JINA_API_KEY` in GAS Script Properties for the higher tier — no code change needed.
 
 **One-time setup if the property doesn't exist yet:**
 
