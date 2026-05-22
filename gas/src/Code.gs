@@ -345,48 +345,64 @@ function azureGenerateText(prompt, apiKey, options) {
 // is api-version or a different deployment, not more input cuts.
 const L2_SOURCE_TEXT_LIMIT = 4000; // characters fed into the prompt
 
-// Hosts where UrlFetchApp is known to either return useless JS-only HTML
-// or — worse — stall the response stream until the 360s GAS execution cap
-// kills the whole function (no JS-level timeout is available on
-// UrlFetchApp). For these hosts we skip the fetch entirely and let the
-// downstream prompt fall back to the L1 summary alone (buildL2Prompt's
-// "本文取得不可" branch tells the model not to fabricate). Grow this list
-// as new hang-prone hosts surface in the operator's "L2 Skip" Notion view.
-const L2_SOURCE_FETCH_HOST_BLOCKLIST = [
+// Hosts where direct UrlFetchApp.fetch is either pointless (JS-only feeds
+// like X/Twitter) or known to hang the response stream until the 360s GAS
+// execution cap (heavy CDN-served articles with consent walls, e.g.
+// McKinsey on Akamai). For these we proxy through Jina Reader
+// (https://r.jina.ai/<url>) which returns pre-extracted clean Markdown.
+// Anonymous access is rate-limited but well within our cadence (~6 L2
+// runs/day); set ScriptProperty JINA_API_KEY to raise the limit if a
+// large backfill ever pushes against it. Grow this list as new hang-prone
+// or JS-only hosts surface in the operator's "L2 Skip" Notion view.
+const L2_SOURCE_FETCH_VIA_READER = [
+  /(?:^|\.)mckinsey\.com$/i,
+  /(?:^|\.)ft\.com$/i,
+  /(?:^|\.)nytimes\.com$/i,
+  /(?:^|\.)wsj\.com$/i,
+  /(?:^|\.)bloomberg\.com$/i,
   /(?:^|\.)x\.com$/i,
   /(?:^|\.)twitter\.com$/i,
+  /(?:^|\.)linkedin\.com$/i,
 ];
 
 function fetchSourceText(url) {
   if (!url || !/^https?:\/\//i.test(url)) return null;
   const host = (url.match(/^https?:\/\/([^\/]+)/) || [])[1] || '';
-  if (L2_SOURCE_FETCH_HOST_BLOCKLIST.some(re => re.test(host))) {
-    Logger.log(`[L2_MD] source fetch SKIPPED (blocklisted host): ${host}`);
-    return null;
+  const viaReader = L2_SOURCE_FETCH_VIA_READER.some(re => re.test(host));
+  const fetchUrl = viaReader ? `https://r.jina.ai/${url}` : url;
+  if (viaReader) {
+    Logger.log(`[L2_MD] source fetch via Jina Reader (host=${host})`);
   }
+  // Optional API key for higher Jina rate limits; unset by default.
+  const jinaKey = viaReader
+    ? PropertiesService.getScriptProperties().getProperty('JINA_API_KEY')
+    : null;
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (compatible; AI-Native-Article-Briefing/1.0)',
+    'Accept': viaReader
+      ? 'text/plain'
+      : 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'ja,en;q=0.8',
+  };
+  if (jinaKey) headers['Authorization'] = `Bearer ${jinaKey}`;
   let response;
   try {
-    response = UrlFetchApp.fetch(url, {
+    response = UrlFetchApp.fetch(fetchUrl, {
       method: 'get',
       followRedirects: true,
       muteHttpExceptions: true,
-      headers: {
-        // A realistic UA reduces the rate at which CDNs serve us a stub /
-        // bot-challenge page. We still gracefully fall back to L1 summary
-        // when JS-only sites (X.com, paywalls, anti-bot) return useless HTML.
-        'User-Agent': 'Mozilla/5.0 (compatible; AI-Native-Article-Briefing/1.0)',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'ja,en;q=0.8',
-      },
+      headers,
     });
   } catch (_e) {
     return null;
   }
   const status = response.getResponseCode();
   if (status >= 400) return null;
-  const html = response.getContentText() || '';
-  if (!html) return null;
-  const text = htmlToPlainText(html);
+  const body = response.getContentText() || '';
+  if (!body) return null;
+  // Jina Reader returns clean Markdown text already; only strip HTML on
+  // the direct-fetch path.
+  const text = viaReader ? body : htmlToPlainText(body);
   if (!text || text.length < 200) return null; // too short → likely a bot wall
   return text.length > L2_SOURCE_TEXT_LIMIT
     ? text.substring(0, L2_SOURCE_TEXT_LIMIT)
