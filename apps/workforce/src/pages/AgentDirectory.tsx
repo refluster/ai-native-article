@@ -1,5 +1,6 @@
-// /workforce/agents — Crew Index. The roster, sorted by tier then last
-// run. Responsive: dense table on md+, stacked cards under that.
+// /workforce/agents — Crew Index. The roster, sorted by depth (root
+// first) then last run. Responsive: dense table on md+, stacked cards
+// under that.
 //
 // Filter chips (ALL / RUNNING / THROWING / PAUSED) and a search box let
 // the operator focus the list. State is purely client-side; reload
@@ -23,12 +24,6 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: 'throwing', label: 'THROWING' },
   { id: 'paused',   label: 'PAUSED' },
 ];
-
-function tierWeight(t: WorkforceAgent['tier']): number {
-  if (t === 'founder') return 0;
-  if (t === 'lead') return 1;
-  return 2;
-}
 
 export default function AgentDirectory() {
   const [manifest, setManifest] = useState<WorkforceAgentManifest | null>(null);
@@ -69,8 +64,8 @@ export default function AgentDirectory() {
         );
       })
       .sort((a, b) => {
-        const tier = tierWeight(a.agent.tier) - tierWeight(b.agent.tier);
-        if (tier !== 0) return tier;
+        const depth = a.agent.depth - b.agent.depth;
+        if (depth !== 0) return depth;
         return new Date(b.stats.last_run_at).getTime() - new Date(a.stats.last_run_at).getTime();
       });
   }, [manifest, stats, filter, query]);
@@ -139,7 +134,7 @@ export default function AgentDirectory() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-                      {agent.slug.toUpperCase()} · {agent.tier.toUpperCase()}
+                      {agent.slug.toUpperCase()} · L{agent.depth}
                     </div>
                     <StatusPill status={status} compact />
                   </div>
@@ -187,7 +182,7 @@ export default function AgentDirectory() {
                   <Sigil slug={agent.slug} size={40} />
                   <div className="min-w-0">
                     <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-                      {agent.slug.toUpperCase()} · {agent.tier.toUpperCase()}
+                      {agent.slug.toUpperCase()} · L{agent.depth}
                     </div>
                     <div className="font-semibold text-wf-on-surface truncate">{fullName(agent)}</div>
                   </div>

@@ -1,14 +1,11 @@
 // Workforce agent manifest types — what the build script emits and the
 // SPA consumes from /workforce-agents.json.
 
-export type AgentTier = 'founder' | 'lead' | 'ic';
-
-/** One cron-to-skill pairing on an agent. */
-export interface AgentBinding {
+export type AgentBinding = {
   cron: string;
   skill: string;
   note?: string;
-}
+};
 
 export interface WorkforceAgent {
   slug: string;
@@ -26,8 +23,10 @@ export interface WorkforceAgent {
   /** First non-heading, non-framing paragraph from system.md. */
   about: string;
   // ----- Org topology, merged from workforce/agents/_org.json by the build
-  // script.
-  tier: AgentTier;
+  // script. `depth` is derived: 0 for nodes with no reports_to (roots),
+  // 1 + min(parent depth) otherwise. There is no hard ceiling on N — a
+  // 4-deep org renders the same way a 3-deep one does.
+  depth: number;
   reports_to: string[];
   direct_reports: string[];
   lateral: string[];

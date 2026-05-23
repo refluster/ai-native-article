@@ -57,7 +57,7 @@ export default function ReportingCard({ agent, roster }: Props) {
   return (
     <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3">
-        <Typeplate label="DECK · ORG" value={agent.tier.toUpperCase()} />
+        <Typeplate label="DECK · ORG" value={`L${agent.depth}`} />
       </div>
       <div className="p-3 space-y-3">
         {noEdges && (
@@ -71,10 +71,10 @@ export default function ReportingCard({ agent, roster }: Props) {
       </div>
       <div className="border-t border-wf-outline-variant px-4 py-2">
         <Link
-          to="/org"
+          to={`/org?center=${agent.slug}`}
           className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
         >
-          VIEW FULL ORG →
+          VIEW IN ORG GRAPH →
         </Link>
       </div>
     </div>

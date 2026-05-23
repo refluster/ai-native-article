@@ -1,63 +1,51 @@
 {
-  "$comment": "Static org topology consumed by build-agent-manifest.mjs. Authoritative reporting graph for the /workforce DAG view. Slugs reference workforce/agents/{slug}/agent.json. Edit here; the manifest is regenerated on next predev/prebuild.",
+  "$comment": "Static org topology consumed by build-agent-manifest.mjs. Authoritative reporting graph for the /workforce DAG view. Slugs reference workforce/agents/{slug}/agent.json. Layer depth is no longer declared here — it is derived from reports_to (0 for roots, 1 + min(parent depth) otherwise) by the build script. Edit edges here; the manifest is regenerated on next predev/prebuild.",
   "topology": {
     "maya": {
-      "tier": "founder",
       "reports_to": [],
       "lateral": []
     },
     "priya": {
-      "tier": "lead",
       "reports_to": ["maya"],
       "lateral": ["elena", "dario"]
     },
     "elena": {
-      "tier": "lead",
       "reports_to": ["maya"],
       "lateral": ["priya", "dario"]
     },
     "dario": {
-      "tier": "lead",
       "reports_to": ["maya"],
       "lateral": ["priya", "elena"]
     },
     "sora": {
-      "tier": "ic",
       "reports_to": ["maya"],
       "lateral": []
     },
     "theo": {
-      "tier": "ic",
       "reports_to": ["priya"],
       "lateral": ["noor"]
     },
     "noor": {
-      "tier": "ic",
       "reports_to": ["priya"],
       "lateral": ["theo"]
     },
     "aoi": {
-      "tier": "ic",
       "reports_to": ["elena"],
       "lateral": ["kai", "yuki", "mira"]
     },
     "kai": {
-      "tier": "ic",
       "reports_to": ["elena"],
       "lateral": ["aoi", "yuki", "mira"]
     },
     "yuki": {
-      "tier": "ic",
       "reports_to": ["elena"],
       "lateral": ["aoi", "kai", "mira"]
     },
     "mira": {
-      "tier": "ic",
       "reports_to": ["elena"],
       "lateral": ["aoi", "kai", "yuki"]
     },
     "ren": {
-      "tier": "ic",
       "reports_to": ["dario"],
       "lateral": []
     }

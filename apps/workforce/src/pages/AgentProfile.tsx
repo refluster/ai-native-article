@@ -185,7 +185,7 @@ export default function AgentProfile() {
         <Sigil slug={agent.slug} size={88} />
         <div className="flex-1 min-w-0">
           <div className="mb-2 flex flex-wrap items-center gap-3">
-            <Typeplate label="AGENT" value={`${agent.slug.toUpperCase()} · ${agent.tier.toUpperCase()}`} />
+            <Typeplate label="AGENT" value={`${agent.slug.toUpperCase()} · L${agent.depth}`} />
             <StatusPill status={status} />
           </div>
           <h1 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-[1.04] text-wf-on-surface mb-1">

@@ -203,7 +203,7 @@ export default function SkillProfile() {
                   <Sigil slug={slug} size={36} />
                   <div className="min-w-0">
                     <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-                      {slug.toUpperCase()}{agent ? ` · ${agent.tier.toUpperCase()}` : ''}
+                      {slug.toUpperCase()}{agent ? ` · L${agent.depth}` : ''}
                     </div>
                     <div className="font-semibold text-wf-on-surface truncate">
                       {agent ? fullName(agent) : slug}
