@@ -1,5 +1,5 @@
 // /workforce/skills/:name — single-skill view. Hero with name + status,
-// the SKILL.md description, the inputs/outputs contract, and the
+// the SKILL.md description, the deliverable contract (when llm-prose), and the
 // owners list as agent chips that link back to /agents/:slug.
 //
 // When the live agents-api is configured the page also surfaces
@@ -137,9 +137,14 @@ export default function SkillProfile() {
         className="mb-6"
         items={[
           {
-            cap: 'TRIGGER',
-            value: skill.trigger_class,
-            sub: skill.trigger_class === 'lambda' ? 'Lambda invoked' : 'GHA workflow_dispatch',
+            cap: 'EXECUTOR',
+            value: skill.executor,
+            sub:
+              skill.executor === 'deterministic'
+                ? 'runner-side handler · no LLM'
+                : skill.executor === 'llm-prose'
+                  ? `LLM → ${skill.deliverable?.type ?? 'artefact'}`
+                  : 'LLM brief → GHA dispatch',
           },
           { cap: 'COST CLASS', value: skill.cost_class, sub: `@${skill.version}` },
           {
@@ -161,46 +166,24 @@ export default function SkillProfile() {
         <p className="mb-4 font-wfmono text-xs text-wf-tertiary">live stats unavailable: {liveError}</p>
       )}
 
-      {/* Contract: inputs → outputs */}
-      <section className="mb-6 border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
-        <div className="border-b border-wf-outline-variant px-4 py-3">
-          <Typeplate label="CONTRACT" value="INPUTS → OUTPUTS" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-          <div>
-            <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-2">INPUTS</div>
-            <ul className="flex flex-wrap gap-2">
-              {skill.inputs.map((i) => (
-                <li
-                  key={i}
-                  className="font-wfmono text-xs px-2.5 py-1.5 border border-wf-outline-variant text-wf-on-surface bg-wf-surface-container rounded-wf-sm"
-                >
-                  {i}
-                </li>
-              ))}
-              {skill.inputs.length === 0 && (
-                <li className="font-wfmono text-xs text-wf-on-surface-variant">none</li>
-              )}
-            </ul>
+      {/* Deliverable (llm-prose only) */}
+      {skill.deliverable && (
+        <section className="mb-6 border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
+          <div className="border-b border-wf-outline-variant px-4 py-3">
+            <Typeplate label="CONTRACT" value="DELIVERABLE" />
           </div>
-          <div>
-            <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-2">OUTPUTS</div>
-            <ul className="flex flex-wrap gap-2">
-              {skill.outputs.map((o) => (
-                <li
-                  key={o}
-                  className="font-wfmono text-xs px-2.5 py-1.5 border border-wf-outline-variant text-wf-on-surface bg-wf-surface-container rounded-wf-sm"
-                >
-                  {o}
-                </li>
-              ))}
-              {skill.outputs.length === 0 && (
-                <li className="font-wfmono text-xs text-wf-on-surface-variant">none</li>
-              )}
-            </ul>
-          </div>
-        </div>
-      </section>
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-4 text-sm">
+            <div>
+              <dt className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">TYPE</dt>
+              <dd className="font-semibold text-wf-on-surface">{skill.deliverable.type}</dd>
+            </div>
+            <div>
+              <dt className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">PUBLISH NOTION</dt>
+              <dd className="font-semibold text-wf-on-surface">{skill.deliverable.publish_notion ? 'yes' : 'no'}</dd>
+            </div>
+          </dl>
+        </section>
+      )}
 
       {/* Owners */}
       <section className="mb-6 border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
@@ -245,7 +228,6 @@ export default function SkillProfile() {
         </div>
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 font-wfmono text-xs">
           <Fact label="IMPROVEMENT AGENT" value={(live?.improvement_agent_override ?? skill.improvement_agent) ?? '—'} />
-          <Fact label="DEPRECATED REPLACEMENT" value={skill.deprecated_replacement ?? '—'} />
           <Fact label="CREATED" value={skill.created_at} />
           <Fact label="VERSION" value={skill.version} />
         </dl>

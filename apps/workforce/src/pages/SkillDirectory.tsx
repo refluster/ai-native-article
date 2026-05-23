@@ -19,8 +19,8 @@ type Filter = 'all' | SkillStatus
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'all',        label: 'ALL' },
   { id: 'active',     label: 'ACTIVE' },
+  { id: 'stale',      label: 'STALE' },
   { id: 'deprecated', label: 'DEPRECATED' },
-  { id: 'paused',     label: 'PAUSED' },
 ]
 
 function statusTone(s: SkillStatus): string {
@@ -154,7 +154,7 @@ export default function SkillDirectory() {
                 })}
               </div>
               <div className="mt-3 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-                {s.trigger_class} · {s.cost_class} cost
+                {s.executor} · {s.cost_class} cost
               </div>
             </Link>
           </li>

@@ -1,11 +1,15 @@
 {
-  "generated_at": "2026-05-22T21:54:45.833Z",
+  "generated_at": "2026-05-23T01:08:26.260Z",
   "skills": [
     {
       "name": "article-draft",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "status": "active",
-      "trigger_class": "lambda",
+      "executor": "llm-prose",
+      "deliverable": {
+        "type": "article",
+        "publish_notion": true
+      },
       "cost_class": "medium",
       "owners": [
         "aoi",
@@ -15,161 +19,103 @@
         "yuki"
       ],
       "improvement_agent": null,
-      "inputs": [
-        "l0-source-ref"
-      ],
-      "outputs": [
-        "article-markdown"
-      ],
       "created_at": "2026-05-18",
-      "deprecated_replacement": null,
       "description": "Produce one 400-800 word L1 insight article in Japanese from a single L0 source. Use when an editorial-stream agent needs to convert a pending L0 source entry into a publishable insight piece — one observation, one inference, one disclosure per paragraph, with the bias-disclosure footer appended."
     },
     {
       "name": "code-task-brief",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "status": "active",
-      "trigger_class": "claude-code-routine",
+      "executor": "claude-code-routine",
+      "deliverable": null,
       "cost_class": "medium",
       "owners": [
         "ren"
       ],
       "improvement_agent": null,
-      "inputs": [
-        "change-request"
-      ],
-      "outputs": [
-        "task-brief-markdown"
-      ],
       "created_at": "2026-05-18",
-      "deprecated_replacement": null,
       "description": "Produce a task brief for the engineer Claude Code routine — what to change, why, acceptance criteria. Use when the Engineer persona needs to dispatch implementation work to the wf-engineer.yml GHA workflow (the R-N1 exception path); the brief is what the CC routine reads as its instructions before writing code."
     },
     {
       "name": "design-note",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "status": "active",
-      "trigger_class": "lambda",
+      "executor": "llm-prose",
+      "deliverable": {
+        "type": "design-doc",
+        "publish_notion": false
+      },
       "cost_class": "medium",
       "owners": [
         "aoi"
       ],
       "improvement_agent": null,
-      "inputs": [
-        "design-brief"
-      ],
-      "outputs": [
-        "design-note-markdown"
-      ],
       "created_at": "2026-05-18",
-      "deprecated_replacement": null,
       "description": "Produce one design note in Japanese — intent, information architecture, components, and acceptance criteria — for a UI or visual-system change. Use when the Designer persona needs to capture a design decision in a reviewable form before any implementation PR opens."
     },
     {
       "name": "discord-ping",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "status": "active",
-      "trigger_class": "webhook",
+      "executor": "deterministic",
+      "deliverable": null,
       "cost_class": "small",
       "owners": [
         "yuki"
       ],
       "improvement_agent": null,
-      "inputs": [
-        "agent-slug",
-        "wall-clock"
-      ],
-      "outputs": [
-        "discord-notification"
-      ],
       "created_at": "2026-05-22",
-      "deprecated_replacement": null,
-      "description": "Post a one-line liveness ping to the team Discord channel. Use to confirm the cron → orchestrator → runner → external-side-effect path is alive end-to-end without committing real generation tokens. Triggers on task_kind=ping. Body is intentionally trivial — this is a heartbeat, not a deliverable."
+      "description": "Post a one-line liveness heartbeat to the team Discord channel. Documents the operational shape of the deterministic runner-side handler so a human or a Claude-Code persona reading this file knows exactly what fires when the matching agent.binding's cron triggers. The runner's discord-ping handler executes this verbatim — no LLM is involved at runtime."
     },
     {
       "name": "market-research",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "status": "active",
-      "trigger_class": "lambda",
+      "executor": "llm-prose",
+      "deliverable": {
+        "type": "article",
+        "publish_notion": true
+      },
       "cost_class": "large",
       "owners": [
         "sora"
       ],
       "improvement_agent": null,
-      "inputs": [
-        "memory-recent",
-        "l0-sources-recent"
-      ],
-      "outputs": [
-        "synthesis-article-markdown"
-      ],
       "created_at": "2026-05-18",
-      "deprecated_replacement": null,
       "description": "Produce one weekly-synthesis article in Japanese (800-1500 words) integrating the week's external signals the agent has memory of, with a falsifiable position. Use when the Researcher/Analyst persona is writing the weekly synthesis cadence (Sora's Sunday 23:00 JST run), not the twice-daily L0→L1 articles."
     },
     {
-      "name": "notion-publish",
-      "version": "0.1.0",
-      "status": "active",
-      "trigger_class": "lambda",
-      "cost_class": "small",
-      "owners": [
-        "aoi",
-        "maya",
-        "ren",
-        "sora",
-        "yuki"
-      ],
-      "improvement_agent": null,
-      "inputs": [
-        "article-markdown"
-      ],
-      "outputs": [
-        "notion-page-id",
-        "notion-page-url"
-      ],
-      "created_at": "2026-05-18",
-      "deprecated_replacement": null,
-      "description": "Insert a finished article body into the existing Notion article DB with the correct Author/Kind/Status properties so the GAS L4 batch picks it up and publishes to kohuehara.xyz. Use as the terminal step of any editorial pipeline that produces an article-markdown — the side-effect that crosses the workforce↔Notion boundary (W-2)."
-    },
-    {
       "name": "plan-write",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "status": "active",
-      "trigger_class": "lambda",
+      "executor": "llm-prose",
+      "deliverable": {
+        "type": "plan",
+        "publish_notion": false
+      },
       "cost_class": "medium",
       "owners": [
         "maya"
       ],
       "improvement_agent": null,
-      "inputs": [
-        "context-summary"
-      ],
-      "outputs": [
-        "plan-markdown"
-      ],
       "created_at": "2026-05-18",
-      "deprecated_replacement": null,
       "description": "Produce one 600-1200 word hypothesis-style plan in Japanese — a clear claim, why-now, what would falsify it, and the next step if false. Use when the PM/Founder persona is writing roadmap or hypothesis content that needs to be measurable against reality, not aspirational prose."
     },
     {
       "name": "positioning-write",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "status": "active",
-      "trigger_class": "lambda",
+      "executor": "llm-prose",
+      "deliverable": {
+        "type": "launch-plan",
+        "publish_notion": false
+      },
       "cost_class": "medium",
       "owners": [
         "yuki"
       ],
       "improvement_agent": null,
-      "inputs": [
-        "launch-context"
-      ],
-      "outputs": [
-        "launch-plan-markdown"
-      ],
       "created_at": "2026-05-18",
-      "deprecated_replacement": null,
       "description": "Produce one launch / positioning artefact in Japanese — positioning, audience, channel, success metric, retraction trigger. Use when the GTM/Customer persona is committing a launch or message to writing in a form that can be evaluated against real channels and real audiences after the fact."
     }
   ]

@@ -166,7 +166,7 @@ export default function AgentProfile() {
     { cap: 'RUNS · MTD',  value: runsMTD !== undefined ? String(runsMTD) : '—',                     sub: 'this month' },
     { cap: 'SPEND · MTD', value: spendMTD !== undefined ? `$${spendMTD.toFixed(2)}` : '—',           sub: `of $${budgetCap} cap · ${spendPct}%` },
     { cap: 'DELIV',       value: delivTotal !== undefined ? String(delivTotal) : '—',                sub: 'lifetime total' },
-    { cap: 'NEXT RUN',    value: nextRunLabel(nextRun),                                              sub: agent.schedule_note, alarm: status === 'throwing' },
+    { cap: 'NEXT RUN',    value: nextRunLabel(nextRun),                                              sub: agent.bindings[0]?.note ?? `${agent.bindings.length} binding(s)`, alarm: status === 'throwing' },
   ];
 
   return (
@@ -236,42 +236,43 @@ export default function AgentProfile() {
             </section>
           )}
 
-          {/* SCHEDULE + MODEL — facts grid */}
+          {/* CONFIG facts grid */}
           <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
             <div className="border-b border-wf-outline-variant px-4 py-3">
-              <Typeplate label="DECK · CONFIG" value="PERSONA · MODEL · SCHEDULE" />
+              <Typeplate label="DECK · CONFIG" value="PERSONA · MODEL · PROJECT" />
             </div>
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-4 text-sm">
               <Fact label="MODEL" value={agent.model} />
               <Fact label="PROMPT" value={`v${agent.prompt_version}`} />
-              <Fact label="CADENCE" value={agent.schedule_note} />
               <Fact label="MONTHLY BUDGET" value={`USD ${agent.budget_monthly_usd}`} />
               <Fact label="PROJECT" value={agent.default_project} />
-              <Fact label="PRIMARY DELIVERABLE" value={`${agent.primary_deliverable_type} · ${agent.primary_deliverable_kind}`} />
               <Fact label="STREAMS" value={agent.streams.map((s) => STREAM_LABEL[s]).join(' · ')} />
               {lastRunAt && (
                 <Fact label="LAST RUN" value={`${formatRelative(lastRunAt)} (${lastRunStatus})`} />
               )}
-              {agent.code_execution === 'claude-code-routine-on-gha' && (
-                <Fact label="CODE EXEC" value="Claude Code on GHA (R-N1 exception)" wide />
-              )}
             </dl>
           </section>
 
-          {/* SKILLS */}
+          {/* BINDINGS — cron × skill pairs */}
           <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
             <div className="border-b border-wf-outline-variant px-4 py-3">
-              <Typeplate label="DECK · SKILLS" value={`${agent.skills.length}`} />
+              <Typeplate label="DECK · BINDINGS" value={`${agent.bindings.length} cron×skill`} />
             </div>
-            <ul className="flex flex-wrap gap-2 p-4">
-              {agent.skills.map((skill) => (
-                <li key={skill}>
+            <ul className="divide-y divide-wf-outline-variant">
+              {agent.bindings.map((b, idx) => (
+                <li key={idx} className="px-4 py-3 flex flex-col sm:flex-row sm:items-baseline gap-2 sm:gap-4 text-sm">
                   <Link
-                    to={`/skills/${skill}`}
-                    className="inline-block font-wfmono text-xs px-2.5 py-1.5 border border-wf-outline-variant text-wf-on-surface bg-wf-surface-container hover:border-wf-on-surface-variant hover:bg-wf-surface-container-hi rounded-wf-sm transition-colors"
+                    to={`/skills/${b.skill}`}
+                    className="font-wfmono text-xs px-2.5 py-1.5 border border-wf-outline-variant text-wf-on-surface bg-wf-surface-container hover:border-wf-on-surface-variant hover:bg-wf-surface-container-hi rounded-wf-sm transition-colors self-start"
                   >
-                    {skill}
+                    {b.skill}
                   </Link>
+                  <span className="font-wfmono text-[11px] uppercase tracking-[0.12em] text-wf-on-surface-variant">
+                    {b.cron}
+                  </span>
+                  {b.note && (
+                    <span className="text-wf-on-surface-variant">{b.note}</span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -296,6 +297,7 @@ export default function AgentProfile() {
                       const id = d.sk.replace(/^DELIV#/, '');
                       const link =
                         d.pr_url ??
+                        d.notion_page_url ??
                         (d.notion_page_id
                           ? `https://www.notion.so/${d.notion_page_id.replace(/-/g, '')}`
                           : undefined);
@@ -310,14 +312,14 @@ export default function AgentProfile() {
                           <span className="flex-1">
                             {link ? (
                               <a href={link} target="_blank" rel="noopener noreferrer" className="text-wf-primary hover:underline">
-                                {d.kind} · {id.slice(0, 8)}
+                                {id.slice(0, 8)}
                               </a>
                             ) : (
-                              <>{d.kind} · {id.slice(0, 8)}</>
+                              <>{id.slice(0, 8)}</>
                             )}
-                            {d.skill_name && (
+                            {d.status && (
                               <span className="ml-2 font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant">
-                                via {d.skill_name}@{d.skill_version}
+                                {d.status}
                               </span>
                             )}
                           </span>

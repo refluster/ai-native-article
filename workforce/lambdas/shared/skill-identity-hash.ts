@@ -9,14 +9,12 @@ const IDENTITY_KEYS = [
   "version",
   "description",
   "status",
-  "trigger_class",
+  "executor",
+  "deliverable",
   "cost_class",
   "owners",
   "improvement_agent",
-  "inputs",
-  "outputs",
   "created_at",
-  "deprecated_replacement",
 ] as const;
 
 export function skillIdentityHash(identity: SkillIdentity): string {
