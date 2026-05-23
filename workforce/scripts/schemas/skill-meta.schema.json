@@ -34,7 +34,7 @@
     "executor": {
       "type": "string",
       "enum": ["llm-prose", "claude-code-routine", "deterministic"],
-      "description": "How the runner executes this skill. llm-prose: LLM call → S3 artefact (+ optional Notion publish). claude-code-routine: LLM brief → GHA workflow_dispatch → pending DELIV. deterministic: registered handler in shared/handlers/, no LLM call."
+      "description": "How the runner executes this skill. llm-prose: LLM call → S3 artefact (+ optional Notion publish). claude-code-routine: LLM brief → GHA workflow_dispatch → pending DELIV. deterministic: sibling handler.ts in the same skill folder (auto-registered via workforce/scripts/build-skill-registry.mjs), no LLM call."
     },
     "deliverable": {
       "type": "object",

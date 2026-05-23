@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-23T18:27:09.419Z",
+  "generated_at": "2026-05-23T18:51:45.052Z",
   "skills": [
     {
       "name": "article-draft",
@@ -62,7 +62,7 @@
     },
     {
       "name": "discord-ping",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "status": "active",
       "executor": "deterministic",
       "deliverable": null,

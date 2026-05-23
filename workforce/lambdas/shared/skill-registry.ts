@@ -1,27 +1,24 @@
-// Registry of deterministic skill handlers. Keyed by the skill's
-// meta.json:name. The runner looks up the entry when it sees
-// executor==="deterministic" and runs the function with the run
-// context. The function returns the bytes that should land in
-// runs/{slug}/{run_id}/output.{ext}; the runner persists them and
-// writes the RUN row.
+// Public API for resolving deterministic skill handlers at runtime.
+//
+// The handler map itself is build-time generated from
+// workforce/skills/*/meta.json (executor === "deterministic") — see
+// ./skill-registry-generated.ts and workforce/scripts/build-skill-registry.mjs.
+// Adding a deterministic skill = drop a folder under workforce/skills/{name}/
+// with SKILL.md + meta.json + handler.ts. No edits to this file.
 
-import { dispatchDiscordPing, type DeterministicResult, type RunnerContext } from "./handlers/discord-ping.js";
-
-export type DeterministicHandler = (ctx: RunnerContext) => Promise<DeterministicResult>;
-
-const REGISTRY: Record<string, DeterministicHandler> = {
-  "discord-ping": dispatchDiscordPing,
-};
+import { DETERMINISTIC_HANDLERS } from "./skill-registry-generated.js";
+import type { DeterministicHandler, DeterministicResult, RunnerContext } from "./skill-types.js";
 
 export function getDeterministicHandler(skillName: string): DeterministicHandler {
-  const handler = REGISTRY[skillName];
+  const handler = DETERMINISTIC_HANDLERS[skillName];
   if (!handler) {
     throw new Error(
       `no deterministic handler registered for skill "${skillName}". ` +
-        `Either register one in shared/skill-registry.ts or change the skill's executor.`,
+        `Add workforce/skills/${skillName}/handler.ts with executor=deterministic in meta.json, ` +
+        `then run \`npm run workforce:skill-registry\`.`,
     );
   }
   return handler;
 }
 
-export type { DeterministicResult, RunnerContext };
+export type { DeterministicHandler, DeterministicResult, RunnerContext };

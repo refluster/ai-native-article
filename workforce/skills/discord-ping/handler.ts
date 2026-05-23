@@ -1,30 +1,19 @@
 // Deterministic handler for the discord-ping skill.
-// See workforce/skills/discord-ping/SKILL.md for the contract.
+// See ./SKILL.md for the contract.
 //
 // Input: agent slug + run timestamp.
 // Output bytes: the one-line heartbeat that was posted.
 // Side effect: POST {content} to the Discord webhook URL behind the
 // secrets-manager id given by DISCORD_WEBHOOK_SECRET.
+//
+// Lives alongside SKILL.md (Anthropic-Skills bundle convention) — the
+// workforce agent-runner picks it up via the build-time generated
+// skill-registry-generated.ts. Adding a new deterministic skill means
+// dropping a folder under workforce/skills/{name}/ with SKILL.md +
+// meta.json + handler.ts — no edits to lambdas/.
 
-import { postToWebhook } from "../webhook.js";
-
-export interface RunnerContext {
-  /** Agent slug — fills the {slug} placeholder in the heartbeat line. */
-  slug: string;
-  /** ISO-8601 timestamp captured when the runner started this RUN. */
-  startedAt: string;
-}
-
-export interface DeterministicResult {
-  /** Bytes the runner persists to S3 as runs/{slug}/{run_id}/output.{ext}. */
-  output: string;
-  /** File extension hint for the S3 key. */
-  outputExt: "txt" | "json" | "md";
-  /** Short summary the runner writes into RUN.output_summary. */
-  summary: string;
-  /** Optional external-publish side-effect status the runner can log. */
-  side_effect?: { kind: "discord-webhook"; status: number };
-}
+import type { DeterministicResult, RunnerContext } from "../../lambdas/shared/skill-types.js";
+import { postToWebhook } from "../../lambdas/shared/webhook.js";
 
 export async function dispatchDiscordPing(ctx: RunnerContext): Promise<DeterministicResult> {
   const secretName = process.env.DISCORD_WEBHOOK_SECRET;

@@ -47,6 +47,8 @@ Per AGENTS.md §1 vocabulary:
 | `workforce/agents/{slug}/agent.json` | **B** with Rule 11 | Persona config (model, schedule, budget). Same one-at-a-time discipline. |
 | `workforce/agents/{slug}/avatar.*` | **Forbidden** | Per-agent avatar files do not scale to 100s of agents. Avatars are rendered procedurally on the frontend from the slug (initial letter + slug-hash-derived HSL hue). The linter rejects any `avatar.*` under `agents/{slug}/`. |
 | `workforce/skills/{name}/SKILL.md` | **A** with Rule 11 | Reusable agent instructions. One PR may not bump more than one skill's body. First version per skill is the documented exception. |
+| `workforce/skills/{name}/meta.json` | **B** with Rule 11 | Workforce-internal skill sidecar (executor, version, owners). Co-versioned with `SKILL.md` per W-5. |
+| `workforce/skills/{name}/handler.ts` | **B** with Rule 11 | Deterministic skill implementation, bundled in the skill folder. A behavior-changing edit bumps `meta.json:version` in the same PR. Auto-registered via `workforce/scripts/build-skill-registry.mjs`. |
 | `workforce/lambdas/**/*.ts` | **B** | Implementation code. Agent-merge OK with CI + review. |
 | `workforce/lambdas/**/package*.json` | **B** | Dependency lists for the Lambdas. Per-PR `npm ci` regeneration is fine. |
 | `workforce/infra/sam/template.yaml` | **B** | SAM template. Changes that alter cost or scheduling are escalated under §5. |

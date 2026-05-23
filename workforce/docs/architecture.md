@@ -109,6 +109,19 @@ Deferred to v2+ and out of scope for the PR1–PR12 sequence below unless explic
 
 See the plan file shared with this branch's session for the full PR1–PR12 sequence.
 
+## Skill bundle convention
+
+Each skill is a self-contained folder under `workforce/skills/{name}/`:
+
+```
+workforce/skills/{name}/
+  SKILL.md      ← Anthropic Agent Skills frontmatter (name + description) + body
+  meta.json     ← workforce-internal sidecar (executor, version, owners, deliverable)
+  handler.ts    ← deterministic executor only — auto-registered, no edits to lambdas/
+```
+
+Adding a deterministic skill means dropping this folder; the agent-runner's `shared/skill-registry-generated.ts` (produced by `workforce/scripts/build-skill-registry.mjs`) picks it up at build time via the import graph. Skills can `import` from `workforce/lambdas/shared/*` (the workforce-provided runtime API surface — `webhook.ts`, `skill-types.ts`, etc.); the reverse direction is forbidden by the auto-registry boundary. This keeps the agent×skill relationship M:N at the data layer (any agent can bind any skill via `bindings[]`) and at the file layer (skills don't know about which agents own them; agents don't know how skills are implemented).
+
 ## How to read alongside other docs
 
 - **[governance.md](governance.md)** — the rules: invariants W-1..W-5, design rules R-N1..R-N8, zone classifications for `workforce/`, action-authority matrix.
