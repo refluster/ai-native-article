@@ -92,10 +92,13 @@ function pickAboutSnippet(md) {
 const slugs = listSlugDirs();
 const agents = slugs.map(loadOne);
 
-// Merge org topology (reports_to / lateral / tier) and compute direct_reports
-// as the inverse of reports_to. This means agent.json stays focused on
-// per-agent config; relationships live in _org.json so they're auditable
-// as a single graph.
+// Merge org topology (reports_to / lateral) and compute direct_reports
+// as the inverse of reports_to. `depth` is derived from the same graph:
+// 0 for roots (reports_to=[]), 1 + min(parent depth) otherwise. This
+// replaces the previous hand-maintained `tier` field — a single edge
+// list is enough to recover both the layout row and the layer label.
+// Relationships live in _org.json so they're auditable as a single
+// graph; agent.json stays focused on per-agent config.
 const org = loadOrgTopology();
 const topology = org.topology ?? {};
 const directReports = Object.fromEntries(slugs.map((s) => [s, []]));
@@ -104,12 +107,53 @@ for (const [child, edges] of Object.entries(topology)) {
     if (directReports[parent]) directReports[parent].push(child);
   }
 }
+
+const depths = computeDepths(slugs, topology);
+
 for (const a of agents) {
   const node = topology[a.slug] ?? {};
-  a.tier = node.tier ?? "ic";
   a.reports_to = node.reports_to ?? [];
   a.lateral = node.lateral ?? [];
   a.direct_reports = directReports[a.slug] ?? [];
+  a.depth = depths[a.slug];
+}
+
+function computeDepths(allSlugs, topo) {
+  // Forward BFS from roots through reports_to edges, taking min over
+  // parents when a slug has more than one. Throws if the graph contains
+  // a cycle or an unreachable node — both are W-4 fail-loud cases the
+  // operator wants to see immediately.
+  const out = {};
+  const queue = [];
+  for (const s of allSlugs) {
+    const parents = topo[s]?.reports_to ?? [];
+    if (parents.length === 0) {
+      out[s] = 0;
+      queue.push(s);
+    }
+  }
+  while (queue.length > 0) {
+    const s = queue.shift();
+    const myDepth = out[s];
+    // Push every child whose parents are all assigned, picking min+1.
+    for (const c of directReports[s] ?? []) {
+      const parentDepths = (topo[c]?.reports_to ?? []).map((p) => out[p]);
+      if (parentDepths.some((d) => d === undefined)) continue;
+      const next = Math.min(...parentDepths) + 1;
+      if (out[c] === undefined || next < out[c]) {
+        out[c] = next;
+        queue.push(c);
+      }
+    }
+    void myDepth;
+  }
+  const unresolved = allSlugs.filter((s) => out[s] === undefined);
+  if (unresolved.length > 0) {
+    throw new Error(
+      `build-agent-manifest: depth unresolved for [${unresolved.join(", ")}] — _org.json likely contains a cycle or a dangling reports_to slug`,
+    );
+  }
+  return out;
 }
 
 const manifest = {

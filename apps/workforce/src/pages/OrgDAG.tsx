@@ -1,15 +1,14 @@
 // /workforce/org — the reporting graph as an SVG DAG.
 //
-// Layout is computed from manifest topology:
-//   - tier === 'founder' → row 0 (apex)
-//   - tier === 'lead'    → row 1
-//   - everyone else      → row 2
-// Reports-to edges are drawn as solid vertical lines. Lateral edges are
-// drawn as dashed horizontal connectors between same-row nodes.
+// Layout is computed from manifest topology by `depth` (0 = root, 1 =
+// direct reports of root, …). N rows in the org graph produce N rows on
+// the page; there is no hardcoded ceiling. Reports-to edges are drawn
+// as solid vertical lines. Lateral edges are drawn as dashed horizontal
+// connectors between same-row nodes.
 //
-// Five-agent dataset doesn't justify d3/visx; we lay it out by hand
-// across a 12-column grid. Mobile collapses to a vertical "manager →
-// you → reports" stack so the rendering still makes sense at ~320px.
+// The dataset is small enough that we lay it out by hand across a
+// 12-column grid. Mobile collapses to a vertical "manager → you →
+// reports" stack so the rendering still makes sense at ~320px.
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -33,13 +32,11 @@ const COL_GAP = 32;
 const ROW_GAP = 96;
 const PADDING = 24;
 
-function layoutByTier(agents: WorkforceAgent[]): { nodes: LaidOutNode[]; width: number; height: number } {
-  // Bucket agents by tier — founder=0, lead=1, ic=2.
-  const rows: WorkforceAgent[][] = [[], [], []];
-  for (const a of agents) {
-    const r = a.tier === 'founder' ? 0 : a.tier === 'lead' ? 1 : 2;
-    rows[r].push(a);
-  }
+function layoutByDepth(agents: WorkforceAgent[]): { nodes: LaidOutNode[]; width: number; height: number } {
+  // Bucket agents by depth: row N holds every agent whose depth === N.
+  const maxDepth = agents.reduce((m, a) => Math.max(m, a.depth), 0);
+  const rows: WorkforceAgent[][] = Array.from({ length: maxDepth + 1 }, () => []);
+  for (const a of agents) rows[a.depth].push(a);
   // Stable sort each row by slug for predictability.
   for (const r of rows) r.sort((a, b) => a.slug.localeCompare(b.slug));
 
@@ -77,7 +74,7 @@ export default function OrgDAG() {
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
 
-  const laid = useMemo(() => (manifest ? layoutByTier(manifest.agents) : null), [manifest]);
+  const laid = useMemo(() => (manifest ? layoutByDepth(manifest.agents) : null), [manifest]);
 
   if (error) {
     return (
@@ -214,7 +211,7 @@ export default function OrgDAG() {
                   <Sigil slug={n.agent.slug} size={56} />
                 </foreignObject>
                 <text x="80" y="28" className="font-wfmono" style={{ fontSize: 10, fill: 'var(--wf-svg-on-surface-variant)', letterSpacing: 1.4 }}>
-                  {n.agent.slug.toUpperCase()} · {n.agent.tier.toUpperCase()}
+                  {n.agent.slug.toUpperCase()} · L{n.agent.depth}
                 </text>
                 <text x="80" y="48" style={{ fontSize: 16, fontWeight: 600, fill: 'var(--wf-svg-on-surface)' }}>
                   {n.agent.first_name} {n.agent.last_name}
@@ -233,15 +230,14 @@ export default function OrgDAG() {
 
       {/* MOBILE: vertical hierarchical list. */}
       <div className="md:hidden space-y-6">
-        {[0, 1, 2].map((tier) => {
-          const tierAgents = laid.nodes.filter((n) => n.row === tier);
-          if (tierAgents.length === 0) return null;
-          const label = tier === 0 ? 'FOUNDER' : tier === 1 ? 'LEAD' : 'IC';
+        {Array.from({ length: Math.max(0, ...laid.nodes.map((n) => n.row)) + 1 }, (_, depth) => {
+          const depthAgents = laid.nodes.filter((n) => n.row === depth);
+          if (depthAgents.length === 0) return null;
           return (
-            <section key={tier}>
-              <Typeplate label={`TIER · ${label}`} value={`${tierAgents.length}`} className="mb-2" />
+            <section key={depth}>
+              <Typeplate label={`LAYER · L${depth}`} value={`${depthAgents.length}`} className="mb-2" />
               <ul className="space-y-2">
-                {tierAgents.map((n) => (
+                {depthAgents.map((n) => (
                   <li key={n.agent.slug}>
                     <Link
                       to={`/agents/${n.agent.slug}`}
@@ -250,7 +246,7 @@ export default function OrgDAG() {
                       <Sigil slug={n.agent.slug} size={48} />
                       <div className="min-w-0 flex-1">
                         <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-                          {n.agent.slug.toUpperCase()} · {n.agent.tier.toUpperCase()}
+                          {n.agent.slug.toUpperCase()} · L{n.agent.depth}
                         </div>
                         <div className="font-semibold text-wf-on-surface truncate">{fullName(n.agent)}</div>
                         <div className="text-xs text-wf-on-surface-variant">{n.agent.role}</div>

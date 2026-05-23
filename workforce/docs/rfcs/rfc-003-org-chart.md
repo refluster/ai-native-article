@@ -37,6 +37,8 @@ Maya is the root because she defines the work the others execute. This isn't a h
 
 **Amendment (2026-05-23) — VP layer.** [RFC-009](rfc-009-vp-tier-and-functional-expansion.md) introduces a middle `lead` tier between Maya and the ICs. Three VPs (People & Legal, Customer Experience, Engineering Excellence) sit on row 1; four new ICs join the existing four on row 2. The `OrgDAG` page already buckets agents by `tier` (`founder` → row 0, `lead` → row 1, `ic` → row 2) and so renders the expanded shape with no UI code change. This RFC's acceptance criteria still hold; RFC-009 is the design record for the new agents themselves.
 
+**Amendment (2026-05-23) — drop `tier`, derive depth.** The hand-maintained `tier` field on each `_org.json` node was redundant: the layer of any agent is `0` for a root (no `reports_to`) and `1 + min(parent depth)` otherwise — `reports_to` alone is enough to recover it. `tier` is removed from `_org.json` and from the manifest; the build script (`scripts/build-agent-manifest.mjs`) now computes `depth: number` via forward BFS from roots and throws on cycles or unreachable nodes (W-4 fail-loud). The `AgentTier = 'founder' | 'lead' | 'ic'` literal type is gone — there is no hard ceiling on N, a 4-deep org renders the same way a 3-deep one does. UI labels switched from `· FOUNDER/LEAD/IC` to `· L0/L1/L2/…` so they generalise to arbitrary depth without code changes. Behaviour is otherwise unchanged (same 3 rows, same nodes, same edges, same sort order).
+
 **UI**
 
 - Card per agent: procedural avatar, name, role, "N reports" count, click-to-expand.
