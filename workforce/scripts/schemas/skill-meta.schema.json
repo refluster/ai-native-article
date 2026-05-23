@@ -9,14 +9,11 @@
     "name",
     "version",
     "status",
-    "trigger_class",
+    "executor",
     "cost_class",
     "owners",
     "improvement_agent",
-    "inputs",
-    "outputs",
-    "created_at",
-    "deprecated_replacement"
+    "created_at"
   ],
   "properties": {
     "name": {
@@ -34,10 +31,23 @@
       "type": "string",
       "enum": ["active", "stale", "deprecated"]
     },
-    "trigger_class": {
+    "executor": {
       "type": "string",
-      "enum": ["lambda", "claude-code-routine", "webhook"],
-      "description": "Where the Skill's scripts/ can actually execute. 'lambda' Skills are prompt-only at v1; 'webhook' adds a runner-side POST step after the LLM call (e.g. Discord notification)."
+      "enum": ["llm-prose", "claude-code-routine", "deterministic"],
+      "description": "How the runner executes this skill. llm-prose: LLM call → S3 artefact (+ optional Notion publish). claude-code-routine: LLM brief → GHA workflow_dispatch → pending DELIV. deterministic: registered handler in shared/handlers/, no LLM call."
+    },
+    "deliverable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "publish_notion"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["article", "plan", "design-doc", "launch-plan", "pr", "notification"]
+        },
+        "publish_notion": { "type": "boolean" }
+      },
+      "description": "Required for executor=llm-prose; forbidden otherwise. Declares the S3 prefix + Notion publish flag for the artefact."
     },
     "cost_class": {
       "type": "string",
@@ -52,38 +62,19 @@
         "type": "string",
         "pattern": "^[a-z]+$"
       },
-      "description": "Agent slugs allowed to invoke this Skill. Cross-checked against workforce/agents/."
+      "description": "Agent slugs allowed to bind this Skill. Cross-checked against workforce/agents/."
     },
     "improvement_agent": {
       "anyOf": [
         { "type": "null" },
         { "type": "string", "pattern": "^[a-z]+$" }
       ],
-      "description": "Agent slug assigned to improve this Skill (RFC-009 placeholder). null until that RFC lands."
-    },
-    "inputs": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-      "description": "Symbolic input slot names; informational at v1."
-    },
-    "outputs": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-      "description": "Symbolic output slot names; informational at v1."
+      "description": "Agent slug assigned to improve this Skill. null until RFC-009 lands."
     },
     "created_at": {
       "type": "string",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
       "description": "ISO date. Set on first PR; never edited."
-    },
-    "deprecated_replacement": {
-      "anyOf": [
-        { "type": "null" },
-        { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
-      ],
-      "description": "When status=deprecated, the slug of the Skill that supersedes this one."
     }
   }
 }

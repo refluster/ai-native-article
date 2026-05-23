@@ -36,18 +36,24 @@ const META_REQUIRED = [
   "name",
   "version",
   "status",
-  "trigger_class",
+  "executor",
   "cost_class",
   "owners",
   "improvement_agent",
-  "inputs",
-  "outputs",
   "created_at",
-  "deprecated_replacement",
 ];
+const META_OPTIONAL = ["deliverable"];
 const STATUSES = new Set(["active", "stale", "deprecated"]);
-const TRIGGER_CLASSES = new Set(["lambda", "claude-code-routine", "webhook"]);
+const EXECUTORS = new Set(["llm-prose", "claude-code-routine", "deterministic"]);
 const COST_CLASSES = new Set(["small", "medium", "large"]);
+const DELIV_TYPES = new Set([
+  "article",
+  "plan",
+  "design-doc",
+  "launch-plan",
+  "pr",
+  "notification",
+]);
 
 if (!existsSync(SKILLS_DIR)) {
   console.log("workforce/scripts/validate-skills.mjs: OK (no skills/ dir yet)");
@@ -160,9 +166,9 @@ for (const name of skillDirs) {
     if (!(k in meta)) v("J1-required-key", metaJson, `missing key "${k}"`);
   }
 
-  // Reject any unknown keys (additionalProperties: false in the schema).
+  const allowed = new Set([...META_REQUIRED, ...META_OPTIONAL]);
   for (const k of Object.keys(meta)) {
-    if (!META_REQUIRED.includes(k)) {
+    if (!allowed.has(k)) {
       v("J1-unknown-key", metaJson, `unknown key "${k}" (additionalProperties: false)`);
     }
   }
@@ -176,11 +182,26 @@ for (const name of skillDirs) {
   if (!STATUSES.has(meta.status)) {
     v("J4-status", metaJson, `status "${meta.status}" not in {active, stale, deprecated}`);
   }
-  if (!TRIGGER_CLASSES.has(meta.trigger_class)) {
-    v("J5-trigger-class", metaJson, `trigger_class "${meta.trigger_class}" not in {lambda, claude-code-routine, webhook}`);
+  if (!EXECUTORS.has(meta.executor)) {
+    v("J5-executor", metaJson, `executor "${meta.executor}" not in {llm-prose, claude-code-routine, deterministic}`);
   }
   if (!COST_CLASSES.has(meta.cost_class)) {
     v("J6-cost-class", metaJson, `cost_class "${meta.cost_class}" not in {small, medium, large}`);
+  }
+  // deliverable is required for llm-prose; absent or null otherwise.
+  if (meta.executor === "llm-prose") {
+    if (!meta.deliverable || typeof meta.deliverable !== "object") {
+      v("J5-deliverable-required", metaJson, `executor=llm-prose requires deliverable {type, publish_notion}`);
+    } else {
+      if (!DELIV_TYPES.has(meta.deliverable.type)) {
+        v("J5-deliverable-type", metaJson, `deliverable.type "${meta.deliverable.type}" not in allowed set`);
+      }
+      if (typeof meta.deliverable.publish_notion !== "boolean") {
+        v("J5-deliverable-notion", metaJson, "deliverable.publish_notion must be boolean");
+      }
+    }
+  } else if ("deliverable" in meta && meta.deliverable !== undefined && meta.deliverable !== null) {
+    v("J5-deliverable-forbidden", metaJson, `executor=${meta.executor} must not declare deliverable`);
   }
 
   if (!Array.isArray(meta.owners) || meta.owners.length === 0) {
@@ -210,30 +231,8 @@ for (const name of skillDirs) {
     }
   }
 
-  for (const arr of ["inputs", "outputs"]) {
-    if (!Array.isArray(meta[arr])) {
-      v(`J9-${arr}`, metaJson, `${arr} must be an array`);
-    } else {
-      for (const x of meta[arr]) {
-        if (typeof x !== "string" || !/^[a-z][a-z0-9-]*$/.test(x)) {
-          v(`J9-${arr}-shape`, metaJson, `${arr} entry "${x}" must be kebab-case`);
-        }
-      }
-    }
-  }
-
   if (typeof meta.created_at !== "string" || !ISO_DATE.test(meta.created_at)) {
     v("J10-created-at", metaJson, `created_at "${meta.created_at}" must be YYYY-MM-DD`);
-  }
-
-  if (meta.deprecated_replacement !== null) {
-    if (typeof meta.deprecated_replacement !== "string" || !SKILL_NAME.test(meta.deprecated_replacement)) {
-      v("J11-replacement", metaJson, `deprecated_replacement "${meta.deprecated_replacement}" must be null or a valid skill name`);
-    }
-  }
-
-  if (meta.status === "deprecated" && meta.deprecated_replacement === null) {
-    v("J11-replacement-required", metaJson, "status=deprecated requires deprecated_replacement to be set");
   }
 }
 

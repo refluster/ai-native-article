@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Validates workforce/agents/{slug}/agent.json against the v0.1 schema.
-// Also checks that system.md and avatar.svg are present alongside each agent.json.
-// Exits non-zero on violation. Designed to be wired into CI.
+// Validates workforce/agents/{slug}/agent.json against the v0.2 schema
+// (1-stage bindings[]). Exits non-zero on violation. Designed to be
+// wired into CI.
 
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -30,27 +30,14 @@ const REQUIRED_KEYS = [
   "residence",
   "role",
   "model",
-  "schedule_cron",
-  "schedule_note",
   "prompt_version",
   "budget_monthly_usd",
-  "skills",
   "default_project",
   "streams",
-  "primary_deliverable_type",
-  "primary_deliverable_kind",
+  "bindings",
   "owner_email",
   "created_at",
 ];
-
-const ALLOWED_DELIVERABLE_TYPES = new Set([
-  "article",
-  "pr",
-  "plan",
-  "design-doc",
-  "launch-plan",
-  "notification",
-]);
 
 const ALLOWED_STREAMS = new Set(["internal", "client", "editorial"]);
 
@@ -71,21 +58,20 @@ if (slugDirs.length === 0) {
 let totalBudget = 0;
 const W3_CAP = 50;
 
-// Build a snapshot of available skills + their owner lists for R8-* checks.
-// Skipped silently when workforce/skills/ doesn't exist yet (PR-A onwards always exists).
+// Build a snapshot of available skills + their owner lists for cross-checks.
 const skillsIndex = new Map(); // name → { owners: Set<slug> }
 if (existsSync(SKILLS_DIR)) {
   for (const name of readdirSync(SKILLS_DIR)) {
     const dir = join(SKILLS_DIR, name);
     if (!statSync(dir).isDirectory()) continue;
     const metaPath = join(dir, "meta.json");
-    if (!existsSync(metaPath)) continue; // validate-skills.mjs flags this; don't double-report
+    if (!existsSync(metaPath)) continue;
     try {
       const meta = JSON.parse(readFileSync(metaPath, "utf8"));
       const owners = new Set(Array.isArray(meta.owners) ? meta.owners : []);
       skillsIndex.set(name, { owners });
     } catch {
-      // validate-skills.mjs reports the parse error; we just skip the cross-check.
+      // validate-skills.mjs reports the parse error
     }
   }
 }
@@ -106,11 +92,8 @@ for (const slug of slugDirs) {
     continue;
   }
   if (!existsSync(sys)) v("F2-system-md-missing", dir, "system.md missing");
-  // F3 removed: per-agent avatar files don't scale to 100s of agents.
-  // Avatars are rendered procedurally from the slug (initial + slug-hash hue).
-  // If an avatar.svg sneaks in, flag it as an unused asset.
   if (existsSync(avatar)) {
-    v("F3-avatar-asset-forbidden", avatar, "per-agent avatar.svg is forbidden; avatars are rendered procedurally from the slug — remove this file");
+    v("F3-avatar-asset-forbidden", avatar, "per-agent avatar.svg is forbidden; avatars are rendered procedurally");
   }
 
   let parsed;
@@ -143,9 +126,6 @@ for (const slug of slugDirs) {
   if (typeof parsed.model !== "string" || !MODEL.test(parsed.model)) {
     v("S5-model", cfg, `model "${parsed.model}" must match provider:name`);
   }
-  if (typeof parsed.schedule_cron !== "string" || !CRON.test(parsed.schedule_cron)) {
-    v("S6-cron", cfg, `schedule_cron "${parsed.schedule_cron}" must be cron(...) form`);
-  }
   if (typeof parsed.prompt_version !== "string" || !SEMVER.test(parsed.prompt_version)) {
     v("S7-semver", cfg, `prompt_version "${parsed.prompt_version}" must be semver x.y.z`);
   }
@@ -154,27 +134,37 @@ for (const slug of slugDirs) {
   } else {
     totalBudget += parsed.budget_monthly_usd;
   }
-  if (!Array.isArray(parsed.skills) || parsed.skills.length === 0) {
-    v("S9-skills", cfg, "skills must be non-empty array");
+  if (!Array.isArray(parsed.bindings) || parsed.bindings.length === 0) {
+    v("S9-bindings", cfg, "bindings must be non-empty array");
   } else {
-    for (const s of parsed.skills) {
-      if (typeof s !== "string" || !/^[a-z][a-z0-9-]*$/.test(s)) {
-        v("S9-skill-name", cfg, `skill name "${s}" must be kebab-case`);
+    for (let i = 0; i < parsed.bindings.length; i++) {
+      const b = parsed.bindings[i];
+      if (typeof b !== "object" || b === null) {
+        v("S9-binding-object", cfg, `bindings[${i}] must be an object`);
         continue;
       }
-      // R8-* cross-checks: only run when the skills index built above is populated
-      // (i.e. workforce/skills/ exists with at least one valid skill).
+      if (typeof b.cron !== "string" || !CRON.test(b.cron)) {
+        v("S9-binding-cron", cfg, `bindings[${i}].cron "${b.cron}" must be cron(...) form`);
+      }
+      if (typeof b.skill !== "string" || !/^[a-z][a-z0-9-]*$/.test(b.skill)) {
+        v("S9-binding-skill", cfg, `bindings[${i}].skill "${b.skill}" must be kebab-case`);
+        continue;
+      }
+      if (b.note !== undefined && typeof b.note !== "string") {
+        v("S9-binding-note", cfg, `bindings[${i}].note must be string if present`);
+      }
+      // R8-* cross-checks
       if (skillsIndex.size === 0) continue;
-      const entry = skillsIndex.get(s);
+      const entry = skillsIndex.get(b.skill);
       if (!entry) {
-        v("R8-skills-exist", cfg, `skill "${s}" has no workforce/skills/${s}/ directory`);
+        v("R8-binding-skill-exists", cfg, `bindings[${i}].skill "${b.skill}" has no workforce/skills/${b.skill}/ directory`);
         continue;
       }
       if (!entry.owners.has(slug)) {
         v(
-          "R8-skills-owner",
+          "R8-binding-skill-owner",
           cfg,
-          `agent "${slug}" declares skill "${s}" but is not listed in workforce/skills/${s}/meta.json:owners`,
+          `agent "${slug}" binds skill "${b.skill}" but is not in workforce/skills/${b.skill}/meta.json:owners`,
         );
       }
     }
@@ -190,12 +180,6 @@ for (const slug of slugDirs) {
         v("S11-stream-value", cfg, `stream "${s}" not in {internal, client, editorial}`);
       }
     }
-  }
-  if (!ALLOWED_DELIVERABLE_TYPES.has(parsed.primary_deliverable_type)) {
-    v("S12-deliv-type", cfg, `primary_deliverable_type "${parsed.primary_deliverable_type}" not in allowed set`);
-  }
-  if (typeof parsed.primary_deliverable_kind !== "string") {
-    v("S13-deliv-kind", cfg, "primary_deliverable_kind must be string");
   }
   if (parsed.owner_email !== null && typeof parsed.owner_email !== "string") {
     v("S14-owner-email", cfg, "owner_email must be null or string");

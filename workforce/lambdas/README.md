@@ -31,7 +31,7 @@ lambdas/
 |---|---|---|---|
 | `GET` | `/agents` | public | List agents (paginated, `?stream=`, `?archived=`, `?page_size=`, `?cursor=`). |
 | `GET` | `/agents/{slug}` | public | Single agent's full record (identity + operational + computed). |
-| `PATCH` | `/agents/{slug}` | AWS_IAM | Update operational fields only (`paused`, `archived`, `schedule_cron_override`, `budget_monthly_usd_override`). Rejects identity fields with `400 non_operational_fields`. |
+| `PATCH` | `/agents/{slug}` | AWS_IAM | Update operational fields only (`paused`, `archived`, `budget_monthly_usd_override`). Rejects identity fields with `400 non_operational_fields`. |
 | `DELETE` | `/agents/{slug}` | AWS_IAM | Soft delete — sets `archived: true`. Hard delete requires the `agents/{slug}/` directory to be removed in a PR first. |
 | `GET` | `/skills` | public | List skills (paginated, `?status=`, `?owner=`, `?page_size=`, `?cursor=`). RFC-008 PR-D. |
 | `GET` | `/skills/{name}` | public | Single skill's full record (identity + body + operational + computed). RFC-008 PR-D. |

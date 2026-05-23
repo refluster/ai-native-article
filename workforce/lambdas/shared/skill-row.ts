@@ -1,7 +1,7 @@
 // Skill DDB row + API view types. Mirrors agent.ts for skills.
 //
-// Identity: name, version, description, body, status, trigger_class,
-// cost_class, owners, inputs, outputs, created_at, deprecated_replacement.
+// Identity: name, version, description, body, status, executor,
+// deliverable, cost_class, owners, improvement_agent, created_at.
 // Operational (DDB-only, PATCH-able in v2): improvement_agent_override.
 // Computed (written by future stats aggregator): invocations_this_month,
 // last_invoked_at.

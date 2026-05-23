@@ -1,13 +1,14 @@
 {
   "name": "positioning-write",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "status": "active",
-  "trigger_class": "lambda",
+  "executor": "llm-prose",
+  "deliverable": {
+    "type": "launch-plan",
+    "publish_notion": false
+  },
   "cost_class": "medium",
   "owners": ["yuki"],
   "improvement_agent": null,
-  "inputs": ["launch-context"],
-  "outputs": ["launch-plan-markdown"],
-  "created_at": "2026-05-18",
-  "deprecated_replacement": null
+  "created_at": "2026-05-18"
 }

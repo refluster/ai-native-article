@@ -514,6 +514,7 @@ Resources:
                 - !Sub ${WfBucket.Arn}/launches/*
                 - !Sub ${WfBucket.Arn}/notifications/*
                 - !Sub ${WfBucket.Arn}/pr-briefs/*
+                - !Sub ${WfBucket.Arn}/runs/*
             - Sid: RunnerSecretsRead
               Effect: Allow
               Action: secretsmanager:GetSecretValue

@@ -1,13 +1,10 @@
 {
   "name": "code-task-brief",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "status": "active",
-  "trigger_class": "claude-code-routine",
+  "executor": "claude-code-routine",
   "cost_class": "medium",
   "owners": ["ren"],
   "improvement_agent": null,
-  "inputs": ["change-request"],
-  "outputs": ["task-brief-markdown"],
-  "created_at": "2026-05-18",
-  "deprecated_replacement": null
+  "created_at": "2026-05-18"
 }

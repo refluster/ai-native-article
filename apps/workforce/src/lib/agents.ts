@@ -82,7 +82,6 @@ export interface AgentLiveRecord {
   first_name: string
   last_name: string
   role: string
-  schedule_cron_effective: string
   budget_monthly_usd_effective: number
   paused: boolean
   archived: boolean
@@ -96,17 +95,16 @@ export interface AgentLiveRecord {
 export interface AgentDeliverable {
   /** AGENT#{slug}/DELIV#{ulid} pk/sk; surfaced here for de-dupe + linking. */
   sk: string
-  type: 'article' | 'pr' | 'plan' | 'design-doc' | 'launch-plan' | 'notification'
-  kind: string
+  run_id: string
+  type: 'article' | 'plan' | 'design-doc' | 'launch-plan' | 'pr' | 'notification'
   project_id: string
   notion_page_id?: string
+  notion_page_url?: string
   pr_url?: string
-  s3_key?: string
+  dispatch_branch?: string
   created_at: string
   published_at?: string
   status?: 'pending' | 'ok' | 'timeout'
-  skill_name?: string
-  skill_version?: string
 }
 
 export async function fetchAgentLive(slug: string): Promise<AgentLiveRecord | undefined> {

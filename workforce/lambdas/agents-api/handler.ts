@@ -32,7 +32,6 @@ const PAGE_SIZE_DEFAULT = 25;
 const PAGE_SIZE_MAX = 100;
 
 const PATCHABLE_FIELDS: Array<keyof AgentOperational> = [
-  "schedule_cron_override",
   "budget_monthly_usd_override",
   "paused",
   "archived",

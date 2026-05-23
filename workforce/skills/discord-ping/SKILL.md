@@ -1,42 +1,41 @@
 ---
 name: discord-ping
-description: Post a one-line liveness ping to the team Discord channel. Use to confirm the cron → orchestrator → runner → external-side-effect path is alive end-to-end without committing real generation tokens. Triggers on task_kind=ping. Body is intentionally trivial — this is a heartbeat, not a deliverable.
+description: Post a one-line liveness heartbeat to the team Discord channel. Documents the operational shape of the deterministic runner-side handler so a human or a Claude-Code persona reading this file knows exactly what fires when the matching agent.binding's cron triggers. The runner's discord-ping handler executes this verbatim — no LLM is involved at runtime.
 ---
 
 # discord-ping
 
-A heartbeat from the workforce. The point is the pipeline, not the prose.
+A heartbeat from the workforce. The point is the pipeline, not the prose. **Deterministic skill** — the runner executes a registered handler keyed by this skill name; no LLM call is made.
 
-## Instructions
+## What the runner does
 
-Produce **exactly one line**, then stop. No leading prose, no trailing prose, no markdown formatting around it. The line is what the runner posts verbatim to Discord.
+When an agent binding `{ cron, skill: "discord-ping" }` fires, the runner:
 
-Format:
+1. Composes the message body verbatim:
+   ```
+   [wf-pulse] {agent.slug} alive at {ISO-8601 UTC timestamp, second precision}
+   ```
+2. POSTs the body to the Discord channel webhook (URL read from Secrets Manager id `DISCORD_WEBHOOK_SECRET`).
+3. Writes the body to S3 (`runs/{slug}/{run_id}/output.txt`) for audit / replay.
+4. Records a RUN row in DDB with `output_s3_key`, `output_summary`, timing, and the Discord HTTP status.
 
-```
-[wf-pulse] {your slug} alive at {ISO-8601 UTC timestamp, second precision}
-```
+## What it deliberately does **not** do
 
-Concrete example (with your own slug and the current UTC time substituted):
+- Call an LLM. This skill has `executor: "deterministic"` in `meta.json`; the runner short-circuits the LLM path.
+- Write a DELIV row. Discord posts have no stable queryable external URL, so there is nothing to track separately from the RUN row.
+- Read memory. The output depends only on `{ agent.slug, wall_clock }`.
+- Take parameters. v1 is intentionally fixed — agent slug + UTC timestamp + literal format.
 
-```
-[wf-pulse] yuki alive at 2026-05-22T09:00:00Z
-```
+## Why a skill at all (and not hardcoded in the runner)
 
-## What is not in scope
+So the heartbeat is a first-class line item in:
+- `workforce/skills/` (the catalogue)
+- the agent's `bindings[]` (operator-editable cadence)
+- the per-RUN trace (`skill_name = "discord-ping"` is searchable in the audit log)
+- the skill directory page on the workforce console (it's discoverable, paused, deprecated like any other skill)
 
-- Your usual persona voice does not apply here. This is a smoke-test ping, not a launch artefact.
-- Do not add commentary, emoji, status colour, or trailing punctuation beyond the literal format above.
-- Do not summarise prior runs or memory.
-- If the wall-clock timestamp is not available, use the current UTC time at the moment of generation. Do not fabricate a value or leave the placeholder unfilled.
+Replacing the runner's literal format only requires bumping `meta.json:version` and editing the handler in `shared/handlers/discord-ping.ts`. Replacing the cadence is one line in the owning agent's `agent.json`.
 
-## Why a skill (and not a hardcoded cron message)
+## Claude-Code compatibility
 
-Two reasons:
-
-1. **Architecture conformance.** Routing the heartbeat through the same Skill / runner / DELIV / RUN row plumbing as real deliverables means a green heartbeat proves the production path is wired, not just a side-channel.
-2. **Claude-Skill compatibility.** This same SKILL.md must be invocable from `.claude/skills/` by any Claude-Code persona and yield the same one-line output. The runner-only side-effect (the actual webhook POST) is added by `meta.json:trigger_class=webhook`, not by the body of these instructions.
-
-## Length
-
-One line. Anything longer is a bug in the persona's compliance with this skill, not a feature.
+This SKILL.md is documentation for human + Claude-Code readers. If a Claude-Code persona is asked to "manually run discord-ping", they should produce the one-line format shown above and POST it themselves — there is no LLM-execution path inside the workforce runner for this skill, by design.
