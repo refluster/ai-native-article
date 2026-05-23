@@ -38,5 +38,15 @@
     "abstract": "Deloitteが提唱するソフトウェアエンジニアリングの未来形。AIエージェントがSDLC全体の共創者・乗数効果をもたらす存在になる世界で、人間エンジニアは「方向性の設定・ガードレールの定義・倫理的判断」に昇格することを解説する。",
     "image": "/posts/images/fbe157a3a80a.jpg",
     "sourceUrls": "https://www.deloitte.com/us/en/services/consulting/articles/future-of-software-engineering.html"
+  },
+  {
+    "slug": "cbb2a482868d",
+    "title": "独立研究が暴く「AIで生産性10倍」の真実——なぜAIを使うと「速くなった気がするのに遅くなる」のか",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "date": "2026-03-26",
+    "abstract": "METR、Uplevel、GitClearの独立研究が示す「AI利用で開発者が19%遅くなった」「バグが41%増加」等の反直感的データを紹介。AI生産性神話の解体と「それでも今行動すべき理由」を論じる。",
+    "image": "/posts/images/cbb2a482868d.jpg",
+    "sourceUrls": "https://paddo.dev/blog/ai-developer-productivity-myth/"
   }
 ]
