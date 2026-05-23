@@ -3,25 +3,22 @@
 // Reads workforce/agents/{slug}/agent.json + system.md from the deployed
 // Lambda bundle and upserts AGENT#{slug}/META rows in the workforce DDB
 // table. Identity fields are written from files; operational fields
-// (paused, archived, overrides) are preserved if already present.
+// (paused, archived, budget override) are preserved if already present.
 //
 // Idempotent: a re-seed against an unchanged file set is a no-op
 // (identity_hash equals stored value -> skip the write).
-//
-// Triggered manually via `aws lambda invoke` until the post-deploy
-// trigger lands in a follow-up PR (see RFC-007 Q1).
 
 import { readFile, readdir, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-import type { AgentIdentity, AgentMetaRow } from "../shared/agent.js";
+import type { AgentBinding, AgentIdentity, AgentMetaRow } from "../shared/agent.js";
 import { agentPk } from "../shared/agent.js";
 import { getItem, putItem } from "../shared/ddb.js";
 import { identityHash } from "../shared/identity-hash.js";
 
-// Each agent.json file omits the runtime-only "_default" / "_override" split
-// suffixes (the file fields are the defaults). Map file shape -> DDB row.
+// agent.json on disk uses `budget_monthly_usd` (no _default suffix); the
+// DDB row splits identity defaults from operational overrides.
 interface AgentJsonOnDisk {
   slug: string;
   first_name: string;
@@ -29,16 +26,11 @@ interface AgentJsonOnDisk {
   residence: string;
   role: string;
   model: string;
-  schedule_cron: string;
-  schedule_note: string;
   prompt_version: string;
   budget_monthly_usd: number;
-  skills: string[];
   default_project: string;
   streams: AgentIdentity["streams"];
-  primary_deliverable_type: AgentIdentity["primary_deliverable_type"];
-  primary_deliverable_kind: string;
-  code_execution?: AgentIdentity["code_execution"];
+  bindings: AgentBinding[];
   owner_email: string | null;
   created_at: string;
 }
@@ -50,9 +42,6 @@ interface SeedResult {
 }
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-// Lambda bundle layout: handler.js sits at the bundle root; we copy the
-// agents/ tree alongside it during `sam build`. See the SAM template's
-// CodeUri + the seed-agents/build.mjs script.
 const AGENTS_ROOT = process.env.AGENTS_ROOT ?? join(HERE, "agents");
 
 export async function handler(): Promise<SeedResult> {
@@ -102,16 +91,11 @@ async function seedOne(slug: string): Promise<"created" | "updated" | "noop"> {
     residence: cfg.residence,
     role: cfg.role,
     model: cfg.model,
-    primary_deliverable_type: cfg.primary_deliverable_type,
-    primary_deliverable_kind: cfg.primary_deliverable_kind,
-    code_execution: cfg.code_execution,
     prompt_version: cfg.prompt_version,
-    schedule_cron_default: cfg.schedule_cron,
-    schedule_note: cfg.schedule_note,
     budget_monthly_usd_default: cfg.budget_monthly_usd,
-    skills: cfg.skills,
     default_project: cfg.default_project,
     streams: cfg.streams,
+    bindings: cfg.bindings,
     created_at: cfg.created_at,
   };
   const hash = identityHash(identity, systemMd);
@@ -126,8 +110,6 @@ async function seedOne(slug: string): Promise<"created" | "updated" | "noop"> {
     pk: agentPk(slug),
     sk: "META",
     ...identity,
-    // operational fields: preserve from existing row on update; default on create
-    schedule_cron_override: existing?.schedule_cron_override,
     budget_monthly_usd_override: existing?.budget_monthly_usd_override,
     paused: existing?.paused ?? false,
     archived: existing?.archived ?? false,

@@ -5,15 +5,17 @@
   "residence": "Berlin, DE",
   "role": "GTM / Customer",
   "model": "anthropic:claude-sonnet-4-6",
-  "schedule_cron": "cron(0 0/3 * * ? *)",
-  "schedule_note": "Every 3h — pulse smoke test. Friday launch-plan cadence resumes once the webhook path is verified.",
   "prompt_version": "0.2.0",
   "budget_monthly_usd": 7,
-  "skills": ["discord-ping", "positioning-write", "article-draft", "notion-publish"],
   "default_project": "editorial",
   "streams": ["editorial", "client", "internal"],
-  "primary_deliverable_type": "notification",
-  "primary_deliverable_kind": "pulse",
   "owner_email": null,
-  "created_at": "2026-05-18"
+  "created_at": "2026-05-18",
+  "bindings": [
+    {
+      "cron": "cron(0 0/6 * * ? *)",
+      "skill": "discord-ping",
+      "note": "Heartbeat every 6h"
+    }
+  ]
 }

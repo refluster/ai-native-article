@@ -1,13 +1,14 @@
 {
   "name": "article-draft",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "status": "active",
-  "trigger_class": "lambda",
+  "executor": "llm-prose",
+  "deliverable": {
+    "type": "article",
+    "publish_notion": true
+  },
   "cost_class": "medium",
   "owners": ["aoi", "maya", "ren", "sora", "yuki"],
   "improvement_agent": null,
-  "inputs": ["l0-source-ref"],
-  "outputs": ["article-markdown"],
-  "created_at": "2026-05-18",
-  "deprecated_replacement": null
+  "created_at": "2026-05-18"
 }

@@ -1,59 +1,44 @@
 // wf-agent-runner Lambda handler.
 //
-// Invoked async by the orchestrator (PR6c) with a payload identifying
-// one agent and one task. Composes the shared libs into the v1 run loop:
+// Invoked async by the orchestrator with a payload identifying one
+// agent and one binding index. The binding names the skill; the skill's
+// meta.executor selects the runtime path:
 //
-//   1. Load agent META (identity + operational) from DDB.
-//   2. Refuse if archived or paused.
-//   3. Read memory INDEX + the latest chunk from S3.
-//   4. Pre-flight budget guard (W-3).
-//   5. Build prompt from system.md + memory + task brief.
-//   6. Call Anthropic. Throws on stop_reason=max_tokens (W-1 / W-4).
-//   7. Write the artefact to S3 (workforce SoT). For type=article also
-//      insert into Notion (existing GAS L4 picks it up).
-//   8. Append a memory chunk (memver conditional).
-//   9. Record RUN + DELIV rows and roll up BUDGET.
+//   llm-prose            LLM call → S3 artefact → (optional) Notion publish
+//   claude-code-routine  LLM brief → GHA workflow_dispatch → pending DELIV
+//   deterministic        Registered handler → S3 audit artefact (no LLM)
 //
-// Failure modes throw and the alarm fires; partial state is acceptable
-// per W-4 (caller / DLQ logic in PR6c handles retry vs report).
+// All three paths land:
+//   - one RUN row with output_s3_key + summary + timing + status
+//   - one memory chunk appended to S3 (the agent's narrative)
+//   - a DELIV row only when there is a queryable external resource
+//     (Notion page / pending GitHub PR)
 
 import type { Context } from "aws-lambda";
-import {
-  agentPk,
-  type AgentMetaRow,
-  type AgentOperational,
-} from "../shared/agent.js";
+import { agentPk, type AgentBinding, type AgentMetaRow, type AgentOperational } from "../shared/agent.js";
 import { getItem, putItem, updateOperational } from "../shared/ddb.js";
 import { complete } from "../shared/llm-anthropic.js";
 import { assertWithinBudget, recordSpend } from "../shared/budget.js";
 import { readIndex, readChunk, appendChunk } from "../shared/memory.js";
 import { insertArticle } from "../shared/notion.js";
-import { deliverableTargetFor, writeDeliverableArtefact } from "../shared/deliverable.js";
+import {
+  deliverableTargetFor,
+  writeDeliverableArtefact,
+  writeRunArtefact,
+} from "../shared/deliverable.js";
 import { dispatchEngineer } from "../shared/github.js";
-import { postToWebhook } from "../shared/webhook.js";
-import {
-  type LoadedSkill,
-  loadSkillsForAgent,
-  pickSkillForTask,
-  composeSystemPrompt,
-} from "../shared/skill.js";
-import {
-  newUlid,
-  type DelivRow,
-  type RunRow,
-  type TaskKind,
-} from "../shared/task.js";
+import { composeSystemPrompt, loadSkill, type LoadedSkill } from "../shared/skill.js";
+import { getDeterministicHandler } from "../shared/skill-registry.js";
+import { newUlid, type DelivRow, type RunRow } from "../shared/task.js";
 
 export interface RunnerEvent {
   /** Agent slug to run. */
   agent: string;
-  /** Task kind drives prompt + deliverable type. */
-  task_kind: TaskKind;
-  /** Optional TASK#{ulid} reference. Orchestrator-created tasks set this. */
-  task_id?: string;
-  /** Optional brief overriding the default task description for this kind. */
+  /** Which entry in agent.bindings[] fired. */
+  binding_idx: number;
+  /** Optional operator brief — only the llm-prose path consumes it. */
   brief?: string;
-  /** When true, do everything except the LLM call + side effects. For smoke tests. */
+  /** When true, do everything except the LLM call + side effects. */
   dryRun?: boolean;
 }
 
@@ -69,308 +54,298 @@ export interface RunnerResult {
   error_message?: string;
 }
 
-const MAX_OUTPUT_TOKENS = 8000;        // floor per docs/azure-budget-rules.md analogue
-const PROJECTED_RUN_COST_USD = 0.50;   // conservative pre-flight ceiling; per-model below
+const MAX_OUTPUT_TOKENS = 8000;
+const PROJECTED_RUN_COST_USD = 0.50;
 
 export async function handler(event: RunnerEvent, context: Context): Promise<RunnerResult> {
   const startedAt = new Date().toISOString();
   const runId = newUlid();
 
-  // 1. Load agent META.
   const agent = await getItem<AgentMetaRow>(agentPk(event.agent), "META");
   if (!agent) {
-    return await failRun(event.agent, runId, startedAt, "agent_not_found");
+    return await failRun(event.agent, runId, startedAt, "anywhere", "agent_not_found");
+  }
+  if (agent.archived) return await skipRun(event.agent, runId, startedAt, "archived");
+  if (agent.paused) return await skipRun(event.agent, runId, startedAt, "paused");
+
+  const binding = agent.bindings[event.binding_idx];
+  if (!binding) {
+    return await failRun(event.agent, runId, startedAt, "anywhere", `binding_idx ${event.binding_idx} not found`);
   }
 
-  // 2. Refuse if archived or paused.
-  if (agent.archived) {
-    return await skipRun(event.agent, runId, startedAt, "archived");
-  }
-  if (agent.paused) {
-    return await skipRun(event.agent, runId, startedAt, "paused");
-  }
-
-  // 3. Memory.
-  const index = await readIndex(event.agent);
-  const memver = index?.memver ?? 0;
-  const previousChunk =
-    index?.latest_chunk_key ? await readChunk(index.latest_chunk_key) : "";
-
-  // 4. Budget pre-flight.
-  const cap = effectiveBudgetCap(agent);
-  await assertWithinBudget(event.agent, cap, PROJECTED_RUN_COST_USD);
-
-  // 5. Build prompt. If an active skill matches the task (RFC-008), the
-  // skill body is appended to the system prompt and the user prompt
-  // becomes minimal — "apply the active skill". When no skill matches,
-  // fall back to the hard-coded defaultBriefFor in the user prompt.
-  const baseSystem = await loadSystemMd(event.agent);
-  const skills = await loadSkillsForAgent(agent);
-  const activeSkill = pickSkillForTask(event.task_kind, skills);
-  const system = activeSkill ? composeSystemPrompt(baseSystem, activeSkill) : baseSystem;
-  const userPrompt = buildUserPrompt(event, previousChunk, activeSkill);
-  if (!activeSkill) {
-    console.warn(
-      JSON.stringify({
-        event: "skill-fallback",
-        agent: event.agent,
-        task_kind: event.task_kind,
-        note: "no active skill matched; using defaultBriefFor (RFC-008 fallback)",
-      }),
+  let skill: LoadedSkill;
+  try {
+    skill = await loadSkill(binding.skill);
+  } catch (err) {
+    return await failRun(
+      event.agent,
+      runId,
+      startedAt,
+      binding.skill,
+      `skill_load_failed: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 
+  // Memory + budget pre-flight are common to all executors; deterministic
+  // skills cost ~0 but a budget breach should still throw.
+  const index = await readIndex(event.agent);
+  const memver = index?.memver ?? 0;
+  const previousChunk = index?.latest_chunk_key ? await readChunk(index.latest_chunk_key) : "";
+  await assertWithinBudget(event.agent, effectiveBudgetCap(agent), PROJECTED_RUN_COST_USD);
+
   if (event.dryRun) {
-    return {
-      status: "ok",
-      run_id: runId,
-      tokens_in: 0,
-      tokens_out: 0,
-      cost_usd: 0,
-    };
+    return { status: "ok", run_id: runId, tokens_in: 0, tokens_out: 0, cost_usd: 0 };
   }
 
-  // 6. LLM call. W-1 / W-4 enforced inside complete().
-  let llm;
+  let result: RunnerResult;
   try {
-    llm = await complete({
-      model: agent.model,
-      system,
-      user: userPrompt,
-      maxTokens: MAX_OUTPUT_TOKENS,
-    });
-  } catch (err) {
-    return await throwRun(event.agent, runId, startedAt, err);
-  }
-
-  // 7. Deliverable.
-  // - article/plan/design-doc/launch-plan: write artefact body to S3 (SoT),
-  //   article also publishes to Notion (GAS L4 picks up).
-  // - claude-code-routine Skill (R-N1 exception): LLM produces a *brief*
-  //   (not code). Lambda writes the brief to S3 + dispatches GHA
-  //   workflow_dispatch. The eventual PR is found asynchronously by the
-  //   orchestrator's poll step.
-  const delivId = newUlid();
-  let delivRow: DelivRow;
-  let notionUrl: string | undefined;
-
-  // RFC-008 R-N1 amendment: the CC-routine exception is selected per-Skill,
-  // not per-agent. When the active Skill's trigger_class is claude-code-routine,
-  // route through dispatchPrPath regardless of which agent is calling. The
-  // legacy agent.code_execution-based path is preserved as a fallback for
-  // runs where no Skill matched (so Ren's pre-Skills behaviour is unchanged).
-  const ccRouteBySkill = activeSkill?.meta.trigger_class === "claude-code-routine";
-  const ccRouteByLegacy =
-    !activeSkill &&
-    agent.code_execution === "claude-code-routine-on-gha" &&
-    agent.primary_deliverable_type === "pr";
-
-  // Per-Skill side-effect router. trigger_class drives the post-LLM step,
-  // independent of agent.primary_deliverable_type so we can reuse the same
-  // persona across deliverable shapes (RFC-008 §3).
-  const webhookRouteBySkill = activeSkill?.meta.trigger_class === "webhook";
-
-  if (ccRouteBySkill || ccRouteByLegacy) {
-    delivRow = await dispatchPrPath(event.agent, agent, delivId, startedAt, event.task_kind, llm.text, activeSkill);
-  } else if (webhookRouteBySkill) {
-    delivRow = await dispatchWebhookPath(event.agent, agent, delivId, startedAt, llm.text, activeSkill);
-  } else {
-    const target = deliverableTargetFor(event.agent, agent.primary_deliverable_type, delivId);
-    await writeDeliverableArtefact(target, llm.text);
-
-    let notionPageId: string | undefined;
-    if (target.hasExternalPublish && agent.primary_deliverable_type === "article") {
-      const title = extractTitle(llm.text) ?? `${agent.first_name} ${agent.last_name} — ${event.task_kind} ${startedAt}`;
-      const notion = await insertArticle({
-        title,
-        bodyMarkdown: llm.text,
-        author: event.agent,
-        kind: agent.primary_deliverable_kind,
-        provenance: `${event.agent}-${event.task_kind}`,
-      });
-      notionUrl = notion.url;
-      notionPageId = notion.pageId;
+    switch (skill.meta.executor) {
+      case "deterministic":
+        result = await runDeterministic(event, agent, binding, skill, runId, startedAt);
+        break;
+      case "claude-code-routine":
+        result = await runClaudeCodeRoutine(event, agent, binding, skill, runId, startedAt, previousChunk);
+        break;
+      case "llm-prose":
+      default:
+        result = await runLlmProse(event, agent, binding, skill, runId, startedAt, previousChunk);
+        break;
     }
-
-    delivRow = {
-      pk: agentPk(event.agent),
-      sk: `DELIV#${delivId}`,
-      type: agent.primary_deliverable_type,
-      kind: agent.primary_deliverable_kind,
-      project_id: agent.default_project,
-      s3_key: target.s3Key,
-      notion_page_id: notionPageId,
-      created_at: startedAt,
-      published_at: notionPageId ? new Date().toISOString() : undefined,
-      skill_name: activeSkill?.meta.name,
-      skill_version: activeSkill?.meta.version,
-    };
-    await putItem(delivRow);
+  } catch (err) {
+    return await throwRun(event.agent, runId, startedAt, binding, skill, err);
   }
 
-  // 8. Append memory chunk.
-  const chunkBody = buildMemoryChunk(event.agent, runId, llm.text, previousChunk);
-  await appendChunk(event.agent, chunkBody, summaryOf(llm.text), memver);
+  // Memory chunk for self-reference: every run feeds the agent's narrative.
+  const chunkBody = buildMemoryChunk(event.agent, runId, binding, skill, result, previousChunk);
+  await appendChunk(event.agent, chunkBody, summaryOf(result.error_message ?? result.notion_page_url ?? runId), memver);
 
-  // 9. RUN row + BUDGET roll-up.
-  const endedAt = new Date().toISOString();
-  const runRow: RunRow = {
-    pk: agentPk(event.agent),
-    sk: `RUN#${runId}`,
-    task_id: event.task_id,
-    status: "ok",
-    tokens_in: llm.tokens_in,
-    tokens_out: llm.tokens_out,
-    cost_usd: llm.cost_usd,
-    started_at: startedAt,
-    ended_at: endedAt,
-    skill_name: activeSkill?.meta.name,
-    skill_version: activeSkill?.meta.version,
-  };
-  await putItem(runRow);
-  await recordSpend(event.agent, llm.tokens_in, llm.tokens_out, llm.cost_usd);
-  await updateLastRun(event.agent, endedAt, "ok");
-
-  return {
-    status: "ok",
-    run_id: runId,
-    deliv_id: delivId,
-    notion_page_url: notionUrl,
-    tokens_in: llm.tokens_in,
-    tokens_out: llm.tokens_out,
-    cost_usd: llm.cost_usd,
-  };
+  await recordSpend(event.agent, result.tokens_in ?? 0, result.tokens_out ?? 0, result.cost_usd ?? 0);
+  await updateLastRun(event.agent, new Date().toISOString(), "ok");
+  return result;
 }
 
 function effectiveBudgetCap(agent: AgentMetaRow): number {
   return agent.budget_monthly_usd_override ?? agent.budget_monthly_usd_default;
 }
 
-/**
- * Ren's R-N1 exception path. The LLM has already produced a *brief*
- * (governed by Ren's system.md). We:
- *   1. Persist the brief to S3 (workforce SoT).
- *   2. workflow_dispatch -> wf-engineer.yml on the target repo, passing
- *      the brief + dispatch_branch in the workflow inputs.
- *   3. Write a pending DELIV row. The orchestrator's poll step will
- *      promote it to ok when the PR appears, or to timeout after 24h.
- *
- * Env vars (set on the agent-runner Lambda by SAM):
- *   ENGINEER_OWNER     GitHub org/user (default "refluster")
- *   ENGINEER_REPO      Repo name (default "ai-native-article")
- *   ENGINEER_WORKFLOW  Workflow filename (default "wf-engineer.yml")
- *   ENGINEER_REF       Ref to dispatch from (default "main")
- */
-async function dispatchPrPath(
-  slug: string,
+// --- deterministic executor ----------------------------------------------
+
+async function runDeterministic(
+  event: RunnerEvent,
   agent: AgentMetaRow,
-  delivId: string,
+  binding: AgentBinding,
+  skill: LoadedSkill,
+  runId: string,
   startedAt: string,
-  taskKind: TaskKind,
-  briefBody: string,
-  activeSkill: LoadedSkill | undefined,
-): Promise<DelivRow> {
+): Promise<RunnerResult> {
+  const handler = getDeterministicHandler(skill.meta.name);
+  const result = await handler({ slug: event.agent, startedAt });
+
+  const s3Key = await writeRunArtefact(event.agent, runId, result.outputExt, result.output);
+  const endedAt = new Date().toISOString();
+
+  const runRow: RunRow = {
+    pk: agentPk(event.agent),
+    sk: `RUN#${runId}`,
+    binding_idx: event.binding_idx,
+    skill_name: skill.meta.name,
+    skill_version: skill.meta.version,
+    cron: binding.cron,
+    status: "ok",
+    tokens_in: 0,
+    tokens_out: 0,
+    cost_usd: 0,
+    started_at: startedAt,
+    ended_at: endedAt,
+    output_s3_key: s3Key,
+    output_summary: result.summary.slice(0, 240),
+  };
+  await putItem(runRow);
+
+  return { status: "ok", run_id: runId, tokens_in: 0, tokens_out: 0, cost_usd: 0 };
+}
+
+// --- llm-prose executor --------------------------------------------------
+
+async function runLlmProse(
+  event: RunnerEvent,
+  agent: AgentMetaRow,
+  binding: AgentBinding,
+  skill: LoadedSkill,
+  runId: string,
+  startedAt: string,
+  previousChunk: string,
+): Promise<RunnerResult> {
+  if (!skill.meta.deliverable) {
+    throw new Error(`skill "${skill.meta.name}" is llm-prose but has no deliverable in meta.json`);
+  }
+
+  const baseSystem = await loadSystemMd(event.agent);
+  const system = composeSystemPrompt(baseSystem, skill);
+  const userPrompt = buildUserPrompt(event, previousChunk);
+
+  const llm = await complete({
+    model: agent.model,
+    system,
+    user: userPrompt,
+    maxTokens: MAX_OUTPUT_TOKENS,
+  });
+
+  const delivId = newUlid();
+  const target = deliverableTargetFor(event.agent, skill.meta.deliverable.type, delivId);
+  await writeDeliverableArtefact(target, llm.text);
+  const runArtefactKey = await writeRunArtefact(event.agent, runId, "md", llm.text);
+
+  let notionPageId: string | undefined;
+  let notionPageUrl: string | undefined;
+  if (skill.meta.deliverable.publish_notion) {
+    const title = extractTitle(llm.text) ?? `${agent.first_name} ${agent.last_name} — ${skill.meta.name} ${startedAt}`;
+    const notion = await insertArticle({
+      title,
+      bodyMarkdown: llm.text,
+      author: event.agent,
+      kind: skill.meta.deliverable.type,
+      provenance: `${event.agent}-${skill.meta.name}`,
+    });
+    notionPageUrl = notion.url;
+    notionPageId = notion.pageId;
+  }
+
+  const endedAt = new Date().toISOString();
+
+  const runRow: RunRow = {
+    pk: agentPk(event.agent),
+    sk: `RUN#${runId}`,
+    binding_idx: event.binding_idx,
+    skill_name: skill.meta.name,
+    skill_version: skill.meta.version,
+    cron: binding.cron,
+    status: "ok",
+    tokens_in: llm.tokens_in,
+    tokens_out: llm.tokens_out,
+    cost_usd: llm.cost_usd,
+    started_at: startedAt,
+    ended_at: endedAt,
+    output_s3_key: runArtefactKey,
+    output_summary: summaryOf(llm.text),
+  };
+  await putItem(runRow);
+
+  const delivRow: DelivRow = {
+    pk: agentPk(event.agent),
+    sk: `DELIV#${delivId}`,
+    run_id: runId,
+    type: skill.meta.deliverable.type,
+    project_id: agent.default_project,
+    notion_page_id: notionPageId,
+    notion_page_url: notionPageUrl,
+    created_at: startedAt,
+    published_at: notionPageId ? endedAt : undefined,
+  };
+  await putItem(delivRow);
+
+  return {
+    status: "ok",
+    run_id: runId,
+    deliv_id: delivId,
+    notion_page_url: notionPageUrl,
+    tokens_in: llm.tokens_in,
+    tokens_out: llm.tokens_out,
+    cost_usd: llm.cost_usd,
+  };
+}
+
+// --- claude-code-routine executor ----------------------------------------
+
+async function runClaudeCodeRoutine(
+  event: RunnerEvent,
+  agent: AgentMetaRow,
+  binding: AgentBinding,
+  skill: LoadedSkill,
+  runId: string,
+  startedAt: string,
+  previousChunk: string,
+): Promise<RunnerResult> {
+  const baseSystem = await loadSystemMd(event.agent);
+  const system = composeSystemPrompt(baseSystem, skill);
+  const userPrompt = buildUserPrompt(event, previousChunk);
+
+  const llm = await complete({
+    model: agent.model,
+    system,
+    user: userPrompt,
+    maxTokens: MAX_OUTPUT_TOKENS,
+  });
+
+  const delivId = newUlid();
   const owner = process.env.ENGINEER_OWNER ?? "refluster";
   const repo = process.env.ENGINEER_REPO ?? "ai-native-article";
   const workflow = process.env.ENGINEER_WORKFLOW ?? "wf-engineer.yml";
   const ref = process.env.ENGINEER_REF ?? "main";
 
-  // Persist the brief. Note: deliverableTargetFor throws for pr; we use a
-  // dedicated pr-briefs/{slug}/{deliv-id}.md key here, in keeping with the
-  // data-model.md prefix layout (one prefix per artefact-kind).
-  const briefKey = `pr-briefs/${slug}/${delivId}.md`;
+  const briefKey = `pr-briefs/${event.agent}/${delivId}.md`;
   await writeDeliverableArtefact(
-    { type: "pr", s3Key: briefKey, hasExternalPublish: true },
-    briefBody,
+    { type: "pr", s3Key: briefKey, hasExternalPublish: true } as never,
+    llm.text,
   );
+  const runArtefactKey = await writeRunArtefact(event.agent, runId, "md", llm.text);
 
-  const dispatchBranch = `${slug}/${delivId}`;
-
+  const dispatchBranch = `${event.agent}/${delivId}`;
   await dispatchEngineer({
     owner,
     repo,
     workflow,
     ref,
-    inputs: {
-      brief: briefBody,
-      task_id: delivId,
-      branch: dispatchBranch,
-    },
+    inputs: { brief: llm.text, task_id: delivId, branch: dispatchBranch },
   });
 
-  const row: DelivRow = {
-    pk: agentPk(slug),
+  const endedAt = new Date().toISOString();
+
+  const runRow: RunRow = {
+    pk: agentPk(event.agent),
+    sk: `RUN#${runId}`,
+    binding_idx: event.binding_idx,
+    skill_name: skill.meta.name,
+    skill_version: skill.meta.version,
+    cron: binding.cron,
+    status: "ok",
+    tokens_in: llm.tokens_in,
+    tokens_out: llm.tokens_out,
+    cost_usd: llm.cost_usd,
+    started_at: startedAt,
+    ended_at: endedAt,
+    output_s3_key: runArtefactKey,
+    output_summary: summaryOf(llm.text),
+  };
+  await putItem(runRow);
+
+  const delivRow: DelivRow = {
+    pk: agentPk(event.agent),
     sk: `DELIV#${delivId}`,
+    run_id: runId,
     type: "pr",
-    kind: agent.primary_deliverable_kind,
     project_id: agent.default_project,
-    s3_key: briefKey,
     status: "pending",
-    dispatched_at: new Date().toISOString(),
+    dispatched_at: endedAt,
     dispatch_branch: dispatchBranch,
     created_at: startedAt,
-    skill_name: activeSkill?.meta.name,
-    skill_version: activeSkill?.meta.version,
-    // pr_url + published_at set when the orchestrator's poll step finds the PR.
   };
-  await putItem(row);
-  void taskKind; // recorded via the RUN row's task_id; deliv row doesn't carry it
-  return row;
+  await putItem(delivRow);
+
+  return {
+    status: "ok",
+    run_id: runId,
+    deliv_id: delivId,
+    tokens_in: llm.tokens_in,
+    tokens_out: llm.tokens_out,
+    cost_usd: llm.cost_usd,
+  };
 }
 
-/**
- * Webhook side-effect path for skills with meta.trigger_class=webhook.
- * The LLM already produced the message body (per the skill's instructions
- * in SKILL.md, which stays Claude-Skill-compatible). We:
- *   1. Persist the posted body to S3 for replay/audit.
- *   2. POST to the configured webhook secret.
- *   3. Write a DELIV row with type=notification, published_at=now.
- *
- * Env vars (set on the agent-runner Lambda by SAM):
- *   DISCORD_WEBHOOK_SECRET  Secrets Manager id for {webhookUrl}
- *                          (default "wf/discord-pulse-{stage}")
- */
-async function dispatchWebhookPath(
-  slug: string,
-  agent: AgentMetaRow,
-  delivId: string,
-  startedAt: string,
-  body: string,
-  activeSkill: LoadedSkill | undefined,
-): Promise<DelivRow> {
-  const secretName = process.env.DISCORD_WEBHOOK_SECRET;
-  if (!secretName) {
-    throw new Error("DISCORD_WEBHOOK_SECRET env var is required for webhook-class skills");
-  }
-
-  const target = deliverableTargetFor(slug, "notification", delivId);
-  // S3 record of exactly what was POSTed — single line per the skill's
-  // instructions, but we don't trim here so a non-compliant message is
-  // visible verbatim in the audit trail.
-  await writeDeliverableArtefact(target, body);
-
-  await postToWebhook(secretName, body);
-
-  const row: DelivRow = {
-    pk: agentPk(slug),
-    sk: `DELIV#${delivId}`,
-    type: "notification",
-    kind: agent.primary_deliverable_kind,
-    project_id: agent.default_project,
-    s3_key: target.s3Key,
-    created_at: startedAt,
-    published_at: new Date().toISOString(),
-    skill_name: activeSkill?.meta.name,
-    skill_version: activeSkill?.meta.version,
-  };
-  await putItem(row);
-  return row;
-}
+// --- prompt + memory helpers ---------------------------------------------
 
 async function loadSystemMd(slug: string): Promise<string> {
-  // The runner Lambda's Makefile (PR6b SAM addition) copies
-  // workforce/agents/{slug}/system.md into the bundle alongside
-  // handler.mjs. Same pattern as seed-agents.
+  // The Makefile bundles workforce/agents/{slug}/system.md alongside handler.mjs.
   const { readFile } = await import("node:fs/promises");
   const { dirname, join } = await import("node:path");
   const { fileURLToPath } = await import("node:url");
@@ -378,60 +353,26 @@ async function loadSystemMd(slug: string): Promise<string> {
   return await readFile(join(here, "agents", slug, "system.md"), "utf8");
 }
 
-function buildUserPrompt(
-  event: RunnerEvent,
-  previousChunk: string,
-  activeSkill?: LoadedSkill,
-): string {
+function buildUserPrompt(event: RunnerEvent, previousChunk: string): string {
   const memorySection = previousChunk
     ? `\n## Your memory from the previous run\n\n${previousChunk}\n`
     : "";
-  if (activeSkill) {
-    // RFC-008 path: skill body sits in the system prompt; the user
-    // prompt is the minimal "go" — task kind + memory + the
-    // operator-supplied free-form brief if any.
-    const operatorBrief = event.brief ? `\n\n## Operator brief\n\n${event.brief}\n` : "";
-    return `# Task: ${event.task_kind}${operatorBrief}${memorySection}\n\nApply the active skill described in your system prompt and produce the deliverable.`;
-  }
-  // Fallback path: hard-coded brief.
-  const brief = event.brief ?? defaultBriefFor(event.task_kind);
-  return `# Task: ${event.task_kind}\n\n${brief}${memorySection}\n\nProduce the deliverable. Begin with a clear title on the first line.`;
-}
-
-function defaultBriefFor(kind: TaskKind): string {
-  switch (kind) {
-    case "l0-to-l1":
-      return "Pick one pending L0 source entry that is most worth covering. Produce one 400-800 word L1 article in Japanese with one observation, one inference, and one disclosure per paragraph. Append the bias disclosure footer.";
-    case "weekly-synthesis":
-      return "Integrate the week's external signals you have memory of into one 800-1500 word synthesis article in Japanese with a falsifiable position.";
-    case "hypothesis":
-      return "State one hypothesis, why now, what would falsify it, and the next step if false. 600-1200 words.";
-    case "tech-note":
-      return "Explain one technical decision or bug fix in 400-1000 words.";
-    case "design":
-      return "Produce one design note: intent, IA, components, acceptance criteria.";
-    case "launch":
-      return "Produce one launch artefact: positioning, audience, channel, success metric, retraction trigger.";
-    case "pr":
-      return "Produce a task brief for the engineer routine: what to change, why, and acceptance criteria. (R-N1 exception path.)";
-    case "ping":
-      return "Produce exactly one line in the format: [wf-pulse] {slug} alive at {ISO-8601 UTC timestamp}. No prose around it.";
-    default:
-      return "Produce the deliverable appropriate to your role.";
-  }
+  const operatorBrief = event.brief ? `\n\n## Operator brief\n\n${event.brief}\n` : "";
+  return `# Active skill\n\nApply the active skill described in your system prompt and produce the deliverable.${operatorBrief}${memorySection}`;
 }
 
 function extractTitle(markdown: string): string | undefined {
   const first = markdown.split("\n", 1)[0]?.trim() ?? "";
   if (!first) return undefined;
-  // Strip a leading `# ` if present.
   return first.replace(/^#+\s*/, "").slice(0, 200);
 }
 
 function buildMemoryChunk(
   slug: string,
   runId: string,
-  body: string,
+  binding: AgentBinding,
+  skill: LoadedSkill,
+  result: RunnerResult,
   previousChunk: string,
 ): string {
   const now = new Date().toISOString();
@@ -439,18 +380,23 @@ function buildMemoryChunk(
   return `---
 slug: ${slug}
 run_id: ${runId}
+skill: ${skill.meta.name}@${skill.meta.version}
+cron: ${binding.cron}
 created_at: ${now}
 ---
 
-## What I produced this run
+## What I did this run
 
-${body.slice(0, 4000)}${previousNote}
+skill=${skill.meta.name} status=${result.status} cost_usd=${result.cost_usd ?? 0}${previousNote}
 `;
 }
 
-function summaryOf(text: string): string {
-  return text.replace(/\s+/g, " ").trim().slice(0, 480);
+function summaryOf(text: string | undefined): string {
+  if (!text) return "";
+  return text.replace(/\s+/g, " ").trim().slice(0, 240);
 }
+
+// --- failure handling ----------------------------------------------------
 
 async function skipRun(
   slug: string,
@@ -461,6 +407,10 @@ async function skipRun(
   const row: RunRow = {
     pk: agentPk(slug),
     sk: `RUN#${runId}`,
+    binding_idx: -1,
+    skill_name: "",
+    skill_version: "",
+    cron: "",
     status: "skipped",
     tokens_in: 0,
     tokens_out: 0,
@@ -477,11 +427,16 @@ async function failRun(
   slug: string,
   runId: string,
   startedAt: string,
+  skillName: string,
   reason: string,
 ): Promise<RunnerResult> {
   const row: RunRow = {
     pk: agentPk(slug),
     sk: `RUN#${runId}`,
+    binding_idx: -1,
+    skill_name: skillName,
+    skill_version: "",
+    cron: "",
     status: "throw",
     tokens_in: 0,
     tokens_out: 0,
@@ -491,7 +446,6 @@ async function failRun(
     error_message: reason,
   };
   await putItem(row);
-  // Don't silently succeed — surface the failure to the caller / alarm.
   throw new Error(`runner failed for ${slug}: ${reason}`);
 }
 
@@ -499,12 +453,18 @@ async function throwRun(
   slug: string,
   runId: string,
   startedAt: string,
+  binding: AgentBinding,
+  skill: LoadedSkill,
   err: unknown,
 ): Promise<RunnerResult> {
   const msg = err instanceof Error ? err.message : String(err);
   const row: RunRow = {
     pk: agentPk(slug),
     sk: `RUN#${runId}`,
+    binding_idx: -1,
+    skill_name: skill.meta.name,
+    skill_version: skill.meta.version,
+    cron: binding.cron,
     status: "throw",
     tokens_in: 0,
     tokens_out: 0,
@@ -523,7 +483,6 @@ async function updateLastRun(
   ts: string,
   status: AgentOperational["last_run_status"],
 ): Promise<void> {
-  // Best-effort; we don't fail the run if META update fails.
   try {
     await updateOperational(agentPk(slug), "META", {
       last_run_at: ts,

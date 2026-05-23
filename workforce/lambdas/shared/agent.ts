@@ -1,19 +1,24 @@
 // Shared agent types and DDB row shape.
 // Mirrors workforce/docs/data-model.md.
+//
+// v1 routing model (1-stage): an agent's bindings[] declares the
+// (cron → skill) pairs directly. There is no task_kind / outputs token
+// matching; the orchestrator dispatches {agent, binding_idx} and the
+// runner loads exactly that binding's skill.
 
 export type AgentSlug = string;
 
-export type CodeExecution = "lambda" | "claude-code-routine-on-gha";
-
 export type Stream = "internal" | "client" | "editorial";
 
-export type DeliverableType =
-  | "article"
-  | "pr"
-  | "plan"
-  | "design-doc"
-  | "launch-plan"
-  | "notification";
+/** One cron-to-skill binding on an agent. The cron fires the named skill. */
+export interface AgentBinding {
+  /** EventBridge cron expression. UTC. */
+  cron: string;
+  /** Skill slug — must match a workforce/skills/{name}/ directory. */
+  skill: string;
+  /** Human-readable cadence note. Renders in the UI. */
+  note?: string;
+}
 
 /** Identity fields — sourced from workforce/agents/{slug}/agent.json (git SoT). */
 export interface AgentIdentity {
@@ -23,22 +28,16 @@ export interface AgentIdentity {
   residence: string;
   role: string;
   model: string;
-  primary_deliverable_type: DeliverableType;
-  primary_deliverable_kind: string;
-  code_execution?: CodeExecution;
   prompt_version: string;
-  schedule_cron_default: string;
-  schedule_note: string;
   budget_monthly_usd_default: number;
-  skills: string[];
   default_project: string;
   streams: Stream[];
+  bindings: AgentBinding[];
   created_at: string;
 }
 
 /** Operational fields — DDB-mutable via the agents-api PATCH endpoint. */
 export interface AgentOperational {
-  schedule_cron_override?: string;
   budget_monthly_usd_override?: number;
   paused: boolean;
   archived: boolean;
@@ -63,14 +62,12 @@ export interface AgentMetaRow extends AgentIdentity, AgentOperational, AgentComp
 
 /** API response shape — flattens the row, omits the PK/SK plumbing. */
 export interface AgentApiView extends AgentIdentity, AgentOperational, AgentComputed {
-  schedule_cron_effective: string;
   budget_monthly_usd_effective: number;
 }
 
 export function toApiView(row: AgentMetaRow): AgentApiView {
   return {
     ...row,
-    schedule_cron_effective: row.schedule_cron_override ?? row.schedule_cron_default,
     budget_monthly_usd_effective:
       row.budget_monthly_usd_override ?? row.budget_monthly_usd_default,
   };

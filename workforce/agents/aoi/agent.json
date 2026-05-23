@@ -5,15 +5,17 @@
   "residence": "Milan, IT",
   "role": "Designer",
   "model": "anthropic:claude-sonnet-4-6",
-  "schedule_cron": "cron(0 2 ? * TUE *)",
-  "schedule_note": "Tuesday 11:00 JST",
   "prompt_version": "0.2.0",
   "budget_monthly_usd": 7,
-  "skills": ["design-note", "article-draft", "notion-publish"],
   "default_project": "workforce-self",
   "streams": ["client", "internal", "editorial"],
-  "primary_deliverable_type": "design-doc",
-  "primary_deliverable_kind": "design",
   "owner_email": null,
-  "created_at": "2026-05-18"
+  "created_at": "2026-05-18",
+  "bindings": [
+    {
+      "cron": "cron(0 2 ? * TUE *)",
+      "skill": "design-note",
+      "note": "Tuesday 11:00 JST"
+    }
+  ]
 }

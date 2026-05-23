@@ -1,44 +1,40 @@
-// Task / Run / Deliverable row shapes. Mirror workforce/docs/data-model.md.
+// Run / Deliverable row shapes. Mirrors workforce/docs/data-model.md.
+//
+// v1 (1-stage routing): one RUN row per skill execution, fully
+// describing what fired, when, and where the output landed. DELIV rows
+// only exist for executions that produce a queryable external resource
+// (Notion page, GitHub PR). Deterministic side-effects like Discord
+// posts are RUN-only — the audit trail is RUN.output_s3_key.
 
-import type { DeliverableType } from "./agent.js";
-
-export type TaskKind = "l0-to-l1" | "weekly-synthesis" | "hypothesis" | "tech-note" | "design" | "launch" | "pr" | "ping";
-
-export type TaskStatus = "pending" | "claimed" | "ok" | "failed";
+import type { DeliverableType } from "./skill.js";
 
 export type RunStatus = "ok" | "throw" | "dlq" | "skipped";
-
-export interface TaskRow {
-  pk: `TASK#${string}`;
-  sk: "META";
-  agent_slug: string;
-  project_id: string;
-  kind: TaskKind;
-  status: TaskStatus;
-  created_at: string;
-  claimed_at?: string;
-  completed_at?: string;
-  gsi1pk?: `STATUS#${TaskStatus}`;
-  gsi1sk?: string;
-}
 
 export interface RunRow {
   pk: `AGENT#${string}`;
   sk: `RUN#${string}`;
-  task_id?: string;
+  /** Index into agent.bindings[] that triggered this run. */
+  binding_idx: number;
+  /** Skill that ran (== agent.bindings[binding_idx].skill). */
+  skill_name: string;
+  /** Skill meta.json:version at the time of the run. */
+  skill_version: string;
+  /** Cron that fired this run. Captured for retrospective audit even if
+   *  the binding's cron is later changed. */
+  cron: string;
   status: RunStatus;
   tokens_in: number;
   tokens_out: number;
   cost_usd: number;
   started_at: string;
   ended_at: string;
+  /** S3 key with the full output payload (LLM text, deterministic JSON,
+   *  Claude-Code brief, ...). Always present on status=ok. */
+  output_s3_key?: string;
+  /** First 240 chars of the output, for quick display without S3 fetch. */
+  output_summary?: string;
   error_message?: string;
   skip_reason?: string;
-  /** RFC-008 traceability: the skill that drove this run, or undefined
-   * when the runner's defaultBriefFor fallback fired. */
-  skill_name?: string;
-  /** meta.json:version at the time of the run. */
-  skill_version?: string;
 }
 
 export type DelivStatus = "pending" | "ok" | "timeout";
@@ -46,33 +42,22 @@ export type DelivStatus = "pending" | "ok" | "timeout";
 export interface DelivRow {
   pk: `AGENT#${string}`;
   sk: `DELIV#${string}`;
+  /** Mirrors the RUN row that produced this deliverable. */
+  run_id: string;
   type: DeliverableType;
-  kind: string;
   project_id: string;
+  /** Notion page id, when publish_notion fired. */
   notion_page_id?: string;
+  notion_page_url?: string;
+  /** GitHub PR URL, set by orchestrator's poll step for claude-code-routine. */
   pr_url?: string;
-  s3_key?: string;
-  eval_score?: number;
+  /** Branch name the GHA workflow is expected to push to (claude-code-routine only). */
+  dispatch_branch?: string;
   created_at: string;
   published_at?: string;
-  /**
-   * Synchronous deliverables (article/plan/design-doc/launch-plan) are
-   * undefined here — they finish atomically. Asynchronous deliverables
-   * (Ren's pr via Claude Code routine on GHA) carry a status:
-   *   - pending  dispatched to GHA, waiting for the PR to appear
-   *   - ok       PR found by the orchestrator's poll step
-   *   - timeout  24h passed without a PR (W-4 alarm)
-   */
   status?: DelivStatus;
-  /** Set when the runner dispatched a long-running job (R-N1 exception). */
   dispatched_at?: string;
-  /** Branch name the GHA workflow is expected to push to (Ren only). */
-  dispatch_branch?: string;
-  /** Per-row error context surfaced into the row on timeout. */
   error_message?: string;
-  /** RFC-008 traceability: mirrors the parent RUN row for one-hop lookup. */
-  skill_name?: string;
-  skill_version?: string;
 }
 
 export function newUlid(): string {
