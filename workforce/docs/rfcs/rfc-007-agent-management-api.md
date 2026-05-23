@@ -41,7 +41,7 @@ The DDB `AGENT#{slug}/META` row carries a **projected copy** of identity (slug, 
 | `WfAgentsApiFunction` | `AWS::Serverless::Function` | API GW HTTP API integration. Handles `GET /agents`, `GET /agents/{slug}`, `PATCH /agents/{slug}`, `DELETE /agents/{slug}`. |
 | `WfAgentsHttpApi` | `AWS::Serverless::HttpApi` | The HTTP API itself. |
 | `WfSeedAgentsFunction` | `AWS::Serverless::Function` | Reads `workforce/agents/{slug}/{agent.json, system.md}` from the deployed Lambda bundle (or `main` HEAD) and upserts `AGENT#{slug}/META` rows. Idempotent. |
-| `WfSeedTriggerRule` | `AWS::Events::Rule` | Runs `WfSeedAgentsFunction` on each successful `main`-branch deploy (via deploy.yml's webhook to API GW, or as a SAM post-deploy step). Plus on-demand `aws lambda invoke`. |
+| `WfSeedTriggerRule` | `AWS::Events::Rule` | Runs `WfSeedAgentsFunction` on each successful `main`-branch deploy (via deploy-article-site.yml's webhook to API GW, or as a SAM post-deploy step). Plus on-demand `aws lambda invoke`. |
 
 ### API contract (v1)
 
@@ -73,7 +73,7 @@ DELETE /agents/{slug}
 ```
 operator opens PR adding workforce/agents/zara/{agent.json, system.md}
    ↓ ship-pr graduates, operator merges to main
-   ↓ deploy.yml fires (existing)
+   ↓ deploy-article-site.yml fires (existing)
    ↓ SAM build packages workforce/agents/** into the Lambda bundle
    ↓ SAM deploy
    ↓ post-deploy hook (or scheduled rule) invokes WfSeedAgentsFunction
@@ -111,7 +111,7 @@ This RFC produces three issues for Maya to file:
 
 - **Issue A — `WfSeedAgentsFunction`**: Reads `workforce/agents/**/agent.json` + `system.md` from the Lambda bundle. Upserts `AGENT#{slug}/META` preserving operational fields. Logs per-agent diff. Idempotent. TypeScript, `nodejs24.x`.
 - **Issue B — `WfAgentsApiFunction` + `WfAgentsHttpApi`**: Implements the four endpoints above. `GET` public, `PATCH`/`DELETE` IAM-auth. CORS open for the gh-pages origin so the SPA can read. TypeScript, `nodejs24.x`.
-- **Issue C — Wiring**: Post-deploy seed trigger (whichever of "deploy.yml step", "EventBridge on stack-update", or "manual invoke" the operator prefers — Q1 below). API GW domain (`api.kohuehara.xyz/workforce/v1/agents` or the AWS-generated URL — Q3 below).
+- **Issue C — Wiring**: Post-deploy seed trigger (whichever of "deploy-article-site.yml step", "EventBridge on stack-update", or "manual invoke" the operator prefers — Q1 below). API GW domain (`api.kohuehara.xyz/workforce/v1/agents` or the AWS-generated URL — Q3 below).
 
 End-to-end test (after all three issues land):
 
@@ -130,7 +130,7 @@ curl https://<api>/agents/sora                                → paused:true (p
 
 # Identity change via PR
 # (operator edits sora/system.md, bumps prompt_version, merges)
-# deploy.yml fires, seed runs
+# deploy-article-site.yml fires, seed runs
 curl https://<api>/agents/sora     → new prompt_version, paused still true
 ```
 

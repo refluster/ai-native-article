@@ -8,7 +8,7 @@ on:
       - 'packages/shared/**'
       - 'workforce/agents/**'         # manifest contents
       - 'scripts/build-agent-manifest.mjs'
-      - '.github/workflows/deploy-workforce.yml'
+      - '.github/workflows/deploy-workforce-console.yml'
   workflow_dispatch:
 
 concurrency:

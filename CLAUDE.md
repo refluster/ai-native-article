@@ -64,7 +64,7 @@ When in doubt: ask in chat with a one-line description; wait for an explicit "ye
 ## Things that cost more than they look
 
 - **GAS deployment lag.** ~60–90s between `clasp deploy` and `/exec` actually serving the new code. `gas-deploy-verify` polls for this. Don't `gas-call` against a fresh deploy without verifying first.
-- **gh-pages cron.** Up to 6 hours between editing Notion and seeing it live (`06:17 / 12:17 / 18:17 UTC`, plus push-to-`main` triggers). For "make it live now," run `gh workflow run deploy.yml`.
+- **gh-pages cron.** Up to 6 hours between editing Notion and seeing it live (`06:17 / 12:17 / 18:17 UTC`, plus push-to-`main` triggers). For "make it live now," run `gh workflow run deploy-article-site.yml`.
 - **Reasoning-token consumption.** `gpt-5.4` shares `max_completion_tokens` between hidden reasoning and visible output. The 2000-token default produced empty articles; 8000 is the floor for any prose-length output. See [docs/azure-budget-rules.md](docs/azure-budget-rules.md).
 - **`curl -X POST` to GAS.** Returns HTTP 405. Use the `gas-call` skill or Node's `fetch` with `redirect: 'follow'`.
 
@@ -73,7 +73,7 @@ When in doubt: ask in chat with a one-line description; wait for an explicit "ye
 1. Run `article-health` to localise: is the breakage on `gh-pages`, in Notion, or both?
 2. Check the GAS execution log (Apps Script editor → Executions) for thrown errors — `finish_reason='length'`, manifest violations, etc.
 3. If it's a content issue: `L2_BACKFILL` (for truncated explanations) or open the Notion row directly.
-4. If it's a deploy issue: `gh workflow run deploy.yml`.
+4. If it's a deploy issue: `gh workflow run deploy-article-site.yml`.
 5. If neither: read [L1-L4-PIPELINE.md §Operator runbooks](L1-L4-PIPELINE.md#operator-runbooks) for the closest matching scenario.
 
 If the symptom is novel, after fixing it, ask whether the rule that should have caught it lives at L1 (a doc), L2 (a mechanical check), or L3 (a runbook), and update the corresponding layer. That's the §6 "governance retrospective" loop.

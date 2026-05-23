@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-23T18:51:45.052Z",
+  "generated_at": "2026-05-23T23:52:03.534Z",
   "skills": [
     {
       "name": "article-draft",
@@ -41,7 +41,7 @@
       ],
       "improvement_agent": null,
       "created_at": "2026-05-18",
-      "description": "Produce a task brief for the engineer Claude Code routine — what to change, why, acceptance criteria. Use when the Engineer persona needs to dispatch implementation work to the wf-engineer.yml GHA workflow (the R-N1 exception path); the brief is what the CC routine reads as its instructions before writing code."
+      "description": "Produce a task brief for the engineer Claude Code routine — what to change, why, acceptance criteria. Use when the Engineer persona needs to dispatch implementation work to the workforce-engineer-routine.yml GHA workflow (the R-N1 exception path); the brief is what the CC routine reads as its instructions before writing code."
     },
     {
       "name": "design-note",

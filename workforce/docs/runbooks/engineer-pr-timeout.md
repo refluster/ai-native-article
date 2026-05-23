@@ -2,11 +2,11 @@
 
 **Symptom.** A DDB row `AGENT#ren/DELIV#{ulid}` has `status=timeout` and `error_message="no PR appeared within 1440min"`. The orchestrator-tick CloudWatch logs show a `engineer-pr-timeout` line for the same `deliv_id`.
 
-**What it means.** The runner dispatched Ren's engineering routine via `workflow_dispatch` on `wf-engineer.yml`, and the orchestrator's 5-minute poll has not seen a PR on the `dispatch_branch` for >24 hours. The R-N1 exception path failed silently — this runbook recovers it without losing the brief.
+**What it means.** The runner dispatched Ren's engineering routine via `workflow_dispatch` on `workforce-engineer-routine.yml`, and the orchestrator's 5-minute poll has not seen a PR on the `dispatch_branch` for >24 hours. The R-N1 exception path failed silently — this runbook recovers it without losing the brief.
 
 ## Triage
 
-1. **Look at the workflow run.** Open `.github/actions/runs` filtered by `wf-engineer.yml`, find the run whose inputs include this `task_id`. Three outcomes:
+1. **Look at the workflow run.** Open `.github/actions/runs` filtered by `workforce-engineer-routine.yml`, find the run whose inputs include this `task_id`. Three outcomes:
    - **No run exists.** The `workflow_dispatch` failed. Causes: `wf/github` PAT lacks `actions:write` on the target repo, workflow disabled, ref doesn't exist. Fix the token/scope/ref, then **re-trigger** (see "Recover" below).
    - **Run failed.** Read the failed step. Most common: `ANTHROPIC_API_KEY` GitHub Secret missing or revoked, or Claude Code action version drift. Fix the secret/action and re-trigger.
    - **Run succeeded but no PR was created.** Claude Code may have decided the brief was infeasible. Read the run logs and the brief in S3 (`pr-briefs/ren/{deliv_id}.md`). Decide whether to revise the brief and re-trigger, or mark the timeout as expected.
@@ -22,7 +22,7 @@
 Use when the brief is sound and the failure was infrastructural (missing secret, action drift, transient network).
 
 ```bash
-gh workflow run wf-engineer.yml \
+gh workflow run workforce-engineer-routine.yml \
   --repo refluster/ai-native-article \
   -f brief="$(aws s3 cp s3://wf-bucket-{acct}-{stage}/pr-briefs/ren/{deliv_id}.md -)" \
   -f task_id={deliv_id} \
@@ -65,6 +65,6 @@ Before enabling Ren in prod (`paused: false` for the first time):
 
 - [ ] `wf/github` PAT has `actions:write` + `pull_requests:write` + `contents:write` on `refluster/ai-native-article`.
 - [ ] GitHub Secret `ANTHROPIC_API_KEY` is set on this repo and not expired.
-- [ ] `.github/workflows/wf-engineer.yml` exists on `main` (this workflow is dispatched against `main` by default).
-- [ ] The Claude Code action version pinned in `wf-engineer.yml` is current (check the action's release notes monthly).
+- [ ] `.github/workflows/workforce-engineer-routine.yml` exists on `main` (this workflow is dispatched against `main` by default).
+- [ ] The Claude Code action version pinned in `workforce-engineer-routine.yml` is current (check the action's release notes monthly).
 - [ ] One successful end-to-end smoke (Ren's tick → brief → workflow → PR → poll promotion to `ok`) has run on `dev`.

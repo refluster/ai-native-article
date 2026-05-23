@@ -172,8 +172,8 @@ git push origin main  # Triggers GitHub Actions → GitHub Pages
 | Trigger | What rebuilds | Latency |
 |---|---|---|
 | `git push` to `main` | gh-pages from current Notion content | ~3 min for the workflow |
-| Scheduled cron at **06:17 / 12:17 / 18:17 UTC** (`.github/workflows/deploy.yml`) | gh-pages from current Notion content | up to 6 hours from your Notion edit to live site |
-| `gh workflow run deploy.yml` | gh-pages from current Notion content | ~3 min — the manual lever |
+| Scheduled cron at **06:17 / 12:17 / 18:17 UTC** (`.github/workflows/deploy-article-site.yml`) | gh-pages from current Notion content | up to 6 hours from your Notion edit to live site |
+| `gh workflow run deploy-article-site.yml` | gh-pages from current Notion content | ~3 min — the manual lever |
 | `runL2Batch` / `runL3Batch` GAS triggers (09:00 / 10:00 JST) | New Notion rows — **not** the live site | next deploy picks them up |
 
 So when fixing article content: edit Notion (directly or via a GAS handler like `L2_BACKFILL`), then either wait for the next cron tick or run the workflow manually.
@@ -190,7 +190,7 @@ Installed via `setupDailyTriggers()` in `gas/src/Code.gs`. Run once from the App
 
 L2 / L3 run every 4 hours so a single stalled cycle (timeout, transient Azure error) doesn't cost a whole day's throughput. With `L2_BATCH_MAX = 2` the daily ceiling is 12 explanations — enough to drain a ~30-row backlog inside a week. `L4_BATCH_MAX = 5` keeps publish throughput aligned with the upstream production rate (up to 12 L2 + 6 L3 per day during a backlog burndown); observed per-item cost is ~35-40s, so 5 items per run lands at ~200s — comfortable under the 360s execution cap.
 
-The hour set avoids the `deploy.yml` cron window (15:17 / 21:17 / 03:17 JST) by ≥17 minutes either side — comfortable margin against the 6-min GAS execution cap.
+The hour set avoids the `deploy-article-site.yml` cron window (15:17 / 21:17 / 03:17 JST) by ≥17 minutes either side — comfortable margin against the 6-min GAS execution cap.
 
 ## Operator runbooks
 
@@ -208,7 +208,7 @@ User reports an article that ends mid-sentence (e.g. `kohuehara.xyz/.../d17e1d58
    ```
 3. Trigger a deploy so gh-pages picks up the fixed Notion content:
    ```bash
-   gh workflow run deploy.yml
+   gh workflow run deploy-article-site.yml
    ```
 4. Re-run `article-health`. Confirm 0 truncated.
 
@@ -245,7 +245,7 @@ The `L2_BACKFILL` action uses the `isTruncatedMarkdown` heuristic in `gas/src/Co
    | `l1.uncovered > 0` but `l2.createdLast7d === 0` | `L2_BATCH` is not making progress despite work being available. Either the trigger isn't installed (see `triggers` row), the daily run is hitting an exception, or every L2_CREATE attempt is throwing. | Check the Apps Script `Executions` log. If the trigger is missing from the snapshot, re-run `setupDailyTriggers()` from the editor (it's idempotent). If runs are erroring, the most common cause is Azure OpenAI / Notion auth — confirm script properties are still set. |
    | `triggers` does not list all of `runL2Batch`, `runL3Batch`, `runL4Batch` | Triggers were dropped (e.g. a project copy/restore). | Open the Apps Script editor and run `setupDailyTriggers()` once. |
    | `l2.createdLast7d > 0` but `l3.createdLast7d === 0` | L3 is gated. Either `L3_LAST_RUN_AT > newest L2` (legitimate skip), or the recent pool has < `L3_SAMPLE_SIZE` items (legitimate too). | If you want one anyway: `gas-call L3_BATCH`. The gate releases as soon as `L3_LAST_RUN_AT` is older than at least one L2 in the recent window. |
-   | `l3.createdLast7d > 0` but site still stale | Deploy lag. gh-pages cron runs `06:17 / 12:17 / 18:17 UTC`. | `gh workflow run deploy.yml`. |
+   | `l3.createdLast7d > 0` but site still stale | Deploy lag. gh-pages cron runs `06:17 / 12:17 / 18:17 UTC`. | `gh workflow run deploy-article-site.yml`. |
 
 3. After the fix, re-run `PIPELINE_STATUS` to confirm the next day's `createdLast7d` is non-zero.
 

@@ -98,8 +98,8 @@ Stack outputs you'll need next:
 
 | Output | Used in |
 |---|---|
-| `WebBucketName`        | `deploy-workforce.yml` (`AWS_S3_BUCKET` secret) |
-| `DistributionId`       | `deploy-workforce.yml` (`AWS_CLOUDFRONT_DISTRIBUTION_ID` secret) |
+| `WebBucketName`        | `deploy-workforce-console.yml` (`AWS_S3_BUCKET` secret) |
+| `DistributionId`       | `deploy-workforce-console.yml` (`AWS_CLOUDFRONT_DISTRIBUTION_ID` secret) |
 | `DistributionDomain`   | Cloudflare CNAME target (step 4) |
 | `UserPoolId`           | `VITE_COGNITO_USER_POOL_ID` build env |
 | `UserPoolClientId`     | `VITE_COGNITO_CLIENT_ID` build env |
@@ -173,7 +173,7 @@ account ID + distribution ID:
 
 Push to `main` (any change under `apps/workforce/**` triggers the
 workflow; also runnable via `workflow_dispatch`).
-`deploy-workforce.yml` builds the SPA with the `VITE_COGNITO_*`
+`deploy-workforce-console.yml` builds the SPA with the `VITE_COGNITO_*`
 secrets injected, syncs `apps/workforce/dist/` to S3, then invalidates
 the CloudFront distribution.
 
@@ -182,7 +182,7 @@ Hosted UI, then Google, then back to the dashboard.
 
 ## Ongoing operation
 
-- **Day-to-day deploys**: handled by `deploy-workforce.yml` on every
+- **Day-to-day deploys**: handled by `deploy-workforce-console.yml` on every
   push that touches `apps/workforce/` or `packages/shared/`. No manual
   steps.
 - **Rotating Google client secret**: re-run `sam deploy` with the new

@@ -29,7 +29,7 @@ This is the one-paragraph doc I wish I'd had at the start of the L2 truncation f
 
 4. **Image existence is a separate, idempotent concern.** `handleL4Batch` uses image presence on `main` as the "has L4 run for this slug?" signal — see the in-code comment at `handleL4Batch`. Don't conflate the markdown export with image generation.
 
-5. **`gh workflow run deploy.yml`** is the manual lever to force-pull current Notion content. Use it when you've just run a Notion-mutating handler (e.g. `runL2Backfill`) and don't want to wait for the cron.
+5. **`gh workflow run deploy-article-site.yml`** is the manual lever to force-pull current Notion content. Use it when you've just run a Notion-mutating handler (e.g. `runL2Backfill`) and don't want to wait for the cron.
 
 ## Common mistakes this prevents
 

@@ -125,7 +125,7 @@ The Skill is the execution unit. Two trigger surfaces, both already permitted by
 │   │     scripts/ are inert at v1 (no bash tool in the runner)      │
 │   │                                                                │
 │   └─ trigger_class=claude-code-routine                             │
-│         build task brief → workflow_dispatch wf-engineer.yml       │
+│         build task brief → workflow_dispatch workforce-engineer-routine.yml       │
 │         (existing R-N1 exception, generalised: any code-writing    │
 │          Skill, not only Ren's pr deliverable)                     │
 └────────────────────────────────────────────────────────────────────┘
@@ -142,7 +142,7 @@ The orchestrator-tick model (RFC-006 S1) already iterates agents on a 5-minute c
 The user's directive named "Claude Code Routine" as an alternative trigger source. Two readings, both supported:
 
 - **Outer trigger** — a CC Routine on a separate cron (not EventBridge) could invoke `wf-agent-runner` via API GW (v2). Not in scope here; if it lands, the run record carries `trigger_source=cc-routine` to distinguish from `trigger_source=eventbridge`.
-- **Per-Skill execution surface** — `trigger_class=claude-code-routine` Skills hand off to the existing `wf-engineer.yml` workflow. This is the path through which Skill scripts actually run; Lambda agents stay in prompt-only mode.
+- **Per-Skill execution surface** — `trigger_class=claude-code-routine` Skills hand off to the existing `workforce-engineer-routine.yml` workflow. This is the path through which Skill scripts actually run; Lambda agents stay in prompt-only mode.
 
 ### Runner integration
 
