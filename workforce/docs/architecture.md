@@ -66,7 +66,7 @@ The workforce runs on **two Lambdas** (v1). API GW–fronted Lambdas (`chat-api`
 - Calls the LLM (Anthropic or Azure OpenAI, routed by `agent.json:model`) with `finish_reason==='length'` guard (W-4).
 - Executes the deliverable's side effect:
   - `type=article` → insert into Notion DB with `Author=<slug>`. Existing GAS L4 batch picks it up and publishes to `kohuehara.xyz`.
-  - `type=pr` → trigger GHA `wf-engineer.yml` via `workflow_dispatch` (Ren only; R-N1 exception).
+  - `type=pr` → trigger GHA `workforce-engineer-routine.yml` via `workflow_dispatch` (Ren only; R-N1 exception).
   - `type=plan` / `type=design-doc` / `type=launch-plan` → write to DDB and/or Notion per the type's defined target.
 - Records `RUN#{ulid}` (cost, tokens, status) and `DELIV#{ulid}` (artefact pointer) rows in DDB. Conditional write with `memver` for memory updates (lost-update prevention).
 
@@ -79,7 +79,7 @@ wf-agent-runner (Ren)
    │
    ├─ LLM call to build the task brief (what to change, why, acceptance criteria)
    │
-   ├─ POST to GitHub Actions workflow_dispatch — wf-engineer.yml
+   ├─ POST to GitHub Actions workflow_dispatch — workforce-engineer-routine.yml
    │       │
    │       ▼
    │   Claude Code routine on GHA (writes code, opens draft PR)

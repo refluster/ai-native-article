@@ -17,7 +17,7 @@ Checklist of implementation milestones. The daily `wf-builder` routine reads thi
 - [x] **PR4** — Data plane SAM: `workforce/infra/sam/template.yaml` — DDB single-table, S3 bucket, SNS alarm topic, AWS Budget. *(Zone B)*
 - [x] **PR5** — agents-api + seed Lambdas: `workforce/lambdas/agents-api/`, `seed-agents/`, `seed-skills/`; SAM wired. *(Zone B)*
 - [x] **PR6** — Orchestrator + agent-runner: `workforce/lambdas/orchestrator/`, `agent-runner/`, shared libs. *(Zone B)*
-- [x] **PR12** — Ren's Claude Code routine path (R-N1 exception): `dispatchPrPath()`, `wf-engineer.yml` workflow. *(Zone A/B)*
+- [x] **PR12** — Ren's Claude Code routine path (R-N1 exception): `dispatchPrPath()`, `workforce-engineer-routine.yml` workflow. *(Zone A/B)*
 
 ## Phase 1 — Live surface (complete)
 
@@ -37,16 +37,16 @@ Checklist of implementation milestones. The daily `wf-builder` routine reads thi
 - [x] **discord-ping skill end-to-end (PR #75 → #77)** — Webhook trigger_class, executor=deterministic, Yuki bound to it on `cron(0 0/6 * * ? *)`. *(Zone B)*
 - [x] **Skill encapsulation refactor (PR #80)** — Each skill is now a self-contained folder (`workforce/skills/{name}/{SKILL.md, meta.json, handler.ts}`); deterministic handlers auto-registered via `workforce/scripts/build-skill-registry.mjs`. No `lambdas/` edits to add a skill. *(Zone B)*
 - [x] **VP tier + 7 new personas (RFC-009, PR #79)** — `workforce/agents/{dario,elena,kai,mira,noor,priya,theo}/`; W-3 cap raised to USD 100/mo. *(Zone B + Zone A for governance amend)*
-- [x] **SAM data-plane auto-deploy (PR #81)** — `.github/workflows/deploy-workforce-sam.yml` rolls out `wf-data-plane-prod` on push to `main` touching `workforce/{infra/sam,lambdas,skills,agents}/**`. Gated by `vars.WORKFORCE_SAM_DEPLOY_ENABLED`. *(Zone A)*
-- [ ] **wf-builder bootstrap** — Add `workforce/README.md`, `workforce/ROADMAP.md`, `workforce/docs/routine-prompt.md`, `.github/workflows/wf-builder.yml`. Acceptance: `wf-builder.yml` is mergeable with CI green and the routine-prompt.md captures the full state-machine contract. *(Zone B + Zone A for the workflow)*
+- [x] **SAM data-plane auto-deploy (PR #81)** — `.github/workflows/deploy-workforce-data-plane.yml` rolls out `wf-data-plane-prod` on push to `main` touching `workforce/{infra/sam,lambdas,skills,agents}/**`. Gated by `vars.WORKFORCE_SAM_DEPLOY_ENABLED`. *(Zone A)*
+- [ ] **wf-builder bootstrap** — Add `workforce/README.md`, `workforce/ROADMAP.md`, `workforce/docs/routine-prompt.md`, `.github/workflows/workforce-builder-routine.yml`. Acceptance: `workforce-builder-routine.yml` is mergeable with CI green and the routine-prompt.md captures the full state-machine contract. *(Zone B + Zone A for the workflow)*
 
 ## Phase 3 — Discord-ping live + first content cycle
 
 - [ ] **Operator pre-flight + flip `WORKFORCE_SAM_DEPLOY_ENABLED`** — Confirm `wf/discord-pulse-prod`, `wf/anthropic`, `wf/notion`, `wf/github` exist in Secrets Manager. Confirm repo secrets `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` are populated. Flip `vars.WORKFORCE_SAM_DEPLOY_ENABLED = true`. *(operator action, no PR)*
-- [ ] **Enable orchestrator tick** — Flip `Enabled: false → true` for `wf-orchestrator-tick-prod` in `workforce/infra/sam/template.yaml`. Merge triggers `deploy-workforce-sam.yml`, which rolls the change-set out. Acceptance: orchestrator tick fires every 5 minutes in CloudWatch without errors; first `[wf-pulse] yuki alive at ...` appears in Discord within 6h. *(Zone B — SAM template, operator approval required per §5)*
-- [ ] **Ren end-to-end smoke-test** — Manually trigger `wf-agent-runner` for Ren with `task_kind=pr` (dry or real). Verify: brief appears in S3 at `pr-briefs/ren/{deliv_id}.md`, `wf-engineer.yml` is dispatched, draft PR appears, orchestrator poll promotes `DELIV#{id}` to `ok`. Fix any gap. *(Zone B, runbook addition only)*
+- [ ] **Enable orchestrator tick** — Flip `Enabled: false → true` for `wf-orchestrator-tick-prod` in `workforce/infra/sam/template.yaml`. Merge triggers `deploy-workforce-data-plane.yml`, which rolls the change-set out. Acceptance: orchestrator tick fires every 5 minutes in CloudWatch without errors; first `[wf-pulse] yuki alive at ...` appears in Discord within 6h. *(Zone B — SAM template, operator approval required per §5)*
+- [ ] **Ren end-to-end smoke-test** — Manually trigger `wf-agent-runner` for Ren with `task_kind=pr` (dry or real). Verify: brief appears in S3 at `pr-briefs/ren/{deliv_id}.md`, `workforce-engineer-routine.yml` is dispatched, draft PR appears, orchestrator poll promotes `DELIV#{id}` to `ok`. Fix any gap. *(Zone B, runbook addition only)*
 - [ ] **First live Sora article** — Sora's tick fires (or manual invocation), produces a synthesis, inserts into Notion, GAS L4 picks it up, article appears on `kohuehara.xyz` with `Author=sora` byline and non-empty eval sidecar. Acceptance: `article-health` reports 0 truncated for the new article. *(Zone B)*
-- [ ] **wf-builder routine verified** — Confirm at least two consecutive daily `wf-builder.yml` runs complete without error (either opens a PR or posts "waiting on human merge"). *(Zone B, ROADMAP update only)*
+- [ ] **wf-builder routine verified** — Confirm at least two consecutive daily `workforce-builder-routine.yml` runs complete without error (either opens a PR or posts "waiting on human merge"). *(Zone B, ROADMAP update only)*
 
 ## Phase 4 — Content cadence
 

@@ -1,6 +1,6 @@
 # workforce-builder — Routine Contract
 
-This file is the stable, authoritative contract for the **`workforce-builder`** Claude Code routine. The `.github/workflows/wf-builder.yml` workflow passes this file's EXECUTION block verbatim as the `direct_prompt` for every daily run.
+This file is the stable, authoritative contract for the **`workforce-builder`** Claude Code routine. The `.github/workflows/workforce-builder-routine.yml` workflow passes this file's EXECUTION block verbatim as the `direct_prompt` for every daily run.
 
 **Zone:** B (operator runbook). Agents may edit and merge; changes that loosen a mechanical check or alter the state-machine invariants should be escalated (`§5` of `workforce/docs/governance.md`).
 

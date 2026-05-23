@@ -15,7 +15,7 @@ const GITHUB_API = "https://api.github.com";
 export interface DispatchEngineerInput {
   owner: string;
   repo: string;
-  /** Workflow filename or numeric id (e.g. "wf-engineer.yml"). */
+  /** Workflow filename or numeric id (e.g. "workforce-engineer-routine.yml"). */
   workflow: string;
   /** Ref to dispatch from (usually the default branch). */
   ref: string;

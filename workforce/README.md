@@ -38,8 +38,8 @@ workforce/skills/{name}/
 
 Two recurring Claude Code routines keep the workforce running:
 
-- **`wf-builder`** (`.github/workflows/wf-builder.yml`, daily) — implements the next unchecked item from `ROADMAP.md` and opens a draft PR. See [docs/routine-prompt.md](docs/routine-prompt.md) for the full contract.
-- **`wf-engineer`** (`.github/workflows/wf-engineer.yml`, on-demand) — Ren's R-N1 exception path. Triggered by the orchestrator Lambda when Ren's cron fires; writes code and opens a draft PR.
+- **`wf-builder`** (`.github/workflows/workforce-builder-routine.yml`, daily) — implements the next unchecked item from `ROADMAP.md` and opens a draft PR. See [docs/routine-prompt.md](docs/routine-prompt.md) for the full contract.
+- **`wf-engineer`** (`.github/workflows/workforce-engineer-routine.yml`, on-demand) — Ren's R-N1 exception path. Triggered by the orchestrator Lambda when Ren's cron fires; writes code and opens a draft PR.
 
 ## Deploying
 
@@ -47,8 +47,8 @@ Both stacks deploy via GitHub Actions on push to `main`:
 
 | Stack | Workflow | Triggered by changes to |
 |---|---|---|
-| `wf-data-plane-prod` | `.github/workflows/deploy-workforce-sam.yml` | `workforce/{infra/sam,lambdas,skills,agents}/**` |
-| `wf-web-prod` | `.github/workflows/deploy-workforce.yml` | `apps/workforce/**`, `packages/shared/**`, `workforce/agents/**` (manifest) |
+| `wf-data-plane-prod` | `.github/workflows/deploy-workforce-data-plane.yml` | `workforce/{infra/sam,lambdas,skills,agents}/**` |
+| `wf-web-prod` | `.github/workflows/deploy-workforce-console.yml` | `apps/workforce/**`, `packages/shared/**`, `workforce/agents/**` (manifest) |
 
 Both workflows are gated by repo variables so the first PR that lands them is a no-op until the operator wires up AWS credentials:
 

@@ -280,7 +280,7 @@ async function runClaudeCodeRoutine(
   const delivId = newUlid();
   const owner = process.env.ENGINEER_OWNER ?? "refluster";
   const repo = process.env.ENGINEER_REPO ?? "ai-native-article";
-  const workflow = process.env.ENGINEER_WORKFLOW ?? "wf-engineer.yml";
+  const workflow = process.env.ENGINEER_WORKFLOW ?? "workforce-engineer-routine.yml";
   const ref = process.env.ENGINEER_REF ?? "main";
 
   const briefKey = `pr-briefs/${event.agent}/${delivId}.md`;

@@ -136,7 +136,7 @@ edit prompt (versioned)
         → promote (replace primary prompt)
           → batch on Notion corpus (L2_BACKFILL, etc.)
             → article-health sweep
-              → deploy (gh workflow run deploy.yml)
+              → deploy (gh workflow run deploy-article-site.yml)
 ```
 
 Each step is the friction point candidate for the next skill or automation. Current friction map (2026-05-16):
@@ -146,7 +146,7 @@ Each step is the friction point candidate for the next skill or automation. Curr
 - **shadow run** — no harness yet. The current ersatz is `L2_BACKFILL` with `mode='all'` against a small slug list. A proper shadow harness (call both old and new prompt, dump pair to disk for comparison) is a worthwhile future skill.
 - **operator glance** — informal; operator opens 2-3 Notion rows in the browser.
 - **promote** — for inline prompts, this is a `gas/src/Code.gs` edit + `gas-deploy-verify`. For extracted prompts, it becomes a file replacement + redeploy.
-- **batch + article-health + deploy** — covered by existing skills (`gas-call`, `article-health`, the `deploy.yml` workflow).
+- **batch + article-health + deploy** — covered by existing skills (`gas-call`, `article-health`, the `deploy-article-site.yml` workflow).
 
 Things that are conspicuously missing and likely worth adding (each is an A action when an agent undertakes it):
 

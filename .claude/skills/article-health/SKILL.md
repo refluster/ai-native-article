@@ -28,7 +28,7 @@ Reports, per slug:
 - `OK` — clean ending on gh-pages, body matches the latest Notion export length within tolerance.
 - `TRUNCATED_PUBLISHED` — gh-pages body ends mid-sentence. Backfill via `L2_BACKFILL` (Notion may also be truncated; check the next column).
 - `TRUNCATED_NOTION` — Notion body is currently truncated. The fix is `runL2Backfill`; gh-pages will follow on next deploy.
-- `STALE_DEPLOY` — gh-pages body is shorter than Notion's (or character-count differs > 5%). The fix is `gh workflow run deploy.yml` or wait for the 06:17 / 12:17 / 18:17 UTC cron.
+- `STALE_DEPLOY` — gh-pages body is shorter than Notion's (or character-count differs > 5%). The fix is `gh workflow run deploy-article-site.yml` or wait for the 06:17 / 12:17 / 18:17 UTC cron.
 - `MISSING_ON_PAGES` — exists in Notion as published, but no markdown on gh-pages. Usually means `handleL4Batch` hasn't run yet (image generation pending) — not a bug per se.
 
 ## Truncation heuristic

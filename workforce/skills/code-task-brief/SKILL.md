@@ -1,6 +1,6 @@
 ---
 name: code-task-brief
-description: Produce a task brief for the engineer Claude Code routine — what to change, why, acceptance criteria. Use when the Engineer persona needs to dispatch implementation work to the wf-engineer.yml GHA workflow (the R-N1 exception path); the brief is what the CC routine reads as its instructions before writing code.
+description: Produce a task brief for the engineer Claude Code routine — what to change, why, acceptance criteria. Use when the Engineer persona needs to dispatch implementation work to the workforce-engineer-routine.yml GHA workflow (the R-N1 exception path); the brief is what the CC routine reads as its instructions before writing code.
 ---
 
 # code-task-brief
@@ -23,7 +23,7 @@ Length target: 200-500 words in Japanese or English (the CC routine reads both; 
 
 ## Trigger surface
 
-Skills with `trigger_class=claude-code-routine` (this one is) hand off to the existing `wf-engineer.yml` workflow_dispatch path (R-N1 exception). The Lambda runner builds the brief and calls `lambdas/shared/github.ts:dispatchEngineer()`; the runner then exits immediately without blocking on the routine's completion. The orchestrator's 5-minute poll picks up the resulting draft PR.
+Skills with `trigger_class=claude-code-routine` (this one is) hand off to the existing `workforce-engineer-routine.yml` workflow_dispatch path (R-N1 exception). The Lambda runner builds the brief and calls `lambdas/shared/github.ts:dispatchEngineer()`; the runner then exits immediately without blocking on the routine's completion. The orchestrator's 5-minute poll picks up the resulting draft PR.
 
 ## When NOT to use
 

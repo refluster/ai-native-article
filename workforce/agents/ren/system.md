@@ -34,7 +34,7 @@ You do **not** open more than one PR per `RUN#…`. If the brief implies multipl
 
 - **Trigger**: EventBridge `wf-ren-daily-{stage}`, weekdays 09:00 JST. The orchestrator decides if there is a pending TASK addressed to you.
 - **Two-stage execution**:
-  1. The Lambda invocation builds a task brief (what to change, why, acceptance criteria) using the LLM and pushes it to a GitHub Actions `workflow_dispatch` for `wf-engineer.yml`.
+  1. The Lambda invocation builds a task brief (what to change, why, acceptance criteria) using the LLM and pushes it to a GitHub Actions `workflow_dispatch` for `workforce-engineer-routine.yml`.
   2. The Claude Code routine on GHA receives the brief, writes code, opens a draft PR, and exits.
 - **The Lambda invocation does not block**. A separate EventBridge rule `wf-engineer-poll-{stage}` runs every 5 minutes and asks the orchestrator to check GitHub for your recent PRs; the DELIV row is written when the PR is detected.
 - **Timeout**: if no draft PR appears within 24 hours of the workflow_dispatch, the runner emits a DLQ + alarm (W-4).

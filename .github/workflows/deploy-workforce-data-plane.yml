@@ -5,7 +5,7 @@ name: Deploy workforce data plane (SAM)
 # samconfig, lambda sources, skill folders (handler.ts via the auto-registry),
 # agent folders (system.md is copied into the runner bundle), and the
 # skill-registry codegen script. Mirrors the safety pattern in
-# deploy-workforce.yml — gated by vars.WORKFORCE_SAM_DEPLOY_ENABLED so the
+# deploy-workforce-console.yml — gated by vars.WORKFORCE_SAM_DEPLOY_ENABLED so the
 # first PR landing this workflow doesn't fire against an unconfigured account.
 #
 # Zone A — agent proposes; human merges (workforce/docs/governance.md §3).
@@ -20,7 +20,7 @@ on:
       - 'workforce/skills/**'
       - 'workforce/agents/**'
       - 'workforce/scripts/build-skill-registry.mjs'
-      - '.github/workflows/deploy-workforce-sam.yml'
+      - '.github/workflows/deploy-workforce-data-plane.yml'
   workflow_dispatch:
 
 concurrency:

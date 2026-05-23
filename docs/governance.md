@@ -101,16 +101,16 @@ Whatever portion of L0/L1 a machine can check, it should. These are the guards a
 | # | Regulation | Tool | Where | Status |
 |---|---|---|---|---|
 | R-1 | GAS manifest sanity (only `gas/appsscript.json`) | `node scripts/check-gas-manifest.mjs` | `npm run push-gas` precondition | ✅ |
-| R-2 | Design-token lint | `node scripts/lint-design-tokens.mjs` | CI in `deploy.yml` | ✅ |
+| R-2 | Design-token lint | `node scripts/lint-design-tokens.mjs` | CI in `deploy-article-site.yml` | ✅ |
 | R-3 | `finish_reason === 'length'` throw | runtime in `azureGenerateText` | every L2/L3/etc. handler | ✅ added 2026-05-03 |
 | R-4 | Empty-content throw | runtime in `azureGenerateText` | same | ✅ |
 | R-5 | Truncation heuristic on regenerated content | runtime in `handleL2Backfill` | `runL2Backfill` operator action | ✅ added 2026-05-03 |
 | R-6 | Deploy-verify supportedActions probe | `.claude/skills/gas-deploy-verify/` | manual after `gas/src/Code.gs` edits | ✅ |
 | R-7 | Article health sweep | `.claude/skills/article-health/` | manual / future cron | ✅ |
-| R-8 | TypeScript typecheck on React app | implicit via `vite build` | `deploy.yml` | ✅ |
-| R-9 | Sitemap generation succeeds | `npm run sitemap` | `deploy.yml` | ✅ |
+| R-8 | TypeScript typecheck on React app | implicit via `vite build` | `deploy-article-site.yml` | ✅ |
+| R-9 | Sitemap generation succeeds | `npm run sitemap` | `deploy-article-site.yml` | ✅ |
 
-**Policy.** R-3 and R-4 are runtime invariants — no agent may catch and ignore them; the right fix is to bump the `maxCompletionTokens` bracket. R-5 is a precondition for `L2_BACKFILL`; if it ever fires there's a deeper bug. R-1, R-2, R-8, R-9 must stay green for `deploy.yml` to ship. The skills (R-6, R-7) are advisory but should be run after every `gas/src/Code.gs` edit and after every user-reported content issue respectively.
+**Policy.** R-3 and R-4 are runtime invariants — no agent may catch and ignore them; the right fix is to bump the `maxCompletionTokens` bracket. R-5 is a precondition for `L2_BACKFILL`; if it ever fires there's a deeper bug. R-1, R-2, R-8, R-9 must stay green for `deploy-article-site.yml` to ship. The skills (R-6, R-7) are advisory but should be run after every `gas/src/Code.gs` edit and after every user-reported content issue respectively.
 
 **Loosening.** Tightening any of R-1…R-9 is L2 work and an agent may do it freely. **Loosening or disabling any of them requires operator approval** — drop the line in chat with the rationale, wait for explicit yes.
 
@@ -124,7 +124,7 @@ These are what the operator (or an agent acting as operator) actually does. Each
 |---|---|---|
 | Article truncated mid-sentence | User reports a broken article on `kohuehara.xyz` | [L1-L4-PIPELINE.md §Operator runbooks](../L1-L4-PIPELINE.md) |
 | Adding a new GAS action | Editing `gas/src/Code.gs` to add a `case 'X'` to `doPost` | [L1-L4-PIPELINE.md §Operator runbooks](../L1-L4-PIPELINE.md) |
-| Force a fresh deploy | "I just edited Notion and want it live now" | `gh workflow run deploy.yml` (documented in [L1-L4-PIPELINE.md](../L1-L4-PIPELINE.md)) |
+| Force a fresh deploy | "I just edited Notion and want it live now" | `gh workflow run deploy-article-site.yml` (documented in [L1-L4-PIPELINE.md](../L1-L4-PIPELINE.md)) |
 | Daily content sweep (advisory) | Once a day, or after any GAS change | `.claude/skills/article-health/` |
 
 Skills are L3 in their entirety: each `SKILL.md` is the runbook, each `scripts/*.mjs` is the executable form.
