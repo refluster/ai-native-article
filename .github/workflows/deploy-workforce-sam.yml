@@ -1,0 +1,93 @@
+name: Deploy workforce data plane (SAM)
+
+# Auto-deploys the wf-data-plane-{stage} CloudFormation stack on changes
+# to anything the agent-runner / orchestrator Lambdas bundle: SAM template,
+# samconfig, lambda sources, skill folders (handler.ts via the auto-registry),
+# agent folders (system.md is copied into the runner bundle), and the
+# skill-registry codegen script. Mirrors the safety pattern in
+# deploy-workforce.yml — gated by vars.WORKFORCE_SAM_DEPLOY_ENABLED so the
+# first PR landing this workflow doesn't fire against an unconfigured account.
+#
+# Zone A — agent proposes; human merges (workforce/docs/governance.md §3).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workforce/infra/sam/template.yaml'
+      - 'workforce/infra/sam/samconfig.toml'
+      - 'workforce/lambdas/**'
+      - 'workforce/skills/**'
+      - 'workforce/agents/**'
+      - 'workforce/scripts/build-skill-registry.mjs'
+      - '.github/workflows/deploy-workforce-sam.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-workforce-sam
+  # Never interrupt a deploy mid-flight — CloudFormation rollbacks from
+  # a half-applied change-set are more expensive than waiting for the
+  # current run to finish.
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Operator pre-flight: see workforce/infra/sam/README.md. Flip the
+    # repo variable WORKFORCE_SAM_DEPLOY_ENABLED to 'true' once secrets
+    # (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY) are populated and
+    # wf/discord-pulse-prod + wf/anthropic + wf/notion + wf/github are
+    # provisioned in Secrets Manager.
+    if: vars.WORKFORCE_SAM_DEPLOY_ENABLED == 'true'
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: workforce/lambdas/package-lock.json
+
+      - name: Install lambda deps
+        # The Lambda Makefiles invoke ../node_modules/.bin/esbuild — that
+        # path resolves from workforce/lambdas/{function}/ to esbuild
+        # installed at workforce/lambdas/node_modules/. `build_in_source =
+        # true` in samconfig keeps the relative path valid during sam build.
+        run: npm ci
+        working-directory: workforce/lambdas
+
+      - name: Regenerate skill registry
+        # Defence-in-depth: also runs inside the agent-runner Makefile,
+        # but doing it here catches a drift before sam-build wastes a minute.
+        run: node workforce/scripts/build-skill-registry.mjs --check
+
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-1
+
+      - name: SAM build
+        run: sam build
+        working-directory: workforce/infra/sam
+
+      - name: SAM deploy (prod)
+        # --no-confirm-changeset overrides samconfig's confirm_changeset=true
+        # (needed for non-interactive CI). --no-fail-on-empty-changeset
+        # makes deploys that don't change anything (e.g. a workflow-only
+        # PR re-trigger) exit clean instead of failing.
+        run: |
+          sam deploy \
+            --config-env prod \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset
+        working-directory: workforce/infra/sam
