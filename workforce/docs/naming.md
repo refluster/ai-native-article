@@ -44,7 +44,7 @@ The script runs in CI as `npm run workforce:naming` and exits non-zero on violat
 
 1. **Directory names under `workforce/{agents,lambdas,skills}/`** must match `^[a-z][a-z0-9-]*$`. Caps, underscores, or trailing punctuation fail.
 2. **Agent slugs (`workforce/agents/{slug}/`)** must match `^[a-z]+$` — single lowercase token, no digits, no hyphens.
-3. **TS source files under `workforce/lambdas/**`** must be `kebab-case.ts` (lowercase with `-` separators) — no `PascalCase.ts`, no `camelCase.ts`.
+3. **TS source files under `workforce/lambdas/**` and `workforce/skills/**`** must be `kebab-case.ts` (lowercase with `-` separators) — no `PascalCase.ts`, no `camelCase.ts`. Skills can bundle their own `handler.ts` (and future co-bundled helpers) in the skill folder; the kebab-case rule applies there as well.
 4. **Markdown files under `workforce/docs/`** must be `kebab-case.md`.
 5. **SAM template (`workforce/infra/sam/template.yaml`)** — when present, deployed resource names referenced via `FunctionName`, `TableName`, `BucketName`, `RuleName`, `TopicName`, `QueueName`, and similar `*Name` properties must start with `wf-` and end with `-{stage}` (or `-${Stage}` / `${WorkforceStage}` token references).
 6. **`agents/{slug}/agent.json:slug` field** (when present) must equal the directory name.

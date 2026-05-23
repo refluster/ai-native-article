@@ -51,7 +51,8 @@ for (const e of listDir(join(WORKFORCE_ROOT, "agents"))) {
   }
 }
 
-// Rule 3: TS files under lambdas/ are kebab-case
+// Rule 3: TS files under lambdas/ and skills/ are kebab-case
+// (skills/{name}/handler.ts and any future co-bundled helpers).
 const walkTs = (dir) => {
   for (const e of listDir(dir)) {
     if (e.stat.isDirectory()) {
@@ -65,6 +66,7 @@ const walkTs = (dir) => {
   }
 };
 walkTs(join(WORKFORCE_ROOT, "lambdas"));
+walkTs(join(WORKFORCE_ROOT, "skills"));
 
 // Rule 4: markdown files anywhere under docs/ are kebab-case
 const walkMd = (dir) => {

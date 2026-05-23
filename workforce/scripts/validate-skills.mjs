@@ -234,6 +234,25 @@ for (const name of skillDirs) {
   if (typeof meta.created_at !== "string" || !ISO_DATE.test(meta.created_at)) {
     v("J10-created-at", metaJson, `created_at "${meta.created_at}" must be YYYY-MM-DD`);
   }
+
+  // ── executor=deterministic requires a sibling handler.ts ─────────────────
+  // The skill bundle is self-contained: SKILL.md + meta.json + handler.ts.
+  // The agent-runner picks up the handler via the build-time generated
+  // skill-registry-generated.ts (workforce/scripts/build-skill-registry.mjs).
+  if (meta.executor === "deterministic") {
+    const handlerTs = join(dir, "handler.ts");
+    if (!existsSync(handlerTs)) {
+      v("J11-deterministic-handler-missing", dir, "executor=deterministic requires handler.ts in the skill folder");
+    }
+  } else {
+    // llm-prose / claude-code-routine skills do not bundle a TS handler —
+    // the runner interprets them. Forbid an orphan handler.ts so the
+    // executor field stays the single source of truth.
+    const handlerTs = join(dir, "handler.ts");
+    if (existsSync(handlerTs)) {
+      v("J11-handler-orphan", handlerTs, `executor=${meta.executor} must not have a handler.ts (only executor=deterministic does)`);
+    }
+  }
 }
 
 if (violations.length === 0) {

@@ -40,3 +40,6 @@ jobs:
 
       - name: Workforce skill schema
         run: npm run workforce:skills
+
+      - name: Workforce skill registry freshness
+        run: npm run workforce:skill-registry:check
