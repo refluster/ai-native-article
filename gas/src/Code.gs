@@ -261,11 +261,14 @@ function azureGenerateText(prompt, apiKey, options) {
       { role: 'system', content: systemPrompt },
       { role: 'user',   content: prompt },
     ],
-    temperature: 0.7,
-    // gpt-5.4 is reasoning-family and rejects the legacy `max_tokens`
-    // parameter with HTTP 400 `unsupported_parameter`; use the newer
-    // `max_completion_tokens` instead. Verified by direct Azure probe
-    // of the deployment on 2026-04-23.
+    // `temperature` is intentionally omitted. gpt-5.4 is a reasoning-family
+    // deployment that rejects non-default temperatures with HTTP 400
+    // `unsupported_value` ("Only the default (1) value is supported").
+    // Verified live by an L2_BATCH probe on 2026-05-22.
+    //
+    // gpt-5.4 also rejects the legacy `max_tokens` parameter with HTTP 400
+    // `unsupported_parameter`; use the newer `max_completion_tokens` instead.
+    // Verified by direct Azure probe of the deployment on 2026-04-23.
     max_completion_tokens: options.maxCompletionTokens || 2000,
   };
 
@@ -332,18 +335,14 @@ function azureGenerateText(prompt, apiKey, options) {
 // truncates to fit the prompt budget, and returns null on any failure so the
 // caller can fall back to the L1 summary alone.
 
-// Reasoning-model latency scales with input size. 30k chars hit the 360s
-// cap (pre PR #71); 12k chars (PR #71) ALSO hit the 360s cap (5 consecutive
-// timeouts 2026-05-22). reasoning_effort='low' alone wasn't enough — either
-// Azure isn't honoring it on this gpt-5.4 deployment, or the floor latency
-// is still north of the budget. 4k chars (~1k tokens) is the floor: still
-// enough to ground a ~3000-字 Japanese briefing on the opening sections of
-// a source article, and small enough that even an ignored reasoning_effort
-// can't blow the budget. The Logger.log dump in azureGenerateText (look for
-// `reasoning_tokens` in the usage line) will tell us if reasoning_effort
-// is actually being applied; if it is and we're STILL slow, the next lever
-// is api-version or a different deployment, not more input cuts.
-const L2_SOURCE_TEXT_LIMIT = 4000; // characters fed into the prompt
+// Source-text input cap. PR #71/#72 ratcheted this down to 4k chars
+// under the (wrong) hypothesis that single-call Azure wall-clock was the
+// 360s-timeout culprit. The real cause was fetchSourceText hanging on
+// consent-walled CDN sites; PR #74's Jina Reader routing fixed it. With
+// fetch latency back in seconds, we can ground L2 on the full article
+// again: 30k chars is plenty for a long Jina-extracted body without
+// stressing the Azure call (which is comfortably <120s even at this size).
+const L2_SOURCE_TEXT_LIMIT = 30000; // characters fed into the prompt
 
 // Hosts where direct UrlFetchApp.fetch is either pointless (JS-only feeds
 // like X/Twitter) or known to hang the response stream until the 360s GAS
@@ -504,15 +503,13 @@ function generateL2Markdown(l1Title, l1Summary, l1SourceUrl, config) {
   }
   const prompt = buildL2Prompt(l1Title, l1Summary, l1SourceUrl, sourceText);
   Logger.log(`[L2_MD] prompt built: ${prompt.length} chars`);
-  // reasoning_effort='low': L2 is faithful summarization of an existing
-  // source, not novel synthesis. Heavy reasoning was driving single-call
-  // wall-clock past the 360s GAS cap. The finish_reason='length' guard in
-  // azureGenerateText still catches under-budgeted output, so a quality
-  // regression surfaces as a thrown error, not a silently-truncated publish.
+  // No explicit reasoning_effort: PR #71 set it to 'low' under the wrong
+  // assumption that Azure wall-clock drove the 360s timeouts. With the
+  // real cause (UrlFetchApp hangs) fixed in PR #74, we let the deployment
+  // use its default reasoning depth for higher-quality briefings.
   const tAzure0 = Date.now();
   const out = azureGenerateText(prompt, config.azure_openapi_key, {
     maxCompletionTokens: 8000,
-    reasoningEffort: 'low',
   });
   Logger.log(`[L2_MD] azure call: ${Date.now() - tAzure0}ms (output ${out.length} chars)`);
   return out;
@@ -1641,17 +1638,11 @@ function handleL3BackfillDate(_data, config) {
 // Per-run caps keep each invocation well under the 6-minute GAS timeout.
 
 // L2_BATCH: for each L1 whose source URL isn't yet referenced by any L2,
-// create an L2 blog. Oldest-first, up to L2_BATCH_MAX per run.
-//
-// MAX=1 is intentional. The 2026-05-22 incident (5 consecutive 360s
-// "Timed Out" runs after PR #71's reasoning_effort='low' fix) showed
-// that a single handleL2Create call can still exhaust the 360s GAS cap
-// even with the Azure budget tightened. Until per-call wall-clock is
-// proven back under ~150s by the Logger.log traces this PR adds, we
-// process exactly one L1 per run — at worst one item completes, at
-// worst-worst one item fails, but the batch always returns a response
-// rather than dying mid-iteration with no observability.
-const L2_BATCH_MAX = 1;
+// create an L2 blog. Oldest-first, up to L2_BATCH_MAX per run. With the
+// real 360s-timeout cause (UrlFetchApp hangs on consent-walled hosts)
+// fixed in PR #74 (Jina Reader routing), one item runs in ~30-90s and
+// two items fit comfortably under the L2_BATCH_DEADLINE_MS budget.
+const L2_BATCH_MAX = 2;
 const L2_BATCH_DEADLINE_MS = 330 * 1000;   // 30s safety margin under 360
 const L2_BATCH_ITEM_RESERVE_MS = 250 * 1000; // worst-case handleL2Create headroom (5/19: 240s+)
 function handleL2Batch(_data, config) {

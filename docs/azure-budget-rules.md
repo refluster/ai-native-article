@@ -6,7 +6,7 @@
 
 The L2 truncation bug (visible until 2026-05-03 on `kohuehara.xyz/.../d17e1d58ec42`) shipped because L2's call to `azureGenerateText` used the 2000-token default while L3's call correctly overrode to 8000. The token-bracket rule below would have caught it at code-review.
 
-The follow-up L2 timeout bug (5 consecutive `runL2Batch` failures at the 360s GAS execution cap, 2026-05-19 → 2026-05-22) was the same shape on a different axis: the doc only constrained output budget, not wall-clock. The wall-clock rule below now covers it.
+The L2 timeout episode (5 consecutive `runL2Batch` failures at the 360s GAS execution cap, 2026-05-19 → 2026-05-22) initially looked like an Azure wall-clock problem; the fix was wrongly aimed at `reasoning_effort` and input caps for two PR cycles. Logger.log instrumentation in PR #72 surfaced the real cause: `UrlFetchApp.fetch` was hanging on consent-walled CDN-served source URLs (McKinsey on Akamai, etc.) before Azure was ever called. PR #74 fixed it by routing those hosts through Jina Reader. The wall-clock guidance below remains as a sanity check, but the L2 row no longer needs the aggressive degradation those wrong-diagnosis PRs introduced.
 
 ## The rule
 
@@ -24,26 +24,23 @@ Every call to `azureGenerateText` MUST set `maxCompletionTokens` explicitly to o
 
 Brackets are easier to enforce than per-call tuning: any new call site picks one of three numbers; reviewers don't need to predict reasoning depth.
 
-## Wall-clock rule (reasoning_effort + input size)
+## Wall-clock rule (input size, default `reasoning_effort`)
 
-`max_completion_tokens` bounds output cost but not latency. For reasoning-family deployments (`gpt-5.4`), single-call wall-clock is driven by:
-
-- `reasoning_effort` (default = deployment-chosen, often `medium`+)
-- input length (prompt + any source text we hand in)
-
-Both must be sized so a **single call** completes well under the **GAS hard execution cap of 360s**. `handleL2Batch` budgets 250s per item; staying under 150s typical / 250s worst-case is the implicit contract.
+`max_completion_tokens` bounds output cost but not latency. For reasoning-family deployments (`gpt-5.4`), single-call wall-clock scales primarily with **input length**. Each call must complete well under the **GAS hard execution cap of 360s**; `handleL2Batch` budgets 250s per item.
 
 | Stage | `reasoning_effort` | Input cap | Rationale |
 |---|---|---|---|
-| L1_SAVE | (unset / `low`) | full L1 payload | Short structured output; reasoning cost negligible |
-| **L2_CREATE / L2_BACKFILL** | **`low`** | **`L2_SOURCE_TEXT_LIMIT = 4000` chars** | Faithful summarization of an existing source — mechanical, not novel synthesis. 30k chars hit the 360s cap; 12k chars also hit it (reasoning_effort apparently not honored on the current `gpt-5.4` deployment / api-version). 4k chars is the floor at which an ignored `reasoning_effort` cannot blow the budget. The `[AZURE]` Logger.log line in `azureGenerateText` dumps `reasoning_tokens`; if that drops with `reasoning_effort='low'`, the param is honored and we can revisit the input cap upward |
-| L3_CREATE / L3_BATCH | (unset for now) | 3 L2s × full body | Novel synthesis across multiple inputs; reasoning is the value-add. If L3 ever starts timing out, add `reasoning_effort: 'medium'` and revisit input cap |
+| L1_SAVE | (unset) | full L1 payload | Short structured output; reasoning cost negligible |
+| L2_CREATE / L2_BACKFILL | (unset) | `L2_SOURCE_TEXT_LIMIT = 30000` chars | Faithful summarization of an existing source. Source body comes pre-extracted as clean Markdown when a host is on `L2_SOURCE_FETCH_VIA_READER` (Jina Reader). At default reasoning depth + 30k input, single-call wall-clock measures ~30–90s — comfortably inside the 250s per-item budget |
+| L3_CREATE / L3_BATCH | (unset) | 3 L2s × full body | Novel synthesis across multiple inputs; reasoning is the value-add. If L3 ever starts timing out, add `reasoning_effort: 'medium'` and revisit input cap |
 | Panel / future Heavy | `medium`+ ok | TBD | Reserved |
 
+**Constraint:** `gpt-5.4` rejects non-default `temperature` with HTTP 400 `unsupported_value` ("Only the default (1) value is supported"). `azureGenerateText` omits the parameter — do not re-add it.
+
 When adding a new call site that does prose generation:
-1. Pick `reasoning_effort` from the table (or justify a different choice in the PR).
+1. Leave `reasoning_effort` unset unless wall-clock telemetry shows you need it.
 2. If you feed in fetched source text, declare a `*_SOURCE_TEXT_LIMIT` constant near the fetch helper.
-3. After the first cron run on real input, check the Apps Script Executions tab. If single-call wall-clock > 200s, lower `reasoning_effort` or tighten the input cap before it pushes a batch over 360s.
+3. After the first cron run on real input, check the Apps Script Executions tab. If single-call wall-clock > 200s, lower the input cap or add `reasoning_effort: 'low'`/`'medium'` before it pushes a batch over 360s.
 
 ## Mechanical guard
 
