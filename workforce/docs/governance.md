@@ -26,7 +26,7 @@ Non-negotiable. A request that would force a violation must be refused or escala
 
 - **W-1 Editorial integrity.** Any article published under a persona byline on `kohuehara.xyz` must be free of mid-sentence truncation, empty bodies, and LLM-failure artefacts. Extends C-1 by attaching responsibility to the persona, not just the site.
 - **W-2 No double source-of-truth.** Article content is owned by Notion (inherits C-2). Workforce state — agent definitions, tasks, runs, deliverables, memory — is owned by DynamoDB + S3. The two domains never cross: Notion never holds workforce state, DDB never holds article body text.
-- **W-3 Cost ceiling.** A monthly token budget per agent is enforced at the LLM call site (throw on overrun). A CloudWatch Billing Alarm covers the deployment as a whole. Initial cap: USD 50/month combined. Raising the cap is a Zone A change.
+- **W-3 Cost ceiling.** A monthly token budget per agent is enforced at the LLM call site (throw on overrun). A CloudWatch Billing Alarm covers the deployment as a whole. Initial cap: USD 100/month combined (raised from USD 50/mo on 2026-05-23 to accommodate the VP layer introduced by RFC-009). Raising the cap is a Zone A change.
 - **W-4 Fail loud.** `finish_reason==='length'`, Notion/GitHub API errors, memory `memver` conflicts, and 24h Engineer-PR timeouts (R-N1 exception path) all throw or DLQ. No silent degradation. Inherits C-4 with the new failure modes named.
 - **W-5 Persona stability.** A bump to any agent's `system.md` (prompt-version) is its own PR (inherits AGENTS.md Rule 11). No PR may bump more than one persona's system.md or more than one skill's `SKILL.md` body. A PR that bumps a `SKILL.md` body must also bump that skill's `meta.json:version` in the same PR (the two are co-versioned). A PR may not combine a persona `system.md` bump with a skill `SKILL.md` bump; each is its own PR even when conceptually paired. The first version of every persona (PR2 of the rebuild) and the first version of every skill (PR3 of the rebuild) are documented exceptions — first version is not a bump.
 
@@ -84,7 +84,7 @@ Defaults for an agent acting on a workforce task. The matrix below tightens [AGE
 | Bump an existing persona's `system.md` (prompt-version). | **B** (escalate) | One agent per PR, human merge (W-5, Rule 11). |
 | Bump an existing skill's `SKILL.md` body (prompt-version). | **B** | Same one-per-PR discipline. |
 | Add a new EventBridge cron rule or enable a previously-disabled rule. | **B** | Affects schedule and cost; operator approval before flipping `Enabled: true`. |
-| Raise the W-3 cost ceiling (`USD 50/mo` default). | **B** | Zone A change to this doc. |
+| Raise the W-3 cost ceiling (`USD 100/mo` default). | **B** | Zone A change to this doc. |
 | Add a new AWS service to the SAM template (e.g., adding SQS, Step Functions). | **B** | Probable R-N1..R-N5 violation. Discuss before opening the PR. |
 | Edit `workforce/docs/governance.md` §2 (W-1..W-5). | **B** | L0 amendments are Zone A by definition; requires explicit operator approval, not just review. |
 | Loosen, disable, or skip the `validate-naming.mjs` check. | **B** | R-N7 tightening only — never loosening — without §2 amendment. |

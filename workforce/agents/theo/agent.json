@@ -1,0 +1,21 @@
+{
+  "slug": "theo",
+  "first_name": "Theo",
+  "last_name": "Castellanos",
+  "residence": "Lisbon, PT",
+  "role": "People Ops + Recruiting",
+  "model": "anthropic:claude-haiku-4-5-20251001",
+  "prompt_version": "0.2.0",
+  "budget_monthly_usd": 3,
+  "default_project": "workforce-self",
+  "streams": ["internal"],
+  "owner_email": null,
+  "created_at": "2026-05-23",
+  "bindings": [
+    {
+      "cron": "cron(0 5 ? * MON *)",
+      "skill": "article-draft",
+      "note": "Monday 14:00 JST (runner enforces biweekly cadence)"
+    }
+  ]
+}

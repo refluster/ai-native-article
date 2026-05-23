@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-23T01:08:26.260Z",
+  "generated_at": "2026-05-23T18:27:09.419Z",
   "skills": [
     {
       "name": "article-draft",
@@ -13,9 +13,16 @@
       "cost_class": "medium",
       "owners": [
         "aoi",
+        "dario",
+        "elena",
+        "kai",
         "maya",
+        "mira",
+        "noor",
+        "priya",
         "ren",
         "sora",
+        "theo",
         "yuki"
       ],
       "improvement_agent": null,

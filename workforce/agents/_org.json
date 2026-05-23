@@ -6,25 +6,60 @@
       "reports_to": [],
       "lateral": []
     },
-    "aoi": {
-      "tier": "ic",
+    "priya": {
+      "tier": "lead",
       "reports_to": ["maya"],
-      "lateral": ["ren"]
+      "lateral": ["elena", "dario"]
     },
-    "ren": {
-      "tier": "ic",
+    "elena": {
+      "tier": "lead",
       "reports_to": ["maya"],
-      "lateral": ["aoi"]
+      "lateral": ["priya", "dario"]
+    },
+    "dario": {
+      "tier": "lead",
+      "reports_to": ["maya"],
+      "lateral": ["priya", "elena"]
     },
     "sora": {
       "tier": "ic",
       "reports_to": ["maya"],
-      "lateral": ["yuki"]
+      "lateral": []
+    },
+    "theo": {
+      "tier": "ic",
+      "reports_to": ["priya"],
+      "lateral": ["noor"]
+    },
+    "noor": {
+      "tier": "ic",
+      "reports_to": ["priya"],
+      "lateral": ["theo"]
+    },
+    "aoi": {
+      "tier": "ic",
+      "reports_to": ["elena"],
+      "lateral": ["kai", "yuki", "mira"]
+    },
+    "kai": {
+      "tier": "ic",
+      "reports_to": ["elena"],
+      "lateral": ["aoi", "yuki", "mira"]
     },
     "yuki": {
       "tier": "ic",
-      "reports_to": ["maya"],
-      "lateral": ["sora"]
+      "reports_to": ["elena"],
+      "lateral": ["aoi", "kai", "mira"]
+    },
+    "mira": {
+      "tier": "ic",
+      "reports_to": ["elena"],
+      "lateral": ["aoi", "kai", "yuki"]
+    },
+    "ren": {
+      "tier": "ic",
+      "reports_to": ["dario"],
+      "lateral": []
     }
   }
 }

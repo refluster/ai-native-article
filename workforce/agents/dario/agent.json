@@ -1,0 +1,21 @@
+{
+  "slug": "dario",
+  "first_name": "Dario",
+  "last_name": "Lindqvist",
+  "residence": "Stockholm, SE",
+  "role": "VP Engineering Excellence",
+  "model": "anthropic:claude-sonnet-4-6",
+  "prompt_version": "0.2.0",
+  "budget_monthly_usd": 7,
+  "default_project": "workforce-self",
+  "streams": ["internal", "editorial"],
+  "owner_email": null,
+  "created_at": "2026-05-23",
+  "bindings": [
+    {
+      "cron": "cron(0 4 ? * FRI *)",
+      "skill": "article-draft",
+      "note": "Friday 13:00 JST (runner enforces biweekly cadence)"
+    }
+  ]
+}
