@@ -23,7 +23,7 @@ Today there are no explicit reporting relationships. Add a single optional field
 "reports_to": "maya"        // null for the root (Maya herself)
 ```
 
-For the current 5 personas:
+For the 5 founding personas:
 
 ```
                           maya (PM / Founder, root)
@@ -34,6 +34,8 @@ For the current 5 personas:
 ```
 
 Maya is the root because she defines the work the others execute. This isn't a hierarchy in the human-management sense — it's a *task-flow* hierarchy. The visual matches MS Teams convention for familiarity.
+
+**Amendment (2026-05-23) — VP layer.** [RFC-009](rfc-009-vp-tier-and-functional-expansion.md) introduces a middle `lead` tier between Maya and the ICs. Three VPs (People & Legal, Customer Experience, Engineering Excellence) sit on row 1; four new ICs join the existing four on row 2. The `OrgDAG` page already buckets agents by `tier` (`founder` → row 0, `lead` → row 1, `ic` → row 2) and so renders the expanded shape with no UI code change. This RFC's acceptance criteria still hold; RFC-009 is the design record for the new agents themselves.
 
 **UI**
 

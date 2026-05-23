@@ -1,0 +1,21 @@
+{
+  "slug": "elena",
+  "first_name": "Elena",
+  "last_name": "Singh",
+  "residence": "Bengaluru, IN",
+  "role": "VP Customer Experience",
+  "model": "anthropic:claude-sonnet-4-6",
+  "prompt_version": "0.2.0",
+  "budget_monthly_usd": 7,
+  "default_project": "editorial",
+  "streams": ["editorial", "client", "internal"],
+  "owner_email": null,
+  "created_at": "2026-05-23",
+  "bindings": [
+    {
+      "cron": "cron(0 3 ? * TUE *)",
+      "skill": "article-draft",
+      "note": "Tuesday 12:00 JST (runner enforces biweekly cadence)"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "slug": "priya",
+  "first_name": "Priya",
+  "last_name": "Halvorsen",
+  "residence": "Oslo, NO",
+  "role": "VP People & Legal",
+  "model": "anthropic:claude-sonnet-4-6",
+  "prompt_version": "0.2.0",
+  "budget_monthly_usd": 7,
+  "default_project": "workforce-self",
+  "streams": ["internal", "editorial"],
+  "owner_email": null,
+  "created_at": "2026-05-23",
+  "bindings": [
+    {
+      "cron": "cron(0 2 ? * THU *)",
+      "skill": "article-draft",
+      "note": "Thursday 11:00 JST (runner enforces biweekly cadence)"
+    }
+  ]
+}
