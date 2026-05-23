@@ -129,7 +129,7 @@ fetch('YOUR_GAS_URL', {
 - **L3_BACKFILL_DATE**: One-shot — set Date = created_time on legacy L3 rows
 - **L4_PUBLISH**: Publish one article to GitHub (markdown + cover image)
 - **L4_LIST**: List published articles
-- **L4_BATCH**: Daily batch — image any unimaged published article (max 2/run)
+- **L4_BATCH**: Daily batch — image any unimaged published article (max 5/run)
 - **REBUILD_MANIFEST**: Rebuild `manifest.json` from Notion (legacy maintenance)
 - **ARTICLE_LIST**: Unified listing across types (used by `article-health` skill)
 - **PIPELINE_STATUS**: Read-only diagnostic — counts (L1 total/uncovered, L2/L3 total + 7d), latest `created_time` per layer, installed triggers, and `L3_LAST_RUN_AT`. Use when `kohuehara.xyz` has gone quiet to localise whether the stall is L1 starvation, L3 gating, or missing triggers. See the [Pipeline has gone quiet](#pipeline-has-gone-quiet) runbook.
@@ -186,9 +186,9 @@ Installed via `setupDailyTriggers()` in `gas/src/Code.gs`. Run once from the App
 |---|---|---|
 | 09 / 13 / 17 / 21 / 01 / 05 (every 4h) | `runL2Batch` | Fetch any uncovered L1 articles, create up to **2** new L2 explanations per run |
 | 10 / 14 / 18 / 22 / 02 / 06 (every 4h, +1h after L2) | `runL3Batch` | Sample recent L2s, synthesize 1 L3 insight if there's a fresh L2 |
-| 11 (daily) | `runL4Batch` | Generate cover images and write markdown for any unimaged article (max 2/run) |
+| 11 (daily) | `runL4Batch` | Generate cover images and write markdown for any unimaged article (max 5/run) |
 
-L2 / L3 run every 4 hours so a single stalled cycle (timeout, transient Azure error) doesn't cost a whole day's throughput. With `L2_BATCH_MAX = 2` the daily ceiling is 12 explanations — enough to drain a ~30-row backlog inside a week. L4 stays daily because the publish step has historically not been the bottleneck.
+L2 / L3 run every 4 hours so a single stalled cycle (timeout, transient Azure error) doesn't cost a whole day's throughput. With `L2_BATCH_MAX = 2` the daily ceiling is 12 explanations — enough to drain a ~30-row backlog inside a week. `L4_BATCH_MAX = 5` keeps publish throughput aligned with the upstream production rate (up to 12 L2 + 6 L3 per day during a backlog burndown); observed per-item cost is ~35-40s, so 5 items per run lands at ~200s — comfortable under the 360s execution cap.
 
 The hour set avoids the `deploy.yml` cron window (15:17 / 21:17 / 03:17 JST) by ≥17 minutes either side — comfortable margin against the 6-min GAS execution cap.
 

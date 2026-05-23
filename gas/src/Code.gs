@@ -1814,7 +1814,14 @@ function handleL3Batch(_data, config) {
 // publish failed, the L3 stays pending and gets retried tomorrow.
 // Skip-with-reason when the pending set is empty so the execution log is
 // explicit instead of showing a silent zero-iteration loop.
-const L4_BATCH_MAX = 2;
+//
+// MAX=5 sized against observed per-item cost. Two prior runs measured
+// 72.265s / 74.483s for 2 items → ~35-40s/item, dominated by image
+// generation in handleL4Publish. 5 items ≈ 175-200s, leaving ≥150s
+// under the 360s GAS execution cap. Raised from 2 to keep up with
+// L2/L3 production (12 L2 + 6 L3 = up to 18 articles/day during a
+// backlog burndown vs the previous 2/day publish ceiling).
+const L4_BATCH_MAX = 5;
 function handleL4Batch(_data, config) {
   // Image existence is the source of truth for "this article has been
   // L4-published." Manifest membership is NOT — scheduled fetch-notion
