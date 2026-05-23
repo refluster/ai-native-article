@@ -71,10 +71,10 @@ export default function ReportingCard({ agent, roster }: Props) {
       </div>
       <div className="border-t border-wf-outline-variant px-4 py-2">
         <Link
-          to="/org"
+          to={`/org?center=${agent.slug}`}
           className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
         >
-          VIEW FULL ORG →
+          VIEW IN ORG GRAPH →
         </Link>
       </div>
     </div>
