@@ -58,5 +58,15 @@
     "abstract": "Martin Fowlerブログの「on the loop」論を起点に、AIエージェント時代に人間エンジニアが果たすべき新しい役割を解説。コードを書く・レビューする役割から、AIを導く仕様・テスト・評価パイプラインを設計する役割への転換を製造業エンジニア向けに語る。",
     "image": "/posts/images/c58c4d6f49c8.jpg",
     "sourceUrls": "https://www.infoq.com/news/2026/03/mf-aiassisted-dev/"
+  },
+  {
+    "slug": "c51d2c5f7ded",
+    "title": "Amazon出身の24歳が「AI時代で最もホットな職種」に転身した理由——FDEという働き方が示す、ソフトウェア開発の未来",
+    "type": "explanation",
+    "category": "C: New Roles / FDE",
+    "date": "2026-03-26",
+    "abstract": "Amazonからスタートアップを経てRipplingのFDE（Forward Deployed Engineer）に転身した24歳の体験談を起点に、FDE職の実態と求められるスキルを解説。製造業エンジニアが「コードを書く人」から「顧客課題を解く人」へ転換するための洞察を論じる。",
+    "image": "/posts/images/c51d2c5f7ded.jpg",
+    "sourceUrls": "https://www.businessinsider.com/hottest-job-ai-forward-deployed-engineer-skills-need-2026-3"
   }
 ]
