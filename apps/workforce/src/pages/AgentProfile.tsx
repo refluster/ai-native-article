@@ -19,7 +19,7 @@ import Sigil from '../components/Sigil';
 import StatusPill, { deriveStatus } from '../components/StatusPill';
 import KPIReadout from '../components/KPIReadout';
 import HeatStrip from '../components/HeatStrip';
-import ReportingCard from '../components/ReportingCard';
+import AgentOrgGraph from '../components/AgentOrgGraph';
 import {
   apiConfigured,
   fetchAgentDeliverables,
@@ -354,7 +354,7 @@ export default function AgentProfile() {
 
         {/* SIDEBAR */}
         <aside className="lg:col-span-1 space-y-6">
-          {roster.length > 0 && <ReportingCard agent={agent} roster={roster} />}
+          {roster.length > 0 && <AgentOrgGraph agent={agent} roster={roster} />}
         </aside>
       </div>
     </WorkforceLayout>
