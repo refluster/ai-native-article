@@ -79,6 +79,9 @@ When the Status line flips, add a parenthetical date so the audit trail is one c
 | [005](rfc-005-agent-authored-article-pipeline.md) | Agent-authored L0→L1 article pipeline | Draft | Maya |
 | [006](rfc-006-scalability.md) | Workforce scalability to 100+ agents | Draft | Maya |
 | [007](rfc-007-agent-management-api.md) | Agent management surface (DDB + CRUD API, SAM, nodejs24.x) | Draft | Maya |
+| [008](rfc-008-skill-repository.md) | Skill repository as the execution unit | In-progress | Maya |
+| [009](rfc-009-vp-tier-and-functional-expansion.md) | VP tier and functional expansion (7 new agents) | Draft | Maya |
+| [010](rfc-010-project-trust-boundary.md) | Project as trust boundary: credentials, executions, agent memory | Draft | Maya |
 
 The index is also the **canonical status view** — keep it in sync when a Status line in an individual RFC flips. A CI check that asserts table-vs-file consistency is on the backlog (see `workforce/scripts/validate-rfc-index.mjs`, forthcoming).
 
