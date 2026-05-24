@@ -98,5 +98,15 @@
     "abstract": "Palantirが生み出したFDE（Forward Deployed Engineer）というモデルがAI時代に再評価され、求人数が800%急増した背景を、First Round CapitalがPalantir・OpenAI・AIスタートアップへの取材を元に分析。エンタープライズAI導入の「最後の1マイル」問題を解く職種として注目される実態を論じる。",
     "image": "/posts/images/dd0f8d9fbf41.jpg",
     "sourceUrls": "https://review.firstround.com/so-you-want-to-hire-a-forward-deployed-engineer/"
+  },
+  {
+    "slug": "c15ea0336aca",
+    "title": "レイオフとAI採用が同時に起きる2026年——テック業界の「組み替え」から学ぶ、製造業エンジニアの生存戦略",
+    "type": "explanation",
+    "category": "D: Big Tech Layoffs & AI Pivot",
+    "date": "2026-03-26",
+    "abstract": "2026年Q1に世界で45,000人超が解雇される一方、AI関連職の採用が92%増加。このパラドックスを解読し、外注依存モデルのリスクと内製ケイパビリティ構築の必要性を説く。",
+    "image": "/posts/images/c15ea0336aca.jpg",
+    "sourceUrls": "https://www.techtimes.com/articles/315282/20260321/tech-layoffs-surge-while-ai-jobs-soar-key-trends-shaping-2026-tech-industry.htm"
   }
 ]
