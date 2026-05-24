@@ -29,9 +29,10 @@ export default function Sigil({ slug, size = 56 }: Props) {
         flexShrink: 0,
         width: size,
         height: size,
-        borderRadius: 8,
+        borderRadius: '50%',
         border: '1px solid var(--wf-sigil-border)',
         background: 'var(--wf-svg-surface)',
+        objectFit: 'cover',
       }}
     />
   );
