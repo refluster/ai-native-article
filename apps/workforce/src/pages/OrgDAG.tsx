@@ -10,7 +10,7 @@
 //
 // URL params:
 //   ?center=<slug>   the focus agent (default: first root, typically maya)
-//   ?hops=1|2|full   neighbourhood radius (default: 1)
+//   ?hops=1|2|full   neighbourhood radius (default: 2)
 //
 // Layout still uses absolute `depth` (0 = root) so the Y-axis stays
 // stable across re-centerings — clicking from Maya's view onto Elena
@@ -45,8 +45,10 @@ type Hops = 1 | 2 | 'full';
 
 function parseHops(raw: string | null): Hops {
   if (raw === 'full') return 'full';
-  if (raw === '2') return 2;
-  return 1;
+  if (raw === '1') return 1;
+  // Default: 2 hops. At N≤~20 agents this effectively shows the whole
+  // org from a root; the bound starts mattering as the headcount grows.
+  return 2;
 }
 
 function pickDefaultCenter(agents: WorkforceAgent[]): string {
@@ -160,7 +162,8 @@ export default function OrgDAG() {
   }
   function setHops(h: Hops) {
     const next = new URLSearchParams(searchParams);
-    if (h === 1) next.delete('hops');
+    // Default is 2 — only emit ?hops= when the value differs.
+    if (h === 2) next.delete('hops');
     else next.set('hops', String(h));
     setSearchParams(next, { replace: true });
   }

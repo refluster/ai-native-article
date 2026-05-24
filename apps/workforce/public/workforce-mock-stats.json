@@ -1,15 +1,15 @@
 {
   "$comment": "Mock live stats used by the workforce console when WORKFORCE_AGENTS_API_BASE is not configured (i.e. running on gh-pages without the agents-api). When the real API is wired up, /workforce/* screens prefer the live record over these mocks. Numbers are illustrative — match the look in workforce/DESIGN.md without claiming live truth.",
-  "generated_at": "2026-05-20T00:00:00Z",
+  "generated_at": "2026-05-23T00:00:00Z",
   "month": "2026-05",
   "totals": {
     "agents_running": 4,
-    "agents_paused": 0,
+    "agents_paused": 7,
     "agents_throwing": 1,
     "runs_this_month": 64,
     "cost_this_month_usd": 2.48,
     "deliv_count_this_month": 46,
-    "budget_envelope_usd": 35
+    "budget_envelope_usd": 83
   },
   "agents": {
     "maya": {
@@ -61,10 +61,74 @@
       "cost_this_month_usd": 0.28,
       "deliv_count_total": 5,
       "next_run_at": "2026-05-24T15:00:00Z"
+    },
+    "priya": {
+      "$comment": "Paused — RFC-009 adds the persona but EventBridge cron is not enabled in v1.",
+      "paused": true,
+      "archived": false,
+      "last_run_at": "2026-05-23T00:00:00Z",
+      "last_run_status": "ok",
+      "runs_this_month": 0,
+      "cost_this_month_usd": 0,
+      "deliv_count_total": 0
+    },
+    "elena": {
+      "paused": true,
+      "archived": false,
+      "last_run_at": "2026-05-23T00:00:00Z",
+      "last_run_status": "ok",
+      "runs_this_month": 0,
+      "cost_this_month_usd": 0,
+      "deliv_count_total": 0
+    },
+    "dario": {
+      "paused": true,
+      "archived": false,
+      "last_run_at": "2026-05-23T00:00:00Z",
+      "last_run_status": "ok",
+      "runs_this_month": 0,
+      "cost_this_month_usd": 0,
+      "deliv_count_total": 0
+    },
+    "theo": {
+      "paused": true,
+      "archived": false,
+      "last_run_at": "2026-05-23T00:00:00Z",
+      "last_run_status": "ok",
+      "runs_this_month": 0,
+      "cost_this_month_usd": 0,
+      "deliv_count_total": 0
+    },
+    "noor": {
+      "paused": true,
+      "archived": false,
+      "last_run_at": "2026-05-23T00:00:00Z",
+      "last_run_status": "ok",
+      "runs_this_month": 0,
+      "cost_this_month_usd": 0,
+      "deliv_count_total": 0
+    },
+    "kai": {
+      "paused": true,
+      "archived": false,
+      "last_run_at": "2026-05-23T00:00:00Z",
+      "last_run_status": "ok",
+      "runs_this_month": 0,
+      "cost_this_month_usd": 0,
+      "deliv_count_total": 0
+    },
+    "mira": {
+      "paused": true,
+      "archived": false,
+      "last_run_at": "2026-05-23T00:00:00Z",
+      "last_run_status": "ok",
+      "runs_this_month": 0,
+      "cost_this_month_usd": 0,
+      "deliv_count_total": 0
     }
   },
   "activity": {
-    "$comment": "30-day heat strip: one bucket per day (oldest first). Each bucket is 0–5 intensity. Used by HeatStrip on the Dashboard.",
+    "$comment": "30-day heat strip: one bucket per day (oldest first). Each bucket is 0–5 intensity. Used by HeatStrip on the Dashboard. Paused personas have an all-zero series; they appear on the strip so the operator notices the empty row.",
     "days": [
       "2026-04-21", "2026-04-22", "2026-04-23", "2026-04-24", "2026-04-25",
       "2026-04-26", "2026-04-27", "2026-04-28", "2026-04-29", "2026-04-30",
@@ -78,7 +142,14 @@
       "aoi":  [2, 1, 0, 3, 0, 2, 1, 1, 0, 2, 1, 3, 0, 1, 2, 1, 0, 3, 1, 2, 0, 1, 2, 0, 3, 1, 0, 2, 1, 2],
       "ren":  [3, 2, 1, 2, 1, 0, 3, 2, 1, 3, 2, 1, 2, 3, 0, 1, 2, 3, 1, 2, 1, 3, 2, 1, 2, 3, 1, 2, 1, 4],
       "sora": [0, 1, 0, 0, 2, 0, 0, 1, 0, 2, 0, 1, 0, 0, 2, 0, 1, 0, 0, 2, 0, 1, 0, 0, 2, 1, 0, 1, 0, 0],
-      "yuki": [0, 0, 1, 0, 0, 1, 0, 0, 2, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1]
+      "yuki": [0, 0, 1, 0, 0, 1, 0, 0, 2, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1],
+      "priya": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "elena": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "dario": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "theo":  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "noor":  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "kai":   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "mira":  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     }
   },
   "recent_runs": [
