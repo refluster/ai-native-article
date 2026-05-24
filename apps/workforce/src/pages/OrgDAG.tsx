@@ -1,22 +1,21 @@
 // /workforce/org — the reporting graph as an SVG DAG, rendered
 // **egocentrically**: one agent is the focus, and only their immediate
-// neighbourhood (parents, direct reports, and laterals within N hops)
-// is shown. Clicking any visible node re-centers the view.
+// 2-hop neighbourhood is shown. Clicking any visible node re-centers.
 //
 // Why not render the whole tree? RFC-003 §"Behaviour at N = 100+ agents"
 // already named this: a single-screen visual of N nodes becomes
 // unreadable past ~15. Going egocentric now (at N=12) means the layout
-// never needs another redesign as the org grows.
+// never needs another redesign as the org grows. At N≤~20 a 2-hop view
+// from a root effectively shows the whole org, so we no longer expose a
+// 1-hop / full toggle — the 2-hop view is the only mode.
 //
 // URL params:
 //   ?center=<slug>   the focus agent (default: first root, typically maya)
-//   ?hops=1|2|full   neighbourhood radius (default: 2)
 //
-// Layout still uses absolute `depth` (0 = root) so the Y-axis stays
-// stable across re-centerings — clicking from Maya's view onto Elena
-// doesn't visually flip the tree upside down. Each edge (reports_to,
-// direct_reports, lateral) counts as one hop when computing the
-// neighbourhood.
+// Layout uses absolute `depth` (0 = root) so the Y-axis stays stable
+// across re-centerings — clicking from Maya's view onto Elena doesn't
+// visually flip the tree upside down. Each edge (reports_to,
+// direct_reports, lateral) counts as one hop.
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -35,21 +34,19 @@ interface LaidOutNode {
   isCenter: boolean;
 }
 
-const NODE_W = 200;
-const NODE_H = 96;
+// Card dimensions tuned so long role titles like "VP Engineering
+// Excellence" fit without overflow. The right-side text column uses a
+// foreignObject so CSS handles ellipsis when a title still exceeds the
+// available width.
+const NODE_W = 264;
+const NODE_H = 100;
 const COL_GAP = 32;
 const ROW_GAP = 96;
 const PADDING = 24;
-
-type Hops = 1 | 2 | 'full';
-
-function parseHops(raw: string | null): Hops {
-  if (raw === 'full') return 'full';
-  if (raw === '1') return 1;
-  // Default: 2 hops. At N≤~20 agents this effectively shows the whole
-  // org from a root; the bound starts mattering as the headcount grows.
-  return 2;
-}
+const SIGIL_SIZE = 56;
+const TEXT_X = 80;
+const TEXT_PAD_RIGHT = 12;
+const HOPS = 2;
 
 function pickDefaultCenter(agents: WorkforceAgent[]): string {
   // Roots first, then alphabetical. Single-root orgs land on that root;
@@ -62,9 +59,8 @@ function pickDefaultCenter(agents: WorkforceAgent[]): string {
 function computeNeighbourhood(
   agents: WorkforceAgent[],
   centerSlug: string,
-  hops: Hops,
+  hops: number,
 ): Set<string> {
-  if (hops === 'full') return new Set(agents.map((a) => a.slug));
   const bySlug = new Map(agents.map((a) => [a.slug, a]));
   const visited = new Set<string>([centerSlug]);
   let frontier: string[] = [centerSlug];
@@ -138,7 +134,6 @@ export default function OrgDAG() {
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
 
-  const hops = parseHops(searchParams.get('hops'));
   const requestedCenter = searchParams.get('center');
 
   const view = useMemo(() => {
@@ -148,24 +143,17 @@ export default function OrgDAG() {
       requestedCenter && manifest.agents.some((a) => a.slug === requestedCenter)
         ? requestedCenter
         : defaultCenter;
-    const neighbourhood = computeNeighbourhood(manifest.agents, center, hops);
+    const neighbourhood = computeNeighbourhood(manifest.agents, center, HOPS);
     const visible = manifest.agents.filter((a) => neighbourhood.has(a.slug));
     const laid = layoutByDepth(visible, center);
     const centerAgent = manifest.agents.find((a) => a.slug === center)!;
     return { center, centerAgent, neighbourhood, laid, allAgents: manifest.agents };
-  }, [manifest, requestedCenter, hops]);
+  }, [manifest, requestedCenter]);
 
   function setCenter(slug: string) {
     const next = new URLSearchParams(searchParams);
     next.set('center', slug);
     setSearchParams(next, { replace: false });
-  }
-  function setHops(h: Hops) {
-    const next = new URLSearchParams(searchParams);
-    // Default is 2 — only emit ?hops= when the value differs.
-    if (h === 2) next.delete('hops');
-    else next.set('hops', String(h));
-    setSearchParams(next, { replace: true });
   }
 
   if (error) {
@@ -203,6 +191,7 @@ export default function OrgDAG() {
   );
 
   const hiddenCount = allAgents.length - neighbourhood.size;
+  const textW = NODE_W - TEXT_X - TEXT_PAD_RIGHT;
 
   return (
     <WorkforceLayout>
@@ -212,10 +201,7 @@ export default function OrgDAG() {
           <h1 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-[1.04] text-wf-on-surface">
             {fullName(centerAgent)}'s neighbourhood.
           </h1>
-          <div className="flex flex-col items-start md:items-end gap-2">
-            <HopsToggle current={hops} onChange={setHops} />
-            <Legend />
-          </div>
+          <Legend />
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
           <Link to={`/agents/${centerAgent.slug}`} className="text-wf-primary hover:underline">
@@ -223,7 +209,7 @@ export default function OrgDAG() {
           </Link>
           <span>
             showing {neighbourhood.size} of {allAgents.length}
-            {hiddenCount > 0 ? ` (${hiddenCount} hidden — increase hops to see more)` : ''}
+            {hiddenCount > 0 ? ` (${hiddenCount} hidden — re-center to explore further)` : ''}
           </span>
           <span className="text-wf-tertiary">click any node to re-center</span>
         </div>
@@ -308,21 +294,74 @@ export default function OrgDAG() {
                   strokeWidth={n.isCenter ? 2.5 : 1}
                   rx="8"
                 />
-                <foreignObject x="12" y="12" width="56" height="56">
-                  <Sigil slug={n.agent.slug} size={56} />
+                <foreignObject x="12" y={(NODE_H - SIGIL_SIZE) / 2} width={SIGIL_SIZE} height={SIGIL_SIZE}>
+                  <Sigil slug={n.agent.slug} size={SIGIL_SIZE} />
                 </foreignObject>
-                <text x="80" y="28" className="font-wfmono" style={{ fontSize: 10, fill: 'var(--wf-svg-on-surface-variant)', letterSpacing: 1.4 }}>
-                  {n.agent.slug.toUpperCase()} · L{n.agent.depth}{n.isCenter ? ' · CENTER' : ''}
-                </text>
-                <text x="80" y="48" style={{ fontSize: 16, fontWeight: 600, fill: 'var(--wf-svg-on-surface)' }}>
-                  {n.agent.first_name} {n.agent.last_name}
-                </text>
-                <text x="80" y="68" style={{ fontSize: 12, fill: 'var(--wf-svg-on-surface-variant)' }}>
-                  {n.agent.role}
-                </text>
-                <text x="80" y="84" className="font-wfmono" style={{ fontSize: 10, fill: 'var(--wf-svg-on-surface-variant)' }}>
-                  {n.agent.residence}
-                </text>
+                <foreignObject x={TEXT_X} y="12" width={textW} height={NODE_H - 24}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                      height: '100%',
+                      width: '100%',
+                      overflow: 'hidden',
+                      color: 'var(--wf-svg-on-surface)',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    <div
+                      className="font-wfmono"
+                      style={{
+                        fontSize: 10,
+                        letterSpacing: '0.14em',
+                        textTransform: 'uppercase',
+                        color: 'var(--wf-svg-on-surface-variant)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {n.agent.slug.toUpperCase()} · L{n.agent.depth}{n.isCenter ? ' · CENTER' : ''}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 15,
+                        fontWeight: 700,
+                        lineHeight: 1.2,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {n.agent.first_name} {n.agent.last_name}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        lineHeight: 1.25,
+                        color: 'var(--wf-svg-on-surface-variant)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {n.agent.role}
+                    </div>
+                    <div
+                      className="font-wfmono"
+                      style={{
+                        fontSize: 10,
+                        color: 'var(--wf-svg-on-surface-variant)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {n.agent.residence}
+                    </div>
+                  </div>
+                </foreignObject>
               </g>
             );
           })}
@@ -350,42 +389,8 @@ export default function OrgDAG() {
           agents={centerAgent.lateral.map((s) => allAgents.find((a) => a.slug === s)).filter((a): a is WorkforceAgent => !!a)}
           onRecenter={setCenter}
         />
-        {hops !== 'full' && hiddenCount > 0 && (
-          <button
-            type="button"
-            onClick={() => setHops(hops === 1 ? 2 : 'full')}
-            className="w-full border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md py-3 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant hover:bg-wf-surface-container-hi"
-          >
-            show more — {hiddenCount} hidden
-          </button>
-        )}
       </div>
     </WorkforceLayout>
-  );
-}
-
-function HopsToggle({ current, onChange }: { current: Hops; onChange: (h: Hops) => void }) {
-  const opts: { id: Hops; label: string }[] = [
-    { id: 1, label: '1 HOP' },
-    { id: 2, label: '2 HOPS' },
-    { id: 'full', label: 'FULL' },
-  ];
-  return (
-    <div className="flex items-center gap-2 font-wfmono text-[10px] uppercase tracking-[0.14em]">
-      {opts.map((o) => (
-        <button
-          key={String(o.id)}
-          onClick={() => onChange(o.id)}
-          className={`px-3 py-1.5 border transition-colors ${
-            current === o.id
-              ? 'border-wf-tertiary text-wf-tertiary'
-              : 'border-wf-outline-variant text-wf-on-surface-variant hover:border-wf-on-surface-variant hover:text-wf-on-surface'
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
   );
 }
 
@@ -440,9 +445,9 @@ function NeighbourCard({
           {agent.slug.toUpperCase()} · L{agent.depth}{isCenter ? ' · CENTER' : ''}
         </div>
         <div className="font-semibold text-wf-on-surface truncate">{fullName(agent)}</div>
-        <div className="text-xs text-wf-on-surface-variant">{agent.role}</div>
+        <div className="text-xs text-wf-on-surface-variant truncate">{agent.role}</div>
       </div>
-      <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary">
+      <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary shrink-0">
         {ctaLabel}
       </span>
     </button>

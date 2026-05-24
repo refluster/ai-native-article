@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./analytics": "./src/analytics.ts"
+    "./analytics": "./src/analytics.ts",
+    "./dicebear": "./src/dicebear.ts"
   }
 }
