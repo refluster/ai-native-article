@@ -1,38 +1,37 @@
-// Procedural avatar — first letter on a slug-hash-derived HSL background.
-// Per PR #28's resolution: no per-agent SVG asset, infinite scale.
+// Persona avatar — DiceBear avataaars rendered from the agent slug.
+// Shares the URL helper with the workforce console's Sigil so the same
+// slug renders the same face on every page (article bylines + workforce
+// directory + org graph).
 
-import { slugHue } from '../../lib/byline'
+import { dicebearAvatarUrl } from '@kohuehara/shared/dicebear'
 
 interface Props {
   slug: string
-  /** First letter shown inside the circle. Defaults to slug[0]. */
+  /** Kept for back-compat — DiceBear ignores the per-agent initial. */
   initial?: string
   /** Diameter in px. Defaults to 40. */
   size?: number
 }
 
-export default function AgentAvatar({ slug, initial, size = 40 }: Props) {
-  const hue = slugHue(slug)
-  const letter = (initial ?? slug[0] ?? '?').toUpperCase()
+export default function AgentAvatar({ slug, size = 40 }: Props) {
+  const url = dicebearAvatarUrl(slug || 'anonymous', size * 2)
   return (
-    <span
+    <img
+      src={url}
+      width={size}
+      height={size}
+      alt=""
       aria-hidden
+      loading="lazy"
       style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        display: 'inline-block',
         width: size,
         height: size,
         borderRadius: '50%',
-        backgroundColor: `hsl(${hue} 60% 45%)`,
-        color: 'white',
-        fontWeight: 600,
-        fontSize: Math.round(size * 0.45),
         flexShrink: 0,
-        userSelect: 'none',
+        objectFit: 'cover',
+        backgroundColor: 'rgb(var(--color-surface-2, 240 240 240))',
       }}
-    >
-      {letter}
-    </span>
+    />
   )
 }
