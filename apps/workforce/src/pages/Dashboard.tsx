@@ -127,8 +127,19 @@ export default function Dashboard() {
           {/* Desktop: table. Mobile: stacked cards. */}
           <ul className="divide-y divide-wf-outline-variant">
             {manifest.agents.map((a) => {
-              const s = stats.agents[a.slug];
-              if (!s) return null;
+              // Synthesize a paused placeholder for agents the
+              // mock-stats file doesn't yet cover — dropping them
+              // silently (the old behaviour) made new personas
+              // invisible until the operator backfilled the JSON.
+              const s = stats.agents[a.slug] ?? {
+                paused: true,
+                archived: false,
+                last_run_at: '',
+                last_run_status: 'ok' as const,
+                runs_this_month: 0,
+                cost_this_month_usd: 0,
+                deliv_count_total: 0,
+              };
               const status = deriveStatus({ paused: s.paused, archived: s.archived, last_run_status: s.last_run_status });
               return (
                 <li key={a.slug}>

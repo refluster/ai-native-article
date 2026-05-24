@@ -47,12 +47,23 @@ export default function AgentDirectory() {
     const q = query.trim().toLowerCase();
     return manifest.agents
       .map((a) => {
-        const s = stats.agents[a.slug];
-        if (!s) return null;
+        // Synthesize a paused placeholder for agents the mock-stats
+        // file doesn't yet cover — silently dropping them (the bug we
+        // had) made new personas invisible until the operator
+        // remembered to backfill the JSON. Render them with PAUSED
+        // status + zeros so they're visibly registered-but-idle.
+        const s = stats.agents[a.slug] ?? {
+          paused: true,
+          archived: false,
+          last_run_at: '',
+          last_run_status: 'ok' as const,
+          runs_this_month: 0,
+          cost_this_month_usd: 0,
+          deliv_count_total: 0,
+        };
         const status = deriveStatus({ paused: s.paused, archived: s.archived, last_run_status: s.last_run_status });
         return { agent: a, stats: s, status } as { agent: WorkforceAgent; stats: typeof s; status: AgentStatus };
       })
-      .filter((r): r is NonNullable<typeof r> => r !== null)
       .filter((r) => (filter === 'all' ? true : r.status === filter))
       .filter((r) => {
         if (!q) return true;
@@ -66,7 +77,9 @@ export default function AgentDirectory() {
       .sort((a, b) => {
         const depth = a.agent.depth - b.agent.depth;
         if (depth !== 0) return depth;
-        return new Date(b.stats.last_run_at).getTime() - new Date(a.stats.last_run_at).getTime();
+        const at = a.stats.last_run_at ? new Date(a.stats.last_run_at).getTime() : 0;
+        const bt = b.stats.last_run_at ? new Date(b.stats.last_run_at).getTime() : 0;
+        return bt - at;
       });
   }, [manifest, stats, filter, query]);
 
@@ -197,7 +210,7 @@ export default function AgentDirectory() {
                 <div className="col-span-1 text-right font-wfmono text-sm text-wf-on-surface">{s.runs_this_month}</div>
                 <div className="col-span-1 text-right font-wfmono text-sm text-wf-on-surface">${s.cost_this_month_usd.toFixed(2)}</div>
                 <div className="col-span-2 text-right font-wfmono text-xs text-wf-on-surface-variant">
-                  {new Date(s.last_run_at).toISOString().slice(0, 16).replace('T', ' ')}
+                  {s.last_run_at ? new Date(s.last_run_at).toISOString().slice(0, 16).replace('T', ' ') : '—'}
                 </div>
               </Link>
             </li>
