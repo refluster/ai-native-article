@@ -4,9 +4,7 @@ name: Deploy workforce data plane (SAM)
 # to anything the agent-runner / orchestrator Lambdas bundle: SAM template,
 # samconfig, lambda sources, skill folders (handler.ts via the auto-registry),
 # agent folders (system.md is copied into the runner bundle), and the
-# skill-registry codegen script. Mirrors the safety pattern in
-# deploy-workforce-console.yml — gated by vars.WORKFORCE_SAM_DEPLOY_ENABLED so the
-# first PR landing this workflow doesn't fire against an unconfigured account.
+# skill-registry codegen script.
 #
 # AWS auth: GitHub OIDC → IAM role assumption (secrets.AWS_ROLE_ARN). No
 # long-lived access keys in repo secrets.
@@ -42,13 +40,6 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Operator pre-flight: see workforce/infra/sam/README.md. Flip the
-    # repo variable WORKFORCE_SAM_DEPLOY_ENABLED to 'true' once
-    # secrets.AWS_ROLE_ARN points at a role with a trust policy that
-    # accepts this repo's GitHub OIDC token, and wf/discord-pulse-prod +
-    # wf/anthropic + wf/notion + wf/github are provisioned in Secrets
-    # Manager.
-    if: vars.WORKFORCE_SAM_DEPLOY_ENABLED == 'true'
     timeout-minutes: 30
 
     steps:
