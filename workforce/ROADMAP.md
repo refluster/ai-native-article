@@ -28,7 +28,7 @@ Checklist of implementation milestones. The daily `wf-builder` routine reads thi
 - [x] **PR-A (monorepo split)** — `apps/article` + `apps/workforce` + `packages/shared`. *(Zone B)*
 - [x] **PR-B (hosting)** — `workforce/infra/sam-web/` CloudFront + Cognito + Google sign-in. *(Zone B)*
 - [x] **PR-C (cutover)** — Article SPA links to `workforce.kohuehara.xyz`; `WORKFORCE ↗` header link. *(Zone B)*
-- [x] **Data plane deployed to prod** — `wf-data-plane-prod` in ap-northeast-1; DDB seeded with 5 agents + 7 skills. *(operator action, no PR)*
+- [x] **Data plane deployed to prod** — `wf-data-plane-prod` in us-west-2; DDB seeded with 5 agents + 7 skills. *(operator action, no PR)*
 - [x] **Workforce SPA live** — `workforce.kohuehara.xyz` serving via CloudFront + Cognito. *(operator action, no PR)*
 - [x] **Live API wired** — SPA reads `VITE_WORKFORCE_AGENTS_API_BASE` from repo secret. *(Zone B)*
 

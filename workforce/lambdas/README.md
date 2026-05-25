@@ -95,6 +95,6 @@ curl "$(aws cloudformation describe-stacks --stack-name wf-data-plane-dev \
   --query 'Stacks[0].Outputs[?OutputKey==`AgentsApiUrl`].OutputValue' --output text)/agents"
 
 # IAM-auth write (AWS SigV4 — use awscurl or aws-vault)
-awscurl --service execute-api --region ap-northeast-1 -X PATCH \
+awscurl --service execute-api --region us-west-2 -X PATCH \
   "https://$API/agents/sora" -d '{"paused": true}'
 ```

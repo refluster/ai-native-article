@@ -17,7 +17,7 @@ AI personas (12 as of RFC-009 — Maya the Founder, the VP tier, and IC contribu
 
 | Stack | Region | Purpose |
 |---|---|---|
-| `wf-data-plane-prod` | ap-northeast-1 | DDB, S3, seed Lambdas, orchestrator, agent-runner, agents-api |
+| `wf-data-plane-prod` | us-west-2 | DDB, S3, seed Lambdas, orchestrator, agent-runner, agents-api |
 | `wf-web-prod` | us-west-2 | CloudFront + S3 hosting for workforce.kohuehara.xyz |
 | `wf-web-cert-prod` | us-east-1 | ACM certificate (CloudFront requires us-east-1) |
 
