@@ -140,8 +140,7 @@ In **Settings → Secrets and variables → Actions**, add:
 
 | Secret | Source |
 |---|---|
-| `AWS_ACCESS_KEY_ID`              | IAM user with `s3:PutObject` on the bucket + `cloudfront:CreateInvalidation` on the distribution |
-| `AWS_SECRET_ACCESS_KEY`          | (pair) |
+| `AWS_ROLE_ARN`                   | ARN of the IAM role the GitHub OIDC provider assumes (e.g. `arn:aws:iam::{acct}:role/wf-gha-deploy-role`). Trust policy must accept the `repo:refluster/ai-native-article:ref:refs/heads/main` subject. Role needs `s3:PutObject` on the bucket + `cloudfront:CreateInvalidation` on the distribution (+ CloudFormation / Lambda / DDB for the data-plane workflow). |
 | `AWS_REGION`                     | `us-west-2` |
 | `AWS_S3_BUCKET`                  | stack output `WebBucketName` |
 | `AWS_CLOUDFRONT_DISTRIBUTION_ID` | stack output `DistributionId` |
