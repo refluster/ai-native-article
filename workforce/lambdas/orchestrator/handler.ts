@@ -1,7 +1,7 @@
 // wf-orchestrator Lambda handler.
 //
 // Driven by a single EventBridge rule wf-orchestrator-tick-{stage} that
-// fires every 5 minutes. On each tick (in order):
+// fires every 30 minutes. On each tick (in order):
 //
 //   A. Poll Ren's pending pr DELIV rows. For each one:
 //        - findRecentPRs(owner, repo, dispatch_branch, dispatched_at)
@@ -10,7 +10,7 @@
 //
 //   B. Scan all AGENT#*/META rows.
 //   C. For each non-paused / non-archived agent, iterate its bindings[].
-//      For each binding, evaluate its cron against a 5-minute window. If
+//      For each binding, evaluate its cron against a 30-minute window. If
 //      matchesNow returns true, async-invoke wf-agent-runner-{stage} with
 //      { agent, binding_idx }.
 //   D. Skip a binding if its (skill, agent) has fired within a per-skill
