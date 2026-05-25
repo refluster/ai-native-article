@@ -17,14 +17,17 @@ concurrency:
 
 permissions:
   contents: read
+  # Required for aws-actions/configure-aws-credentials to mint a JWT and
+  # assume secrets.AWS_ROLE_ARN via the configured GitHub OIDC trust.
+  id-token: write
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    # Skip cleanly when the AWS secrets aren't wired up yet — first PR
-    # to land this workflow won't have them set; the operator runs
-    # through workforce/infra/sam-web/README.md and populates them
-    # before re-running this workflow manually.
+    # Skip cleanly when AWS auth isn't wired up yet — first PR to land
+    # this workflow won't have secrets.AWS_ROLE_ARN set; the operator
+    # runs through workforce/infra/sam-web/README.md and populates it
+    # before flipping vars.WORKFORCE_DEPLOY_ENABLED to true.
     if: vars.WORKFORCE_DEPLOY_ENABLED == 'true'
 
     steps:
@@ -50,11 +53,10 @@ jobs:
           VITE_WORKFORCE_AGENTS_API_BASE: ${{ secrets.VITE_WORKFORCE_AGENTS_API_BASE }}
         run: npm run build:workforce
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Sync to S3
