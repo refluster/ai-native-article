@@ -553,9 +553,9 @@ Resources:
         - !Ref WfAlarmTopic
 
   # --- Orchestrator Lambda + tick rule (PR6c, RFC-006 S1) -------------------
-  # One EventBridge rule fires every 5 minutes. The orchestrator scans all
+  # One EventBridge rule fires every 30 minutes. The orchestrator scans all
   # AGENT#*/META rows, evaluates each agent's schedule_cron against the
-  # 5-minute window, and async-invokes wf-agent-runner-{stage} for the
+  # 30-minute window, and async-invokes wf-agent-runner-{stage} for the
   # ones that fire. No per-agent CFN rules — workforce scales by adding
   # data rows, not template resources.
   WfOrchestratorFunction:
@@ -572,7 +572,7 @@ Resources:
       Environment:
         Variables:
           RUNNER_FUNCTION_NAME: !Ref WfAgentRunnerFunction
-          TICK_WINDOW_MINUTES: "5"
+          TICK_WINDOW_MINUTES: "30"
           ENGINEER_SLUG: ren
           ENGINEER_OWNER: !Ref EngineerOwner
           ENGINEER_REPO: !Ref EngineerRepo
@@ -600,8 +600,8 @@ Resources:
           Type: Schedule
           Properties:
             Name: !Sub wf-orchestrator-tick-${Stage}
-            Description: Drives the workforce dispatch loop every 5 minutes.
-            Schedule: rate(5 minutes)
+            Description: Drives the workforce dispatch loop every 30 minutes.
+            Schedule: rate(30 minutes)
             Enabled: false
       Tags:
         workforce: !Ref Stage
