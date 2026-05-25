@@ -51,7 +51,7 @@ Use when the brief is wrong and you don't want to re-run the same one. Leave the
 Use when the infra failure is unbounded (e.g. action breaking change, repo permissions overhaul).
 
 ```bash
-awscurl --service execute-api --region ap-northeast-1 \
+awscurl --service execute-api --region us-west-2 \
   -X PATCH "$(aws cloudformation describe-stacks --stack-name wf-data-plane-{stage} \
     --query 'Stacks[0].Outputs[?OutputKey==`AgentsApiUrl`].OutputValue' --output text)/agents/ren" \
   -d '{"paused": true}'

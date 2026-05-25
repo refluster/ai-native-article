@@ -14,7 +14,7 @@ parallel = true
 build_in_source = true
 
 [default.deploy.parameters]
-region = "ap-northeast-1"
+region = "us-west-2"
 capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
 confirm_changeset = true
 fail_on_empty_changeset = false
@@ -33,7 +33,7 @@ parallel = true
 build_in_source = true
 
 [dev.deploy.parameters]
-region = "ap-northeast-1"
+region = "us-west-2"
 capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
 parameter_overrides = "Stage=dev MonthlyBudgetUsd=10 AlarmEmail=refluster@gmail.com"
 confirm_changeset = true
@@ -50,7 +50,7 @@ parallel = true
 build_in_source = true
 
 [prod.deploy.parameters]
-region = "ap-northeast-1"
+region = "us-west-2"
 capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
 parameter_overrides = "Stage=prod MonthlyBudgetUsd=50 AlarmEmail=refluster@gmail.com"
 confirm_changeset = true
