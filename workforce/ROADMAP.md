@@ -54,3 +54,11 @@ Checklist of implementation milestones. The daily `wf-builder` routine reads thi
 - [ ] **Aoi design note** — Aoi's bi-weekly `design` task fires, design note published. *(Zone B)*
 - [ ] **Yuki positioning write** — Yuki's bi-weekly `launch` task fires, launch artefact stored in S3 + Notion. *(Zone B)*
 - [ ] **Memory compaction** — Implement memory chunk compaction (`memory/{slug}/v{NNNN}.md` → rolling summary). Acceptance: compaction runs without losing agent identity; `memver` monotonic. *(Zone B)*
+
+## Phase 5 — PdM + VP-eng routine bootstrap (RFC-010 driver chain)
+
+Three-PR series that builds the autonomous flow from RFC → epic tracker → child issues → draft PRs → role-scoped reviews. Backs the RFC-010 epics ([#89](https://github.com/refluster/ai-native-article/issues/89) tracker).
+
+- [ ] **PR A — Unified binding shape (R-N4 amendment)** — Migrate `agent.json:bindings[]` from `{cron, skill}` to `{skill, executor, trigger}`; amend R-N4 in `workforce/docs/governance.md`; add `workforce/docs/runbooks/bindings.md`; update orchestrator + agent-runner + validate-agent-json. *(Zone A: governance + R-N4; Zone B: validator + Lambda + agent.json)*
+- [ ] **PR B — Maya `pdm-decompose` Lambda + `pdm-charter` stub** — New skills under `workforce/skills/`; Maya binding `cron(0 22 * * ? *)` (15:00 PDT daily); `PROJECT#workforce-meta` DDB bootstrap runbook; `workforce/docs/runbooks/pdm-decompose.md` state machine doc. *(Zone A: new skills, Rule-11 first version; Zone B: maya/agent.json edit + runbooks)*
+- [ ] **PR C — CCR routine specs + Dario / Aoi bindings** — `workforce/docs/routines/{dario-implement,dario-review,aoi-review}.md`; add CCR bindings to Dario + Aoi `agent.json`; operator bootstrap runbook for instantiating routines at claude.ai/code/routines. *(Zone A: new routine specs + bindings, Rule-11 first version; Zone B: runbook)*

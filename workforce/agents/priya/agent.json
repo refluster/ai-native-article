@@ -13,8 +13,12 @@
   "created_at": "2026-05-23",
   "bindings": [
     {
-      "cron": "cron(0 2 ? * THU *)",
       "skill": "article-draft",
+      "executor": "lambda",
+      "trigger": {
+        "scheduler": "eventbridge",
+        "cron": "cron(0 2 ? * THU *)"
+      },
       "note": "Thursday 11:00 JST (runner enforces biweekly cadence)"
     }
   ]

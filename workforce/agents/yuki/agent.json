@@ -13,8 +13,12 @@
   "created_at": "2026-05-18",
   "bindings": [
     {
-      "cron": "cron(0 0/6 * * ? *)",
       "skill": "discord-ping",
+      "executor": "lambda",
+      "trigger": {
+        "scheduler": "eventbridge",
+        "cron": "cron(0 0/6 * * ? *)"
+      },
       "note": "Heartbeat every 6h"
     }
   ]

@@ -1,23 +1,73 @@
 // Shared agent types and DDB row shape.
-// Mirrors workforce/docs/data-model.md.
+// Mirrors workforce/docs/data-model.md and workforce/docs/runbooks/bindings.md.
 //
-// v1 routing model (1-stage): an agent's bindings[] declares the
-// (cron → skill) pairs directly. There is no task_kind / outputs token
-// matching; the orchestrator dispatches {agent, binding_idx} and the
-// runner loads exactly that binding's skill.
+// v2 routing model: an agent's bindings[] declares {skill, executor, trigger}
+// tuples. The executor determines where the binding actually runs (Lambda,
+// CCR, GHA, CLI). The trigger.scheduler determines who fires it. The
+// orchestrator-tick only dispatches bindings with executor=lambda +
+// trigger.scheduler=eventbridge; other bindings are declarative (audit
+// surface) and are fired by their respective schedulers.
 
 export type AgentSlug = string;
 
 export type Stream = "internal" | "client" | "editorial";
 
-/** One cron-to-skill binding on an agent. The cron fires the named skill. */
+/** Where a binding actually executes. */
+export type ExecutorKind = "lambda" | "claude-code-routine" | "gha" | "cli";
+
+/** Who fires a binding. */
+export type SchedulerKind =
+  | "eventbridge"
+  | "claude-code-routine"
+  | "gha"
+  | "external"
+  | "manual";
+
+/** How and when a binding fires. Fields are scheduler-specific. */
+export interface BindingTrigger {
+  scheduler: SchedulerKind;
+  /** EventBridge-syntax cron expression. Required when scheduler=eventbridge. */
+  cron?: string;
+  /** GitHub event identifier (e.g. "pull_request.labeled"). Used by
+   *  scheduler=claude-code-routine and scheduler=gha when GitHub-event-driven. */
+  github_event?: string;
+  /** Event filter (e.g. {label: "wf:needs-review-dario"}). Scheduler-specific. */
+  filter?: Record<string, string>;
+  /** For scheduler=external: how the binding is invoked. */
+  invoked_by?: "api" | "repository_dispatch" | "manual";
+  /** For scheduler=external: which skill / routine fires this binding (audit). */
+  fired_from?: string;
+}
+
+/** One binding on an agent: a (skill, executor, trigger) tuple. */
 export interface AgentBinding {
-  /** EventBridge cron expression. UTC. */
-  cron: string;
-  /** Skill slug — must match a workforce/skills/{name}/ directory. */
+  /** Skill / routine name. For executor=lambda, must match workforce/skills/{name}/.
+   *  For executor=claude-code-routine, it's a logical name; the prompt body lives
+   *  in routine_spec. */
   skill: string;
+  /** Where this binding actually runs. */
+  executor: ExecutorKind;
+  /** When/how it fires. */
+  trigger: BindingTrigger;
+  /** For executor=claude-code-routine: repo-relative path to the routine
+   *  specification doc (prompt + connectors + setup notes for the operator
+   *  to instantiate the routine in claude.ai/code/routines). */
+  routine_spec?: string;
+  /** For executor=gha: workflow file path under .github/workflows/. */
+  workflow?: string;
   /** Human-readable cadence note. Renders in the UI. */
   note?: string;
+}
+
+/** Returns the cron string for a binding, or undefined if it has no cron trigger. */
+export function bindingCron(binding: AgentBinding): string | undefined {
+  return binding.trigger?.cron;
+}
+
+/** True when the orchestrator-tick is the scheduler for this binding.
+ *  Non-lambda bindings are scheduled elsewhere (CCR cloud / GHA / external API). */
+export function isOrchestratorOwned(binding: AgentBinding): boolean {
+  return binding.executor === "lambda" && binding.trigger?.scheduler === "eventbridge";
 }
 
 /** Identity fields — sourced from workforce/agents/{slug}/agent.json (git SoT). */

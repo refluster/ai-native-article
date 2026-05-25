@@ -18,7 +18,12 @@
 
 import type { Context } from "aws-lambda";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
-import { agentPk, type AgentMetaRow } from "../shared/agent.js";
+import {
+  agentPk,
+  isOrchestratorOwned,
+  type AgentBinding,
+  type AgentMetaRow,
+} from "../shared/agent.js";
 import { scanPrefix, queryBySkPrefix, updateOperational } from "../shared/ddb.js";
 import { matchesNow } from "../shared/cron-match.js";
 import { findRecentPRs } from "../shared/github.js";
@@ -97,6 +102,19 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
       }
       for (let i = 0; i < agent.bindings.length; i++) {
         const binding = agent.bindings[i]!;
+        // The orchestrator-tick only owns executor=lambda + scheduler=eventbridge
+        // bindings. Other bindings (CCR, GHA, external) are declarative — fired
+        // by their own schedulers. We still record them in `skipped` so the
+        // dispatch trace shows the full binding inventory.
+        if (!isOrchestratorOwned(binding)) {
+          skipped.push({
+            slug: agent.slug,
+            binding_idx: i,
+            skill: binding.skill,
+            reason: `non_orchestrator_executor: ${binding.executor}/${binding.trigger?.scheduler}`,
+          });
+          continue;
+        }
         const decision = await evaluateBinding(agent, i, binding, now);
         if (decision.action === "dispatch") {
           await invokeRunner(agent.slug, i);
@@ -165,12 +183,16 @@ type Decision = { action: "dispatch" } | { action: "skip"; reason: string };
 async function evaluateBinding(
   agent: AgentMetaRow,
   bindingIdx: number,
-  binding: { cron: string; skill: string },
+  binding: AgentBinding,
   now: Date,
 ): Promise<Decision> {
+  const cron = binding.trigger?.cron;
+  if (!cron) {
+    return { action: "skip", reason: "binding_missing_cron" };
+  }
   let fires: boolean;
   try {
-    fires = matchesNow(binding.cron, now, { windowMinutes: TICK_WINDOW_MINUTES });
+    fires = matchesNow(cron, now, { windowMinutes: TICK_WINDOW_MINUTES });
   } catch (err) {
     return { action: "skip", reason: `cron_parse_error: ${err instanceof Error ? err.message : String(err)}` };
   }

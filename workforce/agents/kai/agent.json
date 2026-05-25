@@ -13,8 +13,12 @@
   "created_at": "2026-05-23",
   "bindings": [
     {
-      "cron": "cron(0 7 ? * THU *)",
       "skill": "article-draft",
+      "executor": "lambda",
+      "trigger": {
+        "scheduler": "eventbridge",
+        "cron": "cron(0 7 ? * THU *)"
+      },
       "note": "Thursday 16:00 JST (weekly cadence)"
     }
   ]

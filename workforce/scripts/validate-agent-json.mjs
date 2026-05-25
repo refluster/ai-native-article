@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Validates workforce/agents/{slug}/agent.json against the v0.2 schema
-// (1-stage bindings[]). Exits non-zero on violation. Designed to be
+// Validates workforce/agents/{slug}/agent.json against the v0.3 schema
+// ({skill, executor, trigger} bindings — see workforce/docs/runbooks/bindings.md
+// and governance.md R-N4). Exits non-zero on violation. Designed to be
 // wired into CI.
 
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
@@ -12,6 +13,8 @@ const WORKFORCE_ROOT = join(HERE, "..");
 const REPO_ROOT = join(WORKFORCE_ROOT, "..");
 const AGENTS_DIR = join(WORKFORCE_ROOT, "agents");
 const SKILLS_DIR = join(WORKFORCE_ROOT, "skills");
+const ROUTINES_DIR = join(WORKFORCE_ROOT, "docs", "routines");
+const WORKFLOWS_DIR = join(REPO_ROOT, ".github", "workflows");
 
 const violations = [];
 const v = (rule, path, msg) =>
@@ -22,6 +25,17 @@ const MODEL = /^(anthropic|azure|claude-code):[a-z0-9-]+(?:-[a-z0-9.]+)*$/;
 const SEMVER = /^\d+\.\d+\.\d+$/;
 const CRON = /^cron\([^)]+\)$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const SKILL_NAME = /^[a-z][a-z0-9-]*$/;
+
+const ALLOWED_EXECUTORS = new Set(["lambda", "claude-code-routine", "gha", "cli"]);
+const ALLOWED_SCHEDULERS = new Set([
+  "eventbridge",
+  "claude-code-routine",
+  "gha",
+  "external",
+  "manual",
+]);
+const ALLOWED_INVOKED_BY = new Set(["api", "repository_dispatch", "manual"]);
 
 const REQUIRED_KEYS = [
   "slug",
@@ -143,29 +157,141 @@ for (const slug of slugDirs) {
         v("S9-binding-object", cfg, `bindings[${i}] must be an object`);
         continue;
       }
-      if (typeof b.cron !== "string" || !CRON.test(b.cron)) {
-        v("S9-binding-cron", cfg, `bindings[${i}].cron "${b.cron}" must be cron(...) form`);
-      }
-      if (typeof b.skill !== "string" || !/^[a-z][a-z0-9-]*$/.test(b.skill)) {
+      // skill
+      if (typeof b.skill !== "string" || !SKILL_NAME.test(b.skill)) {
         v("S9-binding-skill", cfg, `bindings[${i}].skill "${b.skill}" must be kebab-case`);
         continue;
       }
+      // executor
+      if (!ALLOWED_EXECUTORS.has(b.executor)) {
+        v(
+          "S9-binding-executor",
+          cfg,
+          `bindings[${i}].executor "${b.executor}" must be one of ${[...ALLOWED_EXECUTORS].join("|")}`,
+        );
+        continue;
+      }
+      // trigger
+      if (typeof b.trigger !== "object" || b.trigger === null) {
+        v("S9-binding-trigger", cfg, `bindings[${i}].trigger must be an object`);
+        continue;
+      }
+      const t = b.trigger;
+      if (!ALLOWED_SCHEDULERS.has(t.scheduler)) {
+        v(
+          "S9-binding-scheduler",
+          cfg,
+          `bindings[${i}].trigger.scheduler "${t.scheduler}" must be one of ${[...ALLOWED_SCHEDULERS].join("|")}`,
+        );
+        continue;
+      }
+      // R-N4 executor↔scheduler compatibility
+      if (b.executor === "lambda" && t.scheduler !== "eventbridge") {
+        v(
+          "S9-binding-compat",
+          cfg,
+          `bindings[${i}]: executor=lambda requires trigger.scheduler=eventbridge (R-N4)`,
+        );
+      }
+      if (b.executor === "gha" && t.scheduler !== "gha" && t.scheduler !== "external") {
+        v(
+          "S9-binding-compat",
+          cfg,
+          `bindings[${i}]: executor=gha requires trigger.scheduler=gha or external`,
+        );
+      }
+      // Cron presence for cron-driven schedulers
+      if (t.scheduler === "eventbridge") {
+        if (typeof t.cron !== "string" || !CRON.test(t.cron)) {
+          v(
+            "S9-binding-cron",
+            cfg,
+            `bindings[${i}].trigger.cron "${t.cron}" must be cron(...) form when scheduler=eventbridge`,
+          );
+        }
+      }
+      // CCR bindings need either a cron or a github_event
+      if (b.executor === "claude-code-routine" && t.scheduler === "claude-code-routine") {
+        if (!t.github_event && !t.cron) {
+          v(
+            "S9-binding-ccr-trigger",
+            cfg,
+            `bindings[${i}]: CCR binding requires either trigger.github_event or trigger.cron`,
+          );
+        }
+      }
+      // external scheduler: must say how it's invoked
+      if (t.scheduler === "external") {
+        if (!ALLOWED_INVOKED_BY.has(t.invoked_by)) {
+          v(
+            "S9-binding-external-invoked-by",
+            cfg,
+            `bindings[${i}]: scheduler=external requires trigger.invoked_by in ${[...ALLOWED_INVOKED_BY].join("|")}`,
+          );
+        }
+      }
+      // routine_spec required + must exist for CCR
+      if (b.executor === "claude-code-routine") {
+        if (typeof b.routine_spec !== "string" || b.routine_spec.length === 0) {
+          v(
+            "S9-binding-routine-spec",
+            cfg,
+            `bindings[${i}]: executor=claude-code-routine requires routine_spec (path under workforce/docs/routines/)`,
+          );
+        } else {
+          const routinePath = join(REPO_ROOT, b.routine_spec);
+          if (!existsSync(routinePath)) {
+            v(
+              "R8-routine-spec-exists",
+              cfg,
+              `bindings[${i}].routine_spec "${b.routine_spec}" does not exist`,
+            );
+          }
+        }
+      }
+      // workflow required + must exist for GHA
+      if (b.executor === "gha") {
+        if (typeof b.workflow !== "string" || b.workflow.length === 0) {
+          v(
+            "S9-binding-workflow",
+            cfg,
+            `bindings[${i}]: executor=gha requires workflow (path under .github/workflows/)`,
+          );
+        } else {
+          const wfPath = join(REPO_ROOT, b.workflow);
+          if (!existsSync(wfPath)) {
+            v(
+              "R8-workflow-exists",
+              cfg,
+              `bindings[${i}].workflow "${b.workflow}" does not exist`,
+            );
+          }
+        }
+      }
+      // note (optional)
       if (b.note !== undefined && typeof b.note !== "string") {
         v("S9-binding-note", cfg, `bindings[${i}].note must be string if present`);
       }
-      // R8-* cross-checks
-      if (skillsIndex.size === 0) continue;
-      const entry = skillsIndex.get(b.skill);
-      if (!entry) {
-        v("R8-binding-skill-exists", cfg, `bindings[${i}].skill "${b.skill}" has no workforce/skills/${b.skill}/ directory`);
-        continue;
-      }
-      if (!entry.owners.has(slug)) {
-        v(
-          "R8-binding-skill-owner",
-          cfg,
-          `agent "${slug}" binds skill "${b.skill}" but is not in workforce/skills/${b.skill}/meta.json:owners`,
-        );
+      // Skill folder cross-check applies only to executor=lambda.
+      // For CCR/GHA the skill name is logical; the artefact lives elsewhere.
+      if (b.executor === "lambda") {
+        if (skillsIndex.size === 0) continue;
+        const entry = skillsIndex.get(b.skill);
+        if (!entry) {
+          v(
+            "R8-binding-skill-exists",
+            cfg,
+            `bindings[${i}].skill "${b.skill}" has no workforce/skills/${b.skill}/ directory (required for executor=lambda)`,
+          );
+          continue;
+        }
+        if (!entry.owners.has(slug)) {
+          v(
+            "R8-binding-skill-owner",
+            cfg,
+            `agent "${slug}" binds skill "${b.skill}" but is not in workforce/skills/${b.skill}/meta.json:owners`,
+          );
+        }
       }
     }
   }
