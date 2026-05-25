@@ -20,6 +20,16 @@
     "sourceUrls": "https://a16z.com/forward-deployed-job-titles/"
   },
   {
+    "slug": "d3f883b8cb87",
+    "title": "解説：IBM: AI Trends for 2026",
+    "type": "explanation",
+    "category": "B: Trends",
+    "date": "2026-03-27",
+    "abstract": "Focus on agentic AI for specific industrial domains like manufacturing and health.",
+    "image": "/posts/images/d3f883b8cb87.jpg",
+    "sourceUrls": "https://www.ibm.com/think/news/ai-tech-trends-predictions-2026"
+  },
+  {
     "slug": "c2357516e41e",
     "title": "「AIのせいでリストラした」と公言する企業が増えた——なぜ今、正直に言えるようになったのか",
     "type": "explanation",
