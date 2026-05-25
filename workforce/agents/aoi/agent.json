@@ -20,6 +20,17 @@
         "cron": "cron(0 2 ? * TUE *)"
       },
       "note": "Tuesday 11:00 JST"
+    },
+    {
+      "skill": "pr-review",
+      "executor": "claude-code-routine",
+      "trigger": {
+        "scheduler": "claude-code-routine",
+        "github_event": "pull_request.labeled",
+        "filter": { "label": "wf:needs-review-aoi" }
+      },
+      "routine_spec": "workforce/docs/routines/aoi-review.md",
+      "note": "Design-lens reviewer. Fires on label add; posts inline comments + summary, then removes the label."
     }
   ]
 }
