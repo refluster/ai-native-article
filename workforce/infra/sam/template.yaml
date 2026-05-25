@@ -602,7 +602,7 @@ Resources:
             Name: !Sub wf-orchestrator-tick-${Stage}
             Description: Drives the workforce dispatch loop every 30 minutes.
             Schedule: rate(30 minutes)
-            Enabled: false
+            Enabled: true
       Tags:
         workforce: !Ref Stage
 
