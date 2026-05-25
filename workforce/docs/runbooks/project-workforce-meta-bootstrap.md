@@ -1,0 +1,97 @@
+# Runbook — `PROJECT#workforce-meta` bootstrap
+
+One-time DDB write to register the project that owns "the workforce
+working on itself" (Maya's PdM routine, Dario's VP-of-eng routines, Aoi's
+design reviews, Ren's engineering, Yuki's GTM ops). All of `pdm-decompose`'s
+artefacts (RUN rows, S3 outputs, child-issue audit) belong to this project.
+
+Runs once. After RFC-010 Epic 1 lands (proper `Project` entity + `MEMBER#`
+rows), this manual step is replaced by the normal project creation API.
+
+## Why
+
+Today the workforce data model has `default_project` on each agent but
+no `PROJECT#{slug}` rows in DDB. Maya's `default_project = "workforce-self"`
+is a string, not a foreign key. To make Maya's pdm-decompose runs auditable
+under "the project that builds the workforce," we pre-seed one project row
+with its membership.
+
+This is an **interim** shape — once RFC-010 Epic 1 lands the membership
+becomes `PROJECT#workforce-meta/MEMBER#maya`, `PROJECT#workforce-meta/MEMBER#dario`,
+... rows. For PR B, we just need the project to exist so pdm-decompose's
+RUN rows don't reference a dangling project_id.
+
+## Pre-flight
+
+```bash
+# Confirm the table exists and you're targeting the right stage.
+aws dynamodb describe-table --table-name wf-table-prod \
+  --query 'Table.{ItemCount: ItemCount, Status: TableStatus}' \
+  --region ap-northeast-1
+```
+
+## One-time writes
+
+Five agents are members for now (the PR A/B/C ribbon participants).
+Theo, Mira, Noor, Priya, Kai are NOT in `workforce-meta` — they have
+their own editorial/legal/people streams. Sora is included because she
+narrates architectural moves.
+
+```bash
+STAGE=prod
+REGION=ap-northeast-1
+NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+aws dynamodb put-item --table-name wf-table-$STAGE --region $REGION --item "$(cat <<JSON
+{
+  "pk": {"S": "PROJECT#workforce-meta"},
+  "sk": {"S": "META"},
+  "stream": {"S": "internal"},
+  "owner_agent": {"S": "maya"},
+  "status": {"S": "active"},
+  "repo": {"S": "refluster/ai-native-article"},
+  "created_at": {"S": "$NOW"}
+}
+JSON
+)"
+
+for slug in maya dario ren aoi yuki sora; do
+  aws dynamodb put-item --table-name wf-table-$STAGE --region $REGION --item "$(cat <<JSON
+{
+  "pk": {"S": "PROJECT#workforce-meta"},
+  "sk": {"S": "MEMBER#$slug"},
+  "agent_slug": {"S": "$slug"},
+  "joined_at": {"S": "$NOW"}
+}
+JSON
+  )"
+done
+```
+
+## Verify
+
+```bash
+aws dynamodb query --table-name wf-table-$STAGE --region $REGION \
+  --key-condition-expression "pk = :pk" \
+  --expression-attribute-values '{":pk":{"S":"PROJECT#workforce-meta"}}' \
+  --query 'Items[*].sk.S' --output table
+```
+
+Expected output: `META`, `MEMBER#aoi`, `MEMBER#dario`, `MEMBER#maya`,
+`MEMBER#ren`, `MEMBER#sora`, `MEMBER#yuki` (alphabetical or insertion
+order).
+
+## After RFC-010 Epic 1 lands
+
+The new `Project.create()` + `Project.add_member()` helpers ([Epic 1 issue](https://github.com/refluster/ai-native-article/issues/90))
+take over. The rows above remain valid — the data model is additive.
+
+The cutover work for Maya's pdm-decompose:
+
+- Set `pdm-decompose` handler to call `Project.append_execution(...)` for
+  the audit trail instead of the standalone RUN row write
+- Resolve `project_id` from the task instead of the hardcoded
+  `"workforce-meta"` (pdm-decompose runs against `PROJECT#workforce-meta`
+  by definition — the project is the workforce itself)
+
+That's a separate PR after Epic 1's foundation lands.
