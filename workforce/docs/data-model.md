@@ -21,7 +21,7 @@ Single-table design. PAY_PER_REQUEST billing. Point-in-time recovery ON. One GSI
 
 | `pk` | `sk` | Purpose | Key attributes |
 |---|---|---|---|
-| `AGENT#{slug}` | `META` | Agent definition mirror | `slug`, `model`, `schedule_cron`, `prompt_version`, `budget_monthly_usd`, `created_at` |
+| `AGENT#{slug}` | `META` | Agent definition mirror | `slug`, `model`, `bindings[]` (each: `{skill, executor, trigger, routine_spec?, workflow?, note?}` — see [runbooks/bindings.md](runbooks/bindings.md)), `prompt_version`, `budget_monthly_usd`, `created_at` |
 | `AGENT#{slug}` | `MEMORY#INDEX` | Memory pointer | `memver` (int, monotonic), `latest_chunk_key` (S3 key), `summary_snippet` (≤512 chars), `updated_at`. Conditional writes use `ConditionExpression: memver = :expected` |
 | `AGENT#{slug}` | `RUN#{ulid}` | Execution log | `task_id`, `status` ∈ `{ok, throw, dlq, skipped}`, `tokens_in`, `tokens_out`, `cost_usd`, `started_at`, `ended_at`, `error_message?`, `skip_reason?`, `skill_name?`, `skill_version?` |
 | `AGENT#{slug}` | `DELIV#{ulid}` | Deliverable metadata | `type` ∈ `{article, pr, plan, design-doc, launch-plan}`, `project_id`, `notion_page_id?`, `pr_url?`, `s3_key?`, `eval_score?`, `published_at?`, `status?` ∈ `{pending, ok, timeout}` (async PR path), `dispatched_at?`, `dispatch_branch?`, `error_message?`, `skill_name?`, `skill_version?` |

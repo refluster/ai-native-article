@@ -13,8 +13,12 @@
   "created_at": "2026-05-18",
   "bindings": [
     {
-      "cron": "cron(0 1 ? * WED *)",
       "skill": "plan-write",
+      "executor": "lambda",
+      "trigger": {
+        "scheduler": "eventbridge",
+        "cron": "cron(0 1 ? * WED *)"
+      },
       "note": "Wednesday 10:00 JST (runner enforces biweekly cadence)"
     }
   ]

@@ -15,7 +15,7 @@
 //     (Notion page / pending GitHub PR)
 
 import type { Context } from "aws-lambda";
-import { agentPk, type AgentBinding, type AgentMetaRow, type AgentOperational } from "../shared/agent.js";
+import { agentPk, bindingCron, type AgentBinding, type AgentMetaRow, type AgentOperational } from "../shared/agent.js";
 import { getItem, putItem, updateOperational } from "../shared/ddb.js";
 import { complete } from "../shared/llm-anthropic.js";
 import { assertWithinBudget, recordSpend } from "../shared/budget.js";
@@ -150,7 +150,7 @@ async function runDeterministic(
     binding_idx: event.binding_idx,
     skill_name: skill.meta.name,
     skill_version: skill.meta.version,
-    cron: binding.cron,
+    cron: bindingCron(binding) ?? "",
     status: "ok",
     tokens_in: 0,
     tokens_out: 0,
@@ -219,7 +219,7 @@ async function runLlmProse(
     binding_idx: event.binding_idx,
     skill_name: skill.meta.name,
     skill_version: skill.meta.version,
-    cron: binding.cron,
+    cron: bindingCron(binding) ?? "",
     status: "ok",
     tokens_in: llm.tokens_in,
     tokens_out: llm.tokens_out,
@@ -307,7 +307,7 @@ async function runClaudeCodeRoutine(
     binding_idx: event.binding_idx,
     skill_name: skill.meta.name,
     skill_version: skill.meta.version,
-    cron: binding.cron,
+    cron: bindingCron(binding) ?? "",
     status: "ok",
     tokens_in: llm.tokens_in,
     tokens_out: llm.tokens_out,
@@ -381,7 +381,7 @@ function buildMemoryChunk(
 slug: ${slug}
 run_id: ${runId}
 skill: ${skill.meta.name}@${skill.meta.version}
-cron: ${binding.cron}
+cron: ${bindingCron(binding) ?? ""}
 created_at: ${now}
 ---
 
@@ -464,7 +464,7 @@ async function throwRun(
     binding_idx: -1,
     skill_name: skill.meta.name,
     skill_version: skill.meta.version,
-    cron: binding.cron,
+    cron: bindingCron(binding) ?? "",
     status: "throw",
     tokens_in: 0,
     tokens_out: 0,
