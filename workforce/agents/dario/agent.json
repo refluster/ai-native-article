@@ -20,6 +20,27 @@
         "cron": "cron(0 4 ? * FRI *)"
       },
       "note": "Friday 13:00 JST (runner enforces biweekly cadence)"
+    },
+    {
+      "skill": "pr-implement",
+      "executor": "claude-code-routine",
+      "trigger": {
+        "scheduler": "claude-code-routine",
+        "cron": "0 * * * *"
+      },
+      "routine_spec": "workforce/docs/routines/dario-implement.md",
+      "note": "Hourly poll for wf:ready issues. CCR routine in the operator's claude.ai account; instantiate per workforce/docs/runbooks/ccr-bootstrap.md."
+    },
+    {
+      "skill": "pr-review",
+      "executor": "claude-code-routine",
+      "trigger": {
+        "scheduler": "claude-code-routine",
+        "github_event": "pull_request.labeled",
+        "filter": { "label": "wf:needs-review-dario" }
+      },
+      "routine_spec": "workforce/docs/routines/dario-review.md",
+      "note": "Architecture-lens reviewer. Fires on label add; posts inline comments + summary, then removes the label."
     }
   ]
 }
