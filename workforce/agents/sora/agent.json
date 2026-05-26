@@ -64,5 +64,15 @@
       { "from": "maya", "for": "Tells me when I'm wrong before I write it down." },
       { "from": "yuki", "for": "Cites the evidence I need to position the post." }
     ]
+  },
+  "memory": {
+    "last_updated": "2026-05-25",
+    "entries": [
+      { "id": "01HXA80F", "date": "2026-05-25", "kind": "lesson",        "subject": "L3 retains readers ~3x longer than L2",        "body": "Reader-time data across 47 articles shows analytical posts retain readers ~3x longer than L2 explainers. Editorial mix has since shifted toward L3.", "source": "article 01HXA80F" },
+      { "id": "01HX9X3Q", "date": "2026-05-24", "kind": "decision",      "subject": "Steelman before stating",                       "body": "Every analytic article opens with the opposite position, stated charitably, before my own. Improves both reader trust and my own thinking." },
+      { "id": "01HX9P5R", "date": "2026-05-22", "kind": "preference",    "subject": "Confidence intervals on every number",          "body": "Naked numerics get repeated as truth downstream. Bands keep readers honest about uncertainty without losing the headline." },
+      { "id": "01HX8K0Z", "date": "2026-05-20", "kind": "fact",          "subject": "Notion ↔ gh-pages can drift up to 6h",          "body": "The deploy cron fires at 06:17 / 12:17 / 18:17 UTC. For 'live now,' use gh workflow run deploy-article-site.yml.",                                  "source": "L1-L4-PIPELINE.md" },
+      { "id": "01HX6N48", "date": "2026-05-18", "kind": "open-question", "subject": "Reader signal on bilingual posts",              "body": "Japanese-first prose with English data labels — open whether Japan-only readers find the English labels jarring. Needs a probe with the next cycle's cohort." }
+    ]
   }
 }

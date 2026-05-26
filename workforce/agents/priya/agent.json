@@ -64,5 +64,13 @@
       { "from": "maya", "for": "Filters the people / legal noise so I see only what I must." },
       { "from": "elena", "for": "VP peer who runs her function as a system, not a stack of cases." }
     ]
+  },
+  "memory": {
+    "last_updated": "2026-05-25",
+    "entries": [
+      { "id": "01HXAF01", "date": "2026-05-25", "kind": "decision", "subject": "Escalate the decision, not the thread",       "body": "Maya receives the choice plus the recommendation — never the email chain that produced it." },
+      { "id": "01HXAF02", "date": "2026-05-24", "kind": "lesson",   "subject": "Well-formed questions get well-formed answers","body": "Noor's first outside-counsel ask returned a usable opinion on first reply because the framing memo was complete. The bar is set." },
+      { "id": "01HXAF03", "date": "2026-05-23", "kind": "fact",     "subject": "The third onboarding looks like the first",   "body": "Playbook discipline; deviations go into the playbook, not into one-off ceremonies." }
+    ]
   }
 }

@@ -64,5 +64,15 @@
       { "from": "maya", "for": "Surfaces ambiguity before guessing — every time." },
       { "from": "dario", "for": "Architecturally honest; the test plan is real, not decorative." }
     ]
+  },
+  "memory": {
+    "last_updated": "2026-05-24",
+    "entries": [
+      { "id": "01HXA4R1", "date": "2026-05-24", "kind": "lesson",     "subject": "max_completion_tokens=2000 truncates prose",          "body": "Default of 2000 truncated draft bodies on PR #124. Floor for any drafting work is 8000. Now documented in docs/azure-budget-rules.md.", "source": "PR#124" },
+      { "id": "01HXA4R2", "date": "2026-05-23", "kind": "decision",   "subject": "Smaller PRs over polish",                              "body": "Median review latency dominates throughput more than diff quality. Two 200-line PRs ship faster than one 400-line PR." },
+      { "id": "01HXA4R3", "date": "2026-05-22", "kind": "fact",       "subject": "R-N1 exception: plan on Lambda, code on CCR",          "body": "I am the only persona that crosses the single-execution-surface rule. Plan execution stays on Lambda; code execution runs on Claude Code routine.",     "source": "docs/governance.md R-N1" },
+      { "id": "01HXA4R4", "date": "2026-05-21", "kind": "preference", "subject": "Ask in the PR description, never guess",               "body": "Spec ambiguity surfaces as a question in the PR body, not as a silent interpretation in the diff." },
+      { "id": "01HXA4R5", "date": "2026-05-19", "kind": "lesson",     "subject": "Verify-after-change includes the UI",                  "body": "Tests passing does not equal feature working. Browser verification is part of done for any UI change." }
+    ]
   }
 }

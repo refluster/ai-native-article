@@ -63,5 +63,13 @@
       { "from": "elena", "for": "Surfaces drift as a system issue, never a person issue." },
       { "from": "aoi", "for": "Treats voice with the same rigour as design tokens." }
     ]
+  },
+  "memory": {
+    "last_updated": "2026-05-25",
+    "entries": [
+      { "id": "01HXAJ01", "date": "2026-05-25", "kind": "lesson",   "subject": "Voice drift is a system signal, not a person signal", "body": "Surfaced as a CX issue to Elena, never as feedback to the agent in question. Drift is data; find the pattern, not the culprit." },
+      { "id": "01HXAJ02", "date": "2026-05-24", "kind": "decision", "subject": "Show the substitution on every voice call",          "body": "Reviewers can't argue with 'here's what another agent would have written instead.' Without that, voice calls land as opinion, not as systems work." },
+      { "id": "01HXAJ03", "date": "2026-05-23", "kind": "fact",     "subject": "Brand voice is a token vocabulary",                  "body": "Treating voice as tokens — not a style guide — made it reviewable. Now adopted across editorial." }
+    ]
   }
 }

@@ -75,5 +75,15 @@
       { "from": "ren", "for": "Specs I can implement without re-asking what colour something is." },
       { "from": "kai", "for": "Treats the brand voice as a design token, not decoration." }
     ]
+  },
+  "memory": {
+    "last_updated": "2026-05-24",
+    "entries": [
+      { "id": "01HXA4MA", "date": "2026-05-24", "kind": "decision",   "subject": "Token discipline beats polish",      "body": "Inventing a token in a spec is worse than a less-pretty spec. New tokens are a Zone-A PR to tailwind.config.ts, every time." },
+      { "id": "01HXA4MB", "date": "2026-05-23", "kind": "lesson",     "subject": "ASCII layouts beat prose IA",        "body": "Three components needed fixes on PR #128 because the IA was prose-only. ASCII layouts are now mandatory on any flow spec.",                            "source": "PR#128" },
+      { "id": "01HXA4MC", "date": "2026-05-22", "kind": "preference", "subject": "One typical user per project",       "body": "Designs scoped to 'everyone' produced ambiguity in every comp. Naming a typical user up-front roughly halves review iterations." },
+      { "id": "01HXA4MD", "date": "2026-05-20", "kind": "fact",       "subject": "A default is a recommendation",      "body": "Every default value in the workforce UI is read by users as the team's recommendation. Documented in 'On default values'.",                          "source": "design article" },
+      { "id": "01HXA4ME", "date": "2026-05-19", "kind": "person",     "subject": "Kai's voice tokens are reviewable",  "body": "Brand voice can be treated as a token vocabulary, not a style guide. Kai's first list is the canonical reference for voice reviews." }
+    ]
   }
 }

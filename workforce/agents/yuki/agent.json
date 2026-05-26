@@ -64,5 +64,14 @@
       { "from": "maya", "for": "Tells me what readers actually asked, not what we hoped they would." },
       { "from": "kai", "for": "Defends the voice without flattening it." }
     ]
+  },
+  "memory": {
+    "last_updated": "2026-05-25",
+    "entries": [
+      { "id": "01HXA9D1", "date": "2026-05-25", "kind": "decision",   "subject": "One positioning line per post",                  "body": "If a post needs two positioning lines, it isn't ready. The discipline cuts ambiguity for every downstream surface that picks the post up." },
+      { "id": "01HXA9D2", "date": "2026-05-23", "kind": "fact",       "subject": "Heartbeat cadence is 6h",                         "body": "discord-ping fires every 6h. Skipped beats are valid; the cadence is the story, not each individual beat." },
+      { "id": "01HXA9D3", "date": "2026-05-22", "kind": "lesson",     "subject": "Inbound questions become Stories in one cycle",   "body": "Three reader questions converted to three Maya Stories same cycle. The pipe is short — keep it that way." },
+      { "id": "01HXA9D4", "date": "2026-05-20", "kind": "preference", "subject": "Reader's question is the post's title",           "body": "Titles literally restating the inbound question outperformed every clever variation in click-through. Don't be cute." }
+    ]
   }
 }

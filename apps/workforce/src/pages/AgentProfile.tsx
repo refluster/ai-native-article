@@ -255,6 +255,11 @@ export default function AgentProfile() {
           {/* EXPERIENCE — joined, highlights, endorsements */}
           {agent.experience && <ExperiencePanel agent={agent} roster={roster} />}
 
+          {/* MEMORY — OpenClaw / Hermes MEMORY.md analogue */}
+          {agent.memory && agent.memory.entries.length > 0 && (
+            <MemoryPanel memory={agent.memory} />
+          )}
+
           {/* CONFIG facts grid */}
           <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
             <div className="border-b border-wf-outline-variant px-4 py-3">
@@ -664,6 +669,67 @@ function formatDuration(secs: number): string {
   const m = Math.floor(secs / 60);
   const s = secs % 60;
   return s === 0 ? `${m}m` : `${m}m${String(s).padStart(2, '0')}`;
+}
+
+const MEMORY_KIND_META: Record<string, { label: string; tone: string; border: string }> = {
+  fact:           { label: 'FACT',     tone: 'text-wf-on-surface',          border: 'border-wf-outline-variant' },
+  decision:       { label: 'DECISION', tone: 'text-wf-tertiary',            border: 'border-wf-tertiary/40' },
+  lesson:         { label: 'LESSON',   tone: 'text-wf-running',             border: 'border-wf-running/40' },
+  preference:     { label: 'PREF',     tone: 'text-wf-on-surface-variant',  border: 'border-wf-outline-variant' },
+  person:         { label: 'PERSON',   tone: 'text-wf-primary',             border: 'border-wf-primary/40' },
+  'open-question':{ label: 'OPEN-Q',   tone: 'text-wf-throwing',            border: 'border-wf-throwing/40' },
+};
+
+function MemoryPanel({ memory }: { memory: NonNullable<WorkforceAgent['memory']> }) {
+  const ordered = [...memory.entries].sort(
+    (a, b) => Date.parse(b.date) - Date.parse(a.date),
+  );
+  const counts = ordered.reduce<Record<string, number>>((acc, e) => {
+    acc[e.kind] = (acc[e.kind] ?? 0) + 1;
+    return acc;
+  }, {});
+  return (
+    <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
+      <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+        <Typeplate label="DECK · MEMORY" value="LONG-TERM · OPENCLAW MEMORY.MD" />
+        <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+          {ordered.length} entries · updated {memory.last_updated}
+        </span>
+      </div>
+      <div className="px-4 pt-3 flex flex-wrap gap-2 border-b border-wf-outline-variant pb-3">
+        {Object.entries(counts).map(([kind, n]) => {
+          const m = MEMORY_KIND_META[kind] ?? MEMORY_KIND_META.fact;
+          return (
+            <span
+              key={kind}
+              className={`font-wfmono text-[10px] uppercase tracking-[0.14em] px-2 py-0.5 border ${m.border} ${m.tone} rounded-wf-sm`}
+            >
+              {m.label} · {n}
+            </span>
+          );
+        })}
+      </div>
+      <ol className="divide-y divide-wf-outline-variant">
+        {ordered.map((e) => {
+          const m = MEMORY_KIND_META[e.kind] ?? MEMORY_KIND_META.fact;
+          return (
+            <li key={e.id} className="px-4 py-3 grid grid-cols-[88px_1fr] sm:grid-cols-[120px_1fr] gap-x-3 gap-y-1">
+              <span className={`font-wfmono text-[10px] uppercase tracking-[0.14em] ${m.tone}`}>{m.label}</span>
+              <span className="text-sm font-semibold text-wf-on-surface leading-snug">{e.subject}</span>
+              <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant">{e.date}</span>
+              <span className="text-sm text-wf-on-surface-variant leading-snug">{e.body}</span>
+              {e.source && (
+                <>
+                  <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">SRC</span>
+                  <span className="font-wfmono text-[11px] text-wf-on-surface-variant">{e.source}</span>
+                </>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
 }
 
 function ExperiencePanel({ agent, roster }: { agent: WorkforceAgent; roster: WorkforceAgent[] }) {

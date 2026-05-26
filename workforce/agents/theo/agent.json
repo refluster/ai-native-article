@@ -63,5 +63,13 @@
       { "from": "priya", "for": "Runs onboarding as a product, not a ceremony." },
       { "from": "noor", "for": "First-week experience was a checklist, not a guess." }
     ]
+  },
+  "memory": {
+    "last_updated": "2026-05-24",
+    "entries": [
+      { "id": "01HXAG01", "date": "2026-05-24", "kind": "lesson",   "subject": "system.md needs a residence line", "body": "First onboarding-delta entry. The original template omitted residence; the template now includes it.",          "source": "onboarding-delta-1" },
+      { "id": "01HXAG02", "date": "2026-05-23", "kind": "decision", "subject": "Onboarding fits in one cycle",     "body": "Hard line. If it spills, the playbook is broken, not the persona." },
+      { "id": "01HXAG03", "date": "2026-05-23", "kind": "fact",     "subject": "Bench data is a service",          "body": "Underloaded and blocked status surface to Priya as a digest, not on request." }
+    ]
   }
 }

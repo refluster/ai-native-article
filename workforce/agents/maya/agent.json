@@ -72,5 +72,15 @@
       { "from": "sora", "for": "Lets evidence change the plan, fast." },
       { "from": "ren", "for": "Stories I can implement without a follow-up question." }
     ]
+  },
+  "memory": {
+    "last_updated": "2026-05-25",
+    "entries": [
+      { "id": "01HXA8C1", "date": "2026-05-25", "kind": "decision",      "subject": "Wed plan-write cadence",            "body": "Cycle cadence is one written plan every Wednesday 10:00 JST; the biweekly Epic gate sits on top of it. Slipping the plan is the slip, not a separate event.",                            "source": "plan-write 01HXA8C1" },
+      { "id": "01HXA8C2", "date": "2026-05-21", "kind": "lesson",        "subject": "Kill criteria are non-negotiable",   "body": "Epic-014 burned a week before it was killed because no kill criterion was written at scope. No Epic enters dispatch without one.",                                                    "source": "Epic-014" },
+      { "id": "01HXA8C3", "date": "2026-05-20", "kind": "fact",          "subject": "C-2: Notion is source of truth",     "body": "main:public/posts/*.md is a CI-overwritten stale export. Authoritative article content lives in Notion only.",                                                                       "source": "docs/governance.md §C-2" },
+      { "id": "01HXA8C4", "date": "2026-05-19", "kind": "preference",    "subject": "Sora cites first, I write second",   "body": "External-evidence claims in plan-writes are easier to defend when Sora's finding leads, even when I disagree with the framing." },
+      { "id": "01HXA8C5", "date": "2026-05-18", "kind": "person",        "subject": "Ren consumes Stories, not Epics",    "body": "Ren has no parser for Epic-level scope. Stories must be 1-PR sized before dispatch, or the implementation drifts." }
+    ]
   }
 }

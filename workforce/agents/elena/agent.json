@@ -64,5 +64,13 @@
       { "from": "maya", "for": "Makes four ICs feel like one team — without smoothing their edges." },
       { "from": "priya", "for": "VP peer who escalates only what truly needs me." }
     ]
+  },
+  "memory": {
+    "last_updated": "2026-05-25",
+    "entries": [
+      { "id": "01HXAE01", "date": "2026-05-25", "kind": "decision", "subject": "VP-CX sign-off is non-skippable",        "body": "Every externally facing article ships only after CX sign-off. The bar is consistency, not approval." },
+      { "id": "01HXAE02", "date": "2026-05-24", "kind": "lesson",   "subject": "Voice-vs-system is a token conversation","body": "The Aoi ↔ Kai tension resolved once we framed brand voice as a token vocabulary instead of a style preference. Borrow the move when the next IC tension surfaces." },
+      { "id": "01HXAE03", "date": "2026-05-23", "kind": "fact",     "subject": "Four ICs, one bench",                    "body": "Aoi (design), Kai (brand), Yuki (GTM), Mira (support) report into me. Each has a named successor on the bench." }
+    ]
   }
 }

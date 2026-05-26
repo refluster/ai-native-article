@@ -55,6 +55,46 @@ export interface AgentEndorsement {
 }
 
 /**
+ * The semantic class of a memory entry. Mirrors the OpenClaw / Hermes
+ * MEMORY.md convention — durable facts, standing decisions, lessons
+ * learned, preferences that emerged, people / context, and open questions.
+ */
+export type AgentMemoryKind =
+  | 'fact'
+  | 'decision'
+  | 'lesson'
+  | 'preference'
+  | 'person'
+  | 'open-question';
+
+export interface AgentMemoryEntry {
+  /** Short id (8-char ULID-ish) for cross-reference. */
+  id: string;
+  /** ISO date the entry was committed to memory. */
+  date: string;
+  kind: AgentMemoryKind;
+  /** Short label, 1–5 words. */
+  subject: string;
+  /** One or two sentences of detail. */
+  body: string;
+  /** Optional provenance: deliv-id, PR ref, conversation, etc. */
+  source?: string;
+}
+
+/**
+ * Persona long-term memory — OpenClaw / Hermes MEMORY.md analogue.
+ * The curated, durable layer the persona "remembers" at session open.
+ * Grows monotonically as the agent accumulates experience; entries are
+ * append-only and rendered newest-first on the profile.
+ */
+export interface AgentMemory {
+  /** ISO date of the latest append. */
+  last_updated: string;
+  /** Append-only log; the UI sorts newest-first. */
+  entries: AgentMemoryEntry[];
+}
+
+/**
  * Persona track record on this Workforce — modeled after LinkedIn's
  * experience block. Authored in agent.json today; live API may layer
  * in `metrics.runs_total_lifetime` etc. when wired.
@@ -86,6 +126,7 @@ export interface WorkforceAgent {
   jd?: AgentJD;
   identity?: AgentIdentity;
   experience?: AgentExperience;
+  memory?: AgentMemory;
   // ----- Org topology, merged from workforce/agents/_org.json by the build
   // script. `depth` is derived: 0 for nodes with no reports_to (roots),
   // 1 + min(parent depth) otherwise. There is no hard ceiling on N — a

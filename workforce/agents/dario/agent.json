@@ -85,5 +85,14 @@
       { "from": "ren", "for": "Reviews ship me forward, never sideways." },
       { "from": "maya", "for": "Closes the loop between 'incident' and 'won't repeat'." }
     ]
+  },
+  "memory": {
+    "last_updated": "2026-05-25",
+    "entries": [
+      { "id": "01HXAD01", "date": "2026-05-25", "kind": "decision",   "subject": "Every incident becomes a mechanical L2 check", "body": "Post-mortems that don't produce a new mechanical check have failed. 'We'll remember next time' is not an outcome." },
+      { "id": "01HXAD02", "date": "2026-05-24", "kind": "fact",       "subject": "L2 finish_reason='length' throw is canonical",  "body": "Closed the truncation class of bug after the May post-mortem. Removing this throw without a successor is an L0 violation.",       "source": "post-mortem 2026-05-19" },
+      { "id": "01HXAD03", "date": "2026-05-23", "kind": "preference", "subject": "Architecture review opens with the timeline",   "body": "Post-mortem-style review (timeline → impact → mechanical fix) lands better than line-by-line nits." },
+      { "id": "01HXAD04", "date": "2026-05-23", "kind": "person",     "subject": "Ren grows by writing, not by my edits",         "body": "Coach the spec, never ghostwrite the code. The bench gets better by writing more, not by my prose appearing in their PRs." }
+    ]
   }
 }
