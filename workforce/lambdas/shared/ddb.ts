@@ -141,3 +141,57 @@ export async function queryBySkPrefix<T extends object>(
   );
   return (res.Items ?? []) as T[];
 }
+
+export type GsiName = "GSI1" | "GSI2";
+
+export interface GsiQuery {
+  /** Inclusive lower + upper bound on the GSI sort key (e.g. timestamp range). */
+  skBetween?: [string, string];
+  /** Prefix match on the GSI sort key. Mutually exclusive with skBetween. */
+  skPrefix?: string;
+  limit?: number;
+  /** Ascending by default; pass false for descending (newest-first). */
+  scanIndexForward?: boolean;
+}
+
+/**
+ * Query a GSI by its partition key (and optional sort-key range / prefix).
+ * Used for cross-partition access patterns — e.g. "all EXEC#* rows whose
+ * gsi1pk=AGENT#ren regardless of which project's partition they sit in."
+ */
+export async function queryByGsi<T extends object>(
+  indexName: GsiName,
+  partitionKey: string,
+  query: GsiQuery = {},
+): Promise<T[]> {
+  const pkAttr = indexName === "GSI1" ? "gsi1pk" : "gsi2pk";
+  const skAttr = indexName === "GSI1" ? "gsi1sk" : "gsi2sk";
+
+  let keyConditionExpression = "#pk = :pk";
+  const exprNames: Record<string, string> = { "#pk": pkAttr };
+  const exprValues: Record<string, unknown> = { ":pk": partitionKey };
+
+  if (query.skBetween) {
+    keyConditionExpression += " AND #sk BETWEEN :from AND :to";
+    exprNames["#sk"] = skAttr;
+    exprValues[":from"] = query.skBetween[0];
+    exprValues[":to"] = query.skBetween[1];
+  } else if (query.skPrefix) {
+    keyConditionExpression += " AND begins_with(#sk, :skp)";
+    exprNames["#sk"] = skAttr;
+    exprValues[":skp"] = query.skPrefix;
+  }
+
+  const res = await ddb.send(
+    new QueryCommand({
+      TableName: tableName,
+      IndexName: indexName,
+      KeyConditionExpression: keyConditionExpression,
+      ExpressionAttributeNames: exprNames,
+      ExpressionAttributeValues: exprValues,
+      Limit: query.limit ?? 100,
+      ScanIndexForward: query.scanIndexForward ?? true,
+    }),
+  );
+  return (res.Items ?? []) as T[];
+}

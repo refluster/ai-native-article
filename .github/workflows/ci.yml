@@ -43,3 +43,9 @@ jobs:
 
       - name: Workforce skill registry freshness
         run: npm run workforce:skill-registry:check
+
+      - name: Workforce Lambda typecheck
+        run: cd workforce/lambdas && npm ci && npm run typecheck
+
+      - name: Workforce Lambda unit tests
+        run: cd workforce/lambdas && npm test

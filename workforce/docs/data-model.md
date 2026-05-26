@@ -35,10 +35,16 @@ Single-table design. PAY_PER_REQUEST billing. Point-in-time recovery ON. One GSI
 
 #### Project rows
 
+Per Epic-010 (Story 1, [#90](https://github.com/refluster/ai-native-article/issues/90)). Project is the unit of trust, audit, and recall: it owns a typed credential bag, an append-only execution ledger, and the S3 prefix its artefacts live under. `workforce/lambdas/shared/project.ts` exports the helpers.
+
 | `pk` | `sk` | Purpose | Key attributes |
 |---|---|---|---|
-| `PROJECT#{slug}` | `META` | Project descriptor | `stream` ∈ `{internal, client, editorial}`, `owner_agent`, `status` ∈ `{active, paused, done}`, `notion_db_id?`, `repo?`, `created_at` |
-| `PROJECT#{slug}` | `MILESTONE#{n}` | Milestone marker | `owner_agent`, `due_at?`, `deliv_refs[]` (ULIDs of contributing DELIVs), `status` |
+| `PROJECT#{project_id}` | `META` | Project descriptor | `project_id`, `status` ∈ `{active, archived}`, `owner_agent` (slug or `_operator`), `created_at`, `archived_at?` |
+| `PROJECT#{project_id}` | `MEMBER#{agent_slug}` | Project membership row | `project_id`, `agent_slug`, `joined_at`. Membership gates `append_execution`. Cross-project denial: a runner writing to project X must have a `MEMBER#X` row for the calling agent or `append_execution` throws. |
+| `PROJECT#{project_id}` | `EXEC#{ulid}` | Execution ledger row | `project_id`, `agent_slug`, `skill_name`, `skill_version`, `started_at`, `ended_at`, `status` ∈ `{ok, throw, skipped}`, `used_credential_types[]`, `inputs_hash?`, `artifact_ref?` (`{uri, content_hash, content_type, size_bytes, summary ≤512c}`), `error?`. GSI1 (`gsi1pk=AGENT#{agent_slug}, gsi1sk=started_at`) for agent-scoped recall; GSI2 (`gsi2pk=SKILL#{skill_name}, gsi2sk=started_at`) for skill-utilisation queries. |
+| `PROJECT#{project_id}` | `MILESTONE#{n}` | Milestone marker (pre-Epic-010 shape; retained for compat) | `owner_agent`, `due_at?`, `deliv_refs[]` (ULIDs of contributing DELIVs), `status` |
+
+`project_id = "self/{agent_slug}"` is the reserved per-agent project for personal artefacts (own observability outputs, per-agent model keys, notification webhooks). Seeded by `seed-agents` (Story 1-B follow-up).
 
 #### Budget rows
 
@@ -46,17 +52,26 @@ Single-table design. PAY_PER_REQUEST billing. Point-in-time recovery ON. One GSI
 |---|---|---|---|
 | `BUDGET#{yyyy-mm}` | `AGENT#{slug}` | Monthly token + cost roll-up | `tokens_in`, `tokens_out`, `cost_usd`, `last_updated_at`. Used by `lambdas/shared/budget.ts` to enforce W-3 before each LLM call |
 
-### GSI1 usage
+### GSI1 / GSI2 usage
 
-`GSI1` (pk: `gsi1pk`, sk: `gsi1sk`) supports a single query at v1:
+**GSI1** (pk: `gsi1pk`, sk: `gsi1sk`) supports two access patterns:
 
 ```
 pk = "STATUS#pending"  → all pending tasks, sorted by created_at
+pk = "AGENT#{slug}"    → all EXEC#* rows where this agent ran, across projects (Epic-010 / agent-scoped recall)
 ```
 
-This is how the orchestrator decides whether an agent already has work outstanding (skip new task creation if so).
+The first is the orchestrator's "skip new task creation if work is outstanding" gate. The second is `Project.list_executions({agent_slug})` — agent-scoped recall regardless of which project's partition the execution lives under.
 
-Other status values write `gsi1pk` so a future operator dashboard can fan out — but v1 only queries `pending`.
+**GSI2** (pk: `gsi2pk`, sk: `gsi2sk`) supports one access pattern at v1:
+
+```
+pk = "SKILL#{name}"    → all EXEC#* rows for this skill, across projects + agents (Epic-010 / skill-utilisation, future Epic-004 surface)
+```
+
+Both indexes use `started_at` as the sort key so range queries (`from` / `to`) push down to DDB.
+
+Other `gsi1pk` values are written for forward-compat (e.g. dashboard fan-out) but only the patterns above are queried in v1.
 
 ### Conditional-write invariants
 

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -b --noEmit",
-    "lint": "tsc -b --noEmit"
+    "lint": "tsc -b --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.700.0",
@@ -18,6 +19,7 @@
     "@types/aws-lambda": "^8.10.150",
     "@types/node": "^22.10.2",
     "esbuild": "^0.24.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
   }
 }
