@@ -12,6 +12,14 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// IMPORTANT (PR #111 cycle 2 — Ren's review): `handler.ts` does a
+// module-top-level throw on missing `TABLE_NAME` (W-4 fail-loud). The
+// env vars below MUST be set before `await import("./handler.js")` at
+// the bottom of this file, otherwise the import side-effect throws and
+// the test runner reports the failure before any test runs. Using a
+// dynamic `await import` after env setup is the ordering that makes
+// this work — a top-of-file static `import` runs before any code in the
+// file body, including these env-var assignments.
 process.env.TABLE_NAME = "wf-table-test";
 process.env.STAGE = "test";
 
@@ -38,6 +46,14 @@ const metricBatches: MetricBatch[] = [];
 // the SDK exports).
 const sendCalls: unknown[] = [];
 
+// When non-empty, the next Scan returns the first item. Use to simulate
+// LastEvaluatedKey pagination.
+const scanPageQueue: Array<{ Items: Row[]; LastEvaluatedKey?: Record<string, unknown> }> = [];
+
+// When non-empty, the next UpdateItem throws the dequeued error (used
+// to simulate non-CCF DDB failures + verify the errors[] path).
+const updateFailureQueue: Error[] = [];
+
 class FakeConditionalCheckFailedException extends Error {
   override name = "ConditionalCheckFailedException";
   constructor() {
@@ -57,12 +73,20 @@ vi.mock("@aws-sdk/lib-dynamodb", () => {
         send: async (cmd: { _kind: string; input: Record<string, unknown> }) => {
           sendCalls.push(cmd);
           if (cmd._kind === "scan") {
+            // Pagination simulation: when scanPageQueue is non-empty, dequeue
+            // the next page's row-set + LastEvaluatedKey. Otherwise return
+            // all matching rows in a single page.
+            const next = scanPageQueue.shift();
+            if (next) return next;
             const items = Array.from(store.values()).filter(
               (r) => r.pk.startsWith("TASK#") && r.sk === "META",
             );
             return { Items: items };
           }
           if (cmd._kind === "update") {
+            if (updateFailureQueue.length > 0) {
+              throw updateFailureQueue.shift();
+            }
             const { Key, ExpressionAttributeValues } = cmd.input as {
               Key: { pk: string; sk: string };
               ExpressionAttributeValues: { ":pid": string; ":now": string };
@@ -117,6 +141,8 @@ beforeEach(() => {
   store.clear();
   metricBatches.length = 0;
   sendCalls.length = 0;
+  scanPageQueue.length = 0;
+  updateFailureQueue.length = 0;
 });
 
 afterEach(() => {
@@ -210,5 +236,49 @@ describe("backfill-tasks handler", () => {
     const result = await handler();
     expect(result.scanned).toBe(1);
     expect(result.backfilled).toBe(1);
+  });
+
+  it("paginates via LastEvaluatedKey (cycle-2 gap: pagination loop now exercised)", async () => {
+    // Pre-seed all three rows so UpdateItem can find them; queue two
+    // disjoint Scan pages so the handler loops once and terminates on
+    // page 2's missing LastEvaluatedKey.
+    store.set(key("TASK#01A", "META"), { pk: "TASK#01A", sk: "META", agent_slug: "ren" });
+    store.set(key("TASK#02A", "META"), { pk: "TASK#02A", sk: "META", agent_slug: "ren" });
+    store.set(key("TASK#02B", "META"), { pk: "TASK#02B", sk: "META", agent_slug: "maya" });
+    scanPageQueue.push({
+      Items: [{ pk: "TASK#01A", sk: "META", agent_slug: "ren" }],
+      LastEvaluatedKey: { pk: "TASK#01A", sk: "META" },
+    });
+    scanPageQueue.push({
+      Items: [
+        { pk: "TASK#02A", sk: "META", agent_slug: "ren" },
+        { pk: "TASK#02B", sk: "META", agent_slug: "maya" },
+      ],
+    });
+
+    const result = await handler();
+    expect(result.scanned).toBe(3);
+    expect(result.backfilled).toBe(3);
+    const scanCount = sendCalls.filter(
+      (c) => (c as { _kind: string })._kind === "scan",
+    ).length;
+    expect(scanCount).toBe(2);
+  });
+
+  it("non-CCF UpdateItem failure pushes the row into errors[] + counts in metric (cycle-2 gap)", async () => {
+    store.set(key("TASK#01A", "META"), { pk: "TASK#01A", sk: "META", agent_slug: "ren" });
+    updateFailureQueue.push(new Error("ProvisionedThroughputExceededException"));
+
+    const result = await handler();
+    expect(result.scanned).toBe(1);
+    expect(result.backfilled).toBe(0);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]!.pk).toBe("TASK#01A");
+    expect(result.errors[0]!.message).toMatch(/ProvisionedThroughput/);
+
+    const batch = metricBatches[0]!;
+    const byName = new Map(batch.MetricData.map((m) => [m.MetricName, m.Value]));
+    expect(byName.get("WfBackfillErrors")).toBe(1);
+    expect(byName.get("WfBackfilledTaskRows")).toBe(0);
   });
 });

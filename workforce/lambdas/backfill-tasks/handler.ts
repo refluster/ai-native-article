@@ -30,6 +30,15 @@ if (!TABLE_NAME) throw new Error("TABLE_NAME env var is required");
 const tableName: string = TABLE_NAME;
 const STAGE = process.env.STAGE ?? "dev";
 
+// Per-page DDB Scan size. DDB applies Limit BEFORE FilterExpression, so
+// at large table sizes a single Scan page may return zero matching TASK
+// rows even though more pages contain matches. The loop terminates on
+// LastEvaluatedKey === undefined; at hobby scale (< 1k rows) one or two
+// pages cover the whole table. If the table grows past ~10k rows and the
+// operator sees Lambda timeouts mid-scan, bump this or shard the
+// invocation by ExclusiveStartKey. See backfill-tasks runbook.
+const SCAN_PAGE_SIZE = 100;
+
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
   marshallOptions: { removeUndefinedValues: true },
 });
@@ -68,7 +77,7 @@ export async function handler(): Promise<BackfillResult> {
         ExpressionAttributeNames: { "#pk": "pk", "#sk": "sk" },
         ExpressionAttributeValues: { ":taskPrefix": "TASK#", ":meta": "META" },
         ExclusiveStartKey: exclusiveStartKey,
-        Limit: 100,
+        Limit: SCAN_PAGE_SIZE,
       }),
     );
     const items = (page.Items ?? []) as TaskMetaRow[];

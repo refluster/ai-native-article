@@ -6,14 +6,28 @@
 //   "Integration test: a full orchestrator-tick → runner → ledger-append
 //    cycle writes the new row AND the legacy RUN row (dual-write)."
 //
-// We don't spin up the orchestrator here — the runner contract is the
-// canonical seam. We exercise `dualWriteExec` (and the resolveProjectId
-// path) by importing the agent-runner module with a mocked DDB +
-// secrets stack, then calling the helper directly. The 3 RUN-row write
-// sites in handler.ts each call dualWriteExec right after `putItem(runRow)`
-// (this is enforced by a smoke test that scans the file for the pattern).
+// The runner contract is the canonical seam. We do not spin up the
+// orchestrator here.
+//
+// Two complementary checks:
+//
+//   1. Structural absence test (cycle-2 hardening per Ren's PR #111
+//      review): assert there is exactly ONE `await putItem(runRow)` in
+//      the entire handler — the one inside `writeRunAndExec`. New
+//      executor paths that bypass the wrapper and call `putItem(runRow)`
+//      directly will trip this. Robust to formatting changes the prior
+//      regex-based check was brittle to (renames, line breaks, inlining
+//      the row).
+//
+//   2. Behaviour test on `appendExecution` directly, with a populated
+//      mock DDB, to prove the cross-project-denial path + the
+//      self/{slug}-default-membership path are reachable in the shape
+//      the runner uses.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
 process.env.TABLE_NAME = "wf-table-test";
 process.env.STAGE = "test";
@@ -29,6 +43,9 @@ const key = (pk: string, sk: string) => `${pk}|${sk}`;
 vi.mock("../shared/ddb.js", () => ({
   getItem: vi.fn(async (pk: string, sk: string) => store.get(key(pk, sk))),
   putItem: vi.fn(async (item: AnyRow) => {
+    store.set(key(item.pk as string, item.sk as string), { ...item });
+  }),
+  conditionalPutItem: vi.fn(async (item: AnyRow, _cond: string) => {
     store.set(key(item.pk as string, item.sk as string), { ...item });
   }),
   deleteItem: vi.fn(async (pk: string, sk: string) => {
@@ -58,18 +75,9 @@ vi.mock("../shared/ddb.js", () => ({
       });
     },
   ),
-  updateOperational: vi.fn(async () => ({})),
 }));
 
 import * as project from "../shared/project.js";
-
-// Import the file as text so we can run the smoke-test ("every
-// putItem(runRow) is followed by a dualWriteExec call"). The smoke
-// test guards against a future maintenance regression where someone
-// adds a new executor path that writes RUN but forgets the EXEC.
-import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
 
 const HANDLER_PATH = join(dirname(fileURLToPath(import.meta.url)), "handler.ts");
 
@@ -81,32 +89,55 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("agent-runner dual-write", () => {
-  it("static check: every `await putItem(runRow)` is followed by a `dualWriteExec` call", async () => {
+describe("agent-runner dual-write — convention enforcement", () => {
+  it("there is EXACTLY ONE `await putItem(runRow)` in handler.ts (inside writeRunAndExec)", async () => {
     const src = await readFile(HANDLER_PATH, "utf8");
+    // Match either `await putItem(runRow)` on its own line, or with
+    // trailing close-paren / semicolon — but NOT inside a comment.
     const lines = src.split("\n");
-    const runWriteLines = lines
+    const hits = lines
       .map((line, idx) => ({ line, idx }))
-      .filter(({ line }) => /^\s*await putItem\(runRow\);?\s*$/.test(line));
-    expect(runWriteLines.length).toBeGreaterThanOrEqual(3); // 3 executor paths
+      .filter(({ line }) => /\bawait\s+putItem\s*\(\s*runRow\b/.test(line))
+      .filter(({ line }) => !/^\s*(\/\/|\*)/.test(line)); // drop comment lines
 
-    for (const { idx } of runWriteLines) {
-      const next = lines[idx + 1] ?? "";
-      expect(next, `line ${idx + 2} should call dualWriteExec`).toMatch(
-        /await dualWriteExec\(/,
-      );
-    }
+    expect(
+      hits.length,
+      `expected exactly 1 raw \`await putItem(runRow)\` in handler.ts (inside writeRunAndExec); found ${hits.length} at lines ${hits.map((h) => h.idx + 1).join(", ")}. Executor paths must use writeRunAndExec(runRow, event, skill) to keep RUN + EXEC dual-write in lockstep.`,
+    ).toBe(1);
   });
 
+  it("the lone putItem(runRow) is inside the writeRunAndExec function", async () => {
+    const src = await readFile(HANDLER_PATH, "utf8");
+    const helperStart = src.indexOf("async function writeRunAndExec");
+    expect(helperStart, "writeRunAndExec helper not found").toBeGreaterThan(-1);
+    // Find the end of the writeRunAndExec body by counting braces.
+    let depth = 0;
+    let inside = false;
+    let helperEnd = src.length;
+    for (let i = helperStart; i < src.length; i++) {
+      const c = src[i];
+      if (c === "{") {
+        depth++;
+        inside = true;
+      } else if (c === "}") {
+        depth--;
+        if (inside && depth === 0) {
+          helperEnd = i;
+          break;
+        }
+      }
+    }
+    const body = src.slice(helperStart, helperEnd);
+    expect(body).toMatch(/\bawait\s+putItem\s*\(\s*runRow\b/);
+  });
+});
+
+describe("agent-runner dual-write — appendExecution seam behaviour", () => {
   it("appendExecution + RUN row are both reachable when the agent is a member of self/{slug}", async () => {
-    // Set up the agent's self project + membership (what seed-agents does).
     const pid = project.selfProjectId("ren");
     await project.create({ project_id: pid, owner_agent: "ren" });
     await project.addMember(pid, "ren");
 
-    // Now exercise appendExecution the same way agent-runner's
-    // dualWriteExec helper does — this proves the cross-project denial
-    // does NOT trip on the default self/{slug} path.
     const exec = await project.appendExecution({
       project_id: pid,
       agent_slug: "ren",
@@ -121,9 +152,6 @@ describe("agent-runner dual-write", () => {
     expect(exec.sk).toBe("EXEC#01EXEC");
     expect(exec.gsi1pk).toBe("AGENT#ren");
 
-    // Confirm the row is queryable through both:
-    //   - the project-partition path (`Project.listExecutions({project_id})`)
-    //   - the agent-scoped GSI1 path (`Project.listExecutions({agent_slug})`)
     const byProject = await project.listExecutions({ project_id: pid });
     expect(byProject.map((r) => r.sk)).toEqual(["EXEC#01EXEC"]);
     const byAgent = await project.listExecutions({ agent_slug: "ren" });

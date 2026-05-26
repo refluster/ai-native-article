@@ -16,10 +16,10 @@ import type { AgentBinding, AgentIdentity, AgentMetaRow } from "../shared/agent.
 import { agentPk } from "../shared/agent.js";
 import { getItem, putItem } from "../shared/ddb.js";
 import { identityHash } from "../shared/identity-hash.js";
+import { ConditionalCheckFailedException } from "../shared/ddb.js";
 import {
   addMember,
   create as createProject,
-  getProject,
   selfProjectId,
 } from "../shared/project.js";
 
@@ -108,8 +108,11 @@ async function seedOne(slug: string): Promise<"created" | "updated" | "noop"> {
 
   const existing = await getItem<AgentMetaRow>(agentPk(slug), "META");
   if (existing && existing.identity_hash === hash) {
-    // META unchanged, but still ensure the Epic-010 self/{slug} project
-    // exists for agents that were seeded before Story 1-B landed.
+    // Catch-up: agents seeded before Story 1-B (#90) lack the
+    // self/{slug} project row. `ensureSelfProject` is idempotent
+    // (create() is race-safe via attribute_not_exists(pk); addMember()
+    // preserves joined_at on active members). Cost is ~1 DDB read +
+    // ≤1 write per agent per noop seed.
     await ensureSelfProject(slug);
     return "noop";
   }
@@ -134,9 +137,14 @@ async function seedOne(slug: string): Promise<"created" | "updated" | "noop"> {
   await putItem(row);
 
   // Epic-010 Story 1-B: auto-seed the agent's `self/{slug}` project +
-  // membership row. Idempotent — getProject() skip prevents overwriting
-  // created_at on re-seed. Membership write is a plain putItem (idempotent
-  // by primary-key + overwrite semantics).
+  // membership row. Idempotent in two layers:
+  //   - createProject() uses attribute_not_exists(pk); a concurrent
+  //     writer winning the race throws CCF which we ignore.
+  //   - addMember() preserves joined_at when the agent is already an
+  //     active member (audit-preserving per PR #111 review).
+  // `self/{slug}` membership intentionally re-adds even when a prior
+  // operator revoked it — the agent's personal project is canonical
+  // for its own observability artefacts and not gated by RBAC.
   await ensureSelfProject(slug);
 
   return existing ? "updated" : "created";
@@ -144,9 +152,12 @@ async function seedOne(slug: string): Promise<"created" | "updated" | "noop"> {
 
 async function ensureSelfProject(slug: string): Promise<void> {
   const pid = selfProjectId(slug);
-  const existing = await getProject(pid);
-  if (!existing) {
+  try {
     await createProject({ project_id: pid, owner_agent: slug });
+  } catch (err) {
+    if (!(err instanceof ConditionalCheckFailedException)) throw err;
+    // Project already exists (this seeder, a previous run, or a concurrent
+    // writer won the race). Idempotent: continue to membership step.
   }
   await addMember(pid, slug);
 }

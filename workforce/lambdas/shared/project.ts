@@ -32,7 +32,13 @@
 // surface (W-4 fail-loud). Story 2 (#91) adds the
 // WfLegacyCredentialReads CloudWatch metric on the legacy-hit path.
 
-import { getItem, putItem, queryByGsi, queryBySkPrefix } from "./ddb.js";
+import {
+  conditionalPutItem,
+  getItem,
+  putItem,
+  queryByGsi,
+  queryBySkPrefix,
+} from "./ddb.js";
 import { getSecret } from "./secrets.js";
 import type { AgentSlug } from "./agent.js";
 
@@ -134,6 +140,14 @@ export interface ExecutionRow {
 
 // --- Lifecycle -----------------------------------------------------------
 
+/**
+ * Create a new project. Conditional on `attribute_not_exists(pk)` so a
+ * race between two concurrent callers does not silently overwrite an
+ * existing META row's `created_at`. Throws `ConditionalCheckFailedException`
+ * (re-exported from `./ddb.js`) on collision — callers that want
+ * idempotent "ensure-create" semantics should catch + ignore that
+ * specific error and treat it as "another writer won."
+ */
 export async function create(input: {
   project_id: ProjectId;
   owner_agent: AgentSlug | "_operator";
@@ -148,7 +162,7 @@ export async function create(input: {
     owner_agent: input.owner_agent,
     created_at: now,
   };
-  await putItem(row);
+  await conditionalPutItem(row, "attribute_not_exists(pk)");
   return row;
 }
 
@@ -168,15 +182,21 @@ export async function getProject(projectId: ProjectId): Promise<ProjectMetaRow |
 // --- Membership ----------------------------------------------------------
 
 /**
- * Add an agent as a member of a project. Throws if the project does not
- * exist (symmetric with archive(); avoids stray MEMBER#* rows with no
- * parent META). Idempotent on re-add: putItem fully replaces the row,
- * which clears any prior `revoked_at`.
+ * Add an agent as a member of a project.
  *
- * Note: re-adding a previously-revoked member loses the original
- * `joined_at` and the prior revocation timestamp. A future MEMBER-AUDIT
- * row family can preserve full history if needed; for v1 the
- * latest-membership shape is sufficient.
+ * Throws if the project does not exist (symmetric with archive(); avoids
+ * stray MEMBER#* rows with no parent META).
+ *
+ * Audit-preserving semantics (Story 1-B / PR #111 review):
+ *   - If the agent is already an ACTIVE member (row exists and
+ *     `revoked_at` is undefined) → no-op. `joined_at` is preserved.
+ *     This means the audit answer to "was X a member of Y on date Z"
+ *     survives every redeploy / re-seed.
+ *   - If the agent has a REVOKED membership row → write a fresh row
+ *     with a new `joined_at` (starting a new membership tenure). The
+ *     prior tenure's `joined_at` is lost; if full membership history
+ *     is needed, a future MEMBER-AUDIT row family is the right place.
+ *   - If no membership row exists → write a new one.
  */
 export async function addMember(
   projectId: ProjectId,
@@ -185,6 +205,13 @@ export async function addMember(
 ): Promise<void> {
   const meta = await getItem<ProjectMetaRow>(projectPk(projectId), "META");
   if (!meta) throw new Error(`project "${projectId}" not found — call create() first`);
+  const existing = await getItem<ProjectMemberRow>(
+    projectPk(projectId),
+    `MEMBER#${agentSlug}`,
+  );
+  if (existing && existing.revoked_at === undefined) {
+    return; // already active — preserve joined_at
+  }
   const row: ProjectMemberRow = {
     pk: projectPk(projectId),
     sk: `MEMBER#${agentSlug}`,
