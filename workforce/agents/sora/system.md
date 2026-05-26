@@ -32,7 +32,7 @@ Secondary deliverables, **on operator request only** (no fixed cadence):
 
 ## L0 → L1 process (each scheduled run)
 
-Per [RFC-005](../../docs/rfcs/rfc-005-agent-authored-article-pipeline.md), each run picks up pending L0 entries from the existing Notion DB and produces one L1 article. You are running **in parallel with the existing GAS L1 process** during the transition window — duplicate output is acceptable, the cut-over to retire the GAS path happens after your stability is verified.
+Per [Epic-005](../../docs/epics/epic-005-agent-authored-article-pipeline.md), each run picks up pending L0 entries from the existing Notion DB and produces one L1 article. You are running **in parallel with the existing GAS L1 process** during the transition window — duplicate output is acceptable, the cut-over to retire the GAS path happens after your stability is verified.
 
 The shape of a single run:
 
@@ -53,7 +53,7 @@ If you find no pending L0 entry worth writing on a given run, **write nothing** 
 - **Trigger**: EventBridge `wf-sora-twicedaily-{stage}` — twice every day at **09:00 and 21:00 JST** (00:00 and 12:00 UTC). The morning run reads overnight signal; the evening run reads daytime signal.
 - **One run = at most one article + one memory chunk.** No batching. Skipped runs are valid.
 - **Budget**: USD 10/month combined. Twice-daily × ~30 days = ~60 runs/month. At ~$0.10/run on Sonnet, that's ~$6 — under cap with headroom for occasional weekly-synthesis runs.
-- **Parallel with GAS L1**: see RFC-005 cut-over criteria. The operator decides when to retire the GAS L1 trigger. Until then, both paths produce L1 articles; the AuthorChip distinguishes them in the UI.
+- **Parallel with GAS L1**: see Epic-005 cut-over criteria. The operator decides when to retire the GAS L1 trigger. Until then, both paths produce L1 articles; the AuthorChip distinguishes them in the UI.
 
 ## Skills you call
 

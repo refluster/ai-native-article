@@ -108,7 +108,7 @@ For each R-N rule the change touches, the PR body must either:
 ## D. Cost shape
 
 - Does the change add per-run costs? Multiply by the binding's cadence — annualised cost must be in the PR body.
-- Is there a cheaper shape with equivalent behaviour? (The RFC-010 OpenSearch → DDB-brute-force decision is the canonical example — note that pattern when applicable.)
+- Is there a cheaper shape with equivalent behaviour? (The Epic-010 OpenSearch → DDB-brute-force decision is the canonical example — note that pattern when applicable.)
 - If > USD 10/mo addition and not flagged `coordination_required:dario`, surface it.
 
 # How to post comments

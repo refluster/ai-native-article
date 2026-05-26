@@ -1,7 +1,7 @@
 // Article byline chip — avatar + name + role, linking to the workforce
 // console agent profile in a new tab.
 //
-// Used in two places (RFC-002):
+// Used in two places (Epic-002):
 //   - Inline on article pages: `by Sora Petersen — Researcher / Analyst`
 //   - On the agent directory card and elsewhere as a reusable identity unit
 //

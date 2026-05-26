@@ -30,7 +30,7 @@ export interface ArticleMeta {
    * or `anonymous` for the legacy unnamed-narrator articles. Optional
    * during the agent rollout — older entries lack this field; the
    * AuthorChip falls back to a quiet placeholder for missing/unknown
-   * values. See workforce/docs/rfcs/rfc-002-agent-profile.md.
+   * values. See workforce/docs/epics/epic-002-agent-profile.md.
    */
   author?: string
 }

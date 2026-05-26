@@ -31,7 +31,7 @@ Create these labels in the repo settings (Issues → Labels) if they don't exist
 | `role:design` | grey | Design-flavoured children |
 | `role:qa` | grey | QA-flavoured children |
 | `coordination_required:dario` | red | Surfaces architecture decisions that need human go/no-go before merge |
-| `epic:N-M` | grey | One per (RFC, Epic) pair, e.g. `epic:10-1` for RFC-010 Epic 1 |
+| `epic:N-M` | grey | One per (Epic, Story) pair, e.g. `epic:10-1` for Epic-010 Story 1 |
 
 These labels are referenced by all three routine prompts. Without them, the routines will fail when trying to apply / remove labels.
 
@@ -140,7 +140,7 @@ To stop the routines without deleting them: at [claude.ai/code/routines](https:/
 To permanently remove: delete the routines from the same page. Past run
 sessions remain in the operator's session list.
 
-## After RFC-010 Epic 1 / 2 land
+## After Epic-010 Story 1 / 2 land
 
 Once the `Project` + `MEMBER` + credential-injector work lands:
 
@@ -148,4 +148,4 @@ Once the `Project` + `MEMBER` + credential-injector work lands:
 - The `routine_spec` docs should be amended to reflect the new auth path
 - The Maya → /fire dispatch path (currently optional) should become primary, with the hourly schedule kept as belt-and-suspenders
 
-Those are separate PRs after Epic 1 / 2 land.
+Those are separate PRs after Story 1 / 2 land.

@@ -5,7 +5,7 @@ working on itself" (Maya's PdM routine, Dario's VP-of-eng routines, Aoi's
 design reviews, Ren's engineering, Yuki's GTM ops). All of `pdm-decompose`'s
 artefacts (RUN rows, S3 outputs, child-issue audit) belong to this project.
 
-Runs once. After RFC-010 Epic 1 lands (proper `Project` entity + `MEMBER#`
+Runs once. After Epic-010 Story 1 lands (proper `Project` entity + `MEMBER#`
 rows), this manual step is replaced by the normal project creation API.
 
 ## Why
@@ -16,7 +16,7 @@ is a string, not a foreign key. To make Maya's pdm-decompose runs auditable
 under "the project that builds the workforce," we pre-seed one project row
 with its membership.
 
-This is an **interim** shape — once RFC-010 Epic 1 lands the membership
+This is an **interim** shape — once Epic-010 Story 1 lands the membership
 becomes `PROJECT#workforce-meta/MEMBER#maya`, `PROJECT#workforce-meta/MEMBER#dario`,
 ... rows. For PR B, we just need the project to exist so pdm-decompose's
 RUN rows don't reference a dangling project_id.
@@ -81,9 +81,9 @@ Expected output: `META`, `MEMBER#aoi`, `MEMBER#dario`, `MEMBER#maya`,
 `MEMBER#ren`, `MEMBER#sora`, `MEMBER#yuki` (alphabetical or insertion
 order).
 
-## After RFC-010 Epic 1 lands
+## After Epic-010 Story 1 lands
 
-The new `Project.create()` + `Project.add_member()` helpers ([Epic 1 issue](https://github.com/refluster/ai-native-article/issues/90))
+The new `Project.create()` + `Project.add_member()` helpers ([Story 1 issue](https://github.com/refluster/ai-native-article/issues/90))
 take over. The rows above remain valid — the data model is additive.
 
 The cutover work for Maya's pdm-decompose:
@@ -94,4 +94,4 @@ The cutover work for Maya's pdm-decompose:
   `"workforce-meta"` (pdm-decompose runs against `PROJECT#workforce-meta`
   by definition — the project is the workforce itself)
 
-That's a separate PR after Epic 1's foundation lands.
+That's a separate PR after Story 1's foundation lands.

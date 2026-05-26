@@ -34,7 +34,7 @@ const REASONING_MODEL = "anthropic:claude-opus-4-7";
 const REASONING_MAX_TOKENS = 4000;
 
 const PROPOSAL_MARKER = "<!-- pdm-decompose:proposal -->";
-const EPIC_TITLE_RE = /^\[RFC-/;
+const EPIC_TITLE_RE = /^\[Epic-/;
 const WORKSTREAMS_HEADING_RE = /^##\s+Workstreams\b/m;
 
 // --- Skill-versioned reasoning contract ----------------------------------
@@ -50,7 +50,7 @@ walk through whether each child task makes them work. If a scenario
 reveals a gap, expand the workstream list.
 
 For each child, output:
-- title: "[RFC-N Epic M] (role) — <=80-char deliverable"
+- title: "[Epic-N Story M] (role) — <=80-char deliverable"
 - body: includes AC bullets + parent link + "Reviewer personas: ..."
 - labels: ["wf:ready", "role:<role>", "epic:<N-M>", "reviewer:<persona>", ...]
 
@@ -59,7 +59,7 @@ Output ONLY a JSON object with these fields, no preamble:
   "scenarios_walked": ["operator scenario 1", "operator scenario 2", ...],
   "children": [
     {
-      "title": "[RFC-N Epic M] (role) — deliverable",
+      "title": "[Epic-N Story M] (role) — deliverable",
       "body": "markdown body...",
       "labels": ["wf:ready", "role:engineering", "epic:N-M", "reviewer:dario"],
       "reviewer_personas": ["dario", "aoi"]

@@ -21,10 +21,10 @@ Checklist of implementation milestones. The daily `wf-builder` routine reads thi
 
 ## Phase 1 — Live surface (complete)
 
-- [x] **RFC-002 v1** — Front-end AuthorChip + agent directory + profile on workforce SPA. *(Zone B)*
-- [x] **RFC-006** — Orchestrator tick + post-deploy seed via EventBridge. *(Zone B)*
-- [x] **RFC-007** — Agent management API (GET/PATCH/DELETE); DDB seed on stack deploy. *(Zone B)*
-- [x] **RFC-008** — Skill repository: skill-runner integration, seed Lambda, `/skills` API routes. *(Zone A/B)*
+- [x] **Epic-002 v1** — Front-end AuthorChip + agent directory + profile on workforce SPA. *(Zone B)*
+- [x] **Epic-006** — Orchestrator tick + post-deploy seed via EventBridge. *(Zone B)*
+- [x] **Epic-007** — Agent management API (GET/PATCH/DELETE); DDB seed on stack deploy. *(Zone B)*
+- [x] **Epic-008** — Skill repository: skill-runner integration, seed Lambda, `/skills` API routes. *(Zone A/B)*
 - [x] **PR-A (monorepo split)** — `apps/article` + `apps/workforce` + `packages/shared`. *(Zone B)*
 - [x] **PR-B (hosting)** — `workforce/infra/sam-web/` CloudFront + Cognito + Google sign-in. *(Zone B)*
 - [x] **PR-C (cutover)** — Article SPA links to `workforce.kohuehara.xyz`; `WORKFORCE ↗` header link. *(Zone B)*
@@ -36,7 +36,7 @@ Checklist of implementation milestones. The daily `wf-builder` routine reads thi
 
 - [x] **discord-ping skill end-to-end (PR #75 → #77)** — Webhook trigger_class, executor=deterministic, Yuki bound to it on `cron(0 0/6 * * ? *)`. *(Zone B)*
 - [x] **Skill encapsulation refactor (PR #80)** — Each skill is now a self-contained folder (`workforce/skills/{name}/{SKILL.md, meta.json, handler.ts}`); deterministic handlers auto-registered via `workforce/scripts/build-skill-registry.mjs`. No `lambdas/` edits to add a skill. *(Zone B)*
-- [x] **VP tier + 7 new personas (RFC-009, PR #79)** — `workforce/agents/{dario,elena,kai,mira,noor,priya,theo}/`; W-3 cap raised to USD 100/mo. *(Zone B + Zone A for governance amend)*
+- [x] **VP tier + 7 new personas (Epic-009, PR #79)** — `workforce/agents/{dario,elena,kai,mira,noor,priya,theo}/`; W-3 cap raised to USD 100/mo. *(Zone B + Zone A for governance amend)*
 - [x] **SAM data-plane auto-deploy (PR #81)** — `.github/workflows/deploy-workforce-data-plane.yml` rolls out `wf-data-plane-prod` on push to `main` touching `workforce/{infra/sam,lambdas,skills,agents}/**`. Auth via GitHub OIDC → IAM role assumption (`secrets.AWS_ROLE_ARN`). *(Zone A)*
 - [ ] **wf-builder bootstrap** — Add `workforce/README.md`, `workforce/ROADMAP.md`, `workforce/docs/routine-prompt.md`, `.github/workflows/workforce-builder-routine.yml`. Acceptance: `workforce-builder-routine.yml` is mergeable with CI green and the routine-prompt.md captures the full state-machine contract. *(Zone B + Zone A for the workflow)*
 
@@ -55,9 +55,9 @@ Checklist of implementation milestones. The daily `wf-builder` routine reads thi
 - [ ] **Yuki positioning write** — Yuki's bi-weekly `launch` task fires, launch artefact stored in S3 + Notion. *(Zone B)*
 - [ ] **Memory compaction** — Implement memory chunk compaction (`memory/{slug}/v{NNNN}.md` → rolling summary). Acceptance: compaction runs without losing agent identity; `memver` monotonic. *(Zone B)*
 
-## Phase 5 — PdM + VP-eng routine bootstrap (RFC-010 driver chain)
+## Phase 5 — PdM + VP-eng routine bootstrap (Epic-010 driver chain)
 
-Three-PR series that builds the autonomous flow from RFC → epic tracker → child issues → draft PRs → role-scoped reviews. Backs the RFC-010 epics ([#89](https://github.com/refluster/ai-native-article/issues/89) tracker).
+Three-PR series that builds the autonomous flow from Epic → epic tracker → child issues → draft PRs → role-scoped reviews. Backs the Epic-010 epics ([#89](https://github.com/refluster/ai-native-article/issues/89) tracker).
 
 - [x] **PR A — Unified binding shape (R-N4 amendment, [#100](https://github.com/refluster/ai-native-article/pull/100))** — Migrate `agent.json:bindings[]` from `{cron, skill}` to `{skill, executor, trigger}`; amend R-N4 in `workforce/docs/governance.md`; add `workforce/docs/runbooks/bindings.md`; update orchestrator + agent-runner + validate-agent-json. *(Zone A: governance + R-N4; Zone B: validator + Lambda + agent.json)*
 - [ ] **PR B — Maya `pdm-decompose` Lambda + `pdm-charter` stub** — New skills under `workforce/skills/`; Maya binding `cron(0 22 * * ? *)` (15:00 PDT daily); `PROJECT#workforce-meta` DDB bootstrap runbook; `workforce/docs/runbooks/pdm-decompose.md` state machine doc. *(Zone A: new skills, Rule-11 first version; Zone B: maya/agent.json edit + runbooks)*

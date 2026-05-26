@@ -65,7 +65,7 @@ If CI is genuinely broken in a way the agent can't fix, the agent says **that** 
 │      method=get_diff to confirm which file the failure is in.               │
 │    - If the failure is tractable and small (lint, type error, missing       │
 │      import, naming-lint violation): fix it locally, commit with a focused  │
-│      message (e.g. "fix(workforce): satisfy R-N7 on rfc-008 path"), push,   │
+│      message (e.g. "fix(workforce): satisfy R-N7 on epic-008 path"), push,   │
 │      and return to step 2.                                                  │
 │    - If the failure is ambiguous, architecturally significant, or would     │
 │      require a destructive operation (force-push to overwrite published     │

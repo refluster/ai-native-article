@@ -112,14 +112,14 @@ R-N1 still constrains this: GHA cron for workforce work is only permitted via th
 
 ### `executor: cli` — operator runs it manually
 
-Declarative entry for skills that exist but have no automatic schedule. The binding documents that the skill is invokable (so it shows up in agent profile listings) but does not fire it. Useful for ad-hoc skills like `pdm-charter` (operator triggers when a new RFC lands).
+Declarative entry for skills that exist but have no automatic schedule. The binding documents that the skill is invokable (so it shows up in agent profile listings) but does not fire it. Useful for ad-hoc skills like `pdm-charter` (operator triggers when a new Epic lands).
 
 ```jsonc
 {
   "skill": "pdm-charter",
   "executor": "cli",
   "trigger": { "scheduler": "manual" },
-  "note": "Operator runs after committing a new RFC."
+  "note": "Operator runs after committing a new Epic."
 }
 ```
 

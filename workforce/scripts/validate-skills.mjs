@@ -147,7 +147,7 @@ for (const name of skillDirs) {
       if (XML_TAG.test(desc)) {
         v("M3-description-xml", skillMd, "description must not contain XML tags");
       }
-      // Soft check (per RFC-008): "what + when" — looks for one of these markers.
+      // Soft check (per Epic-008): "what + when" — looks for one of these markers.
       // Warns only; surfaces as a `WARN` in stdout, not a violation.
       // (Implemented as a comment in stdout below.)
     }
@@ -266,7 +266,7 @@ console.error(`workforce/scripts/validate-skills.mjs: ${violations.length} viola
 for (const x of violations) {
   console.error(`  [${x.rule}] ${x.path}: ${x.msg}`);
 }
-console.error(`\nSee workforce/docs/rfcs/rfc-008-skill-repository.md and workforce/scripts/schemas/skill-meta.schema.json for the schema.`);
+console.error(`\nSee workforce/docs/epics/epic-008-skill-repository.md and workforce/scripts/schemas/skill-meta.schema.json for the schema.`);
 process.exit(1);
 
 // ── Helpers ────────────────────────────────────────────────────────────────

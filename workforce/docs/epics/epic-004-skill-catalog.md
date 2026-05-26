@@ -1,4 +1,4 @@
-# RFC-004 — Skill catalog + utilization
+# Epic-004 — Skill catalog + utilization
 
 - **Status**: Draft
 - **Owner**: Maya
@@ -24,7 +24,7 @@ Two routes on the existing SPA:
 A grid of cards, one per skill. Each card:
 
 - Skill name + one-line description (pulled from the SKILL.md frontmatter).
-- Owner agents (list of avatars + names with links to RFC-002 profiles).
+- Owner agents (list of avatars + names with links to Epic-002 profiles).
 - Last 30 days: invocation count, success/throw counts.
 - Created date / Last bumped date (the SKILL.md prompt-version-bump history).
 
@@ -57,7 +57,7 @@ For a single skill:
 - Each card's "owner agents" matches the union of `agent.json:skills` references across all agents.
 - A skill that no agent owns appears in a separate "Unassigned" section so operators notice.
 - `/workforce/skills/{name}` renders the SKILL.md body and the invocation timeline (empty initially, populated once the runner lands).
-- The skill catalog is searchable from the global agent search (RFC-001) by skill name.
+- The skill catalog is searchable from the global agent search (Epic-001) by skill name.
 
 ## Open questions
 

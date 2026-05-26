@@ -1,4 +1,4 @@
-# RFC-005 — Agent-authored L0 → L1 article pipeline (parallel to GAS)
+# Epic-005 — Agent-authored L0 → L1 article pipeline (parallel to GAS)
 
 - **Status**: Draft
 - **Owner**: Maya
@@ -9,7 +9,7 @@
 
 The existing article pipeline (`L1-L4-PIPELINE.md`) is fully automated but **anonymous** — articles are bylined "the site" rather than to a specific persona. Now that the workforce exists, articles should be authored by **agents** with public bylines so:
 
-- Each agent's body of work accumulates externally as evidence of competence (the LinkedIn-profile-with-real-track-record outcome in RFC-002).
+- Each agent's body of work accumulates externally as evidence of competence (the LinkedIn-profile-with-real-track-record outcome in Epic-002).
 - Readers can follow a specific persona's voice over time.
 - The dogfooding loop is visible: an AI workforce that ships real content under its own names.
 
@@ -35,7 +35,7 @@ Add a second EventBridge rule to Sora (Researcher / Analyst) for **twice-daily**
 - Write to Notion with `Author=sora, Kind=l1-insight, Status=ready_for_L4`.
 - Existing GAS L4 picks it up and pushes to `kohuehara.xyz` with the AuthorChip showing "by Sora."
 
-This is a `system.md` change, so it's a separate Rule-11-compliant PR (Sora prompt-version `0.1.0` → `0.2.0`). This RFC defines the change; the PR implements it.
+This is a `system.md` change, so it's a separate Rule-11-compliant PR (Sora prompt-version `0.1.0` → `0.2.0`). This Epic defines the change; the PR implements it.
 
 ### GAS parallelism (transitional)
 
@@ -55,7 +55,7 @@ Cut-over is a separate operator decision — a `gas/src/Code.gs` edit that disab
 
 ## Behaviour at N = 100+ agents
 
-This RFC is Sora-specific. At N = 100+, the same shape generalises:
+This Epic is Sora-specific. At N = 100+, the same shape generalises:
 
 - Any persona with `streams: ["editorial"]` and a Notion-publish skill can take an L0 → L1 task. The orchestrator distributes pending L0 entries among such personas (round-robin or by recent-deliv-affinity).
 - The twice-daily cadence is a property of the **task**, not the agent — express it as a `cron(0 0,12 * * ? *)` schedule on a TASK-creating rule, not a per-agent rule.
@@ -66,7 +66,7 @@ This RFC is Sora-specific. At N = 100+, the same shape generalises:
 - A new EventBridge rule `wf-sora-twicedaily-{stage}` is wired into the SAM template (PR4 work).
 - Sora's `system.md` v0.2.0 includes the L0 → L1 instructions (separate Rule-11 PR).
 - One Sora L0 → L1 run, end-to-end, produces an article in Notion with `Author=sora, Kind=l1-insight` and W-1 integrity holds.
-- The article appears on `kohuehara.xyz` via the existing GAS L4 batch with "by Sora" byline (depends on RFC-002 / PR7 AuthorChip).
+- The article appears on `kohuehara.xyz` via the existing GAS L4 batch with "by Sora" byline (depends on Epic-002 / PR7 AuthorChip).
 - GAS L1 continues to operate; no GAS code is changed by the agent.
 - After 7 days, an operator-visible report (manual `npm run workforce:agents` plus DDB inspection) shows whether the cut-over criteria are met.
 
@@ -78,6 +78,6 @@ This RFC is Sora-specific. At N = 100+, the same shape generalises:
 
 ## Out of scope
 
-- Moving L2 (explanations) and L3 (synthesis) to agents. Those are separate RFCs.
+- Moving L2 (explanations) and L3 (synthesis) to agents. Those are separate Epics.
 - Generalising the "twice-daily L0 → L1" cadence to other agents (Maya, Aoi, etc. don't run L0 → L1 work).
 - A formal A/B comparison between GAS-L1 and Sora-L1 article quality. The cut-over criteria above are pass/fail, not comparative.

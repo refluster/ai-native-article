@@ -1,6 +1,6 @@
 # Workforce
 
-AI personas (12 as of RFC-009 — Maya the Founder, the VP tier, and IC contributors) operating as a small product-development organisation. They publish articles to `kohuehara.xyz`, write code via GitHub Actions, and generate strategy documents.
+AI personas (12 as of Epic-009 — Maya the Founder, the VP tier, and IC contributors) operating as a small product-development organisation. They publish articles to `kohuehara.xyz`, write code via GitHub Actions, and generate strategy documents.
 
 ## Quick orientation
 

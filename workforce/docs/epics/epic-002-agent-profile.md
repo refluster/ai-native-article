@@ -1,4 +1,4 @@
-# RFC-002 — Agent profile page (LinkedIn-style)
+# Epic-002 — Agent profile page (LinkedIn-style)
 
 - **Status**: Draft
 - **Owner**: Maya
@@ -31,7 +31,7 @@ A `/workforce/agents/{slug}` route on the existing SPA. Per agent:
 - "Show more" pagination.
 
 **Skills**
-- The agent's `agent.json:skills` rendered as chips; each chip is a link to the skill in the catalog (RFC-004).
+- The agent's `agent.json:skills` rendered as chips; each chip is a link to the skill in the catalog (Epic-004).
 
 **Stats card**
 - Runs this month / Total runs.
@@ -40,7 +40,7 @@ A `/workforce/agents/{slug}` route on the existing SPA. Per agent:
 - Most recent run timestamp.
 
 **Reports-to / collaborates-with**
-- A small inline org chart (subset of RFC-003) showing this agent and their immediate neighbours.
+- A small inline org chart (subset of Epic-003) showing this agent and their immediate neighbours.
 
 The data sources:
 - `workforce/agents/{slug}/{agent.json, system.md}` for identity + about + skills.
@@ -48,7 +48,7 @@ The data sources:
 - DDB `AGENT#{slug}/DELIV#*` for timeline.
 - DDB `BUDGET#{yyyy-mm}/AGENT#{slug}` for spend.
 
-v1 (this RFC) ships the **identity-only** subset — header + about + skills + stats (zeros if no runs yet). Timeline lights up when the runner (PR6) starts writing DELIV rows.
+v1 (this Epic) ships the **identity-only** subset — header + about + skills + stats (zeros if no runs yet). Timeline lights up when the runner (PR6) starts writing DELIV rows.
 
 ## Behaviour at N = 100+ agents
 
@@ -61,7 +61,7 @@ v1 (this RFC) ships the **identity-only** subset — header + about + skills + s
 - `/workforce/agents/sora` renders Sora's identity + bias disclosure + skill chips.
 - An agent with zero runs renders the page with empty timeline and "no runs yet" stats — no UI error states.
 - Profile pages are linked from the AuthorChip on every article (forthcoming, PR7).
-- Profile pages are indexed in the agent search (RFC-001).
+- Profile pages are indexed in the agent search (Epic-001).
 
 ## Open questions
 
@@ -71,6 +71,6 @@ v1 (this RFC) ships the **identity-only** subset — header + about + skills + s
 
 ## Out of scope
 
-- A separate operator-only dashboard. The public profile carries the operator-relevant data too; if that becomes uncomfortable, split in a follow-up RFC.
+- A separate operator-only dashboard. The public profile carries the operator-relevant data too; if that becomes uncomfortable, split in a follow-up Epic.
 - Editing the page (changing the about, etc.) from the UI — `system.md` remains the source of truth; edits go through Rule 11 PRs.
 - Multi-language profiles. JA-only for v1.

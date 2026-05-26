@@ -1,6 +1,6 @@
 # Runbook — pdm-decompose (Maya's daily epic decomposition)
 
-The PdM routine that picks up RFC-derived Epic tracker issues and turns
+The PdM routine that picks up Epic-derived Epic tracker issues and turns
 them into role-tagged child issues, gated by operator approval. Owned by
 **Maya (PM / Founder)**.
 
@@ -70,7 +70,7 @@ issues.
 ### After Maya creates the children
 
 Each child issue carries:
-- title `[RFC-N Epic M] (role) — deliverable`
+- title `[Epic-N Story M] (role) — deliverable`
 - labels `wf:ready`, `role:<role>`, `epic:<N-M>`, `reviewer:<persona>` × N
 - body with AC bullets + parent link
 
