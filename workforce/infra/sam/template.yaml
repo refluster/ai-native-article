@@ -6,7 +6,7 @@ Description: |
 
   Carries the persistent surface every later workforce PR depends on:
     - DynamoDB single-table (wf-table-{Stage}) per R-N2 / data-model.md.
-    - S3 bucket (wf-bucket-{AccountId}-{Stage}) per R-N2 / data-model.md.
+    - S3 bucket (wf-bucket-{AccountId}-{Region}-{Stage}) per R-N2 / data-model.md.
     - SNS topic (wf-alarm-topic-{Stage}) for Lambda failure alarms once
       Lambdas land in PR5/PR6.
     - AWS Budgets monthly cap (W-3) with email + SNS notifications.
@@ -113,7 +113,7 @@ Resources:
   WfBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub wf-bucket-${AWS::AccountId}-${Stage}
+      BucketName: !Sub wf-bucket-${AWS::AccountId}-${AWS::Region}-${Stage}
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:

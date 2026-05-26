@@ -64,7 +64,7 @@ Other status values write `gsi1pk` so a future operator dashboard can fan out �
 - `TASK#{ulid}` / `META` claim transition (`pending → claimed`) is conditional on `status = pending`. Two runners can't double-claim.
 - `BUDGET#{yyyy-mm}` / `AGENT#{slug}` increments use `ADD` updates (atomic). The pre-call guard reads the value and short-circuits if `(tokens_out + projected) > cap`.
 
-## S3 — `wf-bucket-{stage}`
+## S3 — `wf-bucket-{acct}-{region}-{stage}`
 
 Versioning ON. SSE-S3. Lifecycle: `memory/` transitions to S3 Standard-IA at 90 days; nothing is auto-deleted (history is cheap, debugging is not).
 
