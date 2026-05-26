@@ -44,9 +44,20 @@ lambdas/
 cd workforce/lambdas
 npm ci
 npm run typecheck   # tsc --noEmit
+npm test            # vitest run (configured by vitest.config.mjs)
 ```
 
-`npm test` does not exist yet; per-Lambda smoke tests land in a follow-up.
+### Test file naming
+
+Test files use the suffix `*-tests.ts` (NOT vitest's default `*.test.ts`).
+Reason: the workforce naming lint (R-N7 / `workforce/scripts/validate-naming.mjs`,
+regex `KEBAB_TS = /^[a-z][a-z0-9-]*\.ts$/`) does not allow dotted segments,
+and `*.test.ts` would fail the lint. The included `vitest.config.mjs` points
+vitest's discovery glob at `**/*-tests.ts` so the convention "just works."
+
+When adding a test, name the file like the module it tests with `-tests`
+appended: `foo.ts` → `foo-tests.ts`. The next governance retrospective should
+formalise this in `workforce/docs/naming.md`.
 
 ## Build + deploy
 
