@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-23T23:52:03.534Z",
+  "generated_at": "2026-05-26T23:09:43.802Z",
   "skills": [
     {
       "name": "article-draft",
@@ -90,6 +90,34 @@
       "improvement_agent": null,
       "created_at": "2026-05-18",
       "description": "Produce one weekly-synthesis article in Japanese (800-1500 words) integrating the week's external signals the agent has memory of, with a falsifiable position. Use when the Researcher/Analyst persona is writing the weekly synthesis cadence (Sora's Sunday 23:00 JST run), not the twice-daily L0→L1 articles."
+    },
+    {
+      "name": "pdm-charter",
+      "version": "0.1.0",
+      "status": "stale",
+      "executor": "deterministic",
+      "deliverable": null,
+      "cost_class": "small",
+      "owners": [
+        "maya"
+      ],
+      "improvement_agent": "maya",
+      "created_at": "2026-05-25",
+      "description": "|"
+    },
+    {
+      "name": "pdm-decompose",
+      "version": "0.1.0",
+      "status": "active",
+      "executor": "deterministic",
+      "deliverable": null,
+      "cost_class": "medium",
+      "owners": [
+        "maya"
+      ],
+      "improvement_agent": "maya",
+      "created_at": "2026-05-25",
+      "description": "|"
     },
     {
       "name": "plan-write",

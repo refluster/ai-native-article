@@ -7,6 +7,67 @@ export type AgentBinding = {
   note?: string;
 };
 
+/**
+ * Persona JD — Mission / Key Responsibilities / Success Measures.
+ * Authored in agent.json. Not a job post; a structured attribute block
+ * the profile page renders for orientation.
+ */
+export interface AgentJD {
+  /** One-sentence statement of why this role exists on the workforce. */
+  mission: string;
+  /** 4-6 verb-led responsibility statements. */
+  key_responsibilities: string[];
+  /** 3-5 measurable outcomes that prove the role is working. */
+  success_measures: string[];
+}
+
+/**
+ * OpenClaw-style IDENTITY block. Complements JD: JD is what the role
+ * does; IDENTITY is who the persona is when they do it.
+ */
+export interface AgentIdentity {
+  /** 3-5 word label, e.g. "Systems-first designer". */
+  archetype: string;
+  /** 3-5 short operating principles. */
+  operating_principles: string[];
+  /** One sentence on voice / tone / register. */
+  voice: string;
+  /** 2-4 hard refusals — things this persona will not do. */
+  guardrails: string[];
+}
+
+/** A single LinkedIn-style highlight on the agent's track record. */
+export interface AgentExperienceHighlight {
+  /** ISO date of the milestone. */
+  date: string;
+  /** Short title (≤ ~80 chars). */
+  title: string;
+  /** One-sentence impact statement. */
+  impact: string;
+}
+
+/** Endorsement from a teammate (lateral or reports_to). */
+export interface AgentEndorsement {
+  /** Slug of the endorsing teammate. */
+  from: string;
+  /** What they're endorsed for (short phrase). */
+  for: string;
+}
+
+/**
+ * Persona track record on this Workforce — modeled after LinkedIn's
+ * experience block. Authored in agent.json today; live API may layer
+ * in `metrics.runs_total_lifetime` etc. when wired.
+ */
+export interface AgentExperience {
+  /** Date the persona was first deployed. */
+  joined_at: string;
+  /** Up to 5 highlight milestones. */
+  highlights: AgentExperienceHighlight[];
+  /** Up to 4 endorsements from teammates. */
+  endorsements: AgentEndorsement[];
+}
+
 export interface WorkforceAgent {
   slug: string;
   first_name: string;
@@ -22,6 +83,9 @@ export interface WorkforceAgent {
   created_at: string;
   /** First non-heading, non-framing paragraph from system.md. */
   about: string;
+  jd?: AgentJD;
+  identity?: AgentIdentity;
+  experience?: AgentExperience;
   // ----- Org topology, merged from workforce/agents/_org.json by the build
   // script. `depth` is derived: 0 for nodes with no reports_to (roots),
   // 1 + min(parent depth) otherwise. There is no hard ceiling on N — a

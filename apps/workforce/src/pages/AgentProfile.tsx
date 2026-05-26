@@ -221,6 +221,22 @@ export default function AgentProfile() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6 sm:space-y-8">
 
+          {/* JD — mission, key responsibilities, success measures */}
+          {agent.jd && <JDPanel jd={agent.jd} />}
+
+          {/* IDENTITY — OpenClaw-style archetype + operating principles */}
+          {agent.identity && <IdentityPanel identity={agent.identity} />}
+
+          {/* PERFORMANCE — 7-day rollup + per-skill execution bars */}
+          {mockForSlug?.last_7d && (
+            <PerformancePanel last7d={mockForSlug.last_7d} />
+          )}
+
+          {/* RECENT ACTIVITY — task log (when, what, result) */}
+          {mockForSlug?.recent_runs && mockForSlug.recent_runs.length > 0 && (
+            <RecentRunsPanel runs={mockForSlug.recent_runs} />
+          )}
+
           {/* HEAT STRIP */}
           {mock && mock.activity.by_slug[agent.slug] && (
             <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
@@ -235,6 +251,9 @@ export default function AgentProfile() {
               </div>
             </section>
           )}
+
+          {/* EXPERIENCE — joined, highlights, endorsements */}
+          {agent.experience && <ExperiencePanel agent={agent} roster={roster} />}
 
           {/* CONFIG facts grid */}
           <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
@@ -332,13 +351,13 @@ export default function AgentProfile() {
             </section>
           )}
 
-          {/* IDENTITY / BIAS DISCLOSURE */}
+          {/* DISCLOSURE — LLM-persona footer (slimmed: IDENTITY moved up) */}
           <section className="border border-wf-outline-variant bg-wf-surface-container rounded-wf-md p-4">
-            <Typeplate label="DECK · IDENTITY" value="LLM-DRIVEN PERSONA" className="mb-2" />
-            <p className="text-sm text-wf-on-surface-variant leading-relaxed">
+            <Typeplate label="DISCLOSURE" value="LLM-DRIVEN PERSONA" className="mb-2" />
+            <p className="text-xs text-wf-on-surface-variant leading-relaxed">
               {fullName(agent)} is an LLM-driven persona on the Workforce platform. Articles bylined to{' '}
-              {agent.first_name} are produced by an Anthropic Claude model running on AWS Lambda; the persona's
-              voice, biases, and limitations are described in their{' '}
+              {agent.first_name} are produced by an Anthropic Claude model running on AWS Lambda; the
+              persona's full voice and limitations are documented in their{' '}
               <a
                 href={`https://github.com/refluster/ai-native-article/blob/main/workforce/agents/${agent.slug}/system.md`}
                 target="_blank"
@@ -367,5 +386,357 @@ function Fact({ label, value, wide = false }: { label: string; value: string; wi
       <dt className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-0.5">{label}</dt>
       <dd className="text-sm text-wf-on-surface">{value}</dd>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sub-panels — kept inline rather than promoted to /components because they
+// are only used here and read like one continuous profile narrative.
+// ---------------------------------------------------------------------------
+
+function JDPanel({ jd }: { jd: NonNullable<WorkforceAgent['jd']> }) {
+  return (
+    <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
+      <div className="border-b border-wf-outline-variant px-4 py-3">
+        <Typeplate label="DECK · JD" value="MISSION · RESPONSIBILITIES · MEASURES" />
+      </div>
+      <div className="p-4 sm:p-5 space-y-5">
+        <div>
+          <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-1.5">
+            MISSION
+          </div>
+          <p className="text-base sm:text-lg text-wf-on-surface leading-snug">{jd.mission}</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-2">
+              KEY RESPONSIBILITIES
+            </div>
+            <ul className="space-y-1.5">
+              {jd.key_responsibilities.map((r, i) => (
+                <li key={i} className="flex gap-2 text-sm text-wf-on-surface">
+                  <span aria-hidden className="font-wfmono text-wf-on-surface-variant shrink-0 w-5 text-right">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span className="leading-snug">{r}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-2">
+              SUCCESS MEASURES
+            </div>
+            <ul className="space-y-1.5">
+              {jd.success_measures.map((s, i) => (
+                <li key={i} className="flex gap-2 text-sm text-wf-on-surface">
+                  <span aria-hidden className="font-wfmono text-wf-tertiary shrink-0 w-5 text-right">
+                    ✓
+                  </span>
+                  <span className="leading-snug">{s}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function IdentityPanel({ identity }: { identity: NonNullable<WorkforceAgent['identity']> }) {
+  return (
+    <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
+      <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
+        <Typeplate label="DECK · IDENTITY" value="ARCHETYPE · PRINCIPLES · GUARDRAILS" />
+        <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+          OPENCLAW
+        </span>
+      </div>
+      <div className="p-4 sm:p-5 space-y-4">
+        <div>
+          <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-1.5">
+            ARCHETYPE
+          </div>
+          <p className="font-headline text-xl sm:text-2xl font-black tracking-tight text-wf-on-surface">
+            {identity.archetype}
+          </p>
+        </div>
+        <div>
+          <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-2">
+            OPERATING PRINCIPLES
+          </div>
+          <ul className="space-y-1.5">
+            {identity.operating_principles.map((p, i) => (
+              <li key={i} className="flex gap-2 text-sm text-wf-on-surface">
+                <span aria-hidden className="text-wf-primary shrink-0">›</span>
+                <span className="leading-snug">{p}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+          <div>
+            <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-1.5">
+              VOICE
+            </div>
+            <p className="text-sm text-wf-on-surface leading-snug italic">"{identity.voice}"</p>
+          </div>
+          <div>
+            <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-1.5">
+              GUARDRAILS
+            </div>
+            <ul className="space-y-1">
+              {identity.guardrails.map((g, i) => (
+                <li key={i} className="flex gap-2 text-xs text-wf-on-surface">
+                  <span aria-hidden className="font-wfmono text-wf-tertiary shrink-0">✕</span>
+                  <span className="leading-snug">{g}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PerformancePanel({ last7d }: { last7d: NonNullable<AgentMockStats['last_7d']> }) {
+  const skillEntries = Object.entries(last7d.by_skill).sort((a, b) => b[1] - a[1]);
+  const max = Math.max(1, ...skillEntries.map(([, n]) => n));
+  const okPct = Math.round(last7d.ok_rate * 100);
+  const avgMin = (last7d.avg_duration_s / 60).toFixed(1);
+  return (
+    <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
+      <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
+        <Typeplate label="DECK · PERF" value="LAST 7 DAYS" />
+        <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+          rolling window
+        </span>
+      </div>
+      <div className="p-4 sm:p-5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+          <PerfTile cap="RUNS · 7D"     value={String(last7d.runs_total)} sub="skill executions" />
+          <PerfTile cap="DELIV · 7D"    value={String(last7d.deliv_count)} sub="artefacts shipped" />
+          <PerfTile cap="AVG · DUR"     value={`${avgMin}m`} sub="per run" />
+          <PerfTile cap="OK · RATE"     value={`${okPct}%`} sub="green exits" alarm={okPct < 80} />
+        </div>
+        <div>
+          <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-2">
+            BY SKILL — 7D EXECUTIONS
+          </div>
+          <ul className="space-y-1.5">
+            {skillEntries.map(([skill, n]) => (
+              <li key={skill} className="flex items-center gap-3 text-sm">
+                <Link
+                  to={`/skills/${skill}`}
+                  className="font-wfmono text-xs text-wf-on-surface hover:text-wf-primary shrink-0 w-40 sm:w-48 truncate"
+                  title={skill}
+                >
+                  {skill}
+                </Link>
+                <div className="flex-1 h-3 bg-wf-surface-container rounded-wf-sm overflow-hidden">
+                  <div
+                    className="h-full bg-wf-primary"
+                    style={{ width: `${Math.round((n / max) * 100)}%` }}
+                    aria-label={`${n} executions`}
+                  />
+                </div>
+                <span className="font-wfmono text-xs text-wf-on-surface tabular-nums shrink-0 w-8 text-right">
+                  {n}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PerfTile({ cap, value, sub, alarm = false }: { cap: string; value: string; sub: string; alarm?: boolean }) {
+  return (
+    <div className="border border-wf-outline-variant bg-wf-surface-container p-3 rounded-wf-sm">
+      <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-1">
+        {cap}
+      </div>
+      <div className={`font-wfmono font-medium leading-none tracking-tight ${
+        alarm ? 'text-wf-tertiary' : 'text-wf-on-surface'
+      } text-2xl sm:text-3xl`}>
+        {value}
+      </div>
+      <div className="font-wfmono text-[10px] text-wf-on-surface-variant mt-1.5">{sub}</div>
+    </div>
+  );
+}
+
+const RUN_STATUS_LABEL: Record<string, { text: string; tone: string }> = {
+  ok:    { text: 'ok',    tone: 'text-wf-running' },
+  throw: { text: 'throw', tone: 'text-wf-throwing' },
+  dlq:   { text: 'dlq',   tone: 'text-wf-throwing' },
+};
+
+function RecentRunsPanel({ runs }: { runs: NonNullable<AgentMockStats['recent_runs']> }) {
+  const ordered = [...runs].sort(
+    (a, b) => Date.parse(b.started_at) - Date.parse(a.started_at),
+  ).slice(0, 20);
+  return (
+    <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
+      <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
+        <Typeplate label="DECK · TASK LOG" value={`LAST ${ordered.length} RUNS`} />
+        <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+          when · what · result
+        </span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-wf-outline-variant">
+              <th className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant text-left px-4 py-2 whitespace-nowrap">WHEN</th>
+              <th className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant text-left px-2 py-2">SKILL</th>
+              <th className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant text-right px-2 py-2 whitespace-nowrap">DUR</th>
+              <th className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant text-left px-2 py-2">STATUS</th>
+              <th className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant text-left px-4 py-2">RESULT</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-wf-outline-variant">
+            {ordered.map((r, idx) => {
+              const status = RUN_STATUS_LABEL[r.status] ?? RUN_STATUS_LABEL.ok;
+              return (
+                <tr key={`${r.started_at}-${idx}`} className="hover:bg-wf-surface-container/40">
+                  <td className="font-wfmono text-xs text-wf-on-surface-variant px-4 py-2 whitespace-nowrap">
+                    <div className="text-wf-on-surface">{r.started_at.slice(0, 10)}</div>
+                    <div className="text-[10px]">{r.started_at.slice(11, 16)} · {formatRelative(r.started_at)}</div>
+                  </td>
+                  <td className="px-2 py-2">
+                    <Link
+                      to={`/skills/${r.skill}`}
+                      className="font-wfmono text-xs text-wf-on-surface hover:text-wf-primary"
+                    >
+                      {r.skill}
+                    </Link>
+                  </td>
+                  <td className="font-wfmono text-xs text-wf-on-surface tabular-nums text-right px-2 py-2 whitespace-nowrap">
+                    {formatDuration(r.duration_s)}
+                  </td>
+                  <td className="px-2 py-2">
+                    <span className={`font-wfmono text-[10px] uppercase tracking-[0.14em] ${status.tone}`}>
+                      ● {status.text}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 text-sm">
+                    {r.deliverable ? (
+                      <span className="flex items-baseline gap-2 flex-wrap">
+                        <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant">
+                          {r.deliverable.type}
+                        </span>
+                        {r.deliverable.url ? (
+                          <a
+                            href={r.deliverable.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-wfmono text-xs text-wf-primary hover:underline"
+                          >
+                            {r.deliverable.id}
+                          </a>
+                        ) : (
+                          <span className="font-wfmono text-xs text-wf-on-surface">{r.deliverable.id}</span>
+                        )}
+                      </span>
+                    ) : r.note ? (
+                      <span className="text-xs text-wf-on-surface-variant italic">{r.note}</span>
+                    ) : (
+                      <span className="font-wfmono text-[10px] text-wf-on-surface-variant">—</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function formatDuration(secs: number): string {
+  if (secs < 60) return `${secs}s`;
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return s === 0 ? `${m}m` : `${m}m${String(s).padStart(2, '0')}`;
+}
+
+function ExperiencePanel({ agent, roster }: { agent: WorkforceAgent; roster: WorkforceAgent[] }) {
+  const exp = agent.experience!;
+  const tenureDays = Math.max(
+    0,
+    Math.round((Date.now() - Date.parse(exp.joined_at)) / 86_400_000),
+  );
+  return (
+    <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
+      <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
+        <Typeplate label="DECK · EXPERIENCE" value="TRACK RECORD ON THE WORKFORCE" />
+        <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+          joined {exp.joined_at} · {tenureDays}d
+        </span>
+      </div>
+      <div className="p-4 sm:p-5 space-y-5">
+        {exp.highlights.length > 0 && (
+          <div>
+            <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-2">
+              HIGHLIGHTS
+            </div>
+            <ol className="relative border-l border-wf-outline-variant pl-4 space-y-3">
+              {exp.highlights.map((h, i) => (
+                <li key={i} className="relative">
+                  <span
+                    aria-hidden
+                    className="absolute -left-[19px] top-1.5 w-2 h-2 bg-wf-primary rounded-full"
+                  />
+                  <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+                    {h.date}
+                  </div>
+                  <div className="text-sm font-semibold text-wf-on-surface leading-snug">{h.title}</div>
+                  <div className="text-sm text-wf-on-surface-variant leading-snug">{h.impact}</div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+        {exp.endorsements.length > 0 && (
+          <div>
+            <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-2">
+              ENDORSEMENTS · TEAMMATES
+            </div>
+            <ul className="space-y-2">
+              {exp.endorsements.map((e, i) => {
+                const teammate = roster.find((r) => r.slug === e.from);
+                const label = teammate ? `${teammate.first_name} ${teammate.last_name}` : e.from;
+                const subtitle = teammate ? teammate.role : '';
+                return (
+                  <li
+                    key={i}
+                    className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3 text-sm border border-wf-outline-variant rounded-wf-sm px-3 py-2"
+                  >
+                    <Link
+                      to={`/agents/${e.from}`}
+                      className="font-wfmono text-xs text-wf-on-surface hover:text-wf-primary shrink-0"
+                    >
+                      {label}
+                    </Link>
+                    {subtitle && (
+                      <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant shrink-0">
+                        {subtitle}
+                      </span>
+                    )}
+                    <span className="text-wf-on-surface flex-1 italic">"{e.for}"</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
