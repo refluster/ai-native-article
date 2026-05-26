@@ -16,6 +16,12 @@ import type { AgentBinding, AgentIdentity, AgentMetaRow } from "../shared/agent.
 import { agentPk } from "../shared/agent.js";
 import { getItem, putItem } from "../shared/ddb.js";
 import { identityHash } from "../shared/identity-hash.js";
+import {
+  addMember,
+  create as createProject,
+  getProject,
+  selfProjectId,
+} from "../shared/project.js";
 
 // agent.json on disk uses `budget_monthly_usd` (no _default suffix); the
 // DDB row splits identity defaults from operational overrides.
@@ -102,6 +108,9 @@ async function seedOne(slug: string): Promise<"created" | "updated" | "noop"> {
 
   const existing = await getItem<AgentMetaRow>(agentPk(slug), "META");
   if (existing && existing.identity_hash === hash) {
+    // META unchanged, but still ensure the Epic-010 self/{slug} project
+    // exists for agents that were seeded before Story 1-B landed.
+    await ensureSelfProject(slug);
     return "noop";
   }
 
@@ -123,5 +132,21 @@ async function seedOne(slug: string): Promise<"created" | "updated" | "noop"> {
   };
 
   await putItem(row);
+
+  // Epic-010 Story 1-B: auto-seed the agent's `self/{slug}` project +
+  // membership row. Idempotent — getProject() skip prevents overwriting
+  // created_at on re-seed. Membership write is a plain putItem (idempotent
+  // by primary-key + overwrite semantics).
+  await ensureSelfProject(slug);
+
   return existing ? "updated" : "created";
+}
+
+async function ensureSelfProject(slug: string): Promise<void> {
+  const pid = selfProjectId(slug);
+  const existing = await getProject(pid);
+  if (!existing) {
+    await createProject({ project_id: pid, owner_agent: slug });
+  }
+  await addMember(pid, slug);
 }

@@ -19,6 +19,13 @@ import { agentPk, bindingCron, type AgentBinding, type AgentMetaRow, type AgentO
 import { getItem, putItem, updateOperational } from "../shared/ddb.js";
 import { complete } from "../shared/llm-anthropic.js";
 import { assertWithinBudget, recordSpend } from "../shared/budget.js";
+import {
+  appendExecution,
+  asProjectId,
+  selfProjectId,
+  type ExecStatus,
+  type ProjectId,
+} from "../shared/project.js";
 import { readIndex, readChunk, appendChunk } from "../shared/memory.js";
 import { insertArticle } from "../shared/notion.js";
 import {
@@ -40,6 +47,10 @@ export interface RunnerEvent {
   brief?: string;
   /** When true, do everything except the LLM call + side effects. */
   dryRun?: boolean;
+  /** Project to attribute this execution to (Epic-010 Story 1-B).
+   *  Defaults to `self/{agent}` if not provided. Forward-compat for the
+   *  TASK.project_id flow that future Stories wire through. */
+  project_id?: string;
 }
 
 export interface RunnerResult {
@@ -161,6 +172,7 @@ async function runDeterministic(
     output_summary: result.summary.slice(0, 240),
   };
   await putItem(runRow);
+  await dualWriteExec(event, runId, skill, startedAt, endedAt, "ok");
 
   return { status: "ok", run_id: runId, tokens_in: 0, tokens_out: 0, cost_usd: 0 };
 }
@@ -230,6 +242,7 @@ async function runLlmProse(
     output_summary: summaryOf(llm.text),
   };
   await putItem(runRow);
+  await dualWriteExec(event, runId, skill, startedAt, endedAt, "ok");
 
   const delivRow: DelivRow = {
     pk: agentPk(event.agent),
@@ -318,6 +331,7 @@ async function runClaudeCodeRoutine(
     output_summary: summaryOf(llm.text),
   };
   await putItem(runRow);
+  await dualWriteExec(event, runId, skill, startedAt, endedAt, "ok");
 
   const delivRow: DelivRow = {
     pk: agentPk(event.agent),
@@ -394,6 +408,72 @@ skill=${skill.meta.name} status=${result.status} cost_usd=${result.cost_usd ?? 0
 function summaryOf(text: string | undefined): string {
   if (!text) return "";
   return text.replace(/\s+/g, " ").trim().slice(0, 240);
+}
+
+// --- Epic-010 Story 1-B: dual-write execution ledger ---------------------
+//
+// Every RUN-row write also writes one PROJECT#{id}/EXEC#{ulid} row.
+// Dual-write window: the legacy AGENT#{slug}/RUN row remains canonical
+// until Story 6 (#95) migrates the front-end. EXEC write failures log
+// but do NOT fail the run — the legacy RUN is still the source of truth.
+//
+// Project resolution: event.project_id (when provided by orchestrator /
+// TASK row) wins; otherwise defaults to selfProjectId(agent). Cross-
+// project denial inside appendExecution can throw if the agent is not
+// a member; that path also logs + continues.
+
+function resolveProjectId(event: RunnerEvent): ProjectId {
+  return event.project_id ? asProjectId(event.project_id) : selfProjectId(event.agent);
+}
+
+async function dualWriteExec(
+  event: RunnerEvent,
+  runId: string,
+  skill: LoadedSkill,
+  startedAt: string,
+  endedAt: string,
+  status: ExecStatus,
+  error?: string,
+): Promise<void> {
+  let projectId: ProjectId;
+  try {
+    projectId = resolveProjectId(event);
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        event: "exec-dual-write-skipped",
+        reason: "invalid_project_id",
+        run_id: runId,
+        agent: event.agent,
+        attempted_project_id: event.project_id,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    return;
+  }
+  try {
+    await appendExecution({
+      project_id: projectId,
+      agent_slug: event.agent,
+      exec_ulid: runId,
+      skill_name: skill.meta.name,
+      skill_version: skill.meta.version,
+      started_at: startedAt,
+      ended_at: endedAt,
+      status,
+      error,
+    });
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        event: "exec-dual-write-failed",
+        run_id: runId,
+        project_id: projectId,
+        agent: event.agent,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+  }
 }
 
 // --- failure handling ----------------------------------------------------
