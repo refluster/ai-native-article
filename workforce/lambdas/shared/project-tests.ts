@@ -37,6 +37,18 @@ vi.mock("./ddb.js", () => ({
   putItem: vi.fn(async (item: AnyRow) => {
     store.set(key(item.pk as string, item.sk as string), { ...item });
   }),
+  conditionalPutItem: vi.fn(async (item: AnyRow, _cond: string) => {
+    // Simulate `attribute_not_exists(pk)` — the only condition project.ts
+    // currently uses. If the row exists, throw CCF the way the real
+    // helper would so callers (seed-agents) can catch + ignore.
+    const existing = store.get(key(item.pk as string, item.sk as string));
+    if (existing) {
+      const err = new Error("conditional check failed");
+      err.name = "ConditionalCheckFailedException";
+      throw err;
+    }
+    store.set(key(item.pk as string, item.sk as string), { ...item });
+  }),
   deleteItem: vi.fn(async (pk: string, sk: string) => {
     store.delete(key(pk, sk));
   }),
@@ -144,6 +156,14 @@ describe("create + getProject + archive", () => {
   it("archive throws when project doesn't exist", async () => {
     await expect(project.archive(project.asProjectId("ghost"))).rejects.toThrow(/not found/);
   });
+
+  it("create throws ConditionalCheckFailedException on duplicate pk (race-safe per PR #111 cycle 2)", async () => {
+    const id = project.asProjectId("dup");
+    await project.create({ project_id: id, owner_agent: "_operator" });
+    await expect(
+      project.create({ project_id: id, owner_agent: "_operator" }),
+    ).rejects.toThrow(/conditional check failed/i);
+  });
 });
 
 // --- Membership ----------------------------------------------------------
@@ -187,6 +207,23 @@ describe("membership", () => {
     await project.addMember(p, "ren");
     await project.addMember(p, "ren");
     expect((await project.members(p)).sort()).toEqual(["ren"]);
+  });
+
+  it("addMember on an ACTIVE member preserves joined_at (audit — PR #111 cycle 2)", async () => {
+    await project.addMember(p, "ren", "2026-01-02T00:00:00.000Z");
+    await project.addMember(p, "ren", "2026-03-01T00:00:00.000Z"); // re-seed
+    const raw = store.get("PROJECT#p|MEMBER#ren");
+    expect(raw?.joined_at).toBe("2026-01-02T00:00:00.000Z");
+  });
+
+  it("addMember on a REVOKED member starts a fresh tenure (new joined_at, revoked_at cleared)", async () => {
+    await project.addMember(p, "ren", "2026-01-02T00:00:00.000Z");
+    await project.removeMember(p, "ren", "2026-02-01T00:00:00.000Z");
+    await project.addMember(p, "ren", "2026-03-01T00:00:00.000Z");
+    const raw = store.get("PROJECT#p|MEMBER#ren");
+    expect(raw?.joined_at).toBe("2026-03-01T00:00:00.000Z");
+    expect(raw?.revoked_at).toBeUndefined();
+    expect(await project.isMember(p, "ren")).toBe(true);
   });
 
   it("addMember throws when project doesn't exist", async () => {

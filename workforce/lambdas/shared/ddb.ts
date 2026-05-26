@@ -1,7 +1,10 @@
 // Thin DDB client wrapper. One shared client per Lambda cold start.
 // Uses Document Client so we can write JS objects without manual marshalling.
 
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  ConditionalCheckFailedException,
+  DynamoDBClient,
+} from "@aws-sdk/client-dynamodb";
 import {
   DynamoDBDocumentClient,
   GetCommand,
@@ -11,6 +14,8 @@ import {
   QueryCommand,
   DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
+
+export { ConditionalCheckFailedException };
 
 const TABLE_NAME = process.env.TABLE_NAME;
 if (!TABLE_NAME) {
@@ -38,6 +43,28 @@ export async function getItem<T extends object>(
 
 export async function putItem(item: object): Promise<void> {
   await ddb.send(new PutCommand({ TableName: tableName, Item: item }));
+}
+
+/**
+ * PutItem with a ConditionExpression. Throws `ConditionalCheckFailedException`
+ * (re-exported above) when the condition does not hold. Use when the caller
+ * needs race-safe "create if not exists" semantics.
+ */
+export async function conditionalPutItem(
+  item: object,
+  conditionExpression: string,
+  expressionAttributeNames?: Record<string, string>,
+  expressionAttributeValues?: Record<string, unknown>,
+): Promise<void> {
+  await ddb.send(
+    new PutCommand({
+      TableName: tableName,
+      Item: item,
+      ConditionExpression: conditionExpression,
+      ExpressionAttributeNames: expressionAttributeNames,
+      ExpressionAttributeValues: expressionAttributeValues,
+    }),
+  );
 }
 
 export async function updateOperational<T extends object = object>(

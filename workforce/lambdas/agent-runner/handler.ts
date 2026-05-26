@@ -15,10 +15,18 @@
 //     (Notion page / pending GitHub PR)
 
 import type { Context } from "aws-lambda";
+import { CloudWatchClient, PutMetricDataCommand } from "@aws-sdk/client-cloudwatch";
 import { agentPk, bindingCron, type AgentBinding, type AgentMetaRow, type AgentOperational } from "../shared/agent.js";
 import { getItem, putItem, updateOperational } from "../shared/ddb.js";
 import { complete } from "../shared/llm-anthropic.js";
 import { assertWithinBudget, recordSpend } from "../shared/budget.js";
+import {
+  appendExecution,
+  asProjectId,
+  selfProjectId,
+  type ExecStatus,
+  type ProjectId,
+} from "../shared/project.js";
 import { readIndex, readChunk, appendChunk } from "../shared/memory.js";
 import { insertArticle } from "../shared/notion.js";
 import {
@@ -40,6 +48,13 @@ export interface RunnerEvent {
   brief?: string;
   /** When true, do everything except the LLM call + side effects. */
   dryRun?: boolean;
+  /** Project to attribute this execution to (Epic-010 Story 1-B).
+   *  Defaults to `self/{agent}` if not provided. Forward-compat for the
+   *  TASK.project_id flow that future Stories wire through — orchestrator
+   *  is unchanged in Story 1-B (still sends `{agent, binding_idx}` only).
+   *  Validated via `asProjectId()` inside `resolveProjectId()` at the
+   *  dual-write seam (wire format is raw string; brand applies after). */
+  project_id?: string;
 }
 
 export interface RunnerResult {
@@ -160,7 +175,7 @@ async function runDeterministic(
     output_s3_key: s3Key,
     output_summary: result.summary.slice(0, 240),
   };
-  await putItem(runRow);
+  await writeRunAndExec(runRow, event, skill);
 
   return { status: "ok", run_id: runId, tokens_in: 0, tokens_out: 0, cost_usd: 0 };
 }
@@ -229,7 +244,7 @@ async function runLlmProse(
     output_s3_key: runArtefactKey,
     output_summary: summaryOf(llm.text),
   };
-  await putItem(runRow);
+  await writeRunAndExec(runRow, event, skill);
 
   const delivRow: DelivRow = {
     pk: agentPk(event.agent),
@@ -317,7 +332,7 @@ async function runClaudeCodeRoutine(
     output_s3_key: runArtefactKey,
     output_summary: summaryOf(llm.text),
   };
-  await putItem(runRow);
+  await writeRunAndExec(runRow, event, skill);
 
   const delivRow: DelivRow = {
     pk: agentPk(event.agent),
@@ -394,6 +409,143 @@ skill=${skill.meta.name} status=${result.status} cost_usd=${result.cost_usd ?? 0
 function summaryOf(text: string | undefined): string {
   if (!text) return "";
   return text.replace(/\s+/g, " ").trim().slice(0, 240);
+}
+
+// --- Epic-010 Story 1-B: dual-write execution ledger ---------------------
+//
+// Convention (enforced by absence-test in dual-write-tests.ts): the
+// runner NEVER writes a RUN row via a raw `putItem(runRow)` call.
+// Every RUN-row write goes through `writeRunAndExec(runRow, event, skill)`,
+// which puts the RUN row AND attempts the dual-write EXEC row. New
+// executor paths MUST follow this shape.
+//
+// Dual-write semantics:
+//   - The legacy `AGENT#{slug}/RUN#{ulid}` row remains canonical until
+//     Story 6 (#95) migrates the front-end.
+//   - The new `PROJECT#{project_id}/EXEC#{ulid}` row is forward-canonical
+//     but currently best-effort: failures log + emit a CloudWatch metric
+//     (`Workforce/Runner / WfExecDualWriteFailed`) and DO NOT fail the
+//     run. W-4 is preserved at the RUN-row level — the run still throws
+//     or succeeds on its primary intent.
+//   - Story 6 cutover prerequisite (#95): drain orphan-RUN backlog
+//     (RUN rows whose EXEC sibling never landed) BEFORE flipping EXEC
+//     to canonical, or audit rows are lost on the flip.
+//
+// Project resolution: event.project_id (forward-compat for the TASK
+// path that future Stories wire through) wins; otherwise defaults to
+// selfProjectId(agent). Cross-project denial inside appendExecution
+// throws when the agent is not a member; that path also logs + emits
+// the failure metric + continues.
+
+const STAGE = process.env.STAGE ?? "dev";
+const cw = new CloudWatchClient({});
+
+function resolveProjectId(event: RunnerEvent): ProjectId {
+  return event.project_id ? asProjectId(event.project_id) : selfProjectId(event.agent);
+}
+
+/** Single seam for RUN+EXEC dual-write. See the comment above for the
+ *  rationale + the absence test that enforces this is the only path. */
+async function writeRunAndExec(
+  runRow: RunRow,
+  event: RunnerEvent,
+  skill: LoadedSkill,
+): Promise<void> {
+  await putItem(runRow);
+  await dualWriteExec({
+    event,
+    runId: runRow.sk.replace(/^RUN#/, ""),
+    skill,
+    startedAt: runRow.started_at,
+    endedAt: runRow.ended_at,
+    status: runRow.status === "throw" ? "throw" : runRow.status === "skipped" ? "skipped" : "ok",
+    error: runRow.error_message,
+  });
+}
+
+interface DualWriteExecArgs {
+  event: RunnerEvent;
+  runId: string;
+  skill: LoadedSkill;
+  startedAt: string;
+  endedAt: string;
+  status: ExecStatus;
+  error?: string;
+}
+
+async function dualWriteExec(args: DualWriteExecArgs): Promise<void> {
+  const { event, runId, skill, startedAt, endedAt, status, error } = args;
+  let projectId: ProjectId;
+  try {
+    projectId = resolveProjectId(event);
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        event: "exec-dual-write-skipped",
+        reason: "invalid_project_id",
+        run_id: runId,
+        agent: event.agent,
+        attempted_project_id: event.project_id,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    await emitExecDualWriteFailedMetric("invalid_project_id");
+    return;
+  }
+  try {
+    await appendExecution({
+      project_id: projectId,
+      agent_slug: event.agent,
+      exec_ulid: runId,
+      skill_name: skill.meta.name,
+      skill_version: skill.meta.version,
+      started_at: startedAt,
+      ended_at: endedAt,
+      status,
+      error,
+    });
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        event: "exec-dual-write-failed",
+        run_id: runId,
+        project_id: projectId,
+        agent: event.agent,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    await emitExecDualWriteFailedMetric("append_execution_threw");
+  }
+}
+
+async function emitExecDualWriteFailedMetric(reason: string): Promise<void> {
+  // Best-effort: never fail the run on metric emission. The dual-write
+  // failure itself has already been logged structurally above.
+  try {
+    await cw.send(
+      new PutMetricDataCommand({
+        Namespace: "Workforce/Runner",
+        MetricData: [
+          {
+            MetricName: "WfExecDualWriteFailed",
+            Value: 1,
+            Unit: "Count",
+            Dimensions: [
+              { Name: "Stage", Value: STAGE },
+              { Name: "Reason", Value: reason },
+            ],
+          },
+        ],
+      }),
+    );
+  } catch (err) {
+    console.warn(
+      JSON.stringify({
+        event: "exec_dual_write_metric_emit_failed",
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+  }
 }
 
 // --- failure handling ----------------------------------------------------

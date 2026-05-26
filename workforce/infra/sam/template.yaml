@@ -405,6 +405,42 @@ Resources:
       Tags:
         workforce: !Ref Stage
 
+  # --- Backfill: TASK rows missing project_id (Epic-010 Story 1-B) --------
+  # Operator-invoked one-shot. Scans TASK#*/META rows; for each missing
+  # `project_id`, fills in `self/{agent_slug}` under a conditional write
+  # (idempotent across re-runs). Emits CW metrics into Workforce/Backfill.
+  WfBackfillTasksFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-backfill-tasks-${Stage}
+      CodeUri: ../../lambdas/backfill-tasks
+      Handler: handler.handler
+      Description: One-shot backfill — fills TASK.project_id with self/{slug}. Epic-010 Story 1-B.
+      MemorySize: 512
+      Timeout: 300
+      Policies:
+        - Statement:
+            - Sid: BackfillTasksTableAccess
+              Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:UpdateItem
+              Resource:
+                - !GetAtt WfTable.Arn
+            - Sid: BackfillTasksPutMetric
+              Effect: Allow
+              Action: cloudwatch:PutMetricData
+              # PutMetricData does not support resource-level permissions;
+              # constrain by namespace via condition.
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace: Workforce/Backfill
+      Tags:
+        workforce: !Ref Stage
+
   WfSeedAgentsErrorsAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -540,6 +576,17 @@ Resources:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/notion-*
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/github-*
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/discord-*
+            - Sid: RunnerPutDualWriteMetric
+              # Epic-010 Story 1-B (#90) / PR #111 review: emit
+              # WfExecDualWriteFailed under Workforce/Runner namespace so
+              # the operator sees dual-write drift in real time, not just
+              # via log spelunking. Namespace condition mirrors backfill.
+              Effect: Allow
+              Action: cloudwatch:PutMetricData
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace: Workforce/Runner
       Environment:
         Variables:
           ENGINEER_OWNER: !Ref EngineerOwner
