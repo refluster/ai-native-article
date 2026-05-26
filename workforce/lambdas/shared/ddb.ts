@@ -144,10 +144,18 @@ export async function queryBySkPrefix<T extends object>(
 
 export type GsiName = "GSI1" | "GSI2";
 
+/** Per-GSI attribute names. Adding GSI3+ is a one-line addition here. */
+const GSI_ATTRS: Record<GsiName, { pk: string; sk: string }> = {
+  GSI1: { pk: "gsi1pk", sk: "gsi1sk" },
+  GSI2: { pk: "gsi2pk", sk: "gsi2sk" },
+};
+
 export interface GsiQuery {
-  /** Inclusive lower + upper bound on the GSI sort key (e.g. timestamp range). */
-  skBetween?: [string, string];
-  /** Prefix match on the GSI sort key. Mutually exclusive with skBetween. */
+  /** Inclusive lower bound on the GSI sort key. Pushes down as `#sk >= :from`. */
+  skGte?: string;
+  /** Inclusive upper bound on the GSI sort key. Pushes down as `#sk <= :to`. */
+  skLte?: string;
+  /** Prefix match on the GSI sort key. Mutually exclusive with skGte/skLte. */
   skPrefix?: string;
   limit?: number;
   /** Ascending by default; pass false for descending (newest-first). */
@@ -158,28 +166,42 @@ export interface GsiQuery {
  * Query a GSI by its partition key (and optional sort-key range / prefix).
  * Used for cross-partition access patterns — e.g. "all EXEC#* rows whose
  * gsi1pk=AGENT#ren regardless of which project's partition they sit in."
+ *
+ * Sort-key constraints (mutually exclusive; pick at most one shape):
+ *   - both skGte + skLte → `BETWEEN :from AND :to`
+ *   - skGte only        → `>= :from`
+ *   - skLte only        → `<= :to`
+ *   - skPrefix only     → `begins_with(:skp)`
+ *   - none              → no SK constraint (full partition)
  */
 export async function queryByGsi<T extends object>(
   indexName: GsiName,
   partitionKey: string,
   query: GsiQuery = {},
 ): Promise<T[]> {
-  const pkAttr = indexName === "GSI1" ? "gsi1pk" : "gsi2pk";
-  const skAttr = indexName === "GSI1" ? "gsi1sk" : "gsi2sk";
+  const { pk: pkAttr, sk: skAttr } = GSI_ATTRS[indexName];
 
   let keyConditionExpression = "#pk = :pk";
   const exprNames: Record<string, string> = { "#pk": pkAttr };
   const exprValues: Record<string, unknown> = { ":pk": partitionKey };
 
-  if (query.skBetween) {
-    keyConditionExpression += " AND #sk BETWEEN :from AND :to";
-    exprNames["#sk"] = skAttr;
-    exprValues[":from"] = query.skBetween[0];
-    exprValues[":to"] = query.skBetween[1];
-  } else if (query.skPrefix) {
+  if (query.skPrefix) {
     keyConditionExpression += " AND begins_with(#sk, :skp)";
     exprNames["#sk"] = skAttr;
     exprValues[":skp"] = query.skPrefix;
+  } else if (query.skGte !== undefined && query.skLte !== undefined) {
+    keyConditionExpression += " AND #sk BETWEEN :from AND :to";
+    exprNames["#sk"] = skAttr;
+    exprValues[":from"] = query.skGte;
+    exprValues[":to"] = query.skLte;
+  } else if (query.skGte !== undefined) {
+    keyConditionExpression += " AND #sk >= :from";
+    exprNames["#sk"] = skAttr;
+    exprValues[":from"] = query.skGte;
+  } else if (query.skLte !== undefined) {
+    keyConditionExpression += " AND #sk <= :to";
+    exprNames["#sk"] = skAttr;
+    exprValues[":to"] = query.skLte;
   }
 
   const res = await ddb.send(

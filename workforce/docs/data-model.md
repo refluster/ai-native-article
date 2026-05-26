@@ -40,7 +40,7 @@ Per Epic-010 (Story 1, [#90](https://github.com/refluster/ai-native-article/issu
 | `pk` | `sk` | Purpose | Key attributes |
 |---|---|---|---|
 | `PROJECT#{project_id}` | `META` | Project descriptor | `project_id`, `status` ∈ `{active, archived}`, `owner_agent` (slug or `_operator`), `created_at`, `archived_at?` |
-| `PROJECT#{project_id}` | `MEMBER#{agent_slug}` | Project membership row | `project_id`, `agent_slug`, `joined_at`. Membership gates `append_execution`. Cross-project denial: a runner writing to project X must have a `MEMBER#X` row for the calling agent or `append_execution` throws. |
+| `PROJECT#{project_id}` | `MEMBER#{agent_slug}` | Project membership row | `project_id`, `agent_slug`, `joined_at`, `revoked_at?`. `removeMember` is a **soft delete** — it writes `revoked_at` rather than dropping the row, so the audit question "was X a member of Y on date Z" can be reconstructed. `isMember`/`members` filter on `revoked_at === undefined`. Cross-project denial: `appendExecution` throws if the agent has no active membership row. |
 | `PROJECT#{project_id}` | `EXEC#{ulid}` | Execution ledger row | `project_id`, `agent_slug`, `skill_name`, `skill_version`, `started_at`, `ended_at`, `status` ∈ `{ok, throw, skipped}`, `used_credential_types[]`, `inputs_hash?`, `artifact_ref?` (`{uri, content_hash, content_type, size_bytes, summary ≤512c}`), `error?`. GSI1 (`gsi1pk=AGENT#{agent_slug}, gsi1sk=started_at`) for agent-scoped recall; GSI2 (`gsi2pk=SKILL#{skill_name}, gsi2sk=started_at`) for skill-utilisation queries. |
 | `PROJECT#{project_id}` | `MILESTONE#{n}` | Milestone marker (pre-Epic-010 shape; retained for compat) | `owner_agent`, `due_at?`, `deliv_refs[]` (ULIDs of contributing DELIVs), `status` |
 
@@ -69,7 +69,7 @@ The first is the orchestrator's "skip new task creation if work is outstanding" 
 pk = "SKILL#{name}"    → all EXEC#* rows for this skill, across projects + agents (Epic-010 / skill-utilisation, future Epic-004 surface)
 ```
 
-Both indexes use `started_at` as the sort key so range queries (`from` / `to`) push down to DDB.
+Both indexes use `started_at` as the sort key so range queries push down to DDB. `Project.listExecutions({agent_slug | skill_name, from?, to?})` supports both bounds (→ `BETWEEN`), only `from` (→ `>=`), only `to` (→ `<=`), or neither (full partition). The project-partition path (`{project_id, ...}`) uses `queryBySkPrefix` and post-filters the range in memory; that path is fine at ledger sizes today, but if the per-project partition grows beyond a few thousand rows, switch to a third sort-key shape that pushes the range down (Story 1-B or later).
 
 Other `gsi1pk` values are written for forward-compat (e.g. dashboard fan-out) but only the patterns above are queried in v1.
 

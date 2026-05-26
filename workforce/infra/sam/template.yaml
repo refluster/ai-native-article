@@ -73,6 +73,11 @@ Resources:
   # GSI1 reserved for status-keyed lookups (pending TASKs in PR6+).
   WfTable:
     Type: AWS::DynamoDB::Table
+    # Protect against accidental stack-delete or replace-update on prod
+    # (per Story 1-A review). The table holds every workforce-state row;
+    # losing it on an unrelated stack-delete is unrecoverable.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub wf-table-${Stage}
       BillingMode: PAY_PER_REQUEST

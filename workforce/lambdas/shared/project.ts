@@ -2,35 +2,74 @@
 //
 // Project as first-class entity. Per Epic-010 (workforce/docs/epics/
 // epic-010-project-trust-boundary.md), a Project owns three things:
-//   - a typed credential bag         → get_credential()
-//   - an append-only execution ledger → append_execution() / list_executions()
-//   - membership                      → add_member() / remove_member() / members() / is_member()
-// plus lifecycle helpers (create / archive / get).
+//   - a typed credential bag         → getCredential()
+//   - an append-only execution ledger → appendExecution() / listExecutions()
+//   - membership                      → addMember() / removeMember() / members() / isMember()
+// plus lifecycle helpers (create / archive / getProject).
 //
 // Story 1-A scope: types + helpers; nothing else in the workforce calls
 // these yet. Story 1-B (#90 follow-up) wires the orchestrator + runner +
 // seed-agents to use them (self auto-seed + TASK.project_id + dual-write).
 //
-// Cross-project denial: append_execution() asserts the agent is a member
-// of the named project before writing. This is the only authorization
-// gate today; IAM-level enforcement (S3 prefix lock-down) lands in
-// Story 3 (#92).
+// Naming convention: camelCase for all exported function names, matching
+// the rest of workforce/lambdas/shared/. The Epic-010 prose uses
+// snake_case for these (e.g. `Project.append_execution`) — that is
+// illustrative; the binding rule is codebase consistency.
 //
-// Credential resolution (get_credential) uses the preferred-path-with-
-// legacy-fallback pattern from Epic-010 §6. Story 2 (#91) tightens this:
-// adds CloudWatch metric `WfLegacyCredentialReads`, removes the bare
-// `wf/{type}` fallback at the end of the deprecation window.
+// Membership audit semantics: removeMember() is a SOFT delete (writes
+// `revoked_at` on the MEMBER row) so the audit trail "was agent X a
+// member of project Y on date Z" can be reconstructed. isMember() and
+// members() filter on `revoked_at === undefined`.
+//
+// Trust-boundary asymmetry (intentional): appendExecution() gates on
+// membership; listExecutions() does NOT — the helper layer doesn't
+// know the caller's identity. Story 1-B's runner wires the read-gate.
+// See JSDoc on listExecutions() below.
+//
+// Credential resolution (getCredential) uses preferred-path-with-
+// scoped-legacy-fallback per Epic-010 §6. The catch is narrowed to
+// ResourceNotFoundException so IAM / network / parse failures still
+// surface (W-4 fail-loud). Story 2 (#91) adds the
+// WfLegacyCredentialReads CloudWatch metric on the legacy-hit path.
 
-import { deleteItem, getItem, putItem, queryByGsi, queryBySkPrefix } from "./ddb.js";
+import { getItem, putItem, queryByGsi, queryBySkPrefix } from "./ddb.js";
 import { getSecret } from "./secrets.js";
 import type { AgentSlug } from "./agent.js";
 
-export type ProjectId = string;
+// --- Branded ProjectId ---------------------------------------------------
 
-/** Reserved per-agent project ID for personal artefacts (own observability,
- *  notification webhooks, per-agent model API keys). One project row per agent. */
+/**
+ * Branded string type — prevents arbitrary strings from being passed where
+ * a validated project id is expected. Construct via `asProjectId()` or
+ * `selfProjectId()`; the brand survives only when one of those was used.
+ */
+export type ProjectId = string & { readonly __projectId: unique symbol };
+
+/**
+ * Construct a `ProjectId` from a raw string. Rejects:
+ *   - empty strings
+ *   - strings containing DDB partition-key delimiters (`#` / `|`) that would
+ *     collide with the row-shape conventions
+ *
+ * Throws on rejection (W-4 fail-loud).
+ */
+export function asProjectId(id: string): ProjectId {
+  if (id.length === 0) {
+    throw new Error("invalid project_id: empty string");
+  }
+  if (id.includes("#") || id.includes("|")) {
+    throw new Error(`invalid project_id "${id}": must not contain '#' or '|'`);
+  }
+  return id as ProjectId;
+}
+
+/**
+ * Reserved per-agent project id for personal artefacts (own observability,
+ * notification webhooks, per-agent model API keys). One project row per
+ * agent. Format: `self/{slug}`.
+ */
 export function selfProjectId(slug: AgentSlug): ProjectId {
-  return `self/${slug}`;
+  return `self/${slug}` as ProjectId;
 }
 
 export function projectPk(id: ProjectId): `PROJECT#${string}` {
@@ -55,6 +94,9 @@ export interface ProjectMemberRow {
   project_id: ProjectId;
   agent_slug: AgentSlug;
   joined_at: string;
+  /** Set when removeMember() soft-deletes this membership. Audit-only;
+   *  isMember() / members() exclude rows where this is set. */
+  revoked_at?: string;
 }
 
 export interface ArtifactRef {
@@ -118,17 +160,31 @@ export async function archive(projectId: ProjectId, now?: string): Promise<void>
   await putItem(meta);
 }
 
-export async function get(projectId: ProjectId): Promise<ProjectMetaRow | undefined> {
+/** Renamed from `get` (shadowed JS keyword in some IDE contexts). */
+export async function getProject(projectId: ProjectId): Promise<ProjectMetaRow | undefined> {
   return getItem<ProjectMetaRow>(projectPk(projectId), "META");
 }
 
 // --- Membership ----------------------------------------------------------
 
-export async function add_member(
+/**
+ * Add an agent as a member of a project. Throws if the project does not
+ * exist (symmetric with archive(); avoids stray MEMBER#* rows with no
+ * parent META). Idempotent on re-add: putItem fully replaces the row,
+ * which clears any prior `revoked_at`.
+ *
+ * Note: re-adding a previously-revoked member loses the original
+ * `joined_at` and the prior revocation timestamp. A future MEMBER-AUDIT
+ * row family can preserve full history if needed; for v1 the
+ * latest-membership shape is sufficient.
+ */
+export async function addMember(
   projectId: ProjectId,
   agentSlug: AgentSlug,
   now?: string,
 ): Promise<void> {
+  const meta = await getItem<ProjectMetaRow>(projectPk(projectId), "META");
+  if (!meta) throw new Error(`project "${projectId}" not found — call create() first`);
   const row: ProjectMemberRow = {
     pk: projectPk(projectId),
     sk: `MEMBER#${agentSlug}`,
@@ -139,18 +195,32 @@ export async function add_member(
   await putItem(row);
 }
 
-export async function remove_member(projectId: ProjectId, agentSlug: AgentSlug): Promise<void> {
-  await deleteItem(projectPk(projectId), `MEMBER#${agentSlug}`);
+/**
+ * Soft-delete a membership. Writes `revoked_at` on the MEMBER row rather
+ * than deleting it, so the audit question "was X a member of Y on date Z"
+ * remains answerable. No-op if the agent was never a member.
+ */
+export async function removeMember(
+  projectId: ProjectId,
+  agentSlug: AgentSlug,
+  now?: string,
+): Promise<void> {
+  const row = await getItem<ProjectMemberRow>(projectPk(projectId), `MEMBER#${agentSlug}`);
+  if (!row) return;
+  row.revoked_at = now ?? new Date().toISOString();
+  await putItem(row);
 }
 
+/** Active members (excludes soft-deleted rows). */
 export async function members(projectId: ProjectId): Promise<AgentSlug[]> {
   const rows = await queryBySkPrefix<ProjectMemberRow>(projectPk(projectId), "MEMBER#", 100);
-  return rows.map((r) => r.agent_slug);
+  return rows.filter((r) => r.revoked_at === undefined).map((r) => r.agent_slug);
 }
 
-export async function is_member(projectId: ProjectId, agentSlug: AgentSlug): Promise<boolean> {
+/** True iff the agent has an active (non-revoked) membership row. */
+export async function isMember(projectId: ProjectId, agentSlug: AgentSlug): Promise<boolean> {
   const row = await getItem<ProjectMemberRow>(projectPk(projectId), `MEMBER#${agentSlug}`);
-  return row !== undefined;
+  return row !== undefined && row.revoked_at === undefined;
 }
 
 // --- Execution ledger ----------------------------------------------------
@@ -170,10 +240,18 @@ export interface AppendExecutionInput {
   error?: string;
 }
 
-/** Append one execution row to a project's ledger. Cross-project denial
- *  is enforced: the calling agent MUST already be a project member. */
-export async function append_execution(input: AppendExecutionInput): Promise<ExecutionRow> {
-  if (!(await is_member(input.project_id, input.agent_slug))) {
+/**
+ * Append one execution row to a project's ledger. Cross-project denial
+ * is enforced at the helper layer: the agent MUST be an active member
+ * (non-revoked) or this throws.
+ *
+ * Note: archive does NOT close the ledger — appendExecution against an
+ * archived project succeeds if the agent is still a member. If
+ * "archive closes the ledger" semantics are wanted later, gate here on
+ * `meta.status === "active"`.
+ */
+export async function appendExecution(input: AppendExecutionInput): Promise<ExecutionRow> {
+  if (!(await isMember(input.project_id, input.agent_slug))) {
     throw new Error(
       `cross-project denial: agent "${input.agent_slug}" is not a member of project "${input.project_id}"`,
     );
@@ -201,13 +279,14 @@ export async function append_execution(input: AppendExecutionInput): Promise<Exe
   return row;
 }
 
-export interface ListExecutionsFilter {
-  /** When set, queries GSI1 (agent-scoped across all projects). */
-  agent_slug?: AgentSlug;
-  /** When set without agent_slug, queries GSI2 (skill-scoped across all projects). */
-  skill_name?: string;
-  /** When set without agent_slug / skill_name, queries the project's own partition. */
-  project_id?: ProjectId;
+// Filter discriminator: exactly one of {agent_slug, skill_name, project_id}
+// must be set. `?: never` on the inactive fields makes mixing them a
+// compile error rather than a runtime throw. Runtime throw stays as
+// defence-in-depth for callers that bypass typing.
+type AgentScope = { agent_slug: AgentSlug; skill_name?: never; project_id?: never };
+type SkillScope = { agent_slug?: never; skill_name: string; project_id?: never };
+type ProjScope = { agent_slug?: never; skill_name?: never; project_id: ProjectId };
+type CommonOpts = {
   /** Inclusive lower bound on started_at (ISO-8601). */
   from?: string;
   /** Inclusive upper bound on started_at. */
@@ -216,32 +295,56 @@ export interface ListExecutionsFilter {
   status?: ExecStatus;
   /** Page size. Default 100. */
   limit?: number;
-}
+};
 
-export async function list_executions(filter: ListExecutionsFilter): Promise<ExecutionRow[]> {
+export type ListExecutionsFilter = (AgentScope | SkillScope | ProjScope) & CommonOpts;
+
+/**
+ * Return execution rows matching the filter.
+ *
+ * **Trust-boundary asymmetry (intentional)**: `appendExecution` gates on
+ * project membership; `listExecutions` does NOT. The helper layer does
+ * not know the caller's identity context. Story 1-B wires the runner to
+ * assert membership before invoking this — that is where the read-gate
+ * lives in the production flow. Callers outside the runner must do the
+ * same check.
+ *
+ * Range push-down: both `from` and `to` are passed to DDB as
+ * `skGte` / `skLte` constraints when scoping by agent_slug / skill_name.
+ * Half-bounded ranges (only `from` or only `to`) work; full-partition
+ * (neither bound) also works.
+ */
+export async function listExecutions(filter: ListExecutionsFilter): Promise<ExecutionRow[]> {
   const limit = filter.limit ?? 100;
   let rows: ExecutionRow[];
 
   if (filter.agent_slug) {
     rows = await queryByGsi<ExecutionRow>("GSI1", `AGENT#${filter.agent_slug}`, {
-      skBetween: filter.from && filter.to ? [filter.from, filter.to] : undefined,
+      skGte: filter.from,
+      skLte: filter.to,
       limit,
     });
   } else if (filter.skill_name) {
     rows = await queryByGsi<ExecutionRow>("GSI2", `SKILL#${filter.skill_name}`, {
-      skBetween: filter.from && filter.to ? [filter.from, filter.to] : undefined,
+      skGte: filter.from,
+      skLte: filter.to,
       limit,
     });
   } else if (filter.project_id) {
+    // Project-partition path; range is post-filtered (no SK push-down).
     rows = await queryBySkPrefix<ExecutionRow>(projectPk(filter.project_id), "EXEC#", limit);
   } else {
+    // Defence-in-depth: discriminated union should make this unreachable
+    // at the type layer, but bypassed callers (e.g. JS interop, `as any`)
+    // still get a loud failure.
     throw new Error(
-      "list_executions requires at least one of {agent_slug, skill_name, project_id}",
+      "listExecutions requires at least one of {agent_slug, skill_name, project_id}",
     );
   }
 
-  // Status / range post-filter (covers the project_id partition path that
-  // does not push the range down to DDB; harmless on the GSI paths too).
+  // status + range post-filter. Status is never part of the index;
+  // the range filter is a no-op on the GSI paths (DDB already pushed
+  // down) and load-bearing on the project_id path.
   return rows.filter((r) => {
     if (filter.status && r.status !== filter.status) return false;
     if (filter.from && r.started_at < filter.from) return false;
@@ -253,20 +356,39 @@ export async function list_executions(filter: ListExecutionsFilter): Promise<Exe
 // --- Credentials ---------------------------------------------------------
 
 /**
- * Resolve a credential by (project_id, credential_type). Tries the
- * project-scoped path first (`wf/projects/{id}/{type}`) and falls back
- * to the legacy bare path (`wf/{type}`) on miss. The fallback exists for
- * the Story 2 (#91) deprecation window — Story 2 will add a CloudWatch
- * metric here and remove the bare-path fallback once the metric graphs
- * to zero.
+ * Resolve a credential by (project_id, credential_type).
+ *
+ * Tries `wf/projects/{id}/{type}` first; falls back to the legacy bare
+ * path `wf/{type}` ONLY when the project-scoped path returns
+ * `ResourceNotFoundException`. Other failures (IAM denial, throttle,
+ * network, JSON parse) re-throw so they surface loudly per W-4.
+ *
+ * The legacy-hit path logs a structured `legacy_credential_read` event
+ * so Story 2 (#91) can land its `WfLegacyCredentialReads` CloudWatch
+ * metric on a clean signal.
+ *
+ * Type parameter `T` has no default — callers MUST specify the expected
+ * secret shape (e.g. `getCredential<GithubSecret>(...)`) so wrong-shape
+ * access is a compile error, not a runtime surprise. A `CredentialMap`
+ * registry that keys T off `credentialType` lives in Story 2 (#91).
  */
-export async function get_credential<T = unknown>(
+export async function getCredential<T>(
   projectId: ProjectId,
   credentialType: string,
 ): Promise<T> {
   try {
     return await getSecret<T>(`wf/projects/${projectId}/${credentialType}`);
-  } catch {
-    return await getSecret<T>(`wf/${credentialType}`);
+  } catch (err) {
+    if (err instanceof Error && err.name === "ResourceNotFoundException") {
+      console.warn(
+        JSON.stringify({
+          event: "legacy_credential_read",
+          project_id: projectId,
+          credential_type: credentialType,
+        }),
+      );
+      return await getSecret<T>(`wf/${credentialType}`);
+    }
+    throw err;
   }
 }
