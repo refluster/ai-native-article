@@ -22,15 +22,6 @@
       "note": "Wednesday 10:00 JST (runner enforces biweekly cadence)"
     },
     {
-      "skill": "pdm-decompose",
-      "executor": "lambda",
-      "trigger": {
-        "scheduler": "eventbridge",
-        "cron": "cron(0 22 * * ? *)"
-      },
-      "note": "Daily 15:00 America/Los_Angeles (PDT; slips to 14:00 in PST). Decomposes Epic tracker issues into role-tagged child issues via the SKILL.md state machine."
-    },
-    {
       "skill": "pdm-charter",
       "executor": "cli",
       "trigger": {
