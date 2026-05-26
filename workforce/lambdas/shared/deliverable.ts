@@ -23,7 +23,7 @@ export interface DeliverableTarget {
 
 /**
  * Resolve the S3 key + external-publish flag for a llm-prose deliverable.
- * See workforce/docs/data-model.md "S3 — wf-bucket-{stage}" for the prefix layout.
+ * See workforce/docs/data-model.md "S3 — wf-bucket-{acct}-{region}-{stage}" for the prefix layout.
  */
 export function deliverableTargetFor(
   slug: string,

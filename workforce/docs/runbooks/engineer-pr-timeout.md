@@ -11,7 +11,7 @@
    - **Run failed.** Read the failed step. Most common: `ANTHROPIC_API_KEY` GitHub Secret missing or revoked, or Claude Code action version drift. Fix the secret/action and re-trigger.
    - **Run succeeded but no PR was created.** Claude Code may have decided the brief was infeasible. Read the run logs and the brief in S3 (`pr-briefs/ren/{deliv_id}.md`). Decide whether to revise the brief and re-trigger, or mark the timeout as expected.
 
-2. **Read the brief.** `aws s3 cp s3://wf-bucket-{acct}-{stage}/pr-briefs/ren/{deliv_id}.md -` — gives the exact text Ren produced. If the brief is wrong-shaped (vague, multi-PR, off-policy), Ren's `system.md` may need a tightening bump (separate Rule-11 PR).
+2. **Read the brief.** `aws s3 cp s3://wf-bucket-{acct}-{region}-{stage}/pr-briefs/ren/{deliv_id}.md -` — gives the exact text Ren produced. If the brief is wrong-shaped (vague, multi-PR, off-policy), Ren's `system.md` may need a tightening bump (separate Rule-11 PR).
 
 3. **Check the budget.** If timeouts cluster around month-end, the LLM call that produced the brief may have throttled or been guard-tripped before producing usable text. Run `aws dynamodb get-item --table-name wf-table-{stage} --key '{"pk":{"S":"BUDGET#{yyyy-mm}"},"sk":{"S":"AGENT#ren"}}'` to confirm.
 
@@ -24,7 +24,7 @@ Use when the brief is sound and the failure was infrastructural (missing secret,
 ```bash
 gh workflow run workforce-engineer-routine.yml \
   --repo refluster/ai-native-article \
-  -f brief="$(aws s3 cp s3://wf-bucket-{acct}-{stage}/pr-briefs/ren/{deliv_id}.md -)" \
+  -f brief="$(aws s3 cp s3://wf-bucket-{acct}-{region}-{stage}/pr-briefs/ren/{deliv_id}.md -)" \
   -f task_id={deliv_id} \
   -f branch=ren/{deliv_id}
 ```
