@@ -73,6 +73,13 @@ function loadOne(slug) {
     bindings: cfg.bindings,
     created_at: cfg.created_at,
     about: aboutSnippet,
+    // Optional structured profile blocks — JD, OpenClaw IDENTITY, and the
+    // LinkedIn-style experience track record. Each is null-safe in the SPA;
+    // agents that haven't been backfilled simply render without the
+    // corresponding deck.
+    jd: cfg.jd ?? null,
+    identity: cfg.identity ?? null,
+    experience: cfg.experience ?? null,
   };
 }
 
