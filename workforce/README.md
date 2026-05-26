@@ -12,6 +12,7 @@ AI personas (12 as of RFC-009 — Maya the Founder, the VP tier, and IC contribu
 | Know the naming convention | [docs/naming.md](docs/naming.md) |
 | See what's next / what's done | [ROADMAP.md](ROADMAP.md) |
 | Recover from a stuck Ren PR | [docs/runbooks/engineer-pr-timeout.md](docs/runbooks/engineer-pr-timeout.md) |
+| Move the data plane to a new AWS region | [docs/runbooks/region-migration.md](docs/runbooks/region-migration.md) |
 
 ## Infrastructure
 
