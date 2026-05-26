@@ -1,4 +1,4 @@
-# RFC-006 — Workforce scalability to 100+ agents
+# Epic-006 — Workforce scalability to 100+ agents
 
 - **Status**: Draft
 - **Owner**: Maya
@@ -13,10 +13,10 @@ The current workforce design (v0.1, defined in [PR2](https://github.com/refluste
 2. **W-3 monthly cap of USD 50 (combined).** At N = 100 the per-agent share is ~USD 0.50, below the price of a single Opus generation. Either total cap rises 20–100× or per-agent caps need to be the only enforcement layer.
 3. **Per-agent avatar files.** Already resolved by [PR #28 review fix](https://github.com/refluster/ai-native-article/pull/28#issuecomment-4479560164) — avatars are now rendered procedurally from the slug, no per-agent asset.
 4. **Per-agent system.md prompts.** 100 files is fine to *store*; the friction is **review**. AGENTS.md Rule 11 ("one persona's prompt bump per PR") means revising a shared phrasing across 100 personas requires 100 PRs. Unsustainable.
-5. **Agent directory UI.** A grid of 100 cards is browsable but not navigable; search (RFC-001) and pagination are non-optional.
+5. **Agent directory UI.** A grid of 100 cards is browsable but not navigable; search (Epic-001) and pagination are non-optional.
 6. **Slug collisions.** The current convention `^[a-z]+$` admits ~26^5 ≈ 12M short slugs, but human-meaningful ones run out fast (`sora`, `maya`, …). Need a disambiguation rule (e.g., suffix `-002`).
 
-This RFC captures all six in one place so we can sequence the fixes deliberately rather than chasing each as it bites.
+This Epic captures all six in one place so we can sequence the fixes deliberately rather than chasing each as it bites.
 
 ## Proposed solution
 
@@ -51,32 +51,32 @@ This is also a governance amendment — `governance.md §3` zone table changes; 
 
 ### S5. Agent directory UI
 
-Covered by RFC-001 (search) and RFC-002 (profile). No additional design needed here; the work happens in those RFCs.
+Covered by Epic-001 (search) and Epic-002 (profile). No additional design needed here; the work happens in those Epics.
 
 ### S6. Slug disambiguation
 
 Extend the `R2-slug` rule in `validate-naming.mjs`:
 
 - v1: `^[a-z]+$` (one to many lowercase letters).
-- v2: `^[a-z]+(-\d{3})?$` — admits an optional three-digit suffix like `sora-002`. The auto-generation flow for new personas (forthcoming, separate RFC) takes the human-meaningful base and appends `-NNN` if taken.
+- v2: `^[a-z]+(-\d{3})?$` — admits an optional three-digit suffix like `sora-002`. The auto-generation flow for new personas (forthcoming, separate Epic) takes the human-meaningful base and appends `-NNN` if taken.
 
 ## Behaviour at N = 100+ agents
 
-This RFC *is* the N = 100 design. After S1–S6 land:
+This Epic *is* the N = 100 design. After S1–S6 land:
 
 - Adding agents 6, 7, … to N = 100 is a `workforce/agents/{slug}/{agent.json, voice.md}` add — no CFN change, no per-agent SAM template edit, no per-agent governance edit.
 - Per-agent budget enforcement is the only cost gate. The combined cap becomes a billing alarm, not a hard CI block.
-- Search, profile, org chart UIs scale by RFC-001/002/003's own N-bounded designs.
+- Search, profile, org chart UIs scale by Epic-001/002/003's own N-bounded designs.
 
 ## Acceptance criteria
 
-This RFC produces **multiple PRs**, not one. Maya converts it into:
+This Epic produces **multiple PRs**, not one. Maya converts it into:
 
 - Issue A — `S1`: orchestrator-tick rule + cron-matcher library; deprecate per-agent rules in SAM template.
 - Issue B — `S2`: W-3 governance amendment; `validate-agent-json.mjs` cap-check update.
 - Issue C — `S4`: prelude/voice split; one persona migrated as the pattern (Sora first), then the other four in separate Rule-11 PRs.
 - Issue D — `S6`: slug regex extension.
-- (S3 already done; S5 covered by RFC-001/002.)
+- (S3 already done; S5 covered by Epic-001/002.)
 
 Each issue is mergeable independently. S1 unblocks N > ~20. S2 unblocks N > ~10. S4 unblocks N > ~30 reviewer-bandwidth. S6 unblocks N > some practical limit on memorable single-word slugs (~50).
 
@@ -88,6 +88,6 @@ Each issue is mergeable independently. S1 unblocks N > ~20. S2 unblocks N > ~10.
 
 ## Out of scope
 
-- Auto-generation of personas (text-to-persona via an LLM). That's a separate RFC; this one defines the *shape* the auto-generator must respect.
+- Auto-generation of personas (text-to-persona via an LLM). That's a separate Epic; this one defines the *shape* the auto-generator must respect.
 - Multi-region deployment, multi-account. C-3 (single-operator scale) still holds.
-- Skill catalog scalability — covered by RFC-004.
+- Skill catalog scalability — covered by Epic-004.

@@ -1,22 +1,29 @@
 ---
 name: pdm-decompose
 description: |
-  Daily PdM routine that decomposes RFC-derived Epic tracker issues into
-  role-tagged child issues. Run once per day; processes one undecomposed
-  epic per run, posts a proposal comment, waits for operator approval
-  (👍 reaction on the proposal), then creates the child issues + dispatches
-  the appropriate implementer routine.
+  SUPERSEDED (2026-05-25). The role-tagged Epic → child-task decomposition
+  step is no longer part of the workflow — Claude Code consumes Story
+  issues directly and decides role decomposition inside the PR. This file
+  remains on disk for trivial reversibility; the Maya binding that fires
+  it daily has been removed.
 ---
 
-# pdm-decompose — Maya's daily epic decomposition loop
+# pdm-decompose — superseded (kept on disk for reversibility)
+
+> **STATUS**: superseded by the simplified flow defined in
+> [workforce/docs/epics/README.md](../../docs/epics/README.md). Maya
+> still owns Epic → Story decomposition (covered by `pdm-charter`), but
+> the additional role-tagging layer this skill produced is no longer
+> needed.
 
 **Owner**: maya (PM / Founder)
 **Executor**: deterministic (handler calls Anthropic + GitHub directly)
 **Cadence**: daily 15:00 America/Los_Angeles (cron(0 22 * * ? *) — PDT; slips to 14:00 in PST)
+**Status**: binding removed from `workforce/agents/maya/agent.json`; handler retained for reversibility
 
 ## What this skill does
 
-Reads the open GitHub issues in `refluster/ai-native-article` whose title matches `^\[RFC-` and whose body contains a `## Workstreams` section. For each, it classifies the state and advances exactly one transition per run.
+Reads the open GitHub issues in `refluster/ai-native-article` whose title matches `^\[Epic-` and whose body contains a `## Workstreams` section. For each, it classifies the state and advances exactly one transition per run.
 
 ### State machine
 
@@ -44,7 +51,7 @@ APPROVED              (proposal comment has 👍 from operator)
    │
    │  Maya creates the child issues using the proposal's
    │  contents. Each child issue carries:
-   │   - title `[RFC-N Epic M] (role) — concise deliverable`
+   │   - title `[Epic-N Story M] (role) — concise deliverable`
    │   - body with AC + parent link + "Reviewer personas: dario, aoi"
    │   - labels: `wf:ready`, `role:{architecture|engineering|design|qa}`,
    │     `epic:{N-M}`, and `reviewer:{persona}` for each reviewer
@@ -107,7 +114,7 @@ versions with the skill):
 > reveals a gap, expand the workstream list.
 >
 > For each child, output:
-> - title: `[RFC-N Epic M] (role) — <≤80-char deliverable>`
+> - title: `[Epic-N Story M] (role) — <≤80-char deliverable>`
 > - body: includes AC bullets + parent link + "Reviewer personas: ..."
 > - labels: `wf:ready`, `role:<role>`, `epic:<N-M>`, `reviewer:<persona>` for each reviewer
 >

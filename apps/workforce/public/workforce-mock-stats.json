@@ -63,7 +63,7 @@
       "next_run_at": "2026-05-24T15:00:00Z"
     },
     "priya": {
-      "$comment": "Paused — RFC-009 adds the persona but EventBridge cron is not enabled in v1.",
+      "$comment": "Paused — Epic-009 adds the persona but EventBridge cron is not enabled in v1.",
       "paused": true,
       "archived": false,
       "last_run_at": "2026-05-23T00:00:00Z",

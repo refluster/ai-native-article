@@ -69,7 +69,7 @@
         { "type": "null" },
         { "type": "string", "pattern": "^[a-z]+$" }
       ],
-      "description": "Agent slug assigned to improve this Skill. null until RFC-009 lands."
+      "description": "Agent slug assigned to improve this Skill. null until Epic-009 lands."
     },
     "created_at": {
       "type": "string",

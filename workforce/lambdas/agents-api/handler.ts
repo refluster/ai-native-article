@@ -8,8 +8,8 @@
 //   GET    /skills                          list of skills (paginated, filterable)
 //   GET    /skills/{name}                   single skill
 //
-// See workforce/docs/rfcs/rfc-007-agent-management-api.md (agents) and
-// workforce/docs/rfcs/rfc-008-skill-repository.md (skills) for the
+// See workforce/docs/epics/epic-007-agent-management-api.md (agents) and
+// workforce/docs/epics/epic-008-skill-repository.md (skills) for the
 // source-of-truth split and the IAM-auth boundary.
 
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
@@ -155,7 +155,7 @@ async function deleteAgent(slug: string): Promise<APIGatewayProxyResultV2> {
   return reply(200, toApiView(updated));
 }
 
-// ----- Skills (RFC-008 PR-D) -----
+// ----- Skills (Epic-008 PR-D) -----
 
 async function listSkills(
   event: APIGatewayProxyEventV2,

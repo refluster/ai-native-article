@@ -1,4 +1,4 @@
-# RFC-007 — Agent management surface (DDB-projection + CRUD API)
+# Epic-007 — Agent management surface (DDB-projection + CRUD API)
 
 - **Status**: Draft
 - **Owner**: Maya
@@ -11,16 +11,16 @@ Operator direction ([PR #28 comment](https://github.com/refluster/ai-native-arti
 
 The existing design (PR #28) keeps agent definitions as repo files at `workforce/agents/{slug}/{agent.json, system.md}`. That works for git-tracked identity but does not provide:
 
-- A runtime API for the workforce UIs (RFCs 001–004) to read agent state without bundling all files into every Lambda.
+- A runtime API for the workforce UIs (Epics 001–004) to read agent state without bundling all files into every Lambda.
 - A way to make **operational** mutations (pause an agent, raise its budget cap, archive a retired persona) without opening a PR per change — unacceptable at 100+ agents.
-- A normalized `AGENT#*` view that the orchestrator can query for "all non-paused, non-archived agents whose `schedule_cron` fires this tick" (RFC-006 S1).
+- A normalized `AGENT#*` view that the orchestrator can query for "all non-paused, non-archived agents whose `schedule_cron` fires this tick" (Epic-006 S1).
 
 A naïve fix — move everything into DDB — would also lose:
 
 - **W-5 / Rule 11** prompt-version discipline (one persona's `system.md` bump per PR, reviewed in git).
 - The audit trail that git provides for identity-defining changes.
 
-This RFC defines a **split**: identity stays in git, operational state lives in DDB, and a thin CRUD API surfaces both for reads while restricting writes to operational fields.
+This Epic defines a **split**: identity stays in git, operational state lives in DDB, and a thin CRUD API surfaces both for reads while restricting writes to operational fields.
 
 ## Proposed solution
 
@@ -90,7 +90,7 @@ The seed is **identity-only**. Operational fields set via API are not stomped by
 
 ### Where the existing 5 agents land
 
-After PR4 + RFC-007 implementation, the existing PR #28 file set becomes the **first seed payload**:
+After PR4 + Epic-007 implementation, the existing PR #28 file set becomes the **first seed payload**:
 
 - 5 `AGENT#{slug}/META` rows in DDB, one per persona, with the file's `agent.json` projected in.
 - Operational fields default from file: `schedule_cron`, `budget_monthly_usd`. `paused=false`, `archived=false`.
@@ -103,11 +103,11 @@ After PR4 + RFC-007 implementation, the existing PR #28 file set becomes the **f
 - Seed Lambda runs in O(N_files) per main-merge — at N=100, ~100 DDB UpdateItem calls, ~5s total. Acceptable.
 - The CRUD API itself does not scale linearly in N — each request is a single-item read or write, constant-time.
 - The runner (PR6) queries DDB directly, not the API, for orchestration (avoids API GW hop in the hot path). The API is for UIs and operators.
-- File-based identity at N = 100+: the prelude/voice split in [RFC-006 S4](rfc-006-scalability.md) is the companion fix that keeps prompt review tractable. Without S4 the file count stays manageable but review of shared boilerplate becomes the bottleneck.
+- File-based identity at N = 100+: the prelude/voice split in [Epic-006 S4](epic-006-scalability.md) is the companion fix that keeps prompt review tractable. Without S4 the file count stays manageable but review of shared boilerplate becomes the bottleneck.
 
 ## Acceptance criteria
 
-This RFC produces three issues for Maya to file:
+This Epic produces three issues for Maya to file:
 
 - **Issue A — `WfSeedAgentsFunction`**: Reads `workforce/agents/**/agent.json` + `system.md` from the Lambda bundle. Upserts `AGENT#{slug}/META` preserving operational fields. Logs per-agent diff. Idempotent. TypeScript, `nodejs24.x`.
 - **Issue B — `WfAgentsApiFunction` + `WfAgentsHttpApi`**: Implements the four endpoints above. `GET` public, `PATCH`/`DELETE` IAM-auth. CORS open for the gh-pages origin so the SPA can read. TypeScript, `nodejs24.x`.
@@ -144,8 +144,8 @@ curl https://<api>/agents/sora     → new prompt_version, paused still true
 
 ## Out of scope
 
-- **POST /agents** (programmatic agent creation) — deliberately not exposed in v1 to preserve Rule 11. Auto-generation of personas (text → persona) gets its own RFC.
-- **POST /agents/{slug}/runs** (trigger an agent manually via API) — useful for ops, but adds a second invocation path next to EventBridge. Defer to RFC-008 if needed.
-- **Skill CRUD API.** Skills are file-based for v1; RFC-004 covers the read surface (skill catalog). Skill mutation via API is a follow-up.
+- **POST /agents** (programmatic agent creation) — deliberately not exposed in v1 to preserve Rule 11. Auto-generation of personas (text → persona) gets its own Epic.
+- **POST /agents/{slug}/runs** (trigger an agent manually via API) — useful for ops, but adds a second invocation path next to EventBridge. Defer to Epic-008 if needed.
+- **Skill CRUD API.** Skills are file-based for v1; Epic-004 covers the read surface (skill catalog). Skill mutation via API is a follow-up.
 - **DDB Streams → derived projections.** v2 concern.
 - **WebSocket / streaming reads** for live status. v2.

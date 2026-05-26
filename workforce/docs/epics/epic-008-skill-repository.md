@@ -1,4 +1,4 @@
-# RFC-008 — Skill repository as the execution unit
+# Epic-008 — Skill repository as the execution unit
 
 - **Status**: In-progress (2026-05-18)
 - **Owner**: Maya
@@ -12,11 +12,11 @@ The workforce treats Skills as the reusable instructions that drive agent behavi
 - `agent.json:skills` is a name array (Maya has `["plan-write", "article-draft", "notion-publish"]`) — no file under `workforce/skills/` materialises any of them.
 - `lambdas/agent-runner/handler.ts` doesn't load skills; it dispatches on `task_kind` via a hard-coded `defaultBriefFor()` switch. The "skill" abstraction is bypassed at runtime.
 - There is no schema for SKILL.md, no validator, no test that an agent's declared skill exists, no traceability from a RUN row back to the skill that drove it.
-- The complementary [RFC-004](rfc-004-skill-catalog.md) covers the **catalog/utilisation view layer** (`/workforce/skills` UI, invocation stats, stale detection) and explicitly defers the substrate; it has no bite without that substrate.
+- The complementary [Epic-004](epic-004-skill-catalog.md) covers the **catalog/utilisation view layer** (`/workforce/skills` UI, invocation stats, stale detection) and explicitly defers the substrate; it has no bite without that substrate.
 
 The operator's directive (chat, 2026-05-18) is: **the Skill is the execution unit.** Multiple agents assign the same Skill and execute it periodically inside their own context. Separately, dedicated improvement agents lift each Skill's quality over time. The repository of Skills is a **layer independent of the agent repository** — agents point at Skills; Skills are not owned by any one agent.
 
-RFC-008 defines that substrate.
+Epic-008 defines that substrate.
 
 ## Constraints
 
@@ -86,11 +86,11 @@ Field semantics:
 |---|---|---|
 | `name` | string | Must equal `SKILL.md:name` and the directory name. |
 | `version` | semver | Bumped on Rule-11 PR. Mirrors `agent.json:prompt_version`. First version is `0.1.0` (Rule-11 documented exception). |
-| `status` | `active` / `stale` / `deprecated` | Catalog filter (RFC-004 Q1). Default `active`. |
+| `status` | `active` / `stale` / `deprecated` | Catalog filter (Epic-004 Q1). Default `active`. |
 | `trigger_class` | `lambda` / `claude-code-routine` | Where the Skill's *scripts* can execute. `lambda` Skills are prompt-only at v1 (no bash inside the runner); `claude-code-routine` Skills route through the R-N1 exception path so scripts run on GHA. See "Trigger dispatch model" below. |
 | `cost_class` | `small` (~$0.05) / `medium` (~$0.20) / `large` (~$0.60) | Pre-flight cost projection. Multiplied by per-agent monthly budget for W-3 enforcement. |
 | `owners` | string[] | Agent slugs allowed to invoke the Skill. The validator cross-checks `agent.json:skills`. |
-| `improvement_agent` | string or null | Slug of the agent assigned to improve this Skill (RFC-009 placeholder). `null` until that RFC lands. |
+| `improvement_agent` | string or null | Slug of the agent assigned to improve this Skill (Epic-009 placeholder). `null` until that Epic lands. |
 | `inputs` | string[] | Symbolic input slot names; informational at v1, basis for typed inputs in v2. |
 | `outputs` | string[] | Symbolic output slot names; informational at v1. |
 | `created_at` | ISO 8601 date | Set on first PR; never edited. |
@@ -100,7 +100,7 @@ Field semantics:
 
 ### Agent → Skill pointer
 
-`agent.json:skills` stays a string array of skill names. No version pinning at v1; the runner always reads the latest. Pinning is deferred to a follow-up RFC if Skills start to drift faster than agents can re-validate.
+`agent.json:skills` stays a string array of skill names. No version pinning at v1; the runner always reads the latest. Pinning is deferred to a follow-up Epic if Skills start to drift faster than agents can re-validate.
 
 Two validations added to `validate-agent-json.mjs`:
 
@@ -137,7 +137,7 @@ Selection rule inside the runner (v1, simplest viable):
 2. Filter by `trigger_class` consistent with the task: for now, `task_kind=l0-to-l1` → any `trigger_class=lambda` Skill whose `outputs` contains `article-markdown`. Hard-coded mapping table; replace with a planner in v2.
 3. Pick the first match. Record the selected `{name, version}` on the RUN row.
 
-The orchestrator-tick model (RFC-006 S1) already iterates agents on a 5-minute cadence; Skills change nothing about scheduling. The agent's cron stays the period at which the agent **wakes**; which Skill it runs is data, not schedule.
+The orchestrator-tick model (Epic-006 S1) already iterates agents on a 5-minute cadence; Skills change nothing about scheduling. The agent's cron stays the period at which the agent **wakes**; which Skill it runs is data, not schedule.
 
 The user's directive named "Claude Code Routine" as an alternative trigger source. Two readings, both supported:
 
@@ -174,20 +174,20 @@ Two new optional attributes on the existing rows (data-model.md extension; no sc
 | `AGENT#{slug}` / `DELIV#{ulid}` | `skill_name` | string | Same value as the parent run for one-hop lookup. |
 | `AGENT#{slug}` / `DELIV#{ulid}` | `skill_version` | string | Same. |
 
-Operator surfaces (RFC-004 catalog, RFC-002 agent profile) consume these fields directly. The user's "種別とID" requirement is satisfied: `(skill_name, skill_version)` is the tracing tuple; an agent's RUN list is filterable by Skill.
+Operator surfaces (Epic-004 catalog, Epic-002 agent profile) consume these fields directly. The user's "種別とID" requirement is satisfied: `(skill_name, skill_version)` is the tracing tuple; an agent's RUN list is filterable by Skill.
 
 ### Repository as an independent layer
 
-This RFC distinguishes the **Skill repository** from the **Agent repository** even though both live under `workforce/`:
+This Epic distinguishes the **Skill repository** from the **Agent repository** even though both live under `workforce/`:
 
 - File layout is parallel: `workforce/agents/{slug}/{agent.json, system.md}` vs. `workforce/skills/{name}/{meta.json, SKILL.md}`.
-- DDB mirrors: Skills get a `SKILL#{name}/META` row (parallel to `AGENT#{slug}/META`), seeded by a new `WfSeedSkillsFunction` Lambda that mirrors `WfSeedAgentsFunction` (RFC-007).
+- DDB mirrors: Skills get a `SKILL#{name}/META` row (parallel to `AGENT#{slug}/META`), seeded by a new `WfSeedSkillsFunction` Lambda that mirrors `WfSeedAgentsFunction` (Epic-007).
 - API surface (v2, deferred): `GET /skills`, `GET /skills/{name}`, `PATCH /skills/{name}` for operational fields (status flip, improvement-agent assignment).
 - Authority: a Skill body bump is Rule-11 (one PR per skill); operational fields are PATCH-able without a body PR.
 
 The independence matters because a Skill that two agents share has no single agent owner. Routing improvement work, ownership disputes, and deprecation through the Skill row (not through any one agent's row) is the data-modelling step that makes the "execution unit" promise hold.
 
-### Mechanical checks added in this RFC's PR sequence
+### Mechanical checks added in this Epic's PR sequence
 
 The validator and CI gates added across the implementation PRs:
 
@@ -206,12 +206,12 @@ The validator and CI gates added across the implementation PRs:
 - Bundle size: 50 Skills × ~3 KB SKILL.md + ~1 KB meta.json + (avg) 5 KB references = ~450 KB packaged into the agent-runner Lambda zip. Comfortable (Lambda zip limit 50 MB unzipped).
 - Read latency: `loadSkill(name)` is a local fs read inside Lambda. Negligible. The catalog API (v2) reads from `SKILL#{name}/META` rows; one read per page request.
 - Validator: `validate-skills.mjs` runs in O(N_skills) on every PR. 50 skills < 1s.
-- Catalog UI (RFC-004): see its own behaviour-at-N section.
-- Selection rule (`pickSkillForTask`) is O(N_skills_per_agent), bounded ~10 in practice. Hard-coded mapping table starts to creak around N_skills > 20 — that's the signal to introduce a planner (v2 RFC).
+- Catalog UI (Epic-004): see its own behaviour-at-N section.
+- Selection rule (`pickSkillForTask`) is O(N_skills_per_agent), bounded ~10 in practice. Hard-coded mapping table starts to creak around N_skills > 20 — that's the signal to introduce a planner (v2 Epic).
 
 ## Acceptance criteria
 
-This RFC produces **four PRs**, sequenced. Each is independently mergeable.
+This Epic produces **four PRs**, sequenced. Each is independently mergeable.
 
 - **PR-A — Repository layout + schema + validator + first pilot.**
   - `workforce/skills/{name}/` directory pattern, `SKILL.md` + `meta.json` schema (JSON Schema file under `workforce/scripts/schemas/`).
@@ -230,15 +230,15 @@ This RFC produces **four PRs**, sequenced. Each is independently mergeable.
 - **PR-C — Traceability + agent-profile + catalog surfaces.**
   - `RUN#…` and `DELIV#…` row writers (`shared/task.ts` types + `agent-runner` writes) carry `skill_name` and `skill_version`.
   - `data-model.md` updated with the two new fields.
-  - Agent profile page (RFC-002) shows the most-recent Skill per RUN row in the timeline.
-  - Skill catalog (RFC-004) starts to render real invocation counts because the data is now present.
+  - Agent profile page (Epic-002) shows the most-recent Skill per RUN row in the timeline.
+  - Skill catalog (Epic-004) starts to render real invocation counts because the data is now present.
 
 - **PR-D — Skill seed Lambda + DDB mirror.**
   - `workforce/lambdas/seed-skills/handler.ts` — mirror of `seed-agents`. Reads `workforce/skills/**/{SKILL.md, meta.json}`, upserts `SKILL#{name}/META` preserving operational fields. Idempotent.
   - SAM template adds `WfSeedSkillsFunction`. Seed trigger reuses the agents-seed deploy hook.
-  - `agents-api` (Lambda handler) extended to expose `GET /skills` + `GET /skills/{name}` reading from `SKILL#…/META`. `PATCH` deferred to v2 per RFC-007's pattern.
+  - `agents-api` (Lambda handler) extended to expose `GET /skills` + `GET /skills/{name}` reading from `SKILL#…/META`. `PATCH` deferred to v2 per Epic-007's pattern.
 
-PR-A unblocks RFC-004's "this skill exists" badge. PR-B unblocks "Skills are actually executed." PR-C unblocks the user's "種別とID" traceability requirement. PR-D unblocks the catalog API at scale.
+PR-A unblocks Epic-004's "this skill exists" badge. PR-B unblocks "Skills are actually executed." PR-C unblocks the user's "種別とID" traceability requirement. PR-D unblocks the catalog API at scale.
 
 End-to-end smoke after all four PRs land:
 
@@ -256,7 +256,7 @@ curl https://<api>/skills/article-draft   → invocation count = 1
 ## Open questions
 
 - **Q1. SKILL.md frontmatter extensions.** The Anthropic spec allows additional frontmatter fields (it specifies *required* fields, not *only allowed* fields). We chose to put workforce-specific metadata in a sidecar `meta.json` instead, to keep SKILL.md trivially portable to claude.ai / Skills API. Default: keep the sidecar. Operator confirms.
-- **Q2. Selection rule planner.** PR-B ships a hard-coded `(task_kind → required outputs)` table. At N_skills > ~20 this becomes a planner — but a planner is its own design conversation. Default: defer to a v2 RFC; ship the table now with a TODO marker.
+- **Q2. Selection rule planner.** PR-B ships a hard-coded `(task_kind → required outputs)` table. At N_skills > ~20 this becomes a planner — but a planner is its own design conversation. Default: defer to a v2 Epic; ship the table now with a TODO marker.
 - **Q3. `trigger_class=claude-code-routine` generalisation.** The current R-N1 exception is Ren-specific. PR-B allows any agent to invoke a `claude-code-routine` Skill, which generalises the exception. Default: yes — but this is a governance amendment to §4 R-N1 (one sentence: "any Skill with `trigger_class=claude-code-routine` may invoke the CC routine path, regardless of the calling agent"). Operator approves before PR-B lands.
 - **Q4. Cost class enforcement.** PR-A defines `cost_class` but PR-B does not enforce it (only logs the projected cost). Should the budget guard reject Skills whose projected cost would breach the agent's remaining monthly cap, even if the run is the first of the month? Default: yes, soft cap (warn) in PR-B, hard cap (throw) after one month of telemetry.
 - **Q5. Skill scripts on Lambda.** `scripts/*.mjs` in a `trigger_class=lambda` Skill is currently inert (the runner has no bash tool). Two options: (a) accept that Lambda Skills are prompt-only and document; (b) add a sandboxed `child_process` execution path. Default: (a). Bash-style scripts run via the `claude-code-routine` path, which is what the existing `.claude/skills/*` already do.
@@ -264,9 +264,9 @@ curl https://<api>/skills/article-draft   → invocation count = 1
 
 ## Out of scope
 
-- **RFC-009 — Skill improvement agent.** Each Skill gets a dedicated improvement agent that reads the Skill's invocation log + DELIV evaluations and proposes Rule-11 bump PRs. `meta.json:improvement_agent` is the field that wires it; nothing else in this RFC depends on it. The improvement loop, its review cadence, and its budget envelope are the RFC-009 conversation.
-- **Inter-skill dependencies.** A Skill cannot import another Skill. The composition model stays "agent + one Skill per run + runtime"; no Skill graph at v1. RFC-004 already calls this out.
-- **A/B testing of Skill versions.** A Skill has one active version at a time. Parallel versions ("article-draft@0.3.0" alongside "article-draft@0.4.0") are not modelled. If competing versions become useful, that's a follow-up RFC about Skill experimentation.
+- **Epic-009 — Skill improvement agent.** Each Skill gets a dedicated improvement agent that reads the Skill's invocation log + DELIV evaluations and proposes Rule-11 bump PRs. `meta.json:improvement_agent` is the field that wires it; nothing else in this Epic depends on it. The improvement loop, its review cadence, and its budget envelope are the Epic-009 conversation.
+- **Inter-skill dependencies.** A Skill cannot import another Skill. The composition model stays "agent + one Skill per run + runtime"; no Skill graph at v1. Epic-004 already calls this out.
+- **A/B testing of Skill versions.** A Skill has one active version at a time. Parallel versions ("article-draft@0.3.0" alongside "article-draft@0.4.0") are not modelled. If competing versions become useful, that's a follow-up Epic about Skill experimentation.
 - **Skill marketplace / external Skills.** Skills are repo-internal artefacts. The fact that SKILL.md is Anthropic-spec-compliant means a Skill *could* be uploaded to claude.ai or the Skills API, but doing so is an operator action, not a runtime path.
-- **POST /skills (programmatic Skill creation via API).** New Skills come from PRs that add files. `WfSeedSkillsFunction` picks them up. Mirrors RFC-007's deliberate no-POST policy for agents.
-- **Skill execution outside the workforce.** The existing `.claude/skills/*` (`gas-call`, `gas-deploy-verify`, `article-health`) continue to live under `.claude/skills/` and operate under the root [AGENTS.md](../../../AGENTS.md). They are *compatible* with this design (same file shape) but **not migrated** by this RFC — they're tooling for the operator's Claude Code sessions, not workforce agent Skills.
+- **POST /skills (programmatic Skill creation via API).** New Skills come from PRs that add files. `WfSeedSkillsFunction` picks them up. Mirrors Epic-007's deliberate no-POST policy for agents.
+- **Skill execution outside the workforce.** The existing `.claude/skills/*` (`gas-call`, `gas-deploy-verify`, `article-health`) continue to live under `.claude/skills/` and operate under the root [AGENTS.md](../../../AGENTS.md). They are *compatible* with this design (same file shape) but **not migrated** by this Epic — they're tooling for the operator's Claude Code sessions, not workforce agent Skills.

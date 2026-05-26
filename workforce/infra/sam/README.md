@@ -80,7 +80,7 @@ aws budgets describe-budget --account-id "$(aws sts get-caller-identity --query 
 
 A `workforce-deploy-article-site.yml` workflow that calls `sam deploy` on `main` merge is a Zone A addition and warrants its own PR (separate review for the OIDC role, the IAM permissions of that role, and the auto-deploy trigger boundary). PR4 keeps the change footprint minimal — operator deploys manually for now.
 
-When the GHA deploy lands, it will use OIDC + an `AWSDeployRole` with the narrowest possible policy (`cloudformation:*` + `iam:PassRole` to the SAM execution role only). Designed in [RFC-006](../../docs/rfcs/rfc-006-scalability.md) implicitly; explicit RFC may follow.
+When the GHA deploy lands, it will use OIDC + an `AWSDeployRole` with the narrowest possible policy (`cloudformation:*` + `iam:PassRole` to the SAM execution role only). Designed in [Epic-006](../../docs/epics/epic-006-scalability.md) implicitly; explicit Epic may follow.
 
 ## Governance
 

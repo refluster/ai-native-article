@@ -1,6 +1,6 @@
 // EventBridge cron expression matcher.
 //
-// The orchestrator-tick (RFC-006 S1) runs every 5 minutes and asks each
+// The orchestrator-tick (Epic-006 S1) runs every 5 minutes and asks each
 // agent: "should you run in this 5-minute window?" Each agent's
 // schedule_cron lives in DDB; this module is the data-level evaluator.
 //

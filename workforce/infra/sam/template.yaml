@@ -215,7 +215,7 @@ Resources:
             - SubscriptionType: EMAIL
               Address: !Ref AlarmEmail
 
-  # --- Agents CRUD API (RFC-007) --------------------------------------------
+  # --- Agents CRUD API (Epic-007) --------------------------------------------
   # HTTP API + Lambda + IAM. GET endpoints are public; PATCH/DELETE require
   # AWS_IAM auth (operator only). Creates via API are deliberately not
   # exposed — new personas come from PRs that add agents/{slug}/ files.
@@ -243,7 +243,7 @@ Resources:
       FunctionName: !Sub wf-agents-api-${Stage}
       CodeUri: ../../lambdas/agents-api
       Handler: handler.handler
-      Description: Workforce agents CRUD API. See workforce/docs/rfcs/rfc-007-agent-management-api.md.
+      Description: Workforce agents CRUD API. See workforce/docs/epics/epic-007-agent-management-api.md.
       MemorySize: 512
       Timeout: 10
       Policies:
@@ -288,7 +288,7 @@ Resources:
             Method: DELETE
             Auth:
               Authorizer: AWS_IAM
-        # RFC-008 PR-D: skills read-only routes on the same HTTP API.
+        # Epic-008 PR-D: skills read-only routes on the same HTTP API.
         # GET /skills + GET /skills/{name}. No PATCH/DELETE on skills at
         # v1 — operational mutations go through PRs that edit meta.json.
         ListSkills:
@@ -333,7 +333,7 @@ Resources:
       AlarmActions:
         - !Ref WfAlarmTopic
 
-  # --- Agents seed Lambda (RFC-007) -----------------------------------------
+  # --- Agents seed Lambda (Epic-007) -----------------------------------------
   # Reads workforce/agents/{slug}/{agent.json, system.md} from the deployed
   # bundle (the Makefile builder copies the tree into ARTIFACTS_DIR/agents/)
   # and upserts AGENT#{slug}/META rows. Identity-hash gates idempotency:
@@ -341,7 +341,7 @@ Resources:
   # re-seed.
   #
   # Invoked automatically on every successful stack CREATE/UPDATE via the
-  # PostDeploy EventBridge rule below (RFC-007 Q1 default-(b): EventBridge
+  # PostDeploy EventBridge rule below (Epic-007 Q1 default-(b): EventBridge
   # rule on CloudFormation Stack Status Change). The Lambda is idempotent
   # via identity_hash, so over-firing is harmless.
   WfSeedAgentsFunction:
@@ -352,7 +352,7 @@ Resources:
       FunctionName: !Sub wf-seed-agents-${Stage}
       CodeUri: ../../lambdas/seed-agents
       Handler: handler.handler
-      Description: Workforce agents seed. Files -> DDB AGENT#{slug}/META. See RFC-007.
+      Description: Workforce agents seed. Files -> DDB AGENT#{slug}/META. See Epic-007.
       MemorySize: 512
       Timeout: 60
       Policies:
@@ -407,7 +407,7 @@ Resources:
       AlarmActions:
         - !Ref WfAlarmTopic
 
-  # --- Skills seed Lambda (RFC-008 PR-D) ------------------------------------
+  # --- Skills seed Lambda (Epic-008 PR-D) ------------------------------------
   # Mirror of WfSeedAgentsFunction for the skill repository. Reads
   # workforce/skills/{name}/{SKILL.md, meta.json} from the deployed bundle
   # (Makefile builder copies the tree) and upserts SKILL#{name}/META rows.
@@ -420,7 +420,7 @@ Resources:
       FunctionName: !Sub wf-seed-skills-${Stage}
       CodeUri: ../../lambdas/seed-skills
       Handler: handler.handler
-      Description: Workforce skill seed. Files -> DDB SKILL#{name}/META. See RFC-008 PR-D.
+      Description: Workforce skill seed. Files -> DDB SKILL#{name}/META. See Epic-008 PR-D.
       MemorySize: 512
       Timeout: 60
       Policies:
@@ -552,7 +552,7 @@ Resources:
       AlarmActions:
         - !Ref WfAlarmTopic
 
-  # --- Orchestrator Lambda + tick rule (PR6c, RFC-006 S1) -------------------
+  # --- Orchestrator Lambda + tick rule (PR6c, Epic-006 S1) -------------------
   # One EventBridge rule fires every 30 minutes. The orchestrator scans all
   # AGENT#*/META rows, evaluates each agent's schedule_cron against the
   # 30-minute window, and async-invokes wf-agent-runner-{stage} for the

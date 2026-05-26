@@ -38,7 +38,7 @@ Before merging the region-change PR (the one that flips `region = "..."` in `sam
     --secret-string "$VALUE" --region $NEW
   ```
 - [ ] **`secrets.AWS_ROLE_ARN`** trust policy is unchanged (IAM is account-global) but the role's **resource-scoped policies** include ARNs in the new region. Inline policies enumerating `arn:aws:dynamodb:OLD_REGION:...`, `arn:aws:lambda:OLD_REGION:...`, `arn:aws:secretsmanager:OLD_REGION:secret:wf/*` etc. must be extended to cover `NEW_REGION` (or wildcarded over region). Test with a `sam deploy --dry-run` first.
-- [ ] The new region is supported by every AWS service the template uses: DynamoDB, S3, Lambda (arm64), EventBridge, SNS, AWS Budgets, IAM, Secrets Manager, API Gateway HTTP API. As of 2026-05-25 all of these are available in every commercial region; flag if a future template addition (e.g. OpenSearch Serverless from RFC-010) lands a region-limited service.
+- [ ] The new region is supported by every AWS service the template uses: DynamoDB, S3, Lambda (arm64), EventBridge, SNS, AWS Budgets, IAM, Secrets Manager, API Gateway HTTP API. As of 2026-05-25 all of these are available in every commercial region; flag if a future template addition (e.g. OpenSearch Serverless from Epic-010) lands a region-limited service.
 
 ## Migration steps
 

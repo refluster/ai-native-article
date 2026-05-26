@@ -36,7 +36,7 @@
       "trigger": {
         "scheduler": "manual"
       },
-      "note": "Operator-fired stub for the RFC → Epic tracker step. Not auto-dispatched in v1; see workforce/skills/pdm-charter/SKILL.md."
+      "note": "Operator-fired stub for Maya's Epic → Story decomposition step. Under the simplified process, pdm-charter is the canonical Maya skill — Claude Code consumes Stories directly, no role-tagged middle layer. Not auto-dispatched in v1; see workforce/skills/pdm-charter/SKILL.md."
     }
   ]
 }
