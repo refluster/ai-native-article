@@ -115,7 +115,7 @@ aws cloudformation wait stack-delete-complete \
 aws dynamodb delete-table --table-name wf-table-${STAGE} --region ${OLD}
 
 #    S3: empty (including versions) then delete the bucket.
-#    Bucket name now includes the region (since PR #107 / 2026-05-26),
+#    Bucket name now includes the region (since PR #109 / 2026-05-26),
 #    so the OLD region's bucket is structurally distinct from the new one.
 BUCKET=wf-bucket-${ACCT}-${OLD}-${STAGE}
 aws s3 rm s3://${BUCKET} --recursive --region ${OLD}
@@ -143,7 +143,7 @@ aws logs describe-log-groups \
 ## Known sharp edges
 
 - **Stack name collision is not a thing.** `wf-data-plane-prod` can exist concurrently in `ap-northeast-1` and `us-west-2`; CFN namespaces stack names per region. This is what makes the "leave the old stack alive while you bring up the new one" recovery path safe.
-- **S3 bucket name collision is no longer a thing either** (since PR #107, 2026-05-26). The template's `BucketName` is now `wf-bucket-${AWS::AccountId}-${AWS::Region}-${Stage}`, so concurrent stacks in two regions get distinct globally-unique bucket names. Historical note: the 2026-05-25 migration hit `BucketAlreadyOwnedByYou` at the CFN `EarlyValidation::ResourceExistenceCheck` step because the old name pattern (`{acct}-{stage}` only) was globally unique across regions and the first region claimed the name. See the "Past migrations" table.
+- **S3 bucket name collision is no longer a thing either** (since PR #109, 2026-05-26). The template's `BucketName` is now `wf-bucket-${AWS::AccountId}-${AWS::Region}-${Stage}`, so concurrent stacks in two regions get distinct globally-unique bucket names. Historical note: the 2026-05-25 migration hit `BucketAlreadyOwnedByYou` at the CFN `EarlyValidation::ResourceExistenceCheck` step because the old name pattern (`{acct}-{stage}` only) was globally unique across regions and the first region claimed the name. See the "Past migrations" table.
 
 - **Secrets Manager 30-day default.** `aws secretsmanager delete-secret` schedules a 30-day recovery window unless you pass `--force-delete-without-recovery`. During that window the secret name is reserved — you cannot recreate it under the same id. For migrations, the force-delete flag is appropriate.
 
@@ -155,4 +155,4 @@ aws logs describe-log-groups \
 
 | Date | From | To | PRs | Notes |
 |---|---|---|---|---|
-| 2026-05-25 → 2026-05-26 | ap-northeast-1 | us-west-2 | [#105](https://github.com/refluster/ai-native-article/pull/105), [#107](https://github.com/refluster/ai-native-article/pull/107) | Consolidation to us-west-2 to match `wf-web-prod`. #103 (tick `Enabled: true`) had merged before #105, so the ap-northeast-1 stack briefly had the tick active. #105's deploy then failed at CFN `EarlyValidation::ResourceExistenceCheck` because the global S3 bucket name was already taken by ap-northeast-1. Operator manually deleted the ap-northeast-1 bucket, then #107 added `{region}` to the bucket name pattern so the same trap is structurally impossible going forward, and the merge of #107 triggered the successful us-west-2 deploy. |
+| 2026-05-25 → 2026-05-26 | ap-northeast-1 | us-west-2 | [#105](https://github.com/refluster/ai-native-article/pull/105), [#109](https://github.com/refluster/ai-native-article/pull/109) | Consolidation to us-west-2 to match `wf-web-prod`. #103 (tick `Enabled: true`) had merged before #105, so the ap-northeast-1 stack briefly had the tick active. #105's deploy then failed at CFN `EarlyValidation::ResourceExistenceCheck` because the global S3 bucket name was already taken by ap-northeast-1. Operator manually deleted the ap-northeast-1 bucket, then #109 added `{region}` to the bucket name pattern so the same trap is structurally impossible going forward, and the merge of #109 triggered the successful us-west-2 deploy. |
