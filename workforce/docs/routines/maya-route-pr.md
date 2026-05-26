@@ -43,12 +43,26 @@ and you need to synthesise). Read the PR state and decide which mode.
 
 # Mode decision
 
+Evaluate in order; the first match wins. **Initial cycle counter = 1**
+when this routine first runs against a PR.
+
 - If the PR has no Maya-authored comments yet → ROUTING (cycle 1).
-- If the last Maya comment was a router AND there is at least one
-  reviewer review after it AND no Maya verdict on that cycle → VERDICT.
-- If the last Maya comment was a verdict 🟡 → ROUTING (next cycle, cycle counter += 1).
+- If the last Maya comment was a router AND no reviewer review has
+  posted after it yet → **exit; nothing to do** (Phase D still in
+  flight — wait for reviewers). Do NOT increment the cycle counter.
+  Loud-but-cheap: log "waiting on reviewers" so the operator can see
+  the routine ran and intentionally no-op'd (W-4).
+- If the last Maya comment was a router AND **every reviewer nominated
+  in that router has posted a review** AND no Maya verdict on that
+  cycle → VERDICT. ("Every nominated reviewer" — not "at least one":
+  partial-quorum verdicts produce drift if cycle 2 introduces a
+  finding only the missing reviewer would catch.)
+- If the last Maya comment was a verdict 🟡 → ROUTING (next cycle,
+  cycle counter += 1).
 - If the last Maya comment was a verdict 🟢 → exit; nothing to do.
 - If cycle count > 7 → ESCALATE (post 🔴 verdict and stop).
+  Mechanical enforcement is FU-004 (CI lint counts Maya-authored
+  router comments); until that lands the cap is honour-system.
 
 # Routing mode
 
@@ -90,11 +104,17 @@ in a single commit per cycle; Maya synthesises in the verdict comment.
    - For each cycle-1 finding from each reviewer: locate the
      address-location in the diff (or confirm it's named as a deferred
      follow-up in the PR body or a linked issue).
-   - Build a table: finding → status (✅ fixed at file:line / 🟡 still
-     open / 📥 deferred to <link>).
+   - Build a table: finding-ID → status:
+     * ✅ **fixed** at file:line (Maya MUST be able to point at the
+       exact location; if you can't, the default is 🟡 not ✅)
+     * 🟡 **still open** (a deferred fix marked "fixed" is treated as 🟡
+       unless the diff line is identifiable)
+     * 📥 **deferred** to <link to FU- entry or follow-up issue>
+     * 💬 **non-blocking nit / acknowledged** (reviewer explicitly
+       flagged as nit; author chose not to address; not a blocker for 🟢)
 3. Decide verdict:
-   - 🟢 all cycle-1 findings either ✅ or 📥; CI green; tests pass; no
-     L0 amendments without operator sign-off → sign off, hand to
+   - 🟢 all cycle-1 findings either ✅, 📥, or 💬; CI green; tests pass;
+     no L0 amendments without operator sign-off → sign off, hand to
      operator.
    - 🟡 one or more findings still 🟡 open → request another revise
      cycle; post a follow-up routing comment if the author needs

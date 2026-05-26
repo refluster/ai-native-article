@@ -29,9 +29,9 @@ See also [governance.md §4 R-N4](../governance.md#4-r-n-design-rules-basic-desi
 | executor | allowed schedulers | where the artefact lives |
 |---|---|---|
 | `lambda` | `eventbridge` | `workforce/skills/{name}/` (folder with `meta.json`, `SKILL.md`, optional `handler.ts`) |
-| `claude-code-routine` | `claude-code-routine`, `external` | `routine_spec` markdown under `workforce/docs/routines/` (operator pastes prompt into claude.ai/code/routines) |
+| `claude-code-routine` | `claude-code-routine`, `external`, `manual` | `routine_spec` markdown under `workforce/docs/routines/`. `manual` is the **declarative-pending** shape: the routine exists as a spec but is not auto-fired (e.g. invoked conversationally as a sub-agent today, future CCR API trigger). The `routine_spec` is the load-bearing artefact in this mode. |
 | `gha` | `gha`, `external` | `workflow` YAML under `.github/workflows/` |
-| `cli` | `manual` | nothing — declarative only; binding documents that the skill is invokable on demand |
+| `cli` | `manual` | nothing — declarative only; binding documents that the skill is invokable on demand. Use `cli` when there is no `routine_spec`; use `claude-code-routine + manual` when the spec exists but is operator-invoked today. |
 
 The orchestrator-tick (`wf-orchestrator-tick-{stage}`) **only dispatches bindings where `executor=lambda` AND `trigger.scheduler=eventbridge`**. All other bindings are documentation + audit; they are fired by their respective schedulers (CCR cloud / GHA / external POST).
 

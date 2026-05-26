@@ -93,7 +93,11 @@ Use mcp__github__pull_request_review_write with method=create + event=COMMENT.
 Inline comments via add_comment_to_pending_review BEFORE submitting.
 
 Inline format:
-- Lead with the checklist letter ("**A. Tokens**: ...", "**D. Contrast**: ...")
+- **Lead with a finding-ID** ("A1", "D2", ...): section letter + integer.
+  Monotonically increasing within each cycle so Maya's verdict table can
+  reference them. Cycle-2+ comments cite the cycle-1 finding-ID they
+  address (or flag `[NEW]`). FU-005 codifies the mechanical check.
+- Then the checklist letter ("**A. Tokens**: ...", "**D. Contrast**: ...")
 - Cite file:line
 - Suggest the fix concretely ("use --color-text-primary rather than #1a1a1a")
 
@@ -102,7 +106,7 @@ Summary body:
 - Highlight the 1-2 most important findings (or "no findings" if clean)
 - For a re-verify cycle: scope to cycle-1 findings only; verified ✅ /
   still open 🟡 mapping
-- Sign off: "— Aoi (LLM persona via [manual route|CCR]; see workforce/docs/routines/aoi-review.md)"
+- Sign off: "— Aoi (LLM persona via `{invocation_mode}`; see workforce/docs/routines/aoi-review.md)" where `{invocation_mode}` is supplied by the caller (`maya-route-pr` passes "manual route" or "CCR"). Default "manual route".
 - Bias disclosure (mandatory for Aoi per her persona contract):
   "Aoi is an LLM persona (anthropic:claude-sonnet-4-6) on the Workforce
   platform. I cannot watch a real user interact with a real interface;

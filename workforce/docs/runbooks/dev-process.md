@@ -135,7 +135,7 @@ After merge:
 
 ## Cycle accounting
 
-Each Maya comment on the PR (router + re-route + verdict) counts as one cycle event. The 7-cap is generous on purpose:
+**One cycle = one `(router → reviewer reviews → revise → verdict)` bundle.** The cycle number increments when Maya posts a fresh router comment (cycle 2 router = "address cycle-1 findings and re-route"). The 7-cap is on bundles, not individual comments — generous on purpose:
 
 | Cycles | Typical reason |
 |---|---|
@@ -146,78 +146,77 @@ Each Maya comment on the PR (router + re-route + verdict) counts as one cycle ev
 | 6-7 | Approaching the cap; Maya should propose a split rather than another revise |
 | > 7 | 🔴 escalate; operator decides whether to split, defer, or kill |
 
+**Enforcement today**: honour-system. Maya counts her own router comments + states the cycle number in each. **Mechanical enforcement is FU-004** (CI lint that counts Maya-authored router comments + fails the build at 8+). Until FU-004 lands, the W-4 "loud on cap hit" guarantee is operator-visible only via Maya's 🔴 verdict comment; there is no human-pageable alert. Operators watching a PR approach cycle 6-7 should pre-emptively propose a split.
+
+## Reviewer-nomination defaults
+
+The same rule that drove Story 1's nominations:
+
+- **dario** — touched whenever the PR changes governance, R-N\*, SAM/IaC, data-model, bindings, or has cost-shape implications. Almost always nominated for a Lambda code or infra PR.
+- **ren** — touched whenever the PR includes TypeScript code under `workforce/lambdas/`. **Always nominate Ren when `workforce/lambdas/` is touched** — Ren is the only reviewer whose spec mandates running `npm run typecheck` + `npm test` locally; without his nomination the "tests pass" claim in the PR body is self-attested only, weakening the cycle. (If Ren is intentionally skipped on a pure-docs PR, the author MUST run the validators themselves and check them off in the PR body.)
+- **aoi** — touched whenever the PR changes UI, design-doc shape, design tokens, or bilingual content.
+- **sora / yuki / kai / mira / noor / priya / theo** — touched only when the PR has surface in their specific lens.
+
+Maya states the nomination rationale + the skip-list in the routing comment. See [maya-route-pr.md](../routines/maya-route-pr.md).
+
 ## Defaults that should stay defaults
 
-- **Single revise commit per cycle**. Don't make two.
+- **Single revise commit per cycle** (post-cycle-1). The initial implementation push can be multiple commits; each subsequent revise cycle squashes into one.
 - **One PR per Story** unless the Story splits cleanly along pure-addition vs behavioural-change lines (Story 1-A/1-B was the right split).
 - **Deferred = named follow-up**, never silent.
 - **Validators green before every push** (`workforce:naming`, `workforce:agents`, `workforce:skills`, `tsc -b --noEmit`, `npm test`).
 - **Zone A changes have operator sign-off in the PR description**, not just the commit message.
 - **Tests lock semantics, not spelling**. Prefer behaviour assertions over regex-on-source.
 
-## Open improvement points (post-Epic-010)
+## Open improvement points
 
-These are the gaps surfaced by the Epic-010 manual run that didn't make it into Story 1's scope:
-
-1. **`pdm-charter` is still a stub**. The next Epic should drive its first real implementation. Currently the Epic → Story split is a chat-driven conversation.
-2. **`maya-route-pr` is a manual routine today**. Maya's routing comment + verdict comment are both written by this conversation; codifying them as a routine spec would let the next manual run be `/route-pr-110` rather than re-deriving the structure.
-3. **Reviewer routine instantiation is operator action**. The CCR specs at `workforce/docs/routines/*-review.md` exist but the operator has not instantiated them in claude.ai/code/routines. Until then, reviews are conversational (sub-agent style, like Epic-010 used).
-4. **No mechanical cycle counter**. The 7-cap is honour-system; a CI lint that counts Maya-authored PR comments could harden it.
-5. **Reviewer scope creep on re-verify**. The cycle-2 re-verify prompts include "scope to cycle-1 findings only"; an enforcement mechanism (require reviewer comments to cite cycle-1 finding IDs) would tighten it.
-6. **Cross-PR pattern detection**. If two PRs in the same Epic make conflicting decisions, we have no automated way to catch it. Epic-010 didn't hit this (Story 1-A/1-B were tightly coupled), but Stories 2-6 may.
-7. **Audit-log for "what was deferred"**. Each PR's deferred-follow-ups list lives in its PR body. A separate `workforce/docs/follow-ups.md` index would help future-operator scan "what was promised."
+Tracked in the live index at [follow-ups.md](../follow-ups.md). The Epic-010 retrospective items are recorded as FU-001..FU-006 + OP-001..OP-003 (operator actions). This doc deliberately does NOT duplicate the list — the index is the single sweep target, with severity / target-Epic / status columns.
 
 ## What every Story PR description should include
 
-A template for Phase B's PR body. Copy + customise per Story:
+The template below is **descriptive of what PRs #110 / #111 actually used**, with sections in the order reviewers expect to find them. Copy + customise per Story; section headings are load-bearing (reviewer prompts key off the exact text):
 
 ```markdown
 **Story N of M** for Epic-NNN ([#issue]). Closes #N on merge.
 
-## Scope (in)
-- bullet
-- bullet
-
-## Scope (out — deferred)
-- thing → Story X / separate PR / backlog
-- thing → ditto
+<one-paragraph scope summary>
 
 ## What changes
-### Core code
-- file:line — what + why
-### Infrastructure
-- ...
-### Docs
+
+### <Core code / Infrastructure / Docs / Tests — pick the categories that apply>
+- **file:line** — what + why
 - ...
 
-## What does NOT change
-- behaviour-stable areas explicitly named (helps reviewers focus)
+## What does NOT change (deferred to Story X / out of scope)
+- Behaviour-stable areas explicitly named (helps reviewers focus)
+- Items deferred to follow-up PRs, with link to the FU- entry or issue
 
 ## AC mapping
 | AC | Where |
 |---|---|
-| ... | ... |
+| <AC bullet from #N> | <file:line OR "deferred to ..."> |
 
 ## Architecture self-check (Dario lens)
-1. R-N* — ...
-2. Audit surface — ...
-3. Failure modes named — ...
-4. Cost shape — ...
-5. One layer per change — ...
+1. **R-N\*** — touched / not-touched + status
+2. **Audit surface** — every persistent action addressable
+3. **Failure modes named** — what throws / times out / fails loud
+4. **Cost shape** — annualised cost (or 0)
+5. **One layer per change** — confirm
 
-## Operator action
-- forward: ...
-- rollback: ...
+## Operator action — <forward / rollback>
+**Forward**: <what happens on merge>
+**Rollback**: <how to revert; what state remains>
 
 ## Validation
-- [x] npm run workforce:naming
-- [x] npm run workforce:agents
-- [x] npm run workforce:skills
-- [x] tsc -b --noEmit (workforce/lambdas)
-- [x] npm test
+- [x] `npm run workforce:naming` → ...
+- [x] `npm run workforce:agents` → ...
+- [x] `npm run workforce:skills` → ...
+- [x] `workforce/lambdas` → `tsc -b --noEmit` green
+- [x] `npm test` → N passed
 
 ## Sequencing
-- depends on / unblocks
+- Depends on / unblocks
+- Closes #N on merge
 ```
 
-Phase D reviewer routines key off these sections — keeping the shape stable reduces the prompt's load-bearing assumptions.
+Phase D reviewer routines key off these sections — keeping the shape stable reduces the prompt's load-bearing assumptions. Maya's verdict comment also re-uses the **AC mapping** + **Validation** + **Sequencing** sections in its summary.
