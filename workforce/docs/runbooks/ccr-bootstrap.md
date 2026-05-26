@@ -1,4 +1,8 @@
-# Runbook — CCR routine bootstrap
+# Runbook — CCR routine bootstrap — **partially superseded**
+
+> **Status (2026-05-27)**: the **label-driven state machine** described below was retired by the simplified dev process in [dev-process.md](dev-process.md). The repo now has **0 labels** — Maya routes via PR comments per [maya-route-pr](../routines/maya-route-pr.md), and reviewer routines (`dario-review`, `ren-review`, `aoi-review`) are invoked by Maya manually (or via a future CCR API trigger), not by labels.
+>
+> The **CCR routine creation steps** below (how to paste a prompt into claude.ai/code/routines, where to store API tokens, etc.) are still accurate as a reference for ANY CCR routine you instantiate. Ignore the "labels — one-time setup" section and the label-triggered routine configs; use the per-routine specs at [routines/](../routines/) as the canonical prompts.
 
 How the operator instantiates the three Claude Code Routines (CCR) that
 back the engineering + review chain introduced in PR C of the Phase 5

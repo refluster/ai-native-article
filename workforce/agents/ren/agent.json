@@ -20,6 +20,15 @@
         "cron": "cron(0 0 ? * MON-FRI *)"
       },
       "note": "Weekdays 09:00 JST — skill dispatches GHA via skill.meta.executor=claude-code-routine (R-N1)"
+    },
+    {
+      "skill": "pr-review",
+      "executor": "claude-code-routine",
+      "trigger": {
+        "scheduler": "manual"
+      },
+      "routine_spec": "workforce/docs/routines/ren-review.md",
+      "note": "Engineering-lens PR reviewer. Invoked by Maya via maya-route-pr per dev-process.md Phase D. No auto-fire; future CCR API trigger from Maya's router."
     }
   ]
 }

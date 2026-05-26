@@ -1,4 +1,8 @@
-# Runbook — pdm-decompose (Maya's daily epic decomposition)
+# Runbook — pdm-decompose (Maya's daily epic decomposition) — **SUPERSEDED**
+
+> **Status: superseded** by the simplified dev process in [dev-process.md](dev-process.md). The `pdm-decompose` skill folder still exists at `workforce/skills/pdm-decompose/` for trivial reversibility, but Maya's binding to it has been removed (see [agent.json history](../../agents/maya/agent.json)). The new canonical decomposition routine is `pdm-charter` (stub today — `workforce/skills/pdm-charter/`), which produces Story-shaped GitHub issues directly per [dev-process.md Phase A](dev-process.md#phase-a--epic-authoring--decomposition).
+>
+> This file is kept as historical record. Future operators reading it should treat the contents below as the OLD decomposition flow (role-tagged sub-tasks, label-driven state machine) — replaced by the simpler "Epic → Story issues → Claude Code consumes directly" flow.
 
 The PdM routine that picks up Epic-derived Epic tracker issues and turns
 them into role-tagged child issues, gated by operator approval. Owned by

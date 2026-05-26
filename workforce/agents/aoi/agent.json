@@ -25,12 +25,10 @@
       "skill": "pr-review",
       "executor": "claude-code-routine",
       "trigger": {
-        "scheduler": "claude-code-routine",
-        "github_event": "pull_request.labeled",
-        "filter": { "label": "wf:needs-review-aoi" }
+        "scheduler": "manual"
       },
       "routine_spec": "workforce/docs/routines/aoi-review.md",
-      "note": "Design-lens reviewer. Fires on label add; posts inline comments + summary, then removes the label."
+      "note": "Design-lens reviewer. Invoked by Maya via maya-route-pr per dev-process.md Phase D when the PR has UI / design-doc surface (skipped on backend-only PRs). No auto-fire; future CCR API trigger from Maya's router. (Previously label-triggered; simplified flow uses Maya's routing comment instead — 0 labels.)"
     }
   ]
 }

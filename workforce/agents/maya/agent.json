@@ -28,6 +28,15 @@
         "scheduler": "manual"
       },
       "note": "Operator-fired stub for Maya's Epic → Story decomposition step. Under the simplified process, pdm-charter is the canonical Maya skill — Claude Code consumes Stories directly, no role-tagged middle layer. Not auto-dispatched in v1; see workforce/skills/pdm-charter/SKILL.md."
+    },
+    {
+      "skill": "route-pr",
+      "executor": "claude-code-routine",
+      "trigger": {
+        "scheduler": "manual"
+      },
+      "routine_spec": "workforce/docs/routines/maya-route-pr.md",
+      "note": "PR router + verdict (Phases C + F of dev-process.md). Two-mode routine: routes reviewers on a new PR cycle; posts 🟢/🟡/🔴 verdict after reviews land. Manual invocation today; future CCR pull_request.opened + .synchronize triggers."
     }
   ]
 }
