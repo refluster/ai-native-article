@@ -42,7 +42,7 @@ const META_REQUIRED = [
   "improvement_agent",
   "created_at",
 ];
-const META_OPTIONAL = ["deliverable"];
+const META_OPTIONAL = ["deliverable", "requires"];
 const STATUSES = new Set(["active", "stale", "deprecated"]);
 const EXECUTORS = new Set(["llm-prose", "claude-code-routine", "deterministic"]);
 const COST_CLASSES = new Set(["small", "medium", "large"]);
@@ -54,6 +54,23 @@ const DELIV_TYPES = new Set([
   "pr",
   "notification",
 ]);
+// Mirror of CREDENTIAL_TYPES in workforce/lambdas/shared/credential-injector.ts.
+// To extend: add the type here AND register its shape in CredentialShapes
+// in the injector module (see the injector file header for all 5 mirror points).
+// Skill meta requires[] is checked against this set, modulo the variant
+// suffix (`type@name`) per Epic-010 §Q2.
+const CREDENTIAL_TYPES = new Set([
+  "anthropic.api_key",
+  "discord.bot_token",
+  "github.token",
+  "notion.integration_token",
+]);
+// Variant naming convention (Epic-010 §Q2): starts with a letter, then
+// kebab/snake-case. Empty variants (`type@`) are rejected explicitly.
+const CREDENTIAL_VARIANT = /^[a-z][a-z0-9_-]*$/;
+// Bound on per-invocation Promise.all fan-out — must equal the JSON
+// schema's maxItems on requires[] (Dario A2).
+const CREDENTIAL_REQUIRES_MAX = 8;
 
 if (!existsSync(SKILLS_DIR)) {
   console.log("workforce/scripts/validate-skills.mjs: OK (no skills/ dir yet)");
@@ -233,6 +250,44 @@ for (const name of skillDirs) {
 
   if (typeof meta.created_at !== "string" || !ISO_DATE.test(meta.created_at)) {
     v("J10-created-at", metaJson, `created_at "${meta.created_at}" must be YYYY-MM-DD`);
+  }
+
+  // ── requires (Story 2-A): credential keys declared by this skill ─────────
+  // Each entry is either a base type from CREDENTIAL_TYPES, or a variant
+  // suffix `type@name` of one (Epic-010 §Q2 "tolerate @"). Duplicates and
+  // over-the-limit arrays are rejected (mirrored from the JSON schema).
+  if ("requires" in meta && meta.requires !== undefined) {
+    if (!Array.isArray(meta.requires)) {
+      v("J12-requires-shape", metaJson, `requires must be an array (got ${typeof meta.requires})`);
+    } else {
+      if (meta.requires.length > CREDENTIAL_REQUIRES_MAX) {
+        v("J12-requires-too-many", metaJson, `requires has ${meta.requires.length} entries; max ${CREDENTIAL_REQUIRES_MAX} (per-invocation fan-out bound)`);
+      }
+      const seen = new Set();
+      for (const entry of meta.requires) {
+        if (typeof entry !== "string") {
+          v("J12-requires-item-shape", metaJson, `requires[] entry must be a string (got ${typeof entry})`);
+          continue;
+        }
+        const atIdx = entry.indexOf("@");
+        const baseType = atIdx === -1 ? entry : entry.slice(0, atIdx);
+        const variant = atIdx === -1 ? null : entry.slice(atIdx + 1);
+        if (!CREDENTIAL_TYPES.has(baseType)) {
+          v("J12-requires-unknown-type", metaJson, `requires[] entry "${entry}" base type "${baseType}" not in CREDENTIAL_TYPES allowlist (extend the set in validate-skills.mjs AND register a shape in credential-injector.ts)`);
+        }
+        if (variant !== null) {
+          if (variant.length === 0) {
+            v("J12-requires-variant-empty", metaJson, `requires[] entry "${entry}" has empty variant after "@"`);
+          } else if (!CREDENTIAL_VARIANT.test(variant)) {
+            v("J12-requires-variant-shape", metaJson, `requires[] entry "${entry}" variant "${variant}" must match ${CREDENTIAL_VARIANT}`);
+          }
+        }
+        if (seen.has(entry)) {
+          v("J12-requires-duplicate", metaJson, `duplicate requires[] entry "${entry}"`);
+        }
+        seen.add(entry);
+      }
+    }
   }
 
   // ── executor=deterministic requires a sibling handler.ts ─────────────────

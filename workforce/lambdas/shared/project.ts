@@ -396,8 +396,11 @@ export async function listExecutions(filter: ListExecutionsFilter): Promise<Exec
  *
  * Type parameter `T` has no default — callers MUST specify the expected
  * secret shape (e.g. `getCredential<GithubSecret>(...)`) so wrong-shape
- * access is a compile error, not a runtime surprise. A `CredentialMap`
- * registry that keys T off `credentialType` lives in Story 2 (#91).
+ * access is a compile error, not a runtime surprise. The type registry
+ * that keys T off `credentialType` lives at
+ * `workforce/lambdas/shared/credential-injector.ts:CredentialShapes`
+ * (Story 2-A); skill code SHOULD prefer `injectCredentials()` over
+ * direct `getCredential()` so the bag is sealed at the trust boundary.
  */
 export async function getCredential<T>(
   projectId: ProjectId,
