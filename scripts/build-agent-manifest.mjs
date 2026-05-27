@@ -73,6 +73,17 @@ function loadOne(slug) {
     bindings: cfg.bindings,
     created_at: cfg.created_at,
     about: aboutSnippet,
+    // Optional structured profile blocks — JD, OpenClaw IDENTITY, and the
+    // LinkedIn-style experience track record. Each is null-safe in the SPA;
+    // agents that haven't been backfilled simply render without the
+    // corresponding deck.
+    jd: cfg.jd ?? null,
+    identity: cfg.identity ?? null,
+    experience: cfg.experience ?? null,
+    // OpenClaw / Hermes MEMORY.md analogue — durable facts, decisions,
+    // lessons the persona has accumulated. Append-only; rendered
+    // newest-first on the profile.
+    memory: cfg.memory ?? null,
   };
 }
 
@@ -196,6 +207,70 @@ function parseFrontmatter(md) {
   return out;
 }
 
+// Cap embedded file payloads to ~256 KiB so a stray large blob can't bloat
+// workforce-skills.json indefinitely. Anything past the cap shows path + size
+// only and the SPA renders a "file too large to preview" placeholder.
+const SKILL_FILE_MAX_BYTES = 256 * 1024;
+
+function detectLanguage(path) {
+  if (path === "SKILL.md") return "markdown";
+  if (path.endsWith(".md")) return "markdown";
+  if (path.endsWith(".json")) return "json";
+  if (path.endsWith(".ts") || path.endsWith(".tsx")) return "typescript";
+  if (path.endsWith(".js") || path.endsWith(".mjs") || path.endsWith(".cjs"))
+    return "javascript";
+  if (path.endsWith(".py")) return "python";
+  if (path.endsWith(".sh")) return "shell";
+  if (path.endsWith(".yml") || path.endsWith(".yaml")) return "yaml";
+  return "text";
+}
+
+function isLikelyText(buf) {
+  // Heuristic: a NUL byte in the first 4 KiB usually means binary. Skills are
+  // expected to be text-only (SKILL.md + meta.json + optional handler) so
+  // anything binary is a misconfiguration; surface it via path+size only.
+  const probe = buf.subarray(0, Math.min(buf.length, 4096));
+  return !probe.includes(0);
+}
+
+function walkSkillDir(skillDir) {
+  // Recursive walk so future nested skills (e.g. examples/) still surface
+  // in the UI. Entries are sorted with SKILL.md first, then alphabetical.
+  const out = [];
+  function recurse(absDir, relDir) {
+    for (const entry of readdirSync(absDir, { withFileTypes: true })) {
+      if (entry.name.startsWith(".")) continue;
+      const abs = join(absDir, entry.name);
+      const rel = relDir ? `${relDir}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        recurse(abs, rel);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      const stat = statSync(abs);
+      const buf = readFileSync(abs);
+      const language = detectLanguage(rel);
+      const text = isLikelyText(buf);
+      const truncated = stat.size > SKILL_FILE_MAX_BYTES;
+      out.push({
+        path: rel,
+        size: stat.size,
+        language,
+        contents: text && !truncated ? buf.toString("utf8") : null,
+        truncated,
+        binary: !text,
+      });
+    }
+  }
+  recurse(skillDir, "");
+  out.sort((a, b) => {
+    if (a.path === "SKILL.md") return -1;
+    if (b.path === "SKILL.md") return 1;
+    return a.path.localeCompare(b.path);
+  });
+  return out;
+}
+
 function loadOneSkill(name) {
   const dir = join(SKILLS_DIR, name);
   const meta = JSON.parse(readFileSync(join(dir, "meta.json"), "utf8"));
@@ -212,6 +287,7 @@ function loadOneSkill(name) {
     improvement_agent: meta.improvement_agent ?? null,
     created_at: meta.created_at,
     description: fm.description ?? "",
+    files: walkSkillDir(dir),
   };
 }
 
