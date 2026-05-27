@@ -79,16 +79,12 @@
     "requires": {
       "type": "array",
       "uniqueItems": true,
+      "maxItems": 8,
       "items": {
         "type": "string",
-        "enum": [
-          "anthropic.api_key",
-          "discord.bot_token",
-          "github.token",
-          "notion.integration_token"
-        ]
+        "pattern": "^(anthropic\\.api_key|discord\\.bot_token|github\\.token|notion\\.integration_token)(@[a-z][a-z0-9_-]*)?$"
       },
-      "description": "Credential types this skill reads from ctx.credentials. Each entry is a reverse-domain type id (service.field). The runner resolves each type from the active project at invocation time and seals the bag — undeclared access throws. To add a new type, extend this enum AND register the shape in shared/credential-injector.ts:CREDENTIAL_SHAPES."
+      "description": "Credential keys this skill reads from ctx.credentials. Each entry is a base credential type (service.field) OR a variant suffix `type@name` (Epic-010 §Q2). The runner resolves each key from the active project at invocation time and seals the bag — undeclared access throws. The base-type allowlist + the variant suffix pattern are enforced both at lint (this schema) and runtime (credential-injector.ts). The `maxItems` bound caps the per-invocation Promise.all fan-out per cycle-1 review (Dario A2). To add a new base type, extend this pattern AND register the shape in shared/credential-injector.ts:CredentialShapes (see the file header there for all 5 mirror points)."
     }
   }
 }
