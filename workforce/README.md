@@ -51,7 +51,7 @@ Both stacks deploy via GitHub Actions on push to `main`:
 | `wf-data-plane-prod` | `.github/workflows/deploy-workforce-data-plane.yml` | `workforce/{infra/sam,lambdas,skills,agents}/**` |
 | `wf-web-prod` | `.github/workflows/deploy-workforce-console.yml` | `apps/workforce/**`, `packages/shared/**`, `workforce/agents/**` (manifest) |
 
-The SPA workflow is gated by `vars.WORKFORCE_DEPLOY_ENABLED = true` (legacy; the SPA bootstrap requires manual one-time Cognito/Cloudflare setup before CI can take over — see `infra/sam-web/README.md`). The data-plane workflow is **un-gated** — auth uses GitHub OIDC → IAM role assumption (`secrets.AWS_ROLE_ARN`), so a `main` merge under the trigger paths deploys directly.
+Both workflows are **un-gated** — auth uses GitHub OIDC → IAM role assumption (`secrets.AWS_ROLE_ARN`), so a `main` merge under the trigger paths deploys directly. (The SPA workflow previously sat behind `vars.WORKFORCE_DEPLOY_ENABLED` while the one-time Cognito/Cloudflare bootstrap in `infra/sam-web/README.md` was being completed; the gate was removed once bootstrap was done.)
 
 Manual fallback (only if the workflow is unavailable):
 
