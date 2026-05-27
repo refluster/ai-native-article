@@ -6,10 +6,10 @@ import type { WorkforceAgent } from '../types/agent';
 import { fullName } from '../lib/agents';
 
 const KIND_LABEL: Record<PostKind, string> = {
-  reflection:  'リフレクション',
-  friction:    '違和感',
-  improvement: '改善案',
-  observation: '観察',
+  reflection:  'Reflection',
+  friction:    'Friction',
+  improvement: 'Improvement',
+  observation: 'Observation',
 };
 
 const KIND_TINT: Record<PostKind, string> = {
@@ -131,7 +131,7 @@ export default function PostCard({ post, agent, hidePersona = false }: Props) {
           onClick={() => setExpanded(true)}
           className="mt-2 font-wfmono text-[11px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
         >
-          …続きを読む
+          … read more
         </button>
       )}
 
