@@ -461,6 +461,178 @@ describe("listExecutions", () => {
       project.listExecutions({}),
     ).rejects.toThrow(/requires at least one of/);
   });
+
+  // ── Story 4 (#93) — caller_agent_slug read-gate ────────────────────
+  // Defence-in-depth: even when a row has a GSI1 partition pointing at
+  // an agent, the row is dropped if the caller is not an active member
+  // of that row's project. `_operator` and the unset (legacy) case both
+  // see all rows.
+  describe("Story 4 — caller_agent_slug read-gate", () => {
+    it("ren as caller sees ONLY rows from projects ren is a member of", async () => {
+      // Add a row in beta with agent_slug=maya but a forged GSI1 pointing
+      // at AGENT#ren (simulating an upstream bug / attack surface).
+      store.set("PROJECT#beta|EXEC#01LEAK", {
+        pk: "PROJECT#beta",
+        sk: "EXEC#01LEAK",
+        project_id: beta,
+        agent_slug: "ren",
+        skill_name: "leak",
+        skill_version: "0.1.0",
+        started_at: "2026-05-25T00:00:00.000Z",
+        ended_at: "2026-05-25T00:00:01.000Z",
+        status: "ok",
+        gsi1pk: "AGENT#ren",
+        gsi1sk: "2026-05-25T00:00:00.000Z",
+        gsi2pk: "SKILL#leak",
+        gsi2sk: "2026-05-25T00:00:00.000Z",
+      });
+
+      // ren is now a member of alpha (per beforeEach) and we ADD ren to
+      // beta in this fixture's outer scope. So set up: remove ren from
+      // beta and verify the leak row is dropped.
+      await project.removeMember(beta, "ren");
+
+      const gated = await project.listExecutions({
+        agent_slug: "ren",
+        caller_agent_slug: "ren",
+      });
+      expect(gated.map((r) => r.sk)).toContain("EXEC#01A"); // ren ∈ alpha
+      expect(gated.map((r) => r.sk)).not.toContain("EXEC#01LEAK"); // ren ∉ beta
+      expect(gated.map((r) => r.sk)).not.toContain("EXEC#01B"); // also dropped — ren ∉ beta now
+    });
+
+    it("_operator caller sees everything (gate short-circuits)", async () => {
+      // Same setup as the previous test but caller is _operator.
+      store.set("PROJECT#beta|EXEC#01LEAK", {
+        pk: "PROJECT#beta",
+        sk: "EXEC#01LEAK",
+        project_id: beta,
+        agent_slug: "ren",
+        skill_name: "leak",
+        skill_version: "0.1.0",
+        started_at: "2026-05-25T00:00:00.000Z",
+        ended_at: "2026-05-25T00:00:01.000Z",
+        status: "ok",
+        gsi1pk: "AGENT#ren",
+        gsi1sk: "2026-05-25T00:00:00.000Z",
+        gsi2pk: "SKILL#leak",
+        gsi2sk: "2026-05-25T00:00:00.000Z",
+      });
+      await project.removeMember(beta, "ren");
+
+      const all = await project.listExecutions({
+        agent_slug: "ren",
+        caller_agent_slug: "_operator",
+      });
+      expect(all.map((r) => r.sk).sort()).toContain("EXEC#01LEAK");
+    });
+
+    it("absent caller_agent_slug is BACKWARD-COMPATIBLE — gate does not run", async () => {
+      // Pre-Story-4 callers (existing agent-runner, agents-api) MUST
+      // continue to see un-gated results so we don't break their tests.
+      // Bare listExecutions({ agent_slug }) keeps the legacy behaviour.
+      const rows = await project.listExecutions({ agent_slug: "ren" });
+      expect(rows.map((r) => r.sk).sort()).toEqual(["EXEC#01A", "EXEC#01B"]);
+    });
+  });
+});
+
+// --- appendExecution: embedding sidecar (Story 4) -------------------------
+
+describe("appendExecution — embedding sidecar (Story 4)", () => {
+  let alpha: ProjectId;
+
+  beforeEach(async () => {
+    alpha = project.asProjectId("alpha");
+    await project.create({ project_id: alpha, owner_agent: "_operator" });
+    await project.addMember(alpha, "ren");
+  });
+
+  function baseInput(opts: Partial<Parameters<typeof project.appendExecution>[0]> = {}) {
+    return {
+      project_id: alpha,
+      agent_slug: "ren" as const,
+      exec_ulid: "01E",
+      skill_name: "s",
+      skill_version: "0.1.0",
+      started_at: "2026-05-20T00:00:00.000Z",
+      ended_at: "2026-05-20T00:00:01.000Z",
+      status: "ok" as const,
+      ...opts,
+    };
+  }
+
+  it("ok-status with all four embedding attrs lands cleanly", async () => {
+    const bytes = new Uint8Array(12); // dim 3 * 4 bytes
+    const row = await project.appendExecution(
+      baseInput({
+        embedding_bytes: bytes,
+        embedding_model_id: "voyage-3-lite",
+        embedding_dim: 3,
+        embedding_status: "ok",
+      }),
+    );
+    expect(row.embedding_status).toBe("ok");
+    expect(row.embedding_dim).toBe(3);
+  });
+
+  it("pending-status with no byte/model/dim attrs lands cleanly", async () => {
+    const row = await project.appendExecution(
+      baseInput({ embedding_status: "pending" }),
+    );
+    expect(row.embedding_status).toBe("pending");
+    expect(row.embedding_bytes).toBeUndefined();
+  });
+
+  it("throws on partial sidecar — bytes without model_id (W-4)", async () => {
+    await expect(
+      project.appendExecution(
+        baseInput({
+          embedding_bytes: new Uint8Array(12),
+          embedding_dim: 3,
+          embedding_status: "ok",
+        }),
+      ),
+    ).rejects.toThrow(/all-present or all-absent/);
+  });
+
+  it("throws on embedding_status='ok' without bytes (would silently break recall)", async () => {
+    await expect(
+      project.appendExecution(baseInput({ embedding_status: "ok" })),
+    ).rejects.toThrow(/embedding_status='ok' requires/);
+  });
+
+  it("throws on bytes-present + non-ok status (corrupt sidecar state)", async () => {
+    await expect(
+      project.appendExecution(
+        baseInput({
+          embedding_bytes: new Uint8Array(12),
+          embedding_model_id: "voyage-3-lite",
+          embedding_dim: 3,
+          embedding_status: "pending",
+        }),
+      ),
+    ).rejects.toThrow(/expected 'ok' when bytes are present/);
+  });
+
+  it("throws on byteLength vs embedding_dim mismatch", async () => {
+    await expect(
+      project.appendExecution(
+        baseInput({
+          embedding_bytes: new Uint8Array(8), // 2 floats
+          embedding_model_id: "voyage-3-lite",
+          embedding_dim: 3, // says 3 floats
+          embedding_status: "ok",
+        }),
+      ),
+    ).rejects.toThrow(/byteLength=8 does not match embedding_dim=3/);
+  });
+
+  it("pre-Story-4 row shape (no sidecar attrs at all) still lands", async () => {
+    const row = await project.appendExecution(baseInput());
+    expect(row.embedding_status).toBeUndefined();
+    expect(row.embedding_bytes).toBeUndefined();
+  });
 });
 
 // --- getCredential -------------------------------------------------------

@@ -30,3 +30,12 @@ export interface NotionSecret {
 export interface GithubSecret {
   token: string;
 }
+/**
+ * Voyage AI API key. Used by the embedding path on `appendExecution`
+ * (Epic-010 Story 4 — DDB-stored embeddings, brute-force kNN). The shape
+ * deliberately mirrors `AnthropicSecret` so the call-site pattern in
+ * `shared/voyage.ts` stays symmetric.
+ */
+export interface VoyageSecret {
+  apiKey: string;
+}
