@@ -143,9 +143,32 @@ DELIV#{ulid} (DDB) ←→ s3://wf-bucket-…/articles/<slug>/<ulid>/final.md ←
 
 If any of these links is broken at audit time (`article-health` skill detects it), `W-1` is at risk.
 
+## Semantic recall — DDB-stored embeddings (Epic-010 Story 4)
+
+Per [epic-010 §9](epics/epic-010-project-trust-boundary.md#9-agent-recall--structured--semantic-both-in-v1) (as amended by [tracker #89 decision delta #1](https://github.com/refluster/ai-native-article/issues/89)), the workforce ships semantic recall in v1 **without** a new vector store. Embeddings live as a float32 binary attribute on the `PROJECT#{id}/EXEC#{ulid}` row; kNN is brute-forced in the recall Lambda over the calling agent's GSI1 partition. The interface is `agent.recall(query, k)`; the index is the GSI1 query plus a cosine-distance sort in memory.
+
+The choice is forced by R-N2 (single state store ⇒ no second engine) and by cost arithmetic at workforce scale — OpenSearch Serverless's ~USD 50/mo floor versus ~USD 1/mo for DDB binary attribute storage at projected execution volume. At ≤ 12 agents producing ~100 executions/day, the calling-agent partition never exceeds a few thousand rows on any horizon worth planning for, so the brute-force latency budget (target p95 < 500 ms) holds with comfortable margin.
+
+Embedding write attributes on each `EXEC` row:
+
+| Attribute | Type | Notes |
+|---|---|---|
+| `embedding` | binary | float32 vector packed little-endian. Computed at write time over `{skill_name, inputs_summary, artifact.summary, error}`. |
+| `embedding_model_id` | string | e.g. `voyage-3-lite`. Re-embedding on a model change is a query, not a guess. |
+| `embedding_dim` | number | dimension; pair-validated against `embedding_model_id` on read. |
+| `embedding_status` | string | `ok` or `pending`. When the embedding API fails the execution still succeeds and the row carries `pending`; a retry worker drains the backlog. |
+
+### Migration triggers — when DDB-brute-force is no longer the right answer
+
+The recall path is intentionally swappable behind `agent.recall(query)`. The migration to a dedicated vector engine (OpenSearch Serverless k-NN, pgvector, or successor) is triggered by **either** of the following conditions being observed for ≥ 1 week:
+
+- **Per-agent executions > 50,000.** Beyond this the GSI1 partition for a single agent stops being trivially cheap to scan, and the brute-force kNN starts to dominate the recall Lambda's duration budget.
+- **`recall` p95 latency > 1 s.** Measured by a CloudWatch metric emitted from the recall Lambda. The 1 s ceiling is set against the operator chat surface's interactive responsiveness target; anything beyond it degrades the user-facing experience independently of execution count.
+
+When triggered, the migration is a Zone A doc amendment (this section + the corresponding Epic-010 §9 paragraph) plus a Zone B engine swap behind the existing recall interface — no schema changes to callers.
+
 ## What's deliberately NOT in the data model
 
 - **Cross-agent message passing** (Maya hands a task to Ren) — v2. Until then, tasks belong to one agent, period.
-- **Vector embeddings / RAG store** — v2 or v3. Sora's first iteration relies on `system.md`-laminated knowledge + the last K memory chunks.
 - **User identity / multi-tenant** — there is one operator; C-3 / single-operator scale is inherited from root governance.
 - **Audit-immutable storage (WORM)** — S3 versioning + DDB PITR are enough for v1. Tightening is a Zone A amendment.
