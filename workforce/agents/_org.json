@@ -5,29 +5,45 @@
       "reports_to": [],
       "lateral": []
     },
+    "nadia": {
+      "reports_to": ["maya"],
+      "lateral": ["priya", "elena", "dario", "sora"]
+    },
     "priya": {
       "reports_to": ["maya"],
-      "lateral": ["elena", "dario"]
+      "lateral": ["nadia", "elena", "dario"]
     },
     "elena": {
       "reports_to": ["maya"],
-      "lateral": ["priya", "dario"]
+      "lateral": ["nadia", "priya", "dario"]
     },
     "dario": {
       "reports_to": ["maya"],
-      "lateral": ["priya", "elena"]
+      "lateral": ["nadia", "priya", "elena"]
     },
     "sora": {
       "reports_to": ["maya"],
-      "lateral": []
+      "lateral": ["nadia"]
+    },
+    "aanya": {
+      "reports_to": ["nadia"],
+      "lateral": ["vikram", "yuki"]
+    },
+    "vikram": {
+      "reports_to": ["nadia"],
+      "lateral": ["aanya", "sora"]
     },
     "theo": {
       "reports_to": ["priya"],
-      "lateral": ["noor"]
+      "lateral": ["noor", "levi"]
     },
     "noor": {
       "reports_to": ["priya"],
-      "lateral": ["theo"]
+      "lateral": ["theo", "levi"]
+    },
+    "levi": {
+      "reports_to": ["priya"],
+      "lateral": ["theo", "noor"]
     },
     "aoi": {
       "reports_to": ["elena"],
@@ -39,7 +55,7 @@
     },
     "yuki": {
       "reports_to": ["elena"],
-      "lateral": ["aoi", "kai", "mira"]
+      "lateral": ["aoi", "kai", "mira", "aanya"]
     },
     "mira": {
       "reports_to": ["elena"],
@@ -47,7 +63,11 @@
     },
     "ren": {
       "reports_to": ["dario"],
-      "lateral": []
+      "lateral": ["farah"]
+    },
+    "farah": {
+      "reports_to": ["dario"],
+      "lateral": ["ren"]
     }
   }
 }

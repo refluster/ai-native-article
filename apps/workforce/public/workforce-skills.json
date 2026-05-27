@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-27T00:08:25.334Z",
+  "generated_at": "2026-05-27T17:27:01.692Z",
   "skills": [
     {
       "name": "article-draft",
@@ -12,17 +12,22 @@
       },
       "cost_class": "medium",
       "owners": [
+        "aanya",
         "aoi",
         "dario",
         "elena",
+        "farah",
         "kai",
+        "levi",
         "maya",
         "mira",
+        "nadia",
         "noor",
         "priya",
         "ren",
         "sora",
         "theo",
+        "vikram",
         "yuki"
       ],
       "improvement_agent": null,
@@ -39,9 +44,9 @@
         },
         {
           "path": "meta.json",
-          "size": 370,
+          "size": 415,
           "language": "json",
-          "contents": "{\n  \"name\": \"article-draft\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": true\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"aoi\", \"dario\", \"elena\", \"kai\", \"maya\", \"mira\", \"noor\", \"priya\", \"ren\", \"sora\", \"theo\", \"yuki\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-18\"\n}\n",
+          "contents": "{\n  \"name\": \"article-draft\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": true\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"aanya\", \"aoi\", \"dario\", \"elena\", \"farah\", \"kai\", \"levi\", \"maya\", \"mira\", \"nadia\", \"noor\", \"priya\", \"ren\", \"sora\", \"theo\", \"vikram\", \"yuki\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-18\"\n}\n",
           "truncated": false,
           "binary": false
         }
