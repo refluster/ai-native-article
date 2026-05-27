@@ -37,7 +37,7 @@ Examples:
 
 The runtime composes the working prompt as: **generic spec + persona voice (`system.md`) + binding config**. Adding a new persona to a skill is one new binding entry + one new config block — no skill-spec rewrite.
 
-The `config` schema is skill-specific; validators check structural fields (executor, scheduler, routine_spec existence) but not the config contents — those are owned by the skill spec author. Tighter schema validation per skill is FU-019.
+The `config` schema is skill-specific; validators check structural fields (executor, scheduler, routine_spec existence) but not the config contents — those are owned by the skill spec author. Tighter schema validation per skill is FU-018.
 
 ## Executor × scheduler compatibility
 

@@ -13,7 +13,7 @@ When an agent invokes this skill, the runtime composes:
 ```
 1. Generic skill spec    ← THIS FILE (modes, output protocol, success criteria)
 2. Persona voice         ← workforce/agents/{agent_slug}/system.md
-3. Skill-specific config ← workforce/agents/{agent_slug}/agent.json:bindings[route-pr].config
+3. Skill-specific config ← workforce/agents/{agent_slug}/agent.json:bindings[pr-route].config
                             (nomination_rules, skip_list, sign_off_persona, cycle_cap)
 ```
 

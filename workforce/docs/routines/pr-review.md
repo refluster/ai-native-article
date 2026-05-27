@@ -1,7 +1,7 @@
 # `pr-review` — Generic PR review skill (persona-agnostic)
 
 **Skill type**: review (post-only).
-**Trigger**: invoked by an agent that holds the `route-pr` skill as part of Phase D of [dev-process.md](../runbooks/dev-process.md).
+**Trigger**: invoked by an agent that holds the `pr-route` skill as part of Phase D of [dev-process.md](../runbooks/dev-process.md).
 **Purpose**: read a PR + linked Story, post inline + summary comments under the invoking agent's persona lens, then return. **Never** approves, requests-changes, or merges (W-5).
 
 > **Persona-agnostic by design.** This spec describes the **task contract** — the protocol, the success criteria, the structural sections of inline + summary comments. The **lens** (what to actually look for) comes from the invoking agent: their voice in `workforce/agents/{slug}/system.md` + their skill-specific config in the binding's `config` field of `workforce/agents/{slug}/agent.json`. Any agent with a `pr-review` binding can invoke this skill — task assignment is fluid, not persona-locked.
