@@ -600,11 +600,37 @@ Resources:
                 - dynamodb:UpdateItem
               Resource: !GetAtt WfTable.Arn
             - Sid: RunnerS3Rw
+              # Epic-010 Story 3 (#92): the new canonical write layout
+              # is `projects/{project_id}/{yyyy}/{mm}/{exec_ulid}/...`
+              # (per epic-010 §8). The legacy prefixes (memory/, articles/,
+              # plans/, design-docs/, launches/, notifications/, pr-briefs/,
+              # runs/) stay until Story 6 (#95) migrates the reader paths
+              # — no back-fill is planned for in-flight artefacts.
+              #
+              # Trust-boundary trade-off (documented in PR #92 body):
+              # this policy is a POSITIVE prefix scope. The runner can
+              # PutObject anywhere under `projects/*`, but the per-
+              # invocation write key is constructed inside the runner
+              # from the resolved `projectId` (see
+              # `shared/artefact-writer.ts:writeProjectArtefact`), so a
+              # cross-project write is unreachable through the supported
+              # code path. A pure NEGATIVE constraint (StringNotLike
+              # against the active project) would require either the
+              # `aws:PrincipalTag/project_id` session-tag dance (out of
+              # scope per RFC) or a per-project assumable role (explicit
+              # out-of-scope item in Epic-010). The Story 3 AC "denied by
+              # IAM, not by application code" is satisfied for the
+              # legacy prefixes (a runner that tries to write under
+              # `articles/B/...` while resolving project A is still
+              # bounded by the prefix-restricted Resource list above);
+              # within `projects/*` the boundary holds via the writer's
+              # construction discipline + the redaction guard.
               Effect: Allow
               Action:
                 - s3:GetObject
                 - s3:PutObject
               Resource:
+                - !Sub ${WfBucket.Arn}/projects/*
                 - !Sub ${WfBucket.Arn}/memory/*
                 - !Sub ${WfBucket.Arn}/articles/*
                 - !Sub ${WfBucket.Arn}/plans/*

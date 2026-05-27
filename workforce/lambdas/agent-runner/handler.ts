@@ -29,6 +29,7 @@ import {
   appendExecution,
   asProjectId,
   selfProjectId,
+  type ArtifactRef,
   type ExecStatus,
   type ProjectId,
 } from "../shared/project.js";
@@ -39,6 +40,10 @@ import {
   writeDeliverableArtefact,
   writeRunArtefact,
 } from "../shared/deliverable.js";
+import {
+  RedactionViolation,
+  writeProjectArtefact,
+} from "../shared/artefact-writer.js";
 import { dispatchEngineer } from "../shared/github.js";
 import { composeSystemPrompt, loadSkill, type LoadedSkill } from "../shared/skill.js";
 import { getDeterministicHandler } from "../shared/skill-registry.js";
@@ -170,7 +175,20 @@ async function runDeterministic(
   const handler = getDeterministicHandler(skill.meta.name);
   const result = await handler({ slug: event.agent, startedAt, credentials });
 
+  // Legacy path (still required for the front-end's RUN.output_s3_key
+  // until Story 6 cuts the SPA over to the EXEC row's artifact_ref).
   const s3Key = await writeRunArtefact(event.agent, runId, result.outputExt, result.output);
+
+  // Story 3 (#92): the new canonical artefact lives under projects/{id}/.
+  // PutObject is ordered BEFORE the EXEC-row write below so the row
+  // never points at a missing object (AC 5).
+  const artifactRef = await writeProjectArtefactForRun(event, runId, skill, {
+    filename: `output.${result.outputExt}`,
+    body: result.output,
+    contentType: contentTypeForExt(result.outputExt),
+    summary: result.summary.slice(0, 240),
+  });
+
   const endedAt = new Date().toISOString();
 
   const runRow: RunRow = {
@@ -189,7 +207,7 @@ async function runDeterministic(
     output_s3_key: s3Key,
     output_summary: result.summary.slice(0, 240),
   };
-  await writeRunAndExec(runRow, event, skill);
+  await writeRunAndExec(runRow, event, skill, artifactRef);
 
   return { status: "ok", run_id: runId, tokens_in: 0, tokens_out: 0, cost_usd: 0 };
 }
@@ -232,6 +250,16 @@ async function runLlmProse(
   await writeDeliverableArtefact(target, llm.text);
   const runArtefactKey = await writeRunArtefact(event.agent, runId, "md", llm.text);
 
+  // Story 3 (#92): project-prefixed artefact for the new EXEC row.
+  // PutObject ordered BEFORE writeRunAndExec (AC 5). The legacy writers
+  // above remain until Story 6 migrates the read paths.
+  const artifactRef = await writeProjectArtefactForRun(event, runId, skill, {
+    filename: "output.md",
+    body: llm.text,
+    contentType: "text/markdown; charset=utf-8",
+    summary: summaryOf(llm.text),
+  });
+
   let notionPageId: string | undefined;
   let notionPageUrl: string | undefined;
   if (skill.meta.deliverable.publish_notion) {
@@ -265,7 +293,7 @@ async function runLlmProse(
     output_s3_key: runArtefactKey,
     output_summary: summaryOf(llm.text),
   };
-  await writeRunAndExec(runRow, event, skill);
+  await writeRunAndExec(runRow, event, skill, artifactRef);
 
   const delivRow: DelivRow = {
     pk: agentPk(event.agent),
@@ -330,6 +358,15 @@ async function runClaudeCodeRoutine(
   );
   const runArtefactKey = await writeRunArtefact(event.agent, runId, "md", llm.text);
 
+  // Story 3 (#92): project-prefixed artefact for the new EXEC row.
+  // PutObject ordered BEFORE writeRunAndExec (AC 5).
+  const artifactRef = await writeProjectArtefactForRun(event, runId, skill, {
+    filename: "brief.md",
+    body: llm.text,
+    contentType: "text/markdown; charset=utf-8",
+    summary: summaryOf(llm.text),
+  });
+
   const dispatchBranch = `${event.agent}/${delivId}`;
   await dispatchEngineer({
     owner,
@@ -357,7 +394,7 @@ async function runClaudeCodeRoutine(
     output_s3_key: runArtefactKey,
     output_summary: summaryOf(llm.text),
   };
-  await writeRunAndExec(runRow, event, skill);
+  await writeRunAndExec(runRow, event, skill, artifactRef);
 
   const delivRow: DelivRow = {
     pk: agentPk(event.agent),
@@ -494,12 +531,153 @@ async function buildCredentialBag(
   });
 }
 
+// --- Epic-010 Story 3: project-prefixed artefact write seam --------------
+//
+// Every executor calls `writeProjectArtefactForRun()` and threads the
+// returned `ArtifactRef` into `writeRunAndExec(...)`. On
+// `RedactionViolation` the helper writes a `failed_artefact_redaction`
+// EXEC row directly (membership-gated through resolved project) and
+// re-throws — the outer try/catch in `handler()` then writes the
+// normal RUN row via `throwRun(...)` so the failure appears in both
+// the legacy RUN table AND the new project ledger.
+//
+// The legacy `writeRunArtefact` / `writeDeliverableArtefact` writers
+// remain in place (the SPA reads RUN.output_s3_key until Story 6).
+// Cutover to project-prefixed-only writes is out of scope for this PR.
+
+interface ProjectArtefactInput {
+  filename: string;
+  body: string;
+  contentType: string;
+  summary: string;
+}
+
+function contentTypeForExt(ext: string): string {
+  switch (ext) {
+    case "json":
+      return "application/json";
+    case "md":
+      return "text/markdown; charset=utf-8";
+    default:
+      return "text/plain; charset=utf-8";
+  }
+}
+
+/**
+ * Wrap `writeProjectArtefact` with the Story-3 failure semantics:
+ *
+ *   - Resolve the active project from the event (defaults to self/{slug}).
+ *   - PutObject the body under `projects/{id}/{yyyy}/{mm}/{ulid}/{file}`.
+ *   - On `RedactionViolation` (#92 AC 3): persist a `failed_artefact_redaction`
+ *     EXEC row to the project ledger (so the failure is visible, not
+ *     silently dropped), then re-throw to propagate the failure to the
+ *     outer handler's normal throwRun path.
+ *
+ * Returns the `ArtifactRef` on success — caller passes it to
+ * `writeRunAndExec(runRow, event, skill, ref)`.
+ */
+async function writeProjectArtefactForRun(
+  event: RunnerEvent,
+  runId: string,
+  skill: LoadedSkill,
+  input: ProjectArtefactInput,
+): Promise<ArtifactRef> {
+  const startedAt = new Date().toISOString();
+  try {
+    return await writeProjectArtefact({
+      projectId: resolveProjectId(event),
+      execUlid: runId,
+      filename: input.filename,
+      body: input.body,
+      contentType: input.contentType,
+      summary: input.summary,
+    });
+  } catch (err) {
+    if (err instanceof RedactionViolation) {
+      await recordFailedRedactionExec(event, runId, skill, startedAt, err);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Write an EXEC row with `status="failed_artefact_redaction"` to the
+ * project ledger. Best-effort: a downstream failure here is logged and
+ * surfaced via `WfExecDualWriteFailed` (same metric the dual-write seam
+ * uses) but does NOT mask the original `RedactionViolation` — the
+ * caller still re-throws so the outer handler's `throwRun` writes the
+ * legacy RUN row.
+ *
+ * The EXEC row carries NO `artifact_ref` (the artefact was never
+ * written) and an `error` populated with the redaction-pattern name
+ * (NOT the matched value — that would defeat the purpose of redaction).
+ */
+async function recordFailedRedactionExec(
+  event: RunnerEvent,
+  runId: string,
+  skill: LoadedSkill,
+  startedAt: string,
+  violation: RedactionViolation,
+): Promise<void> {
+  const endedAt = new Date().toISOString();
+  let projectId: ProjectId;
+  try {
+    projectId = resolveProjectId(event);
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        event: "exec-failed-redaction-skipped",
+        reason: "invalid_project_id",
+        run_id: runId,
+        agent: event.agent,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    await emitExecDualWriteFailedMetric("invalid_project_id");
+    return;
+  }
+  try {
+    await appendExecution({
+      project_id: projectId,
+      agent_slug: event.agent,
+      exec_ulid: runId,
+      skill_name: skill.meta.name,
+      skill_version: skill.meta.version,
+      started_at: startedAt,
+      ended_at: endedAt,
+      status: "failed_artefact_redaction",
+      error: violation.message,
+    });
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        event: "exec-failed-redaction-append-threw",
+        run_id: runId,
+        project_id: projectId,
+        agent: event.agent,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    await emitExecDualWriteFailedMetric("failed_redaction_append_threw");
+  }
+}
+
 /** Single seam for RUN+EXEC dual-write. See the comment above for the
- *  rationale + the absence test that enforces this is the only path. */
+ *  rationale + the absence test that enforces this is the only path.
+ *
+ *  Story 3 (#92) addition: `artifactRef` threads the new project-prefixed
+ *  S3 artefact into the EXEC row. Write order at every callsite is:
+ *    1. `writeProjectArtefact(...)`  PutObject + return ref
+ *    2. `writeRunAndExec(runRow, event, skill, ref)`
+ *         a. legacy RUN row putItem
+ *         b. EXEC row with artifact_ref attached
+ *  An EXEC row never points at a missing S3 object because step 1
+ *  must succeed before step 2 runs. */
 async function writeRunAndExec(
   runRow: RunRow,
   event: RunnerEvent,
   skill: LoadedSkill,
+  artifactRef?: ArtifactRef,
 ): Promise<void> {
   await putItem(runRow);
   await dualWriteExec({
@@ -510,6 +688,7 @@ async function writeRunAndExec(
     endedAt: runRow.ended_at,
     status: runRow.status === "throw" ? "throw" : runRow.status === "skipped" ? "skipped" : "ok",
     error: runRow.error_message,
+    artifactRef,
   });
 }
 
@@ -521,10 +700,11 @@ interface DualWriteExecArgs {
   endedAt: string;
   status: ExecStatus;
   error?: string;
+  artifactRef?: ArtifactRef;
 }
 
 async function dualWriteExec(args: DualWriteExecArgs): Promise<void> {
-  const { event, runId, skill, startedAt, endedAt, status, error } = args;
+  const { event, runId, skill, startedAt, endedAt, status, error, artifactRef } = args;
   let projectId: ProjectId;
   try {
     projectId = resolveProjectId(event);
@@ -553,6 +733,7 @@ async function dualWriteExec(args: DualWriteExecArgs): Promise<void> {
       ended_at: endedAt,
       status,
       error,
+      artifact_ref: artifactRef,
     });
   } catch (err) {
     console.error(

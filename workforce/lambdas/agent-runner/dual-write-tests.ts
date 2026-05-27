@@ -177,3 +177,116 @@ describe("agent-runner dual-write — appendExecution seam behaviour", () => {
     ).rejects.toThrow(/cross-project denial/);
   });
 });
+
+// --- Story 3 (#92) ------------------------------------------------------
+//
+// AC 3 (failed_artefact_redaction EXEC row) and AC 5 (PutObject ordered
+// before the EXEC insert) live at the runner integration layer. The
+// helper-level redaction + write-order tests are in
+// shared/artefact-writer-tests.ts; here we assert the wire-up in
+// agent-runner/handler.ts.
+//
+// Approach for AC 5: structural source-grep that each call-site does
+// `writeProjectArtefactForRun(...)` BEFORE `writeRunAndExec(...)`. This
+// matches the dual-write-convention style above (structural absence test
+// on `putItem(runRow)`) — robust to formatting changes, doesn't require
+// fully spinning up the executor switch with all its dependencies.
+//
+// Approach for AC 3: behaviour test directly on appendExecution to
+// confirm `status: "failed_artefact_redaction"` round-trips through the
+// project ledger row shape. The runner's recordFailedRedactionExec
+// helper produces exactly this row.
+
+describe("agent-runner artefact write order (Story 3 / #92 AC 5)", () => {
+  it("every writeRunAndExec call is preceded by a writeProjectArtefactForRun call in the same executor", async () => {
+    const src = await readFile(HANDLER_PATH, "utf8");
+    // Find each `await writeRunAndExec(...)` call and walk backwards to
+    // the previous `await writeProjectArtefactForRun(...)`. Both must
+    // appear in the same executor function body. The simplest robust
+    // check: the count of writeProjectArtefactForRun callsites equals
+    // the count of writeRunAndExec callsites that carry an artifactRef
+    // (4-arg form).
+    const projectWrites = src.match(/\bawait\s+writeProjectArtefactForRun\s*\(/g) ?? [];
+    const runExecCalls = src.match(/\bawait\s+writeRunAndExec\s*\(/g) ?? [];
+    expect(projectWrites.length, "expected three project-artefact writes (one per executor path)").toBe(3);
+    expect(runExecCalls.length, "expected three writeRunAndExec callsites (one per executor path)").toBe(3);
+
+    // For each writeRunAndExec, the index of the preceding
+    // writeProjectArtefactForRun must be less. Use string-index search.
+    let cursor = 0;
+    for (let i = 0; i < runExecCalls.length; i++) {
+      const runIdx = src.indexOf("await writeRunAndExec", cursor);
+      const projIdx = src.lastIndexOf("await writeProjectArtefactForRun", runIdx);
+      expect(projIdx, `writeProjectArtefactForRun must precede writeRunAndExec #${i + 1}`).toBeGreaterThan(-1);
+      expect(projIdx).toBeLessThan(runIdx);
+      cursor = runIdx + 1;
+    }
+  });
+
+  it("the writeProjectArtefactForRun helper calls writeProjectArtefact BEFORE returning so PutObject happens before the EXEC insert", async () => {
+    const src = await readFile(HANDLER_PATH, "utf8");
+    const helperStart = src.indexOf("async function writeProjectArtefactForRun");
+    expect(helperStart, "writeProjectArtefactForRun helper not found").toBeGreaterThan(-1);
+    // The helper body must contain the PutObject call (via
+    // writeProjectArtefact). We use brace-walking to bound the helper
+    // body and then assert the marker, matching the existing
+    // putItem(runRow) check style above.
+    let depth = 0;
+    let inside = false;
+    let helperEnd = src.length;
+    for (let i = helperStart; i < src.length; i++) {
+      const c = src[i];
+      if (c === "{") {
+        depth++;
+        inside = true;
+      } else if (c === "}") {
+        depth--;
+        if (inside && depth === 0) {
+          helperEnd = i;
+          break;
+        }
+      }
+    }
+    const body = src.slice(helperStart, helperEnd);
+    expect(body).toMatch(/await\s+writeProjectArtefact\s*\(/);
+  });
+});
+
+describe("agent-runner failed-redaction EXEC row (Story 3 / #92 AC 3)", () => {
+  it("appendExecution accepts status=failed_artefact_redaction and round-trips it through the project ledger", async () => {
+    const pid = project.selfProjectId("ren");
+    await project.create({ project_id: pid, owner_agent: "ren" });
+    await project.addMember(pid, "ren");
+
+    const exec = await project.appendExecution({
+      project_id: pid,
+      agent_slug: "ren",
+      exec_ulid: "01REDACTED",
+      skill_name: "code-task-brief",
+      skill_version: "0.1.0",
+      started_at: "2026-05-27T00:00:00.000Z",
+      ended_at: "2026-05-27T00:00:01.000Z",
+      status: "failed_artefact_redaction",
+      error: "failed_artefact_redaction: github_pat pattern matched",
+    });
+    expect(exec.status).toBe("failed_artefact_redaction");
+    expect(exec.error).toContain("github_pat");
+    // EXEC row has NO artifact_ref — the artefact was never written.
+    expect(exec.artifact_ref).toBeUndefined();
+
+    const fromLedger = await project.listExecutions({ project_id: pid });
+    expect(fromLedger).toHaveLength(1);
+    expect(fromLedger[0]!.status).toBe("failed_artefact_redaction");
+  });
+
+  it("the runner's failed-redaction helper is wired through the writeProjectArtefactForRun catch branch", async () => {
+    const src = await readFile(HANDLER_PATH, "utf8");
+    // Defence-in-depth structural check: the catch in
+    // writeProjectArtefactForRun calls recordFailedRedactionExec on a
+    // RedactionViolation. A refactor that drops this branch silently
+    // would re-introduce the "silent drop" the AC explicitly forbids.
+    expect(src).toMatch(/if\s*\(\s*err\s+instanceof\s+RedactionViolation\s*\)/);
+    expect(src).toMatch(/recordFailedRedactionExec\s*\(/);
+    expect(src).toMatch(/status:\s*"failed_artefact_redaction"/);
+  });
+});

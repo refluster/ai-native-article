@@ -138,7 +138,25 @@ export interface ArtifactRef {
   summary: string;
 }
 
-export type ExecStatus = "ok" | "throw" | "skipped";
+/**
+ * Status discriminator for the EXEC ledger row.
+ *
+ *   - `ok`                          execution completed; artefact written.
+ *   - `throw`                       execution body threw before the artefact
+ *                                    write; `error` populated.
+ *   - `skipped`                     scheduler fired but pre-flight skipped
+ *                                    the body (paused / archived / etc.).
+ *   - `failed_artefact_redaction`   execution body completed but the
+ *                                    redaction guard in
+ *                                    `shared/artefact-writer.ts` matched
+ *                                    a known secret shape. The S3 object
+ *                                    was NOT written; the EXEC row is
+ *                                    persisted with `error` populated so
+ *                                    the failure is visible in the
+ *                                    ledger rather than silently dropped
+ *                                    (Epic-010 Story 3 / #92 AC 3).
+ */
+export type ExecStatus = "ok" | "throw" | "skipped" | "failed_artefact_redaction";
 
 export interface ExecutionRow {
   pk: `PROJECT#${string}`;
