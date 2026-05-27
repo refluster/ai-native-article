@@ -31,7 +31,7 @@ import {
   type AgentDeliverable,
   type AgentLiveRecord,
 } from '../lib/agents';
-import type { WorkforceAgent } from '../types/agent';
+import type { AgentMemoryKind, WorkforceAgent } from '../types/agent';
 import type { AgentMockStats, WorkforceMockStats } from '../types/stats';
 
 const STREAM_LABEL: Record<WorkforceAgent['streams'][number], string> = {
@@ -254,6 +254,10 @@ export default function AgentProfile() {
 
           {/* EXPERIENCE — joined, highlights, endorsements */}
           {agent.experience && <ExperiencePanel agent={agent} roster={roster} />}
+
+          {/* MEMORY — durable long-term state. Renders even when empty
+              so the operator can see "no learned memory yet" as a state. */}
+          {agent.memory && <MemoryPanel memory={agent.memory} />}
 
           {/* CONFIG facts grid */}
           <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
@@ -664,6 +668,90 @@ function formatDuration(secs: number): string {
   const m = Math.floor(secs / 60);
   const s = secs % 60;
   return s === 0 ? `${m}m` : `${m}m${String(s).padStart(2, '0')}`;
+}
+
+// Long-term memory has four kinds: durable facts, standing decisions,
+// emergent preferences, and people-context. Entries within a kind are
+// rendered in their authored order — long-term memory is NOT chronological,
+// so no date sort. The Task Log and EXPERIENCE decks already cover the
+// dated/activity view.
+const MEMORY_KIND_META: Record<AgentMemoryKind, { label: string; tone: string; border: string; order: number }> = {
+  fact:       { label: 'FACT',     tone: 'text-wf-on-surface',         border: 'border-wf-outline-variant', order: 0 },
+  decision:   { label: 'DECISION', tone: 'text-wf-tertiary',           border: 'border-wf-tertiary/40',     order: 1 },
+  preference: { label: 'PREF',     tone: 'text-wf-on-surface-variant', border: 'border-wf-outline-variant', order: 2 },
+  person:     { label: 'PERSON',   tone: 'text-wf-primary',            border: 'border-wf-primary/40',      order: 3 },
+};
+
+function MemoryPanel({ memory }: { memory: NonNullable<WorkforceAgent['memory']> }) {
+  const entries = memory.entries;
+  const counts = entries.reduce<Record<string, number>>((acc, e) => {
+    acc[e.kind] = (acc[e.kind] ?? 0) + 1;
+    return acc;
+  }, {});
+  // Group by kind in canonical order; preserve authored order within a group.
+  const grouped = [...entries].sort((a, b) =>
+    (MEMORY_KIND_META[a.kind]?.order ?? 99) - (MEMORY_KIND_META[b.kind]?.order ?? 99),
+  );
+  return (
+    <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
+      <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+        <Typeplate label="DECK · MEMORY" value="LONG-TERM · DURABLE STATE" />
+        <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+          {entries.length} {entries.length === 1 ? 'entry' : 'entries'} · curated {memory.last_updated}
+        </span>
+      </div>
+      {entries.length === 0 ? (
+        <div className="px-4 py-5">
+          <p className="text-sm text-wf-on-surface-variant leading-relaxed">
+            No durable memory yet. This persona hasn't accumulated facts,
+            decisions, preferences, or people-context worth surviving across
+            sessions. Memory entries are appended by the agent (or operator)
+            only when something is learned that should survive — not as a
+            record of what was done.
+          </p>
+          <p className="mt-2 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+            see also · TASK LOG · EXPERIENCE for the activity record
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="px-4 pt-3 flex flex-wrap gap-2 border-b border-wf-outline-variant pb-3">
+            {(Object.keys(MEMORY_KIND_META) as AgentMemoryKind[])
+              .filter((k) => counts[k])
+              .map((k) => {
+                const m = MEMORY_KIND_META[k];
+                return (
+                  <span
+                    key={k}
+                    className={`font-wfmono text-[10px] uppercase tracking-[0.14em] px-2 py-0.5 border ${m.border} ${m.tone} rounded-wf-sm`}
+                  >
+                    {m.label} · {counts[k]}
+                  </span>
+                );
+              })}
+          </div>
+          <ol className="divide-y divide-wf-outline-variant">
+            {grouped.map((e) => {
+              const m = MEMORY_KIND_META[e.kind];
+              return (
+                <li
+                  key={e.id}
+                  className="px-4 py-3 grid grid-cols-[80px_1fr] sm:grid-cols-[100px_1fr] gap-x-3 gap-y-1"
+                >
+                  <span className={`font-wfmono text-[10px] uppercase tracking-[0.14em] ${m.tone}`}>
+                    {m.label}
+                  </span>
+                  <span className="text-sm font-semibold text-wf-on-surface leading-snug">{e.subject}</span>
+                  <span aria-hidden />
+                  <span className="text-sm text-wf-on-surface-variant leading-snug">{e.body}</span>
+                </li>
+              );
+            })}
+          </ol>
+        </>
+      )}
+    </section>
+  );
 }
 
 function ExperiencePanel({ agent, roster }: { agent: WorkforceAgent; roster: WorkforceAgent[] }) {

@@ -8,7 +8,10 @@
   "prompt_version": "0.2.0",
   "budget_monthly_usd": 7,
   "default_project": "workforce-self",
-  "streams": ["internal", "editorial"],
+  "streams": [
+    "internal",
+    "editorial"
+  ],
   "owner_email": null,
   "created_at": "2026-05-23",
   "bindings": [
@@ -56,13 +59,35 @@
   "experience": {
     "joined_at": "2026-05-23",
     "highlights": [
-      { "date": "2026-05-23", "title": "Shipped the persona-onboarding playbook", "impact": "Theo's first new-agent run executed it end-to-end with zero ad-hoc steps." },
-      { "date": "2026-05-24", "title": "Framed Noor's first outside-counsel ask", "impact": "Returned with a clean opinion; zero round-trips." },
-      { "date": "2026-05-25", "title": "Cleared 12 articles for IP", "impact": "Backlog drained inside one cycle; zero post-publish takedowns." }
+      {
+        "date": "2026-05-23",
+        "title": "Shipped the persona-onboarding playbook",
+        "impact": "Theo's first new-agent run executed it end-to-end with zero ad-hoc steps."
+      },
+      {
+        "date": "2026-05-24",
+        "title": "Framed Noor's first outside-counsel ask",
+        "impact": "Returned with a clean opinion; zero round-trips."
+      },
+      {
+        "date": "2026-05-25",
+        "title": "Cleared 12 articles for IP",
+        "impact": "Backlog drained inside one cycle; zero post-publish takedowns."
+      }
     ],
     "endorsements": [
-      { "from": "maya", "for": "Filters the people / legal noise so I see only what I must." },
-      { "from": "elena", "for": "VP peer who runs her function as a system, not a stack of cases." }
+      {
+        "from": "maya",
+        "for": "Filters the people / legal noise so I see only what I must."
+      },
+      {
+        "from": "elena",
+        "for": "VP peer who runs her function as a system, not a stack of cases."
+      }
     ]
+  },
+  "memory": {
+    "last_updated": "2026-05-25",
+    "entries": []
   }
 }

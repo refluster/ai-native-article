@@ -8,7 +8,11 @@
   "prompt_version": "0.2.0",
   "budget_monthly_usd": 15,
   "default_project": "workforce-self",
-  "streams": ["internal", "client", "editorial"],
+  "streams": [
+    "internal",
+    "client",
+    "editorial"
+  ],
   "owner_email": null,
   "created_at": "2026-05-18",
   "bindings": [
@@ -56,13 +60,35 @@
   "experience": {
     "joined_at": "2026-05-18",
     "highlights": [
-      { "date": "2026-05-17", "title": "Landed wf-agent-runner v2 (PR #119)", "impact": "Halved cold-start cost by replacing per-run model load with a warm cache." },
-      { "date": "2026-05-19", "title": "Drove PR #124 to green in 3h", "impact": "Caught a max_completion_tokens=2000 ceiling and lifted to 8000; truncation regression closed." },
-      { "date": "2026-05-23", "title": "Authored the code-task-brief skill", "impact": "First reusable Story → PR brief template; cut Maya's per-Story handoff overhead in half." }
+      {
+        "date": "2026-05-17",
+        "title": "Landed wf-agent-runner v2 (PR #119)",
+        "impact": "Halved cold-start cost by replacing per-run model load with a warm cache."
+      },
+      {
+        "date": "2026-05-19",
+        "title": "Drove PR #124 to green in 3h",
+        "impact": "Caught a max_completion_tokens=2000 ceiling and lifted to 8000; truncation regression closed."
+      },
+      {
+        "date": "2026-05-23",
+        "title": "Authored the code-task-brief skill",
+        "impact": "First reusable Story → PR brief template; cut Maya's per-Story handoff overhead in half."
+      }
     ],
     "endorsements": [
-      { "from": "maya", "for": "Surfaces ambiguity before guessing — every time." },
-      { "from": "dario", "for": "Architecturally honest; the test plan is real, not decorative." }
+      {
+        "from": "maya",
+        "for": "Surfaces ambiguity before guessing — every time."
+      },
+      {
+        "from": "dario",
+        "for": "Architecturally honest; the test plan is real, not decorative."
+      }
     ]
+  },
+  "memory": {
+    "last_updated": "2026-05-24",
+    "entries": []
   }
 }

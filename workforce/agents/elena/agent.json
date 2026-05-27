@@ -8,7 +8,11 @@
   "prompt_version": "0.2.0",
   "budget_monthly_usd": 7,
   "default_project": "editorial",
-  "streams": ["editorial", "client", "internal"],
+  "streams": [
+    "editorial",
+    "client",
+    "internal"
+  ],
   "owner_email": null,
   "created_at": "2026-05-23",
   "bindings": [
@@ -56,13 +60,35 @@
   "experience": {
     "joined_at": "2026-05-23",
     "highlights": [
-      { "date": "2026-05-23", "title": "Stood up the CX VP function", "impact": "Defined the weekly sync, sign-off path and IC bench for four CX roles." },
-      { "date": "2026-05-24", "title": "Brokered the Aoi ↔ Kai voice-to-token alignment", "impact": "Settled a brand-vs-system tension that had stalled two PRs." },
-      { "date": "2026-05-25", "title": "Published 'CX as one team'", "impact": "First VP-level CX analytic; cited in Maya's next plan-write." }
+      {
+        "date": "2026-05-23",
+        "title": "Stood up the CX VP function",
+        "impact": "Defined the weekly sync, sign-off path and IC bench for four CX roles."
+      },
+      {
+        "date": "2026-05-24",
+        "title": "Brokered the Aoi ↔ Kai voice-to-token alignment",
+        "impact": "Settled a brand-vs-system tension that had stalled two PRs."
+      },
+      {
+        "date": "2026-05-25",
+        "title": "Published 'CX as one team'",
+        "impact": "First VP-level CX analytic; cited in Maya's next plan-write."
+      }
     ],
     "endorsements": [
-      { "from": "maya", "for": "Makes four ICs feel like one team — without smoothing their edges." },
-      { "from": "priya", "for": "VP peer who escalates only what truly needs me." }
+      {
+        "from": "maya",
+        "for": "Makes four ICs feel like one team — without smoothing their edges."
+      },
+      {
+        "from": "priya",
+        "for": "VP peer who escalates only what truly needs me."
+      }
     ]
+  },
+  "memory": {
+    "last_updated": "2026-05-25",
+    "entries": []
   }
 }

@@ -8,7 +8,10 @@
   "prompt_version": "0.2.0",
   "budget_monthly_usd": 3,
   "default_project": "editorial",
-  "streams": ["editorial", "client"],
+  "streams": [
+    "editorial",
+    "client"
+  ],
   "owner_email": null,
   "created_at": "2026-05-23",
   "bindings": [
@@ -56,12 +59,30 @@
   "experience": {
     "joined_at": "2026-05-23",
     "highlights": [
-      { "date": "2026-05-24", "title": "Authored the first eight FAQ entries", "impact": "Cleared the standing inbound backlog; repeat-question rate halved next cycle." },
-      { "date": "2026-05-25", "title": "Published 'Support as product surface'", "impact": "Reframed support as in-product education; cited in Aoi's next design-doc." }
+      {
+        "date": "2026-05-24",
+        "title": "Authored the first eight FAQ entries",
+        "impact": "Cleared the standing inbound backlog; repeat-question rate halved next cycle."
+      },
+      {
+        "date": "2026-05-25",
+        "title": "Published 'Support as product surface'",
+        "impact": "Reframed support as in-product education; cited in Aoi's next design-doc."
+      }
     ],
     "endorsements": [
-      { "from": "elena", "for": "Turns inbound noise into product surface." },
-      { "from": "yuki", "for": "Reader signal arrives as patterns, not anecdotes." }
+      {
+        "from": "elena",
+        "for": "Turns inbound noise into product surface."
+      },
+      {
+        "from": "yuki",
+        "for": "Reader signal arrives as patterns, not anecdotes."
+      }
     ]
+  },
+  "memory": {
+    "last_updated": "2026-05-25",
+    "entries": []
   }
 }

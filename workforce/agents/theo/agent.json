@@ -8,7 +8,9 @@
   "prompt_version": "0.2.0",
   "budget_monthly_usd": 3,
   "default_project": "workforce-self",
-  "streams": ["internal"],
+  "streams": [
+    "internal"
+  ],
   "owner_email": null,
   "created_at": "2026-05-23",
   "bindings": [
@@ -56,12 +58,30 @@
   "experience": {
     "joined_at": "2026-05-23",
     "highlights": [
-      { "date": "2026-05-23", "title": "Onboarded Noor and Mira in one cycle", "impact": "First two new personas landed inside Priya's playbook with zero ad-hoc steps." },
-      { "date": "2026-05-24", "title": "Published the onboarding-delta log", "impact": "First delta entry: 'system.md needs a residence line' — fed back into the template." }
+      {
+        "date": "2026-05-23",
+        "title": "Onboarded Noor and Mira in one cycle",
+        "impact": "First two new personas landed inside Priya's playbook with zero ad-hoc steps."
+      },
+      {
+        "date": "2026-05-24",
+        "title": "Published the onboarding-delta log",
+        "impact": "First delta entry: 'system.md needs a residence line' — fed back into the template."
+      }
     ],
     "endorsements": [
-      { "from": "priya", "for": "Runs onboarding as a product, not a ceremony." },
-      { "from": "noor", "for": "First-week experience was a checklist, not a guess." }
+      {
+        "from": "priya",
+        "for": "Runs onboarding as a product, not a ceremony."
+      },
+      {
+        "from": "noor",
+        "for": "First-week experience was a checklist, not a guess."
+      }
     ]
+  },
+  "memory": {
+    "last_updated": "2026-05-24",
+    "entries": []
   }
 }

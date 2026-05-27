@@ -80,6 +80,10 @@ function loadOne(slug) {
     jd: cfg.jd ?? null,
     identity: cfg.identity ?? null,
     experience: cfg.experience ?? null,
+    // OpenClaw / Hermes MEMORY.md analogue — durable facts, decisions,
+    // lessons the persona has accumulated. Append-only; rendered
+    // newest-first on the profile.
+    memory: cfg.memory ?? null,
   };
 }
 

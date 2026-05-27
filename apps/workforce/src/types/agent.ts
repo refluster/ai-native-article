@@ -55,6 +55,54 @@ export interface AgentEndorsement {
 }
 
 /**
+ * The semantic class of a long-term memory entry. Constrained to kinds
+ * that survive across sessions — durable facts about the world, standing
+ * decisions the persona has committed to, preferences that emerged, and
+ * people / context the persona has learned to work with.
+ *
+ * Note: `lesson` and `open-question` deliberately excluded. Generalised
+ * lessons should be reframed as decisions or facts before they land here;
+ * open questions belong in day-to-day notes, not in the durable layer.
+ */
+export type AgentMemoryKind = 'fact' | 'decision' | 'preference' | 'person';
+
+export interface AgentMemoryEntry {
+  /** Short id (8-char ULID-ish) for cross-reference + future amendment. */
+  id: string;
+  kind: AgentMemoryKind;
+  /** Short label, 1–5 words. */
+  subject: string;
+  /** One or two sentences of detail. Self-contained — the entry must
+   *  read correctly at session open with no surrounding context. */
+  body: string;
+}
+
+/**
+ * Persona long-term memory — OpenClaw / Hermes MEMORY.md analogue.
+ *
+ * This is the **durable, curated** layer the persona "remembers" at
+ * session open: facts, standing decisions, preferences, people-context.
+ * It is NOT an activity record — the Task Log (recent_runs) and
+ * EXPERIENCE highlights already cover what the agent has *done*.
+ * Memory is what the agent has *learned*.
+ *
+ * Entries are append-only by convention; the schema does not carry per-
+ * entry timestamps because long-term memory is not chronological. The
+ * top-level `last_updated` exists so operators can see when a human or
+ * agent last curated this layer.
+ *
+ * Empty is a valid state — a brand-new agent has no memory yet. Seeding
+ * sample entries is not permitted because they would feed back into the
+ * agent's execution as system context.
+ */
+export interface AgentMemory {
+  /** ISO date of the latest curation. */
+  last_updated: string;
+  /** Append-only list of durable memory entries. */
+  entries: AgentMemoryEntry[];
+}
+
+/**
  * Persona track record on this Workforce — modeled after LinkedIn's
  * experience block. Authored in agent.json today; live API may layer
  * in `metrics.runs_total_lifetime` etc. when wired.
@@ -86,6 +134,7 @@ export interface WorkforceAgent {
   jd?: AgentJD;
   identity?: AgentIdentity;
   experience?: AgentExperience;
+  memory?: AgentMemory;
   // ----- Org topology, merged from workforce/agents/_org.json by the build
   // script. `depth` is derived: 0 for nodes with no reports_to (roots),
   // 1 + min(parent depth) otherwise. There is no hard ceiling on N — a

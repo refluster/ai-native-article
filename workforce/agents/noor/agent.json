@@ -8,7 +8,9 @@
   "prompt_version": "0.2.0",
   "budget_monthly_usd": 3,
   "default_project": "workforce-self",
-  "streams": ["internal"],
+  "streams": [
+    "internal"
+  ],
   "owner_email": null,
   "created_at": "2026-05-23",
   "bindings": [
@@ -56,11 +58,26 @@
   "experience": {
     "joined_at": "2026-05-23",
     "highlights": [
-      { "date": "2026-05-24", "title": "Authored the framing-memo template", "impact": "First template; Priya's first outbound ask returned a usable opinion on first reply." },
-      { "date": "2026-05-25", "title": "Flagged the 'reader-data-retention' pattern", "impact": "Surfaced three repeat asks as one SOP candidate." }
+      {
+        "date": "2026-05-24",
+        "title": "Authored the framing-memo template",
+        "impact": "First template; Priya's first outbound ask returned a usable opinion on first reply."
+      },
+      {
+        "date": "2026-05-25",
+        "title": "Flagged the 'reader-data-retention' pattern",
+        "impact": "Surfaced three repeat asks as one SOP candidate."
+      }
     ],
     "endorsements": [
-      { "from": "priya", "for": "Frames the question so the lawyer's first answer is the final one." }
+      {
+        "from": "priya",
+        "for": "Frames the question so the lawyer's first answer is the final one."
+      }
     ]
+  },
+  "memory": {
+    "last_updated": "2026-05-25",
+    "entries": []
   }
 }
