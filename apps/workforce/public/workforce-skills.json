@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-26T23:09:43.802Z",
+  "generated_at": "2026-05-27T00:08:25.334Z",
   "skills": [
     {
       "name": "article-draft",
@@ -27,7 +27,25 @@
       ],
       "improvement_agent": null,
       "created_at": "2026-05-18",
-      "description": "Produce one 400-800 word L1 insight article in Japanese from a single L0 source. Use when an editorial-stream agent needs to convert a pending L0 source entry into a publishable insight piece — one observation, one inference, one disclosure per paragraph, with the bias-disclosure footer appended."
+      "description": "Produce one 400-800 word L1 insight article in Japanese from a single L0 source. Use when an editorial-stream agent needs to convert a pending L0 source entry into a publishable insight piece — one observation, one inference, one disclosure per paragraph, with the bias-disclosure footer appended.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 1678,
+          "language": "markdown",
+          "contents": "---\nname: article-draft\ndescription: Produce one 400-800 word L1 insight article in Japanese from a single L0 source. Use when an editorial-stream agent needs to convert a pending L0 source entry into a publishable insight piece — one observation, one inference, one disclosure per paragraph, with the bias-disclosure footer appended.\n---\n\n# article-draft\n\nConvert one L0 source entry into one L1 insight article in Japanese.\n\n## Instructions\n\n1. Pick **one** pending L0 source entry that is most worth covering for this agent's voice and stream.\n2. Produce **one 400-800 word** L1 article in Japanese.\n3. Follow the rhythm: **one observation, one inference, one disclosure per paragraph.** Each paragraph should be coherent under this triad — what was seen, what it implies, what the author is willing to be wrong about.\n4. Begin with a single-line `# {title}` (≤ 60 chars in Japanese; ASCII title also acceptable when the source itself is anglophone).\n5. Append the agent's bias-disclosure footer at the end. The footer lives in the agent's `system.md` under the \"Bias disclosure\" section.\n\n## Outputs\n\nMarkdown body suitable for direct Notion insertion. The runner attaches `Author={agent_slug}`, `Kind=l1-insight`, `Status=ready_for_L4`.\n\n## When NOT to use\n\n- A source already covered by another agent within the last 7 days — skip and pick the next pending entry.\n- A source whose original text is itself thin (one-line headline only) — escalate, do not pad.\n- A run that would push the agent over its monthly token cap (the runner's W-3 pre-flight throws — this skill should still respect it by not assuming a long article when context suggests a short one).\n",
+          "truncated": false,
+          "binary": false
+        },
+        {
+          "path": "meta.json",
+          "size": 370,
+          "language": "json",
+          "contents": "{\n  \"name\": \"article-draft\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": true\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"aoi\", \"dario\", \"elena\", \"kai\", \"maya\", \"mira\", \"noor\", \"priya\", \"ren\", \"sora\", \"theo\", \"yuki\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-18\"\n}\n",
+          "truncated": false,
+          "binary": false
+        }
+      ]
     },
     {
       "name": "code-task-brief",
@@ -41,7 +59,25 @@
       ],
       "improvement_agent": null,
       "created_at": "2026-05-18",
-      "description": "Produce a task brief for the engineer Claude Code routine — what to change, why, acceptance criteria. Use when the Engineer persona needs to dispatch implementation work to the workforce-engineer-routine.yml GHA workflow (the R-N1 exception path); the brief is what the CC routine reads as its instructions before writing code."
+      "description": "Produce a task brief for the engineer Claude Code routine — what to change, why, acceptance criteria. Use when the Engineer persona needs to dispatch implementation work to the workforce-engineer-routine.yml GHA workflow (the R-N1 exception path); the brief is what the CC routine reads as its instructions before writing code.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 2210,
+          "language": "markdown",
+          "contents": "---\nname: code-task-brief\ndescription: Produce a task brief for the engineer Claude Code routine — what to change, why, acceptance criteria. Use when the Engineer persona needs to dispatch implementation work to the workforce-engineer-routine.yml GHA workflow (the R-N1 exception path); the brief is what the CC routine reads as its instructions before writing code.\n---\n\n# code-task-brief\n\nThe handoff document between an LLM-on-Lambda planning step and a Claude Code routine that will actually write code on GitHub Actions.\n\n## Instructions\n\nThe brief must be **self-contained**: the CC routine has no memory of this conversation and only the brief + the target repo's files to work from.\n\nSections:\n\n1. **What** — one sentence stating the change. \"Add X.\" / \"Fix Y in Z.\" / \"Refactor A to B.\" No \"and also\" — one change per brief.\n2. **Why** — 2-4 sentences of context the routine needs to make judgement calls. Include the failing symptom (for fixes), the user value (for features), or the design pressure (for refactors).\n3. **Files likely touched** — bullet list. Best-effort; the routine may diverge if it sees a better path.\n4. **Acceptance criteria** — checkbox list. Each item is unambiguously verifiable by CI or a one-line reproducer. \"All tests pass\" is too weak; \"scripts/check-gas-manifest.mjs passes\" is right.\n5. **Out of scope** — bullet list of nearby changes the routine should **not** touch.\n\nLength target: 200-500 words in Japanese or English (the CC routine reads both; match the prevailing language of the target repo).\n\n## Trigger surface\n\nSkills with `trigger_class=claude-code-routine` (this one is) hand off to the existing `workforce-engineer-routine.yml` workflow_dispatch path (R-N1 exception). The Lambda runner builds the brief and calls `lambdas/shared/github.ts:dispatchEngineer()`; the runner then exits immediately without blocking on the routine's completion. The orchestrator's 5-minute poll picks up the resulting draft PR.\n\n## When NOT to use\n\n- The change is non-code (docs-only, governance, content). Use a different skill or hand off directly.\n- The brief would be longer than the implementation itself — write the code directly and skip the brief.\n",
+          "truncated": false,
+          "binary": false
+        },
+        {
+          "path": "meta.json",
+          "size": 219,
+          "language": "json",
+          "contents": "{\n  \"name\": \"code-task-brief\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"claude-code-routine\",\n  \"cost_class\": \"medium\",\n  \"owners\": [\"ren\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-18\"\n}\n",
+          "truncated": false,
+          "binary": false
+        }
+      ]
     },
     {
       "name": "design-note",
@@ -58,7 +94,25 @@
       ],
       "improvement_agent": null,
       "created_at": "2026-05-18",
-      "description": "Produce one design note in Japanese — intent, information architecture, components, and acceptance criteria — for a UI or visual-system change. Use when the Designer persona needs to capture a design decision in a reviewable form before any implementation PR opens."
+      "description": "Produce one design note in Japanese — intent, information architecture, components, and acceptance criteria — for a UI or visual-system change. Use when the Designer persona needs to capture a design decision in a reviewable form before any implementation PR opens.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 1730,
+          "language": "markdown",
+          "contents": "---\nname: design-note\ndescription: Produce one design note in Japanese — intent, information architecture, components, and acceptance criteria — for a UI or visual-system change. Use when the Designer persona needs to capture a design decision in a reviewable form before any implementation PR opens.\n---\n\n# design-note\n\nA reviewable design decision. Not a polished spec, not a sketch — the in-between artefact that gets a design conversation moving.\n\n## Instructions\n\nFour sections, every time:\n\n1. **Intent** — one paragraph: what is being changed, what is the user/operator outcome, and what is deliberately not changing.\n2. **IA** — a short bullet outline of the page/route/layout structure. If the change is component-level not page-level, replace this with \"Component scope\" listing the components touched.\n3. **Components** — for each new or modified component, name + one-line responsibility + the existing component it borrows from (or \"new from scratch\", which should be rare).\n4. **Acceptance criteria** — checklist. Each item is unambiguously verifiable by a reviewer with no design background.\n\nLength target: 300-800 words in Japanese. Embed mockup references as relative links (`./img/{name}.svg`) that resolve under the skill's `references/` directory if present, or under `s3://wf-bucket-…/design-docs/{slug}/{deliv-ulid}/img/` once published.\n\n## When NOT to use\n\n- The change is one-line CSS — overhead is wasted. Just open the PR.\n- The change touches DESIGN.md itself — that's a governance edit (root AGENTS.md zone A), not a design note. Different process.\n- The decision is between two near-identical options and the operator should pick — write an AskUserQuestion-shaped doc instead.\n",
+          "truncated": false,
+          "binary": false
+        },
+        {
+          "path": "meta.json",
+          "size": 283,
+          "language": "json",
+          "contents": "{\n  \"name\": \"design-note\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"design-doc\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"aoi\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-18\"\n}\n",
+          "truncated": false,
+          "binary": false
+        }
+      ]
     },
     {
       "name": "discord-ping",
@@ -72,7 +126,33 @@
       ],
       "improvement_agent": null,
       "created_at": "2026-05-22",
-      "description": "Post a one-line liveness heartbeat to the team Discord channel. Documents the operational shape of the deterministic runner-side handler so a human or a Claude-Code persona reading this file knows exactly what fires when the matching agent.binding's cron triggers. The runner's discord-ping handler executes this verbatim — no LLM is involved at runtime."
+      "description": "Post a one-line liveness heartbeat to the team Discord channel. Documents the operational shape of the deterministic runner-side handler so a human or a Claude-Code persona reading this file knows exactly what fires when the matching agent.binding's cron triggers. The runner's discord-ping handler executes this verbatim — no LLM is involved at runtime.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 3079,
+          "language": "markdown",
+          "contents": "---\nname: discord-ping\ndescription: Post a one-line liveness heartbeat to the team Discord channel. Documents the operational shape of the deterministic runner-side handler so a human or a Claude-Code persona reading this file knows exactly what fires when the matching agent.binding's cron triggers. The runner's discord-ping handler executes this verbatim — no LLM is involved at runtime.\n---\n\n# discord-ping\n\nA heartbeat from the workforce. The point is the pipeline, not the prose. **Deterministic skill** — the runner executes a handler bundled in this folder; no LLM call is made.\n\n## Bundle layout\n\n```\nworkforce/skills/discord-ping/\n  SKILL.md      ← this file (Anthropic Agent Skills frontmatter compatible)\n  meta.json     ← workforce-internal sidecar (executor, owners, version, …)\n  handler.ts    ← deterministic dispatch logic (auto-registered)\n```\n\nAdding a deterministic skill anywhere under `workforce/skills/` follows the same shape. The agent-runner picks up `handler.ts` via the build-time generated `workforce/lambdas/shared/skill-registry-generated.ts` (regenerated by `npm run workforce:skill-registry`) — no edits to `workforce/lambdas/` are needed.\n\n## What the runner does\n\nWhen an agent binding `{ cron, skill: \"discord-ping\" }` fires, the runner:\n\n1. Composes the message body verbatim:\n   ```\n   [wf-pulse] {agent.slug} alive at {ISO-8601 UTC timestamp, second precision}\n   ```\n2. POSTs the body to the Discord channel webhook (URL read from Secrets Manager id `DISCORD_WEBHOOK_SECRET`).\n3. Writes the body to S3 (`runs/{slug}/{run_id}/output.txt`) for audit / replay.\n4. Records a RUN row in DDB with `output_s3_key`, `output_summary`, timing, and the Discord HTTP status.\n\n## What it deliberately does **not** do\n\n- Call an LLM. This skill has `executor: \"deterministic\"` in `meta.json`; the runner short-circuits the LLM path.\n- Write a DELIV row. Discord posts have no stable queryable external URL, so there is nothing to track separately from the RUN row.\n- Read memory. The output depends only on `{ agent.slug, wall_clock }`.\n- Take parameters. v1 is intentionally fixed — agent slug + UTC timestamp + literal format.\n\n## Why a skill at all (and not hardcoded in the runner)\n\nSo the heartbeat is a first-class line item in:\n- `workforce/skills/` (the catalogue)\n- the agent's `bindings[]` (operator-editable cadence)\n- the per-RUN trace (`skill_name = \"discord-ping\"` is searchable in the audit log)\n- the skill directory page on the workforce console (it's discoverable, paused, deprecated like any other skill)\n\nReplacing the runner's literal format requires editing `handler.ts` in this folder and bumping `meta.json:version`. Replacing the cadence is one line in the owning agent's `agent.json`.\n\n## Claude-Code compatibility\n\nThis SKILL.md is documentation for human + Claude-Code readers. If a Claude-Code persona is asked to \"manually run discord-ping\", they should produce the one-line format shown above and POST it themselves — there is no LLM-execution path inside the workforce runner for this skill, by design.\n",
+          "truncated": false,
+          "binary": false
+        },
+        {
+          "path": "handler.ts",
+          "size": 1512,
+          "language": "typescript",
+          "contents": "// Deterministic handler for the discord-ping skill.\n// See ./SKILL.md for the contract.\n//\n// Input: agent slug + run timestamp.\n// Output bytes: the one-line heartbeat that was posted.\n// Side effect: POST {content} to the Discord webhook URL behind the\n// secrets-manager id given by DISCORD_WEBHOOK_SECRET.\n//\n// Lives alongside SKILL.md (Anthropic-Skills bundle convention) — the\n// workforce agent-runner picks it up via the build-time generated\n// skill-registry-generated.ts. Adding a new deterministic skill means\n// dropping a folder under workforce/skills/{name}/ with SKILL.md +\n// meta.json + handler.ts — no edits to lambdas/.\n\nimport type { DeterministicResult, RunnerContext } from \"../../lambdas/shared/skill-types.js\";\nimport { postToWebhook } from \"../../lambdas/shared/webhook.js\";\n\nexport async function dispatchDiscordPing(ctx: RunnerContext): Promise<DeterministicResult> {\n  const secretName = process.env.DISCORD_WEBHOOK_SECRET;\n  if (!secretName) {\n    throw new Error(\"DISCORD_WEBHOOK_SECRET env var is required for discord-ping handler\");\n  }\n\n  // Strip sub-second precision — heartbeats don't need millis and the\n  // SKILL.md contract says \"second precision\".\n  const isoSecond = ctx.startedAt.replace(/\\.\\d+Z$/, \"Z\");\n  const line = `[wf-pulse] ${ctx.slug} alive at ${isoSecond}`;\n\n  const { status } = await postToWebhook(secretName, line);\n\n  return {\n    output: line,\n    outputExt: \"txt\",\n    summary: line,\n    side_effect: { kind: \"discord-webhook\", status },\n  };\n}\n",
+          "truncated": false,
+          "binary": false
+        },
+        {
+          "path": "meta.json",
+          "size": 210,
+          "language": "json",
+          "contents": "{\n  \"name\": \"discord-ping\",\n  \"version\": \"0.3.0\",\n  \"status\": \"active\",\n  \"executor\": \"deterministic\",\n  \"cost_class\": \"small\",\n  \"owners\": [\"yuki\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-22\"\n}\n",
+          "truncated": false,
+          "binary": false
+        }
+      ]
     },
     {
       "name": "market-research",
@@ -89,7 +169,25 @@
       ],
       "improvement_agent": null,
       "created_at": "2026-05-18",
-      "description": "Produce one weekly-synthesis article in Japanese (800-1500 words) integrating the week's external signals the agent has memory of, with a falsifiable position. Use when the Researcher/Analyst persona is writing the weekly synthesis cadence (Sora's Sunday 23:00 JST run), not the twice-daily L0→L1 articles."
+      "description": "Produce one weekly-synthesis article in Japanese (800-1500 words) integrating the week's external signals the agent has memory of, with a falsifiable position. Use when the Researcher/Analyst persona is writing the weekly synthesis cadence (Sora's Sunday 23:00 JST run), not the twice-daily L0→L1 articles.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 1874,
+          "language": "markdown",
+          "contents": "---\nname: market-research\ndescription: Produce one weekly-synthesis article in Japanese (800-1500 words) integrating the week's external signals the agent has memory of, with a falsifiable position. Use when the Researcher/Analyst persona is writing the weekly synthesis cadence (Sora's Sunday 23:00 JST run), not the twice-daily L0→L1 articles.\n---\n\n# market-research\n\nWeekly synthesis. The deliverable integrates multiple L0 signals into one position the agent is willing to be measured against.\n\n## Instructions\n\n1. List the week's relevant signals first (internally — not in the final body) by scanning the agent's recent memory chunks and the L0 source DB. 3-7 signals is the right shape.\n2. Find the **one thread** that connects ≥ 3 of them. That thread is the article's spine.\n3. Open with the synthesis: state the position in 1-2 sentences. No throat-clearing.\n4. Body: 800-1500 words in Japanese, structured as a sequence of (signal → what it tells us → how it fits the thread). Each signal cited inline by its source link.\n5. End with the falsifier: the observable evidence that would force the position to be rewritten next week. Naming it is what makes the article a research output and not an opinion column.\n6. Append the bias-disclosure footer (same shape as `article-draft`).\n\n## Voice\n\nResearcher voice: more analytical than `article-draft`. Less first-person, more \"the data suggests / the rate at which X / the divergence between A and B.\"\n\n## When NOT to use\n\n- Fewer than 3 relevant signals are available this week — escalate; do not pad with weaker signals.\n- The thread the synthesis would commit to is already covered by a recent L1 article from the same agent — defer one cycle.\n- The signals all point at the same headline event everyone is already writing about — Sora's value is at the long tail; pick a different thread or skip.\n",
+          "truncated": false,
+          "binary": false
+        },
+        {
+          "path": "meta.json",
+          "size": 283,
+          "language": "json",
+          "contents": "{\n  \"name\": \"market-research\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": true\n  },\n  \"cost_class\": \"large\",\n  \"owners\": [\"sora\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-18\"\n}\n",
+          "truncated": false,
+          "binary": false
+        }
+      ]
     },
     {
       "name": "pdm-charter",
@@ -103,7 +201,33 @@
       ],
       "improvement_agent": "maya",
       "created_at": "2026-05-25",
-      "description": "|"
+      "description": "|",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 3418,
+          "language": "markdown",
+          "contents": "---\nname: pdm-charter\ndescription: |\n  Stub for Maya's Epic → Story decomposition step. Reads an Accepted Epic\n  under workforce/docs/epics/ and proposes a Story breakdown (each Story = one\n  GitHub issue) for operator approval. Not implemented in v1 — declared so\n  the binding shape + routine wiring is in place when the contract is\n  proven by the manual run of Epic-010.\n---\n\n# pdm-charter — Epic → Story decomposition (stub for v2)\n\n**Owner**: maya (PM / Founder)\n**Executor**: deterministic (handler currently throws — placeholder)\n**Cadence**: manual (operator triggers when a new Epic flips to `Status: Accepted`)\n\n## Position in the simplified workflow\n\nThe 2026-05-25 process simplification puts Maya in two roles:\n\n1. **Epic → Story split** (this skill, when implemented). For an `Accepted` Epic, propose Story-sized GitHub issues that each Claude Code can pick up and ship as 1 (sometimes more) PR.\n2. **Issue / PR routing** (separate Maya skill, also future). Maya watches issues + PRs and routes them to implementer / reviewer agents via PR comments; ≤ 7 router-comment cycles before escalation.\n\n`pdm-charter` covers (1) only. Routing is its own skill.\n\nThe middle layer that the old design used (`pdm-decompose`: Epic → role-tagged sub-units) is **gone**. Claude Code consumes Stories directly and decides the role decomposition inside each PR.\n\n## Why this skill exists today as a stub\n\nThe Epic-010 thread that opened the original RFC-010 PR series did the Epic → Story split **manually** (operator + assistant in chat). The next Epic should be repeatable from a skill, not a chat thread. `pdm-charter` is the placeholder for that.\n\nDeclaring it now (stub handler + `executor: cli` binding on Maya) means:\n\n- The binding entry documents the intended workflow surface\n- `validate-agent-json.mjs` does not fire orchestrator dispatch for `executor: cli` bindings — the stub never auto-runs\n- The next PR that implements the real handler keeps the binding key (`pdm-charter`) and the operator entry-point unchanged\n\n## v2 contract (sketch — not implemented)\n\n**Inputs**: a path to an `Accepted` Epic file (e.g. `workforce/docs/epics/epic-011-foo.md`).\n\n**Outputs / side effects**:\n1. Create or update a tracker GitHub issue titled `Epic-N — <title>` linking back to the Epic file\n2. Post a `<!-- pdm-charter:proposal -->` comment on the tracker that drafts the Story list. Each Story:\n   - has a user-value framing (per [`workforce/docs/epics/README.md`](../../docs/epics/README.md) \"Epic sizing guidance\" — Stories are 1–5 days of work, single slice of user value)\n   - has explicit acceptance criteria\n   - flags architectural deltas (cost > USD 10/mo, new managed services, R-N* implications) inline — operator decides before approval\n3. Wait for operator 👍 on the proposal comment → on next run, create the Story issues and link as sub-issues of the tracker\n\nThe state machine mirrors operator-gated approval (proposal → 👍 → materialise). The output unit is **GitHub issues** (not a hierarchical sub-epic tree). Epic : Story is M:N — Maya may surface that a Story already exists from a previous Epic and link to it rather than re-creating.\n\n## Until implemented\n\nOperator authors Story issues manually (as in the Epic-010 manual run starting on 2026-05-25). When the contract surfaces from that manual experience, the real handler ships in a follow-up PR.\n",
+          "truncated": false,
+          "binary": false
+        },
+        {
+          "path": "handler.ts",
+          "size": 712,
+          "language": "typescript",
+          "contents": "// Stub handler for the pdm-charter skill. See ./SKILL.md for the\n// intended v2 contract. The Maya binding is executor=cli + scheduler=manual,\n// so this handler is never auto-fired by the orchestrator. Implemented as\n// a throw so any accidental dispatch surfaces loudly (W-1 fail-loud).\n\nimport type { DeterministicResult, RunnerContext } from \"../../lambdas/shared/skill-types.js\";\n\nexport async function dispatchPdmCharter(_ctx: RunnerContext): Promise<DeterministicResult> {\n  throw new Error(\n    \"pdm-charter is a stub — see workforce/skills/pdm-charter/SKILL.md for the v2 contract. \" +\n      \"The Maya binding is executor=cli scheduler=manual, so this handler should not be auto-dispatched.\",\n  );\n}\n",
+          "truncated": false,
+          "binary": false
+        },
+        {
+          "path": "meta.json",
+          "size": 210,
+          "language": "json",
+          "contents": "{\n  \"name\": \"pdm-charter\",\n  \"version\": \"0.1.0\",\n  \"status\": \"stale\",\n  \"executor\": \"deterministic\",\n  \"cost_class\": \"small\",\n  \"owners\": [\"maya\"],\n  \"improvement_agent\": \"maya\",\n  \"created_at\": \"2026-05-25\"\n}\n",
+          "truncated": false,
+          "binary": false
+        }
+      ]
     },
     {
       "name": "pdm-decompose",
@@ -117,7 +241,33 @@
       ],
       "improvement_agent": "maya",
       "created_at": "2026-05-25",
-      "description": "|"
+      "description": "|",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 6684,
+          "language": "markdown",
+          "contents": "---\nname: pdm-decompose\ndescription: |\n  SUPERSEDED (2026-05-25). The role-tagged Epic → child-task decomposition\n  step is no longer part of the workflow — Claude Code consumes Story\n  issues directly and decides role decomposition inside the PR. This file\n  remains on disk for trivial reversibility; the Maya binding that fires\n  it daily has been removed.\n---\n\n# pdm-decompose — superseded (kept on disk for reversibility)\n\n> **STATUS**: superseded by the simplified flow defined in\n> [workforce/docs/epics/README.md](../../docs/epics/README.md). Maya\n> still owns Epic → Story decomposition (covered by `pdm-charter`), but\n> the additional role-tagging layer this skill produced is no longer\n> needed.\n\n**Owner**: maya (PM / Founder)\n**Executor**: deterministic (handler calls Anthropic + GitHub directly)\n**Cadence**: daily 15:00 America/Los_Angeles (cron(0 22 * * ? *) — PDT; slips to 14:00 in PST)\n**Status**: binding removed from `workforce/agents/maya/agent.json`; handler retained for reversibility\n\n## What this skill does\n\nReads the open GitHub issues in `refluster/ai-native-article` whose title matches `^\\[Epic-` and whose body contains a `## Workstreams` section. For each, it classifies the state and advances exactly one transition per run.\n\n### State machine\n\n```\nUNDECOMPOSED          (no children, no Maya-authored proposal comment)\n   │\n   │  Maya reads Workstreams, runs scenario-validation step,\n   │  posts a ### Proposed decomposition comment listing the\n   │  child issues she WOULD create (role, deliverable, AC,\n   │  reviewer personas). Marks the comment with the literal\n   │  HTML comment `<!-- pdm-decompose:proposal -->` so\n   │  subsequent runs can detect it.\n   │\n   ▼\nAWAITING_OPERATOR     (proposal comment present; no 👍 reaction)\n   │\n   │  Operator either:\n   │   (a) adds a 👍 reaction on the proposal comment → APPROVED\n   │   (b) leaves a reply comment with adjustments → Maya revises\n   │       and re-posts (stays in AWAITING_OPERATOR)\n   │   (c) closes the epic → SKIPPED (no further action)\n   │\n   ▼\nAPPROVED              (proposal comment has 👍 from operator)\n   │\n   │  Maya creates the child issues using the proposal's\n   │  contents. Each child issue carries:\n   │   - title `[Epic-N Story M] (role) — concise deliverable`\n   │   - body with AC + parent link + \"Reviewer personas: dario, aoi\"\n   │   - labels: `wf:ready`, `role:{architecture|engineering|design|qa}`,\n   │     `epic:{N-M}`, and `reviewer:{persona}` for each reviewer\n   │  Adds them as sub-issues of the parent (REST sub_issues API).\n   │  Then dispatches the implementer routine (POST to CCR /fire\n   │  for executor=claude-code-routine bindings; ...).\n   │\n   ▼\nDECOMPOSED            (has child issues — no further action)\n```\n\n### Per-run budget\n\n- ≤ 1 Anthropic call per epic (cap at 5 calls per run to bound cost)\n- ≤ 1 GH comment per UNDECOMPOSED epic\n- ≤ N GH issue creates per APPROVED epic (N = children in proposal, typ. 3–5)\n- ≤ N dispatch POSTs per APPROVED epic\n\nA run that finds nothing to do exits with `summary: \"no work\"`. The deterministic handler records the scan summary as the RUN row's `output_summary` so the audit trail is non-empty.\n\n## Inputs\n\nStandard `RunnerContext` (slug + startedAt). No extra parameters. The\ntarget repository is hard-coded to `refluster/ai-native-article` (this\nskill's only consumer for v1).\n\n## Outputs / side effects\n\n- **Output bytes (S3)**: JSON record of the scan. Shape:\n  ```json\n  {\n    \"scanned\": [\n      { \"issue\": 90, \"state\": \"DECOMPOSED\" },\n      { \"issue\": 91, \"state\": \"AWAITING_OPERATOR\" },\n      { \"issue\": 92, \"state\": \"UNDECOMPOSED\", \"action\": \"proposal_posted\", \"comment_url\": \"...\" }\n    ],\n    \"approved_decomposed\": [\n      { \"parent\": 93, \"children\": [124, 125, 126] }\n    ],\n    \"errors\": []\n  }\n  ```\n- **GitHub**: at most one issue comment per UNDECOMPOSED epic; at most N issue creates per APPROVED epic\n- **No Notion / Discord side-effects** in v1. Discord notification of the daily summary is a future enhancement (dispatch via Yuki's `discord-ping` skill chained from Maya — out of scope for PR B).\n\n## Reasoning step prompt\n\nWhen proposing a decomposition, Maya's reasoning call is sent to `claude-opus-4-7` with:\n\n- **system**: Maya's `system.md` (PM/Founder voice) + the contract block below\n- **user**: the parent issue's body, specifically the `## Workstreams` section, plus a section reminding her of the scenario-validation requirement\n\nThe contract block (kept in the handler, not in agent system.md, so it\nversions with the skill):\n\n> You are decomposing an Epic into child GitHub issues. Read the parent\n> issue body's `## Workstreams` section carefully. Before proposing,\n> identify 2–3 concrete operator scenarios this epic must support and\n> walk through whether each child task makes them work. If a scenario\n> reveals a gap, expand the workstream list.\n>\n> For each child, output:\n> - title: `[Epic-N Story M] (role) — <≤80-char deliverable>`\n> - body: includes AC bullets + parent link + \"Reviewer personas: ...\"\n> - labels: `wf:ready`, `role:<role>`, `epic:<N-M>`, `reviewer:<persona>` for each reviewer\n>\n> Output ONLY a JSON array of children, no preamble. Schema:\n> `[{title, body, labels: string[], reviewer_personas: string[]}]`.\n>\n> Architecturally significant decisions (new managed service, > USD 10/mo\n> spend, R-N* implications) → propose alternatives in the body and add\n> `coordination_required:[dario]` label. Do NOT silently decompose work\n> that should go through architecture review.\n\n## Failure modes\n\n- **GH API down / rate-limited**: skill throws; orchestrator records RUN.status=throw; next tick (24h later) retries from scratch. State is fully derivable from issue/comment state.\n- **Anthropic call fails / `stop_reason=max_tokens`**: skill throws (W-1 invariant).\n- **Proposal comment posted but issue create later fails**: subsequent run re-reads state, sees the proposal already exists (skips proposal), sees no children yet (still APPROVED), retries the create step. Idempotent.\n- **Operator adds 👍 to a stale proposal**: Maya proceeds with the proposal text as committed — she does not regenerate. To force regeneration, operator removes the proposal comment (👍 will be lost too).\n\n## Related docs\n\n- [bindings.md](../../docs/runbooks/bindings.md) — binding shape\n- [pdm-decompose.md](../../docs/runbooks/pdm-decompose.md) — operator runbook (gate handling, troubleshooting)\n- [project-workforce-meta-bootstrap.md](../../docs/runbooks/project-workforce-meta-bootstrap.md) — one-time DDB row for `PROJECT#workforce-meta`\n",
+          "truncated": false,
+          "binary": false
+        },
+        {
+          "path": "handler.ts",
+          "size": 12737,
+          "language": "typescript",
+          "contents": "// Deterministic handler for the pdm-decompose skill.\n// See ./SKILL.md for the contract + state machine.\n//\n// Output: JSON record of the per-epic scan, persisted to S3 as the\n// RUN row's output payload.\n// Side effects: GH issue comments + child-issue creates, gated by the\n// state machine documented in SKILL.md.\n\nimport type { DeterministicResult, RunnerContext } from \"../../lambdas/shared/skill-types.js\";\nimport { complete } from \"../../lambdas/shared/llm-anthropic.js\";\nimport {\n  addSubIssue,\n  createIssue,\n  createIssueComment,\n  listIssueComments,\n  listOpenIssues,\n  listReactionsForComment,\n  listSubIssues,\n  type GithubComment,\n  type GithubIssue,\n} from \"../../lambdas/shared/gh-issues.js\";\n\n// --- Configuration -------------------------------------------------------\n\nconst OWNER = process.env.PDM_GH_OWNER ?? \"refluster\";\nconst REPO = process.env.PDM_GH_REPO ?? \"ai-native-article\";\n// Per-run upper bounds — guard against runaway loops + cost spikes.\nconst MAX_EPICS_PER_RUN = parseInt(process.env.PDM_MAX_EPICS ?? \"5\", 10);\nconst MAX_CHILDREN_PER_EPIC = parseInt(process.env.PDM_MAX_CHILDREN ?? \"8\", 10);\n// Maya's model is hard-coded here (not read from agent.json) so the\n// reasoning shape is part of the skill's versioned contract, not subject\n// to per-agent overrides.\nconst REASONING_MODEL = \"anthropic:claude-opus-4-7\";\nconst REASONING_MAX_TOKENS = 4000;\n\nconst PROPOSAL_MARKER = \"<!-- pdm-decompose:proposal -->\";\nconst EPIC_TITLE_RE = /^\\[Epic-/;\nconst WORKSTREAMS_HEADING_RE = /^##\\s+Workstreams\\b/m;\n\n// --- Skill-versioned reasoning contract ----------------------------------\n\nconst REASONING_SYSTEM_SUFFIX = `\n\n# Active task: epic decomposition\n\nYou are decomposing an Epic into child GitHub issues. Read the parent\nissue body's \"## Workstreams\" section carefully. Before proposing,\nidentify 2-3 concrete operator scenarios this epic must support and\nwalk through whether each child task makes them work. If a scenario\nreveals a gap, expand the workstream list.\n\nFor each child, output:\n- title: \"[Epic-N Story M] (role) — <=80-char deliverable\"\n- body: includes AC bullets + parent link + \"Reviewer personas: ...\"\n- labels: [\"wf:ready\", \"role:<role>\", \"epic:<N-M>\", \"reviewer:<persona>\", ...]\n\nOutput ONLY a JSON object with these fields, no preamble:\n{\n  \"scenarios_walked\": [\"operator scenario 1\", \"operator scenario 2\", ...],\n  \"children\": [\n    {\n      \"title\": \"[Epic-N Story M] (role) — deliverable\",\n      \"body\": \"markdown body...\",\n      \"labels\": [\"wf:ready\", \"role:engineering\", \"epic:N-M\", \"reviewer:dario\"],\n      \"reviewer_personas\": [\"dario\", \"aoi\"]\n    }\n  ]\n}\n\nArchitecturally significant decisions (new managed service, > USD 10/mo\nspend, R-N* implications): propose alternatives in the body and add the\nlabel \"coordination_required:dario\". Do NOT silently decompose work that\nshould go through architecture review.\n`;\n\n// --- Public handler ------------------------------------------------------\n\ninterface ScanRecord {\n  issue: number;\n  title: string;\n  state: \"DECOMPOSED\" | \"AWAITING_OPERATOR\" | \"UNDECOMPOSED\" | \"APPROVED\" | \"SKIPPED\";\n  action?: string;\n  comment_url?: string;\n  error?: string;\n}\n\ninterface ApprovedRecord {\n  parent: number;\n  children: Array<{ number: number; title: string }>;\n}\n\ninterface ScanOutput {\n  scanned: ScanRecord[];\n  approved_decomposed: ApprovedRecord[];\n  errors: string[];\n}\n\nexport async function dispatchPdmDecompose(ctx: RunnerContext): Promise<DeterministicResult> {\n  void ctx; // The handler does not currently use slug/startedAt — single-tenant repo.\n\n  const output: ScanOutput = { scanned: [], approved_decomposed: [], errors: [] };\n\n  let issues: GithubIssue[];\n  try {\n    issues = await listOpenIssues(OWNER, REPO);\n  } catch (err) {\n    throw new Error(\n      `pdm-decompose: failed to list issues (${err instanceof Error ? err.message : String(err)})`,\n    );\n  }\n\n  const epicCandidates = issues.filter(\n    (it) => EPIC_TITLE_RE.test(it.title) && it.body && WORKSTREAMS_HEADING_RE.test(it.body),\n  );\n\n  let epicsHandled = 0;\n  for (const epic of epicCandidates) {\n    if (epicsHandled >= MAX_EPICS_PER_RUN) break;\n\n    let state: ScanRecord[\"state\"] = \"UNDECOMPOSED\";\n    let action: string | undefined;\n    let commentUrl: string | undefined;\n\n    try {\n      // 1. Already decomposed?\n      const subIssues = await listSubIssues(OWNER, REPO, epic.number);\n      if (subIssues.length > 0) {\n        state = \"DECOMPOSED\";\n        output.scanned.push({ issue: epic.number, title: epic.title, state });\n        continue;\n      }\n\n      // 2. Proposal already posted?\n      const comments = await listIssueComments(OWNER, REPO, epic.number);\n      const proposal = findProposalComment(comments);\n\n      if (proposal) {\n        // Already proposed — check for 👍 approval\n        const reactions = await listReactionsForComment(OWNER, REPO, proposal.id);\n        const approved = reactions.some((r) => r.content === \"+1\");\n        if (!approved) {\n          state = \"AWAITING_OPERATOR\";\n          output.scanned.push({\n            issue: epic.number,\n            title: epic.title,\n            state,\n            comment_url: proposal.html_url,\n          });\n          continue;\n        }\n        // APPROVED — materialise children from the proposal body\n        const children = parseProposalChildren(proposal.body);\n        const created = await materialiseChildren(epic, children);\n        state = \"APPROVED\";\n        action = `created ${created.length} children`;\n        output.approved_decomposed.push({ parent: epic.number, children: created });\n        output.scanned.push({\n          issue: epic.number,\n          title: epic.title,\n          state,\n          action,\n          comment_url: proposal.html_url,\n        });\n        epicsHandled++;\n        continue;\n      }\n\n      // 3. UNDECOMPOSED — propose\n      const proposalText = await proposeForEpic(epic);\n      const posted = await createIssueComment(\n        OWNER,\n        REPO,\n        epic.number,\n        wrapProposalMarker(proposalText),\n      );\n      state = \"UNDECOMPOSED\";\n      action = \"proposal_posted\";\n      commentUrl = posted.html_url;\n      output.scanned.push({\n        issue: epic.number,\n        title: epic.title,\n        state,\n        action,\n        comment_url: commentUrl,\n      });\n      epicsHandled++;\n    } catch (err) {\n      const message = err instanceof Error ? err.message : String(err);\n      output.errors.push(`epic #${epic.number}: ${message}`);\n      output.scanned.push({ issue: epic.number, title: epic.title, state, error: message });\n    }\n  }\n\n  const summary = summarise(output);\n  return {\n    output: JSON.stringify(output, null, 2),\n    outputExt: \"json\",\n    summary,\n  };\n}\n\n// --- Helpers -------------------------------------------------------------\n\nfunction findProposalComment(comments: GithubComment[]): GithubComment | undefined {\n  return comments.find((c) => c.body.includes(PROPOSAL_MARKER));\n}\n\nfunction wrapProposalMarker(text: string): string {\n  return `${PROPOSAL_MARKER}\\n\\n${text}\\n\\n_To approve, react with 👍 on this comment. To revise, leave a reply with adjustments._`;\n}\n\ninterface ChildSpec {\n  title: string;\n  body: string;\n  labels: string[];\n  reviewer_personas: string[];\n}\n\ninterface ProposalPayload {\n  scenarios_walked: string[];\n  children: ChildSpec[];\n}\n\nfunction parseProposalChildren(commentBody: string): ChildSpec[] {\n  // The proposal comment wraps the JSON in markdown — find the first JSON\n  // block. We accept either a ```json fenced block or a bare JSON object.\n  const fenceMatch = commentBody.match(/```json\\s*\\n([\\s\\S]*?)\\n```/);\n  const raw = fenceMatch ? fenceMatch[1] : extractFirstJsonObject(commentBody);\n  if (!raw) {\n    throw new Error(\"could not locate JSON payload in approved proposal comment\");\n  }\n  let parsed: ProposalPayload;\n  try {\n    parsed = JSON.parse(raw) as ProposalPayload;\n  } catch (err) {\n    throw new Error(`proposal JSON parse failed: ${err instanceof Error ? err.message : String(err)}`);\n  }\n  if (!Array.isArray(parsed.children) || parsed.children.length === 0) {\n    throw new Error(\"proposal has no children to materialise\");\n  }\n  if (parsed.children.length > MAX_CHILDREN_PER_EPIC) {\n    throw new Error(\n      `proposal has ${parsed.children.length} children > cap ${MAX_CHILDREN_PER_EPIC} — split the epic first`,\n    );\n  }\n  return parsed.children;\n}\n\nfunction extractFirstJsonObject(text: string): string | undefined {\n  const start = text.indexOf(\"{\");\n  if (start === -1) return undefined;\n  let depth = 0;\n  for (let i = start; i < text.length; i++) {\n    if (text[i] === \"{\") depth++;\n    else if (text[i] === \"}\") {\n      depth--;\n      if (depth === 0) return text.slice(start, i + 1);\n    }\n  }\n  return undefined;\n}\n\nasync function materialiseChildren(\n  parent: GithubIssue,\n  children: ChildSpec[],\n): Promise<Array<{ number: number; title: string }>> {\n  const created: Array<{ number: number; title: string }> = [];\n  for (const c of children) {\n    const issue = await createIssue(OWNER, REPO, {\n      title: c.title,\n      body: appendParentLink(c.body, parent),\n      labels: c.labels,\n    });\n    try {\n      await addSubIssue(OWNER, REPO, parent.number, issue.number);\n    } catch {\n      // sub_issues API may not be enabled on the repo / on a non-billable plan;\n      // the child issue still exists and the body links back to the parent.\n    }\n    created.push({ number: issue.number, title: issue.title });\n  }\n  return created;\n}\n\nfunction appendParentLink(body: string, parent: GithubIssue): string {\n  const link = `\\n\\n---\\n\\nParent epic: ${parent.html_url} (#${parent.number}) — _${parent.title}_`;\n  return body.includes(parent.html_url) ? body : `${body}${link}`;\n}\n\nasync function proposeForEpic(epic: GithubIssue): Promise<string> {\n  const workstreams = extractWorkstreams(epic.body ?? \"\");\n  const user = [\n    `## Parent epic`,\n    `**#${epic.number}** — ${epic.title}`,\n    epic.html_url,\n    \"\",\n    `## Workstreams section (verbatim)`,\n    \"\",\n    workstreams,\n    \"\",\n    `## Required output`,\n    \"\",\n    \"Walk 2-3 operator scenarios, then return ONLY the JSON object as specified in the system prompt.\",\n  ].join(\"\\n\");\n\n  // Maya's system.md is loaded by the agent-runner for llm-prose flows; for\n  // deterministic skills we compose our own minimal system here (the\n  // reasoning is skill-local, not Maya-persona-flavoured).\n  const system = `You are Maya, the PdM. Decompose the epic below into child GitHub issues per the contract.${REASONING_SYSTEM_SUFFIX}`;\n\n  const llm = await complete({\n    model: REASONING_MODEL,\n    system,\n    user,\n    maxTokens: REASONING_MAX_TOKENS,\n  });\n\n  // Wrap the LLM JSON output in a fenced code block + a human-readable\n  // preface, so the proposal comment is both readable and machine-parseable.\n  const preface = buildProposalPreface(llm.text);\n  return `### Proposed decomposition\\n\\n${preface}\\n\\n\\`\\`\\`json\\n${cleanJsonForFence(llm.text)}\\n\\`\\`\\``;\n}\n\nfunction extractWorkstreams(body: string): string {\n  const m = body.match(/##\\s+Workstreams[\\s\\S]*?(?=\\n##\\s+|\\n#\\s+|$)/);\n  return m ? m[0].trim() : body.slice(0, 4000);\n}\n\nfunction cleanJsonForFence(text: string): string {\n  const json = extractFirstJsonObject(text) ?? text.trim();\n  try {\n    return JSON.stringify(JSON.parse(json), null, 2);\n  } catch {\n    return json;\n  }\n}\n\nfunction buildProposalPreface(text: string): string {\n  const json = extractFirstJsonObject(text);\n  if (!json) return \"_(could not extract structured proposal — raw model output follows)_\";\n  try {\n    const parsed = JSON.parse(json) as ProposalPayload;\n    const scenarios = (parsed.scenarios_walked ?? [])\n      .map((s, i) => `${i + 1}. ${s}`)\n      .join(\"\\n\");\n    const summary = (parsed.children ?? [])\n      .map((c) => `- ${c.title} _(reviewers: ${c.reviewer_personas.join(\", \")})_`)\n      .join(\"\\n\");\n    return `**Scenarios walked**:\\n${scenarios || \"_(none listed)_\"}\\n\\n**Proposed children**:\\n${summary || \"_(none)_\"}`;\n  } catch {\n    return \"_(proposal JSON did not parse cleanly — see the raw block below)_\";\n  }\n}\n\nfunction summarise(o: ScanOutput): string {\n  if (o.scanned.length === 0) return \"no work: 0 epics matched\";\n  const byState: Record<string, number> = {};\n  for (const r of o.scanned) byState[r.state] = (byState[r.state] ?? 0) + 1;\n  const parts = Object.entries(byState).map(([s, n]) => `${s.toLowerCase()}=${n}`);\n  if (o.approved_decomposed.length > 0) {\n    const totalChildren = o.approved_decomposed.reduce((a, r) => a + r.children.length, 0);\n    parts.push(`children_created=${totalChildren}`);\n  }\n  if (o.errors.length > 0) parts.push(`errors=${o.errors.length}`);\n  return `pdm-decompose: ${parts.join(\", \")}`;\n}\n",
+          "truncated": false,
+          "binary": false
+        },
+        {
+          "path": "meta.json",
+          "size": 214,
+          "language": "json",
+          "contents": "{\n  \"name\": \"pdm-decompose\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"executor\": \"deterministic\",\n  \"cost_class\": \"medium\",\n  \"owners\": [\"maya\"],\n  \"improvement_agent\": \"maya\",\n  \"created_at\": \"2026-05-25\"\n}\n",
+          "truncated": false,
+          "binary": false
+        }
+      ]
     },
     {
       "name": "plan-write",
@@ -134,7 +284,25 @@
       ],
       "improvement_agent": null,
       "created_at": "2026-05-18",
-      "description": "Produce one 600-1200 word hypothesis-style plan in Japanese — a clear claim, why-now, what would falsify it, and the next step if false. Use when the PM/Founder persona is writing roadmap or hypothesis content that needs to be measurable against reality, not aspirational prose."
+      "description": "Produce one 600-1200 word hypothesis-style plan in Japanese — a clear claim, why-now, what would falsify it, and the next step if false. Use when the PM/Founder persona is writing roadmap or hypothesis content that needs to be measurable against reality, not aspirational prose.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 1511,
+          "language": "markdown",
+          "contents": "---\nname: plan-write\ndescription: Produce one 600-1200 word hypothesis-style plan in Japanese — a clear claim, why-now, what would falsify it, and the next step if false. Use when the PM/Founder persona is writing roadmap or hypothesis content that needs to be measurable against reality, not aspirational prose.\n---\n\n# plan-write\n\nHypothesis-as-document. The deliverable reads as a short essay but commits to a falsifiable position.\n\n## Instructions\n\n1. State **one** hypothesis up front (the title is the hypothesis, paraphrased).\n2. **Why now** — 1-2 paragraphs of context that triggered this hypothesis being writable today and not three months ago.\n3. **Falsifier** — the observable evidence that would force the author to retract. If you cannot name one, the hypothesis is not yet a plan.\n4. **Next step if false** — what gets tried instead. Naming this is what separates a plan from a guess.\n5. **Next step if true** — 1-2 sentence sketch.\n\nLength target: 600-1200 words in Japanese. ASCII title is acceptable.\n\n## Voice\n\nThis skill assumes the PM/Founder voice: confident-but-falsifiable, explicit about cost of being wrong, allergic to \"let's see what happens\" non-commitments.\n\n## When NOT to use\n\n- The author is reflecting on past decisions (use a different skill — retrospective).\n- The claim is purely technical (a design-doc / tech-note is the right shape).\n- The intended audience is the operator-of-self only (then a private memory chunk is enough; no published artefact required).\n",
+          "truncated": false,
+          "binary": false
+        },
+        {
+          "path": "meta.json",
+          "size": 277,
+          "language": "json",
+          "contents": "{\n  \"name\": \"plan-write\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"plan\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"maya\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-18\"\n}\n",
+          "truncated": false,
+          "binary": false
+        }
+      ]
     },
     {
       "name": "positioning-write",
@@ -151,7 +319,25 @@
       ],
       "improvement_agent": null,
       "created_at": "2026-05-18",
-      "description": "Produce one launch / positioning artefact in Japanese — positioning, audience, channel, success metric, retraction trigger. Use when the GTM/Customer persona is committing a launch or message to writing in a form that can be evaluated against real channels and real audiences after the fact."
+      "description": "Produce one launch / positioning artefact in Japanese — positioning, audience, channel, success metric, retraction trigger. Use when the GTM/Customer persona is committing a launch or message to writing in a form that can be evaluated against real channels and real audiences after the fact.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 1874,
+          "language": "markdown",
+          "contents": "---\nname: positioning-write\ndescription: Produce one launch / positioning artefact in Japanese — positioning, audience, channel, success metric, retraction trigger. Use when the GTM/Customer persona is committing a launch or message to writing in a form that can be evaluated against real channels and real audiences after the fact.\n---\n\n# positioning-write\n\nA launch-shaped deliverable. The form matters because each section is what a post-launch retrospective needs to ask \"did this work?\"\n\n## Instructions\n\nFive sections, ordered:\n\n1. **Positioning** — one sentence completing \"For {audience} who {pain}, this is {category} that {differentiator}, unlike {alternative}.\" If any blank can't be filled, the launch isn't ready.\n2. **Audience** — who reads / hears this. Be concrete: not \"developers\" but \"Tokyo-based JS-leaning indie hackers who already use Claude Code.\" If the audience is \"everyone who follows the site,\" say so explicitly and accept the dilution.\n3. **Channel** — where this lands. Note site-prominence vs. SNS push vs. Notion changelog vs. all-three. Each channel has different fidelity.\n4. **Success metric** — what a \"this worked\" looks like by next Tuesday. One metric. Numeric if possible. If the metric is \"qualitative — the operator's gut\", say so; that's still a metric.\n5. **Retraction trigger** — what observable would force pulling or amending the launch. C-1 / W-1 are non-negotiable; the retraction trigger names the *next* tier of \"we'd take this down.\"\n\nLength: 300-700 words in Japanese.\n\n## When NOT to use\n\n- The artefact is the launch announcement *itself* (the customer-facing copy). That's `article-draft` voice. This skill produces the operator-facing plan that surrounds that copy.\n- The launch is for a feature that hasn't shipped yet — write a `plan-write` doc instead; positioning waits for the feature to exist.\n",
+          "truncated": false,
+          "binary": false
+        },
+        {
+          "path": "meta.json",
+          "size": 291,
+          "language": "json",
+          "contents": "{\n  \"name\": \"positioning-write\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"launch-plan\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"yuki\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-18\"\n}\n",
+          "truncated": false,
+          "binary": false
+        }
+      ]
     }
   ]
 }
