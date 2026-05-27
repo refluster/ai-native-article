@@ -60,6 +60,16 @@
     "sourceUrls": "https://releasebot.io/updates/anthropic"
   },
   {
+    "slug": "de73df48057a",
+    "title": "「AIを育てている、構築しているのではない」——AnthropicがOpenAIを離れた理由と、AI開発の「正しいやり方」をめぐる実験",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "date": "2026-03-28",
+    "abstract": "外交問題評議会（CFR）でのアモデイ講演の深読み。Anthropicがなぜ「ミッションファースト」を標榜するのか、メカニスティック・インタープリタビリティへの投資が示す長期思想、そしてAIの安全性が実は企業競争力と矛盾しない理由。",
+    "image": "/posts/images/de73df48057a.jpg",
+    "sourceUrls": "https://www.cfr.org/event/ceo-speaker-series-dario-amodei-anthropic"
+  },
+  {
     "slug": "c3de4fa6837b",
     "title": "解説：Fujitsu's AI Resilience Platform",
     "type": "explanation",
