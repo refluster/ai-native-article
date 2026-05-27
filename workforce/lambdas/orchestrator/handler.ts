@@ -45,7 +45,7 @@ const lambda = new LambdaClient({});
 // Fallback DEFAULT_DEDUP_MINUTES applies to skills not listed here.
 const DEFAULT_DEDUP_MINUTES = 60;
 const DEDUP_MINUTES_BY_SKILL: Record<string, number> = {
-  "discord-ping": 150,         // 2.5h — under the 6h cadence
+  "discord-ping": 45,          // 45m — under the 1h cadence, well above the 30m tick interval
   "article-draft": 60 * 5,     // 5h — Sora's 12h cadence
   "market-research": 60 * 5,
   "plan-write": 60 * 24 * 13,  // 13d — Maya's biweekly

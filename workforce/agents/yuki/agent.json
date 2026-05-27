@@ -21,9 +21,9 @@
       "executor": "lambda",
       "trigger": {
         "scheduler": "eventbridge",
-        "cron": "cron(0 0/6 * * ? *)"
+        "cron": "cron(0 * * * ? *)"
       },
-      "note": "Heartbeat every 6h"
+      "note": "Heartbeat every hour — doubles as the workforce's at-a-glance uptime monitor (a quiet channel for >1h means the dispatch chain is broken)"
     }
   ],
   "jd": {

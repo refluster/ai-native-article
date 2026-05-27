@@ -1,9 +1,8 @@
-// Webhook side-effect for skills with meta.json:trigger_class=webhook.
+// Webhook side-effect for skills posting to Discord-style incoming webhooks.
 //
-// The runner calls postToWebhook() AFTER a successful LLM call. The skill
-// body (an instruction set, Claude-Skill-compatible) tells the persona to
-// produce a single short message; this module ships that message to the
-// configured channel. Failure throws — the runner's W-4 path surfaces it.
+// The runner calls postToWebhook() from a skill handler (deterministic
+// or after a successful LLM call). Failure throws — the runner's W-4
+// path surfaces it.
 
 import { getSecret } from "./secrets.js";
 
@@ -13,27 +12,68 @@ export interface WebhookSecret {
 }
 
 /**
- * POST a plain-text body to a Discord-style incoming webhook.
+ * Discord embed shape — the subset of fields the workforce uses today.
+ * Full Discord embed spec has more (footer, fields, image, etc.) — add
+ * properties here as a downstream skill needs them.
+ */
+export interface DiscordEmbed {
+  title?: string;
+  description?: string;
+  /**
+   * Sidebar color as a decimal integer (e.g. `0x3498db` = `3447003`,
+   * Discord's conventional "info" blue). Discord ignores the alpha channel.
+   */
+  color?: number;
+  /** ISO-8601 timestamp Discord auto-renders at the embed footer. */
+  timestamp?: string;
+  url?: string;
+}
+
+/**
+ * Discord webhook payload. Either a plain text body (back-compat shorthand
+ * that wraps into `{content}`) or a structured payload supporting embeds.
+ * Discord requires at least one of `content` or `embeds`.
+ */
+export type DiscordPayload =
+  | string
+  | {
+      content?: string;
+      embeds?: DiscordEmbed[];
+    };
+
+/**
+ * POST to a Discord-style incoming webhook. Accepts either a plain string
+ * (wrapped into `{content}` per the back-compat shape skills used at v1)
+ * or a structured `{content?, embeds?}` payload for color-bar / sidebar
+ * formatting (used by deterministic heartbeat skills for at-a-glance health).
  *
- * Discord (and Slack-compat shims) expect JSON `{content: "..."}`. We
- * truncate to 1900 chars to stay under Discord's 2000-char message cap;
- * the skill's instructions ask for a single line so truncation here is
- * the W-4 belt-and-braces guard, not the normal path.
+ * Discord caps `content` at 2000 chars; we truncate strings to 1900 as a
+ * W-4 belt-and-braces against runaway prose. Embeds are NOT truncated —
+ * the caller is responsible for keeping embed payloads under Discord's
+ * 6000-char aggregate limit (the workforce's heartbeat skills are tiny;
+ * if a future skill blows past this, add a guard at the call site, not
+ * here, because the cap is per-embed-field, not whole-payload-trivial).
  */
 export async function postToWebhook(
   secretName: string,
-  body: string,
+  payload: DiscordPayload,
 ): Promise<{ status: number }> {
   const { webhookUrl } = await getSecret<WebhookSecret>(secretName);
   if (!webhookUrl) {
     throw new Error(`webhook secret "${secretName}" missing webhookUrl`);
   }
 
-  const content = body.length > 1900 ? `${body.slice(0, 1897)}...` : body;
+  const body =
+    typeof payload === "string"
+      ? JSON.stringify({
+          content: payload.length > 1900 ? `${payload.slice(0, 1897)}...` : payload,
+        })
+      : JSON.stringify(payload);
+
   const res = await fetch(webhookUrl, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ content }),
+    body,
     redirect: "follow",
   });
   if (!res.ok) {
