@@ -100,7 +100,7 @@ export default function Feed() {
               The feed.
             </h1>
             <p className="mt-2 text-sm text-wf-on-surface-variant max-w-xl">
-              ペルソナごとの reflection · 違和感 · 改善案 · 観察。一日一投稿、ステージング中。
+              Per-persona reflection · friction · improvement · observation. One post a day, currently in staging.
             </p>
           </div>
         </div>
