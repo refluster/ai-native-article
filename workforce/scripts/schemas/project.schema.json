@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kohuehara.xyz/workforce/schemas/project.schema.json",
+  "title": "Workforce Project",
+  "description": "File-based seed for a PROJECT#{id} row + member edges per Epic-010 §3 + §7. The runner reads PROJECT#{id}/META from DDB at invocation time; this file is the authoritative source that workforce/scripts/seed-projects.mjs writes from. `self/{slug}` projects are auto-seeded by the runner (Story 1-B) and MUST NOT have a project.json file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "members",
+    "credential_types"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "maxLength": 64,
+      "description": "Project id. Used as PROJECT#{id} partition key in DDB and wf/projects/{id}/{type} prefix in Secrets Manager. MUST match the parent directory name. MUST NOT contain '#' or '|' (asProjectId() reject). MUST NOT start with 'self/' (reserved per Epic-010 §3)."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "description": "Human-readable project name surfaced in the console."
+    },
+    "owner_agent": {
+      "type": "string",
+      "pattern": "^[a-z]+$",
+      "description": "Agent slug responsible for the project's overall direction. Optional; defaults to no owner (operator-owned). Must be in members[] if set."
+    },
+    "github": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "repo"],
+      "properties": {
+        "owner": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+          "maxLength": 39
+        },
+        "repo": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+$",
+          "maxLength": 100
+        }
+      },
+      "description": "GitHub repo this project ships work against. Used by pr-route / pr-review handlers to resolve PR URLs against the project. The PAT used to call the API is read from wf/projects/{id}/github.token; the project membership policy gates who can invoke a skill against this project."
+    },
+    "governance_docs": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 8,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9._/-]+$",
+        "maxLength": 200
+      },
+      "description": "Optional paths (relative to the target repo's root) to governance docs that reviewer agents should ground their lens against. Examples: AGENTS.md, CONTRIBUTING.md, docs/architecture.md. Empty / omitted means reviewers fall back to generic per-persona principles only. Paths are fetched via GitHub Contents API using the project's github.token credential."
+    },
+    "members": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z]+$"
+      },
+      "description": "Agent slugs that participate in this project. Cross-checked against workforce/agents/. Membership is the access boundary for appendExecution() per Epic-010 §7. Soft-delete via the API/UI is independent of this file — this file declares the seed state."
+    },
+    "credential_types": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 8,
+      "items": {
+        "type": "string",
+        "pattern": "^(anthropic\\.api_key|discord\\.bot_token|github\\.token|notion\\.integration_token)(@[a-z][a-z0-9_-]*)?$"
+      },
+      "description": "Credential keys this project is expected to hold in Secrets Manager under wf/projects/{id}/{type}. Declaring a type here does NOT create the secret — operator stores values via aws secretsmanager put-secret-value out of band. Validators only check the file shape. Runtime check: if a skill's `requires` lists a type not present here, the operator-onboarding runbook is incomplete; the runner will throw on getCredential() ResourceNotFoundException (no _default fallback in scoped projects)."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "paused", "archived"],
+      "description": "Lifecycle. Defaults to active when omitted. archived projects are read-only (no appendExecution; existing ledger remains queryable)."
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "ISO date the project was first declared in-repo."
+    },
+    "note": {
+      "type": "string",
+      "maxLength": 400,
+      "description": "One-line human note about why the project exists. Surfaces in the console."
+    }
+  }
+}
