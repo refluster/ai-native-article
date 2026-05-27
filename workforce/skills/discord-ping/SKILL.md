@@ -1,11 +1,13 @@
 ---
 name: discord-ping
-description: Post a one-line liveness heartbeat to the team Discord channel. Documents the operational shape of the deterministic runner-side handler so a human or a Claude-Code persona reading this file knows exactly what fires when the matching agent.binding's cron triggers. The runner's discord-ping handler executes this verbatim — no LLM is involved at runtime.
+description: Post a color-coded liveness heartbeat embed to the team Discord channel. Documents the operational shape of the deterministic runner-side handler so a human or a Claude-Code persona reading this file knows exactly what fires when the matching agent.binding's cron triggers. Doubles as the workforce's at-a-glance health-check / uptime monitor — a quiet Discord channel for >1h means the dispatch chain is broken. The runner's discord-ping handler executes this verbatim — no LLM is involved at runtime.
 ---
 
 # discord-ping
 
 A heartbeat from the workforce. The point is the pipeline, not the prose. **Deterministic skill** — the runner executes a handler bundled in this folder; no LLM call is made.
+
+Doubles as the workforce's at-a-glance health-check signal: the channel SHOULD see a new embed every hour. A quiet channel for >1h means the dispatch chain (EventBridge tick → orchestrator → runner → webhook) has broken somewhere — the absence-of-heartbeat IS the alarm.
 
 ## Bundle layout
 
@@ -20,14 +22,21 @@ Adding a deterministic skill anywhere under `workforce/skills/` follows the same
 
 ## What the runner does
 
-When an agent binding `{ cron, skill: "discord-ping" }` fires, the runner:
+When an agent binding `{ skill: "discord-ping", trigger: { cron, scheduler: "eventbridge" } }` fires, the runner:
 
-1. Composes the message body verbatim:
+1. Composes a Discord embed:
+   ```json
+   {
+     "embeds": [{
+       "title": "wf-pulse · {agent.slug}",
+       "color": 3447003,                           // 0x3498db, info-blue sidebar
+       "timestamp": "{ISO-8601 UTC, second precision}"
+     }]
+   }
    ```
-   [wf-pulse] {agent.slug} alive at {ISO-8601 UTC timestamp, second precision}
-   ```
-2. POSTs the body to the Discord channel webhook (URL read from Secrets Manager id `DISCORD_WEBHOOK_SECRET`).
-3. Writes the body to S3 (`runs/{slug}/{run_id}/output.txt`) for audit / replay.
+   The color bar on the left of the embed is the at-a-glance health signal — blue = alive. Future health states reserve green (`0x2ecc71`) for ok-with-detail, yellow (`0xf1c40f`) for warn, red (`0xe74c3c`) for critical.
+2. POSTs the embed to the Discord channel webhook (URL read from Secrets Manager id `DISCORD_WEBHOOK_SECRET`).
+3. Writes a textual line `[wf-pulse] {slug} alive at {iso}` to S3 (`runs/{slug}/{run_id}/output.txt`) for audit / replay — the embed shape is for humans, the line is for grep.
 4. Records a RUN row in DDB with `output_s3_key`, `output_summary`, timing, and the Discord HTTP status.
 
 ## What it deliberately does **not** do
@@ -35,7 +44,7 @@ When an agent binding `{ cron, skill: "discord-ping" }` fires, the runner:
 - Call an LLM. This skill has `executor: "deterministic"` in `meta.json`; the runner short-circuits the LLM path.
 - Write a DELIV row. Discord posts have no stable queryable external URL, so there is nothing to track separately from the RUN row.
 - Read memory. The output depends only on `{ agent.slug, wall_clock }`.
-- Take parameters. v1 is intentionally fixed — agent slug + UTC timestamp + literal format.
+- Take parameters. v2 is intentionally fixed — agent slug + UTC timestamp + literal embed shape with the alive-blue color.
 
 ## Why a skill at all (and not hardcoded in the runner)
 
@@ -45,8 +54,14 @@ So the heartbeat is a first-class line item in:
 - the per-RUN trace (`skill_name = "discord-ping"` is searchable in the audit log)
 - the skill directory page on the workforce console (it's discoverable, paused, deprecated like any other skill)
 
-Replacing the runner's literal format requires editing `handler.ts` in this folder and bumping `meta.json:version`. Replacing the cadence is one line in the owning agent's `agent.json`.
+Replacing the embed shape requires editing `handler.ts` in this folder and bumping `meta.json:version`. Replacing the cadence is one line in the owning agent's `agent.json:bindings[].trigger.cron`.
+
+## Cadence and dedup
+
+The owning agent's binding cron determines the natural fire frequency. As of v0.4, Yuki is bound to `cron(0 * * * ? *)` — once every hour at minute 0. The orchestrator's per-skill dedup window for `discord-ping` is 45 minutes — under the 60-minute cron cadence so consecutive natural fires aren't blocked, but well above the 30-minute orchestrator tick interval so a single cron firing isn't double-dispatched by overlapping ticks.
+
+If the binding cron is tightened beyond 1h (e.g. every 30 min), the dedup window must come down to match — see `DEDUP_MINUTES_BY_SKILL` in `workforce/lambdas/orchestrator/handler.ts`.
 
 ## Claude-Code compatibility
 
-This SKILL.md is documentation for human + Claude-Code readers. If a Claude-Code persona is asked to "manually run discord-ping", they should produce the one-line format shown above and POST it themselves — there is no LLM-execution path inside the workforce runner for this skill, by design.
+This SKILL.md is documentation for human + Claude-Code readers. If a Claude-Code persona is asked to "manually run discord-ping", they should construct the embed shown above (or fall back to the legacy one-line `[wf-pulse] {slug} alive at {iso}` string format if the consumer doesn't render embeds) and POST it themselves — there is no LLM-execution path inside the workforce runner for this skill, by design.
