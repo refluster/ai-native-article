@@ -27,10 +27,15 @@ const UP_LIMIT = 2;
 const DOWN_LIMIT = 2;
 const INDENT_PX = 20;
 
+type RailShape = 'vertical' | 'empty' | 'branch' | 'corner';
+
 interface Row {
   agent: WorkforceAgent;
   indent: number;
   isFocus: boolean;
+  // One entry per indent column. Last entry is the L-corner/branch at this
+  // row; earlier entries continue (or skip) the ancestor rails passing through.
+  railShapes: RailShape[];
 }
 
 function computeWindow(
@@ -93,46 +98,84 @@ function buildRows(
   const rows: Row[] = [];
   const seen = new Set<string>();
 
-  function dfs(a: WorkforceAgent, indent: number) {
+  // siblingFlags[j] = does the ancestor on this row's path at depth j+1 have a
+  // younger sibling? Last entry (j = depth-1) reflects this row itself.
+  function dfs(a: WorkforceAgent, siblingFlags: boolean[]) {
     if (seen.has(a.slug)) return;
     seen.add(a.slug);
-    rows.push({ agent: a, indent, isFocus: a.slug === focusSlug });
+    const indent = siblingFlags.length;
+    const railShapes: RailShape[] = [];
+    for (let j = 0; j < indent - 1; j++) {
+      railShapes.push(siblingFlags[j] ? 'vertical' : 'empty');
+    }
+    if (indent > 0) {
+      railShapes.push(siblingFlags[indent - 1] ? 'branch' : 'corner');
+    }
+    rows.push({ agent: a, indent, isFocus: a.slug === focusSlug, railShapes });
     const children = a.direct_reports
       .map((s) => bySlug.get(s))
       .filter((c): c is WorkforceAgent => !!c && visible.has(c.slug))
       .sort((x, y) => x.slug.localeCompare(y.slug));
-    for (const c of children) dfs(c, indent + 1);
+    for (let i = 0; i < children.length; i++) {
+      const isLast = i === children.length - 1;
+      dfs(children[i], [...siblingFlags, !isLast]);
+    }
   }
-  for (const t of tops) dfs(t, 0);
+  for (const t of tops) dfs(t, []);
 
   // Defensive: any visible agent not reachable via direct_reports.
   for (const a of roster) {
     if (visible.has(a.slug) && !seen.has(a.slug)) {
-      rows.push({ agent: a, indent: 0, isFocus: a.slug === focusSlug });
+      rows.push({ agent: a, indent: 0, isFocus: a.slug === focusSlug, railShapes: [] });
       seen.add(a.slug);
     }
   }
   return rows;
 }
 
+function RailCell({ shape }: { shape: RailShape }) {
+  // Lines overshoot the row's top/bottom by 2px to bridge the space-y-0.5 gap
+  // between adjacent TreeRows so the rail reads as continuous.
+  const line = 'absolute bg-[var(--wf-sigil-border)] left-1/2';
+  return (
+    <span
+      className="relative shrink-0 self-stretch"
+      style={{ width: INDENT_PX }}
+      aria-hidden="true"
+    >
+      {(shape === 'vertical' || shape === 'branch') && (
+        <span className={`${line} w-px`} style={{ top: -2, bottom: -2 }} />
+      )}
+      {shape === 'corner' && (
+        <span className={`${line} w-px`} style={{ top: -2, height: 'calc(50% + 2px)' }} />
+      )}
+      {(shape === 'branch' || shape === 'corner') && (
+        <span className={`${line} top-1/2 right-0 h-px`} />
+      )}
+    </span>
+  );
+}
+
 function TreeRow({ row }: { row: Row }) {
-  const base = 'flex items-center gap-2.5 px-2 py-2 rounded-wf-sm transition-colors min-w-0';
+  const cardBase =
+    'flex-1 flex items-center gap-2.5 px-2 py-2 rounded-wf-sm transition-colors min-w-0';
   const focusClass = row.isFocus
     ? 'border border-wf-tertiary bg-wf-surface-container-hi'
-    : 'border border-transparent hover:bg-wf-surface-container-hi';
+    : 'border border-transparent group-hover:bg-wf-surface-container-hi';
   return (
-    <Link
-      to={`/agents/${row.agent.slug}`}
-      className={`${base} ${focusClass}`}
-      style={{ marginLeft: row.indent * INDENT_PX }}
-    >
-      <Sigil slug={row.agent.slug} size={32} />
-      <div className="min-w-0 flex-1">
-        <div className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant">
-          {row.agent.slug.toUpperCase()} · L{row.agent.depth}{row.isFocus ? ' · CENTER' : ''}
+    <Link to={`/agents/${row.agent.slug}`} className="group flex items-stretch min-w-0">
+      {row.railShapes.map((shape, i) => (
+        <RailCell key={i} shape={shape} />
+      ))}
+      <div className={`${cardBase} ${focusClass}`}>
+        <Sigil slug={row.agent.slug} size={32} />
+        <div className="min-w-0 flex-1">
+          <div className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant">
+            {row.agent.slug.toUpperCase()} · L{row.agent.depth}{row.isFocus ? ' · CENTER' : ''}
+          </div>
+          <div className="text-sm font-semibold text-wf-on-surface truncate">{fullName(row.agent)}</div>
+          <div className="text-xs text-wf-on-surface-variant truncate">{row.agent.role}</div>
         </div>
-        <div className="text-sm font-semibold text-wf-on-surface truncate">{fullName(row.agent)}</div>
-        <div className="text-xs text-wf-on-surface-variant truncate">{row.agent.role}</div>
       </div>
     </Link>
   );
