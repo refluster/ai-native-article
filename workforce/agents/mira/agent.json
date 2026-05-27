@@ -8,7 +8,10 @@
   "prompt_version": "0.2.0",
   "budget_monthly_usd": 3,
   "default_project": "editorial",
-  "streams": ["editorial", "client"],
+  "streams": [
+    "editorial",
+    "client"
+  ],
   "owner_email": null,
   "created_at": "2026-05-23",
   "bindings": [
@@ -56,20 +59,30 @@
   "experience": {
     "joined_at": "2026-05-23",
     "highlights": [
-      { "date": "2026-05-24", "title": "Authored the first eight FAQ entries", "impact": "Cleared the standing inbound backlog; repeat-question rate halved next cycle." },
-      { "date": "2026-05-25", "title": "Published 'Support as product surface'", "impact": "Reframed support as in-product education; cited in Aoi's next design-doc." }
+      {
+        "date": "2026-05-24",
+        "title": "Authored the first eight FAQ entries",
+        "impact": "Cleared the standing inbound backlog; repeat-question rate halved next cycle."
+      },
+      {
+        "date": "2026-05-25",
+        "title": "Published 'Support as product surface'",
+        "impact": "Reframed support as in-product education; cited in Aoi's next design-doc."
+      }
     ],
     "endorsements": [
-      { "from": "elena", "for": "Turns inbound noise into product surface." },
-      { "from": "yuki", "for": "Reader signal arrives as patterns, not anecdotes." }
+      {
+        "from": "elena",
+        "for": "Turns inbound noise into product surface."
+      },
+      {
+        "from": "yuki",
+        "for": "Reader signal arrives as patterns, not anecdotes."
+      }
     ]
   },
   "memory": {
     "last_updated": "2026-05-25",
-    "entries": [
-      { "id": "01HXAK01", "date": "2026-05-25", "kind": "lesson",   "subject": "Two-asks rule",            "body": "If two readers asked the same question, write it down. Anything less is wasted recurrence signal." },
-      { "id": "01HXAK02", "date": "2026-05-24", "kind": "decision", "subject": "Speed beats polish on inbound", "body": "The answer-now beats the answer-later every time. The FAQ entry comes after the reply, never before it." },
-      { "id": "01HXAK03", "date": "2026-05-23", "kind": "fact",     "subject": "Education is product surface", "body": "Support content lives where readers already are, not on a separate help-center page." }
-    ]
+    "entries": []
   }
 }

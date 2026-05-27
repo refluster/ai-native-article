@@ -55,42 +55,50 @@ export interface AgentEndorsement {
 }
 
 /**
- * The semantic class of a memory entry. Mirrors the OpenClaw / Hermes
- * MEMORY.md convention — durable facts, standing decisions, lessons
- * learned, preferences that emerged, people / context, and open questions.
+ * The semantic class of a long-term memory entry. Constrained to kinds
+ * that survive across sessions — durable facts about the world, standing
+ * decisions the persona has committed to, preferences that emerged, and
+ * people / context the persona has learned to work with.
+ *
+ * Note: `lesson` and `open-question` deliberately excluded. Generalised
+ * lessons should be reframed as decisions or facts before they land here;
+ * open questions belong in day-to-day notes, not in the durable layer.
  */
-export type AgentMemoryKind =
-  | 'fact'
-  | 'decision'
-  | 'lesson'
-  | 'preference'
-  | 'person'
-  | 'open-question';
+export type AgentMemoryKind = 'fact' | 'decision' | 'preference' | 'person';
 
 export interface AgentMemoryEntry {
-  /** Short id (8-char ULID-ish) for cross-reference. */
+  /** Short id (8-char ULID-ish) for cross-reference + future amendment. */
   id: string;
-  /** ISO date the entry was committed to memory. */
-  date: string;
   kind: AgentMemoryKind;
   /** Short label, 1–5 words. */
   subject: string;
-  /** One or two sentences of detail. */
+  /** One or two sentences of detail. Self-contained — the entry must
+   *  read correctly at session open with no surrounding context. */
   body: string;
-  /** Optional provenance: deliv-id, PR ref, conversation, etc. */
-  source?: string;
 }
 
 /**
  * Persona long-term memory — OpenClaw / Hermes MEMORY.md analogue.
- * The curated, durable layer the persona "remembers" at session open.
- * Grows monotonically as the agent accumulates experience; entries are
- * append-only and rendered newest-first on the profile.
+ *
+ * This is the **durable, curated** layer the persona "remembers" at
+ * session open: facts, standing decisions, preferences, people-context.
+ * It is NOT an activity record — the Task Log (recent_runs) and
+ * EXPERIENCE highlights already cover what the agent has *done*.
+ * Memory is what the agent has *learned*.
+ *
+ * Entries are append-only by convention; the schema does not carry per-
+ * entry timestamps because long-term memory is not chronological. The
+ * top-level `last_updated` exists so operators can see when a human or
+ * agent last curated this layer.
+ *
+ * Empty is a valid state — a brand-new agent has no memory yet. Seeding
+ * sample entries is not permitted because they would feed back into the
+ * agent's execution as system context.
  */
 export interface AgentMemory {
-  /** ISO date of the latest append. */
+  /** ISO date of the latest curation. */
   last_updated: string;
-  /** Append-only log; the UI sorts newest-first. */
+  /** Append-only list of durable memory entries. */
   entries: AgentMemoryEntry[];
 }
 

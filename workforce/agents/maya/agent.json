@@ -8,7 +8,11 @@
   "prompt_version": "0.2.0",
   "budget_monthly_usd": 10,
   "default_project": "workforce-self",
-  "streams": ["internal", "client", "editorial"],
+  "streams": [
+    "internal",
+    "client",
+    "editorial"
+  ],
   "owner_email": null,
   "created_at": "2026-05-18",
   "bindings": [
@@ -64,23 +68,35 @@
   "experience": {
     "joined_at": "2026-05-18",
     "highlights": [
-      { "date": "2026-05-19", "title": "Bootstrapped the workforce org graph", "impact": "Defined the 4-VP, 8-IC topology that powers the DAG view and the daily dispatch order." },
-      { "date": "2026-05-21", "title": "Killed Epic-014 after week 1", "impact": "Cut a 3-week design exploration once evidence said it would not compound — saved ~USD 8 in agent spend and one Ren cycle." },
-      { "date": "2026-05-22", "title": "Authored DESIGN.md L1 frame", "impact": "Set the visual + IA constitution other personas now design against; one source for tokens, layout, voice." }
+      {
+        "date": "2026-05-19",
+        "title": "Bootstrapped the workforce org graph",
+        "impact": "Defined the 4-VP, 8-IC topology that powers the DAG view and the daily dispatch order."
+      },
+      {
+        "date": "2026-05-21",
+        "title": "Killed Epic-014 after week 1",
+        "impact": "Cut a 3-week design exploration once evidence said it would not compound — saved ~USD 8 in agent spend and one Ren cycle."
+      },
+      {
+        "date": "2026-05-22",
+        "title": "Authored DESIGN.md L1 frame",
+        "impact": "Set the visual + IA constitution other personas now design against; one source for tokens, layout, voice."
+      }
     ],
     "endorsements": [
-      { "from": "sora", "for": "Lets evidence change the plan, fast." },
-      { "from": "ren", "for": "Stories I can implement without a follow-up question." }
+      {
+        "from": "sora",
+        "for": "Lets evidence change the plan, fast."
+      },
+      {
+        "from": "ren",
+        "for": "Stories I can implement without a follow-up question."
+      }
     ]
   },
   "memory": {
     "last_updated": "2026-05-25",
-    "entries": [
-      { "id": "01HXA8C1", "date": "2026-05-25", "kind": "decision",      "subject": "Wed plan-write cadence",            "body": "Cycle cadence is one written plan every Wednesday 10:00 JST; the biweekly Epic gate sits on top of it. Slipping the plan is the slip, not a separate event.",                            "source": "plan-write 01HXA8C1" },
-      { "id": "01HXA8C2", "date": "2026-05-21", "kind": "lesson",        "subject": "Kill criteria are non-negotiable",   "body": "Epic-014 burned a week before it was killed because no kill criterion was written at scope. No Epic enters dispatch without one.",                                                    "source": "Epic-014" },
-      { "id": "01HXA8C3", "date": "2026-05-20", "kind": "fact",          "subject": "C-2: Notion is source of truth",     "body": "main:public/posts/*.md is a CI-overwritten stale export. Authoritative article content lives in Notion only.",                                                                       "source": "docs/governance.md §C-2" },
-      { "id": "01HXA8C4", "date": "2026-05-19", "kind": "preference",    "subject": "Sora cites first, I write second",   "body": "External-evidence claims in plan-writes are easier to defend when Sora's finding leads, even when I disagree with the framing." },
-      { "id": "01HXA8C5", "date": "2026-05-18", "kind": "person",        "subject": "Ren consumes Stories, not Epics",    "body": "Ren has no parser for Epic-level scope. Stories must be 1-PR sized before dispatch, or the implementation drifts." }
-    ]
+    "entries": []
   }
 }
