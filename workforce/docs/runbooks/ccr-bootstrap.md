@@ -65,7 +65,7 @@ When you generate the API token, it's shown ONCE. Store it immediately in AWS Se
 aws secretsmanager create-secret \
   --name wf/ccr/dario-implement \
   --secret-string '{"url":"https://api.anthropic.com/v1/claude_code/routines/trig_XXX/fire","token":"sk-ant-oat01-XXX"}' \
-  --region ap-northeast-1
+  --region us-west-2
 ```
 
 The future revision of `pdm-decompose` that fires this endpoint will read from this secret.

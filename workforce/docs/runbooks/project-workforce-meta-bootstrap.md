@@ -27,19 +27,19 @@ RUN rows don't reference a dangling project_id.
 # Confirm the table exists and you're targeting the right stage.
 aws dynamodb describe-table --table-name wf-table-prod \
   --query 'Table.{ItemCount: ItemCount, Status: TableStatus}' \
-  --region ap-northeast-1
+  --region us-west-2
 ```
 
 ## One-time writes
 
-Five agents are members for now (the PR A/B/C ribbon participants).
+Six agents are members for now (the PR A/B/C ribbon participants + Sora).
 Theo, Mira, Noor, Priya, Kai are NOT in `workforce-meta` — they have
 their own editorial/legal/people streams. Sora is included because she
 narrates architectural moves.
 
 ```bash
 STAGE=prod
-REGION=ap-northeast-1
+REGION=us-west-2
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 aws dynamodb put-item --table-name wf-table-$STAGE --region $REGION --item "$(cat <<JSON

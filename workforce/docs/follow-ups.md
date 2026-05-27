@@ -49,11 +49,11 @@ Each row has:
 
 ## Operator-only action items (no PR needed)
 
-| # | Item | Severity | Notes |
-|---|---|---|---|
-| OP-001 | `PROJECT#workforce-meta` DDB bootstrap | L1 per stage | Runbook at `runbooks/project-workforce-meta-bootstrap.md`. One-shot. |
-| OP-002 | `wf-backfill-tasks` first invocation | L2 per stage | Runbook at `runbooks/backfill-tasks.md`. Expected today: 0 rows. |
-| OP-003 | Instantiate reviewer + router CCR routines | L2 | When conversational pattern saturates. Specs in `routines/`. |
+| # | Item | Severity | Status | Notes |
+|---|---|---|---|---|
+| OP-001 | `PROJECT#workforce-meta` DDB bootstrap | L1 per stage | ✅ done 2026-05-27 (prod / us-west-2) | Runbook at `runbooks/project-workforce-meta-bootstrap.md`. Wrote META + 6 MEMBER rows (maya / dario / ren / aoi / yuki / sora). Verified 7 rows present. |
+| OP-002 | `wf-backfill-tasks` first invocation | L2 per stage | ✅ done 2026-05-27 (prod / us-west-2) | Runbook at `runbooks/backfill-tasks.md`. Invocation returned `{scanned: 0, backfilled: 0, already_backfilled: 0, skipped_missing_agent_slug: 0, errors: []}` — matches runbook "no TASK rows yet" expected output. |
+| OP-003 | Instantiate reviewer + router CCR routines | L2 | open | When conversational pattern saturates. Specs in `routines/`. |
 
 ## Done
 
