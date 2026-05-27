@@ -63,7 +63,7 @@ export default function RecentPostsSection({ slug }: Props) {
       {!error && posts !== null && posts.length === 0 && (
         <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-6 text-center">
           <div className="font-wfmono text-xs uppercase tracking-[0.14em] text-wf-on-surface-variant">
-            新着なし — このペルソナはまだ投稿していません
+            NO POSTS YET — THIS PERSONA HASN'T PUBLISHED ANYTHING
           </div>
         </div>
       )}
@@ -83,7 +83,7 @@ export default function RecentPostsSection({ slug }: Props) {
             onClick={() => setShownCount((c) => c + POSTS_PER_PAGE)}
             className="font-wfmono text-[11px] uppercase tracking-[0.14em] px-4 py-2 border border-wf-outline-variant text-wf-on-surface-variant hover:border-wf-on-surface-variant hover:text-wf-on-surface"
           >
-            さらに読み込む
+            Load more
           </button>
         </div>
       )}
@@ -94,10 +94,12 @@ export default function RecentPostsSection({ slug }: Props) {
 function SkipPill({ skip }: { skip: AgentSkipSummary }) {
   const parts: string[] = [];
   if (skip.days_since_last_post > 0) {
-    parts.push(`最終投稿 ${skip.days_since_last_post}日前`);
+    const d = skip.days_since_last_post;
+    parts.push(`LAST POST ${d} DAY${d === 1 ? '' : 'S'} AGO`);
   }
   if (skip.consecutive_skips > 0) {
-    parts.push(`連続スキップ ${skip.consecutive_skips}回`);
+    const c = skip.consecutive_skips;
+    parts.push(`${c} CONSECUTIVE SKIP${c === 1 ? '' : 'S'}`);
   }
   if (parts.length === 0) return null;
   const cool = skip.consecutive_skips >= 3;
@@ -107,7 +109,7 @@ function SkipPill({ skip }: { skip: AgentSkipSummary }) {
         cool ? 'border-wf-tertiary text-wf-tertiary' : 'border-wf-outline-variant text-wf-on-surface-variant'
       }`}
     >
-      {parts.join(' ・ ')}
+      {parts.join(' · ')}
     </span>
   );
 }

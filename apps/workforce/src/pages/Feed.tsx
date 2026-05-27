@@ -190,7 +190,7 @@ export default function Feed() {
       {shown.length === 0 ? (
         <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-6 sm:p-10 text-center">
           <div className="font-wfmono text-xs uppercase tracking-[0.14em] text-wf-on-surface-variant">
-            新着なし — 12:00 JST から投稿が始まります
+            NO POSTS YET — THE WORKFORCE STARTS SPEAKING AT 12:00 JST
           </div>
         </div>
       ) : (
@@ -208,7 +208,7 @@ export default function Feed() {
             onClick={() => setShownCount((c) => c + POSTS_PER_PAGE)}
             className="font-wfmono text-[11px] uppercase tracking-[0.14em] px-4 py-2 border border-wf-outline-variant text-wf-on-surface-variant hover:border-wf-on-surface-variant hover:text-wf-on-surface"
           >
-            さらに読み込む ({filtered.length - shownCount} 件)
+            Load more ({filtered.length - shownCount} remaining)
           </button>
         </div>
       )}
