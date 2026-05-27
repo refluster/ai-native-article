@@ -14,6 +14,23 @@
 
 const NOTION_VERSION = '2022-06-28'
 
+// Notion's documented rate limit is ~3 req/sec per integration. With a
+// 129-article unified DB and recursive block fetches, a single
+// `fetch-notion` run easily exceeds that and starts collecting 429s
+// (see deploy-article-site run 26482870909). These constants govern the
+// retry/throttle behaviour applied uniformly to every Notion request.
+const MAX_RETRIES = 4 // 4 retries = up to 5 attempts total per request
+const BACKOFF_BASE_MS = 1000 // 1s, 2s, 4s, 8s for exponential backoff
+const DEFAULT_THROTTLE_MS = 350 // ~333ms ≈ 3 req/sec ceiling; round up a touch
+const THROTTLE_MS = (() => {
+  const raw = process.env.NOTION_THROTTLE_MS
+  if (raw === undefined) return DEFAULT_THROTTLE_MS
+  const n = Number(raw)
+  return Number.isFinite(n) && n >= 0 ? n : DEFAULT_THROTTLE_MS
+})()
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
 /**
  * Build authorization headers. Kept as a factory so we can swap the
  * api key per-request if we ever need scoped fetches.
@@ -26,26 +43,67 @@ function authHeaders(apiKey) {
   }
 }
 
-async function notionGet(path, apiKey) {
-  const res = await fetch(`https://api.notion.com/v1${path}`, {
-    headers: authHeaders(apiKey),
-  })
-  if (!res.ok) {
-    throw new Error(`Notion GET ${path} → ${res.status}: ${await res.text()}`)
+/**
+ * Wrap a single Notion HTTP call with retry/backoff.
+ *
+ * Retry policy:
+ *   - 429: honour `Retry-After` header (Notion sends seconds) when present;
+ *     otherwise fall back to exponential backoff.
+ *   - 5xx: exponential backoff, same MAX_RETRIES budget.
+ *   - other 4xx / non-OK: throw immediately (caller-fault; retry won't help).
+ *
+ * Per-request throttle (NOTION_THROTTLE_MS, default 350ms) is applied
+ * *before* every attempt — both first attempts and retries — so a burst of
+ * sequential calls naturally stays under the 3 req/sec ceiling.
+ */
+async function notionFetch(method, path, apiKey, body) {
+  const url = `https://api.notion.com/v1${path}`
+  const init = { method, headers: authHeaders(apiKey) }
+  if (body !== undefined) init.body = JSON.stringify(body)
+
+  let attempt = 0
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    if (THROTTLE_MS > 0) await sleep(THROTTLE_MS)
+    const res = await fetch(url, init)
+    if (res.ok) return res.json()
+
+    const isRateLimited = res.status === 429
+    const isServerError = res.status >= 500 && res.status < 600
+    const retryable = isRateLimited || isServerError
+
+    if (!retryable || attempt >= MAX_RETRIES) {
+      throw new Error(
+        `Notion ${method} ${path} → ${res.status}: ${await res.text()}`,
+      )
+    }
+
+    let waitMs
+    if (isRateLimited) {
+      const retryAfterRaw = res.headers.get('retry-after')
+      const retryAfterSec = retryAfterRaw ? Number(retryAfterRaw) : NaN
+      waitMs = Number.isFinite(retryAfterSec) && retryAfterSec >= 0
+        ? retryAfterSec * 1000
+        : BACKOFF_BASE_MS * 2 ** attempt
+    } else {
+      waitMs = BACKOFF_BASE_MS * 2 ** attempt
+    }
+    // Drain the body so the connection can be reused.
+    await res.text().catch(() => {})
+    console.log(
+      `⏳  Notion ${method} ${path} → ${res.status}; retrying in ${waitMs}ms (attempt ${attempt + 1}/${MAX_RETRIES})`,
+    )
+    await sleep(waitMs)
+    attempt += 1
   }
-  return res.json()
+}
+
+async function notionGet(path, apiKey) {
+  return notionFetch('GET', path, apiKey)
 }
 
 async function notionPost(path, apiKey, body) {
-  const res = await fetch(`https://api.notion.com/v1${path}`, {
-    method: 'POST',
-    headers: authHeaders(apiKey),
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) {
-    throw new Error(`Notion POST ${path} → ${res.status}: ${await res.text()}`)
-  }
-  return res.json()
+  return notionFetch('POST', path, apiKey, body)
 }
 
 /** Notion rich_text array → Markdown string (preserves bold/italic/code/links). */
