@@ -1,7 +1,7 @@
 // EventBridge cron expression matcher.
 //
-// The orchestrator-tick (Epic-006 S1) runs every 5 minutes and asks each
-// agent: "should you run in this 5-minute window?" Each agent's
+// The orchestrator-tick (Epic-006 S1) runs every 30 minutes and asks each
+// agent: "did your cron fire in the last 30 minutes?" Each agent's
 // schedule_cron lives in DDB; this module is the data-level evaluator.
 //
 // Supports the EventBridge form `cron(Minutes Hours DayOfMonth Month DayOfWeek Year)`.
@@ -10,8 +10,14 @@
 // or 1-7 (1=SUN) day names. Year is optional in many forms but EventBridge
 // requires all 6 fields.
 //
-// "Matches now" means: at least one minute in [now, now + windowMinutes)
-// falls inside the cron schedule's fire times.
+// "Matches now" means: at least one minute in (now - windowMinutes, now]
+// falls inside the cron schedule's fire times. The window is **past-facing**
+// because each tick asks "what cron fires did I miss since the last tick?"
+// — never "what's about to fire?". This used to be future-facing and the
+// 30-minute discord-ping cron (`cron(0 0/6 * * ? *)`) was silently missed
+// every cycle: a tick at 12:25 looked at [12:25, 12:55) which doesn't
+// contain 12:00, and the next tick at 12:55 looked at [12:55, 13:25) which
+// is even further past. Fixed in claude/lucid-feynman-cron-match-past-window.
 
 const DAY_NAMES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
@@ -22,8 +28,13 @@ export interface MatchOptions {
 
 /**
  * Returns true if the cron expression would fire at any minute in the
- * window [now, now + windowMinutes). Always evaluates in UTC, matching
+ * past window (now - windowMinutes, now]. Always evaluates in UTC, matching
  * how EventBridge interprets cron expressions.
+ *
+ * The window is past-facing (looks backward from `now`) because the
+ * orchestrator tick fires at the *end* of each interval and asks "did I
+ * miss anything?". Looking forward would make the tick a forecaster and
+ * silently drop crons whose fire times fell between ticks.
  */
 export function matchesNow(
   cronExpr: string,
@@ -45,10 +56,12 @@ export function matchesNow(
     string,
   ];
 
-  // Walk every minute in the window. windowMinutes is small (5 in v1)
-  // so this is trivially cheap.
+  // Walk every minute in the past window (now, now-1min, ..., now-(W-1)min).
+  // windowMinutes is small (30 at v1) so this is trivially cheap. The first
+  // iteration (i=0) sees `now` itself, so a cron firing exactly at this
+  // minute is caught — even when ticks are slightly delayed.
   for (let i = 0; i < opts.windowMinutes; i++) {
-    const t = new Date(now.getTime() + i * 60_000);
+    const t = new Date(now.getTime() - i * 60_000);
     const inMin = matchField(minutes, t.getUTCMinutes(), 0, 59);
     const inHour = matchField(hours, t.getUTCHours(), 0, 23);
     const inMonth = matchField(month, t.getUTCMonth() + 1, 1, 12);
@@ -97,7 +110,10 @@ function matchRange(part: string, value: number, min: number, max: number): bool
     hi = parseInt(b, 10);
   } else {
     lo = parseInt(base, 10);
-    hi = lo;
+    // `x/y` (single base + step) means "start at x, step by y up to max"
+    // per cron spec — e.g. `0/6` in hours matches {0, 6, 12, 18}, not just 0.
+    // Without a step, `x` alone matches only x.
+    hi = stepStr !== undefined ? max : lo;
   }
   if (!Number.isFinite(lo) || !Number.isFinite(hi)) return false;
 
