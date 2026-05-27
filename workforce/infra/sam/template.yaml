@@ -441,6 +441,127 @@ Resources:
       Tags:
         workforce: !Ref Stage
 
+  # --- Credentials write API (Epic-010 Story 2-C) ----------------------------
+  # Operator-only write-side API for project credentials. Mirrors the
+  # agents-api shape (separate HttpApi + IAM authoriser) so the IAM scope
+  # stays narrow — this Lambda is the ONLY caller with secretsmanager:
+  # CreateSecret/PutSecretValue/DescribeSecret/DeleteSecret authority on
+  # the wf/projects/* namespace.
+  #
+  # Why a separate HTTP API (not glued onto WfAgentsHttpApi):
+  #   - WfAgentsHttpApi's CORS AllowMethods is [GET, OPTIONS]; credentials
+  #     needs PUT/DELETE too. Adding them to the public agents API would
+  #     widen the cors surface for read-only resources.
+  #   - Auth on every credentials route is AWS_IAM (operator-only). Hosting
+  #     on a dedicated API lets the operator graph "credentials API hits"
+  #     separately from "agents API hits."
+  #
+  # Routes:
+  #   GET    /projects/{slug}/credentials/{type}   metadata only
+  #   PUT    /projects/{slug}/credentials/{type}   create or rotate
+  #   DELETE /projects/{slug}/credentials/{type}   schedule deletion (7d window)
+  WfCredentialsHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Stage
+      CorsConfiguration:
+        AllowOrigins:
+          - https://kohuehara.xyz
+          - https://workforce.kohuehara.xyz
+          - http://localhost:5173
+        AllowMethods: [GET, PUT, DELETE, OPTIONS]
+        AllowHeaders: [content-type, authorization]
+      Auth:
+        EnableIamAuthorizer: true
+        # Default every route on this API to AWS_IAM so a future route
+        # added without an explicit Authorizer cannot accidentally
+        # publish a public credentials surface.
+        DefaultAuthorizer: AWS_IAM
+      Tags:
+        workforce: !Ref Stage
+
+  WfCredentialsApiFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-credentials-api-${Stage}
+      CodeUri: ../../lambdas/credentials-api
+      Handler: handler.handler
+      Description: Workforce credentials write API (PUT/DELETE/GET metadata-only). Epic-010 Story 2-C.
+      MemorySize: 512
+      Timeout: 15
+      Policies:
+        - Statement:
+            - Sid: CredentialsApiTableAccess
+              # getProject + appendExecution + addMember + isMember all
+              # hit the workforce single table. Same surface the
+              # agents-api Lambda needs.
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:Query
+              Resource:
+                - !GetAtt WfTable.Arn
+                - !Sub ${WfTable.Arn}/index/*
+            - Sid: CredentialsApiSecretsWrite
+              # Resource-scoped to the canonical project-credentials
+              # namespace. The bare `wf/{type}` legacy namespace is
+              # intentionally OUT of scope: this API only writes the
+              # post-Story-2-B canonical path. Legacy keys are read by
+              # the runner only and will be deleted in a separate
+              # follow-up once WfLegacyCredentialReads graphs to zero.
+              Effect: Allow
+              Action:
+                - secretsmanager:CreateSecret
+                - secretsmanager:PutSecretValue
+                - secretsmanager:DescribeSecret
+                - secretsmanager:DeleteSecret
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*
+      Events:
+        GetCredential:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfCredentialsHttpApi
+            Path: /projects/{slug}/credentials/{type}
+            Method: GET
+        PutCredential:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfCredentialsHttpApi
+            Path: /projects/{slug}/credentials/{type}
+            Method: PUT
+        DeleteCredential:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfCredentialsHttpApi
+            Path: /projects/{slug}/credentials/{type}
+            Method: DELETE
+      Tags:
+        workforce: !Ref Stage
+
+  WfCredentialsApiErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-credentials-api-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-credentials-api-${Stage} over 5 minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfCredentialsApiFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
   # --- Migration: bare wf/{type} -> wf/projects/_default/{type} (Epic-010 §6) -
   # Operator-invoked one-shot. Copies the legacy bare-path credentials
   # (provisioned pre-Epic-010) into the type-keyed canonical paths under
@@ -770,3 +891,8 @@ Outputs:
     Value: !Sub https://${WfAgentsHttpApi}.execute-api.${AWS::Region}.amazonaws.com
     Export:
       Name: !Sub wf-agents-api-url-${Stage}
+  CredentialsApiUrl:
+    Description: Base URL of the credentials write HTTP API. All routes are AWS_IAM-authorised (operator only).
+    Value: !Sub https://${WfCredentialsHttpApi}.execute-api.${AWS::Region}.amazonaws.com
+    Export:
+      Name: !Sub wf-credentials-api-url-${Stage}
