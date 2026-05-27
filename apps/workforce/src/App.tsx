@@ -12,6 +12,7 @@ import AgentProfile from './pages/AgentProfile';
 import SkillDirectory from './pages/SkillDirectory';
 import SkillProfile from './pages/SkillProfile';
 import OrgDAG from './pages/OrgDAG';
+import Feed from './pages/Feed';
 import AuthCallback from './pages/AuthCallback';
 import AuthBoundary from './components/AuthBoundary';
 import { routerBaseName } from './lib/paths';
@@ -37,6 +38,7 @@ function ProtectedRoutes() {
             <Route path="/agents/:slug" element={<AgentProfile />} />
             <Route path="/skills" element={<SkillDirectory />} />
             <Route path="/skills/:name" element={<SkillProfile />} />
+            <Route path="/feed" element={<Feed />} />
           </Routes>
         </main>
       </div>
