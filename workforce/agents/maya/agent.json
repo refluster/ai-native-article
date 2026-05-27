@@ -32,6 +32,46 @@
         "scheduler": "manual"
       },
       "note": "Operator-fired stub for Maya's Epic → Story decomposition step. Under the simplified process, pdm-charter is the canonical Maya skill — Claude Code consumes Stories directly, no role-tagged middle layer. Not auto-dispatched in v1; see workforce/skills/pdm-charter/SKILL.md."
+    },
+    {
+      "skill": "pr-route",
+      "executor": "claude-code-routine",
+      "trigger": {
+        "scheduler": "manual"
+      },
+      "routine_spec": "workforce/docs/routines/pr-route.md",
+      "config": {
+        "cycle_cap": 7,
+        "nomination_rules": [
+          {
+            "lens": "architecture",
+            "persona": "dario",
+            "trigger": "PR touches workforce/lambdas/ OR workforce/infra/ OR workforce/docs/governance.md OR workforce/docs/data-model.md OR bindings shape"
+          },
+          {
+            "lens": "engineering",
+            "persona": "ren",
+            "trigger": "PR touches workforce/lambdas/ (ALWAYS nominate — Ren has config.run_locally=true, the only reviewer who runs validators locally)"
+          },
+          {
+            "lens": "design",
+            "persona": "aoi",
+            "trigger": "PR touches src/ OR DESIGN.md OR design tokens OR adds design-doc artefacts"
+          }
+        ],
+        "skip_list_default": [
+          "sora",
+          "yuki",
+          "kai",
+          "mira",
+          "noor",
+          "priya",
+          "theo"
+        ],
+        "skip_list_rationale": "Editorial / GTM / brand / support / legal / people — invoke only when the PR has explicit surface in their lens",
+        "sign_off_persona": "Maya"
+      },
+      "note": "PR router + verdict (Phases C + F of dev-process.md). Generic two-mode routine; Maya's persona-specific nomination_rules in config. Manual invocation today; future CCR pull_request.opened + .synchronize triggers. PR routing is a function — any agent with this binding can route in Maya's absence."
     }
   ],
   "jd": {

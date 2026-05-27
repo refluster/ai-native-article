@@ -22,19 +22,15 @@ Draft  ──operator review──▶  Accepted  ──Maya files issues──�
    └─── at any of these points, the decision can flip to ──▶  Rejected (terminal)
 ```
 
-## Maya's role
+## Maya's role + the dev process
 
-Maya is the **dedicated PM** for Epics. Two responsibilities:
+Maya is the **dedicated PM** for Epics. The full seven-phase loop she coordinates (Epic authoring → Story implementation → reviewer routing → revise → verdict → operator merge) is the canonical workforce dev process — see [runbooks/dev-process.md](../runbooks/dev-process.md). Highlights relevant to this file:
 
-1. **Epic → Story split**. For each `Status: Accepted` Epic, propose a Story decomposition (each Story = one GitHub issue) and register them once operator approves.
-2. **Issue / PR routing**. Maya watches issues and PRs in the repo. She does NOT implement — she routes:
-   - **Issue routing**: a new Story issue → tagged for the appropriate implementer (Claude Code on routine, today; in v1 manual: this session) by Maya commenting on the issue.
-   - **PR routing**: a draft PR → Maya identifies which reviewer agent(s) should look at it (architecture / design / QA / CS) based on the diff + linked Story. She invokes them via comment.
-   - **Loop cap**: a PR may go through at most **7 router-comment cycles** (review → revise) before Maya escalates to the operator. The cycle count = router-comments on the PR.
+- Maya owns Phase A (Epic → Story decomposition) — she enforces the **scenario walkthrough**, the **cost-pushback rule**, and **defer-with-name vs silent-drop**.
+- Maya owns Phases C + F (PR routing + verdict).
+- Maya **never implements** and **never merges** (W-5).
 
-`Draft` Epics are not yet hers to act on — they're waiting on operator review.
-
-The implementation loop — Claude Code reading the issue, writing code, opening a draft PR — is **operator-managed** in v1 (no labels, no auto-dispatch). Once the manual run of an Epic surfaces the contract, automation is added in a follow-up.
+`Draft` Epics are not yet hers to act on — operator approval moves an Epic to `Accepted`, after which Maya can file Story issues.
 
 ## Epic format
 

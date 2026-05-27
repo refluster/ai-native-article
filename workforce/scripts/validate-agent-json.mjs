@@ -323,6 +323,45 @@ if (totalBudget > W3_CAP) {
   );
 }
 
+// R8-routine-spec-orphan: every workforce/docs/routines/*.md must be
+// referenced by at least one binding's `routine_spec` field. Catches the
+// inverse failure mode of R8-routine-spec-exists — a routine that was
+// renamed but whose old spec file was left behind on disk.
+// README.md / index-style docs in the routines/ folder are exempt.
+const ROUTINES_DIR_EXEMPT = new Set(["README.md", "index.md"]);
+if (existsSync(ROUTINES_DIR)) {
+  const referencedSpecs = new Set();
+  for (const slug of slugDirs) {
+    const cfg = join(AGENTS_DIR, slug, "agent.json");
+    if (!existsSync(cfg)) continue;
+    let parsed;
+    try {
+      parsed = JSON.parse(readFileSync(cfg, "utf8"));
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(parsed?.bindings)) continue;
+    for (const b of parsed.bindings) {
+      if (typeof b?.routine_spec === "string") {
+        referencedSpecs.add(b.routine_spec);
+      }
+    }
+  }
+  const specFiles = readdirSync(ROUTINES_DIR).filter(
+    (n) => n.endsWith(".md") && !ROUTINES_DIR_EXEMPT.has(n),
+  );
+  for (const file of specFiles) {
+    const relPath = `workforce/docs/routines/${file}`;
+    if (!referencedSpecs.has(relPath)) {
+      v(
+        "R8-routine-spec-orphan",
+        join(ROUTINES_DIR, file),
+        `routine_spec "${relPath}" exists on disk but is not referenced by any agent.json binding. Either delete the file or add a binding that points at it.`,
+      );
+    }
+  }
+}
+
 if (violations.length === 0) {
   console.log(
     `workforce/scripts/validate-agent-json.mjs: OK (${slugDirs.length} agent(s), total budget USD ${totalBudget}/${W3_CAP})`,
