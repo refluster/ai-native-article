@@ -291,7 +291,7 @@ export default function AgentProfile() {
                     {b.skill}
                   </Link>
                   <span className="font-wfmono text-[11px] uppercase tracking-[0.12em] text-wf-on-surface-variant">
-                    {b.cron}
+                    {b.trigger.cron ?? b.trigger.scheduler}
                   </span>
                   {b.note && (
                     <span className="text-wf-on-surface-variant">{b.note}</span>

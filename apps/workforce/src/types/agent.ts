@@ -1,9 +1,18 @@
 // Workforce agent manifest types — what the build script emits and the
 // SPA consumes from /workforce-agents.json.
 
+export type AgentBindingTrigger = {
+  /** Source of the trigger — eventbridge cron, claude-code routine on a
+   *  workflow_dispatch loop, manual/CLI invocation, or webhook-driven. */
+  scheduler: 'eventbridge' | 'claude-code-routine' | 'manual' | 'cli' | 'webhook';
+  /** AWS-style cron expression, present when scheduler is eventbridge. */
+  cron?: string;
+};
+
 export type AgentBinding = {
-  cron: string;
   skill: string;
+  executor?: string;
+  trigger: AgentBindingTrigger;
   note?: string;
 };
 
