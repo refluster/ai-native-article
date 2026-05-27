@@ -75,6 +75,20 @@
       "type": "string",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
       "description": "ISO date. Set on first PR; never edited."
+    },
+    "requires": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "anthropic.api_key",
+          "discord.bot_token",
+          "github.token",
+          "notion.integration_token"
+        ]
+      },
+      "description": "Credential types this skill reads from ctx.credentials. Each entry is a reverse-domain type id (service.field). The runner resolves each type from the active project at invocation time and seals the bag — undeclared access throws. To add a new type, extend this enum AND register the shape in shared/credential-injector.ts:CREDENTIAL_SHAPES."
     }
   }
 }

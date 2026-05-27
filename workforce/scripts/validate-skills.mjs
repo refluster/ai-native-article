@@ -42,7 +42,7 @@ const META_REQUIRED = [
   "improvement_agent",
   "created_at",
 ];
-const META_OPTIONAL = ["deliverable"];
+const META_OPTIONAL = ["deliverable", "requires"];
 const STATUSES = new Set(["active", "stale", "deprecated"]);
 const EXECUTORS = new Set(["llm-prose", "claude-code-routine", "deterministic"]);
 const COST_CLASSES = new Set(["small", "medium", "large"]);
@@ -53,6 +53,15 @@ const DELIV_TYPES = new Set([
   "launch-plan",
   "pr",
   "notification",
+]);
+// Mirror of CREDENTIAL_TYPES in workforce/lambdas/shared/credential-injector.ts.
+// To extend: add the type here AND register its shape in CREDENTIAL_SHAPES
+// in the injector module. Skill meta requires[] is checked against this set.
+const CREDENTIAL_TYPES = new Set([
+  "anthropic.api_key",
+  "discord.bot_token",
+  "github.token",
+  "notion.integration_token",
 ]);
 
 if (!existsSync(SKILLS_DIR)) {
@@ -233,6 +242,31 @@ for (const name of skillDirs) {
 
   if (typeof meta.created_at !== "string" || !ISO_DATE.test(meta.created_at)) {
     v("J10-created-at", metaJson, `created_at "${meta.created_at}" must be YYYY-MM-DD`);
+  }
+
+  // ── requires (Story 2-A): credential types declared by this skill ────────
+  // Each entry must be in the CREDENTIAL_TYPES allowlist. Duplicates rejected
+  // (uniqueItems in the JSON schema; mirrored here so the in-script validator
+  // catches it too). Empty array is allowed.
+  if ("requires" in meta && meta.requires !== undefined) {
+    if (!Array.isArray(meta.requires)) {
+      v("J12-requires-shape", metaJson, `requires must be an array (got ${typeof meta.requires})`);
+    } else {
+      const seen = new Set();
+      for (const type of meta.requires) {
+        if (typeof type !== "string") {
+          v("J12-requires-item-shape", metaJson, `requires[] entry must be a string (got ${typeof type})`);
+          continue;
+        }
+        if (!CREDENTIAL_TYPES.has(type)) {
+          v("J12-requires-unknown-type", metaJson, `requires[] entry "${type}" not in CREDENTIAL_TYPES allowlist (extend the set in validate-skills.mjs AND register a shape in credential-injector.ts)`);
+        }
+        if (seen.has(type)) {
+          v("J12-requires-duplicate", metaJson, `duplicate requires[] entry "${type}"`);
+        }
+        seen.add(type);
+      }
+    }
   }
 
   // ── executor=deterministic requires a sibling handler.ts ─────────────────
