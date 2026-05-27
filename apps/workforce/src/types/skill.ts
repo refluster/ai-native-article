@@ -11,6 +11,27 @@ export interface SkillDeliverable {
   publish_notion: boolean;
 }
 
+export type SkillFileLanguage =
+  | 'markdown'
+  | 'json'
+  | 'typescript'
+  | 'javascript'
+  | 'python'
+  | 'shell'
+  | 'yaml'
+  | 'text';
+
+export interface SkillFile {
+  /** Repo-relative path inside the skill dir, e.g. "SKILL.md" or "examples/x.md". */
+  path: string;
+  size: number;
+  language: SkillFileLanguage;
+  /** UTF-8 text; null when the file is binary or exceeds the manifest cap. */
+  contents: string | null;
+  truncated: boolean;
+  binary: boolean;
+}
+
 export interface WorkforceSkill {
   name: string;
   version: string;
@@ -24,6 +45,8 @@ export interface WorkforceSkill {
   created_at: string;
   /** First-paragraph description from SKILL.md frontmatter. */
   description: string;
+  /** Source files in workforce/skills/{name}/ — SKILL.md first, then alpha. */
+  files: SkillFile[];
 }
 
 export interface WorkforceSkillManifest {

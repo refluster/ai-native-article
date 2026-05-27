@@ -55,3 +55,67 @@
     background-size: 48px 100%;
   }
 }
+
+/* SKILL.md rendered through react-markdown on the skill profile page.
+   The workforce SPA doesn't pull in @tailwindcss/typography, so this is a
+   hand-rolled minimum: GitHub-README-ish spacing, no styling ambition
+   beyond legibility. */
+.skill-md-body {
+  color: #0b0b14;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+}
+.skill-md-body h1,
+.skill-md-body h2,
+.skill-md-body h3,
+.skill-md-body h4 {
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #0b0b14;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.25;
+}
+.skill-md-body h1 { font-size: 1.625rem; }
+.skill-md-body h2 { font-size: 1.25rem; border-bottom: 1px solid #ddd9e6; padding-bottom: 0.25em; }
+.skill-md-body h3 { font-size: 1.0625rem; }
+.skill-md-body h4 { font-size: 1rem; }
+.skill-md-body p,
+.skill-md-body ul,
+.skill-md-body ol,
+.skill-md-body blockquote,
+.skill-md-body pre,
+.skill-md-body table { margin: 0.75em 0; }
+.skill-md-body ul { list-style: disc; padding-left: 1.5em; }
+.skill-md-body ol { list-style: decimal; padding-left: 1.5em; }
+.skill-md-body li { margin: 0.25em 0; }
+.skill-md-body a { color: #0055c8; text-decoration: underline; }
+.skill-md-body a:hover { color: #954500; }
+.skill-md-body code {
+  font-family: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.85em;
+  background: #f1eef8;
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+.skill-md-body pre {
+  background: #f6f4fb;
+  border: 1px solid #ddd9e6;
+  padding: 0.85em 1em;
+  overflow-x: auto;
+  font-size: 0.85em;
+  line-height: 1.55;
+}
+.skill-md-body pre code { background: transparent; padding: 0; font-size: 1em; }
+.skill-md-body blockquote {
+  border-left: 3px solid #c8c4d4;
+  padding-left: 0.9em;
+  color: #4f4d57;
+}
+.skill-md-body table { border-collapse: collapse; }
+.skill-md-body th,
+.skill-md-body td { border: 1px solid #ddd9e6; padding: 0.4em 0.7em; }
+.skill-md-body th { background: #f1eef8; font-weight: 700; }
+.skill-md-body hr { border: 0; border-top: 1px solid #ddd9e6; margin: 1.5em 0; }
+.skill-md-body > *:first-child { margin-top: 0; }
+.skill-md-body > *:last-child { margin-bottom: 0; }
