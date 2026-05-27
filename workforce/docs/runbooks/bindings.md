@@ -20,9 +20,24 @@ See also [governance.md §4 R-N4](../governance.md#4-r-n-design-rules-basic-desi
   },
   "routine_spec": "workforce/docs/routines/<name>.md", // for executor=claude-code-routine
   "workflow": ".github/workflows/<name>.yml",          // for executor=gha
+  "config": { /* skill-specific persona overlay; see below */ },
   "note": "Human-readable cadence note. Renders in the UI."
 }
 ```
+
+## The `config` field — persona overlay (Skills are persona-agnostic)
+
+Per PR #112's "task assignment is fluid" principle, **skill specs are persona-agnostic** (the routine_spec describes the task contract; what the task IS). The **persona overlay** — how a specific agent does this task — lives in the binding's `config` field.
+
+Examples:
+
+- `pr-review` is one generic spec; Dario's binding has `config.lens_name = "architecture"` with R-N\* / cost / audit checklist; Ren's binding has `config.lens_name = "engineering"` with TS-idiom / test-coverage checklist; Aoi's has `config.lens_name = "design"`.
+- `pr-route` is one generic spec; Maya's binding has `config.nomination_rules` for who-to-nominate-when; a future Dario-as-router binding could carry different rules.
+- `pr-implement` is one generic spec; Dario's binding has `config.model_override = "claude-opus-4-7"` + `self_check_lens = "architecture"`; a different persona's binding could override to Sonnet + the engineering lens.
+
+The runtime composes the working prompt as: **generic spec + persona voice (`system.md`) + binding config**. Adding a new persona to a skill is one new binding entry + one new config block — no skill-spec rewrite.
+
+The `config` schema is skill-specific; validators check structural fields (executor, scheduler, routine_spec existence) but not the config contents — those are owned by the skill spec author. Tighter schema validation per skill is FU-019.
 
 ## Executor × scheduler compatibility
 

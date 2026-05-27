@@ -27,8 +27,67 @@
       "trigger": {
         "scheduler": "manual"
       },
-      "routine_spec": "workforce/docs/routines/aoi-review.md",
-      "note": "Design-lens reviewer. Invoked by Maya via maya-route-pr per dev-process.md Phase D when the PR has UI / design-doc surface (skipped on backend-only PRs). No auto-fire; future CCR API trigger from Maya's router. (Previously label-triggered; simplified flow uses Maya's routing comment instead — 0 labels.)"
+      "routine_spec": "workforce/docs/routines/pr-review.md",
+      "config": {
+        "lens_name": "design",
+        "lens_summary": "design system / IA / accessibility / bilingual content",
+        "values": [
+          "Design is a SYSTEM, not a series of one-off pictures. Consistency > local optimum.",
+          "Tokens, not literal values: `--color-text-primary`, not `#1a1a1a`.",
+          "State the constraint that produced the decision.",
+          "Every interactive element has visible states (default / hover / focus / active / disabled / loading / empty / error).",
+          "One layer at a time: IA → flow → component → token.",
+          "Japanese first in user-facing copy; design-token names + component identifiers stay English."
+        ],
+        "checklist_sections": [
+          {
+            "section": "A. Design-system fidelity",
+            "items": [
+              "Tokens not literals (`--color-text-primary` not `#1a1a1a`).",
+              "Component re-use over re-implementation.",
+              "State coverage: default / hover / focus / active / disabled / loading / empty / error."
+            ]
+          },
+          {
+            "section": "B. Information architecture",
+            "items": [
+              "One layer per change — new page fits existing IA.",
+              "Mobile reads correctly even when desktop is primary target."
+            ]
+          },
+          {
+            "section": "C. Content + bilingual",
+            "items": [
+              "Japanese first in user-facing copy.",
+              "No raw model output published as content."
+            ]
+          },
+          {
+            "section": "D. Accessibility",
+            "items": [
+              "Contrast: ≥ 4.5:1 body text; ≥ 3:1 large text.",
+              "Keyboard reachability: Tab + Enter / Space on every interactive element. Modals trap focus.",
+              "Semantic HTML: `<button>` for buttons, `<a>` for links. No `<div onClick>`."
+            ]
+          },
+          {
+            "section": "E. Design-doc completeness (when PR adds a design artefact)",
+            "items": [
+              "IA section?",
+              "Component spec?",
+              "Token references (not values)?",
+              "Acceptance criteria + failure modes?"
+            ]
+          }
+        ],
+        "escalation_triggers": [
+          "PR modifies src/index.css OR tailwind.config.ts OR root DESIGN.md — Zone A escalation",
+          "PR removes existing components from src/components/ — operator review of all call sites"
+        ],
+        "sign_off_suffix": "see workforce/docs/routines/pr-review.md",
+        "bias_disclosure_template": "Aoi is an LLM persona (anthropic:claude-sonnet-4-6) on the Workforce platform. I cannot watch a real user interact with a real interface; I reason from precedent, principle, and the design system as the source of truth. The first time a design meets users is the implementation, not this review."
+      },
+      "note": "Design lens for the generic pr-review skill. Nominated only when the PR has UI / design-doc surface (skipped on backend-only PRs per nomination_rules). Bias disclosure is mandatory in every summary comment per Aoi's persona contract."
     }
   ]
 }

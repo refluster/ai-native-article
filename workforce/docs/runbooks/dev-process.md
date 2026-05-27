@@ -53,30 +53,30 @@ Each cycle = (revise → re-review → verdict). Hard cap at **7 cycles** before
 
 **Anti-patterns observed**: implementing without re-reading the Story AC (results in scope drift); skipping the self-check (results in cycle-1 reviews catching what self-check would have); bundling unrelated fixes into one PR ("while I'm here…" — split them).
 
-## Phase C — Maya routing
+## Phase C — Routing
 
-**Owner**: Maya.
-**Outputs**: one `Maya — cycle N of ≤ 7` comment on the PR nominating 1-3 reviewer personas.
+**Owner**: whichever agent holds the `pr-route` binding. Today Maya is the canonical router; in her absence (or under load) any agent with the binding can route. PR routing is a **function**, not a person.
+**Outputs**: one `{Router-persona} — cycle N of ≤ 7` comment on the PR nominating 1-3 reviewer personas.
 
-1. Maya reads the PR body + the diff at a glance.
-2. Identifies reviewer personas by **lens needed**, not by file path:
+1. The routing agent reads the PR body + the diff at a glance.
+2. Identifies reviewer personas by **lens needed**, not by file path, applying its binding's `config.nomination_rules`. Maya's canonical rules:
    - **dario** (architecture / R-N\* / governance / data-model / IaC / cost shape)
-   - **ren** (engineering / TS idiom / test coverage / API ergonomics)
+   - **ren** (engineering / TS idiom / test coverage / API ergonomics) — **always** nominated when `workforce/lambdas/` is touched (Ren has `config.run_locally = true`, the only reviewer who runs validators against the checked-out branch; without him the "tests pass" claim is self-attested)
    - **aoi** (design system / UI / IA / a11y / bilingual content rules)
    - **sora** (research / citations / editorial accuracy)
    - **yuki** (GTM / positioning / launch artefacts)
    - **kai / mira / noor / priya / theo** (brand / support / legal / people — invoke when the PR touches their lens)
-3. Skip persona if the PR has no surface in that lens. (Epic-010 PRs skipped aoi, sora, yuki — all backend.)
-4. Posts the routing comment with a rationale ("Dario for X, Ren for Y, skipping Aoi because no UI"). Comment count is the cycle counter.
+3. Skip personas with no surface in their lens. (Epic-010 PRs skipped aoi, sora, yuki — all backend.)
+4. Post the routing comment with a rationale ("Dario for X, Ren for Y, skipping Aoi because no UI"). Cycle counter increments per fresh router comment, not per individual comment.
 
 **Anti-patterns observed**: nominating every persona "to be safe" (review fatigue + noise); nominating by file path alone ("this touches SAM, summon Dario" — true but missing the audit/cost lens reason); skipping rationale (next operator wonders why those two).
 
 ## Phase D — Reviewer pass
 
-**Owner**: nominated reviewer personas (subagents today, CCR routines later).
+**Owner**: nominated agents (subagents today, CCR routines later). The "reviewer" is whichever agent the router nominated for the cycle — not a fixed persona-skill mapping.
 **Outputs**: inline + summary review comments per persona, posted via `mcp__github__pull_request_review_write` with `event: "COMMENT"`.
 
-Persona-specific prompts live at `workforce/docs/routines/{persona}-review.md`. The bindings under `workforce/agents/{slug}/agent.json` declare each agent's reviewer skill is `executor: claude-code-routine, scheduler: manual` (declarative for now; auto-instantiation comes later via the CCR runbook).
+**Skill is persona-agnostic; persona is in the binding.** The single canonical skill spec is `workforce/docs/routines/pr-review.md` — it describes the task contract (read PR + Story → post inline + summary → finding-IDs → bias disclosure → sign-off). The persona-specific lens (Dario's R-N\* / Ren's TS idiom / Aoi's design system) lives in each agent's `agent.json` binding `config` field. Any agent holding a `pr-review` binding can review — the binding's `config.lens_name`, `config.values`, `config.checklist_sections`, and `config.bias_disclosure_template` decide what they actually look for. See [bindings.md](bindings.md) for the binding+config shape.
 
 Common contract for every reviewer:
 
@@ -105,12 +105,12 @@ Common contract for every reviewer:
 
 **Anti-patterns observed**: revising piecemeal (multiple commits per cycle inflates the cycle count); silent-dropping a finding without naming it as a follow-up (reviewer reads the absence and re-files in cycle 2); turning a "should-fix" into a 200-line refactor (expands scope into a new PR territory).
 
-## Phase F — Maya verdict
+## Phase F — Verdict
 
-**Owner**: Maya.
+**Owner**: whichever agent holds `pr-route` (same as Phase C). The router and the verdict-caster are the same agent for symmetry — they own the cycle's narrative end-to-end.
 **Outputs**: 🟢 (cleared, hand to operator) or 🟡 (still missing X — back to Phase E) or 🔴 (operator escalation — cycle cap hit or governance/L0 ambiguity).
 
-1. Maya reads the revise commit + each reviewer's cycle-1 review.
+1. The router agent reads the revise commit + each reviewer's cycle-1 review.
 2. Per cycle-1 finding: confirms address-location, confirms tests lock it.
 3. Audit deferred items are named follow-ups (issue links or PR description sections).
 4. Post the verdict comment:
@@ -157,7 +157,7 @@ The same rule that drove Story 1's nominations:
 - **aoi** — touched whenever the PR changes UI, design-doc shape, design tokens, or bilingual content.
 - **sora / yuki / kai / mira / noor / priya / theo** — touched only when the PR has surface in their specific lens.
 
-Maya states the nomination rationale + the skip-list in the routing comment. See [maya-route-pr.md](../routines/maya-route-pr.md).
+Maya states the nomination rationale + the skip-list in the routing comment. See [pr-route.md](../routines/pr-route.md) for the canonical skill spec and her binding `config.nomination_rules` in `agent.json` for the persona-specific rules.
 
 ## Defaults that should stay defaults
 
