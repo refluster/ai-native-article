@@ -83,7 +83,7 @@ When the Status line flips, add a parenthetical date so the audit trail is one c
 | [007](epic-007-agent-management-api.md) | Agent management surface (DDB + CRUD API, SAM, nodejs24.x) | Draft | Maya |
 | [008](epic-008-skill-repository.md) | Skill repository as the execution unit | In-progress | Maya |
 | [009](epic-009-vp-tier-and-functional-expansion.md) | VP tier and functional expansion (7 new agents) | Draft | Maya |
-| [010](epic-010-project-trust-boundary.md) | Project as trust boundary: credentials, executions, agent memory | Draft | Maya |
+| [010](epic-010-project-trust-boundary.md) | Project as trust boundary: credentials, executions, agent memory | Accepted | Maya |
 
 The index is also the **canonical status view** — keep it in sync when a Status line in an individual Epic flips. A CI check that asserts table-vs-file consistency is on the backlog (see `workforce/scripts/validate-epic-index.mjs`, forthcoming).
 
