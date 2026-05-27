@@ -29,9 +29,27 @@
 // Credential resolution (getCredential) uses preferred-path-with-
 // scoped-legacy-fallback per Epic-010 §6. The catch is narrowed to
 // ResourceNotFoundException so IAM / network / parse failures still
-// surface (W-4 fail-loud). Story 2 (#91) adds the
-// WfLegacyCredentialReads CloudWatch metric on the legacy-hit path.
+// surface (W-4 fail-loud).
+//
+// Story 2-B (#91) extended the fallback into THREE tiers and added the
+// WfLegacyCredentialReads CloudWatch metric:
+//   1. wf/projects/{id}/{type}            — canonical, post-migration
+//   2. wf/projects/_default/{type}        — shared fallback for keys
+//                                            the project hasn't shadowed
+//                                            (populated by the migrate-
+//                                            credentials Lambda)
+//   3. wf/{type}                          — legacy bare path; pre-Epic-010
+//                                            deployment artefact, kept
+//                                            until WfLegacyCredentialReads
+//                                            graphs to zero
+// Each fallback hit emits a metric with `Reason=fallback_default` or
+// `fallback_bare`; the operator graphs the bare reason to zero before
+// deleting the bare keys.
 
+import {
+  CloudWatchClient,
+  PutMetricDataCommand,
+} from "@aws-sdk/client-cloudwatch";
 import {
   conditionalPutItem,
   getItem,
@@ -41,6 +59,12 @@ import {
 } from "./ddb.js";
 import { getSecret } from "./secrets.js";
 import type { AgentSlug } from "./agent.js";
+
+const STAGE = process.env.STAGE ?? "dev";
+// One client per cold start. Metric emission is best-effort — failures
+// log but do NOT block the credential read (W-4 is preserved at the
+// read level: a missing credential still throws loudly).
+const cwForCreds = new CloudWatchClient({});
 
 // --- Branded ProjectId ---------------------------------------------------
 
@@ -385,14 +409,21 @@ export async function listExecutions(filter: ListExecutionsFilter): Promise<Exec
 /**
  * Resolve a credential by (project_id, credential_type).
  *
- * Tries `wf/projects/{id}/{type}` first; falls back to the legacy bare
- * path `wf/{type}` ONLY when the project-scoped path returns
- * `ResourceNotFoundException`. Other failures (IAM denial, throttle,
- * network, JSON parse) re-throw so they surface loudly per W-4.
+ * Three-tier preferred-path-with-fallback (Epic-010 Story 2-B / #91):
+ *   1. `wf/projects/{id}/{type}`         project-scoped (canonical)
+ *   2. `wf/projects/_default/{type}`     shared fallback (post-migration)
+ *   3. `wf/{type}`                       legacy bare path (pre-Epic-010)
  *
- * The legacy-hit path logs a structured `legacy_credential_read` event
- * so Story 2 (#91) can land its `WfLegacyCredentialReads` CloudWatch
- * metric on a clean signal.
+ * Each tier-2 / tier-3 hit emits a structured `legacy_credential_read`
+ * log AND a `WfLegacyCredentialReads` CloudWatch metric (namespace
+ * `Workforce/Credentials`, dimensions `Stage` + `Reason`). The operator
+ * watches the bare-path metric graph to zero before deleting the bare
+ * keys (Epic-010 §6 deprecation window).
+ *
+ * Only `ResourceNotFoundException` triggers fallback. IAM / throttle /
+ * network / JSON-parse failures re-throw so they surface loudly per W-4.
+ * If all three tiers miss, the third throw propagates (load-bearing —
+ * a missing credential is a fail-loud event).
  *
  * Type parameter `T` has no default — callers MUST specify the expected
  * secret shape (e.g. `getCredential<GithubSecret>(...)`) so wrong-shape
@@ -409,16 +440,65 @@ export async function getCredential<T>(
   try {
     return await getSecret<T>(`wf/projects/${projectId}/${credentialType}`);
   } catch (err) {
-    if (err instanceof Error && err.name === "ResourceNotFoundException") {
+    if (!isResourceNotFound(err)) throw err;
+  }
+  // Tier 1 missed — try _default shared bag.
+  try {
+    const value = await getSecret<T>(`wf/projects/_default/${credentialType}`);
+    emitLegacyCredentialRead(projectId, credentialType, "fallback_default");
+    return value;
+  } catch (err) {
+    if (!isResourceNotFound(err)) throw err;
+  }
+  // Tier 2 missed — fall back to legacy bare path. A third miss throws
+  // (load-bearing W-4 — a totally missing credential must fail loud).
+  const value = await getSecret<T>(`wf/${credentialType}`);
+  emitLegacyCredentialRead(projectId, credentialType, "fallback_bare");
+  return value;
+}
+
+function isResourceNotFound(err: unknown): boolean {
+  return err instanceof Error && err.name === "ResourceNotFoundException";
+}
+
+function emitLegacyCredentialRead(
+  projectId: ProjectId,
+  credentialType: string,
+  reason: "fallback_default" | "fallback_bare",
+): void {
+  console.warn(
+    JSON.stringify({
+      event: "legacy_credential_read",
+      project_id: projectId,
+      credential_type: credentialType,
+      reason,
+    }),
+  );
+  // Best-effort fire-and-forget; never await, never throw. A metric-
+  // emission failure must NOT mask the successful credential read.
+  cwForCreds
+    .send(
+      new PutMetricDataCommand({
+        Namespace: "Workforce/Credentials",
+        MetricData: [
+          {
+            MetricName: "WfLegacyCredentialReads",
+            Value: 1,
+            Unit: "Count",
+            Dimensions: [
+              { Name: "Stage", Value: STAGE },
+              { Name: "Reason", Value: reason },
+            ],
+          },
+        ],
+      }),
+    )
+    .catch((err) => {
       console.warn(
         JSON.stringify({
-          event: "legacy_credential_read",
-          project_id: projectId,
-          credential_type: credentialType,
+          event: "legacy_credential_metric_emit_failed",
+          error: err instanceof Error ? err.message : String(err),
         }),
       );
-      return await getSecret<T>(`wf/${credentialType}`);
-    }
-    throw err;
-  }
+    });
 }

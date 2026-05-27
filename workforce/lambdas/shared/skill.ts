@@ -47,6 +47,12 @@ export interface SkillMeta {
   owners: string[];
   improvement_agent: string | null;
   created_at: string;
+  /** Epic-010 §5: credential keys the skill will receive via ctx.credentials.
+   *  Schema allowlist + variant pattern enforced by scripts/validate-skills.mjs
+   *  and scripts/schemas/skill-meta.schema.json. Runtime re-check in
+   *  shared/credential-injector.ts:injectCredentials. Absent/empty produces a
+   *  sealed bag with no readable keys — undeclared access throws. */
+  requires?: string[];
 }
 
 export interface LoadedSkill {

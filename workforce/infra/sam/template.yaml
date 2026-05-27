@@ -441,6 +441,51 @@ Resources:
       Tags:
         workforce: !Ref Stage
 
+  # --- Migration: bare wf/{type} -> wf/projects/_default/{type} (Epic-010 §6) -
+  # Operator-invoked one-shot. Copies the legacy bare-path credentials
+  # (provisioned pre-Epic-010) into the type-keyed canonical paths under
+  # the `_default` pseudo-project. Idempotent re-runs are safe (the
+  # CreateSecret race resolves to `already_migrated`). Emits CW metrics
+  # under Workforce/Credentials. Discord bot tokens are NOT in scope
+  # (existing wf/discord-* keys are webhooks, a different credential type).
+  WfMigrateCredentialsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-migrate-credentials-${Stage}
+      CodeUri: ../../lambdas/migrate-credentials
+      Handler: handler.handler
+      Description: One-shot — copies legacy wf/{type} secrets to wf/projects/_default/{type}. Epic-010 Story 2-B.
+      MemorySize: 512
+      Timeout: 300
+      Policies:
+        - Statement:
+            - Sid: MigrateCredentialsReadLegacy
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/anthropic-*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/notion-*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/github-*
+            - Sid: MigrateCredentialsWriteDefault
+              Effect: Allow
+              # CreateSecret takes a wildcard Resource — the action does
+              # not yet exist, so resource-level ARN matching isn't a
+              # tightening surface. The Name parameter is constrained by
+              # the LEGACY_TO_TYPED map inside the handler.
+              Action: secretsmanager:CreateSecret
+              Resource: "*"
+            - Sid: MigrateCredentialsPutMetric
+              Effect: Allow
+              Action: cloudwatch:PutMetricData
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace: Workforce/Credentials
+      Tags:
+        workforce: !Ref Stage
+
   WfSeedAgentsErrorsAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -569,9 +614,14 @@ Resources:
                 - !Sub ${WfBucket.Arn}/pr-briefs/*
                 - !Sub ${WfBucket.Arn}/runs/*
             - Sid: RunnerSecretsRead
+              # Story 2-B (#91) added the `wf/projects/*` arm for the
+              # post-migration canonical path AND the `_default` shared
+              # fallback. The legacy `wf/{service}-*` arms remain until
+              # WfLegacyCredentialReads graphs to zero (Epic-010 §6).
               Effect: Allow
               Action: secretsmanager:GetSecretValue
               Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/anthropic-*
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/notion-*
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/github-*
@@ -581,12 +631,18 @@ Resources:
               # WfExecDualWriteFailed under Workforce/Runner namespace so
               # the operator sees dual-write drift in real time, not just
               # via log spelunking. Namespace condition mirrors backfill.
+              #
+              # Story 2-B (#91) extended the namespace condition to
+              # include Workforce/Credentials — getCredential() emits
+              # WfLegacyCredentialReads on every fallback hit.
               Effect: Allow
               Action: cloudwatch:PutMetricData
               Resource: "*"
               Condition:
                 StringEquals:
-                  cloudwatch:namespace: Workforce/Runner
+                  cloudwatch:namespace:
+                    - Workforce/Runner
+                    - Workforce/Credentials
       Environment:
         Variables:
           ENGINEER_OWNER: !Ref EngineerOwner
