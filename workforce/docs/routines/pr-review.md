@@ -79,6 +79,30 @@ Task assignment is fluid. Today the lens-to-persona mapping is conventional (Dar
 
 This also keeps the skill spec stable as new personas are added — adding Kai-the-brand-reviewer means adding a `pr-review` binding with Kai's config block, not rewriting this file.
 
+## Cross-project mode (Epic-010)
+
+The skill is **target-repo aware** when the binding declares `requires: ["github.token"]` and the invocation carries an explicit `project_id`. The runner resolves the credential per [Epic-010 §5](../epics/epic-010-project-trust-boundary.md#5-type-keyed-credential-resolution) — `wf/projects/{project_id}/github.token`, not the global `wf/github`. The same skill spec covers PRs on the workforce's own repo (`PROJECT#kohuehara-blog`) and PRs on any external project registered under [`workforce/projects/`](../../projects/README.md).
+
+What changes per project:
+
+- **Diff + comment posting** target the project's `(owner, repo)` from `PROJECT#{id}/META.github`, using the project's `github.token` credential — not the workforce's own PAT. The sealed-bag guarantee (per Story 2-A) means the reviewer cannot accidentally reach a credential from another project.
+- **Governance grounding** — the `Context to load` step (5) above references `workforce/docs/governance.md` for the workforce's own self project. For an external project, the reviewer reads `PROJECT#{id}/META.governance_docs` (e.g. `["AGENTS.md", "CONTRIBUTING.md"]`) and fetches those paths from the target repo via the Contents API. If `governance_docs` is empty, the reviewer skips repo-specific governance grounding and falls back to the lens's structural checklist only.
+- **Story / Epic references** — `closes #N` in the PR body resolves against the target repo, not `refluster/ai-native-article`. Issues are read via the project's PAT.
+- **Execution audit** — every review writes `PROJECT#{project_id}/EXEC#{ulid}` via `appendExecution()`. The agent must be in the project's `members[]` or `appendExecution` throws.
+
+What stays the same:
+
+- The `event: COMMENT` constraint (W-5).
+- The lens — `config.lens_name`, `config.values`, `config.checklist_sections`, `config.bias_disclosure_template`.
+- The inline / summary comment shapes; the finding-ID protocol.
+- Cycle-2+ scoping rules.
+
+Invocation:
+
+> {Reviewer persona}, project `{project_id}` の PR `{pr_url}` を review。
+
+When `project_id` is omitted, the runner defaults to the workforce's own self project.
+
 ## Related
 
 - [pr-route.md](pr-route.md) — the routing skill (invoked by Maya today; future: any agent with the binding) that dispatches `pr-review` to nominated personas.
