@@ -21,6 +21,11 @@ import { getItem, putItem, updateOperational } from "../shared/ddb.js";
 import { complete } from "../shared/llm-anthropic.js";
 import { assertWithinBudget, recordSpend } from "../shared/budget.js";
 import {
+  injectCredentials,
+  type CredentialBag,
+  type CredentialKey,
+} from "../shared/credential-injector.js";
+import {
   appendExecution,
   asProjectId,
   selfProjectId,
@@ -112,18 +117,26 @@ export async function handler(event: RunnerEvent, context: Context): Promise<Run
     return { status: "ok", run_id: runId, tokens_in: 0, tokens_out: 0, cost_usd: 0 };
   }
 
+  // Build the sealed credential bag BEFORE entering the executor switch,
+  // so a missing-credential failure flows through the normal throwRun
+  // path (logged + dual-write-emit + propagated). Empty `requires`
+  // yields a bag with no readable keys; the skill still receives it on
+  // ctx.credentials but any read throws (W-2 trust boundary).
+  // Story 2-B (#91): injection happens at the runner seam, NOT inside
+  // each executor, so all three paths use identical resolution rules.
   let result: RunnerResult;
   try {
+    const credentials = await buildCredentialBag(event, skill);
     switch (skill.meta.executor) {
       case "deterministic":
-        result = await runDeterministic(event, agent, binding, skill, runId, startedAt);
+        result = await runDeterministic(event, agent, binding, skill, runId, startedAt, credentials);
         break;
       case "claude-code-routine":
-        result = await runClaudeCodeRoutine(event, agent, binding, skill, runId, startedAt, previousChunk);
+        result = await runClaudeCodeRoutine(event, agent, binding, skill, runId, startedAt, previousChunk, credentials);
         break;
       case "llm-prose":
       default:
-        result = await runLlmProse(event, agent, binding, skill, runId, startedAt, previousChunk);
+        result = await runLlmProse(event, agent, binding, skill, runId, startedAt, previousChunk, credentials);
         break;
     }
   } catch (err) {
@@ -152,9 +165,10 @@ async function runDeterministic(
   skill: LoadedSkill,
   runId: string,
   startedAt: string,
+  credentials: CredentialBag,
 ): Promise<RunnerResult> {
   const handler = getDeterministicHandler(skill.meta.name);
-  const result = await handler({ slug: event.agent, startedAt });
+  const result = await handler({ slug: event.agent, startedAt, credentials });
 
   const s3Key = await writeRunArtefact(event.agent, runId, result.outputExt, result.output);
   const endedAt = new Date().toISOString();
@@ -190,7 +204,14 @@ async function runLlmProse(
   runId: string,
   startedAt: string,
   previousChunk: string,
+  _credentials: CredentialBag,
 ): Promise<RunnerResult> {
+  // _credentials: built + validated at the runner seam so a missing
+  // declared credential fails the run loudly even though llm-prose
+  // skills currently consume secrets indirectly (helpers in
+  // shared/notion.ts, shared/llm-anthropic.ts read their own paths).
+  // Future skills that thread credentials through the prompt will
+  // accept the bag here.
   if (!skill.meta.deliverable) {
     throw new Error(`skill "${skill.meta.name}" is llm-prose but has no deliverable in meta.json`);
   }
@@ -280,6 +301,7 @@ async function runClaudeCodeRoutine(
   runId: string,
   startedAt: string,
   previousChunk: string,
+  _credentials: CredentialBag,
 ): Promise<RunnerResult> {
   const baseSystem = await loadSystemMd(event.agent);
   const system = composeSystemPrompt(baseSystem, skill);
@@ -294,6 +316,9 @@ async function runClaudeCodeRoutine(
 
   const delivId = newUlid();
   const owner = process.env.ENGINEER_OWNER ?? "refluster";
+  // _credentials: see comment in runLlmProse — bag is built at the
+  // runner seam for trust-boundary enforcement; the brief generator
+  // currently does not thread it into the GHA workflow_dispatch payload.
   const repo = process.env.ENGINEER_REPO ?? "ai-native-article";
   const workflow = process.env.ENGINEER_WORKFLOW ?? "workforce-engineer-routine.yml";
   const ref = process.env.ENGINEER_REF ?? "main";
@@ -442,6 +467,31 @@ const cw = new CloudWatchClient({});
 
 function resolveProjectId(event: RunnerEvent): ProjectId {
   return event.project_id ? asProjectId(event.project_id) : selfProjectId(event.agent);
+}
+
+/**
+ * Build the per-invocation sealed credential bag (Epic-010 Story 2-B).
+ *
+ * `requires` is read from skill.meta — Story 2-A's schema extension. An
+ * absent / empty list produces a bag with no readable keys (correct for
+ * every skill in the repo today; the wire-up is meaningful when skills
+ * start declaring `requires` in follow-up PRs).
+ *
+ * Throws on any failure — missing project, undeclared key in `requires`,
+ * missing Secrets Manager value. The outer try/catch in `handler()`
+ * turns the throw into a normal RUN row with status="throw" and an
+ * error_message, matching the existing skill-load / executor-error
+ * handling shape.
+ */
+async function buildCredentialBag(
+  event: RunnerEvent,
+  skill: LoadedSkill,
+): Promise<CredentialBag> {
+  const projectId = resolveProjectId(event);
+  const requires = (skill.meta.requires ?? []) as readonly CredentialKey[];
+  return await injectCredentials(requires, projectId, {
+    skillName: skill.meta.name,
+  });
 }
 
 /** Single seam for RUN+EXEC dual-write. See the comment above for the
