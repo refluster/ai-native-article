@@ -117,6 +117,40 @@ The data-model's current deferral of vector embeddings to v2/v3 is **amended by 
 
 A `recall()` call with both `query=` and structured filters runs the semantic search first, then post-filters by the structured predicates — never the other way around, so the k=5 ceiling is honoured on the semantic axis.
 
+### 10. Projects console — operator UI surface (Story 3)
+
+The console adds pages under the existing Workforce SPA and a thin read/write API layered onto the trust boundary defined in §1–§9. The UI **never resolves credential values** — it shows that a `(project, type)` pair exists, who owns it, and when it was last rotated; the value itself stays inside the runner.
+
+| Page | Path | Role |
+|---|---|---|
+| Projects index | `/workforce/projects` | Filtered list of `PROJECT#*/META` rows. Status / owner chips. `self/*` rows hidden by default. |
+| Project detail | `/workforce/projects/:id` | Three tabs: Members (active + audit), Credentials (type list, no values), Executions (ledger, GSI / partition queries). |
+| Agent cross-link | `/workforce/agents/:slug` | New "Memberships" section listing projects the agent participates in. |
+
+API surface — relayed through the existing `wf-agents-api` Lambda (see Q5), under the Epic-007 routing pattern:
+
+```
+GET    /projects                          list (paginated, ?status=, ?owner=, ?include_self=)
+GET    /projects/{id}                     META row + member summary
+GET    /projects/{id}/members             active members; ?include_revoked=true for audit
+GET    /projects/{id}/credentials         [{type, sm_path, last_rotated_at}]   ← VALUES OMITTED
+GET    /projects/{id}/executions          ledger, paginated, ?from=&to=&status=&agent=&skill=
+GET    /projects/{id}/executions/{ulid}   one row + presigned artefact URL (scoped to {project, ulid})
+POST   /projects/{id}/members             { agent_slug }                       (IAM-auth)
+DELETE /projects/{id}/members/{slug}      soft delete → revoked_at             (IAM-auth)
+PATCH  /projects/{id}                     { status: "archived", owner_agent? } (IAM-auth)
+```
+
+Three invariants the API surface MUST enforce, even though the helper layer in §1 does not:
+
+- **Credentials are never read through the API.** The credentials endpoint returns paths and rotation metadata only. Values resolve only inside the runner via `getCredential()` (§5).
+- **`listExecutions` is read-gated.** §7 leaves this open in the helper by design. The API resolves the Cognito principal to `_operator` or an `AgentSlug`, and rejects unless that principal is `_operator` or an active member of the project.
+- **Artefact presigned URLs are scoped to `(project_id, exec_ulid)`.** A signing Lambda emits the URL; direct S3 references from the SPA are forbidden, matching the §8 IAM prefix-restriction at the AWS layer.
+
+`POST /projects` is **not** exposed: new projects come from `workforce/projects/{id}/project.json` + a seed step, mirroring Epic-007's "Creates via API are deliberately not exposed". `self/{slug}` is auto-seeded by Story 1-B.
+
+Mutation operations take an IAM-authed operator. Agent-as-actor mutation (e.g. Maya removes a member on the operator's behalf) requires an identity-flow the workforce does not yet have, and is out of scope.
+
 ## Behaviour at N = 100+ agents
 
 The proposed shape is **better** at 100+ agents than the current one, in three ways:
@@ -153,7 +187,15 @@ If the operator declines the W-3 raise, the recommended fall-back is to **split 
 - `agent.recall(query="…")` returns top-k executions for the calling agent, never executions from a project the agent does not belong to (covered by an authorisation test).
 - [governance.md §2](../governance.md#2-l0-invariants-w-1w-5) W-3 raised to `USD 200/month combined`, in the same PR series, with a CloudWatch Billing Alarm reconfigured to match.
 - [data-model.md §What's deliberately NOT in the data model](../data-model.md#whats-deliberately-not-in-the-data-model) updated to remove "Vector embeddings / RAG store" from the deferral list and to add `PROJECT#{id}/EXEC#{ulid}` to the row catalogue.
-- This Epic's `Status` flips to `Implemented` only when (a) every `wf/{type}` legacy key is removed, (b) the dual-write window has ended, and (c) the front-end agent-profile view reads from the new row family.
+- **Story 3 — Projects console** (UI + read/write API per §10):
+  - The Workforce SPA mounts `/workforce/projects` (index) and `/workforce/projects/:id` (three tabs: Members / Credentials / Executions) on `workforce.kohuehara.xyz`.
+  - The endpoints in §10 are deployed via the existing `wf-agents-api` Lambda and CORS-allowed for the workforce origin. `GET` is public; `POST` / `DELETE` / `PATCH` require AWS_IAM.
+  - `GET /projects/{id}/credentials` returns `{type, sm_path, last_rotated_at}` only; an integration test asserts the response body contains no secret material.
+  - `GET /projects/{id}/executions` enforces the read-gate (operator OR active member); an authorisation test denies a non-member agent's call.
+  - The presigned-URL emitter rejects an `exec_ulid` whose row lives under a different `project_id` prefix; verified by a deny test.
+  - `self/{slug}` projects are filtered out of the default index view; visible from `/workforce/agents/:slug` and via `?include_self=true`.
+  - The SPA falls back to a static `apps/workforce/public/workforce-projects-mock.json` until Story 1-B's dual-write is on; the flip to live data is a follow-up commit, not a separate Story.
+- This Epic's `Status` flips to `Implemented` only when (a) every `wf/{type}` legacy key is removed, (b) the dual-write window has ended, (c) the front-end agent-profile view reads from the new row family, and (d) Story 3's projects console is live on `workforce.kohuehara.xyz` reading live DDB data.
 
 ## Open questions
 
@@ -161,12 +203,18 @@ If the operator declines the W-3 raise, the recommended fall-back is to **split 
 - **Q2. Same-type, multiple values per project.** A future need: project C uses both an org-level GitHub token (admin) and a per-repo deploy key (scoped). The Epic keeps v1 strict (1 type = 1 value) but reserves `type@name` syntax (`github.token@deploy`) for the inevitable v2 extension. Worth flagging now so the parser supports `@` from day one without parsing it.
 - **Q3. Embedding model lock-in.** `voyage-3-lite` is the v1 choice on cost grounds, but the index is not free to re-embed. We should write the embedding `model_id` and `dim` next to each vector so re-indexing on a model change is a query, not a guess. Adds one row in OpenSearch metadata; small.
 - **Q4. Does Notion go in `wf/projects/{id}/notion.integration_token`?** Today Notion is the editorial source of truth (W-2). It's currently shared across all editorial agents. Treating editorial-pipeline Notion as a project (`PROJECT#editorial`) is the cleanest fit; the per-persona article-publishing skills then resolve their token from that one project. Confirm before committing the migration.
+- **Q5. API placement for `/projects/*`.** Ride along on the existing `wf-agents-api` Lambda (default — single CORS surface, no extra cold-start, `routeKey` dispatch extends cleanly) or split into a new `wf-projects-api`? Split only if cold-start budget tightens. If we ride along, rename the Lambda's logical ID in a follow-up PR for clarity.
+- **Q6. Credential value editing from the UI.** Default: **no**. The UI shows type / path / rotation metadata. Values are written via `aws secretsmanager put-secret-value` or IaC. Surfacing a guarded write path (confirm + audit) is a follow-up Epic, not Story 3.
+- **Q7. Mutation auth scope.** AWS_IAM (operator's `aws-vault` credentials) for `POST /members`, `DELETE /members/:slug`, `PATCH /projects/:id`. Agent-as-actor mutation (Maya removes a member on the operator's behalf) is out of scope — it requires a separate identity-flow the workforce does not yet have.
+- **Q8. `self/{slug}` rendering.** Default: filtered out of `/workforce/projects` by default; surface via `?include_self=true` and on `/workforce/agents/:slug`. Alternative — always shown but with a visual demotion — would risk Q1's per-agent-private guarantee if a future operator action targets the wrong row.
+- **Q9. Members-by-agent index.** The agent-profile "Memberships" section needs "which projects is `ren` a member of?". Three options: (a) full-table scan filtered on `agent_slug` (acceptable to ~100 projects, slow beyond), (b) a new GSI3 (`gsi3pk = MEMBER#{agent_slug}, gsi3sk = joined_at`), (c) duplicate the membership into an `AGENT#{slug}/PROJECT#{id}` mirror row. Recommend (b) for the index-per-query consistency with §7. Confirm before adding the GSI in the Story 3 PR (GSI adds is non-trivial to roll back).
+- **Q10. Credential rotation audit display.** Out of scope for Story 3; rotation events live in CloudTrail. Surfacing them in the console is a separate Epic.
+- **Q11. Live-data cutover.** Story 3 ships first against a static `workforce-projects-mock.json` fall-back, then flips to live DDB once Story 1-B's dual-write is on. The flip is one PR with no schema change, not a separate Story.
 
 ## Out of scope
 
 - Per-project IAM roles (assumable). v1 uses a single runner role with a prefix-restricted policy. Per-project roles are the right shape if and when an attacker model includes "the runner itself is compromised"; today the model assumes runner integrity.
 - Cross-agent message passing as a first-class primitive. Still v2 ([data-model.md](../data-model.md#whats-deliberately-not-in-the-data-model)). Project-shared execution visibility is *not* the same thing as inter-agent messaging — agents read each other's executions but do not send each other commands.
-- A project-management UI on `/workforce/projects`. Out of scope here; covered later by Epic-011 or similar.
 - WORM / append-only hash-chained execution ledger (tamper-evident audit). DDB PITR + S3 Versioning are sufficient for v1 (W-2). Tightening to a hash chain is a Zone A amendment when the threat model demands it.
 - A "credential rotation skill" that automates token refresh. Today rotation is operator-driven; automating it is a separate Epic and a separate trust conversation.
 - Per-project budget ceilings (W-3 currently aggregates by agent). Possible v2 — would compose naturally with the new `PROJECT#{id}` rows, but the operator surface and the alarm configuration are non-trivial. Not in this Epic.
