@@ -70,7 +70,7 @@ if (slugDirs.length === 0) {
 }
 
 let totalBudget = 0;
-const W3_CAP = 100;
+const W3_CAP = 130;
 
 // Build a snapshot of available skills + their owner lists for cross-checks.
 const skillsIndex = new Map(); // name → { owners: Set<slug> }
