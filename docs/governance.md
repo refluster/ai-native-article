@@ -126,6 +126,7 @@ These are what the operator (or an agent acting as operator) actually does. Each
 | Adding a new GAS action | Editing `gas/src/Code.gs` to add a `case 'X'` to `doPost` | [L1-L4-PIPELINE.md §Operator runbooks](../L1-L4-PIPELINE.md) |
 | Force a fresh deploy | "I just edited Notion and want it live now" | `gh workflow run deploy-article-site.yml` (documented in [L1-L4-PIPELINE.md](../L1-L4-PIPELINE.md)) |
 | Daily content sweep (advisory) | Once a day, or after any GAS change | `.claude/skills/article-health/` |
+| Labelling a GitHub issue | Opening or triaging any issue on `refluster/ai-native-article` | [docs/issue-labeling.md](issue-labeling.md) + `scripts/sync-labels.mjs` |
 
 Skills are L3 in their entirety: each `SKILL.md` is the runbook, each `scripts/*.mjs` is the executable form.
 

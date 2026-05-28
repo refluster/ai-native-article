@@ -59,6 +59,7 @@ When in doubt: ask in chat with a one-line description; wait for an explicit "ye
 - **Plan before non-trivial implementation.** Use `EnterPlanMode` for any change that touches `gas/src/Code.gs` substantively or that modifies multiple files.
 - **Verify after change.** A change to `gas/src/Code.gs` is not done until `gas-deploy-verify` passes. A change to content generation is not done until `article-health` reports 0 truncated.
 - **Commit messages cite the layer.** `L2: add finish_reason='length' throw` reads better than `fix: bug`. The layer tag (L1/L2/L3) helps future audit see which doc level a change touches.
+- **Label new issues per [docs/issue-labeling.md](docs/issue-labeling.md).** Mandatory axes: `project:` + `layer:` + `type:`. Reconcile colours via `node scripts/sync-labels.mjs` after editing `.github/labels.json`.
 - **One in_progress todo at a time** when running TodoWrite for multi-step tasks. Mark complete immediately on finish.
 
 ## Things that cost more than they look
