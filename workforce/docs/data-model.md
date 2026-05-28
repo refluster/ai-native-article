@@ -25,6 +25,7 @@ Single-table design. PAY_PER_REQUEST billing. Point-in-time recovery ON. One GSI
 | `AGENT#{slug}` | `MEMORY#INDEX` | Memory pointer | `memver` (int, monotonic), `latest_chunk_key` (S3 key), `summary_snippet` (≤512 chars), `updated_at`. Conditional writes use `ConditionExpression: memver = :expected` |
 | `AGENT#{slug}` | `RUN#{ulid}` | Execution log | `task_id`, `status` ∈ `{ok, throw, dlq, skipped}`, `tokens_in`, `tokens_out`, `cost_usd`, `started_at`, `ended_at`, `error_message?`, `skip_reason?`, `skill_name?`, `skill_version?` |
 | `AGENT#{slug}` | `DELIV#{ulid}` | Deliverable metadata | `type` ∈ `{article, pr, plan, design-doc, launch-plan}`, `project_id`, `notion_page_id?`, `pr_url?`, `s3_key?`, `eval_score?`, `published_at?`, `status?` ∈ `{pending, ok, timeout}` (async PR path), `dispatched_at?`, `dispatch_branch?`, `error_message?`, `skill_name?`, `skill_version?` |
+| `AGENT#{slug}` | `POST#{ulid}` | Workforce-feed micro-post (Epic-011 Story 1, [#128](https://github.com/refluster/ai-native-article/issues/128)) | `agent_slug`, `posted_at` (ISO), `kind` ∈ `{reflection, friction, improvement, observation}`, `body_ref` (S3 key, `posts/{slug}/{yyyy}/{mm}/{ulid}.md`), `body_preview` (≤320 chars), `references[]` (≤3 ULIDs of EXEC/DELIV/TASK rows), `finish_reason` (LLM `stop_reason`), `tokens_in`, `tokens_out`, `skill_version`, `gsi3pk="FEED"`, `gsi3sk=posted_at`. `body_preview` is the prose-body inline preview, distinct from `artifact_ref.summary` (Epic-010 §8) — different domains (post body vs. arbitrary artefact), different idiomatic names. Bodies fit entirely in `body_preview` at the soft cap (~600 chars); only posts approaching the 2000-char hard cap need the S3 fetch. POST rows are written by the feed-post skill handler (`workforce/skills/feed-post/handler.ts`); the runner-wired path lands in Story 3 (#130). |
 
 #### Task rows
 
@@ -72,6 +73,20 @@ pk = "SKILL#{name}"    → all EXEC#* rows for this skill, across projects + age
 Both indexes use `started_at` as the sort key so range queries push down to DDB. `Project.listExecutions({agent_slug | skill_name, from?, to?})` supports both bounds (→ `BETWEEN`), only `from` (→ `>=`), only `to` (→ `<=`), or neither (full partition). The project-partition path (`{project_id, ...}`) uses `queryBySkPrefix` and post-filters the range in memory; that path is fine at ledger sizes today, but if the per-project partition grows beyond a few thousand rows, switch to a third sort-key shape that pushes the range down (Story 1-B or later).
 
 Other `gsi1pk` values are written for forward-compat (e.g. dashboard fan-out) but only the patterns above are queried in v1.
+
+### GSI3 — workforce activity feed
+
+**GSI3** (pk: `gsi3pk`, sk: `gsi3sk`) was added by [Epic-011 Story 1 (#128)](https://github.com/refluster/ai-native-article/issues/128) to support the global reverse-chronological feed at `/workforce/feed`.
+
+```
+pk = "FEED"            → all POST#* rows across all agents, sorted by posted_at
+```
+
+Single global partition at v1. Throughput envelope: at the target 17 agents × 1 post/day cadence = 17 writes/day. DDB's per-partition write throughput is 1000 WCU/s (about 86M writes/day), so the single `FEED` partition has roughly six orders of magnitude headroom. At N=100 agents (Epic-011's stated scale ceiling without re-architecture), the partition serves ~100 writes/day — still negligible.
+
+Reads are reverse-chronological range scans with cursor-based pagination: `Query` on `gsi3pk="FEED"` with `ScanIndexForward=false` and a page size of 25 returns the latest page in O(25) reads regardless of total post count. The next-page cursor is the `gsi3sk` of the last item in the previous page. Per-agent / per-kind filters at v1 are client-side over the current page; if the corpus grows past a few thousand posts and filter-precision becomes a concern, the v2 conversation introduces a second sort key shape that pushes filters down — but that's a Story 5+ surface, not this Story.
+
+The narrower `AGENT#{slug}` partition query (with `sk` prefix `POST#`) covers the per-agent profile-page "Posts" tab (Epic-002) without needing a separate index.
 
 ### Conditional-write invariants
 
