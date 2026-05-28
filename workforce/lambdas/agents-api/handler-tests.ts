@@ -96,10 +96,12 @@ vi.mock("../shared/skill-row.js", () => ({
   toSkillApiView: (r: { name?: string }) => ({ name: r.name }),
 }));
 
-// `shared/project.ts` is consumed for `asProjectId` / `projectPk` only at
-// the handler-dispatch layer; the helpers' behaviour is covered by the
-// real `project-tests.ts`. Lightweight inline impl keeps the dispatch
-// path exercised without re-mocking 30+ helpers.
+// `shared/project.ts` is consumed for `asProjectId` / `projectPk` /
+// (Issue #158 PR-β) `archive` / `unarchive` / `getProject`.
+// The dispatch-level mock backs the lifecycle helpers with the same
+// in-memory `rows` map the DDB mock uses so PATCH integrations can be
+// observed end-to-end without re-mocking the full helper layer.
+const projectStatus = new Map<string, "active" | "archived">();
 vi.mock("../shared/project.js", () => ({
   asProjectId: (s: string) => {
     if (!s || s.includes("#") || s.includes("|")) {
@@ -108,6 +110,69 @@ vi.mock("../shared/project.js", () => ({
     return s;
   },
   projectPk: (id: string) => `PROJECT#${id}`,
+  getProject: async (id: string) => {
+    const row = rows.get(key(`PROJECT#${id}`, "META"));
+    return row;
+  },
+  archive: async (id: string) => {
+    projectStatus.set(id, "archived");
+    const row = rows.get(key(`PROJECT#${id}`, "META"));
+    if (row) {
+      row.status = "archived";
+      row.archived_at = "2026-05-28T00:00:00.000Z";
+    }
+  },
+  unarchive: async (id: string) => {
+    const current = projectStatus.get(id);
+    if (current !== "archived") return;
+    projectStatus.set(id, "active");
+    const row = rows.get(key(`PROJECT#${id}`, "META"));
+    if (row) {
+      row.status = "active";
+      delete row.archived_at;
+    }
+  },
+}));
+
+// Issue #158 PR-β A1: credentials LIST enumerates from CREDENTIAL_TYPES.
+// Mock the registry so tests don't depend on the canonical set's
+// current size; this keeps the suite resilient to future type additions.
+vi.mock("../shared/credential-injector.js", () => ({
+  CREDENTIAL_TYPES: new Set(["github.token", "notion.integration_token"]),
+}));
+
+// Issue #158 PR-β A1: DescribeSecret-backed metadata.
+// In-memory map keyed by SecretId. `undefined` = ResourceNotFoundException.
+const secretsManagerStore = new Map<
+  string,
+  { ARN: string; LastChangedDate?: Date; LastRotatedDate?: Date; CreatedDate?: Date }
+>();
+class FakeSmResourceNotFoundException extends Error {
+  override name = "ResourceNotFoundException";
+  constructor() {
+    super("Secrets Manager: secret not found");
+  }
+}
+vi.mock("@aws-sdk/client-secrets-manager", () => ({
+  SecretsManagerClient: class {
+    async send(cmd: { _kind: string; input: Record<string, unknown> }) {
+      if (cmd._kind === "describe") {
+        const id = cmd.input.SecretId as string;
+        const row = secretsManagerStore.get(id);
+        if (!row) throw new FakeSmResourceNotFoundException();
+        return row;
+      }
+      throw new Error(`unexpected SM command ${cmd._kind}`);
+    }
+  },
+  DescribeSecretCommand: class {
+    _kind = "describe";
+    input: Record<string, unknown>;
+    constructor(input: Record<string, unknown>) {
+      this.input = input;
+    }
+  },
+  ResourceNotFoundException: FakeSmResourceNotFoundException,
 }));
 
 // SUT must be imported AFTER all vi.mock() calls.
@@ -143,6 +208,8 @@ function statusOf(res: APIGatewayProxyResultV2): number {
 beforeEach(() => {
   rows.clear();
   metricBatches.length = 0;
+  projectStatus.clear();
+  secretsManagerStore.clear();
 });
 
 afterEach(() => {
@@ -457,5 +524,223 @@ describe("route dispatch — negative paths", () => {
   it("GET on an unknown path returns 404 route_not_found", async () => {
     const res = await handler(evt("GET /nonsense"));
     expect(statusOf(res)).toBe(404);
+  });
+});
+
+
+// ─── GET /projects/{id+}/credentials (Issue #158 PR-β A1) ──────────────
+
+describe("GET /projects/{id+}/credentials (listProjectCredentials)", () => {
+  function seedProject(id: string) {
+    rows.set(key(`PROJECT#${id}`, "META"), {
+      pk: `PROJECT#${id}`,
+      sk: "META",
+      project_id: id,
+      owner_agent: "_operator",
+      status: "active",
+      created_at: "2026-05-27T00:00:00.000Z",
+    });
+  }
+  function seedSecret(name: string, opts: { lastChangedDate?: string; createdDate?: string } = {}) {
+    secretsManagerStore.set(name, {
+      ARN: `arn:aws:secretsmanager:us-west-2:000000000000:secret:${name}-AbCdEf`,
+      LastChangedDate: opts.lastChangedDate ? new Date(opts.lastChangedDate) : undefined,
+      CreatedDate: opts.createdDate ? new Date(opts.createdDate) : undefined,
+    });
+  }
+
+  it("returns 404 for a ghost project (distinct from 200-with-empty)", async () => {
+    const res = await handler(
+      evt("GET /projects/{id+}/credentials", { id: "ghost" }),
+    );
+    expect(statusOf(res)).toBe(404);
+    expect(bodyOf(res)).toMatchObject({ error: "not_found", project_id: "ghost" });
+  });
+
+  it("returns 200 with metadata for each provisioned credential type", async () => {
+    seedProject("acme");
+    seedSecret("wf/projects/acme/github.token", {
+      lastChangedDate: "2026-05-20T10:00:00.000Z",
+      createdDate: "2026-05-01T00:00:00.000Z",
+    });
+    seedSecret("wf/projects/acme/notion.integration_token", {
+      lastChangedDate: "2026-05-21T11:00:00.000Z",
+      createdDate: "2026-05-02T00:00:00.000Z",
+    });
+
+    const res = await handler(
+      evt("GET /projects/{id+}/credentials", { id: "acme" }),
+    );
+    expect(statusOf(res)).toBe(200);
+    const body = bodyOf(res) as {
+      items: Array<{
+        credential_type: string;
+        name: string;
+        secret_arn: string;
+        last_changed_at?: string;
+        created_date?: string;
+      }>;
+    };
+    expect(body.items).toHaveLength(2);
+    const byType = new Map(body.items.map((i) => [i.credential_type, i]));
+    expect(byType.get("github.token")?.name).toBe("wf/projects/acme/github.token");
+    expect(byType.get("github.token")?.last_changed_at).toBe("2026-05-20T10:00:00.000Z");
+    expect(byType.get("github.token")?.secret_arn).toContain("AbCdEf");
+    expect(byType.get("notion.integration_token")?.created_date).toBe("2026-05-02T00:00:00.000Z");
+  });
+
+  it("omits unprovisioned types from the response (no row, no error)", async () => {
+    seedProject("acme");
+    // Only github.token is provisioned; notion.integration_token is missing.
+    seedSecret("wf/projects/acme/github.token", { createdDate: "2026-05-01T00:00:00.000Z" });
+
+    const res = await handler(
+      evt("GET /projects/{id+}/credentials", { id: "acme" }),
+    );
+    expect(statusOf(res)).toBe(200);
+    const items = (bodyOf(res) as { items: Array<{ credential_type: string }> }).items;
+    expect(items.map((i) => i.credential_type)).toEqual(["github.token"]);
+  });
+
+  it("returns 200 with empty items when nothing is provisioned (distinct from 404)", async () => {
+    seedProject("empty-project");
+    const res = await handler(
+      evt("GET /projects/{id+}/credentials", { id: "empty-project" }),
+    );
+    expect(statusOf(res)).toBe(200);
+    expect((bodyOf(res) as { items: unknown[] }).items).toEqual([]);
+  });
+
+  it("round-trips a slash-bearing project id (self/{slug})", async () => {
+    seedProject("self/ren");
+    seedSecret("wf/projects/self/ren/github.token", { createdDate: "2026-05-01T00:00:00.000Z" });
+    const res = await handler(
+      evt("GET /projects/{id+}/credentials", { id: "self/ren" }),
+    );
+    expect(statusOf(res)).toBe(200);
+    const items = (bodyOf(res) as { items: Array<{ name: string }> }).items;
+    expect(items[0]!.name).toBe("wf/projects/self/ren/github.token");
+  });
+
+  // Secret-leak guard test: confirm GET response body never contains any
+  // value-shaped field even on the happy path. Mirror of the credentials-
+  // api/handler-tests guard from PR #137; defence-in-depth at the LIST
+  // level too since the route is public.
+  it("response body NEVER contains any secret-shaped field (leak guard)", async () => {
+    seedProject("acme");
+    seedSecret("wf/projects/acme/github.token", {
+      lastChangedDate: "2026-05-20T10:00:00.000Z",
+      createdDate: "2026-05-01T00:00:00.000Z",
+    });
+
+    const res = await handler(
+      evt("GET /projects/{id+}/credentials", { id: "acme" }),
+    );
+    const rawBody = typeof res === "string" ? res : (res as { body?: string }).body ?? "";
+    for (const forbidden of ["SecretString", "\"value\"", "\"token\"", "\"apiKey\""]) {
+      expect(rawBody).not.toContain(forbidden);
+    }
+  });
+});
+
+// ─── PATCH /projects/{id+} (Issue #158 PR-β A2) ────────────────────────
+
+describe("PATCH /projects/{id+} (patchProject)", () => {
+  function seedProject(id: string, status: "active" | "archived" = "active") {
+    rows.set(key(`PROJECT#${id}`, "META"), {
+      pk: `PROJECT#${id}`,
+      sk: "META",
+      project_id: id,
+      owner_agent: "_operator",
+      status,
+      created_at: "2026-05-27T00:00:00.000Z",
+    });
+    projectStatus.set(id, status);
+  }
+  function patchEvt(id: string, body: object | string): APIGatewayProxyEventV2 {
+    const e = evt("PATCH /projects/{id+}", { id });
+    const ev = e as APIGatewayProxyEventV2 & { body?: string };
+    ev.body = typeof body === "string" ? body : JSON.stringify(body);
+    return e;
+  }
+
+  it("flips status from active to archived", async () => {
+    seedProject("acme", "active");
+    const res = await handler(patchEvt("acme", { status: "archived" }));
+    expect(statusOf(res)).toBe(200);
+    const view = bodyOf(res) as { status: string; project_id: string };
+    expect(view.status).toBe("archived");
+    expect(view.project_id).toBe("acme");
+  });
+
+  it("flips status from archived back to active (unarchive)", async () => {
+    seedProject("acme", "archived");
+    const res = await handler(patchEvt("acme", { status: "active" }));
+    expect(statusOf(res)).toBe(200);
+    expect((bodyOf(res) as { status: string }).status).toBe("active");
+  });
+
+  it("is idempotent — re-archiving an archived row preserves the original timestamp", async () => {
+    seedProject("acme", "archived");
+    // Pre-existing archived_at — record the value so we can assert it.
+    const beforeRow = rows.get(key("PROJECT#acme", "META"))!;
+    beforeRow.archived_at = "2026-05-20T00:00:00.000Z";
+
+    const res = await handler(patchEvt("acme", { status: "archived" }));
+    expect(statusOf(res)).toBe(200);
+    const afterRow = rows.get(key("PROJECT#acme", "META"))!;
+    expect(afterRow.archived_at).toBe("2026-05-20T00:00:00.000Z");
+  });
+
+  it("returns 400 missing_body when the request has no body", async () => {
+    seedProject("acme");
+    const e = evt("PATCH /projects/{id+}", { id: "acme" });
+    const res = await handler(e);
+    expect(statusOf(res)).toBe(400);
+    expect(bodyOf(res)).toMatchObject({ error: "missing_body" });
+  });
+
+  it("returns 400 invalid_json on malformed body", async () => {
+    seedProject("acme");
+    const res = await handler(patchEvt("acme", "not-json"));
+    expect(statusOf(res)).toBe(400);
+    expect(bodyOf(res)).toMatchObject({ error: "invalid_json" });
+  });
+
+  it("returns 400 non_patchable_fields when the body touches identity attrs", async () => {
+    seedProject("acme");
+    const res = await handler(
+      patchEvt("acme", { owner_agent: "ren", project_id: "renamed" }),
+    );
+    expect(statusOf(res)).toBe(400);
+    const body = bodyOf(res) as { error?: string; detail?: string };
+    expect(body.error).toBe("non_patchable_fields");
+    expect(body.detail).toContain("owner_agent");
+    expect(body.detail).toContain("project_id");
+  });
+
+  it("returns 400 empty_patch when the body only contains unknown fields and no patch lands", async () => {
+    // empty_patch fires only if there are no recognised fields AND no
+    // unknowns either — i.e. {} body. The unknown-field path tests
+    // above land on non_patchable_fields first.
+    seedProject("acme");
+    const res = await handler(patchEvt("acme", {}));
+    expect(statusOf(res)).toBe(400);
+    expect(bodyOf(res)).toMatchObject({ error: "empty_patch" });
+  });
+
+  it("returns 400 invalid_status for an unrecognised status value", async () => {
+    seedProject("acme");
+    const res = await handler(patchEvt("acme", { status: "paused" }));
+    expect(statusOf(res)).toBe(400);
+    const body = bodyOf(res) as { error?: string; detail?: string };
+    expect(body.error).toBe("invalid_status");
+    expect(body.detail).toContain("paused");
+  });
+
+  it("returns 404 for a ghost project (after passing field validation)", async () => {
+    const res = await handler(patchEvt("ghost", { status: "archived" }));
+    expect(statusOf(res)).toBe(404);
+    expect(bodyOf(res)).toMatchObject({ error: "not_found", project_id: "ghost" });
   });
 });
