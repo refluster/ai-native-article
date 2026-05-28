@@ -581,17 +581,10 @@ describe("PATCH /feed/{post_id} (patchFeedPostRoute)", () => {
     expect(bodyOf(res)).toMatchObject({ error: "missing_reason" });
   });
 
-  it("propagates the hide_helper_not_wired throw (Story 4 sequencing contract)", async () => {
-    seedPost({ agent_slug: "ren", ulid: "01A", posted_at: "2026-05-25T00:00:00.000Z" });
-    const res = await handler(
-      patchEvt(JSON.stringify({ visibility: "hidden", reason: "leaked credential" })),
-    );
-    // The handler's outer try/catch maps thrown errors to a 500 with the
-    // message preserved — that's how we lock the throw without sprinkling
-    // status-code branches into hidePost itself.
-    expect(statusOf(res)).toBe(500);
-    expect(bodyOf(res)).toMatchObject({ error: "internal", message: "hide_helper_not_wired" });
-  });
+  // The "hide_helper_not_wired" sequencing test from Story 5 (#157) was
+  // retired by Story 4 (#156) when the real hidePost helper landed. The
+  // 500-mapping path is now covered by the hidePost-fails-loudly path in
+  // shared/post-tests.ts (e.g. missing-row throws), not via this stub.
 });
 
 // ─── CORS posture ──────────────────────────────────────────────────────
