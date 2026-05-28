@@ -127,7 +127,10 @@ export async function handler(
     if (routeKey === "GET /projects/{id+}" && projectId) return getProject(projectId);
     if (routeKey === "GET /feed") return listFeedRoute(event);
     if (routeKey === "GET /feed/{post_id}" && postId) return getFeedPostRoute(postId, event);
-    if (routeKey === "PATCH /feed/{post_id}" && postId) return patchFeedPostRoute(postId, event);
+    // `return await` (not bare `return`) is load-bearing: bare `return Promise` lets the
+    // rejection escape the outer try/catch (Promise flattening on async returns). The
+    // hide_helper_not_wired throw is what relies on this for the 500-mapping contract.
+    if (routeKey === "PATCH /feed/{post_id}" && postId) return await patchFeedPostRoute(postId, event);
 
     return reply(404, { error: "route_not_found", routeKey, path, method });
   } catch (err) {

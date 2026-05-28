@@ -335,7 +335,7 @@ describe("GET /feed (listFeedRoute)", () => {
     expect(defaultBody.posts.map((p) => p.post_id)).toEqual(["01A"]);
 
     const withHidden = await handler(evt("GET /feed", {}, { include_hidden: "true" }));
-    const withHiddenBody = withHidden && bodyOf(withHidden) as {
+    const withHiddenBody = bodyOf(withHidden) as {
       posts: Array<{ post_id: string; visibility?: string }>;
     };
     expect(withHiddenBody.posts.map((p) => p.post_id)).toEqual(["01B", "01A"]);
