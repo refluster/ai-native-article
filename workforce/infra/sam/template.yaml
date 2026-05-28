@@ -314,6 +314,21 @@ Resources:
               Action: s3:GetObject
               Resource:
                 - !Sub ${WfBucket.Arn}/posts/*
+            # Issue #158 PR-β A1: project credentials LIST endpoint
+            # (`GET /projects/{id+}/credentials`) describes each
+            # registered credential type's secret to surface metadata
+            # (last_changed_at / created_date). DescribeSecret never
+            # returns the SecretString, so the LIST stays metadata-only
+            # by construction at the AWS API layer (Story 2-C's secret-
+            # leak guard property at the handler layer is a
+            # belt-and-braces second.) Resource scoped to
+            # `wf/projects/*` so the Lambda role cannot describe
+            # credentials outside the trust boundary.
+            - Sid: AgentsApiProjectCredentialsDescribe
+              Effect: Allow
+              Action: secretsmanager:DescribeSecret
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*
       Events:
         ListAgents:
           Type: HttpApi
@@ -400,6 +415,23 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /projects/{id+}/executions
             Method: GET
+        # Issue #158 PR-β: project credentials LIST (public read, metadata-only)
+        # and project PATCH (AWS_IAM auth) so the operator can flip
+        # status=archived from the SPA without dropping to the CLI.
+        ListProjectCredentials:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects/{id+}/credentials
+            Method: GET
+        PatchProject:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects/{id+}
+            Method: PATCH
+            Auth:
+              Authorizer: AWS_IAM
         # Epic-011 Story 5 (#132): workforce activity-feed read endpoints.
         # GET endpoints are public (CORS gate admits `workforce.kohuehara.xyz`
         # only); PATCH requires AWS_IAM (operator's `aws-vault` credentials)

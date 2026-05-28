@@ -185,6 +185,29 @@ describe("create + getProject + archive", () => {
     await expect(project.archive(project.asProjectId("ghost"))).rejects.toThrow(/not found/);
   });
 
+  it("unarchive flips status back to active + CLEARS archived_at (Issue #158 PR-β)", async () => {
+    const id = project.asProjectId("u");
+    await project.create({ project_id: id, owner_agent: "_operator" });
+    await project.archive(id, "2026-06-01T00:00:00.000Z");
+    await project.unarchive(id);
+    const got = await project.getProject(id);
+    expect(got?.status).toBe("active");
+    expect(got?.archived_at).toBeUndefined();
+  });
+
+  it("unarchive on an already-active project is a no-op (idempotent)", async () => {
+    const id = project.asProjectId("u2");
+    await project.create({ project_id: id, owner_agent: "_operator" });
+    // Should not throw, should not change anything.
+    await project.unarchive(id);
+    const got = await project.getProject(id);
+    expect(got?.status).toBe("active");
+  });
+
+  it("unarchive throws when project doesn't exist (symmetric with archive)", async () => {
+    await expect(project.unarchive(project.asProjectId("ghost"))).rejects.toThrow(/not found/);
+  });
+
   it("create throws ConditionalCheckFailedException on duplicate pk (race-safe per PR #111 cycle 2)", async () => {
     const id = project.asProjectId("dup");
     await project.create({ project_id: id, owner_agent: "_operator" });

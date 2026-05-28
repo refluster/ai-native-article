@@ -54,16 +54,25 @@ import {
 import type { DelivRow } from "../shared/task.js";
 import { getItem, queryBySkPrefix, scanPrefix, updateOperational } from "../shared/ddb.js";
 import {
+  archive as archiveProject,
   asProjectId,
+  getProject,
   projectPk,
+  unarchive as unarchiveProject,
   type ExecutionRow,
   type ProjectMemberRow,
   type ProjectMetaRow,
 } from "../shared/project.js";
+import { CREDENTIAL_TYPES } from "../shared/credential-injector.js";
 import {
   CloudWatchClient,
   PutMetricDataCommand,
 } from "@aws-sdk/client-cloudwatch";
+import {
+  DescribeSecretCommand,
+  ResourceNotFoundException as SmResourceNotFoundException,
+  SecretsManagerClient,
+} from "@aws-sdk/client-secrets-manager";
 import {
   fetchPostBody,
   getPost,
@@ -80,6 +89,11 @@ const STAGE = process.env.STAGE ?? "dev";
 // log but do NOT block the request (W-4 is preserved at the response
 // level: a malformed row is skipped, not returned as garbage).
 const cw = new CloudWatchClient({});
+// One Secrets Manager client per cold start. Used only by the project
+// credentials LIST route below (#158 PR-β A1). The Lambda's IAM grant
+// is scoped to `wf/projects/*` so the client cannot describe anything
+// outside the trust boundary.
+const sm = new SecretsManagerClient({});
 
 const PAGE_SIZE_DEFAULT = 25;
 const PAGE_SIZE_MAX = 100;
@@ -124,7 +138,9 @@ export async function handler(
     if (routeKey === "GET /projects") return listProjects(event);
     if (routeKey === "GET /projects/{id+}/members" && projectId) return listProjectMembers(projectId, event);
     if (routeKey === "GET /projects/{id+}/executions" && projectId) return listProjectExecutions(projectId, event);
-    if (routeKey === "GET /projects/{id+}" && projectId) return getProject(projectId);
+    if (routeKey === "GET /projects/{id+}/credentials" && projectId) return listProjectCredentials(projectId);
+    if (routeKey === "PATCH /projects/{id+}" && projectId) return patchProject(projectId, event.body);
+    if (routeKey === "GET /projects/{id+}" && projectId) return getProjectRoute(projectId);
     if (routeKey === "GET /feed") return listFeedRoute(event);
     if (routeKey === "GET /feed/{post_id}" && postId) return getFeedPostRoute(postId, event);
     // `return await` (not bare `return`) is load-bearing: bare `return Promise` lets the
@@ -420,7 +436,7 @@ function emitMalformedProjectMeta(row: Partial<ProjectMetaRow>): void {
   });
 }
 
-async function getProject(rawId: string): Promise<APIGatewayProxyResultV2> {
+async function getProjectRoute(rawId: string): Promise<APIGatewayProxyResultV2> {
   const id = asProjectId(rawId);
   const row = await getItem<ProjectMetaRow>(projectPk(id), "META");
   if (!row) return reply(404, { error: "not_found", project_id: rawId });
@@ -487,6 +503,142 @@ async function listProjectExecutions(
     error: r.error,
   }));
   return reply(200, { items });
+}
+
+// --- Issue #158 PR-β: project credentials LIST + project PATCH ---------
+//
+// GET /projects/{id+}/credentials returns metadata for every registered
+// credential type the operator has provisioned under this project's
+// Secrets Manager namespace. The response body is intentionally
+// metadata-only (matches the secret-leak guard from PR #137 GET) — no
+// secret value ever leaves the Lambda even on this read path.
+//
+// The route is PUBLIC (no AWS_IAM auth) because the fields it surfaces
+// (last_changed_at / last_rotated_at / created_date) are operational
+// metadata that the SPA project console renders. Tightening to AWS_IAM
+// is a future call if even the rotation-cadence signal turns out to be
+// sensitive in some context. R-N5 alarm path (CloudWatch) is unchanged.
+//
+// PATCH /projects/{id+} flips `status` between `active` / `archived`
+// (AWS_IAM auth). This replaces "run the seed step to archive" from
+// pre-Story-6 — the operator now archives from the SPA. Only `status`
+// is patchable; identity fields (`project_id`, `owner_agent`,
+// `created_at`) cannot be edited from the API per Epic-010 §10
+// (canonical entity edits go through `workforce/projects/{id}/`).
+
+interface CredentialMetadataView {
+  credential_type: string;
+  name: string;
+  /** secret_arn included so the operator can deep-link to the AWS
+   *  console; non-secret in the same sense the credentials-api GET
+   *  surfaces it. */
+  secret_arn: string;
+  last_changed_at?: string;
+  last_rotated_at?: string;
+  created_date?: string;
+}
+
+async function listProjectCredentials(rawId: string): Promise<APIGatewayProxyResultV2> {
+  const id = asProjectId(rawId);
+  // Confirm the project exists so a missing project 404s instead of
+  // returning an empty list (which would look like "registered but
+  // nothing provisioned"). Same pattern as listProjectMembers's seed.
+  const proj = await getProject(id);
+  if (!proj) return reply(404, { error: "not_found", project_id: rawId });
+
+  // Enumerate from the canonical CREDENTIAL_TYPES registry; for each
+  // type try DescribeSecret on the project-scoped path. Missing keys
+  // are omitted from the response (the SPA renders them as "not yet
+  // provisioned" affordances). Concurrency-bounded by the small N
+  // (today: 4 types); a future > 20 would want batching.
+  const results = await Promise.all(
+    [...CREDENTIAL_TYPES].sort().map(async (type): Promise<CredentialMetadataView | undefined> => {
+      const name = `wf/projects/${id}/${type}`;
+      try {
+        const res = await sm.send(new DescribeSecretCommand({ SecretId: name }));
+        return {
+          credential_type: type,
+          name,
+          secret_arn: res.ARN ?? "",
+          last_changed_at: res.LastChangedDate?.toISOString(),
+          last_rotated_at: res.LastRotatedDate?.toISOString(),
+          created_date: res.CreatedDate?.toISOString(),
+        };
+      } catch (err) {
+        if (err instanceof SmResourceNotFoundException) return undefined;
+        // Re-throw on any other error so it bubbles to the outer
+        // handler's 500 (W-4 fail-loud). A throttle / access-denied
+        // would be silently swallowed as "no metadata" without this.
+        throw err;
+      }
+    }),
+  );
+
+  const items = results.filter((v): v is CredentialMetadataView => v !== undefined);
+  return reply(200, { items });
+}
+
+const PATCHABLE_PROJECT_FIELDS = ["status"] as const;
+type PatchableProjectField = (typeof PATCHABLE_PROJECT_FIELDS)[number];
+
+async function patchProject(
+  rawId: string,
+  body: string | undefined,
+): Promise<APIGatewayProxyResultV2> {
+  if (!body) return reply(400, { error: "missing_body" });
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(body) as Record<string, unknown>;
+  } catch {
+    return reply(400, { error: "invalid_json" });
+  }
+
+  const invalid: string[] = [];
+  const patch: Partial<Record<PatchableProjectField, unknown>> = {};
+  for (const [k, v] of Object.entries(parsed)) {
+    if ((PATCHABLE_PROJECT_FIELDS as readonly string[]).includes(k)) {
+      patch[k as PatchableProjectField] = v;
+    } else {
+      invalid.push(k);
+    }
+  }
+  if (invalid.length > 0) {
+    return reply(400, {
+      error: "non_patchable_fields",
+      detail: `the following fields cannot be PATCHed via this API (edit workforce/projects/{id}/project.json + seed instead): ${invalid.join(", ")}`,
+      patchable: [...PATCHABLE_PROJECT_FIELDS],
+    });
+  }
+  if (Object.keys(patch).length === 0) {
+    return reply(400, { error: "empty_patch" });
+  }
+
+  const id = asProjectId(rawId);
+  const existing = await getProject(id);
+  if (!existing) return reply(404, { error: "not_found", project_id: rawId });
+
+  if ("status" in patch) {
+    const next = patch.status;
+    if (next === "archived") {
+      // No-op if already archived — preserves the original
+      // `archived_at` timestamp.
+      if (existing.status === "active") {
+        await archiveProject(id);
+      }
+    } else if (next === "active") {
+      // unarchive() is itself idempotent on already-active rows.
+      await unarchiveProject(id);
+    } else {
+      return reply(400, {
+        error: "invalid_status",
+        detail: `status must be 'active' or 'archived' (got ${JSON.stringify(next)})`,
+      });
+    }
+  }
+
+  const updated = await getProject(id);
+  return reply(200, updated ? toProjectApiView(updated) : { error: "vanished" });
 }
 
 async function listAgentProjects(slug: string): Promise<APIGatewayProxyResultV2> {
