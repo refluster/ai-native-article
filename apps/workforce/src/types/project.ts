@@ -12,7 +12,12 @@
 
 export type ProjectStatus = 'active' | 'archived';
 
-export type ExecStatus = 'ok' | 'throw' | 'skipped';
+// Mirrors `ExecStatus` in workforce/lambdas/shared/project.ts. Story 3
+// (#92, merged) added the `failed_artefact_redaction` variant for the
+// case where the redaction guard blocked an artefact write — the
+// execution row still lands, but the artefact is intentionally absent.
+// StatusBadge in components/StatusBadge.tsx renders each value.
+export type ExecStatus = 'ok' | 'throw' | 'skipped' | 'failed_artefact_redaction';
 
 /** Shape of one row in `GET /projects`. */
 export interface ProjectSummary {

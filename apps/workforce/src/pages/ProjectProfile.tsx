@@ -24,6 +24,7 @@ import { Link, useParams } from 'react-router-dom';
 import WorkforceLayout from '../components/WorkforceLayout';
 import Typeplate from '../components/Typeplate';
 import KPIReadout from '../components/KPIReadout';
+import StatusBadge from '../components/StatusBadge';
 import {
   apiConfigured,
   fetchProject,
@@ -56,11 +57,10 @@ function formatDate(iso: string | undefined): string {
   return new Date(t).toISOString().slice(0, 10);
 }
 
-const EXEC_STATUS_TONE: Record<string, string> = {
-  ok: 'text-wf-running',
-  throw: 'text-wf-throwing',
-  skipped: 'text-wf-on-surface-variant',
-};
+// Status-renderer for the executions table lives in
+// components/StatusBadge.tsx — single source of truth across the SPA
+// (introduced for Story 6 to handle `failed_artefact_redaction` from
+// Story 3).
 
 export default function ProjectProfile() {
   // App.tsx wires `/projects/*` so the full remainder is the project id;
@@ -405,13 +405,7 @@ function ExecutionHistoryPanel({ executions }: { executions: ProjectExecution[] 
                     </div>
                   </td>
                   <td className="px-2 py-2">
-                    <span
-                      className={`font-wfmono text-[10px] uppercase tracking-[0.14em] ${
-                        EXEC_STATUS_TONE[e.status] ?? 'text-wf-on-surface-variant'
-                      }`}
-                    >
-                      ● {e.status}
-                    </span>
+                    <StatusBadge status={e.status} error={e.error} />
                   </td>
                   <td className="px-4 py-2 text-sm">
                     {e.artifact_ref ? (
