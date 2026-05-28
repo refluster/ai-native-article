@@ -326,6 +326,42 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /agents/{slug}/deliverables
             Method: GET
+        # Epic-010 §10 Story 6 (#95): projects read API on the same Lambda.
+        # POST/DELETE/PATCH on projects are intentionally not exposed (see
+        # handler.ts header). The credential vault lives in its own Lambda
+        # (Story 2-C #91) so this Lambda's IAM scope stays narrow per R-N3.
+        # Project ids include slashes (e.g. `self/ren`) so the routes use
+        # the greedy `{id+}` proxy pattern.
+        ListAgentProjects:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}/projects
+            Method: GET
+        ListProjects:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects
+            Method: GET
+        GetProject:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects/{id+}
+            Method: GET
+        ListProjectMembers:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects/{id+}/members
+            Method: GET
+        ListProjectExecutions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects/{id+}/executions
+            Method: GET
       Tags:
         workforce: !Ref Stage
 
