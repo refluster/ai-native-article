@@ -928,6 +928,150 @@ Resources:
       AlarmActions:
         - !Ref WfAlarmTopic
 
+  # --- Epic-010 observability dashboard (FU-NEW-A, Issue #150 B6) -------------
+  # Single CloudWatch Dashboard surfacing every metric Epic-010 introduced:
+  #
+  #   Workforce/Credentials  WfLegacyCredentialReads          (split by Reason
+  #                                                            — fallback_bare
+  #                                                            graphs to zero
+  #                                                            before the C1
+  #                                                            bare-key deletion
+  #                                                            PR ships).
+  #                          WfCredentialsMigrated / *AlreadyMigrated /
+  #                          *SourceMissing / *MigrationErrors
+  #
+  #   Workforce/Recall       WfExecEmbeddingFailed            (operator's
+  #                                                            signal that
+  #                                                            the embedding
+  #                                                            retry queue
+  #                                                            has work).
+  #
+  #   Workforce/Runner       WfExecDualWriteFailed            (Story 1-B
+  #                                                            dual-write
+  #                                                            integrity).
+  #
+  #   Workforce/AgentsApi    WfMalformedProjectMeta           (FU-NEW-D —
+  #                                                            listProjects
+  #                                                            skip count;
+  #                                                            target 0).
+  #
+  # The dashboard is a thin layer over PutMetricData — no IAM additions
+  # required. Per-region, per-stage so the operator can flip stages via
+  # the AWS console picker.
+  WfEpic010Dashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub wf-epic-010-${Stage}
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "text",
+              "x": 0, "y": 0, "width": 24, "height": 2,
+              "properties": {
+                "markdown": "# Workforce / Epic-010 (${Stage})\n\nSurfaces every metric Epic-010 introduced. **Target state**: `WfLegacyCredentialReads{Reason=fallback_bare}` and `WfMalformedProjectMeta` graph to zero. `WfExecDualWriteFailed` stays at zero. `WfExecEmbeddingFailed` reflects pending retry-queue depth."
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0, "y": 2, "width": 12, "height": 6,
+              "properties": {
+                "title": "Workforce/Credentials — WfLegacyCredentialReads (by Reason)",
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "period": 300,
+                "stat": "Sum",
+                "metrics": [
+                  [ "Workforce/Credentials", "WfLegacyCredentialReads", "Stage", "${Stage}", "Reason", "fallback_default" ],
+                  [ ".", ".", ".", ".", "Reason", "fallback_bare", { "color": "#d62728" } ]
+                ],
+                "yAxis": { "left": { "min": 0 } },
+                "annotations": {
+                  "horizontal": [
+                    { "label": "fallback_bare target (deletion gate)", "value": 0, "color": "#d62728" }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12, "y": 2, "width": 12, "height": 6,
+              "properties": {
+                "title": "Workforce/AgentsApi — WfMalformedProjectMeta",
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 300,
+                "stat": "Sum",
+                "metrics": [
+                  [ "Workforce/AgentsApi", "WfMalformedProjectMeta", "Stage", "${Stage}", { "color": "#d62728" } ]
+                ],
+                "yAxis": { "left": { "min": 0 } },
+                "annotations": {
+                  "horizontal": [
+                    { "label": "target (clean)", "value": 0, "color": "#d62728" }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0, "y": 8, "width": 12, "height": 6,
+              "properties": {
+                "title": "Workforce/Credentials — Migration outcomes",
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "period": 300,
+                "stat": "Sum",
+                "metrics": [
+                  [ "Workforce/Credentials", "WfCredentialsMigrated",        "Stage", "${Stage}" ],
+                  [ ".",                     "WfCredentialsAlreadyMigrated", ".",     "." ],
+                  [ ".",                     "WfCredentialsSourceMissing",   ".",     "." ],
+                  [ ".",                     "WfCredentialsMigrationErrors", ".",     ".", { "color": "#d62728" } ]
+                ],
+                "yAxis": { "left": { "min": 0 } }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12, "y": 8, "width": 12, "height": 6,
+              "properties": {
+                "title": "Workforce/Recall — WfExecEmbeddingFailed (pending-queue depth signal)",
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 300,
+                "stat": "Sum",
+                "metrics": [
+                  [ "Workforce/Recall", "WfExecEmbeddingFailed", "Stage", "${Stage}" ]
+                ],
+                "yAxis": { "left": { "min": 0 } }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0, "y": 14, "width": 24, "height": 6,
+              "properties": {
+                "title": "Workforce/Runner — WfExecDualWriteFailed (by Reason)",
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "period": 300,
+                "stat": "Sum",
+                "metrics": [
+                  [ { "expression": "SEARCH('{Workforce/Runner,Stage,Reason} MetricName=\"WfExecDualWriteFailed\" Stage=\"${Stage}\"', 'Sum', 300)", "label": "dual-write failures", "id": "dwf" } ]
+                ],
+                "yAxis": { "left": { "min": 0 } },
+                "annotations": {
+                  "horizontal": [
+                    { "label": "target (no dual-write drift)", "value": 0, "color": "#d62728" }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+
 Outputs:
   TableName:
     Description: DynamoDB table name (consumed by PR5/PR6 Lambdas).
@@ -958,3 +1102,8 @@ Outputs:
     Value: !Sub https://${WfCredentialsHttpApi}.execute-api.${AWS::Region}.amazonaws.com
     Export:
       Name: !Sub wf-credentials-api-url-${Stage}
+  Epic010DashboardName:
+    Description: CloudWatch Dashboard surfacing every Epic-010 metric (FU-NEW-A).
+    Value: !Ref WfEpic010Dashboard
+    Export:
+      Name: !Sub wf-epic-010-dashboard-name-${Stage}
