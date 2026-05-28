@@ -1,10 +1,11 @@
 // Single source of truth for rendering an EXEC row's `status` value.
 //
-// Story 6 (#95) cycle-3 closure of Dario A5 + Aoi C2 from cycle 1: the
-// `failed_artefact_redaction` status that landed via PR #138 (Story 3,
-// merged) needs an explicit case in the executions table render path.
-// Previously the ProjectProfile.tsx page had an inline `EXEC_STATUS_TONE`
-// map that handled only `ok` / `throw` / `skipped` — the new status fell
+// Story 6 cycle-3 closure of Dario A5 + Aoi C2 from cycle 1: the
+// `failed_artefact_redaction` status that landed via Story 3 (Epic-010
+// project-prefixed S3 artefacts + redaction guard) needs an explicit
+// case in the executions table render path. Previously the
+// ProjectProfile.tsx page had an inline `EXEC_STATUS_TONE` map that
+// handled only `ok` / `throw` / `skipped` — the new status fell
 // through to the generic fallback, surfacing as a colourless dot with
 // raw text. That's safe-but-uninformative; this component makes it
 // distinct.
