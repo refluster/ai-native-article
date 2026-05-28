@@ -86,7 +86,8 @@ const CREDENTIAL_TYPE_LABELS: Record<CredentialTypeId, string> = {
 
 // ─── local row + modal state ──────────────────────────────────────────
 
-type LocalRow = CredentialMetadata & {
+type LocalRow = Omit<CredentialMetadata, 'credential_type'> & {
+  credential_type: CredentialTypeId;
   _localState: 'provisioned' | 'unprovisioned' | 'deleted';
   _recoverableUntil?: string;
 };
@@ -110,7 +111,9 @@ function buildInitialRows(items: CredentialMetadata[]): LocalRow[] {
   for (const item of items) byType.set(item.credential_type, item);
   return CREDENTIAL_TYPES.map<LocalRow>((type) => {
     const match = byType.get(type);
-    if (match) return { ...match, _localState: 'provisioned' };
+    if (match) {
+      return { ...match, credential_type: type, _localState: 'provisioned' as const };
+    }
     return {
       credential_type: type,
       name: '',
@@ -233,7 +236,7 @@ export default function CredentialVault({ projectId }: { projectId: string }) {
         value,
       );
       applyRowUpdate(credentialType, () => ({
-        credential_type: res.credential_type,
+        credential_type: credentialType,
         name: res.name,
         secret_arn: res.secret_arn,
         last_changed_at: res.last_changed_at,
@@ -272,7 +275,7 @@ export default function CredentialVault({ projectId }: { projectId: string }) {
         value,
       );
       applyRowUpdate(credentialType, () => ({
-        credential_type: res.credential_type,
+        credential_type: credentialType,
         name: res.name,
         secret_arn: res.secret_arn,
         last_changed_at: res.last_changed_at,
@@ -342,7 +345,7 @@ export default function CredentialVault({ projectId }: { projectId: string }) {
           }}
           disabled={loading || pendingMutations.size > 0}
           title="REFETCH"
-          className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline disabled:text-wf-on-surface-variant disabled:no-underline"
+          className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline disabled:text-wf-on-surface-variant disabled:no-underline disabled:opacity-50 disabled:cursor-not-allowed"
         >
           再取得
         </button>
@@ -367,6 +370,7 @@ export default function CredentialVault({ projectId }: { projectId: string }) {
             <button
               type="button"
               onClick={() => setError(null)}
+              aria-label="エラーを閉じる"
               className="font-wfmono text-[10px] uppercase tracking-[0.14em] hover:underline"
             >
               ×
@@ -388,7 +392,7 @@ export default function CredentialVault({ projectId }: { projectId: string }) {
         )}
 
         {!loading && fetchError && (
-          <div className="space-y-2">
+          <div role="alert" className="space-y-2">
             <p className="font-wfmono text-xs text-wf-throwing">
               クレデンシャル一覧の取得に失敗しました。
             </p>
@@ -400,7 +404,7 @@ export default function CredentialVault({ projectId }: { projectId: string }) {
               onClick={() => {
                 void refetch();
               }}
-              className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
+              className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
             >
               再取得
             </button>
@@ -423,19 +427,19 @@ export default function CredentialVault({ projectId }: { projectId: string }) {
                   onRotate={() =>
                     setModal({
                       kind: 'rotate',
-                      credentialType: row.credential_type as CredentialTypeId,
+                      credentialType: row.credential_type,
                     })
                   }
                   onCreate={() =>
                     setModal({
                       kind: 'create',
-                      credentialType: row.credential_type as CredentialTypeId,
+                      credentialType: row.credential_type,
                     })
                   }
                   onDelete={() =>
                     setModal({
                       kind: 'delete',
-                      credentialType: row.credential_type as CredentialTypeId,
+                      credentialType: row.credential_type,
                     })
                   }
                 />
@@ -504,9 +508,7 @@ function CredentialRow({
   onDelete,
   disabled,
 }: CredentialRowProps) {
-  const label =
-    CREDENTIAL_TYPE_LABELS[row.credential_type as CredentialTypeId] ??
-    row.credential_type;
+  const label = CREDENTIAL_TYPE_LABELS[row.credential_type];
   return (
     <li className="py-3 flex items-start justify-between gap-3">
       <div className="min-w-0">
@@ -532,7 +534,7 @@ function CredentialRow({
               type="button"
               onClick={onRotate}
               disabled={disabled}
-              className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline disabled:text-wf-on-surface-variant disabled:no-underline"
+              className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline disabled:text-wf-on-surface-variant disabled:no-underline disabled:opacity-50 disabled:cursor-not-allowed"
             >
               ROTATE
             </button>
@@ -540,7 +542,7 @@ function CredentialRow({
               type="button"
               onClick={onDelete}
               disabled={disabled}
-              className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-throwing hover:underline disabled:text-wf-on-surface-variant disabled:no-underline"
+              className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-throwing hover:underline disabled:text-wf-on-surface-variant disabled:no-underline disabled:opacity-50 disabled:cursor-not-allowed"
             >
               DELETE
             </button>
@@ -551,7 +553,7 @@ function CredentialRow({
             type="button"
             onClick={onCreate}
             disabled={disabled}
-            className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline disabled:text-wf-on-surface-variant disabled:no-underline"
+            className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline disabled:text-wf-on-surface-variant disabled:no-underline disabled:opacity-50 disabled:cursor-not-allowed"
           >
             CREATE
           </button>
@@ -582,6 +584,7 @@ function CredentialModal({
     Object.fromEntries(fields.map((f) => [f.key, ''])),
   );
   const [confirmText, setConfirmText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const firstInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -627,8 +630,13 @@ function CredentialModal({
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (!canSubmit) return;
-            onSubmit(values);
+            if (!canSubmit || submitting) return;
+            setSubmitting(true);
+            const trimmed = Object.fromEntries(
+              fields.map((f) => [f.key, (values[f.key] ?? '').trim()]),
+            );
+            onSubmit(trimmed);
+            // (no need to flip back — modal will unmount on success)
           }}
           className="space-y-3"
         >
@@ -674,8 +682,8 @@ function CredentialModal({
             </button>
             <button
               type="submit"
-              disabled={!canSubmit}
-              className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline disabled:text-wf-on-surface-variant disabled:no-underline"
+              disabled={!canSubmit || submitting}
+              className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline disabled:text-wf-on-surface-variant disabled:no-underline disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitLabel}
             </button>
@@ -701,6 +709,7 @@ function DeleteConfirmDialog({
 }: DeleteConfirmDialogProps) {
   const titleId = useId();
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     confirmRef.current?.focus();
@@ -747,8 +756,14 @@ function DeleteConfirmDialog({
           <button
             ref={confirmRef}
             type="button"
-            onClick={onConfirm}
-            className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-throwing hover:underline"
+            onClick={() => {
+              if (submitting) return;
+              setSubmitting(true);
+              onConfirm();
+              // (no need to flip back — dialog will unmount)
+            }}
+            disabled={submitting}
+            className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-throwing hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
           >
             削除を実行
           </button>
