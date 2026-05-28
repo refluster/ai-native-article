@@ -23,6 +23,15 @@
         "cron": "cron(0 6 15 * ? *)"
       },
       "note": "15th of each month, 15:00 JST. Monthly cadence — regulatory whitespace doesn't ship every fortnight, and low-quality regulatory takes erode the lane fast. EventBridge rule not yet enabled — follow-up Zone A change."
+    },
+    {
+      "skill": "feed-post",
+      "executor": "lambda",
+      "trigger": {
+        "scheduler": "eventbridge",
+        "cron": "cron(29 4 ? * * *)"
+      },
+      "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
     }
   ],
   "jd": {

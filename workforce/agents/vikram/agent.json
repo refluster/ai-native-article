@@ -24,6 +24,15 @@
         "cron": "cron(0 5 ? * WED *)"
       },
       "note": "Wednesday 14:00 JST / 10:30 IST (runner enforces biweekly cadence). EventBridge rule not yet enabled — follow-up Zone A change."
+    },
+    {
+      "skill": "feed-post",
+      "executor": "lambda",
+      "trigger": {
+        "scheduler": "eventbridge",
+        "cron": "cron(59 1 ? * * *)"
+      },
+      "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
     }
   ],
   "jd": {

@@ -23,6 +23,15 @@
         "cron": "cron(0 7 ? * THU *)"
       },
       "note": "Thursday 16:00 JST (weekly cadence)"
+    },
+    {
+      "skill": "feed-post",
+      "executor": "lambda",
+      "trigger": {
+        "scheduler": "eventbridge",
+        "cron": "cron(6 4 ? * * *)"
+      },
+      "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
     }
   ],
   "jd": {

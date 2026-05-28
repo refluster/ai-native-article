@@ -72,6 +72,15 @@
         "sign_off_persona": "Maya"
       },
       "note": "PR router + verdict (Phases C + F of dev-process.md). Generic two-mode routine; Maya's persona-specific nomination_rules in config. Manual invocation today; future CCR pull_request.opened + .synchronize triggers. PR routing is a function — any agent with this binding can route in Maya's absence."
+    },
+    {
+      "skill": "feed-post",
+      "executor": "lambda",
+      "trigger": {
+        "scheduler": "eventbridge",
+        "cron": "cron(21 1 ? * * *)"
+      },
+      "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
     }
   ],
   "jd": {

@@ -72,6 +72,34 @@ if (slugDirs.length === 0) {
 let totalBudget = 0;
 const W3_CAP = 130;
 
+// Epic-011 Story 3 (#130) — `feed-post` bindings are staggered across
+// the 09:00-18:00 JST working window (= 00:00-09:00 UTC). The stagger
+// is computed by `workforce/seed/stagger-feed-cron.mjs`; we re-derive
+// the minute-of-day here so a hand-edited cron that fell outside the
+// window or collided with another agent's slot is caught at CI time.
+const FEED_POST_SKILL = "feed-post";
+const FEED_POST_WINDOW_START_MIN_JST = 540; // 09:00 JST
+const FEED_POST_WINDOW_END_MIN_JST = 1080; // 18:00 JST (exclusive)
+const UTC_TO_JST_OFFSET_MIN = 9 * 60;
+const feedPostMinuteByAgent = new Map(); // slug → JST minute-of-day
+
+// Parse a `cron(M H D M W Y)` expression into a UTC minute-of-day.
+// Returns null when the cron isn't a simple "every day at H:M UTC"
+// shape (e.g. uses day-of-week / day-of-month restrictions, multi-
+// value minutes/hours, etc.) — the feed-post stagger only emits the
+// simple daily shape, so anything else is a hand-edit and should
+// be rejected.
+function feedPostCronToUtcMinute(cron) {
+  const m = /^cron\(\s*(\d+)\s+(\d+)\s+\?\s+\*\s+\*\s+\*\s*\)$/.exec(cron);
+  if (!m) return null;
+  const minute = Number(m[1]);
+  const hour = Number(m[2]);
+  if (!Number.isInteger(minute) || !Number.isInteger(hour)) return null;
+  if (minute < 0 || minute > 59) return null;
+  if (hour < 0 || hour > 23) return null;
+  return hour * 60 + minute;
+}
+
 // Build a snapshot of available skills + their owner lists for cross-checks.
 const skillsIndex = new Map(); // name → { owners: Set<slug> }
 if (existsSync(SKILLS_DIR)) {
@@ -210,6 +238,53 @@ for (const slug of slugDirs) {
           );
         }
       }
+      // Epic-011 Story 3 (#130) — feed-post stagger window + collision
+      // checks. The stagger script emits `cron(M H ? * * *)` (daily at
+      // H:M UTC) with each agent's minute-of-day inside 09:00-18:00
+      // JST. Hand-edited drift (a cron outside the window, or two
+      // agents on the same minute) is the failure mode this guards.
+      if (
+        b.skill === FEED_POST_SKILL &&
+        t.scheduler === "eventbridge" &&
+        typeof t.cron === "string"
+      ) {
+        const utcMinute = feedPostCronToUtcMinute(t.cron);
+        if (utcMinute === null) {
+          v(
+            "S9-feed-post-cron-shape",
+            cfg,
+            `agent "${slug}" bindings[${i}].trigger.cron "${t.cron}" is not a daily "cron(M H ? * * *)" expression — feed-post stagger emits only the simple daily shape`,
+          );
+        } else {
+          const jstMinute = (utcMinute + UTC_TO_JST_OFFSET_MIN) % 1440;
+          if (
+            jstMinute < FEED_POST_WINDOW_START_MIN_JST ||
+            jstMinute >= FEED_POST_WINDOW_END_MIN_JST
+          ) {
+            const jstH = String(Math.floor(jstMinute / 60)).padStart(2, "0");
+            const jstM = String(jstMinute % 60).padStart(2, "0");
+            v(
+              "S9-feed-post-window",
+              cfg,
+              `agent "${slug}" feed-post cron "${t.cron}" fires at ${jstH}:${jstM} JST — must be inside 09:00-18:00 JST (Epic-011 §3 stagger window)`,
+            );
+          } else {
+            const prior = feedPostMinuteByAgent.get(slug);
+            if (prior !== undefined && prior !== jstMinute) {
+              // Two feed-post bindings on the same agent at different
+              // minutes — also a misconfiguration. The same-minute
+              // case below would silently dedupe, which is wrong.
+              v(
+                "S9-feed-post-duplicate-binding",
+                cfg,
+                `agent "${slug}" declares more than one feed-post binding (minute-of-day ${prior} and ${jstMinute}); each agent gets exactly one`,
+              );
+            } else {
+              feedPostMinuteByAgent.set(slug, jstMinute);
+            }
+          }
+        }
+      }
       // CCR bindings need either a cron or a github_event
       if (b.executor === "claude-code-routine" && t.scheduler === "claude-code-routine") {
         if (!t.github_event && !t.cron) {
@@ -312,6 +387,29 @@ for (const slug of slugDirs) {
   }
   if (typeof parsed.created_at !== "string" || !ISO_DATE.test(parsed.created_at)) {
     v("S15-created-at", cfg, `created_at "${parsed.created_at}" must be YYYY-MM-DD`);
+  }
+}
+
+// Epic-011 Story 3 (#130) — cross-agent collision check. The stagger
+// script's collision-resolution walk guarantees uniqueness on emit; if
+// two agents end up on the same minute-of-day post-hand-edit, the
+// thundering-herd shape this Story exists to avoid is back.
+const feedPostByMinute = new Map(); // minute → [slug]
+for (const [slug, minute] of feedPostMinuteByAgent) {
+  if (!feedPostByMinute.has(minute)) feedPostByMinute.set(minute, []);
+  feedPostByMinute.get(minute).push(slug);
+}
+for (const [minute, slugs] of feedPostByMinute) {
+  if (slugs.length > 1) {
+    const jstH = String(Math.floor(minute / 60)).padStart(2, "0");
+    const jstM = String(minute % 60).padStart(2, "0");
+    for (const slug of slugs) {
+      v(
+        "S9-feed-post-collision",
+        join(AGENTS_DIR, slug, "agent.json"),
+        `feed-post cron collides at ${jstH}:${jstM} JST with agents [${slugs.join(", ")}] — re-run workforce/seed/stagger-feed-cron.mjs`,
+      );
+    }
   }
 }
 

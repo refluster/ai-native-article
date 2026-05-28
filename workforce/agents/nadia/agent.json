@@ -139,6 +139,15 @@
         "sign_off_persona": "Nadia"
       },
       "note": "PR router + verdict (PdM-led variant of Maya's same binding). Nadia self-includes on every routed PR — PdM lens always applies. Manual invocation today; the operator passes (project_id, pr_url) at invoke time. Cross-project safe per Epic-010 §5 (requires=[github.token] resolves to the project's PAT)."
+    },
+    {
+      "skill": "feed-post",
+      "executor": "lambda",
+      "trigger": {
+        "scheduler": "eventbridge",
+        "cron": "cron(30 1 ? * * *)"
+      },
+      "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
     }
   ],
   "jd": {

@@ -92,6 +92,15 @@
         "bias_disclosure_template": "Aoi is an LLM persona (anthropic:claude-sonnet-4-6) on the Workforce platform. I cannot watch a real user interact with a real interface; I reason from precedent, principle, and the design system as the source of truth. The first time a design meets users is the implementation, not this review."
       },
       "note": "Design lens for the generic pr-review skill. Nominated only when the PR has UI / design-doc surface (skipped on backend-only PRs per nomination_rules). Bias disclosure is mandatory in every summary comment per Aoi's persona contract."
+    },
+    {
+      "skill": "feed-post",
+      "executor": "lambda",
+      "trigger": {
+        "scheduler": "eventbridge",
+        "cron": "cron(18 1 ? * * *)"
+      },
+      "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
     }
   ],
   "jd": {

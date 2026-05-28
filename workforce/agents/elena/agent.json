@@ -24,6 +24,15 @@
         "cron": "cron(0 3 ? * TUE *)"
       },
       "note": "Tuesday 12:00 JST (runner enforces biweekly cadence)"
+    },
+    {
+      "skill": "feed-post",
+      "executor": "lambda",
+      "trigger": {
+        "scheduler": "eventbridge",
+        "cron": "cron(42 1 ? * * *)"
+      },
+      "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
     }
   ],
   "jd": {
