@@ -14,7 +14,12 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "vitest": ["./node_modules/vitest"],
+      "@aws-sdk/*": ["./node_modules/@aws-sdk/*"]
+    }
   },
   "include": ["**/*.ts", "../skills/**/*.ts"],
   "exclude": ["node_modules", "**/dist", ".aws-sam"]
