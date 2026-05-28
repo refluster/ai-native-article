@@ -46,6 +46,16 @@ import {
   type ProjectMemberRow,
   type ProjectMetaRow,
 } from "../shared/project.js";
+import {
+  CloudWatchClient,
+  PutMetricDataCommand,
+} from "@aws-sdk/client-cloudwatch";
+
+const STAGE = process.env.STAGE ?? "dev";
+// One client per cold start. Metric emission is best-effort — failures
+// log but do NOT block the request (W-4 is preserved at the response
+// level: a malformed row is skipped, not returned as garbage).
+const cw = new CloudWatchClient({});
 
 const PAGE_SIZE_DEFAULT = 25;
 const PAGE_SIZE_MAX = 100;
@@ -284,7 +294,20 @@ async function listProjects(
   );
 
   const page = await scanPrefix<ProjectMetaRow>("PROJECT#", "META", pageSize, qs.cursor);
-  const filtered = page.items
+
+  // Defence-in-depth: skip rows that don't match the canonical
+  // `ProjectMetaRow` shape rather than throwing the whole request.
+  // This catches data-integrity regressions from operator-side bootstrap
+  // runbooks (the prod bug found in OP-001 verification — a META row
+  // missing `project_id` would 500 the entire listProjects call) and
+  // emits a structured log + `WfMalformedProjectMeta` metric so the
+  // operator sees the gap. The per-route GETs still expose the shape
+  // honestly (a single-row GET 404s on a row that the brand validator
+  // rejects), so this is *list-route defence*, not a silent papering-over.
+  const wellFormed = page.items.filter((r) =>
+    isWellFormedProjectMeta(r) ? true : (emitMalformedProjectMeta(r), false),
+  );
+  const filtered = wellFormed
     .filter((r) => includeSelf || !r.project_id.startsWith("self/"))
     .filter((r) => !filterStatus || r.status === filterStatus)
     .filter((r) => !filterOwner || r.owner_agent === filterOwner);
@@ -307,6 +330,61 @@ async function listProjects(
   );
 
   return reply(200, { items, next_cursor: page.cursor });
+}
+
+/**
+ * True iff the row carries the canonical `ProjectMetaRow` attributes
+ * `listProjects` consumes. Rejection drops the row from the list
+ * response AND emits a metric (see `emitMalformedProjectMeta`). The
+ * branded `asProjectId(row.project_id)` call inside the per-row map
+ * would also throw on a bad value; this pre-check moves the rejection
+ * BEFORE the Promise.all fan-out so one bad row doesn't fail the rest.
+ */
+function isWellFormedProjectMeta(row: Partial<ProjectMetaRow>): row is ProjectMetaRow {
+  return (
+    typeof row.project_id === "string" &&
+    row.project_id.length > 0 &&
+    typeof row.status === "string" &&
+    typeof row.owner_agent === "string" &&
+    typeof row.created_at === "string"
+  );
+}
+
+/**
+ * Structured log + best-effort CW metric on a skipped malformed row.
+ * Fire-and-forget — a metric-emission failure must not block the list
+ * response (the row is already skipped; we just lose the signal).
+ */
+function emitMalformedProjectMeta(row: Partial<ProjectMetaRow>): void {
+  const pk = typeof row.pk === "string" ? row.pk : "<missing-pk>";
+  console.warn(
+    JSON.stringify({
+      event: "agents_api_malformed_project_meta",
+      pk,
+      attrs: Object.keys(row).sort(),
+      reason: "missing canonical attributes — fix the bootstrap runbook",
+    }),
+  );
+  cw.send(
+    new PutMetricDataCommand({
+      Namespace: "Workforce/AgentsApi",
+      MetricData: [
+        {
+          MetricName: "WfMalformedProjectMeta",
+          Value: 1,
+          Unit: "Count",
+          Dimensions: [{ Name: "Stage", Value: STAGE }],
+        },
+      ],
+    }),
+  ).catch((err) => {
+    console.warn(
+      JSON.stringify({
+        event: "agents_api_malformed_meta_metric_emit_failed",
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+  });
 }
 
 async function getProject(rawId: string): Promise<APIGatewayProxyResultV2> {
