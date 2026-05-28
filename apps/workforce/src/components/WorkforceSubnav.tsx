@@ -1,6 +1,5 @@
 // Sub-navigation strip pinned beneath the global Header on every
-// /workforce/* route. Five sections — Dashboard / Crew / Skills /
-// Projects / Org. The strip itself styles like a console subheading
+// /workforce/* route. The strip itself styles like a console subheading
 // (mono caps + active underline in the wf-tertiary accent).
 
 import { NavLink } from 'react-router-dom';
@@ -11,6 +10,7 @@ const links = [
   { to: '/skills',   label: 'SKILLS',    end: false },
   { to: '/projects', label: 'PROJECTS',  end: false },
   { to: '/org',      label: 'ORG',       end: false },
+  { to: '/feed',     label: 'FEED',      end: false },
 ];
 
 interface Props {

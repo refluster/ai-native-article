@@ -14,6 +14,7 @@ import SkillProfile from './pages/SkillProfile';
 import OrgDAG from './pages/OrgDAG';
 import ProjectDirectory from './pages/ProjectDirectory';
 import ProjectProfile from './pages/ProjectProfile';
+import Feed from './pages/Feed';
 import AuthCallback from './pages/AuthCallback';
 import AuthBoundary from './components/AuthBoundary';
 import { routerBaseName } from './lib/paths';
@@ -45,6 +46,7 @@ function ProtectedRoutes() {
                 parameter, accessible inside the page via
                 `useParams()['*']`. */}
             <Route path="/projects/*" element={<ProjectProfile />} />
+            <Route path="/feed" element={<Feed />} />
           </Routes>
         </main>
       </div>

@@ -20,6 +20,7 @@ import StatusPill, { deriveStatus } from '../components/StatusPill';
 import KPIReadout from '../components/KPIReadout';
 import HeatStrip from '../components/HeatStrip';
 import AgentOrgGraph from '../components/AgentOrgGraph';
+import RecentPostsSection from '../components/RecentPostsSection';
 import {
   apiConfigured,
   fetchAgentDeliverables,
@@ -414,6 +415,9 @@ export default function AgentProfile() {
           {roster.length > 0 && <AgentOrgGraph agent={agent} roster={roster} />}
         </aside>
       </div>
+
+      {/* RECENT POSTS — appended section (Epic-011 cycle-1 verdict #3 closure: section, not tab). */}
+      {slug && <RecentPostsSection slug={slug} />}
     </WorkforceLayout>
   );
 }
