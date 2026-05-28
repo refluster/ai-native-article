@@ -22,6 +22,38 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
 
+process.env.STAGE = "test";
+
+// ─── CloudWatch capture ────────────────────────────────────────────────
+//
+// listProjects emits WfMalformedProjectMeta on the row-shape skip path
+// (FU-NEW-D). Other routes don't emit metrics today; the mock collects
+// batches and the malformed-row tests below assert Namespace + Stage.
+
+type MetricBatch = {
+  Namespace: string;
+  MetricData: Array<{
+    MetricName: string;
+    Value: number;
+    Dimensions: Array<{ Name: string; Value: string }>;
+  }>;
+};
+const metricBatches: MetricBatch[] = [];
+
+vi.mock("@aws-sdk/client-cloudwatch", () => ({
+  CloudWatchClient: class {
+    async send(cmd: { input: MetricBatch }) {
+      metricBatches.push(cmd.input);
+    }
+  },
+  PutMetricDataCommand: class {
+    input: MetricBatch;
+    constructor(input: MetricBatch) {
+      this.input = input;
+    }
+  },
+}));
+
 // ─── DDB fakes ─────────────────────────────────────────────────────────
 
 interface AnyRow {
@@ -110,11 +142,19 @@ function statusOf(res: APIGatewayProxyResultV2): number {
 
 beforeEach(() => {
   rows.clear();
+  metricBatches.length = 0;
 });
 
 afterEach(() => {
   vi.clearAllMocks();
 });
+
+/** Fire-and-forget metric emission doesn't await the CW send, so tests
+ *  need to drain microtask + macrotask queues before observing the
+ *  batch. Pattern mirrors `shared/project-tests.ts:flushMetrics`. */
+async function flushMetrics(): Promise<void> {
+  await new Promise<void>((resolve) => setImmediate(resolve));
+}
 
 // ─── GET /projects ─────────────────────────────────────────────────────
 
@@ -173,6 +213,84 @@ describe("GET /projects (listProjects)", () => {
     const res = await handler(evt("GET /projects"));
     expect(statusOf(res)).toBe(200);
     expect((bodyOf(res) as { items: unknown[] }).items).toEqual([]);
+  });
+
+  // ─── FU-NEW-D: malformed-row defence-in-depth ───────────────────────
+
+  it("skips META rows missing the canonical project_id attribute (FU-NEW-D)", async () => {
+    // Mirrors the OP-001 bootstrap-bug shape found in prod: row has
+    // owner_agent + status + created_at + alien attrs (`repo` / `stream`)
+    // but NO project_id. Before FU-NEW-D the whole list route 500'd
+    // because asProjectId(undefined) threw.
+    seedProject("acme", "_operator");
+    rows.set(key("PROJECT#workforce-meta", "META"), {
+      pk: "PROJECT#workforce-meta",
+      sk: "META",
+      owner_agent: "maya",
+      status: "active",
+      created_at: "2026-05-27T04:33:56Z",
+      repo: "refluster/ai-native-article", // alien
+      stream: "internal", // alien
+    });
+
+    const res = await handler(evt("GET /projects"));
+    expect(statusOf(res)).toBe(200);
+    const items = (bodyOf(res) as { items: Array<{ project_id: string }> }).items;
+    // Only the well-formed row makes it through.
+    expect(items.map((i) => i.project_id)).toEqual(["acme"]);
+  });
+
+  it("emits WfMalformedProjectMeta with Stage dimension on the skip path (FU-NEW-D)", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    rows.set(key("PROJECT#bad", "META"), {
+      pk: "PROJECT#bad",
+      sk: "META",
+      owner_agent: "maya",
+      status: "active",
+      created_at: "2026-05-27T00:00:00Z",
+    });
+
+    await handler(evt("GET /projects"));
+    await flushMetrics();
+
+    expect(metricBatches).toHaveLength(1);
+    const batch = metricBatches[0]!;
+    expect(batch.Namespace).toBe("Workforce/AgentsApi");
+    expect(batch.MetricData[0]!.MetricName).toBe("WfMalformedProjectMeta");
+    expect(batch.MetricData[0]!.Value).toBe(1);
+    expect(batch.MetricData[0]!.Dimensions).toEqual(
+      expect.arrayContaining([{ Name: "Stage", Value: "test" }]),
+    );
+
+    // Structured log surfaces the PK + attribute snapshot so the
+    // operator can identify which bootstrap row drifted.
+    expect(warnSpy).toHaveBeenCalledOnce();
+    const logged = JSON.parse(warnSpy.mock.calls[0]![0] as string);
+    expect(logged).toMatchObject({
+      event: "agents_api_malformed_project_meta",
+      pk: "PROJECT#bad",
+    });
+    expect(logged.attrs).toContain("owner_agent");
+    warnSpy.mockRestore();
+  });
+
+  it("does NOT take down the route when ONE row is malformed alongside many good ones (FU-NEW-D)", async () => {
+    // Three good rows + one bad row. Pre-FU-NEW-D this would 500;
+    // post-FU-NEW-D returns 3 + emits one skip metric.
+    seedProject("alpha", "_operator");
+    seedProject("beta", "ren");
+    seedProject("gamma", "maya");
+    rows.set(key("PROJECT#orphan", "META"), {
+      pk: "PROJECT#orphan",
+      sk: "META",
+      // intentionally missing every canonical attribute except pk+sk
+    });
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const res = await handler(evt("GET /projects"));
+    expect(statusOf(res)).toBe(200);
+    const items = (bodyOf(res) as { items: Array<{ project_id: string }> }).items;
+    expect(items.map((i) => i.project_id).sort()).toEqual(["alpha", "beta", "gamma"]);
   });
 });
 

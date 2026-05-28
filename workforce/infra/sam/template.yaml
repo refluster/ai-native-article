@@ -276,6 +276,20 @@ Resources:
               Resource:
                 - !GetAtt WfTable.Arn
                 - !Sub ${WfTable.Arn}/index/*
+            - Sid: AgentsApiPutMalformedMetric
+              # Defence-in-depth metric on listProjects' row-shape skip
+              # path (FU-NEW-D). The handler emits WfMalformedProjectMeta
+              # under Workforce/AgentsApi when a META row missing the
+              # canonical attributes is dropped from the list response —
+              # surfaces operator-side bootstrap-runbook regressions
+              # without 500-ing the whole route. Namespace condition
+              # mirrors the runner / backfill patterns.
+              Effect: Allow
+              Action: cloudwatch:PutMetricData
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace: Workforce/AgentsApi
       Events:
         ListAgents:
           Type: HttpApi
