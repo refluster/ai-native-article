@@ -40,12 +40,20 @@
 // Adding a new base type touches all 5. If the count grows past ~10
 // types and the mirrors become drift-prone, codegen from #1+#2 to
 // #3+#4+#5 is the planned consolidation (Q1 Option B; not implemented).
+//
+// Story 4 (#93) added `voyage.api_key` — the Voyage AI embedding API
+// key used by the EXEC-row embedding-write path. The operator must
+// provision `wf/projects/_default/voyage.api_key` (or a per-project
+// override) before the embedding path lights up; until then the
+// embedding helper lands rows with `embedding_status='pending'` per
+// the AC4 failure-isolation contract.
 
 import { getCredential, type ProjectId } from "./project.js";
 import type {
   AnthropicSecret,
   GithubSecret,
   NotionSecret,
+  VoyageSecret,
 } from "./secrets.js";
 
 /**
@@ -69,6 +77,7 @@ export interface CredentialShapes {
   "discord.bot_token": DiscordBotSecret;
   "github.token": GithubSecret;
   "notion.integration_token": NotionSecret;
+  "voyage.api_key": VoyageSecret;
 }
 
 export type CredentialType = keyof CredentialShapes;
@@ -105,6 +114,7 @@ export const CREDENTIAL_TYPES: ReadonlySet<CredentialType> = new Set([
   "discord.bot_token",
   "github.token",
   "notion.integration_token",
+  "voyage.api_key",
 ]);
 
 /**

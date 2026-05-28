@@ -61,12 +61,18 @@ beforeEach(() => {
 });
 
 describe("CREDENTIAL_TYPES allowlist", () => {
-  it("contains the four canonical types in Story 2 issue scope", () => {
+  it("contains the Story 2 base set plus Story 4's voyage.api_key", () => {
+    // Story 4 (#93) added `voyage.api_key` for the EXEC-row embedding-
+    // write path. All 4 mirror points (see credential-injector.ts file
+    // header) were touched in the same PR; this assertion is the
+    // visible canary that catches drift if a future mirror sync is
+    // forgotten.
     expect([...CREDENTIAL_TYPES].sort()).toEqual([
       "anthropic.api_key",
       "discord.bot_token",
       "github.token",
       "notion.integration_token",
+      "voyage.api_key",
     ]);
   });
 

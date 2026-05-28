@@ -25,6 +25,33 @@ vi.mock("./secrets.js", () => ({
   getSecret: vi.fn(),
 }));
 
+// CloudWatch capture — getCredential() emits WfLegacyCredentialReads on
+// every fallback hit (Story 2-B / #91). The mock collects batches and
+// the per-tier tests below assert on Namespace + Dimensions.
+type MetricBatch = {
+  Namespace: string;
+  MetricData: Array<{
+    MetricName: string;
+    Value: number;
+    Dimensions: Array<{ Name: string; Value: string }>;
+  }>;
+};
+const metricBatches: MetricBatch[] = [];
+
+vi.mock("@aws-sdk/client-cloudwatch", () => ({
+  CloudWatchClient: class {
+    async send(cmd: { input: MetricBatch }) {
+      metricBatches.push(cmd.input);
+    }
+  },
+  PutMetricDataCommand: class {
+    input: MetricBatch;
+    constructor(input: MetricBatch) {
+      this.input = input;
+    }
+  },
+}));
+
 type AnyRow = Record<string, unknown>;
 const store = new Map<string, AnyRow>();
 
@@ -94,6 +121,7 @@ const getSecretMock = vi.mocked(secrets.getSecret);
 beforeEach(() => {
   store.clear();
   getSecretMock.mockReset();
+  metricBatches.length = 0;
 });
 
 afterEach(() => {
@@ -433,6 +461,178 @@ describe("listExecutions", () => {
       project.listExecutions({}),
     ).rejects.toThrow(/requires at least one of/);
   });
+
+  // ── Story 4 (#93) — caller_agent_slug read-gate ────────────────────
+  // Defence-in-depth: even when a row has a GSI1 partition pointing at
+  // an agent, the row is dropped if the caller is not an active member
+  // of that row's project. `_operator` and the unset (legacy) case both
+  // see all rows.
+  describe("Story 4 — caller_agent_slug read-gate", () => {
+    it("ren as caller sees ONLY rows from projects ren is a member of", async () => {
+      // Add a row in beta with agent_slug=maya but a forged GSI1 pointing
+      // at AGENT#ren (simulating an upstream bug / attack surface).
+      store.set("PROJECT#beta|EXEC#01LEAK", {
+        pk: "PROJECT#beta",
+        sk: "EXEC#01LEAK",
+        project_id: beta,
+        agent_slug: "ren",
+        skill_name: "leak",
+        skill_version: "0.1.0",
+        started_at: "2026-05-25T00:00:00.000Z",
+        ended_at: "2026-05-25T00:00:01.000Z",
+        status: "ok",
+        gsi1pk: "AGENT#ren",
+        gsi1sk: "2026-05-25T00:00:00.000Z",
+        gsi2pk: "SKILL#leak",
+        gsi2sk: "2026-05-25T00:00:00.000Z",
+      });
+
+      // ren is now a member of alpha (per beforeEach) and we ADD ren to
+      // beta in this fixture's outer scope. So set up: remove ren from
+      // beta and verify the leak row is dropped.
+      await project.removeMember(beta, "ren");
+
+      const gated = await project.listExecutions({
+        agent_slug: "ren",
+        caller_agent_slug: "ren",
+      });
+      expect(gated.map((r) => r.sk)).toContain("EXEC#01A"); // ren ∈ alpha
+      expect(gated.map((r) => r.sk)).not.toContain("EXEC#01LEAK"); // ren ∉ beta
+      expect(gated.map((r) => r.sk)).not.toContain("EXEC#01B"); // also dropped — ren ∉ beta now
+    });
+
+    it("_operator caller sees everything (gate short-circuits)", async () => {
+      // Same setup as the previous test but caller is _operator.
+      store.set("PROJECT#beta|EXEC#01LEAK", {
+        pk: "PROJECT#beta",
+        sk: "EXEC#01LEAK",
+        project_id: beta,
+        agent_slug: "ren",
+        skill_name: "leak",
+        skill_version: "0.1.0",
+        started_at: "2026-05-25T00:00:00.000Z",
+        ended_at: "2026-05-25T00:00:01.000Z",
+        status: "ok",
+        gsi1pk: "AGENT#ren",
+        gsi1sk: "2026-05-25T00:00:00.000Z",
+        gsi2pk: "SKILL#leak",
+        gsi2sk: "2026-05-25T00:00:00.000Z",
+      });
+      await project.removeMember(beta, "ren");
+
+      const all = await project.listExecutions({
+        agent_slug: "ren",
+        caller_agent_slug: "_operator",
+      });
+      expect(all.map((r) => r.sk).sort()).toContain("EXEC#01LEAK");
+    });
+
+    it("absent caller_agent_slug is BACKWARD-COMPATIBLE — gate does not run", async () => {
+      // Pre-Story-4 callers (existing agent-runner, agents-api) MUST
+      // continue to see un-gated results so we don't break their tests.
+      // Bare listExecutions({ agent_slug }) keeps the legacy behaviour.
+      const rows = await project.listExecutions({ agent_slug: "ren" });
+      expect(rows.map((r) => r.sk).sort()).toEqual(["EXEC#01A", "EXEC#01B"]);
+    });
+  });
+});
+
+// --- appendExecution: embedding sidecar (Story 4) -------------------------
+
+describe("appendExecution — embedding sidecar (Story 4)", () => {
+  let alpha: ProjectId;
+
+  beforeEach(async () => {
+    alpha = project.asProjectId("alpha");
+    await project.create({ project_id: alpha, owner_agent: "_operator" });
+    await project.addMember(alpha, "ren");
+  });
+
+  function baseInput(opts: Partial<Parameters<typeof project.appendExecution>[0]> = {}) {
+    return {
+      project_id: alpha,
+      agent_slug: "ren" as const,
+      exec_ulid: "01E",
+      skill_name: "s",
+      skill_version: "0.1.0",
+      started_at: "2026-05-20T00:00:00.000Z",
+      ended_at: "2026-05-20T00:00:01.000Z",
+      status: "ok" as const,
+      ...opts,
+    };
+  }
+
+  it("ok-status with all four embedding attrs lands cleanly", async () => {
+    const bytes = new Uint8Array(12); // dim 3 * 4 bytes
+    const row = await project.appendExecution(
+      baseInput({
+        embedding_bytes: bytes,
+        embedding_model_id: "voyage-3-lite",
+        embedding_dim: 3,
+        embedding_status: "ok",
+      }),
+    );
+    expect(row.embedding_status).toBe("ok");
+    expect(row.embedding_dim).toBe(3);
+  });
+
+  it("pending-status with no byte/model/dim attrs lands cleanly", async () => {
+    const row = await project.appendExecution(
+      baseInput({ embedding_status: "pending" }),
+    );
+    expect(row.embedding_status).toBe("pending");
+    expect(row.embedding_bytes).toBeUndefined();
+  });
+
+  it("throws on partial sidecar — bytes without model_id (W-4)", async () => {
+    await expect(
+      project.appendExecution(
+        baseInput({
+          embedding_bytes: new Uint8Array(12),
+          embedding_dim: 3,
+          embedding_status: "ok",
+        }),
+      ),
+    ).rejects.toThrow(/all-present or all-absent/);
+  });
+
+  it("throws on embedding_status='ok' without bytes (would silently break recall)", async () => {
+    await expect(
+      project.appendExecution(baseInput({ embedding_status: "ok" })),
+    ).rejects.toThrow(/embedding_status='ok' requires/);
+  });
+
+  it("throws on bytes-present + non-ok status (corrupt sidecar state)", async () => {
+    await expect(
+      project.appendExecution(
+        baseInput({
+          embedding_bytes: new Uint8Array(12),
+          embedding_model_id: "voyage-3-lite",
+          embedding_dim: 3,
+          embedding_status: "pending",
+        }),
+      ),
+    ).rejects.toThrow(/expected 'ok' when bytes are present/);
+  });
+
+  it("throws on byteLength vs embedding_dim mismatch", async () => {
+    await expect(
+      project.appendExecution(
+        baseInput({
+          embedding_bytes: new Uint8Array(8), // 2 floats
+          embedding_model_id: "voyage-3-lite",
+          embedding_dim: 3, // says 3 floats
+          embedding_status: "ok",
+        }),
+      ),
+    ).rejects.toThrow(/byteLength=8 does not match embedding_dim=3/);
+  });
+
+  it("pre-Story-4 row shape (no sidecar attrs at all) still lands", async () => {
+    const row = await project.appendExecution(baseInput());
+    expect(row.embedding_status).toBeUndefined();
+    expect(row.embedding_bytes).toBeUndefined();
+  });
 });
 
 // --- getCredential -------------------------------------------------------
@@ -440,42 +640,117 @@ describe("listExecutions", () => {
 describe("getCredential", () => {
   const id = "x" as ProjectId;
 
-  it("returns the project-scoped secret on the happy path", async () => {
+  /** Fire-and-forget metric emission inside getCredential() doesn't
+   *  await the CloudWatch send, so tests need to drain microtasks /
+   *  macrotasks before observing `metricBatches`. */
+  async function flushMetrics(): Promise<void> {
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+
+  function notFoundErr(): Error {
+    const err = new Error("Secrets Manager: no such secret");
+    err.name = "ResourceNotFoundException";
+    return err;
+  }
+
+  it("returns the project-scoped secret on the happy path (no fallback, no metric)", async () => {
     getSecretMock.mockResolvedValueOnce({ token: "proj-scoped" });
     const got = await project.getCredential<{ token: string }>(id, "github.token");
     expect(got).toEqual({ token: "proj-scoped" });
     expect(getSecretMock).toHaveBeenCalledOnce();
     expect(getSecretMock).toHaveBeenCalledWith("wf/projects/x/github.token");
+    await flushMetrics();
+    expect(metricBatches).toHaveLength(0);
   });
 
-  it("falls back to wf/{type} ONLY on ResourceNotFoundException + logs structured event", async () => {
+  it("falls back to wf/projects/_default/{type} when project-scoped is NotFound + emits fallback_default metric", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const notFound = new Error("Secrets Manager: no such secret");
-    notFound.name = "ResourceNotFoundException";
-    getSecretMock.mockRejectedValueOnce(notFound).mockResolvedValueOnce({ token: "legacy" });
+    getSecretMock
+      .mockRejectedValueOnce(notFoundErr())
+      .mockResolvedValueOnce({ token: "shared-default" });
 
     const got = await project.getCredential<{ token: string }>(id, "github.token");
-    expect(got).toEqual({ token: "legacy" });
+    expect(got).toEqual({ token: "shared-default" });
+    expect(getSecretMock).toHaveBeenCalledTimes(2);
     expect(getSecretMock).toHaveBeenNthCalledWith(1, "wf/projects/x/github.token");
-    expect(getSecretMock).toHaveBeenNthCalledWith(2, "wf/github.token");
-    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(getSecretMock).toHaveBeenNthCalledWith(2, "wf/projects/_default/github.token");
+
     const logged = JSON.parse(warnSpy.mock.calls[0]![0] as string);
     expect(logged).toMatchObject({
       event: "legacy_credential_read",
       project_id: "x",
       credential_type: "github.token",
+      reason: "fallback_default",
     });
+
+    await flushMetrics();
+    expect(metricBatches).toHaveLength(1);
+    const batch = metricBatches[0]!;
+    expect(batch.Namespace).toBe("Workforce/Credentials");
+    expect(batch.MetricData[0]!.MetricName).toBe("WfLegacyCredentialReads");
+    expect(batch.MetricData[0]!.Value).toBe(1);
+    expect(batch.MetricData[0]!.Dimensions).toEqual(
+      expect.arrayContaining([{ Name: "Reason", Value: "fallback_default" }]),
+    );
     warnSpy.mockRestore();
   });
 
-  it("re-throws non-NotFound errors (W-4 — does NOT silently fall back)", async () => {
+  it("falls all the way back to wf/{type} when BOTH project-scoped + _default are NotFound + emits fallback_bare metric", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    getSecretMock
+      .mockRejectedValueOnce(notFoundErr())
+      .mockRejectedValueOnce(notFoundErr())
+      .mockResolvedValueOnce({ token: "legacy-bare" });
+
+    const got = await project.getCredential<{ token: string }>(id, "github.token");
+    expect(got).toEqual({ token: "legacy-bare" });
+    expect(getSecretMock).toHaveBeenCalledTimes(3);
+    expect(getSecretMock).toHaveBeenNthCalledWith(1, "wf/projects/x/github.token");
+    expect(getSecretMock).toHaveBeenNthCalledWith(2, "wf/projects/_default/github.token");
+    expect(getSecretMock).toHaveBeenNthCalledWith(3, "wf/github.token");
+
+    const logged = JSON.parse(warnSpy.mock.calls[0]![0] as string);
+    expect(logged).toMatchObject({
+      event: "legacy_credential_read",
+      reason: "fallback_bare",
+    });
+
+    await flushMetrics();
+    expect(metricBatches).toHaveLength(1);
+    expect(metricBatches[0]!.MetricData[0]!.Dimensions).toEqual(
+      expect.arrayContaining([{ Name: "Reason", Value: "fallback_bare" }]),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it("throws loudly when ALL three tiers are NotFound (W-4)", async () => {
+    getSecretMock
+      .mockRejectedValueOnce(notFoundErr())
+      .mockRejectedValueOnce(notFoundErr())
+      .mockRejectedValueOnce(notFoundErr());
+    await expect(
+      project.getCredential<{ token: string }>(id, "github.token"),
+    ).rejects.toThrow();
+    expect(getSecretMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("re-throws non-NotFound at tier 1 (project-scoped) — does NOT fall through", async () => {
     const denied = new Error("not authorised");
     denied.name = "AccessDeniedException";
     getSecretMock.mockRejectedValueOnce(denied);
     await expect(
       project.getCredential<{ token: string }>(id, "github.token"),
     ).rejects.toThrow(/not authorised/);
-    // Critically: getSecret was NOT called a second time on the legacy path.
     expect(getSecretMock).toHaveBeenCalledOnce();
+  });
+
+  it("re-throws non-NotFound at tier 2 (_default) — does NOT fall through to bare", async () => {
+    const denied = new Error("throttled");
+    denied.name = "ThrottlingException";
+    getSecretMock.mockRejectedValueOnce(notFoundErr()).mockRejectedValueOnce(denied);
+    await expect(
+      project.getCredential<{ token: string }>(id, "github.token"),
+    ).rejects.toThrow(/throttled/);
+    expect(getSecretMock).toHaveBeenCalledTimes(2);
   });
 });

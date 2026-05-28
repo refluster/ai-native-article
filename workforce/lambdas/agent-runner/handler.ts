@@ -21,9 +21,15 @@ import { getItem, putItem, updateOperational } from "../shared/ddb.js";
 import { complete } from "../shared/llm-anthropic.js";
 import { assertWithinBudget, recordSpend } from "../shared/budget.js";
 import {
+  injectCredentials,
+  type CredentialBag,
+  type CredentialKey,
+} from "../shared/credential-injector.js";
+import {
   appendExecution,
   asProjectId,
   selfProjectId,
+  type ArtifactRef,
   type ExecStatus,
   type ProjectId,
 } from "../shared/project.js";
@@ -34,6 +40,10 @@ import {
   writeDeliverableArtefact,
   writeRunArtefact,
 } from "../shared/deliverable.js";
+import {
+  RedactionViolation,
+  writeProjectArtefact,
+} from "../shared/artefact-writer.js";
 import { dispatchEngineer } from "../shared/github.js";
 import { composeSystemPrompt, loadSkill, type LoadedSkill } from "../shared/skill.js";
 import { getDeterministicHandler } from "../shared/skill-registry.js";
@@ -112,18 +122,26 @@ export async function handler(event: RunnerEvent, context: Context): Promise<Run
     return { status: "ok", run_id: runId, tokens_in: 0, tokens_out: 0, cost_usd: 0 };
   }
 
+  // Build the sealed credential bag BEFORE entering the executor switch,
+  // so a missing-credential failure flows through the normal throwRun
+  // path (logged + dual-write-emit + propagated). Empty `requires`
+  // yields a bag with no readable keys; the skill still receives it on
+  // ctx.credentials but any read throws (W-2 trust boundary).
+  // Story 2-B (#91): injection happens at the runner seam, NOT inside
+  // each executor, so all three paths use identical resolution rules.
   let result: RunnerResult;
   try {
+    const credentials = await buildCredentialBag(event, skill);
     switch (skill.meta.executor) {
       case "deterministic":
-        result = await runDeterministic(event, agent, binding, skill, runId, startedAt);
+        result = await runDeterministic(event, agent, binding, skill, runId, startedAt, credentials);
         break;
       case "claude-code-routine":
-        result = await runClaudeCodeRoutine(event, agent, binding, skill, runId, startedAt, previousChunk);
+        result = await runClaudeCodeRoutine(event, agent, binding, skill, runId, startedAt, previousChunk, credentials);
         break;
       case "llm-prose":
       default:
-        result = await runLlmProse(event, agent, binding, skill, runId, startedAt, previousChunk);
+        result = await runLlmProse(event, agent, binding, skill, runId, startedAt, previousChunk, credentials);
         break;
     }
   } catch (err) {
@@ -152,11 +170,25 @@ async function runDeterministic(
   skill: LoadedSkill,
   runId: string,
   startedAt: string,
+  credentials: CredentialBag,
 ): Promise<RunnerResult> {
   const handler = getDeterministicHandler(skill.meta.name);
-  const result = await handler({ slug: event.agent, startedAt });
+  const result = await handler({ slug: event.agent, startedAt, credentials });
 
+  // Legacy path (still required for the front-end's RUN.output_s3_key
+  // until Story 6 cuts the SPA over to the EXEC row's artifact_ref).
   const s3Key = await writeRunArtefact(event.agent, runId, result.outputExt, result.output);
+
+  // Story 3 (#92): the new canonical artefact lives under projects/{id}/.
+  // PutObject is ordered BEFORE the EXEC-row write below so the row
+  // never points at a missing object (AC 5).
+  const artifactRef = await writeProjectArtefactForRun(event, runId, skill, {
+    filename: `output.${result.outputExt}`,
+    body: result.output,
+    contentType: contentTypeForExt(result.outputExt),
+    summary: result.summary.slice(0, 240),
+  });
+
   const endedAt = new Date().toISOString();
 
   const runRow: RunRow = {
@@ -175,7 +207,7 @@ async function runDeterministic(
     output_s3_key: s3Key,
     output_summary: result.summary.slice(0, 240),
   };
-  await writeRunAndExec(runRow, event, skill);
+  await writeRunAndExec(runRow, event, skill, artifactRef);
 
   return { status: "ok", run_id: runId, tokens_in: 0, tokens_out: 0, cost_usd: 0 };
 }
@@ -190,7 +222,14 @@ async function runLlmProse(
   runId: string,
   startedAt: string,
   previousChunk: string,
+  _credentials: CredentialBag,
 ): Promise<RunnerResult> {
+  // _credentials: built + validated at the runner seam so a missing
+  // declared credential fails the run loudly even though llm-prose
+  // skills currently consume secrets indirectly (helpers in
+  // shared/notion.ts, shared/llm-anthropic.ts read their own paths).
+  // Future skills that thread credentials through the prompt will
+  // accept the bag here.
   if (!skill.meta.deliverable) {
     throw new Error(`skill "${skill.meta.name}" is llm-prose but has no deliverable in meta.json`);
   }
@@ -210,6 +249,16 @@ async function runLlmProse(
   const target = deliverableTargetFor(event.agent, skill.meta.deliverable.type, delivId);
   await writeDeliverableArtefact(target, llm.text);
   const runArtefactKey = await writeRunArtefact(event.agent, runId, "md", llm.text);
+
+  // Story 3 (#92): project-prefixed artefact for the new EXEC row.
+  // PutObject ordered BEFORE writeRunAndExec (AC 5). The legacy writers
+  // above remain until Story 6 migrates the read paths.
+  const artifactRef = await writeProjectArtefactForRun(event, runId, skill, {
+    filename: "output.md",
+    body: llm.text,
+    contentType: "text/markdown; charset=utf-8",
+    summary: summaryOf(llm.text),
+  });
 
   let notionPageId: string | undefined;
   let notionPageUrl: string | undefined;
@@ -244,7 +293,7 @@ async function runLlmProse(
     output_s3_key: runArtefactKey,
     output_summary: summaryOf(llm.text),
   };
-  await writeRunAndExec(runRow, event, skill);
+  await writeRunAndExec(runRow, event, skill, artifactRef);
 
   const delivRow: DelivRow = {
     pk: agentPk(event.agent),
@@ -280,6 +329,7 @@ async function runClaudeCodeRoutine(
   runId: string,
   startedAt: string,
   previousChunk: string,
+  _credentials: CredentialBag,
 ): Promise<RunnerResult> {
   const baseSystem = await loadSystemMd(event.agent);
   const system = composeSystemPrompt(baseSystem, skill);
@@ -294,6 +344,9 @@ async function runClaudeCodeRoutine(
 
   const delivId = newUlid();
   const owner = process.env.ENGINEER_OWNER ?? "refluster";
+  // _credentials: see comment in runLlmProse — bag is built at the
+  // runner seam for trust-boundary enforcement; the brief generator
+  // currently does not thread it into the GHA workflow_dispatch payload.
   const repo = process.env.ENGINEER_REPO ?? "ai-native-article";
   const workflow = process.env.ENGINEER_WORKFLOW ?? "workforce-engineer-routine.yml";
   const ref = process.env.ENGINEER_REF ?? "main";
@@ -304,6 +357,15 @@ async function runClaudeCodeRoutine(
     llm.text,
   );
   const runArtefactKey = await writeRunArtefact(event.agent, runId, "md", llm.text);
+
+  // Story 3 (#92): project-prefixed artefact for the new EXEC row.
+  // PutObject ordered BEFORE writeRunAndExec (AC 5).
+  const artifactRef = await writeProjectArtefactForRun(event, runId, skill, {
+    filename: "brief.md",
+    body: llm.text,
+    contentType: "text/markdown; charset=utf-8",
+    summary: summaryOf(llm.text),
+  });
 
   const dispatchBranch = `${event.agent}/${delivId}`;
   await dispatchEngineer({
@@ -332,7 +394,7 @@ async function runClaudeCodeRoutine(
     output_s3_key: runArtefactKey,
     output_summary: summaryOf(llm.text),
   };
-  await writeRunAndExec(runRow, event, skill);
+  await writeRunAndExec(runRow, event, skill, artifactRef);
 
   const delivRow: DelivRow = {
     pk: agentPk(event.agent),
@@ -444,12 +506,178 @@ function resolveProjectId(event: RunnerEvent): ProjectId {
   return event.project_id ? asProjectId(event.project_id) : selfProjectId(event.agent);
 }
 
+/**
+ * Build the per-invocation sealed credential bag (Epic-010 Story 2-B).
+ *
+ * `requires` is read from skill.meta — Story 2-A's schema extension. An
+ * absent / empty list produces a bag with no readable keys (correct for
+ * every skill in the repo today; the wire-up is meaningful when skills
+ * start declaring `requires` in follow-up PRs).
+ *
+ * Throws on any failure — missing project, undeclared key in `requires`,
+ * missing Secrets Manager value. The outer try/catch in `handler()`
+ * turns the throw into a normal RUN row with status="throw" and an
+ * error_message, matching the existing skill-load / executor-error
+ * handling shape.
+ */
+async function buildCredentialBag(
+  event: RunnerEvent,
+  skill: LoadedSkill,
+): Promise<CredentialBag> {
+  const projectId = resolveProjectId(event);
+  const requires = (skill.meta.requires ?? []) as readonly CredentialKey[];
+  return await injectCredentials(requires, projectId, {
+    skillName: skill.meta.name,
+  });
+}
+
+// --- Epic-010 Story 3: project-prefixed artefact write seam --------------
+//
+// Every executor calls `writeProjectArtefactForRun()` and threads the
+// returned `ArtifactRef` into `writeRunAndExec(...)`. On
+// `RedactionViolation` the helper writes a `failed_artefact_redaction`
+// EXEC row directly (membership-gated through resolved project) and
+// re-throws — the outer try/catch in `handler()` then writes the
+// normal RUN row via `throwRun(...)` so the failure appears in both
+// the legacy RUN table AND the new project ledger.
+//
+// The legacy `writeRunArtefact` / `writeDeliverableArtefact` writers
+// remain in place (the SPA reads RUN.output_s3_key until Story 6).
+// Cutover to project-prefixed-only writes is out of scope for this PR.
+
+interface ProjectArtefactInput {
+  filename: string;
+  body: string;
+  contentType: string;
+  summary: string;
+}
+
+function contentTypeForExt(ext: string): string {
+  switch (ext) {
+    case "json":
+      return "application/json";
+    case "md":
+      return "text/markdown; charset=utf-8";
+    default:
+      return "text/plain; charset=utf-8";
+  }
+}
+
+/**
+ * Wrap `writeProjectArtefact` with the Story-3 failure semantics:
+ *
+ *   - Resolve the active project from the event (defaults to self/{slug}).
+ *   - PutObject the body under `projects/{id}/{yyyy}/{mm}/{ulid}/{file}`.
+ *   - On `RedactionViolation` (#92 AC 3): persist a `failed_artefact_redaction`
+ *     EXEC row to the project ledger (so the failure is visible, not
+ *     silently dropped), then re-throw to propagate the failure to the
+ *     outer handler's normal throwRun path.
+ *
+ * Returns the `ArtifactRef` on success — caller passes it to
+ * `writeRunAndExec(runRow, event, skill, ref)`.
+ */
+async function writeProjectArtefactForRun(
+  event: RunnerEvent,
+  runId: string,
+  skill: LoadedSkill,
+  input: ProjectArtefactInput,
+): Promise<ArtifactRef> {
+  const startedAt = new Date().toISOString();
+  try {
+    return await writeProjectArtefact({
+      projectId: resolveProjectId(event),
+      execUlid: runId,
+      filename: input.filename,
+      body: input.body,
+      contentType: input.contentType,
+      summary: input.summary,
+    });
+  } catch (err) {
+    if (err instanceof RedactionViolation) {
+      await recordFailedRedactionExec(event, runId, skill, startedAt, err);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Write an EXEC row with `status="failed_artefact_redaction"` to the
+ * project ledger. Best-effort: a downstream failure here is logged and
+ * surfaced via `WfExecDualWriteFailed` (same metric the dual-write seam
+ * uses) but does NOT mask the original `RedactionViolation` — the
+ * caller still re-throws so the outer handler's `throwRun` writes the
+ * legacy RUN row.
+ *
+ * The EXEC row carries NO `artifact_ref` (the artefact was never
+ * written) and an `error` populated with the redaction-pattern name
+ * (NOT the matched value — that would defeat the purpose of redaction).
+ */
+async function recordFailedRedactionExec(
+  event: RunnerEvent,
+  runId: string,
+  skill: LoadedSkill,
+  startedAt: string,
+  violation: RedactionViolation,
+): Promise<void> {
+  const endedAt = new Date().toISOString();
+  let projectId: ProjectId;
+  try {
+    projectId = resolveProjectId(event);
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        event: "exec-failed-redaction-skipped",
+        reason: "invalid_project_id",
+        run_id: runId,
+        agent: event.agent,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    await emitExecDualWriteFailedMetric("invalid_project_id");
+    return;
+  }
+  try {
+    await appendExecution({
+      project_id: projectId,
+      agent_slug: event.agent,
+      exec_ulid: runId,
+      skill_name: skill.meta.name,
+      skill_version: skill.meta.version,
+      started_at: startedAt,
+      ended_at: endedAt,
+      status: "failed_artefact_redaction",
+      error: violation.message,
+    });
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        event: "exec-failed-redaction-append-threw",
+        run_id: runId,
+        project_id: projectId,
+        agent: event.agent,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    await emitExecDualWriteFailedMetric("failed_redaction_append_threw");
+  }
+}
+
 /** Single seam for RUN+EXEC dual-write. See the comment above for the
- *  rationale + the absence test that enforces this is the only path. */
+ *  rationale + the absence test that enforces this is the only path.
+ *
+ *  Story 3 (#92) addition: `artifactRef` threads the new project-prefixed
+ *  S3 artefact into the EXEC row. Write order at every callsite is:
+ *    1. `writeProjectArtefact(...)`  PutObject + return ref
+ *    2. `writeRunAndExec(runRow, event, skill, ref)`
+ *         a. legacy RUN row putItem
+ *         b. EXEC row with artifact_ref attached
+ *  An EXEC row never points at a missing S3 object because step 1
+ *  must succeed before step 2 runs. */
 async function writeRunAndExec(
   runRow: RunRow,
   event: RunnerEvent,
   skill: LoadedSkill,
+  artifactRef?: ArtifactRef,
 ): Promise<void> {
   await putItem(runRow);
   await dualWriteExec({
@@ -460,6 +688,7 @@ async function writeRunAndExec(
     endedAt: runRow.ended_at,
     status: runRow.status === "throw" ? "throw" : runRow.status === "skipped" ? "skipped" : "ok",
     error: runRow.error_message,
+    artifactRef,
   });
 }
 
@@ -471,10 +700,11 @@ interface DualWriteExecArgs {
   endedAt: string;
   status: ExecStatus;
   error?: string;
+  artifactRef?: ArtifactRef;
 }
 
 async function dualWriteExec(args: DualWriteExecArgs): Promise<void> {
-  const { event, runId, skill, startedAt, endedAt, status, error } = args;
+  const { event, runId, skill, startedAt, endedAt, status, error, artifactRef } = args;
   let projectId: ProjectId;
   try {
     projectId = resolveProjectId(event);
@@ -503,6 +733,7 @@ async function dualWriteExec(args: DualWriteExecArgs): Promise<void> {
       ended_at: endedAt,
       status,
       error,
+      artifact_ref: artifactRef,
     });
   } catch (err) {
     console.error(

@@ -71,7 +71,6 @@ If every item is checked: post an issue titled `workforce ROADMAP complete — o
    - Raise the W-3 monthly budget ceiling without an explicit operator instruction.
    - Edit `workforce/docs/governance.md §2` (W-1..W-5 invariants).
    - Enable an EventBridge rule (flip `Enabled: false → true`) without confirming the pre-flight checklist.
-   - Flip `vars.WORKFORCE_DEPLOY_ENABLED` (operator-only repo variable for the SPA workflow).
 
 ---
 
@@ -128,4 +127,3 @@ Print one line:
 | `--force-with-lease` on feature branches | Safe; force-push to `main`/`gh-pages` is Forbidden |
 | Zone A files: propose, don't merge | `.github/workflows/`, `workforce/docs/governance.md`, `workforce/docs/architecture.md` etc. |
 | Skills = folders, not lambda edits | New deterministic skill = drop `workforce/skills/{name}/` folder + regen registry. Never edit `workforce/lambdas/shared/handlers/` (gone). |
-| Operator-only repo variables | `WORKFORCE_DEPLOY_ENABLED` — never flipped by this routine. |

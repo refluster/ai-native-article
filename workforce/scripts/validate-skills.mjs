@@ -64,6 +64,7 @@ const CREDENTIAL_TYPES = new Set([
   "discord.bot_token",
   "github.token",
   "notion.integration_token",
+  "voyage.api_key",
 ]);
 // Variant naming convention (Epic-010 §Q2): starts with a letter, then
 // kebab/snake-case. Empty variants (`type@`) are rejected explicitly.

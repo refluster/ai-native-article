@@ -441,6 +441,172 @@ Resources:
       Tags:
         workforce: !Ref Stage
 
+  # --- Credentials write API (Epic-010 Story 2-C) ----------------------------
+  # Operator-only write-side API for project credentials. Mirrors the
+  # agents-api shape (separate HttpApi + IAM authoriser) so the IAM scope
+  # stays narrow — this Lambda is the ONLY caller with secretsmanager:
+  # CreateSecret/PutSecretValue/DescribeSecret/DeleteSecret authority on
+  # the wf/projects/* namespace.
+  #
+  # Why a separate HTTP API (not glued onto WfAgentsHttpApi):
+  #   - WfAgentsHttpApi's CORS AllowMethods is [GET, OPTIONS]; credentials
+  #     needs PUT/DELETE too. Adding them to the public agents API would
+  #     widen the cors surface for read-only resources.
+  #   - Auth on every credentials route is AWS_IAM (operator-only). Hosting
+  #     on a dedicated API lets the operator graph "credentials API hits"
+  #     separately from "agents API hits."
+  #
+  # Routes:
+  #   GET    /projects/{slug}/credentials/{type}   metadata only
+  #   PUT    /projects/{slug}/credentials/{type}   create or rotate
+  #   DELETE /projects/{slug}/credentials/{type}   schedule deletion (7d window)
+  WfCredentialsHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Stage
+      CorsConfiguration:
+        AllowOrigins:
+          - https://kohuehara.xyz
+          - https://workforce.kohuehara.xyz
+          - http://localhost:5173
+        AllowMethods: [GET, PUT, DELETE, OPTIONS]
+        AllowHeaders: [content-type, authorization]
+      Auth:
+        EnableIamAuthorizer: true
+        # Default every route on this API to AWS_IAM so a future route
+        # added without an explicit Authorizer cannot accidentally
+        # publish a public credentials surface.
+        DefaultAuthorizer: AWS_IAM
+      Tags:
+        workforce: !Ref Stage
+
+  WfCredentialsApiFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-credentials-api-${Stage}
+      CodeUri: ../../lambdas/credentials-api
+      Handler: handler.handler
+      Description: Workforce credentials write API (PUT/DELETE/GET metadata-only). Epic-010 Story 2-C.
+      MemorySize: 512
+      Timeout: 15
+      Policies:
+        - Statement:
+            - Sid: CredentialsApiTableAccess
+              # getProject + appendExecution + addMember + isMember all
+              # hit the workforce single table. Same surface the
+              # agents-api Lambda needs.
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:Query
+              Resource:
+                - !GetAtt WfTable.Arn
+                - !Sub ${WfTable.Arn}/index/*
+            - Sid: CredentialsApiSecretsWrite
+              # Resource-scoped to the canonical project-credentials
+              # namespace. The bare `wf/{type}` legacy namespace is
+              # intentionally OUT of scope: this API only writes the
+              # post-Story-2-B canonical path. Legacy keys are read by
+              # the runner only and will be deleted in a separate
+              # follow-up once WfLegacyCredentialReads graphs to zero.
+              Effect: Allow
+              Action:
+                - secretsmanager:CreateSecret
+                - secretsmanager:PutSecretValue
+                - secretsmanager:DescribeSecret
+                - secretsmanager:DeleteSecret
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*
+      Events:
+        GetCredential:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfCredentialsHttpApi
+            Path: /projects/{slug}/credentials/{type}
+            Method: GET
+        PutCredential:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfCredentialsHttpApi
+            Path: /projects/{slug}/credentials/{type}
+            Method: PUT
+        DeleteCredential:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfCredentialsHttpApi
+            Path: /projects/{slug}/credentials/{type}
+            Method: DELETE
+      Tags:
+        workforce: !Ref Stage
+
+  WfCredentialsApiErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-credentials-api-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-credentials-api-${Stage} over 5 minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfCredentialsApiFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  # --- Migration: bare wf/{type} -> wf/projects/_default/{type} (Epic-010 §6) -
+  # Operator-invoked one-shot. Copies the legacy bare-path credentials
+  # (provisioned pre-Epic-010) into the type-keyed canonical paths under
+  # the `_default` pseudo-project. Idempotent re-runs are safe (the
+  # CreateSecret race resolves to `already_migrated`). Emits CW metrics
+  # under Workforce/Credentials. Discord bot tokens are NOT in scope
+  # (existing wf/discord-* keys are webhooks, a different credential type).
+  WfMigrateCredentialsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-migrate-credentials-${Stage}
+      CodeUri: ../../lambdas/migrate-credentials
+      Handler: handler.handler
+      Description: One-shot — copies legacy wf/{type} secrets to wf/projects/_default/{type}. Epic-010 Story 2-B.
+      MemorySize: 512
+      Timeout: 300
+      Policies:
+        - Statement:
+            - Sid: MigrateCredentialsReadLegacy
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/anthropic-*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/notion-*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/github-*
+            - Sid: MigrateCredentialsWriteDefault
+              Effect: Allow
+              # CreateSecret takes a wildcard Resource — the action does
+              # not yet exist, so resource-level ARN matching isn't a
+              # tightening surface. The Name parameter is constrained by
+              # the LEGACY_TO_TYPED map inside the handler.
+              Action: secretsmanager:CreateSecret
+              Resource: "*"
+            - Sid: MigrateCredentialsPutMetric
+              Effect: Allow
+              Action: cloudwatch:PutMetricData
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace: Workforce/Credentials
+      Tags:
+        workforce: !Ref Stage
+
   WfSeedAgentsErrorsAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -555,11 +721,37 @@ Resources:
                 - dynamodb:UpdateItem
               Resource: !GetAtt WfTable.Arn
             - Sid: RunnerS3Rw
+              # Epic-010 Story 3 (#92): the new canonical write layout
+              # is `projects/{project_id}/{yyyy}/{mm}/{exec_ulid}/...`
+              # (per epic-010 §8). The legacy prefixes (memory/, articles/,
+              # plans/, design-docs/, launches/, notifications/, pr-briefs/,
+              # runs/) stay until Story 6 (#95) migrates the reader paths
+              # — no back-fill is planned for in-flight artefacts.
+              #
+              # Trust-boundary trade-off (documented in PR #92 body):
+              # this policy is a POSITIVE prefix scope. The runner can
+              # PutObject anywhere under `projects/*`, but the per-
+              # invocation write key is constructed inside the runner
+              # from the resolved `projectId` (see
+              # `shared/artefact-writer.ts:writeProjectArtefact`), so a
+              # cross-project write is unreachable through the supported
+              # code path. A pure NEGATIVE constraint (StringNotLike
+              # against the active project) would require either the
+              # `aws:PrincipalTag/project_id` session-tag dance (out of
+              # scope per RFC) or a per-project assumable role (explicit
+              # out-of-scope item in Epic-010). The Story 3 AC "denied by
+              # IAM, not by application code" is satisfied for the
+              # legacy prefixes (a runner that tries to write under
+              # `articles/B/...` while resolving project A is still
+              # bounded by the prefix-restricted Resource list above);
+              # within `projects/*` the boundary holds via the writer's
+              # construction discipline + the redaction guard.
               Effect: Allow
               Action:
                 - s3:GetObject
                 - s3:PutObject
               Resource:
+                - !Sub ${WfBucket.Arn}/projects/*
                 - !Sub ${WfBucket.Arn}/memory/*
                 - !Sub ${WfBucket.Arn}/articles/*
                 - !Sub ${WfBucket.Arn}/plans/*
@@ -569,9 +761,14 @@ Resources:
                 - !Sub ${WfBucket.Arn}/pr-briefs/*
                 - !Sub ${WfBucket.Arn}/runs/*
             - Sid: RunnerSecretsRead
+              # Story 2-B (#91) added the `wf/projects/*` arm for the
+              # post-migration canonical path AND the `_default` shared
+              # fallback. The legacy `wf/{service}-*` arms remain until
+              # WfLegacyCredentialReads graphs to zero (Epic-010 §6).
               Effect: Allow
               Action: secretsmanager:GetSecretValue
               Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/anthropic-*
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/notion-*
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/github-*
@@ -581,12 +778,18 @@ Resources:
               # WfExecDualWriteFailed under Workforce/Runner namespace so
               # the operator sees dual-write drift in real time, not just
               # via log spelunking. Namespace condition mirrors backfill.
+              #
+              # Story 2-B (#91) extended the namespace condition to
+              # include Workforce/Credentials — getCredential() emits
+              # WfLegacyCredentialReads on every fallback hit.
               Effect: Allow
               Action: cloudwatch:PutMetricData
               Resource: "*"
               Condition:
                 StringEquals:
-                  cloudwatch:namespace: Workforce/Runner
+                  cloudwatch:namespace:
+                    - Workforce/Runner
+                    - Workforce/Credentials
       Environment:
         Variables:
           ENGINEER_OWNER: !Ref EngineerOwner
@@ -714,3 +917,8 @@ Outputs:
     Value: !Sub https://${WfAgentsHttpApi}.execute-api.${AWS::Region}.amazonaws.com
     Export:
       Name: !Sub wf-agents-api-url-${Stage}
+  CredentialsApiUrl:
+    Description: Base URL of the credentials write HTTP API. All routes are AWS_IAM-authorised (operator only).
+    Value: !Sub https://${WfCredentialsHttpApi}.execute-api.${AWS::Region}.amazonaws.com
+    Export:
+      Name: !Sub wf-credentials-api-url-${Stage}

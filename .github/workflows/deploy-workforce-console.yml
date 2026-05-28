@@ -24,11 +24,6 @@ permissions:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    # Skip cleanly when AWS auth isn't wired up yet — first PR to land
-    # this workflow won't have secrets.AWS_ROLE_ARN set; the operator
-    # runs through workforce/infra/sam-web/README.md and populates it
-    # before flipping vars.WORKFORCE_DEPLOY_ENABLED to true.
-    if: vars.WORKFORCE_DEPLOY_ENABLED == 'true'
 
     steps:
       - uses: actions/checkout@v4
