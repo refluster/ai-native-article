@@ -241,12 +241,27 @@ Resources:
     Properties:
       StageName: !Ref Stage
       CorsConfiguration:
+        # Three trusted origins:
+        #   - kohuehara.xyz (the public site; also reads the agents catalogue
+        #     for the about page)
+        #   - workforce.kohuehara.xyz (the operator SPA — feed UI lives here)
+        #   - localhost:5173 (dev)
+        # Epic-011 Story 5 (#132): the feed `GET` endpoints rely on this
+        # CORS gate to limit browser access to the workforce origin. The
+        # threat model (PR #132 body) accepts hostname-guess access as the
+        # blast-radius envelope; the gate is a friction layer, not auth.
         AllowOrigins:
           - https://kohuehara.xyz
           - https://workforce.kohuehara.xyz
           - http://localhost:5173
-        AllowMethods: [GET, OPTIONS]
-        AllowHeaders: [content-type]
+        # PATCH added by Epic-011 Story 5 (#132) for the feed-hide route.
+        # PATCH /agents/{slug} (Epic-007) is also IAM-authed; it's called
+        # by `aws-vault` from a terminal today rather than the browser, but
+        # adding PATCH here keeps the CORS surface honest if the operator
+        # SPA later issues a PATCH from the browser via signed-SigV4.
+        AllowMethods: [GET, PATCH, OPTIONS]
+        # `authorization` header is required for SigV4-signed browser PATCHes.
+        AllowHeaders: [content-type, authorization]
       Auth:
         EnableIamAuthorizer: true
       Tags:
@@ -290,6 +305,15 @@ Resources:
               Condition:
                 StringEquals:
                   cloudwatch:namespace: Workforce/AgentsApi
+            # Epic-011 Story 5 (#132) — `GET /feed/{post_id}` hydrates
+            # post bodies from S3 (`posts/{slug}/{yyyy}/{mm}/{ulid}.md`).
+            # No write needed — the feed-post skill (Story 1) writes; the
+            # API only reads.
+            - Sid: AgentsApiPostBodyRead
+              Effect: Allow
+              Action: s3:GetObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/posts/*
       Events:
         ListAgents:
           Type: HttpApi
@@ -375,6 +399,37 @@ Resources:
           Properties:
             ApiId: !Ref WfAgentsHttpApi
             Path: /projects/{id+}/executions
+            Method: GET
+        # Epic-011 Story 5 (#132): workforce activity-feed read endpoints.
+        # GET endpoints are public (CORS gate admits `workforce.kohuehara.xyz`
+        # only); PATCH requires AWS_IAM (operator's `aws-vault` credentials)
+        # because it flips the `visibility=hidden` audit attribute via
+        # Story 4's `hidePost` helper. Threat model documented in PR #132.
+        ListFeed:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /feed
+            Method: GET
+        GetFeedPost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /feed/{post_id}
+            Method: GET
+        PatchFeedPost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /feed/{post_id}
+            Method: PATCH
+            Auth:
+              Authorizer: AWS_IAM
+        ListAgentPosts:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}/posts
             Method: GET
       Tags:
         workforce: !Ref Stage

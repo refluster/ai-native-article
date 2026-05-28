@@ -4,6 +4,7 @@
 //   GET    /agents/{slug}                   single agent
 //   GET    /agents/{slug}/deliverables      recent DELIV rows (paginated)
 //   GET    /agents/{slug}/projects          projects this agent is an active member of
+//   GET    /agents/{slug}/posts             per-agent activity feed (Epic-011 Story 5)
 //   PATCH  /agents/{slug}                   operational fields only (IAM-auth at API GW)
 //   DELETE /agents/{slug}                   soft delete -> archived=true (IAM-auth at API GW)
 //   GET    /skills                          list of skills (paginated, filterable)
@@ -12,17 +13,30 @@
 //   GET    /projects/{id+}                  single project META + member/exec summary
 //   GET    /projects/{id+}/members          active members (?include_revoked=true for audit)
 //   GET    /projects/{id+}/executions       ledger (paginated, ?from=&to=&status=&agent=&skill=)
+//   GET    /feed                            workforce activity feed, reverse-chrono (Epic-011 Story 5)
+//   GET    /feed/{post_id}                  single post + full body (Epic-011 Story 5)
+//   PATCH  /feed/{post_id}                  hide a post (IAM-auth at API GW; Epic-011 Story 5)
 //
 // See workforce/docs/epics/epic-007-agent-management-api.md (agents),
-// workforce/docs/epics/epic-008-skill-repository.md (skills), and
-// workforce/docs/epics/epic-010-project-trust-boundary.md §10 (projects)
-// for the source-of-truth split and the IAM-auth boundary.
+// workforce/docs/epics/epic-008-skill-repository.md (skills),
+// workforce/docs/epics/epic-010-project-trust-boundary.md §10 (projects),
+// and workforce/docs/epics/epic-011-agent-feed.md (feed) for the
+// source-of-truth split and the IAM-auth boundary.
 //
 // Per Epic-010 §10, `POST /projects` is intentionally NOT exposed: new
 // projects come from `workforce/projects/{id}/project.json` + a seed
 // step, mirroring Epic-007's "creates via API are deliberately not
 // exposed." Member-mutation routes (POST/DELETE) land with Story 6's
 // follow-up slice; this PR ships read endpoints only.
+//
+// Per Epic-011 §6 + Story 5 (#132), `POST /feed` is similarly NOT
+// exposed: posts originate from the runner only, never from the UI.
+// The feed `GET` endpoints are public on the CORS gate
+// (`workforce.kohuehara.xyz` only); `PATCH /feed/{post_id}` requires
+// AWS_IAM (operator's `aws-vault` credentials) — the threat model is
+// documented in PR #132 (workforce-internal; hostname-guess access is
+// the accepted blast radius; mitigated by Story 4's hide primitive +
+// Story 1's write-time guards).
 
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
 import {
@@ -50,6 +64,16 @@ import {
   CloudWatchClient,
   PutMetricDataCommand,
 } from "@aws-sdk/client-cloudwatch";
+import {
+  fetchPostBody,
+  getPost,
+  hidePost,
+  listAgentPosts,
+  listFeed,
+  toFeedPostApiView,
+  type FeedPostDetailView,
+  type PostKind,
+} from "../shared/post.js";
 
 const STAGE = process.env.STAGE ?? "dev";
 // One client per cold start. Metric emission is best-effort — failures
@@ -59,6 +83,7 @@ const cw = new CloudWatchClient({});
 
 const PAGE_SIZE_DEFAULT = 25;
 const PAGE_SIZE_MAX = 100;
+const POST_KINDS: readonly PostKind[] = ["reflection", "friction", "improvement", "observation"];
 
 const PATCHABLE_FIELDS: Array<keyof AgentOperational> = [
   "budget_monthly_usd_override",
@@ -85,12 +110,14 @@ export async function handler(
     // include slashes (e.g. `self/ren`). API Gateway HTTP API v2 maps
     // that to `pathParameters.id` regardless of slash count.
     const projectId = event.pathParameters?.id;
+    const postId = event.pathParameters?.post_id;
 
     if (routeKey === "GET /agents") return listAgents(event);
     if (routeKey === "GET /skills") return listSkills(event);
     if (routeKey === "GET /skills/{name}" && skillName) return getSkill(skillName);
     if (routeKey === "GET /agents/{slug}/deliverables" && slug) return listAgentDeliverables(slug, event);
     if (routeKey === "GET /agents/{slug}/projects" && slug) return listAgentProjects(slug);
+    if (routeKey === "GET /agents/{slug}/posts" && slug) return listAgentPostsRoute(slug, event);
     if (routeKey === "GET /agents/{slug}" && slug) return getAgent(slug);
     if (routeKey === "PATCH /agents/{slug}" && slug) return patchAgent(slug, event.body);
     if (routeKey === "DELETE /agents/{slug}" && slug) return deleteAgent(slug);
@@ -98,6 +125,12 @@ export async function handler(
     if (routeKey === "GET /projects/{id+}/members" && projectId) return listProjectMembers(projectId, event);
     if (routeKey === "GET /projects/{id+}/executions" && projectId) return listProjectExecutions(projectId, event);
     if (routeKey === "GET /projects/{id+}" && projectId) return getProject(projectId);
+    if (routeKey === "GET /feed") return listFeedRoute(event);
+    if (routeKey === "GET /feed/{post_id}" && postId) return getFeedPostRoute(postId, event);
+    // `return await` (not bare `return`) is load-bearing: bare `return Promise` lets the
+    // rejection escape the outer try/catch (Promise flattening on async returns). The
+    // hide_helper_not_wired throw is what relies on this for the 500-mapping contract.
+    if (routeKey === "PATCH /feed/{post_id}" && postId) return await patchFeedPostRoute(postId, event);
 
     return reply(404, { error: "route_not_found", routeKey, path, method });
   } catch (err) {
@@ -490,6 +523,194 @@ async function getLastExecutionAt(rawId: string): Promise<string | undefined> {
     if (latest === undefined || r.started_at > latest) latest = r.started_at;
   }
   return latest;
+}
+
+// ----- Feed (Epic-011 Story 5 — #132) -----
+//
+// Four endpoints layered onto wf-agents-api:
+//   GET   /feed                 reverse-chrono across all agents
+//   GET   /feed/{post_id}       one post + full body (S3 hydrated when
+//                               the body exceeds the inline `body_preview`)
+//   GET   /agents/{slug}/posts  per-agent stream — same shape as /feed
+//                               but partition-scoped
+//   PATCH /feed/{post_id}       operator-only hide; requires AWS_IAM at
+//                               API GW. Body is `{visibility: "hidden",
+//                               reason: string}`; empty `reason` → 400.
+//
+// Auth posture (per Dario B3 closure on PR #123 + Epic-010 §10 pattern):
+//   - GET endpoints: public on a CORS gate that admits only the
+//     `workforce.kohuehara.xyz` origin. The CORS allowlist is enforced at
+//     API GW (CorsConfiguration.AllowOrigins, set in the SAM template).
+//   - PATCH /feed/{post_id}: AWS_IAM authorizer (operator's `aws-vault`
+//     credentials). Signature validation happens at API GW before the
+//     Lambda is invoked, so the handler can assume an authenticated
+//     principal when this route fires.
+//
+// Pagination cursor: opaque base64url-encoded DDB LastEvaluatedKey. Same
+// shape as `scanPrefix` / projects routes — see shared/ddb.ts.
+//
+// Hide-helper sequencing (per task brief): the PATCH route calls
+// `hidePost(...)` from shared/post.ts. That helper is a stub in this PR
+// (throws `hide_helper_not_wired`) — Story 4 (#131) fills it in. The
+// rejection test below locks the stub so the route does not silently
+// no-op after Story 4 lands a different signature.
+
+function parsePostKindFilter(qs: Record<string, string | undefined>): PostKind | undefined {
+  if (!qs.kind) return undefined;
+  return POST_KINDS.includes(qs.kind as PostKind) ? (qs.kind as PostKind) : undefined;
+}
+
+function parsePageSize(qs: Record<string, string | undefined>): number {
+  return Math.min(
+    Math.max(parseInt(qs.page_size ?? `${PAGE_SIZE_DEFAULT}`, 10) || PAGE_SIZE_DEFAULT, 1),
+    PAGE_SIZE_MAX,
+  );
+}
+
+async function listFeedRoute(
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const qs = event.queryStringParameters ?? {};
+  const page = await listFeed({
+    cursor: qs.cursor,
+    pageSize: parsePageSize(qs),
+    kind: parsePostKindFilter(qs),
+    agentSlug: qs.agent_slug,
+    from: qs.from,
+    to: qs.to,
+    includeHidden: qs.include_hidden === "true",
+  });
+  return reply(200, {
+    posts: page.items.map(toFeedPostApiView),
+    cursor: page.cursor,
+  });
+}
+
+async function listAgentPostsRoute(
+  slug: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const qs = event.queryStringParameters ?? {};
+  const page = await listAgentPosts({
+    agentSlug: slug,
+    cursor: qs.cursor,
+    pageSize: parsePageSize(qs),
+    kind: parsePostKindFilter(qs),
+    from: qs.from,
+    to: qs.to,
+    includeHidden: qs.include_hidden === "true",
+  });
+  return reply(200, {
+    posts: page.items.map(toFeedPostApiView),
+    cursor: page.cursor,
+  });
+}
+
+async function getFeedPostRoute(
+  postId: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  // `GET /feed/{post_id}` doesn't carry agent_slug in the URL — the SPA
+  // hydrates from the list response which already knows the slug, so the
+  // detail endpoint accepts it as a query string. (Alternative shapes
+  // considered: a global GSI on `gsi4pk=POST#{ulid}` — rejected as a
+  // second index for a low-frequency access pattern; a `/agents/{slug}
+  // /posts/{post_id}` mirror — rejected as a duplicate of the list shape
+  // for a detail view. The query-string slug keeps the URL flat and
+  // matches Epic-011 §6's "/feed/{post_id}" canonical surface.)
+  const qs = event.queryStringParameters ?? {};
+  const slug = qs.agent_slug;
+  if (!slug) {
+    return reply(400, {
+      error: "missing_agent_slug",
+      detail: "GET /feed/{post_id} requires ?agent_slug= because POST rows are partitioned by AGENT#",
+    });
+  }
+  const row = await getPost(slug, postId);
+  if (!row) return reply(404, { error: "not_found", post_id: postId, agent_slug: slug });
+  // Hidden-post handling on detail: surface the row but include the
+  // visibility badge so the operator UI knows. The default list endpoints
+  // already filter hidden out — the detail path preserves the audit trail
+  // (Epic-011 Story 4 / #131 hide primitive is non-destructive).
+  const view = toFeedPostApiView(row);
+  let body: string;
+  // Skip the S3 round-trip when the entire body fit into body_preview
+  // (≤320 chars, per data-model.md). Most posts at 280–600 chars do
+  // NOT fit, so the round-trip is the common case; cheap-path the rest.
+  if (row.body_preview.length < 320) {
+    body = row.body_preview;
+  } else {
+    body = await fetchPostBody(row.body_ref);
+  }
+  const detail: FeedPostDetailView = { ...view, body };
+  return reply(200, detail);
+}
+
+async function patchFeedPostRoute(
+  postId: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  // AWS_IAM signature validation happens at API GW (Auth.Authorizer:
+  // AWS_IAM in the SAM template). If the request reaches this handler,
+  // the signature is valid; the principal is in `requestContext.authorizer.iam`.
+  const qs = event.queryStringParameters ?? {};
+  const slug = qs.agent_slug;
+  if (!slug) {
+    return reply(400, {
+      error: "missing_agent_slug",
+      detail: "PATCH /feed/{post_id} requires ?agent_slug= because POST rows are partitioned by AGENT#",
+    });
+  }
+
+  if (!event.body) return reply(400, { error: "missing_body" });
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(event.body) as Record<string, unknown>;
+  } catch {
+    return reply(400, { error: "invalid_json" });
+  }
+
+  // v1 only supports `visibility=hidden` as the patch payload. Any other
+  // shape is rejected to keep the audit trail simple.
+  if (parsed.visibility !== "hidden") {
+    return reply(400, {
+      error: "unsupported_visibility",
+      detail: "PATCH /feed/{post_id} v1 only supports visibility=\"hidden\".",
+    });
+  }
+
+  const reason = parsed.reason;
+  if (typeof reason !== "string" || reason.trim() === "") {
+    return reply(400, {
+      error: "missing_reason",
+      detail: "PATCH /feed/{post_id} requires a non-empty `reason` field — it is stored on the audit EXEC row.",
+    });
+  }
+
+  // Resolve the operator principal. API GW's IAM authorizer puts the
+  // signing identity under requestContext.authorizer.iam — we surface
+  // the user ARN's tail as the operator slug for the audit row. Anything
+  // missing means the AWS_IAM gate let an unauthenticated request
+  // through, which is a misconfig — fall back to `_operator` rather than
+  // throwing (W-4 is preserved by the hide_helper_not_wired throw below).
+  type IamCtx = { userArn?: string; userId?: string };
+  const iamRaw = (event.requestContext as unknown as { authorizer?: { iam?: IamCtx } }).authorizer?.iam;
+  const operator = iamRaw?.userArn
+    ? iamRaw.userArn.split("/").pop() ?? "_operator"
+    : "_operator";
+
+  // Stubbed; Story 4 (#131) fills in `hidePost`. The throw below makes
+  // the sequencing visible to callers — until Story 4 lands, the route
+  // surfaces a 500 with `hide_helper_not_wired`. After Story 4, the throw
+  // disappears and the route returns 200 with the updated row.
+  await hidePost({
+    agent_slug: slug,
+    post_id: postId,
+    reason: reason.trim(),
+    operator,
+  });
+
+  return reply(200, { post_id: postId, agent_slug: slug, visibility: "hidden" });
 }
 
 function reply(statusCode: number, body: unknown): APIGatewayProxyResultV2 {
