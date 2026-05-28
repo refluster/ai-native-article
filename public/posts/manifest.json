@@ -90,6 +90,16 @@
     "sourceUrls": "https://a16z.com/forward-deployed-job-titles/, https://siliconangle.com/2026/03/27/anthropic-launch-new-claude-mythos-model-advanced-reasoning-features/, https://martinfowler.com/articles/on-the-loop.html"
   },
   {
+    "slug": "f149902f32fa",
+    "title": "「会社を解雇する」時代の論理——レイオフ×AI採用急増×Macrohardが指し示す、組織設計の根本的転換",
+    "type": "analysis",
+    "category": "AI Replacement × Org Transformation",
+    "date": "2026-03-28",
+    "abstract": "2026年Q1に45,000人が解雇される一方でAI求人が92%増という「同時進行」は、コスト削減ではなく組織設計の哲学の転換だ。Macrohardはその終着点——「人間が運営する会社」という概念そのものへの挑戦。",
+    "image": "/posts/images/f149902f32fa.jpg",
+    "sourceUrls": "https://techcrunch.com/2026/01/layoffs-ai-shift/, https://www.businessinsider.com/ai-layoffs-corporate-transparency-2026, https://www.eweek.com/news/elon-musk-macrohard-ai-software-companies/"
+  },
+  {
     "slug": "c3de4fa6837b",
     "title": "解説：Fujitsu's AI Resilience Platform",
     "type": "explanation",
