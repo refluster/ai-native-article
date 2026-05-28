@@ -66,6 +66,34 @@ export async function writeDeliverableArtefact(
 }
 
 /**
+ * Write a feed-post body (Epic-011 Story 1 / #128) to S3 under the canonical
+ * `posts/{slug}/{yyyy}/{mm}/{post_id}.md` key. Date-partitioned because the
+ * feed grows linearly forever and we want monthly drill-down for ad-hoc
+ * audit / replay. The DDB POST row stores both the inline `body_preview`
+ * (≤320 chars) and the S3 `body_ref` to this object.
+ */
+export async function writeFeedPostBody(
+  slug: string,
+  postedAtIso: string,
+  postId: string,
+  body: string,
+): Promise<string> {
+  const d = new Date(postedAtIso);
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const key = `posts/${slug}/${yyyy}/${mm}/${postId}.md`;
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+      Body: body,
+      ContentType: "text/markdown; charset=utf-8",
+    }),
+  );
+  return key;
+}
+
+/**
  * Write a RUN's output bytes to S3 under the canonical
  * runs/{slug}/{run_id}/output.{ext} key. Used by deterministic handlers
  * and by the LLM path as a uniform audit-trail backup.

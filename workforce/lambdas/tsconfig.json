@@ -16,6 +16,6 @@
     "isolatedModules": true,
     "noEmit": true
   },
-  "include": ["**/*.ts"],
+  "include": ["**/*.ts", "../skills/**/*.ts"],
   "exclude": ["node_modules", "**/dist", ".aws-sam"]
 }

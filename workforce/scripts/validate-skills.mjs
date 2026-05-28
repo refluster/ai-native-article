@@ -291,24 +291,39 @@ for (const name of skillDirs) {
     }
   }
 
-  // ── executor=deterministic requires a sibling handler.ts ─────────────────
-  // The skill bundle is self-contained: SKILL.md + meta.json + handler.ts.
-  // The agent-runner picks up the handler via the build-time generated
-  // skill-registry-generated.ts (workforce/scripts/build-skill-registry.mjs).
+  // ── handler.ts presence rules per executor ───────────────────────────────
+  // deterministic         : handler.ts REQUIRED — registered via
+  //                         skill-registry-generated.ts so the runner
+  //                         can dispatch it (auto-registered, no edits
+  //                         to lambdas/ needed).
+  // llm-prose             : handler.ts OPTIONAL — most llm-prose skills
+  //                         use the runner's generic runLlmProse path,
+  //                         but Epic-011 (#128) introduced the pattern
+  //                         where a skill needs custom pre-/post-LLM
+  //                         processing (recall-packet assembly, sentinel-
+  //                         skip semantics, structured-tail parsing,
+  //                         POST-row write) and bundles those alongside
+  //                         the persona-facing SKILL.md. The handler is
+  //                         consumed directly by callers (not via the
+  //                         registry) — see workforce/skills/feed-post/
+  //                         handler.ts. The registry build script
+  //                         (build-skill-registry.mjs) ignores llm-prose
+  //                         handlers, so adding one does not affect the
+  //                         deterministic dispatch table.
+  // claude-code-routine   : handler.ts FORBIDDEN — these skills are
+  //                         interpreted by the runner; the routine spec
+  //                         is a doc path, not TS code.
+  const handlerTs = join(dir, "handler.ts");
   if (meta.executor === "deterministic") {
-    const handlerTs = join(dir, "handler.ts");
     if (!existsSync(handlerTs)) {
       v("J11-deterministic-handler-missing", dir, "executor=deterministic requires handler.ts in the skill folder");
     }
-  } else {
-    // llm-prose / claude-code-routine skills do not bundle a TS handler —
-    // the runner interprets them. Forbid an orphan handler.ts so the
-    // executor field stays the single source of truth.
-    const handlerTs = join(dir, "handler.ts");
+  } else if (meta.executor === "claude-code-routine") {
     if (existsSync(handlerTs)) {
-      v("J11-handler-orphan", handlerTs, `executor=${meta.executor} must not have a handler.ts (only executor=deterministic does)`);
+      v("J11-handler-orphan", handlerTs, `executor=${meta.executor} must not have a handler.ts (routine specs are docs, not code)`);
     }
   }
+  // llm-prose: handler.ts is allowed but not required. No violation either way.
 }
 
 if (violations.length === 0) {
