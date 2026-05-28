@@ -94,6 +94,13 @@ Resources:
           AttributeType: S
         - AttributeName: gsi2sk
           AttributeType: S
+        # GSI3 — workforce activity feed (Epic-011 Story 1, #128).
+        # gsi3pk="FEED" / gsi3sk=posted_at. Single global partition; see
+        # workforce/docs/data-model.md "GSI3 — workforce activity feed".
+        - AttributeName: gsi3pk
+          AttributeType: S
+        - AttributeName: gsi3sk
+          AttributeType: S
       KeySchema:
         - AttributeName: pk
           KeyType: HASH
@@ -113,6 +120,23 @@ Resources:
             - AttributeName: gsi2pk
               KeyType: HASH
             - AttributeName: gsi2sk
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        # GSI3 — global workforce activity feed.
+        # Added by Epic-011 Story 1 (#128). Deploy-time risk: adding a GSI
+        # to an existing populated table triggers an online index build —
+        # `IndexStatus` flips to CREATING for the duration. The window is
+        # identifiable in CloudTrail by isolating this change in its own
+        # commit (per #128 AC). Current `wf-table-dev` row count is small
+        # (~ low thousands), so the build completes in minutes; at the
+        # Epic-010 EXEC-ledger growth rate, schedule subsequent GSI adds
+        # before the table is at scale.
+        - IndexName: GSI3
+          KeySchema:
+            - AttributeName: gsi3pk
+              KeyType: HASH
+            - AttributeName: gsi3sk
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
