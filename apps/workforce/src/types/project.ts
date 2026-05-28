@@ -71,6 +71,43 @@ export interface AgentMembership {
   joined_at: string;
 }
 
+// ─── Credentials (issue 158) ───────────────────────────────────────────
+//
+// Mirrors the credentials-api response shapes. Backend definitions live
+// at workforce/lambdas/credentials-api/handler.ts and
+// workforce/lambdas/agents-api/handler.ts (CredentialMetadataView for
+// the LIST endpoint). Keep in sync when the API shapes evolve.
+
+/** One row in `GET /projects/{id}/credentials` (agents-api LIST). */
+export interface CredentialMetadata {
+  credential_type: string;
+  name: string;
+  secret_arn: string;
+  last_changed_at?: string;
+  last_rotated_at?: string;
+  created_date?: string;
+}
+
+/** Response shape from `PUT /projects/{slug}/credentials/{type}`. */
+export interface PutCredentialResponse {
+  project_id: string;
+  credential_type: string;
+  name: string;
+  secret_arn: string;
+  outcome: 'created' | 'rotated';
+  last_changed_at: string;
+}
+
+/** Response shape from `DELETE /projects/{slug}/credentials/{type}`. */
+export interface DeleteCredentialResponse {
+  project_id: string;
+  credential_type: string;
+  name: string;
+  secret_arn: string;
+  deletion_date: string;
+  recovery_window_days: number;
+}
+
 /** Static fallback shape served from /workforce-projects-mock.json
  *  when the live API isn't wired (epic-010 §200). */
 export interface WorkforceProjectsMock {
