@@ -169,12 +169,15 @@ export async function queryBySkPrefix<T extends object>(
   return (res.Items ?? []) as T[];
 }
 
-export type GsiName = "GSI1" | "GSI2";
+export type GsiName = "GSI1" | "GSI2" | "GSI3";
 
-/** Per-GSI attribute names. Adding GSI3+ is a one-line addition here. */
+/** Per-GSI attribute names. Adding GSI3+ is a one-line addition here.
+ *  GSI3 added by Epic-011 Story 1 (#128) for the workforce activity feed
+ *  (gsi3pk="FEED" / gsi3sk=posted_at). Story 5 (#132) queries it. */
 const GSI_ATTRS: Record<GsiName, { pk: string; sk: string }> = {
   GSI1: { pk: "gsi1pk", sk: "gsi1sk" },
   GSI2: { pk: "gsi2pk", sk: "gsi2sk" },
+  GSI3: { pk: "gsi3pk", sk: "gsi3sk" },
 };
 
 export interface GsiQuery {
@@ -243,4 +246,115 @@ export async function queryByGsi<T extends object>(
     }),
   );
   return (res.Items ?? []) as T[];
+}
+
+export interface PagedResult<T> {
+  items: T[];
+  /** Opaque base64url cursor; undefined when the result set is exhausted. */
+  cursor?: string;
+}
+
+/**
+ * Paginated variant of `queryByGsi`. Returns the same items plus an opaque
+ * base64url-encoded cursor whenever the DDB query was capped by `limit`
+ * (i.e. `LastEvaluatedKey` was set). Pass the cursor back in subsequent
+ * calls via `cursor` to resume.
+ *
+ * Cursor format matches `scanPrefix`'s — base64url(JSON(LastEvaluatedKey)).
+ * Inheriting that shape keeps the encode/decode logic consistent across
+ * the read API and lets cursors round-trip through the API layer without
+ * any per-endpoint serialisation glue.
+ *
+ * Added by Epic-011 Story 5 (#132) for the workforce activity feed
+ * (`GET /feed`, `GET /agents/{slug}/posts`) which scan reverse-chrono
+ * partitions and must page past arbitrary corpus sizes.
+ */
+export async function queryByGsiPaged<T extends object>(
+  indexName: GsiName,
+  partitionKey: string,
+  query: GsiQuery & { cursor?: string } = {},
+): Promise<PagedResult<T>> {
+  const { pk: pkAttr, sk: skAttr } = GSI_ATTRS[indexName];
+
+  let keyConditionExpression = "#pk = :pk";
+  const exprNames: Record<string, string> = { "#pk": pkAttr };
+  const exprValues: Record<string, unknown> = { ":pk": partitionKey };
+
+  if (query.skPrefix) {
+    keyConditionExpression += " AND begins_with(#sk, :skp)";
+    exprNames["#sk"] = skAttr;
+    exprValues[":skp"] = query.skPrefix;
+  } else if (query.skGte !== undefined && query.skLte !== undefined) {
+    keyConditionExpression += " AND #sk BETWEEN :from AND :to";
+    exprNames["#sk"] = skAttr;
+    exprValues[":from"] = query.skGte;
+    exprValues[":to"] = query.skLte;
+  } else if (query.skGte !== undefined) {
+    keyConditionExpression += " AND #sk >= :from";
+    exprNames["#sk"] = skAttr;
+    exprValues[":from"] = query.skGte;
+  } else if (query.skLte !== undefined) {
+    keyConditionExpression += " AND #sk <= :to";
+    exprNames["#sk"] = skAttr;
+    exprValues[":to"] = query.skLte;
+  }
+
+  const exclusiveStartKey = query.cursor
+    ? (JSON.parse(Buffer.from(query.cursor, "base64url").toString("utf8")) as Record<string, unknown>)
+    : undefined;
+
+  const res = await ddb.send(
+    new QueryCommand({
+      TableName: tableName,
+      IndexName: indexName,
+      KeyConditionExpression: keyConditionExpression,
+      ExpressionAttributeNames: exprNames,
+      ExpressionAttributeValues: exprValues,
+      Limit: query.limit ?? 100,
+      ScanIndexForward: query.scanIndexForward ?? true,
+      ExclusiveStartKey: exclusiveStartKey,
+    }),
+  );
+
+  const next = res.LastEvaluatedKey
+    ? Buffer.from(JSON.stringify(res.LastEvaluatedKey)).toString("base64url")
+    : undefined;
+
+  return { items: (res.Items ?? []) as T[], cursor: next };
+}
+
+/**
+ * Paginated variant of `queryBySkPrefix`. Same opaque base64url cursor
+ * shape as `queryByGsiPaged` + `scanPrefix`. Added by Epic-011 Story 5
+ * (#132) for `GET /agents/{slug}/posts` — single-partition reverse-chrono
+ * paging without the GSI3 hop.
+ */
+export async function queryBySkPrefixPaged<T extends object>(
+  pk: string,
+  skPrefix: string,
+  limit = 100,
+  cursor?: string,
+  scanIndexForward = true,
+): Promise<PagedResult<T>> {
+  const exclusiveStartKey = cursor
+    ? (JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Record<string, unknown>)
+    : undefined;
+
+  const res = await ddb.send(
+    new QueryCommand({
+      TableName: tableName,
+      KeyConditionExpression: "#pk = :pk AND begins_with(#sk, :skp)",
+      ExpressionAttributeNames: { "#pk": "pk", "#sk": "sk" },
+      ExpressionAttributeValues: { ":pk": pk, ":skp": skPrefix },
+      Limit: limit,
+      ScanIndexForward: scanIndexForward,
+      ExclusiveStartKey: exclusiveStartKey,
+    }),
+  );
+
+  const next = res.LastEvaluatedKey
+    ? Buffer.from(JSON.stringify(res.LastEvaluatedKey)).toString("base64url")
+    : undefined;
+
+  return { items: (res.Items ?? []) as T[], cursor: next };
 }
