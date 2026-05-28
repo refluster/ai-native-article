@@ -1166,11 +1166,25 @@ Outputs:
     Value: !Sub https://${WfAgentsHttpApi}.execute-api.${AWS::Region}.amazonaws.com
     Export:
       Name: !Sub wf-agents-api-url-${Stage}
+  AgentsApiId:
+    Description: ID of the agents HTTP API. Consumed by sam-web's
+      Identity Pool operator role (Issue #158 PR-α) to scope
+      `execute-api:Invoke` to this API only.
+    Value: !Ref WfAgentsHttpApi
+    Export:
+      Name: !Sub wf-agents-api-id-${Stage}
   CredentialsApiUrl:
     Description: Base URL of the credentials write HTTP API. All routes are AWS_IAM-authorised (operator only).
     Value: !Sub https://${WfCredentialsHttpApi}.execute-api.${AWS::Region}.amazonaws.com
     Export:
       Name: !Sub wf-credentials-api-url-${Stage}
+  CredentialsApiId:
+    Description: ID of the credentials HTTP API. Consumed by sam-web's
+      Identity Pool operator role (Issue #158 PR-α) to scope
+      `execute-api:Invoke` to this API only.
+    Value: !Ref WfCredentialsHttpApi
+    Export:
+      Name: !Sub wf-credentials-api-id-${Stage}
   Epic010DashboardName:
     Description: CloudWatch Dashboard surfacing every Epic-010 metric (FU-NEW-A).
     Value: !Ref WfEpic010Dashboard

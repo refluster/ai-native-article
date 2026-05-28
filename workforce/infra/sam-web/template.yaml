@@ -260,6 +260,99 @@ Resources:
       Principal: cognito-idp.amazonaws.com
       SourceAccount: !Ref AWS::AccountId
 
+  # ─── Issue #158 PR-α: Cognito Identity Pool + operator IAM role ──────────
+  #
+  # The SPA holds an OIDC ID token from the User Pool above. The
+  # AWS_IAM-authorised API Gateway routes (PATCH/DELETE on agents-api,
+  # all routes on credentials-api) need SigV4 + temporary AWS
+  # credentials, NOT a Cognito JWT. The Identity Pool federates the
+  # User Pool and mints those credentials on demand:
+  #
+  #   1. SPA signs in via Cognito Hosted UI (existing flow).
+  #   2. SPA calls cognito-identity:GetId with the User Pool's ID token.
+  #   3. SPA calls cognito-identity:GetCredentialsForIdentity to get
+  #      ~1h AWS access key / secret / session token.
+  #   4. SPA wraps fetch() with SigV4 signing (aws4fetch) to call any
+  #      AWS_IAM-protected route.
+  #
+  # The operator role is scoped to `execute-api:Invoke` on the two
+  # workforce HTTP APIs only — a stolen Cognito session cannot, e.g.,
+  # write to S3 or DynamoDB directly. ManageDevices / GetCallerIdentity
+  # are NOT granted (the role's identity is implied by the IdentityId).
+  #
+  # AllowUnauthenticatedIdentities is FALSE — the pool ONLY federates
+  # authenticated User Pool users. Operator must complete the Hosted UI
+  # flow first; an anonymous SPA visitor cannot obtain creds.
+  WfWorkforceIdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties:
+      IdentityPoolName: wf-workforce-identity-pool-prod
+      AllowUnauthenticatedIdentities: false
+      CognitoIdentityProviders:
+        - ClientId: !Ref WfUserPoolClient
+          ProviderName: !GetAtt WfUserPool.ProviderName
+          # ServerSideTokenCheck rejects tokens that have been revoked
+          # by Cognito (e.g. operator deleted the federated session)
+          # rather than relying on JWT expiry alone.
+          ServerSideTokenCheck: true
+
+  # Trust policy: the role is assumable only by the WfWorkforceIdentityPool
+  # for authenticated users. The aud claim is the IdentityPool id so a
+  # different identity pool cannot assume this role even with valid
+  # Cognito tokens.
+  WfWorkforceOperatorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: wf-workforce-operator-role-prod
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                "cognito-identity.amazonaws.com:aud": !Ref WfWorkforceIdentityPool
+              ForAnyValue:StringLike:
+                "cognito-identity.amazonaws.com:amr": authenticated
+      Policies:
+        - PolicyName: workforce-operator-api-invoke
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Operator can invoke any route on the two workforce HTTP
+              # APIs. Per-route auth (AWS_IAM vs public) is decided by
+              # the API Gateway config, not by IAM granularity — this
+              # role merely grants execution capability.
+              #
+              # The two API IDs are imported from the data-plane stack
+              # so a stack-replacement in either direction doesn't
+              # silently break the auth chain.
+              - Sid: WorkforceCredentialsApiInvoke
+                Effect: Allow
+                Action: execute-api:Invoke
+                Resource:
+                  - !Sub
+                    - "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiId}/*/*"
+                    - ApiId:
+                        Fn::ImportValue: !Sub "wf-credentials-api-id-prod"
+              - Sid: WorkforceAgentsApiInvoke
+                Effect: Allow
+                Action: execute-api:Invoke
+                Resource:
+                  - !Sub
+                    - "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiId}/*/*"
+                    - ApiId:
+                        Fn::ImportValue: !Sub "wf-agents-api-id-prod"
+
+  WfWorkforceIdentityPoolRoleAttachment:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties:
+      IdentityPoolId: !Ref WfWorkforceIdentityPool
+      Roles:
+        authenticated: !GetAtt WfWorkforceOperatorRole.Arn
+
 Outputs:
   WebBucketName:
     Description: S3 bucket where the SPA dist/ is synced.
@@ -308,3 +401,21 @@ Outputs:
       Google OAuth client's "Authorised redirect URIs" with /oauth2/idpresponse
       appended.
     Value: !Sub "https://${WfUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com"
+
+  WorkforceIdentityPoolId:
+    Description: Cognito Identity Pool ID (Issue #158 PR-α). The SPA
+      exchanges the User Pool's OIDC ID token for temporary AWS
+      credentials at this pool; the credentials assume
+      WfWorkforceOperatorRole and SigV4-sign API Gateway calls. Pass to
+      the SPA build as VITE_COGNITO_IDENTITY_POOL_ID.
+    Value: !Ref WfWorkforceIdentityPool
+    Export:
+      Name: !Sub "${AWS::StackName}-WorkforceIdentityPoolId"
+
+  WorkforceOperatorRoleArn:
+    Description: IAM role assumed by authenticated Identity Pool
+      identities. Visibility for the operator runbook only; the SPA
+      never needs to know this ARN (the Identity Pool selects the role).
+    Value: !GetAtt WfWorkforceOperatorRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-WorkforceOperatorRoleArn"
