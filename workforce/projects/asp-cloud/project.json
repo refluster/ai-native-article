@@ -1,0 +1,15 @@
+{
+  "id": "asp-cloud",
+  "name": "ASP Cloud",
+  "owner_agent": "nadia",
+  "github": {
+    "owner": "PSVL",
+    "repo": "asp-cloud"
+  },
+  "governance_docs": ["AGENTS.md"],
+  "members": ["nadia", "dario", "ren", "aoi"],
+  "credential_types": ["github.token"],
+  "status": "active",
+  "created_at": "2026-05-27",
+  "note": "First external project — validates the multi-project pr-route / pr-review path. Nadia owns; Dario / Ren / Aoi reviewer lenses."
+}

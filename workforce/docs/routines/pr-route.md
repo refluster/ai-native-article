@@ -153,6 +153,33 @@ For 🔴: state the reason for escalation explicitly; tag the operator. Do NOT a
 
 Maya holds this binding today and is the canonical router. But "PR routing" is a function, not a person. If Maya is unavailable / overloaded / on leave, Dario (or any agent with the binding) can route. The skill spec doesn't care which persona holds it — only that the holder applies their `config.nomination_rules`.
 
+## Cross-project mode (Epic-010)
+
+The skill is **target-repo aware** when invoked with an explicit `(project_id, pr_url)` pair. The invoking persona's binding declares `requires: ["github.token"]`; the runner resolves the credential per [Epic-010 §5](../epics/epic-010-project-trust-boundary.md#5-type-keyed-credential-resolution) — `wf/projects/{project_id}/github.token`, not the global `wf/github`. The same skill spec covers both `refluster/ai-native-article` (the workforce's own repo, `PROJECT#kohuehara-blog` once seeded) and any external project registered under [`workforce/projects/`](../../projects/README.md).
+
+What changes per project:
+
+- **`(owner, repo)`** — parsed from `pr_url` AND cross-checked against the resolved `PROJECT#{project_id}/META.github` row. Mismatch is a runtime throw — the operator named the wrong project for this PR.
+- **Governance references** — `config.nomination_rules[].trigger` clauses that today reference `workforce/lambdas/` or `workforce/docs/governance.md` apply *literally* against the workforce's self project. For an external project, the router translates these to the target repo's analogues per `PROJECT#{id}/META.governance_docs` (e.g. `AGENTS.md`, `CONTRIBUTING.md`). If `governance_docs` is empty, the router falls back to the lens's structural triggers only (file-path patterns), not the doc-cited triggers.
+- **Reviewer membership** — every nominated persona MUST be in the project's `members[]`. A nomination that names a non-member persona throws (cross-project denial per [Epic-010 §7](../epics/epic-010-project-trust-boundary.md#7-execution-ledger--project-owned-agent-queryable)) — the project's seed file is incomplete.
+- **Comment posting** — `mcp__github__add_issue_comment` (today's tool) is replaced at handler time by a REST POST using the project-scoped PAT. The comment body shape is unchanged.
+
+What stays the same:
+
+- The two modes (Routing / Verdict) and the mode-decision logic.
+- The router comment + verdict comment shapes (the templates above).
+- The cycle counter semantics; cycle cap.
+- W-5 (agents never gate merges).
+- The persona's voice and `config.nomination_rules`.
+
+Operator invocation:
+
+> {Router persona}, project `{project_id}` の PR `{pr_url}` を route。
+
+The runner resolves `(project_id, pr_url)` at the top of dispatch, validates the operator's project membership, injects the `github.token` credential into the sealed bag, and invokes the persona's routine with the project_id in scope. `appendExecution` records `PROJECT#{project_id}/EXEC#{ulid}` for audit.
+
+When `project_id` is omitted, the runner defaults to the workforce's own self project — preserving today's invocation shape against `refluster/ai-native-article`.
+
 ## Related
 
 - [pr-review.md](pr-review.md) — the reviewer skill this routine dispatches.
