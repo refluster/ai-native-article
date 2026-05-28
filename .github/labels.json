@@ -1,0 +1,44 @@
+{
+  "$schema": "Canonical label set for refluster/ai-native-article. See docs/issue-labeling.md for taxonomy and decision flow. Reconciled to GitHub by scripts/sync-labels.mjs.",
+  "labels": [
+    { "name": "project:article",   "color": "1D76DB", "description": "Article pipeline (kohuehara.xyz blog). Mandatory project axis." },
+    { "name": "project:workforce", "color": "5319E7", "description": "Workforce subsystem (workforce.kohuehara.xyz). Mandatory project axis." },
+
+    { "name": "layer:L0", "color": "B60205", "description": "Touches an L0 invariant (C-1..C-4 or W-1..W-5). Operator-only amendments." },
+    { "name": "layer:L1", "color": "D93F0B", "description": "Touches an L1 doc (governance/architecture/data-model/naming/azure-budget/DESIGN/GROWTH/PIPELINE)." },
+    { "name": "layer:L2", "color": "FBCA04", "description": "Touches a mechanical guard (R-1..R-9 / R-N1..R-N8), runtime throw, lint, or CI check." },
+    { "name": "layer:L3", "color": "2EA043", "description": "Operational: runbook, skill SKILL.md, post-deploy verification, scripts/." },
+
+    { "name": "type:bug",     "color": "D73A4A", "description": "Something is broken. Live invariant violation, regression, or incident follow-up." },
+    { "name": "type:feature", "color": "0366D6", "description": "New capability, endpoint, skill, or page." },
+    { "name": "type:chore",   "color": "CFD3D7", "description": "Refactor, dependency bump, cleanup, naming change, doc reorg." },
+    { "name": "type:tracker", "color": "7057FF", "description": "Index issue that decomposes into sub-issues (epic tracker, RFC rollout)." },
+    { "name": "type:ops",     "color": "006B75", "description": "Operational: post-deploy verification, observation window, Status flip." },
+
+    { "name": "area:gas",            "color": "BFDADC", "description": "Touches gas/src/Code.gs or the Apps Script deployment." },
+    { "name": "area:spa",            "color": "C5DEF5", "description": "Touches the React SPA (src/, apps/workforce/src/, template/)." },
+    { "name": "area:backend",        "color": "BFD4F2", "description": "Touches workforce Lambdas, DDB, S3, or infra/sam/." },
+    { "name": "area:content",        "color": "FEF2C0", "description": "Article content quality, Notion DB schema, generated prose." },
+    { "name": "area:infra",          "color": "EEEEEE", "description": "CI workflows, deploy keys, environment config, CloudWatch." },
+    { "name": "area:docs",           "color": "C2E0C6", "description": "Documentation: governance, runbooks, design notes, READMEs." },
+    { "name": "area:design-tokens",  "color": "F9D0C4", "description": "tailwind.config.ts, design-token lint, visual primitives." },
+
+    { "name": "epic-010", "color": "0052CC", "description": "Epic-010 — Project as trust boundary (workforce)." },
+    { "name": "epic-011", "color": "0052CC", "description": "Epic-011 — Workforce activity feed (LinkedIn-style)." },
+
+    { "name": "role:engineering",   "color": "1D76DB", "description": "Driven by an engineering persona." },
+    { "name": "role:architecture",  "color": "5319E7", "description": "Driven by an architecture persona." },
+    { "name": "role:product",       "color": "0E8A16", "description": "Driven by a product persona." },
+    { "name": "role:design",        "color": "D93F0B", "description": "Driven by a design persona." },
+
+    { "name": "wf:ready",       "color": "0E8A16", "description": "Pickup-ready: dependencies clear, body complete." },
+    { "name": "wf:in-progress", "color": "FBCA04", "description": "Active work in flight. Has an assignee or open PR." },
+    { "name": "wf:blocked",     "color": "B60205", "description": "Blocked on an external dep or another issue. Blocker named in body." },
+
+    { "name": "priority:p0", "color": "B60205", "description": "Live invariant violation in production (C-1/W-1/etc.). Drop everything." },
+    { "name": "priority:p1", "color": "D93F0B", "description": "Blocks an in-flight epic or the live site for non-invariant reasons." }
+  ],
+  "aliases": [
+    { "from": "tracker", "to": "type:tracker" }
+  ]
+}
