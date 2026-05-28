@@ -67,3 +67,28 @@ Three-PR series that builds the autonomous flow from Epic → epic tracker → c
 
 - [x] **Codify dev process + persona-agnostic reviewer skills** (PR #112) — Authored `workforce/docs/runbooks/dev-process.md` (canonical seven-phase loop). Added 3 generic, persona-agnostic routine specs (`pr-review.md`, `pr-route.md`, `pr-implement.md`) — persona overlay lives in each agent's `agent.json:bindings[*].config`. Bound Dario / Ren / Aoi / Maya to the generic skills. Marked `pdm-decompose.md` + `ccr-bootstrap.md` label-state-machine sections as superseded. Added `workforce/docs/follow-ups.md` index. *(Zone B docs + bindings)*
 - [ ] **Follow-up items from retrospective** — Tracked in [follow-ups.md](docs/follow-ups.md): cycle counter lint, scope-creep enforcement, cross-PR audit, `aws-sdk-client-mock` standardisation, etc.
+
+## RFC-010 rollout
+
+The Project-as-trust-boundary rollout runs as a 6-Story program tracked by [Epic-010 (#89)](https://github.com/refluster/ai-native-article/issues/89). The Epic body in [workforce/docs/epics/epic-010-project-trust-boundary.md](docs/epics/epic-010-project-trust-boundary.md) is the canonical spec; the tracker carries the **decision deltas** that adjust the spec post-confirmation (notably the §9 DDB-brute-force-kNN choice that replaces OpenSearch Serverless and the related drop of the W-3 ceiling raise).
+
+| Story | Issue | Scope | Status |
+|---|---|---|---|
+| Tracker | [#89](https://github.com/refluster/ai-native-article/issues/89) | Epic-010 rollout tracker, decision deltas, definition of done | open |
+| Story 1 | [#90](https://github.com/refluster/ai-native-article/issues/90) | Project as first-class entity, membership, ledger schema (DDB row families + GSI1/GSI2 + dual-write) | closed (merged) |
+| Story 2 | [#91](https://github.com/refluster/ai-native-article/issues/91) | Type-keyed credentials + Secrets Manager namespace migration (Story 2-A foundation merged in #119; Story 2-B injector + migration Lambda + fallback metric merged in #125) | open |
+| Story 3 | [#92](https://github.com/refluster/ai-native-article/issues/92) | Project-prefixed S3 artefacts + IAM trust boundary (redaction wrapper, cross-project denial at AWS layer) | open |
+| Story 4 | [#93](https://github.com/refluster/ai-native-article/issues/93) | Semantic recall via DDB-stored embeddings (brute-force kNN, recall console UI) | open |
+| Story 5 | [#94](https://github.com/refluster/ai-native-article/issues/94) | Governance + data-model amendments (this PR series: RFC-010 §9 + Cost impact + ROADMAP) | open |
+| Story 6 | [#95](https://github.com/refluster/ai-native-article/issues/95) | Operator project console (UI for project lifecycle, credentials, membership, execution history) | open |
+
+### Status-transition criteria
+
+Epic-010's `Status` flips from `Draft` to `Implemented` only when **all four** of the following hold (per [Epic-010 §Acceptance criteria](docs/epics/epic-010-project-trust-boundary.md#acceptance-criteria) and the tracker's Definition of Done):
+
+1. **Legacy `wf/{type}` keys removed.** Bare Secrets Manager keys (`wf/anthropic`, `wf/github`, `wf/notion`, …) are deleted after the `WfLegacyCredentialReads` CloudWatch metric, filtered to `Reason=fallback_bare`, has stayed at zero for ≥ 1 week. (Story 2-B ships the metric with two dimensions, `Reason=fallback_default` and `Reason=fallback_bare`; only the latter signals a remaining bare-key reader. The `fallback_default` dimension is expected to be non-zero in steady state — every project that hasn't shadowed a credential reads from `_default` and ticks the metric.) Tracked as a Story 2 follow-up PR; gated on Story 6 readiness so the credential vault UI is the only write surface.
+2. **Dual-write window closed.** Legacy `AGENT#{slug}/RUN#{ulid}` and `AGENT#{slug}/DELIV#{ulid}` writes from Story 1 are removed in a single cutover PR. Gated on the front-end having migrated (criterion 3) so the agent-profile view does not break.
+3. **Front-end agent profile migrated to the `EXEC` row family.** The `/workforce/agents/:slug` page reads exclusively from `PROJECT#{id}/EXEC#{ulid}` (via the GSI1 `AGENT#{slug}` query), not from the legacy `RUN`/`DELIV` rows. Lands in Story 6's PR series.
+4. **`article-health`-equivalent audit is clean.** A workforce-side audit (0 truncated executions, 0 orphaned `EXEC` rows, 0 cross-project leakage detections) runs green for ≥ 1 week post-cutover. The audit skill itself is tracked as [FU-021](docs/follow-ups.md) and must land before this criterion can flip.
+
+The criteria are intentionally ordered: 2 blocks on 3, and 1 blocks on Story 6's vault UI. The Epic stays in `Draft` until the slowest of the three closes.
