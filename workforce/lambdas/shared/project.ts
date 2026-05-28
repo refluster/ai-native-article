@@ -138,7 +138,47 @@ export interface ArtifactRef {
   summary: string;
 }
 
-export type ExecStatus = "ok" | "throw" | "skipped";
+/**
+ * Status discriminator for the EXEC ledger row.
+ *
+ *   - `ok`                          execution completed; artefact written.
+ *   - `throw`                       execution body threw before the artefact
+ *                                    write; `error` populated.
+ *   - `skipped`                     scheduler fired but pre-flight skipped
+ *                                    the body (paused / archived / etc.).
+ *   - `failed_artefact_redaction`   execution body completed but the
+ *                                    redaction guard in
+ *                                    `shared/artefact-writer.ts` matched
+ *                                    a known secret shape. The S3 object
+ *                                    was NOT written; the EXEC row is
+ *                                    persisted with `error` populated so
+ *                                    the failure is visible in the
+ *                                    ledger rather than silently dropped
+ *                                    (Epic-010 Story 3 / #92 AC 3).
+ */
+export type ExecStatus = "ok" | "throw" | "skipped" | "failed_artefact_redaction";
+
+/**
+ * Status of the embedding sidecar attached to an EXEC row (Story 4 / #93).
+ *
+ * - `ok`      — `embedding_bytes`, `embedding_model_id`, `embedding_dim`
+ *               are all present and the vector is L2-normalised float32.
+ * - `pending` — the embedding API call failed (or `voyage.api_key` was
+ *               not yet provisioned); the execution itself succeeded
+ *               and the row was written WITHOUT the three embedding
+ *               attributes so a retry sweep can backfill later.
+ * - `skipped` — the caller intentionally opted out of embedding (e.g.
+ *               a deterministic skill whose summary is the empty string
+ *               — embedding the empty string costs ~10 tokens for zero
+ *               recall signal).
+ *
+ * Rows missing `embedding_status` entirely are pre-Story-4 ledger rows.
+ * The recall path treats both `pending` / `skipped` / missing-attribute
+ * identically: EXCLUDED from semantic-recall candidates, still visible
+ * via structured recall (W-4 — don't silently hide ledger rows from the
+ * audit view because one optional sidecar attribute is missing).
+ */
+export type EmbeddingStatus = "ok" | "pending" | "skipped";
 
 export interface ExecutionRow {
   pk: `PROJECT#${string}`;
@@ -160,6 +200,27 @@ export interface ExecutionRow {
   /** GSI2: skill-utilisation — "how often is article-draft fired, across all agents". */
   gsi2pk: `SKILL#${string}`;
   gsi2sk: string;
+
+  // ── Embedding sidecar (Story 4 / #93) ────────────────────────────────
+  //
+  // Stored only when `embedding_status === 'ok'`. The recall path filters
+  // semantic candidates on the truthiness of `embedding_bytes`, NOT on
+  // `embedding_status`, so pre-Story-4 rows (no status attribute) are
+  // silently treated as `pending` for semantic purposes.
+
+  /** L2-normalised float32 vector, little-endian, encoded by
+   *  `shared/embedding.ts:encodeEmbeddingBytes`. The AWS DocumentClient
+   *  marshals Uint8Array ↔ DDB `B` attribute transparently. */
+  embedding_bytes?: Uint8Array;
+  /** Model id used to compute the embedding (e.g. `voyage-3-lite`). Stored
+   *  per Epic-010 Open Q3 so re-embedding on a model change is a query,
+   *  not a guess. */
+  embedding_model_id?: string;
+  /** Vector dimensionality. Stored explicitly so the kNN code can fail
+   *  loud on dim drift instead of producing silent garbage. */
+  embedding_dim?: number;
+  /** See `EmbeddingStatus` doc. */
+  embedding_status?: EmbeddingStatus;
 }
 
 // --- Lifecycle -----------------------------------------------------------
@@ -289,6 +350,14 @@ export interface AppendExecutionInput {
   inputs_hash?: string;
   artifact_ref?: ArtifactRef;
   error?: string;
+  // ── Embedding sidecar (Story 4 / #93) ──────────────────────────────
+  // All three must be present together, or all three must be absent.
+  // `embedding_status` controls how the row is treated by the recall
+  // path; see EmbeddingStatus doc.
+  embedding_bytes?: Uint8Array;
+  embedding_model_id?: string;
+  embedding_dim?: number;
+  embedding_status?: EmbeddingStatus;
 }
 
 /**
@@ -300,6 +369,15 @@ export interface AppendExecutionInput {
  * archived project succeeds if the agent is still a member. If
  * "archive closes the ledger" semantics are wanted later, gate here on
  * `meta.status === "active"`.
+ *
+ * Story 4 (#93): the embedding sidecar (`embedding_bytes` +
+ * `embedding_model_id` + `embedding_dim` + `embedding_status`) is optional
+ * and validated as a co-set: either all four are present (ok-status) or
+ * none of the byte/model/dim are present (status is `pending` / `skipped`
+ * / absent). Mixed states throw — they would silently corrupt the recall
+ * index. The high-level "compute embedding then append" wrapper lives in
+ * `shared/exec-embedding.ts`; callers that already have a vector in hand
+ * (the retry path, tests) call `appendExecution` directly.
  */
 export async function appendExecution(input: AppendExecutionInput): Promise<ExecutionRow> {
   if (!(await isMember(input.project_id, input.agent_slug))) {
@@ -307,6 +385,37 @@ export async function appendExecution(input: AppendExecutionInput): Promise<Exec
       `cross-project denial: agent "${input.agent_slug}" is not a member of project "${input.project_id}"`,
     );
   }
+
+  // Validate the embedding-sidecar co-set. The three byte/model/dim
+  // fields MUST be all-present or all-absent; `embedding_status='ok'`
+  // requires all three to be present.
+  const hasBytes = input.embedding_bytes !== undefined;
+  const hasModel = input.embedding_model_id !== undefined;
+  const hasDim = input.embedding_dim !== undefined;
+  if (hasBytes !== hasModel || hasModel !== hasDim) {
+    throw new Error(
+      `appendExecution: embedding_{bytes,model_id,dim} must be all-present or all-absent ` +
+        `(got bytes=${hasBytes}, model=${hasModel}, dim=${hasDim})`,
+    );
+  }
+  if (input.embedding_status === "ok" && !hasBytes) {
+    throw new Error(
+      "appendExecution: embedding_status='ok' requires embedding_bytes / embedding_model_id / embedding_dim",
+    );
+  }
+  if (hasBytes && input.embedding_status !== "ok") {
+    throw new Error(
+      `appendExecution: embedding_bytes provided but embedding_status="${input.embedding_status}" ` +
+        `(expected 'ok' when bytes are present)`,
+    );
+  }
+  if (hasDim && input.embedding_bytes!.byteLength !== input.embedding_dim! * 4) {
+    throw new Error(
+      `appendExecution: embedding_bytes byteLength=${input.embedding_bytes!.byteLength} ` +
+        `does not match embedding_dim=${input.embedding_dim} (expected ${input.embedding_dim! * 4})`,
+    );
+  }
+
   const row: ExecutionRow = {
     pk: projectPk(input.project_id),
     sk: `EXEC#${input.exec_ulid}`,
@@ -325,6 +434,10 @@ export async function appendExecution(input: AppendExecutionInput): Promise<Exec
     gsi1sk: input.started_at,
     gsi2pk: `SKILL#${input.skill_name}`,
     gsi2sk: input.started_at,
+    embedding_bytes: input.embedding_bytes,
+    embedding_model_id: input.embedding_model_id,
+    embedding_dim: input.embedding_dim,
+    embedding_status: input.embedding_status,
   };
   await putItem(row);
   return row;
@@ -346,6 +459,26 @@ type CommonOpts = {
   status?: ExecStatus;
   /** Page size. Default 100. */
   limit?: number;
+  /**
+   * Caller identity for the recall trust-boundary read-gate (Story 4 / #93).
+   *
+   * When set, `listExecutions` post-filters out any row whose `project_id`
+   * the named agent is not an active member of. This is the read-side of
+   * the cross-project denial that `appendExecution` enforces at write
+   * time. It is OPTIONAL because:
+   *
+   *   - Pre-Story-4 callers (the agents-api, the agent-runner's own
+   *     dual-write tests) already assert membership at a higher seam and
+   *     would double-charge the check.
+   *   - Cross-project queries from `_operator` are valid (the operator
+   *     sees everything by design) — passing the caller as `_operator`
+   *     short-circuits the gate.
+   *
+   * Story 4's `agent.recall()` ALWAYS sets this (defence in depth — the
+   * surface is reachable from agent-as-actor code paths that may
+   * eventually run with reduced trust). See `shared/recall.ts`.
+   */
+  caller_agent_slug?: AgentSlug | "_operator";
 };
 
 export type ListExecutionsFilter = (AgentScope | SkillScope | ProjScope) & CommonOpts;
@@ -353,12 +486,15 @@ export type ListExecutionsFilter = (AgentScope | SkillScope | ProjScope) & Commo
 /**
  * Return execution rows matching the filter.
  *
- * **Trust-boundary asymmetry (intentional)**: `appendExecution` gates on
- * project membership; `listExecutions` does NOT. The helper layer does
- * not know the caller's identity context. Story 1-B wires the runner to
- * assert membership before invoking this — that is where the read-gate
- * lives in the production flow. Callers outside the runner must do the
- * same check.
+ * **Trust-boundary asymmetry (intentional, then tightened by Story 4)**:
+ * `appendExecution` gates on project membership; `listExecutions`
+ * historically does NOT — the helper layer does not always know the
+ * caller's identity context. Story 1-B wired the runner to assert
+ * membership before invoking this. Story 4 (#93) ADDS an optional
+ * `caller_agent_slug` field (see `CommonOpts.caller_agent_slug` doc) so
+ * the recall surface can defence-in-depth the read-gate here even when
+ * the higher-layer check is forgotten. Callers that don't pass it get
+ * the same (un-gated) behaviour as before — non-breaking.
  *
  * Range push-down: both `from` and `to` are passed to DDB as
  * `skGte` / `skLte` constraints when scoping by agent_slug / skill_name.
@@ -396,12 +532,31 @@ export async function listExecutions(filter: ListExecutionsFilter): Promise<Exec
   // status + range post-filter. Status is never part of the index;
   // the range filter is a no-op on the GSI paths (DDB already pushed
   // down) and load-bearing on the project_id path.
-  return rows.filter((r) => {
+  const prefiltered = rows.filter((r) => {
     if (filter.status && r.status !== filter.status) return false;
     if (filter.from && r.started_at < filter.from) return false;
     if (filter.to && r.started_at > filter.to) return false;
     return true;
   });
+
+  // Story 4 (#93) recall trust-boundary read-gate. Only applied when the
+  // caller explicitly opts in via `caller_agent_slug`. `_operator` sees
+  // everything; named agents see only rows from projects they are an
+  // active member of. The membership check is per-distinct-project_id
+  // (Set dedup) so a partition of 10k EXEC rows across 3 projects only
+  // costs 3 isMember() reads, not 10k.
+  const caller = filter.caller_agent_slug;
+  if (caller === undefined || caller === "_operator") {
+    return prefiltered;
+  }
+  const distinctProjects = new Set<ProjectId>(prefiltered.map((r) => r.project_id));
+  const membershipByProject = new Map<ProjectId, boolean>();
+  await Promise.all(
+    [...distinctProjects].map(async (pid) => {
+      membershipByProject.set(pid, await isMember(pid, caller));
+    }),
+  );
+  return prefiltered.filter((r) => membershipByProject.get(r.project_id) === true);
 }
 
 // --- Credentials ---------------------------------------------------------

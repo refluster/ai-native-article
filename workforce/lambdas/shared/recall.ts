@@ -1,0 +1,293 @@
+// agent.recall() — structured + semantic queries over the EXEC ledger.
+//
+// Epic-010 Story 4 (#93). Two query shapes, both partitioned by the
+// calling agent (GSI1 on `AGENT#{slug}`):
+//
+//   - Structured: `recall({ caller_agent_slug, project?, skill?, from?,
+//     to?, status?, k? })` → DDB GSI1 query + post-filter, ranked by
+//     `started_at` descending (newest first).
+//
+//   - Semantic:   `recall({ caller_agent_slug, query, k? })` → GSI1
+//     query for the caller's executions, brute-force cosine kNN in
+//     Lambda, top-k by similarity. Pre-Story-4 rows (no embedding) and
+//     `embedding_status !== 'ok'` rows are excluded from the candidate
+//     pool but still visible via the structured path.
+//
+// ─── Trust-boundary defence in depth ──────────────────────────────────
+//
+// Per #93 AC1: a recall call NEVER returns an EXEC from a project the
+// calling agent is not an active member of. Enforced TWICE:
+//
+//   1. `listExecutions({ caller_agent_slug })` post-filters by
+//      isMember() (Story 4 addition).
+//   2. `recall()` re-asserts the same condition on the returned set
+//      before applying the kNN sort. A future bug in (1) would still
+//      not leak rows through (2).
+//
+// `_operator` calls short-circuit both gates and see the full ledger.
+//
+// ─── Combined query+filter ────────────────────────────────────────────
+//
+// Best-effort per the PR scope. When the caller provides BOTH `query`
+// and structured predicates (skill / time-range / status / project),
+// the implementation:
+//
+//   1. Pulls the full agent partition (paginated to `limit`).
+//   2. Runs kNN over the embedded subset.
+//   3. Post-filters the kNN-ranked results by the structured predicates.
+//   4. Returns the first `k` that satisfy both.
+//
+// This honours `k` on the semantic axis per RFC §9 ("never the other way
+// around"). The semantic-vs-structured combinator surface is intentionally
+// minimal; richer composition (boolean combinators, hybrid scoring) is
+// out-of-scope and named in the PR follow-ups.
+
+import {
+  listExecutions,
+  isMember,
+  type ExecutionRow,
+  type ExecStatus,
+  type ProjectId,
+} from "./project.js";
+import type { AgentSlug } from "./agent.js";
+import { decodeEmbeddingBytes, topKByCosine, cosine } from "./embedding.js";
+import { embedText } from "./voyage.js";
+
+/** Common bound on returned rows / kNN candidates. */
+const DEFAULT_K = 5;
+
+/** Upper bound on the agent partition scan size for the semantic path.
+ *  At workforce scale (≤ 12 agents × ~100 execs/day) this is months of
+ *  history per agent — well above the typical recall surface. The cap
+ *  is the safety valve for the per-agent-execs > 50k trigger (Epic-010
+ *  §9 amendment) that moves us off brute-force entirely. */
+const SEMANTIC_SCAN_LIMIT = 1000;
+
+export interface RecallStructuredInput {
+  /** Required. `_operator` sees everything; named agents are gated to
+   *  projects they're an active member of. */
+  caller_agent_slug: AgentSlug | "_operator";
+  /** Optional structured filters. */
+  project?: ProjectId;
+  skill?: string;
+  /** ISO-8601 inclusive lower bound on started_at. */
+  from?: string;
+  /** ISO-8601 inclusive upper bound on started_at. */
+  to?: string;
+  status?: ExecStatus;
+  /** Cap on returned rows. Default DEFAULT_K=5. */
+  k?: number;
+}
+
+export interface RecallSemanticInput {
+  caller_agent_slug: AgentSlug | "_operator";
+  /** Free-text query. Embedded via voyage-3-lite at recall time. */
+  query: string;
+  /** Top-k cosine matches. Default DEFAULT_K=5. */
+  k?: number;
+  /** ProjectId used to resolve the Voyage API key. Defaults to the
+   *  caller's `self/{slug}` project (per Epic-010 §3 — every agent is
+   *  auto-seeded into their `self` project). `_operator` MUST pass this
+   *  explicitly (no `self` partition for the operator). */
+  embedding_project_id?: ProjectId;
+  /** Optional structured filters composed AFTER the kNN sort (so `k` is
+   *  honoured on the semantic axis per RFC §9). Best-effort path. */
+  project?: ProjectId;
+  skill?: string;
+  from?: string;
+  to?: string;
+  status?: ExecStatus;
+}
+
+export interface RecallResult {
+  row: ExecutionRow;
+  /** Cosine similarity in [-1, 1]. `undefined` for structured-only
+   *  results (no kNN was run). */
+  score?: number;
+}
+
+/**
+ * Structured recall — GSI1 query against `AGENT#{caller}` partition with
+ * the predicate filters in `RecallStructuredInput` applied.
+ */
+export async function recallStructured(
+  input: RecallStructuredInput,
+): Promise<RecallResult[]> {
+  const callerForGate = input.caller_agent_slug;
+  // The GSI1 partition key is itself `AGENT#{slug}` — for `_operator` we
+  // need a different path (full ledger scan), which the structured
+  // surface intentionally doesn't expose at v1. For named agents the
+  // partition is the natural index.
+  if (callerForGate === "_operator") {
+    throw new Error(
+      "recallStructured: _operator must scope by project or skill — pass project= / skill= explicitly via listExecutions",
+    );
+  }
+
+  const k = input.k ?? DEFAULT_K;
+  const rows = await listExecutions({
+    agent_slug: callerForGate,
+    from: input.from,
+    to: input.to,
+    status: input.status,
+    limit: SEMANTIC_SCAN_LIMIT,
+    caller_agent_slug: callerForGate,
+  });
+
+  // Post-filter on project / skill (GSI1 is already partitioned by agent).
+  const filtered = rows.filter((r) => {
+    if (input.project && r.project_id !== input.project) return false;
+    if (input.skill && r.skill_name !== input.skill) return false;
+    return true;
+  });
+
+  // Defence-in-depth: re-assert membership on the returned set. The
+  // listExecutions read-gate already did this; we redo it here so a
+  // future regression upstream cannot bypass the recall trust boundary.
+  const gated = await dropForbidden(filtered, callerForGate);
+
+  // Newest-first (matches the operator-chat use case).
+  gated.sort((a, b) => (a.started_at < b.started_at ? 1 : a.started_at > b.started_at ? -1 : 0));
+  return gated.slice(0, k).map((row) => ({ row }));
+}
+
+/**
+ * Semantic recall — embed the query, brute-force kNN over the caller's
+ * embedded executions, return top-k by cosine. Optional structured
+ * predicates are post-filtered AFTER the kNN sort (best-effort).
+ */
+export async function recallSemantic(
+  input: RecallSemanticInput,
+): Promise<RecallResult[]> {
+  const caller = input.caller_agent_slug;
+  if (caller === "_operator") {
+    throw new Error(
+      "recallSemantic: _operator must specify a candidate agent — global semantic recall is out of scope (Epic-010 Story 4 §Out of scope)",
+    );
+  }
+  if (input.query.trim().length === 0) {
+    throw new Error("recallSemantic: query must be non-empty");
+  }
+
+  const k = input.k ?? DEFAULT_K;
+
+  // 1. Pull the agent's full ledger window (or up to SEMANTIC_SCAN_LIMIT).
+  const rows = await listExecutions({
+    agent_slug: caller,
+    limit: SEMANTIC_SCAN_LIMIT,
+    caller_agent_slug: caller,
+  });
+
+  // 2. Filter to embedded candidates only. Rows without
+  //    `embedding_status='ok'` (or pre-Story-4 rows entirely) are
+  //    excluded from the semantic pool but remain visible via
+  //    structured recall.
+  const candidates = rows
+    .filter(
+      (r) =>
+        r.embedding_status === "ok" &&
+        r.embedding_bytes !== undefined &&
+        r.embedding_dim !== undefined,
+    )
+    .map((r) => ({
+      row: r,
+      embedding: decodeEmbeddingBytes(r.embedding_bytes!),
+    }));
+
+  if (candidates.length === 0) {
+    return [];
+  }
+
+  // 3. Embed the query (input_type='query' — Voyage's search-side hint).
+  //    The Voyage API key is resolved from `embedding_project_id`,
+  //    defaulting to the caller's `self/{slug}` project.
+  const embeddingProject =
+    input.embedding_project_id ?? (`self/${caller}` as ProjectId);
+  const queryResult = await embedText({
+    projectId: embeddingProject,
+    text: input.query,
+    inputType: "query",
+  });
+
+  // Dim safety: a query embedding with a different `dim` than the
+  // stored vectors must not silently rank — `cosine()` would throw,
+  // but a clearer error here is cheaper to debug.
+  const firstCandDim = candidates[0]!.row.embedding_dim;
+  if (queryResult.dim !== firstCandDim) {
+    throw new Error(
+      `recallSemantic: query dim=${queryResult.dim} but stored dim=${firstCandDim} ` +
+        `(model drift? re-embed the corpus on the new model)`,
+    );
+  }
+
+  // 4. Brute-force top-k by cosine. Run an over-fetch when structured
+  //    filters are also present so we still have k matches after the
+  //    post-filter pass.
+  const hasPostFilters =
+    input.project !== undefined ||
+    input.skill !== undefined ||
+    input.from !== undefined ||
+    input.to !== undefined ||
+    input.status !== undefined;
+  const kSearch = hasPostFilters ? Math.min(candidates.length, k * 10) : k;
+  const ranked = topKByCosine(queryResult.embedding, candidates, kSearch);
+
+  // 5. Apply structured post-filters (composes with kNN per RFC §9).
+  const postFiltered = ranked.filter(({ row: r }) => {
+    if (input.project && r.project_id !== input.project) return false;
+    if (input.skill && r.skill_name !== input.skill) return false;
+    if (input.status && r.status !== input.status) return false;
+    if (input.from && r.started_at < input.from) return false;
+    if (input.to && r.started_at > input.to) return false;
+    return true;
+  });
+
+  // 6. Defence-in-depth membership re-check (mirrors recallStructured).
+  const gated = await dropForbidden(
+    postFiltered.map((x) => x.row),
+    caller,
+  );
+  const gatedSet = new Set(gated.map((r) => r.sk));
+  const finalRanked = postFiltered.filter((x) => gatedSet.has(x.row.sk));
+
+  return finalRanked.slice(0, k).map(({ row, score }) => ({ row, score }));
+}
+
+/**
+ * `agent.recall(...)` — single dispatch surface that picks structured vs.
+ * semantic based on whether `query` is present. Mirrors the RFC §9 API
+ * shape one-for-one.
+ */
+export type RecallInput =
+  | (RecallStructuredInput & { query?: undefined })
+  | RecallSemanticInput;
+
+export async function recall(input: RecallInput): Promise<RecallResult[]> {
+  if ("query" in input && typeof input.query === "string") {
+    return recallSemantic(input);
+  }
+  return recallStructured(input as RecallStructuredInput);
+}
+
+// --- Helpers -------------------------------------------------------------
+
+/** Drop rows whose project the caller is NOT an active member of. The
+ *  membership check is per-distinct-project so a 1k-row partition spread
+ *  across 3 projects costs 3 isMember() reads. */
+async function dropForbidden(
+  rows: ReadonlyArray<ExecutionRow>,
+  caller: AgentSlug,
+): Promise<ExecutionRow[]> {
+  const distinct = new Set(rows.map((r) => r.project_id));
+  const isMemberByProject = new Map<ProjectId, boolean>();
+  await Promise.all(
+    [...distinct].map(async (pid) => {
+      isMemberByProject.set(pid, await isMember(pid, caller));
+    }),
+  );
+  return rows.filter((r) => isMemberByProject.get(r.project_id) === true);
+}
+
+// Re-export `cosine` so tests / future composers don't need to reach
+// into `shared/embedding.ts` directly.
+export { cosine };
