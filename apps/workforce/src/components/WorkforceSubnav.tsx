@@ -5,11 +5,12 @@
 import { NavLink } from 'react-router-dom';
 
 const links = [
-  { to: '/',        label: 'DASHBOARD', end: true  },
-  { to: '/agents',  label: 'CREW',      end: false },
-  { to: '/skills',  label: 'SKILLS',    end: false },
-  { to: '/org',     label: 'ORG',       end: false },
-  { to: '/feed',    label: 'FEED',      end: false },
+  { to: '/',         label: 'DASHBOARD', end: true  },
+  { to: '/agents',   label: 'CREW',      end: false },
+  { to: '/skills',   label: 'SKILLS',    end: false },
+  { to: '/projects', label: 'PROJECTS',  end: false },
+  { to: '/org',      label: 'ORG',       end: false },
+  { to: '/feed',     label: 'FEED',      end: false },
 ];
 
 interface Props {

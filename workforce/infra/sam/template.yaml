@@ -241,12 +241,27 @@ Resources:
     Properties:
       StageName: !Ref Stage
       CorsConfiguration:
+        # Three trusted origins:
+        #   - kohuehara.xyz (the public site; also reads the agents catalogue
+        #     for the about page)
+        #   - workforce.kohuehara.xyz (the operator SPA — feed UI lives here)
+        #   - localhost:5173 (dev)
+        # Epic-011 Story 5 (#132): the feed `GET` endpoints rely on this
+        # CORS gate to limit browser access to the workforce origin. The
+        # threat model (PR #132 body) accepts hostname-guess access as the
+        # blast-radius envelope; the gate is a friction layer, not auth.
         AllowOrigins:
           - https://kohuehara.xyz
           - https://workforce.kohuehara.xyz
           - http://localhost:5173
-        AllowMethods: [GET, OPTIONS]
-        AllowHeaders: [content-type]
+        # PATCH added by Epic-011 Story 5 (#132) for the feed-hide route.
+        # PATCH /agents/{slug} (Epic-007) is also IAM-authed; it's called
+        # by `aws-vault` from a terminal today rather than the browser, but
+        # adding PATCH here keeps the CORS surface honest if the operator
+        # SPA later issues a PATCH from the browser via signed-SigV4.
+        AllowMethods: [GET, PATCH, OPTIONS]
+        # `authorization` header is required for SigV4-signed browser PATCHes.
+        AllowHeaders: [content-type, authorization]
       Auth:
         EnableIamAuthorizer: true
       Tags:
@@ -276,6 +291,44 @@ Resources:
               Resource:
                 - !GetAtt WfTable.Arn
                 - !Sub ${WfTable.Arn}/index/*
+            - Sid: AgentsApiPutMalformedMetric
+              # Defence-in-depth metric on listProjects' row-shape skip
+              # path (FU-NEW-D). The handler emits WfMalformedProjectMeta
+              # under Workforce/AgentsApi when a META row missing the
+              # canonical attributes is dropped from the list response —
+              # surfaces operator-side bootstrap-runbook regressions
+              # without 500-ing the whole route. Namespace condition
+              # mirrors the runner / backfill patterns.
+              Effect: Allow
+              Action: cloudwatch:PutMetricData
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace: Workforce/AgentsApi
+            # Epic-011 Story 5 (#132) — `GET /feed/{post_id}` hydrates
+            # post bodies from S3 (`posts/{slug}/{yyyy}/{mm}/{ulid}.md`).
+            # No write needed — the feed-post skill (Story 1) writes; the
+            # API only reads.
+            - Sid: AgentsApiPostBodyRead
+              Effect: Allow
+              Action: s3:GetObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/posts/*
+            # Issue #158 PR-β A1: project credentials LIST endpoint
+            # (`GET /projects/{id+}/credentials`) describes each
+            # registered credential type's secret to surface metadata
+            # (last_changed_at / created_date). DescribeSecret never
+            # returns the SecretString, so the LIST stays metadata-only
+            # by construction at the AWS API layer (Story 2-C's secret-
+            # leak guard property at the handler layer is a
+            # belt-and-braces second.) Resource scoped to
+            # `wf/projects/*` so the Lambda role cannot describe
+            # credentials outside the trust boundary.
+            - Sid: AgentsApiProjectCredentialsDescribe
+              Effect: Allow
+              Action: secretsmanager:DescribeSecret
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*
       Events:
         ListAgents:
           Type: HttpApi
@@ -325,6 +378,90 @@ Resources:
           Properties:
             ApiId: !Ref WfAgentsHttpApi
             Path: /agents/{slug}/deliverables
+            Method: GET
+        # Epic-010 §10 Story 6 (#95): projects read API on the same Lambda.
+        # POST/DELETE/PATCH on projects are intentionally not exposed (see
+        # handler.ts header). The credential vault lives in its own Lambda
+        # (Story 2-C #91) so this Lambda's IAM scope stays narrow per R-N3.
+        # Project ids include slashes (e.g. `self/ren`) so the routes use
+        # the greedy `{id+}` proxy pattern.
+        ListAgentProjects:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}/projects
+            Method: GET
+        ListProjects:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects
+            Method: GET
+        GetProject:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects/{id+}
+            Method: GET
+        ListProjectMembers:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects/{id+}/members
+            Method: GET
+        ListProjectExecutions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects/{id+}/executions
+            Method: GET
+        # Issue #158 PR-β: project credentials LIST (public read, metadata-only)
+        # and project PATCH (AWS_IAM auth) so the operator can flip
+        # status=archived from the SPA without dropping to the CLI.
+        ListProjectCredentials:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects/{id+}/credentials
+            Method: GET
+        PatchProject:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects/{id+}
+            Method: PATCH
+            Auth:
+              Authorizer: AWS_IAM
+        # Epic-011 Story 5 (#132): workforce activity-feed read endpoints.
+        # GET endpoints are public (CORS gate admits `workforce.kohuehara.xyz`
+        # only); PATCH requires AWS_IAM (operator's `aws-vault` credentials)
+        # because it flips the `visibility=hidden` audit attribute via
+        # Story 4's `hidePost` helper. Threat model documented in PR #132.
+        ListFeed:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /feed
+            Method: GET
+        GetFeedPost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /feed/{post_id}
+            Method: GET
+        PatchFeedPost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /feed/{post_id}
+            Method: PATCH
+            Auth:
+              Authorizer: AWS_IAM
+        ListAgentPosts:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}/posts
             Method: GET
       Tags:
         workforce: !Ref Stage
@@ -892,6 +1029,150 @@ Resources:
       AlarmActions:
         - !Ref WfAlarmTopic
 
+  # --- Epic-010 observability dashboard (FU-NEW-A, Issue #150 B6) -------------
+  # Single CloudWatch Dashboard surfacing every metric Epic-010 introduced:
+  #
+  #   Workforce/Credentials  WfLegacyCredentialReads          (split by Reason
+  #                                                            — fallback_bare
+  #                                                            graphs to zero
+  #                                                            before the C1
+  #                                                            bare-key deletion
+  #                                                            PR ships).
+  #                          WfCredentialsMigrated / *AlreadyMigrated /
+  #                          *SourceMissing / *MigrationErrors
+  #
+  #   Workforce/Recall       WfExecEmbeddingFailed            (operator's
+  #                                                            signal that
+  #                                                            the embedding
+  #                                                            retry queue
+  #                                                            has work).
+  #
+  #   Workforce/Runner       WfExecDualWriteFailed            (Story 1-B
+  #                                                            dual-write
+  #                                                            integrity).
+  #
+  #   Workforce/AgentsApi    WfMalformedProjectMeta           (FU-NEW-D —
+  #                                                            listProjects
+  #                                                            skip count;
+  #                                                            target 0).
+  #
+  # The dashboard is a thin layer over PutMetricData — no IAM additions
+  # required. Per-region, per-stage so the operator can flip stages via
+  # the AWS console picker.
+  WfEpic010Dashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub wf-epic-010-${Stage}
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "text",
+              "x": 0, "y": 0, "width": 24, "height": 2,
+              "properties": {
+                "markdown": "# Workforce / Epic-010 (${Stage})\n\nSurfaces every metric Epic-010 introduced. **Target state**: `WfLegacyCredentialReads{Reason=fallback_bare}` and `WfMalformedProjectMeta` graph to zero. `WfExecDualWriteFailed` stays at zero. `WfExecEmbeddingFailed` reflects pending retry-queue depth."
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0, "y": 2, "width": 12, "height": 6,
+              "properties": {
+                "title": "Workforce/Credentials — WfLegacyCredentialReads (by Reason)",
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "period": 300,
+                "stat": "Sum",
+                "metrics": [
+                  [ "Workforce/Credentials", "WfLegacyCredentialReads", "Stage", "${Stage}", "Reason", "fallback_default" ],
+                  [ ".", ".", ".", ".", "Reason", "fallback_bare", { "color": "#d62728" } ]
+                ],
+                "yAxis": { "left": { "min": 0 } },
+                "annotations": {
+                  "horizontal": [
+                    { "label": "fallback_bare target (deletion gate)", "value": 0, "color": "#d62728" }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12, "y": 2, "width": 12, "height": 6,
+              "properties": {
+                "title": "Workforce/AgentsApi — WfMalformedProjectMeta",
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 300,
+                "stat": "Sum",
+                "metrics": [
+                  [ "Workforce/AgentsApi", "WfMalformedProjectMeta", "Stage", "${Stage}", { "color": "#d62728" } ]
+                ],
+                "yAxis": { "left": { "min": 0 } },
+                "annotations": {
+                  "horizontal": [
+                    { "label": "target (clean)", "value": 0, "color": "#d62728" }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0, "y": 8, "width": 12, "height": 6,
+              "properties": {
+                "title": "Workforce/Credentials — Migration outcomes",
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "period": 300,
+                "stat": "Sum",
+                "metrics": [
+                  [ "Workforce/Credentials", "WfCredentialsMigrated",        "Stage", "${Stage}" ],
+                  [ ".",                     "WfCredentialsAlreadyMigrated", ".",     "." ],
+                  [ ".",                     "WfCredentialsSourceMissing",   ".",     "." ],
+                  [ ".",                     "WfCredentialsMigrationErrors", ".",     ".", { "color": "#d62728" } ]
+                ],
+                "yAxis": { "left": { "min": 0 } }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12, "y": 8, "width": 12, "height": 6,
+              "properties": {
+                "title": "Workforce/Recall — WfExecEmbeddingFailed (pending-queue depth signal)",
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 300,
+                "stat": "Sum",
+                "metrics": [
+                  [ "Workforce/Recall", "WfExecEmbeddingFailed", "Stage", "${Stage}" ]
+                ],
+                "yAxis": { "left": { "min": 0 } }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0, "y": 14, "width": 24, "height": 6,
+              "properties": {
+                "title": "Workforce/Runner — WfExecDualWriteFailed (by Reason)",
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "period": 300,
+                "stat": "Sum",
+                "metrics": [
+                  [ { "expression": "SEARCH('{Workforce/Runner,Stage,Reason} MetricName=\"WfExecDualWriteFailed\" Stage=\"${Stage}\"', 'Sum', 300)", "label": "dual-write failures", "id": "dwf" } ]
+                ],
+                "yAxis": { "left": { "min": 0 } },
+                "annotations": {
+                  "horizontal": [
+                    { "label": "target (no dual-write drift)", "value": 0, "color": "#d62728" }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+
 Outputs:
   TableName:
     Description: DynamoDB table name (consumed by PR5/PR6 Lambdas).
@@ -917,8 +1198,27 @@ Outputs:
     Value: !Sub https://${WfAgentsHttpApi}.execute-api.${AWS::Region}.amazonaws.com
     Export:
       Name: !Sub wf-agents-api-url-${Stage}
+  AgentsApiId:
+    Description: ID of the agents HTTP API. Consumed by sam-web's
+      Identity Pool operator role (Issue #158 PR-α) to scope
+      `execute-api:Invoke` to this API only.
+    Value: !Ref WfAgentsHttpApi
+    Export:
+      Name: !Sub wf-agents-api-id-${Stage}
   CredentialsApiUrl:
     Description: Base URL of the credentials write HTTP API. All routes are AWS_IAM-authorised (operator only).
     Value: !Sub https://${WfCredentialsHttpApi}.execute-api.${AWS::Region}.amazonaws.com
     Export:
       Name: !Sub wf-credentials-api-url-${Stage}
+  CredentialsApiId:
+    Description: ID of the credentials HTTP API. Consumed by sam-web's
+      Identity Pool operator role (Issue #158 PR-α) to scope
+      `execute-api:Invoke` to this API only.
+    Value: !Ref WfCredentialsHttpApi
+    Export:
+      Name: !Sub wf-credentials-api-id-${Stage}
+  Epic010DashboardName:
+    Description: CloudWatch Dashboard surfacing every Epic-010 metric (FU-NEW-A).
+    Value: !Ref WfEpic010Dashboard
+    Export:
+      Name: !Sub wf-epic-010-dashboard-name-${Stage}

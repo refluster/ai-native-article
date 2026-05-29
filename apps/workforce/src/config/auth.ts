@@ -40,3 +40,26 @@ export const AUTH_POST_LOGOUT_URI =
 export const AUTH_IS_CONFIGURED = Boolean(
   AUTH_USER_POOL_ID && AUTH_CLIENT_ID && AUTH_DOMAIN_PREFIX,
 );
+
+// ─── Identity Pool for SigV4 brokering (Project CRUD UI PR-α) ─────────────────
+//
+// Optional — when missing, `signedFetch` (lib/sigv4.ts) throws on first
+// invocation. The basic Hosted-UI flow above works without this; only
+// AWS_IAM-protected API calls need it.
+
+const IDENTITY_POOL_ID = (
+  import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID ?? ''
+).trim();
+
+export const AUTH_IDENTITY_POOL_ID = IDENTITY_POOL_ID;
+
+/** True iff the Identity Pool is configured AND base auth is configured —
+ *  the broker is useless without the User Pool tokens to federate. */
+export const SIGV4_IS_CONFIGURED = Boolean(
+  AUTH_IS_CONFIGURED && AUTH_IDENTITY_POOL_ID,
+);
+
+/** Cognito Identity service endpoint for the configured region. The
+ *  AWS SDK derives this from region; we expose it for `aws4fetch` calls
+ *  that bypass the SDK on the SigV4 hot path. */
+export const AUTH_COGNITO_IDENTITY_ENDPOINT = `https://cognito-identity.${REGION}.amazonaws.com`;

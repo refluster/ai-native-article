@@ -259,6 +259,29 @@ export async function archive(projectId: ProjectId, now?: string): Promise<void>
   await putItem(meta);
 }
 
+/**
+ * Flip an archived project back to active. Mirror of `archive()` —
+ * needed by the operator project console's Unarchive button (Issue #158
+ * D2). The `archived_at` attribute is intentionally CLEARED on unarchive
+ * (rather than preserved as audit) so a future audit can rely on "the
+ * attribute is set" being equivalent to "the project is archived right
+ * now." Tenure-history reconstruction would need a separate row family
+ * (same shape as the soft-delete on memberships) and is out of scope.
+ */
+export async function unarchive(projectId: ProjectId): Promise<void> {
+  const meta = await getItem<ProjectMetaRow>(projectPk(projectId), "META");
+  if (!meta) throw new Error(`project "${projectId}" not found`);
+  if (meta.status !== "archived") {
+    // No-op if not currently archived — callers may want to flip
+    // optimistically without reading first. Throw is reserved for the
+    // genuinely-missing case above.
+    return;
+  }
+  meta.status = "active";
+  delete meta.archived_at;
+  await putItem(meta);
+}
+
 /** Renamed from `get` (shadowed JS keyword in some IDE contexts). */
 export async function getProject(projectId: ProjectId): Promise<ProjectMetaRow | undefined> {
   return getItem<ProjectMetaRow>(projectPk(projectId), "META");

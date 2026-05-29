@@ -281,6 +281,23 @@ Anonymous Jina access is rate-limited (~20 RPM); fine for our ~6 runs/day cadenc
 
 Open the L1 DB → add a Checkbox property named exactly `L2 Skip` (default unchecked). If the property is missing, you'll see `[L2_CREATE] WARNING: write-ahead L2 Skip failed` in the logs and the safety net is off — every hang costs another 6-minute timeout.
 
+### Labelling a new GitHub issue
+
+Every issue on `refluster/ai-native-article` gets three mandatory labels — `project:` + `layer:` + `type:` — plus any relevant `area:` / `epic-NNN` / `role:` / `wf:` / `priority:` axes. The full taxonomy, the L0-L3 mapping per sub-project, and the decision flow are in [`docs/issue-labeling.md`](docs/issue-labeling.md).
+
+When opening a new issue (operator or agent):
+
+1. Walk [`docs/issue-labeling.md §3`](docs/issue-labeling.md#3-decision-flow--labelling-a-new-issue) — the decision flow gives a deterministic 3-6 labels per issue.
+2. If the issue belongs to a new epic, add the epic label to [`.github/labels.json`](.github/labels.json) in the same PR.
+3. If you added or changed any label definition, reconcile to GitHub:
+
+   ```bash
+   GH_TOKEN=ghp_... node scripts/sync-labels.mjs           # apply
+   GH_TOKEN=ghp_... node scripts/sync-labels.mjs --dry-run # preview
+   ```
+
+The script is idempotent and never deletes — orphan labels are reported, not removed.
+
 ### Adding a new GAS action
 
 1. Add the handler function in `gas/src/Code.gs`.

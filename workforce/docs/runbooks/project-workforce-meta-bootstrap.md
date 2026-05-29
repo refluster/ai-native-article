@@ -42,24 +42,32 @@ STAGE=prod
 REGION=us-west-2
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
+# META row — every attribute below corresponds 1:1 to ProjectMetaRow
+# in workforce/lambdas/shared/project.ts. Do NOT add stream / repo /
+# region or any other attribute the type does not declare.
+# Pre-FU-NEW-C runbook versions wrote `stream` + `repo` AND omitted
+# `project_id`, which caused wf-agents-api listProjects to throw in
+# prod (Issue #150 / B5).
 aws dynamodb put-item --table-name wf-table-$STAGE --region $REGION --item "$(cat <<JSON
 {
   "pk": {"S": "PROJECT#workforce-meta"},
   "sk": {"S": "META"},
-  "stream": {"S": "internal"},
-  "owner_agent": {"S": "maya"},
+  "project_id": {"S": "workforce-meta"},
   "status": {"S": "active"},
-  "repo": {"S": "refluster/ai-native-article"},
+  "owner_agent": {"S": "maya"},
   "created_at": {"S": "$NOW"}
 }
 JSON
 )"
 
+# MEMBER rows — match ProjectMemberRow. project_id is a denormalised
+# attribute so scan paths can read it without a META join.
 for slug in maya dario ren aoi yuki sora; do
   aws dynamodb put-item --table-name wf-table-$STAGE --region $REGION --item "$(cat <<JSON
 {
   "pk": {"S": "PROJECT#workforce-meta"},
   "sk": {"S": "MEMBER#$slug"},
+  "project_id": {"S": "workforce-meta"},
   "agent_slug": {"S": "$slug"},
   "joined_at": {"S": "$NOW"}
 }
@@ -67,6 +75,25 @@ JSON
   )"
 done
 ```
+
+### Existing stage hot-fix (if pre-FU-NEW-C runbook was used)
+
+If a previous run of this runbook wrote the legacy shape (no
+`project_id` on META, alien `repo` / `stream` attrs), patch in place:
+
+```bash
+aws dynamodb update-item --table-name wf-table-$STAGE --region $REGION \
+  --key '{"pk":{"S":"PROJECT#workforce-meta"},"sk":{"S":"META"}}' \
+  --update-expression "SET project_id = :pid" \
+  --condition-expression "attribute_not_exists(project_id)" \
+  --expression-attribute-values '{":pid":{"S":"workforce-meta"}}'
+```
+
+The conditional makes it idempotent (skips if `project_id` already set).
+The alien `repo` / `stream` attrs are tolerated by the canonical reader
+(DDB silently ignores unrecognised attributes) AND by the FU-NEW-D
+defensive skip in `wf-agents-api listProjects` if the fix is missed; the
+deletion of those attrs is cosmetic.
 
 ## Verify
 

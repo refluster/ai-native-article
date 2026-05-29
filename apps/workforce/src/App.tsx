@@ -12,6 +12,8 @@ import AgentProfile from './pages/AgentProfile';
 import SkillDirectory from './pages/SkillDirectory';
 import SkillProfile from './pages/SkillProfile';
 import OrgDAG from './pages/OrgDAG';
+import ProjectDirectory from './pages/ProjectDirectory';
+import ProjectProfile from './pages/ProjectProfile';
 import Feed from './pages/Feed';
 import AuthCallback from './pages/AuthCallback';
 import AuthBoundary from './components/AuthBoundary';
@@ -38,6 +40,12 @@ function ProtectedRoutes() {
             <Route path="/agents/:slug" element={<AgentProfile />} />
             <Route path="/skills" element={<SkillDirectory />} />
             <Route path="/skills/:name" element={<SkillProfile />} />
+            <Route path="/projects" element={<ProjectDirectory />} />
+            {/* Project ids may contain `/` (e.g. `self/ren`). Use a
+                wildcard `*` so the whole remainder is captured as one
+                parameter, accessible inside the page via
+                `useParams()['*']`. */}
+            <Route path="/projects/*" element={<ProjectProfile />} />
             <Route path="/feed" element={<Feed />} />
           </Routes>
         </main>

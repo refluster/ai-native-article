@@ -1,5 +1,55 @@
 [
   {
+    "slug": "d07e3ccc7fb2",
+    "title": "Jensen Huangが定義するAIの未来",
+    "type": "explanation",
+    "category": "A",
+    "date": "2026-03-30",
+    "abstract": "Jensen Huang氏の対談から、AI進化の要点を抽出。",
+    "image": "/posts/images/d07e3ccc7fb2.jpg",
+    "sourceUrls": "https://lexfridman.com/jensen-huang-transcript/"
+  },
+  {
+    "slug": "ee62d70466ba",
+    "title": "「垂直統合の逆襲」——Terafabが示す、AI時代のコア・コンピタンス再定義",
+    "type": "analysis",
+    "category": "ORG TRANSFORMATION × AI REPLACEMENT",
+    "date": "2026-03-30",
+    "abstract": "「設計は自社で、製造は外注で」というファブレスモデルへの強烈なアンチテーゼ。Terafabの「設計からパッケージングまでの完全垂直統合」が示すのは、AI時代の勝敗が「製造コスト」ではなく「学習ループのサイクルタイム」で決まるという構造変化である。",
+    "image": "/posts/images/ee62d70466ba.jpg",
+    "sourceUrls": "https://en.wikipedia.org/wiki/Terafab\nhttps://mashable.com/article/tesla-terafab-chip-plant"
+  },
+  {
+    "slug": "fd969a54c786",
+    "title": "Terafab完全解説——Tesla・SpaceX・xAI が共同で「世界最大のAIチップ工場」を建設する理由と、その産業的意味",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "date": "2026-03-29",
+    "abstract": "Terafab（Tesla・SpaceX・xAI共同）の全貌：2nmプロセス・年間1テラワット・総額250億ドル。チップ設計からパッケージングまでの垂直統合がNvidiaとTSMCへの依存を断つ戦略と、その製造業への示唆を解説。",
+    "image": "/posts/images/fd969a54c786.jpg",
+    "sourceUrls": "https://en.wikipedia.org/wiki/Terafab"
+  },
+  {
+    "slug": "e6066f0a6b4b",
+    "title": "「土星旅行が無料になる」——マスクがTerafabで実現しようとしている、AIとロボットが作る「豊かさの臨界点」",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "date": "2026-03-29",
+    "abstract": "Terafabが実現しようとする世界：Optimusロボット年産最大100億台・2035年に最大2000億ドルのロボット市場（Barclays予測）・「想像できるものすべてが無料になる」という豊かさの閾値。SFを「科学的事実」に変えるというマスクのビジョンの論理構造を解説。",
+    "image": "/posts/images/e6066f0a6b4b.jpg",
+    "sourceUrls": "https://www.cbsnews.com/news/terafab-elon-musk-chips-semiconductors-what-to-know/"
+  },
+  {
+    "slug": "d148b8208d71",
+    "title": "Terafabの「月産100万枚」はどれだけ非常識か——TSMCと比較して数字で理解する、マスクの野望の規模感",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "date": "2026-03-29",
+    "abstract": "Terafabの目標数値（月産100万枚、年間100〜200億枚、宇宙1テラワット）をTSMCなど現実と比較して解説。Battery Day 2020の前例も引きながら「過去のマスクの约束」との乖離も検証。",
+    "image": "/posts/images/d148b8208d71.jpg",
+    "sourceUrls": "https://mashable.com/article/tesla-terafab-chip-plant"
+  },
+  {
     "slug": "d8a4f22f5c56",
     "title": "「iPhoneで指示したらMacが動いた」——ClaudeのComputer Use（コンピューター操作）が変える、働き方の常識",
     "type": "explanation",
