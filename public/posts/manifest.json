@@ -1,5 +1,15 @@
 [
   {
+    "slug": "d07e3ccc7fb2",
+    "title": "Jensen Huangが定義するAIの未来",
+    "type": "explanation",
+    "category": "A",
+    "date": "2026-03-30",
+    "abstract": "Jensen Huang氏の対談から、AI進化の要点を抽出。",
+    "image": "/posts/images/d07e3ccc7fb2.jpg",
+    "sourceUrls": "https://lexfridman.com/jensen-huang-transcript/"
+  },
+  {
     "slug": "fd969a54c786",
     "title": "Terafab完全解説——Tesla・SpaceX・xAI が共同で「世界最大のAIチップ工場」を建設する理由と、その産業的意味",
     "type": "explanation",
