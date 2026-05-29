@@ -2,15 +2,13 @@
 // language. Hero with id + status + owner, KPI strip, members panel, and
 // execution-history table.
 //
-// Three deferred slices, each named here as a follow-up (not shipped in
+// Two deferred slices, each named here as a follow-up (not shipped in
 // this PR per the Story 6 vertical-slice scoping):
 //
 //   - Member editor (add/remove agents): the data shape is already
 //     supported by workforce/lambdas/shared/project.ts; the API write
 //     endpoint (POST /projects/{id}/members) needs wiring + Cognito-to-
 //     SigV4 brokering at the SPA edge. Surfaced today as read-only.
-//   - Credential vault: depends on Story 2-C #91 (wf-credentials-api).
-//     This page renders a placeholder card pointing to the issue.
 //   - Task-editor `project_id` selector: lives on the agent profile /
 //     task editor, not this page; out of scope here.
 //
@@ -25,6 +23,7 @@ import WorkforceLayout from '../components/WorkforceLayout';
 import Typeplate from '../components/Typeplate';
 import KPIReadout from '../components/KPIReadout';
 import StatusBadge from '../components/StatusBadge';
+import CredentialVault from '../components/CredentialVault';
 import {
   apiConfigured,
   fetchProject,
@@ -206,7 +205,7 @@ export default function ProjectProfile() {
 
         <aside className="lg:col-span-1 space-y-6">
           <MembersPanel members={activeMembers} loading={members === null} />
-          <CredentialVaultStub projectId={project.project_id} />
+          <CredentialVault projectId={project.project_id} />
         </aside>
       </div>
     </WorkforceLayout>
@@ -303,35 +302,6 @@ function MembersPanel({
           ))}
         </ul>
       )}
-    </section>
-  );
-}
-
-function CredentialVaultStub({ projectId }: { projectId: string }) {
-  return (
-    <section className="border border-wf-outline-variant bg-wf-surface-container rounded-wf-md">
-      <div className="border-b border-wf-outline-variant px-4 py-3">
-        <Typeplate label="DECK · CREDENTIALS" value="DEFERRED" />
-      </div>
-      <div className="p-4 space-y-2">
-        <p className="text-sm text-wf-on-surface-variant leading-relaxed">
-          The credential vault for <code className="font-wfmono text-xs">{projectId}</code> wires
-          to the wf-credentials-api Lambda landing in{' '}
-          <a
-            href="https://github.com/refluster/ai-native-article/issues/91"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-wf-primary hover:underline"
-          >
-            Epic-010 Story 2-C (#91)
-          </a>
-          . Once that endpoint is live the SPA will surface masked credential types here, with
-          paste-to-rotate + delete actions.
-        </p>
-        <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-          GET /projects/{'{id}'}/credentials returns metadata only — values stay in the runner.
-        </p>
-      </div>
     </section>
   );
 }
