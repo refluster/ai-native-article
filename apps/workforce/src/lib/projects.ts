@@ -133,3 +133,39 @@ export async function fetchAgentMemberships(slug: string): Promise<AgentMembersh
   const data = (await res.json()) as { items: AgentMembership[] };
   return data.items;
 }
+
+// ─── Project archive / unarchive — Project CRUD UI (PR-δ) ───────────────
+//
+// PATCH /projects/{id+} (AWS_IAM auth). Body shape: { status: 'active' | 'archived' }.
+// Returns the updated project view. Uses signedFetch from lib/sigv4 — the
+// agents-api PATCH route is AWS_IAM-protected per agents-api SAM events
+// table; the SigV4 broker (cognito identity pool + operator role) was
+// provisioned by the earlier sigv4 PR.
+
+import { signedFetch, assertSigv4Configured } from './sigv4';
+
+export type ProjectStatus = 'active' | 'archived';
+
+export async function patchProjectStatus(
+  projectId: string,
+  status: ProjectStatus,
+  agentsApiBase: string = WORKFORCE_AGENTS_API_BASE,
+): Promise<ProjectDetail> {
+  assertSigv4Configured();
+  const url = `${agentsApiBase}/projects/${encodeProjectId(projectId)}`;
+  const res = await signedFetch(url, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) {
+    let bodyText = '';
+    try {
+      bodyText = await res.text();
+    } catch {
+      // ignore
+    }
+    throw new Error(`PATCH /projects failed (${res.status}): ${bodyText}`);
+  }
+  return (await res.json()) as ProjectDetail;
+}

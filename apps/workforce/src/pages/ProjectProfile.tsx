@@ -23,6 +23,7 @@ import WorkforceLayout from '../components/WorkforceLayout';
 import Typeplate from '../components/Typeplate';
 import KPIReadout from '../components/KPIReadout';
 import StatusBadge from '../components/StatusBadge';
+import ProjectArchiveButton from '../components/ProjectArchiveButton';
 import CredentialVault from '../components/CredentialVault';
 import {
   apiConfigured,
@@ -170,6 +171,17 @@ export default function ProjectProfile() {
         <div className="flex flex-wrap items-center gap-3 mb-3">
           <Typeplate label="PROJECT" value={project.project_id.toUpperCase()} />
           <StatusChip status={project.status} />
+          <ProjectArchiveButton
+            projectId={project.project_id}
+            status={project.status}
+            onStatusChange={(next, archivedAt) => {
+              // Functional updater — keeps state in sync if the parent
+              // refetch fires concurrently with the optimistic flip.
+              setProject((prev) =>
+                prev ? { ...prev, status: next, archived_at: archivedAt } : prev,
+              );
+            }}
+          />
         </div>
         <h1 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-[1.04] text-wf-on-surface mb-1 font-mono">
           {project.project_id}
