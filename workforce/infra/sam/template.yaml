@@ -1029,6 +1029,140 @@ Resources:
       AlarmActions:
         - !Ref WfAlarmTopic
 
+  # --- Audit Lambda + tick rule (FU-021, Issue #146) -------------------------
+  # Daily cron-fired sweep over the last 24h of EXEC + RUN rows for three
+  # signal classes that gate Epic-010's `Status: Implemented` flip (ROADMAP
+  # §Status-transition criterion 4): truncated executions, orphan exec/run
+  # rows (dual-write witness gap), cross-project leakage. Emits one metric
+  # per signal in the Workforce/Audit namespace; the alarms below page
+  # WfAlarmTopic on any non-zero count over the daily window.
+  #
+  # Standalone Lambda (not a skill) — see handler.ts header for the
+  # architectural deviation rationale (skills go through agent-runner,
+  # which itself does the dual-write we audit).
+  WfAuditFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-audit-${Stage}
+      CodeUri: ../../lambdas/audit
+      Handler: handler.handler
+      Description: Daily workforce audit — truncation / orphan-row / cross-project leak signals. FU-021.
+      MemorySize: 512
+      Timeout: 120
+      Policies:
+        - Statement:
+            - Sid: AuditTableScan
+              Effect: Allow
+              Action:
+                - dynamodb:Scan
+              Resource: !GetAtt WfTable.Arn
+            - Sid: AuditPutMetric
+              # Three audit metrics emit under Workforce/Audit. Namespace-
+              # conditioned per the same pattern as the runner / backfill /
+              # credentials / agents-api metric grants.
+              Effect: Allow
+              Action: cloudwatch:PutMetricData
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace: Workforce/Audit
+      Events:
+        DailyTick:
+          Type: Schedule
+          Properties:
+            Name: !Sub wf-audit-tick-${Stage}
+            Description: Drives the daily workforce audit sweep.
+            # 04:00 UTC = 13:00 JST — low workforce traffic per the operator
+            # cadence (orchestrator + most agent bindings run during JST
+            # daytime / overnight, leaving 04:00 UTC quiet).
+            Schedule: cron(0 4 * * ? *)
+            Enabled: true
+      Tags:
+        workforce: !Ref Stage
+
+  WfAuditErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-audit-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-audit-${Stage} over 5 minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfAuditFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  # Three signal alarms — any non-zero count over a 24h evaluation window
+  # fires the existing SNS topic. The 24h Period matches the cron cadence;
+  # one alarm event per problem-day rather than per-15-minute noise.
+  # TreatMissingData: notBreaching covers the cold-start window (no metric
+  # data yet means audit hasn't fired; not an alarm condition).
+  WfAuditTruncatedExecsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-audit-truncated-execs-alarm-${Stage}
+      AlarmDescription: !Sub Audit found truncated EXEC rows in wf-table-${Stage} (Epic-010 C-1 risk).
+      Namespace: Workforce/Audit
+      MetricName: WfAuditTruncatedExecs
+      Dimensions:
+        - Name: Stage
+          Value: !Ref Stage
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  WfAuditOrphanExecsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-audit-orphan-execs-alarm-${Stage}
+      AlarmDescription: !Sub Audit found dual-write orphan rows in wf-table-${Stage} (Epic-010 dual-write integrity).
+      Namespace: Workforce/Audit
+      MetricName: WfAuditOrphanExecs
+      Dimensions:
+        - Name: Stage
+          Value: !Ref Stage
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  WfAuditCrossProjectLeaksAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-audit-cross-project-leaks-alarm-${Stage}
+      AlarmDescription: !Sub Audit found cross-project leakage in wf-table-${Stage} (Epic-010 W-2 trust-boundary breach).
+      Namespace: Workforce/Audit
+      MetricName: WfAuditCrossProjectLeaks
+      Dimensions:
+        - Name: Stage
+          Value: !Ref Stage
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
   # --- Epic-010 observability dashboard (FU-NEW-A, Issue #150 B6) -------------
   # Single CloudWatch Dashboard surfacing every metric Epic-010 introduced:
   #
@@ -1166,6 +1300,73 @@ Resources:
                 "annotations": {
                   "horizontal": [
                     { "label": "target (no dual-write drift)", "value": 0, "color": "#d62728" }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "text",
+              "x": 0, "y": 20, "width": 24, "height": 2,
+              "properties": {
+                "markdown": "## Daily audit (FU-021)\n\nThe daily 04:00 UTC audit sweep emits one metric per signal. Each is gated by the corresponding alarm (`wf-audit-*-alarm-${Stage}`). **Status-transition criterion 4** flips green once all three stay at zero for ≥ 7 consecutive days. SUM over 24h matches the cron cadence — one alarm event per problem-day, not per-15-minute noise."
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0, "y": 22, "width": 8, "height": 6,
+              "properties": {
+                "title": "Workforce/Audit — WfAuditTruncatedExecs (daily)",
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "stat": "Sum",
+                "metrics": [
+                  [ "Workforce/Audit", "WfAuditTruncatedExecs", "Stage", "${Stage}", { "color": "#d62728" } ]
+                ],
+                "yAxis": { "left": { "min": 0 } },
+                "annotations": {
+                  "horizontal": [
+                    { "label": "target (clean — C-1 risk-free)", "value": 0, "color": "#d62728" }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 8, "y": 22, "width": 8, "height": 6,
+              "properties": {
+                "title": "Workforce/Audit — WfAuditOrphanExecs (daily)",
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "stat": "Sum",
+                "metrics": [
+                  [ "Workforce/Audit", "WfAuditOrphanExecs", "Stage", "${Stage}", { "color": "#d62728" } ]
+                ],
+                "yAxis": { "left": { "min": 0 } },
+                "annotations": {
+                  "horizontal": [
+                    { "label": "target (clean — dual-write integrity)", "value": 0, "color": "#d62728" }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 16, "y": 22, "width": 8, "height": 6,
+              "properties": {
+                "title": "Workforce/Audit — WfAuditCrossProjectLeaks (daily)",
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "stat": "Sum",
+                "metrics": [
+                  [ "Workforce/Audit", "WfAuditCrossProjectLeaks", "Stage", "${Stage}", { "color": "#d62728" } ]
+                ],
+                "yAxis": { "left": { "min": 0 } },
+                "annotations": {
+                  "horizontal": [
+                    { "label": "target (clean — W-2 boundary intact)", "value": 0, "color": "#d62728" }
                   ]
                 }
               }
