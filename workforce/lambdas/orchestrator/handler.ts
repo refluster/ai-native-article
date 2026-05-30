@@ -28,7 +28,7 @@ import {
 import { scanPrefix, queryBySkPrefix, updateOperational } from "../shared/ddb.js";
 import { matchesNow } from "../shared/cron-match.js";
 import { findRecentPRs } from "../shared/github.js";
-import { fireCcrRoutine } from "../shared/ccr-fire.js";
+import { fireCcrRoutine, routineIdFromSpec } from "../shared/ccr-fire.js";
 import type { DelivRow } from "../shared/task.js";
 
 const STAGE = process.env.STAGE;
@@ -130,7 +130,11 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
         }
         try {
           if (ownedCcr) {
-            await fireCcrRoutine(binding.skill, {
+            // routine_id = basename of binding.routine_spec → wf/ccr/{routine_id}.
+            // Bindings sharing a routine_spec share the secret (one CCR routine
+            // handles many (agent, skill) pairs — see workforce/docs/routines/agent-runner.md).
+            const routineId = routineIdFromSpec(binding.routine_spec ?? "");
+            await fireCcrRoutine(routineId, {
               agent_slug: agent.slug,
               binding_idx: i,
               ticked_at: tickedAt,

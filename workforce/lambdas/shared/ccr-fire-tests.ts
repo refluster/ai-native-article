@@ -17,10 +17,25 @@ vi.mock("@aws-sdk/client-secrets-manager", () => ({
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
-const { fireCcrRoutine } = await import("./ccr-fire.js");
+const { fireCcrRoutine, routineIdFromSpec } = await import("./ccr-fire.js");
 
 const okSecret = (url = "https://example/fire", token = "tok_X") =>
   Promise.resolve({ SecretString: JSON.stringify({ url, token }) });
+
+describe("routineIdFromSpec", () => {
+  it("returns the basename without .md", () => {
+    expect(routineIdFromSpec("workforce/docs/routines/agent-runner.md")).toBe("agent-runner");
+  });
+  it("handles a bare filename with no slash", () => {
+    expect(routineIdFromSpec("agent-runner.md")).toBe("agent-runner");
+  });
+  it("handles a path without an extension", () => {
+    expect(routineIdFromSpec("a/b/runner")).toBe("runner");
+  });
+  it("throws on empty input", () => {
+    expect(() => routineIdFromSpec("")).toThrow(/required/);
+  });
+});
 
 describe("fireCcrRoutine", () => {
   beforeEach(() => {
@@ -32,7 +47,7 @@ describe("fireCcrRoutine", () => {
     mockSend.mockReturnValueOnce(okSecret("https://api.example/fire", "tok_ABC"));
     mockFetch.mockResolvedValueOnce(new Response("{}", { status: 200 }));
 
-    const res = await fireCcrRoutine("feed-post", {
+    const res = await fireCcrRoutine("agent-runner", {
       agent_slug: "dario",
       binding_idx: 3,
       ticked_at: "2026-05-31T08:20:00Z",
@@ -54,14 +69,14 @@ describe("fireCcrRoutine", () => {
     });
   });
 
-  it("reads from wf/ccr/{skill}", async () => {
+  it("reads from wf/ccr/{routine_id}", async () => {
     mockSend.mockReturnValueOnce(okSecret());
     mockFetch.mockResolvedValueOnce(new Response("{}", { status: 200 }));
 
-    await fireCcrRoutine("feed-post", { agent_slug: "x", binding_idx: 0, ticked_at: "t" });
+    await fireCcrRoutine("agent-runner", { agent_slug: "x", binding_idx: 0, ticked_at: "t" });
 
     const cmd = mockSend.mock.calls[0]![0] as { input: { SecretId: string } };
-    expect(cmd.input.SecretId).toBe("wf/ccr/feed-post");
+    expect(cmd.input.SecretId).toBe("wf/ccr/agent-runner");
   });
 
   it("returns execution_id when the response includes one", async () => {
@@ -70,7 +85,7 @@ describe("fireCcrRoutine", () => {
       new Response(JSON.stringify({ execution_id: "exec_42" }), { status: 202 }),
     );
 
-    const res = await fireCcrRoutine("feed-post", { agent_slug: "x", binding_idx: 0, ticked_at: "t" });
+    const res = await fireCcrRoutine("agent-runner", { agent_slug: "x", binding_idx: 0, ticked_at: "t" });
 
     expect(res.status).toBe(202);
     expect(res.execution_id).toBe("exec_42");
@@ -81,7 +96,7 @@ describe("fireCcrRoutine", () => {
     mockFetch.mockResolvedValueOnce(new Response("rate limited", { status: 429 }));
 
     await expect(
-      fireCcrRoutine("feed-post", { agent_slug: "x", binding_idx: 0, ticked_at: "t" }),
+      fireCcrRoutine("agent-runner", { agent_slug: "x", binding_idx: 0, ticked_at: "t" }),
     ).rejects.toThrow(/HTTP 429/);
   });
 
@@ -89,7 +104,7 @@ describe("fireCcrRoutine", () => {
     mockSend.mockReturnValueOnce(Promise.resolve({}));
 
     await expect(
-      fireCcrRoutine("feed-post", { agent_slug: "x", binding_idx: 0, ticked_at: "t" }),
+      fireCcrRoutine("agent-runner", { agent_slug: "x", binding_idx: 0, ticked_at: "t" }),
     ).rejects.toThrow(/no SecretString/);
   });
 
@@ -97,7 +112,7 @@ describe("fireCcrRoutine", () => {
     mockSend.mockReturnValueOnce(Promise.resolve({ SecretString: JSON.stringify({ url: "u" }) }));
 
     await expect(
-      fireCcrRoutine("feed-post", { agent_slug: "x", binding_idx: 0, ticked_at: "t" }),
+      fireCcrRoutine("agent-runner", { agent_slug: "x", binding_idx: 0, ticked_at: "t" }),
     ).rejects.toThrow(/missing url\/token/);
   });
 
@@ -105,7 +120,7 @@ describe("fireCcrRoutine", () => {
     mockSend.mockReturnValueOnce(Promise.resolve({ SecretString: "not json" }));
 
     await expect(
-      fireCcrRoutine("feed-post", { agent_slug: "x", binding_idx: 0, ticked_at: "t" }),
+      fireCcrRoutine("agent-runner", { agent_slug: "x", binding_idx: 0, ticked_at: "t" }),
     ).rejects.toThrow(/not valid JSON/);
   });
 });

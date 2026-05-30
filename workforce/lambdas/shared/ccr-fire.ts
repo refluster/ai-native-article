@@ -4,8 +4,15 @@
 //   executor=claude-code-routine, scheduler=external, invoked_by=api
 // whose cron matches the current tick window, it calls `fireCcrRoutine()`
 // instead of async-invoking wf-agent-runner. The bearer token + URL for
-// each routine live in AWS Secrets Manager at `wf/ccr/{skill}` per
-// docs/runbooks/bindings.md §"API token storage".
+// each CCR routine live in AWS Secrets Manager at `wf/ccr/{routine_id}`,
+// where `routine_id` is the basename of the binding's `routine_spec`
+// path (e.g. `workforce/docs/routines/agent-runner.md` → "agent-runner").
+//
+// Bindings that share a `routine_spec` share the secret. The current
+// design uses one shared `agent-runner` routine for every CCR-by-API
+// binding regardless of skill; per-skill routines remain possible
+// (different `routine_spec`) but require the operator to instantiate
+// a separate claude.ai routine + store a separate token.
 //
 // The secret payload is the JSON shape established in ccr-bootstrap.md:
 //
@@ -39,12 +46,36 @@ interface CcrSecret {
 }
 
 /**
- * POSTs the fire payload to the CCR routine identified by `skill` (which
- * picks the secret at `wf/ccr/{skill}`). Returns on 2xx; throws on any
- * other outcome.
+ * Derive the secret/routine id from a binding's `routine_spec` path.
+ * Returns the basename without the `.md` extension.
+ *
+ *   "workforce/docs/routines/agent-runner.md" → "agent-runner"
+ *
+ * Throws on an empty / missing input — the binding validator already
+ * guarantees `routine_spec` is set for executor=claude-code-routine, so
+ * a throw here means the orchestrator called us with the wrong binding.
  */
-export async function fireCcrRoutine(skill: string, payload: CcrFirePayload): Promise<CcrFireResult> {
-  const secret = await loadCcrSecret(skill);
+export function routineIdFromSpec(routineSpec: string): string {
+  if (!routineSpec) {
+    throw new Error("routineIdFromSpec: routine_spec is required");
+  }
+  const slash = routineSpec.lastIndexOf("/");
+  const base = slash >= 0 ? routineSpec.slice(slash + 1) : routineSpec;
+  const dot = base.lastIndexOf(".");
+  const id = dot > 0 ? base.slice(0, dot) : base;
+  if (!id) {
+    throw new Error(`routineIdFromSpec: cannot derive id from "${routineSpec}"`);
+  }
+  return id;
+}
+
+/**
+ * POSTs the fire payload to the CCR routine identified by `routineId`
+ * (which picks the secret at `wf/ccr/{routineId}`). Returns on 2xx;
+ * throws on any other outcome.
+ */
+export async function fireCcrRoutine(routineId: string, payload: CcrFirePayload): Promise<CcrFireResult> {
+  const secret = await loadCcrSecret(routineId);
   const res = await fetch(secret.url, {
     method: "POST",
     headers: {
@@ -57,7 +88,7 @@ export async function fireCcrRoutine(skill: string, payload: CcrFirePayload): Pr
   if (res.status < 200 || res.status >= 300) {
     const text = await res.text().catch(() => "");
     throw new Error(
-      `fireCcrRoutine: ${skill} → HTTP ${res.status}: ${text.slice(0, 256)}`,
+      `fireCcrRoutine: ${routineId} → HTTP ${res.status}: ${text.slice(0, 256)}`,
     );
   }
 
@@ -74,8 +105,8 @@ export async function fireCcrRoutine(skill: string, payload: CcrFirePayload): Pr
   return { status: res.status, execution_id };
 }
 
-async function loadCcrSecret(skill: string): Promise<CcrSecret> {
-  const secretId = `wf/ccr/${skill}`;
+async function loadCcrSecret(routineId: string): Promise<CcrSecret> {
+  const secretId = `wf/ccr/${routineId}`;
   const out = await sm.send(new GetSecretValueCommand({ SecretId: secretId }));
   if (!out.SecretString) {
     throw new Error(`loadCcrSecret: ${secretId} has no SecretString`);

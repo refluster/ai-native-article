@@ -119,8 +119,8 @@
         "fired_from": "wf-orchestrator-tick",
         "cron": "cron(20 8 ? * * *)"
       },
-      "routine_spec": "workforce/docs/routines/feed-post.md",
-      "note": "Daily 08:20 JST trial — wf-orchestrator-tick POSTs to the CCR /fire URL stored at wf/ccr/feed-post. Other 16 agents stay on the lambda+eventbridge path (Story 3) until this trial validates."
+      "routine_spec": "workforce/docs/routines/agent-runner.md",
+      "note": "Daily 08:20 JST trial — wf-orchestrator-tick POSTs to the shared CCR /fire URL stored at wf/ccr/agent-runner. The same routine handles any future (agent, skill) CCR binding — no per-skill claude.ai routine needed. Other 16 agents stay on the lambda+eventbridge path (Story 3) until this trial validates."
     }
   ],
   "jd": {
