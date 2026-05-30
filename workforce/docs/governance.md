@@ -44,7 +44,7 @@ Per AGENTS.md §1 vocabulary:
 | `workforce/docs/data-model.md` | **A** | The DDB/S3 schema. Schema changes touch every consumer. |
 | `workforce/docs/runbooks/*.md` | **B** | Operator runbooks. Agent-merge OK with CI + review. |
 | `workforce/agents/{slug}/system.md` | **A** with Rule 11 | Persona identity. One PR may not bump more than one persona's `system.md`. First version per persona is the documented exception. |
-| `workforce/agents/{slug}/agent.json` | **B** with Rule 11 | Persona config (model, schedule, budget). Same one-at-a-time discipline. |
+| `workforce/agents/{slug}/agent.json` | **B** with Rule 11 | Persona config (model, schedule, budget). The one-at-a-time discipline applies to identity-paired changes (model bumps, budget bumps, schedule changes that alter cost or scheduling shape). Additive changes to `bindings[]` that wire a persona to a new skill — without changing the persona's model, budget, or existing schedule — are exempt from the per-persona-per-PR cap and may be applied in a single mass-edit PR when the same skill is being wired across multiple agents (e.g., the Epic-011 feed-post rollout). |
 | `workforce/agents/{slug}/avatar.*` | **Forbidden** | Per-agent avatar files do not scale to 100s of agents. Avatars are rendered procedurally on the frontend from the slug (initial letter + slug-hash-derived HSL hue). The linter rejects any `avatar.*` under `agents/{slug}/`. |
 | `workforce/skills/{name}/SKILL.md` | **A** with Rule 11 | Reusable agent instructions. One PR may not bump more than one skill's body. First version per skill is the documented exception. |
 | `workforce/skills/{name}/meta.json` | **B** with Rule 11 | Workforce-internal skill sidecar (executor, version, owners). Co-versioned with `SKILL.md` per W-5. |
@@ -96,6 +96,7 @@ Defaults for an agent acting on a workforce task. The matrix below tightens [AGE
 | Add a new skill under `workforce/skills/`, first version. | **A** | First version is the Rule 11 documented exception (§3). |
 | Bump an existing persona's `system.md` (prompt-version). | **B** (escalate) | One agent per PR, human merge (W-5, Rule 11). |
 | Bump an existing skill's `SKILL.md` body (prompt-version). | **B** | Same one-per-PR discipline. |
+| Add a `bindings[]` entry to multiple `agent.json` files in one PR for the same new skill. | **A** | Per §3 amendment (this doc). The new binding's `trigger` deploys with `Enabled: false`; flipping to true is a separate B-authority action (see next row). |
 | Add a new EventBridge cron rule or enable a previously-disabled rule. | **B** | Affects schedule and cost; operator approval before flipping `Enabled: true`. |
 | Raise the W-3 cost ceiling (`USD 130/mo` default). | **B** | Zone A change to this doc. |
 | Add a new AWS service to the SAM template (e.g., adding SQS, Step Functions). | **B** | Probable R-N1..R-N5 violation. Discuss before opening the PR. |
