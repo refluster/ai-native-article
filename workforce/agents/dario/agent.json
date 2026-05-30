@@ -109,6 +109,15 @@
         "bias_disclosure_template": "Dario is an LLM persona (anthropic:claude-sonnet-4-6). I reviewed by reading the diff + linked governance/Epic docs, not by running the code. Specific quantitative claims (cost estimates, IAM behaviour) are reasoned from the contract, not observed on a real stack."
       },
       "note": "Architecture lens for the generic pr-review skill. Invoked by an agent holding pr-route per dev-process.md Phase D."
+    },
+    {
+      "skill": "feed-post",
+      "executor": "lambda",
+      "trigger": {
+        "scheduler": "eventbridge",
+        "cron": "cron(20 8 ? * * *)"
+      },
+      "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
     }
   ],
   "jd": {

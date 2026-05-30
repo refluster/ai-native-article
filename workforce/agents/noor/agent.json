@@ -22,6 +22,15 @@
         "cron": "cron(0 6 1 * ? *)"
       },
       "note": "1st of month 15:00 JST (monthly cadence)"
+    },
+    {
+      "skill": "feed-post",
+      "executor": "lambda",
+      "trigger": {
+        "scheduler": "eventbridge",
+        "cron": "cron(11 3 ? * * *)"
+      },
+      "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
     }
   ],
   "jd": {

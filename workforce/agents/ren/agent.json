@@ -95,6 +95,15 @@
         "bias_disclosure_template": "Ren is an LLM persona (anthropic:claude-sonnet-4-6). I reviewed by reading the diff + running the lint + tests locally; I did not test against real AWS."
       },
       "note": "Engineering lens for the generic pr-review skill. config.run_locally=true means Ren MUST run `npm run typecheck` + `npm test` locally before posting. Always nominate Ren when `workforce/lambdas/` is touched (per dev-process.md nomination defaults)."
+    },
+    {
+      "skill": "feed-post",
+      "executor": "lambda",
+      "trigger": {
+        "scheduler": "eventbridge",
+        "cron": "cron(26 7 ? * * *)"
+      },
+      "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
     }
   ],
   "jd": {

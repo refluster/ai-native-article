@@ -1375,6 +1375,371 @@ Resources:
           ]
         }
 
+  # --- Epic-011 Story 3 (#130) — per-agent feed-post EventBridge rules ------
+  # Seventeen rules, one per persona, each at the deterministic minute-of-day
+  # assigned by `workforce/seed/stagger-feed-cron.mjs` across the
+  # 09:00-18:00 JST working window. Each rule targets wf-agent-runner-${Stage}
+  # directly (NOT the orchestrator) with an InputTransformer that emits the
+  # runner's expected `{ agent, binding_idx }` payload.
+  #
+  # **All 17 rules deploy with State: DISABLED.** Operator flips them to
+  # ENABLED at the Story 8 (#135) observation-window start; this PR only
+  # declares the wiring. CFN-managed disabled rules cost USD 0.
+  #
+  # Architectural note (Dario lens): the upstream orchestrator comment
+  # ("No per-agent CFN rules — workforce scales by adding data rows, not
+  # template resources") was the v1 simplification. Epic-011 §scalability
+  # explicitly relaxes that constraint up to ~100 EventBridge rules (well
+  # under the 300/region soft limit) before fan-out is needed. The
+  # feed-post bindings live in `agent.json:bindings[]` per R-N4 — these
+  # rules are the IaC reflection of that data, not an alternate scheduler.
+  #
+  # The block below is stagger-generated. Mutating individual `Schedule`
+  # values by hand will trip the `validate-agent-json.mjs` collision /
+  # window checks once the matching agent.json edit lands.
+  #
+  # rule slug,binding_idx,cron(UTC),JST
+  # aanya  1   cron(15 3 ? * * *)   12:15
+  # aoi    2   cron(18 1 ? * * *)   10:18
+  # dario  3   cron(20 8 ? * * *)   17:20
+  # elena  1   cron(42 1 ? * * *)   10:42
+  # farah  1   cron(31 6 ? * * *)   15:31
+  # kai    1   cron(6  4 ? * * *)   13:06
+  # levi   1   cron(29 4 ? * * *)   13:29
+  # maya   3   cron(21 1 ? * * *)   10:21
+  # mira   1   cron(42 7 ? * * *)   16:42
+  # nadia  3   cron(30 1 ? * * *)   10:30
+  # noor   1   cron(11 3 ? * * *)   12:11
+  # priya  1   cron(54 7 ? * * *)   16:54
+  # ren    2   cron(26 7 ? * * *)   16:26
+  # sora   1   cron(18 2 ? * * *)   11:18
+  # theo   1   cron(17 8 ? * * *)   17:17
+  # vikram 1   cron(59 1 ? * * *)   10:59
+  # yuki   1   cron(11 2 ? * * *)   11:11
+
+  WfAanyaFeedpostRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub wf-aanya-feedpost-${Stage}
+      Description: feed-post stagger for aanya (12:15 JST). Epic-011 Story 3.
+      ScheduleExpression: cron(15 3 ? * * *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt WfAgentRunnerFunction.Arn
+          Id: WfAgentRunnerTarget
+          Input: '{"agent":"aanya","binding_idx":1}'
+  WfAanyaFeedpostInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub wf-agent-runner-${Stage}
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WfAanyaFeedpostRule.Arn
+
+  WfAoiFeedpostRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub wf-aoi-feedpost-${Stage}
+      Description: feed-post stagger for aoi (10:18 JST). Epic-011 Story 3.
+      ScheduleExpression: cron(18 1 ? * * *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt WfAgentRunnerFunction.Arn
+          Id: WfAgentRunnerTarget
+          Input: '{"agent":"aoi","binding_idx":2}'
+  WfAoiFeedpostInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub wf-agent-runner-${Stage}
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WfAoiFeedpostRule.Arn
+
+  WfDarioFeedpostRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub wf-dario-feedpost-${Stage}
+      Description: feed-post stagger for dario (17:20 JST). Epic-011 Story 3.
+      ScheduleExpression: cron(20 8 ? * * *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt WfAgentRunnerFunction.Arn
+          Id: WfAgentRunnerTarget
+          Input: '{"agent":"dario","binding_idx":3}'
+  WfDarioFeedpostInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub wf-agent-runner-${Stage}
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WfDarioFeedpostRule.Arn
+
+  WfElenaFeedpostRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub wf-elena-feedpost-${Stage}
+      Description: feed-post stagger for elena (10:42 JST). Epic-011 Story 3.
+      ScheduleExpression: cron(42 1 ? * * *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt WfAgentRunnerFunction.Arn
+          Id: WfAgentRunnerTarget
+          Input: '{"agent":"elena","binding_idx":1}'
+  WfElenaFeedpostInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub wf-agent-runner-${Stage}
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WfElenaFeedpostRule.Arn
+
+  WfFarahFeedpostRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub wf-farah-feedpost-${Stage}
+      Description: feed-post stagger for farah (15:31 JST). Epic-011 Story 3.
+      ScheduleExpression: cron(31 6 ? * * *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt WfAgentRunnerFunction.Arn
+          Id: WfAgentRunnerTarget
+          Input: '{"agent":"farah","binding_idx":1}'
+  WfFarahFeedpostInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub wf-agent-runner-${Stage}
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WfFarahFeedpostRule.Arn
+
+  WfKaiFeedpostRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub wf-kai-feedpost-${Stage}
+      Description: feed-post stagger for kai (13:06 JST). Epic-011 Story 3.
+      ScheduleExpression: cron(6 4 ? * * *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt WfAgentRunnerFunction.Arn
+          Id: WfAgentRunnerTarget
+          Input: '{"agent":"kai","binding_idx":1}'
+  WfKaiFeedpostInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub wf-agent-runner-${Stage}
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WfKaiFeedpostRule.Arn
+
+  WfLeviFeedpostRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub wf-levi-feedpost-${Stage}
+      Description: feed-post stagger for levi (13:29 JST). Epic-011 Story 3.
+      ScheduleExpression: cron(29 4 ? * * *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt WfAgentRunnerFunction.Arn
+          Id: WfAgentRunnerTarget
+          Input: '{"agent":"levi","binding_idx":1}'
+  WfLeviFeedpostInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub wf-agent-runner-${Stage}
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WfLeviFeedpostRule.Arn
+
+  WfMayaFeedpostRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub wf-maya-feedpost-${Stage}
+      Description: feed-post stagger for maya (10:21 JST). Epic-011 Story 3.
+      ScheduleExpression: cron(21 1 ? * * *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt WfAgentRunnerFunction.Arn
+          Id: WfAgentRunnerTarget
+          Input: '{"agent":"maya","binding_idx":3}'
+  WfMayaFeedpostInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub wf-agent-runner-${Stage}
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WfMayaFeedpostRule.Arn
+
+  WfMiraFeedpostRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub wf-mira-feedpost-${Stage}
+      Description: feed-post stagger for mira (16:42 JST). Epic-011 Story 3.
+      ScheduleExpression: cron(42 7 ? * * *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt WfAgentRunnerFunction.Arn
+          Id: WfAgentRunnerTarget
+          Input: '{"agent":"mira","binding_idx":1}'
+  WfMiraFeedpostInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub wf-agent-runner-${Stage}
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WfMiraFeedpostRule.Arn
+
+  WfNadiaFeedpostRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub wf-nadia-feedpost-${Stage}
+      Description: feed-post stagger for nadia (10:30 JST). Epic-011 Story 3.
+      ScheduleExpression: cron(30 1 ? * * *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt WfAgentRunnerFunction.Arn
+          Id: WfAgentRunnerTarget
+          Input: '{"agent":"nadia","binding_idx":3}'
+  WfNadiaFeedpostInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub wf-agent-runner-${Stage}
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WfNadiaFeedpostRule.Arn
+
+  WfNoorFeedpostRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub wf-noor-feedpost-${Stage}
+      Description: feed-post stagger for noor (12:11 JST). Epic-011 Story 3.
+      ScheduleExpression: cron(11 3 ? * * *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt WfAgentRunnerFunction.Arn
+          Id: WfAgentRunnerTarget
+          Input: '{"agent":"noor","binding_idx":1}'
+  WfNoorFeedpostInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub wf-agent-runner-${Stage}
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WfNoorFeedpostRule.Arn
+
+  WfPriyaFeedpostRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub wf-priya-feedpost-${Stage}
+      Description: feed-post stagger for priya (16:54 JST). Epic-011 Story 3.
+      ScheduleExpression: cron(54 7 ? * * *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt WfAgentRunnerFunction.Arn
+          Id: WfAgentRunnerTarget
+          Input: '{"agent":"priya","binding_idx":1}'
+  WfPriyaFeedpostInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub wf-agent-runner-${Stage}
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WfPriyaFeedpostRule.Arn
+
+  WfRenFeedpostRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub wf-ren-feedpost-${Stage}
+      Description: feed-post stagger for ren (16:26 JST). Epic-011 Story 3.
+      ScheduleExpression: cron(26 7 ? * * *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt WfAgentRunnerFunction.Arn
+          Id: WfAgentRunnerTarget
+          Input: '{"agent":"ren","binding_idx":2}'
+  WfRenFeedpostInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub wf-agent-runner-${Stage}
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WfRenFeedpostRule.Arn
+
+  WfSoraFeedpostRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub wf-sora-feedpost-${Stage}
+      Description: feed-post stagger for sora (11:18 JST). Epic-011 Story 3.
+      ScheduleExpression: cron(18 2 ? * * *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt WfAgentRunnerFunction.Arn
+          Id: WfAgentRunnerTarget
+          Input: '{"agent":"sora","binding_idx":1}'
+  WfSoraFeedpostInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub wf-agent-runner-${Stage}
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WfSoraFeedpostRule.Arn
+
+  WfTheoFeedpostRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub wf-theo-feedpost-${Stage}
+      Description: feed-post stagger for theo (17:17 JST). Epic-011 Story 3.
+      ScheduleExpression: cron(17 8 ? * * *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt WfAgentRunnerFunction.Arn
+          Id: WfAgentRunnerTarget
+          Input: '{"agent":"theo","binding_idx":1}'
+  WfTheoFeedpostInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub wf-agent-runner-${Stage}
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WfTheoFeedpostRule.Arn
+
+  WfVikramFeedpostRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub wf-vikram-feedpost-${Stage}
+      Description: feed-post stagger for vikram (10:59 JST). Epic-011 Story 3.
+      ScheduleExpression: cron(59 1 ? * * *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt WfAgentRunnerFunction.Arn
+          Id: WfAgentRunnerTarget
+          Input: '{"agent":"vikram","binding_idx":1}'
+  WfVikramFeedpostInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub wf-agent-runner-${Stage}
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WfVikramFeedpostRule.Arn
+
+  WfYukiFeedpostRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub wf-yuki-feedpost-${Stage}
+      Description: feed-post stagger for yuki (11:11 JST). Epic-011 Story 3.
+      ScheduleExpression: cron(11 2 ? * * *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt WfAgentRunnerFunction.Arn
+          Id: WfAgentRunnerTarget
+          Input: '{"agent":"yuki","binding_idx":1}'
+  WfYukiFeedpostInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub wf-agent-runner-${Stage}
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WfYukiFeedpostRule.Arn
+
 Outputs:
   TableName:
     Description: DynamoDB table name (consumed by PR5/PR6 Lambdas).
