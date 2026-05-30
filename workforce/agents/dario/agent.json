@@ -112,12 +112,15 @@
     },
     {
       "skill": "feed-post",
-      "executor": "lambda",
+      "executor": "claude-code-routine",
       "trigger": {
-        "scheduler": "eventbridge",
+        "scheduler": "external",
+        "invoked_by": "api",
+        "fired_from": "wf-orchestrator-tick",
         "cron": "cron(20 8 ? * * *)"
       },
-      "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
+      "routine_spec": "workforce/docs/routines/feed-post.md",
+      "note": "Daily 08:20 JST trial — wf-orchestrator-tick POSTs to the CCR /fire URL stored at wf/ccr/feed-post. Other 16 agents stay on the lambda+eventbridge path (Story 3) until this trial validates."
     }
   ],
   "jd": {

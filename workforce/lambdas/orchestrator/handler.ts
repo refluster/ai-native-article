@@ -21,12 +21,14 @@ import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import {
   agentPk,
   isOrchestratorOwned,
+  isOrchestratorOwnedCcr,
   type AgentBinding,
   type AgentMetaRow,
 } from "../shared/agent.js";
 import { scanPrefix, queryBySkPrefix, updateOperational } from "../shared/ddb.js";
 import { matchesNow } from "../shared/cron-match.js";
 import { findRecentPRs } from "../shared/github.js";
+import { fireCcrRoutine } from "../shared/ccr-fire.js";
 import type { DelivRow } from "../shared/task.js";
 
 const STAGE = process.env.STAGE;
@@ -102,11 +104,17 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
       }
       for (let i = 0; i < agent.bindings.length; i++) {
         const binding = agent.bindings[i]!;
-        // The orchestrator-tick only owns executor=lambda + scheduler=eventbridge
-        // bindings. Other bindings (CCR, GHA, external) are declarative — fired
-        // by their own schedulers. We still record them in `skipped` so the
-        // dispatch trace shows the full binding inventory.
-        if (!isOrchestratorOwned(binding)) {
+        // The orchestrator-tick owns two dispatch paths sharing the same
+        // scan/evaluate procedure:
+        //   - isOrchestratorOwned     → async-invoke wf-agent-runner Lambda
+        //   - isOrchestratorOwnedCcr  → POST to a CCR routine's /fire URL
+        //     (Secret at wf/ccr/{skill}, see shared/ccr-fire.ts)
+        // Other bindings (CCR with self-schedule, GHA, external non-API)
+        // are declarative — fired by their own schedulers. Recorded as
+        // skipped for inventory.
+        const ownedLambda = isOrchestratorOwned(binding);
+        const ownedCcr = isOrchestratorOwnedCcr(binding);
+        if (!ownedLambda && !ownedCcr) {
           skipped.push({
             slug: agent.slug,
             binding_idx: i,
@@ -116,11 +124,29 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
           continue;
         }
         const decision = await evaluateBinding(agent, i, binding, now);
-        if (decision.action === "dispatch") {
-          await invokeRunner(agent.slug, i);
-          dispatched.push({ slug: agent.slug, binding_idx: i, skill: binding.skill });
-        } else {
+        if (decision.action !== "dispatch") {
           skipped.push({ slug: agent.slug, binding_idx: i, skill: binding.skill, reason: decision.reason });
+          continue;
+        }
+        try {
+          if (ownedCcr) {
+            await fireCcrRoutine(binding.skill, {
+              agent_slug: agent.slug,
+              binding_idx: i,
+              ticked_at: tickedAt,
+            });
+          } else {
+            await invokeRunner(agent.slug, i);
+          }
+          dispatched.push({ slug: agent.slug, binding_idx: i, skill: binding.skill });
+        } catch (err) {
+          // Dispatch failure: W-4 fail-loud. Record as skipped with the
+          // error message so the operator can find it in the tick log.
+          // The next tick will retry (cron + dedup-window semantics
+          // unchanged).
+          const reason = err instanceof Error ? err.message : String(err);
+          console.error(JSON.stringify({ event: "dispatch-error", slug: agent.slug, skill: binding.skill, reason }));
+          skipped.push({ slug: agent.slug, binding_idx: i, skill: binding.skill, reason: `dispatch_error: ${reason.slice(0, 200)}` });
         }
       }
     }

@@ -77,6 +77,19 @@ export function isOrchestratorOwned(binding: AgentBinding): boolean {
   return binding.executor === "lambda" && binding.trigger?.scheduler === "eventbridge";
 }
 
+/** True when the orchestrator-tick fires this binding by POSTing to a CCR
+ *  routine's `/fire` API. Same cron-window evaluation + RUN dedup as the
+ *  Lambda path; dispatch target differs. The bearer token + URL live in
+ *  Secrets Manager at `wf/ccr/{binding.skill}` — see ccr-bootstrap.md and
+ *  workforce/lambdas/shared/ccr-fire.ts. */
+export function isOrchestratorOwnedCcr(binding: AgentBinding): boolean {
+  return (
+    binding.executor === "claude-code-routine" &&
+    binding.trigger?.scheduler === "external" &&
+    binding.trigger?.invoked_by === "api"
+  );
+}
+
 /** Identity fields — sourced from workforce/agents/{slug}/agent.json (git SoT). */
 export interface AgentIdentity {
   slug: AgentSlug;
