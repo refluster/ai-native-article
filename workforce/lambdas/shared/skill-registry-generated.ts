@@ -9,9 +9,11 @@ import type { DeterministicHandler } from "./skill-types.js";
 import { dispatchDiscordPing } from "../../skills/discord-ping/handler.js";
 import { dispatchPdmCharter } from "../../skills/pdm-charter/handler.js";
 import { dispatchPdmDecompose } from "../../skills/pdm-decompose/handler.js";
+import { dispatchPrRoute } from "../../skills/pr-route/handler.js";
 
 export const DETERMINISTIC_HANDLERS: Record<string, DeterministicHandler> = {
   "discord-ping": dispatchDiscordPing,
   "pdm-charter": dispatchPdmCharter,
   "pdm-decompose": dispatchPdmDecompose,
+  "pr-route": dispatchPrRoute,
 };
