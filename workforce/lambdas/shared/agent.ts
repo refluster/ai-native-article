@@ -55,6 +55,13 @@ export interface AgentBinding {
   routine_spec?: string;
   /** For executor=gha: workflow file path under .github/workflows/. */
   workflow?: string;
+  /** Persona-overlay block — skill-specific. The skill's routine_spec /
+   *  handler.ts contract defines the shape; the validator only enforces
+   *  structural binding fields, not `config` contents. See bindings.md
+   *  §"persona overlay" for examples (nomination_rules, lens_name,
+   *  checklist_sections, ...). Forwarded to deterministic handlers via
+   *  RunnerContext.binding_config (Phase 7 PR3a). */
+  config?: Readonly<Record<string, unknown>>;
   /** Human-readable cadence note. Renders in the UI. */
   note?: string;
 }
