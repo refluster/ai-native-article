@@ -13,8 +13,36 @@ export interface CompletionRequest {
   model: string;
   system: string;
   user: string;
+  /**
+   * Cap on visible-output tokens. With `reasoningBudgetTokens` unset (default
+   * behaviour, preserved for existing callers), this is the single
+   * `max_tokens` value passed to Anthropic — reasoning and visible output
+   * share it. With `reasoningBudgetTokens` set, this becomes the visible-
+   * output portion only; the reasoning budget is allocated separately
+   * (see below). Total wire-level `max_tokens` is `maxTokens +
+   * reasoningBudgetTokens` in that case.
+   */
   maxTokens: number;
   temperature?: number;
+  /**
+   * Optional separate reasoning budget. When set, enables Anthropic's
+   * extended-thinking mode (`thinking: { type: "enabled", budget_tokens }`).
+   * This decouples hidden-reasoning consumption from the visible-output cap,
+   * which is the same class of bug as the L2 truncation fix described in
+   * the root CLAUDE.md: with a shared cap, a model that reasons heavily
+   * can leave too few tokens for the visible body and the response gets
+   * truncated mid-sentence (surfaces as `stop_reason="max_tokens"`).
+   *
+   * For short-form outputs (e.g. feed-post at ~200 tokens visible),
+   * Sonnet/Opus callers SHOULD set this to ≥ `maxTokens` so reasoning
+   * cannot starve the prose budget. Haiku does not use extended thinking
+   * — leave unset for Haiku.
+   *
+   * Note: Anthropic requires `temperature=1` when `thinking` is enabled
+   * (the API throws 400 otherwise). The wrapper forces temperature=1
+   * when this is set, regardless of the caller-provided temperature.
+   */
+  reasoningBudgetTokens?: number;
 }
 
 export interface CompletionResponse {
@@ -36,6 +64,33 @@ export async function complete(req: CompletionRequest): Promise<CompletionRespon
   const { apiKey } = await getSecret<AnthropicSecret>("wf/anthropic");
   const modelKey = req.model.replace(/^anthropic:/, "");
 
+  // Extended-thinking ("reasoning") wiring. When the caller has set
+  // `reasoningBudgetTokens`, we enable Anthropic's `thinking` mode and
+  // pass `max_tokens = visible + reasoning` so the API knows the total
+  // budget. The visible-output portion stays bounded by `req.maxTokens`
+  // — when the model exhausts the visible budget, `stop_reason` becomes
+  // `"max_tokens"` and the throw below catches it (W-4 / R-9).
+  const thinkingEnabled = (req.reasoningBudgetTokens ?? 0) > 0;
+  const wireMaxTokens = thinkingEnabled
+    ? req.maxTokens + (req.reasoningBudgetTokens as number)
+    : req.maxTokens;
+  // Anthropic requires temperature=1 when thinking is enabled.
+  const wireTemperature = thinkingEnabled ? 1 : (req.temperature ?? 0.7);
+
+  const body: Record<string, unknown> = {
+    model: modelKey,
+    max_tokens: wireMaxTokens,
+    temperature: wireTemperature,
+    system: req.system,
+    messages: [{ role: "user", content: req.user }],
+  };
+  if (thinkingEnabled) {
+    body.thinking = {
+      type: "enabled",
+      budget_tokens: req.reasoningBudgetTokens,
+    };
+  }
+
   const res = await fetch(ANTHROPIC_URL, {
     method: "POST",
     headers: {
@@ -43,13 +98,7 @@ export async function complete(req: CompletionRequest): Promise<CompletionRespon
       "x-api-key": apiKey,
       "anthropic-version": ANTHROPIC_VERSION,
     },
-    body: JSON.stringify({
-      model: modelKey,
-      max_tokens: req.maxTokens,
-      temperature: req.temperature ?? 0.7,
-      system: req.system,
-      messages: [{ role: "user", content: req.user }],
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
@@ -65,8 +114,13 @@ export async function complete(req: CompletionRequest): Promise<CompletionRespon
 
   if (data.stop_reason === "max_tokens") {
     // W-1 / W-4. Loud failure — no truncated article ever ships.
+    // When thinking is enabled, both budgets are surfaced separately so
+    // the operator can tell whether reasoning or visible-output starved.
+    const budgetMsg = thinkingEnabled
+      ? `visible_max=${req.maxTokens} reasoning_max=${req.reasoningBudgetTokens} wire_max=${wireMaxTokens}`
+      : `max_tokens=${req.maxTokens}`;
     throw new Error(
-      `anthropic stop_reason=max_tokens (truncated). model=${modelKey} max_tokens=${req.maxTokens} out=${data.usage.output_tokens}`,
+      `anthropic stop_reason=max_tokens (truncated). model=${modelKey} ${budgetMsg} out=${data.usage.output_tokens}`,
     );
   }
 
