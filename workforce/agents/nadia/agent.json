@@ -96,11 +96,10 @@
     },
     {
       "skill": "pr-route",
-      "executor": "claude-code-routine",
+      "executor": "lambda",
       "trigger": {
         "scheduler": "manual"
       },
-      "routine_spec": "workforce/docs/routines/pr-route.md",
       "config": {
         "cycle_cap": 7,
         "requires": ["github.token"],

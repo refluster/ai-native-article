@@ -8,7 +8,10 @@
 
 export default {
   test: {
-    include: ["**/*-tests.ts"],
+    // Also picks up skill-handler tests living alongside their source
+    // (workforce/skills/{name}/*-tests.ts). Adding a new skill that
+    // wants tests = drop a sibling -tests.ts; no test-config edit.
+    include: ["**/*-tests.ts", "../skills/**/*-tests.ts"],
     exclude: ["node_modules/**", "dist/**", ".aws-sam/**"],
   },
 };

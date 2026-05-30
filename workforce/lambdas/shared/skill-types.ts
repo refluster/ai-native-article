@@ -20,6 +20,26 @@ import type { CredentialBag } from "./credential-injector.js";
  * is enforced at RUNTIME via the bag's Proxy throw on undeclared keys.
  * Skill handlers that want stricter compile-time narrowing can re-type
  * `ctx.credentials` to `CredentialBag<R>` where R is a literal subset.
+ *
+ * Phase 7 PR3a additions (Lambda-resident multi-project skills):
+ *
+ * - `project_id` — the resolved project (per Epic-010 §3); the same
+ *   id `credentials` were drawn from. Handlers that write to the
+ *   PROJECT#{id}/EXEC#* ledger or read PROJECT#{id}/META need it.
+ *   Defaults to `self/{slug}` when the invocation didn't specify
+ *   (matches RunnerEvent.project_id default).
+ *
+ * - `args` — invocation-time arguments. For cron-driven bindings this
+ *   is always `{}`. For `external` / `manual` schedulers it carries the
+ *   trigger payload (e.g. `{pr_url, mode, cycle?}` for pr-route /
+ *   pr-review). Handlers MUST treat untrusted values as untrusted —
+ *   the runner does not validate `args` shape.
+ *
+ * - `binding_config` — the `agent.json:bindings[i].config` block for
+ *   the firing binding. Skills overlay persona-specific behaviour
+ *   here (nomination_rules, checklist_sections, lens_name, ...) per
+ *   bindings.md §"persona overlay". Shape is skill-specific; handlers
+ *   own validation.
  */
 export interface RunnerContext {
   /** Agent slug — fills the {slug} placeholder in handler output. */
@@ -28,6 +48,12 @@ export interface RunnerContext {
   startedAt: string;
   /** Sealed credential bag. Reads of keys not in `meta.requires[]` throw. */
   credentials: CredentialBag;
+  /** Resolved project id (Epic-010 §3). Defaults to `self/{slug}`. */
+  project_id: string;
+  /** Invocation-time arguments. Empty for cron-driven bindings. */
+  args: Readonly<Record<string, unknown>>;
+  /** Binding-level config block (persona overlay). Shape is skill-specific. */
+  binding_config: Readonly<Record<string, unknown>>;
 }
 
 export interface DeterministicResult {
@@ -39,6 +65,17 @@ export interface DeterministicResult {
   summary: string;
   /** Optional external-publish side-effect status the runner can log. */
   side_effect?: { kind: string; status: number };
+  /**
+   * Optional LLM-cost accounting from inside the handler. Phase 7 PR3a:
+   * handlers that themselves call Anthropic (e.g. pr-route) MUST set
+   * these so the runner writes accurate tokens_in / tokens_out / cost_usd
+   * to the RUN row and respects W-3 (monthly budget cap) on the next
+   * pre-flight. Missing fields default to 0 (current discord-ping
+   * pattern — deterministic, no LLM, zero cost).
+   */
+  tokens_in?: number;
+  tokens_out?: number;
+  cost_usd?: number;
 }
 
 export type DeterministicHandler = (ctx: RunnerContext) => Promise<DeterministicResult>;

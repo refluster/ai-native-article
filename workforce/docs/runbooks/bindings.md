@@ -43,12 +43,12 @@ The `config` schema is skill-specific; validators check structural fields (execu
 
 | executor | allowed schedulers | where the artefact lives |
 |---|---|---|
-| `lambda` | `eventbridge` | `workforce/skills/{name}/` (folder with `meta.json`, `SKILL.md`, optional `handler.ts`) |
+| `lambda` | `eventbridge`, `external`, `manual` | `workforce/skills/{name}/` (folder with `meta.json`, `SKILL.md`, optional `handler.ts`) |
 | `claude-code-routine` | `claude-code-routine`, `external`, `manual` | `routine_spec` markdown under `workforce/docs/routines/`. `manual` is the **declarative-pending** shape: the routine exists as a spec but is not auto-fired (e.g. invoked conversationally as a sub-agent today, future CCR API trigger). The `routine_spec` is the load-bearing artefact in this mode. |
 | `gha` | `gha`, `external` | `workflow` YAML under `.github/workflows/` |
 | `cli` | `manual` | nothing — declarative only; binding documents that the skill is invokable on demand. Use `cli` when there is no `routine_spec`; use `claude-code-routine + manual` when the spec exists but is operator-invoked today. |
 
-The orchestrator-tick (`wf-orchestrator-tick-{stage}`) **only dispatches bindings where `executor=lambda` AND `trigger.scheduler=eventbridge`**. All other bindings are documentation + audit; they are fired by their respective schedulers (CCR cloud / GHA / external POST).
+The orchestrator-tick (`wf-orchestrator-tick-{stage}`) dispatches bindings where `executor=lambda` AND `trigger.scheduler=eventbridge`. `lambda` bindings with `scheduler=external` are fired by another binding's API GW call (notably `wf-webhook-{stage}` in Phase 7) or by another Lambda's async invoke. `lambda` bindings with `scheduler=manual` are operator-driven: `aws lambda invoke --function-name wf-agent-runner-{stage} --payload '{"agent":"nadia","binding_idx":N,"project_id":"asp-cloud","args":{...}}' out.json`. All non-`lambda` bindings are documentation + audit; they are fired by their respective schedulers (CCR cloud / GHA / external POST).
 
 ## How to add each kind of binding
 

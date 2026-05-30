@@ -65,6 +65,13 @@ export interface RunnerEvent {
    *  Validated via `asProjectId()` inside `resolveProjectId()` at the
    *  dual-write seam (wire format is raw string; brand applies after). */
   project_id?: string;
+  /** Optional invocation-time arguments forwarded to skill handlers
+   *  (Phase 7 PR3a). For cron-driven bindings this is undefined / `{}`.
+   *  For external/manual schedulers (e.g. operator-triggered pr-route
+   *  invocation), this carries the trigger payload — e.g.
+   *  `{pr_url, mode, cycle?}`. The runner does NOT validate the shape;
+   *  individual skill handlers own validation. */
+  args?: Record<string, unknown>;
 }
 
 export interface RunnerResult {
@@ -173,7 +180,18 @@ async function runDeterministic(
   credentials: CredentialBag,
 ): Promise<RunnerResult> {
   const handler = getDeterministicHandler(skill.meta.name);
-  const result = await handler({ slug: event.agent, startedAt, credentials });
+  // Phase 7 PR3a: forward project_id, args, and binding_config so
+  // Lambda-resident multi-project handlers (pr-route et al.) can resolve
+  // the per-project context. RunnerContext is widened backward-compatibly
+  // for legacy handlers (e.g. discord-ping) that ignore the new fields.
+  const result = await handler({
+    slug: event.agent,
+    startedAt,
+    credentials,
+    project_id: resolveProjectId(event),
+    args: event.args ?? {},
+    binding_config: binding.config ?? {},
+  });
 
   // Legacy path (still required for the front-end's RUN.output_s3_key
   // until Story 6 cuts the SPA over to the EXEC row's artifact_ref).
@@ -191,6 +209,14 @@ async function runDeterministic(
 
   const endedAt = new Date().toISOString();
 
+  // Phase 7 PR3a: deterministic handlers that internally call the LLM
+  // (pr-route, future pr-review) populate tokens_in/out/cost_usd on the
+  // result so the RUN row stays accurate. Legacy zero-cost handlers
+  // (discord-ping) leave them undefined and we default to 0.
+  const tokensIn = result.tokens_in ?? 0;
+  const tokensOut = result.tokens_out ?? 0;
+  const costUsd = result.cost_usd ?? 0;
+
   const runRow: RunRow = {
     pk: agentPk(event.agent),
     sk: `RUN#${runId}`,
@@ -199,9 +225,9 @@ async function runDeterministic(
     skill_version: skill.meta.version,
     cron: bindingCron(binding) ?? "",
     status: "ok",
-    tokens_in: 0,
-    tokens_out: 0,
-    cost_usd: 0,
+    tokens_in: tokensIn,
+    tokens_out: tokensOut,
+    cost_usd: costUsd,
     started_at: startedAt,
     ended_at: endedAt,
     output_s3_key: s3Key,
@@ -209,7 +235,7 @@ async function runDeterministic(
   };
   await writeRunAndExec(runRow, event, skill, artifactRef);
 
-  return { status: "ok", run_id: runId, tokens_in: 0, tokens_out: 0, cost_usd: 0 };
+  return { status: "ok", run_id: runId, tokens_in: tokensIn, tokens_out: tokensOut, cost_usd: costUsd };
 }
 
 // --- llm-prose executor --------------------------------------------------
