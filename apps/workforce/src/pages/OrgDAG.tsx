@@ -1,24 +1,23 @@
-// /workforce/org — the reporting graph as an **indented tree**, rendered
-// egocentrically: one agent is the focus, and only their immediate
-// 2-hop neighbourhood is shown. Clicking any visible node re-centers.
+// /workforce/org — the reporting graph as an **egocentric 1-hop chart**.
+// One agent is the focus; we show only their immediate neighbourhood:
+// the manager(s) they report to, the agent itself, and their direct
+// reports. Clicking any visible node re-centers (clicking the focus opens
+// its profile).
 //
-// Why an indented tree (not a horizontal DAG)? The previous horizontal
-// layout grew unboundedly wide as direct-report counts increased, and
-// past a depth of ~3 the columns ran off-screen. An indented vertical
-// list is the same layout every file explorer uses for the same reason:
-// depth lives on the X axis (cheap, small increments), siblings live on
-// the Y axis (free, scrollable). Lateral peers are no longer drawn as
-// inter-card lines — they surface in the mobile section and in each
-// agent's profile sidebar, which is where the operator actually acts on
-// them anyway.
+// Why 1-hop (manager → focus → reports) rather than a deeper indented
+// tree? Past one hop the connector lines crossed behind cards and the
+// "where does this T-junction go?" question got harder, not easier. The
+// shallow spine keeps every junction in open space so the structure reads
+// at a glance; deeper exploration is one click away via re-centering.
+//
+// Layout: a single vertical spine runs down the left gutter. Managers and
+// the focus sit at indent 0 (the spine passes to their left, surfacing as
+// a tick in the gap between stacked cards). Direct reports are indented
+// one step to the right, each hanging off the spine by a horizontal stub —
+// so every parent→child junction is a clean, fully-visible T.
 //
 // URL params:
 //   ?center=<slug>   the focus agent (default: first root, typically maya)
-//
-// Each visible parent→child pair is drawn as a tree-view L-connector
-// (vertical rail from the parent, horizontal stub into the child). The
-// rail anchors on the parent's avatar so it visually originates from
-// the parent regardless of card width.
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -28,27 +27,40 @@ import Sigil from '../components/Sigil';
 import { loadWorkforceManifest, fullName } from '../lib/agents';
 import type { WorkforceAgent, WorkforceAgentManifest } from '../types/agent';
 
-interface TreeRow {
+type Relation = 'manager' | 'focus' | 'report';
+
+interface Node {
   agent: WorkforceAgent;
-  indent: number;
-  /** Slug of the visible parent we descended from (null for top-level rows). */
-  parentSlug: string | null;
-  /** Y position of this row's centre line within the canvas. */
+  relation: Relation;
+  /** Row index (top to bottom). */
+  i: number;
+  /** Left edge x of this card. */
+  x: number;
+  /** Top y of this card. */
   y: number;
-  isCenter: boolean;
 }
 
-const INDENT_STEP = 36;
-const ROW_H = 84;
-const ROW_GAP = 12;
 const PADDING = 24;
+const ROW_H = 84;
+const ROW_GAP = 16;
 const CARD_W = 420;
 const SIGIL_SIZE = 56;
-const SIGIL_X = 12;
-const TEXT_X = SIGIL_X + SIGIL_SIZE + 12;
-const TEXT_PAD_RIGHT = 12;
-const RAIL_OFFSET = SIGIL_X + SIGIL_SIZE / 2;
-const HOPS = 2;
+const SIGIL_X = 16;
+const TEXT_X = SIGIL_X + SIGIL_SIZE + 14;
+const TEXT_PAD_RIGHT = 16;
+const CHILD_INDENT = 64;
+// The vertical spine sits under the avatar centre of the indent-0 cards.
+// Direct reports indent past it (CHILD_X > SPINE_X) so each horizontal
+// stub — and the T-junction it forms — lands in open gutter, never behind
+// a card.
+const SPINE_X = PADDING + SIGIL_X + SIGIL_SIZE / 2;
+const CHILD_X = PADDING + CHILD_INDENT;
+
+const RELATION_LABEL: Record<Relation, string> = {
+  manager: 'REPORTS TO',
+  focus: 'THIS AGENT',
+  report: 'DIRECT REPORT',
+};
 
 function pickDefaultCenter(agents: WorkforceAgent[]): string {
   const roots = agents.filter((a) => a.reports_to.length === 0);
@@ -56,73 +68,8 @@ function pickDefaultCenter(agents: WorkforceAgent[]): string {
   return [...agents].sort((a, b) => a.slug.localeCompare(b.slug))[0].slug;
 }
 
-function computeNeighbourhood(
-  agents: WorkforceAgent[],
-  centerSlug: string,
-  hops: number,
-): Set<string> {
-  const bySlug = new Map(agents.map((a) => [a.slug, a]));
-  const visited = new Set<string>([centerSlug]);
-  let frontier: string[] = [centerSlug];
-  for (let i = 0; i < hops; i++) {
-    const next: string[] = [];
-    for (const s of frontier) {
-      const a = bySlug.get(s);
-      if (!a) continue;
-      for (const peer of [...a.reports_to, ...a.direct_reports, ...a.lateral]) {
-        if (!visited.has(peer) && bySlug.has(peer)) {
-          visited.add(peer);
-          next.push(peer);
-        }
-      }
-    }
-    frontier = next;
-  }
-  return visited;
-}
-
-function buildTree(
-  agents: WorkforceAgent[],
-  visible: Set<string>,
-  centerSlug: string,
-): { rows: TreeRow[]; width: number; height: number } {
-  const bySlug = new Map(agents.map((a) => [a.slug, a]));
-  // Top-level rows: visible agents whose parent is NOT visible. Stable
-  // sort by (absolute depth, slug) so the topmost ancestor renders first.
-  const tops = agents
-    .filter((a) => visible.has(a.slug) && !a.reports_to.some((p) => visible.has(p)))
-    .sort((a, b) => a.depth - b.depth || a.slug.localeCompare(b.slug));
-
-  const rows: TreeRow[] = [];
-  const seen = new Set<string>();
-
-  function dfs(agent: WorkforceAgent, indent: number, parentSlug: string | null) {
-    if (seen.has(agent.slug)) return;
-    seen.add(agent.slug);
-    const y = PADDING + rows.length * (ROW_H + ROW_GAP);
-    rows.push({ agent, indent, parentSlug, y, isCenter: agent.slug === centerSlug });
-    const children = agent.direct_reports
-      .map((s) => bySlug.get(s))
-      .filter((c): c is WorkforceAgent => !!c && visible.has(c.slug))
-      .sort((a, b) => a.slug.localeCompare(b.slug));
-    for (const c of children) dfs(c, indent + 1, agent.slug);
-  }
-  for (const t of tops) dfs(t, 0, null);
-
-  // Defensive: pick up any visible agent that wasn't reachable via
-  // direct_reports from a top (e.g., orphaned by a missing edge).
-  for (const a of agents) {
-    if (visible.has(a.slug) && !seen.has(a.slug)) {
-      const y = PADDING + rows.length * (ROW_H + ROW_GAP);
-      rows.push({ agent: a, indent: 0, parentSlug: null, y, isCenter: a.slug === centerSlug });
-      seen.add(a.slug);
-    }
-  }
-
-  const maxIndent = rows.reduce((m, r) => Math.max(m, r.indent), 0);
-  const width = PADDING + maxIndent * INDENT_STEP + CARD_W + PADDING;
-  const height = PADDING + rows.length * ROW_H + Math.max(0, rows.length - 1) * ROW_GAP + PADDING;
-  return { rows, width, height };
+function byDepthThenSlug(a: WorkforceAgent, b: WorkforceAgent) {
+  return a.depth - b.depth || a.slug.localeCompare(b.slug);
 }
 
 export default function OrgDAG() {
@@ -143,15 +90,66 @@ export default function OrgDAG() {
 
   const view = useMemo(() => {
     if (!manifest) return null;
-    const defaultCenter = pickDefaultCenter(manifest.agents);
+    const agents = manifest.agents;
+    const bySlug = new Map(agents.map((a) => [a.slug, a]));
+    const defaultCenter = pickDefaultCenter(agents);
     const center =
-      requestedCenter && manifest.agents.some((a) => a.slug === requestedCenter)
-        ? requestedCenter
-        : defaultCenter;
-    const neighbourhood = computeNeighbourhood(manifest.agents, center, HOPS);
-    const tree = buildTree(manifest.agents, neighbourhood, center);
-    const centerAgent = manifest.agents.find((a) => a.slug === center)!;
-    return { center, centerAgent, neighbourhood, tree, allAgents: manifest.agents };
+      requestedCenter && bySlug.has(requestedCenter) ? requestedCenter : defaultCenter;
+    const centerAgent = bySlug.get(center)!;
+
+    const resolve = (slugs: string[]) =>
+      slugs.map((s) => bySlug.get(s)).filter((a): a is WorkforceAgent => !!a);
+
+    const managers = resolve(centerAgent.reports_to).sort(byDepthThenSlug);
+    const reports = resolve(centerAgent.direct_reports).sort((a, b) => a.slug.localeCompare(b.slug));
+    const laterals = resolve(centerAgent.lateral).sort((a, b) => a.slug.localeCompare(b.slug));
+
+    // Row order: managers, focus, reports. Managers + focus at indent 0;
+    // reports indented one step.
+    const ordered: { agent: WorkforceAgent; relation: Relation }[] = [
+      ...managers.map((a) => ({ agent: a, relation: 'manager' as const })),
+      { agent: centerAgent, relation: 'focus' as const },
+      ...reports.map((a) => ({ agent: a, relation: 'report' as const })),
+    ];
+    const rowY = (i: number) => PADDING + i * (ROW_H + ROW_GAP);
+    const nodes: Node[] = ordered.map((r, i) => ({
+      agent: r.agent,
+      relation: r.relation,
+      i,
+      x: r.relation === 'report' ? CHILD_X : PADDING,
+      y: rowY(i),
+    }));
+
+    const focusIndex = managers.length;
+    const rowCenter = (i: number) => rowY(i) + ROW_H / 2;
+
+    // One continuous vertical spine + one horizontal stub per direct report.
+    const spineTopY = managers.length > 0 ? rowCenter(0) : rowCenter(focusIndex);
+    const spineBottomY =
+      reports.length > 0 ? rowCenter(focusIndex + reports.length) : rowCenter(focusIndex);
+    const hasSpine = managers.length > 0 || reports.length > 0;
+    const reportStubsY = reports.map((_, k) => rowCenter(focusIndex + 1 + k));
+
+    const totalRows = ordered.length;
+    const rightmostX = reports.length > 0 ? CHILD_X : PADDING;
+    const width = rightmostX + CARD_W + PADDING;
+    const height = PADDING + totalRows * ROW_H + Math.max(0, totalRows - 1) * ROW_GAP + PADDING;
+
+    const shownCount = managers.length + 1 + reports.length + laterals.length;
+
+    return {
+      center,
+      centerAgent,
+      managers,
+      reports,
+      laterals,
+      nodes,
+      spine: { hasSpine, spineTopY, spineBottomY, reportStubsY },
+      width,
+      height,
+      shownCount,
+      allAgents: agents,
+    };
   }, [manifest, requestedCenter]);
 
   function setCenter(slug: string) {
@@ -175,28 +173,9 @@ export default function OrgDAG() {
     );
   }
 
-  const { tree, centerAgent, neighbourhood, allAgents } = view;
-  const rowBySlug = new Map(tree.rows.map((r) => [r.agent.slug, r]));
-
-  // Each visible parent → child becomes one L-connector. We anchor the
-  // vertical rail at the parent's avatar centre (RAIL_OFFSET from the
-  // parent's card x) so the line clearly originates from the parent.
-  const edges = tree.rows
-    .filter((r) => r.parentSlug)
-    .map((child) => {
-      const parent = rowBySlug.get(child.parentSlug!);
-      if (!parent) return null;
-      const parentX = PADDING + parent.indent * INDENT_STEP;
-      const childX = PADDING + child.indent * INDENT_STEP;
-      const railX = parentX + RAIL_OFFSET;
-      const fromY = parent.y + ROW_H; // bottom of parent card
-      const toY = child.y + ROW_H / 2; // middle of child card
-      const toX = childX; // left edge of child card
-      return { child, parent, railX, fromY, toY, toX };
-    })
-    .filter((e): e is NonNullable<typeof e> => !!e);
-
-  const hiddenCount = allAgents.length - neighbourhood.size;
+  const { centerAgent, managers, reports, laterals, nodes, spine, width, height, shownCount, allAgents } =
+    view;
+  const hiddenCount = allAgents.length - shownCount;
   const textW = CARD_W - TEXT_X - TEXT_PAD_RIGHT;
 
   return (
@@ -214,54 +193,66 @@ export default function OrgDAG() {
             VIEW {centerAgent.slug.toUpperCase()} PROFILE →
           </Link>
           <span>
-            showing {neighbourhood.size} of {allAgents.length}
+            showing {shownCount} of {allAgents.length}
             {hiddenCount > 0 ? ` (${hiddenCount} hidden — re-center to explore further)` : ''}
           </span>
-          <span className="text-wf-tertiary">click any row to re-center</span>
+          <span className="text-wf-primary">click any row to re-center</span>
         </div>
       </section>
 
-      {/* DESKTOP: indented tree. */}
+      {/* DESKTOP: egocentric spine chart. */}
       <div className="hidden md:block border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-2 overflow-auto">
         <svg
-          width={tree.width}
-          height={tree.height}
-          viewBox={`0 0 ${tree.width} ${tree.height}`}
+          width={width}
+          height={height}
+          viewBox={`0 0 ${width} ${height}`}
           className="block"
-          style={{ minWidth: tree.width }}
+          style={{ minWidth: width }}
         >
-          {edges.map(({ child, parent, railX, fromY, toY, toX }, i) => {
-            const dim = hoverSlug && hoverSlug !== parent.agent.slug && hoverSlug !== child.agent.slug;
-            return (
-              <path
-                key={`e-${i}`}
-                d={`M ${railX} ${fromY} L ${railX} ${toY} L ${toX} ${toY}`}
-                fill="none"
-                stroke="var(--wf-sigil-border)"
-                strokeWidth={dim ? 1 : 1.5}
-                opacity={dim ? 0.4 : 1}
-              />
-            );
-          })}
+          {/* Connectors drawn first so cards paint over the spine's hidden
+              (behind-card) segments; every visible junction is in open gutter. */}
+          {spine.hasSpine && (
+            <path
+              d={`M ${SPINE_X} ${spine.spineTopY} L ${SPINE_X} ${spine.spineBottomY}`}
+              fill="none"
+              stroke="var(--wf-sigil-border)"
+              strokeWidth={1.5}
+            />
+          )}
+          {spine.reportStubsY.map((cy, k) => (
+            <path
+              key={`stub-${k}`}
+              d={`M ${SPINE_X} ${cy} L ${CHILD_X} ${cy}`}
+              fill="none"
+              stroke="var(--wf-sigil-border)"
+              strokeWidth={1.5}
+            />
+          ))}
 
-          {tree.rows.map((r) => {
-            const dim = hoverSlug !== null && hoverSlug !== r.agent.slug;
-            const x = PADDING + r.indent * INDENT_STEP;
+          {nodes.map((n) => {
+            const isCenter = n.relation === 'focus';
+            const dim = hoverSlug !== null && hoverSlug !== n.agent.slug;
             return (
               <g
-                key={r.agent.slug}
-                transform={`translate(${x}, ${r.y})`}
-                onMouseEnter={() => setHoverSlug(r.agent.slug)}
-                onMouseLeave={() => setHoverSlug((c) => (c === r.agent.slug ? null : c))}
-                onClick={() => setCenter(r.agent.slug)}
-                style={{ cursor: 'pointer', opacity: dim ? 0.5 : 1, transition: 'opacity 120ms' }}
+                key={n.agent.slug}
+                transform={`translate(${n.x}, ${n.y})`}
+                onMouseEnter={() => setHoverSlug(n.agent.slug)}
+                onMouseLeave={() => setHoverSlug((c) => (c === n.agent.slug ? null : c))}
+                onClick={() =>
+                  isCenter ? navigate(`/agents/${n.agent.slug}`) : setCenter(n.agent.slug)
+                }
+                style={{ cursor: 'pointer', opacity: dim ? 0.55 : 1, transition: 'opacity 120ms' }}
                 role="button"
-                aria-label={`Re-center on ${r.agent.first_name} ${r.agent.last_name}`}
+                aria-label={
+                  isCenter
+                    ? `Open ${fullName(n.agent)}'s profile`
+                    : `Re-center on ${fullName(n.agent)}`
+                }
                 tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    setCenter(r.agent.slug);
+                    isCenter ? navigate(`/agents/${n.agent.slug}`) : setCenter(n.agent.slug);
                   }
                 }}
               >
@@ -270,13 +261,13 @@ export default function OrgDAG() {
                   y="0"
                   width={CARD_W}
                   height={ROW_H}
-                  fill={r.isCenter ? 'var(--wf-svg-surface-emphasis, var(--wf-svg-surface))' : 'var(--wf-svg-surface)'}
-                  stroke={r.isCenter ? 'var(--wf-svg-tertiary)' : 'var(--wf-sigil-border)'}
-                  strokeWidth={r.isCenter ? 2.5 : 1}
+                  fill={isCenter ? 'var(--wf-svg-surface-emphasis)' : 'var(--wf-svg-surface)'}
+                  stroke={isCenter ? 'var(--wf-svg-primary)' : 'var(--wf-sigil-border)'}
+                  strokeWidth={isCenter ? 2.5 : 1}
                   rx="8"
                 />
                 <foreignObject x={SIGIL_X} y={(ROW_H - SIGIL_SIZE) / 2} width={SIGIL_SIZE} height={SIGIL_SIZE}>
-                  <Sigil slug={r.agent.slug} size={SIGIL_SIZE} />
+                  <Sigil slug={n.agent.slug} size={SIGIL_SIZE} />
                 </foreignObject>
                 <foreignObject x={TEXT_X} y="12" width={textW} height={ROW_H - 24}>
                   <div
@@ -297,13 +288,13 @@ export default function OrgDAG() {
                         fontSize: 10,
                         letterSpacing: '0.14em',
                         textTransform: 'uppercase',
-                        color: 'var(--wf-svg-on-surface-variant)',
+                        color: 'var(--wf-svg-primary)',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                       }}
                     >
-                      {r.agent.slug.toUpperCase()} · L{r.agent.depth}{r.isCenter ? ' · CENTER' : ''}
+                      {RELATION_LABEL[n.relation]} · L{n.agent.depth}
                     </div>
                     <div
                       style={{
@@ -315,7 +306,7 @@ export default function OrgDAG() {
                         textOverflow: 'ellipsis',
                       }}
                     >
-                      {r.agent.first_name} {r.agent.last_name}
+                      {n.agent.first_name} {n.agent.last_name}
                     </div>
                     <div
                       style={{
@@ -327,7 +318,7 @@ export default function OrgDAG() {
                         textOverflow: 'ellipsis',
                       }}
                     >
-                      {r.agent.role}
+                      {n.agent.role}
                     </div>
                     <div
                       className="font-wfmono"
@@ -339,7 +330,7 @@ export default function OrgDAG() {
                         textOverflow: 'ellipsis',
                       }}
                     >
-                      {r.agent.residence}
+                      {n.agent.residence}
                     </div>
                   </div>
                 </foreignObject>
@@ -347,29 +338,42 @@ export default function OrgDAG() {
             );
           })}
         </svg>
+
+        {laterals.length > 0 && (
+          <div className="mt-3 border-t border-wf-outline-variant pt-3">
+            <Typeplate label="LATERAL" value={`${laterals.length}`} className="mb-2" />
+            <ul className="flex flex-wrap gap-2">
+              {laterals.map((a) => (
+                <li key={a.slug}>
+                  <button
+                    type="button"
+                    onClick={() => setCenter(a.slug)}
+                    className="flex items-center gap-2 border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-sm px-2.5 py-1.5 hover:bg-wf-surface-container-hi transition-colors"
+                  >
+                    <Sigil slug={a.slug} size={24} />
+                    <span className="text-left">
+                      <span className="block font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant">
+                        {a.slug.toUpperCase()} · L{a.depth}
+                      </span>
+                      <span className="block text-sm text-wf-on-surface truncate max-w-[180px]">{fullName(a)}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
-      {/* MOBILE: parents / center / direct reports / lateral, in that order. */}
+      {/* MOBILE: managers / focus / direct reports / lateral, in that order. */}
       <div className="md:hidden space-y-6">
-        <NeighbourGroup
-          label="REPORTS TO"
-          agents={centerAgent.reports_to.map((s) => allAgents.find((a) => a.slug === s)).filter((a): a is WorkforceAgent => !!a)}
-          onRecenter={setCenter}
-        />
+        <NeighbourGroup label="REPORTS TO" agents={managers} onRecenter={setCenter} />
         <section>
-          <Typeplate label="CENTER" value={centerAgent.slug.toUpperCase()} className="mb-2" />
+          <Typeplate label="THIS AGENT" value={centerAgent.slug.toUpperCase()} className="mb-2" />
           <NeighbourCard agent={centerAgent} isCenter onRecenter={() => navigate(`/agents/${centerAgent.slug}`)} ctaLabel="VIEW PROFILE →" />
         </section>
-        <NeighbourGroup
-          label="DIRECT REPORTS"
-          agents={centerAgent.direct_reports.map((s) => allAgents.find((a) => a.slug === s)).filter((a): a is WorkforceAgent => !!a)}
-          onRecenter={setCenter}
-        />
-        <NeighbourGroup
-          label="LATERAL"
-          agents={centerAgent.lateral.map((s) => allAgents.find((a) => a.slug === s)).filter((a): a is WorkforceAgent => !!a)}
-          onRecenter={setCenter}
-        />
+        <NeighbourGroup label="DIRECT REPORTS" agents={reports} onRecenter={setCenter} />
+        <NeighbourGroup label="LATERAL" agents={laterals} onRecenter={setCenter} />
       </div>
     </WorkforceLayout>
   );
@@ -416,13 +420,13 @@ function NeighbourCard({
       onClick={onRecenter}
       className={`w-full flex items-center gap-3 border rounded-wf-md p-3 text-left transition-colors ${
         isCenter
-          ? 'border-wf-tertiary bg-wf-surface-container-hi'
+          ? 'border-wf-primary bg-wf-surface-container-hi'
           : 'border-wf-outline-variant bg-wf-surface-container-lo hover:bg-wf-surface-container-hi'
       }`}
     >
       <Sigil slug={agent.slug} size={48} />
       <div className="min-w-0 flex-1">
-        <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+        <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary">
           {agent.slug.toUpperCase()} · L{agent.depth}{isCenter ? ' · CENTER' : ''}
         </div>
         <div className="font-semibold text-wf-on-surface truncate">{fullName(agent)}</div>
