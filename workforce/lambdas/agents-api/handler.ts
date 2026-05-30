@@ -915,10 +915,9 @@ async function patchFeedPostRoute(
     ? iamRaw.userArn.split("/").pop() ?? "_operator"
     : "_operator";
 
-  // Stubbed; Story 4 (#131) fills in `hidePost`. The throw below makes
-  // the sequencing visible to callers — until Story 4 lands, the route
-  // surfaces a 500 with `hide_helper_not_wired`. After Story 4, the throw
-  // disappears and the route returns 200 with the updated row.
+  // Story 4 (#131) wired the real implementation. The helper writes the
+  // audit EXEC row to PROJECT#self/{operator} BEFORE flipping visibility
+  // (W-2 ordering). If anything fails, the outer try/catch returns 500.
   await hidePost({
     agent_slug: slug,
     post_id: postId,

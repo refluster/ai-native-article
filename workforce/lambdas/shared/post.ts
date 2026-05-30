@@ -22,8 +22,22 @@
 // caller mistake (invalid post_id, missing row) rather than returning
 // `null` and shifting the burden to the route layer.
 
-import { getItem, queryByGsiPaged, queryBySkPrefixPaged, type PagedResult } from "./ddb.js";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import {
+  getItem,
+  queryByGsi,
+  queryByGsiPaged,
+  queryBySkPrefixPaged,
+  updateOperational,
+  type PagedResult,
+} from "./ddb.js";
+import * as project from "./project.js";
+import { selfProjectId } from "./project.js";
+import {
+  S3Client,
+  GetObjectCommand,
+  HeadObjectCommand,
+  NotFound,
+} from "@aws-sdk/client-s3";
 
 const BUCKET_NAME = process.env.BUCKET_NAME;
 const s3 = new S3Client({});
@@ -292,26 +306,134 @@ export interface HidePostInput {
   operator: string;
 }
 
+export const POST_HIDE_SKILL_VERSION = "0.1.0";
+
 /**
- * Operator-only hide primitive — flips `visibility=hidden` on the POST
- * row and writes a PROJECT-scoped audit `EXEC` row.
+ * Operator-only hide primitive — Story 4 (#131). Flips
+ * `visibility=hidden` on the POST row and writes a PROJECT-scoped audit
+ * `EXEC` row.
  *
- * **Stubbed in this PR**: Epic-011 Story 4 (#131) owns the implementation.
- * The Story 5 PR (#132) wires the call site so the API route compiles
- * and the rejection-path tests can assert "no helper means a throw, not
- * a silent success." When Story 4 lands its helper, rename + delete the
- * stub — the call site signature is the contract.
- *
- * Contract per #131:
- *   1. Write the audit EXEC row FIRST (W-2 ordering: audit-then-mutate,
- *      never the reverse).
- *   2. Then flip `visibility=hidden` on the POST row.
- *   3. The body in S3 is NEVER mutated.
+ *   1. Load the POST row (throw if missing — a hide audit for a phantom
+ *      post would be noise).
+ *   2. Write the audit `EXEC` row to `PROJECT#self/{operator}` FIRST
+ *      (W-2 ordering: audit-then-mutate, never the reverse).
+ *   3. Then flip `visibility=hidden` on the POST row via
+ *      `updateOperational()`.
+ *   4. The body in S3 is NEVER mutated.
  */
-export async function hidePost(_input: HidePostInput): Promise<void> {
-  // TODO(story-4-#131): wire to the real `hidePost()` helper — this stub
-  // throws until Story 4 lands. Tests assert this throw to lock the
-  // sequencing contract: a `PATCH /feed/{post_id}` issued before #131
-  // lands fails loudly rather than silently no-oping.
-  throw new Error("hide_helper_not_wired");
+export async function hidePost(input: HidePostInput): Promise<void> {
+  const reason = input.reason.trim();
+  if (reason.length === 0) {
+    throw new Error("hidePost: reason must be a non-empty string");
+  }
+
+  // (1) Load the POST row.
+  const pk = `AGENT#${input.agent_slug}` as const;
+  const sk = `POST#${input.post_id}` as const;
+  const row = await getItem<FeedPostRow>(pk, sk);
+  if (!row) {
+    throw new Error(
+      `hidePost: no POST row for agent_slug="${input.agent_slug}" post_id="${input.post_id}"`,
+    );
+  }
+
+  // (2) Audit row first. Inherits the Epic-010 EXEC shape. The audit
+  //     project (`self/{operator}`) is seeded by `seed-projects.mjs`;
+  //     if missing, `appendExecution()` throws cross-project-denial.
+  const operatorProjectId = selfProjectId(input.operator);
+  const execUlid = defaultNewUlid();
+  const startedAt = new Date().toISOString();
+  const summary = `hidden by operator: ${reason}`.slice(0, 512);
+
+  await project.appendExecution({
+    project_id: operatorProjectId,
+    agent_slug: input.operator,
+    exec_ulid: execUlid,
+    skill_name: "post-hide",
+    skill_version: POST_HIDE_SKILL_VERSION,
+    started_at: startedAt,
+    ended_at: startedAt,
+    status: "ok",
+    used_credential_types: [],
+    inputs_hash: input.post_id,
+    artifact_ref: {
+      uri: `s3://${row.body_ref}`,
+      content_hash: "",
+      content_type: "text/markdown; charset=utf-8",
+      size_bytes: row.tokens_out * 4,
+      summary,
+    },
+  });
+
+  // (3) Flip visibility. `updateOperational` is conditional on the row
+  //     existing — a concurrent delete between (1) and (3) throws.
+  await updateOperational<FeedPostRow>(
+    pk,
+    sk,
+    {
+      visibility: "hidden",
+      hidden_at: startedAt,
+      hidden_reason: reason.slice(0, 256),
+      hidden_by_exec_ulid: execUlid,
+    },
+    undefined,
+  );
+}
+
+// --- feed-health helpers (Story 4) --------------------------------------
+
+/**
+ * Iterate every POST row in the workforce feed corpus, newest first.
+ * Used by the `feed-health` sweep.
+ */
+export async function* iterateAllPosts(pageSize = 100): AsyncGenerator<FeedPostRow> {
+  const rows = await queryByGsi<FeedPostRow>("GSI3", "FEED", {
+    limit: pageSize,
+    scanIndexForward: false,
+  });
+  for (const r of rows) yield r;
+}
+
+/**
+ * Returns `true` iff the S3 object at `bodyRef` resolves via HeadObject.
+ * Returns `false` on a 404. Other SDK errors propagate. When
+ * `BUCKET_NAME` is unset, returns `true` (test-friendly local path).
+ */
+export async function postBodyExists(bodyRef: string): Promise<boolean> {
+  if (!BUCKET_NAME) return true;
+  try {
+    await s3.send(new HeadObjectCommand({ Bucket: BUCKET_NAME, Key: bodyRef }));
+    return true;
+  } catch (err) {
+    if (err instanceof NotFound) return false;
+    if (err instanceof Error && err.name === "NotFound") return false;
+    throw err;
+  }
+}
+
+/**
+ * Fetch the first `maxChars` of the S3 body. Used by the feed-health
+ * LLM-artefact check when the inline `body_preview` is missing.
+ */
+export async function fetchPostBodyHead(bodyRef: string, maxChars: number): Promise<string> {
+  if (!BUCKET_NAME) return "";
+  const out = await s3.send(
+    new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: bodyRef,
+      Range: `bytes=0-${maxChars * 4}`,
+    }),
+  );
+  const body = out.Body;
+  if (!body) return "";
+  const transformed = await body.transformToString();
+  return transformed.slice(0, maxChars);
+}
+
+/** Default ULID generator (timestamp + monotonic counter). */
+let _ulidCounter = 0;
+function defaultNewUlid(): string {
+  const ts = Date.now().toString(36).toUpperCase().padStart(10, "0");
+  const counter = (_ulidCounter++).toString(36).toUpperCase().padStart(6, "0");
+  return `${ts}${counter}`.slice(0, 26).padEnd(26, "0");
 }
