@@ -1034,6 +1034,15 @@ Resources:
               Action: secretsmanager:GetSecretValue
               Resource:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/github-*
+            - Sid: OrchestratorCcrFireSecrets
+              # CCR /fire dispatch path (shared/ccr-fire.ts). The orchestrator
+              # loads `wf/ccr/{skill}` to get the routine's URL + bearer
+              # token, then POSTs the fire payload. Scope is `wf/ccr/*`
+              # only — the broader `wf/*` namespace stays out of reach.
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/ccr/*
       Events:
         Tick:
           Type: Schedule
