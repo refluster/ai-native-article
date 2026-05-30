@@ -391,6 +391,17 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /agents/{slug}/projects
             Method: GET
+        # Epic-010 ROADMAP §Status-transition criterion 3 (C3) — agent
+        # profile reads execution history from the EXEC row family via
+        # GSI1 instead of the legacy AGENT#{slug}/RUN#{ulid} +
+        # AGENT#{slug}/DELIV#{ulid} rows. Public read; same access shape
+        # as the existing GET /agents/{slug}/deliverables it replaces.
+        ListAgentExecutions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}/executions
+            Method: GET
         ListProjects:
           Type: HttpApi
           Properties:

@@ -123,3 +123,38 @@ export async function fetchAgentDeliverables(slug: string, limit = 20): Promise<
   const data = (await res.json()) as { items: AgentDeliverable[] }
   return data.items
 }
+
+// Epic-010 C3: agent profile execution-history read path. Replaces
+// fetchAgentDeliverables with the EXEC-row family (PROJECT#{id}/EXEC#
+// via the GSI1 AGENT#{slug} partition). The legacy fetchAgentDeliverables
+// stays until the dual-write cutover (C2); fetchAgentExecutions is the
+// post-cutover canonical path.
+export interface AgentExecution {
+  /** ULID without the EXEC# prefix. */
+  exec_ulid: string
+  project_id: string
+  agent_slug: string
+  skill_name: string
+  skill_version: string
+  started_at: string
+  ended_at: string
+  status: 'ok' | 'throw' | 'skipped' | 'failed_artefact_redaction'
+  used_credential_types?: string[]
+  artifact_ref?: {
+    uri: string
+    content_hash: string
+    content_type: string
+    size_bytes: number
+    summary: string
+  }
+  error?: string
+}
+
+export async function fetchAgentExecutions(slug: string, limit = 20): Promise<AgentExecution[]> {
+  if (!apiConfigured()) return []
+  const url = `${WORKFORCE_AGENTS_API_BASE}/agents/${encodeURIComponent(slug)}/executions?limit=${limit}`
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`agents-api ${res.status}`)
+  const data = (await res.json()) as { items: AgentExecution[] }
+  return data.items
+}

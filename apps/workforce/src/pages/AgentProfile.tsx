@@ -1,15 +1,25 @@
 // /workforce/agents/:slug — agent profile in the workforce console
 // language. Hero with sigil + name + status, KPI strip, per-agent heat
-// strip, recent runs, skills, identity, and reporting graph card.
+// strip, recent executions, skills, identity, and reporting graph card.
 //
 // Data sources:
 //   - manifest (workforce-agents.json) → static persona record + topology
 //   - mock-stats (workforce-mock-stats.json) → fallback shape when
 //     WORKFORCE_AGENTS_API_BASE is unset
-//   - live agents-api (fetchAgentLive / fetchAgentDeliverables) → preferred
+//   - live agents-api (fetchAgentLive / fetchAgentExecutions) → preferred
 //     when configured; supplants mock for THIS-MONTH numbers and the
-//     deliverables list. The heat strip stays mock-driven for now (no
-//     live endpoint exists yet).
+//     execution-history list. The heat strip stays mock-driven for now
+//     (no live endpoint exists yet).
+//
+// Epic-010 ROADMAP §Status-transition criterion 3 (C3): the execution-
+// history list reads from the EXEC row family (PROJECT#{id}/EXEC#{ulid})
+// via the GSI1 AGENT#{slug} query, NOT from the legacy
+// AGENT#{slug}/RUN#{ulid} + AGENT#{slug}/DELIV#{ulid} rows. The C3
+// migration replaced fetchAgentDeliverables with fetchAgentExecutions
+// on this page; the deeplink-to-Notion/PR affordance the DELIV path
+// surfaced is a documented regression (FU-NEW-G tracks the runner
+// extension that re-enriches the EXEC row with notion_page_url /
+// pr_url so the affordance can come back).
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -23,13 +33,13 @@ import AgentOrgGraph from '../components/AgentOrgGraph';
 import RecentPostsSection from '../components/RecentPostsSection';
 import {
   apiConfigured,
-  fetchAgentDeliverables,
+  fetchAgentExecutions,
   fetchAgentLive,
   findAgent,
   fullName,
   loadWorkforceManifest,
   loadWorkforceMockStats,
-  type AgentDeliverable,
+  type AgentExecution,
   type AgentLiveRecord,
 } from '../lib/agents';
 import { fetchAgentMemberships } from '../lib/projects';
@@ -72,7 +82,7 @@ export default function AgentProfile() {
   const [roster, setRoster] = useState<WorkforceAgent[]>([]);
   const [mock, setMock] = useState<WorkforceMockStats | null>(null);
   const [live, setLive] = useState<AgentLiveRecord | null | undefined>(undefined);
-  const [delivs, setDelivs] = useState<AgentDeliverable[] | null>(null);
+  const [execs, setExecs] = useState<AgentExecution[] | null>(null);
   const [memberships, setMemberships] = useState<AgentMembership[] | null>(null);
   const [liveError, setLiveError] = useState<string | null>(null);
 
@@ -99,20 +109,20 @@ export default function AgentProfile() {
   useEffect(() => {
     if (!slug || !apiConfigured()) {
       setLive(null);
-      setDelivs([]);
+      setExecs([]);
       return;
     }
     let cancelled = false;
-    Promise.all([fetchAgentLive(slug), fetchAgentDeliverables(slug, 20)])
+    Promise.all([fetchAgentLive(slug), fetchAgentExecutions(slug, 20)])
       .then(([l, d]) => {
         if (cancelled) return;
         setLive(l ?? null);
-        setDelivs(d);
+        setExecs(d);
       })
       .catch((err) => {
         if (cancelled) return;
         setLive(null);
-        setDelivs([]);
+        setExecs([]);
         setLiveError(err instanceof Error ? err.message : String(err));
       });
     return () => {
@@ -340,46 +350,55 @@ export default function AgentProfile() {
           {apiConfigured() && (
             <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
               <div className="border-b border-wf-outline-variant px-4 py-3">
-                <Typeplate label="DECK · DELIV" value="RECENT" />
+                <Typeplate label="DECK · EXEC" value="RECENT" />
               </div>
               <div className="p-4">
-                {delivs === null ? (
+                {execs === null ? (
                   <p className="font-wfmono text-xs text-wf-on-surface-variant">Loading…</p>
-                ) : delivs.length === 0 ? (
+                ) : execs.length === 0 ? (
                   <p className="font-wfmono text-xs text-wf-on-surface-variant">
-                    no deliverables yet — orchestrator hasn't fired since deploy.
+                    no executions yet — orchestrator hasn't fired since deploy.
                   </p>
                 ) : (
                   <ul className="divide-y divide-wf-outline-variant">
-                    {delivs.map((d) => {
-                      const id = d.sk.replace(/^DELIV#/, '');
-                      const link =
-                        d.pr_url ??
-                        d.notion_page_url ??
-                        (d.notion_page_id
-                          ? `https://www.notion.so/${d.notion_page_id.replace(/-/g, '')}`
-                          : undefined);
+                    {execs.map((e) => {
+                      const id = e.exec_ulid;
+                      const startedDate = e.started_at?.slice(0, 10);
+                      // EXEC rows carry the canonical S3 artefact URI.
+                      // Deeplinks to Notion / GitHub PRs lived on the
+                      // legacy DELIV row family and aren't on EXEC yet
+                      // (FU-NEW-G follow-up). Until that lands the row
+                      // surfaces the project_id + exec_ulid as the
+                      // operator's drill-down handle.
                       return (
                         <li key={id} className="py-2.5 flex items-baseline gap-3 text-sm">
                           <span className="font-wfmono text-xs text-wf-on-surface-variant shrink-0 w-24">
-                            {d.created_at?.slice(0, 10)}
+                            {startedDate}
                           </span>
-                          <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant shrink-0 w-20">
-                            {d.type}
+                          <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant shrink-0 w-32 truncate" title={e.skill_name}>
+                            {e.skill_name}
                           </span>
-                          <span className="flex-1">
-                            {link ? (
-                              <a href={link} target="_blank" rel="noopener noreferrer" className="text-wf-primary hover:underline">
-                                {id.slice(0, 8)}
-                              </a>
-                            ) : (
-                              <>{id.slice(0, 8)}</>
-                            )}
-                            {d.status && (
-                              <span className="ml-2 font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant">
-                                {d.status}
-                              </span>
-                            )}
+                          <span className="flex-1 font-wfmono text-xs text-wf-on-surface">
+                            <Link
+                              to={`/projects/${encodeURIComponent(e.project_id)}`}
+                              className="text-wf-primary hover:underline"
+                            >
+                              {id.slice(0, 8)}
+                            </Link>
+                            <span className="ml-2 text-wf-on-surface-variant">
+                              · {e.project_id}
+                            </span>
+                            <span
+                              className={`ml-2 font-wfmono text-[10px] uppercase tracking-[0.12em] ${
+                                e.status === 'ok'
+                                  ? 'text-wf-running'
+                                  : e.status === 'throw' || e.status === 'failed_artefact_redaction'
+                                    ? 'text-wf-throwing'
+                                    : 'text-wf-on-surface-variant'
+                              }`}
+                            >
+                              {e.status === 'failed_artefact_redaction' ? 'REDACTED' : e.status}
+                            </span>
                           </span>
                         </li>
                       );

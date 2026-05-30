@@ -57,6 +57,7 @@ import {
   archive as archiveProject,
   asProjectId,
   getProject,
+  listExecutions,
   projectPk,
   unarchive as unarchiveProject,
   type ExecutionRow,
@@ -130,6 +131,7 @@ export async function handler(
     if (routeKey === "GET /skills") return listSkills(event);
     if (routeKey === "GET /skills/{name}" && skillName) return getSkill(skillName);
     if (routeKey === "GET /agents/{slug}/deliverables" && slug) return listAgentDeliverables(slug, event);
+    if (routeKey === "GET /agents/{slug}/executions" && slug) return listAgentExecutions(slug, event);
     if (routeKey === "GET /agents/{slug}/projects" && slug) return listAgentProjects(slug);
     if (routeKey === "GET /agents/{slug}/posts" && slug) return listAgentPostsRoute(slug, event);
     if (routeKey === "GET /agents/{slug}" && slug) return getAgent(slug);
@@ -653,6 +655,68 @@ async function listAgentProjects(slug: string): Promise<APIGatewayProxyResultV2>
       project_id: r.project_id,
       joined_at: r.joined_at,
     }));
+  return reply(200, { items });
+}
+
+// Epic-010 ROADMAP §Status-transition criterion 3 (C3): the agent
+// profile page must read execution history from the EXEC row family
+// (`PROJECT#{id}/EXEC#{ulid}`) via the GSI1 `AGENT#{slug}` partition
+// rather than from the legacy `AGENT#{slug}/RUN#{ulid}` +
+// `AGENT#{slug}/DELIV#{ulid}` rows. This route is the read path.
+//
+// Uses `listExecutions({agent_slug})` which queries GSI1 directly —
+// one round-trip per agent regardless of how many projects they've
+// worked in. Range push-down via `from`/`to` is supported but unused
+// by the SPA's "recent 20" use case today.
+//
+// The route is PUBLIC (no AWS_IAM auth) — matches the existing
+// `GET /agents/{slug}/deliverables` read pattern, and the EXEC row
+// fields surfaced here (skill / status / started_at / ended_at /
+// artifact_ref uri-shape) are no more sensitive than the deliverable
+// metadata that endpoint already exposes. The Cognito-on-hostname gate
+// in front of the SPA is the operator-vs-anonymous boundary.
+//
+// NB: this route does NOT yet surface `notion_page_url` / `pr_url` —
+// those fields live on the legacy DELIV row family and weren't
+// promoted to EXEC by Story 1-B's dual-write. A separate follow-up
+// (FU-NEW-G filed alongside this PR) extends the runner to write
+// those onto EXEC. Until then the SPA renders the artifact_ref URI
+// in place of the deeplink — documented regression.
+async function listAgentExecutions(
+  slug: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const qs = event.queryStringParameters ?? {};
+  const limit = Math.min(
+    Math.max(parseInt(qs.limit ?? `${PAGE_SIZE_DEFAULT}`, 10) || PAGE_SIZE_DEFAULT, 1),
+    PAGE_SIZE_MAX,
+  );
+  const status = qs.status as "ok" | "throw" | "skipped" | "failed_artefact_redaction" | undefined;
+  const rows = await listExecutions({
+    agent_slug: slug,
+    from: qs.from,
+    to: qs.to,
+    status,
+    limit,
+  });
+  // Newest-first matches the SPA's render order + the project-executions
+  // route (PR #140 / agents-api precedent). ULID sort keys encode time,
+  // but the canonical "when did this run start" is the `started_at`
+  // attribute — sort on that.
+  rows.sort((a, b) => b.started_at.localeCompare(a.started_at));
+  const items = rows.slice(0, limit).map((r) => ({
+    exec_ulid: r.sk.replace(/^EXEC#/, ""),
+    project_id: r.project_id,
+    agent_slug: r.agent_slug,
+    skill_name: r.skill_name,
+    skill_version: r.skill_version,
+    started_at: r.started_at,
+    ended_at: r.ended_at,
+    status: r.status,
+    used_credential_types: r.used_credential_types,
+    artifact_ref: r.artifact_ref,
+    error: r.error,
+  }));
   return reply(200, { items });
 }
 

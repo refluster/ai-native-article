@@ -81,7 +81,24 @@ vi.mock("../shared/ddb.js", () => ({
       return { items: items.slice(0, limit) as T[], cursor: undefined };
     },
   ),
-  queryByGsi: vi.fn(async () => []),
+  queryByGsi: vi.fn(
+    async (
+      indexName: "GSI1" | "GSI2",
+      partitionKey: string,
+      query: { skGte?: string; skLte?: string; limit?: number } = {},
+    ) => {
+      const pkAttr = indexName === "GSI1" ? "gsi1pk" : "gsi2pk";
+      const skAttr = indexName === "GSI1" ? "gsi1sk" : "gsi2sk";
+      return Array.from(rows.values()).filter((r) => {
+        if (r[pkAttr] !== partitionKey) return false;
+        const skVal = r[skAttr];
+        if (typeof skVal !== "string") return false;
+        if (query.skGte !== undefined && skVal < query.skGte) return false;
+        if (query.skLte !== undefined && skVal > query.skLte) return false;
+        return true;
+      });
+    },
+  ),
   updateOperational: vi.fn(),
 }));
 
@@ -131,6 +148,27 @@ vi.mock("../shared/project.js", () => ({
       row.status = "active";
       delete row.archived_at;
     }
+  },
+  // Epic-010 C3 (listAgentExecutions): GSI1 query against AGENT#{slug}.
+  // Reuses the same in-memory `rows` Map so test fixtures stay
+  // co-located with the DDB mocks above.
+  listExecutions: async (filter: {
+    agent_slug?: string;
+    status?: string;
+    from?: string;
+    to?: string;
+    limit?: number;
+  }) => {
+    if (!filter.agent_slug) return [];
+    return Array.from(rows.values()).filter((r) => {
+      if (r.gsi1pk !== `AGENT#${filter.agent_slug}`) return false;
+      const skVal = r.gsi1sk;
+      if (typeof skVal !== "string") return false;
+      if (filter.from !== undefined && skVal < filter.from) return false;
+      if (filter.to !== undefined && skVal > filter.to) return false;
+      if (filter.status !== undefined && r.status !== filter.status) return false;
+      return true;
+    });
   },
 }));
 
@@ -742,5 +780,119 @@ describe("PATCH /projects/{id+} (patchProject)", () => {
     const res = await handler(patchEvt("ghost", { status: "archived" }));
     expect(statusOf(res)).toBe(404);
     expect(bodyOf(res)).toMatchObject({ error: "not_found", project_id: "ghost" });
+  });
+});
+
+// ─── GET /agents/{slug}/executions (Epic-010 C3 migration) ─────────────
+
+describe("GET /agents/{slug}/executions (listAgentExecutions)", () => {
+  function seedExec(opts: {
+    project: string;
+    agent: string;
+    ulid: string;
+    skill?: string;
+    status?: string;
+    startedAt: string;
+  }) {
+    rows.set(key(`PROJECT#${opts.project}`, `EXEC#${opts.ulid}`), {
+      pk: `PROJECT#${opts.project}`,
+      sk: `EXEC#${opts.ulid}`,
+      project_id: opts.project,
+      agent_slug: opts.agent,
+      skill_name: opts.skill ?? "code-task-brief",
+      skill_version: "0.1.0",
+      started_at: opts.startedAt,
+      ended_at: opts.startedAt,
+      status: opts.status ?? "ok",
+      used_credential_types: [],
+      gsi1pk: `AGENT#${opts.agent}`,
+      gsi1sk: opts.startedAt,
+      gsi2pk: `SKILL#${opts.skill ?? "code-task-brief"}`,
+      gsi2sk: opts.startedAt,
+      artifact_ref: {
+        uri: `s3://wf-bucket-test/projects/${opts.project}/2026/05/${opts.ulid}/output.txt`,
+        content_hash: "0".repeat(64),
+        content_type: "text/plain",
+        size_bytes: 45,
+        summary: "synopsis",
+      },
+    });
+  }
+
+  it("returns this agent's executions across ALL projects (GSI1 partition query)", async () => {
+    seedExec({ project: "self/ren", agent: "ren", ulid: "01A", startedAt: "2026-05-28T10:00:00.000Z" });
+    seedExec({ project: "workforce-meta", agent: "ren", ulid: "01B", startedAt: "2026-05-28T11:00:00.000Z" });
+    seedExec({ project: "self/maya", agent: "maya", ulid: "01M", startedAt: "2026-05-28T12:00:00.000Z" });
+
+    const res = await handler(evt("GET /agents/{slug}/executions", { slug: "ren" }));
+    expect(statusOf(res)).toBe(200);
+    const body = bodyOf(res) as { items: Array<{ exec_ulid: string; project_id: string }> };
+    expect(body.items.map((i) => i.exec_ulid).sort()).toEqual(["01A", "01B"]);
+    // Cross-project — ren's two executions span two project partitions
+    expect(new Set(body.items.map((i) => i.project_id))).toEqual(
+      new Set(["self/ren", "workforce-meta"]),
+    );
+  });
+
+  it("returns items newest-first by started_at", async () => {
+    seedExec({ project: "p", agent: "ren", ulid: "01OLD", startedAt: "2026-05-25T10:00:00.000Z" });
+    seedExec({ project: "p", agent: "ren", ulid: "01MID", startedAt: "2026-05-26T10:00:00.000Z" });
+    seedExec({ project: "p", agent: "ren", ulid: "01NEW", startedAt: "2026-05-27T10:00:00.000Z" });
+
+    const res = await handler(evt("GET /agents/{slug}/executions", { slug: "ren" }));
+    const items = (bodyOf(res) as { items: Array<{ exec_ulid: string }> }).items;
+    expect(items.map((i) => i.exec_ulid)).toEqual(["01NEW", "01MID", "01OLD"]);
+  });
+
+  it("surfaces artifact_ref + skill + status for each row (renders DELIV-replacement UI)", async () => {
+    seedExec({ project: "p", agent: "ren", ulid: "01OK", skill: "article-draft", startedAt: "2026-05-28T00:00:00.000Z" });
+
+    const res = await handler(evt("GET /agents/{slug}/executions", { slug: "ren" }));
+    const item = (bodyOf(res) as { items: Array<Record<string, unknown>> }).items[0]!;
+    expect(item).toMatchObject({
+      exec_ulid: "01OK",
+      project_id: "p",
+      agent_slug: "ren",
+      skill_name: "article-draft",
+      skill_version: "0.1.0",
+      status: "ok",
+    });
+    expect(item.artifact_ref).toMatchObject({
+      uri: expect.stringContaining("projects/p/2026/05/01OK/output.txt"),
+      summary: "synopsis",
+    });
+  });
+
+  it("?status= filters", async () => {
+    seedExec({ project: "p", agent: "ren", ulid: "01OK", status: "ok", startedAt: "2026-05-28T10:00:00.000Z" });
+    seedExec({ project: "p", agent: "ren", ulid: "01THR", status: "throw", startedAt: "2026-05-28T11:00:00.000Z" });
+
+    const res = await handler(evt("GET /agents/{slug}/executions", { slug: "ren" }, { status: "throw" }));
+    const items = (bodyOf(res) as { items: Array<{ exec_ulid: string }> }).items;
+    expect(items.map((i) => i.exec_ulid)).toEqual(["01THR"]);
+  });
+
+  it("?limit= caps the returned items (post-sort)", async () => {
+    for (let i = 0; i < 5; i++) {
+      seedExec({
+        project: "p",
+        agent: "ren",
+        ulid: `01R${i}`,
+        startedAt: `2026-05-2${5 + i}T10:00:00.000Z`,
+      });
+    }
+    const res = await handler(
+      evt("GET /agents/{slug}/executions", { slug: "ren" }, { limit: "2" }),
+    );
+    const items = (bodyOf(res) as { items: Array<{ exec_ulid: string }> }).items;
+    expect(items).toHaveLength(2);
+    // Newest two
+    expect(items.map((i) => i.exec_ulid)).toEqual(["01R4", "01R3"]);
+  });
+
+  it("returns 200 with empty items for an agent with no executions (distinct from 404)", async () => {
+    const res = await handler(evt("GET /agents/{slug}/executions", { slug: "ghost" }));
+    expect(statusOf(res)).toBe(200);
+    expect((bodyOf(res) as { items: unknown[] }).items).toEqual([]);
   });
 });
