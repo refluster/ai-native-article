@@ -13,7 +13,7 @@
 //
 //   1. Structural absence test (cycle-2 hardening per Ren's PR #111
 //      review): assert there is exactly ONE `await putItem(runRow)` in
-//      the entire handler — the one inside `writeRunAndExec`. New
+//      the entire handler — the one inside `writeExec`. New
 //      executor paths that bypass the wrapper and call `putItem(runRow)`
 //      directly will trip this. Robust to formatting changes the prior
 //      regex-based check was brittle to (renames, line breaks, inlining
@@ -89,28 +89,37 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("agent-runner dual-write — convention enforcement", () => {
-  it("there is EXACTLY ONE `await putItem(runRow)` in handler.ts (inside writeRunAndExec)", async () => {
+describe("agent-runner — Epic-010 C2 cutover (legacy RUN/DELIV writes removed)", () => {
+  it("there is ZERO `await putItem(runRow)` in handler.ts success path (C2 cutover removed the dual-write to legacy RUN)", async () => {
     const src = await readFile(HANDLER_PATH, "utf8");
-    // Match either `await putItem(runRow)` on its own line, or with
-    // trailing close-paren / semicolon — but NOT inside a comment.
     const lines = src.split("\n");
     const hits = lines
       .map((line, idx) => ({ line, idx }))
       .filter(({ line }) => /\bawait\s+putItem\s*\(\s*runRow\b/.test(line))
-      .filter(({ line }) => !/^\s*(\/\/|\*)/.test(line)); // drop comment lines
-
+      .filter(({ line }) => !/^\s*(\/\/|\*)/.test(line));
     expect(
       hits.length,
-      `expected exactly 1 raw \`await putItem(runRow)\` in handler.ts (inside writeRunAndExec); found ${hits.length} at lines ${hits.map((h) => h.idx + 1).join(", ")}. Executor paths must use writeRunAndExec(runRow, event, skill) to keep RUN + EXEC dual-write in lockstep.`,
-    ).toBe(1);
+      `expected ZERO \`await putItem(runRow)\` calls in handler.ts post-C2; found ${hits.length} at lines ${hits.map((h) => h.idx + 1).join(", ")}. The Story-1-B dual-write was removed by C2; new executors must use writeExec(...) (EXEC-only).`,
+    ).toBe(0);
   });
 
-  it("the lone putItem(runRow) is inside the writeRunAndExec function", async () => {
+  it("there is ZERO `await putItem(delivRow)` in handler.ts (C2 cutover removed the legacy DELIV write)", async () => {
     const src = await readFile(HANDLER_PATH, "utf8");
-    const helperStart = src.indexOf("async function writeRunAndExec");
-    expect(helperStart, "writeRunAndExec helper not found").toBeGreaterThan(-1);
-    // Find the end of the writeRunAndExec body by counting braces.
+    const lines = src.split("\n");
+    const hits = lines
+      .map((line, idx) => ({ line, idx }))
+      .filter(({ line }) => /\bawait\s+putItem\s*\(\s*delivRow\b/.test(line))
+      .filter(({ line }) => !/^\s*(\/\/|\*)/.test(line));
+    expect(
+      hits.length,
+      `expected ZERO \`await putItem(delivRow)\` calls in handler.ts post-C2; found ${hits.length} at lines ${hits.map((h) => h.idx + 1).join(", ")}. DELIV writes were removed by C2; deliverable deeplinks (notion_page_url / pr_url) will be re-promoted onto EXEC via FU-NEW-G.`,
+    ).toBe(0);
+  });
+
+  it("writeExec calls appendExecution (EXEC-only post-C2)", async () => {
+    const src = await readFile(HANDLER_PATH, "utf8");
+    const helperStart = src.indexOf("async function writeExec");
+    expect(helperStart, "writeExec helper not found").toBeGreaterThan(-1);
     let depth = 0;
     let inside = false;
     let helperEnd = src.length;
@@ -128,7 +137,10 @@ describe("agent-runner dual-write — convention enforcement", () => {
       }
     }
     const body = src.slice(helperStart, helperEnd);
-    expect(body).toMatch(/\bawait\s+putItem\s*\(\s*runRow\b/);
+    // Body must dispatch into dualWriteExec (the EXEC writer wrapper).
+    // It must NOT contain a raw putItem(runRow) call any more.
+    expect(body).toMatch(/\bawait\s+dualWriteExec\s*\(/);
+    expect(body).not.toMatch(/\bawait\s+putItem\s*\(\s*runRow\b/);
   });
 });
 
@@ -187,7 +199,7 @@ describe("agent-runner dual-write — appendExecution seam behaviour", () => {
 // agent-runner/handler.ts.
 //
 // Approach for AC 5: structural source-grep that each call-site does
-// `writeProjectArtefactForRun(...)` BEFORE `writeRunAndExec(...)`. This
+// `writeProjectArtefactForRun(...)` BEFORE `writeExec(...)`. This
 // matches the dual-write-convention style above (structural absence test
 // on `putItem(runRow)`) — robust to formatting changes, doesn't require
 // fully spinning up the executor switch with all its dependencies.
@@ -198,26 +210,26 @@ describe("agent-runner dual-write — appendExecution seam behaviour", () => {
 // helper produces exactly this row.
 
 describe("agent-runner artefact write order (Story 3 / #92 AC 5)", () => {
-  it("every writeRunAndExec call is preceded by a writeProjectArtefactForRun call in the same executor", async () => {
+  it("every writeExec call is preceded by a writeProjectArtefactForRun call in the same executor", async () => {
     const src = await readFile(HANDLER_PATH, "utf8");
-    // Find each `await writeRunAndExec(...)` call and walk backwards to
+    // Find each `await writeExec(...)` call and walk backwards to
     // the previous `await writeProjectArtefactForRun(...)`. Both must
     // appear in the same executor function body. The simplest robust
     // check: the count of writeProjectArtefactForRun callsites equals
-    // the count of writeRunAndExec callsites that carry an artifactRef
+    // the count of writeExec callsites that carry an artifactRef
     // (4-arg form).
     const projectWrites = src.match(/\bawait\s+writeProjectArtefactForRun\s*\(/g) ?? [];
-    const runExecCalls = src.match(/\bawait\s+writeRunAndExec\s*\(/g) ?? [];
+    const runExecCalls = src.match(/\bawait\s+writeExec\s*\(/g) ?? [];
     expect(projectWrites.length, "expected three project-artefact writes (one per executor path)").toBe(3);
-    expect(runExecCalls.length, "expected three writeRunAndExec callsites (one per executor path)").toBe(3);
+    expect(runExecCalls.length, "expected three writeExec callsites (one per executor path)").toBe(3);
 
-    // For each writeRunAndExec, the index of the preceding
+    // For each writeExec, the index of the preceding
     // writeProjectArtefactForRun must be less. Use string-index search.
     let cursor = 0;
     for (let i = 0; i < runExecCalls.length; i++) {
-      const runIdx = src.indexOf("await writeRunAndExec", cursor);
+      const runIdx = src.indexOf("await writeExec", cursor);
       const projIdx = src.lastIndexOf("await writeProjectArtefactForRun", runIdx);
-      expect(projIdx, `writeProjectArtefactForRun must precede writeRunAndExec #${i + 1}`).toBeGreaterThan(-1);
+      expect(projIdx, `writeProjectArtefactForRun must precede writeExec #${i + 1}`).toBeGreaterThan(-1);
       expect(projIdx).toBeLessThan(runIdx);
       cursor = runIdx + 1;
     }

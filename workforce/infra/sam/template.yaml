@@ -1136,24 +1136,10 @@ Resources:
       AlarmActions:
         - !Ref WfAlarmTopic
 
-  WfAuditOrphanExecsAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub wf-audit-orphan-execs-alarm-${Stage}
-      AlarmDescription: !Sub Audit found dual-write orphan rows in wf-table-${Stage} (Epic-010 dual-write integrity).
-      Namespace: Workforce/Audit
-      MetricName: WfAuditOrphanExecs
-      Dimensions:
-        - Name: Stage
-          Value: !Ref Stage
-      Statistic: Sum
-      Period: 86400
-      EvaluationPeriods: 1
-      Threshold: 0
-      ComparisonOperator: GreaterThanThreshold
-      TreatMissingData: notBreaching
-      AlarmActions:
-        - !Ref WfAlarmTopic
+  # Epic-010 C2 cutover: WfAuditOrphanExecsAlarm removed — see
+  # workforce/lambdas/audit/handler.ts header for rationale (post-C2
+  # the metric was universal noise: success paths write EXEC only,
+  # failure paths write RUN only, neither has a sibling).
 
   WfAuditCrossProjectLeaksAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -1344,27 +1330,7 @@ Resources:
             },
             {
               "type": "metric",
-              "x": 8, "y": 22, "width": 8, "height": 6,
-              "properties": {
-                "title": "Workforce/Audit — WfAuditOrphanExecs (daily)",
-                "view": "timeSeries",
-                "region": "${AWS::Region}",
-                "period": 86400,
-                "stat": "Sum",
-                "metrics": [
-                  [ "Workforce/Audit", "WfAuditOrphanExecs", "Stage", "${Stage}", { "color": "#d62728" } ]
-                ],
-                "yAxis": { "left": { "min": 0 } },
-                "annotations": {
-                  "horizontal": [
-                    { "label": "target (clean — dual-write integrity)", "value": 0, "color": "#d62728" }
-                  ]
-                }
-              }
-            },
-            {
-              "type": "metric",
-              "x": 16, "y": 22, "width": 8, "height": 6,
+              "x": 8, "y": 22, "width": 16, "height": 6,
               "properties": {
                 "title": "Workforce/Audit — WfAuditCrossProjectLeaks (daily)",
                 "view": "timeSeries",

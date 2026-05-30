@@ -5,14 +5,21 @@
 // meta.executor selects the runtime path:
 //
 //   llm-prose            LLM call → S3 artefact → (optional) Notion publish
-//   claude-code-routine  LLM brief → GHA workflow_dispatch → pending DELIV
+//   claude-code-routine  LLM brief → GHA workflow_dispatch
 //   deterministic        Registered handler → S3 audit artefact (no LLM)
 //
-// All three paths land:
-//   - one RUN row with output_s3_key + summary + timing + status
+// All three success paths land:
+//   - one EXEC row under PROJECT#{id}/EXEC#{ulid} carrying artifact_ref
+//     and the canonical run shape (Epic-010 Stories 1/3/C2-cutover)
+//   - one S3 artefact under projects/{id}/{yyyy}/{mm}/{ulid}/output.*
 //   - one memory chunk appended to S3 (the agent's narrative)
-//   - a DELIV row only when there is a queryable external resource
-//     (Notion page / pending GitHub PR)
+//
+// Legacy AGENT#{slug}/RUN#{ulid} + AGENT#{slug}/DELIV#{ulid} dual-writes
+// from Story 1-B were removed by C2 (ROADMAP §Status-transition
+// criterion 2). Failure paths (failRun / skipRun / throwRun below)
+// retain their pre-Epic-010 RUN-row write as the runner's own
+// entry-point error trail — see the C2 cutover comment above the
+// writeExec helper for the full rationale.
 
 import type { Context } from "aws-lambda";
 import { CloudWatchClient, PutMetricDataCommand } from "@aws-sdk/client-cloudwatch";
@@ -47,7 +54,7 @@ import {
 import { dispatchEngineer } from "../shared/github.js";
 import { composeSystemPrompt, loadSkill, type LoadedSkill } from "../shared/skill.js";
 import { getDeterministicHandler } from "../shared/skill-registry.js";
-import { newUlid, type DelivRow, type RunRow } from "../shared/task.js";
+import { newUlid, type RunRow } from "../shared/task.js";
 
 export interface RunnerEvent {
   /** Agent slug to run. */
@@ -233,7 +240,7 @@ async function runDeterministic(
     output_s3_key: s3Key,
     output_summary: result.summary.slice(0, 240),
   };
-  await writeRunAndExec(runRow, event, skill, artifactRef);
+  await writeExec(runRow, event, skill, artifactRef);
 
   return { status: "ok", run_id: runId, tokens_in: tokensIn, tokens_out: tokensOut, cost_usd: costUsd };
 }
@@ -277,7 +284,7 @@ async function runLlmProse(
   const runArtefactKey = await writeRunArtefact(event.agent, runId, "md", llm.text);
 
   // Story 3 (#92): project-prefixed artefact for the new EXEC row.
-  // PutObject ordered BEFORE writeRunAndExec (AC 5). The legacy writers
+  // PutObject ordered BEFORE writeExec (AC 5). The legacy DELIV writer
   // above remain until Story 6 migrates the read paths.
   const artifactRef = await writeProjectArtefactForRun(event, runId, skill, {
     filename: "output.md",
@@ -319,20 +326,16 @@ async function runLlmProse(
     output_s3_key: runArtefactKey,
     output_summary: summaryOf(llm.text),
   };
-  await writeRunAndExec(runRow, event, skill, artifactRef);
+  await writeExec(runRow, event, skill, artifactRef);
 
-  const delivRow: DelivRow = {
-    pk: agentPk(event.agent),
-    sk: `DELIV#${delivId}`,
-    run_id: runId,
-    type: skill.meta.deliverable.type,
-    project_id: agent.default_project,
-    notion_page_id: notionPageId,
-    notion_page_url: notionPageUrl,
-    created_at: startedAt,
-    published_at: notionPageId ? endedAt : undefined,
-  };
-  await putItem(delivRow);
+  // Epic-010 C2 cutover: legacy AGENT#{slug}/DELIV#{ulid} row writes
+  // are removed. notion_page_id / notion_page_url were the
+  // deliverable-deeplink fields the legacy SPA path read; the EXEC
+  // row family does not carry them yet (FU-NEW-G tracks a runner
+  // extension that promotes them). The pageId+url are still returned
+  // in the RunnerResult below so callers (orchestrator logs, ops
+  // tooling) retain immediate visibility into the published Notion
+  // page.
 
   return {
     status: "ok",
@@ -385,7 +388,7 @@ async function runClaudeCodeRoutine(
   const runArtefactKey = await writeRunArtefact(event.agent, runId, "md", llm.text);
 
   // Story 3 (#92): project-prefixed artefact for the new EXEC row.
-  // PutObject ordered BEFORE writeRunAndExec (AC 5).
+  // PutObject ordered BEFORE writeExec (AC 5).
   const artifactRef = await writeProjectArtefactForRun(event, runId, skill, {
     filename: "brief.md",
     body: llm.text,
@@ -420,20 +423,15 @@ async function runClaudeCodeRoutine(
     output_s3_key: runArtefactKey,
     output_summary: summaryOf(llm.text),
   };
-  await writeRunAndExec(runRow, event, skill, artifactRef);
+  await writeExec(runRow, event, skill, artifactRef);
 
-  const delivRow: DelivRow = {
-    pk: agentPk(event.agent),
-    sk: `DELIV#${delivId}`,
-    run_id: runId,
-    type: "pr",
-    project_id: agent.default_project,
-    status: "pending",
-    dispatched_at: endedAt,
-    dispatch_branch: dispatchBranch,
-    created_at: startedAt,
-  };
-  await putItem(delivRow);
+  // Epic-010 C2 cutover: legacy AGENT#{slug}/DELIV#{ulid} row write
+  // removed. The pending-PR DELIV row carried `dispatch_branch` +
+  // `status='pending'` so the operator could correlate the runner's
+  // workflow-dispatch with the eventual GHA-created PR. The EXEC row
+  // family does not carry these fields yet (FU-NEW-G tracks the
+  // runner extension); meanwhile the GHA workflow logs + the runner's
+  // CloudWatch log are the operator's correlation handle.
 
   return {
     status: "ok",
@@ -499,31 +497,39 @@ function summaryOf(text: string | undefined): string {
   return text.replace(/\s+/g, " ").trim().slice(0, 240);
 }
 
-// --- Epic-010 Story 1-B: dual-write execution ledger ---------------------
+// --- Epic-010 execution ledger (post-C2 cutover) --------------------------
 //
 // Convention (enforced by absence-test in dual-write-tests.ts): the
-// runner NEVER writes a RUN row via a raw `putItem(runRow)` call.
-// Every RUN-row write goes through `writeRunAndExec(runRow, event, skill)`,
-// which puts the RUN row AND attempts the dual-write EXEC row. New
-// executor paths MUST follow this shape.
+// runner NEVER writes a legacy `AGENT#{slug}/RUN#{ulid}` row on the
+// success path. The Story-1-B dual-write was removed by C2 (ROADMAP
+// §Status-transition criterion 2); EXEC rows are now the only
+// execution record for successful runs. New executor paths MUST go
+// through `writeExec(runRow, event, skill)`.
 //
-// Dual-write semantics:
-//   - The legacy `AGENT#{slug}/RUN#{ulid}` row remains canonical until
-//     Story 6 (#95) migrates the front-end.
-//   - The new `PROJECT#{project_id}/EXEC#{ulid}` row is forward-canonical
-//     but currently best-effort: failures log + emit a CloudWatch metric
-//     (`Workforce/Runner / WfExecDualWriteFailed`) and DO NOT fail the
-//     run. W-4 is preserved at the RUN-row level — the run still throws
-//     or succeeds on its primary intent.
-//   - Story 6 cutover prerequisite (#95): drain orphan-RUN backlog
-//     (RUN rows whose EXEC sibling never landed) BEFORE flipping EXEC
-//     to canonical, or audit rows are lost on the flip.
+// Failure-path RUN writes (failRun / skipRun / throwRun below) predate
+// the Story-1-B dual-write and are NOT removed by C2 — they're the
+// runner's own entry-point error trail (skill_load_failed,
+// agent_not_found, etc.) where a project_id can't be reliably resolved
+// and `appendExecution` would throw cross-project-denial. The audit
+// (FU-021) treats these as legacy informational rows; they don't gate
+// any alarm.
+//
+// Execution write semantics (success path):
+//   - `PROJECT#{project_id}/EXEC#{ulid}` is the canonical row.
+//   - Cross-project denial inside `appendExecution` throws when the
+//     agent is not a member; the throw is caught, logged, and emits
+//     `Workforce/Runner / WfExecDualWriteFailed` — the success path
+//     never throws on a downstream-EXEC failure (the run's primary
+//     intent — its S3 artefact write + side effects — has already
+//     succeeded by this point).
+//   - The metric name `WfExecDualWriteFailed` is retained for
+//     continuity even though the "dual" qualifier no longer applies
+//     post-C2; renaming would invalidate the existing dashboard +
+//     alarm wiring. Track the rename as a follow-up if needed.
 //
 // Project resolution: event.project_id (forward-compat for the TASK
 // path that future Stories wire through) wins; otherwise defaults to
-// selfProjectId(agent). Cross-project denial inside appendExecution
-// throws when the agent is not a member; that path also logs + emits
-// the failure metric + continues.
+// selfProjectId(agent).
 
 const STAGE = process.env.STAGE ?? "dev";
 const cw = new CloudWatchClient({});
@@ -560,7 +566,7 @@ async function buildCredentialBag(
 // --- Epic-010 Story 3: project-prefixed artefact write seam --------------
 //
 // Every executor calls `writeProjectArtefactForRun()` and threads the
-// returned `ArtifactRef` into `writeRunAndExec(...)`. On
+// returned `ArtifactRef` into `writeExec(...)`. On
 // `RedactionViolation` the helper writes a `failed_artefact_redaction`
 // EXEC row directly (membership-gated through resolved project) and
 // re-throws — the outer try/catch in `handler()` then writes the
@@ -600,7 +606,7 @@ function contentTypeForExt(ext: string): string {
  *     outer handler's normal throwRun path.
  *
  * Returns the `ArtifactRef` on success — caller passes it to
- * `writeRunAndExec(runRow, event, skill, ref)`.
+ * `writeExec(runRow, event, skill, ref)`.
  */
 async function writeProjectArtefactForRun(
   event: RunnerEvent,
@@ -694,18 +700,26 @@ async function recordFailedRedactionExec(
  *  Story 3 (#92) addition: `artifactRef` threads the new project-prefixed
  *  S3 artefact into the EXEC row. Write order at every callsite is:
  *    1. `writeProjectArtefact(...)`  PutObject + return ref
- *    2. `writeRunAndExec(runRow, event, skill, ref)`
- *         a. legacy RUN row putItem
- *         b. EXEC row with artifact_ref attached
- *  An EXEC row never points at a missing S3 object because step 1
- *  must succeed before step 2 runs. */
-async function writeRunAndExec(
+ *    2. `writeExec(runRow, event, skill, ref)`
+ *         EXEC row with artifact_ref attached (canonical execution
+ *         record). Epic-010 C2 cutover (ROADMAP §Status-transition
+ *         criterion 2) removed the legacy `AGENT#{slug}/RUN#{ulid}`
+ *         dual-write from this seam — EXEC is now the only
+ *         success-path execution record. Failure paths
+ *         (failRun / skipRun / throwRun below) retain their pre-Epic-010
+ *         RUN-row write as a fail-loud trail for the runner's own
+ *         entry-point errors, NOT as a dual-write of an EXEC row.
+ *
+ *  The `runRow` parameter is kept as a typed shape for back-compat
+ *  with the executor call sites (which still construct it for the
+ *  in-memory bookkeeping the runner needs across the artefact + exec
+ *  writes); the row itself is never persisted to DDB. */
+async function writeExec(
   runRow: RunRow,
   event: RunnerEvent,
   skill: LoadedSkill,
   artifactRef?: ArtifactRef,
 ): Promise<void> {
-  await putItem(runRow);
   await dualWriteExec({
     event,
     runId: runRow.sk.replace(/^RUN#/, ""),

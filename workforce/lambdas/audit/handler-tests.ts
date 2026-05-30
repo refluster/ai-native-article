@@ -189,17 +189,14 @@ describe("audit handler — clean state", () => {
 
     const res = await handler();
     expect(res.scanned.exec).toBe(3);
-    expect(res.scanned.run).toBe(3);
     expect(res.counts).toEqual({
       truncated: 0,
-      orphan_exec: 0,
-      orphan_run: 0,
       cross_project_leak: 0,
     });
     expect(res.findings).toEqual([]);
   });
 
-  it("emits three Workforce/Audit metrics with Stage dimension and value 0 on a clean run", async () => {
+  it("emits two Workforce/Audit metrics with Stage dimension and value 0 on a clean run", async () => {
     seedPair({ ulid: "01CLEAN", project_id: "self/ren", agent_slug: "ren" });
     await handler();
 
@@ -208,8 +205,9 @@ describe("audit handler — clean state", () => {
     expect(batch.Namespace).toBe("Workforce/Audit");
     const byName = new Map(batch.MetricData.map((m) => [m.MetricName, m.Value]));
     expect(byName.get("WfAuditTruncatedExecs")).toBe(0);
-    expect(byName.get("WfAuditOrphanExecs")).toBe(0);
     expect(byName.get("WfAuditCrossProjectLeaks")).toBe(0);
+    // Post-C2: WfAuditOrphanExecs is no longer emitted.
+    expect(byName.has("WfAuditOrphanExecs")).toBe(false);
     expect(batch.MetricData[0]!.Dimensions).toEqual(
       expect.arrayContaining([{ Name: "Stage", Value: "test" }]),
     );
@@ -279,35 +277,13 @@ describe("audit handler — truncated executions", () => {
   });
 });
 
-describe("audit handler — orphan exec / run rows", () => {
-  it("flags an EXEC without a matching RUN sibling", async () => {
-    seedExec({
-      ulid: "01EXECONLY",
-      project_id: "self/ren",
-      agent_slug: "ren",
-      artifact_ref: { uri: "s3://...", summary: "ok", size_bytes: 1 },
-    });
+// Epic-010 C2 cutover: the orphan-row describe block was removed.
+// The signal is universal noise post-cutover (success paths write
+// EXEC only; failure paths write RUN only) — see the audit handler's
+// file-level header for the full rationale.
 
-    const res = await handler();
-    expect(res.counts.orphan_exec).toBe(1);
-    expect(res.findings[0]).toMatchObject({
-      signal: "orphan_exec",
-      sk: "EXEC#01EXECONLY",
-    });
-  });
-
-  it("flags a RUN without a matching EXEC sibling", async () => {
-    seedRun({ ulid: "01RUNONLY", agent_slug: "ren" });
-
-    const res = await handler();
-    expect(res.counts.orphan_run).toBe(1);
-    expect(res.findings[0]).toMatchObject({
-      signal: "orphan_run",
-      sk: "RUN#01RUNONLY",
-    });
-  });
-
-  it("does NOT flag a stale RUN / EXEC outside the 24h window", async () => {
+describe("audit handler — stale rows outside the 24h window", () => {
+  it("does NOT count stale rows in the scan", async () => {
     seedExec({
       ulid: "01STALE",
       project_id: "self/ren",
@@ -315,15 +291,14 @@ describe("audit handler — orphan exec / run rows", () => {
       started_at: stale(),
       artifact_ref: { uri: "s3://...", summary: "ok", size_bytes: 1 },
     });
-    seedRun({ ulid: "01STALE", agent_slug: "ren", started_at: stale() });
-    // Plus one recent clean pair so we have something in scan.
     seedPair({ ulid: "01FRESH", project_id: "self/ren", agent_slug: "ren" });
 
     const res = await handler();
+    // Only the fresh row is scanned; the stale row is filtered by the
+    // cutoff condition.
     expect(res.scanned.exec).toBe(1);
-    expect(res.scanned.run).toBe(1);
-    expect(res.counts.orphan_exec).toBe(0);
-    expect(res.counts.orphan_run).toBe(0);
+    expect(res.counts.truncated).toBe(0);
+    expect(res.counts.cross_project_leak).toBe(0);
   });
 });
 
@@ -437,16 +412,6 @@ describe("audit handler — composite scenarios", () => {
       agent_slug: "ren",
       status: "ok",
     });
-    seedRun({ ulid: "01TRUNC", agent_slug: "ren" });
-    // Orphan EXEC.
-    seedExec({
-      ulid: "01ORPHANE",
-      project_id: "self/ren",
-      agent_slug: "ren",
-      artifact_ref: { uri: "s3://...", summary: "ok", size_bytes: 1 },
-    });
-    // Orphan RUN.
-    seedRun({ ulid: "01ORPHANR", agent_slug: "ren" });
     // Cross-project leak.
     seedExec({
       ulid: "01LEAK",
@@ -454,17 +419,16 @@ describe("audit handler — composite scenarios", () => {
       agent_slug: "ren",
       artifact_ref: { uri: "s3://...", summary: "ok", size_bytes: 1 },
     });
-    seedRun({ ulid: "01LEAK", agent_slug: "ren" });
 
     const res = await handler();
     expect(res.counts.truncated).toBe(1);
-    expect(res.counts.orphan_exec).toBe(1);
-    expect(res.counts.orphan_run).toBe(1);
     expect(res.counts.cross_project_leak).toBe(1);
 
-    // Combined orphan metric (truncated + orphan_run summed):
     const batch = metricBatches[0]!;
     const byName = new Map(batch.MetricData.map((m) => [m.MetricName, m.Value]));
-    expect(byName.get("WfAuditOrphanExecs")).toBe(2); // 1 exec-orphan + 1 run-orphan
+    expect(byName.get("WfAuditTruncatedExecs")).toBe(1);
+    expect(byName.get("WfAuditCrossProjectLeaks")).toBe(1);
+    // Post-C2: WfAuditOrphanExecs no longer emitted.
+    expect(byName.has("WfAuditOrphanExecs")).toBe(false);
   });
 });
