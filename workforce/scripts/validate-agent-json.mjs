@@ -185,12 +185,25 @@ for (const slug of slugDirs) {
         );
         continue;
       }
-      // R-N4 executor↔scheduler compatibility
-      if (b.executor === "lambda" && t.scheduler !== "eventbridge") {
+      // R-N4 executor↔scheduler compatibility.
+      //
+      // `lambda` accepts the three trigger sources documented in
+      // runbooks/bindings.md:
+      //   - eventbridge: orchestrator-tick cron (the original v1 shape)
+      //   - external:    API GW / async invoke from another binding (Phase 7
+      //                  webhook surface — wf-webhook-{stage} fires runner)
+      //   - manual:      operator-triggered direct invoke
+      //                  (`aws lambda invoke --function-name wf-agent-runner ...`)
+      //
+      // The earlier "lambda → eventbridge only" rule was too tight; Phase 7
+      // (multi-project PR review) needed Lambda-resident skills triggered by
+      // operator chat invocation or by the future webhook, not by a cron.
+      const LAMBDA_SCHEDULERS = new Set(["eventbridge", "external", "manual"]);
+      if (b.executor === "lambda" && !LAMBDA_SCHEDULERS.has(t.scheduler)) {
         v(
           "S9-binding-compat",
           cfg,
-          `bindings[${i}]: executor=lambda requires trigger.scheduler=eventbridge (R-N4)`,
+          `bindings[${i}]: executor=lambda requires trigger.scheduler in ${[...LAMBDA_SCHEDULERS].join("|")} (R-N4)`,
         );
       }
       if (b.executor === "gha" && t.scheduler !== "gha" && t.scheduler !== "external") {
