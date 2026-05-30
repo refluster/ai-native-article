@@ -1,7 +1,7 @@
 // wf-audit Lambda handler.
 //
 // Daily cron-fired (04:00 UTC by default — low workforce traffic).
-// Audits the last 24h of EXEC + RUN rows for three signal classes that
+// Audits the last 24h of EXEC rows for the two signal classes that
 // gate Epic-010's `Status: Implemented` flip (ROADMAP §Status-transition
 // criterion 4):
 //
@@ -13,20 +13,22 @@
 //                                would normally classify as a C-1
 //                                truncation event).
 //
-//   2. WfAuditOrphanExecs        Cross-reference EXEC <-> RUN rows for
-//                                the dual-write window:
-//                                  - EXEC#{ulid} with no matching
-//                                    AGENT#{slug}/RUN#{ulid} sibling
-//                                  - RUN#{ulid} with no matching
-//                                    PROJECT#{id}/EXEC#{ulid} sibling
-//                                Both directions are signal — either
-//                                indicates a dual-write code-path gap.
-//                                Post-cutover (legacy RUN deleted) the
-//                                first arm becomes "EXEC#{ulid} with
-//                                status='ok' but no artifact_ref" —
-//                                already covered by signal 1.
+//   ── (the WfAuditOrphanExecs signal was dropped by the C2 cutover) ──
 //
-//   3. WfAuditCrossProjectLeaks  Every EXEC row in the last 24h has
+//   Pre-C2 (Story-1-B dual-write window), the audit cross-referenced
+//   EXEC <-> RUN rows in both directions:
+//     - EXEC#{ulid} with no matching AGENT#{slug}/RUN#{ulid}
+//     - RUN#{ulid} with no matching PROJECT#{id}/EXEC#{ulid}
+//   Post-C2, the success path writes ONLY EXEC rows (no RUN sibling),
+//   so "EXEC without RUN" would fire for every run — pure noise.
+//   The remaining failure-path RUN writes (failRun / skipRun /
+//   throwRun in agent-runner) have no EXEC sibling by design — also
+//   noise. The metric, the WfAuditOrphanExecsAlarm, and the dashboard
+//   widget were retired by C2. The truncated check (1) is the
+//   informational successor for "EXEC arrived but has no artefact"
+//   regressions.
+//
+//   2. WfAuditCrossProjectLeaks  Every EXEC row in the last 24h has
 //                                project_id + agent_slug + started_at.
 //                                Assert that agent_slug was an active
 //                                member of project_id at started_at
@@ -109,15 +111,6 @@ interface ExecRow {
     uri?: string;
   };
 }
-interface RunRow {
-  pk: string; // AGENT#{slug}
-  sk: string; // RUN#{ulid}
-  status?: string;
-  started_at?: string;
-  // legacy field — RUN rows carry their S3 key here; the audit only
-  // uses RUN existence as a dual-write witness, not its content
-  output_s3_key?: string;
-}
 interface MemberRow {
   pk: string; // PROJECT#{id}
   sk: string; // MEMBER#{slug}
@@ -127,7 +120,7 @@ interface MemberRow {
 }
 
 export interface AuditFinding {
-  signal: "truncated" | "orphan_exec" | "orphan_run" | "cross_project_leak";
+  signal: "truncated" | "cross_project_leak";
   pk: string;
   sk: string;
   reason: string;
@@ -136,11 +129,9 @@ export interface AuditFinding {
 export interface AuditResult {
   window_hours: number;
   cutoff_iso: string;
-  scanned: { exec: number; run: number };
+  scanned: { exec: number };
   counts: {
     truncated: number;
-    orphan_exec: number;
-    orphan_run: number;
     cross_project_leak: number;
   };
   findings: AuditFinding[];
@@ -150,17 +141,12 @@ export async function handler(): Promise<AuditResult> {
   const cutoff = new Date(Date.now() - WINDOW_HOURS * 3600_000);
   const cutoffIso = cutoff.toISOString();
 
-  // 1. Pull every EXEC + RUN row in the window via two filtered Scans.
-  //    At hobby scale this is bounded; at >10k EXEC rows/day, promote
-  //    to a GSI3 keyed on started_at. Out of scope today.
+  // Pull every EXEC row in the window via a filtered Scan.
+  // At hobby scale this is bounded; at >10k EXEC rows/day, promote
+  // to a GSI3 keyed on started_at. Out of scope today.
   const execRows = await scanWindowed<ExecRow>("EXEC#", cutoffIso, "started_at");
-  const runRows = await scanWindowed<RunRow>("RUN#", cutoffIso, "started_at");
 
   const findings: AuditFinding[] = [];
-
-  // Build a Set of EXEC ulids for O(1) cross-reference both directions.
-  const execUlids = new Set(execRows.map((r) => stripPrefix(r.sk, "EXEC#")));
-  const runUlids = new Set(runRows.map((r) => stripPrefix(r.sk, "RUN#")));
 
   // Signal 1: truncated executions.
   for (const exec of execRows) {
@@ -182,34 +168,11 @@ export async function handler(): Promise<AuditResult> {
     }
   }
 
-  // Signal 2: orphan rows in both directions.
-  // EXEC without RUN sibling = orphan_exec (the dual-write write to
-  // legacy RUN failed). RUN without EXEC sibling = orphan_run (the
-  // dual-write write to the new EXEC family failed — typically a
-  // cross-project-denial throw inside appendExecution, which is logged
-  // but doesn't fail the run today).
-  for (const exec of execRows) {
-    const ulid = stripPrefix(exec.sk, "EXEC#");
-    if (!runUlids.has(ulid)) {
-      findings.push({
-        signal: "orphan_exec",
-        pk: exec.pk,
-        sk: exec.sk,
-        reason: `no matching AGENT#${exec.agent_slug ?? "?"}/RUN#${ulid} in the window`,
-      });
-    }
-  }
-  for (const run of runRows) {
-    const ulid = stripPrefix(run.sk, "RUN#");
-    if (!execUlids.has(ulid)) {
-      findings.push({
-        signal: "orphan_run",
-        pk: run.pk,
-        sk: run.sk,
-        reason: `no matching PROJECT#*/EXEC#${ulid} in the window`,
-      });
-    }
-  }
+  // Signal 2 (post-C2): orphan-row cross-reference REMOVED — see the
+  // file-level header. The success path no longer writes legacy RUN
+  // rows (C2 cutover), and failure-path RUN writes don't have an EXEC
+  // sibling by design — both directions of the orphan check became
+  // universal noise after C2.
 
   // Signal 3: cross-project leakage.
   // For each EXEC, derive (project_id, agent_slug) and check membership.
@@ -256,15 +219,13 @@ export async function handler(): Promise<AuditResult> {
 
   const counts = {
     truncated: countBy(findings, "truncated"),
-    orphan_exec: countBy(findings, "orphan_exec"),
-    orphan_run: countBy(findings, "orphan_run"),
     cross_project_leak: countBy(findings, "cross_project_leak"),
   };
 
   const result: AuditResult = {
     window_hours: WINDOW_HOURS,
     cutoff_iso: cutoffIso,
-    scanned: { exec: execRows.length, run: runRows.length },
+    scanned: { exec: execRows.length },
     counts,
     findings,
   };
@@ -272,10 +233,6 @@ export async function handler(): Promise<AuditResult> {
   await emitMetrics(counts);
   console.log(JSON.stringify({ event: "audit_complete", result }));
   return result;
-}
-
-function stripPrefix(sk: string, prefix: string): string {
-  return sk.startsWith(prefix) ? sk.slice(prefix.length) : sk;
 }
 
 function countBy(findings: AuditFinding[], signal: AuditFinding["signal"]): number {
@@ -361,12 +318,6 @@ async function emitMetrics(counts: AuditResult["counts"]): Promise<void> {
           {
             MetricName: "WfAuditTruncatedExecs",
             Value: counts.truncated,
-            Unit: "Count",
-            Dimensions: [{ Name: "Stage", Value: STAGE }],
-          },
-          {
-            MetricName: "WfAuditOrphanExecs",
-            Value: counts.orphan_exec + counts.orphan_run,
             Unit: "Count",
             Dimensions: [{ Name: "Stage", Value: STAGE }],
           },

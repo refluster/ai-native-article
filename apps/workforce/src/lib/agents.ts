@@ -92,21 +92,6 @@ export interface AgentLiveRecord {
   deliv_count_total: number
 }
 
-export interface AgentDeliverable {
-  /** AGENT#{slug}/DELIV#{ulid} pk/sk; surfaced here for de-dupe + linking. */
-  sk: string
-  run_id: string
-  type: 'article' | 'plan' | 'design-doc' | 'launch-plan' | 'pr' | 'notification'
-  project_id: string
-  notion_page_id?: string
-  notion_page_url?: string
-  pr_url?: string
-  dispatch_branch?: string
-  created_at: string
-  published_at?: string
-  status?: 'pending' | 'ok' | 'timeout'
-}
-
 export async function fetchAgentLive(slug: string): Promise<AgentLiveRecord | undefined> {
   if (!apiConfigured()) return undefined
   const res = await fetch(`${WORKFORCE_AGENTS_API_BASE}/agents/${encodeURIComponent(slug)}`)
@@ -115,20 +100,13 @@ export async function fetchAgentLive(slug: string): Promise<AgentLiveRecord | un
   return (await res.json()) as AgentLiveRecord
 }
 
-export async function fetchAgentDeliverables(slug: string, limit = 20): Promise<AgentDeliverable[]> {
-  if (!apiConfigured()) return []
-  const url = `${WORKFORCE_AGENTS_API_BASE}/agents/${encodeURIComponent(slug)}/deliverables?limit=${limit}`
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`agents-api ${res.status}`)
-  const data = (await res.json()) as { items: AgentDeliverable[] }
-  return data.items
-}
-
-// Epic-010 C3: agent profile execution-history read path. Replaces
-// fetchAgentDeliverables with the EXEC-row family (PROJECT#{id}/EXEC#
-// via the GSI1 AGENT#{slug} partition). The legacy fetchAgentDeliverables
-// stays until the dual-write cutover (C2); fetchAgentExecutions is the
-// post-cutover canonical path.
+// Epic-010 C3 (read) + C2 (cutover) — the agent-profile execution-
+// history list reads from the EXEC row family (PROJECT#{id}/EXEC# via
+// the GSI1 AGENT#{slug} partition). The legacy fetchAgentDeliverables
+// + AgentDeliverable interface that targeted AGENT#{slug}/DELIV# were
+// removed in C2 (no callers since C3); the backend GET
+// /agents/{slug}/deliverables route is retained for historical reads
+// of pre-cutover DELIV rows but is no longer consumed by this SPA.
 export interface AgentExecution {
   /** ULID without the EXEC# prefix. */
   exec_ulid: string
