@@ -50,6 +50,7 @@ const lambda = new LambdaClient({});
 const DEFAULT_DEDUP_MINUTES = 60;
 const DEDUP_MINUTES_BY_SKILL: Record<string, number> = {
   "discord-ping": 45,          // 45m — under the 1h cadence, well above the 30m tick interval
+  "discord-heartbeat": 30,     // 30m — half the hourly cadence; same logic as feed-post (cron-vs-dedup edge case at exact 60m equality with default would skip alternate fires)
   "feed-post": 30,             // 30m — half the hourly cadence so the cron-vs-dedup edge case (exact 60m equality with default) can't skip a fire
   "article-draft": 60 * 5,     // 5h — Sora's 12h cadence
   "market-research": 60 * 5,

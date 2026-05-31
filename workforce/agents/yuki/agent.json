@@ -33,6 +33,19 @@
         "cron": "cron(11 2 ? * * *)"
       },
       "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
+    },
+    {
+      "skill": "discord-heartbeat",
+      "executor": "claude-code-routine",
+      "trigger": {
+        "scheduler": "external",
+        "invoked_by": "api",
+        "fired_from": "wf-orchestrator-tick",
+        "cron": "cron(20 * ? * * *)"
+      },
+      "routine_spec": "workforce/docs/routines/agent-runner.md",
+      "project_id": "agent-workforce",
+      "note": "Hourly at :20 UTC — CCR-routed sibling of discord-ping (which stays on Lambda at :00 each hour during the trial for fault isolation). Co-stages with Dario's feed-post at :20 → first multi-task batch fire. Webhook URL reads from wf/projects/agent-workforce/discord.webhook_url; orchestrator-tick injects it inline in the CCR /fire payload."
     }
   ],
   "jd": {
