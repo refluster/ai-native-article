@@ -1801,7 +1801,11 @@ Outputs:
     Export:
       Name: !Sub wf-agents-api-url-${Stage}
   AgentsApiId:
-    Description: ID of the agents HTTP API. Consumed by sam-web's
+    # Folded scalar: backticks + `execute-api:Invoke` colon would otherwise
+    # break the YAML plain-scalar continuation (sam build refused to parse
+    # the template between PR #163 and this fix).
+    Description: >-
+      ID of the agents HTTP API. Consumed by sam-web's
       Identity Pool operator role (Issue #158 PR-α) to scope
       `execute-api:Invoke` to this API only.
     Value: !Ref WfAgentsHttpApi
@@ -1813,7 +1817,9 @@ Outputs:
     Export:
       Name: !Sub wf-credentials-api-url-${Stage}
   CredentialsApiId:
-    Description: ID of the credentials HTTP API. Consumed by sam-web's
+    # Folded scalar — see AgentsApiId for rationale.
+    Description: >-
+      ID of the credentials HTTP API. Consumed by sam-web's
       Identity Pool operator role (Issue #158 PR-α) to scope
       `execute-api:Invoke` to this API only.
     Value: !Ref WfCredentialsHttpApi
