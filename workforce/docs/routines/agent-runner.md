@@ -25,9 +25,23 @@ The runtime working prompt is composed at fire-time:
 
 The CCR session reads these from the cloned repo on each fire. No state lives in claude.ai beyond the thin instruction pointer (see "Operator instantiation" below).
 
-## Fire payload — batched tasks (post-PR-β shape)
+## Fire payload — batched tasks
 
-`wf-orchestrator-tick` POSTs a single payload per tick containing **all** CCR-bound (agent × skill × project) tuples whose cron matched the current tick window:
+`wf-orchestrator-tick` POSTs a single payload per tick containing **all** CCR-bound (agent × skill × project) tuples whose cron matched the current tick window.
+
+### Wire shape (what the CCR `/fire` API sees)
+
+The CCR `/fire` endpoint accepts ONLY a single top-level `text` field (Anthropic docs, observed empirically when an earlier revision tried custom keys and got `HTTP 400: tasks: Extra inputs are not permitted`):
+
+```json
+{
+  "text": "<JSON-encoded batch envelope below>"
+}
+```
+
+When the routine session starts, the contents of `text` become available as the run-specific context passed alongside this saved prompt — treat it as a literal JSON string and **parse it back to the structured envelope as your first step**.
+
+### Logical envelope (what the routine sees after parsing `text`)
 
 ```json
 {
@@ -57,6 +71,8 @@ Each task is independent. The orchestrator-tick is the privileged AWS principal 
 `agent_slug` resolves the persona files; `binding_idx` resolves the specific binding (skill, cron, config); `project_id` is the audit context (the EXEC row this task should end up under).
 
 ## What the runner does (per task in the batch)
+
+**Step 0 — Parse the envelope.** The fire context exposes the `text` field from the `/fire` request body. Run `payload = JSON.parse(text)` to recover the structured `{ tasks: [...] }` envelope. If `text` is missing, empty, or not valid JSON, fail loud — the orchestrator violated the contract.
 
 Iterate `payload.tasks` in order. For each task:
 
@@ -195,29 +211,35 @@ No new claude.ai routine. No new Secrets Manager entry. Same `wf/ccr/agent-runne
 
 ## Verify
 
-After token storage + SAM deploy, click **Run now** on the routine's detail page with a manual batch payload (one task is fine for verification):
+After token storage + SAM deploy, you can verify the wire path two ways:
 
-```json
-{
-  "tasks": [
-    {
-      "agent_slug": "dario",
-      "binding_idx": 3,
-      "project_id": "agent-workforce",
-      "ticked_at": "2026-05-31T08:20:00Z",
-      "credentials": {}
-    }
-  ]
-}
+### Via orchestrator-tick (production path)
+
+Wait for the next cron-match tick. The orchestrator-tick will POST the live payload to `/fire`; CloudWatch logs the resulting `ccr-batch-fired` event with `session_id` + `session_url` you can open in claude.ai to watch the run.
+
+### Via `curl` (operator-driven smoke test)
+
+Click **Run now** on the routine's detail page won't help here — the **Run now** button does not pass any custom `text` to the session. Instead `curl` directly to mirror what orchestrator-tick does:
+
+```bash
+curl -X POST <FIRE_URL_FROM_wf/ccr/agent-runner> \
+  -H "Authorization: Bearer <TOKEN_FROM_wf/ccr/agent-runner>" \
+  -H "anthropic-beta: experimental-cc-routine-2026-04-01" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "{\"tasks\":[{\"agent_slug\":\"dario\",\"binding_idx\":3,\"project_id\":\"agent-workforce\",\"ticked_at\":\"2026-05-31T08:20:00Z\",\"credentials\":{}}]}"
+  }'
 ```
 
 Confirm the session:
+- Parses `text` → `{tasks: [...]}` envelope as the first step
 - Reads `workforce/agents/dario/agent.json` and finds `bindings[3].skill === "feed-post"`
 - Reads `workforce/skills/feed-post/SKILL.md`
 - Produces a draft PR under `claude/feed-post-dario-{yyyy-mm-dd}` with the new post
 - Exits cleanly
 
-For a multi-task verify (Dario + Yuki in the same batch, after Yuki's binding lands in PR γ), the payload has two entries in `tasks[]` and the session opens **one PR per task** (or one PR with multiple files — the v1 fallback shape is documented per skill).
+For a multi-task verify (Dario + Yuki in the same batch), the inner envelope has two entries in `tasks[]` and the session opens **one PR per task** (or one PR with multiple files — the v1 fallback shape is documented per skill).
 
 ## Related
 

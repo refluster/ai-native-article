@@ -7,12 +7,27 @@
 // iterates the tasks and executes each (agent, skill, project) tuple
 // in sequence — see workforce/docs/routines/agent-runner.md.
 //
-// Batch shape (post-PR-β):
+// Internal batch envelope (the structured shape this module emits):
 //
-//   POST { tasks: [
-//     { agent_slug, binding_idx, project_id, ticked_at, credentials },
-//     ...
-//   ] }
+//   { tasks: [
+//       { agent_slug, binding_idx, project_id, ticked_at, credentials },
+//       ...
+//     ]
+//   }
+//
+// Wire shape (what /fire actually accepts):
+//
+//   POST { "text": "<JSON-encoded batch envelope above>" }
+//
+// The CCR /fire endpoint accepts ONLY a `text` string at the top level
+// — custom keys like `tasks` are rejected with HTTP 400. We serialize
+// the structured envelope into `text` and the routine session
+// (workforce/docs/routines/agent-runner.md) parses it back. Required
+// headers per Anthropic docs:
+//   - Authorization: Bearer <token>
+//   - Content-Type: application/json
+//   - anthropic-beta: experimental-cc-routine-2026-04-01
+//   - anthropic-version: 2023-06-01
 //
 // `credentials` is a map keyed by credential type (resolved per the
 // skill's `meta.json:requires[]`) and pre-resolved by orchestrator-tick
@@ -66,8 +81,10 @@ export interface CcrFirePayload {
 export interface CcrFireResult {
   /** HTTP status from the /fire endpoint. 2xx is success. */
   status: number;
-  /** Routine execution id if the response body included one (best-effort). */
-  execution_id?: string;
+  /** CCR session id returned by /fire (e.g. `session_01HJKL...`). */
+  session_id?: string;
+  /** CCR session URL — operator can open this to watch the run. */
+  session_url?: string;
 }
 
 interface CcrSecret {
@@ -109,15 +126,36 @@ export function routineIdFromSpec(routineSpec: string): string {
  * calling this function. (Passing an empty batch here would still POST
  * to Discord, which is wasteful but not a correctness issue.)
  */
+/** Beta header version for the CCR `/fire` API. Per Anthropic docs:
+ *  "Breaking changes ship behind new dated beta header versions, and the
+ *  two most recent previous header versions continue to work so that
+ *  callers have time to migrate." Bump this when the docs publish a
+ *  newer version; the previous two stay valid during migration windows. */
+const CCR_FIRE_BETA = "experimental-cc-routine-2026-04-01";
+const ANTHROPIC_API_VERSION = "2023-06-01";
+
 export async function fireCcrRoutine(routineId: string, payload: CcrFirePayload): Promise<CcrFireResult> {
   const secret = await loadCcrSecret(routineId);
+
+  // The CCR /fire endpoint accepts ONLY a `text` field (per Anthropic
+  // docs: "The request body accepts an optional `text` field ... if you
+  // send JSON or another structured payload, the routine receives it as
+  // a literal string"). Custom top-level keys like `tasks` are rejected
+  // with HTTP 400 "Extra inputs are not permitted" — locked observation
+  // from the 2026-05-31T23:25 tick. We serialize our structured envelope
+  // to a string and let the routine session parse it back; the contract
+  // for the routine side lives in workforce/docs/routines/agent-runner.md.
+  const apiBody = { text: JSON.stringify(payload) };
+
   const res = await fetch(secret.url, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${secret.token}`,
+      "anthropic-beta": CCR_FIRE_BETA,
+      "anthropic-version": ANTHROPIC_API_VERSION,
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(apiBody),
   });
 
   if (res.status < 200 || res.status >= 300) {
@@ -127,17 +165,22 @@ export async function fireCcrRoutine(routineId: string, payload: CcrFirePayload)
     );
   }
 
-  // The CCR /fire response shape isn't formally documented; try to pull
-  // an execution_id but don't fail if it's absent.
-  let execution_id: string | undefined;
+  // Per docs, success response shape:
+  //   { type: "routine_fire", claude_code_session_id, claude_code_session_url }
+  let session_id: string | undefined;
+  let session_url: string | undefined;
   try {
-    const body = (await res.json()) as { execution_id?: unknown };
-    if (typeof body?.execution_id === "string") execution_id = body.execution_id;
+    const body = (await res.json()) as {
+      claude_code_session_id?: unknown;
+      claude_code_session_url?: unknown;
+    };
+    if (typeof body?.claude_code_session_id === "string") session_id = body.claude_code_session_id;
+    if (typeof body?.claude_code_session_url === "string") session_url = body.claude_code_session_url;
   } catch {
     // Non-JSON body is fine — 2xx is the contract.
   }
 
-  return { status: res.status, execution_id };
+  return { status: res.status, session_id, session_url };
 }
 
 async function loadCcrSecret(routineId: string): Promise<CcrSecret> {
