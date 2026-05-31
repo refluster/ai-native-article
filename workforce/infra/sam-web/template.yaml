@@ -403,7 +403,12 @@ Outputs:
     Value: !Sub "https://${WfUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com"
 
   WorkforceIdentityPoolId:
-    Description: Cognito Identity Pool ID (Issue #158 PR-α). The SPA
+    # Folded scalar — see sam/template.yaml AgentsApiId for rationale.
+    # Here the trigger is ` #158` in `(Issue #158 PR-α)`: YAML treats
+    # a space-prefixed `#` as a comment start, which truncates the
+    # plain scalar mid-value and leaves the continuation orphaned.
+    Description: >-
+      Cognito Identity Pool ID (Issue #158 PR-α). The SPA
       exchanges the User Pool's OIDC ID token for temporary AWS
       credentials at this pool; the credentials assume
       WfWorkforceOperatorRole and SigV4-sign API Gateway calls. Pass to

@@ -46,6 +46,13 @@ jobs:
           VITE_COGNITO_CLIENT_ID: ${{ secrets.VITE_COGNITO_CLIENT_ID }}
           VITE_COGNITO_DOMAIN: ${{ secrets.VITE_COGNITO_DOMAIN }}
           VITE_WORKFORCE_AGENTS_API_BASE: ${{ secrets.VITE_WORKFORCE_AGENTS_API_BASE }}
+          # Issue #158 PR-α: SigV4 broker. When the operator populates
+          # VITE_COGNITO_IDENTITY_POOL_ID + VITE_WORKFORCE_CREDENTIALS_API_BASE
+          # secrets the SPA enables the credential vault + project archive
+          # surfaces; until then both render in a disabled-but-visible
+          # state per the per-component fallback in lib/sigv4.ts.
+          VITE_COGNITO_IDENTITY_POOL_ID: ${{ secrets.VITE_COGNITO_IDENTITY_POOL_ID }}
+          VITE_WORKFORCE_CREDENTIALS_API_BASE: ${{ secrets.VITE_WORKFORCE_CREDENTIALS_API_BASE }}
         run: npm run build:workforce
 
       - name: Configure AWS credentials (OIDC)
