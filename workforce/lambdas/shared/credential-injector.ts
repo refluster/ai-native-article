@@ -68,6 +68,16 @@ export interface DiscordBotSecret {
 }
 
 /**
+ * Discord webhook URL — for fire-and-forget channel posts (heartbeat,
+ * deploy notifications, etc.) that don't need bot identity. Inbound
+ * channel posts via webhook are unauthenticated to the bot graph; the
+ * URL itself is the capability. Stored at `wf/projects/{project_id}/discord.webhook_url`.
+ */
+export interface DiscordWebhookSecret {
+  url: string;
+}
+
+/**
  * Type registry: maps each credential type literal to its TS shape.
  * Adding a new type requires extending this interface AND the five
  * sync points listed in the file header.
@@ -75,6 +85,7 @@ export interface DiscordBotSecret {
 export interface CredentialShapes {
   "anthropic.api_key": AnthropicSecret;
   "discord.bot_token": DiscordBotSecret;
+  "discord.webhook_url": DiscordWebhookSecret;
   "github.token": GithubSecret;
   "notion.integration_token": NotionSecret;
   "voyage.api_key": VoyageSecret;
@@ -112,6 +123,7 @@ export type BaseOf<K extends string> = K extends `${infer B}@${string}`
 export const CREDENTIAL_TYPES: ReadonlySet<CredentialType> = new Set([
   "anthropic.api_key",
   "discord.bot_token",
+  "discord.webhook_url",
   "github.token",
   "notion.integration_token",
   "voyage.api_key",
