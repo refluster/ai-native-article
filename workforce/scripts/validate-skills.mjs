@@ -62,6 +62,7 @@ const DELIV_TYPES = new Set([
 const CREDENTIAL_TYPES = new Set([
   "anthropic.api_key",
   "discord.bot_token",
+  "discord.webhook_url",
   "github.token",
   "notion.integration_token",
   "voyage.api_key",

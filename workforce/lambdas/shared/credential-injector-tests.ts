@@ -61,15 +61,19 @@ beforeEach(() => {
 });
 
 describe("CREDENTIAL_TYPES allowlist", () => {
-  it("contains the Story 2 base set plus Story 4's voyage.api_key", () => {
+  it("contains the Story 2 base set plus Story 4's voyage.api_key and discord.webhook_url", () => {
     // Story 4 (#93) added `voyage.api_key` for the EXEC-row embedding-
-    // write path. All 4 mirror points (see credential-injector.ts file
+    // write path. The CCR-foundation PR adds `discord.webhook_url` so
+    // `discord-heartbeat` (CCR-routed sibling of discord-ping) reads
+    // its webhook URL from the project credential bag instead of an
+    // env var. All 5 mirror points (see credential-injector.ts file
     // header) were touched in the same PR; this assertion is the
     // visible canary that catches drift if a future mirror sync is
     // forgotten.
     expect([...CREDENTIAL_TYPES].sort()).toEqual([
       "anthropic.api_key",
       "discord.bot_token",
+      "discord.webhook_url",
       "github.token",
       "notion.integration_token",
       "voyage.api_key",
