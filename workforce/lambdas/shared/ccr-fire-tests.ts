@@ -67,7 +67,7 @@ describe("fireCcrRoutine", () => {
     mockFetch.mockReset();
   });
 
-  it("POSTs to the configured URL with bearer auth + tasks[] payload", async () => {
+  it("POSTs with bearer auth + beta/version headers + wraps tasks in `text`", async () => {
     mockSend.mockReturnValueOnce(okSecret("https://api.example/fire", "tok_ABC"));
     mockFetch.mockResolvedValueOnce(new Response("{}", { status: 200 }));
 
@@ -78,13 +78,21 @@ describe("fireCcrRoutine", () => {
     const [url, init] = mockFetch.mock.calls[0]!;
     expect(url).toBe("https://api.example/fire");
     expect((init as RequestInit).method).toBe("POST");
+    // /fire requires the beta + version headers; bearer auth + content-type.
     expect((init as RequestInit).headers).toMatchObject({
       authorization: "Bearer tok_ABC",
       "content-type": "application/json",
+      "anthropic-beta": "experimental-cc-routine-2026-04-01",
+      "anthropic-version": "2023-06-01",
     });
-    const body = JSON.parse((init as RequestInit).body as string);
-    expect(body.tasks).toHaveLength(1);
-    expect(body.tasks[0]).toEqual({
+    // Wire shape: top-level body is { text: "<json string>" } — /fire
+    // rejects any other top-level key with HTTP 400. The structured
+    // envelope round-trips through the string.
+    const wire = JSON.parse((init as RequestInit).body as string);
+    expect(Object.keys(wire)).toEqual(["text"]);
+    const envelope = JSON.parse(wire.text);
+    expect(envelope.tasks).toHaveLength(1);
+    expect(envelope.tasks[0]).toEqual({
       agent_slug: "dario",
       binding_idx: 3,
       project_id: "agent-workforce",
@@ -117,13 +125,35 @@ describe("fireCcrRoutine", () => {
     });
 
     expect(mockFetch).toHaveBeenCalledOnce();
-    const body = JSON.parse((mockFetch.mock.calls[0]![1] as RequestInit).body as string);
-    expect(body.tasks).toHaveLength(2);
-    expect(body.tasks[0].agent_slug).toBe("dario");
-    expect(body.tasks[1].agent_slug).toBe("yuki");
-    expect(body.tasks[1].credentials).toEqual({
+    const wire = JSON.parse((mockFetch.mock.calls[0]![1] as RequestInit).body as string);
+    expect(Object.keys(wire)).toEqual(["text"]);
+    const envelope = JSON.parse(wire.text);
+    expect(envelope.tasks).toHaveLength(2);
+    expect(envelope.tasks[0].agent_slug).toBe("dario");
+    expect(envelope.tasks[1].agent_slug).toBe("yuki");
+    expect(envelope.tasks[1].credentials).toEqual({
       "discord.webhook_url": { url: "https://discord.com/api/webhooks/X/Y" },
     });
+  });
+
+  it("returns session_id + session_url when the response includes them", async () => {
+    mockSend.mockReturnValueOnce(okSecret());
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          type: "routine_fire",
+          claude_code_session_id: "session_01HJK",
+          claude_code_session_url: "https://claude.ai/code/session_01HJK",
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const res = await fireCcrRoutine("agent-runner", minimalPayload());
+
+    expect(res.status).toBe(200);
+    expect(res.session_id).toBe("session_01HJK");
+    expect(res.session_url).toBe("https://claude.ai/code/session_01HJK");
   });
 
   it("reads from wf/ccr/{routine_id}", async () => {
@@ -134,18 +164,6 @@ describe("fireCcrRoutine", () => {
 
     const cmd = mockSend.mock.calls[0]![0] as { input: { SecretId: string } };
     expect(cmd.input.SecretId).toBe("wf/ccr/agent-runner");
-  });
-
-  it("returns execution_id when the response includes one", async () => {
-    mockSend.mockReturnValueOnce(okSecret());
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ execution_id: "exec_42" }), { status: 202 }),
-    );
-
-    const res = await fireCcrRoutine("agent-runner", minimalPayload());
-
-    expect(res.status).toBe(202);
-    expect(res.execution_id).toBe("exec_42");
   });
 
   it("throws on non-2xx", async () => {

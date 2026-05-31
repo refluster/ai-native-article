@@ -198,9 +198,15 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
   for (const [routineId, slot] of ccrBatchByRoutine) {
     if (slot.tasks.length === 0) continue;
     try {
-      await fireCcrRoutine(routineId, { tasks: slot.tasks });
+      const fired = await fireCcrRoutine(routineId, { tasks: slot.tasks });
       for (const item of slot.items) dispatched.push(item);
-      console.log(JSON.stringify({ event: "ccr-batch-fired", routine_id: routineId, task_count: slot.tasks.length }));
+      console.log(JSON.stringify({
+        event: "ccr-batch-fired",
+        routine_id: routineId,
+        task_count: slot.tasks.length,
+        session_id: fired.session_id,
+        session_url: fired.session_url,
+      }));
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       console.error(JSON.stringify({ event: "ccr-batch-error", routine_id: routineId, task_count: slot.tasks.length, reason }));
