@@ -318,6 +318,25 @@ for (const slug of slugDirs) {
           );
         }
       }
+      // PR β: CCR-batched bindings (executor=claude-code-routine +
+      // scheduler=external + invoked_by=api) MUST declare a project_id.
+      // The orchestrator-tick resolves the skill's requires[] against
+      // wf/projects/{project_id}/{type} and ships credentials inline
+      // in the CCR /fire payload. No default fallback (per operator
+      // Q3-revise in the PR β design discussion).
+      if (
+        b.executor === "claude-code-routine" &&
+        t.scheduler === "external" &&
+        t.invoked_by === "api"
+      ) {
+        if (typeof b.project_id !== "string" || b.project_id.length === 0) {
+          v(
+            "S9-binding-ccr-batch-project",
+            cfg,
+            `bindings[${i}]: CCR-batched binding (executor=claude-code-routine + scheduler=external + invoked_by=api) requires explicit project_id — no default fallback`,
+          );
+        }
+      }
       // routine_spec required + must exist for CCR
       if (b.executor === "claude-code-routine") {
         if (typeof b.routine_spec !== "string" || b.routine_spec.length === 0) {

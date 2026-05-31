@@ -2,7 +2,11 @@
 // DO NOT EDIT BY HAND. Run `npm run workforce:skill-registry` after
 // adding, removing, or changing the executor of a skill.
 //
-// Source: workforce/skills/*/meta.json (executor === "deterministic")
+// Sources:
+//   DETERMINISTIC_HANDLERS — workforce/skills/*/meta.json (executor === "deterministic")
+//   SKILL_REQUIRES        — workforce/skills/*/meta.json (.requires[] for ALL skills,
+//                           defaulting to [] when omitted; consumed by orchestrator-tick
+//                           CCR batch dispatch to resolve project credentials per task)
 
 import type { DeterministicHandler } from "./skill-types.js";
 
@@ -18,4 +22,20 @@ export const DETERMINISTIC_HANDLERS: Record<string, DeterministicHandler> = {
   "pdm-charter": dispatchPdmCharter,
   "pdm-decompose": dispatchPdmDecompose,
   "pr-route": dispatchPrRoute,
+};
+
+export const SKILL_REQUIRES: Record<string, readonly string[]> = {
+  "article-draft": [],
+  "code-task-brief": [],
+  "design-note": [],
+  "discord-heartbeat": ["discord.webhook_url"] as const,
+  "discord-ping": [],
+  "feed-health": [],
+  "feed-post": [],
+  "market-research": [],
+  "pdm-charter": [],
+  "pdm-decompose": [],
+  "plan-write": [],
+  "positioning-write": [],
+  "pr-route": ["github.token"] as const,
 };

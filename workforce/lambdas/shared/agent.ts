@@ -55,6 +55,15 @@ export interface AgentBinding {
   routine_spec?: string;
   /** For executor=gha: workflow file path under .github/workflows/. */
   workflow?: string;
+  /** Project this binding executes against. Required for CCR-batched
+   *  bindings (executor=claude-code-routine + scheduler=external +
+   *  invoked_by=api) per PR β — the orchestrator-tick resolves the
+   *  skill's `requires[]` against `wf/projects/{project_id}/{type}` and
+   *  ships the credentials inline in the CCR /fire payload. Optional on
+   *  Lambda-bound bindings today (the existing wf-agent-runner reads its
+   *  webhook/secret from env vars on the legacy path); a follow-up PR
+   *  may tighten this to required-on-all once the legacy paths migrate. */
+  project_id?: string;
   /** Persona-overlay block — skill-specific. The skill's routine_spec /
    *  handler.ts contract defines the shape; the validator only enforces
    *  structural binding fields, not `config` contents. See bindings.md
