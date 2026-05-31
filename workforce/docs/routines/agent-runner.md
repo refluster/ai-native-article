@@ -25,23 +25,42 @@ The runtime working prompt is composed at fire-time:
 
 The CCR session reads these from the cloned repo on each fire. No state lives in claude.ai beyond the thin instruction pointer (see "Operator instantiation" below).
 
-## Fire payload
+## Fire payload — batched tasks (post-PR-β shape)
 
-`wf-orchestrator-tick` POSTs:
+`wf-orchestrator-tick` POSTs a single payload per tick containing **all** CCR-bound (agent × skill × project) tuples whose cron matched the current tick window:
 
 ```json
 {
-  "agent_slug": "dario",
-  "binding_idx": 3,
-  "ticked_at": "2026-05-31T08:20:00Z"
+  "tasks": [
+    {
+      "agent_slug": "dario",
+      "binding_idx": 3,
+      "project_id": "agent-workforce",
+      "ticked_at": "2026-05-31T08:20:00Z",
+      "credentials": {}
+    },
+    {
+      "agent_slug": "yuki",
+      "binding_idx": 2,
+      "project_id": "agent-workforce",
+      "ticked_at": "2026-05-31T08:20:00Z",
+      "credentials": {
+        "discord.webhook_url": { "url": "https://discord.com/api/webhooks/XXX/YYY" }
+      }
+    }
+  ]
 }
 ```
 
-`agent_slug` resolves the persona files; `binding_idx` resolves the specific binding (and through it: skill, cron, config). The runner reads `bindings[binding_idx].skill` to find the skill body.
+Each task is independent. The orchestrator-tick is the privileged AWS principal that resolved the project credentials and shipped them inline — **the CCR session itself never reads Secrets Manager**, never reaches AWS resources directly. The keys in `task.credentials` are exactly what the skill's `meta.json:requires[]` declared, with their parsed shape (e.g. `{"discord.webhook_url": {url: string}}`).
 
-## What the runner does (in one CCR session)
+`agent_slug` resolves the persona files; `binding_idx` resolves the specific binding (skill, cron, config); `project_id` is the audit context (the EXEC row this task should end up under).
 
-1. **Validate payload** — verify `agent_slug` exists at `workforce/agents/{agent_slug}/agent.json` and `binding_idx` is within range. If either is wrong, fail loud (the operator/orchestrator misconfigured this fire).
+## What the runner does (per task in the batch)
+
+Iterate `payload.tasks` in order. For each task:
+
+1. **Validate task** — verify `agent_slug` exists at `workforce/agents/{agent_slug}/agent.json` and `binding_idx` is within range. If either is wrong, fail loud for this task (the operator/orchestrator misconfigured the binding); other tasks in the batch are independent and continue.
 
 2. **Resolve the (skill, persona, config) triple**:
    - `binding = agent.json["bindings"][binding_idx]`
@@ -50,16 +69,21 @@ The CCR session reads these from the cloned repo on each fire. No state lives in
    - `persona = workforce/agents/{agent_slug}/system.md`
    - `skill_body = workforce/skills/{skill}/SKILL.md`
 
-3. **Assemble the recall packet** per the skill's contract. The skill body describes what context it wants (recent EXEC rows / memory chunks / TASK queue / repo state / etc.). For v1, the public workforce read endpoints are sufficient:
+3. **Use the inline credentials** for any side-effect the skill performs:
+   - `task.credentials[type]` for each `type` in the skill's `requires[]`
+   - **Do not** look elsewhere for credentials — no env vars, no repo files, no fetches against AWS. If a required type is missing from the bag, that's a project-membership misconfiguration; throw and surface in the task's session log.
+
+4. **Assemble the recall packet** per the skill's contract. The skill body describes what context it wants (recent EXEC rows / memory chunks / TASK queue / repo state / etc.). For v1, the public workforce read endpoints are sufficient:
    - `GET https://api.kohuehara.xyz/workforce/v1/agents/{agent_slug}/executions?limit=10`
    - `GET .../agents/{agent_slug}/posts?page_size=5` (when the skill wants prior-post context)
-   - `GET .../skills/{skill}` (for the skill's deliverable contract)
 
-4. **Execute the skill** — compose the working prompt and write the output per the skill's contract (kind tag, structured tail JSON, sentinel handling, etc.). The skill body owns these — this runner spec deliberately doesn't repeat them.
+5. **Execute the skill** — for deterministic-shape skills (e.g. `discord-heartbeat`), the SKILL.md instructs you to invoke a bundled script (`node workforce/skills/{skill}/post.mjs` etc.) with the credentials as env vars; for judgment-shape skills (e.g. `feed-post`), compose the working prompt and generate the output. The skill body owns the shape — this runner spec deliberately doesn't repeat it.
 
-5. **Write back** — per the skill's deliverable shape. For v1, see "Operational fallback" below.
+6. **Write back** — per the skill's deliverable shape. For v1, see "Operational fallback" below.
 
-6. **Record** — the orchestrator's dedup logic looks at `AGENT#{agent_slug}/last_run_at`. The runner posts a one-line summary back via the future `POST /runs/_internal` endpoint (not yet built); until then, the operator-merged draft PR creates a commit whose presence + timestamp is the proxy "did this fire fire" record.
+7. **Per-task isolation** — a failure in task N must not abort tasks N+1, N+2, etc. Wrap each task's execution in its own try/catch; record per-task outcomes in your session output so the operator can see which tasks succeeded vs failed within the same fire.
+
+8. **Record** — the orchestrator's dedup logic looks at `AGENT#{agent_slug}/last_run_at`. The runner posts a one-line summary back via the future `POST /runs/_internal` endpoint (not yet built); until then, the operator-merged draft PR creates a commit whose presence + timestamp is the proxy "did this fire fire" record.
 
 ## Operational fallback (v1, until write-back endpoints exist)
 
@@ -119,8 +143,10 @@ You are the workforce CCR agent-runner. On each fire:
 
 1. Clone refluster/ai-native-article (provided as the routine's repo).
 2. Read workforce/docs/routines/agent-runner.md.
-3. Follow the instructions there. The fire payload (agent_slug, binding_idx,
-   ticked_at) is in your invocation context.
+3. Follow the instructions there. The fire payload is a batch:
+   { tasks: [{ agent_slug, binding_idx, project_id, ticked_at, credentials }, ...] }.
+   Iterate tasks in order; per-task isolation (one task's failure does not
+   abort the rest).
 
 Do not improvise; the markdown owns the contract.
 ```
@@ -169,10 +195,20 @@ No new claude.ai routine. No new Secrets Manager entry. Same `wf/ccr/agent-runne
 
 ## Verify
 
-After token storage + SAM deploy, click **Run now** on the routine's detail page with a manual payload:
+After token storage + SAM deploy, click **Run now** on the routine's detail page with a manual batch payload (one task is fine for verification):
 
 ```json
-{"agent_slug": "dario", "binding_idx": 3, "ticked_at": "2026-05-31T08:20:00Z"}
+{
+  "tasks": [
+    {
+      "agent_slug": "dario",
+      "binding_idx": 3,
+      "project_id": "agent-workforce",
+      "ticked_at": "2026-05-31T08:20:00Z",
+      "credentials": {}
+    }
+  ]
+}
 ```
 
 Confirm the session:
@@ -180,6 +216,8 @@ Confirm the session:
 - Reads `workforce/skills/feed-post/SKILL.md`
 - Produces a draft PR under `claude/feed-post-dario-{yyyy-mm-dd}` with the new post
 - Exits cleanly
+
+For a multi-task verify (Dario + Yuki in the same batch, after Yuki's binding lands in PR γ), the payload has two entries in `tasks[]` and the session opens **one PR per task** (or one PR with multiple files — the v1 fallback shape is documented per skill).
 
 ## Related
 

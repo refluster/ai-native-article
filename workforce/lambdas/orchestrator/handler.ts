@@ -28,7 +28,9 @@ import {
 import { scanPrefix, queryBySkPrefix, updateOperational } from "../shared/ddb.js";
 import { matchesNow } from "../shared/cron-match.js";
 import { findRecentPRs } from "../shared/github.js";
-import { fireCcrRoutine, routineIdFromSpec } from "../shared/ccr-fire.js";
+import { fireCcrRoutine, routineIdFromSpec, type CcrFireTask } from "../shared/ccr-fire.js";
+import { asProjectId, getCredential } from "../shared/project.js";
+import { SKILL_REQUIRES } from "../shared/skill-registry-generated.js";
 import type { DelivRow } from "../shared/task.js";
 
 const STAGE = process.env.STAGE;
@@ -75,11 +77,23 @@ export interface OrchestratorResult {
   };
 }
 
+/** Per-routine batch collector: routineId → (tasks, slot-aligned audit items).
+ *  The two arrays stay parallel — same length, same order — so flush-time
+ *  bookkeeping can pair each task with its (slug, binding_idx, skill)
+ *  audit entry to push into dispatched[] or skipped[] depending on the
+ *  batch outcome. Keyed by routineId because each routine has its own
+ *  /fire URL + token in wf/ccr/{routineId}. */
+type CcrBatchSlot = {
+  tasks: CcrFireTask[];
+  items: Array<{ slug: string; binding_idx: number; skill: string }>;
+};
+
 export async function handler(_event: unknown, _context: Context): Promise<OrchestratorResult> {
   const now = new Date();
   const tickedAt = now.toISOString();
   const dispatched: OrchestratorResult["dispatched"] = [];
   const skipped: OrchestratorResult["skipped"] = [];
+  const ccrBatchByRoutine = new Map<string, CcrBatchSlot>();
 
   // A. Poll Ren's pending PR DELIVs first.
   const pr_polls = await pollEngineerPRs(now);
@@ -107,9 +121,10 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
         const binding = agent.bindings[i]!;
         // The orchestrator-tick owns two dispatch paths sharing the same
         // scan/evaluate procedure:
-        //   - isOrchestratorOwned     → async-invoke wf-agent-runner Lambda
-        //   - isOrchestratorOwnedCcr  → POST to a CCR routine's /fire URL
-        //     (Secret at wf/ccr/{skill}, see shared/ccr-fire.ts)
+        //   - isOrchestratorOwned     → async-invoke wf-agent-runner Lambda (per-binding)
+        //   - isOrchestratorOwnedCcr  → collect into a per-routine batch;
+        //                               fire ONE /fire POST per routine after
+        //                               the agent-scan loop (PR β shape)
         // Other bindings (CCR with self-schedule, GHA, external non-API)
         // are declarative — fired by their own schedulers. Recorded as
         // skipped for inventory.
@@ -129,33 +144,75 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
           skipped.push({ slug: agent.slug, binding_idx: i, skill: binding.skill, reason: decision.reason });
           continue;
         }
-        try {
-          if (ownedCcr) {
-            // routine_id = basename of binding.routine_spec → wf/ccr/{routine_id}.
-            // Bindings sharing a routine_spec share the secret (one CCR routine
-            // handles many (agent, skill) pairs — see workforce/docs/routines/agent-runner.md).
-            const routineId = routineIdFromSpec(binding.routine_spec ?? "");
-            await fireCcrRoutine(routineId, {
-              agent_slug: agent.slug,
-              binding_idx: i,
-              ticked_at: tickedAt,
-            });
-          } else {
+        if (ownedLambda) {
+          // Per-binding immediate dispatch (unchanged).
+          try {
             await invokeRunner(agent.slug, i);
+            dispatched.push({ slug: agent.slug, binding_idx: i, skill: binding.skill });
+          } catch (err) {
+            const reason = err instanceof Error ? err.message : String(err);
+            console.error(JSON.stringify({ event: "dispatch-error", slug: agent.slug, skill: binding.skill, reason }));
+            skipped.push({ slug: agent.slug, binding_idx: i, skill: binding.skill, reason: `dispatch_error: ${reason.slice(0, 200)}` });
           }
-          dispatched.push({ slug: agent.slug, binding_idx: i, skill: binding.skill });
+          continue;
+        }
+        // ownedCcr — pre-resolve credentials, then collect into the
+        // routine-id-keyed batch. A failure here (missing project_id,
+        // unknown skill, credential read error) is per-task: the bad
+        // task is skipped; other tasks in the batch still fire.
+        try {
+          const routineId = routineIdFromSpec(binding.routine_spec ?? "");
+          if (!binding.project_id) {
+            throw new Error(`binding missing project_id (CCR batch requires explicit project per PR β)`);
+          }
+          const requires = SKILL_REQUIRES[binding.skill];
+          if (requires === undefined) {
+            throw new Error(`skill "${binding.skill}" not in SKILL_REQUIRES map — re-run npm run workforce:skill-registry`);
+          }
+          const credentials = await resolveCredentialsForTask(binding.project_id, requires);
+          const task: CcrFireTask = {
+            agent_slug: agent.slug,
+            binding_idx: i,
+            project_id: binding.project_id,
+            ticked_at: tickedAt,
+            credentials,
+          };
+          const slot = ccrBatchByRoutine.get(routineId) ?? { tasks: [], items: [] };
+          slot.tasks.push(task);
+          slot.items.push({ slug: agent.slug, binding_idx: i, skill: binding.skill });
+          ccrBatchByRoutine.set(routineId, slot);
         } catch (err) {
-          // Dispatch failure: W-4 fail-loud. Record as skipped with the
-          // error message so the operator can find it in the tick log.
-          // The next tick will retry (cron + dedup-window semantics
-          // unchanged).
           const reason = err instanceof Error ? err.message : String(err);
-          console.error(JSON.stringify({ event: "dispatch-error", slug: agent.slug, skill: binding.skill, reason }));
-          skipped.push({ slug: agent.slug, binding_idx: i, skill: binding.skill, reason: `dispatch_error: ${reason.slice(0, 200)}` });
+          console.error(JSON.stringify({ event: "ccr-prep-error", slug: agent.slug, skill: binding.skill, reason }));
+          skipped.push({ slug: agent.slug, binding_idx: i, skill: binding.skill, reason: `ccr_prep_error: ${reason.slice(0, 200)}` });
         }
       }
     }
   } while (cursor);
+
+  // Flush per-routine CCR batches. One POST per routine_id with all
+  // its collected tasks. A successful batch promotes every item to
+  // dispatched[]; a failed batch puts every item in skipped[] with
+  // the same error reason — keeps the audit trail clean.
+  for (const [routineId, slot] of ccrBatchByRoutine) {
+    if (slot.tasks.length === 0) continue;
+    try {
+      await fireCcrRoutine(routineId, { tasks: slot.tasks });
+      for (const item of slot.items) dispatched.push(item);
+      console.log(JSON.stringify({ event: "ccr-batch-fired", routine_id: routineId, task_count: slot.tasks.length }));
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      console.error(JSON.stringify({ event: "ccr-batch-error", routine_id: routineId, task_count: slot.tasks.length, reason }));
+      for (const item of slot.items) {
+        skipped.push({
+          slug: item.slug,
+          binding_idx: item.binding_idx,
+          skill: item.skill,
+          reason: `ccr_batch_error[${routineId}]: ${reason.slice(0, 180)}`,
+        });
+      }
+    }
+  }
 
   const result: OrchestratorResult = { ticked_at: tickedAt, scanned, dispatched, skipped, pr_polls };
   console.log(JSON.stringify({ event: "tick-complete", result }));
@@ -257,6 +314,26 @@ async function invokeRunner(slug: string, bindingIdx: number): Promise<void> {
       Payload: Buffer.from(JSON.stringify({ agent: slug, binding_idx: bindingIdx })),
     }),
   );
+}
+
+/** Resolve a task's credential bag inline for the CCR fire payload.
+ *  Per Q1=A (operator design discussion above PR #176): orchestrator
+ *  (the privileged AWS principal) reads each credential from
+ *  `wf/projects/{project_id}/{type}` and ships it inline to CCR. CCR
+ *  itself never touches Secrets Manager. An empty `requires[]` yields
+ *  an empty map; a read error propagates and is caught per-task by the
+ *  scan loop's prep-error branch. */
+async function resolveCredentialsForTask(
+  projectId: string,
+  requires: readonly string[],
+): Promise<Record<string, unknown>> {
+  const out: Record<string, unknown> = {};
+  if (requires.length === 0) return out;
+  const proj = asProjectId(projectId);
+  for (const type of requires) {
+    out[type] = await getCredential<unknown>(proj, type);
+  }
+  return out;
 }
 
 export type { AgentMetaRow };
