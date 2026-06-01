@@ -12,5 +12,5 @@
   "owners": ["elena"],
   "improvement_agent": null,
   "created_at": "2026-06-01",
-  "requires": ["notion.integration_token@l1", "notion.integration_token@l2"]
+  "requires": ["notion.integration_token"]
 }

@@ -21,19 +21,22 @@ every 2 hours by `wf-orchestrator-tick` into the generic `agent-runner` routine
 this skill body, you generate the explanation, then a **bundled write script**
 owns the Notion write — you do **not** hand-edit any file and do **not** open a PR.
 
-## Two Notion DBs, two credential variants
+## Two Notion DBs, one credential (apiKey only)
 
 This skill reads the **L1 source library** and writes the **unified Articles DB** —
-two different databases, reached with two injected credential variants (same Notion
-integration `apiKey`, different `databaseId`):
+two different databases. Only the Notion `apiKey` is a secret; the two database
+ids are **not** secret (they're already committed in `gas/src/Code.gs` and
+`scripts/normalize-categories.mjs`), so the scripts hold them as constants. You
+therefore need just one injected credential:
 
 | Credential | Shape | Used for |
 |---|---|---|
-| `notion.integration_token@l1` | `{apiKey, databaseId}` (L1 source library) | `pick-l1-source.mjs` reads uncovered L1 sources |
-| `notion.integration_token@l2` | `{apiKey, databaseId}` (unified Articles DB) | coverage check + `publish-notion.mjs` writes the explanation |
+| `notion.integration_token` | `{apiKey, …}` — only `apiKey` is read | both `pick-l1-source.mjs` (read L1 + unified coverage) and `publish-notion.mjs` (write the explanation to the unified DB) |
 
-(L2 and L3 share the unified Articles DB, distinguished by `Type`; a future
-`article-level3` skill needs only `@l2`. L1 is the one genuinely separate DB.)
+The Notion integration behind `apiKey` must be shared with **both** databases in
+Notion. (L2 and L3 share the unified Articles DB, distinguished by `Type`; a future
+`article-level3` skill reuses the same credential + unified DB. L1 is the one
+genuinely separate DB — its id is a constant in `pick-l1-source.mjs`.)
 
 ## Instructions
 
@@ -46,9 +49,7 @@ integration `apiKey`, different `databaseId`):
    when it's reachable; otherwise work from `summary` only — see Hard rules).
 
    ```sh
-   NOTION_API_KEY="<credentials['notion.integration_token@l1'].apiKey>" \
-   L1_DB_ID="<credentials['notion.integration_token@l1'].databaseId>" \
-   UNIFIED_DB_ID="<credentials['notion.integration_token@l2'].databaseId>" \
+   NOTION_API_KEY="<credentials['notion.integration_token'].apiKey>" \
      node workforce/skills/article-level2/pick-l1-source.mjs
    ```
 
@@ -89,11 +90,11 @@ Steps:
    — a file, not a shell arg, so multi-line / Unicode prose isn't mangled by
    quoting. The first line must be the `# Title` H1 (used as the page Title and
    stripped from the body blocks).
-2. Run (note the write uses the **`@l2`** variant — the unified Articles DB):
+2. Run (the script writes to the unified Articles DB — its id is a built-in
+   constant, so only `NOTION_API_KEY` is needed):
 
    ```sh
-   NOTION_API_KEY="<credentials['notion.integration_token@l2'].apiKey from your task>" \
-   NOTION_DB_ID="<credentials['notion.integration_token@l2'].databaseId from your task>" \
+   NOTION_API_KEY="<credentials['notion.integration_token'].apiKey from your task>" \
      node workforce/skills/article-level2/publish-notion.mjs \
        --author "<agent_slug>" \
        --type explanation \
@@ -110,10 +111,11 @@ Steps:
      retry blindly.
    - `1` / `3` — bad args / missing H1 title, or Notion API / network error.
 
-The `NOTION_*` values come from your task's injected
-`credentials["notion.integration_token@l2"]` (`{apiKey, databaseId}`) — never read
-them from anywhere else, never hard-code them. The script re-runs the W-1 guards
-before writing, so a degraded body fails loudly rather than landing on the site.
+`NOTION_API_KEY` comes from your task's injected
+`credentials["notion.integration_token"].apiKey` — never read it from anywhere
+else, never hard-code it. (The DB ids are non-secret constants inside the
+scripts.) The script re-runs the W-1 guards before writing, so a degraded body
+fails loudly rather than landing on the site.
 
 **The page lands directly in Notion. No PR, no human-approval gate.** The existing
 GAS L4 batch picks up `Status=ready_for_L4` rows and publishes them to
