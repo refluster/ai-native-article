@@ -96,6 +96,7 @@ Iterate `payload.tasks` in order. For each task:
 5. **Execute the skill, then write via the skill's bundled script.** Every skill now owns a deterministic write script that the LLM invokes — the LLM produces judgment, the script owns the write. The skill's SKILL.md gives the exact command:
    - `discord-heartbeat` → `node workforce/skills/discord-heartbeat/post.mjs` (env-injected webhook URL → Discord POST).
    - `feed-post` → generate body/kind/references, write the body to a temp file, then `node workforce/skills/feed-post/post-feed.mjs` (env-injected feed-write token → authenticated `POST /feed` → DDB POST# row).
+   - `article-level2` → generate the briefing-document markdown, write it to a temp file, then `node workforce/skills/article-level2/publish-notion.mjs` (env-injected `notion.integration_token` → `POST https://api.notion.com/v1/pages` → unified Articles DB row with `Author`, `Type=explanation`, `Status=ready_for_L4`). The Notion API is an external capability endpoint (not an AWS resource); the injected integration token scopes the write, exactly like the feed-write token scopes `POST /feed`.
    You do **not** hand-edit repo files and do **not** open a PR for these skills. The credential each script needs is in your task's `credentials` map.
 
 6. **Per-task isolation** — a failure in task N must not abort tasks N+1, N+2, etc. Wrap each task's execution in its own try/catch; record per-task outcomes in your session output so the operator can see which tasks succeeded vs failed within the same fire.
@@ -108,17 +109,18 @@ Each skill writes through a **bundled script that hits an authenticated endpoint
 
 - `discord-heartbeat` → `post.mjs` → Discord webhook (`discord.webhook_url`).
 - `feed-post` → `post-feed.mjs` → `POST /feed` (`workforce.feed_write_token`) → DDB POST# row, served by `GET /feed`.
+- `article-level2` → `publish-notion.mjs` → `POST /v1/pages` on `api.notion.com` (`notion.integration_token`) → unified Articles DB row (`Author`, `Type=explanation`, `Status=ready_for_L4`), picked up by the GAS L4 batch and served at `kohuehara.xyz`.
 
-The script never reads Secrets Manager; the token/URL is in the task's inline `credentials`. The endpoint runs server-side validation (W-1 editorial guards for feed-post), so a malformed write fails loudly (HTTP 422) rather than landing bad content.
+The script never reads Secrets Manager; the token/URL is in the task's inline `credentials`. For `feed-post` the endpoint runs server-side W-1 validation (HTTP 422 on a malformed write); for `article-level2` there is no server-side editorial gate on the Notion write, so `publish-notion.mjs` re-runs the W-1 guards itself (empty/short body + LLM-artefact prelude → non-zero exit) before POSTing — a degraded body fails loudly rather than landing on the site.
 
-A future skill whose deliverable is a *repo artefact* (e.g. an article-draft markdown file rather than a feed post) may still use a draft-PR write-back — but that's the exception, declared in that skill's SKILL.md, not the default. The default is direct, authenticated, scripted write.
+A skill whose deliverable is a *repo artefact* (e.g. an article-draft markdown file committed to the repo) may instead use a draft-PR write-back — but that's the exception, declared in that skill's SKILL.md, not the default. The default is direct, authenticated, scripted write.
 
 ## Authorisation (uniform across skills)
 
 The CCR session is authorised to:
 - ✅ Read any public repo file in `refluster/ai-native-article`
 - ✅ Read any public workforce API endpoint (`api.kohuehara.xyz/workforce/v1/...`)
-- ✅ Call a skill's bundled write script, which POSTs to an authenticated endpoint using ONLY the credential injected into the task (`discord.webhook_url`, `workforce.feed_write_token`, …)
+- ✅ Call a skill's bundled write script, which POSTs to an authenticated endpoint using ONLY the credential injected into the task (`discord.webhook_url`, `workforce.feed_write_token`, `notion.integration_token`, …)
 - 🚫 Push to main, modify governance docs, change billing/IAM
 - 🚫 Read AWS resources directly (DDB / S3 / Secrets Manager) — reads are via the public API; writes are via an endpoint that holds the AWS privileges, gated by the injected token
 

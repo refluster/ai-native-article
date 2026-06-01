@@ -54,6 +54,9 @@ const DELIV_TYPES = new Set([
   "pr",
   "notification",
 ]);
+// Notion `Type` select values the front-end article pipeline distinguishes.
+// Mirrors ArticleType in apps/article/src/types/article.ts.
+const ARTICLE_TYPES = new Set(["explanation", "analysis"]);
 // Mirror of CREDENTIAL_TYPES in workforce/lambdas/shared/credential-injector.ts.
 // To extend: add the type here AND register its shape in CredentialShapes
 // in the injector module (see the injector file header for all 5 mirror points).
@@ -218,6 +221,22 @@ for (const name of skillDirs) {
       }
       if (typeof meta.deliverable.publish_notion !== "boolean") {
         v("J5-deliverable-notion", metaJson, "deliverable.publish_notion must be boolean");
+      }
+      // article_type (optional): mirrors the JSON schema enum. Sets the
+      // Notion `Type` select the article pipeline reads (explanation vs.
+      // analysis). Only meaningful for article deliverables.
+      const allowedDeliverableKeys = new Set(["type", "publish_notion", "article_type"]);
+      for (const k of Object.keys(meta.deliverable)) {
+        if (!allowedDeliverableKeys.has(k)) {
+          v("J5-deliverable-unknown-key", metaJson, `deliverable has unknown key "${k}" (additionalProperties: false)`);
+        }
+      }
+      if ("article_type" in meta.deliverable) {
+        if (!ARTICLE_TYPES.has(meta.deliverable.article_type)) {
+          v("J5-deliverable-article-type", metaJson, `deliverable.article_type "${meta.deliverable.article_type}" not in {explanation, analysis}`);
+        } else if (meta.deliverable.type !== "article") {
+          v("J5-deliverable-article-type-scope", metaJson, `deliverable.article_type is only valid when deliverable.type="article" (got "${meta.deliverable.type}")`);
+        }
       }
     }
   } else if ("deliverable" in meta && meta.deliverable !== undefined && meta.deliverable !== null) {

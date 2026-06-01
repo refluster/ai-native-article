@@ -52,6 +52,7 @@ const DEDUP_MINUTES_BY_SKILL: Record<string, number> = {
   "discord-ping": 45,          // 45m — under the 1h cadence, well above the 30m tick interval
   "discord-heartbeat": 30,     // 30m — half the hourly cadence; same logic as feed-post (cron-vs-dedup edge case at exact 60m equality with default would skip alternate fires)
   "feed-post": 30,             // 30m — half the hourly cadence so the cron-vs-dedup edge case (exact 60m equality with default) can't skip a fire
+  "article-level2": 30,        // 30m — half Elena's hourly L1→L2 cadence; same cron-vs-dedup edge-case logic as feed-post
   "article-draft": 60 * 5,     // 5h — Sora's 12h cadence
   "market-research": 60 * 5,
   "plan-write": 60 * 24 * 13,  // 13d — Maya's biweekly

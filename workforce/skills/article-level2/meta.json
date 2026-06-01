@@ -1,0 +1,16 @@
+{
+  "name": "article-level2",
+  "version": "0.1.0",
+  "status": "active",
+  "executor": "llm-prose",
+  "deliverable": {
+    "type": "article",
+    "publish_notion": false,
+    "article_type": "explanation"
+  },
+  "cost_class": "medium",
+  "owners": ["elena"],
+  "improvement_agent": null,
+  "created_at": "2026-06-01",
+  "requires": ["notion.integration_token"]
+}

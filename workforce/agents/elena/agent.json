@@ -33,6 +33,19 @@
         "cron": "cron(42 1 ? * * *)"
       },
       "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
+    },
+    {
+      "skill": "article-level2",
+      "executor": "claude-code-routine",
+      "trigger": {
+        "scheduler": "external",
+        "invoked_by": "api",
+        "fired_from": "wf-orchestrator-tick",
+        "cron": "cron(0 * ? * * *)"
+      },
+      "routine_spec": "workforce/docs/routines/agent-runner.md",
+      "project_id": "agent-workforce",
+      "note": "Hourly L1→L2 explanation generation — the agent-workforce equivalent of the GAS L2_BATCH cron, on the CCR execution model (same pattern as Dario's feed-post). wf-orchestrator-tick batches this into the agent-runner /fire POST; project_id=agent-workforce supplies the notion.integration_token (Epic-010 §5). The bundled publish-notion.mjs writes the explanation to Notion with Author=elena, Type=explanation — carries the byline on kohuehara.xyz. One uncovered L1 source per run, oldest-first."
     }
   ],
   "jd": {
