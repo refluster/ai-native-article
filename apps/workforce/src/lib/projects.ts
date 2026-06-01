@@ -65,15 +65,31 @@ export async function fetchProjects(opts: ListProjectsOpts = {}): Promise<Projec
       .filter((p) => !opts.status || p.status === opts.status)
       .filter((p) => !opts.owner || p.owner_agent === opts.owner);
   }
+  // listProjects backs `GET /projects` with a DDB Scan + FilterExpression.
+  // DDB's `Limit` is applied BEFORE the filter, so when the table is
+  // dominated by `RUN#` / `EXEC#` rows (every prod table is) a single page
+  // often holds zero or one PROJECT META row even though many exist.
+  // We loop on `next_cursor` until the API stops handing one back.
+  // Hard cap prevents an unbounded loop if the backend regresses; the
+  // single-operator scale guarantees the real page count stays small.
+  const PAGE_CAP = 50;
   const qs = new URLSearchParams();
   if (opts.includeSelf) qs.set('include_self', 'true');
   if (opts.status) qs.set('status', opts.status);
   if (opts.owner) qs.set('owner', opts.owner);
-  const suffix = qs.toString() ? `?${qs.toString()}` : '';
-  const res = await fetch(`${WORKFORCE_AGENTS_API_BASE}/projects${suffix}`);
-  if (!res.ok) throw new Error(`agents-api ${res.status}`);
-  const data = (await res.json()) as { items: ProjectSummary[] };
-  return data.items;
+  const items: ProjectSummary[] = [];
+  let cursor: string | undefined;
+  for (let i = 0; i < PAGE_CAP; i++) {
+    if (cursor) qs.set('cursor', cursor); else qs.delete('cursor');
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    const res = await fetch(`${WORKFORCE_AGENTS_API_BASE}/projects${suffix}`);
+    if (!res.ok) throw new Error(`agents-api ${res.status}`);
+    const data = (await res.json()) as { items: ProjectSummary[]; next_cursor?: string };
+    items.push(...data.items);
+    if (!data.next_cursor) return items;
+    cursor = data.next_cursor;
+  }
+  return items;
 }
 
 export async function fetchProject(projectId: string): Promise<ProjectDetail | undefined> {
