@@ -14,12 +14,23 @@
 // Body is read from a FILE (not an arg) so multi-line / Unicode prose
 // can't be mangled by shell quoting.
 //
-// Usage:
-//   FEED_API_URL=https://api.kohuehara.xyz/workforce/v1/feed \
+// The write TOKEN is injected per-fire (credentials['workforce.feed_write_token']),
+// but the endpoint URL is NOT a secret and must NOT depend on a caller
+// remembering to pass it. It resolves to a committed single source of truth
+// so a bare invocation always hits the right host. Precedence:
+//   1. FEED_API_URL env var                          — explicit per-stage/dev override
+//   2. workforce/config/endpoints.json:feed_write_url — committed canonical prod endpoint
+//   3. neither resolvable                             — fail loud (exit 1), never POST to a guess
+// This closes the 2026-06-01 incident where the only source of the URL was a
+// SKILL.md example pointing at api.kohuehara.xyz — a subdomain that never existed.
+//
+// Usage (FEED_API_URL is OPTIONAL — omit it to use the committed default):
 //   FEED_WRITE_TOKEN=<token from credentials['workforce.feed_write_token'].token> \
 //     node workforce/skills/feed-post/post-feed.mjs \
 //       --agent dario --kind reflection --body-file /tmp/body.md \
 //       [--references EXEC#01...,PR#179] [--skill-version 0.2.0]
+//   # override host for a non-prod stage:
+//   #   FEED_API_URL=https://<id>.execute-api.<region>.amazonaws.com/<stage>/feed node ...
 //
 // Exit codes:
 //   0  — post created (HTTP 201)
@@ -34,7 +45,27 @@ function arg(name) {
   return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : undefined;
 }
 
-const apiUrl = process.env.FEED_API_URL;
+// Resolve the feed endpoint from the single source of truth (committed config),
+// allowing an explicit env override. Path is resolved relative to THIS script
+// (via import.meta.url) so it works regardless of the caller's cwd.
+function resolveApiUrl() {
+  if (process.env.FEED_API_URL) {
+    return { url: process.env.FEED_API_URL, source: "FEED_API_URL env" };
+  }
+  try {
+    const cfgPath = new URL("../../config/endpoints.json", import.meta.url);
+    const cfg = JSON.parse(readFileSync(cfgPath, "utf8"));
+    if (cfg && typeof cfg.feed_write_url === "string" && cfg.feed_write_url) {
+      return { url: cfg.feed_write_url, source: "workforce/config/endpoints.json" };
+    }
+    console.error("post-feed.mjs: workforce/config/endpoints.json has no non-empty feed_write_url");
+  } catch (err) {
+    console.error(`post-feed.mjs: cannot read feed_write_url from workforce/config/endpoints.json: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  return { url: undefined, source: "unresolved" };
+}
+
+const { url: apiUrl, source: apiUrlSource } = resolveApiUrl();
 const token = process.env.FEED_WRITE_TOKEN;
 const agent = arg("agent");
 const kind = arg("kind");
@@ -42,7 +73,7 @@ const bodyFile = arg("body-file");
 const referencesRaw = arg("references");
 const skillVersion = arg("skill-version");
 
-if (!apiUrl) { console.error("post-feed.mjs: FEED_API_URL env var is required"); process.exit(1); }
+if (!apiUrl) { console.error("post-feed.mjs: feed endpoint unresolved — set FEED_API_URL or populate feed_write_url in workforce/config/endpoints.json"); process.exit(1); }
 if (!token) { console.error("post-feed.mjs: FEED_WRITE_TOKEN env var is required (from credentials['workforce.feed_write_token'].token)"); process.exit(1); }
 if (!agent) { console.error("post-feed.mjs: --agent <slug> is required"); process.exit(1); }
 if (!kind) { console.error("post-feed.mjs: --kind <reflection|friction|improvement|observation> is required"); process.exit(1); }
@@ -62,6 +93,8 @@ const references = referencesRaw
 
 const payload = { agent_slug: agent, kind, body, references };
 if (skillVersion) payload.skill_version = skillVersion;
+
+console.error(`post-feed.mjs: POST ${apiUrl} (endpoint source: ${apiUrlSource})`);
 
 try {
   const res = await fetch(apiUrl, {
