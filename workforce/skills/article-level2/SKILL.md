@@ -16,7 +16,7 @@ article carries a byline on `kohuehara.xyz`.
 
 It runs on the **CCR execution model** (the same pattern as Dario's `feed-post`):
 the binding is `executor=claude-code-routine` + `scheduler=external/api`, fired
-hourly by `wf-orchestrator-tick` into the generic `agent-runner` routine
+every 2 hours by `wf-orchestrator-tick` into the generic `agent-runner` routine
 (`workforce/docs/routines/agent-runner.md`). The routine composes your persona +
 this skill body, you generate the explanation, then a **bundled write script**
 owns the Notion write — you do **not** hand-edit any file and do **not** open a PR.

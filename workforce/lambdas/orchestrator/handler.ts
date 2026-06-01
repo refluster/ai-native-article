@@ -1,7 +1,7 @@
 // wf-orchestrator Lambda handler.
 //
 // Driven by a single EventBridge rule wf-orchestrator-tick-{stage} that
-// fires every 30 minutes. On each tick (in order):
+// fires every 2 hours. On each tick (in order):
 //
 //   A. Poll Ren's pending pr DELIV rows. For each one:
 //        - findRecentPRs(owner, repo, dispatch_branch, dispatched_at)
@@ -10,7 +10,7 @@
 //
 //   B. Scan all AGENT#*/META rows.
 //   C. For each non-paused / non-archived agent, iterate its bindings[].
-//      For each binding, evaluate its cron against a 30-minute window. If
+//      For each binding, evaluate its cron against a 120-minute window. If
 //      matchesNow returns true, async-invoke wf-agent-runner-{stage} with
 //      { agent, binding_idx }.
 //   D. Skip a binding if its (skill, agent) has fired within a per-skill
@@ -49,10 +49,10 @@ const lambda = new LambdaClient({});
 // Fallback DEFAULT_DEDUP_MINUTES applies to skills not listed here.
 const DEFAULT_DEDUP_MINUTES = 60;
 const DEDUP_MINUTES_BY_SKILL: Record<string, number> = {
-  "discord-ping": 45,          // 45m — under the 1h cadence, well above the 30m tick interval
-  "discord-heartbeat": 30,     // 30m — half the hourly cadence; same logic as feed-post (cron-vs-dedup edge case at exact 60m equality with default would skip alternate fires)
-  "feed-post": 30,             // 30m — half the hourly cadence so the cron-vs-dedup edge case (exact 60m equality with default) can't skip a fire
-  "article-level2": 30,        // 30m — half Elena's hourly L1→L2 cadence; same cron-vs-dedup edge-case logic as feed-post
+  "discord-ping": 45,          // 45m — well under the 2-hourly effective cadence (cron is hourly, but the 120m tick collapses each pair of fires into one dispatch), so legit fires are never blocked
+  "discord-heartbeat": 30,     // 30m — well under the 2-hourly cadence (cron(20 0/2 …)); skip-safe with wide margin
+  "feed-post": 30,             // 30m — well under the 2-hourly cadence (cron(20 0/2 …)); skip-safe with wide margin
+  "article-level2": 30,        // 30m — well under Elena's 2-hourly L1→L2 cadence (cron(0 0/2 …)); skip-safe with wide margin
   "article-draft": 60 * 5,     // 5h — Sora's 12h cadence
   "market-research": 60 * 5,
   "plan-write": 60 * 24 * 13,  // 13d — Maya's biweekly
