@@ -21,12 +21,37 @@ every 2 hours by `wf-orchestrator-tick` into the generic `agent-runner` routine
 this skill body, you generate the explanation, then a **bundled write script**
 owns the Notion write — you do **not** hand-edit any file and do **not** open a PR.
 
+## Two Notion DBs, two credential variants
+
+This skill reads the **L1 source library** and writes the **unified Articles DB** —
+two different databases, reached with two injected credential variants (same Notion
+integration `apiKey`, different `databaseId`):
+
+| Credential | Shape | Used for |
+|---|---|---|
+| `notion.integration_token@l1` | `{apiKey, databaseId}` (L1 source library) | `pick-l1-source.mjs` reads uncovered L1 sources |
+| `notion.integration_token@l2` | `{apiKey, databaseId}` (unified Articles DB) | coverage check + `publish-notion.mjs` writes the explanation |
+
+(L2 and L3 share the unified Articles DB, distinguished by `Type`; a future
+`article-level3` skill needs only `@l2`. L1 is the one genuinely separate DB.)
+
 ## Instructions
 
-1. Pick **one** L1 source that is not yet covered by an existing L2 explanation
-   (oldest-uncovered-first, mirroring `handleL2Batch`). The source — its title,
-   L1 summary, source URL, and (when fetchable) the source body — is supplied in
-   your operator brief / run context. **Ground every claim in that source.**
+1. **Pick one uncovered L1 source — run the picker, don't guess.** Run
+   `pick-l1-source.mjs` (below). It queries L1 + the unified DB and returns the
+   oldest L1 source whose Source URL no explanation covers yet (same filters as
+   `handleL2Batch`). If it returns `{"skip": true, …}`, **stop — produce nothing
+   this fire.** Otherwise use the returned `{title, summary, sourceUrl}` as your
+   subject. **Ground every claim in that source** (fetch `sourceUrl` for the body
+   when it's reachable; otherwise work from `summary` only — see Hard rules).
+
+   ```sh
+   NOTION_API_KEY="<credentials['notion.integration_token@l1'].apiKey>" \
+   L1_DB_ID="<credentials['notion.integration_token@l1'].databaseId>" \
+   UNIFIED_DB_ID="<credentials['notion.integration_token@l2'].databaseId>" \
+     node workforce/skills/article-level2/pick-l1-source.mjs
+   ```
+
 2. Produce **one** Japanese briefing-document explanation (target ~3000 字).
 3. Follow the L2 briefing format (identical to the GAS `buildL2Prompt` contract):
    - **Line 1**: a `#` H1 — a concrete Japanese title specific to the source's
@@ -64,17 +89,17 @@ Steps:
    — a file, not a shell arg, so multi-line / Unicode prose isn't mangled by
    quoting. The first line must be the `# Title` H1 (used as the page Title and
    stripped from the body blocks).
-2. Run:
+2. Run (note the write uses the **`@l2`** variant — the unified Articles DB):
 
    ```sh
-   NOTION_API_KEY="<credentials['notion.integration_token'].apiKey from your task>" \
-   NOTION_DB_ID="<credentials['notion.integration_token'].databaseId from your task>" \
+   NOTION_API_KEY="<credentials['notion.integration_token@l2'].apiKey from your task>" \
+   NOTION_DB_ID="<credentials['notion.integration_token@l2'].databaseId from your task>" \
      node workforce/skills/article-level2/publish-notion.mjs \
        --author "<agent_slug>" \
        --type explanation \
        --kind article \
        --body-file /tmp/l2-article.md \
-       --source-url "<L1 source URL>"   # optional, omit if none
+       --source-url "<sourceUrl from step 1>"   # omit if none
    ```
 
 3. Report the script's exit code:
@@ -86,7 +111,7 @@ Steps:
    - `1` / `3` — bad args / missing H1 title, or Notion API / network error.
 
 The `NOTION_*` values come from your task's injected
-`credentials["notion.integration_token"]` (`{apiKey, databaseId}`) — never read
+`credentials["notion.integration_token@l2"]` (`{apiKey, databaseId}`) — never read
 them from anywhere else, never hard-code them. The script re-runs the W-1 guards
 before writing, so a degraded body fails loudly rather than landing on the site.
 
