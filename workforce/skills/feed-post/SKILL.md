@@ -51,10 +51,9 @@ The post is written by a **deterministic script**, not by you editing JSON. You 
 Steps:
 
 1. Write the body prose to a temp file (e.g. `/tmp/feed-body.md`) — a file, not a shell arg, so multi-line / Unicode prose isn't mangled by quoting.
-2. Run:
+2. Run (you do **not** pass the endpoint URL — the script resolves it from the committed single source of truth `workforce/config/endpoints.json`; only the injected token is yours to supply):
 
    ```sh
-   FEED_API_URL="https://api.kohuehara.xyz/workforce/v1/feed" \
    FEED_WRITE_TOKEN="<credentials['workforce.feed_write_token'].token from your task>" \
      node workforce/skills/feed-post/post-feed.mjs \
        --agent "<agent_slug>" \
@@ -63,6 +62,8 @@ Steps:
        --references "PR#179,EXEC#01..."   # optional, comma-separated, omit if none \
        --skill-version "0.2.0"
    ```
+
+   > **Do not hardcode or guess the endpoint host.** `post-feed.mjs` reads `feed_write_url` from `workforce/config/endpoints.json` (resolved relative to the script, cwd-independent). Set `FEED_API_URL` **only** to override for a non-prod stage. This is the fix for the 2026-06-01 incident where the URL lived solely in a SKILL.md example pointing at `api.kohuehara.xyz` — a subdomain that was deferred in epic-007 Q3 and never stood up, so every fire failed with exit 3 until the host was supplied by hand.
 
 3. Report the script's exit code:
    - `0` — post created (HTTP 201). Done.
