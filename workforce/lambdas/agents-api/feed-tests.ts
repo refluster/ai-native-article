@@ -74,6 +74,11 @@ vi.mock("../shared/ddb.js", () => ({
   ),
   queryByGsi: vi.fn(async () => []),
   updateOperational: vi.fn(),
+  // POST /feed → createPost writes via putItem. Store into the same
+  // in-memory `rows` map so a follow-up GET would see it.
+  putItem: vi.fn(async (item: AnyRow) => {
+    rows.set(key(item.pk, item.sk), item);
+  }),
   // The two new paged helpers under test in this file. We replicate the
   // GSI3 / partition behaviour over the in-memory `rows` map, with a
   // synthetic cursor so the round-trip locks the AC for pagination.
@@ -151,7 +156,12 @@ const s3BodyStore = new Map<string, string>();
 
 vi.mock("@aws-sdk/client-s3", () => ({
   S3Client: class {
-    async send(cmd: { input: { Bucket: string; Key: string } }) {
+    async send(cmd: { input: { Bucket: string; Key: string; Body?: string }; __put?: boolean }) {
+      // PutObjectCommand carries a Body — store it (createPost write path).
+      if (cmd.__put) {
+        s3BodyStore.set(cmd.input.Key, String(cmd.input.Body ?? ""));
+        return {};
+      }
       const body = s3BodyStore.get(cmd.input.Key);
       if (!body) {
         return { Body: undefined };
@@ -169,6 +179,32 @@ vi.mock("@aws-sdk/client-s3", () => ({
       this.input = input;
     }
   },
+  PutObjectCommand: class {
+    input: { Bucket: string; Key: string; Body?: string };
+    __put = true;
+    constructor(input: { Bucket: string; Key: string; Body?: string }) {
+      this.input = input;
+    }
+  },
+}));
+
+// ─── Secrets Manager fake — feed-write token validation ────────────────
+const FEED_WRITE_TOKEN = "tok-feed-write-test";
+vi.mock("@aws-sdk/client-secrets-manager", () => ({
+  SecretsManagerClient: class {
+    async send(_cmd: unknown) {
+      return { SecretString: JSON.stringify({ token: FEED_WRITE_TOKEN }) };
+    }
+  },
+  GetSecretValueCommand: class {
+    input: unknown;
+    constructor(input: unknown) { this.input = input; }
+  },
+  DescribeSecretCommand: class {
+    input: unknown;
+    constructor(input: unknown) { this.input = input; }
+  },
+  ResourceNotFoundException: class extends Error {},
 }));
 
 // BUCKET_NAME is required by shared/post.ts on import for fetchPostBody.
@@ -602,5 +638,100 @@ describe("CORS posture (Epic-011 Story 5 — handler-layer header check)", () =>
     const res = await handler(evt("GET /feed"));
     const headers = (res as { headers?: Record<string, string> }).headers ?? {};
     expect(headers["access-control-allow-origin"]).toBe("*");
+  });
+});
+
+// ─── POST /feed (createFeedPostRoute) ──────────────────────────────────
+
+describe("POST /feed (createFeedPostRoute)", () => {
+  beforeEach(() => {
+    rows.clear();
+    s3BodyStore.clear();
+  });
+
+  function postFeedEvt(body: string | undefined, token: string | undefined): APIGatewayProxyEventV2 {
+    const headers: Record<string, string> = {};
+    if (token !== undefined) headers.authorization = `Bearer ${token}`;
+    return {
+      version: "2.0",
+      routeKey: "POST /feed",
+      rawPath: "/feed",
+      rawQueryString: "",
+      headers,
+      requestContext: { http: { method: "POST", path: "/feed" } } as unknown as APIGatewayProxyEventV2["requestContext"],
+      pathParameters: {},
+      queryStringParameters: {},
+      body,
+      isBase64Encoded: false,
+    } as APIGatewayProxyEventV2;
+  }
+
+  const goodBody = () =>
+    JSON.stringify({
+      agent_slug: "dario",
+      kind: "reflection",
+      body: "A grounded reflection on today's work that is comfortably inside the length band and contains no LLM-artefact prelude.",
+      references: ["PR#179"],
+      skill_version: "0.2.0",
+    });
+
+  it("creates a post (201) with a valid bearer token + writes the DDB row", async () => {
+    const res = await handler(postFeedEvt(goodBody(), FEED_WRITE_TOKEN));
+    expect(statusOf(res)).toBe(201);
+    const body = bodyOf(res) as { post_id: string; agent_slug: string; kind: string };
+    expect(body.agent_slug).toBe("dario");
+    expect(body.kind).toBe("reflection");
+    expect(typeof body.post_id).toBe("string");
+    // The row landed in the in-memory DDB fake under AGENT#dario / POST#…
+    const written = Array.from(rows.values()).find(
+      (r) => r.pk === "AGENT#dario" && typeof r.sk === "string" && r.sk.startsWith("POST#"),
+    );
+    expect(written).toBeDefined();
+    expect(written!.gsi3pk).toBe("FEED");
+  });
+
+  it("rejects a missing bearer token with 401", async () => {
+    const res = await handler(postFeedEvt(goodBody(), undefined));
+    expect(statusOf(res)).toBe(401);
+    expect(bodyOf(res)).toMatchObject({ error: "unauthorized" });
+  });
+
+  it("rejects a wrong bearer token with 401", async () => {
+    const res = await handler(postFeedEvt(goodBody(), "tok-wrong"));
+    expect(statusOf(res)).toBe(401);
+  });
+
+  it("rejects an LLM-artefact prelude with 422 (server-side W-1 guard)", async () => {
+    const bad = JSON.stringify({
+      agent_slug: "dario",
+      kind: "reflection",
+      body: "As an AI language model, I noticed that the dispatch path looked healthy today.",
+    });
+    const res = await handler(postFeedEvt(bad, FEED_WRITE_TOKEN));
+    expect(statusOf(res)).toBe(422);
+    expect(bodyOf(res)).toMatchObject({ error: "post_rejected" });
+  });
+
+  it("rejects an invalid kind with 422", async () => {
+    const bad = JSON.stringify({ agent_slug: "dario", kind: "rant", body: "A perfectly fine body with the wrong kind tag attached to it here." });
+    const res = await handler(postFeedEvt(bad, FEED_WRITE_TOKEN));
+    expect(statusOf(res)).toBe(422);
+  });
+
+  it("rejects >3 references with 422", async () => {
+    const bad = JSON.stringify({
+      agent_slug: "dario",
+      kind: "observation",
+      body: "A fine body that happens to cite too many references in its structured tail.",
+      references: ["a", "b", "c", "d"],
+    });
+    const res = await handler(postFeedEvt(bad, FEED_WRITE_TOKEN));
+    expect(statusOf(res)).toBe(422);
+  });
+
+  it("400s on missing required fields", async () => {
+    const res = await handler(postFeedEvt(JSON.stringify({ kind: "reflection", body: "x" }), FEED_WRITE_TOKEN));
+    expect(statusOf(res)).toBe(400);
+    expect(bodyOf(res)).toMatchObject({ error: "missing_agent_slug" });
   });
 });

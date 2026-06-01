@@ -61,13 +61,13 @@ beforeEach(() => {
 });
 
 describe("CREDENTIAL_TYPES allowlist", () => {
-  it("contains the Story 2 base set plus Story 4's voyage.api_key and discord.webhook_url", () => {
-    // Story 4 (#93) added `voyage.api_key` for the EXEC-row embedding-
-    // write path. The CCR-foundation PR adds `discord.webhook_url` so
-    // `discord-heartbeat` (CCR-routed sibling of discord-ping) reads
-    // its webhook URL from the project credential bag instead of an
-    // env var. All 5 mirror points (see credential-injector.ts file
-    // header) were touched in the same PR; this assertion is the
+  it("contains the base set plus discord.webhook_url and workforce.feed_write_token", () => {
+    // Provenance: `voyage.api_key` (Story 4 #93, embedding writes);
+    // `discord.webhook_url` (CCR-foundation, discord-heartbeat);
+    // `workforce.feed_write_token` (feed-post DDB write path — the
+    // capability token the runner presents to the authenticated
+    // POST /feed endpoint). All 6 mirror points (see credential-
+    // injector.ts file header) move together; this assertion is the
     // visible canary that catches drift if a future mirror sync is
     // forgotten.
     expect([...CREDENTIAL_TYPES].sort()).toEqual([
@@ -77,6 +77,7 @@ describe("CREDENTIAL_TYPES allowlist", () => {
       "github.token",
       "notion.integration_token",
       "voyage.api_key",
+      "workforce.feed_write_token",
     ]);
   });
 

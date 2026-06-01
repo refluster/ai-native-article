@@ -74,7 +74,7 @@
       "maxItems": 8,
       "items": {
         "type": "string",
-        "pattern": "^(anthropic\\.api_key|discord\\.bot_token|discord\\.webhook_url|github\\.token|notion\\.integration_token)(@[a-z][a-z0-9_-]*)?$"
+        "pattern": "^(anthropic\\.api_key|discord\\.bot_token|discord\\.webhook_url|github\\.token|notion\\.integration_token|workforce\\.feed_write_token)(@[a-z][a-z0-9_-]*)?$"
       },
       "description": "Credential keys this project is expected to hold in Secrets Manager under wf/projects/{id}/{type}. Declaring a type here does NOT create the secret — operator stores values via aws secretsmanager put-secret-value out of band. Validators only check the file shape. Runtime check: if a skill's `requires` lists a type not present here, the operator-onboarding runbook is incomplete; the runner will throw on getCredential() ResourceNotFoundException (no _default fallback in scoped projects)."
     },

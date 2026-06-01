@@ -312,6 +312,9 @@ Resources:
                 - dynamodb:Scan
                 - dynamodb:Query
                 - dynamodb:DeleteItem
+                # PutItem: POST /feed writes the POST# row (Epic-011
+                # feed-post write path / createPost).
+                - dynamodb:PutItem
               Resource:
                 - !GetAtt WfTable.Arn
                 - !Sub ${WfTable.Arn}/index/*
@@ -338,6 +341,23 @@ Resources:
               Action: s3:GetObject
               Resource:
                 - !Sub ${WfBucket.Arn}/posts/*
+            - Sid: AgentsApiPostBodyWrite
+              # POST /feed writes the post body to posts/{slug}/{yyyy}/{mm}/{ulid}.md
+              # before the DDB row (createPost ordering). Scoped to posts/*.
+              Effect: Allow
+              Action: s3:PutObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/posts/*
+            - Sid: AgentsApiFeedWriteToken
+              # POST /feed validates the runner's bearer token against this
+              # one secret (validateFeedWriteBearer). GetSecretValue scoped
+              # to the single feed-write-token path — NOT the broader
+              # wf/projects/* (the LIST-credentials route uses DescribeSecret
+              # only and never reads values).
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/agent-workforce/workforce.feed_write_token-*
             # Issue #158 PR-β A1: project credentials LIST endpoint
             # (`GET /projects/{id+}/credentials`) describes each
             # registered credential type's secret to surface metadata
@@ -484,6 +504,16 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /feed/{post_id}
             Method: GET
+        CreateFeedPost:
+          # Runner write path (Epic-011 feed-post → DDB). No API GW
+          # authorizer: the CCR session has no SigV4 creds, so auth is
+          # bearer-token at the handler layer (validateFeedWriteBearer →
+          # wf/projects/agent-workforce/workforce.feed_write_token).
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /feed
+            Method: POST
         PatchFeedPost:
           Type: HttpApi
           Properties:
