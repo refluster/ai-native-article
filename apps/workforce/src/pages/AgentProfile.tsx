@@ -441,11 +441,19 @@ export default function AgentProfile() {
   );
 }
 
-function MembershipsPanel({ memberships }: { memberships: AgentMembership[] }) {
+export function MembershipsPanel({ memberships }: { memberships: AgentMembership[] }) {
   // self/{slug} projects are always present (auto-seeded by Story 1-B) so
   // surface them last; "real" project memberships are the interesting
   // signal for the operator.
-  const sorted = [...memberships].sort((a, b) => {
+  //
+  // C-1/C-4: a single malformed membership row (missing project_id — e.g. a
+  // legacy MEMBER row written before addMember stamped project_id, or API
+  // shape drift) must not blank the whole agent page. Drop rows without a
+  // string project_id rather than throwing inside .sort()/.map().
+  const valid = memberships.filter(
+    (m): m is AgentMembership => typeof m.project_id === 'string',
+  );
+  const sorted = [...valid].sort((a, b) => {
     const aSelf = a.project_id.startsWith('self/');
     const bSelf = b.project_id.startsWith('self/');
     if (aSelf !== bSelf) return aSelf ? 1 : -1;
@@ -454,7 +462,7 @@ function MembershipsPanel({ memberships }: { memberships: AgentMembership[] }) {
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
-        <Typeplate label="DECK · PROJECTS" value={`${memberships.length} MEMBERSHIPS`} />
+        <Typeplate label="DECK · PROJECTS" value={`${valid.length} MEMBERSHIPS`} />
         <Link
           to="/projects"
           className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
@@ -462,7 +470,7 @@ function MembershipsPanel({ memberships }: { memberships: AgentMembership[] }) {
           ALL PROJECTS →
         </Link>
       </div>
-      {memberships.length === 0 ? (
+      {valid.length === 0 ? (
         <div className="px-4 py-4">
           <p className="text-sm text-wf-on-surface-variant leading-relaxed">
             No project memberships yet. This agent is not bound to any project's trust boundary —
@@ -494,7 +502,7 @@ function MembershipsPanel({ memberships }: { memberships: AgentMembership[] }) {
                   )}
                 </Link>
                 <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant whitespace-nowrap">
-                  joined {m.joined_at.slice(0, 10)}
+                  joined {m.joined_at ? m.joined_at.slice(0, 10) : '—'}
                 </span>
               </li>
             );
