@@ -77,17 +77,17 @@ Each item should pass before declaring the migration done.
     --query 'Items[?sk.S==`META`].pk.S' --output text
   # Expected: AGENT#sora, AGENT#maya, ..., SKILL#discord-ping, ...
   ```
-- **Orchestrator tick.** If `template.yaml` has `Enabled: true`, CloudWatch metric `Invocations` for `wf-orchestrator-{stage}` should tick up at the rate (30 min as of 2026-05-25):
+- **Orchestrator tick.** If `template.yaml` has `Enabled: true`, CloudWatch metric `Invocations` for `wf-orchestrator-{stage}` should tick up at the rate (2 hours as of 2026-06-01):
   ```bash
   aws cloudwatch get-metric-statistics --region $NEW \
     --namespace AWS/Lambda --metric-name Invocations \
     --dimensions Name=FunctionName,Value=wf-orchestrator-prod \
-    --start-time $(date -u -d '2 hours ago' +%Y-%m-%dT%H:%M:%SZ) \
+    --start-time $(date -u -d '6 hours ago' +%Y-%m-%dT%H:%M:%SZ) \
     --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-    --period 1800 --statistics Sum
+    --period 7200 --statistics Sum
   ```
 - **Runner Errors = 0.** If `wf-agent-runner-{stage}` Errors metric is nonzero, the runner is throwing — usually a missing secret or a permission gap on the role. Check the function's CloudWatch logs.
-- **First externally-visible side effect.** For Yuki / discord-ping: a `[wf-pulse] yuki alive at <iso>` line in the Discord channel within 7h (≤ 6h until the next `0/6` UTC + ≤ 30 min until the next tick after that). For Sora / article-draft: a new Notion page with `Author=sora`.
+- **First externally-visible side effect.** For Yuki / discord-ping: a `[wf-pulse] yuki alive at <iso>` line in the Discord channel within ~8h (≤ 6h until the next `0/6` UTC + ≤ 2h until the next tick after that). For Sora / article-draft: a new Notion page with `Author=sora`.
 
 If any item fails, **do not tear down the old region** — it's the recovery path. Fix the new region first.
 

@@ -1,13 +1,13 @@
 ---
 name: discord-ping
-description: Post a color-coded liveness heartbeat embed to the team Discord channel. Documents the operational shape of the deterministic runner-side handler so a human or a Claude-Code persona reading this file knows exactly what fires when the matching agent.binding's cron triggers. Doubles as the workforce's at-a-glance health-check / uptime monitor — a quiet Discord channel for >1h means the dispatch chain is broken. The runner's discord-ping handler executes this verbatim — no LLM is involved at runtime.
+description: Post a color-coded liveness heartbeat embed to the team Discord channel. Documents the operational shape of the deterministic runner-side handler so a human or a Claude-Code persona reading this file knows exactly what fires when the matching agent.binding's cron triggers. Doubles as the workforce's at-a-glance health-check / uptime monitor — a quiet Discord channel for >2h means the dispatch chain is broken. The runner's discord-ping handler executes this verbatim — no LLM is involved at runtime.
 ---
 
 # discord-ping
 
 A heartbeat from the workforce. The point is the pipeline, not the prose. **Deterministic skill** — the runner executes a handler bundled in this folder; no LLM call is made.
 
-Doubles as the workforce's at-a-glance health-check signal: the channel SHOULD see a new embed every hour. A quiet channel for >1h means the dispatch chain (EventBridge tick → orchestrator → runner → webhook) has broken somewhere — the absence-of-heartbeat IS the alarm.
+Doubles as the workforce's at-a-glance health-check signal: the channel SHOULD see a new embed every 2 hours. A quiet channel for >2h means the dispatch chain (EventBridge tick → orchestrator → runner → webhook) has broken somewhere — the absence-of-heartbeat IS the alarm.
 
 ## Bundle layout
 
@@ -58,9 +58,9 @@ Replacing the embed shape requires editing `handler.ts` in this folder and bumpi
 
 ## Cadence and dedup
 
-The owning agent's binding cron determines the natural fire frequency. As of v0.4, Yuki is bound to `cron(0 * * * ? *)` — once every hour at minute 0. The orchestrator's per-skill dedup window for `discord-ping` is 45 minutes — under the 60-minute cron cadence so consecutive natural fires aren't blocked, but well above the 30-minute orchestrator tick interval so a single cron firing isn't double-dispatched by overlapping ticks.
+The owning agent's binding cron sets the *requested* fire frequency. As of v0.4, Yuki is bound to `cron(0 * * * ? *)` — once every hour at minute 0. The **effective** cadence is 2-hourly, however: the orchestrator tick fires every 2 hours against a 120-minute past-facing window, so the two hourly fires inside each window collapse to a single dispatch per tick. The per-skill dedup window for `discord-ping` is 45 minutes — well under the 2-hourly effective cadence, so consecutive dispatches are never blocked.
 
-If the binding cron is tightened beyond 1h (e.g. every 30 min), the dedup window must come down to match — see `DEDUP_MINUTES_BY_SKILL` in `workforce/lambdas/orchestrator/handler.ts`.
+If both the orchestrator tick and this binding cron are tightened back below 2h, the dedup window must come down to match — see `DEDUP_MINUTES_BY_SKILL` in `workforce/lambdas/orchestrator/handler.ts`.
 
 ## Claude-Code compatibility
 
