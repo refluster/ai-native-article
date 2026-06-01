@@ -117,11 +117,11 @@
         "scheduler": "external",
         "invoked_by": "api",
         "fired_from": "wf-orchestrator-tick",
-        "cron": "cron(20 * ? * * *)"
+        "cron": "cron(* * ? * * *)"
       },
       "routine_spec": "workforce/docs/routines/agent-runner.md",
       "project_id": "agent-workforce",
-      "note": "Hourly trial (every hour at :20 UTC) — wf-orchestrator-tick batches CCR-bound tasks into a single POST to wf/ccr/agent-runner. project_id=agent-workforce is the trial project bundling team-shared credentials (Epic-010 §5). The shared agent-runner routine handles any future (agent, skill) CCR binding — no per-skill claude.ai routine needed."
+      "note": "TEMPORARY: every-minute cron for trial verification — accelerates the wire-shape fix (PR #179) test. REVERT to cron(20 * ? * * *) after one successful fire observed. Original hourly :20 UTC trial."
     }
   ],
   "jd": {
