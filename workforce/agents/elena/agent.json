@@ -33,6 +33,16 @@
         "cron": "cron(42 1 ? * * *)"
       },
       "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
+    },
+    {
+      "skill": "article-level2",
+      "executor": "lambda",
+      "trigger": {
+        "scheduler": "eventbridge",
+        "cron": "cron(0 * * * ? *)"
+      },
+      "project_id": "agent-workforce",
+      "note": "Hourly L1→L2 explanation generation — the agent-workforce equivalent of the GAS L2_BATCH cron. One uncovered L1 source per run, oldest-first; published to Notion with Author=elena, Type=explanation (carries the byline on kohuehara.xyz). Runs against project agent-workforce."
     }
   ],
   "jd": {

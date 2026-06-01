@@ -52,6 +52,7 @@ const DEDUP_MINUTES_BY_SKILL: Record<string, number> = {
   "discord-ping": 45,          // 45m — under the 1h cadence, well above the 30m tick interval
   "discord-heartbeat": 30,     // 30m — half the hourly cadence; same logic as feed-post (cron-vs-dedup edge case at exact 60m equality with default would skip alternate fires)
   "feed-post": 30,             // 30m — half the hourly cadence so the cron-vs-dedup edge case (exact 60m equality with default) can't skip a fire
+  "article-level2": 30,        // 30m — half Elena's hourly L1→L2 cadence; same cron-vs-dedup edge-case logic as feed-post
   "article-draft": 60 * 5,     // 5h — Sora's 12h cadence
   "market-research": 60 * 5,
   "plan-write": 60 * 24 * 13,  // 13d — Maya's biweekly
@@ -146,9 +147,13 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
           continue;
         }
         if (ownedLambda) {
-          // Per-binding immediate dispatch (unchanged).
+          // Per-binding immediate dispatch. A lambda binding may name an
+          // explicit project_id (e.g. Elena's article-level2 runs against
+          // agent-workforce so its EXEC ledger lands under that project);
+          // forward it so the runner's resolveProjectId honours it instead
+          // of defaulting to self/{slug}.
           try {
-            await invokeRunner(agent.slug, i);
+            await invokeRunner(agent.slug, i, binding.project_id);
             dispatched.push({ slug: agent.slug, binding_idx: i, skill: binding.skill });
           } catch (err) {
             const reason = err instanceof Error ? err.message : String(err);
@@ -313,12 +318,19 @@ async function evaluateBinding(
   return { action: "dispatch" };
 }
 
-async function invokeRunner(slug: string, bindingIdx: number): Promise<void> {
+async function invokeRunner(slug: string, bindingIdx: number, projectId?: string): Promise<void> {
+  const payload: { agent: string; binding_idx: number; project_id?: string } = {
+    agent: slug,
+    binding_idx: bindingIdx,
+  };
+  // Only forward project_id when the binding declares one — omitting it lets
+  // the runner fall back to self/{slug} (the default for cron bindings).
+  if (projectId) payload.project_id = projectId;
   await lambda.send(
     new InvokeCommand({
       FunctionName: RUNNER_FUNCTION,
       InvocationType: "Event",
-      Payload: Buffer.from(JSON.stringify({ agent: slug, binding_idx: bindingIdx })),
+      Payload: Buffer.from(JSON.stringify(payload)),
     }),
   );
 }

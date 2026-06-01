@@ -26,6 +26,7 @@ export const DETERMINISTIC_HANDLERS: Record<string, DeterministicHandler> = {
 
 export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "article-draft": [],
+  "article-level2": [],
   "code-task-brief": [],
   "design-note": [],
   "discord-heartbeat": ["discord.webhook_url"] as const,

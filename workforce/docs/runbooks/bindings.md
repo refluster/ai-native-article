@@ -65,7 +65,19 @@ This is the original v1 shape, unchanged behaviour. The skill folder under `work
 }
 ```
 
-No operator action needed beyond merging the PR — the orchestrator picks it up on the next tick after the data-plane deploy.
+**Optional `project_id`.** An `executor=lambda` binding may name an explicit `project_id`. The orchestrator-tick forwards it to `wf-agent-runner`, which resolves it via `resolveProjectId` so the run's EXEC ledger + artefacts land under that project (the agent must be a `members[]` of it, else `appendExecution` throws cross-project denial). Omit it and the run defaults to `self/{slug}`. Example — Elena's hourly L1→L2 explanation binding runs against the shared `agent-workforce` project:
+
+```jsonc
+{
+  "skill": "article-level2",
+  "executor": "lambda",
+  "trigger": { "scheduler": "eventbridge", "cron": "cron(0 * * * ? *)" },
+  "project_id": "agent-workforce",
+  "note": "Hourly L1→L2 explanation — agent-workforce equivalent of the GAS L2_BATCH cron"
+}
+```
+
+No operator action needed beyond merging the PR — the orchestrator picks it up on the next tick after the data-plane deploy. (When `project_id` is set, ensure the project holds any credential types the skill `requires[]`; `article-level2` requires none — `insertArticle` reads the global `wf/notion` secret.)
 
 ### `executor: claude-code-routine` — CCR in operator's claude.ai cloud
 

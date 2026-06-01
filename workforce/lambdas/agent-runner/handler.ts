@@ -302,6 +302,10 @@ async function runLlmProse(
       bodyMarkdown: llm.text,
       author: event.agent,
       kind: skill.meta.deliverable.type,
+      // Sets the Notion `Type` select (explanation|analysis) the front-end
+      // article pipeline reads. Undefined for skills that don't declare it
+      // (the reader's resolveType then defaults to 'analysis').
+      articleType: skill.meta.deliverable.article_type,
       provenance: `${event.agent}-${skill.meta.name}`,
     });
     notionPageUrl = notion.url;

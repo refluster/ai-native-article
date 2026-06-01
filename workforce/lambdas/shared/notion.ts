@@ -12,6 +12,13 @@ export interface InsertArticleInput {
   bodyMarkdown: string;
   author: string;
   kind: string;
+  /**
+   * Optional article `Type` select (explanation | analysis). When set, the
+   * page carries the `Type` property the front-end article pipeline reads
+   * (scripts/fetchers/notion.mjs:resolveType). Omitted → no `Type` written,
+   * and the reader defaults to 'analysis' for the row.
+   */
+  articleType?: "explanation" | "analysis";
   sourceUrl?: string;
   provenance?: string;
 }
@@ -30,6 +37,7 @@ export async function insertArticle(input: InsertArticleInput): Promise<InsertAr
     Kind: { select: { name: input.kind } },
     Status: { select: { name: "ready_for_L4" } },
   };
+  if (input.articleType) properties["Type"] = { select: { name: input.articleType } };
   if (input.sourceUrl) properties["SourceURL"] = { url: input.sourceUrl };
   if (input.provenance) {
     properties["Provenance"] = { select: { name: input.provenance } };

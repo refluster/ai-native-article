@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-01T02:18:27.815Z",
+  "generated_at": "2026-06-01T03:57:54.657Z",
   "skills": [
     {
       "name": "article-draft",
@@ -47,6 +47,42 @@
           "size": 415,
           "language": "json",
           "contents": "{\n  \"name\": \"article-draft\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": true\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"aanya\", \"aoi\", \"dario\", \"elena\", \"farah\", \"kai\", \"levi\", \"maya\", \"mira\", \"nadia\", \"noor\", \"priya\", \"ren\", \"sora\", \"theo\", \"vikram\", \"yuki\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-18\"\n}\n",
+          "truncated": false,
+          "binary": false
+        }
+      ]
+    },
+    {
+      "name": "article-level2",
+      "version": "0.1.0",
+      "status": "active",
+      "executor": "llm-prose",
+      "deliverable": {
+        "type": "article",
+        "publish_notion": true,
+        "article_type": "explanation"
+      },
+      "cost_class": "medium",
+      "owners": [
+        "elena"
+      ],
+      "improvement_agent": null,
+      "created_at": "2026-06-01",
+      "description": "Convert one L1 source entry into one L2 explanation (briefing-document) article in Japanese — the agent-workforce equivalent of the GAS L1→L2 batch. Use when an editorial-stream agent must turn an uncovered L1 source into a faithful, evidence-grounded explanation: an Executive Summary up front, source-specific section headings, and every number/name/date/quote taken verbatim from the source. Published to Notion as Type=explanation, Author={agent_slug}, Status=ready_for_L4.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 3618,
+          "language": "markdown",
+          "contents": "---\nname: article-level2\ndescription: Convert one L1 source entry into one L2 explanation (briefing-document) article in Japanese — the agent-workforce equivalent of the GAS L1→L2 batch. Use when an editorial-stream agent must turn an uncovered L1 source into a faithful, evidence-grounded explanation: an Executive Summary up front, source-specific section headings, and every number/name/date/quote taken verbatim from the source. Published to Notion as Type=explanation, Author={agent_slug}, Status=ready_for_L4.\n---\n\n# article-level2\n\nConvert **one** L1 source entry into **one** L2 explanation article in Japanese.\n\nThis is the agent-workforce counterpart of the GAS `L2_BATCH` / `handleL2Create`\npipeline (`gas/src/Code.gs`). The GAS path fetches a source URL, builds a\nbriefing-document prompt, calls Azure, and writes an `explanation`-type row into\nthe unified Notion Articles DB. This skill produces the *same deliverable* — a\nfaithful briefing-document explanation — attributed to the running agent so the\narticle carries a byline on `kohuehara.xyz`.\n\n## Instructions\n\n1. Pick **one** L1 source that is not yet covered by an existing L2 explanation\n   (oldest-uncovered-first, mirroring `handleL2Batch`). The source — its title,\n   L1 summary, source URL, and (when fetchable) the source body — is supplied in\n   your operator brief / run context. **Ground every claim in that source.**\n2. Produce **one** Japanese briefing-document explanation (target ~3000 字).\n3. Follow the L2 briefing format (identical to the GAS `buildL2Prompt` contract):\n   - **Line 1**: a `#` H1 — a concrete Japanese title specific to the source's\n     subject. No generic placeholders (\"AIの可能性\", \"変化への対応\" are banned).\n   - **Directly below**: a `## Executive Summary` section — a 2–3 sentence lead\n     surfacing the single most important takeaway before the reader scrolls.\n   - **Body**: 2–5 `##` sections, each named after a source-specific theme.\n     Separate evidence (facts from the source) from conclusion (the implication\n     you draw). Use short paragraphs plus bullet lists carrying the actual\n     numbers, names, dates, and direct quotations.\n4. Append the agent's bias-disclosure footer (from the agent's `system.md`).\n\n## Hard rules (editorial integrity — C-1, fail loud — C-4)\n\n- **Never invent facts.** Every concrete figure, proper noun, date, or quotation\n  must come verbatim from the supplied source. Do not abstract, round, or alter\n  them.\n- If the source body could not be fetched (X.com posts, paywalls, JS-only pages),\n  work from the L1 summary *only* and do not supply facts, statistics, company\n  names, or people the summary doesn't contain.\n- If you cannot link to or quote the source, **do not publish** — escalate.\n- Objective, incisive tone. Avoid reviewer-voice hedges (\"重要だ\", \"今後注目される\")\n  and throat-clearing preambles.\n\n## Outputs\n\nMarkdown body suitable for direct Notion insertion. The runner attaches\n`Author={agent_slug}`, `Type=explanation`, `Kind=article`, `Status=ready_for_L4`.\nThe existing GAS L4 batch picks up `Status=ready_for_L4` rows and publishes them\nto `kohuehara.xyz`; `scripts/fetch-notion.mjs` surfaces `Author` + `Type` into\nthe front-end manifest so `AuthorChip` renders the byline.\n\n## When NOT to use\n\n- A source already covered by an existing L2 explanation — skip and pick the next\n  uncovered entry (the GAS coverage check keys on source URL).\n- A test/placeholder source (`example.com`) — never flows to L2.\n- A source whose original text is a one-line headline only — escalate, do not pad.\n",
+          "truncated": false,
+          "binary": false
+        },
+        {
+          "path": "meta.json",
+          "size": 319,
+          "language": "json",
+          "contents": "{\n  \"name\": \"article-level2\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": true,\n    \"article_type\": \"explanation\"\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"elena\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-06-01\"\n}\n",
           "truncated": false,
           "binary": false
         }
