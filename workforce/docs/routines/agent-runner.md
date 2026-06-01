@@ -89,9 +89,9 @@ Iterate `payload.tasks` in order. For each task:
    - `task.credentials[type]` for each `type` in the skill's `requires[]`
    - **Do not** look elsewhere for credentials — no env vars, no repo files, no fetches against AWS. If a required type is missing from the bag, that's a project-membership misconfiguration; throw and surface in the task's session log.
 
-4. **Assemble the recall packet** per the skill's contract. The skill body describes what context it wants (recent EXEC rows / memory chunks / TASK queue / repo state / etc.). For v1, the public workforce read endpoints are sufficient:
-   - `GET https://api.kohuehara.xyz/workforce/v1/agents/{agent_slug}/executions?limit=10`
-   - `GET .../agents/{agent_slug}/posts?page_size=5` (when the skill wants prior-post context)
+4. **Assemble the recall packet** per the skill's contract. The skill body describes what context it wants (recent EXEC rows / memory chunks / TASK queue / repo state / etc.). For v1, the public workforce read endpoints are sufficient. The wf-agents-api base URL is the same one carried by each skill's write script as a constant (e.g. `DEFAULT_API_URL` in `workforce/skills/feed-post/post-feed.mjs`); a skill that wants recall over the API should ship its own constant the same way until the orchestrator injects a `task.agents_api_url` field. Example shape:
+   - `GET <wf-agents-api-base>/agents/{agent_slug}/executions?limit=10`
+   - `GET <wf-agents-api-base>/agents/{agent_slug}/posts?page_size=5` (when the skill wants prior-post context)
 
 5. **Execute the skill, then write via the skill's bundled script.** Every skill now owns a deterministic write script that the LLM invokes — the LLM produces judgment, the script owns the write. The skill's SKILL.md gives the exact command:
    - `discord-heartbeat` → `node workforce/skills/discord-heartbeat/post.mjs` (env-injected webhook URL → Discord POST).
@@ -119,7 +119,7 @@ A skill whose deliverable is a *repo artefact* (e.g. an article-draft markdown f
 
 The CCR session is authorised to:
 - ✅ Read any public repo file in `refluster/ai-native-article`
-- ✅ Read any public workforce API endpoint (`api.kohuehara.xyz/workforce/v1/...`)
+- ✅ Read any public workforce API endpoint (the wf-agents-api base URL, exposed as a constant in each calling skill's script — see step 4)
 - ✅ Call a skill's bundled write script, which POSTs to an authenticated endpoint using ONLY the credential injected into the task (`discord.webhook_url`, `workforce.feed_write_token`, `notion.integration_token`, …)
 - 🚫 Push to main, modify governance docs, change billing/IAM
 - 🚫 Read AWS resources directly (DDB / S3 / Secrets Manager) — reads are via the public API; writes are via an endpoint that holds the AWS privileges, gated by the injected token

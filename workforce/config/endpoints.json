@@ -1,4 +1,0 @@
-{
-  "_comment": "Single source of truth for workforce API endpoints consumed by CCR skill scripts (resolved relative to the script, cwd-independent). Update HERE if the API Gateway is recreated or restaged. These are NOT secrets — authorization is the per-fire injected bearer token (e.g. workforce.feed_write_token); the URL is plain config. Background: the 2026-06-01 feed-post incident, where the only source of the endpoint was a SKILL.md example pointing at api.kohuehara.xyz, a subdomain that was deferred in epic-007 Q3 and never actually stood up.",
-  "feed_write_url": "https://sjhikazsf9.execute-api.us-west-2.amazonaws.com/prod/feed"
-}
