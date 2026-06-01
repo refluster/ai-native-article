@@ -24,6 +24,7 @@
 
 import {
   getItem,
+  putItem,
   queryByGsi,
   queryByGsiPaged,
   queryBySkPrefixPaged,
@@ -37,6 +38,7 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
   NotFound,
+  PutObjectCommand,
 } from "@aws-sdk/client-s3";
 
 const BUCKET_NAME = process.env.BUCKET_NAME;
@@ -290,6 +292,125 @@ export async function fetchPostBody(bodyRef: string): Promise<string> {
     throw new Error(`post body not found in S3: ${bodyRef}`);
   }
   return await res.Body.transformToString();
+}
+
+// --- Create (write path) -------------------------------------------------
+
+/** Inline-preview cap (data-model.md §POST rows: ≤320 chars). */
+const BODY_PREVIEW_MAX_CHARS = 320;
+/** Hard cap — beyond this a "post" is a mis-shaped article (Epic-011 §1). */
+const BODY_HARD_MAX_CHARS = 2000;
+/** Max references on one post (Epic-011 §1 structured tail). */
+const MAX_REFERENCES = 3;
+const POST_KINDS_SET = new Set<PostKind>([
+  "reflection",
+  "friction",
+  "improvement",
+  "observation",
+]);
+/** LLM-failure artefact patterns — checked over the FIRST 50 chars of the
+ *  trimmed body. Mirrors workforce/skills/feed-post/handler.ts so the
+ *  POST /feed endpoint enforces the same W-1 editorial guard server-side,
+ *  independent of whoever calls it (the CCR session self-polices too, but
+ *  the endpoint does not trust that). */
+const LLM_ARTEFACT_PATTERNS: readonly RegExp[] = [
+  /^as an ai/i,
+  /^here is the/i,
+  /^here's the/i,
+  /^i apologi[sz]e/i,
+  /^certainly[!,]/i,
+  /^sure[!,]/i,
+  /^of course[!,]/i,
+  /^i'?m sorry/i,
+  /^i cannot/i,
+  /^i can'?t/i,
+];
+
+export interface CreatePostInput {
+  agent_slug: string;
+  kind: string;
+  body: string;
+  references?: string[];
+  /** Optional metering — defaults to 0 / "stop" when the caller (CCR
+   *  session via POST /feed) has no token accounting. The Lambda path
+   *  passes real values. */
+  finish_reason?: string;
+  tokens_in?: number;
+  tokens_out?: number;
+  skill_version?: string;
+  /** Injectables for deterministic tests. */
+  now?: () => Date;
+  newUlid?: () => string;
+}
+
+/**
+ * Validate + write one feed POST: S3 body first (so a DDB failure can't
+ * leave a row whose `body_ref` 404s), then the DDB POST# row. Returns the
+ * written row.
+ *
+ * Server-side W-1 editorial guards run here regardless of caller — empty
+ * body, hard-cap overflow, bad `kind`, >3 references, and LLM-artefact
+ * preludes all throw (C-4 fail-loud). The `POST /feed` endpoint relies on
+ * this so it does not have to trust the runner's self-policing.
+ */
+export async function createPost(input: CreatePostInput): Promise<FeedPostRow> {
+  const newUlid = input.newUlid ?? defaultNewUlid;
+  const now = input.now ?? (() => new Date());
+
+  const body = input.body.trim();
+  if (body.length === 0) throw new Error("createPost: empty_body");
+  if (body.length > BODY_HARD_MAX_CHARS) {
+    throw new Error(`createPost: body_over_hard_cap: ${body.length} > ${BODY_HARD_MAX_CHARS}`);
+  }
+  if (!POST_KINDS_SET.has(input.kind as PostKind)) {
+    throw new Error(`createPost: invalid_kind: "${input.kind}"`);
+  }
+  const head = body.slice(0, 50);
+  for (const re of LLM_ARTEFACT_PATTERNS) {
+    if (re.test(head)) throw new Error(`createPost: llm_artefact_in_head: ${re.source}`);
+  }
+  const references = input.references ?? [];
+  if (references.length > MAX_REFERENCES) {
+    throw new Error(`createPost: too_many_references: ${references.length} > ${MAX_REFERENCES}`);
+  }
+  if (!BUCKET_NAME) throw new Error("createPost: BUCKET_NAME env var is required");
+
+  const postId = newUlid();
+  const postedAt = now().toISOString();
+  const slug = input.agent_slug;
+
+  // S3 body first — date-partitioned key matching the Story-1 handler.
+  const d = new Date(postedAt);
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const bodyRef = `posts/${slug}/${yyyy}/${mm}/${postId}.md`;
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: bodyRef,
+      Body: body,
+      ContentType: "text/markdown; charset=utf-8",
+    }),
+  );
+
+  const row: FeedPostRow = {
+    pk: `AGENT#${slug}`,
+    sk: `POST#${postId}`,
+    agent_slug: slug,
+    posted_at: postedAt,
+    kind: input.kind as PostKind,
+    body_ref: bodyRef,
+    body_preview: body.slice(0, BODY_PREVIEW_MAX_CHARS),
+    references,
+    finish_reason: input.finish_reason ?? "stop",
+    tokens_in: input.tokens_in ?? 0,
+    tokens_out: input.tokens_out ?? 0,
+    skill_version: input.skill_version ?? "unknown",
+    gsi3pk: "FEED",
+    gsi3sk: postedAt,
+  };
+  await putItem(row);
+  return row;
 }
 
 // --- Mutation ------------------------------------------------------------

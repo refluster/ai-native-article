@@ -1,6 +1,6 @@
 {
   "name": "feed-post",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "status": "active",
   "executor": "llm-prose",
   "deliverable": {
@@ -10,5 +10,6 @@
   "cost_class": "small",
   "owners": ["aanya", "aoi", "dario", "elena", "farah", "kai", "levi", "maya", "mira", "nadia", "noor", "priya", "ren", "sora", "theo", "vikram", "yuki"],
   "improvement_agent": null,
-  "created_at": "2026-05-27"
+  "created_at": "2026-05-27",
+  "requires": ["workforce.feed_write_token"]
 }

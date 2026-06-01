@@ -69,12 +69,15 @@ import {
   CloudWatchClient,
   PutMetricDataCommand,
 } from "@aws-sdk/client-cloudwatch";
+import { timingSafeEqual } from "node:crypto";
 import {
   DescribeSecretCommand,
+  GetSecretValueCommand,
   ResourceNotFoundException as SmResourceNotFoundException,
   SecretsManagerClient,
 } from "@aws-sdk/client-secrets-manager";
 import {
+  createPost,
   fetchPostBody,
   getPost,
   hidePost,
@@ -84,6 +87,15 @@ import {
   type FeedPostDetailView,
   type PostKind,
 } from "../shared/post.js";
+
+// Secrets Manager path holding the feed-write capability token. The
+// runner presents the same token (injected from this secret into its
+// CCR task) as `Authorization: Bearer <token>`; POST /feed validates the
+// incoming bearer against this. Single source of truth, read by two AWS
+// principals (orchestrator to inject, this Lambda to validate). v1 scopes
+// the capability to the agent-workforce project bag.
+const FEED_WRITE_TOKEN_SECRET = "wf/projects/agent-workforce/workforce.feed_write_token";
+let _feedWriteTokenCache: string | undefined;
 
 const STAGE = process.env.STAGE ?? "dev";
 // One client per cold start. Metric emission is best-effort — failures
@@ -145,6 +157,11 @@ export async function handler(
     if (routeKey === "GET /projects/{id+}" && projectId) return getProjectRoute(projectId);
     if (routeKey === "GET /feed") return listFeedRoute(event);
     if (routeKey === "GET /feed/{post_id}" && postId) return getFeedPostRoute(postId, event);
+    // POST /feed is the runner's write path (Epic-011 feed-post → DDB).
+    // Bearer-token auth at the handler layer (the CCR session has no
+    // SigV4 creds, so AWS_IAM is not an option). `return await` so the
+    // auth/validation throws route through the outer 500 mapping.
+    if (routeKey === "POST /feed") return await createFeedPostRoute(event);
     // `return await` (not bare `return`) is load-bearing: bare `return Promise` lets the
     // rejection escape the outer try/catch (Promise flattening on async returns). The
     // hide_helper_not_wired throw is what relies on this for the 500-mapping contract.
@@ -860,6 +877,99 @@ async function getFeedPostRoute(
   }
   const detail: FeedPostDetailView = { ...view, body };
   return reply(200, detail);
+}
+
+/**
+ * POST /feed — the runner's authenticated write path. Validates the
+ * bearer token, then writes the body+row via createPost() (which runs
+ * the server-side W-1 editorial guards). Body shape:
+ *   { agent_slug, kind, body, references?, skill_version? }
+ */
+async function createFeedPostRoute(
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const authed = await validateFeedWriteBearer(event);
+  if (!authed) return reply(401, { error: "unauthorized", detail: "POST /feed requires a valid feed-write bearer token." });
+
+  if (!event.body) return reply(400, { error: "missing_body" });
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(event.body) as Record<string, unknown>;
+  } catch {
+    return reply(400, { error: "invalid_json" });
+  }
+
+  const agent_slug = parsed.agent_slug;
+  const kind = parsed.kind;
+  const body = parsed.body;
+  if (typeof agent_slug !== "string" || agent_slug.length === 0) {
+    return reply(400, { error: "missing_agent_slug" });
+  }
+  if (typeof kind !== "string") {
+    return reply(400, { error: "missing_kind" });
+  }
+  if (typeof body !== "string") {
+    return reply(400, { error: "missing_body_text" });
+  }
+  const references = Array.isArray(parsed.references)
+    ? parsed.references.filter((r): r is string => typeof r === "string")
+    : [];
+  const skill_version = typeof parsed.skill_version === "string" ? parsed.skill_version : undefined;
+
+  try {
+    const row = await createPost({ agent_slug, kind, body, references, skill_version });
+    return reply(201, {
+      post_id: row.sk.replace(/^POST#/, ""),
+      agent_slug: row.agent_slug,
+      posted_at: row.posted_at,
+      kind: row.kind,
+    });
+  } catch (err) {
+    // createPost throws on the W-1 editorial guards (empty_body,
+    // body_over_hard_cap, invalid_kind, llm_artefact_in_head,
+    // too_many_references). Map those to 422 so the caller can
+    // distinguish "your content failed validation" from a 500.
+    const msg = err instanceof Error ? err.message : String(err);
+    const validationFailure = /createPost: (empty_body|body_over_hard_cap|invalid_kind|llm_artefact_in_head|too_many_references)/.test(msg);
+    if (validationFailure) {
+      return reply(422, { error: "post_rejected", detail: msg.replace(/^createPost: /, "") });
+    }
+    throw err; // genuine error → outer 500
+  }
+}
+
+/**
+ * Validate the `Authorization: Bearer <token>` header against the
+ * feed-write secret. Constant-time compare. Caches the secret value for
+ * the Lambda's warm lifetime (rotation requires a cold start, acceptable
+ * for a capability token). Returns false on any miss (missing header,
+ * wrong scheme, mismatch, secret unavailable).
+ */
+async function validateFeedWriteBearer(event: APIGatewayProxyEventV2): Promise<boolean> {
+  const headers = event.headers ?? {};
+  const raw = headers.authorization ?? headers.Authorization;
+  if (!raw || !raw.startsWith("Bearer ")) return false;
+  const presented = raw.slice("Bearer ".length).trim();
+  if (presented.length === 0) return false;
+
+  let expected = _feedWriteTokenCache;
+  if (!expected) {
+    try {
+      const out = await sm.send(new GetSecretValueCommand({ SecretId: FEED_WRITE_TOKEN_SECRET }));
+      if (!out.SecretString) return false;
+      const v = JSON.parse(out.SecretString) as { token?: unknown };
+      if (typeof v.token !== "string" || v.token.length === 0) return false;
+      expected = v.token;
+      _feedWriteTokenCache = expected;
+    } catch {
+      return false;
+    }
+  }
+
+  const a = Buffer.from(presented);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
 
 async function patchFeedPostRoute(

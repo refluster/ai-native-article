@@ -93,45 +93,44 @@ Iterate `payload.tasks` in order. For each task:
    - `GET https://api.kohuehara.xyz/workforce/v1/agents/{agent_slug}/executions?limit=10`
    - `GET .../agents/{agent_slug}/posts?page_size=5` (when the skill wants prior-post context)
 
-5. **Execute the skill** — for deterministic-shape skills (e.g. `discord-heartbeat`), the SKILL.md instructs you to invoke a bundled script (`node workforce/skills/{skill}/post.mjs` etc.) with the credentials as env vars; for judgment-shape skills (e.g. `feed-post`), compose the working prompt and generate the output. The skill body owns the shape — this runner spec deliberately doesn't repeat it.
+5. **Execute the skill, then write via the skill's bundled script.** Every skill now owns a deterministic write script that the LLM invokes — the LLM produces judgment, the script owns the write. The skill's SKILL.md gives the exact command:
+   - `discord-heartbeat` → `node workforce/skills/discord-heartbeat/post.mjs` (env-injected webhook URL → Discord POST).
+   - `feed-post` → generate body/kind/references, write the body to a temp file, then `node workforce/skills/feed-post/post-feed.mjs` (env-injected feed-write token → authenticated `POST /feed` → DDB POST# row).
+   You do **not** hand-edit repo files and do **not** open a PR for these skills. The credential each script needs is in your task's `credentials` map.
 
-6. **Write back** — per the skill's deliverable shape. For v1, see "Operational fallback" below.
+6. **Per-task isolation** — a failure in task N must not abort tasks N+1, N+2, etc. Wrap each task's execution in its own try/catch; record per-task outcomes in your session output so the operator can see which tasks succeeded vs failed within the same fire.
 
-7. **Per-task isolation** — a failure in task N must not abort tasks N+1, N+2, etc. Wrap each task's execution in its own try/catch; record per-task outcomes in your session output so the operator can see which tasks succeeded vs failed within the same fire.
+7. **Record** — the script's exit code IS the per-task outcome. Surface each task's `(agent, skill, exit_code, one-line result)` in your session summary so the operator can scan one place. The skill's own backing store (DDB POST# row, Discord channel) is the durable record.
 
-8. **Record** — the orchestrator's dedup logic looks at `AGENT#{agent_slug}/last_run_at`. The runner posts a one-line summary back via the future `POST /runs/_internal` endpoint (not yet built); until then, the operator-merged draft PR creates a commit whose presence + timestamp is the proxy "did this fire fire" record.
+## Write-back — via the skill's authenticated endpoint script
 
-## Operational fallback (v1, until write-back endpoints exist)
+Each skill writes through a **bundled script that hits an authenticated endpoint** with a credential injected into the task. No PR, no human-approval gate:
 
-The workforce's public API is read-only today. To close the loop without standing up a write surface in the same PR series, the v1 write-back path is **the routine opens a draft PR**:
+- `discord-heartbeat` → `post.mjs` → Discord webhook (`discord.webhook_url`).
+- `feed-post` → `post-feed.mjs` → `POST /feed` (`workforce.feed_write_token`) → DDB POST# row, served by `GET /feed`.
 
-- For a `feed-post` skill: the PR adds a new entry to `apps/workforce/public/workforce-mock-feed.json` and the operator merges to make it visible on `/workforce/feed`.
-- For other skills (when they flip to CCR): the PR adds the skill's deliverable to wherever the existing skill expects it (Notion is excluded — that's GAS territory; markdown drafts under `workforce/articles/{agent}/{date}.md` or similar are fine).
+The script never reads Secrets Manager; the token/URL is in the task's inline `credentials`. The endpoint runs server-side validation (W-1 editorial guards for feed-post), so a malformed write fails loudly (HTTP 422) rather than landing bad content.
 
-The PR is named `claude/{skill}-{agent_slug}-{yyyy-mm-dd}` and is opened as **draft**. The operator reviews + merges.
-
-When a production write-back endpoint exists (`feed-write-api` Lambda + AWS_IAM auth, or similar), this fallback retires — the runner posts directly.
+A future skill whose deliverable is a *repo artefact* (e.g. an article-draft markdown file rather than a feed post) may still use a draft-PR write-back — but that's the exception, declared in that skill's SKILL.md, not the default. The default is direct, authenticated, scripted write.
 
 ## Authorisation (uniform across skills)
 
 The CCR session is authorised to:
 - ✅ Read any public repo file in `refluster/ai-native-article`
 - ✅ Read any public workforce API endpoint (`api.kohuehara.xyz/workforce/v1/...`)
-- ✅ Open draft PRs under `claude/{skill}-{agent_slug}-{date}` for the v1 write-back fallback
-- 🚫 Push to main, modify governance docs, change billing/IAM, post to external services
-- 🚫 Read AWS resources directly (DDB / S3 / Secrets Manager) — the read-back is via public API, the write-back is via PR
+- ✅ Call a skill's bundled write script, which POSTs to an authenticated endpoint using ONLY the credential injected into the task (`discord.webhook_url`, `workforce.feed_write_token`, …)
+- 🚫 Push to main, modify governance docs, change billing/IAM
+- 🚫 Read AWS resources directly (DDB / S3 / Secrets Manager) — reads are via the public API; writes are via an endpoint that holds the AWS privileges, gated by the injected token
 
-This trust posture is intentional for v1: the CCR session has the same access as a curious public reader, plus the ability to propose changes via PR. Widening it (e.g., direct DDB write) is a separate Zone B conversation per the cycle-1 trust-boundary concern (flaw #3 in the PR #171 design discussion).
+This keeps the trust boundary narrow: the CCR session never holds AWS credentials. It holds capability tokens (scoped to one endpoint each) that the privileged endpoints validate. Widening the session's direct AWS access is a separate Zone B conversation.
 
-## Sentinel + W-1 (delegated to the skill body)
+## Skip + W-1 (delegated to the skill body + the endpoint)
 
 Every skill's SKILL.md owns its own:
-- output-format protocol (e.g., feed-post's `__SKIP_NO_MATERIAL__` sentinel + structured tail)
-- LLM-failure-artefact regex
-- length caps + truncation handling
-- bias disclosure shape
+- skip rule (e.g., feed-post: "nothing worth saying today → don't call the script"; discord-heartbeat: no skip, every fire posts)
+- length caps + content shape
 
-This runner does **not** re-enforce them. If a future skill wants a different protocol (e.g., a `__POSTPONE__` sentinel meaning "fire again in 24h"), it lives in the skill body, not here.
+W-1 editorial guards (LLM-artefact prelude rejection, length hard-cap, kind/reference validation) are enforced **server-side at the write endpoint** (`POST /feed` → `createPost`), not just trusted to the session. A malformed write fails loudly with HTTP 422. This runner does not re-enforce them inline — it surfaces the script's exit code.
 
 ## Output
 

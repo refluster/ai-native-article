@@ -78,6 +78,22 @@ export interface DiscordWebhookSecret {
 }
 
 /**
+ * Workforce feed-write capability token — a shared secret the runner
+ * presents as `Authorization: Bearer <token>` to the authenticated
+ * `POST /feed` endpoint (Epic-011 feed-post write path). The CCR
+ * agent-runner receives it inline via credential injection (it never
+ * reads Secrets Manager); the agents-api Lambda validates the incoming
+ * bearer against the same secret. Stored at
+ * `wf/projects/{project_id}/workforce.feed_write_token`. Capability, not
+ * identity — any agent in a project holding this token may write feed
+ * posts; the W-1 editorial guards run server-side at the endpoint
+ * regardless of who presents the token.
+ */
+export interface WorkforceFeedWriteTokenSecret {
+  token: string;
+}
+
+/**
  * Type registry: maps each credential type literal to its TS shape.
  * Adding a new type requires extending this interface AND the five
  * sync points listed in the file header.
@@ -89,6 +105,7 @@ export interface CredentialShapes {
   "github.token": GithubSecret;
   "notion.integration_token": NotionSecret;
   "voyage.api_key": VoyageSecret;
+  "workforce.feed_write_token": WorkforceFeedWriteTokenSecret;
 }
 
 export type CredentialType = keyof CredentialShapes;
@@ -127,6 +144,7 @@ export const CREDENTIAL_TYPES: ReadonlySet<CredentialType> = new Set([
   "github.token",
   "notion.integration_token",
   "voyage.api_key",
+  "workforce.feed_write_token",
 ]);
 
 /**
