@@ -13,10 +13,10 @@
 //                       'unprovisioned' (the LIST endpoint treats
 //                       ResourceNotFound as not-in-list).
 //
-// All copy is Japanese-first per the workforce console language. The
-// "credentials write disabled" advisory is English ASCII because it
-// mirrors the existing apiConfigured() advisory in ProjectProfile.tsx
-// for consistency with operator-facing config-gap messaging.
+// All copy is English per the workforce console language. The
+// "credentials write disabled" advisory mirrors the existing
+// apiConfigured() advisory in ProjectProfile.tsx for consistency with
+// operator-facing config-gap messaging.
 //
 // Optimistic-update strategy:
 //   The mutation closes its modal + flips the row's local state
@@ -227,7 +227,7 @@ export default function CredentialVault({ projectId }: { projectId: string }) {
     }));
     setModal({ kind: null });
     setError(null);
-    setSuccess('ローテートしました');
+    setSuccess('Rotated');
     markPending(credentialType);
     try {
       const res: PutCredentialResponse = await putCredential(
@@ -266,7 +266,7 @@ export default function CredentialVault({ projectId }: { projectId: string }) {
     }));
     setModal({ kind: null });
     setError(null);
-    setSuccess('作成しました');
+    setSuccess('Created');
     markPending(credentialType);
     try {
       const res: PutCredentialResponse = await putCredential(
@@ -305,7 +305,7 @@ export default function CredentialVault({ projectId }: { projectId: string }) {
     setModal({ kind: null });
     setError(null);
     setSuccess(
-      `削除しました — ${formatRecoverableUntil(optimisticUntil)} まで復元可能`,
+      `Deleted — recoverable until ${formatRecoverableUntil(optimisticUntil)}`,
     );
     markPending(credentialType);
     try {
@@ -336,7 +336,7 @@ export default function CredentialVault({ projectId }: { projectId: string }) {
       <header className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between gap-3">
         <Typeplate
           label="DECK · CREDENTIALS"
-          value={`${provisionedCount} / 5 プロビジョン済み`}
+          value={`${provisionedCount} / 5 provisioned`}
         />
         <button
           type="button"
@@ -347,7 +347,7 @@ export default function CredentialVault({ projectId }: { projectId: string }) {
           title="REFETCH"
           className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline disabled:text-wf-on-surface-variant disabled:no-underline disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          再取得
+          REFETCH
         </button>
       </header>
 
@@ -370,7 +370,7 @@ export default function CredentialVault({ projectId }: { projectId: string }) {
             <button
               type="button"
               onClick={() => setError(null)}
-              aria-label="エラーを閉じる"
+              aria-label="Dismiss error"
               className="font-wfmono text-[10px] uppercase tracking-[0.14em] hover:underline"
             >
               ×
@@ -388,13 +388,13 @@ export default function CredentialVault({ projectId }: { projectId: string }) {
         )}
 
         {loading && (
-          <p className="font-wfmono text-xs text-wf-on-surface-variant">読み込み中…</p>
+          <p className="font-wfmono text-xs text-wf-on-surface-variant">Loading…</p>
         )}
 
         {!loading && fetchError && (
           <div role="alert" className="space-y-2">
             <p className="font-wfmono text-xs text-wf-throwing">
-              クレデンシャル一覧の取得に失敗しました。
+              Failed to load credentials.
             </p>
             <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
               {fetchError}
@@ -406,7 +406,7 @@ export default function CredentialVault({ projectId }: { projectId: string }) {
               }}
               className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              再取得
+              REFETCH
             </button>
           </div>
         )}
@@ -415,7 +415,7 @@ export default function CredentialVault({ projectId }: { projectId: string }) {
           <>
             {provisionedCount === 0 && (
               <p className="text-sm text-wf-on-surface-variant leading-relaxed">
-                クレデンシャルはまだ登録されていません。下の各タイプから「作成」してください。
+                No credentials registered yet. Use “CREATE” on each type below.
               </p>
             )}
             <ul role="list" className="divide-y divide-wf-outline-variant">
@@ -523,7 +523,7 @@ function CredentialRow({
         )}
         {row._localState === 'deleted' && (
           <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-throwing mt-1">
-            DELETED — {formatDateShort(row._recoverableUntil)} まで復元可能
+            DELETED — recoverable until {formatDateShort(row._recoverableUntil)}
           </div>
         )}
       </div>
@@ -605,9 +605,9 @@ function CredentialModal({
 
   const title =
     mode === 'rotate'
-      ? `ローテート — ${credentialType}`
-      : `作成 — ${credentialType}`;
-  const submitLabel = mode === 'rotate' ? 'ローテートを実行' : '作成を実行';
+      ? `ROTATE — ${credentialType}`
+      : `CREATE — ${credentialType}`;
+  const submitLabel = mode === 'rotate' ? 'Execute rotate' : 'Execute create';
 
   return (
     <div
@@ -661,7 +661,7 @@ function CredentialModal({
           {mode === 'rotate' && (
             <label className="block space-y-1">
               <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-                確認のため「ROTATE」と入力してください
+                Type “ROTATE” to confirm
               </span>
               <input
                 type="text"
@@ -678,7 +678,7 @@ function CredentialModal({
               onClick={onClose}
               className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant hover:underline"
             >
-              キャンセル
+              Cancel
             </button>
             <button
               type="submit"
@@ -739,11 +739,11 @@ function DeleteConfirmDialog({
           id={titleId}
           className="font-wfmono text-xs uppercase tracking-[0.14em] text-wf-on-surface"
         >
-          削除の確認
+          Confirm deletion
         </h2>
         <p className="text-sm text-wf-on-surface leading-relaxed">
-          この操作は {credentialType} の秘密値を削除します。AWS Secrets Manager
-          の復元ウィンドウにより 7 日間は復元可能です。続行しますか？
+          This will delete the secret value for {credentialType}. AWS Secrets
+          Manager’s recovery window keeps it recoverable for 7 days. Continue?
         </p>
         <div className="flex items-center justify-end gap-3">
           <button
@@ -751,7 +751,7 @@ function DeleteConfirmDialog({
             onClick={onClose}
             className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant hover:underline"
           >
-            キャンセル
+            Cancel
           </button>
           <button
             ref={confirmRef}
@@ -765,7 +765,7 @@ function DeleteConfirmDialog({
             disabled={submitting}
             className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-throwing hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            削除を実行
+            Execute delete
           </button>
         </div>
       </div>
