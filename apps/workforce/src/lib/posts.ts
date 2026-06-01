@@ -1,31 +1,118 @@
-import type { Post, WorkforceMockFeed, AgentSkipSummary } from '../types/post';
+// Feed data loader. Two sources, same shape out:
+//   - live: GET /feed and GET /agents/{slug}/posts on wf-agents-api,
+//     when VITE_WORKFORCE_AGENTS_API_BASE is set (Epic-011 Story 7
+//     live-data wiring). Posts are written to DDB by feed-post via the
+//     authenticated POST /feed endpoint.
+//   - mock: /workforce-mock-feed.json, the build-time placeholder used
+//     on gh-pages / local dev when the API base is unset.
+//
+// The live API returns the list-view shape (body_preview + references as
+// {type,id,accessible} objects); we map it to the SPA's Post shape
+// (full-ish body + references as `TYPE#id` strings). v1 renders
+// body_preview as the body — long posts show the ≤320-char preview; the
+// full-body-on-expand path (GET /feed/{post_id}) is a follow-up.
+
+import type { Post, WorkforceMockFeed, AgentSkipSummary, PostKind } from '../types/post';
 import { withBasePath } from './paths';
+import { WORKFORCE_AGENTS_API_BASE } from '../config/api';
 
-let cache: Promise<WorkforceMockFeed> | null = null;
+const apiConfigured = (): boolean => WORKFORCE_AGENTS_API_BASE.length > 0;
 
-export function loadWorkforceFeed(): Promise<WorkforceMockFeed> {
-  if (!cache) {
-    cache = fetch(withBasePath('/workforce-mock-feed.json'))
+// --- Live API view shapes (mirror workforce/lambdas/shared/post.ts) ------
+
+interface ReferenceView {
+  type: 'EXEC' | 'DELIV' | 'TASK' | 'other';
+  id: string;
+  accessible: boolean;
+}
+interface FeedPostApiView {
+  post_id: string;
+  agent_slug: string;
+  posted_at: string;
+  kind: PostKind;
+  body_preview: string;
+  references: ReferenceView[];
+  visibility?: 'hidden';
+}
+
+function refToString(r: ReferenceView): string {
+  return r.type === 'other' ? r.id : `${r.type}#${r.id}`;
+}
+
+function apiViewToPost(v: FeedPostApiView): Post {
+  return {
+    post_id: v.post_id,
+    agent_slug: v.agent_slug,
+    posted_at: v.posted_at,
+    kind: v.kind,
+    body: v.body_preview,
+    references: (v.references ?? []).map(refToString),
+  };
+}
+
+// --- Mock path (build-time placeholder) ----------------------------------
+
+let mockCache: Promise<WorkforceMockFeed> | null = null;
+
+function loadMockFeed(): Promise<WorkforceMockFeed> {
+  if (!mockCache) {
+    mockCache = fetch(withBasePath('/workforce-mock-feed.json'))
       .then((res) => {
         if (!res.ok) throw new Error(`failed to load workforce-mock-feed.json (${res.status})`);
         return res.json() as Promise<WorkforceMockFeed>;
       })
       .catch((err) => {
-        cache = null;
+        mockCache = null;
         throw err;
       });
   }
-  return cache;
+  return mockCache;
+}
+
+// --- Public loaders ------------------------------------------------------
+
+export async function loadWorkforceFeed(): Promise<WorkforceMockFeed> {
+  if (apiConfigured()) {
+    const res = await fetch(`${WORKFORCE_AGENTS_API_BASE}/feed?page_size=50`);
+    if (!res.ok) throw new Error(`feed api ${res.status}`);
+    const data = (await res.json()) as { posts: FeedPostApiView[] };
+    return {
+      generated_at: new Date().toISOString(),
+      posts: data.posts.map(apiViewToPost),
+      // No skip-summary endpoint; the feed page doesn't use it.
+      agent_skip_summary: {},
+    };
+  }
+  return loadMockFeed();
 }
 
 export async function loadAgentPosts(slug: string): Promise<Post[]> {
-  const feed = await loadWorkforceFeed();
+  if (apiConfigured()) {
+    const res = await fetch(
+      `${WORKFORCE_AGENTS_API_BASE}/agents/${encodeURIComponent(slug)}/posts?page_size=25`,
+    );
+    if (!res.ok) throw new Error(`feed api ${res.status}`);
+    const data = (await res.json()) as { posts: FeedPostApiView[] };
+    // API returns reverse-chronological already.
+    return data.posts.map(apiViewToPost);
+  }
+  const feed = await loadMockFeed();
   return feed.posts
     .filter((p) => p.agent_slug === slug)
     .sort((a, b) => Date.parse(b.posted_at) - Date.parse(a.posted_at));
 }
 
 export async function loadAgentSkipSummary(slug: string): Promise<AgentSkipSummary | null> {
-  const feed = await loadWorkforceFeed();
+  if (apiConfigured()) {
+    // No skip-summary endpoint yet; derive "days since last post" from the
+    // newest post. consecutive_skips needs cron-history we don't expose,
+    // so it's 0 in the live path (the pill still surfaces staleness).
+    const posts = await loadAgentPosts(slug);
+    if (posts.length === 0) return { days_since_last_post: 0, consecutive_skips: 0 };
+    const newest = posts[0]!.posted_at;
+    const days = Math.max(0, Math.floor((Date.now() - Date.parse(newest)) / 86_400_000));
+    return { days_since_last_post: days, consecutive_skips: 0 };
+  }
+  const feed = await loadMockFeed();
   return feed.agent_skip_summary[slug] ?? null;
 }
