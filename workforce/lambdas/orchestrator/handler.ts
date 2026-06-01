@@ -147,13 +147,9 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
           continue;
         }
         if (ownedLambda) {
-          // Per-binding immediate dispatch. A lambda binding may name an
-          // explicit project_id (e.g. Elena's article-level2 runs against
-          // agent-workforce so its EXEC ledger lands under that project);
-          // forward it so the runner's resolveProjectId honours it instead
-          // of defaulting to self/{slug}.
+          // Per-binding immediate dispatch (unchanged).
           try {
-            await invokeRunner(agent.slug, i, binding.project_id);
+            await invokeRunner(agent.slug, i);
             dispatched.push({ slug: agent.slug, binding_idx: i, skill: binding.skill });
           } catch (err) {
             const reason = err instanceof Error ? err.message : String(err);
@@ -318,19 +314,12 @@ async function evaluateBinding(
   return { action: "dispatch" };
 }
 
-async function invokeRunner(slug: string, bindingIdx: number, projectId?: string): Promise<void> {
-  const payload: { agent: string; binding_idx: number; project_id?: string } = {
-    agent: slug,
-    binding_idx: bindingIdx,
-  };
-  // Only forward project_id when the binding declares one — omitting it lets
-  // the runner fall back to self/{slug} (the default for cron bindings).
-  if (projectId) payload.project_id = projectId;
+async function invokeRunner(slug: string, bindingIdx: number): Promise<void> {
   await lambda.send(
     new InvokeCommand({
       FunctionName: RUNNER_FUNCTION,
       InvocationType: "Event",
-      Payload: Buffer.from(JSON.stringify(payload)),
+      Payload: Buffer.from(JSON.stringify({ agent: slug, binding_idx: bindingIdx })),
     }),
   );
 }

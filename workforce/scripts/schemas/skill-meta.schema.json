@@ -49,7 +49,7 @@
         "article_type": {
           "type": "string",
           "enum": ["explanation", "analysis"],
-          "description": "Optional. When deliverable.type=article and publish_notion=true, sets the Notion `Type` select property the front-end article pipeline reads (explanation vs. analysis). Omitted for non-article deliverables and for legacy article skills (the reader's resolveType then defaults to 'analysis'). See scripts/fetchers/notion.mjs:resolveType and apps/article/src/types/article.ts."
+          "description": "Optional; only valid when deliverable.type=article. The Notion `Type` select the article-publish path writes (read by a skill's bundled write script, e.g. workforce/skills/article-level2/publish-notion.mjs) so the front-end labels/groups the article. Omitted for non-article deliverables and legacy article skills — the reader's resolveType then defaults to 'analysis'. See scripts/fetchers/notion.mjs:resolveType and apps/article/src/types/article.ts."
         }
       },
       "description": "Required for executor=llm-prose; forbidden otherwise. Declares the S3 prefix + Notion publish flag for the artefact."

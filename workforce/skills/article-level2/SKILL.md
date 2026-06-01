@@ -14,6 +14,13 @@ the unified Notion Articles DB. This skill produces the *same deliverable* — a
 faithful briefing-document explanation — attributed to the running agent so the
 article carries a byline on `kohuehara.xyz`.
 
+It runs on the **CCR execution model** (the same pattern as Dario's `feed-post`):
+the binding is `executor=claude-code-routine` + `scheduler=external/api`, fired
+hourly by `wf-orchestrator-tick` into the generic `agent-runner` routine
+(`workforce/docs/routines/agent-runner.md`). The routine composes your persona +
+this skill body, you generate the explanation, then a **bundled write script**
+owns the Notion write — you do **not** hand-edit any file and do **not** open a PR.
+
 ## Instructions
 
 1. Pick **one** L1 source that is not yet covered by an existing L2 explanation
@@ -44,13 +51,49 @@ article carries a byline on `kohuehara.xyz`.
 - Objective, incisive tone. Avoid reviewer-voice hedges ("重要だ", "今後注目される")
   and throat-clearing preambles.
 
-## Outputs
+## Write the article — run the script, do NOT hand-edit any file
 
-Markdown body suitable for direct Notion insertion. The runner attaches
-`Author={agent_slug}`, `Type=explanation`, `Kind=article`, `Status=ready_for_L4`.
-The existing GAS L4 batch picks up `Status=ready_for_L4` rows and publishes them
-to `kohuehara.xyz`; `scripts/fetch-notion.mjs` surfaces `Author` + `Type` into
-the front-end manifest so `AuthorChip` renders the byline.
+The page is written by a **deterministic script**, not by you editing JSON. You
+generate the *judgment* (the briefing-document markdown); `publish-notion.mjs`
+owns the *write* (correct schema, properties, block conversion) by POSTing a new
+page into the unified Articles DB with the injected integration token.
+
+Steps:
+
+1. Write the full explanation markdown to a temp file (e.g. `/tmp/l2-article.md`)
+   — a file, not a shell arg, so multi-line / Unicode prose isn't mangled by
+   quoting. The first line must be the `# Title` H1 (used as the page Title and
+   stripped from the body blocks).
+2. Run:
+
+   ```sh
+   NOTION_API_KEY="<credentials['notion.integration_token'].apiKey from your task>" \
+   NOTION_DB_ID="<credentials['notion.integration_token'].databaseId from your task>" \
+     node workforce/skills/article-level2/publish-notion.mjs \
+       --author "<agent_slug>" \
+       --type explanation \
+       --kind article \
+       --body-file /tmp/l2-article.md \
+       --source-url "<L1 source URL>"   # optional, omit if none
+   ```
+
+3. Report the script's exit code:
+   - `0` — page created. The row carries `Author={agent_slug}, Type=explanation,
+     Status=ready_for_L4`. Done.
+   - `2` — W-1 editorial guard failed (empty/short body or LLM-artefact prelude),
+     or `401/403` auth (project credential bag misconfigured). Read stderr; do not
+     retry blindly.
+   - `1` / `3` — bad args / missing H1 title, or Notion API / network error.
+
+The `NOTION_*` values come from your task's injected
+`credentials["notion.integration_token"]` (`{apiKey, databaseId}`) — never read
+them from anywhere else, never hard-code them. The script re-runs the W-1 guards
+before writing, so a degraded body fails loudly rather than landing on the site.
+
+**The page lands directly in Notion. No PR, no human-approval gate.** The existing
+GAS L4 batch picks up `Status=ready_for_L4` rows and publishes them to
+`kohuehara.xyz`; `scripts/fetch-notion.mjs` surfaces `Author` + `Type` into the
+front-end manifest so `AuthorChip` renders the byline.
 
 ## When NOT to use
 

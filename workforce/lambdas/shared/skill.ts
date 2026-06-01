@@ -35,13 +35,12 @@ export interface SkillDeliverable {
   /** True when the runner must also call insertArticle() after writing S3. */
   publish_notion: boolean;
   /**
-   * Optional. When type=article and publish_notion=true, the runner passes
-   * this to insertArticle() as the Notion `Type` select (explanation vs.
-   * analysis) — the property the front-end article pipeline reads to label
-   * and group the article. Omitted for non-article deliverables and for
-   * legacy article skills, in which case the reader's resolveType defaults
-   * to 'analysis'. Enforced by scripts/validate-skills.mjs +
-   * scripts/schemas/skill-meta.schema.json.
+   * Optional. For article deliverables, the Notion `Type` select
+   * (explanation | analysis) the article-publish path writes — read by a
+   * skill's bundled CCR write script (e.g. article-level2/publish-notion.mjs)
+   * so the front-end labels/groups the article correctly. Omitted → the
+   * reader's resolveType defaults to 'analysis'. Enforced by
+   * scripts/validate-skills.mjs + scripts/schemas/skill-meta.schema.json.
    */
   article_type?: "explanation" | "analysis";
 }
