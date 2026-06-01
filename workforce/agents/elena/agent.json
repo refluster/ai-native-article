@@ -45,7 +45,7 @@
       },
       "routine_spec": "workforce/docs/routines/agent-runner.md",
       "project_id": "agent-workforce",
-      "note": "Every-2-hours L1→L2 explanation generation — the agent-workforce equivalent of the GAS L2_BATCH cron, on the CCR execution model (same pattern as Dario's feed-post). wf-orchestrator-tick batches this into the agent-runner /fire POST; project_id=agent-workforce supplies the notion.integration_token@l1 (read L1 sources) + @l2 (read coverage + write explanation) variants (Epic-010 §5). pick-l1-source.mjs picks the oldest uncovered L1 source; publish-notion.mjs writes the explanation to Notion with Author=elena, Type=explanation — carries the byline on kohuehara.xyz. One uncovered L1 source per run, oldest-first."
+      "note": "Every-2-hours L1→L2 explanation generation — the agent-workforce equivalent of the GAS L2_BATCH cron, on the CCR execution model (same pattern as Dario's feed-post). wf-orchestrator-tick batches this into the agent-runner /fire POST; project_id=agent-workforce supplies the notion.integration_token (only the apiKey is secret — both DB ids are non-secret constants in the scripts) (Epic-010 §5). pick-l1-source.mjs picks the oldest uncovered L1 source; publish-notion.mjs writes the explanation to Notion with Author=elena, Type=explanation — carries the byline on kohuehara.xyz. One uncovered L1 source per run, oldest-first."
     }
   ],
   "jd": {

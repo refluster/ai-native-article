@@ -10,9 +10,12 @@
 // Status=ready_for_L4 so the existing GAS L4 batch publishes it to
 // kohuehara.xyz and scripts/fetch-notion.mjs surfaces the byline (AuthorChip).
 //
-// The CCR session never reads Secrets Manager: the token + DB id arrive
-// inline in the task's `credentials["notion.integration_token"]` bag
-// ({apiKey, databaseId}) and are passed through as env vars by the runner.
+// The CCR session never reads Secrets Manager: NOTION_API_KEY arrives inline
+// from the task's `credentials["notion.integration_token"].apiKey` and is
+// passed through as an env var by the runner. The target DB id is NOT secret
+// (the unified Articles DB id is already committed in
+// scripts/normalize-categories.mjs), so it's a constant below — overridable by
+// NOTION_DB_ID for tests / migrations.
 //
 // W-1 (editorial integrity): the script refuses an empty / too-short body and
 // rejects LLM-failure prelude artefacts (C-1), failing loud (exit 2) rather
@@ -24,7 +27,6 @@
 //
 // Usage:
 //   NOTION_API_KEY="<credentials['notion.integration_token'].apiKey>" \
-//   NOTION_DB_ID="<credentials['notion.integration_token'].databaseId>" \
 //     node workforce/skills/article-level2/publish-notion.mjs \
 //       --author elena --type explanation --kind article \
 //       --body-file /tmp/article.md [--source-url https://...]
@@ -39,6 +41,9 @@ import { readFileSync } from "node:fs";
 
 const NOTION_VERSION = "2022-06-28";
 const NOTION_API = "https://api.notion.com/v1";
+// Non-secret target DB id (the unified Articles DB; mirror of the default in
+// scripts/normalize-categories.mjs). Overridable by NOTION_DB_ID for tests.
+const UNIFIED_DB_ID = process.env.NOTION_DB_ID || "34fd0f0b-e61e-817a-9f6b-dc65b0d5b4cc";
 // An L2 explanation is ~3000 字; anything shorter than this floor is almost
 // certainly a truncated / empty generation and must not be published (C-1).
 const MIN_BODY_CHARS = 200;
@@ -53,7 +58,7 @@ function arg(name) {
 }
 
 const apiKey = process.env.NOTION_API_KEY;
-const databaseId = process.env.NOTION_DB_ID;
+const databaseId = UNIFIED_DB_ID;
 const author = arg("author");
 const articleType = arg("type") ?? "explanation";
 const kind = arg("kind") ?? "article";
@@ -61,7 +66,6 @@ const bodyFile = arg("body-file");
 const sourceUrl = arg("source-url");
 
 if (!apiKey) { console.error("publish-notion.mjs: NOTION_API_KEY env var is required (from credentials['notion.integration_token'].apiKey)"); process.exit(1); }
-if (!databaseId) { console.error("publish-notion.mjs: NOTION_DB_ID env var is required (from credentials['notion.integration_token'].databaseId)"); process.exit(1); }
 if (!author) { console.error("publish-notion.mjs: --author <slug> is required"); process.exit(1); }
 if (articleType !== "explanation" && articleType !== "analysis") {
   console.error(`publish-notion.mjs: --type must be explanation|analysis (got "${articleType}")`);

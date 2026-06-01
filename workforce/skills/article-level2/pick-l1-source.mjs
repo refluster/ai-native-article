@@ -10,14 +10,14 @@
 // as handleL2Batch: skip example.com fixtures, skip rows with `L2 Skip`=true,
 // oldest-first by created_time.
 //
-// The CCR session never reads Secrets Manager: NOTION_API_KEY + the two DB ids
-// arrive inline from the task's `credentials["notion.integration_token@l1"]`
-// and `…@l2` bags and are passed through as env vars by the runner.
+// The CCR session never reads Secrets Manager: NOTION_API_KEY arrives inline
+// from the task's `credentials["notion.integration_token"].apiKey` and is
+// passed through as an env var by the runner. The DB ids are NOT secret (they
+// are already committed in gas/src/Code.gs and scripts/normalize-categories.mjs),
+// so they live as constants below — overridable by env for tests / migrations.
 //
 // Usage:
-//   NOTION_API_KEY="<credentials['notion.integration_token@l1'].apiKey>" \
-//   L1_DB_ID="<credentials['notion.integration_token@l1'].databaseId>" \
-//   UNIFIED_DB_ID="<credentials['notion.integration_token@l2'].databaseId>" \
+//   NOTION_API_KEY="<credentials['notion.integration_token'].apiKey>" \
 //     node workforce/skills/article-level2/pick-l1-source.mjs
 //
 // Stdout (single JSON line):
@@ -32,13 +32,16 @@
 const NOTION_VERSION = "2022-06-28";
 const NOTION_API = "https://api.notion.com/v1";
 
-const apiKey = process.env.NOTION_API_KEY;
-const l1DbId = process.env.L1_DB_ID;
-const unifiedDbId = process.env.UNIFIED_DB_ID;
+// Non-secret DB ids (mirror gas/src/Code.gs:l1_db_id and the unified Articles
+// DB in scripts/normalize-categories.mjs). Env overrides allow test/migration.
+const L1_DB_ID = process.env.L1_DB_ID || "32fd0f0b-e61e-80bd-89bf-f94965d05e80";
+const UNIFIED_DB_ID = process.env.UNIFIED_DB_ID || "34fd0f0b-e61e-817a-9f6b-dc65b0d5b4cc";
 
-if (!apiKey) { console.error("pick-l1-source.mjs: NOTION_API_KEY is required (credentials['notion.integration_token@l1'].apiKey)"); process.exit(1); }
-if (!l1DbId) { console.error("pick-l1-source.mjs: L1_DB_ID is required (credentials['notion.integration_token@l1'].databaseId)"); process.exit(1); }
-if (!unifiedDbId) { console.error("pick-l1-source.mjs: UNIFIED_DB_ID is required (credentials['notion.integration_token@l2'].databaseId)"); process.exit(1); }
+const apiKey = process.env.NOTION_API_KEY;
+const l1DbId = L1_DB_ID;
+const unifiedDbId = UNIFIED_DB_ID;
+
+if (!apiKey) { console.error("pick-l1-source.mjs: NOTION_API_KEY is required (credentials['notion.integration_token'].apiKey)"); process.exit(1); }
 
 async function queryAll(databaseId) {
   const pages = [];
