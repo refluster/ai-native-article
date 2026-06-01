@@ -3,8 +3,8 @@
   "name": "Agent Workforce (internal trial)",
   "owner_agent": "maya",
   "members": ["maya", "dario", "yuki", "elena"],
-  "credential_types": ["discord.webhook_url", "workforce.feed_write_token", "notion.integration_token"],
+  "credential_types": ["discord.webhook_url", "workforce.feed_write_token", "notion.integration_token@l1", "notion.integration_token@l2"],
   "status": "active",
   "created_at": "2026-05-31",
-  "note": "Workforce-internal project bundling team-shared resources used by trial CCR-bound skills. Holds the team Discord webhook URL (consumed by Yuki's discord-heartbeat), the feed-write token (Dario's feed-post), and the Notion integration token (Elena's 2-hourly article-level2 L1→L2 explanation, via the CCR agent-runner — orchestrator-tick resolves it from wf/projects/agent-workforce/notion.integration_token and ships it inline to publish-notion.mjs). Members grow as more agents flip skills to the CCR path. Not a customer project — this is the operational substrate the workforce itself runs on."
+  "note": "Workforce-internal project bundling team-shared resources used by trial CCR-bound skills. Holds the team Discord webhook URL (consumed by Yuki's discord-heartbeat), the feed-write token (Dario's feed-post), and two Notion integration-token variants for Elena's 2-hourly article-level2 (L1→L2 explanation, via the CCR agent-runner): @l1 = {apiKey, databaseId=L1 source library}, @l2 = {apiKey, databaseId=unified Articles DB}. Same Notion integration (apiKey) shared to both DBs; pick-l1-source.mjs reads L1 + unified, publish-notion.mjs writes the explanation to unified. orchestrator-tick resolves wf/projects/agent-workforce/notion.integration_token@{l1,l2} and ships them inline. Members grow as more agents flip skills to the CCR path. Not a customer project — this is the operational substrate the workforce itself runs on."
 }
