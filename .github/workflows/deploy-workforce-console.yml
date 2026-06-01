@@ -36,30 +36,68 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # AWS auth runs BEFORE the build so the build can read the live
+      # backend URLs from CloudFormation stack outputs (see next step).
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          # Pinned to the data-plane region rather than secrets.AWS_REGION:
+          # the stacks queried below live in us-west-2 regardless of which
+          # region the deploy role's default happens to be.
+          aws-region: us-west-2
+
+      - name: Resolve backend URLs from CloudFormation
+        # The SPA's API base + identity pool were hand-maintained GitHub
+        # secrets (VITE_WORKFORCE_AGENTS_API_BASE etc.). Those drift the
+        # instant the data plane moves region or an API is recreated — which
+        # is exactly what bit us: a stale ap-northeast-1 URL pointed the live
+        # SPA at a dead host and every /workforce/projects fetch died with an
+        # opaque "Failed to fetch". Deriving the values from the live stack
+        # outputs at deploy time keeps the bundle pinned to whatever is
+        # actually deployed, with no human-maintained URL secret to rot.
+        run: |
+          set -euo pipefail
+          out() {
+            aws cloudformation describe-stacks --region us-west-2 \
+              --stack-name "$1" \
+              --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" \
+              --output text
+          }
+          AGENTS_BASE=$(out wf-data-plane-prod AgentsApiUrl)
+          CREDS_BASE=$(out wf-data-plane-prod CredentialsApiUrl)
+          POOL_ID=$(out wf-web-prod WorkforceIdentityPoolId)
+          # Fail loud (W-4 / C-4): a missing output must turn the deploy red,
+          # never silently ship a bundle that points at nothing.
+          for pair in "AgentsApiUrl=$AGENTS_BASE" "CredentialsApiUrl=$CREDS_BASE" "WorkforceIdentityPoolId=$POOL_ID"; do
+            name="${pair%%=*}"; val="${pair#*=}"
+            if [ -z "$val" ] || [ "$val" = "None" ]; then
+              echo "::error::CloudFormation output $name resolved empty — refusing to build a broken bundle"
+              exit 1
+            fi
+          done
+          {
+            echo "VITE_WORKFORCE_AGENTS_API_BASE=$AGENTS_BASE"
+            echo "VITE_WORKFORCE_CREDENTIALS_API_BASE=$CREDS_BASE"
+            echo "VITE_COGNITO_IDENTITY_POOL_ID=$POOL_ID"
+          } >> "$GITHUB_ENV"
+          echo "Resolved: agents=$AGENTS_BASE creds=$CREDS_BASE pool=$POOL_ID"
+
       - name: Build agent manifest
         run: npm run build:agents
 
       - name: Build workforce SPA
+        # VITE_WORKFORCE_AGENTS_API_BASE / _CREDENTIALS_API_BASE /
+        # VITE_COGNITO_IDENTITY_POOL_ID come from $GITHUB_ENV (the resolve
+        # step above), not from secrets. The Cognito user-pool / client /
+        # domain values stay as secrets — they're not URL-shaped and haven't
+        # been a drift source (follow-up: derive these from wf-web-prod too).
         env:
           VITE_GA_ID: ${{ secrets.GA4_MEASUREMENT_ID }}
           VITE_COGNITO_USER_POOL_ID: ${{ secrets.VITE_COGNITO_USER_POOL_ID }}
           VITE_COGNITO_CLIENT_ID: ${{ secrets.VITE_COGNITO_CLIENT_ID }}
           VITE_COGNITO_DOMAIN: ${{ secrets.VITE_COGNITO_DOMAIN }}
-          VITE_WORKFORCE_AGENTS_API_BASE: ${{ secrets.VITE_WORKFORCE_AGENTS_API_BASE }}
-          # Issue #158 PR-α: SigV4 broker. When the operator populates
-          # VITE_COGNITO_IDENTITY_POOL_ID + VITE_WORKFORCE_CREDENTIALS_API_BASE
-          # secrets the SPA enables the credential vault + project archive
-          # surfaces; until then both render in a disabled-but-visible
-          # state per the per-component fallback in lib/sigv4.ts.
-          VITE_COGNITO_IDENTITY_POOL_ID: ${{ secrets.VITE_COGNITO_IDENTITY_POOL_ID }}
-          VITE_WORKFORCE_CREDENTIALS_API_BASE: ${{ secrets.VITE_WORKFORCE_CREDENTIALS_API_BASE }}
         run: npm run build:workforce
-
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Sync to S3
         # Hashed asset filenames (Vite's default) get a 1-year immutable

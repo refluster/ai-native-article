@@ -1806,8 +1806,14 @@ Outputs:
     Export:
       Name: !Sub wf-alarm-topic-arn-${Stage}
   AgentsApiUrl:
-    Description: Base URL of the agents HTTP API.
-    Value: !Sub https://${WfAgentsHttpApi}.execute-api.${AWS::Region}.amazonaws.com
+    # Includes the stage path so the value is directly usable as the SPA's
+    # API base (the console deploy reads this output into
+    # VITE_WORKFORCE_AGENTS_API_BASE). HTTP API invoke URLs are
+    # https://{id}.execute-api.{region}.amazonaws.com/{stage} — omitting
+    # /{stage} yields a 404 with no CORS headers, which the browser
+    # surfaces as an opaque "Failed to fetch".
+    Description: Base URL of the agents HTTP API, including the stage path.
+    Value: !Sub https://${WfAgentsHttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}
     Export:
       Name: !Sub wf-agents-api-url-${Stage}
   AgentsApiId:
@@ -1822,8 +1828,10 @@ Outputs:
     Export:
       Name: !Sub wf-agents-api-id-${Stage}
   CredentialsApiUrl:
-    Description: Base URL of the credentials write HTTP API. All routes are AWS_IAM-authorised (operator only).
-    Value: !Sub https://${WfCredentialsHttpApi}.execute-api.${AWS::Region}.amazonaws.com
+    # Includes the stage path — see AgentsApiUrl. Read into
+    # VITE_WORKFORCE_CREDENTIALS_API_BASE by the console deploy.
+    Description: Base URL of the credentials write HTTP API (incl. stage path). All routes are AWS_IAM-authorised (operator only).
+    Value: !Sub https://${WfCredentialsHttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}
     Export:
       Name: !Sub wf-credentials-api-url-${Stage}
   CredentialsApiId:
