@@ -99,7 +99,7 @@ afterEach(() => {
 // ─── loading branch ───────────────────────────────────────────────────
 
 describe('loading branch', () => {
-  it('renders 読み込み中… while fetchCredentials is pending', async () => {
+  it('renders the loading indicator while fetchCredentials is pending', async () => {
     let resolve: (items: CredentialMetadata[]) => void = () => {};
     mockedFetch.mockReturnValueOnce(
       new Promise((r) => {
@@ -108,13 +108,13 @@ describe('loading branch', () => {
     );
     render(<CredentialVault projectId="foo" />);
 
-    expect(screen.getByText('読み込み中…')).toBeInTheDocument();
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
 
     await act(async () => {
       resolve([]);
     });
     await waitFor(() => {
-      expect(screen.queryByText('読み込み中…')).not.toBeInTheDocument();
+      expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
     });
   });
 });
@@ -128,12 +128,12 @@ describe('error branch (initial fetch)', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('クレデンシャル一覧の取得に失敗しました。'),
+        screen.getByText('Failed to load credentials.'),
       ).toBeInTheDocument();
     });
     expect(screen.getByText(/agents-api 500/)).toBeInTheDocument();
-    // Re-fetch buttons (both header + inline) are labeled 再取得.
-    const refetchButtons = screen.getAllByRole('button', { name: '再取得' });
+    // Re-fetch buttons (both header + inline) are labeled REFETCH.
+    const refetchButtons = screen.getAllByRole('button', { name: 'REFETCH' });
     expect(refetchButtons.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -143,13 +143,13 @@ describe('error branch (initial fetch)', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('クレデンシャル一覧の取得に失敗しました。'),
+        screen.getByText('Failed to load credentials.'),
       ).toBeInTheDocument();
     });
 
     mockedFetch.mockResolvedValueOnce([]);
     const user = userEvent.setup();
-    const refetchButtons = screen.getAllByRole('button', { name: '再取得' });
+    const refetchButtons = screen.getAllByRole('button', { name: 'REFETCH' });
     await user.click(refetchButtons[refetchButtons.length - 1]);
 
     await waitFor(() => {
@@ -166,13 +166,13 @@ describe('empty / unprovisioned-only', () => {
     render(<CredentialVault projectId="foo" />);
 
     await waitFor(() => {
-      expect(screen.getByText('0 / 5 プロビジョン済み')).toBeInTheDocument();
+      expect(screen.getByText('0 / 5 provisioned')).toBeInTheDocument();
     });
     const createButtons = screen.getAllByRole('button', { name: 'CREATE' });
     expect(createButtons).toHaveLength(5);
     expect(
       screen.getByText(
-        'クレデンシャルはまだ登録されていません。下の各タイプから「作成」してください。',
+        'No credentials registered yet. Use “CREATE” on each type below.',
       ),
     ).toBeInTheDocument();
   });
@@ -188,7 +188,7 @@ describe('provisioned rows', () => {
     render(<CredentialVault projectId="foo" />);
 
     await waitFor(() => {
-      expect(screen.getByText('1 / 5 プロビジョン済み')).toBeInTheDocument();
+      expect(screen.getByText('1 / 5 provisioned')).toBeInTheDocument();
     });
     expect(screen.getByRole('button', { name: 'ROTATE' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'DELETE' })).toBeInTheDocument();
@@ -203,7 +203,7 @@ describe('provisioned rows', () => {
     render(<CredentialVault projectId="foo" />);
 
     await waitFor(() => {
-      expect(screen.getByText('2 / 5 プロビジョン済み')).toBeInTheDocument();
+      expect(screen.getByText('2 / 5 provisioned')).toBeInTheDocument();
     });
     expect(screen.getAllByRole('button', { name: 'ROTATE' })).toHaveLength(2);
     expect(screen.getAllByRole('button', { name: 'CREATE' })).toHaveLength(3);
@@ -224,7 +224,7 @@ describe('rotate modal', () => {
     await user.click(screen.getByRole('button', { name: 'ROTATE' }));
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText(/ローテート — github\.token/)).toBeInTheDocument();
+    expect(screen.getByText(/ROTATE — github\.token/)).toBeInTheDocument();
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByPlaceholderText(/ghp_/)).toBeInTheDocument();
   });
@@ -239,7 +239,7 @@ describe('rotate modal', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'ROTATE' }));
 
-    const submit = screen.getByRole('button', { name: 'ローテートを実行' });
+    const submit = screen.getByRole('button', { name: 'Execute rotate' });
     expect(submit).toBeDisabled();
 
     const dialog = screen.getByRole('dialog');
@@ -273,7 +273,7 @@ describe('create modal', () => {
     const createButtons = screen.getAllByRole('button', { name: 'CREATE' });
     await user.click(createButtons[3]);
 
-    expect(screen.getByText(/作成 — notion\.integration_token/)).toBeInTheDocument();
+    expect(screen.getByText(/CREATE — notion\.integration_token/)).toBeInTheDocument();
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByPlaceholderText(/secret_/)).toBeInTheDocument();
     expect(within(dialog).getByPlaceholderText(/32-char hex/)).toBeInTheDocument();
@@ -298,7 +298,7 @@ describe('create modal', () => {
     const tokenInput = within(dialog).getByPlaceholderText(/ghp_/);
     await user.type(tokenInput, 'ghp_xxx');
 
-    await user.click(within(dialog).getByRole('button', { name: '作成を実行' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Execute create' }));
 
     await waitFor(() => {
       expect(mockedPut).toHaveBeenCalledWith(
@@ -323,9 +323,9 @@ describe('delete confirm', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'DELETE' }));
 
-    expect(screen.getByText('削除の確認')).toBeInTheDocument();
+    expect(screen.getByText('Confirm deletion')).toBeInTheDocument();
     expect(
-      screen.getByText(/AWS Secrets Manager の復元ウィンドウにより 7 日間は復元可能/),
+      screen.getByText(/recovery window keeps it recoverable for 7 days/),
     ).toBeInTheDocument();
   });
 
@@ -339,7 +339,7 @@ describe('delete confirm', () => {
     });
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'DELETE' }));
-    await user.click(screen.getByRole('button', { name: '削除を実行' }));
+    await user.click(screen.getByRole('button', { name: 'Execute delete' }));
 
     await waitFor(() => {
       expect(screen.getByText(/DELETED — /)).toBeInTheDocument();
@@ -369,11 +369,11 @@ describe('optimistic update + error', () => {
     const confirmInput = within(dialog).getAllByRole('textbox')[0];
     await user.type(confirmInput, 'ROTATE');
     await user.click(
-      within(dialog).getByRole('button', { name: 'ローテートを実行' }),
+      within(dialog).getByRole('button', { name: 'Execute rotate' }),
     );
 
     // Success banner appears immediately.
-    expect(screen.getByText('ローテートしました')).toBeInTheDocument();
+    expect(screen.getByText('Rotated')).toBeInTheDocument();
     await waitFor(() => {
       // Server response timestamp surfaces after the PUT resolves.
       expect(screen.getByText(/changed 2026-05-28/)).toBeInTheDocument();
@@ -399,7 +399,7 @@ describe('optimistic update + error', () => {
     const confirmInput = within(dialog).getAllByRole('textbox')[0];
     await user.type(confirmInput, 'ROTATE');
     await user.click(
-      within(dialog).getByRole('button', { name: 'ローテートを実行' }),
+      within(dialog).getByRole('button', { name: 'Execute rotate' }),
     );
 
     await waitFor(() => {

@@ -71,10 +71,10 @@ describe('ProjectArchiveButton', () => {
       <ProjectArchiveButton projectId="acme" status="active" onStatusChange={() => {}} />,
     );
     fireEvent.click(screen.getByRole('button', { name: /ARCHIVE/i }));
-    expect(screen.getByRole('dialog', { name: /アーカイブの確認/ })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /Confirm archive/ })).toBeInTheDocument();
     // Body cites the operational consequence — binding crontabs keep firing.
-    expect(screen.getByText(/バインディング crontab/)).toBeInTheDocument();
-    expect(screen.getByText(/実行の停止ではありません/)).toBeInTheDocument();
+    expect(screen.getByText(/binding crontab/)).toBeInTheDocument();
+    expect(screen.getByText(/does not stop execution/)).toBeInTheDocument();
   });
 
   it('opens the unarchive confirm dialog on click (different copy)', () => {
@@ -82,9 +82,9 @@ describe('ProjectArchiveButton', () => {
       <ProjectArchiveButton projectId="acme" status="archived" onStatusChange={() => {}} />,
     );
     fireEvent.click(screen.getByRole('button', { name: /UNARCHIVE/i }));
-    expect(screen.getByRole('dialog', { name: /アクティブ化の確認/ })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /Confirm activation/ })).toBeInTheDocument();
     expect(
-      screen.getByText(/リスト表示の既定に再び現れます/),
+      screen.getByText(/reappear in the default list view/),
     ).toBeInTheDocument();
   });
 
@@ -93,7 +93,7 @@ describe('ProjectArchiveButton', () => {
       <ProjectArchiveButton projectId="acme" status="active" onStatusChange={() => {}} />,
     );
     fireEvent.click(screen.getByRole('button', { name: /ARCHIVE/i }));
-    fireEvent.click(screen.getByRole('button', { name: /キャンセル/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Cancel/ }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(patchMock).not.toHaveBeenCalled();
   });
@@ -120,7 +120,7 @@ describe('ProjectArchiveButton', () => {
       <ProjectArchiveButton projectId="acme" status="active" onStatusChange={onChange} />,
     );
     fireEvent.click(screen.getByRole('button', { name: /ARCHIVE/i }));
-    fireEvent.click(screen.getByRole('button', { name: /アーカイブを実行/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Execute archive/ }));
 
     // Optimistic call should be synchronous (status flip happens before
     // the async patch resolves).
@@ -132,7 +132,7 @@ describe('ProjectArchiveButton', () => {
 
     // Dialog closes, success banner appears.
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.getByRole('status')).toHaveTextContent(/アーカイブしました/);
+    expect(screen.getByRole('status')).toHaveTextContent(/Archived/);
   });
 
   it('reverts on patch failure and surfaces API ERROR banner', async () => {
@@ -142,7 +142,7 @@ describe('ProjectArchiveButton', () => {
       <ProjectArchiveButton projectId="acme" status="active" onStatusChange={onChange} />,
     );
     fireEvent.click(screen.getByRole('button', { name: /ARCHIVE/i }));
-    fireEvent.click(screen.getByRole('button', { name: /アーカイブを実行/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Execute archive/ }));
 
     await waitFor(() => expect(onChange).toHaveBeenCalledTimes(2));
     // First call: optimistic flip to archived
@@ -161,10 +161,10 @@ describe('ProjectArchiveButton', () => {
       <ProjectArchiveButton projectId="acme" status="active" onStatusChange={() => {}} />,
     );
     fireEvent.click(screen.getByRole('button', { name: /ARCHIVE/i }));
-    fireEvent.click(screen.getByRole('button', { name: /アーカイブを実行/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Execute archive/ }));
 
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeNull());
-    const dismiss = screen.getByRole('button', { name: /エラーを閉じる/ });
+    const dismiss = screen.getByRole('button', { name: /Dismiss error/ });
     fireEvent.click(dismiss);
     expect(screen.queryByRole('alert')).toBeNull();
   });
@@ -178,7 +178,7 @@ describe('ProjectArchiveButton', () => {
       <ProjectArchiveButton projectId="acme" status="active" onStatusChange={() => {}} />,
     );
     fireEvent.click(screen.getByRole('button', { name: /ARCHIVE/i }));
-    const submit = screen.getByRole('button', { name: /アーカイブを実行/ });
+    const submit = screen.getByRole('button', { name: /Execute archive/ });
     fireEvent.click(submit);
 
     // Dialog auto-closed on submit (optimistic path) — so the only

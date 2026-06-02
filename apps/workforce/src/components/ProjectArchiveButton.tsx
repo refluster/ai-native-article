@@ -2,14 +2,14 @@
 //
 // Project CRUD UI workstream (PR-δ — final piece of the project CRUD set).
 // Renders ARCHIVE when the project is active, UNARCHIVE when archived.
-// Click → Japanese-first confirm dialog citing the operational consequence
-// (binding crons keep firing — archive is a list-visibility flag, not a
-// pause), → PATCH /projects/{id+} via signedFetch → optimistic flip via
-// the onStatusChange callback prop + non-modal banner on error/success.
+// Click → confirm dialog citing the operational consequence (binding
+// crons keep firing — archive is a list-visibility flag, not a pause),
+// → PATCH /projects/{id+} via signedFetch → optimistic flip via the
+// onStatusChange callback prop + non-modal banner on error/success.
 //
 // Pattern mirrors CredentialVault.tsx — same submit-guard, same disabled-
 // state token swap with opacity/cursor, same role="alert" banner shape,
-// same Japanese-first modal copy.
+// same English modal copy.
 
 import { useEffect, useRef, useState } from 'react';
 import { patchProjectStatus, type ProjectStatus } from '../lib/projects';
@@ -66,7 +66,7 @@ export default function ProjectArchiveButton({ projectId, status, onStatusChange
     onStatusChange(targetStatus, optimisticArchivedAt);
     setConfirm(null);
     setSuccess(
-      targetStatus === 'archived' ? 'アーカイブしました' : 'アクティブに戻しました',
+      targetStatus === 'archived' ? 'Archived' : 'Restored to active',
     );
 
     try {
@@ -121,7 +121,7 @@ export default function ProjectArchiveButton({ projectId, status, onStatusChange
           <button
             type="button"
             onClick={() => setError(null)}
-            aria-label="エラーを閉じる"
+            aria-label="Dismiss error"
             className="ml-auto font-wfmono text-[10px] text-wf-throwing hover:text-wf-on-surface"
           >
             ×
@@ -164,13 +164,13 @@ function ConfirmDialog({ kind, projectId, pending, onCancel, onConfirm }: Confir
     return () => window.removeEventListener('keydown', onKey);
   }, [onCancel, pending]);
 
-  const title = kind === 'archive' ? 'アーカイブの確認' : 'アクティブ化の確認';
+  const title = kind === 'archive' ? 'Confirm archive' : 'Confirm activation';
   const body =
     kind === 'archive'
-      ? `プロジェクト「${projectId}」をアーカイブします。バインディング crontab はそのまま実行され続け、archive はリスト表示の既定からの除外を意味します（実行の停止ではありません）。続行しますか？`
-      : `プロジェクト「${projectId}」をアクティブに戻します。リスト表示の既定に再び現れます。続行しますか？`;
+      ? `Archive project “${projectId}”. Its binding crontab keeps firing — archive only excludes it from the default list view (it does not stop execution). Continue?`
+      : `Restore project “${projectId}” to active. It will reappear in the default list view. Continue?`;
   const submitLabel =
-    kind === 'archive' ? 'アーカイブを実行' : 'アクティブ化を実行';
+    kind === 'archive' ? 'Execute archive' : 'Execute activation';
   const submitTone =
     kind === 'archive'
       ? 'border-wf-throwing/60 text-wf-throwing hover:bg-wf-throwing hover:text-wf-surface'
@@ -202,7 +202,7 @@ function ConfirmDialog({ kind, projectId, pending, onCancel, onConfirm }: Confir
             disabled={pending}
             className="font-wfmono text-[10px] uppercase tracking-[0.14em] px-3 py-2 border border-wf-outline-variant rounded-wf-sm text-wf-on-surface-variant hover:text-wf-on-surface disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            キャンセル
+            Cancel
           </button>
           <button
             ref={confirmRef}

@@ -117,11 +117,11 @@
         "scheduler": "external",
         "invoked_by": "api",
         "fired_from": "wf-orchestrator-tick",
-        "cron": "cron(20 * ? * * *)"
+        "cron": "cron(20 0/2 ? * * *)"
       },
       "routine_spec": "workforce/docs/routines/agent-runner.md",
       "project_id": "agent-workforce",
-      "note": "Hourly at :20 UTC — wf-orchestrator-tick batches CCR-bound tasks into a single POST to wf/ccr/agent-runner. project_id=agent-workforce bundles team-shared credentials (Epic-010 §5). feed-post writes directly to DDB via the authenticated POST /feed endpoint (post-feed.mjs) — no PR, no approval gate."
+      "note": "Every 2 hours at :20 UTC — wf-orchestrator-tick batches CCR-bound tasks into a single POST to wf/ccr/agent-runner. project_id=agent-workforce bundles team-shared credentials (Epic-010 §5). feed-post writes directly to DDB via the authenticated POST /feed endpoint (post-feed.mjs) — no PR, no approval gate."
     }
   ],
   "jd": {

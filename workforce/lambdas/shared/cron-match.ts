@@ -1,7 +1,7 @@
 // EventBridge cron expression matcher.
 //
-// The orchestrator-tick (Epic-006 S1) runs every 30 minutes and asks each
-// agent: "did your cron fire in the last 30 minutes?" Each agent's
+// The orchestrator-tick (Epic-006 S1) runs every 2 hours and asks each
+// agent: "did your cron fire in the last 120 minutes?" Each agent's
 // schedule_cron lives in DDB; this module is the data-level evaluator.
 //
 // Supports the EventBridge form `cron(Minutes Hours DayOfMonth Month DayOfWeek Year)`.
@@ -57,7 +57,7 @@ export function matchesNow(
   ];
 
   // Walk every minute in the past window (now, now-1min, ..., now-(W-1)min).
-  // windowMinutes is small (30 at v1) so this is trivially cheap. The first
+  // windowMinutes is small (120 at the 2-hourly tick) so this is trivially cheap. The first
   // iteration (i=0) sees `now` itself, so a cron firing exactly at this
   // minute is caught — even when ticks are slightly delayed.
   for (let i = 0; i < opts.windowMinutes; i++) {

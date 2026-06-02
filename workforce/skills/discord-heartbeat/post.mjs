@@ -6,7 +6,7 @@
 // Why a script and not LLM-built JSON: a heartbeat's value is "the
 // dispatch chain is alive" — that signal is meaningful only if every
 // fire produces structurally identical output. Letting an LLM re-build
-// the embed every hour wastes tokens and introduces drift (off-by-one
+// the embed every fire wastes tokens and introduces drift (off-by-one
 // hex color, missed field, etc.). The LLM in the CCR session does one
 // thing: `execSync('node post.mjs')`, then surfaces the exit code.
 //

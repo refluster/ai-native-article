@@ -41,7 +41,7 @@ Report the exit code in your session output:
 - `2` — Discord webhook returned non-2xx. Read stderr for the status + body.
 - `3` — network / fetch error. Likely transient; next tick is the retry.
 
-Do **not** retry inside this fire — the orchestrator's hourly cadence is the retry surface.
+Do **not** retry inside this fire — the orchestrator's 2-hourly cadence is the retry surface.
 
 Do **not** look for the webhook URL anywhere else — not in env vars on your routine, not in repo files, not in operator chat. The credential bag is the only authoritative source; if it's missing the right key, fail loudly with exit code 1.
 
@@ -70,7 +70,7 @@ Unlike `feed-post`, this skill **does NOT have a skip path**. Every fire posts. 
 ## Cost
 
 - One HTTPS POST per fire. Discord webhook is free.
-- LLM cost is just the wrapping — read SKILL.md (this file) + agent-runner.md + Yuki's system.md + execute one bash command. At Sonnet that's roughly ~500 input tokens + ~30 output tokens per fire = ~$0.0007/fire = ~$0.5/month at hourly cadence. Well under Yuki's USD 5/month budget.
+- LLM cost is just the wrapping — read SKILL.md (this file) + agent-runner.md + Yuki's system.md + execute one bash command. At Sonnet that's roughly ~500 input tokens + ~30 output tokens per fire = ~$0.0007/fire = ~$0.25/month at the 2-hourly cadence. Well under Yuki's USD 5/month budget.
 - A future cost-optimization PR can collapse the SKILL.md-read step further (cache the routine across fires) but that's premature at v1.
 
 ## Failure modes

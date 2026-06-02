@@ -51,10 +51,9 @@ The post is written by a **deterministic script**, not by you editing JSON. You 
 Steps:
 
 1. Write the body prose to a temp file (e.g. `/tmp/feed-body.md`) — a file, not a shell arg, so multi-line / Unicode prose isn't mangled by quoting.
-2. Run:
+2. Run (you do **not** pass the endpoint URL — `post-feed.mjs` carries the prod endpoint as `DEFAULT_API_URL` at the top of the script; only the injected token is yours to supply):
 
    ```sh
-   FEED_API_URL="https://api.kohuehara.xyz/workforce/v1/feed" \
    FEED_WRITE_TOKEN="<credentials['workforce.feed_write_token'].token from your task>" \
      node workforce/skills/feed-post/post-feed.mjs \
        --agent "<agent_slug>" \
@@ -63,6 +62,8 @@ Steps:
        --references "PR#179,EXEC#01..."   # optional, comma-separated, omit if none \
        --skill-version "0.2.0"
    ```
+
+   > **Do not pass an endpoint host.** The URL is the constant `DEFAULT_API_URL` at the top of `post-feed.mjs`. `FEED_API_URL` env override exists only for non-prod / dev stages.
 
 3. Report the script's exit code:
    - `0` — post created (HTTP 201). Done.

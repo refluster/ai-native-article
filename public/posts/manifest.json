@@ -1,5 +1,15 @@
 [
   {
+    "slug": "e110ebf39c7e",
+    "title": "テスラとxAIの新技術「マクロハード」：自律的なソフトウェア企業の未来",
+    "type": "explanation",
+    "category": "A: Macrohard",
+    "date": "2026-04-20",
+    "abstract": "Joint Tesla-xAI system using Grok and AI4 chips to emulate entire software companies autonomously.",
+    "image": "/posts/images/e110ebf39c7e.jpg",
+    "sourceUrls": "https://www.technology.org/2026/03/12/elon-musk-launches-macrohard-a-tesla-xai-hybrid-built-to-clone-entire-software-companies/"
+  },
+  {
     "slug": "c202d6ce6555",
     "title": "1ビットボンサイ：業界を変える1ビットLLMの商業的実現",
     "type": "explanation",
@@ -8,6 +18,46 @@
     "abstract": "The article discusses the launch of Bonsai 8B, a new AI model designed to enhance hyper-productivity in various industries. It highlights the innovative features of the model and its potential applications in automating complex tasks.",
     "image": "/posts/images/c202d6ce6555.jpg",
     "sourceUrls": "https://prismml.com/news/bonsai-8b"
+  },
+  {
+    "slug": "dbc6c1cd4119",
+    "title": "AIの時代における技術リーダーシップの変容",
+    "type": "explanation",
+    "category": "B",
+    "date": "2026-04-06",
+    "abstract": "The article discusses the evolving role of technology leaders in the era of AI, emphasizing the blend of product management and engineering roles. It highlights how AI is reshaping responsibilities and expectations within organizations.",
+    "image": "/posts/images/dbc6c1cd4119.jpg",
+    "sourceUrls": "https://www.latent.space/p/pmarca"
+  },
+  {
+    "slug": "c147314e5e76",
+    "title": "AI時代の職業変革とリーダーシップの再定義",
+    "type": "analysis",
+    "category": "職業変革 × 技術リーダーシップ",
+    "date": "2026-04-06",
+    "abstract": "# AI時代の職業変革と技術リーダーシップの進化\n\n## 要旨\nAIの急速な進展は、技術業界における職業の変革とリーダーシップのスタイルに深刻な影響を与えています。本記事では、レイオフの背景、技術リーダーの役割の変化、新しいAIモデルの商業的実現を通じて、これらの現象が同じ原理で説明できることを示します。\n\n## 導入\n2025年における技術業界では、245,000人の労働者がレイオフされ、その4",
+    "image": "/posts/images/c147314e5e76.jpg",
+    "sourceUrls": "https://www.techtimes.com/articles/315282/20260321/tech-layoffs-surge-while-ai-jobs-soar-key-trends-shaping-2026-tech-industry.htm, https://www.latent.space/p/pmarca, https://prismml.com/news/bonsai-8b"
+  },
+  {
+    "slug": "d0c0c7c8aed0",
+    "title": "AI時代における役割変化と新たな戦略",
+    "type": "analysis",
+    "category": "組織変革 × 技術革新",
+    "date": "2026-04-06",
+    "abstract": "# AI時代の新たな原理：組織変革と技術革新が交差する地点\n\n## 要旨\nAI技術の進化は、組織の職務定義やエンジニアの役割、さらには職場の構造を変革する原理を生んでいる。本記事では、異なる視点からの事実を統一的に説明し、今後の組織と技術の未来を予測する。\n\n## 導入\n最近のAI関連の議論では、肩書きの重要性やエンジニアの役割の変化、職場でのレイオフとAI職の増加が取り上げられています。一見無関",
+    "image": "/posts/images/d0c0c7c8aed0.jpg",
+    "sourceUrls": "https://a16z.com/forward-deployed-job-titles/, https://www.thoughtworks.com/en-us/insights/articles/preparing-your-team-for-the-agentic-software-development-life-cycle, https://www.dwarkesh.com/p/dario-amodei-2, https://www.techtimes.com/articles/315282/20260321/tech-layoffs-surge-while-ai-jobs-soar-key-trends-shaping-2026-tech-industry.htm"
+  },
+  {
+    "slug": "c5617b890edb",
+    "title": "AI時代のエンジニアリング進化と学びの未来",
+    "type": "analysis",
+    "category": "技術革新 × 教育・学習",
+    "date": "2026-04-06",
+    "abstract": "# AI時代のエンジニアリングと倫理的判断の進化\n\n## 要旨\nAI技術の進化はエンジニアの役割を根本的に変える可能性を秘めている。DeloitteやJensen Huangの見解、Claude Code流出の教訓を通じて、これらの現象は共通の原理に基づいていると考えられる。\n\n## 導入\n最近、Deloitteが提唱した「制約なきAI時代」の工学、NVIDIAのJensen Huang氏のAI進",
+    "image": "/posts/images/c5617b890edb.jpg",
+    "sourceUrls": "https://www.deloitte.com/us/en/services/consulting/articles/future-of-software-engineering.html, https://lexfridman.com/jensen-huang-transcript/, https://startuphub.ai/ai-news/artificial-intelligence/2026/claude-code-leak-what-developers-can-learn"
   },
   {
     "slug": "ecb31b0773df",

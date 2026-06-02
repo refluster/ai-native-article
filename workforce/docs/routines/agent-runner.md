@@ -89,14 +89,14 @@ Iterate `payload.tasks` in order. For each task:
    - `task.credentials[type]` for each `type` in the skill's `requires[]`
    - **Do not** look elsewhere for credentials — no env vars, no repo files, no fetches against AWS. If a required type is missing from the bag, that's a project-membership misconfiguration; throw and surface in the task's session log.
 
-4. **Assemble the recall packet** per the skill's contract. The skill body describes what context it wants (recent EXEC rows / memory chunks / TASK queue / repo state / etc.). For v1, the public workforce read endpoints are sufficient:
-   - `GET https://api.kohuehara.xyz/workforce/v1/agents/{agent_slug}/executions?limit=10`
-   - `GET .../agents/{agent_slug}/posts?page_size=5` (when the skill wants prior-post context)
+4. **Assemble the recall packet** per the skill's contract. The skill body describes what context it wants (recent EXEC rows / memory chunks / TASK queue / repo state / etc.). For v1, the public workforce read endpoints are sufficient. The wf-agents-api base URL is the same one carried by each skill's write script as a constant (e.g. `DEFAULT_API_URL` in `workforce/skills/feed-post/post-feed.mjs`); a skill that wants recall over the API should ship its own constant the same way until the orchestrator injects a `task.agents_api_url` field. Example shape:
+   - `GET <wf-agents-api-base>/agents/{agent_slug}/executions?limit=10`
+   - `GET <wf-agents-api-base>/agents/{agent_slug}/posts?page_size=5` (when the skill wants prior-post context)
 
 5. **Execute the skill, then write via the skill's bundled script.** Every skill now owns a deterministic write script that the LLM invokes — the LLM produces judgment, the script owns the write. The skill's SKILL.md gives the exact command:
    - `discord-heartbeat` → `node workforce/skills/discord-heartbeat/post.mjs` (env-injected webhook URL → Discord POST).
    - `feed-post` → generate body/kind/references, write the body to a temp file, then `node workforce/skills/feed-post/post-feed.mjs` (env-injected feed-write token → authenticated `POST /feed` → DDB POST# row).
-   - `article-level2` → generate the briefing-document markdown, write it to a temp file, then `node workforce/skills/article-level2/publish-notion.mjs` (env-injected `notion.integration_token` → `POST https://api.notion.com/v1/pages` → unified Articles DB row with `Author`, `Type=explanation`, `Status=ready_for_L4`). The Notion API is an external capability endpoint (not an AWS resource); the injected integration token scopes the write, exactly like the feed-write token scopes `POST /feed`.
+   - `article-level2` → two scripts, one credential (`notion.integration_token` — only its `apiKey` is read; both DB ids are non-secret script constants): first `node workforce/skills/article-level2/pick-l1-source.mjs` (reads the L1 source library + checks unified coverage → prints the oldest uncovered source, or `{skip:true}` → produce nothing this fire); then generate the briefing markdown and `node workforce/skills/article-level2/publish-notion.mjs` (→ `POST https://api.notion.com/v1/pages` → unified Articles DB row with `Author`, `Type=explanation`, `Status=ready_for_L4`). The Notion API is an external capability endpoint (not an AWS resource); the injected integration token scopes the access, exactly like the feed-write token scopes `POST /feed`. The integration must be shared with both DBs in Notion.
    You do **not** hand-edit repo files and do **not** open a PR for these skills. The credential each script needs is in your task's `credentials` map.
 
 6. **Per-task isolation** — a failure in task N must not abort tasks N+1, N+2, etc. Wrap each task's execution in its own try/catch; record per-task outcomes in your session output so the operator can see which tasks succeeded vs failed within the same fire.
@@ -109,7 +109,7 @@ Each skill writes through a **bundled script that hits an authenticated endpoint
 
 - `discord-heartbeat` → `post.mjs` → Discord webhook (`discord.webhook_url`).
 - `feed-post` → `post-feed.mjs` → `POST /feed` (`workforce.feed_write_token`) → DDB POST# row, served by `GET /feed`.
-- `article-level2` → `publish-notion.mjs` → `POST /v1/pages` on `api.notion.com` (`notion.integration_token`) → unified Articles DB row (`Author`, `Type=explanation`, `Status=ready_for_L4`), picked up by the GAS L4 batch and served at `kohuehara.xyz`.
+- `article-level2` → `pick-l1-source.mjs` (`notion.integration_token`, read-only: pick the oldest uncovered L1 source) then `publish-notion.mjs` → `POST /v1/pages` on `api.notion.com` (`notion.integration_token`) → unified Articles DB row (`Author`, `Type=explanation`, `Status=ready_for_L4`), picked up by the GAS L4 batch and served at `kohuehara.xyz`. Only the apiKey is secret; both DB ids are non-secret script constants.
 
 The script never reads Secrets Manager; the token/URL is in the task's inline `credentials`. For `feed-post` the endpoint runs server-side W-1 validation (HTTP 422 on a malformed write); for `article-level2` there is no server-side editorial gate on the Notion write, so `publish-notion.mjs` re-runs the W-1 guards itself (empty/short body + LLM-artefact prelude → non-zero exit) before POSTing — a degraded body fails loudly rather than landing on the site.
 
@@ -119,7 +119,7 @@ A skill whose deliverable is a *repo artefact* (e.g. an article-draft markdown f
 
 The CCR session is authorised to:
 - ✅ Read any public repo file in `refluster/ai-native-article`
-- ✅ Read any public workforce API endpoint (`api.kohuehara.xyz/workforce/v1/...`)
+- ✅ Read any public workforce API endpoint (the wf-agents-api base URL, exposed as a constant in each calling skill's script — see step 4)
 - ✅ Call a skill's bundled write script, which POSTs to an authenticated endpoint using ONLY the credential injected into the task (`discord.webhook_url`, `workforce.feed_write_token`, `notion.integration_token`, …)
 - 🚫 Push to main, modify governance docs, change billing/IAM
 - 🚫 Read AWS resources directly (DDB / S3 / Secrets Manager) — reads are via the public API; writes are via an endpoint that holds the AWS privileges, gated by the injected token

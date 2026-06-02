@@ -1066,11 +1066,17 @@ Resources:
         - !Ref WfAlarmTopic
 
   # --- Orchestrator Lambda + tick rule (PR6c, Epic-006 S1) -------------------
-  # One EventBridge rule fires every 30 minutes. The orchestrator scans all
+  # One EventBridge rule fires every 2 hours. The orchestrator scans all
   # AGENT#*/META rows, evaluates each agent's schedule_cron against the
-  # 30-minute window, and async-invokes wf-agent-runner-{stage} for the
+  # 120-minute window, and async-invokes wf-agent-runner-{stage} for the
   # ones that fire. No per-agent CFN rules — workforce scales by adding
   # data rows, not template resources.
+  #
+  # The window MUST equal the tick interval (120m) so consecutive past-facing
+  # windows are contiguous — no gaps that would silently drop a cron fire.
+  # Trade-off of the 2-hourly tick: any binding whose cron is finer than 2h
+  # (currently only Yuki's hourly discord-ping) collapses to one dispatch per
+  # tick, i.e. an effective 2-hourly cadence. Accepted per operator decision.
   WfOrchestratorFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -1085,7 +1091,7 @@ Resources:
       Environment:
         Variables:
           RUNNER_FUNCTION_NAME: !Ref WfAgentRunnerFunction
-          TICK_WINDOW_MINUTES: "30"
+          TICK_WINDOW_MINUTES: "120"
           ENGINEER_SLUG: ren
           ENGINEER_OWNER: !Ref EngineerOwner
           ENGINEER_REPO: !Ref EngineerRepo
@@ -1132,8 +1138,8 @@ Resources:
           Type: Schedule
           Properties:
             Name: !Sub wf-orchestrator-tick-${Stage}
-            Description: Drives the workforce dispatch loop every 30 minutes.
-            Schedule: rate(30 minutes)
+            Description: Drives the workforce dispatch loop every 2 hours.
+            Schedule: rate(2 hours)
             Enabled: true
       Tags:
         workforce: !Ref Stage

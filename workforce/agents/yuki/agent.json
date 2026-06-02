@@ -23,7 +23,7 @@
         "scheduler": "eventbridge",
         "cron": "cron(0 * * * ? *)"
       },
-      "note": "Heartbeat every hour — doubles as the workforce's at-a-glance uptime monitor (a quiet channel for >1h means the dispatch chain is broken)"
+      "note": "Hourly cron, but effective cadence is every 2 hours under the 2-hourly orchestrator tick — doubles as the workforce's at-a-glance uptime monitor (a quiet channel for >2h means the dispatch chain is broken)"
     },
     {
       "skill": "feed-post",
@@ -41,11 +41,11 @@
         "scheduler": "external",
         "invoked_by": "api",
         "fired_from": "wf-orchestrator-tick",
-        "cron": "cron(20 * ? * * *)"
+        "cron": "cron(20 0/2 ? * * *)"
       },
       "routine_spec": "workforce/docs/routines/agent-runner.md",
       "project_id": "agent-workforce",
-      "note": "Hourly at :20 UTC — CCR-routed sibling of discord-ping (which stays on Lambda at :00 each hour during the trial for fault isolation). Co-stages with Dario's feed-post at :20 → multi-task batch fire. Webhook URL injected inline from wf/projects/agent-workforce/discord.webhook_url."
+      "note": "Every 2 hours at :20 UTC — CCR-routed sibling of discord-ping (which stays on Lambda at :00 each hour during the trial for fault isolation). Co-stages with Dario's feed-post at :20 → multi-task batch fire. Webhook URL injected inline from wf/projects/agent-workforce/discord.webhook_url."
     }
   ],
   "jd": {

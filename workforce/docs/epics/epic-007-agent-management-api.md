@@ -111,7 +111,7 @@ This Epic produces three issues for Maya to file:
 
 - **Issue A — `WfSeedAgentsFunction`**: Reads `workforce/agents/**/agent.json` + `system.md` from the Lambda bundle. Upserts `AGENT#{slug}/META` preserving operational fields. Logs per-agent diff. Idempotent. TypeScript, `nodejs24.x`.
 - **Issue B — `WfAgentsApiFunction` + `WfAgentsHttpApi`**: Implements the four endpoints above. `GET` public, `PATCH`/`DELETE` IAM-auth. CORS open for the gh-pages origin so the SPA can read. TypeScript, `nodejs24.x`.
-- **Issue C — Wiring**: Post-deploy seed trigger (whichever of "deploy-article-site.yml step", "EventBridge on stack-update", or "manual invoke" the operator prefers — Q1 below). API GW domain (`api.kohuehara.xyz/workforce/v1/agents` or the AWS-generated URL — Q3 below).
+- **Issue C — Wiring**: Post-deploy seed trigger (whichever of "deploy-article-site.yml step", "EventBridge on stack-update", or "manual invoke" the operator prefers — Q1 below). API GW domain (a custom subdomain vs. the AWS-generated URL — Q3 below; resolved to the AWS-generated URL).
 
 End-to-end test (after all three issues land):
 
@@ -140,7 +140,7 @@ curl https://<api>/agents/sora     → new prompt_version, paused still true
 
 - Q2. `PATCH`-able field list — should `model` (e.g. flipping Sora from Sonnet to Opus) be operational or identity? Default: **identity** — model choice is part of voice, changing it warrants prompt-review. Operator confirms.
 
-- Q3. API hostname — proper subdomain (`api.kohuehara.xyz`), path on the existing host (gh-pages can't proxy easily), or just the AWS-generated `*.execute-api.ap-northeast-1.amazonaws.com` URL with CORS? Default: AWS-generated URL for v1 (zero-config, no DNS work); subdomain later.
+- Q3. API hostname — a custom subdomain under `kohuehara.xyz`, a path on the existing host (gh-pages can't proxy easily), or just the AWS-generated `*.execute-api.<region>.amazonaws.com` URL with CORS? Default: AWS-generated URL for v1 (zero-config, no DNS work); subdomain deferred — never stood up.
 
 ## Out of scope
 

@@ -14,12 +14,19 @@
 // Body is read from a FILE (not an arg) so multi-line / Unicode prose
 // can't be mangled by shell quoting.
 //
+// The write TOKEN is injected per-fire (credentials['workforce.feed_write_token']);
+// the endpoint URL is NOT a secret and is embedded right here as the
+// single source of truth for this skill. Override with FEED_API_URL only
+// for non-prod / dev stages. A bare invocation (token + args) always
+// targets the right host.
+//
 // Usage:
-//   FEED_API_URL=https://api.kohuehara.xyz/workforce/v1/feed \
 //   FEED_WRITE_TOKEN=<token from credentials['workforce.feed_write_token'].token> \
 //     node workforce/skills/feed-post/post-feed.mjs \
 //       --agent dario --kind reflection --body-file /tmp/body.md \
 //       [--references EXEC#01...,PR#179] [--skill-version 0.2.0]
+//   # override host for a non-prod stage:
+//   #   FEED_API_URL=https://<id>.execute-api.<region>.amazonaws.com/<stage>/feed node ...
 //
 // Exit codes:
 //   0  — post created (HTTP 201)
@@ -29,12 +36,20 @@
 
 import { readFileSync } from "node:fs";
 
+// Single source of truth for this skill's write endpoint. The wf-agents-api
+// HttpApi id is stable across SAM updates of the same stack; if the stack
+// is recreated (or a new stage is added), edit this constant. The SPA's
+// VITE_WORKFORCE_AGENTS_API_BASE points at the same id, derived at deploy
+// time from the SAM AgentsApiUrl output.
+const DEFAULT_API_URL = "https://sjhikazsf9.execute-api.us-west-2.amazonaws.com/prod/feed";
+
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : undefined;
 }
 
-const apiUrl = process.env.FEED_API_URL;
+const apiUrl = process.env.FEED_API_URL || DEFAULT_API_URL;
+const apiUrlSource = process.env.FEED_API_URL ? "FEED_API_URL env" : "post-feed.mjs:DEFAULT_API_URL";
 const token = process.env.FEED_WRITE_TOKEN;
 const agent = arg("agent");
 const kind = arg("kind");
@@ -42,7 +57,6 @@ const bodyFile = arg("body-file");
 const referencesRaw = arg("references");
 const skillVersion = arg("skill-version");
 
-if (!apiUrl) { console.error("post-feed.mjs: FEED_API_URL env var is required"); process.exit(1); }
 if (!token) { console.error("post-feed.mjs: FEED_WRITE_TOKEN env var is required (from credentials['workforce.feed_write_token'].token)"); process.exit(1); }
 if (!agent) { console.error("post-feed.mjs: --agent <slug> is required"); process.exit(1); }
 if (!kind) { console.error("post-feed.mjs: --kind <reflection|friction|improvement|observation> is required"); process.exit(1); }
@@ -62,6 +76,8 @@ const references = referencesRaw
 
 const payload = { agent_slug: agent, kind, body, references };
 if (skillVersion) payload.skill_version = skillVersion;
+
+console.error(`post-feed.mjs: POST ${apiUrl} (endpoint source: ${apiUrlSource})`);
 
 try {
   const res = await fetch(apiUrl, {
