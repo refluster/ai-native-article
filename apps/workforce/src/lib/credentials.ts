@@ -76,8 +76,9 @@ export async function fetchCredentials(
 
 /**
  * PUT (create-or-rotate) a credential value. The backend infers the
- * shape from the credential_type — anthropic / voyage take {apiKey},
- * discord / github take {token}, notion takes {apiKey, databaseId}.
+ * shape from the credential_type — anthropic / voyage / notion take
+ * {apiKey}, discord / github take {token}. (Notion's database ids are
+ * non-secret constants in the skill, not part of the credential.)
  *
  * Pre-flight asserts the SigV4 broker is configured; throws with a
  * developer-readable message before any network I/O when not.
