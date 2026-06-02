@@ -1,0 +1,75 @@
+---
+name: {{NAME}}
+description: {{DESCRIPTION}}
+---
+
+# {{NAME}}
+
+> **This is a Cadence skill** (固有名詞: see `.claude/skills/cadence-forge/references/cadence-archetype.md`).
+> It is fired by EventBridge → `wf-orchestrator-tick` → the generic `agent-runner`
+> CCR routine, which composes your runtime prompt from (persona `system.md` ×
+> this `SKILL.md` × binding `config` × project credentials). The LLM owns the
+> judgment; the bundled `{{WRITE_SCRIPT}}` owns the write. No PR, no AWS access
+> in-session — just the one project-scoped capability credential
+> (`{{CREDENTIAL_KEY}}`) injected into your task.
+
+<!-- ───────────────────────────────────────────────────────────────────────
+     SCAFFOLD STUB. Replace every TODO below with the real contract before the
+     first fire. The four invariants this body MUST honour (or you've drifted
+     out of the archetype — see references/cadence-archetype.md §invariants):
+       1. Read a recall packet, then perform ONE unit of judgment.
+       2. Have an explicit skip rule (when NOT to write this fire).
+       3. Enforce length + W-1 (no LLM-failure prelude) before the write.
+       4. Write ONLY via `{{WRITE_SCRIPT}}` using the injected credential.
+     ─────────────────────────────────────────────────────────────────────── -->
+
+## Read this first (the recall packet)
+
+TODO: describe the context the runner should assemble for you before you act —
+e.g. your N most recent `EXEC#*` rows, recent memory chunks, pending `TASK#*`
+rows, or repo/site state. Keep it single-agent and read-only (public workforce
+API endpoints; the agent-runner never touches AWS directly).
+
+## Do the one thing this Cadence does
+
+TODO: state the single judgment the LLM performs each fire — what it produces,
+its voice/shape, its hard length bounds. Cite the persona's stance from
+`system.md`. One unit per fire, not a summary of many.
+
+## The skip path — when NOT to write
+
+TODO: state the skip rule. A Cadence that has nothing worth doing this fire must
+**not call `{{WRITE_SCRIPT}}`** — producing no side effect is the correct W-4
+behaviour, not an error. (Skipping = not running the script.)
+
+## Write — run the script, do NOT hand-edit any file
+
+The write is owned by a **deterministic script**, not by you editing JSON/markdown.
+You produce the judgment; `{{WRITE_SCRIPT}}` owns the structurally-exact write to
+the authenticated endpoint (`DEFAULT_API_URL` constant at the top of the script).
+
+1. Write your generated body to a temp file (e.g. `/tmp/{{NAME}}-body.md`) — a
+   file, not a shell arg, so multi-line / Unicode prose isn't mangled by quoting.
+2. Run (the endpoint URL is the script's constant — you supply only the injected
+   credential):
+
+   ```sh
+   {{ENV_TOKEN}}="<credentials['{{CREDENTIAL_KEY}}'] from your task>" \
+     node workforce/skills/{{NAME}}/{{WRITE_SCRIPT}} \
+       --agent "<agent_slug>" \
+       --body-file /tmp/{{NAME}}-body.md \
+       --skill-version "0.1.0"
+   ```
+
+3. Report the script's exit code:
+   - `0` — written (HTTP 2xx). Done.
+   - `2` — endpoint rejected it (`401` auth / `422` validation). Read stderr; do not retry blindly.
+   - `1` / `3` — bad args / network error.
+
+The credential comes from your task's injected `credentials["{{CREDENTIAL_KEY}}"]` —
+never read it from anywhere else, never hard-code it.
+
+## When NOT to use this skill
+
+TODO: the boundary — what longer/different surface to reach for instead when the
+thought doesn't fit this Cadence's shape.
