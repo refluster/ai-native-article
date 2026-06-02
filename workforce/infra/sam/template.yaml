@@ -284,8 +284,17 @@ Resources:
         # adding PATCH here keeps the CORS surface honest if the operator
         # SPA later issues a PATCH from the browser via signed-SigV4.
         AllowMethods: [GET, PATCH, OPTIONS]
-        # `authorization` header is required for SigV4-signed browser PATCHes.
-        AllowHeaders: [content-type, authorization]
+        # SigV4-signed browser requests (aws4fetch) send more than
+        # `authorization`: the preflight `Access-Control-Request-Headers`
+        # also lists `x-amz-date`, `x-amz-content-sha256`, and (with
+        # temporary Cognito creds) `x-amz-security-token`. All must be in
+        # AllowHeaders or the browser blocks the actual request.
+        AllowHeaders:
+          - content-type
+          - authorization
+          - x-amz-date
+          - x-amz-content-sha256
+          - x-amz-security-token
       Auth:
         EnableIamAuthorizer: true
       Tags:
@@ -698,7 +707,16 @@ Resources:
           - https://workforce.kohuehara.xyz
           - http://localhost:5173
         AllowMethods: [GET, PUT, DELETE, OPTIONS]
-        AllowHeaders: [content-type, authorization]
+        # Every route here is AWS_IAM, so the SPA always calls via SigV4
+        # (aws4fetch). The preflight requests x-amz-* signing headers in
+        # addition to authorization; omitting them is what made the
+        # credentials preflight fail. Keep in sync with WfAgentsHttpApi.
+        AllowHeaders:
+          - content-type
+          - authorization
+          - x-amz-date
+          - x-amz-content-sha256
+          - x-amz-security-token
       Auth:
         EnableIamAuthorizer: true
         # Default every route on this API to AWS_IAM so a future route
