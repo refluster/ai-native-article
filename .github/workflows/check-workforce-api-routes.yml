@@ -1,0 +1,49 @@
+name: Check workforce API routes (drift blind spot)
+
+# Standing guard for the ApiGatewayV2::Api route drift blind spot.
+#
+# `detect-stack-drift` does NOT compare the routes inside an
+# AWS::ApiGatewayV2::Api OpenAPI body, so a route deleted out-of-band (or
+# never imported because of a greedy-route conflict) leaves the stack
+# reporting IN_SYNC while the live API 404s. The deploy workflow already
+# runs this same assertion right after `sam deploy`; this scheduled run
+# catches a regression that happens *between* deploys.
+#
+# Read-only: assumes the existing data-plane role via OIDC and only calls
+# cloudformation:GetTemplate / DescribeStackResource and apigatewayv2:GetRoutes.
+
+on:
+  schedule:
+    # Daily at 08:17 UTC — offset from the article gh-pages crons (06/12/18:17).
+    - cron: '17 8 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: check-workforce-api-routes
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Audit live routes vs deployed template
+        run: node workforce/scripts/check-api-routes.mjs
+        env:
+          STACK: wf-data-plane-prod
+          AWS_REGION: us-west-2

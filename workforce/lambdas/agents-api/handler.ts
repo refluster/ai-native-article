@@ -10,9 +10,9 @@
 //   GET    /skills                          list of skills (paginated, filterable)
 //   GET    /skills/{name}                   single skill
 //   GET    /projects                        list of projects (paginated, ?include_self=)
-//   GET    /projects/{id+}                  single project META + member/exec summary
-//   GET    /projects/{id+}/members          active members (?include_revoked=true for audit)
-//   GET    /projects/{id+}/executions       ledger (paginated, ?from=&to=&status=&agent=&skill=)
+//   GET    /projects/{id}                  single project META + member/exec summary
+//   GET    /projects/{id}/members          active members (?include_revoked=true for audit)
+//   GET    /projects/{id}/executions       ledger (paginated, ?from=&to=&status=&agent=&skill=)
 //   GET    /feed                            workforce activity feed, reverse-chrono (Epic-011 Story 5)
 //   GET    /feed/{post_id}                  single post + full body (Epic-011 Story 5)
 //   PATCH  /feed/{post_id}                  hide a post (IAM-auth at API GW; Epic-011 Story 5)
@@ -133,10 +133,18 @@ export async function handler(
     // when the API isn't on the $default stage — path becomes
     // "/prod/agents" — which would silently break list endpoints.
     // routeKey is the API GW HTTP API v2 route as configured.
-    // Projects path uses the greedy `{id+}` proxy because project ids
-    // include slashes (e.g. `self/ren`). API Gateway HTTP API v2 maps
-    // that to `pathParameters.id` regardless of slash count.
-    const projectId = event.pathParameters?.id;
+    // Projects path uses a non-greedy `{id}` param. The greedy `{id+}`
+    // proxy CANNOT be used here: a greedy parent (`GET /projects/{id+}`)
+    // conflicts with its child routes (`/projects/{id}/members` etc.) on
+    // HTTP API import — API Gateway silently drops the children (no
+    // warning), so they 404 in the live API even though CloudFormation
+    // reports the stack IN_SYNC (drift detection doesn't compare routes
+    // inside an ApiGatewayV2::Api body). Project ids that contain `/`
+    // (e.g. `self/ren`) are percent-encoded by the client
+    // (encodeProjectId = encodeURIComponent), so they still match a single
+    // `{id}` segment; decodeURIComponent restores the raw id here.
+    const rawProjectId = event.pathParameters?.id;
+    const projectId = rawProjectId ? decodeURIComponent(rawProjectId) : undefined;
     const postId = event.pathParameters?.post_id;
 
     if (routeKey === "GET /agents") return listAgents(event);
@@ -150,11 +158,11 @@ export async function handler(
     if (routeKey === "PATCH /agents/{slug}" && slug) return patchAgent(slug, event.body);
     if (routeKey === "DELETE /agents/{slug}" && slug) return deleteAgent(slug);
     if (routeKey === "GET /projects") return listProjects(event);
-    if (routeKey === "GET /projects/{id+}/members" && projectId) return listProjectMembers(projectId, event);
-    if (routeKey === "GET /projects/{id+}/executions" && projectId) return listProjectExecutions(projectId, event);
-    if (routeKey === "GET /projects/{id+}/credentials" && projectId) return listProjectCredentials(projectId);
-    if (routeKey === "PATCH /projects/{id+}" && projectId) return patchProject(projectId, event.body);
-    if (routeKey === "GET /projects/{id+}" && projectId) return getProjectRoute(projectId);
+    if (routeKey === "GET /projects/{id}/members" && projectId) return listProjectMembers(projectId, event);
+    if (routeKey === "GET /projects/{id}/executions" && projectId) return listProjectExecutions(projectId, event);
+    if (routeKey === "GET /projects/{id}/credentials" && projectId) return listProjectCredentials(projectId);
+    if (routeKey === "PATCH /projects/{id}" && projectId) return patchProject(projectId, event.body);
+    if (routeKey === "GET /projects/{id}" && projectId) return getProjectRoute(projectId);
     if (routeKey === "GET /feed") return listFeedRoute(event);
     if (routeKey === "GET /feed/{post_id}" && postId) return getFeedPostRoute(postId, event);
     // POST /feed is the runner's write path (Epic-011 feed-post → DDB).
@@ -526,7 +534,7 @@ async function listProjectExecutions(
 
 // --- Issue #158 PR-β: project credentials LIST + project PATCH ---------
 //
-// GET /projects/{id+}/credentials returns metadata for every registered
+// GET /projects/{id}/credentials returns metadata for every registered
 // credential type the operator has provisioned under this project's
 // Secrets Manager namespace. The response body is intentionally
 // metadata-only (matches the secret-leak guard from PR #137 GET) — no
@@ -538,7 +546,7 @@ async function listProjectExecutions(
 // is a future call if even the rotation-cadence signal turns out to be
 // sensitive in some context. R-N5 alarm path (CloudWatch) is unchanged.
 //
-// PATCH /projects/{id+} flips `status` between `active` / `archived`
+// PATCH /projects/{id} flips `status` between `active` / `archived`
 // (AWS_IAM auth). This replaces "run the seed step to archive" from
 // pre-Story-6 — the operator now archives from the SPA. Only `status`
 // is patchable; identity fields (`project_id`, `owner_agent`,
