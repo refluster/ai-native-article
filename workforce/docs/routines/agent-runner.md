@@ -248,3 +248,4 @@ For a multi-task verify (Dario + Yuki in the same batch), the inner envelope has
 - [`ccr-bootstrap.md`](../runbooks/ccr-bootstrap.md) — legacy per-skill routine setup (this doc supersedes the per-skill pattern for the CCR-by-API case).
 - [`pr-implement.md`](pr-implement.md), [`pr-review.md`](pr-review.md), [`pr-route.md`](pr-route.md) — peer routines for code work (also generic, fired by their own paths).
 - [`workforce/skills/feed-post/SKILL.md`](../../skills/feed-post/SKILL.md) — the first skill body this runner composes with.
+- [`.claude/skills/cadence-forge/references/cadence-archetype.md`](../../../.claude/skills/cadence-forge/references/cadence-archetype.md) — the **Cadence** archetype (固有名詞) every skill this runner fires conforms to, and [`cadence-forge`](../../../.claude/skills/cadence-forge/SKILL.md) — the skill that scaffolds new ones reproducibly.
