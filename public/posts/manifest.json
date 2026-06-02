@@ -40,6 +40,16 @@
     "sourceUrls": "https://a16z.com/forward-deployed-job-titles/, https://www.thoughtworks.com/en-us/insights/articles/preparing-your-team-for-the-agentic-software-development-life-cycle, https://www.dwarkesh.com/p/dario-amodei-2, https://www.techtimes.com/articles/315282/20260321/tech-layoffs-surge-while-ai-jobs-soar-key-trends-shaping-2026-tech-industry.htm"
   },
   {
+    "slug": "c5617b890edb",
+    "title": "AI時代のエンジニアリング進化と学びの未来",
+    "type": "analysis",
+    "category": "技術革新 × 教育・学習",
+    "date": "2026-04-06",
+    "abstract": "# AI時代のエンジニアリングと倫理的判断の進化\n\n## 要旨\nAI技術の進化はエンジニアの役割を根本的に変える可能性を秘めている。DeloitteやJensen Huangの見解、Claude Code流出の教訓を通じて、これらの現象は共通の原理に基づいていると考えられる。\n\n## 導入\n最近、Deloitteが提唱した「制約なきAI時代」の工学、NVIDIAのJensen Huang氏のAI進",
+    "image": "/posts/images/c5617b890edb.jpg",
+    "sourceUrls": "https://www.deloitte.com/us/en/services/consulting/articles/future-of-software-engineering.html, https://lexfridman.com/jensen-huang-transcript/, https://startuphub.ai/ai-news/artificial-intelligence/2026/claude-code-leak-what-developers-can-learn"
+  },
+  {
     "slug": "ecb31b0773df",
     "title": "AIの時代: 技術業界でのレイオフとAI職の急増",
     "type": "explanation",
