@@ -1,5 +1,15 @@
 [
   {
+    "slug": "e110ebf39c7e",
+    "title": "テスラとxAIの新技術「マクロハード」：自律的なソフトウェア企業の未来",
+    "type": "explanation",
+    "category": "A: Macrohard",
+    "date": "2026-04-20",
+    "abstract": "Joint Tesla-xAI system using Grok and AI4 chips to emulate entire software companies autonomously.",
+    "image": "/posts/images/e110ebf39c7e.jpg",
+    "sourceUrls": "https://www.technology.org/2026/03/12/elon-musk-launches-macrohard-a-tesla-xai-hybrid-built-to-clone-entire-software-companies/"
+  },
+  {
     "slug": "c202d6ce6555",
     "title": "1ビットボンサイ：業界を変える1ビットLLMの商業的実現",
     "type": "explanation",
