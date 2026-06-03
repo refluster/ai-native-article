@@ -70,9 +70,16 @@ genuinely separate DB — its id is a constant in `pick-l1-source.mjs`.)
 - **Never invent facts.** Every concrete figure, proper noun, date, or quotation
   must come verbatim from the supplied source. Do not abstract, round, or alter
   them.
-- If the source body could not be fetched (X.com posts, paywalls, JS-only pages),
-  work from the L1 summary *only* and do not supply facts, statistics, company
-  names, or people the summary doesn't contain.
+- **For JS-only / paywalled hosts (x.com, twitter.com, linkedin.com, and CDN
+  consent-wall sites like nytimes/ft/wsj/bloomberg/mckinsey), fetch via Jina
+  Reader first**: `https://r.jina.ai/<source-url>` returns pre-extracted clean
+  Markdown. This mirrors the GAS `L2_SOURCE_FETCH_VIA_READER` routing in
+  `gas/src/Code.gs` — a direct fetch of these hosts returns 402/HTML-bot-walls,
+  but the Jina-extracted body is groundable. Only fall back to the L1-summary-only
+  path if Jina *also* fails.
+- If the source body still could not be fetched, work from the L1 summary *only*
+  and do not supply facts, statistics, company names, or people the summary
+  doesn't contain.
 - If you cannot link to or quote the source, **do not publish** — escalate.
 - Objective, incisive tone. Avoid reviewer-voice hedges ("重要だ", "今後注目される")
   and throat-clearing preambles.
@@ -90,8 +97,14 @@ Steps:
    — a file, not a shell arg, so multi-line / Unicode prose isn't mangled by
    quoting. The first line must be the `# Title` H1 (used as the page Title and
    stripped from the body blocks).
-2. Run (the script writes to the unified Articles DB — its id is a built-in
-   constant, so only `NOTION_API_KEY` is needed):
+2. Write the **abstract** — a faithful 2–3 sentence lead (your `## Executive
+   Summary`, **not** the speculative L1 summary) — to a second temp file (e.g.
+   `/tmp/l2-abstract.txt`). This populates the `Abstract` column, matching how
+   other rows lead.
+3. Run (the script writes to the unified Articles DB — its id is a built-in
+   constant, so only `NOTION_API_KEY` is needed). Pass the picker's `category`
+   (a bare A–E letter) — the script canonicalises it to `"B: Role Blurring"` etc.
+   and fills both `Category` and `CategoriesMulti`, exactly like the GAS L2 write:
 
    ```sh
    NOTION_API_KEY="<credentials['notion.integration_token'].apiKey from your task>" \
@@ -100,12 +113,15 @@ Steps:
        --type explanation \
        --status ready \
        --body-file /tmp/l2-article.md \
+       --abstract-file /tmp/l2-abstract.txt \
+       --category "<category from the picker, e.g. B>" \
        --source-url "<sourceUrl from step 1>"   # omit if none
    ```
 
-3. Report the script's exit code:
+4. Report the script's exit code:
    - `0` — page created. The row carries `Author={agent_slug}, Type=explanation,
-     Status=ready` (queued; the GAS L4 batch flips it to `published`). Done.
+     Status=ready`, plus `Abstract` + `Category`/`CategoriesMulti` (queued; the
+     GAS L4 batch flips Status to `published`). Done.
    - `2` — W-1 editorial guard failed (empty/short body or LLM-artefact prelude),
      or `401/403` auth (project credential bag misconfigured). Read stderr; do not
      retry blindly.
