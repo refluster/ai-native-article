@@ -7,7 +7,7 @@
 //
 // It POSTs a new page into the unified Articles DB using the injected Notion
 // integration token. The row carries Author + Type=explanation +
-// Status=ready_for_L4 so the existing GAS L4 batch publishes it to
+// Status=ready (queued; the GAS L4 batch flips it to published) so it lands on
 // kohuehara.xyz and scripts/fetch-notion.mjs surfaces the byline (AuthorChip).
 //
 // The CCR session never reads Secrets Manager: NOTION_API_KEY arrives inline
@@ -28,7 +28,7 @@
 // Usage:
 //   NOTION_API_KEY="<credentials['notion.integration_token'].apiKey>" \
 //     node workforce/skills/article-level2/publish-notion.mjs \
-//       --author elena --type explanation --kind article \
+//       --author elena --type explanation --status ready \
 //       --body-file /tmp/article.md [--source-url https://...]
 //
 // Exit codes:
@@ -61,14 +61,23 @@ const apiKey = process.env.NOTION_API_KEY;
 const databaseId = UNIFIED_DB_ID;
 const author = arg("author");
 const articleType = arg("type") ?? "explanation";
-const kind = arg("kind") ?? "article";
+const status = arg("status") ?? "ready";
 const bodyFile = arg("body-file");
 const sourceUrl = arg("source-url");
+
+// Valid Status options on the unified Articles DB (mirror of the live select).
+// L2 explanations land as `ready` (queued, not yet live); the GAS L4 batch
+// flips them to `published`. (--status lets a backfill override.)
+const VALID_STATUS = new Set(["draft", "ready", "published", "archived"]);
 
 if (!apiKey) { console.error("publish-notion.mjs: NOTION_API_KEY env var is required (from credentials['notion.integration_token'].apiKey)"); process.exit(1); }
 if (!author) { console.error("publish-notion.mjs: --author <slug> is required"); process.exit(1); }
 if (articleType !== "explanation" && articleType !== "analysis") {
   console.error(`publish-notion.mjs: --type must be explanation|analysis (got "${articleType}")`);
+  process.exit(1);
+}
+if (!VALID_STATUS.has(status)) {
+  console.error(`publish-notion.mjs: --status must be one of ${[...VALID_STATUS].join("|")} (got "${status}")`);
   process.exit(1);
 }
 if (!bodyFile) { console.error("publish-notion.mjs: --body-file <path> is required"); process.exit(1); }
@@ -104,14 +113,20 @@ const bodyLines = lines.slice(0, h1Idx).concat(lines.slice(h1Idx + 1));
 
 const children = markdownToBlocks(bodyLines.join("\n"));
 
+// Property names mirror the live unified Articles DB exactly (same contract as
+// the GAS L2 write in gas/src/Code.gs): Title (title), Type/Status (select),
+// Author/SourceURLs (rich_text), Date. There is no Name/Kind/SourceURL(url)
+// column — writing those returns HTTP 400 validation_error.
 const properties = {
-  Name: { title: [{ text: { content: title.slice(0, 2000) } }] },
-  Author: { select: { name: author } },
+  Title: { title: [{ text: { content: title.slice(0, 2000) } }] },
+  Author: { rich_text: [{ text: { content: author } }] },
   Type: { select: { name: articleType } },
-  Kind: { select: { name: kind } },
-  Status: { select: { name: "ready_for_L4" } },
+  Status: { select: { name: status } },
+  Date: { date: { start: new Date().toISOString().slice(0, 10) } },
 };
-if (sourceUrl) properties.SourceURL = { url: sourceUrl };
+// Coverage (pick-l1-source.mjs) keys on SourceURLs rich_text, so the next fire
+// sees this source as covered and won't re-pick it.
+if (sourceUrl) properties.SourceURLs = { rich_text: [{ text: { content: sourceUrl } }] };
 
 try {
   const res = await fetch(`${NOTION_API}/pages`, {
@@ -127,7 +142,7 @@ try {
   if (res.ok) {
     let url = "";
     try { url = JSON.parse(text).url ?? ""; } catch { /* non-JSON ok body */ }
-    console.log(`publish-notion.mjs: created — Author=${author} Type=${articleType} "${title}" ${url}`);
+    console.log(`publish-notion.mjs: created — Author=${author} Type=${articleType} Status=${status} "${title}" ${url}`);
     process.exit(0);
   }
   if (res.status === 401 || res.status === 403) {

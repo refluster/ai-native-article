@@ -1,6 +1,6 @@
 ---
 name: article-level2
-description: Convert one L1 source entry into one L2 explanation (briefing-document) article in Japanese — the agent-workforce equivalent of the GAS L1→L2 batch. Use when an editorial-stream agent must turn an uncovered L1 source into a faithful, evidence-grounded explanation: an Executive Summary up front, source-specific section headings, and every number/name/date/quote taken verbatim from the source. Published to Notion as Type=explanation, Author={agent_slug}, Status=ready_for_L4.
+description: Convert one L1 source entry into one L2 explanation (briefing-document) article in Japanese — the agent-workforce equivalent of the GAS L1→L2 batch. Use when an editorial-stream agent must turn an uncovered L1 source into a faithful, evidence-grounded explanation: an Executive Summary up front, source-specific section headings, and every number/name/date/quote taken verbatim from the source. Published to Notion as Type=explanation, Author={agent_slug}, Status=ready.
 ---
 
 # article-level2
@@ -98,14 +98,14 @@ Steps:
      node workforce/skills/article-level2/publish-notion.mjs \
        --author "<agent_slug>" \
        --type explanation \
-       --kind article \
+       --status ready \
        --body-file /tmp/l2-article.md \
        --source-url "<sourceUrl from step 1>"   # omit if none
    ```
 
 3. Report the script's exit code:
    - `0` — page created. The row carries `Author={agent_slug}, Type=explanation,
-     Status=ready_for_L4`. Done.
+     Status=ready` (queued; the GAS L4 batch flips it to `published`). Done.
    - `2` — W-1 editorial guard failed (empty/short body or LLM-artefact prelude),
      or `401/403` auth (project credential bag misconfigured). Read stderr; do not
      retry blindly.
@@ -117,10 +117,12 @@ else, never hard-code it. (The DB ids are non-secret constants inside the
 scripts.) The script re-runs the W-1 guards before writing, so a degraded body
 fails loudly rather than landing on the site.
 
-**The page lands directly in Notion. No PR, no human-approval gate.** The existing
-GAS L4 batch picks up `Status=ready_for_L4` rows and publishes them to
-`kohuehara.xyz`; `scripts/fetch-notion.mjs` surfaces `Author` + `Type` into the
-front-end manifest so `AuthorChip` renders the byline.
+**The page lands directly in Notion. No PR, no human-approval gate.** The page is
+written to the unified Articles DB with the live schema (`Title`, `Author` and
+`SourceURLs` as `rich_text`, `Type`/`Status` as `select`, `Date`) — the same
+property contract as the GAS L2 write. The existing GAS L4 batch picks up the row
+and publishes it to `kohuehara.xyz`; `scripts/fetch-notion.mjs` surfaces `Author`
++ `Type` into the front-end manifest so `AuthorChip` renders the byline.
 
 ## When NOT to use
 
