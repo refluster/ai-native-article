@@ -152,7 +152,7 @@ export async function fetchAgentMemberships(slug: string): Promise<AgentMembersh
 
 // ─── Project archive / unarchive — Project CRUD UI (PR-δ) ───────────────
 //
-// PATCH /projects/{id+} (AWS_IAM auth). Body shape: { status: 'active' | 'archived' }.
+// PATCH /projects/{id} (AWS_IAM auth). Body shape: { status: 'active' | 'archived' }.
 // Returns the updated project view. Uses signedFetch from lib/sigv4 — the
 // agents-api PATCH route is AWS_IAM-protected per agents-api SAM events
 // table; the SigV4 broker (cognito identity pool + operator role) was

@@ -31,6 +31,12 @@
       "type": "string",
       "enum": ["active", "stale", "deprecated"]
     },
+    "archetype": {
+      "type": "string",
+      "enum": ["cadence"],
+      "description": "Optional named skill archetype. \"cadence\": a scheduled, persona-voiced skill fired by EventBridge → wf-orchestrator-tick → the generic agent-runner CCR routine, whose context is composed from (agent × skill × project) and whose side effect is a deterministic bundled write-script POSTing to an authenticated endpoint with a project-scoped credential (no PR, no AWS access in-session). feed-post is the canonical first instance; new Cadences are produced by the .claude/skills/cadence-forge skill. When present, validate-skills.mjs enforces the archetype's structural invariants (see the C-* rules there). Absent for skills that don't fit a named archetype.",
+      "default": null
+    },
     "executor": {
       "type": "string",
       "enum": ["llm-prose", "claude-code-routine", "deterministic"],

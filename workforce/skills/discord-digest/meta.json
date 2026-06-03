@@ -1,12 +1,16 @@
 {
-  "name": "discord-heartbeat",
+  "name": "discord-digest",
   "version": "0.1.0",
   "status": "active",
   "archetype": "cadence",
   "executor": "claude-code-routine",
   "cost_class": "small",
-  "owners": ["yuki"],
+  "owners": [
+    "priya"
+  ],
   "improvement_agent": null,
-  "created_at": "2026-05-31",
-  "requires": ["discord.webhook_url"]
+  "created_at": "2026-06-02",
+  "requires": [
+    "discord.webhook_url"
+  ]
 }

@@ -4,7 +4,7 @@
 // Renders ARCHIVE when the project is active, UNARCHIVE when archived.
 // Click → confirm dialog citing the operational consequence (binding
 // crons keep firing — archive is a list-visibility flag, not a pause),
-// → PATCH /projects/{id+} via signedFetch → optimistic flip via the
+// → PATCH /projects/{id} via signedFetch → optimistic flip via the
 // onStatusChange callback prop + non-modal banner on error/success.
 //
 // Pattern mirrors CredentialVault.tsx — same submit-guard, same disabled-

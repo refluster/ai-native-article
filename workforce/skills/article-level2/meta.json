@@ -2,6 +2,7 @@
   "name": "article-level2",
   "version": "0.1.0",
   "status": "active",
+  "archetype": "cadence",
   "executor": "llm-prose",
   "deliverable": {
     "type": "article",

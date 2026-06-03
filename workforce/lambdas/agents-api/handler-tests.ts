@@ -8,8 +8,8 @@
 //
 //   - routeKey dispatch correctness (5 new routes wire to the right
 //     handler function)
-//   - path-param parsing for greedy {id+} (project ids containing `/`
-//     like `self/ren` round-trip)
+//   - path-param parsing for non-greedy {id} (percent-encoded project ids
+//     containing `/` like `self/ren` decode back via decodeURIComponent)
 //   - query-string filter wiring (include_self, status, owner,
 //     include_revoked, status/agent/skill on executions)
 //   - 404 vs empty-list distinction (ghost project vs empty members)
@@ -399,12 +399,12 @@ describe("GET /projects (listProjects)", () => {
   });
 });
 
-// ─── GET /projects/{id+} ───────────────────────────────────────────────
+// ─── GET /projects/{id} ───────────────────────────────────────────────
 
-describe("GET /projects/{id+} (getProject)", () => {
+describe("GET /projects/{id} (getProject)", () => {
   it("returns 404 with `not_found` for a ghost project (distinct from 200-with-empty)", async () => {
     const res = await handler(
-      evt("GET /projects/{id+}", { id: "ghost" }),
+      evt("GET /projects/{id}", { id: "ghost" }),
     );
     expect(statusOf(res)).toBe(404);
     expect(bodyOf(res)).toMatchObject({ error: "not_found", project_id: "ghost" });
@@ -417,16 +417,16 @@ describe("GET /projects/{id+} (getProject)", () => {
       created_at: "2026-05-27T00:00:00.000Z",
     });
     const res = await handler(
-      evt("GET /projects/{id+}", { id: "self/ren" }),
+      evt("GET /projects/{id}", { id: "self/ren" }),
     );
     expect(statusOf(res)).toBe(200);
     expect(bodyOf(res)).toMatchObject({ project_id: "self/ren", owner_agent: "ren" });
   });
 });
 
-// ─── GET /projects/{id+}/members ───────────────────────────────────────
+// ─── GET /projects/{id}/members ───────────────────────────────────────
 
-describe("GET /projects/{id+}/members (listProjectMembers)", () => {
+describe("GET /projects/{id}/members (listProjectMembers)", () => {
   beforeEach(() => {
     rows.set(key("PROJECT#p", "META"), {
       pk: "PROJECT#p", sk: "META",
@@ -446,7 +446,7 @@ describe("GET /projects/{id+}/members (listProjectMembers)", () => {
 
   it("excludes revoked members by default", async () => {
     const res = await handler(
-      evt("GET /projects/{id+}/members", { id: "p" }),
+      evt("GET /projects/{id}/members", { id: "p" }),
     );
     const items = (bodyOf(res) as { items: Array<{ agent_slug: string }> }).items;
     expect(items.map((i) => i.agent_slug)).toEqual(["ren"]);
@@ -454,7 +454,7 @@ describe("GET /projects/{id+}/members (listProjectMembers)", () => {
 
   it("includes revoked members with ?include_revoked=true (audit query)", async () => {
     const res = await handler(
-      evt("GET /projects/{id+}/members", { id: "p" }, { include_revoked: "true" }),
+      evt("GET /projects/{id}/members", { id: "p" }, { include_revoked: "true" }),
     );
     const items = (bodyOf(res) as { items: Array<{ agent_slug: string; revoked_at?: string }> }).items;
     expect(items.map((i) => i.agent_slug).sort()).toEqual(["aoi", "ren"]);
@@ -469,16 +469,16 @@ describe("GET /projects/{id+}/members (listProjectMembers)", () => {
       created_at: "2026-05-27T00:00:00.000Z",
     });
     const res = await handler(
-      evt("GET /projects/{id+}/members", { id: "empty" }),
+      evt("GET /projects/{id}/members", { id: "empty" }),
     );
     expect(statusOf(res)).toBe(200);
     expect((bodyOf(res) as { items: unknown[] }).items).toEqual([]);
   });
 });
 
-// ─── GET /projects/{id+}/executions ────────────────────────────────────
+// ─── GET /projects/{id}/executions ────────────────────────────────────
 
-describe("GET /projects/{id+}/executions (listProjectExecutions)", () => {
+describe("GET /projects/{id}/executions (listProjectExecutions)", () => {
   function seedExec(ulid: string, status: string, agent: string, skill: string, startedAt: string) {
     rows.set(key("PROJECT#p", `EXEC#${ulid}`), {
       pk: "PROJECT#p", sk: `EXEC#${ulid}`,
@@ -496,7 +496,7 @@ describe("GET /projects/{id+}/executions (listProjectExecutions)", () => {
 
   it("returns executions newest-first (started_at desc)", async () => {
     const res = await handler(
-      evt("GET /projects/{id+}/executions", { id: "p" }),
+      evt("GET /projects/{id}/executions", { id: "p" }),
     );
     const items = (bodyOf(res) as { items: Array<{ exec_ulid: string }> }).items;
     expect(items.map((i) => i.exec_ulid)).toEqual(["01C", "01B", "01A"]);
@@ -504,7 +504,7 @@ describe("GET /projects/{id+}/executions (listProjectExecutions)", () => {
 
   it("?status= filters", async () => {
     const res = await handler(
-      evt("GET /projects/{id+}/executions", { id: "p" }, { status: "throw" }),
+      evt("GET /projects/{id}/executions", { id: "p" }, { status: "throw" }),
     );
     const items = (bodyOf(res) as { items: Array<{ exec_ulid: string }> }).items;
     expect(items.map((i) => i.exec_ulid)).toEqual(["01B"]);
@@ -512,7 +512,7 @@ describe("GET /projects/{id+}/executions (listProjectExecutions)", () => {
 
   it("?agent= + ?skill= compose (both filters applied)", async () => {
     const res = await handler(
-      evt("GET /projects/{id+}/executions", { id: "p" }, { agent: "ren", skill: "code-task-brief" }),
+      evt("GET /projects/{id}/executions", { id: "p" }, { agent: "ren", skill: "code-task-brief" }),
     );
     const items = (bodyOf(res) as { items: Array<{ exec_ulid: string }> }).items;
     expect(items.map((i) => i.exec_ulid).sort()).toEqual(["01A", "01B"]);
@@ -566,9 +566,9 @@ describe("route dispatch — negative paths", () => {
 });
 
 
-// ─── GET /projects/{id+}/credentials (Issue #158 PR-β A1) ──────────────
+// ─── GET /projects/{id}/credentials (Issue #158 PR-β A1) ──────────────
 
-describe("GET /projects/{id+}/credentials (listProjectCredentials)", () => {
+describe("GET /projects/{id}/credentials (listProjectCredentials)", () => {
   function seedProject(id: string) {
     rows.set(key(`PROJECT#${id}`, "META"), {
       pk: `PROJECT#${id}`,
@@ -589,7 +589,7 @@ describe("GET /projects/{id+}/credentials (listProjectCredentials)", () => {
 
   it("returns 404 for a ghost project (distinct from 200-with-empty)", async () => {
     const res = await handler(
-      evt("GET /projects/{id+}/credentials", { id: "ghost" }),
+      evt("GET /projects/{id}/credentials", { id: "ghost" }),
     );
     expect(statusOf(res)).toBe(404);
     expect(bodyOf(res)).toMatchObject({ error: "not_found", project_id: "ghost" });
@@ -607,7 +607,7 @@ describe("GET /projects/{id+}/credentials (listProjectCredentials)", () => {
     });
 
     const res = await handler(
-      evt("GET /projects/{id+}/credentials", { id: "acme" }),
+      evt("GET /projects/{id}/credentials", { id: "acme" }),
     );
     expect(statusOf(res)).toBe(200);
     const body = bodyOf(res) as {
@@ -633,7 +633,7 @@ describe("GET /projects/{id+}/credentials (listProjectCredentials)", () => {
     seedSecret("wf/projects/acme/github.token", { createdDate: "2026-05-01T00:00:00.000Z" });
 
     const res = await handler(
-      evt("GET /projects/{id+}/credentials", { id: "acme" }),
+      evt("GET /projects/{id}/credentials", { id: "acme" }),
     );
     expect(statusOf(res)).toBe(200);
     const items = (bodyOf(res) as { items: Array<{ credential_type: string }> }).items;
@@ -643,7 +643,7 @@ describe("GET /projects/{id+}/credentials (listProjectCredentials)", () => {
   it("returns 200 with empty items when nothing is provisioned (distinct from 404)", async () => {
     seedProject("empty-project");
     const res = await handler(
-      evt("GET /projects/{id+}/credentials", { id: "empty-project" }),
+      evt("GET /projects/{id}/credentials", { id: "empty-project" }),
     );
     expect(statusOf(res)).toBe(200);
     expect((bodyOf(res) as { items: unknown[] }).items).toEqual([]);
@@ -653,7 +653,7 @@ describe("GET /projects/{id+}/credentials (listProjectCredentials)", () => {
     seedProject("self/ren");
     seedSecret("wf/projects/self/ren/github.token", { createdDate: "2026-05-01T00:00:00.000Z" });
     const res = await handler(
-      evt("GET /projects/{id+}/credentials", { id: "self/ren" }),
+      evt("GET /projects/{id}/credentials", { id: "self/ren" }),
     );
     expect(statusOf(res)).toBe(200);
     const items = (bodyOf(res) as { items: Array<{ name: string }> }).items;
@@ -672,7 +672,7 @@ describe("GET /projects/{id+}/credentials (listProjectCredentials)", () => {
     });
 
     const res = await handler(
-      evt("GET /projects/{id+}/credentials", { id: "acme" }),
+      evt("GET /projects/{id}/credentials", { id: "acme" }),
     );
     const rawBody = typeof res === "string" ? res : (res as { body?: string }).body ?? "";
     for (const forbidden of ["SecretString", "\"value\"", "\"token\"", "\"apiKey\""]) {
@@ -681,9 +681,9 @@ describe("GET /projects/{id+}/credentials (listProjectCredentials)", () => {
   });
 });
 
-// ─── PATCH /projects/{id+} (Issue #158 PR-β A2) ────────────────────────
+// ─── PATCH /projects/{id} (Issue #158 PR-β A2) ────────────────────────
 
-describe("PATCH /projects/{id+} (patchProject)", () => {
+describe("PATCH /projects/{id} (patchProject)", () => {
   function seedProject(id: string, status: "active" | "archived" = "active") {
     rows.set(key(`PROJECT#${id}`, "META"), {
       pk: `PROJECT#${id}`,
@@ -696,7 +696,7 @@ describe("PATCH /projects/{id+} (patchProject)", () => {
     projectStatus.set(id, status);
   }
   function patchEvt(id: string, body: object | string): APIGatewayProxyEventV2 {
-    const e = evt("PATCH /projects/{id+}", { id });
+    const e = evt("PATCH /projects/{id}", { id });
     const ev = e as APIGatewayProxyEventV2 & { body?: string };
     ev.body = typeof body === "string" ? body : JSON.stringify(body);
     return e;
@@ -732,7 +732,7 @@ describe("PATCH /projects/{id+} (patchProject)", () => {
 
   it("returns 400 missing_body when the request has no body", async () => {
     seedProject("acme");
-    const e = evt("PATCH /projects/{id+}", { id: "acme" });
+    const e = evt("PATCH /projects/{id}", { id: "acme" });
     const res = await handler(e);
     expect(statusOf(res)).toBe(400);
     expect(bodyOf(res)).toMatchObject({ error: "missing_body" });

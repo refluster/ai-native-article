@@ -42,8 +42,20 @@ const META_REQUIRED = [
   "improvement_agent",
   "created_at",
 ];
-const META_OPTIONAL = ["deliverable", "requires"];
+const META_OPTIONAL = ["deliverable", "requires", "archetype"];
 const STATUSES = new Set(["active", "stale", "deprecated"]);
+// Named skill archetypes (固有名詞). A skill MAY declare one; when it does,
+// the C-* rules below enforce that archetype's structural shape so a
+// mis-built instance turns CI red (W-4 fail-loud) instead of half-working.
+// "cadence": EventBridge → orchestrator-tick → agent-runner CCR routine,
+// (agent × skill × project) context, deterministic write-script → authed
+// endpoint with a project-scoped credential. feed-post is instance #1;
+// new ones are scaffolded by .claude/skills/cadence-forge.
+const ARCHETYPES = new Set(["cadence"]);
+// A Cadence's side effect runs through a bundled deterministic write
+// script; its judgment comes from an LLM, so the executor is never
+// `deterministic` (which has no LLM call).
+const CADENCE_EXECUTORS = new Set(["llm-prose", "claude-code-routine"]);
 const EXECUTORS = new Set(["llm-prose", "claude-code-routine", "deterministic"]);
 const COST_CLASSES = new Set(["small", "medium", "large"]);
 const DELIV_TYPES = new Set([
@@ -308,6 +320,37 @@ for (const name of skillDirs) {
           v("J12-requires-duplicate", metaJson, `duplicate requires[] entry "${entry}"`);
         }
         seen.add(entry);
+      }
+    }
+  }
+
+  // ── archetype (固有名詞) + its structural invariants ──────────────────────
+  // `archetype` is optional. When present it must be a known archetype, and
+  // its C-* structural rules are enforced so a mis-built instance fails loud
+  // (W-4) rather than half-working. Skills with no archetype are unaffected.
+  if ("archetype" in meta && meta.archetype !== undefined && meta.archetype !== null) {
+    if (typeof meta.archetype !== "string" || !ARCHETYPES.has(meta.archetype)) {
+      v("J13-archetype-unknown", metaJson, `archetype "${meta.archetype}" not in {${[...ARCHETYPES].join(", ")}}`);
+    } else if (meta.archetype === "cadence") {
+      // C-1 — a Cadence's judgment is LLM-produced; executor is never
+      // `deterministic` (no LLM call).
+      if (!CADENCE_EXECUTORS.has(meta.executor)) {
+        v("C1-cadence-executor", metaJson, `archetype=cadence requires executor in {${[...CADENCE_EXECUTORS].join(", ")}} (got "${meta.executor}")`);
+      }
+      // C-2 — a Cadence writes through a project-scoped credential to an
+      // authenticated endpoint; an empty/absent requires[] means it has no
+      // capability token, so it can't be the canonical archetype.
+      if (!Array.isArray(meta.requires) || meta.requires.length === 0) {
+        v("C2-cadence-requires", metaJson, "archetype=cadence requires a non-empty requires[] (the project-scoped write credential its bundled script POSTs with)");
+      }
+      // C-3 — the write is owned by a bundled deterministic script, not by
+      // the LLM hand-editing files. Assert at least one *.mjs ships in the
+      // skill folder (the write script, e.g. feed-post/post-feed.mjs).
+      const hasWriteScript = readdirSync(dir).some(
+        (f) => f.endsWith(".mjs") && statSync(join(dir, f)).isFile(),
+      );
+      if (!hasWriteScript) {
+        v("C3-cadence-write-script", dir, "archetype=cadence requires a bundled deterministic write script (*.mjs) — the LLM produces judgment, the script owns the authenticated write");
       }
     }
   }

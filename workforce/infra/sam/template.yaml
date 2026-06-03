@@ -284,8 +284,17 @@ Resources:
         # adding PATCH here keeps the CORS surface honest if the operator
         # SPA later issues a PATCH from the browser via signed-SigV4.
         AllowMethods: [GET, PATCH, OPTIONS]
-        # `authorization` header is required for SigV4-signed browser PATCHes.
-        AllowHeaders: [content-type, authorization]
+        # SigV4-signed browser requests (aws4fetch) send more than
+        # `authorization`: the preflight `Access-Control-Request-Headers`
+        # also lists `x-amz-date`, `x-amz-content-sha256`, and (with
+        # temporary Cognito creds) `x-amz-security-token`. All must be in
+        # AllowHeaders or the browser blocks the actual request.
+        AllowHeaders:
+          - content-type
+          - authorization
+          - x-amz-date
+          - x-amz-content-sha256
+          - x-amz-security-token
       Auth:
         EnableIamAuthorizer: true
       Tags:
@@ -359,7 +368,7 @@ Resources:
               Resource:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/agent-workforce/workforce.feed_write_token-*
             # Issue #158 PR-β A1: project credentials LIST endpoint
-            # (`GET /projects/{id+}/credentials`) describes each
+            # (`GET /projects/{id}/credentials`) describes each
             # registered credential type's secret to surface metadata
             # (last_changed_at / created_date). DescribeSecret never
             # returns the SecretString, so the LIST stays metadata-only
@@ -427,8 +436,12 @@ Resources:
         # POST/DELETE/PATCH on projects are intentionally not exposed (see
         # handler.ts header). The credential vault lives in its own Lambda
         # (Story 2-C #91) so this Lambda's IAM scope stays narrow per R-N3.
-        # Project ids include slashes (e.g. `self/ren`) so the routes use
-        # the greedy `{id+}` proxy pattern.
+        # Routes use a non-greedy `{id}` param, NOT the greedy `{id+}`
+        # proxy: a greedy parent (`/projects/{id+}`) conflicts with its
+        # child routes (`/projects/{id}/members` etc.) on HTTP API import,
+        # so API Gateway silently drops the children. Project ids that
+        # contain `/` (e.g. `self/ren`) are percent-encoded by the client,
+        # so they still match a single `{id}` segment.
         ListAgentProjects:
           Type: HttpApi
           Properties:
@@ -456,19 +469,19 @@ Resources:
           Type: HttpApi
           Properties:
             ApiId: !Ref WfAgentsHttpApi
-            Path: /projects/{id+}
+            Path: /projects/{id}
             Method: GET
         ListProjectMembers:
           Type: HttpApi
           Properties:
             ApiId: !Ref WfAgentsHttpApi
-            Path: /projects/{id+}/members
+            Path: /projects/{id}/members
             Method: GET
         ListProjectExecutions:
           Type: HttpApi
           Properties:
             ApiId: !Ref WfAgentsHttpApi
-            Path: /projects/{id+}/executions
+            Path: /projects/{id}/executions
             Method: GET
         # Issue #158 PR-β: project credentials LIST (public read, metadata-only)
         # and project PATCH (AWS_IAM auth) so the operator can flip
@@ -477,13 +490,13 @@ Resources:
           Type: HttpApi
           Properties:
             ApiId: !Ref WfAgentsHttpApi
-            Path: /projects/{id+}/credentials
+            Path: /projects/{id}/credentials
             Method: GET
         PatchProject:
           Type: HttpApi
           Properties:
             ApiId: !Ref WfAgentsHttpApi
-            Path: /projects/{id+}
+            Path: /projects/{id}
             Method: PATCH
             Auth:
               Authorizer: AWS_IAM
@@ -698,7 +711,16 @@ Resources:
           - https://workforce.kohuehara.xyz
           - http://localhost:5173
         AllowMethods: [GET, PUT, DELETE, OPTIONS]
-        AllowHeaders: [content-type, authorization]
+        # Every route here is AWS_IAM, so the SPA always calls via SigV4
+        # (aws4fetch). The preflight requests x-amz-* signing headers in
+        # addition to authorization; omitting them is what made the
+        # credentials preflight fail. Keep in sync with WfAgentsHttpApi.
+        AllowHeaders:
+          - content-type
+          - authorization
+          - x-amz-date
+          - x-amz-content-sha256
+          - x-amz-security-token
       Auth:
         EnableIamAuthorizer: true
         # Default every route on this API to AWS_IAM so a future route

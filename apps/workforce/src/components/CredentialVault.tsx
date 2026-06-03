@@ -68,8 +68,11 @@ const SHAPE_HINTS: Record<CredentialTypeId, FieldSpec[]> = {
     },
   ],
   'notion.integration_token': [
+    // apiKey only. The Notion database ids are non-secret constants baked
+    // into the article-level2 skill (publish-notion.mjs / pick-l1-source.mjs,
+    // env-overridable), so the operator never enters a databaseId here — the
+    // only consumer reads credentials['notion.integration_token'].apiKey.
     { key: 'apiKey', label: 'apiKey', placeholder: 'secret_...', type: 'password' },
-    { key: 'databaseId', label: 'databaseId', placeholder: '32-char hex', type: 'text' },
   ],
   'voyage.api_key': [
     { key: 'apiKey', label: 'apiKey', placeholder: 'pa-...', type: 'password' },

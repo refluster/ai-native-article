@@ -32,6 +32,19 @@
         "cron": "cron(54 7 ? * * *)"
       },
       "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
+    },
+    {
+      "skill": "discord-digest",
+      "executor": "claude-code-routine",
+      "trigger": {
+        "scheduler": "external",
+        "invoked_by": "api",
+        "fired_from": "wf-orchestrator-tick",
+        "cron": "cron(0 9 ? * SUN *)"
+      },
+      "routine_spec": "workforce/docs/routines/agent-runner.md",
+      "project_id": "agent-workforce",
+      "note": "Weekly Sunday 18:00 JST (09:00 UTC) — Cadence via the CCR agent-runner. Reads the cross-team feed/executions over the public wf-agents-api and posts one weekly team digest embed; Discord webhook URL injected inline from wf/projects/agent-workforce/discord.webhook_url. Operator shares Priya into the project bag + flips Enabled at the observation-window start."
     }
   ],
   "jd": {

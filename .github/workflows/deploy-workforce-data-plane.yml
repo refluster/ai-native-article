@@ -88,3 +88,15 @@ jobs:
             --no-confirm-changeset \
             --no-fail-on-empty-changeset
         working-directory: workforce/infra/sam
+
+      - name: Verify live HTTP API routes match the deployed template
+        # Closes the ApiGatewayV2::Api drift blind spot: CloudFormation can
+        # report a successful deploy while silently dropping routes at import
+        # time (a greedy `{id+}` parent shadowing its `{id}/child` routes is
+        # how GET /projects/{id+}/members etc. 404'd with "no drift"). This
+        # asserts every route in the deployed template's Api body is actually
+        # live, and fails the deploy loudly (C-4) if not.
+        run: node workforce/scripts/check-api-routes.mjs
+        env:
+          STACK: wf-data-plane-prod
+          AWS_REGION: us-west-2

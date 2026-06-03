@@ -1,5 +1,25 @@
 [
   {
+    "slug": "c9c06e22f1db",
+    "title": "マクロハードAIの時代が到来！エロン・マスクが業務自動化の新たな未来を切り開く",
+    "type": "explanation",
+    "category": "A: Macrohard",
+    "date": "2026-04-21",
+    "abstract": "Platform powered by Grok and AI4 chips to automate workflows and emulate full company operations.",
+    "image": "/posts/images/c9c06e22f1db.jpg",
+    "sourceUrls": "https://www.analyticsinsight.net/news/elon-musk-unveils-macrohard-ai-to-run-entire-companies"
+  },
+  {
+    "slug": "fd101ede5ef3",
+    "title": "マクロハードの行き詰まり：XAIの展望と未来の機会",
+    "type": "explanation",
+    "category": "A: Macrohard",
+    "date": "2026-04-21",
+    "abstract": "Project stalled amid leadership changes, Tesla shifting focus to Digital Optimus AI agent.",
+    "image": "/posts/images/fd101ede5ef3.jpg",
+    "sourceUrls": "https://www.businessinsider.com/xai-macrohard-project-tesla-ai-agent-stalls-2026-3"
+  },
+  {
     "slug": "e110ebf39c7e",
     "title": "テスラとxAIの新技術「マクロハード」：自律的なソフトウェア企業の未来",
     "type": "explanation",
@@ -8,6 +28,36 @@
     "abstract": "Joint Tesla-xAI system using Grok and AI4 chips to emulate entire software companies autonomously.",
     "image": "/posts/images/e110ebf39c7e.jpg",
     "sourceUrls": "https://www.technology.org/2026/03/12/elon-musk-launches-macrohard-a-tesla-xai-hybrid-built-to-clone-entire-software-companies/"
+  },
+  {
+    "slug": "e5bac1c10276",
+    "title": "マクロハードの巨人計画：Colossus 2データセンターの展望と影響",
+    "type": "explanation",
+    "category": "A: Macrohard",
+    "date": "2026-04-20",
+    "abstract": "Colossus 2 data center progress toward 400MW computing power, branding Macrohard as a nod to challenge Microsoft.",
+    "image": "/posts/images/e5bac1c10276.jpg",
+    "sourceUrls": "https://www.tomshardware.com/tech-industry/artificial-intelligence/elon-musk-says-xai-will-have-more-ai-compute-than-everyone-else-combined-within-five-years-macrohard-branding-emblazoned-on-the-roof-of-the-colossus-2-data-center-in-nod-to-the-billionaires-ai-project-to-challenge-microsoft"
+  },
+  {
+    "slug": "c3c6dd74b40d",
+    "title": "エージェント型ソフトウェア開発ライフサイクルの未来を見据えて",
+    "type": "explanation",
+    "category": "E: Rethinking SDLC",
+    "date": "2026-04-20",
+    "abstract": "Thoughtworks: Agentic SDLC leads to smaller dev teams as AI agents take on coding tasks. Shift from individual productivity to designing specs, tests, and feedback loops for AI execution.",
+    "image": "/posts/images/c3c6dd74b40d.jpg",
+    "sourceUrls": "https://www.thoughtworks.com/en-us/insights/articles/preparing-your-team-for-agentic-software-development-life-cycle"
+  },
+  {
+    "slug": "daf32ef1132e",
+    "title": "エージェント型ソフトウェアと未来技術の融合",
+    "type": "analysis",
+    "category": "エージェント型ソフトウェア × 未来技術",
+    "date": "2026-04-20",
+    "abstract": "# エージェント型ソフトウェアの進化と未来技術の展望\n\n**要旨**  \nエージェント型ソフトウェア開発、データセンターの進化、そして自律的なソフトウェア企業の台頭は、一見無関係に見える。しかし、これらは「AIによる自動化と効率化」という共通の原理で結びついている。この記事では、その深層原理を探り、未来の技術的変化を予測する。\n\n## 導入\n\n近年、AI技術の進化は目覚ましく、特にエージェント型ソ",
+    "image": "/posts/images/daf32ef1132e.jpg",
+    "sourceUrls": "https://www.thoughtworks.com/en-us/insights/articles/preparing-your-team-for-agentic-software-development-life-cycle, https://www.tomshardware.com/tech-industry/artificial-intelligence/elon-musk-says-xai-will-have-more-ai-compute-than-everyone-else-combined-within-five-years-macrohard-branding-emblazoned-on-the-roof-of-the-colossus-2-data-center-in-nod-to-the-billionaires-ai-project-to-challenge-microsoft, https://www.technology.org/2026/03/12/elon-musk-launches-macrohard-a-tesla-xai-hybrid-built-to-clone-entire-software-companies/"
   },
   {
     "slug": "c202d6ce6555",
