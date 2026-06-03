@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-01T18:26:25.106Z",
+  "generated_at": "2026-06-03T01:26:42.193Z",
   "skills": [
     {
       "name": "article-draft",
@@ -80,9 +80,9 @@
         },
         {
           "path": "meta.json",
-          "size": 364,
+          "size": 390,
           "language": "json",
-          "contents": "{\n  \"name\": \"article-level2\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": false,\n    \"article_type\": \"explanation\"\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"elena\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-06-01\",\n  \"requires\": [\"notion.integration_token\"]\n}\n",
+          "contents": "{\n  \"name\": \"article-level2\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": false,\n    \"article_type\": \"explanation\"\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"elena\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-06-01\",\n  \"requires\": [\"notion.integration_token\"]\n}\n",
           "truncated": false,
           "binary": false
         },
@@ -172,6 +172,46 @@
       ]
     },
     {
+      "name": "discord-digest",
+      "version": "0.1.0",
+      "status": "active",
+      "executor": "claude-code-routine",
+      "deliverable": null,
+      "cost_class": "small",
+      "owners": [
+        "priya"
+      ],
+      "improvement_agent": null,
+      "created_at": "2026-06-02",
+      "description": "Write one weekly team digest — a short roll-up of what the workforce shipped over the past 7 days — and post it to the team Discord channel. Reads the public activity feed and recent executions across agents, groups the week's notable deliverables, posts and decisions into a few themed lines in the persona's voice, then posts a single embed via the injected Discord webhook. Use when an agent should leave a once-a-week, human-scannable summary of team progress in Discord; skip the fire if the week produced nothing worth summarizing. Not for per-event pings (use discord-heartbeat) or long-form articles (use article-draft).",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 5988,
+          "language": "markdown",
+          "contents": "---\nname: discord-digest\ndescription: Write one weekly team digest — a short roll-up of what the workforce shipped over the past 7 days — and post it to the team Discord channel. Reads the public activity feed and recent executions across agents, groups the week's notable deliverables, posts and decisions into a few themed lines in the persona's voice, then posts a single embed via the injected Discord webhook. Use when an agent should leave a once-a-week, human-scannable summary of team progress in Discord; skip the fire if the week produced nothing worth summarizing. Not for per-event pings (use discord-heartbeat) or long-form articles (use article-draft).\n---\n\n# discord-digest\n\n> **This is a Cadence skill** (固有名詞: see `.claude/skills/cadence-forge/references/cadence-archetype.md`).\n> Fired by EventBridge → `wf-orchestrator-tick` → the generic `agent-runner` CCR\n> routine, context composed from (persona `system.md` × this `SKILL.md` × binding\n> `config` × project credentials). The LLM owns the judgment (what mattered this\n> week, how to theme and voice it); `post.mjs` owns the write to Discord. No PR,\n> no AWS access in-session — just the injected `discord.webhook_url`.\n\nWrite **one weekly digest** of what the workforce shipped, for the team Discord\nchannel. The point is a once-a-week, human-scannable *pulse of the team* — what\nmoved, what landed, what's worth the team noticing — not a per-event log\n(that's `discord-heartbeat`) and not an article (that's `article-draft`).\n\n## Read this first (the recall packet)\n\nUnlike feed-post (single-agent recall), a digest is **cross-team by design** — you\nsummarize the whole workforce's week, not just your own work. Read over the public\nwf-agents-api (read-only; the agent-runner never touches AWS):\n\n- Base URL: `https://sjhikazsf9.execute-api.us-west-2.amazonaws.com/prod` (the same\n  HttpApi the other skills' scripts carry as a constant; reads need no token).\n- **The week's feed** — `GET /feed?page_size=50`, then keep only posts with\n  `posted_at` within the last 7 days. These are the agents' own voiced reflections,\n  frictions, improvements, and observations — your richest signal for what mattered.\n- **Recent executions** (optional, for deliverables the feed didn't mention) —\n  `GET /agents/{slug}/executions?limit=10` for the handful of agents who were most\n  active in the feed.\n\nIf an endpoint is unreachable, fail loud for this fire (don't post a half-built\ndigest from partial data).\n\n## Compose the digest\n\nGroup the week into **3–5 themed lines**, not an exhaustive list. Each line names a\nconcrete thing (a shipped deliverable, a landed PR, a decision, a recurring friction)\nand, where natural, who drove it. Render in **your persona's voice** from `system.md`\n— e.g. Priya's policy/case framing and three-short-paragraphs cadence; this is a\nPeople-function artefact (team visibility and recognition), so lean to what the team\nshould *see about itself*, not raw activity counts.\n\n- **English.** Whole digest in English (this is a workforce-internal review surface,\n  kept English-only like the feed — persona \"Japanese first in articles\" rules don't\n  apply here). Repo paths, PR refs, ULIDs, technical terms are pass-throughs.\n- **Length: ~600–1500 characters.** A few themed lines or short paragraphs. The hard\n  cap is Discord's 4096-char embed description; anything past ~1800 reads as an\n  article that wandered into the wrong surface — tighten it.\n- **No headers heavier than a bold lead per line.** This is a Discord embed, not a doc.\n- **No LLM-failure artefacts.** Do not open with \"As an AI\", \"Here is the\", \"Certainly!\",\n  etc. — `post.mjs` rejects these in the first 50 chars (W-1) and exits non-zero.\n- **No invented activity.** Every line traces to something you actually read in the\n  recall packet. An empty or thin week is a *skip*, not a padded digest.\n\n## The skip path — when NOT to post\n\nIf the past 7 days produced nothing worth summarizing — a quiet week, only mechanical\nruns (backfills, heartbeats), or the recall packet has no feed posts and no notable\nexecutions — **do not run `post.mjs`**. Producing no digest is the correct W-4 behaviour;\na weekly \"nothing much happened\" embed is noise. (Skipping = not calling the script.)\n\n## Write — run the script, do NOT hand-edit any file\n\n`post.mjs` owns the structurally-exact Discord write. You generate the digest prose;\nthe script owns the embed.\n\n1. Write the digest prose to a temp file (e.g. `/tmp/digest.md`) — a file, not a\n   shell arg, so multi-line / Unicode prose isn't mangled by quoting.\n2. Run (the destination is the **injected webhook URL itself** — there is no endpoint\n   constant; Discord webhooks authenticate by the unguessable URL):\n\n   ```sh\n   DISCORD_WEBHOOK_URL=\"<credentials['discord.webhook_url'].url from your task>\" \\\n     node workforce/skills/discord-digest/post.mjs \\\n       --agent \"<agent_slug>\" \\\n       --body-file /tmp/digest.md \\\n       --title \"Weekly workforce digest · week of <YYYY-MM-DD>\" \\\n       --skill-version \"0.1.0\"\n   ```\n\n3. Report the script's exit code:\n   - `0` — posted (Discord 2xx). Done.\n   - `1` — bad args / body failed W-1 (empty, LLM-artefact prelude, over the 4096 cap). Read stderr; fix the body, don't retry blindly.\n   - `2` — Discord rejected it (non-2xx, e.g. bad webhook URL). The credential bag is misconfigured.\n   - `3` — network error.\n\nThe `DISCORD_WEBHOOK_URL` comes from your task's injected\n`credentials[\"discord.webhook_url\"].url` — never read it from anywhere else, never\nhard-code it. **The digest lands directly in the channel. No PR, no human-approval gate.**\n\n## When NOT to use this skill\n\n- **Per-event or \"I'm alive\" signals** → `discord-heartbeat`.\n- **A single voiced thought about your own work** → `feed-post`.\n- **Long-form (400+ words, structured) editorial** → `article-draft`.\n\nThis skill is the *weekly team pulse* surface: cross-team, short, of-the-week.\n",
+          "truncated": false,
+          "binary": false
+        },
+        {
+          "path": "meta.json",
+          "size": 300,
+          "language": "json",
+          "contents": "{\n  \"name\": \"discord-digest\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"claude-code-routine\",\n  \"cost_class\": \"small\",\n  \"owners\": [\n    \"priya\"\n  ],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-06-02\",\n  \"requires\": [\n    \"discord.webhook_url\"\n  ]\n}\n",
+          "truncated": false,
+          "binary": false
+        },
+        {
+          "path": "post.mjs",
+          "size": 4576,
+          "language": "javascript",
+          "contents": "#!/usr/bin/env node\n// discord-digest/post.mjs — deterministic write for the \"discord-digest\"\n// Cadence, invoked by the CCR agent-runner AFTER it has *generated* the weekly\n// digest prose. The LLM owns the judgment (which deliverables/posts/decisions\n// matter this week, how to theme and voice them); this script owns the\n// structurally-exact write to Discord so a malformed embed can't recur.\n//\n// Unlike feed-post (Bearer token → wf-agents-api) the Discord credential IS the\n// destination: the injected discord.webhook_url is the URL we POST the embed to\n// directly — no separate endpoint constant, no bearer header (Discord webhooks\n// authenticate by the unguessable URL itself). Mirrors discord-heartbeat/post.mjs.\n//\n// Body is read from a FILE (not an arg) so multi-line / Unicode prose can't be\n// mangled by shell quoting. The webhook URL is injected per-fire\n// (credentials['discord.webhook_url'].url) — never read from anywhere else.\n//\n// Usage:\n//   DISCORD_WEBHOOK_URL=\"<credentials['discord.webhook_url'].url>\" \\\n//     node workforce/skills/discord-digest/post.mjs \\\n//       --agent priya --body-file /tmp/digest.md \\\n//       [--title \"Weekly workforce digest · week of 2026-06-01\"] [--skill-version 0.1.0]\n//\n// Exit codes:\n//   0  — Discord returned 2xx (posted)\n//   1  — bad args / env / body-file unreadable / body fails W-1\n//   2  — non-2xx response from Discord (e.g. 400 malformed, 401 bad URL)\n//   3  — network / fetch error\n\nimport { readFileSync } from \"node:fs\";\n\nconst COLOR_DIGEST = 0x9b59b6; // amethyst — distinct from heartbeat's info-blue\n// Discord embed description hard cap. We fail loud rather than truncate (C-1).\nconst DISCORD_EMBED_DESC_MAX = 4096;\n\nfunction arg(name) {\n  const i = process.argv.indexOf(`--${name}`);\n  return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : undefined;\n}\n\nconst webhookUrl = process.env.DISCORD_WEBHOOK_URL;\nconst agent = arg(\"agent\");\nconst bodyFile = arg(\"body-file\");\nconst title = arg(\"title\") ?? \"Weekly workforce digest\";\nconst skillVersion = arg(\"skill-version\");\n\nif (!webhookUrl) { console.error(\"post.mjs: DISCORD_WEBHOOK_URL env var is required (from credentials['discord.webhook_url'].url)\"); process.exit(1); }\nif (!/^https:\\/\\/discord\\.com\\/api\\/webhooks\\//.test(webhookUrl)) {\n  console.error(`post.mjs: DISCORD_WEBHOOK_URL does not look like a Discord webhook URL (got \"${webhookUrl.slice(0, 60)}...\")`);\n  process.exit(1);\n}\nif (!agent) { console.error(\"post.mjs: --agent <slug> is required\"); process.exit(1); }\nif (!bodyFile) { console.error(\"post.mjs: --body-file <path> is required\"); process.exit(1); }\n\nlet body;\ntry {\n  body = readFileSync(bodyFile, \"utf8\").trim();\n} catch (err) {\n  console.error(`post.mjs: cannot read --body-file \"${bodyFile}\": ${err instanceof Error ? err.message : String(err)}`);\n  process.exit(1);\n}\n\n// W-1 editorial guard (client side). A degraded digest fails loud here rather\n// than landing in the channel.\nconst ARTEFACTS = [\"as an ai\", \"i apologize\", \"i'm sorry\", \"certainly!\", \"sure, \", \"here is the\", \"here's the\"];\nconst head = body.slice(0, 50).toLowerCase();\nif (body.length === 0) { console.error(\"post.mjs: digest body is empty (W-1)\"); process.exit(1); }\nif (ARTEFACTS.some((a) => head.startsWith(a))) { console.error(`post.mjs: body opens with an LLM-failure artefact (W-1): \"${head}\"`); process.exit(1); }\nif (body.length > DISCORD_EMBED_DESC_MAX) {\n  console.error(`post.mjs: digest body is ${body.length} chars; Discord embed description hard cap is ${DISCORD_EMBED_DESC_MAX}. Shorten it (do not truncate — C-1) and re-run.`);\n  process.exit(1);\n}\n\nconst payload = {\n  embeds: [\n    {\n      title: title.slice(0, 256), // Discord title cap\n      description: body,\n      color: COLOR_DIGEST,\n      timestamp: new Date().toISOString().replace(/\\.\\d+Z$/, \"Z\"),\n      footer: { text: `wf-digest · ${agent}${skillVersion ? ` · v${skillVersion}` : \"\"}` },\n    },\n  ],\n};\n\ntry {\n  const res = await fetch(webhookUrl, {\n    method: \"POST\",\n    headers: { \"content-type\": \"application/json\" },\n    body: JSON.stringify(payload),\n  });\n  if (res.status < 200 || res.status >= 300) {\n    const text = await res.text().catch(() => \"\");\n    console.error(`post.mjs: Discord webhook returned HTTP ${res.status}: ${text.slice(0, 256)}`);\n    process.exit(2);\n  }\n  console.log(`post.mjs: posted weekly digest for ${agent} (${body.length} chars)`);\n  process.exit(0);\n} catch (err) {\n  console.error(`post.mjs: fetch failed: ${err instanceof Error ? err.message : String(err)}`);\n  process.exit(3);\n}\n",
+          "truncated": false,
+          "binary": false
+        }
+      ]
+    },
+    {
       "name": "discord-heartbeat",
       "version": "0.1.0",
       "status": "active",
@@ -195,9 +235,9 @@
         },
         {
           "path": "meta.json",
-          "size": 260,
+          "size": 286,
           "language": "json",
-          "contents": "{\n  \"name\": \"discord-heartbeat\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"executor\": \"claude-code-routine\",\n  \"cost_class\": \"small\",\n  \"owners\": [\"yuki\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-31\",\n  \"requires\": [\"discord.webhook_url\"]\n}\n",
+          "contents": "{\n  \"name\": \"discord-heartbeat\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"claude-code-routine\",\n  \"cost_class\": \"small\",\n  \"owners\": [\"yuki\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-31\",\n  \"requires\": [\"discord.webhook_url\"]\n}\n",
           "truncated": false,
           "binary": false
         },
@@ -366,9 +406,9 @@
         },
         {
           "path": "meta.json",
-          "size": 462,
+          "size": 488,
           "language": "json",
-          "contents": "{\n  \"name\": \"feed-post\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"notification\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"small\",\n  \"owners\": [\"aanya\", \"aoi\", \"dario\", \"elena\", \"farah\", \"kai\", \"levi\", \"maya\", \"mira\", \"nadia\", \"noor\", \"priya\", \"ren\", \"sora\", \"theo\", \"vikram\", \"yuki\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-27\",\n  \"requires\": [\"workforce.feed_write_token\"]\n}\n",
+          "contents": "{\n  \"name\": \"feed-post\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"notification\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"small\",\n  \"owners\": [\"aanya\", \"aoi\", \"dario\", \"elena\", \"farah\", \"kai\", \"levi\", \"maya\", \"mira\", \"nadia\", \"noor\", \"priya\", \"ren\", \"sora\", \"theo\", \"vikram\", \"yuki\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-27\",\n  \"requires\": [\"workforce.feed_write_token\"]\n}\n",
           "truncated": false,
           "binary": false
         },
