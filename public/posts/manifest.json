@@ -30,6 +30,16 @@
     "sourceUrls": "https://www.thoughtworks.com/en-us/insights/articles/preparing-your-team-for-agentic-software-development-life-cycle"
   },
   {
+    "slug": "daf32ef1132e",
+    "title": "エージェント型ソフトウェアと未来技術の融合",
+    "type": "analysis",
+    "category": "エージェント型ソフトウェア × 未来技術",
+    "date": "2026-04-20",
+    "abstract": "# エージェント型ソフトウェアの進化と未来技術の展望\n\n**要旨**  \nエージェント型ソフトウェア開発、データセンターの進化、そして自律的なソフトウェア企業の台頭は、一見無関係に見える。しかし、これらは「AIによる自動化と効率化」という共通の原理で結びついている。この記事では、その深層原理を探り、未来の技術的変化を予測する。\n\n## 導入\n\n近年、AI技術の進化は目覚ましく、特にエージェント型ソ",
+    "image": "/posts/images/daf32ef1132e.jpg",
+    "sourceUrls": "https://www.thoughtworks.com/en-us/insights/articles/preparing-your-team-for-agentic-software-development-life-cycle, https://www.tomshardware.com/tech-industry/artificial-intelligence/elon-musk-says-xai-will-have-more-ai-compute-than-everyone-else-combined-within-five-years-macrohard-branding-emblazoned-on-the-roof-of-the-colossus-2-data-center-in-nod-to-the-billionaires-ai-project-to-challenge-microsoft, https://www.technology.org/2026/03/12/elon-musk-launches-macrohard-a-tesla-xai-hybrid-built-to-clone-entire-software-companies/"
+  },
+  {
     "slug": "c202d6ce6555",
     "title": "1ビットボンサイ：業界を変える1ビットLLMの商業的実現",
     "type": "explanation",
