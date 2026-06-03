@@ -1,6 +1,6 @@
 ---
 name: article-level2
-description: Convert one L1 source entry into one L2 explanation (briefing-document) article in Japanese — the agent-workforce equivalent of the GAS L1→L2 batch. Use when an editorial-stream agent must turn an uncovered L1 source into a faithful, evidence-grounded explanation: an Executive Summary up front, source-specific section headings, and every number/name/date/quote taken verbatim from the source. Published to Notion as Type=explanation, Author={agent_slug}, Status=ready_for_L4.
+description: Convert one L1 source entry into one L2 explanation (briefing-document) article in Japanese — the agent-workforce equivalent of the GAS L1→L2 batch. Use when an editorial-stream agent must turn an uncovered L1 source into a faithful, evidence-grounded explanation: an Executive Summary up front, source-specific section headings, and every number/name/date/quote taken verbatim from the source. Published to Notion as Type=explanation, Author={agent_slug}, Status=ready.
 ---
 
 # article-level2
@@ -70,9 +70,16 @@ genuinely separate DB — its id is a constant in `pick-l1-source.mjs`.)
 - **Never invent facts.** Every concrete figure, proper noun, date, or quotation
   must come verbatim from the supplied source. Do not abstract, round, or alter
   them.
-- If the source body could not be fetched (X.com posts, paywalls, JS-only pages),
-  work from the L1 summary *only* and do not supply facts, statistics, company
-  names, or people the summary doesn't contain.
+- **For JS-only / paywalled hosts (x.com, twitter.com, linkedin.com, and CDN
+  consent-wall sites like nytimes/ft/wsj/bloomberg/mckinsey), fetch via Jina
+  Reader first**: `https://r.jina.ai/<source-url>` returns pre-extracted clean
+  Markdown. This mirrors the GAS `L2_SOURCE_FETCH_VIA_READER` routing in
+  `gas/src/Code.gs` — a direct fetch of these hosts returns 402/HTML-bot-walls,
+  but the Jina-extracted body is groundable. Only fall back to the L1-summary-only
+  path if Jina *also* fails.
+- If the source body still could not be fetched, work from the L1 summary *only*
+  and do not supply facts, statistics, company names, or people the summary
+  doesn't contain.
 - If you cannot link to or quote the source, **do not publish** — escalate.
 - Objective, incisive tone. Avoid reviewer-voice hedges ("重要だ", "今後注目される")
   and throat-clearing preambles.
@@ -90,22 +97,31 @@ Steps:
    — a file, not a shell arg, so multi-line / Unicode prose isn't mangled by
    quoting. The first line must be the `# Title` H1 (used as the page Title and
    stripped from the body blocks).
-2. Run (the script writes to the unified Articles DB — its id is a built-in
-   constant, so only `NOTION_API_KEY` is needed):
+2. Write the **abstract** — a faithful 2–3 sentence lead (your `## Executive
+   Summary`, **not** the speculative L1 summary) — to a second temp file (e.g.
+   `/tmp/l2-abstract.txt`). This populates the `Abstract` column, matching how
+   other rows lead.
+3. Run (the script writes to the unified Articles DB — its id is a built-in
+   constant, so only `NOTION_API_KEY` is needed). Pass the picker's `category`
+   (a bare A–E letter) — the script canonicalises it to `"B: Role Blurring"` etc.
+   and fills both `Category` and `CategoriesMulti`, exactly like the GAS L2 write:
 
    ```sh
    NOTION_API_KEY="<credentials['notion.integration_token'].apiKey from your task>" \
      node workforce/skills/article-level2/publish-notion.mjs \
        --author "<agent_slug>" \
        --type explanation \
-       --kind article \
+       --status ready \
        --body-file /tmp/l2-article.md \
+       --abstract-file /tmp/l2-abstract.txt \
+       --category "<category from the picker, e.g. B>" \
        --source-url "<sourceUrl from step 1>"   # omit if none
    ```
 
-3. Report the script's exit code:
+4. Report the script's exit code:
    - `0` — page created. The row carries `Author={agent_slug}, Type=explanation,
-     Status=ready_for_L4`. Done.
+     Status=ready`, plus `Abstract` + `Category`/`CategoriesMulti` (queued; the
+     GAS L4 batch flips Status to `published`). Done.
    - `2` — W-1 editorial guard failed (empty/short body or LLM-artefact prelude),
      or `401/403` auth (project credential bag misconfigured). Read stderr; do not
      retry blindly.
@@ -117,10 +133,12 @@ else, never hard-code it. (The DB ids are non-secret constants inside the
 scripts.) The script re-runs the W-1 guards before writing, so a degraded body
 fails loudly rather than landing on the site.
 
-**The page lands directly in Notion. No PR, no human-approval gate.** The existing
-GAS L4 batch picks up `Status=ready_for_L4` rows and publishes them to
-`kohuehara.xyz`; `scripts/fetch-notion.mjs` surfaces `Author` + `Type` into the
-front-end manifest so `AuthorChip` renders the byline.
+**The page lands directly in Notion. No PR, no human-approval gate.** The page is
+written to the unified Articles DB with the live schema (`Title`, `Author` and
+`SourceURLs` as `rich_text`, `Type`/`Status` as `select`, `Date`) — the same
+property contract as the GAS L2 write. The existing GAS L4 batch picks up the row
+and publishes it to `kohuehara.xyz`; `scripts/fetch-notion.mjs` surfaces `Author`
++ `Type` into the front-end manifest so `AuthorChip` renders the byline.
 
 ## When NOT to use
 

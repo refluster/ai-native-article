@@ -7,7 +7,7 @@
 //
 // It POSTs a new page into the unified Articles DB using the injected Notion
 // integration token. The row carries Author + Type=explanation +
-// Status=ready_for_L4 so the existing GAS L4 batch publishes it to
+// Status=ready (queued; the GAS L4 batch flips it to published) so it lands on
 // kohuehara.xyz and scripts/fetch-notion.mjs surfaces the byline (AuthorChip).
 //
 // The CCR session never reads Secrets Manager: NOTION_API_KEY arrives inline
@@ -28,8 +28,11 @@
 // Usage:
 //   NOTION_API_KEY="<credentials['notion.integration_token'].apiKey>" \
 //     node workforce/skills/article-level2/publish-notion.mjs \
-//       --author elena --type explanation --kind article \
-//       --body-file /tmp/article.md [--source-url https://...]
+//       --author elena --type explanation --status ready \
+//       --body-file /tmp/article.md \
+//       [--source-url https://...] \
+//       [--category B]                 # L1 letter or canonical → Category + CategoriesMulti
+//       [--abstract-file /tmp/abstract.txt]  # L2 lead → Abstract
 //
 // Exit codes:
 //   0  — page created
@@ -57,18 +60,50 @@ function arg(name) {
   return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : undefined;
 }
 
+// Category canonicalisation — mirror of gas/src/Code.gs CATEGORY_NAMES +
+// expandCategoryCode + canonicalCategoryFor, so a CCR-written row groups under
+// the same controlled A–E bucket as the GAS L2 write (and the UI sidebar driven
+// by fetch-notion). The L1 source carries a bare letter (e.g. "B"); the unified
+// DB wants the canonical "B: Role Blurring".
+const CATEGORY_NAMES = {
+  A: "A: AI Hyper-productivity",
+  B: "B: Role Blurring",
+  C: "C: New Roles/FDE",
+  D: "D: Big Tech Layoffs & AI Pivot",
+  E: "E: Rethinking SDLC",
+};
+function canonicalCategory(text) {
+  const trimmed = (text || "").trim();
+  if (!trimmed) return "";
+  if (/^[A-E]$/i.test(trimmed)) return CATEGORY_NAMES[trimmed.toUpperCase()] || "";
+  const m = trimmed.match(/^([A-E])[\s:：][\s\S]*$/i); // "B", "B: …", "B：…"
+  if (m) return CATEGORY_NAMES[m[1].toUpperCase()] || "";
+  return ""; // free-form / unmappable → leave category unset (don't guess)
+}
+
 const apiKey = process.env.NOTION_API_KEY;
 const databaseId = UNIFIED_DB_ID;
 const author = arg("author");
 const articleType = arg("type") ?? "explanation";
-const kind = arg("kind") ?? "article";
+const status = arg("status") ?? "ready";
 const bodyFile = arg("body-file");
 const sourceUrl = arg("source-url");
+const category = arg("category");          // L1 letter or canonical label
+const abstractFile = arg("abstract-file"); // optional lead/summary file
+
+// Valid Status options on the unified Articles DB (mirror of the live select).
+// L2 explanations land as `ready` (queued, not yet live); the GAS L4 batch
+// flips them to `published`. (--status lets a backfill override.)
+const VALID_STATUS = new Set(["draft", "ready", "published", "archived"]);
 
 if (!apiKey) { console.error("publish-notion.mjs: NOTION_API_KEY env var is required (from credentials['notion.integration_token'].apiKey)"); process.exit(1); }
 if (!author) { console.error("publish-notion.mjs: --author <slug> is required"); process.exit(1); }
 if (articleType !== "explanation" && articleType !== "analysis") {
   console.error(`publish-notion.mjs: --type must be explanation|analysis (got "${articleType}")`);
+  process.exit(1);
+}
+if (!VALID_STATUS.has(status)) {
+  console.error(`publish-notion.mjs: --status must be one of ${[...VALID_STATUS].join("|")} (got "${status}")`);
   process.exit(1);
 }
 if (!bodyFile) { console.error("publish-notion.mjs: --body-file <path> is required"); process.exit(1); }
@@ -79,6 +114,19 @@ try {
 } catch (err) {
   console.error(`publish-notion.mjs: cannot read --body-file "${bodyFile}": ${err instanceof Error ? err.message : String(err)}`);
   process.exit(1);
+}
+
+// Optional abstract (the L2 lead / source summary → the Abstract column, same
+// role as l1Summary in the GAS L2 write). Read from a file so multi-line /
+// Unicode prose isn't mangled by shell quoting, exactly like --body-file.
+let abstract = "";
+if (abstractFile) {
+  try {
+    abstract = readFileSync(abstractFile, "utf8").trim();
+  } catch (err) {
+    console.error(`publish-notion.mjs: cannot read --abstract-file "${abstractFile}": ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  }
 }
 
 // ── W-1 editorial guards (fail loud, do not publish) ───────────────────────
@@ -104,14 +152,33 @@ const bodyLines = lines.slice(0, h1Idx).concat(lines.slice(h1Idx + 1));
 
 const children = markdownToBlocks(bodyLines.join("\n"));
 
+// Property names mirror the live unified Articles DB exactly (same contract as
+// the GAS L2 write in gas/src/Code.gs): Title (title), Type/Status (select),
+// Author/SourceURLs (rich_text), Date. There is no Name/Kind/SourceURL(url)
+// column — writing those returns HTTP 400 validation_error.
 const properties = {
-  Name: { title: [{ text: { content: title.slice(0, 2000) } }] },
-  Author: { select: { name: author } },
+  Title: { title: [{ text: { content: title.slice(0, 2000) } }] },
+  Author: { rich_text: [{ text: { content: author } }] },
   Type: { select: { name: articleType } },
-  Kind: { select: { name: kind } },
-  Status: { select: { name: "ready_for_L4" } },
+  Status: { select: { name: status } },
+  Date: { date: { start: new Date().toISOString().slice(0, 10) } },
 };
-if (sourceUrl) properties.SourceURL = { url: sourceUrl };
+// Coverage (pick-l1-source.mjs) keys on SourceURLs rich_text, so the next fire
+// sees this source as covered and won't re-pick it.
+if (sourceUrl) properties.SourceURLs = { rich_text: [{ text: { content: sourceUrl } }] };
+
+// Abstract — the L2 lead (mirror of l1Summary in the GAS L2 write). Optional;
+// only set when an --abstract-file was supplied and non-empty.
+if (abstract) properties.Abstract = { rich_text: [{ text: { content: abstract.slice(0, 2000) } }] };
+
+// Category + CategoriesMulti — the controlled A–E bucket, canonicalised the
+// same way GAS does so the UI sidebar groups this row correctly. A free-form /
+// unmappable --category leaves both unset rather than writing a guessed bucket.
+const canonical = canonicalCategory(category);
+if (canonical) {
+  properties.Category = { rich_text: [{ text: { content: canonical } }] };
+  properties.CategoriesMulti = { multi_select: [{ name: canonical }] };
+}
 
 try {
   const res = await fetch(`${NOTION_API}/pages`, {
@@ -127,7 +194,7 @@ try {
   if (res.ok) {
     let url = "";
     try { url = JSON.parse(text).url ?? ""; } catch { /* non-JSON ok body */ }
-    console.log(`publish-notion.mjs: created — Author=${author} Type=${articleType} "${title}" ${url}`);
+    console.log(`publish-notion.mjs: created — Author=${author} Type=${articleType} Status=${status} "${title}" ${url}`);
     process.exit(0);
   }
   if (res.status === 401 || res.status === 403) {
