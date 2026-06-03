@@ -2,9 +2,9 @@
   "id": "agent-workforce",
   "name": "Agent Workforce (internal trial)",
   "owner_agent": "maya",
-  "members": ["maya", "dario", "yuki", "elena"],
+  "members": ["maya", "dario", "yuki", "elena", "priya"],
   "credential_types": ["discord.webhook_url", "workforce.feed_write_token", "notion.integration_token"],
   "status": "active",
   "created_at": "2026-05-31",
-  "note": "Workforce-internal project bundling team-shared resources used by trial CCR-bound skills. Holds the team Discord webhook URL (consumed by Yuki's discord-heartbeat), the feed-write token (Dario's feed-post), and the Notion integration token for Elena's 2-hourly article-level2 (L1→L2 explanation, via the CCR agent-runner). Only the apiKey is secret: pick-l1-source.mjs (reads the L1 source library + unified coverage) and publish-notion.mjs (writes the explanation to the unified Articles DB) hold both DB ids as script constants — they are non-secret and already committed in gas/src/Code.gs + scripts/normalize-categories.mjs. orchestrator-tick resolves wf/projects/agent-workforce/notion.integration_token and ships the apiKey inline. Members grow as more agents flip skills to the CCR path. Not a customer project — this is the operational substrate the workforce itself runs on."
+  "note": "Workforce-internal project bundling team-shared resources used by trial CCR-bound skills. Holds the team Discord webhook URL (consumed by Yuki's discord-heartbeat and Priya's weekly discord-digest), the feed-write token (Dario's feed-post), and the Notion integration token for Elena's 2-hourly article-level2 (L1→L2 explanation, via the CCR agent-runner). Only the apiKey is secret: pick-l1-source.mjs (reads the L1 source library + unified coverage) and publish-notion.mjs (writes the explanation to the unified Articles DB) hold both DB ids as script constants — they are non-secret and already committed in gas/src/Code.gs + scripts/normalize-categories.mjs. orchestrator-tick resolves wf/projects/agent-workforce/notion.integration_token and ships the apiKey inline. Members grow as more agents flip skills to the CCR path. Not a customer project — this is the operational substrate the workforce itself runs on."
 }

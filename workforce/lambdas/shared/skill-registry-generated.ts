@@ -29,6 +29,7 @@ export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "article-level2": ["notion.integration_token"] as const,
   "code-task-brief": [],
   "design-note": [],
+  "discord-digest": ["discord.webhook_url"] as const,
   "discord-heartbeat": ["discord.webhook_url"] as const,
   "discord-ping": [],
   "feed-health": [],
