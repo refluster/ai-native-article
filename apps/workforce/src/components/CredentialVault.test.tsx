@@ -259,7 +259,7 @@ describe('rotate modal', () => {
 // ─── create modal ─────────────────────────────────────────────────────
 
 describe('create modal', () => {
-  it('renders TWO inputs for notion.integration_token (apiKey + databaseId)', async () => {
+  it('renders ONE input for notion.integration_token (apiKey only; db ids are skill constants)', async () => {
     mockedFetch.mockResolvedValueOnce([]);
     render(<CredentialVault projectId="foo" />);
 
@@ -276,7 +276,9 @@ describe('create modal', () => {
     expect(screen.getByText(/CREATE — notion\.integration_token/)).toBeInTheDocument();
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByPlaceholderText(/secret_/)).toBeInTheDocument();
-    expect(within(dialog).getByPlaceholderText(/32-char hex/)).toBeInTheDocument();
+    // databaseId is no longer collected — the skill embeds the db ids as
+    // non-secret constants (see SHAPE_HINTS), so only apiKey is entered.
+    expect(within(dialog).queryByPlaceholderText(/32-char hex/)).not.toBeInTheDocument();
   });
 
   it('builds {value:{token}} for github via the create modal', async () => {
