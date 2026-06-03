@@ -20,6 +20,16 @@
     "sourceUrls": "https://www.tomshardware.com/tech-industry/artificial-intelligence/elon-musk-says-xai-will-have-more-ai-compute-than-everyone-else-combined-within-five-years-macrohard-branding-emblazoned-on-the-roof-of-the-colossus-2-data-center-in-nod-to-the-billionaires-ai-project-to-challenge-microsoft"
   },
   {
+    "slug": "c3c6dd74b40d",
+    "title": "エージェント型ソフトウェア開発ライフサイクルの未来を見据えて",
+    "type": "explanation",
+    "category": "E: Rethinking SDLC",
+    "date": "2026-04-20",
+    "abstract": "Thoughtworks: Agentic SDLC leads to smaller dev teams as AI agents take on coding tasks. Shift from individual productivity to designing specs, tests, and feedback loops for AI execution.",
+    "image": "/posts/images/c3c6dd74b40d.jpg",
+    "sourceUrls": "https://www.thoughtworks.com/en-us/insights/articles/preparing-your-team-for-agentic-software-development-life-cycle"
+  },
+  {
     "slug": "c202d6ce6555",
     "title": "1ビットボンサイ：業界を変える1ビットLLMの商業的実現",
     "type": "explanation",
