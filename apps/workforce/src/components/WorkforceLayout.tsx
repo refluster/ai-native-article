@@ -27,12 +27,6 @@ export default function WorkforceLayout({ children, subnavRight }: Props) {
             WORKFORCE · CONSOLE
           </Link>
           <div className="flex items-center gap-4">
-            <a
-              href="https://kohuehara.xyz/"
-              className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant hover:text-wf-on-surface"
-            >
-              ← KOHUEHARA.XYZ
-            </a>
             {AUTH_IS_CONFIGURED && (
               <button
                 type="button"
