@@ -15,6 +15,9 @@ import OrgDAG from './pages/OrgDAG';
 import ProjectDirectory from './pages/ProjectDirectory';
 import ProjectProfile from './pages/ProjectProfile';
 import Feed from './pages/Feed';
+import Jobs from './pages/Jobs';
+import Messaging from './pages/Messaging';
+import Notifications from './pages/Notifications';
 import AuthCallback from './pages/AuthCallback';
 import AuthBoundary from './components/AuthBoundary';
 import { routerBaseName } from './lib/paths';
@@ -47,6 +50,9 @@ function ProtectedRoutes() {
                 `useParams()['*']`. */}
             <Route path="/projects/*" element={<ProjectProfile />} />
             <Route path="/feed" element={<Feed />} />
+            <Route path="/jobs" element={<Jobs />} />
+            <Route path="/messaging" element={<Messaging />} />
+            <Route path="/notifications" element={<Notifications />} />
           </Routes>
         </main>
       </div>

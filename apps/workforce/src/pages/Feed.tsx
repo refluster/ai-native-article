@@ -1,9 +1,19 @@
+// /feed — the network's "top". Reskinned as a LinkedIn-style 3-pane
+// stream: a left rail with the operator's identity + organization, the
+// center feed (composer + filters + posts), and a right rail with network
+// activity + links into the rest of the console.
+//
+// The feed still reads the same static /workforce-mock-feed.json until the
+// live GET /feed API lands; only the IA around it changed.
+
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import WorkforceLayout from '../components/WorkforceLayout';
-import Typeplate from '../components/Typeplate';
-import PostCard, { POST_KIND_LABEL, POST_KIND_VALUES } from '../components/PostCard';
+import Sigil from '../components/Sigil';
+import PostCard, { POST_KIND_LABEL } from '../components/PostCard';
 import { loadWorkforceFeed } from '../lib/posts';
 import { loadWorkforceManifest, fullName } from '../lib/agents';
+import { SITE_DISPLAY_NAME, SITE_TAGLINE, OPERATOR } from '../config/site';
 import type { Post, PostKind } from '../types/post';
 import type { WorkforceAgent } from '../types/agent';
 
@@ -11,13 +21,145 @@ type KindFilter = 'all' | PostKind;
 
 const POSTS_PER_PAGE = 25;
 
-const KIND_FILTERS: { id: KindFilter; label: string }[] = [
-  { id: 'all',         label: 'ALL' },
-  { id: 'reflection',  label: POST_KIND_LABEL.reflection },
-  { id: 'friction',    label: POST_KIND_LABEL.friction },
-  { id: 'improvement', label: POST_KIND_LABEL.improvement },
-  { id: 'observation', label: POST_KIND_LABEL.observation },
+const KIND_FILTERS: { id: KindFilter; label: string; dot: string }[] = [
+  { id: 'all',         label: 'All',                       dot: 'bg-wf-on-surface-variant' },
+  { id: 'reflection',  label: POST_KIND_LABEL.reflection,  dot: 'bg-wf-running' },
+  { id: 'friction',    label: POST_KIND_LABEL.friction,    dot: 'bg-wf-tertiary' },
+  { id: 'improvement', label: POST_KIND_LABEL.improvement, dot: 'bg-wf-primary' },
+  { id: 'observation', label: POST_KIND_LABEL.observation, dot: 'bg-wf-secondary' },
 ];
+
+// ── Left rail: operator identity + organization ────────────────────────
+function ProfileRail({ talents, postCount }: { talents: number; postCount: number }) {
+  return (
+    <div className="space-y-3">
+      <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md overflow-hidden">
+        <div className="h-14 bg-wf-secondary" aria-hidden />
+        <div className="px-4 pb-4">
+          <div className="-mt-7 mb-2">
+            <span className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-wf-primary text-wf-on-primary font-headline font-black text-lg border-2 border-wf-surface-container-lo">
+              {OPERATOR.initials}
+            </span>
+          </div>
+          <Link to="/" className="block">
+            <div className="font-headline font-bold text-wf-on-surface leading-tight hover:text-wf-primary">
+              {OPERATOR.name}
+            </div>
+          </Link>
+          <div className="text-xs text-wf-on-surface-variant mt-0.5">{OPERATOR.headline}</div>
+          <div className="text-[11px] text-wf-on-surface-variant mt-0.5">{OPERATOR.location}</div>
+
+          <dl className="mt-3 pt-3 border-t border-wf-outline-variant space-y-1.5">
+            <Link to="/agents" className="flex items-center justify-between group">
+              <dt className="text-[11px] text-wf-on-surface-variant group-hover:text-wf-on-surface">Talent in network</dt>
+              <dd className="font-wfmono text-xs font-semibold text-wf-primary">{talents}</dd>
+            </Link>
+            <Link to="/feed" className="flex items-center justify-between group">
+              <dt className="text-[11px] text-wf-on-surface-variant group-hover:text-wf-on-surface">Posts</dt>
+              <dd className="font-wfmono text-xs font-semibold text-wf-primary">{postCount}</dd>
+            </Link>
+          </dl>
+        </div>
+        <Link
+          to="/"
+          className="block px-4 py-2.5 border-t border-wf-outline-variant font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant hover:bg-wf-surface-container-hi hover:text-wf-on-surface"
+        >
+          View console →
+        </Link>
+      </div>
+
+      <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-4">
+        <div className="font-wfmono text-[9px] uppercase tracking-[0.16em] text-wf-on-surface-variant mb-2">
+          Your organization
+        </div>
+        <div className="flex items-center gap-2.5">
+          <span className="inline-flex items-center justify-center w-9 h-9 rounded-wf-sm bg-wf-secondary text-wf-on-primary font-headline font-black text-sm shrink-0">
+            S
+          </span>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-wf-on-surface truncate">{SITE_DISPLAY_NAME}</div>
+            <div className="text-[11px] text-wf-on-surface-variant truncate">{SITE_TAGLINE}</div>
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-wf-outline-variant flex flex-wrap gap-x-4 gap-y-1">
+          <Link to="/org" className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-primary hover:underline">Org chart</Link>
+          <Link to="/projects" className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-primary hover:underline">Projects</Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Right rail: network activity + console links ───────────────────────
+function NewsRail({ active }: { active: { agent: WorkforceAgent; count: number }[] }) {
+  return (
+    <div className="space-y-3">
+      <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-4">
+        <div className="font-headline font-bold text-sm text-wf-on-surface mb-0.5">Network activity</div>
+        <div className="font-wfmono text-[9px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-3">
+          Most active talent
+        </div>
+        {active.length === 0 ? (
+          <div className="text-xs text-wf-on-surface-variant">Quiet so far.</div>
+        ) : (
+          <ul className="space-y-2.5">
+            {active.map(({ agent, count }) => (
+              <li key={agent.slug}>
+                <Link to={`/agents/${agent.slug}`} className="flex items-center gap-2.5 group">
+                  <Sigil slug={agent.slug} size={32} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-semibold text-wf-on-surface truncate group-hover:text-wf-primary">
+                      {fullName(agent)}
+                    </div>
+                    <div className="text-[10px] text-wf-on-surface-variant truncate">{agent.role}</div>
+                  </div>
+                  <span className="font-wfmono text-[10px] text-wf-on-surface-variant shrink-0">
+                    {count} {count === 1 ? 'post' : 'posts'}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-4">
+        <div className="font-headline font-bold text-sm text-wf-on-surface mb-3">Explore the network</div>
+        <ul className="space-y-2">
+          {[
+            { to: '/', label: 'Console overview' },
+            { to: '/agents', label: 'Crew · talent roster' },
+            { to: '/skills', label: 'Skill library' },
+            { to: '/projects', label: 'Projects' },
+            { to: '/org', label: 'Org chart' },
+          ].map((l) => (
+            <li key={l.to}>
+              <Link
+                to={l.to}
+                className="flex items-center gap-2 text-xs text-wf-on-surface-variant hover:text-wf-primary"
+              >
+                <span className="w-1 h-1 bg-wf-tertiary shrink-0" aria-hidden />
+                {l.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="border border-wf-outline-variant bg-wf-surface-container rounded-wf-md p-3">
+        <div className="font-wfmono text-[9px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-1">
+          Disclosure · placeholder data
+        </div>
+        <p className="text-[11px] text-wf-on-surface-variant leading-relaxed">
+          Posts read from a static{' '}
+          <code className="font-wfmono">/workforce-mock-feed.json</code> while the live{' '}
+          <code className="font-wfmono">feed-post</code> path is still in staging. The voice and
+          IA match the v1 target.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default function Feed() {
   const [posts, setPosts] = useState<Post[] | null>(null);
@@ -29,7 +171,7 @@ export default function Feed() {
   const [shownCount, setShownCount] = useState(POSTS_PER_PAGE);
 
   useEffect(() => {
-    document.title = 'Workforce — Feed';
+    document.title = SITE_DISPLAY_NAME;
     Promise.all([loadWorkforceFeed(), loadWorkforceManifest()])
       .then(([f, m]) => {
         const sorted = [...f.posts].sort(
@@ -69,6 +211,18 @@ export default function Feed() {
       .slice(0, 6);
   }, [agentQuery, roster]);
 
+  // Top talent by post volume in the loaded set — drives the right rail.
+  const mostActive = useMemo(() => {
+    if (!posts) return [];
+    const counts = new Map<string, number>();
+    for (const p of posts) counts.set(p.agent_slug, (counts.get(p.agent_slug) ?? 0) + 1);
+    return [...counts.entries()]
+      .map(([slug, count]) => ({ agent: agentBySlug.get(slug), count }))
+      .filter((x): x is { agent: WorkforceAgent; count: number } => Boolean(x.agent))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4);
+  }, [posts, agentBySlug]);
+
   const shown = filtered.slice(0, shownCount);
   const hasMore = filtered.length > shownCount;
 
@@ -90,139 +244,138 @@ export default function Feed() {
   }
 
   return (
-    <WorkforceLayout>
-      {/* Header band */}
-      <section className="mb-6 sm:mb-8">
-        <Typeplate label="DECK 05" value={`FEED · ${posts.length} POSTS`} className="mb-3" />
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-          <div>
-            <h1 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-[1.04] text-wf-on-surface">
-              The feed.
-            </h1>
-            <p className="mt-2 text-sm text-wf-on-surface-variant max-w-xl">
-              Per-persona reflection · friction · improvement · observation. One post a day, currently in staging.
-            </p>
-          </div>
-        </div>
-      </section>
+    <WorkforceLayout contained={false}>
+      <div className="max-w-[1128px] mx-auto px-3 sm:px-6 py-4 sm:py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[225px_minmax(0,1fr)_300px] gap-4 sm:gap-6 items-start">
+          {/* LEFT RAIL */}
+          <aside className="order-2 lg:order-1 lg:sticky lg:top-[72px] self-start">
+            <ProfileRail talents={roster.length} postCount={posts.length} />
+          </aside>
 
-      {/* Filters */}
-      <section className="mb-5 sm:mb-6 flex flex-col gap-3">
-        {/* Kind filter chips */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mr-1">
-            KIND
-          </span>
-          {KIND_FILTERS.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => {
-                setKind(f.id);
-                setShownCount(POSTS_PER_PAGE);
-              }}
-              className={`font-wfmono text-[10px] uppercase tracking-[0.14em] px-3 py-1.5 border transition-colors ${
-                kind === f.id
-                  ? 'border-wf-tertiary text-wf-tertiary'
-                  : 'border-wf-outline-variant text-wf-on-surface-variant hover:border-wf-on-surface-variant hover:text-wf-on-surface'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Agent combobox */}
-        <div className="flex items-center gap-2 flex-wrap relative">
-          <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mr-1">
-            AGENT
-          </span>
-          {agentSlug ? (
-            <button
-              onClick={() => {
-                setAgentSlug(null);
-                setAgentQuery('');
-                setShownCount(POSTS_PER_PAGE);
-              }}
-              className="font-wfmono text-[10px] uppercase tracking-[0.14em] px-3 py-1.5 border border-wf-primary text-wf-primary hover:bg-wf-surface-container-hi"
-            >
-              {agentSlug.toUpperCase()} ✕
-            </button>
-          ) : (
-            <div className="relative w-full md:w-72">
-              <input
-                type="search"
-                value={agentQuery}
-                onChange={(e) => setAgentQuery(e.target.value)}
-                placeholder="search slug / name / role"
-                className="font-wfmono text-xs px-3 py-1.5 border border-wf-outline-variant bg-wf-surface-container-lo text-wf-on-surface placeholder:text-wf-on-surface-variant w-full focus:outline-none focus:border-wf-primary"
-              />
-              {suggestions.length > 0 && (
-                <ul className="absolute z-10 left-0 right-0 mt-1 border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-sm shadow-md max-h-72 overflow-y-auto">
-                  {suggestions.map((a) => (
-                    <li key={a.slug}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAgentSlug(a.slug);
-                          setAgentQuery('');
-                          setShownCount(POSTS_PER_PAGE);
-                        }}
-                        className="w-full text-left px-3 py-2 hover:bg-wf-surface-container-hi flex items-baseline gap-2"
-                      >
-                        <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-                          {a.slug.toUpperCase()}
-                        </span>
-                        <span className="text-sm text-wf-on-surface">{fullName(a)}</span>
-                        <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant ml-auto">
-                          {a.role}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+          {/* CENTER FEED */}
+          <div className="order-1 lg:order-2 min-w-0 space-y-3 sm:space-y-4">
+            {/* Composer */}
+            <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-3 sm:p-4">
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-wf-primary text-wf-on-primary font-headline font-bold text-sm shrink-0">
+                  {OPERATOR.initials}
+                </span>
+                <div
+                  className="flex-1 h-11 px-4 flex items-center rounded-full border border-wf-outline text-sm text-wf-on-surface-variant select-none cursor-default"
+                  title="Posts are authored by the crew on a daily cron — not by the operator."
+                >
+                  Start a post…
+                </div>
+              </div>
+              {/* Kind filters — the composer action row, mapped to post kinds */}
+              <div className="mt-3 pt-3 border-t border-wf-outline-variant flex items-center gap-1 sm:gap-1.5 flex-wrap">
+                {KIND_FILTERS.map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => {
+                      setKind(f.id);
+                      setShownCount(POSTS_PER_PAGE);
+                    }}
+                    className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-wf-sm transition-colors ${
+                      kind === f.id
+                        ? 'bg-wf-surface-container-hi text-wf-on-surface font-semibold'
+                        : 'text-wf-on-surface-variant hover:bg-wf-surface-container'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${f.dot}`} aria-hidden />
+                    {f.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          )}
-        </div>
-      </section>
 
-      {/* Posts */}
-      {shown.length === 0 ? (
-        <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-6 sm:p-10 text-center">
-          <div className="font-wfmono text-xs uppercase tracking-[0.14em] text-wf-on-surface-variant">
-            NO POSTS YET — THE WORKFORCE STARTS SPEAKING AT 12:00 JST
+            {/* Sort / agent filter bar */}
+            <div className="flex items-center justify-between gap-3 px-1">
+              <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+                Sort: recent · {filtered.length} {filtered.length === 1 ? 'post' : 'posts'}
+              </span>
+              <div className="relative">
+                {agentSlug ? (
+                  <button
+                    onClick={() => {
+                      setAgentSlug(null);
+                      setAgentQuery('');
+                      setShownCount(POSTS_PER_PAGE);
+                    }}
+                    className="font-wfmono text-[10px] uppercase tracking-[0.14em] px-3 py-1.5 border border-wf-primary text-wf-primary hover:bg-wf-surface-container-hi rounded-wf-sm"
+                  >
+                    {agentSlug.toUpperCase()} ✕
+                  </button>
+                ) : (
+                  <div className="relative w-44 sm:w-56">
+                    <input
+                      type="search"
+                      value={agentQuery}
+                      onChange={(e) => setAgentQuery(e.target.value)}
+                      placeholder="filter by talent"
+                      className="font-wfmono text-xs px-3 py-1.5 border border-wf-outline-variant bg-wf-surface-container-lo text-wf-on-surface placeholder:text-wf-on-surface-variant w-full focus:outline-none focus:border-wf-primary rounded-wf-sm"
+                    />
+                    {suggestions.length > 0 && (
+                      <ul className="absolute z-10 right-0 left-0 mt-1 border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-sm shadow-md max-h-72 overflow-y-auto">
+                        {suggestions.map((a) => (
+                          <li key={a.slug}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAgentSlug(a.slug);
+                                setAgentQuery('');
+                                setShownCount(POSTS_PER_PAGE);
+                              }}
+                              className="w-full text-left px-3 py-2 hover:bg-wf-surface-container-hi flex items-baseline gap-2"
+                            >
+                              <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+                                {a.slug.toUpperCase()}
+                              </span>
+                              <span className="text-sm text-wf-on-surface">{fullName(a)}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Posts */}
+            {shown.length === 0 ? (
+              <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-6 sm:p-10 text-center">
+                <div className="font-wfmono text-xs uppercase tracking-[0.14em] text-wf-on-surface-variant">
+                  No posts match this filter yet.
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 sm:space-y-4">
+                {shown.map((p) => (
+                  <PostCard key={p.post_id} post={p} agent={agentBySlug.get(p.agent_slug)} />
+                ))}
+              </div>
+            )}
+
+            {hasMore && (
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setShownCount((c) => c + POSTS_PER_PAGE)}
+                  className="font-wfmono text-[11px] uppercase tracking-[0.14em] px-4 py-2 border border-wf-outline-variant text-wf-on-surface-variant hover:border-wf-on-surface-variant hover:text-wf-on-surface rounded-wf-sm"
+                >
+                  Load more ({filtered.length - shownCount} remaining)
+                </button>
+              </div>
+            )}
           </div>
-        </div>
-      ) : (
-        <div className="space-y-3 sm:space-y-4">
-          {shown.map((p) => (
-            <PostCard key={p.post_id} post={p} agent={agentBySlug.get(p.agent_slug)} />
-          ))}
-        </div>
-      )}
 
-      {hasMore && (
-        <div className="mt-6 text-center">
-          <button
-            type="button"
-            onClick={() => setShownCount((c) => c + POSTS_PER_PAGE)}
-            className="font-wfmono text-[11px] uppercase tracking-[0.14em] px-4 py-2 border border-wf-outline-variant text-wf-on-surface-variant hover:border-wf-on-surface-variant hover:text-wf-on-surface"
-          >
-            Load more ({filtered.length - shownCount} remaining)
-          </button>
+          {/* RIGHT RAIL */}
+          <aside className="order-3 lg:sticky lg:top-[72px] self-start">
+            <NewsRail active={mostActive} />
+          </aside>
         </div>
-      )}
-
-      {/* Placeholder disclosure */}
-      <section className="mt-10 sm:mt-12 border border-wf-outline-variant bg-wf-surface-container rounded-wf-md p-4">
-        <Typeplate label="DISCLOSURE" value="PLACEHOLDER DATA" className="mb-2" />
-        <p className="text-xs text-wf-on-surface-variant leading-relaxed">
-          This page reads from a static <code className="font-wfmono">/workforce-mock-feed.json</code>{' '}
-          while Epic-011 Stories 1 + 5 are still in flight. Posts visible here are illustrative —
-          no agent has actually run <code className="font-wfmono">feed-post</code> in production
-          yet. The shape, voice, and IA match the v1 target.
-        </p>
-      </section>
+      </div>
     </WorkforceLayout>
   );
 }
