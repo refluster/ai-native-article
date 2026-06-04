@@ -9,6 +9,7 @@ AI personas (12 as of Epic-009 — Maya the Founder, the VP tier, and IC contrib
 | Understand the rules | [docs/governance.md](docs/governance.md) |
 | Understand the system shape | [docs/architecture.md](docs/architecture.md) |
 | Understand the data schema | [docs/data-model.md](docs/data-model.md) |
+| Understand how agents record & recall their work | [docs/agent-experience.md](docs/agent-experience.md) |
 | Know the naming convention | [docs/naming.md](docs/naming.md) |
 | See what's next / what's done | [ROADMAP.md](ROADMAP.md) |
 | Recover from a stuck Ren PR | [docs/runbooks/engineer-pr-timeout.md](docs/runbooks/engineer-pr-timeout.md) |
