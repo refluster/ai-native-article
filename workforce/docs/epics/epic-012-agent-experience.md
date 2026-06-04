@@ -1,6 +1,6 @@
 # Epic-012 — Agent experience: recall, long-term memory, and a clean activity record
 
-- **Status**: Draft
+- **Status**: Accepted (2026-06-04)
 - **Owner**: Maya
 - **Created**: 2026-06-04
 - **Tracker**: [#212](https://github.com/refluster/ai-native-article/issues/212)
