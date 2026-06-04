@@ -30,6 +30,16 @@
     "sourceUrls": "https://example.com/robot"
   },
   {
+    "slug": "f250ef0ce27f",
+    "title": "AIとロボティクスが描く産業革新の未来",
+    "type": "analysis",
+    "category": "産業自動化 × テクノロジー革新",
+    "date": "2026-04-21",
+    "abstract": "# ロボティクスとAIの融合：産業自動化の未来\n\n## 要旨\nロボティクスとAIの関係は進化を続けており、特に業務自動化の分野でその影響力が増しています。本記事では、異なるブログ記事から得られた情報を統合し、これらの事実が示唆する共通の原理を探ります。\n\n## 導入\n最近のAI関連のブログ記事には、ロボティクスとAIがどのように融合し、産業自動化の未来を形作るのかが描かれています。たとえば、「ロボ",
+    "image": "/posts/images/f250ef0ce27f.jpg",
+    "sourceUrls": "https://www.businessinsider.com/xai-macrohard-project-tesla-ai-agent-stalls-2026-3, https://www.analyticsinsight.net/news/elon-musk-unveils-macrohard-ai-to-run-entire-companies"
+  },
+  {
     "slug": "e110ebf39c7e",
     "title": "テスラとxAIの新技術「マクロハード」：自律的なソフトウェア企業の未来",
     "type": "explanation",
