@@ -3,7 +3,7 @@
 - **Status**: Draft
 - **Owner**: Maya
 - **Created**: 2026-06-04
-- **Tracker**: — *(set when the tracker issue is opened)*
+- **Tracker**: [#212](https://github.com/refluster/ai-native-article/issues/212)
 - **Implemented by**: —
 
 > **Design records:** the *technical decisions* behind this Epic live as
