@@ -45,7 +45,7 @@ Parameters:
     Description: GitHub repo the engineer routine targets.
   EngineerWorkflow:
     Type: String
-    Default: wf-engineer.yml
+    Default: workforce-engineer-routine.yml
     Description: workflow_dispatch target filename.
   EngineerRef:
     Type: String
