@@ -27,6 +27,7 @@ export const DETERMINISTIC_HANDLERS: Record<string, DeterministicHandler> = {
 export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "article-draft": [],
   "article-level2": ["notion.integration_token"] as const,
+  "article-level3": ["notion.integration_token"] as const,
   "code-task-brief": [],
   "design-note": [],
   "discord-digest": ["discord.webhook_url"] as const,
