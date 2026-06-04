@@ -46,6 +46,19 @@
       "routine_spec": "workforce/docs/routines/agent-runner.md",
       "project_id": "agent-workforce",
       "note": "Every-6-hours L1→L2 explanation generation (UTC 00/06/12/18) — the agent-workforce equivalent of the GAS L2_BATCH cron, on the CCR execution model (same pattern as Dario's feed-post). The 6h cadence is a multiple of the orchestrator-tick rate(2h), so no tick change is needed; the 120-minute match window catches each fire. wf-orchestrator-tick batches this into the agent-runner /fire POST; project_id=agent-workforce supplies the notion.integration_token (only the apiKey is secret — both DB ids are non-secret constants in the scripts) (Epic-010 §5). pick-l1-source.mjs picks the oldest uncovered L1 source; publish-notion.mjs writes the explanation to Notion with Author=elena, Type=explanation — carries the byline on kohuehara.xyz. One uncovered L1 source per run, oldest-first."
+    },
+    {
+      "skill": "article-level3",
+      "executor": "claude-code-routine",
+      "trigger": {
+        "scheduler": "external",
+        "invoked_by": "api",
+        "fired_from": "wf-orchestrator-tick",
+        "cron": "cron(30 3/6 ? * * *)"
+      },
+      "routine_spec": "workforce/docs/routines/agent-runner.md",
+      "project_id": "agent-workforce",
+      "note": "Every-6-hours L2→L3 analysis (insight) synthesis (UTC 03:30/09:30/15:30/21:30) — the agent-workforce equivalent of the GAS L3_BATCH cron, on the CCR execution model. Staggered off article-level2 (minute 30, hours 3/6 vs L2's minute 0, hours 0/6) so the two cadences land in different orchestrator-tick windows. 6h is a multiple of the tick rate(2h); the 120-minute match window catches each fire. pick-l2-sources.mjs samples 3 recent L2 explanations (stateless: fresh-entry gate + reuse-avoidance reconstructed from Notion, not GAS Script Properties); publish-notion.mjs writes the analysis with Author=elena, Type=analysis — carries the byline on kohuehara.xyz. NOTE: GAS L3_BATCH is intentionally left running during a short parallel-run validation window; L3 is sampling-based (no self-dedup), so the operator must disable the GAS L3 trigger once this cadence is verified to avoid duplicate analyses."
     }
   ],
   "jd": {
