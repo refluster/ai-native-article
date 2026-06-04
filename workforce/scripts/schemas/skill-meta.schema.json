@@ -96,6 +96,12 @@
         "pattern": "^(anthropic\\.api_key|discord\\.bot_token|discord\\.webhook_url|github\\.token|notion\\.integration_token|voyage\\.api_key|workforce\\.feed_write_token)(@[a-z][a-z0-9_-]*)?$"
       },
       "description": "Credential keys this skill reads from ctx.credentials. Each entry is a base credential type (service.field) OR a variant suffix `type@name` (Epic-010 §Q2). The runner resolves each key from the active project at invocation time and seals the bag — undeclared access throws. The base-type allowlist + the variant suffix pattern are enforced both at lint (this schema) and runtime (credential-injector.ts). The `maxItems` bound caps the per-invocation Promise.all fan-out per cycle-1 review (Dario A2). To add a new base type, extend this pattern AND register the shape in shared/credential-injector.ts:CredentialShapes (see the file header there for all 5 mirror points)."
+    },
+    "recall_k": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 20,
+      "description": "Epic-012 Story 1: how many past executions the runner semantically recalls and injects into this skill's prompt at run time. Omitted → runner default (RECALL_K_DEFAULT=3). Set 0 to opt a cheap/deterministic skill out of the recall packet. Capped at 20 to bound prompt budget + recall latency."
     }
   }
 }

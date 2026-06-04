@@ -213,8 +213,15 @@ vi.mock("@aws-sdk/client-secrets-manager", () => ({
   ResourceNotFoundException: FakeSmResourceNotFoundException,
 }));
 
+// Epic-012 Story 1: GET /agents/{slug}/recall delegates to recall(); mock it
+// so the route test controls the returned set without the kNN/Voyage path.
+vi.mock("../shared/recall.js", () => ({
+  recall: vi.fn(),
+}));
+
 // SUT must be imported AFTER all vi.mock() calls.
 const { handler } = await import("./handler.js");
+const recallMock = vi.mocked((await import("../shared/recall.js")).recall);
 
 // ─── Helpers ───────────────────────────────────────────────────────────
 
@@ -550,6 +557,62 @@ describe("GET /agents/{slug}/projects (listAgentProjects)", () => {
 });
 
 // ─── Negative: wrong-method / unknown route ────────────────────────────
+
+describe("GET /agents/{slug}/recall (Epic-012 Story 1)", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("400 when q is missing or blank", async () => {
+    const missing = await handler(evt("GET /agents/{slug}/recall", { slug: "sora" }));
+    expect(statusOf(missing)).toBe(400);
+    expect(bodyOf(missing)).toMatchObject({ error: "missing_query" });
+
+    const blank = await handler(evt("GET /agents/{slug}/recall", { slug: "sora" }, { q: "   " }));
+    expect(statusOf(blank)).toBe(400);
+    expect(recallMock).not.toHaveBeenCalled();
+  });
+
+  it("calls recall() caller-scoped to {slug} and maps rows + score", async () => {
+    recallMock.mockResolvedValue([
+      {
+        row: {
+          sk: "EXEC#01HXY",
+          project_id: "self/sora",
+          agent_slug: "sora",
+          skill_name: "article-level2",
+          skill_version: "0.1.0",
+          started_at: "2026-05-18T09:00:00Z",
+          ended_at: "2026-05-18T09:01:00Z",
+          status: "ok",
+          artifact_ref: { summary: "synthesis" },
+        },
+        score: 0.91,
+      },
+    ] as never);
+
+    const res = await handler(evt("GET /agents/{slug}/recall", { slug: "sora" }, { q: "power", k: "5" }));
+    expect(statusOf(res)).toBe(200);
+    const body = bodyOf(res) as { items: Array<Record<string, unknown>> };
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0]).toMatchObject({
+      exec_ulid: "01HXY",
+      score: 0.91,
+      agent_slug: "sora",
+      skill_name: "article-level2",
+      status: "ok",
+    });
+    expect(recallMock.mock.calls[0]![0]).toMatchObject({
+      caller_agent_slug: "sora",
+      query: "power",
+      k: 5,
+    });
+  });
+
+  it("clamps k to PAGE_SIZE_MAX (100)", async () => {
+    recallMock.mockResolvedValue([] as never);
+    await handler(evt("GET /agents/{slug}/recall", { slug: "sora" }, { q: "x", k: "9999" }));
+    expect((recallMock.mock.calls[0]![0] as { k: number }).k).toBe(100);
+  });
+});
 
 describe("route dispatch — negative paths", () => {
   it("POST /projects returns 404 route_not_found (write surface intentionally not exposed per Epic-010 §10)", async () => {

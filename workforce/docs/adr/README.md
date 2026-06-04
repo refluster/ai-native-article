@@ -64,6 +64,7 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0001](adr-0001-record-family-separation.md) | Two record families: activity ledger vs experience memory | Accepted | [012](epics/epic-012-agent-experience.md) |
 | [0002](adr-0002-no-dedicated-vector-store.md) | Semantic recall without a dedicated vector store | Accepted | [010](epics/epic-010-project-trust-boundary.md), [012](epics/epic-012-agent-experience.md) |
 | [0003](adr-0003-experience-storage-split.md) | Experience storage split: narrative in S3, index in DynamoDB | Accepted | [012](epics/epic-012-agent-experience.md) |
+| [0004](adr-0004-workforce-api-custom-domain.md) | Workforce API served from a custom domain (`workforce-api.kohuehara.xyz`) | Accepted | [007](epics/epic-007-agent-management-api.md), [012](epics/epic-012-agent-experience.md) |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](epics/README.md).

@@ -382,6 +382,18 @@ Resources:
               Action: secretsmanager:DescribeSecret
               Resource:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*
+            # Epic-012 Story 1: GET /agents/{slug}/recall embeds the query
+            # via Voyage; recall() resolves voyage.api_key from the project
+            # credential bag (wf/projects/{id}/voyage.api_key, falling back to
+            # wf/projects/_default/voyage.api_key). Scoped to the voyage key
+            # path only — NOT a broad wf/projects/* GetSecretValue — so the
+            # recall route can read the embedding key without widening to
+            # every project credential value.
+            - Sid: AgentsApiRecallVoyageKey
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*/voyage.api_key-*
       Events:
         ListAgents:
           Type: HttpApi
@@ -458,6 +470,15 @@ Resources:
           Properties:
             ApiId: !Ref WfAgentsHttpApi
             Path: /agents/{slug}/executions
+            Method: GET
+        # Epic-012 Story 1: recall inspection surface — same recall() path
+        # the agent-runner uses to ground a run. Public read (CORS-gated),
+        # caller-scoped to {slug} inside recall().
+        GetAgentRecall:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}/recall
             Method: GET
         ListProjects:
           Type: HttpApi

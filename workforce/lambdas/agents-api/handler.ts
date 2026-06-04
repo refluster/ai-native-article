@@ -5,6 +5,7 @@
 //   GET    /agents/{slug}/deliverables      recent DELIV rows (paginated)
 //   GET    /agents/{slug}/projects          projects this agent is an active member of
 //   GET    /agents/{slug}/posts             per-agent activity feed (Epic-011 Story 5)
+//   GET    /agents/{slug}/recall            semantic recall over the agent's ledger (?q=&k=; Epic-012 Story 1)
 //   PATCH  /agents/{slug}                   operational fields only (IAM-auth at API GW)
 //   DELETE /agents/{slug}                   soft delete -> archived=true (IAM-auth at API GW)
 //   GET    /skills                          list of skills (paginated, filterable)
@@ -64,6 +65,7 @@ import {
   type ProjectMemberRow,
   type ProjectMetaRow,
 } from "../shared/project.js";
+import { recall, type RecallResult } from "../shared/recall.js";
 import { CREDENTIAL_TYPES } from "../shared/credential-injector.js";
 import {
   CloudWatchClient,
@@ -152,6 +154,7 @@ export async function handler(
     if (routeKey === "GET /skills/{name}" && skillName) return getSkill(skillName);
     if (routeKey === "GET /agents/{slug}/deliverables" && slug) return listAgentDeliverables(slug, event);
     if (routeKey === "GET /agents/{slug}/executions" && slug) return listAgentExecutions(slug, event);
+    if (routeKey === "GET /agents/{slug}/recall" && slug) return getAgentRecall(slug, event);
     if (routeKey === "GET /agents/{slug}/projects" && slug) return listAgentProjects(slug);
     if (routeKey === "GET /agents/{slug}/posts" && slug) return listAgentPostsRoute(slug, event);
     if (routeKey === "GET /agents/{slug}" && slug) return getAgent(slug);
@@ -741,6 +744,56 @@ async function listAgentExecutions(
     used_credential_types: r.used_credential_types,
     artifact_ref: r.artifact_ref,
     error: r.error,
+  }));
+  return reply(200, { items });
+}
+
+/**
+ * Epic-012 Story 1 — `GET /agents/{slug}/recall?q=&k=`.
+ *
+ * Inspection surface over the SAME `recall()` code path the agent-runner
+ * uses to ground a run. Lets the operator (and a future chat UI) see what an
+ * agent would retrieve for a query. `q` is required (semantic recall);
+ * optional `k`, `project`, `skill`, `from`, `to`, `status` narrow the set.
+ *
+ * Caller-scoped to `{slug}` (an agent recalls its own history; Epic-012 Q2).
+ * The membership trust boundary is enforced inside `recall()` itself.
+ */
+async function getAgentRecall(
+  slug: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const qs = event.queryStringParameters ?? {};
+  const query = (qs.q ?? "").trim();
+  if (!query) return reply(400, { error: "missing_query", detail: "q= is required" });
+  const k = Math.min(
+    Math.max(parseInt(qs.k ?? `${PAGE_SIZE_DEFAULT}`, 10) || PAGE_SIZE_DEFAULT, 1),
+    PAGE_SIZE_MAX,
+  );
+  const status = qs.status as ExecutionRow["status"] | undefined;
+  const results: RecallResult[] = await recall({
+    caller_agent_slug: slug,
+    query,
+    k,
+    embedding_project_id: qs.project ? asProjectId(qs.project) : undefined,
+    project: qs.project ? asProjectId(qs.project) : undefined,
+    skill: qs.skill,
+    from: qs.from,
+    to: qs.to,
+    status,
+  });
+  const items = results.map(({ row, score }) => ({
+    exec_ulid: row.sk.replace(/^EXEC#/, ""),
+    project_id: row.project_id,
+    agent_slug: row.agent_slug,
+    skill_name: row.skill_name,
+    skill_version: row.skill_version,
+    started_at: row.started_at,
+    ended_at: row.ended_at,
+    status: row.status,
+    artifact_ref: row.artifact_ref,
+    error: row.error,
+    score,
   }));
   return reply(200, { items });
 }

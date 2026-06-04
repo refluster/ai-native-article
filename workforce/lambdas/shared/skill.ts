@@ -62,6 +62,12 @@ export interface SkillMeta {
    *  shared/credential-injector.ts:injectCredentials. Absent/empty produces a
    *  sealed bag with no readable keys — undeclared access throws. */
   requires?: string[];
+  /** Epic-012 Story 1: how many past executions to semantically recall and
+   *  inject into the prompt at run time. Omitted → runner default
+   *  (RECALL_K_DEFAULT). Set `0` to opt a cheap/deterministic skill out of
+   *  the recall packet entirely. Validated by scripts/validate-skills.mjs +
+   *  scripts/schemas/skill-meta.schema.json. */
+  recall_k?: number;
 }
 
 export interface LoadedSkill {
