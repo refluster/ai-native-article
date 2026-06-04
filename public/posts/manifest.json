@@ -20,6 +20,16 @@
     "sourceUrls": "https://www.businessinsider.com/xai-macrohard-project-tesla-ai-agent-stalls-2026-3"
   },
   {
+    "slug": "d23079dea47d",
+    "title": "ロボティクスとAIの融合：産業自動化の未来",
+    "type": "explanation",
+    "category": "B: Trends",
+    "date": "2026-04-21",
+    "abstract": "Integration of LLMs into physical hardware for industrial automation.",
+    "image": "/posts/images/d23079dea47d.jpg",
+    "sourceUrls": "https://example.com/robot"
+  },
+  {
     "slug": "e110ebf39c7e",
     "title": "テスラとxAIの新技術「マクロハード」：自律的なソフトウェア企業の未来",
     "type": "explanation",
