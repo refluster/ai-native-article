@@ -1,6 +1,6 @@
 // Minimal service worker to meet PWA install criteria and enable offline shell.
 // Cache is bumped via CACHE_VERSION; bump it whenever the shell changes.
-const CACHE_VERSION = 'v2'
+const CACHE_VERSION = 'v3'
 const CACHE_NAME = `ai-native-l1-${CACHE_VERSION}`
 const SHELL = [
   '/ai-native-article/',
@@ -46,10 +46,24 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(request.url)
   if (url.origin === self.location.origin) {
-    // Network-first for post data (manifest + .md + images) so new L4 publishes
-    // land immediately. Cache-first for the rest of the shell.
-    const isPostData = url.pathname.includes('/posts/')
-    if (isPostData) {
+    // Network-first for data that can change between deploys without a new
+    // hashed filename: post data (manifest + .md + images) so new L4 publishes
+    // land immediately, and the byline manifest (/workforce-agents.json) so a
+    // newly added or renamed agent resolves to its name + role instead of
+    // falling back to the bare slug.
+    //
+    // workforce-agents.json MUST NOT be cache-first: its URL is constant across
+    // deploys, so a once-cached copy is served until CACHE_VERSION bumps. If a
+    // visitor's first request for it predated the file existing, the SPA host
+    // answered with the index.html shell (HTTP 200) and cache-first stored that
+    // HTML under the JSON URL — every later findAuthor() then JSON-parses HTML,
+    // throws, and AuthorChip renders the raw slug (e.g. "elena" instead of
+    // "Elena Singh — VP Customer Experience"). Network-first revalidates on
+    // every load and only falls back to cache when offline.
+    const isFreshData =
+      url.pathname.includes('/posts/') ||
+      url.pathname.endsWith('/workforce-agents.json')
+    if (isFreshData) {
       event.respondWith(
         fetch(request)
           .then(response => {
