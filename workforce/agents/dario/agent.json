@@ -5,7 +5,7 @@
   "residence": "Stockholm, SE",
   "role": "VP Engineering Excellence",
   "model": "anthropic:claude-sonnet-4-6",
-  "prompt_version": "0.2.0",
+  "prompt_version": "0.3.0",
   "budget_monthly_usd": 7,
   "default_project": "workforce-self",
   "streams": [
