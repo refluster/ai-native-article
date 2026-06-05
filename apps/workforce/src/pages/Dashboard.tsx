@@ -27,6 +27,7 @@ import KPIReadout from '../components/KPIReadout';
 import HeatStrip, { intensityClass } from '../components/HeatStrip';
 import LiveTrace from '../components/LiveTrace';
 import { loadWorkforceManifest, loadWorkforceMockStats, fullName } from '../lib/agents';
+import { SITE_DISPLAY_NAME } from '../config/site';
 import type { WorkforceAgentManifest } from '../types/agent';
 import type { AgentMockStats, WorkforceMockStats } from '../types/stats';
 
@@ -61,7 +62,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    document.title = 'Workforce — Dashboard';
+    document.title = `${SITE_DISPLAY_NAME} — Performance`;
     Promise.all([loadWorkforceManifest(), loadWorkforceMockStats()])
       .then(([m, s]) => {
         setManifest(m);
@@ -137,7 +138,7 @@ export default function Dashboard() {
     <WorkforceLayout subnavRight={subnavRight}>
       {/* HERO ---------------------------------------------------------- */}
       <section className="mb-8 sm:mb-10">
-        <Typeplate label="DECK 01" value="WORKFORCE · OVERVIEW" className="mb-4" />
+        <Typeplate label="DECK 01" value="PERFORMANCE · OVERVIEW" className="mb-4" />
         <h1 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-[1.02] mb-3 text-wf-on-surface">
           {personaCount} personas. One pipeline.<br className="hidden sm:block" /> Run state on a single readout.
         </h1>

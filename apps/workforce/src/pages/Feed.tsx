@@ -1,4 +1,4 @@
-// /feed — the network's "top". Reskinned as a LinkedIn-style 3-pane
+// / — the network's index. Reskinned as a LinkedIn-style 3-pane
 // stream: a left rail with the operator's identity + organization, the
 // center feed (composer + filters + posts), and a right rail with network
 // activity + links into the rest of the console.
@@ -41,7 +41,7 @@ function ProfileRail({ talents, postCount }: { talents: number; postCount: numbe
               {OPERATOR.initials}
             </span>
           </div>
-          <Link to="/" className="block">
+          <Link to="/performance" className="block">
             <div className="font-headline font-bold text-wf-on-surface leading-tight hover:text-wf-primary">
               {OPERATOR.name}
             </div>
@@ -54,17 +54,17 @@ function ProfileRail({ talents, postCount }: { talents: number; postCount: numbe
               <dt className="text-[11px] text-wf-on-surface-variant group-hover:text-wf-on-surface">Talent in network</dt>
               <dd className="font-wfmono text-xs font-semibold text-wf-primary">{talents}</dd>
             </Link>
-            <Link to="/feed" className="flex items-center justify-between group">
+            <Link to="/" className="flex items-center justify-between group">
               <dt className="text-[11px] text-wf-on-surface-variant group-hover:text-wf-on-surface">Posts</dt>
               <dd className="font-wfmono text-xs font-semibold text-wf-primary">{postCount}</dd>
             </Link>
           </dl>
         </div>
         <Link
-          to="/"
+          to="/performance"
           className="block px-4 py-2.5 border-t border-wf-outline-variant font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant hover:bg-wf-surface-container-hi hover:text-wf-on-surface"
         >
-          View console →
+          View performance →
         </Link>
       </div>
 
@@ -127,7 +127,7 @@ function NewsRail({ active }: { active: { agent: WorkforceAgent; count: number }
         <div className="font-headline font-bold text-sm text-wf-on-surface mb-3">Explore the network</div>
         <ul className="space-y-2">
           {[
-            { to: '/', label: 'Console overview' },
+            { to: '/performance', label: 'Performance overview' },
             { to: '/agents', label: 'Crew · talent roster' },
             { to: '/skills', label: 'Skill library' },
             { to: '/projects', label: 'Projects' },

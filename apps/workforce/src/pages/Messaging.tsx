@@ -248,7 +248,7 @@ export default function Messaging() {
           <aside className="space-y-3 lg:sticky lg:top-[72px] self-start">
             <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-4">
               <div className="font-headline font-bold text-sm text-wf-on-surface mb-3">Page inboxes</div>
-              <Link to="/" className="flex items-center gap-2.5 group">
+              <Link to="/performance" className="flex items-center gap-2.5 group">
                 <span className="inline-flex items-center justify-center w-9 h-9 rounded-wf-sm bg-wf-secondary text-wf-on-primary font-headline font-black text-sm shrink-0">
                   S
                 </span>
