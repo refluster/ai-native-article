@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-06-04T18:38:24.370Z",
+  "generated_at": "2026-06-05T16:06:59.299Z",
   "skills": [
     {
       "name": "article-draft",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "status": "active",
       "executor": "llm-prose",
       "deliverable": {
@@ -17,20 +17,24 @@
         "dario",
         "elena",
         "farah",
+        "freya",
+        "hana",
         "kai",
         "levi",
         "maya",
+        "mateo",
         "mira",
         "nadia",
         "noor",
         "priya",
         "ren",
+        "sana",
         "sora",
         "theo",
         "vikram",
         "yuki"
       ],
-      "improvement_agent": null,
+      "improvement_agent": "sana",
       "created_at": "2026-05-18",
       "description": "Produce one 400-800 word L1 insight article in Japanese from a single L0 source. Use when an editorial-stream agent needs to convert a pending L0 source entry into a publishable insight piece — one observation, one inference, one disclosure per paragraph, with the bias-disclosure footer appended.",
       "files": [
@@ -44,9 +48,9 @@
         },
         {
           "path": "meta.json",
-          "size": 415,
+          "size": 451,
           "language": "json",
-          "contents": "{\n  \"name\": \"article-draft\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": true\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"aanya\", \"aoi\", \"dario\", \"elena\", \"farah\", \"kai\", \"levi\", \"maya\", \"mira\", \"nadia\", \"noor\", \"priya\", \"ren\", \"sora\", \"theo\", \"vikram\", \"yuki\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-18\"\n}\n",
+          "contents": "{\n  \"name\": \"article-draft\",\n  \"version\": \"0.3.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": true\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"aanya\", \"aoi\", \"dario\", \"elena\", \"farah\", \"freya\", \"hana\", \"kai\", \"levi\", \"maya\", \"mateo\", \"mira\", \"nadia\", \"noor\", \"priya\", \"ren\", \"sana\", \"sora\", \"theo\", \"vikram\", \"yuki\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-18\"\n}\n",
           "truncated": false,
           "binary": false
         }

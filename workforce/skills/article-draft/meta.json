@@ -1,6 +1,6 @@
 {
   "name": "article-draft",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "status": "active",
   "executor": "llm-prose",
   "deliverable": {
@@ -8,7 +8,7 @@
     "publish_notion": true
   },
   "cost_class": "medium",
-  "owners": ["aanya", "aoi", "dario", "elena", "farah", "kai", "levi", "maya", "mira", "nadia", "noor", "priya", "ren", "sora", "theo", "vikram", "yuki"],
-  "improvement_agent": null,
+  "owners": ["aanya", "aoi", "dario", "elena", "farah", "freya", "hana", "kai", "levi", "maya", "mateo", "mira", "nadia", "noor", "priya", "ren", "sana", "sora", "theo", "vikram", "yuki"],
+  "improvement_agent": "sana",
   "created_at": "2026-05-18"
 }
