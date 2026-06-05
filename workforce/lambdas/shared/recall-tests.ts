@@ -90,6 +90,15 @@ vi.mock("./voyage.js", () => ({
   VOYAGE_DIM: 3, // tiny dim for fixture clarity
 }));
 
+// Epic-012 Story 4: recall emits latency + vintage-mismatch metrics. Mock
+// the emitter so unit tests don't reach CloudWatch.
+const latencyMock = vi.fn();
+const vintageMock = vi.fn();
+vi.mock("./recall-metrics.js", () => ({
+  emitRecallLatency: latencyMock,
+  emitVintageMismatch: vintageMock,
+}));
+
 // Import AFTER mocks.
 const project = await import("./project.js");
 const recall = await import("./recall.js");
@@ -115,6 +124,9 @@ async function seedExec(
     status?: "ok" | "throw" | "skipped";
     embedding?: Float32Array;
     embeddingStatus?: "ok" | "pending" | "skipped";
+    /** Override the stored embedding model id (Epic-012 Story 4 vintage
+     *  tests). Defaults to the current model. */
+    modelId?: string;
   },
 ) {
   const hasEmbedding = opts.embedding !== undefined;
@@ -128,7 +140,7 @@ async function seedExec(
     ended_at: opts.startedAt,
     status: opts.status ?? "ok",
     embedding_bytes: hasEmbedding ? encodeEmbeddingBytes(opts.embedding!) : undefined,
-    embedding_model_id: hasEmbedding ? "voyage-3-lite" : undefined,
+    embedding_model_id: hasEmbedding ? (opts.modelId ?? "voyage-3-lite") : undefined,
     embedding_dim: hasEmbedding ? opts.embedding!.length : undefined,
     embedding_status: opts.embeddingStatus ?? (hasEmbedding ? "ok" : "pending"),
   });
@@ -527,6 +539,68 @@ describe("recall() dispatch", () => {
     });
     expect(r.map((x) => x.row.sk)).toEqual(["EXEC#01X"]);
     expect(embedMock).toHaveBeenCalledOnce();
+  });
+});
+
+// ─── Epic-012 Story 4 — embedding-vintage guard ───────────────────────
+
+describe("recallSemantic — embedding-model-vintage guard (Story 4)", () => {
+  const alpha = "alpha" as ProjectId;
+
+  beforeEach(async () => {
+    await seedProject(alpha, ["ren"]);
+  });
+
+  it("throws RecallVintageMismatchError when the candidate set spans >1 model", async () => {
+    await seedExec(alpha, { agent: "ren", ulid: "01A", skill: "s", startedAt: "2026-05-20T00:00:00.000Z", embedding: Float32Array.from([1, 0, 0]), modelId: "voyage-3-lite" });
+    await seedExec(alpha, { agent: "ren", ulid: "01B", skill: "s", startedAt: "2026-05-21T00:00:00.000Z", embedding: Float32Array.from([0, 1, 0]), modelId: "voyage-4-next" });
+    embedMock.mockResolvedValueOnce({ embedding: Float32Array.from([1, 0, 0]), modelId: "voyage-3-lite", dim: 3, tokensIn: 5 });
+
+    await expect(
+      recall.recallSemantic({ caller_agent_slug: "ren", query: "x", k: 5, embedding_project_id: alpha }),
+    ).rejects.toThrow(recall.RecallVintageMismatchError);
+    expect(vintageMock).toHaveBeenCalledOnce();
+  });
+
+  it("throws when the corpus is single-vintage but differs from the query's model", async () => {
+    await seedExec(alpha, { agent: "ren", ulid: "01A", skill: "s", startedAt: "2026-05-20T00:00:00.000Z", embedding: Float32Array.from([1, 0, 0]), modelId: "voyage-3-lite" });
+    // Query embedded with a newer model than the (uniform) stored corpus.
+    embedMock.mockResolvedValueOnce({ embedding: Float32Array.from([1, 0, 0]), modelId: "voyage-4-next", dim: 3, tokensIn: 5 });
+
+    await expect(
+      recall.recallSemantic({ caller_agent_slug: "ren", query: "x", k: 5, embedding_project_id: alpha }),
+    ).rejects.toThrow(/re-embed the corpus onto voyage-4-next/);
+  });
+
+  it("does NOT throw when corpus and query share one model (steady state)", async () => {
+    await seedExec(alpha, { agent: "ren", ulid: "01A", skill: "s", startedAt: "2026-05-20T00:00:00.000Z", embedding: Float32Array.from([1, 0, 0]), modelId: "voyage-3-lite" });
+    embedMock.mockResolvedValueOnce({ embedding: Float32Array.from([1, 0, 0]), modelId: "voyage-3-lite", dim: 3, tokensIn: 5 });
+
+    const r = await recall.recallSemantic({ caller_agent_slug: "ren", query: "x", k: 5, embedding_project_id: alpha });
+    expect(r.map((x) => x.row.sk)).toEqual(["EXEC#01A"]);
+    expect(vintageMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("recall() dispatch — latency metric (Story 4)", () => {
+  const alpha = "alpha" as ProjectId;
+
+  it("emits WfRecallLatencyMs once per call (structured path)", async () => {
+    await seedProject(alpha, ["ren"]);
+    await seedExec(alpha, { agent: "ren", ulid: "01A", skill: "s", startedAt: "2026-05-20T00:00:00.000Z" });
+    await recall.recall({ caller_agent_slug: "ren", project: alpha });
+    expect(latencyMock).toHaveBeenCalledOnce();
+  });
+
+  it("emits latency even when the call throws (finally)", async () => {
+    await seedProject(alpha, ["ren"]);
+    await seedExec(alpha, { agent: "ren", ulid: "01A", skill: "s", startedAt: "2026-05-20T00:00:00.000Z", embedding: Float32Array.from([1, 0, 0]), modelId: "voyage-3-lite" });
+    await seedExec(alpha, { agent: "ren", ulid: "01B", skill: "s", startedAt: "2026-05-21T00:00:00.000Z", embedding: Float32Array.from([0, 1, 0]), modelId: "voyage-4-next" });
+    embedMock.mockResolvedValueOnce({ embedding: Float32Array.from([1, 0, 0]), modelId: "voyage-3-lite", dim: 3, tokensIn: 5 });
+    await expect(
+      recall.recall({ caller_agent_slug: "ren", query: "x", k: 5, embedding_project_id: alpha }),
+    ).rejects.toThrow(recall.RecallVintageMismatchError);
+    expect(latencyMock).toHaveBeenCalledOnce();
   });
 });
 
