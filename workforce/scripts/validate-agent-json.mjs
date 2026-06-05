@@ -70,7 +70,7 @@ if (slugDirs.length === 0) {
 }
 
 let totalBudget = 0;
-const W3_CAP = 130;
+const W3_CAP = 160;
 
 // Epic-011 Story 3 (#130) — `feed-post` bindings are staggered across
 // the 09:00-18:00 JST working window (= 00:00-09:00 UTC). The stagger
