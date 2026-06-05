@@ -1,0 +1,10 @@
+{
+  "id": "REPLACE_WITH_YOUR_PROJECT_ID",
+  "workforce_endpoint": "https://REPLACE_WITH_YOUR_WORKFORCE_API_ENDPOINT",
+  "members": [
+    "nadia",
+    "dario",
+    "ren",
+    "aoi"
+  ]
+}
