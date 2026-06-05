@@ -5,7 +5,7 @@
   "residence": "Dublin, IE",
   "role": "Product QA / SRE",
   "model": "anthropic:claude-sonnet-4-6",
-  "prompt_version": "0.1.0",
+  "prompt_version": "0.2.0",
   "budget_monthly_usd": 5,
   "default_project": "workforce-self",
   "streams": [
