@@ -340,7 +340,11 @@ Resources:
               Resource: "*"
               Condition:
                 StringEquals:
-                  cloudwatch:namespace: Workforce/AgentsApi
+                  cloudwatch:namespace:
+                    - Workforce/AgentsApi
+                    # Epic-012 Story 4: GET /agents/{slug}/recall emits
+                    # WfRecallLatencyMs / WfRecallVintageMismatch via recall().
+                    - Workforce/Recall
             # Epic-011 Story 5 (#132) — `GET /feed/{post_id}` hydrates
             # post bodies from S3 (`posts/{slug}/{yyyy}/{mm}/{ulid}.md`).
             # No write needed — the feed-post skill (Story 1) writes; the
@@ -1061,6 +1065,9 @@ Resources:
                   cloudwatch:namespace:
                     - Workforce/Runner
                     - Workforce/Credentials
+                    # Epic-012 Story 4: the runner's recall packet path emits
+                    # WfRecallLatencyMs / WfRecallVintageMismatch via recall().
+                    - Workforce/Recall
       Environment:
         Variables:
           ENGINEER_OWNER: !Ref EngineerOwner

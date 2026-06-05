@@ -52,6 +52,31 @@ import {
 import type { AgentSlug } from "./agent.js";
 import { decodeEmbeddingBytes, topKByCosine, cosine } from "./embedding.js";
 import { embedText } from "./voyage.js";
+import { emitRecallLatency, emitVintageMismatch } from "./recall-metrics.js";
+
+/**
+ * Thrown (Epic-012 Story 4) when the embedded candidate set is not a single
+ * embedding-model vintage, or when that vintage differs from the query's
+ * model. Cosine across two embedding spaces is meaningless, so recall
+ * fails LOUD rather than silently ranking garbage. The fix is a re-embedding
+ * sweep onto the current model (see ADR-0002 §Consequences). The runner's
+ * `buildRecallBlock` catches this fail-soft (empty recall block, run
+ * proceeds); the agents-api recall route surfaces it as a 500 to the
+ * operator. Each occurrence also ticks `WfRecallVintageMismatch`.
+ */
+export class RecallVintageMismatchError extends Error {
+  readonly models: string[];
+  readonly queryModel: string;
+  constructor(models: string[], queryModel: string) {
+    super(
+      `recall: embedded candidates span models [${models.join(", ")}] vs query model ${queryModel} — ` +
+        `cosine across embedding spaces is invalid; re-embed the corpus onto ${queryModel} (ADR-0002)`,
+    );
+    this.name = "RecallVintageMismatchError";
+    this.models = models;
+    this.queryModel = queryModel;
+  }
+}
 
 /** Common bound on returned rows / kNN candidates. */
 const DEFAULT_K = 5;
@@ -209,9 +234,22 @@ export async function recallSemantic(
     inputType: "query",
   });
 
-  // Dim safety: a query embedding with a different `dim` than the
-  // stored vectors must not silently rank — `cosine()` would throw,
-  // but a clearer error here is cheaper to debug.
+  // Vintage safety (Epic-012 Story 4): cosine is only meaningful within a
+  // single embedding space. If the candidate set spans more than one
+  // `embedding_model_id`, or that model differs from the query's model, the
+  // kNN would silently rank across incompatible spaces. Fail LOUD instead —
+  // the operator's signal to run a re-embedding sweep (ADR-0002). The
+  // pre-existing dim check is subsumed: a model change usually changes dim,
+  // but two models can share a dim (e.g. both 512), which only the model-id
+  // check catches.
+  const candidateModels = [...new Set(candidates.map((c) => c.row.embedding_model_id ?? "unknown"))];
+  if (candidateModels.length > 1 || candidateModels[0] !== queryResult.modelId) {
+    await emitVintageMismatch();
+    throw new RecallVintageMismatchError(candidateModels, queryResult.modelId);
+  }
+
+  // Dim safety: defence-in-depth behind the vintage check above — a query
+  // embedding whose `dim` differs from the stored vectors must not rank.
   const firstCandDim = candidates[0]!.row.embedding_dim;
   if (queryResult.dim !== firstCandDim) {
     throw new Error(
@@ -263,10 +301,19 @@ export type RecallInput =
   | RecallSemanticInput;
 
 export async function recall(input: RecallInput): Promise<RecallResult[]> {
-  if ("query" in input && typeof input.query === "string") {
-    return recallSemantic(input);
+  // Epic-012 Story 4: per-call latency → WfRecallLatencyMs (CloudWatch p95
+  // over this is the ADR-0002 migration trigger). Measured around BOTH
+  // dispatch arms, including the error path, so a slow-then-throwing call
+  // still shows up. Emission is best-effort and never alters the result.
+  const t0 = Date.now();
+  try {
+    if ("query" in input && typeof input.query === "string") {
+      return await recallSemantic(input);
+    }
+    return await recallStructured(input as RecallStructuredInput);
+  } finally {
+    await emitRecallLatency(Date.now() - t0);
   }
-  return recallStructured(input as RecallStructuredInput);
 }
 
 // --- Helpers -------------------------------------------------------------

@@ -181,9 +181,11 @@ Embedding write attributes on each `EXEC` row:
 The recall path is intentionally swappable behind `agent.recall(query)`. The migration to a dedicated vector engine (OpenSearch Serverless k-NN, pgvector, or successor) is triggered by **either** of the following conditions being observed for ≥ 1 week:
 
 - **Per-agent executions > 50,000.** Beyond this the GSI1 partition for a single agent stops being trivially cheap to scan, and the brute-force kNN starts to dominate the recall Lambda's duration budget.
-- **`recall` p95 latency > 1 s.** Measured by a CloudWatch metric emitted from the recall Lambda. The 1 s ceiling is set against the operator chat surface's interactive responsiveness target; anything beyond it degrades the user-facing experience independently of execution count.
+- **`recall` p95 latency > 1 s.** Measured by the **`WfRecallLatencyMs`** CloudWatch metric (`Workforce/Recall` namespace), emitted per call by `recall()` (Epic-012 Story 4). The 1 s ceiling is set against the operator chat surface's interactive responsiveness target; anything beyond it degrades the user-facing experience independently of execution count.
 
 When triggered, the migration is a Zone A doc amendment (this section + the corresponding Epic-010 §9 paragraph) plus a Zone B engine swap behind the existing recall interface — no schema changes to callers.
+
+**Vintage guard (Epic-012 Story 4).** `recallSemantic` will not rank across embedding spaces: if the embedded candidate set spans more than one `embedding_model_id`, or that vintage differs from the query's model, it throws `RecallVintageMismatchError` and ticks **`WfRecallVintageMismatch`** — the operator's signal to run a re-embedding sweep onto the current `VOYAGE_MODEL_ID`. See [ADR-0002 §Consequences](adr/adr-0002-no-dedicated-vector-store.md) for the re-embedding policy.
 
 ## What's deliberately NOT in the data model
 
