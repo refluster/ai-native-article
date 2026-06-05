@@ -2,7 +2,8 @@
 // Routes:
 //   GET    /agents                          list (paginated, filterable)
 //   GET    /agents/{slug}                   single agent
-//   GET    /agents/{slug}/deliverables      recent DELIV rows (paginated)
+//   GET    /agents/{slug}/deliverables      LEGACY DELIV rows (historical; no SPA caller — EXEC is canonical, see Story 3 #216)
+//   GET    /agents/{slug}/executions        canonical activity ledger — EXEC rows via GSI1 (the agent-profile task log)
 //   GET    /agents/{slug}/projects          projects this agent is an active member of
 //   GET    /agents/{slug}/posts             per-agent activity feed (Epic-011 Story 5)
 //   GET    /agents/{slug}/recall            semantic recall over the agent's ledger (?q=&k=; Epic-012 Story 1)
@@ -301,6 +302,15 @@ async function getSkill(name: string): Promise<APIGatewayProxyResultV2> {
   return reply(200, toSkillApiView(row));
 }
 
+// LEGACY (Epic-010 C2/C3 cutover — reconciled by Epic-012 Story 3 #216).
+// Reads the legacy `AGENT#{slug}/DELIV#{ulid}` rows, whose SUCCESS-path
+// writes were removed at the C2 cutover (the runner is EXEC-only on success;
+// see workforce/lambdas/agent-runner/dual-write-tests.ts). The SPA's
+// agent-profile activity list migrated to `GET /agents/{slug}/executions`
+// (the EXEC family, GSI1) — `fetchAgentDeliverables` was removed, so this
+// route has NO front-end caller. It is retained only to read historical
+// DELIV rows written before the cutover. The canonical activity source is
+// the EXEC ledger; do not wire new readers to this route.
 async function listAgentDeliverables(
   slug: string,
   event: APIGatewayProxyEventV2,

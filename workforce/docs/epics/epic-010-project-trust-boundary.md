@@ -197,7 +197,7 @@ This Epic is therefore **kept whole under the cheaper recall path**. The earlier
   - The presigned-URL emitter rejects an `exec_ulid` whose row lives under a different `project_id` prefix; verified by a deny test.
   - `self/{slug}` projects are filtered out of the default index view; visible from `/workforce/agents/:slug` and via `?include_self=true`.
   - The SPA falls back to a static `apps/workforce/public/workforce-projects-mock.json` until Story 1-B's dual-write is on; the flip to live data is a follow-up commit, not a separate Story.
-- This Epic's `Status` flips to `Implemented` only when (a) every `wf/{type}` legacy key is removed, (b) the dual-write window has ended, (c) the front-end agent-profile view reads from the new row family, and (d) Story 3's projects console is live on `workforce.kohuehara.xyz` reading live DDB data.
+- This Epic's `Status` flips to `Implemented` only when (a) every `wf/{type}` legacy key is removed, (b) the dual-write window has ended, (c) the front-end agent-profile view reads from the new row family, and (d) Story 3's projects console is live on `workforce.kohuehara.xyz` reading live DDB data. **Status (reconciled 2026-06-05 by Epic-012 Story 3, [#216](https://github.com/refluster/ai-native-article/issues/216)): (b) ✅ done** — the success-path dual-write is removed (EXEC-only; enforced by the `dual-write-tests.ts` structural absence tests); **(c) ✅ done** — `AgentProfile.tsx` reads `fetchAgentExecutions` (GSI1 EXEC), legacy DELIV/RUN reads removed. **(a) and (d) remain**, so the Epic stays `Draft`.
 
 ## Open questions
 
