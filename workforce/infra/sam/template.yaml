@@ -1308,6 +1308,105 @@ Resources:
       AlarmActions:
         - !Ref WfAlarmTopic
 
+  # --- Memory compactor Lambda (Epic-012 Story 2) ---------------------------
+  # Nightly sweep that folds each agent's accumulated run chunks into a
+  # rolling long-term-memory summary. One summariser LLM call per compacting
+  # agent. Modelled on wf-audit (standalone scheduled Lambda, not a skill).
+  WfMemoryCompactorFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-memory-compactor-${Stage}
+      CodeUri: ../../lambdas/memory-compactor
+      Handler: handler.handler
+      Description: Nightly memory compaction — rolling long-term-memory summary per agent. Epic-012 Story 2.
+      MemorySize: 512
+      Timeout: 300
+      Policies:
+        - Statement:
+            - Sid: CompactorTableRw
+              Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt WfTable.Arn
+            - Sid: CompactorMemoryS3Rw
+              # Reads run chunks + prior summary, writes the new summary chunk.
+              # Scoped to memory/* — the only prefix this Lambda touches.
+              Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/memory/*
+            - Sid: CompactorAnthropicRead
+              # The summariser model key. wf/anthropic is the legacy bare key
+              # complete() reads (shared/llm-anthropic.ts); kept until the
+              # Epic-010 §6 bare-key deletion lands.
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/anthropic-*
+            - Sid: CompactorPutMetric
+              Effect: Allow
+              Action: cloudwatch:PutMetricData
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace: Workforce/Memory
+      Events:
+        NightlyTick:
+          Type: Schedule
+          Properties:
+            Name: !Sub wf-memory-compactor-tick-${Stage}
+            Description: Drives the nightly memory-compaction sweep.
+            # 05:00 UTC = 14:00 JST — one hour after wf-audit, same quiet
+            # window; compaction reads the same table the audit just swept.
+            Schedule: cron(0 5 * * ? *)
+            Enabled: true
+      Tags:
+        workforce: !Ref Stage
+
+  WfMemoryCompactorErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-memory-compactor-errors-alarm-${Stage}
+      AlarmDescription: !Sub The wf-memory-compactor-${Stage} Lambda is erroring.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfMemoryCompactorFunction
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  WfMemoryCompactionIdentityLossAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-memory-compaction-identity-loss-alarm-${Stage}
+      AlarmDescription: !Sub Compaction dropped an agent identity fact in wf-table-${Stage} (Epic-012 persona-integrity breach).
+      Namespace: Workforce/Memory
+      MetricName: WfMemoryCompactionIdentityLoss
+      Dimensions:
+        - Name: Stage
+          Value: !Ref Stage
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
   # --- Epic-010 observability dashboard (FU-NEW-A, Issue #150 B6) -------------
   # Single CloudWatch Dashboard surfacing every metric Epic-010 introduced:
   #
