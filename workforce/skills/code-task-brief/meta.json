@@ -5,6 +5,6 @@
   "executor": "claude-code-routine",
   "cost_class": "medium",
   "owners": ["ren"],
-  "improvement_agent": null,
+  "improvement_agent": "sana",
   "created_at": "2026-05-18"
 }
