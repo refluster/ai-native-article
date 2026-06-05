@@ -13,7 +13,7 @@
   "owners": [
     "elena"
   ],
-  "improvement_agent": null,
+  "improvement_agent": "sana",
   "created_at": "2026-06-04",
   "requires": [
     "notion.integration_token"

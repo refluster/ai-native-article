@@ -9,6 +9,6 @@
   },
   "cost_class": "medium",
   "owners": ["aoi"],
-  "improvement_agent": null,
+  "improvement_agent": "sana",
   "created_at": "2026-05-18"
 }

@@ -6,7 +6,7 @@
   "executor": "claude-code-routine",
   "cost_class": "small",
   "owners": ["yuki"],
-  "improvement_agent": null,
+  "improvement_agent": "sana",
   "created_at": "2026-05-31",
   "requires": ["discord.webhook_url"]
 }

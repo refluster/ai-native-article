@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-05T20:18:28.747Z",
+  "generated_at": "2026-06-05T20:21:11.874Z",
   "skills": [
     {
       "name": "article-draft",
@@ -70,7 +70,7 @@
       "owners": [
         "elena"
       ],
-      "improvement_agent": null,
+      "improvement_agent": "sana",
       "created_at": "2026-06-01",
       "description": "Convert one L1 source entry into one L2 explanation (briefing-document) article in Japanese — the agent-workforce equivalent of the GAS L1→L2 batch. Use when an editorial-stream agent must turn an uncovered L1 source into a faithful, evidence-grounded explanation: an Executive Summary up front, source-specific section headings, and every number/name/date/quote taken verbatim from the source. Published to Notion as Type=explanation, Author={agent_slug}, Status=ready.",
       "files": [
@@ -84,9 +84,9 @@
         },
         {
           "path": "meta.json",
-          "size": 390,
+          "size": 392,
           "language": "json",
-          "contents": "{\n  \"name\": \"article-level2\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": false,\n    \"article_type\": \"explanation\"\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"elena\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-06-01\",\n  \"requires\": [\"notion.integration_token\"]\n}\n",
+          "contents": "{\n  \"name\": \"article-level2\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": false,\n    \"article_type\": \"explanation\"\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"elena\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-06-01\",\n  \"requires\": [\"notion.integration_token\"]\n}\n",
           "truncated": false,
           "binary": false
         },
@@ -122,7 +122,7 @@
       "owners": [
         "elena"
       ],
-      "improvement_agent": null,
+      "improvement_agent": "sana",
       "created_at": "2026-06-04",
       "description": "Synthesize 3 recent L2 explanation articles into one L3 analysis (insight) article in Japanese via inductive reasoning — the agent-workforce equivalent of the GAS L3_BATCH/handleL3Create pipeline. Use when an editorial-stream agent must find the deeper principle connecting several ostensibly-unrelated explanations and project its implications. Published to the unified Notion Articles DB as Type=analysis, Author={agent_slug}, Status=ready.",
       "files": [
@@ -136,9 +136,9 @@
         },
         {
           "path": "meta.json",
-          "size": 402,
+          "size": 404,
           "language": "json",
-          "contents": "{\n  \"name\": \"article-level3\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": false,\n    \"article_type\": \"analysis\"\n  },\n  \"cost_class\": \"large\",\n  \"owners\": [\n    \"elena\"\n  ],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-06-04\",\n  \"requires\": [\n    \"notion.integration_token\"\n  ]\n}\n",
+          "contents": "{\n  \"name\": \"article-level3\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": false,\n    \"article_type\": \"analysis\"\n  },\n  \"cost_class\": \"large\",\n  \"owners\": [\n    \"elena\"\n  ],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-06-04\",\n  \"requires\": [\n    \"notion.integration_token\"\n  ]\n}\n",
           "truncated": false,
           "binary": false
         },
@@ -170,7 +170,7 @@
       "owners": [
         "ren"
       ],
-      "improvement_agent": null,
+      "improvement_agent": "sana",
       "created_at": "2026-05-18",
       "description": "Produce a task brief for the engineer Claude Code routine — what to change, why, acceptance criteria. Use when the Engineer persona needs to dispatch implementation work to the workforce-engineer-routine.yml GHA workflow (the R-N1 exception path); the brief is what the CC routine reads as its instructions before writing code.",
       "files": [
@@ -184,9 +184,9 @@
         },
         {
           "path": "meta.json",
-          "size": 219,
+          "size": 221,
           "language": "json",
-          "contents": "{\n  \"name\": \"code-task-brief\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"claude-code-routine\",\n  \"cost_class\": \"medium\",\n  \"owners\": [\"ren\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-18\"\n}\n",
+          "contents": "{\n  \"name\": \"code-task-brief\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"claude-code-routine\",\n  \"cost_class\": \"medium\",\n  \"owners\": [\"ren\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-18\"\n}\n",
           "truncated": false,
           "binary": false
         }
@@ -205,7 +205,7 @@
       "owners": [
         "aoi"
       ],
-      "improvement_agent": null,
+      "improvement_agent": "sana",
       "created_at": "2026-05-18",
       "description": "Produce one design note in Japanese — intent, information architecture, components, and acceptance criteria — for a UI or visual-system change. Use when the Designer persona needs to capture a design decision in a reviewable form before any implementation PR opens.",
       "files": [
@@ -219,9 +219,9 @@
         },
         {
           "path": "meta.json",
-          "size": 283,
+          "size": 285,
           "language": "json",
-          "contents": "{\n  \"name\": \"design-note\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"design-doc\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"aoi\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-18\"\n}\n",
+          "contents": "{\n  \"name\": \"design-note\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"design-doc\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"aoi\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-18\"\n}\n",
           "truncated": false,
           "binary": false
         }
@@ -237,7 +237,7 @@
       "owners": [
         "priya"
       ],
-      "improvement_agent": null,
+      "improvement_agent": "sana",
       "created_at": "2026-06-02",
       "description": "Write one weekly team digest — a short roll-up of what the workforce shipped over the past 7 days — and post it to the team Discord channel. Reads the public activity feed and recent executions across agents, groups the week's notable deliverables, posts and decisions into a few themed lines in the persona's voice, then posts a single embed via the injected Discord webhook. Use when an agent should leave a once-a-week, human-scannable summary of team progress in Discord; skip the fire if the week produced nothing worth summarizing. Not for per-event pings (use discord-heartbeat) or long-form articles (use article-draft).",
       "files": [
@@ -251,9 +251,9 @@
         },
         {
           "path": "meta.json",
-          "size": 300,
+          "size": 302,
           "language": "json",
-          "contents": "{\n  \"name\": \"discord-digest\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"claude-code-routine\",\n  \"cost_class\": \"small\",\n  \"owners\": [\n    \"priya\"\n  ],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-06-02\",\n  \"requires\": [\n    \"discord.webhook_url\"\n  ]\n}\n",
+          "contents": "{\n  \"name\": \"discord-digest\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"claude-code-routine\",\n  \"cost_class\": \"small\",\n  \"owners\": [\n    \"priya\"\n  ],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-06-02\",\n  \"requires\": [\n    \"discord.webhook_url\"\n  ]\n}\n",
           "truncated": false,
           "binary": false
         },
@@ -277,7 +277,7 @@
       "owners": [
         "yuki"
       ],
-      "improvement_agent": null,
+      "improvement_agent": "sana",
       "created_at": "2026-05-31",
       "description": "Post a single liveness heartbeat embed to the team Discord channel via webhook URL. CCR-routed sibling of the deterministic `discord-ping` skill — same intent (the workforce's dispatch chain is alive), different execution surface (CCR session via agent-runner.md). Deterministic-shape: the CCR session invokes the bundled `post.mjs` script verbatim; no LLM construction of the webhook payload. Reads the Discord webhook URL from the active project's credential bag (`discord.webhook_url`); does NOT use environment variables or special-case secret paths.",
       "files": [
@@ -291,9 +291,9 @@
         },
         {
           "path": "meta.json",
-          "size": 286,
+          "size": 288,
           "language": "json",
-          "contents": "{\n  \"name\": \"discord-heartbeat\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"claude-code-routine\",\n  \"cost_class\": \"small\",\n  \"owners\": [\"yuki\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-31\",\n  \"requires\": [\"discord.webhook_url\"]\n}\n",
+          "contents": "{\n  \"name\": \"discord-heartbeat\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"claude-code-routine\",\n  \"cost_class\": \"small\",\n  \"owners\": [\"yuki\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-31\",\n  \"requires\": [\"discord.webhook_url\"]\n}\n",
           "truncated": false,
           "binary": false
         },
@@ -317,7 +317,7 @@
       "owners": [
         "yuki"
       ],
-      "improvement_agent": null,
+      "improvement_agent": "sana",
       "created_at": "2026-05-22",
       "description": "Post a color-coded liveness heartbeat embed to the team Discord channel. Documents the operational shape of the deterministic runner-side handler so a human or a Claude-Code persona reading this file knows exactly what fires when the matching agent.binding's cron triggers. Doubles as the workforce's at-a-glance health-check / uptime monitor — a quiet Discord channel for >2h means the dispatch chain is broken. The runner's discord-ping handler executes this verbatim — no LLM is involved at runtime.",
       "files": [
@@ -339,9 +339,9 @@
         },
         {
           "path": "meta.json",
-          "size": 210,
+          "size": 212,
           "language": "json",
-          "contents": "{\n  \"name\": \"discord-ping\",\n  \"version\": \"0.4.0\",\n  \"status\": \"active\",\n  \"executor\": \"deterministic\",\n  \"cost_class\": \"small\",\n  \"owners\": [\"yuki\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-22\"\n}\n",
+          "contents": "{\n  \"name\": \"discord-ping\",\n  \"version\": \"0.4.0\",\n  \"status\": \"active\",\n  \"executor\": \"deterministic\",\n  \"cost_class\": \"small\",\n  \"owners\": [\"yuki\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-22\"\n}\n",
           "truncated": false,
           "binary": false
         }
@@ -432,7 +432,7 @@
         "vikram",
         "yuki"
       ],
-      "improvement_agent": null,
+      "improvement_agent": "sana",
       "created_at": "2026-05-27",
       "description": "Write one short first-person micro-post (~280–600 characters) for the workforce activity feed. Reads 5–10 recent execution rows, optionally a memory chunk or two and pending TASK rows, then picks one thing worth saying — a reflection, sensed friction, improvement proposal, or neutral observation. Emits the literal token __SKIP_NO_MATERIAL__ if nothing today is worth saying. The post body is **always in English**, regardless of the persona's primary article voice (which may be Japanese — feed-post is a workforce-internal trial surface kept English-only for review consistency).",
       "files": [
@@ -462,9 +462,9 @@
         },
         {
           "path": "meta.json",
-          "size": 488,
+          "size": 490,
           "language": "json",
-          "contents": "{\n  \"name\": \"feed-post\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"notification\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"small\",\n  \"owners\": [\"aanya\", \"aoi\", \"dario\", \"elena\", \"farah\", \"kai\", \"levi\", \"maya\", \"mira\", \"nadia\", \"noor\", \"priya\", \"ren\", \"sora\", \"theo\", \"vikram\", \"yuki\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-27\",\n  \"requires\": [\"workforce.feed_write_token\"]\n}\n",
+          "contents": "{\n  \"name\": \"feed-post\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"notification\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"small\",\n  \"owners\": [\"aanya\", \"aoi\", \"dario\", \"elena\", \"farah\", \"kai\", \"levi\", \"maya\", \"mira\", \"nadia\", \"noor\", \"priya\", \"ren\", \"sora\", \"theo\", \"vikram\", \"yuki\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-27\",\n  \"requires\": [\"workforce.feed_write_token\"]\n}\n",
           "truncated": false,
           "binary": false
         },
@@ -491,7 +491,7 @@
       "owners": [
         "sora"
       ],
-      "improvement_agent": null,
+      "improvement_agent": "sana",
       "created_at": "2026-05-18",
       "description": "Produce one weekly-synthesis article in Japanese (800-1500 words) integrating the week's external signals the agent has memory of, with a falsifiable position. Use when the Researcher/Analyst persona is writing the weekly synthesis cadence (Sora's Sunday 23:00 JST run), not the twice-daily L0→L1 articles.",
       "files": [
@@ -505,9 +505,9 @@
         },
         {
           "path": "meta.json",
-          "size": 283,
+          "size": 285,
           "language": "json",
-          "contents": "{\n  \"name\": \"market-research\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": true\n  },\n  \"cost_class\": \"large\",\n  \"owners\": [\"sora\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-18\"\n}\n",
+          "contents": "{\n  \"name\": \"market-research\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": true\n  },\n  \"cost_class\": \"large\",\n  \"owners\": [\"sora\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-18\"\n}\n",
           "truncated": false,
           "binary": false
         }
@@ -606,7 +606,7 @@
       "owners": [
         "maya"
       ],
-      "improvement_agent": null,
+      "improvement_agent": "sana",
       "created_at": "2026-05-18",
       "description": "Produce one 600-1200 word hypothesis-style plan in Japanese — a clear claim, why-now, what would falsify it, and the next step if false. Use when the PM/Founder persona is writing roadmap or hypothesis content that needs to be measurable against reality, not aspirational prose.",
       "files": [
@@ -620,9 +620,9 @@
         },
         {
           "path": "meta.json",
-          "size": 277,
+          "size": 279,
           "language": "json",
-          "contents": "{\n  \"name\": \"plan-write\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"plan\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"maya\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-18\"\n}\n",
+          "contents": "{\n  \"name\": \"plan-write\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"plan\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"maya\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-18\"\n}\n",
           "truncated": false,
           "binary": false
         }
@@ -641,7 +641,7 @@
       "owners": [
         "yuki"
       ],
-      "improvement_agent": null,
+      "improvement_agent": "sana",
       "created_at": "2026-05-18",
       "description": "Produce one launch / positioning artefact in Japanese — positioning, audience, channel, success metric, retraction trigger. Use when the GTM/Customer persona is committing a launch or message to writing in a form that can be evaluated against real channels and real audiences after the fact.",
       "files": [
@@ -655,9 +655,9 @@
         },
         {
           "path": "meta.json",
-          "size": 291,
+          "size": 293,
           "language": "json",
-          "contents": "{\n  \"name\": \"positioning-write\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"launch-plan\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"yuki\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-18\"\n}\n",
+          "contents": "{\n  \"name\": \"positioning-write\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"launch-plan\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"yuki\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-18\"\n}\n",
           "truncated": false,
           "binary": false
         }
@@ -674,7 +674,7 @@
         "nadia",
         "maya"
       ],
-      "improvement_agent": null,
+      "improvement_agent": "sana",
       "created_at": "2026-05-30",
       "description": "Workforce skill that routes a target-repo PR to 1-3 reviewer personas under the invoking agent's lens (today Nadia's PdM lens). Reads the PR + linked Story, applies the invoker's `binding_config.nomination_rules` to decide reviewers, and posts a single routing comment to the PR. Lambda-resident; project-scoped credentials per Epic-010 §5. Verdict mode (the second leg of the pr-route contract documented in workforce/docs/routines/pr-route.md) lands in Phase 7 PR3b.",
       "files": [
@@ -704,9 +704,9 @@
         },
         {
           "path": "meta.json",
-          "size": 248,
+          "size": 250,
           "language": "json",
-          "contents": "{\n  \"name\": \"pr-route\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"executor\": \"deterministic\",\n  \"cost_class\": \"medium\",\n  \"owners\": [\"nadia\", \"maya\"],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-05-30\",\n  \"requires\": [\"github.token\"]\n}\n",
+          "contents": "{\n  \"name\": \"pr-route\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"executor\": \"deterministic\",\n  \"cost_class\": \"medium\",\n  \"owners\": [\"nadia\", \"maya\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-30\",\n  \"requires\": [\"github.token\"]\n}\n",
           "truncated": false,
           "binary": false
         }
