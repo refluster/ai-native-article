@@ -83,18 +83,17 @@ DNS + secret cutover) is a separate infrastructure Story — see §Consequences.
   secret and every script constant; the public-facing name reads cleanly.
 - **Cost.** Negligible — an ACM cert is free; the custom domain + mapping
   add no per-request charge.
-- **New infra to build (separate Story).**
-  1. Regional ACM cert for `workforce-api.kohuehara.xyz` in **us-west-2**.
-  2. `AWS::ApiGatewayV2::DomainName` + `AWS::ApiGatewayV2::ApiMapping` in
-     `workforce/infra/sam/template.yaml` (or a sibling stack), targeting
-     `WfAgentsHttpApi` / stage `prod`.
-  3. DNS record for `workforce-api.kohuehara.xyz` → the regional API GW
-     target (operator action if DNS is managed outside IaC).
-  4. Cut `VITE_WORKFORCE_AGENTS_API_BASE` and the discord-digest skill's
-     base-URL constant over to `https://workforce-api.kohuehara.xyz`; drop
-     the `/prod` suffix.
-  5. Update [runbooks/region-migration.md](../runbooks/region-migration.md)
-     to note the custom domain decouples the SPA from the API-id.
+- **Rollout — IaC prepared; operator-executed (#220).** Shipped as the
+  standalone, operator-deployed stack
+  [`workforce/infra/sam-api-domain/`](../../infra/sam-api-domain/README.md)
+  (cert + `DomainName` + `ApiMapping`), NOT folded into the auto-deploying
+  data plane — because the cert's DNS-01 validation would otherwise stall
+  every prod deploy (same split + reason as `sam-web-cert`). The operator
+  runbook covers: (1) regional ACM cert in **us-west-2**, (2) the Cloudflare
+  validation CNAME, (3) the `workforce-api` CNAME → regional API GW target,
+  (4) cutting `VITE_WORKFORCE_AGENTS_API_BASE` + the discord-digest constant
+  over (dropping `/prod`). [runbooks/region-migration.md](../runbooks/region-migration.md)
+  is updated to note the decoupling.
 - **Watch-out — cert region.** HttpApi regional custom domains require the
   ACM cert in the **API's region (us-west-2)**, NOT us-east-1. Copying the
   `sam-web-cert` (us-east-1, for CloudFront) pattern here would fail
