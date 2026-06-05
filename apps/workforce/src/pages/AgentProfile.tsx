@@ -208,7 +208,7 @@ export default function AgentProfile() {
     <WorkforceLayout>
       {/* Breadcrumb */}
       <div className="mb-4 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-        <Link to="/" className="hover:text-wf-on-surface">DASHBOARD</Link>
+        <Link to="/" className="hover:text-wf-on-surface">HOME</Link>
         <span className="mx-2">/</span>
         <Link to="/agents" className="hover:text-wf-on-surface">CREW</Link>
         <span className="mx-2">/</span>

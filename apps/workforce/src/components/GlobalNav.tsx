@@ -5,14 +5,15 @@
 // left, then a row of icon/label destinations on the right. The route
 // map applies that IA to the existing pages without renaming any URL:
 //
-//   Home          → /feed     (the public feed — the network's "top")
-//   My Network    → /agents   (the Crew roster)
-//   Jobs          → /jobs     (placeholder — future agent↔project hiring)
+//   Home          → /          (the public feed — the network's index)
+//   My Network    → /agents    (the Crew roster)
+//   Projects      → /projects  (the project directory)
+//   Jobs          → /jobs      (placeholder — future agent↔project hiring)
 //   Messaging     → /messaging (placeholder — talent-to-talent comms)
 //   Notifications → /notifications (placeholder — network activity)
-//   Me            → /         (the operator console / dashboard)
+//   Me            → /performance (the operator overview / dashboard)
 //
-// Skills / Projects / Org are reachable from the feed's right rail.
+// Skills / Org are reachable from the feed's right rail.
 
 import { type ReactNode } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
@@ -65,6 +66,15 @@ function BellIcon({ className }: IconProps) {
     </svg>
   );
 }
+function ProjectsIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <path d="M12 3 3 7.5 12 12l9-4.5L12 3Z" strokeLinejoin="round" />
+      <path d="m3 12 9 4.5 9-4.5" strokeLinejoin="round" />
+      <path d="m3 16.5 9 4.5 9-4.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
 function SearchIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden className={className} fill="none" stroke="currentColor" strokeWidth={1.8}>
@@ -75,8 +85,9 @@ function SearchIcon({ className }: IconProps) {
 }
 
 const NAV: { to: string; label: string; icon: (p: IconProps) => ReactNode; end?: boolean; badge?: string }[] = [
-  { to: '/feed',          label: 'Home',          icon: HomeIcon },
+  { to: '/',              label: 'Home',          icon: HomeIcon, end: true },
   { to: '/agents',        label: 'My Network',    icon: NetworkIcon },
+  { to: '/projects',      label: 'Projects',      icon: ProjectsIcon },
   { to: '/jobs',          label: 'Jobs',          icon: JobsIcon },
   { to: '/messaging',     label: 'Messaging',     icon: MessageIcon },
   { to: '/notifications', label: 'Notifications', icon: BellIcon, badge: '3' },
@@ -94,7 +105,7 @@ export default function GlobalNav({ right }: Props) {
     <header className="sticky top-0 z-30 bg-wf-surface/90 backdrop-blur border-b border-wf-outline-variant">
       <div className="max-w-[1440px] mx-auto px-3 sm:px-6 md:px-12 h-14 flex items-center gap-3 sm:gap-4">
         {/* Brand + search */}
-        <Link to="/feed" className="flex items-center gap-2 shrink-0 group" aria-label={SITE_DISPLAY_NAME}>
+        <Link to="/" className="flex items-center gap-2 shrink-0 group" aria-label={SITE_DISPLAY_NAME}>
           <span className="inline-flex items-center justify-center w-8 h-8 rounded-wf-sm bg-wf-secondary text-wf-on-primary font-headline font-black text-sm">
             S
           </span>
@@ -144,9 +155,9 @@ export default function GlobalNav({ right }: Props) {
             </NavLink>
           ))}
 
-          {/* Me — links to the operator console (dashboard). */}
+          {/* Me — links to the operator overview ("Performance"). */}
           <NavLink
-            to="/"
+            to="/performance"
             end
             className={({ isActive }) =>
               `flex flex-col items-center justify-center pl-3 sm:pl-4 ml-1 sm:ml-2 border-l border-wf-outline-variant gap-0.5 transition-colors ${
