@@ -367,6 +367,16 @@ Resources:
               Action: secretsmanager:GetSecretValue
               Resource:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/agent-workforce/workforce.feed_write_token-*
+            - Sid: AgentsApiEngagementWriteToken
+              # Phase 7 PR5 — POST /agents/{slug}/engagements validates
+              # external clients' bearer tokens against this single shared
+              # secret (validateEngagementWriteBearer). Same scoping
+              # discipline as AgentsApiFeedWriteToken: one secret only,
+              # GetSecretValue read by this handler at warm-cache time.
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/api/engagements-write-token-*
             # Issue #158 PR-β A1: project credentials LIST endpoint
             # (`GET /projects/{id}/credentials`) describes each
             # registered credential type's secret to surface metadata
@@ -480,6 +490,29 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /agents/{slug}/recall
             Method: GET
+        # Phase 7 PR5 — engagements API (external-client surface).
+        # Portfolio is the public-facing read of executions filtered to
+        # the calling client's project_id. Same access shape as
+        # ListAgentExecutions; the handler enforces the project filter
+        # so cross-project leak is prevented at the application layer.
+        ListAgentPortfolio:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}/portfolio
+            Method: GET
+        # POST /agents/{slug}/engagements — external clients (RepoA-style)
+        # POST engagement records (client-side execution outcomes) back
+        # to the workforce's ledger. Bearer-token auth at the handler
+        # (not AWS_IAM at API GW — the external client has no SigV4
+        # creds), matching the POST /feed pattern. Token lives at
+        # wf/api/engagements-write-token.
+        CreateEngagement:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}/engagements
+            Method: POST
         ListProjects:
           Type: HttpApi
           Properties:

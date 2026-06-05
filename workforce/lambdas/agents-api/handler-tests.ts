@@ -170,7 +170,52 @@ vi.mock("../shared/project.js", () => ({
       return true;
     });
   },
+  // Phase 7 PR5: POST /agents/{slug}/engagements writes a project EXEC
+  // row through this helper. Tests inject an EXEC row directly into
+  // `rows` to simulate the write, with cross-project denial flagged via
+  // membershipSet (mirrors shared/project.ts:isMember).
+  appendExecution: async (input: {
+    project_id: string;
+    agent_slug: string;
+    exec_ulid: string;
+    skill_name: string;
+    skill_version: string;
+    started_at: string;
+    ended_at: string;
+    status: string;
+    artifact_ref?: unknown;
+    error?: string;
+  }) => {
+    if (!membershipSet.has(`${input.project_id}|${input.agent_slug}`)) {
+      throw new Error(
+        `cross-project denial: agent "${input.agent_slug}" is not a member of project "${input.project_id}"`,
+      );
+    }
+    const row = {
+      pk: `PROJECT#${input.project_id}`,
+      sk: `EXEC#${input.exec_ulid}`,
+      project_id: input.project_id,
+      agent_slug: input.agent_slug,
+      skill_name: input.skill_name,
+      skill_version: input.skill_version,
+      started_at: input.started_at,
+      ended_at: input.ended_at,
+      status: input.status,
+      artifact_ref: input.artifact_ref,
+      error: input.error,
+      gsi1pk: `AGENT#${input.agent_slug}`,
+      gsi1sk: input.started_at,
+    };
+    rows.set(key(row.pk, row.sk), row as AnyRow);
+    return row;
+  },
 }));
+
+// Membership set the appendExecution mock above reads. Tests add a
+// (project_id|agent_slug) tuple before exercising the POST path so the
+// cross-project denial branch is reachable without re-instantiating the
+// whole shared/project mock.
+const membershipSet = new Set<string>();
 
 // Issue #158 PR-β A1: credentials LIST enumerates from CREDENTIAL_TYPES.
 // Mock the registry so tests don't depend on the canonical set's
@@ -191,6 +236,12 @@ class FakeSmResourceNotFoundException extends Error {
     super("Secrets Manager: secret not found");
   }
 }
+// Secret-value store for GetSecretValueCommand (Phase 7 PR5: the
+// engagement-write bearer validator reads its token from here). Keyed
+// by SecretId. `undefined` value = the path resolves but has no
+// SecretString (returns auth failure, not 500).
+const secretValueStore = new Map<string, string | undefined>();
+
 vi.mock("@aws-sdk/client-secrets-manager", () => ({
   SecretsManagerClient: class {
     async send(cmd: { _kind: string; input: Record<string, unknown> }) {
@@ -200,11 +251,23 @@ vi.mock("@aws-sdk/client-secrets-manager", () => ({
         if (!row) throw new FakeSmResourceNotFoundException();
         return row;
       }
+      if (cmd._kind === "get-value") {
+        const id = cmd.input.SecretId as string;
+        if (!secretValueStore.has(id)) throw new FakeSmResourceNotFoundException();
+        return { SecretString: secretValueStore.get(id) };
+      }
       throw new Error(`unexpected SM command ${cmd._kind}`);
     }
   },
   DescribeSecretCommand: class {
     _kind = "describe";
+    input: Record<string, unknown>;
+    constructor(input: Record<string, unknown>) {
+      this.input = input;
+    }
+  },
+  GetSecretValueCommand: class {
+    _kind = "get-value";
     input: Record<string, unknown>;
     constructor(input: Record<string, unknown>) {
       this.input = input;
@@ -957,5 +1020,251 @@ describe("GET /agents/{slug}/executions (listAgentExecutions)", () => {
     const res = await handler(evt("GET /agents/{slug}/executions", { slug: "ghost" }));
     expect(statusOf(res)).toBe(200);
     expect((bodyOf(res) as { items: unknown[] }).items).toEqual([]);
+  });
+});
+
+// ─── Phase 7 PR5: Engagements API ──────────────────────────────────────
+
+describe("GET /agents/{slug}/portfolio (Engagements API — listAgentPortfolio)", () => {
+  function seedExec(opts: {
+    project: string;
+    agent: string;
+    ulid: string;
+    startedAt: string;
+  }) {
+    rows.set(key(`PROJECT#${opts.project}`, `EXEC#${opts.ulid}`), {
+      pk: `PROJECT#${opts.project}`,
+      sk: `EXEC#${opts.ulid}`,
+      project_id: opts.project,
+      agent_slug: opts.agent,
+      skill_name: "pr-review",
+      skill_version: "0.1.0",
+      started_at: opts.startedAt,
+      ended_at: opts.startedAt,
+      status: "ok",
+      used_credential_types: [],
+      gsi1pk: `AGENT#${opts.agent}`,
+      gsi1sk: opts.startedAt,
+      artifact_ref: {
+        uri: `https://github.com/foo/bar/pull/${opts.ulid}#issuecomment-1`,
+        content_hash: "0".repeat(64),
+        content_type: "text/html",
+        size_bytes: 200,
+        summary: `engagement ${opts.ulid}`,
+      },
+    });
+  }
+
+  beforeEach(() => {
+    rows.clear();
+  });
+
+  it("400s when ?project_id is missing — portfolio is per-client", async () => {
+    const res = await handler(evt("GET /agents/{slug}/portfolio", { slug: "nadia" }));
+    expect(statusOf(res)).toBe(400);
+    expect((bodyOf(res) as { error: string }).error).toBe("missing_project_id");
+  });
+
+  it("filters to the calling client's project — no cross-project leak", async () => {
+    seedExec({ project: "asp-cloud", agent: "nadia", ulid: "01A", startedAt: "2026-05-25T00:00:00.000Z" });
+    seedExec({ project: "other-client", agent: "nadia", ulid: "01B", startedAt: "2026-05-26T00:00:00.000Z" });
+    const res = await handler(
+      evt("GET /agents/{slug}/portfolio", { slug: "nadia" }, { project_id: "asp-cloud" }),
+    );
+    expect(statusOf(res)).toBe(200);
+    const items = (bodyOf(res) as { items: Array<{ engagement_id: string; project_id: string }> }).items;
+    expect(items).toHaveLength(1);
+    expect(items[0]!.engagement_id).toBe("01A");
+    expect(items[0]!.project_id).toBe("asp-cloud");
+  });
+
+  it("returns items in engagement-view shape (not raw EXEC)", async () => {
+    seedExec({ project: "asp-cloud", agent: "nadia", ulid: "01A", startedAt: "2026-05-25T00:00:00.000Z" });
+    const res = await handler(
+      evt("GET /agents/{slug}/portfolio", { slug: "nadia" }, { project_id: "asp-cloud" }),
+    );
+    const item = (bodyOf(res) as { items: Array<Record<string, unknown>> }).items[0]!;
+    expect(item.engagement_id).toBe("01A"); // not "sk": "EXEC#01A"
+    expect(item.summary).toBe("engagement 01A");
+    expect(item.artifact).toBeDefined();
+  });
+
+  it("returns items newest-first", async () => {
+    seedExec({ project: "asp-cloud", agent: "nadia", ulid: "01A", startedAt: "2026-05-25T00:00:00.000Z" });
+    seedExec({ project: "asp-cloud", agent: "nadia", ulid: "01B", startedAt: "2026-05-27T00:00:00.000Z" });
+    seedExec({ project: "asp-cloud", agent: "nadia", ulid: "01C", startedAt: "2026-05-26T00:00:00.000Z" });
+    const res = await handler(
+      evt("GET /agents/{slug}/portfolio", { slug: "nadia" }, { project_id: "asp-cloud" }),
+    );
+    const ids = (bodyOf(res) as { items: Array<{ engagement_id: string }> }).items.map((i) => i.engagement_id);
+    expect(ids).toEqual(["01B", "01C", "01A"]);
+  });
+
+  it("returns 200 with empty items when the agent has no engagements with this client", async () => {
+    seedExec({ project: "other-client", agent: "nadia", ulid: "01A", startedAt: "2026-05-25T00:00:00.000Z" });
+    const res = await handler(
+      evt("GET /agents/{slug}/portfolio", { slug: "nadia" }, { project_id: "asp-cloud" }),
+    );
+    expect(statusOf(res)).toBe(200);
+    expect((bodyOf(res) as { items: unknown[] }).items).toEqual([]);
+  });
+});
+
+describe("POST /agents/{slug}/engagements (Engagements API — createEngagement)", () => {
+  const TOKEN_SECRET = "wf/api/engagements-write-token";
+  const TOKEN = "test-engagement-bearer-xxxxx";
+
+  beforeEach(() => {
+    rows.clear();
+    membershipSet.clear();
+    secretValueStore.clear();
+    secretValueStore.set(TOKEN_SECRET, JSON.stringify({ token: TOKEN }));
+    // Reset module-level token cache by re-importing? The handler caches
+    // the bearer for warm-lifetime. We can't reset it from here, but the
+    // first test populates the cache and subsequent ones reuse it. As long
+    // as we don't change the token value mid-suite, this is fine.
+  });
+
+  function postEvt(slug: string, headers: Record<string, string>, body: unknown): APIGatewayProxyEventV2 {
+    return {
+      version: "2.0",
+      routeKey: "POST /agents/{slug}/engagements",
+      rawPath: `/agents/${slug}/engagements`,
+      rawQueryString: "",
+      headers,
+      requestContext: { http: { method: "POST", path: `/agents/${slug}/engagements` } } as unknown as APIGatewayProxyEventV2["requestContext"],
+      pathParameters: { slug },
+      queryStringParameters: {},
+      isBase64Encoded: false,
+      body: typeof body === "string" ? body : JSON.stringify(body),
+    } as APIGatewayProxyEventV2;
+  }
+
+  function validBody(overrides: Record<string, unknown> = {}) {
+    return {
+      project_id: "asp-cloud",
+      skill_name: "pr-review",
+      skill_version: "0.1.0",
+      started_at: "2026-05-30T10:00:00.000Z",
+      ended_at: "2026-05-30T10:02:30.000Z",
+      status: "ok",
+      ...overrides,
+    };
+  }
+
+  it("401s on missing Authorization header", async () => {
+    membershipSet.add("asp-cloud|nadia");
+    const res = await handler(postEvt("nadia", {}, validBody()));
+    expect(statusOf(res)).toBe(401);
+  });
+
+  it("401s on wrong bearer", async () => {
+    membershipSet.add("asp-cloud|nadia");
+    const res = await handler(postEvt("nadia", { authorization: "Bearer wrong" }, validBody()));
+    expect(statusOf(res)).toBe(401);
+  });
+
+  it("401s on non-Bearer scheme", async () => {
+    membershipSet.add("asp-cloud|nadia");
+    const res = await handler(postEvt("nadia", { authorization: `Basic ${TOKEN}` }, validBody()));
+    expect(statusOf(res)).toBe(401);
+  });
+
+  it("400s on missing body", async () => {
+    membershipSet.add("asp-cloud|nadia");
+    const evt: APIGatewayProxyEventV2 = postEvt("nadia", { authorization: `Bearer ${TOKEN}` }, "");
+    delete (evt as { body?: string }).body;
+    const res = await handler(evt);
+    expect(statusOf(res)).toBe(400);
+    expect((bodyOf(res) as { error: string }).error).toBe("missing_body");
+  });
+
+  it("400s on invalid JSON", async () => {
+    membershipSet.add("asp-cloud|nadia");
+    const res = await handler(postEvt("nadia", { authorization: `Bearer ${TOKEN}` }, "{not json"));
+    expect(statusOf(res)).toBe(400);
+    expect((bodyOf(res) as { error: string }).error).toBe("invalid_json");
+  });
+
+  it("400s listing missing required fields", async () => {
+    membershipSet.add("asp-cloud|nadia");
+    const res = await handler(
+      postEvt("nadia", { authorization: `Bearer ${TOKEN}` }, { project_id: "asp-cloud" }),
+    );
+    expect(statusOf(res)).toBe(400);
+    const body = bodyOf(res) as { error: string; missing: string[] };
+    expect(body.error).toBe("missing_fields");
+    expect(body.missing).toEqual(
+      expect.arrayContaining(["skill_name", "skill_version", "started_at", "ended_at", "status"]),
+    );
+  });
+
+  it("400s on invalid status", async () => {
+    membershipSet.add("asp-cloud|nadia");
+    const res = await handler(
+      postEvt("nadia", { authorization: `Bearer ${TOKEN}` }, validBody({ status: "weird" })),
+    );
+    expect(statusOf(res)).toBe(400);
+    expect((bodyOf(res) as { error: string }).error).toBe("invalid_status");
+  });
+
+  it("400s on malformed artifact", async () => {
+    membershipSet.add("asp-cloud|nadia");
+    const res = await handler(
+      postEvt(
+        "nadia",
+        { authorization: `Bearer ${TOKEN}` },
+        validBody({ artifact: { uri: "x" } }), // missing other required fields
+      ),
+    );
+    expect(statusOf(res)).toBe(400);
+    expect((bodyOf(res) as { error: string }).error).toBe("invalid_artifact");
+  });
+
+  it("403s on cross-project denial (agent not a member of the supplied project)", async () => {
+    // membershipSet intentionally empty for asp-cloud + nadia
+    const res = await handler(
+      postEvt("nadia", { authorization: `Bearer ${TOKEN}` }, validBody()),
+    );
+    expect(statusOf(res)).toBe(403);
+    expect((bodyOf(res) as { error: string }).error).toBe("not_a_member");
+  });
+
+  it("201s on happy path, returns engagement view", async () => {
+    membershipSet.add("asp-cloud|nadia");
+    const res = await handler(
+      postEvt(
+        "nadia",
+        { authorization: `Bearer ${TOKEN}` },
+        validBody({
+          artifact: {
+            uri: "https://github.com/PSVL/asp-cloud/pull/42#issuecomment-1",
+            content_hash: "0".repeat(64),
+            content_type: "text/html",
+            size_bytes: 300,
+            summary: "review on PR #42",
+          },
+        }),
+      ),
+    );
+    expect(statusOf(res)).toBe(201);
+    const body = bodyOf(res) as { engagement: { engagement_id: string; project_id: string; agent_slug: string } };
+    expect(body.engagement.project_id).toBe("asp-cloud");
+    expect(body.engagement.agent_slug).toBe("nadia");
+    expect(body.engagement.engagement_id).toMatch(/^[0-9A-Z]{26}$/);
+  });
+
+  it("honours client-supplied engagement_id when present", async () => {
+    membershipSet.add("asp-cloud|nadia");
+    const res = await handler(
+      postEvt(
+        "nadia",
+        { authorization: `Bearer ${TOKEN}` },
+        validBody({ engagement_id: "CLIENT-SUPPLIED-ULID-0000000" }),
+      ),
+    );
+    expect(statusOf(res)).toBe(201);
+    const body = bodyOf(res) as { engagement: { engagement_id: string } };
+    expect(body.engagement.engagement_id).toBe("CLIENT-SUPPLIED-ULID-0000000");
   });
 });
