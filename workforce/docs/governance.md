@@ -55,6 +55,7 @@ Per AGENTS.md §1 vocabulary:
 | `workforce/infra/sam/samconfig.toml` | **A** | Deploy targets, region, stack names. Production surface. |
 | `workforce/scripts/**` | **B** | Lint scripts, seeders, validators. Pure tooling. |
 | `workforce/seed/**` | **B** | Bootstrap data. Idempotent. |
+| `workforce/client/**` | **B** | External-repo distribution surface (Phase 7 PR7 — `wf-engage` Claude Code skill + helper scripts + install template). Consumed by downstream repos via `scripts/install.sh`; the skill body is the load-bearing contract for client-side agent engagement under R-N1(b). |
 | `.github/workflows/workforce-*.yml` | **A** | Inherits the AGENTS.md Zone A on `.github/workflows/**`. Agent proposes the diff in a PR; human merges. |
 
 Anything new under `workforce/**` that doesn't match an entry above defaults to **B** with the requirement that the PR description names the new path and why it doesn't need Zone A protection. If reviewers disagree, treat it as Zone A pending a follow-up classification PR.
