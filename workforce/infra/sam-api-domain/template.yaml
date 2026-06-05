@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Description: |
+  Custom domain for the workforce API (wf-agents-api) — ADR-0004.
+
+  Serves wf-agents-api under a stable hostname (workforce-api.kohuehara.xyz)
+  instead of the raw, region+api-id-coupled execute-api URL. Implements
+  ADR-0004 (workforce/docs/adr/adr-0004-workforce-api-custom-domain.md).
+
+  ── Why a SEPARATE, operator-deployed stack (not the data plane) ──
+  The ACM cert uses DNS-01 validation, which BLOCKS the CloudFormation
+  stack on create until the validation CNAME exists in Cloudflare. Putting
+  it in the auto-deploying wf-data-plane stack would stall every prod
+  deploy until the operator added DNS. So — exactly like the CloudFront
+  cert in sam-web-cert — this lives in its own stack the operator deploys
+  by hand, with the runbook in README.md.
+
+  This stack is REGIONAL and MUST be deployed in the API's region
+  (us-west-2). HTTP API custom domains require the cert in the same region
+  as the API — NOT us-east-1 (that's the CloudFront-only rule in
+  sam-web-cert).
+
+  Cross-stack coupling is avoided on purpose: the HTTP API id is passed in
+  as a parameter (the operator reads it from the wf-data-plane stack
+  outputs / the agents-api URL), so deploying this stack touches nothing
+  in the data plane.
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: workforce-api.kohuehara.xyz
+    Description: FQDN the workforce API is served under (ADR-0004).
+  HttpApiId:
+    Type: String
+    Description: >-
+      Id of the existing wf-agents-api HttpApi (e.g. sjhikazsf9). Read it
+      from the wf-data-plane-{stage} stack, or from the host of the current
+      VITE_WORKFORCE_AGENTS_API_BASE (https://{id}.execute-api...).
+  ApiStage:
+    Type: String
+    Default: prod
+    Description: >-
+      Stage name on the HttpApi to map the domain root at. The mapping
+      absorbs the stage, so the custom domain drops the trailing /{stage}
+      the raw execute-api URL carries.
+
+Resources:
+  ApiCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      # DNS-01: emits a validation CNAME the operator adds to Cloudflare
+      # (DNS-only / gray cloud). Same flow as sam-web-cert; see README.
+      ValidationMethod: DNS
+
+  ApiDomainName:
+    Type: AWS::ApiGatewayV2::DomainName
+    Properties:
+      DomainName: !Ref DomainName
+      DomainNameConfigurations:
+        - CertificateArn: !Ref ApiCertificate
+          EndpointType: REGIONAL
+          SecurityPolicy: TLS_1_2
+
+  ApiMapping:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    # Empty mapping key → the domain root maps to the stage, so
+    # https://workforce-api.kohuehara.xyz/agents → {stage}'s /agents.
+    Properties:
+      ApiId: !Ref HttpApiId
+      DomainName: !Ref ApiDomainName
+      Stage: !Ref ApiStage
+
+Outputs:
+  RegionalDomainTarget:
+    Description: >-
+      Point the Cloudflare CNAME for {DomainName} at this hostname
+      (DNS-only / gray cloud). This is the API Gateway regional target.
+    Value: !GetAtt ApiDomainName.RegionalDomainName
+  CustomDomainUrl:
+    Description: The stable base URL once DNS resolves.
+    Value: !Sub "https://${DomainName}"
