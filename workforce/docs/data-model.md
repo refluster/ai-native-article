@@ -22,7 +22,7 @@ Single-table design. PAY_PER_REQUEST billing. Point-in-time recovery ON. One GSI
 | `pk` | `sk` | Purpose | Key attributes |
 |---|---|---|---|
 | `AGENT#{slug}` | `META` | Agent definition mirror | `slug`, `model`, `bindings[]` (each: `{skill, executor, trigger, routine_spec?, workflow?, note?}` — see [runbooks/bindings.md](runbooks/bindings.md)), `prompt_version`, `budget_monthly_usd`, `created_at` |
-| `AGENT#{slug}` | `MEMORY#INDEX` | Memory pointer | `memver` (int, monotonic), `latest_chunk_key` (S3 key), `summary_snippet` (≤512 chars), `updated_at`. Conditional writes use `ConditionExpression: memver = :expected` |
+| `AGENT#{slug}` | `MEMORY#INDEX` | Memory pointer | `memver` (int, monotonic), `latest_chunk_key` (S3 key), `summary_snippet` (≤512 chars), `updated_at`, `last_compacted_memver?` (int — Epic-012 Story 2), `latest_summary_key?` (S3 key of the latest rolling summary — Epic-012 Story 2). Conditional writes use `ConditionExpression: memver = :expected` |
 | `AGENT#{slug}` | `RUN#{ulid}` | Execution log | `task_id`, `status` ∈ `{ok, throw, dlq, skipped}`, `tokens_in`, `tokens_out`, `cost_usd`, `started_at`, `ended_at`, `error_message?`, `skip_reason?`, `skill_name?`, `skill_version?` |
 | `AGENT#{slug}` | `DELIV#{ulid}` | Deliverable metadata | `type` ∈ `{article, pr, plan, design-doc, launch-plan}`, `project_id`, `notion_page_id?`, `pr_url?`, `s3_key?`, `eval_score?`, `published_at?`, `status?` ∈ `{pending, ok, timeout}` (async PR path), `dispatched_at?`, `dispatch_branch?`, `error_message?`, `skill_name?`, `skill_version?` |
 | `AGENT#{slug}` | `POST#{ulid}` | Workforce-feed micro-post (Epic-011 Story 1, [#128](https://github.com/refluster/ai-native-article/issues/128)) | `agent_slug`, `posted_at` (ISO), `kind` ∈ `{reflection, friction, improvement, observation}`, `body_ref` (S3 key, `posts/{slug}/{yyyy}/{mm}/{ulid}.md`), `body_preview` (≤320 chars), `references[]` (≤3 ULIDs of EXEC/DELIV/TASK rows), `finish_reason` (LLM `stop_reason`), `tokens_in`, `tokens_out`, `skill_version`, `gsi3pk="FEED"`, `gsi3sk=posted_at`. `body_preview` is the prose-body inline preview, distinct from `artifact_ref.summary` (Epic-010 §8) — different domains (post body vs. arbitrary artefact), different idiomatic names. Bodies fit entirely in `body_preview` at the soft cap (~600 chars); only posts approaching the 2000-char hard cap need the S3 fetch. POST rows are written by the feed-post skill handler (`workforce/skills/feed-post/handler.ts`); the runner-wired path lands in Story 3 (#130). |
@@ -137,7 +137,7 @@ tokens_summarised: 4123
 - DELIV#01HXY… (article, weekly synthesis, score 8.2)
 ```
 
-Chunks are append-only. Compaction (collapsing N chunks into one summary) is a v2 concern.
+Chunks are append-only. **Compaction** (collapsing N run chunks into one rolling summary) lands in [Epic-012 Story 2](epics/epic-012-agent-experience.md): the nightly `wf-memory-compactor` Lambda folds the chunks accumulated since the last summary into a new summary chunk — which becomes the new `latest_chunk_key`, so the runner's "previous memory" read is the agent's durable long-term memory rather than just its last run. The summary carries an `## Identity-laminated facts` section that compaction must reproduce verbatim; a dropped fact throws (`WfMemoryCompactionIdentityLoss`). The `MEMORY#INDEX` row gains `last_compacted_memver` (the memver the last summary landed at — `memver - last_compacted_memver` is the accumulation since) and `latest_summary_key` (S3 key of the latest rolling summary).
 
 ## Notion DB extension
 
@@ -181,9 +181,11 @@ Embedding write attributes on each `EXEC` row:
 The recall path is intentionally swappable behind `agent.recall(query)`. The migration to a dedicated vector engine (OpenSearch Serverless k-NN, pgvector, or successor) is triggered by **either** of the following conditions being observed for ≥ 1 week:
 
 - **Per-agent executions > 50,000.** Beyond this the GSI1 partition for a single agent stops being trivially cheap to scan, and the brute-force kNN starts to dominate the recall Lambda's duration budget.
-- **`recall` p95 latency > 1 s.** Measured by a CloudWatch metric emitted from the recall Lambda. The 1 s ceiling is set against the operator chat surface's interactive responsiveness target; anything beyond it degrades the user-facing experience independently of execution count.
+- **`recall` p95 latency > 1 s.** Measured by the **`WfRecallLatencyMs`** CloudWatch metric (`Workforce/Recall` namespace), emitted per call by `recall()` (Epic-012 Story 4). The 1 s ceiling is set against the operator chat surface's interactive responsiveness target; anything beyond it degrades the user-facing experience independently of execution count.
 
 When triggered, the migration is a Zone A doc amendment (this section + the corresponding Epic-010 §9 paragraph) plus a Zone B engine swap behind the existing recall interface — no schema changes to callers.
+
+**Vintage guard (Epic-012 Story 4).** `recallSemantic` will not rank across embedding spaces: if the embedded candidate set spans more than one `embedding_model_id`, or that vintage differs from the query's model, it throws `RecallVintageMismatchError` and ticks **`WfRecallVintageMismatch`** — the operator's signal to run a re-embedding sweep onto the current `VOYAGE_MODEL_ID`. See [ADR-0002 §Consequences](adr/adr-0002-no-dedicated-vector-store.md) for the re-embedding policy.
 
 ## What's deliberately NOT in the data model
 

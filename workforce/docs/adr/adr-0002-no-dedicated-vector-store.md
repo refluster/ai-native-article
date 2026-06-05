@@ -72,14 +72,27 @@ interface** — callers never see the storage choice.
   **either** holds for ≥ 1 week:
   - per-agent executions > 50,000 (partition scan stops being trivially
     cheap), or
-  - `recall` p95 latency > 1 s (measured via a CloudWatch metric from the
-    recall Lambda).
+  - `recall` p95 latency > 1 s (measured via the **`WfRecallLatencyMs`**
+    CloudWatch metric — `Workforce/Recall` namespace — emitted per call by
+    `recall()`; Epic-012 Story 4).
   When triggered, the migration is a Zone A doc amendment (this ADR + a
   superseding ADR) plus a Zone B engine swap — no caller changes.
-- **Watch-out — model drift.** Cosine across two embedding spaces is
-  meaningless. A change of `embedding_model_id` requires a re-embedding
-  pass or a query-time filter to a single vintage. Tracked as an
-  epic-012 open question.
+- **Model drift — guarded (Epic-012 Story 4).** Cosine across two embedding
+  spaces is meaningless, so `recallSemantic` **fails loud** rather than
+  silently ranking across them: if the embedded candidate set spans more
+  than one `embedding_model_id`, or that vintage differs from the query's
+  model, recall throws `RecallVintageMismatchError` and ticks
+  **`WfRecallVintageMismatch`**. (The runner's `buildRecallBlock` catches it
+  fail-soft — empty recall block, the run proceeds; the agents-api recall
+  route surfaces it as a 500.)
+  - **Re-embedding policy.** `embedding_model_id` is stamped on every EXEC
+    row at write time (`voyage.ts:VOYAGE_MODEL_ID`). Changing the model is a
+    two-step Zone B operation: (1) bump `VOYAGE_MODEL_ID` so new executions
+    embed on the new model, (2) run a backfill that re-embeds the standing
+    corpus onto it. Between the two, `WfRecallVintageMismatch` fires and
+    semantic recall is intentionally down (forcing completion) — structured
+    recall is unaffected. The backfill sweep itself is a follow-up
+    (not built in Story 4, which ships the guard + the signal).
 
 ## Related
 

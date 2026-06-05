@@ -45,7 +45,7 @@ Parameters:
     Description: GitHub repo the engineer routine targets.
   EngineerWorkflow:
     Type: String
-    Default: wf-engineer.yml
+    Default: workforce-engineer-routine.yml
     Description: workflow_dispatch target filename.
   EngineerRef:
     Type: String
@@ -340,7 +340,11 @@ Resources:
               Resource: "*"
               Condition:
                 StringEquals:
-                  cloudwatch:namespace: Workforce/AgentsApi
+                  cloudwatch:namespace:
+                    - Workforce/AgentsApi
+                    # Epic-012 Story 4: GET /agents/{slug}/recall emits
+                    # WfRecallLatencyMs / WfRecallVintageMismatch via recall().
+                    - Workforce/Recall
             # Epic-011 Story 5 (#132) — `GET /feed/{post_id}` hydrates
             # post bodies from S3 (`posts/{slug}/{yyyy}/{mm}/{ulid}.md`).
             # No write needed — the feed-post skill (Story 1) writes; the
@@ -367,6 +371,16 @@ Resources:
               Action: secretsmanager:GetSecretValue
               Resource:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/agent-workforce/workforce.feed_write_token-*
+            - Sid: AgentsApiEngagementWriteToken
+              # Phase 7 PR5 — POST /agents/{slug}/engagements validates
+              # external clients' bearer tokens against this single shared
+              # secret (validateEngagementWriteBearer). Same scoping
+              # discipline as AgentsApiFeedWriteToken: one secret only,
+              # GetSecretValue read by this handler at warm-cache time.
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/api/engagements-write-token-*
             # Issue #158 PR-β A1: project credentials LIST endpoint
             # (`GET /projects/{id}/credentials`) describes each
             # registered credential type's secret to surface metadata
@@ -480,6 +494,29 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /agents/{slug}/recall
             Method: GET
+        # Phase 7 PR5 — engagements API (external-client surface).
+        # Portfolio is the public-facing read of executions filtered to
+        # the calling client's project_id. Same access shape as
+        # ListAgentExecutions; the handler enforces the project filter
+        # so cross-project leak is prevented at the application layer.
+        ListAgentPortfolio:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}/portfolio
+            Method: GET
+        # POST /agents/{slug}/engagements — external clients (RepoA-style)
+        # POST engagement records (client-side execution outcomes) back
+        # to the workforce's ledger. Bearer-token auth at the handler
+        # (not AWS_IAM at API GW — the external client has no SigV4
+        # creds), matching the POST /feed pattern. Token lives at
+        # wf/api/engagements-write-token.
+        CreateEngagement:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}/engagements
+            Method: POST
         ListProjects:
           Type: HttpApi
           Properties:
@@ -1061,6 +1098,9 @@ Resources:
                   cloudwatch:namespace:
                     - Workforce/Runner
                     - Workforce/Credentials
+                    # Epic-012 Story 4: the runner's recall packet path emits
+                    # WfRecallLatencyMs / WfRecallVintageMismatch via recall().
+                    - Workforce/Recall
       Environment:
         Variables:
           ENGINEER_OWNER: !Ref EngineerOwner
@@ -1296,6 +1336,105 @@ Resources:
       AlarmDescription: !Sub Audit found cross-project leakage in wf-table-${Stage} (Epic-010 W-2 trust-boundary breach).
       Namespace: Workforce/Audit
       MetricName: WfAuditCrossProjectLeaks
+      Dimensions:
+        - Name: Stage
+          Value: !Ref Stage
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  # --- Memory compactor Lambda (Epic-012 Story 2) ---------------------------
+  # Nightly sweep that folds each agent's accumulated run chunks into a
+  # rolling long-term-memory summary. One summariser LLM call per compacting
+  # agent. Modelled on wf-audit (standalone scheduled Lambda, not a skill).
+  WfMemoryCompactorFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-memory-compactor-${Stage}
+      CodeUri: ../../lambdas/memory-compactor
+      Handler: handler.handler
+      Description: Nightly memory compaction — rolling long-term-memory summary per agent. Epic-012 Story 2.
+      MemorySize: 512
+      Timeout: 300
+      Policies:
+        - Statement:
+            - Sid: CompactorTableRw
+              Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt WfTable.Arn
+            - Sid: CompactorMemoryS3Rw
+              # Reads run chunks + prior summary, writes the new summary chunk.
+              # Scoped to memory/* — the only prefix this Lambda touches.
+              Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/memory/*
+            - Sid: CompactorAnthropicRead
+              # The summariser model key. wf/anthropic is the legacy bare key
+              # complete() reads (shared/llm-anthropic.ts); kept until the
+              # Epic-010 §6 bare-key deletion lands.
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/anthropic-*
+            - Sid: CompactorPutMetric
+              Effect: Allow
+              Action: cloudwatch:PutMetricData
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace: Workforce/Memory
+      Events:
+        NightlyTick:
+          Type: Schedule
+          Properties:
+            Name: !Sub wf-memory-compactor-tick-${Stage}
+            Description: Drives the nightly memory-compaction sweep.
+            # 05:00 UTC = 14:00 JST — one hour after wf-audit, same quiet
+            # window; compaction reads the same table the audit just swept.
+            Schedule: cron(0 5 * * ? *)
+            Enabled: true
+      Tags:
+        workforce: !Ref Stage
+
+  WfMemoryCompactorErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-memory-compactor-errors-alarm-${Stage}
+      AlarmDescription: !Sub The wf-memory-compactor-${Stage} Lambda is erroring.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfMemoryCompactorFunction
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  WfMemoryCompactionIdentityLossAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-memory-compaction-identity-loss-alarm-${Stage}
+      AlarmDescription: !Sub Compaction dropped an agent identity fact in wf-table-${Stage} (Epic-012 persona-integrity breach).
+      Namespace: Workforce/Memory
+      MetricName: WfMemoryCompactionIdentityLoss
       Dimensions:
         - Name: Stage
           Value: !Ref Stage

@@ -1,5 +1,25 @@
 [
   {
+    "slug": "ff2697c88e8c",
+    "title": "デザインプロセスの進化：変革する役割と協力の重要性",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "date": "2026-04-23",
+    "abstract": "The article discusses how the design process has evolved, highlighting the shift in roles and responsibilities within design teams. It emphasizes the importance of adaptability and collaboration in a rapidly changing digital landscape.",
+    "image": "/posts/images/ff2697c88e8c.jpg",
+    "sourceUrls": "https://medium.com/design-bootcamp/jenny-wen-the-design-process-has-changed-7b3b586ecab0"
+  },
+  {
+    "slug": "c66efe8dea7f",
+    "title": "AIが変える働き方の未来: 職務の境界線が曖昧になる時代",
+    "type": "explanation",
+    "category": "B: Role Blurring",
+    "date": "2026-04-23",
+    "abstract": "The status update discusses recent developments in AI and how they are blurring the lines between traditional job roles. It highlights the impact of AI on workforce dynamics and the necessity for adaptation among professionals.",
+    "image": "/posts/images/c66efe8dea7f.jpg",
+    "sourceUrls": "https://x.com/_mayumayu13/status/2046378245004911056"
+  },
+  {
     "slug": "f362cac8f219",
     "title": "2026年のデータセンターインフラ: AIトレーニングモデルの電力要件",
     "type": "explanation",
@@ -8,6 +28,36 @@
     "abstract": "Power requirements for large scale AI training models.",
     "image": "/posts/images/f362cac8f219.jpg",
     "sourceUrls": "https://example.com/data"
+  },
+  {
+    "slug": "cd6f3c5a58ed",
+    "title": "自律型AIエージェントの台頭：生産性への影響と未来の可能性",
+    "type": "explanation",
+    "category": "B: Trends",
+    "date": "2026-04-22",
+    "abstract": "Analysis of multi-agent systems and their impact on productivity.",
+    "image": "/posts/images/cd6f3c5a58ed.jpg",
+    "sourceUrls": "https://example.com/agents"
+  },
+  {
+    "slug": "fd7103d190d0",
+    "title": "製造業におけるAIトレンド2026: スマート工場の未来",
+    "type": "explanation",
+    "category": "B: Trends",
+    "date": "2026-04-22",
+    "abstract": "AI agents taking over shop floor scheduling and predictive maintenance.",
+    "image": "/posts/images/fd7103d190d0.jpg",
+    "sourceUrls": "https://example.com/mfg"
+  },
+  {
+    "slug": "c6e2910c9277",
+    "title": "AIが変革する製造業とデータセンターの未来",
+    "type": "analysis",
+    "category": "製造業 × データセンター",
+    "date": "2026-04-22",
+    "abstract": "# AI業界の深層原理：製造業とデータセンターの未来に迫る\n\n## 要旨\n製造業におけるAIトレンド、独立型AIエージェントの影響、そしてデータセンターの電力要件は、一見無関係に見える。しかし、これらはすべて「自動化と効率性の向上」という共通の原理で結びついている。本記事では、これらの事実を統一的に分析し、未来の展望を探る。\n\n## 導入\n近年、製造業とデータセンターの分野で加速するAI技術の進化",
+    "image": "/posts/images/c6e2910c9277.jpg",
+    "sourceUrls": ""
   },
   {
     "slug": "c9c06e22f1db",

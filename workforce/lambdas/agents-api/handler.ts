@@ -2,9 +2,12 @@
 // Routes:
 //   GET    /agents                          list (paginated, filterable)
 //   GET    /agents/{slug}                   single agent
-//   GET    /agents/{slug}/deliverables      recent DELIV rows (paginated)
+//   GET    /agents/{slug}/deliverables      LEGACY DELIV rows (historical; no SPA caller — EXEC is canonical, see Story 3 #216)
+//   GET    /agents/{slug}/executions        canonical activity ledger — EXEC rows via GSI1 (the agent-profile task log)
 //   GET    /agents/{slug}/projects          projects this agent is an active member of
 //   GET    /agents/{slug}/posts             per-agent activity feed (Epic-011 Story 5)
+//   GET    /agents/{slug}/portfolio         per-client engagement records (Phase 7 PR5; ?project_id= required)
+//   POST   /agents/{slug}/engagements       register a client-side engagement record (Phase 7 PR5; Bearer auth)
 //   GET    /agents/{slug}/recall            semantic recall over the agent's ledger (?q=&k=; Epic-012 Story 1)
 //   PATCH  /agents/{slug}                   operational fields only (IAM-auth at API GW)
 //   DELETE /agents/{slug}                   soft delete -> archived=true (IAM-auth at API GW)
@@ -55,12 +58,15 @@ import {
 import type { DelivRow } from "../shared/task.js";
 import { getItem, queryBySkPrefix, scanPrefix, updateOperational } from "../shared/ddb.js";
 import {
+  appendExecution,
   archive as archiveProject,
   asProjectId,
   getProject,
   listExecutions,
   projectPk,
   unarchive as unarchiveProject,
+  type ArtifactRef,
+  type ExecStatus,
   type ExecutionRow,
   type ProjectMemberRow,
   type ProjectMetaRow,
@@ -98,6 +104,17 @@ import {
 // the capability to the agent-workforce project bag.
 const FEED_WRITE_TOKEN_SECRET = "wf/projects/agent-workforce/workforce.feed_write_token";
 let _feedWriteTokenCache: string | undefined;
+
+// Secrets Manager path holding the engagement-write capability token.
+// External clients (RepoA-style downstream repos) hold this token and
+// present it as `Authorization: Bearer <token>` on POST /agents/{slug}/
+// engagements. Single shared token per Phase 7 PR5 scope; per-project
+// tokens are a future amendment (the operator decides distribution at
+// single-operator scale, C-3). The engagement record's `project_id` is
+// client-supplied — the operator's trust assumption is that only project
+// members hold the token.
+const ENGAGEMENT_WRITE_TOKEN_SECRET = "wf/api/engagements-write-token";
+let _engagementWriteTokenCache: string | undefined;
 
 const STAGE = process.env.STAGE ?? "dev";
 // One client per cold start. Metric emission is best-effort — failures
@@ -154,6 +171,12 @@ export async function handler(
     if (routeKey === "GET /skills/{name}" && skillName) return getSkill(skillName);
     if (routeKey === "GET /agents/{slug}/deliverables" && slug) return listAgentDeliverables(slug, event);
     if (routeKey === "GET /agents/{slug}/executions" && slug) return listAgentExecutions(slug, event);
+    // Phase 7 PR5 — engagements API (external-client read/write surface).
+    // Portfolio is the public-facing display projection of executions filtered
+    // to the calling client's project; engagements POST is the inbound write
+    // path from client-side (RepoA) execution per the R-N1 amendment.
+    if (routeKey === "GET /agents/{slug}/portfolio" && slug) return listAgentPortfolio(slug, event);
+    if (routeKey === "POST /agents/{slug}/engagements" && slug) return await createEngagementRoute(slug, event);
     if (routeKey === "GET /agents/{slug}/recall" && slug) return getAgentRecall(slug, event);
     if (routeKey === "GET /agents/{slug}/projects" && slug) return listAgentProjects(slug);
     if (routeKey === "GET /agents/{slug}/posts" && slug) return listAgentPostsRoute(slug, event);
@@ -301,6 +324,15 @@ async function getSkill(name: string): Promise<APIGatewayProxyResultV2> {
   return reply(200, toSkillApiView(row));
 }
 
+// LEGACY (Epic-010 C2/C3 cutover — reconciled by Epic-012 Story 3 #216).
+// Reads the legacy `AGENT#{slug}/DELIV#{ulid}` rows, whose SUCCESS-path
+// writes were removed at the C2 cutover (the runner is EXEC-only on success;
+// see workforce/lambdas/agent-runner/dual-write-tests.ts). The SPA's
+// agent-profile activity list migrated to `GET /agents/{slug}/executions`
+// (the EXEC family, GSI1) — `fetchAgentDeliverables` was removed, so this
+// route has NO front-end caller. It is retained only to read historical
+// DELIV rows written before the cutover. The canonical activity source is
+// the EXEC ledger; do not wire new readers to this route.
 async function listAgentDeliverables(
   slug: string,
   event: APIGatewayProxyEventV2,
@@ -1097,6 +1129,247 @@ async function patchFeedPostRoute(
   });
 
   return reply(200, { post_id: postId, agent_slug: slug, visibility: "hidden" });
+}
+
+// --- Phase 7 PR5: Engagements API ----------------------------------------
+//
+// Business-shape over the existing PROJECT#{id}/EXEC#* ledger:
+//
+//   GET  /agents/{slug}/portfolio?project_id=X   list past engagement records
+//                                                  filtered to the calling
+//                                                  client's project. Each item
+//                                                  is one completed engagement
+//                                                  (= one EXEC row in the
+//                                                  business-vocabulary view).
+//
+//   POST /agents/{slug}/engagements              register a new engagement
+//                                                  record from a client-side
+//                                                  (RepoA) execution. Bearer-
+//                                                  token auth. The body's
+//                                                  project_id determines the
+//                                                  PROJECT#{id}/EXEC#* row
+//                                                  partition.
+//
+// Per the R-N1 amendment (governance.md §4 R-N1 exception (b)):
+// client-side execution is best-effort on audit, cost tracking, and
+// persona stability — silent loss is an accepted failure mode at single-
+// operator scale (C-3). The shape here matches that posture: a single
+// shared bearer token, client-supplied project_id, no auto-membership
+// enforcement beyond what appendExecution() already gates (cross-project
+// denial throws if the agent isn't a project member).
+
+interface EngagementView {
+  engagement_id: string;
+  agent_slug: string;
+  project_id: string;
+  skill_name: string;
+  skill_version: string;
+  started_at: string;
+  ended_at: string;
+  status: ExecStatus;
+  summary: string;
+  artifact?: ArtifactRef;
+  error?: string;
+}
+
+function toEngagementView(row: ExecutionRow): EngagementView {
+  return {
+    engagement_id: row.sk.replace(/^EXEC#/, ""),
+    agent_slug: row.agent_slug,
+    project_id: row.project_id,
+    skill_name: row.skill_name,
+    skill_version: row.skill_version,
+    started_at: row.started_at,
+    ended_at: row.ended_at,
+    status: row.status,
+    summary: row.artifact_ref?.summary ?? "",
+    artifact: row.artifact_ref,
+    error: row.error,
+  };
+}
+
+async function listAgentPortfolio(
+  slug: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const qs = event.queryStringParameters ?? {};
+  const projectId = qs.project_id;
+  if (!projectId) {
+    return reply(400, {
+      error: "missing_project_id",
+      detail:
+        "GET /agents/{slug}/portfolio requires ?project_id= — portfolio is per-client (the dispatch agency only shows you the work the agent did *for you*).",
+    });
+  }
+  const limit = Math.min(
+    Math.max(parseInt(qs.limit ?? `${PAGE_SIZE_DEFAULT}`, 10) || PAGE_SIZE_DEFAULT, 1),
+    PAGE_SIZE_MAX,
+  );
+  const status = qs.status as ExecStatus | undefined;
+  const rows = await listExecutions({
+    agent_slug: slug,
+    from: qs.from,
+    to: qs.to,
+    status,
+    limit: PAGE_SIZE_MAX, // upper-bound the GSI1 fetch, then post-filter
+  });
+  const filtered = rows.filter((r) => r.project_id === projectId);
+  filtered.sort((a, b) => b.started_at.localeCompare(a.started_at));
+  return reply(200, { items: filtered.slice(0, limit).map(toEngagementView) });
+}
+
+async function createEngagementRoute(
+  slug: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const authed = await validateEngagementWriteBearer(event);
+  if (!authed) return reply(401, { error: "unauthorized" });
+
+  if (!event.body) return reply(400, { error: "missing_body" });
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(event.body) as Record<string, unknown>;
+  } catch {
+    return reply(400, { error: "invalid_json" });
+  }
+
+  // Required fields. The client (RepoA) computes timestamps because the
+  // execution happened on their side; we trust them for audit purposes
+  // per the R-N1(b) "best-effort" posture.
+  const required: Array<keyof typeof parsed> = [
+    "project_id",
+    "skill_name",
+    "skill_version",
+    "started_at",
+    "ended_at",
+    "status",
+  ];
+  const missing = required.filter((k) => parsed[k] === undefined);
+  if (missing.length > 0) {
+    return reply(400, { error: "missing_fields", missing });
+  }
+  const projectId = parsed.project_id;
+  if (typeof projectId !== "string") {
+    return reply(400, { error: "invalid_project_id" });
+  }
+  const status = parsed.status;
+  if (status !== "ok" && status !== "throw" && status !== "skipped" && status !== "failed_artefact_redaction") {
+    return reply(400, { error: "invalid_status", detail: "status must be one of ok|throw|skipped|failed_artefact_redaction" });
+  }
+
+  // Validate the optional artifact shape if present.
+  const rawArtifact = parsed.artifact;
+  let artifactRef: ArtifactRef | undefined;
+  if (rawArtifact !== undefined && rawArtifact !== null) {
+    if (typeof rawArtifact !== "object") {
+      return reply(400, { error: "invalid_artifact" });
+    }
+    const a = rawArtifact as Record<string, unknown>;
+    if (
+      typeof a.uri !== "string" ||
+      typeof a.content_hash !== "string" ||
+      typeof a.content_type !== "string" ||
+      typeof a.size_bytes !== "number" ||
+      typeof a.summary !== "string"
+    ) {
+      return reply(400, {
+        error: "invalid_artifact",
+        detail: "artifact requires {uri, content_hash, content_type, size_bytes, summary}",
+      });
+    }
+    artifactRef = {
+      uri: a.uri,
+      content_hash: a.content_hash,
+      content_type: a.content_type,
+      size_bytes: a.size_bytes,
+      summary: a.summary.slice(0, 512),
+    };
+  }
+
+  // ULID-shaped; client-supplied is fine but we generate if missing so
+  // the response always carries an engagement_id the client can follow up
+  // on. Time-monotonic ULIDs aren't required for the engagements path —
+  // a random ULID-shaped string is sufficient for the partition key.
+  const exec_ulid =
+    typeof parsed.engagement_id === "string" && parsed.engagement_id.length > 0
+      ? (parsed.engagement_id as string)
+      : generateUlid();
+
+  try {
+    const row = await appendExecution({
+      project_id: asProjectId(projectId),
+      agent_slug: slug as AgentMetaRow["slug"],
+      exec_ulid,
+      skill_name: parsed.skill_name as string,
+      skill_version: parsed.skill_version as string,
+      started_at: parsed.started_at as string,
+      ended_at: parsed.ended_at as string,
+      status: status as ExecStatus,
+      used_credential_types:
+        Array.isArray(parsed.used_credential_types) && parsed.used_credential_types.every((x) => typeof x === "string")
+          ? (parsed.used_credential_types as string[])
+          : undefined,
+      inputs_hash: typeof parsed.inputs_hash === "string" ? parsed.inputs_hash : undefined,
+      artifact_ref: artifactRef,
+      error: typeof parsed.error === "string" ? parsed.error : undefined,
+    });
+    return reply(201, { engagement: toEngagementView(row) });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.startsWith("cross-project denial")) {
+      return reply(403, { error: "not_a_member", detail: msg });
+    }
+    if (msg.startsWith("invalid project_id")) {
+      return reply(400, { error: "invalid_project_id", detail: msg });
+    }
+    throw err;
+  }
+}
+
+// Lightweight ULID-shaped id generator. Crockford base32, 26 chars, no
+// time monotonicity guarantee — sufficient for an EXEC row's partition
+// key on a write that already carries client-supplied started_at.
+function generateUlid(): string {
+  const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+  let out = "";
+  for (let i = 0; i < 26; i++) {
+    out += ALPHABET[Math.floor(Math.random() * 32)];
+  }
+  return out;
+}
+
+/**
+ * Validate the engagement-write bearer token. Mirrors the
+ * validateFeedWriteBearer pattern: constant-time compare, cached for
+ * Lambda warm lifetime. Returns false on any miss — handler maps to 401.
+ */
+async function validateEngagementWriteBearer(
+  event: APIGatewayProxyEventV2,
+): Promise<boolean> {
+  const headers = event.headers ?? {};
+  const raw = headers.authorization ?? headers.Authorization;
+  if (!raw || !raw.startsWith("Bearer ")) return false;
+  const presented = raw.slice("Bearer ".length).trim();
+  if (presented.length === 0) return false;
+
+  let expected = _engagementWriteTokenCache;
+  if (!expected) {
+    try {
+      const out = await sm.send(new GetSecretValueCommand({ SecretId: ENGAGEMENT_WRITE_TOKEN_SECRET }));
+      if (!out.SecretString) return false;
+      const v = JSON.parse(out.SecretString) as { token?: unknown };
+      if (typeof v.token !== "string" || v.token.length === 0) return false;
+      expected = v.token;
+      _engagementWriteTokenCache = expected;
+    } catch {
+      return false;
+    }
+  }
+
+  const a = Buffer.from(presented);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
 
 function reply(statusCode: number, body: unknown): APIGatewayProxyResultV2 {

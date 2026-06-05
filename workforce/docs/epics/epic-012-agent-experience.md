@@ -1,10 +1,10 @@
 # Epic-012 — Agent experience: recall, long-term memory, and a clean activity record
 
-- **Status**: Accepted (2026-06-04)
+- **Status**: In-progress (2026-06-05)
 - **Owner**: Maya
 - **Created**: 2026-06-04
 - **Tracker**: [#212](https://github.com/refluster/ai-native-article/issues/212)
-- **Implemented by**: —
+- **Implemented by**: #219 (Story 1, merged); #224 (Story 2, merged); Story 3 in review
 
 > **Design records:** the *technical decisions* behind this Epic live as
 > ADRs, not in this body — [ADR-0001](../adr/adr-0001-record-family-separation.md)
