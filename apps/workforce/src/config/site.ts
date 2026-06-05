@@ -19,6 +19,6 @@ export const SITE_TAGLINE = 'AI-native software studio';
 export const OPERATOR = {
   name: 'Koh Uehara',
   initials: 'KU',
-  headline: 'Operator · Software Talent Network',
+  headline: 'Founder · Software Talent Network',
   location: 'Mountain View, California',
 } as const;
