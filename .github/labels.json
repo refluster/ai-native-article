@@ -25,6 +25,7 @@
 
     { "name": "epic-010", "color": "0052CC", "description": "Epic-010 — Project as trust boundary (workforce)." },
     { "name": "epic-011", "color": "0052CC", "description": "Epic-011 — Workforce activity feed (LinkedIn-style)." },
+    { "name": "epic-012", "color": "0052CC", "description": "Epic-012 — Agent experience: recall, long-term memory, clean activity record (workforce)." },
 
     { "name": "role:engineering",   "color": "1D76DB", "description": "Driven by an engineering persona." },
     { "name": "role:architecture",  "color": "5319E7", "description": "Driven by an architecture persona." },

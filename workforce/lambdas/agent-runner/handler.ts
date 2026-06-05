@@ -40,6 +40,7 @@ import {
   type ExecStatus,
   type ProjectId,
 } from "../shared/project.js";
+import { buildRecallBlock } from "../shared/recall-prompt.js";
 import { readIndex, readChunk, appendChunk } from "../shared/memory.js";
 import { insertArticle } from "../shared/notion.js";
 import {
@@ -136,6 +137,23 @@ export async function handler(event: RunnerEvent, context: Context): Promise<Run
     return { status: "ok", run_id: runId, tokens_in: 0, tokens_out: 0, cost_usd: 0 };
   }
 
+  // Epic-012 Story 1: assemble the recall packet — relevant past executions
+  // surfaced via semantic kNN over this agent's ledger — so the agent
+  // reasons from its own experience, not just the previous run's memory
+  // chunk. Only the prompt-bearing executors (llm-prose / claude-code-routine)
+  // consume it; the deterministic path has no prompt, so we skip the
+  // (network-bearing) recall call for it entirely.
+  const recallBlock =
+    skill.meta.executor === "deterministic"
+      ? ""
+      : await buildRecallBlock({
+          caller_agent_slug: event.agent,
+          brief: event.brief,
+          skillName: skill.meta.name,
+          recall_k: skill.meta.recall_k,
+          projectId: resolveProjectId(event),
+        });
+
   // Build the sealed credential bag BEFORE entering the executor switch,
   // so a missing-credential failure flows through the normal throwRun
   // path (logged + dual-write-emit + propagated). Empty `requires`
@@ -151,11 +169,11 @@ export async function handler(event: RunnerEvent, context: Context): Promise<Run
         result = await runDeterministic(event, agent, binding, skill, runId, startedAt, credentials);
         break;
       case "claude-code-routine":
-        result = await runClaudeCodeRoutine(event, agent, binding, skill, runId, startedAt, previousChunk, credentials);
+        result = await runClaudeCodeRoutine(event, agent, binding, skill, runId, startedAt, previousChunk, recallBlock, credentials);
         break;
       case "llm-prose":
       default:
-        result = await runLlmProse(event, agent, binding, skill, runId, startedAt, previousChunk, credentials);
+        result = await runLlmProse(event, agent, binding, skill, runId, startedAt, previousChunk, recallBlock, credentials);
         break;
     }
   } catch (err) {
@@ -255,6 +273,7 @@ async function runLlmProse(
   runId: string,
   startedAt: string,
   previousChunk: string,
+  recallBlock: string,
   _credentials: CredentialBag,
 ): Promise<RunnerResult> {
   // _credentials: built + validated at the runner seam so a missing
@@ -269,7 +288,7 @@ async function runLlmProse(
 
   const baseSystem = await loadSystemMd(event.agent);
   const system = composeSystemPrompt(baseSystem, skill);
-  const userPrompt = buildUserPrompt(event, previousChunk);
+  const userPrompt = buildUserPrompt(event, previousChunk, recallBlock);
 
   const llm = await complete({
     model: agent.model,
@@ -358,11 +377,12 @@ async function runClaudeCodeRoutine(
   runId: string,
   startedAt: string,
   previousChunk: string,
+  recallBlock: string,
   _credentials: CredentialBag,
 ): Promise<RunnerResult> {
   const baseSystem = await loadSystemMd(event.agent);
   const system = composeSystemPrompt(baseSystem, skill);
-  const userPrompt = buildUserPrompt(event, previousChunk);
+  const userPrompt = buildUserPrompt(event, previousChunk, recallBlock);
 
   const llm = await complete({
     model: agent.model,
@@ -454,12 +474,15 @@ async function loadSystemMd(slug: string): Promise<string> {
   return await readFile(join(here, "agents", slug, "system.md"), "utf8");
 }
 
-function buildUserPrompt(event: RunnerEvent, previousChunk: string): string {
+function buildUserPrompt(event: RunnerEvent, previousChunk: string, recallBlock: string): string {
   const memorySection = previousChunk
     ? `\n## Your memory from the previous run\n\n${previousChunk}\n`
     : "";
   const operatorBrief = event.brief ? `\n\n## Operator brief\n\n${event.brief}\n` : "";
-  return `# Active skill\n\nApply the active skill described in your system prompt and produce the deliverable.${operatorBrief}${memorySection}`;
+  // Recall (broad past experience) sits between the immediate operator brief
+  // and the previous-run memory (immediate continuity): brief → experience →
+  // last step.
+  return `# Active skill\n\nApply the active skill described in your system prompt and produce the deliverable.${operatorBrief}${recallBlock}${memorySection}`;
 }
 
 function extractTitle(markdown: string): string | undefined {

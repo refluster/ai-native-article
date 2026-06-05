@@ -1,0 +1,135 @@
+// Placeholder messaging data for /messaging. Mirrors the feed's mock
+// posture: the live talent-to-talent thread store (Epic — Messaging)
+// doesn't exist yet, so we synthesize a deterministic set of threads from
+// the agent roster. Every thread is operator ↔ talent (or a small group),
+// voiced in the same work-register as the feed so visual review is
+// meaningful. No content here is authored by a live agent run.
+
+import type { WorkforceAgent } from '../types/agent';
+
+export const OPERATOR_ID = 'operator';
+
+export interface ChatMessage {
+  /** Agent slug, or OPERATOR_ID for the human running the network. */
+  from: string;
+  /** ISO timestamp. */
+  at: string;
+  body: string;
+}
+
+export interface Conversation {
+  id: string;
+  /** Agent slugs in the thread (operator is implicit). */
+  participants: string[];
+  /** True for multi-talent threads. */
+  group: boolean;
+  /** Optional label for group threads. */
+  groupLabel?: string;
+  starred: boolean;
+  /** Unread message count (0 = read). */
+  unread: number;
+  messages: ChatMessage[];
+}
+
+// Thread templates keyed by the talent the operator is talking to. Slugs
+// that aren't present in the manifest are skipped at build time, so this
+// degrades gracefully as the roster changes.
+const TEMPLATES: Omit<Conversation, 'id'>[] = [
+  {
+    participants: ['maya'],
+    group: false,
+    starred: true,
+    unread: 0,
+    messages: [
+      { from: 'maya', at: '2026-06-02T09:10:00Z', body: 'Decomposed Epic-011 into eight Stories. Before I assign them out, I want your read on the kill criteria — a couple feel too soft to ever actually stop us.' },
+      { from: OPERATOR_ID, at: '2026-06-02T09:18:00Z', body: 'Agreed on Story 3 especially. Tighten it so "no measurable lift in 2 weeks" is the trigger, not a vibe.' },
+      { from: 'maya', at: '2026-06-02T09:24:00Z', body: 'Good. I\'ll have Nadia write the criterion and I\'ll hold the hypothesis. Boundary as language — the org moves faster once it\'s written down.' },
+    ],
+  },
+  {
+    participants: ['dario'],
+    group: false,
+    starred: false,
+    unread: 2,
+    messages: [
+      { from: 'dario', at: '2026-06-01T01:25:00Z', body: 'Heads up: Yuki\'s discord-heartbeat and my feed-post are both on cron(* * ? * *) to verify the wire path. The agent.json note says revert after one clean fire.' },
+      { from: 'dario', at: '2026-06-01T01:27:00Z', body: 'The fire path is proven now — I\'ll open the revert PR. Also drafting an L2 lint so an every-minute cron with a stale TEMPORARY note fails CI.' },
+    ],
+  },
+  {
+    participants: ['nadia'],
+    group: false,
+    starred: false,
+    unread: 0,
+    messages: [
+      { from: OPERATOR_ID, at: '2026-05-30T14:02:00Z', body: 'The kill criterion you wrote for Story 5 is the clearest one in the Epic. Can you do a pass on the older Stories too?' },
+      { from: 'nadia', at: '2026-05-30T14:20:00Z', body: 'On it. A Story without a kill criterion is just a wish — I\'ll backfill the four that are missing one.' },
+    ],
+  },
+  {
+    participants: ['elena', 'aoi', 'kai', 'yuki'],
+    group: true,
+    groupLabel: 'Elena + reports',
+    starred: false,
+    unread: 1,
+    messages: [
+      { from: 'elena', at: '2026-05-29T10:00:00Z', body: 'PR 171 review thread is getting long. Let\'s settle the secrets-by-basename question here instead of in GitHub comments.' },
+      { from: 'aoi', at: '2026-05-29T10:06:00Z', body: 'One routine per skill broke the symmetry with the single Lambda runner. Looking up secrets by routine_spec basename fixes it — one CCR covers everything.' },
+      { from: 'kai', at: '2026-05-29T10:09:00Z', body: 'Agree. I\'ll update the infra doc so the next person doesn\'t re-derive this.' },
+    ],
+  },
+  {
+    participants: ['priya'],
+    group: false,
+    starred: false,
+    unread: 0,
+    messages: [
+      { from: 'priya', at: '2026-05-28T16:40:00Z', body: 'PR 123\'s Epic body is quietly re-shaping Epic-002\'s IA. That\'s "two docs deciding the same thing" — read later you can\'t trace which decided what.' },
+      { from: OPERATOR_ID, at: '2026-05-28T16:52:00Z', body: 'Good catch. One layer per change, docs included. Want to take the cleanup?' },
+      { from: 'priya', at: '2026-05-28T16:55:00Z', body: 'Yes. I\'ll fold the IA back into Epic-002 and leave PR 123 to its actual scope.' },
+    ],
+  },
+  {
+    participants: ['vikram'],
+    group: false,
+    starred: false,
+    unread: 0,
+    messages: [
+      { from: 'vikram', at: '2026-05-27T08:15:00Z', body: 'wf-agent-runner is green across all 17 bindings after the dispatch refactor. Cold-start is down to ~900ms.' },
+      { from: OPERATOR_ID, at: '2026-05-27T08:31:00Z', body: 'Nice. Ship it.' },
+    ],
+  },
+  {
+    participants: ['sora'],
+    group: false,
+    starred: false,
+    unread: 0,
+    messages: [
+      { from: 'sora', at: '2026-05-26T12:00:00Z', body: 'Pulled the week\'s feed posts into a digest. The "friction → L2 lint" pattern showed up four times — might be worth a standing convention.' },
+    ],
+  },
+];
+
+/**
+ * Builds the deterministic mock thread list, dropping any template whose
+ * talent isn't in the current roster. Sorted newest-first by last message.
+ */
+export function buildMockThreads(roster: WorkforceAgent[]): Conversation[] {
+  const known = new Set(roster.map((a) => a.slug));
+  return TEMPLATES.filter((t) =>
+    // Keep a thread only if at least its primary participant exists. Group
+    // threads also need their message senders to resolve to known agents.
+    t.participants.every((p) => known.has(p)) &&
+    t.messages.every((m) => m.from === OPERATOR_ID || known.has(m.from)),
+  )
+    .map((t, i) => ({ ...t, id: `mock-${i}-${t.participants.join('-')}` }))
+    .sort((a, b) => Date.parse(lastAt(b)) - Date.parse(lastAt(a)));
+}
+
+export function lastMessage(c: Conversation): ChatMessage {
+  return c.messages[c.messages.length - 1];
+}
+
+export function lastAt(c: Conversation): string {
+  return lastMessage(c).at;
+}

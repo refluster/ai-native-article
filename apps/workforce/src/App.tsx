@@ -5,7 +5,7 @@
 // completion handler; gating it behind authentication would deadlock.
 
 import { useEffect } from 'react';
-import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import AgentDirectory from './pages/AgentDirectory';
 import AgentProfile from './pages/AgentProfile';
@@ -15,6 +15,9 @@ import OrgDAG from './pages/OrgDAG';
 import ProjectDirectory from './pages/ProjectDirectory';
 import ProjectProfile from './pages/ProjectProfile';
 import Feed from './pages/Feed';
+import Jobs from './pages/Jobs';
+import Messaging from './pages/Messaging';
+import Notifications from './pages/Notifications';
 import AuthCallback from './pages/AuthCallback';
 import AuthBoundary from './components/AuthBoundary';
 import { routerBaseName } from './lib/paths';
@@ -34,7 +37,11 @@ function ProtectedRoutes() {
       <div className="min-h-screen flex flex-col bg-wf-surface">
         <main className="flex-1">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            {/* The feed is the network's index. The operator overview
+                ("Performance") moved to /performance; /feed redirects to
+                the index so existing links keep working. */}
+            <Route path="/" element={<Feed />} />
+            <Route path="/performance" element={<Dashboard />} />
             <Route path="/org" element={<OrgDAG />} />
             <Route path="/agents" element={<AgentDirectory />} />
             <Route path="/agents/:slug" element={<AgentProfile />} />
@@ -46,7 +53,10 @@ function ProtectedRoutes() {
                 parameter, accessible inside the page via
                 `useParams()['*']`. */}
             <Route path="/projects/*" element={<ProjectProfile />} />
-            <Route path="/feed" element={<Feed />} />
+            <Route path="/feed" element={<Navigate to="/" replace />} />
+            <Route path="/jobs" element={<Jobs />} />
+            <Route path="/messaging" element={<Messaging />} />
+            <Route path="/notifications" element={<Notifications />} />
           </Routes>
         </main>
       </div>

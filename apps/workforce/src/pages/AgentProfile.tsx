@@ -208,7 +208,7 @@ export default function AgentProfile() {
     <WorkforceLayout>
       {/* Breadcrumb */}
       <div className="mb-4 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-        <Link to="/" className="hover:text-wf-on-surface">DASHBOARD</Link>
+        <Link to="/" className="hover:text-wf-on-surface">HOME</Link>
         <span className="mx-2">/</span>
         <Link to="/agents" className="hover:text-wf-on-surface">CREW</Link>
         <span className="mx-2">/</span>
@@ -220,7 +220,7 @@ export default function AgentProfile() {
         <Sigil slug={agent.slug} size={88} />
         <div className="flex-1 min-w-0">
           <div className="mb-2 flex flex-wrap items-center gap-3">
-            <Typeplate label="AGENT" value={`${agent.slug.toUpperCase()} · L${agent.depth}`} />
+            <Typeplate label="AGENT WORKFORCE" value={`${agent.slug.toUpperCase()} · L${agent.depth}`} />
             <StatusPill status={status} />
           </div>
           <h1 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-[1.04] text-wf-on-surface mb-1">
@@ -297,7 +297,7 @@ export default function AgentProfile() {
           {/* CONFIG facts grid */}
           <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
             <div className="border-b border-wf-outline-variant px-4 py-3">
-              <Typeplate label="DECK · CONFIG" value="PERSONA · MODEL · PROJECT" />
+              <Typeplate label="CONFIG" value="PERSONA · MODEL · PROJECT" />
             </div>
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-4 text-sm">
               <Fact label="MODEL" value={agent.model} />
@@ -314,7 +314,7 @@ export default function AgentProfile() {
           {/* BINDINGS — cron × skill pairs */}
           <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
             <div className="border-b border-wf-outline-variant px-4 py-3">
-              <Typeplate label="DECK · BINDINGS" value={`${agent.bindings.length} cron×skill`} />
+              <Typeplate label="BINDINGS" value={`${agent.bindings.length} cron×skill`} />
             </div>
             <ul className="divide-y divide-wf-outline-variant">
               {agent.bindings.map((b, idx) => (
@@ -350,7 +350,7 @@ export default function AgentProfile() {
           {apiConfigured() && (
             <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
               <div className="border-b border-wf-outline-variant px-4 py-3">
-                <Typeplate label="DECK · EXEC" value="RECENT" />
+                <Typeplate label="EXEC" value="RECENT" />
               </div>
               <div className="p-4">
                 {execs === null ? (
@@ -462,7 +462,7 @@ export function MembershipsPanel({ memberships }: { memberships: AgentMembership
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
-        <Typeplate label="DECK · PROJECTS" value={`${valid.length} MEMBERSHIPS`} />
+        <Typeplate label="PROJECTS" value={`${valid.length} MEMBERSHIPS`} />
         <Link
           to="/projects"
           className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
@@ -531,7 +531,7 @@ function JDPanel({ jd }: { jd: NonNullable<WorkforceAgent['jd']> }) {
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3">
-        <Typeplate label="DECK · JD" value="MISSION · RESPONSIBILITIES · MEASURES" />
+        <Typeplate label="JD" value="MISSION · RESPONSIBILITIES · MEASURES" />
       </div>
       <div className="p-4 sm:p-5 space-y-5">
         <div>
@@ -581,7 +581,7 @@ function IdentityPanel({ identity }: { identity: NonNullable<WorkforceAgent['ide
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
-        <Typeplate label="DECK · IDENTITY" value="ARCHETYPE · PRINCIPLES · GUARDRAILS" />
+        <Typeplate label="IDENTITY" value="ARCHETYPE · PRINCIPLES · GUARDRAILS" />
         <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
           OPENCLAW
         </span>
@@ -642,7 +642,7 @@ function PerformancePanel({ last7d }: { last7d: NonNullable<AgentMockStats['last
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
-        <Typeplate label="DECK · PERF" value="LAST 7 DAYS" />
+        <Typeplate label="PERF" value="LAST 7 DAYS" />
         <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
           rolling window
         </span>
@@ -716,7 +716,7 @@ function RecentRunsPanel({ runs }: { runs: NonNullable<AgentMockStats['recent_ru
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
-        <Typeplate label="DECK · TASK LOG" value={`LAST ${ordered.length} RUNS`} />
+        <Typeplate label="TASK LOG" value={`LAST ${ordered.length} RUNS`} />
         <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
           when · what · result
         </span>
@@ -824,7 +824,7 @@ function MemoryPanel({ memory }: { memory: NonNullable<WorkforceAgent['memory']>
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between flex-wrap gap-2">
-        <Typeplate label="DECK · MEMORY" value="LONG-TERM · DURABLE STATE" />
+        <Typeplate label="MEMORY" value="LONG-TERM · DURABLE STATE" />
         <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
           {entries.length} {entries.length === 1 ? 'entry' : 'entries'} · curated {memory.last_updated}
         </span>
@@ -892,7 +892,7 @@ function ExperiencePanel({ agent, roster }: { agent: WorkforceAgent; roster: Wor
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
-        <Typeplate label="DECK · EXPERIENCE" value="TRACK RECORD ON THE WORKFORCE" />
+        <Typeplate label="EXPERIENCE" value="TRACK RECORD ON THE WORKFORCE" />
         <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
           joined {exp.joined_at} · {tenureDays}d
         </span>
