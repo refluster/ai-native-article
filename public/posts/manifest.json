@@ -20,6 +20,16 @@
     "sourceUrls": "https://example.com/agents"
   },
   {
+    "slug": "fd7103d190d0",
+    "title": "製造業におけるAIトレンド2026: スマート工場の未来",
+    "type": "explanation",
+    "category": "B: Trends",
+    "date": "2026-04-22",
+    "abstract": "AI agents taking over shop floor scheduling and predictive maintenance.",
+    "image": "/posts/images/fd7103d190d0.jpg",
+    "sourceUrls": "https://example.com/mfg"
+  },
+  {
     "slug": "c9c06e22f1db",
     "title": "マクロハードAIの時代が到来！エロン・マスクが業務自動化の新たな未来を切り開く",
     "type": "explanation",
