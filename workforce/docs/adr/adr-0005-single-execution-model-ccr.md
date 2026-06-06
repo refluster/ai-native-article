@@ -86,13 +86,28 @@ Concretely:
    nothing to switch on. `skill.meta.archetype` is **kept** — it has no
    runtime effect (a CI-validation tag only), is `cadence`-only today, and is
    left extensible for future named patterns.
-5. **One framework-level sink: the EXEC activity ledger.** The generic CCR
-   routine writes back **one EXEC row per task** through an authenticated
-   endpoint — generalising #238's `execution_surface` with a new value
-   `ccr` (extending `POST /agents/{slug}/engagements` or a sibling
-   `POST /agents/{slug}/executions`, bearer-auth'd by a project-scoped
-   `workforce.exec_write_token`, exactly like `POST /feed`). This closes the
-   CCR observability gap the routine spec flagged.
+5. **One framework-level sink: the engagement (activity ledger).** The generic
+   CCR routine writes back **one engagement per task** — the agent's uniform,
+   queryable business record of a unit of work, stored as an `EXEC#{ulid}` row
+   and surfaced in the operator's Track Record. It reuses the **single,
+   business-named write surface** `POST /agents/{slug}/engagements` (no second
+   `/executions` endpoint — one surface, not two), generalising #238's
+   `execution_surface` with a new value `ccr`. **Auth is an ephemeral
+   capability token, not a static secret** (refined during implementation —
+   see §Alternatives and data-model.md `AUTH#ENGAGEMENT`): a short-lived
+   `AUTH#ENGAGEMENT / TOKEN#{token}` row minted in DynamoDB, validated by
+   expiry. The trust gate is *"can write the table"* — minting needs AWS
+   access, so a CCR session (no AWS of its own) can only **use** a token minted
+   for it. Two mint paths, one mechanism:
+   - **cron** — the orchestrator mints one token per 2-hourly fire and injects
+     it into each CCR task's `credentials.engagement_write_token`;
+   - **interactive** — an operator-credentialed session mints its own via
+     `workforce/scripts/record-engagement.mjs`, so work requested in a Claude
+     Code conversation also lands in the Track Record.
+
+   External (Phase 7) clients keep the static `wf/api/engagements-write-token`
+   bearer as a fallback. This closes the CCR observability gap the routine
+   spec flagged.
 6. **Three sinks stay separate** (upholding
    [ADR-0001](adr-0001-record-family-separation.md)):
    - **deliverable / publish** (Notion page, feed POST) — the *product*,
@@ -150,7 +165,19 @@ dispatches nothing.
   dead-field smell on a CCR-only system. Rejected — delete it.
 - **Build a dedicated `POST /exec` endpoint from scratch.** Rejected in
   favour of generalising the existing #238 engagement/EXEC write-back route
-  (one auth-endpoint pattern, not two).
+  (one auth-endpoint pattern, not two). Implementation confirmed this: the
+  CCR write-back reuses `POST /agents/{slug}/engagements` verbatim, marked by
+  `execution_surface:"ccr"` — no `/executions` sibling exists.
+- **Static project-scoped write token (like `POST /feed`).** Item 5 first
+  proposed a long-lived `workforce.exec_write_token` secret. **Rejected
+  during implementation** in favour of an **ephemeral DynamoDB capability
+  token** (`AUTH#ENGAGEMENT / TOKEN#{token}`, minted with an `expires_at` +
+  TTL): nothing to provision or rotate in Secrets Manager, leak is bounded by
+  the short lifetime, and the trust boundary falls out of existing DynamoDB
+  IAM ("can write the table" = can mint) rather than a second secret to
+  guard. The orchestrator mints one token per fire; an operator session mints
+  its own (`record-engagement.mjs`); the static-secret path survives only as
+  an external-client fallback. See `shared/engagement-token.ts`.
 - **Keep autonomous engineering + on-demand review now.** Code/PR and
   event-driven review are a genuine *second* write-shape and *second*
   trigger class that the cadence model does not cover. The operator chose to
@@ -182,10 +209,14 @@ dispatches nothing.
 
 ### Phased implementation plan
 
-1. **PR-1 — EXEC write-back endpoint + CCR routine record step.** Add
-   `execution_surface: "ccr"`; authenticated `POST` write-back (generalise
-   the #238 route) with a project-scoped `workforce.exec_write_token`; teach
-   `routines/agent-runner.md` to call it once per task. *No deletes yet.*
+1. **PR-1 — engagement write-back + CCR routine record step.** ✅ **Landed in
+   [#254](https://github.com/refluster/ai-native-article/pull/254).** Add
+   `execution_surface:"ccr"`; reuse `POST /agents/{slug}/engagements` (no new
+   endpoint); teach `routines/agent-runner.md` to record one engagement per
+   task. Auth shipped as an **ephemeral DynamoDB capability token** (mint per
+   fire in the orchestrator + the `record-engagement.mjs` interactive path),
+   *not* the project-scoped `workforce.exec_write_token` secret first sketched
+   here — see §Alternatives. *No deletes.*
 2. **PR-2 — Rebind.** `agent.json`: unbind/rebind per the table; flip
    `feed-post` to Dario only; delete the 17 disabled feed-post EventBridge
    rules in `template.yaml`.
@@ -209,6 +240,14 @@ dispatches nothing.
   carries the draft-PR exception this ADR leans on for engineer skills.
 - [epic-012](../epics/epic-012-agent-experience.md) / #238 — the
   `execution_surface` field + engagement write-back this generalises.
+- [#254](https://github.com/refluster/ai-native-article/pull/254) — item 5
+  as shipped (ephemeral-token write-back, cron + interactive).
+- `workforce/lambdas/shared/engagement-token.ts` — mint/validate the ephemeral
+  `AUTH#ENGAGEMENT` capability token (the auth mechanism that replaced the
+  static `workforce.exec_write_token` secret).
+- `workforce/scripts/record-engagement.mjs` — the interactive mint+record path.
+- [data-model.md](../data-model.md) — the `AUTH#ENGAGEMENT` row family and the
+  `execution_surface ∈ {lambda, client, ccr}` enum.
 - `workforce/lambdas/agent-runner/handler.ts` — the executor switch retired
   here.
 - `workforce/docs/governance.md` — W-3 / R-N1, amended by the companion PR.
