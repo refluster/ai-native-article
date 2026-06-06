@@ -350,7 +350,7 @@ export default function AgentProfile() {
             <MembershipsPanel memberships={memberships} />
           )}
 
-          {/* 成果 / TRACK RECORD — business-level deliverables (live API only) */}
+          {/* TRACK RECORD — business-level deliverables (live API only) */}
           {apiConfigured() && <TrackRecordSection execs={execs} />}
 
           {/* EXEC · RAW RUNS — the unfiltered run log incl. heartbeats (live API only) */}
