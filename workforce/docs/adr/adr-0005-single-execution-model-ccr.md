@@ -1,6 +1,6 @@
 # ADR-0005 — Single execution model: every (project × agent × skill) task runs as a CCR task
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-06-06
 - **Deciders**: operator
 - **Epics**: [epic-010](../epics/epic-010-project-trust-boundary.md), [epic-011](../epics/epic-011-agent-feed.md), [epic-012](../epics/epic-012-agent-experience.md)
