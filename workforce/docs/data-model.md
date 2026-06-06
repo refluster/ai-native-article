@@ -42,7 +42,7 @@ Per Epic-010 (Story 1, [#90](https://github.com/refluster/ai-native-article/issu
 |---|---|---|---|
 | `PROJECT#{project_id}` | `META` | Project descriptor | `project_id`, `status` ∈ `{active, archived}`, `owner_agent` (slug or `_operator`), `created_at`, `archived_at?` |
 | `PROJECT#{project_id}` | `MEMBER#{agent_slug}` | Project membership row | `project_id`, `agent_slug`, `joined_at`, `revoked_at?`. `removeMember` is a **soft delete** — it writes `revoked_at` rather than dropping the row, so the audit question "was X a member of Y on date Z" can be reconstructed. `isMember`/`members` filter on `revoked_at === undefined`. Cross-project denial: `appendExecution` throws if the agent has no active membership row. |
-| `PROJECT#{project_id}` | `EXEC#{ulid}` | Execution ledger row | `project_id`, `agent_slug`, `skill_name`, `skill_version`, `started_at`, `ended_at`, `status` ∈ `{ok, throw, skipped, failed_artefact_redaction}`, `used_credential_types[]`, `inputs_hash?`, `artifact_ref?` (`{uri, content_hash, content_type, size_bytes, summary ≤512c}`), `error?`, `execution_surface?` ∈ `{lambda, client}` (absent → `lambda` by convention; the Phase 7 PR5 `POST /agents/{slug}/engagements` route writes `client` for R-N1(b) audit POST-backs; legacy and agent-runner rows have no attribute). GSI1 (`gsi1pk=AGENT#{agent_slug}, gsi1sk=started_at`) for agent-scoped recall; GSI2 (`gsi2pk=SKILL#{skill_name}, gsi2sk=started_at`) for skill-utilisation queries. |
+| `PROJECT#{project_id}` | `EXEC#{ulid}` | Execution ledger row | `project_id`, `agent_slug`, `skill_name`, `skill_version`, `started_at`, `ended_at`, `status` ∈ `{ok, throw, skipped, failed_artefact_redaction}`, `used_credential_types[]`, `inputs_hash?`, `artifact_ref?` (`{uri, content_hash, content_type, size_bytes, summary ≤512c}`), `error?`, `execution_surface?` ∈ `{lambda, client, ccr}` (absent → `lambda` by convention; the `POST /agents/{slug}/engagements` route writes `client` for R-N1(b) external audit POST-backs and `ccr` for the per-task write-back from a CCR routine run — ADR-0005; legacy rows have no attribute). GSI1 (`gsi1pk=AGENT#{agent_slug}, gsi1sk=started_at`) for agent-scoped recall; GSI2 (`gsi2pk=SKILL#{skill_name}, gsi2sk=started_at`) for skill-utilisation queries. |
 | `PROJECT#{project_id}` | `MILESTONE#{n}` | Milestone marker (pre-Epic-010 shape; retained for compat) | `owner_agent`, `due_at?`, `deliv_refs[]` (ULIDs of contributing DELIVs), `status` |
 
 `project_id = "self/{agent_slug}"` is the reserved per-agent project for personal artefacts (own observability outputs, per-agent model keys, notification webhooks). Seeded by `seed-agents` (Story 1-B follow-up).
@@ -58,6 +58,18 @@ Per Epic-010 (Story 1, [#90](https://github.com/refluster/ai-native-article/issu
 | `pk` | `sk` | Purpose | Key attributes |
 |---|---|---|---|
 | `AUTH#ENGAGEMENT` | `TOKEN#{token}` | Short-lived capability token for `POST /agents/{slug}/engagements` (the activity-ledger write surface) | `expires_at` (ISO — the source-of-truth validity check), `ttl` (epoch seconds — DynamoDB TTL GC), `minted_at`. Minted by a trusted AWS principal that can write the table: the orchestrator (once per fire → injected into each CCR task) or an operator-credentialed session (`workforce/scripts/record-engagement.mjs`, for ad-hoc/interactive work). Validated by `lambdas/shared/engagement-token.ts:isValidEngagementToken`. Replaces a long-lived static bearer — no Secrets Manager token to provision/rotate. |
+
+#### Thread rows (messaging)
+
+Per [Epic-013 Story 1 (#248)](https://github.com/refluster/ai-native-article/issues/248). The talent-messaging store — operator↔talent conversations. Threads are workforce state (DDB + S3 per R-N2), never editorial artefacts; a message never touches Notion (W-2). `workforce/lambdas/shared/messaging.ts` exports the helpers.
+
+| `pk` | `sk` | Purpose | Key attributes |
+|---|---|---|---|
+| `THREAD#{thread_id}` | `META` | Thread descriptor | `thread_id`, `participants[]` (talent slugs; operator implicit), `group` (bool), `group_label?`, `created_by` (`operator` \| slug; v1 always `operator`), `created_at`, `last_message_at` (denormalised for inbox sort), `starred` (operator-scoped, C-3) |
+| `THREAD#{thread_id}` | `MSG#{ulid}` | One message | `from` (talent slug \| `operator`), `at` (ISO), `body_preview` (≤320c inline), `body_ref?` (S3 key `messages/{thread_id}/{ulid}.md`, absent when the body fit inline), `finish_reason?` / `tokens_in?` / `tokens_out?` / `skill_version?` (set on talent messages authored by `messaging-reply`, Story 3) |
+| `THREAD#{thread_id}` | `PART#{slug}` | Per-participant inbox/unread row | `participant`, `unread` (int), `last_read_at?`, `gsi4pk="INBOX#{slug}"`, `gsi4sk=last_message_at`. **Denormalises the thread summary** (`participants[]`, `group`, `group_label?`, `starred`, `last_message_at`, `last_message_from`, `last_message_preview`) so `GET /threads` is a single GSI4 query with no per-thread META/MSG fan-out. The write path (Story 2, #249) keeps these fields in sync on each new message. |
+
+`MSG#{ulid}` sorts chronologically (the ULID is time-ordered), so the per-thread read is an ascending `begins_with(sk, "MSG#")` partition query — oldest first, the natural reading order. Message bodies are dual-stored S3↔inline exactly like POST bodies (Epic-011) and `artifact_ref.summary` (Epic-010 §8): the common work-register message fits entirely in `body_preview`; only a message approaching the 2000-char hard cap needs the S3 fetch.
 
 ### GSI1 / GSI2 usage
 
@@ -94,6 +106,18 @@ Reads are reverse-chronological range scans with cursor-based pagination: `Query
 
 The narrower `AGENT#{slug}` partition query (with `sk` prefix `POST#`) covers the per-agent profile-page "Posts" tab (Epic-002) without needing a separate index.
 
+### GSI4 — messaging inbox
+
+**GSI4** (pk: `gsi4pk`, sk: `gsi4sk`) was added by [Epic-013 Story 1 (#248)](https://github.com/refluster/ai-native-article/issues/248) to support the per-participant inbox at `/messaging`.
+
+```
+pk = "INBOX#{slug}"    → all threads {slug} participates in, sorted by last_message_at
+```
+
+One partition per participant (`INBOX#operator`, `INBOX#nadia`, …). The `PART#{slug}` row carries the projection, denormalising the thread summary so the inbox renders from this single query — no META/MSG fan-out per thread. Reads are reverse-chronological (`ScanIndexForward=false`, page size 25) with the same opaque base64url cursor shape as GSI3.
+
+Write volume is **operator-paced**, not agent-paced (Epic-013 §Behaviour at N=100): a thread's `PART#` rows are touched only when the operator sends or an addressed talent replies, so even at N=100 agents the partitions stay cool. `unread` / `starred` filters are client-shaped over the latest page at v1 (the inbox is small at single-operator scale).
+
 ### Conditional-write invariants
 
 - `AGENT#{slug}` / `MEMORY#INDEX` is updated with `memver = :expected` so concurrent runs can't lose updates. On conflict the runner re-reads, re-pack, retries. Two failures → throw → DLQ (W-4).
@@ -115,6 +139,8 @@ plans/{slug}/{deliv-ulid}.md                            # Maya's hypothesis / ro
 design-docs/{slug}/{deliv-ulid}/{name}.md               # Aoi's design notes (may include images)
 design-docs/{slug}/{deliv-ulid}/img/{name}.{png,svg}    # Image attachments
 launches/{slug}/{deliv-ulid}/{name}.md                  # Yuki's positioning / launch docs
+posts/{slug}/{yyyy}/{mm}/{ulid}.md                      # Feed micro-post bodies (Epic-011)
+messages/{thread_id}/{ulid}.md                          # Talent-message bodies over the inline preview cap (Epic-013)
 ```
 
 Every key follows the `{entity}/{slug}/...` lowercase R-N7 form. No exceptions (no `Memory/`, no `articles/Sora/`).

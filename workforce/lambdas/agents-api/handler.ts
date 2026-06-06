@@ -20,6 +20,12 @@
 //   GET    /feed                            workforce activity feed, reverse-chrono (Epic-011 Story 5)
 //   GET    /feed/{post_id}                  single post + full body (Epic-011 Story 5)
 //   PATCH  /feed/{post_id}                  hide a post (IAM-auth at API GW; Epic-011 Story 5)
+//   GET    /threads                         operator inbox, reverse-chrono (Epic-013 Story 1; ?cursor=&page_size=&filter=unread|starred)
+//   GET    /threads/{id}                    single thread + messages, S3-hydrated bodies (Epic-013 Story 1)
+//   POST   /threads                         operator starts a thread (Epic-013 Story 2; Cognito JWT at GW)
+//   POST   /threads/{id}/messages           operator appends a message (Epic-013 Story 2; Cognito JWT at GW)
+//   POST   /threads/{id}/read               clear operator unread (Epic-013 Story 2; Cognito JWT at GW)
+//   POST   /threads/{id}/star               set operator star (Epic-013 Story 2; Cognito JWT at GW)
 //
 // See workforce/docs/epics/epic-007-agent-management-api.md (agents),
 // workforce/docs/epics/epic-008-skill-repository.md (skills),
@@ -97,6 +103,17 @@ import {
   type FeedPostDetailView,
   type PostKind,
 } from "../shared/post.js";
+import {
+  getThreadDetail,
+  listInbox,
+  toThreadSummaryView,
+  createThread,
+  sendMessage,
+  markThreadRead,
+  setThreadStar,
+  MESSAGING_OPERATOR_ID,
+  type ThreadFilter,
+} from "../shared/messaging.js";
 
 // Secrets Manager path holding the feed-write capability token. The
 // runner presents the same token (injected from this secret into its
@@ -167,6 +184,10 @@ export async function handler(
     const rawProjectId = event.pathParameters?.id;
     const projectId = rawProjectId ? decodeURIComponent(rawProjectId) : undefined;
     const postId = event.pathParameters?.post_id;
+    // Talent-messaging threads (Epic-013 Story 1) share the `{id}` path
+    // param name with projects; thread ids are bare ULIDs (no `/`), so the
+    // decodeURIComponent on rawProjectId is identity for them.
+    const threadId = event.pathParameters?.id;
 
     if (routeKey === "GET /agents") return listAgents(event);
     if (routeKey === "GET /skills") return listSkills(event);
@@ -202,6 +223,16 @@ export async function handler(
     // rejection escape the outer try/catch (Promise flattening on async returns). The
     // hide_helper_not_wired throw is what relies on this for the 500-mapping contract.
     if (routeKey === "PATCH /feed/{post_id}" && postId) return await patchFeedPostRoute(postId, event);
+    // Talent messaging (Epic-013). Reads are public on the CORS gate;
+    // the writes (Story 2, #249) sit behind the Cognito JWT authorizer at
+    // API Gateway (decision D3), so the handler trusts the caller. `await`
+    // on the writes so validation throws route through the 500 mapping.
+    if (routeKey === "GET /threads") return listThreadsRoute(event);
+    if (routeKey === "GET /threads/{id}" && threadId) return getThreadRoute(threadId);
+    if (routeKey === "POST /threads") return await createThreadRoute(event);
+    if (routeKey === "POST /threads/{id}/messages" && threadId) return await sendMessageRoute(threadId, event);
+    if (routeKey === "POST /threads/{id}/read" && threadId) return await markReadRoute(threadId);
+    if (routeKey === "POST /threads/{id}/star" && threadId) return await setStarRoute(threadId, event);
 
     return reply(404, { error: "route_not_found", routeKey, path, method });
   } catch (err) {
@@ -972,6 +1003,123 @@ async function getFeedPostRoute(
   }
   const detail: FeedPostDetailView = { ...view, body };
   return reply(200, detail);
+}
+
+// --- Talent messaging (Epic-013 Story 1, #248) --------------------------
+
+/** Parse the `?filter=` query param for the inbox. Unknown values are
+ *  ignored (no filter), matching the lenient posture of the feed filters. */
+function parseThreadFilter(qs: Record<string, string | undefined>): ThreadFilter | undefined {
+  if (qs.filter === "unread" || qs.filter === "starred") return qs.filter;
+  return undefined;
+}
+
+/**
+ * GET /threads — the operator's inbox, reverse-chronological. Single GSI4
+ * partition query (`INBOX#operator`). Reads only the operator's inbox in
+ * v1 (operator↔talent); a per-talent inbox view is a Story 2+ concern.
+ */
+async function listThreadsRoute(
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const qs = event.queryStringParameters ?? {};
+  const page = await listInbox({
+    slug: MESSAGING_OPERATOR_ID,
+    cursor: qs.cursor,
+    pageSize: parsePageSize(qs),
+    filter: parseThreadFilter(qs),
+  });
+  return reply(200, {
+    threads: page.items.map(toThreadSummaryView),
+    cursor: page.cursor,
+  });
+}
+
+/**
+ * GET /threads/{id} — one thread with its messages, oldest-first, each
+ * body resolved (inline preview or S3 hydration). 404 when the thread has
+ * no META row.
+ */
+async function getThreadRoute(threadId: string): Promise<APIGatewayProxyResultV2> {
+  const detail = await getThreadDetail(threadId);
+  if (!detail) return reply(404, { error: "not_found", thread_id: threadId });
+  return reply(200, detail);
+}
+
+/** Parse a JSON request body, or return undefined for the 400 path. */
+function parseJsonBody(raw: string | undefined): Record<string, unknown> | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * POST /threads — operator starts a thread. Body:
+ *   { participants: string[], body: string, group_label?: string }
+ * Auth: Cognito JWT at the gateway (decision D3); the author is always the
+ * operator in v1.
+ */
+async function createThreadRoute(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> {
+  const body = parseJsonBody(event.body);
+  if (!body) return reply(400, { error: "invalid_json" });
+  const participants = body.participants;
+  const messageBody = body.body;
+  if (!Array.isArray(participants) || participants.length === 0 || !participants.every((p) => typeof p === "string")) {
+    return reply(400, { error: "invalid_participants" });
+  }
+  if (typeof messageBody !== "string") return reply(400, { error: "invalid_body" });
+  try {
+    const out = await createThread({
+      participants: participants as string[],
+      body: messageBody,
+      from: MESSAGING_OPERATOR_ID,
+      ...(typeof body.group_label === "string" ? { group_label: body.group_label } : {}),
+    });
+    return reply(201, out);
+  } catch (err) {
+    return reply(400, { error: "create_failed", detail: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+/**
+ * POST /threads/{id}/messages — operator appends a message. Body:
+ *   { body: string }
+ * The reply TASK that wakes the addressed talent is enqueued in Story 3.
+ */
+async function sendMessageRoute(
+  threadId: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const body = parseJsonBody(event.body);
+  if (!body) return reply(400, { error: "invalid_json" });
+  if (typeof body.body !== "string") return reply(400, { error: "invalid_body" });
+  try {
+    const out = await sendMessage({ thread_id: threadId, from: MESSAGING_OPERATOR_ID, body: body.body });
+    return reply(201, out);
+  } catch (err) {
+    return reply(400, { error: "send_failed", detail: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+/** POST /threads/{id}/read — clear the operator's unread on this thread. */
+async function markReadRoute(threadId: string): Promise<APIGatewayProxyResultV2> {
+  await markThreadRead(threadId, MESSAGING_OPERATOR_ID);
+  return reply(200, { ok: true });
+}
+
+/** POST /threads/{id}/star — toggle/set the operator star. Body: { starred: boolean }. */
+async function setStarRoute(
+  threadId: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const body = parseJsonBody(event.body);
+  if (!body || typeof body.starred !== "boolean") return reply(400, { error: "invalid_starred" });
+  await setThreadStar(threadId, body.starred);
+  return reply(200, { ok: true, starred: body.starred });
 }
 
 /**

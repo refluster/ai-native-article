@@ -108,6 +108,13 @@ Resources:
           AttributeType: S
         - AttributeName: gsi3sk
           AttributeType: S
+        # GSI4 — talent-messaging inbox (Epic-013 Story 1, #248).
+        # gsi4pk="INBOX#{slug}" / gsi4sk=last_message_at. One partition per
+        # participant; see workforce/docs/data-model.md "GSI4 — messaging inbox".
+        - AttributeName: gsi4pk
+          AttributeType: S
+        - AttributeName: gsi4sk
+          AttributeType: S
       KeySchema:
         - AttributeName: pk
           KeyType: HASH
@@ -144,6 +151,19 @@ Resources:
             - AttributeName: gsi3pk
               KeyType: HASH
             - AttributeName: gsi3sk
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        # GSI4 — talent-messaging inbox (Epic-013 Story 1, #248). One
+        # partition per participant (`INBOX#{slug}`), reverse-chrono on
+        # last_message_at. Same online-index-build caveat as GSI3 above:
+        # isolate this add in its own commit. Writes are operator-paced
+        # (Epic-013 §Behaviour at N=100), so the partition stays cool.
+        - IndexName: GSI4
+          KeySchema:
+            - AttributeName: gsi4pk
+              KeyType: HASH
+            - AttributeName: gsi4sk
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
@@ -290,7 +310,10 @@ Resources:
         # by `aws-vault` from a terminal today rather than the browser, but
         # adding PATCH here keeps the CORS surface honest if the operator
         # SPA later issues a PATCH from the browser via signed-SigV4.
-        AllowMethods: [GET, PATCH, OPTIONS]
+        # POST added by Epic-013 Story 2 (#249) for the talent-messaging
+        # operator write routes (start thread / send / read / star), gated
+        # by the Cognito JWT authorizer below.
+        AllowMethods: [GET, POST, PATCH, OPTIONS]
         # SigV4-signed browser requests (aws4fetch) send more than
         # `authorization`: the preflight `Access-Control-Request-Headers`
         # also lists `x-amz-date`, `x-amz-content-sha256`, and (with
@@ -304,8 +327,75 @@ Resources:
           - x-amz-security-token
       Auth:
         EnableIamAuthorizer: true
+        # Epic-013 Story 2 (#249) / decision D3 — operator write routes for
+        # talent messaging authenticate against a single-operator Cognito
+        # user pool (hosted login). A single-user pool is login-for-the-
+        # operator, not a multi-tenant primitive, so it stays within C-3.
+        # Read routes remain public on the CORS gate (Epic-011 §6 posture).
+        Authorizers:
+          WfOperatorJwt:
+            IdentitySource: "$request.header.Authorization"
+            JwtConfiguration:
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${WfOperatorPool}
+              audience:
+                - !Ref WfOperatorPoolClient
       Tags:
         workforce: !Ref Stage
+
+  # --- Cognito: single-operator login for messaging writes (Epic-013 D3) ---
+  WfOperatorPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub wf-operator-${Stage}
+      # Operator-only: no self-service sign-up. The operator account is
+      # created once via the console / CLI (admin-create-user). C-3.
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      UserPoolTags:
+        workforce: !Ref Stage
+
+  WfOperatorPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub wf-operator-spa-${Stage}
+      UserPoolId: !Ref WfOperatorPool
+      # Public SPA client — no secret (the secret can't be protected in a
+      # browser bundle; the hosted-login Authorization-Code + PKCE flow is
+      # the protection).
+      GenerateSecret: false
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthScopes:
+        - openid
+        - email
+      SupportedIdentityProviders:
+        - COGNITO
+      CallbackURLs:
+        - https://workforce.kohuehara.xyz/messaging
+        - http://localhost:5173/messaging
+      LogoutURLs:
+        - https://workforce.kohuehara.xyz/messaging
+        - http://localhost:5173/messaging
+      ExplicitAuthFlows:
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
+
+  WfOperatorPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      # Hosted-UI login domain: wf-operator-{stage}.auth.{region}.amazoncognito.com
+      Domain: !Sub wf-operator-${Stage}
+      UserPoolId: !Ref WfOperatorPool
 
   WfAgentsApiFunction:
     Type: AWS::Serverless::Function
@@ -361,6 +451,22 @@ Resources:
               Action: s3:GetObject
               Resource:
                 - !Sub ${WfBucket.Arn}/posts/*
+            # Epic-013 Story 1 (#248) — `GET /threads/{id}` hydrates long
+            # message bodies from S3 (`messages/{thread_id}/{ulid}.md`).
+            # Read-only here; the operator write path (Story 2) adds PutObject.
+            - Sid: AgentsApiMessageBodyRead
+              Effect: Allow
+              Action: s3:GetObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/messages/*
+            # Epic-013 Story 2 (#249) — the operator write routes store long
+            # message bodies (>320c) before the DDB MSG row (createThread /
+            # sendMessage ordering). Scoped to messages/*.
+            - Sid: AgentsApiMessageBodyWrite
+              Effect: Allow
+              Action: s3:PutObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/messages/*
             - Sid: AgentsApiPostBodyWrite
               # POST /feed writes the post body to posts/{slug}/{yyyy}/{mm}/{ulid}.md
               # before the DDB row (createPost ordering). Scoped to posts/*.
@@ -606,6 +712,57 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /agents/{slug}/posts
             Method: GET
+        # Talent messaging — read endpoints (Epic-013 Story 1, #248).
+        # Public on the CORS gate like the feed reads; the write routes
+        # (Story 2) add the operator Bearer gate at the handler layer.
+        ListThreads:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /threads
+            Method: GET
+        GetThread:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /threads/{id}
+            Method: GET
+        # Operator write routes (Epic-013 Story 2, #249) — gated by the
+        # WfOperatorJwt Cognito authorizer (decision D3). No talent ever
+        # posts a message from the UI; talent messages come from the
+        # messaging-reply runner path (Story 3).
+        CreateThread:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /threads
+            Method: POST
+            Auth:
+              Authorizer: WfOperatorJwt
+        SendThreadMessage:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /threads/{id}/messages
+            Method: POST
+            Auth:
+              Authorizer: WfOperatorJwt
+        MarkThreadRead:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /threads/{id}/read
+            Method: POST
+            Auth:
+              Authorizer: WfOperatorJwt
+        SetThreadStar:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /threads/{id}/star
+            Method: POST
+            Auth:
+              Authorizer: WfOperatorJwt
       Tags:
         workforce: !Ref Stage
 
@@ -621,32 +778,6 @@ Resources:
       Dimensions:
         - Name: FunctionName
           Value: !Ref WfAgentsApiFunction
-      Statistic: Sum
-      Period: 300
-      EvaluationPeriods: 1
-      Threshold: 0
-      ComparisonOperator: GreaterThanThreshold
-      TreatMissingData: notBreaching
-      AlarmActions:
-        - !Ref WfAlarmTopic
-
-  # CloudWatch alarm: any W-1 violation surfaced by the `feed-health`
-  # sweep (Epic-011 Story 4 / #131). The sweep emits
-  # `WfFeedHealthViolation` (count, with `Check` + `Stage` dimensions)
-  # for each tripped row. We alarm on the partition's Sum > 0 over a
-  # 5-minute window so a single violation in any sweep pages.
-  # TreatMissingData=notBreaching so the long quiet windows between
-  # sweeps don't auto-alarm.
-  WfFeedHealthViolationsAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub wf-feed-health-violations-alarm-${Stage}
-      AlarmDescription: !Sub feed-health sweep (Epic-011 Story 4) found a W-1 violation on ${Stage} — see WfFeedHealthViolation in CloudWatch.
-      Namespace: Workforce/Feed
-      MetricName: WfFeedHealthViolation
-      Dimensions:
-        - Name: Stage
-          Value: !Ref Stage
       Statistic: Sum
       Period: 300
       EvaluationPeriods: 1
@@ -1521,6 +1652,24 @@ Outputs:
     Value: !Ref WfTable
     Export:
       Name: !Sub wf-table-name-${Stage}
+  # Epic-013 Story 2 (#249) — the workforce SPA needs these at build time to
+  # construct the Cognito hosted-login URL and validate JWTs for the
+  # messaging write routes. Surfaced as Vite env (VITE_WORKFORCE_COGNITO_*).
+  OperatorPoolId:
+    Description: Cognito user pool id for operator login (messaging writes).
+    Value: !Ref WfOperatorPool
+    Export:
+      Name: !Sub wf-operator-pool-id-${Stage}
+  OperatorPoolClientId:
+    Description: Cognito SPA app-client id (public, PKCE).
+    Value: !Ref WfOperatorPoolClient
+    Export:
+      Name: !Sub wf-operator-pool-client-id-${Stage}
+  OperatorPoolDomain:
+    Description: Cognito hosted-UI domain prefix (wf-operator-{stage}).
+    Value: !Ref WfOperatorPoolDomain
+    Export:
+      Name: !Sub wf-operator-pool-domain-${Stage}
   TableArn:
     Value: !GetAtt WfTable.Arn
     Export:

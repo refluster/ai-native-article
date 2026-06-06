@@ -25,7 +25,6 @@
 import {
   getItem,
   putItem,
-  queryByGsi,
   queryByGsiPaged,
   queryBySkPrefixPaged,
   updateOperational,
@@ -36,8 +35,6 @@ import { selfProjectId } from "./project.js";
 import {
   S3Client,
   GetObjectCommand,
-  HeadObjectCommand,
-  NotFound,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 
@@ -279,8 +276,8 @@ export async function getPost(
  *  route layer makes that decision; this helper unconditionally fetches.
  *
  *  Throws on S3 failure (W-4): the operator's expectation is that a row
- *  whose `body_ref` doesn't resolve is a `feed-health` violation, not a
- *  silent partial response. */
+ *  whose `body_ref` doesn't resolve is a write-path integrity violation,
+ *  not a silent partial response. */
 export async function fetchPostBody(bodyRef: string): Promise<string> {
   if (!BUCKET_NAME) {
     throw new Error("BUCKET_NAME env var is required to fetch post bodies");
@@ -499,56 +496,6 @@ export async function hidePost(input: HidePostInput): Promise<void> {
     },
     undefined,
   );
-}
-
-// --- feed-health helpers (Story 4) --------------------------------------
-
-/**
- * Iterate every POST row in the workforce feed corpus, newest first.
- * Used by the `feed-health` sweep.
- */
-export async function* iterateAllPosts(pageSize = 100): AsyncGenerator<FeedPostRow> {
-  const rows = await queryByGsi<FeedPostRow>("GSI3", "FEED", {
-    limit: pageSize,
-    scanIndexForward: false,
-  });
-  for (const r of rows) yield r;
-}
-
-/**
- * Returns `true` iff the S3 object at `bodyRef` resolves via HeadObject.
- * Returns `false` on a 404. Other SDK errors propagate. When
- * `BUCKET_NAME` is unset, returns `true` (test-friendly local path).
- */
-export async function postBodyExists(bodyRef: string): Promise<boolean> {
-  if (!BUCKET_NAME) return true;
-  try {
-    await s3.send(new HeadObjectCommand({ Bucket: BUCKET_NAME, Key: bodyRef }));
-    return true;
-  } catch (err) {
-    if (err instanceof NotFound) return false;
-    if (err instanceof Error && err.name === "NotFound") return false;
-    throw err;
-  }
-}
-
-/**
- * Fetch the first `maxChars` of the S3 body. Used by the feed-health
- * LLM-artefact check when the inline `body_preview` is missing.
- */
-export async function fetchPostBodyHead(bodyRef: string, maxChars: number): Promise<string> {
-  if (!BUCKET_NAME) return "";
-  const out = await s3.send(
-    new GetObjectCommand({
-      Bucket: BUCKET_NAME,
-      Key: bodyRef,
-      Range: `bytes=0-${maxChars * 4}`,
-    }),
-  );
-  const body = out.Body;
-  if (!body) return "";
-  const transformed = await body.transformToString();
-  return transformed.slice(0, maxChars);
 }
 
 /** Default ULID generator (timestamp + monotonic counter). */
