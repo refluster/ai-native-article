@@ -342,43 +342,24 @@ for (const slug of slugDirs) {
           }
         }
       }
-      // workflow required + must exist for GHA
-      if (b.executor === "gha") {
-        if (typeof b.workflow !== "string" || b.workflow.length === 0) {
-          v(
-            "S9-binding-workflow",
-            cfg,
-            `bindings[${i}]: executor=gha requires workflow (path under .github/workflows/)`,
-          );
-        } else {
-          const wfPath = join(REPO_ROOT, b.workflow);
-          if (!existsSync(wfPath)) {
-            v(
-              "R8-workflow-exists",
-              cfg,
-              `bindings[${i}].workflow "${b.workflow}" does not exist`,
-            );
-          }
-        }
-      }
       // note (optional)
       if (b.note !== undefined && typeof b.note !== "string") {
         v("S9-binding-note", cfg, `bindings[${i}].note must be string if present`);
       }
-      // Skill folder cross-check applies only to executor=lambda.
-      // For CCR/GHA the skill name is logical; the artefact lives elsewhere.
-      if (b.executor === "lambda") {
-        if (skillsIndex.size === 0) continue;
+      // Skill cross-check. ADR-0005: every binding runs as a CCR task whose
+      // SKILL.md + write-script live in workforce/skills/{name}/, so each
+      // binding must name an existing skill folder that lists this agent in
+      // its owners. (Pre-ADR-0005 this was gated on executor=lambda; CCR
+      // skills now live in the same tree, so the check applies to all.)
+      if (skillsIndex.size > 0) {
         const entry = skillsIndex.get(b.skill);
         if (!entry) {
           v(
             "R8-binding-skill-exists",
             cfg,
-            `bindings[${i}].skill "${b.skill}" has no workforce/skills/${b.skill}/ directory (required for executor=lambda)`,
+            `bindings[${i}].skill "${b.skill}" has no workforce/skills/${b.skill}/ directory`,
           );
-          continue;
-        }
-        if (!entry.owners.has(slug)) {
+        } else if (!entry.owners.has(slug)) {
           v(
             "R8-binding-skill-owner",
             cfg,
