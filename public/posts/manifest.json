@@ -30,6 +30,16 @@
     "sourceUrls": "https://www.ft.com/content/d23bd03a-92ac-4e81-8460-3b867a833860?syn-25a6b1a6=1"
   },
   {
+    "slug": "f54f71772082",
+    "title": "クロードコード流出がもたらす影響：規制産業におけるエンジニアリングチームへの教訓",
+    "type": "explanation",
+    "category": "AI Development Process",
+    "date": "2026-04-23",
+    "abstract": "Claude Codeのソースコード流出がコンプライアンス要件のある企業の開発チームに与える影響を分析。Undercover Modeの詳細と開発プロセスへの示唆。",
+    "image": "/posts/images/f54f71772082.jpg",
+    "sourceUrls": "https://systima.ai/blog/claude-code-leak-compliance-implications"
+  },
+  {
     "slug": "f362cac8f219",
     "title": "2026年のデータセンターインフラ: AIトレーニングモデルの電力要件",
     "type": "explanation",
