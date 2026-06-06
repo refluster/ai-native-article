@@ -280,7 +280,6 @@ function loadOneSkill(name) {
     name: meta.name,
     version: meta.version,
     status: meta.status,
-    executor: meta.executor,
     deliverable: meta.deliverable ?? null,
     cost_class: meta.cost_class,
     owners: meta.owners ?? [],

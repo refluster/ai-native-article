@@ -9,7 +9,6 @@
     "name",
     "version",
     "status",
-    "executor",
     "cost_class",
     "owners",
     "improvement_agent",
@@ -37,11 +36,6 @@
       "description": "Optional named skill archetype. \"cadence\": a scheduled, persona-voiced skill fired by EventBridge → wf-orchestrator-tick → the generic agent-runner CCR routine, whose context is composed from (agent × skill × project) and whose side effect is a deterministic bundled write-script POSTing to an authenticated endpoint with a project-scoped credential (no PR, no AWS access in-session). feed-post is the canonical first instance; new Cadences are produced by the .claude/skills/cadence-forge skill. When present, validate-skills.mjs enforces the archetype's structural invariants (see the C-* rules there). Absent for skills that don't fit a named archetype.",
       "default": null
     },
-    "executor": {
-      "type": "string",
-      "enum": ["llm-prose", "claude-code-routine", "deterministic"],
-      "description": "How the runner executes this skill. llm-prose: LLM call → S3 artefact (+ optional Notion publish). claude-code-routine: LLM brief → GHA workflow_dispatch → pending DELIV. deterministic: sibling handler.ts in the same skill folder (auto-registered via workforce/scripts/build-skill-registry.mjs), no LLM call."
-    },
     "deliverable": {
       "type": "object",
       "additionalProperties": false,
@@ -59,7 +53,7 @@
           "description": "Optional; only valid when deliverable.type=article. The Notion `Type` select the article-publish path writes (read by a skill's bundled write script, e.g. workforce/skills/article-level2/publish-notion.mjs) so the front-end labels/groups the article. Omitted for non-article deliverables and legacy article skills — the reader's resolveType then defaults to 'analysis'. See scripts/fetchers/notion.mjs:resolveType and apps/article/src/types/article.ts."
         }
       },
-      "description": "Required for executor=llm-prose; forbidden otherwise. Declares the S3 prefix + Notion publish flag for the artefact."
+      "description": "Optional. Declares the S3 prefix + Notion publish flag for a skill's published artefact, read by the skill's bundled CCR write-script. Absent for skills with no published deliverable."
     },
     "cost_class": {
       "type": "string",

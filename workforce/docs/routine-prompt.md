@@ -61,7 +61,7 @@ If every item is checked: post an issue titled `workforce ROADMAP complete — o
 
 2. **Implement.** Work on the branch already designated for this session (the branch this workflow checked out). Make the smallest correct change that satisfies the acceptance criterion stated in the ROADMAP item.
 
-3. **Respect the skill bundle convention.** Adding a new skill = create `workforce/skills/{name}/` with `SKILL.md`, `meta.json`, and (for `executor=deterministic`) `handler.ts`. Do **not** add per-skill files under `workforce/lambdas/shared/` — there is no `handlers/` directory there by design. Run `npm run workforce:skill-registry` to regenerate `workforce/lambdas/shared/skill-registry-generated.ts` and commit it alongside the new folder.
+3. **Respect the skill bundle convention.** Adding a new skill = create `workforce/skills/{name}/` with `SKILL.md`, `meta.json`, and (for a Cadence) a bundled write-script. Per ADR-0005 every skill runs as a CCR task — there is no `meta.executor` skill-shape field and no Lambda handler dispatch. Do **not** add per-skill files under `workforce/lambdas/shared/`. Run `npm run workforce:skill-registry` to regenerate `workforce/lambdas/shared/skill-registry-generated.ts` (the SKILL_REQUIRES credential map) and commit it alongside the new folder.
 
 4. **Respect zone constraints.** Zone A files require human merge — you can create and edit them in a PR but cannot merge. Zone B diffs < 30 lines touching no Zone A files may be agent-merged; all others need human review. When in doubt, leave merging to the human.
 

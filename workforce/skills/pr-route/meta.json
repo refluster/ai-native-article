@@ -2,7 +2,6 @@
   "name": "pr-route",
   "version": "0.1.0",
   "status": "active",
-  "executor": "deterministic",
   "cost_class": "medium",
   "owners": ["nadia", "maya"],
   "improvement_agent": "sana",

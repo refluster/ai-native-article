@@ -139,14 +139,13 @@ export default function SkillProfile() {
         className="mb-6"
         items={[
           {
-            cap: 'EXECUTOR',
-            value: skill.executor,
-            sub:
-              skill.executor === 'deterministic'
-                ? 'runner-side handler · no LLM'
-                : skill.executor === 'llm-prose'
-                  ? `LLM → ${skill.deliverable?.type ?? 'artefact'}`
-                  : 'LLM brief → GHA dispatch',
+            cap: 'DELIVERABLE',
+            value: skill.deliverable?.type ?? 'none',
+            sub: skill.deliverable
+              ? skill.deliverable.publish_notion
+                ? 'published to Notion'
+                : 'S3 artefact'
+              : 'no published artefact',
           },
           { cap: 'COST CLASS', value: skill.cost_class, sub: `@${skill.version}` },
           {

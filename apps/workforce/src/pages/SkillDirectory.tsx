@@ -154,7 +154,7 @@ export default function SkillDirectory() {
                 })}
               </div>
               <div className="mt-3 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-                {s.executor} · {s.cost_class} cost
+                {s.cost_class} cost
               </div>
             </Link>
           </li>

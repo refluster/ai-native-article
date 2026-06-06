@@ -2,7 +2,6 @@
 // SPA consumes from /workforce-skills.json.
 
 export type SkillStatus = 'active' | 'stale' | 'deprecated';
-export type SkillExecutor = 'llm-prose' | 'claude-code-routine' | 'deterministic';
 export type CostClass = 'small' | 'medium' | 'large';
 export type DeliverableType = 'article' | 'plan' | 'design-doc' | 'launch-plan' | 'pr' | 'notification';
 
@@ -36,8 +35,7 @@ export interface WorkforceSkill {
   name: string;
   version: string;
   status: SkillStatus;
-  executor: SkillExecutor;
-  /** Present only when executor === "llm-prose". */
+  /** Optional published-artefact declaration; null when the skill publishes none. */
   deliverable: SkillDeliverable | null;
   cost_class: CostClass;
   owners: string[];
@@ -59,7 +57,6 @@ export interface SkillLiveRecord {
   name: string;
   version: string;
   status: SkillStatus;
-  executor: SkillExecutor;
   deliverable: SkillDeliverable | null;
   cost_class: CostClass;
   owners: string[];

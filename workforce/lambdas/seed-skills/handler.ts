@@ -75,7 +75,6 @@ async function seedOne(name: string): Promise<"created" | "updated" | "noop"> {
     name: meta.name,
     version: meta.version,
     status: meta.status,
-    executor: meta.executor,
     deliverable: meta.deliverable,
     cost_class: meta.cost_class,
     owners: meta.owners,

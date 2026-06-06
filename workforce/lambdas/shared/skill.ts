@@ -1,20 +1,15 @@
-// Skill repository loader for the agent-runner.
+// Skill repository loader.
 //
-// v1 1-stage routing: an agent's binding names a skill directly; the
-// runner loads that skill and dispatches based on its `executor`:
-//   - llm-prose            LLM generates an artefact body. The skill's
-//                          `deliverable` field declares S3 key + Notion
-//                          publish flag.
-//   - claude-code-routine  LLM generates a brief, runner dispatches GHA
-//                          workflow_dispatch and writes a pending DELIV.
-//   - deterministic        Runner runs a registered handler keyed by
-//                          skill name. No LLM call. The handler returns
-//                          the output bytes; the runner persists them.
+// Single execution model (ADR-0005): every (project × agent × skill) task
+// runs as a CCR task. An agent's binding names a skill directly; the
+// orchestrator dispatches it to the generic CCR routine, which composes
+// persona + SKILL.md + binding config and runs the skill's bundled
+// write-script. There is no runtime "skill-shape" branch — the retired
+// `meta.executor` field (llm-prose / claude-code-routine / deterministic)
+// is gone; it was load-bearing only on the deleted Lambda runner.
 //
-// SKILL.md is documentation for human + Claude-Code readers. Only the
-// llm-prose executor injects the body into a prompt at runtime.
-
-export type SkillExecutor = "llm-prose" | "claude-code-routine" | "deterministic";
+// SKILL.md is documentation for human + Claude-Code readers; the CCR
+// routine injects the body into the task context at runtime.
 
 export type DeliverableType =
   | "article"
@@ -38,7 +33,9 @@ export interface SkillFrontmatter {
   description: string;
 }
 
-/** Output target declared by llm-prose skills. Other executors leave this undefined. */
+/** Optional output target a skill declares (S3 prefix + Notion publish flag).
+ *  Read by the skill's bundled CCR write-script; absent for skills with no
+ *  published artefact. */
 export interface SkillDeliverable {
   type: DeliverableType;
   /** True when the runner must also call insertArticle() after writing S3. */
@@ -58,8 +55,7 @@ export interface SkillMeta {
   name: string;
   version: string;
   status: "active" | "stale" | "deprecated";
-  executor: SkillExecutor;
-  /** Required when executor === "llm-prose"; absent otherwise. */
+  /** Optional published-artefact declaration (S3 prefix + Notion publish). */
   deliverable?: SkillDeliverable;
   cost_class: "small" | "medium" | "large";
   owners: string[];
@@ -109,7 +105,7 @@ export async function loadSkill(name: string): Promise<LoadedSkill> {
 
 /**
  * Compose the agent's system.md with the active skill's body under a
- * clearly delimited heading. Only used by the llm-prose executor.
+ * clearly delimited heading.
  */
 export function composeSystemPrompt(baseSystemMd: string, skill: LoadedSkill): string {
   return `${baseSystemMd}\n\n---\n\n## Active skill: ${skill.meta.name} (v${skill.meta.version})\n\n${skill.body}`;
