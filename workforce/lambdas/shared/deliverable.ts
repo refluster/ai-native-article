@@ -39,6 +39,13 @@ export function deliverableTargetFor(
       return { type, s3Key: `design-docs/${slug}/${delivId}/intent.md`, hasExternalPublish: false };
     case "launch-plan":
       return { type, s3Key: `launches/${slug}/${delivId}/launch.md`, hasExternalPublish: false };
+    case "external-pr":
+      // Phase 7 PR6 — workforce/lambdas/shared/external-pr.ts opens a
+      // PR against the external project's target repo per R-N9. The S3
+      // body is the PR's first commit on a `workforce/{agent}/{run_id}`
+      // branch; hasExternalPublish=true signals the side-effect Lambda
+      // call follows the S3 write (same shape as article + Notion).
+      return { type, s3Key: `external-prs/${slug}/${delivId}/body.md`, hasExternalPublish: true };
     case "notification":
     case "pr":
       // notification: handled by the deterministic discord-ping handler — it

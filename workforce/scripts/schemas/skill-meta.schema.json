@@ -49,7 +49,8 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["article", "plan", "design-doc", "launch-plan", "pr", "notification"]
+          "enum": ["article", "plan", "design-doc", "launch-plan", "pr", "notification", "external-pr"],
+          "description": "Deliverable shape produced by an llm-prose skill. Phase 7 PR6 adds `external-pr` — opens a PR against an external project's target repo per R-N9 (governance.md §4). The mechanical R-N9 gate IS this enum: `external-commit` deliberately does not exist, so a skill CANNOT declare 'I will push directly to the external repo's default branch'. Adding `external-commit` is a Zone A amendment requiring an explicit W-5 reconciliation."
         },
         "publish_notion": { "type": "boolean" },
         "article_type": {
