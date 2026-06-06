@@ -136,7 +136,7 @@ export function lastAt(c: Conversation): string {
   return lastMessage(c).at;
 }
 
-// ----- Live messaging store (Epic-013 Story 1, #248) -----
+// ----- Live messaging store (Epic-013 Story 1, issue 248) -----
 //
 // When the live agents-api is configured (authenticated workforce origin),
 // /messaging reads from the real THREAD store; on the public gh-pages
