@@ -8,9 +8,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import WorkforceLayout from '../components/WorkforceLayout';
 import Sigil from '../components/Sigil';
-import { loadWorkforceManifest, fullName } from '../lib/agents';
+import { loadWorkforceManifest, fullName, apiConfigured } from '../lib/agents';
 import {
   buildMockThreads,
+  fetchThreadSummaries,
+  fetchThreadDetail,
   lastMessage,
   lastAt,
   OPERATOR_ID,
@@ -86,16 +88,32 @@ function senderName(slug: string, roster: Map<string, WorkforceAgent>): string {
   return a ? fullName(a) : slug;
 }
 
+// Live when the agents-api base is configured (authenticated workforce
+// origin); mock on the public gh-pages mirror. Resolved once at module
+// scope — the build-time env var doesn't change within a session.
+const LIVE = apiConfigured();
+
 export default function Messaging() {
   const [roster, setRoster] = useState<WorkforceAgent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  // Live inbox summaries (null until loaded); detailCache holds the full
+  // transcript for threads the operator has opened.
+  const [liveThreads, setLiveThreads] = useState<Conversation[] | null>(null);
+  const [detailCache, setDetailCache] = useState<Record<string, Conversation>>({});
 
   useEffect(() => {
     document.title = `${SITE_DISPLAY_NAME} — Messaging`;
     loadWorkforceManifest()
       .then((m) => setRoster(m.agents))
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+  }, []);
+
+  useEffect(() => {
+    if (!LIVE) return;
+    fetchThreadSummaries()
+      .then(setLiveThreads)
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
 
@@ -105,7 +123,10 @@ export default function Messaging() {
     return map;
   }, [roster]);
 
-  const threads = useMemo(() => buildMockThreads(roster), [roster]);
+  const threads = useMemo(
+    () => (LIVE ? (liveThreads ?? []) : buildMockThreads(roster)),
+    [liveThreads, roster],
+  );
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -121,7 +142,23 @@ export default function Messaging() {
     if (selectedId === null && threads.length > 0) setSelectedId(threads[0].id);
   }, [threads, selectedId]);
 
-  const selected = threads.find((c) => c.id === selectedId) ?? null;
+  // Lazily hydrate the full transcript for the opened thread (live only —
+  // the mock already carries every message inline).
+  useEffect(() => {
+    if (!LIVE || !selectedId || detailCache[selectedId]) return;
+    fetchThreadDetail(selectedId)
+      .then((conv) => {
+        if (conv) setDetailCache((m) => ({ ...m, [conv.id]: conv }));
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+    // detailCache intentionally omitted: the guard above prevents refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
+  const selected =
+    (selectedId ? detailCache[selectedId] : undefined) ??
+    threads.find((c) => c.id === selectedId) ??
+    null;
 
   if (error) {
     return (
@@ -263,11 +300,12 @@ export default function Messaging() {
 
             <div className="border border-wf-outline-variant bg-wf-surface-container rounded-wf-md p-3">
               <div className="font-wfmono text-[9px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-1">
-                Disclosure · placeholder data
+                {LIVE ? 'Disclosure · live read-only' : 'Disclosure · placeholder data'}
               </div>
               <p className="text-[11px] text-wf-on-surface-variant leading-relaxed">
-                Threads are illustrative mock data — the live talent-to-talent messaging store isn't
-                wired yet. Voice and IA match the v1 target. Composing is disabled.
+                {LIVE
+                  ? "Threads are live from the messaging store. Composing and talent replies arrive with the operator write path (Epic-013 Story 2)."
+                  : "Threads are illustrative mock data — the live talent-to-talent messaging store isn't wired yet. Voice and IA match the v1 target. Composing is disabled."}
               </p>
             </div>
 

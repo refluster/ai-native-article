@@ -101,6 +101,13 @@ Resources:
           AttributeType: S
         - AttributeName: gsi3sk
           AttributeType: S
+        # GSI4 — talent-messaging inbox (Epic-013 Story 1, #248).
+        # gsi4pk="INBOX#{slug}" / gsi4sk=last_message_at. One partition per
+        # participant; see workforce/docs/data-model.md "GSI4 — messaging inbox".
+        - AttributeName: gsi4pk
+          AttributeType: S
+        - AttributeName: gsi4sk
+          AttributeType: S
       KeySchema:
         - AttributeName: pk
           KeyType: HASH
@@ -137,6 +144,19 @@ Resources:
             - AttributeName: gsi3pk
               KeyType: HASH
             - AttributeName: gsi3sk
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        # GSI4 — talent-messaging inbox (Epic-013 Story 1, #248). One
+        # partition per participant (`INBOX#{slug}`), reverse-chrono on
+        # last_message_at. Same online-index-build caveat as GSI3 above:
+        # isolate this add in its own commit. Writes are operator-paced
+        # (Epic-013 §Behaviour at N=100), so the partition stays cool.
+        - IndexName: GSI4
+          KeySchema:
+            - AttributeName: gsi4pk
+              KeyType: HASH
+            - AttributeName: gsi4sk
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
@@ -354,6 +374,14 @@ Resources:
               Action: s3:GetObject
               Resource:
                 - !Sub ${WfBucket.Arn}/posts/*
+            # Epic-013 Story 1 (#248) — `GET /threads/{id}` hydrates long
+            # message bodies from S3 (`messages/{thread_id}/{ulid}.md`).
+            # Read-only here; the operator write path (Story 2) adds PutObject.
+            - Sid: AgentsApiMessageBodyRead
+              Effect: Allow
+              Action: s3:GetObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/messages/*
             - Sid: AgentsApiPostBodyWrite
               # POST /feed writes the post body to posts/{slug}/{yyyy}/{mm}/{ulid}.md
               # before the DDB row (createPost ordering). Scoped to posts/*.
@@ -598,6 +626,21 @@ Resources:
           Properties:
             ApiId: !Ref WfAgentsHttpApi
             Path: /agents/{slug}/posts
+            Method: GET
+        # Talent messaging — read endpoints (Epic-013 Story 1, #248).
+        # Public on the CORS gate like the feed reads; the write routes
+        # (Story 2) add the operator Bearer gate at the handler layer.
+        ListThreads:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /threads
+            Method: GET
+        GetThread:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /threads/{id}
             Method: GET
       Tags:
         workforce: !Ref Stage

@@ -20,6 +20,8 @@
 //   GET    /feed                            workforce activity feed, reverse-chrono (Epic-011 Story 5)
 //   GET    /feed/{post_id}                  single post + full body (Epic-011 Story 5)
 //   PATCH  /feed/{post_id}                  hide a post (IAM-auth at API GW; Epic-011 Story 5)
+//   GET    /threads                         operator inbox, reverse-chrono (Epic-013 Story 1; ?cursor=&page_size=&filter=unread|starred)
+//   GET    /threads/{id}                    single thread + messages, S3-hydrated bodies (Epic-013 Story 1)
 //
 // See workforce/docs/epics/epic-007-agent-management-api.md (agents),
 // workforce/docs/epics/epic-008-skill-repository.md (skills),
@@ -96,6 +98,13 @@ import {
   type FeedPostDetailView,
   type PostKind,
 } from "../shared/post.js";
+import {
+  getThreadDetail,
+  listInbox,
+  toThreadSummaryView,
+  MESSAGING_OPERATOR_ID,
+  type ThreadFilter,
+} from "../shared/messaging.js";
 
 // Secrets Manager path holding the feed-write capability token. The
 // runner presents the same token (injected from this secret into its
@@ -166,6 +175,10 @@ export async function handler(
     const rawProjectId = event.pathParameters?.id;
     const projectId = rawProjectId ? decodeURIComponent(rawProjectId) : undefined;
     const postId = event.pathParameters?.post_id;
+    // Talent-messaging threads (Epic-013 Story 1) share the `{id}` path
+    // param name with projects; thread ids are bare ULIDs (no `/`), so the
+    // decodeURIComponent on rawProjectId is identity for them.
+    const threadId = event.pathParameters?.id;
 
     if (routeKey === "GET /agents") return listAgents(event);
     if (routeKey === "GET /skills") return listSkills(event);
@@ -201,6 +214,11 @@ export async function handler(
     // rejection escape the outer try/catch (Promise flattening on async returns). The
     // hide_helper_not_wired throw is what relies on this for the 500-mapping contract.
     if (routeKey === "PATCH /feed/{post_id}" && postId) return await patchFeedPostRoute(postId, event);
+    // Talent messaging — read endpoints only (Epic-013 Story 1, #248). The
+    // operator write path (POST /threads, .../messages, .../read, .../star)
+    // lands in Story 2 (#249) behind the operator Bearer gate.
+    if (routeKey === "GET /threads") return listThreadsRoute(event);
+    if (routeKey === "GET /threads/{id}" && threadId) return getThreadRoute(threadId);
 
     return reply(404, { error: "route_not_found", routeKey, path, method });
   } catch (err) {
@@ -970,6 +988,47 @@ async function getFeedPostRoute(
     body = await fetchPostBody(row.body_ref);
   }
   const detail: FeedPostDetailView = { ...view, body };
+  return reply(200, detail);
+}
+
+// --- Talent messaging (Epic-013 Story 1, #248) --------------------------
+
+/** Parse the `?filter=` query param for the inbox. Unknown values are
+ *  ignored (no filter), matching the lenient posture of the feed filters. */
+function parseThreadFilter(qs: Record<string, string | undefined>): ThreadFilter | undefined {
+  if (qs.filter === "unread" || qs.filter === "starred") return qs.filter;
+  return undefined;
+}
+
+/**
+ * GET /threads — the operator's inbox, reverse-chronological. Single GSI4
+ * partition query (`INBOX#operator`). Reads only the operator's inbox in
+ * v1 (operator↔talent); a per-talent inbox view is a Story 2+ concern.
+ */
+async function listThreadsRoute(
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const qs = event.queryStringParameters ?? {};
+  const page = await listInbox({
+    slug: MESSAGING_OPERATOR_ID,
+    cursor: qs.cursor,
+    pageSize: parsePageSize(qs),
+    filter: parseThreadFilter(qs),
+  });
+  return reply(200, {
+    threads: page.items.map(toThreadSummaryView),
+    cursor: page.cursor,
+  });
+}
+
+/**
+ * GET /threads/{id} — one thread with its messages, oldest-first, each
+ * body resolved (inline preview or S3 hydration). 404 when the thread has
+ * no META row.
+ */
+async function getThreadRoute(threadId: string): Promise<APIGatewayProxyResultV2> {
+  const detail = await getThreadDetail(threadId);
+  if (!detail) return reply(404, { error: "not_found", thread_id: threadId });
   return reply(200, detail);
 }
 
