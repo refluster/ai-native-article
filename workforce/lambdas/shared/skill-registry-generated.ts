@@ -14,6 +14,7 @@ import { dispatchDiscordPing } from "../../skills/discord-ping/handler.js";
 import { dispatchFeedHealth } from "../../skills/feed-health/handler.js";
 import { dispatchPdmCharter } from "../../skills/pdm-charter/handler.js";
 import { dispatchPdmDecompose } from "../../skills/pdm-decompose/handler.js";
+import { dispatchPrReview } from "../../skills/pr-review/handler.js";
 import { dispatchPrRoute } from "../../skills/pr-route/handler.js";
 
 export const DETERMINISTIC_HANDLERS: Record<string, DeterministicHandler> = {
@@ -21,6 +22,7 @@ export const DETERMINISTIC_HANDLERS: Record<string, DeterministicHandler> = {
   "feed-health": dispatchFeedHealth,
   "pdm-charter": dispatchPdmCharter,
   "pdm-decompose": dispatchPdmDecompose,
+  "pr-review": dispatchPrReview,
   "pr-route": dispatchPrRoute,
 };
 
@@ -40,5 +42,6 @@ export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "pdm-decompose": [],
   "plan-write": [],
   "positioning-write": [],
+  "pr-review": ["github.token"] as const,
   "pr-route": ["github.token"] as const,
 };
