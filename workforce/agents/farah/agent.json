@@ -15,26 +15,7 @@
   ],
   "owner_email": null,
   "created_at": "2026-05-27",
-  "bindings": [
-    {
-      "skill": "article-draft",
-      "executor": "lambda",
-      "trigger": {
-        "scheduler": "eventbridge",
-        "cron": "cron(0 5 ? * THU *)"
-      },
-      "note": "Thursday 14:00 JST / 06:00 IST (runner enforces biweekly cadence). EventBridge rule not yet enabled — follow-up Zone A change."
-    },
-    {
-      "skill": "feed-post",
-      "executor": "lambda",
-      "trigger": {
-        "scheduler": "eventbridge",
-        "cron": "cron(31 6 ? * * *)"
-      },
-      "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
-    }
-  ],
+  "bindings": [],
   "jd": {
     "mission": "Make every customer-facing claim about the product measurable — and the measurement honest, including when the burn rate is bad.",
     "key_responsibilities": [

@@ -14,26 +14,7 @@
   ],
   "owner_email": null,
   "created_at": "2026-05-27",
-  "bindings": [
-    {
-      "skill": "article-draft",
-      "executor": "lambda",
-      "trigger": {
-        "scheduler": "eventbridge",
-        "cron": "cron(0 2 ? * TUE *)"
-      },
-      "note": "Tuesday 11:00 JST / 07:30 IST (runner enforces biweekly cadence). EventBridge rule not yet enabled — follow-up Zone A change."
-    },
-    {
-      "skill": "feed-post",
-      "executor": "lambda",
-      "trigger": {
-        "scheduler": "eventbridge",
-        "cron": "cron(15 3 ? * * *)"
-      },
-      "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
-    }
-  ],
+  "bindings": [],
   "jd": {
     "mission": "Surface the first sentence a frustrated India resident writes about their power situation — in the language they wrote it in, on the channel they wrote it on — before it gets filtered through a journalist or a consultant deck.",
     "key_responsibilities": [

@@ -17,24 +17,6 @@
   "created_at": "2026-05-18",
   "bindings": [
     {
-      "skill": "discord-ping",
-      "executor": "lambda",
-      "trigger": {
-        "scheduler": "eventbridge",
-        "cron": "cron(0 * * * ? *)"
-      },
-      "note": "Hourly cron, but effective cadence is every 2 hours under the 2-hourly orchestrator tick — doubles as the workforce's at-a-glance uptime monitor (a quiet channel for >2h means the dispatch chain is broken)"
-    },
-    {
-      "skill": "feed-post",
-      "executor": "lambda",
-      "trigger": {
-        "scheduler": "eventbridge",
-        "cron": "cron(11 2 ? * * *)"
-      },
-      "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
-    },
-    {
       "skill": "discord-heartbeat",
       "executor": "claude-code-routine",
       "trigger": {

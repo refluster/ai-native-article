@@ -14,17 +14,7 @@
   ],
   "owner_email": null,
   "created_at": "2026-06-05",
-  "bindings": [
-    {
-      "skill": "article-draft",
-      "executor": "lambda",
-      "trigger": {
-        "scheduler": "eventbridge",
-        "cron": "cron(0 7 ? * TUE *)"
-      },
-      "note": "Tuesday 16:00 JST (runner enforces biweekly cadence). EventBridge rule not yet enabled — follow-up Zone A change."
-    }
-  ],
+  "bindings": [],
   "jd": {
     "mission": "Keep the substrate that runs the agents healthy — the orchestrator -> agent-runner fire path, DDB, secrets injection, CI validators, deploy, region-migration — and make its reliability measurable, including the quality of the work it produces.",
     "key_responsibilities": [

@@ -14,17 +14,7 @@
   ],
   "owner_email": null,
   "created_at": "2026-06-05",
-  "bindings": [
-    {
-      "skill": "article-draft",
-      "executor": "lambda",
-      "trigger": {
-        "scheduler": "eventbridge",
-        "cron": "cron(0 9 ? * THU *)"
-      },
-      "note": "Thursday 18:00 JST (runner enforces biweekly cadence). EventBridge rule not yet enabled — follow-up Zone A change."
-    }
-  ],
+  "bindings": [],
   "jd": {
     "mission": "Make the sophistication of every registered skill evaluable, and raise each skill's level continuously. The skill axis of the platform — steward of capability, not of code review.",
     "key_responsibilities": [
