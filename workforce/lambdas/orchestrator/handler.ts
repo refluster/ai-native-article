@@ -49,13 +49,9 @@ const lambda = new LambdaClient({});
 // Fallback DEFAULT_DEDUP_MINUTES applies to skills not listed here.
 const DEFAULT_DEDUP_MINUTES = 60;
 const DEDUP_MINUTES_BY_SKILL: Record<string, number> = {
-  "discord-ping": 45,          // 45m — well under the 2-hourly effective cadence (cron is hourly, but the 120m tick collapses each pair of fires into one dispatch), so legit fires are never blocked
   "discord-heartbeat": 30,     // 30m — well under the 2-hourly cadence (cron(20 0/2 …)); skip-safe with wide margin
   "feed-post": 30,             // 30m — well under the 2-hourly cadence (cron(20 0/2 …)); skip-safe with wide margin
   "article-level2": 30,        // 30m — well under Elena's 2-hourly L1→L2 cadence (cron(0 0/2 …)); skip-safe with wide margin
-  "article-draft": 60 * 5,     // 5h — Sora's 12h cadence
-  "market-research": 60 * 5,
-  "plan-write": 60 * 24 * 13,  // 13d — Maya's biweekly
   "design-note": 60 * 24 * 6,
   "positioning-write": 60 * 24 * 6,
   "code-task-brief": 60 * 12,  // 12h — Ren's daily

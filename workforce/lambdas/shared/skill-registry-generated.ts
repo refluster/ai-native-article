@@ -10,35 +10,23 @@
 
 import type { DeterministicHandler } from "./skill-types.js";
 
-import { dispatchDiscordPing } from "../../skills/discord-ping/handler.js";
-import { dispatchFeedHealth } from "../../skills/feed-health/handler.js";
 import { dispatchPdmCharter } from "../../skills/pdm-charter/handler.js";
-import { dispatchPdmDecompose } from "../../skills/pdm-decompose/handler.js";
 import { dispatchPrRoute } from "../../skills/pr-route/handler.js";
 
 export const DETERMINISTIC_HANDLERS: Record<string, DeterministicHandler> = {
-  "discord-ping": dispatchDiscordPing,
-  "feed-health": dispatchFeedHealth,
   "pdm-charter": dispatchPdmCharter,
-  "pdm-decompose": dispatchPdmDecompose,
   "pr-route": dispatchPrRoute,
 };
 
 export const SKILL_REQUIRES: Record<string, readonly string[]> = {
-  "article-draft": [],
   "article-level2": ["notion.integration_token"] as const,
   "article-level3": ["notion.integration_token"] as const,
   "code-task-brief": [],
   "design-note": [],
   "discord-digest": ["discord.webhook_url"] as const,
   "discord-heartbeat": ["discord.webhook_url"] as const,
-  "discord-ping": [],
-  "feed-health": [],
   "feed-post": ["workforce.feed_write_token"] as const,
-  "market-research": [],
   "pdm-charter": [],
-  "pdm-decompose": [],
-  "plan-write": [],
   "positioning-write": [],
   "pr-route": ["github.token"] as const,
 };
