@@ -284,9 +284,17 @@ vi.mock("../shared/recall.js", () => ({
   recall: vi.fn(),
 }));
 
+// ADR-0005: the engagement bearer validator checks ephemeral DDB tokens via
+// isValidEngagementToken. Mock it so route tests control validity (default
+// false → the existing static-token tests exercise the fallback path).
+vi.mock("../shared/engagement-token.js", () => ({
+  isValidEngagementToken: vi.fn(async () => false),
+}));
+
 // SUT must be imported AFTER all vi.mock() calls.
 const { handler } = await import("./handler.js");
 const recallMock = vi.mocked((await import("../shared/recall.js")).recall);
+const isValidEngagementTokenMock = vi.mocked((await import("../shared/engagement-token.js")).isValidEngagementToken);
 
 // ─── Helpers ───────────────────────────────────────────────────────────
 
@@ -1337,5 +1345,25 @@ describe("POST /agents/{slug}/engagements (Engagements API — createEngagement)
     expect((bodyOf(omitted) as { engagement: { execution_surface: string } }).engagement.execution_surface).toBe("client");
     const bogus = await handler(postEvt("nadia", { authorization: `Bearer ${TOKEN}` }, validBody({ execution_surface: "nonsense" })));
     expect((bodyOf(bogus) as { engagement: { execution_surface: string } }).engagement.execution_surface).toBe("client");
+  });
+
+  // ADR-0005: an ephemeral DDB-minted token (NOT the static secret) authorises
+  // the write — the cron + interactive path.
+  it("accepts an ephemeral engagement-write token (no static secret)", async () => {
+    membershipSet.add("asp-cloud|nadia");
+    isValidEngagementTokenMock.mockResolvedValueOnce(true);
+    const res = await handler(
+      postEvt("nadia", { authorization: "Bearer ephemeral-minted-token-xyz" }, validBody({ execution_surface: "ccr" })),
+    );
+    expect(statusOf(res)).toBe(201);
+    expect((bodyOf(res) as { engagement: { execution_surface: string } }).engagement.execution_surface).toBe("ccr");
+  });
+
+  it("401s when the bearer is neither a valid ephemeral token nor the static secret", async () => {
+    membershipSet.add("asp-cloud|nadia");
+    // isValidEngagementTokenMock defaults to false; no static secret either.
+    secretValueStore.delete(TOKEN_SECRET);
+    const res = await handler(postEvt("nadia", { authorization: "Bearer not-a-real-token" }, validBody()));
+    expect(statusOf(res)).toBe(401);
   });
 });

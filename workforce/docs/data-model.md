@@ -53,6 +53,12 @@ Per Epic-010 (Story 1, [#90](https://github.com/refluster/ai-native-article/issu
 |---|---|---|---|
 | `BUDGET#{yyyy-mm}` | `AGENT#{slug}` | Monthly token + cost roll-up | `tokens_in`, `tokens_out`, `cost_usd`, `last_updated_at`. Used by `lambdas/shared/budget.ts` to enforce W-3 before each LLM call |
 
+#### Auth rows (ADR-0005 — ephemeral engagement-write tokens)
+
+| `pk` | `sk` | Purpose | Key attributes |
+|---|---|---|---|
+| `AUTH#ENGAGEMENT` | `TOKEN#{token}` | Short-lived capability token for `POST /agents/{slug}/engagements` (the activity-ledger write surface) | `expires_at` (ISO — the source-of-truth validity check), `ttl` (epoch seconds — DynamoDB TTL GC), `minted_at`. Minted by a trusted AWS principal that can write the table: the orchestrator (once per fire → injected into each CCR task) or an operator-credentialed session (`workforce/scripts/record-engagement.mjs`, for ad-hoc/interactive work). Validated by `lambdas/shared/engagement-token.ts:isValidEngagementToken`. Replaces a long-lived static bearer — no Secrets Manager token to provision/rotate. |
+
 ### GSI1 / GSI2 usage
 
 **GSI1** (pk: `gsi1pk`, sk: `gsi1sk`) supports two access patterns:

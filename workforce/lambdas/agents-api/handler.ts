@@ -73,6 +73,7 @@ import {
   type ProjectMetaRow,
 } from "../shared/project.js";
 import { recall, type RecallResult } from "../shared/recall.js";
+import { isValidEngagementToken } from "../shared/engagement-token.js";
 import { CREDENTIAL_TYPES } from "../shared/credential-injector.js";
 import {
   CloudWatchClient,
@@ -1372,6 +1373,17 @@ async function validateEngagementWriteBearer(
   const presented = raw.slice("Bearer ".length).trim();
   if (presented.length === 0) return false;
 
+  // Primary path (ADR-0005): a short-lived engagement-write token minted in
+  // DynamoDB — by the orchestrator per fire (cron), or by an operator-
+  // credentialed session via workforce/scripts/record-engagement.mjs
+  // (interactive). No static secret needed for either.
+  try {
+    if (await isValidEngagementToken(presented)) return true;
+  } catch {
+    // DDB read error — fall through to the static path rather than 500.
+  }
+
+  // Fallback: the long-lived capability token external (Phase 7) clients hold.
   let expected = _engagementWriteTokenCache;
   if (!expected) {
     try {
