@@ -1,61 +1,75 @@
 ---
 name: pr-route
-description: Workforce skill that routes a target-repo PR to 1-3 reviewer personas under the invoking agent's lens (today Nadia's PdM lens). Reads the PR + linked Story, applies the invoker's `binding_config.nomination_rules` to decide reviewers, and posts a single routing comment to the PR. Lambda-resident; project-scoped credentials per Epic-010 §5. Verdict mode (the second leg of the pr-route contract documented in workforce/docs/routines/pr-route.md) lands in Phase 7 PR3b.
+description: Workforce skill that routes open PRs in a bound project's repo to 1-3 reviewer personas under the invoking agent's lens. On each cron tick it discovers open PRs that still need a cycle-1 routing comment, applies the binding's nomination_rules to each, and posts one routing comment per PR. Runs as a CCR task (ADR-0005); github.token resolved via the (project × agent × skill) binding's project linkage (Epic-010 §5). Comment-only — never approves, merges, or pushes (R-N9 / W-5). Verdict mode (cycle-2 synthesis) and pr-review are separate skills.
 ---
 
-# pr-route
+# pr-route (CCR cron-poll routing leg)
 
-Lambda-resident implementation of the routing leg of the persona-agnostic [pr-route routine spec](../../docs/routines/pr-route.md). The full skill contract (modes, mode-decision logic, comment shapes) lives in that doc; this folder is the **deterministic-executor handler** that the workforce agent-runner dispatches on a binding firing.
+You are routing pull requests in your bound project's repo to reviewer personas under your lens. This runs as a **CCR task** fired by `wf-orchestrator-tick` on the binding's cron. There is no `pr_url` argument — you **discover** which PRs need routing, then route each one.
 
-## Bundle layout
+Your task context supplies:
 
-```
-workforce/skills/pr-route/
-  SKILL.md      ← this file (Anthropic Agent Skills frontmatter compatible)
-  meta.json     ← executor: deterministic, requires: ["github.token"]
-  handler.ts    ← dispatchPrRoute(ctx) — auto-registered into skill-registry-generated.ts
-```
+- `agent_slug` — you (the routing persona; today Nadia's PdM lens).
+- `project_id` — the bound project. Its `workforce/projects/{project_id}/project.json` declares the GitHub repo (`github.owner` / `github.repo`).
+- `credentials['github.token'].token` — the project-scoped PAT, resolved via the project linkage. Export it as `GITHUB_TOKEN` for the scripts below.
+- `binding_config` — your lens overlay: `nomination_rules`, `cycle_cap`, `skip_list_default`, `skip_list_rationale`, `sign_off_persona`.
 
-## What the runner does
+## Step 1 — discover candidate PRs (deterministic, read-only)
 
-When an agent binding `{skill: "pr-route", executor: "lambda", trigger: {scheduler: "manual" | "external"}}` fires, the runner:
-
-1. Resolves `project_id` from `RunnerEvent.project_id` (defaults to `self/{agent}` — pr-route on `self` rejects in the handler with a "needs explicit external project" error).
-2. Resolves credentials for `requires: ["github.token"]` from `wf/projects/{project_id}/github.token` via the sealed credential bag (Epic-010 §5 + Story 2-A).
-3. Forwards `RunnerEvent.args` (e.g. `{pr_url: "https://github.com/.../pull/42"}`) into `RunnerContext.args`.
-4. Forwards `agent.json:bindings[i].config` (lens-specific `nomination_rules`, `cycle_cap`, `sign_off_persona`) into `RunnerContext.binding_config`.
-5. Calls `dispatchPrRoute(ctx)` (this folder's handler.ts).
-
-The handler then:
-
-1. Parses `pr_url` → `(owner, repo, pr_number)`. Throws on malformed URL (W-4 fail loud).
-2. Cross-checks `(owner, repo)` against `PROJECT#{project_id}/META.github` — mismatch throws (operator mis-attributed the PR to the wrong project).
-3. Fetches the PR + diff + existing comments via GitHub REST using `ctx.credentials.github.token`.
-4. Composes an LLM prompt:
-   - System = persona system.md + `binding_config.nomination_rules` + `binding_config.cycle_cap` + the lens summary.
-   - User = PR title + body + diff (truncated to the model's budget) + existing routing-comment count (for cycle detection — cycle 1 initially in PR3a; cycle N+1 detection in PR3b).
-5. Calls `complete()` with a structured-output JSON expectation.
-6. Parses the JSON → `{summary, reviewers: [{persona, lens, rationale}], skipped: [...], skip_rationale}`.
-7. POSTs the routing comment via GitHub REST `POST /repos/{owner}/{repo}/issues/{pr}/comments` using the same `github.token`.
-8. Returns a `DeterministicResult` with `tokens_in / tokens_out / cost_usd` populated (the runner writes them to the RUN row + the next pre-flight budget check).
-
-Per [governance §4 R-N9](../../docs/governance.md#4-r-n-design-rules-basic-design-simplicity) (external git surface is PR-only): this skill only **comments** on PRs — it never opens / merges / pushes. W-5 inheritance — agents never gate merges.
-
-## Invocation
-
-Today (PR3a):
-```bash
-aws lambda invoke --function-name wf-agent-runner-prod \
-  --payload '{"agent":"nadia","binding_idx":1,"project_id":"asp-cloud","args":{"pr_url":"https://github.com/PSVL/asp-cloud/pull/42"}}' \
-  out.json
+```sh
+GITHUB_TOKEN="<credentials['github.token'].token>" \
+  node workforce/skills/pr-route/pr-route-scan.mjs \
+    --project "<project_id>" --persona "<agent_slug>" \
+    --max 3 --since-days 7 --out /tmp/pr-route-candidates.json
 ```
 
-Tomorrow (Phase 7 PR5): the `wf-webhook-{stage}` API GW endpoint receives the target repo's `pull_request.opened` webhook, reverse-maps `(owner, repo) → project_id`, enqueues the invocation, and async-invokes the runner with the same payload shape.
+The scan lists open, non-draft PRs updated within the window, **skips any PR you have already posted a cycle-1 routing comment on**, caps at `--max`, and writes each remaining candidate (title, body, diff, existing comments) to the `--out` file. If it reports **0 candidates**, there is nothing to route this tick — **stop here, post nothing.**
 
-## What this skill does NOT do (yet)
+## Step 2 — route each candidate (your judgment)
 
-- **Verdict mode.** The second leg of the pr-route contract — read each reviewer's review against cycle-1 findings, compute 🟢/🟡/🔴 — lands in Phase 7 PR3b alongside the pr-review skill.
-- **Cycle counting beyond cycle 1.** PR3a posts a cycle-1 routing comment unconditionally. PR3b adds the comment-history scan that increments the counter on revise pushes.
-- **Verbose Story / Epic context.** The handler does fetch the linked Story body (`closes #N` parse) but doesn't follow the Story → parent Epic chain. PR3b adds full Story+Epic grounding.
+Read `/tmp/pr-route-candidates.json`. For **each** candidate PR, apply your `binding_config.nomination_rules` to the PR's diff + body:
 
-Related: [pr-review.md](../../docs/routines/pr-review.md), [pr-route.md](../../docs/routines/pr-route.md), [dev-process.md](../../docs/runbooks/dev-process.md).
+- Nominate **1-3** reviewer personas whose lens has real surface on this PR. You (the routing persona) MAY self-include if your rules say so.
+- Each nomination's `rationale` must **cite the PR surface** (file paths / topics), not just restate the trigger.
+- List in `skipped` the personas you considered and rejected (per `skip_list_default` / `skip_list_rationale`) — not every persona in the org.
+
+Write the routing comment body for PR `<number>` to `/tmp/route-body-<number>.md` using **exactly** this template (the opening marker is what the scanner reads to avoid double-routing):
+
+```md
+**<PersonaName> — cycle 1 of ≤ <cycle_cap>.**
+
+<one-paragraph PR summary>
+
+Reviewers nominated:
+
+- **@<persona>** — <rationale citing the PR surface>
+- **@<persona>** — <rationale>
+
+Skipping @<persona>, @<persona> — <one short clause why the skip-list applies>.
+
+**Cycle 1 of ≤ <cycle_cap>.** Reviewers post inline + summary via `pull_request_review_write event=COMMENT` (never approve / never request-changes per W-5). Author revises in a single commit per cycle; the verdict comment synthesises.
+
+— <PersonaName> (CCR persona; see workforce/docs/routines/pr-route.md)
+```
+
+Omit the "Skipping …" line if you skipped no one. `<PersonaName>` is your `agent_slug` capitalised (e.g. `nadia` → `Nadia`).
+
+## Step 3 — post each routing comment (deterministic, comment-only)
+
+For each candidate you wrote a body for:
+
+```sh
+GITHUB_TOKEN="<credentials['github.token'].token>" \
+  node workforce/skills/pr-route/pr-route-post.mjs \
+    --project "<project_id>" --pr <number> --body-file /tmp/route-body-<number>.md
+```
+
+`pr-route-post.mjs` posts **only** an issue comment — there is no code path to approve, request changes, merge, push, or open a PR (R-N9 / W-5 enforced by construction). Exit 0 means the comment landed.
+
+## Scope (this skill)
+
+- **Cycle 1 only.** It posts the initial routing comment. Cycle-2 **verdict mode** (synthesising reviewers' findings into 🟢/🟡/🔴) is a separate follow-up.
+- **Routing only.** The actual persona reviews are the `pr-review` skill (separate). pr-route decides *who* reviews; pr-review *is* the review.
+- **Comment-only.** No merge/approve/push/PR-open under any path.
+
+Related: [pr-route routine spec](../../docs/routines/pr-route.md), [pr-review.md](../../docs/routines/pr-review.md), [dev-process.md](../../docs/runbooks/dev-process.md).
