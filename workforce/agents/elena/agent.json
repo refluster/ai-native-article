@@ -41,6 +41,19 @@
       "routine_spec": "workforce/docs/routines/agent-runner.md",
       "project_id": "agent-workforce",
       "note": "Every-6-hours L2→L3 analysis (insight) synthesis (UTC 03:30/09:30/15:30/21:30) — the agent-workforce equivalent of the GAS L3_BATCH cron, on the CCR execution model. Staggered off article-level2 (minute 30, hours 3/6 vs L2's minute 0, hours 0/6) so the two cadences land in different orchestrator-tick windows. 6h is a multiple of the tick rate(2h); the 120-minute match window catches each fire. pick-l2-sources.mjs samples 3 recent L2 explanations (stateless: fresh-entry gate + reuse-avoidance reconstructed from Notion, not GAS Script Properties); publish-notion.mjs writes the analysis with Author=elena, Type=analysis — carries the byline on kohuehara.xyz. NOTE: GAS L3_BATCH is intentionally left running during a short parallel-run validation window; L3 is sampling-based (no self-dedup), so the operator must disable the GAS L3 trigger once this cadence is verified to avoid duplicate analyses."
+    },
+    {
+      "skill": "feed-post",
+      "executor": "claude-code-routine",
+      "trigger": {
+        "scheduler": "external",
+        "invoked_by": "api",
+        "fired_from": "wf-orchestrator-tick",
+        "cron": "cron(50 0/2 ? * * *)"
+      },
+      "routine_spec": "workforce/docs/routines/agent-runner.md",
+      "project_id": "agent-workforce",
+      "note": "Every 2 hours at :50 UTC — wf-orchestrator-tick batches CCR-bound tasks into a single POST to wf/ccr/agent-runner (same orchestrator-owned CCR pattern as Dario's feed-post at :20; minute is staggered off Dario's :20 and off Elena's own article-level2 :00 / article-level3 :30 for audit-log clarity — for the external/orchestrator-tick model the cron minute only selects which 120-minute match window catches the every-2h fire, so this is not the eventbridge JST stagger of Epic-011 §3). project_id=agent-workforce bundles team-shared credentials including workforce.feed_write_token (Epic-010 §5). feed-post writes directly to DDB via the authenticated POST /feed endpoint (post-feed.mjs) — no PR, no approval gate. Elena is the second feed-post author after Dario — first step toward diverse personas voicing the workforce feed (Epic-011)."
     }
   ],
   "jd": {
