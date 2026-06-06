@@ -1,11 +1,10 @@
 {
-  "generated_at": "2026-06-06T05:58:02.117Z",
+  "generated_at": "2026-06-06T06:44:44.269Z",
   "skills": [
     {
       "name": "article-level2",
       "version": "0.1.0",
       "status": "active",
-      "executor": "llm-prose",
       "deliverable": {
         "type": "article",
         "publish_notion": false,
@@ -29,9 +28,9 @@
         },
         {
           "path": "meta.json",
-          "size": 392,
+          "size": 365,
           "language": "json",
-          "contents": "{\n  \"name\": \"article-level2\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": false,\n    \"article_type\": \"explanation\"\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"elena\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-06-01\",\n  \"requires\": [\"notion.integration_token\"]\n}\n",
+          "contents": "{\n  \"name\": \"article-level2\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": false,\n    \"article_type\": \"explanation\"\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"elena\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-06-01\",\n  \"requires\": [\"notion.integration_token\"]\n}\n",
           "truncated": false,
           "binary": false
         },
@@ -57,7 +56,6 @@
       "name": "article-level3",
       "version": "0.1.0",
       "status": "active",
-      "executor": "llm-prose",
       "deliverable": {
         "type": "article",
         "publish_notion": false,
@@ -81,9 +79,9 @@
         },
         {
           "path": "meta.json",
-          "size": 404,
+          "size": 377,
           "language": "json",
-          "contents": "{\n  \"name\": \"article-level3\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": false,\n    \"article_type\": \"analysis\"\n  },\n  \"cost_class\": \"large\",\n  \"owners\": [\n    \"elena\"\n  ],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-06-04\",\n  \"requires\": [\n    \"notion.integration_token\"\n  ]\n}\n",
+          "contents": "{\n  \"name\": \"article-level3\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": false,\n    \"article_type\": \"analysis\"\n  },\n  \"cost_class\": \"large\",\n  \"owners\": [\n    \"elena\"\n  ],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-06-04\",\n  \"requires\": [\n    \"notion.integration_token\"\n  ]\n}\n",
           "truncated": false,
           "binary": false
         },
@@ -109,7 +107,6 @@
       "name": "code-task-brief",
       "version": "0.2.0",
       "status": "active",
-      "executor": "claude-code-routine",
       "deliverable": null,
       "cost_class": "medium",
       "owners": [
@@ -129,9 +126,9 @@
         },
         {
           "path": "meta.json",
-          "size": 221,
+          "size": 184,
           "language": "json",
-          "contents": "{\n  \"name\": \"code-task-brief\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"claude-code-routine\",\n  \"cost_class\": \"medium\",\n  \"owners\": [\"ren\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-18\"\n}\n",
+          "contents": "{\n  \"name\": \"code-task-brief\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"cost_class\": \"medium\",\n  \"owners\": [\"ren\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-18\"\n}\n",
           "truncated": false,
           "binary": false
         }
@@ -141,7 +138,6 @@
       "name": "design-note",
       "version": "0.2.0",
       "status": "active",
-      "executor": "llm-prose",
       "deliverable": {
         "type": "design-doc",
         "publish_notion": false
@@ -164,9 +160,9 @@
         },
         {
           "path": "meta.json",
-          "size": 285,
+          "size": 258,
           "language": "json",
-          "contents": "{\n  \"name\": \"design-note\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"design-doc\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"aoi\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-18\"\n}\n",
+          "contents": "{\n  \"name\": \"design-note\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"deliverable\": {\n    \"type\": \"design-doc\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"aoi\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-18\"\n}\n",
           "truncated": false,
           "binary": false
         }
@@ -176,7 +172,6 @@
       "name": "discord-digest",
       "version": "0.1.1",
       "status": "active",
-      "executor": "claude-code-routine",
       "deliverable": null,
       "cost_class": "small",
       "owners": [
@@ -196,9 +191,9 @@
         },
         {
           "path": "meta.json",
-          "size": 302,
+          "size": 265,
           "language": "json",
-          "contents": "{\n  \"name\": \"discord-digest\",\n  \"version\": \"0.1.1\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"claude-code-routine\",\n  \"cost_class\": \"small\",\n  \"owners\": [\n    \"priya\"\n  ],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-06-02\",\n  \"requires\": [\n    \"discord.webhook_url\"\n  ]\n}\n",
+          "contents": "{\n  \"name\": \"discord-digest\",\n  \"version\": \"0.1.1\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"cost_class\": \"small\",\n  \"owners\": [\n    \"priya\"\n  ],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-06-02\",\n  \"requires\": [\n    \"discord.webhook_url\"\n  ]\n}\n",
           "truncated": false,
           "binary": false
         },
@@ -216,7 +211,6 @@
       "name": "discord-heartbeat",
       "version": "0.1.0",
       "status": "active",
-      "executor": "claude-code-routine",
       "deliverable": null,
       "cost_class": "small",
       "owners": [
@@ -236,9 +230,9 @@
         },
         {
           "path": "meta.json",
-          "size": 288,
+          "size": 251,
           "language": "json",
-          "contents": "{\n  \"name\": \"discord-heartbeat\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"claude-code-routine\",\n  \"cost_class\": \"small\",\n  \"owners\": [\"yuki\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-31\",\n  \"requires\": [\"discord.webhook_url\"]\n}\n",
+          "contents": "{\n  \"name\": \"discord-heartbeat\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"cost_class\": \"small\",\n  \"owners\": [\"yuki\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-31\",\n  \"requires\": [\"discord.webhook_url\"]\n}\n",
           "truncated": false,
           "binary": false
         },
@@ -256,7 +250,6 @@
       "name": "feed-post",
       "version": "0.2.0",
       "status": "active",
-      "executor": "llm-prose",
       "deliverable": {
         "type": "notification",
         "publish_notion": false
@@ -311,9 +304,9 @@
         },
         {
           "path": "meta.json",
-          "size": 490,
+          "size": 463,
           "language": "json",
-          "contents": "{\n  \"name\": \"feed-post\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"notification\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"small\",\n  \"owners\": [\"aanya\", \"aoi\", \"dario\", \"elena\", \"farah\", \"kai\", \"levi\", \"maya\", \"mira\", \"nadia\", \"noor\", \"priya\", \"ren\", \"sora\", \"theo\", \"vikram\", \"yuki\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-27\",\n  \"requires\": [\"workforce.feed_write_token\"]\n}\n",
+          "contents": "{\n  \"name\": \"feed-post\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"deliverable\": {\n    \"type\": \"notification\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"small\",\n  \"owners\": [\"aanya\", \"aoi\", \"dario\", \"elena\", \"farah\", \"kai\", \"levi\", \"maya\", \"mira\", \"nadia\", \"noor\", \"priya\", \"ren\", \"sora\", \"theo\", \"vikram\", \"yuki\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-27\",\n  \"requires\": [\"workforce.feed_write_token\"]\n}\n",
           "truncated": false,
           "binary": false
         },
@@ -331,7 +324,6 @@
       "name": "pdm-charter",
       "version": "0.1.0",
       "status": "stale",
-      "executor": "deterministic",
       "deliverable": null,
       "cost_class": "small",
       "owners": [
@@ -359,9 +351,9 @@
         },
         {
           "path": "meta.json",
-          "size": 210,
+          "size": 179,
           "language": "json",
-          "contents": "{\n  \"name\": \"pdm-charter\",\n  \"version\": \"0.1.0\",\n  \"status\": \"stale\",\n  \"executor\": \"deterministic\",\n  \"cost_class\": \"small\",\n  \"owners\": [\"maya\"],\n  \"improvement_agent\": \"maya\",\n  \"created_at\": \"2026-05-25\"\n}\n",
+          "contents": "{\n  \"name\": \"pdm-charter\",\n  \"version\": \"0.1.0\",\n  \"status\": \"stale\",\n  \"cost_class\": \"small\",\n  \"owners\": [\"maya\"],\n  \"improvement_agent\": \"maya\",\n  \"created_at\": \"2026-05-25\"\n}\n",
           "truncated": false,
           "binary": false
         }
@@ -371,7 +363,6 @@
       "name": "positioning-write",
       "version": "0.2.0",
       "status": "active",
-      "executor": "llm-prose",
       "deliverable": {
         "type": "launch-plan",
         "publish_notion": false
@@ -394,9 +385,9 @@
         },
         {
           "path": "meta.json",
-          "size": 293,
+          "size": 266,
           "language": "json",
-          "contents": "{\n  \"name\": \"positioning-write\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"executor\": \"llm-prose\",\n  \"deliverable\": {\n    \"type\": \"launch-plan\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"yuki\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-18\"\n}\n",
+          "contents": "{\n  \"name\": \"positioning-write\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"deliverable\": {\n    \"type\": \"launch-plan\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"yuki\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-18\"\n}\n",
           "truncated": false,
           "binary": false
         }
@@ -406,7 +397,6 @@
       "name": "pr-review",
       "version": "0.1.0",
       "status": "active",
-      "executor": "deterministic",
       "deliverable": null,
       "cost_class": "medium",
       "owners": [
@@ -445,9 +435,9 @@
         },
         {
           "path": "meta.json",
-          "size": 266,
+          "size": 235,
           "language": "json",
-          "contents": "{\n  \"name\": \"pr-review\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"executor\": \"deterministic\",\n  \"cost_class\": \"medium\",\n  \"owners\": [\"nadia\", \"dario\", \"ren\", \"aoi\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-06-06\",\n  \"requires\": [\"github.token\"]\n}\n",
+          "contents": "{\n  \"name\": \"pr-review\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"cost_class\": \"medium\",\n  \"owners\": [\"nadia\", \"dario\", \"ren\", \"aoi\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-06-06\",\n  \"requires\": [\"github.token\"]\n}\n",
           "truncated": false,
           "binary": false
         }
@@ -457,7 +447,6 @@
       "name": "pr-route",
       "version": "0.1.0",
       "status": "active",
-      "executor": "deterministic",
       "deliverable": null,
       "cost_class": "medium",
       "owners": [
@@ -494,9 +483,9 @@
         },
         {
           "path": "meta.json",
-          "size": 250,
+          "size": 219,
           "language": "json",
-          "contents": "{\n  \"name\": \"pr-route\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"executor\": \"deterministic\",\n  \"cost_class\": \"medium\",\n  \"owners\": [\"nadia\", \"maya\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-30\",\n  \"requires\": [\"github.token\"]\n}\n",
+          "contents": "{\n  \"name\": \"pr-route\",\n  \"version\": \"0.1.0\",\n  \"status\": \"active\",\n  \"cost_class\": \"medium\",\n  \"owners\": [\"nadia\", \"maya\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-30\",\n  \"requires\": [\"github.token\"]\n}\n",
           "truncated": false,
           "binary": false
         }

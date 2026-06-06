@@ -9,7 +9,6 @@ const IDENTITY_KEYS = [
   "version",
   "description",
   "status",
-  "executor",
   "deliverable",
   "cost_class",
   "owners",

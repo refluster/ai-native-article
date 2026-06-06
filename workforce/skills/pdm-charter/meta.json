@@ -2,7 +2,6 @@
   "name": "pdm-charter",
   "version": "0.1.0",
   "status": "stale",
-  "executor": "deterministic",
   "cost_class": "small",
   "owners": ["maya"],
   "improvement_agent": "maya",

@@ -2,7 +2,6 @@
   "name": "design-note",
   "version": "0.2.0",
   "status": "active",
-  "executor": "llm-prose",
   "deliverable": {
     "type": "design-doc",
     "publish_notion": false

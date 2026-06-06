@@ -27,7 +27,12 @@ const CRON = /^cron\([^)]+\)$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const SKILL_NAME = /^[a-z][a-z0-9-]*$/;
 
-const ALLOWED_EXECUTORS = new Set(["lambda", "claude-code-routine", "gha", "cli"]);
+// Single substrate (ADR-0005): every binding runs as a CCR task. The Lambda
+// runner is retired, so `lambda` (and the runner-era `gha` / `cli` executor
+// shapes) are no longer permitted — re-introducing a `lambda` binding is the
+// #243-class regression this guard turns CI red on. To add a new substrate,
+// amend ADR-0005 first, then widen this set.
+const ALLOWED_EXECUTORS = new Set(["claude-code-routine"]);
 const ALLOWED_SCHEDULERS = new Set([
   "eventbridge",
   "claude-code-routine",
@@ -217,34 +222,11 @@ for (const slug of slugDirs) {
         );
         continue;
       }
-      // R-N4 executor↔scheduler compatibility.
-      //
-      // `lambda` accepts the three trigger sources documented in
-      // runbooks/bindings.md:
-      //   - eventbridge: orchestrator-tick cron (the original v1 shape)
-      //   - external:    API GW / async invoke from another binding (Phase 7
-      //                  webhook surface — wf-webhook-{stage} fires runner)
-      //   - manual:      operator-triggered direct invoke
-      //                  (`aws lambda invoke --function-name wf-agent-runner ...`)
-      //
-      // The earlier "lambda → eventbridge only" rule was too tight; Phase 7
-      // (multi-project PR review) needed Lambda-resident skills triggered by
-      // operator chat invocation or by the future webhook, not by a cron.
-      const LAMBDA_SCHEDULERS = new Set(["eventbridge", "external", "manual"]);
-      if (b.executor === "lambda" && !LAMBDA_SCHEDULERS.has(t.scheduler)) {
-        v(
-          "S9-binding-compat",
-          cfg,
-          `bindings[${i}]: executor=lambda requires trigger.scheduler in ${[...LAMBDA_SCHEDULERS].join("|")} (R-N4)`,
-        );
-      }
-      if (b.executor === "gha" && t.scheduler !== "gha" && t.scheduler !== "external") {
-        v(
-          "S9-binding-compat",
-          cfg,
-          `bindings[${i}]: executor=gha requires trigger.scheduler=gha or external`,
-        );
-      }
+      // R-N4 executor↔scheduler compatibility. ADR-0005: the only executor is
+      // `claude-code-routine` (CCR), which accepts any allowed scheduler — the
+      // orchestrator dispatches every binding to the generic CCR routine
+      // regardless of trigger source. The retired `lambda`/`gha` compat
+      // branches are gone with the runner.
       // Cron presence for cron-driven schedulers
       if (t.scheduler === "eventbridge") {
         if (typeof t.cron !== "string" || !CRON.test(t.cron)) {
@@ -360,43 +342,24 @@ for (const slug of slugDirs) {
           }
         }
       }
-      // workflow required + must exist for GHA
-      if (b.executor === "gha") {
-        if (typeof b.workflow !== "string" || b.workflow.length === 0) {
-          v(
-            "S9-binding-workflow",
-            cfg,
-            `bindings[${i}]: executor=gha requires workflow (path under .github/workflows/)`,
-          );
-        } else {
-          const wfPath = join(REPO_ROOT, b.workflow);
-          if (!existsSync(wfPath)) {
-            v(
-              "R8-workflow-exists",
-              cfg,
-              `bindings[${i}].workflow "${b.workflow}" does not exist`,
-            );
-          }
-        }
-      }
       // note (optional)
       if (b.note !== undefined && typeof b.note !== "string") {
         v("S9-binding-note", cfg, `bindings[${i}].note must be string if present`);
       }
-      // Skill folder cross-check applies only to executor=lambda.
-      // For CCR/GHA the skill name is logical; the artefact lives elsewhere.
-      if (b.executor === "lambda") {
-        if (skillsIndex.size === 0) continue;
+      // Skill cross-check. ADR-0005: every binding runs as a CCR task whose
+      // SKILL.md + write-script live in workforce/skills/{name}/, so each
+      // binding must name an existing skill folder that lists this agent in
+      // its owners. (Pre-ADR-0005 this was gated on executor=lambda; CCR
+      // skills now live in the same tree, so the check applies to all.)
+      if (skillsIndex.size > 0) {
         const entry = skillsIndex.get(b.skill);
         if (!entry) {
           v(
             "R8-binding-skill-exists",
             cfg,
-            `bindings[${i}].skill "${b.skill}" has no workforce/skills/${b.skill}/ directory (required for executor=lambda)`,
+            `bindings[${i}].skill "${b.skill}" has no workforce/skills/${b.skill}/ directory`,
           );
-          continue;
-        }
-        if (!entry.owners.has(slug)) {
+        } else if (!entry.owners.has(slug)) {
           v(
             "R8-binding-skill-owner",
             cfg,

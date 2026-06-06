@@ -36,7 +36,6 @@ const META_REQUIRED = [
   "name",
   "version",
   "status",
-  "executor",
   "cost_class",
   "owners",
   "improvement_agent",
@@ -47,16 +46,11 @@ const STATUSES = new Set(["active", "stale", "deprecated"]);
 // Named skill archetypes (固有名詞). A skill MAY declare one; when it does,
 // the C-* rules below enforce that archetype's structural shape so a
 // mis-built instance turns CI red (W-4 fail-loud) instead of half-working.
-// "cadence": EventBridge → orchestrator-tick → agent-runner CCR routine,
+// "cadence": EventBridge → orchestrator-tick → the generic CCR routine,
 // (agent × skill × project) context, deterministic write-script → authed
 // endpoint with a project-scoped credential. feed-post is instance #1;
 // new ones are scaffolded by .claude/skills/cadence-forge.
 const ARCHETYPES = new Set(["cadence"]);
-// A Cadence's side effect runs through a bundled deterministic write
-// script; its judgment comes from an LLM, so the executor is never
-// `deterministic` (which has no LLM call).
-const CADENCE_EXECUTORS = new Set(["llm-prose", "claude-code-routine"]);
-const EXECUTORS = new Set(["llm-prose", "claude-code-routine", "deterministic"]);
 const COST_CLASSES = new Set(["small", "medium", "large"]);
 const DELIV_TYPES = new Set([
   "article",
@@ -217,16 +211,15 @@ for (const name of skillDirs) {
   if (!STATUSES.has(meta.status)) {
     v("J4-status", metaJson, `status "${meta.status}" not in {active, stale, deprecated}`);
   }
-  if (!EXECUTORS.has(meta.executor)) {
-    v("J5-executor", metaJson, `executor "${meta.executor}" not in {llm-prose, claude-code-routine, deterministic}`);
-  }
   if (!COST_CLASSES.has(meta.cost_class)) {
     v("J6-cost-class", metaJson, `cost_class "${meta.cost_class}" not in {small, medium, large}`);
   }
-  // deliverable is required for llm-prose; absent or null otherwise.
-  if (meta.executor === "llm-prose") {
-    if (!meta.deliverable || typeof meta.deliverable !== "object") {
-      v("J5-deliverable-required", metaJson, `executor=llm-prose requires deliverable {type, publish_notion}`);
+  // deliverable is optional (ADR-0005: no skill-shape axis). When present it
+  // declares the published-artefact target read by the skill's CCR
+  // write-script; its shape is validated regardless of which skill carries it.
+  if ("deliverable" in meta && meta.deliverable !== undefined && meta.deliverable !== null) {
+    if (typeof meta.deliverable !== "object") {
+      v("J5-deliverable-shape", metaJson, "deliverable must be an object {type, publish_notion}");
     } else {
       if (!DELIV_TYPES.has(meta.deliverable.type)) {
         v("J5-deliverable-type", metaJson, `deliverable.type "${meta.deliverable.type}" not in allowed set`);
@@ -251,8 +244,6 @@ for (const name of skillDirs) {
         }
       }
     }
-  } else if ("deliverable" in meta && meta.deliverable !== undefined && meta.deliverable !== null) {
-    v("J5-deliverable-forbidden", metaJson, `executor=${meta.executor} must not declare deliverable`);
   }
 
   if (!Array.isArray(meta.owners) || meta.owners.length === 0) {
@@ -332,11 +323,6 @@ for (const name of skillDirs) {
     if (typeof meta.archetype !== "string" || !ARCHETYPES.has(meta.archetype)) {
       v("J13-archetype-unknown", metaJson, `archetype "${meta.archetype}" not in {${[...ARCHETYPES].join(", ")}}`);
     } else if (meta.archetype === "cadence") {
-      // C-1 — a Cadence's judgment is LLM-produced; executor is never
-      // `deterministic` (no LLM call).
-      if (!CADENCE_EXECUTORS.has(meta.executor)) {
-        v("C1-cadence-executor", metaJson, `archetype=cadence requires executor in {${[...CADENCE_EXECUTORS].join(", ")}} (got "${meta.executor}")`);
-      }
       // C-2 — a Cadence writes through a project-scoped credential to an
       // authenticated endpoint; an empty/absent requires[] means it has no
       // capability token, so it can't be the canonical archetype.
@@ -355,39 +341,11 @@ for (const name of skillDirs) {
     }
   }
 
-  // ── handler.ts presence rules per executor ───────────────────────────────
-  // deterministic         : handler.ts REQUIRED — registered via
-  //                         skill-registry-generated.ts so the runner
-  //                         can dispatch it (auto-registered, no edits
-  //                         to lambdas/ needed).
-  // llm-prose             : handler.ts OPTIONAL — most llm-prose skills
-  //                         use the runner's generic runLlmProse path,
-  //                         but Epic-011 (#128) introduced the pattern
-  //                         where a skill needs custom pre-/post-LLM
-  //                         processing (recall-packet assembly, sentinel-
-  //                         skip semantics, structured-tail parsing,
-  //                         POST-row write) and bundles those alongside
-  //                         the persona-facing SKILL.md. The handler is
-  //                         consumed directly by callers (not via the
-  //                         registry) — see workforce/skills/feed-post/
-  //                         handler.ts. The registry build script
-  //                         (build-skill-registry.mjs) ignores llm-prose
-  //                         handlers, so adding one does not affect the
-  //                         deterministic dispatch table.
-  // claude-code-routine   : handler.ts FORBIDDEN — these skills are
-  //                         interpreted by the runner; the routine spec
-  //                         is a doc path, not TS code.
-  const handlerTs = join(dir, "handler.ts");
-  if (meta.executor === "deterministic") {
-    if (!existsSync(handlerTs)) {
-      v("J11-deterministic-handler-missing", dir, "executor=deterministic requires handler.ts in the skill folder");
-    }
-  } else if (meta.executor === "claude-code-routine") {
-    if (existsSync(handlerTs)) {
-      v("J11-handler-orphan", handlerTs, `executor=${meta.executor} must not have a handler.ts (routine specs are docs, not code)`);
-    }
-  }
-  // llm-prose: handler.ts is allowed but not required. No violation either way.
+  // handler.ts is optional library code (ADR-0005: no skill-shape axis, no
+  // runtime dispatch on executor). A skill MAY bundle a handler.ts for custom
+  // pre-/post-processing (e.g. feed-post) or as a dormant library awaiting a
+  // CCR rework (pr-review / pr-route / pdm-charter). Neither required nor
+  // forbidden — the CCR routine never switches on it.
 }
 
 if (violations.length === 0) {

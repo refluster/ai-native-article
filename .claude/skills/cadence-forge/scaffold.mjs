@@ -23,8 +23,7 @@
 //     --owners dario,maya \
 //     --credential workforce.feed_write_token \
 //     --endpoint https://sjhikazsf9.execute-api.us-west-2.amazonaws.com/prod/feed \
-//     [--executor llm-prose|claude-code-routine] \
-//     [--deliverable-type notification] \
+//     [--deliverable-type notification]   # only if the skill also publishes an artefact \
 //     [--cost-class small|medium|large] \
 //     [--write-script post.mjs] \
 //     [--env-token FEED_WRITE_TOKEN] \
@@ -54,7 +53,6 @@ const CREDENTIAL_TYPES = new Set([
   "voyage.api_key",
   "workforce.feed_write_token",
 ]);
-const CADENCE_EXECUTORS = new Set(["llm-prose", "claude-code-routine"]);
 const COST_CLASSES = new Set(["small", "medium", "large"]);
 const DELIV_TYPES = new Set(["article", "plan", "design-doc", "launch-plan", "pr", "notification"]);
 const SKILL_NAME = /^[a-z][a-z0-9-]*$/;
@@ -74,8 +72,11 @@ const description = arg("description");
 const ownersRaw = arg("owners");
 const credential = arg("credential");
 const endpoint = arg("endpoint");
-const executor = arg("executor") ?? "llm-prose";
-const deliverableType = arg("deliverable-type") ?? "notification";
+// ADR-0005: no skill-shape axis. A Cadence runs as a CCR task; its judgment
+// is LLM-produced and its side effect is the bundled write-script. A
+// deliverable is optional — declare one only if the skill also publishes an
+// artefact (pass --deliverable-type); omit for pure POST-to-endpoint cadences.
+const deliverableType = arg("deliverable-type");
 const costClass = arg("cost-class") ?? "small";
 const writeScript = arg("write-script") ?? "post.mjs";
 const dryRun = flag("dry-run");
@@ -91,9 +92,8 @@ if (!credential) die(`--credential <type> is required (one of: ${[...CREDENTIAL_
 
 const credBase = credential.split("@")[0];
 if (!CREDENTIAL_TYPES.has(credBase)) die(`--credential base type "${credBase}" not in the allowlist: ${[...CREDENTIAL_TYPES].join(", ")}`);
-if (!CADENCE_EXECUTORS.has(executor)) die(`--executor must be one of {${[...CADENCE_EXECUTORS].join(", ")}} for a Cadence (deterministic has no LLM judgment)`);
 if (!COST_CLASSES.has(costClass)) die(`--cost-class must be one of {${[...COST_CLASSES].join(", ")}}`);
-if (executor === "llm-prose" && !DELIV_TYPES.has(deliverableType)) die(`--deliverable-type "${deliverableType}" not in {${[...DELIV_TYPES].join(", ")}}`);
+if (deliverableType && !DELIV_TYPES.has(deliverableType)) die(`--deliverable-type "${deliverableType}" not in {${[...DELIV_TYPES].join(", ")}}`);
 if (!writeScript.endsWith(".mjs")) die(`--write-script must end in .mjs (got "${writeScript}")`);
 
 const owners = ownersRaw.split(",").map((s) => s.trim()).filter(Boolean);
@@ -123,8 +123,7 @@ const meta = {
   version: "0.1.0",
   status: "active",
   archetype: "cadence",
-  executor,
-  ...(executor === "llm-prose" ? { deliverable: { type: deliverableType, publish_notion: false } } : {}),
+  ...(deliverableType ? { deliverable: { type: deliverableType, publish_notion: false } } : {}),
   cost_class: costClass,
   owners,
   improvement_agent: null,
@@ -163,7 +162,7 @@ if (dryRun) {
 mkdirSync(outDir, { recursive: true });
 for (const f of files) writeFileSync(f.path, f.body);
 
-console.log(`cadence-forge: scaffolded workforce/skills/${name}/ (archetype=cadence, executor=${executor})`);
+console.log(`cadence-forge: scaffolded workforce/skills/${name}/ (archetype=cadence)`);
 for (const f of files) console.log(`  ✓ ${f.path.replace(REPO_ROOT + "/", "")}`);
 console.log(`
 Next steps (see .claude/skills/cadence-forge/SKILL.md):
