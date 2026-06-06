@@ -44,6 +44,9 @@ jobs:
       - name: Workforce skill registry freshness
         run: npm run workforce:skill-registry:check
 
+      - name: Workforce client skill-spec drift (Dario L2-1)
+        run: npm run workforce:skill-spec-drift
+
       - name: Workforce Lambda typecheck
         run: cd workforce/lambdas && npm ci && npm run typecheck
 

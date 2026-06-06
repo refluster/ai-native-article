@@ -30,6 +30,7 @@
     "workforce:projects:seed": "node workforce/scripts/seed-projects.mjs",
     "workforce:skill-registry": "node workforce/scripts/build-skill-registry.mjs",
     "workforce:skill-registry:check": "node workforce/scripts/build-skill-registry.mjs --check",
-    "workforce:api-routes": "node workforce/scripts/check-api-routes.mjs"
+    "workforce:api-routes": "node workforce/scripts/check-api-routes.mjs",
+    "workforce:skill-spec-drift": "node workforce/scripts/check-skill-spec-drift.mjs"
   }
 }
