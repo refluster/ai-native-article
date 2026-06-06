@@ -1000,148 +1000,18 @@ Resources:
       AlarmActions:
         - !Ref WfAlarmTopic
 
-  # --- Agent runner Lambda (PR6b) -------------------------------------------
-  # Invoked async by the orchestrator (PR6c) with { agent, task_kind, ... }.
-  # Composes shared/* libs into the per-agent execution loop:
-  # load META -> memory -> budget guard -> LLM -> Notion -> memory append ->
-  # RUN + DELIV rows + BUDGET roll-up.
-  #
-  # Reads workforce/agents/{slug}/system.md from the bundle (Makefile build
-  # copies the tree, same pattern as seed-agents).
-  WfAgentRunnerFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      FunctionName: !Sub wf-agent-runner-${Stage}
-      CodeUri: ../../lambdas/agent-runner
-      Handler: handler.handler
-      Description: Workforce agent execution loop. PR6b.
-      MemorySize: 1024
-      Timeout: 300
-      Policies:
-        - Statement:
-            - Sid: RunnerDdbRw
-              Effect: Allow
-              Action:
-                - dynamodb:GetItem
-                - dynamodb:PutItem
-                - dynamodb:UpdateItem
-              Resource: !GetAtt WfTable.Arn
-            - Sid: RunnerS3Rw
-              # Epic-010 Story 3 (#92): the new canonical write layout
-              # is `projects/{project_id}/{yyyy}/{mm}/{exec_ulid}/...`
-              # (per epic-010 §8). The legacy prefixes (memory/, articles/,
-              # plans/, design-docs/, launches/, notifications/, pr-briefs/,
-              # runs/) stay until Story 6 (#95) migrates the reader paths
-              # — no back-fill is planned for in-flight artefacts.
-              #
-              # Trust-boundary trade-off (documented in PR #92 body):
-              # this policy is a POSITIVE prefix scope. The runner can
-              # PutObject anywhere under `projects/*`, but the per-
-              # invocation write key is constructed inside the runner
-              # from the resolved `projectId` (see
-              # `shared/artefact-writer.ts:writeProjectArtefact`), so a
-              # cross-project write is unreachable through the supported
-              # code path. A pure NEGATIVE constraint (StringNotLike
-              # against the active project) would require either the
-              # `aws:PrincipalTag/project_id` session-tag dance (out of
-              # scope per RFC) or a per-project assumable role (explicit
-              # out-of-scope item in Epic-010). The Story 3 AC "denied by
-              # IAM, not by application code" is satisfied for the
-              # legacy prefixes (a runner that tries to write under
-              # `articles/B/...` while resolving project A is still
-              # bounded by the prefix-restricted Resource list above);
-              # within `projects/*` the boundary holds via the writer's
-              # construction discipline + the redaction guard.
-              Effect: Allow
-              Action:
-                - s3:GetObject
-                - s3:PutObject
-              Resource:
-                - !Sub ${WfBucket.Arn}/projects/*
-                - !Sub ${WfBucket.Arn}/memory/*
-                - !Sub ${WfBucket.Arn}/articles/*
-                - !Sub ${WfBucket.Arn}/plans/*
-                - !Sub ${WfBucket.Arn}/design-docs/*
-                - !Sub ${WfBucket.Arn}/launches/*
-                - !Sub ${WfBucket.Arn}/notifications/*
-                - !Sub ${WfBucket.Arn}/pr-briefs/*
-                - !Sub ${WfBucket.Arn}/runs/*
-            - Sid: RunnerSecretsRead
-              # Story 2-B (#91) added the `wf/projects/*` arm for the
-              # post-migration canonical path AND the `_default` shared
-              # fallback. The legacy `wf/{service}-*` arms remain until
-              # WfLegacyCredentialReads graphs to zero (Epic-010 §6).
-              Effect: Allow
-              Action: secretsmanager:GetSecretValue
-              Resource:
-                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*
-                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/anthropic-*
-                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/notion-*
-                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/github-*
-                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/discord-*
-            - Sid: RunnerPutDualWriteMetric
-              # Epic-010 Story 1-B (#90) / PR #111 review: emit
-              # WfExecDualWriteFailed under Workforce/Runner namespace so
-              # the operator sees dual-write drift in real time, not just
-              # via log spelunking. Namespace condition mirrors backfill.
-              #
-              # Story 2-B (#91) extended the namespace condition to
-              # include Workforce/Credentials — getCredential() emits
-              # WfLegacyCredentialReads on every fallback hit.
-              Effect: Allow
-              Action: cloudwatch:PutMetricData
-              Resource: "*"
-              Condition:
-                StringEquals:
-                  cloudwatch:namespace:
-                    - Workforce/Runner
-                    - Workforce/Credentials
-                    # Epic-012 Story 4: the runner's recall packet path emits
-                    # WfRecallLatencyMs / WfRecallVintageMismatch via recall().
-                    - Workforce/Recall
-      Environment:
-        Variables:
-          ENGINEER_OWNER: !Ref EngineerOwner
-          ENGINEER_REPO: !Ref EngineerRepo
-          ENGINEER_WORKFLOW: !Ref EngineerWorkflow
-          ENGINEER_REF: !Ref EngineerRef
-          DISCORD_WEBHOOK_SECRET: !Sub wf/discord-pulse-${Stage}
-      Tags:
-        workforce: !Ref Stage
-
-  WfAgentRunnerErrorsAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub wf-agent-runner-errors-alarm-${Stage}
-      AlarmDescription: !Sub Errors > 0 on wf-agent-runner-${Stage} over 5 minutes.
-      Namespace: AWS/Lambda
-      MetricName: Errors
-      Dimensions:
-        - Name: FunctionName
-          Value: !Ref WfAgentRunnerFunction
-      Statistic: Sum
-      Period: 300
-      EvaluationPeriods: 1
-      Threshold: 0
-      ComparisonOperator: GreaterThanThreshold
-      TreatMissingData: notBreaching
-      AlarmActions:
-        - !Ref WfAlarmTopic
-
   # --- Orchestrator Lambda + tick rule (PR6c, Epic-006 S1) -------------------
   # One EventBridge rule fires every 2 hours. The orchestrator scans all
   # AGENT#*/META rows, evaluates each agent's schedule_cron against the
-  # 120-minute window, and async-invokes wf-agent-runner-{stage} for the
-  # ones that fire. No per-agent CFN rules — workforce scales by adding
+  # 120-minute window, and fires the CCR /fire routine for the bindings that
+  # match (ADR-0005). No per-agent CFN rules — workforce scales by adding
   # data rows, not template resources.
   #
   # The window MUST equal the tick interval (120m) so consecutive past-facing
   # windows are contiguous — no gaps that would silently drop a cron fire.
   # Trade-off of the 2-hourly tick: any binding whose cron is finer than 2h
-  # (currently only Yuki's hourly discord-ping) collapses to one dispatch per
-  # tick, i.e. an effective 2-hourly cadence. Accepted per operator decision.
+  # collapses to one dispatch per tick, i.e. an effective 2-hourly cadence.
+  # Accepted per operator decision.
   WfOrchestratorFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -1150,12 +1020,11 @@ Resources:
       FunctionName: !Sub wf-orchestrator-${Stage}
       CodeUri: ../../lambdas/orchestrator
       Handler: handler.handler
-      Description: Workforce dispatcher. Reads cron from DDB, async-invokes runner.
+      Description: Workforce dispatcher. Reads cron from DDB, fires CCR routines.
       MemorySize: 512
       Timeout: 60
       Environment:
         Variables:
-          RUNNER_FUNCTION_NAME: !Ref WfAgentRunnerFunction
           TICK_WINDOW_MINUTES: "120"
           ENGINEER_SLUG: ren
           ENGINEER_OWNER: !Ref EngineerOwner
@@ -1170,10 +1039,6 @@ Resources:
                 - dynamodb:Query
                 - dynamodb:UpdateItem
               Resource: !GetAtt WfTable.Arn
-            - Sid: OrchestratorRunnerInvoke
-              Effect: Allow
-              Action: lambda:InvokeFunction
-              Resource: !GetAtt WfAgentRunnerFunction.Arn
             - Sid: OrchestratorGithubSecret
               Effect: Allow
               Action: secretsmanager:GetSecretValue

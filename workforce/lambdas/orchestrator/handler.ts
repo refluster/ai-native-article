@@ -17,10 +17,8 @@
 //      dedup window — guards against same-window double-fire.
 
 import type { Context } from "aws-lambda";
-import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import {
   agentPk,
-  isOrchestratorOwned,
   isOrchestratorOwnedCcr,
   type AgentBinding,
   type AgentMetaRow,
@@ -35,11 +33,7 @@ import type { DelivRow } from "../shared/task.js";
 
 const STAGE = process.env.STAGE;
 const TICK_WINDOW_MINUTES = parseInt(process.env.TICK_WINDOW_MINUTES ?? "5", 10);
-const RUNNER_FUNCTION = process.env.RUNNER_FUNCTION_NAME;
 if (!STAGE) throw new Error("STAGE env var is required");
-if (!RUNNER_FUNCTION) throw new Error("RUNNER_FUNCTION_NAME env var is required");
-
-const lambda = new LambdaClient({});
 
 // Per-skill dedup window. The orchestrator skips a binding when the
 // agent's last RUN for the same skill is within this many minutes. The
@@ -117,18 +111,15 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
       }
       for (let i = 0; i < agent.bindings.length; i++) {
         const binding = agent.bindings[i]!;
-        // The orchestrator-tick owns two dispatch paths sharing the same
-        // scan/evaluate procedure:
-        //   - isOrchestratorOwned     → async-invoke wf-agent-runner Lambda (per-binding)
-        //   - isOrchestratorOwnedCcr  → collect into a per-routine batch;
-        //                               fire ONE /fire POST per routine after
-        //                               the agent-scan loop (PR β shape)
-        // Other bindings (CCR with self-schedule, GHA, external non-API)
-        // are declarative — fired by their own schedulers. Recorded as
-        // skipped for inventory.
-        const ownedLambda = isOrchestratorOwned(binding);
+        // ADR-0005: the orchestrator-tick fires CCR bindings only
+        // (executor=claude-code-routine, scheduler=external, invoked_by=api):
+        // collect each into a per-routine batch and fire ONE /fire POST per
+        // routine after the agent-scan loop. Other bindings (CCR self-schedule,
+        // GHA, external non-API) are declarative — fired by their own
+        // schedulers. Recorded as skipped for inventory. The legacy
+        // async-invoke-Lambda path was removed when wf-agent-runner was retired.
         const ownedCcr = isOrchestratorOwnedCcr(binding);
-        if (!ownedLambda && !ownedCcr) {
+        if (!ownedCcr) {
           skipped.push({
             slug: agent.slug,
             binding_idx: i,
@@ -140,18 +131,6 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
         const decision = await evaluateBinding(agent, i, binding, now);
         if (decision.action !== "dispatch") {
           skipped.push({ slug: agent.slug, binding_idx: i, skill: binding.skill, reason: decision.reason });
-          continue;
-        }
-        if (ownedLambda) {
-          // Per-binding immediate dispatch (unchanged).
-          try {
-            await invokeRunner(agent.slug, i);
-            dispatched.push({ slug: agent.slug, binding_idx: i, skill: binding.skill });
-          } catch (err) {
-            const reason = err instanceof Error ? err.message : String(err);
-            console.error(JSON.stringify({ event: "dispatch-error", slug: agent.slug, skill: binding.skill, reason }));
-            skipped.push({ slug: agent.slug, binding_idx: i, skill: binding.skill, reason: `dispatch_error: ${reason.slice(0, 200)}` });
-          }
           continue;
         }
         // ownedCcr — pre-resolve credentials, then collect into the
@@ -308,16 +287,6 @@ async function evaluateBinding(
   }
   void bindingIdx;
   return { action: "dispatch" };
-}
-
-async function invokeRunner(slug: string, bindingIdx: number): Promise<void> {
-  await lambda.send(
-    new InvokeCommand({
-      FunctionName: RUNNER_FUNCTION,
-      InvocationType: "Event",
-      Payload: Buffer.from(JSON.stringify({ agent: slug, binding_idx: bindingIdx })),
-    }),
-  );
 }
 
 /** Resolve a task's credential bag inline for the CCR fire payload.

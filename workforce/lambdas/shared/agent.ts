@@ -80,12 +80,6 @@ export function bindingCron(binding: AgentBinding): string | undefined {
   return binding.trigger?.cron;
 }
 
-/** True when the orchestrator-tick is the scheduler for this binding.
- *  Non-lambda bindings are scheduled elsewhere (CCR cloud / GHA / external API). */
-export function isOrchestratorOwned(binding: AgentBinding): boolean {
-  return binding.executor === "lambda" && binding.trigger?.scheduler === "eventbridge";
-}
-
 /** True when the orchestrator-tick fires this binding by POSTing to a CCR
  *  routine's `/fire` API. Same cron-window evaluation + RUN dedup as the
  *  Lambda path; dispatch target differs. The bearer token + URL live in
