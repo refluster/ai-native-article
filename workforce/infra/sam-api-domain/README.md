@@ -25,12 +25,18 @@ you do, the API keeps serving on the raw execute-api URL and every route
 ### 1. Find the HTTP API id (~1 min)
 
 ```bash
-aws apigatewayv2 get-apis --region us-west-2 \
-  --query "Items[?Name=='wf-agents-api-prod'].ApiId" --output text
+# The agents + credentials HTTP APIs both carry the stack name
+# (wf-data-plane-{stage}) as their Name, so filtering by Name is ambiguous.
+# Identify the agents API by a route only it has (GET /agents):
+for id in $(aws apigatewayv2 get-apis --region us-west-2 --query "Items[].ApiId" --output text); do
+  aws apigatewayv2 get-routes --api-id "$id" --region us-west-2 \
+    --query "Items[?RouteKey=='GET /agents'].RouteKey" --output text | grep -q . && echo "$id"
+done
 ```
 
 …or just read it from the host of the current `VITE_WORKFORCE_AGENTS_API_BASE`
-secret: `https://{HttpApiId}.execute-api.us-west-2.amazonaws.com/prod`.
+secret (pre-cutover form): `https://{HttpApiId}.execute-api.us-west-2.amazonaws.com/prod`.
+(As of the 2026-06 rollout the agents API id is `sjhikazsf9`.)
 
 ### 2. Deploy this stack (~2 min + DNS validation wait)
 

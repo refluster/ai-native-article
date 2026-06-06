@@ -1,6 +1,6 @@
 {
   "name": "discord-digest",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "status": "active",
   "archetype": "cadence",
   "executor": "claude-code-routine",
