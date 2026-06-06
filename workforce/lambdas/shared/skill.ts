@@ -22,7 +22,16 @@ export type DeliverableType =
   | "design-doc"
   | "launch-plan"
   | "pr"
-  | "notification";
+  | "notification"
+  // Phase 7 PR6: opens a Pull Request against an external project's
+  // target repo per R-N9. The mechanical enforcement is the enum
+  // itself — `external-commit` deliberately doesn't exist, so a skill
+  // CAN'T declare "I will push directly to the external repo's
+  // default branch". Adding `external-commit` is a Zone A amendment
+  // that must explain why W-5 (agents never gate merges) doesn't
+  // extend outward to external maintainers. See workforce/lambdas/
+  // shared/external-pr.ts for the helper that opens the PR.
+  | "external-pr";
 
 export interface SkillFrontmatter {
   name: string;
