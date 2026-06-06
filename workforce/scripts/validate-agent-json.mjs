@@ -176,8 +176,12 @@ for (const slug of slugDirs) {
   } else {
     totalBudget += parsed.budget_monthly_usd;
   }
-  if (!Array.isArray(parsed.bindings) || parsed.bindings.length === 0) {
-    v("S9-bindings", cfg, "bindings must be non-empty array");
+  // ADR-0005: an agent with no bindings is a valid *dormant* agent — it keeps
+  // its identity/persona but the orchestrator schedules no work for it. The
+  // non-empty constraint was dropped when the workforce consolidated to the
+  // single CCR execution model and most cadence bindings were retired.
+  if (!Array.isArray(parsed.bindings)) {
+    v("S9-bindings", cfg, "bindings must be an array");
   } else {
     for (let i = 0; i < parsed.bindings.length; i++) {
       const b = parsed.bindings[i];
@@ -459,6 +463,10 @@ if (totalBudget > W3_CAP) {
 // renamed but whose old spec file was left behind on disk.
 // README.md / index-style docs in the routines/ folder are exempt.
 const ROUTINES_DIR_EXEMPT = new Set(["README.md", "index.md"]);
+// ADR-0005: routine specs for capabilities that were *unbound but kept as a
+// library* (paused, re-bindable later). They intentionally have no binding,
+// so the orphan check exempts them rather than forcing a delete.
+const UNBOUND_LIBRARY_SPECS = new Set(["pr-review.md", "pr-route.md"]);
 if (existsSync(ROUTINES_DIR)) {
   const referencedSpecs = new Set();
   for (const slug of slugDirs) {
@@ -478,7 +486,10 @@ if (existsSync(ROUTINES_DIR)) {
     }
   }
   const specFiles = readdirSync(ROUTINES_DIR).filter(
-    (n) => n.endsWith(".md") && !ROUTINES_DIR_EXEMPT.has(n),
+    (n) =>
+      n.endsWith(".md") &&
+      !ROUTINES_DIR_EXEMPT.has(n) &&
+      !UNBOUND_LIBRARY_SPECS.has(n),
   );
   for (const file of specFiles) {
     const relPath = `workforce/docs/routines/${file}`;

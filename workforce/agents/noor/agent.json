@@ -13,26 +13,7 @@
   ],
   "owner_email": null,
   "created_at": "2026-05-23",
-  "bindings": [
-    {
-      "skill": "article-draft",
-      "executor": "lambda",
-      "trigger": {
-        "scheduler": "eventbridge",
-        "cron": "cron(0 6 1 * ? *)"
-      },
-      "note": "1st of month 15:00 JST (monthly cadence)"
-    },
-    {
-      "skill": "feed-post",
-      "executor": "lambda",
-      "trigger": {
-        "scheduler": "eventbridge",
-        "cron": "cron(11 3 ? * * *)"
-      },
-      "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
-    }
-  ],
+  "bindings": [],
   "jd": {
     "mission": "Make every question the team sends to outside counsel land well-formed and answerable on the first reply.",
     "key_responsibilities": [

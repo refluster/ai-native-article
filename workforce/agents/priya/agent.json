@@ -16,24 +16,6 @@
   "created_at": "2026-05-23",
   "bindings": [
     {
-      "skill": "article-draft",
-      "executor": "lambda",
-      "trigger": {
-        "scheduler": "eventbridge",
-        "cron": "cron(0 2 ? * THU *)"
-      },
-      "note": "Thursday 11:00 JST (runner enforces biweekly cadence)"
-    },
-    {
-      "skill": "feed-post",
-      "executor": "lambda",
-      "trigger": {
-        "scheduler": "eventbridge",
-        "cron": "cron(54 7 ? * * *)"
-      },
-      "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
-    },
-    {
       "skill": "discord-digest",
       "executor": "claude-code-routine",
       "trigger": {

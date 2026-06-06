@@ -14,26 +14,7 @@
   ],
   "owner_email": null,
   "created_at": "2026-05-27",
-  "bindings": [
-    {
-      "skill": "article-draft",
-      "executor": "lambda",
-      "trigger": {
-        "scheduler": "eventbridge",
-        "cron": "cron(0 6 15 * ? *)"
-      },
-      "note": "15th of each month, 15:00 JST. Monthly cadence — regulatory whitespace doesn't ship every fortnight, and low-quality regulatory takes erode the lane fast. EventBridge rule not yet enabled — follow-up Zone A change."
-    },
-    {
-      "skill": "feed-post",
-      "executor": "lambda",
-      "trigger": {
-        "scheduler": "eventbridge",
-        "cron": "cron(29 4 ? * * *)"
-      },
-      "note": "Per Epic-011 Story 3 (#130). Deploys with Enabled: false; operator flips to Enabled: true at observation window start (#135)."
-    }
-  ],
+  "bindings": [],
   "jd": {
     "mission": "Find the regulatory windows the team should walk through before the rules arrive, and frame the bets that would build MOAT in that whitespace.",
     "key_responsibilities": [
