@@ -107,7 +107,7 @@ Iterate `payload.tasks` in order. For each task:
 
    ```
    POST {API_BASE}/agents/{agent_slug}/engagements
-   Authorization: Bearer {the injected engagement-write capability token}
+   Authorization: Bearer {task.credentials.engagement_write_token}
    Content-Type: application/json
 
    {

@@ -1053,6 +1053,14 @@ Resources:
               Action: secretsmanager:GetSecretValue
               Resource:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/ccr/*
+            - Sid: OrchestratorEngagementWriteToken
+              # ADR-0005 item 5 — the orchestrator reads the engagement-write
+              # token and injects it into every CCR task so the routine can
+              # record one activity row per task (POST /agents/{slug}/engagements).
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/api/engagements-write-token-*
             - Sid: OrchestratorProjectCredentials
               # PR β: orchestrator-tick resolves a CCR task's project
               # credentials inline (per skill `requires[]`) and ships

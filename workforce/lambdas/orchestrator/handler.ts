@@ -28,6 +28,7 @@ import { matchesNow } from "../shared/cron-match.js";
 import { findRecentPRs } from "../shared/github.js";
 import { fireCcrRoutine, routineIdFromSpec, type CcrFireTask } from "../shared/ccr-fire.js";
 import { asProjectId, getCredential } from "../shared/project.js";
+import { getSecret } from "../shared/secrets.js";
 import { SKILL_REQUIRES } from "../shared/skill-registry-generated.js";
 import type { DelivRow } from "../shared/task.js";
 
@@ -147,6 +148,14 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
             throw new Error(`skill "${binding.skill}" not in SKILL_REQUIRES map — re-run npm run workforce:skill-registry`);
           }
           const credentials = await resolveCredentialsForTask(binding.project_id, requires);
+          // ADR-0005 item 5: inject the framework engagement-write token into
+          // EVERY task (not skill-declared) so the CCR routine can record one
+          // EXEC activity row per task via POST /agents/{slug}/engagements.
+          // Best-effort: if the secret isn't provisioned yet, the run still
+          // fires (the per-task engagement record is simply skipped that
+          // cycle) — so this can roll out before the secret exists.
+          const ewt = await engagementWriteToken();
+          if (ewt) (credentials as Record<string, unknown>).engagement_write_token = ewt;
           const task: CcrFireTask = {
             agent_slug: agent.slug,
             binding_idx: i,
@@ -296,6 +305,24 @@ async function evaluateBinding(
  *  itself never touches Secrets Manager. An empty `requires[]` yields
  *  an empty map; a read error propagates and is caught per-task by the
  *  scan loop's prep-error branch. */
+// ADR-0005 item 5 — the framework engagement-write token, read once and
+// injected into every CCR task so the routine can record an activity row.
+// `undefined` = not yet fetched; `null` = fetched-but-unavailable (secret not
+// provisioned), so we stop retrying within a warm lifetime and just skip the
+// record. Provisioning the secret + a cold start lights it up.
+let _engagementWriteToken: string | null | undefined;
+async function engagementWriteToken(): Promise<string | undefined> {
+  if (_engagementWriteToken === undefined) {
+    try {
+      const { token } = await getSecret<{ token: string }>("wf/api/engagements-write-token");
+      _engagementWriteToken = typeof token === "string" && token.length > 0 ? token : null;
+    } catch {
+      _engagementWriteToken = null;
+    }
+  }
+  return _engagementWriteToken ?? undefined;
+}
+
 async function resolveCredentialsForTask(
   projectId: string,
   requires: readonly string[],
