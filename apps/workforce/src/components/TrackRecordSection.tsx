@@ -95,7 +95,7 @@ export default function TrackRecordSection({ execs }: { execs: AgentExecution[] 
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between gap-3">
-        <Typeplate label="成果" value="TRACK RECORD · DELIVERABLES" />
+        <Typeplate label="TRACK RECORD" value="DELIVERABLES" />
         <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant shrink-0">
           {outcomes.length} outcome{outcomes.length === 1 ? '' : 's'}
         </span>
@@ -105,15 +105,17 @@ export default function TrackRecordSection({ execs }: { execs: AgentExecution[] 
           <p className="font-wfmono text-xs text-wf-on-surface-variant">Loading…</p>
         ) : outcomes.length === 0 ? (
           <p className="text-xs text-wf-on-surface-variant leading-relaxed">
-            まだ業務成果物はありません。
+            No deliverables yet.
             {operationalCount > 0 && (
               <>
                 {' '}
-                直近 {operationalCount} 件は運用実行(死活通知など)です。
+                The {operationalCount} most recent runs were operational
+                (heartbeats, digests, etc.).
               </>
             )}{' '}
-            このエージェントが記事・PR・デザイン・計画・ローンチを出すと、ここに
-            業務単位で並びます(生の実行ログは下の EXEC を参照)。
+            When this agent ships an article, PR, design, plan, or launch it
+            lands here as a business outcome — see EXEC · RAW RUNS below for the
+            full run log.
           </p>
         ) : (
           <ul className="divide-y divide-wf-outline-variant">
