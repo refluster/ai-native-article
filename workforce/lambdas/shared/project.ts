@@ -159,6 +159,25 @@ export interface ArtifactRef {
 export type ExecStatus = "ok" | "throw" | "skipped" | "failed_artefact_redaction";
 
 /**
+ * Where the LLM call that produced this execution ran. Per R-N1
+ * (governance.md §4):
+ *
+ *   - `lambda`  Workforce agent-runner Lambda — the canonical surface
+ *               with full W-3 budget enforcement, W-4 fail-loud, W-5
+ *               persona stability. Default if unset (covers all rows
+ *               written before L2-2 added this field).
+ *   - `client`  Client-side execution under R-N1(b): the consumer fetched
+ *               agent metadata + persona, ran the LLM in their own
+ *               environment, and filed the engagement record via the
+ *               Phase 7 PR5 `POST /agents/{slug}/engagements` surface.
+ *               Best-effort audit by definition — silent loss of the
+ *               POST-back is the accepted failure mode.
+ *
+ * Adding new surfaces is a Zone A amendment (governance.md R-N1).
+ */
+export type ExecutionSurface = "lambda" | "client";
+
+/**
  * Status of the embedding sidecar attached to an EXEC row (Story 4 / #93).
  *
  * - `ok`      — `embedding_bytes`, `embedding_model_id`, `embedding_dim`
@@ -194,6 +213,15 @@ export interface ExecutionRow {
   inputs_hash?: string;
   artifact_ref?: ArtifactRef;
   error?: string;
+  /**
+   * Where the LLM call ran. `lambda` = workforce agent-runner (default; the
+   * historical-and-still-canonical path). `client` = client-side execution
+   * under R-N1(b) — the consumer fetched agent metadata + persona, ran the
+   * LLM in their own environment, and POSTed the engagement record via
+   * `POST /agents/{slug}/engagements` to file the audit. Pre-L2-2 rows
+   * have no attribute; readers treat absent as `lambda` (no migration).
+   */
+  execution_surface?: ExecutionSurface;
   /** GSI1: agent-scoped recall — "what did Ren do, across all projects". */
   gsi1pk: `AGENT#${string}`;
   gsi1sk: string;
@@ -373,6 +401,11 @@ export interface AppendExecutionInput {
   inputs_hash?: string;
   artifact_ref?: ArtifactRef;
   error?: string;
+  /** Where the LLM call ran. Omit (or set `lambda`) for workforce
+   *  agent-runner executions; set `client` when the row is written via
+   *  the `POST /agents/{slug}/engagements` route for R-N1(b) client-side
+   *  execution. See `ExecutionSurface` doc above. */
+  execution_surface?: ExecutionSurface;
   // ── Embedding sidecar (Story 4 / #93) ──────────────────────────────
   // All three must be present together, or all three must be absent.
   // `embedding_status` controls how the row is treated by the recall
@@ -453,6 +486,7 @@ export async function appendExecution(input: AppendExecutionInput): Promise<Exec
     inputs_hash: input.inputs_hash,
     artifact_ref: input.artifact_ref,
     error: input.error,
+    execution_surface: input.execution_surface,
     gsi1pk: `AGENT#${input.agent_slug}`,
     gsi1sk: input.started_at,
     gsi2pk: `SKILL#${input.skill_name}`,

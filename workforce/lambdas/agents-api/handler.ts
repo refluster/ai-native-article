@@ -68,6 +68,7 @@ import {
   type ArtifactRef,
   type ExecStatus,
   type ExecutionRow,
+  type ExecutionSurface,
   type ProjectMemberRow,
   type ProjectMetaRow,
 } from "../shared/project.js";
@@ -1167,6 +1168,14 @@ interface EngagementView {
   started_at: string;
   ended_at: string;
   status: ExecStatus;
+  /**
+   * L2-2: where the LLM call ran. Defaults to `lambda` on legacy rows
+   * (pre-L2-2 EXEC rows have no attribute; we surface `lambda` as the
+   * canonical default per the data-model amendment). Lets clients
+   * (and the portfolio UI) tell Lambda-side and client-side engagements
+   * apart for attribution / analytics.
+   */
+  execution_surface: ExecutionSurface;
   summary: string;
   artifact?: ArtifactRef;
   error?: string;
@@ -1182,6 +1191,9 @@ function toEngagementView(row: ExecutionRow): EngagementView {
     started_at: row.started_at,
     ended_at: row.ended_at,
     status: row.status,
+    // Legacy rows (pre-L2-2) are Lambda-side by construction — the
+    // client-side write path is what introduced the field.
+    execution_surface: row.execution_surface ?? "lambda",
     summary: row.artifact_ref?.summary ?? "",
     artifact: row.artifact_ref,
     error: row.error,
@@ -1311,6 +1323,12 @@ async function createEngagementRoute(
           : undefined,
       inputs_hash: typeof parsed.inputs_hash === "string" ? parsed.inputs_hash : undefined,
       artifact_ref: artifactRef,
+      // L2-2: rows POSTed via this endpoint are by definition client-side
+      // (R-N1(b) audit POST-back). The Lambda-side runDeterministic /
+      // runLlmProse paths in agent-runner DON'T set this field, so
+      // toEngagementView() defaults missing values to `lambda`, preserving
+      // the canonical surface attribution by construction.
+      execution_surface: "client",
       error: typeof parsed.error === "string" ? parsed.error : undefined,
     });
     return reply(201, { engagement: toEngagementView(row) });
