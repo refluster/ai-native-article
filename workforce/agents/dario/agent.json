@@ -44,11 +44,10 @@
     },
     {
       "skill": "pr-review",
-      "executor": "claude-code-routine",
+      "executor": "lambda",
       "trigger": {
         "scheduler": "manual"
       },
-      "routine_spec": "workforce/docs/routines/pr-review.md",
       "config": {
         "lens_name": "architecture",
         "lens_summary": "R-N* / governance / audit / cost / one-layer-per-change",
