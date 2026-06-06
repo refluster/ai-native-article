@@ -31,6 +31,7 @@ import KPIReadout from '../components/KPIReadout';
 import HeatStrip from '../components/HeatStrip';
 import AgentOrgGraph from '../components/AgentOrgGraph';
 import RecentPostsSection from '../components/RecentPostsSection';
+import TrackRecordSection from '../components/TrackRecordSection';
 import {
   apiConfigured,
   fetchAgentExecutions,
@@ -113,7 +114,10 @@ export default function AgentProfile() {
       return;
     }
     let cancelled = false;
-    Promise.all([fetchAgentLive(slug), fetchAgentExecutions(slug, 20)])
+    // Fetch a deeper window (not just 20) so the business-level TrackRecord
+    // section can find deliverable-producing runs among the heartbeat noise;
+    // the raw EXEC list below still renders only the most recent 20.
+    Promise.all([fetchAgentLive(slug), fetchAgentExecutions(slug, 100)])
       .then(([l, d]) => {
         if (cancelled) return;
         setLive(l ?? null);
@@ -346,11 +350,14 @@ export default function AgentProfile() {
             <MembershipsPanel memberships={memberships} />
           )}
 
-          {/* DELIVERABLES (live API only) */}
+          {/* TRACK RECORD — business-level deliverables (live API only) */}
+          {apiConfigured() && <TrackRecordSection execs={execs} />}
+
+          {/* EXEC · RAW RUNS — the unfiltered run log incl. heartbeats (live API only) */}
           {apiConfigured() && (
             <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
               <div className="border-b border-wf-outline-variant px-4 py-3">
-                <Typeplate label="EXEC" value="RECENT" />
+                <Typeplate label="EXEC" value="RAW RUNS · ALL ACTIVITY" />
               </div>
               <div className="p-4">
                 {execs === null ? (
@@ -361,7 +368,7 @@ export default function AgentProfile() {
                   </p>
                 ) : (
                   <ul className="divide-y divide-wf-outline-variant">
-                    {execs.map((e) => {
+                    {execs.slice(0, 20).map((e) => {
                       const id = e.exec_ulid;
                       const startedDate = e.started_at?.slice(0, 10);
                       // EXEC rows carry the canonical S3 artefact URI.
