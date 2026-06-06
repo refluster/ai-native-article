@@ -6,6 +6,8 @@
 // meaningful. No content here is authored by a live agent run.
 
 import type { WorkforceAgent } from '../types/agent';
+import { WORKFORCE_AGENTS_API_BASE } from '../config/api';
+import { apiConfigured } from './agents';
 
 export const OPERATOR_ID = 'operator';
 
@@ -132,4 +134,81 @@ export function lastMessage(c: Conversation): ChatMessage {
 
 export function lastAt(c: Conversation): string {
   return lastMessage(c).at;
+}
+
+// ----- Live messaging store (Epic-013 Story 1, issue 248) -----
+//
+// When the live agents-api is configured (authenticated workforce origin),
+// /messaging reads from the real THREAD store; on the public gh-pages
+// mirror the API base is empty and the page keeps the deterministic mock
+// above (same dual posture as workforce-mock-stats.json). The wire shapes
+// map straight back onto Conversation / ChatMessage — the kill criterion
+// for Story 1 is that this mapping stays cosmetic.
+
+interface ThreadSummaryDto {
+  thread_id: string;
+  participants: string[];
+  group: boolean;
+  group_label?: string;
+  starred: boolean;
+  unread: number;
+  last_message: { from: string; at: string; preview: string };
+}
+
+interface ThreadDetailDto {
+  thread_id: string;
+  participants: string[];
+  group: boolean;
+  group_label?: string;
+  starred: boolean;
+  created_by: string;
+  created_at: string;
+  messages: Array<{ message_id: string; from: string; at: string; body: string }>;
+}
+
+function summaryToConversation(t: ThreadSummaryDto): Conversation {
+  return {
+    id: t.thread_id,
+    participants: t.participants,
+    group: t.group,
+    groupLabel: t.group_label,
+    starred: t.starred,
+    unread: t.unread,
+    // The inbox summary carries only the last message; the full transcript
+    // is hydrated by fetchThreadDetail when the thread is opened.
+    messages: [{ from: t.last_message.from, at: t.last_message.at, body: t.last_message.preview }],
+  };
+}
+
+function detailToConversation(d: ThreadDetailDto): Conversation {
+  return {
+    id: d.thread_id,
+    participants: d.participants,
+    group: d.group,
+    groupLabel: d.group_label,
+    starred: d.starred,
+    unread: 0,
+    messages: d.messages.map((m) => ({ from: m.from, at: m.at, body: m.body })),
+  };
+}
+
+/** Fetch the operator inbox (thread summaries), newest-first. Returns []
+ *  when the live API is not configured. */
+export async function fetchThreadSummaries(): Promise<Conversation[]> {
+  if (!apiConfigured()) return [];
+  const res = await fetch(`${WORKFORCE_AGENTS_API_BASE}/threads`);
+  if (!res.ok) throw new Error(`agents-api ${res.status}`);
+  const data = (await res.json()) as { threads: ThreadSummaryDto[] };
+  return data.threads.map(summaryToConversation);
+}
+
+/** Fetch one thread's full transcript. Returns undefined on 404 / when the
+ *  live API is not configured. */
+export async function fetchThreadDetail(id: string): Promise<Conversation | undefined> {
+  if (!apiConfigured()) return undefined;
+  const res = await fetch(`${WORKFORCE_AGENTS_API_BASE}/threads/${encodeURIComponent(id)}`);
+  if (res.status === 404) return undefined;
+  if (!res.ok) throw new Error(`agents-api ${res.status}`);
+  const d = (await res.json()) as ThreadDetailDto;
+  return detailToConversation(d);
 }

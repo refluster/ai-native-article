@@ -169,15 +169,18 @@ export async function queryBySkPrefix<T extends object>(
   return (res.Items ?? []) as T[];
 }
 
-export type GsiName = "GSI1" | "GSI2" | "GSI3";
+export type GsiName = "GSI1" | "GSI2" | "GSI3" | "GSI4";
 
 /** Per-GSI attribute names. Adding GSI3+ is a one-line addition here.
  *  GSI3 added by Epic-011 Story 1 (#128) for the workforce activity feed
- *  (gsi3pk="FEED" / gsi3sk=posted_at). Story 5 (#132) queries it. */
+ *  (gsi3pk="FEED" / gsi3sk=posted_at). Story 5 (#132) queries it.
+ *  GSI4 added by Epic-013 Story 1 (#248) for the talent-messaging inbox
+ *  (gsi4pk="INBOX#{slug}" / gsi4sk=last_message_at). */
 const GSI_ATTRS: Record<GsiName, { pk: string; sk: string }> = {
   GSI1: { pk: "gsi1pk", sk: "gsi1sk" },
   GSI2: { pk: "gsi2pk", sk: "gsi2sk" },
   GSI3: { pk: "gsi3pk", sk: "gsi3sk" },
+  GSI4: { pk: "gsi4pk", sk: "gsi4sk" },
 };
 
 export interface GsiQuery {
