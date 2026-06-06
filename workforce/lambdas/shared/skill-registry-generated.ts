@@ -11,10 +11,12 @@
 import type { DeterministicHandler } from "./skill-types.js";
 
 import { dispatchPdmCharter } from "../../skills/pdm-charter/handler.js";
+import { dispatchPrReview } from "../../skills/pr-review/handler.js";
 import { dispatchPrRoute } from "../../skills/pr-route/handler.js";
 
 export const DETERMINISTIC_HANDLERS: Record<string, DeterministicHandler> = {
   "pdm-charter": dispatchPdmCharter,
+  "pr-review": dispatchPrReview,
   "pr-route": dispatchPrRoute,
 };
 
@@ -28,5 +30,6 @@ export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "feed-post": ["workforce.feed_write_token"] as const,
   "pdm-charter": [],
   "positioning-write": [],
+  "pr-review": ["github.token"] as const,
   "pr-route": ["github.token"] as const,
 };
