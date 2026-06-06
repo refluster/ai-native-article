@@ -175,7 +175,12 @@ export type ExecStatus = "ok" | "throw" | "skipped" | "failed_artefact_redaction
  *
  * Adding new surfaces is a Zone A amendment (governance.md R-N1).
  */
-export type ExecutionSurface = "lambda" | "client";
+// `ccr` (ADR-0005 item 5): the row was written by the generic CCR
+// agent-runner routine's per-task write-back — the framework activity-ledger
+// sink for the CCR execution model. `lambda` = the retired in-Lambda runner;
+// `client` = an external R-N1(b) engagement POST. All three flow through the
+// one `POST /agents/{slug}/engagements` write surface.
+export type ExecutionSurface = "lambda" | "client" | "ccr";
 
 /**
  * Status of the embedding sidecar attached to an EXEC row (Story 4 / #93).

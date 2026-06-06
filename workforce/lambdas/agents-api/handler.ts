@@ -1323,12 +1323,14 @@ async function createEngagementRoute(
           : undefined,
       inputs_hash: typeof parsed.inputs_hash === "string" ? parsed.inputs_hash : undefined,
       artifact_ref: artifactRef,
-      // L2-2: rows POSTed via this endpoint are by definition client-side
-      // (R-N1(b) audit POST-back). The Lambda-side runDeterministic /
-      // runLlmProse paths in agent-runner DON'T set this field, so
-      // toEngagementView() defaults missing values to `lambda`, preserving
-      // the canonical surface attribution by construction.
-      execution_surface: "client",
+      // This single write surface records every off-Lambda execution. The
+      // optional `execution_surface` says which produced it: `ccr` for the
+      // generic CCR agent-runner routine's per-task write-back (ADR-0005
+      // item 5 — the framework activity ledger), or `client` (default) for an
+      // external R-N1(b) engagement POST. Missing/invalid → `client`, the
+      // original engagement behaviour. (`lambda` is the retired runner and is
+      // not accepted from the wire.)
+      execution_surface: parsed.execution_surface === "ccr" ? "ccr" : "client",
       error: typeof parsed.error === "string" ? parsed.error : undefined,
     });
     return reply(201, { engagement: toEngagementView(row) });
