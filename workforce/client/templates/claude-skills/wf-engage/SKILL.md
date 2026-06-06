@@ -108,6 +108,8 @@ Fields:
 - `status` — `"ok"` on success, `"throw"` if you hit an unrecoverable error (and include the `error` field), `"skipped"` if the operator cancelled mid-task.
 - `artifact` — the deliverable. `uri` is the most important field — it's how the workforce links the engagement record to what you actually produced. Use a stable URL (PR comment permalink, GitHub file blob URL, etc.). If you can't produce a real `content_hash`, use 64 zeros (the workforce accepts that as "client didn't compute"). `size_bytes` can be 0 if unknown.
 
+The workforce's `POST /agents/{slug}/engagements` route **automatically stamps `execution_surface: "client"`** on every record it accepts via this path — you don't need to (and shouldn't try to) set it. That field is what lets the workforce's portfolio analytics tell Lambda-side and client-side engagements apart for the same agent (see governance.md §4 R-N1(b) for the trust-boundary background).
+
 The script's exit code reflects the workforce's response:
 - 0 = `201 Created` (logged in portfolio).
 - non-0 = transport failure or workforce returned 4xx/5xx. Print the response body for diagnostics. **Don't retry silently** — per R-N1(b), the engagement record may be lost; that's the explicitly-accepted failure mode.

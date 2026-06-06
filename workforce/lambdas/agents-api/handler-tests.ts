@@ -185,6 +185,7 @@ vi.mock("../shared/project.js", () => ({
     status: string;
     artifact_ref?: unknown;
     error?: string;
+    execution_surface?: "lambda" | "client";
   }) => {
     if (!membershipSet.has(`${input.project_id}|${input.agent_slug}`)) {
       throw new Error(
@@ -203,6 +204,7 @@ vi.mock("../shared/project.js", () => ({
       status: input.status,
       artifact_ref: input.artifact_ref,
       error: input.error,
+      execution_surface: input.execution_surface,
       gsi1pk: `AGENT#${input.agent_slug}`,
       gsi1sk: input.started_at,
     };
@@ -1089,6 +1091,45 @@ describe("GET /agents/{slug}/portfolio (Engagements API — listAgentPortfolio)"
     expect(item.artifact).toBeDefined();
   });
 
+  it("L2-2: legacy EXEC rows (no execution_surface attribute) project as lambda", async () => {
+    // seedExec writes no execution_surface — mirrors pre-L2-2 rows
+    // that all 4 deterministic skills + the llm-prose path have ever
+    // produced. The view MUST surface them as `lambda` so portfolio
+    // attribution analytics stay correct.
+    seedExec({ project: "asp-cloud", agent: "nadia", ulid: "01A", startedAt: "2026-05-25T00:00:00.000Z" });
+    const res = await handler(
+      evt("GET /agents/{slug}/portfolio", { slug: "nadia" }, { project_id: "asp-cloud" }),
+    );
+    const item = (bodyOf(res) as { items: Array<{ execution_surface: string }> }).items[0]!;
+    expect(item.execution_surface).toBe("lambda");
+  });
+
+  it("L2-2: EXEC rows with execution_surface=client are surfaced as-is", async () => {
+    // Seed a row that DOES carry the field (simulates what
+    // createEngagementRoute writes post-L2-2). The view must round-trip
+    // the value, not silently override to lambda.
+    rows.set(key("PROJECT#asp-cloud", "EXEC#01B"), {
+      pk: "PROJECT#asp-cloud",
+      sk: "EXEC#01B",
+      project_id: "asp-cloud",
+      agent_slug: "nadia",
+      skill_name: "pr-review",
+      skill_version: "0.0.0",
+      started_at: "2026-06-05T10:00:00.000Z",
+      ended_at: "2026-06-05T10:01:00.000Z",
+      status: "ok",
+      used_credential_types: [],
+      execution_surface: "client",
+      gsi1pk: "AGENT#nadia",
+      gsi1sk: "2026-06-05T10:00:00.000Z",
+    });
+    const res = await handler(
+      evt("GET /agents/{slug}/portfolio", { slug: "nadia" }, { project_id: "asp-cloud" }),
+    );
+    const item = (bodyOf(res) as { items: Array<{ execution_surface: string }> }).items[0]!;
+    expect(item.execution_surface).toBe("client");
+  });
+
   it("returns items newest-first", async () => {
     seedExec({ project: "asp-cloud", agent: "nadia", ulid: "01A", startedAt: "2026-05-25T00:00:00.000Z" });
     seedExec({ project: "asp-cloud", agent: "nadia", ulid: "01B", startedAt: "2026-05-27T00:00:00.000Z" });
@@ -1252,6 +1293,16 @@ describe("POST /agents/{slug}/engagements (Engagements API — createEngagement)
     expect(body.engagement.project_id).toBe("asp-cloud");
     expect(body.engagement.agent_slug).toBe("nadia");
     expect(body.engagement.engagement_id).toMatch(/^[0-9A-Z]{26}$/);
+  });
+
+  it("L2-2: stamps execution_surface=client on the response engagement view", async () => {
+    membershipSet.add("asp-cloud|nadia");
+    const res = await handler(
+      postEvt("nadia", { authorization: `Bearer ${TOKEN}` }, validBody()),
+    );
+    expect(statusOf(res)).toBe(201);
+    const body = bodyOf(res) as { engagement: { execution_surface: string } };
+    expect(body.engagement.execution_surface).toBe("client");
   });
 
   it("honours client-supplied engagement_id when present", async () => {
