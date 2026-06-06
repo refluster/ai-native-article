@@ -42,7 +42,7 @@ Per Epic-010 (Story 1, [#90](https://github.com/refluster/ai-native-article/issu
 |---|---|---|---|
 | `PROJECT#{project_id}` | `META` | Project descriptor | `project_id`, `status` ∈ `{active, archived}`, `owner_agent` (slug or `_operator`), `created_at`, `archived_at?` |
 | `PROJECT#{project_id}` | `MEMBER#{agent_slug}` | Project membership row | `project_id`, `agent_slug`, `joined_at`, `revoked_at?`. `removeMember` is a **soft delete** — it writes `revoked_at` rather than dropping the row, so the audit question "was X a member of Y on date Z" can be reconstructed. `isMember`/`members` filter on `revoked_at === undefined`. Cross-project denial: `appendExecution` throws if the agent has no active membership row. |
-| `PROJECT#{project_id}` | `EXEC#{ulid}` | Execution ledger row | `project_id`, `agent_slug`, `skill_name`, `skill_version`, `started_at`, `ended_at`, `status` ∈ `{ok, throw, skipped, failed_artefact_redaction}`, `used_credential_types[]`, `inputs_hash?`, `artifact_ref?` (`{uri, content_hash, content_type, size_bytes, summary ≤512c}`), `error?`, `execution_surface?` ∈ `{lambda, client}` (absent → `lambda` by convention; the Phase 7 PR5 `POST /agents/{slug}/engagements` route writes `client` for R-N1(b) audit POST-backs; legacy and agent-runner rows have no attribute). GSI1 (`gsi1pk=AGENT#{agent_slug}, gsi1sk=started_at`) for agent-scoped recall; GSI2 (`gsi2pk=SKILL#{skill_name}, gsi2sk=started_at`) for skill-utilisation queries. |
+| `PROJECT#{project_id}` | `EXEC#{ulid}` | Execution ledger row | `project_id`, `agent_slug`, `skill_name`, `skill_version`, `started_at`, `ended_at`, `status` ∈ `{ok, throw, skipped, failed_artefact_redaction}`, `used_credential_types[]`, `inputs_hash?`, `artifact_ref?` (`{uri, content_hash, content_type, size_bytes, summary ≤512c}`), `error?`, `execution_surface?` ∈ `{lambda, client, ccr}` (absent → `lambda` by convention; the `POST /agents/{slug}/engagements` route writes `client` for R-N1(b) external audit POST-backs and `ccr` for the per-task write-back from a CCR routine run — ADR-0005; legacy rows have no attribute). GSI1 (`gsi1pk=AGENT#{agent_slug}, gsi1sk=started_at`) for agent-scoped recall; GSI2 (`gsi2pk=SKILL#{skill_name}, gsi2sk=started_at`) for skill-utilisation queries. |
 | `PROJECT#{project_id}` | `MILESTONE#{n}` | Milestone marker (pre-Epic-010 shape; retained for compat) | `owner_agent`, `due_at?`, `deliv_refs[]` (ULIDs of contributing DELIVs), `status` |
 
 `project_id = "self/{agent_slug}"` is the reserved per-agent project for personal artefacts (own observability outputs, per-agent model keys, notification webhooks). Seeded by `seed-agents` (Story 1-B follow-up).
@@ -52,6 +52,12 @@ Per Epic-010 (Story 1, [#90](https://github.com/refluster/ai-native-article/issu
 | `pk` | `sk` | Purpose | Key attributes |
 |---|---|---|---|
 | `BUDGET#{yyyy-mm}` | `AGENT#{slug}` | Monthly token + cost roll-up | `tokens_in`, `tokens_out`, `cost_usd`, `last_updated_at`. Used by `lambdas/shared/budget.ts` to enforce W-3 before each LLM call |
+
+#### Auth rows (ADR-0005 — ephemeral engagement-write tokens)
+
+| `pk` | `sk` | Purpose | Key attributes |
+|---|---|---|---|
+| `AUTH#ENGAGEMENT` | `TOKEN#{token}` | Short-lived capability token for `POST /agents/{slug}/engagements` (the activity-ledger write surface) | `expires_at` (ISO — the source-of-truth validity check), `ttl` (epoch seconds — DynamoDB TTL GC), `minted_at`. Minted by a trusted AWS principal that can write the table: the orchestrator (once per fire → injected into each CCR task) or an operator-credentialed session (`workforce/scripts/record-engagement.mjs`, for ad-hoc/interactive work). Validated by `lambdas/shared/engagement-token.ts:isValidEngagementToken`. Replaces a long-lived static bearer — no Secrets Manager token to provision/rotate. |
 
 #### Thread rows (messaging)
 

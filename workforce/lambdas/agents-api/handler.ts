@@ -79,6 +79,7 @@ import {
   type ProjectMetaRow,
 } from "../shared/project.js";
 import { recall, type RecallResult } from "../shared/recall.js";
+import { isValidEngagementToken } from "../shared/engagement-token.js";
 import { CREDENTIAL_TYPES } from "../shared/credential-injector.js";
 import {
   CloudWatchClient,
@@ -1471,12 +1472,14 @@ async function createEngagementRoute(
           : undefined,
       inputs_hash: typeof parsed.inputs_hash === "string" ? parsed.inputs_hash : undefined,
       artifact_ref: artifactRef,
-      // L2-2: rows POSTed via this endpoint are by definition client-side
-      // (R-N1(b) audit POST-back). The Lambda-side runDeterministic /
-      // runLlmProse paths in agent-runner DON'T set this field, so
-      // toEngagementView() defaults missing values to `lambda`, preserving
-      // the canonical surface attribution by construction.
-      execution_surface: "client",
+      // This single write surface records every off-Lambda execution. The
+      // optional `execution_surface` says which produced it: `ccr` for the
+      // generic CCR agent-runner routine's per-task write-back (ADR-0005
+      // item 5 — the framework activity ledger), or `client` (default) for an
+      // external R-N1(b) engagement POST. Missing/invalid → `client`, the
+      // original engagement behaviour. (`lambda` is the retired runner and is
+      // not accepted from the wire.)
+      execution_surface: parsed.execution_surface === "ccr" ? "ccr" : "client",
       error: typeof parsed.error === "string" ? parsed.error : undefined,
     });
     return reply(201, { engagement: toEngagementView(row) });
@@ -1518,6 +1521,17 @@ async function validateEngagementWriteBearer(
   const presented = raw.slice("Bearer ".length).trim();
   if (presented.length === 0) return false;
 
+  // Primary path (ADR-0005): a short-lived engagement-write token minted in
+  // DynamoDB — by the orchestrator per fire (cron), or by an operator-
+  // credentialed session via workforce/scripts/record-engagement.mjs
+  // (interactive). No static secret needed for either.
+  try {
+    if (await isValidEngagementToken(presented)) return true;
+  } catch {
+    // DDB read error — fall through to the static path rather than 500.
+  }
+
+  // Fallback: the long-lived capability token external (Phase 7) clients hold.
   let expected = _engagementWriteTokenCache;
   if (!expected) {
     try {

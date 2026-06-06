@@ -101,7 +101,37 @@ Iterate `payload.tasks` in order. For each task:
 
 6. **Per-task isolation** — a failure in task N must not abort tasks N+1, N+2, etc. Wrap each task's execution in its own try/catch; record per-task outcomes in your session output so the operator can see which tasks succeeded vs failed within the same fire.
 
-7. **Record** — the script's exit code IS the per-task outcome. Surface each task's `(agent, skill, exit_code, one-line result)` in your session summary so the operator can scan one place. The skill's own backing store (DDB POST# row, Discord channel) is the durable record.
+7. **Record** — the script's exit code IS the per-task outcome. Surface each task's `(agent, skill, exit_code, one-line result)` in your session summary so the operator can scan one place. The skill's own backing store (DDB POST# row, Discord channel) is the *product* record.
+
+8. **Record the engagement — MANDATORY, once per task (ADR-0005 item 5).** Independently of the skill's product write (step 5), record one **engagement** — the agent's uniform, queryable business record of this unit of work. This is what the operator reads in the agent's **Track Record**, and it is the *only* framework-level activity ledger now that the Lambda runner is retired. `POST` it to the one write surface:
+
+   ```
+   POST {API_BASE}/agents/{agent_slug}/engagements
+   Authorization: Bearer {task.credentials.engagement_write_token}
+   Content-Type: application/json
+
+   {
+     "project_id":        "{task.project_id}",
+     "skill_name":        "{skill}",
+     "skill_version":     "{skill meta.version}",
+     "started_at":        "{ISO you began the task}",
+     "ended_at":          "{ISO the skill write finished}",
+     "status":            "ok" | "throw" | "skipped",
+     "execution_surface": "ccr",
+     "artifact": {                         // OMIT on skip / no deliverable
+       "uri":          "{the deliverable's link — Notion page URL, kohuehara.xyz URL, PR URL, Discord, or s3:// key}",
+       "content_hash": "{sha256 hex of the deliverable body, or 64 zeros}",
+       "content_type": "text/markdown" | "application/json" | "...",
+       "size_bytes":   0,
+       "summary":      "{ONE business-level line, lead with the title — e.g. 'Published L2: 2026年のデータセンターインフラ…' — a human result, NOT a technical/machine string; ≤512 chars}"
+     }
+   }
+   ```
+
+   - The `summary` is the business sentence the operator reads — write it as an accomplishment, title-first. Never a machine blob.
+   - `status:"skipped"` with no `artifact` when the skill's skip-rule fired — the skip is worth recording too.
+   - This is the **same `engagements` write surface** external clients use (one endpoint, not two); `execution_surface:"ccr"` is the only thing that marks it as a workforce CCR run.
+   - The token is injected into the task by the orchestrator; never hard-code it. A 401 means it wasn't injected — fail loud for the task, don't silently drop the record.
 
 ## Write-back — via the skill's authenticated endpoint script
 

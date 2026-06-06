@@ -28,6 +28,7 @@ import { matchesNow } from "../shared/cron-match.js";
 import { findRecentPRs } from "../shared/github.js";
 import { fireCcrRoutine, routineIdFromSpec, type CcrFireTask } from "../shared/ccr-fire.js";
 import { asProjectId, getCredential } from "../shared/project.js";
+import { mintEngagementToken } from "../shared/engagement-token.js";
 import { SKILL_REQUIRES } from "../shared/skill-registry-generated.js";
 import type { DelivRow } from "../shared/task.js";
 
@@ -86,6 +87,18 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
   const dispatched: OrchestratorResult["dispatched"] = [];
   const skipped: OrchestratorResult["skipped"] = [];
   const ccrBatchByRoutine = new Map<string, CcrBatchSlot>();
+
+  // ADR-0005 item 5: mint ONE short-lived engagement-write token for this
+  // fire and inject it into every CCR task, so the routine can record one
+  // activity-ledger row per task (POST /agents/{slug}/engagements). Best-
+  // effort: a mint failure must not stall the fire — tasks still run, the
+  // per-task engagement record is just skipped this cycle.
+  let fireEngagementToken: string | undefined;
+  try {
+    fireEngagementToken = (await mintEngagementToken()).token;
+  } catch (err) {
+    console.warn(JSON.stringify({ event: "engagement-token-mint-failed", error: err instanceof Error ? err.message : String(err) }));
+  }
 
   // A. Poll Ren's pending PR DELIVs first.
   const pr_polls = await pollEngineerPRs(now);
@@ -147,6 +160,9 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
             throw new Error(`skill "${binding.skill}" not in SKILL_REQUIRES map — re-run npm run workforce:skill-registry`);
           }
           const credentials = await resolveCredentialsForTask(binding.project_id, requires);
+          // Inject this fire's short-lived engagement-write token (minted
+          // above) so the CCR routine can record the task's activity row.
+          if (fireEngagementToken) (credentials as Record<string, unknown>).engagement_write_token = fireEngagementToken;
           const task: CcrFireTask = {
             agent_slug: agent.slug,
             binding_idx: i,
@@ -296,6 +312,7 @@ async function evaluateBinding(
  *  itself never touches Secrets Manager. An empty `requires[]` yields
  *  an empty map; a read error propagates and is caught per-task by the
  *  scan loop's prep-error branch. */
+
 async function resolveCredentialsForTask(
   projectId: string,
   requires: readonly string[],

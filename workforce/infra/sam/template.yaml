@@ -81,6 +81,13 @@ Resources:
     Properties:
       TableName: !Sub wf-table-${Stage}
       BillingMode: PAY_PER_REQUEST
+      # ADR-0005 item 5: garbage-collect expired ephemeral engagement-write
+      # tokens (AUTH#ENGAGEMENT rows carry a `ttl` epoch-seconds attribute).
+      # TTL is best-effort cleanup; the agents-api validity check is the
+      # source of truth, so correctness doesn't depend on deletion timing.
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
       AttributeDefinitions:
         - AttributeName: pk
           AttributeType: S
@@ -1184,6 +1191,10 @@ Resources:
               Action: secretsmanager:GetSecretValue
               Resource:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/ccr/*
+            # ADR-0005 item 5: the orchestrator mints a short-lived engagement-
+            # write token into DynamoDB (AUTH#ENGAGEMENT row) per fire — that's
+            # the OrchestratorDdbAccess UpdateItem grant above, no Secrets
+            # Manager token needed.
             - Sid: OrchestratorProjectCredentials
               # PR β: orchestrator-tick resolves a CCR task's project
               # credentials inline (per skill `requires[]`) and ships
