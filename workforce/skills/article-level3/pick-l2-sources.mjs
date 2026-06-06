@@ -26,7 +26,7 @@
 // The CCR session never reads Secrets Manager: NOTION_API_KEY arrives inline
 // from the task's `credentials["notion.integration_token"].apiKey` and is passed
 // through as an env var by the runner. The unified DB id is NOT secret (already
-// committed in scripts/normalize-categories.mjs), so it's a constant below —
+// committed in newsletter/pipeline/normalize-categories.mjs), so it's a constant below —
 // overridable by env for tests / migrations.
 //
 // Usage:
@@ -48,16 +48,16 @@ const NOTION_VERSION = "2022-06-28";
 const NOTION_API = "https://api.notion.com/v1";
 
 // Non-secret unified Articles DB id (mirror of the default in
-// scripts/normalize-categories.mjs and article-level2's scripts). Env override
+// newsletter/pipeline/normalize-categories.mjs and article-level2's scripts). Env override
 // allows test/migration.
 const UNIFIED_DB_ID = process.env.UNIFIED_DB_ID || process.env.NOTION_DB_ID || "34fd0f0b-e61e-817a-9f6b-dc65b0d5b4cc";
 
-// Sampling parameters — mirror of gas/src/Code.gs L3_* constants.
+// Sampling parameters — mirror of newsletter/gas/src/Code.gs L3_* constants.
 const L3_RECENT_DAYS = Number(process.env.L3_RECENT_DAYS || 14);
 const L3_SAMPLE_SIZE = Number(process.env.L3_SAMPLE_SIZE || 3);
 const L3_AVOID_REUSE_COUNT = Number(process.env.L3_AVOID_REUSE_COUNT || 10);
 
-// Canonical A–E buckets — mirror of gas/src/Code.gs CATEGORY_NAMES +
+// Canonical A–E buckets — mirror of newsletter/gas/src/Code.gs CATEGORY_NAMES +
 // canonicalCategoryFor + pickCanonicalFromSources, so the L3 row groups under
 // the same controlled bucket the GAS synthesis would have chosen (majority vote
 // across the source L2s' categories).

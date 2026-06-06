@@ -88,11 +88,11 @@ Azure OpenAI gets better → our articles get better, for free. Notion ships a n
 
 | Artifact | Current state (2026-05) | Software 2.0 commitment |
 |---|---|---|
-| **TypeScript / GAS** | git-managed in `gas/src/Code.gs`, `src/`, `scripts/` | unchanged — already first-class code |
-| **Prompts** | inline string literals inside `azureGenerateText` call sites in `gas/src/Code.gs` | **destination:** extract to separate versioned files (e.g. `gas/src/prompts/l2-explanation.txt`) so PRs show prompt diffs cleanly. **Today:** commitment is declared; the migration is a separate task and is itself an A action when undertaken |
+| **TypeScript / GAS** | git-managed in `newsletter/gas/src/Code.gs`, the apps' `src/`, `newsletter/pipeline/` & root `scripts/` | unchanged — already first-class code |
+| **Prompts** | inline string literals inside `azureGenerateText` call sites in `newsletter/gas/src/Code.gs` | **destination:** extract to separate versioned files (e.g. `newsletter/gas/src/prompts/l2-explanation.txt`) so PRs show prompt diffs cleanly. **Today:** commitment is declared; the migration is a separate task and is itself an A action when undertaken |
 | **Dataset (L1〜L3 corpus)** | lives in Notion (L1, L2, L3 databases) | Notion **is** the dataset. Treat it as a canonical asset: governance C-2 already pins this. Mass mutations require operator approval (governance §8.1 B). Backups out of scope until the corpus is irreplaceable |
 | **Evaluation** | `article-health` heuristic (truncation + drift) + `isTruncatedMarkdown` + `finish_reason==='length'` throw (governance R-3〜R-5) | grow over time: LLM-as-judge for editorial quality, factual-claim spot-check, style consistency. New eval skills live under `.claude/skills/` (adding one is **A**) |
-| **Model selection** | `gpt-5.4` hardcoded inside `azureGenerateText`; budget brackets in [`docs/azure-budget-rules.md`](azure-budget-rules.md) | swapping the primary model requires (a) eval comparison evidence, (b) a design-policy amendment naming the new model and the rationale, (c) operator approval (governance §8.1 B). **Shadow-running** a candidate model in parallel is **A** |
+| **Model selection** | `gpt-5.4` hardcoded inside `azureGenerateText`; budget brackets in [`docs/azure-budget-rules.md`](../newsletter/docs/azure-budget-rules.md) | swapping the primary model requires (a) eval comparison evidence, (b) a design-policy amendment naming the new model and the rationale, (c) operator approval (governance §8.1 B). **Shadow-running** a candidate model in parallel is **A** |
 
 The order matters: prompts are the most fluid layer, dataset is the most precious, evals are the most under-invested, model selection is the rarest decision.
 
@@ -141,11 +141,11 @@ edit prompt (versioned)
 
 Each step is the friction point candidate for the next skill or automation. Current friction map (2026-05-16):
 
-- **edit prompt (versioned)** — prompts are still inline in `gas/src/Code.gs`. The first Software-2.0 migration is to extract them. Once extracted, the diff in a PR shows exactly what changed about content generation.
+- **edit prompt (versioned)** — prompts are still inline in `newsletter/gas/src/Code.gs`. The first Software-2.0 migration is to extract them. Once extracted, the diff in a PR shows exactly what changed about content generation.
 - **local probe** — the `gas-call` skill handles this. ✅
 - **shadow run** — no harness yet. The current ersatz is `L2_BACKFILL` with `mode='all'` against a small slug list. A proper shadow harness (call both old and new prompt, dump pair to disk for comparison) is a worthwhile future skill.
 - **operator glance** — informal; operator opens 2-3 Notion rows in the browser.
-- **promote** — for inline prompts, this is a `gas/src/Code.gs` edit + `gas-deploy-verify`. For extracted prompts, it becomes a file replacement + redeploy.
+- **promote** — for inline prompts, this is a `newsletter/gas/src/Code.gs` edit + `gas-deploy-verify`. For extracted prompts, it becomes a file replacement + redeploy.
 - **batch + article-health + deploy** — covered by existing skills (`gas-call`, `article-health`, the `deploy-article-site.yml` workflow).
 
 Things that are conspicuously missing and likely worth adding (each is an A action when an agent undertakes it):
@@ -169,7 +169,7 @@ The default decision tree for an agent:
 | Adding a new eval check that flags more things | **A** | L2 tightening per governance §8.1; design policy concurs |
 | Running an existing batch (`L2_BACKFILL`, `L3_BATCH`, etc.) | **A** | idempotent by governance I-3 |
 | Trying a new external service in shadow mode (parallel, output discarded) | **A** | shadow = reversible by definition |
-| Editing an L1 doc (e.g. this file, [`azure-budget-rules.md`](azure-budget-rules.md)) | **A** to draft as a PR; **B** to merge | matches governance §8.1 |
+| Editing an L1 doc (e.g. this file, [`azure-budget-rules.md`](../newsletter/docs/azure-budget-rules.md)) | **A** to draft as a PR; **B** to merge | matches governance §8.1 |
 | Swapping the primary LLM model for production | **B** | governance §8.1 B (spending money / changing critical path) + design-policy §2 (model swap protocol) |
 | Promoting a shadow substrate to primary | **B** | matches governance §8.1 B "spending money outside the existing envelope" |
 | Rewriting >50% of an existing L2/L3 prompt in one diff | **B** | operator should eyeball 2-3 sample outputs before commit |

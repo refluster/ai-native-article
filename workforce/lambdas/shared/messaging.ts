@@ -42,7 +42,7 @@ const s3 = new S3Client({});
 export const MESSAGE_HARD_MAX_CHARS = 2000;
 
 /** The human operator's pseudo-slug. Mirrors the SPA's OPERATOR_ID
- *  (apps/workforce/src/lib/messages.ts) so message `from` / inbox keys
+ *  (workforce/app/src/lib/messages.ts) so message `from` / inbox keys
  *  line up across the wire. */
 export const MESSAGING_OPERATOR_ID = "operator";
 

@@ -16,7 +16,7 @@ Sections:
 1. **What** — one sentence stating the change. "Add X." / "Fix Y in Z." / "Refactor A to B." No "and also" — one change per brief.
 2. **Why** — 2-4 sentences of context the routine needs to make judgement calls. Include the failing symptom (for fixes), the user value (for features), or the design pressure (for refactors).
 3. **Files likely touched** — bullet list. Best-effort; the routine may diverge if it sees a better path.
-4. **Acceptance criteria** — checkbox list. Each item is unambiguously verifiable by CI or a one-line reproducer. "All tests pass" is too weak; "scripts/check-gas-manifest.mjs passes" is right.
+4. **Acceptance criteria** — checkbox list. Each item is unambiguously verifiable by CI or a one-line reproducer. "All tests pass" is too weak; "newsletter/pipeline/check-gas-manifest.mjs passes" is right.
 5. **Out of scope** — bullet list of nearby changes the routine should **not** touch.
 
 Length target: 200-500 words in Japanese or English (the CC routine reads both; match the prevailing language of the target repo).

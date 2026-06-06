@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// gas-deploy-verify: deploy gas/src/Code.gs via clasp, then assert the new
+// gas-deploy-verify: deploy newsletter/gas/src/Code.gs via clasp, then assert the new
 // version is actually serving by polling GET /exec for the expected
 // supportedActions. Closes the "did v49 actually go live?" gap.
 
@@ -10,8 +10,8 @@ import { dirname, resolve } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(__dirname, '..', '..', '..', '..')
-// PR #60 moved the React app from src/ to apps/article/src/.
-const GAS_CONFIG_PATH = resolve(REPO_ROOT, 'apps', 'article', 'src', 'lib', 'gas-config.ts')
+// PR #60 moved the React app from src/ to newsletter/app/src/.
+const GAS_CONFIG_PATH = resolve(REPO_ROOT, 'newsletter', 'app', 'src', 'lib', 'gas-config.ts')
 const POLL_BUDGET_MS = 90 * 1000
 const POLL_INTERVAL_MS = 3 * 1000
 

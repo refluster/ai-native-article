@@ -33,7 +33,7 @@ Reports, per slug:
 
 ## Truncation heuristic
 
-Same rule as `gas/src/Code.gs#isTruncatedMarkdown`:
+Same rule as `newsletter/gas/src/Code.gs#isTruncatedMarkdown`:
 - Body's last non-empty line is a heading (`#`/`##`/`###`) — heading-with-no-body, the d17e1d58ec42 case.
 - OR the last non-empty prose line doesn't end with one of `。`/`！`/`？`/`」`/`）`/`…`/`.`/`!`/`?`/`)`/`]`/<code>`</code>.
 

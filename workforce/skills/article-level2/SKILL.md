@@ -8,7 +8,7 @@ description: Convert one L1 source entry into one L2 explanation (briefing-docum
 Convert **one** L1 source entry into **one** L2 explanation article in Japanese.
 
 This is the agent-workforce counterpart of the GAS `L2_BATCH` / `handleL2Create`
-pipeline (`gas/src/Code.gs`). The GAS path fetches a source URL, builds a
+pipeline (`newsletter/gas/src/Code.gs`). The GAS path fetches a source URL, builds a
 briefing-document prompt, calls Azure, and writes an `explanation`-type row into
 the unified Notion Articles DB. This skill produces the *same deliverable* — a
 faithful briefing-document explanation — attributed to the running agent so the
@@ -25,8 +25,8 @@ owns the Notion write — you do **not** hand-edit any file and do **not** open 
 
 This skill reads the **L1 source library** and writes the **unified Articles DB** —
 two different databases. Only the Notion `apiKey` is a secret; the two database
-ids are **not** secret (they're already committed in `gas/src/Code.gs` and
-`scripts/normalize-categories.mjs`), so the scripts hold them as constants. You
+ids are **not** secret (they're already committed in `newsletter/gas/src/Code.gs` and
+`newsletter/pipeline/normalize-categories.mjs`), so the scripts hold them as constants. You
 therefore need just one injected credential:
 
 | Credential | Shape | Used for |
@@ -74,7 +74,7 @@ genuinely separate DB — its id is a constant in `pick-l1-source.mjs`.)
   consent-wall sites like nytimes/ft/wsj/bloomberg/mckinsey), fetch via Jina
   Reader first**: `https://r.jina.ai/<source-url>` returns pre-extracted clean
   Markdown. This mirrors the GAS `L2_SOURCE_FETCH_VIA_READER` routing in
-  `gas/src/Code.gs` — a direct fetch of these hosts returns 402/HTML-bot-walls,
+  `newsletter/gas/src/Code.gs` — a direct fetch of these hosts returns 402/HTML-bot-walls,
   but the Jina-extracted body is groundable. Only fall back to the L1-summary-only
   path if Jina *also* fails.
 - If the source body still could not be fetched, work from the L1 summary *only*
@@ -137,7 +137,7 @@ fails loudly rather than landing on the site.
 written to the unified Articles DB with the live schema (`Title`, `Author` and
 `SourceURLs` as `rich_text`, `Type`/`Status` as `select`, `Date`) — the same
 property contract as the GAS L2 write. The existing GAS L4 batch picks up the row
-and publishes it to `kohuehara.xyz`; `scripts/fetch-notion.mjs` surfaces `Author`
+and publishes it to `kohuehara.xyz`; `newsletter/pipeline/fetch-notion.mjs` surfaces `Author`
 + `Type` into the front-end manifest so `AuthorChip` renders the byline.
 
 ## When NOT to use

@@ -82,7 +82,7 @@ jobs:
           # Capture (the only write-side route) is gated behind a shared
           # password baked into the bundle at build time. When unset the
           # page renders a visible warning and stays open. See the
-          # PasswordGate component in apps/article/src/pages/pipeline/Capture.tsx.
+          # PasswordGate component in newsletter/app/src/pages/pipeline/Capture.tsx.
           VITE_CAPTURE_PASSWORD: ${{ secrets.VITE_CAPTURE_PASSWORD }}
         run: npm run build:article
 
@@ -90,6 +90,6 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./apps/article/dist
+          publish_dir: ./newsletter/app/dist
           force_orphan: true
           cname: kohuehara.xyz

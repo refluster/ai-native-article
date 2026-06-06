@@ -20,26 +20,26 @@ import { dirname } from 'path'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-// Roots to scan. apps/* and packages/shared. Each app's index.css and
-// config/site.ts are token surfaces (allowlisted hex). Workforce stores
+// Roots to scan. the domain apps + packages/shared. Each app's index.css
+// and config/site.ts are token surfaces (allowlisted hex). Workforce stores
 // raw hex inside .css custom properties so SVG fill/stroke can reference
 // var(--wf-svg-*) — see PR #57.
 const ROOTS = [
-  join(ROOT, 'apps', 'article', 'src'),
-  join(ROOT, 'apps', 'workforce', 'src'),
+  join(ROOT, 'newsletter', 'app', 'src'),
+  join(ROOT, 'workforce', 'app', 'src'),
   join(ROOT, 'packages', 'shared', 'src'),
 ]
 
 const ALLOWLIST = new Set([
-  'apps/article/src/config/site.ts',
-  'apps/article/src/index.css',
-  'apps/workforce/src/config/site.ts',
-  'apps/workforce/src/index.css',
+  'newsletter/app/src/config/site.ts',
+  'newsletter/app/src/index.css',
+  'workforce/app/src/config/site.ts',
+  'workforce/app/src/index.css',
 ])
 
 const PALETTE_DEMO_FILES = new Set([
-  'apps/article/src/pages/design/DesignSystem.tsx',
-  'apps/article/src/pages/design/DesignGuide.tsx',
+  'newsletter/app/src/pages/design/DesignSystem.tsx',
+  'newsletter/app/src/pages/design/DesignGuide.tsx',
 ])
 
 const HEX_RE = /#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/g
@@ -79,7 +79,7 @@ function walk(dir) {
   }
 }
 
-console.log('Linting design tokens in apps/* and packages/*/src …')
+console.log('Linting design tokens in newsletter/app, workforce/app, and packages/*/src …')
 for (const root of ROOTS) {
   if (existsSync(root)) walk(root)
 }

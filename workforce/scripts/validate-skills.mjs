@@ -61,7 +61,7 @@ const DELIV_TYPES = new Set([
   "notification",
 ]);
 // Notion `Type` select values the front-end article pipeline distinguishes.
-// Mirrors ArticleType in apps/article/src/types/article.ts.
+// Mirrors ArticleType in newsletter/app/src/types/article.ts.
 const ARTICLE_TYPES = new Set(["explanation", "analysis"]);
 // Mirror of CREDENTIAL_TYPES in workforce/lambdas/shared/credential-injector.ts.
 // To extend: add the type here AND register its shape in CredentialShapes

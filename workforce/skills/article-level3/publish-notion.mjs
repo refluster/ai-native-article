@@ -10,10 +10,10 @@
 // It POSTs a new page into the unified Articles DB using the injected Notion
 // integration token. The row carries Author + Type=analysis + Status=ready
 // (queued; the GAS L4 batch generates the hero image and flips it to published)
-// so it lands on kohuehara.xyz and scripts/fetch-notion.mjs surfaces the byline
+// so it lands on kohuehara.xyz and newsletter/pipeline/fetch-notion.mjs surfaces the byline
 // (AuthorChip).
 //
-// L3 differs from L2 on two writes (mirror of gas/src/Code.gs handleL3Create):
+// L3 differs from L2 on two writes (mirror of newsletter/gas/src/Code.gs handleL3Create):
 //   • SourceURLs   — the COMMA-JOINED source L2 URLs (not a single URL). This is
 //     both the "References" surface and the reuse-avoidance key pick-l2-sources
 //     reads back on the next fire.
@@ -66,7 +66,7 @@ function arg(name) {
   return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : undefined;
 }
 
-// Canonical A–E bucket — mirror of gas/src/Code.gs CATEGORY_NAMES +
+// Canonical A–E bucket — mirror of newsletter/gas/src/Code.gs CATEGORY_NAMES +
 // canonicalCategoryFor. The picker already computed the majority bucket; this
 // re-canonicalises so a bare letter ("B") or a canonical label both resolve.
 const CATEGORY_NAMES = {

@@ -13,7 +13,7 @@
 // The CCR session never reads Secrets Manager: NOTION_API_KEY arrives inline
 // from the task's `credentials["notion.integration_token"].apiKey` and is
 // passed through as an env var by the runner. The DB ids are NOT secret (they
-// are already committed in gas/src/Code.gs and scripts/normalize-categories.mjs),
+// are already committed in newsletter/gas/src/Code.gs and newsletter/pipeline/normalize-categories.mjs),
 // so they live as constants below — overridable by env for tests / migrations.
 //
 // Usage:
@@ -32,8 +32,8 @@
 const NOTION_VERSION = "2022-06-28";
 const NOTION_API = "https://api.notion.com/v1";
 
-// Non-secret DB ids (mirror gas/src/Code.gs:l1_db_id and the unified Articles
-// DB in scripts/normalize-categories.mjs). Env overrides allow test/migration.
+// Non-secret DB ids (mirror newsletter/gas/src/Code.gs:l1_db_id and the unified Articles
+// DB in newsletter/pipeline/normalize-categories.mjs). Env overrides allow test/migration.
 const L1_DB_ID = process.env.L1_DB_ID || "32fd0f0b-e61e-80bd-89bf-f94965d05e80";
 const UNIFIED_DB_ID = process.env.UNIFIED_DB_ID || "34fd0f0b-e61e-817a-9f6b-dc65b0d5b4cc";
 

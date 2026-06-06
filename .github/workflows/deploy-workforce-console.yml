@@ -4,10 +4,10 @@ on:
   push:
     branches: [main]
     paths:
-      - 'apps/workforce/**'
+      - 'workforce/app/**'
       - 'packages/shared/**'
       - 'workforce/agents/**'         # manifest contents
-      - 'scripts/build-agent-manifest.mjs'
+      - 'workforce/scripts/build-agent-manifest.mjs'
       - '.github/workflows/deploy-workforce-console.yml'
   workflow_dispatch:
 
@@ -105,10 +105,10 @@ jobs:
         # gets no-cache so a deploy goes live the moment invalidation
         # finishes.
         run: |
-          aws s3 sync apps/workforce/dist/assets/ s3://${{ secrets.AWS_S3_BUCKET }}/assets/ \
+          aws s3 sync workforce/app/dist/assets/ s3://${{ secrets.AWS_S3_BUCKET }}/assets/ \
             --delete \
             --cache-control "public,max-age=31536000,immutable"
-          aws s3 sync apps/workforce/dist/ s3://${{ secrets.AWS_S3_BUCKET }}/ \
+          aws s3 sync workforce/app/dist/ s3://${{ secrets.AWS_S3_BUCKET }}/ \
             --delete \
             --exclude "assets/*" \
             --cache-control "no-cache"
