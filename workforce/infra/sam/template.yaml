@@ -780,32 +780,6 @@ Resources:
       AlarmActions:
         - !Ref WfAlarmTopic
 
-  # CloudWatch alarm: any W-1 violation surfaced by the `feed-health`
-  # sweep (Epic-011 Story 4 / #131). The sweep emits
-  # `WfFeedHealthViolation` (count, with `Check` + `Stage` dimensions)
-  # for each tripped row. We alarm on the partition's Sum > 0 over a
-  # 5-minute window so a single violation in any sweep pages.
-  # TreatMissingData=notBreaching so the long quiet windows between
-  # sweeps don't auto-alarm.
-  WfFeedHealthViolationsAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub wf-feed-health-violations-alarm-${Stage}
-      AlarmDescription: !Sub feed-health sweep (Epic-011 Story 4) found a W-1 violation on ${Stage} — see WfFeedHealthViolation in CloudWatch.
-      Namespace: Workforce/Feed
-      MetricName: WfFeedHealthViolation
-      Dimensions:
-        - Name: Stage
-          Value: !Ref Stage
-      Statistic: Sum
-      Period: 300
-      EvaluationPeriods: 1
-      Threshold: 0
-      ComparisonOperator: GreaterThanThreshold
-      TreatMissingData: notBreaching
-      AlarmActions:
-        - !Ref WfAlarmTopic
-
   # --- Agents seed Lambda (Epic-007) -----------------------------------------
   # Reads workforce/agents/{slug}/{agent.json, system.md} from the deployed
   # bundle (the Makefile builder copies the tree into ARTIFACTS_DIR/agents/)
