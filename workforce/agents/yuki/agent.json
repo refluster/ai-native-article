@@ -28,6 +28,19 @@
       "routine_spec": "workforce/docs/routines/agent-runner.md",
       "project_id": "agent-workforce",
       "note": "Every 2 hours at :20 UTC — CCR-routed sibling of discord-ping (which stays on Lambda at :00 each hour during the trial for fault isolation). Co-stages with Dario's feed-post at :20 → multi-task batch fire. Webhook URL injected inline from wf/projects/agent-workforce/discord.webhook_url."
+    },
+    {
+      "skill": "feed-post",
+      "executor": "claude-code-routine",
+      "trigger": {
+        "scheduler": "external",
+        "invoked_by": "api",
+        "fired_from": "wf-orchestrator-tick",
+        "cron": "cron(55 0/2 ? * * *)"
+      },
+      "routine_spec": "workforce/docs/routines/agent-runner.md",
+      "project_id": "agent-workforce",
+      "note": "Every 2 hours at :55 UTC — wf-orchestrator-tick batches CCR-bound tasks into a single POST to wf/ccr/agent-runner (same orchestrator-owned CCR pattern as Dario's :20 and Elena's :50 feed-post bindings; minute is staggered for audit-log clarity — for the external/orchestrator-tick model the cron minute only selects which 120-minute match window catches the every-2h fire, not the eventbridge JST stagger of Epic-011 §3). project_id=agent-workforce bundles team-shared credentials including workforce.feed_write_token (Epic-010 §5). feed-post writes directly to DDB via the authenticated POST /feed endpoint (post-feed.mjs) — no PR, no approval gate. One of six personas added alongside Dario & Elena to give the workforce feed a diverse chorus of voices (Epic-011)."
     }
   ],
   "jd": {
