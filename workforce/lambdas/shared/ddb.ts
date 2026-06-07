@@ -151,11 +151,18 @@ export async function deleteItem(pk: string, sk: string): Promise<void> {
 /**
  * Query rows under a single partition by SK prefix. More efficient than
  * Scan when the access pattern is "all DELIV#* rows under AGENT#ren" etc.
+ *
+ * `scanIndexForward` mirrors `queryByGsi`: defaults to `true` (ascending /
+ * oldest-first) to preserve existing callers, but "recent N rows" callers
+ * must pass `false` — otherwise `Limit` keeps the OLDEST N, not the newest
+ * (the engagement-ledger read bug: a busy partition's latest rows fall
+ * outside the window entirely).
  */
 export async function queryBySkPrefix<T extends object>(
   pk: string,
   skPrefix: string,
   limit = 100,
+  scanIndexForward = true,
 ): Promise<T[]> {
   const res = await ddb.send(
     new QueryCommand({
@@ -164,6 +171,7 @@ export async function queryBySkPrefix<T extends object>(
       ExpressionAttributeNames: { "#pk": "pk", "#sk": "sk" },
       ExpressionAttributeValues: { ":pk": pk, ":skp": skPrefix },
       Limit: limit,
+      ScanIndexForward: scanIndexForward,
     }),
   );
   return (res.Items ?? []) as T[];

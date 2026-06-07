@@ -562,6 +562,14 @@ export type ListExecutionsFilter = (AgentScope | SkillScope | ProjScope) & Commo
  * `skGte` / `skLte` constraints when scoping by agent_slug / skill_name.
  * Half-bounded ranges (only `from` or only `to`) work; full-partition
  * (neither bound) also works.
+ *
+ * Ordering: all three branches query **newest-first** (`ScanIndexForward:
+ * false`). This is load-bearing, not cosmetic — DDB applies `Limit` before
+ * returning, so an ascending query keeps the OLDEST `limit` rows and a
+ * busy partition's recent rows never surface (the engagement-ledger read
+ * bug: an agent with >100 historical EXEC rows could not see today's
+ * engagement at all). Callers that want a stable order still re-sort, but
+ * must receive the recent window first.
  */
 export async function listExecutions(filter: ListExecutionsFilter): Promise<ExecutionRow[]> {
   const limit = filter.limit ?? 100;
@@ -572,16 +580,18 @@ export async function listExecutions(filter: ListExecutionsFilter): Promise<Exec
       skGte: filter.from,
       skLte: filter.to,
       limit,
+      scanIndexForward: false,
     });
   } else if (filter.skill_name) {
     rows = await queryByGsi<ExecutionRow>("GSI2", `SKILL#${filter.skill_name}`, {
       skGte: filter.from,
       skLte: filter.to,
       limit,
+      scanIndexForward: false,
     });
   } else if (filter.project_id) {
     // Project-partition path; range is post-filtered (no SK push-down).
-    rows = await queryBySkPrefix<ExecutionRow>(projectPk(filter.project_id), "EXEC#", limit);
+    rows = await queryBySkPrefix<ExecutionRow>(projectPk(filter.project_id), "EXEC#", limit, false);
   } else {
     // Defence-in-depth: discriminated union should make this unreachable
     // at the type layer, but bypassed callers (e.g. JS interop, `as any`)

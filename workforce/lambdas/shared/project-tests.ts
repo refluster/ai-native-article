@@ -79,11 +79,19 @@ vi.mock("./ddb.js", () => ({
   deleteItem: vi.fn(async (pk: string, sk: string) => {
     store.delete(key(pk, sk));
   }),
-  queryBySkPrefix: vi.fn(async (pk: string, skPrefix: string, _limit?: number) => {
-    return Array.from(store.values()).filter(
-      (r) => r.pk === pk && typeof r.sk === "string" && (r.sk as string).startsWith(skPrefix),
-    );
-  }),
+  queryBySkPrefix: vi.fn(
+    async (pk: string, skPrefix: string, limit = 100, scanIndexForward = true) => {
+      const matched = Array.from(store.values()).filter(
+        (r) => r.pk === pk && typeof r.sk === "string" && (r.sk as string).startsWith(skPrefix),
+      );
+      // Mirror DDB: sort by sort-key, apply scan direction, THEN cap by
+      // Limit — so the regression (Limit keeping the oldest rows on an
+      // ascending scan) is reproducible in the mock.
+      matched.sort((a, b) => (a.sk as string).localeCompare(b.sk as string));
+      if (!scanIndexForward) matched.reverse();
+      return matched.slice(0, limit);
+    },
+  ),
   // Mock matches real DDB semantics: rows missing the GSI sort-key
   // attribute are NOT projected into the index, so they never match.
   // (Real DDB drops them at index-build time; the mock filters them out
@@ -97,11 +105,12 @@ vi.mock("./ddb.js", () => ({
         skLte?: string;
         skPrefix?: string;
         limit?: number;
+        scanIndexForward?: boolean;
       } = {},
     ) => {
       const pkAttr = indexName === "GSI1" ? "gsi1pk" : "gsi2pk";
       const skAttr = indexName === "GSI1" ? "gsi1sk" : "gsi2sk";
-      return Array.from(store.values()).filter((r) => {
+      const matched = Array.from(store.values()).filter((r) => {
         if (r[pkAttr] !== partitionKey) return false;
         const skVal = r[skAttr];
         if (typeof skVal !== "string") return false; // not projected
@@ -110,6 +119,11 @@ vi.mock("./ddb.js", () => ({
         if (query.skLte !== undefined && skVal > query.skLte) return false;
         return true;
       });
+      // Mirror DDB: sort by GSI sort-key, apply scan direction, THEN cap
+      // by Limit — so an ascending scan keeps the oldest `limit` rows.
+      matched.sort((a, b) => (a[skAttr] as string).localeCompare(b[skAttr] as string));
+      if (query.scanIndexForward === false) matched.reverse();
+      return matched.slice(0, query.limit ?? 100);
     },
   ),
 }));
@@ -426,6 +440,25 @@ describe("listExecutions", () => {
   it("agent_slug filter returns ren's executions across BOTH projects (GSI1)", async () => {
     const rows = await project.listExecutions({ agent_slug: "ren" });
     expect(rows.map((r) => r.sk).sort()).toEqual(["EXEC#01A", "EXEC#01B"]);
+  });
+
+  it("returns the NEWEST rows when limit truncates (engagement-ledger read regression)", async () => {
+    // ren already has 01A (05-20) + 01B (05-22) from beforeEach. Add a row
+    // newer than both; with limit:1, an ascending scan would keep the
+    // OLDEST (01A) and today's engagement would never surface — the exact
+    // bug that hid a busy agent's just-written EXEC row from /executions.
+    await project.appendExecution({
+      project_id: alpha,
+      agent_slug: "ren",
+      exec_ulid: "01Z",
+      skill_name: "code-task-brief",
+      skill_version: "0.1.0",
+      started_at: "2026-06-07T11:29:58.000Z",
+      ended_at: "2026-06-07T11:30:00.000Z",
+      status: "ok",
+    });
+    const rows = await project.listExecutions({ agent_slug: "ren", limit: 1 });
+    expect(rows.map((r) => r.sk)).toEqual(["EXEC#01Z"]);
   });
 
   it("skill_name filter returns code-task-brief across BOTH projects (GSI2)", async () => {
