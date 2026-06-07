@@ -44,7 +44,7 @@ The four layers are a unified mental model, but they map to different concrete a
 |---|---|---|
 | `layer:L0` | A C-1..C-4 invariant in [docs/governance.md §2](governance.md#2-l0--constitution). Operator-only amendments. | "Allow truncated articles to publish" (would never be filed — it's a refusal trigger). |
 | `layer:L1` | An L1 doc in [§3.1 of governance.md](governance.md#31-current-statute): `architecture-source-of-truth.md`, `azure-budget-rules.md`, `L1-L4-PIPELINE.md`, `DESIGN.md`, `GROWTH.md`. | "Add a fourth budget bracket to azure-budget-rules.md". |
-| `layer:L2` | A mechanical guard from [§4](governance.md#4-l2--regulations-mechanical-enforcement) (R-1..R-9), or a runtime throw in `gas/src/Code.gs`, or `scripts/{check-gas-manifest,lint-design-tokens}.mjs`. | "Add a regex throw for LLM-failure artefacts" |
+| `layer:L2` | A mechanical guard from [§4](governance.md#4-l2--regulations-mechanical-enforcement) (R-1..R-9), or a runtime throw in `newsletter/gas/src/Code.gs`, or `scripts/{check-gas-manifest,lint-design-tokens}.mjs`. | "Add a regex throw for LLM-failure artefacts" |
 | `layer:L3` | A runbook in `L1-L4-PIPELINE.md §Operator runbooks`, a skill under `.claude/skills/`, or an issue about operational follow-up. | "Document the pipeline-quiet runbook"; "Run L2_BACKFILL on the truncated row". |
 
 ### 2.2 `project:workforce` mapping
@@ -70,7 +70,7 @@ If the issue exists *because* the higher-layer amendment is blocking it (e.g. "S
 
 When opening or triaging an issue, walk these steps:
 
-1. **`project:`** — which sub-tree? `article` if it touches `gas/`, `src/`, `docs/`, `scripts/`, `public/`, `template/`, or `.github/workflows/deploy-article-site.yml`. `workforce` if it touches `workforce/`, `apps/workforce/`, `.github/workflows/workforce-*.yml`. Both → split the issue if at all possible.
+1. **`project:`** — which sub-tree? `article` if it touches `newsletter/` (the app, gas, pipeline, or docs), the shared root `scripts/`, or `.github/workflows/deploy-article-site.yml`. `workforce` if it touches `workforce/` (including `workforce/app/`) or `.github/workflows/workforce-*.yml`. The shared root `docs/` can belong to either — label by the change's intent. Both → split the issue if at all possible.
 2. **`layer:`** — read the §2 table for that sub-project. Pick the highest layer touched (§2.3).
 3. **`type:`** — bug (something broken), feature (new capability), chore (refactor / maintenance), tracker (decomposes into sub-issues), ops (verification, observation, post-deploy follow-up).
 4. **`area:`** — apply each surface the issue touches. Skip if cross-cutting (>3 areas).
@@ -165,7 +165,7 @@ The script is L3 tooling — agents may freely edit it, with one exception: chan
 ## 6. Cross-references
 
 - **[docs/governance.md §5](governance.md#5-l3--operational-rules-runbooks)** — the L3 table that lists this runbook.
-- **[L1-L4-PIPELINE.md §Operator runbooks](../L1-L4-PIPELINE.md#operator-runbooks)** — sibling runbooks for pipeline-side ops; "Labelling a new issue" entry there points back here.
+- **[L1-L4-PIPELINE.md §Operator runbooks](../newsletter/docs/L1-L4-PIPELINE.md#operator-runbooks)** — sibling runbooks for pipeline-side ops; "Labelling a new issue" entry there points back here.
 - **[CLAUDE.md §Skills you should use](../CLAUDE.md#skills-you-should-use-not-reinvent)** — agent-facing pointer.
 - **[workforce/docs/governance.md §3](../workforce/docs/governance.md#3-zone-classifications-for-workforce)** — Zone A/B/C/D mapping for workforce paths; informs `layer:` selection inside `project:workforce`.
 

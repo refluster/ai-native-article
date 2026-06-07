@@ -8,13 +8,13 @@
 // It POSTs a new page into the unified Articles DB using the injected Notion
 // integration token. The row carries Author + Type=explanation +
 // Status=ready (queued; the GAS L4 batch flips it to published) so it lands on
-// kohuehara.xyz and scripts/fetch-notion.mjs surfaces the byline (AuthorChip).
+// kohuehara.xyz and newsletter/pipeline/fetch-notion.mjs surfaces the byline (AuthorChip).
 //
 // The CCR session never reads Secrets Manager: NOTION_API_KEY arrives inline
 // from the task's `credentials["notion.integration_token"].apiKey` and is
 // passed through as an env var by the runner. The target DB id is NOT secret
 // (the unified Articles DB id is already committed in
-// scripts/normalize-categories.mjs), so it's a constant below — overridable by
+// newsletter/pipeline/normalize-categories.mjs), so it's a constant below — overridable by
 // NOTION_DB_ID for tests / migrations.
 //
 // W-1 (editorial integrity): the script refuses an empty / too-short body and
@@ -45,7 +45,7 @@ import { readFileSync } from "node:fs";
 const NOTION_VERSION = "2022-06-28";
 const NOTION_API = "https://api.notion.com/v1";
 // Non-secret target DB id (the unified Articles DB; mirror of the default in
-// scripts/normalize-categories.mjs). Overridable by NOTION_DB_ID for tests.
+// newsletter/pipeline/normalize-categories.mjs). Overridable by NOTION_DB_ID for tests.
 const UNIFIED_DB_ID = process.env.NOTION_DB_ID || "34fd0f0b-e61e-817a-9f6b-dc65b0d5b4cc";
 // An L2 explanation is ~3000 字; anything shorter than this floor is almost
 // certainly a truncated / empty generation and must not be published (C-1).
@@ -60,7 +60,7 @@ function arg(name) {
   return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : undefined;
 }
 
-// Category canonicalisation — mirror of gas/src/Code.gs CATEGORY_NAMES +
+// Category canonicalisation — mirror of newsletter/gas/src/Code.gs CATEGORY_NAMES +
 // expandCategoryCode + canonicalCategoryFor, so a CCR-written row groups under
 // the same controlled A–E bucket as the GAS L2 write (and the UI sidebar driven
 // by fetch-notion). The L1 source carries a bare letter (e.g. "B"); the unified
@@ -153,7 +153,7 @@ const bodyLines = lines.slice(0, h1Idx).concat(lines.slice(h1Idx + 1));
 const children = markdownToBlocks(bodyLines.join("\n"));
 
 // Property names mirror the live unified Articles DB exactly (same contract as
-// the GAS L2 write in gas/src/Code.gs): Title (title), Type/Status (select),
+// the GAS L2 write in newsletter/gas/src/Code.gs): Title (title), Type/Status (select),
 // Author/SourceURLs (rich_text), Date. There is no Name/Kind/SourceURL(url)
 // column — writing those returns HTTP 400 validation_error.
 const properties = {

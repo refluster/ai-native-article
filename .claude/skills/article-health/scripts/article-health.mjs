@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // article-health: sweep gh-pages + Notion (via GAS) and flag truncated /
 // stale articles. Single-shot; no destructive actions. Mirrors the
-// `isTruncatedMarkdown` heuristic in gas/src/Code.gs so what fails here
+// `isTruncatedMarkdown` heuristic in newsletter/gas/src/Code.gs so what fails here
 // would also be flagged by the GAS-side L2_BACKFILL sweep.
 
 import { readFileSync } from 'node:fs'
@@ -10,13 +10,13 @@ import { dirname, resolve } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(__dirname, '..', '..', '..', '..')
-// PR #60 moved the React app from src/ to apps/article/src/.
-const GAS_CONFIG_PATH = resolve(REPO_ROOT, 'apps', 'article', 'src', 'lib', 'gas-config.ts')
+// PR #60 moved the React app from src/ to newsletter/app/src/.
+const GAS_CONFIG_PATH = resolve(REPO_ROOT, 'newsletter', 'app', 'src', 'lib', 'gas-config.ts')
 const REPO_OWNER_REPO = 'refluster/ai-native-article'
 const PAGES_BRANCH = 'gh-pages'
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO_OWNER_REPO}/${PAGES_BRANCH}/posts`
 
-// The same predicate used inside gas/src/Code.gs#isTruncatedMarkdown.
+// The same predicate used inside newsletter/gas/src/Code.gs#isTruncatedMarkdown.
 // Keep these two definitions in sync — diverging would cause "the GAS-side
 // sweep clears, but article-health still complains" or vice versa.
 function isTruncatedMarkdown (mdBody) {

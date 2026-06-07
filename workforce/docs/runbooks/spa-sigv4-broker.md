@@ -104,6 +104,6 @@ The temp AWS credentials live only in the browser tab's JS heap; on tab close th
 - [Issue #158](https://github.com/refluster/ai-native-article/issues/158) — Project CRUD UI workstream (this is PR-α).
 - [PR #137](https://github.com/refluster/ai-native-article/pull/137) — credentials API backend (consumer).
 - [PR #161](https://github.com/refluster/ai-native-article/pull/161) — LIST credentials + PATCH project backend (consumer).
-- `apps/workforce/src/lib/sigv4.ts` — the SPA-side helper.
+- `workforce/app/src/lib/sigv4.ts` — the SPA-side helper.
 - `workforce/infra/sam-web/template.yaml` — `WfWorkforceIdentityPool` + `WfWorkforceOperatorRole`.
 - `workforce/infra/sam/template.yaml` — `AgentsApiId` + `CredentialsApiId` exports.

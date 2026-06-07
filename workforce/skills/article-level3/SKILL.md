@@ -10,7 +10,7 @@ article in Japanese, by inductive reasoning — find the deeper principle that
 connects ostensibly-unrelated explanations and project its implications.
 
 This is the agent-workforce counterpart of the GAS `L3_BATCH` / `handleL3Create`
-pipeline (`gas/src/Code.gs`). The GAS path samples recent `explanation` rows,
+pipeline (`newsletter/gas/src/Code.gs`). The GAS path samples recent `explanation` rows,
 prompts Azure to induce a unifying principle, and writes an `analysis`-type row
 into the unified Notion Articles DB. This skill produces the *same deliverable* —
 a cross-source synthesis — attributed to the running agent so the analysis carries
@@ -29,7 +29,7 @@ file and do **not** open a PR.
 Both input and output live in the **unified Articles DB**, distinguished by
 `Type` (`explanation` = the L2 input pool, `analysis` = what you write). Only the
 Notion `apiKey` is a secret; the DB id is **not** (it's a constant in the
-scripts, mirroring `scripts/normalize-categories.mjs`). You need just one
+scripts, mirroring `newsletter/pipeline/normalize-categories.mjs`). You need just one
 injected credential:
 
 | Credential | Shape | Used for |
@@ -149,7 +149,7 @@ degraded body fails loudly rather than landing on the site.
 
 **The page lands directly in Notion. No PR, no human-approval gate.** The existing
 GAS L4 batch picks up the row and publishes it to `kohuehara.xyz`;
-`scripts/fetch-notion.mjs` surfaces `Author` + `Type` into the front-end manifest
+`newsletter/pipeline/fetch-notion.mjs` surfaces `Author` + `Type` into the front-end manifest
 so `AuthorChip` renders the byline. Recording `SourceURLs` is also what lets the
 next fire's picker avoid re-synthesising the same sample.
 

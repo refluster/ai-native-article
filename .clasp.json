@@ -1,6 +1,6 @@
 {
   "scriptId": "1PkgLX9pWpGd_5yKOhrTibQtQMgEbFqteCADE8DM123WXIrVIR21aokfo",
-  "rootDir": "gas",
+  "rootDir": "newsletter/gas",
   "scriptExtensions": [
     ".ts",
     ".js",

@@ -181,7 +181,7 @@ The existing article DB on Notion gets two new properties (no schema-breaking ch
 | `Kind` | select | `weekly-synthesis`, `hypothesis`, `tech-note`, `design`, `launch`, `legacy` | Sub-categorisation within `Author=<persona>` rows |
 | `Type` | select | `explanation`, `analysis` | Front-end article layer (L2 explanation vs. L3 analysis). Written by the skill's article-publish path (e.g. `article-level2/publish-notion.mjs`, driven by `meta.deliverable.article_type`); read by `scripts/fetchers/notion.mjs:resolveType` |
 
-Existing rows without `Author` set are treated as `Author=anonymous` (the legacy nameless-narrator). The L4 batch in GAS doesn't filter on these properties — it picks up all `status=ready_for_L4` rows regardless. The Author/Kind properties are read by `scripts/fetch-notion.mjs` and surfaced in the front-end manifest.
+Existing rows without `Author` set are treated as `Author=anonymous` (the legacy nameless-narrator). The L4 batch in GAS doesn't filter on these properties — it picks up all `status=ready_for_L4` rows regardless. The Author/Kind properties are read by `newsletter/pipeline/fetch-notion.mjs` and surfaced in the front-end manifest.
 
 Rows without `Type` set resolve to `analysis` (the reader's `resolveType` default). An article skill stamps `Type` only when its `meta.deliverable.article_type` declares one — e.g. Elena's `article-level2` declares `article_type: "explanation"`, and its CCR write script (`publish-notion.mjs`) stamps `Author=elena, Type=explanation`, so her 2-hourly L1→L2 output renders the byline as an explanation article. Legacy explanation rows produced by the GAS `L2_BATCH` path carry no `Author`, so they correctly show no byline (anonymous).
 

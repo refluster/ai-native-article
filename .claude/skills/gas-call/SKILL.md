@@ -13,7 +13,7 @@ POST a JSON action to this project's deployed GAS web app and print the response
 
 ## Deployment ID
 
-Read live from `apps/article/src/lib/gas-config.ts` (the article app's source of truth — moved here from `src/lib/` in PR #60). If that file ever moves again, update the script below and this section together — they must agree.
+Read live from `newsletter/app/src/lib/gas-config.ts` (the article app's source of truth — moved here from `src/lib/` in PR #60). If that file ever moves again, update the script below and this section together — they must agree.
 
 Current value (also visible from `npx clasp deployments`):
 ```
@@ -53,5 +53,5 @@ The script:
 
 - **GAS handlers can take 1–6 minutes** for batches that call Azure OpenAI multiple times. The script waits up to 6 minutes (matches GAS's own `maxExecutionTime`).
 - **Auth is anonymous** (`appsscript.json` sets `access: ANYONE_ANONYMOUS`). No tokens needed.
-- **You're hitting the deployed version, not @HEAD.** If you just changed `gas/src/Code.gs`, you must `npm run deploy-gas` first. Use the `gas-deploy-verify` skill to confirm the new action is actually live.
+- **You're hitting the deployed version, not @HEAD.** If you just changed `newsletter/gas/src/Code.gs`, you must `npm run deploy-gas` first. Use the `gas-deploy-verify` skill to confirm the new action is actually live.
 - **For deletes / mutations**, the response usually includes `{ success: true, data: { processed, errors } }`. Always inspect `errors` — handlers swallow per-item failures and report them rather than crashing the batch.

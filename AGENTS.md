@@ -12,17 +12,16 @@ Every file in this repo belongs to one of four zones. The zone determines the ap
 
 Agents may propose diffs. Agents may NOT merge without a human on the PR.
 
-- [DESIGN.md](DESIGN.md)
-- [GROWTH.md](GROWTH.md)
+- [DESIGN.md](newsletter/docs/DESIGN.md)
+- [GROWTH.md](newsletter/docs/GROWTH.md)
 - [AGENTS.md](AGENTS.md) (this file)
-- [tailwind.config.ts](tailwind.config.ts)
-- [src/config/site.ts](src/config/site.ts)
-- [src/index.css](src/index.css) — base and utilities layers
+- [newsletter/app/tailwind.config.ts](newsletter/app/tailwind.config.ts)
+- [newsletter/app/src/config/site.ts](newsletter/app/src/config/site.ts)
+- [newsletter/app/src/index.css](newsletter/app/src/index.css) — base and utilities layers
 - [.github/CODEOWNERS](.github/CODEOWNERS)
 - [.github/workflows/*.yml](.github/workflows/)
-- **L2/L3 generator prompts** — [skills/l2-ai-blog/SKILL.md](skills/l2-ai-blog/SKILL.md), [skills/l3-insight/SKILL.md](skills/l3-insight/SKILL.md), and the prompt blocks in [gas/src/Code.gs](gas/src/Code.gs). This applies to *every* generator on the panel.
-- **Judge rubric text and thresholds** — the rubric tables in [GROWTH.md §3, §4](GROWTH.md), and `JUDGE_GATE` / `DIM_FLOOR` / `FALSIFIABILITY_FLOOR` constants in [src/types/quality.ts](src/types/quality.ts).
-- **Panel rosters and model registry** — `JUDGE_ROSTER`, `GENERATOR_ROSTER`, and `MODEL_REGISTRY` in [src/types/quality.ts](src/types/quality.ts). Adding or removing a panel member, changing perspective weights, activating a new provider in the registry, or migrating a roster entry to a new `modelBinding` are all product-shape decisions.
+- **Judge rubric text and thresholds** — the rubric tables in [GROWTH.md §3, §4](newsletter/docs/GROWTH.md), and `JUDGE_GATE` / `DIM_FLOOR` / `FALSIFIABILITY_FLOOR` constants in [newsletter/app/src/types/quality.ts](newsletter/app/src/types/quality.ts).
+- **Panel rosters and model registry** — `JUDGE_ROSTER`, `GENERATOR_ROSTER`, and `MODEL_REGISTRY` in [newsletter/app/src/types/quality.ts](newsletter/app/src/types/quality.ts). Adding or removing a panel member, changing perspective weights, activating a new provider in the registry, or migrating a roster entry to a new `modelBinding` are all product-shape decisions.
 
 Rationale: these files encode the brand, the typography, the deployment surface, and the governance itself. A design-token change cascades across every article. A workflow change can nuke production. A prompt change is an identity change — it shifts what the product *is*. A rubric change invalidates every score that came before it. Humans approve.
 
@@ -30,12 +29,12 @@ Rationale: these files encode the brand, the typography, the deployment surface,
 
 Agents may author and merge, subject to CI passing and one human review *unless* the diff is smaller than 30 lines and touches no Zone A files.
 
-- `src/components/**`
-- `src/pages/**`
-- `src/lib/**`
-- `src/types/**`
-- `scripts/**` (except GAS deploy target)
-- `gas/src/**`
+- `newsletter/app/src/components/**`
+- `newsletter/app/src/pages/**`
+- `newsletter/app/src/lib/**`
+- `newsletter/app/src/types/**`
+- `newsletter/pipeline/**`, `scripts/**` (except the GAS deploy target)
+- `newsletter/gas/src/**`
 
 **Workforce subsystem** — the `workforce/` subtree is being rebuilt. Its zone classifications (including the prompt-version-bump-per-PR rule for `agents/**` and `skills/**`) will be reintroduced in [workforce/docs/governance.md](workforce/docs/governance.md), added in PR1 of the rebuild sequence. Until then, no agent may author PRs that touch `workforce/**` outside of the planned rebuild PRs.
 
@@ -43,11 +42,11 @@ Agents may author and merge, subject to CI passing and one human review *unless*
 
 Agents merge freely. No human review required. Machine regenerable.
 
-- `public/posts/*.md`
-- `public/posts/manifest.json`
-- `public/posts/images/*`
-- `public/sitemap.xml`
-- `public/robots.txt`
+- `newsletter/app/public/posts/*.md`
+- `newsletter/app/public/posts/manifest.json`
+- `newsletter/app/public/posts/images/*`
+- `newsletter/app/public/sitemap.xml`
+- `newsletter/app/public/robots.txt`
 
 If an agent deletes a file in Zone C that is referenced from Zone B or A (e.g., an article still linked from the homepage), CI's build step catches it. That is the safety net — not human review.
 
@@ -57,20 +56,20 @@ Nobody edits by hand. Agents regenerate via scripts only.
 
 - `dist/**`
 - `package-lock.json` (only `npm install` touches it)
-- `public/manifest.webmanifest`
+- `newsletter/app/public/manifest.webmanifest`
 
 ## 2. The rules agents must follow
 
 1. **Small, labeled PRs.** Each PR carries a `growth:`, `fix:`, `content:`, `chore:`, or `governance:` prefix. The prefix decides the reviewer (CODEOWNERS) and the release note section.
-2. **Every `growth:` PR names a metric.** The PR description says which KPI from [GROWTH.md](GROWTH.md) it is expected to move and in which direction. No metric → not a growth PR, relabel to `chore:`.
-3. **No raw hex colors in `src/**`.** The design-token linter blocks this. Use the token.
+2. **Every `growth:` PR names a metric.** The PR description says which KPI from [GROWTH.md](newsletter/docs/GROWTH.md) it is expected to move and in which direction. No metric → not a growth PR, relabel to `chore:`.
+3. **No raw hex colors in the apps' `src/**`** (`newsletter/app/src`, `workforce/app/src`)**.** The design-token linter blocks this. Use the token.
 4. **No new top-level routes without updating [AGENTS.md](AGENTS.md) zones.** Silent IA additions erode the public/internal separation.
 5. **No writes to Zone A from a skill.** Skills must edit Zone B or C only. If a skill "needs" to touch a token, it files a PR and stops.
 6. **Never force-push `main` or `gh-pages`.** The deploy workflow owns `gh-pages`. Human operators own `main`.
-7. **Idempotent scripts only.** `fetch-notion.mjs`, `generate-sitemap.mjs`, and their peers must be safe to run twice. No "this script assumes fresh state" scripts.
+7. **Idempotent scripts only.** `newsletter/pipeline/fetch-notion.mjs`, `newsletter/pipeline/generate-sitemap.mjs`, and their peers must be safe to run twice. No "this script assumes fresh state" scripts.
 8. **Secrets stay in `.env` (local) or GitHub Secrets (CI).** An agent that prints a secret to stdout is a bug. CI redaction is a backstop, not a plan.
 9. **When in doubt, file an issue, not a PR.** It is cheaper for a human to redirect an idea than to close a PR.
-10. **Every L2/L3 generation writes a sidecar `.eval.json`** with full panel output — every candidate, every judge (schema: [src/types/quality.ts](src/types/quality.ts)). No sidecar → no publish. This applies whether the generator is a Claude skill or the GAS pathway. Articles missing the sidecar are treated as Zone A changes and require human review.
+10. **Every L2/L3 generation writes a sidecar `.eval.json`** with full panel output — every candidate, every judge (schema: [newsletter/app/src/types/quality.ts](newsletter/app/src/types/quality.ts)). No sidecar → no publish. This applies whether the generator is a Claude skill or the GAS pathway. Articles missing the sidecar are treated as Zone A changes and require human review.
 11. **A prompt-version bump is its own PR.** Do not bundle a prompt change with unrelated work. The outer-loop leaderboard attributes reader behavior by `generator.systemPromptVersion`; mixed PRs corrupt attribution. Bumping two panel members in one PR is also forbidden — bump one at a time so the outer loop can tell which move helped.
 12. **Model disjointness — Phase 2 rule.** Once `MODEL_REGISTRY` contains two or more *active* providers, no generator on the panel may share a `modelBinding` with any judge on the panel. In Phase 1 (single provider, all members on `azure-gpt5`) the rule is inactive by design — see GROWTH.md §2a trade-off. Every PR that activates a second provider or changes a `modelBinding` must include a "disjointness check" line in the description proving the rule holds after the change.
 

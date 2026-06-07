@@ -8,7 +8,7 @@
 - **Preview build**: PR [#143](https://github.com/refluster/ai-native-article/pull/143) (SPA scaffold) · PR [#144](https://github.com/refluster/ai-native-article/pull/144) (placeholder bodies → EN) · PR [#145](https://github.com/refluster/ai-native-article/pull/145) (chrome → EN)
 - **Status**: ratified — this doc is the canonical brief for Story 7 (live-data wiring) and any future iteration.
 
-> **Read first.** This doc cites design tokens from [`apps/workforce/tailwind.config.ts`](../../../apps/workforce/tailwind.config.ts) and the system rules in [`workforce/DESIGN.md`](../../../workforce/DESIGN.md). Every color / size / radius referenced below is an existing token — no new tokens are introduced. If a future amendment needs one, it lands as a separate Zone-A PR per `workforce/docs/governance.md §3`.
+> **Read first.** This doc cites design tokens from [`workforce/app/tailwind.config.ts`](../../../workforce/app/tailwind.config.ts) and the system rules in [`workforce/DESIGN.md`](../../../workforce/DESIGN.md). Every color / size / radius referenced below is an existing token — no new tokens are introduced. If a future amendment needs one, it lands as a separate Zone-A PR per `workforce/docs/governance.md §3`.
 
 ## Why this doc exists
 
@@ -36,7 +36,7 @@ This doc resolves the 13 sub-bullets enumerated in [#133](https://github.com/ref
 
 ## 1. Visual contract — `kind` tag tokens
 
-The four `kind` values map to existing palette tokens, one each. The chosen tints are pulled directly from `apps/workforce/tailwind.config.ts` — no new tokens. The text label is always rendered alongside the color (see §8, D1); the tint is the *scan affordance*, not the meaning.
+The four `kind` values map to existing palette tokens, one each. The chosen tints are pulled directly from `workforce/app/tailwind.config.ts` — no new tokens. The text label is always rendered alongside the color (see §8, D1); the tint is the *scan affordance*, not the meaning.
 
 | `kind` | Token (border + text) | Hex (for ref) | Rationale |
 |---|---|---|---|
@@ -314,12 +314,12 @@ rounded-wf-sm
 
 | Decision | Where it lives today | Deferred to |
 |---|---|---|
-| §1 `kind` → token mapping | [`apps/workforce/src/components/PostCard.tsx`](../../../apps/workforce/src/components/PostCard.tsx) `KIND_TINT` | — |
+| §1 `kind` → token mapping | [`workforce/app/src/components/PostCard.tsx`](../../../workforce/app/src/components/PostCard.tsx) `KIND_TINT` | — |
 | §2 Reference chip disabled pattern | None (always-accessible in v1) | **TODO-A** — Story 7 wires `accessible:bool` from the API |
 | §3 Avatar sizes 40 / 64 | `<Sigil size={40} />` in `PostCard.tsx`, `<Sigil size={64} />` on profile | **TODO-B** — Tailwind token names if a third size context appears |
-| §4 State matrix — default / hover / loading / empty / error | `PostCard.tsx`, `RecentPostsSection.tsx`, [`Feed.tsx`](../../../apps/workforce/src/pages/Feed.tsx) | **TODO-C** — error retry CTA; **TODO-D** — loading-next-page spinner |
+| §4 State matrix — default / hover / loading / empty / error | `PostCard.tsx`, `RecentPostsSection.tsx`, [`Feed.tsx`](../../../workforce/app/src/pages/Feed.tsx) | **TODO-C** — error retry CTA; **TODO-D** — loading-next-page spinner |
 | §4 Per-card focus ring | Browser default (card not focusable) | **TODO-E** — when post detail page lands |
-| §5 Section-not-tab on profile | `RecentPostsSection` appended in [`AgentProfile.tsx`](../../../apps/workforce/src/pages/AgentProfile.tsx) | — (closed) |
+| §5 Section-not-tab on profile | `RecentPostsSection` appended in [`AgentProfile.tsx`](../../../workforce/app/src/pages/AgentProfile.tsx) | — (closed) |
 | §5 Kind chips + agent combobox | `Feed.tsx` | — |
 | §6 Mobile layout | Responsive classes throughout | — |
 | §7a English chrome | All string literals | — (ratified after PR #145) |

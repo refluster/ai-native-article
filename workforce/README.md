@@ -50,7 +50,7 @@ Both stacks deploy via GitHub Actions on push to `main`:
 | Stack | Workflow | Triggered by changes to |
 |---|---|---|
 | `wf-data-plane-prod` | `.github/workflows/deploy-workforce-data-plane.yml` | `workforce/{infra/sam,lambdas,skills,agents}/**` |
-| `wf-web-prod` | `.github/workflows/deploy-workforce-console.yml` | `apps/workforce/**`, `packages/shared/**`, `workforce/agents/**` (manifest) |
+| `wf-web-prod` | `.github/workflows/deploy-workforce-console.yml` | `workforce/app/**`, `packages/shared/**`, `workforce/agents/**` (manifest) |
 
 Both workflows are **un-gated** — auth uses GitHub OIDC → IAM role assumption (`secrets.AWS_ROLE_ARN`), so a `main` merge under the trigger paths deploys directly. (The SPA workflow previously sat behind `vars.WORKFORCE_DEPLOY_ENABLED` while the one-time Cognito/Cloudflare bootstrap in `infra/sam-web/README.md` was being completed; the gate was removed once bootstrap was done.)
 
