@@ -145,6 +145,22 @@ The script never reads Secrets Manager; the token/URL is in the task's inline `c
 
 A skill whose deliverable is a *repo artefact* (e.g. an article-draft markdown file committed to the repo) may instead use a draft-PR write-back — but that's the exception, declared in that skill's SKILL.md, not the default. The default is direct, authenticated, scripted write.
 
+## Reading the ledger back — one row, one noun (engagements)
+
+The engagement you POST in step 8 is **one `PROJECT#{id}/EXEC#{ulid}` row** with a GSI1 (`AGENT#{slug}`) and GSI2 (`SKILL#{name}`) projection. There is exactly one stored shape; the read API historically exposed it under several names, which was confusing. The model now:
+
+| Surface | What it is |
+|---|---|
+| `POST /agents/{slug}/engagements` | the write (step 8). |
+| `GET /agents/{slug}/engagements` | **the canonical read** — the symmetric read of the write. Newest-first, across every project the agent is in. `?project_id=` narrows to one project; `?skill=` / `?status=` / `?from=` / `?to=` filter; `?limit=` caps. |
+| `GET /agents/{slug}/executions` | **deprecated alias** of the above (same rows, legacy `exec_ulid` field shape). The SPA reads through this name today via a lib-layer adapter; removed at the Phase-A convergence. |
+| `GET /agents/{slug}/portfolio?project_id=` | **deprecated** — exactly `engagements?project_id=`. |
+| `GET /agents/{slug}/recall?q=&k=` | not a plain list — the *ranked / semantic* lens over the same rows, used to ground a run. |
+
+So: **the engagement you wrote is read back at `GET …/engagements`.** The operator-facing view of it is the agent profile's TRACK RECORD section (`workforce/app` → `AgentProfile` → `TrackRecordSection`), which fetches that ledger. The dead `deliverables` route (pre-cutover `DELIV#` rows, no caller) was removed.
+
+> Read ordering is load-bearing: the ledger query is newest-first (`ScanIndexForward=false`). An ascending query with a `Limit` keeps the *oldest* N rows, so a busy agent's just-written engagement would never surface — see `listExecutions` in `workforce/lambdas/shared/project.ts`.
+
 ## Authorisation (uniform across skills)
 
 The CCR session is authorised to:

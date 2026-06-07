@@ -1159,6 +1159,73 @@ describe("GET /agents/{slug}/portfolio (Engagements API — listAgentPortfolio)"
   });
 });
 
+describe("GET /agents/{slug}/engagements (Engagements API — listAgentEngagements)", () => {
+  function seedExec(opts: { project: string; agent: string; ulid: string; startedAt: string }) {
+    rows.set(key(`PROJECT#${opts.project}`, `EXEC#${opts.ulid}`), {
+      pk: `PROJECT#${opts.project}`,
+      sk: `EXEC#${opts.ulid}`,
+      project_id: opts.project,
+      agent_slug: opts.agent,
+      skill_name: "pr-review",
+      skill_version: "0.1.0",
+      started_at: opts.startedAt,
+      ended_at: opts.startedAt,
+      status: "ok",
+      used_credential_types: [],
+      gsi1pk: `AGENT#${opts.agent}`,
+      gsi1sk: opts.startedAt,
+      artifact_ref: {
+        uri: `https://example.test/${opts.ulid}`,
+        content_hash: "0".repeat(64),
+        content_type: "text/markdown",
+        size_bytes: 10,
+        summary: `engagement ${opts.ulid}`,
+      },
+    });
+  }
+
+  beforeEach(() => {
+    rows.clear();
+  });
+
+  it("returns the agent's engagements across ALL projects (superset of portfolio)", async () => {
+    seedExec({ project: "alpha", agent: "ren", ulid: "01A", startedAt: "2026-05-25T00:00:00.000Z" });
+    seedExec({ project: "beta", agent: "ren", ulid: "01B", startedAt: "2026-05-26T00:00:00.000Z" });
+    const res = await handler(evt("GET /agents/{slug}/engagements", { slug: "ren" }));
+    expect(statusOf(res)).toBe(200);
+    const ids = (bodyOf(res) as { items: Array<{ engagement_id: string }> }).items.map((i) => i.engagement_id);
+    expect(ids.sort()).toEqual(["01A", "01B"]); // no project_id required, unlike portfolio
+  });
+
+  it("?project_id= narrows to one project (the portfolio behaviour, no 400)", async () => {
+    seedExec({ project: "alpha", agent: "ren", ulid: "01A", startedAt: "2026-05-25T00:00:00.000Z" });
+    seedExec({ project: "beta", agent: "ren", ulid: "01B", startedAt: "2026-05-26T00:00:00.000Z" });
+    const res = await handler(
+      evt("GET /agents/{slug}/engagements", { slug: "ren" }, { project_id: "alpha" }),
+    );
+    const items = (bodyOf(res) as { items: Array<{ engagement_id: string; project_id: string }> }).items;
+    expect(items).toHaveLength(1);
+    expect(items[0]!.engagement_id).toBe("01A");
+  });
+
+  it("returns engagement-view shape, newest-first", async () => {
+    seedExec({ project: "alpha", agent: "ren", ulid: "01A", startedAt: "2026-05-25T00:00:00.000Z" });
+    seedExec({ project: "alpha", agent: "ren", ulid: "01C", startedAt: "2026-05-27T00:00:00.000Z" });
+    seedExec({ project: "alpha", agent: "ren", ulid: "01B", startedAt: "2026-05-26T00:00:00.000Z" });
+    const res = await handler(evt("GET /agents/{slug}/engagements", { slug: "ren" }));
+    const items = (bodyOf(res) as { items: Array<Record<string, unknown>> }).items;
+    expect(items.map((i) => i.engagement_id)).toEqual(["01C", "01B", "01A"]);
+    expect(items[0]!.summary).toBe("engagement 01C"); // not raw sk "EXEC#01C"
+    expect(items[0]!.artifact).toBeDefined();
+  });
+
+  it("returns 200 with empty items when the agent has no engagements", async () => {
+    const res = await handler(evt("GET /agents/{slug}/engagements", { slug: "ghost" }));
+    expect(statusOf(res)).toBe(200);
+    expect((bodyOf(res) as { items: unknown[] }).items).toEqual([]);
+  });
+});
+
 describe("POST /agents/{slug}/engagements (Engagements API — createEngagement)", () => {
   const TOKEN_SECRET = "wf/api/engagements-write-token";
   const TOKEN = "test-engagement-bearer-xxxxx";

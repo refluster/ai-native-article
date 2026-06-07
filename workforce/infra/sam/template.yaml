@@ -565,12 +565,6 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /skills/{name}
             Method: GET
-        ListAgentDeliverables:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref WfAgentsHttpApi
-            Path: /agents/{slug}/deliverables
-            Method: GET
         # Epic-010 §10 Story 6 (#95): projects read API on the same Lambda.
         # POST/DELETE/PATCH on projects are intentionally not exposed (see
         # handler.ts header). The credential vault lives in its own Lambda
@@ -590,8 +584,10 @@ Resources:
         # Epic-010 ROADMAP §Status-transition criterion 3 (C3) — agent
         # profile reads execution history from the EXEC row family via
         # GSI1 instead of the legacy AGENT#{slug}/RUN#{ulid} +
-        # AGENT#{slug}/DELIV#{ulid} rows. Public read; same access shape
-        # as the existing GET /agents/{slug}/deliverables it replaces.
+        # AGENT#{slug}/DELIV#{ulid} rows. Public read. DEPRECATED alias of
+        # ListAgentEngagements (identical EXEC rows); removed at the
+        # Phase-A convergence. The dead /deliverables route it once
+        # mirrored was removed in Phase B.
         ListAgentExecutions:
           Type: HttpApi
           Properties:
@@ -617,6 +613,16 @@ Resources:
           Properties:
             ApiId: !Ref WfAgentsHttpApi
             Path: /agents/{slug}/portfolio
+            Method: GET
+        # GET /agents/{slug}/engagements — the symmetric read of the POST
+        # below: the agent's EXEC ledger as EngagementView, newest-first,
+        # `?project_id=` narrowing (superset of ListAgentPortfolio). Public
+        # read (CORS-gated), same access shape as ListAgentExecutions.
+        ListAgentEngagements:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}/engagements
             Method: GET
         # POST /agents/{slug}/engagements — external clients (RepoA-style)
         # POST engagement records (client-side execution outcomes) back

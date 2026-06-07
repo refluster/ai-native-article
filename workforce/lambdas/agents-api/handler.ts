@@ -2,12 +2,13 @@
 // Routes:
 //   GET    /agents                          list (paginated, filterable)
 //   GET    /agents/{slug}                   single agent
-//   GET    /agents/{slug}/deliverables      LEGACY DELIV rows (historical; no SPA caller — EXEC is canonical, see Story 3 #216)
-//   GET    /agents/{slug}/executions        canonical activity ledger — EXEC rows via GSI1 (the agent-profile task log)
+//   GET    /agents/{slug}/engagements       canonical activity ledger — EXEC rows via GSI1, EngagementView, newest-first (?project_id= narrows; superset of /portfolio)
+//   GET    /agents/{slug}/executions        DEPRECATED alias of /engagements (same EXEC rows, exec_ulid shape; removed at Phase-A convergence)
 //   GET    /agents/{slug}/projects          projects this agent is an active member of
 //   GET    /agents/{slug}/posts             per-agent activity feed (Epic-011 Story 5)
-//   GET    /agents/{slug}/portfolio         per-client engagement records (Phase 7 PR5; ?project_id= required)
+//   GET    /agents/{slug}/portfolio         DEPRECATED — /engagements?project_id= is the superset (Phase 7 PR5; ?project_id= required here)
 //   POST   /agents/{slug}/engagements       register a client-side engagement record (Phase 7 PR5; Bearer auth)
+//   (removed) GET /agents/{slug}/deliverables — dead legacy DELIV route, deleted in the engagements read-model consolidation (Phase B)
 //   GET    /agents/{slug}/recall            semantic recall over the agent's ledger (?q=&k=; Epic-012 Story 1)
 //   PATCH  /agents/{slug}                   operational fields only (IAM-auth at API GW)
 //   DELETE /agents/{slug}                   soft delete -> archived=true (IAM-auth at API GW)
@@ -61,7 +62,6 @@ import {
   skillPk,
   toSkillApiView,
 } from "../shared/skill-row.js";
-import type { DelivRow } from "../shared/task.js";
 import { getItem, queryBySkPrefix, scanPrefix, updateOperational } from "../shared/ddb.js";
 import {
   appendExecution,
@@ -192,12 +192,16 @@ export async function handler(
     if (routeKey === "GET /agents") return listAgents(event);
     if (routeKey === "GET /skills") return listSkills(event);
     if (routeKey === "GET /skills/{name}" && skillName) return getSkill(skillName);
-    if (routeKey === "GET /agents/{slug}/deliverables" && slug) return listAgentDeliverables(slug, event);
     if (routeKey === "GET /agents/{slug}/executions" && slug) return listAgentExecutions(slug, event);
-    // Phase 7 PR5 — engagements API (external-client read/write surface).
-    // Portfolio is the public-facing display projection of executions filtered
-    // to the calling client's project; engagements POST is the inbound write
-    // path from client-side (RepoA) execution per the R-N1 amendment.
+    // Engagements API — the canonical read AND write of an agent's activity
+    // ledger (the EXEC row family). `GET` is the symmetric read of the
+    // `POST` write, which previously had no matching read noun: the same
+    // rows were only reachable under the `executions` / `portfolio` aliases
+    // (see the read-model note in workforce/docs/routines/agent-runner.md).
+    // `?project_id=` narrows to one project, subsuming `portfolio`.
+    // `executions` + `portfolio` are kept as deprecated aliases until the
+    // Phase-A convergence; the dead `deliverables` route was removed here.
+    if (routeKey === "GET /agents/{slug}/engagements" && slug) return listAgentEngagements(slug, event);
     if (routeKey === "GET /agents/{slug}/portfolio" && slug) return listAgentPortfolio(slug, event);
     if (routeKey === "POST /agents/{slug}/engagements" && slug) return await createEngagementRoute(slug, event);
     if (routeKey === "GET /agents/{slug}/recall" && slug) return getAgentRecall(slug, event);
@@ -355,34 +359,6 @@ async function getSkill(name: string): Promise<APIGatewayProxyResultV2> {
   const row = await getItem<SkillMetaRow>(skillPk(name), "META");
   if (!row) return reply(404, { error: "not_found", name });
   return reply(200, toSkillApiView(row));
-}
-
-// LEGACY (Epic-010 C2/C3 cutover — reconciled by Epic-012 Story 3 #216).
-// Reads the legacy `AGENT#{slug}/DELIV#{ulid}` rows, whose SUCCESS-path
-// writes were removed at the C2 cutover (the runner is EXEC-only on success;
-// see workforce/lambdas/agent-runner/dual-write-tests.ts). The SPA's
-// agent-profile activity list migrated to `GET /agents/{slug}/executions`
-// (the EXEC family, GSI1) — `fetchAgentDeliverables` was removed, so this
-// route has NO front-end caller. It is retained only to read historical
-// DELIV rows written before the cutover. The canonical activity source is
-// the EXEC ledger; do not wire new readers to this route.
-async function listAgentDeliverables(
-  slug: string,
-  event: APIGatewayProxyEventV2,
-): Promise<APIGatewayProxyResultV2> {
-  const qs = event.queryStringParameters ?? {};
-  const limit = Math.min(
-    Math.max(parseInt(qs.limit ?? "20", 10) || 20, 1),
-    PAGE_SIZE_MAX,
-  );
-  // DDB Query under AGENT#{slug} with SK begins_with DELIV# returns rows
-  // sorted by SK lex order, i.e. by ulid which encodes time. Limit is the
-  // page size; v1 returns most-recent-first by reversing client-side.
-  const rows = await queryBySkPrefix<DelivRow>(agentPk(slug), "DELIV#", limit);
-  // Sort by created_at desc (the ULID ordering already gives chronology,
-  // but explicit sort handles any operator-inserted out-of-order rows).
-  rows.sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
-  return reply(200, { items: rows });
 }
 
 // ----- Projects (Epic-010 §10 — Story 6 #95) -----
@@ -1377,6 +1353,37 @@ async function listAgentPortfolio(
   const filtered = rows.filter((r) => r.project_id === projectId);
   filtered.sort((a, b) => b.started_at.localeCompare(a.started_at));
   return reply(200, { items: filtered.slice(0, limit).map(toEngagementView) });
+}
+
+// GET /agents/{slug}/engagements — the symmetric read of POST /engagements.
+// Returns the agent's EXEC ledger rows as EngagementView (the same `engagement_id`
+// shape the POST returns), newest-first, across every project the agent is in.
+// `?project_id=` narrows to one project (this is exactly what `portfolio` does,
+// so engagements is a strict superset of it). Same auth posture as
+// `executions`: GET is public at the HTTP-API layer (Cognito gates the SPA host).
+async function listAgentEngagements(
+  slug: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const qs = event.queryStringParameters ?? {};
+  const projectId = qs.project_id;
+  const limit = Math.min(
+    Math.max(parseInt(qs.limit ?? `${PAGE_SIZE_DEFAULT}`, 10) || PAGE_SIZE_DEFAULT, 1),
+    PAGE_SIZE_MAX,
+  );
+  const status = qs.status as ExecStatus | undefined;
+  const rows = await listExecutions({
+    agent_slug: slug,
+    from: qs.from,
+    to: qs.to,
+    status,
+    // When narrowing to one project we over-fetch then post-filter, mirroring
+    // listAgentPortfolio; otherwise the GSI window IS the result window.
+    limit: projectId ? PAGE_SIZE_MAX : limit,
+  });
+  const scoped = projectId ? rows.filter((r) => r.project_id === projectId) : rows;
+  scoped.sort((a, b) => b.started_at.localeCompare(a.started_at));
+  return reply(200, { items: scoped.slice(0, limit).map(toEngagementView) });
 }
 
 async function createEngagementRoute(

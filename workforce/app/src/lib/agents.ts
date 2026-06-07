@@ -100,13 +100,13 @@ export async function fetchAgentLive(slug: string): Promise<AgentLiveRecord | un
   return (await res.json()) as AgentLiveRecord
 }
 
-// Epic-010 C3 (read) + C2 (cutover) — the agent-profile execution-
-// history list reads from the EXEC row family (PROJECT#{id}/EXEC# via
-// the GSI1 AGENT#{slug} partition). The legacy fetchAgentDeliverables
-// + AgentDeliverable interface that targeted AGENT#{slug}/DELIV# were
+// Epic-010 C3 (read) + C2 (cutover) — the agent-profile activity list
+// reads from the EXEC row family (PROJECT#{id}/EXEC# via the GSI1
+// AGENT#{slug} partition). The legacy fetchAgentDeliverables +
+// AgentDeliverable interface that targeted AGENT#{slug}/DELIV# were
 // removed in C2 (no callers since C3); the backend GET
-// /agents/{slug}/deliverables route is retained for historical reads
-// of pre-cutover DELIV rows but is no longer consumed by this SPA.
+// /agents/{slug}/deliverables route — already SPA-dead — was removed in
+// the engagements read-model consolidation (Phase B).
 export interface AgentExecution {
   /** ULID without the EXEC# prefix. */
   exec_ulid: string
@@ -128,11 +128,44 @@ export interface AgentExecution {
   error?: string
 }
 
+// Reads the canonical engagement ledger (GET /agents/{slug}/engagements —
+// the symmetric read of POST /engagements). This replaced the old
+// /executions read: same EXEC rows, but the engagement noun is the one the
+// write surface uses. The route returns EngagementView (`engagement_id` /
+// `artifact`); we adapt it here to the AgentExecution shape the components
+// already render, so the field rename (engagement_id → … ) stays a single
+// Phase-A change isolated to this adapter rather than touching every view.
+interface EngagementView {
+  engagement_id: string
+  project_id: string
+  agent_slug: string
+  skill_name: string
+  skill_version: string
+  started_at: string
+  ended_at: string
+  status: AgentExecution['status']
+  execution_surface?: string
+  summary?: string
+  artifact?: AgentExecution['artifact_ref']
+  error?: string
+}
+
 export async function fetchAgentExecutions(slug: string, limit = 20): Promise<AgentExecution[]> {
   if (!apiConfigured()) return []
-  const url = `${WORKFORCE_AGENTS_API_BASE}/agents/${encodeURIComponent(slug)}/executions?limit=${limit}`
+  const url = `${WORKFORCE_AGENTS_API_BASE}/agents/${encodeURIComponent(slug)}/engagements?limit=${limit}`
   const res = await fetch(url)
   if (!res.ok) throw new Error(`agents-api ${res.status}`)
-  const data = (await res.json()) as { items: AgentExecution[] }
-  return data.items
+  const data = (await res.json()) as { items: EngagementView[] }
+  return data.items.map((e) => ({
+    exec_ulid: e.engagement_id,
+    project_id: e.project_id,
+    agent_slug: e.agent_slug,
+    skill_name: e.skill_name,
+    skill_version: e.skill_version,
+    started_at: e.started_at,
+    ended_at: e.ended_at,
+    status: e.status,
+    artifact_ref: e.artifact,
+    error: e.error,
+  }))
 }
