@@ -312,7 +312,8 @@ Resources:
         # SPA later issues a PATCH from the browser via signed-SigV4.
         # POST added by Epic-013 Story 2 (#249) for the talent-messaging
         # operator write routes (start thread / send / read / star), gated
-        # by the Cognito JWT authorizer below.
+        # by AWS_IAM (SigV4) — the SPA calls them with signed requests just
+        # like the existing PATCH writes.
         AllowMethods: [GET, POST, PATCH, OPTIONS]
         # SigV4-signed browser requests (aws4fetch) send more than
         # `authorization`: the preflight `Access-Control-Request-Headers`
@@ -327,75 +328,19 @@ Resources:
           - x-amz-security-token
       Auth:
         EnableIamAuthorizer: true
-        # Epic-013 Story 2 (#249) / decision D3 — operator write routes for
-        # talent messaging authenticate against a single-operator Cognito
-        # user pool (hosted login). A single-user pool is login-for-the-
-        # operator, not a multi-tenant primitive, so it stays within C-3.
-        # Read routes remain public on the CORS gate (Epic-011 §6 posture).
-        Authorizers:
-          WfOperatorJwt:
-            IdentitySource: "$request.header.Authorization"
-            JwtConfiguration:
-              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${WfOperatorPool}
-              audience:
-                - !Ref WfOperatorPoolClient
+        # Epic-013 Story 2 (#249) / decision D3 (revised — see #256 follow-up)
+        # — operator write routes for talent messaging authenticate with
+        # AWS_IAM (SigV4), the same gate every other operator write on this
+        # API already uses (PATCH /agents, PATCH /feed, PATCH /projects).
+        # The SPA signs in via the workforce Cognito user pool (infra/sam-web)
+        # and mints temporary AWS credentials from the workforce Identity
+        # Pool, whose operator role (WfWorkforceOperatorRole) already grants
+        # execute-api:Invoke on this whole API — so these routes reuse the
+        # existing operator login rather than standing up a second, redundant
+        # user pool + JWT authorizer. Read routes stay public on the CORS
+        # gate (Epic-011 §6 posture).
       Tags:
         workforce: !Ref Stage
-
-  # --- Cognito: single-operator login for messaging writes (Epic-013 D3) ---
-  WfOperatorPool:
-    Type: AWS::Cognito::UserPool
-    Properties:
-      UserPoolName: !Sub wf-operator-${Stage}
-      # Operator-only: no self-service sign-up. The operator account is
-      # created once via the console / CLI (admin-create-user). C-3.
-      AdminCreateUserConfig:
-        AllowAdminCreateUserOnly: true
-      UsernameAttributes:
-        - email
-      Policies:
-        PasswordPolicy:
-          MinimumLength: 12
-          RequireLowercase: true
-          RequireUppercase: true
-          RequireNumbers: true
-          RequireSymbols: true
-      UserPoolTags:
-        workforce: !Ref Stage
-
-  WfOperatorPoolClient:
-    Type: AWS::Cognito::UserPoolClient
-    Properties:
-      ClientName: !Sub wf-operator-spa-${Stage}
-      UserPoolId: !Ref WfOperatorPool
-      # Public SPA client — no secret (the secret can't be protected in a
-      # browser bundle; the hosted-login Authorization-Code + PKCE flow is
-      # the protection).
-      GenerateSecret: false
-      AllowedOAuthFlows:
-        - code
-      AllowedOAuthFlowsUserPoolClient: true
-      AllowedOAuthScopes:
-        - openid
-        - email
-      SupportedIdentityProviders:
-        - COGNITO
-      CallbackURLs:
-        - https://workforce.kohuehara.xyz/messaging
-        - http://localhost:5173/messaging
-      LogoutURLs:
-        - https://workforce.kohuehara.xyz/messaging
-        - http://localhost:5173/messaging
-      ExplicitAuthFlows:
-        - ALLOW_REFRESH_TOKEN_AUTH
-        - ALLOW_USER_SRP_AUTH
-
-  WfOperatorPoolDomain:
-    Type: AWS::Cognito::UserPoolDomain
-    Properties:
-      # Hosted-UI login domain: wf-operator-{stage}.auth.{region}.amazoncognito.com
-      Domain: !Sub wf-operator-${Stage}
-      UserPoolId: !Ref WfOperatorPool
 
   WfAgentsApiFunction:
     Type: AWS::Serverless::Function
@@ -727,8 +672,10 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /threads/{id}
             Method: GET
-        # Operator write routes (Epic-013 Story 2, #249) — gated by the
-        # WfOperatorJwt Cognito authorizer (decision D3). No talent ever
+        # Operator write routes (Epic-013 Story 2, #249) — gated by AWS_IAM
+        # (decision D3, revised in the #256 follow-up): the operator's SPA
+        # signs these with SigV4 using temporary creds from the workforce
+        # Identity Pool, same as the PATCH writes above. No talent ever
         # posts a message from the UI; talent messages come from the
         # messaging-reply runner path (Story 3).
         CreateThread:
@@ -738,7 +685,7 @@ Resources:
             Path: /threads
             Method: POST
             Auth:
-              Authorizer: WfOperatorJwt
+              Authorizer: AWS_IAM
         SendThreadMessage:
           Type: HttpApi
           Properties:
@@ -746,7 +693,7 @@ Resources:
             Path: /threads/{id}/messages
             Method: POST
             Auth:
-              Authorizer: WfOperatorJwt
+              Authorizer: AWS_IAM
         MarkThreadRead:
           Type: HttpApi
           Properties:
@@ -754,7 +701,7 @@ Resources:
             Path: /threads/{id}/read
             Method: POST
             Auth:
-              Authorizer: WfOperatorJwt
+              Authorizer: AWS_IAM
         SetThreadStar:
           Type: HttpApi
           Properties:
@@ -762,7 +709,7 @@ Resources:
             Path: /threads/{id}/star
             Method: POST
             Auth:
-              Authorizer: WfOperatorJwt
+              Authorizer: AWS_IAM
       Tags:
         workforce: !Ref Stage
 
@@ -1652,24 +1599,9 @@ Outputs:
     Value: !Ref WfTable
     Export:
       Name: !Sub wf-table-name-${Stage}
-  # Epic-013 Story 2 (#249) — the workforce SPA needs these at build time to
-  # construct the Cognito hosted-login URL and validate JWTs for the
-  # messaging write routes. Surfaced as Vite env (VITE_WORKFORCE_COGNITO_*).
-  OperatorPoolId:
-    Description: Cognito user pool id for operator login (messaging writes).
-    Value: !Ref WfOperatorPool
-    Export:
-      Name: !Sub wf-operator-pool-id-${Stage}
-  OperatorPoolClientId:
-    Description: Cognito SPA app-client id (public, PKCE).
-    Value: !Ref WfOperatorPoolClient
-    Export:
-      Name: !Sub wf-operator-pool-client-id-${Stage}
-  OperatorPoolDomain:
-    Description: Cognito hosted-UI domain prefix (wf-operator-{stage}).
-    Value: !Ref WfOperatorPoolDomain
-    Export:
-      Name: !Sub wf-operator-pool-domain-${Stage}
+  # Epic-013 Story 2 messaging writes reuse the existing workforce operator
+  # login (infra/sam-web Cognito user pool + Identity Pool); no messaging-
+  # specific Cognito outputs are needed. The SPA already has its login env.
   TableArn:
     Value: !GetAtt WfTable.Arn
     Export:

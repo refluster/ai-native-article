@@ -424,6 +424,16 @@ own throttle. No ceiling raise.
   confirms this is acceptable before Story 2 opens, since it's the first
   UI-write gate and sets precedent. If the operator wants Cognito, that's a
   Zone A / R-N3 conversation (Story 2's kill criterion).
+  - **→ Resolved (D3, then revised after #256):** neither a Bearer token nor a
+    new Cognito pool. The writes use **AWS_IAM (SigV4)** — the same gate the
+    other operator writes on this API already use (PATCH /agents, /feed,
+    /projects). The SPA already logs the operator in via the workforce Cognito
+    user pool (`infra/sam-web`) and mints temporary AWS creds from the
+    workforce Identity Pool, whose operator role already grants
+    `execute-api:Invoke` on this API. #256 first shipped a *second*, redundant
+    single-operator user pool + JWT authorizer; the follow-up removes it and
+    folds the four write routes onto the existing AWS_IAM login. Net: one login,
+    one auth pattern, no new infra.
 - **Q2. Reply latency expectation.** Replies are not instant — they ride the
   addressed agent's next run (event-driven, but Lambda cold-start + LLM call =
   seconds, not milliseconds). v1 polls with a ~60s ceiling and a "drafting…"
@@ -436,6 +446,10 @@ own throttle. No ceiling raise.
   unindexed host this is acceptable (same trust model as the engagement
   token), but a short-lived token minted per session would be cleaner. Default:
   build-time injection on the authenticated origin only; never on `gh-pages`.
+  - **→ Moot under the AWS_IAM resolution (see Q1):** there is no static write
+    token in the bundle. SigV4 signing uses short-lived credentials minted per
+    session from the Identity Pool — exactly the "short-lived token minted per
+    session" this question wished for.
 - **Q4. Talent-initiated threads.** v1 is operator-initiated only
   (`created_by` is always `operator`). Should an agent be able to start a
   thread *to the operator* (e.g. a friction the agent wants to raise
