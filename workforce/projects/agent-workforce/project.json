@@ -2,7 +2,7 @@
   "id": "agent-workforce",
   "name": "Agent Workforce (internal trial)",
   "owner_agent": "maya",
-  "members": ["maya", "dario", "yuki", "elena", "priya"],
+  "members": ["maya", "dario", "yuki", "elena", "priya", "theo", "vikram", "noor", "aanya"],
   "credential_types": ["discord.webhook_url", "workforce.feed_write_token", "notion.integration_token"],
   "status": "active",
   "created_at": "2026-05-31",
