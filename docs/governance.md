@@ -30,6 +30,10 @@ Governance constrains; design policy directs. An agent consults both before acti
 
 A D-principle is **not** enforced by hook or CI; violating it does not make a build red. It shapes judgment in the moments governance leaves open — typically "default to A or B?", "build it ourselves or ride a substrate?", "ask the operator or just ship?". When the two axes appear to conflict, the rules axis wins (a D-principle never licenses a C-1 violation).
 
+### 0.2 The third document: the machinery
+
+This document is the law; design-policy is the direction. **[`docs/governance-mechanisms.md`](governance-mechanisms.md)** is the *machinery* — the working mechanisms that make this law run itself without the operator in the loop: the CI gates (R-10…R-12), the two self-driving engines (the memory→lint **ratchet** and the content-insights **loop**), the registries that make the audit loop converge, and the provenance of each (what we imported from **asp-cloud** and **mononaware**, and what we deliberately left as ceremony). Read it before adding a new gate, loop, or registry — it carries the anti-reinvention reflex.
+
 ---
 
 ## 1. Layers
@@ -109,8 +113,11 @@ Whatever portion of L0/L1 a machine can check, it should. These are the guards a
 | R-7 | Article health sweep | `.claude/skills/article-health/` | manual / future cron | ✅ |
 | R-8 | TypeScript typecheck on React app | implicit via `vite build` | `deploy-article-site.yml` | ✅ |
 | R-9 | Sitemap generation succeeds | `npm run sitemap` | `deploy-article-site.yml` | ✅ |
+| R-10 | Pre-deploy corpus truncation gate | `node scripts/check-corpus-truncation.mjs` | `deploy-article-site.yml` (after `fetch-notion`) | ✅ added 2026-06-07 |
+| R-11 | L1 citation gate (touch an L1 doc → cite it or `RULE-N/A:`) | `node scripts/check-l1-citation.mjs` | `ci.yml` (PRs only) | ✅ added 2026-06-07 |
+| R-12 | Governance registry integrity (backlog + ledger well-formed) | `node scripts/check-governance-registries.mjs` | `ci.yml` + `.githooks/pre-push` | ✅ added 2026-06-07 |
 
-**Policy.** R-3 and R-4 are runtime invariants — no agent may catch and ignore them; the right fix is to bump the `maxCompletionTokens` bracket. R-5 is a precondition for `L2_BACKFILL`; if it ever fires there's a deeper bug. R-1, R-2, R-8, R-9 must stay green for `deploy-article-site.yml` to ship. The skills (R-6, R-7) are advisory but should be run after every `newsletter/gas/src/Code.gs` edit and after every user-reported content issue respectively.
+**Policy.** R-3 and R-4 are runtime invariants — no agent may catch and ignore them; the right fix is to bump the `maxCompletionTokens` bracket. R-5 is a precondition for `L2_BACKFILL`; if it ever fires there's a deeper bug. R-1, R-2, R-8, R-9, **R-10** must stay green for `deploy-article-site.yml` to ship. The skills (R-6, R-7) are advisory but should be run after every `newsletter/gas/src/Code.gs` edit and after every user-reported content issue respectively. R-10 is the *deploy-time* twin of the *generation-time* finish_reason throw (R-3): R-3 stops bad content from being written; R-10 stops it from being published. R-11 mirrors asp-cloud's R-15 (ADR-presence). R-12 keeps the two governance registries ([memory-lint-backlog.md](memory-lint-backlog.md), [risk-acceptance-ledger.md](risk-acceptance-ledger.md)) machine-parseable. The full operating notes for R-10…R-12 live in [governance-mechanisms.md §2.1](governance-mechanisms.md#21-how-to-operate-each).
 
 **Loosening.** Tightening any of R-1…R-9 is L2 work and an agent may do it freely. **Loosening or disabling any of them requires operator approval** — drop the line in chat with the rationale, wait for explicit yes.
 
@@ -134,14 +141,36 @@ Skills are L3 in their entirety: each `SKILL.md` is the runbook, each `scripts/*
 
 ## 6. Audit cadence
 
-Lighter than asp-cloud — no QA engineer, no monthly threat-model refresh. The two cadences that matter:
+Lighter than asp-cloud — no QA engineer, no monthly threat-model refresh. The cadences that matter:
 
 | Review | Trigger | Output |
 |---|---|---|
 | **Article health sweep** | After any `newsletter/gas/src/Code.gs` change that touches generation; after any user-reported broken article | Run the `article-health` skill; fix any TRUNCATED_* findings before considering the change done |
-| **Governance retrospective** | Whenever an incident reveals a bug class that an existing rule didn't catch (the L2 truncation case is the seed example) | Update this doc + the relevant L1 doc to make the next instance impossible. Cite the incident in the change. |
+| **Governance retrospective** | Whenever an incident reveals a bug class that an existing rule didn't catch (the L2 truncation case is the seed example) | Update this doc + the relevant L1 doc to make the next instance impossible. **Record the failure mode in [memory-lint-backlog.md](memory-lint-backlog.md)** (§6.1). Cite the incident in the change. |
+| **Weekly content-insights** | Mondays 02:00 UTC, automatic ([weekly-content-insights.yml](../.github/workflows/weekly-content-insights.yml)) | One `insights`-labelled GitHub issue with reader-engagement gaps + top performers. Triage into editorial action. Inert until the GA4 credential is provisioned (RAL-002). |
 
 Missing a "what should this rule have caught?" pass after an incident is itself a governance defect.
+
+### 6.1 The memory→lint ratchet
+
+A retrospective that just edits a doc is forgotten by the next incident. The **ratchet** makes the
+loop converge: every recurring failure is logged in [memory-lint-backlog.md](memory-lint-backlog.md),
+and on its **second occurrence within 90 days** it is promoted to an `R-NN` mechanical regulation
+(§4). This is mononaware's memory→lint pipeline scaled to one operator. The truncation incident is
+the worked example: `d17e1d58ec42` → R-3/R-4/R-5 (runtime) → R-10 (deploy gate). Do not write a
+one-off lint without a backlog row — the row is the provenance for "why does this gate exist?".
+
+### 6.2 The risk-acceptance ledger
+
+A finding that is real but **not** worth a machine check goes to
+[risk-acceptance-ledger.md](risk-acceptance-ledger.md) — an agent drafts the row, the operator
+"signs" it by merging (the only merge authority, §8.1 B). A signed row **suppresses re-filing**: a
+later retrospective that rediscovers the gap checks the `Re-eval` date instead of opening a new
+finding. This is asp-cloud's signed ledger, and it is what stops the audit loop from re-litigating
+the same accepted trade-offs forever. Both registries are kept well-formed by R-12.
+
+The mechanics of all of this — the gates, the two engines, the provenance, and the C-3 boundary on
+what we deliberately did *not* import — live in [governance-mechanisms.md](governance-mechanisms.md).
 
 ---
 
@@ -215,3 +244,5 @@ These are conventions worth borrowing from production-grade governance framework
 - **Dependency-vulnerability triage runbook.** Dependabot is configured but findings go to the operator's chat, not a formal triage process.
 
 If any of these become relevant (the site grows, takes payments, hosts user data), revisit this section.
+
+The full, current decision table — every mechanism we *did* import from asp-cloud / mononaware versus the ones we judged to be ceremony at single-operator scale, each with a "revisit when…" trigger — lives in [governance-mechanisms.md §5](governance-mechanisms.md#5-what-we-deliberately-did-not-import-c-3-boundary). That table supersedes this list as the canonical "what we left off and why."
