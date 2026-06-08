@@ -156,6 +156,33 @@ Things that are conspicuously missing and likely worth adding (each is an A acti
 
 None of these are mandatory. They are the kind of thing an agent should propose-and-ship on a Tuesday afternoon, not wait for permission to consider.
 
+### 4.1 Canary rollout discipline
+
+The loop above has a sharp edge: **promote** replaces the primary prompt, and the very next batch
+runs the new prompt against 100% of pending articles. A subtly-worse prompt therefore degrades a
+whole day's output before `article-health` catches it post-deploy. The discipline is:
+
+> Never promote a prompt change straight to a full batch. Run it against a **small canary slug list
+> first**, sweep `article-health`, *then* widen.
+
+Concretely, today: invoke `L2_BACKFILL` with a short explicit slug list (3–5 articles), inspect, and
+only then run the full `mode='all'`. A first-class canary mode wired into `Code.gs` is deferred
+(tracked as **RAL-003** in the [risk-acceptance ledger](risk-acceptance-ledger.md)) — the small-list
+convention covers the common case until a prompt change actually burns a batch. The pre-deploy
+truncation gate (governance R-10) is the backstop if canary discipline is skipped: a truncated
+canary output cannot reach gh-pages.
+
+### 4.2 Closing the loop: reader behaviour → roadmap
+
+D-2 named evaluation as the under-invested layer, and §4 above named the analytics→roadmap gap. That
+gap is now closed by the **weekly content-insights loop**
+([governance-mechanisms.md §1 Engine B](governance-mechanisms.md#engine-b--improvement-is-generated-not-remembered-the-loop)):
+GA4 engagement is joined to the published manifest every Monday and surfaced as one triage issue, so
+"which articles underperform?" drives "what to revise/cross-link/write next?" without the operator
+remembering to look. This is the article-side version of the Software 2.0 feedback loop D-2 commits
+to. It is inert until the GA4 credential is provisioned (an operator B action, RAL-002), then
+self-running.
+
 ---
 
 ## 5. Innovation-velocity discipline (D-1 implementation guide)

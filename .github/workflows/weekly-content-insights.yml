@@ -1,0 +1,45 @@
+name: Weekly content insights
+
+# Article-side Software 2.0 loop (see docs/governance-mechanisms.md).
+# Joins GA4 7-day engagement to the published manifest and upserts ONE
+# `insights`-labelled issue with adoption gaps + top performers, so reader
+# behaviour drives the editorial roadmap instead of dying in a dashboard.
+#
+# Inert-by-design until GA4_PROPERTY_ID + GA4_SA_KEY secrets exist (RAL-002):
+# the script then prints what's missing and exits 0.
+
+on:
+  schedule:
+    # Mondays 02:00 UTC — after the weekend, before the week's work.
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Compute and print, do not write the issue'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: content-insights
+  cancel-in-progress: false
+
+jobs:
+  insights:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Derive insights and upsert issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GA4_PROPERTY_ID: ${{ secrets.GA4_PROPERTY_ID }}
+          GA4_SA_KEY: ${{ secrets.GA4_SA_KEY }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+        run: npm run content-insights

@@ -14,6 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # R-11 (L1 citation gate) diffs against the PR base ref.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -31,6 +34,18 @@ jobs:
 
       - name: GAS manifest check
         run: npm run check-gas
+
+      - name: Governance registries (R-12)
+        run: npm run check-registries
+
+      - name: L1 citation gate (R-11)
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git fetch --no-tags origin "$BASE_REF"
+          npm run check-l1-citation
 
       - name: Workforce naming lint (R-N7)
         run: npm run workforce:naming

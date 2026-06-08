@@ -32,6 +32,15 @@ Eight axes. Three are **mandatory** on every issue; the rest are applied when re
 | `wf:` | `ready` \| `blocked` \| `in-progress` | Workflow status. Apply only at interesting transitions — unlabelled = backlog/triaged. |
 | `priority:` | `p0` \| `p1` | Urgency. Apply ONLY to genuinely urgent issues. Unlabelled = p2 (default). `p0` = blocks an invariant in production (C-1/W-1 live violation, build is red). `p1` = blocks an in-flight epic or the live site for non-invariant reasons. |
 
+### 1.3 Marker labels (machine-applied)
+
+Some labels are not part of an axis — they mark an issue's *origin* so an automation can find its own
+issue idempotently. Do not hand-apply or hand-remove these.
+
+| Label | Applied by | Meaning |
+|---|---|---|
+| `insights` | the weekly content-insights loop (`content-insights.mjs`) | This is *the* auto-generated reader-engagement issue. The loop keeps exactly one open at a time, updating it in place. It also carries `project:article` + `area:content` + `type:ops`. Triage it; don't relabel it. See [governance-mechanisms.md](governance-mechanisms.md). |
+
 ---
 
 ## 2. `layer:` mapping per sub-project

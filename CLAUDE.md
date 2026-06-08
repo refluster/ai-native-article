@@ -15,6 +15,8 @@ In priority order — every agent should know all four:
 
 If a task touches `newsletter/app/src` (the reader SPA), [DESIGN.md](newsletter/docs/DESIGN.md) is the L1 doc for the visual/IA system.
 
+If a task touches the **governance machinery** — a CI gate, a registry, the analytics loop — read [docs/governance-mechanisms.md](docs/governance-mechanisms.md) first (decision record: [docs/adr/adr-0001](docs/adr/adr-0001-self-driving-governance-mechanisms.md)). It is the map of the self-driving mechanisms (R-10…R-12, the memory→lint ratchet, the content-insights loop) and what was deliberately left as ceremony. It carries the anti-reinvention reflex: extend an existing mechanism, don't build a parallel one.
+
 ## The four invariants you must not violate
 
 From [docs/governance.md §2](docs/governance.md#2-l0--constitution):
@@ -63,6 +65,8 @@ When in doubt: ask in chat with a one-line description; wait for an explicit "ye
 - **Commit messages cite the layer.** `L2: add finish_reason='length' throw` reads better than `fix: bug`. The layer tag (L1/L2/L3) helps future audit see which doc level a change touches.
 - **Label new issues per [docs/issue-labeling.md](docs/issue-labeling.md).** Mandatory axes: `project:` + `layer:` + `type:`. Reconcile colours via `node scripts/sync-labels.mjs` after editing `.github/labels.json`.
 - **One in_progress todo at a time** when running TodoWrite for multi-step tasks. Mark complete immediately on finish.
+- **Touching an L1 doc or ADR?** The R-11 citation gate requires the PR body to either reference the L1 doc / ADR you're changing or carry `RULE-N/A: <reason>`. (L1 = the statute docs in [governance.md §3.1](docs/governance.md#31-current-statute), governance.md / design-policy.md themselves, and any ADR under [docs/adr/](docs/adr/README.md).)
+- **Found a recurring failure mode?** Log it in [docs/memory-lint-backlog.md](docs/memory-lint-backlog.md); a second occurrence within 90 days promotes it to an `R-NN` gate (the §6.1 ratchet). A real-but-not-worth-a-check gap goes to [docs/risk-acceptance-ledger.md](docs/risk-acceptance-ledger.md) instead.
 
 ## Things that cost more than they look
 

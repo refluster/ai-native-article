@@ -7,6 +7,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
+import { isTruncatedMarkdown, stripFrontmatter, lastNonEmptyLine } from '../../../../scripts/lib/truncation.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(__dirname, '..', '..', '..', '..')
@@ -16,34 +17,10 @@ const REPO_OWNER_REPO = 'refluster/ai-native-article'
 const PAGES_BRANCH = 'gh-pages'
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO_OWNER_REPO}/${PAGES_BRANCH}/posts`
 
-// The same predicate used inside newsletter/gas/src/Code.gs#isTruncatedMarkdown.
-// Keep these two definitions in sync — diverging would cause "the GAS-side
-// sweep clears, but article-health still complains" or vice versa.
-function isTruncatedMarkdown (mdBody) {
-  if (!mdBody) return false
-  const lines = mdBody.split('\n').map(l => l.replace(/\s+$/, ''))
-  let i = lines.length - 1
-  while (i >= 0 && lines[i].trim() === '') i--
-  if (i < 0) return false
-  const trimmed = lines[i].trim()
-  if (/^#{1,6}\s+/.test(trimmed)) return true
-  if (/^([-*]\s|\d+\.\s|>\s|---|```)/.test(trimmed)) return false
-  return !/[。！？」）…\.!\?\)\]`>]$/.test(trimmed)
-}
-
-function lastNonEmptyLine (md) {
-  const lines = md.split('\n')
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const t = lines[i].trim()
-    if (t) return t.length > 60 ? t.slice(0, 57) + '...' : t
-  }
-  return ''
-}
-
-function stripFrontmatter (md) {
-  const m = md.match(/^---\n[\s\S]*?\n---\n?/)
-  return m ? md.slice(m[0].length) : md
-}
+// isTruncatedMarkdown / lastNonEmptyLine / stripFrontmatter now live in the
+// shared scripts/lib/truncation.mjs (imported above). The GAS-side copy in
+// newsletter/gas/src/Code.gs must still be kept in sync by hand — see that
+// module's header and docs/memory-lint-backlog.md ML-001.
 
 async function fetchText (url) {
   const r = await fetch(url, { redirect: 'follow' })

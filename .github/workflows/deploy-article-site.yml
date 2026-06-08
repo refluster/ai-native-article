@@ -62,6 +62,12 @@ jobs:
           FETCH_BRIDGE: ${{ secrets.FETCH_BRIDGE }}
         run: npm run fetch-notion
 
+      - name: Corpus truncation gate (R-10)
+        # C-1/C-4: a truncated body must not reach gh-pages. Runs on the
+        # freshly-fetched local posts, before build. The runtime finish_reason
+        # throw (R-3) guards generation; this guards the deploy itself.
+        run: npm run check-truncation
+
       - name: Design-token lint
         run: npm run lint:tokens
 
