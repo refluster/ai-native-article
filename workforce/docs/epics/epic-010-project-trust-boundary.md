@@ -180,7 +180,7 @@ This Epic is therefore **kept whole under the cheaper recall path**. The earlier
 
 ## Acceptance criteria
 
-- `workforce/lambdas/shared/project.ts` exports `Project.get_credential(type)`, `Project.append_execution(...)`, `Project.list_executions(filter)`. Unit tests cover the cross-project denial path.
+- `workforce/lambdas/shared/project.ts` exports `Project.get_credential(type)`, `Project.append_execution(...)`, `Project.list_executions(filter)`. (Update 2026-06-08: the cross-project membership *write-gate* on `append_execution` was removed by operator decision — see CLAUDE.md C-3, single-operator scale. Membership rows persist as an informational record only; `append_execution` no longer throws "cross-project denial". The optional recall read-filter on `list_executions` remains.)
 - `workforce/skills/*/meta.json` schema (`workforce/scripts/validate-skill-meta.mjs`) gains an optional `requires: string[]` field, validated against a known type list.
 - A new file `workforce/lambdas/shared/credential-injector.ts` injects only the declared `requires` types; an attempt to read an undeclared type from the skill context throws.
 - DDB has the new row family `PROJECT#{id}/EXEC#{ulid}` and the GSI1 / GSI2 indexes described in §7. Migration is dual-write for two releases; the cut-over PR removes the old `RUN`/`DELIV` writes.

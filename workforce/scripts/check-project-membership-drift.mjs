@@ -146,7 +146,7 @@ async function main() {
     console.error(`- ${data.id}: DRIFT (${relative(REPO_ROOT, file)})`);
     if (missing.length) {
       console.error(
-        `    declared but NOT seeded (these get 403 not_a_member): ${missing.join(", ")}`,
+        `    declared but NOT seeded (roster drift; informational only since the membership write-gate was removed 2026-06-08): ${missing.join(", ")}`,
       );
     }
     if (extra.length) {

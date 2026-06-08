@@ -161,7 +161,7 @@ What changes per project:
 
 - **`(owner, repo)`** — parsed from `pr_url` AND cross-checked against the resolved `PROJECT#{project_id}/META.github` row. Mismatch is a runtime throw — the operator named the wrong project for this PR.
 - **Governance references** — `config.nomination_rules[].trigger` clauses that today reference `workforce/lambdas/` or `workforce/docs/governance.md` apply *literally* against the workforce's self project. For an external project, the router translates these to the target repo's analogues per `PROJECT#{id}/META.governance_docs` (e.g. `AGENTS.md`, `CONTRIBUTING.md`). If `governance_docs` is empty, the router falls back to the lens's structural triggers only (file-path patterns), not the doc-cited triggers.
-- **Reviewer membership** — every nominated persona MUST be in the project's `members[]`. A nomination that names a non-member persona throws (cross-project denial per [Epic-010 §7](../epics/epic-010-project-trust-boundary.md#7-execution-ledger--project-owned-agent-queryable)) — the project's seed file is incomplete.
+- **Reviewer membership** — nominated personas SHOULD be in the project's `members[]` so they appear in the project roster. (Update 2026-06-08: this is no longer *enforced* — the cross-project membership write-gate on the EXEC append was removed per CLAUDE.md C-3, so a nomination naming a non-member persona no longer throws. Membership is now advisory/informational; keep the seed file complete for roster accuracy.)
 - **Comment posting** — `mcp__github__add_issue_comment` (today's tool) is replaced at handler time by a REST POST using the project-scoped PAT. The comment body shape is unchanged.
 
 What stays the same:

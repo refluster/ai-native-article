@@ -21,10 +21,12 @@
 // member of project Y on date Z" can be reconstructed. isMember() and
 // members() filter on `revoked_at === undefined`.
 //
-// Trust-boundary asymmetry (intentional): appendExecution() gates on
-// membership; listExecutions() does NOT — the helper layer doesn't
-// know the caller's identity. Story 1-B's runner wires the read-gate.
-// See JSDoc on listExecutions() below.
+// Membership write-gate removed 2026-06-08 (operator decision; C-3): neither
+// appendExecution() nor listExecutions() gate writes on membership anymore.
+// listExecutions() still offers an OPTIONAL recall read-filter via
+// `caller_agent_slug` (defence-in-depth for the semantic-recall surface) —
+// see JSDoc on listExecutions() below — but it errors no one; it silently
+// scopes recall candidates and is not on the engagement-write path.
 //
 // Credential resolution (getCredential) uses preferred-path-with-
 // scoped-legacy-fallback per Epic-010 §6. The catch is narrowed to
@@ -422,14 +424,17 @@ export interface AppendExecutionInput {
 }
 
 /**
- * Append one execution row to a project's ledger. Cross-project denial
- * is enforced at the helper layer: the agent MUST be an active member
- * (non-revoked) or this throws.
+ * Append one execution row to a project's ledger.
+ *
+ * NOTE (2026-06-08): the cross-project membership write-gate was removed.
+ * This no longer checks `isMember` and never throws "cross-project denial".
+ * Any caller holding the API-layer write token may append to any project's
+ * ledger (single-operator scale, C-3). Membership is now an informational
+ * record only.
  *
  * Note: archive does NOT close the ledger — appendExecution against an
- * archived project succeeds if the agent is still a member. If
- * "archive closes the ledger" semantics are wanted later, gate here on
- * `meta.status === "active"`.
+ * archived project succeeds. If "archive closes the ledger" semantics are
+ * wanted later, gate here on `meta.status === "active"`.
  *
  * Story 4 (#93): the embedding sidecar (`embedding_bytes` +
  * `embedding_model_id` + `embedding_dim` + `embedding_status`) is optional
@@ -441,11 +446,14 @@ export interface AppendExecutionInput {
  * (the retry path, tests) call `appendExecution` directly.
  */
 export async function appendExecution(input: AppendExecutionInput): Promise<ExecutionRow> {
-  if (!(await isMember(input.project_id, input.agent_slug))) {
-    throw new Error(
-      `cross-project denial: agent "${input.agent_slug}" is not a member of project "${input.project_id}"`,
-    );
-  }
+  // Membership is no longer a write-gate. Per the operator decision of
+  // 2026-06-08 (and aligned with C-3, single-operator scale — don't build
+  // multi-tenant auth primitives), the project-membership permission split
+  // was removed: appendExecution writes the ledger row regardless of whether
+  // the agent has a MEMBER# row for the project. Membership rows survive as
+  // an informational record (GET /projects/{id}/members) but gate nothing.
+  // Write access to this surface is still bounded by the engagement-write
+  // Bearer token at the API layer; it is simply not partitioned per project.
 
   // Validate the embedding-sidecar co-set. The three byte/model/dim
   // fields MUST be all-present or all-absent; `embedding_status='ok'`
@@ -525,9 +533,11 @@ type CommonOpts = {
    * Caller identity for the recall trust-boundary read-gate (Story 4 / #93).
    *
    * When set, `listExecutions` post-filters out any row whose `project_id`
-   * the named agent is not an active member of. This is the read-side of
-   * the cross-project denial that `appendExecution` enforces at write
-   * time. It is OPTIONAL because:
+   * the named agent is not an active member of. This is a recall-scoping
+   * read-filter only; the matching write-gate on `appendExecution` was
+   * removed 2026-06-08, so this no longer mirrors a write-time denial — it
+   * just narrows which ledger rows feed semantic recall. It is OPTIONAL
+   * because:
    *
    *   - Pre-Story-4 callers (the agents-api, the agent-runner's own
    *     dual-write tests) already assert membership at a higher seam and
@@ -548,11 +558,10 @@ export type ListExecutionsFilter = (AgentScope | SkillScope | ProjScope) & Commo
 /**
  * Return execution rows matching the filter.
  *
- * **Trust-boundary asymmetry (intentional, then tightened by Story 4)**:
- * `appendExecution` gates on project membership; `listExecutions`
- * historically does NOT — the helper layer does not always know the
- * caller's identity context. Story 1-B wired the runner to assert
- * membership before invoking this. Story 4 (#93) ADDS an optional
+ * **Recall read-filter (optional)**: the `appendExecution` write-gate on
+ * project membership was removed 2026-06-08 (C-3). `listExecutions` never
+ * gated either; it retains an optional recall-scoping filter. Story 4 (#93)
+ * ADDED the optional
  * `caller_agent_slug` field (see `CommonOpts.caller_agent_slug` doc) so
  * the recall surface can defence-in-depth the read-gate here even when
  * the higher-layer check is forgotten. Callers that don't pass it get

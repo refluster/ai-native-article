@@ -130,5 +130,5 @@ Briefly summarise: "I [did the work]. Engagement record filed. {SLUG}'s portfoli
 - **Agent not in project members[]** → refuse, point at upstream `workforce/projects/{id}/project.json`.
 - **Resume fetch 4xx/5xx** → workforce API is down or the agent was removed upstream. If you're confident from upstream knowledge what the persona looks like, you may continue on degraded mode; otherwise refuse.
 - **`system.md` fetch fails** → continue with resume-only voice. Note the degradation in the engagement record's `summary`.
-- **POST engagement 4xx** → most likely `403 not_a_member` (project not seeded upstream) or `400 invalid_*` (your record shape is malformed). Diagnose, fix, re-POST.
+- **POST engagement 4xx** → `401 unauthorized` (bad/missing Bearer token) or `400 invalid_*` (your record shape is malformed). Diagnose, fix, re-POST. (The old `403 not_a_member` membership gate was removed 2026-06-08, so project membership no longer rejects an engagement write.)
 - **POST engagement transport failure** → silent loss is acceptable per R-N1(b). Tell the operator the work was done but the audit record was lost.

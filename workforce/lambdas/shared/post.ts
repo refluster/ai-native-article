@@ -456,8 +456,9 @@ export async function hidePost(input: HidePostInput): Promise<void> {
   }
 
   // (2) Audit row first. Inherits the Epic-010 EXEC shape. The audit
-  //     project (`self/{operator}`) is seeded by `seed-projects.mjs`;
-  //     if missing, `appendExecution()` throws cross-project-denial.
+  //     project (`self/{operator}`) is seeded by `seed-projects.mjs`.
+  //     (The appendExecution membership write-gate was removed 2026-06-08,
+  //     so a missing membership row no longer throws cross-project-denial.)
   const operatorProjectId = selfProjectId(input.operator);
   const execUlid = defaultNewUlid();
   const startedAt = new Date().toISOString();
