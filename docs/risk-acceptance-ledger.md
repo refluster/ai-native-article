@@ -1,7 +1,7 @@
 # Risk Acceptance Ledger
 
 **Layer:** L2 registry (this file is data; `scripts/check-governance-registries.mjs` keeps its table well-formed — R-12).
-**Provenance:** imported from [asp-cloud's risk_acceptance_ledger.md](../../asp-cloud/docs/reviews/risk_acceptance_ledger.md), scaled to a single-operator repo.
+**Decision record:** [ADR-0001](adr/adr-0001-self-driving-governance-mechanisms.md) (the converging audit loop).
 **Audience:** the operator (who signs), and any agent triaging a known-but-unfixed gap.
 
 ---

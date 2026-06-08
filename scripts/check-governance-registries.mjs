@@ -3,10 +3,10 @@
 //
 // The memory→lint backlog and the risk-acceptance ledger are only useful if
 // they stay machine-parseable: a malformed row silently drops a finding from
-// the audit trail. This is mononaware's lesson (the backlog IS the provenance;
-// a broken backlog is a broken provenance). This gate parses both registries
-// and fails on structural drift — wrong columns, ragged rows, duplicate IDs,
-// or an unknown status value.
+// the audit trail. The backlog IS the provenance, so a broken backlog is a
+// broken provenance. This gate parses both registries and fails on structural
+// drift — wrong columns, ragged rows, duplicate IDs, or an unknown status
+// value.
 //
 // Each registry table is preceded by an anchor comment that declares its
 // columns:

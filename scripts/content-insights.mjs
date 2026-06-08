@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Weekly content-insights loop — the article-side analogue of mononaware's
-// Software 2.0 feedback loop (gi-track → /insights → weekly-insights.yml →
-// sw2-actionable issue). Closes the gap noted in design-policy.md: GA4 is wired
-// on the client, but the data never came back to drive the roadmap.
+// Weekly content-insights loop — the Software 2.0 feedback loop for the article
+// side (design-policy.md D-2). Closes the gap noted there: GA4 is wired on the
+// client, but the data never came back to drive the editorial roadmap.
+// Decision record: docs/adr/adr-0001-self-driving-governance-mechanisms.md.
 //
 // Flow:
 //   GA4 Data API (last 7d page views + engagement)

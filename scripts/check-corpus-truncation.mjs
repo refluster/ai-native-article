@@ -9,8 +9,8 @@
 // finish_reason throw (R-3) stops bad content at *generation* time; this gate
 // stops it at *deploy* time, before the public site is overwritten.
 //
-// Provenance: asp-cloud's "health gate before promote" + mononaware's
-// pre-publish parity gates. Recorded in docs/governance-mechanisms.md.
+// Decision record: docs/adr/adr-0001-self-driving-governance-mechanisms.md.
+// Operating notes: docs/governance-mechanisms.md.
 //
 // Exit codes:
 //   0  every published body is well-formed

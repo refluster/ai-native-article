@@ -17,7 +17,7 @@ This document does three things:
 2. **Layers the rules** so an agent reading a diff knows which layer a change touches and what evidence is required for it to be safe.
 3. **Tells agents what they may do automatically vs. what requires the operator's explicit approval.**
 
-The framework is borrowed from [asp-cloud's governance.md](../../asp-cloud/docs/governance.md) — civil-law-style hierarchy where higher layers constrain lower — and scaled down for a hobby-grade project. **Production security and multi-stakeholder process are explicitly out of scope.**
+The framework is a civil-law-style hierarchy — higher layers constrain lower — scaled down for a hobby-grade project. **Production security and multi-stakeholder process are explicitly out of scope.**
 
 ### 0.1 The other axis: design policy
 
@@ -32,7 +32,7 @@ A D-principle is **not** enforced by hook or CI; violating it does not make a bu
 
 ### 0.2 The third document: the machinery
 
-This document is the law; design-policy is the direction. **[`docs/governance-mechanisms.md`](governance-mechanisms.md)** is the *machinery* — the working mechanisms that make this law run itself without the operator in the loop: the CI gates (R-10…R-12), the two self-driving engines (the memory→lint **ratchet** and the content-insights **loop**), the registries that make the audit loop converge, and the provenance of each (what we imported from **asp-cloud** and **mononaware**, and what we deliberately left as ceremony). Read it before adding a new gate, loop, or registry — it carries the anti-reinvention reflex.
+This document is the law; design-policy is the direction. **[`docs/governance-mechanisms.md`](governance-mechanisms.md)** is the *machinery* — the working mechanisms that make this law run itself without the operator in the loop: the CI gates (R-10…R-12), the two self-driving engines (the memory→lint **ratchet** and the content-insights **loop**), and the registries that make the audit loop converge. The decision to adopt them — and what was deliberately left as ceremony — is recorded in [ADR-0001](adr/adr-0001-self-driving-governance-mechanisms.md). Read it before adding a new gate, loop, or registry — it carries the anti-reinvention reflex.
 
 ---
 
@@ -67,12 +67,13 @@ These are the four invariants. If a proposed change conflicts with one of these,
 
 ## 3. L1 — Framework Laws
 
-L1 is the body of architectural decisions the project rests on. Each is documented in a single file; superseding a file is the only way to change its rule.
+L1 is the body of architectural decisions the project rests on. Each is documented in a single file; superseding a file is the only way to change its rule. Decisions are recorded two ways: the **named statute docs** below (long-lived contracts, edited in place when refined), and **ADRs** under [`docs/adr/`](adr/README.md) (point-in-time decisions, append-only — a reversal supersedes the old ADR rather than rewriting it). Both are L1; both are citable by the R-11 gate, so implementing against either announces itself in the PR.
 
 ### 3.1 Current statute
 
 | File | Subject | Binding on |
 |---|---|---|
+| [docs/adr/](adr/README.md) | Architecture Decision Records — point-in-time framework decisions (e.g. [ADR-0001](adr/adr-0001-self-driving-governance-mechanisms.md), the governance mechanisms). Follow the ADR in force when implementing what it governs. | whatever each ADR scopes |
 | [docs/architecture-source-of-truth.md](../newsletter/docs/architecture-source-of-truth.md) | Notion = authoritative; main:newsletter/app/public/posts is stale; gh-pages built fresh per deploy | `newsletter/gas/src/Code.gs`, `newsletter/pipeline/fetch-notion.mjs`, any future content-pipeline script |
 | [docs/azure-budget-rules.md](../newsletter/docs/azure-budget-rules.md) | 3-bracket sizing (Tiny=2000 / Standard=8000 / Heavy=16000) for `maxCompletionTokens`; throw on length | every `azureGenerateText` call site |
 | [L1-L4-PIPELINE.md](../newsletter/docs/L1-L4-PIPELINE.md) | The 4-stage L1→L2→L3→L4 pipeline shape; daily idempotent batch design; per-batch caps | `newsletter/gas/src/Code.gs`, `newsletter/app/src/pages/L*.tsx` |
@@ -91,8 +92,8 @@ These are mechanical consequences that any agent reviewing a diff should check:
 
 ### 3.3 How to amend L1
 
-1. Open a PR that edits the relevant doc (or adds a new one).
-2. PR description names the L0 invariant the new rule honours.
+1. Open a PR that edits the relevant statute doc, or adds an ADR under [`docs/adr/`](adr/README.md) for a point-in-time decision (use the format in the ADR README; reverse a prior ADR by superseding it, never by rewriting its Decision).
+2. PR description names the L0 invariant the new rule honours, and cites the L1 doc / ADR (the R-11 gate requires this).
 3. PR description names the L2 (mechanical) checks that will need to update as a consequence — agent or operator follows up with those changes.
 4. **Operator approves.** An agent never self-merges an L1 change.
 
@@ -115,9 +116,9 @@ Whatever portion of L0/L1 a machine can check, it should. These are the guards a
 | R-9 | Sitemap generation succeeds | `npm run sitemap` | `deploy-article-site.yml` | ✅ |
 | R-10 | Pre-deploy corpus truncation gate | `node scripts/check-corpus-truncation.mjs` | `deploy-article-site.yml` (after `fetch-notion`) | ✅ added 2026-06-07 |
 | R-11 | L1 citation gate (touch an L1 doc → cite it or `RULE-N/A:`) | `node scripts/check-l1-citation.mjs` | `ci.yml` (PRs only) | ✅ added 2026-06-07 |
-| R-12 | Governance registry integrity (backlog + ledger well-formed) | `node scripts/check-governance-registries.mjs` | `ci.yml` + `.githooks/pre-push` | ✅ added 2026-06-07 |
+| R-12 | Governance registry integrity (backlog + ledger well-formed) | `node scripts/check-governance-registries.mjs` | `ci.yml` | ✅ added 2026-06-07 |
 
-**Policy.** R-3 and R-4 are runtime invariants — no agent may catch and ignore them; the right fix is to bump the `maxCompletionTokens` bracket. R-5 is a precondition for `L2_BACKFILL`; if it ever fires there's a deeper bug. R-1, R-2, R-8, R-9, **R-10** must stay green for `deploy-article-site.yml` to ship. The skills (R-6, R-7) are advisory but should be run after every `newsletter/gas/src/Code.gs` edit and after every user-reported content issue respectively. R-10 is the *deploy-time* twin of the *generation-time* finish_reason throw (R-3): R-3 stops bad content from being written; R-10 stops it from being published. R-11 mirrors asp-cloud's R-15 (ADR-presence). R-12 keeps the two governance registries ([memory-lint-backlog.md](memory-lint-backlog.md), [risk-acceptance-ledger.md](risk-acceptance-ledger.md)) machine-parseable. The full operating notes for R-10…R-12 live in [governance-mechanisms.md §2.1](governance-mechanisms.md#21-how-to-operate-each).
+**Policy.** R-3 and R-4 are runtime invariants — no agent may catch and ignore them; the right fix is to bump the `maxCompletionTokens` bracket. R-5 is a precondition for `L2_BACKFILL`; if it ever fires there's a deeper bug. R-1, R-2, R-8, R-9, **R-10** must stay green for `deploy-article-site.yml` to ship. The skills (R-6, R-7) are advisory but should be run after every `newsletter/gas/src/Code.gs` edit and after every user-reported content issue respectively. R-10 is the *deploy-time* twin of the *generation-time* finish_reason throw (R-3): R-3 stops bad content from being written; R-10 stops it from being published. R-11 requires an L1-document edit (a framework law in §3.1, this doc / design-policy, or any ADR under `docs/adr/`) to cite the law it touches — so following the relevant ADR when implementing is mechanical, not optional. R-12 keeps the two governance registries ([memory-lint-backlog.md](memory-lint-backlog.md), [risk-acceptance-ledger.md](risk-acceptance-ledger.md)) machine-parseable. The full operating notes for R-10…R-12 live in [governance-mechanisms.md §2.1](governance-mechanisms.md#21-how-to-operate-each); the decision record is [ADR-0001](adr/adr-0001-self-driving-governance-mechanisms.md).
 
 **Loosening.** Tightening any of R-1…R-9 is L2 work and an agent may do it freely. **Loosening or disabling any of them requires operator approval** — drop the line in chat with the rationale, wait for explicit yes.
 
@@ -141,7 +142,7 @@ Skills are L3 in their entirety: each `SKILL.md` is the runbook, each `scripts/*
 
 ## 6. Audit cadence
 
-Lighter than asp-cloud — no QA engineer, no monthly threat-model refresh. The cadences that matter:
+Deliberately lightweight — no QA engineer, no monthly threat-model refresh. The cadences that matter:
 
 | Review | Trigger | Output |
 |---|---|---|
@@ -156,7 +157,7 @@ Missing a "what should this rule have caught?" pass after an incident is itself 
 A retrospective that just edits a doc is forgotten by the next incident. The **ratchet** makes the
 loop converge: every recurring failure is logged in [memory-lint-backlog.md](memory-lint-backlog.md),
 and on its **second occurrence within 90 days** it is promoted to an `R-NN` mechanical regulation
-(§4). This is mononaware's memory→lint pipeline scaled to one operator. The truncation incident is
+(§4). The truncation incident is
 the worked example: `d17e1d58ec42` → R-3/R-4/R-5 (runtime) → R-10 (deploy gate). Do not write a
 one-off lint without a backlog row — the row is the provenance for "why does this gate exist?".
 
@@ -166,7 +167,7 @@ A finding that is real but **not** worth a machine check goes to
 [risk-acceptance-ledger.md](risk-acceptance-ledger.md) — an agent drafts the row, the operator
 "signs" it by merging (the only merge authority, §8.1 B). A signed row **suppresses re-filing**: a
 later retrospective that rediscovers the gap checks the `Re-eval` date instead of opening a new
-finding. This is asp-cloud's signed ledger, and it is what stops the audit loop from re-litigating
+finding. The signed ledger is what stops the audit loop from re-litigating
 the same accepted trade-offs forever. Both registries are kept well-formed by R-12.
 
 The mechanics of all of this — the gates, the two engines, the provenance, and the C-3 boundary on
@@ -245,4 +246,4 @@ These are conventions worth borrowing from production-grade governance framework
 
 If any of these become relevant (the site grows, takes payments, hosts user data), revisit this section.
 
-The full, current decision table — every mechanism we *did* import from asp-cloud / mononaware versus the ones we judged to be ceremony at single-operator scale, each with a "revisit when…" trigger — lives in [governance-mechanisms.md §5](governance-mechanisms.md#5-what-we-deliberately-did-not-import-c-3-boundary). That table supersedes this list as the canonical "what we left off and why."
+The full, current decision table — every mechanism we *did* adopt versus the ones we judged to be ceremony at single-operator scale, each with a "revisit when…" trigger — lives in [governance-mechanisms.md §5](governance-mechanisms.md#5-what-we-deliberately-did-not-adopt-c-3-boundary) and is ratified in [ADR-0001](adr/adr-0001-self-driving-governance-mechanisms.md). That table supersedes this list as the canonical "what we left off and why."

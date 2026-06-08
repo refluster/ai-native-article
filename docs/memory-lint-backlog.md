@@ -1,7 +1,7 @@
 # Memory → Lint Promotion Backlog
 
 **Layer:** L2 registry (this file is data; `scripts/check-governance-registries.mjs` keeps its table well-formed — R-12).
-**Provenance:** imported from [mononaware's RFC 034 memory-to-lint pipeline](../../mononaware/dev/software20/memory_lint_backlog.yaml), scaled to a single-operator repo.
+**Decision record:** [ADR-0001](adr/adr-0001-self-driving-governance-mechanisms.md) (the memory→lint ratchet, Engine A).
 **Audience:** the operator, and any agent running a governance retrospective (governance.md §6).
 
 ---

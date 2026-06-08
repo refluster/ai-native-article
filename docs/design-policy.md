@@ -160,8 +160,7 @@ None of these are mandatory. They are the kind of thing an agent should propose-
 
 The loop above has a sharp edge: **promote** replaces the primary prompt, and the very next batch
 runs the new prompt against 100% of pending articles. A subtly-worse prompt therefore degrades a
-whole day's output before `article-health` catches it post-deploy. The discipline (imported from
-mononaware's release-cohort model, scaled down) is:
+whole day's output before `article-health` catches it post-deploy. The discipline is:
 
 > Never promote a prompt change straight to a full batch. Run it against a **small canary slug list
 > first**, sweep `article-health`, *then* widen.
