@@ -114,7 +114,7 @@ The first invocation is conversational (today's invocation surface — [`pr-rout
 > Nadia, project `acme-web` の PR https://github.com/acmeorg/web/pull/42 を PdM 視点で review。Architecture surface あれば Dario に route。
 
 The runner:
-1. Validates the operator's project membership for `acme-web` (or rejects with `cross-project denial`).
+1. Resolves the project context for `acme-web`. (Update 2026-06-08: membership is no longer a write-gate — the cross-project denial was removed per CLAUDE.md C-3 — so this step records context rather than rejecting non-members.)
 2. Resolves `wf/projects/acme-web/github.token` via `getCredential<GithubSecret>("acme-web", "github.token")`.
 3. Fetches the PR + governance_docs from `acmeorg/web` using the token.
 4. Composes the Nadia persona prompt (system.md + `pr-route` binding config + `pr-route.md` skill contract).
@@ -129,7 +129,7 @@ Verdict synthesis (cycle close) is the second mode of the same `pr-route` skill.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `cross-project denial: agent "X" is not a member of project "acme-web"` | `members[]` missing X | Add to `project.json`, re-run `workforce:projects:seed` |
+| `cross-project denial: …` (removed 2026-06-08) | n/a — the membership write-gate was removed (C-3); this error no longer occurs | If a record is missing from the roster, add to `project.json` + re-run `workforce:projects:seed` (informational only) |
 | `ResourceNotFoundException` on `getCredential` | Step 2 skipped or wrong path | Confirm `aws secretsmanager describe-secret --secret-id wf/projects/acme-web/github.token` |
 | 401 from GitHub | PAT expired or wrong scope | Rotate per Step 2; verify scopes (Contents Read, Issues R/W, Pull requests R/W) |
 | Validator P-4 ("member X has no matching workforce/agents/X/") | Typo in members[], or agent not yet hired | Fix slug or wait for agent's onboarding PR |

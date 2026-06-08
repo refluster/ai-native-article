@@ -172,8 +172,9 @@ vi.mock("../shared/project.js", () => ({
   },
   // Phase 7 PR5: POST /agents/{slug}/engagements writes a project EXEC
   // row through this helper. Tests inject an EXEC row directly into
-  // `rows` to simulate the write, with cross-project denial flagged via
-  // membershipSet (mirrors shared/project.ts:isMember).
+  // `rows` to simulate the write. The membership write-gate was removed
+  // 2026-06-08 (C-3), so this mock no longer denies non-members — it
+  // mirrors shared/project.ts:appendExecution, which now always writes.
   appendExecution: async (input: {
     project_id: string;
     agent_slug: string;
@@ -187,11 +188,6 @@ vi.mock("../shared/project.js", () => ({
     error?: string;
     execution_surface?: "lambda" | "client";
   }) => {
-    if (!membershipSet.has(`${input.project_id}|${input.agent_slug}`)) {
-      throw new Error(
-        `cross-project denial: agent "${input.agent_slug}" is not a member of project "${input.project_id}"`,
-      );
-    }
     const row = {
       pk: `PROJECT#${input.project_id}`,
       sk: `EXEC#${input.exec_ulid}`,
@@ -213,10 +209,10 @@ vi.mock("../shared/project.js", () => ({
   },
 }));
 
-// Membership set the appendExecution mock above reads. Tests add a
-// (project_id|agent_slug) tuple before exercising the POST path so the
-// cross-project denial branch is reachable without re-instantiating the
-// whole shared/project mock.
+// VESTIGIAL (2026-06-08): the membership write-gate was removed (C-3), so the
+// appendExecution mock no longer reads this set. The remaining `.add()`/
+// `.clear()` calls in the engagement tests are harmless no-ops kept to avoid
+// churning ~16 call sites; the POST path now succeeds regardless of membership.
 const membershipSet = new Set<string>();
 
 // Issue #158 PR-β A1: credentials LIST enumerates from CREDENTIAL_TYPES.
@@ -1270,13 +1266,17 @@ describe("POST /agents/{slug}/engagements (Engagements API — createEngagement)
     expect((bodyOf(res) as { error: string }).error).toBe("invalid_artifact");
   });
 
-  it("403s on cross-project denial (agent not a member of the supplied project)", async () => {
-    // membershipSet intentionally empty for asp-cloud + nadia
+  it("201s even when the agent is NOT a project member (write-gate removed 2026-06-08)", async () => {
+    // membershipSet intentionally empty for asp-cloud + nadia — the
+    // engagement write must still succeed now that the cross-project
+    // membership gate is gone (C-3, single-operator scale).
     const res = await handler(
       postEvt("nadia", { authorization: `Bearer ${TOKEN}` }, validBody()),
     );
-    expect(statusOf(res)).toBe(403);
-    expect((bodyOf(res) as { error: string }).error).toBe("not_a_member");
+    expect(statusOf(res)).toBe(201);
+    expect((bodyOf(res) as { engagement: { agent_slug: string } }).engagement.agent_slug).toBe(
+      "nadia",
+    );
   });
 
   it("201s on happy path, returns engagement view", async () => {

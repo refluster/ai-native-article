@@ -1304,9 +1304,9 @@ async function patchFeedPostRoute(
 // client-side execution is best-effort on audit, cost tracking, and
 // persona stability — silent loss is an accepted failure mode at single-
 // operator scale (C-3). The shape here matches that posture: a single
-// shared bearer token, client-supplied project_id, no auto-membership
-// enforcement beyond what appendExecution() already gates (cross-project
-// denial throws if the agent isn't a project member).
+// shared bearer token, client-supplied project_id, and — since 2026-06-08 —
+// no project-membership gate at all (the cross-project denial that
+// appendExecution() used to throw was removed; membership is informational).
 
 interface EngagementView {
   engagement_id: string;
@@ -1485,9 +1485,10 @@ async function createEngagementRoute(
     return reply(201, { engagement: toEngagementView(row) });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (msg.startsWith("cross-project denial")) {
-      return reply(403, { error: "not_a_member", detail: msg });
-    }
+    // Membership write-gate removed 2026-06-08 (C-3): appendExecution no
+    // longer throws "cross-project denial", so there is no 403 not_a_member
+    // path here anymore. Any holder of the engagement-write Bearer token may
+    // record an engagement against any project_id.
     if (msg.startsWith("invalid project_id")) {
       return reply(400, { error: "invalid_project_id", detail: msg });
     }

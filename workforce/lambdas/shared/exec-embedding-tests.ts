@@ -9,8 +9,8 @@
 //         succeeds; the EXEC row carries `embedding_status='pending'`.
 //
 //   Plus the skip path (empty text → status='skipped' without a Voyage
-//   call) and the cross-project denial path (the wrapper does NOT mask
-//   the membership gate that appendExecution enforces).
+//   call) and the failure-propagation path (the wrapper does NOT mask a
+//   genuine appendExecution write failure as an embedding failure).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -73,6 +73,7 @@ vi.mock("./voyage.js", () => ({
 
 const project = await import("./project.js");
 const execEmbedding = await import("./exec-embedding.js");
+const ddb = await import("./ddb.js");
 
 async function flushMetrics(): Promise<void> {
   await new Promise<void>((resolve) => setImmediate(resolve));
@@ -192,10 +193,14 @@ describe("appendExecutionWithEmbedding — failure isolation (AC4)", () => {
     expect(store.get("PROJECT#alpha|EXEC#01NOKEY")).toBeDefined();
   });
 
-  it("cross-project denial is NOT masked — appendExecution still throws + no spurious embedding-failed metric", async () => {
+  it("an appendExecution write failure is NOT masked — it throws + emits no spurious embedding-failed metric", async () => {
+    // The membership write-gate was removed 2026-06-08, so a non-member no
+    // longer triggers a throw. This still asserts the wrapper's invariant:
+    // a genuine appendExecution-layer failure (here, the DDB putItem write)
+    // must propagate, NOT be silently re-classified as an embedding failure.
     const alpha = project.asProjectId("alpha");
     await project.create({ project_id: alpha, owner_agent: "_operator" });
-    // ren is NOT a member of alpha.
+    await project.addMember(alpha, "ren");
 
     embedMock.mockResolvedValueOnce({
       embedding: Float32Array.from([1, 0, 0]),
@@ -203,6 +208,8 @@ describe("appendExecutionWithEmbedding — failure isolation (AC4)", () => {
       dim: 3,
       tokensIn: 5,
     });
+    // Make the underlying ledger write fail after the embedding succeeded.
+    vi.mocked(ddb.putItem).mockRejectedValueOnce(new Error("ddb putItem failed"));
 
     await expect(
       execEmbedding.appendExecutionWithEmbedding({
@@ -216,13 +223,12 @@ describe("appendExecutionWithEmbedding — failure isolation (AC4)", () => {
         status: "ok",
         embedding_text: "anything",
       }),
-    ).rejects.toThrow(/cross-project denial/);
+    ).rejects.toThrow(/ddb putItem failed/);
 
-    // The embedding step DID succeed (Voyage returned a vector); the
-    // cross-project denial fires inside appendExecution. The denial must
-    // propagate, NOT get silently re-classified as an embedding failure
-    // (that would emit a misleading WfExecEmbeddingFailed metric and
-    // hide a W-2 trust-boundary violation in the retry queue).
+    // The embedding step DID succeed (Voyage returned a vector); the write
+    // failed inside appendExecution. That failure must propagate, NOT get
+    // silently re-classified as an embedding failure (which would emit a
+    // misleading WfExecEmbeddingFailed metric and hide the real fault).
     await flushMetrics();
     expect(metricBatches).toHaveLength(0);
   });

@@ -23,10 +23,11 @@
 // ─── Audit (EXEC row) ──────────────────────────────────────────────────
 //
 // Every successful PUT / DELETE appends an EXEC row to the project's
-// ledger via `appendExecution(...)`. The operator is a project member by
-// auto-add on first write (idempotent — see `ensureOperatorMember`); this
-// keeps the trust-boundary asymmetry (membership-gated append, ungated
-// read) intact rather than punching a special bypass into `appendExecution`.
+// ledger via `appendExecution(...)`. The operator is still recorded as a
+// project member by auto-add on first write (idempotent — see
+// `ensureOperatorMember`). NOTE (2026-06-08): the appendExecution membership
+// write-gate was removed (C-3), so this auto-add is no longer required to
+// avoid a denial — it's kept only so `_operator` shows up in members[].
 //
 // The choice between "auto-add `_operator` as a member" vs "special path
 // past the membership gate" went auto-add: it preserves the gate's
@@ -397,9 +398,9 @@ async function ensureOperatorMember(projectId: ProjectId): Promise<void> {
 
 /**
  * Append an EXEC row attributed to `_operator` for the credentials-write
- * or credentials-delete skill. Auto-adds operator membership first so
- * `appendExecution`'s cross-project denial gate doesn't fire on the
- * very first operator-authored mutation.
+ * or credentials-delete skill. Records operator membership first (kept for
+ * the informational members[] list; the appendExecution cross-project
+ * write-gate it used to bypass was removed 2026-06-08).
  *
  * Mutates DDB after the Secrets Manager write has already succeeded —
  * if the audit append throws, the secret change persists (loud thrown

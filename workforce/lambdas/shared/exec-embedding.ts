@@ -99,9 +99,10 @@ export async function appendExecutionWithEmbedding(
   }
 
   // Narrow the failure-isolation try/catch to JUST the embedding step.
-  // Wrapping `appendExecution` would mask cross-project denial throws
-  // (W-2 trust boundary) as "embedding failed", emitting a misleading
-  // metric and an extra (still-failing) write attempt.
+  // Wrapping `appendExecution` would mask a genuine ledger-write failure
+  // as "embedding failed", emitting a misleading metric and an extra
+  // (still-failing) write attempt. (Before 2026-06-08 this also protected
+  // the cross-project denial throw; that write-gate has since been removed.)
   let embeddingAttrs: {
     embedding_bytes: Uint8Array;
     embedding_model_id: string;

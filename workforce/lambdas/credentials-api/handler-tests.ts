@@ -13,8 +13,9 @@
 //     malformed `type@variant` variants)
 //   - Every successful PUT / DELETE appends an EXEC row attributed to
 //     `_operator` with skill_name = credentials-write / credentials-delete
-//   - Operator membership is auto-added on first PUT per project (so the
-//     appendExecution membership gate doesn't block the first audit row)
+//   - Operator membership is still recorded on first PUT per project (the
+//     appendExecution membership write-gate was removed 2026-06-08, so this
+//     is now an informational membership row, not a gate bypass)
 //
 // Secrets Manager and the appendExecution / project helpers are mocked
 // at the module boundary; project + membership state lives in an
@@ -181,12 +182,8 @@ vi.mock("../shared/project.js", () => ({
     exec_ulid: string;
     status: string;
   }) => {
-    const p = projects.get(input.project_id);
-    if (!p || !p.members.has(input.agent_slug)) {
-      throw new Error(
-        `cross-project denial: agent "${input.agent_slug}" is not a member of project "${input.project_id}"`,
-      );
-    }
+    // Membership write-gate removed 2026-06-08 (C-3): appendExecution writes
+    // unconditionally now, so this mock no longer throws cross-project denial.
     execRows.push({
       project_id: input.project_id,
       agent_slug: input.agent_slug,

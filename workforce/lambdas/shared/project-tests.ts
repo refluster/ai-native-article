@@ -2,7 +2,7 @@
 //
 // Covers the Story 1 (#90) acceptance criteria that are testable at the
 // helper layer, plus the cycle-1 review findings from Dario + Ren:
-//   - cross-project denial via membership gate
+//   - appendExecution writes regardless of membership (write-gate removed)
 //   - selfProjectId returns the canonical shape
 //   - GSI1 / GSI2 cross-project recall
 //   - removeMember is SOFT delete (revoked_at, audit row remains)
@@ -317,35 +317,37 @@ describe("appendExecution", () => {
     // ren is NOT a member of "b" — used to trigger cross-project denial.
   });
 
-  it("throws cross-project denial when the agent is not a member", async () => {
-    await expect(
-      project.appendExecution({
-        project_id: b,
-        agent_slug: "ren",
-        exec_ulid: "01HXY",
-        skill_name: "code-task-brief",
-        skill_version: "0.1.0",
-        started_at: "2026-05-26T00:00:00.000Z",
-        ended_at: "2026-05-26T00:00:01.000Z",
-        status: "ok",
-      }),
-    ).rejects.toThrow(/cross-project denial.*"ren".*not a member.*"b"/);
+  // Membership write-gate removed 2026-06-08 (operator decision; C-3).
+  // appendExecution writes the ledger row regardless of membership.
+  it("writes the row even when the agent is NOT a member (gate removed)", async () => {
+    const row = await project.appendExecution({
+      project_id: b, // ren is not a member of "b"
+      agent_slug: "ren",
+      exec_ulid: "01HXY",
+      skill_name: "code-task-brief",
+      skill_version: "0.1.0",
+      started_at: "2026-05-26T00:00:00.000Z",
+      ended_at: "2026-05-26T00:00:01.000Z",
+      status: "ok",
+    });
+    expect(row.pk).toBe("PROJECT#b");
+    expect(row.sk).toBe("EXEC#01HXY");
+    expect(row.agent_slug).toBe("ren");
   });
 
-  it("throws when the agent's membership has been revoked", async () => {
+  it("writes the row even when membership has been revoked (gate removed)", async () => {
     await project.removeMember(a, "ren");
-    await expect(
-      project.appendExecution({
-        project_id: a,
-        agent_slug: "ren",
-        exec_ulid: "01HXY",
-        skill_name: "code-task-brief",
-        skill_version: "0.1.0",
-        started_at: "2026-05-26T00:00:00.000Z",
-        ended_at: "2026-05-26T00:00:01.000Z",
-        status: "ok",
-      }),
-    ).rejects.toThrow(/cross-project denial/);
+    const row = await project.appendExecution({
+      project_id: a,
+      agent_slug: "ren",
+      exec_ulid: "01HXY",
+      skill_name: "code-task-brief",
+      skill_version: "0.1.0",
+      started_at: "2026-05-26T00:00:00.000Z",
+      ended_at: "2026-05-26T00:00:01.000Z",
+      status: "ok",
+    });
+    expect(row.sk).toBe("EXEC#01HXY");
   });
 
   it("succeeds when member; populates pk/sk + both GSI fields", async () => {
