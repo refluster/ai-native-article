@@ -17,6 +17,15 @@
   "created_at": "2026-05-18",
   "bindings": [
     {
+      "skill": "pdm-charter",
+      "executor": "claude-code-routine",
+      "trigger": {
+        "scheduler": "manual"
+      },
+      "routine_spec": "workforce/docs/routines/agent-runner.md",
+      "note": "Operator-triggered stub — Maya uses this when manually decomposing an Epic into Story issues. The orchestrator never auto-dispatches (scheduler=manual, no cron). pdm-decompose (the role-tagged sub-task approach) is superseded by dev-process.md; pdm-charter is the current canonical decomposition surface. See workforce/skills/pdm-charter/SKILL.md for the v2 contract."
+    },
+    {
       "skill": "feed-post",
       "executor": "claude-code-routine",
       "trigger": {
