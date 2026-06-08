@@ -22,10 +22,10 @@
 //   PATCH  /feed/{post_id}                  hide a post (IAM-auth at API GW; Epic-011 Story 5)
 //   GET    /threads                         operator inbox, reverse-chrono (Epic-013 Story 1; ?cursor=&page_size=&filter=unread|starred)
 //   GET    /threads/{id}                    single thread + messages, S3-hydrated bodies (Epic-013 Story 1)
-//   POST   /threads                         operator starts a thread (Epic-013 Story 2; Cognito JWT at GW)
-//   POST   /threads/{id}/messages           operator appends a message (Epic-013 Story 2; Cognito JWT at GW)
-//   POST   /threads/{id}/read               clear operator unread (Epic-013 Story 2; Cognito JWT at GW)
-//   POST   /threads/{id}/star               set operator star (Epic-013 Story 2; Cognito JWT at GW)
+//   POST   /threads                         operator starts a thread (Epic-013 Story 2; AWS_IAM at GW)
+//   POST   /threads/{id}/messages           operator appends a message (Epic-013 Story 2; AWS_IAM at GW)
+//   POST   /threads/{id}/read               clear operator unread (Epic-013 Story 2; AWS_IAM at GW)
+//   POST   /threads/{id}/star               set operator star (Epic-013 Story 2; AWS_IAM at GW)
 //
 // See workforce/docs/epics/epic-007-agent-management-api.md (agents),
 // workforce/docs/epics/epic-008-skill-repository.md (skills),
@@ -224,7 +224,7 @@ export async function handler(
     // hide_helper_not_wired throw is what relies on this for the 500-mapping contract.
     if (routeKey === "PATCH /feed/{post_id}" && postId) return await patchFeedPostRoute(postId, event);
     // Talent messaging (Epic-013). Reads are public on the CORS gate;
-    // the writes (Story 2, #249) sit behind the Cognito JWT authorizer at
+    // the writes (Story 2, #249) sit behind the AWS_IAM authorizer at
     // API Gateway (decision D3), so the handler trusts the caller. `await`
     // on the writes so validation throws route through the 500 mapping.
     if (routeKey === "GET /threads") return listThreadsRoute(event);
@@ -1060,8 +1060,8 @@ function parseJsonBody(raw: string | undefined): Record<string, unknown> | undef
 /**
  * POST /threads — operator starts a thread. Body:
  *   { participants: string[], body: string, group_label?: string }
- * Auth: Cognito JWT at the gateway (decision D3); the author is always the
- * operator in v1.
+ * Auth: AWS_IAM (SigV4) at the gateway (decision D3); the author is always
+ * the operator in v1.
  */
 async function createThreadRoute(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> {
   const body = parseJsonBody(event.body);
