@@ -31,7 +31,7 @@ import KPIReadout from '../components/KPIReadout';
 import HeatStrip from '../components/HeatStrip';
 import AgentOrgGraph from '../components/AgentOrgGraph';
 import RecentPostsSection from '../components/RecentPostsSection';
-import TrackRecordSection from '../components/TrackRecordSection';
+import StatusBadge from '../components/StatusBadge';
 import {
   apiConfigured,
   fetchAgentExecutions,
@@ -53,6 +53,11 @@ const STREAM_LABEL: Record<WorkforceAgent['streams'][number], string> = {
   client: 'client work',
   editorial: 'editorial',
 };
+
+// Unified ACTIVITY ledger: how many of the fetched EXEC rows to render,
+// and where to clip a long deliverable summary in the row body.
+const ACTIVITY_LIMIT = 30;
+const SUMMARY_CAP = 180;
 
 function formatRelative(iso: string): string {
   const t = Date.parse(iso);
@@ -114,9 +119,9 @@ export default function AgentProfile() {
       return;
     }
     let cancelled = false;
-    // Fetch a deeper window (not just 20) so the business-level TrackRecord
-    // section can find deliverable-producing runs among the heartbeat noise;
-    // the raw EXEC list below still renders only the most recent 20.
+    // Fetch a deeper window (not just 20) so the unified ACTIVITY ledger
+    // has a meaningful run of recent history to render; it shows the most
+    // recent ACTIVITY_LIMIT rows newest-first.
     Promise.all([fetchAgentLive(slug), fetchAgentExecutions(slug, 100)])
       .then(([l, d]) => {
         if (cancelled) return;
@@ -350,14 +355,25 @@ export default function AgentProfile() {
             <MembershipsPanel memberships={memberships} />
           )}
 
-          {/* TRACK RECORD — business-level deliverables (live API only) */}
-          {apiConfigured() && <TrackRecordSection execs={execs} />}
-
-          {/* EXEC · RAW RUNS — the unfiltered run log incl. heartbeats (live API only) */}
+          {/* ACTIVITY — one unified ledger of every EXEC row, newest-first
+              (live API only). Replaces the former split TRACK RECORD
+              (deliverables-only) + EXEC RAW RUNS (everything) sections,
+              which read as near-duplicates. Each row carries date ·
+              project · skill · status, with the deliverable summary in the
+              body when one exists and a "skipped"/"no summary" fallback
+              otherwise. Deeplinks to Notion / GitHub PRs aren't on EXEC
+              yet (FU-NEW-G follow-up promotes notion_page_url / pr_url
+              onto the row); until then the project link is the operator's
+              drill-down handle. */}
           {apiConfigured() && (
             <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
-              <div className="border-b border-wf-outline-variant px-4 py-3">
-                <Typeplate label="EXEC" value="RAW RUNS · ALL ACTIVITY" />
+              <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between gap-3">
+                <Typeplate label="ACTIVITY" value="RUNS · DELIVERABLES" />
+                {execs !== null && execs.length > 0 && (
+                  <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant shrink-0">
+                    {Math.min(execs.length, ACTIVITY_LIMIT)} of {execs.length}
+                  </span>
+                )}
               </div>
               <div className="p-4">
                 {execs === null ? (
@@ -368,45 +384,41 @@ export default function AgentProfile() {
                   </p>
                 ) : (
                   <ul className="divide-y divide-wf-outline-variant">
-                    {execs.slice(0, 20).map((e) => {
-                      const id = e.exec_ulid;
-                      const startedDate = e.started_at?.slice(0, 10);
-                      // EXEC rows carry the canonical S3 artefact URI.
-                      // Deeplinks to Notion / GitHub PRs lived on the
-                      // legacy DELIV row family and aren't on EXEC yet
-                      // (FU-NEW-G follow-up). Until that lands the row
-                      // surfaces the project_id + exec_ulid as the
-                      // operator's drill-down handle.
+                    {execs.slice(0, ACTIVITY_LIMIT).map((e) => {
+                      const raw = e.artifact_ref?.summary?.trim() ?? '';
+                      const summary = raw.length > SUMMARY_CAP ? `${raw.slice(0, SUMMARY_CAP)}…` : raw;
+                      // A skipped run did no work, so "skipped" is a truer
+                      // body than "no summary"; an ok/throw run that simply
+                      // carried no artefact summary gets "no summary".
+                      const fallback = e.status === 'skipped' ? 'skipped' : 'no summary';
                       return (
-                        <li key={id} className="py-2.5 flex items-baseline gap-3 text-sm">
-                          <span className="font-wfmono text-xs text-wf-on-surface-variant shrink-0 w-24">
-                            {startedDate}
-                          </span>
-                          <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant shrink-0 w-32 truncate" title={e.skill_name}>
-                            {e.skill_name}
-                          </span>
-                          <span className="flex-1 font-wfmono text-xs text-wf-on-surface">
+                        <li key={e.exec_ulid} className="py-3 text-sm">
+                          <div className="flex items-center gap-2 flex-wrap font-wfmono text-[10px] tracking-[0.08em] text-wf-on-surface-variant">
+                            <span>{e.started_at?.slice(0, 10)}</span>
+                            <span aria-hidden>·</span>
                             <Link
                               to={`/projects/${encodeURIComponent(e.project_id)}`}
                               className="text-wf-primary hover:underline"
                             >
-                              {id.slice(0, 8)}
+                              {e.project_id}
                             </Link>
-                            <span className="ml-2 text-wf-on-surface-variant">
-                              · {e.project_id}
-                            </span>
-                            <span
-                              className={`ml-2 font-wfmono text-[10px] uppercase tracking-[0.12em] ${
-                                e.status === 'ok'
-                                  ? 'text-wf-running'
-                                  : e.status === 'throw' || e.status === 'failed_artefact_redaction'
-                                    ? 'text-wf-throwing'
-                                    : 'text-wf-on-surface-variant'
-                              }`}
+                            <span aria-hidden>·</span>
+                            <Link
+                              to={`/skills/${e.skill_name}`}
+                              className="hover:text-wf-primary truncate max-w-[12rem]"
+                              title={e.skill_name}
                             >
-                              {e.status === 'failed_artefact_redaction' ? 'REDACTED' : e.status}
-                            </span>
-                          </span>
+                              {e.skill_name}
+                            </Link>
+                            <StatusBadge status={e.status} error={e.error} className="ml-auto" />
+                          </div>
+                          <div className="mt-1 leading-snug">
+                            {summary.length > 0 ? (
+                              <span className="text-wf-on-surface">{summary}</span>
+                            ) : (
+                              <span className="italic text-wf-on-surface-variant">{fallback}</span>
+                            )}
+                          </div>
                         </li>
                       );
                     })}

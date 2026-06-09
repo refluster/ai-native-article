@@ -2,7 +2,6 @@
 // Routes:
 //   GET    /agents                          list (paginated, filterable)
 //   GET    /agents/{slug}                   single agent
-//   GET    /agents/{slug}/deliverables      LEGACY DELIV rows (historical; no SPA caller — EXEC is canonical, see Story 3 #216)
 //   GET    /agents/{slug}/executions        canonical activity ledger — EXEC rows via GSI1 (the agent-profile task log)
 //   GET    /agents/{slug}/projects          projects this agent is an active member of
 //   GET    /agents/{slug}/posts             per-agent activity feed (Epic-011 Story 5)
@@ -61,7 +60,6 @@ import {
   skillPk,
   toSkillApiView,
 } from "../shared/skill-row.js";
-import type { DelivRow } from "../shared/task.js";
 import { getItem, queryBySkPrefix, scanPrefix, updateOperational } from "../shared/ddb.js";
 import {
   appendExecution,
@@ -192,7 +190,6 @@ export async function handler(
     if (routeKey === "GET /agents") return listAgents(event);
     if (routeKey === "GET /skills") return listSkills(event);
     if (routeKey === "GET /skills/{name}" && skillName) return getSkill(skillName);
-    if (routeKey === "GET /agents/{slug}/deliverables" && slug) return listAgentDeliverables(slug, event);
     if (routeKey === "GET /agents/{slug}/executions" && slug) return listAgentExecutions(slug, event);
     // Phase 7 PR5 — engagements API (external-client read/write surface).
     // Portfolio is the public-facing display projection of executions filtered
@@ -355,34 +352,6 @@ async function getSkill(name: string): Promise<APIGatewayProxyResultV2> {
   const row = await getItem<SkillMetaRow>(skillPk(name), "META");
   if (!row) return reply(404, { error: "not_found", name });
   return reply(200, toSkillApiView(row));
-}
-
-// LEGACY (Epic-010 C2/C3 cutover — reconciled by Epic-012 Story 3 #216).
-// Reads the legacy `AGENT#{slug}/DELIV#{ulid}` rows, whose SUCCESS-path
-// writes were removed at the C2 cutover (the runner is EXEC-only on success;
-// see workforce/lambdas/agent-runner/dual-write-tests.ts). The SPA's
-// agent-profile activity list migrated to `GET /agents/{slug}/executions`
-// (the EXEC family, GSI1) — `fetchAgentDeliverables` was removed, so this
-// route has NO front-end caller. It is retained only to read historical
-// DELIV rows written before the cutover. The canonical activity source is
-// the EXEC ledger; do not wire new readers to this route.
-async function listAgentDeliverables(
-  slug: string,
-  event: APIGatewayProxyEventV2,
-): Promise<APIGatewayProxyResultV2> {
-  const qs = event.queryStringParameters ?? {};
-  const limit = Math.min(
-    Math.max(parseInt(qs.limit ?? "20", 10) || 20, 1),
-    PAGE_SIZE_MAX,
-  );
-  // DDB Query under AGENT#{slug} with SK begins_with DELIV# returns rows
-  // sorted by SK lex order, i.e. by ulid which encodes time. Limit is the
-  // page size; v1 returns most-recent-first by reversing client-side.
-  const rows = await queryBySkPrefix<DelivRow>(agentPk(slug), "DELIV#", limit);
-  // Sort by created_at desc (the ULID ordering already gives chronology,
-  // but explicit sort handles any operator-inserted out-of-order rows).
-  rows.sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
-  return reply(200, { items: rows });
 }
 
 // ----- Projects (Epic-010 §10 — Story 6 #95) -----
@@ -762,11 +731,10 @@ async function listAgentProjects(slug: string): Promise<APIGatewayProxyResultV2>
 // worked in. Range push-down via `from`/`to` is supported but unused
 // by the SPA's "recent 20" use case today.
 //
-// The route is PUBLIC (no AWS_IAM auth) — matches the existing
-// `GET /agents/{slug}/deliverables` read pattern, and the EXEC row
-// fields surfaced here (skill / status / started_at / ended_at /
-// artifact_ref uri-shape) are no more sensitive than the deliverable
-// metadata that endpoint already exposes. The Cognito-on-hostname gate
+// The route is PUBLIC (no AWS_IAM auth) — the EXEC row fields surfaced
+// here (skill / status / started_at / ended_at / artifact_ref uri-shape)
+// are operational metadata, no more sensitive than the public projects
+// read API on this same Lambda. The Cognito-on-hostname gate
 // in front of the SPA is the operator-vs-anonymous boundary.
 //
 // NB: this route does NOT yet surface `notion_page_url` / `pr_url` —
