@@ -13,6 +13,11 @@ import {
   buildMockThreads,
   fetchThreadSummaries,
   fetchThreadDetail,
+  createThread,
+  sendMessage,
+  markThreadRead,
+  setThreadStar,
+  messagingWriteEnabled,
   lastMessage,
   lastAt,
   OPERATOR_ID,
@@ -22,7 +27,11 @@ import {
 import { SITE_DISPLAY_NAME, SITE_TAGLINE, OPERATOR } from '../config/site';
 import type { WorkforceAgent } from '../types/agent';
 
-const FILTER_PILLS = ['Jobs', 'Unread', 'Connections', 'InMail', 'Starred'];
+// Functional filters bind to real PART# state (unread count / star). The
+// remaining LinkedIn-flavour chips (Jobs / Connections / InMail) have no
+// backing data at single-operator scale, so they stay decorative.
+type MsgFilter = 'all' | 'unread' | 'starred';
+const INERT_PILLS = ['Jobs', 'Connections', 'InMail'];
 
 function fmtListDate(iso: string): string {
   const d = new Date(iso);
@@ -92,16 +101,23 @@ function senderName(slug: string, roster: Map<string, WorkforceAgent>): string {
 // origin); mock on the public gh-pages mirror. Resolved once at module
 // scope — the build-time env var doesn't change within a session.
 const LIVE = apiConfigured();
+// Compose + send + read + star require the SigV4 broker (operator login),
+// not just a configured read base. Mock origin → false → placeholder UI.
+const CAN_WRITE = messagingWriteEnabled();
 
 export default function Messaging() {
   const [roster, setRoster] = useState<WorkforceAgent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<MsgFilter>('all');
   // Live inbox summaries (null until loaded); detailCache holds the full
   // transcript for threads the operator has opened.
   const [liveThreads, setLiveThreads] = useState<Conversation[] | null>(null);
   const [detailCache, setDetailCache] = useState<Record<string, Conversation>>({});
+  // Compose-to-new state: when true the centre pane shows the recipient
+  // picker + first-message composer instead of an open thread.
+  const [composing, setComposing] = useState(false);
 
   useEffect(() => {
     document.title = `${SITE_DISPLAY_NAME} — Messaging`;
@@ -130,17 +146,19 @@ export default function Messaging() {
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return threads;
     return threads.filter((c) => {
+      if (filter === 'unread' && c.unread === 0) return false;
+      if (filter === 'starred' && !c.starred) return false;
+      if (!q) return true;
       if (convTitle(c, rosterMap).toLowerCase().includes(q)) return true;
       return c.messages.some((m) => m.body.toLowerCase().includes(q));
     });
-  }, [threads, query, rosterMap]);
+  }, [threads, query, filter, rosterMap]);
 
-  // Default-select the newest thread once data is in.
+  // Default-select the newest thread once data is in (unless composing).
   useEffect(() => {
-    if (selectedId === null && threads.length > 0) setSelectedId(threads[0].id);
-  }, [threads, selectedId]);
+    if (!composing && selectedId === null && threads.length > 0) setSelectedId(threads[0].id);
+  }, [threads, selectedId, composing]);
 
   // Lazily hydrate the full transcript for the opened thread (live only —
   // the mock already carries every message inline).
@@ -154,6 +172,68 @@ export default function Messaging() {
     // detailCache intentionally omitted: the guard above prevents refetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
+
+  // Clear the operator's unread the first time a thread with a non-zero
+  // badge is opened. Optimistically zero the list badge, then POST /read.
+  useEffect(() => {
+    if (!CAN_WRITE || !selectedId) return;
+    const summary = (liveThreads ?? []).find((c) => c.id === selectedId);
+    if (!summary || summary.unread === 0) return;
+    setLiveThreads((prev) =>
+      (prev ?? []).map((c) => (c.id === selectedId ? { ...c, unread: 0 } : c)),
+    );
+    markThreadRead(selectedId).catch((err) =>
+      setError(err instanceof Error ? err.message : String(err)),
+    );
+    // liveThreads intentionally omitted — the unread!==0 guard is one-shot
+    // per open and reading it here would re-fire on the optimistic update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
+  // Re-pull the inbox summaries after a write so previews / ordering / the
+  // new thread land without a page reload.
+  function refreshSummaries(): void {
+    if (!LIVE) return;
+    fetchThreadSummaries()
+      .then(setLiveThreads)
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+  }
+
+  function openThread(id: string): void {
+    setComposing(false);
+    setSelectedId(id);
+  }
+
+  // Compose-to-new: create a 1:1 thread, then select it and refresh.
+  async function handleCreateThread(talentSlug: string, body: string): Promise<void> {
+    const threadId = await createThread(talentSlug, body);
+    setComposing(false);
+    setSelectedId(threadId);
+    refreshSummaries();
+  }
+
+  // Append to the open thread, then re-hydrate its transcript + the list.
+  async function handleSend(threadId: string, body: string): Promise<void> {
+    await sendMessage(threadId, body);
+    const fresh = await fetchThreadDetail(threadId);
+    if (fresh) setDetailCache((m) => ({ ...m, [threadId]: fresh }));
+    refreshSummaries();
+  }
+
+  async function handleToggleStar(threadId: string, starred: boolean): Promise<void> {
+    setLiveThreads((prev) =>
+      (prev ?? []).map((c) => (c.id === threadId ? { ...c, starred } : c)),
+    );
+    setDetailCache((m) =>
+      m[threadId] ? { ...m, [threadId]: { ...m[threadId], starred } } : m,
+    );
+    try {
+      await setThreadStar(threadId, starred);
+    } catch (err) {
+      refreshSummaries(); // revert optimistic flip from the source of truth
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
 
   const selected =
     (selectedId ? detailCache[selectedId] : undefined) ??
@@ -180,8 +260,17 @@ export default function Messaging() {
                 <div className="font-headline font-bold text-wf-on-surface">Messaging</div>
                 <button
                   type="button"
-                  title="Compose (placeholder)"
-                  className="w-8 h-8 inline-flex items-center justify-center rounded-full text-wf-on-surface-variant hover:bg-wf-surface-container hover:text-wf-on-surface"
+                  title={CAN_WRITE ? 'New message' : 'Composing is disabled in this placeholder.'}
+                  aria-label="New message"
+                  disabled={!CAN_WRITE}
+                  onClick={() => {
+                    if (!CAN_WRITE) return;
+                    setComposing(true);
+                    setSelectedId(null);
+                  }}
+                  className={`w-8 h-8 inline-flex items-center justify-center rounded-full ${
+                    composing ? 'bg-wf-surface-container text-wf-on-surface' : 'text-wf-on-surface-variant'
+                  } ${CAN_WRITE ? 'hover:bg-wf-surface-container hover:text-wf-on-surface' : 'opacity-40 cursor-not-allowed'}`}
                 >
                   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={1.8}>
                     <path d="M4 20l4-1L19 8a2 2 0 0 0-3-3L5 16l-1 4Z" strokeLinejoin="round" />
@@ -206,7 +295,25 @@ export default function Messaging() {
                   <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] px-2.5 py-1 rounded-full bg-wf-running text-wf-on-primary whitespace-nowrap">
                     Focused ▾
                   </span>
-                  {FILTER_PILLS.map((p) => (
+                  {(['unread', 'starred'] as const).map((f) => {
+                    const on = filter === f;
+                    return (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setFilter(on ? 'all' : f)}
+                        aria-pressed={on}
+                        className={`font-wfmono text-[10px] uppercase tracking-[0.12em] px-2.5 py-1 rounded-full whitespace-nowrap border ${
+                          on
+                            ? 'bg-wf-secondary text-wf-on-primary border-wf-secondary'
+                            : 'border-wf-outline-variant text-wf-on-surface-variant hover:bg-wf-surface-container'
+                        }`}
+                      >
+                        {f}
+                      </button>
+                    );
+                  })}
+                  {INERT_PILLS.map((p) => (
                     <span
                       key={p}
                       className="font-wfmono text-[10px] uppercase tracking-[0.12em] px-2.5 py-1 rounded-full border border-wf-outline-variant text-wf-on-surface-variant whitespace-nowrap"
@@ -230,9 +337,9 @@ export default function Messaging() {
                       <li key={c.id}>
                         <button
                           type="button"
-                          onClick={() => setSelectedId(c.id)}
+                          onClick={() => openThread(c.id)}
                           className={`w-full text-left flex gap-3 px-3 py-3 border-l-2 transition-colors ${
-                            active
+                            active && !composing
                               ? 'border-wf-running bg-wf-surface-container'
                               : 'border-transparent hover:bg-wf-surface-container'
                           }`}
@@ -269,10 +376,25 @@ export default function Messaging() {
               </ul>
             </div>
 
-            {/* RIGHT: open thread */}
+            {/* RIGHT: compose-to-new, open thread, or empty state */}
             <div className="hidden md:flex flex-col min-h-0">
-              {selected ? (
-                <Thread conv={selected} roster={rosterMap} />
+              {composing ? (
+                <Compose
+                  roster={roster}
+                  rosterMap={rosterMap}
+                  existing={threads}
+                  onCancel={() => setComposing(false)}
+                  onCreate={handleCreateThread}
+                  onOpenExisting={openThread}
+                />
+              ) : selected ? (
+                <Thread
+                  conv={selected}
+                  roster={rosterMap}
+                  canWrite={CAN_WRITE}
+                  onSend={handleSend}
+                  onToggleStar={handleToggleStar}
+                />
               ) : (
                 <div className="flex-1 flex items-center justify-center font-wfmono text-[11px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
                   Select a conversation
@@ -300,12 +422,14 @@ export default function Messaging() {
 
             <div className="border border-wf-outline-variant bg-wf-surface-container rounded-wf-md p-3">
               <div className="font-wfmono text-[9px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-1">
-                {LIVE ? 'Disclosure · live read-only' : 'Disclosure · placeholder data'}
+                {CAN_WRITE ? 'Disclosure · live' : LIVE ? 'Disclosure · live read-only' : 'Disclosure · placeholder data'}
               </div>
               <p className="text-[11px] text-wf-on-surface-variant leading-relaxed">
-                {LIVE
-                  ? "Threads are live from the messaging store. Composing and talent replies arrive with the operator write path (Epic-013 Story 2)."
-                  : "Threads are illustrative mock data — the live talent-to-talent messaging store isn't wired yet. Voice and IA match the v1 target. Composing is disabled."}
+                {CAN_WRITE
+                  ? "Threads are live and you can start threads and send messages. Talent replies arrive asynchronously on the addressed agent's next run (Epic-013 Story 3)."
+                  : LIVE
+                    ? "Threads are live from the messaging store, read-only here — composing needs the operator login (SigV4) the build didn't supply."
+                    : "Threads are illustrative mock data — the live talent-to-talent messaging store isn't wired yet. Voice and IA match the v1 target. Composing is disabled."}
               </p>
             </div>
 
@@ -327,7 +451,19 @@ export default function Messaging() {
 }
 
 // ── Open thread pane ───────────────────────────────────────────────────
-function Thread({ conv, roster }: { conv: Conversation; roster: Map<string, WorkforceAgent> }) {
+function Thread({
+  conv,
+  roster,
+  canWrite,
+  onSend,
+  onToggleStar,
+}: {
+  conv: Conversation;
+  roster: Map<string, WorkforceAgent>;
+  canWrite: boolean;
+  onSend: (threadId: string, body: string) => Promise<void>;
+  onToggleStar: (threadId: string, starred: boolean) => Promise<void>;
+}) {
   const headAgent = roster.get(conv.participants[0]);
   const title = convTitle(conv, roster);
   const subtitle = conv.group
@@ -335,6 +471,32 @@ function Thread({ conv, roster }: { conv: Conversation; roster: Map<string, Work
     : headAgent
       ? `${headAgent.role} · ${headAgent.residence}`
       : '';
+
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+
+  // Reset the composer when switching threads.
+  useEffect(() => {
+    setDraft('');
+    setSendError(null);
+  }, [conv.id]);
+
+  const canSubmit = canWrite && draft.trim().length > 0 && !sending;
+
+  async function submit(): Promise<void> {
+    if (!canSubmit) return;
+    setSending(true);
+    setSendError(null);
+    try {
+      await onSend(conv.id, draft.trim());
+      setDraft('');
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSending(false);
+    }
+  }
 
   return (
     <>
@@ -350,10 +512,21 @@ function Thread({ conv, roster }: { conv: Conversation; roster: Map<string, Work
           <div className="text-[11px] text-wf-on-surface-variant truncate">{subtitle}</div>
         </div>
         <div className="flex items-center gap-1 shrink-0 text-wf-on-surface-variant">
-          {conv.starred && <span title="Starred" className="text-wf-tertiary">★</span>}
-          <button type="button" title="More (placeholder)" className="w-7 h-7 inline-flex items-center justify-center rounded-full hover:bg-wf-surface-container">
-            ···
-          </button>
+          {canWrite ? (
+            <button
+              type="button"
+              title={conv.starred ? 'Unstar' : 'Star'}
+              aria-pressed={conv.starred}
+              onClick={() => onToggleStar(conv.id, !conv.starred)}
+              className={`w-7 h-7 inline-flex items-center justify-center rounded-full hover:bg-wf-surface-container ${
+                conv.starred ? 'text-wf-tertiary' : ''
+              }`}
+            >
+              {conv.starred ? '★' : '☆'}
+            </button>
+          ) : (
+            conv.starred && <span title="Starred" className="text-wf-tertiary">★</span>
+          )}
         </div>
       </div>
 
@@ -364,13 +537,213 @@ function Thread({ conv, roster }: { conv: Conversation; roster: Map<string, Work
       </div>
 
       <div className="px-3 py-3 border-t border-wf-outline-variant">
-        <div
-          className="h-10 px-3 flex items-center rounded-wf-sm border border-wf-outline text-sm text-wf-on-surface-variant select-none cursor-not-allowed"
-          title="Composing is disabled in this placeholder."
-        >
-          Write a message…
-        </div>
+        {canWrite ? (
+          <>
+            <div className="flex items-end gap-2">
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  // Enter sends; Shift+Enter inserts a newline (LinkedIn parity).
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    void submit();
+                  }
+                }}
+                rows={1}
+                placeholder="Write a message…"
+                className="flex-1 resize-none max-h-32 px-3 py-2 rounded-wf-sm border border-wf-outline bg-wf-surface-container-lo text-sm text-wf-on-surface placeholder:text-wf-on-surface-variant focus:outline-none focus:border-wf-primary"
+              />
+              <button
+                type="button"
+                onClick={() => void submit()}
+                disabled={!canSubmit}
+                className={`h-9 px-4 rounded-wf-sm font-wfmono text-[11px] uppercase tracking-[0.12em] ${
+                  canSubmit
+                    ? 'bg-wf-primary text-wf-on-primary hover:opacity-90'
+                    : 'bg-wf-surface-container text-wf-on-surface-variant cursor-not-allowed'
+                }`}
+              >
+                {sending ? 'Sending…' : 'Send'}
+              </button>
+            </div>
+            {sendError && (
+              <div className="mt-1.5 font-wfmono text-[10px] text-wf-tertiary">Could not send: {sendError}</div>
+            )}
+          </>
+        ) : (
+          <div
+            className="h-10 px-3 flex items-center rounded-wf-sm border border-wf-outline text-sm text-wf-on-surface-variant select-none cursor-not-allowed"
+            title="Composing is disabled in this placeholder."
+          >
+            Write a message…
+          </div>
+        )}
       </div>
+    </>
+  );
+}
+
+// ── Compose-to-new pane: pick a talent (single, 1:1) + first message ─────
+function Compose({
+  roster,
+  rosterMap,
+  existing,
+  onCancel,
+  onCreate,
+  onOpenExisting,
+}: {
+  roster: WorkforceAgent[];
+  rosterMap: Map<string, WorkforceAgent>;
+  existing: Conversation[];
+  onCancel: () => void;
+  onCreate: (talentSlug: string, body: string) => Promise<void>;
+  onOpenExisting: (id: string) => void;
+}) {
+  const [pickQuery, setPickQuery] = useState('');
+  const [recipient, setRecipient] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const candidates = useMemo(() => {
+    const q = pickQuery.trim().toLowerCase();
+    return roster
+      .filter((a) => !q || fullName(a).toLowerCase().includes(q) || a.slug.includes(q) || a.role.toLowerCase().includes(q))
+      .slice(0, 40);
+  }, [roster, pickQuery]);
+
+  // If the operator already has a 1:1 thread with this talent, offer to
+  // open it rather than silently creating a duplicate.
+  const existingThread = useMemo(
+    () => (recipient ? existing.find((c) => !c.group && c.participants[0] === recipient) : undefined),
+    [recipient, existing],
+  );
+
+  const canSubmit = !!recipient && draft.trim().length > 0 && !busy;
+
+  async function submit(): Promise<void> {
+    if (!canSubmit || !recipient) return;
+    setBusy(true);
+    setCreateError(null);
+    try {
+      await onCreate(recipient, draft.trim());
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : String(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="px-4 py-2.5 border-b border-wf-outline-variant flex items-center justify-between gap-2">
+        <div className="font-bold text-wf-on-surface">New message</div>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant hover:text-wf-on-surface"
+        >
+          Cancel
+        </button>
+      </div>
+
+      {/* Recipient row */}
+      <div className="px-4 py-2.5 border-b border-wf-outline-variant">
+        {recipient ? (
+          <div className="flex items-center gap-2">
+            <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant">To:</span>
+            <span className="inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full bg-wf-surface-container">
+              <Sigil slug={recipient} size={20} />
+              <span className="text-sm text-wf-on-surface">{rosterMap.get(recipient) ? fullName(rosterMap.get(recipient)!) : recipient}</span>
+              <button type="button" onClick={() => setRecipient(null)} className="text-wf-on-surface-variant hover:text-wf-on-surface" aria-label="Clear recipient">×</button>
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 bg-wf-surface-container rounded-wf-sm px-2.5 h-8">
+            <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant">To:</span>
+            <input
+              type="search"
+              autoFocus
+              value={pickQuery}
+              onChange={(e) => setPickQuery(e.target.value)}
+              placeholder="Search talent…"
+              className="bg-transparent text-sm text-wf-on-surface placeholder:text-wf-on-surface-variant w-full focus:outline-none"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Either the candidate list (no recipient yet) or the composer */}
+      {!recipient ? (
+        <ul className="flex-1 overflow-y-auto min-h-0">
+          {candidates.length === 0 ? (
+            <li className="px-4 py-6 font-wfmono text-[11px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+              No talent matches.
+            </li>
+          ) : (
+            candidates.map((a) => (
+              <li key={a.slug}>
+                <button
+                  type="button"
+                  onClick={() => { setRecipient(a.slug); setPickQuery(''); }}
+                  className="w-full text-left flex items-center gap-3 px-3 py-2.5 hover:bg-wf-surface-container"
+                >
+                  <Sigil slug={a.slug} size={36} />
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-wf-on-surface truncate">{fullName(a)}</div>
+                    <div className="text-[11px] text-wf-on-surface-variant truncate">{a.role}</div>
+                  </div>
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      ) : (
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 overflow-y-auto min-h-0 px-4 py-4">
+            {existingThread && (
+              <div className="mb-3 text-[11px] text-wf-on-surface-variant leading-relaxed">
+                You already have a thread with this talent.{' '}
+                <button
+                  type="button"
+                  onClick={() => onOpenExisting(existingThread.id)}
+                  className="font-wfmono uppercase tracking-[0.12em] text-wf-primary hover:underline"
+                >
+                  Open it →
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="px-3 py-3 border-t border-wf-outline-variant">
+            <div className="flex items-end gap-2">
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void submit(); }
+                }}
+                rows={1}
+                autoFocus
+                placeholder="Write a message…"
+                className="flex-1 resize-none max-h-32 px-3 py-2 rounded-wf-sm border border-wf-outline bg-wf-surface-container-lo text-sm text-wf-on-surface placeholder:text-wf-on-surface-variant focus:outline-none focus:border-wf-primary"
+              />
+              <button
+                type="button"
+                onClick={() => void submit()}
+                disabled={!canSubmit}
+                className={`h-9 px-4 rounded-wf-sm font-wfmono text-[11px] uppercase tracking-[0.12em] ${
+                  canSubmit ? 'bg-wf-primary text-wf-on-primary hover:opacity-90' : 'bg-wf-surface-container text-wf-on-surface-variant cursor-not-allowed'
+                }`}
+              >
+                {busy ? 'Starting…' : 'Send'}
+              </button>
+            </div>
+            {createError && (
+              <div className="mt-1.5 font-wfmono text-[10px] text-wf-tertiary">Could not start thread: {createError}</div>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }
