@@ -160,9 +160,24 @@ write per row, ordered): (a) write the operator `MSG#` row, (b) bump
 the failure is a W-4 throw with a CloudWatch metric — the operator sees their
 message landed but gets a "delivery pending" state, never a silent drop.
 
-### 4. The reply loop: `messaging-reply` skill (event-driven)
+### 4. The reply loop: `messaging-reply` (event-driven)
 
-A new skill under `workforce/skills/messaging-reply/`:
+> **Implementation note (Story 3 — [ADR-0006](../adr/adr-0006-realtime-messaging-reply.md)).**
+> The sketch below predates [ADR-0005](../adr/adr-0005-single-execution-model-ccr.md)
+> (the Lambda *runner* was retired; `executor: lambda` / `RunnerContext` no
+> longer exist). As built, the reply loop is **not** a CCR cadence skill. It is
+> a dedicated, async-invoked Lambda (`workforce/lambdas/messaging-reply/`) that
+> the operator write routes fire with `{thread_id, addressed_slug}`; it loads
+> the thread, composes the addressed agent's `system.md` + a reply prompt,
+> calls Claude once via the shared `wf/anthropic` secret, enforces the W-1
+> guards in-handler, and writes the talent `MSG#` row via the shared messaging
+> module. No TASK queue, no dispatcher, no CCR `/fire`, no bearer endpoint. The
+> voice/format rules, `__NO_REPLY_NEEDED__` sentinel, W-1 throws (§5), loop
+> safety (§6), and group constraints (§7) below all hold as written — only the
+> *substrate* changed. See ADR-0006 for the rationale.
+
+The original (pre-ADR-0005) design envisioned a skill under
+`workforce/skills/messaging-reply/`:
 
 ```
 workforce/skills/messaging-reply/

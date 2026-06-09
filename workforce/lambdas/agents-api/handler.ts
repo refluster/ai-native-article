@@ -105,6 +105,7 @@ import {
 } from "../shared/post.js";
 import {
   getThreadDetail,
+  getThreadMeta,
   listInbox,
   toThreadSummaryView,
   createThread,
@@ -114,6 +115,7 @@ import {
   MESSAGING_OPERATOR_ID,
   type ThreadFilter,
 } from "../shared/messaging.js";
+import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 
 // Secrets Manager path holding the feed-write capability token. The
 // runner presents the same token (injected from this secret into its
@@ -529,6 +531,71 @@ function emitMalformedProjectMeta(row: Partial<ProjectMetaRow>): void {
       }),
     );
   });
+}
+
+// ── Talent reply dispatch (Epic-013 Story 3, ADR-0006) ──────────────────
+// After the operator's message persists, fire the real-time reply Lambda so
+// the addressed talent answers within seconds. Async ("Event") invoke +
+// best-effort: a dispatch failure must NOT fail the operator's send — the
+// message already landed (W-4: "delivery pending", never a silent drop).
+const lambda = new LambdaClient({});
+const MESSAGING_REPLY_FUNCTION = process.env.MESSAGING_REPLY_FUNCTION;
+
+/** Choose which talent should reply to an operator message. 1:1 → the sole
+ *  talent. Group → the first @-addressed participant, else the primary
+ *  (`participants[0]`). Keeps a group post to ONE reply (Epic §6/§7). */
+function pickAddressedSlug(participants: readonly string[], body: string): string | undefined {
+  if (participants.length === 0) return undefined;
+  if (participants.length === 1) return participants[0];
+  const at = body.match(/@([a-z0-9-]+)/i);
+  if (at && at[1]) {
+    const slug = at[1].toLowerCase();
+    if (participants.includes(slug)) return slug;
+  }
+  return participants[0];
+}
+
+async function dispatchReply(threadId: string, addressedSlug: string | undefined): Promise<void> {
+  if (!addressedSlug) return;
+  if (!MESSAGING_REPLY_FUNCTION) {
+    console.warn(
+      JSON.stringify({ event: "messaging_reply_function_unset", thread_id: threadId }),
+    );
+    return;
+  }
+  try {
+    await lambda.send(
+      new InvokeCommand({
+        FunctionName: MESSAGING_REPLY_FUNCTION,
+        InvocationType: "Event",
+        Payload: Buffer.from(JSON.stringify({ thread_id: threadId, addressed_slug: addressedSlug })),
+      }),
+    );
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        event: "messaging_reply_dispatch_failed",
+        thread_id: threadId,
+        addressed_slug: addressedSlug,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    cw.send(
+      new PutMetricDataCommand({
+        Namespace: "Workforce/Messaging",
+        MetricData: [
+          {
+            MetricName: "WfMsgReplyDispatchFailed",
+            Value: 1,
+            Unit: "Count",
+            Dimensions: [{ Name: "Stage", Value: STAGE }],
+          },
+        ],
+      }),
+    ).catch(() => {
+      /* metric emission is itself best-effort */
+    });
+  }
 }
 
 async function getProjectRoute(rawId: string): Promise<APIGatewayProxyResultV2> {
@@ -1079,6 +1146,7 @@ async function createThreadRoute(event: APIGatewayProxyEventV2): Promise<APIGate
       from: MESSAGING_OPERATOR_ID,
       ...(typeof body.group_label === "string" ? { group_label: body.group_label } : {}),
     });
+    await dispatchReply(out.thread_id, pickAddressedSlug(participants as string[], messageBody));
     return reply(201, out);
   } catch (err) {
     return reply(400, { error: "create_failed", detail: err instanceof Error ? err.message : String(err) });
@@ -1099,6 +1167,8 @@ async function sendMessageRoute(
   if (typeof body.body !== "string") return reply(400, { error: "invalid_body" });
   try {
     const out = await sendMessage({ thread_id: threadId, from: MESSAGING_OPERATOR_ID, body: body.body });
+    const meta = await getThreadMeta(threadId);
+    if (meta) await dispatchReply(threadId, pickAddressedSlug(meta.participants, body.body));
     return reply(201, out);
   } catch (err) {
     return reply(400, { error: "send_failed", detail: err instanceof Error ? err.message : String(err) });
