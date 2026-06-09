@@ -8,6 +8,8 @@
 import type { WorkforceAgent } from '../types/agent';
 import { WORKFORCE_AGENTS_API_BASE } from '../config/api';
 import { apiConfigured } from './agents';
+import { SIGV4_IS_CONFIGURED } from '../config/auth';
+import { assertSigv4Configured, signedFetch } from './sigv4';
 
 export const OPERATOR_ID = 'operator';
 
@@ -211,4 +213,73 @@ export async function fetchThreadDetail(id: string): Promise<Conversation | unde
   if (!res.ok) throw new Error(`agents-api ${res.status}`);
   const d = (await res.json()) as ThreadDetailDto;
   return detailToConversation(d);
+}
+
+// ----- Operator write path (Epic-013 Story 2b) -----
+//
+// The four POST routes are AWS_IAM-gated (PR 266) — identical posture to
+// the credentials-api writes — so every write goes through `signedFetch`
+// (lib/sigv4.ts), which SigV4-signs with the operator's temporary
+// Identity-Pool credentials. The author is always the operator at the
+// gateway; the SPA never sends a `from`. Talent replies arrive via the
+// Story 3 runner, not from here.
+//
+// Reads stay on plain `fetch` (public CORS gate); only writes need signing.
+
+/** True when the operator write path is usable: live API base configured
+ *  AND the SigV4 broker has its Identity-Pool config. Mirrors the
+ *  credentials UI's enablement gate so compose is hidden on the mock. */
+export function messagingWriteEnabled(): boolean {
+  return apiConfigured() && SIGV4_IS_CONFIGURED;
+}
+
+/** Best-effort error-body reader — surfaces the handler's `{error,detail}`
+ *  text for the operator banner without making JSON parsing its own
+ *  failure mode (mirrors lib/credentials.ts). */
+async function readErrorBody(res: Response): Promise<string> {
+  try {
+    const data = (await res.json()) as { error?: string; detail?: string };
+    return [data.error, data.detail].filter(Boolean).join(' · ');
+  } catch {
+    return '';
+  }
+}
+
+async function postSigned(path: string, body?: unknown): Promise<Response> {
+  assertSigv4Configured();
+  const init: RequestInit =
+    body === undefined
+      ? { method: 'POST' }
+      : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
+  const res = await signedFetch(`${WORKFORCE_AGENTS_API_BASE}${path}`, init);
+  if (!res.ok) {
+    const detail = await readErrorBody(res);
+    throw new Error(`agents-api ${res.status}${detail ? ` · ${detail}` : ''}`);
+  }
+  return res;
+}
+
+/** Start a 1:1 thread with `talentSlug`, seeded with `body`. v1 is
+ *  operator-initiated and single-recipient (group threads deferred); the
+ *  backend already supports `participants[]`/`group_label` for later.
+ *  Returns the new thread id so the caller can select it. */
+export async function createThread(talentSlug: string, body: string): Promise<string> {
+  const res = await postSigned('/threads', { participants: [talentSlug], body });
+  const data = (await res.json()) as { thread_id: string };
+  return data.thread_id;
+}
+
+/** Append an operator message to an existing thread. */
+export async function sendMessage(threadId: string, body: string): Promise<void> {
+  await postSigned(`/threads/${encodeURIComponent(threadId)}/messages`, { body });
+}
+
+/** Clear the operator's unread count on a thread. */
+export async function markThreadRead(threadId: string): Promise<void> {
+  await postSigned(`/threads/${encodeURIComponent(threadId)}/read`);
+}
+
+/** Set (not toggle) the operator star on a thread. */
+export async function setThreadStar(threadId: string, starred: boolean): Promise<void> {
+  await postSigned(`/threads/${encodeURIComponent(threadId)}/star`, { starred });
 }
