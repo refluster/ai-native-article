@@ -12,7 +12,8 @@ import WorkforceLayout from '../components/WorkforceLayout';
 import Typeplate from '../components/Typeplate';
 import Sigil from '../components/Sigil';
 import StatusPill, { type AgentStatus, deriveStatus } from '../components/StatusPill';
-import { loadWorkforceManifest, loadWorkforceMockStats, fullName } from '../lib/agents';
+import { loadWorkforceManifest, loadWorkforceStats, fullName } from '../lib/agents';
+import { fmtDuration } from '../lib/duration';
 import type { WorkforceAgent, WorkforceAgentManifest } from '../types/agent';
 import type { WorkforceMockStats } from '../types/stats';
 
@@ -34,7 +35,7 @@ export default function AgentDirectory() {
 
   useEffect(() => {
     document.title = 'Workforce — Crew';
-    Promise.all([loadWorkforceManifest(), loadWorkforceMockStats()])
+    Promise.all([loadWorkforceManifest(), loadWorkforceStats()])
       .then(([m, s]) => {
         setManifest(m);
         setStats(s);
@@ -58,8 +59,9 @@ export default function AgentDirectory() {
           last_run_at: '',
           last_run_status: 'ok' as const,
           runs_this_month: 0,
-          cost_this_month_usd: 0,
-          deliv_count_total: 0,
+          deliv_this_month: 0,
+          avg_duration_s: 0,
+          compute_seconds_this_month: 0,
         };
         const status = deriveStatus({ paused: s.paused, archived: s.archived, last_run_status: s.last_run_status });
         return { agent: a, stats: s, status } as { agent: WorkforceAgent; stats: typeof s; status: AgentStatus };
@@ -161,12 +163,12 @@ export default function AgentDirectory() {
                   <div className="text-sm text-wf-on-surface">{s.runs_this_month}</div>
                 </div>
                 <div>
-                  <div className="text-[9px] uppercase tracking-[0.14em] text-wf-on-surface-variant">SPEND</div>
-                  <div className="text-sm text-wf-on-surface">${s.cost_this_month_usd.toFixed(2)}</div>
+                  <div className="text-[9px] uppercase tracking-[0.14em] text-wf-on-surface-variant">AVG DUR</div>
+                  <div className="text-sm text-wf-on-surface">{s.avg_duration_s != null ? fmtDuration(s.avg_duration_s) : '—'}</div>
                 </div>
                 <div>
                   <div className="text-[9px] uppercase tracking-[0.14em] text-wf-on-surface-variant">DELIV</div>
-                  <div className="text-sm text-wf-on-surface">{s.deliv_count_total}</div>
+                  <div className="text-sm text-wf-on-surface">{s.deliv_this_month ?? s.deliv_count_total ?? 0}</div>
                 </div>
               </div>
             </Link>
@@ -181,7 +183,7 @@ export default function AgentDirectory() {
           <div className="col-span-2">ROLE</div>
           <div className="col-span-2">STATUS</div>
           <div className="col-span-1 text-right">RUNS</div>
-          <div className="col-span-1 text-right">SPEND</div>
+          <div className="col-span-1 text-right">AVG DUR</div>
           <div className="col-span-2 text-right">LAST RUN</div>
         </div>
         <ul className="divide-y divide-wf-outline-variant">
@@ -208,7 +210,7 @@ export default function AgentDirectory() {
                   <StatusPill status={status} />
                 </div>
                 <div className="col-span-1 text-right font-wfmono text-sm text-wf-on-surface">{s.runs_this_month}</div>
-                <div className="col-span-1 text-right font-wfmono text-sm text-wf-on-surface">${s.cost_this_month_usd.toFixed(2)}</div>
+                <div className="col-span-1 text-right font-wfmono text-sm text-wf-on-surface">{s.avg_duration_s != null ? fmtDuration(s.avg_duration_s) : '—'}</div>
                 <div className="col-span-2 text-right font-wfmono text-xs text-wf-on-surface-variant">
                   {s.last_run_at ? new Date(s.last_run_at).toISOString().slice(0, 16).replace('T', ' ') : '—'}
                 </div>

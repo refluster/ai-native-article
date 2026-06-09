@@ -1367,3 +1367,178 @@ describe("POST /agents/{slug}/engagements (Engagements API — createEngagement)
     expect(statusOf(res)).toBe(401);
   });
 });
+
+// ─── GET /stats (listStats — EXEC-ledger dashboard roll-up) ─────────────
+//
+// Verifies the real-data aggregate replacing the static mock: MTD run /
+// deliverable counts, the duration (spend-proxy) figures, the status
+// rollup mirroring deriveStatus, the 30-day heat strip, and the
+// reverse-chrono live-trace ribbon. Cost/token are intentionally ABSENT
+// from the contract — assert that too.
+describe("GET /stats (listStats)", () => {
+  function seedAgent(slug: string, over: Partial<AnyRow> = {}) {
+    rows.set(key(`AGENT#${slug}`, "META"), {
+      pk: `AGENT#${slug}`,
+      sk: "META",
+      slug,
+      paused: false,
+      archived: false,
+      last_run_status: "ok",
+      last_run_at: "",
+      ...over,
+    });
+  }
+
+  // All MTD-asserted runs are dated "today" so the suite is deterministic
+  // regardless of the day-of-month it runs on (today is always in both the
+  // current month AND the 30-day heat window's last bucket).
+  function todayAt(hour: number): string {
+    const d = new Date();
+    d.setUTCHours(hour, 0, 0, 0);
+    return d.toISOString();
+  }
+
+  function seedExec(
+    slug: string,
+    opts: {
+      ulid: string;
+      startedAt: string;
+      durationS?: number;
+      status?: string;
+      deliverable?: boolean;
+      skill?: string;
+    },
+  ) {
+    const started = new Date(opts.startedAt);
+    const ended = new Date(started.getTime() + (opts.durationS ?? 0) * 1000);
+    rows.set(key(`PROJECT#self/${slug}`, `EXEC#${opts.ulid}`), {
+      pk: `PROJECT#self/${slug}`,
+      sk: `EXEC#${opts.ulid}`,
+      project_id: `self/${slug}`,
+      agent_slug: slug,
+      skill_name: opts.skill ?? "article-draft",
+      skill_version: "1.0.0",
+      started_at: started.toISOString(),
+      ended_at: ended.toISOString(),
+      status: opts.status ?? "ok",
+      artifact_ref: opts.deliverable
+        ? { uri: "s3://x", content_hash: "h", content_type: "text/markdown", size_bytes: 10, summary: "s" }
+        : undefined,
+      gsi1pk: `AGENT#${slug}`,
+      gsi1sk: started.toISOString(),
+    });
+  }
+
+  type StatsBody = {
+    totals: {
+      agents_running: number;
+      agents_paused: number;
+      agents_throwing: number;
+      runs_this_month: number;
+      deliv_count_this_month: number;
+      compute_seconds_this_month: number;
+      avg_duration_s: number;
+    };
+    agents: Record<string, {
+      paused: boolean;
+      archived: boolean;
+      last_run_status: string;
+      runs_this_month: number;
+      deliv_this_month: number;
+      compute_seconds_this_month: number;
+      avg_duration_s: number;
+    }>;
+    activity: { days: string[]; by_slug: Record<string, number[]> };
+    recent_runs: Array<{ slug: string; started_at: string; duration_s: number; status: string; skill: string }>;
+  };
+
+  it("aggregates MTD runs/deliverables and duration from the EXEC ledger", async () => {
+    seedAgent("maya");
+    seedAgent("ren");
+    seedExec("maya", { ulid: "01A", startedAt: todayAt(1), durationS: 100, deliverable: true });
+    seedExec("maya", { ulid: "01B", startedAt: todayAt(2), durationS: 200 });
+    seedExec("ren", { ulid: "01C", startedAt: todayAt(3), durationS: 50, status: "throw" });
+
+    const res = await handler(evt("GET /stats"));
+    expect(statusOf(res)).toBe(200);
+    const body = bodyOf(res) as StatsBody;
+
+    expect(body.totals.runs_this_month).toBe(3);
+    expect(body.totals.deliv_count_this_month).toBe(1);
+    expect(body.totals.compute_seconds_this_month).toBe(350);
+    expect(body.totals.avg_duration_s).toBe(117); // round(350/3)
+
+    expect(body.agents.maya!.runs_this_month).toBe(2);
+    expect(body.agents.maya!.deliv_this_month).toBe(1);
+    expect(body.agents.maya!.compute_seconds_this_month).toBe(300);
+    expect(body.agents.maya!.avg_duration_s).toBe(150);
+  });
+
+  it("reports NO cost or token figures (C-1: no fabricated truth)", async () => {
+    seedAgent("maya");
+    seedExec("maya", { ulid: "01A", startedAt: todayAt(1), durationS: 100 });
+
+    const body = bodyOf(await handler(evt("GET /stats"))) as Record<string, unknown> & {
+      totals: Record<string, unknown>;
+      agents: Record<string, Record<string, unknown>>;
+    };
+    const blob = JSON.stringify(body);
+    expect(blob).not.toMatch(/cost/i);
+    expect(blob).not.toMatch(/token/i);
+    expect(blob).not.toMatch(/usd/i);
+    expect(body.totals).not.toHaveProperty("cost_this_month_usd");
+    expect(body.agents.maya).not.toHaveProperty("cost_this_month_usd");
+  });
+
+  it("rolls up status mirroring deriveStatus (throwing > paused; archived counts none)", async () => {
+    seedAgent("maya"); // running
+    seedAgent("ren"); // throwing (last run throws)
+    seedAgent("priya", { paused: true });
+    seedAgent("zed", { archived: true });
+    seedExec("maya", { ulid: "01A", startedAt: todayAt(1), durationS: 100 });
+    seedExec("ren", { ulid: "01C", startedAt: todayAt(2), durationS: 50, status: "throw" });
+
+    const body = bodyOf(await handler(evt("GET /stats"))) as StatsBody;
+    expect(body.totals.agents_running).toBe(1);
+    expect(body.totals.agents_throwing).toBe(1);
+    expect(body.totals.agents_paused).toBe(1);
+    expect(body.agents.ren!.last_run_status).toBe("throw");
+    expect(body.agents.priya!.runs_this_month).toBe(0);
+    // Archived agent stays on the roster but its ledger is not read.
+    expect(body.agents.zed!.archived).toBe(true);
+    expect(body.agents.zed!.runs_this_month).toBe(0);
+  });
+
+  it("emits a 30-day heat strip with today's runs in the final bucket", async () => {
+    seedAgent("maya");
+    seedExec("maya", { ulid: "01A", startedAt: todayAt(1), durationS: 100 });
+    seedExec("maya", { ulid: "01B", startedAt: todayAt(2), durationS: 100 });
+
+    const body = bodyOf(await handler(evt("GET /stats"))) as StatsBody;
+    expect(body.activity.days).toHaveLength(30);
+    expect(body.activity.days[29]).toBe(new Date().toISOString().slice(0, 10));
+    expect(body.activity.by_slug.maya![29]).toBe(2);
+  });
+
+  it("returns the live-trace ribbon newest-first across agents", async () => {
+    seedAgent("maya");
+    seedAgent("ren");
+    seedExec("maya", { ulid: "01A", startedAt: todayAt(1), durationS: 100, skill: "plan-write" });
+    seedExec("ren", { ulid: "01C", startedAt: todayAt(5), durationS: 50, skill: "code-task-brief" });
+
+    const body = bodyOf(await handler(evt("GET /stats"))) as StatsBody;
+    expect(body.recent_runs).toHaveLength(2);
+    // todayAt(5) is later than todayAt(1) → ren leads.
+    expect(body.recent_runs[0]!.slug).toBe("ren");
+    expect(body.recent_runs[0]!.skill).toBe("code-task-brief");
+    expect(body.recent_runs[1]!.slug).toBe("maya");
+  });
+
+  it("returns an empty-but-valid payload on an empty roster", async () => {
+    const body = bodyOf(await handler(evt("GET /stats"))) as StatsBody;
+    expect(body.totals.runs_this_month).toBe(0);
+    expect(body.totals.avg_duration_s).toBe(0);
+    expect(body.activity.days).toHaveLength(30);
+    expect(body.recent_runs).toEqual([]);
+  });
+});

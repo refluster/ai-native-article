@@ -49,6 +49,22 @@ export function loadWorkforceMockStats(): Promise<WorkforceMockStats> {
   return mockStatsCache
 }
 
+/**
+ * Dashboard aggregate stats. Prefers the live agents-api `GET /stats`
+ * endpoint (real EXEC-ledger roll-up: runs/deliv MTD, 30-day heat strip,
+ * live-trace ribbon, run-duration KPI) and falls back to the static mock
+ * JSON only when the API base is unconfigured (e.g. local `npm run dev`
+ * without env, or a bare gh-pages build). A non-OK live response throws —
+ * fail loud rather than silently serving stale mock figures over a real
+ * deployment.
+ */
+export async function loadWorkforceStats(): Promise<WorkforceMockStats> {
+  if (!apiConfigured()) return loadWorkforceMockStats()
+  const res = await fetch(`${WORKFORCE_AGENTS_API_BASE}/stats`)
+  if (!res.ok) throw new Error(`failed to load /stats (${res.status})`)
+  return (await res.json()) as WorkforceMockStats
+}
+
 export async function findAgent(slug: string): Promise<WorkforceAgent | undefined> {
   const m = await loadWorkforceManifest()
   return m.agents.find((a) => a.slug === slug)

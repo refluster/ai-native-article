@@ -1,6 +1,7 @@
 // wf-agents-api Lambda handler.
 // Routes:
 //   GET    /agents                          list (paginated, filterable)
+//   GET    /stats                           dashboard aggregate — EXEC-ledger roll-up (runs/deliv/heat/trace; duration, not cost)
 //   GET    /agents/{slug}                   single agent
 //   GET    /agents/{slug}/executions        canonical activity ledger — EXEC rows via GSI1 (the agent-profile task log)
 //   GET    /agents/{slug}/projects          projects this agent is an active member of
@@ -188,6 +189,7 @@ export async function handler(
     const threadId = event.pathParameters?.id;
 
     if (routeKey === "GET /agents") return listAgents(event);
+    if (routeKey === "GET /stats") return listStats(event);
     if (routeKey === "GET /skills") return listSkills(event);
     if (routeKey === "GET /skills/{name}" && skillName) return getSkill(skillName);
     if (routeKey === "GET /agents/{slug}/executions" && slug) return listAgentExecutions(slug, event);
@@ -264,6 +266,204 @@ async function getAgent(slug: string): Promise<APIGatewayProxyResultV2> {
   const row = await getItem<AgentMetaRow>(agentPk(slug), "META");
   if (!row) return reply(404, { error: "not_found", slug });
   return reply(200, toApiView(row));
+}
+
+// ─── GET /stats — dashboard aggregate (real EXEC-ledger roll-up) ─────────
+//
+// The console's /workforce landing page historically fell back to the
+// static `public/workforce-mock-stats.json` because no live aggregate
+// endpoint existed. This route replaces that with figures computed from
+// the EXEC ledger (PROJECT#…/EXEC# via the GSI1 AGENT#{slug} partition):
+// runs · MTD, deliverables · MTD, the 30-day heat strip, and the
+// live-trace ribbon.
+//
+// It deliberately reports NO cost or token figures. Per-run token usage
+// is not observable from the CCR execution path — the agent's Claude Code
+// session writes its EXEC row via POST /agents/{slug}/engagements but has
+// no access to its own usage, and the orchestrator's CCR fire returns
+// only a session id. Inventing a dollar/token number would violate C-1
+// (no fabricated truth on the operator surface), so the 4th KPI is run
+// DURATION, a real proxy for compute that IS derivable from started_at /
+// ended_at on every row.
+
+const STATS_HEAT_DAYS = 30;
+const STATS_RECENT_RUNS = 8;
+// Per-agent ledger read cap. The roster is single-operator-small; this is
+// a generous ceiling that still bounds a pathological busy partition.
+const STATS_PER_AGENT_EXEC_LIMIT = 1000;
+
+/** Collapse the 4 EXEC statuses into the 3 the console paints. `skipped`
+ *  is a clean no-op (not a failure), so it renders as non-throwing. */
+function mapExecStatus(s: ExecStatus): "ok" | "throw" | "dlq" {
+  return s === "throw" || s === "failed_artefact_redaction" ? "throw" : "ok";
+}
+
+/** Wall-clock run duration in seconds. Guards malformed / clock-skewed
+ *  rows (missing or ended<started) to 0 rather than emitting a negative. */
+function execDurationSeconds(r: ExecutionRow): number {
+  const started = Date.parse(r.started_at);
+  const ended = Date.parse(r.ended_at);
+  if (!Number.isFinite(started) || !Number.isFinite(ended)) return 0;
+  const secs = (ended - started) / 1000;
+  return secs > 0 ? secs : 0;
+}
+
+async function listStats(
+  _event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const now = new Date();
+  const monthStartMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+  const monthStartIso = new Date(monthStartMs).toISOString();
+
+  // 30-day heat window: one bucket per UTC day, oldest-first, ending today.
+  const dayMs = 24 * 60 * 60 * 1000;
+  const todayMidnightMs = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+  const heatStartMs = todayMidnightMs - (STATS_HEAT_DAYS - 1) * dayMs;
+  const days: string[] = [];
+  for (let i = 0; i < STATS_HEAT_DAYS; i++) {
+    days.push(new Date(heatStartMs + i * dayMs).toISOString().slice(0, 10));
+  }
+
+  // Read back to whichever window opens earlier (MTD vs the 30-day heat).
+  const queryFromIso = new Date(Math.min(monthStartMs, heatStartMs)).toISOString();
+
+  // Enumerate every agent META row, paginating the scan to completion — the
+  // roster is small but a silently-truncated dashboard would be worse than
+  // a slightly slower one.
+  const agentRows: AgentMetaRow[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await scanPrefix<AgentMetaRow>("AGENT#", "META", 100, cursor);
+    agentRows.push(...page.items);
+    cursor = page.cursor;
+  } while (cursor);
+
+  interface AgentStat {
+    paused: boolean;
+    archived: boolean;
+    last_run_at: string;
+    last_run_status: "ok" | "throw" | "dlq";
+    runs_this_month: number;
+    deliv_this_month: number;
+    compute_seconds_this_month: number;
+    avg_duration_s: number;
+  }
+  const agents: Record<string, AgentStat> = {};
+  const bySlug: Record<string, number[]> = {};
+  const allRecent: Array<{
+    slug: string;
+    started_at: string;
+    duration_s: number;
+    status: "ok" | "throw" | "dlq";
+    skill: string;
+  }> = [];
+
+  let totalRuns = 0;
+  let totalDeliv = 0;
+  let totalComputeSeconds = 0;
+  let agentsRunning = 0;
+  let agentsPaused = 0;
+  let agentsThrowing = 0;
+
+  for (const meta of agentRows) {
+    const slug = meta.slug;
+    // Archived agents stay on the roster (an all-zero heat row the operator
+    // can see) but we skip the ledger read — they're retired, not idle.
+    const rows = meta.archived
+      ? []
+      : await listExecutions({
+          agent_slug: slug,
+          from: queryFromIso,
+          limit: STATS_PER_AGENT_EXEC_LIMIT,
+        });
+    // Don't depend on the caller's ordering for the "last run" pick — sort
+    // newest-first explicitly (the live path already does, but the unit
+    // mock doesn't, and the cost is trivial).
+    rows.sort((a, b) => (a.started_at < b.started_at ? 1 : a.started_at > b.started_at ? -1 : 0));
+
+    const heat = new Array<number>(STATS_HEAT_DAYS).fill(0);
+    let runsThisMonth = 0;
+    let delivThisMonth = 0;
+    let computeThisMonth = 0;
+
+    for (const r of rows) {
+      const tsMs = Date.parse(r.started_at);
+      if (Number.isFinite(tsMs)) {
+        const idx = Math.floor((tsMs - heatStartMs) / dayMs);
+        if (idx >= 0 && idx < STATS_HEAT_DAYS) heat[idx] = (heat[idx] ?? 0) + 1;
+      }
+      if (r.started_at >= monthStartIso) {
+        runsThisMonth += 1;
+        if (r.artifact_ref) delivThisMonth += 1;
+        computeThisMonth += execDurationSeconds(r);
+      }
+      allRecent.push({
+        slug,
+        started_at: r.started_at,
+        duration_s: Math.round(execDurationSeconds(r)),
+        status: mapExecStatus(r.status),
+        skill: r.skill_name,
+      });
+    }
+
+    bySlug[slug] = heat;
+
+    const lastRow = rows[0];
+    const lastRunStatus = lastRow
+      ? mapExecStatus(lastRow.status)
+      : meta.last_run_status === "throw" || meta.last_run_status === "dlq"
+        ? "throw"
+        : "ok";
+    const avgDurationS = runsThisMonth > 0 ? computeThisMonth / runsThisMonth : 0;
+
+    agents[slug] = {
+      paused: meta.paused,
+      archived: meta.archived,
+      last_run_at: lastRow?.started_at ?? meta.last_run_at ?? "",
+      last_run_status: lastRunStatus,
+      runs_this_month: runsThisMonth,
+      deliv_this_month: delivThisMonth,
+      compute_seconds_this_month: Math.round(computeThisMonth),
+      avg_duration_s: Math.round(avgDurationS),
+    };
+
+    // Status rollup — mirrors deriveStatus() on the client (throwing wins
+    // over paused; archived agents count in none of the three).
+    if (!meta.archived) {
+      if (lastRunStatus === "throw") agentsThrowing += 1;
+      else if (meta.paused) agentsPaused += 1;
+      else agentsRunning += 1;
+    }
+
+    totalRuns += runsThisMonth;
+    totalDeliv += delivThisMonth;
+    totalComputeSeconds += computeThisMonth;
+  }
+
+  allRecent.sort((a, b) =>
+    a.started_at < b.started_at ? 1 : a.started_at > b.started_at ? -1 : 0,
+  );
+
+  return reply(200, {
+    generated_at: now.toISOString(),
+    month: monthStartIso.slice(0, 7),
+    totals: {
+      agents_running: agentsRunning,
+      agents_paused: agentsPaused,
+      agents_throwing: agentsThrowing,
+      runs_this_month: totalRuns,
+      deliv_count_this_month: totalDeliv,
+      compute_seconds_this_month: Math.round(totalComputeSeconds),
+      avg_duration_s: totalRuns > 0 ? Math.round(totalComputeSeconds / totalRuns) : 0,
+    },
+    agents,
+    activity: { days, by_slug: bySlug },
+    recent_runs: allRecent.slice(0, STATS_RECENT_RUNS),
+  });
 }
 
 async function patchAgent(
