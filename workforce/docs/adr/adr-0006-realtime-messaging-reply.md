@@ -1,6 +1,6 @@
 # ADR-0006 — Real-time talent replies run on a dedicated async Lambda, not the CCR batch runner
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-06-09
 - **Deciders**: operator
 - **Epics**: [epic-013](../epics/epic-013-talent-messaging.md)

@@ -24,11 +24,13 @@ vi.mock('../config/auth', () => ({
 import { signedFetch, assertSigv4Configured } from '../lib/sigv4';
 import {
   messagingWriteEnabled,
+  isAwaitingReply,
   createThread,
   sendMessage,
   markThreadRead,
   setThreadStar,
   fetchThreadSummaries,
+  type Conversation,
 } from './messages';
 
 const mockedSignedFetch = vi.mocked(signedFetch);
@@ -54,6 +56,48 @@ afterEach(() => {
 describe('messagingWriteEnabled', () => {
   it('is true when the API base is set AND SigV4 is configured', () => {
     expect(messagingWriteEnabled()).toBe(true);
+  });
+});
+
+describe('isAwaitingReply', () => {
+  const conv = (
+    over: Partial<Conversation> & { messages: Conversation['messages'] },
+  ): Conversation => ({
+    id: '01THREAD',
+    participants: ['maya'],
+    group: false,
+    starred: false,
+    unread: 0,
+    ...over,
+  });
+  const NOW = 1_000_000;
+
+  it('is true on a 1:1 thread whose last message is the operator and within the window', () => {
+    const c = conv({ messages: [{ from: 'operator', at: 'x', body: 'ping' }] });
+    expect(isAwaitingReply(c, NOW + 5000, NOW)).toBe(true);
+  });
+
+  it('is false once the window has expired', () => {
+    const c = conv({ messages: [{ from: 'operator', at: 'x', body: 'ping' }] });
+    expect(isAwaitingReply(c, NOW - 1, NOW)).toBe(false);
+  });
+
+  it('is false when the last message is already a talent reply', () => {
+    const c = conv({
+      messages: [
+        { from: 'operator', at: 'x', body: 'ping' },
+        { from: 'maya', at: 'y', body: 'pong' },
+      ],
+    });
+    expect(isAwaitingReply(c, NOW + 5000, NOW)).toBe(false);
+  });
+
+  it('is false for group threads, undefined until, or undefined conv', () => {
+    const g = conv({ group: true, messages: [{ from: 'operator', at: 'x', body: 'ping' }] });
+    expect(isAwaitingReply(g, NOW + 5000, NOW)).toBe(false);
+    const c = conv({ messages: [{ from: 'operator', at: 'x', body: 'ping' }] });
+    expect(isAwaitingReply(c, undefined, NOW)).toBe(false);
+    expect(isAwaitingReply(undefined, NOW + 5000, NOW)).toBe(false);
   });
 });
 

@@ -4,7 +4,7 @@
 // right. Threads are deterministic mock data (see lib/messages.ts) until
 // the live messaging store lands.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import WorkforceLayout from '../components/WorkforceLayout';
 import Sigil from '../components/Sigil';
@@ -18,6 +18,7 @@ import {
   markThreadRead,
   setThreadStar,
   messagingWriteEnabled,
+  isAwaitingReply,
   lastMessage,
   lastAt,
   OPERATOR_ID,
@@ -105,6 +106,12 @@ const LIVE = apiConfigured();
 // not just a configured read base. Mock origin → false → placeholder UI.
 const CAN_WRITE = messagingWriteEnabled();
 
+// Story 3b receive-side timings. The reply Lambda answers in seconds; we poll
+// the open thread every POLL_MS only while an "awaiting reply" window is
+// active (REPLY_WAIT_MS after a send), so there's no steady-state polling.
+const POLL_MS = 4000;
+const REPLY_WAIT_MS = 75_000;
+
 export default function Messaging() {
   const [roster, setRoster] = useState<WorkforceAgent[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -118,6 +125,14 @@ export default function Messaging() {
   // Compose-to-new state: when true the centre pane shows the recipient
   // picker + first-message composer instead of an open thread.
   const [composing, setComposing] = useState(false);
+  // Real-time receive (Story 3b): after the operator sends, we arm a short
+  // "awaiting reply" window per thread (until = expiry ms) and poll the open
+  // thread so the talent's async reply (wf-messaging-reply) surfaces without a
+  // manual refresh. See ADR-0006 on why this is bounded polling, not SSE/WS.
+  const [pendingReplyUntil, setPendingReplyUntil] = useState<Record<string, number>>({});
+  // Per-thread last-seen message count — the poll's change detector. A ref so
+  // updating it never itself triggers a render.
+  const seenLenRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     document.title = `${SITE_DISPLAY_NAME} — Messaging`;
@@ -166,12 +181,56 @@ export default function Messaging() {
     if (!LIVE || !selectedId || detailCache[selectedId]) return;
     fetchThreadDetail(selectedId)
       .then((conv) => {
-        if (conv) setDetailCache((m) => ({ ...m, [conv.id]: conv }));
+        if (conv) {
+          setDetailCache((m) => ({ ...m, [conv.id]: conv }));
+          seenLenRef.current[conv.id] = conv.messages.length;
+        }
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
     // detailCache intentionally omitted: the guard above prevents refetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
+
+  // Poll the open thread while an awaiting-reply window is active, so the
+  // talent's async reply lands without a refresh. Bounded: runs only between a
+  // send and `until`, pauses when the tab is hidden, and stops the moment a
+  // non-operator message arrives. Single-operator scale (C-3) → trivial load.
+  const awaitingUntil = selectedId ? pendingReplyUntil[selectedId] : undefined;
+  useEffect(() => {
+    if (!LIVE || !selectedId || !awaitingUntil || awaitingUntil <= Date.now()) return;
+    const tid = selectedId;
+    let cancelled = false;
+    const poll = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      let fresh: Conversation | undefined;
+      try {
+        fresh = await fetchThreadDetail(tid);
+      } catch {
+        return; // transient; next tick retries
+      }
+      if (cancelled || !fresh) return;
+      const seen = seenLenRef.current[tid] ?? 0;
+      if (fresh.messages.length <= seen) return; // nothing new yet
+      seenLenRef.current[tid] = fresh.messages.length;
+      const conv = fresh;
+      setDetailCache((m) => ({ ...m, [tid]: conv }));
+      refreshSummaries();
+      const last = conv.messages[conv.messages.length - 1];
+      if (last && last.from !== OPERATOR_ID) {
+        // The reply landed — disarm (stops this poll, hides "drafting…").
+        setPendingReplyUntil((p) => {
+          const { [tid]: _done, ...rest } = p;
+          return rest;
+        });
+      }
+    };
+    const id = window.setInterval(poll, POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, awaitingUntil]);
 
   // Clear the operator's unread the first time a thread with a non-zero
   // badge is opened. Optimistically zero the list badge, then POST /read.
@@ -204,20 +263,41 @@ export default function Messaging() {
     setSelectedId(id);
   }
 
+  // Arm an awaiting-reply window for a thread the operator just posted to. The
+  // poll effect picks it up; a timeout disarms it if no reply lands in time
+  // (drafting just stops — no error; the reply may still arrive on next open).
+  function armPendingReply(threadId: string): void {
+    if (!LIVE) return;
+    const until = Date.now() + REPLY_WAIT_MS;
+    setPendingReplyUntil((p) => ({ ...p, [threadId]: until }));
+    window.setTimeout(() => {
+      setPendingReplyUntil((p) => {
+        if (p[threadId] !== until) return p; // re-armed by a newer send
+        const { [threadId]: _expired, ...rest } = p;
+        return rest;
+      });
+    }, REPLY_WAIT_MS + 500);
+  }
+
   // Compose-to-new: create a 1:1 thread, then select it and refresh.
   async function handleCreateThread(talentSlug: string, body: string): Promise<void> {
     const threadId = await createThread(talentSlug, body);
     setComposing(false);
     setSelectedId(threadId);
     refreshSummaries();
+    armPendingReply(threadId);
   }
 
   // Append to the open thread, then re-hydrate its transcript + the list.
   async function handleSend(threadId: string, body: string): Promise<void> {
     await sendMessage(threadId, body);
     const fresh = await fetchThreadDetail(threadId);
-    if (fresh) setDetailCache((m) => ({ ...m, [threadId]: fresh }));
+    if (fresh) {
+      setDetailCache((m) => ({ ...m, [threadId]: fresh }));
+      seenLenRef.current[threadId] = fresh.messages.length;
+    }
     refreshSummaries();
+    armPendingReply(threadId);
   }
 
   async function handleToggleStar(threadId: string, starred: boolean): Promise<void> {
@@ -394,6 +474,7 @@ export default function Messaging() {
                   canWrite={CAN_WRITE}
                   onSend={handleSend}
                   onToggleStar={handleToggleStar}
+                  drafting={isAwaitingReply(selected, awaitingUntil, Date.now())}
                 />
               ) : (
                 <div className="flex-1 flex items-center justify-center font-wfmono text-[11px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
@@ -457,12 +538,14 @@ function Thread({
   canWrite,
   onSend,
   onToggleStar,
+  drafting,
 }: {
   conv: Conversation;
   roster: Map<string, WorkforceAgent>;
   canWrite: boolean;
   onSend: (threadId: string, body: string) => Promise<void>;
   onToggleStar: (threadId: string, starred: boolean) => Promise<void>;
+  drafting: boolean;
 }) {
   const headAgent = roster.get(conv.participants[0]);
   const title = convTitle(conv, roster);
@@ -534,6 +617,16 @@ function Thread({
         {conv.messages.map((m, i) => (
           <MessageRow key={i} msg={m} roster={roster} />
         ))}
+        {drafting && (
+          <div className="flex items-center gap-2 pl-[52px] text-[11px] text-wf-on-surface-variant font-wfmono">
+            <span>{title.split(' ')[0]} is drafting</span>
+            <span className="inline-flex gap-0.5" aria-hidden="true">
+              <span className="animate-bounce [animation-delay:-0.3s]">·</span>
+              <span className="animate-bounce [animation-delay:-0.15s]">·</span>
+              <span className="animate-bounce">·</span>
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="px-3 py-3 border-t border-wf-outline-variant">
