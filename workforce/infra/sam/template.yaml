@@ -486,6 +486,17 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /agents
             Method: GET
+        # PR #274 — dashboard aggregate (EXEC-ledger roll-up: runs/deliv MTD,
+        # 30-day heat strip, live trace, run-duration KPI). Public read
+        # (CORS-gated), same shape as the other GET routes. The handler route
+        # shipped in #274 without this event, 404ing the whole console
+        # (the SPA's Promise.all couples the crew index to this fetch).
+        GetStats:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /stats
+            Method: GET
         GetAgent:
           Type: HttpApi
           Properties:
