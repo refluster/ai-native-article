@@ -155,14 +155,20 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-// ─── AC1 — Cross-project read-gate ────────────────────────────────────
+// ─── No cross-project gate (read-gate removed 2026-06-10) ─────────────
+//
+// recall is partitioned by the calling agent (GSI1 `AGENT#{slug}`), so it
+// surfaces the caller's OWN executions across every project. The Story-4
+// membership read-gate that hid rows from projects the caller was not an
+// active member of was removed per owner directive (project↔member binding
+// is not an access boundary at single-operator scale, C-3).
 
-describe("recall — AC1 cross-project read-gate", () => {
-  it("structured recall: ren sees rows from project alpha but NOT from project beta (non-member)", async () => {
+describe("recall — no cross-project membership gate", () => {
+  it("structured recall: ren sees its own rows across all projects, member or not", async () => {
     const alpha = project.asProjectId("alpha");
     const beta = project.asProjectId("beta");
     await seedProject(alpha, ["ren"]);
-    await seedProject(beta, ["maya"]); // ren is NOT a member of beta
+    await seedProject(beta, ["maya"]); // ren is NOT a declared member of beta
 
     await seedExec(alpha, {
       agent: "ren",
@@ -171,50 +177,36 @@ describe("recall — AC1 cross-project read-gate", () => {
       startedAt: "2026-05-20T00:00:00.000Z",
     });
 
-    // Maya runs in beta; ren is not a member. Inject a row whose GSI1
-    // partition happens to also point at AGENT#ren (simulating a
-    // historical buggy write — the gate must still catch it).
-    await project.appendExecution({
-      project_id: beta,
-      agent_slug: "maya",
-      exec_ulid: "01BETA",
-      skill_name: "plan-write",
-      skill_version: "0.1.0",
-      started_at: "2026-05-21T00:00:00.000Z",
-      ended_at: "2026-05-21T00:00:01.000Z",
-      status: "ok",
-    });
-    // Force a GSI1 row pointing at ren to simulate the attack surface.
-    store.set("PROJECT#beta|EXEC#01LEAK", {
+    // A ren-partitioned row in beta. Pre-2026-06-10 this was filtered out
+    // because ren is not a beta member; it is now returned.
+    store.set("PROJECT#beta|EXEC#01BETA", {
       pk: "PROJECT#beta",
-      sk: "EXEC#01LEAK",
+      sk: "EXEC#01BETA",
       project_id: beta,
       agent_slug: "ren",
-      skill_name: "leak",
+      skill_name: "plan-write",
       skill_version: "0.1.0",
       started_at: "2026-05-22T00:00:00.000Z",
       ended_at: "2026-05-22T00:00:01.000Z",
       status: "ok",
       gsi1pk: "AGENT#ren",
       gsi1sk: "2026-05-22T00:00:00.000Z",
-      gsi2pk: "SKILL#leak",
+      gsi2pk: "SKILL#plan-write",
       gsi2sk: "2026-05-22T00:00:00.000Z",
     });
 
     const results = await recall.recallStructured({ caller_agent_slug: "ren" });
     const sks = results.map((r) => r.row.sk);
     expect(sks).toContain("EXEC#01ALPHA");
-    expect(sks).not.toContain("EXEC#01LEAK");
+    expect(sks).toContain("EXEC#01BETA"); // no longer gated by membership
   });
 
-  it("semantic recall: ren never gets a kNN hit from a project they don't belong to", async () => {
+  it("semantic recall: a kNN hit from a non-member project is returned", async () => {
     const alpha = project.asProjectId("alpha");
     const beta = project.asProjectId("beta");
     await seedProject(alpha, ["ren"]);
     await seedProject(beta, ["maya"]);
 
-    // Both rows are GSI1 'AGENT#ren' (simulating the same buggy write
-    // shape). The beta row is the better kNN match by construction.
     await seedExec(alpha, {
       agent: "ren",
       ulid: "01ALPHA",
@@ -222,19 +214,21 @@ describe("recall — AC1 cross-project read-gate", () => {
       startedAt: "2026-05-20T00:00:00.000Z",
       embedding: Float32Array.from([0, 1, 0]),
     });
-    store.set("PROJECT#beta|EXEC#01LEAK", {
+    // beta row is the better kNN match by construction; previously the gate
+    // dropped it. It is now the top hit.
+    store.set("PROJECT#beta|EXEC#01BETA", {
       pk: "PROJECT#beta",
-      sk: "EXEC#01LEAK",
+      sk: "EXEC#01BETA",
       project_id: beta,
       agent_slug: "ren",
-      skill_name: "leak",
+      skill_name: "s",
       skill_version: "0.1.0",
       started_at: "2026-05-22T00:00:00.000Z",
       ended_at: "2026-05-22T00:00:01.000Z",
       status: "ok",
       gsi1pk: "AGENT#ren",
       gsi1sk: "2026-05-22T00:00:00.000Z",
-      gsi2pk: "SKILL#leak",
+      gsi2pk: "SKILL#s",
       gsi2sk: "2026-05-22T00:00:00.000Z",
       embedding_bytes: encodeEmbeddingBytes(Float32Array.from([1, 0, 0])),
       embedding_model_id: "voyage-3-lite",
@@ -242,8 +236,7 @@ describe("recall — AC1 cross-project read-gate", () => {
       embedding_status: "ok",
     });
 
-    // Query points at (1,0,0) — the LEAK row is a perfect match. Gate
-    // must drop it before returning to the caller.
+    // Query points at (1,0,0) — the beta row is a perfect match.
     embedMock.mockResolvedValueOnce({
       embedding: Float32Array.from([1, 0, 0]),
       modelId: "voyage-3-lite",
@@ -257,7 +250,7 @@ describe("recall — AC1 cross-project read-gate", () => {
       k: 5,
     });
     const sks = results.map((r) => r.row.sk);
-    expect(sks).not.toContain("EXEC#01LEAK");
+    expect(sks).toContain("EXEC#01BETA"); // no longer gated by membership
     expect(sks).toContain("EXEC#01ALPHA");
   });
 });

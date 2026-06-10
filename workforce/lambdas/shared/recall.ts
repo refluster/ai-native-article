@@ -13,18 +13,15 @@
 //     `embedding_status !== 'ok'` rows are excluded from the candidate
 //     pool but still visible via the structured path.
 //
-// ─── Trust-boundary defence in depth ──────────────────────────────────
+// ─── No membership gate ───────────────────────────────────────────────
 //
-// Per #93 AC1: a recall call NEVER returns an EXEC from a project the
-// calling agent is not an active member of. Enforced TWICE:
-//
-//   1. `listExecutions({ caller_agent_slug })` post-filters by
-//      isMember() (Story 4 addition).
-//   2. `recall()` re-asserts the same condition on the returned set
-//      before applying the kNN sort. A future bug in (1) would still
-//      not leak rows through (2).
-//
-// `_operator` calls short-circuit both gates and see the full ledger.
+// recall is always partitioned by the CALLING agent (GSI1 on
+// `AGENT#{slug}`), so it only ever surfaces the caller's OWN executions.
+// The Story-4 (#93) read-gate that additionally hid the caller's rows for
+// projects they were no longer an active member of was removed 2026-06-10
+// (owner directive): project↔member binding is not an access-control
+// primitive at single-operator scale (C-3), so an agent always recalls its
+// full own ledger regardless of current project membership.
 //
 // ─── Combined query+filter ────────────────────────────────────────────
 //
@@ -44,7 +41,6 @@
 
 import {
   listExecutions,
-  isMember,
   type ExecutionRow,
   type ExecStatus,
   type ProjectId,
@@ -89,8 +85,10 @@ const DEFAULT_K = 5;
 const SEMANTIC_SCAN_LIMIT = 1000;
 
 export interface RecallStructuredInput {
-  /** Required. `_operator` sees everything; named agents are gated to
-   *  projects they're an active member of. */
+  /** Required. Selects the agent partition to recall over (GSI1
+   *  `AGENT#{slug}`) — a recall always surfaces the named agent's own
+   *  ledger. `_operator` has no agent partition and must scope by
+   *  project/skill via listExecutions instead. */
   caller_agent_slug: AgentSlug | "_operator";
   /** Optional structured filters. */
   project?: ProjectId;
@@ -156,7 +154,6 @@ export async function recallStructured(
     to: input.to,
     status: input.status,
     limit: SEMANTIC_SCAN_LIMIT,
-    caller_agent_slug: callerForGate,
   });
 
   // Post-filter on project / skill (GSI1 is already partitioned by agent).
@@ -166,14 +163,9 @@ export async function recallStructured(
     return true;
   });
 
-  // Defence-in-depth: re-assert membership on the returned set. The
-  // listExecutions read-gate already did this; we redo it here so a
-  // future regression upstream cannot bypass the recall trust boundary.
-  const gated = await dropForbidden(filtered, callerForGate);
-
   // Newest-first (matches the operator-chat use case).
-  gated.sort((a, b) => (a.started_at < b.started_at ? 1 : a.started_at > b.started_at ? -1 : 0));
-  return gated.slice(0, k).map((row) => ({ row }));
+  filtered.sort((a, b) => (a.started_at < b.started_at ? 1 : a.started_at > b.started_at ? -1 : 0));
+  return filtered.slice(0, k).map((row) => ({ row }));
 }
 
 /**
@@ -200,7 +192,6 @@ export async function recallSemantic(
   const rows = await listExecutions({
     agent_slug: caller,
     limit: SEMANTIC_SCAN_LIMIT,
-    caller_agent_slug: caller,
   });
 
   // 2. Filter to embedded candidates only. Rows without
@@ -280,15 +271,7 @@ export async function recallSemantic(
     return true;
   });
 
-  // 6. Defence-in-depth membership re-check (mirrors recallStructured).
-  const gated = await dropForbidden(
-    postFiltered.map((x) => x.row),
-    caller,
-  );
-  const gatedSet = new Set(gated.map((r) => r.sk));
-  const finalRanked = postFiltered.filter((x) => gatedSet.has(x.row.sk));
-
-  return finalRanked.slice(0, k).map(({ row, score }) => ({ row, score }));
+  return postFiltered.slice(0, k).map(({ row, score }) => ({ row, score }));
 }
 
 /**
@@ -314,25 +297,6 @@ export async function recall(input: RecallInput): Promise<RecallResult[]> {
   } finally {
     await emitRecallLatency(Date.now() - t0);
   }
-}
-
-// --- Helpers -------------------------------------------------------------
-
-/** Drop rows whose project the caller is NOT an active member of. The
- *  membership check is per-distinct-project so a 1k-row partition spread
- *  across 3 projects costs 3 isMember() reads. */
-async function dropForbidden(
-  rows: ReadonlyArray<ExecutionRow>,
-  caller: AgentSlug,
-): Promise<ExecutionRow[]> {
-  const distinct = new Set(rows.map((r) => r.project_id));
-  const isMemberByProject = new Map<ProjectId, boolean>();
-  await Promise.all(
-    [...distinct].map(async (pid) => {
-      isMemberByProject.set(pid, await isMember(pid, caller));
-    }),
-  );
-  return rows.filter((r) => isMemberByProject.get(r.project_id) === true);
 }
 
 // Re-export `cosine` so tests / future composers don't need to reach
