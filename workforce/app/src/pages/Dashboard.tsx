@@ -7,15 +7,21 @@
 //     hero copy, persona count, cron-binding count, and the per-agent
 //     budget envelope; recomputed at render time so a new persona shows
 //     up immediately).
-//   - workforce-mock-stats.json → per-agent activity + cost mocks used
-//     until the live agents-api is wired. The Dashboard re-aggregates
-//     totals from the per-agent rows (rather than reading the JSON's
-//     `totals` block) so personas the mock file hasn't been backfilled
-//     with still register as paused-zero in the headline KPIs.
-//   - The 30-day heat-strip date axis is computed at render time as the
-//     30 days ending today, so the dashboard never shows a stale date
-//     window. The bar intensities remain illustrative until the live
-//     activity endpoint exists.
+//   - agents-api GET /stats  → real EXEC-ledger roll-up: per-agent runs /
+//     deliverables MTD, the 30-day heat strip, the live-trace ribbon, and
+//     run-duration figures. Falls back to the static
+//     workforce-mock-stats.json only when the API base is unconfigured
+//     (local dev / bare gh-pages). The Dashboard re-aggregates totals from
+//     the per-agent rows (rather than reading the response's `totals`
+//     block) so a persona the ledger hasn't logged yet still registers as
+//     paused-zero in the headline KPIs.
+//   - The 4th KPI is run DURATION, not spend: per-run token/cost usage is
+//     not observable from the CCR execution path, so the dashboard reports
+//     the real compute proxy it CAN derive instead of a fabricated dollar
+//     figure.
+//   - The 30-day heat-strip date axis is the 30 days ending today (the
+//     /stats endpoint emits this window directly; the mock fallback is
+//     re-axised at render time so it never shows a stale date window).
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -26,7 +32,8 @@ import StatusPill, { deriveStatus } from '../components/StatusPill';
 import KPIReadout from '../components/KPIReadout';
 import HeatStrip, { intensityClass } from '../components/HeatStrip';
 import LiveTrace from '../components/LiveTrace';
-import { loadWorkforceManifest, loadWorkforceMockStats, fullName } from '../lib/agents';
+import { loadWorkforceManifest, loadWorkforceStats, fullName } from '../lib/agents';
+import { fmtDuration, fmtCompute } from '../lib/duration';
 import { SITE_DISPLAY_NAME } from '../config/site';
 import type { WorkforceAgentManifest } from '../types/agent';
 import type { AgentMockStats, WorkforceMockStats } from '../types/stats';
@@ -40,8 +47,9 @@ const PAUSED_PLACEHOLDER: AgentMockStats = {
   last_run_at: '',
   last_run_status: 'ok',
   runs_this_month: 0,
-  cost_this_month_usd: 0,
-  deliv_count_total: 0,
+  deliv_this_month: 0,
+  avg_duration_s: 0,
+  compute_seconds_this_month: 0,
 };
 
 function lastNDaysUTC(n: number): string[] {
@@ -63,7 +71,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     document.title = `${SITE_DISPLAY_NAME} — Performance`;
-    Promise.all([loadWorkforceManifest(), loadWorkforceMockStats()])
+    Promise.all([loadWorkforceManifest(), loadWorkforceStats()])
       .then(([m, s]) => {
         setManifest(m);
         setStats(s);
@@ -87,8 +95,8 @@ export default function Dashboard() {
   }
 
   // Per-agent rollup that synthesises paused-zero rows for personas the
-  // mock JSON hasn't been backfilled for. Totals are re-aggregated from
-  // this so new agents flip CREW LIVE / RUNS · MTD / SPEND immediately.
+  // ledger hasn't logged yet. Totals are re-aggregated from this so new
+  // agents flip CREW LIVE / RUNS · MTD / AVG DUR immediately.
   const rollup = manifest.agents.map((a) => {
     const s = stats.agents[a.slug] ?? PAUSED_PLACEHOLDER;
     const status = deriveStatus({ paused: s.paused, archived: s.archived, last_run_status: s.last_run_status });
@@ -101,7 +109,6 @@ export default function Dashboard() {
       acc + a.bindings.filter((b) => b.trigger.scheduler === 'eventbridge' && b.trigger.cron).length,
     0,
   );
-  const budgetEnvelope = manifest.agents.reduce((acc, a) => acc + (a.budget_monthly_usd ?? 0), 0);
   const currentMonth = new Date().toISOString().slice(0, 7);
 
   const computedTotals = {
@@ -109,18 +116,25 @@ export default function Dashboard() {
     agents_paused: rollup.filter((r) => r.status === 'paused').length,
     agents_throwing: rollup.filter((r) => r.status === 'throwing').length,
     runs_this_month: rollup.reduce((acc, r) => acc + r.stats.runs_this_month, 0),
-    cost_this_month_usd: rollup.reduce((acc, r) => acc + r.stats.cost_this_month_usd, 0),
+    compute_seconds_this_month: rollup.reduce((acc, r) => acc + (r.stats.compute_seconds_this_month ?? 0), 0),
+    deliv_this_month: rollup.reduce((acc, r) => acc + (r.stats.deliv_this_month ?? 0), 0),
   };
-  // deliv_count_this_month isn't broken down per-agent in the mock — keep
-  // reading it from the totals block until per-agent MTD deliv counts exist.
-  const delivMTD = stats.totals.deliv_count_this_month;
   const t = computedTotals;
+  // Prefer the per-agent rollup (so an agent the ledger hasn't logged still
+  // counts) when agents carry the MTD deliv field; the static-mock fallback
+  // has no per-agent breakdown, so fall back to the totals block there.
+  const delivMTD = rollup.some((r) => r.stats.deliv_this_month !== undefined)
+    ? t.deliv_this_month
+    : stats.totals.deliv_count_this_month;
+  // AVG DUR is the spend-proxy KPI: real run duration, not a fabricated
+  // token/dollar figure (per-run usage isn't observable from the CCR path).
+  const avgDurMTD = t.runs_this_month > 0 ? t.compute_seconds_this_month / t.runs_this_month : 0;
 
   const kpis = [
-    { cap: 'CREW LIVE',  value: String(t.agents_running),                                                 sub: `${t.agents_paused} paused · ${t.agents_throwing} throwing` },
-    { cap: 'RUNS · MTD', value: String(t.runs_this_month),                                                sub: `${currentMonth} · ${personaCount} agents` },
-    { cap: 'SPEND · MTD',value: `$${t.cost_this_month_usd.toFixed(2)}`,                                   sub: `of $${budgetEnvelope.toFixed(0)} envelope` },
-    { cap: 'DELIV · MTD',value: String(delivMTD),                                                         sub: 'across all streams' },
+    { cap: 'CREW LIVE',    value: String(t.agents_running),    sub: `${t.agents_paused} paused · ${t.agents_throwing} throwing` },
+    { cap: 'RUNS · MTD',   value: String(t.runs_this_month),   sub: `${currentMonth} · ${personaCount} agents` },
+    { cap: 'AVG DUR · MTD',value: fmtDuration(avgDurMTD),      sub: `${fmtCompute(t.compute_seconds_this_month)} compute · ${t.runs_this_month} runs` },
+    { cap: 'DELIV · MTD',  value: String(delivMTD),            sub: 'across all streams' },
   ];
 
   const subnavRight = (
@@ -228,12 +242,12 @@ export default function Dashboard() {
                         <div className="text-wf-on-surface">{s.runs_this_month}</div>
                       </div>
                       <div>
-                        <div className="text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">spend</div>
-                        <div className="text-wf-on-surface">${s.cost_this_month_usd.toFixed(2)}</div>
+                        <div className="text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">avg dur</div>
+                        <div className="text-wf-on-surface">{s.avg_duration_s != null ? fmtDuration(s.avg_duration_s) : '—'}</div>
                       </div>
                       <div>
                         <div className="text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">deliv</div>
-                        <div className="text-wf-on-surface">{s.deliv_count_total}</div>
+                        <div className="text-wf-on-surface">{s.deliv_this_month ?? s.deliv_count_total ?? 0}</div>
                       </div>
                     </div>
                   </Link>

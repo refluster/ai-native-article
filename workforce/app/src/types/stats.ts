@@ -42,8 +42,20 @@ export interface AgentMockStats {
   last_run_at: string;
   last_run_status: RunStatus;
   runs_this_month: number;
-  cost_this_month_usd: number;
-  deliv_count_total: number;
+  /** Deliverables (EXEC rows with an artefact) produced this month. */
+  deliv_this_month?: number;
+  /** Mean run duration in seconds, MTD — the live spend-proxy metric. */
+  avg_duration_s?: number;
+  /** Total wall-clock run time in seconds, MTD. */
+  compute_seconds_this_month?: number;
+  /** Lifetime deliverable counter. Optional: the live /stats endpoint
+   *  reports MTD figures only (token/cost roll-ups were never observable
+   *  from the CCR path); retained for the static mock fallback. */
+  deliv_count_total?: number;
+  /** Per-run cost in USD. Optional + unused on the live path — per-run
+   *  token/cost usage is not observable from the CCR execution path, so
+   *  the dashboard surfaces run duration instead. */
+  cost_this_month_usd?: number;
   next_run_at?: string;
   last_7d?: AgentLast7d;
   recent_runs?: AgentRunEntry[];
@@ -54,9 +66,14 @@ export interface MockTotals {
   agents_paused: number;
   agents_throwing: number;
   runs_this_month: number;
-  cost_this_month_usd: number;
   deliv_count_this_month: number;
-  budget_envelope_usd: number;
+  /** Total wall-clock run time across the workforce this month, seconds. */
+  compute_seconds_this_month?: number;
+  /** Mean run duration this month, seconds. */
+  avg_duration_s?: number;
+  /** Deprecated — see AgentMockStats.cost_this_month_usd. */
+  cost_this_month_usd?: number;
+  budget_envelope_usd?: number;
 }
 
 export interface MockActivity {

@@ -39,10 +39,11 @@ import {
   findAgent,
   fullName,
   loadWorkforceManifest,
-  loadWorkforceMockStats,
+  loadWorkforceStats,
   type AgentExecution,
   type AgentLiveRecord,
 } from '../lib/agents';
+import { fmtDuration, fmtCompute } from '../lib/duration';
 import { fetchAgentMemberships } from '../lib/projects';
 import type { AgentMembership } from '../types/project';
 import type { AgentMemoryKind, WorkforceAgent } from '../types/agent';
@@ -96,7 +97,7 @@ export default function AgentProfile() {
   useEffect(() => {
     if (!slug) return;
     let cancelled = false;
-    Promise.all([findAgent(slug), loadWorkforceManifest(), loadWorkforceMockStats()])
+    Promise.all([findAgent(slug), loadWorkforceManifest(), loadWorkforceStats()])
       .then(([a, m, s]) => {
         if (cancelled) return;
         setAgent(a ?? null);
@@ -190,27 +191,30 @@ export default function AgentProfile() {
     );
   }
 
-  // KPI source preference: live → mock → '—'
-  const runsMTD = live?.runs_this_month ?? mockForSlug?.runs_this_month;
-  const spendMTD = live?.cost_this_month_usd ?? mockForSlug?.cost_this_month_usd;
-  const delivTotal = live?.deliv_count_total ?? mockForSlug?.deliv_count_total;
+  // KPI source preference: the /stats roll-up (computed from the EXEC
+  // ledger) is the authoritative source for the activity figures — the
+  // live AGENT#…/META counters (runs/cost) are stale because the CCR path
+  // no longer maintains them. paused/archived DO come from META (the PATCH
+  // endpoint writes them), so those keep their live preference below.
+  const runsMTD = mockForSlug?.runs_this_month ?? live?.runs_this_month;
+  // AVG DUR replaces SPEND: per-run token/cost usage is not observable
+  // from the CCR execution path, so we report run duration — a real
+  // compute proxy derivable from started_at/ended_at — instead.
+  const avgDurMTD = mockForSlug?.avg_duration_s;
+  const computeMTD = mockForSlug?.compute_seconds_this_month;
+  const delivMTD = mockForSlug?.deliv_this_month ?? live?.deliv_count_total;
   const nextRun = mockForSlug?.next_run_at;
-  const lastRunAt = live?.last_run_at ?? mockForSlug?.last_run_at;
-  const lastRunStatus = live?.last_run_status ?? mockForSlug?.last_run_status ?? 'ok';
+  const lastRunAt = mockForSlug?.last_run_at ?? live?.last_run_at;
+  const lastRunStatus = mockForSlug?.last_run_status ?? live?.last_run_status ?? 'ok';
   const isPaused = live?.paused ?? mockForSlug?.paused ?? false;
   const isArchived = live?.archived ?? mockForSlug?.archived ?? false;
   const status = deriveStatus({ paused: isPaused, archived: isArchived, last_run_status: lastRunStatus });
 
-  const budgetCap = agent.budget_monthly_usd;
-  const spendPct = budgetCap > 0 && spendMTD !== undefined
-    ? Math.min(100, Math.round((spendMTD / budgetCap) * 100))
-    : 0;
-
   const kpis = [
-    { cap: 'RUNS · MTD',  value: runsMTD !== undefined ? String(runsMTD) : '—',                     sub: 'this month' },
-    { cap: 'SPEND · MTD', value: spendMTD !== undefined ? `$${spendMTD.toFixed(2)}` : '—',           sub: `of $${budgetCap} cap · ${spendPct}%` },
-    { cap: 'DELIV',       value: delivTotal !== undefined ? String(delivTotal) : '—',                sub: 'lifetime total' },
-    { cap: 'NEXT RUN',    value: nextRunLabel(nextRun),                                              sub: agent.bindings[0]?.note ?? `${agent.bindings.length} binding(s)`, alarm: status === 'throwing' },
+    { cap: 'RUNS · MTD',   value: runsMTD !== undefined ? String(runsMTD) : '—',           sub: 'this month' },
+    { cap: 'AVG DUR · MTD',value: avgDurMTD !== undefined ? fmtDuration(avgDurMTD) : '—',   sub: computeMTD !== undefined ? `${fmtCompute(computeMTD)} compute` : 'run duration' },
+    { cap: 'DELIV · MTD',  value: delivMTD !== undefined ? String(delivMTD) : '—',          sub: 'this month' },
+    { cap: 'NEXT RUN',     value: nextRunLabel(nextRun),                                     sub: agent.bindings[0]?.note ?? `${agent.bindings.length} binding(s)`, alarm: status === 'throwing' },
   ];
 
   return (
