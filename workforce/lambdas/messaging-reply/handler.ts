@@ -33,14 +33,22 @@ import {
   getThreadDetail,
   sendMessage,
 } from "../shared/messaging.js";
+import { buildRecallBlock } from "../shared/recall-prompt.js";
+import { readIndex, readChunk } from "../shared/memory.js";
+import type { ProjectId } from "../shared/project.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AGENTS_ROOT = process.env.AGENTS_ROOT ?? join(HERE, "agents");
 const STAGE = process.env.STAGE ?? "dev";
 
 /** Bumped when the reply prompt/guard contract changes (lands on MSG rows
- *  as `skill_version`, mirroring the cadence skills' versioning). */
-const SKILL_VERSION = "0.1.0";
+ *  as `skill_version`, mirroring the cadence skills' versioning).
+ *  0.2.0: recall packet (EXEC recall + latest memory summary) grounding. */
+const SKILL_VERSION = "0.2.0";
+
+/** Cap on the memory-summary excerpt folded into the system prompt. The
+ *  rolling summary can grow; a reply needs the gist, not the archive. */
+const MEMORY_EXCERPT_CHARS = 1200;
 
 const NO_REPLY_TOKEN = "__NO_REPLY_NEEDED__";
 
@@ -78,6 +86,9 @@ const REPLY_INSTRUCTIONS = [
   "Write ONE reply, in your own voice (first-person, work-register). 1–4",
   "sentences. No headers, no bullet lists, no greeting boilerplate — this is a",
   "message, not a document. Answer from your actual work; do not invent facts.",
+  "When a 'Relevant past work' or 'Your memory' section is present below, treat",
+  "it as your own private notes: ground your answer in it, but never quote it",
+  "verbatim or mention that you were given notes.",
   "",
   `If the last message needs no reply — an acknowledgement ("Nice. Ship it."),`,
   "a closing, or a message clearly addressed to someone else in a group — output",
@@ -125,6 +136,45 @@ async function loadAgent(slug: string): Promise<AgentCard> {
   const cfg = JSON.parse(await readFile(join(AGENTS_ROOT, slug, "agent.json"), "utf8")) as { model: string };
   const systemMd = await readFile(join(AGENTS_ROOT, slug, "system.md"), "utf8");
   return { model: cfg.model, systemMd };
+}
+
+/** Assemble the grounding packet (Epic-013 §4: "answer *from your work*, not
+ *  from invention"): semantic recall over the agent's own EXEC ledger keyed
+ *  on the inbound message, plus the tail of the latest rolling memory
+ *  summary. Both legs fail-soft — a missing Voyage key, an un-embedded
+ *  ledger or an absent memory index yields a smaller packet, never a failed
+ *  reply (buildRecallBlock carries the same contract internally). */
+async function assembleWorkContext(slug: string, inbound: string): Promise<string> {
+  const sections: string[] = [];
+
+  // renderRecallBlock supplies its own "## Relevant past work" header and
+  // enforces RECALL_BLOCK_CHAR_CAP; empty ledger → "".
+  const recallBlock = await buildRecallBlock({
+    caller_agent_slug: slug,
+    brief: inbound.slice(0, 300),
+    skillName: "messaging-reply",
+    projectId: `self/${slug}` as ProjectId,
+  });
+  if (recallBlock) sections.push(recallBlock.trim());
+
+  try {
+    const idx = await readIndex(slug);
+    const key = idx?.latest_summary_key ?? idx?.latest_chunk_key ?? undefined;
+    if (key) {
+      const chunk = await readChunk(key);
+      const excerpt =
+        chunk.length > MEMORY_EXCERPT_CHARS
+          ? `${chunk.slice(0, MEMORY_EXCERPT_CHARS)}\n…(older memory omitted)`
+          : chunk;
+      sections.push(`## Your memory (latest summary)\n\n${excerpt.trim()}`);
+    }
+  } catch (err) {
+    console.warn(
+      JSON.stringify({ event: "messaging_reply_memory_skipped", slug, error: String(err) }),
+    );
+  }
+
+  return sections.join("\n\n");
 }
 
 function buildTranscript(
@@ -184,13 +234,16 @@ export async function handler(event: MessagingReplyEvent): Promise<MessagingRepl
 
   const agent = await loadAgent(addressed_slug);
   const transcript = buildTranscript(detail.messages, addressed_slug);
+  const workContext = await assembleWorkContext(addressed_slug, last.body);
 
   // complete() throws on stop_reason==='max_tokens' — that IS the W-1
   // finish_reason==='length' guard (a 1–4 sentence reply that truncates is a
   // real signal, not an expected case). We let it propagate.
   const out = await complete({
     model: agent.model,
-    system: `${agent.systemMd}\n\n---\n\n${REPLY_INSTRUCTIONS}`,
+    system: [agent.systemMd, REPLY_INSTRUCTIONS, workContext]
+      .filter((s) => s.length > 0)
+      .join("\n\n---\n\n"),
     user: transcript,
     maxTokens: REPLY_MAX_TOKENS,
     reasoningBudgetTokens: REPLY_REASONING_TOKENS,

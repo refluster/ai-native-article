@@ -788,6 +788,25 @@ Resources:
               Action: s3:PutObject
               Resource:
                 - !Sub ${WfBucket.Arn}/messages/*
+            - Sid: MessagingReplyMemoryRead
+              # Recall packet (skill 0.2.0) — the latest rolling memory
+              # summary grounds the reply. Read-only on memory/*; chunks are
+              # written by the compactor, never from here.
+              Effect: Allow
+              Action: s3:GetObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/memory/*
+            - Sid: MessagingReplyRecallVoyageKey
+              # Recall packet (skill 0.2.0) — semantic recall over the
+              # agent's own EXEC ledger embeds the inbound message via
+              # Voyage. Same narrow scoping as AgentsApiRecallVoyageKey:
+              # the voyage.api_key path only, never the broader credential
+              # bag. Fail-soft in the handler — a missing key skips recall,
+              # never fails the reply.
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*/voyage.api_key-*
             - Sid: MessagingReplyAnthropicKey
               # The persona reply is generated via shared/llm-anthropic.ts,
               # which reads the same wf/anthropic secret every agent uses. One
