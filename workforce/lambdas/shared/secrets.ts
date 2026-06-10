@@ -11,13 +11,28 @@ export async function getSecret<T>(name: string): Promise<T> {
   const hit = cache.get(name);
   if (hit !== undefined) return hit as T;
 
+  const parsed = JSON.parse(await getSecretRaw(name)) as T;
+  cache.set(name, parsed);
+  return parsed;
+}
+
+const rawCache = new Map<string, string>();
+
+/** The un-parsed SecretString. For secrets whose value may legitimately be
+ *  either a JSON object or a bare string — the credentials-api stores the
+ *  operator's `value` verbatim ("MAY be a JSON object … or a string"), so
+ *  consumers that must tolerate both shapes (llm-anthropic's key
+ *  resolution) read raw and parse themselves. */
+export async function getSecretRaw(name: string): Promise<string> {
+  const hit = rawCache.get(name);
+  if (hit !== undefined) return hit;
+
   const res = await sm.send(new GetSecretValueCommand({ SecretId: name }));
   if (!res.SecretString) {
     throw new Error(`secret "${name}" has no SecretString (binary secret?)`);
   }
-  const parsed = JSON.parse(res.SecretString) as T;
-  cache.set(name, parsed);
-  return parsed;
+  rawCache.set(name, res.SecretString);
+  return res.SecretString;
 }
 
 export interface AnthropicSecret {

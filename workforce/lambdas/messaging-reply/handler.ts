@@ -201,6 +201,10 @@ export interface MessagingReplyResult {
 
 export async function handler(event: MessagingReplyEvent): Promise<MessagingReplyResult> {
   const { thread_id, addressed_slug } = event ?? {};
+  // Structured entry log: with async fire-and-forget dispatch, "was the
+  // Lambda even invoked?" is the first triage question — answer it in one
+  // log line rather than by inference.
+  console.log(JSON.stringify({ event: "messaging_reply_invoked", thread_id, addressed_slug }));
   if (!thread_id || !addressed_slug) {
     throw new Error("messaging-reply: missing thread_id or addressed_slug");
   }
