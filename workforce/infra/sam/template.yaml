@@ -820,11 +820,13 @@ Resources:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*/voyage.api_key-*
             - Sid: MessagingReplyAnthropicKey
               # The persona reply is generated via shared/llm-anthropic.ts,
-              # which reads the same wf/anthropic secret every agent uses. One
-              # secret only — no new credential introduced by Story 3.
+              # which resolves the key typed-first (Epic-010 §6 home:
+              # wf/projects/_default/anthropic.api_key) and falls back to
+              # the legacy bare wf/anthropic. Both names granted.
               Effect: Allow
               Action: secretsmanager:GetSecretValue
               Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/_default/anthropic.api_key-*
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/anthropic-*
             - Sid: MessagingReplyMetrics
               Effect: Allow
@@ -1460,12 +1462,14 @@ Resources:
               Resource:
                 - !Sub ${WfBucket.Arn}/memory/*
             - Sid: CompactorAnthropicRead
-              # The summariser model key. wf/anthropic is the legacy bare key
-              # complete() reads (shared/llm-anthropic.ts); kept until the
-              # Epic-010 §6 bare-key deletion lands.
+              # The summariser model key. complete() (shared/llm-anthropic.ts)
+              # resolves typed-first (wf/projects/_default/anthropic.api_key,
+              # the Epic-010 §6 home) and falls back to the legacy bare
+              # wf/anthropic. Both names granted.
               Effect: Allow
               Action: secretsmanager:GetSecretValue
               Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/_default/anthropic.api_key-*
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/anthropic-*
             - Sid: CompactorPutMetric
               Effect: Allow

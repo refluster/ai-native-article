@@ -4,7 +4,7 @@
 // by, surfaced as a loud failure here instead of silently shipping a
 // half-written article.
 
-import { getSecret, type AnthropicSecret } from "./secrets.js";
+import { getSecretRaw } from "./secrets.js";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -68,6 +68,86 @@ const PRICING: Record<string, { in: number; out: number }> = {
  *  call so the mistake fails loudly with a readable message (C-4). */
 export const ANTHROPIC_MIN_THINKING_BUDGET_TOKENS = 1024;
 
+/** Where the Anthropic key may live, in resolution order. Epic-010 §6 moved
+ *  credentials to typed per-project secrets (`wf/projects/_default/
+ *  anthropic.api_key` is the shared bag) with the bare `wf/anthropic` kept
+ *  only for a deprecation window — so the typed home is tried first and the
+ *  legacy name is the fallback, mirroring project.ts getCredential(). */
+const ANTHROPIC_KEY_SECRET_NAMES = [
+  "wf/projects/_default/anthropic.api_key",
+  "wf/anthropic",
+] as const;
+
+let cachedApiKey: string | null = null;
+
+function isResourceNotFound(err: unknown): boolean {
+  return err instanceof Error && err.name === "ResourceNotFoundException";
+}
+
+/** Accept both value shapes the credentials-api can store: a JSON object
+ *  carrying `apiKey` (the vault's anthropic shape) or the bare key string.
+ *  Returns undefined when the payload matches neither. Exported for tests
+ *  (pure — the resolver's cold-start cache makes it awkward to exercise
+ *  shape variants through resolveAnthropicApiKey itself). */
+export function extractApiKey(raw: string): string | undefined {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return undefined;
+  if (trimmed.startsWith("{")) {
+    try {
+      const obj = JSON.parse(trimmed) as { apiKey?: unknown };
+      return typeof obj.apiKey === "string" && obj.apiKey.length > 0 ? obj.apiKey : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  // A bare string; tolerate a JSON-quoted string too.
+  if (trimmed.startsWith('"')) {
+    try {
+      const s = JSON.parse(trimmed) as unknown;
+      return typeof s === "string" && s.length > 0 ? s : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  return trimmed;
+}
+
+/** Resolve the Anthropic API key across the typed/legacy secret names,
+ *  tolerating both storage shapes. A total miss throws with every name
+ *  tried and the expected shapes — the W-4 readable-failure contract
+ *  (the Epic-013 follow-up bug: replies kept failing when the key wasn't
+ *  readable at the single hardcoded legacy name). Exported for tests. */
+export async function resolveAnthropicApiKey(): Promise<string> {
+  if (cachedApiKey) return cachedApiKey;
+  const tried: string[] = [];
+  for (const name of ANTHROPIC_KEY_SECRET_NAMES) {
+    let raw: string;
+    try {
+      raw = await getSecretRaw(name);
+    } catch (err) {
+      if (isResourceNotFound(err)) {
+        tried.push(`${name} (not found)`);
+        continue;
+      }
+      throw err;
+    }
+    const key = extractApiKey(raw);
+    if (key) {
+      if (name === "wf/anthropic") {
+        console.warn(JSON.stringify({ event: "anthropic_key_legacy_name_used", name }));
+      }
+      cachedApiKey = key;
+      return key;
+    }
+    tried.push(`${name} (unrecognised value shape)`);
+  }
+  throw new Error(
+    `anthropic api key unresolvable; tried: ${tried.join(", ")}. ` +
+      `Store it via the credential vault as anthropic.api_key (value {"apiKey":"sk-ant-…"} ` +
+      `or the bare key string) under wf/projects/_default/, or keep legacy wf/anthropic.`,
+  );
+}
+
 export async function complete(req: CompletionRequest): Promise<CompletionResponse> {
   if (
     req.reasoningBudgetTokens !== undefined &&
@@ -80,7 +160,7 @@ export async function complete(req: CompletionRequest): Promise<CompletionRespon
         `raise it or unset it to disable extended thinking`,
     );
   }
-  const { apiKey } = await getSecret<AnthropicSecret>("wf/anthropic");
+  const apiKey = await resolveAnthropicApiKey();
   const modelKey = req.model.replace(/^anthropic:/, "");
 
   // Extended-thinking ("reasoning") wiring. When the caller has set
