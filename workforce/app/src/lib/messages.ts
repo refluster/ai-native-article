@@ -283,3 +283,18 @@ export async function markThreadRead(threadId: string): Promise<void> {
 export async function setThreadStar(threadId: string, starred: boolean): Promise<void> {
   await postSigned(`/threads/${encodeURIComponent(threadId)}/star`, { starred });
 }
+
+/** Whether to show a "drafting…" affordance on an open 1:1 thread: the
+ *  operator is waiting on the talent's reply (armed at send time, expiring at
+ *  `until`) and it hasn't landed yet (the last message is still the
+ *  operator's). Pure so the page can derive it and the test can pin it.
+ *  Group threads never show it (Story 3b is 1:1-only for the indicator). */
+export function isAwaitingReply(
+  conv: Conversation | undefined,
+  until: number | undefined,
+  now: number,
+): boolean {
+  if (!conv || conv.group || !until || until <= now) return false;
+  const last = conv.messages[conv.messages.length - 1];
+  return !!last && last.from === OPERATOR_ID;
+}
