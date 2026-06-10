@@ -60,7 +60,26 @@ const PRICING: Record<string, { in: number; out: number }> = {
   "claude-opus-4-7": { in: 15.0, out: 75.0 },
 };
 
+/** Anthropic's documented floor for `thinking.budget_tokens`. A request
+ *  below this is rejected by the API with a 400 — which, on an async
+ *  invoke path, surfaces only as a CloudWatch error and looks like a
+ *  silent no-reply from the operator's seat (the Epic-013 launch bug:
+ *  messaging-reply shipped with budget 1000). Validate before the wire
+ *  call so the mistake fails loudly with a readable message (C-4). */
+export const ANTHROPIC_MIN_THINKING_BUDGET_TOKENS = 1024;
+
 export async function complete(req: CompletionRequest): Promise<CompletionResponse> {
+  if (
+    req.reasoningBudgetTokens !== undefined &&
+    req.reasoningBudgetTokens > 0 &&
+    req.reasoningBudgetTokens < ANTHROPIC_MIN_THINKING_BUDGET_TOKENS
+  ) {
+    throw new Error(
+      `complete: reasoningBudgetTokens=${req.reasoningBudgetTokens} is below Anthropic's ` +
+        `thinking.budget_tokens minimum (${ANTHROPIC_MIN_THINKING_BUDGET_TOKENS}); ` +
+        `raise it or unset it to disable extended thinking`,
+    );
+  }
   const { apiKey } = await getSecret<AnthropicSecret>("wf/anthropic");
   const modelKey = req.model.replace(/^anthropic:/, "");
 

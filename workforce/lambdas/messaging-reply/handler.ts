@@ -55,9 +55,12 @@ const NO_REPLY_TOKEN = "__NO_REPLY_NEEDED__";
 // A work-register reply is 1–4 sentences; 400 visible tokens is generous.
 // reasoningBudgetTokens ≥ the visible cap so hidden reasoning cannot starve
 // the prose budget (the same class of bug as the L2 truncation — see
-// llm-anthropic.ts on `reasoningBudgetTokens`).
+// llm-anthropic.ts on `reasoningBudgetTokens`). Anthropic's extended-thinking
+// API rejects budgets below 1024 (`thinking.budget_tokens` minimum) — the
+// original 1000 made every reply call 400 and was why /messaging never
+// answered. complete() now throws loudly on sub-minimum budgets.
 const REPLY_MAX_TOKENS = 400;
-const REPLY_REASONING_TOKENS = 1000;
+const REPLY_REASONING_TOKENS = 2048;
 
 /** Per-thread reply budget per UTC day. Never trips in normal single-operator
  *  use; it's the seatbelt against a bug that re-fires (Epic §6). */
