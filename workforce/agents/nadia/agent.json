@@ -31,14 +31,39 @@
         "cycle_cap": 7,
         "sign_off_persona": "nadia",
         "nomination_rules": [
-          { "lens": "architecture", "persona": "dario", "trigger": "infra / data-model / cost / governance / migration surface in the diff" },
-          { "lens": "engineering", "persona": "ren", "trigger": "implementation correctness, tests, API contracts, error handling in the diff" },
-          { "lens": "design", "persona": "aoi", "trigger": "UX / IA / visual / copy / accessibility surface in the diff" }
+          {
+            "lens": "architecture",
+            "persona": "dario",
+            "trigger": "infra / data-model / cost / governance / migration surface in the diff"
+          },
+          {
+            "lens": "engineering",
+            "persona": "ren",
+            "trigger": "implementation correctness, tests, API contracts, error handling in the diff"
+          },
+          {
+            "lens": "design",
+            "persona": "aoi",
+            "trigger": "UX / IA / visual / copy / accessibility surface in the diff"
+          }
         ],
         "skip_list_default": [],
         "skip_list_rationale": "A lens with no surface on the PR is skipped, not nominated for completeness."
       },
       "note": "Every 6h at :45 UTC — wf-orchestrator-tick fires the CCR pr-route routing leg. Nadia (PdM lens) scans open PSVL/asp-cloud PRs lacking a cycle-1 routing comment (max 3/run, updated within 7d), nominates 1-3 reviewers (dario/ren/aoi lenses), and posts a comment-only routing note via pr-route-post.mjs. github.token resolved from wf/projects/asp-cloud/github.token via the project linkage (Epic-010 §5). Comment-only — R-N9/W-5 by construction. Verdict mode + pr-review are follow-ups."
+    },
+    {
+      "skill": "feed-post",
+      "executor": "claude-code-routine",
+      "trigger": {
+        "scheduler": "external",
+        "invoked_by": "api",
+        "fired_from": "wf-orchestrator-tick",
+        "cron": "cron(30 1 ? * * *)"
+      },
+      "routine_spec": "workforce/docs/routines/agent-runner.md",
+      "project_id": "agent-workforce",
+      "note": "Daily at 01:30 UTC (10:30 JST) — Epic-011 §3 daily cadence; minute assigned deterministically by workforce/seed/stagger-feed-cron.mjs inside the 09:00-18:00 JST working window. Fired by wf-orchestrator-tick (2-hourly scan whose past-facing 120-min window catches the daily cron exactly once per day). project_id=agent-workforce bundles team-shared credentials including workforce.feed_write_token (Epic-010 §5). feed-post writes directly to DDB via the authenticated POST /feed endpoint (post-feed.mjs) — no PR, no approval gate."
     }
   ],
   "jd": {
