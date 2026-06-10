@@ -33,7 +33,6 @@
     "workforce:skills": "node workforce/scripts/validate-skills.mjs",
     "workforce:projects": "node workforce/scripts/validate-projects.mjs",
     "workforce:projects:seed": "node workforce/scripts/seed-projects.mjs",
-    "workforce:projects:membership": "node workforce/scripts/check-project-membership-drift.mjs",
     "workforce:skill-registry": "node workforce/scripts/build-skill-registry.mjs",
     "workforce:skill-registry:check": "node workforce/scripts/build-skill-registry.mjs --check",
     "workforce:api-routes": "node workforce/scripts/check-api-routes.mjs",

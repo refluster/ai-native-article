@@ -16,17 +16,15 @@
 // snake_case for these (e.g. `Project.append_execution`) — that is
 // illustrative; the binding rule is codebase consistency.
 //
-// Membership audit semantics: removeMember() is a SOFT delete (writes
-// `revoked_at` on the MEMBER row) so the audit trail "was agent X a
-// member of project Y on date Z" can be reconstructed. isMember() and
-// members() filter on `revoked_at === undefined`.
-//
-// Membership write-gate removed 2026-06-08 (operator decision; C-3): neither
-// appendExecution() nor listExecutions() gate writes on membership anymore.
-// listExecutions() still offers an OPTIONAL recall read-filter via
-// `caller_agent_slug` (defence-in-depth for the semantic-recall surface) —
-// see JSDoc on listExecutions() below — but it errors no one; it silently
-// scopes recall candidates and is not on the engagement-write path.
+// Membership is now ROSTER METADATA ONLY — it gates nothing. addMember() /
+// removeMember() / members() / isMember() persist a soft-deletable roster
+// (removeMember() writes `revoked_at` so "was X a member of Y on date Z"
+// stays answerable), but no code path reads it for access control:
+//   - the appendExecution() write-gate was removed 2026-06-08 (C-3); and
+//   - the listExecutions() / recall() membership READ-gate was removed
+//     2026-06-10 (owner directive) — project↔member binding is not an
+//     access-control primitive at single-operator scale, so every
+//     registered agent participates in every project.
 //
 // Credential resolution (getCredential) uses preferred-path-with-
 // scoped-legacy-fallback per Epic-010 §6. The catch is narrowed to
@@ -529,28 +527,6 @@ type CommonOpts = {
   status?: ExecStatus;
   /** Page size. Default 100. */
   limit?: number;
-  /**
-   * Caller identity for the recall trust-boundary read-gate (Story 4 / #93).
-   *
-   * When set, `listExecutions` post-filters out any row whose `project_id`
-   * the named agent is not an active member of. This is a recall-scoping
-   * read-filter only; the matching write-gate on `appendExecution` was
-   * removed 2026-06-08, so this no longer mirrors a write-time denial — it
-   * just narrows which ledger rows feed semantic recall. It is OPTIONAL
-   * because:
-   *
-   *   - Pre-Story-4 callers (the agents-api, the agent-runner's own
-   *     dual-write tests) already assert membership at a higher seam and
-   *     would double-charge the check.
-   *   - Cross-project queries from `_operator` are valid (the operator
-   *     sees everything by design) — passing the caller as `_operator`
-   *     short-circuits the gate.
-   *
-   * Story 4's `agent.recall()` ALWAYS sets this (defence in depth — the
-   * surface is reachable from agent-as-actor code paths that may
-   * eventually run with reduced trust). See `shared/recall.ts`.
-   */
-  caller_agent_slug?: AgentSlug | "_operator";
 };
 
 export type ListExecutionsFilter = (AgentScope | SkillScope | ProjScope) & CommonOpts;
@@ -558,14 +534,13 @@ export type ListExecutionsFilter = (AgentScope | SkillScope | ProjScope) & Commo
 /**
  * Return execution rows matching the filter.
  *
- * **Recall read-filter (optional)**: the `appendExecution` write-gate on
- * project membership was removed 2026-06-08 (C-3). `listExecutions` never
- * gated either; it retains an optional recall-scoping filter. Story 4 (#93)
- * ADDED the optional
- * `caller_agent_slug` field (see `CommonOpts.caller_agent_slug` doc) so
- * the recall surface can defence-in-depth the read-gate here even when
- * the higher-layer check is forgotten. Callers that don't pass it get
- * the same (un-gated) behaviour as before — non-breaking.
+ * **No membership gate.** The `appendExecution` write-gate on project
+ * membership was removed 2026-06-08 (C-3), and the recall read-gate that
+ * post-filtered rows by `isMember(caller, project)` was removed 2026-06-10
+ * (owner directive: project↔member binding is not an access-control
+ * primitive — every registered agent participates in every project; the
+ * single-operator scale of C-3 has no tenant boundary to enforce). Rows
+ * are returned to any caller subject only to the structured filters below.
  *
  * Range push-down: both `from` and `to` are passed to DDB as
  * `skGte` / `skLte` constraints when scoping by agent_slug / skill_name.
@@ -613,31 +588,12 @@ export async function listExecutions(filter: ListExecutionsFilter): Promise<Exec
   // status + range post-filter. Status is never part of the index;
   // the range filter is a no-op on the GSI paths (DDB already pushed
   // down) and load-bearing on the project_id path.
-  const prefiltered = rows.filter((r) => {
+  return rows.filter((r) => {
     if (filter.status && r.status !== filter.status) return false;
     if (filter.from && r.started_at < filter.from) return false;
     if (filter.to && r.started_at > filter.to) return false;
     return true;
   });
-
-  // Story 4 (#93) recall trust-boundary read-gate. Only applied when the
-  // caller explicitly opts in via `caller_agent_slug`. `_operator` sees
-  // everything; named agents see only rows from projects they are an
-  // active member of. The membership check is per-distinct-project_id
-  // (Set dedup) so a partition of 10k EXEC rows across 3 projects only
-  // costs 3 isMember() reads, not 10k.
-  const caller = filter.caller_agent_slug;
-  if (caller === undefined || caller === "_operator") {
-    return prefiltered;
-  }
-  const distinctProjects = new Set<ProjectId>(prefiltered.map((r) => r.project_id));
-  const membershipByProject = new Map<ProjectId, boolean>();
-  await Promise.all(
-    [...distinctProjects].map(async (pid) => {
-      membershipByProject.set(pid, await isMember(pid, caller));
-    }),
-  );
-  return prefiltered.filter((r) => membershipByProject.get(r.project_id) === true);
 }
 
 // --- Credentials ---------------------------------------------------------

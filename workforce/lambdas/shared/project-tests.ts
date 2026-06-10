@@ -520,75 +520,18 @@ describe("listExecutions", () => {
     ).rejects.toThrow(/requires at least one of/);
   });
 
-  // ── Story 4 (#93) — caller_agent_slug read-gate ────────────────────
-  // Defence-in-depth: even when a row has a GSI1 partition pointing at
-  // an agent, the row is dropped if the caller is not an active member
-  // of that row's project. `_operator` and the unset (legacy) case both
-  // see all rows.
-  describe("Story 4 — caller_agent_slug read-gate", () => {
-    it("ren as caller sees ONLY rows from projects ren is a member of", async () => {
-      // Add a row in beta with agent_slug=maya but a forged GSI1 pointing
-      // at AGENT#ren (simulating an upstream bug / attack surface).
-      store.set("PROJECT#beta|EXEC#01LEAK", {
-        pk: "PROJECT#beta",
-        sk: "EXEC#01LEAK",
-        project_id: beta,
-        agent_slug: "ren",
-        skill_name: "leak",
-        skill_version: "0.1.0",
-        started_at: "2026-05-25T00:00:00.000Z",
-        ended_at: "2026-05-25T00:00:01.000Z",
-        status: "ok",
-        gsi1pk: "AGENT#ren",
-        gsi1sk: "2026-05-25T00:00:00.000Z",
-        gsi2pk: "SKILL#leak",
-        gsi2sk: "2026-05-25T00:00:00.000Z",
-      });
-
-      // ren is now a member of alpha (per beforeEach) and we ADD ren to
-      // beta in this fixture's outer scope. So set up: remove ren from
-      // beta and verify the leak row is dropped.
+  // ── No membership read-gate (removed 2026-06-10) ───────────────────
+  // The Story-4 (#93) `caller_agent_slug` read-gate, which dropped rows
+  // whose project the caller was not an active member of, was removed per
+  // owner directive: project↔member binding is not an access-control
+  // primitive at single-operator scale (C-3). listExecutions returns every
+  // row in the queried partition, subject only to the structured filters.
+  describe("no membership read-gate", () => {
+    it("returns all rows in the agent partition regardless of membership", async () => {
+      // ren is seeded into alpha (beforeEach) but we revoke beta here.
+      // Pre-2026-06-10 the beta row (EXEC#01B) would have been filtered
+      // out; it is now returned — membership no longer gates reads.
       await project.removeMember(beta, "ren");
-
-      const gated = await project.listExecutions({
-        agent_slug: "ren",
-        caller_agent_slug: "ren",
-      });
-      expect(gated.map((r) => r.sk)).toContain("EXEC#01A"); // ren ∈ alpha
-      expect(gated.map((r) => r.sk)).not.toContain("EXEC#01LEAK"); // ren ∉ beta
-      expect(gated.map((r) => r.sk)).not.toContain("EXEC#01B"); // also dropped — ren ∉ beta now
-    });
-
-    it("_operator caller sees everything (gate short-circuits)", async () => {
-      // Same setup as the previous test but caller is _operator.
-      store.set("PROJECT#beta|EXEC#01LEAK", {
-        pk: "PROJECT#beta",
-        sk: "EXEC#01LEAK",
-        project_id: beta,
-        agent_slug: "ren",
-        skill_name: "leak",
-        skill_version: "0.1.0",
-        started_at: "2026-05-25T00:00:00.000Z",
-        ended_at: "2026-05-25T00:00:01.000Z",
-        status: "ok",
-        gsi1pk: "AGENT#ren",
-        gsi1sk: "2026-05-25T00:00:00.000Z",
-        gsi2pk: "SKILL#leak",
-        gsi2sk: "2026-05-25T00:00:00.000Z",
-      });
-      await project.removeMember(beta, "ren");
-
-      const all = await project.listExecutions({
-        agent_slug: "ren",
-        caller_agent_slug: "_operator",
-      });
-      expect(all.map((r) => r.sk).sort()).toContain("EXEC#01LEAK");
-    });
-
-    it("absent caller_agent_slug is BACKWARD-COMPATIBLE — gate does not run", async () => {
-      // Pre-Story-4 callers (existing agent-runner, agents-api) MUST
-      // continue to see un-gated results so we don't break their tests.
-      // Bare listExecutions({ agent_slug }) keeps the legacy behaviour.
       const rows = await project.listExecutions({ agent_slug: "ren" });
       expect(rows.map((r) => r.sk).sort()).toEqual(["EXEC#01A", "EXEC#01B"]);
     });
