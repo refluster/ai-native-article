@@ -1,4 +1,4 @@
-# ADR-0007 — Agent config is single-sourced from git; DDB holds only operational state
+# ADR-0007 — Agent identity/config is single-sourced from DynamoDB; git definition files retire
 
 - **Status**: Proposed
 - **Date**: 2026-06-11
@@ -12,131 +12,171 @@ owners (`workforce/lambdas/shared/agent.ts`):
 
 | Slice | Fields | Authoritative source | Mutated by |
 |---|---|---|---|
-| **Identity / config** | `bindings[]`, `model`, `prompt_version`, `budget_monthly_usd_default`, `streams`, … | `workforce/agents/{slug}/agent.json` (git) | PR + merge |
+| **Identity / config** | `bindings[]`, `model`, `prompt_version`, `budget_monthly_usd_default`, `streams`, `system.md` content, … | `workforce/agents/{slug}/` (git) | PR + merge |
 | **Operational** | `paused`, `archived`, `budget_monthly_usd_override`, `last_run_at`, `last_run_status` | the DDB row itself | agents-api PATCH, orchestrator |
 | **Computed** | `runs_this_month`, `cost_this_month_usd`, `deliv_count_total` | the DDB row itself | runner roll-ups |
 
 Only the first slice is duplicated: git is its declared source of truth, but
 runtime consumers (orchestrator dispatch scan, agents-api GET) read the DDB
-mirror. The mirror is refreshed by a **manual, two-stage** sync: a merge to
-`main` triggers the data-plane deploy, which bakes the `workforce/agents/**`
-tree into the `wf-seed-agents` Lambda artefact (its Makefile copies the
-tree); the operator must then remember to invoke it
-(`node workforce/scripts/seed-agents.mjs prod`) to upsert the rows.
+mirror, refreshed by a **manual, two-stage** sync (merge-triggered deploy
+bakes `workforce/agents/**` into the `wf-seed-agents` artefact; the operator
+must then remember to invoke the seed). This produced two concrete failure
+modes, both observed:
 
-This shape has produced two concrete failure modes:
+1. **Forgotten seed.** A merged config change silently never takes effect
+   (the PR #282 feed-post rollout, 2026-06-11 — a W-4 / C-4 anti-pattern).
+2. **Seed-before-deploy race.** Seeding mid-deploy re-seeds the *previous*
+   agents tree while reporting success.
 
-1. **Forgotten seed.** A merged config change silently never takes effect.
-   Observed on 2026-06-11: the feed-post daily-cadence rollout (PR #282)
-   merged green, and the orchestrator kept dispatching the old 2-hourly
-   bindings until the operator was told, out of band, to run the seed. A
-   silently-stale scheduler is the W-4 / C-4 anti-pattern — broken state
-   that does not fail loud.
-2. **Seed-before-deploy race.** Invoking the seed while the data-plane
-   deploy is still running re-seeds the *previous* agents tree (the Lambda
-   artefact is the data source), reporting success while writing stale
-   config.
-
-Meanwhile the codebase already contains the alternative, in production:
-`wf-messaging-reply` reads `agents/{slug}/system.md` and `agent.json`
-directly from its **own bundled copy** of the agents tree
-(`messaging-reply/handler.ts` `AGENTS_ROOT`) — no DDB mirror, no seed, no
-drift window. The same datum therefore has two supply chains today: bundled
-file for messaging, seeded DDB row for dispatch and the API.
-
-Supporting machinery that exists only to serve the mirror: the
-`identity_hash` change-detection in `shared/identity-hash.ts`, the noop/upsert
-accounting in `seed-agents/handler.ts`, and the `ensureSelfProject` call that
-piggybacks on the seed pass.
+Two single-source directions eliminate the drift class. An earlier draft of
+this ADR chose **git-first** (build-time bundle into every consuming Lambda,
+the `wf-messaging-reply` pattern; deploy = sync). The operator rejected that
+direction on operational grounds: agent config is the workforce's *runtime
+roster*, and routine adjustments (cadence, budgets, wiring a skill to a
+persona) should not each cost a PR + review + data-plane deploy at
+single-operator scale. Epic-007's original operator direction already pointed
+here — "a DynamoDB-backed list with basic CRUD API operations" — and its v1
+compromise (identity in git, operational overrides in DDB) is what created
+the mirror this ADR removes. The operator's judgment: the governance value of
+per-change PR review on config is real but disproportionate to its ceremony,
+and can be preserved more cheaply by a **periodic (weekly) review of an audit
+trail** plus mechanical write-time guards.
 
 ## Decision
 
-**Make git the only authoritative store for agent identity/config. Deliver
-it to runtime as a build-time projection bundled into each consuming Lambda
-artefact. Shrink the DDB row to the operational + computed slices it
-uniquely owns. Retire the seed.**
+**Make the DynamoDB `AGENT#{slug}` item family the only authoritative store
+for agent identity/config, alongside the operational + computed slices it
+already owns. All mutations flow through agents-api. Rebuild the governance
+functions that git provided — validation, history, review — as DB-native
+mechanisms. Retire the git definition tree and the seed.**
 
 Concretely:
 
-1. `workforce/agents/{slug}/agent.json` + `system.md` are the sole source of
-   identity/config. The SAM Makefile of every Lambda that needs identity at
-   runtime (orchestrator, agents-api; messaging-reply already does) copies
-   the agents tree into its artefact — the pattern `wf-seed-agents` and
-   `wf-messaging-reply` already use, promoted from exception to rule.
-2. A shared loader (`shared/agent-bundle.ts` or similar) reads the bundled
-   tree; the orchestrator iterates bundled identities instead of scanning
-   `AGENT#*/META` for config; agents-api composes its GET responses from
-   bundled identity + the DDB state row.
-3. The `AGENT#{slug}` DDB row keeps **only** operational + computed
-   attributes. Identity attributes stop being written; the row is no longer
-   a "definition mirror" (`docs/data-model.md` row catalogue updated
-   accordingly).
-4. `wf-seed-agents`, `workforce/scripts/seed-agents.mjs`, and the
-   `identity_hash` machinery retire. `ensureSelfProject` rehomes to a path
-   that still runs for every agent (orchestrator first-encounter or
-   agents-api lazy-create — implementation PR decides).
-5. Propagation contract: **deploy = sync.** The data-plane workflow already
-   auto-triggers on `workforce/agents/**`; once it completes, every Lambda
-   is serving the merged config. No second step exists to forget, and the
-   stale-bundle race disappears because the artefact and the code ship
-   atomically.
+1. **Single store.** `AGENT#{slug}/META` carries identity/config
+   authoritatively: `bindings[]`, `model`, `prompt_version`, budget defaults,
+   `streams`, and the persona prompt (`system.md` content inline, or an S3
+   object pointer if size warrants — implementation PR decides; both stores
+   are already sanctioned by R-N2). `workforce/agents/{slug}/` is seeded into
+   DDB one final time, then deleted from the repo (history preserves it).
+   `wf-seed-agents`, `seed-agents.mjs`, and the `identity_hash` machinery
+   retire with it.
+2. **Single writer.** agents-api is the only mutation path (extends the
+   existing PATCH to full CRUD over identity fields, IAM-auth as today).
+   The orchestrator keeps scanning `AGENT#*/META` for dispatch — unchanged,
+   since it already reads DDB. `wf-messaging-reply` migrates from its bundled
+   file copy to reading the same rows (an in-VPC DDB read on an async path —
+   the latency/availability objection to *GitHub*-at-runtime does not apply
+   to the store the hot path already queries).
+3. **Write-time validation replaces CI validation.** The JSON-schema checks
+   in `validate-agent-json.mjs` move into a shared module enforced
+   synchronously by agents-api on every write; invalid config is rejected at
+   the boundary (W-4: fail loud, and earlier than CI did).
+4. **Audit trail replaces git history.** Every config mutation appends an
+   immutable `AGENT#{slug}/AUDIT#{iso-ts}` item: actor, field-level
+   before/after diff, request context. No write path may bypass it (single
+   writer makes this enforceable).
+5. **Weekly review replaces per-change PR review.** A scheduled weekly
+   digest — built on the existing EventBridge → orchestrator cadence
+   machinery, not a parallel mechanism — compiles the week's AUDIT items
+   into a reviewable summary for the operator (delivery surface:
+   implementation PR decides; a GitHub issue is the default). Producing the
+   digest is mechanical and fail-loud: a week with mutations but no digest
+   is an alarm condition, so the review step cannot silently lapse the way
+   the manual seed did. The human act is *reading* the digest, not
+   remembering to assemble it.
+6. **Blast-radius guards bound the unreviewed window.** Because review is
+   now post-hoc (up to ~7 days), the API validator enforces mechanical
+   ceilings an unreviewed change cannot exceed: a cadence floor (no binding
+   may fire more often than the orchestrator tick), per-agent budget caps,
+   and a model allowlist. These are L2-style limits; loosening one is a
+   Zone B change.
+7. **Durability.** Git no longer reconstructs the org, so the table gets
+   point-in-time recovery plus a scheduled export to the existing S3 bucket.
+   Environment rebuild = restore, not re-seed.
+8. **Propagation contract: write = live.** A validated write is
+   authoritative immediately; no deploy, no second step, no drift window.
 
-This is the workforce sibling of the newsletter's C-2 invariant: git is to
-workforce config what Notion is to article content — every other copy is a
-derived projection, rebuilt mechanically, never hand-refreshed.
+### Rule amendments this decision entails (not applied in this PR)
+
+Ratifying this ADR commits the operator to a follow-up governance PR that:
+
+- Amends **W-5 / Rule 11** (an L0 amendment — explicit operator approval
+  required per §3): "one persona's `system.md` bump per PR" becomes "one
+  persona's prompt bump per write, each carrying its own AUDIT item and
+  surfacing in the weekly digest." The discipline (atomic, reviewable,
+  versioned persona changes) survives; the substrate changes.
+- Updates the §3 zone table rows for `workforce/agents/{slug}/*` (the files
+  cease to exist) to equivalent rows governing the API mutation classes.
+- Re-words **R-N2** to note that agent config is now *state* in the R-N2
+  sense, and names the audit/digest/export machinery as its guard.
+- Marks epic-007's "identity stays in git" split as superseded by this ADR.
+- Updates `docs/data-model.md`'s row catalogue (META becomes authoritative
+  for identity; AUDIT items added).
 
 ## Alternatives considered
 
-- **Status quo + auto-seed step appended to the deploy workflow.** Removes
-  the forgotten-seed mode cheaply, but keeps two authoritative-looking
-  stores, keeps the identity-hash/upsert machinery, and keeps a window where
-  rows and artefacts disagree mid-deploy. Rejected as treating the symptom;
-  it was the fallback if this ADR is not accepted.
-- **DDB as the single source (edit config via console/API).** Reverses the
-  governance model: `agent.json` edits are Zone B with PR review, CI
-  validation (`validate-agent-json.mjs`), and git history; a DB-first source
-  has none of those. Rejected outright.
+- **Git-first: build-time projection bundled into each consuming Lambda**
+  (the previous draft of this ADR). Keeps PR review, CI validation, and git
+  history intact with zero new machinery, and structurally eliminates drift
+  via deploy = sync. Rejected by the operator: every routine config
+  adjustment costs a PR plus a multi-minute data-plane deploy, runtime
+  console editing stays impossible, and epic-007's CRUD-API direction stays
+  permanently truncated to operational fields. What is genuinely given up by
+  rejecting it — *pre-change* human gating — is consciously traded for
+  post-hoc weekly review bounded by write-time guards (Decision §5–6).
+- **Status quo + auto-seed appended to the deploy workflow.** Removes the
+  forgotten-seed mode cheaply but keeps two authoritative-looking stores,
+  the identity-hash machinery, and a mid-deploy disagreement window.
+  Rejected as treating the symptom.
 - **Read GitHub at runtime (orchestrator fetches agent.json per tick).**
-  Couples every 2-hourly tick — and every messaging reply — to GitHub
-  availability, credentials, and latency, for data that changes a few times
-  a week. Rejected; the build-time projection gets the same freshness
-  (changes only land via deploy anyway) with zero runtime dependency.
-- **Bundle into a Lambda layer instead of per-function copies.** Saves a few
-  hundred KB of duplication across artefacts but adds a layer-versioning
-  moving part; the agents tree is small (~hundreds of KB). Rejected for v1;
-  revisit if artefact size ever matters.
+  Couples every tick and every messaging reply to GitHub availability,
+  credentials, and latency. Rejected; note this objection is specific to
+  GitHub-as-runtime-dependency and does not apply to DDB, which the
+  dispatch path already reads.
+- **DDB-first without the audit/digest/guard machinery** (just open up
+  PATCH). Rejected outright: config changes with no review, no history, and
+  no ceilings is the C-4 anti-pattern as a *governance* property — silent
+  degradation of the change-control layer itself.
 
 ## Consequences
 
-- **Positive.** The config-drift failure class is structurally eliminated,
-  not guarded against; the seed runbook step and its two failure modes
-  disappear; one supply chain for identity instead of two; `data-model.md`'s
-  agent row shrinks to fields with exactly one owner; the mental model
-  matches the rest of the repo (build-time projections: skill registry
-  codegen, SPA agent manifest, messaging-reply bundle).
-- **Accepted costs.** (a) Config changes take effect only after a successful
-  data-plane deploy — minutes of latency, already true for the
-  messaging-reply path. (b) Every identity-consuming Lambda's artefact
-  carries the agents tree. (c) Runtime config edits from the console remain
-  impossible — unchanged: the PATCH endpoint is operational-only today.
-  (d) Emergency controls are unaffected: `paused` / `archived` stay in DDB
-  and keep working mid-incident without a deploy.
-- **Migration.** Existing `META` rows retain stale identity attributes until
-  a one-time cleanup (or are left in place and ignored — implementation PR
-  decides, with a preference for cleanup so the row catalogue stays
-  truthful). `ensureSelfProject` must be rehomed **before** the seed is
-  deleted, or new agents lose their self-project row.
+- **Positive.** The config-drift failure class is structurally eliminated
+  (one store, no mirror); the seed runbook step and both its failure modes
+  disappear; config changes take effect in seconds without a deploy;
+  agents-api becomes the full management surface epic-007 originally aimed
+  at, unlocking console editing and (a future ADR) programmatic persona
+  creation; `wf-messaging-reply` and the orchestrator converge on one supply
+  chain for identity.
+- **Accepted costs.** (a) Review of config changes is post-hoc — a bad-but-
+  schema-valid change can run for up to a week before a human sees it,
+  bounded by the Decision §6 ceilings. (b) The audit-trail, weekly-digest,
+  and export machinery must be built and maintained — governance moves from
+  "free with git" to "owned code." (c) Prompt changes lose git-diff review
+  ergonomics; the weekly digest must render prompt diffs legibly or the W-5
+  discipline degrades in practice. (d) Disaster recovery now depends on DDB
+  PITR/exports, not `git clone`. (e) Local development reads prod-shaped
+  config from a table, not the worktree.
+- **Migration order.** (1) Extend agents-api with identity writes + AUDIT +
+  validation + guards; (2) migrate `wf-messaging-reply` and any other
+  bundled-file consumer to DDB reads; (3) final seed from the git tree;
+  (4) ship the weekly digest; (5) governance amendment PR (W-5, zone table,
+  R-N2, data-model); (6) delete `workforce/agents/**`, `wf-seed-agents`,
+  `seed-agents.mjs`, `identity_hash`, and `validate-agent-json.mjs`'s
+  agent-tree duty. Steps 1–4 precede 6; until 6, the git tree is frozen
+  (changes go to DDB only) to avoid a two-master interregnum.
 - **Until implemented**, the manual seed remains required after every
   `agent.json` merge; the operator runbook stands.
 
 ## Related
 
-- [ADR-0005](adr-0005-single-execution-model-ccr.md) — the CCR
-  consolidation that left the orchestrator as the only META-scan consumer
-  of `bindings[]`.
-- `workforce/lambdas/messaging-reply/handler.ts` — the in-production
-  precedent for bundled identity.
-- [docs/governance.md](../governance.md) R-N2 — DDB/S3 remain the stores for
-  *state*; this ADR narrows "state" to exclude config mirrors.
+- [Epic-007](../epics/epic-007-agent-management-api.md) — this ADR completes
+  its CRUD-API direction and supersedes its "identity stays in git" split.
+- [ADR-0005](adr-0005-single-execution-model-ccr.md) — the CCR consolidation
+  that left the orchestrator as the only META-scan consumer of `bindings[]`.
+- `workforce/lambdas/messaging-reply/handler.ts` — the bundled-file consumer
+  that must migrate (Decision §2).
+- [docs/governance.md](../governance.md) W-5 and R-N2 — the rules the
+  follow-up governance PR amends.
 - Root [docs/governance.md §2 C-2](../../../docs/governance.md) — the
-  newsletter invariant this decision mirrors.
+  newsletter's single-source invariant; this ADR is its workforce sibling
+  with DDB, not git, as the master copy.
