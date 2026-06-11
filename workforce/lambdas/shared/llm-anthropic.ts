@@ -23,24 +23,24 @@ export interface CompletionRequest {
    * reasoningBudgetTokens` in that case.
    */
   maxTokens: number;
+  /** Ignored when thinking is on, and never sent to models where Anthropic
+   *  removed sampling params (Opus 4.7+ / Fable tier — a sent temperature
+   *  is a 400 there). */
   temperature?: number;
   /**
-   * Optional separate reasoning budget. When set, enables Anthropic's
-   * extended-thinking mode (`thinking: { type: "enabled", budget_tokens }`).
-   * This decouples hidden-reasoning consumption from the visible-output cap,
-   * which is the same class of bug as the L2 truncation fix described in
-   * the root CLAUDE.md: with a shared cap, a model that reasons heavily
-   * can leave too few tokens for the visible body and the response gets
-   * truncated mid-sentence (surfaces as `stop_reason="max_tokens"`).
+   * Reasoning on-switch + headroom. When set (>0), the wrapper enables
+   * Anthropic's ADAPTIVE thinking (`thinking: {type: "adaptive"}` — the
+   * legacy `{type:"enabled", budget_tokens}` shape is deprecated on
+   * Sonnet/Opus 4.6 and REMOVED (400) on Opus 4.7+), and widens the wire
+   * `max_tokens` to `maxTokens + reasoningBudgetTokens` so hidden
+   * reasoning cannot starve the visible-output floor — the same class of
+   * bug as the L2 truncation fix described in the root CLAUDE.md
+   * (truncation surfaces as `stop_reason="max_tokens"` and throws).
    *
    * For short-form outputs (e.g. feed-post at ~200 tokens visible),
-   * Sonnet/Opus callers SHOULD set this to ≥ `maxTokens` so reasoning
-   * cannot starve the prose budget. Haiku does not use extended thinking
-   * — leave unset for Haiku.
-   *
-   * Note: Anthropic requires `temperature=1` when `thinking` is enabled
-   * (the API throws 400 otherwise). The wrapper forces temperature=1
-   * when this is set, regardless of the caller-provided temperature.
+   * Sonnet/Opus callers SHOULD set this to ≥ `maxTokens`. Haiku has no
+   * extended thinking — the wrapper omits the `thinking` field for Haiku
+   * models regardless of this setting.
    */
   reasoningBudgetTokens?: number;
 }
@@ -53,19 +53,26 @@ export interface CompletionResponse {
   cost_usd: number;
 }
 
-// USD per million tokens — keep in sync with Anthropic pricing.
-// https://www.anthropic.com/pricing — Sonnet 4.6 / Opus 4.7 figures.
+// USD per million tokens — keep in sync with Anthropic pricing
+// (https://www.anthropic.com/pricing). Covers every model on the roster
+// (agents/*/agent.json); a missing entry degrades to cost_usd=0, never a
+// throw. Opus 4.7 corrected 2026-06-11: it is $5/$25, not the $15/$75 of
+// the older Opus tier.
 const PRICING: Record<string, { in: number; out: number }> = {
   "claude-sonnet-4-6": { in: 3.0, out: 15.0 },
-  "claude-opus-4-7": { in: 15.0, out: 75.0 },
+  "claude-opus-4-7": { in: 5.0, out: 25.0 },
+  "claude-opus-4-8": { in: 5.0, out: 25.0 },
+  "claude-haiku-4-5-20251001": { in: 1.0, out: 5.0 },
+  "claude-haiku-4-5": { in: 1.0, out: 5.0 },
 };
 
-/** Anthropic's documented floor for `thinking.budget_tokens`. A request
- *  below this is rejected by the API with a 400 — which, on an async
- *  invoke path, surfaces only as a CloudWatch error and looks like a
- *  silent no-reply from the operator's seat (the Epic-013 launch bug:
- *  messaging-reply shipped with budget 1000). Validate before the wire
- *  call so the mistake fails loudly with a readable message (C-4). */
+/** Anthropic's documented floor for the legacy `thinking.budget_tokens`
+ *  param (the Epic-013 launch bug: messaging-reply shipped with budget
+ *  1000 and every call 400'd, invisible from the operator's seat). The
+ *  wrapper now sends ADAPTIVE thinking — no budget_tokens on the wire —
+ *  but the floor is kept as a sanity check on the caller contract: a
+ *  sub-1024 reasoning headroom is a misconfiguration either way, and
+ *  failing it loudly here beats discovering it in CloudWatch (C-4). */
 export const ANTHROPIC_MIN_THINKING_BUDGET_TOKENS = 1024;
 
 /** Where the Anthropic key may live, in resolution order. Epic-010 §6 moved
@@ -163,31 +170,43 @@ export async function complete(req: CompletionRequest): Promise<CompletionRespon
   const apiKey = await resolveAnthropicApiKey();
   const modelKey = req.model.replace(/^anthropic:/, "");
 
-  // Extended-thinking ("reasoning") wiring. When the caller has set
-  // `reasoningBudgetTokens`, we enable Anthropic's `thinking` mode and
-  // pass `max_tokens = visible + reasoning` so the API knows the total
-  // budget. The visible-output portion stays bounded by `req.maxTokens`
-  // — when the model exhausts the visible budget, `stop_reason` becomes
-  // `"max_tokens"` and the throw below catches it (W-4 / R-9).
-  const thinkingEnabled = (req.reasoningBudgetTokens ?? 0) > 0;
-  const wireMaxTokens = thinkingEnabled
+  // Model-capability gates (the /messaging Maya incident, 2026-06-11):
+  // Anthropic REMOVED the legacy `thinking:{type:"enabled",budget_tokens}`
+  // shape AND the sampling params (temperature/top_p/top_k) on Opus 4.7+
+  // and the Fable/Mythos tier — sending either returns a 400. The roster's
+  // one opus-4-7 persona (maya) therefore failed on EVERY reply while the
+  // sonnet-4-6 personas worked (the legacy shape is deprecated-but-
+  // functional there). Adaptive thinking is the supported replacement on
+  // every current non-Haiku model; Haiku has no extended thinking at all,
+  // so it must not receive a `thinking` field.
+  const adaptiveOnly = /^claude-(opus-4-[789]|fable|mythos)/.test(modelKey);
+  const noThinking = /^claude-haiku/.test(modelKey);
+
+  // Reasoning wiring. `reasoningBudgetTokens` is the on-switch plus the
+  // max_tokens headroom reserved for thinking: with adaptive thinking the
+  // model decides how much to think inside the shared `max_tokens` cap, so
+  // we widen the cap by the requested budget to keep the visible-output
+  // floor intact. Exhausting the cap still surfaces as
+  // `stop_reason==="max_tokens"` and throws below (W-4 / R-9).
+  const useThinking = (req.reasoningBudgetTokens ?? 0) > 0 && !noThinking;
+  const wireMaxTokens = useThinking
     ? req.maxTokens + (req.reasoningBudgetTokens as number)
     : req.maxTokens;
-  // Anthropic requires temperature=1 when thinking is enabled.
-  const wireTemperature = thinkingEnabled ? 1 : (req.temperature ?? 0.7);
 
   const body: Record<string, unknown> = {
     model: modelKey,
     max_tokens: wireMaxTokens,
-    temperature: wireTemperature,
     system: req.system,
     messages: [{ role: "user", content: req.user }],
   };
-  if (thinkingEnabled) {
-    body.thinking = {
-      type: "enabled",
-      budget_tokens: req.reasoningBudgetTokens,
-    };
+  if (useThinking) {
+    body.thinking = { type: "adaptive" };
+  }
+  // Sampling: omitted whenever thinking is on (the API controls sampling
+  // under thinking), and omitted entirely on adaptive-only models where
+  // the parameter no longer exists (400 if sent).
+  if (!useThinking && !adaptiveOnly) {
+    body.temperature = req.temperature ?? 0.7;
   }
 
   const res = await fetch(ANTHROPIC_URL, {
@@ -215,8 +234,8 @@ export async function complete(req: CompletionRequest): Promise<CompletionRespon
     // W-1 / W-4. Loud failure — no truncated article ever ships.
     // When thinking is enabled, both budgets are surfaced separately so
     // the operator can tell whether reasoning or visible-output starved.
-    const budgetMsg = thinkingEnabled
-      ? `visible_max=${req.maxTokens} reasoning_max=${req.reasoningBudgetTokens} wire_max=${wireMaxTokens}`
+    const budgetMsg = useThinking
+      ? `visible_max=${req.maxTokens} reasoning_headroom=${req.reasoningBudgetTokens} wire_max=${wireMaxTokens}`
       : `max_tokens=${req.maxTokens}`;
     throw new Error(
       `anthropic stop_reason=max_tokens (truncated). model=${modelKey} ${budgetMsg} out=${data.usage.output_tokens}`,

@@ -104,3 +104,64 @@ describe("resolveAnthropicApiKey", () => {
     expect(getSecretRaw).not.toHaveBeenCalled();
   });
 });
+
+describe("complete — per-model wire shape (the Maya incident)", () => {
+  // Anthropic removed the legacy thinking shape AND sampling params on
+  // Opus 4.7+ (400 if sent); Haiku has no thinking at all. These tests pin
+  // the request body per model class. The resolver's key is already cached
+  // by the tests above, so only fetch needs mocking.
+  let lastBody: Record<string, unknown>;
+  const okFetch = vi.fn(async (_url: unknown, init?: { body?: string }) => {
+    lastBody = JSON.parse(init?.body ?? "{}") as Record<string, unknown>;
+    return new Response(
+      JSON.stringify({
+        content: [{ type: "text", text: "ok" }],
+        stop_reason: "end_turn",
+        usage: { input_tokens: 10, output_tokens: 5 },
+      }),
+      { status: 200 },
+    );
+  });
+
+  const base = { system: "s", user: "u", maxTokens: 400 };
+
+  it("opus-4-7 + reasoning → adaptive thinking, NO budget_tokens, NO temperature", async () => {
+    vi.stubGlobal("fetch", okFetch);
+    const out = await complete({ ...base, model: "anthropic:claude-opus-4-7", reasoningBudgetTokens: 2048 });
+    expect(lastBody.thinking).toEqual({ type: "adaptive" });
+    expect(lastBody).not.toHaveProperty("temperature");
+    expect(JSON.stringify(lastBody)).not.toContain("budget_tokens");
+    expect(lastBody.max_tokens).toBe(400 + 2048);
+    expect(out.cost_usd).toBeGreaterThan(0); // opus-4-7 pricing present (5/25)
+    vi.unstubAllGlobals();
+  });
+
+  it("opus-4-7 WITHOUT reasoning → no thinking field and still no temperature", async () => {
+    vi.stubGlobal("fetch", okFetch);
+    await complete({ ...base, model: "anthropic:claude-opus-4-7" });
+    expect(lastBody).not.toHaveProperty("thinking");
+    expect(lastBody).not.toHaveProperty("temperature");
+    vi.unstubAllGlobals();
+  });
+
+  it("sonnet-4-6 + reasoning → adaptive thinking (legacy enabled+budget shape gone)", async () => {
+    vi.stubGlobal("fetch", okFetch);
+    await complete({ ...base, model: "anthropic:claude-sonnet-4-6", reasoningBudgetTokens: 2048 });
+    expect(lastBody.thinking).toEqual({ type: "adaptive" });
+    expect(lastBody).not.toHaveProperty("temperature");
+    vi.unstubAllGlobals();
+  });
+
+  it("haiku + reasoning request → thinking omitted entirely, sampling kept", async () => {
+    vi.stubGlobal("fetch", okFetch);
+    await complete({
+      ...base,
+      model: "anthropic:claude-haiku-4-5-20251001",
+      reasoningBudgetTokens: 2048,
+    });
+    expect(lastBody).not.toHaveProperty("thinking");
+    expect(lastBody.temperature).toBe(0.7);
+    expect(lastBody.max_tokens).toBe(400); // no headroom without thinking
+    vi.unstubAllGlobals();
+  });
+});
