@@ -150,6 +150,15 @@ describe("wf-config-digest", () => {
     await expect(handler()).rejects.toThrow("github create-issue 502");
   });
 
+  it("fail-loud: a full audit page (possible window truncation) throws instead of delivering a partial digest", async () => {
+    seedAgent("sora");
+    for (let i = 0; i < 500; i++) {
+      seedAudit("sora", daysAgo(1), [{ field: "role", before: `r${i}`, after: `r${i + 1}` }]);
+    }
+    await expect(handler()).rejects.toThrow(/cannot prove window completeness/);
+    expect(createIssue).not.toHaveBeenCalled();
+  });
+
   it("export parameters target the wf bucket exports/ prefix", async () => {
     seedAgent("sora");
     await handler();

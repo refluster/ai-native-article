@@ -79,6 +79,16 @@ export async function handler(): Promise<ConfigDigestResult> {
         AUDIT_PAGE_LIMIT,
         false, // newest-first; the window filter below trims the tail
       );
+      // A full page means the window MAY extend past what we fetched — a
+      // digest that silently omits mutations is worse than no digest
+      // (C-4), so refuse to deliver a possibly-partial one. At
+      // single-operator scale this never trips; if it does, paginate
+      // before raising the limit.
+      if (audits.length >= AUDIT_PAGE_LIMIT) {
+        throw new Error(
+          `config-digest: AGENT#${meta.slug} audit partition returned a full page (${AUDIT_PAGE_LIMIT}); cannot prove window completeness — paginate the audit query`,
+        );
+      }
       const inWindow = audits
         .filter((a) => a.at >= fromIso && a.at <= toIso)
         .sort((a, b) => (a.at < b.at ? -1 : 1));
