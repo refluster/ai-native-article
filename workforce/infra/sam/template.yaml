@@ -836,6 +836,11 @@ Resources:
                 StringEquals:
                   cloudwatch:namespace:
                     - Workforce/Messaging
+                    # The recall packet (skill 0.2.0) runs the shared recall()
+                    # path, which emits WfRecallLatencyMs under Workforce/Recall
+                    # (recall-metrics.ts). Without this the metric is silently
+                    # dropped (fail-soft warn) — surfaced by the #284 diagnostic.
+                    - Workforce/Recall
       Tags:
         workforce: !Ref Stage
 
