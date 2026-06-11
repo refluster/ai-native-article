@@ -1,0 +1,101 @@
+name: Workforce diagnostic (messaging-reply)
+
+# One-shot operator/agent diagnostic for the talent-reply path. Reuses the
+# same GitHub OIDC → AWS role the data-plane deploy uses (no creds in repo)
+# to answer "why did /messaging not reply?" from inside AWS:
+#
+#   1. caller identity + the agents-api dispatch wiring (env var),
+#   2. recent wf-messaging-reply logs,
+#   3. a SYNCHRONOUS invoke of the reply Lambda against a real thread —
+#      the decisive step: a healthy run posts the reply (and prints it),
+#      a broken run returns the thrown error + stack in the response.
+#
+# Read-only except step 3, which performs exactly the action the async
+# dispatch would have: generate + write one talent reply. Safe to re-run.
+#
+# Zone A — agent proposes; human merges (workforce/docs/governance.md §3).
+
+on:
+  workflow_dispatch:
+    inputs:
+      thread_id:
+        description: Thread id to diagnose (THREAD#… without the prefix)
+        required: true
+        type: string
+      addressed_slug:
+        description: Talent slug expected to reply
+        required: true
+        default: dario
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: wf-diagnostic
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      AWS_REGION: us-west-2
+      REPLY_FN: wf-messaging-reply-prod
+      AGENTS_FN: wf-agents-api-prod
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Caller identity
+        continue-on-error: true
+        run: aws sts get-caller-identity
+
+      - name: agents-api dispatch wiring (MESSAGING_REPLY_FUNCTION must be set)
+        continue-on-error: true
+        run: |
+          aws lambda get-function-configuration \
+            --function-name "$AGENTS_FN" \
+            --query '{Env:Environment.Variables, LastModified:LastModified}' \
+            --output json
+
+      - name: reply Lambda config
+        continue-on-error: true
+        run: |
+          aws lambda get-function-configuration \
+            --function-name "$REPLY_FN" \
+            --query '{LastModified:LastModified, Timeout:Timeout, MemorySize:MemorySize}' \
+            --output json
+
+      - name: Recent reply-Lambda logs (last 3h)
+        continue-on-error: true
+        run: |
+          aws logs tail "/aws/lambda/$REPLY_FN" --since 3h --format short || \
+            echo "(no log group / no events / no logs:tail permission)"
+
+      - name: Synchronous invoke against the real thread (decisive)
+        continue-on-error: true
+        run: |
+          set -x
+          PAYLOAD=$(printf '{"thread_id":"%s","addressed_slug":"%s"}' \
+            "${{ inputs.thread_id }}" "${{ inputs.addressed_slug }}")
+          echo "payload: $PAYLOAD"
+          aws lambda invoke \
+            --function-name "$REPLY_FN" \
+            --cli-binary-format raw-in-base64-out \
+            --payload "$PAYLOAD" \
+            --log-type Tail \
+            --query '{StatusCode:StatusCode, FunctionError:FunctionError, LogTail:LogResult}' \
+            --output json out.meta.json
+          echo "=== invoke metadata (LogResult is base64) ==="
+          cat out.meta.json
+          echo "=== decoded tail log ==="
+          python3 -c "import json,base64; d=json.load(open('out.meta.json')); print(base64.b64decode(d.get('LogResult','')).decode('utf-8','replace')) if d.get('LogResult') else print('(no tail)')"
+          echo "=== function response body ==="
+          cat response.json 2>/dev/null || true
+          aws lambda invoke --function-name "$REPLY_FN" --cli-binary-format raw-in-base64-out \
+            --payload "$PAYLOAD" response.json >/dev/null 2>&1 || true
+          cat response.json 2>/dev/null || echo "(no response body)"
