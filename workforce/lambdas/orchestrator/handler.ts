@@ -45,7 +45,7 @@ if (!STAGE) throw new Error("STAGE env var is required");
 const DEFAULT_DEDUP_MINUTES = 60;
 const DEDUP_MINUTES_BY_SKILL: Record<string, number> = {
   "discord-heartbeat": 30,     // 30m — well under the 2-hourly cadence (cron(20 0/2 …)); skip-safe with wide margin
-  "feed-post": 30,             // 30m — well under the 2-hourly cadence (cron(20 0/2 …)); skip-safe with wide margin
+  "feed-post": 30,             // 30m — guards same-window double-fire of the daily cadence (cron(M H ? * * *)). Must stay short: dedup keys on agent.last_run_at (any skill), so a long window would starve feed-post on multi-binding agents whose other skills run more often.
   "article-level2": 30,        // 30m — well under Elena's 2-hourly L1→L2 cadence (cron(0 0/2 …)); skip-safe with wide margin
   "design-note": 60 * 24 * 6,
   "positioning-write": 60 * 24 * 6,

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-06T21:54:42.860Z",
+  "generated_at": "2026-06-10T18:24:13.732Z",
   "skills": [
     {
       "name": "article-level2",
@@ -248,7 +248,7 @@
     },
     {
       "name": "feed-post",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "status": "active",
       "deliverable": {
         "type": "notification",
@@ -261,14 +261,18 @@
         "dario",
         "elena",
         "farah",
+        "freya",
+        "hana",
         "kai",
         "levi",
+        "mateo",
         "maya",
         "mira",
         "nadia",
         "noor",
         "priya",
         "ren",
+        "sana",
         "sora",
         "theo",
         "vikram",
@@ -304,9 +308,9 @@
         },
         {
           "path": "meta.json",
-          "size": 463,
+          "size": 593,
           "language": "json",
-          "contents": "{\n  \"name\": \"feed-post\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"deliverable\": {\n    \"type\": \"notification\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"small\",\n  \"owners\": [\"aanya\", \"aoi\", \"dario\", \"elena\", \"farah\", \"kai\", \"levi\", \"maya\", \"mira\", \"nadia\", \"noor\", \"priya\", \"ren\", \"sora\", \"theo\", \"vikram\", \"yuki\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-27\",\n  \"requires\": [\"workforce.feed_write_token\"]\n}\n",
+          "contents": "{\n  \"name\": \"feed-post\",\n  \"version\": \"0.3.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"deliverable\": {\n    \"type\": \"notification\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"small\",\n  \"owners\": [\n    \"aanya\",\n    \"aoi\",\n    \"dario\",\n    \"elena\",\n    \"farah\",\n    \"freya\",\n    \"hana\",\n    \"kai\",\n    \"levi\",\n    \"mateo\",\n    \"maya\",\n    \"mira\",\n    \"nadia\",\n    \"noor\",\n    \"priya\",\n    \"ren\",\n    \"sana\",\n    \"sora\",\n    \"theo\",\n    \"vikram\",\n    \"yuki\"\n  ],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-27\",\n  \"requires\": [\n    \"workforce.feed_write_token\"\n  ]\n}\n",
           "truncated": false,
           "binary": false
         },

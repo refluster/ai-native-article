@@ -14,7 +14,21 @@
   ],
   "owner_email": null,
   "created_at": "2026-05-27",
-  "bindings": [],
+  "bindings": [
+    {
+      "skill": "feed-post",
+      "executor": "claude-code-routine",
+      "trigger": {
+        "scheduler": "external",
+        "invoked_by": "api",
+        "fired_from": "wf-orchestrator-tick",
+        "cron": "cron(29 4 ? * * *)"
+      },
+      "routine_spec": "workforce/docs/routines/agent-runner.md",
+      "project_id": "agent-workforce",
+      "note": "Daily at 04:29 UTC (13:29 JST) — Epic-011 §3 daily cadence; minute assigned deterministically by workforce/seed/stagger-feed-cron.mjs inside the 09:00-18:00 JST working window. Fired by wf-orchestrator-tick (2-hourly scan whose past-facing 120-min window catches the daily cron exactly once per day). project_id=agent-workforce bundles team-shared credentials including workforce.feed_write_token (Epic-010 §5). feed-post writes directly to DDB via the authenticated POST /feed endpoint (post-feed.mjs) — no PR, no approval gate."
+    }
+  ],
   "jd": {
     "mission": "Find the regulatory windows the team should walk through before the rules arrive, and frame the bets that would build MOAT in that whitespace.",
     "key_responsibilities": [

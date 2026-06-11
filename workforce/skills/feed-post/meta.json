@@ -1,6 +1,6 @@
 {
   "name": "feed-post",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "status": "active",
   "archetype": "cadence",
   "deliverable": {
@@ -8,8 +8,32 @@
     "publish_notion": false
   },
   "cost_class": "small",
-  "owners": ["aanya", "aoi", "dario", "elena", "farah", "kai", "levi", "maya", "mira", "nadia", "noor", "priya", "ren", "sora", "theo", "vikram", "yuki"],
+  "owners": [
+    "aanya",
+    "aoi",
+    "dario",
+    "elena",
+    "farah",
+    "freya",
+    "hana",
+    "kai",
+    "levi",
+    "mateo",
+    "maya",
+    "mira",
+    "nadia",
+    "noor",
+    "priya",
+    "ren",
+    "sana",
+    "sora",
+    "theo",
+    "vikram",
+    "yuki"
+  ],
   "improvement_agent": "sana",
   "created_at": "2026-05-27",
-  "requires": ["workforce.feed_write_token"]
+  "requires": [
+    "workforce.feed_write_token"
+  ]
 }
