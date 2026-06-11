@@ -18,7 +18,7 @@
 // (W-4). Folding both writes into a TransactWriteItems is a hardening
 // follow-up if the gap ever bites.
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { agentPk, type AgentSlug } from "./agent.js";
 import { putItem, queryBySkPrefixPaged, type PagedResult } from "./ddb.js";
 
@@ -81,6 +81,34 @@ export async function listAgentAudit(
   );
 }
 
+/** Long string values (the persona system_prompt, since ADR-0007 step 2)
+ *  are recorded as a digest, not verbatim: the full before/after text would
+ *  double-store kilobytes per edit in an append-only partition, and the
+ *  weekly digest only needs "the prompt changed, by whom, roughly how".
+ *  The authoritative current text is always on the META row itself. */
+const AUDIT_STRING_VERBATIM_MAX = 1024;
+const AUDIT_STRING_HEAD_CHARS = 200;
+
+export interface TruncatedAuditValue {
+  truncated: true;
+  length: number;
+  sha256: string;
+  head: string;
+}
+
+function auditValue(v: unknown): unknown {
+  if (typeof v === "string" && v.length > AUDIT_STRING_VERBATIM_MAX) {
+    const t: TruncatedAuditValue = {
+      truncated: true,
+      length: v.length,
+      sha256: createHash("sha256").update(v).digest("hex"),
+      head: v.slice(0, AUDIT_STRING_HEAD_CHARS),
+    };
+    return t;
+  }
+  return v;
+}
+
 /** Field-level diff between the pre-mutation row and the applied patch.
  *  Only fields actually present in the patch are recorded; a field whose
  *  patched value deep-equals the existing value is skipped (a PATCH that
@@ -93,7 +121,11 @@ export function diffChanges(
   for (const [field, after] of Object.entries(patch)) {
     const before = existing[field];
     if (JSON.stringify(before) === JSON.stringify(after)) continue;
-    changes.push({ field, before: before === undefined ? null : before, after });
+    changes.push({
+      field,
+      before: before === undefined ? null : auditValue(before),
+      after: auditValue(after),
+    });
   }
   return changes;
 }

@@ -203,6 +203,23 @@ describe("PATCH /agents/{slug} — identity writes (ADR-0007)", () => {
     );
   });
 
+  it("accepts a system_prompt rewrite; the audit stores a digest, not the full text", async () => {
+    seedAgent("sora", { system_prompt: `You are Sora. ${"a".repeat(2000)}` });
+    const next = `You are Sora v2. ${"b".repeat(3000)}`;
+    const { status } = await call(
+      makeEvent("PATCH", "PATCH /agents/{slug}", "sora", { system_prompt: next }),
+    );
+    expect(status).toBe(200);
+    expect(rows.get(key("AGENT#sora", "META"))!.system_prompt).toBe(next);
+
+    const audits = auditRows("sora");
+    expect(audits).toHaveLength(1);
+    const change = (audits[0]!.changes as Array<{ field: string; after: { truncated?: boolean; length?: number } }>)[0]!;
+    expect(change.field).toBe("system_prompt");
+    expect(change.after.truncated).toBe(true);
+    expect(change.after.length).toBe(next.length);
+  });
+
   it("rejects an invalid config 422 with violations and writes nothing", async () => {
     const before = seedAgent("sora");
     const { status, json } = await call(

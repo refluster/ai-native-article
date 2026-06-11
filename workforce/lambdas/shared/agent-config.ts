@@ -46,7 +46,14 @@ export const IDENTITY_PATCHABLE_FIELDS = [
   "default_project",
   "streams",
   "bindings",
+  "system_prompt",
 ] as const satisfies readonly (keyof AgentIdentity)[];
+
+// Blast-radius ceiling on the persona prompt (ADR-0007 step 2). The live
+// system.md bodies are 1–4 KB; 32 KB bounds an unreviewed write well below
+// the DDB 400 KB item limit and the model-context budget while leaving
+// generous headroom for richer personas.
+export const SYSTEM_PROMPT_MAX_CHARS = 32 * 1024;
 
 export type IdentityPatchableField = (typeof IDENTITY_PATCHABLE_FIELDS)[number];
 
@@ -118,6 +125,17 @@ export function validateIdentityPatch(
   if ("prompt_version" in patch) {
     if (typeof patch.prompt_version !== "string" || !SEMVER.test(patch.prompt_version)) {
       v("S7-semver", "prompt_version", "prompt_version must be semver x.y.z");
+    }
+  }
+  if ("system_prompt" in patch) {
+    if (typeof patch.system_prompt !== "string" || patch.system_prompt.trim().length === 0) {
+      v("S16-system-prompt", "system_prompt", "system_prompt must be a non-empty string");
+    } else if (patch.system_prompt.length > SYSTEM_PROMPT_MAX_CHARS) {
+      v(
+        "G2-prompt-size",
+        "system_prompt",
+        `system_prompt is ${patch.system_prompt.length} chars; the write-time ceiling is ${SYSTEM_PROMPT_MAX_CHARS}`,
+      );
     }
   }
   if ("budget_monthly_usd_default" in patch) {
