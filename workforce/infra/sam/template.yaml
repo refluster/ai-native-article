@@ -81,6 +81,12 @@ Resources:
     Properties:
       TableName: !Sub wf-table-${Stage}
       BillingMode: PAY_PER_REQUEST
+      # ADR-0007 Decision §7: with agent config single-sourced here, git no
+      # longer reconstructs the org — point-in-time recovery (plus the
+      # weekly ExportTableToPointInTime from wf-config-digest) is the
+      # durability story. Disabling this is a Zone B change.
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
       # ADR-0005 item 5: garbage-collect expired ephemeral engagement-write
       # tokens (AUTH#ENGAGEMENT rows carry a `ttl` epoch-seconds attribute).
       # TTL is best-effort cleanup; the agents-api validity check is the
@@ -1334,6 +1340,110 @@ Resources:
   # Standalone Lambda (not a skill) — see handler.ts header for the
   # architectural deviation rationale (skills go through agent-runner,
   # which itself does the dual-write we audit).
+# --- Weekly agent-config digest (ADR-0007 §5 review + §7 durability) -------
+  # Compiles the week's AGENT#{slug}/AUDIT# items (written by agents-api on
+  # every config mutation) into a GitHub issue — the post-hoc review surface
+  # that replaced per-change PR review — and kicks the weekly
+  # ExportTableToPointInTime durability export. Fail-loud: a week with
+  # mutations but no delivered digest = function error = Errors alarm; a
+  # scheduling lapse = missed-run alarm below.
+  WfConfigDigestFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-config-digest-${Stage}
+      CodeUri: ../../lambdas/config-digest
+      Handler: handler.handler
+      Description: Weekly agent-config review digest + DDB durability export. ADR-0007 §5/§7.
+      MemorySize: 512
+      Timeout: 120
+      Environment:
+        Variables:
+          TABLE_ARN: !GetAtt WfTable.Arn
+      Policies:
+        - Statement:
+            - Sid: ConfigDigestTableRead
+              Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:Query
+              Resource: !GetAtt WfTable.Arn
+            - Sid: ConfigDigestExport
+              Effect: Allow
+              Action: dynamodb:ExportTableToPointInTime
+              Resource: !GetAtt WfTable.Arn
+            - Sid: ConfigDigestExportS3Write
+              # ExportTableToPointInTime writes through the caller's role;
+              # scoped to the exports/ prefix only.
+              Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:AbortMultipartUpload
+              Resource:
+                - !Sub ${WfBucket.Arn}/exports/*
+            - Sid: ConfigDigestGithubToken
+              # Issue delivery uses the same wf/github secret as the R-N1
+              # dispatch path (shared/github.ts).
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/github-*
+      Events:
+        WeeklyTick:
+          Type: Schedule
+          Properties:
+            Name: !Sub wf-config-digest-tick-${Stage}
+            Description: Drives the ADR-0007 weekly agent-config review digest.
+            # Monday 00:30 UTC = 09:30 JST — start of the operator's week,
+            # so the digest is at the top of the inbox during JST morning.
+            Schedule: cron(30 0 ? * MON *)
+            Enabled: true
+      Tags:
+        workforce: !Ref Stage
+
+  WfConfigDigestErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-config-digest-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-config-digest-${Stage} — a week's config mutations may be undelivered (ADR-0007 §5 fail-loud).
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfConfigDigestFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  # The review step must not silently lapse the way the manual seed did
+  # (ADR-0007 §5). Eight consecutive days without a single invocation means
+  # the weekly EventBridge tick is broken — breaching on missing data is
+  # what makes the silence loud.
+  WfConfigDigestMissedRunAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-config-digest-missed-run-alarm-${Stage}
+      AlarmDescription: !Sub No wf-config-digest-${Stage} invocation in 8 days — the weekly config review is not running.
+      Namespace: AWS/Lambda
+      MetricName: Invocations
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfConfigDigestFunction
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 8
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
   WfAuditFunction:
     Type: AWS::Serverless::Function
     Metadata:
