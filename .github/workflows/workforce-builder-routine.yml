@@ -21,6 +21,10 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
+  # claude-code-action@beta exchanges an OIDC token for its GitHub App token;
+  # without this every run dies at "Unable to get ACTIONS_ID_TOKEN_REQUEST_URL"
+  # (runs #1–#19 all failed this way).
+  id-token: write
 
 concurrency:
   group: wf-builder
@@ -52,6 +56,8 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          # The action reads its key from this input, not the env var.
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           direct_prompt: |
             You are the daily `workforce-builder` Claude routine. Fire-and-forget contract:
 
