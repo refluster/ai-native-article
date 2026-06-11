@@ -100,6 +100,20 @@ vi.mock("../shared/ddb.js", () => ({
     },
   ),
   updateOperational: vi.fn(),
+  // ADR-0007: shared/agent-audit.ts (pulled in by the PATCH/DELETE paths)
+  // imports these two. The projects tests in this file never hit them;
+  // patch-agent-tests.ts covers the audit behaviour with live fakes.
+  putItem: vi.fn(async (item: AnyRow) => {
+    rows.set(key(item.pk, item.sk), item);
+  }),
+  queryBySkPrefixPaged: vi.fn(
+    async <T extends object>(pk: string, skPrefix: string, limit: number) => {
+      const items = Array.from(rows.values())
+        .filter((r) => r.pk === pk && r.sk.startsWith(skPrefix))
+        .slice(0, limit);
+      return { items: items as T[], cursor: undefined };
+    },
+  ),
 }));
 
 // Stubs for unused-in-this-file imports that other agents-api routes pull

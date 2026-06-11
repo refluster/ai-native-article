@@ -9,8 +9,9 @@
 //   GET    /agents/{slug}/portfolio         per-client engagement records (Phase 7 PR5; ?project_id= required)
 //   POST   /agents/{slug}/engagements       register a client-side engagement record (Phase 7 PR5; Bearer auth)
 //   GET    /agents/{slug}/recall            semantic recall over the agent's ledger (?q=&k=; Epic-012 Story 1)
-//   PATCH  /agents/{slug}                   operational fields only (IAM-auth at API GW)
+//   PATCH  /agents/{slug}                   config writes — operational + identity fields, validated + audited (IAM-auth at API GW; ADR-0007)
 //   DELETE /agents/{slug}                   soft delete -> archived=true (IAM-auth at API GW)
+//   GET    /agents/{slug}/audit             config-mutation audit trail, newest-first (ADR-0007)
 //   GET    /skills                          list of skills (paginated, filterable)
 //   GET    /skills/{name}                   single skill
 //   GET    /projects                        list of projects (paginated, ?include_self=)
@@ -56,6 +57,18 @@ import {
   agentPk,
   toApiView,
 } from "../shared/agent.js";
+import {
+  IDENTITY_PATCHABLE_FIELDS,
+  validateBudgetOverride,
+  validateIdentityPatch,
+  type ConfigViolation,
+} from "../shared/agent-config.js";
+import {
+  appendAgentAudit,
+  diffChanges,
+  listAgentAudit,
+  type AgentAuditKind,
+} from "../shared/agent-audit.js";
 import {
   type SkillMetaRow,
   skillPk,
@@ -204,9 +217,12 @@ export async function handler(
     if (routeKey === "GET /agents/{slug}/recall" && slug) return getAgentRecall(slug, event);
     if (routeKey === "GET /agents/{slug}/projects" && slug) return listAgentProjects(slug);
     if (routeKey === "GET /agents/{slug}/posts" && slug) return listAgentPostsRoute(slug, event);
+    if (routeKey === "GET /agents/{slug}/audit" && slug) return listAgentAuditRoute(slug, event);
     if (routeKey === "GET /agents/{slug}" && slug) return getAgent(slug);
-    if (routeKey === "PATCH /agents/{slug}" && slug) return patchAgent(slug, event.body);
-    if (routeKey === "DELETE /agents/{slug}" && slug) return deleteAgent(slug);
+    // `return await` so the audit-append throw (W-4 fail-loud contract,
+    // see shared/agent-audit.ts) routes through the outer 500 mapping.
+    if (routeKey === "PATCH /agents/{slug}" && slug) return await patchAgent(slug, event);
+    if (routeKey === "DELETE /agents/{slug}" && slug) return await deleteAgent(slug, event);
     if (routeKey === "GET /projects") return listProjects(event);
     if (routeKey === "GET /projects/{id}/members" && projectId) return listProjectMembers(projectId, event);
     if (routeKey === "GET /projects/{id}/executions" && projectId) return listProjectExecutions(projectId, event);
@@ -468,33 +484,48 @@ async function listStats(
   });
 }
 
+// ADR-0007: PATCH /agents/{slug} is the single write path for agent config.
+// Operational fields (paused / archived / budget override) behave as before;
+// identity fields (model, bindings, streams, …) became writable when the
+// DDB row was promoted to the authoritative store. Every accepted mutation:
+//   1. passes write-time validation (shared/agent-config.ts) — schema checks
+//      ported from validate-agent-json.mjs plus the blast-radius guards;
+//   2. appends an AUDIT# item (shared/agent-audit.ts) — the git-history
+//      replacement the weekly review digest compiles.
+// An identity write also stamps config_owner="ddb" so wf-seed-agents stops
+// re-imposing the bundled git tree on this row (two-master interregnum
+// guard; both retire with migration step 6).
 async function patchAgent(
   slug: string,
-  body: string | undefined,
+  event: APIGatewayProxyEventV2,
 ): Promise<APIGatewayProxyResultV2> {
-  if (!body) return reply(400, { error: "missing_body" });
+  if (!event.body) return reply(400, { error: "missing_body" });
 
   let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(body) as Record<string, unknown>;
+    parsed = JSON.parse(event.body) as Record<string, unknown>;
   } catch {
     return reply(400, { error: "invalid_json" });
   }
 
-  const patch: Partial<AgentOperational> = {};
+  const patch: Record<string, unknown> = {};
+  const identityKeys: string[] = [];
   const invalid: string[] = [];
   for (const [k, v] of Object.entries(parsed)) {
     if (PATCHABLE_FIELDS.includes(k as keyof AgentOperational)) {
-      (patch as Record<string, unknown>)[k] = v;
+      patch[k] = v;
+    } else if ((IDENTITY_PATCHABLE_FIELDS as readonly string[]).includes(k)) {
+      patch[k] = v;
+      identityKeys.push(k);
     } else {
       invalid.push(k);
     }
   }
   if (invalid.length > 0) {
     return reply(400, {
-      error: "non_operational_fields",
-      detail: `the following fields are identity-only and cannot be PATCHed: ${invalid.join(", ")}`,
-      patchable: PATCHABLE_FIELDS,
+      error: "non_patchable_fields",
+      detail: `the following fields are immutable or computed and cannot be PATCHed: ${invalid.join(", ")}`,
+      patchable: [...PATCHABLE_FIELDS, ...IDENTITY_PATCHABLE_FIELDS],
     });
   }
   if (Object.keys(patch).length === 0) {
@@ -504,16 +535,63 @@ async function patchAgent(
   const existing = await getItem<AgentMetaRow>(agentPk(slug), "META");
   if (!existing) return reply(404, { error: "not_found", slug });
 
+  const violations: ConfigViolation[] = [];
+  const budgetTouched =
+    "budget_monthly_usd_default" in patch || "budget_monthly_usd_override" in patch;
+  const otherAgentsEffectiveBudgetUsd = budgetTouched
+    ? await sumOtherEffectiveBudgets(slug)
+    : 0;
+
+  if (identityKeys.length > 0) {
+    const skillOwners = await buildSkillOwnersLookup(patch.bindings);
+    violations.push(
+      ...validateIdentityPatch(patch, { slug, otherAgentsEffectiveBudgetUsd, skillOwners }),
+    );
+  }
+  if ("budget_monthly_usd_override" in patch) {
+    // The override is the effective budget when set, so it is what counts
+    // against the W-3 headroom (a default sent in the same PATCH is checked
+    // by validateIdentityPatch against the same sum, conservatively).
+    violations.push(
+      ...validateBudgetOverride(patch.budget_monthly_usd_override, {
+        otherAgentsEffectiveBudgetUsd,
+      }),
+    );
+  }
+  if ("paused" in patch && typeof patch.paused !== "boolean") {
+    violations.push({ rule: "S12-paused", field: "paused", msg: "paused must be a boolean" });
+  }
+  if ("archived" in patch && typeof patch.archived !== "boolean") {
+    violations.push({ rule: "S13-archived", field: "archived", msg: "archived must be a boolean" });
+  }
+  if (violations.length > 0) {
+    return reply(422, { error: "config_validation_failed", violations });
+  }
+
+  const changes = diffChanges(existing as unknown as Record<string, unknown>, patch);
+  if (changes.length === 0) {
+    // Patch re-sends current values; nothing to write, nothing to audit.
+    return reply(200, toApiView(existing));
+  }
+
+  const kind: AgentAuditKind = identityKeys.length > 0 ? "identity" : "operational";
+  const write: Record<string, unknown> =
+    kind === "identity" ? { ...patch, config_owner: "ddb" } : patch;
+
   const updated = await updateOperational<AgentMetaRow>(
     agentPk(slug),
     "META",
-    patch,
+    write,
     existing.identity_hash,
   );
+  await appendAgentAudit(slug, actorFromEvent(event), kind, changes);
   return reply(200, toApiView(updated));
 }
 
-async function deleteAgent(slug: string): Promise<APIGatewayProxyResultV2> {
+async function deleteAgent(
+  slug: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
   const existing = await getItem<AgentMetaRow>(agentPk(slug), "META");
   if (!existing) return reply(404, { error: "not_found", slug });
   if (existing.archived) {
@@ -525,7 +603,79 @@ async function deleteAgent(slug: string): Promise<APIGatewayProxyResultV2> {
     { archived: true },
     existing.identity_hash,
   );
+  await appendAgentAudit(slug, actorFromEvent(event), "operational", [
+    { field: "archived", before: false, after: true },
+  ]);
   return reply(200, toApiView(updated));
+}
+
+// IAM principal from the API GW HTTP API authorizer context. PATCH/DELETE
+// sit behind AWS_IAM, so this is the operator's (or a future role's) ARN;
+// it lands in the AUDIT item as the actor.
+function actorFromEvent(event: APIGatewayProxyEventV2): string {
+  const iam = (
+    event.requestContext as unknown as {
+      authorizer?: { iam?: { userArn?: string } };
+    }
+  ).authorizer?.iam;
+  return iam?.userArn ?? "operator";
+}
+
+// Sum of effective (override ?? default) monthly budgets across all OTHER
+// non-archived agents — the W-3 aggregate context for budget writes. Pages
+// the full AGENT#/META scan; at C-3 scale this is one page.
+async function sumOtherEffectiveBudgets(slug: string): Promise<number> {
+  let total = 0;
+  let cursor: string | undefined;
+  do {
+    const page = await scanPrefix<AgentMetaRow>("AGENT#", "META", PAGE_SIZE_MAX, cursor);
+    for (const row of page.items) {
+      if (row.slug === slug || row.archived) continue;
+      total += row.budget_monthly_usd_override ?? row.budget_monthly_usd_default;
+    }
+    cursor = page.cursor;
+  } while (cursor);
+  return total;
+}
+
+// Prefetch SKILL#{name}/META owners for every skill named in a prospective
+// bindings[] write, so the pure validator can cross-check existence and
+// ownership without doing I/O itself.
+async function buildSkillOwnersLookup(
+  bindings: unknown,
+): Promise<(name: string) => readonly string[] | undefined> {
+  const owners = new Map<string, readonly string[] | undefined>();
+  if (Array.isArray(bindings)) {
+    const names = [
+      ...new Set(
+        bindings
+          .map((b) => (typeof b === "object" && b !== null ? (b as { skill?: unknown }).skill : undefined))
+          .filter((s): s is string => typeof s === "string"),
+      ),
+    ];
+    await Promise.all(
+      names.map(async (name) => {
+        const row = await getItem<SkillMetaRow>(skillPk(name), "META");
+        owners.set(name, row ? (row.owners ?? []) : undefined);
+      }),
+    );
+  }
+  return (name) => owners.get(name);
+}
+
+async function listAgentAuditRoute(
+  slug: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const qs = event.queryStringParameters ?? {};
+  const pageSize = Math.min(
+    Math.max(parseInt(qs.page_size ?? `${PAGE_SIZE_DEFAULT}`, 10) || PAGE_SIZE_DEFAULT, 1),
+    PAGE_SIZE_MAX,
+  );
+  const existing = await getItem<AgentMetaRow>(agentPk(slug), "META");
+  if (!existing) return reply(404, { error: "not_found", slug });
+  const page = await listAgentAudit(slug, pageSize, qs.cursor);
+  return reply(200, { items: page.items, next_cursor: page.cursor });
 }
 
 // ----- Skills (Epic-008 PR-D) -----

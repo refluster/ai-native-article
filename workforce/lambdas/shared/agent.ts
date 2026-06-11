@@ -131,6 +131,11 @@ export interface AgentMetaRow extends AgentIdentity, AgentOperational, AgentComp
   sk: "META";
   identity_hash: string;
   updated_at: string;
+  /** ADR-0007 migration marker. Set to "ddb" on the first identity write
+   *  through agents-api; wf-seed-agents then stops overwriting this row's
+   *  identity from the bundled git tree (the two-master interregnum guard).
+   *  Absent = identity still git-sourced. Retires with the seed (step 6). */
+  config_owner?: "ddb";
 }
 
 /** API response shape — flattens the row, omits the PK/SK plumbing. */

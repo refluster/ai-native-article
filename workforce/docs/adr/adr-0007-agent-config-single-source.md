@@ -1,6 +1,6 @@
 # ADR-0007 — Agent identity/config is single-sourced from DynamoDB; git definition files retire
 
-- **Status**: Proposed
+- **Status**: Accepted (ratified by the operator via PR #286 merge, 2026-06-11)
 - **Date**: 2026-06-11
 - **Deciders**: operator
 - **Epics**: [epic-006](../epics/epic-006-scalability.md), [epic-007](../epics/epic-007-agent-management-api.md)
