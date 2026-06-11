@@ -1,12 +1,13 @@
 // GitHub REST API wrapper for Ren's R-N1 exception path.
 //
-// Two operations:
+// Operations:
 //   - dispatchEngineer(...)   POST /repos/{o}/{r}/actions/workflows/{w}/dispatches
 //   - findRecentPRs(...)      GET  /repos/{o}/{r}/pulls?state=all  (client-side filter)
+//   - createIssue(...)        POST /repos/{o}/{r}/issues  (ADR-0007 weekly config digest)
 //
 // Auth comes from wf/github (PAT or GitHub App installation token) in
-// Secrets Manager. Both endpoints are rate-limited (5000/h for PAT); v1
-// polling is ~12 calls/h per stage so headroom is huge.
+// Secrets Manager. All endpoints are rate-limited (5000/h for PAT); v1
+// usage is ~12 calls/h per stage so headroom is huge.
 
 import { getSecret, type GithubSecret } from "./secrets.js";
 
@@ -85,6 +86,40 @@ export async function findRecentPRs(
       draft: p.draft,
       created_at: p.created_at,
     }));
+}
+
+export interface CreateIssueInput {
+  owner: string;
+  repo: string;
+  title: string;
+  body: string;
+  /** Label names must already exist in the repo (.github/labels.json is
+   *  the canonical set; sync via scripts/sync-labels.mjs). */
+  labels?: readonly string[];
+}
+
+/** Create a GitHub issue. Throws on any non-2xx — callers on the weekly
+ *  digest path rely on this to keep delivery fail-loud (ADR-0007 §5). */
+export async function createIssue(
+  input: CreateIssueInput,
+): Promise<{ number: number; url: string }> {
+  const { token } = await getSecret<GithubSecret>("wf/github");
+  const url = `${GITHUB_API}/repos/${input.owner}/${input.repo}/issues`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: ghHeaders(token),
+    body: JSON.stringify({
+      title: input.title,
+      body: input.body,
+      labels: input.labels ?? [],
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`github create-issue ${res.status}: ${body.slice(0, 500)}`);
+  }
+  const json = (await res.json()) as { number: number; html_url: string };
+  return { number: json.number, url: json.html_url };
 }
 
 function ghHeaders(token: string): Record<string, string> {
