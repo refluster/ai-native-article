@@ -6,8 +6,11 @@
 // tick, so `POST /threads/{id}/messages` async-invokes this Lambda, which:
 //
 //   1. loads the thread transcript (shared/messaging.ts, direct DDB),
-//   2. composes the addressed agent's persona (`agents/{slug}/system.md`,
-//      bundled into this artefact) + a tight reply prompt,
+//   2. composes the addressed agent's persona from the AGENT#{slug}/META
+//      row (`model` + inline `system_prompt`, ADR-0007 step 2) + a tight
+//      reply prompt — falling back to the bundled `agents/{slug}/` files
+//      only while a row predates the seed backfill (the bundle and the
+//      fallback both retire with ADR-0007 step 6),
 //   3. calls Claude once (shared/llm-anthropic.ts — same `wf/anthropic`
 //      secret every other agent uses; no new credential),
 //   4. enforces the W-1 editorial guards (finish_reason==='length' throw via
@@ -27,6 +30,8 @@ import { dirname, join } from "node:path";
 
 import { CloudWatchClient, PutMetricDataCommand } from "@aws-sdk/client-cloudwatch";
 
+import { type AgentMetaRow, agentPk } from "../shared/agent.js";
+import { getItem } from "../shared/ddb.js";
 import { complete } from "../shared/llm-anthropic.js";
 import {
   MESSAGING_OPERATOR_ID,
@@ -43,8 +48,9 @@ const STAGE = process.env.STAGE ?? "dev";
 
 /** Bumped when the reply prompt/guard contract changes (lands on MSG rows
  *  as `skill_version`, mirroring the cadence skills' versioning).
- *  0.2.0: recall packet (EXEC recall + latest memory summary) grounding. */
-const SKILL_VERSION = "0.2.0";
+ *  0.2.0: recall packet (EXEC recall + latest memory summary) grounding.
+ *  0.3.0: persona read from the AGENT# META row (ADR-0007 step 2). */
+const SKILL_VERSION = "0.3.0";
 
 /** Cap on the memory-summary excerpt folded into the system prompt. The
  *  rolling summary can grow; a reply needs the gist, not the archive. */
@@ -136,7 +142,21 @@ interface AgentCard {
   systemMd: string;
 }
 
+// ADR-0007 step 2: the AGENT#{slug}/META row is the authoritative persona
+// source — `model` + inline `system_prompt`. The bundled-file path below is
+// a transitional bridge for rows the post-deploy seed has not backfilled
+// yet (and for a ddb-owned row that somehow lacks a prompt); it logs +
+// emits a metric so lingering fallbacks are visible, and it retires with
+// the bundle itself in migration step 6.
 async function loadAgent(slug: string): Promise<AgentCard> {
+  const row = await getItem<AgentMetaRow>(agentPk(slug), "META");
+  if (row?.model && typeof row.system_prompt === "string" && row.system_prompt.length > 0) {
+    return { model: row.model, systemMd: row.system_prompt };
+  }
+  console.warn(
+    JSON.stringify({ event: "messaging_reply_persona_file_fallback", slug, row_found: !!row }),
+  );
+  emitMetric("WfMsgPersonaFileFallback", { Slug: slug });
   const cfg = JSON.parse(await readFile(join(AGENTS_ROOT, slug, "agent.json"), "utf8")) as { model: string };
   const systemMd = await readFile(join(AGENTS_ROOT, slug, "system.md"), "utf8");
   return { model: cfg.model, systemMd };

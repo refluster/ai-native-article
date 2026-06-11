@@ -114,11 +114,17 @@ async function seedOne(slug: string): Promise<"created" | "updated" | "noop" | "
     streams: cfg.streams,
     bindings: cfg.bindings,
     created_at: cfg.created_at,
+    // ADR-0007 step 2: the persona prompt lives inline on the META row so
+    // wf-messaging-reply (and later the whole substrate) reads it from DDB.
+    system_prompt: systemMd,
   };
   const hash = identityHash(identity, systemMd);
 
   const existing = preexisting;
-  if (existing && existing.identity_hash === hash) {
+  // `system_prompt === systemMd` is the step-2 backfill clause: identityHash
+  // already covers system.md content, so a pre-step-2 row can match the hash
+  // while still missing the inline prompt — write through once to add it.
+  if (existing && existing.identity_hash === hash && existing.system_prompt === systemMd) {
     // Catch-up: agents seeded before Story 1-B (#90) lack the
     // self/{slug} project row. `ensureSelfProject` is idempotent
     // (create() is race-safe via attribute_not_exists(pk); addMember()

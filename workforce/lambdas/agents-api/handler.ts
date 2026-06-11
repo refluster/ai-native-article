@@ -275,7 +275,12 @@ async function listAgents(
   const items = page.items
     .filter((r) => wantArchived || !r.archived)
     .filter((r) => !filterStream || r.streams.includes(filterStream))
-    .map(toApiView);
+    // The inline persona prompt (ADR-0007 step 2) is KBs per agent — serve
+    // it on GET /agents/{slug}, keep the list payload lean.
+    .map((r) => {
+      const { system_prompt: _sp, ...lean } = toApiView(r);
+      return lean;
+    });
 
   return reply(200, { items, next_cursor: page.cursor });
 }

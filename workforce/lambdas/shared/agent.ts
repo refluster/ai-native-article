@@ -93,7 +93,8 @@ export function isOrchestratorOwnedCcr(binding: AgentBinding): boolean {
   );
 }
 
-/** Identity fields — sourced from workforce/agents/{slug}/agent.json (git SoT). */
+/** Identity fields — authoritative in the AGENT#{slug}/META DDB row
+ *  (ADR-0007); historically sourced from workforce/agents/{slug}/. */
 export interface AgentIdentity {
   slug: AgentSlug;
   first_name: string;
@@ -107,6 +108,11 @@ export interface AgentIdentity {
   streams: Stream[];
   bindings: AgentBinding[];
   created_at: string;
+  /** Persona prompt (the former system.md body), inline per ADR-0007
+   *  Decision §1. Backfilled into existing rows by wf-seed-agents
+   *  (migration step 2); optional until the backfill has run everywhere,
+   *  required once the git tree retires (step 6). */
+  system_prompt?: string;
 }
 
 /** Operational fields — DDB-mutable via the agents-api PATCH endpoint. */

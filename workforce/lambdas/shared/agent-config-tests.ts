@@ -64,6 +64,13 @@ describe("validateIdentityPatch — scalar fields", () => {
     expect(rules({ prompt_version: "1.4.0" })).toEqual([]);
   });
 
+  it("validates system_prompt: non-empty, under the G2 size ceiling", () => {
+    expect(rules({ system_prompt: "" })).toContain("S16-system-prompt");
+    expect(rules({ system_prompt: "   " })).toContain("S16-system-prompt");
+    expect(rules({ system_prompt: "x".repeat(32 * 1024 + 1) })).toContain("G2-prompt-size");
+    expect(rules({ system_prompt: "You are Sora, an editorial writer." })).toEqual([]);
+  });
+
   it("requires non-empty allowed streams", () => {
     expect(rules({ streams: [] })).toContain("S11-streams");
     expect(rules({ streams: ["editorial", "bogus"] })).toContain("S11-stream-value");
