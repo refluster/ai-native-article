@@ -137,9 +137,13 @@ generate the *judgment* (the synthesis markdown); `publish-notion.mjs` owns the
      Status=ready`, plus `Abstract`, `SourceURLs` (the three source L2 URLs), and
      `Category`/`CategoriesMulti` (the canonical bucket + your theme tag). The GAS
      L4 batch generates the hero image and flips Status to `published`. Done.
-   - `2` — W-1 editorial guard failed (empty/short body or LLM-artefact prelude),
-     or `401/403` auth (project credential bag misconfigured). Read stderr; do not
-     retry blindly.
+   - `2` — W-1 editorial guard failed (empty/short body, LLM-artefact prelude,
+     or a last line that looks cut off mid-content — the shared
+     `scripts/lib/truncation.mjs` heuristic), or `401/403` auth (project
+     credential bag misconfigured). Read stderr; do not retry blindly. A
+     complete italic bias-disclosure footer (`*…ください。*`) is a valid ending —
+     if the guard trips, the body really is cut off; regenerate the ending,
+     don't trim the footer.
    - `1` / `3` — bad args / missing H1 title, or Notion API / network error.
 
 `NOTION_API_KEY` comes from your task's injected

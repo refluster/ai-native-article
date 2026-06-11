@@ -122,9 +122,13 @@ Steps:
    - `0` — page created. The row carries `Author={agent_slug}, Type=explanation,
      Status=ready`, plus `Abstract` + `Category`/`CategoriesMulti` (queued; the
      GAS L4 batch flips Status to `published`). Done.
-   - `2` — W-1 editorial guard failed (empty/short body or LLM-artefact prelude),
-     or `401/403` auth (project credential bag misconfigured). Read stderr; do not
-     retry blindly.
+   - `2` — W-1 editorial guard failed (empty/short body, LLM-artefact prelude,
+     or a last line that looks cut off mid-content — the shared
+     `scripts/lib/truncation.mjs` heuristic), or `401/403` auth (project
+     credential bag misconfigured). Read stderr; do not retry blindly. A
+     complete italic bias-disclosure footer (`*…ください。*`) is a valid ending —
+     if the guard trips, the body really is cut off; regenerate the ending,
+     don't trim the footer.
    - `1` / `3` — bad args / missing H1 title, or Notion API / network error.
 
 `NOTION_API_KEY` comes from your task's injected

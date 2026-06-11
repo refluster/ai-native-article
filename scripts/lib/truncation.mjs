@@ -5,6 +5,11 @@
 //   2. this module                                      (CI + skills, R-10)
 //   3. .claude/skills/article-health/scripts/article-health.mjs (imports this)
 //
+// Node consumers that import this module directly (no copy to keep in sync):
+// article-health (above) and the workforce publish guards
+// workforce/skills/article-level{2,3}/publish-notion.mjs (W-1, the
+// generation-time check while the GAS cron is paused).
+//
 // (1) lives in Apps Script and cannot import this file, so it stays a hand-kept
 // copy; (2) is the single source for every Node consumer. When the heuristic
 // changes, update Code.gs and this file together and cite the incident in
