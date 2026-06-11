@@ -53,12 +53,13 @@ const MEMORY_EXCERPT_CHARS = 1200;
 const NO_REPLY_TOKEN = "__NO_REPLY_NEEDED__";
 
 // A work-register reply is 1–4 sentences; 400 visible tokens is generous.
-// reasoningBudgetTokens ≥ the visible cap so hidden reasoning cannot starve
-// the prose budget (the same class of bug as the L2 truncation — see
-// llm-anthropic.ts on `reasoningBudgetTokens`). Anthropic's extended-thinking
-// API rejects budgets below 1024 (`thinking.budget_tokens` minimum) — the
-// original 1000 made every reply call 400 and was why /messaging never
-// answered. complete() now throws loudly on sub-minimum budgets.
+// reasoningBudgetTokens is the thinking on-switch + max_tokens headroom
+// (complete() sends ADAPTIVE thinking on supported models, omits it on
+// Haiku) — keep it ≥ the visible cap so reasoning cannot starve the prose
+// budget (same class of bug as the L2 truncation; see llm-anthropic.ts).
+// History: 1000 (< the legacy 1024 budget floor) 400'd every call, and the
+// legacy enabled+budget_tokens shape itself 400'd on opus-4-7 (Maya) —
+// both now guarded/handled in complete().
 const REPLY_MAX_TOKENS = 400;
 const REPLY_REASONING_TOKENS = 2048;
 
