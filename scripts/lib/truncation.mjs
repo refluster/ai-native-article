@@ -5,6 +5,11 @@
 //   2. this module                                      (CI + skills, R-10)
 //   3. .claude/skills/article-health/scripts/article-health.mjs (imports this)
 //
+// Node consumers that import this module directly (no copy to keep in sync):
+// article-health (above) and the workforce publish guards
+// workforce/skills/article-level{2,3}/publish-notion.mjs (W-1, the
+// generation-time check while the GAS cron is paused).
+//
 // (1) lives in Apps Script and cannot import this file, so it stays a hand-kept
 // copy; (2) is the single source for every Node consumer. When the heuristic
 // changes, update Code.gs and this file together and cite the incident in
@@ -14,7 +19,10 @@
 // generation: a dangling heading, or a prose line that does not end on a
 // sentence-terminating glyph (Japanese 。！？」） or ASCII .!?)]> / closing code).
 // List items, blockquotes, rules and fences are structural, not prose, so they
-// are never treated as truncation.
+// are never treated as truncation. Trailing emphasis closers (* / _) are
+// unwrapped before the glyph test: an italic byline like `*…ください。*` is a
+// complete ending, not a truncation (incident e7fc028993e1, 2026-06-10 —
+// ML-006).
 
 export function isTruncatedMarkdown (mdBody) {
   if (!mdBody) return false
@@ -25,7 +33,9 @@ export function isTruncatedMarkdown (mdBody) {
   const trimmed = lines[i].trim()
   if (/^#{1,6}\s+/.test(trimmed)) return true
   if (/^([-*]\s|\d+\.\s|>\s|---|```)/.test(trimmed)) return false
-  return !/[。！？」）…\.!\?\)\]`>]$/.test(trimmed)
+  const unwrapped = trimmed.replace(/[*_]+$/, '')
+  if (unwrapped === '') return true
+  return !/[。！？」）…\.!\?\)\]`>]$/.test(unwrapped)
 }
 
 // Strip a leading YAML frontmatter block, if present.

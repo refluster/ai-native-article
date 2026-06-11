@@ -84,7 +84,12 @@ them**, and build the article on that hypothesis. Not a summary of three article
 - **未来予測と示唆 (`##`, 500–800 字)**: the situational changes this principle
   implies, with their probability and grounds, and a practical takeaway for the
   reader.
-- Append the agent's bias-disclosure footer (from the agent's `system.md`).
+- Do **not** append a bias-disclosure footer (or any byline boilerplate) to the
+  body. Disclosure is carried by the `Author` metadata — rendered as the
+  AuthorChip byline on `kohuehara.xyz` — the same policy `feed-post` already
+  follows (Epic-011 §7 / Q9). In-body boilerplate duplicates that metadata,
+  freezes a model id in prose, and was the trigger for the ML-006 deploy-gate
+  false positive.
 
 ## Hard rules (editorial integrity — C-1, fail loud — C-4)
 
@@ -137,9 +142,12 @@ generate the *judgment* (the synthesis markdown); `publish-notion.mjs` owns the
      Status=ready`, plus `Abstract`, `SourceURLs` (the three source L2 URLs), and
      `Category`/`CategoriesMulti` (the canonical bucket + your theme tag). The GAS
      L4 batch generates the hero image and flips Status to `published`. Done.
-   - `2` — W-1 editorial guard failed (empty/short body or LLM-artefact prelude),
-     or `401/403` auth (project credential bag misconfigured). Read stderr; do not
-     retry blindly.
+   - `2` — W-1 editorial guard failed (empty/short body, LLM-artefact prelude,
+     or a last line that looks cut off mid-content — the shared
+     `scripts/lib/truncation.mjs` heuristic), or `401/403` auth (project
+     credential bag misconfigured). Read stderr; do not retry blindly. A
+     sentence ending wrapped in emphasis (`*…。*`) is a valid ending — if the
+     guard trips, the body really is cut off; regenerate the ending.
    - `1` / `3` — bad args / missing H1 title, or Notion API / network error.
 
 `NOTION_API_KEY` comes from your task's injected

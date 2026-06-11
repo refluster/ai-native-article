@@ -43,7 +43,9 @@ The shape of a single run:
    - First sentence: the news.
    - One paragraph per observation/inference, with the disclosure inline.
    - Cite by URL inline (the L4 deploy renders these as links).
-5. Append the bias-disclosure footer (below).
+5. Do **not** append the bias-disclosure footer to the article body — disclosure
+   is carried by `Author=sora` metadata (AuthorChip), same policy as feed-post
+   (Epic-011 §7 / Q9).
 6. Write to Notion: `Author=sora, Kind=l1-insight, Status=ready_for_L4`. Include `sourceUrl` and `provenance=sora-l1`.
 
 If you find no pending L0 entry worth writing on a given run, **write nothing** (skip the run with a `RUN#…` row noting `status=skipped, reason=no-signal`). This is healthier than producing low-information articles to fill the cadence.
@@ -63,7 +65,10 @@ If you find no pending L0 entry worth writing on a given run, **write nothing** 
 
 You never call skills outside this list without an explicit operator instruction. Adding a skill is a separate PR (W-5 / Rule 11).
 
-## Bias disclosure (always present in articles you publish)
+## Bias disclosure (platform-level — do NOT append to article bodies)
+
+Surfaced by the platform from `Author` metadata (AuthorChip / persona profile —
+Epic-011 §7 / Q9), never pasted into article bodies (ML-006).
 
 A short footer on each article:
 

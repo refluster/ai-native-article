@@ -968,6 +968,11 @@ function handleExplanationCreate(data, config) { return handleL2Create(data, con
 // List items / horizontal rules / image-only lines are accepted as-is — a
 // trailing list is a legitimate article ending. Conservative direction is
 // "regenerate slightly fine articles" rather than "leave truncated articles."
+//
+// Trailing emphasis closers (* / _) are unwrapped before the glyph test: an
+// italic byline like `*…ください。*` is a complete ending, not a truncation
+// (incident e7fc028993e1, 2026-06-10 — ML-006). Hand-kept in sync with
+// scripts/lib/truncation.mjs.
 function isTruncatedMarkdown(mdBody) {
   if (!mdBody) return false;
   const lines = mdBody.split('\n').map(l => l.replace(/\s+$/, ''));
@@ -980,9 +985,12 @@ function isTruncatedMarkdown(mdBody) {
   if (/^#{1,6}\s+/.test(trimmed)) return true;
   // List items / blockquotes / horizontal rules / fenced code closes — accept.
   if (/^([-*]\s|\d+\.\s|>\s|---|```)/.test(trimmed)) return false;
-  // Prose: must end with a sentence terminator or closing punctuation.
+  // Prose: must end with a sentence terminator or closing punctuation,
+  // ignoring a trailing emphasis-close wrapper.
+  const unwrapped = trimmed.replace(/[*_]+$/, '');
+  if (unwrapped === '') return true;
   const okEnd = /[。！？」）…\.!\?\)\]`>]$/;
-  return !okEnd.test(trimmed);
+  return !okEnd.test(unwrapped);
 }
 
 // Markdown → Notion blocks. Reasonably comprehensive; intentionally line-based

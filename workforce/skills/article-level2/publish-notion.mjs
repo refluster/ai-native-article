@@ -17,9 +17,14 @@
 // newsletter/pipeline/normalize-categories.mjs), so it's a constant below — overridable by
 // NOTION_DB_ID for tests / migrations.
 //
-// W-1 (editorial integrity): the script refuses an empty / too-short body and
-// rejects LLM-failure prelude artefacts (C-1), failing loud (exit 2) rather
-// than landing a degraded article.
+// W-1 (editorial integrity): the script refuses an empty / too-short body,
+// rejects LLM-failure prelude artefacts, and rejects a body whose last line
+// looks cut off mid-content (C-1), failing loud (exit 2) rather than landing
+// a degraded article. The cut-off check is the canonical heuristic from
+// scripts/lib/truncation.mjs — with the GAS cron paused this skill is the
+// generation path, so the R-5-equivalent guard must fire here, per-article,
+// rather than only at the R-10 deploy gate where one bad body blocks the
+// whole site deploy.
 //
 // Body is read from a FILE (not an arg) so multi-line / Unicode prose can't be
 // mangled by shell quoting. The first `# ` line is used as the page Title and
@@ -37,10 +42,12 @@
 // Exit codes:
 //   0  — page created
 //   1  — bad args / env / body-file unreadable / no H1 title
-//   2  — W-1 editorial guard failed (empty/short body or LLM-artefact prelude)
+//   2  — W-1 editorial guard failed (empty/short body, LLM-artefact prelude,
+//        or cut-off last line)
 //   3  — Notion API error / network error
 
 import { readFileSync } from "node:fs";
+import { isTruncatedMarkdown, lastNonEmptyLine } from "../../../scripts/lib/truncation.mjs";
 
 const NOTION_VERSION = "2022-06-28";
 const NOTION_API = "https://api.notion.com/v1";
@@ -137,6 +144,10 @@ if (trimmed.length < MIN_BODY_CHARS) {
 }
 if (ARTEFACT_PRELUDE.test(trimmed.slice(0, 50))) {
   console.error(`publish-notion.mjs: body opens with an LLM-failure prelude — refusing to publish (W-1)`);
+  process.exit(2);
+}
+if (isTruncatedMarkdown(trimmed)) {
+  console.error(`publish-notion.mjs: body looks cut off mid-content (last line: "${lastNonEmptyLine(trimmed)}") — refusing to publish a truncated explanation (W-1)`);
   process.exit(2);
 }
 
