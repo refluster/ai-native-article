@@ -560,6 +560,16 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /agents/{slug}/executions
             Method: GET
+        # ADR-0007 Decision §4 — config-mutation audit trail. Newest-first
+        # page of AGENT#{slug}/AUDIT# items (actor + field-level diffs).
+        # Public read (CORS-gated) like the rest of the agent surface; the
+        # weekly review digest and the console both read from here.
+        ListAgentAudit:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}/audit
+            Method: GET
         # Epic-012 Story 1: recall inspection surface — same recall() path
         # the agent-runner uses to ground a run. Public read (CORS-gated),
         # caller-scoped to {slug} inside recall().

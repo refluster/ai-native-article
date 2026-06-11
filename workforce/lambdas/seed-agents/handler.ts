@@ -42,7 +42,7 @@ interface AgentJsonOnDisk {
 }
 
 interface SeedResult {
-  upserts: Array<{ slug: string; action: "created" | "updated" | "noop" }>;
+  upserts: Array<{ slug: string; action: "created" | "updated" | "noop" | "ddb-owned" }>;
   errors: Array<{ slug: string; message: string }>;
   scanned: number;
 }
@@ -80,7 +80,7 @@ async function listAgentDirs(root: string): Promise<string[]> {
   return dirs.sort();
 }
 
-async function seedOne(slug: string): Promise<"created" | "updated" | "noop"> {
+async function seedOne(slug: string): Promise<"created" | "updated" | "noop" | "ddb-owned"> {
   const dir = join(AGENTS_ROOT, slug);
   const cfg = JSON.parse(
     await readFile(join(dir, "agent.json"), "utf8"),
@@ -89,6 +89,17 @@ async function seedOne(slug: string): Promise<"created" | "updated" | "noop"> {
     throw new Error(`agent.json:slug "${cfg.slug}" does not match dir "${slug}"`);
   }
   const systemMd = await readFile(join(dir, "system.md"), "utf8");
+
+  // ADR-0007 two-master interregnum guard: once an agent's identity has
+  // been written through agents-api (config_owner="ddb"), the DDB row is
+  // authoritative and the bundled git tree must not stomp it on the next
+  // post-deploy seed. Self-project upkeep still runs. This branch — and
+  // this whole Lambda — retires with migration step 6.
+  const preexisting = await getItem<AgentMetaRow>(agentPk(slug), "META");
+  if (preexisting?.config_owner === "ddb") {
+    await ensureSelfProject(slug);
+    return "ddb-owned";
+  }
 
   const identity: AgentIdentity = {
     slug: cfg.slug,
@@ -106,7 +117,7 @@ async function seedOne(slug: string): Promise<"created" | "updated" | "noop"> {
   };
   const hash = identityHash(identity, systemMd);
 
-  const existing = await getItem<AgentMetaRow>(agentPk(slug), "META");
+  const existing = preexisting;
   if (existing && existing.identity_hash === hash) {
     // Catch-up: agents seeded before Story 1-B (#90) lack the
     // self/{slug} project row. `ensureSelfProject` is idempotent
