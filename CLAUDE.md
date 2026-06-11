@@ -1,21 +1,32 @@
 # CLAUDE.md — orientation for agents
 
-You are working in `ai-native-article`, a personal blog/insight site at `https://kohuehara.xyz`. The repo is split into two domain modules: **`newsletter/`** — this site's L1→L4 article pipeline (`newsletter/app` reader SPA + `newsletter/gas` Apps Script engine + `newsletter/pipeline` build/sync scripts + `newsletter/docs`) — and **`workforce/`** — the agent organisation (`workforce/app` console + `agents/`, `skills/`, `lambdas/`, `infra/`). The **newsletter is one of the activities the workforce performs**: agents author articles into it via the `workforce/skills/article-level2` and `article-level3` skills, alongside the GAS cron. Cross-cutting governance/QA docs stay at root `docs/`; `packages/shared` is shared by both apps.
+You are working in `ai-native-article`, a personal blog/insight site at `https://kohuehara.xyz`. The repo is split into two domain modules:
 
-Articles flow through a 4-stage pipeline: web sources → Notion blog drafts → Notion synthesis → published markdown. Most automation lives in **Google Apps Script** (`newsletter/gas/src/Code.gs`); the reader-facing site is a Vite/React SPA built from Notion content at deploy time.
+- **`newsletter/`** — the site's L1→L4 article pipeline: `newsletter/app` (Vite/React reader SPA), `newsletter/gas` (the Apps Script generation engine, `src/Code.gs`), `newsletter/pipeline` (build/sync scripts run in CI), `newsletter/template`, and `newsletter/docs` (the pipeline's L1 statute docs).
+- **`workforce/`** — a separate agent-organisation subtree (console `workforce/app` + `agents/`, `skills/`, `lambdas/`, `infra/`, `client/`, `projects/`, …). **It has its own governance and decision log** — read [`workforce/docs/governance.md`](workforce/docs/governance.md) and [`workforce/docs/adr/`](workforce/docs/adr/README.md) before touching `workforce/**`; do not assume the root rules map onto it 1:1. The workforce authors articles into the newsletter via the `workforce/skills/article-level2` / `article-level3` cadences (the active generation path; their `publish-notion.mjs` carries the canonical truncation guard).
 
-## Read these before editing
+Cross-cutting governance lives at root: [`docs/`](docs/) and [`AGENTS.md`](AGENTS.md). `packages/shared` is shared by both apps.
 
-In priority order — every agent should know all four:
+Articles flow through a 4-stage pipeline: web sources → Notion blog drafts (L2) → Notion synthesis (L3) → published markdown (L4). Generation logic lives in **Google Apps Script** (`newsletter/gas/src/Code.gs` — the L2/L3/L4 handlers + the daily cron, schedule in L1-L4-PIPELINE.md) and the workforce `article-level2/3` cadences; the reader-facing site is a React SPA built from Notion content at deploy time. Generation is increasingly run through a **multi-candidate, multi-judge quality layer** (see "The quality layer" below).
 
-1. **[docs/governance.md](docs/governance.md)** — the rules. 4-layer hierarchy (L0 invariants → L1 framework → L2 mechanical → L3 operational), action-authority matrix (what an agent does autonomously vs. escalates), and the single most important constraint for this project: **C-2, Notion is the source of truth.**
-2. **[newsletter/docs/architecture-source-of-truth.md](newsletter/docs/architecture-source-of-truth.md)** — *where* article content lives and which copies are stale. Reading this once will save you the hour I lost on the L2 truncation fix.
-3. **[newsletter/docs/L1-L4-PIPELINE.md](newsletter/docs/L1-L4-PIPELINE.md)** — what each stage does, the daily cron schedule, and the operator runbooks for the common "something is broken on the site" cases.
-4. **[newsletter/docs/azure-budget-rules.md](newsletter/docs/azure-budget-rules.md)** — the 3-bracket sizing rule for `azureGenerateText`. The L2 truncation bug existed because this rule wasn't documented; don't reintroduce it.
+## Doc map — what to read before editing
 
-If a task touches `newsletter/app/src` (the reader SPA), [DESIGN.md](newsletter/docs/DESIGN.md) is the L1 doc for the visual/IA system.
+**The rules (start here):**
+1. **[docs/governance.md](docs/governance.md)** — the layered law. L0 invariants → L1 framework → L2 mechanical (R-rules) → L3 operational, plus the §8.1 action-authority (A/B) matrix. The single most important constraint: **C-2, Notion is the source of truth.**
+2. **[AGENTS.md](AGENTS.md)** — the multi-agent **Zone** model (A=human-owned design/identity/prompts/workflows, B=agent-assisted product code, C/D below). The Zone decides the approval bar; governance.md decides the layer. They're complementary — consult both.
 
-If a task touches the **governance machinery** — a CI gate, a registry, the analytics loop — read [docs/governance-mechanisms.md](docs/governance-mechanisms.md) first (decision record: [docs/adr/adr-0001](docs/adr/adr-0001-self-driving-governance-mechanisms.md)). It is the map of the self-driving mechanisms (R-10…R-12, the memory→lint ratchet, the content-insights loop) and what was deliberately left as ceremony. It carries the anti-reinvention reflex: extend an existing mechanism, don't build a parallel one.
+**The direction:**
+3. **[docs/design-policy.md](docs/design-policy.md)** — the orthogonal "how/why we build" axis: Software 2.0, external-substrate-over-reinvention, and the D-1 *innovation-velocity* bias (default to A for reversible work).
+
+**The self-driving machinery:**
+4. **[docs/governance-mechanisms.md](docs/governance-mechanisms.md)** (decision record: [docs/adr/adr-0001](docs/adr/adr-0001-self-driving-governance-mechanisms.md)) — the working mechanisms: the CI gates **R-10…R-12**, the **memory→lint ratchet**, the **content-insights loop**, the two registries. Read it before adding any gate/loop/registry — it carries the anti-reinvention reflex.
+
+**The pipeline (read the one your task touches):**
+5. **[newsletter/docs/architecture-source-of-truth.md](newsletter/docs/architecture-source-of-truth.md)** — *where* content lives and which copies are stale. Reading this once saves the hour I lost on the L2 truncation fix.
+6. **[newsletter/docs/L1-L4-PIPELINE.md](newsletter/docs/L1-L4-PIPELINE.md)** — what each stage does, the daily cron schedule, and the operator runbooks.
+7. **[newsletter/docs/azure-budget-rules.md](newsletter/docs/azure-budget-rules.md)** — the 3-bracket sizing for `azureGenerateText`. The L2 truncation bug existed because this wasn't documented.
+8. **[newsletter/docs/DESIGN.md](newsletter/docs/DESIGN.md)** — visual/IA system (L1) for `newsletter/app/src`.
+9. **[newsletter/docs/GROWTH.md](newsletter/docs/GROWTH.md)** — the Software 2.0 growth plan and the two-loop quality model + rubrics (the source of the quality layer below).
 
 ## The four invariants you must not violate
 
@@ -28,59 +39,68 @@ From [docs/governance.md §2](docs/governance.md#2-l0--constitution):
 
 When a request would conflict with one of these, stop and report — don't ship a "creative interpretation" that violates them.
 
+## The quality layer (Software 2.0)
+
+Generation is no longer "one prompt → one article." L2/L3 generation is moving onto a **multi-candidate, multi-judge** model (GROWTH.md §2–§5):
+
+- Each article can be generated by ≥1 **generator** on a panel, scored by ≥1 **judge** (editor / domain / reader perspectives) against a per-level **rubric**, with a panel-weighted aggregate and a `chosen` candidate. The schema is [`newsletter/app/src/types/quality.ts`](newsletter/app/src/types/quality.ts); per-article evidence is the operator-only `.eval.json` sidecar.
+- The **chosen** candidate's `systemPromptVersion` + aggregate score are copied into the published article's frontmatter, so GA4 can bucket reader behaviour by prompt version — this is the **outer loop** that the weekly content-insights loop feeds.
+- **Zone A (human-owned).** The rubric text/thresholds (`JUDGE_GATE`, `DIM_FLOOR`, `FALSIFIABILITY_FLOOR`), the panel rosters (`JUDGE_ROSTER`, `GENERATOR_ROSTER`), and the model registry (`MODEL_REGISTRY`, currently `gpt-5.4` on Azure) are **operator-approved** — propose diffs, don't self-merge. A rubric change invalidates every prior score; a roster/model change is a product-shape decision.
+
+When investigating a content-quality issue, the first reflex (design-policy.md D-2) is: *prompt problem, eval gap, or code problem?* — usually the first two.
+
 ## Skills you should use, not reinvent
 
-Three project-local skills live under `.claude/skills/`:
+Five project-local skills under `.claude/skills/`:
 
-- **`gas-call`** — POST a JSON action to the deployed GAS web app. Use this instead of `curl -X POST` (which silently fails because of how GAS handles the auth redirect — see [gas-call/SKILL.md](.claude/skills/gas-call/SKILL.md) for the full story).
-- **`gas-deploy-verify`** — push `newsletter/gas/src/Code.gs` and confirm the new version is actually serving by probing `/exec`. Use this every time you edit `newsletter/gas/src/Code.gs` instead of `npm run deploy-gas`. Same speed, catches the "did v49 actually go live?" class of bug.
-- **`article-health`** — sweep the published corpus, flag truncated articles and Notion-vs-gh-pages drift. Run it after any GAS change that affects content generation, and any time the user reports a broken article.
+- **`gas-call`** — POST a JSON action to the deployed GAS web app. Use this instead of `curl -X POST` (which fails on the GAS auth redirect — see [gas-call/SKILL.md](.claude/skills/gas-call/SKILL.md)).
+- **`gas-deploy-verify`** — push `newsletter/gas/src/Code.gs` and confirm the new version is actually serving by probing `/exec`. Use this every time you edit `Code.gs` instead of bare `npm run deploy-gas`.
+- **`article-health`** — sweep the published corpus, flag truncated articles and Notion↔gh-pages drift. Run after any GAS change affecting generation, and any time a broken article is reported.
+- **`cadence-forge`** — scaffold a new workforce "Cadence" skill (scheduled, persona-voiced periodic task).
+- **`ship-pr`** — drive a freshly-opened draft PR to all-CI-green + no unresolved threads, then flip it ready.
 
-The newsletter's article-authoring skills (`article-level2`, `article-level3`) live under `workforce/skills/` — they're workforce-owned cadences, validated by the workforce CI, not Claude-Code session skills.
+The article-authoring skills (`article-level2`, `article-level3`) live under `workforce/skills/` — they're workforce-owned cadences validated by workforce CI, not Claude-Code session skills.
 
 ## Action authority — what to do autonomously
 
-Default to **A (auto-execute)** for L3 work and L2 tightening. Default to **B (escalate to operator)** for anything that mutates `main`, merges PRs, amends `docs/governance.md` or any doc named in [§3.1 of governance.md](docs/governance.md#31-current-statute), loosens an existing mechanical check, or spends money outside the existing pipeline cost envelope. Full matrix at [docs/governance.md §8.1](docs/governance.md#81-action-authority-matrix).
-
-Specifically:
+Default to **A (auto-execute)** for L3 work and L2 tightening. Default to **B (escalate to operator)** for anything that mutates `main`, merges PRs, amends an L1 doc / ADR / Zone-A file, loosens an existing mechanical check, or spends money outside the existing pipeline envelope. Full matrix at [docs/governance.md §8.1](docs/governance.md#81-action-authority-matrix); cross-check the [AGENTS.md](AGENTS.md) Zone of the files you touch.
 
 - ✅ Edit `newsletter/gas/src/Code.gs` to fix a bug, then deploy via `gas-deploy-verify`.
 - ✅ Add a new GAS action and wire it through `doPost` + `supportedActions`.
-- ✅ Run `L2_BACKFILL`, `L3_BATCH`, etc. on demand via `gas-call`.
-- ✅ Open a PR (you author + draft).
-- ✅ Add a runtime guard or new lint (L2 tightening).
-- ✅ Edit a runbook in `newsletter/docs/L1-L4-PIPELINE.md`.
-- 🚫 Merge any PR, including your own.
-- 🚫 Push directly to `main` (PR-only).
-- 🚫 Edit `docs/governance.md` §2 (L0 invariants).
-- 🚫 Loosen or disable the `finish_reason === 'length'` throw, the manifest check, or any other R-1…R-9 in [§4](docs/governance.md#4-l2--regulations-mechanical-enforcement).
-- 🚫 Change `package.json` deploy IDs, `newsletter/gas/appsscript.json` access settings, GitHub repo settings.
+- ✅ Run `L2_BACKFILL`, `L3_BATCH`, `REBUILD_MANIFEST`, etc. on demand via `gas-call`.
+- ✅ Open a PR (you author + draft). Add a runtime guard or new lint (L2 tightening). Edit a runbook.
+- 🚫 Merge any PR (incl. your own). Push directly to `main` (PR-only).
+- 🚫 Edit `docs/governance.md` §2 (L0 invariants) or any **Zone A** file (design tokens, prompts, rubric/roster/model registry, workflows) without operator approval.
+- 🚫 Loosen or disable any R-rule ([§4](docs/governance.md#4-l2--regulations-mechanical-enforcement)) — incl. the `finish_reason==='length'` throw, the manifest check, the R-10 truncation gate.
+- 🚫 Change `package.json` deploy IDs, `newsletter/gas/appsscript.json` access, GitHub repo settings.
 
 When in doubt: ask in chat with a one-line description; wait for an explicit "yes."
 
 ## Workflow expectations
 
+- **Before implementing, check for a governing ADR.** Skim [docs/adr/](docs/adr/README.md) (root/newsletter decisions) and [workforce/docs/adr/](workforce/docs/adr/README.md) (workforce decisions) for an ADR that governs the area you're about to change. If one exists, **follow it and cite it in the PR.** ADRs are L1 framework laws (governance.md §3); a reversal is a new *superseding* ADR, never an in-place edit of a decided one.
+- **Touching an L1 doc or ADR?** The R-11 citation gate requires the PR body to either reference the L1 doc / ADR you're changing or carry `RULE-N/A: <reason>`. (L1 = the statute docs in [governance.md §3.1](docs/governance.md#31-current-statute), governance.md / design-policy.md themselves, and any ADR under `docs/adr/`.)
 - **Plan before non-trivial implementation.** Use `EnterPlanMode` for any change that touches `newsletter/gas/src/Code.gs` substantively or that modifies multiple files.
-- **Verify after change.** A change to `newsletter/gas/src/Code.gs` is not done until `gas-deploy-verify` passes. A change to content generation is not done until `article-health` reports 0 truncated.
-- **Commit messages cite the layer.** `L2: add finish_reason='length' throw` reads better than `fix: bug`. The layer tag (L1/L2/L3) helps future audit see which doc level a change touches.
+- **Verify after change.** A `Code.gs` change isn't done until `gas-deploy-verify` passes. A content-generation change isn't done until `article-health` reports 0 truncated.
+- **Commit messages cite the layer.** `L2: add finish_reason='length' throw` beats `fix: bug`.
 - **Label new issues per [docs/issue-labeling.md](docs/issue-labeling.md).** Mandatory axes: `project:` + `layer:` + `type:`. Reconcile colours via `node scripts/sync-labels.mjs` after editing `.github/labels.json`.
-- **One in_progress todo at a time** when running TodoWrite for multi-step tasks. Mark complete immediately on finish.
-- **Touching an L1 doc or ADR?** The R-11 citation gate requires the PR body to either reference the L1 doc / ADR you're changing or carry `RULE-N/A: <reason>`. (L1 = the statute docs in [governance.md §3.1](docs/governance.md#31-current-statute), governance.md / design-policy.md themselves, and any ADR under [docs/adr/](docs/adr/README.md).)
 - **Found a recurring failure mode?** Log it in [docs/memory-lint-backlog.md](docs/memory-lint-backlog.md); a second occurrence within 90 days promotes it to an `R-NN` gate (the §6.1 ratchet). A real-but-not-worth-a-check gap goes to [docs/risk-acceptance-ledger.md](docs/risk-acceptance-ledger.md) instead.
+- **One in_progress todo at a time** when running TodoWrite for multi-step tasks. Mark complete immediately on finish.
 
 ## Things that cost more than they look
 
-- **GAS deployment lag.** ~60–90s between `clasp deploy` and `/exec` actually serving the new code. `gas-deploy-verify` polls for this. Don't `gas-call` against a fresh deploy without verifying first.
-- **gh-pages cron.** Up to 6 hours between editing Notion and seeing it live (`06:17 / 12:17 / 18:17 UTC`, plus push-to-`main` triggers). For "make it live now," run `gh workflow run deploy-article-site.yml`.
-- **Reasoning-token consumption.** `gpt-5.4` shares `max_completion_tokens` between hidden reasoning and visible output. The 2000-token default produced empty articles; 8000 is the floor for any prose-length output. See [newsletter/docs/azure-budget-rules.md](newsletter/docs/azure-budget-rules.md).
-- **`curl -X POST` to GAS.** Returns HTTP 405. Use the `gas-call` skill or Node's `fetch` with `redirect: 'follow'`.
+- **GAS deployment lag.** ~60–90s between `clasp deploy` and `/exec` serving new code. `gas-deploy-verify` polls for this. Don't `gas-call` a fresh deploy without verifying first.
+- **gh-pages cron.** Up to 6 hours between editing Notion and seeing it live (`06:17 / 12:17 / 18:17 UTC`, plus push-to-`main`). For "make it live now," run `gh workflow run deploy-article-site.yml`.
+- **Reasoning-token consumption.** The active model (`gpt-5.4`, via `MODEL_REGISTRY`) shares `max_completion_tokens` between hidden reasoning and visible output. The 2000-token default produced empty articles; 8000 is the floor for prose. See [azure-budget-rules.md](newsletter/docs/azure-budget-rules.md).
+- **`curl -X POST` to GAS.** Returns HTTP 405 / 302. Use the `gas-call` skill or Node `fetch` with `redirect: 'follow'`.
+- **Network allowlist (remote sessions).** Cloud/remote execution environments may block `script.google.com`, so `gas-call` / `article-health`'s GAS comparison can 403 (`Host not in allowlist`). The gh-pages sweep still works; GAS-side actions must run from an unrestricted machine.
 
 ## When something breaks
 
-1. Run `article-health` to localise: is the breakage on `gh-pages`, in Notion, or both?
+1. Run `article-health` to localise: breakage on `gh-pages`, in Notion, or both?
 2. Check the GAS execution log (Apps Script editor → Executions) for thrown errors — `finish_reason='length'`, manifest violations, etc.
-3. If it's a content issue: `L2_BACKFILL` (for truncated explanations) or open the Notion row directly.
-4. If it's a deploy issue: `gh workflow run deploy-article-site.yml`.
-5. If neither: read [newsletter/docs/L1-L4-PIPELINE.md §Operator runbooks](newsletter/docs/L1-L4-PIPELINE.md#operator-runbooks) for the closest matching scenario.
+3. Content issue → `L2_BACKFILL` (truncated explanations) or open the Notion row directly.
+4. Deploy issue → `gh workflow run deploy-article-site.yml` (R-10 will block a deploy that would publish a truncated article).
+5. Otherwise → [L1-L4-PIPELINE.md §Operator runbooks](newsletter/docs/L1-L4-PIPELINE.md#operator-runbooks).
 
-If the symptom is novel, after fixing it, ask whether the rule that should have caught it lives at L1 (a doc), L2 (a mechanical check), or L3 (a runbook), and update the corresponding layer. That's the §6 "governance retrospective" loop.
+If the symptom is novel, after fixing it ask whether the rule that should have caught it lives at L1 (a doc/ADR), L2 (a mechanical check), or L3 (a runbook), record it in [memory-lint-backlog.md](docs/memory-lint-backlog.md), and update the corresponding layer. That's the §6 "governance retrospective" loop.
