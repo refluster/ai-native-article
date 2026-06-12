@@ -30,7 +30,7 @@ export interface AgentAuditChange {
   after: unknown;
 }
 
-export type AgentAuditKind = "identity" | "operational";
+export type AgentAuditKind = "create" | "identity" | "operational";
 
 export interface AgentAuditRow {
   pk: `AGENT#${string}`;

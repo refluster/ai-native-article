@@ -61,10 +61,20 @@ interface AnyRow {
   sk: string;
   [k: string]: unknown;
 }
+class FakeConditionalCheckFailed extends Error {}
 const rows = new Map<string, AnyRow>();
 const key = (pk: string, sk: string) => `${pk}|${sk}`;
 
 vi.mock("../shared/ddb.js", () => ({
+  // ADR-0007 POST /agents: the create path imports these two from ddb.js;
+  // the vi.mock module namespace must carry them or the SUT import fails.
+  ConditionalCheckFailedException: FakeConditionalCheckFailed,
+  conditionalPutItem: vi.fn(async (item: AnyRow) => {
+    if (rows.has(key(item.pk, item.sk))) {
+      throw new FakeConditionalCheckFailed("conditional request failed");
+    }
+    rows.set(key(item.pk, item.sk), item);
+  }),
   getItem: vi.fn(async <T extends object>(pk: string, sk: string): Promise<T | undefined> => {
     return rows.get(key(pk, sk)) as T | undefined;
   }),
