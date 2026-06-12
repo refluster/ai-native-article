@@ -143,6 +143,25 @@ for (const [child, edges] of Object.entries(topology)) {
   }
 }
 
+// W-4 flat-org guard: a roster of >1 agents with ZERO reports_to edges is
+// not a plausible org — it means the META rows lost (or never received)
+// their org edges, and `?? []` above would silently publish every agent
+// as a depth-0 root. computeDepths can't catch this (an all-roots graph
+// resolves cleanly), which is exactly how the ADR-0007 step-6a miss
+// shipped. Repair path: workforce/scripts/restore-agent-profile-fields.mjs.
+// A deliberately flat org can bypass with WF_ALLOW_FLAT_ORG=1.
+const reportsToEdgeCount = Object.values(topology).reduce(
+  (n, t) => n + (t.reports_to?.length ?? 0),
+  0,
+);
+if (agents.length > 1 && reportsToEdgeCount === 0 && process.env.WF_ALLOW_FLAT_ORG !== "1") {
+  throw new Error(
+    `build-agent-manifest: ${agents.length} agents but 0 reports_to edges — the agents-api rows are missing their org topology. ` +
+      `Refusing to ship a flat org (C-4/W-4). Run workforce/scripts/restore-agent-profile-fields.mjs, ` +
+      `or set WF_ALLOW_FLAT_ORG=1 if the flat org is intentional.`,
+  );
+}
+
 const depths = computeDepths(slugs, topology);
 
 for (const a of agents) {
@@ -185,7 +204,7 @@ function computeDepths(allSlugs, topo) {
   const unresolved = allSlugs.filter((s) => out[s] === undefined);
   if (unresolved.length > 0) {
     throw new Error(
-      `build-agent-manifest: depth unresolved for [${unresolved.join(", ")}] — _org.json likely contains a cycle or a dangling reports_to slug`,
+      `build-agent-manifest: depth unresolved for [${unresolved.join(", ")}] — the META rows' reports_to edges likely contain a cycle or a dangling slug (PATCH the offending agent via agents-api)`,
     );
   }
   return out;
