@@ -509,6 +509,19 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /agents/{slug}
             Method: GET
+        # ADR-0007 — POST /agents completes the "full CRUD over identity
+        # fields" Decision §2 sanctions (the C was unimplemented when the
+        # git agents tree retired, leaving no path to register a new
+        # persona). Same AWS_IAM gate as the other config writes; called
+        # by the operator via SigV4, not the anonymous SPA surface.
+        CreateAgent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents
+            Method: POST
+            Auth:
+              Authorizer: AWS_IAM
         PatchAgent:
           Type: HttpApi
           Properties:

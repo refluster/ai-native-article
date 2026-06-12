@@ -30,12 +30,13 @@ lambdas/
 |---|---|---|---|
 | `GET` | `/agents` | public | List agents (paginated, `?stream=`, `?archived=`, `?page_size=`, `?cursor=`). |
 | `GET` | `/agents/{slug}` | public | Single agent's full record (identity + operational + computed). |
-| `PATCH` | `/agents/{slug}` | AWS_IAM | Update operational fields only (`paused`, `archived`, `budget_monthly_usd_override`). Rejects identity fields with `400 non_operational_fields`. |
-| `DELETE` | `/agents/{slug}` | AWS_IAM | Soft delete — sets `archived: true`. Hard delete requires the `agents/{slug}/` directory to be removed in a PR first. |
+| `POST` | `/agents` | AWS_IAM | Create an agent ([ADR-0007](../docs/adr/adr-0007-agent-config-single-source.md) "full CRUD"). Body = `slug` + the identity fields; `created_at` and the operational/computed slices are server-set. Validated by `shared/agent-config.ts` (`S0-required` + the PATCH rules + W-3), `409` on an existing slug, appends a `kind=create` AUDIT item. |
+| `PATCH` | `/agents/{slug}` | AWS_IAM | Update operational fields (`paused`, `archived`, `budget_monthly_usd_override`) **and** identity fields (ADR-0007). Validated + audited; rejects immutable/computed fields with `400 non_patchable_fields`. |
+| `DELETE` | `/agents/{slug}` | AWS_IAM | Soft delete — sets `archived: true`. |
 | `GET` | `/skills` | public | List skills (paginated, `?status=`, `?owner=`, `?page_size=`, `?cursor=`). Epic-008 PR-D. |
 | `GET` | `/skills/{name}` | public | Single skill's full record (identity + body + operational + computed). Epic-008 PR-D. |
 
-`POST /agents` is **not** exposed. New personas come from PRs that add `workforce/agents/{slug}/{agent.json, system.md}` files (Rule 11 / W-5 preserved). Skills follow the same discipline — no `POST /skills`.
+New personas are registered via `POST /agents` (ADR-0007 retired the `workforce/agents/` git tree; the DDB row family is the single authoritative store and agents-api the single writer — see [runbooks/agent-registration.md](../docs/runbooks/agent-registration.md)). Skills still follow the git discipline — no `POST /skills`.
 
 ## Local dev
 

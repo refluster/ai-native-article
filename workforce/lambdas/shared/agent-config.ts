@@ -208,6 +208,52 @@ export function validateIdentityPatch(
   return out;
 }
 
+// Fields a POST /agents create body must carry. Everything else writable
+// (jd / identity / experience / memory / org edges / owner_email) is
+// optional at create time and PATCHable later. `bindings` is required but
+// may be `[]` — a new hire typically gets its cadence wired in a second
+// step, after the skill's owners[] is amended to include it (R8).
+export const AGENT_CREATE_REQUIRED_FIELDS = [
+  "slug",
+  "first_name",
+  "last_name",
+  "residence",
+  "role",
+  "model",
+  "prompt_version",
+  "budget_monthly_usd_default",
+  "default_project",
+  "streams",
+  "bindings",
+  "system_prompt",
+] as const;
+
+/**
+ * Validation for POST /agents (ADR-0007 Decision §2 — the C of the "full
+ * CRUD over identity fields" the decision sanctions). Checks required-field
+ * presence plus the slug shape, then reuses the per-field PATCH rules so a
+ * created row can never carry config a PATCH would have rejected. The
+ * caller supplies the same cross-row context as for a patch; `created_at`
+ * and the operational/computed slices are server-set, never client-supplied.
+ */
+export function validateAgentCreate(
+  body: Readonly<Record<string, unknown>>,
+  ctx: IdentityPatchContext,
+): ConfigViolation[] {
+  const out: ConfigViolation[] = [];
+  for (const field of AGENT_CREATE_REQUIRED_FIELDS) {
+    if (!(field in body) || body[field] === undefined || body[field] === null) {
+      out.push({ rule: "S0-required", field, msg: `${field} is required on create` });
+    }
+  }
+  if ("slug" in body && (typeof body.slug !== "string" || !SLUG.test(body.slug))) {
+    out.push({ rule: "S2-slug", field: "slug", msg: "slug must match /^[a-z]+$/" });
+  }
+  const { slug: _slug, ...identityFields } = body;
+  out.push(...validateIdentityPatch(identityFields, ctx));
+  return out;
+}
+
 /** Guard for the operational budget override (PATCH budget_monthly_usd_override).
  *  `null` clears the override (the default budget takes effect again). */
 export function validateBudgetOverride(

@@ -1,6 +1,7 @@
 // wf-agents-api Lambda handler.
 // Routes:
 //   GET    /agents                          list (paginated, filterable)
+//   POST   /agents                          create an agent — validated + audited (IAM-auth at API GW; ADR-0007 full CRUD)
 //   GET    /stats                           dashboard aggregate — EXEC-ledger roll-up (runs/deliv/heat/trace; duration, not cost)
 //   GET    /agents/{slug}                   single agent
 //   GET    /agents/{slug}/executions        canonical activity ledger — EXEC rows via GSI1 (the agent-profile task log)
@@ -59,6 +60,7 @@ import {
 } from "../shared/agent.js";
 import {
   IDENTITY_PATCHABLE_FIELDS,
+  validateAgentCreate,
   validateBudgetOverride,
   validateIdentityPatch,
   type ConfigViolation,
@@ -74,7 +76,14 @@ import {
   skillPk,
   toSkillApiView,
 } from "../shared/skill-row.js";
-import { getItem, queryBySkPrefix, scanPrefix, updateOperational } from "../shared/ddb.js";
+import {
+  ConditionalCheckFailedException,
+  conditionalPutItem,
+  getItem,
+  queryBySkPrefix,
+  scanPrefix,
+  updateOperational,
+} from "../shared/ddb.js";
 import {
   appendExecution,
   archive as archiveProject,
@@ -204,6 +213,10 @@ export async function handler(
     const threadId = event.pathParameters?.id;
 
     if (routeKey === "GET /agents") return listAgents(event);
+    // ADR-0007 Decision §2 sanctions full CRUD over identity fields; this
+    // is the C. IAM-auth at API GW like the other config writes. `return
+    // await` so the audit-append throw routes through the 500 mapping.
+    if (routeKey === "POST /agents") return await createAgent(event);
     if (routeKey === "GET /stats") return listStats(event);
     if (routeKey === "GET /skills") return listSkills(event);
     if (routeKey === "GET /skills/{name}" && skillName) return getSkill(skillName);
@@ -585,6 +598,78 @@ async function patchAgent(
   const updated = await updateOperational<AgentMetaRow>(agentPk(slug), "META", patch);
   await appendAgentAudit(slug, actorFromEvent(event), kind, changes);
   return reply(200, toApiView(updated));
+}
+
+// ADR-0007: POST /agents — create a new agent META row. Identity fields
+// come from the body (same writable set as PATCH, plus the immutable slug);
+// `created_at` and the operational/computed slices are server-initialised.
+// Validation reuses the PATCH rules (shared/agent-config.ts) so a created
+// row can never carry config a PATCH would have rejected, including the
+// W-3 aggregate budget ceiling. The put is conditional on the slug not
+// existing (409 on duplicate — a create is never an update), and every
+// accepted create appends a kind="create" AUDIT item.
+async function createAgent(
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  if (!event.body) return reply(400, { error: "missing_body" });
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(event.body) as Record<string, unknown>;
+  } catch {
+    return reply(400, { error: "invalid_json" });
+  }
+
+  const writable = ["slug", ...IDENTITY_PATCHABLE_FIELDS] as readonly string[];
+  const invalid = Object.keys(parsed).filter((k) => !writable.includes(k));
+  if (invalid.length > 0) {
+    return reply(400, {
+      error: "non_writable_fields",
+      detail: `the following fields are server-set or computed and cannot be supplied on create: ${invalid.join(", ")}`,
+      writable: [...writable],
+    });
+  }
+
+  const slug = typeof parsed.slug === "string" ? parsed.slug : "";
+  const otherAgentsEffectiveBudgetUsd = await sumOtherEffectiveBudgets(slug);
+  const skillOwners = await buildSkillOwnersLookup(parsed.bindings);
+  const violations = validateAgentCreate(parsed, {
+    slug,
+    otherAgentsEffectiveBudgetUsd,
+    skillOwners,
+  });
+  if (violations.length > 0) {
+    return reply(422, { error: "config_validation_failed", violations });
+  }
+
+  const now = new Date().toISOString();
+  const row: AgentMetaRow = {
+    ...(parsed as unknown as Omit<AgentMetaRow, "pk" | "sk" | "created_at" | "updated_at" | "paused" | "archived" | "runs_this_month" | "cost_this_month_usd" | "deliv_count_total">),
+    pk: agentPk(slug),
+    sk: "META",
+    // Day-resolution created_at matches the rows the retired seed wrote.
+    created_at: now.slice(0, 10),
+    updated_at: now,
+    paused: false,
+    archived: false,
+    runs_this_month: 0,
+    cost_this_month_usd: 0,
+    deliv_count_total: 0,
+  };
+
+  try {
+    await conditionalPutItem(row, "attribute_not_exists(pk)");
+  } catch (err) {
+    if (err instanceof ConditionalCheckFailedException) {
+      return reply(409, { error: "already_exists", slug });
+    }
+    throw err;
+  }
+
+  // diffChanges against an empty row records every supplied field as
+  // null→value, with the long-string digest applied to system_prompt.
+  await appendAgentAudit(slug, actorFromEvent(event), "create", diffChanges({}, parsed));
+  return reply(201, toApiView(row));
 }
 
 async function deleteAgent(
