@@ -1,0 +1,90 @@
+name: Restore workforce agent profile fields (OP-008)
+
+# Dispatch-only runner for workforce/scripts/restore-agent-profile-fields.mjs
+# — the FU-025 / OP-008 repair that PATCHes the missing org edges
+# (reports_to / lateral) and profile blocks back onto the AGENT#/META rows
+# through wf-agents-api (single writer per ADR-0007; S14/S17/S18/G3
+# validation + AUDIT rows apply).
+#
+# Why a workflow: the repair needs AWS credentials (`aws lambda invoke` on
+# wf-agents-api-{stage}) and full git history (the snapshot is read via
+# `git show c4e0422`). Sandboxed/remote agent sessions have neither; this
+# gives the operator a one-click run with the same OIDC role the deploys
+# already assume. Requires lambda:InvokeFunction on wf-agents-api-* in
+# secrets.AWS_ROLE_ARN — if the role lacks it, the run fails loudly (W-4)
+# and the fallback is the documented local run (follow-ups.md OP-008).
+#
+# Defaults to --dry-run: the first dispatch previews the patches; re-run
+# with dry_run=false to write. After a real prod run, re-run
+# deploy-workforce-console.yml + deploy-article-site.yml so the manifest
+# rebuilds from the repaired rows and the flat-org guard goes green.
+#
+# Zone A — agent proposes; human merges (workforce/docs/governance.md §3).
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: 'Target stage'
+        type: choice
+        options: [prod, dev]
+        default: prod
+      dry_run:
+        description: 'Preview the patches without writing'
+        type: boolean
+        default: true
+      force:
+        description: 'Overwrite fields already present on the rows'
+        type: boolean
+        default: false
+      agents:
+        description: 'Optional comma-separated slug list (default: all snapshot agents)'
+        type: string
+        default: ''
+
+concurrency:
+  group: workforce-restore-agent-profile-fields
+  # Two concurrent restores interleaving PATCHes against the same rows is
+  # never what the operator wants — queue, don't cancel.
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  # Required for aws-actions/configure-aws-credentials to mint a JWT and
+  # assume secrets.AWS_ROLE_ARN via the configured GitHub OIDC trust.
+  id-token: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The script reads the pre-deletion agent snapshot via
+          # `git show c4e0422…` — a shallow clone can't resolve it.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Run restore-agent-profile-fields
+        env:
+          STAGE: ${{ inputs.stage }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          FORCE: ${{ inputs.force }}
+          AGENTS: ${{ inputs.agents }}
+        run: |
+          set -euo pipefail
+          flags=()
+          [ "$DRY_RUN" = "true" ] && flags+=(--dry-run)
+          [ "$FORCE" = "true" ] && flags+=(--force)
+          [ -n "$AGENTS" ] && flags+=(--agents "$AGENTS")
+          node workforce/scripts/restore-agent-profile-fields.mjs "$STAGE" "${flags[@]}"
