@@ -1,0 +1,15 @@
+{
+  "name": "grid-watch",
+  "version": "0.1.0",
+  "status": "active",
+  "archetype": "cadence",
+  "cost_class": "small",
+  "owners": [
+    "grace"
+  ],
+  "improvement_agent": null,
+  "created_at": "2026-06-12",
+  "requires": [
+    "workforce.feed_write_token"
+  ]
+}
