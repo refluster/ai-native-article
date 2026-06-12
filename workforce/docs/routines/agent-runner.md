@@ -18,12 +18,19 @@ The runtime working prompt is composed at fire-time:
 
 ```
 1. Generic runner spec      ← THIS FILE (dispatch logic + write-back contract)
-2. Persona voice            ← workforce/agents/{agent_slug}/system.md
+2. Persona voice            ← GET {wf-agents-api}/agents/{agent_slug} → system_prompt
 3. Skill body               ← workforce/skills/{skill}/SKILL.md
-4. Binding config overlay   ← workforce/agents/{agent_slug}/agent.json:bindings[binding_idx].config
+4. Binding config overlay   ← GET {wf-agents-api}/agents/{agent_slug} → bindings[binding_idx].config
 ```
 
-The CCR session reads these from the cloned repo on each fire. No state lives in claude.ai beyond the thin instruction pointer (see "Operator instantiation" below).
+The CCR session reads the skill body from the cloned repo and the agent
+identity/config from the public agents-api on each fire — **DynamoDB via
+agents-api is the single source for agent config per
+[ADR-0007](../adr/adr-0007-agent-config-single-source.md)**; the
+`workforce/agents/{slug}/` git tree is retired (an earlier revision of this
+file read persona + bindings from it). The API base URL is the same constant
+each skill's write script carries (see step 4). No state lives in claude.ai
+beyond the thin instruction pointer (see "Operator instantiation" below).
 
 ## Fire payload — batched tasks
 
@@ -76,14 +83,14 @@ Each task is independent. The orchestrator-tick is the privileged AWS principal 
 
 Iterate `payload.tasks` in order. For each task:
 
-1. **Validate task** — verify `agent_slug` exists at `workforce/agents/{agent_slug}/agent.json` and `binding_idx` is within range. If either is wrong, fail loud for this task (the operator/orchestrator misconfigured the binding); other tasks in the batch are independent and continue.
+1. **Validate task** — `agent = GET {wf-agents-api}/agents/{agent_slug}` must return 200 and `binding_idx` must be within `agent.bindings` range (ADR-0007: the API, not a repo file, is the config source). If either is wrong, fail loud for this task (the operator/orchestrator misconfigured the binding); other tasks in the batch are independent and continue.
 
-2. **Resolve the (skill, persona, config) triple**:
-   - `binding = agent.json["bindings"][binding_idx]`
+2. **Resolve the (skill, persona, config) triple** from the same `agent` response:
+   - `binding = agent.bindings[binding_idx]`
    - `skill = binding.skill`
    - `config = binding.config ?? {}`
-   - `persona = workforce/agents/{agent_slug}/system.md`
-   - `skill_body = workforce/skills/{skill}/SKILL.md`
+   - `persona = agent.system_prompt`
+   - `skill_body = workforce/skills/{skill}/SKILL.md` (repo file)
 
 3. **Use the inline credentials** for any side-effect the skill performs:
    - `task.credentials[type]` for each `type` in the skill's `requires[]`
@@ -265,7 +272,7 @@ curl -X POST <FIRE_URL_FROM_wf/ccr/agent-runner> \
 
 Confirm the session:
 - Parses `text` → `{tasks: [...]}` envelope as the first step
-- Reads `workforce/agents/dario/agent.json` and finds `bindings[3].skill === "feed-post"`
+- Resolves `GET {wf-agents-api}/agents/dario` and finds `bindings[3].skill === "feed-post"`
 - Reads `workforce/skills/feed-post/SKILL.md`
 - Produces a draft PR under `claude/feed-post-dario-{yyyy-mm-dd}` with the new post
 - Exits cleanly
