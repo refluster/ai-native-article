@@ -1,0 +1,91 @@
+name: Record workforce engagement (Track Record)
+
+# Dispatch-only runner for workforce/scripts/record-engagement.mjs — the
+# ADR-0005 item-5 ad-hoc activity sink. Records one EXEC row in an agent's
+# ACTIVITY / RUNS · DELIVERABLES ledger by minting a short-lived engagement
+# bearer in DDB (AUTH#ENGAGEMENT — needs dynamodb:UpdateItem on
+# wf-table-{stage} in the OIDC role) and POSTing the engagement through
+# wf-agents-api, exactly as an operator-credentialed local run would.
+#
+# Why a workflow: the token mint is the trust gate and requires AWS
+# credentials, which sandboxed/remote agent sessions don't have. This is
+# the same pattern as workforce-restore-agent-profile-fields.yml — the
+# operator (or a remote session with `workflow` scope) gets a dispatch
+# button instead of needing a local AWS-credentialed shell.
+#
+# The engagement endpoint's posture is R-N1(b) best-effort: skill_name /
+# project_id are recorded as given (a descriptive non-skill label like
+# "ops-repair" is acceptable for work no cadence skill covers).
+#
+# Zone A — agent proposes; human merges (workforce/docs/governance.md §3).
+
+on:
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: 'Agent slug (e.g. mateo)'
+        type: string
+        required: true
+      skill:
+        description: 'Skill / work label for the EXEC row'
+        type: string
+        required: true
+      project:
+        description: 'Project id (e.g. workforce-self)'
+        type: string
+        required: true
+      status:
+        description: 'Run status'
+        type: choice
+        options: [ok, throw, skipped]
+        default: ok
+      summary:
+        description: 'Deliverable summary (omit for a summary-less row)'
+        type: string
+        default: ''
+      uri:
+        description: 'Artifact URI (PR / run link)'
+        type: string
+        default: ''
+
+concurrency:
+  group: workforce-record-engagement
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  # Required for aws-actions/configure-aws-credentials to mint a JWT and
+  # assume secrets.AWS_ROLE_ARN via the configured GitHub OIDC trust.
+  id-token: write
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Record engagement
+        env:
+          AGENT: ${{ inputs.agent }}
+          SKILL: ${{ inputs.skill }}
+          PROJECT: ${{ inputs.project }}
+          STATUS: ${{ inputs.status }}
+          SUMMARY: ${{ inputs.summary }}
+          URI: ${{ inputs.uri }}
+        run: |
+          set -euo pipefail
+          args=(--agent "$AGENT" --skill "$SKILL" --project "$PROJECT" --status "$STATUS")
+          [ -n "$SUMMARY" ] && args+=(--summary "$SUMMARY")
+          [ -n "$URI" ] && args+=(--uri "$URI")
+          node workforce/scripts/record-engagement.mjs "${args[@]}"
