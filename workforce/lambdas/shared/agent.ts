@@ -109,9 +109,9 @@ export interface AgentIdentity {
   bindings: AgentBinding[];
   created_at: string;
   /** Persona prompt (the former system.md body), inline per ADR-0007
-   *  Decision §1. Backfilled into existing rows by wf-seed-agents
-   *  (migration step 2); optional until the backfill has run everywhere,
-   *  required once the git tree retires (step 6). */
+   *  Decision §1. Required in practice — wf-messaging-reply throws on a
+   *  row without it (W-4). Optional in the type only because legacy rows
+   *  predate the backfill; PATCH it via agents-api if one surfaces. */
   system_prompt?: string;
   /** Profile blocks (the former agent.json extended fields) + org edges
    *  (the former workforce/agents/_org.json topology) — moved onto the
@@ -148,12 +148,11 @@ export interface AgentComputed {
 export interface AgentMetaRow extends AgentIdentity, AgentOperational, AgentComputed {
   pk: `AGENT#${string}`;
   sk: "META";
-  identity_hash: string;
   updated_at: string;
-  /** ADR-0007 migration marker. Set to "ddb" on the first identity write
-   *  through agents-api; wf-seed-agents then stops overwriting this row's
-   *  identity from the bundled git tree (the two-master interregnum guard).
-   *  Absent = identity still git-sourced. Retires with the seed (step 6). */
+  /** Legacy seed-era attributes (ADR-0007 steps 1–6a). Still present on
+   *  rows written before the wf-seed-agents retirement; nothing reads or
+   *  writes them any more. */
+  identity_hash?: string;
   config_owner?: "ddb";
 }
 

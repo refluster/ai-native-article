@@ -495,13 +495,13 @@ async function listStats(
 // Operational fields (paused / archived / budget override) behave as before;
 // identity fields (model, bindings, streams, …) became writable when the
 // DDB row was promoted to the authoritative store. Every accepted mutation:
-//   1. passes write-time validation (shared/agent-config.ts) — schema checks
-//      ported from validate-agent-json.mjs plus the blast-radius guards;
+//   1. passes write-time validation (shared/agent-config.ts) — the schema
+//      checks that used to run in CI plus the blast-radius guards;
 //   2. appends an AUDIT# item (shared/agent-audit.ts) — the git-history
 //      replacement the weekly review digest compiles.
-// An identity write also stamps config_owner="ddb" so wf-seed-agents stops
-// re-imposing the bundled git tree on this row (two-master interregnum
-// guard; both retire with migration step 6).
+// (The step-1..6a transitional machinery — config_owner stamping and the
+// identity_hash write condition that guarded against a concurrent seed —
+// retired with the seed itself in step 6b. This Lambda is the only writer.)
 async function patchAgent(
   slug: string,
   event: APIGatewayProxyEventV2,
@@ -582,15 +582,7 @@ async function patchAgent(
   }
 
   const kind: AgentAuditKind = identityKeys.length > 0 ? "identity" : "operational";
-  const write: Record<string, unknown> =
-    kind === "identity" ? { ...patch, config_owner: "ddb" } : patch;
-
-  const updated = await updateOperational<AgentMetaRow>(
-    agentPk(slug),
-    "META",
-    write,
-    existing.identity_hash,
-  );
+  const updated = await updateOperational<AgentMetaRow>(agentPk(slug), "META", patch);
   await appendAgentAudit(slug, actorFromEvent(event), kind, changes);
   return reply(200, toApiView(updated));
 }
@@ -604,12 +596,9 @@ async function deleteAgent(
   if (existing.archived) {
     return reply(200, { ...toApiView(existing), already_archived: true });
   }
-  const updated = await updateOperational<AgentMetaRow>(
-    agentPk(slug),
-    "META",
-    { archived: true },
-    existing.identity_hash,
-  );
+  const updated = await updateOperational<AgentMetaRow>(agentPk(slug), "META", {
+    archived: true,
+  });
   await appendAgentAudit(slug, actorFromEvent(event), "operational", [
     { field: "archived", before: false, after: true },
   ]);

@@ -1,7 +1,6 @@
-# Builds the wf-messaging-reply Lambda artefact via esbuild AND copies the
-# workforce/agents/** tree into the artefact so the handler can read each
-# talent's system.md (persona) at runtime — same bundling pattern as
-# wf-seed-agents.
+# Builds the wf-messaging-reply Lambda artefact via esbuild. Pure code —
+# the persona is read from the AGENT#{slug}/META row (ADR-0007); the
+# agents-tree bundle copy retired with step 6b.
 #
 # CWD when SAM invokes this is workforce/lambdas/messaging-reply (CodeUri).
 # Dependencies come from the shared workforce/lambdas/node_modules — the
@@ -15,5 +14,3 @@ build-WfMessagingReplyFunction:
 		--format=esm \
 		--external:@aws-sdk/* \
 		--outfile=$(ARTIFACTS_DIR)/handler.mjs
-	mkdir -p $(ARTIFACTS_DIR)/agents
-	cp -R ../../agents/. $(ARTIFACTS_DIR)/agents/

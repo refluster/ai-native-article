@@ -144,7 +144,7 @@ Bindings are immutable per-PR (Rule 11 / R-N8: one prompt-version-bump per PR). 
 
 ## CI lint summary
 
-`workforce/scripts/validate-agent-json.mjs` enforces:
+The agents-api write-time validator (`workforce/lambdas/shared/agent-config.ts`, ADR-0007 — formerly the `validate-agent-json.mjs` CI lint) enforces:
 
 - shape rules (`S9-binding-*`)
 - executor × scheduler compatibility (`S9-binding-compat`)

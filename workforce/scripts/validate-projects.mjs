@@ -159,8 +159,13 @@ function main() {
       v("P-3", file, `owner_agent "${data.owner_agent}" must also appear in members[]`);
     }
 
-    // P-4
-    if (Array.isArray(data.members)) {
+    // P-4 — member slugs must reference existing agents. ADR-0007 step 6b
+    // retired the workforce/agents/ tree, so CI can no longer check
+    // existence against the filesystem (agents.size === 0); slug shape is
+    // still enforced above, and existence is enforced at runtime by the
+    // agents-api / DDB single source. The directory check only fires in a
+    // checkout that still carries a legacy tree.
+    if (Array.isArray(data.members) && agents.size > 0) {
       for (const m of data.members) {
         if (typeof m === "string" && !agents.has(m)) {
           v("P-4", file, `member "${m}" has no matching workforce/agents/${m}/ directory`);
