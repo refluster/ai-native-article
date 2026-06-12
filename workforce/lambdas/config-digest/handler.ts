@@ -33,6 +33,8 @@ import {
   type AgentAuditRow,
   type TruncatedAuditValue,
 } from "../shared/agent-audit.js";
+import { type SkillMetaRow, skillPk } from "../shared/skill-row.js";
+import { type SkillAuditRow } from "../shared/skill-audit.js";
 import { queryBySkPrefix, scanPrefix } from "../shared/ddb.js";
 import { createIssue } from "../shared/github.js";
 
@@ -56,6 +58,7 @@ export interface ConfigDigestResult {
   window_from: string;
   window_to: string;
   agents_changed: number;
+  skills_changed: number;
   mutations: number;
   issue_url?: string;
   export_arn?: string;
@@ -97,7 +100,34 @@ export async function handler(): Promise<ConfigDigestResult> {
     cursor = page.cursor;
   } while (cursor);
 
-  const mutations = [...byAgent.values()].reduce((n, rows) => n + rows.length, 0);
+  // ── 1b. the week's skill audits (ADR-0008 §4) — same shape, SKILL# pk ──
+  const bySkill = new Map<string, SkillAuditRow[]>();
+  let skillCursor: string | undefined;
+  do {
+    const page = await scanPrefix<SkillMetaRow>("SKILL#", "META", 100, skillCursor);
+    for (const meta of page.items) {
+      const audits = await queryBySkPrefix<SkillAuditRow>(
+        skillPk(meta.name),
+        AUDIT_SK_PREFIX,
+        AUDIT_PAGE_LIMIT,
+        false,
+      );
+      if (audits.length >= AUDIT_PAGE_LIMIT) {
+        throw new Error(
+          `config-digest: SKILL#${meta.name} audit partition returned a full page (${AUDIT_PAGE_LIMIT}); cannot prove window completeness — paginate the audit query`,
+        );
+      }
+      const inWindow = audits
+        .filter((a) => a.at >= fromIso && a.at <= toIso)
+        .sort((a, b) => (a.at < b.at ? -1 : 1));
+      if (inWindow.length > 0) bySkill.set(meta.name, inWindow);
+    }
+    skillCursor = page.cursor;
+  } while (skillCursor);
+
+  const mutations =
+    [...byAgent.values()].reduce((n, rows) => n + rows.length, 0) +
+    [...bySkill.values()].reduce((n, rows) => n + rows.length, 0);
 
   // ── 2. durability export (Decision §7) — runs on quiet weeks too ──────
   const exportArn = await exportTable(toIso);
@@ -112,13 +142,14 @@ export async function handler(): Promise<ConfigDigestResult> {
       window_from: fromIso,
       window_to: toIso,
       agents_changed: 0,
+      skills_changed: 0,
       mutations: 0,
       export_arn: exportArn,
     };
   }
 
-  const title = `Weekly agent-config digest — ${fromIso.slice(0, 10)} → ${toIso.slice(0, 10)}`;
-  const body = renderDigest(byAgent, fromIso, toIso, exportArn);
+  const title = `Weekly config digest — ${fromIso.slice(0, 10)} → ${toIso.slice(0, 10)}`;
+  const body = renderDigest(byAgent, bySkill, fromIso, toIso, exportArn);
   const issue = await createIssue({
     owner: GITHUB_OWNER,
     repo: GITHUB_REPO,
@@ -133,6 +164,7 @@ export async function handler(): Promise<ConfigDigestResult> {
       from: fromIso,
       to: toIso,
       agents_changed: byAgent.size,
+      skills_changed: bySkill.size,
       mutations,
       issue_url: issue.url,
     }),
@@ -142,6 +174,7 @@ export async function handler(): Promise<ConfigDigestResult> {
     window_from: fromIso,
     window_to: toIso,
     agents_changed: byAgent.size,
+    skills_changed: bySkill.size,
     mutations,
     issue_url: issue.url,
     export_arn: exportArn,
@@ -197,12 +230,13 @@ function renderChange(c: AgentAuditChange): string {
 
 export function renderDigest(
   byAgent: ReadonlyMap<string, readonly AgentAuditRow[]>,
+  bySkill: ReadonlyMap<string, readonly SkillAuditRow[]>,
   fromIso: string,
   toIso: string,
   exportArn: string,
 ): string {
   const lines: string[] = [
-    `Weekly agent-config review (ADR-0007 §5). Window: \`${fromIso}\` → \`${toIso}\`.`,
+    `Weekly config review (agents: ADR-0007 §5; skills: ADR-0008 §4). Window: \`${fromIso}\` → \`${toIso}\`.`,
     "",
     "Every entry below is a config mutation written through agents-api and",
     "validated by the write-time guards; this digest is the post-hoc human",
@@ -214,6 +248,17 @@ export function renderDigest(
   for (const slug of slugs) {
     const rows = byAgent.get(slug)!;
     lines.push(`## ${slug} — ${rows.length} mutation(s)`);
+    lines.push("");
+    for (const row of rows) {
+      lines.push(`- \`${row.at}\` · ${row.kind} · actor \`${shortActor(row.actor)}\``);
+      for (const c of row.changes) lines.push(renderChange(c));
+    }
+    lines.push("");
+  }
+  const skillNames = [...bySkill.keys()].sort();
+  for (const name of skillNames) {
+    const rows = bySkill.get(name)!;
+    lines.push(`## skill:${name} — ${rows.length} mutation(s)`);
     lines.push("");
     for (const row of rows) {
       lines.push(`- \`${row.at}\` · ${row.kind} · actor \`${shortActor(row.actor)}\``);

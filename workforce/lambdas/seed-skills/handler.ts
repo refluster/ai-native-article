@@ -1,13 +1,12 @@
 // wf-seed-skills Lambda handler.
 //
-// Mirror of seed-agents/handler.ts for the skill repository. Reads
-// workforce/skills/{name}/{SKILL.md, meta.json} from the deployed bundle
-// (the Makefile builder copies the tree into ARTIFACTS_DIR/skills/) and
-// upserts SKILL#{name}/META rows in the workforce DDB table.
+// Reads workforce/skills/{name}/{SKILL.md, meta.json} from the deployed
+// bundle (the Makefile builder copies the tree into ARTIFACTS_DIR/skills/)
+// and registers SKILL#{name}/META rows in the workforce DDB table.
 //
-// Identity-hash gates idempotency: an unchanged file set is a no-op.
-// Operational fields (improvement_agent_override) preserved on re-seed.
-// Computed fields (invocations_this_month, last_invoked_at) preserved.
+// ADR-0008: CREATE-ONLY. The row is authoritative for judgment-side fields
+// after first seed (mutations flow through agents-api PATCH /skills/{name}),
+// so existing rows are never overwritten — only new skill folders create.
 //
 // Invoked automatically by the wf-seed-skills-postdeploy-{stage}
 // EventBridge rule on every successful stack CREATE/UPDATE. Operator
@@ -86,7 +85,13 @@ async function seedOne(name: string): Promise<"created" | "updated" | "noop"> {
   const hash = skillIdentityHash(identity);
 
   const existing = await getItem<SkillMetaRow>(skillPk(name), "META");
-  if (existing && existing.identity_hash === hash) {
+  // ADR-0008 Decision §5: the seed is CREATE-ONLY. Judgment-side fields
+  // (body / owners / status / …) are API-writable on the live row, so an
+  // upsert from the git copy on the next deploy would silently revert
+  // those edits — the exact two-master clobber ADR-0007 retired on the
+  // agent side. An existing row is therefore never touched, regardless of
+  // how the git folder has drifted; new skill folders still register here.
+  if (existing) {
     return "noop";
   }
 
@@ -95,14 +100,12 @@ async function seedOne(name: string): Promise<"created" | "updated" | "noop"> {
     pk: skillPk(name),
     sk: "META",
     ...identity,
-    improvement_agent_override: existing?.improvement_agent_override,
-    invocations_this_month: existing?.invocations_this_month ?? 0,
-    last_invoked_at: existing?.last_invoked_at,
+    invocations_this_month: 0,
     identity_hash: hash,
     updated_at: now,
   };
   await putItem(row);
-  return existing ? "updated" : "created";
+  return "created";
 }
 
 function splitFrontmatter(raw: string): { description: string; body: string } {

@@ -28,6 +28,13 @@ Single-table design. PAY_PER_REQUEST billing. Point-in-time recovery ON. One GSI
 | `AGENT#{slug}` | `DELIV#{ulid}` | Deliverable metadata | `type` ∈ `{article, pr, plan, design-doc, launch-plan}`, `project_id`, `notion_page_id?`, `pr_url?`, `s3_key?`, `eval_score?`, `published_at?`, `status?` ∈ `{pending, ok, timeout}` (async PR path), `dispatched_at?`, `dispatch_branch?`, `error_message?`, `skill_name?`, `skill_version?` |
 | `AGENT#{slug}` | `POST#{ulid}` | Workforce-feed micro-post (Epic-011 Story 1, [#128](https://github.com/refluster/ai-native-article/issues/128)) | `agent_slug`, `posted_at` (ISO), `kind` ∈ `{reflection, friction, improvement, observation}`, `body_ref` (S3 key, `posts/{slug}/{yyyy}/{mm}/{ulid}.md`), `body_preview` (≤320 chars), `references[]` (≤3 ULIDs of EXEC/DELIV/TASK rows), `finish_reason` (LLM `stop_reason`), `tokens_in`, `tokens_out`, `skill_version`, `gsi3pk="FEED"`, `gsi3sk=posted_at`. `body_preview` is the prose-body inline preview, distinct from `artifact_ref.summary` (Epic-010 §8) — different domains (post body vs. arbitrary artefact), different idiomatic names. Bodies fit entirely in `body_preview` at the soft cap (~600 chars); only posts approaching the 2000-char hard cap need the S3 fetch. POST rows are written by the feed-post skill handler (`workforce/skills/feed-post/handler.ts`); the runner-wired path lands in Story 3 (#130). |
 
+#### Skill rows
+
+| `pk` | `sk` | Purpose | Key attributes |
+|---|---|---|---|
+| `SKILL#{name}` | `META` | Skill identity/config. **Judgment-side fields are authoritative here** ([ADR-0008](adr/adr-0008-skill-config-single-source.md)): `body` (the SKILL.md judgment text), `description`, `version`, `status` ∈ `{active, stale, deprecated}`, `owners[]`, `cost_class`, `improvement_agent`. Created by `wf-seed-skills` from a new `workforce/skills/{name}/` folder (CREATE-ONLY — never overwrites), mutated only via agents-api `PATCH /skills/{name}`. Code-side artefacts (write-scripts, `requires[]` → `skill-registry-generated.ts`, `archetype`, `deliverable`) stay git-owned. Operational: `improvement_agent_override?`. Computed: `invocations_this_month`, `last_invoked_at?` |
+| `SKILL#{name}` | `AUDIT#{iso-ts}#{nonce}` | Skill config-mutation audit trail (ADR-0008 §4) — append-only, same shape and long-string-digest rule as the agent AUDIT rows; compiled into the weekly `wf-config-digest` issue under `skill:{name}` | `name`, `at`, `actor`, `source` = `agents-api`, `kind` = `config`, `changes[]`. Read by `GET /skills/{name}/audit` (newest-first) |
+
 #### Task rows
 
 | `pk` | `sk` | Purpose | Key attributes |

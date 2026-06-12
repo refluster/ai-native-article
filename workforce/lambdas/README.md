@@ -35,8 +35,10 @@ lambdas/
 | `DELETE` | `/agents/{slug}` | AWS_IAM | Soft delete — sets `archived: true`. |
 | `GET` | `/skills` | public | List skills (paginated, `?status=`, `?owner=`, `?page_size=`, `?cursor=`). Epic-008 PR-D. |
 | `GET` | `/skills/{name}` | public | Single skill's full record (identity + body + operational + computed). Epic-008 PR-D. |
+| `PATCH` | `/skills/{name}` | AWS_IAM | Update judgment-side skill config ([ADR-0008](../docs/adr/adr-0008-skill-config-single-source.md)): `body`, `description`, `version`, `status`, `owners`, `cost_class`, `improvement_agent[_override]`. Validated by `shared/skill-config.ts`, audited to `SKILL#{name}/AUDIT#`. Code-side fields (write-scripts, `requires[]`, `archetype`, `deliverable`) are git-owned and rejected `400`. |
+| `GET` | `/skills/{name}/audit` | public | Skill config-mutation audit trail, newest-first (ADR-0008). |
 
-New personas are registered via `POST /agents` (ADR-0007 retired the `workforce/agents/` git tree; the DDB row family is the single authoritative store and agents-api the single writer — see [runbooks/agent-registration.md](../docs/runbooks/agent-registration.md)). Skills still follow the git discipline — no `POST /skills`.
+New personas are registered via `POST /agents` (ADR-0007 retired the `workforce/agents/` git tree; the DDB row family is the single authoritative store and agents-api the single writer — see [runbooks/agent-registration.md](../docs/runbooks/agent-registration.md)). Skills split along the Software 2.0 seam ([ADR-0008](../docs/adr/adr-0008-skill-config-single-source.md)): judgment-side fields mutate via `PATCH /skills/{name}` (DDB-authoritative, write = live on the next fire); write-scripts and `requires[]` stay git-owned, so a NEW skill still enters via the `cadence-forge` scaffold + PR — no `POST /skills`.
 
 ## Local dev
 
