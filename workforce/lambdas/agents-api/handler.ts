@@ -275,10 +275,12 @@ async function listAgents(
   const items = page.items
     .filter((r) => wantArchived || !r.archived)
     .filter((r) => !filterStream || r.streams.includes(filterStream))
-    // The inline persona prompt (ADR-0007 step 2) is KBs per agent — serve
-    // it on GET /agents/{slug}, keep the list payload lean.
+    // The inline persona prompt (ADR-0007 step 2) and the profile decks
+    // (step 6a) are KBs per agent — serve them on GET /agents/{slug},
+    // keep the list payload lean. Org edges stay: the directory and the
+    // manifest's org graph read them from the list.
     .map((r) => {
-      const { system_prompt: _sp, ...lean } = toApiView(r);
+      const { system_prompt: _sp, jd: _jd, identity: _id, experience: _ex, memory: _me, ...lean } = toApiView(r);
       return lean;
     });
 

@@ -19,6 +19,17 @@ const IDENTITY_KEYS = [
   "default_project",
   "streams",
   "created_at",
+  // ADR-0007 step 6a: profile blocks + org edges join the row. Adding
+  // them here changes every agent's hash exactly once — intended: the
+  // next post-deploy seed write-throughs all non-ddb-owned rows with
+  // the new fields (the final backfill before the tree retires at 6b).
+  "owner_email",
+  "jd",
+  "identity",
+  "experience",
+  "memory",
+  "reports_to",
+  "lateral",
 ] as const;
 
 export function identityHash(identity: AgentIdentity, systemMd: string): string {
