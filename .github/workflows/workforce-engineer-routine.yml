@@ -59,6 +59,11 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
+          # schedule / workflow_dispatch are "automation events": the action's
+          # default tag mode only handles @claude-mention events and fails its
+          # prepare step with "Tag mode cannot handle <event> events"
+          # (builder run #20, 2026-06-12 — the failure right after the OIDC fix).
+          mode: agent
           # The action reads its key from this input, not the env var.
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           direct_prompt: |
