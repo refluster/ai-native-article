@@ -38,9 +38,12 @@ const API_BASE = (
   process.env.VITE_WORKFORCE_AGENTS_API_BASE ??
   "https://workforce-api.kohuehara.xyz"
 ).replace(/\/+$/, "");
+// Newsletter only (the AuthorChip byline subset of a fully static site).
+// The workforce console stopped consuming a baked agents manifest with
+// ADR-0008 §7 — it reads GET /agents live, so emitting a snapshot there
+// would only re-create the staleness window the ADR removes.
 const OUT_PATHS = [
   join(REPO_ROOT, "newsletter", "app", "public", "workforce-agents.json"),
-  join(REPO_ROOT, "workforce", "app", "public", "workforce-agents.json"),
 ];
 const SKILLS_OUT_PATH = join(
   REPO_ROOT,
