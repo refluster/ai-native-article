@@ -1,19 +1,30 @@
 #!/usr/bin/env node
-// Build-time manifests of workforce personas + skills — reads
-// workforce/agents/{slug}/ and workforce/skills/{name}/, then emits
+// Build-time manifests of workforce personas + skills — emits
 // workforce-agents.json (both SPAs) and workforce-skills.json
 // (workforce SPA only) into the matching public/ directories.
 //
+// AGENTS are sourced from the live agents-api (ADR-0007 step 6a): the
+// AGENT#{slug}/META rows are the single source of truth and the
+// workforce/agents/ git tree is retired. The manifest keeps the exact
+// pre-6a shape (including the derived about / direct_reports / depth
+// fields) so neither SPA changes. Base URL resolution:
+//   WF_AGENTS_API_BASE > VITE_WORKFORCE_AGENTS_API_BASE >
+//   https://workforce-api.kohuehara.xyz   (the stable custom domain —
+//   workforce/infra/sam-api-domain — reachable without AWS credentials,
+//   which the article-site deploy does not have).
+// Fail-loud (C-4): an unreachable API turns the build red rather than
+// shipping a stale or empty manifest.
+//
+// SKILLS remain file-sourced from workforce/skills/ — ADR-0007 covers
+// agent config only; skills are still git-owned.
+//
 // Why both apps for agents? The workforce SPA renders the manifest in
 // full; the article SPA reads a small subset (slug / name / role) to
-// power the AuthorChip byline. Skills are workforce-only — the article
-// SPA doesn't surface them.
+// power the AuthorChip byline. Skills are workforce-only.
 //
 // Run automatically before `npm run dev` and `npm run build` via the
 // per-app `predev` / `prebuild` lifecycle hooks in each app's
-// package.json. When the live agents-api is configured the SPA still
-// reads these manifests for the static fields (about, system.md
-// snippet, the SKILL.md description) the API doesn't currently return.
+// package.json.
 
 import { readdirSync, readFileSync, statSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -21,9 +32,12 @@ import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..", "..");
-const AGENTS_DIR = join(REPO_ROOT, "workforce", "agents");
 const SKILLS_DIR = join(REPO_ROOT, "workforce", "skills");
-const ORG_PATH = join(AGENTS_DIR, "_org.json");
+const API_BASE = (
+  process.env.WF_AGENTS_API_BASE ??
+  process.env.VITE_WORKFORCE_AGENTS_API_BASE ??
+  "https://workforce-api.kohuehara.xyz"
+).replace(/\/+$/, "");
 const OUT_PATHS = [
   join(REPO_ROOT, "newsletter", "app", "public", "workforce-agents.json"),
   join(REPO_ROOT, "workforce", "app", "public", "workforce-agents.json"),
@@ -36,54 +50,64 @@ const SKILLS_OUT_PATH = join(
   "workforce-skills.json",
 );
 
-function listSlugDirs() {
-  if (!existsSync(AGENTS_DIR)) return [];
-  return readdirSync(AGENTS_DIR)
-    .filter((name) => /^[a-z]+$/.test(name))
-    .filter((name) => statSync(join(AGENTS_DIR, name)).isDirectory())
-    .sort();
+async function apiGet(path) {
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`build-agent-manifest: GET ${url} -> HTTP ${res.status}`);
+  }
+  return res.json();
 }
 
-function loadOrgTopology() {
-  if (!existsSync(ORG_PATH)) return { topology: {} };
-  return JSON.parse(readFileSync(ORG_PATH, "utf8"));
+/** Page through GET /agents, then hydrate each slug via GET /agents/{slug}
+ *  (the list strips system_prompt + the profile decks to stay lean; the
+ *  detail route carries them). */
+async function fetchAgentRows() {
+  const summaries = [];
+  let cursor;
+  do {
+    const qs = new URLSearchParams({ page_size: "100" });
+    if (cursor) qs.set("cursor", cursor);
+    const page = await apiGet(`/agents?${qs}`);
+    summaries.push(...(page.items ?? []));
+    cursor = page.next_cursor;
+  } while (cursor);
+  if (summaries.length === 0) {
+    throw new Error(
+      "build-agent-manifest: agents-api returned 0 agents — refusing to ship an empty manifest (C-4)",
+    );
+  }
+  const details = await Promise.all(
+    summaries.map((s) => apiGet(`/agents/${encodeURIComponent(s.slug)}`)),
+  );
+  return details.sort((a, b) => a.slug.localeCompare(b.slug));
 }
 
-function loadOne(slug) {
-  const dir = join(AGENTS_DIR, slug);
-  const cfg = JSON.parse(readFileSync(join(dir, "agent.json"), "utf8"));
-  const systemMd = readFileSync(join(dir, "system.md"), "utf8");
-
-  // "About" snippet: first non-empty paragraph after the title block.
-  // Skips the H1 and any subsequent "You are X" framing line; takes the
-  // next prose paragraph that explains the role.
-  const aboutSnippet = pickAboutSnippet(systemMd);
-
+function toManifestAgent(row) {
   return {
-    slug: cfg.slug,
-    first_name: cfg.first_name,
-    last_name: cfg.last_name,
-    residence: cfg.residence,
-    role: cfg.role,
-    model: cfg.model,
-    prompt_version: cfg.prompt_version,
-    budget_monthly_usd: cfg.budget_monthly_usd,
-    default_project: cfg.default_project,
-    streams: cfg.streams,
-    bindings: cfg.bindings,
-    created_at: cfg.created_at,
-    about: aboutSnippet,
-    // Optional structured profile blocks — JD, OpenClaw IDENTITY, and the
-    // LinkedIn-style experience track record. Each is null-safe in the SPA;
-    // agents that haven't been backfilled simply render without the
-    // corresponding deck.
-    jd: cfg.jd ?? null,
-    identity: cfg.identity ?? null,
-    experience: cfg.experience ?? null,
-    // OpenClaw / Hermes MEMORY.md analogue — durable facts, decisions,
-    // lessons the persona has accumulated. Append-only; rendered
-    // newest-first on the profile.
-    memory: cfg.memory ?? null,
+    slug: row.slug,
+    first_name: row.first_name,
+    last_name: row.last_name,
+    residence: row.residence,
+    role: row.role,
+    model: row.model,
+    prompt_version: row.prompt_version,
+    // Manifest keeps the pre-6a field name; the row splits default/override.
+    budget_monthly_usd: row.budget_monthly_usd_default,
+    default_project: row.default_project,
+    streams: row.streams,
+    bindings: row.bindings,
+    created_at: row.created_at,
+    // "About" snippet: first prose paragraph of the persona prompt (the
+    // former system.md body, now row.system_prompt per ADR-0007).
+    about: pickAboutSnippet(row.system_prompt ?? ""),
+    // Optional structured profile blocks — JD, OpenClaw IDENTITY, the
+    // LinkedIn-style experience track record, and the MEMORY.md analogue.
+    // Each is null-safe in the SPA.
+    jd: row.jd ?? null,
+    identity: row.identity ?? null,
+    experience: row.experience ?? null,
+    memory: row.memory ?? null,
   };
 }
 
@@ -100,18 +124,18 @@ function pickAboutSnippet(md) {
   return "";
 }
 
-const slugs = listSlugDirs();
-const agents = slugs.map(loadOne);
+const agentRows = await fetchAgentRows();
+const slugs = agentRows.map((r) => r.slug);
+const agents = agentRows.map(toManifestAgent);
 
 // Merge org topology (reports_to / lateral) and compute direct_reports
 // as the inverse of reports_to. `depth` is derived from the same graph:
-// 0 for roots (reports_to=[]), 1 + min(parent depth) otherwise. This
-// replaces the previous hand-maintained `tier` field — a single edge
-// list is enough to recover both the layout row and the layer label.
-// Relationships live in _org.json so they're auditable as a single
-// graph; agent.json stays focused on per-agent config.
-const org = loadOrgTopology();
-const topology = org.topology ?? {};
+// 0 for roots (reports_to=[]), 1 + min(parent depth) otherwise. The edge
+// list lives on each agent's META row (ADR-0007 step 6a — formerly
+// workforce/agents/_org.json); the derivation is unchanged.
+const topology = Object.fromEntries(
+  agentRows.map((r) => [r.slug, { reports_to: r.reports_to ?? [], lateral: r.lateral ?? [] }]),
+);
 const directReports = Object.fromEntries(slugs.map((s) => [s, []]));
 for (const [child, edges] of Object.entries(topology)) {
   for (const parent of edges.reports_to ?? []) {

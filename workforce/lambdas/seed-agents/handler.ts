@@ -39,6 +39,19 @@ interface AgentJsonOnDisk {
   bindings: AgentBinding[];
   owner_email: string | null;
   created_at: string;
+  // ADR-0007 step 6a: profile blocks ride along into the row so the SPA
+  // manifest can build from the API once the tree retires.
+  jd?: Record<string, unknown> | null;
+  identity?: Record<string, unknown> | null;
+  experience?: Record<string, unknown> | null;
+  memory?: Record<string, unknown> | null;
+}
+
+/** workforce/agents/_org.json — the reporting graph, bundled alongside the
+ *  agent dirs. Step 6a copies each agent's edges onto its row; consumers
+ *  (the manifest builder) derive direct_reports / depth from them. */
+interface OrgTopologyOnDisk {
+  topology?: Record<string, { reports_to?: string[]; lateral?: string[] }>;
 }
 
 interface SeedResult {
@@ -52,11 +65,12 @@ const AGENTS_ROOT = process.env.AGENTS_ROOT ?? join(HERE, "agents");
 
 export async function handler(): Promise<SeedResult> {
   const slugDirs = await listAgentDirs(AGENTS_ROOT);
+  const org = await loadOrgTopology();
   const result: SeedResult = { upserts: [], errors: [], scanned: slugDirs.length };
 
   for (const slug of slugDirs) {
     try {
-      const action = await seedOne(slug);
+      const action = await seedOne(slug, org);
       result.upserts.push({ slug, action });
     } catch (err) {
       result.errors.push({
@@ -80,7 +94,23 @@ async function listAgentDirs(root: string): Promise<string[]> {
   return dirs.sort();
 }
 
-async function seedOne(slug: string): Promise<"created" | "updated" | "noop" | "ddb-owned"> {
+async function loadOrgTopology(): Promise<OrgTopologyOnDisk["topology"]> {
+  try {
+    const parsed = JSON.parse(
+      await readFile(join(AGENTS_ROOT, "_org.json"), "utf8"),
+    ) as OrgTopologyOnDisk;
+    return parsed.topology ?? {};
+  } catch {
+    // No _org.json in the bundle (pre-6a artefact) — rows seed without
+    // org edges; the manifest renders the flat fallback.
+    return {};
+  }
+}
+
+async function seedOne(
+  slug: string,
+  org: OrgTopologyOnDisk["topology"],
+): Promise<"created" | "updated" | "noop" | "ddb-owned"> {
   const dir = join(AGENTS_ROOT, slug);
   const cfg = JSON.parse(
     await readFile(join(dir, "agent.json"), "utf8"),
@@ -117,6 +147,15 @@ async function seedOne(slug: string): Promise<"created" | "updated" | "noop" | "
     // ADR-0007 step 2: the persona prompt lives inline on the META row so
     // wf-messaging-reply (and later the whole substrate) reads it from DDB.
     system_prompt: systemMd,
+    // ADR-0007 step 6a: profile blocks + org edges — the final pieces of
+    // the git tree — ride into the row so the manifest builds from the API.
+    owner_email: cfg.owner_email ?? null,
+    jd: cfg.jd ?? null,
+    identity: cfg.identity ?? null,
+    experience: cfg.experience ?? null,
+    memory: cfg.memory ?? null,
+    reports_to: org?.[slug]?.reports_to ?? [],
+    lateral: org?.[slug]?.lateral ?? [],
   };
   const hash = identityHash(identity, systemMd);
 

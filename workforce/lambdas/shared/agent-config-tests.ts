@@ -71,6 +71,19 @@ describe("validateIdentityPatch — scalar fields", () => {
     expect(rules({ system_prompt: "You are Sora, an editorial writer." })).toEqual([]);
   });
 
+  it("validates profile blocks and org edges (ADR-0007 step 6a)", () => {
+    expect(rules({ owner_email: 42 })).toContain("S14-owner-email");
+    expect(rules({ owner_email: null })).toEqual([]);
+    expect(rules({ jd: "not-an-object" })).toContain("S17-profile-block");
+    expect(rules({ jd: ["array"] })).toContain("S17-profile-block");
+    expect(rules({ jd: null })).toEqual([]);
+    expect(rules({ jd: { mission: "x".repeat(17 * 1024) } })).toContain("G3-profile-size");
+    expect(rules({ experience: { highlights: [] }, memory: { notes: [] } })).toEqual([]);
+    expect(rules({ reports_to: ["maya"], lateral: [] })).toEqual([]);
+    expect(rules({ reports_to: ["Maya!"] })).toContain("S18-org-edges");
+    expect(rules({ lateral: "maya" })).toContain("S18-org-edges");
+  });
+
   it("requires non-empty allowed streams", () => {
     expect(rules({ streams: [] })).toContain("S11-streams");
     expect(rules({ streams: ["editorial", "bogus"] })).toContain("S11-stream-value");

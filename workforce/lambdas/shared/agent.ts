@@ -113,6 +113,19 @@ export interface AgentIdentity {
    *  (migration step 2); optional until the backfill has run everywhere,
    *  required once the git tree retires (step 6). */
   system_prompt?: string;
+  /** Profile blocks (the former agent.json extended fields) + org edges
+   *  (the former workforce/agents/_org.json topology) — moved onto the
+   *  row by ADR-0007 step 6a so the SPA manifest can build from the API
+   *  and the git tree can retire. The SPA renders all of these
+   *  null-safe; consumers derive direct_reports / depth from the
+   *  reports_to edge list. */
+  owner_email?: string | null;
+  jd?: Record<string, unknown> | null;
+  identity?: Record<string, unknown> | null;
+  experience?: Record<string, unknown> | null;
+  memory?: Record<string, unknown> | null;
+  reports_to?: string[];
+  lateral?: string[];
 }
 
 /** Operational fields — DDB-mutable via the agents-api PATCH endpoint. */

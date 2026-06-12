@@ -47,7 +47,19 @@ export const IDENTITY_PATCHABLE_FIELDS = [
   "streams",
   "bindings",
   "system_prompt",
+  "owner_email",
+  "jd",
+  "identity",
+  "experience",
+  "memory",
+  "reports_to",
+  "lateral",
 ] as const satisfies readonly (keyof AgentIdentity)[];
+
+// Blast-radius ceiling per profile block (jd / identity / experience /
+// memory — ADR-0007 step 6a). These are render-only SPA decks; 16 KB
+// serialized bounds an unreviewed write far below the DDB item limit.
+export const PROFILE_BLOCK_MAX_CHARS = 16 * 1024;
 
 // Blast-radius ceiling on the persona prompt (ADR-0007 step 2). The live
 // system.md bodies are 1–4 KB; 32 KB bounds an unreviewed write well below
@@ -62,6 +74,7 @@ export type IdentityPatchableField = (typeof IDENTITY_PATCHABLE_FIELDS)[number];
 // check and retires there in migration step 6.
 export const W3_BUDGET_CAP_USD = 160;
 
+const SLUG = /^[a-z]+$/;
 const MODEL = /^(anthropic|azure|claude-code):[a-z0-9-]+(?:-[a-z0-9.]+)*$/;
 const SEMVER = /^\d+\.\d+\.\d+$/;
 const CRON = /^cron\(([^)]+)\)$/;
@@ -162,6 +175,34 @@ export function validateIdentityPatch(
       v("S9-bindings", "bindings", "bindings must be an array");
     } else {
       patch.bindings.forEach((b, i) => out.push(...validateBinding(b, i, ctx)));
+    }
+  }
+  if ("owner_email" in patch) {
+    if (patch.owner_email !== null && typeof patch.owner_email !== "string") {
+      v("S14-owner-email", "owner_email", "owner_email must be null or string");
+    }
+  }
+  // Profile blocks (ADR-0007 step 6a): null or a plain object, bounded by
+  // the G3 size ceiling. Contents are SPA-rendered decks, not contracts —
+  // structural freedom is intentional, the ceiling is the guard.
+  for (const field of ["jd", "identity", "experience", "memory"] as const) {
+    if (!(field in patch)) continue;
+    const val = patch[field];
+    if (val === null) continue;
+    if (typeof val !== "object" || Array.isArray(val)) {
+      v("S17-profile-block", field, `${field} must be null or a plain object`);
+    } else if (JSON.stringify(val).length > PROFILE_BLOCK_MAX_CHARS) {
+      v("G3-profile-size", field, `${field} exceeds the ${PROFILE_BLOCK_MAX_CHARS}-char serialized ceiling`);
+    }
+  }
+  // Org edges: slug lists. Edge targets are validated as slug-shaped only —
+  // cross-row existence (and the no-cycle property) is enforced by the
+  // manifest builder's depth derivation, which throws on a broken graph.
+  for (const field of ["reports_to", "lateral"] as const) {
+    if (!(field in patch)) continue;
+    const val = patch[field];
+    if (!Array.isArray(val) || val.some((s) => typeof s !== "string" || !SLUG.test(s))) {
+      v("S18-org-edges", field, `${field} must be an array of agent slugs`);
     }
   }
   return out;
