@@ -1362,14 +1362,25 @@ Resources:
         - !Ref WfAlarmTopic
 
   # The review step must not silently lapse the way the manual seed did
-  # (ADR-0007 §5). Eight consecutive days without a single invocation means
+  # (ADR-0007 §5). Seven consecutive days without a single invocation means
   # the weekly EventBridge tick is broken — breaching on missing data is
   # what makes the silence loud.
+  #
+  # Window sizing: CloudWatch hard-caps EvaluationPeriods * Period at
+  # 604800s (1 week) for period >= 3600. The original 8-day window
+  # (8 x 86400) violated the cap and rolled back EVERY wf-data-plane
+  # deploy from ADR-0007 step 4 through 6b (runs 116-119) — which is how
+  # the step-6a backfill never reached prod (FU-025). 7 daily buckets is
+  # the widest legal window. Known caveat: the previous Monday-00:30-UTC
+  # tick's bucket leaves the window at Monday 00:00 UTC, so this can
+  # false-breach for ~30 min/week until the next tick lands; it
+  # self-resolves (FU-026 tracks a heartbeat-metric design if the weekly
+  # page proves noisy).
   WfConfigDigestMissedRunAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub wf-config-digest-missed-run-alarm-${Stage}
-      AlarmDescription: !Sub No wf-config-digest-${Stage} invocation in 8 days — the weekly config review is not running.
+      AlarmDescription: !Sub No wf-config-digest-${Stage} invocation in 7 days — the weekly config review is not running.
       Namespace: AWS/Lambda
       MetricName: Invocations
       Dimensions:
@@ -1377,7 +1388,7 @@ Resources:
           Value: !Ref WfConfigDigestFunction
       Statistic: Sum
       Period: 86400
-      EvaluationPeriods: 8
+      EvaluationPeriods: 7
       Threshold: 1
       ComparisonOperator: LessThanThreshold
       TreatMissingData: breaching
