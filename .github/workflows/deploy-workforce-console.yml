@@ -6,7 +6,6 @@ on:
     paths:
       - 'workforce/app/**'
       - 'packages/shared/**'
-      - 'workforce/agents/**'         # manifest contents
       - 'workforce/scripts/build-agent-manifest.mjs'
       - '.github/workflows/deploy-workforce-console.yml'
   workflow_dispatch:

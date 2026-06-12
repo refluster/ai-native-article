@@ -1,8 +1,8 @@
 // Unit tests for the ADR-0007 config write path in agents-api/handler.ts:
 //
 //   - PATCH /agents/{slug} accepts identity fields, validates them via
-//     shared/agent-config.ts, stamps config_owner="ddb", and appends an
-//     AUDIT# item with the field-level diff + IAM actor
+//     shared/agent-config.ts, and appends an AUDIT# item with the
+//     field-level diff + IAM actor
 //   - invalid configs are rejected 422 with the violation list and write
 //     NOTHING (no row update, no audit item)
 //   - operational PATCH / DELETE also audit (every config mutation does)
@@ -45,15 +45,11 @@ vi.mock("../shared/ddb.js", () => ({
   }),
   queryBySkPrefix: vi.fn(async () => []),
   queryByGsi: vi.fn(async () => []),
-  // Merge-updating fake with the identity_hash optimistic-concurrency
-  // condition the real updateOperational enforces.
+  // Merge-updating fake of updateOperational.
   updateOperational: vi.fn(
-    async (pk: string, sk: string, patch: Record<string, unknown>, expectedHash?: string) => {
+    async (pk: string, sk: string, patch: Record<string, unknown>) => {
       const row = rows.get(key(pk, sk));
       if (!row) throw new Error("no row");
-      if (expectedHash !== undefined && row.identity_hash !== expectedHash) {
-        throw new Error("ConditionalCheckFailed");
-      }
       for (const [k, v] of Object.entries(patch)) {
         if (v !== undefined) row[k] = v;
       }
@@ -152,7 +148,6 @@ function seedAgent(slug: string, over: Record<string, unknown> = {}): AnyRow {
     runs_this_month: 0,
     cost_this_month_usd: 0,
     deliv_count_total: 0,
-    identity_hash: "hash-v1",
     updated_at: "2026-06-01T00:00:00.000Z",
     ...over,
   };
@@ -177,7 +172,7 @@ beforeEach(() => {
 });
 
 describe("PATCH /agents/{slug} — identity writes (ADR-0007)", () => {
-  it("accepts a valid identity patch, stamps config_owner, audits actor + diff", async () => {
+  it("accepts a valid identity patch and audits actor + diff", async () => {
     seedAgent("sora");
     const { status, json } = await call(
       makeEvent("PATCH", "PATCH /agents/{slug}", "sora", {
@@ -187,9 +182,6 @@ describe("PATCH /agents/{slug} — identity writes (ADR-0007)", () => {
     );
     expect(status).toBe(200);
     expect(json.model).toBe("anthropic:claude-opus-4-8");
-
-    const row = rows.get(key("AGENT#sora", "META"))!;
-    expect(row.config_owner).toBe("ddb");
 
     const audits = auditRows("sora");
     expect(audits).toHaveLength(1);
@@ -285,7 +277,6 @@ describe("PATCH /agents/{slug} — identity writes (ADR-0007)", () => {
     );
     expect(status).toBe(200);
     expect(auditRows("sora")).toHaveLength(0);
-    expect(rows.get(key("AGENT#sora", "META"))!.config_owner).toBeUndefined();
   });
 });
 
@@ -300,8 +291,6 @@ describe("PATCH /agents/{slug} — operational writes still audit", () => {
     expect(audits).toHaveLength(1);
     expect(audits[0]!.kind).toBe("operational");
     expect(audits[0]!.changes).toEqual([{ field: "paused", before: false, after: true }]);
-    // operational-only writes do NOT flip config ownership
-    expect(rows.get(key("AGENT#sora", "META"))!.config_owner).toBeUndefined();
   });
 
   it("type-checks operational fields (W-4: garbage rejected at the boundary)", async () => {

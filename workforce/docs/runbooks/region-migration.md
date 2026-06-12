@@ -12,7 +12,7 @@ CloudFormation stacks are **per-region**. Changing `region` in `workforce/infra/
 - The **old region** still has the original stack alive, including:
   - DDB table `wf-table-{stage}` (with PITR — so deletion has a recovery window)
   - S3 bucket `wf-bucket-{acct}-{region}-{stage}` (with Versioning + retain-on-delete)
-  - Lambdas: `wf-agent-runner-{stage}`, `wf-orchestrator-{stage}`, `wf-agents-api-{stage}`, `wf-seed-agents-{stage}`, `wf-seed-skills-{stage}`, `wf-pre-signup-{stage}`
+  - Lambdas: `wf-agent-runner-{stage}`, `wf-orchestrator-{stage}`, `wf-agents-api-{stage}`, `wf-seed-skills-{stage}`, `wf-pre-signup-{stage}`
   - EventBridge rule `wf-orchestrator-tick-{stage}` — may still be `Enabled: true` and firing
   - SNS alarm topic, AWS Budget
   - CloudWatch log groups under `/aws/lambda/wf-*`
@@ -71,7 +71,7 @@ Each item should pass before declaring the migration done.
     --query 'Stacks[0].StackStatus'
   # Expected: "CREATE_COMPLETE" or "UPDATE_COMPLETE"
   ```
-- **Seed Lambdas ran.** Post-deploy EventBridge rules fire `wf-seed-agents-{stage}` and `wf-seed-skills-{stage}`. Confirm `AGENT#*/META` and `SKILL#*/META` rows exist:
+- **Seed Lambda ran / data restored.** The post-deploy EventBridge rule fires `wf-seed-skills-{stage}`; agent rows are NOT seeded from files any more (ADR-0007 — restore them from the weekly DDB export / PITR instead). Confirm `AGENT#*/META` and `SKILL#*/META` rows exist:
   ```bash
   aws dynamodb scan --table-name wf-table-prod --region $NEW \
     --query 'Items[?sk.S==`META`].pk.S' --output text

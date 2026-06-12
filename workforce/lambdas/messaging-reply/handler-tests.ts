@@ -1,6 +1,6 @@
 // Unit tests for wf-messaging-reply (Epic-013 Story 3).
 //
-// The shared messaging store, the Claude wrapper, persona file reads, and
+// The shared messaging store, the Claude wrapper, the persona row read, and
 // CloudWatch are all mocked — these tests pin the handler's decision logic:
 // loop-safety skips, the per-thread budget, the W-1 guards (artefact / empty /
 // truncation), the __NO_REPLY_NEEDED__ sentinel, and the happy-path write.
@@ -46,21 +46,11 @@ vi.mock("../shared/memory.js", () => ({
   readChunk: (...args: unknown[]) => readChunk(...args),
 }));
 
-// ADR-0007 step 2: the persona is DDB-first (AGENT#{slug}/META row). The
-// ddb mock serves that path; the fs mock below remains as the transitional
-// bundled-file fallback (rows the seed has not backfilled yet).
+// ADR-0007: the persona is DDB-only (AGENT#{slug}/META row). The bundled
+// file fallback retired with step 6b — a missing row/prompt throws.
 const getItem = vi.fn();
 vi.mock("../shared/ddb.js", () => ({
   getItem: (...args: unknown[]) => getItem(...args),
-}));
-
-const readFile = vi.fn(async (p: string) => {
-  if (p.endsWith("agent.json")) return JSON.stringify({ model: "anthropic:claude-sonnet-4-6" });
-  if (p.endsWith("system.md")) return "You are Maya, a backend engineer on the workforce.";
-  throw new Error(`unexpected read: ${p}`);
-});
-vi.mock("node:fs/promises", () => ({
-  readFile: (...args: unknown[]) => readFile(...(args as [string])),
 }));
 
 import { handler } from "./handler.js";
@@ -70,7 +60,7 @@ const MAYA_META = {
   sk: "META",
   slug: "maya",
   model: "anthropic:claude-sonnet-4-6",
-  system_prompt: "You are Maya, a backend engineer on the workforce. [ddb persona]",
+  system_prompt: "You are Maya, a backend engineer on the workforce.",
 };
 
 const NOW = new Date().toISOString();
@@ -107,7 +97,6 @@ beforeEach(() => {
   readChunk.mockReset();
   getItem.mockReset();
   getItem.mockResolvedValue(MAYA_META);
-  readFile.mockClear();
 });
 
 afterEach(() => {
@@ -132,7 +121,7 @@ describe("happy path", () => {
       finish_reason: "end_turn",
       tokens_in: 120,
       tokens_out: 18,
-      skill_version: "0.3.0",
+      skill_version: "0.3.1",
     });
     // The persona system prompt is fed into the LLM system prompt.
     expect(complete.mock.calls[0]![0].system).toContain("You are Maya");
@@ -140,40 +129,34 @@ describe("happy path", () => {
   });
 });
 
-describe("persona source (ADR-0007 step 2)", () => {
-  it("reads model + system_prompt from the AGENT# META row, not the bundle", async () => {
+describe("persona source (ADR-0007 — DDB only)", () => {
+  it("reads model + system_prompt from the AGENT# META row", async () => {
     getThreadDetail.mockResolvedValueOnce(thread([{ from: "operator", body: "ping" }]));
     complete.mockResolvedValueOnce(completion("pong."));
 
     await handler({ thread_id: "01THREAD", addressed_slug: "maya" });
 
     expect(getItem).toHaveBeenCalledWith("AGENT#maya", "META");
-    expect(complete.mock.calls[0]![0].system).toContain("[ddb persona]");
-    expect(readFile).not.toHaveBeenCalled();
+    expect(complete.mock.calls[0]![0].system).toContain("You are Maya");
   });
 
-  it("falls back to the bundled files when the row lacks system_prompt", async () => {
+  it("throws (W-4) when the row lacks system_prompt — no file fallback exists", async () => {
     getItem.mockResolvedValueOnce({ ...MAYA_META, system_prompt: undefined });
     getThreadDetail.mockResolvedValueOnce(thread([{ from: "operator", body: "ping" }]));
-    complete.mockResolvedValueOnce(completion("pong."));
 
-    await handler({ thread_id: "01THREAD", addressed_slug: "maya" });
-
-    const system = complete.mock.calls[0]![0].system as string;
-    expect(system).toContain("You are Maya");
-    expect(system).not.toContain("[ddb persona]");
-    expect(readFile).toHaveBeenCalledTimes(2); // agent.json + system.md
+    await expect(handler({ thread_id: "01THREAD", addressed_slug: "maya" })).rejects.toThrow(
+      /lacks model\/system_prompt/,
+    );
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 
-  it("falls back to the bundled files when the row is missing entirely", async () => {
+  it("throws when the META row is missing entirely", async () => {
     getItem.mockResolvedValueOnce(undefined);
     getThreadDetail.mockResolvedValueOnce(thread([{ from: "operator", body: "ping" }]));
-    complete.mockResolvedValueOnce(completion("pong."));
 
-    const res = await handler({ thread_id: "01THREAD", addressed_slug: "maya" });
-
-    expect(res.status).toBe("ok");
-    expect(readFile).toHaveBeenCalledTimes(2);
+    await expect(handler({ thread_id: "01THREAD", addressed_slug: "maya" })).rejects.toThrow(
+      /AGENT#maya\/META row not found/,
+    );
   });
 });
 

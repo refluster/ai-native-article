@@ -90,7 +90,7 @@ Verbs keep the lanes apart: Priya **decides**, Hana **runs**, Freya/Sana
 
 The four personas were sized to fit the **existing** W-3 headroom rather than
 raise the cap autonomously (raising `W3_CAP` is a Zone-A change to
-`validate-agent-json.mjs` + `governance.md`):
+the agents-api write-time validator (`shared/agent-config.ts`, ADR-0007) + `governance.md`):
 
 | Persona | Model | Budget/mo |
 |---|---|---|

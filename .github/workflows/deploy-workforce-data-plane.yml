@@ -3,8 +3,8 @@ name: Deploy workforce data plane (SAM)
 # Auto-deploys the wf-data-plane-{stage} CloudFormation stack on changes
 # to anything the agent-runner / orchestrator Lambdas bundle: SAM template,
 # samconfig, lambda sources, skill folders (handler.ts via the auto-registry),
-# agent folders (system.md is copied into the runner bundle), and the
-# skill-registry codegen script.
+# and the skill-registry codegen script. (The workforce/agents/ tree
+# retired with ADR-0007 step 6b — agent config lives in DDB.)
 #
 # AWS auth: GitHub OIDC → IAM role assumption (secrets.AWS_ROLE_ARN). No
 # long-lived access keys in repo secrets.
@@ -19,7 +19,6 @@ on:
       - 'workforce/infra/sam/samconfig.toml'
       - 'workforce/lambdas/**'
       - 'workforce/skills/**'
-      - 'workforce/agents/**'
       - 'workforce/scripts/build-skill-registry.mjs'
       - '.github/workflows/deploy-workforce-data-plane.yml'
   workflow_dispatch:

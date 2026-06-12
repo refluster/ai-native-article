@@ -881,61 +881,6 @@ Resources:
       AlarmActions:
         - !Ref WfAlarmTopic
 
-  # --- Agents seed Lambda (Epic-007) -----------------------------------------
-  # Reads workforce/agents/{slug}/{agent.json, system.md} from the deployed
-  # bundle (the Makefile builder copies the tree into ARTIFACTS_DIR/agents/)
-  # and upserts AGENT#{slug}/META rows. Identity-hash gates idempotency:
-  # an unchanged file set is a no-op. Operational fields preserved on
-  # re-seed.
-  #
-  # Invoked automatically on every successful stack CREATE/UPDATE via the
-  # PostDeploy EventBridge rule below (Epic-007 Q1 default-(b): EventBridge
-  # rule on CloudFormation Stack Status Change). The Lambda is idempotent
-  # via identity_hash, so over-firing is harmless.
-  WfSeedAgentsFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
-    Properties:
-      FunctionName: !Sub wf-seed-agents-${Stage}
-      CodeUri: ../../lambdas/seed-agents
-      Handler: handler.handler
-      Description: Workforce agents seed. Files -> DDB AGENT#{slug}/META. See Epic-007.
-      MemorySize: 512
-      Timeout: 60
-      Policies:
-        - Statement:
-            - Sid: SeedAgentsTableAccess
-              Effect: Allow
-              Action:
-                - dynamodb:GetItem
-                - dynamodb:PutItem
-              Resource:
-                - !GetAtt WfTable.Arn
-      Events:
-        PostDeploy:
-          # Fires after every successful stack CREATE/UPDATE of *this*
-          # data-plane stack. Stack-id is a prefix filter because the
-          # full ARN includes a UUID suffix. The seed Lambda is
-          # idempotent, so any spurious match is a cheap no-op.
-          Type: EventBridgeRule
-          Properties:
-            RuleName: !Sub wf-seed-agents-postdeploy-${Stage}
-            Pattern:
-              source:
-                - aws.cloudformation
-              detail-type:
-                - CloudFormation Stack Status Change
-              detail:
-                stack-id:
-                  - prefix: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/wf-data-plane-${Stage}/
-                status-details:
-                  status:
-                    - CREATE_COMPLETE
-                    - UPDATE_COMPLETE
-      Tags:
-        workforce: !Ref Stage
-
   # --- Backfill: TASK rows missing project_id (Epic-010 Story 1-B) --------
   # Operator-invoked one-shot. Scans TASK#*/META rows; for each missing
   # `project_id`, fills in `self/{agent_slug}` under a conditional write
@@ -1147,27 +1092,9 @@ Resources:
       Tags:
         workforce: !Ref Stage
 
-  WfSeedAgentsErrorsAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub wf-seed-agents-errors-alarm-${Stage}
-      AlarmDescription: !Sub Errors > 0 on wf-seed-agents-${Stage} over 5 minutes.
-      Namespace: AWS/Lambda
-      MetricName: Errors
-      Dimensions:
-        - Name: FunctionName
-          Value: !Ref WfSeedAgentsFunction
-      Statistic: Sum
-      Period: 300
-      EvaluationPeriods: 1
-      Threshold: 0
-      ComparisonOperator: GreaterThanThreshold
-      TreatMissingData: notBreaching
-      AlarmActions:
-        - !Ref WfAlarmTopic
-
   # --- Skills seed Lambda (Epic-008 PR-D) ------------------------------------
-  # Mirror of WfSeedAgentsFunction for the skill repository. Reads
+  # Skill-repository seeder (the agents-side twin retired with ADR-0007
+  # step 6b — agent config now lives in DDB, written via agents-api). Reads
   # workforce/skills/{name}/{SKILL.md, meta.json} from the deployed bundle
   # (Makefile builder copies the tree) and upserts SKILL#{name}/META rows.
   # Identity_hash gates idempotency; operational fields preserved on re-seed.
@@ -1193,7 +1120,7 @@ Resources:
                 - !GetAtt WfTable.Arn
       Events:
         PostDeploy:
-          # Mirror of WfSeedAgentsFunction.Events.PostDeploy. Fires on
+          # Post-deploy trigger (same pattern the retired agents seed used). Fires on
           # CREATE_COMPLETE / UPDATE_COMPLETE of this stack.
           Type: EventBridgeRule
           Properties:

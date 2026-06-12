@@ -21,7 +21,6 @@ lambdas/
 │   └── identity-hash.ts        sha256 over identity fields + system.md (seed idempotency)
 ├── agents-api/                 wf-agents-api Lambda — CRUD over AGENT#{slug}/META rows
 │   └── handler.ts
-└── seed-agents/                wf-seed-agents Lambda — file -> DDB upsert (SAM wiring in a follow-up PR)
     └── handler.ts
 ```
 
@@ -78,27 +77,11 @@ R-N8 (data-shape uniformity) holds at the build layer — both functions share t
 
 The CloudFormation output `AgentsApiUrl` gives the base URL of the HTTP API. The API has **no custom domain in v1** — the AWS-generated URL is the contract.
 
-## Seeding DDB
+## Agent rows — no seeding (ADR-0007)
 
-**Seed runs automatically on every `sam deploy`.** The SAM template wires an EventBridge rule `wf-seed-agents-postdeploy-{stage}` that fires on `CREATE_COMPLETE` / `UPDATE_COMPLETE` of the `wf-data-plane-{stage}` stack and invokes the seed Lambda. The Lambda is **idempotent** via `identity_hash` — an unchanged file set is a no-op, and operational fields set via the API (`paused`, `archived`, `*_override`) are preserved on re-seed.
+Agent identity/config lives in the `AGENT#{slug}/META` rows and is mutated only through `PATCH /agents/{slug}` on the agents-api (validated at the write boundary, appended to the `AUDIT#` trail, reviewed via the weekly config digest). The file-based seed (`wf-seed-agents` + `workforce/agents/**`) retired with ADR-0007 step 6b; durability is DDB PITR + the weekly `wf-config-digest` export to S3 `exports/` — environment rebuild = restore, not re-seed. Creating a brand-new agent is currently an operator action (direct row write or a future create API per the ADR); skills are still seeded from files by `wf-seed-skills` post-deploy.
 
-To verify after a deploy:
-
-```bash
-aws logs tail "/aws/lambda/wf-seed-agents-dev" --since 5m
-# expect: {"event":"seed-complete","result":{"upserts":[...],"errors":[],"scanned":5}}
-```
-
-To force a re-seed without redeploying (e.g., recovering after a manual DDB mutation), run the CLI:
-
-```bash
-node workforce/scripts/seed-agents.mjs dev    # default stage
-node workforce/scripts/seed-agents.mjs prod
-```
-
-The CLI is a thin wrapper that invokes `wf-seed-agents-{stage}` directly and pretty-prints the result.
-
-## Invocation (after seeding)
+## Invocation
 
 ```bash
 # Public read
