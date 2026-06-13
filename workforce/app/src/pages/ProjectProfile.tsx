@@ -390,7 +390,14 @@ function ExecutionHistoryPanel({ executions }: { executions: ProjectExecution[] 
                     <StatusBadge status={e.status} error={e.error} />
                   </td>
                   <td className="px-4 py-2 text-sm">
-                    {e.artifact_ref ? (
+                    {e.summary ? (
+                      <span
+                        className="font-wfmono text-xs text-wf-on-surface-variant"
+                        title={e.artifact_ref?.uri}
+                      >
+                        {e.summary.slice(0, 60)}
+                      </span>
+                    ) : e.artifact_ref ? (
                       <span
                         className="font-wfmono text-xs text-wf-on-surface-variant"
                         title={e.artifact_ref.uri}

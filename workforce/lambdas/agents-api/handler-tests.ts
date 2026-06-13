@@ -209,6 +209,7 @@ vi.mock("../shared/project.js", () => ({
     ended_at: string;
     status: string;
     artifact_ref?: unknown;
+    summary?: string;
     error?: string;
     execution_surface?: "lambda" | "client";
   }) => {
@@ -223,6 +224,7 @@ vi.mock("../shared/project.js", () => ({
       ended_at: input.ended_at,
       status: input.status,
       artifact_ref: input.artifact_ref,
+      summary: input.summary,
       error: input.error,
       execution_surface: input.execution_surface,
       gsi1pk: `AGENT#${input.agent_slug}`,
@@ -1325,6 +1327,54 @@ describe("POST /agents/{slug}/engagements (Engagements API — createEngagement)
     expect(body.engagement.project_id).toBe("asp-cloud");
     expect(body.engagement.agent_slug).toBe("nadia");
     expect(body.engagement.engagement_id).toMatch(/^[0-9A-Z]{26}$/);
+  });
+
+  it("persists and round-trips a top-level free-text summary (deliverables 'no summary' fix)", async () => {
+    const summary = "Reviewed PR #507: flagged the truncation guard gap, signed off after fix.";
+    const res = await handler(
+      postEvt("dario", { authorization: `Bearer ${TOKEN}` }, validBody({ summary })),
+    );
+    expect(statusOf(res)).toBe(201);
+    expect((bodyOf(res) as { engagement: { summary: string } }).engagement.summary).toBe(summary);
+  });
+
+  it("prefers the top-level summary over artifact.summary in the engagement view", async () => {
+    const res = await handler(
+      postEvt(
+        "dario",
+        { authorization: `Bearer ${TOKEN}` },
+        validBody({
+          summary: "business summary wins",
+          artifact: {
+            uri: "https://github.com/PSVL/asp-cloud/pull/42#issuecomment-1",
+            content_hash: "0".repeat(64),
+            content_type: "text/html",
+            size_bytes: 300,
+            summary: "artifact preview loses",
+          },
+        }),
+      ),
+    );
+    expect(statusOf(res)).toBe(201);
+    expect((bodyOf(res) as { engagement: { summary: string } }).engagement.summary).toBe(
+      "business summary wins",
+    );
+  });
+
+  it("slices an over-long summary to 512 chars", async () => {
+    const res = await handler(
+      postEvt("dario", { authorization: `Bearer ${TOKEN}` }, validBody({ summary: "x".repeat(600) })),
+    );
+    expect(statusOf(res)).toBe(201);
+    expect((bodyOf(res) as { engagement: { summary: string } }).engagement.summary.length).toBe(512);
+  });
+
+  it("drops a non-string / empty summary (view falls back to '')", async () => {
+    const res = await handler(
+      postEvt("dario", { authorization: `Bearer ${TOKEN}` }, validBody({ summary: "   " })),
+    );
+    expect(statusOf(res)).toBe(201);
+    expect((bodyOf(res) as { engagement: { summary: string } }).engagement.summary).toBe("");
   });
 
   it("L2-2: stamps execution_surface=client on the response engagement view", async () => {
