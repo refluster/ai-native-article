@@ -1220,6 +1220,7 @@ async function listProjectExecutions(
     status: r.status,
     used_credential_types: r.used_credential_types,
     artifact_ref: r.artifact_ref,
+    summary: r.summary,
     error: r.error,
   }));
   return reply(200, { items });
@@ -1432,6 +1433,7 @@ async function listAgentExecutions(
     status: r.status,
     used_credential_types: r.used_credential_types,
     artifact_ref: r.artifact_ref,
+    summary: r.summary,
     error: r.error,
   }));
   return reply(200, { items });
@@ -1481,6 +1483,7 @@ async function getAgentRecall(
     ended_at: row.ended_at,
     status: row.status,
     artifact_ref: row.artifact_ref,
+    summary: row.summary,
     error: row.error,
     score,
   }));
@@ -1970,7 +1973,9 @@ function toEngagementView(row: ExecutionRow): EngagementView {
     // Legacy rows (pre-L2-2) are Lambda-side by construction — the
     // client-side write path is what introduced the field.
     execution_surface: row.execution_surface ?? "lambda",
-    summary: row.artifact_ref?.summary ?? "",
+    // Prefer the explicit top-level business summary; fall back to the
+    // artifact preview for CCR/legacy rows that only carried an artifact.
+    summary: row.summary ?? row.artifact_ref?.summary ?? "",
     artifact: row.artifact_ref,
     error: row.error,
   };
@@ -2074,6 +2079,17 @@ async function createEngagementRoute(
     };
   }
 
+  // Optional top-level business summary of the engagement — what the unit of
+  // work accomplished, in the client's words. This is what the portfolio /
+  // RUNS·DELIVERABLES UI renders; without it an artifact-less engagement
+  // (e.g. a pr-review) shows "no summary". Distinct from artifact.summary
+  // (a file-deliverable preview). Sliced to 512 to match that convention and
+  // keep the EXEC item small; a non-string or empty value is simply dropped.
+  const summary =
+    typeof parsed.summary === "string" && parsed.summary.trim().length > 0
+      ? parsed.summary.slice(0, 512)
+      : undefined;
+
   // ULID-shaped; client-supplied is fine but we generate if missing so
   // the response always carries an engagement_id the client can follow up
   // on. Time-monotonic ULIDs aren't required for the engagements path —
@@ -2099,6 +2115,7 @@ async function createEngagementRoute(
           : undefined,
       inputs_hash: typeof parsed.inputs_hash === "string" ? parsed.inputs_hash : undefined,
       artifact_ref: artifactRef,
+      summary,
       // This single write surface records every off-Lambda execution. The
       // optional `execution_surface` says which produced it: `ccr` for the
       // generic CCR agent-runner routine's per-task write-back (ADR-0005

@@ -329,6 +329,10 @@ export interface AgentExecution {
   ended_at: string
   status: 'ok' | 'throw' | 'skipped' | 'failed_artefact_redaction'
   used_credential_types?: string[]
+  /** Free-text business summary of the engagement (top-level, distinct from
+   *  artifact_ref.summary). Preferred over artifact_ref.summary for display;
+   *  absent on pre-2026-06-13 rows. */
+  summary?: string
   artifact_ref?: {
     uri: string
     content_hash: string

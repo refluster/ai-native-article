@@ -374,11 +374,14 @@ export default function AgentProfile() {
                 ) : (
                   <ul className="divide-y divide-wf-outline-variant">
                     {execs.slice(0, ACTIVITY_LIMIT).map((e) => {
-                      const raw = e.artifact_ref?.summary?.trim() ?? '';
+                      // Prefer the explicit top-level engagement summary;
+                      // fall back to the artifact preview for CCR/legacy rows
+                      // that only carried an artifact_ref.
+                      const raw = (e.summary ?? e.artifact_ref?.summary)?.trim() ?? '';
                       const summary = raw.length > SUMMARY_CAP ? `${raw.slice(0, SUMMARY_CAP)}…` : raw;
                       // A skipped run did no work, so "skipped" is a truer
                       // body than "no summary"; an ok/throw run that simply
-                      // carried no artefact summary gets "no summary".
+                      // carried no summary gets "no summary".
                       const fallback = e.status === 'skipped' ? 'skipped' : 'no summary';
                       return (
                         <li key={e.exec_ulid} className="py-3 text-sm">

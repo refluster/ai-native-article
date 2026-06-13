@@ -219,6 +219,18 @@ export interface ExecutionRow {
   artifact_ref?: ArtifactRef;
   error?: string;
   /**
+   * Free-text business summary of the engagement — what this unit of work
+   * accomplished, in the caller's own words. Distinct from
+   * `artifact_ref.summary`, which is a ≤512-char preview of a produced *file*
+   * deliverable: an engagement (e.g. a `pr-review`) can carry a meaningful
+   * summary with no file artifact at all, and previously had nowhere to put
+   * it (the portfolio/deliverables UI rendered "no summary"). Set via the
+   * `POST /agents/{slug}/engagements` route; ≤512 chars, sliced at the write
+   * seam. Pre-2026-06-13 rows have no attribute; readers fall back to
+   * `artifact_ref.summary`, then "".
+   */
+  summary?: string;
+  /**
    * Where the LLM call ran. `lambda` = workforce agent-runner (default; the
    * historical-and-still-canonical path). `client` = client-side execution
    * under R-N1(b) — the consumer fetched agent metadata + persona, ran the
@@ -406,6 +418,10 @@ export interface AppendExecutionInput {
   inputs_hash?: string;
   artifact_ref?: ArtifactRef;
   error?: string;
+  /** Free-text business summary of the engagement (≤512 chars; the caller
+   *  must slice). Distinct from `artifact_ref.summary` — see
+   *  `ExecutionRow.summary`. */
+  summary?: string;
   /** Where the LLM call ran. Omit (or set `lambda`) for workforce
    *  agent-runner executions; set `client` when the row is written via
    *  the `POST /agents/{slug}/engagements` route for R-N1(b) client-side
@@ -497,6 +513,7 @@ export async function appendExecution(input: AppendExecutionInput): Promise<Exec
     inputs_hash: input.inputs_hash,
     artifact_ref: input.artifact_ref,
     error: input.error,
+    summary: input.summary,
     execution_surface: input.execution_surface,
     gsi1pk: `AGENT#${input.agent_slug}`,
     gsi1sk: input.started_at,
