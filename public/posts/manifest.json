@@ -70,6 +70,16 @@
     "sourceUrls": "https://www.cfr.org/event/ceo-speaker-series-dario-amodei-anthropic"
   },
   {
+    "slug": "ed7acbacc363",
+    "title": "「AIで遅くなる」のは正しい——生産性データの逆説と、259件のリリースノートが描くAI時代の変革の本質",
+    "type": "analysis",
+    "category": "AI Productivity × SDLC Transformation",
+    "date": "2026-03-28",
+    "abstract": "「AIを使うと開発者が19%遅くなった」（METR研究）と「Claude Codeが259件のリリースノートを持つ」という2つの事実は矛盾しているように見えて、実は同じ変革の異なるフェーズを描いている。個人の生産性は一時的に下がるが、組織としての開発速度は桁違いに上がる——この逆説が「遅くなっている人こそが変革の最前線にいる」という驚愕の結論につながる。",
+    "image": "/posts/images/ed7acbacc363.jpg",
+    "sourceUrls": "https://www.uplevel.work/blog/the-ai-coding-productivity-paradox, https://releasebot.io/updates/anthropic, https://www.thoughtworks.com/insights/articles/agentic-sdlc"
+  },
+  {
     "slug": "c3de4fa6837b",
     "title": "解説：Fujitsu's AI Resilience Platform",
     "type": "explanation",
