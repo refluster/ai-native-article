@@ -50,11 +50,12 @@ const STATUSES = new Set(["active", "stale", "deprecated"]);
 const COST_CLASSES = new Set(["small", "medium", "large"]);
 
 export interface SkillPatchContext {
-  /** Lookup: agent slug → true when an AGENT#{slug}/META row exists.
-   *  Replaces the CI-era owners cross-check against workforce/agents/
-   *  (which degraded to shape-only when ADR-0007 deleted that tree —
-   *  the API can check existence against the live rows again). */
-  agentExists: (slug: string) => boolean;
+  /** Lookup: agent slug → row state. Replaces the CI-era owners cross-check
+   *  against workforce/agents/ (which degraded to shape-only when ADR-0007
+   *  deleted that tree — the API can check against the live rows again).
+   *  `archived` is rejected too (M4, PR #304 review): a retired agent can
+   *  neither own a skill nor run its improvement loop. */
+  agentState: (slug: string) => "active" | "archived" | undefined;
 }
 
 export function validateSkillPatch(
@@ -114,8 +115,11 @@ export function validateSkillPatch(
         }
         if (seen.has(s)) v("J7-owner-duplicate", "owners", `duplicate owner "${s}"`);
         seen.add(s);
-        if (!ctx.agentExists(s)) {
+        const state = ctx.agentState(s);
+        if (state === undefined) {
           v("J7-owner-exists", "owners", `owner "${s}" has no AGENT#${s} row`);
+        } else if (state === "archived") {
+          v("J7-owner-archived", "owners", `owner "${s}" is archived — a retired agent cannot own a skill`);
         }
       }
     }
@@ -126,8 +130,13 @@ export function validateSkillPatch(
     if (val === null) continue;
     if (typeof val !== "string" || !AGENT_SLUG.test(val)) {
       v("J8-improvement-agent", field, `${field} must be null or an agent slug`);
-    } else if (!ctx.agentExists(val)) {
-      v("J8-improvement-agent-exists", field, `${field} "${val}" has no AGENT#${val} row`);
+    } else {
+      const state = ctx.agentState(val);
+      if (state === undefined) {
+        v("J8-improvement-agent-exists", field, `${field} "${val}" has no AGENT#${val} row`);
+      } else if (state === "archived") {
+        v("J8-improvement-agent-archived", field, `${field} "${val}" is archived`);
+      }
     }
   }
   return out;

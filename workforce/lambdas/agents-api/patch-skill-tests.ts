@@ -160,6 +160,7 @@ function seedAgent(slug: string): void {
     sk: "META",
     slug,
     archived: false,
+    bindings: [],
   });
 }
 
@@ -225,6 +226,43 @@ describe("PATCH /skills/{name} — judgment-config writes (ADR-0008)", () => {
     );
     expect(ghost.status).toBe(422);
     expect(ghost.json.violations.map((v: { rule: string }) => v.rule)).toContain("J7-owner-exists");
+  });
+
+  it("rejects an archived owner / improvement agent (M4)", async () => {
+    seedSkill("grid-watch");
+    rows.set(key("AGENT#oldtimer", "META"), {
+      pk: "AGENT#oldtimer", sk: "META", slug: "oldtimer", archived: true,
+    });
+    const owner = await call(
+      makeEvent("PATCH", "PATCH /skills/{name}", "grid-watch", { owners: ["grace", "oldtimer"] }),
+    );
+    expect(owner.status).toBe(422);
+    expect(owner.json.violations.map((v: { rule: string }) => v.rule)).toContain("J7-owner-archived");
+    const imp = await call(
+      makeEvent("PATCH", "PATCH /skills/{name}", "grid-watch", { improvement_agent: "oldtimer" }),
+    );
+    expect(imp.status).toBe(422);
+    expect(imp.json.violations.map((v: { rule: string }) => v.rule)).toContain("J8-improvement-agent-archived");
+  });
+
+  it("blocks an owners-shrink that would orphan an existing binding (R8-reverse, M2)", async () => {
+    seedSkill("grid-watch", { owners: ["grace", "sana"] });
+    rows.get(key("AGENT#grace", "META"))!.bindings = [
+      { skill: "grid-watch", executor: "claude-code-routine", trigger: { scheduler: "manual" } },
+    ];
+    const shrink = await call(
+      makeEvent("PATCH", "PATCH /skills/{name}", "grid-watch", { owners: ["sana"] }),
+    );
+    expect(shrink.status).toBe(422);
+    expect(shrink.json.violations.map((v: { rule: string }) => v.rule)).toContain("R8-reverse");
+    expect(rows.get(key("SKILL#grid-watch", "META"))!.owners).toEqual(["grace", "sana"]);
+
+    // Unbound owner removal passes.
+    rows.get(key("AGENT#grace", "META"))!.bindings = [];
+    const ok = await call(
+      makeEvent("PATCH", "PATCH /skills/{name}", "grid-watch", { owners: ["sana"] }),
+    );
+    expect(ok.status).toBe(200);
   });
 
   it("rejects git-owned / immutable fields 400", async () => {

@@ -86,7 +86,7 @@ Each task is independent. The orchestrator-tick is the privileged AWS principal 
 
 Iterate `payload.tasks` in order. For each task:
 
-1. **Validate task** — verify `agent_slug` exists at `workforce/agents/{agent_slug}/agent.json` and `binding_idx` is within range. If either is wrong, fail loud for this task (the operator/orchestrator misconfigured the binding); other tasks in the batch are independent and continue.
+1. **Validate task** — `GET <wf-agents-api-base>/agents/{agent_slug}` must return 200 and `binding_idx` must be within `agent.bindings` range (this is the same fetch step 2 consumes — share it). If either is wrong, fail loud for this task (the operator/orchestrator misconfigured the binding); other tasks in the batch are independent and continue. Do NOT look for `workforce/agents/{agent_slug}/` in the clone — that tree retired with ADR-0007.
 
 2. **Resolve the (skill, persona, config) triple** from the live API:
    - `agent = GET <wf-agents-api-base>/agents/{agent_slug}`
@@ -278,8 +278,8 @@ curl -X POST <FIRE_URL_FROM_wf/ccr/agent-runner> \
 
 Confirm the session:
 - Parses `text` → `{tasks: [...]}` envelope as the first step
-- Reads `workforce/agents/dario/agent.json` and finds `bindings[3].skill === "feed-post"`
-- Reads `workforce/skills/feed-post/SKILL.md`
+- Fetches `GET <wf-agents-api-base>/agents/dario` and finds `bindings[3].skill === "feed-post"` (plus `system_prompt` for the persona overlay)
+- Fetches `GET <wf-agents-api-base>/skills/feed-post` and composes with its `.body` (ADR-0008 — never the git copy)
 - Produces a draft PR under `claude/feed-post-dario-{yyyy-mm-dd}` with the new post
 - Exits cleanly
 

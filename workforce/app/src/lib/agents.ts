@@ -194,7 +194,10 @@ export async function findAgent(slug: string): Promise<WorkforceAgent | undefine
   // rather than failing the whole profile page.
   try {
     const res = await fetch(`${ROSTER_API_BASE}/agents/${encodeURIComponent(slug)}`)
-    if (!res.ok) return base
+    if (!res.ok) {
+      console.warn(`workforce roster: profile hydration for "${slug}" degraded (HTTP ${res.status}) — rendering the lean record without decks`)
+      return base
+    }
     const d = (await res.json()) as AgentDetailItem
     return {
       ...base,
@@ -204,7 +207,8 @@ export async function findAgent(slug: string): Promise<WorkforceAgent | undefine
       experience: d.experience ?? undefined,
       memory: d.memory ?? undefined,
     }
-  } catch {
+  } catch (err) {
+    console.warn(`workforce roster: profile hydration for "${slug}" degraded (${err instanceof Error ? err.message : String(err)}) — rendering the lean record without decks`)
     return base
   }
 }

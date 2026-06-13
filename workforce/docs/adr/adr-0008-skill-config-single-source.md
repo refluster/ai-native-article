@@ -69,12 +69,16 @@ Concretely:
    `SKILL#{name}/AUDIT#{iso-ts}` item (same shape and digest-for-long-strings
    rule as agent audits); `wf-config-digest` compiles skill audits into the
    same weekly issue, under a `skill:{name}` heading.
-5. **The seed becomes create-only.** `wf-seed-skills` keeps registering
-   *new* skill folders on deploy but never overwrites an existing
+5. **The seed becomes create-only for judgment-side fields.**
+   `wf-seed-skills` keeps registering *new* skill folders on deploy but
+   never overwrites the API-writable fields of an existing
    `SKILL#{name}/META` row — eliminating the two-master clobber (a deploy
    silently reverting API edits) instead of managing it with hash
-   transitional machinery. After first seed, the git `SKILL.md` body is a
-   creation-time scaffold artefact; the authoritative text is the row.
+   transitional machinery. The one exception is `deliverable`: it is
+   git-authoritative (PATCH rejects it), so the seed reconciles that field
+   from git on existing rows — the correct master writing its own field.
+   After first seed, the git `SKILL.md` body is a creation-time scaffold
+   artefact; the authoritative text is the row.
 6. **The runner reads the body from the API.** `agent-runner.md` step 3
    changes from "read `workforce/skills/{skill}/SKILL.md` from the clone"
    to "GET `/skills/{name}` and use `.body`" (fail loud on error — the same
@@ -119,12 +123,20 @@ Concretely:
   review/audit machinery agents already have, on shared code paths.
 - **Accepted costs.** (a) Post-hoc (≤1 week) review for skill-body changes,
   bounded by the size caps — same trade as ADR-0007. (b) Git `SKILL.md`
-  bodies go stale after API edits; the file carries a scaffold-artefact
-  banner and the validators keep checking only creation-time shape.
-  (c) The console depends on API availability at page load (it already did
-  for stats/feed/threads). (d) `version` self-reported via API is no longer
-  forced to move with script changes — acceptable at C-3 scale; the digest
-  shows both sides.
+  bodies go stale after API edits; the runner spec, the lambdas README, and
+  `docs/data-model.md` state that the row is authoritative, and a per-file
+  scaffold-artefact banner (+ a `validate-skills` warning on body edits to
+  already-seeded skills) is a **named follow-up** of this ADR — until it
+  ships, the git body must be treated as creation-time only. (c) The
+  console depends on API availability at page load (it already did for
+  stats/feed/threads), and an unset `VITE_WORKFORCE_AGENTS_API_BASE` now
+  falls back to the prod custom domain for the public roster read — a dev
+  build reads prod data, accepted consciously at C-3 (read-only, public).
+  (d) `version` self-reported via API is no longer forced to move with
+  script changes — acceptable at C-3 scale; the AUDIT diff (and hence the
+  weekly digest) records every version change. (e) `deliverable` is
+  git-authoritative, so the create-only seed reconciles that one field
+  from git on existing rows — the correct master writing its own field.
 - **Migration order.** (1) PATCH /skills + validation + AUDIT + digest
   extension + create-only seed (one PR, this ADR); (2) runner-spec body
   cutover (same PR — effective next fire after merge); (3) console live

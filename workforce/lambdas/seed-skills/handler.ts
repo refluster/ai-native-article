@@ -85,13 +85,21 @@ async function seedOne(name: string): Promise<"created" | "updated" | "noop"> {
   const hash = skillIdentityHash(identity);
 
   const existing = await getItem<SkillMetaRow>(skillPk(name), "META");
-  // ADR-0008 Decision §5: the seed is CREATE-ONLY. Judgment-side fields
-  // (body / owners / status / …) are API-writable on the live row, so an
+  // ADR-0008 Decision §5: the seed is CREATE-ONLY for judgment-side fields.
+  // body / owners / status / … are API-writable on the live row, so an
   // upsert from the git copy on the next deploy would silently revert
   // those edits — the exact two-master clobber ADR-0007 retired on the
-  // agent side. An existing row is therefore never touched, regardless of
-  // how the git folder has drifted; new skill folders still register here.
+  // agent side. The ONE exception (D2, PR #304 review): `deliverable` is
+  // git-authoritative (rejected by PATCH /skills), so reconciling it FROM
+  // git is the correct master writing its own field, not a clobber —
+  // without this, a meta.json deliverable change would have no write path
+  // at all. (`identity_hash` is a seed-era residue: stale after the first
+  // PATCH; nothing reads it any more.)
   if (existing) {
+    if (JSON.stringify(existing.deliverable) !== JSON.stringify(meta.deliverable)) {
+      await putItem({ ...existing, deliverable: meta.deliverable, updated_at: new Date().toISOString() });
+      return "updated";
+    }
     return "noop";
   }
 

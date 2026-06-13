@@ -857,7 +857,9 @@ async function patchSkill(
   const existing = await getItem<SkillMetaRow>(skillPk(name), "META");
   if (!existing) return reply(404, { error: "not_found", name });
 
-  // Owners / improvement-agent existence cross-check against live AGENT rows.
+  // Owners / improvement-agent existence + archived cross-check against
+  // live AGENT rows (a retired agent can neither own a skill nor run its
+  // improvement loop — M4, PR #304 review).
   const candidateSlugs = new Set<string>();
   if (Array.isArray(parsed.owners)) {
     for (const s of parsed.owners) if (typeof s === "string") candidateSlugs.add(s);
@@ -865,17 +867,44 @@ async function patchSkill(
   for (const f of ["improvement_agent", "improvement_agent_override"] as const) {
     if (typeof parsed[f] === "string") candidateSlugs.add(parsed[f] as string);
   }
-  const existsMap = new Map<string, boolean>();
+  const stateMap = new Map<string, "active" | "archived">();
   await Promise.all(
     [...candidateSlugs].map(async (slug) => {
       const row = await getItem<AgentMetaRow>(agentPk(slug), "META");
-      existsMap.set(slug, row !== undefined && row !== null);
+      if (row) stateMap.set(slug, row.archived ? "archived" : "active");
     }),
   );
 
   const violations: SkillConfigViolation[] = validateSkillPatch(parsed, {
-    agentExists: (slug) => existsMap.get(slug) ?? false,
+    agentState: (slug) => stateMap.get(slug),
   });
+
+  // Reverse-R8 (M2, PR #304 review): shrinking owners[] must not orphan an
+  // EXISTING binding — the agent-side R8 check would otherwise surface the
+  // breakage as a confusing 422 on a later, unrelated agent PATCH. One
+  // META scan at C-3 scale; non-archived agents only.
+  if (violations.length === 0 && Array.isArray(parsed.owners)) {
+    const nextOwners = new Set(parsed.owners.filter((s): s is string => typeof s === "string"));
+    const removed = (existing.owners ?? []).filter((s) => !nextOwners.has(s));
+    if (removed.length > 0) {
+      let cursor: string | undefined;
+      do {
+        const page = await scanPrefix<AgentMetaRow>("AGENT#", "META", PAGE_SIZE_MAX, cursor);
+        for (const row of page.items) {
+          if (row.archived || !removed.includes(row.slug)) continue;
+          if ((row.bindings ?? []).some((b) => b.skill === name)) {
+            violations.push({
+              rule: "R8-reverse",
+              field: "owners",
+              msg: `cannot remove owner "${row.slug}": AGENT#${row.slug} still has a binding on skill "${name}" — unbind first (PATCH the agent's bindings), then shrink owners`,
+            });
+          }
+        }
+        cursor = page.cursor;
+      } while (cursor);
+    }
+  }
+
   if (violations.length > 0) {
     return reply(422, { error: "config_validation_failed", violations });
   }
