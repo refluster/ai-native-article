@@ -131,6 +131,7 @@ Iterate `payload.tasks` in order. For each task:
      "ended_at":          "{ISO the skill write finished}",
      "status":            "ok" | "throw" | "skipped",
      "execution_surface": "ccr",
+     "error":             "{REQUIRED when status is 'skipped' or 'throw' — see below; OMIT when 'ok'}",
      "artifact": {                         // OMIT on skip / no deliverable
        "uri":          "{the deliverable's link — Notion page URL, kohuehara.xyz URL, PR URL, Discord, or s3:// key}",
        "content_hash": "{sha256 hex of the deliverable body, or 64 zeros}",
@@ -142,7 +143,8 @@ Iterate `payload.tasks` in order. For each task:
    ```
 
    - The `summary` is the business sentence the operator reads — write it as an accomplishment, title-first. Never a machine blob.
-   - `status:"skipped"` with no `artifact` when the skill's skip-rule fired — the skip is worth recording too.
+   - **A skip MUST say why (C-4/W-4: a skip is not silent — it is a recorded, legible non-write).** `status:"skipped"` with no `artifact`, AND a one-line `error` naming *which* skip-rule fired and the evidence (e.g. `skip: nothing-moved — no FERC/EPA/DOE issuance on the beat in the 24h window` or `skip: already-covered — docket EL24-xxx posted at the same status on {date}`). A bare `skipped` with an empty `error` is itself a defect: the operator cannot then tell a correct quiet-day skip from a misfiring research loop, which is the exact failure this field closes. The `error` field surfaces on the agent profile's ACTIVITY row (StatusBadge hover), so write it for a human. (A skill whose SKILL.md has **removed** the skip path — e.g. `grid-watch` — never emits `skipped`; this clause governs the skills that still can.)
+   - `status:"throw"` carries the thrown message in `error` (unchanged) — the skip rule above simply extends the same fail-loud discipline to the no-write path.
    - This is the **same `engagements` write surface** external clients use (one endpoint, not two); `execution_surface:"ccr"` is the only thing that marks it as a workforce CCR run.
    - The token is injected into the task by the orchestrator; never hard-code it. A 401 means it wasn't injected — fail loud for the task, don't silently drop the record.
 
@@ -172,7 +174,7 @@ This keeps the trust boundary narrow: the CCR session never holds AWS credential
 ## Skip + W-1 (delegated to the skill body + the endpoint)
 
 Every skill's SKILL.md owns its own:
-- skip rule (e.g., feed-post: "nothing worth saying today → don't call the script"; discord-heartbeat: no skip, every fire posts)
+- skip rule (e.g., feed-post: "nothing worth saying today → don't call the script"; discord-heartbeat and grid-watch: **no skip path** — every fire produces and posts one observation). When a skill *does* skip, the engagement record MUST name the reason in `error` (step 8 above) — a skip is a recorded non-write, never a silent one.
 - length caps + content shape
 
 W-1 editorial guards (LLM-artefact prelude rejection, length hard-cap, kind/reference validation) are enforced **server-side at the write endpoint** (`POST /feed` → `createPost`), not just trusted to the session. A malformed write fails loudly with HTTP 422. This runner does not re-enforce them inline — it surfaces the script's exit code.
