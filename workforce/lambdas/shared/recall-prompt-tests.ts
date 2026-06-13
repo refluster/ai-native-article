@@ -22,13 +22,14 @@ const recallMock = vi.mocked(recall);
 
 /** Minimal ExecutionRow-shaped fixture — only the fields the renderer reads. */
 function result(
-  opts: { skill?: string; status?: string; summary?: string; error?: string; when?: string },
+  opts: { skill?: string; status?: string; summary?: string; top_summary?: string; error?: string; when?: string },
 ): RecallResult {
   return {
     row: {
       started_at: opts.when ?? "2026-05-18T09:00:00Z",
       skill_name: opts.skill ?? "article-level2",
       status: opts.status ?? "ok",
+      summary: opts.top_summary,
       artifact_ref: opts.summary ? { summary: opts.summary } : undefined,
       error: opts.error,
     },
@@ -71,6 +72,17 @@ describe("renderRecallBlock", () => {
       "finish_reason=length",
     );
     expect(renderRecallBlock([result({})])).toContain("(no summary)");
+  });
+
+  it("prefers the top-level engagement summary over the artifact preview", () => {
+    // An artifact-less engagement (e.g. pr-review) carries only the top-level
+    // summary; a row with both must surface the business line, not the preview.
+    expect(renderRecallBlock([result({ top_summary: "Reviewed PR #507, signed off" })])).toContain(
+      "Reviewed PR #507, signed off",
+    );
+    const both = renderRecallBlock([result({ top_summary: "business line", summary: "artifact preview" })]);
+    expect(both).toContain("business line");
+    expect(both).not.toContain("artifact preview");
   });
 
   it("caps the block and appends a VISIBLE omission marker (loud, not silent)", () => {
