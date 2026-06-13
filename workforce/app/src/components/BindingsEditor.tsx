@@ -7,11 +7,13 @@
 // ProjectArchiveButton. Every write PATCHes the FULL bindings[] via
 // lib/agents.patchAgentBindings — append for new bindings (binding_idx is
 // load-bearing for in-flight fires, so we never reorder), in-place
-// replacement for cron edits, splice for unbind (with a confirm citing
-// the index-shift consequence). Server-side validation (G1 cadence floor,
-// R8 owners, S9 shape) is the real gate; 422 violations render inline.
+// replacement for cron edits, splice for unbind. The destructive unbind
+// uses the house ConfirmDialog grammar (modal, autofocus, ESC) shared in
+// spirit with ProjectArchiveButton. Server-side validation (G1 cadence
+// floor, R8 owners, S9 shape) is the real gate; 422 violations render
+// inline.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   BindingPatchError,
@@ -30,6 +32,8 @@ interface Props {
 }
 
 const CRON_SHAPE = /^cron\(.+\)$/;
+const CRON_PLACEHOLDER = 'cron(0 1 ? * * *)';
+const CRON_HINT = 'EventBridge cron, UTC. Minute must be a single value (hourly floor, G1).';
 const DEFAULT_PROJECT = 'agent-workforce';
 
 /** The CCR-batched binding shape wf-orchestrator-tick dispatches —
@@ -50,6 +54,75 @@ function newCcrBinding(skill: string, cron: string, projectId: string): AgentBin
   };
 }
 
+/** House destructive-confirm grammar (mirrors ProjectArchiveButton's
+ *  ConfirmDialog): modal, autofocus on confirm, ESC-to-cancel, the
+ *  consequence stated in operator-visible terms at the point of decision. */
+function UnbindDialog({
+  skill,
+  pending,
+  onCancel,
+  onConfirm,
+}: {
+  skill: string;
+  pending: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const titleId = 'binding-unbind-confirm-title';
+  useEffect(() => {
+    confirmRef.current?.focus();
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !pending) onCancel();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel, pending]);
+
+  return (
+    <div
+      onClick={onCancel}
+      className="fixed inset-0 z-50 bg-wf-on-surface/40 flex items-center justify-center p-4"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(e) => e.stopPropagation()}
+        className="max-w-md w-full bg-wf-surface border border-wf-outline-variant rounded-wf-md p-6"
+      >
+        <h2 id={titleId} className="font-wfmono text-xs uppercase tracking-[0.14em] text-wf-on-surface-variant mb-3">
+          Confirm unbind
+        </h2>
+        <p className="text-sm text-wf-on-surface leading-relaxed mb-6">
+          Unbind <span className="font-wfmono">{skill}</span> from this agent. Its scheduled runs
+          stop on the next orchestrator tick; the agent’s other bindings keep firing. You can
+          re-bind it later from this panel. Continue?
+        </p>
+        <div className="flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={pending}
+            className="font-wfmono text-[10px] uppercase tracking-[0.14em] px-3 py-2 border border-wf-outline-variant rounded-wf-sm text-wf-on-surface-variant hover:text-wf-on-surface disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Cancel
+          </button>
+          <button
+            ref={confirmRef}
+            type="button"
+            onClick={onConfirm}
+            disabled={pending}
+            className="font-wfmono text-[10px] uppercase tracking-[0.14em] px-3 py-2 border rounded-wf-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-wf-error/60 text-wf-error hover:bg-wf-error hover:text-wf-surface"
+          >
+            Execute unbind
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,9 +133,10 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
   const [confirmUnbind, setConfirmUnbind] = useState<number | null>(null);
   // Add form.
   const [adding, setAdding] = useState(false);
-  const [bindableSkills, setBindableSkills] = useState<string[] | null>(null);
+  // null = not yet loaded, 'error' = fetch failed (offer retry), else the list.
+  const [bindableSkills, setBindableSkills] = useState<string[] | 'error' | null>(null);
   const [addSkill, setAddSkill] = useState('');
-  const [addCron, setAddCron] = useState('cron(0 1 ? * * *)');
+  const [addCron, setAddCron] = useState(CRON_PLACEHOLDER);
   const [addProject, setAddProject] = useState(DEFAULT_PROJECT);
 
   useEffect(() => {
@@ -72,15 +146,26 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
   }, [success]);
 
   // Lazy-load the R8-eligible skill list the first time the add form opens.
+  // A failed fetch lands a distinct 'error' sentinel so the <select>
+  // resolves to a retryable state instead of an indefinite "loading…".
   useEffect(() => {
     if (!adding || bindableSkills !== null) return;
+    let cancelled = false;
     fetchBindableSkills(slug)
       .then((names) => {
+        if (cancelled) return;
         setBindableSkills(names);
         const unbound = names.filter((n) => !bindings.some((b) => b.skill === n));
         if (unbound.length > 0) setAddSkill(unbound[0]!);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+      .catch((err) => {
+        if (cancelled) return;
+        setBindableSkills('error');
+        setError(`could not load bindable skills: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [adding, bindableSkills, slug, bindings]);
 
   async function write(next: AgentBinding[], successMsg: string) {
@@ -102,9 +187,18 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
       } else {
         setError(err instanceof Error ? err.message : String(err));
       }
+      // Keep the confirm modal closed on failure — the banner carries the cause.
+      setConfirmUnbind(null);
     } finally {
       setPending(false);
     }
+  }
+
+  function startEdit(idx: number, cron: string | undefined) {
+    // Entering a cron edit dismisses any armed unbind confirm (A6).
+    setConfirmUnbind(null);
+    setError(null);
+    setCronDrafts((d) => ({ ...d, [idx]: cron ?? '' }));
   }
 
   function saveCron(idx: number) {
@@ -140,6 +234,7 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
     );
   }
 
+  const skillList = Array.isArray(bindableSkills) ? bindableSkills : [];
   const inputCls =
     'font-wfmono text-[11px] bg-wf-surface-container border border-wf-outline-variant rounded-wf-sm px-2 py-1 text-wf-on-surface w-full sm:w-auto';
   const btnCls =
@@ -163,19 +258,29 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
         )}
       </div>
 
-      {(error || success) && (
-        <div
-          role="alert"
-          className={`px-4 py-2 text-xs border-b border-wf-outline-variant ${error ? 'text-wf-error' : 'text-wf-tertiary'}`}
-        >
-          {error ?? success}
+      {/* Error and success are distinct containers (house pattern): error
+          is role=alert + a rule-violation list under a lead-in; success is
+          role=status. They never share one box. */}
+      {error && (
+        <div role="alert" className="px-4 py-2 text-xs border-b border-wf-outline-variant border-l-2 border-l-wf-error bg-wf-error/5 text-wf-error">
+          {error}
           {violations.length > 0 && (
-            <ul className="mt-1 space-y-0.5">
-              {violations.map((v, i) => (
-                <li key={i} className="font-wfmono text-[11px]">{v.rule}: {v.msg}</li>
-              ))}
-            </ul>
+            <>
+              <div className="mt-1.5 font-wfmono text-[10px] uppercase tracking-[0.12em] opacity-80">
+                rejected — {violations.length} rule violation{violations.length > 1 ? 's' : ''}
+              </div>
+              <ul className="mt-1 space-y-0.5">
+                {violations.map((v, i) => (
+                  <li key={i} className="font-wfmono text-[11px]">{v.rule}: {v.msg}</li>
+                ))}
+              </ul>
+            </>
           )}
+        </div>
+      )}
+      {success && !error && (
+        <div role="status" className="px-4 py-2 text-xs border-b border-wf-outline-variant border-l-2 border-l-wf-tertiary bg-wf-tertiary/5 text-wf-tertiary">
+          {success}
         </div>
       )}
 
@@ -191,16 +296,20 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
                 {b.skill}
               </Link>
               {editing ? (
-                <span className="flex items-center gap-2 flex-1">
-                  <input
-                    className={inputCls}
-                    value={cronDrafts[idx]}
-                    onChange={(e) => setCronDrafts((d) => ({ ...d, [idx]: e.target.value }))}
-                    spellCheck={false}
-                    aria-label={`cron for ${b.skill}`}
-                  />
-                  <button type="button" disabled={pending} onClick={() => saveCron(idx)} className={`${btnCls} border-wf-tertiary text-wf-tertiary`}>SAVE</button>
-                  <button type="button" disabled={pending} onClick={() => setCronDrafts(({ [idx]: _, ...rest }) => rest)} className={`${btnCls} border-wf-outline-variant text-wf-on-surface-variant`}>CANCEL</button>
+                <span className="flex flex-col gap-1 flex-1">
+                  <span className="flex items-center gap-2">
+                    <input
+                      className={inputCls}
+                      value={cronDrafts[idx]}
+                      onChange={(e) => setCronDrafts((d) => ({ ...d, [idx]: e.target.value }))}
+                      spellCheck={false}
+                      placeholder={CRON_PLACEHOLDER}
+                      aria-label={`cron for ${b.skill}`}
+                    />
+                    <button type="button" disabled={pending} onClick={() => saveCron(idx)} className={`${btnCls} border-wf-tertiary text-wf-tertiary`}>SAVE</button>
+                    <button type="button" disabled={pending} onClick={() => setCronDrafts(({ [idx]: _, ...rest }) => rest)} className={`${btnCls} border-wf-outline-variant text-wf-on-surface-variant`}>CANCEL</button>
+                  </span>
+                  <span className="text-[10px] text-wf-on-surface-variant">{CRON_HINT}</span>
                 </span>
               ) : (
                 <span className="font-wfmono text-[11px] uppercase tracking-[0.12em] text-wf-on-surface-variant">
@@ -214,19 +323,19 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
                   <button
                     type="button"
                     disabled={pending}
-                    onClick={() => { setCronDrafts((d) => ({ ...d, [idx]: b.trigger.cron ?? '' })); setError(null); }}
+                    onClick={() => startEdit(idx, b.trigger.cron)}
                     className={`${btnCls} border-wf-outline-variant text-wf-on-surface hover:border-wf-on-surface-variant`}
                   >
                     EDIT CRON
                   </button>
-                  {confirmUnbind === idx ? (
-                    <>
-                      <button type="button" disabled={pending} onClick={() => unbind(idx)} className={`${btnCls} border-wf-error text-wf-error`}>CONFIRM UNBIND</button>
-                      <button type="button" disabled={pending} onClick={() => setConfirmUnbind(null)} className={`${btnCls} border-wf-outline-variant text-wf-on-surface-variant`}>KEEP</button>
-                    </>
-                  ) : (
-                    <button type="button" disabled={pending} onClick={() => { setConfirmUnbind(idx); setError(null); }} className={`${btnCls} border-wf-outline-variant text-wf-on-surface-variant hover:border-wf-error hover:text-wf-error`}>UNBIND</button>
-                  )}
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => { setConfirmUnbind(idx); setError(null); }}
+                    className={`${btnCls} border-wf-outline-variant text-wf-on-surface-variant hover:border-wf-error hover:text-wf-error`}
+                  >
+                    UNBIND
+                  </button>
                 </span>
               )}
             </li>
@@ -238,29 +347,51 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
       </ul>
 
       {adding && (
-        <div className="border-t border-wf-outline-variant px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 text-sm">
-          <select
-            className={inputCls}
-            value={addSkill}
-            onChange={(e) => setAddSkill(e.target.value)}
-            aria-label="skill to bind"
-          >
-            {bindableSkills === null && <option value="">loading…</option>}
-            {bindableSkills?.length === 0 && <option value="">no bindable skills (add {slug} to a skill's owners first — R8)</option>}
-            {bindableSkills?.map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
-          <input className={inputCls} value={addCron} onChange={(e) => setAddCron(e.target.value)} spellCheck={false} aria-label="cron expression (UTC)" placeholder="cron(0 1 ? * * *)" />
-          <input className={inputCls} value={addProject} onChange={(e) => setAddProject(e.target.value)} spellCheck={false} aria-label="project id" placeholder={DEFAULT_PROJECT} />
-          <button type="button" disabled={pending || !addSkill} onClick={addBinding} className={`${btnCls} border-wf-tertiary text-wf-tertiary`}>BIND</button>
+        <div className="border-t border-wf-outline-variant px-4 py-3 flex flex-col gap-2 text-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            {bindableSkills === 'error' ? (
+              <span className="flex items-center gap-2">
+                <span className="text-xs text-wf-error">couldn’t load skills</span>
+                <button type="button" disabled={pending} onClick={() => { setBindableSkills(null); setError(null); }} className={`${btnCls} border-wf-outline-variant text-wf-on-surface hover:border-wf-on-surface-variant`}>RETRY</button>
+              </span>
+            ) : (
+              <select
+                className={inputCls}
+                value={addSkill}
+                onChange={(e) => setAddSkill(e.target.value)}
+                disabled={bindableSkills === null || skillList.length === 0}
+                aria-label="skill to bind"
+              >
+                {bindableSkills === null && <option value="">loading…</option>}
+                {Array.isArray(bindableSkills) && skillList.length === 0 && (
+                  <option value="">no bindable skills — add {slug} to a skill’s owners first (R8)</option>
+                )}
+                {skillList.map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            )}
+            <input className={inputCls} value={addCron} onChange={(e) => setAddCron(e.target.value)} spellCheck={false} aria-label="cron expression (UTC)" placeholder={CRON_PLACEHOLDER} />
+            <input className={inputCls} value={addProject} onChange={(e) => setAddProject(e.target.value)} spellCheck={false} aria-label="project id" placeholder={DEFAULT_PROJECT} />
+            <button type="button" disabled={pending || !addSkill} onClick={addBinding} className={`${btnCls} border-wf-tertiary text-wf-tertiary`}>BIND</button>
+          </div>
+          <span className="text-[10px] text-wf-on-surface-variant">{CRON_HINT}</span>
         </div>
       )}
 
       {SIGV4_IS_CONFIGURED && (
         <p className="px-4 pb-3 pt-1 text-[11px] text-wf-on-surface-variant">
-          Writes are audited config PATCHes (ADR-0007) — live on the next orchestrator tick, no deploy. Cron is UTC, hourly floor (G1); unbinding shifts later binding indices.
+          Writes are audited config PATCHes (ADR-0007) — live on the next orchestrator tick, no deploy.
         </p>
+      )}
+
+      {confirmUnbind !== null && bindings[confirmUnbind] && (
+        <UnbindDialog
+          skill={bindings[confirmUnbind]!.skill}
+          pending={pending}
+          onCancel={() => setConfirmUnbind(null)}
+          onConfirm={() => unbind(confirmUnbind)}
+        />
       )}
     </section>
   );
