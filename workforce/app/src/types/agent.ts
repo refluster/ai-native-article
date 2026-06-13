@@ -1,18 +1,30 @@
-// Workforce agent manifest types — what the build script emits and the
-// SPA consumes from /workforce-agents.json.
+// Workforce agent types — what the live agents-api serves (ADR-0008 §7)
+// and the SPA consumes. Binding shapes mirror the canonical
+// workforce/lambdas/shared/agent.ts (duplicated because the two TS
+// projects compile under different module/target configs — same
+// precedent as types/project.ts).
 
 export type AgentBindingTrigger = {
-  /** Source of the trigger — eventbridge cron, claude-code routine on a
-   *  workflow_dispatch loop, manual/CLI invocation, or webhook-driven. */
-  scheduler: 'eventbridge' | 'claude-code-routine' | 'manual' | 'cli' | 'webhook';
-  /** AWS-style cron expression, present when scheduler is eventbridge. */
+  /** Who fires the binding. The CCR-batched shape the orchestrator
+   *  dispatches is scheduler=external + invoked_by=api. */
+  scheduler: 'eventbridge' | 'claude-code-routine' | 'gha' | 'external' | 'manual';
+  /** EventBridge-syntax cron expression, e.g. "cron(7 1 ? * * *)" (UTC). */
   cron?: string;
+  github_event?: string;
+  filter?: Record<string, string>;
+  invoked_by?: 'api' | 'repository_dispatch' | 'manual';
+  fired_from?: string;
 };
 
 export type AgentBinding = {
   skill: string;
   executor?: string;
   trigger: AgentBindingTrigger;
+  routine_spec?: string;
+  workflow?: string;
+  /** Project whose credential bag is injected at fire time. */
+  project_id?: string;
+  config?: Record<string, unknown>;
   note?: string;
 };
 

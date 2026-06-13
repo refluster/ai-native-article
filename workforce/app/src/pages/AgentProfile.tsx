@@ -32,6 +32,7 @@ import HeatStrip from '../components/HeatStrip';
 import AgentOrgGraph from '../components/AgentOrgGraph';
 import RecentPostsSection from '../components/RecentPostsSection';
 import StatusBadge from '../components/StatusBadge';
+import BindingsEditor from '../components/BindingsEditor';
 import {
   apiConfigured,
   fetchAgentExecutions,
@@ -324,30 +325,14 @@ export default function AgentProfile() {
             </dl>
           </section>
 
-          {/* BINDINGS — cron × skill pairs */}
-          <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
-            <div className="border-b border-wf-outline-variant px-4 py-3">
-              <Typeplate label="BINDINGS" value={`${agent.bindings.length} cron×skill`} />
-            </div>
-            <ul className="divide-y divide-wf-outline-variant">
-              {agent.bindings.map((b, idx) => (
-                <li key={idx} className="px-4 py-3 flex flex-col sm:flex-row sm:items-baseline gap-2 sm:gap-4 text-sm">
-                  <Link
-                    to={`/skills/${b.skill}`}
-                    className="font-wfmono text-xs px-2.5 py-1.5 border border-wf-outline-variant text-wf-on-surface bg-wf-surface-container hover:border-wf-on-surface-variant hover:bg-wf-surface-container-hi rounded-wf-sm transition-colors self-start"
-                  >
-                    {b.skill}
-                  </Link>
-                  <span className="font-wfmono text-[11px] uppercase tracking-[0.12em] text-wf-on-surface-variant">
-                    {b.trigger.cron ?? b.trigger.scheduler}
-                  </span>
-                  {b.note && (
-                    <span className="text-wf-on-surface-variant">{b.note}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
+          {/* BINDINGS — cron × skill pairs. Editable when the SigV4
+              broker is configured (binding CRUD + cron edits land as
+              audited PATCHes on the live row — ADR-0007/0008). */}
+          <BindingsEditor
+            slug={agent.slug}
+            bindings={agent.bindings}
+            onUpdated={(next) => setAgent({ ...agent, bindings: next })}
+          />
 
           {/* MEMBERSHIPS — projects this agent is an active member of.
               Lives between BINDINGS and DELIVERABLES so the operator sees

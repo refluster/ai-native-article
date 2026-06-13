@@ -231,6 +231,58 @@ export function fullName(agent: Pick<WorkforceAgent, 'first_name' | 'last_name'>
   return `${agent.first_name} ${agent.last_name}`
 }
 
+// ----- Binding writes (ADR-0007: bindings are identity config on the
+// AGENT row; PATCH replaces the whole array — append-only edits keep
+// binding_idx stable for in-flight fires) -----
+
+/** Error carrying the agents-api 422 violation list so the editor can
+ *  render rule-level feedback instead of a generic failure line. */
+export class BindingPatchError extends Error {
+  constructor(
+    message: string,
+    public readonly violations: Array<{ rule: string; field: string; msg: string }> = [],
+  ) {
+    super(message)
+  }
+}
+
+/** PATCH the agent's full bindings[] via the SigV4 broker. Returns the
+ *  server's post-write bindings (authoritative — write = live). */
+export async function patchAgentBindings(
+  slug: string,
+  bindings: WorkforceAgent['bindings'],
+): Promise<WorkforceAgent['bindings']> {
+  const { signedFetch } = await import('./sigv4')
+  const res = await signedFetch(`${ROSTER_API_BASE}/agents/${encodeURIComponent(slug)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ bindings }),
+  })
+  const json = (await res.json().catch(() => ({}))) as {
+    bindings?: WorkforceAgent['bindings']
+    error?: string
+    violations?: Array<{ rule: string; field: string; msg: string }>
+  }
+  if (!res.ok) {
+    throw new BindingPatchError(
+      json.error === 'config_validation_failed'
+        ? 'Validation failed'
+        : `agents-api ${res.status}${json.error ? ` (${json.error})` : ''}`,
+      json.violations ?? [],
+    )
+  }
+  return json.bindings ?? bindings
+}
+
+/** Skills this agent may bind (R8: the agent must be in the skill's
+ *  owners[]). Public read; used to populate the add-binding picker. */
+export async function fetchBindableSkills(slug: string): Promise<string[]> {
+  const res = await fetch(`${ROSTER_API_BASE}/skills?owner=${encodeURIComponent(slug)}&page_size=100`)
+  if (!res.ok) throw new Error(`agents-api ${res.status}`)
+  const data = (await res.json()) as { items: Array<{ name: string; status: string }> }
+  return data.items.filter((s) => s.status === 'active').map((s) => s.name)
+}
+
 // ----- Live agents-api client -----
 
 export const apiConfigured = (): boolean => WORKFORCE_AGENTS_API_BASE.length > 0
