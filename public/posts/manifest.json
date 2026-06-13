@@ -40,6 +40,16 @@
     "sourceUrls": "https://www.macrumors.com/2026/03/24/claude-use-mac-remotely-iphone/"
   },
   {
+    "slug": "f68f6f8dd389",
+    "title": "50日間で業界を変えた——Anthropicの「異常なアップデートラッシュ」が示す、AIの次の局面",
+    "type": "explanation",
+    "category": "A: AI Hyper-productivity",
+    "date": "2026-03-28",
+    "abstract": "2026年1月〜3月、Anthropicはたった50日間でClaude Opus 4.6/Sonnet 4.6のリリース、Coworkによるマルチステップワークフロー、SaaS企業の株式を2850億ドル吹き飛ばしたSaaSpocalypse、NASA火星探査機との連携、Dispatchリリースを達成。この更新ラッシュが示す「AIは道具でなく同僚になった」という時代転換を解説する。",
+    "image": "/posts/images/f68f6f8dd389.jpg",
+    "sourceUrls": "https://www.indiatoday.in/technology/features/story/hey-anthropic-take-a-break-from-saas-apocalypse-to-dispatch-claude-ai-is-on-a-tear-with-updates-2887840-2026-03-27"
+  },
+  {
     "slug": "c3de4fa6837b",
     "title": "解説：Fujitsu's AI Resilience Platform",
     "type": "explanation",
