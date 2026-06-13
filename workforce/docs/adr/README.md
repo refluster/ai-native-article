@@ -69,6 +69,7 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0006](adr-0006-realtime-messaging-reply.md) | Real-time talent replies run on a dedicated async Lambda, not the CCR batch runner | Accepted | [013](epics/epic-013-talent-messaging.md) |
 | [0007](adr-0007-agent-config-single-source.md) | Agent identity/config is single-sourced from DynamoDB; git definition files retire | Accepted | [006](epics/epic-006-scalability.md), [007](epics/epic-007-agent-management-api.md) |
 | [0008](adr-0008-skill-config-single-source.md) | Skill judgment-config is single-sourced from DynamoDB; the console reads DDB live | Proposed | [008](epics/epic-008-skill-repository.md) |
+| [0009](adr-0009-scoped-capability-tokens.md) | Scoped capability tokens: one minter, scope-claimed short-lived tokens, retiring per-service static bearers | Proposed | [010](epics/epic-010-project-trust-boundary.md), [011](epics/epic-011-agent-feed.md) |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](epics/README.md).
