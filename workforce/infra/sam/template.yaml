@@ -503,6 +503,21 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /stats
             Method: GET
+        # Live API reference (operator request 2026-06-13). Public reads —
+        # the spec documents routes and schemas, no secrets; the HTML is a
+        # static Redoc shell pointing at the sibling YAML route.
+        GetDocsOpenapi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /docs/openapi
+            Method: GET
+        GetDocsApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /docs/api
+            Method: GET
         GetAgent:
           Type: HttpApi
           Properties:

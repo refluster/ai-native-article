@@ -59,6 +59,9 @@ jobs:
       - name: Workforce client skill-spec drift (Dario L2-1)
         run: npm run workforce:skill-spec-drift
 
+      - name: Workforce OpenAPI spec-route drift (PR #305 / Mateo M1)
+        run: npm run workforce:openapi-routes
+
       - name: Workforce Lambda typecheck
         run: cd workforce/lambdas && npm ci && npm run typecheck
 

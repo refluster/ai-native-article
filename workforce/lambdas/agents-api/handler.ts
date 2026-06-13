@@ -13,6 +13,8 @@
 //   PATCH  /agents/{slug}                   config writes — operational + identity fields, validated + audited (IAM-auth at API GW; ADR-0007)
 //   DELETE /agents/{slug}                   soft delete -> archived=true (IAM-auth at API GW)
 //   GET    /agents/{slug}/audit             config-mutation audit trail, newest-first (ADR-0007)
+//   GET    /docs/openapi                    OpenAPI 3.0 spec (YAML; source ./openapi.ts)
+//   GET    /docs/api                        rendered API reference (Redoc HTML)
 //   GET    /skills                          list of skills (paginated, filterable)
 //   GET    /skills/{name}                   single skill
 //   PATCH  /skills/{name}                   judgment-config writes — validated + audited (IAM-auth at API GW; ADR-0008)
@@ -145,6 +147,7 @@ import {
   type ThreadFilter,
 } from "../shared/messaging.js";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
+import { DOCS_HTML, OPENAPI_YAML } from "./openapi.js";
 
 // Secrets Manager path holding the feed-write capability token. The
 // runner presents the same token (injected from this secret into its
@@ -220,6 +223,14 @@ export async function handler(
     // decodeURIComponent on rawProjectId is identity for them.
     const threadId = event.pathParameters?.id;
 
+    // API reference (single source: ./openapi.ts — keep in lockstep with
+    // this route table). Public reads; YAML + a Redoc shell.
+    if (routeKey === "GET /docs/openapi") {
+      return { statusCode: 200, headers: { "content-type": "application/yaml; charset=utf-8" }, body: OPENAPI_YAML };
+    }
+    if (routeKey === "GET /docs/api") {
+      return { statusCode: 200, headers: { "content-type": "text/html; charset=utf-8" }, body: DOCS_HTML };
+    }
     if (routeKey === "GET /agents") return listAgents(event);
     // ADR-0007 Decision §2 sanctions full CRUD over identity fields; this
     // is the C. IAM-auth at API GW like the other config writes. `return
