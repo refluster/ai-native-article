@@ -33,6 +33,8 @@ lambdas/
 | `POST` | `/agents` | AWS_IAM | Create an agent ([ADR-0007](../docs/adr/adr-0007-agent-config-single-source.md) "full CRUD"). Body = `slug` + the identity fields; `created_at` and the operational/computed slices are server-set. Validated by `shared/agent-config.ts` (`S0-required` + the PATCH rules + W-3), `409` on an existing slug, appends a `kind=create` AUDIT item. |
 | `PATCH` | `/agents/{slug}` | AWS_IAM | Update operational fields (`paused`, `archived`, `budget_monthly_usd_override`) **and** identity fields (ADR-0007). Validated + audited; rejects immutable/computed fields with `400 non_patchable_fields`. |
 | `DELETE` | `/agents/{slug}` | AWS_IAM | Soft delete — sets `archived: true`. |
+| `GET` | `/docs/openapi` | public | OpenAPI 3.0 spec (YAML). Single source: `agents-api/openapi.ts` — update it with every route change. |
+| `GET` | `/docs/api` | public | Rendered API reference (Redoc shell over `/docs/openapi`). |
 | `GET` | `/skills` | public | List skills (paginated, `?status=`, `?owner=`, `?page_size=`, `?cursor=`). Epic-008 PR-D. |
 | `GET` | `/skills/{name}` | public | Single skill's full record (identity + body + operational + computed). Epic-008 PR-D. |
 | `PATCH` | `/skills/{name}` | AWS_IAM | Update judgment-side skill config ([ADR-0008](../docs/adr/adr-0008-skill-config-single-source.md)): `body`, `description`, `version`, `status`, `owners`, `cost_class`, `improvement_agent[_override]`. Validated by `shared/skill-config.ts`, audited to `SKILL#{name}/AUDIT#`. Code-side fields (write-scripts, `requires[]`, `archetype`, `deliverable`) are git-owned and rejected `400`. |

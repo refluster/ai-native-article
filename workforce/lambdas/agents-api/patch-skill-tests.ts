@@ -341,3 +341,27 @@ describe("GET /skills/{name}/audit", () => {
     expect(json.items[0].changes[0]).toEqual({ field: "status", before: "stale", after: "active" });
   });
 });
+
+describe("GET /docs/* — live API reference", () => {
+  it("serves the OpenAPI YAML with the right content type", async () => {
+    const res = (await handler({
+      routeKey: "GET /docs/openapi",
+      requestContext: { http: { method: "GET", path: "/docs/openapi" } },
+    } as any)) as { statusCode?: number; headers?: Record<string, string>; body?: string };
+    expect(res.statusCode).toBe(200);
+    expect(res.headers?.["content-type"]).toContain("application/yaml");
+    expect(res.body).toContain("openapi: 3.0");
+    expect(res.body).toContain("/skills/{name}");
+    expect(res.body).toContain("/agents/{slug}");
+  });
+
+  it("serves the Redoc shell pointing at the sibling spec route", async () => {
+    const res = (await handler({
+      routeKey: "GET /docs/api",
+      requestContext: { http: { method: "GET", path: "/docs/api" } },
+    } as any)) as { statusCode?: number; headers?: Record<string, string>; body?: string };
+    expect(res.statusCode).toBe(200);
+    expect(res.headers?.["content-type"]).toContain("text/html");
+    expect(res.body).toContain('spec-url="./openapi"');
+  });
+});
