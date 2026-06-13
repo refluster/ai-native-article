@@ -18,12 +18,22 @@ The runtime working prompt is composed at fire-time:
 
 ```
 1. Generic runner spec      ← THIS FILE (dispatch logic + write-back contract)
-2. Persona voice            ← workforce/agents/{agent_slug}/system.md
-3. Skill body               ← workforce/skills/{skill}/SKILL.md
-4. Binding config overlay   ← workforce/agents/{agent_slug}/agent.json:bindings[binding_idx].config
+2. Persona voice            ← GET <wf-agents-api-base>/agents/{agent_slug} → .system_prompt   (ADR-0007)
+3. Skill body               ← GET <wf-agents-api-base>/skills/{skill} → .body                 (ADR-0008)
+4. Binding config overlay   ← the same GET /agents/{agent_slug} record → .bindings[binding_idx].config
 ```
 
-The CCR session reads these from the cloned repo on each fire. No state lives in claude.ai beyond the thin instruction pointer (see "Operator instantiation" below).
+The runner spec itself (and every skill's bundled write-script) is read from
+the cloned repo on each fire; persona and skill-judgment config are read from
+the live agents-api — the DDB rows are their authoritative store (ADR-0007 /
+ADR-0008), so a PATCH takes effect on the next fire with no deploy and no
+re-clone. The git `workforce/skills/{name}/SKILL.md` is the creation-time
+scaffold, NOT the runtime body — do not fall back to it; if the API read
+fails, throw (C-4/W-4: a fire against a possibly-stale judgment body is a
+silent-degradation class, not a graceful fallback). The API base is the
+ADR-0004 custom domain `https://workforce-api.kohuehara.xyz`. No state lives
+in claude.ai beyond the thin instruction pointer (see "Operator instantiation"
+below).
 
 ## Fire payload — batched tasks
 
@@ -76,14 +86,17 @@ Each task is independent. The orchestrator-tick is the privileged AWS principal 
 
 Iterate `payload.tasks` in order. For each task:
 
-1. **Validate task** — verify `agent_slug` exists at `workforce/agents/{agent_slug}/agent.json` and `binding_idx` is within range. If either is wrong, fail loud for this task (the operator/orchestrator misconfigured the binding); other tasks in the batch are independent and continue.
+1. **Validate task** — `GET <wf-agents-api-base>/agents/{agent_slug}` must return 200 and `binding_idx` must be within `agent.bindings` range (this is the same fetch step 2 consumes — share it). If either is wrong, fail loud for this task (the operator/orchestrator misconfigured the binding); other tasks in the batch are independent and continue. Do NOT look for `workforce/agents/{agent_slug}/` in the clone — that tree retired with ADR-0007.
 
-2. **Resolve the (skill, persona, config) triple**:
-   - `binding = agent.json["bindings"][binding_idx]`
+2. **Resolve the (skill, persona, config) triple** from the live API:
+   - `agent = GET <wf-agents-api-base>/agents/{agent_slug}`
+   - `binding = agent.bindings[binding_idx]`
    - `skill = binding.skill`
    - `config = binding.config ?? {}`
-   - `persona = workforce/agents/{agent_slug}/system.md`
-   - `skill_body = workforce/skills/{skill}/SKILL.md`
+   - `persona = agent.system_prompt`
+   - `skill_body = (GET <wf-agents-api-base>/skills/{skill}).body`
+   A non-2xx on either GET fails the task loudly — never substitute the git
+   copy of a SKILL.md body (post-ADR-0008 it is a creation-time artefact).
 
 3. **Use the inline credentials** for any side-effect the skill performs:
    - `task.credentials[type]` for each `type` in the skill's `requires[]`
@@ -265,8 +278,8 @@ curl -X POST <FIRE_URL_FROM_wf/ccr/agent-runner> \
 
 Confirm the session:
 - Parses `text` → `{tasks: [...]}` envelope as the first step
-- Reads `workforce/agents/dario/agent.json` and finds `bindings[3].skill === "feed-post"`
-- Reads `workforce/skills/feed-post/SKILL.md`
+- Fetches `GET <wf-agents-api-base>/agents/dario` and finds `bindings[3].skill === "feed-post"` (plus `system_prompt` for the persona overlay)
+- Fetches `GET <wf-agents-api-base>/skills/feed-post` and composes with its `.body` (ADR-0008 — never the git copy)
 - Produces a draft PR under `claude/feed-post-dario-{yyyy-mm-dd}` with the new post
 - Exits cleanly
 

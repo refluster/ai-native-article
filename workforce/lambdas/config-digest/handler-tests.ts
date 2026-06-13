@@ -56,6 +56,27 @@ function seedAgent(slug: string): void {
   rows.push({ pk: `AGENT#${slug}`, sk: "META", slug, archived: false });
 }
 
+function seedSkill(name: string): void {
+  rows.push({ pk: `SKILL#${name}`, sk: "META", name, status: "active" });
+}
+
+function seedSkillAudit(
+  name: string,
+  at: string,
+  changes: Array<{ field: string; before: unknown; after: unknown }>,
+): void {
+  rows.push({
+    pk: `SKILL#${name}`,
+    sk: `AUDIT#${at}#abcd1234`,
+    name,
+    at,
+    actor: "arn:aws:iam::123456789012:user/operator",
+    source: "agents-api",
+    kind: "config",
+    changes,
+  });
+}
+
 function seedAudit(
   slug: string,
   at: string,
@@ -91,22 +112,31 @@ describe("wf-config-digest", () => {
     ]);
     seedAudit("sora", daysAgo(20), [{ field: "role", before: "Old", after: "Ancient" }]); // out of window
     seedAudit("ren", daysAgo(3), [{ field: "paused", before: false, after: true }], "operational");
+    // ADR-0008: skill mutations land in the same digest under skill:{name}.
+    seedSkill("grid-watch");
+    seedSkill("feed-post"); // no mutations — must not appear
+    seedSkillAudit("grid-watch", daysAgo(2), [
+      { field: "version", before: "0.1.0", after: "0.2.0" },
+    ]);
 
     const res = await handler();
 
     expect(res.status).toBe("delivered");
-    expect(res.mutations).toBe(2);
+    expect(res.mutations).toBe(3);
     expect(res.agents_changed).toBe(2);
+    expect(res.skills_changed).toBe(1);
     expect(res.issue_url).toBe("https://github.com/x/y/issues/42");
     expect(res.export_arn).toContain("export/01EXPORT");
 
     expect(createIssue).toHaveBeenCalledTimes(1);
     const input = createIssue.mock.calls[0]![0] as { title: string; body: string; labels: string[] };
-    expect(input.title).toContain("Weekly agent-config digest");
+    expect(input.title).toContain("Weekly config digest");
     expect(input.labels).toEqual(["project:workforce", "layer:L3", "type:ops"]);
     expect(input.body).toContain("## sora — 1 mutation(s)");
     expect(input.body).toContain("## ren — 1 mutation(s)");
     expect(input.body).not.toContain("## maya");
+    expect(input.body).toContain("## skill:grid-watch — 1 mutation(s)");
+    expect(input.body).not.toContain("## skill:feed-post");
     expect(input.body).not.toContain("Ancient"); // out-of-window change excluded
     expect(input.body).toContain("`anthropic:claude-sonnet-4-6` → `anthropic:claude-opus-4-8`");
     expect(input.body).toContain("actor `user/operator`");

@@ -1,26 +1,145 @@
-// Client-side helpers for the workforce agent manifest + live agents-api.
-//   - fetch + cache the static /workforce-agents.json (build-time manifest)
+// Client-side helpers for the workforce agent roster + live agents-api.
+//   - build + cache the roster from the LIVE agents-api (ADR-0008 §7: the
+//     console reads the authoritative DDB store, not a build-time snapshot —
+//     the baked workforce-agents.json showed BINDINGS 0 for hours after a
+//     live bindings PATCH)
 //   - derive a deterministic HSL hue from a slug (for procedural avatars)
-//   - fetch live agent record / deliverables from wf-agents-api (when configured)
+//   - fetch live agent record / deliverables from wf-agents-api
 
 import type { WorkforceAgent, WorkforceAgentManifest } from '../types/agent'
 import type { WorkforceMockStats } from '../types/stats'
 import { withBasePath } from './paths'
 import { WORKFORCE_AGENTS_API_BASE } from '../config/api'
 
+// The roster read MUST work even when the build-time env var is unset
+// (bare gh-pages / local dev without env): fall back to the stable custom
+// domain (ADR-0004), which is public read.
+const ROSTER_API_BASE =
+  WORKFORCE_AGENTS_API_BASE.length > 0
+    ? WORKFORCE_AGENTS_API_BASE
+    : 'https://workforce-api.kohuehara.xyz'
+
+/** Lean agent record as returned by `GET /agents` (list view: persona
+ *  prompt + profile decks stripped server-side; `about` derived there). */
+interface AgentListItem {
+  slug: string
+  first_name: string
+  last_name: string
+  residence: string
+  role: string
+  model: string
+  prompt_version: string
+  budget_monthly_usd_default: number
+  default_project: string
+  streams: WorkforceAgent['streams']
+  bindings: WorkforceAgent['bindings']
+  created_at: string
+  about?: string
+  reports_to?: string[]
+  lateral?: string[]
+}
+
+/** Detail record from `GET /agents/{slug}` — adds the profile decks the
+ *  list view strips. */
+interface AgentDetailItem extends AgentListItem {
+  jd?: WorkforceAgent['jd'] | null
+  identity?: WorkforceAgent['identity'] | null
+  experience?: WorkforceAgent['experience'] | null
+  memory?: WorkforceAgent['memory'] | null
+}
+
+/** Derive each agent's org depth from reports_to: 0 for roots, 1 + min
+ *  parent depth otherwise. Same derivation build-agent-manifest.mjs uses,
+ *  with one divergence: a dangling/cyclic edge degrades that node to a
+ *  root with a console.warn instead of throwing — bricking the console is
+ *  the wrong failure mode for the surface the operator needs in order to
+ *  SEE a broken graph (the weekly config digest carries the loud alarm,
+ *  FU-022). */
+function deriveOrg(items: AgentListItem[]): WorkforceAgent[] {
+  const bySlug = new Map(items.map((a) => [a.slug, a]))
+  const depths = new Map<string, number>()
+  for (const a of items) {
+    if (!a.reports_to || a.reports_to.length === 0) depths.set(a.slug, 0)
+  }
+  let progressed = true
+  while (progressed) {
+    progressed = false
+    for (const a of items) {
+      if (depths.has(a.slug)) continue
+      const parentDepths = (a.reports_to ?? [])
+        .filter((p) => bySlug.has(p))
+        .map((p) => depths.get(p))
+        .filter((d): d is number => d !== undefined)
+      if (parentDepths.length > 0) {
+        depths.set(a.slug, 1 + Math.min(...parentDepths))
+        progressed = true
+      }
+    }
+  }
+  const directReports = new Map<string, string[]>(items.map((a) => [a.slug, []]))
+  for (const a of items) {
+    for (const p of a.reports_to ?? []) {
+      directReports.get(p)?.push(a.slug)
+    }
+  }
+  return items.map((a) => {
+    if (!depths.has(a.slug)) {
+      console.warn(
+        `workforce roster: unresolvable reports_to for "${a.slug}" (cycle or dangling edge) — rendering as root`,
+      )
+    }
+    return {
+      slug: a.slug,
+      first_name: a.first_name,
+      last_name: a.last_name,
+      residence: a.residence,
+      role: a.role,
+      model: a.model,
+      prompt_version: a.prompt_version,
+      budget_monthly_usd: a.budget_monthly_usd_default,
+      default_project: a.default_project,
+      streams: a.streams,
+      bindings: a.bindings ?? [],
+      created_at: a.created_at,
+      about: a.about ?? '',
+      depth: depths.get(a.slug) ?? 0,
+      reports_to: a.reports_to ?? [],
+      direct_reports: (directReports.get(a.slug) ?? []).sort(),
+      lateral: a.lateral ?? [],
+    }
+  })
+}
+
 let cache: Promise<WorkforceAgentManifest> | null = null
 
 export function loadWorkforceManifest(): Promise<WorkforceAgentManifest> {
   if (!cache) {
-    cache = fetch(withBasePath('/workforce-agents.json'))
-      .then((res) => {
-        if (!res.ok) throw new Error(`failed to load workforce-agents.json (${res.status})`)
-        return res.json() as Promise<WorkforceAgentManifest>
-      })
-      .catch((err) => {
-        cache = null
-        throw err
-      })
+    cache = (async () => {
+      const items: AgentListItem[] = []
+      let cursor: string | undefined
+      do {
+        const qs = new URLSearchParams({ page_size: '100' })
+        if (cursor) qs.set('cursor', cursor)
+        const res = await fetch(`${ROSTER_API_BASE}/agents?${qs}`)
+        if (!res.ok) throw new Error(`failed to load live agent roster (${res.status})`)
+        const page = (await res.json()) as { items: AgentListItem[]; next_cursor?: string }
+        items.push(...(page.items ?? []))
+        cursor = page.next_cursor
+      } while (cursor)
+      if (items.length === 0) {
+        // C-4 moved from build-time (red build) to render-time: an empty
+        // roster is an error state, never a silently empty directory.
+        throw new Error('live agent roster returned 0 agents — refusing to render an empty workforce')
+      }
+      const manifest: WorkforceAgentManifest = {
+        generated_at: new Date().toISOString(),
+        agents: deriveOrg(items).sort((a, b) => a.slug.localeCompare(b.slug)),
+      }
+      return manifest
+    })().catch((err) => {
+      cache = null
+      throw err
+    })
   }
   return cache
 }
@@ -67,7 +186,31 @@ export async function loadWorkforceStats(): Promise<WorkforceMockStats> {
 
 export async function findAgent(slug: string): Promise<WorkforceAgent | undefined> {
   const m = await loadWorkforceManifest()
-  return m.agents.find((a) => a.slug === slug)
+  const base = m.agents.find((a) => a.slug === slug)
+  if (!base) return undefined
+  // Hydrate the profile decks (jd / identity / experience / memory) from
+  // the detail route — the list view strips them to stay lean. A failed
+  // hydration degrades to the lean record (the decks render null-safe)
+  // rather than failing the whole profile page.
+  try {
+    const res = await fetch(`${ROSTER_API_BASE}/agents/${encodeURIComponent(slug)}`)
+    if (!res.ok) {
+      console.warn(`workforce roster: profile hydration for "${slug}" degraded (HTTP ${res.status}) — rendering the lean record without decks`)
+      return base
+    }
+    const d = (await res.json()) as AgentDetailItem
+    return {
+      ...base,
+      about: d.about ?? base.about,
+      jd: d.jd ?? undefined,
+      identity: d.identity ?? undefined,
+      experience: d.experience ?? undefined,
+      memory: d.memory ?? undefined,
+    }
+  } catch (err) {
+    console.warn(`workforce roster: profile hydration for "${slug}" degraded (${err instanceof Error ? err.message : String(err)}) — rendering the lean record without decks`)
+    return base
+  }
 }
 
 /**

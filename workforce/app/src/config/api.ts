@@ -5,8 +5,9 @@
 // AgentsApiUrl, which already includes the stage path (for prod:
 // https://{apiId}.execute-api.{region}.amazonaws.com/prod) — no manual
 // suffixing, no hand-maintained secret to drift out of region. When the
-// var is unset the SPA shows static manifest data only and falls back
-// to mock-stats for the live-stats sections.
+// var is unset, the roster read (lib/agents.ts) falls back to the prod
+// custom domain (ADR-0008 §7 — the roster is live-API, no static manifest
+// remains) and the live-stats sections fall back to mock-stats.
 //
 // Trailing slashes are stripped so callers can always concatenate
 // "/agents/foo" without worrying about double slashes.

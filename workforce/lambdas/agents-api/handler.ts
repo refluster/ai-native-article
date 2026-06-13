@@ -15,6 +15,8 @@
 //   GET    /agents/{slug}/audit             config-mutation audit trail, newest-first (ADR-0007)
 //   GET    /skills                          list of skills (paginated, filterable)
 //   GET    /skills/{name}                   single skill
+//   PATCH  /skills/{name}                   judgment-config writes — validated + audited (IAM-auth at API GW; ADR-0008)
+//   GET    /skills/{name}/audit             skill config-mutation audit trail, newest-first (ADR-0008)
 //   GET    /projects                        list of projects (paginated, ?include_self=)
 //   GET    /projects/{id}                  single project META + member/exec summary
 //   GET    /projects/{id}/members          active members (?include_revoked=true for audit)
@@ -76,6 +78,12 @@ import {
   skillPk,
   toSkillApiView,
 } from "../shared/skill-row.js";
+import {
+  SKILL_PATCHABLE_FIELDS,
+  validateSkillPatch,
+  type SkillConfigViolation,
+} from "../shared/skill-config.js";
+import { appendSkillAudit, listSkillAudit } from "../shared/skill-audit.js";
 import {
   ConditionalCheckFailedException,
   conditionalPutItem,
@@ -219,7 +227,11 @@ export async function handler(
     if (routeKey === "POST /agents") return await createAgent(event);
     if (routeKey === "GET /stats") return listStats(event);
     if (routeKey === "GET /skills") return listSkills(event);
+    if (routeKey === "GET /skills/{name}/audit" && skillName) return listSkillAuditRoute(skillName, event);
     if (routeKey === "GET /skills/{name}" && skillName) return getSkill(skillName);
+    // ADR-0008: judgment-side skill fields are DDB-authoritative and
+    // API-writable (IAM-auth). `return await` for the 500 mapping.
+    if (routeKey === "PATCH /skills/{name}" && skillName) return await patchSkill(skillName, event);
     if (routeKey === "GET /agents/{slug}/executions" && slug) return listAgentExecutions(slug, event);
     // Phase 7 PR5 — engagements API (external-client read/write surface).
     // Portfolio is the public-facing display projection of executions filtered
@@ -291,19 +303,39 @@ async function listAgents(
     // The inline persona prompt (ADR-0007 step 2) and the profile decks
     // (step 6a) are KBs per agent — serve them on GET /agents/{slug},
     // keep the list payload lean. Org edges stay: the directory and the
-    // manifest's org graph read them from the list.
+    // manifest's org graph read them from the list. `about` is the
+    // build-manifest's snippet derivation moved server-side (ADR-0008
+    // Decision §7) so the live-reading SPA index doesn't need N detail
+    // fetches just for the card blurbs.
     .map((r) => {
       const { system_prompt: _sp, jd: _jd, identity: _id, experience: _ex, memory: _me, ...lean } = toApiView(r);
-      return lean;
+      return { ...lean, about: pickAboutSnippet(r.system_prompt ?? "") };
     });
 
   return reply(200, { items, next_cursor: page.cursor });
 }
 
+/** First non-heading, non-framing prose paragraph of the persona prompt —
+ *  the "about" blurb. Same derivation build-agent-manifest.mjs uses for
+ *  the newsletter byline manifest; duplicated here because that script is
+ *  build-time JS and this is the runtime path (ADR-0008 Decision §7). */
+function pickAboutSnippet(md: string): string {
+  const paragraphs = md
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+  for (const p of paragraphs) {
+    if (p.startsWith("#")) continue;
+    if (p.startsWith("You are")) continue;
+    return p.replace(/\s+/g, " ").slice(0, 400);
+  }
+  return "";
+}
+
 async function getAgent(slug: string): Promise<APIGatewayProxyResultV2> {
   const row = await getItem<AgentMetaRow>(agentPk(slug), "META");
   if (!row) return reply(404, { error: "not_found", slug });
-  return reply(200, toApiView(row));
+  return reply(200, { ...toApiView(row), about: pickAboutSnippet(row.system_prompt ?? "") });
 }
 
 // ─── GET /stats — dashboard aggregate (real EXEC-ledger roll-up) ─────────
@@ -785,6 +817,121 @@ async function getSkill(name: string): Promise<APIGatewayProxyResultV2> {
   const row = await getItem<SkillMetaRow>(skillPk(name), "META");
   if (!row) return reply(404, { error: "not_found", name });
   return reply(200, toSkillApiView(row));
+}
+
+// ADR-0008: PATCH /skills/{name} — the single write path for a skill's
+// judgment-side config (body / description / version / status / owners /
+// cost_class / improvement_agent[_override]). Code-side fields (write-
+// scripts, requires[], archetype, deliverable) stay git-owned and are not
+// patchable. Same contract as the agent config writes: write-time
+// validation (shared/skill-config.ts), then a SKILL#{name}/AUDIT# item
+// the weekly digest compiles. There is no POST /skills — a new skill
+// enters via the git scaffold because it needs its write-script.
+async function patchSkill(
+  name: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  if (!event.body) return reply(400, { error: "missing_body" });
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(event.body) as Record<string, unknown>;
+  } catch {
+    return reply(400, { error: "invalid_json" });
+  }
+
+  const invalid = Object.keys(parsed).filter(
+    (k) => !(SKILL_PATCHABLE_FIELDS as readonly string[]).includes(k),
+  );
+  if (invalid.length > 0) {
+    return reply(400, {
+      error: "non_patchable_fields",
+      detail: `the following fields are git-owned, immutable, or computed and cannot be PATCHed: ${invalid.join(", ")} (write-scripts / requires / archetype / deliverable stay in workforce/skills/{name}/ per ADR-0008)`,
+      patchable: [...SKILL_PATCHABLE_FIELDS],
+    });
+  }
+  if (Object.keys(parsed).length === 0) {
+    return reply(400, { error: "empty_patch" });
+  }
+
+  const existing = await getItem<SkillMetaRow>(skillPk(name), "META");
+  if (!existing) return reply(404, { error: "not_found", name });
+
+  // Owners / improvement-agent existence + archived cross-check against
+  // live AGENT rows (a retired agent can neither own a skill nor run its
+  // improvement loop — M4, PR #304 review).
+  const candidateSlugs = new Set<string>();
+  if (Array.isArray(parsed.owners)) {
+    for (const s of parsed.owners) if (typeof s === "string") candidateSlugs.add(s);
+  }
+  for (const f of ["improvement_agent", "improvement_agent_override"] as const) {
+    if (typeof parsed[f] === "string") candidateSlugs.add(parsed[f] as string);
+  }
+  const stateMap = new Map<string, "active" | "archived">();
+  await Promise.all(
+    [...candidateSlugs].map(async (slug) => {
+      const row = await getItem<AgentMetaRow>(agentPk(slug), "META");
+      if (row) stateMap.set(slug, row.archived ? "archived" : "active");
+    }),
+  );
+
+  const violations: SkillConfigViolation[] = validateSkillPatch(parsed, {
+    agentState: (slug) => stateMap.get(slug),
+  });
+
+  // Reverse-R8 (M2, PR #304 review): shrinking owners[] must not orphan an
+  // EXISTING binding — the agent-side R8 check would otherwise surface the
+  // breakage as a confusing 422 on a later, unrelated agent PATCH. One
+  // META scan at C-3 scale; non-archived agents only.
+  if (violations.length === 0 && Array.isArray(parsed.owners)) {
+    const nextOwners = new Set(parsed.owners.filter((s): s is string => typeof s === "string"));
+    const removed = (existing.owners ?? []).filter((s) => !nextOwners.has(s));
+    if (removed.length > 0) {
+      let cursor: string | undefined;
+      do {
+        const page = await scanPrefix<AgentMetaRow>("AGENT#", "META", PAGE_SIZE_MAX, cursor);
+        for (const row of page.items) {
+          if (row.archived || !removed.includes(row.slug)) continue;
+          if ((row.bindings ?? []).some((b) => b.skill === name)) {
+            violations.push({
+              rule: "R8-reverse",
+              field: "owners",
+              msg: `cannot remove owner "${row.slug}": AGENT#${row.slug} still has a binding on skill "${name}" — unbind first (PATCH the agent's bindings), then shrink owners`,
+            });
+          }
+        }
+        cursor = page.cursor;
+      } while (cursor);
+    }
+  }
+
+  if (violations.length > 0) {
+    return reply(422, { error: "config_validation_failed", violations });
+  }
+
+  const changes = diffChanges(existing as unknown as Record<string, unknown>, parsed);
+  if (changes.length === 0) {
+    return reply(200, toSkillApiView(existing));
+  }
+
+  const updated = await updateOperational<SkillMetaRow>(skillPk(name), "META", parsed);
+  await appendSkillAudit(name, actorFromEvent(event), changes);
+  return reply(200, toSkillApiView(updated));
+}
+
+async function listSkillAuditRoute(
+  name: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const qs = event.queryStringParameters ?? {};
+  const pageSize = Math.min(
+    Math.max(parseInt(qs.page_size ?? `${PAGE_SIZE_DEFAULT}`, 10) || PAGE_SIZE_DEFAULT, 1),
+    PAGE_SIZE_MAX,
+  );
+  const existing = await getItem<SkillMetaRow>(skillPk(name), "META");
+  if (!existing) return reply(404, { error: "not_found", name });
+  const page = await listSkillAudit(name, pageSize, qs.cursor);
+  return reply(200, { items: page.items, next_cursor: page.cursor });
 }
 
 // ----- Projects (Epic-010 §10 — Story 6 #95) -----
