@@ -16,6 +16,7 @@ export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "discord-heartbeat": ["discord.webhook_url"] as const,
   "feed-post": ["workforce.feed_write_token"] as const,
   "grid-watch": ["workforce.feed_write_token"] as const,
+  "india-grid-watch": ["workforce.feed_write_token"] as const,
   "pdm-charter": [],
   "positioning-write": [],
   "pr-review": ["github.token"] as const,
