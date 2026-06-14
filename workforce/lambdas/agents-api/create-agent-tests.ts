@@ -260,7 +260,8 @@ describe("POST /agents — create (ADR-0007)", () => {
   });
 
   it("enforces the W-3 aggregate budget cap against the existing roster", async () => {
-    seedAgent("ren", { slug: "ren", pk: "AGENT#ren", budget_monthly_usd_default: 150 });
+    // Fixtures track the W-3 cap (190): 180 + 11 = 191 trips it, 180 + 10 = 190 fits.
+    seedAgent("ren", { slug: "ren", pk: "AGENT#ren", budget_monthly_usd_default: 180 });
     seedAgent("maya", {
       slug: "maya",
       pk: "AGENT#maya",

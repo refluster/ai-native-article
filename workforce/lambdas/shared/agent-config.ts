@@ -70,9 +70,10 @@ export const SYSTEM_PROMPT_MAX_CHARS = 32 * 1024;
 export type IdentityPatchableField = (typeof IDENTITY_PATCHABLE_FIELDS)[number];
 
 // W-3 cap: sum of effective monthly budgets across non-archived agents.
-// Mirrors validate-agent-json.mjs W3_CAP; the constant moves here with the
-// check and retires there in migration step 6.
-export const W3_BUDGET_CAP_USD = 160;
+// The single enforced source of truth (validate-agent-json.mjs retired in
+// ADR-0007 migration step 6); governance.md §2 W-3 documents the same value.
+// Raised 160 → 190 on 2026-06-14 for the Finance & Capital group (+USD 18/mo).
+export const W3_BUDGET_CAP_USD = 190;
 
 const SLUG = /^[a-z]+$/;
 const MODEL = /^(anthropic|azure|claude-code):[a-z0-9-]+(?:-[a-z0-9.]+)*$/;
