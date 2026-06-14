@@ -484,6 +484,7 @@ describe("GET /feed full-body hydration", () => {
   it("falls back to body_preview when the S3 object is missing (one bad post can't 500 the feed)", async () => {
     // body_preview at the cap → hydration attempted, but no full_body seeded
     // → fetchPostBody throws → list path swallows and serves the preview.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     seedPost({
       agent_slug: "ren",
       ulid: "01A",
@@ -503,6 +504,33 @@ describe("GET /feed full-body hydration", () => {
     expect(body.posts.map((p) => p.post_id)).toEqual(["01B", "01A"]);
     expect(body.posts.find((p) => p.post_id === "01A")!.body).toBe("y".repeat(320));
     expect(body.posts.find((p) => p.post_id === "01B")!.body).toBe("healthy short post");
+    // W-4: the degrade is bounded but NOT silent — the miss is logged.
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]![0]).toContain("01A");
+    warn.mockRestore();
+  });
+
+  it("pins the cheap-path boundary at exactly the preview cap (319 inline, 320 hydrates)", async () => {
+    // 319 chars < cap → provably whole → no S3 read (full_body must be ignored).
+    seedPost({
+      agent_slug: "ren",
+      ulid: "01A",
+      posted_at: "2026-05-25T00:00:00.000Z",
+      body_preview: "a".repeat(319),
+      full_body: "SHOULD NOT BE FETCHED",
+    });
+    // 320 chars === cap → maybe truncated → hydrate the full body.
+    seedPost({
+      agent_slug: "ren",
+      ulid: "01B",
+      posted_at: "2026-05-26T00:00:00.000Z",
+      body_preview: "b".repeat(320),
+      full_body: `${"b".repeat(320)} and the rest`,
+    });
+    const res = await handler(evt("GET /feed"));
+    const body = bodyOf(res) as { posts: Array<{ post_id: string; body: string }> };
+    expect(body.posts.find((p) => p.post_id === "01A")!.body).toBe("a".repeat(319));
+    expect(body.posts.find((p) => p.post_id === "01B")!.body).toBe(`${"b".repeat(320)} and the rest`);
   });
 });
 

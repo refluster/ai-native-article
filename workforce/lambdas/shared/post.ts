@@ -315,12 +315,22 @@ export async function fetchPostBody(bodyRef: string): Promise<string> {
  *  bad object cannot take down the whole feed. The detail endpoint
  *  (`getPost` + `fetchPostBody`) stays fail-loud (C-4 / W-4) because a
  *  detail request is *about* that one post — there, a missing body is a
- *  write-path integrity violation worth surfacing. */
+ *  write-path integrity violation worth surfacing.
+ *
+ *  W-4 ("no *silent* degradation"): the fallback is bounded but not
+ *  silent — it `console.warn`s the offending `body_ref` so a systemic S3
+ *  miss surfaces in CloudWatch (operator can alarm on it) rather than the
+ *  feed quietly serving cut posts. A best-effort serve + a loud log is the
+ *  intended middle ground between "500 the page" and "hide the rot". */
 export async function resolveFeedBody(row: FeedPostRow): Promise<string> {
   if (row.body_preview.length < BODY_PREVIEW_MAX_CHARS) return row.body_preview;
   try {
     return await fetchPostBody(row.body_ref);
-  } catch {
+  } catch (err) {
+    // Bounded degrade — serve the preview, but make the miss observable.
+    console.warn(
+      `resolveFeedBody: body hydration failed for ${row.pk}/${row.sk} (body_ref=${row.body_ref}); serving truncated preview. ${err instanceof Error ? err.message : String(err)}`,
+    );
     return row.body_preview;
   }
 }
