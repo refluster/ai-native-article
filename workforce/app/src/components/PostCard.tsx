@@ -19,7 +19,12 @@ const KIND_TINT: Record<PostKind, string> = {
   observation: 'border-wf-secondary text-wf-secondary',
 };
 
-const BODY_PREVIEW_CHARS = 320;
+// Client-side collapse threshold. Posts target 280–600 chars (Epic-011 §1),
+// so a 600-char cut lets the typical post render in full and reserves the
+// "read more" affordance for the genuinely long outlier — the API now ships
+// the whole body, so nothing is lost either way (only deferred behind the
+// toggle).
+const BODY_PREVIEW_CHARS = 600;
 
 function formatRelative(iso: string): string {
   const t = Date.parse(iso);

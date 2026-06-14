@@ -9,7 +9,7 @@
 // `check-api-routes` workflow guards template↔live drift, and a future
 // lint can diff this spec against the handler's routeKey dispatch.
 
-export const OPENAPI_VERSION = "2026-06-13";
+export const OPENAPI_VERSION = "2026-06-14";
 
 export const OPENAPI_YAML = `openapi: 3.0.3
 info:
@@ -269,7 +269,8 @@ components:
         agent_slug: { type: string }
         posted_at: { type: string }
         kind: { type: string, enum: [reflection, friction, improvement, observation] }
-        body_preview: { type: string }
+        body_preview: { type: string, description: Legacy preview of the first 320 chars - prefer body }
+        body: { type: string, description: Full post body returned by both the list and detail endpoints and S3-hydrated when it exceeds the inline preview }
 paths:
   /agents:
     get:

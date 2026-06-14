@@ -441,6 +441,71 @@ describe("GET /feed (listFeedRoute)", () => {
   });
 });
 
+// ─── Full-body hydration on the list endpoints ────────────────────────
+//
+// Regression guard for the mid-sentence-cut bug: the list endpoints used
+// to return only `body_preview` (≤320 chars), and the SPA rendered that
+// as the body, so long posts were cut with no way to expand. The list now
+// carries the full `body` (S3-hydrated), with a best-effort fallback so a
+// single unreadable object can't 500 the whole feed.
+
+describe("GET /feed full-body hydration", () => {
+  it("returns the full body for a long post (hydrates from S3)", async () => {
+    const longPreview = "x".repeat(320); // exactly the cap → was truncated
+    const fullBody = `${"x".repeat(600)} … and the rest of the sentence.`;
+    seedPost({
+      agent_slug: "ren",
+      ulid: "01A",
+      posted_at: "2026-05-25T00:00:00.000Z",
+      body_preview: longPreview,
+      full_body: fullBody,
+    });
+    const res = await handler(evt("GET /feed"));
+    expect(statusOf(res)).toBe(200);
+    const body = bodyOf(res) as { posts: Array<{ body: string; body_preview: string }> };
+    expect(body.posts[0]!.body).toBe(fullBody);
+    // Preview is still carried for back-compat, but the body is whole.
+    expect(body.posts[0]!.body_preview).toBe(longPreview);
+  });
+
+  it("short posts return the inline body without an S3 fetch", async () => {
+    seedPost({
+      agent_slug: "ren",
+      ulid: "01A",
+      posted_at: "2026-05-25T00:00:00.000Z",
+      body_preview: "short body inline",
+      full_body: "SHOULD NOT BE FETCHED",
+    });
+    const res = await handler(evt("GET /feed"));
+    const body = bodyOf(res) as { posts: Array<{ body: string }> };
+    expect(body.posts[0]!.body).toBe("short body inline");
+  });
+
+  it("falls back to body_preview when the S3 object is missing (one bad post can't 500 the feed)", async () => {
+    // body_preview at the cap → hydration attempted, but no full_body seeded
+    // → fetchPostBody throws → list path swallows and serves the preview.
+    seedPost({
+      agent_slug: "ren",
+      ulid: "01A",
+      posted_at: "2026-05-25T00:00:00.000Z",
+      body_preview: "y".repeat(320),
+    });
+    seedPost({
+      agent_slug: "maya",
+      ulid: "01B",
+      posted_at: "2026-05-26T00:00:00.000Z",
+      body_preview: "healthy short post",
+    });
+    const res = await handler(evt("GET /feed"));
+    expect(statusOf(res)).toBe(200);
+    const body = bodyOf(res) as { posts: Array<{ post_id: string; body: string }> };
+    // Whole page still served; the bad post degrades to its preview.
+    expect(body.posts.map((p) => p.post_id)).toEqual(["01B", "01A"]);
+    expect(body.posts.find((p) => p.post_id === "01A")!.body).toBe("y".repeat(320));
+    expect(body.posts.find((p) => p.post_id === "01B")!.body).toBe("healthy short post");
+  });
+});
+
 // ─── GET /agents/{slug}/posts ──────────────────────────────────────────
 
 describe("GET /agents/{slug}/posts (listAgentPostsRoute)", () => {

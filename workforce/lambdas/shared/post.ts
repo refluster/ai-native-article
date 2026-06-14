@@ -111,6 +111,18 @@ export interface FeedPostDetailView extends FeedPostApiView {
   body: string;
 }
 
+/** List-view shape — `GET /feed`, `GET /agents/{slug}/posts`. Carries the
+ *  **full** `body` alongside `body_preview` so the feed renders the whole
+ *  post instead of a mid-sentence cut. The renderer (PostCard) owns the
+ *  client-side "read more" collapse; the API's job is to never withhold
+ *  text. Hydrated by `toFeedPostListView` — short posts (whole body fits
+ *  the inline preview) skip the S3 round-trip; longer ones fetch, with a
+ *  best-effort fallback to `body_preview` so one unreadable S3 object
+ *  can't 500 the whole page. */
+export interface FeedPostListView extends FeedPostApiView {
+  body: string;
+}
+
 // --- Row → view ----------------------------------------------------------
 
 /** Extract the ulid suffix from a `POST#{ulid}` sort key. */
@@ -291,10 +303,43 @@ export async function fetchPostBody(bodyRef: string): Promise<string> {
   return await res.Body.transformToString();
 }
 
+/** Resolve a post's **full** body for list rendering.
+ *
+ *  Cheap-path: a `body_preview` shorter than `BODY_PREVIEW_MAX_CHARS` is
+ *  the whole body, so we return it without touching S3. A preview at the
+ *  cap may be truncated → hydrate from S3.
+ *
+ *  Error posture differs from the detail endpoint **on purpose**: the
+ *  list path is best-effort. A single post whose `body_ref` 404s falls
+ *  back to its (possibly cut) `body_preview` rather than throwing, so one
+ *  bad object cannot take down the whole feed. The detail endpoint
+ *  (`getPost` + `fetchPostBody`) stays fail-loud (C-4 / W-4) because a
+ *  detail request is *about* that one post — there, a missing body is a
+ *  write-path integrity violation worth surfacing. */
+export async function resolveFeedBody(row: FeedPostRow): Promise<string> {
+  if (row.body_preview.length < BODY_PREVIEW_MAX_CHARS) return row.body_preview;
+  try {
+    return await fetchPostBody(row.body_ref);
+  } catch {
+    return row.body_preview;
+  }
+}
+
+/** Build the list-view (full body) for one row. Used by `GET /feed` and
+ *  `GET /agents/{slug}/posts`; map over a page with `Promise.all` so the
+ *  S3 hydrations fan out in parallel. */
+export async function toFeedPostListView(row: FeedPostRow): Promise<FeedPostListView> {
+  return { ...toFeedPostApiView(row), body: await resolveFeedBody(row) };
+}
+
 // --- Create (write path) -------------------------------------------------
 
-/** Inline-preview cap (data-model.md §POST rows: ≤320 chars). */
-const BODY_PREVIEW_MAX_CHARS = 320;
+/** Inline-preview cap (data-model.md §POST rows: ≤320 chars). A stored
+ *  `body_preview` shorter than this is provably the whole body (no write
+ *  could have truncated it); one exactly at the cap may be cut, so the
+ *  read path hydrates the full body from S3 for those. Exported so the
+ *  feed routes share the single truncation threshold. */
+export const BODY_PREVIEW_MAX_CHARS = 320;
 /** Hard cap — beyond this a "post" is a mis-shaped article (Epic-011 §1). */
 const BODY_HARD_MAX_CHARS = 2000;
 /** Max references on one post (Epic-011 §1 structured tail). */
