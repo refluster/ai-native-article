@@ -110,6 +110,8 @@ export function renderRecallBlock(results: RecallResult[]): string {
 function renderRecallLine(result: RecallResult): string {
   const row = result.row;
   const when = row.started_at.slice(0, 10);
-  const summary = row.artifact_ref?.summary ?? row.error ?? "(no summary)";
+  // Prefer the top-level engagement summary (the business line); fall back to
+  // the artifact preview for legacy/CCR rows, then the error, then a marker.
+  const summary = row.summary ?? row.artifact_ref?.summary ?? row.error ?? "(no summary)";
   return `- [${when} · ${row.skill_name} · ${row.status}] ${summary}`;
 }

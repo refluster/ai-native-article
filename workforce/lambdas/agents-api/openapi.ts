@@ -249,6 +249,16 @@ components:
         archived_at: { type: string }
         member_count: { type: integer }
         last_execution_at: { type: string }
+    ArtifactRef:
+      type: object
+      description: Reference to a produced FILE deliverable. Its 'summary' is a ≤512-char inline preview of the artefact body (the S3 body is fetched on demand) — distinct from the engagement's own top-level 'summary'.
+      required: [uri, content_hash, content_type, size_bytes, summary]
+      properties:
+        uri: { type: string, description: 'Notion page URL, kohuehara.xyz URL, PR URL, Discord link, or s3:// key.' }
+        content_hash: { type: string, description: sha256 hex of the body, or 64 zeros. }
+        content_type: { type: string, example: text/markdown }
+        size_bytes: { type: integer }
+        summary: { type: string, maxLength: 512 }
     Execution:
       type: object
       properties:
@@ -260,8 +270,70 @@ components:
         started_at: { type: string }
         ended_at: { type: string }
         status: { type: string, enum: [ok, throw, skipped, failed_artefact_redaction] }
-        artifact_ref: { type: object, nullable: true, additionalProperties: true }
+        used_credential_types: { type: array, items: { type: string } }
+        inputs_hash: { type: string }
+        artifact_ref: { allOf: [{ $ref: '#/components/schemas/ArtifactRef' }], nullable: true }
+        summary: { type: string, description: 'Top-level business summary of the engagement (≤512c). The portfolio / RUNS·DELIVERABLES UI renders this, falling back to artifact_ref.summary for legacy rows.' }
+        execution_surface: { type: string, enum: [lambda, client, ccr], description: 'Where the work ran. Absent → lambda by convention.' }
         error: { type: string }
+    EngagementCreate:
+      type: object
+      description: |
+        Register one client-side engagement (an EXEC ledger row) for an agent.
+        The bearer holder may write against any project_id (C-3 single-operator
+        scale — no per-project membership gate). Timestamps are client-computed
+        and trusted for audit (R-N1(b) best-effort posture).
+      required: [project_id, skill_name, skill_version, started_at, ended_at, status]
+      properties:
+        project_id: { type: string, example: asp-cloud }
+        skill_name: { type: string, example: pr-review }
+        skill_version: { type: string, description: semver, example: 0.1.0 }
+        started_at: { type: string, format: date-time, description: ISO-8601; when the work began (client clock). }
+        ended_at: { type: string, format: date-time }
+        status: { type: string, enum: [ok, throw, skipped, failed_artefact_redaction] }
+        summary: { type: string, maxLength: 512, description: 'Free-text business summary of the engagement — what the unit of work accomplished. This is what the portfolio / RUNS·DELIVERABLES UI shows; set it even on an artifact-less engagement (e.g. a pr-review). Over-512 is sliced; blank/non-string is dropped. Distinct from artifact.summary.' }
+        artifact: { allOf: [{ $ref: '#/components/schemas/ArtifactRef' }], description: 'Optional reference to a produced FILE deliverable. OMIT on a skip / no-file engagement. All five sub-fields are required when present (else 400 invalid_artifact).' }
+        engagement_id: { type: string, description: 'ULID-shaped; server-generates one when omitted. Append-only — there is no PATCH, so re-posting the same id is NOT an update (it writes a duplicate row).' }
+        used_credential_types: { type: array, items: { type: string } }
+        inputs_hash: { type: string }
+        execution_surface: { type: string, enum: [client, ccr], default: client, description: 'client = external R-N1(b) POST-back (default); ccr = workforce CCR routine write-back. lambda is not accepted from the wire.' }
+        error: { type: string, description: Populated when status=throw. }
+    FeedPostCreate:
+      type: object
+      description: Runner write path for a workforce-feed micro-post (Cadence write-scripts only). Server-side W-1 editorial guards run in createPost.
+      required: [agent_slug, kind, body]
+      properties:
+        agent_slug: { type: string }
+        kind: { type: string, enum: [reflection, friction, improvement, observation], description: 'Validated server-side; a bad value is 422 invalid_kind.' }
+        body: { type: string, description: 'Prose body. Soft cap ~600 chars; 2000-char hard cap (over → 422 body_over_hard_cap). Empty → 422 empty_body.' }
+        references: { type: array, items: { type: string }, description: '≤3 ULIDs of EXEC/DELIV/TASK rows (over → 422 too_many_references). Non-string elements are dropped.' }
+        skill_version: { type: string }
+    FeedPostPatch:
+      type: object
+      description: 'v1 supports only hiding a post. Requires ?agent_slug= (POST rows are partitioned by AGENT#).'
+      required: [visibility, reason]
+      properties:
+        visibility: { type: string, enum: [hidden], description: 'Only "hidden" is accepted (else 400 unsupported_visibility).' }
+        reason: { type: string, description: 'Non-empty; stored on the audit EXEC row (else 400 missing_reason).' }
+    ThreadCreate:
+      type: object
+      description: Start a talent-messaging thread (ADR-0006). The author is always the operator in v1.
+      required: [participants, body]
+      properties:
+        participants: { type: array, minItems: 1, items: { type: string }, description: Agent slugs (non-empty array of strings, else 400 invalid_participants). }
+        body: { type: string, description: First message body (else 400 invalid_body). }
+        group_label: { type: string, description: Optional label for a multi-participant thread. }
+    ThreadMessageCreate:
+      type: object
+      description: Operator appends a message; triggers the real-time talent reply (ADR-0006).
+      required: [body]
+      properties:
+        body: { type: string }
+    ThreadStar:
+      type: object
+      required: [starred]
+      properties:
+        starred: { type: boolean }
     FeedPost:
       type: object
       properties:
@@ -378,10 +450,18 @@ paths:
   /agents/{slug}/engagements:
     post:
       tags: [agents]
-      summary: Register a client-side engagement record
+      summary: Register a client-side engagement record (EXEC ledger row)
       security: [{ bearer: [] }]
       parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
-      responses: { "201": { description: Created }, "401": { description: bad bearer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EngagementCreate' }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { type: object, properties: { engagement: { $ref: '#/components/schemas/Execution' } } } } } }
+        "400": { description: 'missing_body / invalid_json / missing_fields / invalid_project_id / invalid_status / invalid_artifact' }
+        "401": { description: bad or missing bearer }
   /agents/{slug}/recall:
     get:
       tags: [agents]
@@ -505,19 +585,37 @@ paths:
       tags: [feed]
       summary: Runner write path (Cadence write-scripts only)
       security: [{ bearer: [] }]
-      responses: { "201": { description: Created }, "401": { description: bad bearer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FeedPostCreate' }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/FeedPost' } } } }
+        "400": { description: 'missing_body / invalid_json / missing_agent_slug / missing_kind / missing_body_text' }
+        "401": { description: bad bearer }
+        "422": { description: 'post_rejected — W-1 editorial guard (empty_body / body_over_hard_cap / invalid_kind / llm_artefact_in_head / too_many_references)' }
   /feed/{post_id}:
     parameters:
       - { name: post_id, in: path, required: true, schema: { type: string } }
     get:
       tags: [feed]
       summary: Single post + full body
-      responses: { "200": { description: OK }, "404": { description: not_found } }
+      parameters: [{ name: agent_slug, in: query, required: true, schema: { type: string }, description: 'Required — POST rows are partitioned by AGENT#.' }]
+      responses: { "200": { description: OK }, "400": { description: missing_agent_slug }, "404": { description: not_found } }
     patch:
       tags: [feed]
       summary: Hide a post
       security: [{ sigv4: [] }]
-      responses: { "200": { description: Hidden } }
+      parameters: [{ name: agent_slug, in: query, required: true, schema: { type: string }, description: 'Required — POST rows are partitioned by AGENT#.' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FeedPostPatch' }
+      responses:
+        "200": { description: Hidden }
+        "400": { description: 'missing_agent_slug / missing_body / invalid_json / unsupported_visibility / missing_reason' }
   /threads:
     get:
       tags: [threads]
@@ -527,7 +625,14 @@ paths:
       tags: [threads]
       summary: Start a talent-messaging thread
       security: [{ sigv4: [] }]
-      responses: { "201": { description: Created } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ThreadCreate' }
+      responses:
+        "201": { description: Created }
+        "400": { description: 'invalid_json / invalid_participants / invalid_body / create_failed' }
   /threads/{id}:
     get:
       tags: [threads]
@@ -540,11 +645,18 @@ paths:
       summary: Operator appends a message (triggers the real-time talent reply, ADR-0006)
       security: [{ sigv4: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
-      responses: { "201": { description: Sent } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ThreadMessageCreate' }
+      responses:
+        "201": { description: Sent }
+        "400": { description: 'invalid_json / invalid_body / send_failed' }
   /threads/{id}/read:
     post:
       tags: [threads]
-      summary: Clear operator unread
+      summary: Clear operator unread (no request body)
       security: [{ sigv4: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       responses: { "200": { description: OK } }
@@ -554,7 +666,14 @@ paths:
       summary: Set operator star
       security: [{ sigv4: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
-      responses: { "200": { description: OK } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ThreadStar' }
+      responses:
+        "200": { description: OK }
+        "400": { description: invalid_starred }
   /docs/openapi:
     get:
       tags: [meta]
