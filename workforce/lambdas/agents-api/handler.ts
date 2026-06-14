@@ -124,6 +124,7 @@ import {
   SecretsManagerClient,
 } from "@aws-sdk/client-secrets-manager";
 import {
+  BODY_PREVIEW_MAX_CHARS,
   createPost,
   fetchPostBody,
   getPost,
@@ -131,6 +132,7 @@ import {
   listAgentPosts,
   listFeed,
   toFeedPostApiView,
+  toFeedPostListView,
   type FeedPostDetailView,
   type PostKind,
 } from "../shared/post.js";
@@ -1567,7 +1569,10 @@ async function listFeedRoute(
     includeHidden: qs.include_hidden === "true",
   });
   return reply(200, {
-    posts: page.items.map(toFeedPostApiView),
+    // Full body, not a 320-char preview — the feed renders the whole post
+    // (PostCard owns the client-side "read more" collapse). Hydrations fan
+    // out in parallel; short posts skip S3 (see resolveFeedBody).
+    posts: await Promise.all(page.items.map(toFeedPostListView)),
     cursor: page.cursor,
   });
 }
@@ -1587,7 +1592,7 @@ async function listAgentPostsRoute(
     includeHidden: qs.include_hidden === "true",
   });
   return reply(200, {
-    posts: page.items.map(toFeedPostApiView),
+    posts: await Promise.all(page.items.map(toFeedPostListView)),
     cursor: page.cursor,
   });
 }
@@ -1621,9 +1626,11 @@ async function getFeedPostRoute(
   const view = toFeedPostApiView(row);
   let body: string;
   // Skip the S3 round-trip when the entire body fit into body_preview
-  // (≤320 chars, per data-model.md). Most posts at 280–600 chars do
-  // NOT fit, so the round-trip is the common case; cheap-path the rest.
-  if (row.body_preview.length < 320) {
+  // (< BODY_PREVIEW_MAX_CHARS, per data-model.md). Most posts at 280–600
+  // chars do NOT fit, so the round-trip is the common case; cheap-path the
+  // rest. Detail stays fail-loud on S3 error (unlike the best-effort list
+  // path) — a detail request is about this one post.
+  if (row.body_preview.length < BODY_PREVIEW_MAX_CHARS) {
     body = row.body_preview;
   } else {
     body = await fetchPostBody(row.body_ref);

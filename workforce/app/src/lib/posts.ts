@@ -6,11 +6,13 @@
 //   - mock: /workforce-mock-feed.json, the build-time placeholder used
 //     on gh-pages / local dev when the API base is unset.
 //
-// The live API returns the list-view shape (body_preview + references as
+// The live API returns the list-view shape (full `body` + references as
 // {type,id,accessible} objects); we map it to the SPA's Post shape
-// (full-ish body + references as `TYPE#id` strings). v1 renders
-// body_preview as the body — long posts show the ≤320-char preview; the
-// full-body-on-expand path (GET /feed/{post_id}) is a follow-up.
+// (`body` + references as `TYPE#id` strings). The list endpoints now
+// carry the whole body (S3-hydrated server-side), so the feed renders the
+// complete post and PostCard owns the client-side "read more" collapse.
+// `body_preview` is kept as a fallback for any older API build that hasn't
+// shipped the full-body field yet.
 
 import type { Post, WorkforceMockFeed, AgentSkipSummary, PostKind } from '../types/post';
 import { withBasePath } from './paths';
@@ -30,6 +32,9 @@ interface FeedPostApiView {
   agent_slug: string;
   posted_at: string;
   kind: PostKind;
+  /** Full post body — present on current API builds (list + detail). */
+  body?: string;
+  /** Legacy ≤320-char preview; fallback when `body` is absent. */
   body_preview: string;
   references: ReferenceView[];
   visibility?: 'hidden';
@@ -45,7 +50,7 @@ function apiViewToPost(v: FeedPostApiView): Post {
     agent_slug: v.agent_slug,
     posted_at: v.posted_at,
     kind: v.kind,
-    body: v.body_preview,
+    body: v.body ?? v.body_preview,
     references: (v.references ?? []).map(refToString),
   };
 }
