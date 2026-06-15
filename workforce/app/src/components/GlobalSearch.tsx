@@ -49,8 +49,22 @@ export default function GlobalSearch() {
   const ensureLoaded = () => {
     if (loadedRef.current) return
     loadedRef.current = true
-    loadWorkforceManifest().then((m) => setAgents(m.agents)).catch(() => { loadedRef.current = false })
-    loadWorkforceSkillManifest().then((m) => setSkills(m.skills)).catch(() => { loadedRef.current = false })
+    // A degraded typeahead must be diagnosable (W-4 fail-loud): warn on
+    // each failed load and reset the latch so a re-focus retries. The
+    // /search page (Enter) re-attempts and surfaces the real error to the
+    // user; the warn is for the bug report when the dropdown looks empty.
+    loadWorkforceManifest()
+      .then((m) => setAgents(m.agents))
+      .catch((err) => {
+        loadedRef.current = false
+        console.warn('GlobalSearch: agent roster load failed — typeahead degraded, Enter still works', err)
+      })
+    loadWorkforceSkillManifest()
+      .then((m) => setSkills(m.skills))
+      .catch((err) => {
+        loadedRef.current = false
+        console.warn('GlobalSearch: skill manifest load failed — typeahead degraded, Enter still works', err)
+      })
   }
 
   const rows = useMemo<Row[]>(() => {
