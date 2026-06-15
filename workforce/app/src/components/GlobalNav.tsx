@@ -16,10 +16,11 @@
 // Skills / Org are reachable from the feed's right rail.
 
 import { type ReactNode } from 'react';
-import { NavLink, Link, useNavigate } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import { SITE_DISPLAY_NAME, OPERATOR } from '../config/site';
 import { AUTH_IS_CONFIGURED } from '../config/auth';
 import { signOut } from '../lib/auth';
+import GlobalSearch from './GlobalSearch';
 
 type IconProps = { className?: string };
 
@@ -75,15 +76,6 @@ function ProjectsIcon({ className }: IconProps) {
     </svg>
   );
 }
-function SearchIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden className={className} fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <circle cx="11" cy="11" r="6.5" />
-      <path d="m16 16 4 4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 const NAV: { to: string; label: string; icon: (p: IconProps) => ReactNode; end?: boolean; badge?: string }[] = [
   { to: '/',              label: 'Home',          icon: HomeIcon, end: true },
   { to: '/agents',        label: 'My Network',    icon: NetworkIcon },
@@ -99,8 +91,6 @@ interface Props {
 }
 
 export default function GlobalNav({ right }: Props) {
-  const navigate = useNavigate();
-
   return (
     <header className="sticky top-0 z-30 bg-wf-surface/90 backdrop-blur border-b border-wf-outline-variant">
       <div className="max-w-[1440px] mx-auto px-3 sm:px-6 md:px-12 h-14 flex items-center gap-3 sm:gap-4">
@@ -114,19 +104,7 @@ export default function GlobalNav({ right }: Props) {
           </span>
         </Link>
 
-        <form
-          onSubmit={(e) => { e.preventDefault(); navigate('/agents'); }}
-          className="hidden sm:flex items-center gap-2 bg-wf-surface-container rounded-wf-sm px-3 h-9 w-44 md:w-64 focus-within:ring-1 focus-within:ring-wf-primary"
-          role="search"
-        >
-          <SearchIcon className="w-4 h-4 text-wf-on-surface-variant shrink-0" />
-          <input
-            type="search"
-            aria-label="Search the network"
-            placeholder="Search talent, skills…"
-            className="bg-transparent text-sm text-wf-on-surface placeholder:text-wf-on-surface-variant w-full focus:outline-none"
-          />
-        </form>
+        <GlobalSearch />
 
         {/* Destinations */}
         <nav className="flex items-stretch ml-auto h-full">
