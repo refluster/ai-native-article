@@ -91,6 +91,7 @@ import {
   conditionalPutItem,
   getItem,
   queryBySkPrefix,
+  scanAllPrefix,
   scanPrefix,
   updateOperational,
 } from "../shared/ddb.js";
@@ -304,13 +305,14 @@ async function listAgents(
   const qs = event.queryStringParameters ?? {};
   const wantArchived = qs.archived === "true";
   const filterStream = qs.stream as Stream | undefined;
-  const pageSize = Math.min(
-    Math.max(parseInt(qs.page_size ?? `${PAGE_SIZE_DEFAULT}`, 10) || PAGE_SIZE_DEFAULT, 1),
-    PAGE_SIZE_MAX,
-  );
 
-  const page = await scanPrefix<AgentMetaRow>("AGENT#", "META", pageSize, qs.cursor);
-  const items = page.items
+  // Drain the whole AGENT#/META set (scanAllPrefix), never a single
+  // Limit-capped scan window: a `scanPrefix` page bounds items EVALUATED,
+  // not matched, so a paged list silently drops agents outside the first
+  // window (FU-PROJ-SCAN — same root cause as the projects-console
+  // disappearance). The roster is ≤ a few hundred at C-3 scale.
+  const agentRows = await scanAllPrefix<AgentMetaRow>("AGENT#", "META");
+  const items = agentRows
     .filter((r) => wantArchived || !r.archived)
     .filter((r) => !filterStream || r.streams.includes(filterStream))
     // The inline persona prompt (ADR-0007 step 2) and the profile decks
@@ -325,7 +327,9 @@ async function listAgents(
       return { ...lean, about: pickAboutSnippet(r.system_prompt ?? "") };
     });
 
-  return reply(200, { items, next_cursor: page.cursor });
+  // next_cursor retained for response-shape stability; the set is fully
+  // drained above, so it is always absent (no client-side paging needed).
+  return reply(200, { items, next_cursor: undefined });
 }
 
 /** First non-heading, non-framing prose paragraph of the persona prompt —
@@ -812,18 +816,17 @@ async function listSkills(
   const qs = event.queryStringParameters ?? {};
   const filterStatus = qs.status as "active" | "stale" | "deprecated" | undefined;
   const filterOwner = qs.owner; // agent slug — show skills the given agent owns
-  const pageSize = Math.min(
-    Math.max(parseInt(qs.page_size ?? `${PAGE_SIZE_DEFAULT}`, 10) || PAGE_SIZE_DEFAULT, 1),
-    PAGE_SIZE_MAX,
-  );
 
-  const page = await scanPrefix<SkillMetaRow>("SKILL#", "META", pageSize, qs.cursor);
-  const items = page.items
+  // Drain the whole SKILL#/META set (see scanAllPrefix / FU-PROJ-SCAN): a
+  // Limit-capped scan window would hide skills that scan past it.
+  const skillRows = await scanAllPrefix<SkillMetaRow>("SKILL#", "META");
+  const items = skillRows
     .filter((r) => !filterStatus || r.status === filterStatus)
     .filter((r) => !filterOwner || r.owners.includes(filterOwner))
     .map(toSkillApiView);
 
-  return reply(200, { items, next_cursor: page.cursor });
+  // Fully drained above — next_cursor retained for shape, always absent.
+  return reply(200, { items, next_cursor: undefined });
 }
 
 async function getSkill(name: string): Promise<APIGatewayProxyResultV2> {
@@ -994,12 +997,15 @@ async function listProjects(
   const includeSelf = qs.include_self === "true";
   const filterStatus = qs.status as "active" | "archived" | undefined;
   const filterOwner = qs.owner;
-  const pageSize = Math.min(
-    Math.max(parseInt(qs.page_size ?? `${PAGE_SIZE_DEFAULT}`, 10) || PAGE_SIZE_DEFAULT, 1),
-    PAGE_SIZE_MAX,
-  );
 
-  const page = await scanPrefix<ProjectMetaRow>("PROJECT#", "META", pageSize, qs.cursor);
+  // Drain EVERY PROJECT#/META row (scanAllPrefix), not a single
+  // Limit-capped scan page. A `scanPrefix` page bounds items EVALUATED,
+  // not matched, so on a single table dominated by EXEC#/MSG#/AGENT# rows
+  // only the handful of PROJECT#/META rows that happen to land in the
+  // first scan window come back — which is exactly how `agent-workforce`
+  // vanished from the console on 2026-06-15 while its row sat intact in
+  // DDB (FU-PROJ-SCAN). Projects are ≤ a few dozen at C-3 scale.
+  const projectRows = await scanAllPrefix<ProjectMetaRow>("PROJECT#", "META");
 
   // Defence-in-depth: skip rows that don't match the canonical
   // `ProjectMetaRow` shape rather than throwing the whole request.
@@ -1010,7 +1016,7 @@ async function listProjects(
   // operator sees the gap. The per-route GETs still expose the shape
   // honestly (a single-row GET 404s on a row that the brand validator
   // rejects), so this is *list-route defence*, not a silent papering-over.
-  const wellFormed = page.items.filter((r) =>
+  const wellFormed = projectRows.filter((r) =>
     isWellFormedProjectMeta(r) ? true : (emitMalformedProjectMeta(r), false),
   );
   const filtered = wellFormed
@@ -1035,7 +1041,9 @@ async function listProjects(
     }),
   );
 
-  return reply(200, { items, next_cursor: page.cursor });
+  // Fully drained above (scanAllPrefix) — next_cursor retained for
+  // response-shape stability, always absent.
+  return reply(200, { items, next_cursor: undefined });
 }
 
 /**
@@ -1366,11 +1374,13 @@ async function patchProject(
 
 async function listAgentProjects(slug: string): Promise<APIGatewayProxyResultV2> {
   // Memberships query: scan MEMBER#{slug} rows across all PROJECT#*
-  // partitions. No GSI for this access pattern yet; scanPrefix is fine
-  // at workforce scale (≤ 20 projects). When this grows hot, add a GSI
-  // on (gsi3pk=AGENT#slug, gsi3sk=PROJECT#id) at MEMBER write time.
-  const page = await scanPrefix<ProjectMemberRow>("PROJECT#", `MEMBER#${slug}`, PAGE_SIZE_MAX);
-  const items = page.items
+  // partitions. No GSI for this access pattern yet; a full drain
+  // (scanAllPrefix) is fine at workforce scale (≤ 20 projects). A single
+  // Limit-capped scanPrefix page would drop memberships outside the first
+  // scan window (FU-PROJ-SCAN). When this grows hot, add a GSI on
+  // (gsi3pk=AGENT#slug, gsi3sk=PROJECT#id) at MEMBER write time.
+  const memberRows = await scanAllPrefix<ProjectMemberRow>("PROJECT#", `MEMBER#${slug}`);
+  const items = memberRows
     .filter((r) => r.revoked_at === undefined)
     .map((r) => ({
       project_id: r.project_id,
