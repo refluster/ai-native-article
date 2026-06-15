@@ -21,4 +21,5 @@ export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "positioning-write": [],
   "pr-review": ["github.token"] as const,
   "pr-route": ["github.token"] as const,
+  "record-engagement": [],
 };
