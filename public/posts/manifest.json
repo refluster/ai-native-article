@@ -10,6 +10,16 @@
     "sourceUrls": "https://lexfridman.com/jensen-huang-transcript/"
   },
   {
+    "slug": "ee62d70466ba",
+    "title": "「垂直統合の逆襲」——Terafabが示す、AI時代のコア・コンピタンス再定義",
+    "type": "analysis",
+    "category": "ORG TRANSFORMATION × AI REPLACEMENT",
+    "date": "2026-03-30",
+    "abstract": "「設計は自社で、製造は外注で」というファブレスモデルへの強烈なアンチテーゼ。Terafabの「設計からパッケージングまでの完全垂直統合」が示すのは、AI時代の勝敗が「製造コスト」ではなく「学習ループのサイクルタイム」で決まるという構造変化である。",
+    "image": "/posts/images/ee62d70466ba.jpg",
+    "sourceUrls": "https://en.wikipedia.org/wiki/Terafab\nhttps://mashable.com/article/tesla-terafab-chip-plant"
+  },
+  {
     "slug": "fd969a54c786",
     "title": "Terafab完全解説——Tesla・SpaceX・xAI が共同で「世界最大のAIチップ工場」を建設する理由と、その産業的意味",
     "type": "explanation",
