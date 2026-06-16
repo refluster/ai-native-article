@@ -332,6 +332,55 @@ function SkillSourceBrowser({ skill }: { skill: WorkforceSkill }) {
   )
 }
 
+// SKILL.md (and any Agent-Skills markdown) opens with a YAML frontmatter
+// block (`---\nname: …\ndescription: …\n---`). react-markdown has no
+// frontmatter plugin, so it parsed that block as body: the closing `---`
+// became a setext heading underline and collapsed name+description into one
+// giant bold line. Split the block out and render it as a legible key/value
+// card instead, then hand the real body to react-markdown.
+export function splitFrontmatter(src: string): {
+  frontmatter: Array<[string, string]> | null
+  body: string
+} {
+  const m = /^﻿?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(src)
+  if (!m) return { frontmatter: null, body: src }
+
+  const fields: Array<[string, string]> = []
+  for (const line of m[1].split(/\r?\n/)) {
+    if (!line.trim()) continue
+    // A new key starts flush-left as `key:`; anything indented is a folded
+    // continuation of the previous value (YAML block/wrapped scalar).
+    const keyMatch = /^([^\s:][^:]*):[ \t]*(.*)$/.exec(line)
+    if (!keyMatch) {
+      if (fields.length) fields[fields.length - 1][1] = `${fields[fields.length - 1][1]} ${line.trim()}`.trim()
+      continue
+    }
+    let value = keyMatch[2].trim()
+    if (value.length >= 2 && ((value[0] === '"' && value.endsWith('"')) || (value[0] === "'" && value.endsWith("'")))) {
+      value = value.slice(1, -1)
+    }
+    fields.push([keyMatch[1].trim(), value])
+  }
+
+  return { frontmatter: fields.length ? fields : null, body: src.slice(m[0].length) }
+}
+
+function FrontmatterCard({ fields }: { fields: Array<[string, string]> }) {
+  return (
+    <div className="skill-md-frontmatter">
+      <div className="skill-md-frontmatter-cap">FRONTMATTER</div>
+      <dl>
+        {fields.map(([k, v]) => (
+          <div key={k} className="skill-md-frontmatter-row">
+            <dt>{k}</dt>
+            <dd>{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )
+}
+
 function SkillFileView({ file }: { file: SkillFile }) {
   if (file.contents === null) {
     return (
@@ -343,9 +392,11 @@ function SkillFileView({ file }: { file: SkillFile }) {
     )
   }
   if (file.language === 'markdown') {
+    const { frontmatter, body } = splitFrontmatter(file.contents)
     return (
       <div className="p-4 sm:p-6 skill-md-body">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{file.contents}</ReactMarkdown>
+        {frontmatter && <FrontmatterCard fields={frontmatter} />}
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{body}</ReactMarkdown>
       </div>
     )
   }

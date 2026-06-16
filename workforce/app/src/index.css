@@ -121,3 +121,48 @@
 .skill-md-body hr { border: 0; border-top: 1px solid #ddd9e6; margin: 1.5em 0; }
 .skill-md-body > *:first-child { margin-top: 0; }
 .skill-md-body > *:last-child { margin-bottom: 0; }
+
+/* YAML frontmatter lifted out of the markdown body and rendered as a
+   key/value card (see splitFrontmatter in SkillProfile.tsx). Echoes the
+   page's other bordered cards rather than competing with the prose. */
+.skill-md-frontmatter {
+  margin-bottom: 1.5em;
+  border: 1px solid #ddd9e6;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #faf9ff;
+}
+.skill-md-frontmatter-cap {
+  font-family: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #4f4d57;
+  background: #f1eef8;
+  padding: 0.5em 0.9em;
+  border-bottom: 1px solid #ddd9e6;
+}
+.skill-md-frontmatter dl { margin: 0; }
+.skill-md-frontmatter-row {
+  display: grid;
+  grid-template-columns: minmax(5rem, max-content) minmax(0, 1fr);
+  gap: 0.4em 1.25em;
+  padding: 0.65em 0.9em;
+}
+.skill-md-frontmatter-row + .skill-md-frontmatter-row { border-top: 1px solid #ddd9e6; }
+.skill-md-frontmatter dt {
+  font-family: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #4f4d57;
+  padding-top: 0.15em;
+}
+.skill-md-frontmatter dd {
+  margin: 0;
+  color: #0b0b14;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
