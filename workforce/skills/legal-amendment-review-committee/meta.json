@@ -1,0 +1,10 @@
+{
+  "name": "legal-amendment-review-committee",
+  "version": "0.1.0",
+  "status": "active",
+  "cost_class": "large",
+  "owners": ["maya"],
+  "improvement_agent": "maya",
+  "created_at": "2026-06-16",
+  "requires": ["github.token"]
+}
