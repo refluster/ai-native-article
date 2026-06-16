@@ -83,14 +83,34 @@ vi.mock("../shared/ddb.js", () => ({
       (r) => r.pk === pk && typeof r.sk === "string" && r.sk.startsWith(skPrefix),
     ) as T[];
   }),
+  // FAITHFUL DynamoDB Scan semantics (FU-PROJ-SCAN): `limit` bounds the
+  // items EVALUATED, and the begins_with(pk)/sk filter is applied to THAT
+  // window — so a page can return fewer matches than `limit` (or zero)
+  // while still carrying a cursor for the next window. The prior mock
+  // applied the filter FIRST and only then sliced to `limit`, which made
+  // the projects-console disappearance impossible to reproduce in CI (the
+  // eval gap that let the bug ship). This window-then-filter + offset
+  // cursor models reality, so a single-page list handler now demonstrably
+  // truncates and the regression tests below bite.
   scanPrefix: vi.fn(
-    async <T extends object>(pkPrefix: string, sk: string, limit: number, _cursor?: string) => {
-      const items = Array.from(rows.values()).filter(
-        (r) => r.pk.startsWith(pkPrefix) && r.sk === sk,
-      );
-      return { items: items.slice(0, limit) as T[], cursor: undefined };
+    async <T extends object>(pkPrefix: string, sk: string, limit: number, cursor?: string) => {
+      const all = Array.from(rows.values());
+      const start = cursor ? parseInt(Buffer.from(cursor, "base64url").toString("utf8"), 10) : 0;
+      const end = start + limit;
+      const items = all
+        .slice(start, end)
+        .filter((r) => r.pk.startsWith(pkPrefix) && r.sk === sk) as T[];
+      const nextCursor =
+        end < all.length ? Buffer.from(String(end), "utf8").toString("base64url") : undefined;
+      return { items, cursor: nextCursor };
     },
   ),
+  // Drained variant — returns every matched row regardless of scan windows.
+  scanAllPrefix: vi.fn(async <T extends object>(pkPrefix: string, sk: string) => {
+    return Array.from(rows.values()).filter(
+      (r) => r.pk.startsWith(pkPrefix) && r.sk === sk,
+    ) as T[];
+  }),
   queryByGsi: vi.fn(
     async (
       indexName: "GSI1" | "GSI2",
@@ -498,6 +518,56 @@ describe("GET /projects (listProjects)", () => {
     expect(statusOf(res)).toBe(200);
     const items = (bodyOf(res) as { items: Array<{ project_id: string }> }).items;
     expect(items.map((i) => i.project_id).sort()).toEqual(["alpha", "beta", "gamma"]);
+  });
+
+  // ─── FU-PROJ-SCAN: the projects-console disappearance ────────────────
+  //
+  // Root cause: listProjects returned ONE Limit-capped scan page. On a
+  // single table dominated by EXEC#/MSG#/AGENT# rows, the PROJECT#/META
+  // rows scan past the first window, so the console rendered "2
+  // registered" while `agent-workforce` sat intact in DDB. The fix drains
+  // the full PROJECT#/META set (scanAllPrefix). These tests seed enough
+  // non-project rows AHEAD of the projects that, under the OLD single-page
+  // scanPrefix(…, 25) read, every project would land beyond the first scan
+  // window — so a regression back to single-page paging makes them fail.
+
+  /** Seed N filler rows of an unrelated entity type ahead of the projects,
+   *  so the project META rows only appear in later scan windows. */
+  function seedFiller(n: number) {
+    for (let i = 0; i < n; i++) {
+      const ulid = String(i).padStart(26, "0");
+      rows.set(key("AGENT#ren", `EXEC#${ulid}`), {
+        pk: "AGENT#ren",
+        sk: `EXEC#${ulid}`,
+        project_id: "noise",
+      });
+    }
+  }
+
+  it("returns ALL projects even when they scan past the first window (FU-PROJ-SCAN)", async () => {
+    seedFiller(40); // > PAGE_SIZE_DEFAULT (25): projects fall outside window 1
+    seedProject("asp-cloud", "nadia");
+    seedProject("workforce-meta", "maya");
+    seedProject("agent-workforce", "maya"); // the one that "disappeared"
+
+    const res = await handler(evt("GET /projects"));
+    expect(statusOf(res)).toBe(200);
+    const ids = (bodyOf(res) as { items: Array<{ project_id: string }> }).items
+      .map((i) => i.project_id)
+      .sort();
+    expect(ids).toEqual(["agent-workforce", "asp-cloud", "workforce-meta"]);
+  });
+
+  it("filters (owner/status) still apply across the full drained set, not just window 1 (FU-PROJ-SCAN)", async () => {
+    seedFiller(40);
+    seedProject("asp-cloud", "nadia");
+    seedProject("agent-workforce", "maya");
+
+    const res = await handler(evt("GET /projects", {}, { owner: "maya" }));
+    const ids = (bodyOf(res) as { items: Array<{ project_id: string }> }).items.map(
+      (i) => i.project_id,
+    );
+    expect(ids).toEqual(["agent-workforce"]);
   });
 });
 

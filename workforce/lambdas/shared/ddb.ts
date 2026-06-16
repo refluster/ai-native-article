@@ -116,6 +116,22 @@ export interface ScanPage<T> {
   cursor?: string;
 }
 
+/**
+ * One raw page of a filtered Scan.
+ *
+ * ⚠️ FOOTGUN — `pageSize` (DynamoDB `Limit`) bounds the number of items
+ * EVALUATED, not the number that survive the `begins_with(pk) AND sk=`
+ * filter. A single page can therefore return far fewer matches than
+ * `pageSize` — or ZERO — while still reporting a `cursor` (more pages).
+ * This is correct ONLY for callers that loop `while (cursor)` to drain
+ * every page (orchestrator-tick, config-digest, memory-compactor, the
+ * agents-api stats/budget paths). A caller that returns ONE page verbatim
+ * to an HTTP client silently drops every matching row outside the first
+ * scan window — the 2026-06-15 projects-console disappearance (FU-PROJ-SCAN).
+ *
+ * To back a list endpoint that returns a whole entity type, use
+ * {@link scanAllPrefix} instead — never this.
+ */
 export async function scanPrefix<T extends object>(
   pkPrefix: string,
   skEquals: string,
@@ -142,6 +158,55 @@ export async function scanPrefix<T extends object>(
     : undefined;
 
   return { items: (res.Items ?? []) as T[], cursor: next };
+}
+
+/**
+ * Drained filtered Scan: returns EVERY row matching
+ * `begins_with(pk, pkPrefix) AND sk = skEquals`, following
+ * `LastEvaluatedKey` to exhaustion. The only sanctioned primitive for a
+ * list endpoint that surfaces a whole entity type (projects / agents /
+ * skills) to a caller.
+ *
+ * Why this exists — and why it has no `Limit`: see the FOOTGUN note on
+ * {@link scanPrefix}. DynamoDB's `Limit` is a SCAN-window bound, not a
+ * match count, so a `Limit`-capped page silently truncates the filtered
+ * result. Omitting `Limit` lets each scan return a full 1 MB page (more
+ * matches per round-trip); the loop drains the rest.
+ *
+ * Incident 2026-06-15 (Agent Workforce Platform — Mateo/Hana): the
+ * projects console rendered "2 registered" because only 2 PROJECT#/META
+ * rows fell inside the first 25-item scan window of a single table
+ * dominated by EXEC#/MSG#/AGENT# rows. `agent-workforce` — the credential
+ * bag every feed-post cadence resolves — existed in DDB the whole time;
+ * the read path truncated it out of view. No row was deleted. See
+ * workforce/docs/follow-ups.md (FU-PROJ-SCAN).
+ *
+ * Bounded by C-3 (single-operator scale): the matched entity types are
+ * ≤ a few hundred rows, so a full drain is cheap. If a matched set ever
+ * grows unbounded, the fix is a per-entity-type GSI (e.g. gsiNpk="PROJECT"),
+ * NOT a re-introduced `Limit` — that is a Zone-A SAM amendment (R-N2),
+ * tracked as a follow-up, never an in-handler `scanPrefix` shortcut.
+ */
+export async function scanAllPrefix<T extends object>(
+  pkPrefix: string,
+  skEquals: string,
+): Promise<T[]> {
+  const items: T[] = [];
+  let exclusiveStartKey: Record<string, unknown> | undefined;
+  do {
+    const res = await ddb.send(
+      new ScanCommand({
+        TableName: tableName,
+        FilterExpression: "begins_with(#pk, :pkprefix) AND #sk = :sk",
+        ExpressionAttributeNames: { "#pk": "pk", "#sk": "sk" },
+        ExpressionAttributeValues: { ":pkprefix": pkPrefix, ":sk": skEquals },
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
+    );
+    items.push(...((res.Items ?? []) as T[]));
+    exclusiveStartKey = res.LastEvaluatedKey as Record<string, unknown> | undefined;
+  } while (exclusiveStartKey);
+  return items;
 }
 
 export async function deleteItem(pk: string, sk: string): Promise<void> {

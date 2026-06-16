@@ -62,6 +62,9 @@ jobs:
       - name: Workforce OpenAPI spec-route drift (PR #305 / Mateo M1)
         run: npm run workforce:openapi-routes
 
+      - name: Workforce scan-drain guard (Dario L2 / FU-PROJ-SCAN)
+        run: npm run workforce:scan-drain
+
       - name: Workforce Lambda typecheck
         run: cd workforce/lambdas && npm ci && npm run typecheck
 
