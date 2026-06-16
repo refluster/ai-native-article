@@ -142,6 +142,10 @@ For 🟡: replace the green sign-off body with a list of "still open" findings +
 
 For 🔴: state the reason for escalation explicitly; tag the operator. Do NOT auto-merge or auto-label.
 
+### Bounded R-N10 merge leg (🟢 + safe class only)
+
+A 🟢 verdict normally hands off — "Operator decides per W-5". The **one** exception is the R-N10 delegated-external-merge lane: when the verdict is 🟢 **and** the bound project's own statute has delegated merge authority (e.g. `PSVL/asp-cloud` → `docs/adr_autopilot_pr_merge.md`) **and** the PR is in the delegated *safe class* (clean Dependabot security update · lockfile-only · semver-patch/minor-on-≥1.0 · all checks green · `AUTOPILOT_PR=on`), verdict mode MAY merge it by running the shared fail-closed engine `workforce/skills/pr-route/pr-merge.mjs` (which re-verifies the predicate server-side and refuses anything outside it). **Every other 🟢 PR — all feature/code PRs — still hands off to a human merger.** Review generalises to all PRs; merge does not. See [governance R-N10](../governance.md) and [pr-route SKILL.md Step 4](../../skills/pr-route/SKILL.md).
+
 ## What success looks like
 
 - A routing comment that names 1-3 reviewers with concrete rationale + skip-list, OR a verdict comment with the cycle's mapping table + clear color (🟢/🟡/🔴).
@@ -169,7 +173,7 @@ What stays the same:
 - The two modes (Routing / Verdict) and the mode-decision logic.
 - The router comment + verdict comment shapes (the templates above).
 - The cycle counter semantics; cycle cap.
-- W-5 (agents never gate merges).
+- W-5 (agents never gate merges) — with the one bounded R-N10 exception (🟢 + delegated safe-class PR; see the merge leg above).
 - The persona's voice and `config.nomination_rules`.
 
 Operator invocation:
