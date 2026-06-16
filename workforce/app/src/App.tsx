@@ -11,6 +11,7 @@ import AgentDirectory from './pages/AgentDirectory';
 import AgentProfile from './pages/AgentProfile';
 import SkillDirectory from './pages/SkillDirectory';
 import SkillProfile from './pages/SkillProfile';
+import SearchResults from './pages/SearchResults';
 import OrgDAG from './pages/OrgDAG';
 import ProjectDirectory from './pages/ProjectDirectory';
 import ProjectProfile from './pages/ProjectProfile';
@@ -47,6 +48,7 @@ function ProtectedRoutes() {
             <Route path="/agents/:slug" element={<AgentProfile />} />
             <Route path="/skills" element={<SkillDirectory />} />
             <Route path="/skills/:name" element={<SkillProfile />} />
+            <Route path="/search" element={<SearchResults />} />
             <Route path="/projects" element={<ProjectDirectory />} />
             {/* Project ids may contain `/` (e.g. `self/ren`). Use a
                 wildcard `*` so the whole remainder is captured as one

@@ -27,6 +27,7 @@
     { "name": "epic-011", "color": "0052CC", "description": "Epic-011 — Workforce activity feed (LinkedIn-style)." },
     { "name": "epic-012", "color": "0052CC", "description": "Epic-012 — Agent experience: recall, long-term memory, clean activity record (workforce)." },
     { "name": "epic-013", "color": "0052CC", "description": "Epic-013 — Talent messaging: operator↔talent thread store (workforce)." },
+    { "name": "epic-014", "color": "0052CC", "description": "Epic-014 — Global nav search: talent + skills typeahead (workforce)." },
 
     { "name": "role:engineering",   "color": "1D76DB", "description": "Driven by an engineering persona." },
     { "name": "role:architecture",  "color": "5319E7", "description": "Driven by an architecture persona." },
