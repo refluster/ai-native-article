@@ -43,8 +43,8 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["article", "plan", "design-doc", "launch-plan", "pr", "notification", "external-pr"],
-          "description": "Deliverable shape produced by an llm-prose skill. Phase 7 PR6 adds `external-pr` — opens a PR against an external project's target repo per R-N9 (governance.md §4). The mechanical R-N9 gate IS this enum: `external-commit` deliberately does not exist, so a skill CANNOT declare 'I will push directly to the external repo's default branch'. Adding `external-commit` is a Zone A amendment requiring an explicit W-5 reconciliation."
+          "enum": ["article", "plan", "design-doc", "launch-plan", "pr", "notification", "external-pr", "external-pr-merge"],
+          "description": "Deliverable shape produced by an llm-prose skill. Phase 7 PR6 adds `external-pr` — opens a PR against an external project's target repo per R-N9 (governance.md §4). The mechanical R-N9 gate IS this enum: `external-commit` deliberately does not exist, so a skill CANNOT declare 'I will push directly to the external repo's default branch'. `external-pr-merge` (added 2026-06-16 by the R-N10 Zone A amendment) marks the ONE delegated-merge exception: a skill may merge an external PR only under all four R-N10 clauses (target-statute delegation, server-side predicate, kill-switches, audit). Adding any further `external-*` type is a Zone A amendment requiring an explicit W-5 reconciliation."
         },
         "publish_notion": { "type": "boolean" },
         "article_type": {

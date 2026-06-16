@@ -48,11 +48,16 @@ export function deliverableTargetFor(
       return { type, s3Key: `external-prs/${slug}/${delivId}/body.md`, hasExternalPublish: true };
     case "notification":
     case "pr":
+    case "external-pr-merge":
       // notification: handled by the deterministic discord-ping handler — it
       //   writes runs/{slug}/{run_id}/output.txt directly via writeRunArtefact.
       // pr: claude-code-routine dispatches via GHA; the runner writes the
       //   brief to a pr-briefs/ key separately.
-      // Neither uses deliverableTargetFor today.
+      // external-pr-merge: the R-N10 delegated-merge cadence (e.g.
+      //   dependabot-triage) has no S3 artefact body — its effect is the
+      //   GitHub comment/approve/squash-merge (or escalation issue) performed
+      //   by the skill's bundled write-script (apply-triage.mjs).
+      // None of these uses deliverableTargetFor.
       throw new Error(`deliverableTargetFor: type=${type} not routed through this helper.`);
   }
 }

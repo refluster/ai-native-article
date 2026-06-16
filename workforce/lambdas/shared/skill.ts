@@ -26,7 +26,15 @@ export type DeliverableType =
   // that must explain why W-5 (agents never gate merges) doesn't
   // extend outward to external maintainers. See workforce/lambdas/
   // shared/external-pr.ts for the helper that opens the PR.
-  | "external-pr";
+  | "external-pr"
+  // R-N10 (Zone A amendment, 2026-06-16): the ONE delegated-merge
+  // exception. A skill may MERGE an external PR — not just open one —
+  // only when the target repo's own statute has granted merge
+  // authority (e.g. asp-cloud's Autopilot ADR), the eligibility
+  // predicate passes server-side, the kill-switches are armed, and the
+  // merge is audited (CVE comment + advisory-citing squash +
+  // engagement). `external-pr` skills still cannot merge.
+  | "external-pr-merge";
 
 export interface SkillFrontmatter {
   name: string;
