@@ -18,6 +18,7 @@ export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "feed-post": ["workforce.feed_write_token"] as const,
   "grid-watch": ["workforce.feed_write_token"] as const,
   "india-grid-watch": ["workforce.feed_write_token"] as const,
+  "legal-amendment-review-committee": ["github.token"] as const,
   "pdm-charter": [],
   "positioning-write": [],
   "pr-review": ["github.token"] as const,
