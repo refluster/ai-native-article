@@ -20,6 +20,16 @@
     "sourceUrls": "https://www.anthropic.com/engineering/harness-design-long-running-apps"
   },
   {
+    "slug": "da9f093cae98",
+    "title": "開発者が学ぶべきClaude Code流出の教訓：無料の並列処理とフックシステム (修正版)",
+    "type": "explanation",
+    "category": "Best Practices",
+    "date": "2026-04-01",
+    "abstract": "開発者の視点からClaude Code流出を分析。プロンプトキャッシュ共有による並列処理や権限設定の多層化など、実践的な学びを抽出。",
+    "image": "/posts/images/da9f093cae98.jpg",
+    "sourceUrls": "https://startuphub.ai/ai-news/artificial-intelligence/2026/claude-code-leak-what-developers-can-learn"
+  },
+  {
     "slug": "f80afc462914",
     "title": "限界費用ゼロの知能：TerafabとAgentic Scalingが示す「極限の共同設計」の世界",
     "type": "analysis",
