@@ -82,12 +82,12 @@ for s,r,sk in rows: print(f"{s:12}| {r:28}| {sk}")
 PY
 ```
 
-## The workforce's own routing skill (`nadia`/`pr-route`)
-`nadia` runs `pr-route` autonomously every 6h: scans open PRs lacking a cycle-1
+## The workforce's own routing skill (`nadia`/`pr-autopilot`)
+`nadia` runs `pr-autopilot` autonomously every 6h: scans open PRs lacking a cycle-1
 routing comment, nominates reviewers by lens (architecture=dario,
 engineering=ren, design=aoi) via `config.nomination_rules`, posts a
 **comment-only** routing note. It does **not** perform the review or fixes
 ("verdict mode + pr-review are follow-ups"). This skill's step #3 mirrors that
 nomination model but the operator supplies the actual review content. **Dedup
-with nadia:** before posting a routing comment, check the PR for a `pr-route`
+with nadia:** before posting a routing comment, check the PR for a `pr-autopilot`
 routing comment from the last 7 days so you don't double-route.

@@ -31,7 +31,7 @@ import type { CredentialBag } from "./credential-injector.js";
  *
  * - `args` — invocation-time arguments. For cron-driven bindings this
  *   is always `{}`. For `external` / `manual` schedulers it carries the
- *   trigger payload (e.g. `{pr_url, mode, cycle?}` for pr-route /
+ *   trigger payload (e.g. `{pr_url, mode, cycle?}` for pr-autopilot /
  *   pr-review). Handlers MUST treat untrusted values as untrusted —
  *   the runner does not validate `args` shape.
  *
@@ -67,7 +67,7 @@ export interface DeterministicResult {
   side_effect?: { kind: string; status: number };
   /**
    * Optional LLM-cost accounting from inside the handler. Phase 7 PR3a:
-   * handlers that themselves call Anthropic (e.g. pr-route) MUST set
+   * handlers that themselves call Anthropic (e.g. pr-autopilot) MUST set
    * these so the runner writes accurate tokens_in / tokens_out / cost_usd
    * to the RUN row and respects W-3 (monthly budget cap) on the next
    * pre-flight. Missing fields default to 0 (current discord-ping

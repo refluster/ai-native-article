@@ -31,7 +31,7 @@ const AGENTS = [
 ]
 const SKILLS = [
   { name: 'pr-review', description: 'Review a PR.', owners: ['ren'], status: 'active' },
-  { name: 'pr-route', description: 'Route a PR.', owners: ['nadia'], status: 'active' },
+  { name: 'pr-autopilot', description: 'Route a PR.', owners: ['nadia'], status: 'active' },
 ]
 
 beforeEach(() => {

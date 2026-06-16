@@ -74,7 +74,7 @@ pages the operator never searches from pay nothing.
 
 - [x] `/search?q=ren` ranks the Ren persona first; `/search?q=engineer`
   returns every agent whose role contains "Engineer".
-- [x] `/search?q=pr-` surfaces both `pr-review` and `pr-route`;
+- [x] `/search?q=pr-` surfaces both `pr-review` and `pr-autopilot`;
   `/search?q=<owner-slug>` surfaces the skills that owner owns.
 - [x] The `GlobalNav` box shows a live typeahead (talent + skills) and
   Enter routes to `/search?q=…`; clicking a row navigates to the entity.

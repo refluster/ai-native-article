@@ -1,9 +1,9 @@
 ---
-name: pr-route
+name: pr-autopilot
 description: Workforce skill that drives an open PR through its **full** review cycle in a bound project's repo — route to 1-3 reviewer personas, obtain their reviews, synthesise the 🟢/🟡/🔴 verdict, and complete. On a 🟢 verdict for an R-N10 *safe-class* PR (a delegated-merge-eligible Dependabot security PR, predicate-passing) it approves + merges via the shared fail-closed pr-merge.mjs engine; every other 🟢 PR hands off to a human merger (R-N9 / W-5). **Dependabot/bot PRs are out of scope — they are the no-review `dependabot-triage` lane**, never human-lens routing. Review/routing generalise to all (non-bot) PRs; autonomous merge stays gated to the R-N10 safe class. Runs as a CCR task (ADR-0005); github.token via the binding's project linkage (Epic-010 §5).
 ---
 
-# pr-route (CCR cron-poll routing leg)
+# pr-autopilot (CCR cron-poll routing leg)
 
 You are routing pull requests in your bound project's repo to reviewer personas under your lens. This runs as a **CCR task** fired by `wf-orchestrator-tick` on the binding's cron. There is no `pr_url` argument — you **discover** which PRs need routing, then route each one.
 
@@ -18,18 +18,18 @@ Your task context supplies:
 
 ```sh
 GITHUB_TOKEN="<credentials['github.token'].token>" \
-  node workforce/skills/pr-route/pr-route-scan.mjs \
+  node workforce/skills/pr-autopilot/pr-autopilot-scan.mjs \
     --project "<project_id>" --persona "<agent_slug>" \
-    --max 3 --since-days 7 --out /tmp/pr-route-candidates.json
+    --max 3 --since-days 7 --out /tmp/pr-autopilot-candidates.json
 ```
 
 The scan lists open, non-draft PRs updated within the window, **skips any PR you have already posted a cycle-1 routing comment on**, **skips bot-authored (Dependabot) PRs** — those are the no-review `dependabot-triage` lane (R-N10 auto-merge), never human-lens routing — caps at `--max`, and writes each remaining candidate (title, body, diff, existing comments) to the `--out` file. If it reports **0 candidates**, there is nothing to route this tick — **stop here, post nothing.**
 
-> **Why the bot skip (the #530/#514 fix).** Routing a Dependabot lockfile bump to architecture/engineering/design reviewers adds no value and, with no reviewer dispatched, leaves the PR stalled at a lone routing comment. Dependabot security PRs belong to [`dependabot-triage`](../dependabot-triage/SKILL.md), which triages and (R-N10) auto-merges them without a human-review cycle. pr-route handles the **general/human-authored** PRs.
+> **Why the bot skip (the #530/#514 fix).** Routing a Dependabot lockfile bump to architecture/engineering/design reviewers adds no value and, with no reviewer dispatched, leaves the PR stalled at a lone routing comment. Dependabot security PRs belong to [`dependabot-triage`](../dependabot-triage/SKILL.md), which triages and (R-N10) auto-merges them without a human-review cycle. pr-autopilot handles the **general/human-authored** PRs.
 
 ## Step 2 — route each candidate (your judgment)
 
-Read `/tmp/pr-route-candidates.json`. For **each** candidate PR, apply your `binding_config.nomination_rules` to the PR's diff + body:
+Read `/tmp/pr-autopilot-candidates.json`. For **each** candidate PR, apply your `binding_config.nomination_rules` to the PR's diff + body:
 
 - Nominate **1-3** reviewer personas whose lens has real surface on this PR. You (the routing persona) MAY self-include if your rules say so.
 - Each nomination's `rationale` must **cite the PR surface** (file paths / topics), not just restate the trigger.
@@ -51,7 +51,7 @@ Skipping @<persona>, @<persona> — <one short clause why the skip-list applies>
 
 **Cycle 1 of ≤ <cycle_cap>.** Reviewers post inline + summary via `pull_request_review_write event=COMMENT` (never approve / never request-changes per W-5). Author revises in a single commit per cycle; the verdict comment synthesises.
 
-— <PersonaName> (CCR persona; see workforce/docs/routines/pr-route.md)
+— <PersonaName> (CCR persona; see workforce/docs/routines/pr-autopilot.md)
 ```
 
 Omit the "Skipping …" line if you skipped no one. `<PersonaName>` is your `agent_slug` capitalised (e.g. `nadia` → `Nadia`).
@@ -62,11 +62,11 @@ For each candidate you wrote a body for:
 
 ```sh
 GITHUB_TOKEN="<credentials['github.token'].token>" \
-  node workforce/skills/pr-route/pr-route-post.mjs \
+  node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
     --project "<project_id>" --pr <number> --body-file /tmp/route-body-<number>.md
 ```
 
-`pr-route-post.mjs` posts **only** an issue comment — there is no code path in *that* script to approve, request changes, merge, push, or open a PR (R-N9 / W-5). Exit 0 means the comment landed. (The bounded R-N10 merge in Step 5 goes through a separate, fail-closed script — never through `pr-route-post.mjs`.)
+`pr-autopilot-post.mjs` posts **only** an issue comment — there is no code path in *that* script to approve, request changes, merge, push, or open a PR (R-N9 / W-5). Exit 0 means the comment landed. (The bounded R-N10 merge in Step 5 goes through a separate, fail-closed script — never through `pr-autopilot-post.mjs`.)
 
 ## Step 4 — obtain each nominated review (drive the cycle; do not stall)
 
@@ -81,7 +81,7 @@ Each posted review is a real lens review — concrete findings citing the PR sur
 
 Now that the nominated reviews exist (you produced/dispatched them in Step 4, or they arrived on a prior tick), **synthesise** — you do not re-review.
 
-1. **Synthesise the verdict** (your judgment): read the reviewers' findings + the author's response commits, and decide one of **🟢 (ship)** / **🟡 (ship after the noted fixes)** / **🔴 (do not ship)**. Write a verdict comment that names each reviewer's load-bearing finding and how it resolved, then post it with `pr-route-post.mjs` (Step 3's script — comment-only).
+1. **Synthesise the verdict** (your judgment): read the reviewers' findings + the author's response commits, and decide one of **🟢 (ship)** / **🟡 (ship after the noted fixes)** / **🔴 (do not ship)**. Write a verdict comment that names each reviewer's load-bearing finding and how it resolved, then post it with `pr-autopilot-post.mjs` (Step 3's script — comment-only).
 2. **Complete the cycle** — never leave it open:
    - **🟢 + R-N10 safe class** → approve + merge via the engine below.
    - **🟢 + general PR** → hand off: the verdict comment tags the human merger (`Operator decides per W-5`). Done — do **not** merge.
@@ -100,7 +100,7 @@ When those hold, build the decisions payload (schema in the script header) — o
 
 ```sh
 TOKEN="<credentials['github.token'].token>" \
-  node workforce/skills/pr-route/pr-merge.mjs \
+  node workforce/skills/pr-autopilot/pr-merge.mjs \
     --repo "<owner>/<repo>" --decisions /tmp/pr-merge-decisions.json
 ```
 
@@ -109,8 +109,8 @@ TOKEN="<credentials['github.token'].token>" \
 ## Scope (this skill)
 
 - **Drive the whole cycle — don't stop at routing.** route → obtain each nominated review → synthesise verdict → complete (merge or hand off). A PR left at a lone routing comment is a bug (the #530/#514 failure), not a finished run.
-- **The orchestrator, keeping the `pr-review` skill.** `pr-review` is the standalone reviewer contract; pr-route *drives* it — dispatching it to bound personas, or (until dispatch is wired everywhere) applying each nominee's lens inline per that contract. pr-route decides *who* reviews and *what the verdict is*; `pr-review` defines *how* a single lens review is shaped.
+- **The orchestrator, keeping the `pr-review` skill.** `pr-review` is the standalone reviewer contract; pr-autopilot *drives* it — dispatching it to bound personas, or (until dispatch is wired everywhere) applying each nominee's lens inline per that contract. pr-autopilot decides *who* reviews and *what the verdict is*; `pr-review` defines *how* a single lens review is shaped.
 - **Bots are out of scope.** Dependabot/bot PRs are skipped at discovery — they are `dependabot-triage`'s no-review lane.
 - **Merge is the bounded R-N10 exception only.** No merge/approve outside the safe-class lane; no push or PR-open under any path. Every non-safe-class 🟢 PR hands off to a human merger (R-N9 / W-5).
 
-Related: [pr-route routine spec](../../docs/routines/pr-route.md), [pr-review.md](../../docs/routines/pr-review.md), [R-N10 governance](../../docs/governance.md), [dependabot-triage](../dependabot-triage/SKILL.md) (the no-review Dependabot lane sharing `pr-merge.mjs`), [dev-process.md](../../docs/runbooks/dev-process.md).
+Related: [pr-autopilot routine spec](../../docs/routines/pr-autopilot.md), [pr-review.md](../../docs/routines/pr-review.md), [R-N10 governance](../../docs/governance.md), [dependabot-triage](../dependabot-triage/SKILL.md) (the no-review Dependabot lane sharing `pr-merge.mjs`), [dev-process.md](../../docs/runbooks/dev-process.md).

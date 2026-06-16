@@ -5,7 +5,7 @@
 // Applies the invoking persona's lens (from binding_config) to a target-
 // repo PR and posts a single COMMENT-event review (W-5 — never APPROVE,
 // never REQUEST_CHANGES). Verdict synthesis (the 🟢/🟡/🔴 leg) lives in
-// pr-route's verdict mode, not here.
+// pr-autopilot's verdict mode, not here.
 //
 // Trust boundary:
 //   - Project resolved at the runner seam (event.project_id →
@@ -287,7 +287,7 @@ async function postPrReview(
  * Heuristic for prior reviews by this persona. The review body opens
  * with `**{PersonaName} review (cycle N, lens: ...)**`. PR3b detail:
  * the count drives the cycle number stamped on the next review and
- * lets the verdict-mode synthesis (pr-route, follow-up) tell cycle-1
+ * lets the verdict-mode synthesis (pr-autopilot, follow-up) tell cycle-1
  * findings apart from cycle-2 follow-ups.
  */
 export function countPriorReviews(

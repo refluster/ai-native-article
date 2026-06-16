@@ -1,6 +1,6 @@
 // Unit tests for the pr-review handler's pure helpers (Phase 7 PR3b).
 //
-// Mirrors the scope split from pr-route/handler-tests.ts: pure-function
+// Mirrors the scope split from pr-autopilot/handler-tests.ts: pure-function
 // coverage here (parser + formatter + cycle counter), integration tests
 // for the full dispatchPrReview deferred to a follow-up that adds shared
 // mocking infra for GitHub REST × 4, Anthropic, getProject, bundled

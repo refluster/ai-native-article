@@ -1,4 +1,4 @@
-# `pr-route` — Generic PR routing + verdict skill (persona-agnostic)
+# `pr-autopilot` — Generic PR routing + verdict skill (persona-agnostic)
 
 **Skill type**: routing + synthesis.
 **Trigger**: invoked on every new draft PR (Phase C of [dev-process.md](../runbooks/dev-process.md)) and on every revise push (Phase F). Operator-conversational today; future CCR `pull_request.opened` + `pull_request.synchronize` triggers.
@@ -13,7 +13,7 @@ When an agent invokes this skill, the runtime composes:
 ```
 1. Generic skill spec    ← THIS FILE (modes, output protocol, success criteria)
 2. Persona voice         ← workforce/agents/{agent_slug}/system.md
-3. Skill-specific config ← workforce/agents/{agent_slug}/agent.json:bindings[pr-route].config
+3. Skill-specific config ← workforce/agents/{agent_slug}/agent.json:bindings[pr-autopilot].config
                             (nomination_rules, skip_list, sign_off_persona, cycle_cap)
 ```
 
@@ -30,7 +30,7 @@ Mode is determined by inspecting the PR's existing comments (see Mode decision b
 
 **Drive the cycle to completion (the #530/#514 fix).** Routing is not the finished job: between routing and verdict the **reviews must actually land**. Where reviewer personas have a dispatchable `pr-review` binding, routing dispatches them; where none is wired yet, the routing persona **obtains each nominated review inline** (applying that persona's `pr-review` lens and posting it under their byline) so a PR is never left stalled at a lone routing comment. Then verdict mode synthesises and completes (R-N10 safe-class merge, or hand-off).
 
-**Bot PRs are out of scope.** Dependabot/bot-authored PRs are skipped at discovery — they are the no-review [`dependabot-triage`](../../skills/dependabot-triage/SKILL.md) lane (R-N10 auto-merge), not human-lens routing. pr-route handles general/human-authored PRs.
+**Bot PRs are out of scope.** Dependabot/bot-authored PRs are skipped at discovery — they are the no-review [`dependabot-triage`](../../skills/dependabot-triage/SKILL.md) lane (R-N10 auto-merge), not human-lens routing. pr-autopilot handles general/human-authored PRs.
 
 ## Skill contract
 
@@ -91,7 +91,7 @@ Skipping <list with one-word reasons>.
 
 **Cycle N of ≤ {cycle_cap}.** Reviewers post inline + summary via `pull_request_review_write event=COMMENT` (never approve / never request-changes per W-5). Author revises in a single commit per cycle; verdict comment synthesises.
 
-— {persona_full_name} (LLM persona via {invocation_mode}; see workforce/docs/routines/pr-route.md)
+— {persona_full_name} (LLM persona via {invocation_mode}; see workforce/docs/routines/pr-autopilot.md)
 ```
 
 5. Stop. Wait for reviewer comments.
@@ -139,7 +139,7 @@ Skipping <list with one-word reasons>.
 
 **Closes #<story> on merge.** <unblocks-list>. Operator decides per W-5.
 
-— {persona_full_name} (LLM persona via {invocation_mode}; see workforce/docs/routines/pr-route.md)
+— {persona_full_name} (LLM persona via {invocation_mode}; see workforce/docs/routines/pr-autopilot.md)
 ```
 
 For 🟡: replace the green sign-off body with a list of "still open" findings + which reviewer flagged each, plus an "author: please address in cycle N+1" line.
@@ -148,7 +148,7 @@ For 🔴: state the reason for escalation explicitly; tag the operator. Do NOT a
 
 ### Bounded R-N10 merge leg (🟢 + safe class only)
 
-A 🟢 verdict normally hands off — "Operator decides per W-5". The **one** exception is the R-N10 delegated-external-merge lane: when the verdict is 🟢 **and** the bound project's own statute has delegated merge authority (e.g. `PSVL/asp-cloud` → `docs/adr_autopilot_pr_merge.md`) **and** the PR is in the delegated *safe class* (clean Dependabot security update · lockfile-only · semver-patch/minor-on-≥1.0 · all checks green · `AUTOPILOT_PR=on`), verdict mode MAY merge it by running the shared fail-closed engine `workforce/skills/pr-route/pr-merge.mjs` (which re-verifies the predicate server-side and refuses anything outside it). **Every other 🟢 PR — all feature/code PRs — still hands off to a human merger.** Review generalises to all PRs; merge does not. See [governance R-N10](../governance.md) and [pr-route SKILL.md Step 4](../../skills/pr-route/SKILL.md).
+A 🟢 verdict normally hands off — "Operator decides per W-5". The **one** exception is the R-N10 delegated-external-merge lane: when the verdict is 🟢 **and** the bound project's own statute has delegated merge authority (e.g. `PSVL/asp-cloud` → `docs/adr_autopilot_pr_merge.md`) **and** the PR is in the delegated *safe class* (clean Dependabot security update · lockfile-only · semver-patch/minor-on-≥1.0 · all checks green · `AUTOPILOT_PR=on`), verdict mode MAY merge it by running the shared fail-closed engine `workforce/skills/pr-autopilot/pr-merge.mjs` (which re-verifies the predicate server-side and refuses anything outside it). **Every other 🟢 PR — all feature/code PRs — still hands off to a human merger.** Review generalises to all PRs; merge does not. See [governance R-N10](../governance.md) and [pr-autopilot SKILL.md Step 4](../../skills/pr-autopilot/SKILL.md).
 
 ## What success looks like
 

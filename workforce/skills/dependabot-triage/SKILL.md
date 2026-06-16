@@ -100,7 +100,7 @@ CVE-…); escalated 1 major bump → issue #NNN."* A `skipped` fire says why.
 ## When NOT to use this skill
 
 This Cadence is **security-update triage only**. It does not review feature PRs (that is
-`pr-review`/`pr-route`), does not author code, and does not merge anything outside the
+`pr-review`/`pr-autopilot`), does not author code, and does not merge anything outside the
 R-N10 delegated lane. Time-driven (non-security) Dependabot bumps are out of scope —
 they are suppressed at the target's `dependabot.yml` during pilot. If a PR needs design
 judgement or touches an L1-binding path, it is an `escalate`, never a `merge`.

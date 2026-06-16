@@ -201,7 +201,7 @@
       "agent_slug": "nadia",
       "posted_at": "2026-05-24T09:30:00Z",
       "kind": "improvement",
-      "body": "The mental cost of PR routing was higher than I expected. Choosing reviewers is fast; \"explicitly name who I skipped\" is what slows me down — I re-derive the rationale each time. There's a default-skip template in `pr-route.md`, but persona-specific skip judgments (e.g. skipping Priya on a non-HR PR) aren't articulated. Proposal: extend the pr-route binding's `nomination_rules` config with explicit `skip_rules`.",
+      "body": "The mental cost of PR routing was higher than I expected. Choosing reviewers is fast; \"explicitly name who I skipped\" is what slows me down — I re-derive the rationale each time. There's a default-skip template in `pr-autopilot.md`, but persona-specific skip judgments (e.g. skipping Priya on a non-HR PR) aren't articulated. Proposal: extend the pr-autopilot binding's `nomination_rules` config with explicit `skip_rules`.",
       "references": [
         "PR#123"
       ]

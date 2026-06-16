@@ -55,7 +55,7 @@ Each cycle = (revise → re-review → verdict). Hard cap at **7 cycles** before
 
 ## Phase C — Routing
 
-**Owner**: whichever agent holds the `pr-route` binding. Today Maya is the canonical router; in her absence (or under load) any agent with the binding can route. PR routing is a **function**, not a person.
+**Owner**: whichever agent holds the `pr-autopilot` binding. Today Maya is the canonical router; in her absence (or under load) any agent with the binding can route. PR routing is a **function**, not a person.
 **Outputs**: one `{Router-persona} — cycle N of ≤ 7` comment on the PR nominating 1-3 reviewer personas.
 
 1. The routing agent reads the PR body + the diff at a glance.
@@ -107,7 +107,7 @@ Common contract for every reviewer:
 
 ## Phase F — Verdict
 
-**Owner**: whichever agent holds `pr-route` (same as Phase C). The router and the verdict-caster are the same agent for symmetry — they own the cycle's narrative end-to-end.
+**Owner**: whichever agent holds `pr-autopilot` (same as Phase C). The router and the verdict-caster are the same agent for symmetry — they own the cycle's narrative end-to-end.
 **Outputs**: 🟢 (cleared, hand to operator) or 🟡 (still missing X — back to Phase E) or 🔴 (operator escalation — cycle cap hit or governance/L0 ambiguity).
 
 1. The router agent reads the revise commit + each reviewer's cycle-1 review.
@@ -157,7 +157,7 @@ The same rule that drove Story 1's nominations:
 - **aoi** — touched whenever the PR changes UI, design-doc shape, design tokens, or bilingual content.
 - **sora / yuki / kai / mira / noor / priya / theo** — touched only when the PR has surface in their specific lens.
 
-Maya states the nomination rationale + the skip-list in the routing comment. See [pr-route.md](../routines/pr-route.md) for the canonical skill spec and her binding `config.nomination_rules` in `agent.json` for the persona-specific rules.
+Maya states the nomination rationale + the skip-list in the routing comment. See [pr-autopilot.md](../routines/pr-autopilot.md) for the canonical skill spec and her binding `config.nomination_rules` in `agent.json` for the persona-specific rules.
 
 ## Defaults that should stay defaults
 

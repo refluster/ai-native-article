@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// Deterministic pr-route SCAN script — GET-only discovery for the CCR
+// Deterministic pr-autopilot SCAN script — GET-only discovery for the CCR
 // cron-poll routing leg (ADR-0005). The CCR session runs this first to
 // learn WHICH open PRs in the bound project's repo still need a cycle-1
 // routing comment; it then applies the persona's nomination_rules (its
-// judgment) and posts each routing comment via pr-route-post.mjs.
+// judgment) and posts each routing comment via pr-autopilot-post.mjs.
 //
 // This script performs NO writes — it only issues GitHub GETs:
 //   - list open PRs in the project repo
@@ -16,9 +16,9 @@
 //
 // Usage:
 //   GITHUB_TOKEN=<credentials['github.token'].token> \
-//     node workforce/skills/pr-route/pr-route-scan.mjs \
+//     node workforce/skills/pr-autopilot/pr-autopilot-scan.mjs \
 //       --project asp-cloud --persona nadia \
-//       [--max 3] [--since-days 7] [--out /tmp/pr-route-candidates.json]
+//       [--max 3] [--since-days 7] [--out /tmp/pr-autopilot-candidates.json]
 //
 // Output: writes a JSON array of candidate PRs to --out and prints a
 // one-line summary to stdout. Exit 0 even when zero candidates (a valid
@@ -37,7 +37,7 @@ import { dirname, join } from "node:path";
 const GH_API = "https://api.github.com";
 const MAX_DIFF_CHARS = 48_000; // ~12K tokens; protects the CCR context budget
 const HERE = dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = join(HERE, "..", "..", ".."); // workforce/skills/pr-route → repo root
+const REPO_ROOT = join(HERE, "..", "..", ".."); // workforce/skills/pr-autopilot → repo root
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`);
@@ -51,11 +51,11 @@ export function projectRepo(repoRoot, projectId) {
   try {
     json = JSON.parse(readFileSync(path, "utf8"));
   } catch {
-    throw new Error(`pr-route-scan: project.json not found for "${projectId}" at ${path}`);
+    throw new Error(`pr-autopilot-scan: project.json not found for "${projectId}" at ${path}`);
   }
   if (!json.github || !json.github.owner || !json.github.repo) {
     throw new Error(
-      `pr-route-scan: project "${projectId}" declares no github.{owner,repo} — pr-route needs an external project repo`,
+      `pr-autopilot-scan: project "${projectId}" declares no github.{owner,repo} — pr-autopilot needs an external project repo`,
     );
   }
   return { owner: json.github.owner, repo: json.github.repo };
@@ -63,7 +63,7 @@ export function projectRepo(repoRoot, projectId) {
 
 /** A PR has already been routed (this cycle leg) if a comment from this
  *  persona opens with the router-comment marker. Mirrors the marker that
- *  pr-route-post writes via the SKILL.md comment template. */
+ *  pr-autopilot-post writes via the SKILL.md comment template. */
 export function alreadyRouted(comments, personaSlug) {
   const personaName = personaSlug.charAt(0).toUpperCase() + personaSlug.slice(1);
   const marker = new RegExp(`^\\*\\*${personaName} — cycle \\d+ of `, "m");
@@ -101,7 +101,7 @@ async function main() {
   const persona = arg("persona");
   const max = Number(arg("max", "3"));
   const sinceDays = Number(arg("since-days", "7"));
-  const out = arg("out", "/tmp/pr-route-candidates.json");
+  const out = arg("out", "/tmp/pr-autopilot-candidates.json");
   const token = process.env.GITHUB_TOKEN;
 
   if (!projectId) die(1, "--project <id> is required");
@@ -168,13 +168,13 @@ async function main() {
 
   writeFileSync(out, JSON.stringify({ project_id: projectId, owner, repo, persona, candidates }, null, 2));
   console.log(
-    `pr-route-scan: ${owner}/${repo} — ${candidates.length} candidate PR(s) need cycle-1 routing (scanned ${prs.length} open, max ${max}, window ${sinceDays}d) → ${out}`,
+    `pr-autopilot-scan: ${owner}/${repo} — ${candidates.length} candidate PR(s) need cycle-1 routing (scanned ${prs.length} open, max ${max}, window ${sinceDays}d) → ${out}`,
   );
   process.exit(0);
 }
 
 function die(code, msg) {
-  console.error(`pr-route-scan: ${msg}`);
+  console.error(`pr-autopilot-scan: ${msg}`);
   process.exit(code);
 }
 
