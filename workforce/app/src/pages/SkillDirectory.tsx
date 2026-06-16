@@ -1,6 +1,7 @@
-// /workforce/skills — Skill repository index. Lists every entry from
-// workforce-skills.json, with the SKILL.md description and the agent
-// owners as chips back into /agents/:slug.
+// /workforce/skills — Skill repository index. Lists every entry LIVE from
+// the agents-api `GET /skills` (the authoritative DDB `SKILL#` store,
+// ADR-0008 §7 — not the build-time workforce-skills.json snapshot), with
+// the SKILL.md description and the agent owners as chips into /agents/:slug.
 //
 // Filter chips by status (ALL / ACTIVE / DEPRECATED / PAUSED) and a
 // search box for name / description / owner. Pure client state.
@@ -9,9 +10,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import WorkforceLayout from '../components/WorkforceLayout'
 import Typeplate from '../components/Typeplate'
-import { loadWorkforceSkillManifest } from '../lib/skills'
+import { loadWorkforceSkills } from '../lib/skills'
 import { loadWorkforceManifest, fullName } from '../lib/agents'
-import type { SkillStatus, WorkforceSkill, WorkforceSkillManifest } from '../types/skill'
+import type { SkillStatus, WorkforceSkill } from '../types/skill'
 import type { WorkforceAgentManifest } from '../types/agent'
 
 type Filter = 'all' | SkillStatus
@@ -30,7 +31,7 @@ function statusTone(s: SkillStatus): string {
 }
 
 export default function SkillDirectory() {
-  const [skillManifest, setSkillManifest] = useState<WorkforceSkillManifest | null>(null)
+  const [skills, setSkills] = useState<WorkforceSkill[] | null>(null)
   const [agentManifest, setAgentManifest] = useState<WorkforceAgentManifest | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
@@ -38,9 +39,9 @@ export default function SkillDirectory() {
 
   useEffect(() => {
     document.title = 'Workforce — Skills'
-    Promise.all([loadWorkforceSkillManifest(), loadWorkforceManifest()])
+    Promise.all([loadWorkforceSkills(), loadWorkforceManifest()])
       .then(([s, a]) => {
-        setSkillManifest(s)
+        setSkills(s)
         setAgentManifest(a)
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
@@ -53,9 +54,9 @@ export default function SkillDirectory() {
   }, [agentManifest])
 
   const rows = useMemo(() => {
-    if (!skillManifest) return []
+    if (!skills) return []
     const q = query.trim().toLowerCase()
-    return skillManifest.skills
+    return skills
       .filter((s) => (filter === 'all' ? true : s.status === filter))
       .filter((s) => {
         if (!q) return true
@@ -66,7 +67,7 @@ export default function SkillDirectory() {
         )
       })
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [skillManifest, filter, query])
+  }, [skills, filter, query])
 
   if (error) {
     return (
@@ -75,7 +76,7 @@ export default function SkillDirectory() {
       </WorkforceLayout>
     )
   }
-  if (!skillManifest || !agentManifest) {
+  if (!skills || !agentManifest) {
     return (
       <WorkforceLayout>
         <div className="font-wfmono text-xs uppercase tracking-[0.14em] text-wf-on-surface-variant">Loading…</div>
@@ -86,7 +87,7 @@ export default function SkillDirectory() {
   return (
     <WorkforceLayout>
       <section className="mb-6 sm:mb-8">
-        <Typeplate label="DECK 03" value={`SKILLS · ${skillManifest.skills.length} ENTRIES`} className="mb-3" />
+        <Typeplate label="DECK 03" value={`SKILLS · ${skills.length} ENTRIES`} className="mb-3" />
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <h1 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-[1.04] text-wf-on-surface">
             The skill repository.
