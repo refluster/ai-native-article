@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// pr-route/pr-merge.mjs — the shared, deterministic **safe-class merge engine**
+// pr-autopilot/pr-merge.mjs — the shared, deterministic **safe-class merge engine**
 // for the workforce's R-N10 delegated-external-merge lane.
 //
 // Two skills share this one engine (the merge logic lives here once; callers
 // only assemble the decisions payload from their own judgment):
-//   • pr-route   — cycle-2 "verdict mode": after reviewers post, on a 🟢 verdict
+//   • pr-autopilot   — cycle-2 "verdict mode": after reviewers post, on a 🟢 verdict
 //                  AND an R-N10-safe-class PR, it merges; otherwise comment-only.
 //   • dependabot-triage — the no-review Cadence fast path for Dependabot security
 //                  PRs (its apply-triage.mjs is a thin wrapper over main() here).
@@ -18,7 +18,7 @@
 // AUTOPILOT_PR kill-switch == "on". Any failure → that PR is REFUSED (left
 // untouched). Escalations (issue filing) are unconditional. The narrowness of
 // this predicate IS the "merge stays gated to a safe class" decision — review
-// generalises to all PRs (pr-route routing/review), merge does not.
+// generalises to all PRs (pr-autopilot routing/review), merge does not.
 //
 // CLI usage (both callers invoke this exact surface):
 //   TOKEN=<github.token> node .../pr-merge.mjs \
@@ -193,7 +193,7 @@ export async function main(argv, env) {
   return result.refused > 0 ? 2 : 0;
 }
 
-// Run as a CLI when invoked directly (pr-route verdict mode calls this path).
+// Run as a CLI when invoked directly (pr-autopilot verdict mode calls this path).
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   process.exit(await main(process.argv, process.env));
 }

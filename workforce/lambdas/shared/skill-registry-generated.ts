@@ -20,7 +20,7 @@ export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "india-grid-watch": ["workforce.feed_write_token"] as const,
   "pdm-charter": [],
   "positioning-write": [],
+  "pr-autopilot": ["github.token"] as const,
   "pr-review": ["github.token"] as const,
-  "pr-route": ["github.token"] as const,
   "record-engagement": [],
 };

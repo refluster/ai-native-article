@@ -14,7 +14,7 @@ Default profile when the `target` is a PR.
 - `target` — PR number or URL.
 
 ## Lens → persona map (step #2)
-Mirrors `nadia`/`pr-route` `config.nomination_rules`, plus the SRE lens.
+Mirrors `nadia`/`pr-autopilot` `config.nomination_rules`, plus the SRE lens.
 
 | Lens | Persona | Nominate when the diff surface has… |
 |---|---|---|
@@ -31,7 +31,7 @@ skill owner or skip with a note.
 
 ## Deliverable (step #3) — GitHub PR comments
 Post, in order, as comments on the PR:
-1. **Routing/pickup comment** (once; dedup against any `pr-route` comment <7d).
+1. **Routing/pickup comment** (once; dedup against any `pr-autopilot` comment <7d).
    Header `🧭 Agent-workforce routing — pickup & nomination`. Include the
    diff-surface→lens table with skip reasons, and state it is operator-
    orchestrated, comment-only.
@@ -50,7 +50,7 @@ One per agent that did work, via `scripts/register_engagement.py`:
 
 | agent | `--skill-name` | `--skill-version` |
 |---|---|---|
-| nadia (routing) | `pr-route` | auto (`GET /skills/pr-route`, e.g. 0.2.0) |
+| nadia (routing) | `pr-autopilot` | auto (`GET /skills/pr-autopilot`, e.g. 0.2.0) |
 | ren / dario / farah / aoi (review) | `pr-review` | auto (e.g. 0.1.0) |
 
 - `--project-id <project>`, `--status ok`, `--started-at/--ended-at` = real work

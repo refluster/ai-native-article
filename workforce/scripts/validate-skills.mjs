@@ -348,7 +348,7 @@ for (const name of skillDirs) {
   // handler.ts is optional library code (ADR-0005: no skill-shape axis, no
   // runtime dispatch on executor). A skill MAY bundle a handler.ts for custom
   // pre-/post-processing (e.g. feed-post) or as a dormant library awaiting a
-  // CCR rework (pr-review / pr-route / pdm-charter). Neither required nor
+  // CCR rework (pr-review / pr-autopilot / pdm-charter). Neither required nor
   // forbidden — the CCR routine never switches on it.
 }
 

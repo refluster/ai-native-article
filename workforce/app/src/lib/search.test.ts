@@ -55,7 +55,7 @@ const ROSTER: WorkforceAgent[] = [
 
 const SKILLS: WorkforceSkill[] = [
   skill({ name: 'pr-review', description: 'Review a pull request across lenses.', owners: ['nadia', 'dario', 'ren', 'aoi'] }),
-  skill({ name: 'pr-route', description: 'Route a PR to reviewer personas.', owners: ['nadia'] }),
+  skill({ name: 'pr-autopilot', description: 'Route a PR to reviewer personas.', owners: ['nadia'] }),
   skill({ name: 'article-level2', description: 'Author an L2 explanation article.', owners: ['sora'] }),
 ]
 
@@ -134,7 +134,7 @@ describe('searchSkills', () => {
   it('prefix "pr-" surfaces both pr- skills', () => {
     const names = searchSkills(SKILLS, 'pr-').map((h) => h.skill.name)
     expect(names).toContain('pr-review')
-    expect(names).toContain('pr-route')
+    expect(names).toContain('pr-autopilot')
   })
 
   it('matches on owner slug (skills "ren" owns)', () => {

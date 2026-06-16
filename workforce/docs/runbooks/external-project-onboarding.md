@@ -109,7 +109,7 @@ Seed OK — 1 project(s): 1 created.
 
 ## Step 5 — Invoke
 
-The first invocation is conversational (today's invocation surface — [`pr-route.md`](../routines/pr-route.md) describes the contract):
+The first invocation is conversational (today's invocation surface — [`pr-autopilot.md`](../routines/pr-autopilot.md) describes the contract):
 
 > Nadia, project `acme-web` の PR https://github.com/acmeorg/web/pull/42 を PdM 視点で review。Architecture surface あれば Dario に route。
 
@@ -117,13 +117,13 @@ The runner:
 1. Resolves the project context for `acme-web`. (Update 2026-06-08: membership is no longer a write-gate — the cross-project denial was removed per CLAUDE.md C-3 — so this step records context rather than rejecting non-members.)
 2. Resolves `wf/projects/acme-web/github.token` via `getCredential<GithubSecret>("acme-web", "github.token")`.
 3. Fetches the PR + governance_docs from `acmeorg/web` using the token.
-4. Composes the Nadia persona prompt (system.md + `pr-route` binding config + `pr-route.md` skill contract).
+4. Composes the Nadia persona prompt (system.md + `pr-autopilot` binding config + `pr-autopilot.md` skill contract).
 5. Posts the routing comment via the target repo's REST API.
-6. Writes `PROJECT#acme-web/EXEC#{ulid}` with `agent_slug=nadia, skill_name=pr-route` + an `artifact_ref` summarising the comment.
+6. Writes `PROJECT#acme-web/EXEC#{ulid}` with `agent_slug=nadia, skill_name=pr-autopilot` + an `artifact_ref` summarising the comment.
 
 Reviewer dispatch (Dario etc.) repeats steps 2–6 with the reviewer persona's `pr-review` binding.
 
-Verdict synthesis (cycle close) is the second mode of the same `pr-route` skill.
+Verdict synthesis (cycle close) is the second mode of the same `pr-autopilot` skill.
 
 ## Troubleshooting
 
@@ -145,5 +145,5 @@ Verdict synthesis (cycle close) is the second mode of the same `pr-route` skill.
 
 - [`workforce/projects/README.md`](../../projects/README.md) — file/schema reference
 - [Epic-010](../epics/epic-010-project-trust-boundary.md) — design rationale
-- [`pr-route.md`](../routines/pr-route.md) / [`pr-review.md`](../routines/pr-review.md) — skill contracts (cross-project mode section)
+- [`pr-autopilot.md`](../routines/pr-autopilot.md) / [`pr-review.md`](../routines/pr-review.md) — skill contracts (cross-project mode section)
 - [`workforce/lambdas/shared/project.ts`](../../lambdas/shared/project.ts) — runtime API

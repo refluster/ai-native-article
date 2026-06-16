@@ -45,7 +45,7 @@
           "maxLength": 100
         }
       },
-      "description": "GitHub repo this project ships work against. Used by pr-route / pr-review handlers to resolve PR URLs against the project. The PAT used to call the API is read from wf/projects/{id}/github.token; the project membership policy gates who can invoke a skill against this project."
+      "description": "GitHub repo this project ships work against. Used by pr-autopilot / pr-review handlers to resolve PR URLs against the project. The PAT used to call the API is read from wf/projects/{id}/github.token; the project membership policy gates who can invoke a skill against this project."
     },
     "governance_docs": {
       "type": "array",

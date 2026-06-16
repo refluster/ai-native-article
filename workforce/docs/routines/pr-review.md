@@ -1,7 +1,7 @@
 # `pr-review` — Generic PR review skill (persona-agnostic)
 
 **Skill type**: review (post-only).
-**Trigger**: invoked by an agent that holds the `pr-route` skill as part of Phase D of [dev-process.md](../runbooks/dev-process.md).
+**Trigger**: invoked by an agent that holds the `pr-autopilot` skill as part of Phase D of [dev-process.md](../runbooks/dev-process.md).
 **Purpose**: read a PR + linked Story, post inline + summary comments under the invoking agent's persona lens, then return. **Never** approves, requests-changes, or merges (W-5).
 
 > **Persona-agnostic by design.** This spec describes the **task contract** — the protocol, the success criteria, the structural sections of inline + summary comments. The **lens** (what to actually look for) comes from the invoking agent: their voice in `workforce/agents/{slug}/system.md` + their skill-specific config in the binding's `config` field of `workforce/agents/{slug}/agent.json`. Any agent with a `pr-review` binding can invoke this skill — task assignment is fluid, not persona-locked.
@@ -18,7 +18,7 @@ When an agent invokes this skill, the runtime (operator-conversational today; fu
                              escalation_triggers, sign_off_suffix)
 ```
 
-The invoker MUST be told its own `{agent_slug}` so it can load the right system.md + config block. Maya's `pr-route` skill passes this at invocation.
+The invoker MUST be told its own `{agent_slug}` so it can load the right system.md + config block. Maya's `pr-autopilot` skill passes this at invocation.
 
 ## Skill contract (applies to every invocation regardless of persona)
 
@@ -71,7 +71,7 @@ If your binding's `config.run_locally` is `true`, you MUST run the validators + 
 - Inline comments cite finding-IDs.
 - Sign-off + bias disclosure present.
 - For re-verify cycles: cycle-1 → cycle-2 mapping table.
-- Maya's `pr-route` skill can synthesise the verdict from this review's structured outputs.
+- Maya's `pr-autopilot` skill can synthesise the verdict from this review's structured outputs.
 
 ## Why this shape (persona-agnostic)
 
@@ -105,7 +105,7 @@ When `project_id` is omitted, the runner defaults to the workforce's own self pr
 
 ## Related
 
-- [pr-route.md](pr-route.md) — the routing skill (invoked by Maya today; future: any agent with the binding) that dispatches `pr-review` to nominated personas.
+- [pr-autopilot.md](pr-autopilot.md) — the routing skill (invoked by Maya today; future: any agent with the binding) that dispatches `pr-review` to nominated personas.
 - [pr-implement.md](pr-implement.md) — the implementer skill, same persona-agnostic shape.
 - [dev-process.md](../runbooks/dev-process.md) — the seven-phase loop.
 - [bindings.md](../runbooks/bindings.md) — binding shape including the new `config` field.

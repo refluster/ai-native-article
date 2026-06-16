@@ -1,11 +1,11 @@
 ---
 name: pr-review
-description: Workforce skill that applies the invoking persona's lens to a target-repo PR and posts an inline + summary review (event=COMMENT only, per W-5). Persona-agnostic — Dario's architecture lens, Ren's engineering lens, Aoi's design lens, and Nadia's product lens all overlay the same generic handler via the binding's `config.checklist_sections`. Lambda-resident; project-scoped credentials per Epic-010 §5. Verdict synthesis (the 🟢/🟡/🔴 leg of the pr-route contract) is in pr-route's verdict mode, not here.
+description: Workforce skill that applies the invoking persona's lens to a target-repo PR and posts an inline + summary review (event=COMMENT only, per W-5). Persona-agnostic — Dario's architecture lens, Ren's engineering lens, Aoi's design lens, and Nadia's product lens all overlay the same generic handler via the binding's `config.checklist_sections`. Lambda-resident; project-scoped credentials per Epic-010 §5. Verdict synthesis (the 🟢/🟡/🔴 leg of the pr-autopilot contract) is in pr-autopilot's verdict mode, not here.
 ---
 
 # pr-review
 
-Lambda-resident implementation of the reviewer leg of the persona-agnostic [pr-review routine spec](../../docs/routines/pr-review.md). One generic handler, persona-specific lens via binding `config`. Sister skill to [pr-route](../pr-route/SKILL.md) — that one decides who reviews, this one IS the review.
+Lambda-resident implementation of the reviewer leg of the persona-agnostic [pr-review routine spec](../../docs/routines/pr-review.md). One generic handler, persona-specific lens via binding `config`. Sister skill to [pr-autopilot](../pr-autopilot/SKILL.md) — that one decides who reviews, this one IS the review.
 
 ## Bundle layout
 
@@ -57,12 +57,12 @@ aws lambda invoke --function-name wf-agent-runner-prod \
   out.json
 ```
 
-Tomorrow (Phase 7 PR5 webhook surface), pr-route's verdict mode invokes this skill per-reviewer-persona after the routing comment lands.
+Tomorrow (Phase 7 PR5 webhook surface), pr-autopilot's verdict mode invokes this skill per-reviewer-persona after the routing comment lands.
 
 ## What this skill does NOT do
 
-- **Verdict synthesis.** The 🟢/🟡/🔴 cycle-2-verdict comment is pr-route's responsibility (verdict mode — a separate path in pr-route's handler). This skill produces the per-persona review only.
+- **Verdict synthesis.** The 🟢/🟡/🔴 cycle-2-verdict comment is pr-autopilot's responsibility (verdict mode — a separate path in pr-autopilot's handler). This skill produces the per-persona review only.
 - **Cycle counter management.** Scoping to cycle-1 vs cycle-2+ findings is the routine spec's pr-review.md responsibility; the handler's cycle-detection lifts the count from existing review comments authored by this persona.
-- **Cross-persona coordination.** Each pr-review invocation is one persona's lens applied independently. The routing layer (pr-route) decides which lenses run.
+- **Cross-persona coordination.** Each pr-review invocation is one persona's lens applied independently. The routing layer (pr-autopilot) decides which lenses run.
 
-Related: [pr-review.md](../../docs/routines/pr-review.md), [pr-route.md](../../docs/routines/pr-route.md), [pr-route handler](../pr-route/handler.ts) (sister skill — verdict mode lives there).
+Related: [pr-review.md](../../docs/routines/pr-review.md), [pr-autopilot.md](../../docs/routines/pr-autopilot.md), [pr-autopilot handler](../pr-autopilot/handler.ts) (sister skill — verdict mode lives there).

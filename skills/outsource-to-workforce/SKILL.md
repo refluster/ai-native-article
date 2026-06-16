@@ -25,7 +25,7 @@ new skill.
 ## Execution model — be honest about this (read first)
 
 This is **operator-orchestrated**, not autonomous delegation. Today the workforce
-has only `nadia`/`pr-route` bound as an executable PR skill, and it is
+has only `nadia`/`pr-autopilot` bound as an executable PR skill, and it is
 **comment-only routing** — no `pr-review`/verdict/fix executor is bound yet. So
 **you (the operator/Claude) generate the per-lens reviews and post them**; the
 agents do not autonomously run. Reflect this truthfully:
@@ -78,7 +78,7 @@ against.
 
 ### 3 · Assign & execute (operator-orchestrated)
 Follow the profile's **deliverable** section. For `pr-review` that is, in order:
-a routing/pickup comment (dedup against any `pr-route` comment <7d), one review
+a routing/pickup comment (dedup against any `pr-autopilot` comment <7d), one review
 comment per nominated lens (real findings in that persona's voice), and one
 operator-response comment per lens (`accepted, fixed in <sha>` / `deferred` /
 `recorded`) — **applying the agreed fixes as a commit**. The reviews must be
@@ -114,7 +114,7 @@ foundation steps above stay identical. Start from `profiles/pr-review.md`.
 
 ## Reference
 - `references/workforce-api.md` — endpoints, auth/token scoping, engagement field
-  mechanics, roster snippet, and the `nadia`/`pr-route` relationship. Read it
+  mechanics, roster snippet, and the `nadia`/`pr-autopilot` relationship. Read it
   before step #2 or #4 if any detail is unclear.
 
 ## Worked example

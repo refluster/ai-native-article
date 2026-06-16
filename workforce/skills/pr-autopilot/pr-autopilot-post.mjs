@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Deterministic pr-route POST script — the ONLY write the pr-route skill
+// Deterministic pr-autopilot POST script — the ONLY write the pr-autopilot skill
 // performs. It posts ONE routing comment to a PR's issue-comment thread.
 //
 // R-N9 / W-5 by construction: the single fetch below targets
@@ -15,7 +15,7 @@
 //
 // Usage:
 //   GITHUB_TOKEN=<credentials['github.token'].token> \
-//     node workforce/skills/pr-route/pr-route-post.mjs \
+//     node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
 //       --project asp-cloud --pr 42 --body-file /tmp/route-body-42.md
 //
 // Exit codes:
@@ -27,7 +27,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
-import { projectRepo } from "./pr-route-scan.mjs";
+import { projectRepo } from "./pr-autopilot-scan.mjs";
 
 const GH_API = "https://api.github.com";
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -80,7 +80,7 @@ async function main() {
   }
   if (res.status === 201) {
     const json = await res.json().catch(() => ({}));
-    console.log(`pr-route-post: routed ${owner}/${repo}#${prNumber} (comment ${json.id ?? "?"})`);
+    console.log(`pr-autopilot-post: routed ${owner}/${repo}#${prNumber} (comment ${json.id ?? "?"})`);
     process.exit(0);
   }
   const text = await res.text().catch(() => "");
@@ -88,7 +88,7 @@ async function main() {
 }
 
 function die(code, msg) {
-  console.error(`pr-route-post: ${msg}`);
+  console.error(`pr-autopilot-post: ${msg}`);
   process.exit(code);
 }
 
