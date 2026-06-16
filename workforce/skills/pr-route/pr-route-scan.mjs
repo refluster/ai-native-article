@@ -128,6 +128,10 @@ async function main() {
   for (const pr of prs) {
     if (candidates.length >= max) break;
     if (pr.draft) continue;
+    // Dependabot (and other bot) PRs belong to the no-review dependabot-triage
+    // lane (R-N10 auto-merge), not human-lens routing. Skip them here so they
+    // are never mis-routed to reviewers and then stalled (the #530/#514 case).
+    if (pr.user?.type === "Bot" || /\[bot\]$/.test(pr.user?.login ?? "")) continue;
     if (!withinWindow(pr.updated_at, sinceDays)) continue;
     let comments;
     try {

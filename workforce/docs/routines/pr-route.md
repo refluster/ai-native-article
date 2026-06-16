@@ -28,6 +28,10 @@ The same skill handles both legs of the cycle:
 
 Mode is determined by inspecting the PR's existing comments (see Mode decision below).
 
+**Drive the cycle to completion (the #530/#514 fix).** Routing is not the finished job: between routing and verdict the **reviews must actually land**. Where reviewer personas have a dispatchable `pr-review` binding, routing dispatches them; where none is wired yet, the routing persona **obtains each nominated review inline** (applying that persona's `pr-review` lens and posting it under their byline) so a PR is never left stalled at a lone routing comment. Then verdict mode synthesises and completes (R-N10 safe-class merge, or hand-off).
+
+**Bot PRs are out of scope.** Dependabot/bot-authored PRs are skipped at discovery — they are the no-review [`dependabot-triage`](../../skills/dependabot-triage/SKILL.md) lane (R-N10 auto-merge), not human-lens routing. pr-route handles general/human-authored PRs.
+
 ## Skill contract
 
 ### Context to load
