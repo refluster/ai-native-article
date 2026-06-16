@@ -1,10 +1,14 @@
 {
   "name": "pr-route",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "status": "active",
   "cost_class": "medium",
   "owners": ["nadia", "maya"],
   "improvement_agent": "sana",
   "created_at": "2026-05-30",
-  "requires": ["github.token"]
+  "requires": ["github.token"],
+  "deliverable": {
+    "type": "external-pr-merge",
+    "publish_notion": false
+  }
 }
