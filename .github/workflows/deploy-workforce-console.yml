@@ -7,6 +7,11 @@ on:
       - 'workforce/app/**'
       - 'packages/shared/**'
       - 'workforce/scripts/build-agent-manifest.mjs'
+      # The deploy regenerates workforce-skills.json from workforce/skills/ via
+      # build:agents, so a skill add/change/remove must redeploy the console —
+      # otherwise the /skills page silently lags the source tree (the manifest
+      # is a deploy-time build artefact, not the committed copy).
+      - 'workforce/skills/**'
       - '.github/workflows/deploy-workforce-console.yml'
   workflow_dispatch:
 
