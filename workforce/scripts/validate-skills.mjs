@@ -59,6 +59,10 @@ const DELIV_TYPES = new Set([
   "launch-plan",
   "pr",
   "notification",
+  "external-pr",
+  // R-N10 (Zone A, 2026-06-16): the one delegated-merge marker. Mirrors the
+  // skill-meta schema enum + skill.ts:DeliverableType.
+  "external-pr-merge",
 ]);
 // Notion `Type` select values the front-end article pipeline distinguishes.
 // Mirrors ArticleType in newsletter/app/src/types/article.ts.
