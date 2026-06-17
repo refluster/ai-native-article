@@ -65,7 +65,7 @@ Each row has:
 
 | # | Item | Severity | Status | Notes |
 |---|---|---|---|---|
-| OP-001 | `PROJECT#workforce-meta` DDB bootstrap | L1 per stage | ✅ done 2026-05-27 (prod / us-west-2) | Runbook at `runbooks/project-workforce-meta-bootstrap.md`. Wrote META + 6 MEMBER rows (maya / dario / ren / aoi / yuki / sora). Verified 7 rows present. |
+| OP-001 | `PROJECT#workforce-meta` DDB bootstrap | L1 per stage | ✅ done 2026-05-27 (prod / us-west-2) · **🗄️ archived 2026-06-17** | Runbook at `runbooks/project-workforce-meta-bootstrap.md`. Wrote META + 6 MEMBER rows (maya / dario / ren / aoi / yuki / sora). Verified 7 rows present. **2026-06-17:** sole consumer (`pdm-decompose`) superseded + unbound, so the project was archived (META `status: archived` + `archived_at`, via `project.ts:archive()` shape) rather than hard-deleted — EXEC ledger / MEMBER rows preserved. Runbook marked RETIRED. |
 | OP-002 | `wf-backfill-tasks` first invocation | L2 per stage | ✅ done 2026-05-27 (prod / us-west-2) | Runbook at `runbooks/backfill-tasks.md`. Invocation returned `{scanned: 0, backfilled: 0, already_backfilled: 0, skipped_missing_agent_slug: 0, errors: []}` — matches runbook "no TASK rows yet" expected output. |
 | OP-003 | Instantiate reviewer + router CCR routines | L2 | open | When conversational pattern saturates. Specs in `routines/`. |
 | OP-004 | Epic-010 post-deploy verification | L2 per stage | ✅ done 2026-05-28 (prod / us-west-2) | Issue [#150](https://github.com/refluster/ai-native-article/issues/150). Ran by agent with operator creds — A1–A8 + B1–B6 sections; surfaced FU-NEW-C / FU-NEW-D from a real prod bug (workforce-meta META row missing `project_id`). Hot-fix applied + this PR patches the runbook + harden. |

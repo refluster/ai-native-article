@@ -1,4 +1,16 @@
-# Runbook — `PROJECT#workforce-meta` bootstrap
+# Runbook — `PROJECT#workforce-meta` bootstrap — **RETIRED**
+
+> **Status: retired (project archived 2026-06-17).** `workforce-meta` was
+> bootstrapped solely to own the audit/RUN rows of Maya's `pdm-decompose`
+> routine. That routine is superseded (see [pdm-decompose.md](pdm-decompose.md) /
+> [dev-process.md](dev-process.md)) and Maya's binding to it was removed, so the
+> project has no remaining consumer. Rather than hard-delete (which would destroy
+> the `EXEC#` audit ledger — against R-N2 / append-only AUDIT / ADR-0007
+> durability), the `PROJECT#workforce-meta/META` row was flipped to
+> `status: archived` (+ `archived_at`) in prod via the `project.ts:archive()`
+> shape; the META / MEMBER / EXEC rows remain queryable. Do NOT re-run the
+> bootstrap below. Kept as historical record + for the canonical-shape /
+> idempotent hot-fix knowledge.
 
 One-time DDB write to register the project that owns "the workforce
 working on itself" (Maya's PdM routine, Dario's VP-of-eng routines, Aoi's
