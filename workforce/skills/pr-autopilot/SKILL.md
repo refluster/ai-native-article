@@ -77,6 +77,8 @@ GITHUB_TOKEN="<credentials['github.token'].token>" \
 
 Each posted review is a real lens review — concrete findings citing the PR surface, or an explicit "no findings from this lens". When every nominated review is posted, go to Step 5.
 
+> **Green sign-off marker (machine-checkable consensus — adr-0010 / Sana B1).** When a reviewer's lens is **non-blocking** (their findings are all ✅/📥/💬, no 🔴), their posted review **must embed the exact hidden marker** `<!-- autopilot:review:{slug}:green -->` (e.g. `<!-- autopilot:review:dario:green -->`), where `{slug}` is that reviewer's agent slug. This is the **only** signal the merge engine accepts as that reviewer's green vote — it does not parse bylines or prose. A reviewer who is blocking (🔴) or has an open finding **omits** the marker (or writes `:red`). No marker ⇒ that reviewer is "not green" ⇒ the merge fails closed.
+
 ## Step 5 — verdict by reviewer consensus + completion (+ bounded merge)
 
 Now that the nominated reviews exist (you produced/dispatched them in Step 4, or they arrived on a prior tick), **synthesise the reviewers' collective verdict** — you do not re-review, and the verdict is **not** your solo call. It is the **consensus of all nominated reviewers**:
@@ -103,7 +105,7 @@ Autonomous merge widened (adr-0010) from the old Dependabot safe class to **"the
 - the bound `project_id` has an **R-N10 delegation** (the target repo's own statute grants the workforce autonomous-merge authority — e.g. `PSVL/asp-cloud` → `docs/adr_autopilot_pr_merge.md`; if none, never merge), and
 - the PR touches **no L0/L1 path** declared in the target repo's own `docs/governance.md` (between the `<!-- autopilot:l0l1-paths -->` markers), all required checks are green, the PR is mergeable/clean, and no reviewer left `CHANGES_REQUESTED`.
 
-When those hold, build the decisions payload (schema in the script header) — one `{ pr, action:"merge", comment, squash_subject, squash_body, reviewers:[...] }` where `reviewers` is the nominated set whose unanimous sign-off you are attesting — and run the **shared** merge engine:
+When those hold, build the decisions payload (schema in the script header) — one `{ pr, action:"merge", comment, squash_subject, squash_body, reviewers:[...] }` where `reviewers` is the nominated set whose unanimous sign-off you are attesting (each must have posted their `<!-- autopilot:review:{slug}:green -->` marker per Step 4) — and run the **shared** merge engine:
 
 ```sh
 TOKEN="<credentials['github.token'].token>" \
@@ -111,7 +113,7 @@ TOKEN="<credentials['github.token'].token>" \
     --repo "<owner>/<repo>" --decisions /tmp/pr-merge-decisions.json
 ```
 
-`pr-merge.mjs` **re-verifies the full predicate server-side and fails closed**: it reads the target repo's `docs/governance.md` to learn the L0/L1 path set (if that doc is unreadable or declares no L0/L1 block, the set is *unknown* and the merge is **refused** — never guessed), then confirms open + mergeable + clean, no L0/L1 file in the diff, all checks green, no `CHANGES_REQUESTED`, and that each reviewer in `reviewers[]` has a posted lens review. A mis-judged "🟢 + eligible" therefore cannot cause a bad merge. Exit `2` = a decision was refused server-side or GitHub rejected the write; surface it, do not retry blindly. For an L0/L1 PR or a non-consensus PR, emit **no** merge decision — the verdict comment is the deliverable and a human decides.
+`pr-merge.mjs` **re-verifies the full predicate server-side and fails closed**: it reads the target repo's `docs/governance.md` to learn the L0/L1 path set (if that doc is unreadable or declares no L0/L1 block, the set is *unknown* and the merge is **refused** — never guessed), then confirms open + mergeable + clean, no L0/L1 file in the diff, all checks green, no `CHANGES_REQUESTED`, and that each reviewer in `reviewers[]` posted their exact `<!-- autopilot:review:{slug}:green -->` marker (not a byline — an exact hidden token, so prose can't fake a vote and a format change can't drop one). A mis-judged "🟢 + eligible" therefore cannot cause a bad merge. Exit `2` = a decision was refused server-side or GitHub rejected the write; surface it, do not retry blindly. For an L0/L1 PR or a non-consensus PR, emit **no** merge decision — the verdict comment is the deliverable and a human decides.
 
 ## Scope (this skill)
 
@@ -121,4 +123,4 @@ TOKEN="<credentials['github.token'].token>" \
 - **The verdict is the reviewers' consensus, not your solo call.** Merge needs unanimous green; one reviewer short, or any 🔴 / `CHANGES_REQUESTED`, blocks it.
 - **Merge is bounded to non-L0/L1 + consensus (R-N10 / adr-0010).** A PR touching the target repo's governance L0/L1 always hands off to a human (the operator's final call). No push or PR-open under any path. The engine re-verifies and fails closed.
 
-Related: [agent-runner.md](../../docs/routines/agent-runner.md) (the generic CCR routine this skill runs under — there is no per-skill routine spec; this SKILL.md is the authoritative contract), [pr-review.md](../../docs/routines/pr-review.md), [R-N10 governance](../../docs/governance.md) + [adr-0010](../../docs/adr/adr-0010-autopilot-merge-consensus-widening.md) (the widened merge predicate), [dependabot-triage](../dependabot-triage/SKILL.md) (the former no-review Dependabot lane, retired by adr-0010 — bot PRs now route here), [dev-process.md](../../docs/runbooks/dev-process.md).
+Related: [agent-runner.md](../../docs/routines/agent-runner.md) (the generic CCR routine this skill runs under — there is no per-skill routine spec; this SKILL.md is the authoritative contract), [pr-review.md](../../docs/routines/pr-review.md), [R-N10 governance](../../docs/governance.md) + [adr-0010](../../docs/adr/adr-0010-autopilot-merge-consensus-widening.md) (the widened merge predicate; the former no-review `dependabot-triage` lane it retired has since been deleted — bot PRs now route here), [dev-process.md](../../docs/runbooks/dev-process.md).

@@ -79,11 +79,11 @@ Concretely:
    workforce-side per-binding switch remain.
 6. **`dependabot-triage` retires.** Bot PRs route through `pr-autopilot` like
    any other PR — reviewed, not no-review. The shared engine `pr-merge.mjs`
-   keeps its single `main`/`applyDecisions` surface (so the thin
-   `apply-triage.mjs` wrapper still imports cleanly), but the no-review fast
+   keeps its single `main`/`applyDecisions` surface, but the no-review fast
    path is dead: a merge now *requires* `reviewers[]` consensus, which a
-   no-review fire cannot supply. The `dependabot-triage` skill folder is slated
-   for deletion in a follow-up.
+   no-review fire cannot supply. The `dependabot-triage` skill folder was
+   **deleted** in the follow-up that hardened the consensus marker (Sana B1) —
+   it was bound to no agent, so removal is inert.
 
 The fail-closed engine (`pr-merge.mjs`) re-verifies the full predicate
 server-side: open + mergeable + clean, no L0/L1 file in the diff (set read from

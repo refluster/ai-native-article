@@ -160,14 +160,20 @@ export function makeGh({ token, api = process.env["GITHUB_API_URL"] || "https://
   };
 }
 
-// A reviewer persona's lens review has landed if a review or issue comment body
-// carries that persona's byline. Reviews post under the shared workforce token
-// (W-5: COMMENT-event, never APPROVE), so the persona is identified by byline
-// text, not GitHub login.
+// A reviewer persona's green sign-off has landed iff a review/comment body
+// carries that persona's EXACT structured marker (adr-0010 / Sana B1 hardening,
+// 2026-06-17): `<!-- autopilot:review:{slug}:green -->`. The routing persona
+// embeds this token in each nominated reviewer's posted review when that lens is
+// non-blocking. An exact hidden-comment match removes the two failure modes of
+// the old byline regex: a differently-formatted sign-off no longer reads as
+// "missing" by accident, and prose that merely names the persona can no longer
+// read as a green vote. Absence of the marker fails closed (no merge).
+export function reviewerGreenMarker(slug) {
+  return `<!-- autopilot:review:${String(slug).toLowerCase()}:green -->`;
+}
 export function reviewerSignedOff(slug, reviewBodies) {
-  const name = slug.charAt(0).toUpperCase() + slug.slice(1);
-  const byline = new RegExp(`(^|\\n)\\s*[—-]\\s*${name}\\b|\\*\\*@?${slug}\\b|\\*\\*${name}\\b`, "i");
-  return reviewBodies.some((b) => byline.test(b || ""));
+  const marker = reviewerGreenMarker(slug);
+  return reviewBodies.some((b) => (b || "").toLowerCase().includes(marker));
 }
 
 // Server-side predicate re-check. Returns {ok, why, sha}.
@@ -209,7 +215,7 @@ export async function verifyMergeable(gh, repo, pr, decision) {
     ...(ics === 200 && Array.isArray(comments) ? comments.map((c) => c.body) : []),
   ];
   const missing = reviewers.filter((slug) => !reviewerSignedOff(slug, bodies));
-  if (missing.length > 0) return { ok: false, why: `missing lens review(s) from ${missing.join(", ")} — consensus not reached` };
+  if (missing.length > 0) return { ok: false, why: `missing green marker(s) from ${missing.join(", ")} (expected ${reviewerGreenMarker(missing[0])}) — consensus not reached` };
 
   return { ok: true, why: `consensus-green, no L0/L1 surface (${reviewers.join(", ")})`, sha: p.head.sha };
 }

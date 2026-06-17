@@ -9,6 +9,7 @@ import {
   globToRegExp,
   resolveL0L1Paths,
   reviewerSignedOff,
+  reviewerGreenMarker,
   verifyMergeable,
   applyDecisions,
   ESCALATION_LABEL,
@@ -35,7 +36,8 @@ const govDoc = (block) => ({
 const L0_BLOCK =
   "<!-- autopilot:l0l1-paths -->\n- docs/governance.md\n- docs/adr/**\n<!-- /autopilot:l0l1-paths -->";
 const GREEN_CHECK = [{ name: "ci", status: "completed", conclusion: "success" }];
-const DARIO_REVIEW = [{ state: "COMMENTED", body: "looks good\n— Dario" }];
+// A non-blocking lens review carries the exact structured green marker.
+const DARIO_REVIEW = [{ state: "COMMENTED", body: `looks good\n\n${reviewerGreenMarker("dario")}` }];
 
 /** Standard happy-path route table, parameterised by the variable bits. */
 const routes = (files, checks, reviews, comments = []) => [
@@ -57,9 +59,11 @@ describe("globToRegExp", () => {
   });
 });
 
-describe("reviewerSignedOff", () => {
-  it("matches an em-dash byline", () => expect(reviewerSignedOff("dario", ["x\n— Dario (CCR)"])).toBe(true));
-  it("matches a bold byline", () => expect(reviewerSignedOff("ren", ["**Ren — cycle 1**"])).toBe(true));
+describe("reviewerSignedOff (exact structured marker, not byline)", () => {
+  it("matches the exact green marker", () => expect(reviewerSignedOff("dario", [`ok\n${reviewerGreenMarker("dario")}`])).toBe(true));
+  it("is case-insensitive on the slug token", () => expect(reviewerSignedOff("Ren", ["<!-- AUTOPILOT:REVIEW:REN:GREEN -->"])).toBe(true));
+  it("does NOT count a byline/prose mention as a green vote (no false-open)", () => expect(reviewerSignedOff("dario", ["x\n— Dario (CCR) looks good"])).toBe(false));
+  it("does NOT count a :red marker", () => expect(reviewerSignedOff("dario", ["<!-- autopilot:review:dario:red -->"])).toBe(false));
   it("is false when the persona never signed", () => expect(reviewerSignedOff("aoi", ["nothing here"])).toBe(false));
 });
 
