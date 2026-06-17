@@ -30,7 +30,7 @@ Mode is determined by inspecting the PR's existing comments (see Mode decision b
 
 **Drive the cycle to completion (the #530/#514 fix).** Routing is not the finished job: between routing and verdict the **reviews must actually land**. Where reviewer personas have a dispatchable `pr-review` binding, routing dispatches them; where none is wired yet, the routing persona **obtains each nominated review inline** (applying that persona's `pr-review` lens and posting it under their byline) so a PR is never left stalled at a lone routing comment. Then verdict mode synthesises and completes (R-N10 safe-class merge, or hand-off).
 
-**Bot PRs are out of scope.** Dependabot/bot-authored PRs are skipped at discovery — they are the no-review [`dependabot-triage`](../../skills/dependabot-triage/SKILL.md) lane (R-N10 auto-merge), not human-lens routing. pr-autopilot handles general/human-authored PRs.
+**Every open PR is in scope (adr-0010).** Draft and non-draft, human- and bot-authored (Dependabot) PRs all route through the same review→consensus→merge path. The former no-review [`dependabot-triage`](../../skills/dependabot-triage/SKILL.md) lane is retired; bot PRs now get the same lens routing as human PRs.
 
 ## Skill contract
 
@@ -106,10 +106,10 @@ Skipping <list with one-word reasons>.
      - 🟡 **still open**
      - 📥 **deferred** to `<link to FU- entry or follow-up issue>`
      - 💬 **non-blocking nit / acknowledged** (reviewer flagged as nit; author chose not to address; not a blocker for 🟢)
-3. Decide verdict:
-   - 🟢: all cycle-1 findings ✅, 📥, or 💬; CI green; tests pass; no L0 amendments without operator sign-off.
-   - 🟡: one or more findings 🟡 open. Request another revise cycle.
-   - 🔴: cycle count > `config.cycle_cap` OR L0 amendment without operator sign-off OR scope question you can't decide (new managed service, R-N\* loosening). Escalate to operator.
+3. Decide verdict **by reviewer consensus** (not your solo call):
+   - 🟢 **unanimous-green**: *every* nominated reviewer is non-blocking (their cycle findings all ✅, 📥, or 💬; none left 🔴 / `CHANGES_REQUESTED`); CI green; tests pass. One reviewer short of green ⇒ not green.
+   - 🟡: one or more reviewers have an open blocking finding. Request another revise cycle.
+   - 🔴: any reviewer's 🔴 is a veto, OR cycle count > `config.cycle_cap`, OR a scope question you can't decide (new managed service, R-N\* loosening). Escalate to operator.
 4. Post via `mcp__github__add_issue_comment` with body matching the verdict template (see `config.verdict_template` in the binding, or the canonical Maya version below):
 
 ```
@@ -146,9 +146,9 @@ For 🟡: replace the green sign-off body with a list of "still open" findings +
 
 For 🔴: state the reason for escalation explicitly; tag the operator. Do NOT auto-merge or auto-label.
 
-### Bounded R-N10 merge leg (🟢 + safe class only)
+### Bounded merge leg (🟢 unanimous-green + non-L0/L1 only — R-N10 / adr-0010)
 
-A 🟢 verdict normally hands off — "Operator decides per W-5". The **one** exception is the R-N10 delegated-external-merge lane: when the verdict is 🟢 **and** the bound project's own statute has delegated merge authority (e.g. `PSVL/asp-cloud` → `docs/adr_autopilot_pr_merge.md`) **and** the PR is in the delegated *safe class* (clean Dependabot security update · lockfile-only · semver-patch/minor-on-≥1.0 · all checks green · `AUTOPILOT_PR=on`), verdict mode MAY merge it by running the shared fail-closed engine `workforce/skills/pr-autopilot/pr-merge.mjs` (which re-verifies the predicate server-side and refuses anything outside it). **Every other 🟢 PR — all feature/code PRs — still hands off to a human merger.** Review generalises to all PRs; merge does not. See [governance R-N10](../governance.md) and [pr-autopilot SKILL.md Step 4](../../skills/pr-autopilot/SKILL.md).
+A 🟢 verdict merges only when it touches **no L0/L1 path**; otherwise it hands off. The R-N10 delegated-external-merge lane (widened by [adr-0010](../adr/adr-0010-autopilot-merge-consensus-widening.md)): when the verdict is **🟢 unanimous-green**, **and** the bound project's own statute has delegated merge authority (e.g. `PSVL/asp-cloud` → `docs/adr_autopilot_pr_merge.md`), **and** the PR touches **no L0/L1 path** declared in the target repo's own `docs/governance.md` (`<!-- autopilot:l0l1-paths -->` block), with all checks green / mergeable-clean / no `CHANGES_REQUESTED`, verdict mode MAY merge it by running the shared fail-closed engine `workforce/skills/pr-autopilot/pr-merge.mjs` (which reads the target governance doc, re-verifies the predicate server-side, and **fails closed** — an unreadable or marker-less governance doc means the L0/L1 set is unknown and the merge is refused). **Any PR touching the target repo's governance L0/L1 hands off to a human — the operator's final call.** Review generalises to all PRs; merge is bounded to non-L0/L1 + consensus. See [governance R-N10](../governance.md) and [pr-autopilot SKILL.md Step 5](../../skills/pr-autopilot/SKILL.md).
 
 ## What success looks like
 

@@ -1,24 +1,30 @@
 #!/usr/bin/env node
-// pr-autopilot/pr-merge.mjs — the shared, deterministic **safe-class merge engine**
-// for the workforce's R-N10 delegated-external-merge lane.
+// pr-autopilot/pr-merge.mjs — the shared, deterministic **consensus merge engine**
+// for the workforce's R-N10 delegated-external-merge lane (widened by adr-0010,
+// 2026-06-17, superseding the original Dependabot-only safe-class predicate).
 //
-// Two skills share this one engine (the merge logic lives here once; callers
-// only assemble the decisions payload from their own judgment):
-//   • pr-autopilot   — cycle-2 "verdict mode": after reviewers post, on a 🟢 verdict
-//                  AND an R-N10-safe-class PR, it merges; otherwise comment-only.
-//   • dependabot-triage — the no-review Cadence fast path for Dependabot security
-//                  PRs (its apply-triage.mjs is a thin wrapper over main() here).
+// The merge predicate is now: a PR is mergeable iff it touches **no L0/L1 path**
+// of the TARGET repo's own governance (read from that repo's docs/governance.md),
+// is open + mergeable + CLEAN, has **all required checks green**, carries **no
+// human CHANGES_REQUESTED**, and the routing persona's nominated reviewers have
+// each posted their lens review (the unanimous-green consensus). L0/L1-touching
+// PRs are never merged — they escalate to a human (the operator's final call).
 //
 // R-N10 (workforce/docs/governance.md) clause 2: this engine RE-VERIFIES the
-// eligibility predicate SERVER-SIDE and FAILS CLOSED. A decision marked
-// action:"merge" is honoured only if, at apply time, the live PR is: authored by
-// dependabot[bot]; open + mergeable + mergeStateStatus CLEAN; lockfile/manifest-
-// only (no L1-binding path); a semver-patch or minor-on->=1.0 bump (never a
-// major or 0.x-minor crossing); all checks green; and the target repo's
-// AUTOPILOT_PR kill-switch == "on". Any failure → that PR is REFUSED (left
-// untouched). Escalations (issue filing) are unconditional. The narrowness of
-// this predicate IS the "merge stays gated to a safe class" decision — review
-// generalises to all PRs (pr-autopilot routing/review), merge does not.
+// predicate SERVER-SIDE and FAILS CLOSED. A decision marked action:"merge" is
+// honoured only if, at apply time, every predicate clause re-passes against the
+// live PR. Anything it cannot positively confirm — including an unreadable /
+// marker-less target governance doc (so the L0/L1 set is unknown) — is a REFUSAL,
+// never a merge. Escalations (issue filing) are unconditional.
+//
+// Source of truth for "what is L0/L1": the TARGET repo's own statute, per the
+// operator direction (adr-0010). The engine fetches `docs/governance.md`
+// (override: env GOVERNANCE_PATH) and extracts the path globs declared between
+//   <!-- autopilot:l0l1-paths -->  …  <!-- /autopilot:l0l1-paths -->
+// (one `- <glob>` per line). If that block is absent or empty, the L0/L1 set is
+// UNKNOWN and every merge fails closed (route/review/verdict still run; the
+// verdict hands off). This keeps the delegation in the maintainer's repo, never
+// self-asserted by the workforce (R-N10 clause 1).
 //
 // CLI usage (both callers invoke this exact surface):
 //   TOKEN=<github.token> node .../pr-merge.mjs \
@@ -26,13 +32,15 @@
 //
 // Decisions file shape:
 //   { "decisions": [
-//       { "pr": 499, "action": "merge",
-//         "comment": "<CVE-cited triage comment>",
-//         "squash_subject": "chore(deps): bump … (#499)",
-//         "squash_body": "Security update. Fixes CVE-… (GHSA-…)." },
+//       { "pr": 553, "action": "merge",
+//         "comment": "<verdict / advisory-cited merge comment>",
+//         "squash_subject": "feat: … (#553)",
+//         "squash_body": "Unanimous reviewer sign-off (dario, ren). No L0/L1 surface.",
+//         "reviewers": ["dario", "ren"] },
 //       { "pr": 506, "action": "escalate",
-//         "issue_title": "Hold #506: …", "issue_body": "<why held + next step>",
-//         "issue_labels": ["security","dependencies","area:backend","type:chore","priority:P2"] }
+//         "issue_title": "Hold #506: touches L0/L1",
+//         "issue_body": "<why held + next step>",
+//         "issue_labels": ["governance","needs-operator"] }
 //   ] }
 //
 // Exit codes: 0 all applied · 1 bad args/file · 2 a decision refused or a GitHub
@@ -41,16 +49,9 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-export const LOCKFILES =
-  /(^|\/)(yarn\.lock|package-lock\.json|pnpm-lock\.yaml|package\.json|uv\.lock|pyproject\.toml|requirements[^/]*\.txt|Pipfile\.lock|poetry\.lock|go\.(mod|sum)|Cargo\.(toml|lock))$/;
-// Never-merge paths (defence-in-depth on top of the lockfile allowlist above).
-export const L1_DENY = [
-  /restapi\/src\/handlers\/(auth|user|device)/i,
-  /adapter-[^/]+\/src\/.*control/i,
-  /(^|\/)template\.ya?ml$/i,
-  /docs\/adr_/i,
-  /docs\/governance\.md$/i,
-];
+const GOVERNANCE_PATH = process.env["GOVERNANCE_PATH"] || "docs/governance.md";
+const L0L1_OPEN = "<!-- autopilot:l0l1-paths -->";
+const L0L1_CLOSE = "<!-- /autopilot:l0l1-paths -->";
 
 // W-1 editorial guard: a degraded body fails loud here, never lands on GitHub.
 const ARTEFACTS = ["as an ai", "i apologize", "i'm sorry", "certainly!", "here is the", "here's the"];
@@ -62,20 +63,49 @@ export function w1(text, label) {
   return t;
 }
 
-export function parseSemver(v) {
-  const m = String(v).trim().replace(/^v/, "").match(/^(\d+)\.(\d+)\.(\d+)/);
-  return m ? { major: +m[1], minor: +m[2], patch: +m[3] } : null;
+// Translate a leading-slash-free path glob (`**`, `*`, `?`) into an anchored
+// RegExp. `**` matches across slashes; `*` matches within a path segment.
+export function globToRegExp(glob) {
+  let re = "";
+  for (let i = 0; i < glob.length; i++) {
+    const c = glob[i];
+    if (c === "*") {
+      if (glob[i + 1] === "*") { re += ".*"; i++; if (glob[i + 1] === "/") i++; }
+      else re += "[^/]*";
+    } else if (c === "?") re += "[^/]";
+    else if ("\\^$.|+()[]{}".includes(c)) re += "\\" + c;
+    else re += c;
+  }
+  return new RegExp(`(^|/)${re}$`, "i");
 }
-// Eligible = semver-patch, OR minor on a >=1.0 package. Major bumps and any
-// 0.x-minor crossing are excluded (the esbuild 0.21->0.28 case).
-export function eligibleBump(title) {
-  const m = String(title).match(/from\s+(\S+)\s+to\s+(\S+)/i);
-  if (!m) return { ok: false, why: "cannot parse 'from A to B' from title" };
-  const a = parseSemver(m[1]), b = parseSemver(m[2]);
-  if (!a || !b) return { ok: false, why: `unparseable semver (${m[1]} -> ${m[2]})` };
-  if (b.major !== a.major) return { ok: false, why: `major bump ${m[1]} -> ${m[2]}` };
-  if (a.major === 0 && b.minor !== a.minor) return { ok: false, why: `0.x minor crossing ${m[1]} -> ${m[2]}` };
-  return { ok: true, why: `patch/minor ${m[1]} -> ${m[2]}` };
+
+// Fetch the TARGET repo's governance doc and extract the declared L0/L1 path
+// globs. Returns { ok, patterns, why }. ok=false ⇒ the L0/L1 set is unknown ⇒
+// the caller fails every merge closed (route/review still run).
+export async function resolveL0L1Paths(gh, repo, ref) {
+  const path = GOVERNANCE_PATH;
+  const q = ref ? `?ref=${encodeURIComponent(ref)}` : "";
+  const { status, json } = await gh("GET", `/repos/${repo}/contents/${encodeURIComponent(path).replace(/%2F/g, "/")}${q}`);
+  if (status !== 200 || typeof json?.content !== "string") {
+    return { ok: false, patterns: [], why: `cannot read target governance ${path} (HTTP ${status}) — L0/L1 set unknown, failing merge closed` };
+  }
+  const md = Buffer.from(json.content, json.encoding === "base64" ? "base64" : "utf8").toString("utf8");
+  const start = md.indexOf(L0L1_OPEN);
+  const end = md.indexOf(L0L1_CLOSE, start + 1);
+  if (start === -1 || end === -1) {
+    return { ok: false, patterns: [], why: `${path} declares no ${L0L1_OPEN} block — L0/L1 set unknown, failing merge closed` };
+  }
+  const block = md.slice(start + L0L1_OPEN.length, end);
+  const globs = block
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("- "))
+    .map((l) => l.slice(2).trim())
+    .filter(Boolean);
+  if (globs.length === 0) {
+    return { ok: false, patterns: [], why: `${path} L0/L1 block is empty — failing merge closed` };
+  }
+  return { ok: true, patterns: globs.map(globToRegExp), why: `${globs.length} L0/L1 glob(s) from ${path}` };
 }
 
 // Build a thin GitHub REST client bound to one token + repo.
@@ -101,41 +131,63 @@ export function makeGh({ token, api = process.env["GITHUB_API_URL"] || "https://
   };
 }
 
-export async function autopilotOn(gh, repo) {
-  const { status, json } = await gh("GET", `/repos/${repo}/actions/variables/AUTOPILOT_PR`);
-  return status === 200 && json?.value === "on";
+// A reviewer persona's lens review has landed if a review or issue comment body
+// carries that persona's byline. Reviews post under the shared workforce token
+// (W-5: COMMENT-event, never APPROVE), so the persona is identified by byline
+// text, not GitHub login.
+export function reviewerSignedOff(slug, reviewBodies) {
+  const name = slug.charAt(0).toUpperCase() + slug.slice(1);
+  const byline = new RegExp(`(^|\\n)\\s*[—-]\\s*${name}\\b|\\*\\*@?${slug}\\b|\\*\\*${name}\\b`, "i");
+  return reviewBodies.some((b) => byline.test(b || ""));
 }
 
 // Server-side predicate re-check. Returns {ok, why, sha}.
-export async function verifyMergeable(gh, repo, pr) {
+export async function verifyMergeable(gh, repo, pr, decision) {
   const { status, json: p } = await gh("GET", `/repos/${repo}/pulls/${pr}`);
   if (status !== 200) return { ok: false, why: `GET pull ${pr} -> HTTP ${status}` };
   if (p.state !== "open") return { ok: false, why: `PR #${pr} is ${p.state}` };
-  if (p.user?.login !== "dependabot[bot]") return { ok: false, why: `author is ${p.user?.login}, not dependabot[bot]` };
   if (p.mergeable !== true || p.mergeable_state !== "clean") return { ok: false, why: `not clean (mergeable=${p.mergeable}, state=${p.mergeable_state})` };
-  const bump = eligibleBump(p.title);
-  if (!bump.ok) return { ok: false, why: bump.why };
 
+  // L0/L1 guard — sourced from the TARGET repo's own governance (adr-0010).
+  const l0l1 = await resolveL0L1Paths(gh, repo, p.base?.ref);
+  if (!l0l1.ok) return { ok: false, why: l0l1.why };
   const { status: fs, json: files } = await gh("GET", `/repos/${repo}/pulls/${pr}/files?per_page=100`);
   if (fs !== 200 || !Array.isArray(files)) return { ok: false, why: `GET files -> HTTP ${fs}` };
   for (const f of files) {
-    if (L1_DENY.some((re) => re.test(f.filename))) return { ok: false, why: `touches L1-binding path ${f.filename}` };
-    if (!LOCKFILES.test(f.filename)) return { ok: false, why: `non-lockfile change ${f.filename}` };
+    if (l0l1.patterns.some((re) => re.test(f.filename))) {
+      return { ok: false, why: `touches L0/L1 path ${f.filename} — escalate to human (operator's final call)` };
+    }
   }
 
+  // All required checks green.
   const { status: cs, json: checks } = await gh("GET", `/repos/${repo}/commits/${p.head.sha}/check-runs?per_page=100`);
   if (cs !== 200) return { ok: false, why: `GET check-runs -> HTTP ${cs}` };
   for (const c of checks.check_runs || []) {
     if (c.status !== "completed") return { ok: false, why: `check '${c.name}' is ${c.status}` };
     if (!["success", "neutral", "skipped"].includes(c.conclusion)) return { ok: false, why: `check '${c.name}' = ${c.conclusion}` };
   }
-  return { ok: true, why: bump.why, sha: p.head.sha };
+
+  // Unanimous-green consensus: no human CHANGES_REQUESTED, and every nominated
+  // reviewer has posted their lens review.
+  const { status: rs, json: reviews } = await gh("GET", `/repos/${repo}/pulls/${pr}/reviews?per_page=100`);
+  if (rs !== 200 || !Array.isArray(reviews)) return { ok: false, why: `GET reviews -> HTTP ${rs}` };
+  if (reviews.some((r) => r.state === "CHANGES_REQUESTED")) return { ok: false, why: `a reviewer has CHANGES_REQUESTED — not consensus-green` };
+  const reviewers = Array.isArray(decision?.reviewers) ? decision.reviewers.filter((s) => typeof s === "string" && s) : [];
+  if (reviewers.length === 0) return { ok: false, why: `decision carries no reviewers[] — a merge requires the nominated reviewers' consensus (no-review merge refused)` };
+  const { status: ics, json: comments } = await gh("GET", `/repos/${repo}/issues/${pr}/comments?per_page=100`);
+  const bodies = [
+    ...reviews.map((r) => r.body),
+    ...(ics === 200 && Array.isArray(comments) ? comments.map((c) => c.body) : []),
+  ];
+  const missing = reviewers.filter((slug) => !reviewerSignedOff(slug, bodies));
+  if (missing.length > 0) return { ok: false, why: `missing lens review(s) from ${missing.join(", ")} — consensus not reached` };
+
+  return { ok: true, why: `consensus-green, no L0/L1 surface (${reviewers.join(", ")})`, sha: p.head.sha };
 }
 
-// Apply one decisions payload. Returns { merged, escalated, refused, autopilot_switch }.
+// Apply one decisions payload. Returns { merged, escalated, refused }.
 export async function applyDecisions(gh, repo, decisions) {
   let refused = 0, merged = 0, escalated = 0;
-  const switchOn = await autopilotOn(gh, repo);
 
   for (const d of decisions) {
     const pr = d.pr;
@@ -149,22 +201,21 @@ export async function applyDecisions(gh, repo, decisions) {
     }
     if (d.action !== "merge") { refused++; console.error(`pr-merge: #${pr} unknown action "${d.action}"`); continue; }
 
-    // ── R-N10 fail-closed gate ──────────────────────────────────────────────
-    if (!switchOn) { refused++; console.error(`pr-merge: REFUSE merge #${pr}: AUTOPILOT_PR kill-switch is not "on"`); continue; }
+    // ── R-N10 fail-closed gate (adr-0010 widened predicate) ─────────────────
     const comment = w1(d.comment, `#${pr} comment`);
     const subject = w1(d.squash_subject, `#${pr} squash_subject`);
-    const verdict = await verifyMergeable(gh, repo, pr);
+    const verdict = await verifyMergeable(gh, repo, pr, d);
     if (!verdict.ok) { refused++; console.error(`pr-merge: REFUSE merge #${pr}: ${verdict.why}`); continue; }
 
     const c = await gh("POST", `/repos/${repo}/issues/${pr}/comments`, { body: comment });
     if (c.status !== 201) { refused++; console.error(`pr-merge: REFUSE merge #${pr}: comment failed HTTP ${c.status}`); continue; }
-    const rv = await gh("POST", `/repos/${repo}/pulls/${pr}/reviews`, { event: "APPROVE", body: "Autopilot-eligible (R-N10). Approving + squash-merging." });
+    const rv = await gh("POST", `/repos/${repo}/pulls/${pr}/reviews`, { event: "APPROVE", body: "Autopilot consensus-green merge (R-N10 / adr-0010): unanimous reviewer sign-off, no L0/L1 surface." });
     if (rv.status !== 200) { refused++; console.error(`pr-merge: REFUSE merge #${pr}: approve failed HTTP ${rv.status} ${JSON.stringify(rv.json).slice(0, 200)}`); continue; }
     const mg = await gh("PUT", `/repos/${repo}/pulls/${pr}/merge`, { merge_method: "squash", sha: verdict.sha, commit_title: subject, commit_message: d.squash_body || "" });
     if (mg.status === 200) { merged++; console.error(`pr-merge: MERGED #${pr} (${verdict.why})`); }
     else { refused++; console.error(`pr-merge: merge #${pr} REJECTED HTTP ${mg.status}: ${JSON.stringify(mg.json).slice(0, 300)}`); }
   }
-  return { repo, merged, escalated, refused, autopilot_switch: switchOn ? "on" : "off" };
+  return { repo, merged, escalated, refused };
 }
 
 function arg(argv, n) { const i = argv.indexOf(`--${n}`); return i >= 0 && i + 1 < argv.length ? argv[i + 1] : undefined; }
