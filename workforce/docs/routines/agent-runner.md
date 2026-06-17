@@ -290,6 +290,6 @@ For a multi-task verify (Dario + Yuki in the same batch), the inner envelope has
 
 - [`bindings.md`](../runbooks/bindings.md) — binding shape + executor/scheduler matrix.
 - [`ccr-bootstrap.md`](../runbooks/ccr-bootstrap.md) — legacy per-skill routine setup (this doc supersedes the per-skill pattern for the CCR-by-API case).
-- [`pr-implement.md`](pr-implement.md), [`pr-review.md`](pr-review.md) — peer routines for code work (also generic, fired by their own paths). `pr-autopilot` has no per-skill routine doc — its contract is its [SKILL.md](../../skills/pr-autopilot/SKILL.md).
+- [`pr-implement.md`](pr-implement.md) — peer routine for code work (generic, fired by its own path). `pr-autopilot` has no per-skill routine doc — its contract is its [SKILL.md](../../skills/pr-autopilot/SKILL.md), which now also owns the reviewer-lens contract (the separate `pr-review` skill was retired).
 - [`workforce/skills/feed-post/SKILL.md`](../../skills/feed-post/SKILL.md) — the first skill body this runner composes with.
 - [`.claude/skills/cadence-forge/references/cadence-archetype.md`](../../../.claude/skills/cadence-forge/references/cadence-archetype.md) — the **Cadence** archetype (固有名詞) every skill this runner fires conforms to, and [`cadence-forge`](../../../.claude/skills/cadence-forge/SKILL.md) — the skill that scaffolds new ones reproducibly.

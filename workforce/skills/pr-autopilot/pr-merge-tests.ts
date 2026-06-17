@@ -112,6 +112,14 @@ describe("verifyMergeable (fail-closed predicate)", () => {
     expect(v.ok).toBe(false);
     expect(v.why).toMatch(/ren/);
   });
+  it("refuses an own-repo (workforce) merge — W-5 escalate to operator", async () => {
+    const v = await verifyMergeable(
+      mockGh([[/GET \/repos\/refluster\/ai-native-article\/pulls\/1$/, { status: 200, json: { state: "open", mergeable: true, mergeable_state: "clean", head: { sha: "abc" }, base: { ref: "main" } } }]]),
+      "refluster/ai-native-article", 1, { reviewers: ["ren"] },
+    );
+    expect(v.ok).toBe(false);
+    expect(v.why).toMatch(/W-5 own-repo/);
+  });
   it("refuses when the maintainer set the autopilot:off label", async () => {
     const v = await verifyMergeable(
       mockGh([[/GET \/repos\/o\/r\/pulls\/1$/, { status: 200, json: { state: "open", mergeable: true, mergeable_state: "clean", labels: [{ name: "autopilot:off" }], head: { sha: "abc" }, base: { ref: "main" } } }]]),

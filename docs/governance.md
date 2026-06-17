@@ -122,6 +122,26 @@ Whatever portion of L0/L1 a machine can check, it should. These are the guards a
 
 **Loosening.** Tightening any of R-1…R-9 is L2 work and an agent may do it freely. **Loosening or disabling any of them requires operator approval** — drop the line in chat with the rationale, wait for explicit yes.
 
+### 4.4 Autopilot PR merge — workforce R-N10 delegation + L0/L1 off-limits
+
+This repository **delegates** bounded autonomous merge to the agent-workforce's `pr-autopilot` skill (its R-N10 lane, predicate per workforce [adr-0010](../workforce/docs/adr/adr-0010-autopilot-merge-consensus-widening.md)) — the same delegation `PSVL/asp-cloud` carries, now granted for this repo too. `pr-autopilot` may approve+merge a PR **iff** it touches **no L0/L1 path** declared below, has the nominated reviewers' **unanimous-green consensus**, is mergeable/clean with checks green, and carries no `autopilot:off` label.
+
+**W-5 own-repo escalation (the one difference from an external target).** This repo is the workforce's *own* repo, so the merge predicate's final step is **not** an autonomous merge — per workforce **W-5** (no agent merges) the agent **escalates to the operator** (the org's superior) to perform the merge. So a 🟢, non-L0/L1, consensus PR here resolves to *"reviewed → ready → operator completes the merge"* (labelled `autopilot:needs-human`), never an agent self-merge. The engine enforces this mechanically (a self-repo guard in `pr-merge.mjs` refuses the merge and returns the escalation reason).
+
+**L0/L1 off-limits (machine-readable; the engine reads this block from this file).** A PR touching any path below is L0/L1 — it always escalates to a human and is never autopilot-merged. The block doubles as the **repo-wide kill-switch**: empty it → the L0/L1 set is unknown → every autopilot merge fails closed.
+
+<!-- autopilot:l0l1-paths -->
+- docs/governance.md
+- docs/design-policy.md
+- docs/adr/**
+- AGENTS.md
+- CLAUDE.md
+- workforce/docs/governance.md
+- workforce/docs/adr/**
+<!-- /autopilot:l0l1-paths -->
+
+(Per-PR pause: an `autopilot:off` label. This §4.4 block sits inside `docs/governance.md`, which is itself L0/L1 — so the autopilot can never edit its own boundary.)
+
 ---
 
 ## 5. L3 — Operational rules (runbooks)

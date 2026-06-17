@@ -31,7 +31,7 @@ Per PR #112's "task assignment is fluid" principle, **skill specs are persona-ag
 
 Examples:
 
-- `pr-review` is one generic spec; Dario's binding has `config.lens_name = "architecture"` with R-N\* / cost / audit checklist; Ren's binding has `config.lens_name = "engineering"` with TS-idiom / test-coverage checklist; Aoi's has `config.lens_name = "design"`.
+- `pr-autopilot`'s reviewer lens is persona-config: the router applies each nominated persona's lens inline (the `pr-review` skill was retired/folded into `pr-autopilot` Step 4). A reviewer persona's `config.lens_name` (e.g. Dario `"architecture"` with R-N\* / cost / audit; Ren `"engineering"` with TS-idiom / test-coverage; Aoi `"design"`) decides what they look for.
 - `pr-autopilot` is one generic spec; Maya's binding has `config.nomination_rules` for who-to-nominate-when; a future Dario-as-router binding could carry different rules.
 - `pr-implement` is one generic spec; Dario's binding has `config.model_override = "claude-opus-4-7"` + `self_check_lens = "architecture"`; a different persona's binding could override to Sonnet + the engineering lens.
 
