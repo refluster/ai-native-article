@@ -57,6 +57,13 @@ const GOVERNANCE_PATH = process.env["GOVERNANCE_PATH"] || "docs/governance.md";
 const L0L1_OPEN = "<!-- autopilot:l0l1-paths -->";
 const L0L1_CLOSE = "<!-- /autopilot:l0l1-paths -->";
 
+// The workforce's OWN repo. W-5: no agent merges the workforce's own PRs. Even
+// when this repo carries the R-N10 delegation + L0/L1 block (root docs/
+// governance.md §4.4) so the predicate is fully evaluable, the merge is refused
+// here and escalated to the operator (the superior) to complete — a mechanical,
+// reproducible W-5 own-repo guard, not a router-discipline-only rule.
+const SELF_REPO = (process.env["WORKFORCE_SELF_REPO"] || "refluster/ai-native-article").toLowerCase();
+
 // The canonical, searchable label stamped on every PR/issue this skill hands
 // off to a human (a 🔴 verdict, a non-consensus PR, a tracking issue, or — the
 // common one — a 🟢 PR that touches the target repo's governance L0/L1). The
@@ -181,6 +188,11 @@ export async function verifyMergeable(gh, repo, pr, decision) {
   const { status, json: p } = await gh("GET", `/repos/${repo}/pulls/${pr}`);
   if (status !== 200) return { ok: false, why: `GET pull ${pr} -> HTTP ${status}` };
   if (p.state !== "open") return { ok: false, why: `PR #${pr} is ${p.state}` };
+  // W-5 own-repo guard: the workforce never merges its own PRs. Escalate to the
+  // operator (superior) to complete the merge instead (root governance §4.4).
+  if (repo.toLowerCase() === SELF_REPO) {
+    return { ok: false, why: `W-5 own-repo (${repo}): the workforce does not merge its own PRs — escalate to the operator (superior) to complete the merge` };
+  }
   // Per-PR maintainer off-switch: an `autopilot:off` label pauses this PR
   // (fail-closed). The repo-wide off-switch is emptying the target's
   // autopilot:l0l1-paths block (→ unknown set → refuse, see resolveL0L1Paths).

@@ -120,10 +120,10 @@ TOKEN="<credentials['github.token'].token>" \
 
 > **The terminal state is the merge, not the verdict.** Where the merge predicate holds, *this skill finishes the job* — it approves and merges; stopping at a 🟢 verdict and handing off is **incomplete**, not a finished run. Drive every cycle to one of: **merged** (predicate held) or an **explicit hand-off/escalation** (a stated reason the predicate did not hold). Never leave a 🟢 PR sitting with no terminal action.
 >
-> **When a 🟢 legitimately does *not* merge (and that is correct).** The merge requires a *delegated, declared* target. A 🟢 hands off — it does **not** merge — when any of these is true, and the verdict must name which:
-> 1. **No R-N10 delegation** for the bound project (the target's own statute never granted autonomous merge).
-> 2. **No `autopilot:l0l1-paths` block** in the target's `docs/governance.md` → the L0/L1 set is unknown → the engine fails closed.
-> 3. **The PR is on the workforce's *own* repo** (`refluster/ai-native-article`) — W-5 forbids an agent merging the workforce's own PRs, and that repo carries no delegation/block anyway.
+> **When a 🟢 does *not* autonomously merge (and that is correct).** The autonomous merge requires a *delegated, declared, external* target. A 🟢 does not self-merge when:
+> 1. **No R-N10 delegation** for the bound project (the target's own statute never granted autonomous merge) → hand off, verdict names this.
+> 2. **No `autopilot:l0l1-paths` block** in the target's `docs/governance.md` → the L0/L1 set is unknown → the engine fails closed → hand off.
+> 3. **The PR is on the workforce's *own* repo** (`refluster/ai-native-article`) → **W-5 own-repo escalation**: the repo *does* carry the delegation + the block ([root `docs/governance.md` §4.4](../../../docs/governance.md)), so the predicate is evaluated in full — but because no agent may merge the workforce's own PRs (W-5), a passing 🟢 **escalates to the operator (the superior) to complete the merge**, rather than self-merging. This is a *defined terminal escalation*, not a dead hand-off: post the verdict with `--label autopilot:needs-human`, tag the operator, and state "ready to merge — operator (superior) completes per W-5 own-repo rule." The engine enforces this mechanically (its self-repo guard refuses the merge and returns the escalation reason), so an own-repo merge can never fire autonomously.
 >
 > These are not bugs in the cadence; they are the guard working. (Worked example — **#338**: a 🟢-unanimous PR on the workforce's own repo hit all three (1)+(2)+(3); the engine fail-closed and it handed off to the operator, who merged it manually. The merge *step* was present and correct — it simply, correctly, declined to fire.)
 
