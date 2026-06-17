@@ -286,7 +286,7 @@ components:
       required: [project_id, skill_name, skill_version, started_at, ended_at, status]
       properties:
         project_id: { type: string, example: asp-cloud }
-        skill_name: { type: string, example: pr-review }
+        skill_name: { type: string, example: pr-autopilot }
         skill_version: { type: string, description: semver, example: 0.1.0 }
         started_at: { type: string, format: date-time, description: ISO-8601; when the work began (client clock). }
         ended_at: { type: string, format: date-time }

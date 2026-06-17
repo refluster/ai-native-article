@@ -1,6 +1,6 @@
 # Runbook — CCR routine bootstrap — **partially superseded**
 
-> **Status (2026-05-27)**: the **label-driven state machine** described below was retired by the simplified dev process in [dev-process.md](dev-process.md). The repo now has **0 labels** — the agent holding `pr-autopilot` routes via PR comments per [pr-autopilot SKILL.md](../../skills/pr-autopilot/SKILL.md), and the generic [pr-review](../routines/pr-review.md) skill is invoked manually under the invoking persona's binding `config` (or via a future CCR API trigger), not by labels.
+> **Status (2026-05-27)**: the **label-driven state machine** described below was retired by the simplified dev process in [dev-process.md](dev-process.md). The repo now has **0 labels** — the agent holding `pr-autopilot` routes via PR comments per [pr-autopilot SKILL.md](../../skills/pr-autopilot/SKILL.md), which now also owns the reviewer-lens contract (the separate `pr-review` skill was retired), applied per nominated persona under their binding `config`, not by labels.
 >
 > The **CCR routine creation steps** below (how to paste a prompt into claude.ai/code/routines, where to store API tokens, etc.) are still accurate as a reference for ANY CCR routine you instantiate. Ignore the "labels — one-time setup" section and the label-triggered routine configs; use the per-routine specs at [routines/](../routines/) as the canonical prompts.
 

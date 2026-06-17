@@ -145,5 +145,5 @@ Verdict synthesis (cycle close) is the second mode of the same `pr-autopilot` sk
 
 - [`workforce/projects/README.md`](../../projects/README.md) — file/schema reference
 - [Epic-010](../epics/epic-010-project-trust-boundary.md) — design rationale
-- [`pr-autopilot SKILL.md`](../../skills/pr-autopilot/SKILL.md) / [`pr-review.md`](../routines/pr-review.md) — skill contracts (cross-project mode section)
+- [`pr-autopilot SKILL.md`](../../skills/pr-autopilot/SKILL.md) — skill contract incl. the reviewer-lens contract (cross-project mode section; the separate `pr-review` skill was retired/folded in)
 - [`workforce/lambdas/shared/project.ts`](../../lambdas/shared/project.ts) — runtime API
