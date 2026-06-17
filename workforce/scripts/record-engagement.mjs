@@ -80,13 +80,23 @@ const body = {
   status,
   execution_surface: "ccr",
 };
-if (summary) {
+// The business line is the top-level `summary` — that is the field the
+// agents-api records as the engagement summary (handler.ts) and the
+// RUNS·DELIVERABLES deck renders directly. It used to be smuggled inside a
+// fabricated `artifact`, which left this field empty (the deck only surfaced
+// it via a view-side fallback) and produced a FULLY blank row whenever no
+// summary was passed. Send it where it belongs.
+if (summary) body.summary = summary;
+// Attach an artifact only for a real deliverable link. A text-only
+// engagement (a pr-review / committee verdict has no file) carries its
+// result in `summary` above — no fake file metadata required.
+if (uri) {
   body.artifact = {
-    uri: uri || "",
+    uri,
     content_hash: "0".repeat(64),
     content_type: contentType,
-    size_bytes: Buffer.byteLength(summary, "utf8"),
-    summary,
+    size_bytes: Buffer.byteLength(summary || uri, "utf8"),
+    summary: summary || "",
   };
 }
 
