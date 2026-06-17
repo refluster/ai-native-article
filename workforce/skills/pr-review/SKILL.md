@@ -65,4 +65,4 @@ Tomorrow (Phase 7 PR5 webhook surface), pr-autopilot's verdict mode invokes this
 - **Cycle counter management.** Scoping to cycle-1 vs cycle-2+ findings is the routine spec's pr-review.md responsibility; the handler's cycle-detection lifts the count from existing review comments authored by this persona.
 - **Cross-persona coordination.** Each pr-review invocation is one persona's lens applied independently. The routing layer (pr-autopilot) decides which lenses run.
 
-Related: [pr-review.md](../../docs/routines/pr-review.md), [pr-autopilot.md](../../docs/routines/pr-autopilot.md), [pr-autopilot handler](../pr-autopilot/handler.ts) (sister skill — verdict mode lives there).
+Related: [pr-review.md](../../docs/routines/pr-review.md), [pr-autopilot SKILL.md](../pr-autopilot/SKILL.md) (sister skill — routing + verdict + merge live there; it has no per-skill routine doc).

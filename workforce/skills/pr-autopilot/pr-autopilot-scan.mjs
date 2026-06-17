@@ -14,11 +14,16 @@
 // The repo (owner/repo) is read from the in-repo project.json — the CCR
 // session runs inside the workforce checkout.
 //
+// Discovery includes BOTH draft and non-draft PRs, and BOTH human- and
+// bot-authored (Dependabot) PRs — every open PR in the window is routable
+// (2026-06-17 Autopilot widening, adr-0010). The only discovery filters are
+// the recency window and "already routed this cycle".
+//
 // Usage:
 //   GITHUB_TOKEN=<credentials['github.token'].token> \
 //     node workforce/skills/pr-autopilot/pr-autopilot-scan.mjs \
 //       --project asp-cloud --persona nadia \
-//       [--max 3] [--since-days 7] [--out /tmp/pr-autopilot-candidates.json]
+//       [--max 5] [--since-days 7] [--out /tmp/pr-autopilot-candidates.json]
 //
 // Output: writes a JSON array of candidate PRs to --out and prints a
 // one-line summary to stdout. Exit 0 even when zero candidates (a valid
@@ -99,7 +104,7 @@ async function ghGet(token, path, accept) {
 async function main() {
   const projectId = arg("project");
   const persona = arg("persona");
-  const max = Number(arg("max", "3"));
+  const max = Number(arg("max", "5"));
   const sinceDays = Number(arg("since-days", "7"));
   const out = arg("out", "/tmp/pr-autopilot-candidates.json");
   const token = process.env.GITHUB_TOKEN;
@@ -116,7 +121,8 @@ async function main() {
     die(1, e.message);
   }
 
-  // List open, non-draft PRs, most-recently-updated first.
+  // List ALL open PRs (draft + non-draft, human + bot), most-recently-updated
+  // first. Draft/bot are no longer discovery filters (adr-0010).
   let prs;
   try {
     prs = await ghGet(token, `/repos/${owner}/${repo}/pulls?state=open&sort=updated&direction=desc&per_page=50`);
@@ -127,11 +133,9 @@ async function main() {
   const candidates = [];
   for (const pr of prs) {
     if (candidates.length >= max) break;
-    if (pr.draft) continue;
-    // Dependabot (and other bot) PRs belong to the no-review dependabot-triage
-    // lane (R-N10 auto-merge), not human-lens routing. Skip them here so they
-    // are never mis-routed to reviewers and then stalled (the #530/#514 case).
-    if (pr.user?.type === "Bot" || /\[bot\]$/.test(pr.user?.login ?? "")) continue;
+    // Draft and bot-authored PRs are IN scope (adr-0010): drafts get an early
+    // review pass, and Dependabot PRs route through the same review→consensus
+    // →merge path as human PRs (the dependabot-triage no-review lane retires).
     if (!withinWindow(pr.updated_at, sinceDays)) continue;
     let comments;
     try {
@@ -155,6 +159,8 @@ async function main() {
       title: pr.title,
       body: pr.body ?? "",
       author: pr.user?.login ?? "(unknown)",
+      draft: pr.draft === true,
+      is_bot: pr.user?.type === "Bot" || /\[bot\]$/.test(pr.user?.login ?? ""),
       base: pr.base?.ref ?? "",
       head: pr.head?.ref ?? "",
       html_url: pr.html_url,

@@ -157,7 +157,7 @@ The same rule that drove Story 1's nominations:
 - **aoi** — touched whenever the PR changes UI, design-doc shape, design tokens, or bilingual content.
 - **sora / yuki / kai / mira / noor / priya / theo** — touched only when the PR has surface in their specific lens.
 
-Maya states the nomination rationale + the skip-list in the routing comment. See [pr-autopilot.md](../routines/pr-autopilot.md) for the canonical skill spec and her binding `config.nomination_rules` in `agent.json` for the persona-specific rules.
+Maya states the nomination rationale + the skip-list in the routing comment. See [pr-autopilot SKILL.md](../../skills/pr-autopilot/SKILL.md) for the canonical skill contract and the binding's `config.nomination_rules` (on the `AGENT#{slug}/META` row) for the persona-specific rules.
 
 ## Defaults that should stay defaults
 

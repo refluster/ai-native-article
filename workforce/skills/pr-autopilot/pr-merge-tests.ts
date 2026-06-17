@@ -1,0 +1,131 @@
+// @ts-nocheck — the engine under test (pr-merge.mjs) is a dependency-free ESM
+// script, not TS; vitest/esbuild imports it fine at runtime, and this suite is
+// not shipped code. Discovered by workforce/lambdas/vitest.config.mjs
+// (`include: ["../skills/**/*-tests.ts"]`), so `cd workforce/lambdas && npm test`
+// (the CI step) runs it. Closes Sana's C1: the merge-gating predicate's
+// regression net lives in the repo, not a session transcript (adr-0010).
+import { describe, it, expect } from "vitest";
+import {
+  globToRegExp,
+  resolveL0L1Paths,
+  reviewerSignedOff,
+  verifyMergeable,
+  applyDecisions,
+  ESCALATION_LABEL,
+} from "./pr-merge.mjs";
+
+/** Route a `${method} ${path}` string to a canned {status,json} response. */
+function mockGh(routes) {
+  const calls = [];
+  const gh = async (method, path, body) => {
+    calls.push({ method, path, body });
+    for (const [re, resp] of routes) {
+      if (re.test(`${method} ${path}`)) return typeof resp === "function" ? resp() : resp;
+    }
+    return { status: 404, json: {} };
+  };
+  gh.calls = calls;
+  return gh;
+}
+
+const govDoc = (block) => ({
+  status: 200,
+  json: { encoding: "base64", content: Buffer.from(`# gov\n${block}\n`).toString("base64") },
+});
+const L0_BLOCK =
+  "<!-- autopilot:l0l1-paths -->\n- docs/governance.md\n- docs/adr/**\n<!-- /autopilot:l0l1-paths -->";
+const GREEN_CHECK = [{ name: "ci", status: "completed", conclusion: "success" }];
+const DARIO_REVIEW = [{ state: "COMMENTED", body: "looks good\n— Dario" }];
+
+/** Standard happy-path route table, parameterised by the variable bits. */
+const routes = (files, checks, reviews, comments = []) => [
+  [/GET \/repos\/o\/r\/pulls\/1$/, { status: 200, json: { state: "open", mergeable: true, mergeable_state: "clean", head: { sha: "abc" }, base: { ref: "main" } } }],
+  [/GET .*contents/, govDoc(L0_BLOCK)],
+  [/GET \/repos\/o\/r\/pulls\/1\/files/, { status: 200, json: files }],
+  [/GET \/repos\/o\/r\/commits\/abc\/check-runs/, { status: 200, json: { check_runs: checks } }],
+  [/GET \/repos\/o\/r\/pulls\/1\/reviews/, { status: 200, json: reviews }],
+  [/GET \/repos\/o\/r\/issues\/1\/comments/, { status: 200, json: comments }],
+];
+
+describe("globToRegExp", () => {
+  it("matches an exact path", () => expect(globToRegExp("docs/governance.md").test("docs/governance.md")).toBe(true));
+  it("** spans slashes", () => expect(globToRegExp("docs/adr/**").test("docs/adr/adr-1.md")).toBe(true));
+  it("** does not false-match a sibling", () => expect(globToRegExp("docs/adr/**").test("docs/adrx.md")).toBe(false));
+  it("* stays within a segment", () => {
+    expect(globToRegExp("src/*.ts").test("src/a.ts")).toBe(true);
+    expect(globToRegExp("src/*.ts").test("src/sub/a.ts")).toBe(false);
+  });
+});
+
+describe("reviewerSignedOff", () => {
+  it("matches an em-dash byline", () => expect(reviewerSignedOff("dario", ["x\n— Dario (CCR)"])).toBe(true));
+  it("matches a bold byline", () => expect(reviewerSignedOff("ren", ["**Ren — cycle 1**"])).toBe(true));
+  it("is false when the persona never signed", () => expect(reviewerSignedOff("aoi", ["nothing here"])).toBe(false));
+});
+
+describe("resolveL0L1Paths (source of truth = target repo governance)", () => {
+  it("parses the declared block", async () => {
+    const r = await resolveL0L1Paths(mockGh([[/GET .*contents/, govDoc(L0_BLOCK)]]), "o/r", "main");
+    expect(r.ok).toBe(true);
+    expect(r.patterns).toHaveLength(2);
+  });
+  it("fails closed when the governance doc is unreadable", async () => {
+    const r = await resolveL0L1Paths(mockGh([[/GET .*contents/, { status: 404, json: {} }]]), "o/r", "main");
+    expect(r.ok).toBe(false);
+  });
+  it("fails closed when the markers are absent", async () => {
+    const r = await resolveL0L1Paths(mockGh([[/GET .*contents/, govDoc("no markers here")]]), "o/r", "main");
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe("verifyMergeable (fail-closed predicate)", () => {
+  it("passes on a non-L0/L1, green, consensus PR", async () => {
+    const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, DARIO_REVIEW)), "o/r", 1, { reviewers: ["dario"] });
+    expect(v.ok).toBe(true);
+  });
+  it("refuses a PR touching an L0/L1 path", async () => {
+    const v = await verifyMergeable(mockGh(routes([{ filename: "docs/governance.md" }], GREEN_CHECK, DARIO_REVIEW)), "o/r", 1, { reviewers: ["dario"] });
+    expect(v.ok).toBe(false);
+    expect(v.why).toMatch(/L0\/L1/);
+  });
+  it("refuses when a reviewer requested changes", async () => {
+    const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, [{ state: "CHANGES_REQUESTED", body: "x" }])), "o/r", 1, { reviewers: ["dario"] });
+    expect(v.ok).toBe(false);
+    expect(v.why).toMatch(/CHANGES_REQUESTED/);
+  });
+  it("refuses when a required check is not green", async () => {
+    const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], [{ name: "ci", status: "completed", conclusion: "failure" }], DARIO_REVIEW)), "o/r", 1, { reviewers: ["dario"] });
+    expect(v.ok).toBe(false);
+  });
+  it("refuses a no-review merge (empty reviewers[])", async () => {
+    const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, [])), "o/r", 1, { reviewers: [] });
+    expect(v.ok).toBe(false);
+    expect(v.why).toMatch(/reviewers/);
+  });
+  it("refuses when a nominated reviewer's lens review is missing", async () => {
+    const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, DARIO_REVIEW)), "o/r", 1, { reviewers: ["dario", "ren"] });
+    expect(v.ok).toBe(false);
+    expect(v.why).toMatch(/ren/);
+  });
+  it("refuses when the PR is not mergeable/clean", async () => {
+    const v = await verifyMergeable(
+      mockGh([[/GET \/repos\/o\/r\/pulls\/1$/, { status: 200, json: { state: "open", mergeable: false, mergeable_state: "dirty", head: { sha: "abc" }, base: { ref: "main" } } }]]),
+      "o/r", 1, { reviewers: ["dario"] },
+    );
+    expect(v.ok).toBe(false);
+  });
+});
+
+describe("applyDecisions (escalation labelling)", () => {
+  it("always stamps ESCALATION_LABEL on the filed issue", async () => {
+    const gh = mockGh([
+      [/POST \/repos\/o\/r\/labels/, { status: 422, json: {} }], // label already exists
+      [/POST \/repos\/o\/r\/issues$/, { status: 201, json: { html_url: "u" } }],
+    ]);
+    const res = await applyDecisions(gh, "o/r", [{ pr: 9, action: "escalate", issue_title: "Hold #9", issue_body: "touches L0/L1" }]);
+    expect(res.escalated).toBe(1);
+    const issueCall = gh.calls.find((c) => c.method === "POST" && /\/issues$/.test(c.path));
+    expect(issueCall.body.labels).toContain(ESCALATION_LABEL);
+  });
+});

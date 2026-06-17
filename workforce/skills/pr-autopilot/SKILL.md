@@ -1,6 +1,6 @@
 ---
 name: pr-autopilot
-description: Workforce skill that drives an open PR through its **full** review cycle in a bound project's repo — route to 1-3 reviewer personas, obtain their reviews, synthesise the 🟢/🟡/🔴 verdict, and complete. On a 🟢 verdict for an R-N10 *safe-class* PR (a delegated-merge-eligible Dependabot security PR, predicate-passing) it approves + merges via the shared fail-closed pr-merge.mjs engine; every other 🟢 PR hands off to a human merger (R-N9 / W-5). **Dependabot/bot PRs are out of scope — they are the no-review `dependabot-triage` lane**, never human-lens routing. Review/routing generalise to all (non-bot) PRs; autonomous merge stays gated to the R-N10 safe class. Runs as a CCR task (ADR-0005); github.token via the binding's project linkage (Epic-010 §5).
+description: Workforce skill that drives an open PR through its **full** review cycle in a bound project's repo — route to 1-3 reviewer personas, obtain their reviews, synthesise the unanimous-green / 🟡 / 🔴 verdict, and complete. **Every open PR is in scope — draft and non-draft, human- and bot-authored (Dependabot).** On a unanimous-green verdict for a PR that touches **no L0/L1 governance path** of the target repo, it approves + merges via the shared fail-closed pr-merge.mjs engine; a PR touching the target repo's **governance L0/L1 escalates to a human** for the final call (R-N9 / W-5), as does any non-consensus PR. The merge predicate (adr-0010, 2026-06-17) widened from the old Dependabot safe class to "not-L0/L1 + unanimous reviewer consensus"; the engine re-verifies it server-side and fails closed. Runs as a CCR task (ADR-0005); github.token via the binding's project linkage (Epic-010 §5).
 ---
 
 # pr-autopilot (CCR cron-poll routing leg)
@@ -20,12 +20,12 @@ Your task context supplies:
 GITHUB_TOKEN="<credentials['github.token'].token>" \
   node workforce/skills/pr-autopilot/pr-autopilot-scan.mjs \
     --project "<project_id>" --persona "<agent_slug>" \
-    --max 3 --since-days 7 --out /tmp/pr-autopilot-candidates.json
+    --max 5 --since-days 7 --out /tmp/pr-autopilot-candidates.json
 ```
 
-The scan lists open, non-draft PRs updated within the window, **skips any PR you have already posted a cycle-1 routing comment on**, **skips bot-authored (Dependabot) PRs** — those are the no-review `dependabot-triage` lane (R-N10 auto-merge), never human-lens routing — caps at `--max`, and writes each remaining candidate (title, body, diff, existing comments) to the `--out` file. If it reports **0 candidates**, there is nothing to route this tick — **stop here, post nothing.**
+The scan lists **every** open PR updated within the window — **draft and non-draft, human- and bot-authored (Dependabot)** — **skips only any PR you have already posted a cycle-1 routing comment on**, caps at `--max` (default 5), and writes each remaining candidate (title, body, diff, existing comments, plus `draft` / `is_bot` flags) to the `--out` file. If it reports **0 candidates**, there is nothing to route this tick — **stop here, post nothing.**
 
-> **Why the bot skip (the #530/#514 fix).** Routing a Dependabot lockfile bump to architecture/engineering/design reviewers adds no value and, with no reviewer dispatched, leaves the PR stalled at a lone routing comment. Dependabot security PRs belong to [`dependabot-triage`](../dependabot-triage/SKILL.md), which triages and (R-N10) auto-merges them without a human-review cycle. pr-autopilot handles the **general/human-authored** PRs.
+> **Drafts and bots are in scope (adr-0010).** Drafts get an early review pass so issues surface before "Ready for review"; Dependabot/bot PRs route through the **same** review→consensus→merge path as human PRs (the old no-review `dependabot-triage` lane is retired). Note the candidate's `draft` / `is_bot` flags when you write the routing comment, but route them like any other PR.
 
 ## Step 2 — route each candidate (your judgment)
 
@@ -51,7 +51,7 @@ Skipping @<persona>, @<persona> — <one short clause why the skip-list applies>
 
 **Cycle 1 of ≤ <cycle_cap>.** Reviewers post inline + summary via `pull_request_review_write event=COMMENT` (never approve / never request-changes per W-5). Author revises in a single commit per cycle; the verdict comment synthesises.
 
-— <PersonaName> (CCR persona; see workforce/docs/routines/pr-autopilot.md)
+— <PersonaName> (CCR persona; see workforce/skills/pr-autopilot/SKILL.md)
 ```
 
 Omit the "Skipping …" line if you skipped no one. `<PersonaName>` is your `agent_slug` capitalised (e.g. `nadia` → `Nadia`).
@@ -77,26 +77,33 @@ GITHUB_TOKEN="<credentials['github.token'].token>" \
 
 Each posted review is a real lens review — concrete findings citing the PR surface, or an explicit "no findings from this lens". When every nominated review is posted, go to Step 5.
 
-## Step 5 — verdict + completion (+ bounded R-N10 safe-class merge)
+## Step 5 — verdict by reviewer consensus + completion (+ bounded merge)
 
-Now that the nominated reviews exist (you produced/dispatched them in Step 4, or they arrived on a prior tick), **synthesise** — you do not re-review.
+Now that the nominated reviews exist (you produced/dispatched them in Step 4, or they arrived on a prior tick), **synthesise the reviewers' collective verdict** — you do not re-review, and the verdict is **not** your solo call. It is the **consensus of all nominated reviewers**:
 
-1. **Synthesise the verdict** (your judgment): read the reviewers' findings + the author's response commits, and decide one of **🟢 (ship)** / **🟡 (ship after the noted fixes)** / **🔴 (do not ship)**. Write a verdict comment that names each reviewer's load-bearing finding and how it resolved, then post it with `pr-autopilot-post.mjs` (Step 3's script — comment-only).
-2. **Complete the cycle** — never leave it open:
-   - **🟢 + R-N10 safe class** → approve + merge via the engine below.
-   - **🟢 + general PR** → hand off: the verdict comment tags the human merger (`Operator decides per W-5`). Done — do **not** merge.
-   - **🟡** → the verdict lists the required fixes; the next tick re-routes (cycle += 1) once the author has revised.
-   - **🔴** → escalate: state the blocking reason and tag the operator. Do not merge/label.
+1. **Aggregate the reviewers (unanimous-green rule).** Read every nominated reviewer's findings + the author's response commits. The colour is:
+   - **🟢 unanimous-green** — *every* nominated reviewer is non-blocking (their findings are all ✅ fixed / 📥 deferred / 💬 nit; none left a 🔴 or `CHANGES_REQUESTED`). One reviewer short of green ⇒ not green.
+   - **🟡** — one or more reviewers have an open blocking finding. Next tick re-routes (cycle += 1) once the author revises.
+   - **🔴** — any reviewer's 🔴 is a **veto**, or cycle > `cycle_cap`, or a scope question you can't decide. Escalate to the operator.
 
-### The merge leg — only for an R-N10 *safe-class* PR
+   Write a verdict comment that names each reviewer's load-bearing finding and how it resolved, states the aggregated colour, and post it with `pr-autopilot-post.mjs` (Step 3's script — comment-only).
+2. **Complete the cycle** — never leave it open. Every PR that goes to a human is **labelled `autopilot:needs-human`** (pass `--label autopilot:needs-human` to `pr-autopilot-post.mjs` when posting the verdict) so the operator finds the whole queue with `is:open label:autopilot:needs-human`:
+   - **🟢 unanimous-green + touches NO L0/L1 path** → approve + merge via the engine below. (No label — it merges.)
+   - **🟢 unanimous-green + touches the target repo's governance L0/L1** → **escalate to a human** for the final call. Post the verdict with `--label autopilot:needs-human` and tag the operator (`L0/L1 change — operator's final call per W-5`). Do **not** merge.
+   - **🟡** → the verdict lists the required fixes; re-route next tick. (No escalation label — it stays in the cycle.)
+   - **🔴** → escalate: post the verdict with `--label autopilot:needs-human`, state the blocking reason, tag the operator. Do not merge.
 
-Autonomous merge is **gated to the R-N10 safe class** — review generalises to every PR, merge does not. Do **not** emit a merge for a feature/code PR even on 🟢; that stays a human merge. Emit a merge **only** when *all* hold (otherwise: verdict comment only, hand off):
+   The `pr-merge.mjs` engine always stamps the same `autopilot:needs-human` label on any tracking **issue** it files (`action:"escalate"`), so PR hand-offs and issue escalations share one searchable queue.
 
-- Your verdict is **🟢**, and
+### The merge leg — unanimous-green, non-L0/L1 only (R-N10 / adr-0010)
+
+Autonomous merge widened (adr-0010) from the old Dependabot safe class to **"the reviewers reached unanimous green AND the PR touches no L0/L1 governance path of the target repo."** L0/L1 changes always go to a human. Emit a merge **only** when *all* hold (otherwise: verdict comment only, hand off / escalate):
+
+- The aggregated verdict is **🟢 unanimous-green** (no reviewer blocking), and
 - the bound `project_id` has an **R-N10 delegation** (the target repo's own statute grants the workforce autonomous-merge authority — e.g. `PSVL/asp-cloud` → `docs/adr_autopilot_pr_merge.md`; if none, never merge), and
-- the PR is in the **delegated predicate class** — a clean Dependabot **security-update** PR, lockfile/manifest-only (no L1-binding path), semver-patch or minor-on-≥1.0, all checks green, no `CHANGES_REQUESTED`, and the target's `AUTOPILOT_PR` kill-switch is `on`.
+- the PR touches **no L0/L1 path** declared in the target repo's own `docs/governance.md` (between the `<!-- autopilot:l0l1-paths -->` markers), all required checks are green, the PR is mergeable/clean, and no reviewer left `CHANGES_REQUESTED`.
 
-When those hold, build the decisions payload (schema in the script header) — one `{ pr, action:"merge", comment, squash_subject, squash_body }` with a **CVE/GHSA-cited** comment — and run the **shared** merge engine:
+When those hold, build the decisions payload (schema in the script header) — one `{ pr, action:"merge", comment, squash_subject, squash_body, reviewers:[...] }` where `reviewers` is the nominated set whose unanimous sign-off you are attesting — and run the **shared** merge engine:
 
 ```sh
 TOKEN="<credentials['github.token'].token>" \
@@ -104,13 +111,14 @@ TOKEN="<credentials['github.token'].token>" \
     --repo "<owner>/<repo>" --decisions /tmp/pr-merge-decisions.json
 ```
 
-`pr-merge.mjs` is the same fail-closed engine the `dependabot-triage` Cadence uses: it **re-verifies the full R-N10 predicate server-side** (author, state, mergeability, file allowlist, semver delta, green checks, `AUTOPILOT_PR`) and **refuses** any merge that does not pass — so a mis-judged "🟢 + eligible" cannot cause a bad merge. Exit `2` = a decision was refused server-side or GitHub rejected the write; surface it, do not retry blindly. For anything outside the safe class, you emit **no** merge decision — the verdict comment is the deliverable and a human merges.
+`pr-merge.mjs` **re-verifies the full predicate server-side and fails closed**: it reads the target repo's `docs/governance.md` to learn the L0/L1 path set (if that doc is unreadable or declares no L0/L1 block, the set is *unknown* and the merge is **refused** — never guessed), then confirms open + mergeable + clean, no L0/L1 file in the diff, all checks green, no `CHANGES_REQUESTED`, and that each reviewer in `reviewers[]` has a posted lens review. A mis-judged "🟢 + eligible" therefore cannot cause a bad merge. Exit `2` = a decision was refused server-side or GitHub rejected the write; surface it, do not retry blindly. For an L0/L1 PR or a non-consensus PR, emit **no** merge decision — the verdict comment is the deliverable and a human decides.
 
 ## Scope (this skill)
 
 - **Drive the whole cycle — don't stop at routing.** route → obtain each nominated review → synthesise verdict → complete (merge or hand off). A PR left at a lone routing comment is a bug (the #530/#514 failure), not a finished run.
 - **The orchestrator, keeping the `pr-review` skill.** `pr-review` is the standalone reviewer contract; pr-autopilot *drives* it — dispatching it to bound personas, or (until dispatch is wired everywhere) applying each nominee's lens inline per that contract. pr-autopilot decides *who* reviews and *what the verdict is*; `pr-review` defines *how* a single lens review is shaped.
-- **Bots are out of scope.** Dependabot/bot PRs are skipped at discovery — they are `dependabot-triage`'s no-review lane.
-- **Merge is the bounded R-N10 exception only.** No merge/approve outside the safe-class lane; no push or PR-open under any path. Every non-safe-class 🟢 PR hands off to a human merger (R-N9 / W-5).
+- **Every open PR is in scope.** Draft, non-draft, human-authored, and bot-authored (Dependabot) PRs all route through the same review→consensus→merge path (adr-0010). The retired `dependabot-triage` no-review lane is no longer the bot path.
+- **The verdict is the reviewers' consensus, not your solo call.** Merge needs unanimous green; one reviewer short, or any 🔴 / `CHANGES_REQUESTED`, blocks it.
+- **Merge is bounded to non-L0/L1 + consensus (R-N10 / adr-0010).** A PR touching the target repo's governance L0/L1 always hands off to a human (the operator's final call). No push or PR-open under any path. The engine re-verifies and fails closed.
 
-Related: [pr-autopilot routine spec](../../docs/routines/pr-autopilot.md), [pr-review.md](../../docs/routines/pr-review.md), [R-N10 governance](../../docs/governance.md), [dependabot-triage](../dependabot-triage/SKILL.md) (the no-review Dependabot lane sharing `pr-merge.mjs`), [dev-process.md](../../docs/runbooks/dev-process.md).
+Related: [agent-runner.md](../../docs/routines/agent-runner.md) (the generic CCR routine this skill runs under — there is no per-skill routine spec; this SKILL.md is the authoritative contract), [pr-review.md](../../docs/routines/pr-review.md), [R-N10 governance](../../docs/governance.md) + [adr-0010](../../docs/adr/adr-0010-autopilot-merge-consensus-widening.md) (the widened merge predicate), [dependabot-triage](../dependabot-triage/SKILL.md) (the former no-review Dependabot lane, retired by adr-0010 — bot PRs now route here), [dev-process.md](../../docs/runbooks/dev-process.md).
