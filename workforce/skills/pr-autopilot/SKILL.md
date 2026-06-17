@@ -51,7 +51,7 @@ Skipping @<persona>, @<persona> — <one short clause why the skip-list applies>
 
 **Cycle 1 of ≤ <cycle_cap>.** Reviewers post inline + summary via `pull_request_review_write event=COMMENT` (never approve / never request-changes per W-5). Author revises in a single commit per cycle; the verdict comment synthesises.
 
-— <PersonaName> (CCR persona; see workforce/docs/routines/pr-autopilot.md)
+— <PersonaName> (CCR persona; see workforce/skills/pr-autopilot/SKILL.md)
 ```
 
 Omit the "Skipping …" line if you skipped no one. `<PersonaName>` is your `agent_slug` capitalised (e.g. `nadia` → `Nadia`).
@@ -87,11 +87,13 @@ Now that the nominated reviews exist (you produced/dispatched them in Step 4, or
    - **🔴** — any reviewer's 🔴 is a **veto**, or cycle > `cycle_cap`, or a scope question you can't decide. Escalate to the operator.
 
    Write a verdict comment that names each reviewer's load-bearing finding and how it resolved, states the aggregated colour, and post it with `pr-autopilot-post.mjs` (Step 3's script — comment-only).
-2. **Complete the cycle** — never leave it open:
-   - **🟢 unanimous-green + touches NO L0/L1 path** → approve + merge via the engine below.
-   - **🟢 unanimous-green + touches the target repo's governance L0/L1** → **escalate to a human** for the final call (the verdict comment tags the operator: `L0/L1 change — operator's final call per W-5`). Do **not** merge.
-   - **🟡** → the verdict lists the required fixes; re-route next tick.
-   - **🔴** → escalate: state the blocking reason, tag the operator. Do not merge/label.
+2. **Complete the cycle** — never leave it open. Every PR that goes to a human is **labelled `autopilot:needs-human`** (pass `--label autopilot:needs-human` to `pr-autopilot-post.mjs` when posting the verdict) so the operator finds the whole queue with `is:open label:autopilot:needs-human`:
+   - **🟢 unanimous-green + touches NO L0/L1 path** → approve + merge via the engine below. (No label — it merges.)
+   - **🟢 unanimous-green + touches the target repo's governance L0/L1** → **escalate to a human** for the final call. Post the verdict with `--label autopilot:needs-human` and tag the operator (`L0/L1 change — operator's final call per W-5`). Do **not** merge.
+   - **🟡** → the verdict lists the required fixes; re-route next tick. (No escalation label — it stays in the cycle.)
+   - **🔴** → escalate: post the verdict with `--label autopilot:needs-human`, state the blocking reason, tag the operator. Do not merge.
+
+   The `pr-merge.mjs` engine always stamps the same `autopilot:needs-human` label on any tracking **issue** it files (`action:"escalate"`), so PR hand-offs and issue escalations share one searchable queue.
 
 ### The merge leg — unanimous-green, non-L0/L1 only (R-N10 / adr-0010)
 
@@ -119,4 +121,4 @@ TOKEN="<credentials['github.token'].token>" \
 - **The verdict is the reviewers' consensus, not your solo call.** Merge needs unanimous green; one reviewer short, or any 🔴 / `CHANGES_REQUESTED`, blocks it.
 - **Merge is bounded to non-L0/L1 + consensus (R-N10 / adr-0010).** A PR touching the target repo's governance L0/L1 always hands off to a human (the operator's final call). No push or PR-open under any path. The engine re-verifies and fails closed.
 
-Related: [pr-autopilot routine spec](../../docs/routines/pr-autopilot.md), [pr-review.md](../../docs/routines/pr-review.md), [R-N10 governance](../../docs/governance.md) + [adr-0010](../../docs/adr/adr-0010-autopilot-merge-consensus-widening.md) (the widened merge predicate), [dependabot-triage](../dependabot-triage/SKILL.md) (the former no-review Dependabot lane, retired by adr-0010 — bot PRs now route here), [dev-process.md](../../docs/runbooks/dev-process.md).
+Related: [agent-runner.md](../../docs/routines/agent-runner.md) (the generic CCR routine this skill runs under — there is no per-skill routine spec; this SKILL.md is the authoritative contract), [pr-review.md](../../docs/routines/pr-review.md), [R-N10 governance](../../docs/governance.md) + [adr-0010](../../docs/adr/adr-0010-autopilot-merge-consensus-widening.md) (the widened merge predicate), [dependabot-triage](../dependabot-triage/SKILL.md) (the former no-review Dependabot lane, retired by adr-0010 — bot PRs now route here), [dev-process.md](../../docs/runbooks/dev-process.md).

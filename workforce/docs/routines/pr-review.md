@@ -105,7 +105,7 @@ When `project_id` is omitted, the runner defaults to the workforce's own self pr
 
 ## Related
 
-- [pr-autopilot.md](pr-autopilot.md) — the routing skill (invoked by Maya today; future: any agent with the binding) that dispatches `pr-review` to nominated personas.
+- [pr-autopilot SKILL.md](../../skills/pr-autopilot/SKILL.md) — the routing skill that dispatches `pr-review` to nominated personas (its contract lives in its SKILL.md; there is no per-skill routine doc).
 - [pr-implement.md](pr-implement.md) — the implementer skill, same persona-agnostic shape.
 - [dev-process.md](../runbooks/dev-process.md) — the seven-phase loop.
 - [bindings.md](../runbooks/bindings.md) — binding shape including the new `config` field.

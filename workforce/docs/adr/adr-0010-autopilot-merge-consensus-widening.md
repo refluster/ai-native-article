@@ -143,10 +143,12 @@ and each `reviewers[]` nominee has a posted lens review. A mis-judged
 ## Related
 
 - [governance.md R-N10](../governance.md) — the rule this amends (clauses 2–3).
-- [routines/pr-autopilot.md](../routines/pr-autopilot.md) — the routine spec
-  updated to the consensus verdict + non-L0/L1 merge leg.
-- `workforce/skills/pr-autopilot/{SKILL.md,pr-autopilot-scan.mjs,pr-merge.mjs}`
-  — the skill body + scan + fail-closed merge engine implementing this.
+- `workforce/skills/pr-autopilot/{SKILL.md,pr-autopilot-scan.mjs,pr-merge.mjs,pr-autopilot-post.mjs}`
+  — the authoritative skill contract (SKILL.md) + scan + fail-closed merge
+  engine + comment/label poster implementing this. The redundant per-skill
+  routine doc `routines/pr-autopilot.md` was removed in this change (the
+  binding runs under the generic `routines/agent-runner.md`, ADR-0005, and the
+  judgment lives in SKILL.md, ADR-0008).
 - [ADR-0005](adr-0005-single-execution-model-ccr.md) — the CCR substrate
   `pr-autopilot` runs on.
 - [epic-010](../epics/epic-010-project-trust-boundary.md) — the project-scoped

@@ -40,8 +40,12 @@
 //       { "pr": 506, "action": "escalate",
 //         "issue_title": "Hold #506: touches L0/L1",
 //         "issue_body": "<why held + next step>",
-//         "issue_labels": ["governance","needs-operator"] }
+//         "issue_labels": ["governance"] }   // ESCALATION_LABEL is always added
 //   ] }
+//
+// Every escalation issue (and, via pr-autopilot-post.mjs --label, every PR
+// handed off to a human) is stamped with ESCALATION_LABEL ("autopilot:needs-
+// human") so the operator can list the whole human-decision queue at once.
 //
 // Exit codes: 0 all applied · 1 bad args/file · 2 a decision refused or a GitHub
 // write rejected · 3 network/unexpected.
@@ -52,6 +56,31 @@ import { fileURLToPath } from "node:url";
 const GOVERNANCE_PATH = process.env["GOVERNANCE_PATH"] || "docs/governance.md";
 const L0L1_OPEN = "<!-- autopilot:l0l1-paths -->";
 const L0L1_CLOSE = "<!-- /autopilot:l0l1-paths -->";
+
+// The canonical, searchable label stamped on every PR/issue this skill hands
+// off to a human (a 🔴 verdict, a non-consensus PR, a tracking issue, or — the
+// common one — a 🟢 PR that touches the target repo's governance L0/L1). The
+// operator finds the full human-decision queue with `is:open label:<this>`.
+// pr-autopilot-post.mjs stamps it on hand-off PRs; this engine stamps it on
+// every escalation issue it files.
+export const ESCALATION_LABEL = "autopilot:needs-human";
+const ESCALATION_LABEL_COLOR = "b60205"; // red — "an autopilot decision needs a human"
+
+// Create labels if they do not already exist (idempotent: an existing label
+// returns 422, which we ignore). Lets a target repo that has never seen the
+// escalation label still receive it without a manual pre-create step.
+export async function ensureLabels(gh, repo, names) {
+  for (const name of names) {
+    const { status } = await gh("POST", `/repos/${repo}/labels`, {
+      name,
+      color: ESCALATION_LABEL_COLOR,
+      description: "Autopilot handed this off — a human's call (merge / governance L0/L1 / blocked).",
+    });
+    if (status !== 201 && status !== 422) {
+      console.error(`pr-merge: WARN could not ensure label "${name}" (HTTP ${status}) — continuing`);
+    }
+  }
+}
 
 // W-1 editorial guard: a degraded body fails loud here, never lands on GitHub.
 const ARTEFACTS = ["as an ai", "i apologize", "i'm sorry", "certainly!", "here is the", "here's the"];
@@ -194,7 +223,12 @@ export async function applyDecisions(gh, repo, decisions) {
     if (d.action === "escalate") {
       const title = w1(d.issue_title, `#${pr} issue_title`);
       const body = w1(d.issue_body, `#${pr} issue_body`);
-      const { status, json } = await gh("POST", `/repos/${repo}/issues`, { title, body, labels: Array.isArray(d.issue_labels) ? d.issue_labels : undefined });
+      // Always stamp the canonical escalation label so the operator can find
+      // every human-decision item with one search, in addition to any
+      // PR-specific labels the caller supplied.
+      const labels = [...new Set([...(Array.isArray(d.issue_labels) ? d.issue_labels : []), ESCALATION_LABEL])];
+      await ensureLabels(gh, repo, labels);
+      const { status, json } = await gh("POST", `/repos/${repo}/issues`, { title, body, labels });
       if (status === 201) { escalated++; console.error(`pr-merge: escalated #${pr} -> issue ${json.html_url}`); }
       else { refused++; console.error(`pr-merge: FAILED to file issue for #${pr}: HTTP ${status} ${JSON.stringify(json).slice(0, 300)}`); }
       continue;
