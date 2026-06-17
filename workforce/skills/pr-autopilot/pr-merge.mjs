@@ -181,6 +181,12 @@ export async function verifyMergeable(gh, repo, pr, decision) {
   const { status, json: p } = await gh("GET", `/repos/${repo}/pulls/${pr}`);
   if (status !== 200) return { ok: false, why: `GET pull ${pr} -> HTTP ${status}` };
   if (p.state !== "open") return { ok: false, why: `PR #${pr} is ${p.state}` };
+  // Per-PR maintainer off-switch: an `autopilot:off` label pauses this PR
+  // (fail-closed). The repo-wide off-switch is emptying the target's
+  // autopilot:l0l1-paths block (→ unknown set → refuse, see resolveL0L1Paths).
+  if (Array.isArray(p.labels) && p.labels.some((l) => (l?.name || "").toLowerCase() === "autopilot:off")) {
+    return { ok: false, why: `autopilot:off label set — paused by maintainer` };
+  }
   if (p.mergeable !== true || p.mergeable_state !== "clean") return { ok: false, why: `not clean (mergeable=${p.mergeable}, state=${p.mergeable_state})` };
 
   // L0/L1 guard — sourced from the TARGET repo's own governance (adr-0010).
