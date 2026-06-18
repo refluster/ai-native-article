@@ -112,13 +112,25 @@ describe("verifyMergeable (fail-closed predicate)", () => {
     expect(v.ok).toBe(false);
     expect(v.why).toMatch(/ren/);
   });
-  it("refuses an own-repo (workforce) merge — W-5 escalate to operator", async () => {
-    const v = await verifyMergeable(
-      mockGh([[/GET \/repos\/refluster\/ai-native-article\/pulls\/1$/, { status: 200, json: { state: "open", mergeable: true, mergeable_state: "clean", head: { sha: "abc" }, base: { ref: "main" } } }]]),
-      "refluster/ai-native-article", 1, { reviewers: ["ren"] },
-    );
+  // adr-0011: the workforce's own repo is a normal delegated target — no own-repo
+  // veto. The single boundary is the L0/L1 path set, so a reviewed non-L0/L1 PR
+  // passes (next test) while a governance PR still escalates (the one after).
+  const ownRepoRoutes = (files) => [
+    [/GET \/repos\/refluster\/ai-native-article\/pulls\/1$/, { status: 200, json: { state: "open", mergeable: true, mergeable_state: "clean", head: { sha: "abc" }, base: { ref: "main" } } }],
+    [/GET .*contents/, govDoc(L0_BLOCK)],
+    [/GET \/repos\/refluster\/ai-native-article\/pulls\/1\/files/, { status: 200, json: files }],
+    [/GET \/repos\/refluster\/ai-native-article\/commits\/abc\/check-runs/, { status: 200, json: { check_runs: GREEN_CHECK } }],
+    [/GET \/repos\/refluster\/ai-native-article\/pulls\/1\/reviews/, { status: 200, json: DARIO_REVIEW }],
+    [/GET \/repos\/refluster\/ai-native-article\/issues\/1\/comments/, { status: 200, json: [] }],
+  ];
+  it("passes an own-repo, non-L0/L1, green, consensus PR (adr-0011: no own-repo veto)", async () => {
+    const v = await verifyMergeable(mockGh(ownRepoRoutes([{ filename: "workforce/app/src/pages/Messaging.tsx" }])), "refluster/ai-native-article", 1, { reviewers: ["dario"] });
+    expect(v.ok).toBe(true);
+  });
+  it("still refuses an own-repo PR that touches L0/L1 — the boundary holds", async () => {
+    const v = await verifyMergeable(mockGh(ownRepoRoutes([{ filename: "docs/governance.md" }])), "refluster/ai-native-article", 1, { reviewers: ["dario"] });
     expect(v.ok).toBe(false);
-    expect(v.why).toMatch(/W-5 own-repo/);
+    expect(v.why).toMatch(/L0\/L1/);
   });
   it("refuses when the maintainer set the autopilot:off label", async () => {
     const v = await verifyMergeable(

@@ -71,6 +71,7 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0008](adr-0008-skill-config-single-source.md) | Skill judgment-config is single-sourced from DynamoDB; the console reads DDB live | Proposed | [008](epics/epic-008-skill-repository.md) |
 | [0009](adr-0009-scoped-capability-tokens.md) | Scoped capability tokens: one minter, scope-claimed short-lived tokens, retiring per-service static bearers | Proposed | [010](epics/epic-010-project-trust-boundary.md), [011](epics/epic-011-agent-feed.md) |
 | [0010](adr-0010-autopilot-merge-consensus-widening.md) | Autopilot merge widens to "non-L0/L1 + unanimous reviewer consensus" | Proposed | [010](epics/epic-010-project-trust-boundary.md) |
+| [0011](adr-0011-own-repo-autopilot-merge.md) | Own-repo autopilot merge: retire the self-repo carve-out; the L0/L1 boundary is the single line | Proposed | [010](epics/epic-010-project-trust-boundary.md) |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](epics/README.md).

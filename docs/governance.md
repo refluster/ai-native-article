@@ -124,11 +124,11 @@ Whatever portion of L0/L1 a machine can check, it should. These are the guards a
 
 ### 4.4 Autopilot PR merge — workforce R-N10 delegation + L0/L1 off-limits
 
-This repository **delegates** bounded autonomous merge to the agent-workforce's `pr-autopilot` skill (its R-N10 lane, predicate per workforce [adr-0010](../workforce/docs/adr/adr-0010-autopilot-merge-consensus-widening.md)) — the same delegation `PSVL/asp-cloud` carries, now granted for this repo too. `pr-autopilot` may approve+merge a PR **iff** it touches **no L0/L1 path** declared below, has the nominated reviewers' **unanimous-green consensus**, is mergeable/clean with checks green, and carries no `autopilot:off` label.
+This repository **delegates** bounded autonomous merge to the agent-workforce's `pr-autopilot` skill (its R-N10 lane, predicate per workforce [adr-0010](../workforce/docs/adr/adr-0010-autopilot-merge-consensus-widening.md), extended to this repo by [adr-0011](../workforce/docs/adr/adr-0011-own-repo-autopilot-merge.md)) — the same delegation `PSVL/asp-cloud` carries. `pr-autopilot` may approve+merge a PR **iff** it touches **no L0/L1 path** declared below, has the nominated reviewers' **unanimous-green consensus**, is mergeable/clean with checks green, and carries no `autopilot:off` label.
 
-**W-5 own-repo escalation (the one difference from an external target).** This repo is the workforce's *own* repo, so the merge predicate's final step is **not** an autonomous merge — per workforce **W-5** (no agent merges) the agent **escalates to the operator** (the org's superior) to perform the merge. So a 🟢, non-L0/L1, consensus PR here resolves to *"reviewed → ready → operator completes the merge"* (labelled `autopilot:needs-human`), never an agent self-merge. The engine enforces this mechanically (a self-repo guard in `pr-merge.mjs` refuses the merge and returns the escalation reason).
+**No own-repo exception ([adr-0011](../workforce/docs/adr/adr-0011-own-repo-autopilot-merge.md)).** This repo is treated **identically to an external delegated target** — the former "the agent escalates rather than self-merges on the own repo" step is retired. A 🟢, non-L0/L1, consensus PR here is **merged by the agent**, exactly as on `PSVL/asp-cloud`; the single thing that holds a PR back from an autonomous merge is the **L0/L1 boundary** below (plus the standard predicate: clean, checks green, no `autopilot:off`). This is why that boundary must be the faithful, complete projection of the repo's **operator-only (Zone A)** surface — it is now the *only* line between "agent merges" and "human merges."
 
-**L0/L1 off-limits (machine-readable; the engine reads this block from this file).** A PR touching any path below is L0/L1 — it always escalates to a human and is never autopilot-merged. The block doubles as the **repo-wide kill-switch**: empty it → the L0/L1 set is unknown → every autopilot merge fails closed.
+**L0/L1 off-limits (machine-readable; the engine reads this block from this file).** A PR touching any path below is L0/L1 — it always escalates to a human and is never autopilot-merged. The block doubles as the **repo-wide kill-switch**: empty it → the L0/L1 set is unknown → every autopilot merge fails closed. It mirrors the AGENTS.md **Zone A** (human-owned) surface — governance, decision records, system shape, schedules, and deploy/production config.
 
 <!-- autopilot:l0l1-paths -->
 - docs/governance.md
@@ -136,11 +136,17 @@ This repository **delegates** bounded autonomous merge to the agent-workforce's 
 - docs/adr/**
 - AGENTS.md
 - CLAUDE.md
+- .github/workflows/**
 - workforce/docs/governance.md
 - workforce/docs/adr/**
+- workforce/docs/architecture.md
+- workforce/docs/naming.md
+- workforce/docs/data-model.md
+- workforce/infra/sam/samconfig.toml
+- workforce/skills/**/SKILL.md
 <!-- /autopilot:l0l1-paths -->
 
-(Per-PR pause: an `autopilot:off` label. This §4.4 block sits inside `docs/governance.md`, which is itself L0/L1 — so the autopilot can never edit its own boundary.)
+(Per-PR pause: an `autopilot:off` label. This §4.4 block sits inside `docs/governance.md`, which is itself L0/L1 — so the autopilot can never edit its own boundary, nor widen what it may merge.)
 
 ---
 
