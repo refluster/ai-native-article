@@ -19,22 +19,33 @@ description: >-
 A reproducible, operator-side workflow for handing a unit of work to the external
 agent-workforce and recording each agent's track-record. One **foundation**
 workflow, parameterized by a **profile** (the task type). Ships with the
-`pr-review` profile; add new task types by adding `profiles/<name>.md`, never a
+`pr-autopilot` profile; add new task types by adding `profiles/<name>.md`, never a
 new skill.
 
-## Execution model — be honest about this (read first)
+## The one active PR skill is `pr-autopilot` (read first)
 
-This is **operator-orchestrated**, not autonomous delegation. Today the workforce
-has only `nadia`/`pr-autopilot` bound as an executable PR skill, and it is
-**comment-only routing** — no `pr-review`/verdict/fix executor is bound yet. So
-**you (the operator/Claude) generate the per-lens reviews and post them**; the
-agents do not autonomously run. Reflect this truthfully:
+There is exactly **one** registrable workforce PR skill: **`pr-autopilot`**. On
+2026-06-17 the workforce **retired the standalone `pr-review` reviewer skill and
+folded routing + review + verdict into `pr-autopilot`** (workforce
+[adr-0010](../../workforce/docs/adr/adr-0010-autopilot-merge-consensus-widening.md)
+/ [governance §4 R-N10](../../workforce/docs/governance.md)). **Always credit
+engagements (step #4) to `pr-autopilot` — never `pr-review`.** `pr-review` is a
+dead skill name; a track-record row written against it is the bug this skill
+exists to avoid, and `scripts/register_engagement.py` now rejects it outright.
+
+## Execution model — be honest about this
+
+This is **operator-orchestrated**, not autonomous delegation. Today `nadia`
+runs `pr-autopilot` autonomously for *routing* (comment-only nomination); the
+per-lens **reviews and fixes are generated and posted by you (the
+operator/Claude)** — the workforce does not yet dispatch a verdict/fix executor
+on demand. Reflect this truthfully:
 - routing/review comments say they are operator-orchestrated;
 - engagement `summary` describes the real work (the API forces
   `execution_surface=client` regardless).
 
-Never imply an agent ran by itself. When real `pr-review` executors get bound,
-revisit step #3 to dispatch them instead of simulating.
+Never imply an agent ran by itself. The work is still credited to `pr-autopilot`
+(the skill that owns the PR review cycle), not to a retired `pr-review` skill.
 
 ## Governance (inviolable — L0)
 
@@ -50,11 +61,11 @@ revisit step #3 to dispatch them instead of simulating.
 ## Inputs
 
 - **project_id** — the client project / workforce project (e.g. `asp-cloud`).
-- **target** — the work item (a PR number/URL for `pr-review`).
-- **profile** — task type; inferred when obvious (a PR → `pr-review`).
+- **target** — the work item (a PR number/URL for `pr-autopilot`).
+- **profile** — task type; inferred when obvious (a PR → `pr-autopilot`).
 
 If the matching profile doesn't exist yet, say so and offer to add one (it's a
-data file, ~1 screen — see `profiles/pr-review.md` as the template).
+data file, ~1 screen — see `profiles/pr-autopilot.md` as the template).
 
 ## The 4 steps
 
@@ -77,7 +88,7 @@ against.
   note. Don't pick an agent that can't do the lens.
 
 ### 3 · Assign & execute (operator-orchestrated)
-Follow the profile's **deliverable** section. For `pr-review` that is, in order:
+Follow the profile's **deliverable** section. For `pr-autopilot` that is, in order:
 a routing/pickup comment (dedup against any `pr-autopilot` comment <7d), one review
 comment per nominated lens (real findings in that persona's voice), and one
 operator-response comment per lens (`accepted, fixed in <sha>` / `deferred` /
@@ -91,7 +102,7 @@ token):
 
 ```bash
 python3 scripts/register_engagement.py \
-  --slug ren --project-id asp-cloud --skill-name pr-review \
+  --slug ren --project-id asp-cloud --skill-name pr-autopilot \
   --started-at 2026-06-13T16:34:00Z --ended-at 2026-06-13T16:48:00Z \
   --status ok --dedup-key "PR #507" \
   --summary "PR #507 engineering-lens review: … R1 fixed in b2f9c25; R2/R3 deferred. Verdict: approve."
@@ -110,7 +121,7 @@ payload.
 lens→persona map + surface-scan rule, the deliverable (where/what to post), and
 the engagement `skill_name` per role. **To support a new kind of work (research,
 design review, doc audit, …), add a profile file — do not add a skill.** The
-foundation steps above stay identical. Start from `profiles/pr-review.md`.
+foundation steps above stay identical. Start from `profiles/pr-autopilot.md`.
 
 ## Reference
 - `references/workforce-api.md` — endpoints, auth/token scoping, engagement field
@@ -121,4 +132,6 @@ foundation steps above stay identical. Start from `profiles/pr-review.md`.
 asp-cloud **PR #507** (SLI-1/SLI-2 standardization): nadia routing →
 ren / dario / farah lens reviews → operator responses + fix commit `b2f9c25` →
 4 engagements registered against `asp-cloud`. The design lens was skipped (no UX
-surface). See `profiles/pr-review.md` for the blow-by-blow.
+surface). See `profiles/pr-autopilot.md` for the blow-by-blow. _(That early run
+pre-dated adr-0010 and mislabelled the review lenses as `pr-review`; current runs
+credit `pr-autopilot` for every lens.)_

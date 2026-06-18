@@ -41,6 +41,17 @@ BASE = "https://workforce-api.kohuehara.xyz"
 DEFAULT_ENV = os.path.expanduser("~/work/asp-cloud/.env")
 TOKEN_KEY = "WF_ENGAGEMENT_WRITE_TOKEN"
 
+# Skills the workforce has retired, mapped to the live skill that absorbed them.
+# The engagements API does NOT validate skill_name (see references/workforce-api.md
+# "Skill ownership is not enforced"), so a typo or a stale transcript will happily
+# write a track-record row against a dead skill name. The `pr-review` reviewer skill
+# was folded into `pr-autopilot` on 2026-06-17 (workforce adr-0010); crediting it is
+# the exact mislabelling this guard exists to make impossible. Fail loud (C-4).
+RETIRED_SKILLS = {
+    "pr-review": "pr-autopilot",
+    "pr-route": "pr-autopilot",
+}
+
 
 def read_token(env_path: str) -> str:
     try:
@@ -79,7 +90,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Register a workforce engagement (flow step #4).")
     ap.add_argument("--slug", required=True, help="agent slug, e.g. ren")
     ap.add_argument("--project-id", required=True, help="client project, e.g. asp-cloud")
-    ap.add_argument("--skill-name", required=True, help="engagement skill, e.g. pr-review")
+    ap.add_argument("--skill-name", required=True, help="engagement skill, e.g. pr-autopilot")
     ap.add_argument("--skill-version", default=None, help="auto-fetched from /skills if omitted")
     ap.add_argument("--status", default="ok", choices=["ok", "throw", "skipped"])
     ap.add_argument("--started-at", required=True, help="ISO-8601 Z")
@@ -90,6 +101,14 @@ def main(argv=None) -> int:
     ap.add_argument("--allow-duplicate", action="store_true", help="post even if dedup-key matches")
     ap.add_argument("--env", default=DEFAULT_ENV, help=f"path to .env (default {DEFAULT_ENV})")
     args = ap.parse_args(argv)
+
+    replacement = RETIRED_SKILLS.get(args.skill_name)
+    if replacement:
+        print(f"ERROR: '{args.skill_name}' is a RETIRED workforce skill — registering it "
+              f"writes a track-record row against a dead skill name. It was folded into "
+              f"'{replacement}' (workforce adr-0010, 2026-06-17). Re-run with "
+              f"--skill-name {replacement}. See profiles/pr-autopilot.md.", file=sys.stderr)
+        return 4
 
     tok = read_token(args.env)
     if not tok:

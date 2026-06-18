@@ -1,8 +1,19 @@
-# Profile: pr-review
+# Profile: pr-autopilot
 
 A task profile is **data** — it tells the foundation workflow how to handle one
 task type. Adding a new task type means adding a `profiles/<name>.md` like this
 one, NOT writing a new skill.
+
+> **Why this profile is named `pr-autopilot`, not `pr-review`.** The profile
+> name mirrors the **workforce skill credited in step #4**. On 2026-06-17 the
+> workforce **retired the standalone `pr-review` reviewer skill and folded
+> routing + review + verdict into the single active skill `pr-autopilot`**
+> (workforce [adr-0010](../../../workforce/docs/adr/adr-0010-autopilot-merge-consensus-widening.md);
+> [governance §4 R-N10](../../../workforce/docs/governance.md)). `pr-review` is
+> no longer a registrable skill — crediting it produces a track-record row
+> against a dead skill name. Keeping profile-name == credited-skill-name is the
+> invariant that prevents that drift; `register_engagement.py` also rejects the
+> retired name outright.
 
 ## Triggers
 A GitHub PR to be reviewed (and optionally fixed). Phrases: "PRレビューを依頼",
@@ -46,12 +57,14 @@ Post, in order, as comments on the PR:
    commit** (then cite the sha). Defer anything out of scope, say why.
 
 ## Engagement (step #4)
-One per agent that did work, via `scripts/register_engagement.py`:
+One per agent that did work, via `scripts/register_engagement.py`. **Every
+lens — routing and review — is credited to the one active workforce PR skill,
+`pr-autopilot`** (it absorbed the retired `pr-review`; see the note at the top).
 
 | agent | `--skill-name` | `--skill-version` |
 |---|---|---|
-| nadia (routing) | `pr-autopilot` | auto (`GET /skills/pr-autopilot`, e.g. 0.2.0) |
-| ren / dario / farah / aoi (review) | `pr-review` | auto (e.g. 0.1.0) |
+| nadia (routing) | `pr-autopilot` | auto (`GET /skills/pr-autopilot`, e.g. 0.8.0) |
+| ren / dario / farah / aoi (review) | `pr-autopilot` | auto (same) |
 
 - `--project-id <project>`, `--status ok`, `--started-at/--ended-at` = real work
   window, `--summary` = a faithful 1-paragraph account of that lens's findings +
@@ -59,6 +72,8 @@ One per agent that did work, via `scripts/register_engagement.py`:
 - `--dedup-key "PR #<n>"` so a re-run doesn't silently double-register; only pass
   `--allow-duplicate` when the user explicitly asks to re-post (e.g. to backfill
   a summary).
+- **Do not pass `--skill-name pr-review`** — it is retired; the script rejects it
+  and points you here.
 
 ## Worked example — asp-cloud PR #507 (first real run)
 Standardized SLI-1/SLI-2 numerator/denominator. Routing by nadia →
@@ -66,4 +81,6 @@ Standardized SLI-1/SLI-2 numerator/denominator. Routing by nadia →
 (D1 "ratified"→"proposed"; D2 ADR §5 cross-ref → recorded), `farah` (F1 rolling
 vs Sunday-anchored window; F2 orphaned-pending alarm; F3 "valid record" filter).
 Operator responses applied fixes in `b2f9c25`; design lens skipped (no UX
-surface). Four engagements registered against `asp-cloud`.
+surface). Four engagements registered against `asp-cloud`. _(That run pre-dated
+adr-0010 and credited the review lenses to the since-retired `pr-review`; new
+runs credit `pr-autopilot` for every lens.)_
