@@ -57,8 +57,11 @@ The OpenAPI spec defines **no request-body schema** — these were learned empir
 - **Append-only** — there is no `PATCH`/update. Fixing a record = a duplicate.
   Hence the dedup guard in `scripts/register_engagement.py`.
 - **Skill ownership is not enforced** — an agent can be given an engagement for
-  a skill it does not own (e.g. `farah` got a `pr-review` engagement though
-  `pr-review` owners are nadia/dario/ren/aoi).
+  a skill it does not own (e.g. a QA-lens persona like `farah` can be credited a
+  `pr-autopilot` engagement though `pr-autopilot` is owned by nadia/maya). The
+  server will **also** happily accept a *retired* skill name like `pr-review` —
+  that lack of validation is exactly why `register_engagement.py` rejects retired
+  names client-side.
 
 Use `scripts/register_engagement.py` — it encodes all of the above (token read,
 version auto-fill, dedup guard, 401 hinting, no token printing).
@@ -82,12 +85,15 @@ for s,r,sk in rows: print(f"{s:12}| {r:28}| {sk}")
 PY
 ```
 
-## The workforce's own routing skill (`nadia`/`pr-autopilot`)
+## The workforce's own PR skill (`nadia`/`pr-autopilot`)
 `nadia` runs `pr-autopilot` autonomously every 6h: scans open PRs lacking a cycle-1
 routing comment, nominates reviewers by lens (architecture=dario,
 engineering=ren, design=aoi) via `config.nomination_rules`, posts a
-**comment-only** routing note. It does **not** perform the review or fixes
-("verdict mode + pr-review are follow-ups"). This skill's step #3 mirrors that
-nomination model but the operator supplies the actual review content. **Dedup
-with nadia:** before posting a routing comment, check the PR for a `pr-autopilot`
-routing comment from the last 7 days so you don't double-route.
+**comment-only** routing note. Per adr-0010 (2026-06-17) `pr-autopilot` now owns
+the **full** PR cycle — route → review → verdict → (delegated) merge — having
+**absorbed the retired `pr-review` reviewer skill**. The autonomous CCR leg is
+still routing-only; this skill's step #3 mirrors the nomination model and the
+operator supplies the actual review content, **all credited to `pr-autopilot`**
+(there is no separate `pr-review` skill to credit any more). **Dedup with nadia:**
+before posting a routing comment, check the PR for a `pr-autopilot` routing
+comment from the last 7 days so you don't double-route.
