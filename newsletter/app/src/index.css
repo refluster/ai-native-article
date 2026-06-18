@@ -81,3 +81,65 @@
 .article-content a {
   @apply text-tertiary underline underline-offset-2 hover:no-underline;
 }
+
+/* Print / "Save as PDF" optimisation.
+   On screen the site header is `fixed top-0 z-50` with a backdrop blur and
+   `<main>` carries a matching `pt-16` offset. When the browser prints, a
+   fixed element repaints over the flowed content on every sheet, so article
+   lines disappear behind the bar. Here we drop the site chrome, reclaim its
+   spacing, and keep blocks from splitting across page breaks. */
+@media print {
+  /* Site chrome is navigation, not content — and the header is the element
+     that overlaps the text. Hide both the fixed nav and the footer. */
+  header,
+  footer {
+    display: none !important;
+  }
+
+  /* Reclaim the offset that compensated for the now-hidden fixed header. */
+  main {
+    padding-top: 0 !important;
+  }
+
+  /* Paper is white; force high-contrast ink and let backgrounds print. */
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* In-page navigation affordances (← INDEX, ← BACK TO …) are noise on paper.
+     Tag them with .print-hide at the call site. */
+  .print-hide {
+    display: none !important;
+  }
+
+  @page {
+    margin: 16mm 14mm;
+  }
+
+  /* Keep headings with their following text, and don't split atomic blocks
+     (paragraphs, list items, quotes, code) mid-element across a page break. */
+  .article-content h1,
+  .article-content h2,
+  .article-content h3 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+  .article-content p,
+  .article-content li,
+  .article-content blockquote,
+  .article-content pre {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Code blocks scroll on screen; on paper they must wrap or they clip. */
+  .article-content pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+}

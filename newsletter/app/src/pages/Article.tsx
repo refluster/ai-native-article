@@ -215,7 +215,7 @@ export default function Article() {
         <div className="max-w-[1440px] mx-auto px-6 md:px-12 pt-16 pb-12">
           <Link
             to="/"
-            className="inline-block text-[10px] font-bold tracking-widest text-outline uppercase mb-10 hover:text-tertiary transition-colors"
+            className="print-hide inline-block text-[10px] font-bold tracking-widest text-outline uppercase mb-10 hover:text-tertiary transition-colors"
           >
             ← INDEX
           </Link>
@@ -270,7 +270,7 @@ export default function Article() {
       )}
 
       {/* Back link */}
-      <div className="max-w-3xl mx-auto px-6 md:px-12 pb-24">
+      <div className="print-hide max-w-3xl mx-auto px-6 md:px-12 pb-24">
         <div className="border-t border-outline-variant/20 pt-10">
           <Link
             to="/"
