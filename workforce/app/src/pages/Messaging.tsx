@@ -125,6 +125,11 @@ export default function Messaging() {
   // Compose-to-new state: when true the centre pane shows the recipient
   // picker + first-message composer instead of an open thread.
   const [composing, setComposing] = useState(false);
+  // Mobile is single-pane: the list and the thread/compose pane can't sit
+  // side-by-side on a phone. This flag drives which one is on screen below
+  // the `md` breakpoint (false = list, true = thread/compose). It's inert on
+  // md+ where both panes render together via the responsive classes.
+  const [showThreadMobile, setShowThreadMobile] = useState(false);
   // Real-time receive (Story 3b): after the operator sends, we arm a short
   // "awaiting reply" window per thread (until = expiry ms) and poll the open
   // thread so the talent's async reply (wf-messaging-reply) surfaces without a
@@ -261,6 +266,12 @@ export default function Messaging() {
   function openThread(id: string): void {
     setComposing(false);
     setSelectedId(id);
+    setShowThreadMobile(true); // slide the thread in over the list on mobile
+  }
+
+  // Mobile back: slide the list back over the open thread / composer.
+  function backToList(): void {
+    setShowThreadMobile(false);
   }
 
   // Arm an awaiting-reply window for a thread the operator just posted to. The
@@ -332,10 +343,13 @@ export default function Messaging() {
     <WorkforceLayout contained={false}>
       <div className="max-w-[1128px] mx-auto px-3 sm:px-6 py-4 sm:py-6">
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 sm:gap-6 items-start">
-          {/* MAIN: list + thread, two-pane inside one bordered card */}
-          <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md overflow-hidden grid grid-cols-1 md:grid-cols-[300px_minmax(0,1fr)] lg:grid-cols-[340px_minmax(0,1fr)] h-[calc(100vh-9rem)] min-h-[480px]">
-            {/* LEFT: conversation list */}
-            <div className="flex flex-col border-b md:border-b-0 md:border-r border-wf-outline-variant min-h-0">
+          {/* MAIN: list + thread. Two panes side-by-side on md+; a single
+              swappable pane (flex column) on mobile, toggled by
+              showThreadMobile. */}
+          <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md overflow-hidden flex flex-col md:grid md:grid-cols-[300px_minmax(0,1fr)] lg:grid-cols-[340px_minmax(0,1fr)] h-[calc(100vh-9rem)] min-h-[480px]">
+            {/* LEFT: conversation list — full pane on mobile when no thread is
+                open, always shown on md+. */}
+            <div className={`${showThreadMobile ? 'hidden' : 'flex'} md:flex flex-1 md:flex-none flex-col md:border-r border-wf-outline-variant min-h-0`}>
               <div className="px-3 py-2.5 flex items-center justify-between gap-2 border-b border-wf-outline-variant">
                 <div className="font-headline font-bold text-wf-on-surface">Messaging</div>
                 <button
@@ -347,6 +361,7 @@ export default function Messaging() {
                     if (!CAN_WRITE) return;
                     setComposing(true);
                     setSelectedId(null);
+                    setShowThreadMobile(true); // reveal the composer on mobile
                   }}
                   className={`w-8 h-8 inline-flex items-center justify-center rounded-full ${
                     composing ? 'bg-wf-surface-container text-wf-on-surface' : 'text-wf-on-surface-variant'
@@ -456,14 +471,19 @@ export default function Messaging() {
               </ul>
             </div>
 
-            {/* RIGHT: compose-to-new, open thread, or empty state */}
-            <div className="hidden md:flex flex-col min-h-0">
+            {/* RIGHT: compose-to-new, open thread, or empty state — full pane
+                on mobile when a thread/composer is open, always shown on md+. */}
+            <div className={`${showThreadMobile ? 'flex' : 'hidden'} md:flex flex-1 md:flex-none flex-col min-h-0`}>
               {composing ? (
                 <Compose
                   roster={roster}
                   rosterMap={rosterMap}
                   existing={threads}
-                  onCancel={() => setComposing(false)}
+                  onCancel={() => {
+                    setComposing(false);
+                    setShowThreadMobile(false); // drop back to the list on mobile
+                  }}
+                  onBack={backToList}
                   onCreate={handleCreateThread}
                   onOpenExisting={openThread}
                 />
@@ -472,6 +492,7 @@ export default function Messaging() {
                   conv={selected}
                   roster={rosterMap}
                   canWrite={CAN_WRITE}
+                  onBack={backToList}
                   onSend={handleSend}
                   onToggleStar={handleToggleStar}
                   drafting={isAwaitingReply(selected, awaitingUntil, Date.now())}
@@ -536,6 +557,7 @@ function Thread({
   conv,
   roster,
   canWrite,
+  onBack,
   onSend,
   onToggleStar,
   drafting,
@@ -543,6 +565,7 @@ function Thread({
   conv: Conversation;
   roster: Map<string, WorkforceAgent>;
   canWrite: boolean;
+  onBack: () => void;
   onSend: (threadId: string, body: string) => Promise<void>;
   onToggleStar: (threadId: string, starred: boolean) => Promise<void>;
   drafting: boolean;
@@ -584,7 +607,17 @@ function Thread({
   return (
     <>
       <div className="px-4 py-2.5 border-b border-wf-outline-variant flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="Back to conversations"
+          className="md:hidden -ml-1 mr-0.5 w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-full text-wf-on-surface-variant hover:bg-wf-surface-container hover:text-wf-on-surface"
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.8}>
+            <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <div className="min-w-0 flex-1">
           {conv.group ? (
             <div className="font-bold text-wf-on-surface truncate">{title}</div>
           ) : (
@@ -683,6 +716,7 @@ function Compose({
   rosterMap,
   existing,
   onCancel,
+  onBack,
   onCreate,
   onOpenExisting,
 }: {
@@ -690,6 +724,7 @@ function Compose({
   rosterMap: Map<string, WorkforceAgent>;
   existing: Conversation[];
   onCancel: () => void;
+  onBack: () => void;
   onCreate: (talentSlug: string, body: string) => Promise<void>;
   onOpenExisting: (id: string) => void;
 }) {
@@ -730,7 +765,19 @@ function Compose({
   return (
     <>
       <div className="px-4 py-2.5 border-b border-wf-outline-variant flex items-center justify-between gap-2">
-        <div className="font-bold text-wf-on-surface">New message</div>
+        <div className="flex items-center gap-1 min-w-0">
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back to conversations"
+            className="md:hidden -ml-1 w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-full text-wf-on-surface-variant hover:bg-wf-surface-container hover:text-wf-on-surface"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.8}>
+              <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <div className="font-bold text-wf-on-surface">New message</div>
+        </div>
         <button
           type="button"
           onClick={onCancel}
