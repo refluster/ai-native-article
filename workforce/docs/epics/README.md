@@ -84,6 +84,7 @@ When the Status line flips, add a parenthetical date so the audit trail is one c
 | [012](epic-012-agent-experience.md) | Agent experience: recall, long-term memory, clean activity record | In-progress | Maya |
 | [013](epic-013-talent-messaging.md) | Talent-to-talent messaging | Draft | Maya |
 | [014](epic-014-global-nav-search.md) | Global nav search (talent + skills) | In-progress | nadia |
+| [015](epic-015-daily-research-cadence.md) | daily-research: one generic research cadence across personas | Draft | sana |
 
 The index is also the **canonical status view** — keep it in sync when a Status line in an individual Epic flips. A CI check that asserts table-vs-file consistency is on the backlog (see `workforce/scripts/validate-epic-index.mjs`, forthcoming).
 
