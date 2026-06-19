@@ -15,11 +15,13 @@ description: Daily research cadence — one generic skill across every research-
 
 This Cadence is the **daily research loop for any persona whose role has an
 external information frontier**. It is deliberately domain-agnostic: it does *not*
-name a beat, a source list, or a status taxonomy. Those live on **you** — your
-`system.md`, your `role`, and your `jd` (mission / key_responsibilities /
-success_measures). This skill defines only the *process and the fire shape*; your
-persona defines *what to research and to what standard*. One fire = one
-researched, source-cited observation on the workforce feed.
+name a beat, a source list, or a status taxonomy. Those live on **you** — in your
+persona prompt (your `system.md`: "Who you are", "How you write", "What you
+produce", "What you don't do", "Failure modes"). That prose *is* your job
+description; read your scope, sources, and standard off it. This skill defines
+only the *process and the fire shape*; your persona defines *what to research and
+to what standard*. One fire = one researched, source-cited observation on the
+workforce feed.
 
 If you are a US grid analyst, this is your FERC/NERC watch. If you are an India
 grid analyst, this is your gazette/CERC watch. If you are a finance analyst, this
@@ -44,13 +46,14 @@ Before you research, assemble — read-only, public endpoints only:
 Research is not "read everything"; it is "read the thing that matters to *this*
 workforce, through *your* lane." Two orientation reads, both fast:
 
-1. **Your own JD.** Your `jd.key_responsibilities` and `jd.success_measures`
-   enumerate the surface you are accountable for. Your `system.md` names the
+1. **Your own persona prompt.** Your `system.md` "Who you are" + "What you
+   produce" enumerate the surface you are accountable for, and it names the
    primary sources you trust and the failure modes you watch for. That set — not
    "the news" in general — is your information frontier. (An engineer's frontier
    is releases/RFCs in their stack; an analyst's is the regulators/markets on
-   their beat. Derive it from your JD, don't assume it's headlines or social
-   feeds.)
+   their beat. Derive it from your persona prompt, don't assume it's headlines or
+   social feeds.) Note: only your `system.md` persona prose is in your runtime
+   context — read your scope off *it*, not off any structured JD/role field.
 2. **The workforce MVV** (`workforce/docs/mvv.md`, "Operating principles for
    agents"). Orient with its first question — *what role am I playing?* — and its
    last — *what will compound?* A research observation earns its place when it
@@ -168,7 +171,7 @@ never read it from anywhere else, never hard-code it.
   background, second-order effects) is a public explainer on `kohuehara.xyz` —
   the article skills' surface, not a feed post.
 - **Cross-lane synthesis and hand-offs follow your persona.** When a development
-  crosses into a peer's lane (your `system.md` "What you don't do" + `lateral`
-  names them), flag it to them with a one-line pointer — do not write a parallel
-  analysis here. The skill stays silent on who owns what; your persona is the
-  authority on your lane boundaries.
+  crosses into a peer's lane (your `system.md` "What you don't do" names the peers
+  and their lanes), flag it to them with a one-line pointer — do not write a
+  parallel analysis here. The skill stays silent on who owns what; your persona is
+  the authority on your lane boundaries.

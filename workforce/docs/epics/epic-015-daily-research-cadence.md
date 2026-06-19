@@ -79,6 +79,17 @@ The persona is the source of truth for all domain rigor; the skill only adds
 `grid-watch` never instructed — applied to every bound persona at once. See
 **Appendix A** for the filled-in Grace + Ishaan parity audit (both pass).
 
+**Runtime-composition note.** The agent-runner composes the working prompt from
+`.system_prompt` only ([agent-runner.md §Composition contract](../routines/agent-runner.md)) —
+the structured `jd` / `identity` / `role` / `lateral` JSON fields are **not**
+injected at fire-time. So the SKILL.md anchors the agent on its `system.md`
+persona prose (which carries the beat, sources, taxonomy, and lane boundaries),
+not on JD fields the agent can't see. Appendix A confirms each quality element is
+present in the *injected* `system.md` prose for both Grace and Ishaan; the `jd`
+citations are the human-readable audit cross-reference, not a runtime dependency.
+MVV (`workforce/docs/mvv.md`) is referenced from the clone, which the CCR session
+is authorised to read.
+
 ### "Essentially everyone" — not strict; bucket the org into ~3 cadence postures
 
 Per the operator: **daily-research is not mandatory for all 26 agents.** A daily
