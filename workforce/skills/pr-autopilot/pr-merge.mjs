@@ -160,6 +160,24 @@ export function makeGh({ token, api = process.env["GITHUB_API_URL"] || "https://
   };
 }
 
+// W-4 hard cycle cap (FU-004 / dev-process.md §"cycle counter").
+// The routing comment opening line is (SKILL.md §Step 2 template):
+//   **<PersonaName> — cycle N of ≤ M.**   ("—" = U+2014, "≤" = U+2264)
+// countRouterCycles() scans bodies for this pattern and returns the highest N.
+// verifyMergeable() refuses a merge when that maximum exceeds W4_CYCLE_CAP
+// (cycle > 7 == process breakdown; W-4: fail loud, escalate to human).
+export const W4_CYCLE_CAP = 7;
+const ROUTING_CYCLE_RE = /\*\*[\w ]+\s*—\s*cycle\s+(\d+)\s+of\s+≤\s*\d+/u;
+export function countRouterCycles(bodies) {
+  let max = 0;
+  for (const b of bodies) {
+    if (typeof b !== "string") continue;
+    const m = ROUTING_CYCLE_RE.exec(b);
+    if (m) { const n = parseInt(m[1], 10); if (n > max) max = n; }
+  }
+  return max;
+}
+
 // A reviewer persona's green sign-off has landed iff a review/comment body
 // carries that persona's EXACT structured marker (adr-0010 / Sana B1 hardening,
 // 2026-06-17): `<!-- autopilot:review:{slug}:green -->`. The routing persona
@@ -224,6 +242,12 @@ export async function verifyMergeable(gh, repo, pr, decision) {
     ...reviews.map((r) => r.body),
     ...(ics === 200 && Array.isArray(comments) ? comments.map((c) => c.body) : []),
   ];
+  // FU-004: W-4 hard cycle cap — a PR that has reached cycle > W4_CYCLE_CAP is
+  // a process breakdown; refuse the merge and hand off to a human.
+  const cycle = countRouterCycles(bodies);
+  if (cycle > W4_CYCLE_CAP) {
+    return { ok: false, why: `review reached cycle ${cycle}, exceeding the W-4 hard cap of ${W4_CYCLE_CAP} — process breakdown, escalate to human` };
+  }
   const missing = reviewers.filter((slug) => !reviewerSignedOff(slug, bodies));
   if (missing.length > 0) return { ok: false, why: `missing green marker(s) from ${missing.join(", ")} (expected ${reviewerGreenMarker(missing[0])}) — consensus not reached` };
 
