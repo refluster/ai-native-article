@@ -220,7 +220,7 @@ components:
         body: { type: string, description: 'The SKILL.md judgment text — DDB-authoritative (ADR-0008); the runner composes with THIS, not the git copy.' }
         deliverable: { type: object, nullable: true, additionalProperties: true, description: Git-authoritative (seed-reconciled); not PATCHable. }
         cost_class: { type: string, enum: [small, medium, large] }
-        owners: { type: array, items: { type: string }, description: Agent slugs allowed to bind this skill (R8). }
+        owners: { type: array, items: { type: string }, description: Authorship/Rule-11/improvement set. Not a binding prerequisite (adr-0012) — any agent may bind any existing skill. }
         improvement_agent: { type: string, nullable: true }
         improvement_agent_override: { type: string, nullable: true }
         improvement_agent_effective: { type: string, nullable: true }

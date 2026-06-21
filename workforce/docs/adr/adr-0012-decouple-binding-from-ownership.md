@@ -3,7 +3,8 @@
 - **Status**: Proposed (operator ratifies by merging the implementation PR)
 - **Date**: 2026-06-21
 - **Deciders**: operator, mateo (VP Agent Workforce Platform)
-- **Related**: [ADR-0007](adr-0007-agent-config-single-source.md) (agent-config single source / write-time validator), [ADR-0008](adr-0008-skill-config-single-source.md) (skill judgment-config single source), [Epic-008](../epics/epic-008-skill-repository.md)
+- **Epics**: [008](../epics/epic-008-skill-repository.md)
+- **Related**: [ADR-0007](adr-0007-agent-config-single-source.md) (agent-config single source / write-time validator), [ADR-0008](adr-0008-skill-config-single-source.md) (skill judgment-config single source)
 
 ## Context
 

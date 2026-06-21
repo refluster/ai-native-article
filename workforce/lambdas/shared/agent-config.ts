@@ -211,7 +211,8 @@ export function validateIdentityPatch(
 // (jd / identity / experience / memory / org edges / owner_email) is
 // optional at create time and PATCHable later. `bindings` is required but
 // may be `[]` — a new hire typically gets its cadence wired in a second
-// step, after the skill's owners[] is amended to include it (R8).
+// step (any existing skill is bindable; ownership is not a prerequisite —
+// adr-0012).
 export const AGENT_CREATE_REQUIRED_FIELDS = [
   "slug",
   "first_name",

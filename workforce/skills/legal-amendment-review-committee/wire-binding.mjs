@@ -15,7 +15,7 @@
 // finished — wf-seed-skills creates the SKILL#legal-amendment-review-
 // committee row (owners=[maya]) post-deploy, and the R8 write-time check
 // validates this binding against that row. Running before the seed 422s
-// with R8-binding-skill-owner (no partial write).
+// with R8-binding-skill-exists (no partial write).
 //
 // Idempotent: maya's existing bindings are preserved (append-only —
 // binding_idx is load-bearing); if the committee skill is already bound,
@@ -91,7 +91,7 @@ if (status === 200) {
 } else {
   console.error(`✗ ${AGENT}: HTTP ${status} ${JSON.stringify(json)}`);
   if (status === 422) {
-    console.error("  422 usually means the SKILL# row isn't seeded yet (R8-binding-skill-owner) —");
+    console.error("  422 usually means the SKILL# row isn't seeded yet (R8-binding-skill-exists) —");
     console.error("  ensure the skill PR is merged AND the data-plane deploy + wf-seed-skills have run.");
   }
   process.exit(1);

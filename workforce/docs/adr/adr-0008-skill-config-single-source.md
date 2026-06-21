@@ -146,7 +146,10 @@ Concretely:
 ## Related rules
 
 - R8 (binding skill/owner cross-check) now reads API-writable `owners[]` —
-  intended; the check itself is unchanged.
+  intended; the check itself is unchanged. **Update ([adr-0012](adr-0012-decouple-binding-from-ownership.md)):**
+  the *owner* half of this cross-check (`R8-binding-skill-owner`) was later
+  removed — binding is decoupled from ownership; only the existence check
+  (`R8-binding-skill-exists`) remains. `owners[]` is no longer a binding gate.
 - `validate-skills.mjs` continues to gate *creation-time* shape and the
   C1–C3 cadence invariants in CI; it no longer implies the git body is
   runtime-authoritative.

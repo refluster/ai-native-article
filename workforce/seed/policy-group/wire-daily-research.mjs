@@ -19,7 +19,7 @@
 // PREREQ: the PR adding workforce/skills/daily-research must be MERGED and the
 // data-plane deploy finished — wf-seed-skills syncs SKILL# rows post-deploy, and
 // the R8 write-time check validates bindings against those rows. Running this
-// before the sync 422s with R8-binding-skill-owner (fail-loud, no partial write).
+// before the sync 422s with R8-binding-skill-exists (fail-loud, no partial write).
 //
 // Idempotent: existing bindings are preserved; daily-research already bound on an
 // agent is skipped, never duplicated or reordered (binding_idx is load-bearing).
