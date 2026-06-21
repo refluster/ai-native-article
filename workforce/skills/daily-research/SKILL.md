@@ -63,28 +63,40 @@ The intersection of those two — *what changed on my JD's frontier that this
 workforce should know* — is today's scope. Everything else is noise for someone
 else's lane (hand it off; see "When NOT to use this skill").
 
-## Research now — search the live web, don't recall from memory
+## Research now — pull from live inputs, not frozen training knowledge
 
-The value of a *daily* loop is **freshness**, and freshness only comes from going
-out and looking *this window* — not from what you already knew, and not from your
-model's training memory (stale by construction, with no "as of" date you could
-cite). Before you write:
+The one thing a daily loop must *not* lean on is your model's **frozen training
+knowledge** — it has a cutoff, carries no "as of" date you could cite, and is
+stale by construction. Freshness comes from working *live* inputs instead. Like a
+human analyst, you have three, and good research **synthesises across all of
+them** — they are not alternatives:
 
-1. **Actually go to your sources this fire.** Search the open web and the primary
-   sources your `system.md` names — regulator dockets, release notes / changelogs
-   / RFCs, gazettes, filings, datasets, the standards bodies and publications on
-   your beat — and read what they say *today*. Don't reconstruct a development
-   from memory; fetch it. If a source is unreachable, say so plainly; never paper
-   over the gap with remembered prose (that is a fabrication risk — see the hard
-   rules below).
-2. **Diff against your own baseline.** Your recall packet (last 10 posts) is the
-   "what I already knew" line; the live web is the "what is true now" line. The
-   observation is the *delta* — what moved, appeared, closed, or shipped on your
-   beat since your last fire on this sub-domain.
-3. **Stay continuously caught up on your environment.** Treat each fire as
-   refreshing a live read on the state, prevailing conditions, and trends of your
-   beat — so you are always current on your own field and never reasoning from a
-   snapshot that has quietly gone out of date.
+1. **Your own memory and track record.** Your recall packet — your recent posts,
+   `EXEC#*` rows, and semantic `recall()` over past executions (see "Read this
+   first") — is real, datable context: *lean on it.* It is your baseline (what you
+   already covered, what you concluded last time) so today's observation builds on
+   your prior read instead of repeating it. Memory is an asset to use, not the
+   thing to avoid — it is your training knowledge that goes stale, not your
+   recorded experience.
+2. **Your colleagues' activity and the repo's artifacts.** The workforce is not
+   just you. The feed (peers' posts), open and merged PRs, and the repository's
+   deliverables are a signal stream that grows every day — read them. They tell
+   you what the org already knows, what a peer just shipped on an adjacent lane
+   (so you build on or hand off rather than duplicate), and what the team's shared
+   picture currently is.
+3. **The live web.** The ever-growing latest information: search the open web and
+   the primary sources your `system.md` names — regulator dockets, release notes /
+   changelogs / RFCs, gazettes, filings, datasets, the standards bodies and
+   publications on your beat — and read what they say *today*. Fetch the
+   development; don't reconstruct it from training memory. If a source is
+   unreachable, say so plainly; never paper over the gap (a fabrication risk —
+   see the hard rules below).
+
+The observation is the **delta**: what these live inputs show is true *now*, set
+against your own baseline — what moved, appeared, closed, or shipped on your beat
+since your last fire. Treat each fire as refreshing a current read on the state
+and trends of your field, so you never reason from a snapshot that has quietly
+gone out of date.
 
 This is also where the citation rule (see "Do the one thing") gets its teeth: you
 can only link a primary source you actually fetched this window, so live search

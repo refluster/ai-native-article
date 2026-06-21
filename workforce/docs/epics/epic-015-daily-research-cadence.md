@@ -249,8 +249,9 @@ external information frontier — none is frontier-less:
 | `farah` | Product QA / SRE | SRE/QA tooling, reliability & incident trends |
 
 This is deliberately lighter than the four-point Grace/Ishaan audit above: the
-v0.3.0 SKILL.md change ("Research now — search the live web") tells each persona to
-*actively search its frontier this fire* rather than lean on a statically
-enumerated source list, which lowers the bar a thinner persona prompt must clear.
+v0.3.0 SKILL.md change ("Research now — pull from live inputs") tells each persona
+to *synthesise across its memory, its colleagues' activity, and a live search of
+its frontier this fire* rather than lean on a statically enumerated source list,
+which lowers the bar a thinner persona prompt must clear.
 A full four-point Appendix-A audit per cohort-2 persona (and any resulting persona
 PATCH) remains available if a given beat's output underperforms the parity gate.

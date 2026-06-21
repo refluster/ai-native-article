@@ -24,7 +24,8 @@
 // genuine quiet windows and SHOULD skip when nothing material moved (Epic-015
 // §"Cost (W-3)" / §"Feed signal-to-noise"). A light per-persona parity pass
 // (Appendix A, cohort-2) confirmed each carries a frontier; the v0.3.0 SKILL.md
-// "search the live web" change further hardens the skill for thinner source-lists.
+// "pull from live inputs" change (synthesise memory + colleagues' activity + a
+// live web search) further hardens the skill for thinner source-lists.
 //
 // This script does NOT touch grid-watch / india-grid-watch — deprecating those
 // (Phase 5) is a later, B-authority step gated on the Phase-4 parity observation.
