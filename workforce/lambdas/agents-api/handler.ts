@@ -614,7 +614,7 @@ async function patchAgent(
   if (identityKeys.length > 0) {
     const skillOwners = await buildSkillOwnersLookup(patch.bindings);
     violations.push(
-      ...validateIdentityPatch(patch, { slug, otherAgentsEffectiveBudgetUsd, skillOwners }),
+      ...validateIdentityPatch(patch, { otherAgentsEffectiveBudgetUsd, skillOwners }),
     );
   }
   if ("budget_monthly_usd_override" in patch) {
@@ -683,7 +683,6 @@ async function createAgent(
   const otherAgentsEffectiveBudgetUsd = await sumOtherEffectiveBudgets(slug);
   const skillOwners = await buildSkillOwnersLookup(parsed.bindings);
   const violations = validateAgentCreate(parsed, {
-    slug,
     otherAgentsEffectiveBudgetUsd,
     skillOwners,
   });
@@ -895,31 +894,9 @@ async function patchSkill(
     agentState: (slug) => stateMap.get(slug),
   });
 
-  // Reverse-R8 (M2, PR #304 review): shrinking owners[] must not orphan an
-  // EXISTING binding — the agent-side R8 check would otherwise surface the
-  // breakage as a confusing 422 on a later, unrelated agent PATCH. One
-  // META scan at C-3 scale; non-archived agents only.
-  if (violations.length === 0 && Array.isArray(parsed.owners)) {
-    const nextOwners = new Set(parsed.owners.filter((s): s is string => typeof s === "string"));
-    const removed = (existing.owners ?? []).filter((s) => !nextOwners.has(s));
-    if (removed.length > 0) {
-      let cursor: string | undefined;
-      do {
-        const page = await scanPrefix<AgentMetaRow>("AGENT#", "META", PAGE_SIZE_MAX, cursor);
-        for (const row of page.items) {
-          if (row.archived || !removed.includes(row.slug)) continue;
-          if ((row.bindings ?? []).some((b) => b.skill === name)) {
-            violations.push({
-              rule: "R8-reverse",
-              field: "owners",
-              msg: `cannot remove owner "${row.slug}": AGENT#${row.slug} still has a binding on skill "${name}" — unbind first (PATCH the agent's bindings), then shrink owners`,
-            });
-          }
-        }
-        cursor = page.cursor;
-      } while (cursor);
-    }
-  }
+  // Reverse-R8 retired by adr-0012: binding no longer requires ownership, so
+  // shrinking owners[] can never orphan a binding. owners[] is now purely the
+  // authorship/Rule-11/improvement set; editing it is independent of bindings.
 
   if (violations.length > 0) {
     return reply(422, { error: "config_validation_failed", violations });

@@ -68,7 +68,7 @@
         "type": "string",
         "pattern": "^[a-z]+$"
       },
-      "description": "Agent slugs allowed to bind this Skill. Cross-checked against workforce/agents/."
+      "description": "Authorship/Rule-11/improvement owners of this Skill (slugs). Not a binding prerequisite (adr-0012) — any agent may bind any existing skill. Cross-checked against the agent roster."
     },
     "improvement_agent": {
       "anyOf": [

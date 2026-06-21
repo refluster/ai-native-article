@@ -12,7 +12,6 @@ import {
 } from "./agent-config.js";
 
 const ctx = (over: Partial<IdentityPatchContext> = {}): IdentityPatchContext => ({
-  slug: "sora",
   otherAgentsEffectiveBudgetUsd: 0,
   skillOwners: (name) => (name === "feed-post" ? ["sora", "ren"] : undefined),
   ...over,
@@ -117,12 +116,16 @@ describe("validateIdentityPatch — bindings", () => {
     expect(rules({ bindings: [42] })).toContain("S9-binding-object");
   });
 
-  it("cross-checks skill existence and ownership against SKILL rows", () => {
+  it("cross-checks skill existence against SKILL rows", () => {
     expect(rules({ bindings: [ccrBinding({ skill: "ghost-skill" })] })).toContain(
       "R8-binding-skill-exists",
     );
-    const notOwner = ctx({ slug: "maya" });
-    expect(rules({ bindings: [ccrBinding()] }, notOwner)).toContain("R8-binding-skill-owner");
+  });
+
+  it("does NOT gate binding on ownership (adr-0012): a non-owner may bind any existing skill", () => {
+    // "maya" is not in feed-post's owners[] (["sora", "ren"]) — still allowed.
+    expect(rules({ bindings: [ccrBinding()] })).toEqual([]);
+    expect(rules({ bindings: [ccrBinding()] })).not.toContain("R8-binding-skill-owner");
   });
 
   it("enforces the ADR-0005 executor allowlist", () => {

@@ -97,15 +97,13 @@ const ALLOWED_INVOKED_BY = new Set(["api", "repository_dispatch", "manual"]);
 const ALLOWED_STREAMS = new Set(["internal", "client", "editorial"]);
 
 export interface IdentityPatchContext {
-  /** Slug of the agent being mutated (for binding-owner cross-checks). */
-  slug: string;
   /** Sum of effective (override ?? default) monthly budgets across all
    *  OTHER non-archived agents, for the W-3 aggregate ceiling. Callers
    *  only need to compute this when the patch touches budget fields. */
   otherAgentsEffectiveBudgetUsd: number;
   /** Lookup: skill name → owners[] from the SKILL#{name}/META row, or
-   *  undefined when no such skill exists. Replaces the CI-time check
-   *  against workforce/skills/{name}/meta.json. */
+   *  undefined when no such skill exists. Used for the binding existence
+   *  cross-check; ownership no longer gates bindings (adr-0012). */
   skillOwners: (name: string) => readonly string[] | undefined;
 }
 
@@ -213,7 +211,8 @@ export function validateIdentityPatch(
 // (jd / identity / experience / memory / org edges / owner_email) is
 // optional at create time and PATCHable later. `bindings` is required but
 // may be `[]` — a new hire typically gets its cadence wired in a second
-// step, after the skill's owners[] is amended to include it (R8).
+// step (any existing skill is bindable; ownership is not a prerequisite —
+// adr-0012).
 export const AGENT_CREATE_REQUIRED_FIELDS = [
   "slug",
   "first_name",
@@ -305,13 +304,13 @@ function validateBinding(
     v("S9-binding-skill", `skill "${String(b.skill)}" must be kebab-case`);
     return out;
   }
-  // Skill cross-check against the SKILL# rows (the runtime counterpart of
-  // the CI check against workforce/skills/{name}/meta.json).
-  const owners = ctx.skillOwners(b.skill);
-  if (owners === undefined) {
+  // Skill cross-check against the SKILL# rows: the skill must EXIST. The
+  // former owner cross-check (R8-binding-skill-owner — agent must be in the
+  // skill's owners[]) was removed by adr-0012: binding is decoupled from
+  // ownership, so any agent may bind any existing skill. owners[] keeps its
+  // authorship/Rule-11/improvement meaning; it no longer gates bindings.
+  if (ctx.skillOwners(b.skill) === undefined) {
     v("R8-binding-skill-exists", `skill "${b.skill}" has no SKILL#${b.skill} row`);
-  } else if (!owners.includes(ctx.slug)) {
-    v("R8-binding-skill-owner", `agent "${ctx.slug}" is not in skill "${b.skill}" owners`);
   }
 
   if (!ALLOWED_EXECUTORS.has(b.executor as string)) {

@@ -66,7 +66,7 @@ This is exactly how the `daily-research` cadence (Epic-015) misled the console: 
 
 ### `executor: lambda` — orchestrator-tick fires the wf-agent-runner
 
-This is the original v1 shape, unchanged behaviour. The skill folder under `workforce/skills/{name}/` carries `meta.json` (which sets `owners[]`, must include this agent's slug) and either a `handler.ts` (deterministic) or `SKILL.md` (llm-prose / claude-code-routine).
+This is the original v1 shape, unchanged behaviour. The skill folder under `workforce/skills/{name}/` carries `meta.json` (which sets `owners[]` — the authorship/Rule-11/improvement set; since [adr-0012](../adr/adr-0012-decouple-binding-from-ownership.md) it is **not** a binding prerequisite, so the binding agent need not appear in it) and either a `handler.ts` (deterministic) or `SKILL.md` (llm-prose / claude-code-routine).
 
 ```jsonc
 {
@@ -163,6 +163,6 @@ The agents-api write-time validator (`workforce/lambdas/shared/agent-config.ts`,
 - cron presence when required (`S9-binding-cron`, `S9-binding-ccr-trigger`)
 - `external` scheduler must have `invoked_by` (`S9-binding-external-invoked-by`)
 - `routine_spec` / `workflow` presence and file existence (`S9-binding-routine-spec`, `R8-routine-spec-exists`, `S9-binding-workflow`, `R8-workflow-exists`)
-- `executor=lambda` skill folder + owner cross-checks (`R8-binding-skill-exists`, `R8-binding-skill-owner`)
+- skill **existence** cross-check (`R8-binding-skill-exists`). The former owner cross-check (`R8-binding-skill-owner`) was removed by [adr-0012](../adr/adr-0012-decouple-binding-from-ownership.md) — binding is decoupled from ownership.
 
 Lint failures block the PR. Loosening any of these is Zone A (governance amendment).
