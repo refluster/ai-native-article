@@ -46,9 +46,10 @@ digest-side check).
 - **Verify** via `GET /agents/{slug}` (public) — the same read the SPA and
   `build-agent-manifest.mjs` consume; the next console predev/prebuild picks
   the new roster up automatically.
-- **Wire cadences second.** `bindings` referencing a skill require the new
-  slug in that skill's `owners[]` (R8) — amend the skill, then PATCH the
-  bindings on. `cadence-forge` scaffolds new periodic skills.
+- **Wire cadences second.** `bindings` may reference any *existing* skill —
+  since [adr-0012](../adr/adr-0012-decouple-binding-from-ownership.md) binding
+  is no longer gated on ownership, so no `owners[]` amendment is needed first;
+  just PATCH the bindings on. `cadence-forge` scaffolds new periodic skills.
 - **W-5 discipline**: subsequent persona-prompt changes remain one persona's
   prompt bump per write, each carrying its own AUDIT item.
 - **Budget**: the API enforces the W-3 aggregate (`160` USD/mo across

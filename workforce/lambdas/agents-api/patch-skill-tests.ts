@@ -245,7 +245,9 @@ describe("PATCH /skills/{name} — judgment-config writes (ADR-0008)", () => {
     expect(imp.json.violations.map((v: { rule: string }) => v.rule)).toContain("J8-improvement-agent-archived");
   });
 
-  it("blocks an owners-shrink that would orphan an existing binding (R8-reverse, M2)", async () => {
+  it("allows an owners-shrink even when an agent still binds the skill (R8-reverse retired, adr-0012)", async () => {
+    // Binding is decoupled from ownership: shrinking owners[] can no longer
+    // orphan a binding, so the former R8-reverse guard is gone.
     seedSkill("grid-watch", { owners: ["grace", "sana"] });
     rows.get(key("AGENT#grace", "META"))!.bindings = [
       { skill: "grid-watch", executor: "claude-code-routine", trigger: { scheduler: "manual" } },
@@ -253,16 +255,8 @@ describe("PATCH /skills/{name} — judgment-config writes (ADR-0008)", () => {
     const shrink = await call(
       makeEvent("PATCH", "PATCH /skills/{name}", "grid-watch", { owners: ["sana"] }),
     );
-    expect(shrink.status).toBe(422);
-    expect(shrink.json.violations.map((v: { rule: string }) => v.rule)).toContain("R8-reverse");
-    expect(rows.get(key("SKILL#grid-watch", "META"))!.owners).toEqual(["grace", "sana"]);
-
-    // Unbound owner removal passes.
-    rows.get(key("AGENT#grace", "META"))!.bindings = [];
-    const ok = await call(
-      makeEvent("PATCH", "PATCH /skills/{name}", "grid-watch", { owners: ["sana"] }),
-    );
-    expect(ok.status).toBe(200);
+    expect(shrink.status).toBe(200);
+    expect(rows.get(key("SKILL#grid-watch", "META"))!.owners).toEqual(["sana"]);
   });
 
   it("rejects git-owned / immutable fields 400", async () => {

@@ -146,13 +146,14 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
     return () => window.clearTimeout(id);
   }, [success]);
 
-  // Lazy-load the R8-eligible skill list the first time the add form opens.
+  // Lazy-load the bindable skill list (all active skills — binding is no
+  // longer gated on ownership, adr-0012) the first time the add form opens.
   // A failed fetch lands a distinct 'error' sentinel so the <select>
   // resolves to a retryable state instead of an indefinite "loading…".
   useEffect(() => {
     if (!adding || bindableSkills !== null) return;
     let cancelled = false;
-    fetchBindableSkills(slug)
+    fetchBindableSkills()
       .then((names) => {
         if (cancelled) return;
         setBindableSkills(names);
@@ -374,7 +375,7 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
               >
                 {bindableSkills === null && <option value="">loading…</option>}
                 {Array.isArray(bindableSkills) && skillList.length === 0 && (
-                  <option value="">no bindable skills — add {slug} to a skill’s owners first (R8)</option>
+                  <option value="">no active skills in the repository</option>
                 )}
                 {skillList.map((n) => (
                   <option key={n} value={n}>{n}</option>

@@ -235,7 +235,7 @@ components:
         description: { type: string, maxLength: 1024 }
         version: { type: string, description: semver }
         status: { type: string, enum: [active, stale, deprecated] }
-        owners: { type: array, items: { type: string }, description: Must exist + be non-archived; shrinking past a live binding is rejected (R8-reverse). }
+        owners: { type: array, items: { type: string }, description: Must exist + be non-archived. The authorship/Rule-11/improvement set; not a binding prerequisite (adr-0012), so it may be shrunk freely. }
         cost_class: { type: string, enum: [small, medium, large] }
         improvement_agent: { type: string, nullable: true }
         improvement_agent_override: { type: string, nullable: true }
@@ -509,7 +509,7 @@ paths:
         "200": { description: Updated (kind=config AUDIT appended), content: { application/json: { schema: { $ref: '#/components/schemas/Skill' } } } }
         "400": { description: non_patchable_fields (git-owned / immutable) }
         "404": { description: not_found }
-        "422": { description: Validation failed (J-rules, G4 body cap, R8-reverse), content: { application/json: { schema: { $ref: '#/components/schemas/ValidationError' } } } }
+        "422": { description: Validation failed (J-rules, G4 body cap), content: { application/json: { schema: { $ref: '#/components/schemas/ValidationError' } } } }
   /skills/{name}/audit:
     get:
       tags: [skills]
