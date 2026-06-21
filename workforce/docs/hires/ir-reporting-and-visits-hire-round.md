@@ -129,7 +129,7 @@ Because no cap raise is needed, the API's write-time aggregate check (`184` agai
 
 ## §7. Registration and runtime activation (deferred)
 
-Per ADR-0007 + the finance-group precedent: both personas register via `POST /agents` with `bindings: []`. The PR ships the registration inputs only; it **wires no cadence**. Wiring the running reporting cadence and the visit-prep cadence is a follow-up via `cadence-forge` + `PATCH /agents/{slug}` (binding is no longer gated on `owners[]` since [adr-0012](../adr/adr-0012-decouple-binding-from-ownership.md), so no skill-ownership amendment is needed first). The personas register, render on `/workforce/agents` and `/workforce/org` (both as row-2 ICs under Corinne), and sit idle until those follow-ups land — one cadence at a time, with cost monitoring.
+Per ADR-0007 + the finance-group precedent: both personas register via `POST /agents` with `bindings: []`. The PR ships the registration inputs only; it **wires no cadence**. Wiring the running reporting cadence and the visit-prep cadence is a follow-up via `cadence-forge` + `PATCH /agents/{slug}` (binding is no longer gated on `owners[]` since [adr-0012](../adr/adr-0012-decouple-binding-from-ownership.md), so no skill-ownership amendment is needed first). The personas register, render on `/workforce/agents` and `/workforce/org` (both as ICs under Corinne — org-depth 3 along Maya → Silas → Corinne → them), and sit idle until those follow-ups land — one cadence at a time, with cost monitoring.
 
 Intended cadences (declared here, wired later):
 
@@ -139,7 +139,7 @@ Intended cadences (declared here, wired later):
 ## §8. Theo's people-ops review (reconstructed)
 
 - **Naming**: both slugs (`marisol`, `yara`) match `^[a-z]+$`; no collision with the existing roster. `validate-naming.mjs` passes.
-- **Org edges**: Marisol → Corinne; Yara → Corinne. No cycles, no orphans. Corinne gains span 2 (Marisol + Yara); Silas's span is unchanged at 2 (Delphine + Corinne). Laterals reference existing slugs only (`corinne`, `silas`, `kai`, `delphine`, `levi`).
+- **Org edges**: Marisol → Corinne; Yara → Corinne. No cycles, no orphans. Corinne gains span 2 (Marisol + Yara) and sits at org-depth 2 (Maya → Silas → Corinne), so Marisol and Yara land at org-depth 3 ICs; Silas's span is unchanged at 2 (Delphine + Corinne). Laterals reference existing slugs only (`corinne`, `silas`, `kai`, `delphine`, `levi`).
 - **Playbook delta**: this is the first round that is a *function expansion* rather than a *new group*, and the first that fits inside the standing W-3 cap. Theo will fold two precedent entries into the onboarding playbook: (a) "a function expansion adds ICs under the existing lead, not peers under the VP — preserve the one-voice property recursively"; and (b) "a round that fits the cap ships without an L1 edit — don't manufacture a governance change the round doesn't need."
 - **Bench-gap visibility**: this round closes the "finance IC below Corinne" gap the finance round deferred. It does **not** add a sponsor-only reporting IC (folded into Marisol) or a dedicated FP&A analyst (still deferred under Silas). The next gap likely to surface is cap headroom, not headcount.
 

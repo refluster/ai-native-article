@@ -72,9 +72,9 @@ breaching it. Full procedure + after-registration steps:
 reporting-draft, the on-demand visit-prep) are wired afterwards via
 `cadence-forge` + PATCH. Since [adr-0012](../../docs/adr/adr-0012-decouple-binding-from-ownership.md)
 binding is no longer gated on `owners[]`, so no skill-ownership amendment is
-needed first. The personas register, render on the directory (both row-2 ICs
-under Corinne), and sit idle until those follow-ups land — same posture as the
-finance group at registration.
+needed first. The personas register, render on the directory (both ICs at org-depth 3 under
+Corinne — Maya → Silas → Corinne → them), and sit idle until those follow-ups
+land — same posture as the finance group at registration.
 
 Full rationale, panel discussion, and the C-3 boundary on 視察コーディネーション:
 [docs/hires/ir-reporting-and-visits-hire-round.md](../../docs/hires/ir-reporting-and-visits-hire-round.md).
