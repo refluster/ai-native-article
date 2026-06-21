@@ -93,6 +93,56 @@ export function isOrchestratorOwnedCcr(binding: AgentBinding): boolean {
   );
 }
 
+/** True when *some* scheduler actually consumes `trigger.cron`, i.e. the cron
+ *  is load-bearing and the binding really fires on it. A cron is honored by:
+ *    - `external` + `invoked_by=api` CCR (the orchestrator-tick — isOrchestratorOwnedCcr),
+ *    - `eventbridge` (a Lambda cron rule),
+ *    - `gha` (a GitHub Actions cron),
+ *    - `claude-code-routine` (a CCR self-schedule; see bindings.md compat table).
+ *  Any other scheduler carrying a cron (notably `manual`, or `external` without
+ *  `invoked_by=api`) has a **dead cron**: the string is present but no fire path
+ *  reads it. This is the single predicate the UI must use so the console never
+ *  again renders a decorative cron as a live schedule (the daily-research /
+ *  Epic-015 drift: a cron was hand-added while scheduler stayed `manual`). */
+export function bindingCronIsLoadBearing(binding: AgentBinding): boolean {
+  const s = binding.trigger?.scheduler;
+  return (
+    isOrchestratorOwnedCcr(binding) ||
+    s === "eventbridge" ||
+    s === "gha" ||
+    s === "claude-code-routine"
+  );
+}
+
+/** The effective schedule of a binding — the operator-facing answer to "will
+ *  this fire, and when?", derived from the SAME gate the orchestrator uses
+ *  (isOrchestratorOwnedCcr / bindingCronIsLoadBearing) so the console can never
+ *  disagree with the engine. This decides what to *display*; whether a live
+ *  cron matches *this* tick is cron-match.ts (engine-only).
+ *
+ *    - `cron`       — a load-bearing cron; the binding fires on it.
+ *    - `dead-cron`  — a cron is set but no scheduler consumes it (inert).
+ *    - `manual`     — operator-triggered; no cron, nothing auto-fires it.
+ *    - `declarative`— no cron; fired by its own scheduler (gha / CCR self /
+ *                     external-non-api / github-event), which owns the cadence. */
+export type EffectiveSchedule =
+  | { kind: "cron"; cron: string; scheduler: SchedulerKind }
+  | { kind: "dead-cron"; cron: string; scheduler: SchedulerKind }
+  | { kind: "manual"; scheduler: SchedulerKind }
+  | { kind: "declarative"; scheduler: SchedulerKind; executor: ExecutorKind };
+
+export function effectiveSchedule(binding: AgentBinding): EffectiveSchedule {
+  const scheduler = binding.trigger?.scheduler;
+  const cron = binding.trigger?.cron;
+  if (typeof cron === "string" && cron.length > 0) {
+    return bindingCronIsLoadBearing(binding)
+      ? { kind: "cron", cron, scheduler }
+      : { kind: "dead-cron", cron, scheduler };
+  }
+  if (scheduler === "manual") return { kind: "manual", scheduler };
+  return { kind: "declarative", scheduler, executor: binding.executor };
+}
+
 /** Identity fields — authoritative in the AGENT#{slug}/META DDB row
  *  (ADR-0007); historically sourced from workforce/agents/{slug}/. */
 export interface AgentIdentity {

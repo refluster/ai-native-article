@@ -21,6 +21,7 @@ import {
   patchAgentBindings,
 } from '../lib/agents';
 import { SIGV4_IS_CONFIGURED } from '../config/auth';
+import { effectiveSchedule, scheduleLabel } from '../lib/effectiveSchedule';
 import type { AgentBinding } from '../types/agent';
 
 interface Props {
@@ -312,8 +313,17 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
                   <span className="text-[10px] text-wf-on-surface-variant">{CRON_HINT}</span>
                 </span>
               ) : (
-                <span className="font-wfmono text-[11px] uppercase tracking-[0.12em] text-wf-on-surface-variant">
-                  {b.trigger.cron ?? b.trigger.scheduler}
+                <span
+                  className={`font-wfmono text-[11px] uppercase tracking-[0.12em] ${
+                    effectiveSchedule(b).kind === 'dead-cron' ? 'text-wf-error' : 'text-wf-on-surface-variant'
+                  }`}
+                  title={
+                    effectiveSchedule(b).kind === 'dead-cron'
+                      ? 'This cron is decorative — the scheduler can’t fire it. Flip scheduler→external + invoked_by=api to enable (operator B-authority).'
+                      : undefined
+                  }
+                >
+                  {scheduleLabel(b)}
                   {b.project_id ? ` · ${b.project_id}` : ''}
                 </span>
               )}
