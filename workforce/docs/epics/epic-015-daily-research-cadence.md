@@ -120,7 +120,7 @@ two bindings (Grace, Ishaan).
 | **3** | Bind `daily-research` to Grace + Ishaan, landing **paused** (`scheduler:"manual"`) | A (additive binding, lands disabled) | ✅ wire-script authored; operator runs it |
 | **4** | Enable the cron (flip to `external`+`cron`) and watch the feed | **B (operator)** | ⛔ operator step — out of this PR |
 | 5 | Deprecate `grid-watch` + `india-grid-watch`; remove their bindings | B (skill status PATCH + persona config mutation) | later Epic phase |
-| 6 | Expand the research cohort (Astrid/Mei/Sora/finance/…) after per-persona audit | B (cost) / A (binding) | later |
+| **6** | Expand the research cohort after per-persona audit | B (cost) / A (binding) | ✅ cohort-2 (dario/mateo/maya/mei/aoi/hana/farah), operator greenlight 2026-06-21 — see Appendix A |
 
 This PR delivers Phases 1–3 as committable artefacts. **Phase 4 (cron enable) is
 the operator's B-authority gate** and is *not* performed here; the wire-script
@@ -228,3 +228,29 @@ US federal-and-state beat).
 
 → Ishaan can be enabled with **no persona change**. Bind `no_skip:true` (live
 India central-and-state beat).
+
+### Cohort-2 (Phase 6, 2026-06-21) — light parity pass, all bound `no_skip:false`
+
+Operator greenlight (in-message, the Phase-6 B-authority cost approval) to expand
+the cadence past the grid pilot, which had proven out. Bound **enabled** with a
+daily djb2-staggered cron each, `no_skip:false` (non-grid beats have genuine quiet
+windows and should skip — Epic-015 §"Feed signal-to-noise"). A *light* parity pass
+(over each persona's live `system_prompt` + `jd`) confirmed every one carries an
+external information frontier — none is frontier-less:
+
+| Persona | Role | Frontier (illustrative) |
+|---|---|---|
+| `dario` | VP Engineering Excellence | eng-practice / tooling releases + RFCs on the stack |
+| `mateo` | VP Agent Workforce Platform | agent-platform tech, multi-agent frameworks, releases |
+| `maya` | President / Founder | market, competitive & strategic landscape |
+| `mei` | Director, Carbon Markets Research | carbon markets / standards / filings — a native research beat |
+| `aoi` | Designer | design-system, UX/UI publications & tooling |
+| `hana` | Agent Platform Engineer | platform/infra releases, RFCs |
+| `farah` | Product QA / SRE | SRE/QA tooling, reliability & incident trends |
+
+This is deliberately lighter than the four-point Grace/Ishaan audit above: the
+v0.3.0 SKILL.md change ("Research now — search the live web") tells each persona to
+*actively search its frontier this fire* rather than lean on a statically
+enumerated source list, which lowers the bar a thinner persona prompt must clear.
+A full four-point Appendix-A audit per cohort-2 persona (and any resulting persona
+PATCH) remains available if a given beat's output underperforms the parity gate.

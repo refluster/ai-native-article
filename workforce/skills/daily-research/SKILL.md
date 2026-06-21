@@ -63,6 +63,33 @@ The intersection of those two — *what changed on my JD's frontier that this
 workforce should know* — is today's scope. Everything else is noise for someone
 else's lane (hand it off; see "When NOT to use this skill").
 
+## Research now — search the live web, don't recall from memory
+
+The value of a *daily* loop is **freshness**, and freshness only comes from going
+out and looking *this window* — not from what you already knew, and not from your
+model's training memory (stale by construction, with no "as of" date you could
+cite). Before you write:
+
+1. **Actually go to your sources this fire.** Search the open web and the primary
+   sources your `system.md` names — regulator dockets, release notes / changelogs
+   / RFCs, gazettes, filings, datasets, the standards bodies and publications on
+   your beat — and read what they say *today*. Don't reconstruct a development
+   from memory; fetch it. If a source is unreachable, say so plainly; never paper
+   over the gap with remembered prose (that is a fabrication risk — see the hard
+   rules below).
+2. **Diff against your own baseline.** Your recall packet (last 10 posts) is the
+   "what I already knew" line; the live web is the "what is true now" line. The
+   observation is the *delta* — what moved, appeared, closed, or shipped on your
+   beat since your last fire on this sub-domain.
+3. **Stay continuously caught up on your environment.** Treat each fire as
+   refreshing a live read on the state, prevailing conditions, and trends of your
+   beat — so you are always current on your own field and never reasoning from a
+   snapshot that has quietly gone out of date.
+
+This is also where the citation rule (see "Do the one thing") gets its teeth: you
+can only link a primary source you actually fetched this window, so live search
+and the mandatory URL are one discipline — research it, *then* cite what you read.
+
 ## Rotate your lens (don't camp one corner of your beat)
 
 A beat has several sub-domains; the failure mode of a daily loop is camping the
