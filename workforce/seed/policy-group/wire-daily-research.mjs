@@ -89,22 +89,39 @@ for (const { slug, add } of PLAN) {
     failed = true;
     continue;
   }
-  const bound = new Set(cur.bindings.map((b) => b.skill));
-  const additions = add.filter((b) => !bound.has(b.skill));
-  if (additions.length === 0) {
-    console.log(`  - ${slug}: daily-research already bound, skipped`);
-    continue;
+  const existingIdx = cur.bindings.findIndex((b) => b.skill === "daily-research");
+
+  let next;
+  let summary;
+  if (existingIdx === -1) {
+    // Not bound yet — append PAUSED (binding_idx is load-bearing; never reorder).
+    next = [...cur.bindings, ...add];
+    summary = add.map((b) => `${b.skill} @ ${b.trigger.scheduler} (PAUSED, no_skip:true)`).join(", ");
+  } else {
+    // Already bound — idempotently REPAIR config.no_skip:true *in place*, without
+    // touching the (possibly already-enabled) trigger. The Phase-4 enable used to
+    // rewrite the whole trigger and silently drop config.no_skip — the same
+    // manual-enable drift class as the cron-without-scheduler bug (PR #348). This
+    // restores the standing-obligation flag these always-on grid beats require.
+    // A binding already carrying no_skip:true is a no-op (skip the PATCH).
+    const b = cur.bindings[existingIdx];
+    if (b.config?.no_skip === true) {
+      console.log(`  - ${slug}: daily-research already bound with no_skip:true, nothing to do`);
+      continue;
+    }
+    const repaired = { ...b, config: { ...(b.config ?? {}), no_skip: true } };
+    next = cur.bindings.map((x, i) => (i === existingIdx ? repaired : x));
+    const t = repaired.trigger ?? {};
+    summary = `daily-research config.no_skip → true (trigger preserved: ${t.scheduler}${t.cron ? " " + t.cron : ""})`;
   }
-  // Append-only: existing bindings keep their binding_idx.
-  const next = [...cur.bindings, ...additions];
-  const summary = additions.map((b) => `${b.skill} @ ${b.trigger.scheduler} (PAUSED)`).join(", ");
+
   if (DRY_RUN) {
-    console.log(`  [dry-run] ${slug}: would PATCH bindings -> +${additions.length} (${summary}); total ${next.length}`);
+    console.log(`  [dry-run] ${slug}: would PATCH bindings -> ${summary}; total ${next.length}`);
     continue;
   }
   const { status, json } = curlJson("PATCH", `/agents/${slug}`, { bindings: next });
   if (status === 200) {
-    console.log(`  ✓ ${slug}: bound ${summary}`);
+    console.log(`  ✓ ${slug}: ${summary}`);
   } else {
     failed = true;
     console.error(`  ✗ ${slug}: HTTP ${status} ${JSON.stringify(json)}`);
@@ -112,19 +129,32 @@ for (const { slug, add } of PLAN) {
 }
 
 if (failed) process.exit(1);
-console.log(DRY_RUN ? "Dry run complete." : "Done. Binding landed PAUSED — nothing fires until Phase 4 (operator) enables it.");
+console.log(
+  DRY_RUN
+    ? "Dry run complete."
+    : "Done. New bindings land PAUSED (enable at Phase 4); already-enabled bindings now carry no_skip:true.",
+);
 
 // ── Phase 4 (operator, B-authority): enable a paused binding ─────────────────
 // After observing the binding is in place, the operator enables it by PATCHing the
-// daily-research binding's trigger to the live shape (a distinct minute-of-day to
-// avoid stampeding /fire — reuse the djb2 stagger from wire-cadences.mjs):
+// daily-research binding to the live trigger shape (a distinct minute-of-day to
+// avoid stampeding /fire — reuse the djb2 stagger from wire-cadences.mjs). MERGE
+// the trigger; do NOT replace the whole binding — preserving config.no_skip:true:
 //
-//   trigger: {
-//     scheduler: "external",
-//     invoked_by: "api",
-//     fired_from: "wf-orchestrator-tick",
-//     cron: "cron(M H ? * * *)"   // UTC; e.g. grace 01:07 = 21:07 ET, after the US docket day
+//   {
+//     ...existingBinding,                 // keep skill, executor, routine_spec,
+//                                         // project_id, AND config.no_skip:true
+//     trigger: {
+//       scheduler: "external",
+//       invoked_by: "api",
+//       fired_from: "wf-orchestrator-tick",
+//       cron: "cron(M H ? * * *)"         // UTC; e.g. grace 01:07 = 21:07 ET, after the US docket day
+//     },
 //   }
 //
-// This is the Phase-4 cron-enable B-authority step (governance §5). Keep grid-watch
-// bound until Phase 4 parity is confirmed; remove it only at Phase 5.
+// Dropping config.no_skip here is what stranded daily-research in skip-default and
+// produced the all-skips feed (it shares the grid beat with grid-watch / india-
+// grid-watch, so without the standing-obligation flag every item reads as already
+// covered). Re-running THIS script repairs that flag idempotently. This is the
+// Phase-4 cron-enable B-authority step (governance §5). Keep grid-watch bound
+// until Phase 4 parity is confirmed; remove it only at Phase 5.

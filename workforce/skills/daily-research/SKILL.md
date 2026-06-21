@@ -1,6 +1,6 @@
 ---
 name: daily-research
-description: Daily research cadence — one generic skill across every research-beat persona. Once per period, scan the public information frontier YOUR role/JD defines, scope it against the workforce MVV and your own expertise, dedupe against your past research, and post ONE feed observation: the single most role-relevant development, source-cited, with the so-what for the team. Domain-agnostic by design — the beat, the primary sources, and the status/stage vocabulary all come from your persona (system.md / JD), never from this skill. Skips when nothing material moved, unless your binding opts into no-skip.
+description: Daily research cadence — one generic skill across every research-beat persona. Once per period, scan the public information frontier YOUR role/JD defines, scope it against the workforce MVV and your own expertise, dedupe against your past research, rotate the sub-domain you lead with so the feed doesn't camp one corner of your beat, and post ONE feed observation: the single most role-relevant development, source-cited, with the so-what for the team. Domain-agnostic by design — the beat, the primary sources, and the status/stage vocabulary all come from your persona (system.md / JD), never from this skill. Skips when nothing material moved, unless your binding opts into no-skip.
 ---
 
 # daily-research
@@ -62,6 +62,36 @@ workforce, through *your* lane." Two orientation reads, both fast:
 The intersection of those two — *what changed on my JD's frontier that this
 workforce should know* — is today's scope. Everything else is noise for someone
 else's lane (hand it off; see "When NOT to use this skill").
+
+## Rotate your lens (don't camp one corner of your beat)
+
+A beat has several sub-domains; the failure mode of a daily loop is camping the
+one that was hot last week, so the feed reads as a single story on repeat — and,
+on a beat where a sibling Cadence already covers the headline instrument, every
+fire then finds it "already covered" and skips. Spread your coverage instead.
+This is recall-driven rotation, not a random draw — deterministic and dedupe-safe
+by construction (it reuses the recall packet you already assembled):
+
+1. **Partition your beat.** From your `system.md` ("Who you are" / "What you
+   produce"), read off the natural sub-domains of your frontier — e.g. an India
+   grid analyst's tariff/ToD, resource adequacy, open access, compliance-carbon
+   *design*, auctions/schemes, ISTS/transmission; a finance analyst's
+   rates/macro, credit, comparables, capital flows. *You* define the partition
+   off your own persona; this skill stays domain-agnostic and never names it.
+2. **See what you've led with.** Your recall packet (10 most recent posts) shows
+   which sub-domains you covered lately. Treat any sub-domain you led with in your
+   **last 2–3 fires** as cooling-off — do not lead with it again unless a genuine
+   material escalation (a stage change, a closing deadline) forces it.
+3. **Lead from an under-covered sub-domain.** Among the sub-domains you have *not*
+   touched recently, pick the one carrying the most material development this
+   window and lead with that. Rotation chooses the *lens*; the so-what bar still
+   chooses the *item* within it — never elevate a non-event to fill a slot.
+
+If two sub-domains are equally stale, break the tie by materiality, then by
+whichever you've covered least this month. The goal is breadth across your beat
+over a week, not a forced round-robin on any single fire. (This is also how a
+`no_skip` beat stays non-repetitive — see the no-skip section: rotate which
+*standing* item you surface, don't re-post the same one daily.)
 
 ## Do the one thing this Cadence does
 
@@ -128,8 +158,18 @@ instead of skipping, in priority order:
 
 Even under `no_skip`, the two hard rules above hold: a standing item always has a
 primary-source URL — use it — and "always post" means *always find the real
-most-material item*, never invent one. (US grid is `no_skip:true`; India grid is
+most-material item*, never invent one. **And rotate** (see "Rotate your lens"):
+pick the standing item from a sub-domain you have *not* surfaced in your last 2–3
+fires, so a no-skip beat produces breadth across the week instead of the same
+deadline re-posted daily. (US grid is `no_skip:true`; India grid is
 `no_skip:true`. Most other beats are not — leave the default skip in place.)
+
+> **Sharing a beat with a sibling Cadence?** If a dedicated watch already covers
+> the same frontier (e.g. `grid-watch` / `india-grid-watch` run on the same
+> persona), do **not** re-surface the instrument that watch already led with this
+> window — rotate to a sub-domain it did *not* cover. If every sub-domain is
+> already covered by the sibling, that is the one legitimate skip even under
+> `no_skip`: report it as `redundant-with-sibling`, not as a quiet day.
 
 ## Write — run the script, do NOT hand-edit any file
 
