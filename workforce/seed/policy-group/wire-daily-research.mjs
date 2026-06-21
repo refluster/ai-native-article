@@ -158,21 +158,26 @@ for (const { slug, add } of PLAN) {
       })
       .join(", ");
   } else {
-    // Already bound — idempotently REPAIR config.no_skip:true *in place*, without
-    // touching the (possibly already-enabled) trigger. The Phase-4 enable used to
-    // rewrite the whole trigger and silently drop config.no_skip — the same
-    // manual-enable drift class as the cron-without-scheduler bug (PR #348). This
-    // restores the standing-obligation flag these always-on grid beats require.
-    // A binding already carrying no_skip:true is a no-op (skip the PATCH).
+    // Already bound — idempotently RECONCILE config.no_skip *in place* to THIS
+    // PLAN entry's intended value, without touching the (possibly already-enabled)
+    // trigger. The intent is per-cohort, so read it off the PLAN binding rather
+    // than hardcoding true: grace/ishaan are no_skip:true (always-on grid beats —
+    // the standing-obligation flag the Phase-4 enable used to silently drop, same
+    // drift class as the cron-without-scheduler bug, PR #348), while cohort-2 is
+    // no_skip:false (non-grid beats that SHOULD skip on quiet windows). Hardcoding
+    // true here would flip cohort-2 into standing-item spam on any re-run — the
+    // very failure mode no_skip governs, inverted. Reconciling to the entry's
+    // intent makes a re-run a true no-op for BOTH cohorts.
+    const desiredNoSkip = add[0]?.config?.no_skip === true;
     const b = cur.bindings[existingIdx];
-    if (b.config?.no_skip === true) {
-      console.log(`  - ${slug}: daily-research already bound with no_skip:true, nothing to do`);
+    if ((b.config?.no_skip === true) === desiredNoSkip) {
+      console.log(`  - ${slug}: daily-research already bound with no_skip:${desiredNoSkip}, nothing to do`);
       continue;
     }
-    const repaired = { ...b, config: { ...(b.config ?? {}), no_skip: true } };
+    const repaired = { ...b, config: { ...(b.config ?? {}), no_skip: desiredNoSkip } };
     next = cur.bindings.map((x, i) => (i === existingIdx ? repaired : x));
     const t = repaired.trigger ?? {};
-    summary = `daily-research config.no_skip → true (trigger preserved: ${t.scheduler}${t.cron ? " " + t.cron : ""})`;
+    summary = `daily-research config.no_skip → ${desiredNoSkip} (trigger preserved: ${t.scheduler}${t.cron ? " " + t.cron : ""})`;
   }
 
   if (DRY_RUN) {
