@@ -299,14 +299,44 @@ function OverviewPanel({
       </div>
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-4 text-sm">
         <Fact label="PROJECT_ID" value={project.project_id} mono />
+        {project.name && <Fact label="NAME" value={project.name} />}
         <Fact label="STATUS" value={project.status} />
         <Fact label="OWNER" value={project.owner_agent} />
+        <RepoFact owner={project.github_owner} repo={project.github_repo} />
         <Fact label="CREATED" value={formatDate(project.created_at)} />
         <Fact label="MEMBERS" value={String(memberCount)} />
         <Fact label="LAST EXEC" value={formatRelative(project.last_execution_at)} />
         {project.archived_at && <Fact label="ARCHIVED" value={formatDate(project.archived_at)} />}
       </dl>
     </section>
+  );
+}
+
+// The GitHub repo is the standard project attribute (project.json
+// `github.{owner,repo}`, flattened to `github_owner`/`github_repo` on the
+// META row). Non-confidential — rendered as a deep link to the repo. When
+// a project declares no repo (e.g. `self/*` personal projects) the row is
+// omitted entirely rather than showing an empty cell. Edited via
+// project.json + seed (Epic-010 §10), so this is read-only here.
+function RepoFact({ owner, repo }: { owner?: string; repo?: string }) {
+  if (!owner || !repo) return null;
+  const slug = `${owner}/${repo}`;
+  return (
+    <div>
+      <dt className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-0.5">
+        GITHUB REPO
+      </dt>
+      <dd className="text-sm">
+        <a
+          href={`https://github.com/${owner}/${repo}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-mono text-wf-primary hover:underline"
+        >
+          {slug}
+        </a>
+      </dd>
+    </div>
   );
 }
 

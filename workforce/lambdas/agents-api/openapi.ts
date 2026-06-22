@@ -249,6 +249,9 @@ components:
         archived_at: { type: string }
         member_count: { type: integer }
         last_execution_at: { type: string }
+        name: { type: string, description: Human-readable project name. }
+        github_owner: { type: string, example: refluster, description: 'Standard target-repo attribute (non-confidential variable). Both github_owner + github_repo present or both absent. The PAT is a separate credential under wf/projects/[id]/github.token.' }
+        github_repo: { type: string, example: project-ind }
     ArtifactRef:
       type: object
       description: Reference to a produced FILE deliverable. Its 'summary' is a ≤512-char inline preview of the artefact body (the S3 body is fetched on demand) — distinct from the engagement's own top-level 'summary'.
