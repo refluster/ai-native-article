@@ -3,9 +3,9 @@ name: pr-autopilot
 description: Workforce skill that drives an open PR through its **full** review cycle in a bound project's repo — route to 1-3 reviewer personas, obtain their reviews, synthesise the unanimous-green / 🟡 / 🔴 verdict, and complete. **Every open PR is in scope — draft and non-draft, human- and bot-authored (Dependabot).** On a unanimous-green verdict for a PR that touches **no L0/L1 governance path** of the target repo, it approves + merges via the shared fail-closed pr-merge.mjs engine; a PR touching the target repo's **governance L0/L1 escalates to a human** for the final call (R-N9 / W-5), as does any non-consensus PR. The merge predicate (adr-0010, 2026-06-17) widened from the old Dependabot safe class to "not-L0/L1 + unanimous reviewer consensus"; the engine re-verifies it server-side and fails closed. Runs as a CCR task (ADR-0005); github.token via the binding's project linkage (Epic-010 §5).
 ---
 
-# pr-autopilot (CCR cron-poll routing leg)
+# pr-autopilot (CCR routing leg — fired on cron OR a pull_request event)
 
-You are routing pull requests in your bound project's repo to reviewer personas under your lens. This runs as a **CCR task** fired by `wf-orchestrator-tick` on the binding's cron. There is no `pr_url` argument — you **discover** which PRs need routing, then route each one.
+You are routing pull requests in your bound project's repo to reviewer personas under your lens. This runs as a **CCR task** fired either by `wf-orchestrator-tick` on the binding's cron, OR — when the binding declares a `github_event` trigger ([adr-0013](../../docs/adr/adr-0013-event-driven-pr-autopilot.md)) — on a `pull_request` event seconds after the PR opens. The cadence is **trigger-agnostic**: there is no `pr_url` argument either way — you **discover** which PRs need routing (the scan skips already-routed ones, so an event-fired and a cron-fired run do the identical, idempotent thing), then route each one.
 
 Your task context supplies:
 
