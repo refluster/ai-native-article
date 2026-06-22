@@ -31,6 +31,15 @@ export interface ProjectSummary {
   member_count?: number;
   /** Most-recent EXEC#* started_at on this project's partition. */
   last_execution_at?: string;
+  /** Human-readable project name (project.json `name`). */
+  name?: string;
+  /** Standard project attribute: the GitHub repo this project ships work
+   *  against (e.g. owner `refluster`, repo `project-ind`). Non-confidential
+   *  project variable — the PAT is a separate credential under
+   *  `wf/projects/{id}/github.token`. Both present or both absent. Edited
+   *  via project.json + seed (Epic-010 §10), not the PATCH API. */
+  github_owner?: string;
+  github_repo?: string;
 }
 
 /** Shape of `GET /projects/{id}` — same as ProjectSummary today. */

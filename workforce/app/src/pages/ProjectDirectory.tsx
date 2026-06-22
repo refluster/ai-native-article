@@ -266,7 +266,30 @@ function StatusChip({ status }: { status: 'active' | 'archived' }) {
 function NewProjectPanel() {
   const [projectId, setProjectId] = useState('');
   const [owner, setOwner] = useState('_operator');
+  // The standard project attribute: the target GitHub repo as `owner/repo`
+  // (e.g. `refluster/project-ind`). Non-confidential — it lands as the
+  // `github` block in project.json, distinct from the PAT credential stored
+  // out-of-band under wf/projects/{id}/github.token. Optional: a project
+  // without a repo simply omits the block.
+  const [repo, setRepo] = useState('');
   const [copied, setCopied] = useState(false);
+
+  // Parse `owner/repo` into the schema's github block. Validated against the
+  // same patterns as project.schema.json (github.owner / github.repo).
+  const repoTrimmed = repo.trim();
+  const repoParts = repoTrimmed.split('/');
+  const repoInvalid =
+    repoTrimmed.length === 0
+      ? null
+      : repoParts.length !== 2 ||
+          !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(repoParts[0] ?? '') ||
+          !/^[A-Za-z0-9._-]+$/.test(repoParts[1] ?? '')
+        ? 'must be owner/repo (e.g. refluster/project-ind)'
+        : null;
+  const github =
+    repoTrimmed.length > 0 && !repoInvalid
+      ? { owner: repoParts[0]!, repo: repoParts[1]! }
+      : undefined;
 
   // Validate against the same constraints as asProjectId() in the
   // backend (workforce/lambdas/shared/project.ts): non-empty, no `#`,
@@ -287,6 +310,7 @@ function NewProjectPanel() {
         {
           project_id: projectId,
           owner_agent: owner,
+          ...(github ? { github } : {}),
         },
         null,
         2,
@@ -348,7 +372,28 @@ function NewProjectPanel() {
           />
         </div>
 
-        {snippet && !invalid && (
+        <div>
+          <label className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant block mb-1">
+            GITHUB REPO <span className="text-wf-on-surface-variant/60">· OPTIONAL</span>
+          </label>
+          <input
+            type="text"
+            value={repo}
+            onChange={(e) => setRepo(e.target.value)}
+            placeholder="owner/repo · e.g. refluster/project-ind"
+            className="w-full font-mono text-sm px-3 py-2 border border-wf-outline-variant bg-wf-surface-container text-wf-on-surface placeholder:text-wf-on-surface-variant focus:outline-none focus:border-wf-primary"
+          />
+          {repoInvalid && (
+            <p className="mt-1 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary">
+              {repoInvalid}
+            </p>
+          )}
+          <p className="mt-1 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+            non-secret · the github.token PAT is stored separately
+          </p>
+        </div>
+
+        {snippet && !invalid && !repoInvalid && (
           <div>
             <div className="flex items-baseline justify-between mb-1">
               <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">

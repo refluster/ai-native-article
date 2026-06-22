@@ -955,6 +955,14 @@ interface ProjectApiView {
   /** Most-recent EXEC#* `started_at` on this project's partition.
    *  Undefined when the ledger is empty. */
   last_execution_at?: string;
+  /** Human-readable project name (project.json `name`). */
+  name?: string;
+  /** Standard project attribute: the GitHub repo this project ships work
+   *  against. Non-confidential project variable (the PAT is a separate
+   *  credential under `wf/projects/{id}/github.token`). Both present or
+   *  both absent. Surfaced so the console can render the repo link. */
+  github_owner?: string;
+  github_repo?: string;
 }
 
 function toProjectApiView(row: ProjectMetaRow): ProjectApiView {
@@ -964,6 +972,9 @@ function toProjectApiView(row: ProjectMetaRow): ProjectApiView {
     owner_agent: row.owner_agent,
     created_at: row.created_at,
     archived_at: row.archived_at,
+    name: row.name,
+    github_owner: row.github_owner,
+    github_repo: row.github_repo,
   };
 }
 

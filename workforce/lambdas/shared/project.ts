@@ -116,6 +116,32 @@ export interface ProjectMetaRow {
   owner_agent: AgentSlug | "_operator";
   created_at: string;
   archived_at?: string;
+  /**
+   * Human-readable project name (the schema's `name`). Seeded from
+   * `workforce/projects/{id}/project.json` by `seed-projects.mjs`; surfaced
+   * in the console. Optional on the type because runner-auto-seeded
+   * `self/{slug}` projects and pre-seed rows carry none.
+   */
+  name?: string;
+  /**
+   * The GitHub repo this project ships work against — the standard project
+   * attribute for the target repo (e.g. `refluster/project-ind`,
+   * `PSVL/asp-cloud`). Stored flattened as two scalar attributes (not a
+   * nested map) so DDB filter/projection stays cheap; the seed
+   * (`seed-projects.mjs`) writes them from `project.json:github.{owner,repo}`.
+   *
+   * NON-CONFIDENTIAL by design — this is a project *variable*, not a secret.
+   * The matching PAT lives in Secrets Manager under
+   * `wf/projects/{id}/github.token` (credential_types), exactly the
+   * github-repo-var vs. github-repo-secret split. Canonical edits go through
+   * `project.json` + seed (Epic-010 §10), not the PATCH API.
+   *
+   * Both present or both absent: a project either declares a target repo or
+   * it does not. Read by the pr-autopilot / pr-review path to resolve PR
+   * URLs against the project (governance.md R-N9 / R-N10).
+   */
+  github_owner?: string;
+  github_repo?: string;
 }
 
 export interface ProjectMemberRow {
