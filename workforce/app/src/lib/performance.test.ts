@@ -48,7 +48,6 @@ const DATASET: PerformanceDataset = {
 };
 
 beforeEach(() => {
-  vi.resetModules();
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => new Response(JSON.stringify(DATASET), { status: 200 })),

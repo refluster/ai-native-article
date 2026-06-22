@@ -116,6 +116,11 @@ export default function StackedAreaChart({
             </rect>
           ))}
       </svg>
+      {/* x-axis: first → last value of xKey (the date range the area spans). */}
+      <div className="mt-1 flex justify-between font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+        <span>{String(data[0][xKey])}</span>
+        {data.length > 1 && <span>{String(data[data.length - 1][xKey])}</span>}
+      </div>
     </div>
   );
 }
