@@ -210,7 +210,11 @@ boundary):
   *registered*. Snapshots **today** and appends one `LifecyclePoint` to a
   `PERF#{scope}/LIFECYCLE` item (trailing 28d, idempotent per day), workforce-wide
   and per active project (sparse). It pre-aggregates server-side — the SPA never
-  scans the ledger (the N=100+ requirement).
+  scans the ledger (the N=100+ requirement). *Per-project nuance:* a project's
+  `assigned` band counts a member only if a load-bearing binding is **attributed
+  to that project** (`binding.project_id === projectId`); a member whose
+  triggerable bindings carry no `project_id` reads as `registered` on that
+  project while still counting `assigned` workforce-wide (freya, cycle-1 review).
 - **PR sections stay git-derived.** `build-pr-metrics.mjs --publish-ddb` writes
   the `PERF#{scope}/PR` item from `git log` in CI **under the deploy role's
   existing AWS creds** — an *internal* writer, **no new external/public write
