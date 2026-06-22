@@ -259,8 +259,26 @@ export async function applyDecisions(gh, repo, decisions) {
 
     const c = await gh("POST", `/repos/${repo}/issues/${pr}/comments`, { body: comment });
     if (c.status !== 201) { refused++; console.error(`pr-merge: REFUSE merge #${pr}: comment failed HTTP ${c.status}`); continue; }
+    // The native GitHub APPROVE is a courtesy/visibility step and the
+    // branch-protection satisfier for PRs authored by a DIFFERENT identity
+    // (Dependabot, external contributors). It is NOT the workforce's consensus
+    // gate: verifyMergeable() already re-verified the green-marker consensus +
+    // checks + L0/L1 server-side, and the merge PUT below re-enforces branch
+    // protection authoritatively. The workforce authors most PRs under the SAME
+    // identity it merges with, where GitHub forbids a self-approve (422 "Can not
+    // approve your own pull request") — treating that as fatal stalled every
+    // green own-identity PR at the approve step (#361). So approve is
+    // best-effort: log a non-200 and proceed. The merge PUT is the real gate and
+    // fails loud if an approving review were genuinely required by protection.
     const rv = await gh("POST", `/repos/${repo}/pulls/${pr}/reviews`, { event: "APPROVE", body: "Autopilot consensus-green merge (R-N10 / adr-0010): unanimous reviewer sign-off, no L0/L1 surface." });
-    if (rv.status !== 200) { refused++; console.error(`pr-merge: REFUSE merge #${pr}: approve failed HTTP ${rv.status} ${JSON.stringify(rv.json).slice(0, 200)}`); continue; }
+    if (rv.status !== 200) {
+      const selfApprove = rv.status === 422 && JSON.stringify(rv.json).toLowerCase().includes("can not approve your own pull request");
+      console.error(
+        selfApprove
+          ? `pr-merge: #${pr} self-approve not possible (own-identity PR) — consensus is the verified green markers; proceeding to merge`
+          : `pr-merge: #${pr} WARN approve returned HTTP ${rv.status} ${JSON.stringify(rv.json).slice(0, 200)} — approve is advisory; proceeding (the merge PUT is the gate)`,
+      );
+    }
     const mg = await gh("PUT", `/repos/${repo}/pulls/${pr}/merge`, { merge_method: "squash", sha: verdict.sha, commit_title: subject, commit_message: d.squash_body || "" });
     if (mg.status === 200) { merged++; console.error(`pr-merge: MERGED #${pr} (${verdict.why})`); }
     else { refused++; console.error(`pr-merge: merge #${pr} REJECTED HTTP ${mg.status}: ${JSON.stringify(mg.json).slice(0, 300)}`); }

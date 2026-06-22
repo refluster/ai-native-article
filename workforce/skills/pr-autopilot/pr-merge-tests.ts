@@ -149,6 +149,48 @@ describe("verifyMergeable (fail-closed predicate)", () => {
   });
 });
 
+describe("applyDecisions (merge path — approve is advisory, not a gate)", () => {
+  const MERGE_DECISION = {
+    pr: 1, action: "merge", comment: "consensus-green, merging", reviewers: ["dario"],
+    squash_subject: "feat: thing (#1)", squash_body: "Unanimous sign-off (dario).",
+  };
+  // verifyMergeable's GET routes (green, non-L0/L1, consensus) + the write legs.
+  const mergeRoutes = (approveResp) => [
+    ...routes([{ filename: "workforce/lambdas/shared/x.ts" }], GREEN_CHECK, DARIO_REVIEW),
+    [/POST \/repos\/o\/r\/issues\/1\/comments/, { status: 201, json: {} }],
+    [/POST \/repos\/o\/r\/pulls\/1\/reviews/, approveResp],
+    [/PUT \/repos\/o\/r\/pulls\/1\/merge/, { status: 200, json: { merged: true } }],
+  ];
+  const OWN_PR_422 = { status: 422, json: { message: "Unprocessable Entity", errors: ["Review Can not approve your own pull request"] } };
+
+  it("merges a green own-identity PR even though self-approve 422s (the #361 stall fix)", async () => {
+    const gh = mockGh(mergeRoutes(OWN_PR_422));
+    const res = await applyDecisions(gh, "o/r", [MERGE_DECISION]);
+    expect(res.merged).toBe(1);
+    expect(res.refused).toBe(0);
+    // The merge PUT — the real gate — must have been reached despite the 422.
+    expect(gh.calls.some((c) => c.method === "PUT" && /\/merge$/.test(c.path))).toBe(true);
+  });
+
+  it("still merges on a normal approve (200) — non-self-authored path unbroken", async () => {
+    const res = await applyDecisions(mockGh(mergeRoutes({ status: 200, json: {} })), "o/r", [MERGE_DECISION]);
+    expect(res.merged).toBe(1);
+    expect(res.refused).toBe(0);
+  });
+
+  it("does NOT merge when the predicate fails (verifyMergeable refuses) even if approve would 422", async () => {
+    // L0/L1-touching PR → verifyMergeable refuses before any write leg runs.
+    const gh = mockGh([
+      ...routes([{ filename: "docs/governance.md" }], GREEN_CHECK, DARIO_REVIEW),
+      [/PUT \/repos\/o\/r\/pulls\/1\/merge/, { status: 200, json: { merged: true } }],
+    ]);
+    const res = await applyDecisions(gh, "o/r", [MERGE_DECISION]);
+    expect(res.merged).toBe(0);
+    expect(res.refused).toBe(1);
+    expect(gh.calls.some((c) => c.method === "PUT" && /\/merge$/.test(c.path))).toBe(false);
+  });
+});
+
 describe("applyDecisions (escalation labelling)", () => {
   it("always stamps ESCALATION_LABEL on the filed issue", async () => {
     const gh = mockGh([
