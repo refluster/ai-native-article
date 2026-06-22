@@ -7,11 +7,12 @@
 import { useEffect, useState } from 'react';
 import AgentLifecycleDeck from './AgentLifecycleDeck';
 import PrAutomationDeck from './PrAutomationDeck';
-import { apiConfigured, loadPerformance, type PerformanceScope } from '../lib/performance';
+import { loadPerformance, type PerformanceScope } from '../lib/performance';
 import type { PerformanceSeries } from '../types/performance';
 
 export default function PerformancePanels({ scope }: { scope: PerformanceScope }) {
-  const [series, setSeries] = useState<PerformanceSeries | null | undefined>(undefined);
+  const [series, setSeries] = useState<PerformanceSeries | undefined>(undefined);
+  const [source, setSource] = useState<'live' | 'mock'>('mock');
   const [error, setError] = useState<string | null>(null);
 
   // Re-fetch whenever the scope identity changes. For a project scope that is
@@ -23,8 +24,10 @@ export default function PerformancePanels({ scope }: { scope: PerformanceScope }
     setSeries(undefined);
     setError(null);
     loadPerformance(scope)
-      .then((s) => {
-        if (!cancelled) setSeries(s ?? null);
+      .then((r) => {
+        if (cancelled) return;
+        setSeries(r.series);
+        setSource(r.source);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -50,22 +53,14 @@ export default function PerformancePanels({ scope }: { scope: PerformanceScope }
       </p>
     );
   }
-  if (series === null) {
-    return (
-      <p className="text-sm text-wf-on-surface-variant leading-relaxed">
-        No performance series for this scope yet. Metrics appear here once the
-        scope has lifecycle + PR activity in the window.
-      </p>
-    );
-  }
 
   return (
     <div className="space-y-6 sm:space-y-8">
       <AgentLifecycleDeck series={series} />
       <PrAutomationDeck series={series} />
-      {!apiConfigured() && (
+      {source === 'mock' && (
         <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-          * illustrative — wire WORKFORCE_AGENTS_API_BASE for the live roll-up
+          * illustrative — the live performance roll-up endpoint is not deployed yet (Epic-016 Phase 2)
         </p>
       )}
     </div>

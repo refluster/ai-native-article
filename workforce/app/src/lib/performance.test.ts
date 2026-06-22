@@ -63,19 +63,33 @@ describe('lib/performance (mock fallback)', () => {
   });
 
   it('loads the workforce scope from the bundled dataset', async () => {
-    const s = await loadPerformance(WORKFORCE_SCOPE);
-    expect(s?.scope).toBe('workforce');
-    expect(s?.pr_summary.autopilot_share).toBe(0.75);
+    const r = await loadPerformance(WORKFORCE_SCOPE);
+    expect(r.series.scope).toBe('workforce');
+    expect(r.source).toBe('mock');
+    expect(r.series.pr_summary.autopilot_share).toBe(0.75);
   });
 
   it('loads a present project scope', async () => {
-    const s = await loadPerformance(projectScope('editorial'));
-    expect(s?.scope).toBe('editorial');
+    const r = await loadPerformance(projectScope('editorial'));
+    expect(r.series.scope).toBe('editorial');
+    expect(r.source).toBe('mock');
   });
 
-  it('returns undefined for a project with no series (honest empty state)', async () => {
-    const s = await loadPerformance(projectScope('does-not-exist'));
-    expect(s).toBeUndefined();
+  it('synthesizes a deterministic series for a project absent from the fixture', async () => {
+    const r1 = await loadPerformance(projectScope('does-not-exist'));
+    expect(r1.series.scope).toBe('does-not-exist');
+    expect(r1.series.lifecycle.length).toBeGreaterThan(0);
+    expect(r1.series.pr_daily.length).toBeGreaterThan(0);
+    // Deterministic: same id → identical synthesized totals.
+    const r2 = await loadPerformance(projectScope('does-not-exist'));
+    expect(r2.series.pr_summary.total_prs).toBe(r1.series.pr_summary.total_prs);
+  });
+
+  it('re-axises dates to a window ending today', async () => {
+    const r = await loadPerformance(WORKFORCE_SCOPE);
+    const today = new Date().toISOString().slice(0, 10);
+    expect(r.series.window.end).toBe(today);
+    expect(r.series.lifecycle[r.series.lifecycle.length - 1].date).toBe(today);
   });
 });
 
