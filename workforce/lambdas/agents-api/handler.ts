@@ -110,6 +110,12 @@ import {
   type ProjectMemberRow,
   type ProjectMetaRow,
 } from "../shared/project.js";
+import {
+  type PerfLifecycleRow,
+  type PerfPrRow,
+  composeSeries,
+  perfPk,
+} from "../shared/performance.js";
 import { recall, type RecallResult } from "../shared/recall.js";
 import { isValidEngagementToken } from "../shared/engagement-token.js";
 import { CREDENTIAL_TYPES } from "../shared/credential-injector.js";
@@ -240,6 +246,11 @@ export async function handler(
     // await` so the audit-append throw routes through the 500 mapping.
     if (routeKey === "POST /agents") return await createAgent(event);
     if (routeKey === "GET /stats") return listStats(event);
+    // Epic-016 Phase 2 — performance analytics (lifecycle funnel + PR
+    // automation). Public read, same CORS-gated shape as /stats. Serves the
+    // reducer's live lifecycle roll-up; 404 (→ client illustrative fallback)
+    // until the first reducer run lands a PERF#{scope}/LIFECYCLE item.
+    if (routeKey === "GET /performance") return getPerformanceRoute("workforce");
     if (routeKey === "GET /skills") return listSkills(event);
     if (routeKey === "GET /skills/{name}/audit" && skillName) return listSkillAuditRoute(skillName, event);
     if (routeKey === "GET /skills/{name}" && skillName) return getSkill(skillName);
@@ -266,6 +277,7 @@ export async function handler(
     if (routeKey === "GET /projects/{id}/members" && projectId) return listProjectMembers(projectId, event);
     if (routeKey === "GET /projects/{id}/executions" && projectId) return listProjectExecutions(projectId, event);
     if (routeKey === "GET /projects/{id}/credentials" && projectId) return listProjectCredentials(projectId);
+    if (routeKey === "GET /projects/{id}/performance" && projectId) return getPerformanceRoute(projectId);
     if (routeKey === "PATCH /projects/{id}" && projectId) return patchProject(projectId, event.body);
     if (routeKey === "GET /projects/{id}" && projectId) return getProjectRoute(projectId);
     if (routeKey === "GET /feed") return listFeedRoute(event);
@@ -1166,6 +1178,24 @@ async function getProjectRoute(rawId: string): Promise<APIGatewayProxyResultV2> 
   view.member_count = memberRows.filter((m) => m.revoked_at === undefined).length;
   if (lastExec !== undefined) view.last_execution_at = lastExec;
   return reply(200, view);
+}
+
+// Epic-016 Phase 2 — assemble one scope's PerformanceSeries from the two
+// roll-up items: LIFECYCLE (reducer-owned, the live funnel) + PR (git-derived,
+// published by build-pr-metrics.mjs). LIFECYCLE is the live differentiator: its
+// absence means the reducer has not run for this scope yet, so we 404 and let
+// the client serve its illustrative fallback (Epic-016 §"Data contract" — a
+// missing live roll-up is graceful degradation, not a masked outage). The PR
+// item is optional — a scope with lifecycle but no published PR sections serves
+// an empty PR block rather than 404ing the whole series.
+async function getPerformanceRoute(scope: string): Promise<APIGatewayProxyResultV2> {
+  const [lifecycleRow, prRow] = await Promise.all([
+    getItem<PerfLifecycleRow>(perfPk(scope), "LIFECYCLE"),
+    getItem<PerfPrRow>(perfPk(scope), "PR"),
+  ]);
+  if (!lifecycleRow) return reply(404, { error: "not_found", scope });
+  const series = composeSeries(scope, new Date().toISOString(), lifecycleRow, prRow);
+  return reply(200, series);
 }
 
 async function listProjectMembers(

@@ -479,6 +479,12 @@ paths:
       tags: [meta]
       summary: Dashboard aggregate (EXEC-ledger roll-up)
       responses: { "200": { description: OK } }
+  /performance:
+    get:
+      tags: [meta]
+      summary: 'Workforce performance analytics (Epic-016): live lifecycle funnel + PR automation'
+      description: 'Live agent-lifecycle funnel (registered→assigned→delivered) from the daily reducer roll-up, plus the git-derived PR-automation sections. 404 until the first reducer run lands a roll-up (the client then serves its illustrative fallback).'
+      responses: { "200": { description: OK }, "404": { description: No roll-up yet for this scope } }
   /skills:
     get:
       tags: [skills]
@@ -576,6 +582,13 @@ paths:
       summary: Provisioned credential metadata (never values)
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       responses: { "200": { description: OK } }
+  /projects/{id}/performance:
+    get:
+      tags: [projects]
+      summary: 'Project-scoped performance analytics (Epic-016): lifecycle funnel + PR automation'
+      description: 'Same shape as /performance, scoped to one project. id is percent-encoded for ids containing "/" (e.g. self%2Fren). 404 until the reducer lands a roll-up for the scope.'
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK }, "404": { description: No roll-up yet for this scope } }
   /feed:
     get:
       tags: [feed]

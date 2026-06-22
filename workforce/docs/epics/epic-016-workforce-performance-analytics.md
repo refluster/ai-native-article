@@ -1,9 +1,9 @@
 # Epic-016 — Workforce performance analytics (per-project + cross-project)
 
-- **Status**: In-progress (2026-06-22)
+- **Status**: Phase 1 **shipped** (#357 IA + both metric families; #359 graceful fallback). Phase 2 (live lifecycle reducer + `/performance` endpoints) **implemented 2026-06-22** — code + infra landed, **pending operator deploy** (`sam deploy`, schedule already `Enabled: true`, + wiring `build-pr-metrics.mjs --publish-ddb` into the deploy workflow). Open questions Q1/Q2/Q3 **resolved** (operator, 2026-06-22).
 - **Owner**: nadia
 - **Created**: 2026-06-22
-- **Implemented by**: (this PR — opening implementation lands the IA + both metric families against the live-API-first / mock-fallback contract per operator greenlight)
+- **Implemented by**: Phase 1 — #357 / #359. Phase 2 — nadia (lead, IA + endpoint shape), hana (data plane: the `AUDIT#`/`bindings[]`/`EXEC#` partition + roll-up item contract), ren (reducer Lambda build under Dario's L2 bar).
 
 ## Members
 
@@ -93,10 +93,13 @@ bound tasks convert into shipped output. A flat or falling delivered share is
 the alarm — hiring outrunning delivery. At project scope the same three bands
 count the project's *members* by furthest state on that project's partition.
 
-The lifecycle series is **illustrative** in this PR (clearly labelled, exactly
+The lifecycle series was **illustrative** in Phase 1 (clearly labelled, exactly
 as the Dashboard heat strip is "illustrative until the live activity endpoint
 exists") — grounded in the real `AUDIT#` / `bindings[]` / `EXEC#` definitions
-above, with the live `/performance` roll-up deferred to Phase 2.
+above. **Phase 2 (2026-06-22) makes it live**: the `performance-reducer`
+snapshots these definitions daily into `PERF#{scope}/LIFECYCLE` and the
+`/performance` endpoints serve it (see "Phase 2" below). The headline read is
+the absolute **delivered count** (Q2), not a share.
 
 ### Metric 3 — PR automation
 
@@ -152,8 +155,8 @@ false live truth (C-1).
 
 ## Acceptance criteria
 
-- `/performance` renders DECK 03 (lifecycle funnel, stacked area, delivered-share
-  headline) and DECK 04 (PR automation, stacked daily bars + autopilot-share /
+- `/performance` renders DECK 03 (lifecycle funnel, stacked area, delivered-count
+  headline — Q2) and DECK 04 (PR automation, stacked daily bars + autopilot-share /
   churn / humans-involved summary), workforce-scoped.
 - `/projects/{id}` shows an **Overview / Performance** tab pair; `…/performance`
   renders the same two decks project-scoped without an `App.tsx` route change,
@@ -169,28 +172,75 @@ false live truth (C-1).
   lint:tokens` stays green. `npm run build:workforce`, the `workforce:*`
   validators, and `vitest` all pass.
 
-## Open questions
+## Open questions — resolved (operator, 2026-06-22)
 
-- **Q1.** Should the lifecycle funnel count **agents** (a registered persona) or
-  **task-assignments** (a binding)? This PR counts personas by furthest state;
-  if the operator wants per-task granularity the band definitions move from
-  `AGENT#` to `bindings[]`-cardinality. (Draft: personas — it answers the hiring
-  question directly.)
-- **Q2.** Is *delivered share* the right single KPI, or should the headline be a
-  **conversion rate** between adjacent stages (assigned/registered,
-  delivered/assigned) to localise *where* the funnel leaks? (Draft: delivered
-  share for the headline, adjacent ratios available on hover.)
-- **Q3.** PR→project attribution by path prefix is heuristic; a PR spanning
-  `newsletter/**` and `workforce/**` counts in both. Acceptable for a trend, but
-  do we want a canonical `project:` PR label instead? (Defer — a labels change is
-  its own decision.)
+- **Q1 — RESOLVED: count personas (pure head-count).** The funnel counts
+  **agents** by furthest reached state, one persona per band, not
+  binding/task-assignment cardinality. Implemented in `tallyLifecycle`
+  (`workforce/lambdas/shared/performance.ts`) and the reducer's per-agent
+  classification; the band defs stay `AGENT#`-anchored.
+- **Q2 — RESOLVED: absolute delivered count, not a rate.** The deck headline is
+  the **absolute number of personas that have delivered** (`LifecyclePoint.delivered`),
+  not the delivered *share* and not an adjacent-stage conversion rate. The
+  `deliveredShare` helper stays for a secondary/hover read. Implemented in
+  `AgentLifecycleDeck.tsx`; the live `PerformanceSeries` shape is unchanged (the
+  count is already a field).
+- **Q3 — RESOLVED: keep the path-prefix heuristic, no `project:` label.** PR→project
+  attribution stays the `newsletter/**`→`editorial`, `workforce/**`→`workforce-meta`
+  path-prefix mapping in `build-pr-metrics.mjs`; a PR spanning both counts in
+  both (acceptable for a trend). No canonical `project:` PR label is introduced
+  (a labels change remains its own decision if ever revisited).
+
+## Phase 2 — live lifecycle endpoint (implemented 2026-06-22)
+
+Phase 2 makes **Metric 2 real** (Metric 3 was already git-true). Scope is exactly
+what this epic deferred: *the scheduled pre-aggregating reducer over
+`AUDIT#`/`bindings[]`/`EXEC#`* + the read endpoints. Architecture (the one design
+fork resolved here — keep the surface honest and inside the Epic-010 trust
+boundary):
+
+- **The endpoint returns a complete `PerformanceSeries`** = live lifecycle ⊕
+  git-derived PR sections. No client/loader change — the Phase-1 live-first /
+  mock-fallback contract already fetches a full series.
+- **Reducer (`workforce/lambdas/performance-reducer`)** — EventBridge daily
+  (`02:00 UTC`). Scans `AGENT#…/META` (the cohort), and per agent decides
+  *delivered* (≥1 `EXEC#` `status:ok` + `artifact_ref`) → *assigned*
+  (≥1 load-bearing binding via `bindingCronIsLoadBearing` — the same predicate
+  the orchestrator fires on, so a dead cron never inflates `assigned`) →
+  *registered*. Snapshots **today** and appends one `LifecyclePoint` to a
+  `PERF#{scope}/LIFECYCLE` item (trailing 28d, idempotent per day), workforce-wide
+  and per active project (sparse). It pre-aggregates server-side — the SPA never
+  scans the ledger (the N=100+ requirement).
+- **PR sections stay git-derived.** `build-pr-metrics.mjs --publish-ddb` writes
+  the `PERF#{scope}/PR` item from `git log` in CI **under the deploy role's
+  existing AWS creds** — an *internal* writer, **no new external/public write
+  surface**, so the Epic-010 trust boundary is unchanged. (The authoritative
+  GitHub merge-metadata split for autopilot-vs-human — see the build script's
+  header — is a Phase-2.1 follow-up; today it carries the git "no human author"
+  proxy in both phases, no regression.)
+- **Endpoint (`GET /performance`, `GET /projects/{id}/performance`)** reads both
+  `PERF#` items and composes the series (`composeSeries`). `LIFECYCLE` is the
+  live differentiator: **absent → 404**, and the client serves its illustrative
+  fallback (#359). `PR` is optional (empty block until first publish).
+- **Observability (W-4):** the reducer throws on any failure (Errors alarm) and
+  carries a 2-day missed-run alarm so a frozen funnel is loud.
+
+**Remaining operator steps (B-authority / W-3 cost):** `sam deploy` the new
+function + routes; the schedule ships `Enabled: true` (Phase-2 greenlit); wire
+`build-pr-metrics.mjs --publish-ddb --table $TABLE_NAME` into the deploy
+workflow so the live endpoint serves PR sections. Until then the surface keeps
+rendering the illustrative fallback — no user-visible regression.
 
 ## Out of scope
 
-- **The live `/performance` endpoint** (Phase 2) — the agents-api Lambda + the
-  scheduled pre-aggregating reducer over `AUDIT#`/`bindings[]`/`EXEC#`. This PR
-  ships the client contract + mock; the endpoint is a `ren`/`hana` build under a
-  follow-up issue (a W-3 cost decision → operator B-authority).
+- ~~**The live `/performance` endpoint** (Phase 2)~~ — **DONE 2026-06-22**, see
+  "Phase 2 — live lifecycle endpoint" above. The `ren`/`hana` build landed in the
+  same epic rather than a separate follow-up issue; only the operator deploy
+  (`sam deploy` + PR-publish wiring) remains.
+- **Authoritative GitHub merge-metadata PR split** (Phase 2.1) — having the
+  reducer read GitHub's `mergedBy` / `autopilot:*` labels for the exact
+  autopilot-vs-human split, replacing the git "no human author" proxy. Its own
+  follow-up (needs a GitHub token in the reducer, like config-digest).
 - **Real-time / streaming** updates — the surface is a daily roll-up, not a live
   socket.
 - **Cross-project comparison / ranking views** ("which project converts best") —

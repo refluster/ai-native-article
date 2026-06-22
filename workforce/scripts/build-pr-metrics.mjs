@@ -22,10 +22,20 @@
  * Usage:
  *   node workforce/scripts/build-pr-metrics.mjs [--days 30] [--branch main]
  *        [--agents nadia,ren,maya,...] [--humans refluster] [--dry-run]
- *        [--write]   # patch workforce/app/public/workforce-mock-performance.json
+ *        [--write]          # patch workforce/app/public/workforce-mock-performance.json
+ *        [--publish-ddb]    # upsert PERF#workforce/PR for the live endpoint
+ *        [--table NAME]     # DDB table (default: $TABLE_NAME)
  *
  * Default is --dry-run (print the derived workforce PR block as JSON). The
  * illustrative mock is only overwritten with --write.
+ *
+ * --publish-ddb (Epic-016 Phase 2): the agents-api /performance endpoint
+ * serves a live lifecycle funnel (from wf-performance-reducer) composed with
+ * these git-derived PR sections. So CI must land them in DDB as the
+ * PERF#workforce/PR roll-up item the endpoint reads. This runs in the deploy
+ * workflow under the deploy role's existing AWS creds — an INTERNAL writer, no
+ * new external/public write surface (Epic-010 trust boundary unchanged). With
+ * --dry-run it prints the item instead of putting it.
  */
 
 import { execSync } from 'node:child_process';
@@ -52,7 +62,9 @@ const AGENTS = new Set(
     .filter(Boolean),
 );
 const WRITE = process.argv.includes('--write');
-const DRY = !WRITE || process.argv.includes('--dry-run');
+const PUBLISH_DDB = process.argv.includes('--publish-ddb');
+const TABLE = arg('table', process.env.TABLE_NAME);
+const DRY = (!WRITE && !PUBLISH_DDB) || process.argv.includes('--dry-run');
 
 const since = new Date();
 since.setUTCDate(since.getUTCDate() - DAYS);
@@ -174,19 +186,59 @@ console.error(
     `(estimate; authoritative split needs GitHub merge metadata).`,
 );
 
+// The PERF#{scope}/PR roll-up item the agents-api /performance endpoint reads
+// (shape mirrors PerfPrRow in workforce/lambdas/shared/performance.ts).
+function prRowItem(scope, b) {
+  return {
+    pk: `PERF#${scope}`,
+    sk: 'PR',
+    scope,
+    updated_at: new Date().toISOString(),
+    window: b.window,
+    pr_daily: b.pr_daily,
+    pr_summary: b.pr_summary,
+    pr_contributors: b.pr_contributors,
+  };
+}
+
+async function publishToDdb(scope, b) {
+  if (!TABLE) {
+    console.error('--publish-ddb requires --table NAME or $TABLE_NAME');
+    process.exit(1);
+  }
+  // Dynamic import so the offline --dry-run / --write paths never need the SDK.
+  const { DynamoDBClient } = await import('@aws-sdk/client-dynamodb');
+  const { DynamoDBDocumentClient, PutCommand } = await import('@aws-sdk/lib-dynamodb');
+  const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
+    marshallOptions: { removeUndefinedValues: true },
+  });
+  await ddb.send(new PutCommand({ TableName: TABLE, Item: prRowItem(scope, b) }));
+  console.error(`published PERF#${scope}/PR to ${TABLE}`);
+}
+
 if (DRY) {
   console.log(JSON.stringify(block, null, 2));
+  if (PUBLISH_DDB) {
+    console.error('[--publish-ddb --dry-run] would upsert PERF#workforce/PR:');
+    console.log(JSON.stringify(prRowItem('workforce', block), null, 2));
+  }
   process.exit(0);
 }
 
-const ds = JSON.parse(readFileSync(MOCK, 'utf8'));
-ds.generated_at = new Date().toISOString();
-ds.workforce = {
-  ...ds.workforce,
-  window: block.window,
-  pr_daily: block.pr_daily,
-  pr_summary: block.pr_summary,
-  pr_contributors: block.pr_contributors,
-};
-writeFileSync(MOCK, JSON.stringify(ds, null, 2) + '\n');
-console.error(`patched workforce PR block in ${MOCK}`);
+if (PUBLISH_DDB) {
+  await publishToDdb('workforce', block);
+}
+
+if (WRITE) {
+  const ds = JSON.parse(readFileSync(MOCK, 'utf8'));
+  ds.generated_at = new Date().toISOString();
+  ds.workforce = {
+    ...ds.workforce,
+    window: block.window,
+    pr_daily: block.pr_daily,
+    pr_summary: block.pr_summary,
+    pr_contributors: block.pr_contributors,
+  };
+  writeFileSync(MOCK, JSON.stringify(ds, null, 2) + '\n');
+  console.error(`patched workforce PR block in ${MOCK}`);
+}
