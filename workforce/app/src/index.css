@@ -46,6 +46,14 @@
     --wf-svg-tertiary: #954500;
     --wf-svg-primary: #0055c8;
     --wf-svg-surface-emphasis: #eef3fc;
+    /* Performance-chart series fills (Epic-016). Mirror the wf-running /
+       wf-paused / wf-archived / wf-outline-variant status tokens so the
+       lifecycle-funnel + PR-automation SVGs paint through CSS vars and
+       keep lint:tokens green. */
+    --wf-svg-running: #1f7a4f;
+    --wf-svg-paused: #b58200;
+    --wf-svg-archived: #6b7280;
+    --wf-svg-outline-variant: #ddd9e6;
   }
 }
 
