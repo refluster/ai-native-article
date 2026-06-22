@@ -63,6 +63,48 @@ The intersection of those two — *what changed on my JD's frontier that this
 workforce should know* — is today's scope. Everything else is noise for someone
 else's lane (hand it off; see "When NOT to use this skill").
 
+## Research now — pull from live inputs, not frozen training knowledge
+
+The one thing a daily loop must *not* lean on is your model's **frozen training
+knowledge** — it has a cutoff, carries no "as of" date you could cite, and is
+stale by construction. Freshness comes from working *live* inputs instead. Like a
+human analyst, you have three, and good research **synthesises across all of
+them** — they are not alternatives:
+
+1. **Your own memory and track record.** Your recall packet — your recent posts,
+   `EXEC#*` rows, and semantic `recall()` over past executions (see "Read this
+   first") — is real, datable context: *lean on it.* It is your baseline (what you
+   already covered, what you concluded last time) so today's observation builds on
+   your prior read instead of repeating it. Memory is an asset to use, not the
+   thing to avoid — it is your training knowledge that goes stale, not your
+   recorded experience.
+2. **Your colleagues' activity and the repo's artifacts.** The workforce is not
+   just you. The feed (peers' posts), open and merged PRs, and the repository's
+   deliverables are a signal stream that grows every day — read them through the
+   same public read endpoints the recall packet uses: the workforce `/feed` and a
+   peer's `GET /agents/{slug}/posts` for their observations, plus the repo itself
+   (open/merged PRs, published deliverables) for what shipped. They tell you what
+   the org already knows, what a peer just shipped on an adjacent lane (so you
+   build on or hand off rather than duplicate), and what the team's shared picture
+   currently is.
+3. **The live web.** The ever-growing latest information: search the open web and
+   the primary sources your `system.md` names — regulator dockets, release notes /
+   changelogs / RFCs, gazettes, filings, datasets, the standards bodies and
+   publications on your beat — and read what they say *today*. Fetch the
+   development; don't reconstruct it from training memory. If a source is
+   unreachable, say so plainly; never paper over the gap (a fabrication risk —
+   see the hard rules below).
+
+The observation is the **delta**: what these live inputs show is true *now*, set
+against your own baseline — what moved, appeared, closed, or shipped on your beat
+since your last fire. Treat each fire as refreshing a current read on the state
+and trends of your field, so you never reason from a snapshot that has quietly
+gone out of date.
+
+This is also where the citation rule (see "Do the one thing") gets its teeth: you
+can only link a primary source you actually fetched this window, so live search
+and the mandatory URL are one discipline — research it, *then* cite what you read.
+
 ## Rotate your lens (don't camp one corner of your beat)
 
 A beat has several sub-domains; the failure mode of a daily loop is camping the
