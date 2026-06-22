@@ -1,0 +1,1653 @@
+{
+  "$comment": "ILLUSTRATIVE mock for the Epic-016 performance surface, served when WORKFORCE_AGENTS_API_BASE is unset (gh-pages / local dev). Numbers are synthetic and trend-shaped to match the intended reads (delivered share + autopilot share both climbing) — they do NOT claim live truth. The live agents-api /performance + /projects/{id}/performance roll-ups replace this in production; build-pr-metrics.mjs derives the git-true PR subset offline. Mirrors the workforce-mock-stats.json convention.",
+  "generated_at": "2026-06-22T00:00:00Z",
+  "workforce": {
+    "scope": "workforce",
+    "generated_at": "2026-06-22T00:00:00Z",
+    "window": {
+      "start": "2026-05-25",
+      "end": "2026-06-21"
+    },
+    "lifecycle": [
+      {
+        "date": "2026-05-25",
+        "registered": 4,
+        "assigned": 3,
+        "delivered": 3
+      },
+      {
+        "date": "2026-05-26",
+        "registered": 5,
+        "assigned": 3,
+        "delivered": 3
+      },
+      {
+        "date": "2026-05-27",
+        "registered": 5,
+        "assigned": 3,
+        "delivered": 3
+      },
+      {
+        "date": "2026-05-28",
+        "registered": 4,
+        "assigned": 4,
+        "delivered": 4
+      },
+      {
+        "date": "2026-05-29",
+        "registered": 4,
+        "assigned": 4,
+        "delivered": 4
+      },
+      {
+        "date": "2026-05-30",
+        "registered": 4,
+        "assigned": 4,
+        "delivered": 5
+      },
+      {
+        "date": "2026-05-31",
+        "registered": 5,
+        "assigned": 4,
+        "delivered": 5
+      },
+      {
+        "date": "2026-06-01",
+        "registered": 5,
+        "assigned": 4,
+        "delivered": 5
+      },
+      {
+        "date": "2026-06-02",
+        "registered": 5,
+        "assigned": 4,
+        "delivered": 6
+      },
+      {
+        "date": "2026-06-03",
+        "registered": 5,
+        "assigned": 4,
+        "delivered": 6
+      },
+      {
+        "date": "2026-06-04",
+        "registered": 6,
+        "assigned": 4,
+        "delivered": 6
+      },
+      {
+        "date": "2026-06-05",
+        "registered": 5,
+        "assigned": 5,
+        "delivered": 7
+      },
+      {
+        "date": "2026-06-06",
+        "registered": 5,
+        "assigned": 5,
+        "delivered": 7
+      },
+      {
+        "date": "2026-06-07",
+        "registered": 5,
+        "assigned": 5,
+        "delivered": 8
+      },
+      {
+        "date": "2026-06-08",
+        "registered": 4,
+        "assigned": 5,
+        "delivered": 9
+      },
+      {
+        "date": "2026-06-09",
+        "registered": 5,
+        "assigned": 5,
+        "delivered": 9
+      },
+      {
+        "date": "2026-06-10",
+        "registered": 5,
+        "assigned": 5,
+        "delivered": 9
+      },
+      {
+        "date": "2026-06-11",
+        "registered": 5,
+        "assigned": 5,
+        "delivered": 10
+      },
+      {
+        "date": "2026-06-12",
+        "registered": 5,
+        "assigned": 6,
+        "delivered": 10
+      },
+      {
+        "date": "2026-06-13",
+        "registered": 6,
+        "assigned": 5,
+        "delivered": 10
+      },
+      {
+        "date": "2026-06-14",
+        "registered": 5,
+        "assigned": 5,
+        "delivered": 12
+      },
+      {
+        "date": "2026-06-15",
+        "registered": 4,
+        "assigned": 6,
+        "delivered": 12
+      },
+      {
+        "date": "2026-06-16",
+        "registered": 5,
+        "assigned": 5,
+        "delivered": 13
+      },
+      {
+        "date": "2026-06-17",
+        "registered": 4,
+        "assigned": 6,
+        "delivered": 14
+      },
+      {
+        "date": "2026-06-18",
+        "registered": 4,
+        "assigned": 6,
+        "delivered": 14
+      },
+      {
+        "date": "2026-06-19",
+        "registered": 4,
+        "assigned": 6,
+        "delivered": 15
+      },
+      {
+        "date": "2026-06-20",
+        "registered": 4,
+        "assigned": 6,
+        "delivered": 15
+      },
+      {
+        "date": "2026-06-21",
+        "registered": 4,
+        "assigned": 6,
+        "delivered": 16
+      }
+    ],
+    "pr_daily": [
+      {
+        "date": "2026-05-25",
+        "prs": 2,
+        "autopilot_merged": 0,
+        "additions": 432,
+        "deletions": 104
+      },
+      {
+        "date": "2026-05-26",
+        "prs": 3,
+        "autopilot_merged": 1,
+        "additions": 456,
+        "deletions": 288
+      },
+      {
+        "date": "2026-05-27",
+        "prs": 3,
+        "autopilot_merged": 1,
+        "additions": 234,
+        "deletions": 132
+      },
+      {
+        "date": "2026-05-28",
+        "prs": 3,
+        "autopilot_merged": 1,
+        "additions": 255,
+        "deletions": 174
+      },
+      {
+        "date": "2026-05-29",
+        "prs": 4,
+        "autopilot_merged": 1,
+        "additions": 300,
+        "deletions": 320
+      },
+      {
+        "date": "2026-05-30",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 216,
+        "deletions": 80
+      },
+      {
+        "date": "2026-05-31",
+        "prs": 3,
+        "autopilot_merged": 1,
+        "additions": 195,
+        "deletions": 288
+      },
+      {
+        "date": "2026-06-01",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 172,
+        "deletions": 166
+      },
+      {
+        "date": "2026-06-02",
+        "prs": 5,
+        "autopilot_merged": 2,
+        "additions": 1010,
+        "deletions": 480
+      },
+      {
+        "date": "2026-06-03",
+        "prs": 4,
+        "autopilot_merged": 2,
+        "additions": 844,
+        "deletions": 204
+      },
+      {
+        "date": "2026-06-04",
+        "prs": 3,
+        "autopilot_merged": 1,
+        "additions": 648,
+        "deletions": 255
+      },
+      {
+        "date": "2026-06-05",
+        "prs": 4,
+        "autopilot_merged": 2,
+        "additions": 212,
+        "deletions": 304
+      },
+      {
+        "date": "2026-06-06",
+        "prs": 4,
+        "autopilot_merged": 2,
+        "additions": 396,
+        "deletions": 108
+      },
+      {
+        "date": "2026-06-07",
+        "prs": 3,
+        "autopilot_merged": 2,
+        "additions": 201,
+        "deletions": 180
+      },
+      {
+        "date": "2026-06-08",
+        "prs": 3,
+        "autopilot_merged": 2,
+        "additions": 639,
+        "deletions": 216
+      },
+      {
+        "date": "2026-06-09",
+        "prs": 3,
+        "autopilot_merged": 2,
+        "additions": 177,
+        "deletions": 159
+      },
+      {
+        "date": "2026-06-10",
+        "prs": 4,
+        "autopilot_merged": 2,
+        "additions": 668,
+        "deletions": 172
+      },
+      {
+        "date": "2026-06-11",
+        "prs": 5,
+        "autopilot_merged": 3,
+        "additions": 895,
+        "deletions": 120
+      },
+      {
+        "date": "2026-06-12",
+        "prs": 6,
+        "autopilot_merged": 4,
+        "additions": 1044,
+        "deletions": 342
+      },
+      {
+        "date": "2026-06-13",
+        "prs": 5,
+        "autopilot_merged": 3,
+        "additions": 825,
+        "deletions": 395
+      },
+      {
+        "date": "2026-06-14",
+        "prs": 6,
+        "autopilot_merged": 4,
+        "additions": 534,
+        "deletions": 486
+      },
+      {
+        "date": "2026-06-15",
+        "prs": 5,
+        "autopilot_merged": 3,
+        "additions": 250,
+        "deletions": 305
+      },
+      {
+        "date": "2026-06-16",
+        "prs": 4,
+        "autopilot_merged": 3,
+        "additions": 192,
+        "deletions": 376
+      },
+      {
+        "date": "2026-06-17",
+        "prs": 5,
+        "autopilot_merged": 4,
+        "additions": 565,
+        "deletions": 225
+      },
+      {
+        "date": "2026-06-18",
+        "prs": 6,
+        "autopilot_merged": 5,
+        "additions": 1320,
+        "deletions": 366
+      },
+      {
+        "date": "2026-06-19",
+        "prs": 4,
+        "autopilot_merged": 3,
+        "additions": 720,
+        "deletions": 332
+      },
+      {
+        "date": "2026-06-20",
+        "prs": 5,
+        "autopilot_merged": 4,
+        "additions": 655,
+        "deletions": 375
+      },
+      {
+        "date": "2026-06-21",
+        "prs": 8,
+        "autopilot_merged": 7,
+        "additions": 608,
+        "deletions": 432
+      }
+    ],
+    "pr_summary": {
+      "total_prs": 114,
+      "autopilot_merged": 67,
+      "autopilot_share": 0.588,
+      "total_additions": 14663,
+      "total_deletions": 7384,
+      "humans_involved": [
+        "refluster"
+      ]
+    },
+    "pr_contributors": [
+      {
+        "handle": "maya",
+        "kind": "agent",
+        "prs": 20
+      },
+      {
+        "handle": "freya",
+        "kind": "agent",
+        "prs": 19
+      },
+      {
+        "handle": "hana",
+        "kind": "agent",
+        "prs": 18
+      },
+      {
+        "handle": "nadia",
+        "kind": "agent",
+        "prs": 15
+      },
+      {
+        "handle": "ren",
+        "kind": "agent",
+        "prs": 14
+      },
+      {
+        "handle": "mateo",
+        "kind": "agent",
+        "prs": 14
+      },
+      {
+        "handle": "sana",
+        "kind": "agent",
+        "prs": 14
+      },
+      {
+        "handle": "refluster",
+        "kind": "human",
+        "prs": 0
+      }
+    ]
+  },
+  "projects": {
+    "editorial": {
+      "scope": "editorial",
+      "generated_at": "2026-06-22T00:00:00Z",
+      "window": {
+        "start": "2026-05-25",
+        "end": "2026-06-21"
+      },
+      "lifecycle": [
+        {
+          "date": "2026-05-25",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-26",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-27",
+          "registered": 1,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-28",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-29",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-30",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-31",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-06-01",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-06-02",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 3
+        },
+        {
+          "date": "2026-06-03",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 3
+        },
+        {
+          "date": "2026-06-04",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 3
+        },
+        {
+          "date": "2026-06-05",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 3
+        },
+        {
+          "date": "2026-06-06",
+          "registered": 3,
+          "assigned": 2,
+          "delivered": 3
+        },
+        {
+          "date": "2026-06-07",
+          "registered": 3,
+          "assigned": 2,
+          "delivered": 3
+        },
+        {
+          "date": "2026-06-08",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 4
+        },
+        {
+          "date": "2026-06-09",
+          "registered": 3,
+          "assigned": 2,
+          "delivered": 4
+        },
+        {
+          "date": "2026-06-10",
+          "registered": 3,
+          "assigned": 2,
+          "delivered": 4
+        },
+        {
+          "date": "2026-06-11",
+          "registered": 3,
+          "assigned": 2,
+          "delivered": 4
+        },
+        {
+          "date": "2026-06-12",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 5
+        },
+        {
+          "date": "2026-06-13",
+          "registered": 3,
+          "assigned": 2,
+          "delivered": 5
+        },
+        {
+          "date": "2026-06-14",
+          "registered": 3,
+          "assigned": 2,
+          "delivered": 5
+        },
+        {
+          "date": "2026-06-15",
+          "registered": 3,
+          "assigned": 2,
+          "delivered": 5
+        },
+        {
+          "date": "2026-06-16",
+          "registered": 2,
+          "assigned": 3,
+          "delivered": 5
+        },
+        {
+          "date": "2026-06-17",
+          "registered": 2,
+          "assigned": 3,
+          "delivered": 6
+        },
+        {
+          "date": "2026-06-18",
+          "registered": 2,
+          "assigned": 3,
+          "delivered": 6
+        },
+        {
+          "date": "2026-06-19",
+          "registered": 2,
+          "assigned": 3,
+          "delivered": 6
+        },
+        {
+          "date": "2026-06-20",
+          "registered": 1,
+          "assigned": 3,
+          "delivered": 7
+        },
+        {
+          "date": "2026-06-21",
+          "registered": 1,
+          "assigned": 3,
+          "delivered": 8
+        }
+      ],
+      "pr_daily": [
+        {
+          "date": "2026-05-25",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 64,
+          "deletions": 28
+        },
+        {
+          "date": "2026-05-26",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 88,
+          "deletions": 32
+        },
+        {
+          "date": "2026-05-27",
+          "prs": 2,
+          "autopilot_merged": 0,
+          "additions": 126,
+          "deletions": 150
+        },
+        {
+          "date": "2026-05-28",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 182,
+          "deletions": 81
+        },
+        {
+          "date": "2026-05-29",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 48,
+          "deletions": 90
+        },
+        {
+          "date": "2026-05-30",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 174,
+          "deletions": 34
+        },
+        {
+          "date": "2026-05-31",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 182,
+          "deletions": 72
+        },
+        {
+          "date": "2026-06-01",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 190,
+          "deletions": 114
+        },
+        {
+          "date": "2026-06-02",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 71,
+          "deletions": 75
+        },
+        {
+          "date": "2026-06-03",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 388,
+          "deletions": 156
+        },
+        {
+          "date": "2026-06-04",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 62,
+          "deletions": 57
+        },
+        {
+          "date": "2026-06-05",
+          "prs": 3,
+          "autopilot_merged": 1,
+          "additions": 495,
+          "deletions": 51
+        },
+        {
+          "date": "2026-06-06",
+          "prs": 3,
+          "autopilot_merged": 1,
+          "additions": 567,
+          "deletions": 174
+        },
+        {
+          "date": "2026-06-07",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 183,
+          "deletions": 27
+        },
+        {
+          "date": "2026-06-08",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 316,
+          "deletions": 154
+        },
+        {
+          "date": "2026-06-09",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 396,
+          "deletions": 174
+        },
+        {
+          "date": "2026-06-10",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 284,
+          "deletions": 42
+        },
+        {
+          "date": "2026-06-11",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 126,
+          "deletions": 198
+        },
+        {
+          "date": "2026-06-12",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 150,
+          "deletions": 178
+        },
+        {
+          "date": "2026-06-13",
+          "prs": 3,
+          "autopilot_merged": 2,
+          "additions": 156,
+          "deletions": 108
+        },
+        {
+          "date": "2026-06-14",
+          "prs": 3,
+          "autopilot_merged": 2,
+          "additions": 129,
+          "deletions": 207
+        },
+        {
+          "date": "2026-06-15",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 390,
+          "deletions": 84
+        },
+        {
+          "date": "2026-06-16",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 404,
+          "deletions": 132
+        },
+        {
+          "date": "2026-06-17",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 188,
+          "deletions": 62
+        },
+        {
+          "date": "2026-06-18",
+          "prs": 2,
+          "autopilot_merged": 2,
+          "additions": 274,
+          "deletions": 38
+        },
+        {
+          "date": "2026-06-19",
+          "prs": 2,
+          "autopilot_merged": 2,
+          "additions": 232,
+          "deletions": 68
+        },
+        {
+          "date": "2026-06-20",
+          "prs": 2,
+          "autopilot_merged": 2,
+          "additions": 412,
+          "deletions": 112
+        },
+        {
+          "date": "2026-06-21",
+          "prs": 4,
+          "autopilot_merged": 3,
+          "additions": 868,
+          "deletions": 96
+        }
+      ],
+      "pr_summary": {
+        "total_prs": 54,
+        "autopilot_merged": 26,
+        "autopilot_share": 0.481,
+        "total_additions": 7145,
+        "total_deletions": 2794,
+        "humans_involved": [
+          "refluster"
+        ]
+      },
+      "pr_contributors": [
+        {
+          "handle": "maya",
+          "kind": "agent",
+          "prs": 23
+        },
+        {
+          "handle": "ren",
+          "kind": "agent",
+          "prs": 19
+        },
+        {
+          "handle": "aoi",
+          "kind": "agent",
+          "prs": 12
+        },
+        {
+          "handle": "refluster",
+          "kind": "human",
+          "prs": 0
+        }
+      ]
+    },
+    "workforce-meta": {
+      "scope": "workforce-meta",
+      "generated_at": "2026-06-22T00:00:00Z",
+      "window": {
+        "start": "2026-05-25",
+        "end": "2026-06-21"
+      },
+      "lifecycle": [
+        {
+          "date": "2026-05-25",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-26",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-27",
+          "registered": 3,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-28",
+          "registered": 3,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-29",
+          "registered": 3,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-30",
+          "registered": 3,
+          "assigned": 2,
+          "delivered": 3
+        },
+        {
+          "date": "2026-05-31",
+          "registered": 3,
+          "assigned": 2,
+          "delivered": 3
+        },
+        {
+          "date": "2026-06-01",
+          "registered": 3,
+          "assigned": 2,
+          "delivered": 3
+        },
+        {
+          "date": "2026-06-02",
+          "registered": 4,
+          "assigned": 2,
+          "delivered": 3
+        },
+        {
+          "date": "2026-06-03",
+          "registered": 2,
+          "assigned": 3,
+          "delivered": 4
+        },
+        {
+          "date": "2026-06-04",
+          "registered": 3,
+          "assigned": 3,
+          "delivered": 4
+        },
+        {
+          "date": "2026-06-05",
+          "registered": 3,
+          "assigned": 3,
+          "delivered": 4
+        },
+        {
+          "date": "2026-06-06",
+          "registered": 3,
+          "assigned": 3,
+          "delivered": 4
+        },
+        {
+          "date": "2026-06-07",
+          "registered": 3,
+          "assigned": 3,
+          "delivered": 5
+        },
+        {
+          "date": "2026-06-08",
+          "registered": 3,
+          "assigned": 3,
+          "delivered": 5
+        },
+        {
+          "date": "2026-06-09",
+          "registered": 3,
+          "assigned": 3,
+          "delivered": 5
+        },
+        {
+          "date": "2026-06-10",
+          "registered": 3,
+          "assigned": 3,
+          "delivered": 6
+        },
+        {
+          "date": "2026-06-11",
+          "registered": 3,
+          "assigned": 3,
+          "delivered": 6
+        },
+        {
+          "date": "2026-06-12",
+          "registered": 3,
+          "assigned": 3,
+          "delivered": 6
+        },
+        {
+          "date": "2026-06-13",
+          "registered": 2,
+          "assigned": 4,
+          "delivered": 7
+        },
+        {
+          "date": "2026-06-14",
+          "registered": 3,
+          "assigned": 3,
+          "delivered": 7
+        },
+        {
+          "date": "2026-06-15",
+          "registered": 3,
+          "assigned": 3,
+          "delivered": 7
+        },
+        {
+          "date": "2026-06-16",
+          "registered": 2,
+          "assigned": 4,
+          "delivered": 8
+        },
+        {
+          "date": "2026-06-17",
+          "registered": 3,
+          "assigned": 3,
+          "delivered": 8
+        },
+        {
+          "date": "2026-06-18",
+          "registered": 2,
+          "assigned": 4,
+          "delivered": 9
+        },
+        {
+          "date": "2026-06-19",
+          "registered": 2,
+          "assigned": 4,
+          "delivered": 9
+        },
+        {
+          "date": "2026-06-20",
+          "registered": 2,
+          "assigned": 4,
+          "delivered": 9
+        },
+        {
+          "date": "2026-06-21",
+          "registered": 2,
+          "assigned": 4,
+          "delivered": 10
+        }
+      ],
+      "pr_daily": [
+        {
+          "date": "2026-05-25",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 92,
+          "deletions": 95
+        },
+        {
+          "date": "2026-05-26",
+          "prs": 2,
+          "autopilot_merged": 0,
+          "additions": 314,
+          "deletions": 208
+        },
+        {
+          "date": "2026-05-27",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 60,
+          "deletions": 98
+        },
+        {
+          "date": "2026-05-28",
+          "prs": 3,
+          "autopilot_merged": 1,
+          "additions": 381,
+          "deletions": 309
+        },
+        {
+          "date": "2026-05-29",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 44,
+          "deletions": 38
+        },
+        {
+          "date": "2026-05-30",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 166,
+          "deletions": 68
+        },
+        {
+          "date": "2026-05-31",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 106,
+          "deletions": 190
+        },
+        {
+          "date": "2026-06-01",
+          "prs": 3,
+          "autopilot_merged": 1,
+          "additions": 492,
+          "deletions": 96
+        },
+        {
+          "date": "2026-06-02",
+          "prs": 3,
+          "autopilot_merged": 1,
+          "additions": 231,
+          "deletions": 81
+        },
+        {
+          "date": "2026-06-03",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 218,
+          "deletions": 70
+        },
+        {
+          "date": "2026-06-04",
+          "prs": 3,
+          "autopilot_merged": 1,
+          "additions": 618,
+          "deletions": 159
+        },
+        {
+          "date": "2026-06-05",
+          "prs": 4,
+          "autopilot_merged": 2,
+          "additions": 744,
+          "deletions": 280
+        },
+        {
+          "date": "2026-06-06",
+          "prs": 3,
+          "autopilot_merged": 2,
+          "additions": 579,
+          "deletions": 267
+        },
+        {
+          "date": "2026-06-07",
+          "prs": 3,
+          "autopilot_merged": 1,
+          "additions": 546,
+          "deletions": 159
+        },
+        {
+          "date": "2026-06-08",
+          "prs": 3,
+          "autopilot_merged": 2,
+          "additions": 561,
+          "deletions": 60
+        },
+        {
+          "date": "2026-06-09",
+          "prs": 3,
+          "autopilot_merged": 2,
+          "additions": 402,
+          "deletions": 90
+        },
+        {
+          "date": "2026-06-10",
+          "prs": 3,
+          "autopilot_merged": 2,
+          "additions": 639,
+          "deletions": 141
+        },
+        {
+          "date": "2026-06-11",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 336,
+          "deletions": 202
+        },
+        {
+          "date": "2026-06-12",
+          "prs": 4,
+          "autopilot_merged": 3,
+          "additions": 724,
+          "deletions": 268
+        },
+        {
+          "date": "2026-06-13",
+          "prs": 3,
+          "autopilot_merged": 2,
+          "additions": 348,
+          "deletions": 75
+        },
+        {
+          "date": "2026-06-14",
+          "prs": 4,
+          "autopilot_merged": 3,
+          "additions": 812,
+          "deletions": 116
+        },
+        {
+          "date": "2026-06-15",
+          "prs": 4,
+          "autopilot_merged": 3,
+          "additions": 788,
+          "deletions": 348
+        },
+        {
+          "date": "2026-06-16",
+          "prs": 5,
+          "autopilot_merged": 4,
+          "additions": 840,
+          "deletions": 295
+        },
+        {
+          "date": "2026-06-17",
+          "prs": 3,
+          "autopilot_merged": 2,
+          "additions": 318,
+          "deletions": 60
+        },
+        {
+          "date": "2026-06-18",
+          "prs": 5,
+          "autopilot_merged": 4,
+          "additions": 730,
+          "deletions": 495
+        },
+        {
+          "date": "2026-06-19",
+          "prs": 5,
+          "autopilot_merged": 4,
+          "additions": 660,
+          "deletions": 415
+        },
+        {
+          "date": "2026-06-20",
+          "prs": 4,
+          "autopilot_merged": 3,
+          "additions": 580,
+          "deletions": 152
+        },
+        {
+          "date": "2026-06-21",
+          "prs": 3,
+          "autopilot_merged": 3,
+          "additions": 210,
+          "deletions": 72
+        }
+      ],
+      "pr_summary": {
+        "total_prs": 84,
+        "autopilot_merged": 50,
+        "autopilot_share": 0.595,
+        "total_additions": 12539,
+        "total_deletions": 4907,
+        "humans_involved": [
+          "refluster"
+        ]
+      },
+      "pr_contributors": [
+        {
+          "handle": "hana",
+          "kind": "agent",
+          "prs": 28
+        },
+        {
+          "handle": "nadia",
+          "kind": "agent",
+          "prs": 21
+        },
+        {
+          "handle": "sana",
+          "kind": "agent",
+          "prs": 21
+        },
+        {
+          "handle": "mateo",
+          "kind": "agent",
+          "prs": 14
+        },
+        {
+          "handle": "refluster",
+          "kind": "human",
+          "prs": 0
+        }
+      ]
+    },
+    "self/ren": {
+      "scope": "self/ren",
+      "generated_at": "2026-06-22T00:00:00Z",
+      "window": {
+        "start": "2026-05-25",
+        "end": "2026-06-21"
+      },
+      "lifecycle": [
+        {
+          "date": "2026-05-25",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-26",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-27",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-28",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-29",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-30",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-31",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-06-01",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 2
+        },
+        {
+          "date": "2026-06-02",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 2
+        },
+        {
+          "date": "2026-06-03",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 2
+        },
+        {
+          "date": "2026-06-04",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 2
+        },
+        {
+          "date": "2026-06-05",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 2
+        },
+        {
+          "date": "2026-06-06",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 2
+        },
+        {
+          "date": "2026-06-07",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 2
+        },
+        {
+          "date": "2026-06-08",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 2
+        },
+        {
+          "date": "2026-06-09",
+          "registered": 1,
+          "assigned": 2,
+          "delivered": 3
+        },
+        {
+          "date": "2026-06-10",
+          "registered": 1,
+          "assigned": 2,
+          "delivered": 3
+        },
+        {
+          "date": "2026-06-11",
+          "registered": 1,
+          "assigned": 2,
+          "delivered": 3
+        },
+        {
+          "date": "2026-06-12",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 3
+        },
+        {
+          "date": "2026-06-13",
+          "registered": 1,
+          "assigned": 2,
+          "delivered": 3
+        },
+        {
+          "date": "2026-06-14",
+          "registered": 1,
+          "assigned": 2,
+          "delivered": 4
+        },
+        {
+          "date": "2026-06-15",
+          "registered": 1,
+          "assigned": 2,
+          "delivered": 4
+        },
+        {
+          "date": "2026-06-16",
+          "registered": 1,
+          "assigned": 2,
+          "delivered": 4
+        },
+        {
+          "date": "2026-06-17",
+          "registered": 1,
+          "assigned": 2,
+          "delivered": 4
+        },
+        {
+          "date": "2026-06-18",
+          "registered": 1,
+          "assigned": 2,
+          "delivered": 4
+        },
+        {
+          "date": "2026-06-19",
+          "registered": 1,
+          "assigned": 2,
+          "delivered": 4
+        },
+        {
+          "date": "2026-06-20",
+          "registered": 1,
+          "assigned": 2,
+          "delivered": 5
+        },
+        {
+          "date": "2026-06-21",
+          "registered": 1,
+          "assigned": 2,
+          "delivered": 5
+        }
+      ],
+      "pr_daily": [
+        {
+          "date": "2026-05-25",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 120,
+          "deletions": 71
+        },
+        {
+          "date": "2026-05-26",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 45,
+          "deletions": 86
+        },
+        {
+          "date": "2026-05-27",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 85,
+          "deletions": 89
+        },
+        {
+          "date": "2026-05-28",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 170,
+          "deletions": 98
+        },
+        {
+          "date": "2026-05-29",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 60,
+          "deletions": 61
+        },
+        {
+          "date": "2026-05-30",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 139,
+          "deletions": 47
+        },
+        {
+          "date": "2026-05-31",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 211,
+          "deletions": 83
+        },
+        {
+          "date": "2026-06-01",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 53,
+          "deletions": 87
+        },
+        {
+          "date": "2026-06-02",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 190,
+          "deletions": 63
+        },
+        {
+          "date": "2026-06-03",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 103,
+          "deletions": 65
+        },
+        {
+          "date": "2026-06-04",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 215,
+          "deletions": 34
+        },
+        {
+          "date": "2026-06-05",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 336,
+          "deletions": 54
+        },
+        {
+          "date": "2026-06-06",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 152,
+          "deletions": 97
+        },
+        {
+          "date": "2026-06-07",
+          "prs": 1,
+          "autopilot_merged": 1,
+          "additions": 114,
+          "deletions": 37
+        },
+        {
+          "date": "2026-06-08",
+          "prs": 1,
+          "autopilot_merged": 1,
+          "additions": 116,
+          "deletions": 34
+        },
+        {
+          "date": "2026-06-09",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 328,
+          "deletions": 192
+        },
+        {
+          "date": "2026-06-10",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 360,
+          "deletions": 130
+        },
+        {
+          "date": "2026-06-11",
+          "prs": 1,
+          "autopilot_merged": 1,
+          "additions": 62,
+          "deletions": 50
+        },
+        {
+          "date": "2026-06-12",
+          "prs": 1,
+          "autopilot_merged": 1,
+          "additions": 73,
+          "deletions": 35
+        },
+        {
+          "date": "2026-06-13",
+          "prs": 1,
+          "autopilot_merged": 1,
+          "additions": 65,
+          "deletions": 71
+        },
+        {
+          "date": "2026-06-14",
+          "prs": 1,
+          "autopilot_merged": 1,
+          "additions": 66,
+          "deletions": 40
+        },
+        {
+          "date": "2026-06-15",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 318,
+          "deletions": 206
+        },
+        {
+          "date": "2026-06-16",
+          "prs": 1,
+          "autopilot_merged": 1,
+          "additions": 140,
+          "deletions": 98
+        },
+        {
+          "date": "2026-06-17",
+          "prs": 2,
+          "autopilot_merged": 2,
+          "additions": 384,
+          "deletions": 168
+        },
+        {
+          "date": "2026-06-18",
+          "prs": 2,
+          "autopilot_merged": 1,
+          "additions": 192,
+          "deletions": 148
+        },
+        {
+          "date": "2026-06-19",
+          "prs": 1,
+          "autopilot_merged": 1,
+          "additions": 118,
+          "deletions": 84
+        },
+        {
+          "date": "2026-06-20",
+          "prs": 1,
+          "autopilot_merged": 1,
+          "additions": 55,
+          "deletions": 30
+        },
+        {
+          "date": "2026-06-21",
+          "prs": 1,
+          "autopilot_merged": 1,
+          "additions": 174,
+          "deletions": 21
+        }
+      ],
+      "pr_summary": {
+        "total_prs": 34,
+        "autopilot_merged": 17,
+        "autopilot_share": 0.5,
+        "total_additions": 4444,
+        "total_deletions": 2279,
+        "humans_involved": [
+          "refluster"
+        ]
+      },
+      "pr_contributors": [
+        {
+          "handle": "ren",
+          "kind": "agent",
+          "prs": 34
+        },
+        {
+          "handle": "refluster",
+          "kind": "human",
+          "prs": 0
+        }
+      ]
+    }
+  }
+}

@@ -25,6 +25,8 @@ import KPIReadout from '../components/KPIReadout';
 import StatusBadge from '../components/StatusBadge';
 import ProjectArchiveButton from '../components/ProjectArchiveButton';
 import CredentialVault from '../components/CredentialVault';
+import PerformancePanels from '../components/PerformancePanels';
+import { projectScope } from '../lib/performance';
 import {
   apiConfigured,
   fetchProject,
@@ -68,13 +70,22 @@ export default function ProjectProfile() {
   const params = useParams();
   const rawId = params['*'] ?? '';
   // The route param arrives URL-encoded (`self%2Fren`); the API + the
-  // mock fixture key on the decoded form.
-  const projectId = (() => {
+  // mock fixture key on the decoded form. A trailing `/performance` segment
+  // selects the Performance tab (Epic-016) — the `/projects/*` wildcard
+  // captures the whole remainder, so the view is parsed here rather than
+  // via a separate route (which would collide with slash-bearing ids).
+  const { projectId, view } = (() => {
+    let decoded = rawId;
     try {
-      return decodeURIComponent(rawId);
+      decoded = decodeURIComponent(rawId);
     } catch {
-      return rawId;
+      /* keep raw on malformed input */
     }
+    const PERF = '/performance';
+    if (decoded.endsWith(PERF)) {
+      return { projectId: decoded.slice(0, -PERF.length), view: 'performance' as const };
+    }
+    return { projectId: decoded, view: 'overview' as const };
   })();
 
   const [project, setProject] = useState<ProjectDetail | null | undefined>(undefined);
@@ -207,20 +218,61 @@ export default function ProjectProfile() {
         )}
       </section>
 
-      {/* TWO COLUMN: main / sidebar */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6 sm:space-y-8">
-          <OverviewPanel project={project} memberCount={activeMembers.length} />
+      {/* Overview / Performance tabs (Epic-016) */}
+      <ProjectTabs projectId={project.project_id} view={view} />
 
-          <ExecutionHistoryPanel executions={executions} />
+      {view === 'performance' ? (
+        <section className="mb-8 sm:mb-10">
+          <PerformancePanels scope={projectScope(project.project_id)} />
+        </section>
+      ) : (
+        /* TWO COLUMN: main / sidebar */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6 sm:space-y-8">
+            <OverviewPanel project={project} memberCount={activeMembers.length} />
+
+            <ExecutionHistoryPanel executions={executions} />
+          </div>
+
+          <aside className="lg:col-span-1 space-y-6">
+            <MembersPanel members={activeMembers} loading={members === null} />
+            <CredentialVault projectId={project.project_id} />
+          </aside>
         </div>
-
-        <aside className="lg:col-span-1 space-y-6">
-          <MembersPanel members={activeMembers} loading={members === null} />
-          <CredentialVault projectId={project.project_id} />
-        </aside>
-      </div>
+      )}
     </WorkforceLayout>
+  );
+}
+
+function ProjectTabs({
+  projectId,
+  view,
+}: {
+  projectId: string;
+  view: 'overview' | 'performance';
+}) {
+  const enc = encodeURIComponent(projectId);
+  const tabs: { label: string; to: string; active: boolean }[] = [
+    { label: 'Overview', to: `/projects/${enc}`, active: view === 'overview' },
+    { label: 'Performance', to: `/projects/${enc}/performance`, active: view === 'performance' },
+  ];
+  return (
+    <nav className="mb-6 flex items-stretch gap-1 border-b border-wf-outline-variant">
+      {tabs.map((t) => (
+        <Link
+          key={t.to}
+          to={t.to}
+          className={`px-3 py-2 -mb-px border-b-2 font-wfmono text-[11px] uppercase tracking-[0.14em] transition-colors ${
+            t.active
+              ? 'border-wf-on-surface text-wf-on-surface'
+              : 'border-transparent text-wf-on-surface-variant hover:text-wf-on-surface'
+          }`}
+          aria-current={t.active ? 'page' : undefined}
+        >
+          {t.label}
+        </Link>
+      ))}
+    </nav>
   );
 }
 

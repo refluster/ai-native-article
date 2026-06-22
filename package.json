@@ -37,6 +37,7 @@
     "workforce:openapi-routes": "node workforce/scripts/check-openapi-routes.mjs",
     "workforce:api-routes": "node workforce/scripts/check-api-routes.mjs",
     "workforce:skill-spec-drift": "node workforce/scripts/check-skill-spec-drift.mjs",
-    "workforce:scan-drain": "node workforce/scripts/check-scan-drain.mjs"
+    "workforce:scan-drain": "node workforce/scripts/check-scan-drain.mjs",
+    "workforce:pr-metrics": "node workforce/scripts/build-pr-metrics.mjs"
   }
 }
