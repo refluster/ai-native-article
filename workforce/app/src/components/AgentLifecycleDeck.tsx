@@ -8,7 +8,6 @@
 
 import Typeplate from './Typeplate';
 import StackedAreaChart, { type AreaSeries } from './StackedAreaChart';
-import { deliveredShare } from '../types/performance';
 import type { PerformanceSeries } from '../types/performance';
 
 // Bottom→top: registered (base, muted) → assigned (in-flight, blue) →
@@ -20,17 +19,15 @@ const SERIES: AreaSeries[] = [
   { key: 'delivered', label: 'delivered', fill: 'var(--wf-svg-running)' },
 ];
 
-function pct(x: number): string {
-  return `${Math.round(x * 100)}%`;
-}
-
 export default function AgentLifecycleDeck({ series }: { series: PerformanceSeries }) {
   const points = series.lifecycle;
   const last = points[points.length - 1];
   const first = points[0];
-  const shareNow = last ? deliveredShare(last) : 0;
-  const shareThen = first ? deliveredShare(first) : 0;
-  const deltaPts = Math.round((shareNow - shareThen) * 100);
+  // Q2 (operator, 2026-06-22): the headline is the ABSOLUTE delivered count —
+  // the number of personas that have shipped an artefact — not a share/rate.
+  const deliveredNow = last ? last.delivered : 0;
+  const deliveredThen = first ? first.delivered : 0;
+  const delta = deliveredNow - deliveredThen;
   const cohortNow = last ? last.registered + last.assigned + last.delivered : 0;
 
   return (
@@ -43,21 +40,21 @@ export default function AgentLifecycleDeck({ series }: { series: PerformanceSeri
       </div>
 
       <div className="p-4">
-        {/* Delivered-share headline — the read the deck exists for. */}
+        {/* Delivered-count headline — the read the deck exists for (Q2). */}
         <div className="flex flex-wrap items-end gap-x-6 gap-y-2 mb-4">
           <div>
             <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-              delivered share
+              delivered
             </div>
             <div className="font-headline text-3xl font-black tracking-tighter text-wf-on-surface leading-none">
-              {pct(shareNow)}
+              {deliveredNow}
             </div>
           </div>
           <div
-            className={`font-wfmono text-xs ${deltaPts >= 0 ? 'text-wf-running' : 'text-wf-throwing'}`}
-            title="change in delivered share across the window"
+            className={`font-wfmono text-xs ${delta >= 0 ? 'text-wf-running' : 'text-wf-throwing'}`}
+            title="change in delivered count across the window"
           >
-            {deltaPts >= 0 ? '▲' : '▼'} {Math.abs(deltaPts)} pts
+            {delta >= 0 ? '▲' : '▼'} {Math.abs(delta)}
           </div>
           <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
             cohort {cohortNow}

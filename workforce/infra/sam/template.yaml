@@ -503,6 +503,24 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /stats
             Method: GET
+        # Epic-016 Phase 2 — performance analytics (lifecycle funnel + PR
+        # automation), workforce-wide and per-project. Public read, same
+        # CORS-gated shape as /stats; reads the wf-performance-reducer
+        # roll-up items. The handler routes shipped with these events so the
+        # SPA's Performance tab lights up with live data (vs the #357 route
+        # 404ing — the GetStats comment above records that exact failure mode).
+        GetPerformance:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /performance
+            Method: GET
+        GetProjectPerformance:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects/{id}/performance
+            Method: GET
         # Live API reference (operator request 2026-06-13). Public reads —
         # the spec documents routes and schemas, no secrets; the HTML is a
         # static Redoc shell pointing at the sibling YAML route.
@@ -1422,6 +1440,94 @@ Resources:
       Statistic: Sum
       Period: 86400
       EvaluationPeriods: 7
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  # --- Performance reducer (Epic-016 Phase 2) --------------------------------
+  # Daily roll-up that makes the console's agent-lifecycle funnel REAL: snapshots
+  # the active cohort, partitions it registered→assigned→delivered over
+  # AGENT#/bindings[]/EXEC#, and appends the day's point to a per-scope
+  # PERF#{scope}/LIFECYCLE item the agents-api /performance endpoint reads.
+  # Pre-aggregates server-side (the SPA never scans the ledger — Epic-016
+  # §"Behaviour at N=100+"). PR sections (Metric 3) stay git-derived, published
+  # to PERF#{scope}/PR by build-pr-metrics.mjs.
+  WfPerformanceReducerFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-performance-reducer-${Stage}
+      CodeUri: ../../lambdas/performance-reducer
+      Handler: handler.handler
+      Description: Daily agent-lifecycle funnel roll-up for the console Performance surface. Epic-016 Phase 2.
+      MemorySize: 512
+      Timeout: 300
+      Policies:
+        - Statement:
+            - Sid: PerformanceReducerTableAccess
+              Effect: Allow
+              Action:
+                # Scan AGENT#/PROJECT# META + Query EXEC# (GSI1) + Query
+                # MEMBER# / read+write the PERF# roll-up items.
+                - dynamodb:Scan
+                - dynamodb:Query
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+              Resource:
+                - !GetAtt WfTable.Arn
+                - !Sub ${WfTable.Arn}/index/*
+      Events:
+        DailyTick:
+          Type: Schedule
+          Properties:
+            Name: !Sub wf-performance-reducer-tick-${Stage}
+            Description: Drives the Epic-016 daily lifecycle-funnel roll-up.
+            # 02:00 UTC = 11:00 JST — after the day has rolled over UTC so the
+            # snapshot lands on a complete prior day, before the operator's
+            # JST midday review of the console.
+            Schedule: cron(0 2 * * ? *)
+            Enabled: true
+      Tags:
+        workforce: !Ref Stage
+
+  WfPerformanceReducerErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-performance-reducer-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-performance-reducer-${Stage} — the live lifecycle funnel may be stale (Epic-016 W-4 fail-loud).
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfPerformanceReducerFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  # A daily reducer that silently stops appending freezes the funnel without
+  # erroring; breaching on missing Invocations makes the lapse loud. Two daily
+  # buckets below threshold = no run in ~48h (one missed tick tolerated).
+  WfPerformanceReducerMissedRunAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-performance-reducer-missed-run-alarm-${Stage}
+      AlarmDescription: !Sub No wf-performance-reducer-${Stage} invocation in 2 days — the daily lifecycle roll-up is not running.
+      Namespace: AWS/Lambda
+      MetricName: Invocations
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfPerformanceReducerFunction
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 2
       Threshold: 1
       ComparisonOperator: LessThanThreshold
       TreatMissingData: breaching

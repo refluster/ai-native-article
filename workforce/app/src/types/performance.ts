@@ -15,8 +15,10 @@
  *   assigned   — carries ≥1 non-manual binding but has produced no artefact yet.
  *   delivered  — has produced ≥1 EXEC# row with status:ok + an artifact_ref.
  *
- * The headline read is the delivered *share* — expected to climb as hiring
- * converts into bound, then delivered, work.
+ * Personas are counted as head-count (Epic-016 Q1) — one persona contributes to
+ * exactly one band. The deck's headline read is the ABSOLUTE delivered count
+ * (Epic-016 Q2), expected to climb as hiring converts into bound, then
+ * delivered, work; `deliveredShare` below stays available as a secondary read.
  */
 export interface LifecyclePoint {
   /** UTC day, YYYY-MM-DD. */
