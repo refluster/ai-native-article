@@ -25,6 +25,8 @@ import KPIReadout from '../components/KPIReadout';
 import StatusBadge from '../components/StatusBadge';
 import ProjectArchiveButton from '../components/ProjectArchiveButton';
 import CredentialVault from '../components/CredentialVault';
+import PerformancePanels from '../components/PerformancePanels';
+import { projectScope } from '../lib/performance';
 import {
   apiConfigured,
   fetchProject,
@@ -68,13 +70,22 @@ export default function ProjectProfile() {
   const params = useParams();
   const rawId = params['*'] ?? '';
   // The route param arrives URL-encoded (`self%2Fren`); the API + the
-  // mock fixture key on the decoded form.
-  const projectId = (() => {
+  // mock fixture key on the decoded form. A trailing `/performance` segment
+  // selects the Performance tab (Epic-016) — the `/projects/*` wildcard
+  // captures the whole remainder, so the view is parsed here rather than
+  // via a separate route (which would collide with slash-bearing ids).
+  const { projectId, view } = (() => {
+    let decoded = rawId;
     try {
-      return decodeURIComponent(rawId);
+      decoded = decodeURIComponent(rawId);
     } catch {
-      return rawId;
+      /* keep raw on malformed input */
     }
+    const PERF = '/performance';
+    if (decoded.endsWith(PERF)) {
+      return { projectId: decoded.slice(0, -PERF.length), view: 'performance' as const };
+    }
+    return { projectId: decoded, view: 'overview' as const };
   })();
 
   const [project, setProject] = useState<ProjectDetail | null | undefined>(undefined);
@@ -207,20 +218,61 @@ export default function ProjectProfile() {
         )}
       </section>
 
-      {/* TWO COLUMN: main / sidebar */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6 sm:space-y-8">
-          <OverviewPanel project={project} memberCount={activeMembers.length} />
+      {/* Overview / Performance tabs (Epic-016) */}
+      <ProjectTabs projectId={project.project_id} view={view} />
 
-          <ExecutionHistoryPanel executions={executions} />
+      {view === 'performance' ? (
+        <section className="mb-8 sm:mb-10">
+          <PerformancePanels scope={projectScope(project.project_id)} />
+        </section>
+      ) : (
+        /* TWO COLUMN: main / sidebar */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6 sm:space-y-8">
+            <OverviewPanel project={project} memberCount={activeMembers.length} />
+
+            <ExecutionHistoryPanel executions={executions} />
+          </div>
+
+          <aside className="lg:col-span-1 space-y-6">
+            <MembersPanel members={activeMembers} loading={members === null} />
+            <CredentialVault projectId={project.project_id} />
+          </aside>
         </div>
-
-        <aside className="lg:col-span-1 space-y-6">
-          <MembersPanel members={activeMembers} loading={members === null} />
-          <CredentialVault projectId={project.project_id} />
-        </aside>
-      </div>
+      )}
     </WorkforceLayout>
+  );
+}
+
+function ProjectTabs({
+  projectId,
+  view,
+}: {
+  projectId: string;
+  view: 'overview' | 'performance';
+}) {
+  const enc = encodeURIComponent(projectId);
+  const tabs: { label: string; to: string; active: boolean }[] = [
+    { label: 'Overview', to: `/projects/${enc}`, active: view === 'overview' },
+    { label: 'Performance', to: `/projects/${enc}/performance`, active: view === 'performance' },
+  ];
+  return (
+    <nav className="mb-6 flex items-stretch gap-1 border-b border-wf-outline-variant">
+      {tabs.map((t) => (
+        <Link
+          key={t.to}
+          to={t.to}
+          className={`px-3 py-2 -mb-px border-b-2 font-wfmono text-[11px] uppercase tracking-[0.14em] transition-colors ${
+            t.active
+              ? 'border-wf-on-surface text-wf-on-surface'
+              : 'border-transparent text-wf-on-surface-variant hover:text-wf-on-surface'
+          }`}
+          aria-current={t.active ? 'page' : undefined}
+        >
+          {t.label}
+        </Link>
+      ))}
+    </nav>
   );
 }
 
@@ -247,14 +299,44 @@ function OverviewPanel({
       </div>
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-4 text-sm">
         <Fact label="PROJECT_ID" value={project.project_id} mono />
+        {project.name && <Fact label="NAME" value={project.name} />}
         <Fact label="STATUS" value={project.status} />
         <Fact label="OWNER" value={project.owner_agent} />
+        <RepoFact owner={project.github_owner} repo={project.github_repo} />
         <Fact label="CREATED" value={formatDate(project.created_at)} />
         <Fact label="MEMBERS" value={String(memberCount)} />
         <Fact label="LAST EXEC" value={formatRelative(project.last_execution_at)} />
         {project.archived_at && <Fact label="ARCHIVED" value={formatDate(project.archived_at)} />}
       </dl>
     </section>
+  );
+}
+
+// The GitHub repo is the standard project attribute (project.json
+// `github.{owner,repo}`, flattened to `github_owner`/`github_repo` on the
+// META row). Non-confidential — rendered as a deep link to the repo. When
+// a project declares no repo (e.g. `self/*` personal projects) the row is
+// omitted entirely rather than showing an empty cell. Edited via
+// project.json + seed (Epic-010 §10), so this is read-only here.
+function RepoFact({ owner, repo }: { owner?: string; repo?: string }) {
+  if (!owner || !repo) return null;
+  const slug = `${owner}/${repo}`;
+  return (
+    <div>
+      <dt className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-0.5">
+        GITHUB REPO
+      </dt>
+      <dd className="text-sm">
+        <a
+          href={`https://github.com/${owner}/${repo}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-mono text-wf-primary hover:underline"
+        >
+          {slug}
+        </a>
+      </dd>
+    </div>
   );
 }
 

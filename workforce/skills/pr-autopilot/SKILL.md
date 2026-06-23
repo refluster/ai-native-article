@@ -3,9 +3,9 @@ name: pr-autopilot
 description: Workforce skill that drives an open PR through its **full** review cycle in a bound project's repo — route to 1-3 reviewer personas, obtain their reviews, synthesise the unanimous-green / 🟡 / 🔴 verdict, and complete. **Every open PR is in scope — draft and non-draft, human- and bot-authored (Dependabot).** On a unanimous-green verdict for a PR that touches **no L0/L1 governance path** of the target repo, it approves + merges via the shared fail-closed pr-merge.mjs engine; a PR touching the target repo's **governance L0/L1 escalates to a human** for the final call (R-N9 / W-5), as does any non-consensus PR. The merge predicate (adr-0010, 2026-06-17) widened from the old Dependabot safe class to "not-L0/L1 + unanimous reviewer consensus"; the engine re-verifies it server-side and fails closed. Runs as a CCR task (ADR-0005); github.token via the binding's project linkage (Epic-010 §5).
 ---
 
-# pr-autopilot (CCR cron-poll routing leg)
+# pr-autopilot (CCR routing leg — fired on cron OR a pull_request event)
 
-You are routing pull requests in your bound project's repo to reviewer personas under your lens. This runs as a **CCR task** fired by `wf-orchestrator-tick` on the binding's cron. There is no `pr_url` argument — you **discover** which PRs need routing, then route each one.
+You are routing pull requests in your bound project's repo to reviewer personas under your lens. This runs as a **CCR task** fired either by `wf-orchestrator-tick` on the binding's cron, OR — when the binding declares a `github_event` trigger ([adr-0013](../../docs/adr/adr-0013-event-driven-pr-autopilot.md)) — on a `pull_request` event seconds after the PR opens. The cadence is **trigger-agnostic**: there is no `pr_url` argument either way — you **discover** which PRs need routing (the scan skips already-routed ones, so an event-fired and a cron-fired run do the identical, idempotent thing), then route each one.
 
 Your task context supplies:
 
@@ -76,7 +76,7 @@ GITHUB_TOKEN="<credentials['github.token'].token>" \
 - **The lens** = that persona's voice + their skill-judgment config (`lens_name`, `values`, `checklist_sections`, `escalation_triggers`, `bias_disclosure_template` on their `AGENT#{slug}` record). Scan the diff for violations *in that lens only*; silence on an item means "looks good" — post only real findings.
 - **Inline findings** lead with a finding-ID (section letter + integer, e.g. `A1`), name the checklist section, cite `file:line`, 1-3 sentences, suggest the fix concretely. Cycle-2+ comments cite the cycle-1 finding-ID they map to (or flag `[NEW]`).
 - **Summary body**: opening verdict signal (🟢/🟡/🔴 from this lens) → section-by-section notes → **sign-off** `— {persona} (LLM persona; lens: {lens_name}; manual route via pr-autopilot)` → a **bias-disclosure** paragraph (mandatory: it is an LLM persona; what it DID / did NOT do).
-- **Escalation instead of review**: if the PR matches the persona's `escalation_triggers` (e.g. a governance §2 / L0 amendment, an R-rule loosening without amendment, a destructive force-push), post a single comment naming the trigger + "requires explicit operator approval", and do not run the checklist.
+- **Escalation instead of review**: if the PR matches the persona's `escalation_triggers` (e.g. a governance §2 / L0 amendment, an R-rule loosening without amendment, a destructive force-push), post a single comment naming the trigger + "requires explicit operator approval", and do not run the checklist. This is a hand-off to a human, so it follows the escalation-labelling rule (Step 5.2): the comment embeds `<!-- autopilot:needs-human -->` and is posted with `--needs-human`.
 
 Each posted review is a real lens review — concrete findings citing the PR surface, or an explicit "no findings from this lens". When every nominated review is posted, go to Step 5.
 
@@ -91,14 +91,32 @@ Now that the nominated reviews exist (you produced/dispatched them in Step 4, or
    - **🟡** — one or more reviewers have an open blocking finding. Next tick re-routes (cycle += 1) once the author revises.
    - **🔴** — any reviewer's 🔴 is a **veto**, or cycle > `cycle_cap`, or a scope question you can't decide. Escalate to the operator.
 
-   Write a verdict comment that names each reviewer's load-bearing finding and how it resolved, states the aggregated colour, and post it with `pr-autopilot-post.mjs` (Step 3's script — comment-only).
-2. **Complete the cycle** — never leave it open. Every PR that goes to a human is **labelled `autopilot:needs-human`** (pass `--label autopilot:needs-human` to `pr-autopilot-post.mjs` when posting the verdict) so the operator finds the whole queue with `is:open label:autopilot:needs-human`:
-   - **🟢 unanimous-green + touches NO L0/L1 path** → approve + merge via the engine below. (No label — it merges.)
-   - **🟢 unanimous-green + touches the target repo's governance L0/L1** → **escalate to a human** for the final call. Post the verdict with `--label autopilot:needs-human` and tag the operator (`L0/L1 change — operator's final call per W-5`). Do **not** merge.
-   - **🟡** → the verdict lists the required fixes; re-route next tick. (No escalation label — it stays in the cycle.)
-   - **🔴** → escalate: post the verdict with `--label autopilot:needs-human`, state the blocking reason, tag the operator. Do not merge.
+   Write a verdict comment that names each reviewer's load-bearing finding and how it resolved, states the aggregated colour, and post it **with `pr-autopilot-post.mjs`** — that script is the **only** path that applies the escalation label, so the verdict/hand-off comment must go through it, **never** a raw issue-comment API call, `gh`, or an MCP comment tool (any of those drops the label — this is exactly how #353's L0/L1 hand-off reached the operator un-labelled). Flags by outcome: **comment-only** for a 🟡 re-route, or **`--needs-human`** for any hand-off (🔴 / 🟢-but-L0/L1 / no-delegation — see 5.2), composed into the hand-off template in 5.2 so the marker is present by construction.
+2. **Complete the cycle** — never leave it open. **Escalation ALWAYS carries the `autopilot:needs-human` label — no exceptions.** Every comment that hands a PR to a human MUST (a) embed the hidden marker `<!-- autopilot:needs-human -->` in the verdict body **and** (b) be posted with the `--needs-human` flag. `pr-autopilot-post.mjs` stamps the canonical label from *either* signal (belt-and-suspenders, so a forgotten flag still labels from the marker), so the operator finds the whole queue with `is:open label:autopilot:needs-human`:
+   - **🟢 unanimous-green + touches NO L0/L1 path** → approve + merge via the engine below. (No marker, no `--needs-human` — it merges.)
+   - **🟢 unanimous-green + touches the target repo's governance L0/L1** → **escalate to a human** for the final call. Post the verdict **with the `<!-- autopilot:needs-human -->` marker and `--needs-human`**, and tag the operator (`L0/L1 change — operator's final call per W-5`). Do **not** merge.
+   - **🟡** → the verdict lists the required fixes; re-route next tick. (No marker / no `--needs-human` — it stays in the cycle, not the human queue.)
+   - **🔴** → escalate: post the verdict **with the marker and `--needs-human`**, state the blocking reason, tag the operator. Do not merge.
+   - **Any other hand-off** (no R-N10 delegation, unreadable governance, a scope question you can't decide) → same rule: marker + `--needs-human`.
 
-   The `pr-merge.mjs` engine always stamps the same `autopilot:needs-human` label on any tracking **issue** it files (`action:"escalate"`), so PR hand-offs and issue escalations share one searchable queue.
+   **Hand-off verdict template — compose the verdict *into* this block, never freehand** (the trailing marker is the mechanical half of the guarantee: it forces the label even if `--needs-human` is ever dropped, and it is only reliably present if you start from this template — Step 2 has the analogous routing template):
+   ```md
+   **<PersonaName> — verdict, cycle <n> of ≤ <cycle_cap>. <🟢 escalate / 🔴 / hand-off>.**
+
+   <one-paragraph synthesis: each nominated reviewer's load-bearing finding and how it resolved, then the aggregated colour>
+
+   **Handing to the operator — <reason>.** <e.g. "🟢 consensus, but touches L0/L1 path `<file>` — operator's final call per W-5"; or "🔴 <reviewer>'s blocking finding"; or "no R-N10 delegation".> Not merging.
+
+   — <PersonaName> (CCR persona; see workforce/skills/pr-autopilot/SKILL.md)
+
+   <!-- autopilot:needs-human -->
+   ```
+   So every hand-off comment is posted as:
+   ```sh
+   GITHUB_TOKEN="<…>" node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
+     --project "<project_id>" --pr <number> --body-file /tmp/verdict-<number>.md --needs-human
+   ```
+   and the verdict body ends with the marker line `<!-- autopilot:needs-human -->` (the template above already carries it). The `pr-merge.mjs` engine independently stamps the same label on any tracking **issue** it files (`action:"escalate"`), and the label name is single-sourced (`ESCALATION_LABEL`) across both scripts — so PR hand-offs and issue escalations share one searchable queue. **A hand-off comment with no `autopilot:needs-human` label is a cadence bug, not a finished run.**
 
 ### The merge leg — unanimous-green, non-L0/L1 only (R-N10 / adr-0010)
 

@@ -19,12 +19,23 @@
 //   GITHUB_TOKEN=<credentials['github.token'].token> \
 //     node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
 //       --project asp-cloud --pr 42 --body-file /tmp/route-body-42.md \
-//       [--label autopilot:needs-human]   # repeatable; stamp on hand-off/escalation
+//       [--needs-human] [--label <name>]   # see escalation rule below
 //
-// Pass --label on a verdict that hands off to a human (a 🟢 PR touching the
-// target's governance L0/L1, a 🔴 verdict, a non-consensus PR) so the operator
-// can list the queue with `is:open label:autopilot:needs-human`. Missing labels
-// are auto-created. Routing comments (cycle 1) carry no label.
+// ESCALATION ALWAYS CARRIES THE LABEL (operator directive 2026-06-21). Any
+// comment that hands a PR to a human — a 🟢 PR touching the target's governance
+// L0/L1, a 🔴 verdict, a non-consensus PR, a no-delegation hand-off — MUST be
+// stamped `autopilot:needs-human` so the operator finds the queue with
+// `is:open label:autopilot:needs-human`. This script applies that label from
+// EITHER signal, so a hand-off can never reach a human un-labelled even if one
+// is forgotten:
+//   - `--needs-human` flag, OR
+//   - the hidden marker `<!-- autopilot:needs-human -->` embedded in the verdict
+//     body (the SKILL.md escalation template carries it).
+// The canonical label name is single-sourced from pr-merge.mjs (ESCALATION_LABEL),
+// the same constant the engine stamps on escalation issues — one queue, one name.
+// Extra `--label <name>` values (repeatable) are merged in. Routing comments
+// (cycle 1) carry neither flag nor marker, so they stay unlabelled. Missing
+// labels are auto-created.
 //
 // Exit codes:
 //   0  — comment created (HTTP 201); labels best-effort
@@ -36,15 +47,25 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { projectRepo } from "./pr-autopilot-scan.mjs";
+import { ESCALATION_LABEL } from "./pr-merge.mjs";
 
 const GH_API = "https://api.github.com";
 const ESCALATION_LABEL_COLOR = "b60205";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..", "..", "..");
 
+/** Hidden marker the SKILL.md hand-off/escalation verdict template embeds. Its
+ *  presence in the comment body forces ESCALATION_LABEL even if --needs-human
+ *  was omitted — the mechanical half of "escalation ALWAYS carries the label". */
+export const NEEDS_HUMAN_MARKER = "<!-- autopilot:needs-human -->";
+
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : undefined;
+}
+
+function flag(name) {
+  return process.argv.includes(`--${name}`);
 }
 
 /** All values passed via repeated --label flags. */
@@ -53,6 +74,17 @@ function labelArgs() {
   for (let i = 0; i < process.argv.length; i++) {
     if (process.argv[i] === "--label" && process.argv[i + 1]) out.push(process.argv[i + 1]);
   }
+  return [...new Set(out)];
+}
+
+/** The label set to stamp. Exported + pure so the invariant "any hand-off to a
+ *  human carries ESCALATION_LABEL" is unit-tested, not merely documented: the
+ *  canonical label is added whenever the verdict escalates — signalled by the
+ *  --needs-human flag OR the hidden body marker — on top of any explicit
+ *  --label values. */
+export function resolveLabels(rawLabels, { needsHuman = false, body = "" } = {}) {
+  const out = [...rawLabels];
+  if (needsHuman || body.includes(NEEDS_HUMAN_MARKER)) out.push(ESCALATION_LABEL);
   return [...new Set(out)];
 }
 
@@ -115,7 +147,9 @@ async function main() {
     console.log(`pr-autopilot-post: posted to ${owner}/${repo}#${prNumber} (comment ${json.id ?? "?"})`);
     // Stamp escalation labels (best-effort: a label problem must not fail a
     // comment that already landed). Auto-create any label the repo lacks.
-    const labels = labelArgs();
+    // resolveLabels guarantees ESCALATION_LABEL whenever this comment hands the
+    // PR to a human (--needs-human flag or the body marker).
+    const labels = resolveLabels(labelArgs(), { needsHuman: flag("needs-human"), body });
     if (labels.length > 0) {
       for (const name of labels) {
         const cr = await gh(token, "POST", `/repos/${owner}/${repo}/labels`, {

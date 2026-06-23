@@ -274,10 +274,12 @@ export async function patchAgentBindings(
   return json.bindings ?? bindings
 }
 
-/** Skills this agent may bind (R8: the agent must be in the skill's
- *  owners[]). Public read; used to populate the add-binding picker. */
-export async function fetchBindableSkills(slug: string): Promise<string[]> {
-  const res = await fetch(`${ROSTER_API_BASE}/skills?owner=${encodeURIComponent(slug)}&page_size=100`)
+/** Skills this agent may bind. Since adr-0012 binding is decoupled from
+ *  ownership: any agent may bind any *active* skill, so this returns the
+ *  full active-skill list (no `?owner=` filter). Public read; used to
+ *  populate the add-binding picker. */
+export async function fetchBindableSkills(): Promise<string[]> {
+  const res = await fetch(`${ROSTER_API_BASE}/skills?status=active&page_size=100`)
   if (!res.ok) throw new Error(`agents-api ${res.status}`)
   const data = (await res.json()) as { items: Array<{ name: string; status: string }> }
   return data.items.filter((s) => s.status === 'active').map((s) => s.name)

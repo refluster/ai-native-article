@@ -220,7 +220,7 @@ components:
         body: { type: string, description: 'The SKILL.md judgment text — DDB-authoritative (ADR-0008); the runner composes with THIS, not the git copy.' }
         deliverable: { type: object, nullable: true, additionalProperties: true, description: Git-authoritative (seed-reconciled); not PATCHable. }
         cost_class: { type: string, enum: [small, medium, large] }
-        owners: { type: array, items: { type: string }, description: Agent slugs allowed to bind this skill (R8). }
+        owners: { type: array, items: { type: string }, description: Authorship/Rule-11/improvement set. Not a binding prerequisite (adr-0012) — any agent may bind any existing skill. }
         improvement_agent: { type: string, nullable: true }
         improvement_agent_override: { type: string, nullable: true }
         improvement_agent_effective: { type: string, nullable: true }
@@ -235,7 +235,7 @@ components:
         description: { type: string, maxLength: 1024 }
         version: { type: string, description: semver }
         status: { type: string, enum: [active, stale, deprecated] }
-        owners: { type: array, items: { type: string }, description: Must exist + be non-archived; shrinking past a live binding is rejected (R8-reverse). }
+        owners: { type: array, items: { type: string }, description: Must exist + be non-archived. The authorship/Rule-11/improvement set; not a binding prerequisite (adr-0012), so it may be shrunk freely. }
         cost_class: { type: string, enum: [small, medium, large] }
         improvement_agent: { type: string, nullable: true }
         improvement_agent_override: { type: string, nullable: true }
@@ -249,6 +249,9 @@ components:
         archived_at: { type: string }
         member_count: { type: integer }
         last_execution_at: { type: string }
+        name: { type: string, description: Human-readable project name. }
+        github_owner: { type: string, example: refluster, description: 'Standard target-repo attribute (non-confidential variable). Both github_owner + github_repo present or both absent. The PAT is a separate credential under wf/projects/[id]/github.token.' }
+        github_repo: { type: string, example: project-ind }
     ArtifactRef:
       type: object
       description: Reference to a produced FILE deliverable. Its 'summary' is a ≤512-char inline preview of the artefact body (the S3 body is fetched on demand) — distinct from the engagement's own top-level 'summary'.
@@ -476,6 +479,12 @@ paths:
       tags: [meta]
       summary: Dashboard aggregate (EXEC-ledger roll-up)
       responses: { "200": { description: OK } }
+  /performance:
+    get:
+      tags: [meta]
+      summary: 'Workforce performance analytics (Epic-016): live lifecycle funnel + PR automation'
+      description: 'Live agent-lifecycle funnel (registered→assigned→delivered) from the daily reducer roll-up, plus the git-derived PR-automation sections. 404 until the first reducer run lands a roll-up (the client then serves its illustrative fallback).'
+      responses: { "200": { description: OK }, "404": { description: No roll-up yet for this scope } }
   /skills:
     get:
       tags: [skills]
@@ -509,7 +518,7 @@ paths:
         "200": { description: Updated (kind=config AUDIT appended), content: { application/json: { schema: { $ref: '#/components/schemas/Skill' } } } }
         "400": { description: non_patchable_fields (git-owned / immutable) }
         "404": { description: not_found }
-        "422": { description: Validation failed (J-rules, G4 body cap, R8-reverse), content: { application/json: { schema: { $ref: '#/components/schemas/ValidationError' } } } }
+        "422": { description: Validation failed (J-rules, G4 body cap), content: { application/json: { schema: { $ref: '#/components/schemas/ValidationError' } } } }
   /skills/{name}/audit:
     get:
       tags: [skills]
@@ -573,6 +582,13 @@ paths:
       summary: Provisioned credential metadata (never values)
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       responses: { "200": { description: OK } }
+  /projects/{id}/performance:
+    get:
+      tags: [projects]
+      summary: 'Project-scoped performance analytics (Epic-016): lifecycle funnel + PR automation'
+      description: 'Same shape as /performance, scoped to one project. id is percent-encoded for ids containing "/" (e.g. self%2Fren). 404 until the reducer lands a roll-up for the scope.'
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK }, "404": { description: No roll-up yet for this scope } }
   /feed:
     get:
       tags: [feed]

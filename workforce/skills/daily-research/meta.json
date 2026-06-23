@@ -1,0 +1,16 @@
+{
+  "name": "daily-research",
+  "version": "0.3.0",
+  "status": "active",
+  "archetype": "cadence",
+  "cost_class": "small",
+  "owners": [
+    "grace",
+    "ishaan"
+  ],
+  "improvement_agent": "sana",
+  "created_at": "2026-06-19",
+  "requires": [
+    "workforce.feed_write_token"
+  ]
+}

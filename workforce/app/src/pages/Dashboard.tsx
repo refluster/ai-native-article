@@ -32,6 +32,8 @@ import StatusPill, { deriveStatus } from '../components/StatusPill';
 import KPIReadout from '../components/KPIReadout';
 import HeatStrip, { intensityClass } from '../components/HeatStrip';
 import LiveTrace from '../components/LiveTrace';
+import PerformancePanels from '../components/PerformancePanels';
+import { WORKFORCE_SCOPE } from '../lib/performance';
 import { loadWorkforceManifest, loadWorkforceStats, fullName } from '../lib/agents';
 import { fmtDuration, fmtCompute } from '../lib/duration';
 import { SITE_DISPLAY_NAME } from '../config/site';
@@ -256,6 +258,18 @@ export default function Dashboard() {
             })}
           </ul>
         </div>
+      </section>
+
+      {/* PERFORMANCE ANALYTICS (Epic-016) ----------------------------- */}
+      <section className="mb-8 sm:mb-10">
+        <div className="mb-3">
+          <Typeplate label="DECK 03–04" value="PERFORMANCE · ANALYTICS" />
+          <p className="mt-1 text-sm text-wf-on-surface-variant max-w-prose leading-relaxed">
+            The workforce as one organism: is hiring converting into delivered
+            output, and is the delivery process shedding its humans?
+          </p>
+        </div>
+        <PerformancePanels scope={WORKFORCE_SCOPE} />
       </section>
 
       <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">

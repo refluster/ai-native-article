@@ -21,6 +21,7 @@ import {
   patchAgentBindings,
 } from '../lib/agents';
 import { SIGV4_IS_CONFIGURED } from '../config/auth';
+import { effectiveSchedule, scheduleLabel } from '../lib/effectiveSchedule';
 import type { AgentBinding } from '../types/agent';
 
 interface Props {
@@ -145,13 +146,14 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
     return () => window.clearTimeout(id);
   }, [success]);
 
-  // Lazy-load the R8-eligible skill list the first time the add form opens.
+  // Lazy-load the bindable skill list (all active skills — binding is no
+  // longer gated on ownership, adr-0012) the first time the add form opens.
   // A failed fetch lands a distinct 'error' sentinel so the <select>
   // resolves to a retryable state instead of an indefinite "loading…".
   useEffect(() => {
     if (!adding || bindableSkills !== null) return;
     let cancelled = false;
-    fetchBindableSkills(slug)
+    fetchBindableSkills()
       .then((names) => {
         if (cancelled) return;
         setBindableSkills(names);
@@ -312,8 +314,17 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
                   <span className="text-[10px] text-wf-on-surface-variant">{CRON_HINT}</span>
                 </span>
               ) : (
-                <span className="font-wfmono text-[11px] uppercase tracking-[0.12em] text-wf-on-surface-variant">
-                  {b.trigger.cron ?? b.trigger.scheduler}
+                <span
+                  className={`font-wfmono text-[11px] uppercase tracking-[0.12em] ${
+                    effectiveSchedule(b).kind === 'dead-cron' ? 'text-wf-error' : 'text-wf-on-surface-variant'
+                  }`}
+                  title={
+                    effectiveSchedule(b).kind === 'dead-cron'
+                      ? 'This cron is decorative — the scheduler can’t fire it. Flip scheduler→external + invoked_by=api to enable (operator B-authority).'
+                      : undefined
+                  }
+                >
+                  {scheduleLabel(b)}
                   {b.project_id ? ` · ${b.project_id}` : ''}
                 </span>
               )}
@@ -364,7 +375,7 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
               >
                 {bindableSkills === null && <option value="">loading…</option>}
                 {Array.isArray(bindableSkills) && skillList.length === 0 && (
-                  <option value="">no bindable skills — add {slug} to a skill’s owners first (R8)</option>
+                  <option value="">no active skills in the repository</option>
                 )}
                 {skillList.map((n) => (
                   <option key={n} value={n}>{n}</option>

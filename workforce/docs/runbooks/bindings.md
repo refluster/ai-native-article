@@ -50,11 +50,23 @@ The `config` schema is skill-specific; validators check structural fields (execu
 
 The orchestrator-tick (`wf-orchestrator-tick-{stage}`) dispatches bindings where `executor=lambda` AND `trigger.scheduler=eventbridge`. `lambda` bindings with `scheduler=external` are fired by another binding's API GW call (notably `wf-webhook-{stage}` in Phase 7) or by another Lambda's async invoke. `lambda` bindings with `scheduler=manual` are operator-driven: `aws lambda invoke --function-name wf-agent-runner-{stage} --payload '{"agent":"nadia","binding_idx":N,"project_id":"asp-cloud","args":{...}}' out.json`. All non-`lambda` bindings are documentation + audit; they are fired by their respective schedulers (CCR cloud / GHA / external POST).
 
+## The effective schedule — one predicate, no decorative crons
+
+A binding's `trigger.cron` is **load-bearing only when its scheduler actually consumes it**: `external`+`invoked_by=api` (the orchestrator-fired CCR batch — `isOrchestratorOwnedCcr`), `eventbridge`, `gha`, or `claude-code-routine` (CCR self-schedule). A cron on **any other** scheduler — notably `scheduler=manual`, or `external` without `invoked_by=api` — is a **dead cron**: the string is present but no fire path reads it, so the binding does not run.
+
+This is exactly how the `daily-research` cadence (Epic-015) misled the console: it landed correctly PAUSED (`scheduler=manual`, **no cron**, per `workforce/seed/policy-group/wire-daily-research.mjs`), but a cron was later hand-added while the scheduler stayed `manual` — a half-applied Phase-4 enable. The orchestrator-tick screens the binding out at `isOrchestratorOwnedCcr` (`workforce/lambdas/orchestrator/handler.ts`) **before** any cron is evaluated, so it never appeared in the fire history; meanwhile the UI rendered the cron as if it were live.
+
+**The single predicate.** "Will this binding fire, and when?" is answered by `effectiveSchedule(binding)` in `workforce/lambdas/shared/agent.ts` (mirrored, with a parity fixture, in `workforce/app/src/lib/effectiveSchedule.ts`). It is derived from the **same** `isOrchestratorOwnedCcr` gate the orchestrator uses, so the console can never again disagree with the engine. Any surface that displays a binding's schedule MUST go through it (or `scheduleLabel`) — never `trigger.cron ?? scheduler`, which presents a dead cron as live.
+
+**Enabling a paused cadence (operator, B-authority).** Flip `scheduler→external` + `invoked_by=api` + add the staggered `cron` **in one write** — atomically, so the binding never sits in the `manual`+cron dead-cron state. This is the §5 "enable a previously-disabled rule" B-authority action.
+
+**§6 follow-up (recommended).** The agents-api write-time validator (`workforce/lambdas/shared/agent-config.ts`) does not yet reject/flag a binding written with a dead cron (cron present + non-consuming scheduler). Surfacing it at the write boundary (a non-blocking `S9-binding-dead-cron` notice, since a hard reject would block the legitimate "author then enable" path and re-validating a full `bindings[]` array could lock edits on agents that already carry the drift) closes this class at the source as well as the display. Tracked as an operator decision (reject vs. a new validator warning channel).
+
 ## How to add each kind of binding
 
 ### `executor: lambda` — orchestrator-tick fires the wf-agent-runner
 
-This is the original v1 shape, unchanged behaviour. The skill folder under `workforce/skills/{name}/` carries `meta.json` (which sets `owners[]`, must include this agent's slug) and either a `handler.ts` (deterministic) or `SKILL.md` (llm-prose / claude-code-routine).
+This is the original v1 shape, unchanged behaviour. The skill folder under `workforce/skills/{name}/` carries `meta.json` (which sets `owners[]` — the authorship/Rule-11/improvement set; since [adr-0012](../adr/adr-0012-decouple-binding-from-ownership.md) it is **not** a binding prerequisite, so the binding agent need not appear in it) and either a `handler.ts` (deterministic) or `SKILL.md` (llm-prose / claude-code-routine).
 
 ```jsonc
 {
@@ -151,6 +163,6 @@ The agents-api write-time validator (`workforce/lambdas/shared/agent-config.ts`,
 - cron presence when required (`S9-binding-cron`, `S9-binding-ccr-trigger`)
 - `external` scheduler must have `invoked_by` (`S9-binding-external-invoked-by`)
 - `routine_spec` / `workflow` presence and file existence (`S9-binding-routine-spec`, `R8-routine-spec-exists`, `S9-binding-workflow`, `R8-workflow-exists`)
-- `executor=lambda` skill folder + owner cross-checks (`R8-binding-skill-exists`, `R8-binding-skill-owner`)
+- skill **existence** cross-check (`R8-binding-skill-exists`). The former owner cross-check (`R8-binding-skill-owner`) was removed by [adr-0012](../adr/adr-0012-decouple-binding-from-ownership.md) — binding is decoupled from ownership.
 
 Lint failures block the PR. Loosening any of these is Zone A (governance amendment).

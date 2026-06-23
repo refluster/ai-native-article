@@ -110,6 +110,12 @@ import {
   type ProjectMemberRow,
   type ProjectMetaRow,
 } from "../shared/project.js";
+import {
+  type PerfLifecycleRow,
+  type PerfPrRow,
+  composeSeries,
+  perfPk,
+} from "../shared/performance.js";
 import { recall, type RecallResult } from "../shared/recall.js";
 import { isValidEngagementToken } from "../shared/engagement-token.js";
 import { CREDENTIAL_TYPES } from "../shared/credential-injector.js";
@@ -240,6 +246,11 @@ export async function handler(
     // await` so the audit-append throw routes through the 500 mapping.
     if (routeKey === "POST /agents") return await createAgent(event);
     if (routeKey === "GET /stats") return listStats(event);
+    // Epic-016 Phase 2 — performance analytics (lifecycle funnel + PR
+    // automation). Public read, same CORS-gated shape as /stats. Serves the
+    // reducer's live lifecycle roll-up; 404 (→ client illustrative fallback)
+    // until the first reducer run lands a PERF#{scope}/LIFECYCLE item.
+    if (routeKey === "GET /performance") return getPerformanceRoute("workforce");
     if (routeKey === "GET /skills") return listSkills(event);
     if (routeKey === "GET /skills/{name}/audit" && skillName) return listSkillAuditRoute(skillName, event);
     if (routeKey === "GET /skills/{name}" && skillName) return getSkill(skillName);
@@ -266,6 +277,7 @@ export async function handler(
     if (routeKey === "GET /projects/{id}/members" && projectId) return listProjectMembers(projectId, event);
     if (routeKey === "GET /projects/{id}/executions" && projectId) return listProjectExecutions(projectId, event);
     if (routeKey === "GET /projects/{id}/credentials" && projectId) return listProjectCredentials(projectId);
+    if (routeKey === "GET /projects/{id}/performance" && projectId) return getPerformanceRoute(projectId);
     if (routeKey === "PATCH /projects/{id}" && projectId) return patchProject(projectId, event.body);
     if (routeKey === "GET /projects/{id}" && projectId) return getProjectRoute(projectId);
     if (routeKey === "GET /feed") return listFeedRoute(event);
@@ -614,7 +626,7 @@ async function patchAgent(
   if (identityKeys.length > 0) {
     const skillOwners = await buildSkillOwnersLookup(patch.bindings);
     violations.push(
-      ...validateIdentityPatch(patch, { slug, otherAgentsEffectiveBudgetUsd, skillOwners }),
+      ...validateIdentityPatch(patch, { otherAgentsEffectiveBudgetUsd, skillOwners }),
     );
   }
   if ("budget_monthly_usd_override" in patch) {
@@ -683,7 +695,6 @@ async function createAgent(
   const otherAgentsEffectiveBudgetUsd = await sumOtherEffectiveBudgets(slug);
   const skillOwners = await buildSkillOwnersLookup(parsed.bindings);
   const violations = validateAgentCreate(parsed, {
-    slug,
     otherAgentsEffectiveBudgetUsd,
     skillOwners,
   });
@@ -895,31 +906,9 @@ async function patchSkill(
     agentState: (slug) => stateMap.get(slug),
   });
 
-  // Reverse-R8 (M2, PR #304 review): shrinking owners[] must not orphan an
-  // EXISTING binding — the agent-side R8 check would otherwise surface the
-  // breakage as a confusing 422 on a later, unrelated agent PATCH. One
-  // META scan at C-3 scale; non-archived agents only.
-  if (violations.length === 0 && Array.isArray(parsed.owners)) {
-    const nextOwners = new Set(parsed.owners.filter((s): s is string => typeof s === "string"));
-    const removed = (existing.owners ?? []).filter((s) => !nextOwners.has(s));
-    if (removed.length > 0) {
-      let cursor: string | undefined;
-      do {
-        const page = await scanPrefix<AgentMetaRow>("AGENT#", "META", PAGE_SIZE_MAX, cursor);
-        for (const row of page.items) {
-          if (row.archived || !removed.includes(row.slug)) continue;
-          if ((row.bindings ?? []).some((b) => b.skill === name)) {
-            violations.push({
-              rule: "R8-reverse",
-              field: "owners",
-              msg: `cannot remove owner "${row.slug}": AGENT#${row.slug} still has a binding on skill "${name}" — unbind first (PATCH the agent's bindings), then shrink owners`,
-            });
-          }
-        }
-        cursor = page.cursor;
-      } while (cursor);
-    }
-  }
+  // Reverse-R8 retired by adr-0012: binding no longer requires ownership, so
+  // shrinking owners[] can never orphan a binding. owners[] is now purely the
+  // authorship/Rule-11/improvement set; editing it is independent of bindings.
 
   if (violations.length > 0) {
     return reply(422, { error: "config_validation_failed", violations });
@@ -978,6 +967,14 @@ interface ProjectApiView {
   /** Most-recent EXEC#* `started_at` on this project's partition.
    *  Undefined when the ledger is empty. */
   last_execution_at?: string;
+  /** Human-readable project name (project.json `name`). */
+  name?: string;
+  /** Standard project attribute: the GitHub repo this project ships work
+   *  against. Non-confidential project variable (the PAT is a separate
+   *  credential under `wf/projects/{id}/github.token`). Both present or
+   *  both absent. Surfaced so the console can render the repo link. */
+  github_owner?: string;
+  github_repo?: string;
 }
 
 function toProjectApiView(row: ProjectMetaRow): ProjectApiView {
@@ -987,6 +984,9 @@ function toProjectApiView(row: ProjectMetaRow): ProjectApiView {
     owner_agent: row.owner_agent,
     created_at: row.created_at,
     archived_at: row.archived_at,
+    name: row.name,
+    github_owner: row.github_owner,
+    github_repo: row.github_repo,
   };
 }
 
@@ -1178,6 +1178,24 @@ async function getProjectRoute(rawId: string): Promise<APIGatewayProxyResultV2> 
   view.member_count = memberRows.filter((m) => m.revoked_at === undefined).length;
   if (lastExec !== undefined) view.last_execution_at = lastExec;
   return reply(200, view);
+}
+
+// Epic-016 Phase 2 — assemble one scope's PerformanceSeries from the two
+// roll-up items: LIFECYCLE (reducer-owned, the live funnel) + PR (git-derived,
+// published by build-pr-metrics.mjs). LIFECYCLE is the live differentiator: its
+// absence means the reducer has not run for this scope yet, so we 404 and let
+// the client serve its illustrative fallback (Epic-016 §"Data contract" — a
+// missing live roll-up is graceful degradation, not a masked outage). The PR
+// item is optional — a scope with lifecycle but no published PR sections serves
+// an empty PR block rather than 404ing the whole series.
+async function getPerformanceRoute(scope: string): Promise<APIGatewayProxyResultV2> {
+  const [lifecycleRow, prRow] = await Promise.all([
+    getItem<PerfLifecycleRow>(perfPk(scope), "LIFECYCLE"),
+    getItem<PerfPrRow>(perfPk(scope), "PR"),
+  ]);
+  if (!lifecycleRow) return reply(404, { error: "not_found", scope });
+  const series = composeSeries(scope, new Date().toISOString(), lifecycleRow, prRow);
+  return reply(200, series);
 }
 
 async function listProjectMembers(

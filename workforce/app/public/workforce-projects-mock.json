@@ -4,11 +4,14 @@
   "projects": [
     {
       "project_id": "workforce-meta",
+      "name": "Workforce Meta",
       "status": "active",
       "owner_agent": "_operator",
       "created_at": "2026-05-10T12:00:00Z",
       "member_count": 3,
-      "last_execution_at": "2026-05-26T16:12:00Z"
+      "last_execution_at": "2026-05-26T16:12:00Z",
+      "github_owner": "refluster",
+      "github_repo": "ai-native-article"
     },
     {
       "project_id": "editorial",
