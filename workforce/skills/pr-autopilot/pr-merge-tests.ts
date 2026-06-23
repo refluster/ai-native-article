@@ -10,6 +10,8 @@ import {
   resolveL0L1Paths,
   reviewerSignedOff,
   reviewerGreenMarker,
+  countRouterCycles,
+  W4_CYCLE_CAP,
   verifyMergeable,
   applyDecisions,
   ESCALATION_LABEL,
@@ -146,6 +148,48 @@ describe("verifyMergeable (fail-closed predicate)", () => {
       "o/r", 1, { reviewers: ["dario"] },
     );
     expect(v.ok).toBe(false);
+  });
+});
+
+describe("countRouterCycles (FU-004)", () => {
+  it("returns 0 for empty input", () => expect(countRouterCycles([])).toBe(0));
+  it("returns 0 when no routing comment is present", () =>
+    expect(countRouterCycles(["no routing here", "just a review comment"])).toBe(0));
+  it("detects cycle 1 from a canonical routing comment", () =>
+    expect(countRouterCycles(["**Nadia — cycle 1 of ≤ 7.**\n\nPR summary…"])).toBe(1));
+  it("detects the highest cycle across multiple routing comments", () =>
+    expect(countRouterCycles([
+      "**Nadia — cycle 1 of ≤ 7.**",
+      "other comment",
+      "**Nadia — cycle 3 of ≤ 7.**",
+    ])).toBe(3));
+  it("matches when persona name contains a space", () =>
+    expect(countRouterCycles(["**Some Name — cycle 2 of ≤ 7.**"])).toBe(2));
+  it("W4_CYCLE_CAP is 7", () => expect(W4_CYCLE_CAP).toBe(7));
+});
+
+describe("verifyMergeable — W-4 cycle cap (FU-004)", () => {
+  it("allows merge when cycle equals W4_CYCLE_CAP (exactly 7)", async () => {
+    const gh = mockGh(routes(
+      [{ filename: "src/app.ts" }],
+      GREEN_CHECK,
+      DARIO_REVIEW,
+      [{ body: "**Nadia — cycle 7 of ≤ 7.**\n\nsummary" }],
+    ));
+    const v = await verifyMergeable(gh, "o/r", 1, { reviewers: ["dario"] });
+    expect(v.ok).toBe(true);
+  });
+  it("refuses merge when cycle exceeds W4_CYCLE_CAP (cycle = 8)", async () => {
+    const gh = mockGh(routes(
+      [{ filename: "src/app.ts" }],
+      GREEN_CHECK,
+      DARIO_REVIEW,
+      [{ body: "**Nadia — cycle 8 of ≤ 7.**\n\nsummary" }],
+    ));
+    const v = await verifyMergeable(gh, "o/r", 1, { reviewers: ["dario"] });
+    expect(v.ok).toBe(false);
+    expect(v.why).toMatch(/W-4/);
+    expect(v.why).toMatch(/cycle 8/);
   });
 });
 
