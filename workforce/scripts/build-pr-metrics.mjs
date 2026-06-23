@@ -207,8 +207,14 @@ async function publishToDdb(scope, b) {
     process.exit(1);
   }
   // Dynamic import so the offline --dry-run / --write paths never need the SDK.
-  const { DynamoDBClient } = await import('@aws-sdk/client-dynamodb');
-  const { DynamoDBDocumentClient, PutCommand } = await import('@aws-sdk/lib-dynamodb');
+  // @aws-sdk lives in workforce/lambdas/node_modules; resolve it from there so
+  // this script runs from any cwd (ESM bare-specifier resolution is file-relative).
+  const { createRequire } = await import('node:module');
+  const { pathToFileURL } = await import('node:url');
+  const lambdasReq = createRequire(join(ROOT, 'workforce', 'lambdas', 'package.json'));
+  const importLambdaDep = (spec) => import(pathToFileURL(lambdasReq.resolve(spec)).href);
+  const { DynamoDBClient } = await importLambdaDep('@aws-sdk/client-dynamodb');
+  const { DynamoDBDocumentClient, PutCommand } = await importLambdaDep('@aws-sdk/lib-dynamodb');
   const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
     marshallOptions: { removeUndefinedValues: true },
   });

@@ -8,8 +8,11 @@
 // item that the agents-api `/performance` endpoint reads back.
 //
 //   registered — an AGENT#{slug} row exists, but no triggerable binding yet.
-//   assigned   — carries ≥1 load-bearing (non-manual) binding, no artefact yet.
-//   delivered  — has ≥1 EXEC# row with status:ok + an artifact_ref.
+//   assigned   — carries ≥1 load-bearing (non-manual) binding, no delivery yet.
+//   delivered  — has ≥1 EXEC# row with status:ok (any successful execution —
+//                a shipped artefact OR a completed engagement such as a
+//                pr-review/route; Epic-016 Phase 3 widened this from
+//                "status:ok + artifact_ref" so review-heavy work counts).
 //
 // Furthest state wins (delivered ⊃ assigned ⊃ registered) and personas are
 // counted as head-count (Epic-016 Q1), so the three bands are mutually
@@ -95,7 +98,8 @@ export async function handler(): Promise<PerformanceReducerResult> {
   const workforceStates: LifecycleState[] = [];
   for (const meta of metas) {
     const execs = await okExecs(meta.slug);
-    const hasDelivered = execs.some((e) => e.artifact_ref !== undefined);
+    // Delivered = any successful execution (Phase 3: artefact OR engagement).
+    const hasDelivered = execs.length > 0;
     const hasTriggerable = hasTriggerableBinding(meta);
     workforceStates.push(classifyAgentState({ hasDelivered, hasTriggerableBinding: hasTriggerable }));
   }
@@ -113,9 +117,7 @@ export async function handler(): Promise<PerformanceReducerResult> {
     const states: LifecycleState[] = [];
     for (const slug of memberSlugs) {
       const execs = await okExecs(slug);
-      const hasDelivered = execs.some(
-        (e) => e.project_id === projectId && e.artifact_ref !== undefined,
-      );
+      const hasDelivered = execs.some((e) => e.project_id === projectId);
       const hasTriggerable = hasTriggerableBinding(metaBySlug.get(slug), projectId);
       states.push(classifyAgentState({ hasDelivered, hasTriggerableBinding: hasTriggerable }));
     }
