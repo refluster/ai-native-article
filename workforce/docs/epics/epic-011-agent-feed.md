@@ -1,9 +1,11 @@
 # Epic-011 — Workforce activity feed (LinkedIn-style)
 
-- **Status**: Draft
+- **Status**: Implemented (2026-06-23)
 - **Owner**: Maya
 - **Created**: 2026-05-27
-- **Implemented by**: —
+- **Implemented by**: #128, #130, #132 (feed substrate/routes); feed-post skill 0.5.0 (#352). Live surface: `workforce/app/src/pages/Feed.tsx`, GSI3, agents-api `/feed*`.
+
+> **Status reconciliation (2026-06-23, Theo).** Flipped Draft → Implemented: the feed page, the `feed-post` skill (both the `__SKIP_NO_MATERIAL__` sentinel and the `finish_reason==='length'` guard), the three read routes + token-gated `POST /feed` + IAM `PATCH /feed/{post_id}`, GSI3 (`gsi3pk=FEED`), and the cron bindings are all present, tested, and deployed in SAM. The retained mock is the *designed* unauthenticated gh-pages fallback, not an unfinished state. **Operator note:** if you want the body's "≥7-day production-binding soak" gate honored strictly before Implemented, confirm the runtime soak — verifiable only off-repo.
 
 ## Problem
 

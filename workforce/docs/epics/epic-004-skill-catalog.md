@@ -1,9 +1,11 @@
 # Epic-004 — Skill catalog + utilization
 
-- **Status**: Draft
+- **Status**: Implemented (2026-06-23)
 - **Owner**: Maya
 - **Created**: 2026-05-18
-- **Implemented by**: —
+- **Implemented by**: present at repo import (`65d7848`); #332 (live `GET /skills`, ADR-0008). Live surface: `workforce/app/src/pages/SkillDirectory.tsx` + `SkillProfile.tsx`.
+
+> **Status reconciliation (2026-06-23, Nadia).** Flipped Draft → Implemented: the skill catalog index and per-skill detail read live from `GET /skills` / `GET /skills/{name}` with status filters, owner chips, and search. The only not-fully-live piece is invocation-history counts, which the Epic itself scoped as "populated once the runner lands."
 
 ## Problem
 

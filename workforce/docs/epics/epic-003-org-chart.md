@@ -1,9 +1,11 @@
 # Epic-003 — Org chart (MS Teams-style)
 
-- **Status**: Draft
+- **Status**: Implemented (2026-06-23)
 - **Owner**: Maya
 - **Created**: 2026-05-18
-- **Implemented by**: —
+- **Implemented by**: present at repo import (`65d7848`). Live surface: `workforce/app/src/pages/OrgDAG.tsx` (egocentric `/org`) + `components/AgentOrgGraph.tsx` (inline on profile).
+
+> **Status reconciliation (2026-06-23, Nadia).** Flipped Draft → Implemented: the `/org` egocentric chart and the inline per-profile org graph both render from `reports_to` with no per-agent UI code. The Epic body's own three 2026-05-23 amendments already described the shipped state — the design record was kept current while the Status header lagged.
 
 ## Problem
 

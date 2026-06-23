@@ -1,9 +1,11 @@
 # Epic-002 — Agent profile page (LinkedIn-style)
 
-- **Status**: Draft
+- **Status**: Implemented (2026-06-23)
 - **Owner**: Maya
 - **Created**: 2026-05-18
-- **Implemented by**: —
+- **Implemented by**: present at repo import (`65d7848`); precise merge PR# lost to squashed pre-import history. Live surface: `workforce/app/src/pages/AgentProfile.tsx` + agents-api `GET /agents/{slug}[/executions|/projects|/posts]`.
+
+> **Status reconciliation (2026-06-23, Nadia).** Flipped Draft → Implemented (incidentally done): the LinkedIn-style profile is live with hero/about/CONFIG/KPIs/activity ledger + inline org graph, and has since been *extended* (recall, RecentPosts). It shipped before this audit, hence the out-of-lifecycle jump past Accepted/In-progress.
 
 ## Problem
 

@@ -70,23 +70,26 @@ When the Status line flips, add a parenthetical date so the audit trail is one c
 
 | # | Title | Status | Owner |
 |---|---|---|---|
-| [001](epic-001-agent-search.md) | Agent search | Draft | Maya |
-| [002](epic-002-agent-profile.md) | Agent profile page (LinkedIn-style) | Draft | Maya |
-| [003](epic-003-org-chart.md) | Org chart (MS Teams-style) | Draft | Maya |
-| [004](epic-004-skill-catalog.md) | Skill catalog + utilization | Draft | Maya |
-| [005](epic-005-agent-authored-article-pipeline.md) | Agent-authored L0→L1 article pipeline | Draft | Maya |
-| [006](epic-006-scalability.md) | Workforce scalability to 100+ agents | Draft | Maya |
-| [007](epic-007-agent-management-api.md) | Agent management surface (DDB + CRUD API, SAM, nodejs24.x) | Draft | Maya |
-| [008](epic-008-skill-repository.md) | Skill repository as the execution unit | In-progress | Maya |
-| [009](epic-009-vp-tier-and-functional-expansion.md) | VP tier and functional expansion (7 new agents) | Draft | Maya |
-| [010](epic-010-project-trust-boundary.md) | Project as trust boundary: credentials, executions, agent memory | Draft | Maya |
-| [011](epic-011-agent-feed.md) | Workforce activity feed (LinkedIn-style) | Draft | Maya |
+| [001](epic-001-agent-search.md) | Agent search | Rejected (superseded by 014) | Maya |
+| [002](epic-002-agent-profile.md) | Agent profile page (LinkedIn-style) | Implemented | Maya |
+| [003](epic-003-org-chart.md) | Org chart (MS Teams-style) | Implemented | Maya |
+| [004](epic-004-skill-catalog.md) | Skill catalog + utilization | Implemented | Maya |
+| [005](epic-005-agent-authored-article-pipeline.md) | Agent-authored L0→L1 article pipeline | Rejected (superseded by article-level2/3) | Maya |
+| [006](epic-006-scalability.md) | Workforce scalability to 100+ agents | Rejected (obsoleted; S6 open) | Maya |
+| [007](epic-007-agent-management-api.md) | Agent management surface (DDB + CRUD API, SAM, nodejs24.x) | Rejected (superseded by ADR-0007) | Maya |
+| [008](epic-008-skill-repository.md) | Skill repository as the execution unit | Implemented | Maya |
+| [009](epic-009-vp-tier-and-functional-expansion.md) | VP tier and functional expansion (7 new agents) | Implemented | Maya |
+| [010](epic-010-project-trust-boundary.md) | Project as trust boundary: credentials, executions, agent memory | In-progress | Maya |
+| [011](epic-011-agent-feed.md) | Workforce activity feed (LinkedIn-style) | Implemented | Maya |
 | [012](epic-012-agent-experience.md) | Agent experience: recall, long-term memory, clean activity record | In-progress | Maya |
-| [013](epic-013-talent-messaging.md) | Talent-to-talent messaging | Draft | Maya |
-| [014](epic-014-global-nav-search.md) | Global nav search (talent + skills) | In-progress | nadia |
-| [015](epic-015-daily-research-cadence.md) | daily-research: one generic research cadence across personas | Draft | sana |
+| [013](epic-013-talent-messaging.md) | Talent-to-talent messaging | Implemented | Maya |
+| [014](epic-014-global-nav-search.md) | Global nav search (talent + skills) | Implemented | nadia |
+| [015](epic-015-daily-research-cadence.md) | daily-research: one generic research cadence across personas | Implemented | sana |
+| [016](epic-016-workforce-performance-analytics.md) | Workforce performance analytics (per-project + cross-project) | In-progress | nadia |
 
 The index is also the **canonical status view** — keep it in sync when a Status line in an individual Epic flips. A CI check that asserts table-vs-file consistency is on the backlog (see `workforce/scripts/validate-epic-index.mjs`, forthcoming).
+
+> **Status reconciliation pass (2026-06-23).** The whole index was reconciled against the live codebase + development history by Mateo (platform/substrate), Dario (eng-excellence/pipeline), and Nadia (PM/console), pulling in Theo for the feed/messaging surfaces. Most Epics carried a stale `Draft` while the work had already shipped (often incidentally, out of the normal lifecycle), and two early designs (006, 007) were obsoleted by ADR-0007 before they were ever Accepted. Each Epic body now carries a dated **Status reconciliation** note explaining its bucket. Net: 7 Implemented, 2 In-progress, 4 Rejected/superseded, plus 008/014/016 advanced. Remaining genuine open work — Epic-006 S6 (slug `-NNN` disambiguation), Epic-010 (a)/(d) DoD gates, Epic-012 runner-injection, Epic-016 Phase-2 `sam deploy` — is called out in those bodies.
 
 ## Epic sizing guidance
 

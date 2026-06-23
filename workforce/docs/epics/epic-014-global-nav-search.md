@@ -1,9 +1,11 @@
 # Epic-014 — Global nav search (talent + skills)
 
-- **Status**: In-progress (2026-06-15)
+- **Status**: Implemented (2026-06-23)
 - **Owner**: nadia
 - **Created**: 2026-06-15
-- **Implemented by**: (this PR)
+- **Implemented by**: #320. Live surface: `workforce/app/src/lib/search.ts`, `pages/SearchResults.tsx`, `components/GlobalSearch.tsx` (mounted in `GlobalNav`).
+
+> **Status reconciliation (2026-06-23, Nadia).** Flipped In-progress → Implemented: the sole tracked PR (#320) is merged — the shared `lib/search` ranking module (unit-tested), the `/search` page, and the `GlobalNav` typeahead are all live with every acceptance criterion checked. Only the status line lagged one step.
 
 ## Problem
 
