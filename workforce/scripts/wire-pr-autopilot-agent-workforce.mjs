@@ -87,7 +87,7 @@ const BINDING = {
       "Cadence / finance / policy personas have no review surface on this repo's code + pipeline PRs; nominate only when their lens is actually implicated.",
   },
   note:
-    "Nadia's PdM-lens pr-autopilot on the workforce's own repo (refluster/ai-native-article, via project agent-workforce). Fires every 6h; routes ≤5 PRs/tick to reviewer lenses and drives each to a consensus verdict. Own-repo: a 🟢 non-L0/L1 PR escalates to the operator to merge (W-5; root docs/governance.md §4.4 / workforce adr-0010) — never an agent self-merge.",
+    "Nadia's PdM-lens pr-autopilot on the workforce's own repo (refluster/ai-native-article, via project agent-workforce). Fires every 6h; routes ≤5 PRs/tick to reviewer lenses and drives each to a consensus verdict. Own-repo is a normal delegated target (adr-0011, Accepted): a 🟢 non-L0/L1 consensus PR is merged by the agent, exactly as on an external delegated repo; only the L0/L1 boundary (root docs/governance.md §4.4) escalates to the operator. Drafts are merge-eligible too (adr-0014) — a green draft is marked Ready for Review, then merged.",
 };
 
 function curlJson(method, path, body) {
