@@ -1,8 +1,8 @@
 # Epic-016 — Workforce performance analytics (per-project + cross-project)
 
-- **Status**: In-progress (Phase 1 shipped 2026-06-22 — #357 IA + both metric families, #359 graceful fallback; Phase 2 code-complete #361, pending operator `sam deploy`)
+- **Status**: In-progress. Phase 1 **shipped** (#357 / #359). Phase 2 (live lifecycle reducer + `/performance` endpoints, #361) is **deployed and serving** — the live endpoints return real reducer data (confirmed 2026-06-23 against the execute-api origin). Phase 3 (2026-06-23) **populated real data**: widened `delivered`, a 28-day lifecycle backfill, and an authoritative GitHub-API PR builder — all run against prod, so the decks now show 28-day curves + real PR/autopilot metrics (workforce 218 PRs / 2.8% autopilot; asp-cloud 214 / 4.2%). Q1/Q2/Q3 **resolved**. **Remaining**: redeploy the reducer (widened `delivered`, OP-011) + schedule the daily PR refresh (OP-012).
 
-> **Status reconciliation (2026-06-23, Nadia).** Normalized the prose Status to the lifecycle word **In-progress**. Phase 1 (console IA + both metric families + graceful illustrative fallback) is live; Phase 2 (live lifecycle reducer Lambda + `/performance` endpoints, #361; Q1/Q2/Q3 resolved) is code- and infra-complete but **not yet live on AWS** — it is gated on the operator's `sam deploy` + wiring `build-pr-metrics.mjs --publish-ddb` into the deploy workflow. Flip to Implemented once that deploy lands.
+> **Status reconciliation (2026-06-23, Nadia).** Phase 2 is live (the reducer ran and the `/performance` endpoints serve real data — the earlier "pending `sam deploy`" note is superseded). Phase 3 added real-data population on top; the only open work is the ongoing daily refresh wiring (OP-011 reducer redeploy for the widened `delivered`, OP-012 daily PR refresh). Flip to Implemented once those land.
 - **Owner**: nadia
 - **Created**: 2026-06-22
 - **Implemented by**: Phase 1 — #357 / #359. Phase 2 — nadia (lead, IA + endpoint shape), hana (data plane: the `AUDIT#`/`bindings[]`/`EXEC#` partition + roll-up item contract), ren (reducer Lambda build under Dario's L2 bar).
@@ -86,7 +86,7 @@ readable):
 
 - **registered** — hired (an `AGENT#{slug}` row exists; first `AUDIT#…kind=create`) but holds no non-manual binding yet.
 - **assigned** — carries ≥1 triggerable binding (`META.bindings[]`, `trigger ≠ manual`) but has not yet produced a delivered artefact.
-- **delivered** — has produced ≥1 `EXEC#` row with `status:ok` + an `artifact_ref`.
+- **delivered** — has produced ≥1 `EXEC#` row with `status:ok` (Phase 3 widened this from "`status:ok` + an `artifact_ref`" so artefact-less engagements like pr-review count — see Phase 3).
 
 The headline read is the **delivered share** = `delivered / (registered +
 assigned + delivered)`. The thesis (and the chart's whole point) is that this
@@ -236,6 +236,41 @@ function + routes; the schedule ships `Enabled: true` (Phase-2 greenlit); wire
 `build-pr-metrics.mjs --publish-ddb --table $TABLE_NAME` into the deploy
 workflow so the live endpoint serves PR sections. Until then the surface keeps
 rendering the illustrative fallback — no user-visible regression.
+
+## Phase 3 — real-data population (2026-06-23)
+
+Phase 2 deployed, but the live decks read near-empty: the lifecycle chart was a
+single flat point (the reducer snapshots forward, so a fresh deploy has no
+history) and the PR deck was 0 (the `--publish-ddb` git-proxy was never wired,
+and even when run it can't see the autopilot split — every squash-merge is
+authored by the one push identity). Phase 3 makes the data real:
+
+- **`delivered` widened (Q-followup).** The reducer (and the backfill) now count
+  *any* `status:ok` EXEC as delivered, not only those with an `artifact_ref` —
+  so artefact-less engagements (pr-review/route, the bulk of review-heavy
+  projects) count. (asp-cloud went 1→3 delivered on this alone.) **Needs the
+  reducer redeploy** for the ongoing daily snapshot to match the backfill.
+- **28-day lifecycle backfill** (`workforce/scripts/backfill-performance-lifecycle.mjs`):
+  reconstructs the trailing window from history already in DDB — per agent
+  `created_at` (cohort entry) + earliest `status:ok` EXEC (first delivery,
+  global + per-project) + current triggerable bindings — and writes the 28-point
+  `PERF#{scope}/LIFECYCLE` for workforce + every active project. One-shot,
+  idempotent. Ran 2026-06-23: workforce delivered 1→28 across the window;
+  asp-cloud 0→3; 25 scopes. The delivered curve is exact from EXEC history;
+  `assigned` is approximated by current bindings.
+- **Authoritative PR metrics** (`workforce/scripts/build-pr-metrics-github.mjs`):
+  reads GitHub merge metadata for *any* repo (so it works for the external
+  asp-cloud, not just this repo). A PR is **autopilot-merged** iff its thread
+  carries a pr-autopilot green consensus marker (`<!-- autopilot:review:{slug}:green -->`)
+  and no `autopilot:needs-human` label — the real "no human in the loop" signal
+  (this is the Phase-2.1 authoritative split the build-script header promised).
+  Ran 2026-06-23 → `PERF#{scope}/PR`: workforce 218 PRs / 2.8% autopilot / churn
+  +75988/-27103 / reviewers dario·ren·sana·…; asp-cloud 214 PRs / 4.2% autopilot
+  / reviewers ren·dario.
+
+**Remaining operator wiring (the "daily batch" so it stays fresh):**
+1. **Redeploy the reducer** (broadened `delivered`) so ongoing daily snapshots match the backfill.
+2. **Schedule a daily PR refresh** — run `build-pr-metrics-github.mjs --publish-ddb` per scope (workforce + each project with a repo) on a cron, OR fold it into the reducer Lambda (needs the project `github.token` in the reducer's Secrets-Manager grant). The backfill is one-shot (history can't be re-derived forward); the daily job keeps the trailing window current.
 
 ## Out of scope
 

@@ -127,7 +127,9 @@ export type LifecycleState = "registered" | "assigned" | "delivered";
  *  partition needs. `delivered` dominates `assigned` dominates `registered`
  *  (furthest state wins) — every hired persona is at least `registered`. */
 export interface AgentLifecycleSignal {
-  /** ≥1 EXEC# row with status:ok + an artifact_ref in the scope's partition. */
+  /** ≥1 EXEC# row with status:ok in the scope's partition. Phase 3 widened
+   *  this from "status:ok + artifact_ref" to any successful execution, so
+   *  artefact-less engagements (pr-review/route) count as delivered work. */
   hasDelivered: boolean;
   /** carries ≥1 triggerable (non-manual / load-bearing) binding in scope. */
   hasTriggerableBinding: boolean;

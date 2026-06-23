@@ -13,7 +13,9 @@
  *
  *   registered — hired (AGENT# row exists) but holds no triggerable binding yet.
  *   assigned   — carries ≥1 non-manual binding but has produced no artefact yet.
- *   delivered  — has produced ≥1 EXEC# row with status:ok + an artifact_ref.
+ *   delivered  — has produced ≥1 EXEC# row with status:ok (any successful
+ *                execution — a shipped artefact OR a completed engagement such
+ *                as a pr-review; widened in Epic-016 Phase 3).
  *
  * Personas are counted as head-count (Epic-016 Q1) — one persona contributes to
  * exactly one band. The deck's headline read is the ABSOLUTE delivered count

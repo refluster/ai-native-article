@@ -32,11 +32,9 @@ const META = [
   { slug: "sana", bindings: [{ skill: "z", executor: "cli", trigger: { scheduler: "manual" } }] },
 ];
 
-const okExecWithArtifact = (project_id: string) => ({
-  project_id,
-  status: "ok",
-  artifact_ref: { uri: "s3://b/k", content_hash: "h", content_type: "text/markdown", size_bytes: 1, summary: "s" },
-});
+// Phase 3: delivered = ANY status:ok execution, artifact_ref no longer required
+// (so an artefact-less engagement such as a pr-review counts as delivered).
+const okExec = (project_id: string) => ({ project_id, status: "ok" });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -49,7 +47,7 @@ beforeEach(() => {
   );
   // ren delivered (has ok+artifact), others none.
   listExecutions.mockImplementation(async (f: { agent_slug: string }) =>
-    f.agent_slug === "ren" ? [okExecWithArtifact("editorial")] : [],
+    f.agent_slug === "ren" ? [okExec("editorial")] : [],
   );
   members.mockResolvedValue(["ren", "maya"]);
 });

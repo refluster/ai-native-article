@@ -2,8 +2,9 @@
 // into autopilot-merged (no human in the loop) vs human-involved, plus a
 // summary band: autopilot share (the headline, target → 100%), churn (± lines
 // per PR), and the distinct humans still touching merged PRs (the set we are
-// trying to shrink). The PR series is real — derived offline from git history
-// by workforce/scripts/build-pr-metrics.mjs.
+// trying to shrink). The PR series is real — derived from GitHub merge metadata
+// by workforce/scripts/build-pr-metrics-github.mjs (autopilot-merged = a PR with
+// pr-autopilot green consensus markers and no autopilot:needs-human label).
 
 import Typeplate from './Typeplate';
 import type { PerformanceSeries } from '../types/performance';
@@ -51,10 +52,21 @@ export default function PrAutomationDeck({ series }: { series: PerformanceSeries
           />
         </div>
 
-        {/* Daily stacked bars: autopilot (green) over human-involved (amber). */}
-        <div className="overflow-x-auto">
-          <div className="flex items-end gap-[3px]" style={{ height: 120, minWidth: days.length * 10 }}>
-            {days.map((d) => {
+        {/* Daily stacked bars: autopilot (green) over human-involved (amber).
+            Y-axis shows the peak PRs/day (top) → 0 so the scale reads without
+            hovering (Epic-016 Phase 3). */}
+        <div className="flex items-stretch">
+          <div
+            className="flex flex-col justify-between pr-1.5 text-right font-wfmono text-[10px] tabular-nums text-wf-on-surface-variant"
+            style={{ height: 120 }}
+            aria-hidden
+          >
+            <span>{maxPrs}</span>
+            <span>0</span>
+          </div>
+          <div className="overflow-x-auto flex-1 min-w-0">
+            <div className="flex items-end gap-[3px]" style={{ height: 120, minWidth: days.length * 10 }}>
+              {days.map((d) => {
               const human = Math.max(0, d.prs - d.autopilot_merged);
               const h = (d.prs / maxPrs) * 100;
               const autoFrac = d.prs > 0 ? d.autopilot_merged / d.prs : 0;
@@ -75,7 +87,8 @@ export default function PrAutomationDeck({ series }: { series: PerformanceSeries
                   </div>
                 </div>
               );
-            })}
+              })}
+            </div>
           </div>
         </div>
 

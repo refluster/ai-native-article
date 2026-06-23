@@ -79,47 +79,71 @@ export default function StackedAreaChart({
 
   return (
     <div className={className}>
-      <svg
-        viewBox={`0 0 ${VW} ${VH}`}
-        preserveAspectRatio="none"
-        width="100%"
-        height={height}
-        role="img"
-        aria-label={ariaLabel}
-        style={{ display: 'block' }}
-      >
-        {/* Baseline. */}
-        <line
-          x1={0}
-          y1={VH}
-          x2={VW}
-          y2={VH}
-          stroke="var(--wf-svg-outline-variant)"
-          strokeWidth={0.5}
-          vectorEffect="non-scaling-stroke"
-        />
-        {bands.map((b) => (
-          <polygon key={b.series.key} points={b.points} fill={b.series.fill} fillOpacity={0.85} />
-        ))}
-        {/* Transparent per-day hover columns carrying the breakdown title. */}
-        {tooltip &&
-          data.map((d, i) => (
-            <rect
-              key={i}
-              x={Math.max(0, i - VW / n / 2)}
-              y={0}
-              width={VW / n}
-              height={VH}
-              fill="transparent"
-            >
-              <title>{tooltip(d)}</title>
-            </rect>
-          ))}
-      </svg>
-      {/* x-axis: first → last value of xKey (the date range the area spans). */}
-      <div className="mt-1 flex justify-between font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-        <span>{String(data[0][xKey])}</span>
-        {data.length > 1 && <span>{String(data[data.length - 1][xKey])}</span>}
+      <div className="flex items-stretch">
+        {/* Y-axis scale: max stack total (top) → 0 (bottom), so the absolute
+            scale is readable without hovering (Epic-016 Phase 3). */}
+        <div
+          className="flex flex-col justify-between pr-1.5 text-right font-wfmono text-[10px] tabular-nums text-wf-on-surface-variant"
+          style={{ height }}
+          aria-hidden
+        >
+          <span>{maxTotal}</span>
+          <span>0</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <svg
+            viewBox={`0 0 ${VW} ${VH}`}
+            preserveAspectRatio="none"
+            width="100%"
+            height={height}
+            role="img"
+            aria-label={ariaLabel}
+            style={{ display: 'block' }}
+          >
+            {/* Top gridline at the max, + baseline at 0. */}
+            <line
+              x1={0}
+              y1={0}
+              x2={VW}
+              y2={0}
+              stroke="var(--wf-svg-outline-variant)"
+              strokeWidth={0.5}
+              strokeDasharray="2 2"
+              vectorEffect="non-scaling-stroke"
+            />
+            <line
+              x1={0}
+              y1={VH}
+              x2={VW}
+              y2={VH}
+              stroke="var(--wf-svg-outline-variant)"
+              strokeWidth={0.5}
+              vectorEffect="non-scaling-stroke"
+            />
+            {bands.map((b) => (
+              <polygon key={b.series.key} points={b.points} fill={b.series.fill} fillOpacity={0.85} />
+            ))}
+            {/* Transparent per-day hover columns carrying the breakdown title. */}
+            {tooltip &&
+              data.map((d, i) => (
+                <rect
+                  key={i}
+                  x={Math.max(0, i - VW / n / 2)}
+                  y={0}
+                  width={VW / n}
+                  height={VH}
+                  fill="transparent"
+                >
+                  <title>{tooltip(d)}</title>
+                </rect>
+              ))}
+          </svg>
+          {/* x-axis: first → last value of xKey (the date range the area spans). */}
+          <div className="mt-1 flex justify-between font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+            <span>{String(data[0][xKey])}</span>
+            {data.length > 1 && <span>{String(data[data.length - 1][xKey])}</span>}
+          </div>
+        </div>
       </div>
     </div>
   );
