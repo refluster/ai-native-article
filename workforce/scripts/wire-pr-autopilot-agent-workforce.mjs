@@ -7,10 +7,18 @@
 // What this adds:
 //   - pr-autopilot, every 6h, Nadia (PdM router lens), project=agent-workforce.
 //     The project's github surface is refluster/ai-native-article — the
-//     workforce's OWN repo — so the merge leg never self-merges: a 🟢,
-//     non-L0/L1, consensus PR escalates to the operator (W-5 own-repo rule,
-//     root docs/governance.md §4.4 + workforce adr-0010). The cadence routes
-//     ≤5 PRs per tick (config.max_prs_per_tick → the scan's `--max 5`).
+//     workforce's OWN repo — and adr-0011 retired the self-repo carve-out: it
+//     is now treated **identically to an external delegated R-N10 target**
+//     (root docs/governance.md §4.4 carries the delegation + the L0/L1 block).
+//     So a 🟢 unanimous-green, **non-L0/L1**, consensus PR is **merged by the
+//     agent**, exactly as on PSVL/asp-cloud; only a PR touching the L0/L1
+//     boundary (governance / ADR / identity / schedule / production paths) —
+//     or a 🔴 / non-consensus verdict — escalates to the operator. A 🟢
+//     merge-ready L0/L1 hand-off carries `autopilot:reviewed` alongside
+//     `autopilot:needs-human` so the operator's merge-ready queue is legible.
+//     Every open PR is in scope — draft and non-draft, human- and bot-authored
+//     (adr-0010). The cadence routes ≤5 PRs/tick (config.max_prs_per_tick →
+//     the scan's `--max 5`).
 //
 // PREREQ:
 //   1. workforce/projects/agent-workforce/project.json declares
@@ -22,10 +30,13 @@
 //   3. The data-plane deploy that syncs the pr-autopilot SKILL# row has run
 //      (the R8 write-time check validates the binding against it).
 //
-// Idempotent: the binding is keyed on (skill, project_id). If Nadia already
-// has pr-autopilot bound for agent-workforce, this is a no-op (her existing
-// asp-cloud pr-autopilot binding is preserved and untouched — binding_idx is
-// load-bearing, so existing bindings keep their slot; this only appends).
+// Idempotent + declares desired state. The binding is keyed on (skill,
+// project_id). If Nadia has no agent-workforce pr-autopilot binding it is
+// appended; if she has one that already equals this declaration it is a true
+// no-op; if she has one that has DRIFTED (e.g. a stale note) it is replaced
+// in place — same slot, so binding_idx stays load-bearing — so the corrected
+// note/config re-syncs. Her separate asp-cloud pr-autopilot binding is matched
+// out by project_id and left untouched in every case.
 //
 // Usage:
 //   node workforce/scripts/wire-pr-autopilot-agent-workforce.mjs --dry-run
@@ -87,7 +98,7 @@ const BINDING = {
       "Cadence / finance / policy personas have no review surface on this repo's code + pipeline PRs; nominate only when their lens is actually implicated.",
   },
   note:
-    "Nadia's PdM-lens pr-autopilot on the workforce's own repo (refluster/ai-native-article, via project agent-workforce). Fires every 6h; routes ≤5 PRs/tick to reviewer lenses and drives each to a consensus verdict. Own-repo: a 🟢 non-L0/L1 PR escalates to the operator to merge (W-5; root docs/governance.md §4.4 / workforce adr-0010) — never an agent self-merge.",
+    "Nadia's PdM-lens pr-autopilot on the workforce's own repo (refluster/ai-native-article, via project agent-workforce). Fires every 6h; routes ≤5 PRs/tick — draft and non-draft, human- and bot-authored (adr-0010) — to reviewer lenses and drives each to a consensus verdict. Own-repo is a normal delegated R-N10 target (adr-0011, root docs/governance.md §4.4): a 🟢 unanimous-green, non-L0/L1 PR is merged by the agent; an L0/L1 (or 🔴 / non-consensus) PR escalates to the operator. A 🟢 merge-ready L0/L1 hand-off carries autopilot:reviewed + autopilot:needs-human so the operator's merge-ready queue is legible.",
 };
 
 function curlJson(method, path, body) {
@@ -114,27 +125,51 @@ if (!Array.isArray(cur.bindings)) {
   process.exit(1);
 }
 
-// Dedup on (skill, project_id) — Nadia already has pr-autopilot for asp-cloud;
-// only skip if she already has it for THIS project.
-const already = cur.bindings.some(
+// Stable, key-order-independent serialization so a true no-op (the live binding
+// already equals what we declare) is distinguished from drift (e.g. a stale
+// note/config that must re-sync) — order of keys in the GET response is not
+// guaranteed to match our literal.
+const stable = (v) =>
+  v && typeof v === "object" && !Array.isArray(v)
+    ? `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${stable(v[k])}`).join(",")}}`
+    : Array.isArray(v)
+      ? `[${v.map(stable).join(",")}]`
+      : JSON.stringify(v);
+
+// This script declares the DESIRED state of Nadia's (pr-autopilot @ agent-
+// workforce) binding. Match on (skill, project_id) — Nadia also has a separate
+// pr-autopilot binding for asp-cloud, which is preserved untouched.
+//   - not present  → append (existing bindings keep their binding_idx).
+//   - present, equal → true no-op.
+//   - present, drifted → REPLACE in place (same slot, binding_idx preserved)
+//     so a corrected note/config re-syncs to DDB. Earlier the script skipped on
+//     mere presence, which left the live binding's stale (pre-adr-0011) note in
+//     place after the prose was fixed — replace-on-drift closes that.
+const idx = cur.bindings.findIndex(
   (b) => b.skill === BINDING.skill && b.project_id === BINDING.project_id,
 );
-if (already) {
-  console.log(`  - ${SLUG}: pr-autopilot @ ${PROJECT_ID} already bound, skipped (no-op).`);
-  process.exit(0);
-}
-
-// Append-only: existing bindings keep their binding_idx.
-const next = [...cur.bindings, BINDING];
 const summary = `${BINDING.skill} @ ${PROJECT_ID} (${BINDING.trigger.cron})`;
+let next;
+let verb;
+if (idx >= 0) {
+  if (stable(cur.bindings[idx]) === stable(BINDING)) {
+    console.log(`  - ${SLUG}: pr-autopilot @ ${PROJECT_ID} already bound + current, skipped (no-op).`);
+    process.exit(0);
+  }
+  next = cur.bindings.map((b, i) => (i === idx ? BINDING : b));
+  verb = "updated (in-place, binding_idx preserved)";
+} else {
+  next = [...cur.bindings, BINDING];
+  verb = "bound";
+}
 if (DRY_RUN) {
-  console.log(`  [dry-run] ${SLUG}: would PATCH bindings -> +1 (${summary}); total ${next.length}`);
+  console.log(`  [dry-run] ${SLUG}: would PATCH bindings -> ${verb} (${summary}); total ${next.length}`);
   process.exit(0);
 }
 
 const { status, json } = curlJson("PATCH", `/agents/${SLUG}`, { bindings: next });
 if (status === 200) {
-  console.log(`  ✓ ${SLUG}: bound ${summary}`);
+  console.log(`  ✓ ${SLUG}: ${verb} ${summary}`);
   console.log("Done. Next orchestrator tick picks the binding up — no deploy needed (ADR-0007 write=live).");
 } else {
   console.error(`  ✗ ${SLUG}: HTTP ${status} ${JSON.stringify(json)}`);
