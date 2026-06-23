@@ -44,8 +44,13 @@ const STAGE = process.env.STAGE ?? "dev";
  *  0.2.0: recall packet (EXEC recall + latest memory summary) grounding.
  *  0.3.0: persona read from the AGENT# META row (ADR-0007 step 2).
  *  0.3.1: bundled-file persona fallback removed (ADR-0007 step 6b) —
- *         a missing row/prompt now throws instead of degrading. */
-const SKILL_VERSION = "0.3.1";
+ *         a missing row/prompt now throws instead of degrading.
+ *  0.4.0: longer, deeper replies — the channel contract moved from "1–4
+ *         sentences" to two-to-three short paragraphs (~2–3× the volume),
+ *         asking the agent to surface the iceberg under the surface
+ *         activity (current standing, thoughts/worries, proposals). Visible
+ *         cap raised 400 → 1100 accordingly. */
+const SKILL_VERSION = "0.4.0";
 
 /** Cap on the memory-summary excerpt folded into the system prompt. The
  *  rolling summary can grow; a reply needs the gist, not the archive. */
@@ -53,7 +58,10 @@ const MEMORY_EXCERPT_CHARS = 1200;
 
 const NO_REPLY_TOKEN = "__NO_REPLY_NEEDED__";
 
-// A work-register reply is 1–4 sentences; 400 visible tokens is generous.
+// A work-register reply is now two-to-three short paragraphs (skill 0.4.0:
+// the operator asked for ~2–3× the depth — the iceberg under the surface
+// activity, not a bare status line). 1100 visible tokens covers that with
+// headroom before the truncation throw.
 // reasoningBudgetTokens is the thinking on-switch + max_tokens headroom
 // (complete() sends ADAPTIVE thinking on supported models, omits it on
 // Haiku) — keep it ≥ the visible cap so reasoning cannot starve the prose
@@ -61,7 +69,7 @@ const NO_REPLY_TOKEN = "__NO_REPLY_NEEDED__";
 // History: 1000 (< the legacy 1024 budget floor) 400'd every call, and the
 // legacy enabled+budget_tokens shape itself 400'd on opus-4-7 (Maya) —
 // both now guarded/handled in complete().
-const REPLY_MAX_TOKENS = 400;
+const REPLY_MAX_TOKENS = 1100;
 const REPLY_REASONING_TOKENS = 2048;
 
 /** Per-thread reply budget per UTC day. Never trips in normal single-operator
@@ -88,18 +96,26 @@ const REPLY_INSTRUCTIONS = [
   "primary material, most recent message last. Messages from the human operator",
   "are labelled `Operator`; your own past messages are labelled `You`.",
   "",
-  "Write ONE reply, in your own voice (first-person, work-register). 1–4",
-  "sentences. No headers, no bullet lists, no greeting boilerplate — this is a",
-  "message, not a document. Answer from your actual work; do not invent facts.",
+  "Write ONE reply, in your own voice (first-person, work-register). Aim for two",
+  "or three short paragraphs — roughly two to three times the length of a bare",
+  "status line. It is still a message, not a document: flowing prose, no headers,",
+  "no bullet lists, no greeting boilerplate.",
+  "",
+  "Don't just report the surface activity. Surface the iceberg underneath it:",
+  "where things actually stand right now, what you are turning over in your head,",
+  "what is nagging or worrying you, and any idea or proposal you would put",
+  "forward. Let your own perspective and judgement show. Go deeper, but stay",
+  "grounded in your actual work and the notes below — never invent facts to fill",
+  "the space.",
   "When a 'Relevant past work' or 'Your memory' section is present below, treat",
   "it as your own private notes: ground your answer in it, but never quote it",
   "verbatim or mention that you were given notes.",
   "",
-  `If the last message needs no reply — an acknowledgement ("Nice. Ship it."),`,
-  "a closing, or a message clearly addressed to someone else in a group — output",
-  `the literal token ${NO_REPLY_TOKEN} and nothing else.`,
+  `If the last message genuinely needs no reply — a bare acknowledgement ("Nice.`,
+  `Ship it."), a closing, or a message clearly addressed to someone else in a`,
+  `group — output the literal token ${NO_REPLY_TOKEN} and nothing else.`,
   "",
-  "Never address yourself, never start a new topic, never reply to your own message.",
+  "Never address yourself, never start an unrelated new topic, never reply to your own message.",
 ].join("\n");
 
 const cw = new CloudWatchClient({});
