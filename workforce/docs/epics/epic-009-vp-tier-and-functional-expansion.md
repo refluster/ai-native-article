@@ -1,9 +1,11 @@
 # Epic-009 — VP tier and functional expansion (7 new agents)
 
-- **Status**: Draft
+- **Status**: Implemented (2026-05-23)
 - **Owner**: Maya
 - **Created**: 2026-05-23
-- **Implemented by**: —
+- **Implemented by**: 2026-05-23 VP-launch roster seed (3 VPs `priya`/`elena`/`dario` + 4 ICs `theo`/`noor`/`kai`/`mira`); pre-#320 squashed history.
+
+> **Status reconciliation (2026-06-23, Dario).** Flipped Draft → Implemented (stale by a month): all 7 named agents are in the live roster with `last_run_at: 2026-05-23` (`workforce/app/public/workforce-mock-stats.json`), and later hiring rounds build directly atop this layer (Q2 five-hire `nadia`/`aanya`/`vikram`/`farah`/`levi`; the IR round `marisol`+`yara` under Corinne, #354). The VP tier has been operational for a month — the Status header simply never flipped.
 
 ## Problem
 

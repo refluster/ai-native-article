@@ -1,9 +1,11 @@
 # Epic-005 — Agent-authored L0 → L1 article pipeline (parallel to GAS)
 
-- **Status**: Draft
+- **Status**: Rejected (2026-06-23 — superseded by the `article-level2`/`article-level3` cadences)
 - **Owner**: Maya
 - **Created**: 2026-05-18
-- **Implemented by**: —
+- **Implemented by**: — (superseded; goal met by `workforce/skills/article-level2` + `article-level3` under Elena)
+
+> **Status reconciliation (2026-06-23, Dario).** Rejected as *obsoleted*: the Epic's specific mechanism — a `sora`-owned twice-daily EventBridge **L0→L1** cadence writing `Kind=l1-insight` — was never built. Agent-authored articles instead ship via the **L2/L3** `article-level2`/`article-level3` cadences owned by Elena (with the GAS cron paused; `publish-notion.mjs` carries the canonical truncation guard). The *goal* (agent-authored articles) shipped a different way; this design is kept as history.
 
 ## Problem
 

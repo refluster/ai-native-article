@@ -1,9 +1,11 @@
 # Epic-006 — Workforce scalability to 100+ agents
 
-- **Status**: Draft
+- **Status**: Rejected (2026-06-23 — obsoleted; only S6 slug-disambiguation left open)
 - **Owner**: Maya
 - **Created**: 2026-05-18
-- **Implemented by**: —
+- **Implemented by**: — (S1/S3 shipped incidentally; S2/S4 made moot; S6 to carve to a follow-up Story)
+
+> **Status reconciliation (2026-06-23, Mateo).** Rejected as *obsoleted*: this six-item bundle was overtaken before it was ever Accepted. **S1** (single `wf-orchestrator-tick` rule, dispatch-from-data) and **S3** (procedural `Sigil` avatars) shipped incidentally via other work — SAM carries zero per-agent CFN rules. **S2/S4** were made moot by the dispatch-from-data model + **ADR-0007** (no per-agent CFN rule explosion; no git-file prompt review — agent config lives in DDB). Only **S6** (slug `-NNN` disambiguation; `validate-naming.mjs` still `/^[a-z]+$/`) is genuinely unbuilt — carve it to a one-Story follow-up if still wanted. Not marked Implemented because it never moved through the lifecycle and S6 remains open.
 
 ## Problem
 

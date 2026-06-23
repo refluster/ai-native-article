@@ -1,9 +1,11 @@
 # Epic-015 — daily-research: one generic research cadence across personas
 
-- **Status**: Draft
+- **Status**: Implemented (2026-06-21)
 - **Owner**: sana
 - **Created**: 2026-06-19
-- **Implemented by**: — (Phase 1 skill + wire-script land in the opening PR per operator greenlight; binding-enable is the operator's B-authority step)
+- **Implemented by**: #345 (generic cadence), #350 (rotate lens + restore `no_skip`), #353 (live-web search + cohort-2 Phase 6). Cohort-2 (`dario`/`mateo`/`maya`/`mei`/`aoi`/`hana`/`farah`) bound **enabled** under operator greenlight 2026-06-21.
+
+> **Status reconciliation (2026-06-23, Dario).** Flipped Draft → Implemented (Status lagged multiple PRs behind reality): the `daily-research` skill (v0.3.0, `status: active`) + the idempotent `wire-daily-research.mjs` merged across #345/#350/#353, and Phase 6 bound cohort-2 **enabled** with per-persona staggered crons under the operator's 2026-06-21 greenlight (the binding-enable B-step the original line was waiting on). The generic research cadence now runs across personas in prod.
 
 ## Problem
 

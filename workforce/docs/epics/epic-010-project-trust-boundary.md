@@ -1,9 +1,11 @@
 # Epic-010 — Project as trust boundary: credentials, executions, agent memory
 
-- **Status**: Draft
+- **Status**: In-progress (2026-06-23)
 - **Owner**: Maya
 - **Created**: 2026-05-24
-- **Implemented by**: —
+- **Implemented by**: substrate live (#89 tracker; (b)/(c) credited via Epic-012 Story 3 #216); 2 of 4 DoD gates remain.
+
+> **Status reconciliation (2026-06-23, Mateo).** Flipped Draft → In-progress: all §1–§10 substrate is built and live — `shared/project.ts` (`getCredential`/`appendExecution`/`listExecutions`, `PROJECT#{id}/EXEC#{ulid}`), the new `credential-injector.ts`, semantic recall (ADR-0002), the `migrate-credentials` Lambda, and the live `/projects` console (`ProjectDirectory`/`ProjectProfile`). It is **not yet Implemented**: the Epic's own four-gate DoD has two open items — (a) deleting the legacy bare `wf/{type}` keys (gated on the unbuilt Story-6 vault UI) and (d) the ≥1-week clean-audit observation window (`ROADMAP.md`).
 
 ## Problem
 

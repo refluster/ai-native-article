@@ -1,9 +1,11 @@
 # Epic-008 — Skill repository as the execution unit
 
-- **Status**: In-progress (2026-05-18)
+- **Status**: Implemented (2026-06-23)
 - **Owner**: Maya
 - **Created**: 2026-05-18
-- **Implemented by**: PR-A (substrate + 7 pilots, validators) + PR-B (runner integration) + PR-C (RUN/DELIV traceability) + PR-D (skill seed Lambda + DDB mirror + `/skills` endpoints on agents-api) all landed.
+- **Implemented by**: PR-A (substrate + 7 pilots, validators) + PR-B (runner integration) + PR-C (RUN/DELIV traceability) + PR-D (skill seed Lambda + DDB mirror + `/skills` endpoints on agents-api) all landed; substrate since extended by ADR-0008 (#332) + ADR-0012 (#349).
+
+> **Status reconciliation (2026-06-23, Mateo).** Flipped In-progress → Implemented: every PR-A…PR-D deliverable is present and live — `validate-skills.mjs` + schemas, the registry build, `skill_name`/`skill_version` on EXEC rows, the `seed-skills` Lambda upserting `SKILL#{name}/META`, and `GET /skills` / `GET /skills/{name}` on agents-api. The substrate is load-bearing enough that two later ADRs (0008 judgment-config single-source, 0012 decouple-binding-from-ownership) build directly on it.
 
 ## Problem
 

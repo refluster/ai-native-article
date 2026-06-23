@@ -1,9 +1,11 @@
 # Epic-007 — Agent management surface (DDB-projection + CRUD API)
 
-- **Status**: Draft
+- **Status**: Rejected (2026-06-23 — design superseded by ADR-0007; outcome live)
 - **Owner**: Maya
 - **Created**: 2026-05-18
-- **Implemented by**: —
+- **Implemented by**: — (CRUD outcome live via agents-api, but the git-split design here was reversed by ADR-0007 / #286)
+
+> **Status reconciliation (2026-06-23, Mateo).** Rejected as *superseded*: the agent-management **outcome** is live and richer than specified (`GET/PATCH/DELETE /agents`, `POST /agents` create, pagination, `nodejs24.x`). But the Epic's **defining design choice** — identity stays in git, a `seed-agents` Lambda projects git→DDB, and **no `POST /agents`** in v1 — was explicitly reversed by **ADR-0007** (single-sourced from DDB, #286): `workforce/agents/` was deleted, `validate-agent-json.mjs` retired into `agent-config.ts` write-time validation, and `POST /agents` *is* exposed. The realized capability is delivered via a deliberately different, ADR-ratified path, so this design is kept as history, not marked Implemented.
 
 ## Problem
 

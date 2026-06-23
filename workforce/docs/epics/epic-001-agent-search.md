@@ -1,9 +1,11 @@
 # Epic-001 — Agent search
 
-- **Status**: Draft
+- **Status**: Rejected (2026-06-23 — superseded by Epic-014)
 - **Owner**: Maya
 - **Created**: 2026-05-18
-- **Implemented by**: —
+- **Implemented by**: — (superseded by Epic-014)
+
+> **Status reconciliation (2026-06-23, Nadia).** Rejected as *superseded*: the agent-search **outcome** is live, but it shipped through Epic-014's unified ranked search (`workforce/app/src/pages/SearchResults.tsx`, `lib/search.ts`, `/search`, #320), not Epic-001's standalone build-time-manifest design. Epic-014 is the live design record; Epic-001 stays as history per the README "Rejected" definition.
 
 ## Problem
 

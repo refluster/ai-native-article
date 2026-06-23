@@ -1,6 +1,8 @@
 # Epic-016 — Workforce performance analytics (per-project + cross-project)
 
-- **Status**: Phase 1 **shipped** (#357 IA + both metric families; #359 graceful fallback). Phase 2 (live lifecycle reducer + `/performance` endpoints) **implemented 2026-06-22** — code + infra landed, **pending operator deploy** (`sam deploy`, schedule already `Enabled: true`, + wiring `build-pr-metrics.mjs --publish-ddb` into the deploy workflow). Open questions Q1/Q2/Q3 **resolved** (operator, 2026-06-22).
+- **Status**: In-progress (Phase 1 shipped 2026-06-22 — #357 IA + both metric families, #359 graceful fallback; Phase 2 code-complete #361, pending operator `sam deploy`)
+
+> **Status reconciliation (2026-06-23, Nadia).** Normalized the prose Status to the lifecycle word **In-progress**. Phase 1 (console IA + both metric families + graceful illustrative fallback) is live; Phase 2 (live lifecycle reducer Lambda + `/performance` endpoints, #361; Q1/Q2/Q3 resolved) is code- and infra-complete but **not yet live on AWS** — it is gated on the operator's `sam deploy` + wiring `build-pr-metrics.mjs --publish-ddb` into the deploy workflow. Flip to Implemented once that deploy lands.
 - **Owner**: nadia
 - **Created**: 2026-06-22
 - **Implemented by**: Phase 1 — #357 / #359. Phase 2 — nadia (lead, IA + endpoint shape), hana (data plane: the `AUDIT#`/`bindings[]`/`EXEC#` partition + roll-up item contract), ren (reducer Lambda build under Dario's L2 bar).

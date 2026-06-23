@@ -6,6 +6,8 @@
 - **Tracker**: [#212](https://github.com/refluster/ai-native-article/issues/212)
 - **Implemented by**: #219 (Story 1, merged); #224 (Story 2, merged); Story 3 in review
 
+> **Status reconciliation (2026-06-23, Dario).** Confirmed In-progress (no flip): compaction (Story 2, `memory-compactor` Lambda), the recall library + `GET /agents/{slug}/recall` read-endpoint (Story 1), and recall metrics (Story 4, `recall-metrics.ts`) are all live. But the **headline Story-1 gate is still open** — `buildRecallBlock` is only wired into `messaging-reply`, never the orchestrator/run path, so the runner does not yet inject recall into the fire-time prompt (`agent-runner.md` defers it pending `task.agents_api_url`). Correctly stays In-progress until agents demonstrably ground on recalled experience in the production runner.
+
 > **Design records:** the *technical decisions* behind this Epic live as
 > ADRs, not in this body — [ADR-0001](../adr/adr-0001-record-family-separation.md)
 > (two record families), [ADR-0002](../adr/adr-0002-no-dedicated-vector-store.md)

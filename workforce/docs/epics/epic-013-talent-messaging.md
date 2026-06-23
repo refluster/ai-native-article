@@ -1,9 +1,11 @@
 # Epic-013 — Talent messaging: wire the operator↔talent thread store
 
-- **Status**: Draft
+- **Status**: Implemented (2026-06-23)
 - **Owner**: Maya
 - **Created**: 2026-06-06
-- **Implemented by**: —
+- **Implemented by**: #248, #249, #256 (thread store + write path + AWS_IAM auth); #341 (mobile). Live surface: agents-api `/threads*`, `messaging-reply` Lambda, GSI4, `workforce/app/src/pages/Messaging.tsx`.
+
+> **Status reconciliation (2026-06-23, Theo).** Flipped Draft → Implemented: the `THREAD#` store + GSI4, all six `/threads*` routes (writes AWS_IAM/SigV4-gated per Q1, not the sketched Bearer token), the `messaging-reply` Lambda (ADR-0006 — `__NO_REPLY_NEEDED__` sentinel + all three W-1 guards), and the live-composing Messaging SPA are present and deployed. The retained mock is the deliberately-kept gh-pages fallback (Epic Q8). **Operator note:** the body's "≥1 production reply" gate is verifiable only off-repo — confirm if honoring it strictly.
 
 > **Scope note:** this Epic turns `/messaging` from a deterministic mock
 > (`apps/workforce/src/lib/messages.ts`, `apps/workforce/src/pages/Messaging.tsx`)
