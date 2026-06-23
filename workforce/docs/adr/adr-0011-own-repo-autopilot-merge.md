@@ -1,6 +1,6 @@
 # ADR-0011 — Own-repo autopilot merge: retire the self-repo carve-out; the L0/L1 boundary is the single line
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-06-23 — operator-ratified; the engine + root `docs/governance.md §4.4` already implemented this, the status now matches)
 - **Date**: 2026-06-18
 - **Deciders**: operator, nadia
 - **Supersedes**: extends [adr-0010](adr-0010-autopilot-merge-consensus-widening.md) (the non-L0/L1 + unanimous-consensus predicate) by removing its one remaining special case

@@ -1,6 +1,6 @@
 ---
 name: pr-autopilot
-description: Workforce skill that drives an open PR through its **full** review cycle in a bound project's repo — route to 1-3 reviewer personas, obtain their reviews, synthesise the unanimous-green / 🟡 / 🔴 verdict, and complete. **Every open PR is in scope — draft and non-draft, human- and bot-authored (Dependabot).** On a unanimous-green verdict for a PR that touches **no L0/L1 governance path** of the target repo, it approves + merges via the shared fail-closed pr-merge.mjs engine; a PR touching the target repo's **governance L0/L1 escalates to a human** for the final call (R-N9 / W-5), as does any non-consensus PR. The merge predicate (adr-0010, 2026-06-17) widened from the old Dependabot safe class to "not-L0/L1 + unanimous reviewer consensus"; the engine re-verifies it server-side and fails closed. Runs as a CCR task (ADR-0005); github.token via the binding's project linkage (Epic-010 §5).
+description: Workforce skill that drives an open PR through its **full** review cycle in a bound project's repo — route to 1-3 reviewer personas, obtain their reviews, synthesise the unanimous-green / 🟡 / 🔴 verdict, and complete. **Every open PR is in scope — draft and non-draft, human- and bot-authored (Dependabot).** On a unanimous-green verdict for a PR that touches **no L0/L1 governance path** of the target repo, it approves + merges via the shared fail-closed pr-merge.mjs engine (**drafts included — a green draft is marked Ready for Review, then merged, adr-0014**); a PR touching the target repo's **governance L0/L1 escalates to a human** for the final call (R-N9 / W-5), as does any non-consensus PR. The merge predicate (adr-0010, 2026-06-17) widened from the old Dependabot safe class to "not-L0/L1 + unanimous reviewer consensus"; the engine re-verifies it server-side and fails closed. Runs as a CCR task (ADR-0005); github.token via the binding's project linkage (Epic-010 §5).
 ---
 
 # pr-autopilot (CCR routing leg — fired on cron OR a pull_request event)
@@ -25,7 +25,7 @@ GITHUB_TOKEN="<credentials['github.token'].token>" \
 
 The scan lists **every** open PR updated within the window — **draft and non-draft, human- and bot-authored (Dependabot)** — **skips only any PR you have already posted a cycle-1 routing comment on**, caps at `--max` (default 5), and writes each remaining candidate (title, body, diff, existing comments, plus `draft` / `is_bot` flags) to the `--out` file. If it reports **0 candidates**, there is nothing to route this tick — **stop here, post nothing.**
 
-> **Drafts and bots are in scope (adr-0010).** Drafts get an early review pass so issues surface before "Ready for review"; Dependabot/bot PRs route through the **same** review→consensus→merge path as human PRs (the old no-review `dependabot-triage` lane is retired). Note the candidate's `draft` / `is_bot` flags when you write the routing comment, but route them like any other PR.
+> **Drafts and bots are in scope (adr-0010), and drafts are merge-eligible (adr-0014).** A draft is a **first-class merge target**, not just an early review pass: it routes, is reviewed, and — on a green, non-L0/L1 verdict with the standard predicate satisfied — **merges through the same path as a non-draft**. Because GitHub refuses to merge a draft directly, the `pr-merge.mjs` engine marks the draft **Ready for Review** (GraphQL) immediately before the merge PUT; everything else (L0/L1 boundary, consensus, checks-green, delegation) is identical. Dependabot/bot PRs route through the **same** review→consensus→merge path as human PRs (the old no-review `dependabot-triage` lane is retired). Note the candidate's `draft` / `is_bot` flags when you write the routing comment, but route them like any other PR.
 
 ## Step 2 — route each candidate (your judgment)
 
@@ -124,7 +124,9 @@ Autonomous merge widened (adr-0010) from the old Dependabot safe class to **"the
 
 - The aggregated verdict is **🟢 unanimous-green** (no reviewer blocking), and
 - the bound `project_id` has an **R-N10 delegation** (the target repo's own statute grants the workforce autonomous-merge authority — e.g. `PSVL/asp-cloud` → `docs/adr_autopilot_pr_merge.md`; if none, never merge), and
-- the PR touches **no L0/L1 path** declared in the target repo's own `docs/governance.md` (between the `<!-- autopilot:l0l1-paths -->` markers), all required checks are green, the PR is mergeable/clean, and no reviewer left `CHANGES_REQUESTED`.
+- the PR touches **no L0/L1 path** declared in the target repo's own `docs/governance.md` (between the `<!-- autopilot:l0l1-paths -->` markers), all required checks are green, the PR is mergeable (state `clean` **or** `draft` — adr-0014), and no reviewer left `CHANGES_REQUESTED`.
+
+A **draft** that clears this predicate merges like any other PR: the engine flips it Ready for Review (GraphQL `markPullRequestReadyForReview`) right before the merge PUT, since GitHub will not merge a draft directly. The draft flag is not a hold — only the L0/L1 boundary, consensus, checks, and delegation are (adr-0014).
 
 When those hold, build the decisions payload (schema in the script header) — one `{ pr, action:"merge", comment, squash_subject, squash_body, reviewers:[...] }` where `reviewers` is the nominated set whose unanimous sign-off you are attesting (each must have posted their `<!-- autopilot:review:{slug}:green -->` marker per Step 4) — and run the **shared** merge engine:
 
