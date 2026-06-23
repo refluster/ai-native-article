@@ -121,7 +121,7 @@ describe("happy path", () => {
       finish_reason: "end_turn",
       tokens_in: 120,
       tokens_out: 18,
-      skill_version: "0.3.1",
+      skill_version: "0.4.0",
     });
     // The persona system prompt is fed into the LLM system prompt.
     expect(complete.mock.calls[0]![0].system).toContain("You are Maya");
