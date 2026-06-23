@@ -128,7 +128,9 @@ if (!Array.isArray(cur.bindings)) {
 // Stable, key-order-independent serialization so a true no-op (the live binding
 // already equals what we declare) is distinguished from drift (e.g. a stale
 // note/config that must re-sync) — order of keys in the GET response is not
-// guaranteed to match our literal.
+// guaranteed to match our literal. Note: ARRAY order is preserved (significant)
+// on purpose — config.nomination_rules is first-match precedence, so a reorder
+// is semantic drift that SHOULD re-PATCH, not a cosmetic no-op.
 const stable = (v) =>
   v && typeof v === "object" && !Array.isArray(v)
     ? `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${stable(v[k])}`).join(",")}}`

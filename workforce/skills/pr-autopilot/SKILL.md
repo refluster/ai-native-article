@@ -102,13 +102,15 @@ Now that the nominated reviews exist (you produced/dispatched them in Step 4, or
 
    **The `autopilot:reviewed` companion label (operator directive 2026-06-23).** A 🟢 unanimous-green PR that is handed off **only** because a human gate blocks the autonomous merge (an L0/L1 path, or no R-N10 delegation) is *reviewed and merge-ready* — the operator's only task is the final merge click. Stamp it `autopilot:reviewed` (the `--reviewed` flag and/or the `<!-- autopilot:reviewed -->` body marker — belt-and-suspenders, exactly like `--needs-human`) **in addition to** `autopilot:needs-human`. So `is:open label:autopilot:reviewed` is the merge-ready queue, a strict subset of `is:open label:autopilot:needs-human` that excludes the 🔴 / cycle-capped / non-consensus PRs that still need work. `autopilot:reviewed` is **never** stamped on a non-green hand-off, and never implies a merge — the agent still does not merge an L0/L1 PR.
 
+   > **Drafts carry a second human gate.** Since adr-0010 puts drafts in scope, `autopilot:reviewed` lands on a green **draft** too — but "reviewed" there means *the reviewer gate is cleared*, not "click merge now": the draft flag is a second human gate. When the handed-off PR is a draft, the verdict MUST say so explicitly — **"mark ready, then merge"** — so `autopilot:reviewed` never reads as merge-now on something still drafted.
+
    **Hand-off verdict template — compose the verdict *into* this block, never freehand** (the trailing marker is the mechanical half of the guarantee: it forces the label even if `--needs-human` is ever dropped, and it is only reliably present if you start from this template — Step 2 has the analogous routing template):
    ```md
    **<PersonaName> — verdict, cycle <n> of ≤ <cycle_cap>. <🟢 escalate / 🔴 / hand-off>.**
 
    <one-paragraph synthesis: each nominated reviewer's load-bearing finding and how it resolved, then the aggregated colour>
 
-   **Handing to the operator — <reason>.** <e.g. "🟢 consensus, but touches L0/L1 path `<file>` — operator's final call per W-5"; or "🔴 <reviewer>'s blocking finding"; or "no R-N10 delegation".> Not merging.
+   **Handing to the operator — <reason>.** <e.g. "🟢 consensus, but touches L0/L1 path `<file>` — operator's final call per W-5"; or "🔴 <reviewer>'s blocking finding"; or "no R-N10 delegation".> Not merging. <If the PR is a DRAFT, add: "Still a draft — mark ready, then merge.">
 
    — <PersonaName> (CCR persona; see workforce/skills/pr-autopilot/SKILL.md)
 
