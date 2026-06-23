@@ -10,6 +10,13 @@
 // each posted their lens review (the unanimous-green consensus). L0/L1-touching
 // PRs are never merged — they escalate to a human (the operator's final call).
 //
+// DRAFTS (adr-0014): a draft that passes the FULL predicate above is not handed
+// off for the draft flag alone — the engine marks it ready-for-review (GraphQL
+// markPullRequestReadyForReview) as the TERMINAL pre-merge step, then merges.
+// This is bounded: un-draft happens only immediately before a merge already
+// verified green/non-L0/L1/conflict-clear, never for an escalation. A draft that
+// would escalate (L0/L1 / 🔴 / non-consensus) stays a draft for the human.
+//
 // R-N10 (workforce/docs/governance.md) clause 2: this engine RE-VERIFIES the
 // predicate SERVER-SIDE and FAILS CLOSED. A decision marked action:"merge" is
 // honoured only if, at apply time, every predicate clause re-passes against the
@@ -149,7 +156,7 @@ export async function resolveL0L1Paths(gh, repo, ref) {
 
 // Build a thin GitHub REST client bound to one token + repo.
 export function makeGh({ token, api = process.env["GITHUB_API_URL"] || "https://api.github.com", userAgent = "workforce-pr-merge" }) {
-  return async function gh(method, path, body) {
+  const gh = async function gh(method, path, body) {
     let res;
     try {
       res = await fetch(`${api}${path}`, {
@@ -168,6 +175,46 @@ export function makeGh({ token, api = process.env["GITHUB_API_URL"] || "https://
     let json; try { json = text ? JSON.parse(text) : {}; } catch { json = { _raw: text }; }
     return { status: res.status, json };
   };
+  // GraphQL leg (adr-0014): the REST pulls API cannot flip draft→ready, so the
+  // terminal un-draft step of an eligible merge uses the GraphQL
+  // markPullRequestReadyForReview mutation. Same auth/UA; returns {status,json}.
+  gh.graphql = async function graphql(query, variables) {
+    let res;
+    try {
+      res = await fetch(`${api}/graphql`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+          "user-agent": userAgent,
+        },
+        body: JSON.stringify({ query, variables }),
+      });
+    } catch (e) { throw { code: 3, msg: `network error on graphql: ${e?.message || e}` }; }
+    const text = await res.text().catch(() => "");
+    let json; try { json = text ? JSON.parse(text) : {}; } catch { json = { _raw: text }; }
+    return { status: res.status, json };
+  };
+  return gh;
+}
+
+// Mark a draft PR ready for review (adr-0014). The REST pulls API cannot flip
+// draft→ready, so this uses the GraphQL markPullRequestReadyForReview mutation.
+// BOUNDED: applyDecisions calls this ONLY as the terminal pre-merge step of a
+// PR that verifyMergeable already confirmed green / non-L0/L1 / conflict-clear —
+// never for an escalation, and never on a PR that is going to a human. Fails
+// loud (returns {ok:false}) rather than guessing.
+export async function markReadyForReview(gh, nodeId) {
+  if (typeof gh.graphql !== "function") return { ok: false, why: "gh.graphql unavailable" };
+  if (!nodeId) return { ok: false, why: "missing PR node_id" };
+  const { status, json } = await gh.graphql(
+    `mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){pullRequest{isDraft}}}`,
+    { id: nodeId },
+  );
+  if (status !== 200 || json?.errors) {
+    return { ok: false, why: `markReady -> HTTP ${status} ${JSON.stringify(json?.errors || json).slice(0, 200)}` };
+  }
+  return { ok: true, isDraft: json?.data?.markPullRequestReadyForReview?.pullRequest?.isDraft };
 }
 
 // W-4 hard cycle cap (FU-004 / dev-process.md §"cycle counter").
@@ -219,7 +266,20 @@ export async function verifyMergeable(gh, repo, pr, decision) {
   if (Array.isArray(p.labels) && p.labels.some((l) => (l?.name || "").toLowerCase() === "autopilot:off")) {
     return { ok: false, why: `autopilot:off label set — paused by maintainer` };
   }
-  if (p.mergeable !== true || p.mergeable_state !== "clean") return { ok: false, why: `not clean (mergeable=${p.mergeable}, state=${p.mergeable_state})` };
+  // Draft handling (adr-0014). A draft is a PENDING-mergeable state, not a
+  // refusal: GitHub reports mergeable_state="draft", which masks "clean", so we
+  // do NOT trust mergeable_state for a draft — the real gates (L0/L1, checks,
+  // consensus) are verified explicitly below, and if they pass the merge leg
+  // marks the PR ready as its terminal step. We still require mergeable===true
+  // (no merge conflicts); a draft that is mergeable!==true or still-computing
+  // (null) fails closed here and retries on the next tick. A non-draft must be
+  // fully clean as before.
+  const isDraft = p.draft === true || p.mergeable_state === "draft";
+  if (isDraft) {
+    if (p.mergeable !== true) return { ok: false, why: `draft not yet conflict-clear (mergeable=${p.mergeable}) — retry next tick` };
+  } else if (p.mergeable !== true || p.mergeable_state !== "clean") {
+    return { ok: false, why: `not clean (mergeable=${p.mergeable}, state=${p.mergeable_state})` };
+  }
 
   // L0/L1 guard — sourced from the TARGET repo's own governance (adr-0010).
   const l0l1 = await resolveL0L1Paths(gh, repo, p.base?.ref);
@@ -261,7 +321,7 @@ export async function verifyMergeable(gh, repo, pr, decision) {
   const missing = reviewers.filter((slug) => !reviewerSignedOff(slug, bodies));
   if (missing.length > 0) return { ok: false, why: `missing green marker(s) from ${missing.join(", ")} (expected ${reviewerGreenMarker(missing[0])}) — consensus not reached` };
 
-  return { ok: true, why: `consensus-green, no L0/L1 surface (${reviewers.join(", ")})`, sha: p.head.sha };
+  return { ok: true, why: `consensus-green, no L0/L1 surface (${reviewers.join(", ")})${isDraft ? " [draft → will mark ready]" : ""}`, sha: p.head.sha, node_id: p.node_id, wasDraft: isDraft };
 }
 
 // Apply one decisions payload. Returns { merged, escalated, refused }.
@@ -293,6 +353,18 @@ export async function applyDecisions(gh, repo, decisions) {
 
     const c = await gh("POST", `/repos/${repo}/issues/${pr}/comments`, { body: comment });
     if (c.status !== 201) { refused++; console.error(`pr-merge: REFUSE merge #${pr}: comment failed HTTP ${c.status}`); continue; }
+
+    // adr-0014: un-draft as the TERMINAL pre-merge step. Reached only when
+    // verifyMergeable already confirmed the full predicate (green consensus,
+    // non-L0/L1, conflict-clear) AND the PR is a draft — so the draft flag was
+    // the last gate and we clear it ourselves rather than handing off. Drafts
+    // that escalate (L0/L1 / 🔴 / non-consensus) never reach here; they stay
+    // draft for the human. Fail loud if the mutation does not land.
+    if (verdict.wasDraft) {
+      const ready = await markReadyForReview(gh, verdict.node_id);
+      if (!ready.ok) { refused++; console.error(`pr-merge: REFUSE merge #${pr}: could not mark draft ready — ${ready.why}`); continue; }
+      console.error(`pr-merge: #${pr} marked ready for review (was a draft; predicate already green) — proceeding to merge`);
+    }
     // The native GitHub APPROVE is a courtesy/visibility step and the
     // branch-protection satisfier for PRs authored by a DIFFERENT identity
     // (Dependabot, external contributors). It is NOT the workforce's consensus

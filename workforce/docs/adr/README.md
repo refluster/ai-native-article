@@ -74,6 +74,7 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0011](adr-0011-own-repo-autopilot-merge.md) | Own-repo autopilot merge: retire the self-repo carve-out; the L0/L1 boundary is the single line | Proposed | [010](epics/epic-010-project-trust-boundary.md) |
 | [0012](adr-0012-decouple-binding-from-ownership.md) | Binding is decoupled from skill ownership: any agent may bind any skill | Proposed | [008](epics/epic-008-skill-repository.md) |
 | [0013](adr-0013-event-driven-pr-autopilot.md) | pr-autopilot fires on PR-open via a CCR-native `github_event` trigger (within adr-0005) | Proposed | — (cadence; adr-0005/0010/0011) |
+| [0014](adr-0014-autopilot-mark-draft-ready-on-merge.md) | Autopilot un-drafts as the terminal step of an eligible merge (extends adr-0010/0011) | Proposed | [010](epics/epic-010-project-trust-boundary.md) |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](epics/README.md).

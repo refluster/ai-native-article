@@ -14,6 +14,7 @@ import {
   W4_CYCLE_CAP,
   verifyMergeable,
   applyDecisions,
+  markReadyForReview,
   ESCALATION_LABEL,
 } from "./pr-merge.mjs";
 
@@ -26,6 +27,15 @@ function mockGh(routes) {
       if (re.test(`${method} ${path}`)) return typeof resp === "function" ? resp() : resp;
     }
     return { status: 404, json: {} };
+  };
+  // GraphQL leg (adr-0014). Routes match against `GRAPHQL <query>`; default is a
+  // successful markReadyForReview so non-draft merge tests are unaffected.
+  gh.graphql = async (query, variables) => {
+    calls.push({ method: "GRAPHQL", path: query, body: variables });
+    for (const [re, resp] of routes) {
+      if (re.test(`GRAPHQL ${query}`)) return typeof resp === "function" ? resp() : resp;
+    }
+    return { status: 200, json: { data: { markPullRequestReadyForReview: { pullRequest: { isDraft: false } } } } };
   };
   gh.calls = calls;
   return gh;
@@ -245,5 +255,92 @@ describe("applyDecisions (escalation labelling)", () => {
     expect(res.escalated).toBe(1);
     const issueCall = gh.calls.find((c) => c.method === "POST" && /\/issues$/.test(c.path));
     expect(issueCall.body.labels).toContain(ESCALATION_LABEL);
+  });
+});
+
+// ── Draft → mark-ready terminal step (adr-0014) ──────────────────────────────
+const draftPull = (extra = {}) => ({
+  status: 200,
+  json: { state: "open", mergeable: true, mergeable_state: "draft", draft: true, node_id: "PR_node1", head: { sha: "abc" }, base: { ref: "main" }, ...extra },
+});
+
+describe("verifyMergeable — draft is a pending state, not a refusal (adr-0014)", () => {
+  it("a green, non-L0/L1, conflict-clear DRAFT passes with wasDraft + node_id", async () => {
+    const r = [
+      [/GET \/repos\/o\/r\/pulls\/1$/, draftPull()],
+      ...routes([{ filename: "src/app.ts" }], GREEN_CHECK, DARIO_REVIEW).slice(1), // reuse the rest, drop the non-draft pull route
+    ];
+    const v = await verifyMergeable(mockGh(r), "o/r", 1, { reviewers: ["dario"] });
+    expect(v.ok).toBe(true);
+    expect(v.wasDraft).toBe(true);
+    expect(v.node_id).toBe("PR_node1");
+  });
+
+  it("a DRAFT with merge conflicts (mergeable=false) fails closed — retry next tick", async () => {
+    const v = await verifyMergeable(
+      mockGh([[/GET \/repos\/o\/r\/pulls\/1$/, draftPull({ mergeable: false })]]),
+      "o/r", 1, { reviewers: ["dario"] },
+    );
+    expect(v.ok).toBe(false);
+    expect(v.why).toMatch(/draft not yet conflict-clear/);
+  });
+
+  it("a DRAFT touching L0/L1 still escalates (draft never widens the L0/L1 gate)", async () => {
+    const r = [
+      [/GET \/repos\/o\/r\/pulls\/1$/, draftPull()],
+      ...routes([{ filename: "docs/governance.md" }], GREEN_CHECK, DARIO_REVIEW).slice(1),
+    ];
+    const v = await verifyMergeable(mockGh(r), "o/r", 1, { reviewers: ["dario"] });
+    expect(v.ok).toBe(false);
+    expect(v.why).toMatch(/L0\/L1/);
+  });
+});
+
+describe("applyDecisions — draft is un-drafted as the terminal pre-merge step (adr-0014)", () => {
+  const MERGE_DECISION = {
+    pr: 1, action: "merge", comment: "consensus-green, merging", reviewers: ["dario"],
+    squash_subject: "feat: thing (#1)", squash_body: "Unanimous sign-off (dario).",
+  };
+  const draftMergeRoutes = (graphqlResp) => [
+    [/GET \/repos\/o\/r\/pulls\/1$/, draftPull()],
+    ...routes([{ filename: "src/app.ts" }], GREEN_CHECK, DARIO_REVIEW).slice(1),
+    [/POST \/repos\/o\/r\/issues\/1\/comments/, { status: 201, json: {} }],
+    [/POST \/repos\/o\/r\/pulls\/1\/reviews/, { status: 200, json: {} }],
+    [/PUT \/repos\/o\/r\/pulls\/1\/merge/, { status: 200, json: { merged: true } }],
+    ...(graphqlResp ? [[/GRAPHQL .*markPullRequestReadyForReview/, graphqlResp]] : []),
+  ];
+
+  it("calls markPullRequestReadyForReview, then merges", async () => {
+    const gh = mockGh(draftMergeRoutes());
+    const res = await applyDecisions(gh, "o/r", [MERGE_DECISION]);
+    expect(res.merged).toBe(1);
+    expect(res.refused).toBe(0);
+    const gqlIdx = gh.calls.findIndex((c) => c.method === "GRAPHQL" && /markPullRequestReadyForReview/.test(c.path));
+    const mergeIdx = gh.calls.findIndex((c) => c.method === "PUT" && /\/merge$/.test(c.path));
+    expect(gqlIdx).toBeGreaterThanOrEqual(0);     // un-draft happened
+    expect(gqlIdx).toBeLessThan(mergeIdx);         // ...before the merge
+  });
+
+  it("refuses (no merge) if the un-draft mutation fails — fail loud", async () => {
+    const gh = mockGh(draftMergeRoutes({ status: 200, json: { errors: [{ message: "could not mark ready" }] } }));
+    const res = await applyDecisions(gh, "o/r", [MERGE_DECISION]);
+    expect(res.merged).toBe(0);
+    expect(res.refused).toBe(1);
+    expect(gh.calls.some((c) => c.method === "PUT" && /\/merge$/.test(c.path))).toBe(false);
+  });
+});
+
+describe("markReadyForReview", () => {
+  it("fails closed when gh.graphql is unavailable", async () => {
+    const r = await markReadyForReview(async () => ({ status: 200, json: {} }), "PR_x");
+    expect(r.ok).toBe(false);
+  });
+  it("fails closed on a missing node_id", async () => {
+    const r = await markReadyForReview(mockGh([]), "");
+    expect(r.ok).toBe(false);
+  });
+  it("ok on a clean mutation", async () => {
+    const r = await markReadyForReview(mockGh([]), "PR_node1");
+    expect(r.ok).toBe(true);
   });
 });
