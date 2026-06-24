@@ -98,7 +98,7 @@ const BINDING = {
       "Cadence / finance / policy personas have no review surface on this repo's code + pipeline PRs; nominate only when their lens is actually implicated.",
   },
   note:
-    "Nadia's PdM-lens pr-autopilot on the workforce's own repo (refluster/ai-native-article, via project agent-workforce). Fires every 6h; routes ≤5 PRs/tick — draft and non-draft, human- and bot-authored (adr-0010) — to reviewer lenses and drives each to a consensus verdict. Own-repo is a normal delegated R-N10 target (adr-0011, root docs/governance.md §4.4): a 🟢 unanimous-green, non-L0/L1 PR is merged by the agent; an L0/L1 (or 🔴 / non-consensus) PR escalates to the operator. A 🟢 merge-ready L0/L1 hand-off carries autopilot:reviewed + autopilot:needs-human so the operator's merge-ready queue is legible.",
+    "Nadia's PdM-lens pr-autopilot on the workforce's own repo (refluster/ai-native-article, via project agent-workforce). Fires every 6h; routes ≤5 PRs/tick — draft and non-draft, human- and bot-authored (adr-0010) — to reviewer lenses and drives each to a consensus verdict. Own-repo is a normal delegated R-N10 target (adr-0011, Accepted; root docs/governance.md §4.4): a 🟢 unanimous-green, non-L0/L1 PR is merged by the agent, exactly as on an external delegated repo; only an L0/L1 (or 🔴 / non-consensus) PR escalates to the operator. Drafts are merge-eligible too (adr-0014) — a green, non-L0/L1 draft is marked Ready for Review, then merged. A 🟢 merge-ready L0/L1 hand-off carries autopilot:reviewed + autopilot:needs-human so the operator's merge-ready queue is legible.",
 };
 
 function curlJson(method, path, body) {
