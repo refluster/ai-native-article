@@ -33,9 +33,19 @@
 //     body (the SKILL.md escalation template carries it).
 // The canonical label name is single-sourced from pr-merge.mjs (ESCALATION_LABEL),
 // the same constant the engine stamps on escalation issues — one queue, one name.
+//
+// REVIEWED (merge-ready) hand-offs (operator directive 2026-06-23). When the
+// hand-off is a 🟢 unanimous-green PR held back only by a human gate (the
+// target's L0/L1 boundary, or a missing R-N10 delegation), it ALSO carries
+// `autopilot:reviewed` — so the operator can tell "reviewed + merge-ready, my
+// final call" apart from a 🔴 / cycle-capped / non-consensus escalation that
+// still needs work. Stamped from EITHER `--reviewed` OR the hidden body marker
+// `<!-- autopilot:reviewed -->`. A 🔴 / non-consensus escalation gets only
+// `autopilot:needs-human`, never this.
+//
 // Extra `--label <name>` values (repeatable) are merged in. Routing comments
 // (cycle 1) carry neither flag nor marker, so they stay unlabelled. Missing
-// labels are auto-created.
+// labels are auto-created (each with its own colour/description).
 //
 // Exit codes:
 //   0  — comment created (HTTP 201); labels best-effort
@@ -47,17 +57,36 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { projectRepo } from "./pr-autopilot-scan.mjs";
-import { ESCALATION_LABEL } from "./pr-merge.mjs";
+import { ESCALATION_LABEL, REVIEWED_LABEL } from "./pr-merge.mjs";
 
 const GH_API = "https://api.github.com";
-const ESCALATION_LABEL_COLOR = "b60205";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..", "..", "..");
+
+/** Per-label colour + description used when auto-creating a label the target
+ *  repo lacks. Unknown labels (explicit --label values) fall back to the
+ *  escalation colour. Single object so the two canonical labels never drift. */
+const LABEL_META = {
+  [ESCALATION_LABEL]: {
+    color: "b60205", // red — "an autopilot decision needs a human"
+    description: "Autopilot handed this off — a human's call (merge / governance L0/L1 / blocked).",
+  },
+  [REVIEWED_LABEL]: {
+    color: "0e8a16", // green — "reviewed to 🟢 consensus, merge-ready"
+    description: "Autopilot reviewed this to a 🟢 unanimous-green consensus; merge-ready, held only by a human gate (L0/L1 / delegation) — the operator merges.",
+  },
+};
+const FALLBACK_LABEL_META = LABEL_META[ESCALATION_LABEL];
 
 /** Hidden marker the SKILL.md hand-off/escalation verdict template embeds. Its
  *  presence in the comment body forces ESCALATION_LABEL even if --needs-human
  *  was omitted — the mechanical half of "escalation ALWAYS carries the label". */
 export const NEEDS_HUMAN_MARKER = "<!-- autopilot:needs-human -->";
+
+/** Hidden marker for a 🟢 merge-ready hand-off. Its presence (or --reviewed)
+ *  adds REVIEWED_LABEL alongside ESCALATION_LABEL — the mechanical half of
+ *  "a green, human-gated PR is flagged reviewed even if the flag is dropped". */
+export const REVIEWED_MARKER = "<!-- autopilot:reviewed -->";
 
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`);
@@ -77,14 +106,17 @@ function labelArgs() {
   return [...new Set(out)];
 }
 
-/** The label set to stamp. Exported + pure so the invariant "any hand-off to a
- *  human carries ESCALATION_LABEL" is unit-tested, not merely documented: the
- *  canonical label is added whenever the verdict escalates — signalled by the
- *  --needs-human flag OR the hidden body marker — on top of any explicit
- *  --label values. */
-export function resolveLabels(rawLabels, { needsHuman = false, body = "" } = {}) {
+/** The label set to stamp. Exported + pure so the invariants are unit-tested,
+ *  not merely documented:
+ *   - any hand-off to a human carries ESCALATION_LABEL — added whenever the
+ *     verdict escalates (the --needs-human flag OR the hidden body marker);
+ *   - a 🟢 merge-ready hand-off ALSO carries REVIEWED_LABEL (the --reviewed
+ *     flag OR the hidden reviewed marker) — and reviewed never implies escalated
+ *     and vice versa; each is its own signal, on top of any explicit --label. */
+export function resolveLabels(rawLabels, { needsHuman = false, reviewed = false, body = "" } = {}) {
   const out = [...rawLabels];
   if (needsHuman || body.includes(NEEDS_HUMAN_MARKER)) out.push(ESCALATION_LABEL);
+  if (reviewed || body.includes(REVIEWED_MARKER)) out.push(REVIEWED_LABEL);
   return [...new Set(out)];
 }
 
@@ -149,12 +181,16 @@ async function main() {
     // comment that already landed). Auto-create any label the repo lacks.
     // resolveLabels guarantees ESCALATION_LABEL whenever this comment hands the
     // PR to a human (--needs-human flag or the body marker).
-    const labels = resolveLabels(labelArgs(), { needsHuman: flag("needs-human"), body });
+    const labels = resolveLabels(labelArgs(), {
+      needsHuman: flag("needs-human"),
+      reviewed: flag("reviewed"),
+      body,
+    });
     if (labels.length > 0) {
       for (const name of labels) {
+        const meta = LABEL_META[name] ?? FALLBACK_LABEL_META;
         const cr = await gh(token, "POST", `/repos/${owner}/${repo}/labels`, {
-          name, color: ESCALATION_LABEL_COLOR,
-          description: "Autopilot handed this off — a human's call (merge / governance L0/L1 / blocked).",
+          name, color: meta.color, description: meta.description,
         }).catch(() => ({ status: 0 }));
         if (cr.status !== 201 && cr.status !== 422) {
           console.error(`pr-autopilot-post: WARN ensure label "${name}" → HTTP ${cr.status}`);

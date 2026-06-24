@@ -70,6 +70,17 @@ const L0L1_CLOSE = "<!-- /autopilot:l0l1-paths -->";
 export const ESCALATION_LABEL = "autopilot:needs-human";
 const ESCALATION_LABEL_COLOR = "b60205"; // red — "an autopilot decision needs a human"
 
+// The companion "this was reviewed" marker, stamped *alongside* ESCALATION_LABEL
+// only on a 🟢 unanimous-green hand-off — a PR that reached reviewer consensus
+// and is merge-ready, held back from an autonomous merge solely by a human gate
+// (the target repo's L0/L1 boundary, or a missing R-N10 delegation). It lets the
+// operator separate "reviewed + merge-ready, just my final call" from a 🔴 /
+// cycle-capped / non-consensus escalation that still needs work — both carry
+// ESCALATION_LABEL, only the former carries this. It is NOT put on the engine's
+// refused-decision tracking issues (those never reached green). Single-sourced
+// here; pr-autopilot-post.mjs imports it (and a --reviewed flag) to stamp it.
+export const REVIEWED_LABEL = "autopilot:reviewed";
+
 // Create labels if they do not already exist (idempotent: an existing label
 // returns 422, which we ignore). Lets a target repo that has never seen the
 // escalation label still receive it without a manual pre-create step.

@@ -91,13 +91,16 @@ Now that the nominated reviews exist (you produced/dispatched them in Step 4, or
    - **🟡** — one or more reviewers have an open blocking finding. Next tick re-routes (cycle += 1) once the author revises.
    - **🔴** — any reviewer's 🔴 is a **veto**, or cycle > `cycle_cap`, or a scope question you can't decide. Escalate to the operator.
 
-   Write a verdict comment that names each reviewer's load-bearing finding and how it resolved, states the aggregated colour, and post it **with `pr-autopilot-post.mjs`** — that script is the **only** path that applies the escalation label, so the verdict/hand-off comment must go through it, **never** a raw issue-comment API call, `gh`, or an MCP comment tool (any of those drops the label — this is exactly how #353's L0/L1 hand-off reached the operator un-labelled). Flags by outcome: **comment-only** for a 🟡 re-route, or **`--needs-human`** for any hand-off (🔴 / 🟢-but-L0/L1 / no-delegation — see 5.2), composed into the hand-off template in 5.2 so the marker is present by construction.
+   Write a verdict comment that names each reviewer's load-bearing finding and how it resolved, states the aggregated colour, and post it **with `pr-autopilot-post.mjs`** — that script is the **only** path that applies the escalation label, so the verdict/hand-off comment must go through it, **never** a raw issue-comment API call, `gh`, or an MCP comment tool (any of those drops the label — this is exactly how #353's L0/L1 hand-off reached the operator un-labelled). Flags by outcome: **comment-only** for a 🟡 re-route; **`--needs-human`** for any hand-off (🔴 / 🟢-but-L0/L1 / no-delegation — see 5.2); **plus `--reviewed`** when that hand-off is 🟢 unanimous-green and merge-ready (held only by the human gate — see 5.2), composed into the hand-off template in 5.2 so the markers are present by construction.
 2. **Complete the cycle** — never leave it open. **Escalation ALWAYS carries the `autopilot:needs-human` label — no exceptions.** Every comment that hands a PR to a human MUST (a) embed the hidden marker `<!-- autopilot:needs-human -->` in the verdict body **and** (b) be posted with the `--needs-human` flag. `pr-autopilot-post.mjs` stamps the canonical label from *either* signal (belt-and-suspenders, so a forgotten flag still labels from the marker), so the operator finds the whole queue with `is:open label:autopilot:needs-human`:
    - **🟢 unanimous-green + touches NO L0/L1 path** → approve + merge via the engine below. (No marker, no `--needs-human` — it merges.)
-   - **🟢 unanimous-green + touches the target repo's governance L0/L1** → **escalate to a human** for the final call. Post the verdict **with the `<!-- autopilot:needs-human -->` marker and `--needs-human`**, and tag the operator (`L0/L1 change — operator's final call per W-5`). Do **not** merge.
+   - **🟢 unanimous-green + touches the target repo's governance L0/L1** → **escalate to a human** for the final call. This is a **merge-ready** hand-off — the reviewers reached green; only the human gate holds it back — so it carries **both** markers and flags: `--needs-human --reviewed` (and the body ends with `<!-- autopilot:needs-human -->` then `<!-- autopilot:reviewed -->`). Tag the operator (`L0/L1 change — operator's final call per W-5`). Do **not** merge.
    - **🟡** → the verdict lists the required fixes; re-route next tick. (No marker / no `--needs-human` — it stays in the cycle, not the human queue.)
-   - **🔴** → escalate: post the verdict **with the marker and `--needs-human`**, state the blocking reason, tag the operator. Do not merge.
-   - **Any other hand-off** (no R-N10 delegation, unreadable governance, a scope question you can't decide) → same rule: marker + `--needs-human`.
+   - **🔴** → escalate: post the verdict **with the marker and `--needs-human`** (no `--reviewed` — it did **not** reach green), state the blocking reason, tag the operator. Do not merge.
+   - **🟢 unanimous-green + no R-N10 delegation** (the bound project's target repo never granted autonomous merge) → a merge-ready hand-off like the L0/L1 case: `--needs-human --reviewed`.
+   - **Any other hand-off** (unreadable governance, a scope question you can't decide — i.e. the verdict did **not** reach 🟢) → `--needs-human` only, **no** `--reviewed`.
+
+   **The `autopilot:reviewed` companion label (operator directive 2026-06-23).** A 🟢 unanimous-green PR that is handed off **only** because a human gate blocks the autonomous merge (an L0/L1 path, or no R-N10 delegation) is *reviewed and merge-ready* — the operator's only task is the final merge click. Stamp it `autopilot:reviewed` (the `--reviewed` flag and/or the `<!-- autopilot:reviewed -->` body marker — belt-and-suspenders, exactly like `--needs-human`) **in addition to** `autopilot:needs-human`. So `is:open label:autopilot:reviewed` is the merge-ready queue, a strict subset of `is:open label:autopilot:needs-human` that excludes the 🔴 / cycle-capped / non-consensus PRs that still need work. `autopilot:reviewed` is **never** stamped on a non-green hand-off, and never implies a merge — the agent still does not merge an L0/L1 PR.
 
    **Hand-off verdict template — compose the verdict *into* this block, never freehand** (the trailing marker is the mechanical half of the guarantee: it forces the label even if `--needs-human` is ever dropped, and it is only reliably present if you start from this template — Step 2 has the analogous routing template):
    ```md
@@ -105,18 +108,24 @@ Now that the nominated reviews exist (you produced/dispatched them in Step 4, or
 
    <one-paragraph synthesis: each nominated reviewer's load-bearing finding and how it resolved, then the aggregated colour>
 
-   **Handing to the operator — <reason>.** <e.g. "🟢 consensus, but touches L0/L1 path `<file>` — operator's final call per W-5"; or "🔴 <reviewer>'s blocking finding"; or "no R-N10 delegation".> Not merging.
+   **Handing to the operator — <reason>.** <e.g. "🟢 consensus, but touches L0/L1 path `<file>` — operator's final call per W-5"; or "🔴 <reviewer>'s blocking finding"; or "no R-N10 delegation".> Not merging. <If the PR is a DRAFT, add: "Still a draft — mark ready, then merge.">
 
    — <PersonaName> (CCR persona; see workforce/skills/pr-autopilot/SKILL.md)
 
    <!-- autopilot:needs-human -->
+   <!-- autopilot:reviewed -->   ⟵ include this SECOND marker line ONLY on a 🟢 merge-ready hand-off (L0/L1 / no-delegation); omit it on a 🔴 / non-consensus hand-off.
    ```
-   So every hand-off comment is posted as:
+   So a 🔴 / non-consensus hand-off (drop the reviewed marker line) is posted as:
    ```sh
    GITHUB_TOKEN="<…>" node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
      --project "<project_id>" --pr <number> --body-file /tmp/verdict-<number>.md --needs-human
    ```
-   and the verdict body ends with the marker line `<!-- autopilot:needs-human -->` (the template above already carries it). The `pr-merge.mjs` engine independently stamps the same label on any tracking **issue** it files (`action:"escalate"`), and the label name is single-sourced (`ESCALATION_LABEL`) across both scripts — so PR hand-offs and issue escalations share one searchable queue. **A hand-off comment with no `autopilot:needs-human` label is a cadence bug, not a finished run.**
+   and a 🟢 merge-ready hand-off (keep the reviewed marker line) adds `--reviewed`:
+   ```sh
+   GITHUB_TOKEN="<…>" node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
+     --project "<project_id>" --pr <number> --body-file /tmp/verdict-<number>.md --needs-human --reviewed
+   ```
+   and the verdict body ends with the marker line `<!-- autopilot:needs-human -->` (the template above already carries it; the `<!-- autopilot:reviewed -->` line is the merge-ready companion). The `pr-merge.mjs` engine independently stamps the same label on any tracking **issue** it files (`action:"escalate"`), and the label name is single-sourced (`ESCALATION_LABEL`) across both scripts — so PR hand-offs and issue escalations share one searchable queue. **A hand-off comment with no `autopilot:needs-human` label is a cadence bug, not a finished run.**
 
 ### The merge leg — unanimous-green, non-L0/L1 only (R-N10 / adr-0010)
 
