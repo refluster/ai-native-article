@@ -1,0 +1,15 @@
+{
+  "id": "conference",
+  "name": "Conference",
+  "owner_agent": "corinne",
+  "github": {
+    "owner": "refluster",
+    "repo": "conference"
+  },
+  "governance_docs": ["AGENTS.md"],
+  "members": ["corinne", "silas", "delphine", "marisol", "yara", "maya", "elena", "aoi", "kai"],
+  "credential_types": ["github.token"],
+  "status": "active",
+  "created_at": "2026-06-25",
+  "note": "Sponsor-engagement / fundraising project: attend and report on events (conferences etc.) to drive fundraising. Corinne (IR) owns; Silas (VP Finance) frames the model, Delphine the fundraising narrative, Marisol the sponsor reporting, Yara the visit/event coordination; Maya sponsors, Elena/Aoi/Kai keep public materials brand-consistent. Draft/stage only — the operator alone acts on outreach (W-1/C-3). github.token stored out-of-band under wf/projects/conference/github.token."
+}
