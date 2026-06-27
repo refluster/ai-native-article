@@ -34,6 +34,7 @@ Read `/tmp/pr-autopilot-candidates.json`. For **each** candidate PR, apply your 
 - Nominate **1-3** reviewer personas whose lens has real surface on this PR. You (the routing persona) MAY self-include if your rules say so.
 - Each nomination's `rationale` must **cite the PR surface** (file paths / topics), not just restate the trigger.
 - List in `skipped` the personas you considered and rejected (per `skip_list_default` / `skip_list_rationale`) — not every persona in the org.
+- **Epic PRs always carry a VP-class reviewer (operator directive 2026-06-27).** When the diff touches the target repo's Epic / design-record path (for `agent-workforce`: `workforce/docs/epics/**`), never route to a single non-VP lens — e.g. PdM self-review alone is **not** sufficient. Nominate the product lens **plus** at least one VP-class persona: the VP whose functional area the Epic concerns when one is clearly implicated, otherwise the standing VP lens declared in your `nomination_rules`. An Epic is an org-shaping decision; it gets senior sign-off, not a solo review.
 
 Write the routing comment body for PR `<number>` to `/tmp/route-body-<number>.md` using **exactly** this template (the opening marker is what the scanner reads to avoid double-routing):
 
