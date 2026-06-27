@@ -21,9 +21,10 @@ Three gaps block this today:
 
 Stand up a **dedicated Media & External Communications team**, give it a **`podcast-script` Cadence** for script generation, and build a **deterministic synthesis → RSS → Spotify** pipeline. The reader site gains only a Spotify link (no in-page player). Confirmed product decisions from the operator:
 
-- **D1 — Format.** Single narrator (colloquial, conversational-style narration), **one Polly voice**, for V1. Multi-host dialogue is a later version (Phase 2).
-- **D2 — Org.** A **new, independent Media & External Communications team**, headed by a **Marketing VP (統括)** with integrated oversight of all outbound channels; multiple new positions. **Raise the W-3 budget ceiling substantially.**
+- **D1 — Format.** Single narrator (colloquial, conversational-style narration); **one Polly voice per episode, chosen at random from a JA Neural voice pool each cast**, for V1 (so the same single-voice episode varies its narrator across casts). Multi-host dialogue is a later version (Phase 2).
+- **D2 — Org.** A **new, independent Media & External Communications team**, headed by a **net-new Marketing VP (統括)** with integrated oversight of all outbound channels; multiple new positions. **The W-3 budget ceiling is raised to $250/mo (operator-approved).**
 - **D3 — Distribution scope.** **Spotify only.** **No in-page audio player** — the operator explicitly dropped on-site playback to avoid the time-cost of download-protection work. The article page carries a **Spotify icon link only**. MP3s are hosted on S3 **solely as the RSS enclosure** for Spotify's crawler, never linked from the site; frontmatter therefore needs `spotifyUrl` (+ `hasPodcast`), not `audioUrl`.
+- **D4 — No GAS.** Script generation runs entirely on the cadence-forge `podcast-script` Cadence (calling its own bundled scripts is fine); **Google Apps Script is not used anywhere in this Epic.** The `spotifyUrl` frontmatter field flows only through the CI sync path — the GAS `Code.gs` publish path is explicitly excluded.
 
 ### Architecture
 
@@ -57,7 +58,7 @@ A new independent team under Maya (Founder). Four new positions, registered via 
 3. **Podcast Producer / Narration & Voice Casting** — **narrator casting** (Polly voice selection and article↔voice mapping), episode QA, Spotify operations.
 4. **Media Rights & Compliance Coordinator** — owns the operational no-verbatim-reproduction / mandatory-citation checklist and the mechanical guard. **Legal authority (fair-use / derivative-work judgment) escalates to levi (Product Counsel) and priya (VP People & Legal)** — IP/legal authority stays centralized per workforce governance (priya decides whether a persona exists).
 
-Each persona = `{slug}.json` + `{slug}-system.md` (slug/role/model/budget/reports_to/lateral/jd/identity). **Budget:** ≈ +$24–26/mo for four hires → **raise W-3** from $190/mo to a provisional **$250/mo** (headroom for Phase-2 multi-voice and episode growth) — a **Zone A** edit to `workforce/docs/governance.md §2`, operator decision.
+Each persona = `{slug}.json` + `{slug}-system.md` (slug/role/model/budget/reports_to/lateral/jd/identity). **Budget:** ≈ +$24–26/mo for four hires → **raise W-3** from $190/mo to **$250/mo (operator-approved)** (headroom for Phase-2 multi-voice and episode growth) — a **Zone A** edit to `workforce/docs/governance.md §2`. The VP is a net-new hire: integrated external communications is too broad to cover from the CX seat, so elena is not expanded.
 
 ### B. `podcast-script` Cadence — `workforce/skills/podcast-script/`
 
@@ -71,13 +72,13 @@ Bound to the scriptwriter persona via the `wire-cadences.mjs` pattern (executor=
 
 ### C. Audio synthesis + RSS (deterministic CI)
 
-- **`newsletter/pipeline/podcast/synthesize.mjs`** — reads `podcastStatus=script-ready` from Notion → **Amazon Polly Neural Japanese, single voice, `StartSpeechSynthesisTask`** (10 min ≈ 5,000 chars; the async API is required because synchronous `SynthesizeSpeech` caps at 3,000 billed chars; Polly writes the MP3 straight to S3) → MP3 to S3 (`s3://…/podcast/audio/{slug}.mp3`, public for Spotify's crawler) → writes `audioUrl` (internal) + `podcastStatus=audio-ready` back to Notion.
+- **`newsletter/pipeline/podcast/synthesize.mjs`** — reads `podcastStatus=script-ready` from Notion → **Amazon Polly Neural Japanese, one voice chosen at random per episode from a JA Neural voice pool, `StartSpeechSynthesisTask`** (10 min ≈ 5,000 chars; the async API is required because synchronous `SynthesizeSpeech` caps at 3,000 billed chars; Polly writes the MP3 straight to S3) → MP3 to the **existing `wf` bucket's public prefix** (`…/podcast/audio/{slug}.mp3`, public for Spotify's crawler — no dedicated bucket) → writes `audioUrl` (internal) + `podcastStatus=audio-ready` back to Notion. The producer / voice-casting persona owns the voice-pool definition and QA.
 - **`newsletter/pipeline/podcast/build-rss.mjs`** — builds the podcast **RSS** from `audio-ready` episodes (`<item><enclosure>` = S3 MP3, `<item><description>` carries the **mandatory source citations**, GUID = slug) → public S3.
 - **`.github/workflows/podcast-synthesize.yml`** — scheduled GitHub Action running both scripts; AWS credentials via GH Secret, IAM scoped to Polly + S3.
 - Per-cast cost (≈10 min JA): script-gen via the Cadence's LLM + Polly Neural ≈ **$0.08/episode TTS**, total **~$0.15–0.30/episode** — negligible; the W-3 raise is for salaries, not synthesis.
 - **No download-protection work** (out of scope per D3 — a podcast RSS enclosure is public by nature).
 
-Notion article-DB properties to add: `podcastStatus` (select: none/script-ready/audio-ready/published), `podcastScript` (child blocks), `podcastSources` (citations), `audioUrl` (internal), `spotifyUrl`.
+Notion article-DB properties (**pre-created by the operator**): `podcastStatus` (select: none/script-ready/audio-ready/published), `podcastScript` (**text** property — Notion exposes no child-block property type, so the script body is stored as text), `podcastSources` (citations), `audioUrl` (internal), `spotifyUrl`. The `podcast-script` write-script writes the script into the `podcastScript` text property.
 
 ### D. Reader app — Spotify link only
 
@@ -86,14 +87,14 @@ Notion article-DB properties to add: `podcastStatus` (select: none/script-ready/
 
 ### E. Pipeline frontmatter — `spotifyUrl` only
 
-Authoritative path is the CI sync (Path B): `newsletter/pipeline/fetchers/types.mjs` (`ArticleRecord += spotifyUrl?`), `fetchers/notion.mjs` (extract it), `writers/posts-md.mjs` (`frontmatter()` conditional push). The secondary GAS path `newsletter/gas/src/Code.gs` `handleL4Publish()` gets the same `spotifyUrl` field for parity — and **any `Code.gs` change requires `gas-deploy-verify`**.
+The **only** path is the CI sync (Path B): `newsletter/pipeline/fetchers/types.mjs` (`ArticleRecord += spotifyUrl?`), `fetchers/notion.mjs` (extract it), `writers/posts-md.mjs` (`frontmatter()` conditional push). **GAS is not used (D4)** — the `newsletter/gas/src/Code.gs` publish path is explicitly excluded, so there is no `Code.gs` change and no `gas-deploy-verify` step.
 
 ### Staged rollout
 
 | Phase | Action | Authority |
 |---|---|---|
 | **0 — Team** | Register `media-group` (4 personas) via `register.mjs`; raise W-3 in governance.md; land the new ADR (podcast execution surface, R-N1). | A (seed/ADR draft) + **B (W-3 cap, persona existence — priya/operator)** |
-| **1 — Spotify (primary)** | `podcast-script` Cadence + `synthesize.mjs` (Polly single voice → S3) + `build-rss.mjs` + Spotify feed submission + `spotifyUrl` → frontmatter → reader Spotify link. Cadence binding lands **paused**. | A (skill, pipeline, reader) + **B (cron enable, PR merge, Spotify submission)** |
+| **1 — Spotify (primary)** | `podcast-script` Cadence + `synthesize.mjs` (Polly random JA voice → S3) + `build-rss.mjs` + Spotify feed submission + `spotifyUrl` → frontmatter → reader Spotify link. Cadence binding lands **paused**. | A (skill, pipeline, reader) + **B (cron enable, PR merge, Spotify submission)** |
 | **2 — Future** | Multi-host dialogue (multiple Polly voices, speaker splitting/joining); Spotify API automation (`spotify.token` credential); Japanese Generative voice if available. | later Epic phase |
 
 ## Behaviour at N = 100+ agents
@@ -108,19 +109,23 @@ Authoritative path is the CI sync (Path B): `newsletter/pipeline/fetchers/types.
 
 - `workforce/seed/media-group/` registers four personas (`GET /agents/{slug}` → 200 each); `governance.md §2` W-3 ceiling raised; a new ADR declares the podcast production/distribution execution surface.
 - `workforce/skills/podcast-script/` exists (`archetype:"cadence"`, `requires:["notion.integration_token"]`) with `publish-notion.mjs`; passes `npm run workforce:skills` + `:skill-registry:check`; **empty citations → exit 2** verified.
-- `synthesize.mjs` turns a `script-ready` test article into an S3 MP3 (single Polly JA voice via async task) and writes `audioUrl` + `audio-ready` to Notion.
+- `synthesize.mjs` turns a `script-ready` test article into an S3 MP3 (a random JA Neural voice via async task) and writes `audioUrl` + `audio-ready` to Notion.
 - `build-rss.mjs` emits a valid podcast RSS (enclosure = MP3, citations in `<description>`); feed submitted to Spotify (operator).
 - `spotifyUrl` flows Notion → `posts/{slug}.md` frontmatter + `manifest.json` → reader; the article page renders a Spotify icon link (and **no** `<audio>`); `article-health` reports no truncation regression.
 - End-to-end verified on `c91368439868`. PR body cites the L1 docs / ADRs it touches (governance.md, the new ADR, ADR-0007) per the R-11 citation gate.
 
 ## Open questions
 
-- **Q1.** Is the Marketing VP (統括) a **new hire** (current draft, consistent with the independent-team decision) or an expansion of an existing VP (e.g. elena)? priya decides persona existence; switching to expansion means seed → PATCH instead.
-- **Q2.** Who creates the Notion article-DB properties (`podcastStatus`/`audioUrl`/`spotifyUrl`/`podcastSources`) — operator pre-creates, or the ADR specifies the schema?
-- **Q3.** S3 hosting: reuse the existing `wf` bucket's public prefix, or a dedicated podcast bucket/CDN?
-- **Q4.** Exact new W-3 ceiling (provisional $250/mo).
-- **Q5.** Spotify per-episode URL capture — manual in Phase 1, or pull forward the `spotify.token` API automation (a new credential type touching the five mirror points)?
-- **Q6.** Japanese Polly voice choice (Neural: Takumi / Kazuha / Tomoko); confirm Generative/Long-form JA availability before any Phase-2 upgrade.
+All six Phase-1 questions were resolved by operator decision (2026-06-27):
+
+- **Q1 → New hire.** The Marketing VP (統括) is net-new — external communications is too broad to cover from the CX seat, so elena is not expanded.
+- **Q2 → Operator pre-creates** the Notion properties; `podcastScript` is a **text** property (Notion has no child-block property type).
+- **Q3 → Reuse** the existing `wf` bucket's public prefix (no dedicated bucket).
+- **Q4 → W-3 = $250/mo, approved.**
+- **Q5 → Manual** `spotifyUrl` capture in Phase 1 (`spotify.token` API automation deferred to Phase 2).
+- **Q6 → Random voice per cast** from a JA Neural voice pool.
+
+Residual (non-blocking, implementation-time): the exact JA Neural voice-pool membership (owned by the producer / voice-casting persona), and confirming whether `workforce/docs/epics/` is inside the `autopilot:l0l1-paths` protected set in `governance.md` (decides whether pr-autopilot may merge this PR or must escalate it to a human).
 
 ## Out of scope
 
@@ -128,4 +133,5 @@ Authoritative path is the CI sync (Path B): `newsletter/pipeline/fetchers/types.
 - **Multi-host dialogue format and multiple voices** — Phase 2.
 - **Spotify API automation / `spotify.token` credential** — Phase 2; Phase 1 captures `spotifyUrl` manually.
 - **Bedrock for script generation** — explicitly excluded; generation runs on the Cadence mechanism.
-- **Generative / Long-form Japanese voices** — V1 uses Neural single voice; revisit on availability.
+- **Google Apps Script (GAS)** — not used anywhere in this Epic (D4). Generation is the cadence-forge `podcast-script` Cadence; `spotifyUrl` frontmatter flows only through the CI sync pipeline, never `Code.gs`.
+- **Generative / Long-form Japanese voices** — V1 uses Neural voices (one per episode, random); revisit on availability.
