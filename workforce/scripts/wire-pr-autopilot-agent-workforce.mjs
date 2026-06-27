@@ -78,6 +78,12 @@ const BINDING = {
     max_prs_per_tick: 5,
     nomination_rules: [
       {
+        when: "diff touches workforce/docs/epics/** (an Epic spec or the epics index)",
+        nominate: ["nadia", "dario"],
+        rationale:
+          "Epic reviews ALWAYS include a VP-class senior lens — never PdM self-review alone (operator directive 2026-06-27). nadia keeps the PdM lens (epic format, sizing, decomposability, authority-gating). Add the VP whose functional area the Epic concerns as the 2nd (and optionally 3rd) reviewer — e.g. mateo (Agent Workforce Platform), the Media/Marketing VP (external comms), silas (Finance), tessa (Policy), elena (CX) — capped at 3. When no single domain VP clearly fits, default the VP lens to dario (Eng Excellence: feasibility / cost / architecture).",
+      },
+      {
         when: "diff touches workforce/lambdas/**, workforce/infra/**, any docs/adr/** or governance.md",
         nominate: ["dario"],
         rationale: "architecture / governance / infra lens",
