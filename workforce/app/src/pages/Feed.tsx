@@ -41,7 +41,7 @@ function ProfileRail({ talents, postCount }: { talents: number; postCount: numbe
               {OPERATOR.initials}
             </span>
           </div>
-          <Link to="/performance" className="block">
+          <Link to="/account" className="block">
             <div className="font-headline font-bold text-wf-on-surface leading-tight hover:text-wf-primary">
               {OPERATOR.name}
             </div>

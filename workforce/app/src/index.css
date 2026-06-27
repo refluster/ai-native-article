@@ -1,8 +1,9 @@
-/* JetBrains Mono — typeplate / KPI mono. Loaded via Google Fonts CDN
-   so the workforce console has the maker's-mark mono treatment without
-   a self-hosted file in this repo. Must precede @tailwind directives
-   per the CSS spec. */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+/* Geist — primary typeface for the "Cognitive Network" reskin (headings +
+   body). JetBrains Mono — typeplate / KPI / data mono. Both loaded via the
+   Google Fonts CDN so the workforce console carries the design without a
+   self-hosted file in this repo. Must precede @tailwind directives per the
+   CSS spec. Inter stays in the family stack as a graceful fallback. */
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800;900&family=Inter:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -10,16 +11,16 @@
 
 @layer base {
   body {
-    font-family: 'Inter', sans-serif;
-    background-color: #faf9ff;
-    color: #0b0b14;
+    font-family: 'Geist', 'Inter', sans-serif;
+    background-color: #f8fafb;
+    color: #191c1d;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   ::selection {
-    background-color: #954500;
-    color: #fff5ec;
+    background-color: #6b3b16;
+    color: #ffffff;
   }
 
   /* Section wrapper kept for compat with components written before the
@@ -28,8 +29,8 @@
      these colours on body already; the class becomes a no-op but stays
      to avoid touching every page. */
   .workforce-section {
-    background-color: #faf9ff;
-    color: #0b0b14;
+    background-color: #f8fafb;
+    color: #191c1d;
   }
 
   /* CSS variables for SVG fill/stroke values that cannot reach the
@@ -38,14 +39,14 @@
      wf-* tokens. Keeping hex centralised here keeps lint:tokens green —
      see scripts/lint-design-tokens.mjs. */
   :root {
-    --wf-sigil-ink: #0b0b14;
-    --wf-sigil-border: #c8c4d4;
-    --wf-svg-surface: #faf9ff;
-    --wf-svg-on-surface: #0b0b14;
-    --wf-svg-on-surface-variant: #4f4d57;
-    --wf-svg-tertiary: #954500;
-    --wf-svg-primary: #0055c8;
-    --wf-svg-surface-emphasis: #eef3fc;
+    --wf-sigil-ink: #191c1d;
+    --wf-sigil-border: #c6c5d0;
+    --wf-svg-surface: #f8fafb;
+    --wf-svg-on-surface: #191c1d;
+    --wf-svg-on-surface-variant: #45464f;
+    --wf-svg-tertiary: #6b3b16;
+    --wf-svg-primary: #0f1b46;
+    --wf-svg-surface-emphasis: #e9ebf2;
     /* Performance-chart series fills (Epic-016). Mirror the wf-running /
        wf-paused / wf-archived / wf-outline-variant status tokens so the
        lifecycle-funnel + PR-automation SVGs paint through CSS vars and
@@ -53,7 +54,7 @@
     --wf-svg-running: #1f7a4f;
     --wf-svg-paused: #b58200;
     --wf-svg-archived: #6b7280;
-    --wf-svg-outline-variant: #ddd9e6;
+    --wf-svg-outline-variant: #c6c5d0;
   }
 }
 
@@ -61,7 +62,7 @@
   /* Subtle vertical-rule background used behind hero typeplates.
      Tailwind-only equivalent would be heavy; one custom utility is cheaper. */
   .wf-rule-bg {
-    background-image: linear-gradient(to right, #ddd9e6 1px, transparent 1px);
+    background-image: linear-gradient(to right, #dfe1e2 1px, transparent 1px);
     background-size: 48px 100%;
   }
 }
@@ -71,7 +72,7 @@
    hand-rolled minimum: GitHub-README-ish spacing, no styling ambition
    beyond legibility. */
 .skill-md-body {
-  color: #0b0b14;
+  color: #191c1d;
   font-size: 0.9375rem;
   line-height: 1.65;
 }
@@ -81,13 +82,13 @@
 .skill-md-body h4 {
   font-weight: 800;
   letter-spacing: -0.01em;
-  color: #0b0b14;
+  color: #191c1d;
   margin-top: 1.5em;
   margin-bottom: 0.5em;
   line-height: 1.25;
 }
 .skill-md-body h1 { font-size: 1.625rem; }
-.skill-md-body h2 { font-size: 1.25rem; border-bottom: 1px solid #ddd9e6; padding-bottom: 0.25em; }
+.skill-md-body h2 { font-size: 1.25rem; border-bottom: 1px solid #dfe1e2; padding-bottom: 0.25em; }
 .skill-md-body h3 { font-size: 1.0625rem; }
 .skill-md-body h4 { font-size: 1rem; }
 .skill-md-body p,
@@ -99,18 +100,18 @@
 .skill-md-body ul { list-style: disc; padding-left: 1.5em; }
 .skill-md-body ol { list-style: decimal; padding-left: 1.5em; }
 .skill-md-body li { margin: 0.25em 0; }
-.skill-md-body a { color: #0055c8; text-decoration: underline; }
-.skill-md-body a:hover { color: #954500; }
+.skill-md-body a { color: #0f1b46; text-decoration: underline; }
+.skill-md-body a:hover { color: #6b3b16; }
 .skill-md-body code {
   font-family: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
   font-size: 0.85em;
-  background: #f1eef8;
+  background: #eceeef;
   padding: 0.1em 0.35em;
   border-radius: 3px;
 }
 .skill-md-body pre {
-  background: #f6f4fb;
-  border: 1px solid #ddd9e6;
+  background: #f2f4f5;
+  border: 1px solid #dfe1e2;
   padding: 0.85em 1em;
   overflow-x: auto;
   font-size: 0.85em;
@@ -118,15 +119,15 @@
 }
 .skill-md-body pre code { background: transparent; padding: 0; font-size: 1em; }
 .skill-md-body blockquote {
-  border-left: 3px solid #c8c4d4;
+  border-left: 3px solid #c6c5d0;
   padding-left: 0.9em;
-  color: #4f4d57;
+  color: #45464f;
 }
 .skill-md-body table { border-collapse: collapse; }
 .skill-md-body th,
-.skill-md-body td { border: 1px solid #ddd9e6; padding: 0.4em 0.7em; }
-.skill-md-body th { background: #f1eef8; font-weight: 700; }
-.skill-md-body hr { border: 0; border-top: 1px solid #ddd9e6; margin: 1.5em 0; }
+.skill-md-body td { border: 1px solid #dfe1e2; padding: 0.4em 0.7em; }
+.skill-md-body th { background: #eceeef; font-weight: 700; }
+.skill-md-body hr { border: 0; border-top: 1px solid #dfe1e2; margin: 1.5em 0; }
 .skill-md-body > *:first-child { margin-top: 0; }
 .skill-md-body > *:last-child { margin-bottom: 0; }
 
@@ -135,10 +136,10 @@
    page's other bordered cards rather than competing with the prose. */
 .skill-md-frontmatter {
   margin-bottom: 1.5em;
-  border: 1px solid #ddd9e6;
+  border: 1px solid #dfe1e2;
   border-radius: 8px;
   overflow: hidden;
-  background: #faf9ff;
+  background: #f8fafb;
 }
 .skill-md-frontmatter-cap {
   font-family: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
@@ -146,10 +147,10 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  color: #4f4d57;
-  background: #f1eef8;
+  color: #45464f;
+  background: #eceeef;
   padding: 0.5em 0.9em;
-  border-bottom: 1px solid #ddd9e6;
+  border-bottom: 1px solid #dfe1e2;
 }
 .skill-md-frontmatter dl { margin: 0; }
 .skill-md-frontmatter-row {
@@ -158,18 +159,18 @@
   gap: 0.4em 1.25em;
   padding: 0.65em 0.9em;
 }
-.skill-md-frontmatter-row + .skill-md-frontmatter-row { border-top: 1px solid #ddd9e6; }
+.skill-md-frontmatter-row + .skill-md-frontmatter-row { border-top: 1px solid #dfe1e2; }
 .skill-md-frontmatter dt {
   font-family: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
   font-size: 0.6875rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #4f4d57;
+  color: #45464f;
   padding-top: 0.15em;
 }
 .skill-md-frontmatter dd {
   margin: 0;
-  color: #0b0b14;
+  color: #191c1d;
   font-size: 0.875rem;
   line-height: 1.55;
   overflow-wrap: anywhere;
