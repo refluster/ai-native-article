@@ -57,9 +57,10 @@ const SLUG = "nadia";
 const PROJECT_ID = "agent-workforce";
 const ROUTINE_SPEC = "workforce/docs/routines/agent-runner.md";
 
-// Once a day at 02:41 UTC (≈ Nadia's APAC-morning planning slot, cron(0 2 ? * MON *)
-// from the Q2 hire round, nudged off the hour). Single-literal minute + hour clears
-// the agents-api hourly cadence floor (G1-cadence-floor).
+// Once a day at 02:41 UTC: cron(41 2 ? * * *). 02:00 UTC is Nadia's APAC-morning
+// planning slot — her *weekly* pdm cron is cron(0 2 ? * MON *) (Mondays) from the
+// Q2 hire round; THIS cadence runs DAILY, nudged to :41 so the single-literal
+// minute + hour clears the agents-api hourly cadence floor (G1-cadence-floor).
 const BINDING = {
   skill: "backlog-reconcile",
   executor: "claude-code-routine",

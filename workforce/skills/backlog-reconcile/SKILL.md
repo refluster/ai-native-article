@@ -169,7 +169,24 @@ rewritten/split, K newly filed — not just edited docs.
 > edit. Batch the proposed diff and, if the operator hasn't pre-authorised the issue churn, show
 > it for a yes before applying — especially bulk closes.
 
-## Step 7 — ship it, hand off the merge
+## Step 7 — if nothing changed, say so cheaply (no forced PR)
+
+Most daily runs will find the backlog already true. **"Nothing changed" is a first-class, cheap
+outcome — never a forced PR.** If a run produces **no status flips and an empty issue diff**
+(0 closed / 0 rewritten·split / 0 filed):
+
+- **Do not open a PR.** Record a one-line no-op in the run output (and, if the binding tracks it,
+  bump an empty-run counter), and stop.
+- **After K consecutive empty runs** (default 5), surface a recommendation that the cadence could
+  **downgrade to weekly** — a *daily* reconciliation only earns its recurring cost while the
+  codebase is actively outrunning the plan. Re-wiring the binding cron is an operator decision,
+  not a self-applied one.
+
+This is load-bearing because the cadence is `cost_class: large` (~$0.60/run, ≈$18/mo at daily): the
+**audit fan-out is the cost**, so skipping the write-up on a quiet day keeps the standing daily
+commitment honest. Only proceed to Step 8 when there is a real diff to ship.
+
+## Step 8 — ship it, hand off the merge
 
 - Commit the planning-doc changes with a message that **cites the layer/area** (not "fix: stuff").
 - Open a **draft PR** describing the verdict table, the bucket counts, the **issue diff**, and the
