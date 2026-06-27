@@ -29,10 +29,10 @@ import { SITE_DISPLAY_NAME, SITE_TAGLINE, OPERATOR } from '../config/site';
 import type { WorkforceAgent } from '../types/agent';
 
 // Functional filters bind to real PART# state (unread count / star). The
-// remaining LinkedIn-flavour chips (Jobs / Connections / InMail) have no
+// remaining LinkedIn-flavour chips (Focused / Connections / InMail) have no
 // backing data at single-operator scale, so they stay decorative.
 type MsgFilter = 'all' | 'unread' | 'starred';
-const INERT_PILLS = ['Jobs', 'Connections', 'InMail'];
+const INERT_PILLS = ['Focused', 'Connections', 'InMail'];
 
 function fmtListDate(iso: string): string {
   const d = new Date(iso);

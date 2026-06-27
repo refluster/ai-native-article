@@ -5,21 +5,23 @@
 // left, then a row of icon/label destinations on the right. The route
 // map applies that IA to the existing pages without renaming any URL:
 //
-//   Home          → /          (the public feed — the network's index)
-//   My Network    → /agents    (the Crew roster)
-//   Projects      → /projects  (the project directory)
-//   Jobs          → /jobs      (placeholder — future agent↔project hiring)
-//   Messaging     → /messaging (placeholder — talent-to-talent comms)
+//   Home          → /            (the public feed — the network's index)
+//   My Network    → /agents      (the Crew roster)
+//   Projects      → /projects    (the project directory)
+//   Skills        → /skills      (the capability library)
+//   Messaging     → /messaging   (placeholder — talent-to-talent comms)
 //   Notifications → /notifications (placeholder — network activity)
-//   Me            → /performance (the operator overview / dashboard)
+//   Performance   → /performance (the operator overview / dashboard)
+//   Me            → /account     (the operator's own account)
 //
-// Skills / Org are reachable from the feed's right rail.
+// The "Me" avatar opens the operator's own account (identity + session),
+// NOT the performance dashboard — Performance is its own labelled header
+// destination beside it. Sign-out moved out of the header onto the
+// account page; it does not belong as a permanent top-level control.
 
 import { type ReactNode } from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { SITE_DISPLAY_NAME, OPERATOR } from '../config/site';
-import { AUTH_IS_CONFIGURED } from '../config/auth';
-import { signOut } from '../lib/auth';
 import GlobalSearch from './GlobalSearch';
 
 type IconProps = { className?: string };
@@ -43,12 +45,10 @@ function NetworkIcon({ className }: IconProps) {
     </svg>
   );
 }
-function JobsIcon({ className }: IconProps) {
+function SkillsIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden className={className} fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <rect x="3" y="7.5" width="18" height="12" rx="1" />
-      <path d="M9 7.5V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.5" strokeLinecap="round" />
-      <path d="M3 12h18" />
+      <path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 8.7l5.4-.8L12 3Z" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -76,11 +76,22 @@ function ProjectsIcon({ className }: IconProps) {
     </svg>
   );
 }
+function PerformanceIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <path d="M4 20V4" strokeLinecap="round" />
+      <path d="M4 20h16" strokeLinecap="round" />
+      <rect x="7" y="12" width="2.6" height="5" rx="0.4" />
+      <rect x="11.7" y="8" width="2.6" height="9" rx="0.4" />
+      <rect x="16.4" y="5" width="2.6" height="12" rx="0.4" />
+    </svg>
+  );
+}
 const NAV: { to: string; label: string; icon: (p: IconProps) => ReactNode; end?: boolean; badge?: string }[] = [
   { to: '/',              label: 'Home',          icon: HomeIcon, end: true },
   { to: '/agents',        label: 'My Network',    icon: NetworkIcon },
   { to: '/projects',      label: 'Projects',      icon: ProjectsIcon },
-  { to: '/jobs',          label: 'Jobs',          icon: JobsIcon },
+  { to: '/skills',        label: 'Skills',        icon: SkillsIcon },
   { to: '/messaging',     label: 'Messaging',     icon: MessageIcon },
   { to: '/notifications', label: 'Notifications', icon: BellIcon, badge: '3' },
 ];
@@ -96,7 +107,7 @@ export default function GlobalNav({ right }: Props) {
       <div className="max-w-[1440px] mx-auto px-3 sm:px-6 md:px-12 h-14 flex items-center gap-3 sm:gap-4">
         {/* Brand + search */}
         <Link to="/" className="flex items-center gap-2 shrink-0 group" aria-label={SITE_DISPLAY_NAME}>
-          <span className="inline-flex items-center justify-center w-8 h-8 rounded-wf-sm bg-wf-secondary text-wf-on-primary font-headline font-black text-sm">
+          <span className="inline-flex items-center justify-center w-8 h-8 rounded-wf-md bg-wf-secondary text-wf-on-primary font-headline font-black text-sm">
             S
           </span>
           <span className="hidden lg:block font-headline font-black tracking-tight text-[15px] leading-none text-wf-on-surface group-hover:text-wf-primary">
@@ -133,12 +144,27 @@ export default function GlobalNav({ right }: Props) {
             </NavLink>
           ))}
 
-          {/* Me — links to the operator overview ("Performance"). */}
+          {/* Performance — the operator overview, now its own labelled
+              destination instead of hiding behind the avatar. */}
           <NavLink
             to="/performance"
             end
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center pl-3 sm:pl-4 ml-1 sm:ml-2 border-l border-wf-outline-variant gap-0.5 transition-colors ${
+              `flex flex-col items-center justify-center px-2.5 sm:px-3.5 ml-1 sm:ml-2 border-l border-wf-outline-variant gap-0.5 transition-colors ${
+                isActive ? 'text-wf-on-surface' : 'text-wf-on-surface-variant hover:text-wf-on-surface'
+              }`
+            }
+          >
+            <PerformanceIcon className="w-6 h-6" />
+            <span className="hidden md:block text-[11px] leading-none">Performance</span>
+          </NavLink>
+
+          {/* Me — the operator's own account (identity + session), NOT the
+              performance dashboard. */}
+          <NavLink
+            to="/account"
+            className={({ isActive }) =>
+              `flex flex-col items-center justify-center pl-3 sm:pl-4 gap-0.5 transition-colors ${
                 isActive ? 'text-wf-on-surface' : 'text-wf-on-surface-variant hover:text-wf-on-surface'
               }`
             }
@@ -151,16 +177,6 @@ export default function GlobalNav({ right }: Props) {
             </span>
             <span className="hidden md:block text-[11px] leading-none">Me</span>
           </NavLink>
-
-          {AUTH_IS_CONFIGURED && (
-            <button
-              type="button"
-              onClick={() => { void signOut(); }}
-              className="hidden sm:flex items-center font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant hover:text-wf-tertiary pl-3 ml-2 border-l border-wf-outline-variant"
-            >
-              Sign out
-            </button>
-          )}
         </nav>
       </div>
 
