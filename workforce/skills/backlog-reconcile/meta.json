@@ -1,0 +1,10 @@
+{
+  "name": "backlog-reconcile",
+  "version": "0.1.0",
+  "status": "active",
+  "cost_class": "large",
+  "owners": ["maya", "nadia"],
+  "improvement_agent": "sana",
+  "created_at": "2026-06-23",
+  "requires": ["github.token"]
+}
