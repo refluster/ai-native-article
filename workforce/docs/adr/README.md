@@ -75,6 +75,7 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0012](adr-0012-decouple-binding-from-ownership.md) | Binding is decoupled from skill ownership: any agent may bind any skill | Proposed | [008](epics/epic-008-skill-repository.md) |
 | [0013](adr-0013-event-driven-pr-autopilot.md) | pr-autopilot fires on PR-open via a CCR-native `github_event` trigger (within adr-0005) | Proposed | — (cadence; adr-0005/0010/0011) |
 | [0014](adr-0014-drafts-are-merge-eligible.md) | Drafts are merge-eligible: the engine marks a green, non-L0/L1 draft Ready for Review, then merges | Accepted | [010](epics/epic-010-project-trust-boundary.md) |
+| [0015](adr-0015-skill-bodies-not-l0l1.md) | Skill bodies (`SKILL.md`) are removed from the L0/L1 autopilot off-limits set | Proposed | [010](epics/epic-010-project-trust-boundary.md) |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](epics/README.md).
