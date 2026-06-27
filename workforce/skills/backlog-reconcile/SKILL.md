@@ -7,7 +7,11 @@ description: Reconcile a repo's planning artifacts — epics/specs and their ope
 
 A **claude-code-routine** skill (R-N1(a)): it runs in a Claude Code session because it
 fans out audit subagents, edits planning docs, and drives a PR + the issue tracker —
-none of which a Lambda can host. It is **operator-invoked and one-shot**, not a cadence.
+none of which a Lambda can host. It runs **on a daily binding** (the standing instance is
+Nadia × the workforce's own repo, fired once a day by the orchestrator-tick CCR path —
+see `workforce/scripts/wire-backlog-reconcile-agent-workforce.mjs`) **and** is invocable
+on demand by the operator. It is **not** the persona-voiced `cadence` archetype — it
+publishes no Notion/feed artefact; its side effect is a draft PR plus issue-tracker edits.
 
 The job: a repository's *plan* (its epics/specs and the open issues under them) drifts away
 from its *shipped reality* over time. Items sit at `open`/`draft` long after the work landed;
@@ -23,14 +27,23 @@ issues** (close, retire, rewrite, split, and *file new ones* for the real remain
 
 ## Inputs / run context
 
-- **Repo + tracker.** The bound project's repo (the GitHub `owner`/`repo`). A `github.token`
-  is required (declared in `meta.json:requires`) — export it for the GitHub MCP / API calls
-  that read, label, close, and open issues and open the PR.
-- **Optional scope hint.** The operator may name a subset ("just the platform epics",
-  "everything under the 2026-Q2 milestone"). Absent a hint, **every** open planning item is in
-  scope.
-- **Optional roster hint.** The operator may name the agents to divide the work across. Absent
-  one, derive the partition from subsystem ownership (Step 2).
+When fired on the daily binding, the generic agent-runner supplies the task context (same
+shape as every claude-code-routine): `agent_slug` (the owning persona — the standing instance
+is Nadia's PM lens), `project_id` (the bound project, whose `project.json` declares the GitHub
+`owner`/`repo`), `credentials['github.token'].token` (the project-scoped PAT — export it for the
+GitHub calls that read, label, close, and open issues and open the PR), and `binding_config`
+(the persona overlay below). When invoked conversationally, the operator supplies the same
+inputs inline.
+
+- **Repo + tracker.** The bound project's repo + its `github.token` (declared in
+  `meta.json:requires`).
+- **Optional scope hint.** The operator (or `binding_config.scope`) may name a subset ("just the
+  platform epics", "everything under the 2026-Q2 milestone"). Absent a hint, **every** open
+  planning item is in scope.
+- **Routing config (`binding_config`).** The standing partition owners, the routing rules that
+  pull in additional specialists, and the skip list — see Step 2. The persona overlay lives in
+  the binding, not in this portable spec, so the same skill re-uses cleanly across repos with a
+  different roster.
 
 ## Step 0 — establish the two ground truths
 
@@ -60,16 +73,34 @@ reconcile; this is not the skill for greenfield planning.
   with labels, milestone, and the epic/spec it claims to serve.
 - Produce a flat work-list. This is the fan-out unit for Step 2.
 
-## Step 2 — partition by subsystem and fan out parallel auditors
+## Step 2 — partition by subsystem, then **route** auditors (standing core + specialists)
 
-Divide the work-list into partitions **by subsystem / domain**, and assign each partition to the
-agent who **owns or is strongest in that area** — match the auditor to the surface, e.g.
-backend/substrate, product/UI, data/pipeline, quality/eval, infra. Pull in **additional**
-auditors when a partition is too large for one pass or spans a genuinely distinct surface. The
-mapping is **by ownership, not by fixed names** — derive it from the project's org/CODEOWNERS or
-the operator's roster hint.
+Divide the work-list into partitions **by subsystem / domain**, then staff each partition by
+**routing**, not a fixed roster. This is the same first-match nomination model `pr-autopilot`
+uses, applied to audit lenses:
 
-Launch the auditors **in parallel** (one subagent per partition). Give each the same contract:
+1. **Standing core.** `binding_config.partition_owners` gives the small set of owners that audit
+   on **every** run — each pairs a `lens` (the surface it owns) with an agent slug, chosen to
+   blanket the repo's primary subsystems. For the workforce's own repo the standing core is
+   **Mateo** (backend / substrate / data-plane), **Dario** (engineering quality / governance /
+   CI), **Nadia** (product / console / IA / roadmap framing — the router, self-included), and
+   **Aoi** (design system / agent-experience / content & article surfaces / brand voice). This
+   is the fixed skeleton — it is intentionally *not* all-engineers, so the design/experience
+   surface gets a first-class auditor.
+2. **Routed specialists.** Apply `binding_config.routing_rules` (first-match) to the *actual*
+   partition surfaces this run: when a partition touches a surface the standing core does not
+   cover, **nominate the specialist whose lens it is** — pipeline/content, legal/policy, finance,
+   reliability/SRE, market/GTM, memory/recall, … A specialist joins **only** for the partitions
+   that implicate them, each nomination citing the partition surface (file paths / topics).
+3. **Skip list.** `binding_config.skip_list_default` names personas with no plausible audit
+   surface on this repo — do not fan out to them unless a routing rule pulls them in.
+
+So the partition set = **standing core ∪ routed specialists**, sized to the run. The roster is
+declarative (it lives in the binding), so adapting to another repo is a config change, not a
+spec edit.
+
+Launch the auditors **in parallel** (one read-only subagent per partition). Give each the same
+contract:
 
 > For each item in your partition: read its acceptance criteria / definition-of-done, then
 > **verify against the live codebase + git history whether the behaviour actually exists** —
