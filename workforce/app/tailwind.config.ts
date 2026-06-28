@@ -15,10 +15,16 @@ export default {
         'wf-secondary':            '#50634f', // Sage — balanced/organizational
         'wf-tertiary':             '#6b3b16', // Pale Copper — sparing accent (white-text safe)
         'wf-on-tertiary':          '#ffffff',
-        'wf-surface':              '#f8fafb', // Cool Mist canvas
-        'wf-surface-container':    '#eceeef',
-        'wf-surface-container-lo': '#f2f4f5',
-        'wf-surface-container-hi': '#e6e8e9',
+        // Elevation per DESIGN.md §Elevation: the Cool Mist canvas is the
+        // base; cards/work surfaces use a PURE WHITE fill to "lift" toward
+        // the user (1px borders, not shadows, do the separation). So the
+        // monotonic tone ladder lightest→darkest is:
+        //   container-lo (#ffffff, lifted cards) → surface (#f8fafb, canvas)
+        //   → container (#eceeef, recessed inset/chips) → container-hi (hover).
+        'wf-surface':              '#f8fafb', // Cool Mist canvas (base)
+        'wf-surface-container':    '#eceeef', // recessed inset / chips
+        'wf-surface-container-lo': '#ffffff', // pure-white lifted cards (DESIGN surface-container-lowest)
+        'wf-surface-container-hi': '#e6e8e9', // hover / emphasis
         'wf-on-surface':           '#191c1d',
         'wf-on-surface-variant':   '#45464f',
         'wf-outline':              '#767680',
