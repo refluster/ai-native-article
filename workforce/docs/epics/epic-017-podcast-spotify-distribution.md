@@ -97,6 +97,31 @@ The **only** path is the CI sync (Path B): `newsletter/pipeline/fetchers/types.m
 | **1 — Spotify (primary)** | `podcast-script` Cadence + `synthesize.mjs` (Polly random JA voice → S3) + `build-rss.mjs` + Spotify feed submission + `spotifyUrl` → frontmatter → reader Spotify link. Cadence binding lands **paused**. | A (skill, pipeline, reader) + **B (cron enable, PR merge, Spotify submission)** |
 | **2 — Future** | Multi-host dialogue (multiple Polly voices, speaker splitting/joining); Spotify API automation (`spotify.token` credential); Japanese Generative voice if available. | later Epic phase |
 
+## Kill criterion (the falsifier — @nadia cycle 1)
+
+The podcast surface adds **recurring cost** (the W-3 raise + the four salaries +
+cents/episode of Polly/CloudFront) against an **unproven reader behaviour** —
+that readers of an analysis article want to listen to it on Spotify. State the
+falsifier up front so the bet is killable, not sunk:
+
+> **Kill line.** After **≥ 8 published episodes** with a live reader Spotify
+> link, if the **Spotify click-through rate** — GA4 `podcast_spotify_click` ÷
+> `article_view` on articles that *have* a `spotifyUrl` — stays **below 2%**
+> (and absolute clicks are trivial), the surface has not earned its cost.
+
+**Rollback on a kill:** stop the `podcast-script` cadence (disable the binding),
+stop producing episodes, and **roll the W-3 cap back $250 → $190** (offboard or
+repurpose the media team via `PATCH /agents`), leaving the already-published
+episodes and the reader links in place (no destructive teardown). The decision
+is the operator's; this Epic only commits to *measuring* the click-through from
+day one (the `podcast_spotify_click` event is instrumented in Story 7) and
+**re-evaluating at the 8-episode mark** rather than letting the surface run on
+indefinitely unexamined.
+
+Phase-2 (multi-voice, Spotify API automation) is gated on clearing this kill
+line first — we do not invest further in a surface that hasn't proven the base
+behaviour.
+
 ## Behaviour at N = 100+ agents
 
 - **The media team is O(1), not O(N).** It is a fixed four-role function that does not grow with workforce size — unlike the research cohort (Epic-015), it is not fanned out across personas. Adding agents elsewhere does not multiply media headcount.

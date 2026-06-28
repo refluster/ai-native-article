@@ -113,9 +113,24 @@ surface — composed of:
   no-verbatim-reproduction discipline is owned operationally by Idris and
   escalated to Levi/Priya, so the legal blast-radius does not widen with team or
   episode growth.
-- **Cost.** The W-3 raise to USD 250/mo (Epic-017 Story 2) funds the four
-  salaries; Polly/S3/CloudFront are cents per episode (~$0.08 TTS, ~$0.15–0.30
-  all-in) **outside** the token budget.
+- **Cost (the derivation behind the W-3 raise — @dario cycle 1).** The
+  $190→$250/mo (+$60) raise funds **salaries**, not synthesis. The two are
+  separate budgets:
+  - **Salaries (inside W-3).** The four hires draw `celeste 8 + rhys 6 +
+    odette 6 + idris 6 = USD 26/mo` (the persona `budget_monthly_usd_default`
+    sum the API enforces against the cap). The +$60 raise covers that $26 with
+    ~$34 of deliberate headroom for Phase-2 (multi-voice, episode-volume growth)
+    — so the cap is the salary line plus a stated buffer, not a round number.
+  - **Synthesis/distribution (outside W-3 — AWS infra, not token budget).**
+    Amazon Polly Neural bills ~$16 per 1M chars; a ~10-min JA episode ≈ 5,000
+    chars → **~$0.08/episode** TTS. CloudFront egress on a ~10 MB MP3 ≈
+    $0.00085/download → **<$1/episode even at ~1,000 listens**; S3 storage is
+    negligible. All-in **~$0.15–0.30/episode** at launch volume — i.e. a few
+    dollars a month of AWS spend at any plausible cadence, covered by the
+    deployment-wide CloudWatch billing alarm, **never** the per-agent token cap.
+
+  So W-3 governs the $26 of salaries (+headroom); Polly/S3/CloudFront are cents
+  per episode on a different budget line entirely.
 
 ## Related
 
