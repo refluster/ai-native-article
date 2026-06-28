@@ -47,6 +47,7 @@ function propText(prop) {
     case "date": return prop.date?.start ?? "";
     case "url": return prop.url ?? "";
     case "select": return prop.select?.name ?? "";
+    case "status": return prop.status?.name ?? "";
     case "multi_select": return (prop.multi_select ?? []).map((o) => o.name).join(", ");
     default: return "";
   }

@@ -131,7 +131,9 @@ function richTextChunks(str) {
 const properties = {
   podcastScript: { rich_text: richTextChunks(trimmed) },
   podcastSources: { rich_text: richTextChunks(citations.trim()) },
-  podcastStatus: { select: { name: status } },
+  // podcastStatus is a Notion `status`-type property (operator-created), not a
+  // select — write the status shape.
+  podcastStatus: { status: { name: status } },
 };
 
 try {

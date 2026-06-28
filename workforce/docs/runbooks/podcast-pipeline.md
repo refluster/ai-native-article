@@ -17,7 +17,7 @@ frontmatter sync reference — **use these exact names** (camelCase):
 
 | Property | Type | Written by | Read by | Notes |
 |---|---|---|---|---|
-| `podcastStatus` | **Select** | `podcast-script`, `wf-podcast` Lambda | picker, synthesis, RSS, frontmatter | Options: `none`, `script-ready`, `audio-ready`, `published`. Absent/`none` ⇒ no podcast. |
+| `podcastStatus` | **Status** | `podcast-script`, `wf-podcast` Lambda | picker, synthesis, RSS, frontmatter | Notion `status`-type property. Options: `none`, `script-ready`, `audio-ready`, `published`. Absent/`none` ⇒ no podcast. (The code reads/writes the `status` shape; `propText` handles `status`.) |
 | `podcastScript` | **Text** (rich_text) | `podcast-script` | synthesis | The narration script. Notion has no child-block property type, so the body is stored as chunked rich_text (≤2000 chars/object). |
 | `podcastSources` | **Text** (rich_text) | `podcast-script` | RSS `<description>` | Mandatory source citations. Empty ⇒ the write hard-fails (exit 2). |
 | `audioUrl` | **URL** | `wf-podcast` Lambda (synthesis) | RSS `<enclosure>` | Internal — the S3/CDN MP3 URL. **Never** linked from the reader site (D3). |
