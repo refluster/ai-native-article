@@ -61,6 +61,14 @@ const STREAM_LABEL: Record<WorkforceAgent['streams'][number], string> = {
 const ACTIVITY_LIMIT = 30;
 const SUMMARY_CAP = 180;
 
+// Timeline dot colour per EXEC status — the point marker on the ACTIVITY
+// rail reads at a glance: green ran clean, copper threw, grey did no work.
+const ACTIVITY_DOT: Record<string, string> = {
+  ok: 'bg-wf-running',
+  throw: 'bg-wf-throwing',
+  skipped: 'bg-wf-archived',
+};
+
 function formatRelative(iso: string): string {
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return iso;
@@ -70,18 +78,6 @@ function formatRelative(iso: string): string {
   if (hrs < 48) return `${hrs}h ago`;
   const days = Math.round(hrs / 24);
   return `${days}d ago`;
-}
-
-function nextRunLabel(iso: string | undefined): string {
-  if (!iso) return '—';
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return iso;
-  const diffMin = Math.round((t - Date.now()) / 60_000);
-  if (diffMin <= 0) return 'queued';
-  if (diffMin < 60) return `in ${diffMin}m`;
-  const hrs = Math.round(diffMin / 60);
-  if (hrs < 48) return `in ${hrs}h`;
-  return `in ${Math.round(hrs / 24)}d`;
 }
 
 export default function AgentProfile() {
@@ -204,7 +200,6 @@ export default function AgentProfile() {
   const avgDurMTD = mockForSlug?.avg_duration_s;
   const computeMTD = mockForSlug?.compute_seconds_this_month;
   const delivMTD = mockForSlug?.deliv_this_month ?? live?.deliv_count_total;
-  const nextRun = mockForSlug?.next_run_at;
   const lastRunAt = mockForSlug?.last_run_at ?? live?.last_run_at;
   const lastRunStatus = mockForSlug?.last_run_status ?? live?.last_run_status ?? 'ok';
   const isPaused = live?.paused ?? mockForSlug?.paused ?? false;
@@ -215,7 +210,12 @@ export default function AgentProfile() {
     { cap: 'RUNS · MTD',   value: runsMTD !== undefined ? String(runsMTD) : '—',           sub: 'this month' },
     { cap: 'AVG DUR · MTD',value: avgDurMTD !== undefined ? fmtDuration(avgDurMTD) : '—',   sub: computeMTD !== undefined ? `${fmtCompute(computeMTD)} compute` : 'run duration' },
     { cap: 'DELIV · MTD',  value: delivMTD !== undefined ? String(delivMTD) : '—',          sub: 'this month' },
-    { cap: 'NEXT RUN',     value: nextRunLabel(nextRun),                                     sub: agent.bindings[0]?.note ?? `${agent.bindings.length} binding(s)`, alarm: status === 'throwing' },
+    // LAST RUN replaces the former NEXT RUN tile: next_run_at has no live
+    // scheduler endpoint feeding it, so that tile always rendered "—" with
+    // the whole binding note crammed underneath (a tall, value-less box).
+    // LAST RUN is derivable from the EXEC ledger and pairs a real value
+    // with a one-word status sub.
+    { cap: 'LAST RUN',     value: lastRunAt ? formatRelative(lastRunAt) : '—',               sub: `status · ${lastRunStatus}`, alarm: status === 'throwing' },
   ];
 
   return (
@@ -301,9 +301,6 @@ export default function AgentProfile() {
             </section>
           )}
 
-          {/* EXPERIENCE — joined, highlights, endorsements */}
-          {agent.experience && <ExperiencePanel agent={agent} roster={roster} />}
-
           {/* MEMORY — durable long-term state. Renders even when empty
               so the operator can see "no learned memory yet" as a state. */}
           {agent.memory && <MemoryPanel memory={agent.memory} />}
@@ -372,7 +369,7 @@ export default function AgentProfile() {
                     no executions yet — orchestrator hasn't fired since deploy.
                   </p>
                 ) : (
-                  <ul className="divide-y divide-wf-outline-variant">
+                  <ol className="relative border-l border-wf-outline-variant pl-4 space-y-4">
                     {execs.slice(0, ACTIVITY_LIMIT).map((e) => {
                       // Prefer the explicit top-level engagement summary;
                       // fall back to the artifact preview for CCR/legacy rows
@@ -384,7 +381,15 @@ export default function AgentProfile() {
                       // carried no summary gets "no summary".
                       const fallback = e.status === 'skipped' ? 'skipped' : 'no summary';
                       return (
-                        <li key={e.exec_ulid} className="py-3 text-sm">
+                        <li key={e.exec_ulid} className="relative text-sm">
+                          {/* Point marker on the time axis — the vertical
+                              rail is the <ol> left border; the dot sits on
+                              it, ringed in the card fill so it reads as
+                              punched through the line. */}
+                          <span
+                            aria-hidden
+                            className={`absolute -left-[19px] top-1 w-2.5 h-2.5 rounded-full ring-2 ring-wf-surface-container-lo ${ACTIVITY_DOT[e.status] ?? 'bg-wf-primary'}`}
+                          />
                           <div className="flex items-center gap-2 flex-wrap font-wfmono text-[10px] tracking-[0.08em] text-wf-on-surface-variant">
                             <span>{e.started_at?.slice(0, 10)}</span>
                             <span aria-hidden>·</span>
@@ -414,7 +419,7 @@ export default function AgentProfile() {
                         </li>
                       );
                     })}
-                  </ul>
+                  </ol>
                 )}
               </div>
             </section>
@@ -813,7 +818,7 @@ function formatDuration(secs: number): string {
 // Long-term memory has four kinds: durable facts, standing decisions,
 // emergent preferences, and people-context. Entries within a kind are
 // rendered in their authored order — long-term memory is NOT chronological,
-// so no date sort. The Task Log and EXPERIENCE decks already cover the
+// so no date sort. The Task Log and ACTIVITY ledger already cover the
 // dated/activity view.
 const MEMORY_KIND_META: Record<AgentMemoryKind, { label: string; tone: string; border: string; order: number }> = {
   fact:       { label: 'FACT',     tone: 'text-wf-on-surface',         border: 'border-wf-outline-variant', order: 0 },
@@ -850,7 +855,7 @@ function MemoryPanel({ memory }: { memory: NonNullable<WorkforceAgent['memory']>
             record of what was done.
           </p>
           <p className="mt-2 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-            see also · TASK LOG · EXPERIENCE for the activity record
+            see also · TASK LOG · ACTIVITY for the activity record
           </p>
         </div>
       ) : (
@@ -894,77 +899,3 @@ function MemoryPanel({ memory }: { memory: NonNullable<WorkforceAgent['memory']>
   );
 }
 
-function ExperiencePanel({ agent, roster }: { agent: WorkforceAgent; roster: WorkforceAgent[] }) {
-  const exp = agent.experience!;
-  const tenureDays = Math.max(
-    0,
-    Math.round((Date.now() - Date.parse(exp.joined_at)) / 86_400_000),
-  );
-  return (
-    <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
-      <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
-        <Typeplate label="EXPERIENCE" value="TRACK RECORD ON THE WORKFORCE" />
-        <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-          joined {exp.joined_at} · {tenureDays}d
-        </span>
-      </div>
-      <div className="p-4 sm:p-5 space-y-5">
-        {exp.highlights.length > 0 && (
-          <div>
-            <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-2">
-              HIGHLIGHTS
-            </div>
-            <ol className="relative border-l border-wf-outline-variant pl-4 space-y-3">
-              {exp.highlights.map((h, i) => (
-                <li key={i} className="relative">
-                  <span
-                    aria-hidden
-                    className="absolute -left-[19px] top-1.5 w-2 h-2 bg-wf-primary rounded-full"
-                  />
-                  <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-                    {h.date}
-                  </div>
-                  <div className="text-sm font-semibold text-wf-on-surface leading-snug">{h.title}</div>
-                  <div className="text-sm text-wf-on-surface-variant leading-snug">{h.impact}</div>
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-        {exp.endorsements.length > 0 && (
-          <div>
-            <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-2">
-              ENDORSEMENTS · TEAMMATES
-            </div>
-            <ul className="space-y-2">
-              {exp.endorsements.map((e, i) => {
-                const teammate = roster.find((r) => r.slug === e.from);
-                const label = teammate ? `${teammate.first_name} ${teammate.last_name}` : e.from;
-                const subtitle = teammate ? teammate.role : '';
-                return (
-                  <li
-                    key={i}
-                    className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3 text-sm border border-wf-outline-variant rounded-wf-sm px-3 py-2"
-                  >
-                    <Link
-                      to={`/agents/${e.from}`}
-                      className="font-wfmono text-xs text-wf-on-surface hover:text-wf-primary shrink-0"
-                    >
-                      {label}
-                    </Link>
-                    {subtitle && (
-                      <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant shrink-0">
-                        {subtitle}
-                      </span>
-                    )}
-                    <span className="text-wf-on-surface flex-1 italic">"{e.for}"</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}

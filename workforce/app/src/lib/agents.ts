@@ -44,7 +44,6 @@ interface AgentListItem {
 interface AgentDetailItem extends AgentListItem {
   jd?: WorkforceAgent['jd'] | null
   identity?: WorkforceAgent['identity'] | null
-  experience?: WorkforceAgent['experience'] | null
   memory?: WorkforceAgent['memory'] | null
 }
 
@@ -188,8 +187,8 @@ export async function findAgent(slug: string): Promise<WorkforceAgent | undefine
   const m = await loadWorkforceManifest()
   const base = m.agents.find((a) => a.slug === slug)
   if (!base) return undefined
-  // Hydrate the profile decks (jd / identity / experience / memory) from
-  // the detail route — the list view strips them to stay lean. A failed
+  // Hydrate the profile decks (jd / identity / memory) from the detail
+  // route — the list view strips them to stay lean. A failed
   // hydration degrades to the lean record (the decks render null-safe)
   // rather than failing the whole profile page.
   try {
@@ -204,7 +203,6 @@ export async function findAgent(slug: string): Promise<WorkforceAgent | undefine
       about: d.about ?? base.about,
       jd: d.jd ?? undefined,
       identity: d.identity ?? undefined,
-      experience: d.experience ?? undefined,
       memory: d.memory ?? undefined,
     }
   } catch (err) {

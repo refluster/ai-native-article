@@ -48,8 +48,10 @@ import { fileURLToPath } from "node:url";
 // pinning the full SHA keeps the repair input reproducible.
 const SNAPSHOT_SHA = "c4e0422a436730c10ce3d97013729a54b3127b50";
 
-// The seven fields step 6a moved onto the META row.
-const PROFILE_FIELDS = ["owner_email", "jd", "identity", "experience", "memory"];
+// The profile fields step 6a moved onto the META row. `experience` was
+// removed (the LinkedIn-style track record was a hollow placeholder); a
+// re-run of this one-shot repair must NOT re-seed it back onto the rows.
+const PROFILE_FIELDS = ["owner_email", "jd", "identity", "memory"];
 const EDGE_FIELDS = ["reports_to", "lateral"];
 
 const HERE = dirname(fileURLToPath(import.meta.url));

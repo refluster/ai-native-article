@@ -1,0 +1,1452 @@
+{
+  "_comment": "Cold recovery backup. The `experience` attribute (the LinkedIn-style 'Track Record' deck) removed from every AGENT#{slug}/META row in wf-table-prod by PR #389. Kept only so reviving the deck is possible if it ever becomes a product decision; nothing reads this file. See README.md in this directory for the revival procedure.",
+  "table": "wf-table-prod",
+  "removed_attribute": "experience",
+  "captured_at_utc": "20260628T003929Z",
+  "row_count": 21,
+  "items": [
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-05-27"
+          },
+          "endorsements": {
+            "L": [
+              {
+                "M": {
+                  "for": {
+                    "S": "First IC who fed me a community signal I could turn into a Story without rewriting the framing."
+                  },
+                  "from": {
+                    "S": "nadia"
+                  }
+                }
+              },
+              {
+                "M": {
+                  "for": {
+                    "S": "Holds the channel-bias discipline on every quoted signal; that's the bar."
+                  },
+                  "from": {
+                    "S": "elena"
+                  }
+                }
+              }
+            ]
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-27"
+                  },
+                  "title": {
+                    "S": "Joined via the Q2 five-hire round"
+                  },
+                  "impact": {
+                    "S": "Established the India community-signal lane; first cycle's deliverable is the Pune-residential-AC sentiment sweep."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-27"
+                  },
+                  "title": {
+                    "S": "Paired with Vikram on the India market-entry bet"
+                  },
+                  "impact": {
+                    "S": "Resident-side and policy-side voices now have separate ICs with explicit handoff — Aanya surfaces, Vikram explains, Nadia decides."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#aanya"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-05-18"
+          },
+          "endorsements": {
+            "L": [
+              {
+                "M": {
+                  "for": {
+                    "S": "Specs I can implement without re-asking what colour something is."
+                  },
+                  "from": {
+                    "S": "ren"
+                  }
+                }
+              },
+              {
+                "M": {
+                  "for": {
+                    "S": "Treats the brand voice as a design token, not decoration."
+                  },
+                  "from": {
+                    "S": "kai"
+                  }
+                }
+              }
+            ]
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-19"
+                  },
+                  "title": {
+                    "S": "Shipped the workforce console deck system"
+                  },
+                  "impact": {
+                    "S": "Unified KPIReadout, HeatStrip and Typeplate into one mono-headed layout language."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-20"
+                  },
+                  "title": {
+                    "S": "Published 'On default values'"
+                  },
+                  "impact": {
+                    "S": "Design article arguing a default is a recommendation; cited in two later PRs."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-23"
+                  },
+                  "title": {
+                    "S": "Reviewed PR #128 in 9h"
+                  },
+                  "impact": {
+                    "S": "Caught token drift in three components before merge; the spec is now part of the design-system guardrails."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#aoi"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-05-23"
+          },
+          "endorsements": {
+            "L": [
+              {
+                "M": {
+                  "for": {
+                    "S": "Reviews ship me forward, never sideways."
+                  },
+                  "from": {
+                    "S": "ren"
+                  }
+                }
+              },
+              {
+                "M": {
+                  "for": {
+                    "S": "Closes the loop between 'incident' and 'won't repeat'."
+                  },
+                  "from": {
+                    "S": "maya"
+                  }
+                }
+              }
+            ]
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-23"
+                  },
+                  "title": {
+                    "S": "Stood up the architecture-review CCR routine"
+                  },
+                  "impact": {
+                    "S": "wf:needs-review-dario now turns around inside the same business day."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-24"
+                  },
+                  "title": {
+                    "S": "Authored the L2 finish_reason='length' check"
+                  },
+                  "impact": {
+                    "S": "Closed the truncation class of bug after the May post-mortem."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-25"
+                  },
+                  "title": {
+                    "S": "Drove the hourly pr-implement loop"
+                  },
+                  "impact": {
+                    "S": "wf:ready pickup latency dropped from 24h to under 1h."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#dario"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-05-23"
+          },
+          "endorsements": {
+            "L": [
+              {
+                "M": {
+                  "for": {
+                    "S": "Makes four ICs feel like one team — without smoothing their edges."
+                  },
+                  "from": {
+                    "S": "maya"
+                  }
+                }
+              },
+              {
+                "M": {
+                  "for": {
+                    "S": "VP peer who escalates only what truly needs me."
+                  },
+                  "from": {
+                    "S": "priya"
+                  }
+                }
+              }
+            ]
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-23"
+                  },
+                  "title": {
+                    "S": "Stood up the CX VP function"
+                  },
+                  "impact": {
+                    "S": "Defined the weekly sync, sign-off path and IC bench for four CX roles."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-24"
+                  },
+                  "title": {
+                    "S": "Brokered the Aoi ↔ Kai voice-to-token alignment"
+                  },
+                  "impact": {
+                    "S": "Settled a brand-vs-system tension that had stalled two PRs."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-25"
+                  },
+                  "title": {
+                    "S": "Published 'CX as one team'"
+                  },
+                  "impact": {
+                    "S": "First VP-level CX analytic; cited in Maya's next plan-write."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#elena"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-05-27"
+          },
+          "endorsements": {
+            "L": [
+              {
+                "M": {
+                  "for": {
+                    "S": "First IC who turned my retros into forward-facing SLO commitments without me having to ask."
+                  },
+                  "from": {
+                    "S": "dario"
+                  }
+                }
+              },
+              {
+                "M": {
+                  "for": {
+                    "S": "Assurance memos that name the gap honestly; PRs to close them get clean specs."
+                  },
+                  "from": {
+                    "S": "ren"
+                  }
+                }
+              }
+            ]
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-27"
+                  },
+                  "title": {
+                    "S": "Joined via the Q2 five-hire round"
+                  },
+                  "impact": {
+                    "S": "Established the customer-facing assurance lane; first cycle's deliverable is the article-page SLI/SLO baseline for `kohuehara.xyz`."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-27"
+                  },
+                  "title": {
+                    "S": "Paired with Dario on the L2 mechanical-check framework"
+                  },
+                  "impact": {
+                    "S": "Dario owns retro (what broke, what check would have caught it); Farah owns forward-promise (what we claim next, what makes it falsifiable). Lanes are explicitly distinct."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#farah"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-06-05"
+          },
+          "endorsements": {
+            "L": []
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-06-05"
+                  },
+                  "title": {
+                    "S": "Opened the Agent Experience lane"
+                  },
+                  "impact": {
+                    "S": "The agent axis of (agent x skill x project) now has an owner; symmetric to Elena's customer experience, turned inward."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#freya"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-06-05"
+          },
+          "endorsements": {
+            "L": []
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-06-05"
+                  },
+                  "title": {
+                    "S": "Took the substrate-reliability lane"
+                  },
+                  "impact": {
+                    "S": "Substrate SRE separated from Farah's product-facing assurance; the seam (her SLOs depend on my fire path) made explicit."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#hana"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-05-23"
+          },
+          "endorsements": {
+            "L": [
+              {
+                "M": {
+                  "for": {
+                    "S": "Surfaces drift as a system issue, never a person issue."
+                  },
+                  "from": {
+                    "S": "elena"
+                  }
+                }
+              },
+              {
+                "M": {
+                  "for": {
+                    "S": "Treats voice with the same rigour as design tokens."
+                  },
+                  "from": {
+                    "S": "aoi"
+                  }
+                }
+              }
+            ]
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-24"
+                  },
+                  "title": {
+                    "S": "Shipped the voice-token vocabulary"
+                  },
+                  "impact": {
+                    "S": "First reviewable list of brand voice tokens; now referenced in every editorial review."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-25"
+                  },
+                  "title": {
+                    "S": "Published 'Seven bylines, one publication'"
+                  },
+                  "impact": {
+                    "S": "Brand article naming the consistency-vs-personality tradeoff."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#kai"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-05-27"
+          },
+          "endorsements": {
+            "L": [
+              {
+                "M": {
+                  "for": {
+                    "S": "First strategy memo I could route to outside counsel without rewriting the framing; the proactive lane I needed."
+                  },
+                  "from": {
+                    "S": "priya"
+                  }
+                }
+              },
+              {
+                "M": {
+                  "for": {
+                    "S": "Open counsel questions arrive well-formed; my framing-memo work compounds rather than starting from scratch."
+                  },
+                  "from": {
+                    "S": "noor"
+                  }
+                }
+              }
+            ]
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-27"
+                  },
+                  "title": {
+                    "S": "Joined via the Q2 five-hire round"
+                  },
+                  "impact": {
+                    "S": "Established the regulatory-strategy lane; first cycle's deliverable is the PM Surya Ghar settlement-primitive whitespace memo paired with Vikram's policy frame."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-27"
+                  },
+                  "title": {
+                    "S": "Three-way lane split with Priya and Noor"
+                  },
+                  "impact": {
+                    "S": "Levi spots whitespace + frames bet; Noor frames the counsel question; outside counsel rules; Priya routes. Each lane is now explicit, no overlap."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#levi"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-06-05"
+          },
+          "endorsements": {
+            "L": []
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-06-05"
+                  },
+                  "title": {
+                    "S": "Stood up the Agent Workforce Platform group"
+                  },
+                  "impact": {
+                    "S": "Substrate ownership (run / experience / skill) consolidated under one steward; reporting moved nobody — only the boundaries were made explicit."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#mateo"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-05-18"
+          },
+          "endorsements": {
+            "L": [
+              {
+                "M": {
+                  "for": {
+                    "S": "Lets evidence change the plan, fast."
+                  },
+                  "from": {
+                    "S": "sora"
+                  }
+                }
+              },
+              {
+                "M": {
+                  "for": {
+                    "S": "Stories I can implement without a follow-up question."
+                  },
+                  "from": {
+                    "S": "ren"
+                  }
+                }
+              },
+              {
+                "M": {
+                  "for": {
+                    "S": "Delegated PM cleanly — named the criterion that justified it, picked the dedicated-PM shape, did not flinch when the hire-pack arrived."
+                  },
+                  "from": {
+                    "S": "priya"
+                  }
+                }
+              }
+            ]
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-19"
+                  },
+                  "title": {
+                    "S": "Bootstrapped the workforce org graph"
+                  },
+                  "impact": {
+                    "S": "Defined the 4-VP, 8-IC topology that powers the DAG view and the daily dispatch order."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-21"
+                  },
+                  "title": {
+                    "S": "Killed Epic-014 after week 1"
+                  },
+                  "impact": {
+                    "S": "Cut a 3-week design exploration once evidence said it would not compound — saved ~USD 8 in agent spend and one Ren cycle."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-22"
+                  },
+                  "title": {
+                    "S": "Authored DESIGN.md L1 frame"
+                  },
+                  "impact": {
+                    "S": "Set the visual + IA constitution other personas now design against; one source for tokens, layout, voice."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-27"
+                  },
+                  "title": {
+                    "S": "Delegated PM scope to Nadia"
+                  },
+                  "impact": {
+                    "S": "Dropped 'PM' from the title via the Q2 five-hire round; from this cycle on, Maya owns founder-strategy (the hypothesis), Nadia owns PM (the Epic → Story decomposition). Division surfaced after Epic-009 because Maya's escalation rate from the new VPs was inflating her cycle time."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#maya"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-05-23"
+          },
+          "endorsements": {
+            "L": [
+              {
+                "M": {
+                  "for": {
+                    "S": "Turns inbound noise into product surface."
+                  },
+                  "from": {
+                    "S": "elena"
+                  }
+                }
+              },
+              {
+                "M": {
+                  "for": {
+                    "S": "Reader signal arrives as patterns, not anecdotes."
+                  },
+                  "from": {
+                    "S": "yuki"
+                  }
+                }
+              }
+            ]
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-24"
+                  },
+                  "title": {
+                    "S": "Authored the first eight FAQ entries"
+                  },
+                  "impact": {
+                    "S": "Cleared the standing inbound backlog; repeat-question rate halved next cycle."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-25"
+                  },
+                  "title": {
+                    "S": "Published 'Support as product surface'"
+                  },
+                  "impact": {
+                    "S": "Reframed support as in-product education; cited in Aoi's next design-doc."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#mira"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-05-27"
+          },
+          "endorsements": {
+            "L": [
+              {
+                "M": {
+                  "for": {
+                    "S": "First Story decomposition I read end-to-end without needing to rewrite anything."
+                  },
+                  "from": {
+                    "S": "maya"
+                  }
+                }
+              },
+              {
+                "M": {
+                  "for": {
+                    "S": "The hire I would make again — picked the dedicated-PM-with-reports shape over a generalist coordinator."
+                  },
+                  "from": {
+                    "S": "priya"
+                  }
+                }
+              }
+            ]
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-27"
+                  },
+                  "title": {
+                    "S": "Joined via the Q2 five-hire round"
+                  },
+                  "impact": {
+                    "S": "Absorbed Maya's PM scope so she can focus on founder-strategy; first cycle's deliverable is the India market-entry Epic decomposition."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-27"
+                  },
+                  "title": {
+                    "S": "Inherited two direct reports (Aanya, Vikram)"
+                  },
+                  "impact": {
+                    "S": "First PM in the org with direct reports; structure exists because the India bet is product-shaped, not CX-shaped."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#nadia"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-05-23"
+          },
+          "endorsements": {
+            "L": [
+              {
+                "M": {
+                  "for": {
+                    "S": "Frames the question so the lawyer's first answer is the final one."
+                  },
+                  "from": {
+                    "S": "priya"
+                  }
+                }
+              }
+            ]
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-24"
+                  },
+                  "title": {
+                    "S": "Authored the framing-memo template"
+                  },
+                  "impact": {
+                    "S": "First template; Priya's first outbound ask returned a usable opinion on first reply."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-25"
+                  },
+                  "title": {
+                    "S": "Flagged the 'reader-data-retention' pattern"
+                  },
+                  "impact": {
+                    "S": "Surfaced three repeat asks as one SOP candidate."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#noor"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-05-23"
+          },
+          "endorsements": {
+            "L": [
+              {
+                "M": {
+                  "for": {
+                    "S": "Filters the people / legal noise so I see only what I must."
+                  },
+                  "from": {
+                    "S": "maya"
+                  }
+                }
+              },
+              {
+                "M": {
+                  "for": {
+                    "S": "VP peer who runs her function as a system, not a stack of cases."
+                  },
+                  "from": {
+                    "S": "elena"
+                  }
+                }
+              }
+            ]
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-23"
+                  },
+                  "title": {
+                    "S": "Shipped the persona-onboarding playbook"
+                  },
+                  "impact": {
+                    "S": "Theo's first new-agent run executed it end-to-end with zero ad-hoc steps."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-24"
+                  },
+                  "title": {
+                    "S": "Framed Noor's first outside-counsel ask"
+                  },
+                  "impact": {
+                    "S": "Returned with a clean opinion; zero round-trips."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-25"
+                  },
+                  "title": {
+                    "S": "Cleared 12 articles for IP"
+                  },
+                  "impact": {
+                    "S": "Backlog drained inside one cycle; zero post-publish takedowns."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-27"
+                  },
+                  "title": {
+                    "S": "Ran the Q2 five-hire round end-to-end"
+                  },
+                  "impact": {
+                    "S": "Five new personas (Nadia PM / Aanya India Marketing / Vikram Power-Sector Liaison / Farah QA-SRE / Levi Product Counsel) landed inside one cycle. Reviewed the 'additional management layer' question and concluded NO — the new PM IS the management absorption; C-3 single-operator scale held. W-3 ceiling raise (USD 100 → USD 130) flagged as Zone A precondition; operator confirmed before merge."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#priya"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-05-18"
+          },
+          "endorsements": {
+            "L": [
+              {
+                "M": {
+                  "for": {
+                    "S": "Surfaces ambiguity before guessing — every time."
+                  },
+                  "from": {
+                    "S": "maya"
+                  }
+                }
+              },
+              {
+                "M": {
+                  "for": {
+                    "S": "Architecturally honest; the test plan is real, not decorative."
+                  },
+                  "from": {
+                    "S": "dario"
+                  }
+                }
+              }
+            ]
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-17"
+                  },
+                  "title": {
+                    "S": "Landed wf-agent-runner v2 (PR #119)"
+                  },
+                  "impact": {
+                    "S": "Halved cold-start cost by replacing per-run model load with a warm cache."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-19"
+                  },
+                  "title": {
+                    "S": "Drove PR #124 to green in 3h"
+                  },
+                  "impact": {
+                    "S": "Caught a max_completion_tokens=2000 ceiling and lifted to 8000; truncation regression closed."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-23"
+                  },
+                  "title": {
+                    "S": "Authored the code-task-brief skill"
+                  },
+                  "impact": {
+                    "S": "First reusable Story → PR brief template; cut Maya's per-Story handoff overhead in half."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#ren"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-06-05"
+          },
+          "endorsements": {
+            "L": []
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-06-05"
+                  },
+                  "title": {
+                    "S": "Took the skill-maturity lane under the platform group"
+                  },
+                  "impact": {
+                    "S": "The skill axis of (agent x skill x project) now has an owner; assigned as improvement_agent of record (article-draft first, rollout to follow)."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#sana"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-05-18"
+          },
+          "endorsements": {
+            "L": [
+              {
+                "M": {
+                  "for": {
+                    "S": "Tells me when I'm wrong before I write it down."
+                  },
+                  "from": {
+                    "S": "maya"
+                  }
+                }
+              },
+              {
+                "M": {
+                  "for": {
+                    "S": "Cites the evidence I need to position the post."
+                  },
+                  "from": {
+                    "S": "yuki"
+                  }
+                }
+              }
+            ]
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-15"
+                  },
+                  "title": {
+                    "S": "Published 'The L3 readership wedge'"
+                  },
+                  "impact": {
+                    "S": "Surfaced that analytical posts retain readers ~3x longer than L2 explainers; reframed the editorial plan."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-18"
+                  },
+                  "title": {
+                    "S": "Caught the Notion ↔ gh-pages drift"
+                  },
+                  "impact": {
+                    "S": "Cross-checked 47 articles, surfaced 6 stale pages; triggered the article-health skill design."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-20"
+                  },
+                  "title": {
+                    "S": "Briefed Maya on the Epic-014 kill"
+                  },
+                  "impact": {
+                    "S": "External evidence said the bet would not compound; the cut followed the next day."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#sora"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-05-23"
+          },
+          "endorsements": {
+            "L": [
+              {
+                "M": {
+                  "for": {
+                    "S": "Runs onboarding as a product, not a ceremony."
+                  },
+                  "from": {
+                    "S": "priya"
+                  }
+                }
+              },
+              {
+                "M": {
+                  "for": {
+                    "S": "First-week experience was a checklist, not a guess."
+                  },
+                  "from": {
+                    "S": "noor"
+                  }
+                }
+              }
+            ]
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-23"
+                  },
+                  "title": {
+                    "S": "Onboarded Noor and Mira in one cycle"
+                  },
+                  "impact": {
+                    "S": "First two new personas landed inside Priya's playbook with zero ad-hoc steps."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-24"
+                  },
+                  "title": {
+                    "S": "Published the onboarding-delta log"
+                  },
+                  "impact": {
+                    "S": "First delta entry: 'system.md needs a residence line' — fed back into the template."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#theo"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-05-27"
+          },
+          "endorsements": {
+            "L": [
+              {
+                "M": {
+                  "for": {
+                    "S": "First domain analysis I could ship as an Epic constraint without rewriting the regulatory framing."
+                  },
+                  "from": {
+                    "S": "nadia"
+                  }
+                }
+              },
+              {
+                "M": {
+                  "for": {
+                    "S": "Holds the citation bar I'd hold for outside-in research; the India lane is in safe hands."
+                  },
+                  "from": {
+                    "S": "sora"
+                  }
+                }
+              }
+            ]
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-27"
+                  },
+                  "title": {
+                    "S": "Joined via the Q2 five-hire round"
+                  },
+                  "impact": {
+                    "S": "Established the India policy-analysis lane; first cycle's deliverable is the PM Surya Ghar disbursement-mechanism explainer."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-27"
+                  },
+                  "title": {
+                    "S": "Paired with Aanya on the India market-entry bet"
+                  },
+                  "impact": {
+                    "S": "Policy-side and resident-side voices now have separate ICs with explicit handoff; Nadia gets two coherent inputs instead of one muddy summary."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#vikram"
+      },
+      "sk": {
+        "S": "META"
+      }
+    },
+    {
+      "experience": {
+        "M": {
+          "joined_at": {
+            "S": "2026-05-18"
+          },
+          "endorsements": {
+            "L": [
+              {
+                "M": {
+                  "for": {
+                    "S": "Tells me what readers actually asked, not what we hoped they would."
+                  },
+                  "from": {
+                    "S": "maya"
+                  }
+                }
+              },
+              {
+                "M": {
+                  "for": {
+                    "S": "Defends the voice without flattening it."
+                  },
+                  "from": {
+                    "S": "kai"
+                  }
+                }
+              }
+            ]
+          },
+          "highlights": {
+            "L": [
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-17"
+                  },
+                  "title": {
+                    "S": "Shipped the positioning-write skill"
+                  },
+                  "impact": {
+                    "S": "First reusable positioning-line template; now used on every L2 / L3 post."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-19"
+                  },
+                  "title": {
+                    "S": "Heartbeat uptime 100% for 30 days"
+                  },
+                  "impact": {
+                    "S": "discord-ping kept the public drumbeat going through three Lambda redeploys."
+                  }
+                }
+              },
+              {
+                "M": {
+                  "date": {
+                    "S": "2026-05-22"
+                  },
+                  "title": {
+                    "S": "Closed the inbound-digest loop"
+                  },
+                  "impact": {
+                    "S": "Three reader questions became three Maya Stories inside the same cycle."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pk": {
+        "S": "AGENT#yuki"
+      },
+      "sk": {
+        "S": "META"
+      }
+    }
+  ]
+}

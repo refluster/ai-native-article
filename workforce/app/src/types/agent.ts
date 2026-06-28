@@ -57,24 +57,6 @@ export interface AgentIdentity {
   guardrails: string[];
 }
 
-/** A single LinkedIn-style highlight on the agent's track record. */
-export interface AgentExperienceHighlight {
-  /** ISO date of the milestone. */
-  date: string;
-  /** Short title (≤ ~80 chars). */
-  title: string;
-  /** One-sentence impact statement. */
-  impact: string;
-}
-
-/** Endorsement from a teammate (lateral or reports_to). */
-export interface AgentEndorsement {
-  /** Slug of the endorsing teammate. */
-  from: string;
-  /** What they're endorsed for (short phrase). */
-  for: string;
-}
-
 /**
  * The semantic class of a long-term memory entry. Constrained to kinds
  * that survive across sessions — durable facts about the world, standing
@@ -103,8 +85,8 @@ export interface AgentMemoryEntry {
  *
  * This is the **durable, curated** layer the persona "remembers" at
  * session open: facts, standing decisions, preferences, people-context.
- * It is NOT an activity record — the Task Log (recent_runs) and
- * EXPERIENCE highlights already cover what the agent has *done*.
+ * It is NOT an activity record — the Task Log (recent_runs) and the
+ * ACTIVITY ledger already cover what the agent has *done*.
  * Memory is what the agent has *learned*.
  *
  * Entries are append-only by convention; the schema does not carry per-
@@ -121,20 +103,6 @@ export interface AgentMemory {
   last_updated: string;
   /** Append-only list of durable memory entries. */
   entries: AgentMemoryEntry[];
-}
-
-/**
- * Persona track record on this Workforce — modeled after LinkedIn's
- * experience block. Authored in agent.json today; live API may layer
- * in `metrics.runs_total_lifetime` etc. when wired.
- */
-export interface AgentExperience {
-  /** Date the persona was first deployed. */
-  joined_at: string;
-  /** Up to 5 highlight milestones. */
-  highlights: AgentExperienceHighlight[];
-  /** Up to 4 endorsements from teammates. */
-  endorsements: AgentEndorsement[];
 }
 
 export interface WorkforceAgent {
@@ -154,7 +122,6 @@ export interface WorkforceAgent {
   about: string;
   jd?: AgentJD;
   identity?: AgentIdentity;
-  experience?: AgentExperience;
   memory?: AgentMemory;
   // ----- Org topology, merged from workforce/agents/_org.json by the build
   // script. `depth` is derived: 0 for nodes with no reports_to (roots),
