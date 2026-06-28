@@ -33,6 +33,7 @@ export type AnalyticsEvent =
   | { name: 'featured_click'; params: { slug: string; category: string } }
   | { name: 'internal_link_click'; params: { slug: string; href: string } }
   | { name: 'outbound_click'; params: { slug: string; href: string; host: string } }
+  | { name: 'podcast_spotify_click'; params: { slug: string; href: string } }
 
 let initialized = false
 let measurementId: string | null = null
