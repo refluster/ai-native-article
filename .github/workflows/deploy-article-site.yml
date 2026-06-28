@@ -80,6 +80,10 @@ jobs:
       - name: Build article app
         env:
           VITE_GA_ID: ${{ secrets.GA4_MEASUREMENT_ID }}
+          # Capture page → wf-l1-source-register Lambda. NON-secret base URL
+          # (the bearer token is entered by the operator at runtime, never
+          # built in). When unset the Capture page shows a config warning.
+          VITE_L1_CAPTURE_ENDPOINT: ${{ secrets.L1_CAPTURE_ENDPOINT }}
         run: npm run build:article
 
       - name: Deploy to gh-pages

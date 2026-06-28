@@ -4,9 +4,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const getSecret = vi.fn();
 const insertL1Source = vi.fn();
 const findL1SourceByUrl = vi.fn();
+const listL1Sources = vi.fn();
 
 vi.mock("../shared/secrets.js", () => ({ getSecret }));
-vi.mock("../shared/notion.js", () => ({ insertL1Source, findL1SourceByUrl }));
+vi.mock("../shared/notion.js", () => ({ insertL1Source, findL1SourceByUrl, listL1Sources }));
 
 const { handler } = await import("./handler.js");
 
@@ -28,7 +29,15 @@ beforeEach(() => {
   });
   findL1SourceByUrl.mockResolvedValue(null);
   insertL1Source.mockResolvedValue({ pageId: "p1", url: "https://notion.so/p1" });
+  listL1Sources.mockResolvedValue([{ id: "a", sourceUrl: "https://x.com/a" }]);
 });
+
+function getEvt(auth?: string) {
+  return {
+    headers: auth ? { authorization: auth } : {},
+    requestContext: { http: { method: "GET" } },
+  } as never;
+}
 
 describe("wf-l1-source-register handler", () => {
   it("rejects a missing bearer token (401)", async () => {
@@ -69,5 +78,19 @@ describe("wf-l1-source-register handler", () => {
     expect(res.statusCode).toBe(200);
     expect(insertL1Source).not.toHaveBeenCalled();
     expect(JSON.parse(res.body as string)).toMatchObject({ deduped: true, pageId: "old" });
+  });
+
+  it("GET /l1/sources lists recent rows (200)", async () => {
+    const res = await handler(getEvt(`Bearer ${TOKEN}`));
+    expect(res.statusCode).toBe(200);
+    expect(listL1Sources).toHaveBeenCalled();
+    expect(insertL1Source).not.toHaveBeenCalled();
+    expect(JSON.parse(res.body as string)).toMatchObject({ ok: true, data: [{ id: "a" }] });
+  });
+
+  it("GET without a token is rejected (401)", async () => {
+    const res = await handler(getEvt());
+    expect(res.statusCode).toBe(401);
+    expect(listL1Sources).not.toHaveBeenCalled();
   });
 });

@@ -5,9 +5,14 @@ The **non-GAS replacement for the retired GAS `L1_SAVE` capture**. A mechanical
 **L1 source DB** — the DB that `workforce/skills/article-level2/pick-l1-source.mjs`
 reads to find uncovered sources.
 
-## Endpoint
+## Endpoints
 
-`POST /l1/register` on the workforce HTTP API (`WfAgentsHttpApi`).
+On the workforce HTTP API (`WfAgentsHttpApi`):
+
+- **`POST /l1/register`** — register one source URL (below).
+- **`GET /l1/sources`** — recent L1 rows (newest-first, ≤50) for the Capture page's list + streak. Bearer-auth, same token.
+
+### `POST /l1/register`
 
 Body (JSON):
 
@@ -46,6 +51,19 @@ Articles DB).
    cd ../infra/sam && sam build && sam deploy --config-env dev
    ```
 3. Note the API base from the stack output; the route is `…/l1/register`.
+
+## Browser Capture page (primary UI)
+
+The reader app's **Capture page** (`/capture`, header **+ CAPTURE** link) is the
+primary UI — same page as before, repointed from GAS to these endpoints. Build
+the article app with `VITE_L1_CAPTURE_ENDPOINT` = the `/l1/register` URL (a
+non-secret base; the list URL is derived as `/l1/sources`). The operator enters
+the bearer token once in the page (stored in `localStorage`, never bundled); a
+wrong token 401s and re-locks the page. The iOS **Share Sheet** target
+(`/l1-register`) prefills and auto-submits a shared link.
+
+Set the GitHub Actions secret `L1_CAPTURE_ENDPOINT` (consumed by
+`deploy-article-site.yml`) to the `/l1/register` URL.
 
 ## Desktop CLI
 

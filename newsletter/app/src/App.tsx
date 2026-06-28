@@ -7,6 +7,7 @@ import Article from './pages/Article'
 import Sources from './pages/Sources'
 import DesignSystem from './pages/design/DesignSystem'
 import DesignGuide from './pages/design/DesignGuide'
+import Capture from './pages/pipeline/Capture'
 import { routerBaseName } from './lib/paths'
 import { trackPageView } from '@kohuehara/shared/analytics'
 
@@ -35,6 +36,9 @@ export default function App() {
             <Route path="/article/:slug" element={<Article />} />
             <Route path="/design-system" element={<DesignSystem />} />
             <Route path="/design-guide" element={<DesignGuide />} />
+            <Route path="/capture" element={<Capture />} />
+            {/* Legacy alias — the PWA share-target action points here. */}
+            <Route path="/l1-register" element={<Capture />} />
           </Routes>
         </main>
         <Footer />

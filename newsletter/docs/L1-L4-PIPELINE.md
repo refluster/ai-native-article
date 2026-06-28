@@ -26,16 +26,15 @@ Both L2 and L3 rows live in **one unified Notion Articles DB**, distinguished by
 
 ### L1 — Capture sources
 
-New L1 source rows land in the Notion L1 source DB, which the L2 cadence's picker (`workforce/skills/article-level2/pick-l1-source.mjs`) reads to find uncovered sources. Two ways in:
+New L1 source rows land in the Notion L1 source DB, which the L2 cadence's picker (`workforce/skills/article-level2/pick-l1-source.mjs`) reads to find uncovered sources. The capture path is the same **Capture UI** as before — only its backend changed from GAS to the `wf-l1-source-register` Lambda (`POST /l1/register` to save, `GET /l1/sources` for the recent-list/streak). Ways in:
 
-1. **The capture endpoint (the GAS `L1_SAVE` replacement).** `POST /l1/register` on the `wf-l1-source-register` Lambda registers a URL as an L1 row — **mechanically, no LLM** (`url` required; `title` / `category` / `summary` / `publicationDate` optional; idempotent on the Source URL). Invoke it from:
-   - the **iOS Shortcut** (Share Sheet → POST) — one-tap capture from mobile, the closest replacement for the retired capture PWA;
-   - the **CLI**: `L1_CAPTURE_ENDPOINT=… L1_CAPTURE_TOKEN=… node scripts/capture-l1.mjs <url> [--title …] [--category A-E]`.
+1. **The Capture page** (`/capture` in the reader app; header **+ CAPTURE** link). Paste a URL (optionally a title/category) and save; the iOS Share Sheet target (`/l1-register`) prefills and auto-submits a shared link. Auth: the operator enters the capture bearer token once (kept in `localStorage`, never built into the bundle); the build-time `VITE_L1_CAPTURE_ENDPOINT` points at `/l1/register`.
+2. **The CLI** (desktop / scripts): `L1_CAPTURE_ENDPOINT=… L1_CAPTURE_TOKEN=… node scripts/capture-l1.mjs <url> [--title …] [--category A-E]`.
+3. **Directly in Notion.** Add the row by hand (Title + Source URL, optionally Contents Summary + Category). Useful for paywalled sources where you want to paste a `Contents Summary` (the L2 cadence's only grounding fallback when the URL body can't be fetched).
 
-   Auth is a bearer token (`wf/api/l1-source-write-token`). Setup, deploy, and the Shortcut recipe: [`workforce/lambdas/l1-source-register/README.md`](../../workforce/lambdas/l1-source-register/README.md).
-2. **Directly in Notion.** Add the row by hand (Title + Source URL, optionally Contents Summary + Category). Useful for paywalled sources where you want to paste a `Contents Summary` (the L2 cadence's only grounding fallback when the URL body can't be fetched).
+The endpoint is **mechanical, no LLM** (`url` required; `title`/`category`/`summary`/`publicationDate` optional; idempotent on the Source URL). Bearer token `wf/api/l1-source-write-token`. Setup, deploy, and the iOS Shortcut recipe: [`workforce/lambdas/l1-source-register/README.md`](../../workforce/lambdas/l1-source-register/README.md).
 
-> **Why no LLM at capture.** The retired GAS `L1_SAVE` auto-extracted title/category/summary via Azure. Downstream, the L2 cadence fetches the actual source URL and re-canonicalises category, so those fields are selection hints, not load-bearing — capture is now a deterministic write. The one exception is the paywall fallback above: supply a `summary` (via the endpoint or by hand) for sources whose body can't be fetched.
+> **Why no LLM at capture.** The retired GAS `L1_SAVE` auto-extracted title/category/summary via Azure. Downstream, the L2 cadence fetches the actual source URL and re-canonicalises category, so those fields are selection hints, not load-bearing — capture is now a deterministic write, with title/category saved exactly as entered. The one exception is the paywall fallback above: supply a `summary` (via the optional field or by hand) for sources whose body can't be fetched.
 
 ### L2 — Explanation articles (`article-level2` cadence)
 

@@ -8,6 +8,11 @@ const publicNav = [
   { to: '/design-guide', label: 'DESIGN GUIDE' },
 ]
 
+// Capture is the only write-side route on this site; we surface it on
+// the right edge of the bar (separate from the read-side nav on the
+// left) so it reads as an action rather than another section.
+const adminNav = [{ to: '/capture', label: 'CAPTURE' }]
+
 export default function Header() {
   return (
     <header className="fixed top-0 left-0 w-full z-50 bg-surface/90 backdrop-blur-xl">
@@ -47,12 +52,27 @@ export default function Header() {
           AI NATIVE ARTICLE
         </NavLink>
 
-        {/* Right-edge spacer keeps the logo visually centred between the
-            left nav and the right edge (the former Capture action lived
-            here before the GAS pipeline UI was retired). */}
-        <div aria-hidden className="hidden lg:block w-px" />
+        {/* Right cluster: Capture link (always visible) + tagline (md+) */}
+        <div className="flex items-center gap-4 md:gap-6">
+          {adminNav.map(({ to, label }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                `text-[10px] md:text-xs font-bold tracking-widest uppercase border px-2 md:px-3 py-1 transition-colors ${
+                  isActive
+                    ? 'border-tertiary text-tertiary'
+                    : 'border-outline-variant/40 text-outline hover:border-tertiary hover:text-tertiary'
+                }`
+              }
+            >
+              + {label}
+            </NavLink>
+          ))}
+        </div>
 
-        {/* Mobile nav (read-side only). */}
+        {/* Mobile nav (read-side only — Capture is in the right cluster
+            above so it stays reachable on every viewport). */}
         <nav className="hidden">
           {publicNav
             .filter(n => n.to !== '/')

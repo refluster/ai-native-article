@@ -2109,6 +2109,12 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /l1/register
             Method: POST
+        ListL1Sources:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /l1/sources
+            Method: GET
 
 Outputs:
   TableName:

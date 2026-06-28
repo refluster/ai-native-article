@@ -24,6 +24,7 @@ import { getSecret } from "../shared/secrets.js";
 import {
   insertL1Source,
   findL1SourceByUrl,
+  listL1Sources,
   type NotionApiSecret,
 } from "../shared/notion.js";
 
@@ -73,6 +74,30 @@ export async function handler(
     return json(401, { error: "unauthorized" });
   }
 
+  let notionList: NotionApiSecret;
+  try {
+    notionList = await getSecret<NotionApiSecret>("wf/notion");
+  } catch {
+    return json(500, { error: "notion credential unavailable" });
+  }
+
+  // GET /l1/sources — recent rows for the Capture UI list/streak.
+  if ((event.requestContext?.http?.method ?? "POST").toUpperCase() === "GET") {
+    try {
+      const data = await listL1Sources({
+        apiKey: notionList.apiKey,
+        databaseId: L1_DB_ID,
+        limit: 50,
+      });
+      return json(200, { ok: true, data });
+    } catch (err) {
+      return json(502, {
+        error: `notion query failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+  }
+
+  // POST /l1/register — register one source URL (mechanical, no LLM).
   let parsed: Record<string, unknown>;
   try {
     parsed = JSON.parse(event.body ?? "{}");
@@ -92,18 +117,11 @@ export async function handler(
   const summary = optStr(parsed.summary);
   const publicationDate = optStr(parsed.publicationDate);
 
-  let notion: NotionApiSecret;
-  try {
-    notion = await getSecret<NotionApiSecret>("wf/notion");
-  } catch {
-    return json(500, { error: "notion credential unavailable" });
-  }
-
   try {
     // Idempotent on Source URL: a re-capture of the same URL returns the
     // existing row rather than creating a duplicate L1 entry.
     const existing = await findL1SourceByUrl({
-      apiKey: notion.apiKey,
+      apiKey: notionList.apiKey,
       databaseId: L1_DB_ID,
       url,
     });
@@ -111,7 +129,7 @@ export async function handler(
       return json(200, { ok: true, deduped: true, pageId: existing.pageId, url: existing.url });
     }
     const created = await insertL1Source({
-      apiKey: notion.apiKey,
+      apiKey: notionList.apiKey,
       databaseId: L1_DB_ID,
       url,
       title,

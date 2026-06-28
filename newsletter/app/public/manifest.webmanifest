@@ -13,5 +13,14 @@
     { "src": "/ai-native-article/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/ai-native-article/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
     { "src": "/ai-native-article/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ]
+  ],
+  "share_target": {
+    "action": "/ai-native-article/l1-register",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
 }

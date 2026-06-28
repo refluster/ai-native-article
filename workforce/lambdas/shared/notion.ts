@@ -148,6 +148,63 @@ export async function insertL1Source(
   return { pageId: data.id, url: data.url };
 }
 
+export interface L1SourceRow {
+  id: string;
+  title: string;
+  sourceUrl: string;
+  category: string;
+  contentsSummary: string;
+  publicationDate: string;
+  notionUrl: string;
+  createdAt: string;
+}
+
+const txt = (rt: unknown): string => {
+  const arr = rt as Array<{ plain_text?: string }> | undefined;
+  return (arr ?? []).map((t) => t?.plain_text ?? "").join("");
+};
+
+/** Recent L1 source rows for the Capture UI list/streak. Newest-first. */
+export async function listL1Sources(args: {
+  apiKey: string;
+  databaseId: string;
+  limit?: number;
+}): Promise<L1SourceRow[]> {
+  const res = await fetch(`${NOTION_API}/databases/${args.databaseId}/query`, {
+    method: "POST",
+    headers: notionHeaders(args.apiKey),
+    body: JSON.stringify({
+      sorts: [{ timestamp: "created_time", direction: "descending" }],
+      page_size: Math.min(args.limit ?? 50, 100),
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`notion ${res.status}: ${(await res.text()).slice(0, 500)}`);
+  }
+  const data = (await res.json()) as {
+    results?: Array<{
+      id: string;
+      url: string;
+      created_time: string;
+      properties: Record<string, { type: string; [k: string]: unknown }>;
+    }>;
+  };
+  return (data.results ?? []).map((p) => {
+    const props = p.properties ?? {};
+    const prop = (name: string) => props[name] as Record<string, unknown> | undefined;
+    return {
+      id: p.id,
+      title: txt(prop("Title")?.title),
+      sourceUrl: (prop("Source URL")?.url as string) ?? "",
+      category: txt(prop("Category")?.rich_text),
+      contentsSummary: txt(prop("Contents Summary")?.rich_text),
+      publicationDate: ((prop("Publication Date")?.date as { start?: string } | undefined)?.start) ?? "",
+      notionUrl: p.url,
+      createdAt: p.created_time,
+    };
+  });
+}
+
 /** Idempotency lookup: returns the first L1 row whose `Source URL` equals
  *  `url`, or null. Lets the capture endpoint dedupe re-submits. */
 export async function findL1SourceByUrl(args: {
