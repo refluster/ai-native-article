@@ -76,6 +76,7 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0013](adr-0013-event-driven-pr-autopilot.md) | pr-autopilot fires on PR-open via a CCR-native `github_event` trigger (within adr-0005) | Proposed | — (cadence; adr-0005/0010/0011) |
 | [0014](adr-0014-drafts-are-merge-eligible.md) | Drafts are merge-eligible: the engine marks a green, non-L0/L1 draft Ready for Review, then merges | Accepted | [010](epics/epic-010-project-trust-boundary.md) |
 | [0015](adr-0015-skill-bodies-not-l0l1.md) | Skill bodies (`SKILL.md`) are removed from the L0/L1 autopilot off-limits set | Proposed | [010](epics/epic-010-project-trust-boundary.md) |
+| [0016](adr-0016-podcast-production-surface.md) | Podcast production & distribution execution surface (deterministic `wf-podcast` Lambda + Polly/public-RSS egress, within R-N1) | Proposed | [017](epics/epic-017-podcast-spotify-distribution.md) |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](epics/README.md).

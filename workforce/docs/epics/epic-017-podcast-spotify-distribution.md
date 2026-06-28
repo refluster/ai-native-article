@@ -1,9 +1,9 @@
 # Epic-017 — Podcast production & Spotify distribution from analysis articles
 
-- **Status**: Draft
+- **Status**: In-progress
 - **Owner**: Maya
 - **Created**: 2026-06-27
-- **Implemented by**: _(set when Status hits In-progress)_
+- **Implemented by**: branch `claude/epic-017-spotify-podcast-k8z11e` — Stories 1–7 A-authority artifacts (seed, governance/ADR-0016, podcast-script/synthesize/rss skills, wf-podcast Lambda + SAM, reader/pipeline). Architecture per tracker #379: workforce skills + backing `wf-podcast` Lambda (no GAS/Actions synthesis). B-gated steps (register, SAM deploy, Notion props, cron enable, Spotify submission) tracked in [runbooks/podcast-pipeline.md](../runbooks/podcast-pipeline.md).
 
 ## Problem
 
