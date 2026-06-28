@@ -1978,12 +1978,13 @@ Resources:
               Resource:
                 - !Sub ${WfBucket.Arn}/podcast/*
             - Sid: PodcastNotionSecret
-              # The shared Notion token (apiKey + databaseId). Same secret the
-              # other Notion-egress Lambdas read; no new credential type.
+              # The project-scoped Notion integration token ({apiKey}); the DB
+              # id is a non-secret constant in the handler. No new credential
+              # type — same secret the agent-workforce project bag holds.
               Effect: Allow
               Action: secretsmanager:GetSecretValue
               Resource:
-                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/notion-*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/agent-workforce/notion.integration_token-*
       Events:
         Synthesize:
           Type: HttpApi
