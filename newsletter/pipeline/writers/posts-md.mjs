@@ -80,6 +80,9 @@ function frontmatter(record) {
   if (record.sourceUrls) lines.push(`sourceUrls: "${esc(record.sourceUrls)}"`)
   if (record.legacySlug) lines.push(`legacySlug: "${esc(record.legacySlug)}"`)
   if (record.author) lines.push(`author: "${esc(record.author)}"`)
+  // Epic-017: Spotify deep-link → reader icon link (only emitted when set).
+  if (record.spotifyUrl) lines.push(`spotifyUrl: "${esc(record.spotifyUrl)}"`)
+  if (record.hasPodcast) lines.push(`hasPodcast: "${esc(record.hasPodcast)}"`)
   lines.push('---', '')
   return lines.join('\n')
 }
@@ -139,6 +142,8 @@ export async function writePosts(records, options) {
       image: imagePath,
       sourceUrls: record.sourceUrls,
       author: record.author,
+      spotifyUrl: record.spotifyUrl,
+      hasPodcast: record.hasPodcast,
     })
   }
 

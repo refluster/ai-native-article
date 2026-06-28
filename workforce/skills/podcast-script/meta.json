@@ -1,0 +1,16 @@
+{
+  "name": "podcast-script",
+  "version": "0.1.0",
+  "status": "active",
+  "archetype": "cadence",
+  "deliverable": {
+    "type": "article",
+    "publish_notion": false,
+    "article_type": "analysis"
+  },
+  "cost_class": "medium",
+  "owners": ["rhys", "odette"],
+  "improvement_agent": "sana",
+  "created_at": "2026-06-28",
+  "requires": ["notion.integration_token"]
+}

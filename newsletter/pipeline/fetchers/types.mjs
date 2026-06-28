@@ -22,6 +22,8 @@
  *  @property {string} lastEditedAt          // ISO timestamp; for incremental fetch
  *  @property {string} [imagePath]           // e.g. "/posts/images/<slug>.jpg" or undefined
  *  @property {string} [author]              // Workforce persona slug (sora/maya/…). Optional; pre-workforce rows omit it.
+ *  @property {string} [spotifyUrl]          // Epic-017: Spotify episode/show deep-link. Set once an episode is published. Drives the reader Spotify icon link.
+ *  @property {string} [hasPodcast]          // Epic-017: 'true' when a podcast cast exists for this article. Informational.
  */
 
 /**

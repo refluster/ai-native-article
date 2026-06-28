@@ -348,6 +348,17 @@ async function pageToRecord(page, apiKey, legacyHint) {
   // workforce rows have no Author property and resolve to undefined,
   // which the front-end renders as a quiet placeholder (anonymous).
   const author = propText(props.Author) || undefined
+  // Epic-017: the Spotify deep-link the operator records back to Notion once
+  // an episode is published. Flows to the reader as a Spotify icon link. No
+  // GAS path (D4) — this is the only sync route. Property name is the canonical
+  // `spotifyUrl` (Story 4 schema, ADR-0016); PascalCase kept as a tolerant
+  // fallback. `hasPodcast` is derived from `podcastStatus` so the reader can
+  // know an episode exists even before the Spotify URL is captured.
+  const spotifyUrl =
+    propText(props.spotifyUrl) || propText(props.SpotifyUrl) || undefined
+  const podcastStatus = propText(props.podcastStatus) || ''
+  const hasPodcast =
+    podcastStatus && podcastStatus !== 'none' ? 'true' : undefined
 
   const bodyMd = await blocksToMd(page.id, apiKey)
   const slug = legacySlug || slugFromId(page.id)
@@ -368,6 +379,8 @@ async function pageToRecord(page, apiKey, legacyHint) {
     lastEditedAt: page.last_edited_time || '',
     imagePath: `/posts/images/${slug}.jpg`,
     author,
+    spotifyUrl,
+    hasPodcast,
   }
 }
 
