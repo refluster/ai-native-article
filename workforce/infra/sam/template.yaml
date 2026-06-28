@@ -2054,9 +2054,12 @@ Resources:
           # Managed-CachingOptimized policy id (AWS-managed, region-agnostic).
           CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
         PriceClass: PriceClass_100
-        Tags:
-          - Key: workforce
-            Value: !Ref Stage
+      # Tags is a resource-level property of AWS::CloudFront::Distribution, NOT
+      # a member of DistributionConfig — nesting it inside DistributionConfig
+      # fails CloudFormation Early Validation (the deploy-blocking bug here).
+      Tags:
+        - Key: workforce
+          Value: !Ref Stage
 
   WfPodcastBucketPolicy:
     Type: AWS::S3::BucketPolicy
