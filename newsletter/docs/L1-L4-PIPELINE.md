@@ -24,9 +24,18 @@ Both L2 and L3 rows live in **one unified Notion Articles DB**, distinguished by
 
 ## The stages
 
-### L1 — Capture sources (into Notion)
+### L1 — Capture sources
 
-New L1 source rows are added **directly in the Notion L1 source DB** (title, summary, Source URL). There is no longer a capture web page — you add the row in Notion. The L2 cadence's picker (`workforce/skills/article-level2/pick-l1-source.mjs`) reads this DB to find uncovered sources.
+New L1 source rows land in the Notion L1 source DB, which the L2 cadence's picker (`workforce/skills/article-level2/pick-l1-source.mjs`) reads to find uncovered sources. Two ways in:
+
+1. **The capture endpoint (the GAS `L1_SAVE` replacement).** `POST /l1/register` on the `wf-l1-source-register` Lambda registers a URL as an L1 row — **mechanically, no LLM** (`url` required; `title` / `category` / `summary` / `publicationDate` optional; idempotent on the Source URL). Invoke it from:
+   - the **iOS Shortcut** (Share Sheet → POST) — one-tap capture from mobile, the closest replacement for the retired capture PWA;
+   - the **CLI**: `L1_CAPTURE_ENDPOINT=… L1_CAPTURE_TOKEN=… node scripts/capture-l1.mjs <url> [--title …] [--category A-E]`.
+
+   Auth is a bearer token (`wf/api/l1-source-write-token`). Setup, deploy, and the Shortcut recipe: [`workforce/lambdas/l1-source-register/README.md`](../../workforce/lambdas/l1-source-register/README.md).
+2. **Directly in Notion.** Add the row by hand (Title + Source URL, optionally Contents Summary + Category). Useful for paywalled sources where you want to paste a `Contents Summary` (the L2 cadence's only grounding fallback when the URL body can't be fetched).
+
+> **Why no LLM at capture.** The retired GAS `L1_SAVE` auto-extracted title/category/summary via Azure. Downstream, the L2 cadence fetches the actual source URL and re-canonicalises category, so those fields are selection hints, not load-bearing — capture is now a deterministic write. The one exception is the paywall fallback above: supply a `summary` (via the endpoint or by hand) for sources whose body can't be fetched.
 
 ### L2 — Explanation articles (`article-level2` cadence)
 
