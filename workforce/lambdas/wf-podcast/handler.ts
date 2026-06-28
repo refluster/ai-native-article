@@ -38,11 +38,20 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 
-import { getSecret, type NotionSecret } from "../shared/secrets.js";
+import { getSecret } from "../shared/secrets.js";
 import { buildPodcastRss, type PodcastEpisode } from "./rss.js";
 
 const NOTION_VERSION = "2022-06-28";
 const NOTION_API = "https://api.notion.com/v1";
+
+// The Notion credential is the project-scoped integration token (shape
+// {apiKey}); the DB id is a NON-secret constant (the unified Articles DB,
+// already committed in the article-level2 scripts + the pipeline) — overridable
+// for tests. This mirrors how the article-level2 scripts resolve Notion: apiKey
+// from the credential, DB id as a constant.
+const NOTION_SECRET_ID =
+  process.env.NOTION_SECRET_ID ?? "wf/projects/agent-workforce/notion.integration_token";
+const UNIFIED_DB_ID = process.env.NOTION_DB_ID ?? "34fd0f0b-e61e-817a-9f6b-dc65b0d5b4cc";
 
 const BUCKET = process.env.BUCKET_NAME ?? "";
 // The public base URL the MP3/feed are served from (CloudFront/OAC over the
@@ -84,9 +93,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // ── Notion helpers (the unified Articles DB; podcast properties from Story 4) ─
 
 async function notionHeaders(): Promise<{ apiKey: string; databaseId: string }> {
-  const { apiKey, databaseId } = await getSecret<NotionSecret>("wf/notion");
-  if (!apiKey || !databaseId) throw new Error("wf/notion secret missing apiKey/databaseId");
-  return { apiKey, databaseId };
+  const sec = await getSecret<{ apiKey?: string }>(NOTION_SECRET_ID);
+  const apiKey = sec?.apiKey;
+  if (!apiKey) throw new Error(`${NOTION_SECRET_ID} secret missing apiKey`);
+  return { apiKey, databaseId: UNIFIED_DB_ID };
 }
 
 async function notionFetch(apiKey: string, path: string, init: RequestInit): Promise<unknown> {
