@@ -1,0 +1,15 @@
+{
+  "name": "podcast-cast",
+  "version": "0.1.0",
+  "status": "active",
+  "archetype": "cadence",
+  "deliverable": {
+    "type": "notification",
+    "publish_notion": false
+  },
+  "cost_class": "small",
+  "owners": ["odette"],
+  "improvement_agent": "sana",
+  "created_at": "2026-06-28",
+  "requires": ["notion.integration_token"]
+}

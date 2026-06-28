@@ -43,21 +43,31 @@ const PROJECT_ID = "agent-workforce";
 // yet — the operator adds it when enabling (ENABLE_SNIPPET). podcast-script
 // reads the Notion integration token (its requires[]), supplied by the
 // agent-workforce project credential bag at fire time.
-function podcastScriptBinding() {
+// All three podcast persona cadences land PAUSED (scheduler:"manual"), Notion-
+// only (no AWS). The operator enables each (B-authority) by flipping
+// scheduler→external + invoked_by=api + a daily cron. project_id=agent-workforce
+// supplies notion.integration_token.
+function pausedCadence(skill, note) {
   return {
-    skill: "podcast-script",
+    skill,
     executor: "claude-code-routine",
-    trigger: {
-      scheduler: "manual", // PAUSED — not dispatched by orchestrator-tick until enabled (scheduler→"external")
-    },
+    trigger: { scheduler: "manual" },
     routine_spec: ROUTINE_SPEC,
     project_id: PROJECT_ID,
-    note: "podcast-script Cadence (Epic-017 Story 3), landed PAUSED (scheduler=manual). The operator enables it (B-authority) by flipping scheduler→external + invoked_by=api + a staggered cron. project_id=agent-workforce supplies notion.integration_token.",
+    note,
   };
 }
 
 const PLAN = [
-  { slug: "rhys", add: [podcastScriptBinding()] },
+  // Stage none→script-ready (Rhys writes the script; Idris co-owns compliance).
+  { slug: "rhys", add: [pausedCadence("podcast-script",
+    "podcast-script Cadence (Epic-017), PAUSED. none→script-ready: writes the script + Idris compliance verdict, up to 5/fire. Enable = daily cron (B).")] },
+  // Stage approved→ (Odette casts the voice param the CI synthesis reads).
+  { slug: "odette", add: [pausedCadence("podcast-cast",
+    "podcast-cast Cadence (Epic-017), PAUSED. Sets podcastVoice on up to 5 approved episodes. Enable = daily cron (B).")] },
+  // Stage audio-ready→ (Celeste writes the show-notes the CI publish folds in).
+  { slug: "celeste", add: [pausedCadence("podcast-shownotes",
+    "podcast-shownotes Cadence (Epic-017), PAUSED. Sets podcastShowNotes on up to 5 audio-ready episodes. Enable = daily cron (B).")] },
 ];
 
 function curlJson(method, path, body) {
