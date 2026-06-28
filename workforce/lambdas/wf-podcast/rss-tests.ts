@@ -8,6 +8,12 @@ const channel: PodcastChannel = {
   language: "ja",
   author: "Workforce",
   feedSelfUrl: "https://cdn.example/podcast/feed.xml",
+  imageUrl: "https://cdn.example/podcast/cover.png",
+  category: "Technology",
+  explicit: false,
+  ownerName: "kohuehara",
+  ownerEmail: "owner@example.com",
+  type: "episodic",
 };
 
 describe("rss builder", () => {
@@ -38,6 +44,15 @@ describe("rss builder", () => {
     // citations are carried in the description (mandatory — ADR-0016)
     expect(xml).toContain("<description>出典: https://example.com/a, https://example.com/b</description>");
     expect(xml).toContain('<atom:link href="https://cdn.example/podcast/feed.xml"');
+  });
+
+  it("emits the Spotify-required show tags (image, category, explicit, owner email, type)", () => {
+    const xml = buildPodcastRss(channel, []);
+    expect(xml).toContain('<itunes:image href="https://cdn.example/podcast/cover.png" />');
+    expect(xml).toContain('<itunes:category text="Technology" />');
+    expect(xml).toContain("<itunes:explicit>false</itunes:explicit>");
+    expect(xml).toContain("<itunes:type>episodic</itunes:type>");
+    expect(xml).toContain("<itunes:email>owner@example.com</itunes:email>");
   });
 
   it("produces a feed with zero items when there are no episodes", () => {

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // podcast-synthesize — trigger the deterministic wf-podcast Lambda to turn a
-// `script-ready` episode into an MP3 (Epic-017 Story 5). This skill carries NO
+// `approved` episode into an MP3 (Epic-017 Story 5). This skill carries NO
 // judgment: it SigV4-POSTs to the IAM-authorized /podcast/synthesize route, and
 // the Lambda does all the work (read podcastScript from Notion → Polly Neural JA
 // random voice → MP3 on the wf bucket's podcast/audio/ prefix → write audioUrl +
@@ -12,7 +12,7 @@
 // secret via its IAM role), never in this session.
 //
 // Usage:
-//   aws-vault exec <profile> -- node workforce/skills/podcast-synthesize/synthesize.mjs            # oldest script-ready
+//   aws-vault exec <profile> -- node workforce/skills/podcast-synthesize/synthesize.mjs            # oldest approved
 //   aws-vault exec <profile> -- node workforce/skills/podcast-synthesize/synthesize.mjs --slug c91368439868
 //
 // Env:
@@ -20,7 +20,7 @@
 //   AWS_REGION           SigV4 region (default us-west-2)
 //
 // Exit codes:
-//   0  — synthesised (or a skip: no script-ready episode) — read the JSON
+//   0  — synthesised (or a skip: no approved episode) — read the JSON
 //   1  — bad env / missing AWS creds
 //   2  — Lambda returned 4xx (bad request / auth)
 //   3  — Lambda 5xx / network error (fail loud — a Polly/synthesis error)

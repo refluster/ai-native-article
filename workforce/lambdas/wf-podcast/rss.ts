@@ -16,6 +16,14 @@ export interface PodcastChannel {
   author: string;
   imageUrl?: string;
   feedSelfUrl: string; // the public URL this feed is served from
+  // Spotify-required show metadata (Story #1). Cover art + category +
+  // explicit + an owner email (used by Spotify to verify ownership) are
+  // mandatory for a publishable show; without them submission is rejected.
+  category?: string; // an Apple Podcasts category, e.g. "Technology"
+  explicit?: boolean; // content advisory; default false
+  ownerName?: string;
+  ownerEmail?: string; // verification address — must be present to claim the show
+  type?: "episodic" | "serial"; // itunes:type
 }
 
 export interface PodcastEpisode {
@@ -79,6 +87,14 @@ export function buildPodcastRss(channel: PodcastChannel, episodes: PodcastEpisod
   const image = channel.imageUrl
     ? `\n    <itunes:image href="${xmlEscape(channel.imageUrl)}" />\n    <image><url>${xmlEscape(channel.imageUrl)}</url><title>${xmlEscape(channel.title)}</title><link>${xmlEscape(channel.link)}</link></image>`
     : "";
+  const category = channel.category
+    ? `\n    <itunes:category text="${xmlEscape(channel.category)}" />`
+    : "";
+  const explicit = `\n    <itunes:explicit>${channel.explicit ? "true" : "false"}</itunes:explicit>`;
+  const itype = `\n    <itunes:type>${xmlEscape(channel.type ?? "episodic")}</itunes:type>`;
+  const owner = channel.ownerEmail
+    ? `\n    <itunes:owner><itunes:name>${xmlEscape(channel.ownerName ?? channel.author)}</itunes:name><itunes:email>${xmlEscape(channel.ownerEmail)}</itunes:email></itunes:owner>`
+    : "";
 
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -89,7 +105,7 @@ export function buildPodcastRss(channel: PodcastChannel, episodes: PodcastEpisod
     `    <language>${xmlEscape(channel.language)}</language>`,
     `    <description>${xmlEscape(channel.description)}</description>`,
     `    <itunes:author>${xmlEscape(channel.author)}</itunes:author>`,
-    `    <itunes:summary>${xmlEscape(channel.description)}</itunes:summary>`,
+    `    <itunes:summary>${xmlEscape(channel.description)}</itunes:summary>${category}${explicit}${itype}${owner}`,
     `    <atom:link href="${xmlEscape(channel.feedSelfUrl)}" rel="self" type="application/rss+xml" />${image}`,
     items,
     "  </channel>",
