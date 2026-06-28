@@ -265,7 +265,7 @@ export default function Article() {
                       params: { slug: slug ?? '', href: meta.spotifyUrl ?? '' },
                     })
                   }
-                  className="inline-flex items-center gap-1.5 text-[#1DB954] hover:opacity-80 transition-opacity normal-case tracking-normal"
+                  className="inline-flex items-center gap-1.5 text-on-surface-variant hover:text-tertiary transition-colors normal-case tracking-normal"
                 >
                   <svg
                     viewBox="0 0 24 24"
