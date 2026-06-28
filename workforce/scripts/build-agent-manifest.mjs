@@ -104,12 +104,12 @@ function toManifestAgent(row) {
     // "About" snippet: first prose paragraph of the persona prompt (the
     // former system.md body, now row.system_prompt per ADR-0007).
     about: pickAboutSnippet(row.system_prompt ?? ""),
-    // Optional structured profile blocks — JD, OpenClaw IDENTITY, the
-    // LinkedIn-style experience track record, and the MEMORY.md analogue.
-    // Each is null-safe in the SPA.
+    // Optional structured profile blocks — JD, OpenClaw IDENTITY, and the
+    // MEMORY.md analogue. Each is null-safe in the SPA. (The former
+    // LinkedIn-style `experience` track record was removed — it was a
+    // hand-authored placeholder with no live data behind it.)
     jd: row.jd ?? null,
     identity: row.identity ?? null,
-    experience: row.experience ?? null,
     memory: row.memory ?? null,
   };
 }
