@@ -253,8 +253,8 @@ describe("PATCH /agents/{slug} — identity writes (ADR-0007)", () => {
 
   it("enforces the W-3 aggregate budget cap across other live agents", async () => {
     seedAgent("sora");
-    // Fixtures track the W-3 cap (190): 130 + 60 = 190 fits, 130 + 61 = 191 trips it.
-    seedAgent("ren", { slug: "ren", pk: "AGENT#ren", budget_monthly_usd_default: 130 });
+    // Fixtures track the W-3 cap (250): 190 + 60 = 250 fits, 190 + 61 = 251 trips it.
+    seedAgent("ren", { slug: "ren", pk: "AGENT#ren", budget_monthly_usd_default: 190 });
     seedAgent("maya", {
       slug: "maya",
       pk: "AGENT#maya",
@@ -315,8 +315,8 @@ describe("PATCH /agents/{slug} — operational writes still audit", () => {
 
   it("guards the budget override against the W-3 cap", async () => {
     seedAgent("sora");
-    // Fixtures track the W-3 cap (190): 180 + override 20 = 200 trips it.
-    seedAgent("ren", { slug: "ren", pk: "AGENT#ren", budget_monthly_usd_default: 180 });
+    // Fixtures track the W-3 cap (250): 240 + override 20 = 260 trips it.
+    seedAgent("ren", { slug: "ren", pk: "AGENT#ren", budget_monthly_usd_default: 240 });
     const { status, json } = await call(
       makeEvent("PATCH", "PATCH /agents/{slug}", "sora", { budget_monthly_usd_override: 20 }),
     );
