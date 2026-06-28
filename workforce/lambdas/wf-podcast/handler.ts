@@ -124,6 +124,7 @@ function propText(prop: any): string {
     case "date": return prop.date?.start ?? "";
     case "url": return prop.url ?? "";
     case "select": return prop.select?.name ?? "";
+    case "status": return prop.status?.name ?? "";
     case "multi_select": return (prop.multi_select ?? []).map((o: any) => o.name).join(", ");
     default: return "";
   }
@@ -250,7 +251,7 @@ async function synthesize(slug: string | undefined): Promise<ProxyResult> {
   const audioUrl = `${PUBLIC_BASE}/${destKey}`;
   await patchPodcast(apiKey, page.id, {
     audioUrl: { url: audioUrl },
-    podcastStatus: { select: { name: "audio-ready" } },
+    podcastStatus: { status: { name: "audio-ready" } },
   });
 
   return json(200, { slug: theSlug, title, voiceId, audioUrl, status: "audio-ready" });

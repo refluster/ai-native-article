@@ -240,6 +240,8 @@ function propText(prop) {
       return prop.url ?? ''
     case 'select':
       return prop.select?.name ?? ''
+    case 'status':
+      return prop.status?.name ?? ''
     case 'multi_select':
       // For multi_select, return the FIRST tag (used for legacy `Category`
       // single-string fallback). Use propMultiSelect for the full list.
