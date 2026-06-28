@@ -1,6 +1,6 @@
 ---
 name: article-health
-description: Audit the L2/L3 article corpus for truncation and Notion↔gh-pages drift. Sweeps every published explanation/analysis, flags articles whose body looks cut off mid-sentence, and reports which slugs on gh-pages still serve content older than the current Notion body (i.e. a stale deploy). Run this proactively after a GAS change or whenever a user reports a broken article. Triggers on requests like "check article health", "any truncated articles?", "is the site in sync with Notion?", "audit published articles".
+description: Audit the L2/L3 article corpus for truncation and Notion↔gh-pages drift. Sweeps every published explanation/analysis, flags articles whose body looks cut off mid-sentence, and reports which slugs on gh-pages still serve content older than the current Notion body (i.e. a stale deploy). Run this proactively after an article-generation change (the workforce article-level2/level3 cadences) or whenever a user reports a broken article. Triggers on requests like "check article health", "any truncated articles?", "is the site in sync with Notion?", "audit published articles".
 ---
 
 # article-health
@@ -12,28 +12,31 @@ One-shot consistency sweep over the published article corpus. Answers two questi
 
 ## Why a skill
 
-Both checks individually are five-line scripts. Combining them removes the most common debugging dead-end this session hit: "I see a broken article on the site, but the GAS backfill says nothing is truncated." The answer was that gh-pages was just stale — Notion had already been fixed. This skill makes that distinction obvious in one report.
+Both checks individually are five-line scripts. Combining them removes the most common debugging dead-end: "I see a broken article on the site, but Notion says nothing is truncated." The answer is usually that gh-pages was just stale — Notion had already been fixed. This skill makes that distinction obvious in one report.
 
 ## Usage
 
 ```bash
+# gh-pages truncation sweep only:
 node .claude/skills/article-health/scripts/article-health.mjs
+
+# include the Notion↔gh-pages drift comparison:
+NOTION_API_KEY=secret_xxx node .claude/skills/article-health/scripts/article-health.mjs
 ```
 
-No args. Reads:
+Reads:
 - gh-pages `posts/manifest.json` and each `posts/<slug>.md` (the live site's view).
-- The deployed GAS endpoint via `L2_LIST` / `ARTICLE_LIST` to learn what Notion says today.
+- When `NOTION_API_KEY` is set: the Notion Articles DB directly (via the shared `newsletter/pipeline/fetchers/notion.mjs` fetcher) to learn what Notion says today. With no key, the drift comparison is skipped and only the gh-pages truncation sweep runs.
 
 Reports, per slug:
 - `OK` — clean ending on gh-pages, body matches the latest Notion export length within tolerance.
-- `TRUNCATED_PUBLISHED` — gh-pages body ends mid-sentence. Backfill via `L2_BACKFILL` (Notion may also be truncated; check the next column).
-- `TRUNCATED_NOTION` — Notion body is currently truncated. The fix is `runL2Backfill`; gh-pages will follow on next deploy.
+- `TRUNCATED_PUBLISHED` — gh-pages body ends mid-sentence. Fix the Notion row (re-run the relevant article-level2/level3 cadence or edit Notion directly), then re-deploy.
 - `STALE_DEPLOY` — gh-pages body is shorter than Notion's (or character-count differs > 5%). The fix is `gh workflow run deploy-article-site.yml` or wait for the 06:17 / 12:17 / 18:17 UTC cron.
-- `MISSING_ON_PAGES` — exists in Notion as published, but no markdown on gh-pages. Usually means `handleL4Batch` hasn't run yet (image generation pending) — not a bug per se.
+- `MISSING_ON_PAGES` — exists in Notion but no markdown on gh-pages. Usually means the deploy cron hasn't run since the row was added — not a bug per se.
 
 ## Truncation heuristic
 
-Same rule as `newsletter/gas/src/Code.gs#isTruncatedMarkdown`:
+The canonical rule from `scripts/lib/truncation.mjs` (the same guard the workforce `publish-notion.mjs` enforces at generation time):
 - Body's last non-empty line is a heading (`#`/`##`/`###`) — heading-with-no-body, the d17e1d58ec42 case.
 - OR the last non-empty prose line doesn't end with one of `。`/`！`/`？`/`」`/`）`/`…`/`.`/`!`/`?`/`)`/`]`/<code>`</code>.
 

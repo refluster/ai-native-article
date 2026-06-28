@@ -2079,6 +2079,42 @@ Resources:
               StringEquals:
                 AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${WfPodcastDistribution.Id}
 
+  # --- L1 source capture (non-GAS replacement for GAS L1_SAVE) ---------------
+  # Mechanical (no-LLM) endpoint: registers a web source URL as a row in the
+  # Notion L1 source DB that article-level2/pick-l1-source.mjs reads. Auth is a
+  # bearer token at the handler layer (no API GW authorizer — the operator /
+  # iOS Shortcut / CLI has no SigV4 creds), exactly like POST /feed.
+  WfL1SourceRegisterFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-l1-source-register-${Stage}
+      CodeUri: ../../lambdas/l1-source-register
+      Handler: handler.handler
+      MemorySize: 256
+      Timeout: 15
+      Policies:
+        - Statement:
+            - Sid: L1RegisterReadSecrets
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/notion-*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/api/l1-source-write-token-*
+      Events:
+        RegisterL1Source:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /l1/register
+            Method: POST
+        ListL1Sources:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /l1/sources
+            Method: GET
 
 Outputs:
   TableName:

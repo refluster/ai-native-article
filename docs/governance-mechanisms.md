@@ -81,9 +81,10 @@ This implements `design-policy.md` D-2 (Software 2.0).
 ### 2.1 How to operate each
 
 - **R-10 corpus truncation** — runs automatically in `deploy-article-site.yml`. If it fails, an
-  article is truncated *after a fresh Notion fetch*: fix the Notion row or run `L2_BACKFILL`, then
-  redeploy. Emergency escape hatch (operator-only): `ALLOW_TRUNCATED=1` to ship an unrelated fix
-  while regenerating; record it in the risk-acceptance ledger.
+  article is truncated *after a fresh Notion fetch*: fix the Notion row or re-run the relevant
+  workforce cadence (`article-level{2,3}`), then redeploy. Emergency escape hatch (operator-only):
+  `ALLOW_TRUNCATED=1` to ship an unrelated fix while regenerating; record it in the risk-acceptance
+  ledger.
 - **R-11 L1 citation** — runs on PRs. If you edit an L1 doc (governance.md §3.1 list, the two
   governance-axis docs, or any ADR under `docs/adr/`), put in the PR body either a reference to the
   doc you're changing, or `RULE-N/A: <reason>`. This is how "follow the ADR when implementing" is
@@ -114,7 +115,7 @@ Each mechanism maps to the problem it solves:
 | Converging audit loop (promote / accept / decline) | The audit backlog could grow without ever closing. |
 | Memory→lint promotion backlog | A failure that bit twice was re-discovered, not mechanised. |
 | Content-insights (analytics→issue) loop | Reader data died in a dashboard instead of driving the roadmap. |
-| Pre-publish health gate (R-10) | The finish_reason throw guards generation, not publication. |
+| Pre-publish health gate (R-10) | The generation-time W-1 guard (historically the GAS finish_reason throw) guards generation, not publication. |
 | ADRs as the decision-record vehicle | Architectural rationale lived in chat history, not the repo. |
 
 ---

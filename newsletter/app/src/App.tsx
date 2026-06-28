@@ -8,9 +8,6 @@ import Sources from './pages/Sources'
 import DesignSystem from './pages/design/DesignSystem'
 import DesignGuide from './pages/design/DesignGuide'
 import Capture from './pages/pipeline/Capture'
-import L2Blog from './pages/pipeline/L2Blog'
-import L3Insight from './pages/pipeline/L3Insight'
-import L4Publish from './pages/pipeline/L4Publish'
 import { routerBaseName } from './lib/paths'
 import { trackPageView } from '@kohuehara/shared/analytics'
 
@@ -40,12 +37,8 @@ export default function App() {
             <Route path="/design-system" element={<DesignSystem />} />
             <Route path="/design-guide" element={<DesignGuide />} />
             <Route path="/capture" element={<Capture />} />
-            {/* Legacy alias — kept so the iOS Share Sheet target keeps
-                working without re-pinning. Drop in a future cleanup. */}
+            {/* Legacy alias — the PWA share-target action points here. */}
             <Route path="/l1-register" element={<Capture />} />
-            <Route path="/l2-blog" element={<L2Blog />} />
-            <Route path="/l3-insight" element={<L3Insight />} />
-            <Route path="/l4-publish" element={<L4Publish />} />
           </Routes>
         </main>
         <Footer />

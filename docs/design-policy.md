@@ -31,7 +31,7 @@ A few terms recur in this doc — defined once here so they read cleanly later:
 - **Reversible** — changeable back by reverting Notion data and redeploying. Almost everything in this project is reversible. Exceptions: published slug changes (C-2 territory), removing a runtime guard, force-pushing `main`.
 - **Shadow / primary** — a shadow run is a parallel invocation whose output is compared but not promoted to the corpus. A primary run is the production path.
 - **Orchestrate vs. compute** — we wire external services together (orchestrate); we do not run inference, host a CMS, or serve traffic ourselves (compute).
-- **Substrate / reinvention** — substrates are the external systems we ride on (Azure OpenAI, Notion, GitHub Actions, gh-pages, Claude Code, GAS). Reinvention is building our own version of any of them.
+- **Substrate / reinvention** — substrates are the external systems we ride on (Azure OpenAI, Notion, GitHub Actions, gh-pages, Claude Code, the workforce agent-runtime). Reinvention is building our own version of any of them.
 
 ---
 
@@ -55,11 +55,11 @@ Operationalized in §5.
 
 ### D-2. Software 2.0 is the design center.
 
-The "code" of this project is not just TypeScript and GAS. It also includes:
+The "code" of this project is not just TypeScript and the pipeline scripts. It also includes:
 
-- **Prompts** — the strings passed to `azureGenerateText`. A content-quality bug is more often fixed by editing a prompt than by editing a function.
+- **Prompts** — the strings the workforce `article-level{2,3}` cadences send to the LLM. A content-quality bug is more often fixed by editing a prompt than by editing a function.
 - **Dataset** — the L1 web corpus, L2 explanations, and L3 insights. This is an asset that compounds; treat Notion as canonical.
-- **Evaluation** — `article-health`, `finish_reason='length'` throw, future LLM-as-judge skills. Evals are the "compilation" step: they decide whether a prompt change is shippable.
+- **Evaluation** — `article-health`, the W-1 `publish-notion.mjs` guard, the multi-judge quality layer (GROWTH.md). Evals are the "compilation" step: they decide whether a prompt change is shippable.
 - **Model selection** — `gpt-5.4` today, something else tomorrow. The choice is an architectural decision, not a config tweak.
 
 These artifacts are **versioned, reviewed, and rolled back** with the same care as code. §2 makes the artifact list explicit, with current state and Software 2.0 commitment per row.
@@ -88,11 +88,11 @@ Azure OpenAI gets better → our articles get better, for free. Notion ships a n
 
 | Artifact | Current state (2026-05) | Software 2.0 commitment |
 |---|---|---|
-| **TypeScript / GAS** | git-managed in `newsletter/gas/src/Code.gs`, the apps' `src/`, `newsletter/pipeline/` & root `scripts/` | unchanged — already first-class code |
-| **Prompts** | inline string literals inside `azureGenerateText` call sites in `newsletter/gas/src/Code.gs` | **destination:** extract to separate versioned files (e.g. `newsletter/gas/src/prompts/l2-explanation.txt`) so PRs show prompt diffs cleanly. **Today:** commitment is declared; the migration is a separate task and is itself an A action when undertaken |
-| **Dataset (L1〜L3 corpus)** | lives in Notion (L1, L2, L3 databases) | Notion **is** the dataset. Treat it as a canonical asset: governance C-2 already pins this. Mass mutations require operator approval (governance §8.1 B). Backups out of scope until the corpus is irreplaceable |
-| **Evaluation** | `article-health` heuristic (truncation + drift) + `isTruncatedMarkdown` + `finish_reason==='length'` throw (governance R-3〜R-5) | grow over time: LLM-as-judge for editorial quality, factual-claim spot-check, style consistency. New eval skills live under `.claude/skills/` (adding one is **A**) |
-| **Model selection** | `gpt-5.4` hardcoded inside `azureGenerateText`; budget brackets in [`docs/azure-budget-rules.md`](../newsletter/docs/azure-budget-rules.md) | swapping the primary model requires (a) eval comparison evidence, (b) a design-policy amendment naming the new model and the rationale, (c) operator approval (governance §8.1 B). **Shadow-running** a candidate model in parallel is **A** |
+| **TypeScript / generation scripts** | git-managed in the workforce `article-level{2,3}` cadences, the apps' `src/`, `newsletter/pipeline/` & root `scripts/` | unchanged — already first-class code |
+| **Prompts** | the prompt strings the workforce `article-level{2,3}` cadences send to the LLM (in each skill body + its `publish-notion.mjs` path) | **commitment:** prompt changes ship as their own versioned PRs (AGENTS.md §2 rule 11), so PRs show prompt diffs cleanly. A prompt-version bump is its own PR; bumping is an A action to draft |
+| **Dataset (L1〜L3 corpus)** | lives in Notion (the unified Articles DB) | Notion **is** the dataset. Treat it as a canonical asset: governance C-2 already pins this. Mass mutations require operator approval (governance §8.1 B). Backups out of scope until the corpus is irreplaceable |
+| **Evaluation** | `article-health` heuristic (truncation + drift) + the shared `scripts/lib/truncation.mjs` guard (W-1 at generation, R-10 at deploy) + the multi-judge quality layer | grow over time: LLM-as-judge for editorial quality, factual-claim spot-check, style consistency. New eval skills live under `.claude/skills/` (adding one is **A**) |
+| **Model selection** | `gpt-5.4` via `MODEL_REGISTRY`; budget brackets in [`docs/azure-budget-rules.md`](../newsletter/docs/azure-budget-rules.md) | swapping the primary model requires (a) eval comparison evidence, (b) a design-policy amendment naming the new model and the rationale, (c) operator approval (governance §8.1 B). **Shadow-running** a candidate model in parallel is **A** |
 
 The order matters: prompts are the most fluid layer, dataset is the most precious, evals are the most under-invested, model selection is the rarest decision.
 
@@ -107,7 +107,7 @@ The order matters: prompts are the most fluid layer, dataset is the most preciou
 | **GitHub Actions** | scheduled jobs (gh-pages deploy cron), CI runners, secret store, workflow logs | our own scheduler, our own deploy server, our own CI runner |
 | **gh-pages** | static-site CDN, TLS, custom domain hosting | our own web server, our own CDN, our own TLS termination |
 | **Claude Code + skills** | code iteration, subagent orchestration, hook system, plan mode | our own AI agent, our own code-editing tooling, our own subagent framework |
-| **GAS (Google Apps Script)** | server runtime, Notion/Azure secret store (script properties), time-based triggers, 6-min execution envelope | a Node server, a Lambda, our own cron, our own secret manager |
+| **Workforce agent-runtime** | scheduled generation (EventBridge → `wf-orchestrator-tick` → agent-runner), persona/skill context, project-scoped secret resolution, the bundled `publish-notion.mjs` write path | our own scheduler, our own agent framework, our own secret manager (historical: this role was the now-retired GAS time-triggers + script-properties store) |
 | **Open web** | L1 source articles via manual + AI-assisted research | original journalism, primary reporting |
 
 The mapping above is the **whole infrastructure surface** the project consumes. The contract is:
@@ -129,24 +129,22 @@ The bias is hard toward (1) and (2). Item (3) requires a strong case.
 ## 4. Iteration loop
 
 ```
-edit prompt (versioned)
-  → local probe (gas-call against /exec)
-    → shadow run (parallel call, compare outputs)
-      → operator glance (sample 2-3 outputs)
-        → promote (replace primary prompt)
-          → batch on Notion corpus (L2_BACKFILL, etc.)
-            → article-health sweep
-              → deploy (gh workflow run deploy-article-site.yml)
+edit prompt (versioned, in the article-level{2,3} cadence)
+  → shadow run (parallel call, compare outputs)
+    → operator glance (sample 2-3 outputs)
+      → promote (replace primary prompt; its own PR)
+        → cadence runs on Notion corpus (wf-orchestrator-tick schedule)
+          → article-health sweep
+            → deploy (gh workflow run deploy-article-site.yml)
 ```
 
-Each step is the friction point candidate for the next skill or automation. Current friction map (2026-05-16):
+Each step is the friction point candidate for the next skill or automation. Current friction map (updated 2026-06-28):
 
-- **edit prompt (versioned)** — prompts are still inline in `newsletter/gas/src/Code.gs`. The first Software-2.0 migration is to extract them. Once extracted, the diff in a PR shows exactly what changed about content generation.
-- **local probe** — the `gas-call` skill handles this. ✅
-- **shadow run** — no harness yet. The current ersatz is `L2_BACKFILL` with `mode='all'` against a small slug list. A proper shadow harness (call both old and new prompt, dump pair to disk for comparison) is a worthwhile future skill.
+- **edit prompt (versioned)** — prompts live in the workforce `article-level{2,3}` cadences; a prompt-version bump ships as its own PR (AGENTS.md §2 rule 11) so the diff shows exactly what changed about content generation.
+- **shadow run** — no harness yet. A proper shadow harness (run both old and new prompt, dump the pair to disk for comparison) is a worthwhile future skill.
 - **operator glance** — informal; operator opens 2-3 Notion rows in the browser.
-- **promote** — for inline prompts, this is a `newsletter/gas/src/Code.gs` edit + `gas-deploy-verify`. For extracted prompts, it becomes a file replacement + redeploy.
-- **batch + article-health + deploy** — covered by existing skills (`gas-call`, `article-health`, the `deploy-article-site.yml` workflow).
+- **promote** — replace the primary prompt in the cadence, in its own PR; the next scheduled fire uses it.
+- **cadence run + article-health + deploy** — the cadence fires on schedule, then `article-health` and the `deploy-article-site.yml` workflow cover the rest.
 
 Things that are conspicuously missing and likely worth adding (each is an A action when an agent undertakes it):
 
@@ -158,19 +156,20 @@ None of these are mandatory. They are the kind of thing an agent should propose-
 
 ### 4.1 Canary rollout discipline
 
-The loop above has a sharp edge: **promote** replaces the primary prompt, and the very next batch
-runs the new prompt against 100% of pending articles. A subtly-worse prompt therefore degrades a
-whole day's output before `article-health` catches it post-deploy. The discipline is:
+The loop above has a sharp edge: **promote** replaces the primary prompt, and every subsequent
+cadence fire runs the new prompt against pending articles. A subtly-worse prompt therefore degrades
+a run's output before `article-health` catches it post-deploy. The discipline is:
 
-> Never promote a prompt change straight to a full batch. Run it against a **small canary slug list
-> first**, sweep `article-health`, *then* widen.
+> Never promote a prompt change and immediately let it generate at full volume. Validate it against a
+> **small canary set first**, sweep `article-health`, *then* widen.
 
-Concretely, today: invoke `L2_BACKFILL` with a short explicit slug list (3–5 articles), inspect, and
-only then run the full `mode='all'`. A first-class canary mode wired into `Code.gs` is deferred
-(tracked as **RAL-003** in the [risk-acceptance ledger](risk-acceptance-ledger.md)) — the small-list
-convention covers the common case until a prompt change actually burns a batch. The pre-deploy
-truncation gate (governance R-10) is the backstop if canary discipline is skipped: a truncated
-canary output cannot reach gh-pages.
+Concretely, today: run the cadence against a short explicit set of sources/slugs (3–5 articles),
+inspect, and only then let it run at full volume. A first-class canary mode wired into the cadence is
+deferred (tracked as **RAL-003** in the [risk-acceptance ledger](risk-acceptance-ledger.md)) — the
+small-set convention covers the common case until a prompt change actually burns a run. The two
+editorial guards are the backstop if canary discipline is skipped: W-1 (`publish-notion.mjs`, exit 2)
+stops a degraded body from reaching Notion, and the pre-deploy truncation gate (governance R-10)
+stops one from reaching gh-pages.
 
 ### 4.2 Closing the loop: reader behaviour → roadmap
 
@@ -194,7 +193,7 @@ The default decision tree for an agent:
 | Editing a prompt; reversible by re-edit | **A** | reversible, no governance R touched |
 | Adding a new `.claude/skills/` skill | **A** | additive, reversible, no critical path mutated |
 | Adding a new eval check that flags more things | **A** | L2 tightening per governance §8.1; design policy concurs |
-| Running an existing batch (`L2_BACKFILL`, `L3_BATCH`, etc.) | **A** | idempotent by governance I-3 |
+| Running an existing generation cadence (`article-level{2,3}`) | **A** | idempotent by governance I-3 |
 | Trying a new external service in shadow mode (parallel, output discarded) | **A** | shadow = reversible by definition |
 | Editing an L1 doc (e.g. this file, [`azure-budget-rules.md`](../newsletter/docs/azure-budget-rules.md)) | **A** to draft as a PR; **B** to merge | matches governance §8.1 |
 | Swapping the primary LLM model for production | **B** | governance §8.1 B (spending money / changing critical path) + design-policy §2 (model swap protocol) |

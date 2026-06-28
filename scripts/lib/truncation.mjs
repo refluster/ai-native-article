@@ -1,19 +1,15 @@
-// Shared truncation heuristic — the canonical JS copy.
+// Shared truncation heuristic — the single canonical copy.
 //
-// This predicate is mirrored in three places that must agree:
-//   1. newsletter/gas/src/Code.gs#isTruncatedMarkdown  (GAS / runtime, R-5)
-//   2. this module                                      (CI + skills, R-10)
-//   3. .claude/skills/article-health/scripts/article-health.mjs (imports this)
+// Every consumer imports this module directly; there are no hand-kept copies
+// to keep in sync (the GAS Code.gs#isTruncatedMarkdown copy was removed when
+// the GAS L1→L4 pipeline was retired). Consumers:
+//   - scripts/check-corpus-truncation.mjs               (R-10, deploy gate)
+//   - .claude/skills/article-health/scripts/article-health.mjs (live-site sweep)
+//   - workforce/skills/article-level{2,3}/publish-notion.mjs  (W-1, the
+//     generation-time guard — the workforce cadences are now the only
+//     generation path)
 //
-// Node consumers that import this module directly (no copy to keep in sync):
-// article-health (above) and the workforce publish guards
-// workforce/skills/article-level{2,3}/publish-notion.mjs (W-1, the
-// generation-time check while the GAS cron is paused).
-//
-// (1) lives in Apps Script and cannot import this file, so it stays a hand-kept
-// copy; (2) is the single source for every Node consumer. When the heuristic
-// changes, update Code.gs and this file together and cite the incident in
-// docs/memory-lint-backlog.md.
+// When the heuristic changes, cite the incident in docs/memory-lint-backlog.md.
 //
 // A body is "truncated" when its last non-empty line looks like a cut-off
 // generation: a dangling heading, or a prose line that does not end on a

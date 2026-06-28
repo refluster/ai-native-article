@@ -262,10 +262,10 @@ export function slugFromId(id) {
 }
 
 /**
- * Canonical 5-bucket taxonomy used by L1 capture (see GAS handleL1Save).
- * The original prompt told Azure to return a single letter A–E and meant
- * those letters to map onto these labels — but Azure has been free-form
- * enough to also produce things like bare "B", "B: TRENDS", "A: MACROHARD"
+ * Canonical 5-bucket taxonomy used when categorising L1 sources.
+ * The category prompt asks for a single letter A–E meant to map onto these
+ * labels — but the model has been free-form enough to also produce things
+ * like bare "B", "B: TRENDS", "A: MACROHARD"
  * which all leaked downstream and exploded the sidebar into ~30 buckets.
  *
  * normalizeCategory collapses every variant of letter X (or "X: anything")
@@ -340,9 +340,9 @@ async function pageToRecord(page, apiKey, legacyHint) {
     propText(props['Source URLs'])
   const legacySlug = propText(props.LegacySlug)
   // Migrated rows carry the original L2/L3 page id in `LegacyNotionId`.
-  // The writer needs this to resolve images written by GAS using the
-  // <32-char-no-dash-uuid>.jpg naming convention — those filenames are
-  // derived from the legacy id, not the new unified-DB id.
+  // The writer needs this to resolve cover images written by the former GAS
+  // L4 pipeline using the <32-char-no-dash-uuid>.jpg naming convention —
+  // those filenames are derived from the legacy id, not the new unified-DB id.
   const legacyNotionId = propText(props.LegacyNotionId)
   const type = resolveType(props, legacyHint)
   // Epic-002 / Epic-005: agent-authored articles carry an Author select
@@ -351,8 +351,8 @@ async function pageToRecord(page, apiKey, legacyHint) {
   // which the front-end renders as a quiet placeholder (anonymous).
   const author = propText(props.Author) || undefined
   // Epic-017: the Spotify deep-link the operator records back to Notion once
-  // an episode is published. Flows to the reader as a Spotify icon link. No
-  // GAS path (D4) — this is the only sync route. Property name is the canonical
+  // an episode is published. Flows to the reader as a Spotify icon link via
+  // this fetch-notion sync — the only sync route. Property name is the canonical
   // `spotifyUrl` (Story 4 schema, ADR-0016); PascalCase kept as a tolerant
   // fallback. `hasPodcast` is derived from `podcastStatus` so the reader can
   // know an episode exists even before the Spotify URL is captured.
