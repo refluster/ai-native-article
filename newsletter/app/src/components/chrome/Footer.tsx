@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom'
 
+// Reader-facing footer links stay minimal. Operator tooling (design system,
+// capture, workforce, sources) is collected on /operator and reached via the
+// single discreet "OPERATOR" link below.
 const publicLinks = [
   { to: '/', label: 'INDEX' },
-  { to: '/design-system', label: 'DESIGN SYSTEM' },
-  { to: '/design-guide', label: 'DESIGN GUIDE' },
+  { to: '/operator', label: 'OPERATOR' },
 ]
 
 export default function Footer() {

@@ -10,6 +10,7 @@ import {
   hostnameOf,
   type SourceEntry,
 } from '../lib/source-links'
+import { displayTag } from '../lib/article-types'
 
 type ScopeFilter = 'all' | 'with-explanation' | 'external-only'
 
@@ -181,7 +182,7 @@ export default function Sources() {
                 onClick={() => onCategoryClick(activeCategory)}
                 className="mb-6 text-[10px] font-bold tracking-widest text-tertiary uppercase hover:underline"
               >
-                × CLEAR CATEGORY ({activeCategory})
+                × CLEAR CATEGORY ({displayTag(activeCategory)})
               </button>
             )}
 
@@ -221,7 +222,7 @@ export default function Sources() {
                           }`}
                         >
                           <span className="text-sm font-bold uppercase group-hover:text-tertiary transition-colors">
-                            {cat.name}
+                            {displayTag(cat.name)}
                           </span>
                           <span className="text-[10px] font-medium text-outline">{cat.count}</span>
                         </button>
@@ -246,7 +247,7 @@ export default function Sources() {
                           }`}
                         >
                           <span className="text-xs font-medium leading-snug group-hover:text-tertiary transition-colors">
-                            {cat.name}
+                            {displayTag(cat.name)}
                           </span>
                           <span className="text-[10px] font-medium text-outline shrink-0 ml-3">
                             {cat.count}
@@ -284,7 +285,7 @@ function SourceRow({ entry, onExternalClick }: RowProps) {
           <div className="flex items-center gap-2 mb-2">
             {category ? (
               <span className="text-[10px] font-bold tracking-widest text-tertiary uppercase">
-                {category}
+                {displayTag(category)}
               </span>
             ) : (
               <span className="text-[10px] font-bold tracking-widest text-outline uppercase">
