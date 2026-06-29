@@ -5,6 +5,19 @@
 - **Deciders**: operator (refluster), maya, celeste
 - **Epics**: [017](../epics/epic-017-podcast-spotify-distribution.md)
 
+> **Update (2026-06-29) — skill consolidation (no decision reversed).** The
+> production skills were consolidated from five into **two persona cadences**:
+> **`podcast-script`** (Rhys + Idris — the prepare half) and **`podcast-publish`**
+> (Celeste — the publish half, which absorbs the former `podcast-cast`,
+> `podcast-shownotes`, `podcast-synthesize`, and `podcast-rss`). Every decision
+> below stands: the prepare cadence still runs on the R-N1 exception (a) surface;
+> the deterministic Polly/S3/RSS work still runs in the `wf-podcast` Lambda
+> (triggered by the daily CI workflow via OIDC, never the Notion-only cadence);
+> Polly + public-CloudFront egress, the mandatory-citation guard, and the
+> authority placement are unchanged. Odette still owns voice-pool membership and
+> Idris still owns the rights checklist — only the mechanical *writes* moved into
+> the two cadences. See `epic-017` for the consolidation rationale.
+
 ## Context
 
 Epic-017 repurposes the L3/L4 analysis articles on `kohuehara.xyz` into

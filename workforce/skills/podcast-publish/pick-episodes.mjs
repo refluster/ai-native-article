@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// podcast-cast picker — list up to N oldest episodes at a given podcastStatus,
-// so the casting cadence can set a voice on each. Mirror of the article-level2
-// picker shape (query the unified DB, filter, oldest-first) but keyed on the
-// `status`-type podcastStatus property.
+// podcast-publish picker — list up to N oldest episodes at a given podcastStatus,
+// so the publish cadence can set the voice + show-notes params on each. Mirror of
+// the article-level2 picker shape (query the unified DB, filter, oldest-first)
+// keyed on the `status`-type podcastStatus property.
 //
 // Output (stdout, single JSON line): { episodes: [{pageId, slug, title}, …] }
 // (empty array ⇒ nothing to do — the skill skips, producing no write).
