@@ -17,20 +17,32 @@ frontmatter sync reference — **use these exact names** (camelCase):
 
 | Property | Type | Written by | Read by | Notes |
 |---|---|---|---|---|
-| `podcastStatus` | **Status** | `podcast-script`, `wf-podcast` Lambda | picker, synthesis, RSS, frontmatter | Notion `status`-type property. Options: `none`, `script-ready`, `audio-ready`, `published`. Absent/`none` ⇒ no podcast. (The code reads/writes the `status` shape; `propText` handles `status`.) |
-| `podcastScript` | **Text** (rich_text) | `podcast-script` | synthesis | The narration script. Notion has no child-block property type, so the body is stored as chunked rich_text (≤2000 chars/object). |
-| `podcastSources` | **Text** (rich_text) | `podcast-script` | RSS `<description>` | Mandatory source citations. Empty ⇒ the write hard-fails (exit 2). |
-| `audioUrl` | **URL** | `wf-podcast` Lambda (synthesis) | RSS `<enclosure>` | Internal — the S3/CDN MP3 URL. **Never** linked from the reader site (D3). |
-| `spotifyUrl` | **URL** | operator (manual, Phase 1) | frontmatter sync → reader | The Spotify episode/show deep-link. Drives the reader Spotify icon link. |
+| `podcastStatus` | **Status** | `podcast-script`, `wf-podcast` Lambda | every stage | Notion `status`-type property. Options: `none`, `script-ready`, `approved`, `audio-ready`, `published`. Absent/`none` ⇒ no podcast. |
+| `podcastScript` | **Text** (rich_text) | `podcast-script` (Rhys) | synthesis | The narration script (chunked rich_text). |
+| `podcastSources` | **Text** (rich_text) | `podcast-script` (Rhys) | RSS description | Mandatory source citations. Empty ⇒ the write hard-fails (exit 2). |
+| `complianceVerdict` | **Text** (rich_text) | `podcast-script` (Idris) | operator (before approve) | Idris's no-verbatim + citation-completeness verdict (`PASS`/`FLAG: …`). |
+| `podcastVoice` | **Text** (rich_text) | `podcast-cast` (Odette) | synthesis | The cast JA Neural voice (`Takumi`/`Kazuha`/`Tomoko`); else random. |
+| `podcastShowNotes` | **Text** (rich_text) | `podcast-shownotes` (Celeste) | RSS description | Show-notes framing; leads the feed description, citations follow. |
+| `audioUrl` | **URL** | `wf-podcast` Lambda (synthesis) | RSS enclosure | Internal S3/CDN MP3 URL. **Never** linked from the reader site (D3). |
+| `spotifyUrl` | **URL** | operator (manual, Phase 1) | frontmatter sync → reader | Spotify deep-link; drives the reader icon link. |
 
-Select-option spelling for `podcastStatus` must match exactly — the picker and
-the Lambda filter on these literal strings.
+`podcastStatus` option spelling must match exactly — the picker and the Lambda
+filter on these literal strings.
 
-The state machine:
+The state machine (judgment = persona cadences writing Notion params; execution
+= the daily CI job; the only human gate is `script-ready → approved`):
 
 ```
-(none) ──podcast-script──▶ script-ready ──wf-podcast synth──▶ audio-ready ──RSS+Spotify──▶ published
+(none) ──podcast-script (Rhys+Idris: script+verdict)──▶ script-ready
+       ──operator reviews + approves──▶ approved
+       ──podcast-cast (Odette: voice) + CI synthesize (Polly→S3)──▶ audio-ready
+       ──podcast-shownotes (Celeste: notes) + CI publish (RSS)──▶ published
 ```
+
+Cadences (CCR, Notion-only, ≤5/fire, daily, land **paused**): `podcast-script`
+(rhys), `podcast-cast` (odette), `podcast-shownotes` (celeste). Deterministic
+execution: `.github/workflows/podcast-pipeline.yml` (daily, AWS OIDC) runs
+`synthesize` then `publish`, ≤5 each.
 
 ---
 

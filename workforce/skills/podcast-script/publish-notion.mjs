@@ -62,9 +62,10 @@ const apiKey = process.env.NOTION_API_KEY;
 const pageId = arg("page-id");
 const scriptFile = arg("script-file");
 const citationsFile = arg("citations-file");
+const complianceFile = arg("compliance-file"); // optional: Idris's compliance verdict
 const status = arg("status") ?? "script-ready";
 
-const VALID_STATUS = new Set(["none", "script-ready", "audio-ready", "published"]);
+const VALID_STATUS = new Set(["none", "script-ready", "approved", "audio-ready", "published"]);
 
 if (!apiKey) { console.error("publish-notion.mjs: NOTION_API_KEY env var is required (from credentials['notion.integration_token'].apiKey)"); process.exit(1); }
 if (!pageId) { console.error("publish-notion.mjs: --page-id <notion page id> is required (from pick-article.mjs)"); process.exit(1); }
@@ -135,6 +136,16 @@ const properties = {
   // select — write the status shape.
   podcastStatus: { status: { name: status } },
 };
+
+// Idris's compliance verdict (optional) — no-verbatim-reproduction +
+// citation-completeness check the operator reads before approving. Written to
+// the `complianceVerdict` text property alongside the script.
+if (complianceFile) {
+  let verdict = "";
+  try { verdict = readFileSync(complianceFile, "utf8").trim(); }
+  catch (err) { console.error(`publish-notion.mjs: cannot read --compliance-file "${complianceFile}": ${err instanceof Error ? err.message : String(err)}`); process.exit(1); }
+  if (verdict) properties.complianceVerdict = { rich_text: richTextChunks(verdict) };
+}
 
 try {
   const res = await fetch(`${NOTION_API}/pages/${pageId}`, {

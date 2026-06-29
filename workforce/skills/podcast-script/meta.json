@@ -1,6 +1,6 @@
 {
   "name": "podcast-script",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "status": "active",
   "archetype": "cadence",
   "deliverable": {
@@ -9,7 +9,7 @@
     "article_type": "analysis"
   },
   "cost_class": "medium",
-  "owners": ["rhys", "odette"],
+  "owners": ["rhys", "idris"],
   "improvement_agent": "sana",
   "created_at": "2026-06-28",
   "requires": ["notion.integration_token"]

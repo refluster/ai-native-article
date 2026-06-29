@@ -32,11 +32,15 @@ scripts. You need just one injected credential:
 
 ## Instructions
 
+**Up to 5 episodes per fire.** Loop the steps below at most **5** times — after
+each publish the article is no longer `none`, so re-running the picker advances
+to the next uncovered article. Stop early when the picker returns `{skip:true}`.
+
 1. **Pick one uncovered analysis article — run the picker, don't guess.** Run
    `pick-article.mjs` (below). It returns the oldest **published, Type=analysis**
    article whose `podcastStatus` is empty/`none`. If it returns
-   `{"skip": true, …}`, **stop — produce nothing this fire.** Otherwise use the
-   returned `{pageId, slug, title, sourceUrls}`.
+   `{"skip": true, …}`, **stop — produce nothing more this fire.** Otherwise use
+   the returned `{pageId, slug, title, sourceUrls}`.
 
    ```sh
    NOTION_API_KEY="<credentials['notion.integration_token'].apiKey>" \
@@ -64,6 +68,18 @@ scripts. You need just one injected credential:
    draw a fact from goes into the citations — the URLs from `sourceUrls` plus any
    the article body credits. This becomes the show-note credits (mandatory). It
    must **not** be empty.
+
+5. **Apply the Idris compliance check (rights — co-owner of this stage).** Before
+   publishing, audit the script against Idris's checklist and write a short
+   verdict to a temp file (e.g. `/tmp/podcast-compliance.txt`):
+   - **No verbatim reproduction** — the script is derivative commentary, not a
+     reading of any source. Flag any passage that reads as reproduction.
+   - **Citations complete & accurate** — every borrowed fact traces to a listed
+     source.
+   Format: `PASS` or `FLAG: <what to fix>` on the first line, then a one-line
+   rationale. The operator reads this verdict before approving the episode
+   (`script-ready → approved`). A `FLAG` is advisory — fix the script and
+   re-verify rather than publishing a flagged episode.
 
 ## Hard rules (editorial integrity — C-1, fail loud — C-4, rights — ADR-0016)
 
@@ -93,12 +109,15 @@ scripts. You need just one injected credential:
      node workforce/skills/podcast-script/publish-notion.mjs \
        --page-id "<pageId from pick-article.mjs>" \
        --script-file /tmp/podcast-script.md \
-       --citations-file /tmp/podcast-citations.txt
+       --citations-file /tmp/podcast-citations.txt \
+       --compliance-file /tmp/podcast-compliance.txt
    ```
 
 4. Report the script's exit code:
-   - `0` — page updated. `podcastScript` + `podcastSources` set, `podcastStatus=script-ready`.
-     The Producer's synthesis step (Story 5) picks it up from there. Done.
+   - `0` — page updated. `podcastScript` + `podcastSources` + `complianceVerdict`
+     set, `podcastStatus=script-ready`. It now awaits the operator's review +
+     approval (`script-ready → approved`) before synthesis. Loop to the next
+     article (up to 5 total), then done.
    - `2` — a guard failed: empty citations, or a W-1 editorial guard (empty/short
      script, LLM-artefact prelude, or a last line cut off mid-content), or
      `401/403` auth. Read stderr; do not retry blindly. If the truncation guard
@@ -111,7 +130,10 @@ else, never hard-code it. The script re-runs the W-1 + citation guards before
 writing, so a degraded script or an uncited episode fails loudly rather than
 moving toward audio.
 
-**The page is updated directly in Notion. No PR, no human-approval gate.**
+**The page is updated directly in Notion (no PR).** There IS a downstream
+human-approval gate: the episode lands `script-ready` with its compliance
+verdict, and an operator reviews + flips it to `approved` before any audio is
+synthesised. You produce the script + verdict; you never approve or synthesise.
 
 ## When NOT to use
 
