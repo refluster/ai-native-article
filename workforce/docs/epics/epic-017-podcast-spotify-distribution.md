@@ -15,6 +15,8 @@
 > - Synthesis/RSS run in the **`wf-podcast` Lambda** (`workforce/lambdas/`) behind the daily `.github/workflows/podcast-pipeline.yml`, **not** `newsletter/pipeline/podcast/*.mjs` (those files were never created). `podcastStatus` is a Notion **status**-type (not `select`) with options `none / script-ready / approved / audio-ready / published`. Spotify-compliance `itunes:*` feed tags + cover art were added in #395.
 >
 > Tech-debt follow-ups filed: #398 (cfn-lint gate + PITR dedup), #399 (shared `propText` helper + parity test). Phase-2 automation (spotifyUrl capture, gate retirement, multi-voice): #400.
+>
+> **Skill consolidation (2026-06-29).** The five production skills were collapsed into **two persona cadences** to cut redundancy: **`podcast-script`** (Rhys + Idris — the prepare half: pick → script → compliance verdict → `script-ready`) and **`podcast-publish`** (Celeste — the publish half, absorbing `podcast-cast`, `podcast-shownotes`, `podcast-synthesize`, and `podcast-rss`). The Celeste cadence sets `podcastVoice` (from Odette's pool) + `podcastShowNotes` on `approved` episodes; the bundled SigV4 `synthesize`/`publish` scripts stay CI-run (the daily workflow, OIDC) because a Notion-only CCR cadence cannot hold AWS credentials. Bindings: `podcast-script` → rhys, `podcast-publish` → celeste, both daily. No decision in ADR-0016 is reversed (see its 2026-06-29 update note).
 
 ## Problem
 

@@ -21,28 +21,32 @@ frontmatter sync reference — **use these exact names** (camelCase):
 | `podcastScript` | **Text** (rich_text) | `podcast-script` (Rhys) | synthesis | The narration script (chunked rich_text). |
 | `podcastSources` | **Text** (rich_text) | `podcast-script` (Rhys) | RSS description | Mandatory source citations. Empty ⇒ the write hard-fails (exit 2). |
 | `complianceVerdict` | **Text** (rich_text) | `podcast-script` (Idris) | operator (before approve) | Idris's no-verbatim + citation-completeness verdict (`PASS`/`FLAG: …`). |
-| `podcastVoice` | **Text** (rich_text) | `podcast-cast` (Odette) | synthesis | The cast JA Neural voice (`Takumi`/`Kazuha`/`Tomoko`); else random. |
-| `podcastShowNotes` | **Text** (rich_text) | `podcast-shownotes` (Celeste) | RSS description | Show-notes framing; leads the feed description, citations follow. |
+| `podcastVoice` | **Text** (rich_text) | `podcast-publish` (Celeste, Odette's pool) | synthesis | The cast JA Neural voice (`Takumi`/`Kazuha`/`Tomoko`); else random. |
+| `podcastShowNotes` | **Text** (rich_text) | `podcast-publish` (Celeste) | RSS description | Show-notes framing; leads the feed description, citations follow. |
 | `audioUrl` | **URL** | `wf-podcast` Lambda (synthesis) | RSS enclosure | Internal S3/CDN MP3 URL. **Never** linked from the reader site (D3). |
 | `spotifyUrl` | **URL** | operator (manual, Phase 1) | frontmatter sync → reader | Spotify deep-link; drives the reader icon link. |
 
 `podcastStatus` option spelling must match exactly — the picker and the Lambda
 filter on these literal strings.
 
-The state machine (judgment = persona cadences writing Notion params; execution
-= the daily CI job; the only human gate is `script-ready → approved`):
+The state machine (judgment = **two** persona cadences writing Notion params;
+execution = the daily CI job; the only human gate is `script-ready → approved`):
 
 ```
 (none) ──podcast-script (Rhys+Idris: script+verdict)──▶ script-ready
        ──operator reviews + approves──▶ approved
-       ──podcast-cast (Odette: voice) + CI synthesize (Polly→S3)──▶ audio-ready
-       ──podcast-shownotes (Celeste: notes) + CI publish (RSS)──▶ published
+       ──podcast-publish (Celeste: voice + show-notes)──▶ approved (params set)
+       ──CI synthesize (Polly→S3)──▶ audio-ready
+       ──CI publish (flip + RSS)──▶ published
 ```
 
-Cadences (CCR, Notion-only, ≤5/fire, daily, land **paused**): `podcast-script`
-(rhys), `podcast-cast` (odette), `podcast-shownotes` (celeste). Deterministic
-execution: `.github/workflows/podcast-pipeline.yml` (daily, AWS OIDC) runs
-`synthesize` then `publish`, ≤5 each.
+Cadences (CCR, Notion-only, ≤5/fire, daily, land **paused**): **`podcast-script`**
+(rhys — the prepare half) and **`podcast-publish`** (celeste — the publish half;
+sets `podcastVoice` from Odette's pool + `podcastShowNotes` on `approved`
+episodes). Deterministic execution: `.github/workflows/podcast-pipeline.yml`
+(daily, AWS OIDC) runs `podcast-publish`'s bundled `synthesize` then `publish`,
+≤5 each. (Epic-017 consolidated the former four skills — `podcast-cast`,
+`podcast-shownotes`, `podcast-synthesize`, `podcast-rss` — into `podcast-publish`.)
 
 ---
 
@@ -80,40 +84,47 @@ Lambda's `PODCAST_PUBLIC_BASE_URL`.
 
 ---
 
-## 4. Enable the podcast-script cadence (Phase 1 — B: cron enable)
+## 4. Enable the podcast cadences (Phase 1 — B: cron enable)
 
-The `podcast-script` binding lands **paused** (`scheduler:"manual"`). Wire it
-(A-authored script, operator runs it), then enable it when ready:
+Both bindings (`podcast-script` → rhys, `podcast-publish` → celeste) land
+**paused** (`scheduler:"manual"`). Wire them (A-authored script, operator runs
+it), then enable when ready:
 
 ```bash
-# after the podcast-script SKILL# row is synced post-deploy (R8):
+# after the podcast-script + podcast-publish SKILL# rows are synced post-deploy (R8):
 aws-vault exec <profile> -- node workforce/seed/media-group/wire-cadences.mjs
 ```
 
-To enable: PATCH rhys's `podcast-script` binding to the live trigger
-(`scheduler:"external"` + `invoked_by:"api"` + a staggered weekly cron) — see the
-ENABLE_SNIPPET at the bottom of `wire-cadences.mjs`. Enabling a cron is
-B-authority (governance §5).
+To enable each: PATCH the binding to the live trigger (`scheduler:"external"` +
+`invoked_by:"api"` + a staggered daily cron) — see the ENABLE_SNIPPET at the
+bottom of `wire-cadences.mjs`. Stagger `podcast-publish` (celeste) **before** the
+18:37 UTC CI workflow so the day's voice/show-notes params are set before
+synthesis. Enabling a cron is B-authority (governance §5).
 
-For a first manual episode without enabling the cron, fire the cadence once via
-the orchestrator's manual-dispatch path against rhys + `podcast-script`.
+For a first manual episode without enabling the cron, fire each cadence once via
+the orchestrator's manual-dispatch path (rhys + `podcast-script`; then, after the
+operator approves, celeste + `podcast-publish`).
 
 ---
 
 ## 5. Synthesize & build the feed (Phase 1)
 
-Once an article is `script-ready`:
+Once an article is `approved` (and `podcast-publish` has set its voice/notes):
 
-1. **Synthesize** — invoke the `podcast-synthesize` skill / `wf-podcast`
-   synthesize route. It casts a random JA Neural Polly voice
-   (`StartSpeechSynthesisTask`), writes the MP3 to `s3://…/podcast/audio/{slug}.mp3`,
-   and sets `audioUrl` + `podcastStatus=audio-ready` on the Notion page.
-2. **Build RSS** — invoke the `podcast-rss` skill / `wf-podcast` RSS route. It
-   assembles the podcast RSS from all `audio-ready` episodes (enclosure = the
-   CDN MP3, `<description>` = `podcastSources` citations, GUID = slug) and writes
-   it to the public `podcast/feed.xml`.
-3. Validate the feed against a podcast-feed checker (e.g. Cast Feed Validator,
-   Podba.se) before submitting.
+1. **Synthesize** — `node workforce/skills/podcast-publish/synthesize.mjs` →
+   `wf-podcast` synthesize route. It reads the episode's `podcastVoice` (else a
+   random JA Neural Polly voice), `StartSpeechSynthesisTask`, writes the MP3 to
+   `s3://…/podcast/audio/{slug}.mp3`, and sets `audioUrl` +
+   `podcastStatus=audio-ready`. Up to 5 oldest `approved` per run.
+2. **Publish + build RSS** — `node workforce/skills/podcast-publish/publish.mjs`
+   → `wf-podcast` publish route. It flips up to 5 oldest `audio-ready` episodes to
+   `published` and rebuilds the podcast RSS (enclosure = the CDN MP3,
+   `<description>` = `podcastShowNotes` then the mandatory `podcastSources`
+   citations, GUID = slug) to the public `podcast/feed.xml`. (For a standalone
+   feed refresh without flipping status: `build-rss.mjs`.)
+3. The daily `.github/workflows/podcast-pipeline.yml` runs steps 1–2 in CI (AWS
+   OIDC). Validate the feed against a podcast-feed checker (e.g. Cast Feed
+   Validator, Podba.se) before the first Spotify submission.
 
 ---
 
@@ -148,6 +159,6 @@ Once an article is `script-ready`:
 | Merge the Epic-017 PR | **B** | Agents never merge. |
 | Run `register.mjs` (persona existence) | **B** | priya/operator; gated by the W-3 raise. |
 | `sam deploy` (Polly = new AWS service) | **B** | §5 new-AWS-service row. |
-| Enable the `podcast-script` cron | **B** | §5 cron-enable row. |
+| Enable the `podcast-script` + `podcast-publish` crons | **B** | §5 cron-enable row. |
 | Submit the RSS feed to Spotify | **B** | External publication, one-time. |
 | Record `spotifyUrl` → `published` | **B** (Phase 1 manual) | Closes the loop; reader link goes live. |

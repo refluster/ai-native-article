@@ -1,10 +1,11 @@
 name: Podcast pipeline (synthesize + publish)
 
 # Deterministic podcast execution, aligned with the newsletter publish flow
-# (Epic-017). The judgment lives in Notion parameters the persona cadences set
-# (Rhys: script, Idris: complianceVerdict, Odette: podcastVoice, Celeste:
-# podcastShowNotes) + the human approval gate (script-ready → approved). This
-# job only *executes* the deterministic transitions:
+# (Epic-017). The judgment lives in Notion parameters the two persona cadences
+# set (podcast-script → Rhys: script + Idris compliance verdict; podcast-publish
+# → Celeste: podcastVoice + podcastShowNotes) + the human approval gate
+# (script-ready → approved). This job only *executes* the deterministic
+# transitions, using podcast-publish's bundled SigV4 scripts:
 #
 #   1. synthesize — up to 5 oldest `approved` episodes → Polly (Odette's
 #      podcastVoice, else random) → MP3 on S3/CloudFront → `audio-ready`.
@@ -48,7 +49,7 @@ jobs:
           aws-region: us-west-2
 
       - name: Synthesize approved episodes (≤5) → audio-ready
-        run: node workforce/skills/podcast-synthesize/synthesize.mjs
+        run: node workforce/skills/podcast-publish/synthesize.mjs
 
       - name: Publish audio-ready episodes (≤5) → published + rebuild feed
-        run: node workforce/skills/podcast-rss/publish.mjs
+        run: node workforce/skills/podcast-publish/publish.mjs

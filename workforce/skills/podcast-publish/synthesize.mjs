@@ -1,19 +1,20 @@
 #!/usr/bin/env node
-// podcast-synthesize — trigger the deterministic wf-podcast Lambda to turn a
-// `approved` episode into an MP3 (Epic-017 Story 5). This skill carries NO
-// judgment: it SigV4-POSTs to the IAM-authorized /podcast/synthesize route, and
-// the Lambda does all the work (read podcastScript from Notion → Polly Neural JA
-// random voice → MP3 on the wf bucket's podcast/audio/ prefix → write audioUrl +
-// podcastStatus=audio-ready back to Notion).
+// podcast-publish / synthesize — trigger the deterministic wf-podcast Lambda to
+// turn `approved` episodes into MP3s (Epic-017). This script carries NO judgment:
+// it SigV4-POSTs to the IAM-authorized /podcast/synthesize route, and the Lambda
+// does all the work (read podcastScript from Notion → Polly Neural JA voice
+// [Odette's podcastVoice param, else random] → MP3 on the wf bucket's
+// podcast/audio/ prefix → write audioUrl + podcastStatus=audio-ready). Up to 5
+// oldest approved episodes per call.
 //
-// Auth is IAM (the operator/orchestrator's AWS credentials sign the request) —
-// the same SigV4 pattern as workforce/seed/*/register.mjs. No new project
-// credential type; the Notion token lives in the Lambda (shared wf/notion
-// secret via its IAM role), never in this session.
+// Auth is IAM (the CI OIDC role / the operator's AWS credentials sign the
+// request) — NOT the CCR cadence, which is Notion-only and never touches AWS.
+// The Notion token lives in the Lambda (its IAM role), never in this session.
+// No new project credential type.
 //
 // Usage:
-//   aws-vault exec <profile> -- node workforce/skills/podcast-synthesize/synthesize.mjs            # oldest approved
-//   aws-vault exec <profile> -- node workforce/skills/podcast-synthesize/synthesize.mjs --slug c91368439868
+//   aws-vault exec <profile> -- node workforce/skills/podcast-publish/synthesize.mjs            # oldest approved (≤5)
+//   aws-vault exec <profile> -- node workforce/skills/podcast-publish/synthesize.mjs --slug c91368439868
 //
 // Env:
 //   WF_PODCAST_API_BASE  override the API base (default: prod execute-api URL)
@@ -41,7 +42,7 @@ const slug = arg("slug");
 
 const { AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN } = process.env;
 if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
-  console.error("synthesize.mjs: AWS credentials missing — run under `aws-vault exec <profile> --` (the route is IAM-authorized)");
+  console.error("synthesize.mjs: AWS credentials missing — run under CI OIDC or `aws-vault exec <profile> --` (the route is IAM-authorized)");
   process.exit(1);
 }
 

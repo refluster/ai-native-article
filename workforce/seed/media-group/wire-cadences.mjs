@@ -40,10 +40,10 @@ const ROUTINE_SPEC = "workforce/docs/routines/agent-runner.md";
 const PROJECT_ID = "agent-workforce";
 
 // The binding lands PAUSED: scheduler:"manual" (declarative-pending). No cron
-// yet — the operator adds it when enabling (ENABLE_SNIPPET). podcast-script
-// reads the Notion integration token (its requires[]), supplied by the
+// yet — the operator adds it when enabling (ENABLE_SNIPPET). Both cadences read
+// the Notion integration token (their requires[]), supplied by the
 // agent-workforce project credential bag at fire time.
-// All three podcast persona cadences land PAUSED (scheduler:"manual"), Notion-
+// Both podcast persona cadences land PAUSED (scheduler:"manual"), Notion-
 // only (no AWS). The operator enables each (B-authority) by flipping
 // scheduler→external + invoked_by=api + a daily cron. project_id=agent-workforce
 // supplies notion.integration_token.
@@ -58,16 +58,18 @@ function pausedCadence(skill, note) {
   };
 }
 
+// Epic-017 consolidated to TWO persona cadences (the prepare half + the publish
+// half); the deterministic Polly/S3/RSS work stays in the daily
+// .github/workflows/podcast-pipeline.yml (CI OIDC), not in a cadence.
 const PLAN = [
-  // Stage none→script-ready (Rhys writes the script; Idris co-owns compliance).
+  // Prepare half — none→script-ready (Rhys writes the script + Idris compliance).
   { slug: "rhys", add: [pausedCadence("podcast-script",
     "podcast-script Cadence (Epic-017), PAUSED. none→script-ready: writes the script + Idris compliance verdict, up to 5/fire. Enable = daily cron (B).")] },
-  // Stage approved→ (Odette casts the voice param the CI synthesis reads).
-  { slug: "odette", add: [pausedCadence("podcast-cast",
-    "podcast-cast Cadence (Epic-017), PAUSED. Sets podcastVoice on up to 5 approved episodes. Enable = daily cron (B).")] },
-  // Stage audio-ready→ (Celeste writes the show-notes the CI publish folds in).
-  { slug: "celeste", add: [pausedCadence("podcast-shownotes",
-    "podcast-shownotes Cadence (Epic-017), PAUSED. Sets podcastShowNotes on up to 5 audio-ready episodes. Enable = daily cron (B).")] },
+  // Publish half — sets the publish params on approved episodes (Celeste casts
+  // podcastVoice + writes podcastShowNotes); the CI workflow then synthesises +
+  // publishes them.
+  { slug: "celeste", add: [pausedCadence("podcast-publish",
+    "podcast-publish Cadence (Epic-017), PAUSED. Sets podcastVoice + podcastShowNotes on up to 5 approved episodes; the daily CI workflow synthesises + publishes. Enable = daily cron (B).")] },
 ];
 
 function curlJson(method, path, body) {
@@ -99,7 +101,7 @@ for (const { slug, add } of PLAN) {
   const bound = new Set(cur.bindings.map((b) => b.skill));
   const additions = add.filter((b) => !bound.has(b.skill));
   if (additions.length === 0) {
-    console.log(`  - ${slug}: podcast-script already bound, skipped`);
+    console.log(`  - ${slug}: ${add.map((b) => b.skill).join(", ")} already bound, skipped`);
     continue;
   }
   // Append-only: existing bindings keep their binding_idx.

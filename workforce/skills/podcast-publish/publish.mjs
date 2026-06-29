@@ -1,16 +1,17 @@
 #!/usr/bin/env node
-// podcast-publish — Celeste's stage (audio-ready → published). Triggers the
-// deterministic wf-podcast Lambda's /podcast/publish route, which flips up to 5
-// oldest `audio-ready` episodes to `published` and rebuilds the RSS feed
-// (enclosure = public MP3, <description> = Celeste's show-notes + the mandatory
-// citations). No judgment here — the judgment (show-notes framing) is a Notion
-// parameter Celeste sets beforehand; this only executes the transition.
+// podcast-publish / publish — the audio-ready → published transition. Triggers
+// the deterministic wf-podcast Lambda's /podcast/publish route, which flips up
+// to 5 oldest `audio-ready` episodes to `published` and rebuilds the RSS feed
+// (enclosure = the public MP3, <description> = Celeste's podcastShowNotes + the
+// mandatory citations). No judgment here — the show-notes framing is a Notion
+// parameter Celeste's cadence sets beforehand; this only executes the transition.
 //
 // Auth is IAM (SigV4) — run from CI (OIDC) or by the operator, same pattern as
-// build-rss.mjs / synthesize.mjs. No new credential type.
+// synthesize.mjs. The CCR cadence never runs this (Notion-only, no AWS). No new
+// credential type.
 //
 // Usage:
-//   aws-vault exec <profile> -- node workforce/skills/podcast-rss/publish.mjs
+//   aws-vault exec <profile> -- node workforce/skills/podcast-publish/publish.mjs
 //
 // Env: WF_PODCAST_API_BASE (default prod execute-api), AWS_REGION (us-west-2).
 //
@@ -27,7 +28,7 @@ const REGION = process.env.AWS_REGION ?? "us-west-2";
 
 const { AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN } = process.env;
 if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
-  console.error("publish.mjs: AWS credentials missing — run under aws-vault / CI OIDC (the route is IAM-authorized)");
+  console.error("publish.mjs: AWS credentials missing — run under CI OIDC / aws-vault (the route is IAM-authorized)");
   process.exit(1);
 }
 
