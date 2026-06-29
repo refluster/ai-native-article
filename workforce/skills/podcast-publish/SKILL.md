@@ -100,9 +100,15 @@ These ship in this skill but run with **AWS** credentials, not as part of your
 Cadence. The daily `podcast-pipeline.yml` runs them in order; the operator can
 also run them under `aws-vault`.
 
-- `synthesize.mjs` → POST `/podcast/synthesize`: up to 5 oldest `approved`
-  episodes → Polly (your `podcastVoice`, else random) → MP3 on S3/CloudFront →
-  `audio-ready`. Fail-loud (C-4) on a Polly error.
+- `synthesize.mjs` → POST `/podcast/synthesize`: a **kickoff + poll** pair, because
+  a full-episode Polly synthesis outlasts the API Gateway HTTP-API hard 30s
+  integration timeout. The kickoff (`POST {}`) starts Polly async tasks for up
+  to 5 oldest `approved` episodes (your `podcastVoice`, else random) and returns
+  `202` with the task handles; the script then polls (`POST {finalize:[…]}`)
+  until each completed task is copied to its public MP3 key and flipped to
+  `audio-ready`. The wait lives inside Polly, not the Lambda — every HTTP call
+  stays under 30s, and no per-Lambda nested invocation is introduced (R-N1).
+  Fail-loud (C-4) on a Polly failure or if the poll budget expires.
 - `publish.mjs` → POST `/podcast/publish`: up to 5 oldest `audio-ready` episodes
   → `published`, then rebuild the RSS feed (`<description>` = your show-notes,
   then the mandatory citations).

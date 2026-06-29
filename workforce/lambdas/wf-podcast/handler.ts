@@ -3,13 +3,20 @@
 // (R-N1) because it performs NO agent reasoning — synthesis and feed assembly
 // are deterministic. Two routes on the IAM-authorized HttpApi:
 //
-//   POST /podcast/synthesize  {slug?}  — Story 5
-//       Read a script-ready episode from Notion (by slug, or the oldest
-//       script-ready), strip the script to plain text, synthesise it with
-//       Amazon Polly (Neural JA, ONE voice chosen at random per cast,
-//       StartSpeechSynthesisTask — async, required because the script exceeds
-//       the 3,000-char sync cap), copy the MP3 to the public podcast/audio/
-//       prefix, and write audioUrl + podcastStatus=audio-ready back to Notion.
+//   POST /podcast/synthesize  {slug?}        — Story 5 (kickoff)
+//       Start an Amazon Polly async task (Neural JA, per-cast voice) for up to
+//       BATCH_LIMIT oldest `approved` episodes and return 202 immediately with
+//       the task handles. Polly — not the Lambda — does the waiting, so the
+//       call never approaches the API Gateway HTTP-API hard 30s integration
+//       timeout (the old path polled Polly to completion inside the request and
+//       a real batch ran ~55s → the HTTP API 503'd at 30s even though the
+//       synthesis succeeded).
+//   POST /podcast/synthesize  {finalize:[…]} — Story 5 (finalize poll)
+//       The caller echoes the kickoff handles back; for each completed Polly
+//       task we copy the MP3 to the public podcast/audio/ key and write
+//       audioUrl + podcastStatus=audio-ready to Notion. Returns {done,pending}.
+//       No per-Lambda nested invocation (R-N1): the taskId is the only state,
+//       carried by the caller; GetSpeechSynthesisTask is the status check.
 //
 //   POST /podcast/rss                  — Story 6
 //       Build the podcast RSS from every audio-ready/published episode
@@ -99,8 +106,6 @@ const json = (statusCode: number, obj: unknown): ProxyResult => ({
   body: JSON.stringify(obj),
 });
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 // ── Notion helpers (the unified Articles DB; podcast properties from Story 4) ─
 
 async function notionHeaders(): Promise<{ apiKey: string; databaseId: string }> {
@@ -184,10 +189,20 @@ function scriptToPlainText(md: string): string {
     .trim();
 }
 
-// ── Story 5: synthesize one approved episode → audio-ready ───────────────────
-async function synthesizeOne(apiKey: string, page: NotionPage): Promise<Record<string, unknown>> {
+// ── Story 5: synthesise approved episodes → audio-ready (kickoff + finalize) ──
+//
+// The waiting happens INSIDE Amazon Polly's async task service, never inside
+// the Lambda request, so every HTTP call stays well under the API Gateway
+// HTTP-API hard 30s integration timeout. No per-Lambda nested invocation is
+// introduced (R-N1): the Polly taskId is the only state, carried by the caller
+// between the 202 kickoff and the finalize polls.
+
+type SynthHandle = { pageId: string; slug: string; taskId: string; voiceId?: string };
+
+// Start one Polly task for an approved episode and return the handle the caller
+// echoes back on each finalize poll. Does NOT wait for completion.
+async function startSynthesis(page: NotionPage): Promise<SynthHandle> {
   const theSlug = pageSlug(page);
-  const title = propText(page.properties?.Title) || theSlug;
   const script = propText(page.properties?.podcastScript);
   const plain = scriptToPlainText(script);
   if (plain.length < 200) {
@@ -216,25 +231,30 @@ async function synthesizeOne(apiKey: string, page: NotionPage): Promise<Record<s
     }),
   );
   const taskId = started.SynthesisTask?.TaskId;
-  if (!taskId) throw new Error("Polly StartSpeechSynthesisTask returned no TaskId");
+  if (!taskId) throw new Error(`Polly StartSpeechSynthesisTask returned no TaskId for ${theSlug}`);
+  return { pageId: page.id, slug: theSlug, taskId, voiceId };
+}
 
-  // Poll until the async task completes. Fail loud on a Polly failure (C-4).
-  let outputUri: string | undefined;
-  for (let i = 0; i < 50; i++) {
-    await sleep(3000);
-    const got = await polly.send(new GetSpeechSynthesisTaskCommand({ TaskId: taskId }));
-    const status = got.SynthesisTask?.TaskStatus;
-    if (status === "completed") { outputUri = got.SynthesisTask?.OutputUri; break; }
-    if (status === "failed") {
-      throw new Error(`Polly task ${taskId} failed: ${got.SynthesisTask?.TaskStatusReason ?? "unknown"}`);
-    }
+// Finalize one started task: if Polly has completed it, copy the MP3 to the
+// clean public key and flip Notion to audio-ready; if Polly failed, throw
+// (C-4). Idempotent — re-running on a finished episode overwrites the same key
+// and re-patches the same status. Returns {done:false} while still in progress.
+async function finalizeOne(apiKey: string, h: SynthHandle): Promise<Record<string, unknown>> {
+  const got = await polly.send(new GetSpeechSynthesisTaskCommand({ TaskId: h.taskId }));
+  const status = got.SynthesisTask?.TaskStatus;
+  if (status === "failed") {
+    throw new Error(`Polly task ${h.taskId} (${h.slug}) failed: ${got.SynthesisTask?.TaskStatusReason ?? "unknown"}`);
   }
-  if (!outputUri) throw new Error(`Polly task ${taskId} did not complete within the poll budget`);
+  if (status !== "completed") {
+    return { pageId: h.pageId, slug: h.slug, status: status ?? "inProgress", done: false };
+  }
 
   // OutputUri is https://s3.<region>.amazonaws.com/<bucket>/<key>. Copy it to
   // the clean public path podcast/audio/{slug}.mp3.
+  const outputUri = got.SynthesisTask?.OutputUri;
+  if (!outputUri) throw new Error(`Polly task ${h.taskId} (${h.slug}) completed without an OutputUri`);
   const srcKey = decodeURIComponent(new URL(outputUri).pathname.replace(new RegExp(`^/${BUCKET}/`), "").replace(/^\//, ""));
-  const destKey = `${PREFIX_AUDIO}/${theSlug}.mp3`;
+  const destKey = `${PREFIX_AUDIO}/${h.slug}.mp3`;
   await s3.send(new CopyObjectCommand({
     Bucket: BUCKET,
     CopySource: `/${BUCKET}/${srcKey}`,
@@ -245,17 +265,18 @@ async function synthesizeOne(apiKey: string, page: NotionPage): Promise<Record<s
   await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: srcKey })).catch(() => { /* best-effort temp cleanup */ });
 
   const audioUrl = `${PUBLIC_BASE}/${destKey}`;
-  await patchPodcast(apiKey, page.id, {
+  await patchPodcast(apiKey, h.pageId, {
     audioUrl: { url: audioUrl },
     podcastStatus: { status: { name: "audio-ready" } },
   });
-  return { slug: theSlug, title, voiceId, audioUrl, status: "audio-ready" };
+  return { pageId: h.pageId, slug: h.slug, voiceId: h.voiceId, audioUrl, status: "audio-ready", done: true };
 }
 
-// Batch driver: synthesise up to BATCH_LIMIT oldest `approved` episodes
-// (or a specific --slug). The human-approval gate is `approved`; nothing is
-// cast until a person has reviewed the script and flipped script-ready→approved.
-async function synthesize(slug: string | undefined): Promise<ProxyResult> {
+// KICKOFF: start Polly tasks for up to BATCH_LIMIT oldest `approved` episodes
+// (or a specific --slug) and return 202 immediately with the handles to poll.
+// The human-approval gate is `approved`; nothing is cast until a person has
+// reviewed the script and flipped script-ready→approved.
+async function synthesizeKickoff(slug: string | undefined): Promise<ProxyResult> {
   if (!BUCKET) throw new Error("BUCKET_NAME env var is required");
   if (!PUBLIC_BASE) throw new Error("PODCAST_PUBLIC_BASE_URL env var is required");
   const { apiKey, databaseId } = await notionHeaders();
@@ -269,12 +290,24 @@ async function synthesize(slug: string | undefined): Promise<ProxyResult> {
     ? approved.filter((p) => pageSlug(p) === slug)
     : approved.slice(0, BATCH_LIMIT);
   if (targets.length === 0) {
-    return json(200, { skip: true, reason: slug ? `no approved page for slug ${slug}` : "no approved episode", results: [] });
+    return json(200, { skip: true, reason: slug ? `no approved page for slug ${slug}` : "no approved episode", started: [] });
   }
 
+  const started: SynthHandle[] = [];
+  for (const page of targets) started.push(await startSynthesis(page));
+  return json(202, { status: "synthesizing", pending: started.length, started });
+}
+
+// FINALIZE: the caller echoes the kickoff handles back; for each completed
+// Polly task we flip the episode to audio-ready. done === all handles finished.
+async function synthesizeFinalize(handles: SynthHandle[]): Promise<ProxyResult> {
+  if (!BUCKET) throw new Error("BUCKET_NAME env var is required");
+  if (!PUBLIC_BASE) throw new Error("PODCAST_PUBLIC_BASE_URL env var is required");
+  const { apiKey } = await notionHeaders();
   const results: Record<string, unknown>[] = [];
-  for (const page of targets) results.push(await synthesizeOne(apiKey, page));
-  return json(200, { count: results.length, results });
+  for (const h of handles) results.push(await finalizeOne(apiKey, h));
+  const pending = results.filter((r) => !r.done).length;
+  return json(200, { done: pending === 0, pending, results });
 }
 
 // ── Celeste's stage: publish audio-ready → published, then rebuild the feed ──
@@ -403,7 +436,10 @@ export async function handler(event: ProxyEventV2): Promise<ProxyResult> {
 
   try {
     if (path.endsWith("/podcast/synthesize")) {
-      return await synthesize(typeof body.slug === "string" ? body.slug : undefined);
+      if (Array.isArray(body.finalize)) {
+        return await synthesizeFinalize(body.finalize as SynthHandle[]);
+      }
+      return await synthesizeKickoff(typeof body.slug === "string" ? body.slug : undefined);
     }
     if (path.endsWith("/podcast/publish")) {
       return await publish();
