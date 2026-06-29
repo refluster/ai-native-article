@@ -7,8 +7,10 @@
 // of the TARGET repo's own governance (read from that repo's docs/governance.md),
 // is open + mergeable (state "clean" OR "draft" — adr-0014), has **all required
 // checks green**, carries **no human CHANGES_REQUESTED**, and the routing
-// persona's nominated reviewers have each posted their lens review (the
-// unanimous-green consensus). L0/L1-touching PRs are never merged — they
+// persona's nominated reviewers — **at least MIN_REVIEWERS (3) distinct
+// personas** (operator directive 2026-06-29) — have each posted their lens
+// review (the unanimous-green consensus). A panel of fewer than 3 green
+// reviewers is refused. L0/L1-touching PRs are never merged — they
 // escalate to a human (the operator's final call). A **draft** that clears the
 // predicate is a first-class merge target: applyDecisions marks it Ready for
 // Review (GraphQL) immediately before the merge PUT, since GitHub refuses to
@@ -39,8 +41,8 @@
 //       { "pr": 553, "action": "merge",
 //         "comment": "<verdict / advisory-cited merge comment>",
 //         "squash_subject": "feat: … (#553)",
-//         "squash_body": "Unanimous reviewer sign-off (dario, ren). No L0/L1 surface.",
-//         "reviewers": ["dario", "ren"] },
+//         "squash_body": "Unanimous reviewer sign-off (dario, ren, mateo). No L0/L1 surface.",
+//         "reviewers": ["dario", "ren", "mateo"] },   // ≥3 distinct (MIN_REVIEWERS)
 //       { "pr": 506, "action": "escalate",
 //         "issue_title": "Hold #506: touches L0/L1",
 //         "issue_body": "<why held + next step>",
@@ -80,6 +82,16 @@ const ESCALATION_LABEL_COLOR = "b60205"; // red — "an autopilot decision needs
 // refused-decision tracking issues (those never reached green). Single-sourced
 // here; pr-autopilot-post.mjs imports it (and a --reviewed flag) to stamp it.
 export const REVIEWED_LABEL = "autopilot:reviewed";
+
+// Minimum reviewer-panel size for an autonomous merge (operator directive
+// 2026-06-29). A merge is honoured only when at least this many DISTINCT
+// reviewer personas have each posted their `<!-- autopilot:review:{slug}:green
+// -->` marker — a lone-reviewer (or two-reviewer) sign-off is no longer a
+// consensus the engine will merge on. This TIGHTENS the R-N10 / adr-0010
+// predicate (more reviewers required, never fewer); it does not widen what may
+// merge. verifyMergeable() fails closed below this floor; the SKILL.md routing
+// contract mirrors it by mandating a ≥3-persona panel at nomination time.
+export const MIN_REVIEWERS = 3;
 
 // Create labels if they do not already exist (idempotent: an existing label
 // returns 422, which we ignore). Lets a target repo that has never seen the
@@ -256,8 +268,11 @@ export async function verifyMergeable(gh, repo, pr, decision) {
   const { status: rs, json: reviews } = await gh("GET", `/repos/${repo}/pulls/${pr}/reviews?per_page=100`);
   if (rs !== 200 || !Array.isArray(reviews)) return { ok: false, why: `GET reviews -> HTTP ${rs}` };
   if (reviews.some((r) => r.state === "CHANGES_REQUESTED")) return { ok: false, why: `a reviewer has CHANGES_REQUESTED — not consensus-green` };
-  const reviewers = Array.isArray(decision?.reviewers) ? decision.reviewers.filter((s) => typeof s === "string" && s) : [];
-  if (reviewers.length === 0) return { ok: false, why: `decision carries no reviewers[] — a merge requires the nominated reviewers' consensus (no-review merge refused)` };
+  // Distinct reviewer slugs (case-folded, de-duped) — listing the same persona
+  // three times is one reviewer, not a panel of three.
+  const reviewers = Array.isArray(decision?.reviewers)
+    ? [...new Set(decision.reviewers.filter((s) => typeof s === "string" && s).map((s) => s.trim().toLowerCase()).filter(Boolean))]
+    : [];
   const { status: ics, json: comments } = await gh("GET", `/repos/${repo}/issues/${pr}/comments?per_page=100`);
   const bodies = [
     ...reviews.map((r) => r.body),
@@ -271,6 +286,11 @@ export async function verifyMergeable(gh, repo, pr, decision) {
   }
   const missing = reviewers.filter((slug) => !reviewerSignedOff(slug, bodies));
   if (missing.length > 0) return { ok: false, why: `missing green marker(s) from ${missing.join(", ")} (expected ${reviewerGreenMarker(missing[0])}) — consensus not reached` };
+  // Minimum-panel floor (operator directive 2026-06-29): a merge requires at
+  // least MIN_REVIEWERS distinct unanimous-green reviewers. Checked last so a
+  // more specific reason (L0/L1, CHANGES_REQUESTED, a missing marker) surfaces
+  // first; an empty or under-sized green panel falls through to here.
+  if (reviewers.length < MIN_REVIEWERS) return { ok: false, why: `only ${reviewers.length} distinct reviewer(s) signed off — a merge requires a panel of at least ${MIN_REVIEWERS} unanimous-green reviewers (operator directive 2026-06-29); under-reviewed merge refused` };
 
   // `draft` + `nodeId` let applyDecisions flip a green draft Ready for Review
   // before the merge PUT (adr-0014 — GitHub refuses to merge a draft directly).
