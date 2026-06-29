@@ -338,7 +338,11 @@ async function buildRss(): Promise<ProxyResult> {
       title: propText(p.properties?.Title) || pageSlug(p),
       description: showNotes ? `${showNotes}\n\n${citations}` : citations,
       audioUrl,
-      pubDate: propText(p.properties?.Date) || (p.created_time ?? "").slice(0, 10),
+      // pubDate source is the Notion `PublishedAt` property — the publish date of
+      // the source article this episode is derived from, which we treat as the
+      // episode's own publish date too. Fall back to Notion's created_time so an
+      // undated row still carries a valid date rather than an empty <pubDate>.
+      pubDate: (propText(p.properties?.PublishedAt) || (p.created_time ?? "")).slice(0, 10),
       byteLength,
     });
   }
@@ -349,9 +353,13 @@ async function buildRss(): Promise<ProxyResult> {
     {
       title: "AI Native Article — Podcast",
       link: SITE_BASE,
-      description: "L3/L4 分析記事を一話完結のナレーション・ポッドキャストに再構成（出典明記）。AI Native Article (kohuehara.xyz).",
+      description:
+        "AI をはじめとするテクノロジーが、働き方や人材（HR）、経済・財務・金融、産業、そして人々のくらしにもたらす変化（シフト）を読み解くポッドキャストです。" +
+        "技術そのものの解説ではなく、複数の記事やニュースを横断して見えてくる分析・示唆を、一話完結のナレーションでお届けします（出典明記）。" +
+        "音声はすべて音声合成によって生成されており、聞き間違いや不自然な読み上げが含まれる場合があります。" +
+        "AI Native Article (https://kohuehara.xyz/ai-native-article).",
       language: "ja",
-      author: "Workforce / kohuehara.xyz",
+      author: "Cognitive Guild / https://kohuehara.xyz/ai-native-article",
       feedSelfUrl,
       imageUrl: COVER_URL || undefined,
       category: CATEGORY,
