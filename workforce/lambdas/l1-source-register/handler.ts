@@ -34,6 +34,13 @@ const L1_DB_ID =
   process.env.L1_DB_ID || "32fd0f0b-e61e-80bd-89bf-f94965d05e80";
 const WRITE_TOKEN_SECRET =
   process.env.L1_WRITE_TOKEN_SECRET || "wf/api/l1-source-write-token";
+// The Notion integration token is the PROJECT-scoped credential (shape
+// {apiKey, databaseId}; only apiKey is read here), the same secret the
+// article-level2/3 cadences and wf-podcast resolve — NOT a top-level
+// `wf/notion`. The integration behind it is shared with the L1 source DB.
+const NOTION_SECRET_ID =
+  process.env.NOTION_SECRET_ID ||
+  "wf/projects/agent-workforce/notion.integration_token";
 
 interface WriteTokenSecret {
   token: string;
@@ -76,7 +83,7 @@ export async function handler(
 
   let notionList: NotionApiSecret;
   try {
-    notionList = await getSecret<NotionApiSecret>("wf/notion");
+    notionList = await getSecret<NotionApiSecret>(NOTION_SECRET_ID);
   } catch {
     return json(500, { error: "notion credential unavailable" });
   }

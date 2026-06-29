@@ -32,11 +32,13 @@ authorizer on this route — the operator/Shortcut/CLI has no SigV4 creds),
 validated constant-time against the Secrets Manager secret
 `wf/api/l1-source-write-token`. Same pattern as `POST /feed`.
 
-**Notion credential:** reuses `wf/notion` (only its `apiKey`). The integration
-behind that key **must be shared with the L1 source DB** (it already is — the
-article cadences read that DB with the same key). The L1 DB id is the constant
-`L1_DB_ID` (overridable via env), not the `wf/notion` `databaseId` (that's the
-Articles DB).
+**Notion credential:** reuses the **project-scoped** integration token
+`wf/projects/agent-workforce/notion.integration_token` (only its `apiKey`) — the
+same secret the article-level2/3 cadences and `wf-podcast` resolve (NOT a
+top-level `wf/notion`). The integration behind that key is already shared with
+the L1 source DB (the cadences read it). The L1 DB id is the constant `L1_DB_ID`
+(overridable via env), not that secret's `databaseId` (which is the Articles DB).
+Override the secret path with `NOTION_SECRET_ID` if needed.
 
 ## Operator setup (one-time)
 

@@ -87,7 +87,7 @@ function toRichBlocks(md: string): Array<Record<string, unknown>> {
 // ── L1 source capture (non-GAS replacement for GAS handleL1Save) ───────────
 
 /** Only `apiKey` is read for L1 writes; the L1 DB id is passed explicitly
- *  (it is a different DB from `wf/notion`'s `databaseId`, the Articles DB). */
+ *  (it is a different DB from the Notion secret's `databaseId`, the Articles DB). */
 export interface NotionApiSecret {
   apiKey: string;
 }
