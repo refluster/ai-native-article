@@ -105,10 +105,14 @@ change it there, not here.
   They remain reachable at `/article/:slug` and from each analysis's **SOURCES
   USED** section, which links both the source explanation ("解説を読む") and the
   original external article ("元記事").
-- **Flat tags, no hierarchy.** Articles carry multiple tags (target 3–5). No
-  lettered A–E hierarchy and no leading-letter prefix; `displayTag()` strips any
-  legacy prefix at render time. The right rail shows the top tags (expandable)
-  plus an incremental title/tag search.
+- **Flat tags, no hierarchy.** Articles carry multiple tags (target 3–5),
+  many-to-many. No lettered A–E hierarchy and no leading-letter prefix. The
+  controlled vocabulary is the single source of truth in
+  [`scripts/lib/tags.mjs`](../../scripts/lib/tags.mjs) and is governed by
+  [ADR-0003](../../docs/adr/adr-0003-flat-tag-taxonomy.md) — editing it is a
+  Zone A editorial decision. `displayTag()` remains a defensive guard for any
+  legacy/un-backfilled row. The right rail shows the top tags (expandable) plus
+  an incremental title/tag search.
 - **Pagination over period filters.** No time-period filter; the list paginates
   (`?page=N`) so views stay shareable.
 - **Sticky rails must scroll.** Any `sticky` side rail carries a `max-height`
