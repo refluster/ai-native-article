@@ -24,7 +24,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   getSecret.mockImplementation(async (name: string) => {
     if (name === "wf/api/l1-source-write-token") return { token: TOKEN };
-    if (name === "wf/notion") return { apiKey: "notion-key", databaseId: "unified" };
+    if (name === "wf/projects/agent-workforce/notion.integration_token")
+      return { apiKey: "notion-key", databaseId: "unified" };
     throw new Error(`unexpected secret ${name}`);
   });
   findL1SourceByUrl.mockResolvedValue(null);
