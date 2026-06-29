@@ -88,3 +88,33 @@ In this system, depth is a product of light and layering, not shadow.
 
 ### Accessibility Note:
 Despite the monochromatic look, ensure that all text (`on-surface` on `surface`) maintains a contrast ratio of at least 4.5:1. Use the `outline` token (#757c81) for icons to ensure they are visible against all `surface-container` tiers.
+
+---
+
+## 7. Information Architecture (Daily-Use Reader)
+
+The reader site is optimised for **daily return reading**, not archive
+crawling. The IA below is governed by [ADR-0002](../../docs/adr/adr-0002-daily-use-reader-ia.md);
+change it there, not here.
+
+- **Analysis is the default surface.** The homepage lists *analysis* articles
+  only, newest first, grouped by recency (`TODAY` / `THIS WEEK` / `THIS MONTH`
+  / `YYYY.MM`). There is no type tab and no `分析` / `解説` label in the list —
+  analysis is the norm, so it is unmarked.
+- **Explanations are the back drawer.** They are not listed on the homepage.
+  They remain reachable at `/article/:slug` and from each analysis's **SOURCES
+  USED** section, which links both the source explanation ("解説を読む") and the
+  original external article ("元記事").
+- **Flat tags, no hierarchy.** Articles carry multiple tags (target 3–5). No
+  lettered A–E hierarchy and no leading-letter prefix; `displayTag()` strips any
+  legacy prefix at render time. The right rail shows the top tags (expandable)
+  plus an incremental title/tag search.
+- **Pagination over period filters.** No time-period filter; the list paginates
+  (`?page=N`) so views stay shareable.
+- **Sticky rails must scroll.** Any `sticky` side rail carries a `max-height`
+  and `overflow-y-auto` so long content never clips with no affordance.
+- **Reader chrome vs operator tooling.** The public header carries only the
+  reader's home (INDEX). Operator surfaces — design system, design guide,
+  capture, workforce console, original sources — live on `/operator`, reached by
+  one discreet footer link. Routes are never deleted, only relocated out of the
+  public nav, so existing URLs keep resolving.

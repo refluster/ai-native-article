@@ -5,6 +5,7 @@ import Footer from './components/chrome/Footer'
 import Home from './pages/Home'
 import Article from './pages/Article'
 import Sources from './pages/Sources'
+import Operator from './pages/Operator'
 import DesignSystem from './pages/design/DesignSystem'
 import DesignGuide from './pages/design/DesignGuide'
 import Capture from './pages/pipeline/Capture'
@@ -33,6 +34,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/sources" element={<Sources />} />
+            <Route path="/operator" element={<Operator />} />
             <Route path="/article/:slug" element={<Article />} />
             <Route path="/design-system" element={<DesignSystem />} />
             <Route path="/design-guide" element={<DesignGuide />} />

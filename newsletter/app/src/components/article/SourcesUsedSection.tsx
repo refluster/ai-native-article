@@ -6,6 +6,7 @@ import {
   parseSourceUrls,
   type SourceIndex,
 } from '../../lib/source-links'
+import { displayTag } from '../../lib/article-types'
 import { trackEvent } from '@kohuehara/shared/analytics'
 
 interface Props {
@@ -44,7 +45,7 @@ export default function SourcesUsedSection({ slug, sourceUrls, index }: Props) {
                 <div className="flex items-center gap-2 mb-2">
                   {exp?.category ? (
                     <span className="text-[10px] font-bold tracking-widest text-tertiary uppercase">
-                      {exp.category}
+                      {displayTag(exp.category)}
                     </span>
                   ) : (
                     <span className="text-[10px] font-bold tracking-widest text-outline uppercase">

@@ -108,6 +108,21 @@ export function setSourcesSeo() {
   removeJsonLd('article')
 }
 
+export function setOperatorSeo() {
+  const url = `${SITE_ORIGIN}${SITE_BASE}/operator`
+  const title = `Operator — ${SITE_NAME}`
+  const desc = '運営者向けのツールとリファレンスの集約ページ。'
+  document.title = title
+  upsertMeta('meta[name="description"]', 'name', 'description', desc)
+  upsertLink('canonical', url)
+  upsertMeta('meta[property="og:title"]', 'property', 'og:title', 'Operator')
+  upsertMeta('meta[property="og:description"]', 'property', 'og:description', desc)
+  upsertMeta('meta[property="og:type"]', 'property', 'og:type', 'website')
+  upsertMeta('meta[property="og:url"]', 'property', 'og:url', url)
+  upsertMeta('meta[name="twitter:card"]', 'name', 'twitter:card', 'summary')
+  removeJsonLd('article')
+}
+
 export function setArticleSeo(article: ArticleSeo) {
   const url = `${SITE_ORIGIN}${SITE_BASE}/article/${article.slug}`
   const title = `${article.title} — ${SITE_NAME}`
