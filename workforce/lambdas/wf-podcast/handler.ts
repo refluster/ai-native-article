@@ -357,7 +357,7 @@ async function buildRss(): Promise<ProxyResult> {
         "AI をはじめとするテクノロジーが、働き方や人材（HR）、経済・財務・金融、産業、そして人々のくらしにもたらす変化（シフト）を読み解くポッドキャストです。" +
         "技術そのものの解説ではなく、複数の記事やニュースを横断して見えてくる分析・示唆を、一話完結のナレーションでお届けします（出典明記）。" +
         "音声はすべて音声合成によって生成されており、聞き間違いや不自然な読み上げが含まれる場合があります。" +
-        "AI Native Article (kohuehara.xyz).",
+        "AI Native Article (https://kohuehara.xyz/ai-native-article).",
       language: "ja",
       author: "Cognitive Guild / https://kohuehara.xyz/ai-native-article",
       feedSelfUrl,
