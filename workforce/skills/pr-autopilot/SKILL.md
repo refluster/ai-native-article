@@ -1,9 +1,17 @@
 ---
 name: pr-autopilot
-description: Workforce skill that drives an open PR through its **full** review cycle in a bound project's repo — route to 1-3 reviewer personas, obtain their reviews, synthesise the unanimous-green / 🟡 / 🔴 verdict, and complete. **Every open PR is in scope — draft and non-draft, human- and bot-authored (Dependabot).** On a unanimous-green verdict for a PR that touches **no L0/L1 governance path** of the target repo, it approves + merges via the shared fail-closed pr-merge.mjs engine (**drafts included — a green draft is marked Ready for Review, then merged, adr-0014**); a PR touching the target repo's **governance L0/L1 escalates to a human** for the final call (R-N9 / W-5), as does any non-consensus PR. The merge predicate (adr-0010, 2026-06-17) widened from the old Dependabot safe class to "not-L0/L1 + unanimous reviewer consensus"; the engine re-verifies it server-side and fails closed. Runs as a CCR task (ADR-0005); github.token via the binding's project linkage (Epic-010 §5).
+description: Workforce skill that drives an open PR through its **full** review cycle in a bound project's repo — route to a panel of **≥3** reviewer personas, post every review + the synthesised 🟢/🟡/🔴 verdict as PR comments, and complete. **Every open PR is in scope — draft and non-draft, human- and bot-authored (Dependabot).** On a unanimous-green verdict for a PR that touches **no L0/L1 governance path** of the target repo, it approves + merges via the shared fail-closed pr-merge.mjs engine (**drafts included — a green draft is marked Ready for Review, then merged, adr-0014**); a PR touching the target repo's **governance L0/L1 escalates to a human** for the final call (R-N9 / W-5), as does any non-consensus PR. The merge predicate (adr-0010, 2026-06-17) widened from the old Dependabot safe class to "not-L0/L1 + unanimous reviewer consensus"; the engine re-verifies it server-side and fails closed. Runs as a CCR task (ADR-0005); github.token via the binding's project linkage (Epic-010 §5).
 ---
 
 # pr-autopilot (CCR routing leg — fired on cron OR a pull_request event)
+
+> **Operator mandate (2026-06-29) — four things every run MUST do, no exceptions.** This cadence has too often stopped at a lone routing comment, or routed to a single reviewer, or flipped a draft toward mergeable without ever posting a review. That is a **bug**, not a finished run. Every PR you pick up is driven to ALL of:
+> 1. **Nominate at least 3 reviewer personas** (a minimum-3 panel — never 1, never 2). Step 2.
+> 2. **Post every nominated reviewer's review as a PR comment**, and post the synthesised **verdict comment**. The review and the verdict always land on the PR — never only "in your head" or in chat. Steps 3–5.
+> 3. **If the PR is mergeable** (🟢 unanimous-green across the ≥3 panel, non-L0/L1, predicate holds) → **approve + merge** via `pr-merge.mjs`. The terminal state is the merge, not the verdict. Step 5 + merge leg.
+> 4. **If the PR is NOT mergeable** (🔴 / non-consensus / L0/L1 / no delegation / can't seat 3 reviewers) → post the verdict **with `--needs-human`** so it carries the `autopilot:needs-human` escalation label. Step 5.2.
+>
+> The `pr-merge.mjs` engine **fails closed below 3 distinct green reviewers** (`MIN_REVIEWERS`), so a merge attempt with a sub-3 panel is refused server-side — the doc mandate and the mechanical gate agree.
 
 You are routing pull requests in your bound project's repo to reviewer personas under your lens. This runs as a **CCR task** fired either by `wf-orchestrator-tick` on the binding's cron, OR — when the binding declares a `github_event` trigger ([adr-0013](../../docs/adr/adr-0013-event-driven-pr-autopilot.md)) — on a `pull_request` event seconds after the PR opens. The cadence is **trigger-agnostic**: there is no `pr_url` argument either way — you **discover** which PRs need routing (the scan skips already-routed ones, so an event-fired and a cron-fired run do the identical, idempotent thing), then route each one.
 
@@ -31,10 +39,10 @@ The scan lists **every** open PR updated within the window — **draft and non-d
 
 Read `/tmp/pr-autopilot-candidates.json`. For **each** candidate PR, apply your `binding_config.nomination_rules` to the PR's diff + body:
 
-- Nominate **1-3** reviewer personas whose lens has real surface on this PR. You (the routing persona) MAY self-include if your rules say so.
+- Nominate **at least 3** reviewer personas (a minimum-3 panel — operator directive 2026-06-29; **never fewer than 3**). You (the routing persona) MAY self-include if your rules say so. Seat the lenses with the most real surface first; then fill to **3** with the next-most-relevant broad lenses (the standing trio in your `nomination_rules` — typically a product/PdM lens, an engineering-excellence / architecture lens, and the platform / system-shape lens — each has plausible surface on nearly any PR in this repo). If after honest effort you genuinely cannot seat 3 distinct lenses with any real surface, do **not** pad with a no-op reviewer — that PR is **not autopilot-eligible**: hand it off to a human per Step 5.2 (`--needs-human`), stating that a 3-reviewer panel could not be seated.
 - Each nomination's `rationale` must **cite the PR surface** (file paths / topics), not just restate the trigger.
 - List in `skipped` the personas you considered and rejected (per `skip_list_default` / `skip_list_rationale`) — not every persona in the org.
-- **Epic PRs always carry a VP-class reviewer (operator directive 2026-06-27).** When the diff touches the target repo's Epic / design-record path (for `agent-workforce`: `workforce/docs/epics/**`), never route to a single non-VP lens — e.g. PdM self-review alone is **not** sufficient. Nominate the product lens **plus** at least one VP-class persona: the VP whose functional area the Epic concerns when one is clearly implicated, otherwise the standing VP lens declared in your `nomination_rules`. An Epic is an org-shaping decision; it gets senior sign-off, not a solo review.
+- **Epic PRs always carry a VP-class reviewer (operator directive 2026-06-27).** When the diff touches the target repo's Epic / design-record path (for `agent-workforce`: `workforce/docs/epics/**`), never route to a single non-VP lens — e.g. PdM self-review alone is **not** sufficient. Nominate the product lens **plus** at least one VP-class persona — and still seat the full ≥3 panel: the VP whose functional area the Epic concerns when one is clearly implicated, plus the standing VP / platform lenses to reach 3. An Epic is an org-shaping decision; it gets senior sign-off, never a solo or two-person review.
 
 Write the routing comment body for PR `<number>` to `/tmp/route-body-<number>.md` using **exactly** this template (the opening marker is what the scanner reads to avoid double-routing):
 
@@ -43,10 +51,11 @@ Write the routing comment body for PR `<number>` to `/tmp/route-body-<number>.md
 
 <one-paragraph PR summary>
 
-Reviewers nominated:
+Reviewers nominated (≥ 3):
 
 - **@<persona>** — <rationale citing the PR surface>
-- **@<persona>** — <rationale>
+- **@<persona>** — <rationale citing the PR surface>
+- **@<persona>** — <rationale citing the PR surface>
 
 Skipping @<persona>, @<persona> — <one short clause why the skip-list applies>.
 
@@ -138,7 +147,7 @@ Autonomous merge widened (adr-0010) from the old Dependabot safe class to **"the
 
 A **draft** that clears this predicate merges like any other PR: the engine flips it Ready for Review (GraphQL `markPullRequestReadyForReview`) right before the merge PUT, since GitHub will not merge a draft directly. The draft flag is not a hold — only the L0/L1 boundary, consensus, checks, and delegation are (adr-0014).
 
-When those hold, build the decisions payload (schema in the script header) — one `{ pr, action:"merge", comment, squash_subject, squash_body, reviewers:[...] }` where `reviewers` is the nominated set whose unanimous sign-off you are attesting (each must have posted their `<!-- autopilot:review:{slug}:green -->` marker per Step 4) — and run the **shared** merge engine:
+When those hold, build the decisions payload (schema in the script header) — one `{ pr, action:"merge", comment, squash_subject, squash_body, reviewers:[...] }` where `reviewers` is the nominated set whose unanimous sign-off you are attesting (each must have posted their `<!-- autopilot:review:{slug}:green -->` marker per Step 4). **`reviewers[]` must list at least 3 distinct personas** (`MIN_REVIEWERS`, operator directive 2026-06-29) — the engine fails closed on a sub-3 green panel, so a merge that routed to 1–2 reviewers is refused server-side. Run the **shared** merge engine:
 
 ```sh
 TOKEN="<credentials['github.token'].token>" \
@@ -146,7 +155,7 @@ TOKEN="<credentials['github.token'].token>" \
     --repo "<owner>/<repo>" --decisions /tmp/pr-merge-decisions.json
 ```
 
-`pr-merge.mjs` **re-verifies the full predicate server-side and fails closed**: it reads the target repo's `docs/governance.md` to learn the L0/L1 path set (if that doc is unreadable or declares no L0/L1 block, the set is *unknown* and the merge is **refused** — never guessed), then confirms open + mergeable + clean, **no `autopilot:off` label** (the per-PR maintainer pause; the repo-wide pause is emptying the target's `autopilot:l0l1-paths` block), no L0/L1 file in the diff, all checks green, no `CHANGES_REQUESTED`, and that each reviewer in `reviewers[]` posted their exact `<!-- autopilot:review:{slug}:green -->` marker (not a byline — an exact hidden token, so prose can't fake a vote and a format change can't drop one). A mis-judged "🟢 + eligible" therefore cannot cause a bad merge. Exit `2` = a decision was refused server-side or GitHub rejected the write; surface it, do not retry blindly. For an L0/L1 PR or a non-consensus PR, emit **no** merge decision — the verdict comment is the deliverable and a human decides.
+`pr-merge.mjs` **re-verifies the full predicate server-side and fails closed**: it reads the target repo's `docs/governance.md` to learn the L0/L1 path set (if that doc is unreadable or declares no L0/L1 block, the set is *unknown* and the merge is **refused** — never guessed), then confirms open + mergeable + clean, **no `autopilot:off` label** (the per-PR maintainer pause; the repo-wide pause is emptying the target's `autopilot:l0l1-paths` block), no L0/L1 file in the diff, all checks green, no `CHANGES_REQUESTED`, that each reviewer in `reviewers[]` posted their exact `<!-- autopilot:review:{slug}:green -->` marker (not a byline — an exact hidden token, so prose can't fake a vote and a format change can't drop one), **and that the green panel is at least `MIN_REVIEWERS` (3) distinct personas** (a 1- or 2-reviewer panel is refused — operator directive 2026-06-29). A mis-judged "🟢 + eligible" therefore cannot cause a bad merge. Exit `2` = a decision was refused server-side or GitHub rejected the write; surface it, do not retry blindly. For an L0/L1 PR or a non-consensus PR, emit **no** merge decision — the verdict comment is the deliverable and a human decides.
 
 > **The terminal state is the merge, not the verdict.** Where the merge predicate holds, *this skill finishes the job* — it approves and merges; stopping at a 🟢 verdict and handing off is **incomplete**, not a finished run. Drive every cycle to one of: **merged** (predicate held) or an **explicit hand-off/escalation** (a stated reason the predicate did not hold). Never leave a 🟢 PR sitting with no terminal action.
 >
@@ -163,7 +172,7 @@ TOKEN="<credentials['github.token'].token>" \
 - **Drive the whole cycle — don't stop at routing.** route → obtain each nominated review → synthesise verdict → complete (merge or hand off). A PR left at a lone routing comment is a bug (the #530/#514 failure), not a finished run.
 - **The orchestrator, keeping the `pr-review` skill.** `pr-review` is the standalone reviewer contract; pr-autopilot *drives* it — dispatching it to bound personas, or (until dispatch is wired everywhere) applying each nominee's lens inline per that contract. pr-autopilot decides *who* reviews and *what the verdict is*; `pr-review` defines *how* a single lens review is shaped.
 - **Every open PR is in scope.** Draft, non-draft, human-authored, and bot-authored (Dependabot) PRs all route through the same review→consensus→merge path (adr-0010). The retired `dependabot-triage` no-review lane is no longer the bot path.
-- **The verdict is the reviewers' consensus, not your solo call.** Merge needs unanimous green; one reviewer short, or any 🔴 / `CHANGES_REQUESTED`, blocks it.
+- **The verdict is the reviewers' consensus, not your solo call.** Merge needs unanimous green across a panel of **at least 3** distinct reviewers (`MIN_REVIEWERS`, operator directive 2026-06-29); fewer than 3 green, one reviewer short, or any 🔴 / `CHANGES_REQUESTED`, blocks it — the engine fails closed below 3.
 - **Merge is bounded to non-L0/L1 + consensus (R-N10 / adr-0010).** A PR touching the target repo's governance L0/L1 always hands off to a human (the operator's final call). No push or PR-open under any path. The engine re-verifies and fails closed.
 
 Related: [agent-runner.md](../../docs/routines/agent-runner.md) (the generic CCR routine this skill runs under — there is no per-skill routine spec; this SKILL.md is the authoritative contract), [R-N10 governance](../../docs/governance.md) + [adr-0010](../../docs/adr/adr-0010-autopilot-merge-consensus-widening.md) (the widened merge predicate). The former `dependabot-triage` (no-review bot lane) and `pr-review` (separate reviewer skill) have both been **retired/deleted** — this skill now owns the entire route → review → consensus → merge cadence; bot PRs and human PRs alike route here. [dev-process.md](../../docs/runbooks/dev-process.md).
