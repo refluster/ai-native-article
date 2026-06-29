@@ -1,11 +1,11 @@
 ---
 name: podcast-synthesize
-description: Turn a script-ready podcast episode into an MP3 by triggering the deterministic wf-podcast Lambda (Amazon Polly Neural Japanese, one voice chosen at random per cast → S3). Use after podcast-script has attached a script to an article's Notion page (podcastStatus=script-ready). This skill carries no judgment — it SigV4-POSTs to the IAM-authorized synthesis route; the Lambda reads the script from Notion, synthesises it, writes the MP3 to the public podcast/audio/ prefix, and sets audioUrl + podcastStatus=audio-ready. Owned by the Podcast Producer (voice-pool + QA).
+description: Turn an approved podcast episode into an MP3 by triggering the deterministic wf-podcast Lambda (Amazon Polly Neural Japanese, one voice chosen at random per cast → S3). Use after podcast-script has attached a script to an article's Notion page (podcastStatus=approved). This skill carries no judgment — it SigV4-POSTs to the IAM-authorized synthesis route; the Lambda reads the script from Notion, synthesises it, writes the MP3 to the public podcast/audio/ prefix, and sets audioUrl + podcastStatus=audio-ready. Owned by the Podcast Producer (voice-pool + QA).
 ---
 
 # podcast-synthesize
 
-Turn a **script-ready** episode into an MP3. This is a **deterministic** step
+Turn an **approved** episode into an MP3. This is a **deterministic** step
 (no archetype, no LLM judgment) — the production counterpart to the
 `podcast-script` Cadence. The judgment already happened (Rhys wrote the script);
 this skill just casts and synthesises it.
@@ -15,7 +15,7 @@ this skill just casts and synthesises it.
 It triggers the `wf-podcast` Lambda's `/podcast/synthesize` route. The Lambda:
 
 1. Reads the target episode from Notion — by `--slug`, or the **oldest**
-   `podcastStatus=script-ready` page if no slug is given.
+   `podcastStatus=approved` page if no slug is given.
 2. Strips the `podcastScript` to plain text and synthesises it with **Amazon
    Polly Neural Japanese**, **one voice chosen at random per cast** from the JA
    Neural pool (`StartSpeechSynthesisTask` — async, required because a ~10-minute
@@ -39,20 +39,20 @@ credential type**.
 ## Run it
 
 ```sh
-# the oldest script-ready episode:
+# the oldest approved episode:
 aws-vault exec <profile> -- node workforce/skills/podcast-synthesize/synthesize.mjs
 
 # a specific article (slug from the Notion page / pick-article.mjs):
 aws-vault exec <profile> -- node workforce/skills/podcast-synthesize/synthesize.mjs --slug c91368439868
 ```
 
-Exit codes: `0` synthesised (or a `{skip:true}` when nothing is script-ready),
+Exit codes: `0` synthesised (or a `{skip:true}` when nothing is approved),
 `1` missing AWS creds, `2` the Lambda rejected the request (4xx), `3` the Lambda
 failed (5xx) or a network error — read stderr, don't retry a 5xx blindly.
 
 ## When NOT to use
 
-- Before `podcast-script` has set `podcastStatus=script-ready` — there is nothing
+- Before `podcast-script` has set `podcastStatus=approved` — there is nothing
   to synthesise (the Lambda returns `{skip:true}`).
 - To re-cast a `published` episode — that would orphan the live Spotify episode;
   re-synthesis is an operator decision.

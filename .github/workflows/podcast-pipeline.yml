@@ -1,0 +1,54 @@
+name: Podcast pipeline (synthesize + publish)
+
+# Deterministic podcast execution, aligned with the newsletter publish flow
+# (Epic-017). The judgment lives in Notion parameters the persona cadences set
+# (Rhys: script, Idris: complianceVerdict, Odette: podcastVoice, Celeste:
+# podcastShowNotes) + the human approval gate (script-ready → approved). This
+# job only *executes* the deterministic transitions:
+#
+#   1. synthesize — up to 5 oldest `approved` episodes → Polly (Odette's
+#      podcastVoice, else random) → MP3 on S3/CloudFront → `audio-ready`.
+#   2. publish    — up to 5 oldest `audio-ready` episodes → `published`, then
+#      rebuild the RSS feed (Celeste's show-notes + the mandatory citations).
+#
+# AWS auth: GitHub OIDC → IAM role assumption (secrets.AWS_ROLE_ARN), the same
+# role the data-plane deploy uses. The wf-podcast routes are IAM-authorized, so
+# no project bearer token / new credential type is needed (the CCR cadences
+# never touch AWS — they only write Notion params).
+
+on:
+  schedule:
+    # Daily at 18:37 UTC (03:37 JST) — after the day's article-publish windows.
+    - cron: '37 18 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: podcast-pipeline
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Synthesize approved episodes (≤5) → audio-ready
+        run: node workforce/skills/podcast-synthesize/synthesize.mjs
+
+      - name: Publish audio-ready episodes (≤5) → published + rebuild feed
+        run: node workforce/skills/podcast-rss/publish.mjs

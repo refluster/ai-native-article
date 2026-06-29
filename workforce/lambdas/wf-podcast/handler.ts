@@ -59,10 +59,21 @@ const BUCKET = process.env.BUCKET_NAME ?? "";
 const PUBLIC_BASE = (process.env.PODCAST_PUBLIC_BASE_URL ?? "").replace(/\/+$/, "");
 const SITE_BASE = (process.env.PODCAST_SITE_BASE_URL ?? "https://kohuehara.xyz/ai-native-article").replace(/\/+$/, "");
 
-// JA Neural voice pool — one chosen at random per cast (Epic-017 D1/Q6). These
-// are the Amazon Polly voices that support the `neural` engine for ja-JP. The
-// Producer (odette) owns pool membership; this is the V1 set.
+// JA Neural voice pool — one chosen at random per cast (Epic-017 D1/Q6) when
+// the Producer (odette) hasn't set a per-episode `podcastVoice`. These are the
+// Amazon Polly voices that support the `neural` engine for ja-JP.
 const JA_NEURAL_VOICES = ["Takumi", "Kazuha", "Tomoko"];
+
+// Per-run batch cap (operator: "1回の実施で5記事/podcastを上限"). synthesize and
+// publish each process at most this many episodes per call.
+const BATCH_LIMIT = Number(process.env.PODCAST_BATCH_LIMIT ?? "5");
+
+// Show-level Spotify metadata. Cover art + an owner email are required for a
+// publishable show; defaults point at the CloudFront-served cover.
+const COVER_URL = process.env.PODCAST_COVER_URL ?? (PUBLIC_BASE ? `${PUBLIC_BASE}/podcast/cover.png` : "");
+const CATEGORY = process.env.PODCAST_CATEGORY ?? "Technology";
+const OWNER_NAME = process.env.PODCAST_OWNER_NAME ?? "kohuehara";
+const OWNER_EMAIL = process.env.PODCAST_OWNER_EMAIL ?? "";
 
 const PREFIX_AUDIO = "podcast/audio";
 const FEED_KEY = "podcast/feed.xml";
@@ -173,24 +184,8 @@ function scriptToPlainText(md: string): string {
     .trim();
 }
 
-// ── Story 5: synthesize ──────────────────────────────────────────────────────
-async function synthesize(slug: string | undefined): Promise<ProxyResult> {
-  if (!BUCKET) throw new Error("BUCKET_NAME env var is required");
-  if (!PUBLIC_BASE) throw new Error("PODCAST_PUBLIC_BASE_URL env var is required");
-  const { apiKey, databaseId } = await notionHeaders();
-
-  const pages = await queryAll(apiKey, databaseId);
-  const scriptReady = pages
-    .filter((p) => propText(p.properties?.podcastStatus).toLowerCase() === "script-ready")
-    .sort((a, b) => (a.created_time ?? "").localeCompare(b.created_time ?? ""));
-
-  const page = slug
-    ? scriptReady.find((p) => pageSlug(p) === slug)
-    : scriptReady[0];
-  if (!page) {
-    return json(200, { skip: true, reason: slug ? `no script-ready page for slug ${slug}` : "no script-ready episode" });
-  }
-
+// ── Story 5: synthesize one approved episode → audio-ready ───────────────────
+async function synthesizeOne(apiKey: string, page: NotionPage): Promise<Record<string, unknown>> {
   const theSlug = pageSlug(page);
   const title = propText(page.properties?.Title) || theSlug;
   const script = propText(page.properties?.podcastScript);
@@ -199,8 +194,13 @@ async function synthesize(slug: string | undefined): Promise<ProxyResult> {
     throw new Error(`podcastScript for ${theSlug} is ${plain.length} chars after strip — refusing to synthesise a truncated/empty episode (C-1)`);
   }
 
-  // One voice chosen at random per cast (D1/Q6).
-  const voiceId = JA_NEURAL_VOICES[Math.floor(Math.random() * JA_NEURAL_VOICES.length)];
+  // Voice: the Producer (odette) may set `podcastVoice` per episode; otherwise
+  // one is chosen at random from the JA Neural pool (D1/Q6). An unknown value
+  // falls back to random rather than failing the cast.
+  const casted = propText(page.properties?.podcastVoice).trim();
+  const voiceId = JA_NEURAL_VOICES.includes(casted)
+    ? casted
+    : JA_NEURAL_VOICES[Math.floor(Math.random() * JA_NEURAL_VOICES.length)];
   const tmpPrefix = `podcast/audio/tmp/${theSlug}-`;
 
   const started = await polly.send(
@@ -218,25 +218,21 @@ async function synthesize(slug: string | undefined): Promise<ProxyResult> {
   const taskId = started.SynthesisTask?.TaskId;
   if (!taskId) throw new Error("Polly StartSpeechSynthesisTask returned no TaskId");
 
-  // Poll until the async task completes (well under the Lambda timeout for a
-  // ~10-min script). Fail loud on a Polly failure (C-4).
+  // Poll until the async task completes. Fail loud on a Polly failure (C-4).
   let outputUri: string | undefined;
   for (let i = 0; i < 50; i++) {
     await sleep(3000);
     const got = await polly.send(new GetSpeechSynthesisTaskCommand({ TaskId: taskId }));
     const status = got.SynthesisTask?.TaskStatus;
-    if (status === "completed") {
-      outputUri = got.SynthesisTask?.OutputUri;
-      break;
-    }
+    if (status === "completed") { outputUri = got.SynthesisTask?.OutputUri; break; }
     if (status === "failed") {
       throw new Error(`Polly task ${taskId} failed: ${got.SynthesisTask?.TaskStatusReason ?? "unknown"}`);
     }
   }
   if (!outputUri) throw new Error(`Polly task ${taskId} did not complete within the poll budget`);
 
-  // OutputUri is https://s3.<region>.amazonaws.com/<bucket>/<key>. Extract the
-  // key and copy it to the clean public path podcast/audio/{slug}.mp3.
+  // OutputUri is https://s3.<region>.amazonaws.com/<bucket>/<key>. Copy it to
+  // the clean public path podcast/audio/{slug}.mp3.
   const srcKey = decodeURIComponent(new URL(outputUri).pathname.replace(new RegExp(`^/${BUCKET}/`), "").replace(/^\//, ""));
   const destKey = `${PREFIX_AUDIO}/${theSlug}.mp3`;
   await s3.send(new CopyObjectCommand({
@@ -253,8 +249,57 @@ async function synthesize(slug: string | undefined): Promise<ProxyResult> {
     audioUrl: { url: audioUrl },
     podcastStatus: { status: { name: "audio-ready" } },
   });
+  return { slug: theSlug, title, voiceId, audioUrl, status: "audio-ready" };
+}
 
-  return json(200, { slug: theSlug, title, voiceId, audioUrl, status: "audio-ready" });
+// Batch driver: synthesise up to BATCH_LIMIT oldest `approved` episodes
+// (or a specific --slug). The human-approval gate is `approved`; nothing is
+// cast until a person has reviewed the script and flipped script-ready→approved.
+async function synthesize(slug: string | undefined): Promise<ProxyResult> {
+  if (!BUCKET) throw new Error("BUCKET_NAME env var is required");
+  if (!PUBLIC_BASE) throw new Error("PODCAST_PUBLIC_BASE_URL env var is required");
+  const { apiKey, databaseId } = await notionHeaders();
+
+  const pages = await queryAll(apiKey, databaseId);
+  const approved = pages
+    .filter((p) => propText(p.properties?.podcastStatus).toLowerCase() === "approved")
+    .sort((a, b) => (a.created_time ?? "").localeCompare(b.created_time ?? ""));
+
+  const targets = slug
+    ? approved.filter((p) => pageSlug(p) === slug)
+    : approved.slice(0, BATCH_LIMIT);
+  if (targets.length === 0) {
+    return json(200, { skip: true, reason: slug ? `no approved page for slug ${slug}` : "no approved episode", results: [] });
+  }
+
+  const results: Record<string, unknown>[] = [];
+  for (const page of targets) results.push(await synthesizeOne(apiKey, page));
+  return json(200, { count: results.length, results });
+}
+
+// ── Celeste's stage: publish audio-ready → published, then rebuild the feed ──
+async function publish(): Promise<ProxyResult> {
+  const { apiKey, databaseId } = await notionHeaders();
+  const pages = await queryAll(apiKey, databaseId);
+  const audioReady = pages
+    .filter((p) => propText(p.properties?.podcastStatus).toLowerCase() === "audio-ready" && !!propText(p.properties?.audioUrl))
+    .sort((a, b) => (a.created_time ?? "").localeCompare(b.created_time ?? ""))
+    .slice(0, BATCH_LIMIT);
+
+  const published: string[] = [];
+  for (const p of audioReady) {
+    // Citation guard before publish (ADR-0016).
+    if (!propText(p.properties?.podcastSources).trim()) {
+      throw new Error(`episode ${pageSlug(p)} has empty podcastSources — refusing to publish an uncited episode (ADR-0016)`);
+    }
+    await patchPodcast(apiKey, p.id, { podcastStatus: { status: { name: "published" } } });
+    published.push(pageSlug(p));
+  }
+
+  // Always rebuild the feed so newly-published episodes appear for Spotify.
+  const feed = await buildRss();
+  const feedBody = JSON.parse(feed.body) as { feedUrl?: string; episodes?: number };
+  return json(200, { published, feedUrl: feedBody.feedUrl, episodes: feedBody.episodes });
 }
 
 // ── Story 6: build RSS ───────────────────────────────────────────────────────
@@ -285,10 +330,13 @@ async function buildRss(): Promise<ProxyResult> {
       const head = await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
       byteLength = head.ContentLength ?? 0;
     } catch { /* length is optional in the enclosure; 0 is tolerated by readers */ }
+    // Celeste's stage: an optional `podcastShowNotes` framing leads the
+    // <description>; the mandatory citations always follow it.
+    const showNotes = propText(p.properties?.podcastShowNotes).trim();
     episodes.push({
       slug: pageSlug(p),
       title: propText(p.properties?.Title) || pageSlug(p),
-      description: citations,
+      description: showNotes ? `${showNotes}\n\n${citations}` : citations,
       audioUrl,
       pubDate: propText(p.properties?.Date) || (p.created_time ?? "").slice(0, 10),
       byteLength,
@@ -305,6 +353,12 @@ async function buildRss(): Promise<ProxyResult> {
       language: "ja",
       author: "Workforce / kohuehara.xyz",
       feedSelfUrl,
+      imageUrl: COVER_URL || undefined,
+      category: CATEGORY,
+      explicit: false,
+      ownerName: OWNER_NAME,
+      ownerEmail: OWNER_EMAIL || undefined,
+      type: "episodic",
     },
     episodes,
   );
@@ -335,6 +389,9 @@ export async function handler(event: ProxyEventV2): Promise<ProxyResult> {
   try {
     if (path.endsWith("/podcast/synthesize")) {
       return await synthesize(typeof body.slug === "string" ? body.slug : undefined);
+    }
+    if (path.endsWith("/podcast/publish")) {
+      return await publish();
     }
     if (path.endsWith("/podcast/rss")) {
       return await buildRss();

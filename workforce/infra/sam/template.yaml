@@ -1958,6 +1958,11 @@ Resources:
           # private, ADR-0016).
           PODCAST_PUBLIC_BASE_URL: !Sub https://${WfPodcastDistribution.DomainName}
           PODCAST_SITE_BASE_URL: https://kohuehara.xyz/ai-native-article
+          # Spotify show metadata. Owner email is the verification address used
+          # to claim the show on Spotify for Podcasters.
+          PODCAST_OWNER_EMAIL: refluster@gmail.com
+          PODCAST_OWNER_NAME: kohuehara
+          PODCAST_CATEGORY: Technology
       Policies:
         - Statement:
             - Sid: PodcastPolly
@@ -1997,6 +2002,12 @@ Resources:
           Properties:
             ApiId: !Ref WfAgentsHttpApi
             Path: /podcast/rss
+            Method: POST
+        Publish:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /podcast/publish
             Method: POST
       Tags:
         workforce: !Ref Stage
