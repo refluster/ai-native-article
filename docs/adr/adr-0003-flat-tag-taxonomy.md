@@ -37,10 +37,12 @@ one tag spans many articles.
    [`scripts/lib/tags.mjs`](../../scripts/lib/tags.mjs) (`TAGS`), importable by
    both the newsletter pipeline and the workforce write-scripts. Editing the
    list is a Zone A editorial decision and amends this ADR.
-2. **The vocabulary (14 tags).** AI生産性 / エージェントAI / 検証と信頼 /
-   開発プロセス / 開発者ツール / 役割の融合 / 新しい職種 / スキルと学習 /
-   組織変革 / 雇用と労働市場 / 大手テック動向 / AIインフラ / 製造業のAI /
-   AI戦略. Flat, no letters, reader-facing labels verbatim.
+2. **The vocabulary (14 tags), English labels** (reader-facing on the web,
+   matching the site's uppercase Swiss microlabel style): AI Productivity /
+   Agentic AI / Verification & Trust / Engineering Process / Developer Tools /
+   Role Blurring / Emerging Roles / Skills & Learning / Org Transformation /
+   Labor Market / Big Tech / AI Infrastructure / Manufacturing AI / AI Strategy.
+   Flat, no letters, reader-facing labels verbatim.
 3. **Storage is unchanged.** `CategoriesMulti` (multi_select) is already the
    many-to-many field; it now holds vocabulary tags only. The single `Category`
    field is demoted to the article's primary tag (first of `CategoriesMulti`).
