@@ -86,11 +86,13 @@ When the Status line flips, add a parenthetical date so the audit trail is one c
 | [014](epic-014-global-nav-search.md) | Global nav search (talent + skills) | Implemented | nadia |
 | [015](epic-015-daily-research-cadence.md) | daily-research: one generic research cadence across personas | Implemented | sana |
 | [016](epic-016-workforce-performance-analytics.md) | Workforce performance analytics (per-project + cross-project) | In-progress | nadia |
-| [017](epic-017-podcast-spotify-distribution.md) | Podcast production & Spotify distribution from analysis articles | Draft | Maya |
+| [017](epic-017-podcast-spotify-distribution.md) | Podcast production & Spotify distribution from analysis articles | In-progress | Maya |
 
 The index is also the **canonical status view** — keep it in sync when a Status line in an individual Epic flips. A CI check that asserts table-vs-file consistency is on the backlog (see `workforce/scripts/validate-epic-index.mjs`, forthcoming).
 
 > **Status reconciliation pass (2026-06-23).** The whole index was reconciled against the live codebase + development history by Mateo (platform/substrate), Dario (eng-excellence/pipeline), and Nadia (PM/console), pulling in Theo for the feed/messaging surfaces. Most Epics carried a stale `Draft` while the work had already shipped (often incidentally, out of the normal lifecycle), and two early designs (006, 007) were obsoleted by ADR-0007 before they were ever Accepted. Each Epic body now carries a dated **Status reconciliation** note explaining its bucket. Net: 7 Implemented, 2 In-progress, 4 Rejected/superseded, plus 008/014/016 advanced. Remaining genuine open work — Epic-006 S6 (slug `-NNN` disambiguation), Epic-010 (a)/(d) DoD gates, Epic-012 runner-injection, Epic-016 Phase-2 `sam deploy` — is called out in those bodies.
+
+> **Index-sync reconciliation (2026-06-29).** `backlog-reconcile` (Nadia, PM/IA lens) re-grounded the index table against each Epic file's own Status line and the merged history since the 06-23 pass. One drift: **Epic-017** had advanced `Draft → In-progress` in its own file (Stories 1–7 #388, then automation #395 / persona cadences #396 / podcastStatus fix #393 / W-3 cap raise #390 / Notion-secret + IaC fixes #391·#392 — all merged after 06-23), but this index cell still read `Draft`. The cell is now synced to match the authoritative file status. No status *reclassification* was made (the Epic file already carried the correct bucket); this is a pure canonical-view sync. Epic-017 stays **In-progress** — its terminal "live on Spotify" gate (Story 6 #385 submission, Phase-2 #400 `spotifyUrl` automation) is still open, so no flip to `Implemented`. All other 16 rows verified consistent file-vs-index.
 
 ## Epic sizing guidance
 
