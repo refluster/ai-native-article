@@ -368,6 +368,13 @@ async function buildRss(): Promise<ProxyResult> {
     Key: FEED_KEY,
     Body: xml,
     ContentType: "application/rss+xml; charset=utf-8",
+    // feed.xml is overwritten in place on every publish/rebuild, so a long
+    // CloudFront TTL makes new episodes invisible at the edge until the cache
+    // expires (the S3 object updates, the edge keeps serving the stale feed).
+    // A short max-age bounds that staleness to ~5 min without a CloudFront
+    // invalidation (no extra IAM / per-invalidation cost). The MP3s don't need
+    // this — each episode is a fresh, immutable key, so it's never a stale hit.
+    CacheControl: "max-age=300",
   }));
 
   return json(200, { feedUrl: feedSelfUrl, episodes: episodes.length });
