@@ -45,8 +45,7 @@
 //       --body-file /tmp/l3-article.md \
 //       --abstract-file /tmp/l3-abstract.txt \
 //       --source-urls "https://a, https://b, https://c" \
-//       --category "B" \                  # majority A–E bucket from the picker
-//       [--theme "担い手の交代 × ツールの民主化"]   # free-form synthesis theme
+//       --tags "Org Transformation,Verification & Trust,AI Strategy"   # 3–5 flat tags from scripts/lib/tags.mjs
 //
 // Exit codes:
 //   0  — page created
@@ -57,6 +56,7 @@
 
 import { readFileSync } from "node:fs";
 import { isTruncatedMarkdown, lastNonEmptyLine } from "../../../scripts/lib/truncation.mjs";
+import { validateTags } from "../../../scripts/lib/tags.mjs";
 
 const NOTION_VERSION = "2022-06-28";
 const NOTION_API = "https://api.notion.com/v1";
@@ -72,23 +72,14 @@ function arg(name) {
   return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : undefined;
 }
 
-// Canonical A–E bucket — mirror of newsletter/gas/src/Code.gs CATEGORY_NAMES +
-// canonicalCategoryFor. The picker already computed the majority bucket; this
-// re-canonicalises so a bare letter ("B") or a canonical label both resolve.
-const CATEGORY_NAMES = {
-  A: "A: AI Hyper-productivity",
-  B: "B: Role Blurring",
-  C: "C: New Roles/FDE",
-  D: "D: Big Tech Layoffs & AI Pivot",
-  E: "E: Rethinking SDLC",
-};
-function canonicalCategory(text) {
-  const trimmed = (text || "").trim();
-  if (!trimmed) return "";
-  if (/^[A-E]$/i.test(trimmed)) return CATEGORY_NAMES[trimmed.toUpperCase()] || "";
-  const m = trimmed.match(/^([A-E])[\s:：][\s\S]*$/i);
-  if (m) return CATEGORY_NAMES[m[1].toUpperCase()] || "";
-  return ""; // free-form / unmappable → leave canonical unset (don't guess)
+// Tags — flat vocabulary (ADR-0003). The retired A–E majority-bucket + free-form
+// "× theme" pair lived here; the single source of truth is now
+// scripts/lib/tags.mjs. The agent picks 3–5 tags from that vocabulary for the
+// synthesis (see SKILL.md) and passes them via --tags; validateTags drops
+// anything not in the controlled set (never invents). Splits on comma so the
+// runner can pass one shell arg.
+function parseTags(raw) {
+  return validateTags((raw || "").split(",").map((t) => t.trim()).filter(Boolean));
 }
 
 const apiKey = process.env.NOTION_API_KEY;
@@ -98,8 +89,7 @@ const articleType = arg("type") ?? "analysis";
 const status = arg("status") ?? "ready";
 const bodyFile = arg("body-file");
 const sourceUrls = arg("source-urls");      // comma-joined source L2 URLs
-const category = arg("category");           // majority A–E letter or canonical label
-const theme = arg("theme");                 // optional free-form synthesis theme
+const tagsArg = arg("tags");                // comma-separated vocabulary tags (3–5)
 const abstractFile = arg("abstract-file");
 
 const VALID_STATUS = new Set(["draft", "ready", "published", "archived"]);
@@ -179,16 +169,19 @@ if (sourceUrls) properties.SourceURLs = { rich_text: [{ text: { content: sourceU
 
 if (abstract) properties.Abstract = { rich_text: [{ text: { content: abstract.slice(0, 2000) } }] };
 
-// Category + CategoriesMulti — the canonical bucket (majority vote of sources)
-// plus an optional free-form synthesis theme, mirroring the GAS L3 two-tag
-// write. A free-form / unmappable --category leaves the canonical unset rather
-// than guessing; the theme tag is still added when present.
-const canonical = canonicalCategory(category);
-const tags = [];
-if (canonical) tags.push(canonical);
-if (theme && theme.trim()) tags.push(theme.trim().slice(0, 100));
-if (canonical) properties.Category = { rich_text: [{ text: { content: canonical } }] };
-if (tags.length) properties.CategoriesMulti = { multi_select: tags.map((name) => ({ name })) };
+// CategoriesMulti — the flat vocabulary tags (ADR-0003), the many-to-many field
+// that drives the reader sidebar/filter. Category (single) carries the primary
+// tag for legacy single-category consumers. Tags outside the vocabulary are
+// dropped by validateTags; if --tags was given but nothing validated, publish
+// untagged rather than block (W-1 governs the body, not tags) — but say so.
+const tags = parseTags(tagsArg);
+if (tagsArg && tags.length === 0) {
+  console.warn(`publish-notion.mjs: --tags "${tagsArg}" had no valid vocabulary tags — publishing untagged (see scripts/lib/tags.mjs TAGS)`);
+}
+if (tags.length) {
+  properties.Category = { rich_text: [{ text: { content: tags[0] } }] };
+  properties.CategoriesMulti = { multi_select: tags.map((name) => ({ name })) };
+}
 
 try {
   const res = await fetch(`${NOTION_API}/pages`, {
