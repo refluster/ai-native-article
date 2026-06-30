@@ -24,6 +24,7 @@ It has **two halves with two executors**, by design:
 
 ```
 approved ──(you: podcastVoice + podcastShowNotes)──▶ approved
+         ──(you, optional: trigger-pipeline.mjs)───▶ dispatches podcast-pipeline.yml
          ──(CI synthesize.mjs → Polly → S3)────────▶ audio-ready
          ──(CI publish.mjs → flip + rebuild feed)──▶ published → Spotify
 ```
@@ -31,16 +32,20 @@ approved ──(you: podcastVoice + podcastShowNotes)──▶ approved
 The voice pool (V1): **Takumi**, **Kazuha**, **Tomoko** (Polly Neural ja-JP).
 Odette (Producer) owns pool membership; you cast within it.
 
-## One credential (apiKey only)
+## Credentials
 
 | Credential | Used for |
 |---|---|
 | `notion.integration_token` | `pick-episodes.mjs` (list approved episodes) + `set-params.mjs` (write `podcastVoice` + `podcastShowNotes`) |
+| `github.token` | `trigger-pipeline.mjs` (optional last leg — `workflow_dispatch` of `podcast-pipeline.yml`). Needs the **`workflow`** scope / Actions:write. |
 
-The Notion `apiKey` is the only secret; the DB id is a non-secret constant in
-the bundled scripts. The synthesize/publish scripts use **AWS** credentials (CI
-OIDC / the operator), never a project credential — so the Cadence adds **no new
-credential type**.
+The Notion `apiKey` and the GitHub token are the only secrets; the DB id is a
+non-secret constant in the bundled scripts. **The AWS trust boundary stays
+closed**: the cadence never holds AWS credentials. The optional pipeline trigger
+is **GitHub-only** — it dispatches the existing CI workflow, which then does the
+Polly/S3/RSS work via its own OIDC→AWS role. The synthesize/publish scripts
+themselves still run with **AWS** credentials (CI OIDC / the operator), never a
+project credential.
 
 ## Instructions (the Cadence — judgment only)
 
@@ -82,6 +87,24 @@ so the day's CI run can synthesise + publish them.
    Exit `0` written; `2` voice not in the pool or empty notes (re-pick / write
    something); `1`/`3` arg/Notion error.
 
+4. **(Optional) Hand off to the pipeline — one continuous flow.** Once every
+   approved episode has its `podcastVoice` + `podcastShowNotes`, you may dispatch
+   the deterministic pipeline immediately instead of waiting for the daily cron:
+
+   ```sh
+   GITHUB_TOKEN="<credentials['github.token'].token>" \
+     node workforce/skills/podcast-publish/trigger-pipeline.mjs --ref main
+   ```
+
+   This is **GitHub-only** (`workflow_dispatch` of `podcast-pipeline.yml`) — the
+   AWS trust boundary stays closed; the dispatched workflow does the Polly/S3/RSS
+   work via its own OIDC→AWS role. Exit `0` dispatched; `2` the token lacks the
+   `workflow` scope (403); `1`/`3` missing token / GitHub error. **Skip this step
+   if you have no `approved` episodes** (nothing to synthesise). Note: a Claude
+   Code session's egress proxy injects a fixed session GitHub identity and 403s
+   this call — it works from the CCR runner / CI / an operator shell, where the
+   project PAT is honoured.
+
 ## Hard rules
 
 - **Judgment only — no audio, no publish.** You set Notion parameters; the CI
@@ -114,6 +137,11 @@ also run them under `aws-vault`.
   then the mandatory citations).
 - `build-rss.mjs` → POST `/podcast/rss`: standalone feed rebuild (operator
   escape hatch — e.g. to refresh the feed without flipping any status).
+- `trigger-pipeline.mjs` → `workflow_dispatch` of `podcast-pipeline.yml`. The
+  **only GitHub-auth (not AWS) script** here: it uses `github.token` (needs the
+  `workflow` scope), and merely asks GitHub to run the workflow that then runs
+  the three AWS scripts above. This is the cadence's optional hand-off leg
+  (Instructions step 4); it never touches AWS.
 
 ```sh
 # CI runs these (OIDC); the operator can run them under aws-vault:
