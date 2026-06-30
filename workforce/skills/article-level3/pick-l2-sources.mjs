@@ -120,7 +120,7 @@ function asL2(p) {
     abstract: p.properties?.Abstract?.rich_text?.[0]?.plain_text ?? "",
     sourceUrl: sourceUrlOf(p),
     category: p.properties?.Category?.rich_text?.[0]?.plain_text ?? "",
-    categoriesMulti: (p.properties?.CategoriesMulti?.multi_select ?? []).map((o) => o.name),
+    categoriesMulti: ((p.properties?.Tags ?? p.properties?.CategoriesMulti)?.multi_select ?? []).map((o) => o.name),
     created_time: p.created_time ?? "",
   };
 }

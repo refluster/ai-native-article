@@ -12,8 +12,14 @@ export interface ArticleMeta {
   type?: ArticleType
   category: string
   /**
-   * Optional multi-select tag list (from the unified DB's `CategoriesMulti`
-   * property). Currently used only by the upcoming category-cloud UI.
+   * Multi-select tag list (from the unified DB's `Tags` property). This is the
+   * many-to-many taxonomy shown on cards, the article page, and the sidebar.
+   */
+  tags?: string[]
+  /**
+   * @deprecated Former name of `tags` (Notion `CategoriesMulti`). Kept as a
+   * read fallback for any manifest generated before the rename; new exports
+   * write `tags`.
    */
   categoriesMulti?: string[]
   date: string

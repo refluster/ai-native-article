@@ -43,9 +43,12 @@ one tag spans many articles.
    Role Blurring / Emerging Roles / Skills & Learning / Org Transformation /
    Labor Market / Big Tech / AI Infrastructure / Manufacturing AI / AI Strategy.
    Flat, no letters, reader-facing labels verbatim.
-3. **Storage is unchanged.** `CategoriesMulti` (multi_select) is already the
-   many-to-many field; it now holds vocabulary tags only. The single `Category`
-   field is demoted to the article's primary tag (first of `CategoriesMulti`).
+3. **Storage: the `Tags` multi_select.** The many-to-many field — **renamed
+   from `CategoriesMulti` to `Tags`** (2026-06-30) for clarity now that it is
+   reader-facing — holds vocabulary tags only. The single `Category` field is
+   demoted to the article's primary tag (first of `Tags`). Readers see the
+   `Tags` values on each article (card, article page, sidebar). Pipeline reads
+   accept `CategoriesMulti` as a fallback for un-migrated rows.
 4. **Generation picks tags from the vocabulary.** The article-level2/level3
    cadences select 3–5 tags against `TAGS` (validated at the write boundary by
    `validateTags`) instead of deriving an A–E bucket + free-form theme. These

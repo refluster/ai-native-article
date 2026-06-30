@@ -208,6 +208,13 @@ export default function Article() {
 
   const articleType = inferType({ type: isArticleType(meta.type) ? meta.type : undefined })
 
+  // The article's tags (Notion `Tags`), shown in place of the old single
+  // category. `categoriesMulti` is the pre-rename fallback; `category` covers
+  // any row with neither. Prefix-stripped for display via displayTag.
+  const tags = (meta.tags ?? meta.categoriesMulti ?? (meta.category ? [meta.category] : []))
+    .map(displayTag)
+    .filter(Boolean)
+
   return (
     <>
       {/* Header section */}
@@ -220,10 +227,17 @@ export default function Article() {
             ← INDEX
           </Link>
           <div className="max-w-3xl">
-            {meta.category && (
-              <span className="inline-block bg-tertiary text-on-tertiary px-2 py-1 text-[10px] font-bold tracking-widest uppercase mb-6">
-                {displayTag(meta.category)}
-              </span>
+            {tags.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 mb-6">
+                {tags.map(tag => (
+                  <span
+                    key={tag}
+                    className="inline-block bg-tertiary text-on-tertiary px-2 py-1 text-[10px] font-bold tracking-widest uppercase"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
             )}
             <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-tight mb-8">
               {meta.title}

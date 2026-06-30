@@ -136,7 +136,7 @@ export async function writePosts(records, options) {
       title: record.title,
       type: record.type,
       category: record.category,
-      categoriesMulti: record.categoriesMulti,
+      tags: record.tags,
       date: record.date,
       abstract: record.abstract,
       image: imagePath,

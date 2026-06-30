@@ -171,7 +171,7 @@ if (sourceUrl) properties.SourceURLs = { rich_text: [{ text: { content: sourceUr
 // only set when an --abstract-file was supplied and non-empty.
 if (abstract) properties.Abstract = { rich_text: [{ text: { content: abstract.slice(0, 2000) } }] };
 
-// CategoriesMulti — the flat vocabulary tags (ADR-0003), the many-to-many
+// Tags — the flat vocabulary tags (ADR-0003), the many-to-many
 // field that drives the reader sidebar/filter. Category (single) carries the
 // primary tag for legacy single-category consumers. Tags outside the
 // vocabulary are dropped by validateTags; if --tags was given but nothing
@@ -183,7 +183,7 @@ if (tagsArg && tags.length === 0) {
 }
 if (tags.length) {
   properties.Category = { rich_text: [{ text: { content: tags[0] } }] };
-  properties.CategoriesMulti = { multi_select: tags.map((name) => ({ name })) };
+  properties.Tags = { multi_select: tags.map((name) => ({ name })) };
 }
 
 try {

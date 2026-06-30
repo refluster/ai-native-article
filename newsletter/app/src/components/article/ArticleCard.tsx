@@ -7,14 +7,16 @@ interface Props {
 }
 
 /**
- * Tags shown on the card. CategoriesMulti is canonical; older rows that
- * predate it fall back to the singular `category`. We cap at three so the
- * card stays text-forward and the meta row never wraps awkwardly.
+ * Tags shown on the card. `tags` (Notion `Tags`) is canonical; the deprecated
+ * `categoriesMulti` is a fallback for pre-rename manifests, then the singular
+ * `category`. We cap at three so the card stays text-forward and the meta row
+ * never wraps awkwardly.
  */
 function cardTags(article: ArticleMeta): string[] {
+  const multi = article.tags ?? article.categoriesMulti
   const raw =
-    article.categoriesMulti && article.categoriesMulti.length > 0
-      ? article.categoriesMulti
+    multi && multi.length > 0
+      ? multi
       : article.category
         ? [article.category]
         : []
