@@ -497,7 +497,14 @@ async function listStats(
       }
       if (r.started_at >= monthStartIso) {
         runsThisMonth += 1;
-        if (r.artifact_ref) delivThisMonth += 1;
+        // Delivered = any status:ok EXEC — the SAME definition the Epic-016
+        // lifecycle funnel uses (performance-reducer Phase 3, epic-016 §"Phase
+        // 3"). Phase 3 widened "delivered" off "status:ok + artifact_ref" so
+        // artefact-less engagements (pr-review/route — the bulk of review-heavy
+        // work) count; this card was the last surface still on the old
+        // file-artefact-only rule, so it under-reported. One predicate, one
+        // meaning of "delivered" across every surface.
+        if (r.status === "ok") delivThisMonth += 1;
         computeThisMonth += execDurationSeconds(r);
       }
       allRecent.push({

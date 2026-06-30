@@ -1599,6 +1599,9 @@ describe("GET /stats (listStats)", () => {
   it("aggregates MTD runs/deliverables and duration from the EXEC ledger", async () => {
     seedAgent("maya");
     seedAgent("ren");
+    // 01A: ok + file artefact, 01B: ok + no artefact (an artefact-less
+    // engagement), 01C: threw. Delivered = any status:ok EXEC (Epic-016
+    // Phase-3) → 01A and 01B count, 01C does not.
     seedExec("maya", { ulid: "01A", startedAt: todayAt(1), durationS: 100, deliverable: true });
     seedExec("maya", { ulid: "01B", startedAt: todayAt(2), durationS: 200 });
     seedExec("ren", { ulid: "01C", startedAt: todayAt(3), durationS: 50, status: "throw" });
@@ -1608,12 +1611,12 @@ describe("GET /stats (listStats)", () => {
     const body = bodyOf(res) as StatsBody;
 
     expect(body.totals.runs_this_month).toBe(3);
-    expect(body.totals.deliv_count_this_month).toBe(1);
+    expect(body.totals.deliv_count_this_month).toBe(2); // 01A + 01B ok; 01C threw
     expect(body.totals.compute_seconds_this_month).toBe(350);
     expect(body.totals.avg_duration_s).toBe(117); // round(350/3)
 
     expect(body.agents.maya!.runs_this_month).toBe(2);
-    expect(body.agents.maya!.deliv_this_month).toBe(1);
+    expect(body.agents.maya!.deliv_this_month).toBe(2);
     expect(body.agents.maya!.compute_seconds_this_month).toBe(300);
     expect(body.agents.maya!.avg_duration_s).toBe(150);
   });
