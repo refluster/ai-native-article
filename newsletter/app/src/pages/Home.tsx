@@ -16,14 +16,15 @@ const PAGE_SIZE = 12
 const TOP_TAGS = 5
 
 /**
- * Raw tag list for an article. CategoriesMulti is canonical post the
- * normalize-categories sweep; older entries fall back to the singular
- * `category`. We keep the *raw* names as keys (the `?category=` filter
- * matches them verbatim) and only strip the legacy A–E prefix at render
- * time via `displayTag`.
+ * Raw tag list for an article. `tags` (Notion `Tags`) is canonical; the
+ * deprecated `categoriesMulti` is a fallback for pre-rename manifests, then
+ * the singular `category`. We keep the *raw* names as keys (the `?category=`
+ * filter matches them verbatim) and only strip the legacy A–E prefix at
+ * render time via `displayTag`.
  */
 function tagsOf(a: ArticleMeta): string[] {
-  if (a.categoriesMulti && a.categoriesMulti.length > 0) return a.categoriesMulti
+  const t = a.tags ?? a.categoriesMulti
+  if (t && t.length > 0) return t
   return a.category ? [a.category] : []
 }
 

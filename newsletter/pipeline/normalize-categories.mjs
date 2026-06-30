@@ -10,16 +10,16 @@
  * source of truth (`scripts/lib/tags.mjs#classifyTags`) over the row's
  * title + abstract + existing Category text, and writes:
  *
- *   CategoriesMulti (multi_select) = up to 5 vocabulary tags (many-to-many)
- *   Category        (rich_text)    = the primary tag (tags[0])
+ *   Tags     (multi_select) = up to 5 vocabulary tags (many-to-many)
+ *   Category (rich_text)    = the primary tag (tags[0])
  *
  * Keyword classification is best-effort (operator chose the immediate keyword
  * path over an LLM pass). Rows that match no keyword are left UNTOUCHED and
  * logged for manual review — we never overwrite an existing tag set with an
  * empty one.
  *
- * Idempotent: a row whose CategoriesMulti already equals the desired set AND
- * whose Category already equals tags[0] is skipped. Run --dry-run to preview.
+ * Idempotent: a row whose Tags already equals the desired set AND whose
+ * Category already equals tags[0] is skipped. Run --dry-run to preview.
  *
  * Usage:
  *   node --env-file=.env newsletter/pipeline/normalize-categories.mjs --dry-run
@@ -138,7 +138,9 @@ async function main() {
   for (const page of pages) {
     const props = page.properties || {}
     const title = readRichText(props.Title) || page.id
-    const currentTags = readMultiSelect(props.CategoriesMulti)
+    const currentTags = readMultiSelect(props.Tags).length
+      ? readMultiSelect(props.Tags)
+      : readMultiSelect(props.CategoriesMulti)
     const currentCategory = readRichText(props.Category)
     const { tags: desiredTags, reason } = computeTags(props)
 
@@ -168,7 +170,7 @@ async function main() {
     if (!DRY_RUN) {
       await notionFetch('PATCH', `/pages/${page.id}`, {
         properties: {
-          CategoriesMulti: {
+          Tags: {
             multi_select: desiredTags.map(name => ({ name })),
           },
           Category: {

@@ -11,7 +11,7 @@
  *  @property {string} title
  *  @property {'explanation'|'analysis'} type
  *  @property {string} category              // Free-text. e.g. "テーマ1 × テーマ2"
- *  @property {string[]} categoriesMulti     // Multi-select tags. May be empty.
+ *  @property {string[]} tags                // Multi-select tags (Notion `Tags`). May be empty.
  *  @property {string} date                  // ISO date "YYYY-MM-DD"
  *  @property {string} abstract
  *  @property {string} bodyMd                // Body Markdown (no frontmatter)

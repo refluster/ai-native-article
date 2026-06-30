@@ -27,7 +27,8 @@ function categoryOf(entry: SourceEntry): string | null {
 function tagsOf(entry: SourceEntry): string[] {
   const exp = entry.explanation
   if (!exp) return []
-  if (exp.categoriesMulti && exp.categoriesMulti.length > 0) return exp.categoriesMulti
+  const t = exp.tags ?? exp.categoriesMulti
+  if (t && t.length > 0) return t
   return exp.category ? [exp.category] : []
 }
 

@@ -17,7 +17,7 @@
 //   • SourceURLs   — the COMMA-JOINED source L2 URLs (not a single URL). This is
 //     both the "References" surface and the reuse-avoidance key pick-l2-sources
 //     reads back on the next fire.
-//   • CategoriesMulti — TWO tags: the majority A–E canonical bucket of the source
+//   • Tags — the flat vocabulary tags (multi_select; was CategoriesMulti / the
 //     L2s (--category) + an optional free-form "テーマ1 × テーマ2" synthesis theme
 //     (--theme). Category (rich_text) carries the canonical bucket.
 //
@@ -169,7 +169,7 @@ if (sourceUrls) properties.SourceURLs = { rich_text: [{ text: { content: sourceU
 
 if (abstract) properties.Abstract = { rich_text: [{ text: { content: abstract.slice(0, 2000) } }] };
 
-// CategoriesMulti — the flat vocabulary tags (ADR-0003), the many-to-many field
+// Tags — the flat vocabulary tags (ADR-0003), the many-to-many field
 // that drives the reader sidebar/filter. Category (single) carries the primary
 // tag for legacy single-category consumers. Tags outside the vocabulary are
 // dropped by validateTags; if --tags was given but nothing validated, publish
@@ -180,7 +180,7 @@ if (tagsArg && tags.length === 0) {
 }
 if (tags.length) {
   properties.Category = { rich_text: [{ text: { content: tags[0] } }] };
-  properties.CategoriesMulti = { multi_select: tags.map((name) => ({ name })) };
+  properties.Tags = { multi_select: tags.map((name) => ({ name })) };
 }
 
 try {
