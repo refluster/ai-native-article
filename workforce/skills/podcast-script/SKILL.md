@@ -38,9 +38,12 @@ to the next uncovered article. Stop early when the picker returns `{skip:true}`.
 
 1. **Pick one uncovered analysis article — run the picker, don't guess.** Run
    `pick-article.mjs` (below). It returns the oldest **published, Type=analysis**
-   article whose `podcastStatus` is empty/`none`. If it returns
-   `{"skip": true, …}`, **stop — produce nothing more this fire.** Otherwise use
-   the returned `{pageId, slug, title, sourceUrls}`.
+   article whose `podcastStatus` is empty/`none` **and that has non-empty
+   `SourceURLs`** — an article with no sources can't produce a compliant episode
+   (mandatory citations, C-1) and would otherwise permanently block the
+   oldest-first queue, so the picker skips it (add its `SourceURLs` in Notion to
+   podcast it). If it returns `{"skip": true, …}`, **stop — produce nothing more
+   this fire.** Otherwise use the returned `{pageId, slug, title, sourceUrls}`.
 
    ```sh
    NOTION_API_KEY="<credentials['notion.integration_token'].apiKey>" \
