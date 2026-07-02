@@ -10,6 +10,10 @@
 //   - Type == "analysis"                          (the L3/L4 synthesis articles)
 //   - Status == "published"                        (only cast what's live)
 //   - podcastStatus is empty or "none"             (no podcast exists yet)
+//   - SourceURLs is non-empty                      (citable — an article with no
+//                                                   sources can't produce a
+//                                                   compliant episode and would
+//                                                   block the oldest-first queue)
 //
 // Output (stdout, single JSON line):
 //   { pageId, slug, title, sourceUrls, date }      — the chosen article, or
@@ -90,12 +94,24 @@ try {
       if (propText(props.Status) !== "published") return false;
       const podStatus = propText(props.podcastStatus).trim().toLowerCase();
       if (podStatus && podStatus !== "none") return false; // already has a podcast in flight/done
+      // Citable-only: an article with NO SourceURLs cannot become a compliant
+      // episode — the script needs a non-empty citation list (C-1; publish-notion
+      // exit-2s on empty citations). Being oldest-first, an uncitable article
+      // would otherwise permanently block the picker (the whole queue stalls on
+      // one un-podcastable row). Skip it so the picker advances to the next
+      // citable article. To podcast such an article, add its SourceURLs in Notion.
+      const sourceUrls = (
+        propText(props.SourceURLs) ||
+        propText(props["Source Article URLs"]) ||
+        propText(props["Source URLs"])
+      ).trim();
+      if (!sourceUrls) return false;
       return true;
     })
     .sort((a, b) => (a.created_time ?? "").localeCompare(b.created_time ?? ""));
 
   if (eligible.length === 0) {
-    console.log(JSON.stringify({ skip: true, reason: "no published analysis article without a podcast" }));
+    console.log(JSON.stringify({ skip: true, reason: "no published analysis article with SourceURLs and without a podcast" }));
     process.exit(0);
   }
 
