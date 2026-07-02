@@ -151,7 +151,22 @@ for (const a of items) {
     if (m != null) taken.add(m);
   }
 }
+// Window-scoped saturation guard (C-4: fail loud, never spin forever). The
+// forward-walk stays inside [0, mod), so it can only loop endlessly if EVERY
+// minute in that window is already taken. We check window occupancy, NOT
+// taken.size — the global taken-set also holds daily-research minutes ≥ 540, so
+// a bare `taken.size >= mod` would false-positive on the 540-slot feed-post
+// window while it still has free ticks.
+const windowFull = (mod) => {
+  for (let i = 0; i < mod; i++) if (!taken.has(i)) return false;
+  return true;
+};
 const claim = (base, mod) => {
+  if (windowFull(mod)) {
+    throw new Error(
+      `stagger window [0,${mod}) is fully saturated — no collision-free minute left`,
+    );
+  }
   let m = base % mod;
   while (taken.has(m)) m = (m + 1) % mod;
   taken.add(m);
