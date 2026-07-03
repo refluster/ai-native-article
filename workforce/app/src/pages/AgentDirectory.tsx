@@ -104,7 +104,7 @@ export default function AgentDirectory() {
     <WorkforceLayout>
       {/* Header band */}
       <section className="mb-6 sm:mb-8">
-        <Typeplate label="DECK 02" value={`CREW · ${manifest.agents.length} AGENTS`} className="mb-3" />
+        <Typeplate label="CREW" value={`CREW · ${manifest.agents.length} AGENTS`} className="mb-3" />
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <h1 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-[1.04] text-wf-on-surface">
             The crew.

@@ -22,7 +22,7 @@
 // pr_url so the affordance can come back).
 
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import WorkforceLayout from '../components/WorkforceLayout';
 import Typeplate from '../components/Typeplate';
 import Sigil from '../components/Sigil';
@@ -31,8 +31,8 @@ import KPIReadout from '../components/KPIReadout';
 import HeatStrip from '../components/HeatStrip';
 import AgentOrgGraph from '../components/AgentOrgGraph';
 import RecentPostsSection from '../components/RecentPostsSection';
-import StatusBadge from '../components/StatusBadge';
 import BindingsEditor from '../components/BindingsEditor';
+import ExecutionTimeline from '../components/ExecutionTimeline';
 import {
   apiConfigured,
   fetchAgentExecutions,
@@ -54,18 +54,15 @@ const STREAM_LABEL: Record<WorkforceAgent['streams'][number], string> = {
   editorial: 'editorial',
 };
 
-// Unified ACTIVITY ledger: how many of the fetched EXEC rows to render,
-// and where to clip a long deliverable summary in the row body.
+// Unified ACTIVITY ledger: how many of the fetched EXEC rows to render.
 const ACTIVITY_LIMIT = 30;
-const SUMMARY_CAP = 180;
 
-// Timeline dot colour per EXEC status — the point marker on the ACTIVITY
-// rail reads at a glance: green ran clean, copper threw, grey did no work.
-const ACTIVITY_DOT: Record<string, string> = {
-  ok: 'bg-wf-running',
-  throw: 'bg-wf-throwing',
-  skipped: 'bg-wf-archived',
-};
+// The profile splits into meaning-level tabs (operator direction 2026-07-03,
+// LinkedIn-style IA): identity reads in OVERVIEW, the run/deliverable record
+// in ACTIVITY, the voice in POSTS, the wiring in BINDINGS. The active tab
+// lives in the URL (?tab=) so deep links and refreshes keep their place.
+const TABS = ['overview', 'activity', 'posts', 'bindings'] as const;
+type Tab = (typeof TABS)[number];
 
 function formatRelative(iso: string): string {
   const t = Date.parse(iso);
@@ -80,6 +77,14 @@ function formatRelative(iso: string): string {
 
 export default function AgentProfile() {
   const { slug } = useParams<{ slug: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = searchParams.get('tab');
+  const tab: Tab = (TABS as readonly string[]).includes(rawTab ?? '') ? (rawTab as Tab) : 'overview';
+  const setTab = (next: Tab) => {
+    if (next === 'overview') searchParams.delete('tab');
+    else searchParams.set('tab', next);
+    setSearchParams(searchParams, { replace: true });
+  };
   const [agent, setAgent] = useState<WorkforceAgent | null | undefined>(undefined);
   const [roster, setRoster] = useState<WorkforceAgent[]>([]);
   const [mock, setMock] = useState<WorkforceMockStats | null>(null);
@@ -242,25 +247,86 @@ export default function AgentProfile() {
         )}
       </section>
 
-      {/* TWO COLUMN: main / sidebar */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6 sm:space-y-8">
+      {/* Meaning-level tabs (URL-backed via ?tab=) */}
+      <nav className="mb-6 flex items-stretch gap-1 border-b border-wf-outline-variant overflow-x-auto">
+        {TABS.map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={`px-3 py-2 -mb-px border-b-2 font-wfmono text-[11px] uppercase tracking-[0.14em] whitespace-nowrap transition-colors ${
+              tab === t
+                ? 'border-wf-on-surface text-wf-on-surface'
+                : 'border-transparent text-wf-on-surface-variant hover:text-wf-on-surface'
+            }`}
+            aria-current={tab === t ? 'page' : undefined}
+          >
+            {t}
+          </button>
+        ))}
+      </nav>
 
-          {/* JD — mission, key responsibilities, success measures */}
-          {agent.jd && <JDPanel jd={agent.jd} />}
+      {tab === 'overview' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6 sm:space-y-8">
+            {/* JD — mission, key responsibilities, success measures */}
+            {agent.jd && <JDPanel jd={agent.jd} />}
 
-          {/* IDENTITY — OpenClaw-style archetype + operating principles */}
-          {agent.identity && <IdentityPanel identity={agent.identity} />}
+            {/* IDENTITY — archetype + operating principles */}
+            {agent.identity && <IdentityPanel identity={agent.identity} />}
 
+            {/* MEMORY — durable long-term state. Renders even when empty
+                so the operator can see "no learned memory yet" as a state. */}
+            {agent.memory && <MemoryPanel memory={agent.memory} />}
+
+            {/* CONFIG facts grid */}
+            <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
+              <div className="border-b border-wf-outline-variant px-4 py-3">
+                <Typeplate label="CONFIG" value="PERSONA · MODEL · PROJECT" />
+              </div>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-4 text-sm">
+                <Fact label="MODEL" value={agent.model} />
+                <Fact label="PROMPT" value={`v${agent.prompt_version}`} />
+                <Fact label="MONTHLY BUDGET" value={`USD ${agent.budget_monthly_usd}`} />
+                <Fact label="PROJECT" value={agent.default_project} />
+                <Fact label="STREAMS" value={agent.streams.map((s) => STREAM_LABEL[s]).join(' · ')} />
+                {lastRunAt && (
+                  <Fact label="LAST RUN" value={`${formatRelative(lastRunAt)} (${lastRunStatus})`} />
+                )}
+              </dl>
+            </section>
+
+            {/* DISCLOSURE — LLM-persona footer */}
+            <section className="border border-wf-outline-variant bg-wf-surface-container rounded-wf-md p-4">
+              <Typeplate label="DISCLOSURE" value="LLM-DRIVEN PERSONA" className="mb-2" />
+              <p className="text-xs text-wf-on-surface-variant leading-relaxed">
+                {fullName(agent)} is an LLM-driven persona on the Workforce platform. Articles bylined to{' '}
+                {agent.first_name} are produced by an Anthropic Claude model running on AWS Lambda; the
+                persona's full voice and limitations are documented in their{' '}
+                <a
+                  href={`https://github.com/refluster/ai-native-article/blob/main/workforce/agents/${agent.slug}/system.md`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-wf-primary hover:underline"
+                >
+                  system prompt
+                </a>{' '}
+                and acknowledged in every article footer.
+              </p>
+            </section>
+          </div>
+
+          {/* SIDEBAR */}
+          <aside className="lg:col-span-1 space-y-6">
+            {roster.length > 0 && <AgentOrgGraph agent={agent} roster={roster} />}
+          </aside>
+        </div>
+      )}
+
+      {tab === 'activity' && (
+        <div className="space-y-6 sm:space-y-8">
           {/* PERFORMANCE — 7-day rollup + per-skill execution bars */}
-          {mockForSlug?.last_7d && (
-            <PerformancePanel last7d={mockForSlug.last_7d} />
-          )}
-
-          {/* RECENT ACTIVITY — task log (when, what, result) */}
-          {mockForSlug?.recent_runs && mockForSlug.recent_runs.length > 0 && (
-            <RecentRunsPanel runs={mockForSlug.recent_runs} />
-          )}
+          {mockForSlug?.last_7d && <PerformancePanel last7d={mockForSlug.last_7d} />}
 
           {/* HEAT STRIP */}
           {mock && mock.activity.by_slug[agent.slug] && (
@@ -277,51 +343,11 @@ export default function AgentProfile() {
             </section>
           )}
 
-          {/* MEMORY — durable long-term state. Renders even when empty
-              so the operator can see "no learned memory yet" as a state. */}
-          {agent.memory && <MemoryPanel memory={agent.memory} />}
-
-          {/* CONFIG facts grid */}
-          <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
-            <div className="border-b border-wf-outline-variant px-4 py-3">
-              <Typeplate label="CONFIG" value="PERSONA · MODEL · PROJECT" />
-            </div>
-            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-4 text-sm">
-              <Fact label="MODEL" value={agent.model} />
-              <Fact label="PROMPT" value={`v${agent.prompt_version}`} />
-              <Fact label="MONTHLY BUDGET" value={`USD ${agent.budget_monthly_usd}`} />
-              <Fact label="PROJECT" value={agent.default_project} />
-              <Fact label="STREAMS" value={agent.streams.map((s) => STREAM_LABEL[s]).join(' · ')} />
-              {lastRunAt && (
-                <Fact label="LAST RUN" value={`${formatRelative(lastRunAt)} (${lastRunStatus})`} />
-              )}
-            </dl>
-          </section>
-
-          {/* BINDINGS — cron × skill pairs. Editable when the SigV4
-              broker is configured (binding CRUD + cron edits land as
-              audited PATCHes on the live row — ADR-0007/0008). */}
-          <BindingsEditor
-            slug={agent.slug}
-            bindings={agent.bindings}
-            onUpdated={(next) => setAgent({ ...agent, bindings: next })}
-          />
-
-          {/* (The MEMBERSHIPS panel was removed 2026-07-03 with the
-              membership concept — every registered agent participates in
-              every project. Project participation is visible through the
-              ACTIVITY ledger's project column and the bindings above.) */}
-
           {/* ACTIVITY — one unified ledger of every EXEC row, newest-first
-              (live API only). Replaces the former split TRACK RECORD
-              (deliverables-only) + EXEC RAW RUNS (everything) sections,
-              which read as near-duplicates. Each row carries date ·
-              project · skill · status, with the deliverable summary in the
-              body when one exists and a "skipped"/"no summary" fallback
-              otherwise. Deeplinks to Notion / GitHub PRs aren't on EXEC
-              yet (FU-NEW-G follow-up promotes notion_page_url / pr_url
-              onto the row); until then the project link is the operator's
-              drill-down handle. */}
+              (live API only), rendered through the shared ExecutionTimeline
+              (same visual language as the project page). Deeplinks to
+              Notion / GitHub PRs aren't on EXEC yet (FU-NEW-G); until then
+              the project link is the drill-down handle. */}
           {apiConfigured() && (
             <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
               <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between gap-3">
@@ -340,90 +366,30 @@ export default function AgentProfile() {
                     no executions yet — orchestrator hasn't fired since deploy.
                   </p>
                 ) : (
-                  <ol className="relative border-l border-wf-outline-variant pl-4 space-y-4">
-                    {execs.slice(0, ACTIVITY_LIMIT).map((e) => {
-                      // Prefer the explicit top-level engagement summary;
-                      // fall back to the artifact preview for CCR/legacy rows
-                      // that only carried an artifact_ref.
-                      const raw = (e.summary ?? e.artifact_ref?.summary)?.trim() ?? '';
-                      const summary = raw.length > SUMMARY_CAP ? `${raw.slice(0, SUMMARY_CAP)}…` : raw;
-                      // A skipped run did no work, so "skipped" is a truer
-                      // body than "no summary"; an ok/throw run that simply
-                      // carried no summary gets "no summary".
-                      const fallback = e.status === 'skipped' ? 'skipped' : 'no summary';
-                      return (
-                        <li key={e.exec_ulid} className="relative text-sm">
-                          {/* Point marker on the time axis — the vertical
-                              rail is the <ol> left border; the dot sits on
-                              it, ringed in the card fill so it reads as
-                              punched through the line. */}
-                          <span
-                            aria-hidden
-                            className={`absolute -left-[19px] top-1 w-2.5 h-2.5 rounded-full ring-2 ring-wf-surface-container-lo ${ACTIVITY_DOT[e.status] ?? 'bg-wf-primary'}`}
-                          />
-                          <div className="flex items-center gap-2 flex-wrap font-wfmono text-[10px] tracking-[0.08em] text-wf-on-surface-variant">
-                            <span>{e.started_at?.slice(0, 10)}</span>
-                            <span aria-hidden>·</span>
-                            <Link
-                              to={`/projects/${encodeURIComponent(e.project_id)}`}
-                              className="text-wf-primary hover:underline"
-                            >
-                              {e.project_id}
-                            </Link>
-                            <span aria-hidden>·</span>
-                            <Link
-                              to={`/skills/${e.skill_name}`}
-                              className="hover:text-wf-primary truncate max-w-[12rem]"
-                              title={e.skill_name}
-                            >
-                              {e.skill_name}
-                            </Link>
-                            <StatusBadge status={e.status} error={e.error} className="ml-auto" />
-                          </div>
-                          <div className="mt-1 leading-snug">
-                            {summary.length > 0 ? (
-                              <span className="text-wf-on-surface">{summary}</span>
-                            ) : (
-                              <span className="italic text-wf-on-surface-variant">{fallback}</span>
-                            )}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ol>
+                  <ExecutionTimeline executions={execs} perspective="agent" limit={ACTIVITY_LIMIT} />
                 )}
               </div>
             </section>
           )}
 
-          {/* DISCLOSURE — LLM-persona footer (slimmed: IDENTITY moved up) */}
-          <section className="border border-wf-outline-variant bg-wf-surface-container rounded-wf-md p-4">
-            <Typeplate label="DISCLOSURE" value="LLM-DRIVEN PERSONA" className="mb-2" />
-            <p className="text-xs text-wf-on-surface-variant leading-relaxed">
-              {fullName(agent)} is an LLM-driven persona on the Workforce platform. Articles bylined to{' '}
-              {agent.first_name} are produced by an Anthropic Claude model running on AWS Lambda; the
-              persona's full voice and limitations are documented in their{' '}
-              <a
-                href={`https://github.com/refluster/ai-native-article/blob/main/workforce/agents/${agent.slug}/system.md`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-wf-primary hover:underline"
-              >
-                system prompt
-              </a>{' '}
-              and acknowledged in every article footer.
-            </p>
-          </section>
+          {/* TASK LOG (mock fallback) */}
+          {mockForSlug?.recent_runs && mockForSlug.recent_runs.length > 0 && (
+            <RecentRunsPanel runs={mockForSlug.recent_runs} />
+          )}
         </div>
+      )}
 
-        {/* SIDEBAR */}
-        <aside className="lg:col-span-1 space-y-6">
-          {roster.length > 0 && <AgentOrgGraph agent={agent} roster={roster} />}
-        </aside>
-      </div>
+      {tab === 'posts' && slug && <RecentPostsSection slug={slug} />}
 
-      {/* RECENT POSTS — appended section (Epic-011 cycle-1 verdict #3 closure: section, not tab). */}
-      {slug && <RecentPostsSection slug={slug} />}
+      {tab === 'bindings' && (
+        <div className="space-y-6">
+          <BindingsEditor
+            slug={agent.slug}
+            bindings={agent.bindings}
+            onUpdated={(next) => setAgent({ ...agent, bindings: next })}
+          />
+        </div>
+      )}
     </WorkforceLayout>
   );
 }

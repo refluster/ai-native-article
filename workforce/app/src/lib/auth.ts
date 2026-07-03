@@ -51,13 +51,56 @@ export async function getCurrentUser(): Promise<User | null> {
   return u;
 }
 
-export async function signIn(): Promise<void> {
+// The deep link the operator was on when the token expired. Carried
+// through the OIDC round-trip TWO ways (belt and suspenders): as the
+// oidc-client-ts `state` (returned on the User object at the callback)
+// AND in sessionStorage (survives an oidc state-entry miss). Without
+// this, every token refresh dumped the operator back at "/" — losing
+// the /agents/:slug or /projects/:id they were reading.
+const RETURN_TO_KEY = 'wf.auth.returnTo';
+
+export async function signIn(returnTo?: string): Promise<void> {
   const m = getUserManager();
   if (!m) {
     console.warn('auth not configured; cannot sign in');
     return;
   }
+  if (returnTo && returnTo.startsWith('/') && !returnTo.startsWith('/auth/')) {
+    try {
+      window.sessionStorage.setItem(RETURN_TO_KEY, returnTo);
+    } catch {
+      // storage full/blocked — the state param below still carries it
+    }
+    await m.signinRedirect({ state: { returnTo } });
+    return;
+  }
   await m.signinRedirect();
+}
+
+/** The path to restore after the callback. Prefers the OIDC state echoed
+ *  on the signed-in User; falls back to the sessionStorage copy. Returns
+ *  an in-app path only (never a foreign origin — the value is validated
+ *  to start with "/" and to not point back at /auth/). */
+export function consumeReturnTo(user: User | null): string {
+  let candidate: string | undefined;
+  const st = user?.state as { returnTo?: unknown } | undefined;
+  if (st && typeof st.returnTo === 'string') candidate = st.returnTo;
+  if (!candidate) {
+    try {
+      candidate = window.sessionStorage.getItem(RETURN_TO_KEY) ?? undefined;
+    } catch {
+      // ignore
+    }
+  }
+  try {
+    window.sessionStorage.removeItem(RETURN_TO_KEY);
+  } catch {
+    // ignore
+  }
+  if (candidate && candidate.startsWith('/') && !candidate.startsWith('//') && !candidate.startsWith('/auth/')) {
+    return candidate;
+  }
+  return '/';
 }
 
 /** Cognito-specific sign-out: hits /logout so the User Pool session ends too. */

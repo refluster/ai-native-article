@@ -35,7 +35,10 @@ export default function AuthBoundary({ children }: Props) {
           setStatus('authed');
         } else {
           setStatus('redirecting');
-          signIn().catch((err) => {
+          // Preserve the deep link across the Cognito round-trip — the
+          // callback restores it instead of dumping the operator at "/".
+          const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+          signIn(returnTo).catch((err) => {
             console.error('signIn redirect failed:', err);
             if (!cancelled) setStatus('unconfigured');
           });

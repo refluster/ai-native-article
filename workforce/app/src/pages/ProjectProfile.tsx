@@ -16,8 +16,8 @@ import { Link, useParams } from 'react-router-dom';
 import WorkforceLayout from '../components/WorkforceLayout';
 import Typeplate from '../components/Typeplate';
 import KPIReadout from '../components/KPIReadout';
-import StatusBadge from '../components/StatusBadge';
 import ProjectArchiveButton from '../components/ProjectArchiveButton';
+import ExecutionTimeline from '../components/ExecutionTimeline';
 import CredentialVault from '../components/CredentialVault';
 import PerformancePanels from '../components/PerformancePanels';
 import { projectScope } from '../lib/performance';
@@ -290,7 +290,7 @@ function OverviewPanel({ project }: { project: ProjectDetail }) {
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3">
-        <Typeplate label="DECK · OVERVIEW" value="META · OWNER · ACTIVITY" />
+        <Typeplate label="OVERVIEW" value="META · OWNER · ACTIVITY" />
       </div>
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-4 text-sm">
         <Fact label="PROJECT_ID" value={project.project_id} mono />
@@ -350,7 +350,7 @@ function ExecutionHistoryPanel({ executions }: { executions: ProjectExecution[] 
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
         <Typeplate
-          label="DECK · EXECUTIONS"
+          label="EXECUTIONS"
           value={executions ? `LAST ${executions.length} ROWS` : '—'}
         />
         <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
@@ -364,83 +364,10 @@ function ExecutionHistoryPanel({ executions }: { executions: ProjectExecution[] 
           No executions yet. EXEC rows appear here as agents run skills against this project.
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-wf-outline-variant">
-                <th className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant text-left px-4 py-2 whitespace-nowrap">
-                  WHEN
-                </th>
-                <th className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant text-left px-2 py-2">
-                  AGENT
-                </th>
-                <th className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant text-left px-2 py-2">
-                  SKILL
-                </th>
-                <th className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant text-left px-2 py-2">
-                  STATUS
-                </th>
-                <th className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant text-left px-4 py-2">
-                  ARTIFACT
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-wf-outline-variant">
-              {executions.map((e) => (
-                <tr key={e.exec_ulid} className="hover:bg-wf-surface-container/40">
-                  <td className="font-wfmono text-xs text-wf-on-surface-variant px-4 py-2 whitespace-nowrap">
-                    <div className="text-wf-on-surface">{e.started_at.slice(0, 10)}</div>
-                    <div className="text-[10px]">
-                      {e.started_at.slice(11, 16)} · {formatRelative(e.started_at)}
-                    </div>
-                  </td>
-                  <td className="px-2 py-2">
-                    <Link
-                      to={`/agents/${e.agent_slug}`}
-                      className="font-wfmono text-xs text-wf-on-surface hover:text-wf-primary"
-                    >
-                      {e.agent_slug}
-                    </Link>
-                  </td>
-                  <td className="px-2 py-2">
-                    <Link
-                      to={`/skills/${e.skill_name}`}
-                      className="font-wfmono text-xs text-wf-on-surface hover:text-wf-primary"
-                    >
-                      {e.skill_name}
-                    </Link>
-                    <div className="font-wfmono text-[10px] text-wf-on-surface-variant">
-                      v{e.skill_version}
-                    </div>
-                  </td>
-                  <td className="px-2 py-2">
-                    <StatusBadge status={e.status} error={e.error} />
-                  </td>
-                  <td className="px-4 py-2 text-sm">
-                    {e.summary ? (
-                      <span
-                        className="font-wfmono text-xs text-wf-on-surface-variant"
-                        title={e.artifact_ref?.uri}
-                      >
-                        {e.summary.slice(0, 60)}
-                      </span>
-                    ) : e.artifact_ref ? (
-                      <span
-                        className="font-wfmono text-xs text-wf-on-surface-variant"
-                        title={e.artifact_ref.uri}
-                      >
-                        {e.artifact_ref.summary?.slice(0, 60) ?? e.artifact_ref.content_type}
-                      </span>
-                    ) : e.error ? (
-                      <span className="text-xs text-wf-tertiary italic">{e.error.slice(0, 80)}</span>
-                    ) : (
-                      <span className="font-wfmono text-[10px] text-wf-on-surface-variant">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="p-4">
+          {/* Same visual language as the agent page's ACTIVITY ledger —
+              one timeline component across the console (2026-07-03). */}
+          <ExecutionTimeline executions={executions} perspective="project" />
         </div>
       )}
     </section>
