@@ -18,22 +18,57 @@ The runtime working prompt is composed at fire-time:
 
 ```
 1. Generic runner spec      ← THIS FILE (dispatch logic + write-back contract)
-2. Persona voice            ← GET <wf-agents-api-base>/agents/{agent_slug} → .system_prompt   (ADR-0007)
-3. Skill body               ← GET <wf-agents-api-base>/skills/{skill} → .body                 (ADR-0008)
-4. Binding config overlay   ← the same GET /agents/{agent_slug} record → .bindings[binding_idx].config
+2. North star (collective)  ← workforce/docs/mvv.md, read from the cloned repo (Zone A; git-authoritative)
+3. Persona voice            ← GET <wf-agents-api-base>/agents/{agent_slug} → .system_prompt   (ADR-0007)
+4. Skill body               ← GET <wf-agents-api-base>/skills/{skill} → .body                 (ADR-0008)
+5. Binding config overlay   ← the same GET /agents/{agent_slug} record → .bindings[binding_idx].config
 ```
 
-The runner spec itself (and every skill's bundled write-script) is read from
-the cloned repo on each fire; persona and skill-judgment config are read from
-the live agents-api — the DDB rows are their authoritative store (ADR-0007 /
-ADR-0008), so a PATCH takes effect on the next fire with no deploy and no
-re-clone. The git `workforce/skills/{name}/SKILL.md` is the creation-time
-scaffold, NOT the runtime body — do not fall back to it; if the API read
-fails, throw (C-4/W-4: a fire against a possibly-stale judgment body is a
+The runner spec itself, the MVV, and every skill's bundled write-script are
+read from the cloned repo on each fire (git is their authoritative store —
+the MVV is a Zone A statute doc, so reading the clone IS reading the master
+copy); persona and skill-judgment config are read from the live agents-api —
+the DDB rows are their authoritative store (ADR-0007 / ADR-0008), so a PATCH
+takes effect on the next fire with no deploy and no re-clone. The git
+`workforce/skills/{name}/SKILL.md` is the creation-time scaffold, NOT the
+runtime body — do not fall back to it; if the API read fails, throw
+(C-4/W-4: a fire against a possibly-stale judgment body is a
 silent-degradation class, not a graceful fallback). The API base is the
 ADR-0004 custom domain `https://workforce-api.kohuehara.xyz`. No state lives
 in claude.ai beyond the thin instruction pointer (see "Operator instantiation"
 below).
+
+### The knowledge sources, systematised
+
+Every task's working context draws from two tiers. When a skill body asks for
+"context" without specifying, this is the canonical inventory:
+
+**Individual (the agent's own):**
+- **Identity & JD** — `GET /agents/{slug}` → `jd` (mission, responsibilities,
+  success measures), `identity` (archetype, operating principles, voice,
+  guardrails), and the full persona prose in `system_prompt`.
+- **Assigned skills** — the same record's `bindings[]` (what this agent is
+  trusted to run, on what cadence, in which project).
+- **Memory** — the rolling narrative chunks (`memory/{slug}/v{NNNN}.md`,
+  latest via `MEMORY#INDEX`).
+- **Past activity & deliverables** — `GET /agents/{slug}/executions` (the
+  EXEC ledger) and `GET /agents/{slug}/posts` (the agent's own feed posts).
+
+**Collective (the organisation's):**
+- **The north star** — `workforce/docs/mvv.md`: mission, vision, the eight
+  values, and the five orienting questions under "Operating principles". Read
+  it once per fire and hold it for every task in the batch.
+
+The north-star layer is **unconditional and shared** — unlike the recall
+packet (which is single-agent by construction), every persona works inside
+the same mission. Concretely: when a skill calls for judgment about *what is
+worth doing or saying* (a feed post's insight, a research pick's relevance, a
+review's severity call), weigh it against the MVV's operating principles —
+"What role am I playing? What artefact proves progress? Is this old workflow
+still rational? Where is human judgment essential? What will compound?" —
+and prefer the framing that carries a hypothesis or a discovery over the one
+that merely reports work done. Persona voice (layer 3) still owns *how* it is
+said; the north star owns *why it matters to the network*.
 
 ## Fire payload — batched tasks
 
@@ -97,6 +132,13 @@ Iterate `payload.tasks` in order. For each task:
    - `skill_body = (GET <wf-agents-api-base>/skills/{skill}).body`
    A non-2xx on either GET fails the task loudly — never substitute the git
    copy of a SKILL.md body (post-ADR-0008 it is a creation-time artefact).
+
+2.5. **Hold the north star.** Once per fire (not per task), read
+   `workforce/docs/mvv.md` from the clone and keep it as the shared layer-2
+   context for every task in the batch (see "The knowledge sources,
+   systematised" above). If the file is missing from the clone, fail the fire
+   loudly — a batch run without the org's north star is the silent-degradation
+   class C-4 forbids.
 
 3. **Use the inline credentials** for any side-effect the skill performs:
    - `task.credentials[type]` for each `type` in the skill's `requires[]`
