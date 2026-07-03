@@ -5,7 +5,6 @@
 //   GET    /stats                           dashboard aggregate — EXEC-ledger roll-up (runs/deliv/heat/trace; duration, not cost)
 //   GET    /agents/{slug}                   single agent
 //   GET    /agents/{slug}/executions        canonical activity ledger — EXEC rows via GSI1 (the agent-profile task log)
-//   GET    /agents/{slug}/projects          projects this agent is an active member of
 //   GET    /agents/{slug}/posts             per-agent activity feed (Epic-011 Story 5)
 //   GET    /agents/{slug}/portfolio         per-client engagement records (Phase 7 PR5; ?project_id= required)
 //   POST   /agents/{slug}/engagements       register a client-side engagement record (Phase 7 PR5; Bearer auth)
@@ -20,9 +19,9 @@
 //   PATCH  /skills/{name}                   judgment-config writes — validated + audited (IAM-auth at API GW; ADR-0008)
 //   GET    /skills/{name}/audit             skill config-mutation audit trail, newest-first (ADR-0008)
 //   GET    /projects                        list of projects (paginated, ?include_self=)
-//   GET    /projects/{id}                  single project META + member/exec summary
-//   GET    /projects/{id}/members          active members (?include_revoked=true for audit)
+//   GET    /projects/{id}                  single project META + exec summary
 //   GET    /projects/{id}/executions       ledger (paginated, ?from=&to=&status=&agent=&skill=)
+//   PATCH  /projects/{id}                  status (archive/unarchive) + display-name rename (IAM-auth)
 //   GET    /feed                            workforce activity feed, reverse-chrono (Epic-011 Story 5)
 //   GET    /feed/{post_id}                  single post + full body (Epic-011 Story 5)
 //   PATCH  /feed/{post_id}                  hide a post (IAM-auth at API GW; Epic-011 Story 5)
@@ -42,8 +41,8 @@
 // Per Epic-010 §10, `POST /projects` is intentionally NOT exposed: new
 // projects come from `workforce/projects/{id}/project.json` + a seed
 // step, mirroring Epic-007's "creates via API are deliberately not
-// exposed." Member-mutation routes (POST/DELETE) land with Story 6's
-// follow-up slice; this PR ships read endpoints only.
+// exposed." (Project MEMBERSHIP was removed 2026-07-03 — every registered
+// agent participates in every project; only `owner_agent` remains.)
 //
 // Per Epic-011 §6 + Story 5 (#132), `POST /feed` is similarly NOT
 // exposed: posts originate from the runner only, never from the UI.
@@ -102,12 +101,12 @@ import {
   getProject,
   listExecutions,
   projectPk,
+  rename as renameProject,
   unarchive as unarchiveProject,
   type ArtifactRef,
   type ExecStatus,
   type ExecutionRow,
   type ExecutionSurface,
-  type ProjectMemberRow,
   type ProjectMetaRow,
 } from "../shared/project.js";
 import {
@@ -173,8 +172,8 @@ let _feedWriteTokenCache: string | undefined;
 // engagements. Single shared token per Phase 7 PR5 scope; per-project
 // tokens are a future amendment (the operator decides distribution at
 // single-operator scale, C-3). The engagement record's `project_id` is
-// client-supplied — the operator's trust assumption is that only project
-// members hold the token.
+// client-supplied — the operator's trust assumption is that only the
+// project's trusted clients hold the token.
 const ENGAGEMENT_WRITE_TOKEN_SECRET = "wf/api/engagements-write-token";
 let _engagementWriteTokenCache: string | undefined;
 
@@ -216,7 +215,7 @@ export async function handler(
     // routeKey is the API GW HTTP API v2 route as configured.
     // Projects path uses a non-greedy `{id}` param. The greedy `{id+}`
     // proxy CANNOT be used here: a greedy parent (`GET /projects/{id+}`)
-    // conflicts with its child routes (`/projects/{id}/members` etc.) on
+    // conflicts with its child routes (`/projects/{id}/executions` etc.) on
     // HTTP API import — API Gateway silently drops the children (no
     // warning), so they 404 in the live API even though CloudFormation
     // reports the stack IN_SYNC (drift detection doesn't compare routes
@@ -265,7 +264,6 @@ export async function handler(
     if (routeKey === "GET /agents/{slug}/portfolio" && slug) return listAgentPortfolio(slug, event);
     if (routeKey === "POST /agents/{slug}/engagements" && slug) return await createEngagementRoute(slug, event);
     if (routeKey === "GET /agents/{slug}/recall" && slug) return getAgentRecall(slug, event);
-    if (routeKey === "GET /agents/{slug}/projects" && slug) return listAgentProjects(slug);
     if (routeKey === "GET /agents/{slug}/posts" && slug) return listAgentPostsRoute(slug, event);
     if (routeKey === "GET /agents/{slug}/audit" && slug) return listAgentAuditRoute(slug, event);
     if (routeKey === "GET /agents/{slug}" && slug) return getAgent(slug);
@@ -274,7 +272,6 @@ export async function handler(
     if (routeKey === "PATCH /agents/{slug}" && slug) return await patchAgent(slug, event);
     if (routeKey === "DELETE /agents/{slug}" && slug) return await deleteAgent(slug, event);
     if (routeKey === "GET /projects") return listProjects(event);
-    if (routeKey === "GET /projects/{id}/members" && projectId) return listProjectMembers(projectId, event);
     if (routeKey === "GET /projects/{id}/executions" && projectId) return listProjectExecutions(projectId, event);
     if (routeKey === "GET /projects/{id}/credentials" && projectId) return listProjectCredentials(projectId);
     if (routeKey === "GET /projects/{id}/performance" && projectId) return getPerformanceRoute(projectId);
@@ -957,7 +954,7 @@ async function listSkillAuditRoute(
 //
 // Authorisation: `GET` is allowed at the HTTP API layer (Cognito on the
 // SPA host gates browser access). The `listExecutions` read-gate from
-// Epic-010 §10 ("operator OR active member") needs per-request IAM
+// Epic-010 §10 (originally "operator OR active member") needed per-request IAM
 // brokering that isn't wired into the SPA yet — the operator is the
 // only browser consumer today, by hostname convention.
 
@@ -968,9 +965,6 @@ interface ProjectApiView {
   owner_agent: string;
   created_at: string;
   archived_at?: string;
-  /** Number of active (non-revoked) MEMBER rows. Resolved lazily by
-   *  list/get callers so the index view can paginate cheaply. */
-  member_count?: number;
   /** Most-recent EXEC#* `started_at` on this project's partition.
    *  Undefined when the ledger is empty. */
   last_execution_at?: string;
@@ -1031,18 +1025,13 @@ async function listProjects(
     .filter((r) => !filterStatus || r.status === filterStatus)
     .filter((r) => !filterOwner || r.owner_agent === filterOwner);
 
-  // Resolve member_count + last_execution_at concurrently per row. At v1
-  // page sizes (≤100) this is bounded and cheap; promote to a single GSI
-  // query if it becomes hot.
+  // Resolve last_execution_at concurrently per row. At v1 page sizes
+  // (≤100) this is bounded and cheap; promote to a single GSI query if it
+  // becomes hot.
   const items: ProjectApiView[] = await Promise.all(
     filtered.map(async (row) => {
       const view = toProjectApiView(row);
-      const id = asProjectId(row.project_id);
-      const [memberRows, lastExec] = await Promise.all([
-        queryBySkPrefix<ProjectMemberRow>(projectPk(id), "MEMBER#", 100),
-        getLastExecutionAt(row.project_id),
-      ]);
-      view.member_count = memberRows.filter((m) => m.revoked_at === undefined).length;
+      const lastExec = await getLastExecutionAt(row.project_id);
       if (lastExec !== undefined) view.last_execution_at = lastExec;
       return view;
     }),
@@ -1178,11 +1167,7 @@ async function getProjectRoute(rawId: string): Promise<APIGatewayProxyResultV2> 
   const row = await getItem<ProjectMetaRow>(projectPk(id), "META");
   if (!row) return reply(404, { error: "not_found", project_id: rawId });
   const view = toProjectApiView(row);
-  const [memberRows, lastExec] = await Promise.all([
-    queryBySkPrefix<ProjectMemberRow>(projectPk(id), "MEMBER#", 100),
-    getLastExecutionAt(rawId),
-  ]);
-  view.member_count = memberRows.filter((m) => m.revoked_at === undefined).length;
+  const lastExec = await getLastExecutionAt(rawId);
   if (lastExec !== undefined) view.last_execution_at = lastExec;
   return reply(200, view);
 }
@@ -1203,24 +1188,6 @@ async function getPerformanceRoute(scope: string): Promise<APIGatewayProxyResult
   if (!lifecycleRow) return reply(404, { error: "not_found", scope });
   const series = composeSeries(scope, new Date().toISOString(), lifecycleRow, prRow);
   return reply(200, series);
-}
-
-async function listProjectMembers(
-  rawId: string,
-  event: APIGatewayProxyEventV2,
-): Promise<APIGatewayProxyResultV2> {
-  const id = asProjectId(rawId);
-  const qs = event.queryStringParameters ?? {};
-  const includeRevoked = qs.include_revoked === "true";
-  const rows = await queryBySkPrefix<ProjectMemberRow>(projectPk(id), "MEMBER#", 100);
-  const items = rows
-    .filter((r) => includeRevoked || r.revoked_at === undefined)
-    .map((r) => ({
-      agent_slug: r.agent_slug,
-      joined_at: r.joined_at,
-      revoked_at: r.revoked_at,
-    }));
-  return reply(200, { items });
 }
 
 async function listProjectExecutions(
@@ -1275,12 +1242,15 @@ async function listProjectExecutions(
 // is a future call if even the rotation-cadence signal turns out to be
 // sensitive in some context. R-N5 alarm path (CloudWatch) is unchanged.
 //
-// PATCH /projects/{id} flips `status` between `active` / `archived`
-// (AWS_IAM auth). This replaces "run the seed step to archive" from
-// pre-Story-6 — the operator now archives from the SPA. Only `status`
-// is patchable; identity fields (`project_id`, `owner_agent`,
-// `created_at`) cannot be edited from the API per Epic-010 §10
-// (canonical entity edits go through `workforce/projects/{id}/`).
+// PATCH /projects/{id} flips `status` between `active` / `archived` and
+// renames the display `name` (AWS_IAM auth). This replaces "run the seed
+// step" for both operations — the operator archives/renames from the SPA.
+// `name` is a pure display attribute decoupled from the immutable
+// `project_id` slug (URLs, DDB keys, and Secrets Manager prefixes never
+// move on rename); the seed treats `name` as create-only on existing rows
+// so a PATCHed name survives re-seeds. Identity fields (`project_id`,
+// `owner_agent`, `created_at`) cannot be edited from the API per
+// Epic-010 §10 (canonical entity edits go through `workforce/projects/{id}/`).
 
 interface CredentialMetadataView {
   credential_type: string;
@@ -1298,7 +1268,7 @@ async function listProjectCredentials(rawId: string): Promise<APIGatewayProxyRes
   const id = asProjectId(rawId);
   // Confirm the project exists so a missing project 404s instead of
   // returning an empty list (which would look like "registered but
-  // nothing provisioned"). Same pattern as listProjectMembers's seed.
+  // nothing provisioned").
   const proj = await getProject(id);
   if (!proj) return reply(404, { error: "not_found", project_id: rawId });
 
@@ -1334,7 +1304,7 @@ async function listProjectCredentials(rawId: string): Promise<APIGatewayProxyRes
   return reply(200, { items });
 }
 
-const PATCHABLE_PROJECT_FIELDS = ["status"] as const;
+const PATCHABLE_PROJECT_FIELDS = ["status", "name"] as const;
 type PatchableProjectField = (typeof PATCHABLE_PROJECT_FIELDS)[number];
 
 async function patchProject(
@@ -1374,6 +1344,17 @@ async function patchProject(
   const existing = await getProject(id);
   if (!existing) return reply(404, { error: "not_found", project_id: rawId });
 
+  if ("name" in patch) {
+    const nextName = patch.name;
+    if (typeof nextName !== "string" || nextName.trim().length === 0 || nextName.trim().length > 80) {
+      return reply(400, {
+        error: "invalid_name",
+        detail: `name must be a 1..80 char string after trim (got ${JSON.stringify(nextName)})`,
+      });
+    }
+    await renameProject(id, nextName);
+  }
+
   if ("status" in patch) {
     const next = patch.status;
     if (next === "archived") {
@@ -1395,23 +1376,6 @@ async function patchProject(
 
   const updated = await getProject(id);
   return reply(200, updated ? toProjectApiView(updated) : { error: "vanished" });
-}
-
-async function listAgentProjects(slug: string): Promise<APIGatewayProxyResultV2> {
-  // Memberships query: scan MEMBER#{slug} rows across all PROJECT#*
-  // partitions. No GSI for this access pattern yet; a full drain
-  // (scanAllPrefix) is fine at workforce scale (≤ 20 projects). A single
-  // Limit-capped scanPrefix page would drop memberships outside the first
-  // scan window (FU-PROJ-SCAN). When this grows hot, add a GSI on
-  // (gsi3pk=AGENT#slug, gsi3sk=PROJECT#id) at MEMBER write time.
-  const memberRows = await scanAllPrefix<ProjectMemberRow>("PROJECT#", `MEMBER#${slug}`);
-  const items = memberRows
-    .filter((r) => r.revoked_at === undefined)
-    .map((r) => ({
-      project_id: r.project_id,
-      joined_at: r.joined_at,
-    }));
-  return reply(200, { items });
 }
 
 // Epic-010 ROADMAP §Status-transition criterion 3 (C3): the agent
@@ -1485,7 +1449,7 @@ async function listAgentExecutions(
  * optional `k`, `project`, `skill`, `from`, `to`, `status` narrow the set.
  *
  * Caller-scoped to `{slug}` (an agent recalls its own history; Epic-012 Q2).
- * The membership trust boundary is enforced inside `recall()` itself.
+ * Caller-scoping is enforced inside `recall()` itself.
  */
 async function getAgentRecall(
   slug: string,
@@ -1977,8 +1941,8 @@ async function patchFeedPostRoute(
 // persona stability — silent loss is an accepted failure mode at single-
 // operator scale (C-3). The shape here matches that posture: a single
 // shared bearer token, client-supplied project_id, and — since 2026-06-08 —
-// no project-membership gate at all (the cross-project denial that
-// appendExecution() used to throw was removed; membership is informational).
+// no project-membership gate at all (the concept was removed 2026-07-03 —
+// every registered agent participates in every project).
 
 interface EngagementView {
   engagement_id: string;
@@ -2172,7 +2136,7 @@ async function createEngagementRoute(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     // Membership write-gate removed 2026-06-08 (C-3): appendExecution no
-    // longer throws "cross-project denial", so there is no 403 not_a_member
+    // longer throws "cross-project denial", so there is no 403 non-member
     // path here anymore. Any holder of the engagement-write Bearer token may
     // record an engagement against any project_id.
     if (msg.startsWith("invalid project_id")) {
