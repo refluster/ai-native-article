@@ -38,6 +38,8 @@ const L1_DOCS = [
   'newsletter/docs/GROWTH.md',
   'docs/governance.md',
   'docs/design-policy.md',
+  'docs/governance-mechanisms.md',
+  'AGENTS.md',
   'workforce/docs/governance.md',
   'workforce/docs/architecture.md',
   'workforce/docs/naming.md',

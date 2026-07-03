@@ -6,6 +6,12 @@ accept. It is the *engineering* counterpart to an [Epic](../epics/README.md) —
 where an Epic records a **user/business outcome** and its lifecycle, an ADR
 records a **structural choice** and its rationale.
 
+This is the **workforce** ADR tree. The root/article tree lives at
+[`docs/adr/`](../../../docs/adr/README.md); **the two trees share numbering
+but not identity** (this tree's adr-0004 = API custom domain; the root tree's
+ADR-0004 = governance consolidation). When citing across trees, qualify the
+path: `workforce/adr-NNNN` vs `docs/adr-NNNN`.
+
 ## Epic vs ADR — which goes where
 
 | | Epic | ADR |

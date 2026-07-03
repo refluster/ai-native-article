@@ -4,6 +4,10 @@ An ADR captures **one decision**: the context that forced it, the option we
 chose, the alternatives we rejected, and the consequences we accept. This
 directory is the article/root-side ADR log (the workforce subsystem keeps its
 own engineering ADRs under [`workforce/docs/adr/`](../../workforce/docs/adr/README.md)).
+**The two trees share numbering but not identity** — e.g. this tree's ADR-0004
+(governance consolidation) is a different decision from the workforce tree's
+adr-0004 (API custom domain). When citing across trees, qualify the path:
+`docs/adr-0004` vs `workforce/adr-0004`.
 
 ADRs are **L1 framework laws** ([governance.md §3](../governance.md#3-l1--framework-laws)):
 an ADR records *why the system is built this way*, and implementation must
