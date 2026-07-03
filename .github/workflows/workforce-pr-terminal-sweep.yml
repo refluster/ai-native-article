@@ -1,0 +1,47 @@
+# R-13 — PR terminal-state sweep (docs/governance.md §4, ADR-0004).
+#
+# The pr-autopilot two-outcome contract: every PR in autopilot scope ends
+# MERGED or ESCALATED (`autopilot:needs-human`). This daily sweep enforces it
+# mechanically — it escalates (label + hand-off comment) any open PR left in a
+# non-terminal state: an unlabelled hand-off (ML-009), a routed cycle stalled
+# ≥48h, or a PR that aged out of the cadence's 7-day discovery window.
+#
+# Writes are labels + comments on this repo's PRs only (repo-scoped token);
+# never a push, never a merge. Promoted from ML-009 per the §6.1 ratchet;
+# resolves OP-010.
+
+name: Workforce PR terminal-state sweep (R-13)
+
+on:
+  schedule:
+    - cron: "47 4 * * *" # daily 04:47 UTC — clear of the deploy/tick crons
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Dependency-free scripts — no npm ci needed.
+      - name: Terminal-state sweep (auto-escalate)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f workforce/skills/pr-autopilot/pr-autopilot-sweep.mjs ]; then
+            node workforce/skills/pr-autopilot/pr-autopilot-sweep.mjs \
+              --repo "$GITHUB_REPOSITORY" --apply
+          else
+            # Transitional (until PR #425 lands the sweep engine): run the
+            # narrower ML-009 state check so the gate is never silently absent.
+            node workforce/scripts/check-escalation-labels.mjs --repo "$GITHUB_REPOSITORY"
+          fi

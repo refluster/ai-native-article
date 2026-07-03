@@ -11,7 +11,7 @@
 
 This is the **design-policy axis** of the project — orthogonal to [`docs/governance.md`](governance.md), which is the rules axis.
 
-- Governance answers *"may I do this?"* via invariants (C-1〜C-4), mechanical regulations (R-1〜R-9), and the A/B action-authority matrix. CI and hooks enforce it; violating a C or R turns a build red.
+- Governance answers *"may I do this?"* via invariants (C-1〜C-4), the mechanical regulations (the active R-rules in [governance.md §4](governance.md#4-l2--regulations-mechanical-enforcement)), and the A/B action-authority matrix. CI and hooks enforce it; violating a C or R turns a build red.
 - Design policy answers *"should I do this, and how?"* via principles (D-1〜D-3), the substrate map, and the iteration loop. **Nothing here is enforced by hook or CI.** A D-principle is a north star, not a tripwire. Violating one does not break the build — it just means an agent has drifted from the project's shape.
 
 When the two axes appear to conflict, the rules axis wins. A D-principle never licenses a C-1 (editorial integrity) or C-4 (fail loud) violation. Design policy operates in the space governance leaves open — and governance leaves a lot of space open, deliberately.

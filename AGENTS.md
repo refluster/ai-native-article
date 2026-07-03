@@ -35,7 +35,7 @@ Agents may author and merge, subject to CI passing and one human review *unless*
 - `newsletter/app/src/types/**`
 - `newsletter/pipeline/**`, `scripts/**`
 
-**Workforce subsystem** — the `workforce/` subtree is being rebuilt. Its zone classifications (including the prompt-version-bump-per-PR rule for `agents/**` and `skills/**`) will be reintroduced in [workforce/docs/governance.md](workforce/docs/governance.md), added in PR1 of the rebuild sequence. Until then, no agent may author PRs that touch `workforce/**` outside of the planned rebuild PRs.
+**Workforce subsystem** — `workforce/**` is governed by its own statute: [workforce/docs/governance.md](workforce/docs/governance.md) (zone table in its §3, W-invariants §2, R-N design rules §4). It inherits this file's zone model and rules; where the two conflict, root wins unless the workforce doc explicitly tightens. Consult that doc before touching anything under `workforce/**`.
 
 ### Zone C — Agent-generated (content)
 

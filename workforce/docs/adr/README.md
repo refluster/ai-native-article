@@ -2,7 +2,7 @@
 
 An ADR captures **one technical decision**: the context that forced it, the
 option we chose, the alternatives we rejected, and the consequences we
-accept. It is the *engineering* counterpart to an [Epic](epics/README.md) —
+accept. It is the *engineering* counterpart to an [Epic](../epics/README.md) —
 where an Epic records a **user/business outcome** and its lifecycle, an ADR
 records a **structural choice** and its rationale.
 
@@ -61,22 +61,22 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 
 | # | Title | Status | Epics |
 |---|---|---|---|
-| [0001](adr-0001-record-family-separation.md) | Two record families: activity ledger vs experience memory | Accepted | [012](epics/epic-012-agent-experience.md) |
-| [0002](adr-0002-no-dedicated-vector-store.md) | Semantic recall without a dedicated vector store | Accepted | [010](epics/epic-010-project-trust-boundary.md), [012](epics/epic-012-agent-experience.md) |
-| [0003](adr-0003-experience-storage-split.md) | Experience storage split: narrative in S3, index in DynamoDB | Accepted | [012](epics/epic-012-agent-experience.md) |
-| [0004](adr-0004-workforce-api-custom-domain.md) | Workforce API served from a custom domain (`workforce-api.kohuehara.xyz`) | Accepted | [007](epics/epic-007-agent-management-api.md), [012](epics/epic-012-agent-experience.md) |
-| [0005](adr-0005-single-execution-model-ccr.md) | Single execution model: every (project × agent × skill) task runs as a CCR task | Accepted | [010](epics/epic-010-project-trust-boundary.md), [011](epics/epic-011-agent-feed.md), [012](epics/epic-012-agent-experience.md) |
-| [0006](adr-0006-realtime-messaging-reply.md) | Real-time talent replies run on a dedicated async Lambda, not the CCR batch runner | Accepted | [013](epics/epic-013-talent-messaging.md) |
-| [0007](adr-0007-agent-config-single-source.md) | Agent identity/config is single-sourced from DynamoDB; git definition files retire | Accepted | [006](epics/epic-006-scalability.md), [007](epics/epic-007-agent-management-api.md) |
-| [0008](adr-0008-skill-config-single-source.md) | Skill judgment-config is single-sourced from DynamoDB; the console reads DDB live | Proposed | [008](epics/epic-008-skill-repository.md) |
-| [0009](adr-0009-scoped-capability-tokens.md) | Scoped capability tokens: one minter, scope-claimed short-lived tokens, retiring per-service static bearers | Proposed | [010](epics/epic-010-project-trust-boundary.md), [011](epics/epic-011-agent-feed.md) |
-| [0010](adr-0010-autopilot-merge-consensus-widening.md) | Autopilot merge widens to "non-L0/L1 + unanimous reviewer consensus" | Proposed | [010](epics/epic-010-project-trust-boundary.md) |
-| [0011](adr-0011-own-repo-autopilot-merge.md) | Own-repo autopilot merge: retire the self-repo carve-out; the L0/L1 boundary is the single line | Accepted | [010](epics/epic-010-project-trust-boundary.md) |
-| [0012](adr-0012-decouple-binding-from-ownership.md) | Binding is decoupled from skill ownership: any agent may bind any skill | Proposed | [008](epics/epic-008-skill-repository.md) |
+| [0001](adr-0001-record-family-separation.md) | Two record families: activity ledger vs experience memory | Accepted | [012](../epics/epic-012-agent-experience.md) |
+| [0002](adr-0002-no-dedicated-vector-store.md) | Semantic recall without a dedicated vector store | Accepted | [010](../epics/epic-010-project-trust-boundary.md), [012](../epics/epic-012-agent-experience.md) |
+| [0003](adr-0003-experience-storage-split.md) | Experience storage split: narrative in S3, index in DynamoDB | Accepted | [012](../epics/epic-012-agent-experience.md) |
+| [0004](adr-0004-workforce-api-custom-domain.md) | Workforce API served from a custom domain (`workforce-api.kohuehara.xyz`) | Accepted | [007](../epics/epic-007-agent-management-api.md), [012](../epics/epic-012-agent-experience.md) |
+| [0005](adr-0005-single-execution-model-ccr.md) | Single execution model: every (project × agent × skill) task runs as a CCR task | Accepted | [010](../epics/epic-010-project-trust-boundary.md), [011](../epics/epic-011-agent-feed.md), [012](../epics/epic-012-agent-experience.md) |
+| [0006](adr-0006-realtime-messaging-reply.md) | Real-time talent replies run on a dedicated async Lambda, not the CCR batch runner | Accepted | [013](../epics/epic-013-talent-messaging.md) |
+| [0007](adr-0007-agent-config-single-source.md) | Agent identity/config is single-sourced from DynamoDB; git definition files retire | Accepted | [006](../epics/epic-006-scalability.md), [007](../epics/epic-007-agent-management-api.md) |
+| [0008](adr-0008-skill-config-single-source.md) | Skill judgment-config is single-sourced from DynamoDB; the console reads DDB live | Proposed | [008](../epics/epic-008-skill-repository.md) |
+| [0009](adr-0009-scoped-capability-tokens.md) | Scoped capability tokens: one minter, scope-claimed short-lived tokens, retiring per-service static bearers | Proposed | [010](../epics/epic-010-project-trust-boundary.md), [011](../epics/epic-011-agent-feed.md) |
+| [0010](adr-0010-autopilot-merge-consensus-widening.md) | Autopilot merge widens to "non-L0/L1 + unanimous reviewer consensus" | Accepted | [010](../epics/epic-010-project-trust-boundary.md) |
+| [0011](adr-0011-own-repo-autopilot-merge.md) | Own-repo autopilot merge: retire the self-repo carve-out; the L0/L1 boundary is the single line | Accepted | [010](../epics/epic-010-project-trust-boundary.md) |
+| [0012](adr-0012-decouple-binding-from-ownership.md) | Binding is decoupled from skill ownership: any agent may bind any skill | Proposed | [008](../epics/epic-008-skill-repository.md) |
 | [0013](adr-0013-event-driven-pr-autopilot.md) | pr-autopilot fires on PR-open via a CCR-native `github_event` trigger (within adr-0005) | Proposed | — (cadence; adr-0005/0010/0011) |
-| [0014](adr-0014-drafts-are-merge-eligible.md) | Drafts are merge-eligible: the engine marks a green, non-L0/L1 draft Ready for Review, then merges | Accepted | [010](epics/epic-010-project-trust-boundary.md) |
-| [0015](adr-0015-skill-bodies-not-l0l1.md) | Skill bodies (`SKILL.md`) are removed from the L0/L1 autopilot off-limits set | Proposed | [010](epics/epic-010-project-trust-boundary.md) |
-| [0016](adr-0016-podcast-production-surface.md) | Podcast production & distribution execution surface (deterministic `wf-podcast` Lambda + Polly/public-RSS egress, within R-N1) | Proposed | [017](epics/epic-017-podcast-spotify-distribution.md) |
+| [0014](adr-0014-drafts-are-merge-eligible.md) | Drafts are merge-eligible: the engine marks a green, non-L0/L1 draft Ready for Review, then merges | Accepted | [010](../epics/epic-010-project-trust-boundary.md) |
+| [0015](adr-0015-skill-bodies-not-l0l1.md) | Skill bodies (`SKILL.md`) are removed from the L0/L1 autopilot off-limits set | Proposed | [010](../epics/epic-010-project-trust-boundary.md) |
+| [0016](adr-0016-podcast-production-surface.md) | Podcast production & distribution execution surface (deterministic `wf-podcast` Lambda + Polly/public-RSS egress, within R-N1) | Proposed | [017](../epics/epic-017-podcast-spotify-distribution.md) |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
-canonical status view, same convention as [epics/README.md](epics/README.md).
+canonical status view, same convention as [epics/README.md](../epics/README.md).

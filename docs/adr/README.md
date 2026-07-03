@@ -44,5 +44,8 @@ headers:
 | # | Title | Status |
 |---|---|---|
 | [0001](adr-0001-self-driving-governance-mechanisms.md) | Self-driving governance mechanisms (R-10…R-12 gates, the two engines, the registries) | Accepted |
+| [0002](adr-0002-daily-use-reader-ia.md) | Daily-use reader IA: analysis-default, flat tags, operator split | Proposed |
+| [0003](adr-0003-flat-tag-taxonomy.md) | Flat tag taxonomy (replacing the A–E hierarchy) | Proposed |
+| [0004](adr-0004-governance-consolidation.md) | Governance consolidation: de-duplicated statute, R-11 full-law coverage, R-13 terminal-state sweep | Proposed |
 
 Keep this table in sync when an ADR is added or its Status flips.
