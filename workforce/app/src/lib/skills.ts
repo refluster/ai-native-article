@@ -8,6 +8,7 @@
 import type {
   CostClass,
   SkillDeliverable,
+  SkillExecution,
   SkillLiveRecord,
   SkillStatus,
   WorkforceSkill,
@@ -55,6 +56,7 @@ export async function findSkill(name: string): Promise<WorkforceSkill | undefine
  *  the write-scripts / meta.json are code artefacts, not DDB state. */
 interface SkillListItem {
   name: string
+  display_name?: string | null
   version: string
   status: SkillStatus
   description: string
@@ -65,7 +67,7 @@ interface SkillListItem {
   created_at: string
 }
 
-let listCache: Promise<WorkforceSkill[]> | null = null
+const listCache = new Map<string, Promise<WorkforceSkill[]>>()
 
 /**
  * Load the skill repository list LIVE from the agents-api (ADR-0008 §7: the
@@ -79,13 +81,15 @@ let listCache: Promise<WorkforceSkill[]> | null = null
  * empty result (C-4 at render time — an empty repository is an error state,
  * never a silently empty directory). `files[]` is empty in this shape.
  */
-export function loadWorkforceSkills(): Promise<WorkforceSkill[]> {
-  if (!listCache) {
-    listCache = (async () => {
+export function loadWorkforceSkills(opts: { includeArchived?: boolean } = {}): Promise<WorkforceSkill[]> {
+  const cacheKey = opts.includeArchived ? 'all' : 'default'
+  if (!listCache.has(cacheKey)) {
+    const p = (async () => {
       const items: SkillListItem[] = []
       let cursor: string | undefined
       do {
         const qs = new URLSearchParams({ page_size: '100' })
+        if (opts.includeArchived) qs.set('include_archived', 'true')
         if (cursor) qs.set('cursor', cursor)
         const res = await fetch(`${SKILLS_API_BASE}/skills?${qs}`)
         if (!res.ok) throw new Error(`failed to load live skill repository (${res.status})`)
@@ -99,6 +103,7 @@ export function loadWorkforceSkills(): Promise<WorkforceSkill[]> {
       return items
         .map<WorkforceSkill>((s) => ({
           name: s.name,
+          display_name: s.display_name ?? null,
           version: s.version,
           status: s.status,
           deliverable: s.deliverable ?? null,
@@ -111,11 +116,30 @@ export function loadWorkforceSkills(): Promise<WorkforceSkill[]> {
         }))
         .sort((a, b) => a.name.localeCompare(b.name))
     })().catch((err) => {
-      listCache = null
+      listCache.delete(cacheKey)
       throw err
     })
+    listCache.set(cacheKey, p)
   }
-  return listCache
+  return listCache.get(cacheKey)!
+}
+
+/** Per-skill run ledger (ADR-0017 observability): GET /skills/{name}/executions.
+ *  Public read on the same base as the list. */
+export async function fetchSkillExecutions(
+  name: string,
+  opts: { agent?: string; status?: string; from?: string; to?: string; limit?: number } = {},
+): Promise<SkillExecution[]> {
+  const qs = new URLSearchParams()
+  if (opts.agent) qs.set('agent', opts.agent)
+  if (opts.status) qs.set('status', opts.status)
+  if (opts.from) qs.set('from', opts.from)
+  if (opts.to) qs.set('to', opts.to)
+  qs.set('limit', String(opts.limit ?? 50))
+  const res = await fetch(`${SKILLS_API_BASE}/skills/${encodeURIComponent(name)}/executions?${qs}`)
+  if (!res.ok) throw new Error(`agents-api ${res.status}`)
+  const data = (await res.json()) as { items: SkillExecution[] }
+  return data.items
 }
 
 export const apiConfigured = (): boolean => WORKFORCE_AGENTS_API_BASE.length > 0
@@ -125,5 +149,36 @@ export async function fetchSkillLive(name: string): Promise<SkillLiveRecord | un
   const res = await fetch(`${WORKFORCE_AGENTS_API_BASE}/skills/${encodeURIComponent(name)}`)
   if (res.status === 404) return undefined
   if (!res.ok) throw new Error(`agents-api ${res.status}`)
+  return (await res.json()) as SkillLiveRecord
+}
+
+// ─── Skill PATCH (rename display label / archive lifecycle) ─────────────
+//
+// PATCH /skills/{name} (AWS_IAM auth — ADR-0008 write path). The slug never
+// changes; display_name is the renameable label, status=archived is the
+// soft delete (hidden from the default list; history intact) — ADR-0017.
+
+import { signedFetch, assertSigv4Configured } from './sigv4'
+
+export async function patchSkillConfig(
+  name: string,
+  body: { display_name?: string; status?: SkillStatus },
+  apiBase: string = SKILLS_API_BASE,
+): Promise<SkillLiveRecord> {
+  assertSigv4Configured()
+  const res = await signedFetch(`${apiBase}/skills/${encodeURIComponent(name)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    let text = ''
+    try {
+      text = await res.text()
+    } catch {
+      // ignore
+    }
+    throw new Error(`PATCH /skills failed (${res.status}): ${text}`)
+  }
   return (await res.json()) as SkillLiveRecord
 }

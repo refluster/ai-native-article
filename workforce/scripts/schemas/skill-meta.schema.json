@@ -19,7 +19,13 @@
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$",
       "maxLength": 64,
-      "description": "Skill name. Must equal SKILL.md:name and the directory name."
+      "description": "Skill slug — the immutable identifier. Must equal SKILL.md:name and the directory name (Anthropic Agent Skills compatibility); rename via display_name, never by changing this."
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "Optional human-readable label, decoupled from the immutable slug (name). Renaming it never touches bindings, EXEC history, or URLs. API-writable post-seed (ADR-0017)."
     },
     "version": {
       "type": "string",
@@ -28,28 +34,53 @@
     },
     "status": {
       "type": "string",
-      "enum": ["active", "stale", "deprecated"]
+      "enum": [
+        "active",
+        "stale",
+        "deprecated",
+        "archived"
+      ],
+      "description": "Lifecycle. archived = soft delete: hidden from the default skill list, rejected as a NEW binding target; EXEC/deliverable history stays intact (ADR-0017)."
     },
     "archetype": {
       "type": "string",
-      "enum": ["cadence"],
+      "enum": [
+        "cadence"
+      ],
       "description": "Optional named skill archetype. \"cadence\": a scheduled, persona-voiced skill fired by EventBridge → wf-orchestrator-tick → the generic agent-runner CCR routine, whose context is composed from (agent × skill × project) and whose side effect is a deterministic bundled write-script POSTing to an authenticated endpoint with a project-scoped credential (no PR, no AWS access in-session). feed-post is the canonical first instance; new Cadences are produced by the .claude/skills/cadence-forge skill. When present, validate-skills.mjs enforces the archetype's structural invariants (see the C-* rules there). Absent for skills that don't fit a named archetype.",
       "default": null
     },
     "deliverable": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "publish_notion"],
+      "required": [
+        "type",
+        "publish_notion"
+      ],
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["article", "plan", "design-doc", "launch-plan", "pr", "notification", "external-pr", "external-pr-merge"],
+          "enum": [
+            "article",
+            "plan",
+            "design-doc",
+            "launch-plan",
+            "pr",
+            "notification",
+            "external-pr",
+            "external-pr-merge"
+          ],
           "description": "Deliverable shape produced by an llm-prose skill. Phase 7 PR6 adds `external-pr` — opens a PR against an external project's target repo per R-N9 (governance.md §4). The mechanical R-N9 gate IS this enum: `external-commit` deliberately does not exist, so a skill CANNOT declare 'I will push directly to the external repo's default branch'. `external-pr-merge` (added 2026-06-16 by the R-N10 Zone A amendment) marks the ONE delegated-merge exception: a skill may merge an external PR only under all four R-N10 clauses (target-statute delegation, server-side predicate, kill-switches, audit). Adding any further `external-*` type is a Zone A amendment requiring an explicit W-5 reconciliation."
         },
-        "publish_notion": { "type": "boolean" },
+        "publish_notion": {
+          "type": "boolean"
+        },
         "article_type": {
           "type": "string",
-          "enum": ["explanation", "analysis"],
+          "enum": [
+            "explanation",
+            "analysis"
+          ],
           "description": "Optional; only valid when deliverable.type=article. The Notion `Type` select the article-publish path writes (read by a skill's bundled write script, e.g. workforce/skills/article-level2/publish-notion.mjs) so the front-end labels/groups the article. Omitted for non-article deliverables and legacy article skills — the reader's resolveType then defaults to 'analysis'. See newsletter/pipeline/fetchers/notion.mjs:resolveType and newsletter/app/src/types/article.ts."
         }
       },
@@ -57,7 +88,11 @@
     },
     "cost_class": {
       "type": "string",
-      "enum": ["small", "medium", "large"],
+      "enum": [
+        "small",
+        "medium",
+        "large"
+      ],
       "description": "Projected per-invocation cost. small ~$0.05, medium ~$0.20, large ~$0.60."
     },
     "owners": {
@@ -72,8 +107,13 @@
     },
     "improvement_agent": {
       "anyOf": [
-        { "type": "null" },
-        { "type": "string", "pattern": "^[a-z]+$" }
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-z]+$"
+        }
       ],
       "description": "Agent slug assigned to improve this Skill. null until Epic-009 lands."
     },
