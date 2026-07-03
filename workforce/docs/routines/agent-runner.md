@@ -29,7 +29,12 @@ read from the cloned repo on each fire (git is their authoritative store —
 the MVV is a Zone A statute doc, so reading the clone IS reading the master
 copy); persona and skill-judgment config are read from the live agents-api —
 the DDB rows are their authoritative store (ADR-0007 / ADR-0008), so a PATCH
-takes effect on the next fire with no deploy and no re-clone. The git
+takes effect on the next fire with no deploy and no re-clone. **Note the
+activation asymmetry between the layers**: a merged git edit to layer 1/2
+(this file, the MVV) is live on the next fire with no further action, while
+a git edit to a skill's `SKILL.md` (layer 4) changes nothing at runtime until
+the matching `PATCH /skills/{name}` lands on the DDB row — two files in one
+PR can have two different activation paths. The git
 `workforce/skills/{name}/SKILL.md` is the creation-time scaffold, NOT the
 runtime body — do not fall back to it; if the API read fails, throw
 (C-4/W-4: a fire against a possibly-stale judgment body is a
