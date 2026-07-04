@@ -100,6 +100,14 @@ export default function SkillProfile() {
     return skill.owners.map((slug) => ({ slug, agent: bySlug.get(slug) }))
   }, [skill, roster])
 
+  // Agents still bound to this skill (any trigger). Archive does NOT unbind —
+  // existing bindings keep firing (ADR-0017) — so the archive confirm must
+  // say exactly who keeps running it, not leave the operator to guess.
+  const boundAgents = useMemo(() => {
+    if (!skill) return []
+    return roster.filter((a) => a.bindings?.some((b) => b.skill === skill.name)).map((a) => a.slug)
+  }, [skill, roster])
+
   if (skill === undefined) {
     return (
       <WorkforceLayout>
@@ -140,6 +148,7 @@ export default function SkillProfile() {
             name={skill.name}
             displayName={live?.display_name ?? skill.display_name ?? undefined}
             status={live?.status ?? skill.status}
+            boundAgents={boundAgents}
             onChanged={(next) => setLive((prev) => (prev ? { ...prev, ...next } : prev))}
           />
         </div>
@@ -428,6 +437,19 @@ function SkillFileView({ file }: { file: SkillFile }) {
   )
 }
 
+// Archive is a LIST-side soft delete, not a kill switch: existing bindings
+// keep firing until unbound (ADR-0017 documents this deliberately). The
+// confirm dialog must therefore name the agents that will keep running the
+// skill, or the operator's mental model of "archive = stopped" ships a
+// silent surprise.
+export function archiveConfirmMessage(name: string, boundAgents: string[]): string {
+  const bindingWarning =
+    boundAgents.length > 0
+      ? `⚠ Still bound to ${boundAgents.length} agent${boundAgents.length === 1 ? '' : 's'} (${boundAgents.join(', ')}) — archiving does NOT stop execution. Unbind to stop the runs.`
+      : 'No agents are currently bound to this skill.'
+  return `Archive skill "${name}"? It disappears from the default list and new bindings are rejected; its run/deliverable history stays intact.\n\n${bindingWarning}`
+}
+
 // ─── Lifecycle controls: rename display label + archive/unarchive ─────────
 // SigV4-gated (same affordance pattern as ProjectRenameButton /
 // ProjectArchiveButton). The slug never changes — rename touches only the
@@ -436,11 +458,15 @@ function SkillLifecycleControls({
   name,
   displayName,
   status,
+  boundAgents,
   onChanged,
 }: {
   name: string
   displayName?: string
   status: WorkforceSkill['status']
+  /** Slugs of agents whose bindings still reference this skill — archive
+   *  does not unbind them, so the confirm dialog names them explicitly. */
+  boundAgents: string[]
   onChanged: (next: Partial<SkillLiveRecord>) => void
 }) {
   const [pending, setPending] = useState(false)
@@ -471,7 +497,7 @@ function SkillLifecycleControls({
     const target = status === 'archived' ? 'active' : 'archived'
     const ok = window.confirm(
       target === 'archived'
-        ? `Archive skill "${name}"? It disappears from the default list and new bindings are rejected; its run/deliverable history stays intact. Existing bindings keep firing until unbound.`
+        ? archiveConfirmMessage(name, boundAgents)
         : `Restore skill "${name}" to active?`,
     )
     if (!ok) return
