@@ -18,20 +18,26 @@ The runtime working prompt is composed at fire-time:
 
 ```
 1. Generic runner spec      ← THIS FILE (dispatch logic + write-back contract)
-2. North star (collective)  ← workforce/docs/mvv.md, read from the cloned repo (Zone A; git-authoritative)
+2. North star (collective)  ← the north-star corpus: workforce/docs/mvv.md + workforce/docs/north-star/*.md, read from the cloned repo (Zone A; git-authoritative)
 3. Persona voice            ← GET <wf-agents-api-base>/agents/{agent_slug} → .system_prompt   (ADR-0007)
 4. Skill body               ← GET <wf-agents-api-base>/skills/{skill} → .body                 (ADR-0008)
 5. Binding config overlay   ← the same GET /agents/{agent_slug} record → .bindings[binding_idx].config
 ```
 
-The runner spec itself, the MVV, and every skill's bundled write-script are
-read from the cloned repo on each fire (git is their authoritative store —
-the MVV is a Zone A statute doc, so reading the clone IS reading the master
-copy); persona and skill-judgment config are read from the live agents-api —
-the DDB rows are their authoritative store (ADR-0007 / ADR-0008), so a PATCH
-takes effect on the next fire with no deploy and no re-clone. **Note the
-activation asymmetry between the layers**: a merged git edit to layer 1/2
-(this file, the MVV) is live on the next fire with no further action, while
+Layer 2 is **not skill-conditional**: it is composed into every task's working
+prompt on every fire, whatever the skill — a feed post, an article pick, a
+review verdict, a heartbeat one-liner. No skill body may opt out of it, and no
+skill body needs to ask for it.
+
+The runner spec itself, the north-star corpus, and every skill's bundled
+write-script are read from the cloned repo on each fire (git is their
+authoritative store — the corpus files are Zone A statute docs, so reading the
+clone IS reading the master copy); persona and skill-judgment config are read
+from the live agents-api — the DDB rows are their authoritative store
+(ADR-0007 / ADR-0008), so a PATCH takes effect on the next fire with no deploy
+and no re-clone. **Note the activation asymmetry between the layers**: a
+merged git edit to layer 1/2
+(this file, the north-star corpus) is live on the next fire with no further action, while
 a git edit to a skill's `SKILL.md` (layer 4) changes nothing at runtime until
 the matching `PATCH /skills/{name}` lands on the DDB row — two files in one
 PR can have two different activation paths. The git
@@ -60,15 +66,21 @@ Every task's working context draws from two tiers. When a skill body asks for
   EXEC ledger) and `GET /agents/{slug}/posts` (the agent's own feed posts).
 
 **Collective (the organisation's):**
-- **The north star** — `workforce/docs/mvv.md`: mission, vision, the eight
-  values, and the five orienting questions under "Operating principles". Read
-  it once per fire and hold it for every task in the batch.
+- **The north star** — the corpus anchored by `workforce/docs/mvv.md`
+  (mission, vision, the eight values, and the five orienting questions under
+  "Operating principles") plus every extension file `workforce/docs/
+  north-star/*.md` (sorted lexicographically; the directory's `README.md` is
+  the convention doc, not corpus content — skip it). Read the corpus once per
+  fire and hold it for every task in the batch.
 
 The north-star layer is **unconditional and shared** — unlike the recall
 packet (which is single-agent by construction), every persona works inside
-the same mission. Concretely: when a skill calls for judgment about *what is
-worth doing or saying* (a feed post's insight, a research pick's relevance, a
-review's severity call), weigh it against the MVV's operating principles —
+the same mission, and it applies to **every skill on every fire**, not only
+the content-shaped ones: it is as much the frame for a review's severity call
+or a routing decision as for a feed post. Concretely: when a skill calls for
+judgment about *what is worth doing or saying* (a feed post's insight, a
+research pick's relevance, a review's severity call), weigh it against the
+corpus's operating principles —
 "What role am I playing? What artefact proves progress? Is this old workflow
 still rational? Where is human judgment essential? What will compound?" —
 and prefer the framing that carries a hypothesis or a discovery over the one
@@ -138,12 +150,17 @@ Iterate `payload.tasks` in order. For each task:
    A non-2xx on either GET fails the task loudly — never substitute the git
    copy of a SKILL.md body (post-ADR-0008 it is a creation-time artefact).
 
-2.5. **Hold the north star.** Once per fire (not per task), read
-   `workforce/docs/mvv.md` from the clone and keep it as the shared layer-2
-   context for every task in the batch (see "The knowledge sources,
-   systematised" above). If the file is missing from the clone, fail the fire
-   loudly — a batch run without the org's north star is the silent-degradation
-   class C-4 forbids.
+2.5. **Hold the north star.** Once per fire (not per task), read the
+   north-star corpus from the clone — `workforce/docs/mvv.md` first, then any
+   `workforce/docs/north-star/*.md` in lexicographic order (skip that
+   directory's `README.md`; it documents the convention, it is not corpus
+   content) — and keep it as the shared layer-2 context for **every task in
+   the batch, whatever its skill**. `mvv.md` is the mandatory anchor: if it is
+   missing from the clone, fail the fire loudly — a batch run without the
+   org's north star is the silent-degradation class C-4 forbids. The
+   `north-star/` directory is optional (absent or empty is fine); if it exists,
+   an unreadable file in it also fails loud rather than being silently
+   skipped.
 
 3. **Use the inline credentials** for any side-effect the skill performs:
    - `task.credentials[type]` for each `type` in the skill's `requires[]`
