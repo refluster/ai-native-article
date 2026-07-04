@@ -31,10 +31,12 @@ info:
     - 'bearer' — capability tokens for specific machine write paths
       (POST /feed, POST /agents/{slug}/engagements).
 
-    **Not exposed by design**: POST /skills (a new skill needs its git
-    write-script — cadence-forge scaffold + PR), POST /projects (project.json
-    + seed step). Code-side skill fields (write-scripts, requires[],
-    archetype, deliverable) are git-owned and rejected by PATCH /skills.
+    **Not exposed by design**: POST /projects (project.json + seed step).
+    POST /skills exists but creates judgment-only skills (ADR-0017); a skill
+    that needs a bundled write-script still enters via the git scaffold
+    (cadence-forge + PR). Code-side skill fields (write-scripts, requires[],
+    archetype, deliverable) are git-owned and rejected by both POST and
+    PATCH /skills.
 servers:
   - url: https://workforce-api.kohuehara.xyz
     description: prod (custom domain, ADR-0004)
