@@ -1,0 +1,16 @@
+{
+  "name": "hypothesis",
+  "version": "0.1.0",
+  "status": "active",
+  "archetype": "cadence",
+  "deliverable": {
+    "type": "article",
+    "publish_notion": false,
+    "article_type": "analysis"
+  },
+  "cost_class": "medium",
+  "owners": ["maya"],
+  "improvement_agent": "sana",
+  "created_at": "2026-07-03",
+  "requires": ["notion.integration_token"]
+}
