@@ -84,11 +84,11 @@ and the cycle-cap counter read):
 
 Reviewers nominated (≥ 3):
 
-- **@<persona>** — <rationale citing the PR surface>
-- **@<persona>** — <rationale citing the PR surface>
-- **@<persona>** — <rationale citing the PR surface>
+- **`wf:<persona>`** — <rationale citing the PR surface>
+- **`wf:<persona>`** — <rationale citing the PR surface>
+- **`wf:<persona>`** — <rationale citing the PR surface>
 
-Skipping @<persona> — <one short clause>.
+Skipping `wf:<persona>` — <one short clause>.
 
 **Cycle 1 of ≤ <cycle_cap>.** Reviewers post via `event=COMMENT` (never
 approve / never request-changes per W-5). Author revises in a single commit
@@ -99,6 +99,17 @@ per cycle; the verdict comment synthesises.
 
 `<PersonaName>` is your `agent_slug` capitalised. Omit "Skipping …" if empty.
 
+**Never `@`-mention a persona (ML-012).** Workforce persona slugs are **not**
+GitHub accounts — a raw `@<slug>` in any posted body notifies whichever real
+GitHub user owns that name (a routing comment's `@yuki` pinged the unrelated
+github.com/yuki, operator report 2026-07-04). The canonical agent-reference
+format everywhere you post — nominations, skip lines, review bodies, verdict
+comments — is `wf:<slug>` wrapped in backticks (e.g. `wf:yuki`). This is
+enforced mechanically: `pr-autopilot-post.mjs` refuses (exit 1) any body
+containing a raw `@`-mention outside backticks/code fences, so wrap literal
+`@…` tokens you must quote (scoped npm packages, decorators, emails in prose)
+in backticks too.
+
 ## Step 3 — post each routing comment (deterministic)
 
 ```sh
@@ -107,7 +118,8 @@ GITHUB_TOKEN="…" node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
 ```
 
 `pr-autopilot-post.mjs` is comment+label-only — it has no code path that
-approves, merges, or pushes (R-N9 / W-5).
+approves, merges, or pushes (R-N9 / W-5). It also refuses a body carrying a
+raw GitHub `@`-mention (ML-012): agents are `wf:<slug>`, never `@<slug>`.
 
 ## Step 4 — obtain each nominated review (drive the cycle; do not stall)
 
