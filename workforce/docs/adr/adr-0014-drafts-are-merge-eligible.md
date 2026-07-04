@@ -4,7 +4,7 @@
 - **Date**: 2026-06-23
 - **Deciders**: operator, nadia
 - **Supersedes**: extends [adr-0010](adr-0010-autopilot-merge-consensus-widening.md) (the non-L0/L1 + unanimous-consensus predicate) and applies uniformly across delegated repos per [adr-0011](adr-0011-own-repo-autopilot-merge.md)
-- **Epics**: [epic-010](epics/epic-010-project-trust-boundary.md)
+- **Epics**: [epic-010](../epics/epic-010-project-trust-boundary.md)
 
 ## Context
 
