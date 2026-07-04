@@ -14,8 +14,10 @@
 //   GET    /agents/{slug}/audit             config-mutation audit trail, newest-first (ADR-0007)
 //   GET    /docs/openapi                    OpenAPI 3.0 spec (YAML; source ./openapi.ts)
 //   GET    /docs/api                        rendered API reference (Redoc HTML)
-//   GET    /skills                          list of skills (paginated, filterable)
+//   GET    /skills                          list of skills (archived hidden by default; ?include_archived=)
+//   POST   /skills                          create a judgment-only skill (IAM-auth; ADR-0017)
 //   GET    /skills/{name}                   single skill
+//   GET    /skills/{name}/executions        per-skill run ledger via GSI2 (?agent=&from=&to=&status=)
 //   PATCH  /skills/{name}                   judgment-config writes — validated + audited (IAM-auth at API GW; ADR-0008)
 //   GET    /skills/{name}/audit             skill config-mutation audit trail, newest-first (ADR-0008)
 //   GET    /projects                        list of projects (paginated, ?include_self=)
@@ -81,6 +83,7 @@ import {
 } from "../shared/skill-row.js";
 import {
   SKILL_PATCHABLE_FIELDS,
+  validateSkillCreate,
   validateSkillPatch,
   type SkillConfigViolation,
 } from "../shared/skill-config.js";
@@ -251,6 +254,9 @@ export async function handler(
     // until the first reducer run lands a PERF#{scope}/LIFECYCLE item.
     if (routeKey === "GET /performance") return getPerformanceRoute("workforce");
     if (routeKey === "GET /skills") return listSkills(event);
+    // ADR-0017: API-first creation of judgment-only skills (IAM-auth).
+    if (routeKey === "POST /skills") return await createSkill(event);
+    if (routeKey === "GET /skills/{name}/executions" && skillName) return listSkillExecutions(skillName, event);
     if (routeKey === "GET /skills/{name}/audit" && skillName) return listSkillAuditRoute(skillName, event);
     if (routeKey === "GET /skills/{name}" && skillName) return getSkill(skillName);
     // ADR-0008: judgment-side skill fields are DDB-authoritative and
@@ -628,9 +634,9 @@ async function patchAgent(
     : 0;
 
   if (identityKeys.length > 0) {
-    const skillOwners = await buildSkillOwnersLookup(patch.bindings);
+    const { skillOwners, skillStatus } = await buildSkillLookups(patch.bindings);
     violations.push(
-      ...validateIdentityPatch(patch, { otherAgentsEffectiveBudgetUsd, skillOwners }),
+      ...validateIdentityPatch(patch, { otherAgentsEffectiveBudgetUsd, skillOwners, skillStatus }),
     );
   }
   if ("budget_monthly_usd_override" in patch) {
@@ -697,10 +703,11 @@ async function createAgent(
 
   const slug = typeof parsed.slug === "string" ? parsed.slug : "";
   const otherAgentsEffectiveBudgetUsd = await sumOtherEffectiveBudgets(slug);
-  const skillOwners = await buildSkillOwnersLookup(parsed.bindings);
+  const { skillOwners, skillStatus } = await buildSkillLookups(parsed.bindings);
   const violations = validateAgentCreate(parsed, {
     otherAgentsEffectiveBudgetUsd,
     skillOwners,
+    skillStatus,
   });
   if (violations.length > 0) {
     return reply(422, { error: "config_validation_failed", violations });
@@ -786,10 +793,14 @@ async function sumOtherEffectiveBudgets(slug: string): Promise<number> {
 // Prefetch SKILL#{name}/META owners for every skill named in a prospective
 // bindings[] write, so the pure validator can cross-check existence and
 // ownership without doing I/O itself.
-async function buildSkillOwnersLookup(
+async function buildSkillLookups(
   bindings: unknown,
-): Promise<(name: string) => readonly string[] | undefined> {
+): Promise<{
+  skillOwners: (name: string) => readonly string[] | undefined;
+  skillStatus: (name: string) => string | undefined;
+}> {
   const owners = new Map<string, readonly string[] | undefined>();
+  const status = new Map<string, string | undefined>();
   if (Array.isArray(bindings)) {
     const names = [
       ...new Set(
@@ -802,10 +813,11 @@ async function buildSkillOwnersLookup(
       names.map(async (name) => {
         const row = await getItem<SkillMetaRow>(skillPk(name), "META");
         owners.set(name, row ? (row.owners ?? []) : undefined);
+        status.set(name, row?.status);
       }),
     );
   }
-  return (name) => owners.get(name);
+  return { skillOwners: (name) => owners.get(name), skillStatus: (name) => status.get(name) };
 }
 
 async function listAgentAuditRoute(
@@ -829,13 +841,18 @@ async function listSkills(
   event: APIGatewayProxyEventV2,
 ): Promise<APIGatewayProxyResultV2> {
   const qs = event.queryStringParameters ?? {};
-  const filterStatus = qs.status as "active" | "stale" | "deprecated" | undefined;
+  const filterStatus = qs.status as "active" | "stale" | "deprecated" | "archived" | undefined;
   const filterOwner = qs.owner; // agent slug — show skills the given agent owns
+  // Archived skills are soft-deleted: hidden from the default list. They
+  // reappear with ?include_archived=true, or when explicitly requested via
+  // ?status=archived (asking for them IS opting in).
+  const includeArchived = qs.include_archived === "true" || filterStatus === "archived";
 
   // Drain the whole SKILL#/META set (see scanAllPrefix / FU-PROJ-SCAN): a
   // Limit-capped scan window would hide skills that scan past it.
   const skillRows = await scanAllPrefix<SkillMetaRow>("SKILL#", "META");
   const items = skillRows
+    .filter((r) => includeArchived || r.status !== "archived")
     .filter((r) => !filterStatus || r.status === filterStatus)
     .filter((r) => !filterOwner || r.owners.includes(filterOwner))
     .map(toSkillApiView);
@@ -850,14 +867,132 @@ async function getSkill(name: string): Promise<APIGatewayProxyResultV2> {
   return reply(200, toSkillApiView(row));
 }
 
+// ADR-0017: POST /skills — API-first creation of a JUDGMENT-ONLY skill
+// (name/description/body + display_name/status/cost_class/owners/
+// improvement_agent). No write-script, no requires[], no deliverable, no
+// archetype — those are code / the credential trust boundary and still
+// enter via the git scaffold (cadence-forge). IAM-auth at the gateway;
+// validated by shared/skill-config.ts:validateSkillCreate; audited like
+// every other config mutation. This is the "create + bind in 5 minutes"
+// path: POST /skills, then PATCH /agents/{slug} bindings[].
+async function createSkill(
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  if (!event.body) return reply(400, { error: "missing_body" });
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(event.body) as Record<string, unknown>;
+  } catch {
+    return reply(400, { error: "invalid_json" });
+  }
+
+  // Owners / improvement-agent existence cross-check against live AGENT rows.
+  const candidateSlugs = new Set<string>();
+  if (Array.isArray(parsed.owners)) {
+    for (const o of parsed.owners) if (typeof o === "string") candidateSlugs.add(o);
+  }
+  if (typeof parsed.improvement_agent === "string") candidateSlugs.add(parsed.improvement_agent);
+  const stateMap = new Map<string, "active" | "archived">();
+  await Promise.all(
+    [...candidateSlugs].map(async (slug) => {
+      const row = await getItem<AgentMetaRow>(agentPk(slug), "META");
+      if (row) stateMap.set(slug, row.archived ? "archived" : "active");
+    }),
+  );
+
+  const violations = validateSkillCreate(parsed, {
+    agentState: (slug) => stateMap.get(slug),
+  });
+  if (violations.length > 0) {
+    return reply(422, { error: "config_validation_failed", violations });
+  }
+
+  const name = parsed.name as string;
+  const now = new Date().toISOString();
+  const row: SkillMetaRow = {
+    pk: skillPk(name),
+    sk: "META",
+    name,
+    display_name: typeof parsed.display_name === "string" ? parsed.display_name.trim() : undefined,
+    description: parsed.description as string,
+    body: parsed.body as string,
+    version: typeof parsed.version === "string" ? parsed.version : "0.1.0",
+    status: (parsed.status as SkillMetaRow["status"]) ?? "active",
+    cost_class: (parsed.cost_class as SkillMetaRow["cost_class"]) ?? "small",
+    owners: parsed.owners as string[],
+    improvement_agent: (parsed.improvement_agent as string | null | undefined) ?? null,
+    created_at: now.slice(0, 10),
+    updated_at: now,
+    identity_hash: "api", // no git seed identity for API-born skills
+    invocations_this_month: 0,
+  };
+
+  try {
+    await conditionalPutItem(row, "attribute_not_exists(pk)");
+  } catch (err) {
+    if (err instanceof ConditionalCheckFailedException) {
+      return reply(409, { error: "already_exists", name });
+    }
+    throw err;
+  }
+
+  await appendSkillAudit(name, actorFromEvent(event), diffChanges({}, parsed));
+  return reply(201, toSkillApiView(row));
+}
+
+// ADR-0017 observability: GET /skills/{name}/executions — the per-skill run
+// ledger (the CloudWatch-for-skills read). Backed by GSI2
+// (gsi2pk=SKILL#{name}, gsi2sk=started_at) so ?from/?to push down to DDB;
+// ?agent= and ?status= post-filter. Same item shape as the project ledger
+// so the console renders both through one component.
+async function listSkillExecutions(
+  name: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const skill = await getItem<SkillMetaRow>(skillPk(name), "META");
+  if (!skill) return reply(404, { error: "not_found", name });
+
+  const qs = event.queryStringParameters ?? {};
+  const limit = Math.min(
+    Math.max(parseInt(qs.limit ?? `${PAGE_SIZE_DEFAULT}`, 10) || PAGE_SIZE_DEFAULT, 1),
+    PAGE_SIZE_MAX,
+  );
+  const rows = await listExecutions({
+    skill_name: name,
+    from: qs.from,
+    to: qs.to,
+    status: qs.status as ExecStatus | undefined,
+    limit,
+  });
+  const items = rows
+    .filter((r) => !qs.agent || r.agent_slug === qs.agent)
+    .map((r) => ({
+      exec_ulid: r.sk.replace(/^EXEC#/, ""),
+      project_id: r.project_id,
+      agent_slug: r.agent_slug,
+      skill_name: r.skill_name,
+      skill_version: r.skill_version,
+      started_at: r.started_at,
+      ended_at: r.ended_at,
+      status: r.status,
+      execution_surface: r.execution_surface,
+      summary: r.summary,
+      artifact_ref: r.artifact_ref,
+      error: r.error,
+    }));
+  return reply(200, { items });
+}
+
 // ADR-0008: PATCH /skills/{name} — the single write path for a skill's
 // judgment-side config (body / description / version / status / owners /
 // cost_class / improvement_agent[_override]). Code-side fields (write-
 // scripts, requires[], archetype, deliverable) stay git-owned and are not
 // patchable. Same contract as the agent config writes: write-time
 // validation (shared/skill-config.ts), then a SKILL#{name}/AUDIT# item
-// the weekly digest compiles. There is no POST /skills — a new skill
-// enters via the git scaffold because it needs its write-script.
+// the weekly digest compiles. Judgment-only skills may also be CREATED via
+// POST /skills (ADR-0017); skills that need a write-script / credentials
+// still enter via the git scaffold.
 async function patchSkill(
   name: string,
   event: APIGatewayProxyEventV2,

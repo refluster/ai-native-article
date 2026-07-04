@@ -1,7 +1,7 @@
 // Workforce skill manifest types — what the build script emits and the
 // SPA consumes from /workforce-skills.json.
 
-export type SkillStatus = 'active' | 'stale' | 'deprecated';
+export type SkillStatus = 'active' | 'stale' | 'deprecated' | 'archived';
 export type CostClass = 'small' | 'medium' | 'large';
 export type DeliverableType = 'article' | 'plan' | 'design-doc' | 'launch-plan' | 'pr' | 'notification';
 
@@ -32,7 +32,10 @@ export interface SkillFile {
 }
 
 export interface WorkforceSkill {
+  /** Immutable slug — the identifier bindings/EXEC history reference. */
   name: string;
+  /** Human-readable label decoupled from the slug (renameable). */
+  display_name?: string | null;
   version: string;
   status: SkillStatus;
   /** Optional published-artefact declaration; null when the skill publishes none. */
@@ -55,6 +58,7 @@ export interface WorkforceSkillManifest {
 /** Subset returned by the live agents-api (no description). */
 export interface SkillLiveRecord {
   name: string;
+  display_name?: string | null;
   version: string;
   status: SkillStatus;
   deliverable: SkillDeliverable | null;
@@ -65,4 +69,27 @@ export interface SkillLiveRecord {
   created_at: string;
   invocations_this_month: number;
   last_invoked_at?: string;
+}
+
+/** One row in `GET /skills/{name}/executions` — the per-skill run ledger
+ *  (ADR-0017 observability; same shape as the project ledger rows). */
+export interface SkillExecution {
+  exec_ulid: string;
+  project_id: string;
+  agent_slug: string;
+  skill_name: string;
+  skill_version: string;
+  started_at: string;
+  ended_at: string;
+  status: 'ok' | 'throw' | 'skipped' | 'failed_artefact_redaction';
+  execution_surface?: 'lambda' | 'client' | 'ccr';
+  summary?: string;
+  artifact_ref?: {
+    uri: string;
+    content_hash: string;
+    content_type: string;
+    size_bytes: number;
+    summary: string;
+  };
+  error?: string;
 }

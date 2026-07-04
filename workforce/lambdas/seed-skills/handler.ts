@@ -72,6 +72,7 @@ async function seedOne(name: string): Promise<"created" | "updated" | "noop"> {
 
   const identity: SkillIdentity = {
     name: meta.name,
+    display_name: meta.display_name,
     version: meta.version,
     status: meta.status,
     deliverable: meta.deliverable,
