@@ -59,13 +59,30 @@ export async function getCurrentUser(): Promise<User | null> {
 // the /agents/:slug or /projects/:id they were reading.
 const RETURN_TO_KEY = 'wf.auth.returnTo';
 
+/** The ONE definition of "safe to navigate back to": an in-app absolute
+ *  path — never a foreign origin, never protocol-relative (`//evil.com`),
+ *  never back into the auth flow. Both the writer (signIn) and the reader
+ *  (consumeReturnTo) apply this same predicate, so a future caller of
+ *  signIn() can't reintroduce an asymmetry (Dario review on #430). The
+ *  reader still re-validates because both carriers (OIDC state,
+ *  sessionStorage) are attacker-influenceable — the read is the trust
+ *  boundary. */
+export function isSafeReturnTo(candidate: unknown): candidate is string {
+  return (
+    typeof candidate === 'string' &&
+    candidate.startsWith('/') &&
+    !candidate.startsWith('//') &&
+    !candidate.startsWith('/auth/')
+  );
+}
+
 export async function signIn(returnTo?: string): Promise<void> {
   const m = getUserManager();
   if (!m) {
     console.warn('auth not configured; cannot sign in');
     return;
   }
-  if (returnTo && returnTo.startsWith('/') && !returnTo.startsWith('/auth/')) {
+  if (isSafeReturnTo(returnTo)) {
     try {
       window.sessionStorage.setItem(RETURN_TO_KEY, returnTo);
     } catch {
@@ -97,10 +114,7 @@ export function consumeReturnTo(user: User | null): string {
   } catch {
     // ignore
   }
-  if (candidate && candidate.startsWith('/') && !candidate.startsWith('//') && !candidate.startsWith('/auth/')) {
-    return candidate;
-  }
-  return '/';
+  return isSafeReturnTo(candidate) ? candidate : '/';
 }
 
 /** Cognito-specific sign-out: hits /logout so the User Pool session ends too. */

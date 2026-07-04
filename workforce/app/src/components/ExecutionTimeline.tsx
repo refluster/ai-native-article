@@ -74,7 +74,14 @@ export default function ExecutionTimeline({ executions, perspective, limit }: Pr
             </span>
             <div className={`text-sm min-w-0 ${isLast ? '' : 'pb-4'}`}>
               <div className="flex items-center gap-2 flex-wrap font-wfmono text-[10px] tracking-[0.08em] text-wf-on-surface-variant">
-                <span>{e.started_at?.slice(0, 10)}</span>
+                {/* Date + time-of-day — parity with the old project table,
+                    which showed HH:MM (Dario review on #430). */}
+                <span>
+                  {e.started_at?.slice(0, 10)}
+                  {e.started_at?.length >= 16 && (
+                    <span className="ml-1 text-wf-on-surface-variant/80">{e.started_at.slice(11, 16)}</span>
+                  )}
+                </span>
                 <span aria-hidden>·</span>
                 {perspective === 'agent' && e.project_id && (
                   <>
@@ -102,6 +109,9 @@ export default function ExecutionTimeline({ executions, perspective, limit }: Pr
                 >
                   {e.skill_name}
                 </Link>
+                {/* Visible version — parity with the old table's sub-line
+                    (was tooltip-only; Dario review on #430). */}
+                {e.skill_version && <span className="text-wf-on-surface-variant/80">v{e.skill_version}</span>}
                 <StatusBadge status={e.status} error={e.error} className="ml-auto" />
               </div>
               <div className="mt-1 leading-snug">
