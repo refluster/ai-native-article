@@ -20,7 +20,7 @@ const ROSTER_API_BASE =
     : 'https://workforce-api.kohuehara.xyz'
 
 /** Lean agent record as returned by `GET /agents` (list view: persona
- *  prompt + profile decks stripped server-side; `about` derived there). */
+ *  prompt + profile sections stripped server-side; `about` derived there). */
 interface AgentListItem {
   slug: string
   first_name: string
@@ -39,7 +39,7 @@ interface AgentListItem {
   lateral?: string[]
 }
 
-/** Detail record from `GET /agents/{slug}` — adds the profile decks the
+/** Detail record from `GET /agents/{slug}` — adds the profile sections the
  *  list view strips. */
 interface AgentDetailItem extends AgentListItem {
   jd?: WorkforceAgent['jd'] | null
@@ -187,14 +187,14 @@ export async function findAgent(slug: string): Promise<WorkforceAgent | undefine
   const m = await loadWorkforceManifest()
   const base = m.agents.find((a) => a.slug === slug)
   if (!base) return undefined
-  // Hydrate the profile decks (jd / identity / memory) from the detail
+  // Hydrate the profile sections (jd / identity / memory) from the detail
   // route — the list view strips them to stay lean. A failed
-  // hydration degrades to the lean record (the decks render null-safe)
+  // hydration degrades to the lean record (the profile sections render null-safe)
   // rather than failing the whole profile page.
   try {
     const res = await fetch(`${ROSTER_API_BASE}/agents/${encodeURIComponent(slug)}`)
     if (!res.ok) {
-      console.warn(`workforce roster: profile hydration for "${slug}" degraded (HTTP ${res.status}) — rendering the lean record without decks`)
+      console.warn(`workforce roster: profile hydration for "${slug}" degraded (HTTP ${res.status}) — rendering the lean record without profile sections`)
       return base
     }
     const d = (await res.json()) as AgentDetailItem
@@ -206,7 +206,7 @@ export async function findAgent(slug: string): Promise<WorkforceAgent | undefine
       memory: d.memory ?? undefined,
     }
   } catch (err) {
-    console.warn(`workforce roster: profile hydration for "${slug}" degraded (${err instanceof Error ? err.message : String(err)}) — rendering the lean record without decks`)
+    console.warn(`workforce roster: profile hydration for "${slug}" degraded (${err instanceof Error ? err.message : String(err)}) — rendering the lean record without profile sections`)
     return base
   }
 }

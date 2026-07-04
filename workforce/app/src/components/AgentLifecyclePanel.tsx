@@ -1,7 +1,7 @@
-// DECK · AGENT LIFECYCLE (Epic-016 Metric 2). A cumulative stacked-area
+// PANEL · AGENT LIFECYCLE (Epic-016 Metric 2). A cumulative stacked-area
 // funnel of the active cohort partitioned by furthest reached state —
 // registered → assigned → delivered — over the window, with the
-// delivered-share headline the whole deck exists to surface.
+// delivered-share headline the whole panel exists to surface.
 //
 // Renders at two scopes (workforce-wide on /performance; per-project on
 // /projects/{id}/performance) from the same PerformanceSeries shape.
@@ -12,14 +12,14 @@ import type { PerformanceSeries } from '../types/performance';
 
 // Bottom→top: registered (base, muted) → assigned (in-flight, blue) →
 // delivered (the outcome, green). The green band growing to dominate is the
-// thesis the deck visualises.
+// thesis the panel visualises.
 const SERIES: AreaSeries[] = [
   { key: 'registered', label: 'registered', fill: 'var(--wf-svg-archived)' },
   { key: 'assigned', label: 'assigned', fill: 'var(--wf-svg-primary)' },
   { key: 'delivered', label: 'delivered', fill: 'var(--wf-svg-running)' },
 ];
 
-export default function AgentLifecycleDeck({ series }: { series: PerformanceSeries }) {
+export default function AgentLifecyclePanel({ series }: { series: PerformanceSeries }) {
   const points = series.lifecycle;
   const last = points[points.length - 1];
   const first = points[0];
@@ -33,14 +33,14 @@ export default function AgentLifecycleDeck({ series }: { series: PerformanceSeri
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
-        <Typeplate label="DECK 03 · AGENT LIFECYCLE" value="REGISTERED → ASSIGNED → DELIVERED" />
+        <Typeplate label="AGENT LIFECYCLE" value="REGISTERED → ASSIGNED → DELIVERED" />
         <span className="hidden sm:inline font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
           {series.window.start} → {series.window.end}
         </span>
       </div>
 
       <div className="p-4">
-        {/* Delivered-count headline — the read the deck exists for (Q2). */}
+        {/* Delivered-count headline — the read the panel exists for (Q2). */}
         <div className="flex flex-wrap items-end gap-x-6 gap-y-2 mb-4">
           <div>
             <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">

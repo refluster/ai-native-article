@@ -28,23 +28,18 @@
 //   informational successor for "EXEC arrived but has no artefact"
 //   regressions.
 //
-//   2. WfAuditCrossProjectLeaks  Every EXEC row in the last 24h has
-//                                project_id + agent_slug + started_at.
-//                                Assert that agent_slug was an active
-//                                member of project_id at started_at
-//                                (MEMBER#{slug} row exists under
-//                                PROJECT#{id} AND revoked_at is unset
-//                                OR > started_at). Special cases:
-//                                  - agent_slug='_operator' is treated
-//                                    as implicit member (credentials-
-//                                    api auto-adds the row on first PUT
-//                                    per project; treating as always-
-//                                    member avoids a benign racy gap)
-//                                  - project_id='self/{slug}' is an
-//                                    implicit one-agent project where
-//                                    the named slug is always a member
-//                                Anything else is a W-2 trust-boundary
-//                                violation and surfaces as the metric.
+//   2. WfAuditMalformedExecs     EXEC rows missing project_id /
+//                                agent_slug / started_at — a data-shape
+//                                regression (FU-NEW-D class) that would
+//                                silently break the ledger's audit value.
+//                                (This signal replaced the retired
+//                                WfAuditCrossProjectLeaks membership
+//                                check on 2026-07-03: the member concept
+//                                was removed — every registered agent
+//                                participates in every project — so
+//                                "agent has no MEMBER row" stopped being
+//                                a violation. The malformed-row half of
+//                                that check is what survives.)
 //
 // ─── Architectural deviation from FU-021 / #146 spec ──────────────────
 //
@@ -111,16 +106,9 @@ interface ExecRow {
     uri?: string;
   };
 }
-interface MemberRow {
-  pk: string; // PROJECT#{id}
-  sk: string; // MEMBER#{slug}
-  agent_slug?: string;
-  joined_at?: string;
-  revoked_at?: string;
-}
 
 export interface AuditFinding {
-  signal: "truncated" | "cross_project_leak";
+  signal: "truncated" | "malformed_exec";
   pk: string;
   sk: string;
   reason: string;
@@ -132,7 +120,7 @@ export interface AuditResult {
   scanned: { exec: number };
   counts: {
     truncated: number;
-    cross_project_leak: number;
+    malformed_exec: number;
   };
   findings: AuditFinding[];
 }
@@ -174,52 +162,25 @@ export async function handler(): Promise<AuditResult> {
   // sibling by design — both directions of the orphan check became
   // universal noise after C2.
 
-  // Signal 3: cross-project leakage.
-  // For each EXEC, derive (project_id, agent_slug) and check membership.
-  // Member rows are scanned once (not per-EXEC) to keep the lookup O(1).
-  const memberRows = await scanByPrefix<MemberRow>("MEMBER#");
-  const memberIndex = new Map<string, MemberRow[]>(); // key: PROJECT#{id}
-  for (const m of memberRows) {
-    const list = memberIndex.get(m.pk) ?? [];
-    list.push(m);
-    memberIndex.set(m.pk, list);
-  }
+  // Signal 2: malformed EXEC rows (fail-loud on data-shape regressions;
+  // FU-NEW-D class). The membership-based cross-project-leak check that
+  // used to live here was retired with the member concept (2026-07-03):
+  // every registered agent participates in every project, so a missing
+  // MEMBER row is no longer a violation.
   for (const exec of execRows) {
-    const projectId = exec.project_id;
-    const agentSlug = exec.agent_slug;
-    const startedAt = exec.started_at;
-    if (!projectId || !agentSlug || !startedAt) {
-      // Malformed row — surface as a leak finding so the operator
-      // notices (fail-loud on data-shape regressions; FU-NEW-D-class).
+    if (!exec.project_id || !exec.agent_slug || !exec.started_at) {
       findings.push({
-        signal: "cross_project_leak",
+        signal: "malformed_exec",
         pk: exec.pk,
         sk: exec.sk,
         reason: `malformed exec row — missing project_id/agent_slug/started_at`,
-      });
-      continue;
-    }
-    if (isImplicitMember(projectId, agentSlug)) continue;
-    const memberPk = `PROJECT#${projectId}`;
-    const candidates = memberIndex.get(memberPk) ?? [];
-    const wasActive = candidates.some(
-      (m) =>
-        m.agent_slug === agentSlug &&
-        (m.revoked_at === undefined || m.revoked_at > startedAt),
-    );
-    if (!wasActive) {
-      findings.push({
-        signal: "cross_project_leak",
-        pk: exec.pk,
-        sk: exec.sk,
-        reason: `agent ${agentSlug} not an active member of ${projectId} at ${startedAt}`,
       });
     }
   }
 
   const counts = {
     truncated: countBy(findings, "truncated"),
-    cross_project_leak: countBy(findings, "cross_project_leak"),
+    malformed_exec: countBy(findings, "malformed_exec"),
   };
 
   const result: AuditResult = {
@@ -237,24 +198,6 @@ export async function handler(): Promise<AuditResult> {
 
 function countBy(findings: AuditFinding[], signal: AuditFinding["signal"]): number {
   return findings.filter((f) => f.signal === signal).length;
-}
-
-/**
- * `_operator` agent is implicit-member everywhere — the credentials-api
- * auto-adds the MEMBER row on first PUT per project but the race window
- * before that write can produce a benign cross-project flag. Treat as
- * always-member.
- *
- * `self/{slug}` projects are one-agent partitions where the named slug
- * is the only legitimate caller; treat as implicit-member to avoid
- * needing seed-time MEMBER row writes.
- */
-function isImplicitMember(projectId: string, agentSlug: string): boolean {
-  if (agentSlug === "_operator") return true;
-  if (projectId.startsWith("self/") && projectId.slice("self/".length) === agentSlug) {
-    return true;
-  }
-  return false;
 }
 
 async function scanWindowed<T extends { sk: string }>(
@@ -287,28 +230,6 @@ async function scanWindowed<T extends { sk: string }>(
   return results;
 }
 
-async function scanByPrefix<T>(skPrefix: string): Promise<T[]> {
-  // Unbounded scan over a key prefix — for MEMBER#* the row count is
-  // O(projects × members/project) which at hobby scale is < 200.
-  const results: T[] = [];
-  let exclusiveStartKey: Record<string, unknown> | undefined;
-  do {
-    const page = await ddb.send(
-      new ScanCommand({
-        TableName: tableName,
-        FilterExpression: "begins_with(#sk, :skPrefix)",
-        ExpressionAttributeNames: { "#sk": "sk" },
-        ExpressionAttributeValues: { ":skPrefix": skPrefix },
-        ExclusiveStartKey: exclusiveStartKey,
-        Limit: SCAN_PAGE_SIZE,
-      }),
-    );
-    results.push(...((page.Items ?? []) as T[]));
-    exclusiveStartKey = page.LastEvaluatedKey;
-  } while (exclusiveStartKey);
-  return results;
-}
-
 async function emitMetrics(counts: AuditResult["counts"]): Promise<void> {
   try {
     await cw.send(
@@ -322,8 +243,8 @@ async function emitMetrics(counts: AuditResult["counts"]): Promise<void> {
             Dimensions: [{ Name: "Stage", Value: STAGE }],
           },
           {
-            MetricName: "WfAuditCrossProjectLeaks",
-            Value: counts.cross_project_leak,
+            MetricName: "WfAuditMalformedExecs",
+            Value: counts.malformed_exec,
             Unit: "Count",
             Dimensions: [{ Name: "Stage", Value: STAGE }],
           },

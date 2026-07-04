@@ -41,7 +41,6 @@ import {
   type ProjectMetaRow,
   type ExecutionRow,
   projectPk,
-  members,
   listExecutions,
 } from "../shared/project.js";
 import { getItem, putItem, scanAllPrefix } from "../shared/ddb.js";
@@ -113,16 +112,22 @@ export async function handler(): Promise<PerformanceReducerResult> {
   let projectsWritten = 0;
   for (const project of projects) {
     const projectId = project.project_id;
-    const memberSlugs = await members(projectId);
+    // Participation is behavioural, not roster-based (the membership
+    // concept was removed 2026-07-03 — every registered agent participates
+    // in every project): an agent counts toward a project's snapshot when
+    // it has a project-scoped load-bearing binding OR a delivered EXEC on
+    // the project's ledger. This keeps the per-project funnel meaningful
+    // without a member roster.
     const states: LifecycleState[] = [];
-    for (const slug of memberSlugs) {
-      const execs = await okExecs(slug);
+    for (const meta of metas) {
+      const execs = await okExecs(meta.slug);
       const hasDelivered = execs.some((e) => e.project_id === projectId);
-      const hasTriggerable = hasTriggerableBinding(metaBySlug.get(slug), projectId);
+      const hasTriggerable = hasTriggerableBinding(metaBySlug.get(meta.slug), projectId);
+      if (!hasDelivered && !hasTriggerable) continue; // not participating here
       states.push(classifyAgentState({ hasDelivered, hasTriggerableBinding: hasTriggerable }));
     }
-    // Skip empty projects so a 100-project org doesn't bloat with zero-member
-    // scopes (Epic-016 "per-project map is sparse by construction").
+    // Skip projects with no participants so a 100-project org doesn't bloat
+    // with empty scopes (Epic-016 "per-project map is sparse by construction").
     if (states.length === 0) continue;
     await upsertLifecycle(projectId, tallyLifecycle(date, states));
     projectsWritten += 1;

@@ -1,30 +1,24 @@
 // workforce/lambdas/shared/project.ts
 //
 // Project as first-class entity. Per Epic-010 (workforce/docs/epics/
-// epic-010-project-trust-boundary.md), a Project owns three things:
+// epic-010-project-trust-boundary.md), a Project owns two things:
 //   - a typed credential bag         → getCredential()
 //   - an append-only execution ledger → appendExecution() / listExecutions()
-//   - membership                      → addMember() / removeMember() / members() / isMember()
-// plus lifecycle helpers (create / archive / getProject).
-//
-// Story 1-A scope: types + helpers; nothing else in the workforce calls
-// these yet. Story 1-B (#90 follow-up) wires the orchestrator + runner +
-// seed-agents to use them (self auto-seed + TASK.project_id + dual-write).
+// plus lifecycle helpers (create / archive / rename / getProject).
 //
 // Naming convention: camelCase for all exported function names, matching
 // the rest of workforce/lambdas/shared/. The Epic-010 prose uses
 // snake_case for these (e.g. `Project.append_execution`) — that is
 // illustrative; the binding rule is codebase consistency.
 //
-// Membership is now ROSTER METADATA ONLY — it gates nothing. addMember() /
-// removeMember() / members() / isMember() persist a soft-deletable roster
-// (removeMember() writes `revoked_at` so "was X a member of Y on date Z"
-// stays answerable), but no code path reads it for access control:
-//   - the appendExecution() write-gate was removed 2026-06-08 (C-3); and
-//   - the listExecutions() / recall() membership READ-gate was removed
-//     2026-06-10 (owner directive) — project↔member binding is not an
-//     access-control primitive at single-operator scale, so every
-//     registered agent participates in every project.
+// MEMBERSHIP WAS REMOVED (2026-07-03, operator direction): every registered
+// agent participates in every project — there is no member/non-member
+// distinction, only `owner_agent`. The concept had already been reduced to
+// "roster metadata that gates nothing" (the appendExecution write-gate was
+// removed 2026-06-08 and the listExecutions/recall read-gate 2026-06-10 at
+// C-3 scale); this removal deletes the vestigial helpers, routes, and seed
+// writes. Historical PROJECT#{id}/MEMBER#{slug} rows remain in DDB as inert
+// audit data — nothing reads or writes them.
 //
 // Credential resolution (getCredential) uses preferred-path-with-
 // scoped-legacy-fallback per Epic-010 §6. The catch is narrowed to
@@ -142,17 +136,6 @@ export interface ProjectMetaRow {
    */
   github_owner?: string;
   github_repo?: string;
-}
-
-export interface ProjectMemberRow {
-  pk: `PROJECT#${string}`;
-  sk: `MEMBER#${string}`;
-  project_id: ProjectId;
-  agent_slug: AgentSlug;
-  joined_at: string;
-  /** Set when removeMember() soft-deletes this membership. Audit-only;
-   *  isMember() / members() exclude rows where this is set. */
-  revoked_at?: string;
 }
 
 export interface ArtifactRef {
@@ -358,75 +341,23 @@ export async function getProject(projectId: ProjectId): Promise<ProjectMetaRow |
   return getItem<ProjectMetaRow>(projectPk(projectId), "META");
 }
 
-// --- Membership ----------------------------------------------------------
-
 /**
- * Add an agent as a member of a project.
- *
- * Throws if the project does not exist (symmetric with archive(); avoids
- * stray MEMBER#* rows with no parent META).
- *
- * Audit-preserving semantics (Story 1-B / PR #111 review):
- *   - If the agent is already an ACTIVE member (row exists and
- *     `revoked_at` is undefined) → no-op. `joined_at` is preserved.
- *     This means the audit answer to "was X a member of Y on date Z"
- *     survives every redeploy / re-seed.
- *   - If the agent has a REVOKED membership row → write a fresh row
- *     with a new `joined_at` (starting a new membership tenure). The
- *     prior tenure's `joined_at` is lost; if full membership history
- *     is needed, a future MEMBER-AUDIT row family is the right place.
- *   - If no membership row exists → write a new one.
+ * Rename a project's human-readable display name. The `name` is a display
+ * attribute fully decoupled from `project_id` (the immutable slug that keys
+ * the partition, the URL, and the Secrets Manager prefix) — renames never
+ * cascade, and any characters that fit the length bound are fine. Writable
+ * via `PATCH /projects/{id}` (AWS_IAM); the seed treats `name` as
+ * create-only on existing rows so a PATCHed name survives re-seeds.
  */
-export async function addMember(
-  projectId: ProjectId,
-  agentSlug: AgentSlug,
-  now?: string,
-): Promise<void> {
-  const meta = await getItem<ProjectMetaRow>(projectPk(projectId), "META");
-  if (!meta) throw new Error(`project "${projectId}" not found — call create() first`);
-  const existing = await getItem<ProjectMemberRow>(
-    projectPk(projectId),
-    `MEMBER#${agentSlug}`,
-  );
-  if (existing && existing.revoked_at === undefined) {
-    return; // already active — preserve joined_at
+export async function rename(projectId: ProjectId, name: string): Promise<void> {
+  const trimmed = name.trim();
+  if (trimmed.length === 0 || trimmed.length > 80) {
+    throw new Error(`project name must be 1..80 chars after trim (got ${trimmed.length})`);
   }
-  const row: ProjectMemberRow = {
-    pk: projectPk(projectId),
-    sk: `MEMBER#${agentSlug}`,
-    project_id: projectId,
-    agent_slug: agentSlug,
-    joined_at: now ?? new Date().toISOString(),
-  };
-  await putItem(row);
-}
-
-/**
- * Soft-delete a membership. Writes `revoked_at` on the MEMBER row rather
- * than deleting it, so the audit question "was X a member of Y on date Z"
- * remains answerable. No-op if the agent was never a member.
- */
-export async function removeMember(
-  projectId: ProjectId,
-  agentSlug: AgentSlug,
-  now?: string,
-): Promise<void> {
-  const row = await getItem<ProjectMemberRow>(projectPk(projectId), `MEMBER#${agentSlug}`);
-  if (!row) return;
-  row.revoked_at = now ?? new Date().toISOString();
-  await putItem(row);
-}
-
-/** Active members (excludes soft-deleted rows). */
-export async function members(projectId: ProjectId): Promise<AgentSlug[]> {
-  const rows = await queryBySkPrefix<ProjectMemberRow>(projectPk(projectId), "MEMBER#", 100);
-  return rows.filter((r) => r.revoked_at === undefined).map((r) => r.agent_slug);
-}
-
-/** True iff the agent has an active (non-revoked) membership row. */
-export async function isMember(projectId: ProjectId, agentSlug: AgentSlug): Promise<boolean> {
-  const row = await getItem<ProjectMemberRow>(projectPk(projectId), `MEMBER#${agentSlug}`);
-  return row !== undefined && row.revoked_at === undefined;
+  const meta = await getItem<ProjectMetaRow>(projectPk(projectId), "META");
+  if (!meta) throw new Error(`project "${projectId}" not found`);
+  meta.name = trimmed;
+  await putItem(meta);
 }
 
 // --- Execution ledger ----------------------------------------------------
@@ -466,11 +397,9 @@ export interface AppendExecutionInput {
 /**
  * Append one execution row to a project's ledger.
  *
- * NOTE (2026-06-08): the cross-project membership write-gate was removed.
- * This no longer checks `isMember` and never throws "cross-project denial".
- * Any caller holding the API-layer write token may append to any project's
- * ledger (single-operator scale, C-3). Membership is now an informational
- * record only.
+ * No membership gate (the concept was removed 2026-07-03; the write-gate
+ * had already gone 2026-06-08): any caller holding the API-layer write
+ * token may append to any project's ledger (single-operator scale, C-3).
  *
  * Note: archive does NOT close the ledger — appendExecution against an
  * archived project succeeds. If "archive closes the ledger" semantics are
@@ -486,15 +415,6 @@ export interface AppendExecutionInput {
  * (the retry path, tests) call `appendExecution` directly.
  */
 export async function appendExecution(input: AppendExecutionInput): Promise<ExecutionRow> {
-  // Membership is no longer a write-gate. Per the operator decision of
-  // 2026-06-08 (and aligned with C-3, single-operator scale — don't build
-  // multi-tenant auth primitives), the project-membership permission split
-  // was removed: appendExecution writes the ledger row regardless of whether
-  // the agent has a MEMBER# row for the project. Membership rows survive as
-  // an informational record (GET /projects/{id}/members) but gate nothing.
-  // Write access to this surface is still bounded by the engagement-write
-  // Bearer token at the API layer; it is simply not partitioned per project.
-
   // Validate the embedding-sidecar co-set. The three byte/model/dim
   // fields MUST be all-present or all-absent; `embedding_status='ok'`
   // requires all three to be present.

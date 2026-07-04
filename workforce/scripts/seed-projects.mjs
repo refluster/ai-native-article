@@ -1,8 +1,13 @@
 #!/usr/bin/env node
-// Seeds PROJECT#{id}/META + PROJECT#{id}/MEMBER#{slug} rows from
-// workforce/projects/{id}/project.json files. Runs from the operator's
-// machine — invokes the AWS CLI directly, using whichever AWS credentials
-// are in scope (aws-vault / SSO / env vars).
+// Seeds PROJECT#{id}/META rows from workforce/projects/{id}/project.json
+// files. Runs from the operator's machine — invokes the AWS CLI directly,
+// using whichever AWS credentials are in scope (aws-vault / SSO / env vars).
+//
+// The membership concept was removed 2026-07-03 (every registered agent
+// participates in every project) — this seed no longer writes MEMBER rows.
+// `name` is CREATE-ONLY on existing rows: a name PATCHed via the API
+// (PATCH /projects/{id}) survives re-seeds; project.json's name applies
+// only at first creation.
 //
 // Why a CLI shell-out script (vs. a sibling Lambda to wf-seed-agents):
 //   - Project rows are written rarely (one per external repo). A new
@@ -60,7 +65,6 @@ function projectIdentityHash(data) {
     owner_agent: data.owner_agent ?? null,
     github: data.github ?? null,
     governance_docs: (data.governance_docs ?? []).slice().sort(),
-    members: data.members.slice().sort(),
     credential_types: data.credential_types.slice().sort(),
     status: data.status ?? "active",
     note: data.note ?? null,
@@ -111,18 +115,6 @@ function projectMetaRow(data, now) {
     identity_hash: projectIdentityHash(data),
     created_at: data.created_at ?? now,
     updated_at: now,
-  };
-}
-
-function memberRow(projectId, agentSlug, now) {
-  return {
-    pk: `PROJECT#${projectId}`,
-    sk: `MEMBER#${agentSlug}`,
-    project_id: projectId,
-    agent_slug: agentSlug,
-    joined_at: now,
-    gsi3pk: `MEMBER#${agentSlug}`,
-    gsi3sk: now,
   };
 }
 
@@ -180,15 +172,15 @@ function upsertMeta(data, now) {
   if (existing?.created_at?.S) {
     next.created_at = existing.created_at.S;
   }
+  // `name` is create-only: the API (PATCH /projects/{id}) owns renames of
+  // existing rows; project.json's name applies at creation only. Without
+  // this, a re-seed after any project.json change would clobber a
+  // PATCHed display name (the ADR-0008 create-only pattern).
+  if (existing?.name?.S) {
+    next.name = existing.name.S;
+  }
   putItem(next);
   return existing ? "updated" : "created";
-}
-
-function ensureMember(projectId, slug, now) {
-  const existing = getItem(`PROJECT#${projectId}`, `MEMBER#${slug}`);
-  if (existing && !existing.revoked_at) return "noop";
-  putItem(memberRow(projectId, slug, now));
-  return existing ? "reactivated" : "added";
 }
 
 function listProjectFiles() {
@@ -214,11 +206,7 @@ function main() {
   for (const file of files) {
     const data = JSON.parse(readFileSync(file, "utf8"));
     const metaAction = upsertMeta(data, now);
-    const memberActions = [];
-    for (const slug of data.members) {
-      memberActions.push({ slug, action: ensureMember(data.id, slug, now) });
-    }
-    results.push({ id: data.id, meta: metaAction, members: memberActions });
+    results.push({ id: data.id, meta: metaAction });
   }
 
   console.log(JSON.stringify(results, null, 2));
