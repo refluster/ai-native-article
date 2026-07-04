@@ -4,7 +4,7 @@
 - **Date**: 2026-06-18
 - **Deciders**: operator, nadia
 - **Supersedes**: extends [adr-0010](adr-0010-autopilot-merge-consensus-widening.md) (the non-L0/L1 + unanimous-consensus predicate) by removing its one remaining special case
-- **Epics**: [epic-010](epics/epic-010-project-trust-boundary.md)
+- **Epics**: [epic-010](../epics/epic-010-project-trust-boundary.md)
 
 ## Context
 

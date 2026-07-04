@@ -109,9 +109,10 @@ function unitVec(...components: number[]): Uint8Array {
   return encodeEmbeddingBytes(Float32Array.from(components));
 }
 
-async function seedProject(id: ProjectId, members: Array<"ren" | "maya" | "aoi">) {
+async function seedProject(id: ProjectId, _participants: Array<"ren" | "maya" | "aoi"> = []) {
+  // (Membership was removed 2026-07-03 — creating the project is enough;
+  // the participant list is kept in call sites purely as documentation.)
   await project.create({ project_id: id, owner_agent: "_operator" });
-  for (const m of members) await project.addMember(id, m);
 }
 
 async function seedExec(

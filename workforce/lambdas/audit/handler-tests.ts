@@ -1,11 +1,11 @@
 // Unit tests for workforce/lambdas/audit/handler.ts.
 //
-// Covers FU-021 / Issue #146 acceptance criteria:
+// Covers FU-021 / Issue #146 acceptance criteria (as amended 2026-07-03 —
+// the membership concept was removed, so the cross-project-leak signal
+// became WfAuditMalformedExecs, its surviving malformed-row half):
 //   - WfAuditTruncatedExecs: status=ok rows with empty/missing artifact_ref
-//   - WfAuditOrphanExecs: EXEC<->RUN dual-write witnesses (both directions)
-//   - WfAuditCrossProjectLeaks: EXEC where agent wasn't an active member
-//     at started_at; implicit-membership rules for _operator + self/{slug}
-//   - Daily-clean run returns zero on all three signals (the operator's
+//   - WfAuditMalformedExecs: EXEC rows missing project_id/agent_slug/started_at
+//   - Daily-clean run returns zero on all signals (the operator's
 //     1-week-clean criterion)
 //   - Metrics emission via CloudWatch
 //
@@ -134,21 +134,6 @@ function seedRun(opts: { ulid: string; agent_slug: string; started_at?: string }
     output_s3_key: `runs/${opts.agent_slug}/${opts.ulid}/output.txt`,
   });
 }
-function seedMember(opts: {
-  project_id: string;
-  agent_slug: string;
-  joined_at?: string;
-  revoked_at?: string;
-}) {
-  store.set(key(`PROJECT#${opts.project_id}`, `MEMBER#${opts.agent_slug}`), {
-    pk: `PROJECT#${opts.project_id}`,
-    sk: `MEMBER#${opts.agent_slug}`,
-    agent_slug: opts.agent_slug,
-    joined_at: opts.joined_at ?? recent(60 * 24 * 30),
-    ...(opts.revoked_at !== undefined ? { revoked_at: opts.revoked_at } : {}),
-  });
-}
-
 /** Helper to seed a clean, dual-write-consistent EXEC + RUN pair. */
 function seedPair(opts: {
   ulid: string;
@@ -191,7 +176,7 @@ describe("audit handler — clean state", () => {
     expect(res.scanned.exec).toBe(3);
     expect(res.counts).toEqual({
       truncated: 0,
-      cross_project_leak: 0,
+      malformed_exec: 0,
     });
     expect(res.findings).toEqual([]);
   });
@@ -205,7 +190,7 @@ describe("audit handler — clean state", () => {
     expect(batch.Namespace).toBe("Workforce/Audit");
     const byName = new Map(batch.MetricData.map((m) => [m.MetricName, m.Value]));
     expect(byName.get("WfAuditTruncatedExecs")).toBe(0);
-    expect(byName.get("WfAuditCrossProjectLeaks")).toBe(0);
+    expect(byName.get("WfAuditMalformedExecs")).toBe(0);
     // Post-C2: WfAuditOrphanExecs is no longer emitted.
     expect(byName.has("WfAuditOrphanExecs")).toBe(false);
     expect(batch.MetricData[0]!.Dimensions).toEqual(
@@ -298,106 +283,42 @@ describe("audit handler — stale rows outside the 24h window", () => {
     // cutoff condition.
     expect(res.scanned.exec).toBe(1);
     expect(res.counts.truncated).toBe(0);
-    expect(res.counts.cross_project_leak).toBe(0);
+    expect(res.counts.malformed_exec).toBe(0);
   });
 });
 
-describe("audit handler — cross-project leakage", () => {
-  it("flags an EXEC where the agent was NOT an active member of the project at started_at", async () => {
-    // ren wrote an EXEC under workforce-meta, but is NOT a member.
+describe("audit handler — malformed EXEC rows", () => {
+  it("does NOT flag a well-formed EXEC by any agent on any project (membership removed)", async () => {
+    // ren writes on workforce-meta with no roster row anywhere — fine:
+    // every registered agent participates in every project (2026-07-03).
     seedExec({
-      ulid: "01LEAK",
+      ulid: "01ANY",
       project_id: "workforce-meta",
       agent_slug: "ren",
       artifact_ref: { uri: "s3://...", summary: "ok", size_bytes: 1 },
     });
-    seedRun({ ulid: "01LEAK", agent_slug: "ren" });
-    // No MEMBER#ren under PROJECT#workforce-meta.
+    seedRun({ ulid: "01ANY", agent_slug: "ren" });
 
     const res = await handler();
-    expect(res.counts.cross_project_leak).toBe(1);
-    expect(res.findings.find((f) => f.signal === "cross_project_leak")?.reason).toMatch(
-      /not an active member of workforce-meta/,
-    );
+    expect(res.counts.malformed_exec).toBe(0);
   });
 
-  it("does NOT flag an EXEC where the member row exists + revoked_at is unset", async () => {
-    seedMember({ project_id: "workforce-meta", agent_slug: "ren" });
-    seedExec({
-      ulid: "01OK",
-      project_id: "workforce-meta",
-      agent_slug: "ren",
-      artifact_ref: { uri: "s3://...", summary: "ok", size_bytes: 1 },
-    });
-    seedRun({ ulid: "01OK", agent_slug: "ren" });
-
-    const res = await handler();
-    expect(res.counts.cross_project_leak).toBe(0);
-  });
-
-  it("flags an EXEC whose started_at is AFTER the agent's revoked_at", async () => {
-    seedMember({
-      project_id: "workforce-meta",
-      agent_slug: "ren",
-      joined_at: stale(),
-      revoked_at: stale(), // revoked at -48h, exec at -1h → revoked BEFORE exec
-    });
-    seedExec({
-      ulid: "01POSTREVOKE",
-      project_id: "workforce-meta",
-      agent_slug: "ren",
-      artifact_ref: { uri: "s3://...", summary: "ok", size_bytes: 1 },
-    });
-    seedRun({ ulid: "01POSTREVOKE", agent_slug: "ren" });
-
-    const res = await handler();
-    expect(res.counts.cross_project_leak).toBe(1);
-  });
-
-  it("treats _operator as implicit-member everywhere (credentials-api auto-add race)", async () => {
-    seedExec({
-      ulid: "01OPERATOR",
-      project_id: "workforce-meta",
-      agent_slug: "_operator",
-      artifact_ref: { uri: "s3://...", summary: "ok", size_bytes: 1 },
-    });
-    seedRun({ ulid: "01OPERATOR", agent_slug: "_operator" });
-    // No MEMBER#_operator row — should still pass.
-
-    const res = await handler();
-    expect(res.counts.cross_project_leak).toBe(0);
-  });
-
-  it("treats agent X as implicit-member of project self/X", async () => {
-    seedExec({
-      ulid: "01SELF",
-      project_id: "self/ren",
-      agent_slug: "ren",
-      artifact_ref: { uri: "s3://...", summary: "ok", size_bytes: 1 },
-    });
-    seedRun({ ulid: "01SELF", agent_slug: "ren" });
-    // No MEMBER#ren under PROJECT#self/ren — should still pass.
-
-    const res = await handler();
-    expect(res.counts.cross_project_leak).toBe(0);
-  });
-
-  it("flags a malformed EXEC row (missing project_id) as a leak finding", async () => {
+  it("flags a malformed EXEC row (missing project_id/agent_slug)", async () => {
     // Pre-FU-NEW-C-class drift: an EXEC row missing canonical attrs.
     store.set(key("PROJECT#workforce-meta", "EXEC#01MALFORMED"), {
       pk: "PROJECT#workforce-meta",
       sk: "EXEC#01MALFORMED",
-      // no project_id, no agent_slug, no started_at — but we still
-      // need started_at to pass the cutoff filter
+      // no project_id, no agent_slug — but we still need started_at to
+      // pass the cutoff filter
       started_at: recent(),
       status: "ok",
       artifact_ref: { uri: "s3://...", summary: "ok", size_bytes: 1 },
     });
 
     const res = await handler();
-    expect(res.counts.cross_project_leak).toBe(1);
-    const leak = res.findings.find((f) => f.signal === "cross_project_leak");
-    expect(leak?.reason).toMatch(/malformed exec row/);
+    expect(res.counts.malformed_exec).toBe(1);
+    const finding = res.findings.find((f) => f.signal === "malformed_exec");
+    expect(finding?.reason).toMatch(/malformed exec row/);
   });
 });
 
@@ -412,22 +333,23 @@ describe("audit handler — composite scenarios", () => {
       agent_slug: "ren",
       status: "ok",
     });
-    // Cross-project leak.
-    seedExec({
-      ulid: "01LEAK",
-      project_id: "workforce-meta",
-      agent_slug: "ren",
+    // Malformed row.
+    store.set(key("PROJECT#workforce-meta", "EXEC#01MALFORMED"), {
+      pk: "PROJECT#workforce-meta",
+      sk: "EXEC#01MALFORMED",
+      started_at: recent(),
+      status: "ok",
       artifact_ref: { uri: "s3://...", summary: "ok", size_bytes: 1 },
     });
 
     const res = await handler();
     expect(res.counts.truncated).toBe(1);
-    expect(res.counts.cross_project_leak).toBe(1);
+    expect(res.counts.malformed_exec).toBe(1);
 
     const batch = metricBatches[0]!;
     const byName = new Map(batch.MetricData.map((m) => [m.MetricName, m.Value]));
     expect(byName.get("WfAuditTruncatedExecs")).toBe(1);
-    expect(byName.get("WfAuditCrossProjectLeaks")).toBe(1);
+    expect(byName.get("WfAuditMalformedExecs")).toBe(1);
     // Post-C2: WfAuditOrphanExecs no longer emitted.
     expect(byName.has("WfAuditOrphanExecs")).toBe(false);
   });

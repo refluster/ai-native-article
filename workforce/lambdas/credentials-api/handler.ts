@@ -23,17 +23,10 @@
 // ─── Audit (EXEC row) ──────────────────────────────────────────────────
 //
 // Every successful PUT / DELETE appends an EXEC row to the project's
-// ledger via `appendExecution(...)`. The operator is still recorded as a
-// project member by auto-add on first write (idempotent — see
-// `ensureOperatorMember`). NOTE (2026-06-08): the appendExecution membership
-// write-gate was removed (C-3), so this auto-add is no longer required to
-// avoid a denial — it's kept only so `_operator` shows up in members[].
-//
-// The choice between "auto-add `_operator` as a member" vs "special path
-// past the membership gate" went auto-add: it preserves the gate's
-// invariant ("if there's an EXEC row, there was a MEMBER row") and gives
-// the operator's writes the same audit shape every other agent's writes
-// produce. The cost is one extra DDB write on first PUT per project.
+// ledger via `appendExecution(...)`, attributed to `_operator`. (The
+// membership concept — and the `_operator` MEMBER auto-add that lived
+// here — was removed 2026-07-03; every registered agent participates in
+// every project, so an EXEC row needs no roster row to accompany it.)
 //
 // ─── Read-side leak prevention (test-locked) ───────────────────────────
 //
@@ -58,11 +51,9 @@ import {
   parseCredentialKey,
 } from "../shared/credential-injector.js";
 import {
-  addMember,
   appendExecution,
   asProjectId,
   getProject,
-  isMember,
   type ProjectId,
 } from "../shared/project.js";
 import { newUlid } from "../shared/task.js";
@@ -387,20 +378,10 @@ function toIso(d: Date | undefined): string | undefined {
 }
 
 /**
- * Ensure `_operator` has an active MEMBER row on this project. Idempotent
- * (addMember preserves joined_at on an active member); first call per
- * project costs one DDB write.
- */
-async function ensureOperatorMember(projectId: ProjectId): Promise<void> {
-  if (await isMember(projectId, OPERATOR_SLUG)) return;
-  await addMember(projectId, OPERATOR_SLUG);
-}
-
-/**
  * Append an EXEC row attributed to `_operator` for the credentials-write
- * or credentials-delete skill. Records operator membership first (kept for
- * the informational members[] list; the appendExecution cross-project
- * write-gate it used to bypass was removed 2026-06-08).
+ * or credentials-delete skill. (The `_operator` MEMBER auto-add that used
+ * to precede this write was removed with the membership concept,
+ * 2026-07-03 — every registered agent participates in every project.)
  *
  * Mutates DDB after the Secrets Manager write has already succeeded —
  * if the audit append throws, the secret change persists (loud thrown
@@ -414,7 +395,6 @@ async function writeOperatorExec(input: {
   skill: typeof SKILL_CREDENTIALS_WRITE | typeof SKILL_CREDENTIALS_DELETE;
   startedAt: string;
 }): Promise<void> {
-  await ensureOperatorMember(input.projectId);
   await appendExecution({
     project_id: input.projectId,
     agent_slug: OPERATOR_SLUG,

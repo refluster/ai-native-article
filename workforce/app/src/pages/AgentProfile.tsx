@@ -45,8 +45,6 @@ import {
   type AgentLiveRecord,
 } from '../lib/agents';
 import { fmtDuration, fmtCompute } from '../lib/duration';
-import { fetchAgentMemberships } from '../lib/projects';
-import type { AgentMembership } from '../types/project';
 import type { AgentMemoryKind, WorkforceAgent } from '../types/agent';
 import type { AgentMockStats, WorkforceMockStats } from '../types/stats';
 
@@ -87,7 +85,6 @@ export default function AgentProfile() {
   const [mock, setMock] = useState<WorkforceMockStats | null>(null);
   const [live, setLive] = useState<AgentLiveRecord | null | undefined>(undefined);
   const [execs, setExecs] = useState<AgentExecution[] | null>(null);
-  const [memberships, setMemberships] = useState<AgentMembership[] | null>(null);
   const [liveError, setLiveError] = useState<string | null>(null);
 
   // Load persona + mock stats up front.
@@ -131,27 +128,6 @@ export default function AgentProfile() {
         setLive(null);
         setExecs([]);
         setLiveError(err instanceof Error ? err.message : String(err));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [slug]);
-
-  // Project memberships — separate effect so the projects API can be
-  // wired independently of the agents live API (Story 6 #95). Renders
-  // off whichever data source is configured: live agents-api when set,
-  // otherwise the projects-mock fallback.
-  useEffect(() => {
-    if (!slug) return;
-    let cancelled = false;
-    fetchAgentMemberships(slug)
-      .then((items) => {
-        if (cancelled) return;
-        setMemberships(items);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setMemberships([]);
       });
     return () => {
       cancelled = true;
@@ -331,15 +307,10 @@ export default function AgentProfile() {
             onUpdated={(next) => setAgent({ ...agent, bindings: next })}
           />
 
-          {/* MEMBERSHIPS — projects this agent is an active member of.
-              Lives between BINDINGS and DELIVERABLES so the operator sees
-              which trust boundaries this agent crosses before they see
-              the artefacts they've produced inside those boundaries.
-              Renders even when empty so a brand-new agent is visibly
-              registered-but-unattached. */}
-          {memberships !== null && (
-            <MembershipsPanel memberships={memberships} />
-          )}
+          {/* (The MEMBERSHIPS panel was removed 2026-07-03 with the
+              membership concept — every registered agent participates in
+              every project. Project participation is visible through the
+              ACTIVITY ledger's project column and the bindings above.) */}
 
           {/* ACTIVITY — one unified ledger of every EXEC row, newest-first
               (live API only). Replaces the former split TRACK RECORD
@@ -454,78 +425,6 @@ export default function AgentProfile() {
       {/* RECENT POSTS — appended section (Epic-011 cycle-1 verdict #3 closure: section, not tab). */}
       {slug && <RecentPostsSection slug={slug} />}
     </WorkforceLayout>
-  );
-}
-
-export function MembershipsPanel({ memberships }: { memberships: AgentMembership[] }) {
-  // self/{slug} projects are always present (auto-seeded by Story 1-B) so
-  // surface them last; "real" project memberships are the interesting
-  // signal for the operator.
-  //
-  // C-1/C-4: a single malformed membership row (missing project_id — e.g. a
-  // legacy MEMBER row written before addMember stamped project_id, or API
-  // shape drift) must not blank the whole agent page. Drop rows without a
-  // string project_id rather than throwing inside .sort()/.map().
-  const valid = memberships.filter(
-    (m): m is AgentMembership => typeof m.project_id === 'string',
-  );
-  const sorted = [...valid].sort((a, b) => {
-    const aSelf = a.project_id.startsWith('self/');
-    const bSelf = b.project_id.startsWith('self/');
-    if (aSelf !== bSelf) return aSelf ? 1 : -1;
-    return a.project_id.localeCompare(b.project_id);
-  });
-  return (
-    <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
-      <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
-        <Typeplate label="PROJECTS" value={`${valid.length} MEMBERSHIPS`} />
-        <Link
-          to="/projects"
-          className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
-        >
-          ALL PROJECTS →
-        </Link>
-      </div>
-      {valid.length === 0 ? (
-        <div className="px-4 py-4">
-          <p className="text-sm text-wf-on-surface-variant leading-relaxed">
-            No project memberships yet. This agent is not bound to any project's trust boundary —
-            assign one via{' '}
-            <code className="font-wfmono text-xs">
-              workforce/projects/{'{id}'}/members.json
-            </code>{' '}
-            (seed) or the in-app member editor (follow-up slice).
-          </p>
-        </div>
-      ) : (
-        <ul className="divide-y divide-wf-outline-variant">
-          {sorted.map((m) => {
-            const isSelf = m.project_id.startsWith('self/');
-            return (
-              <li
-                key={m.project_id}
-                className="px-4 py-3 flex items-baseline justify-between gap-3"
-              >
-                <Link
-                  to={`/projects/${encodeURIComponent(m.project_id)}`}
-                  className="font-mono text-sm text-wf-on-surface hover:text-wf-primary truncate"
-                >
-                  {m.project_id}
-                  {isSelf && (
-                    <span className="ml-2 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-                      self
-                    </span>
-                  )}
-                </Link>
-                <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant whitespace-nowrap">
-                  joined {m.joined_at ? m.joined_at.slice(0, 10) : '—'}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
   );
 }
 

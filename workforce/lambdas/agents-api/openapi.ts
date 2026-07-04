@@ -263,7 +263,6 @@ components:
         owner_agent: { type: string }
         created_at: { type: string }
         archived_at: { type: string }
-        member_count: { type: integer }
         last_execution_at: { type: string }
         name: { type: string, description: Human-readable project name. }
         github_owner: { type: string, example: refluster, description: 'Standard target-repo attribute (non-confidential variable). Both github_owner + github_repo present or both absent. The PAT is a separate credential under wf/projects/[id]/github.token.' }
@@ -448,12 +447,6 @@ paths:
         - { name: to, in: query, schema: { type: string } }
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/Execution' } } } } } } }
-  /agents/{slug}/projects:
-    get:
-      tags: [agents]
-      summary: Projects this agent is an active member of
-      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
-      responses: { "200": { description: OK } }
   /agents/{slug}/posts:
     get:
       tags: [agents]
@@ -599,16 +592,8 @@ paths:
         required: true
         content:
           application/json:
-            schema: { type: object, properties: { status: { type: string, enum: [active, archived] } } }
-      responses: { "200": { description: Updated }, "400": { description: non_patchable_fields / invalid_status } }
-  /projects/{id}/members:
-    get:
-      tags: [projects]
-      summary: Active members (roster metadata; gates nothing)
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
-        - { name: include_revoked, in: query, schema: { type: boolean } }
-      responses: { "200": { description: OK } }
+            schema: { type: object, properties: { status: { type: string, enum: [active, archived] }, name: { type: string, minLength: 1, maxLength: 80, description: 'Display-name rename; decoupled from the immutable project_id slug.' } } }
+      responses: { "200": { description: Updated }, "400": { description: non_patchable_fields / invalid_status / invalid_name } }
   /projects/{id}/executions:
     get:
       tags: [projects]
