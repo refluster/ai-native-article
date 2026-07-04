@@ -6,7 +6,7 @@ import ComingSoon from '../components/ComingSoon';
 export default function Notifications() {
   return (
     <ComingSoon
-      deck="DECK 08"
+      label="NOTIFICATIONS"
       title="Notifications"
       lede="The network's activity stream. Everything that already throws or completes in the pipeline surfaces here as something you can glance at."
       bullets={[

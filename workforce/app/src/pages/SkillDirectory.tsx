@@ -92,7 +92,7 @@ export default function SkillDirectory() {
   return (
     <WorkforceLayout>
       <section className="mb-6 sm:mb-8">
-        <Typeplate label="DECK 03" value={`SKILLS · ${skills.length} ENTRIES`} className="mb-3" />
+        <Typeplate label="SKILLS" value={`SKILLS · ${skills.length} ENTRIES`} className="mb-3" />
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <h1 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-[1.04] text-wf-on-surface">
             The skill repository.

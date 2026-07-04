@@ -96,7 +96,7 @@ export default function ProjectDirectory() {
   return (
     <WorkforceLayout>
       <section className="mb-6 sm:mb-8">
-        <Typeplate label="DECK 04" value={`PROJECTS · ${rows?.length ?? '—'} REGISTERED`} className="mb-3" />
+        <Typeplate label="PROJECTS" value={`PROJECTS · ${rows?.length ?? '—'} REGISTERED`} className="mb-3" />
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
             <h1 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-[1.04] text-wf-on-surface">
@@ -332,7 +332,7 @@ function NewProjectPanel() {
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3">
-        <Typeplate label="DECK · NEW PROJECT" value="SEED · NOT POST" />
+        <Typeplate label="NEW PROJECT" value="SEED · NOT POST" />
       </div>
       <div className="p-4 space-y-4">
         <p className="text-sm text-wf-on-surface-variant leading-relaxed">

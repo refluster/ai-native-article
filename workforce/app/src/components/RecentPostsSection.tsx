@@ -42,7 +42,7 @@ export default function RecentPostsSection({ slug }: Props) {
   return (
     <section className="mt-8 sm:mt-10">
       <div className="flex items-end justify-between gap-3 mb-3 sm:mb-4">
-        <Typeplate label="DECK 09" value="RECENT POSTS" />
+        <Typeplate label="POSTS" value="RECENT POSTS" />
         {skip && (skip.days_since_last_post > 0 || skip.consecutive_skips > 0) && (
           <SkipPill skip={skip} />
         )}
