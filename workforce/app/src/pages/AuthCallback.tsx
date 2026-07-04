@@ -1,10 +1,12 @@
 // /auth/callback — the OAuth code-exchange landing page. Cognito sends
 // the operator here after they finish the Google consent screen. We
-// complete the PKCE flow, then send the operator to "/".
+// complete the PKCE flow, then send the operator BACK TO WHERE THEY WERE
+// (the deep link captured at redirect time via the OIDC state / a
+// sessionStorage fallback) — never unconditionally to "/".
 
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { completeSignIn } from '../lib/auth';
+import { completeSignIn, consumeReturnTo } from '../lib/auth';
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -12,8 +14,8 @@ export default function AuthCallback() {
 
   useEffect(() => {
     completeSignIn()
-      .then(() => {
-        navigate('/', { replace: true });
+      .then((user) => {
+        navigate(consumeReturnTo(user), { replace: true });
       })
       .catch((err) => {
         console.error('completeSignIn failed:', err);

@@ -47,6 +47,12 @@
 // (cycle 1) carry neither flag nor marker, so they stay unlabelled. Missing
 // labels are auto-created (each with its own colour/description).
 //
+// NO RAW @-MENTIONS (ML-012, operator report 2026-07-04). Persona slugs are
+// not GitHub accounts; a raw `@<slug>` in a posted body notifies the real
+// GitHub user who owns that name (`@yuki` pinged github.com/yuki). Agents are
+// referenced as `wf:<slug>` in backticks; this script fails loud (exit 1) on
+// any body carrying a raw @-mention outside backticks/code fences.
+//
 // Exit codes:
 //   0  — comment created (HTTP 201); labels best-effort
 //   1  — bad args / project.json missing / body-file unreadable
@@ -87,6 +93,30 @@ export const NEEDS_HUMAN_MARKER = "<!-- autopilot:needs-human -->";
  *  adds REVIEWED_LABEL alongside ESCALATION_LABEL — the mechanical half of
  *  "a green, human-gated PR is flagged reviewed even if the flag is dropped". */
 export const REVIEWED_MARKER = "<!-- autopilot:reviewed -->";
+
+/** Raw GitHub @-mentions found in a comment body's prose (ML-012).
+ *
+ *  Workforce persona slugs are NOT GitHub accounts: a raw `@<slug>` in a
+ *  posted comment notifies whichever real GitHub user owns that name (a
+ *  routing comment's `@yuki` pinged the unrelated github.com/yuki,
+ *  2026-07-04). Agents are referenced as `wf:<slug>` in backticks; any
+ *  literal `@…` token (scoped npm package, decorator) must be quoted in
+ *  backticks/code fences, where GitHub never linkifies.
+ *
+ *  Backtick-quoted spans and fenced blocks are stripped before matching
+ *  (`(`+)…\1` covers inline spans, double-backtick spans, and ``` fences
+ *  alike). A mention is `@` + a GitHub-shaped login (alnum + inner hyphens,
+ *  ≤39 chars) not preceded by a word character — so `user@example.com`
+ *  stays legal, matching GitHub's own linkification rule. Pure + exported
+ *  so the refusal is unit-tested, not merely documented. */
+export function findRawMentions(body) {
+  const prose = String(body ?? "").replace(/(`+)[\s\S]*?\1/g, " ");
+  const re = /(^|[^\w`])@([a-zA-Z\d](?:[a-zA-Z\d]|-(?=[a-zA-Z\d])){0,38})/g;
+  const found = new Set();
+  let m;
+  while ((m = re.exec(prose))) found.add(`@${m[2]}`);
+  return [...found];
+}
 
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`);
@@ -157,6 +187,15 @@ async function main() {
     die(1, `body-file unreadable: ${bodyFile}`);
   }
   if (body.trim().length === 0) die(1, "body-file is empty — refusing to post an empty routing comment (W-4)");
+  const rawMentions = findRawMentions(body);
+  if (rawMentions.length > 0) {
+    die(
+      1,
+      `body contains raw GitHub @-mention(s): ${rawMentions.join(", ")} — persona slugs are not GitHub ` +
+        `accounts and a raw @ notifies the real, unrelated user who owns that name (ML-012). ` +
+        "Reference agents as `wf:<slug>` and wrap any literal @token in backticks.",
+    );
+  }
 
   let res;
   try {

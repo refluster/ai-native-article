@@ -11,10 +11,8 @@
 import { WORKFORCE_AGENTS_API_BASE } from '../config/api';
 import { withBasePath } from './paths';
 import type {
-  AgentMembership,
   ProjectDetail,
   ProjectExecution,
-  ProjectMember,
   ProjectSummary,
   WorkforceProjectsMock,
 } from '../types/project';
@@ -103,24 +101,6 @@ export async function fetchProject(projectId: string): Promise<ProjectDetail | u
   return (await res.json()) as ProjectDetail;
 }
 
-export async function fetchProjectMembers(
-  projectId: string,
-  includeRevoked = false,
-): Promise<ProjectMember[]> {
-  if (!apiConfigured()) {
-    const mock = await loadProjectsMock();
-    const rows = mock.members[projectId] ?? [];
-    return includeRevoked ? rows : rows.filter((m) => !m.revoked_at);
-  }
-  const qs = includeRevoked ? '?include_revoked=true' : '';
-  const res = await fetch(
-    `${WORKFORCE_AGENTS_API_BASE}/projects/${encodeProjectId(projectId)}/members${qs}`,
-  );
-  if (!res.ok) throw new Error(`agents-api ${res.status}`);
-  const data = (await res.json()) as { items: ProjectMember[] };
-  return data.items;
-}
-
 export async function fetchProjectExecutions(
   projectId: string,
   limit = 25,
@@ -137,34 +117,21 @@ export async function fetchProjectExecutions(
   return data.items;
 }
 
-export async function fetchAgentMemberships(slug: string): Promise<AgentMembership[]> {
-  if (!apiConfigured()) {
-    const mock = await loadProjectsMock();
-    return mock.agent_memberships[slug] ?? [];
-  }
-  const res = await fetch(
-    `${WORKFORCE_AGENTS_API_BASE}/agents/${encodeURIComponent(slug)}/projects`,
-  );
-  if (!res.ok) throw new Error(`agents-api ${res.status}`);
-  const data = (await res.json()) as { items: AgentMembership[] };
-  return data.items;
-}
-
-// ─── Project archive / unarchive — Project CRUD UI (PR-δ) ───────────────
+// ─── Project PATCH (archive / unarchive / rename) ───────────────────────
 //
-// PATCH /projects/{id} (AWS_IAM auth). Body shape: { status: 'active' | 'archived' }.
-// Returns the updated project view. Uses signedFetch from lib/sigv4 — the
-// agents-api PATCH route is AWS_IAM-protected per agents-api SAM events
-// table; the SigV4 broker (cognito identity pool + operator role) was
-// provisioned by the earlier sigv4 PR.
+// PATCH /projects/{id} (AWS_IAM auth). Body: { status?: 'active'|'archived',
+// name?: string }. Returns the updated project view. Uses signedFetch from
+// lib/sigv4 — the agents-api PATCH route is AWS_IAM-protected per agents-api
+// SAM events table. `name` is a display attribute decoupled from the
+// immutable project_id slug (URL and keys never move on rename).
 
 import { signedFetch, assertSigv4Configured } from './sigv4';
 
 export type ProjectStatus = 'active' | 'archived';
 
-export async function patchProjectStatus(
+async function patchProject(
   projectId: string,
-  status: ProjectStatus,
+  body: { status?: ProjectStatus; name?: string },
   agentsApiBase: string = WORKFORCE_AGENTS_API_BASE,
 ): Promise<ProjectDetail> {
   assertSigv4Configured();
@@ -172,7 +139,7 @@ export async function patchProjectStatus(
   const res = await signedFetch(url, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     let bodyText = '';
@@ -184,4 +151,21 @@ export async function patchProjectStatus(
     throw new Error(`PATCH /projects failed (${res.status}): ${bodyText}`);
   }
   return (await res.json()) as ProjectDetail;
+}
+
+export async function patchProjectStatus(
+  projectId: string,
+  status: ProjectStatus,
+  agentsApiBase: string = WORKFORCE_AGENTS_API_BASE,
+): Promise<ProjectDetail> {
+  return patchProject(projectId, { status }, agentsApiBase);
+}
+
+/** Rename the project's display name (the slug/URL never changes). */
+export async function patchProjectName(
+  projectId: string,
+  name: string,
+  agentsApiBase: string = WORKFORCE_AGENTS_API_BASE,
+): Promise<ProjectDetail> {
+  return patchProject(projectId, { name }, agentsApiBase);
 }

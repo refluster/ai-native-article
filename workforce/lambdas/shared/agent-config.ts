@@ -110,6 +110,11 @@ export interface IdentityPatchContext {
    *  undefined when no such skill exists. Used for the binding existence
    *  cross-check; ownership no longer gates bindings (adr-0012). */
   skillOwners: (name: string) => readonly string[] | undefined;
+  /** Optional lookup: skill name → lifecycle status. When supplied, a NEW
+   *  binding targeting an `archived` skill is rejected (ADR-0017 — archive
+   *  is a soft delete; history stays, new wiring stops). Callers that
+   *  don't resolve status (older tests) skip the check. */
+  skillStatus?: (name: string) => string | undefined;
 }
 
 export function validateIdentityPatch(
@@ -316,6 +321,8 @@ function validateBinding(
   // authorship/Rule-11/improvement meaning; it no longer gates bindings.
   if (ctx.skillOwners(b.skill) === undefined) {
     v("R8-binding-skill-exists", `skill "${b.skill}" has no SKILL#${b.skill} row`);
+  } else if (ctx.skillStatus?.(b.skill) === "archived") {
+    v("R8-binding-skill-archived", `skill "${b.skill}" is archived — unarchive it (PATCH status) before binding (ADR-0017)`);
   }
 
   if (!ALLOWED_EXECUTORS.has(b.executor as string)) {

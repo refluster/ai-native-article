@@ -1,12 +1,12 @@
-// Loads one scope's PerformanceSeries and renders the two Epic-016 decks
+// Loads one scope's PerformanceSeries and renders the two Epic-016 panels
 // (agent lifecycle + PR automation). Shared by the workforce Dashboard
 // (/performance) and the per-project Performance tab so the two scopes stay
 // visually + behaviourally identical. Handles loading / error / empty-scope
 // states and the "* mocked" advisory the rest of the console uses.
 
 import { useEffect, useState } from 'react';
-import AgentLifecycleDeck from './AgentLifecycleDeck';
-import PrAutomationDeck from './PrAutomationDeck';
+import AgentLifecyclePanel from './AgentLifecyclePanel';
+import PrAutomationPanel from './PrAutomationPanel';
 import { loadPerformance, type PerformanceScope } from '../lib/performance';
 import type { PerformanceSeries } from '../types/performance';
 
@@ -56,8 +56,8 @@ export default function PerformancePanels({ scope }: { scope: PerformanceScope }
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <AgentLifecycleDeck series={series} />
-      <PrAutomationDeck series={series} />
+      <AgentLifecyclePanel series={series} />
+      <PrAutomationPanel series={series} />
       {source === 'mock' && (
         <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
           * illustrative — the live performance roll-up endpoint is not deployed yet (Epic-016 Phase 2)

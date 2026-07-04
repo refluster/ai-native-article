@@ -31,10 +31,12 @@ info:
     - 'bearer' — capability tokens for specific machine write paths
       (POST /feed, POST /agents/{slug}/engagements).
 
-    **Not exposed by design**: POST /skills (a new skill needs its git
-    write-script — cadence-forge scaffold + PR), POST /projects (project.json
-    + seed step). Code-side skill fields (write-scripts, requires[],
-    archetype, deliverable) are git-owned and rejected by PATCH /skills.
+    **Not exposed by design**: POST /projects (project.json + seed step).
+    POST /skills exists but creates judgment-only skills (ADR-0017); a skill
+    that needs a bundled write-script still enters via the git scaffold
+    (cadence-forge + PR). Code-side skill fields (write-scripts, requires[],
+    archetype, deliverable) are git-owned and rejected by both POST and
+    PATCH /skills.
 servers:
   - url: https://workforce-api.kohuehara.xyz
     description: prod (custom domain, ADR-0004)
@@ -213,9 +215,10 @@ components:
     Skill:
       type: object
       properties:
-        name: { type: string }
+        name: { type: string, description: 'Immutable slug — DDB key, binding reference, EXEC skill_name. Rename via display_name.' }
+        display_name: { type: string, nullable: true, description: 'Human-readable label decoupled from the slug; renaming never touches bindings or history.' }
         version: { type: string }
-        status: { type: string, enum: [active, stale, deprecated] }
+        status: { type: string, enum: [active, stale, deprecated, archived] }
         description: { type: string }
         body: { type: string, description: 'The SKILL.md judgment text — DDB-authoritative (ADR-0008); the runner composes with THIS, not the git copy.' }
         deliverable: { type: object, nullable: true, additionalProperties: true, description: Git-authoritative (seed-reconciled); not PATCHable. }
@@ -233,12 +236,27 @@ components:
       properties:
         body: { type: string, maxLength: 65536 }
         description: { type: string, maxLength: 1024 }
+        display_name: { type: string, maxLength: 120 }
         version: { type: string, description: semver }
-        status: { type: string, enum: [active, stale, deprecated] }
+        status: { type: string, enum: [active, stale, deprecated, archived], description: 'archived = soft delete — hidden from the default list, rejected as a NEW binding target; history intact.' }
         owners: { type: array, items: { type: string }, description: Must exist + be non-archived. The authorship/Rule-11/improvement set; not a binding prerequisite (adr-0012), so it may be shrunk freely. }
         cost_class: { type: string, enum: [small, medium, large] }
         improvement_agent: { type: string, nullable: true }
         improvement_agent_override: { type: string, nullable: true }
+    SkillCreate:
+      type: object
+      description: ADR-0017 — API-first creation of a JUDGMENT-ONLY skill. Code-side fields (write-scripts, requires, archetype, deliverable) are rejected; they enter via the git scaffold (cadence-forge).
+      required: [name, description, body, owners]
+      properties:
+        name: { type: string, pattern: '^[a-z][a-z0-9-]*$', maxLength: 64, description: 'Immutable slug (Anthropic skill-name compatible; no reserved tokens).' }
+        display_name: { type: string, maxLength: 120 }
+        description: { type: string, maxLength: 1024 }
+        body: { type: string, maxLength: 65536 }
+        version: { type: string, description: 'semver; default 0.1.0' }
+        status: { type: string, enum: [active, stale, deprecated, archived], description: 'default active' }
+        cost_class: { type: string, enum: [small, medium, large], description: 'default small' }
+        owners: { type: array, items: { type: string }, description: '≥1 existing, non-archived agent slug.' }
+        improvement_agent: { type: string, nullable: true }
     Project:
       type: object
       properties:
@@ -247,7 +265,6 @@ components:
         owner_agent: { type: string }
         created_at: { type: string }
         archived_at: { type: string }
-        member_count: { type: integer }
         last_execution_at: { type: string }
         name: { type: string, description: Human-readable project name. }
         github_owner: { type: string, example: refluster, description: 'Standard target-repo attribute (non-confidential variable). Both github_owner + github_repo present or both absent. The PAT is a separate credential under wf/projects/[id]/github.token.' }
@@ -432,12 +449,6 @@ paths:
         - { name: to, in: query, schema: { type: string } }
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/Execution' } } } } } } }
-  /agents/{slug}/projects:
-    get:
-      tags: [agents]
-      summary: Projects this agent is an active member of
-      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
-      responses: { "200": { description: OK } }
   /agents/{slug}/posts:
     get:
       tags: [agents]
@@ -488,14 +499,28 @@ paths:
   /skills:
     get:
       tags: [skills]
-      summary: List skills
+      summary: List skills (archived hidden by default)
       parameters:
         - $ref: '#/components/parameters/pageSize'
         - $ref: '#/components/parameters/cursor'
-        - { name: status, in: query, schema: { type: string, enum: [active, stale, deprecated] } }
+        - { name: status, in: query, schema: { type: string, enum: [active, stale, deprecated, archived] } }
         - { name: owner, in: query, schema: { type: string }, description: 'Filter to skills whose owners[] contains this agent slug.' }
+        - { name: include_archived, in: query, schema: { type: boolean }, description: 'Archived skills are soft-deleted and hidden by default; true reveals them (?status=archived also opts in).' }
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/Skill' } }, next_cursor: { type: string, nullable: true } } } } } }
+    post:
+      tags: [skills]
+      summary: Create a judgment-only skill (ADR-0017 — no write-script / requires / deliverable; those enter via the git scaffold)
+      security: [{ sigv4: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SkillCreate' }
+      responses:
+        "201": { description: Created (kind=create AUDIT appended), content: { application/json: { schema: { $ref: '#/components/schemas/Skill' } } } }
+        "409": { description: already_exists }
+        "422": { description: Validation failed, content: { application/json: { schema: { $ref: '#/components/schemas/ValidationError' } } } }
   /skills/{name}:
     parameters:
       - { name: name, in: path, required: true, schema: { type: string } }
@@ -519,6 +544,20 @@ paths:
         "400": { description: non_patchable_fields (git-owned / immutable) }
         "404": { description: not_found }
         "422": { description: Validation failed (J-rules, G4 body cap), content: { application/json: { schema: { $ref: '#/components/schemas/ValidationError' } } } }
+  /skills/{name}/executions:
+    get:
+      tags: [skills]
+      summary: Per-skill run ledger (GSI2; ?from/?to push down, ?agent/?status post-filter) — ADR-0017 observability
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer } }
+        - { name: agent, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: from, in: query, schema: { type: string } }
+        - { name: to, in: query, schema: { type: string } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/Execution' } } } } } } }
+        "404": { description: not_found }
   /skills/{name}/audit:
     get:
       tags: [skills]
@@ -555,16 +594,8 @@ paths:
         required: true
         content:
           application/json:
-            schema: { type: object, properties: { status: { type: string, enum: [active, archived] } } }
-      responses: { "200": { description: Updated }, "400": { description: non_patchable_fields / invalid_status } }
-  /projects/{id}/members:
-    get:
-      tags: [projects]
-      summary: Active members (roster metadata; gates nothing)
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
-        - { name: include_revoked, in: query, schema: { type: boolean } }
-      responses: { "200": { description: OK } }
+            schema: { type: object, properties: { status: { type: string, enum: [active, archived] }, name: { type: string, minLength: 1, maxLength: 80, description: 'Display-name rename; decoupled from the immutable project_id slug.' } } }
+      responses: { "200": { description: Updated }, "400": { description: non_patchable_fields / invalid_status / invalid_name } }
   /projects/{id}/executions:
     get:
       tags: [projects]

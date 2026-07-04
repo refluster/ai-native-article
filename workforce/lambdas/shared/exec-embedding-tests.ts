@@ -93,7 +93,6 @@ describe("appendExecutionWithEmbedding — happy path (AC3)", () => {
   it("computes embedding, stores model_id + dim + bytes, status='ok'", async () => {
     const alpha = project.asProjectId("alpha");
     await project.create({ project_id: alpha, owner_agent: "_operator" });
-    await project.addMember(alpha, "ren");
 
     embedMock.mockResolvedValueOnce({
       embedding: Float32Array.from([1, 0, 0]),
@@ -132,7 +131,6 @@ describe("appendExecutionWithEmbedding — failure isolation (AC4)", () => {
   it("Voyage API throws → row STILL lands with embedding_status='pending'", async () => {
     const alpha = project.asProjectId("alpha");
     await project.create({ project_id: alpha, owner_agent: "_operator" });
-    await project.addMember(alpha, "ren");
 
     embedMock.mockRejectedValueOnce(new Error("voyage 503: upstream timeout"));
 
@@ -171,7 +169,6 @@ describe("appendExecutionWithEmbedding — failure isolation (AC4)", () => {
   it("missing voyage.api_key (ResourceNotFoundException) → same pending fallback", async () => {
     const alpha = project.asProjectId("alpha");
     await project.create({ project_id: alpha, owner_agent: "_operator" });
-    await project.addMember(alpha, "ren");
 
     const err = new Error("Secrets Manager: no such secret");
     err.name = "ResourceNotFoundException";
@@ -200,7 +197,6 @@ describe("appendExecutionWithEmbedding — failure isolation (AC4)", () => {
     // must propagate, NOT be silently re-classified as an embedding failure.
     const alpha = project.asProjectId("alpha");
     await project.create({ project_id: alpha, owner_agent: "_operator" });
-    await project.addMember(alpha, "ren");
 
     embedMock.mockResolvedValueOnce({
       embedding: Float32Array.from([1, 0, 0]),
@@ -238,7 +234,6 @@ describe("appendExecutionWithEmbedding — skip path", () => {
   it("empty embedding_text → status='skipped', no Voyage call", async () => {
     const alpha = project.asProjectId("alpha");
     await project.create({ project_id: alpha, owner_agent: "_operator" });
-    await project.addMember(alpha, "ren");
 
     const row = await execEmbedding.appendExecutionWithEmbedding({
       project_id: alpha,

@@ -4,6 +4,10 @@ An ADR captures **one decision**: the context that forced it, the option we
 chose, the alternatives we rejected, and the consequences we accept. This
 directory is the article/root-side ADR log (the workforce subsystem keeps its
 own engineering ADRs under [`workforce/docs/adr/`](../../workforce/docs/adr/README.md)).
+**The two trees share numbering but not identity** — e.g. this tree's ADR-0004
+(governance consolidation) is a different decision from the workforce tree's
+adr-0004 (API custom domain). When citing across trees, qualify the path:
+`docs/adr-0004` vs `workforce/adr-0004`.
 
 ADRs are **L1 framework laws** ([governance.md §3](../governance.md#3-l1--framework-laws)):
 an ADR records *why the system is built this way*, and implementation must
@@ -44,5 +48,8 @@ headers:
 | # | Title | Status |
 |---|---|---|
 | [0001](adr-0001-self-driving-governance-mechanisms.md) | Self-driving governance mechanisms (R-10…R-12 gates, the two engines, the registries) | Accepted |
+| [0002](adr-0002-daily-use-reader-ia.md) | Daily-use reader IA: analysis-default, flat tags, operator split | Proposed |
+| [0003](adr-0003-flat-tag-taxonomy.md) | Flat tag taxonomy (replacing the A–E hierarchy) | Proposed |
+| [0004](adr-0004-governance-consolidation.md) | Governance consolidation: de-duplicated statute, R-11 full-law coverage, R-13 terminal-state sweep | Proposed |
 
 Keep this table in sync when an ADR is added or its Status flips.

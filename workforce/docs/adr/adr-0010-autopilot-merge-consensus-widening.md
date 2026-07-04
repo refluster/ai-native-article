@@ -1,6 +1,6 @@
 # ADR-0010 — Autopilot merge widens to "non-L0/L1 + unanimous reviewer consensus"
 
-- **Status**: Proposed
+- **Status**: Accepted (ratified by the merged implementation PRs; status normalised 2026-07-03 per root ADR-0004 — the Accepted adr-0011/adr-0014 extend this predicate)
 - **Date**: 2026-06-17
 - **Deciders**: operator, nadia
 - **Epics**: [epic-010](../epics/epic-010-project-trust-boundary.md)

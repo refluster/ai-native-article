@@ -18,7 +18,7 @@
  *                as a pr-review; widened in Epic-016 Phase 3).
  *
  * Personas are counted as head-count (Epic-016 Q1) — one persona contributes to
- * exactly one band. The deck's headline read is the ABSOLUTE delivered count
+ * exactly one band. The panel's headline read is the ABSOLUTE delivered count
  * (Epic-016 Q2), expected to climb as hiring converts into bound, then
  * delivered, work; `deliveredShare` below stays available as a secondary read.
  */
