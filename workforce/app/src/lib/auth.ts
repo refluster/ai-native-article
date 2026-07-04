@@ -63,7 +63,7 @@ const RETURN_TO_KEY = 'wf.auth.returnTo';
  *  path — never a foreign origin, never protocol-relative (`//evil.com`),
  *  never back into the auth flow. Both the writer (signIn) and the reader
  *  (consumeReturnTo) apply this same predicate, so a future caller of
- *  signIn() can't reintroduce an asymmetry (Dario review on #430). The
+ *  signIn() can't reintroduce an asymmetry (Dario review on PR 430). The
  *  reader still re-validates because both carriers (OIDC state,
  *  sessionStorage) are attacker-influenceable — the read is the trust
  *  boundary. */
