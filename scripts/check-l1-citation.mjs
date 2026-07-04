@@ -50,7 +50,7 @@ const L1_BASENAMES = L1_DOCS.map(p => p.split('/').pop())
 
 // Any file under these prefixes is an ADR — an L1 framework law (governance.md
 // §3). The workforce keeps its own ADR log; both are law, both must announce.
-const L1_DIR_PREFIXES = ['docs/adr/', 'workforce/docs/adr/']
+const L1_DIR_PREFIXES = ['docs/adr/', 'workforce/docs/adr/', 'workforce/docs/north-star/']
 
 const body = process.env.PR_BODY || ''
 const baseRef = process.env.BASE_REF || 'main'

@@ -50,7 +50,8 @@ Per AGENTS.md §1 vocabulary:
 | `workforce/docs/architecture.md` | **A** | The "system shape". Changes to the diagram or the R-N1 exception belong in their own PRs. |
 | `workforce/docs/naming.md` | **A** | The naming contract; loosening it cascades through every later PR. |
 | `workforce/docs/data-model.md` | **A** | The DDB/S3 schema. Schema changes touch every consumer. |
-| `workforce/docs/mvv.md` | **A** | Mission/vision/values — org identity, and (once injected into the runner's composition contract) every persona's north-star context. |
+| `workforce/docs/mvv.md` | **A** | Mission/vision/values — org identity; the mandatory anchor of the north-star corpus injected as layer 2 of every agent fire (agent-runner composition contract). |
+| `workforce/docs/north-star/*.md` | **A** | Extension files of the north-star corpus — injected alongside `mvv.md` into every persona's fire. Same bar as `mvv.md`; see the directory's README for what belongs. |
 | `workforce/docs/runbooks/*.md` | **B** | Operator runbooks. Agent-merge OK with CI + review. |
 | Agent identity/config — DDB `AGENT#{slug}/META` via agents-api `PATCH` | **B** with W-5 | [ADR-0007](adr/adr-0007-agent-config-single-source.md): the authoritative store; not a git path. One persona per mutation; the write-time validator + blast-radius guards (model allowlist, W-3 budget ceiling, cadence floor, prompt-size cap) are the mechanical gate; the `AUDIT#` trail + weekly digest are the review. The mass-edit exemption survives as: additive `bindings[]` writes that wire the same new skill across multiple agents may land as a series of writes in one digest week. |
 | `workforce/agents/{slug}/*` (legacy git tree) | **Frozen** | ADR-0007 migration: changes go to DDB only; the tree and its seed retire at step 6. Until then a file edit here is a governance violation, not a config change. |
