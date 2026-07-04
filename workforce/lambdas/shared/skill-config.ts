@@ -24,6 +24,7 @@ export interface SkillConfigViolation {
 export const SKILL_PATCHABLE_FIELDS = [
   "body",
   "description",
+  "display_name",
   "version",
   "status",
   "owners",
@@ -46,7 +47,7 @@ export const SKILL_DESCRIPTION_MAX_CHARS = 1024;
 const SEMVER = /^\d+\.\d+\.\d+$/;
 const AGENT_SLUG = /^[a-z]+$/;
 const XML_TAG = /<[^>]+>/;
-const STATUSES = new Set(["active", "stale", "deprecated"]);
+const STATUSES = new Set(["active", "stale", "deprecated", "archived"]);
 const COST_CLASSES = new Set(["small", "medium", "large"]);
 
 export interface SkillPatchContext {
@@ -92,13 +93,21 @@ export function validateSkillPatch(
       }
     }
   }
+  if ("display_name" in patch) {
+    const d = patch.display_name;
+    if (typeof d !== "string" || d.trim().length === 0 || d.trim().length > 120) {
+      v("N1-display-name", "display_name", "display_name must be a 1..120 char string after trim");
+    } else if (XML_TAG.test(d)) {
+      v("N1-display-name-xml", "display_name", "display_name must not contain XML tags");
+    }
+  }
   if ("version" in patch) {
     if (typeof patch.version !== "string" || !SEMVER.test(patch.version)) {
       v("J3-version", "version", `version must be semver x.y.z`);
     }
   }
   if ("status" in patch && !STATUSES.has(patch.status as string)) {
-    v("J4-status", "status", `status "${String(patch.status)}" not in {active, stale, deprecated}`);
+    v("J4-status", "status", `status "${String(patch.status)}" not in {active, stale, deprecated, archived}`);
   }
   if ("cost_class" in patch && !COST_CLASSES.has(patch.cost_class as string)) {
     v("J6-cost-class", "cost_class", `cost_class "${String(patch.cost_class)}" not in {small, medium, large}`);
@@ -138,6 +147,66 @@ export function validateSkillPatch(
         v("J8-improvement-agent-archived", field, `${field} "${val}" is archived`);
       }
     }
+  }
+  return out;
+}
+
+// ─── POST /skills — API-first creation (ADR-0017) ─────────────────────────
+//
+// ADR-0008 kept creation git-only because "a new skill needs its script".
+// ADR-0017 splits that: a JUDGMENT-ONLY skill (no bundled write-script, no
+// requires[], no deliverable, no archetype) may be created entirely through
+// the API — validated here, audited, live on the next fire once bound. A
+// skill that needs a write-script / credentials still enters via the git
+// scaffold (cadence-forge), because those are code and the credential trust
+// boundary (ADR-0008's reasoning stands for the code slice).
+
+export const SKILL_NAME_MAX = 64;
+const SKILL_NAME = /^[a-z][a-z0-9-]*$/;
+const RESERVED_NAME_TOKENS = ["anthropic", "claude"];
+
+export interface SkillCreateInput {
+  name: string;
+  description: string;
+  body: string;
+  display_name?: string;
+  version?: string;
+  status?: string;
+  cost_class?: string;
+  owners?: string[];
+  improvement_agent?: string | null;
+}
+
+export function validateSkillCreate(
+  input: Readonly<Record<string, unknown>>,
+  ctx: SkillPatchContext,
+): SkillConfigViolation[] {
+  const out: SkillConfigViolation[] = [];
+  const v = (rule: string, field: string, msg: string) => out.push({ rule, field, msg });
+
+  const name = input.name;
+  if (typeof name !== "string" || !SKILL_NAME.test(name) || name.length > SKILL_NAME_MAX) {
+    v("S0-name", "name", `name must match ${SKILL_NAME} and be ≤${SKILL_NAME_MAX} chars — it is the immutable slug (rename via display_name)`);
+  } else if (RESERVED_NAME_TOKENS.some((t) => name.includes(t))) {
+    v("S0-name-reserved", "name", `name must not contain a reserved token (${RESERVED_NAME_TOKENS.join(", ")}) — Anthropic skill-name compatibility`);
+  }
+
+  // Required judgment fields.
+  if (!("description" in input)) v("M3-description-empty", "description", "description is required");
+  if (!("body" in input)) v("K1-body", "body", "body is required");
+  if (!("owners" in input)) v("J7-owners", "owners", "owners is required (\u22651 existing agent slug \u2014 the authorship/Rule-11 set)");
+
+  // Shared field checks (body/description/display_name/version/status/
+  // cost_class/owners/improvement_agent) — same rules as PATCH.
+  const patchLike: Record<string, unknown> = { ...input };
+  delete patchLike.name;
+  out.push(...validateSkillPatch(patchLike, ctx));
+
+  // Unknown / code-side keys are rejected: write-scripts, requires[],
+  // archetype, deliverable enter via git only (ADR-0008 code slice).
+  const allowed = new Set(["name", "description", "body", "display_name", "version", "status", "cost_class", "owners", "improvement_agent"]);
+  for (const k of Object.keys(input)) {
+    if (!allowed.has(k)) v("S1-unknown-key", k, `"${k}" is not creatable via the API (code-side fields enter via the git scaffold)`);
   }
   return out;
 }

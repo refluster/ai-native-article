@@ -27,6 +27,7 @@ const FILTERS: { id: Filter; label: string }[] = [
 function statusTone(s: SkillStatus): string {
   if (s === 'active')     return 'text-wf-primary border-wf-primary'
   if (s === 'deprecated') return 'text-wf-tertiary border-wf-tertiary'
+  if (s === 'archived')   return 'text-wf-archived border-wf-archived'
   return 'text-wf-on-surface-variant border-wf-outline-variant'
 }
 
@@ -36,16 +37,19 @@ export default function SkillDirectory() {
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
+  // Archived skills are soft-deleted: hidden by default, revealed by the
+  // checkbox (their EXEC/deliverable history stays reachable via the link).
+  const [showArchived, setShowArchived] = useState(false)
 
   useEffect(() => {
     document.title = 'Workforce — Skills'
-    Promise.all([loadWorkforceSkills(), loadWorkforceManifest()])
+    Promise.all([loadWorkforceSkills({ includeArchived: showArchived }), loadWorkforceManifest()])
       .then(([s, a]) => {
         setSkills(s)
         setAgentManifest(a)
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
-  }, [])
+  }, [showArchived])
 
   const agentBySlug = useMemo(() => {
     const m = new Map<string, WorkforceAgentManifest['agents'][number]>()
@@ -62,6 +66,7 @@ export default function SkillDirectory() {
         if (!q) return true
         return (
           s.name.includes(q) ||
+          (s.display_name ?? '').toLowerCase().includes(q) ||
           s.description.toLowerCase().includes(q) ||
           s.owners.some((o) => o.includes(q))
         )
@@ -106,6 +111,15 @@ export default function SkillDirectory() {
                 {f.label}
               </button>
             ))}
+            <label className="flex items-center gap-1.5 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showArchived}
+                onChange={(e) => setShowArchived(e.target.checked)}
+                className="accent-wf-primary"
+              />
+              ARCHIVED
+            </label>
             <input
               type="search"
               value={query}
@@ -130,8 +144,11 @@ export default function SkillDirectory() {
                     SKILL · v{s.version}
                   </div>
                   <div className="font-headline text-xl font-black tracking-tight text-wf-on-surface truncate">
-                    {s.name}
+                    {s.display_name ?? s.name}
                   </div>
+                  {s.display_name && (
+                    <div className="font-wfmono text-[10px] text-wf-on-surface-variant truncate">{s.name}</div>
+                  )}
                 </div>
                 <span
                   className={`font-wfmono text-[10px] uppercase tracking-[0.14em] px-2 py-0.5 border ${statusTone(s.status)}`}
