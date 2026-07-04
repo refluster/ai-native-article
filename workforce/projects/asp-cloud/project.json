@@ -6,9 +6,12 @@
     "owner": "PSVL",
     "repo": "asp-cloud"
   },
-  "governance_docs": ["AGENTS.md"],
-  "members": ["nadia", "dario", "ren", "aoi"],
-  "credential_types": ["github.token"],
+  "governance_docs": [
+    "AGENTS.md"
+  ],
+  "credential_types": [
+    "github.token"
+  ],
   "status": "active",
   "created_at": "2026-05-27",
   "note": "First external project — validates the multi-project pr-autopilot / pr-review path. Nadia owns; Dario / Ren / Aoi reviewer lenses."

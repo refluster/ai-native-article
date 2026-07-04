@@ -5,8 +5,8 @@
 //  P-1   project.json:id MUST equal the parent directory name.
 //  P-2   id MUST NOT start with "self/" (reserved per Epic-010 §3 for the
 //        runner-auto-seeded per-agent personal projects).
-//  P-3   owner_agent (if set) MUST be in members[].
-//  P-4   Every member slug MUST resolve to workforce/agents/{slug}/.
+//  (P-3 / P-4 retired 2026-07-03 with the membership concept — every
+//   registered agent participates in every project.)
 //  P-5   credential_types[] base types MUST be in the Epic-010 §5 type
 //        registry (anthropic.api_key / discord.bot_token / github.token /
 //        notion.integration_token) — enforced by schema pattern; this
@@ -24,7 +24,6 @@ const HERE = fileURLToPath(new URL(".", import.meta.url));
 const WORKFORCE_ROOT = join(HERE, "..");
 const REPO_ROOT = join(WORKFORCE_ROOT, "..");
 const PROJECTS_DIR = join(WORKFORCE_ROOT, "projects");
-const AGENTS_DIR = join(WORKFORCE_ROOT, "agents");
 const SCHEMA_PATH = join(HERE, "schemas", "project.schema.json");
 
 const violations = [];
@@ -32,23 +31,12 @@ const v = (rule, path, msg) =>
   violations.push({ rule, path: relative(REPO_ROOT, path), msg });
 
 const ID = /^[a-z][a-z0-9-]*$/;
-const AGENT_SLUG = /^[a-z]+$/;
 const CREDENTIAL_KEY =
   /^(anthropic\.api_key|discord\.bot_token|discord\.webhook_url|github\.token|notion\.integration_token|workforce\.feed_write_token)(@[a-z][a-z0-9_-]*)?$/;
 
 const schema = JSON.parse(readFileSync(SCHEMA_PATH, "utf8"));
 const requiredKeys = new Set(schema.required ?? []);
 const allowedKeys = new Set(Object.keys(schema.properties ?? {}));
-
-function knownAgents() {
-  if (!existsSync(AGENTS_DIR)) return new Set();
-  return new Set(
-    readdirSync(AGENTS_DIR).filter((name) => {
-      const stat = statSync(join(AGENTS_DIR, name));
-      return stat.isDirectory() && AGENT_SLUG.test(name);
-    }),
-  );
-}
 
 function listProjectDirs() {
   if (!existsSync(PROJECTS_DIR)) return [];
@@ -88,22 +76,6 @@ function shallowSchemaCheck(file, data) {
       }
     }
   }
-  if (data.members !== undefined) {
-    if (!Array.isArray(data.members) || data.members.length === 0) {
-      v("schema:members-empty", file, `members must be a non-empty array`);
-    } else {
-      const seen = new Set();
-      for (const m of data.members) {
-        if (typeof m !== "string" || !AGENT_SLUG.test(m)) {
-          v("schema:member-pattern", file, `member "${m}" must match ${AGENT_SLUG}`);
-        }
-        if (seen.has(m)) {
-          v("schema:members-duplicate", file, `duplicate member "${m}"`);
-        }
-        seen.add(m);
-      }
-    }
-  }
   if (data.credential_types !== undefined) {
     if (!Array.isArray(data.credential_types)) {
       v("schema:cred-type", file, `credential_types must be an array`);
@@ -123,7 +95,6 @@ function shallowSchemaCheck(file, data) {
 }
 
 function main() {
-  const agents = knownAgents();
   const dirs = listProjectDirs();
 
   for (const dir of dirs) {
@@ -154,24 +125,6 @@ function main() {
       v("P-2", file, `id "${data.id}" cannot start with "self" — reserved for per-agent runner-auto-seeded projects (Epic-010 §3)`);
     }
 
-    // P-3
-    if (data.owner_agent && Array.isArray(data.members) && !data.members.includes(data.owner_agent)) {
-      v("P-3", file, `owner_agent "${data.owner_agent}" must also appear in members[]`);
-    }
-
-    // P-4 — member slugs must reference existing agents. ADR-0007 step 6b
-    // retired the workforce/agents/ tree, so CI can no longer check
-    // existence against the filesystem (agents.size === 0); slug shape is
-    // still enforced above, and existence is enforced at runtime by the
-    // agents-api / DDB single source. The directory check only fires in a
-    // checkout that still carries a legacy tree.
-    if (Array.isArray(data.members) && agents.size > 0) {
-      for (const m of data.members) {
-        if (typeof m === "string" && !agents.has(m)) {
-          v("P-4", file, `member "${m}" has no matching workforce/agents/${m}/ directory`);
-        }
-      }
-    }
   }
 
   if (violations.length === 0) {

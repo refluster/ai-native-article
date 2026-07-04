@@ -27,11 +27,10 @@ export interface ProjectSummary {
   owner_agent: string;
   created_at: string;
   archived_at?: string;
-  /** Count of active (non-revoked) MEMBER rows. */
-  member_count?: number;
   /** Most-recent EXEC#* started_at on this project's partition. */
   last_execution_at?: string;
-  /** Human-readable project name (project.json `name`). */
+  /** Human-readable display name — decoupled from the immutable
+   *  project_id slug; renamed via PATCH /projects/{id}. */
   name?: string;
   /** Standard project attribute: the GitHub repo this project ships work
    *  against (e.g. owner `refluster`, repo `project-ind`). Non-confidential
@@ -44,14 +43,6 @@ export interface ProjectSummary {
 
 /** Shape of `GET /projects/{id}` — same as ProjectSummary today. */
 export type ProjectDetail = ProjectSummary;
-
-/** One row in `GET /projects/{id}/members`. */
-export interface ProjectMember {
-  agent_slug: string;
-  joined_at: string;
-  /** Present only when `?include_revoked=true` and the row is revoked. */
-  revoked_at?: string;
-}
 
 /** One row in `GET /projects/{id}/executions`. */
 export interface ProjectExecution {
@@ -76,12 +67,6 @@ export interface ProjectExecution {
     summary: string;
   };
   error?: string;
-}
-
-/** One row in `GET /agents/{slug}/projects` — the agent's memberships. */
-export interface AgentMembership {
-  project_id: string;
-  joined_at: string;
 }
 
 // ─── Credentials (issue 158) ───────────────────────────────────────────
@@ -126,8 +111,5 @@ export interface DeleteCredentialResponse {
 export interface WorkforceProjectsMock {
   generated_at: string;
   projects: ProjectSummary[];
-  members: Record<string, ProjectMember[]>;
   executions: Record<string, ProjectExecution[]>;
-  /** agent_slug → memberships. */
-  agent_memberships: Record<string, AgentMembership[]>;
 }

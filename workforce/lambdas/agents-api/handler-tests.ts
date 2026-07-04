@@ -397,18 +397,14 @@ describe("GET /projects (listProjects)", () => {
     });
   }
 
-  it("returns 200 with items + member_count on the happy path", async () => {
+  it("returns 200 with items on the happy path (no member_count — membership removed 2026-07-03)", async () => {
     seedProject("acme", "_operator");
-    rows.set(key("PROJECT#acme", "MEMBER#ren"), {
-      pk: "PROJECT#acme", sk: "MEMBER#ren",
-      project_id: "acme", agent_slug: "ren", joined_at: "2026-05-27T00:00:00.000Z",
-    });
     const res = await handler(evt("GET /projects"));
     expect(statusOf(res)).toBe(200);
-    const body = bodyOf(res) as { items: Array<{ project_id: string; member_count: number }> };
+    const body = bodyOf(res) as { items: Array<{ project_id: string; member_count?: number }> };
     expect(body.items).toHaveLength(1);
     expect(body.items[0]!.project_id).toBe("acme");
-    expect(body.items[0]!.member_count).toBe(1);
+    expect(body.items[0]!.member_count).toBeUndefined();
   });
 
   it("hides self/{slug} projects by default; surfaces them with ?include_self=true", async () => {
@@ -596,58 +592,6 @@ describe("GET /projects/{id} (getProject)", () => {
   });
 });
 
-// ─── GET /projects/{id}/members ───────────────────────────────────────
-
-describe("GET /projects/{id}/members (listProjectMembers)", () => {
-  beforeEach(() => {
-    rows.set(key("PROJECT#p", "META"), {
-      pk: "PROJECT#p", sk: "META",
-      project_id: "p", owner_agent: "_operator", status: "active",
-      created_at: "2026-05-27T00:00:00.000Z",
-    });
-    rows.set(key("PROJECT#p", "MEMBER#ren"), {
-      pk: "PROJECT#p", sk: "MEMBER#ren",
-      project_id: "p", agent_slug: "ren", joined_at: "2026-05-27T00:00:00.000Z",
-    });
-    rows.set(key("PROJECT#p", "MEMBER#aoi"), {
-      pk: "PROJECT#p", sk: "MEMBER#aoi",
-      project_id: "p", agent_slug: "aoi", joined_at: "2026-05-27T00:00:00.000Z",
-      revoked_at: "2026-05-28T00:00:00.000Z",
-    });
-  });
-
-  it("excludes revoked members by default", async () => {
-    const res = await handler(
-      evt("GET /projects/{id}/members", { id: "p" }),
-    );
-    const items = (bodyOf(res) as { items: Array<{ agent_slug: string }> }).items;
-    expect(items.map((i) => i.agent_slug)).toEqual(["ren"]);
-  });
-
-  it("includes revoked members with ?include_revoked=true (audit query)", async () => {
-    const res = await handler(
-      evt("GET /projects/{id}/members", { id: "p" }, { include_revoked: "true" }),
-    );
-    const items = (bodyOf(res) as { items: Array<{ agent_slug: string; revoked_at?: string }> }).items;
-    expect(items.map((i) => i.agent_slug).sort()).toEqual(["aoi", "ren"]);
-    const aoi = items.find((i) => i.agent_slug === "aoi");
-    expect(aoi?.revoked_at).toBe("2026-05-28T00:00:00.000Z");
-  });
-
-  it("returns 200 with empty items for a project with no members (distinct from 404)", async () => {
-    rows.set(key("PROJECT#empty", "META"), {
-      pk: "PROJECT#empty", sk: "META",
-      project_id: "empty", owner_agent: "_operator", status: "active",
-      created_at: "2026-05-27T00:00:00.000Z",
-    });
-    const res = await handler(
-      evt("GET /projects/{id}/members", { id: "empty" }),
-    );
-    expect(statusOf(res)).toBe(200);
-    expect((bodyOf(res) as { items: unknown[] }).items).toEqual([]);
-  });
-});
-
 // ─── GET /projects/{id}/executions ────────────────────────────────────
 
 describe("GET /projects/{id}/executions (listProjectExecutions)", () => {
@@ -691,35 +635,11 @@ describe("GET /projects/{id}/executions (listProjectExecutions)", () => {
   });
 });
 
-// ─── GET /agents/{slug}/projects ───────────────────────────────────────
-
-describe("GET /agents/{slug}/projects (listAgentProjects)", () => {
-  it("returns active memberships for the agent", async () => {
-    rows.set(key("PROJECT#acme", "META"), {
-      pk: "PROJECT#acme", sk: "META",
-      project_id: "acme", owner_agent: "_operator", status: "active",
-      created_at: "2026-05-27T00:00:00.000Z",
-    });
-    rows.set(key("PROJECT#acme", "MEMBER#ren"), {
-      pk: "PROJECT#acme", sk: "MEMBER#ren",
-      project_id: "acme", agent_slug: "ren", joined_at: "2026-05-27T00:00:00.000Z",
-    });
-    const res = await handler(
-      evt("GET /agents/{slug}/projects", { slug: "ren" }),
-    );
-    expect(statusOf(res)).toBe(200);
-    const body = bodyOf(res) as { items?: unknown[] } | unknown[];
-    const items = Array.isArray(body) ? body : (body as { items?: unknown[] }).items ?? [];
-    expect(items.length).toBeGreaterThanOrEqual(0);
-  });
-
-  it("returns 200 with empty items for an agent with no memberships (no 404)", async () => {
-    const res = await handler(
-      evt("GET /agents/{slug}/projects", { slug: "ghost" }),
-    );
-    expect(statusOf(res)).toBe(200);
-  });
-});
+// ─── membership routes removed (2026-07-03) ───────────────────────────
+//
+// GET /projects/{id}/members and GET /agents/{slug}/projects were removed
+// with the membership concept — every registered agent participates in
+// every project. Unknown-route negatives below cover the 404 behaviour.
 
 // ─── Negative: wrong-method / unknown route ────────────────────────────
 

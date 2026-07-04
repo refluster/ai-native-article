@@ -610,16 +610,10 @@ Resources:
         # (Story 2-C #91) so this Lambda's IAM scope stays narrow per R-N3.
         # Routes use a non-greedy `{id}` param, NOT the greedy `{id+}`
         # proxy: a greedy parent (`/projects/{id+}`) conflicts with its
-        # child routes (`/projects/{id}/members` etc.) on HTTP API import,
+        # child routes (`/projects/{id}/executions` etc.) on HTTP API import,
         # so API Gateway silently drops the children. Project ids that
         # contain `/` (e.g. `self/ren`) are percent-encoded by the client,
         # so they still match a single `{id}` segment.
-        ListAgentProjects:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref WfAgentsHttpApi
-            Path: /agents/{slug}/projects
-            Method: GET
         # Epic-010 ROADMAP §Status-transition criterion 3 (C3) — agent
         # profile reads execution history from the EXEC row family via
         # GSI1 instead of the legacy AGENT#{slug}/RUN#{ulid} +
@@ -683,12 +677,6 @@ Resources:
           Properties:
             ApiId: !Ref WfAgentsHttpApi
             Path: /projects/{id}
-            Method: GET
-        ListProjectMembers:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref WfAgentsHttpApi
-            Path: /projects/{id}/members
             Method: GET
         ListProjectExecutions:
           Type: HttpApi
@@ -1624,13 +1612,16 @@ Resources:
   # the metric was universal noise: success paths write EXEC only,
   # failure paths write RUN only, neither has a sibling).
 
-  WfAuditCrossProjectLeaksAlarm:
+  # 2026-07-03: the membership concept was removed (every registered agent
+  # participates in every project), so the cross-project-leak membership
+  # check retired; the malformed-row half survives as WfAuditMalformedExecs.
+  WfAuditMalformedExecsAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub wf-audit-cross-project-leaks-alarm-${Stage}
-      AlarmDescription: !Sub Audit found cross-project leakage in wf-table-${Stage} (Epic-010 W-2 trust-boundary breach).
+      AlarmName: !Sub wf-audit-malformed-execs-alarm-${Stage}
+      AlarmDescription: !Sub Audit found malformed EXEC rows in wf-table-${Stage} (data-shape regression; FU-NEW-D class).
       Namespace: Workforce/Audit
-      MetricName: WfAuditCrossProjectLeaks
+      MetricName: WfAuditMalformedExecs
       Dimensions:
         - Name: Stage
           Value: !Ref Stage
@@ -1916,13 +1907,13 @@ Resources:
               "type": "metric",
               "x": 8, "y": 22, "width": 16, "height": 6,
               "properties": {
-                "title": "Workforce/Audit — WfAuditCrossProjectLeaks (daily)",
+                "title": "Workforce/Audit — WfAuditMalformedExecs (daily)",
                 "view": "timeSeries",
                 "region": "${AWS::Region}",
                 "period": 86400,
                 "stat": "Sum",
                 "metrics": [
-                  [ "Workforce/Audit", "WfAuditCrossProjectLeaks", "Stage", "${Stage}", { "color": "#d62728" } ]
+                  [ "Workforce/Audit", "WfAuditMalformedExecs", "Stage", "${Stage}", { "color": "#d62728" } ]
                 ],
                 "yAxis": { "left": { "min": 0 } },
                 "annotations": {
