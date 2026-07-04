@@ -146,6 +146,7 @@ This repository **delegates** bounded autonomous merge to the agent-workforce's 
 - workforce/docs/naming.md
 - workforce/docs/data-model.md
 - workforce/docs/mvv.md
+- workforce/docs/north-star/**
 - workforce/infra/sam/samconfig.toml
 <!-- /autopilot:l0l1-paths -->
 
