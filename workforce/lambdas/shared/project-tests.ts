@@ -5,11 +5,10 @@
 //   - appendExecution writes regardless of membership (write-gate removed)
 //   - selfProjectId returns the canonical shape
 //   - GSI1 / GSI2 cross-project recall
-//   - removeMember is SOFT delete (revoked_at, audit row remains)
+//   - rename sets the display name; the slug (project_id) never moves
 //   - getCredential narrows catch to ResourceNotFoundException
 //   - listExecutions filter type discrimination
-//   - addMember idempotency + project-existence gate
-//   - members() on empty project + half-bounded range queries
+//   - half-bounded range queries
 //   - archive does NOT close the ledger (assertion of chosen semantics)
 //
 // The dual-write integration test + backfill-Lambda idempotency test
@@ -231,74 +230,35 @@ describe("create + getProject + archive", () => {
   });
 });
 
-// --- Membership ----------------------------------------------------------
+// --- Rename ---------------------------------------------------------------
 
-describe("membership", () => {
+describe("rename", () => {
   let p: ProjectId;
   beforeEach(async () => {
     p = project.asProjectId("p");
     await project.create({ project_id: p, owner_agent: "_operator" });
   });
 
-  it("addMember + isMember + members + removeMember round-trip", async () => {
-    expect(await project.isMember(p, "ren")).toBe(false);
-    await project.addMember(p, "ren", "2026-01-02T00:00:00.000Z");
-    await project.addMember(p, "aoi", "2026-01-03T00:00:00.000Z");
-    expect(await project.isMember(p, "ren")).toBe(true);
-    expect(await project.isMember(p, "aoi")).toBe(true);
-    expect(await project.isMember(p, "yuki")).toBe(false);
-    expect((await project.members(p)).sort()).toEqual(["aoi", "ren"]);
-
-    await project.removeMember(p, "ren", "2026-02-01T00:00:00.000Z");
-    expect(await project.isMember(p, "ren")).toBe(false);
-    expect((await project.members(p)).sort()).toEqual(["aoi"]);
+  it("sets the display name on META (decoupled from the immutable slug)", async () => {
+    await project.rename(p, "Talent Network Console");
+    const raw = store.get("PROJECT#p|META");
+    expect(raw?.name).toBe("Talent Network Console");
+    expect(raw?.project_id).toBe("p"); // the slug never moves on rename
   });
 
-  it("removeMember is SOFT delete — row remains with revoked_at for audit", async () => {
-    await project.addMember(p, "ren", "2026-01-02T00:00:00.000Z");
-    await project.removeMember(p, "ren", "2026-02-01T00:00:00.000Z");
-    const raw = store.get("PROJECT#p|MEMBER#ren");
-    expect(raw).toBeDefined();
-    expect(raw?.revoked_at).toBe("2026-02-01T00:00:00.000Z");
-    expect(raw?.joined_at).toBe("2026-01-02T00:00:00.000Z");
+  it("accepts non-slug characters and trims whitespace", async () => {
+    await project.rename(p, "  日本語の名前 / Emoji 🚀  ");
+    const raw = store.get("PROJECT#p|META");
+    expect(raw?.name).toBe("日本語の名前 / Emoji 🚀");
   });
 
-  it("removeMember on a non-member is a no-op (idempotent)", async () => {
-    await expect(project.removeMember(p, "ghost")).resolves.toBeUndefined();
-    expect(store.get("PROJECT#p|MEMBER#ghost")).toBeUndefined();
+  it("rejects empty and over-long names", async () => {
+    await expect(project.rename(p, "   ")).rejects.toThrow(/1\.\.80/);
+    await expect(project.rename(p, "x".repeat(81))).rejects.toThrow(/1\.\.80/);
   });
 
-  it("addMember is idempotent (same slug twice doesn't duplicate)", async () => {
-    await project.addMember(p, "ren");
-    await project.addMember(p, "ren");
-    expect((await project.members(p)).sort()).toEqual(["ren"]);
-  });
-
-  it("addMember on an ACTIVE member preserves joined_at (audit — PR #111 cycle 2)", async () => {
-    await project.addMember(p, "ren", "2026-01-02T00:00:00.000Z");
-    await project.addMember(p, "ren", "2026-03-01T00:00:00.000Z"); // re-seed
-    const raw = store.get("PROJECT#p|MEMBER#ren");
-    expect(raw?.joined_at).toBe("2026-01-02T00:00:00.000Z");
-  });
-
-  it("addMember on a REVOKED member starts a fresh tenure (new joined_at, revoked_at cleared)", async () => {
-    await project.addMember(p, "ren", "2026-01-02T00:00:00.000Z");
-    await project.removeMember(p, "ren", "2026-02-01T00:00:00.000Z");
-    await project.addMember(p, "ren", "2026-03-01T00:00:00.000Z");
-    const raw = store.get("PROJECT#p|MEMBER#ren");
-    expect(raw?.joined_at).toBe("2026-03-01T00:00:00.000Z");
-    expect(raw?.revoked_at).toBeUndefined();
-    expect(await project.isMember(p, "ren")).toBe(true);
-  });
-
-  it("addMember throws when project doesn't exist", async () => {
-    await expect(project.addMember(project.asProjectId("ghost"), "ren")).rejects.toThrow(
-      /not found.*call create/,
-    );
-  });
-
-  it("members() on a project with no MEMBER#* rows returns []", async () => {
-    expect(await project.members(p)).toEqual([]);
+  it("throws when the project doesn't exist", async () => {
+    await expect(project.rename(project.asProjectId("ghost"), "X")).rejects.toThrow(/not found/);
   });
 });
 
@@ -313,13 +273,11 @@ describe("appendExecution", () => {
     b = project.asProjectId("b");
     await project.create({ project_id: a, owner_agent: "_operator" });
     await project.create({ project_id: b, owner_agent: "_operator" });
-    await project.addMember(a, "ren");
-    // ren is NOT a member of "b" — used to trigger cross-project denial.
   });
 
-  // Membership write-gate removed 2026-06-08 (operator decision; C-3).
-  // appendExecution writes the ledger row regardless of membership.
-  it("writes the row even when the agent is NOT a member (gate removed)", async () => {
+  // No membership gate (the concept was removed 2026-07-03; the write-gate
+  // had already gone 2026-06-08). appendExecution writes the row for any agent.
+  it("writes the row for any (agent, project) pair — no membership gate", async () => {
     const row = await project.appendExecution({
       project_id: b, // ren is not a member of "b"
       agent_slug: "ren",
@@ -335,8 +293,7 @@ describe("appendExecution", () => {
     expect(row.agent_slug).toBe("ren");
   });
 
-  it("writes the row even when membership has been revoked (gate removed)", async () => {
-    await project.removeMember(a, "ren");
+  it("writes the row on a second project too (no per-project partitioning of write access)", async () => {
     const row = await project.appendExecution({
       project_id: a,
       agent_slug: "ren",
@@ -403,9 +360,6 @@ describe("listExecutions", () => {
     beta = project.asProjectId("beta");
     await project.create({ project_id: alpha, owner_agent: "_operator" });
     await project.create({ project_id: beta, owner_agent: "_operator" });
-    await project.addMember(alpha, "ren");
-    await project.addMember(alpha, "maya");
-    await project.addMember(beta, "ren");
 
     await project.appendExecution({
       project_id: alpha,
@@ -527,11 +481,7 @@ describe("listExecutions", () => {
   // primitive at single-operator scale (C-3). listExecutions returns every
   // row in the queried partition, subject only to the structured filters.
   describe("no membership read-gate", () => {
-    it("returns all rows in the agent partition regardless of membership", async () => {
-      // ren is seeded into alpha (beforeEach) but we revoke beta here.
-      // Pre-2026-06-10 the beta row (EXEC#01B) would have been filtered
-      // out; it is now returned — membership no longer gates reads.
-      await project.removeMember(beta, "ren");
+    it("returns all rows in the agent partition across projects", async () => {
       const rows = await project.listExecutions({ agent_slug: "ren" });
       expect(rows.map((r) => r.sk).sort()).toEqual(["EXEC#01A", "EXEC#01B"]);
     });
@@ -546,7 +496,6 @@ describe("appendExecution — embedding sidecar (Story 4)", () => {
   beforeEach(async () => {
     alpha = project.asProjectId("alpha");
     await project.create({ project_id: alpha, owner_agent: "_operator" });
-    await project.addMember(alpha, "ren");
   });
 
   function baseInput(opts: Partial<Parameters<typeof project.appendExecution>[0]> = {}) {

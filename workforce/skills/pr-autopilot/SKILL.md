@@ -1,20 +1,47 @@
 ---
 name: pr-autopilot
-description: Workforce skill that drives an open PR through its **full** review cycle in a bound project's repo — route to 1-3 reviewer personas, obtain their reviews, synthesise the unanimous-green / 🟡 / 🔴 verdict, and complete. **Every open PR is in scope — draft and non-draft, human- and bot-authored (Dependabot).** On a unanimous-green verdict for a PR that touches **no L0/L1 governance path** of the target repo, it approves + merges via the shared fail-closed pr-merge.mjs engine (**drafts included — a green draft is marked Ready for Review, then merged, adr-0014**); a PR touching the target repo's **governance L0/L1 escalates to a human** for the final call (R-N9 / W-5), as does any non-consensus PR. The merge predicate (adr-0010, 2026-06-17) widened from the old Dependabot safe class to "not-L0/L1 + unanimous reviewer consensus"; the engine re-verifies it server-side and fails closed. Runs as a CCR task (ADR-0005); github.token via the binding's project linkage (Epic-010 §5).
+description: Drive every open PR in the bound project's repo to one of exactly two terminal states — MERGED (unanimous-green ≥3-reviewer consensus, no L0/L1 surface, via the fail-closed pr-merge.mjs engine) or ESCALATED to a human with the `autopilot:needs-human` label. Routes each PR to a ≥3-persona reviewer panel, posts every review + the synthesised verdict as PR comments, merges when the R-N10 predicate holds (drafts included), and hands off with the label when it doesn't. A deterministic sweep (pr-autopilot-sweep.mjs) escalates anything that stalls, so no PR is ever left in neither state. Runs as a CCR task (ADR-0005), fired on cron or a pull_request event (adr-0013); github.token via the binding's project linkage.
 ---
 
-# pr-autopilot (CCR routing leg — fired on cron OR a pull_request event)
+# pr-autopilot
 
-You are routing pull requests in your bound project's repo to reviewer personas under your lens. This runs as a **CCR task** fired either by `wf-orchestrator-tick` on the binding's cron, OR — when the binding declares a `github_event` trigger ([adr-0013](../../docs/adr/adr-0013-event-driven-pr-autopilot.md)) — on a `pull_request` event seconds after the PR opens. The cadence is **trigger-agnostic**: there is no `pr_url` argument either way — you **discover** which PRs need routing (the scan skips already-routed ones, so an event-fired and a cron-fired run do the identical, idempotent thing), then route each one.
+**The two-outcome contract.** Every PR this cadence touches ends in exactly one
+of two terminal states:
+
+1. **MERGED** — the R-N10 predicate held and `pr-merge.mjs` merged it.
+2. **ESCALATED** — a hand-off comment carrying the hidden marker
+   `<!-- autopilot:needs-human -->` was posted via `pr-autopilot-post.mjs
+   --needs-human`, which stamps the `autopilot:needs-human` label.
+
+A run that leaves a PR in neither state is a bug, not a finished run. The
+deterministic sweep (Step 6) enforces the contract mechanically even when a
+run stalls. The one legitimate *interim* state is 🟡 (an open review cycle
+awaiting the author's revision) — and it is bounded: a 🟡 PR untouched past the
+sweep's stale threshold is escalated.
+
+You are the routing persona (today Nadia's PdM lens). This runs as a **CCR
+task** fired by `wf-orchestrator-tick` on the binding's cron, or — when the
+binding declares a `github_event` trigger (adr-0013) — on a `pull_request`
+event. The cadence is trigger-agnostic and idempotent: you **discover** which
+PRs need work; already-routed PRs are skipped.
 
 Your task context supplies:
 
-- `agent_slug` — you (the routing persona; today Nadia's PdM lens).
-- `project_id` — the bound project. Its `workforce/projects/{project_id}/project.json` declares the GitHub repo (`github.owner` / `github.repo`).
-- `credentials['github.token'].token` — the project-scoped PAT, resolved via the project linkage. Export it as `GITHUB_TOKEN` for the scripts below.
-- `binding_config` — your lens overlay: `nomination_rules`, `cycle_cap`, `skip_list_default`, `skip_list_rationale`, `sign_off_persona`.
+- `agent_slug` — you (the routing persona).
+- `project_id` — the bound project; its `workforce/projects/{project_id}/project.json`
+  declares the GitHub repo.
+- `credentials['github.token'].token` — the project-scoped PAT. Export as
+  `GITHUB_TOKEN` for every script below.
+- `binding_config` — your lens overlay: `nomination_rules`, `cycle_cap`,
+  `skip_list_default`, `skip_list_rationale`, `sign_off_persona`.
 
-## Step 1 — discover candidate PRs (deterministic, read-only)
+**Scope: every open PR** — draft and non-draft, human- and bot-authored
+(Dependabot) — routes through the same review → consensus → merge path
+(adr-0010; drafts are merge-eligible per adr-0014). The reviewer-lens contract
+in Step 4 is part of this skill (the former standalone `pr-review` skill was
+retired and folded in; `dependabot-triage`'s no-review lane likewise).
+
+## Step 1 — discover candidates (deterministic, read-only)
 
 ```sh
 GITHUB_TOKEN="<credentials['github.token'].token>" \
@@ -23,147 +50,219 @@ GITHUB_TOKEN="<credentials['github.token'].token>" \
     --max 5 --since-days 7 --out /tmp/pr-autopilot-candidates.json
 ```
 
-The scan lists **every** open PR updated within the window — **draft and non-draft, human- and bot-authored (Dependabot)** — **skips only any PR you have already posted a cycle-1 routing comment on**, caps at `--max` (default 5), and writes each remaining candidate (title, body, diff, existing comments, plus `draft` / `is_bot` flags) to the `--out` file. If it reports **0 candidates**, there is nothing to route this tick — **stop here, post nothing.**
-
-> **Drafts and bots are in scope (adr-0010), and drafts are merge-eligible (adr-0014).** A draft is a **first-class merge target**, not just an early review pass: it routes, is reviewed, and — on a green, non-L0/L1 verdict with the standard predicate satisfied — **merges through the same path as a non-draft**. Because GitHub refuses to merge a draft directly, the `pr-merge.mjs` engine marks the draft **Ready for Review** (GraphQL) immediately before the merge PUT; everything else (L0/L1 boundary, consensus, checks-green, delegation) is identical. Dependabot/bot PRs route through the **same** review→consensus→merge path as human PRs (the old no-review `dependabot-triage` lane is retired). Note the candidate's `draft` / `is_bot` flags when you write the routing comment, but route them like any other PR.
+The scan lists every open PR updated within the window, skips PRs you already
+routed, caps at `--max`, and writes each candidate (title, body, diff,
+comments, `draft`/`is_bot` flags) to `--out`. **0 candidates → skip Steps 2–5,
+but still run the Step 6 sweep.**
 
 ## Step 2 — route each candidate (your judgment)
 
-Read `/tmp/pr-autopilot-candidates.json`. For **each** candidate PR, apply your `binding_config.nomination_rules` to the PR's diff + body:
+For each candidate, apply your `binding_config.nomination_rules` to the diff +
+body:
 
-- Nominate **1-3** reviewer personas whose lens has real surface on this PR. You (the routing persona) MAY self-include if your rules say so.
-- Each nomination's `rationale` must **cite the PR surface** (file paths / topics), not just restate the trigger.
-- List in `skipped` the personas you considered and rejected (per `skip_list_default` / `skip_list_rationale`) — not every persona in the org.
-- **Epic PRs always carry a VP-class reviewer (operator directive 2026-06-27).** When the diff touches the target repo's Epic / design-record path (for `agent-workforce`: `workforce/docs/epics/**`), never route to a single non-VP lens — e.g. PdM self-review alone is **not** sufficient. Nominate the product lens **plus** at least one VP-class persona: the VP whose functional area the Epic concerns when one is clearly implicated, otherwise the standing VP lens declared in your `nomination_rules`. An Epic is an org-shaping decision; it gets senior sign-off, not a solo review.
+- Nominate **at least 3** reviewer personas (never 1 or 2 — the merge engine
+  fails closed below `MIN_REVIEWERS=3`). Seat the lenses with the most real
+  surface first, then fill to 3 with your standing broad lenses (product,
+  engineering-excellence, platform). If you honestly cannot seat 3 distinct
+  lenses, the PR is not autopilot-eligible: hand it off per Step 5 with
+  `--needs-human`, stating why.
+- Each nomination's `rationale` cites the PR surface (file paths / topics).
+- List in `skipped` only personas you considered and rejected.
+- **Epic PRs carry a VP-class reviewer.** When the diff touches the Epic /
+  design-record path (for `agent-workforce`: `workforce/docs/epics/**`),
+  nominate the product lens **plus** at least one VP-class persona, still
+  seating the full ≥3 panel.
 
-Write the routing comment body for PR `<number>` to `/tmp/route-body-<number>.md` using **exactly** this template (the opening marker is what the scanner reads to avoid double-routing):
+Write the routing comment for PR `<number>` to `/tmp/route-body-<number>.md`
+using **exactly** this template (the opening line is the marker the scanner
+and the cycle-cap counter read):
 
 ```md
 **<PersonaName> — cycle 1 of ≤ <cycle_cap>.**
 
 <one-paragraph PR summary>
 
-Reviewers nominated:
+Reviewers nominated (≥ 3):
 
-- **@<persona>** — <rationale citing the PR surface>
-- **@<persona>** — <rationale>
+- **`wf:<persona>`** — <rationale citing the PR surface>
+- **`wf:<persona>`** — <rationale citing the PR surface>
+- **`wf:<persona>`** — <rationale citing the PR surface>
 
-Skipping @<persona>, @<persona> — <one short clause why the skip-list applies>.
+Skipping `wf:<persona>` — <one short clause>.
 
-**Cycle 1 of ≤ <cycle_cap>.** Reviewers post inline + summary via `pull_request_review_write event=COMMENT` (never approve / never request-changes per W-5). Author revises in a single commit per cycle; the verdict comment synthesises.
+**Cycle 1 of ≤ <cycle_cap>.** Reviewers post via `event=COMMENT` (never
+approve / never request-changes per W-5). Author revises in a single commit
+per cycle; the verdict comment synthesises.
 
 — <PersonaName> (CCR persona; see workforce/skills/pr-autopilot/SKILL.md)
 ```
 
-Omit the "Skipping …" line if you skipped no one. `<PersonaName>` is your `agent_slug` capitalised (e.g. `nadia` → `Nadia`).
+`<PersonaName>` is your `agent_slug` capitalised. Omit "Skipping …" if empty.
 
-## Step 3 — post each routing comment (deterministic, comment-only)
+**Never `@`-mention a persona (ML-012).** Workforce persona slugs are **not**
+GitHub accounts — a raw `@<slug>` in any posted body notifies whichever real
+GitHub user owns that name (a routing comment's `@yuki` pinged the unrelated
+github.com/yuki, operator report 2026-07-04). The canonical agent-reference
+format everywhere you post — nominations, skip lines, review bodies, verdict
+comments — is `wf:<slug>` wrapped in backticks (e.g. `wf:yuki`). This is
+enforced mechanically: `pr-autopilot-post.mjs` refuses (exit 1) any body
+containing a raw `@`-mention outside backticks/code fences, so wrap literal
+`@…` tokens you must quote (scoped npm packages, decorators, emails in prose)
+in backticks too.
 
-For each candidate you wrote a body for:
+## Step 3 — post each routing comment (deterministic)
 
 ```sh
-GITHUB_TOKEN="<credentials['github.token'].token>" \
-  node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
-    --project "<project_id>" --pr <number> --body-file /tmp/route-body-<number>.md
+GITHUB_TOKEN="…" node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
+  --project "<project_id>" --pr <number> --body-file /tmp/route-body-<number>.md
 ```
 
-`pr-autopilot-post.mjs` posts **only** an issue comment — there is no code path in *that* script to approve, request changes, merge, push, or open a PR (R-N9 / W-5). Exit 0 means the comment landed. (The bounded R-N10 merge in Step 5 goes through a separate, fail-closed script — never through `pr-autopilot-post.mjs`.)
+`pr-autopilot-post.mjs` is comment+label-only — it has no code path that
+approves, merges, or pushes (R-N9 / W-5). It also refuses a body carrying a
+raw GitHub `@`-mention (ML-012): agents are `wf:<slug>`, never `@<slug>`.
 
 ## Step 4 — obtain each nominated review (drive the cycle; do not stall)
 
-**This is the step whose absence left #530/#514 stuck at a lone routing comment.** Routing alone is not the job — you must ensure each nominated reviewer's review actually lands, then proceed. For **each** persona you nominated in Step 2, **apply that persona's review lens inline and post it as that persona** — a COMMENT review (`event=COMMENT`, never approve/request-changes per W-5). The cycle must **not** stall waiting on a dispatch that does not exist. There is no separate `pr-review` skill — this skill owns the whole cadence end-to-end; the reviewer-lens contract below is the contract (it was folded in when `pr-review` was retired).
+For **each** persona you nominated, apply that persona's review lens inline
+and post it as that persona — a COMMENT review (`event=COMMENT`, never
+approve / request-changes per W-5). Do not wait on any external dispatch.
 
-**Reviewer-lens contract (inline — apply per nominated persona):**
-- **The lens** = that persona's voice + their skill-judgment config (`lens_name`, `values`, `checklist_sections`, `escalation_triggers`, `bias_disclosure_template` on their `AGENT#{slug}` record). Scan the diff for violations *in that lens only*; silence on an item means "looks good" — post only real findings.
-- **Inline findings** lead with a finding-ID (section letter + integer, e.g. `A1`), name the checklist section, cite `file:line`, 1-3 sentences, suggest the fix concretely. Cycle-2+ comments cite the cycle-1 finding-ID they map to (or flag `[NEW]`).
-- **Summary body**: opening verdict signal (🟢/🟡/🔴 from this lens) → section-by-section notes → **sign-off** `— {persona} (LLM persona; lens: {lens_name}; manual route via pr-autopilot)` → a **bias-disclosure** paragraph (mandatory: it is an LLM persona; what it DID / did NOT do).
-- **Escalation instead of review**: if the PR matches the persona's `escalation_triggers` (e.g. a governance §2 / L0 amendment, an R-rule loosening without amendment, a destructive force-push), post a single comment naming the trigger + "requires explicit operator approval", and do not run the checklist. This is a hand-off to a human, so it follows the escalation-labelling rule (Step 5.2): the comment embeds `<!-- autopilot:needs-human -->` and is posted with `--needs-human`.
+**Reviewer-lens contract (per nominated persona):**
 
-Each posted review is a real lens review — concrete findings citing the PR surface, or an explicit "no findings from this lens". When every nominated review is posted, go to Step 5.
+- **The lens** = that persona's voice + skill-judgment config (`lens_name`,
+  `values`, `checklist_sections`, `escalation_triggers`,
+  `bias_disclosure_template` on their `AGENT#{slug}` record). Scan the diff in
+  that lens only; post only real findings (or an explicit "no findings from
+  this lens").
+- **Inline findings** lead with a finding-ID (`A1`), name the checklist
+  section, cite `file:line`, suggest the fix concretely. Cycle-2+ comments
+  cite the cycle-1 finding-ID or flag `[NEW]`.
+- **Summary body**: verdict signal (🟢/🟡/🔴 from this lens) →
+  section-by-section notes → sign-off
+  `— {persona} (LLM persona; lens: {lens_name}; manual route via pr-autopilot)`
+  → a mandatory bias-disclosure paragraph (it is an LLM persona; what it DID /
+  did NOT do).
+- **Green sign-off marker (machine-checkable).** A non-blocking lens (no 🔴)
+  **must embed the exact hidden marker** `<!-- autopilot:review:{slug}:green -->`.
+  This is the only signal the merge engine accepts as that reviewer's green
+  vote. A blocking reviewer omits it. No marker ⇒ not green ⇒ no merge.
+- **Escalation instead of review**: if the PR matches the persona's
+  `escalation_triggers`, post a single comment naming the trigger — as a
+  hand-off per Step 5 (`--needs-human` + the hidden marker), not a checklist
+  run.
 
-> **Green sign-off marker (machine-checkable consensus — adr-0010 / Sana B1).** When a reviewer's lens is **non-blocking** (their findings are all ✅/📥/💬, no 🔴), their posted review **must embed the exact hidden marker** `<!-- autopilot:review:{slug}:green -->` (e.g. `<!-- autopilot:review:dario:green -->`), where `{slug}` is that reviewer's agent slug. This is the **only** signal the merge engine accepts as that reviewer's green vote — it does not parse bylines or prose. A reviewer who is blocking (🔴) or has an open finding **omits** the marker (or writes `:red`). No marker ⇒ that reviewer is "not green" ⇒ the merge fails closed.
+## Step 5 — verdict by reviewer consensus → terminal action
 
-## Step 5 — verdict by reviewer consensus + completion (+ bounded merge)
+Synthesise the reviewers' **collective** verdict (never your solo call):
 
-Now that the nominated reviews exist (you produced/dispatched them in Step 4, or they arrived on a prior tick), **synthesise the reviewers' collective verdict** — you do not re-review, and the verdict is **not** your solo call. It is the **consensus of all nominated reviewers**:
+- **🟢 unanimous-green** — every nominated reviewer non-blocking.
+- **🟡** — one or more reviewers left an open blocking finding; the author is
+  expected to revise; next tick re-routes (cycle += 1).
+- **🔴** — any reviewer's veto, cycle > `cycle_cap`, or a scope question you
+  cannot decide.
 
-1. **Aggregate the reviewers (unanimous-green rule).** Read every nominated reviewer's findings + the author's response commits. The colour is:
-   - **🟢 unanimous-green** — *every* nominated reviewer is non-blocking (their findings are all ✅ fixed / 📥 deferred / 💬 nit; none left a 🔴 or `CHANGES_REQUESTED`). One reviewer short of green ⇒ not green.
-   - **🟡** — one or more reviewers have an open blocking finding. Next tick re-routes (cycle += 1) once the author revises.
-   - **🔴** — any reviewer's 🔴 is a **veto**, or cycle > `cycle_cap`, or a scope question you can't decide. Escalate to the operator.
+Write a verdict comment that names each reviewer's load-bearing finding and
+the aggregated colour, then take the terminal action:
 
-   Write a verdict comment that names each reviewer's load-bearing finding and how it resolved, states the aggregated colour, and post it **with `pr-autopilot-post.mjs`** — that script is the **only** path that applies the escalation label, so the verdict/hand-off comment must go through it, **never** a raw issue-comment API call, `gh`, or an MCP comment tool (any of those drops the label — this is exactly how #353's L0/L1 hand-off reached the operator un-labelled). Flags by outcome: **comment-only** for a 🟡 re-route; **`--needs-human`** for any hand-off (🔴 / 🟢-but-L0/L1 / no-delegation — see 5.2); **plus `--reviewed`** when that hand-off is 🟢 unanimous-green and merge-ready (held only by the human gate — see 5.2), composed into the hand-off template in 5.2 so the markers are present by construction.
-2. **Complete the cycle** — never leave it open. **Escalation ALWAYS carries the `autopilot:needs-human` label — no exceptions.** Every comment that hands a PR to a human MUST (a) embed the hidden marker `<!-- autopilot:needs-human -->` in the verdict body **and** (b) be posted with the `--needs-human` flag. `pr-autopilot-post.mjs` stamps the canonical label from *either* signal (belt-and-suspenders, so a forgotten flag still labels from the marker), so the operator finds the whole queue with `is:open label:autopilot:needs-human`:
-   - **🟢 unanimous-green + touches NO L0/L1 path** → approve + merge via the engine below. (No marker, no `--needs-human` — it merges.)
-   - **🟢 unanimous-green + touches the target repo's governance L0/L1** → **escalate to a human** for the final call. This is a **merge-ready** hand-off — the reviewers reached green; only the human gate holds it back — so it carries **both** markers and flags: `--needs-human --reviewed` (and the body ends with `<!-- autopilot:needs-human -->` then `<!-- autopilot:reviewed -->`). Tag the operator (`L0/L1 change — operator's final call per W-5`). Do **not** merge.
-   - **🟡** → the verdict lists the required fixes; re-route next tick. (No marker / no `--needs-human` — it stays in the cycle, not the human queue.)
-   - **🔴** → escalate: post the verdict **with the marker and `--needs-human`** (no `--reviewed` — it did **not** reach green), state the blocking reason, tag the operator. Do not merge.
-   - **🟢 unanimous-green + no R-N10 delegation** (the bound project's target repo never granted autonomous merge) → a merge-ready hand-off like the L0/L1 case: `--needs-human --reviewed`.
-   - **Any other hand-off** (unreadable governance, a scope question you can't decide — i.e. the verdict did **not** reach 🟢) → `--needs-human` only, **no** `--reviewed`.
+| Verdict | Condition | Action |
+|---|---|---|
+| 🟢 | no L0/L1 path + R-N10 delegation + predicate holds | **merge** via `pr-merge.mjs` (below) |
+| 🟢 | touches the target's L0/L1 paths | hand off `--needs-human --reviewed` |
+| 🟢 | no R-N10 delegation for this repo | hand off `--needs-human --reviewed` |
+| 🟡 | author revision pending | verdict comment only (no label); the Step 6 sweep bounds this state |
+| 🔴 / non-consensus / can't seat 3 / unreadable governance | any | hand off `--needs-human` (no `--reviewed`) |
 
-   **The `autopilot:reviewed` companion label (operator directive 2026-06-23).** A 🟢 unanimous-green PR that is handed off **only** because a human gate blocks the autonomous merge (an L0/L1 path, or no R-N10 delegation) is *reviewed and merge-ready* — the operator's only task is the final merge click. Stamp it `autopilot:reviewed` (the `--reviewed` flag and/or the `<!-- autopilot:reviewed -->` body marker — belt-and-suspenders, exactly like `--needs-human`) **in addition to** `autopilot:needs-human`. So `is:open label:autopilot:reviewed` is the merge-ready queue, a strict subset of `is:open label:autopilot:needs-human` that excludes the 🔴 / cycle-capped / non-consensus PRs that still need work. `autopilot:reviewed` is **never** stamped on a non-green hand-off, and never implies a merge — the agent still does not merge an L0/L1 PR.
+**Every hand-off goes through `pr-autopilot-post.mjs`** — never a raw API
+call, `gh`, or an MCP comment tool (those drop the label; ML-009). Compose the
+verdict **into** this template so the markers are present by construction:
 
-   **Hand-off verdict template — compose the verdict *into* this block, never freehand** (the trailing marker is the mechanical half of the guarantee: it forces the label even if `--needs-human` is ever dropped, and it is only reliably present if you start from this template — Step 2 has the analogous routing template):
-   ```md
-   **<PersonaName> — verdict, cycle <n> of ≤ <cycle_cap>. <🟢 escalate / 🔴 / hand-off>.**
+```md
+**<PersonaName> — verdict, cycle <n> of ≤ <cycle_cap>. <🟢 escalate / 🔴 / hand-off>.**
 
-   <one-paragraph synthesis: each nominated reviewer's load-bearing finding and how it resolved, then the aggregated colour>
+<one-paragraph synthesis: each reviewer's load-bearing finding, the aggregated colour>
 
-   **Handing to the operator — <reason>.** <e.g. "🟢 consensus, but touches L0/L1 path `<file>` — operator's final call per W-5"; or "🔴 <reviewer>'s blocking finding"; or "no R-N10 delegation".> Not merging. <If the PR is a DRAFT, add: "Still a draft — mark ready, then merge.">
+**Handing to the operator — <reason>.** Not merging. <If a DRAFT: "Still a draft — mark ready, then merge.">
 
-   — <PersonaName> (CCR persona; see workforce/skills/pr-autopilot/SKILL.md)
+— <PersonaName> (CCR persona; see workforce/skills/pr-autopilot/SKILL.md)
 
-   <!-- autopilot:needs-human -->
-   <!-- autopilot:reviewed -->   ⟵ include this SECOND marker line ONLY on a 🟢 merge-ready hand-off (L0/L1 / no-delegation); omit it on a 🔴 / non-consensus hand-off.
-   ```
-   So a 🔴 / non-consensus hand-off (drop the reviewed marker line) is posted as:
-   ```sh
-   GITHUB_TOKEN="<…>" node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
-     --project "<project_id>" --pr <number> --body-file /tmp/verdict-<number>.md --needs-human
-   ```
-   and a 🟢 merge-ready hand-off (keep the reviewed marker line) adds `--reviewed`:
-   ```sh
-   GITHUB_TOKEN="<…>" node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
-     --project "<project_id>" --pr <number> --body-file /tmp/verdict-<number>.md --needs-human --reviewed
-   ```
-   and the verdict body ends with the marker line `<!-- autopilot:needs-human -->` (the template above already carries it; the `<!-- autopilot:reviewed -->` line is the merge-ready companion). The `pr-merge.mjs` engine independently stamps the same label on any tracking **issue** it files (`action:"escalate"`), and the label name is single-sourced (`ESCALATION_LABEL`) across both scripts — so PR hand-offs and issue escalations share one searchable queue. **A hand-off comment with no `autopilot:needs-human` label is a cadence bug, not a finished run.**
-
-### The merge leg — unanimous-green, non-L0/L1 only (R-N10 / adr-0010)
-
-Autonomous merge widened (adr-0010) from the old Dependabot safe class to **"the reviewers reached unanimous green AND the PR touches no L0/L1 governance path of the target repo."** L0/L1 changes always go to a human. Emit a merge **only** when *all* hold (otherwise: verdict comment only, hand off / escalate):
-
-- The aggregated verdict is **🟢 unanimous-green** (no reviewer blocking), and
-- the bound `project_id` has an **R-N10 delegation** (the target repo's own statute grants the workforce autonomous-merge authority — e.g. `PSVL/asp-cloud` → `docs/adr_autopilot_pr_merge.md`; if none, never merge), and
-- the PR touches **no L0/L1 path** declared in the target repo's own `docs/governance.md` (between the `<!-- autopilot:l0l1-paths -->` markers), all required checks are green, the PR is mergeable (state `clean` **or** `draft` — adr-0014), and no reviewer left `CHANGES_REQUESTED`.
-
-A **draft** that clears this predicate merges like any other PR: the engine flips it Ready for Review (GraphQL `markPullRequestReadyForReview`) right before the merge PUT, since GitHub will not merge a draft directly. The draft flag is not a hold — only the L0/L1 boundary, consensus, checks, and delegation are (adr-0014).
-
-When those hold, build the decisions payload (schema in the script header) — one `{ pr, action:"merge", comment, squash_subject, squash_body, reviewers:[...] }` where `reviewers` is the nominated set whose unanimous sign-off you are attesting (each must have posted their `<!-- autopilot:review:{slug}:green -->` marker per Step 4) — and run the **shared** merge engine:
-
-```sh
-TOKEN="<credentials['github.token'].token>" \
-  node workforce/skills/pr-autopilot/pr-merge.mjs \
-    --repo "<owner>/<repo>" --decisions /tmp/pr-merge-decisions.json
+<!-- autopilot:needs-human -->
+<!-- autopilot:reviewed -->   ⟵ keep this SECOND marker line ONLY on a 🟢 merge-ready hand-off; delete it on a 🔴 / non-consensus hand-off.
 ```
 
-`pr-merge.mjs` **re-verifies the full predicate server-side and fails closed**: it reads the target repo's `docs/governance.md` to learn the L0/L1 path set (if that doc is unreadable or declares no L0/L1 block, the set is *unknown* and the merge is **refused** — never guessed), then confirms open + mergeable + clean, **no `autopilot:off` label** (the per-PR maintainer pause; the repo-wide pause is emptying the target's `autopilot:l0l1-paths` block), no L0/L1 file in the diff, all checks green, no `CHANGES_REQUESTED`, and that each reviewer in `reviewers[]` posted their exact `<!-- autopilot:review:{slug}:green -->` marker (not a byline — an exact hidden token, so prose can't fake a vote and a format change can't drop one). A mis-judged "🟢 + eligible" therefore cannot cause a bad merge. Exit `2` = a decision was refused server-side or GitHub rejected the write; surface it, do not retry blindly. For an L0/L1 PR or a non-consensus PR, emit **no** merge decision — the verdict comment is the deliverable and a human decides.
+```sh
+GITHUB_TOKEN="…" node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
+  --project "<project_id>" --pr <number> --body-file /tmp/verdict-<number>.md \
+  --needs-human [--reviewed]
+```
 
-> **The terminal state is the merge, not the verdict.** Where the merge predicate holds, *this skill finishes the job* — it approves and merges; stopping at a 🟢 verdict and handing off is **incomplete**, not a finished run. Drive every cycle to one of: **merged** (predicate held) or an **explicit hand-off/escalation** (a stated reason the predicate did not hold). Never leave a 🟢 PR sitting with no terminal action.
->
-> **When a 🟢 does *not* autonomously merge (and that is correct).** The autonomous merge requires a *delegated, declared* target. A 🟢 does not self-merge when:
-> 1. **No R-N10 delegation** for the bound project (the target's own statute never granted autonomous merge) → hand off, verdict names this.
-> 2. **No `autopilot:l0l1-paths` block** in the target's `docs/governance.md` → the L0/L1 set is unknown → the engine fails closed → hand off.
->
-> **These two are the *only* holds — and the PR's _author_ is NOT one of them.** A workforce- or agent-authored PR (including one this routing persona did not write — or even did) is merged on the same predicate as any other: author identity is absent from `verifyMergeable()` by design. The author≠merger separation that W-5 / R-6 care about is satisfied by the **nominated reviewer panel**, not by who opened the PR; where the author and merge identity coincide, GitHub's self-approve refusal (HTTP 422) is treated as *advisory* and the verified `<!-- autopilot:review:{slug}:green -->` markers are the consensus gate ([#362](https://github.com/refluster/ai-native-article/pull/362), FU-028). So **do NOT hand off a green, non-L0/L1 PR by citing its authorship, W-5, or "this is the workforce's own PR"** — and do not invoke the *retired* Dependabot-only safe class (superseded by [adr-0010](../../docs/adr/adr-0010-autopilot-merge-consensus-widening.md)) as a reason a general docs PR "isn't eligible." That exact reasoning was the #373 misfire: a 🟢, non-L0/L1, own-authored docs PR was handed off as "not a Dependabot safe-class PR … a human decision," when the predicate said *merge*. Authorship gates nothing; the L0/L1 boundary, consensus, checks-green, and delegation are the whole predicate.
->
-> These are not bugs in the cadence; they are the guard working. **The workforce's own repo (`refluster/ai-native-article`) is *not* an exception ([adr-0011](../../docs/adr/adr-0011-own-repo-autopilot-merge.md)):** it carries the delegation + the L0/L1 block ([root `docs/governance.md` §4.4](../../../docs/governance.md)) and is merged exactly like an external delegated target — a reviewed, non-L0/L1 🟢 merges; a PR on the L0/L1 boundary (governance / ADR / identity / schedule / production paths) escalates to the operator like on any repo. (The former own-repo `SELF_REPO` escalation guard was retired by adr-0011; W-5 is unaffected — all operator-only Zone A files are inside the L0/L1 set.)
+`autopilot:reviewed` marks "reviewed to 🟢, merge-ready, held only by the
+human gate" — the operator's merge-click queue
+(`is:open label:autopilot:reviewed`). Never stamp it on a non-green hand-off.
+
+### The merge leg (R-N10; one shared engine)
+
+Emit a merge **only** when all hold: 🟢 unanimous-green; the bound project's
+target repo carries an **R-N10 delegation** in its own statute; the PR touches
+**no L0/L1 path** declared between the `<!-- autopilot:l0l1-paths -->` markers
+of the target's `docs/governance.md`; checks green; mergeable (state `clean`
+or `draft` — a green draft is flipped Ready for Review then merged); no
+`CHANGES_REQUESTED`. The workforce's own repo (`refluster/ai-native-article`)
+is a normal delegated target (adr-0011) — **authorship is not a hold**: a
+green, non-L0/L1 PR merges regardless of who opened it; the panel is the
+author≠merger separation (FU-028).
+
+Build the decisions payload (schema in the script header) with `reviewers[]` =
+the ≥3 nominated personas whose green markers you verified, then:
+
+```sh
+TOKEN="…" node workforce/skills/pr-autopilot/pr-merge.mjs \
+  --repo "<owner>/<repo>" --decisions /tmp/pr-merge-decisions.json
+```
+
+`pr-merge.mjs` re-verifies the full predicate server-side and **fails
+closed** — an unreadable/markerless target governance doc, a missing green
+marker, a sub-3 panel, an `autopilot:off` label, or cycle > 7 all refuse the
+merge. A mis-judged 🟢 cannot cause a bad merge.
+
+**A refusal is a hand-off, not a no-op.** If `pr-merge.mjs` exits `2` (any
+decision refused server-side or a GitHub write rejected), do not retry blindly
+and do not stop: post the verdict for the affected PR again via
+`pr-autopilot-post.mjs --needs-human`, quoting the engine's refusal reason.
+The run still ends in one of the two terminal states.
+
+## Step 6 — terminal-state sweep (deterministic; run every fire)
+
+```sh
+GITHUB_TOKEN="…" node workforce/skills/pr-autopilot/pr-autopilot-sweep.mjs \
+  --project "<project_id>" --apply
+```
+
+The sweep enforces the two-outcome contract mechanically. It escalates (label
++ hand-off comment) any open PR that is in **neither** terminal state:
+
+- **unlabelled-handoff** — a hand-off marker exists but the label was dropped
+  (a session-driven escalation that bypassed the stamper; ML-009).
+- **stale-routed** — routed, but no terminal state after `--stale-hours`
+  (default 48) without an update — a stalled run or an abandoned 🟡.
+- **never-routed** — never picked up and now older than the scan's discovery
+  window (default 7 days), so the cadence would never see it again.
+
+PRs labelled `autopilot:off` (maintainer pause) or already labelled
+`autopilot:needs-human` are never touched. Run it even when Step 1 found 0
+candidates — the sweep is how the contract survives runs that die mid-cycle.
 
 ## Scope (this skill)
 
-- **Drive the whole cycle — don't stop at routing.** route → obtain each nominated review → synthesise verdict → complete (merge or hand off). A PR left at a lone routing comment is a bug (the #530/#514 failure), not a finished run.
-- **The orchestrator, keeping the `pr-review` skill.** `pr-review` is the standalone reviewer contract; pr-autopilot *drives* it — dispatching it to bound personas, or (until dispatch is wired everywhere) applying each nominee's lens inline per that contract. pr-autopilot decides *who* reviews and *what the verdict is*; `pr-review` defines *how* a single lens review is shaped.
-- **Every open PR is in scope.** Draft, non-draft, human-authored, and bot-authored (Dependabot) PRs all route through the same review→consensus→merge path (adr-0010). The retired `dependabot-triage` no-review lane is no longer the bot path.
-- **The verdict is the reviewers' consensus, not your solo call.** Merge needs unanimous green; one reviewer short, or any 🔴 / `CHANGES_REQUESTED`, blocks it.
-- **Merge is bounded to non-L0/L1 + consensus (R-N10 / adr-0010).** A PR touching the target repo's governance L0/L1 always hands off to a human (the operator's final call). No push or PR-open under any path. The engine re-verifies and fails closed.
+- **Drive the whole cycle**: route → review → verdict → **merge or escalate**.
+  Stopping at a routing comment or a bare 🟢 verdict is an incomplete run.
+- **The verdict is the panel's consensus** (≥3 distinct reviewers; the engine
+  fails closed below 3).
+- **Merge is bounded to non-L0/L1 + consensus + delegation** (R-N10). A PR on
+  the target's governance L0/L1 always escalates to a human. No push or
+  PR-open under any path.
+- **The sweep is part of every fire.** No PR is left in neither state.
 
-Related: [agent-runner.md](../../docs/routines/agent-runner.md) (the generic CCR routine this skill runs under — there is no per-skill routine spec; this SKILL.md is the authoritative contract), [R-N10 governance](../../docs/governance.md) + [adr-0010](../../docs/adr/adr-0010-autopilot-merge-consensus-widening.md) (the widened merge predicate). The former `dependabot-triage` (no-review bot lane) and `pr-review` (separate reviewer skill) have both been **retired/deleted** — this skill now owns the entire route → review → consensus → merge cadence; bot PRs and human PRs alike route here. [dev-process.md](../../docs/runbooks/dev-process.md).
+Related: [agent-runner.md](../../docs/routines/agent-runner.md) (the generic
+CCR routine this runs under — this SKILL.md is the authoritative contract),
+R-N10 in [workforce governance](../../docs/governance.md) + adr-0010/0011/0013/0014/0015
+(the merge predicate's decision trail), [dev-process.md](../../docs/runbooks/dev-process.md).

@@ -5,6 +5,23 @@
 - **Deciders**: operator (refluster), maya, celeste
 - **Epics**: [017](../epics/epic-017-podcast-spotify-distribution.md)
 
+> **Update (2026-06-29) — skill consolidation (no decision reversed).** The
+> production skills were consolidated from five into **two persona cadences**:
+> **`podcast-script`** (Rhys + Idris — the prepare half) and **`podcast-publish`**
+> (Celeste — the publish half, which absorbs the former `podcast-cast`,
+> `podcast-shownotes`, `podcast-synthesize`, and `podcast-rss`). Every decision
+> below stands: the prepare cadence still runs on the R-N1 exception (a) surface;
+> the deterministic Polly/S3/RSS work still runs in the `wf-podcast` Lambda
+> (triggered by the daily CI workflow via OIDC, never the Notion-only cadence);
+> Polly + public-CloudFront egress, the mandatory-citation guard, and the
+> authority placement are unchanged. Odette still owns voice-pool membership and
+> Idris still owns the rights checklist — only the mechanical *writes* moved into
+> the two cadences. See `epic-017` for the consolidation rationale.
+
+> **Update (2026-06-30) — end-to-end sequence, triggers & status model documented (no decision reversed).** Clarifies the as-built flow after operator confusion over "which component does what." See the new [§ Operational sequence & status model](#operational-sequence--status-model-added-2026-06-30): the per-article `podcastStatus` machine, the three triggers (the two CCR cadences + the `podcast-pipeline.yml` workflow), and the skill↔workflow↔Lambda division of labour. It also records the `/podcast/synthesize` route's **kickoff + finalize-poll** shape ([#409](https://github.com/refluster/ai-native-article/pull/409)): a full-episode Polly synthesis outlasts the API Gateway HTTP-API hard 30s integration timeout, so the Lambda starts the Polly async task and returns `202` while the caller polls — the wait lives in Polly, not the Lambda, and **no per-Lambda nested invocation** is introduced (R-N1). No decision below is reversed.
+
+> **Update (2026-06-30) — optional cadence→pipeline hand-off (operator-requested; AWS trust boundary unchanged).** `podcast-publish` gains an optional final leg, `trigger-pipeline.mjs`, that `workflow_dispatch`es `podcast-pipeline.yml` so the publish cadence can run as one continuous flow (cast + show-notes → kick the pipeline) instead of only waiting for the daily cron. This **refines** — does not reverse — the earlier note's "triggered by the daily CI workflow, never the Notion-only cadence": the daily cron remains; the cadence may now *also* dispatch the workflow on demand. Crucially this is **GitHub-only** — the dispatch uses the project `github.token` (added to `podcast-publish`'s `requires`; needs the `workflow` scope), and the dispatched CI workflow still does all Polly/S3/RSS work via its **own OIDC→AWS** role. The cadence holds **no AWS credentials** — the R-N1 / §"Decision" AWS trust boundary is intact; only a GitHub capability is added. (A Claude Code session's egress proxy injects a fixed session GitHub identity and cannot exercise the project PAT, so the leg is validated in the CCR runner / CI / an operator shell, not from such a session.)
+
 ## Context
 
 Epic-017 repurposes the L3/L4 analysis articles on `kohuehara.xyz` into
@@ -78,6 +95,96 @@ surface — composed of:
    back to Notion is **manual** in Phase 1 (`spotify.token` API automation is
    deferred to Phase 2). `spotifyUrl` then flows Notion → frontmatter → the
    reader Spotify link through the existing non-GAS CI sync (Epic-017 D4/E).
+
+## Operational sequence & status model (added 2026-06-30)
+
+The pipeline spans **four components** with **distinct triggers**; the single
+source of per-article truth is the `podcastStatus` property on the unified
+Articles DB row (C-2). This section documents the as-built flow — it
+operationalises the Decision above and reverses none of it.
+
+### Components & triggers
+
+| Component | Kind / surface | Trigger | Touches |
+|---|---|---|---|
+| `podcast-script` skill | CCR Cadence (R-N1 exc. (a)) | `wf-orchestrator-tick` cron (per binding) **or** manual | Notion only — writes `podcastScript` + `podcastSources` + `complianceVerdict` |
+| operator approval | human gate | **manual** (Notion) | flips `podcastStatus` `script-ready → approved` |
+| `podcast-publish` — **judgment half** | CCR Cadence (Notion-only, no AWS) | `wf-orchestrator-tick` cron (per binding) **or** manual | Notion only — writes `podcastVoice` + `podcastShowNotes` |
+| `podcast-publish` — **deterministic half** (`synthesize.mjs` / `publish.mjs` / `build-rss.mjs`, **bundled in the skill**) | scripts run in CI, **not** in the cadence | **`.github/workflows/podcast-pipeline.yml`** — `cron: 37 18 * * *` + `workflow_dispatch`; OIDC → IAM | SigV4-POST to the `wf-podcast` HttpApi |
+| `wf-podcast` Lambda | **default** Lambda surface (deterministic) | invoked by the bundled scripts via the IAM HttpApi | Amazon Polly, S3 (`podcast/*`), Notion writes, RSS |
+
+The division the table makes explicit (the point that caused the confusion):
+**the deterministic scripts are *owned by* the `podcast-publish` skill but
+*executed by* the `podcast-pipeline.yml` workflow** — by R-N1 design, CCR
+cadences are Notion-only and never hold AWS credentials. The workflow is the
+executor/trigger, **not** where the logic lives; the heavy work (Polly / S3 /
+Notion / RSS) is in the Lambda. So no single component "does everything": the
+**script** is `podcast-script`; the **voice + show-notes** are `podcast-publish`'s
+judgment half; the **synthesis + feed** are `podcast-publish`'s bundled scripts
+run by the workflow against the Lambda.
+
+### Per-article `podcastStatus` machine
+
+```
+(none / empty)
+   │  podcast-script Cadence → publish-notion.mjs:
+   │  write podcastScript + podcastSources + complianceVerdict
+   ▼
+script-ready
+   │  operator: manual review (reads Idris's compliance verdict) → flip in Notion
+   ▼
+approved        ◀── podcast-publish judgment half writes podcastVoice +
+   │                podcastShowNotes here (does NOT change podcastStatus)
+   │  podcast-pipeline.yml → synthesize.mjs → wf-podcast Lambda:
+   │  Polly StartSpeechSynthesisTask (kickoff → 202) → caller polls finalize →
+   │  MP3 copied to podcast/audio/<slug>.mp3 + audioUrl written
+   ▼
+audio-ready
+   │  podcast-pipeline.yml → publish.mjs → wf-podcast Lambda:
+   │  flip status + rebuild podcast/feed.xml
+   ▼
+published ──► feed.xml (S3) ──CloudFront/OAC (~5 min edge cache)──► Spotify crawler
+```
+
+| `podcastStatus` | set by | when |
+|---|---|---|
+| `none` / empty | — | article has no podcast yet (the `podcast-script` picker's eligibility) |
+| `script-ready` | `podcast-script` `publish-notion.mjs` | script + citations + compliance attached |
+| `approved` | **operator (manual)** | human approves the `script-ready` episode |
+| `audio-ready` | `wf-podcast` Lambda (synthesize finalize) | Polly task complete; MP3 + `audioUrl` written |
+| `published` | `wf-podcast` Lambda (publish) | episode included in the rebuilt feed |
+
+Notes:
+- `podcastVoice` / `podcastShowNotes` are written while the row is still
+  `approved` and do **not** advance `podcastStatus`; synthesize consumes
+  `podcastVoice`, the feed builder consumes `podcastShowNotes`.
+- **synthesize processes only `approved` rows; publish only `audio-ready` rows.**
+  A `script-ready` row that was never approved is invisible to both — the most
+  common "why didn't my episode publish?" cause.
+- The feed includes every `audio-ready`-or-`published` row that has an `audioUrl`.
+
+### Synthesize: kickoff + finalize poll ([#409](https://github.com/refluster/ai-native-article/pull/409))
+
+A full ~10-min JA episode's Polly synthesis runs longer than the API Gateway
+**HTTP API's hard 30s integration timeout** (the original synchronous
+poll-to-completion 503'd at 30s on a real batch while the synthesis actually
+succeeded). So `/podcast/synthesize` does **not** wait: the kickoff (`POST {}`)
+calls `StartSpeechSynthesisTask` for up to `BATCH_LIMIT` `approved` rows and
+returns `202` with the task handles; `synthesize.mjs` then polls
+(`POST {finalize:[…]}`) until each completed task is copied to its public key
+and flipped to `audio-ready`. The wait lives inside **Polly's async task
+service**, not the Lambda, and the Polly `taskId` is carried by the caller — so
+there is **no per-Lambda nested invocation** (which R-N1 forbids without a Zone A
+amendment). Fail-loud (C-4) on a Polly `failed` status or a poll-budget timeout.
+
+### Feed propagation (not a pipeline step)
+
+`feed.xml` is written to S3 with `Cache-Control: max-age=300` and served via
+CloudFront/OAC. After a rebuild, the edge (and the browser) serve the prior feed
+for **up to ~5 minutes** — by design, to avoid a per-publish CloudFront
+invalidation (cost/IAM). For an immediate refresh, invalidate `/podcast/feed.xml`
+on the distribution. "The run succeeded but the feed hasn't changed yet" within
+that window is expected, **not** a failure.
 
 ## Alternatives considered
 

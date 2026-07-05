@@ -54,9 +54,12 @@ Prereqs:
 Full procedure + after-registration steps:
 [workforce/docs/runbooks/agent-registration.md](../../docs/runbooks/agent-registration.md).
 
-`bindings` are intentionally `[]` at registration. The `podcast-script` Cadence
-is wired afterwards via `wire-cadences.mjs`, landing **PAUSED**
-(`scheduler:"manual"`) — adding the binding is A-authority; enabling the cron is
-the separate B-authority step the operator performs (Epic-017 Story 3). Wiring
-first requires the `podcast-script` PR merged so its `SKILL#` row exists (R8
-write-time check).
+`bindings` are intentionally `[]` at registration. The **two** podcast Cadences
+are wired afterwards via `wire-cadences.mjs` — `podcast-script` → **rhys** (the
+prepare half) and `podcast-publish` → **celeste** (the publish half: sets
+`podcastVoice` from Odette's pool + `podcastShowNotes` on `approved` episodes,
+then the daily CI workflow synthesises + publishes). Both land **PAUSED**
+(`scheduler:"manual"`) — adding a binding is A-authority; enabling the cron is the
+separate B-authority step the operator performs. Wiring first requires the
+skills' PR merged so their `SKILL#` rows exist (R8 write-time check). (Epic-017
+consolidated the original four publish-side skills into `podcast-publish`.)

@@ -1,17 +1,20 @@
 #!/usr/bin/env node
-// podcast-rss — (re)build the podcast RSS feed by triggering the deterministic
-// wf-podcast Lambda (Epic-017 Story 6). No judgment: it SigV4-POSTs to the
-// IAM-authorized /podcast/rss route, and the Lambda assembles the feed from
-// every audio-ready/published episode (enclosure = the public MP3,
-// <description> = the mandatory source citations, GUID = slug) and writes it to
-// the public podcast/feed.xml. The operator submits that feed URL to Spotify
-// once; subsequent episodes auto-ingest on the next rebuild.
+// podcast-publish / build-rss — standalone feed rebuild (operator escape hatch).
+// Triggers the deterministic wf-podcast Lambda's /podcast/rss route, which
+// assembles the feed from every audio-ready/published episode (enclosure = the
+// public MP3, <description> = show-notes + the mandatory citations, GUID = slug)
+// and writes it to the public podcast/feed.xml — WITHOUT flipping any status.
 //
-// Auth is IAM — the same SigV4 pattern as register.mjs / synthesize.mjs. No new
-// project credential type.
+// The daily flow doesn't need this (publish.mjs already rebuilds the feed); use
+// it to refresh the feed after editing show-notes/citations, or before/after the
+// one-time Spotify submission. The operator submits the feed URL to Spotify once;
+// subsequent episodes auto-ingest on the next rebuild.
+//
+// Auth is IAM (SigV4) — the same pattern as synthesize.mjs / publish.mjs. The
+// CCR cadence never runs this (Notion-only, no AWS). No new credential type.
 //
 // Usage:
-//   aws-vault exec <profile> -- node workforce/skills/podcast-rss/build-rss.mjs
+//   aws-vault exec <profile> -- node workforce/skills/podcast-publish/build-rss.mjs
 //
 // Env:
 //   WF_PODCAST_API_BASE  override the API base (default: prod execute-api URL)
@@ -33,7 +36,7 @@ const REGION = process.env.AWS_REGION ?? "us-west-2";
 
 const { AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN } = process.env;
 if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
-  console.error("build-rss.mjs: AWS credentials missing — run under `aws-vault exec <profile> --` (the route is IAM-authorized)");
+  console.error("build-rss.mjs: AWS credentials missing — run under CI OIDC / aws-vault (the route is IAM-authorized)");
   process.exit(1);
 }
 

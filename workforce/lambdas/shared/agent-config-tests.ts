@@ -122,6 +122,20 @@ describe("validateIdentityPatch — bindings", () => {
     );
   });
 
+  it("rejects a NEW binding to an archived skill (ADR-0017 soft delete)", () => {
+    const c = ctx({
+      skillOwners: (name) => (name === "old-skill" || name === "feed-post" ? ["sora"] : undefined),
+      skillStatus: (name) => (name === "old-skill" ? "archived" : "active"),
+    });
+    expect(rules({ bindings: [ccrBinding({ skill: "old-skill" })] }, c)).toContain(
+      "R8-binding-skill-archived",
+    );
+    // active skills bind fine under the same ctx
+    expect(rules({ bindings: [ccrBinding()] }, c)).toEqual([]);
+    // callers that don't resolve status (no skillStatus) skip the check
+    expect(rules({ bindings: [ccrBinding()] })).toEqual([]);
+  });
+
   it("does NOT gate binding on ownership (adr-0012): a non-owner may bind any existing skill", () => {
     // "maya" is not in feed-post's owners[] (["sora", "ren"]) — still allowed.
     expect(rules({ bindings: [ccrBinding()] })).toEqual([]);

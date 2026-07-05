@@ -191,7 +191,7 @@ export default function AgentOrgGraph({ agent, roster }: Props) {
   return (
     <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3">
-        <Typeplate label="DECK · ORG" value={`±${UP_LIMIT} FROM L${agent.depth}`} />
+        <Typeplate label="ORG" value={`±${UP_LIMIT} FROM L${agent.depth}`} />
       </div>
       <div className="p-2 space-y-0.5">
         {rows.length === 0 && (

@@ -321,9 +321,15 @@ async function pageToRecord(page, apiKey, legacyHint) {
   const category = normalizeCategory(
     propText(props.Category) || propText(props['Sub Category']),
   )
-  const categoriesMulti = propMultiSelect(props.CategoriesMulti).length
-    ? propMultiSelect(props.CategoriesMulti)
-    : propMultiSelect(props.Categories)
+  // `Tags` is the multi-select tag column (renamed from `CategoriesMulti`).
+  // Read the new name first; fall back to the old names so a fetch that runs
+  // before the Notion property rename (or against an un-migrated row) still
+  // populates tags.
+  const tags = propMultiSelect(props.Tags).length
+    ? propMultiSelect(props.Tags)
+    : propMultiSelect(props.CategoriesMulti).length
+      ? propMultiSelect(props.CategoriesMulti)
+      : propMultiSelect(props.Categories)
   // Date with sensible fallbacks: dedicated `Date` → legacy
   // `Publication Date` → Notion's own created_time. The created_time
   // fallback prevents undated rows from sinking to the bottom of the
@@ -370,7 +376,7 @@ async function pageToRecord(page, apiKey, legacyHint) {
     title,
     type,
     category,
-    categoriesMulti,
+    tags,
     date,
     abstract,
     bodyMd,

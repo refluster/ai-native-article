@@ -1,7 +1,7 @@
 # ai-native-article Governance (Repository Law Code)
 
-**Status:** Draft v1.0
-**Last updated:** 2026-05-03
+**Status:** v1.1 (consolidated 2026-07-03 — [ADR-0004](adr/adr-0004-governance-consolidation.md))
+**Last updated:** 2026-07-03
 **Scope:** Everything in this repository — `newsletter/`, `workforce/`, `packages/`, `scripts/`, `.github/`, `.claude/`
 **Audience:** the operator (solo author), Claude Code agents acting on this repo, CI
 
@@ -59,7 +59,7 @@ These are the four invariants. If a proposed change conflicts with one of these,
 
 **C-3. Single-operator scale.** This is a hobby project with one human author. The agent must NOT propose primitives that only make sense at scale: multi-tenant auth, per-user quotas, role-based access, pay-tier gating, cross-region failover. New endpoints stay single-operator; new env vars stay opt-in.
 
-**C-4. Fail loud, not silent.** When something goes wrong — a timeout, a content-filter strip, a budget overrun, a missing API key — the system must error visibly (thrown exception, a non-zero exit from a cadence's `publish-notion.mjs`, CI red). Silent fallbacks that publish degraded content are a C-1 violation. The current example is the W-1 guard in the workforce `publish-notion.mjs` (exit 2 on an empty/short/cut-off body), backed by the R-10 deploy gate; the original seed was the `finish_reason === 'length'` throw added 2026-05-03 (in the since-retired GAS `azureGenerateText`), itself a fix for content that was previously returned truncated and silently — a C-4 (and consequently a C-1) violation.
+**C-4. Fail loud, not silent.** When something goes wrong — a timeout, a content-filter strip, a budget overrun, a missing API key — the system must error visibly (thrown exception, a non-zero exit from a cadence's `publish-notion.mjs`, CI red). Silent fallbacks that publish degraded content are a C-1 violation. The current enforcers are the W-1 guard in the workforce `publish-notion.mjs` (exit 2 on an empty/short/cut-off body) and the R-10 deploy gate. (Provenance: the 2026-05-03 truncation incident `d17e1d58ec42` — see ML-001.)
 
 **Agent application.** When the operator or an external rule asks for a change that would violate any of C-1…C-4, the agent stops, names the conflict in chat, and waits. It does not "interpret" the request charitably and ship anyway. The cost of stopping is one extra exchange; the cost of misreading is days of broken content.
 
@@ -85,7 +85,7 @@ L1 is the body of architectural decisions the project rests on. Each is document
 These are mechanical consequences that any agent reviewing a diff should check:
 
 - **I-1 (Source-of-truth read direction).** Code that decides "should this article be regenerated?" reads from Notion or gh-pages, NEVER from `main:newsletter/app/public/posts/`. The latter is stale by design.
-- **I-2 (Editorial-integrity floor).** A generation path must refuse to emit an empty / truncated / LLM-artefact body rather than publish it degraded. Enforced by the W-1 guard in `article-level{2,3}/publish-notion.mjs` (exit 2) and the R-10 deploy gate. (Historical: the GAS `azureGenerateText` budget brackets {2000, 8000, 16000} + `finish_reason === 'length'` throw served this role before the GAS pipeline was retired — see [azure-budget-rules.md](../newsletter/docs/azure-budget-rules.md).)
+- **I-2 (Editorial-integrity floor).** A generation path must refuse to emit an empty / truncated / LLM-artefact body rather than publish it degraded. Enforced by the W-1 guard in `article-level{2,3}/publish-notion.mjs` (exit 2) and the R-10 deploy gate; token-budget discipline for any LLM call site is [azure-budget-rules.md](../newsletter/docs/azure-budget-rules.md).
 - **I-3 (Cadence idempotency).** The generation cadences and the deploy build must be safe to re-run. The pickers (`pick-l1-source.mjs`, `pick-l2-sources.mjs`) re-derive "pending"/"uncovered" work from Notion each fire (covered-URL set, reuse-avoidance), and `fetch-notion.mjs` re-derives the full corpus from the Notion DB — not from a cursor. A failed run leaves the system in a state where the next run picks up where it left off.
 - **I-4 (Slug stability).** Once an article is published, its slug never changes. New article? Last 12 hex chars of the Notion page id. Migrated from a legacy URL? Honour `LegacySlug`. No agent may rewrite slugs to "make them prettier."
 - **I-5 (Image fallback).** A slug's cover image is whatever `posts/images/<slug>.jpg` is committed on disk; when absent the reader falls back to a placeholder (`posts-md.mjs` resolveImagePath). (Historical: cover images were auto-generated once by the GAS `handleL4Batch`; that generation path was retired with the GAS pipeline, so new articles carry the placeholder unless an image is added by hand.)
@@ -117,12 +117,13 @@ Whatever portion of L0/L1 a machine can check, it should. These are the guards a
 | R-10 | Pre-deploy corpus truncation gate | `node scripts/check-corpus-truncation.mjs` | `deploy-article-site.yml` (after `fetch-notion`) | ✅ added 2026-06-07 |
 | R-11 | L1 citation gate (touch an L1 doc → cite it or `RULE-N/A:`) | `node scripts/check-l1-citation.mjs` | `ci.yml` (PRs only) | ✅ added 2026-06-07 |
 | R-12 | Governance registry integrity (backlog + ledger well-formed) | `node scripts/check-governance-registries.mjs` | `ci.yml` | ✅ added 2026-06-07 |
+| R-13 | PR terminal-state sweep — every PR in autopilot scope ends **merged** or **escalated** (`autopilot:needs-human`); auto-escalates ML-009 label drops, stalled cycles, and window-aged PRs | `node workforce/skills/pr-autopilot/pr-autopilot-sweep.mjs --apply` (state check: `workforce/scripts/check-escalation-labels.mjs`) | `workforce-pr-terminal-sweep.yml` (daily) | ✅ added 2026-07-03 |
 
 R-numbers are never re-used: a retired row keeps its slot so older provenance (incident notes, ADRs, memory-lint rows) still resolves.
 
-**Policy.** R-1, R-3, R-4, R-5 and R-6 were guards on the GAS L1→L4 engine; they were **retired 2026-06-28** when that engine was removed and generation moved to the workforce `article-level{2,3}` cadences. Their editorial-integrity job did not disappear — it moved to **W-1** (the generation-time guard in `article-level{2,3}/publish-notion.mjs`, owned by the workforce governance) plus **R-10** (the deploy-time gate). R-2, R-8, R-9, **R-10** must stay green for `deploy-article-site.yml` to ship. R-10 is the *deploy-time* twin of the *generation-time* W-1 guard: W-1 stops bad content from being written to Notion; R-10 stops it from being published to gh-pages. The `article-health` skill (R-7) is advisory but should be run after any generation change and after every user-reported content issue. R-11 requires an L1-document edit (a framework law in §3.1, this doc / design-policy, or any ADR under `docs/adr/`) to cite the law it touches — so following the relevant ADR when implementing is mechanical, not optional. R-12 keeps the two governance registries ([memory-lint-backlog.md](memory-lint-backlog.md), [risk-acceptance-ledger.md](risk-acceptance-ledger.md)) machine-parseable. The full operating notes for R-10…R-12 live in [governance-mechanisms.md §2.1](governance-mechanisms.md#21-how-to-operate-each); the decision record is [ADR-0001](adr/adr-0001-self-driving-governance-mechanisms.md).
+**Policy.** R-1, R-3, R-4, R-5 and R-6 were guards on the GAS L1→L4 engine; they were **retired 2026-06-28** when that engine was removed and generation moved to the workforce `article-level{2,3}` cadences. Their editorial-integrity job did not disappear — it moved to **W-1** (the generation-time guard in `article-level{2,3}/publish-notion.mjs`, owned by the workforce governance) plus **R-10** (the deploy-time gate). R-2, R-8, R-9, **R-10** must stay green for `deploy-article-site.yml` to ship. R-10 is the *deploy-time* twin of the *generation-time* W-1 guard: W-1 stops bad content from being written to Notion; R-10 stops it from being published to gh-pages. The `article-health` skill (R-7) is advisory but should be run after any generation change and after every user-reported content issue. R-11 requires an L1-document edit (a framework law in §3.1, this doc / design-policy, the workforce statute docs, or any ADR under `docs/adr/` / `workforce/docs/adr/`) to cite the law it touches — so following the relevant ADR when implementing is mechanical, not optional. R-12 keeps the two governance registries ([memory-lint-backlog.md](memory-lint-backlog.md), [risk-acceptance-ledger.md](risk-acceptance-ledger.md)) machine-parseable. R-13 is the mechanical half of the §4.4 two-outcome contract: a daily scheduled sweep that escalates any open PR the autopilot left in a non-terminal state (promoted from ML-009 per the §6.1 ratchet). The full operating notes for R-10…R-13 live in [governance-mechanisms.md §2.1](governance-mechanisms.md#21-how-to-operate-each); the decision records are [ADR-0001](adr/adr-0001-self-driving-governance-mechanisms.md) and [ADR-0004](adr/adr-0004-governance-consolidation.md).
 
-**Loosening.** Tightening any active R-rule (R-2, R-7…R-12) is L2 work and an agent may do it freely. **Loosening, disabling, or retiring any of them requires operator approval** — drop the line in chat with the rationale, wait for explicit yes. (The 2026-06-28 retirements above were operator-approved as part of the GAS-cleanup refactor.)
+**Loosening.** Tightening any active R-rule (R-2, R-7…R-13) is L2 work and an agent may do it freely. **Loosening, disabling, or retiring any of them requires operator approval** — drop the line in chat with the rationale, wait for explicit yes. (The 2026-06-28 retirements above were operator-approved as part of the GAS-cleanup refactor.)
 
 ### 4.4 Autopilot PR merge — workforce R-N10 delegation + L0/L1 off-limits
 
@@ -144,6 +145,8 @@ This repository **delegates** bounded autonomous merge to the agent-workforce's 
 - workforce/docs/architecture.md
 - workforce/docs/naming.md
 - workforce/docs/data-model.md
+- workforce/docs/mvv.md
+- workforce/docs/north-star/**
 - workforce/infra/sam/samconfig.toml
 <!-- /autopilot:l0l1-paths -->
 
@@ -260,14 +263,4 @@ A B action surfaces in chat with a one-line ask. Operator says "yes" → agent p
 
 ## 9. Out of scope (deliberately)
 
-These are conventions worth borrowing from production-grade governance frameworks that we explicitly do NOT adopt here:
-
-- **Production security review** (threat models, pen tests, ISO 27001 alignment). Not a production service.
-- **Multi-stakeholder approval matrices.** Single operator.
-- **Quarterly governance retrospective with formal output document.** Replaced by §6's lighter "after an incident, update the doc."
-- **SBOM generation per release.** The "release" is gh-pages; auditing it adds no value here.
-- **Dependency-vulnerability triage runbook.** Dependabot is configured but findings go to the operator's chat, not a formal triage process.
-
-If any of these become relevant (the site grows, takes payments, hosts user data), revisit this section.
-
-The full, current decision table — every mechanism we *did* adopt versus the ones we judged to be ceremony at single-operator scale, each with a "revisit when…" trigger — lives in [governance-mechanisms.md §5](governance-mechanisms.md#5-what-we-deliberately-did-not-adopt-c-3-boundary) and is ratified in [ADR-0001](adr/adr-0001-self-driving-governance-mechanisms.md). That table supersedes this list as the canonical "what we left off and why."
+The canonical "what we deliberately did NOT adopt" table — every mechanism we *did* adopt versus the ones we judged to be ceremony at single-operator scale, each with a "revisit when…" trigger — lives in **one place**: [governance-mechanisms.md §5](governance-mechanisms.md#5-what-we-deliberately-did-not-adopt-c-3-boundary), ratified in [ADR-0001](adr/adr-0001-self-driving-governance-mechanisms.md). (This section previously carried its own copy of that list; the duplicate was removed by [ADR-0004](adr/adr-0004-governance-consolidation.md) — one table, one owner.) If any of those become relevant (the site grows, takes payments, hosts user data), revisit there.

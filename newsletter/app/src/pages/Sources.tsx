@@ -10,6 +10,7 @@ import {
   hostnameOf,
   type SourceEntry,
 } from '../lib/source-links'
+import { displayTag } from '../lib/article-types'
 
 type ScopeFilter = 'all' | 'with-explanation' | 'external-only'
 
@@ -26,7 +27,8 @@ function categoryOf(entry: SourceEntry): string | null {
 function tagsOf(entry: SourceEntry): string[] {
   const exp = entry.explanation
   if (!exp) return []
-  if (exp.categoriesMulti && exp.categoriesMulti.length > 0) return exp.categoriesMulti
+  const t = exp.tags ?? exp.categoriesMulti
+  if (t && t.length > 0) return t
   return exp.category ? [exp.category] : []
 }
 
@@ -181,7 +183,7 @@ export default function Sources() {
                 onClick={() => onCategoryClick(activeCategory)}
                 className="mb-6 text-[10px] font-bold tracking-widest text-tertiary uppercase hover:underline"
               >
-                × CLEAR CATEGORY ({activeCategory})
+                × CLEAR CATEGORY ({displayTag(activeCategory)})
               </button>
             )}
 
@@ -221,7 +223,7 @@ export default function Sources() {
                           }`}
                         >
                           <span className="text-sm font-bold uppercase group-hover:text-tertiary transition-colors">
-                            {cat.name}
+                            {displayTag(cat.name)}
                           </span>
                           <span className="text-[10px] font-medium text-outline">{cat.count}</span>
                         </button>
@@ -246,7 +248,7 @@ export default function Sources() {
                           }`}
                         >
                           <span className="text-xs font-medium leading-snug group-hover:text-tertiary transition-colors">
-                            {cat.name}
+                            {displayTag(cat.name)}
                           </span>
                           <span className="text-[10px] font-medium text-outline shrink-0 ml-3">
                             {cat.count}
@@ -284,7 +286,7 @@ function SourceRow({ entry, onExternalClick }: RowProps) {
           <div className="flex items-center gap-2 mb-2">
             {category ? (
               <span className="text-[10px] font-bold tracking-widest text-tertiary uppercase">
-                {category}
+                {displayTag(category)}
               </span>
             ) : (
               <span className="text-[10px] font-bold tracking-widest text-outline uppercase">

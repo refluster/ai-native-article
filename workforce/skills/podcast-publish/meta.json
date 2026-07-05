@@ -1,6 +1,6 @@
 {
-  "name": "podcast-cast",
-  "version": "0.1.0",
+  "name": "podcast-publish",
+  "version": "0.3.0",
   "status": "active",
   "archetype": "cadence",
   "deliverable": {
@@ -8,8 +8,8 @@
     "publish_notion": false
   },
   "cost_class": "small",
-  "owners": ["odette"],
+  "owners": ["celeste", "odette"],
   "improvement_agent": "sana",
-  "created_at": "2026-06-28",
-  "requires": ["notion.integration_token"]
+  "created_at": "2026-06-29",
+  "requires": ["notion.integration_token", "github.token"]
 }

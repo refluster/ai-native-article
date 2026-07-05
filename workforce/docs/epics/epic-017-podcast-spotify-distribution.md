@@ -1,9 +1,22 @@
 # Epic-017 — Podcast production & Spotify distribution from analysis articles
 
-- **Status**: In-progress
+- **Status**: Implemented (2026-06-29)
 - **Owner**: Maya
 - **Created**: 2026-06-27
-- **Implemented by**: branch `claude/epic-017-spotify-podcast-k8z11e` — Stories 1–7 A-authority artifacts (seed, governance/ADR-0016, podcast-script/synthesize/rss skills, wf-podcast Lambda + SAM, reader/pipeline). Architecture per tracker #379: workforce skills + backing `wf-podcast` Lambda (no GAS/Actions synthesis). B-gated steps (register, SAM deploy, Notion props, cron enable, Spotify submission) tracked in [runbooks/podcast-pipeline.md](../runbooks/podcast-pipeline.md).
+- **Implemented by**: #376 (design record) · #388 (Stories 1–7 A-authority artifacts) · #390 (W-3 doc/code drift) · #391 (CloudFront `Tags`) · #392 (project-scoped Notion secret) · #393 (`status`-type `podcastStatus`) · #395 (Spotify feed tags, batch≤5, approval gate, daily CI) · #396 (parameter-based persona cadences). B-gated residual (the one-time Spotify submission for episode 1) tracked in #385 + [runbooks/podcast-pipeline.md](../runbooks/podcast-pipeline.md).
+
+> **Status reconciliation (2026-06-29).** The pipeline is **live**: the `wf-podcast` Lambda (Polly Neural JA → S3, CloudFront+OAC) is deployed, the three persona cadences are bound + enabled daily, episode 1 is synthesized and live in a Spotify-compliant feed. What shipped **diverged from the §C draft below** in one material way — recorded here as the design record's source of truth:
+>
+> **Parameter-based design (supersedes §C "synthesis CI job `newsletter/pipeline/podcast/*.mjs`").** Rather than personas calling the Lambda directly, judgment and execution were split: **personas write Notion judgment parameters** (CCR cadences, Notion-only, no AWS, ≤5/run, daily) and **deterministic CI executes the transitions** via AWS OIDC aligned with the newsletter publish flow — so the podcast surface introduces **no new credential type**.
+> - **Rhys** (script) + **Idris** (LLM compliance verdict → `complianceVerdict`) land `none → script-ready` (#396).
+> - A **human approval gate** `script-ready → approved` (operator) sits before any audio spend — interim, intended to retire onto Idris's verdict once it has a track record (Phase 2, #400).
+> - **Odette** sets `podcastVoice` on `approved` episodes; CI Polly synthesis reads it (else random) → `audio-ready`.
+> - **Celeste** sets `podcastShowNotes` on `audio-ready` episodes; CI publish (`/podcast/publish`, ≤5/run) leads the feed `<description>` with them, then the mandatory citations → `published`.
+> - Synthesis/RSS run in the **`wf-podcast` Lambda** (`workforce/lambdas/`) behind the daily `.github/workflows/podcast-pipeline.yml`, **not** `newsletter/pipeline/podcast/*.mjs` (those files were never created). `podcastStatus` is a Notion **status**-type (not `select`) with options `none / script-ready / approved / audio-ready / published`. Spotify-compliance `itunes:*` feed tags + cover art were added in #395.
+>
+> Tech-debt follow-ups filed: #398 (cfn-lint gate + PITR dedup), #399 (shared `propText` helper + parity test). Phase-2 automation (spotifyUrl capture, gate retirement, multi-voice): #400.
+>
+> **Skill consolidation (2026-06-29).** The five production skills were collapsed into **two persona cadences** to cut redundancy: **`podcast-script`** (Rhys + Idris — the prepare half: pick → script → compliance verdict → `script-ready`) and **`podcast-publish`** (Celeste — the publish half, absorbing `podcast-cast`, `podcast-shownotes`, `podcast-synthesize`, and `podcast-rss`). The Celeste cadence sets `podcastVoice` (from Odette's pool) + `podcastShowNotes` on `approved` episodes; the bundled SigV4 `synthesize`/`publish` scripts stay CI-run (the daily workflow, OIDC) because a Notion-only CCR cadence cannot hold AWS credentials. Bindings: `podcast-script` → rhys, `podcast-publish` → celeste, both daily. No decision in ADR-0016 is reversed (see its 2026-06-29 update note).
 
 ## Problem
 

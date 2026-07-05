@@ -142,7 +142,6 @@ vi.mock("@aws-sdk/client-secrets-manager", () => ({
 
 interface FakeProject {
   project_id: string;
-  members: Set<string>;
 }
 interface FakeExecRow {
   project_id: string;
@@ -155,7 +154,6 @@ interface FakeExecRow {
 
 const projects = new Map<string, FakeProject>();
 const execRows: FakeExecRow[] = [];
-let addMemberCalls = 0;
 
 vi.mock("../shared/project.js", () => ({
   asProjectId: (s: string) => {
@@ -166,14 +164,6 @@ vi.mock("../shared/project.js", () => ({
     return s as string;
   },
   getProject: async (id: string) => projects.get(id),
-  isMember: async (id: string, slug: string) =>
-    projects.get(id)?.members.has(slug) ?? false,
-  addMember: async (id: string, slug: string) => {
-    addMemberCalls++;
-    const p = projects.get(id);
-    if (!p) throw new Error(`project "${id}" not found`);
-    p.members.add(slug);
-  },
   appendExecution: async (input: {
     project_id: string;
     agent_slug: string;
@@ -235,11 +225,9 @@ beforeEach(() => {
   projects.clear();
   execRows.length = 0;
   sendFailureQueue.length = 0;
-  addMemberCalls = 0;
-  projects.set("editorial", { project_id: "editorial", members: new Set(["maya"]) });
+  projects.set("editorial", { project_id: "editorial" });
   projects.set("workforce-meta", {
     project_id: "workforce-meta",
-    members: new Set(["maya"]),
   });
 });
 
@@ -521,7 +509,7 @@ describe("PUT /projects/{slug}/credentials/{type}", () => {
     expect(secrets.get("wf/projects/editorial/github.token")?.value).toBe("raw-string-token");
   });
 
-  it("auto-adds `_operator` as a project member on first PUT (idempotent thereafter)", async () => {
+  it("writes no membership state on PUT (membership removed 2026-07-03) — only the EXEC audit row", async () => {
     await handler(
       event(
         "PUT /projects/{slug}/credentials/{type}",
@@ -529,18 +517,10 @@ describe("PUT /projects/{slug}/credentials/{type}", () => {
         { value: "v1" },
       ),
     );
-    expect(projects.get("editorial")!.members.has("_operator")).toBe(true);
-    expect(addMemberCalls).toBe(1);
-
-    await handler(
-      event(
-        "PUT /projects/{slug}/credentials/{type}",
-        { slug: "editorial", type: "github.token" },
-        { value: "v2" },
-      ),
-    );
-    // Already a member — addMember is NOT called again.
-    expect(addMemberCalls).toBe(1);
+    // The mock's project.js surface no longer even exposes addMember/isMember;
+    // the only DDB side effect besides the secret is the EXEC audit row.
+    expect(execRows).toHaveLength(1);
+    expect(execRows[0]!.agent_slug).toBe("_operator");
   });
 
   it("appends an EXEC row attributed to `_operator` with skill_name=credentials-write", async () => {

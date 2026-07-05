@@ -1,4 +1,4 @@
-// DECK · PR AUTOMATION (Epic-016 Metric 3). Daily merged-PR throughput split
+// PANEL · PR AUTOMATION (Epic-016 Metric 3). Daily merged-PR throughput split
 // into autopilot-merged (no human in the loop) vs human-involved, plus a
 // summary band: autopilot share (the headline, target → 100%), churn (± lines
 // per PR), and the distinct humans still touching merged PRs (the set we are
@@ -13,7 +13,7 @@ function pct(x: number): string {
   return `${Math.round(x * 100)}%`;
 }
 
-export default function PrAutomationDeck({ series }: { series: PerformanceSeries }) {
+export default function PrAutomationPanel({ series }: { series: PerformanceSeries }) {
   const days = series.pr_daily;
   const s = series.pr_summary;
   const maxPrs = Math.max(1, ...days.map((d) => d.prs));
@@ -23,7 +23,7 @@ export default function PrAutomationDeck({ series }: { series: PerformanceSeries
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
-        <Typeplate label="DECK 04 · PR AUTOMATION" value="HUMAN-OUT-OF-LOOP TREND" />
+        <Typeplate label="PR AUTOMATION" value="HUMAN-OUT-OF-LOOP TREND" />
         <span className="hidden sm:inline font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
           {series.window.start} → {series.window.end}
         </span>

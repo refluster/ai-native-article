@@ -41,8 +41,8 @@ const META_REQUIRED = [
   "improvement_agent",
   "created_at",
 ];
-const META_OPTIONAL = ["deliverable", "requires", "archetype"];
-const STATUSES = new Set(["active", "stale", "deprecated"]);
+const META_OPTIONAL = ["deliverable", "requires", "archetype", "display_name", "recall_k"];
+const STATUSES = new Set(["active", "stale", "deprecated", "archived"]);
 // Named skill archetypes (固有名詞). A skill MAY declare one; when it does,
 // the C-* rules below enforce that archetype's structural shape so a
 // mis-built instance turns CI red (W-4 fail-loud) instead of half-working.
@@ -212,8 +212,13 @@ for (const name of skillDirs) {
   if (typeof meta.version !== "string" || !SEMVER.test(meta.version)) {
     v("J3-version", metaJson, `version "${meta.version}" must be semver x.y.z`);
   }
+  if (meta.display_name !== undefined) {
+    if (typeof meta.display_name !== "string" || meta.display_name.trim().length === 0 || meta.display_name.length > 120) {
+      v("N1-display-name", metaJson, `display_name must be a 1..120 char string`);
+    }
+  }
   if (!STATUSES.has(meta.status)) {
-    v("J4-status", metaJson, `status "${meta.status}" not in {active, stale, deprecated}`);
+    v("J4-status", metaJson, `status "${meta.status}" not in {active, stale, deprecated, archived}`);
   }
   if (!COST_CLASSES.has(meta.cost_class)) {
     v("J6-cost-class", metaJson, `cost_class "${meta.cost_class}" not in {small, medium, large}`);

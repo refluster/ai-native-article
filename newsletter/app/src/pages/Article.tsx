@@ -6,7 +6,7 @@ import type { ArticleMeta, ArticleType } from '../types/article'
 import { withBasePath } from '../lib/paths'
 import { setArticleSeo, setDefaultSeo } from '../lib/seo'
 import { trackEvent, isOutbound, hrefHost } from '@kohuehara/shared/analytics'
-import { ARTICLE_TYPE_LABELS, inferType, isArticleType } from '../lib/article-types'
+import { ARTICLE_TYPE_LABELS, displayTag, inferType, isArticleType } from '../lib/article-types'
 import { buildSourceIndex } from '../lib/source-links'
 import SourcesUsedSection from '../components/article/SourcesUsedSection'
 import AnalysesUsingSection from '../components/article/AnalysesUsingSection'
@@ -208,6 +208,13 @@ export default function Article() {
 
   const articleType = inferType({ type: isArticleType(meta.type) ? meta.type : undefined })
 
+  // The article's tags (Notion `Tags`), shown in place of the old single
+  // category. `categoriesMulti` is the pre-rename fallback; `category` covers
+  // any row with neither. Prefix-stripped for display via displayTag.
+  const tags = (meta.tags ?? meta.categoriesMulti ?? (meta.category ? [meta.category] : []))
+    .map(displayTag)
+    .filter(Boolean)
+
   return (
     <>
       {/* Header section */}
@@ -220,10 +227,17 @@ export default function Article() {
             ← INDEX
           </Link>
           <div className="max-w-3xl">
-            {meta.category && (
-              <span className="inline-block bg-tertiary text-on-tertiary px-2 py-1 text-[10px] font-bold tracking-widest uppercase mb-6">
-                {meta.category}
-              </span>
+            {tags.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 mb-6">
+                {tags.map(tag => (
+                  <span
+                    key={tag}
+                    className="inline-block bg-tertiary text-on-tertiary px-2 py-1 text-[10px] font-bold tracking-widest uppercase"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
             )}
             <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-tight mb-8">
               {meta.title}
@@ -241,13 +255,17 @@ export default function Article() {
             <div className="flex items-center gap-6 text-[10px] font-bold tracking-widest text-outline uppercase">
               {meta.date && <span>{meta.date}</span>}
               <span>AI NATIVE ARTICLE</span>
-              {/* Type-driven label. Falls back to ANALYSIS for legacy
-                  manifest entries that predate the unified-DB rollout. */}
-              <span className="text-tertiary">
-                {ARTICLE_TYPE_LABELS[inferType({ type: isArticleType(meta.type) ? meta.type : undefined })]}
-                {' / '}
-                {TYPE_BADGE_EN[inferType({ type: isArticleType(meta.type) ? meta.type : undefined })]}
-              </span>
+              {/* Type label only for explanations — analysis is the default
+                  reading surface, so it's left unmarked (per ADR-0002). The
+                  label on an explanation signals the reader is in the
+                  fact-check "back drawer". */}
+              {articleType === 'explanation' && (
+                <span className="text-tertiary">
+                  {ARTICLE_TYPE_LABELS.explanation}
+                  {' / '}
+                  {TYPE_BADGE_EN.explanation}
+                </span>
+              )}
               {/* Epic-017: Spotify deep-link to the article's podcast episode.
                   Rendered only when the operator has recorded `spotifyUrl`
                   back to Notion. No in-page player (D3) — this is a link

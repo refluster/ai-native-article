@@ -26,43 +26,23 @@ export function inferType(meta: Pick<ArticleMeta, 'type'>): ArticleType {
   return meta.type ?? 'analysis'
 }
 
-export type DateRange = '7d' | '30d' | '90d' | 'all'
-
-export const DATE_RANGES: readonly DateRange[] = ['7d', '30d', '90d', 'all'] as const
-
-export const DATE_RANGE_LABELS: Record<DateRange, string> = {
-  '7d': '7日',
-  '30d': '30日',
-  '90d': '90日',
-  all: '全期間',
-}
-
 /**
- * True iff the article's `date` falls within `range` relative to today.
+ * Strip the legacy A–E bucket prefix from a tag label for display.
  *
- * `all` always returns true. Invalid / missing dates pass the filter
- * (we'd rather show an undated article than silently hide it).
+ * The old single-category taxonomy stored canonical names like
+ * `"C: New Roles / FDE"` where the leading letter encoded a hierarchy
+ * position. The hierarchy is gone (flat tags now), and the letter only
+ * confused readers, so we hide it at render time. Data-side cleanup (the
+ * generation cadences + normalize-categories.mjs) removes the prefix at the
+ * source; this guard keeps already-published rows clean until then.
+ *
+ * Non-prefixed tags (free-form `× theme` strings) pass through untouched.
  */
-export function isWithinDateRange(
-  meta: Pick<ArticleMeta, 'date'>,
-  range: DateRange,
-): boolean {
-  if (range === 'all') return true
-  const dateStr = meta.date
-  if (!dateStr) return true
-  const articleTs = new Date(dateStr).getTime()
-  if (Number.isNaN(articleTs)) return true
-  const days = range === '7d' ? 7 : range === '30d' ? 30 : 90
-  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000
-  return articleTs >= cutoff
+export function displayTag(name: string): string {
+  return name.replace(/^[A-E][:：]\s*/, '')
 }
 
 /** Type guard: is the input a valid ArticleType? */
 export function isArticleType(v: unknown): v is ArticleType {
   return v === 'explanation' || v === 'analysis'
-}
-
-/** Type guard: is the input a valid DateRange? */
-export function isDateRange(v: unknown): v is DateRange {
-  return v === '7d' || v === '30d' || v === '90d' || v === 'all'
 }

@@ -321,9 +321,11 @@ function buildUnifiedProperties(page, kind, slugIndex) {
     plain(props.Category) ||
     plain(props['Sub Category'])
 
-  const categoriesMulti = multi(props.CategoriesMulti).length
-    ? multi(props.CategoriesMulti)
-    : multi(props.Categories)
+  const categoriesMulti = multi(props.Tags).length
+    ? multi(props.Tags)
+    : multi(props.CategoriesMulti).length
+      ? multi(props.CategoriesMulti)
+      : multi(props.Categories)
 
   const dateRaw =
     plain(props.Date) ||
@@ -351,7 +353,7 @@ function buildUnifiedProperties(page, kind, slugIndex) {
     LegacyDB: { select: { name: kind } },
   }
   if (categoriesMulti.length) {
-    out.CategoriesMulti = { multi_select: categoriesMulti.map(name => ({ name })) }
+    out.Tags = { multi_select: categoriesMulti.map(name => ({ name })) }
   }
   return out
 }

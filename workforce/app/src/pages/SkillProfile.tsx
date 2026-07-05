@@ -16,12 +16,16 @@ import Sigil from '../components/Sigil'
 import KPIReadout from '../components/KPIReadout'
 import {
   apiConfigured,
+  fetchSkillExecutions,
   fetchSkillLive,
   findSkill,
   loadWorkforceSkillManifest,
+  patchSkillConfig,
 } from '../lib/skills'
 import { fullName, loadWorkforceManifest } from '../lib/agents'
-import type { SkillFile, SkillLiveRecord, WorkforceSkill } from '../types/skill'
+import { SIGV4_IS_CONFIGURED } from '../config/auth'
+import StatusBadge from '../components/StatusBadge'
+import type { SkillExecution, SkillFile, SkillLiveRecord, WorkforceSkill } from '../types/skill'
 import type { WorkforceAgent } from '../types/agent'
 
 function formatRelative(iso: string | undefined): string {
@@ -39,6 +43,7 @@ function formatRelative(iso: string | undefined): string {
 function statusTone(s: WorkforceSkill['status']): string {
   if (s === 'active')     return 'text-wf-primary border-wf-primary'
   if (s === 'deprecated') return 'text-wf-tertiary border-wf-tertiary'
+  if (s === 'archived')   return 'text-wf-archived border-wf-archived'
   return 'text-wf-on-surface-variant border-wf-outline-variant'
 }
 
@@ -95,6 +100,14 @@ export default function SkillProfile() {
     return skill.owners.map((slug) => ({ slug, agent: bySlug.get(slug) }))
   }, [skill, roster])
 
+  // Agents still bound to this skill (any trigger). Archive does NOT unbind —
+  // existing bindings keep firing (ADR-0017) — so the archive confirm must
+  // say exactly who keeps running it, not leave the operator to guess.
+  const boundAgents = useMemo(() => {
+    if (!skill) return []
+    return roster.filter((a) => a.bindings?.some((b) => b.skill === skill.name)).map((a) => a.slug)
+  }, [skill, roster])
+
   if (skill === undefined) {
     return (
       <WorkforceLayout>
@@ -117,16 +130,28 @@ export default function SkillProfile() {
     <WorkforceLayout>
       <section className="mb-6 sm:mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div className="min-w-0">
-          <Typeplate label="SKILL" value={`v${skill.version} · ${skill.created_at}`} className="mb-3" />
+          <Typeplate label="SKILL" value={`v${live?.version ?? skill.version} · ${skill.created_at}`} className="mb-3" />
           <h1 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-[1.04] text-wf-on-surface break-words">
-            {skill.name}
+            {live?.display_name ?? skill.display_name ?? skill.name}
           </h1>
+          {(live?.display_name ?? skill.display_name) && (
+            <div className="mt-1 font-wfmono text-xs text-wf-on-surface-variant">{skill.name}</div>
+          )}
         </div>
-        <span
-          className={`self-start md:self-auto font-wfmono text-[11px] uppercase tracking-[0.14em] px-2.5 py-1 border ${statusTone(skill.status)}`}
-        >
-          {skill.status}
-        </span>
+        <div className="flex items-center gap-2 self-start md:self-auto">
+          <span
+            className={`font-wfmono text-[11px] uppercase tracking-[0.14em] px-2.5 py-1 border ${statusTone(live?.status ?? skill.status)}`}
+          >
+            {live?.status ?? skill.status}
+          </span>
+          <SkillLifecycleControls
+            name={skill.name}
+            displayName={live?.display_name ?? skill.display_name ?? undefined}
+            status={live?.status ?? skill.status}
+            boundAgents={boundAgents}
+            onChanged={(next) => setLive((prev) => (prev ? { ...prev, ...next } : prev))}
+          />
+        </div>
       </section>
 
       {/* Description */}
@@ -188,6 +213,11 @@ export default function SkillProfile() {
 
       {/* Source — SKILL.md + sibling files (file list + selected file viewer) */}
       <SkillSourceBrowser skill={skill} />
+
+      {/* Executions — the per-skill run ledger (ADR-0017 observability):
+          who ran this skill, when, with what outcome. Filterable by agent
+          + status; each row links agent + project for the drill-down. */}
+      <SkillExecutionsPanel name={skill.name} />
 
       {/* Owners */}
       <section className="mb-6 border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
@@ -404,5 +434,198 @@ function SkillFileView({ file }: { file: SkillFile }) {
     <pre className="p-4 overflow-x-auto font-wfmono text-xs leading-relaxed text-wf-on-surface bg-wf-surface-container-lo whitespace-pre">
       <code>{file.contents}</code>
     </pre>
+  )
+}
+
+// Archive is a LIST-side soft delete, not a kill switch: existing bindings
+// keep firing until unbound (ADR-0017 documents this deliberately). The
+// confirm dialog must therefore name the agents that will keep running the
+// skill, or the operator's mental model of "archive = stopped" ships a
+// silent surprise.
+export function archiveConfirmMessage(name: string, boundAgents: string[]): string {
+  const bindingWarning =
+    boundAgents.length > 0
+      ? `⚠ Still bound to ${boundAgents.length} agent${boundAgents.length === 1 ? '' : 's'} (${boundAgents.join(', ')}) — archiving does NOT stop execution. Unbind to stop the runs.`
+      : 'No agents are currently bound to this skill.'
+  return `Archive skill "${name}"? It disappears from the default list and new bindings are rejected; its run/deliverable history stays intact.\n\n${bindingWarning}`
+}
+
+// ─── Lifecycle controls: rename display label + archive/unarchive ─────────
+// SigV4-gated (same affordance pattern as ProjectRenameButton /
+// ProjectArchiveButton). The slug never changes — rename touches only the
+// display label; archive is the ADR-0017 soft delete.
+function SkillLifecycleControls({
+  name,
+  displayName,
+  status,
+  boundAgents,
+  onChanged,
+}: {
+  name: string
+  displayName?: string
+  status: WorkforceSkill['status']
+  /** Slugs of agents whose bindings still reference this skill — archive
+   *  does not unbind them, so the confirm dialog names them explicitly. */
+  boundAgents: string[]
+  onChanged: (next: Partial<SkillLiveRecord>) => void
+}) {
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const sigv4Ready = SIGV4_IS_CONFIGURED
+
+  async function rename() {
+    const next = window.prompt(
+      `Display name for "${name}" (the slug/URL never changes; 1–120 chars, any script):`,
+      displayName ?? '',
+    )
+    if (next === null) return
+    const trimmed = next.trim()
+    if (trimmed.length === 0 || trimmed.length > 120) return
+    setPending(true)
+    setError(null)
+    try {
+      const updated = await patchSkillConfig(name, { display_name: trimmed })
+      onChanged({ display_name: updated.display_name })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  async function flipArchive() {
+    const target = status === 'archived' ? 'active' : 'archived'
+    const ok = window.confirm(
+      target === 'archived'
+        ? archiveConfirmMessage(name, boundAgents)
+        : `Restore skill "${name}" to active?`,
+    )
+    if (!ok) return
+    setPending(true)
+    setError(null)
+    try {
+      const updated = await patchSkillConfig(name, { status: target })
+      onChanged({ status: updated.status })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  const btn =
+    'font-wfmono text-[10px] uppercase tracking-[0.14em] px-2 py-1 border border-wf-outline-variant rounded-wf-sm text-wf-on-surface hover:text-wf-primary hover:border-wf-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+  const title = sigv4Ready ? undefined : 'sigv4 broker not configured — wire VITE_COGNITO_IDENTITY_POOL_ID'
+
+  return (
+    <div className="flex items-center gap-2">
+      <button type="button" onClick={rename} disabled={!sigv4Ready || pending} title={title} className={btn}>
+        ✎ RENAME
+      </button>
+      <button type="button" onClick={flipArchive} disabled={!sigv4Ready || pending} title={title} className={btn}>
+        {status === 'archived' ? '● UNARCHIVE' : '● ARCHIVE'}
+      </button>
+      {error && (
+        <span role="alert" className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-throwing">
+          {error.slice(0, 80)}
+        </span>
+      )}
+    </div>
+  )
+}
+
+// ─── Per-skill run ledger (ADR-0017 observability) ─────────────────────────
+function SkillExecutionsPanel({ name }: { name: string }) {
+  const [execs, setExecs] = useState<SkillExecution[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [agentFilter, setAgentFilter] = useState<string>('')
+  const [statusFilter, setStatusFilter] = useState<string>('')
+
+  useEffect(() => {
+    let cancelled = false
+    fetchSkillExecutions(name, { limit: 50 })
+      .then((items) => {
+        if (!cancelled) setExecs(items)
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setExecs([])
+          setError(err instanceof Error ? err.message : String(err))
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [name])
+
+  const agents = useMemo(() => [...new Set((execs ?? []).map((e) => e.agent_slug))].sort(), [execs])
+  const rows = (execs ?? [])
+    .filter((e) => !agentFilter || e.agent_slug === agentFilter)
+    .filter((e) => !statusFilter || e.status === statusFilter)
+
+  return (
+    <section className="mb-6 border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
+      <div className="border-b border-wf-outline-variant px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+        <Typeplate label="EXECUTIONS" value={execs ? `LAST ${rows.length} RUNS` : '—'} />
+        <div className="flex items-center gap-2">
+          <select
+            value={agentFilter}
+            onChange={(e) => setAgentFilter(e.target.value)}
+            className="font-wfmono text-[10px] uppercase tracking-[0.14em] px-2 py-1 border border-wf-outline-variant bg-wf-surface-container-lo text-wf-on-surface-variant focus:outline-none"
+            aria-label="filter by agent"
+          >
+            <option value="">ALL AGENTS</option>
+            {agents.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="font-wfmono text-[10px] uppercase tracking-[0.14em] px-2 py-1 border border-wf-outline-variant bg-wf-surface-container-lo text-wf-on-surface-variant focus:outline-none"
+            aria-label="filter by status"
+          >
+            <option value="">ALL STATUS</option>
+            {['ok', 'throw', 'skipped', 'failed_artefact_redaction'].map((st) => (
+              <option key={st} value={st}>
+                {st}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      {execs === null ? (
+        <p className="px-4 py-4 font-wfmono text-xs text-wf-on-surface-variant">Loading…</p>
+      ) : rows.length === 0 ? (
+        <p className="px-4 py-4 text-sm text-wf-on-surface-variant leading-relaxed">
+          {error ? `run ledger unavailable: ${error}` : 'No executions recorded for this skill yet.'}
+        </p>
+      ) : (
+        <ul className="divide-y divide-wf-outline-variant">
+          {rows.map((e) => (
+            <li key={e.exec_ulid} className="px-4 py-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="font-wfmono text-xs text-wf-on-surface-variant whitespace-nowrap">
+                {e.started_at.slice(0, 16).replace('T', ' ')}
+              </span>
+              <Link to={`/agents/${e.agent_slug}`} className="font-wfmono text-xs text-wf-on-surface hover:text-wf-primary">
+                {e.agent_slug}
+              </Link>
+              <Link
+                to={`/projects/${encodeURIComponent(e.project_id)}`}
+                className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant hover:text-wf-primary"
+              >
+                {e.project_id}
+              </Link>
+              <StatusBadge status={e.status} error={e.error} />
+              <span className="basis-full text-sm text-wf-on-surface-variant truncate" title={e.artifact_ref?.uri}>
+                {e.summary ?? e.artifact_ref?.summary ?? (e.error ? e.error.slice(0, 80) : '—')}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }
