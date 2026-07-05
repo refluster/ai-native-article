@@ -39,10 +39,9 @@ workforce/skills/{name}/
 
 ## Daily automation
 
-Two recurring Claude Code routines keep the workforce running:
-
-- **`wf-builder`** (`.github/workflows/workforce-builder-routine.yml`, daily) — implements the next unchecked item from `ROADMAP.md` and opens a draft PR. See [docs/routine-prompt.md](docs/routine-prompt.md) for the full contract.
 - **`wf-engineer`** (`.github/workflows/workforce-engineer-routine.yml`, on-demand) — Ren's R-N1 exception path. Triggered by the orchestrator Lambda when Ren's cron fires; writes code and opens a draft PR.
+
+(The daily `wf-builder` routine was retired 2026-07-05: it ran on the pre-CCR `claude-code-action@beta` surface, its `ANTHROPIC_API_KEY` secret was unset so every scheduled run failed, and its two jobs are now covered elsewhere — ROADMAP items are implemented by operator-run CCR sessions, and open-PR babysitting lives in pr-autopilot + the R-13 terminal-state sweep. See ADR-0005's single-CCR execution model.)
 
 ## Deploying
 

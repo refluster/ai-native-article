@@ -1,11 +1,11 @@
 # Workforce — ROADMAP
 
-Checklist of implementation milestones. The daily `wf-builder` routine reads this file and implements the next unchecked item, one PR at a time.
+Checklist of implementation milestones. Items are picked up one PR at a time by operator-run CCR sessions. (The daily `wf-builder` GHA routine that formerly drove this list off `claude-code-action@beta` was retired 2026-07-05 — superseded by the single-CCR execution model of ADR-0005; open-PR babysitting now lives in pr-autopilot + the R-13 terminal-state sweep.)
 
 **Rules:**
 - One `[ ]` item per PR. Mark `[x]` only after the PR merges to `main`.
 - Each item briefly states what to build, the acceptance criterion, and the Zone classification of the affected files.
-- The `wf-builder` routine NEVER merges PRs; it only opens them.
+- No routine self-merges PRs; humans merge.
 
 ---
 
@@ -46,7 +46,6 @@ Checklist of implementation milestones. The daily `wf-builder` routine reads thi
 - [ ] **Enable orchestrator tick** — Flip `Enabled: false → true` for `wf-orchestrator-tick-prod` in `workforce/infra/sam/template.yaml`. Merge triggers `deploy-workforce-data-plane.yml`, which rolls the change-set out. Acceptance: orchestrator tick fires every 2 hours in CloudWatch without errors; first `[wf-pulse] yuki alive at ...` appears in Discord within ~8h (≤ 6h until the next `0/6` UTC boundary + ≤ 2h until the next tick after that). *(Zone B — SAM template, operator approval required per §5)*
 - [ ] **Ren end-to-end smoke-test** — Manually trigger `wf-agent-runner` for Ren with `task_kind=pr` (dry or real). Verify: brief appears in S3 at `pr-briefs/ren/{deliv_id}.md`, `workforce-engineer-routine.yml` is dispatched, draft PR appears, orchestrator poll promotes `DELIV#{id}` to `ok`. Fix any gap. *(Zone B, runbook addition only)*
 - [ ] **First live Sora article** — Sora's tick fires (or manual invocation), produces a synthesis, inserts into Notion, GAS L4 picks it up, article appears on `kohuehara.xyz` with `Author=sora` byline and non-empty eval sidecar. Acceptance: `article-health` reports 0 truncated for the new article. *(Zone B)*
-- [ ] **wf-builder routine verified** — Confirm at least two consecutive daily `workforce-builder-routine.yml` runs complete without error (either opens a PR or posts "waiting on human merge"). *(Zone B, ROADMAP update only)*
 
 ## Phase 4 — Content cadence
 
