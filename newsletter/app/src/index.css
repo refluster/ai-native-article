@@ -82,6 +82,31 @@
   @apply text-tertiary underline underline-offset-2 hover:no-underline;
 }
 
+/* Mermaid figures (```mermaid fences → MermaidBlock). The figure is a tonal
+   block (surface-container-low) per the No-Line rule; the SVG centers inside
+   it and scales down on narrow viewports. */
+.article-content .mermaid-figure svg {
+  display: block;
+  margin-inline: auto;
+  max-width: 100%;
+  height: auto;
+}
+/* 0px-radius rule (DESIGN.md): mermaid rounds some node/bar rects — flatten
+   every corner back to the Mathematical Monolith. rx/ry are CSS-stylable SVG
+   presentation attributes. */
+.article-content .mermaid-figure svg rect {
+  rx: 0;
+  ry: 0;
+}
+/* Mermaid sizes each label's foreignObject to its *measured* text width; if
+   the metric is a few px short (font swap, fallback face), the box clips the
+   label's last characters. Node rects carry ~30px side padding, so letting
+   the label overflow its measuring box is always safe. */
+.article-content .mermaid-figure svg foreignObject,
+.article-content .mermaid-figure svg foreignObject > div {
+  overflow: visible;
+}
+
 /* Print / "Save as PDF" optimisation.
    On screen the site header is `fixed top-0 z-50` with a backdrop blur and
    `<main>` carries a matching `pt-16` offset. When the browser prints, a
@@ -132,7 +157,8 @@
   .article-content p,
   .article-content li,
   .article-content blockquote,
-  .article-content pre {
+  .article-content pre,
+  .article-content .mermaid-figure {
     break-inside: avoid;
     page-break-inside: avoid;
   }
