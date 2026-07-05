@@ -5,6 +5,7 @@ import {
   parseSourceUrls,
   type SourceIndex,
 } from '../../lib/source-links'
+import { displayTag } from '../../lib/article-types'
 import { trackEvent } from '@kohuehara/shared/analytics'
 
 interface Props {
@@ -54,7 +55,7 @@ export default function AnalysesUsingSection({ slug, sourceUrls, index }: Props)
                 <li key={a.slug} className="border-l-2 border-tertiary/60 pl-5 py-1">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-[10px] font-bold tracking-widest text-tertiary uppercase">
-                      {a.category}
+                      {displayTag(a.category)}
                     </span>
                     <span className="text-[10px] font-medium tracking-widest text-outline uppercase">
                       {a.date}

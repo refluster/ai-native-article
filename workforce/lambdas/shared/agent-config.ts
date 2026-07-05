@@ -72,8 +72,13 @@ export type IdentityPatchableField = (typeof IDENTITY_PATCHABLE_FIELDS)[number];
 // W-3 cap: sum of effective monthly budgets across non-archived agents.
 // The single enforced source of truth (validate-agent-json.mjs retired in
 // ADR-0007 migration step 6); governance.md §2 W-3 documents the same value.
-// Raised 160 → 190 on 2026-06-14 for the Finance & Capital group (+USD 18/mo).
-export const W3_BUDGET_CAP_USD = 190;
+// Raised 190 → 250 on 2026-06-28 for the Media & External Communications group
+// (Epic-017, +USD 26/mo); previously 160 → 190 on 2026-06-14 for the Finance &
+// Capital group (+USD 18/mo). This constant is the *enforced* W-3 cap and MUST
+// stay in lockstep with governance.md §2 — raising one without the other is the
+// doc/code drift that lets a registration silently breach (or get wrongly
+// rejected by) the ceiling.
+export const W3_BUDGET_CAP_USD = 250;
 
 const SLUG = /^[a-z]+$/;
 const MODEL = /^(anthropic|azure|claude-code):[a-z0-9-]+(?:-[a-z0-9.]+)*$/;
@@ -105,6 +110,11 @@ export interface IdentityPatchContext {
    *  undefined when no such skill exists. Used for the binding existence
    *  cross-check; ownership no longer gates bindings (adr-0012). */
   skillOwners: (name: string) => readonly string[] | undefined;
+  /** Optional lookup: skill name → lifecycle status. When supplied, a NEW
+   *  binding targeting an `archived` skill is rejected (ADR-0017 — archive
+   *  is a soft delete; history stays, new wiring stops). Callers that
+   *  don't resolve status (older tests) skip the check. */
+  skillStatus?: (name: string) => string | undefined;
 }
 
 export function validateIdentityPatch(
@@ -311,6 +321,8 @@ function validateBinding(
   // authorship/Rule-11/improvement meaning; it no longer gates bindings.
   if (ctx.skillOwners(b.skill) === undefined) {
     v("R8-binding-skill-exists", `skill "${b.skill}" has no SKILL#${b.skill} row`);
+  } else if (ctx.skillStatus?.(b.skill) === "archived") {
+    v("R8-binding-skill-archived", `skill "${b.skill}" is archived — unarchive it (PATCH status) before binding (ADR-0017)`);
   }
 
   if (!ALLOWED_EXECUTORS.has(b.executor as string)) {

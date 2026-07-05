@@ -1,8 +1,10 @@
 # Azure OpenAI budget sizing rules
 
-**Status:** Adopted (governance L1).
-**Last updated:** 2026-05-22.
-**Audience:** anyone calling `azureGenerateText` in `newsletter/gas/src/Code.gs` or extending the LLM-driven prompts.
+**Status:** Retained as historical context (governance L1).
+**Last updated:** 2026-06.
+**Audience:** anyone wiring a new programmatic LLM call site.
+
+> **Retirement note (2026-06):** This doc governed the `azureGenerateText` helper in the GAS engine (`newsletter/gas/src/Code.gs`) — the L1_SAVE / L2 / L3 / panel call sites. **That engine has been removed, and with it every `azureGenerateText` call site it governed.** A repo-wide grep confirms no live `azureGenerateText` / Azure-OpenAI call site remains: today's L2/L3 prose is produced by the workforce `article-level2` / `article-level3` cadences, where the *running agent itself* generates the text under the CCR `agent-runner` routine — there is no programmatic `maxCompletionTokens`/`reasoning_effort` knob in the repo to set. (The Azure binding still appears as a pre-shaped entry in the `MODEL_REGISTRY` for the eval/quality layer, but no code calls it.) The doc is kept because the **budget-bracket discipline below — pick a fixed bracket, fail loud on truncation, don't size-to-prompt — should inform any future LLM call site this repo grows.** The incident history is preserved verbatim as the rationale for that discipline.
 
 The L2 truncation bug (visible until 2026-05-03 on `kohuehara.xyz/.../d17e1d58ec42`) shipped because L2's call to `azureGenerateText` used the 2000-token default while L3's call correctly overrode to 8000. The token-bracket rule below would have caught it at code-review.
 
@@ -60,6 +62,6 @@ This guard is the runtime expression of the rule above. **Do not catch and ignor
 
 ## Verification
 
-After deploying a new call site, run the `gas-deploy-verify` skill. After running it for the first time on real input, check the GAS execution log (Apps Script editor → Executions) for any `Azure OpenAI hit max_completion_tokens` error. If you see it, you under-budgeted; bump the bracket.
+*(Historical: applied to the retired GAS engine.)* After deploying a new GAS call site, you ran the `gas-deploy-verify` skill, then checked the GAS execution log (Apps Script editor → Executions) for any `Azure OpenAI hit max_completion_tokens` error — if you saw it, you'd under-budgeted and bumped the bracket. For any **future** programmatic LLM call site, the equivalent is: run it once on real input and confirm no length-truncation in its logs.
 
-For a global view of which articles slipped through truncated, run the `article-health` skill — it scans gh-pages for the symptom.
+For a global view of which articles slipped through truncated, run the `article-health` skill — it scans gh-pages for the symptom. This still works (the truncation symptom is a property of the published article, independent of how it was generated).

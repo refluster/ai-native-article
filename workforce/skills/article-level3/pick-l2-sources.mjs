@@ -35,7 +35,7 @@
 //
 // Stdout (single JSON line):
 //   { "sources": [ { l2PageId, title, abstract, sourceUrl, category }, x3 ],
-//     "canonicalCategory": "B: Role Blurring",   ← majority A–E bucket of the 3
+//     "suggestedTags": ["Org Transformation", …],  ← union of source L2 tags (hint)
 //     "sourceUrls": "https://… , https://…" }    ← comma-joined, for --source-urls
 //   { "skip": true, "reason": "..." }            ← nothing to do this fire
 //
@@ -43,6 +43,8 @@
 //   0  — printed a pick OR a {skip:true} (both are valid outcomes)
 //   1  — bad env
 //   3  — Notion API / network error
+
+import { validateTags } from "../../../scripts/lib/tags.mjs";
 
 const NOTION_VERSION = "2022-06-28";
 const NOTION_API = "https://api.notion.com/v1";
@@ -57,38 +59,21 @@ const L3_RECENT_DAYS = Number(process.env.L3_RECENT_DAYS || 14);
 const L3_SAMPLE_SIZE = Number(process.env.L3_SAMPLE_SIZE || 3);
 const L3_AVOID_REUSE_COUNT = Number(process.env.L3_AVOID_REUSE_COUNT || 10);
 
-// Canonical A–E buckets — mirror of newsletter/gas/src/Code.gs CATEGORY_NAMES +
-// canonicalCategoryFor + pickCanonicalFromSources, so the L3 row groups under
-// the same controlled bucket the GAS synthesis would have chosen (majority vote
-// across the source L2s' categories).
-const CATEGORY_NAMES = {
-  A: "A: AI Hyper-productivity",
-  B: "B: Role Blurring",
-  C: "C: New Roles/FDE",
-  D: "D: Big Tech Layoffs & AI Pivot",
-  E: "E: Rethinking SDLC",
-};
-function canonicalCategoryFor(text) {
-  const trimmed = (text || "").trim();
-  if (!trimmed) return "";
-  if (/^[A-E]$/i.test(trimmed)) return CATEGORY_NAMES[trimmed.toUpperCase()] || "";
-  const m = trimmed.match(/^([A-E])[\s:：][\s\S]*$/i);
-  if (m) return CATEGORY_NAMES[m[1].toUpperCase()] || "";
-  return "";
-}
-function pickCanonicalFromSources(categories) {
-  const counts = {};
-  for (const c of categories) {
-    const canonical = canonicalCategoryFor(c);
-    if (!canonical) continue;
-    counts[canonical] = (counts[canonical] || 0) + 1;
+// Tag suggestion — flat vocabulary (ADR-0003), replacing the retired A–E
+// majority-vote. The L3 synthesis picks its own 3–5 tags (SKILL.md); this hint
+// is the union of the source L2s' existing vocabulary tags, ranked by how many
+// sources carry each, validated against scripts/lib/tags.mjs. The agent uses it
+// as a starting point and adjusts to the synthesis's actual themes.
+function suggestTagsFromSources(sources) {
+  const counts = new Map();
+  for (const s of sources) {
+    for (const t of validateTags(s.categoriesMulti || [])) {
+      counts.set(t, (counts.get(t) || 0) + 1);
+    }
   }
-  let best = "";
-  let bestN = 0;
-  for (const k of Object.keys(counts)) {
-    if (counts[k] > bestN) { best = k; bestN = counts[k]; }
-  }
-  return best;
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([tag]) => tag);
 }
 
 const apiKey = process.env.NOTION_API_KEY;
@@ -135,6 +120,7 @@ function asL2(p) {
     abstract: p.properties?.Abstract?.rich_text?.[0]?.plain_text ?? "",
     sourceUrl: sourceUrlOf(p),
     category: p.properties?.Category?.rich_text?.[0]?.plain_text ?? "",
+    categoriesMulti: ((p.properties?.Tags ?? p.properties?.CategoriesMulti)?.multi_select ?? []).map((o) => o.name),
     created_time: p.created_time ?? "",
   };
 }
@@ -202,7 +188,7 @@ try {
   const fills = shuffle(fillPool.slice()).slice(0, L3_SAMPLE_SIZE - 1);
 
   const picked = [required, ...fills];
-  const canonicalCategory = pickCanonicalFromSources(picked.map((p) => p.category));
+  const suggestedTags = suggestTagsFromSources(picked);
   const sourceUrls = picked.map((p) => p.sourceUrl).filter(Boolean).join(", ");
 
   console.log(
@@ -214,7 +200,7 @@ try {
         sourceUrl,
         category,
       })),
-      canonicalCategory,
+      suggestedTags,
       sourceUrls,
       requiredNewL2Id: required.l2PageId,
     }),

@@ -1,4 +1,4 @@
-// CredentialVault — project credentials deck on the project profile page.
+// CredentialVault — project credentials panel on the project profile page.
 //
 // Five canonical credential types (anthropic / discord / github / notion /
 // voyage) render as a fixed-order list, each in one of three local
@@ -338,7 +338,7 @@ export default function CredentialVault({ projectId }: { projectId: string }) {
     <section className="border border-wf-outline-variant bg-wf-surface-container rounded-wf-md">
       <header className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between gap-3">
         <Typeplate
-          label="DECK · CREDENTIALS"
+          label="CREDENTIALS"
           value={`${provisionedCount} / 5 provisioned`}
         />
         <button

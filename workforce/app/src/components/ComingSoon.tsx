@@ -9,7 +9,7 @@ import Typeplate from './Typeplate';
 import { SITE_DISPLAY_NAME } from '../config/site';
 
 interface Props {
-  deck: string;
+  label: string;
   title: string;
   lede: string;
   /** Bullet teasers describing the planned shape of the feature. */
@@ -17,7 +17,7 @@ interface Props {
   icon: ReactNode;
 }
 
-export default function ComingSoon({ deck, title, lede, bullets, icon }: Props) {
+export default function ComingSoon({ label, title, lede, bullets, icon }: Props) {
   useEffect(() => {
     document.title = `${SITE_DISPLAY_NAME} — ${title}`;
   }, [title]);
@@ -25,7 +25,7 @@ export default function ComingSoon({ deck, title, lede, bullets, icon }: Props) 
   return (
     <WorkforceLayout>
       <section className="max-w-2xl">
-        <Typeplate label={deck} value="ROADMAP · NOT YET LIVE" className="mb-4" />
+        <Typeplate label={label} value="ROADMAP · NOT YET LIVE" className="mb-4" />
         <div className="flex items-start gap-4">
           <span className="shrink-0 inline-flex items-center justify-center w-12 h-12 rounded-wf-md bg-wf-surface-container text-wf-primary">
             {icon}

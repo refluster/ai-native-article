@@ -28,11 +28,13 @@ export type AnalyticsEvent =
   | { name: 'article_read_90'; params: { slug: string; category: string } }
   | { name: 'article_read_complete'; params: { slug: string; category: string; dwell_ms: number } }
   | { name: 'category_click'; params: { category: string } }
+  | { name: 'page_change'; params: { page: number } }
   | { name: 'type_filter_click'; params: { type: string } }
   | { name: 'range_filter_click'; params: { range: string } }
   | { name: 'featured_click'; params: { slug: string; category: string } }
   | { name: 'internal_link_click'; params: { slug: string; href: string } }
   | { name: 'outbound_click'; params: { slug: string; href: string; host: string } }
+  | { name: 'podcast_spotify_click'; params: { slug: string; href: string } }
 
 let initialized = false
 let measurementId: string | null = null

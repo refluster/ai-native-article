@@ -51,13 +51,70 @@ export async function getCurrentUser(): Promise<User | null> {
   return u;
 }
 
-export async function signIn(): Promise<void> {
+// The deep link the operator was on when the token expired. Carried
+// through the OIDC round-trip TWO ways (belt and suspenders): as the
+// oidc-client-ts `state` (returned on the User object at the callback)
+// AND in sessionStorage (survives an oidc state-entry miss). Without
+// this, every token refresh dumped the operator back at "/" — losing
+// the /agents/:slug or /projects/:id they were reading.
+const RETURN_TO_KEY = 'wf.auth.returnTo';
+
+/** The ONE definition of "safe to navigate back to": an in-app absolute
+ *  path — never a foreign origin, never protocol-relative (`//evil.com`),
+ *  never back into the auth flow. Both the writer (signIn) and the reader
+ *  (consumeReturnTo) apply this same predicate, so a future caller of
+ *  signIn() can't reintroduce an asymmetry (Dario review on PR 430). The
+ *  reader still re-validates because both carriers (OIDC state,
+ *  sessionStorage) are attacker-influenceable — the read is the trust
+ *  boundary. */
+export function isSafeReturnTo(candidate: unknown): candidate is string {
+  return (
+    typeof candidate === 'string' &&
+    candidate.startsWith('/') &&
+    !candidate.startsWith('//') &&
+    !candidate.startsWith('/auth/')
+  );
+}
+
+export async function signIn(returnTo?: string): Promise<void> {
   const m = getUserManager();
   if (!m) {
     console.warn('auth not configured; cannot sign in');
     return;
   }
+  if (isSafeReturnTo(returnTo)) {
+    try {
+      window.sessionStorage.setItem(RETURN_TO_KEY, returnTo);
+    } catch {
+      // storage full/blocked — the state param below still carries it
+    }
+    await m.signinRedirect({ state: { returnTo } });
+    return;
+  }
   await m.signinRedirect();
+}
+
+/** The path to restore after the callback. Prefers the OIDC state echoed
+ *  on the signed-in User; falls back to the sessionStorage copy. Returns
+ *  an in-app path only (never a foreign origin — the value is validated
+ *  to start with "/" and to not point back at /auth/). */
+export function consumeReturnTo(user: User | null): string {
+  let candidate: string | undefined;
+  const st = user?.state as { returnTo?: unknown } | undefined;
+  if (st && typeof st.returnTo === 'string') candidate = st.returnTo;
+  if (!candidate) {
+    try {
+      candidate = window.sessionStorage.getItem(RETURN_TO_KEY) ?? undefined;
+    } catch {
+      // ignore
+    }
+  }
+  try {
+    window.sessionStorage.removeItem(RETURN_TO_KEY);
+  } catch {
+    // ignore
+  }
+  return isSafeReturnTo(candidate) ? candidate : '/';
 }
 
 /** Cognito-specific sign-out: hits /logout so the User Pool session ends too. */

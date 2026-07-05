@@ -3,7 +3,7 @@
 // and the tertiary accent dot. Behaves like a heading; never a link.
 
 interface Props {
-  /** Short uppercase label, e.g. "AGENT" or "DECK 03". */
+  /** Short uppercase label, e.g. "AGENT" or "OVERVIEW". */
   label: string;
   /** The value to display next to the label. */
   value: string;

@@ -1,8 +1,8 @@
 {
-  "name": "AI Native L1",
-  "short_name": "L1",
-  "description": "Register web articles to the AI Transformation Library.",
-  "start_url": "/ai-native-article/l1-register",
+  "name": "AI Native Article",
+  "short_name": "AI Native",
+  "description": "AI Transformation Library — explanations (L2) and analyses (L3) on the AI-native shift.",
+  "start_url": "/ai-native-article/",
   "scope": "/ai-native-article/",
   "display": "standalone",
   "orientation": "portrait",

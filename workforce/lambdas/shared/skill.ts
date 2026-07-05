@@ -60,9 +60,20 @@ export interface SkillDeliverable {
 }
 
 export interface SkillMeta {
+  /** The immutable slug — DDB key (`SKILL#{name}`), directory name, binding
+   *  reference, EXEC-row `skill_name`, GSI2 partition. Never changes; the
+   *  renameable label is `display_name`. Matches the Anthropic Agent Skills
+   *  frontmatter `name` (portability contract). */
   name: string;
+  /** Human-readable display label, decoupled from the slug. Renaming it
+   *  never touches bindings, EXEC history, or URLs. Optional — the console
+   *  falls back to `name`. API-writable (PATCH /skills/{name}). */
+  display_name?: string;
   version: string;
-  status: "active" | "stale" | "deprecated";
+  /** Lifecycle. `archived` = soft-deleted: hidden from the default skill
+   *  list (`?include_archived=true` reveals), rejected as a NEW binding
+   *  target, but its EXEC/deliverable history stays intact and queryable. */
+  status: "active" | "stale" | "deprecated" | "archived";
   /** Optional published-artefact declaration (S3 prefix + Notion publish). */
   deliverable?: SkillDeliverable;
   cost_class: "small" | "medium" | "large";

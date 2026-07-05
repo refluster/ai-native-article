@@ -1,35 +1,47 @@
 import { Link } from 'react-router-dom'
 import type { ArticleMeta } from '../../types/article'
-import { ARTICLE_TYPE_LABELS, inferType } from '../../lib/article-types'
+import { displayTag } from '../../lib/article-types'
 
 interface Props {
   article: ArticleMeta
 }
 
+/**
+ * Tags shown on the card. `tags` (Notion `Tags`) is canonical; the deprecated
+ * `categoriesMulti` is a fallback for pre-rename manifests, then the singular
+ * `category`. We cap at three so the card stays text-forward and the meta row
+ * never wraps awkwardly.
+ */
+function cardTags(article: ArticleMeta): string[] {
+  const multi = article.tags ?? article.categoriesMulti
+  const raw =
+    multi && multi.length > 0
+      ? multi
+      : article.category
+        ? [article.category]
+        : []
+  return raw.slice(0, 3).map(displayTag)
+}
+
 export default function ArticleCard({ article }: Props) {
-  const type = inferType(article)
-  const typeLabel = ARTICLE_TYPE_LABELS[type]
+  const tags = cardTags(article)
 
   return (
     <article className="group">
       <Link to={`/article/${article.slug}`}>
         <div className="flex flex-col">
-          <div className="flex justify-between items-baseline mb-3">
-            <div className="flex items-center gap-2">
-              <span
-                className={`text-[9px] font-bold tracking-widest uppercase px-1.5 py-0.5 border ${
-                  type === 'explanation'
-                    ? 'border-outline text-outline'
-                    : 'border-tertiary text-tertiary'
-                }`}
-              >
-                {typeLabel}
-              </span>
-              <span className="text-[10px] font-bold tracking-widest text-tertiary uppercase">
-                {article.category}
-              </span>
+          <div className="flex justify-between items-baseline mb-3 gap-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
+              {tags.map(tag => (
+                <span
+                  key={tag}
+                  className="text-[10px] font-bold tracking-widest text-tertiary uppercase truncate"
+                >
+                  {tag}
+                </span>
+              ))}
             </div>
-            <span className="text-[10px] font-medium tracking-widest text-outline uppercase">
+            <span className="text-[10px] font-medium tracking-widest text-outline uppercase shrink-0">
               {article.date}
             </span>
           </div>

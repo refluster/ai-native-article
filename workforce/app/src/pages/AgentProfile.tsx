@@ -22,7 +22,7 @@
 // pr_url so the affordance can come back).
 
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import WorkforceLayout from '../components/WorkforceLayout';
 import Typeplate from '../components/Typeplate';
 import Sigil from '../components/Sigil';
@@ -31,8 +31,8 @@ import KPIReadout from '../components/KPIReadout';
 import HeatStrip from '../components/HeatStrip';
 import AgentOrgGraph from '../components/AgentOrgGraph';
 import RecentPostsSection from '../components/RecentPostsSection';
-import StatusBadge from '../components/StatusBadge';
 import BindingsEditor from '../components/BindingsEditor';
+import ExecutionTimeline from '../components/ExecutionTimeline';
 import {
   apiConfigured,
   fetchAgentExecutions,
@@ -45,8 +45,6 @@ import {
   type AgentLiveRecord,
 } from '../lib/agents';
 import { fmtDuration, fmtCompute } from '../lib/duration';
-import { fetchAgentMemberships } from '../lib/projects';
-import type { AgentMembership } from '../types/project';
 import type { AgentMemoryKind, WorkforceAgent } from '../types/agent';
 import type { AgentMockStats, WorkforceMockStats } from '../types/stats';
 
@@ -56,10 +54,15 @@ const STREAM_LABEL: Record<WorkforceAgent['streams'][number], string> = {
   editorial: 'editorial',
 };
 
-// Unified ACTIVITY ledger: how many of the fetched EXEC rows to render,
-// and where to clip a long deliverable summary in the row body.
+// Unified ACTIVITY ledger: how many of the fetched EXEC rows to render.
 const ACTIVITY_LIMIT = 30;
-const SUMMARY_CAP = 180;
+
+// The profile splits into meaning-level tabs (operator direction 2026-07-03,
+// LinkedIn-style IA): identity reads in OVERVIEW, the run/deliverable record
+// in ACTIVITY, the voice in POSTS, the wiring in BINDINGS. The active tab
+// lives in the URL (?tab=) so deep links and refreshes keep their place.
+const TABS = ['overview', 'activity', 'posts', 'bindings'] as const;
+type Tab = (typeof TABS)[number];
 
 function formatRelative(iso: string): string {
   const t = Date.parse(iso);
@@ -72,26 +75,21 @@ function formatRelative(iso: string): string {
   return `${days}d ago`;
 }
 
-function nextRunLabel(iso: string | undefined): string {
-  if (!iso) return '—';
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return iso;
-  const diffMin = Math.round((t - Date.now()) / 60_000);
-  if (diffMin <= 0) return 'queued';
-  if (diffMin < 60) return `in ${diffMin}m`;
-  const hrs = Math.round(diffMin / 60);
-  if (hrs < 48) return `in ${hrs}h`;
-  return `in ${Math.round(hrs / 24)}d`;
-}
-
 export default function AgentProfile() {
   const { slug } = useParams<{ slug: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = searchParams.get('tab');
+  const tab: Tab = (TABS as readonly string[]).includes(rawTab ?? '') ? (rawTab as Tab) : 'overview';
+  const setTab = (next: Tab) => {
+    if (next === 'overview') searchParams.delete('tab');
+    else searchParams.set('tab', next);
+    setSearchParams(searchParams, { replace: true });
+  };
   const [agent, setAgent] = useState<WorkforceAgent | null | undefined>(undefined);
   const [roster, setRoster] = useState<WorkforceAgent[]>([]);
   const [mock, setMock] = useState<WorkforceMockStats | null>(null);
   const [live, setLive] = useState<AgentLiveRecord | null | undefined>(undefined);
   const [execs, setExecs] = useState<AgentExecution[] | null>(null);
-  const [memberships, setMemberships] = useState<AgentMembership[] | null>(null);
   const [liveError, setLiveError] = useState<string | null>(null);
 
   // Load persona + mock stats up front.
@@ -141,27 +139,6 @@ export default function AgentProfile() {
     };
   }, [slug]);
 
-  // Project memberships — separate effect so the projects API can be
-  // wired independently of the agents live API (Story 6 #95). Renders
-  // off whichever data source is configured: live agents-api when set,
-  // otherwise the projects-mock fallback.
-  useEffect(() => {
-    if (!slug) return;
-    let cancelled = false;
-    fetchAgentMemberships(slug)
-      .then((items) => {
-        if (cancelled) return;
-        setMemberships(items);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setMemberships([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [slug]);
-
   useEffect(() => {
     if (agent) document.title = `${fullName(agent)} — Workforce`;
   }, [agent]);
@@ -204,7 +181,6 @@ export default function AgentProfile() {
   const avgDurMTD = mockForSlug?.avg_duration_s;
   const computeMTD = mockForSlug?.compute_seconds_this_month;
   const delivMTD = mockForSlug?.deliv_this_month ?? live?.deliv_count_total;
-  const nextRun = mockForSlug?.next_run_at;
   const lastRunAt = mockForSlug?.last_run_at ?? live?.last_run_at;
   const lastRunStatus = mockForSlug?.last_run_status ?? live?.last_run_status ?? 'ok';
   const isPaused = live?.paused ?? mockForSlug?.paused ?? false;
@@ -215,7 +191,12 @@ export default function AgentProfile() {
     { cap: 'RUNS · MTD',   value: runsMTD !== undefined ? String(runsMTD) : '—',           sub: 'this month' },
     { cap: 'AVG DUR · MTD',value: avgDurMTD !== undefined ? fmtDuration(avgDurMTD) : '—',   sub: computeMTD !== undefined ? `${fmtCompute(computeMTD)} compute` : 'run duration' },
     { cap: 'DELIV · MTD',  value: delivMTD !== undefined ? String(delivMTD) : '—',          sub: 'this month' },
-    { cap: 'NEXT RUN',     value: nextRunLabel(nextRun),                                     sub: agent.bindings[0]?.note ?? `${agent.bindings.length} binding(s)`, alarm: status === 'throwing' },
+    // LAST RUN replaces the former NEXT RUN tile: next_run_at has no live
+    // scheduler endpoint feeding it, so that tile always rendered "—" with
+    // the whole binding note crammed underneath (a tall, value-less box).
+    // LAST RUN is derivable from the EXEC ledger and pairs a real value
+    // with a one-word status sub.
+    { cap: 'LAST RUN',     value: lastRunAt ? formatRelative(lastRunAt) : '—',               sub: `status · ${lastRunStatus}`, alarm: status === 'throwing' },
   ];
 
   return (
@@ -266,25 +247,86 @@ export default function AgentProfile() {
         )}
       </section>
 
-      {/* TWO COLUMN: main / sidebar */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6 sm:space-y-8">
+      {/* Meaning-level tabs (URL-backed via ?tab=) */}
+      <nav className="mb-6 flex items-stretch gap-1 border-b border-wf-outline-variant overflow-x-auto">
+        {TABS.map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={`px-3 py-2 -mb-px border-b-2 font-wfmono text-[11px] uppercase tracking-[0.14em] whitespace-nowrap transition-colors ${
+              tab === t
+                ? 'border-wf-on-surface text-wf-on-surface'
+                : 'border-transparent text-wf-on-surface-variant hover:text-wf-on-surface'
+            }`}
+            aria-current={tab === t ? 'page' : undefined}
+          >
+            {t}
+          </button>
+        ))}
+      </nav>
 
-          {/* JD — mission, key responsibilities, success measures */}
-          {agent.jd && <JDPanel jd={agent.jd} />}
+      {tab === 'overview' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6 sm:space-y-8">
+            {/* JD — mission, key responsibilities, success measures */}
+            {agent.jd && <JDPanel jd={agent.jd} />}
 
-          {/* IDENTITY — OpenClaw-style archetype + operating principles */}
-          {agent.identity && <IdentityPanel identity={agent.identity} />}
+            {/* IDENTITY — archetype + operating principles */}
+            {agent.identity && <IdentityPanel identity={agent.identity} />}
 
+            {/* MEMORY — durable long-term state. Renders even when empty
+                so the operator can see "no learned memory yet" as a state. */}
+            {agent.memory && <MemoryPanel memory={agent.memory} />}
+
+            {/* CONFIG facts grid */}
+            <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
+              <div className="border-b border-wf-outline-variant px-4 py-3">
+                <Typeplate label="CONFIG" value="PERSONA · MODEL · PROJECT" />
+              </div>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-4 text-sm">
+                <Fact label="MODEL" value={agent.model} />
+                <Fact label="PROMPT" value={`v${agent.prompt_version}`} />
+                <Fact label="MONTHLY BUDGET" value={`USD ${agent.budget_monthly_usd}`} />
+                <Fact label="PROJECT" value={agent.default_project} />
+                <Fact label="STREAMS" value={agent.streams.map((s) => STREAM_LABEL[s]).join(' · ')} />
+                {lastRunAt && (
+                  <Fact label="LAST RUN" value={`${formatRelative(lastRunAt)} (${lastRunStatus})`} />
+                )}
+              </dl>
+            </section>
+
+            {/* DISCLOSURE — LLM-persona footer */}
+            <section className="border border-wf-outline-variant bg-wf-surface-container rounded-wf-md p-4">
+              <Typeplate label="DISCLOSURE" value="LLM-DRIVEN PERSONA" className="mb-2" />
+              <p className="text-xs text-wf-on-surface-variant leading-relaxed">
+                {fullName(agent)} is an LLM-driven persona on the Workforce platform. Articles bylined to{' '}
+                {agent.first_name} are produced by an Anthropic Claude model running on AWS Lambda; the
+                persona's full voice and limitations are documented in their{' '}
+                <a
+                  href={`https://github.com/refluster/ai-native-article/blob/main/workforce/agents/${agent.slug}/system.md`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-wf-primary hover:underline"
+                >
+                  system prompt
+                </a>{' '}
+                and acknowledged in every article footer.
+              </p>
+            </section>
+          </div>
+
+          {/* SIDEBAR */}
+          <aside className="lg:col-span-1 space-y-6">
+            {roster.length > 0 && <AgentOrgGraph agent={agent} roster={roster} />}
+          </aside>
+        </div>
+      )}
+
+      {tab === 'activity' && (
+        <div className="space-y-6 sm:space-y-8">
           {/* PERFORMANCE — 7-day rollup + per-skill execution bars */}
-          {mockForSlug?.last_7d && (
-            <PerformancePanel last7d={mockForSlug.last_7d} />
-          )}
-
-          {/* RECENT ACTIVITY — task log (when, what, result) */}
-          {mockForSlug?.recent_runs && mockForSlug.recent_runs.length > 0 && (
-            <RecentRunsPanel runs={mockForSlug.recent_runs} />
-          )}
+          {mockForSlug?.last_7d && <PerformancePanel last7d={mockForSlug.last_7d} />}
 
           {/* HEAT STRIP */}
           {mock && mock.activity.by_slug[agent.slug] && (
@@ -301,59 +343,11 @@ export default function AgentProfile() {
             </section>
           )}
 
-          {/* EXPERIENCE — joined, highlights, endorsements */}
-          {agent.experience && <ExperiencePanel agent={agent} roster={roster} />}
-
-          {/* MEMORY — durable long-term state. Renders even when empty
-              so the operator can see "no learned memory yet" as a state. */}
-          {agent.memory && <MemoryPanel memory={agent.memory} />}
-
-          {/* CONFIG facts grid */}
-          <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
-            <div className="border-b border-wf-outline-variant px-4 py-3">
-              <Typeplate label="CONFIG" value="PERSONA · MODEL · PROJECT" />
-            </div>
-            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-4 text-sm">
-              <Fact label="MODEL" value={agent.model} />
-              <Fact label="PROMPT" value={`v${agent.prompt_version}`} />
-              <Fact label="MONTHLY BUDGET" value={`USD ${agent.budget_monthly_usd}`} />
-              <Fact label="PROJECT" value={agent.default_project} />
-              <Fact label="STREAMS" value={agent.streams.map((s) => STREAM_LABEL[s]).join(' · ')} />
-              {lastRunAt && (
-                <Fact label="LAST RUN" value={`${formatRelative(lastRunAt)} (${lastRunStatus})`} />
-              )}
-            </dl>
-          </section>
-
-          {/* BINDINGS — cron × skill pairs. Editable when the SigV4
-              broker is configured (binding CRUD + cron edits land as
-              audited PATCHes on the live row — ADR-0007/0008). */}
-          <BindingsEditor
-            slug={agent.slug}
-            bindings={agent.bindings}
-            onUpdated={(next) => setAgent({ ...agent, bindings: next })}
-          />
-
-          {/* MEMBERSHIPS — projects this agent is an active member of.
-              Lives between BINDINGS and DELIVERABLES so the operator sees
-              which trust boundaries this agent crosses before they see
-              the artefacts they've produced inside those boundaries.
-              Renders even when empty so a brand-new agent is visibly
-              registered-but-unattached. */}
-          {memberships !== null && (
-            <MembershipsPanel memberships={memberships} />
-          )}
-
           {/* ACTIVITY — one unified ledger of every EXEC row, newest-first
-              (live API only). Replaces the former split TRACK RECORD
-              (deliverables-only) + EXEC RAW RUNS (everything) sections,
-              which read as near-duplicates. Each row carries date ·
-              project · skill · status, with the deliverable summary in the
-              body when one exists and a "skipped"/"no summary" fallback
-              otherwise. Deeplinks to Notion / GitHub PRs aren't on EXEC
-              yet (FU-NEW-G follow-up promotes notion_page_url / pr_url
-              onto the row); until then the project link is the operator's
-              drill-down handle. */}
+              (live API only), rendered through the shared ExecutionTimeline
+              (same visual language as the project page). Deeplinks to
+              Notion / GitHub PRs aren't on EXEC yet (FU-NEW-G); until then
+              the project link is the drill-down handle. */}
           {apiConfigured() && (
             <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
               <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between gap-3">
@@ -372,155 +366,31 @@ export default function AgentProfile() {
                     no executions yet — orchestrator hasn't fired since deploy.
                   </p>
                 ) : (
-                  <ul className="divide-y divide-wf-outline-variant">
-                    {execs.slice(0, ACTIVITY_LIMIT).map((e) => {
-                      // Prefer the explicit top-level engagement summary;
-                      // fall back to the artifact preview for CCR/legacy rows
-                      // that only carried an artifact_ref.
-                      const raw = (e.summary ?? e.artifact_ref?.summary)?.trim() ?? '';
-                      const summary = raw.length > SUMMARY_CAP ? `${raw.slice(0, SUMMARY_CAP)}…` : raw;
-                      // A skipped run did no work, so "skipped" is a truer
-                      // body than "no summary"; an ok/throw run that simply
-                      // carried no summary gets "no summary".
-                      const fallback = e.status === 'skipped' ? 'skipped' : 'no summary';
-                      return (
-                        <li key={e.exec_ulid} className="py-3 text-sm">
-                          <div className="flex items-center gap-2 flex-wrap font-wfmono text-[10px] tracking-[0.08em] text-wf-on-surface-variant">
-                            <span>{e.started_at?.slice(0, 10)}</span>
-                            <span aria-hidden>·</span>
-                            <Link
-                              to={`/projects/${encodeURIComponent(e.project_id)}`}
-                              className="text-wf-primary hover:underline"
-                            >
-                              {e.project_id}
-                            </Link>
-                            <span aria-hidden>·</span>
-                            <Link
-                              to={`/skills/${e.skill_name}`}
-                              className="hover:text-wf-primary truncate max-w-[12rem]"
-                              title={e.skill_name}
-                            >
-                              {e.skill_name}
-                            </Link>
-                            <StatusBadge status={e.status} error={e.error} className="ml-auto" />
-                          </div>
-                          <div className="mt-1 leading-snug">
-                            {summary.length > 0 ? (
-                              <span className="text-wf-on-surface">{summary}</span>
-                            ) : (
-                              <span className="italic text-wf-on-surface-variant">{fallback}</span>
-                            )}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <ExecutionTimeline executions={execs} perspective="agent" limit={ACTIVITY_LIMIT} />
                 )}
               </div>
             </section>
           )}
 
-          {/* DISCLOSURE — LLM-persona footer (slimmed: IDENTITY moved up) */}
-          <section className="border border-wf-outline-variant bg-wf-surface-container rounded-wf-md p-4">
-            <Typeplate label="DISCLOSURE" value="LLM-DRIVEN PERSONA" className="mb-2" />
-            <p className="text-xs text-wf-on-surface-variant leading-relaxed">
-              {fullName(agent)} is an LLM-driven persona on the Workforce platform. Articles bylined to{' '}
-              {agent.first_name} are produced by an Anthropic Claude model running on AWS Lambda; the
-              persona's full voice and limitations are documented in their{' '}
-              <a
-                href={`https://github.com/refluster/ai-native-article/blob/main/workforce/agents/${agent.slug}/system.md`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-wf-primary hover:underline"
-              >
-                system prompt
-              </a>{' '}
-              and acknowledged in every article footer.
-            </p>
-          </section>
+          {/* TASK LOG (mock fallback) */}
+          {mockForSlug?.recent_runs && mockForSlug.recent_runs.length > 0 && (
+            <RecentRunsPanel runs={mockForSlug.recent_runs} />
+          )}
         </div>
-
-        {/* SIDEBAR */}
-        <aside className="lg:col-span-1 space-y-6">
-          {roster.length > 0 && <AgentOrgGraph agent={agent} roster={roster} />}
-        </aside>
-      </div>
-
-      {/* RECENT POSTS — appended section (Epic-011 cycle-1 verdict #3 closure: section, not tab). */}
-      {slug && <RecentPostsSection slug={slug} />}
-    </WorkforceLayout>
-  );
-}
-
-export function MembershipsPanel({ memberships }: { memberships: AgentMembership[] }) {
-  // self/{slug} projects are always present (auto-seeded by Story 1-B) so
-  // surface them last; "real" project memberships are the interesting
-  // signal for the operator.
-  //
-  // C-1/C-4: a single malformed membership row (missing project_id — e.g. a
-  // legacy MEMBER row written before addMember stamped project_id, or API
-  // shape drift) must not blank the whole agent page. Drop rows without a
-  // string project_id rather than throwing inside .sort()/.map().
-  const valid = memberships.filter(
-    (m): m is AgentMembership => typeof m.project_id === 'string',
-  );
-  const sorted = [...valid].sort((a, b) => {
-    const aSelf = a.project_id.startsWith('self/');
-    const bSelf = b.project_id.startsWith('self/');
-    if (aSelf !== bSelf) return aSelf ? 1 : -1;
-    return a.project_id.localeCompare(b.project_id);
-  });
-  return (
-    <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
-      <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
-        <Typeplate label="PROJECTS" value={`${valid.length} MEMBERSHIPS`} />
-        <Link
-          to="/projects"
-          className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
-        >
-          ALL PROJECTS →
-        </Link>
-      </div>
-      {valid.length === 0 ? (
-        <div className="px-4 py-4">
-          <p className="text-sm text-wf-on-surface-variant leading-relaxed">
-            No project memberships yet. This agent is not bound to any project's trust boundary —
-            assign one via{' '}
-            <code className="font-wfmono text-xs">
-              workforce/projects/{'{id}'}/members.json
-            </code>{' '}
-            (seed) or the in-app member editor (follow-up slice).
-          </p>
-        </div>
-      ) : (
-        <ul className="divide-y divide-wf-outline-variant">
-          {sorted.map((m) => {
-            const isSelf = m.project_id.startsWith('self/');
-            return (
-              <li
-                key={m.project_id}
-                className="px-4 py-3 flex items-baseline justify-between gap-3"
-              >
-                <Link
-                  to={`/projects/${encodeURIComponent(m.project_id)}`}
-                  className="font-mono text-sm text-wf-on-surface hover:text-wf-primary truncate"
-                >
-                  {m.project_id}
-                  {isSelf && (
-                    <span className="ml-2 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-                      self
-                    </span>
-                  )}
-                </Link>
-                <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant whitespace-nowrap">
-                  joined {m.joined_at ? m.joined_at.slice(0, 10) : '—'}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
       )}
-    </section>
+
+      {tab === 'posts' && slug && <RecentPostsSection slug={slug} />}
+
+      {tab === 'bindings' && (
+        <div className="space-y-6">
+          <BindingsEditor
+            slug={agent.slug}
+            bindings={agent.bindings}
+            onUpdated={(next) => setAgent({ ...agent, bindings: next })}
+          />
+        </div>
+      )}
+    </WorkforceLayout>
   );
 }
 
@@ -813,7 +683,7 @@ function formatDuration(secs: number): string {
 // Long-term memory has four kinds: durable facts, standing decisions,
 // emergent preferences, and people-context. Entries within a kind are
 // rendered in their authored order — long-term memory is NOT chronological,
-// so no date sort. The Task Log and EXPERIENCE decks already cover the
+// so no date sort. The Task Log and ACTIVITY ledger already cover the
 // dated/activity view.
 const MEMORY_KIND_META: Record<AgentMemoryKind, { label: string; tone: string; border: string; order: number }> = {
   fact:       { label: 'FACT',     tone: 'text-wf-on-surface',         border: 'border-wf-outline-variant', order: 0 },
@@ -850,7 +720,7 @@ function MemoryPanel({ memory }: { memory: NonNullable<WorkforceAgent['memory']>
             record of what was done.
           </p>
           <p className="mt-2 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-            see also · TASK LOG · EXPERIENCE for the activity record
+            see also · TASK LOG · ACTIVITY for the activity record
           </p>
         </div>
       ) : (
@@ -894,77 +764,3 @@ function MemoryPanel({ memory }: { memory: NonNullable<WorkforceAgent['memory']>
   );
 }
 
-function ExperiencePanel({ agent, roster }: { agent: WorkforceAgent; roster: WorkforceAgent[] }) {
-  const exp = agent.experience!;
-  const tenureDays = Math.max(
-    0,
-    Math.round((Date.now() - Date.parse(exp.joined_at)) / 86_400_000),
-  );
-  return (
-    <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
-      <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
-        <Typeplate label="EXPERIENCE" value="TRACK RECORD ON THE WORKFORCE" />
-        <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-          joined {exp.joined_at} · {tenureDays}d
-        </span>
-      </div>
-      <div className="p-4 sm:p-5 space-y-5">
-        {exp.highlights.length > 0 && (
-          <div>
-            <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-2">
-              HIGHLIGHTS
-            </div>
-            <ol className="relative border-l border-wf-outline-variant pl-4 space-y-3">
-              {exp.highlights.map((h, i) => (
-                <li key={i} className="relative">
-                  <span
-                    aria-hidden
-                    className="absolute -left-[19px] top-1.5 w-2 h-2 bg-wf-primary rounded-full"
-                  />
-                  <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-                    {h.date}
-                  </div>
-                  <div className="text-sm font-semibold text-wf-on-surface leading-snug">{h.title}</div>
-                  <div className="text-sm text-wf-on-surface-variant leading-snug">{h.impact}</div>
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-        {exp.endorsements.length > 0 && (
-          <div>
-            <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-2">
-              ENDORSEMENTS · TEAMMATES
-            </div>
-            <ul className="space-y-2">
-              {exp.endorsements.map((e, i) => {
-                const teammate = roster.find((r) => r.slug === e.from);
-                const label = teammate ? `${teammate.first_name} ${teammate.last_name}` : e.from;
-                const subtitle = teammate ? teammate.role : '';
-                return (
-                  <li
-                    key={i}
-                    className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3 text-sm border border-wf-outline-variant rounded-wf-sm px-3 py-2"
-                  >
-                    <Link
-                      to={`/agents/${e.from}`}
-                      className="font-wfmono text-xs text-wf-on-surface hover:text-wf-primary shrink-0"
-                    >
-                      {label}
-                    </Link>
-                    {subtitle && (
-                      <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant shrink-0">
-                        {subtitle}
-                      </span>
-                    )}
-                    <span className="text-wf-on-surface flex-1 italic">"{e.for}"</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}

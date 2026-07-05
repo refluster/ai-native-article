@@ -96,14 +96,14 @@ export default function ProjectDirectory() {
   return (
     <WorkforceLayout>
       <section className="mb-6 sm:mb-8">
-        <Typeplate label="DECK 04" value={`PROJECTS · ${rows?.length ?? '—'} REGISTERED`} className="mb-3" />
+        <Typeplate label="PROJECTS" value={`PROJECTS · ${rows?.length ?? '—'} REGISTERED`} className="mb-3" />
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
             <h1 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-[1.04] text-wf-on-surface">
               The projects.
             </h1>
             <p className="mt-2 max-w-prose text-sm text-wf-on-surface-variant leading-relaxed">
-              Every credential, execution, and member binding hangs off a project. A project is the
+              Every credential and execution hangs off a project. A project is the
               workforce's trust boundary — see{' '}
               <a
                 href="https://github.com/refluster/ai-native-article/blob/main/workforce/docs/epics/epic-010-project-trust-boundary.md"
@@ -192,10 +192,9 @@ function ProjectList({ items }: { items: ProjectSummary[] }) {
   return (
     <div className="border border-wf-outline-variant rounded-wf-md overflow-hidden bg-wf-surface-container-lo">
       <div className="hidden md:grid grid-cols-12 gap-3 px-4 py-2 border-b border-wf-outline-variant font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-        <div className="col-span-4">PROJECT</div>
+        <div className="col-span-5">PROJECT</div>
         <div className="col-span-2">OWNER</div>
         <div className="col-span-2">STATUS</div>
-        <div className="col-span-1 text-right">MEMBERS</div>
         <div className="col-span-3 text-right">LAST EXEC</div>
       </div>
       <ul className="divide-y divide-wf-outline-variant">
@@ -205,11 +204,18 @@ function ProjectList({ items }: { items: ProjectSummary[] }) {
               to={`/projects/${encodeURIComponent(p.project_id)}`}
               className="grid grid-cols-1 md:grid-cols-12 gap-3 items-baseline px-4 py-3 hover:bg-wf-surface-container-hi transition-colors"
             >
-              <div className="md:col-span-4 min-w-0">
+              <div className="md:col-span-5 min-w-0">
                 <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
                   PROJECT
                 </div>
-                <div className="font-mono text-sm text-wf-on-surface truncate">{p.project_id}</div>
+                <div className="text-sm text-wf-on-surface truncate">
+                  {p.name ?? <span className="font-mono">{p.project_id}</span>}
+                </div>
+                {p.name && (
+                  <div className="font-mono text-[10px] text-wf-on-surface-variant truncate">
+                    {p.project_id}
+                  </div>
+                )}
               </div>
               <div className="md:col-span-2 text-sm">
                 <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant md:hidden">
@@ -222,12 +228,6 @@ function ProjectList({ items }: { items: ProjectSummary[] }) {
                   STATUS
                 </div>
                 <StatusChip status={p.status} />
-              </div>
-              <div className="md:col-span-1 md:text-right font-wfmono text-sm text-wf-on-surface">
-                <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant md:hidden mr-2">
-                  MEMBERS
-                </span>
-                {p.member_count ?? '—'}
               </div>
               <div className="md:col-span-3 md:text-right font-wfmono text-xs text-wf-on-surface-variant">
                 <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant md:hidden mr-2">
@@ -332,7 +332,7 @@ function NewProjectPanel() {
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3">
-        <Typeplate label="DECK · NEW PROJECT" value="SEED · NOT POST" />
+        <Typeplate label="NEW PROJECT" value="SEED · NOT POST" />
       </div>
       <div className="p-4 space-y-4">
         <p className="text-sm text-wf-on-surface-variant leading-relaxed">

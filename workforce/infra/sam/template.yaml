@@ -604,22 +604,33 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /skills/{name}/audit
             Method: GET
+        # ADR-0017: API-first creation of judgment-only skills (IAM-auth,
+        # same gate as agent/skill config writes) + the per-skill run
+        # ledger (public read, GSI2-backed observability surface).
+        CreateSkill:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /skills
+            Method: POST
+            Auth:
+              Authorizer: AWS_IAM
+        ListSkillExecutions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /skills/{name}/executions
+            Method: GET
         # Epic-010 §10 Story 6 (#95): projects read API on the same Lambda.
         # POST/DELETE/PATCH on projects are intentionally not exposed (see
         # handler.ts header). The credential vault lives in its own Lambda
         # (Story 2-C #91) so this Lambda's IAM scope stays narrow per R-N3.
         # Routes use a non-greedy `{id}` param, NOT the greedy `{id+}`
         # proxy: a greedy parent (`/projects/{id+}`) conflicts with its
-        # child routes (`/projects/{id}/members` etc.) on HTTP API import,
+        # child routes (`/projects/{id}/executions` etc.) on HTTP API import,
         # so API Gateway silently drops the children. Project ids that
         # contain `/` (e.g. `self/ren`) are percent-encoded by the client,
         # so they still match a single `{id}` segment.
-        ListAgentProjects:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref WfAgentsHttpApi
-            Path: /agents/{slug}/projects
-            Method: GET
         # Epic-010 ROADMAP §Status-transition criterion 3 (C3) — agent
         # profile reads execution history from the EXEC row family via
         # GSI1 instead of the legacy AGENT#{slug}/RUN#{ulid} +
@@ -683,12 +694,6 @@ Resources:
           Properties:
             ApiId: !Ref WfAgentsHttpApi
             Path: /projects/{id}
-            Method: GET
-        ListProjectMembers:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref WfAgentsHttpApi
-            Path: /projects/{id}/members
             Method: GET
         ListProjectExecutions:
           Type: HttpApi
@@ -1624,13 +1629,16 @@ Resources:
   # the metric was universal noise: success paths write EXEC only,
   # failure paths write RUN only, neither has a sibling).
 
-  WfAuditCrossProjectLeaksAlarm:
+  # 2026-07-03: the membership concept was removed (every registered agent
+  # participates in every project), so the cross-project-leak membership
+  # check retired; the malformed-row half survives as WfAuditMalformedExecs.
+  WfAuditMalformedExecsAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub wf-audit-cross-project-leaks-alarm-${Stage}
-      AlarmDescription: !Sub Audit found cross-project leakage in wf-table-${Stage} (Epic-010 W-2 trust-boundary breach).
+      AlarmName: !Sub wf-audit-malformed-execs-alarm-${Stage}
+      AlarmDescription: !Sub Audit found malformed EXEC rows in wf-table-${Stage} (data-shape regression; FU-NEW-D class).
       Namespace: Workforce/Audit
-      MetricName: WfAuditCrossProjectLeaks
+      MetricName: WfAuditMalformedExecs
       Dimensions:
         - Name: Stage
           Value: !Ref Stage
@@ -1916,13 +1924,13 @@ Resources:
               "type": "metric",
               "x": 8, "y": 22, "width": 16, "height": 6,
               "properties": {
-                "title": "Workforce/Audit — WfAuditCrossProjectLeaks (daily)",
+                "title": "Workforce/Audit — WfAuditMalformedExecs (daily)",
                 "view": "timeSeries",
                 "region": "${AWS::Region}",
                 "period": 86400,
                 "stat": "Sum",
                 "metrics": [
-                  [ "Workforce/Audit", "WfAuditCrossProjectLeaks", "Stage", "${Stage}", { "color": "#d62728" } ]
+                  [ "Workforce/Audit", "WfAuditMalformedExecs", "Stage", "${Stage}", { "color": "#d62728" } ]
                 ],
                 "yAxis": { "left": { "min": 0 } },
                 "annotations": {
@@ -1935,6 +1943,197 @@ Resources:
           ]
         }
 
+  # --- Podcast production & distribution (Epic-017 Stories 5 & 6; ADR-0016) ---
+  # Deterministic Lambda on the DEFAULT surface (R-N1): Polly Neural JA TTS →
+  # MP3 on the wf bucket's podcast/ prefix, plus the RSS builder. IAM-authorized
+  # (the operator/orchestrator SigV4-signs); no new project credential type.
+  WfPodcastFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-podcast-${Stage}
+      CodeUri: ../../lambdas/wf-podcast
+      Handler: handler.handler
+      Description: Podcast synthesis (Polly Neural JA, random voice → S3) + RSS build (Epic-017; ADR-0016).
+      MemorySize: 512
+      # Polly StartSpeechSynthesisTask is async; the handler polls up to ~150s.
+      Timeout: 300
+      Environment:
+        Variables:
+          # CloudFront/OAC domain over the wf bucket's podcast/* prefix — the
+          # public base for MP3 enclosures and the feed (the bucket stays
+          # private, ADR-0016).
+          PODCAST_PUBLIC_BASE_URL: !Sub https://${WfPodcastDistribution.DomainName}
+          PODCAST_SITE_BASE_URL: https://kohuehara.xyz/ai-native-article
+          # Spotify show metadata. Owner email is the verification address used
+          # to claim the show on Spotify for Podcasters.
+          PODCAST_OWNER_EMAIL: refluster@gmail.com
+          PODCAST_OWNER_NAME: kohuehara
+          PODCAST_CATEGORY: Technology
+      Policies:
+        - Statement:
+            - Sid: PodcastPolly
+              Effect: Allow
+              Action:
+                - polly:StartSpeechSynthesisTask
+                - polly:GetSpeechSynthesisTask
+              Resource: "*"
+            - Sid: PodcastS3Audio
+              # Read/write only the podcast/* prefix: Polly's temp write +
+              # CopyObject to the clean key + DeleteObject of the temp +
+              # PutObject feed.xml + HeadObject for the enclosure length.
+              Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+                - s3:DeleteObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/podcast/*
+            - Sid: PodcastNotionSecret
+              # The project-scoped Notion integration token ({apiKey}); the DB
+              # id is a non-secret constant in the handler. No new credential
+              # type — same secret the agent-workforce project bag holds.
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/agent-workforce/notion.integration_token-*
+      Events:
+        Synthesize:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /podcast/synthesize
+            Method: POST
+        BuildRss:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /podcast/rss
+            Method: POST
+        Publish:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /podcast/publish
+            Method: POST
+      Tags:
+        workforce: !Ref Stage
+
+  WfPodcastErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-podcast-errors-alarm-${Stage}
+      AlarmDescription: A Polly/S3/Notion failure in wf-podcast (C-4 fail-loud).
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfPodcastFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  # CloudFront Origin Access Control — serves the podcast/* prefix publicly to
+  # Spotify's crawler while the bucket keeps its full PublicAccessBlock. The
+  # bucket policy below grants ONLY the CloudFront service principal (scoped by
+  # SourceArn to this distribution), so it is not a "public" grant and is
+  # permitted with BlockPublicPolicy on.
+  WfPodcastOac:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub wf-podcast-oac-${Stage}
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  WfPodcastDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub Podcast audio + RSS for Spotify (Epic-017, ${Stage})
+        Origins:
+          - Id: WfPodcastS3Origin
+            DomainName: !GetAtt WfBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt WfPodcastOac.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        DefaultCacheBehavior:
+          TargetOriginId: WfPodcastS3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          # Managed-CachingOptimized policy id (AWS-managed, region-agnostic).
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        PriceClass: PriceClass_100
+      # Tags is a resource-level property of AWS::CloudFront::Distribution, NOT
+      # a member of DistributionConfig — nesting it inside DistributionConfig
+      # fails CloudFormation Early Validation (the deploy-blocking bug here).
+      Tags:
+        - Key: workforce
+          Value: !Ref Stage
+
+  WfPodcastBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WfBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontPodcastRead
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub ${WfBucket.Arn}/podcast/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${WfPodcastDistribution.Id}
+
+  # --- L1 source capture (non-GAS replacement for GAS L1_SAVE) ---------------
+  # Mechanical (no-LLM) endpoint: registers a web source URL as a row in the
+  # Notion L1 source DB that article-level2/pick-l1-source.mjs reads. Auth is a
+  # bearer token at the handler layer (no API GW authorizer — the operator /
+  # iOS Shortcut / CLI has no SigV4 creds), exactly like POST /feed.
+  WfL1SourceRegisterFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-l1-source-register-${Stage}
+      CodeUri: ../../lambdas/l1-source-register
+      Handler: handler.handler
+      MemorySize: 256
+      Timeout: 15
+      Policies:
+        - Statement:
+            - Sid: L1RegisterReadSecrets
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/agent-workforce/notion.integration_token-*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/api/l1-source-write-token-*
+      Events:
+        RegisterL1Source:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /l1/register
+            Method: POST
+        ListL1Sources:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /l1/sources
+            Method: GET
 
 Outputs:
   TableName:
@@ -1959,6 +2158,16 @@ Outputs:
     Value: !Ref WfAlarmTopic
     Export:
       Name: !Sub wf-alarm-topic-arn-${Stage}
+  PodcastFeedUrl:
+    Description: Public podcast RSS feed URL (submit this once to Spotify for Podcasters — Epic-017 Story 6).
+    Value: !Sub https://${WfPodcastDistribution.DomainName}/podcast/feed.xml
+    Export:
+      Name: !Sub wf-podcast-feed-url-${Stage}
+  PodcastPublicBaseUrl:
+    Description: CloudFront base for podcast audio/feed (the wf-podcast Lambda's PODCAST_PUBLIC_BASE_URL).
+    Value: !Sub https://${WfPodcastDistribution.DomainName}
+    Export:
+      Name: !Sub wf-podcast-public-base-url-${Stage}
   AgentsApiUrl:
     # Includes the stage path so the value is directly usable as the SPA's
     # API base (the console deploy reads this output into

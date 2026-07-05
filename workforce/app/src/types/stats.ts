@@ -42,7 +42,9 @@ export interface AgentMockStats {
   last_run_at: string;
   last_run_status: RunStatus;
   runs_this_month: number;
-  /** Deliverables (EXEC rows with an artefact) produced this month. */
+  /** Deliverables this month — any status:ok EXEC (the Epic-016 Phase-3
+   *  "delivered" definition: artefact-bearing runs AND artefact-less
+   *  engagements like pr-review/route both count). */
   deliv_this_month?: number;
   /** Mean run duration in seconds, MTD — the live spend-proxy metric. */
   avg_duration_s?: number;
@@ -66,6 +68,8 @@ export interface MockTotals {
   agents_paused: number;
   agents_throwing: number;
   runs_this_month: number;
+  /** Deliverables this month across the workforce — any status:ok EXEC
+   *  (Epic-016 Phase-3 "delivered"; engagements count, not just file artefacts). */
   deliv_count_this_month: number;
   /** Total wall-clock run time across the workforce this month, seconds. */
   compute_seconds_this_month?: number;

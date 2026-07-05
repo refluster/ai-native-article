@@ -240,6 +240,8 @@ function propText(prop) {
       return prop.url ?? ''
     case 'select':
       return prop.select?.name ?? ''
+    case 'status':
+      return prop.status?.name ?? ''
     case 'multi_select':
       // For multi_select, return the FIRST tag (used for legacy `Category`
       // single-string fallback). Use propMultiSelect for the full list.
@@ -260,10 +262,10 @@ export function slugFromId(id) {
 }
 
 /**
- * Canonical 5-bucket taxonomy used by L1 capture (see GAS handleL1Save).
- * The original prompt told Azure to return a single letter A–E and meant
- * those letters to map onto these labels — but Azure has been free-form
- * enough to also produce things like bare "B", "B: TRENDS", "A: MACROHARD"
+ * Canonical 5-bucket taxonomy used when categorising L1 sources.
+ * The category prompt asks for a single letter A–E meant to map onto these
+ * labels — but the model has been free-form enough to also produce things
+ * like bare "B", "B: TRENDS", "A: MACROHARD"
  * which all leaked downstream and exploded the sidebar into ~30 buckets.
  *
  * normalizeCategory collapses every variant of letter X (or "X: anything")
@@ -319,9 +321,15 @@ async function pageToRecord(page, apiKey, legacyHint) {
   const category = normalizeCategory(
     propText(props.Category) || propText(props['Sub Category']),
   )
-  const categoriesMulti = propMultiSelect(props.CategoriesMulti).length
-    ? propMultiSelect(props.CategoriesMulti)
-    : propMultiSelect(props.Categories)
+  // `Tags` is the multi-select tag column (renamed from `CategoriesMulti`).
+  // Read the new name first; fall back to the old names so a fetch that runs
+  // before the Notion property rename (or against an un-migrated row) still
+  // populates tags.
+  const tags = propMultiSelect(props.Tags).length
+    ? propMultiSelect(props.Tags)
+    : propMultiSelect(props.CategoriesMulti).length
+      ? propMultiSelect(props.CategoriesMulti)
+      : propMultiSelect(props.Categories)
   // Date with sensible fallbacks: dedicated `Date` → legacy
   // `Publication Date` → Notion's own created_time. The created_time
   // fallback prevents undated rows from sinking to the bottom of the
@@ -338,9 +346,9 @@ async function pageToRecord(page, apiKey, legacyHint) {
     propText(props['Source URLs'])
   const legacySlug = propText(props.LegacySlug)
   // Migrated rows carry the original L2/L3 page id in `LegacyNotionId`.
-  // The writer needs this to resolve images written by GAS using the
-  // <32-char-no-dash-uuid>.jpg naming convention — those filenames are
-  // derived from the legacy id, not the new unified-DB id.
+  // The writer needs this to resolve cover images written by the former GAS
+  // L4 pipeline using the <32-char-no-dash-uuid>.jpg naming convention —
+  // those filenames are derived from the legacy id, not the new unified-DB id.
   const legacyNotionId = propText(props.LegacyNotionId)
   const type = resolveType(props, legacyHint)
   // Epic-002 / Epic-005: agent-authored articles carry an Author select
@@ -348,6 +356,17 @@ async function pageToRecord(page, apiKey, legacyHint) {
   // workforce rows have no Author property and resolve to undefined,
   // which the front-end renders as a quiet placeholder (anonymous).
   const author = propText(props.Author) || undefined
+  // Epic-017: the Spotify deep-link the operator records back to Notion once
+  // an episode is published. Flows to the reader as a Spotify icon link via
+  // this fetch-notion sync — the only sync route. Property name is the canonical
+  // `spotifyUrl` (Story 4 schema, ADR-0016); PascalCase kept as a tolerant
+  // fallback. `hasPodcast` is derived from `podcastStatus` so the reader can
+  // know an episode exists even before the Spotify URL is captured.
+  const spotifyUrl =
+    propText(props.spotifyUrl) || propText(props.SpotifyUrl) || undefined
+  const podcastStatus = propText(props.podcastStatus) || ''
+  const hasPodcast =
+    podcastStatus && podcastStatus !== 'none' ? 'true' : undefined
 
   const bodyMd = await blocksToMd(page.id, apiKey)
   const slug = legacySlug || slugFromId(page.id)
@@ -357,7 +376,7 @@ async function pageToRecord(page, apiKey, legacyHint) {
     title,
     type,
     category,
-    categoriesMulti,
+    tags,
     date,
     abstract,
     bodyMd,
@@ -368,6 +387,8 @@ async function pageToRecord(page, apiKey, legacyHint) {
     lastEditedAt: page.last_edited_time || '',
     imagePath: `/posts/images/${slug}.jpg`,
     author,
+    spotifyUrl,
+    hasPodcast,
   }
 }
 

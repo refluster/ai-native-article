@@ -70,7 +70,7 @@ jobs:
             2. The high-level state machine: (a) if the previous workforce PR is still open with green CI → leave a one-line 'waiting on human merge' comment and exit; (b) if it's open with failing CI → classify+fix (max 3 turns); (c) if it's merged → implement the next un-checked PR from `workforce/ROADMAP.md` and open a PR.
             3. NEVER run `gh pr merge` on your own work. Governance C-3 is absolute.
             4. NEVER use `--no-verify` or `--no-gpg-sign` flags. If a hook blocks, fix the underlying issue.
-            5. Verify locally with `npm run build && npm run lint:tokens && npm run check-gas` before pushing.
+            5. Verify locally with `npm run build && npm run lint:tokens && npm run check-truncation` before pushing.
             6. The full plan + roadmap is in the repo. Authoritative files: `workforce/README.md`, `workforce/ROADMAP.md`, `workforce/docs/routine-prompt.md`, `AGENTS.md`.
             7. Output should be a one-liner: the PR URL you opened, or '`no-op — PR #N still open, awaiting human merge`'.
 

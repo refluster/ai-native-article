@@ -106,10 +106,22 @@ Steps:
    Summary`, **not** the speculative L1 summary) — to a second temp file (e.g.
    `/tmp/l2-abstract.txt`). This populates the `Abstract` column, matching how
    other rows lead.
-3. Run (the script writes to the unified Articles DB — its id is a built-in
-   constant, so only `NOTION_API_KEY` is needed). Pass the picker's `category`
-   (a bare A–E letter) — the script canonicalises it to `"B: Role Blurring"` etc.
-   and fills both `Category` and `CategoriesMulti`, exactly like the GAS L2 write:
+3. **Choose 3–5 tags** from the controlled flat vocabulary (ADR-0003 /
+   `scripts/lib/tags.mjs`) — pick by what the explanation genuinely covers,
+   *by topic*, not by the L1 source's old letter. The vocabulary:
+
+   `AI Productivity` · `Agentic AI` · `Verification & Trust` · `Engineering Process` ·
+   `Developer Tools` · `Role Blurring` · `Emerging Roles` · `Skills & Learning` ·
+   `Org Transformation` · `Labor Market` · `Big Tech` · `AI Infrastructure` ·
+   `Manufacturing AI` · `AI Strategy`
+
+   Use the labels **verbatim** — the script silently drops anything outside the
+   vocabulary, so a typo means a missing tag.
+
+4. Run (the script writes to the unified Articles DB — its id is a built-in
+   constant, so only `NOTION_API_KEY` is needed). Pass the chosen tags as a
+   comma-separated `--tags`; the script validates them against the vocabulary
+   and fills `CategoriesMulti` (the many-to-many field) + the primary `Category`:
 
    ```sh
    NOTION_API_KEY="<credentials['notion.integration_token'].apiKey from your task>" \
@@ -119,11 +131,11 @@ Steps:
        --status ready \
        --body-file /tmp/l2-article.md \
        --abstract-file /tmp/l2-abstract.txt \
-       --category "<category from the picker, e.g. B>" \
+       --tags "Verification & Trust,Engineering Process" \
        --source-url "<sourceUrl from step 1>"   # omit if none
    ```
 
-4. Report the script's exit code:
+5. Report the script's exit code:
    - `0` — page created. The row carries `Author={agent_slug}, Type=explanation,
      Status=ready`, plus `Abstract` + `Category`/`CategoriesMulti` (queued; the
      GAS L4 batch flips Status to `published`). Done.

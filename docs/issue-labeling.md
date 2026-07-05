@@ -53,8 +53,8 @@ The four layers are a unified mental model, but they map to different concrete a
 |---|---|---|
 | `layer:L0` | A C-1..C-4 invariant in [docs/governance.md §2](governance.md#2-l0--constitution). Operator-only amendments. | "Allow truncated articles to publish" (would never be filed — it's a refusal trigger). |
 | `layer:L1` | An L1 doc in [§3.1 of governance.md](governance.md#31-current-statute): `architecture-source-of-truth.md`, `azure-budget-rules.md`, `L1-L4-PIPELINE.md`, `DESIGN.md`, `GROWTH.md`. | "Add a fourth budget bracket to azure-budget-rules.md". |
-| `layer:L2` | A mechanical guard from [§4](governance.md#4-l2--regulations-mechanical-enforcement) (R-1..R-9), or a runtime throw in `newsletter/gas/src/Code.gs`, or `scripts/{check-gas-manifest,lint-design-tokens}.mjs`. | "Add a regex throw for LLM-failure artefacts" |
-| `layer:L3` | A runbook in `L1-L4-PIPELINE.md §Operator runbooks`, a skill under `.claude/skills/`, or an issue about operational follow-up. | "Document the pipeline-quiet runbook"; "Run L2_BACKFILL on the truncated row". |
+| `layer:L2` | A mechanical guard from [§4](governance.md#4-l2--regulations-mechanical-enforcement) (the active R-rules), the workforce W-1 generation guard (`workforce/skills/article-level{2,3}/publish-notion.mjs`), or `scripts/{check-corpus-truncation,lint-design-tokens}.mjs`. | "Add a regex throw for LLM-failure artefacts" |
+| `layer:L3` | A runbook in `L1-L4-PIPELINE.md §Operator runbooks`, a skill under `.claude/skills/`, or an issue about operational follow-up. | "Document the pipeline-quiet runbook"; "Re-run the article-level2 cadence on the truncated row". |
 
 ### 2.2 `project:workforce` mapping
 

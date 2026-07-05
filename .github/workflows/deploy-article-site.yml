@@ -4,22 +4,17 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  # Edits made directly in Notion (category fixes via the normalize
-  # script, manual title tweaks, captures whose L4 batch hasn't run
-  # yet) only surface when something pushes to main. Without a
-  # scheduled run, a quiet day in the publishing pipeline means a
-  # quiet day on the live site even if the Notion DB has changed.
-  #
-  # Hours chosen to AVOID the GAS batch trigger window. The earlier
-  # `*/6` schedule fired at 09:17 JST — between L2_BATCH (09:00) and
-  # L4_BATCH (11:00) — which let fetch-notion add new explanations to
-  # the manifest before L4 had a chance to generate their images. L4
-  # then saw them as already-published and skipped. Running cron at
-  # 15:17 / 21:17 / 03:17 JST keeps it strictly after L4_BATCH (11
-  # JST daily) and ≥17 min outside every L2/L3 every-4h slot
-  # (L2: 09/13/17/21/01/05, L3: 10/14/18/22/02/06 JST). (See
-  # Code.gs handleL4Batch for the matching belt-and-braces image-
-  # existence check.)
+  # New articles authored by the workforce article-level2/level3
+  # cadences land in the Notion Articles DB; edits made directly in
+  # Notion (category fixes via the normalize script, manual title
+  # tweaks) likewise only surface when something pushes to main.
+  # Without a scheduled run, a quiet day on the main branch means a
+  # quiet day on the live site even if the Notion DB has changed, so
+  # we rebuild from Notion three times a day at 15:17 / 21:17 / 03:17
+  # JST. (The earlier rationale of dodging the GAS L2/L3/L4 batch
+  # trigger windows no longer applies — the GAS pipeline was retired;
+  # generation is the workforce cadences and publication is this
+  # Notion→gh-pages build.)
   schedule:
     - cron: '17 6,12,18 * * *'
 
@@ -85,11 +80,10 @@ jobs:
       - name: Build article app
         env:
           VITE_GA_ID: ${{ secrets.GA4_MEASUREMENT_ID }}
-          # Capture (the only write-side route) is gated behind a shared
-          # password baked into the bundle at build time. When unset the
-          # page renders a visible warning and stays open. See the
-          # PasswordGate component in newsletter/app/src/pages/pipeline/Capture.tsx.
-          VITE_CAPTURE_PASSWORD: ${{ secrets.VITE_CAPTURE_PASSWORD }}
+          # Capture page → wf-l1-source-register Lambda. NON-secret base URL
+          # (the bearer token is entered by the operator at runtime, never
+          # built in). When unset the Capture page shows a config warning.
+          VITE_L1_CAPTURE_ENDPOINT: ${{ secrets.L1_CAPTURE_ENDPOINT }}
         run: npm run build:article
 
       - name: Deploy to gh-pages

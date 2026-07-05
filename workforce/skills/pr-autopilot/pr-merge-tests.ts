@@ -12,6 +12,7 @@ import {
   reviewerGreenMarker,
   countRouterCycles,
   W4_CYCLE_CAP,
+  MIN_REVIEWERS,
   verifyMergeable,
   applyDecisions,
   ESCALATION_LABEL,
@@ -40,6 +41,11 @@ const L0_BLOCK =
 const GREEN_CHECK = [{ name: "ci", status: "completed", conclusion: "success" }];
 // A non-blocking lens review carries the exact structured green marker.
 const DARIO_REVIEW = [{ state: "COMMENTED", body: `looks good\n\n${reviewerGreenMarker("dario")}` }];
+// A merge needs a panel of ≥ MIN_REVIEWERS (operator directive 2026-06-29).
+// PANEL + PANEL_REVIEWS is the canonical green-consensus fixture; each persona
+// posts its own exact green marker.
+const PANEL = ["dario", "ren", "mateo"];
+const PANEL_REVIEWS = PANEL.map((slug) => ({ state: "COMMENTED", body: `looks good\n\n${reviewerGreenMarker(slug)}` }));
 
 /** Standard happy-path route table, parameterised by the variable bits. */
 const routes = (files, checks, reviews, comments = []) => [
@@ -86,8 +92,8 @@ describe("resolveL0L1Paths (source of truth = target repo governance)", () => {
 });
 
 describe("verifyMergeable (fail-closed predicate)", () => {
-  it("passes on a non-L0/L1, green, consensus PR", async () => {
-    const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, DARIO_REVIEW)), "o/r", 1, { reviewers: ["dario"] });
+  it("passes on a non-L0/L1, green, 3-reviewer consensus PR", async () => {
+    const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, PANEL_REVIEWS)), "o/r", 1, { reviewers: PANEL });
     expect(v.ok).toBe(true);
   });
   it("refuses a PR touching an L0/L1 path", async () => {
@@ -110,9 +116,31 @@ describe("verifyMergeable (fail-closed predicate)", () => {
     expect(v.why).toMatch(/reviewers/);
   });
   it("refuses when a nominated reviewer's lens review is missing", async () => {
-    const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, DARIO_REVIEW)), "o/r", 1, { reviewers: ["dario", "ren"] });
+    // 3 nominated (clears the panel floor), but ren never posted a green marker.
+    const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, [...DARIO_REVIEW, { state: "COMMENTED", body: reviewerGreenMarker("mateo") }])), "o/r", 1, { reviewers: PANEL });
     expect(v.ok).toBe(false);
     expect(v.why).toMatch(/ren/);
+  });
+  it("refuses a single green reviewer — below the 3-reviewer panel floor", async () => {
+    const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, DARIO_REVIEW)), "o/r", 1, { reviewers: ["dario"] });
+    expect(v.ok).toBe(false);
+    expect(v.why).toMatch(/at least 3/);
+  });
+  it("refuses two green reviewers — still below the floor", async () => {
+    const two = ["dario", "ren"];
+    const reviews = two.map((s) => ({ state: "COMMENTED", body: reviewerGreenMarker(s) }));
+    const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, reviews)), "o/r", 1, { reviewers: two });
+    expect(v.ok).toBe(false);
+    expect(v.why).toMatch(/at least 3/);
+  });
+  it("de-dupes reviewers — the same persona listed 3× is one reviewer, refused", async () => {
+    const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, DARIO_REVIEW)), "o/r", 1, { reviewers: ["dario", "Dario", "DARIO"] });
+    expect(v.ok).toBe(false);
+    expect(v.why).toMatch(/at least 3/);
+  });
+  it("passes on exactly 3 distinct green reviewers", async () => {
+    const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, PANEL_REVIEWS)), "o/r", 1, { reviewers: PANEL });
+    expect(v.ok).toBe(true);
   });
   // adr-0011: the workforce's own repo is a normal delegated target — no own-repo
   // veto. The single boundary is the L0/L1 path set, so a reviewed non-L0/L1 PR
@@ -122,15 +150,15 @@ describe("verifyMergeable (fail-closed predicate)", () => {
     [/GET .*contents/, govDoc(L0_BLOCK)],
     [/GET \/repos\/refluster\/ai-native-article\/pulls\/1\/files/, { status: 200, json: files }],
     [/GET \/repos\/refluster\/ai-native-article\/commits\/abc\/check-runs/, { status: 200, json: { check_runs: GREEN_CHECK } }],
-    [/GET \/repos\/refluster\/ai-native-article\/pulls\/1\/reviews/, { status: 200, json: DARIO_REVIEW }],
+    [/GET \/repos\/refluster\/ai-native-article\/pulls\/1\/reviews/, { status: 200, json: PANEL_REVIEWS }],
     [/GET \/repos\/refluster\/ai-native-article\/issues\/1\/comments/, { status: 200, json: [] }],
   ];
   it("passes an own-repo, non-L0/L1, green, consensus PR (adr-0011: no own-repo veto)", async () => {
-    const v = await verifyMergeable(mockGh(ownRepoRoutes([{ filename: "workforce/app/src/pages/Messaging.tsx" }])), "refluster/ai-native-article", 1, { reviewers: ["dario"] });
+    const v = await verifyMergeable(mockGh(ownRepoRoutes([{ filename: "workforce/app/src/pages/Messaging.tsx" }])), "refluster/ai-native-article", 1, { reviewers: PANEL });
     expect(v.ok).toBe(true);
   });
   it("still refuses an own-repo PR that touches L0/L1 — the boundary holds", async () => {
-    const v = await verifyMergeable(mockGh(ownRepoRoutes([{ filename: "docs/governance.md" }])), "refluster/ai-native-article", 1, { reviewers: ["dario"] });
+    const v = await verifyMergeable(mockGh(ownRepoRoutes([{ filename: "docs/governance.md" }])), "refluster/ai-native-article", 1, { reviewers: PANEL });
     expect(v.ok).toBe(false);
     expect(v.why).toMatch(/L0\/L1/);
   });
@@ -168,25 +196,29 @@ describe("countRouterCycles (FU-004)", () => {
   it("W4_CYCLE_CAP is 7", () => expect(W4_CYCLE_CAP).toBe(7));
 });
 
+describe("MIN_REVIEWERS (3-reviewer panel floor — operator directive 2026-06-29)", () => {
+  it("MIN_REVIEWERS is 3", () => expect(MIN_REVIEWERS).toBe(3));
+});
+
 describe("verifyMergeable — W-4 cycle cap (FU-004)", () => {
   it("allows merge when cycle equals W4_CYCLE_CAP (exactly 7)", async () => {
     const gh = mockGh(routes(
       [{ filename: "src/app.ts" }],
       GREEN_CHECK,
-      DARIO_REVIEW,
+      PANEL_REVIEWS,
       [{ body: "**Nadia — cycle 7 of ≤ 7.**\n\nsummary" }],
     ));
-    const v = await verifyMergeable(gh, "o/r", 1, { reviewers: ["dario"] });
+    const v = await verifyMergeable(gh, "o/r", 1, { reviewers: PANEL });
     expect(v.ok).toBe(true);
   });
   it("refuses merge when cycle exceeds W4_CYCLE_CAP (cycle = 8)", async () => {
     const gh = mockGh(routes(
       [{ filename: "src/app.ts" }],
       GREEN_CHECK,
-      DARIO_REVIEW,
+      PANEL_REVIEWS,
       [{ body: "**Nadia — cycle 8 of ≤ 7.**\n\nsummary" }],
     ));
-    const v = await verifyMergeable(gh, "o/r", 1, { reviewers: ["dario"] });
+    const v = await verifyMergeable(gh, "o/r", 1, { reviewers: PANEL });
     expect(v.ok).toBe(false);
     expect(v.why).toMatch(/W-4/);
     expect(v.why).toMatch(/cycle 8/);
@@ -195,12 +227,12 @@ describe("verifyMergeable — W-4 cycle cap (FU-004)", () => {
 
 describe("applyDecisions (merge path — approve is advisory, not a gate)", () => {
   const MERGE_DECISION = {
-    pr: 1, action: "merge", comment: "consensus-green, merging", reviewers: ["dario"],
-    squash_subject: "feat: thing (#1)", squash_body: "Unanimous sign-off (dario).",
+    pr: 1, action: "merge", comment: "consensus-green, merging", reviewers: PANEL,
+    squash_subject: "feat: thing (#1)", squash_body: "Unanimous sign-off (dario, ren, mateo).",
   };
-  // verifyMergeable's GET routes (green, non-L0/L1, consensus) + the write legs.
+  // verifyMergeable's GET routes (green, non-L0/L1, 3-reviewer consensus) + write legs.
   const mergeRoutes = (approveResp) => [
-    ...routes([{ filename: "workforce/lambdas/shared/x.ts" }], GREEN_CHECK, DARIO_REVIEW),
+    ...routes([{ filename: "workforce/lambdas/shared/x.ts" }], GREEN_CHECK, PANEL_REVIEWS),
     [/POST \/repos\/o\/r\/issues\/1\/comments/, { status: 201, json: {} }],
     [/POST \/repos\/o\/r\/pulls\/1\/reviews/, approveResp],
     [/PUT \/repos\/o\/r\/pulls\/1\/merge/, { status: 200, json: { merged: true } }],
@@ -258,9 +290,9 @@ describe("verifyMergeable — drafts are merge-eligible (adr-0014)", () => {
   it("accepts a green, non-L0/L1 draft and surfaces draft + nodeId", async () => {
     const gh = mockGh([
       [/GET \/repos\/o\/r\/pulls\/1$/, draftPullGet],
-      ...routes([{ filename: "src/app.ts" }], GREEN_CHECK, DARIO_REVIEW),
+      ...routes([{ filename: "src/app.ts" }], GREEN_CHECK, PANEL_REVIEWS),
     ]);
-    const v = await verifyMergeable(gh, "o/r", 1, { reviewers: ["dario"] });
+    const v = await verifyMergeable(gh, "o/r", 1, { reviewers: PANEL });
     expect(v.ok).toBe(true);
     expect(v.draft).toBe(true);
     expect(v.nodeId).toBe("PR_kwDraft");
@@ -268,21 +300,21 @@ describe("verifyMergeable — drafts are merge-eligible (adr-0014)", () => {
   it("still refuses a genuinely non-mergeable state even on a draft (dirty)", async () => {
     const gh = mockGh([
       [/GET \/repos\/o\/r\/pulls\/1$/, { status: 200, json: { state: "open", draft: true, mergeable: false, mergeable_state: "dirty", head: { sha: "abc" }, base: { ref: "main" } } }],
-      ...routes([{ filename: "src/app.ts" }], GREEN_CHECK, DARIO_REVIEW),
+      ...routes([{ filename: "src/app.ts" }], GREEN_CHECK, PANEL_REVIEWS),
     ]);
-    const v = await verifyMergeable(gh, "o/r", 1, { reviewers: ["dario"] });
+    const v = await verifyMergeable(gh, "o/r", 1, { reviewers: PANEL });
     expect(v.ok).toBe(false);
   });
 });
 
 describe("applyDecisions (draft auto-ready then merge — adr-0014)", () => {
   const DRAFT_MERGE = {
-    pr: 1, action: "merge", comment: "consensus-green, merging", reviewers: ["dario"],
-    squash_subject: "feat: thing (#1)", squash_body: "Unanimous sign-off (dario).",
+    pr: 1, action: "merge", comment: "consensus-green, merging", reviewers: PANEL,
+    squash_subject: "feat: thing (#1)", squash_body: "Unanimous sign-off (dario, ren, mateo).",
   };
   const draftMergeRoutes = (readyResp) => [
     [/GET \/repos\/o\/r\/pulls\/1$/, { status: 200, json: { state: "open", draft: true, node_id: "PR_kwDraft", mergeable: true, mergeable_state: "draft", head: { sha: "abc" }, base: { ref: "main" } } }],
-    ...routes([{ filename: "workforce/lambdas/shared/x.ts" }], GREEN_CHECK, DARIO_REVIEW),
+    ...routes([{ filename: "workforce/lambdas/shared/x.ts" }], GREEN_CHECK, PANEL_REVIEWS),
     [/POST \/graphql/, readyResp],
     [/POST \/repos\/o\/r\/issues\/1\/comments/, { status: 201, json: {} }],
     [/POST \/repos\/o\/r\/pulls\/1\/reviews/, { status: 200, json: {} }],

@@ -11,7 +11,7 @@
  *  @property {string} title
  *  @property {'explanation'|'analysis'} type
  *  @property {string} category              // Free-text. e.g. "テーマ1 × テーマ2"
- *  @property {string[]} categoriesMulti     // Multi-select tags. May be empty.
+ *  @property {string[]} tags                // Multi-select tags (Notion `Tags`). May be empty.
  *  @property {string} date                  // ISO date "YYYY-MM-DD"
  *  @property {string} abstract
  *  @property {string} bodyMd                // Body Markdown (no frontmatter)
@@ -22,6 +22,8 @@
  *  @property {string} lastEditedAt          // ISO timestamp; for incremental fetch
  *  @property {string} [imagePath]           // e.g. "/posts/images/<slug>.jpg" or undefined
  *  @property {string} [author]              // Workforce persona slug (sora/maya/…). Optional; pre-workforce rows omit it.
+ *  @property {string} [spotifyUrl]          // Epic-017: Spotify episode/show deep-link. Set once an episode is published. Drives the reader Spotify icon link.
+ *  @property {string} [hasPodcast]          // Epic-017: 'true' when a podcast cast exists for this article. Informational.
  */
 
 /**

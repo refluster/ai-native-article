@@ -18,7 +18,9 @@
 //     `autopilot:needs-human` so the operator's merge-ready queue is legible.
 //     Every open PR is in scope — draft and non-draft, human- and bot-authored
 //     (adr-0010). The cadence routes ≤5 PRs/tick (config.max_prs_per_tick →
-//     the scan's `--max 5`).
+//     the scan's `--max 5`), each to a panel of AT LEAST 3 reviewer lenses
+//     (operator directive 2026-06-29; the nomination_rules below seat ≥3 and
+//     pr-merge.mjs MIN_REVIEWERS=3 refuses any sub-3 green panel server-side).
 //
 // PREREQ:
 //   1. workforce/projects/agent-workforce/project.json declares
@@ -76,21 +78,34 @@ const BINDING = {
     // The operator-set cap on PRs processed per tick — the CCR session runs
     // pr-autopilot-scan.mjs with `--max 5`.
     max_prs_per_tick: 5,
+    // EVERY rule seats a panel of AT LEAST 3 distinct reviewers (operator
+    // directive 2026-06-29; pr-merge.mjs MIN_REVIEWERS=3 fails closed below it).
+    // The standing trio — nadia (PdM), dario (Eng Excellence: feasibility / cost
+    // / architecture), mateo (Agent Workforce Platform / system-shape) — has
+    // plausible surface on nearly any PR in this repo and backfills domain rules
+    // to 3. Seat domain lenses first, then fill to 3 from the trio; swap in the
+    // VP whose functional area a change concerns when one clearly fits.
     nomination_rules: [
       {
+        when: "diff touches workforce/docs/epics/** (an Epic spec or the epics index)",
+        nominate: ["nadia", "dario", "mateo"],
+        rationale:
+          "Epic reviews ALWAYS include a VP-class senior lens AND seat the full ≥3 panel — never PdM self-review alone (operator directive 2026-06-27), never fewer than 3 (operator directive 2026-06-29). nadia keeps the PdM lens (epic format, sizing, decomposability, authority-gating); dario the Eng-Excellence lens (feasibility / cost / architecture); mateo the Agent-Workforce-Platform lens. When a single domain VP clearly fits the Epic's functional area — the Media/Marketing VP (external comms), silas (Finance), tessa (Policy), elena (CX) — swap that VP in as the 3rd seat in place of mateo, keeping nadia + dario.",
+      },
+      {
         when: "diff touches workforce/lambdas/**, workforce/infra/**, any docs/adr/** or governance.md",
-        nominate: ["dario"],
-        rationale: "architecture / governance / infra lens",
+        nominate: ["dario", "mateo", "nadia"],
+        rationale: "architecture / governance / infra lens (dario) + platform / system-shape lens (mateo) + PdM read (nadia) — a ≥3 panel on infra/governance surface.",
       },
       {
         when: "diff touches newsletter/** (GAS L1→L4 pipeline, reader SPA)",
-        nominate: ["dario"],
-        rationale: "pipeline-architecture lens; Nadia keeps the PdM read",
+        nominate: ["dario", "nadia", "mateo"],
+        rationale: "pipeline-architecture lens (dario) + PdM read (nadia) + platform lens (mateo) — ≥3 panel on the newsletter pipeline / reader SPA.",
       },
       {
-        when: "docs-only / product-framing / roadmap surface",
-        nominate: ["nadia"],
-        rationale: "PdM self-review (router self-include)",
+        when: "docs-only / product-framing / roadmap surface (and the default fallback)",
+        nominate: ["nadia", "dario", "mateo"],
+        rationale: "PdM self-review (nadia, router self-include) + Eng-Excellence breadth lens (dario) + platform breadth lens (mateo) — the standing ≥3 trio; broad lenses with surface on nearly any docs/product change.",
       },
     ],
     skip_list_default: ["yuki", "elena", "priya", "theo", "vikram", "noor", "aanya"],
@@ -98,7 +113,7 @@ const BINDING = {
       "Cadence / finance / policy personas have no review surface on this repo's code + pipeline PRs; nominate only when their lens is actually implicated.",
   },
   note:
-    "Nadia's PdM-lens pr-autopilot on the workforce's own repo (refluster/ai-native-article, via project agent-workforce). Fires every 6h; routes ≤5 PRs/tick — draft and non-draft, human- and bot-authored (adr-0010) — to reviewer lenses and drives each to a consensus verdict. Own-repo is a normal delegated R-N10 target (adr-0011, Accepted; root docs/governance.md §4.4): a 🟢 unanimous-green, non-L0/L1 PR is merged by the agent, exactly as on an external delegated repo; only an L0/L1 (or 🔴 / non-consensus) PR escalates to the operator. Drafts are merge-eligible too (adr-0014) — a green, non-L0/L1 draft is marked Ready for Review, then merged. A 🟢 merge-ready L0/L1 hand-off carries autopilot:reviewed + autopilot:needs-human so the operator's merge-ready queue is legible.",
+    "Nadia's PdM-lens pr-autopilot on the workforce's own repo (refluster/ai-native-article, via project agent-workforce). Fires every 6h; routes ≤5 PRs/tick — draft and non-draft, human- and bot-authored (adr-0010) — to a panel of ≥3 reviewer lenses (operator directive 2026-06-29; pr-merge.mjs MIN_REVIEWERS=3 fails closed below it), posts each review + the verdict as PR comments, and drives each to a consensus verdict. Own-repo is a normal delegated R-N10 target (adr-0011, Accepted; root docs/governance.md §4.4): a 🟢 unanimous-green, non-L0/L1 PR is merged by the agent, exactly as on an external delegated repo; only an L0/L1 (or 🔴 / non-consensus) PR escalates to the operator. Drafts are merge-eligible too (adr-0014) — a green, non-L0/L1 draft is marked Ready for Review, then merged. A 🟢 merge-ready L0/L1 hand-off carries autopilot:reviewed + autopilot:needs-human so the operator's merge-ready queue is legible.",
 };
 
 function curlJson(method, path, body) {

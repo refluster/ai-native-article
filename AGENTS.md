@@ -33,10 +33,9 @@ Agents may author and merge, subject to CI passing and one human review *unless*
 - `newsletter/app/src/pages/**`
 - `newsletter/app/src/lib/**`
 - `newsletter/app/src/types/**`
-- `newsletter/pipeline/**`, `scripts/**` (except the GAS deploy target)
-- `newsletter/gas/src/**`
+- `newsletter/pipeline/**`, `scripts/**`
 
-**Workforce subsystem** — the `workforce/` subtree is being rebuilt. Its zone classifications (including the prompt-version-bump-per-PR rule for `agents/**` and `skills/**`) will be reintroduced in [workforce/docs/governance.md](workforce/docs/governance.md), added in PR1 of the rebuild sequence. Until then, no agent may author PRs that touch `workforce/**` outside of the planned rebuild PRs.
+**Workforce subsystem** — `workforce/**` is governed by its own statute: [workforce/docs/governance.md](workforce/docs/governance.md) (zone table in its §3, W-invariants §2, R-N design rules §4). It inherits this file's zone model and rules; where the two conflict, root wins unless the workforce doc explicitly tightens. Consult that doc before touching anything under `workforce/**`.
 
 ### Zone C — Agent-generated (content)
 
@@ -69,7 +68,7 @@ Nobody edits by hand. Agents regenerate via scripts only.
 7. **Idempotent scripts only.** `newsletter/pipeline/fetch-notion.mjs`, `newsletter/pipeline/generate-sitemap.mjs`, and their peers must be safe to run twice. No "this script assumes fresh state" scripts.
 8. **Secrets stay in `.env` (local) or GitHub Secrets (CI).** An agent that prints a secret to stdout is a bug. CI redaction is a backstop, not a plan.
 9. **When in doubt, file an issue, not a PR.** It is cheaper for a human to redirect an idea than to close a PR.
-10. **Every L2/L3 generation writes a sidecar `.eval.json`** with full panel output — every candidate, every judge (schema: [newsletter/app/src/types/quality.ts](newsletter/app/src/types/quality.ts)). No sidecar → no publish. This applies whether the generator is a Claude skill or the GAS pathway. Articles missing the sidecar are treated as Zone A changes and require human review.
+10. **Every L2/L3 generation writes a sidecar `.eval.json`** with full panel output — every candidate, every judge (schema: [newsletter/app/src/types/quality.ts](newsletter/app/src/types/quality.ts)). No sidecar → no publish. This applies to any generator on the panel, i.e. the workforce `article-level{2,3}` cadences. Articles missing the sidecar are treated as Zone A changes and require human review.
 11. **A prompt-version bump is its own PR.** Do not bundle a prompt change with unrelated work. The outer-loop leaderboard attributes reader behavior by `generator.systemPromptVersion`; mixed PRs corrupt attribution. Bumping two panel members in one PR is also forbidden — bump one at a time so the outer loop can tell which move helped.
 12. **Model disjointness — Phase 2 rule.** Once `MODEL_REGISTRY` contains two or more *active* providers, no generator on the panel may share a `modelBinding` with any judge on the panel. In Phase 1 (single provider, all members on `azure-gpt5`) the rule is inactive by design — see GROWTH.md §2a trade-off. Every PR that activates a second provider or changes a `modelBinding` must include a "disjointness check" line in the description proving the rule holds after the change.
 

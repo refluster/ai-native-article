@@ -6,7 +6,7 @@ import type { ArticleMeta, ArticleType } from '../types/article'
 import { withBasePath } from '../lib/paths'
 import { setArticleSeo, setDefaultSeo } from '../lib/seo'
 import { trackEvent, isOutbound, hrefHost } from '@kohuehara/shared/analytics'
-import { ARTICLE_TYPE_LABELS, inferType, isArticleType } from '../lib/article-types'
+import { ARTICLE_TYPE_LABELS, displayTag, inferType, isArticleType } from '../lib/article-types'
 import { buildSourceIndex } from '../lib/source-links'
 import SourcesUsedSection from '../components/article/SourcesUsedSection'
 import AnalysesUsingSection from '../components/article/AnalysesUsingSection'
@@ -208,6 +208,13 @@ export default function Article() {
 
   const articleType = inferType({ type: isArticleType(meta.type) ? meta.type : undefined })
 
+  // The article's tags (Notion `Tags`), shown in place of the old single
+  // category. `categoriesMulti` is the pre-rename fallback; `category` covers
+  // any row with neither. Prefix-stripped for display via displayTag.
+  const tags = (meta.tags ?? meta.categoriesMulti ?? (meta.category ? [meta.category] : []))
+    .map(displayTag)
+    .filter(Boolean)
+
   return (
     <>
       {/* Header section */}
@@ -220,10 +227,17 @@ export default function Article() {
             ← INDEX
           </Link>
           <div className="max-w-3xl">
-            {meta.category && (
-              <span className="inline-block bg-tertiary text-on-tertiary px-2 py-1 text-[10px] font-bold tracking-widest uppercase mb-6">
-                {meta.category}
-              </span>
+            {tags.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 mb-6">
+                {tags.map(tag => (
+                  <span
+                    key={tag}
+                    className="inline-block bg-tertiary text-on-tertiary px-2 py-1 text-[10px] font-bold tracking-widest uppercase"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
             )}
             <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-tight mb-8">
               {meta.title}
@@ -241,13 +255,48 @@ export default function Article() {
             <div className="flex items-center gap-6 text-[10px] font-bold tracking-widest text-outline uppercase">
               {meta.date && <span>{meta.date}</span>}
               <span>AI NATIVE ARTICLE</span>
-              {/* Type-driven label. Falls back to ANALYSIS for legacy
-                  manifest entries that predate the unified-DB rollout. */}
-              <span className="text-tertiary">
-                {ARTICLE_TYPE_LABELS[inferType({ type: isArticleType(meta.type) ? meta.type : undefined })]}
-                {' / '}
-                {TYPE_BADGE_EN[inferType({ type: isArticleType(meta.type) ? meta.type : undefined })]}
-              </span>
+              {/* Type label only for explanations — analysis is the default
+                  reading surface, so it's left unmarked (per ADR-0002). The
+                  label on an explanation signals the reader is in the
+                  fact-check "back drawer". */}
+              {articleType === 'explanation' && (
+                <span className="text-tertiary">
+                  {ARTICLE_TYPE_LABELS.explanation}
+                  {' / '}
+                  {TYPE_BADGE_EN.explanation}
+                </span>
+              )}
+              {/* Epic-017: Spotify deep-link to the article's podcast episode.
+                  Rendered only when the operator has recorded `spotifyUrl`
+                  back to Notion. No in-page player (D3) — this is a link
+                  out to Spotify, nothing more. Reuses the external-link
+                  styling from SourcesUsedSection. */}
+              {meta.spotifyUrl && (
+                <a
+                  href={meta.spotifyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Spotifyでポッドキャストを聴く"
+                  onClick={() =>
+                    trackEvent({
+                      name: 'podcast_spotify_click',
+                      params: { slug: slug ?? '', href: meta.spotifyUrl ?? '' },
+                    })
+                  }
+                  className="inline-flex items-center gap-1.5 text-on-surface-variant hover:text-tertiary transition-colors normal-case tracking-normal"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.52 17.34c-.24.36-.66.48-1.02.24-2.82-1.74-6.36-2.1-10.56-1.14-.42.12-.78-.18-.9-.54-.12-.42.18-.78.54-.9 4.56-1.02 8.52-.6 11.64 1.32.42.18.48.66.3 1.02zm1.44-3.3c-.3.42-.84.6-1.26.3-3.24-1.98-8.16-2.58-11.94-1.38-.48.12-1.02-.12-1.14-.6-.12-.48.12-1.02.6-1.14 4.38-1.32 9.78-.66 13.5 1.62.36.18.6.84.24 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.1 9.3c-.6.18-1.2-.18-1.38-.72-.18-.6.18-1.2.72-1.38 4.32-1.32 11.4-1.02 15.84 1.62.54.3.72 1.02.42 1.56-.3.42-1.02.66-1.56.36z" />
+                  </svg>
+                  <span>Spotify ↗</span>
+                </a>
+              )}
             </div>
           </div>
         </div>

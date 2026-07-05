@@ -44,8 +44,8 @@ Run `pick-l2-sources.mjs`. It reconstructs the GAS `handleL3Batch` sampling rule
 from Notion alone (no extra state store): a 14-day recent window, a fresh-entry
 gate (≥1 L2 created since the most recent analysis row), and reuse-avoidance
 derived from the source URLs stamped on recent L3 rows. It returns **3** L2
-explanations to synthesise, the **majority canonical A–E bucket**, and the
-**comma-joined source URLs** to record.
+explanations to synthesise, a **`suggestedTags`** hint (the source L2s' own
+vocabulary tags), and the **comma-joined source URLs** to record.
 
 ```sh
 NOTION_API_KEY="<credentials['notion.integration_token'].apiKey>" \
@@ -55,7 +55,7 @@ NOTION_API_KEY="<credentials['notion.integration_token'].apiKey>" \
 - If it prints `{"skip": true, …}` — **stop. Produce nothing this fire.** No new
   L2 has arrived since the last analysis, or there are fewer than 3 recent L2s.
   Skipping (not calling the write script) is the correct behaviour, not an error.
-- Otherwise you get `{ sources: [ {l2PageId, title, abstract, sourceUrl, category} ×3 ], canonicalCategory, sourceUrls }`.
+- Otherwise you get `{ sources: [ {l2PageId, title, abstract, sourceUrl, category} ×3 ], suggestedTags, sourceUrls }`.
   Use the three `{title, abstract}` pairs as your evidence base. **Ground every
   claim in those three sources** — quote their figures, names, and findings; do
   not import facts they don't contain. (The `abstract` is each L2's lead; when a
@@ -119,10 +119,25 @@ generate the *judgment* (the synthesis markdown); `publish-notion.mjs` owns the
 2. Write the **abstract** — a faithful 2–3 sentence lead (your opening thesis) —
    to a second temp file (e.g. `/tmp/l3-abstract.txt`). This populates the
    `Abstract` column.
-3. Run (the script writes to the unified Articles DB — its id is a built-in
-   constant, so only `NOTION_API_KEY` is needed). Pass the picker's
-   `sourceUrls` and `canonicalCategory` verbatim, plus the free-form
-   `テーマ1 × テーマ2` theme you chose for the synthesis:
+3. **Choose 3–5 tags** for the analysis from the controlled flat vocabulary
+   (ADR-0003 / `scripts/lib/tags.mjs`). Start from the picker's `suggestedTags`
+   (the union of the three sources' tags), then adjust to what the *synthesis*
+   actually argues — the unifying principle may pull in a tag none of the
+   sources carried (e.g. `Verification & Trust`). The vocabulary:
+
+   `AI Productivity` · `Agentic AI` · `Verification & Trust` · `Engineering Process` ·
+   `Developer Tools` · `Role Blurring` · `Emerging Roles` · `Skills & Learning` ·
+   `Org Transformation` · `Labor Market` · `Big Tech` · `AI Infrastructure` ·
+   `Manufacturing AI` · `AI Strategy`
+
+   Use the labels **verbatim** — the script silently drops anything outside the
+   vocabulary, so a typo means a missing tag.
+
+4. Run (the script writes to the unified Articles DB — its id is a built-in
+   constant, so only `NOTION_API_KEY` is needed). Pass the picker's `sourceUrls`
+   verbatim and the chosen tags as a comma-separated `--tags`; the script
+   validates them against the vocabulary and fills `CategoriesMulti` (the
+   many-to-many field) + the primary `Category`:
 
    ```sh
    NOTION_API_KEY="<credentials['notion.integration_token'].apiKey from your task>" \
@@ -133,14 +148,13 @@ generate the *judgment* (the synthesis markdown); `publish-notion.mjs` owns the
        --body-file /tmp/l3-article.md \
        --abstract-file /tmp/l3-abstract.txt \
        --source-urls "<sourceUrls from the picker>" \
-       --category "<canonicalCategory from the picker, e.g. B>" \
-       --theme "<テーマ1 × テーマ2>"   # omit if you have none
+       --tags "Org Transformation,Verification & Trust,AI Strategy"
    ```
 
-4. Report the script's exit code:
+5. Report the script's exit code:
    - `0` — page created. The row carries `Author={agent_slug}, Type=analysis,
      Status=ready`, plus `Abstract`, `SourceURLs` (the three source L2 URLs), and
-     `Category`/`CategoriesMulti` (the canonical bucket + your theme tag). The GAS
+     `Category`/`CategoriesMulti` (the vocabulary tags you chose). The GAS
      L4 batch generates the hero image and flips Status to `published`. Done.
    - `2` — W-1 editorial guard failed (empty/short body, LLM-artefact prelude,
      or a last line that looks cut off mid-content — the shared

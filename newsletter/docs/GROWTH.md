@@ -6,7 +6,7 @@ This site is a content product. Its value is not pageviews, not article count �
 
 Karpathy's framing: Software 2.0 replaces hand-coded rules with learned parameters. Applied to this pipeline:
 
-- **The prompt is the model.** L2 and L3 are LLM calls whose behavior is almost entirely determined by prompt text. The prompts in [workforce/skills/article-level2/SKILL.md](../../workforce/skills/article-level2/SKILL.md), [workforce/skills/article-level3/SKILL.md](../../workforce/skills/article-level3/SKILL.md), and [newsletter/gas/src/Code.gs](../gas/src/Code.gs) are this product's weights.
+- **The prompt is the model.** L2 and L3 are LLM-driven generations whose behavior is almost entirely determined by prompt text. The prompts in [workforce/skills/article-level2/SKILL.md](../../workforce/skills/article-level2/SKILL.md), [workforce/skills/article-level3/SKILL.md](../../workforce/skills/article-level3/SKILL.md) (and the shared helpers under [`scripts/lib`](../../scripts/lib/)) are this product's weights. (The legacy GAS prompts in `newsletter/gas/src/Code.gs` were retired with the GAS engine in 2026-06.)
 - **The rubric is the proxy loss.** An LLM judge that scores output against a rubric is a fast, cheap signal we can run every generation.
 - **Reader behavior is the true loss.** GA4's `article_read_complete` per prompt version, broken out by category, is the external signal the rubric is calibrated against.
 - **Prompt versioning is gradient descent.** Every new prompt version is a step; the judge decides if it passes local inspection; the reader data decides if it survives.
@@ -70,7 +70,7 @@ published articles ──▶ GA4 bucketed by prompt_version
                    prompt-version leaderboard ──▶ next bump to a panel member
 ```
 
-1. Weekly GAS job calls the GA4 Data API, bucketed by `(prompt_version, category, slug)`. `prompt_version` now identifies the *winning candidate's generator*, not a single prompt — e.g., `l3-claude-pattern-2026-04-23a`.
+1. A weekly scheduled job (the GAS cron that hosted this is retired; a workforce cadence or a scheduled GitHub Action is the replacement host) calls the GA4 Data API, bucketed by `(prompt_version, category, slug)`. `prompt_version` now identifies the *winning candidate's generator*, not a single prompt — e.g., `l3-claude-pattern-2026-04-23a`.
 2. Rank prompt versions by `article_read_complete` / `article_view`.
 3. A panel member's new prompt version is accepted only if its outer-loop rank is **not worse** than its predecessor after ≥ 5 articles shipped with it as the chosen candidate.
 4. If inner said "great" and outer says "worse," roll back that panel member and add a failure entry to the rubric calibration set.
@@ -81,7 +81,7 @@ The panel approach generalizes the proxy/true-loss pairing: the **judge panel** 
 
 Zone A (see [AGENTS.md](AGENTS.md)). The roster — which providers, which perspectives, which weights — is a product-shape decision, not an implementation detail.
 
-**Provider model registry** lives in [src/types/quality.ts `MODEL_REGISTRY`](src/types/quality.ts) and is the single source of truth for which providers are active. Starting state: **Azure OpenAI only**, using the `AZURE_OPENAPI_KEY` + `AZURE_OPENAPI_ENDPOINT` already configured for the existing L2/L3 GAS calls. Anthropic, OpenAI-direct, and Gemini are pre-shaped in the registry as commented-out stanzas — activating one is a config change (add env var, uncomment, update the relevant roster entry's `modelBinding`).
+**Provider model registry** lives in [src/types/quality.ts `MODEL_REGISTRY`](src/types/quality.ts) and is the single source of truth for which providers are active. Starting state: **Azure OpenAI only**, using the `AZURE_OPENAPI_KEY` + `AZURE_OPENAPI_ENDPOINT` (the binding the retired L2/L3 GAS calls used; the eval/quality layer keeps it as the registry default). Anthropic, OpenAI-direct, and Gemini are pre-shaped in the registry as commented-out stanzas — activating one is a config change (add env var, uncomment, update the relevant roster entry's `modelBinding`).
 
 **Phase 1 — prompt-only diversity (current):**
 
@@ -129,7 +129,7 @@ Swap individual `modelBinding` values in the rosters to point at activated regis
 
 Latency envelope (measured order-of-magnitude, not guaranteed): `low` ≈ 8–20 s, `medium` ≈ 20–40 s, `high` ≈ 40–120 s. GAS has a hard 6-minute per-call ceiling; L3 `pattern` at `high` with 5 source L2s needs measurement before chaining — it is the most-likely member to bump into the ceiling. If it does, the fix is to split the L3 call into "draft" + "refine" or to drop `pattern` to `medium` and re-measure reader-completion impact via the outer loop.
 
-`max_tokens` vs `max_completion_tokens`: `gpt-5.4` and the rest of the reasoning family reject the legacy `max_tokens` parameter and require `max_completion_tokens`. `azureGenerateText` in `newsletter/gas/src/Code.gs` uses the new name; this is not a per-member tunable and should not be reverted.
+`max_tokens` vs `max_completion_tokens`: `gpt-5.4` and the rest of the reasoning family reject the legacy `max_tokens` parameter and require `max_completion_tokens`. Any programmatic Azure call site (e.g. an eval/judge runner reading `MODEL_REGISTRY`) must use the new name; this is not a per-member tunable and should not be reverted. (The retired GAS `azureGenerateText` helper already used it.)
 
 **Prompt-version naming scheme (frozen):** `{level}-{rosterId}-{YYYY-MM-DD}{variant}`. Examples: `l3-pattern-2026-04-23a`, `l2-skeptic-2026-04-24a`, `rubric-l3-editor-2026-04-23`. The outer-loop leaderboard keys on this exact string, so changes to the scheme require a migration.
 
@@ -206,16 +206,16 @@ Register `prompt_version` as a user-scoped custom dimension in the GA4 property.
 
 ### Notion — add properties
 
-Add `Prompt Version` (rich_text) and `Judge Score` (number) properties to L2 Blog Repository and L3 Insights DBs. The skill/GAS writers fill these at creation time; `fetch-notion.mjs` copies them into the sitewide manifest and per-article frontmatter.
+Add `Prompt Version` (rich_text) and `Judge Score` (number) properties to the unified Articles DB (covering both `explanation` and `analysis` rows). The cadences' `publish-notion.mjs` writers fill these at creation time; `fetch-notion.mjs` copies them into the sitewide manifest and per-article frontmatter.
 
 ## 6. Where the prompts live
 
-Important for governance: prompts exist in **two** places, and both need to be under the two-loop regime.
+Important for governance: the generation prompts now live in **one** place — the workforce cadences — and they are the only active generation path, so they must be under the two-loop regime.
 
-- **[workforce/skills/article-level2/SKILL.md](../../workforce/skills/article-level2/SKILL.md)**, **[workforce/skills/article-level3/SKILL.md](../../workforce/skills/article-level3/SKILL.md)** — the Claude skill prompts, used for rich interactive generation.
-- **[newsletter/gas/src/Code.gs](../gas/src/Code.gs)** — GAS-side prompts, used by the operator UI (`/l2-blog`, `/l3-insight`, `/l4-publish`).
+- **[workforce/skills/article-level2/SKILL.md](../../workforce/skills/article-level2/SKILL.md)**, **[workforce/skills/article-level3/SKILL.md](../../workforce/skills/article-level3/SKILL.md)** — the cadence skill bodies (with shared helpers under [`scripts/lib`](../../scripts/lib/)). These are the active generators.
+- The old GAS-side prompts in `newsletter/gas/src/Code.gs` (and the operator UI `/l2-blog` etc.) were **retired** with the GAS engine in 2026-06; there is no longer a second generation path to keep in sync.
 
-The same `prompt_version` tag must flow from whichever one generated the article. If the two diverge (skill evolves, GAS doesn't), the outer loop will mis-attribute reader behavior. Keep them in sync or clearly label which is in use; [AGENTS.md §3](AGENTS.md) lists prompt-version bumps as human-reviewed.
+The `prompt_version` tag flows from the cadence that generated the article. Since there is now a single generation path, the earlier "two prompts can diverge" hazard is gone; the remaining discipline is to bump `prompt_version` when a skill body changes so the outer loop attributes reader behavior correctly. [AGENTS.md §3](AGENTS.md) lists prompt-version bumps as human-reviewed.
 
 ## 7. SEO and distribution
 
@@ -239,7 +239,7 @@ Shipped: public header/footer show only reader-facing routes. L1–L4 operator p
 2. **Notion** — host the `Prompt Version`, `Judge Score`, and `Chosen Candidate` columns; operator filters by them pre-publish.
 3. **GA4 + GA4 Data API** — outer-loop signal. Event side shipped; Data API reader not yet built.
 4. **Google Search Console** — unchanged: verify domain, submit sitemap.
-5. **GAS cron scheduler** — weekly report writer, panel A/B runner host.
+5. **Scheduled-job host** — weekly report writer, panel A/B runner host. (The GAS cron that previously played this role is retired; the replacement host is a workforce cadence or a scheduled GitHub Action.)
 6. **Anthropic Claude API** — Phase 2 activator. Adds true model diversity to the panel once its key is available. Already shaped in the model registry.
 7. **Gemini / OpenAI-direct** — further Phase 2 options, pre-shaped in the registry, activated when the bias signal warrants.
 8. **X / LinkedIn scheduled post** — deferred until prerender lands.
@@ -250,11 +250,11 @@ Quality layer is sequenced so the panel ships incrementally — single judge fir
 
 **Step 1 — one generator, one judge (minimum viable inner loop):**
 
-- [ ] Add `Prompt Version`, `Judge Score`, `Chosen Candidate` columns to L2 and L3 Notion DBs. **KPI:** 100% coverage on new articles.
-- [ ] Implement `judgeL2` / `judgeL3` in `newsletter/gas/src/Code.gs` against Azure OpenAI GPT-4o using the rubric system prompt. **KPI:** median `judge_score` trend over a 30-day window.
+- [ ] Add `Prompt Version`, `Judge Score`, `Chosen Candidate` columns to the unified Articles DB (both `explanation` and `analysis` rows). **KPI:** 100% coverage on new articles.
+- [ ] Implement `judgeL2` / `judgeL3` as a judge runner (reading `MODEL_REGISTRY`) against the active provider using the rubric system prompt — wired into the `article-level2` / `article-level3` cadence write path, not the retired GAS engine. **KPI:** median `judge_score` trend over a 30-day window.
 - [ ] Write sidecar `.eval.json` at generation time (operator branch, gitignored from `public/`). **KPI:** 100% of L4 publishes have a matching sidecar.
 - [ ] Regenerate-on-fail loop (N=3, critique in context). **KPI:** inner-loop first-pass rate, trend over time.
-- [ ] Show `Judge Score` + `Chosen Candidate` in the L4 publish UI. **KPI:** ratio of flagged-and-regenerated to published.
+- [ ] Surface `Judge Score` + `Chosen Candidate` per article (in Notion and/or the article-health sweep). **KPI:** ratio of flagged-and-regenerated to published.
 
 **Step 2 — judge panel (multi-perspective evaluation, Azure OpenAI only):**
 
@@ -269,7 +269,7 @@ Quality layer is sequenced so the panel ships incrementally — single judge fir
 
 **Step 4 — outer loop:**
 
-- [ ] Weekly cron (GAS) that pulls GA4 Data API and writes `quality/leaderboard.md` on the operator branch, bucketed by the winning candidate's `systemPromptVersion`. **KPI:** at least one panel-member decision per month informed by it.
+- [ ] Weekly scheduled job (a workforce cadence or a scheduled GitHub Action — the GAS cron is retired) that pulls GA4 Data API and writes `quality/leaderboard.md` on the operator branch, bucketed by the winning candidate's `systemPromptVersion`. **KPI:** at least one panel-member decision per month informed by it.
 - [ ] Rubric calibration ritual: every 90 days, sample 20 articles from the `.eval.json` history and re-score by hand; Spearman against the aggregate panel score; if < 0.5, revise the rubric. **KPI:** rolling 90-day Spearman ≥ 0.5.
 
 **Step 5 — model diversity (Phase 2, unlocks when additional keys are added):**
@@ -283,6 +283,6 @@ Quality layer is sequenced so the panel ships incrementally — single judge fir
 
 - [ ] SSG or per-article prerender for real OG images and zero-JS article loads.
 - [ ] RSS feed from `newsletter/app/public/posts/manifest.json`.
-- [ ] Auth gate on `/l[1-4]-*` (GitHub OAuth via GAS).
+- [ ] ~~Auth gate on `/l[1-4]-*` (GitHub OAuth via GAS).~~ Obsolete — the GAS-backed operator UI pages were removed in 2026-06; capture/generation now happen in Notion and the workforce cadences, with no public operator routes to gate.
 
 Each roadmap item's PR names its KPI in the description. No unlabeled ships.

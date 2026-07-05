@@ -32,9 +32,6 @@ jobs:
       - name: Design-token lint
         run: npm run lint:tokens
 
-      - name: GAS manifest check
-        run: npm run check-gas
-
       - name: Governance registries (R-12)
         run: npm run check-registries
 

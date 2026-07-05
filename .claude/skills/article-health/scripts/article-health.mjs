@@ -1,26 +1,33 @@
 #!/usr/bin/env node
-// article-health: sweep gh-pages + Notion (via GAS) and flag truncated /
-// stale articles. Single-shot; no destructive actions. Mirrors the
-// `isTruncatedMarkdown` heuristic in newsletter/gas/src/Code.gs so what fails here
-// would also be flagged by the GAS-side L2_BACKFILL sweep.
+// article-health: sweep gh-pages (and, when NOTION_API_KEY is set, compare
+// against Notion directly) and flag truncated / stale articles. Single-shot;
+// no destructive actions. Uses the canonical `isTruncatedMarkdown` heuristic
+// from scripts/lib/truncation.mjs — the same guard enforced at generation
+// time by the workforce article-level2/level3 publish-notion.mjs (W-1) and at
+// deploy time by check-corpus-truncation.mjs (R-10).
+//
+// History: the Notion comparison used to go through the GAS `ARTICLE_LIST`
+// web-app action. The GAS L1→L4 pipeline was retired (generation moved to the
+// workforce cadences), so the comparison now reads the Notion Articles DB
+// directly via the shared fetcher. It is optional: with no NOTION_API_KEY the
+// gh-pages truncation sweep still runs (the primary C-1 guard).
 
-import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { isTruncatedMarkdown, stripFrontmatter, lastNonEmptyLine } from '../../../../scripts/lib/truncation.mjs'
+import { fetchArticles } from '../../../../newsletter/pipeline/fetchers/notion.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(__dirname, '..', '..', '..', '..')
-// PR #60 moved the React app from src/ to newsletter/app/src/.
-const GAS_CONFIG_PATH = resolve(REPO_ROOT, 'newsletter', 'app', 'src', 'lib', 'gas-config.ts')
+void REPO_ROOT
 const REPO_OWNER_REPO = 'refluster/ai-native-article'
 const PAGES_BRANCH = 'gh-pages'
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO_OWNER_REPO}/${PAGES_BRANCH}/posts`
 
-// isTruncatedMarkdown / lastNonEmptyLine / stripFrontmatter now live in the
-// shared scripts/lib/truncation.mjs (imported above). The GAS-side copy in
-// newsletter/gas/src/Code.gs must still be kept in sync by hand — see that
-// module's header and docs/memory-lint-backlog.md ML-001.
+// Notion Articles DB id (non-secret; mirrors the constant used across the
+// workforce article skills and newsletter/pipeline). Override via env.
+const UNIFIED_DB_ID =
+  process.env.UNIFIED_DB_ID || process.env.NOTION_DB_ID || '34fd0f0b-e61e-817a-9f6b-dc65b0d5b4cc'
 
 async function fetchText (url) {
   const r = await fetch(url, { redirect: 'follow' })
@@ -32,32 +39,10 @@ async function fetchJson (url) {
   return JSON.parse(await fetchText(url))
 }
 
-function loadGasUrl () {
-  const txt = readFileSync(GAS_CONFIG_PATH, 'utf8')
-  const m = txt.match(/const\s+id\s*=\s*['"]([^'"]+)['"]/)
-  if (!m) throw new Error(`Could not parse deployment id from ${GAS_CONFIG_PATH}`)
-  return `https://script.google.com/macros/s/${m[1]}/exec`
-}
-
-async function gasPost (action) {
-  const url = loadGasUrl()
-  const r = await fetch(url, {
-    method: 'POST',
-    redirect: 'follow',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action }),
-  })
-  const txt = await r.text()
-  if (!r.ok || !txt.trim().startsWith('{')) {
-    throw new Error(`GAS ${action} failed: HTTP ${r.status} ${txt.slice(0, 200)}`)
-  }
-  return JSON.parse(txt)
-}
-
-// 5% length tolerance: the markdown produced by fetch-notion.mjs and the
-// markdown we'd reconstruct from the GAS L2_LIST summary are not
-// byte-identical (frontmatter, image inserts, image-link rewriting). Below
-// 5% is noise; above is "Notion has substantively newer content."
+// 5% length tolerance: the markdown produced by fetch-notion.mjs and the body
+// we read back from Notion are not byte-identical (frontmatter, image inserts,
+// image-link rewriting). Below 5% is noise; above is "Notion has
+// substantively newer content."
 const STALE_LENGTH_RATIO = 0.95
 
 async function main () {
@@ -68,21 +53,22 @@ async function main () {
   const manifest = await fetchJson(`${RAW_BASE}/manifest.json`)
   console.log(`Manifest: ${manifest.length} published articles`)
 
-  // ARTICLE_LIST returns both explanations and analyses (unified DB).
-  // Falls back gracefully if the action isn't supported on this deploy.
+  // Compare against Notion directly via the shared fetcher (both explanations
+  // and analyses live in the unified Articles DB). Optional: with no
+  // NOTION_API_KEY the gh-pages truncation sweep still runs.
   let notionByNotionId = new Map()
   let notionEntries = []
-  try {
-    const r = await gasPost('ARTICLE_LIST')
-    notionEntries = (r && r.data) || []
-    for (const e of notionEntries) {
-      // Match by trailing 12 hex chars of the Notion id; that's how slugs
-      // are derived in handleL4Publish when LegacySlug is absent.
-      const tail = (e.id || '').replace(/-/g, '').slice(-12)
-      notionByNotionId.set(tail, e)
+  const notionApiKey = process.env.NOTION_API_KEY
+  if (notionApiKey) {
+    try {
+      const records = await fetchArticles({ apiKey: notionApiKey, dbId: UNIFIED_DB_ID })
+      notionEntries = records.map(r => ({ type: r.type, bodyLength: (r.bodyMd || '').length, slug: r.slug }))
+      for (const e of notionEntries) notionByNotionId.set(e.slug, e)
+    } catch (e) {
+      console.error(`(warning: Notion query failed — comparison disabled. ${e.message})`)
     }
-  } catch (e) {
-    console.error(`(warning: ARTICLE_LIST unavailable — Notion comparison disabled. ${e.message})`)
+  } else {
+    console.error('(note: NOTION_API_KEY unset — Notion drift comparison disabled; gh-pages truncation sweep only)')
   }
   const explanationCount = notionEntries.filter(e => e.type === 'explanation').length
   const analysisCount = notionEntries.filter(e => e.type === 'analysis').length

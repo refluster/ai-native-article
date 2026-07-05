@@ -1,27 +1,27 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { GAS_URL } from '../../lib/gas-config'
+import { L1_REGISTER_URL, L1_SOURCES_URL, L1_TOKEN_KEY } from '../../lib/l1-capture'
 
 /**
  * Capture — the only page on this site that accepts user input.
  *
- * It saves a URL into the source library; downstream batches turn each
- * captured URL into a 解説 article (single-source explainer) and feed
- * combinations of them into 分析 articles (multi-source synthesis).
+ * It saves a URL into the L1 source library; the workforce article-level2 /
+ * article-level3 cadences turn each captured URL into a 解説 article
+ * (single-source explainer) and feed combinations into 分析 articles.
  *
- * Because writes hit GAS (which writes to Notion), and because GAS is
- * authenticated separately, the password gate here is *only* a "don't
- * show this UI to random visitors" guard, not a real auth boundary.
- * VITE_CAPTURE_PASSWORD must be set at build time (via .env locally and
- * GitHub Actions secret in CI) to enable the gate.
+ * Backend: the wf-l1-source-register Lambda (POST /l1/register, GET
+ * /l1/sources) — the non-GAS replacement for the retired GAS L1_SAVE. The
+ * write is **mechanical (no LLM)**: title/category are saved as entered, not
+ * auto-extracted. Auth is a bearer token the operator enters once (kept in
+ * localStorage, never baked into the bundle); the same token gates the page.
  */
 
-/** A captured source article. Mirrors the GAS L1_LIST wire shape. */
+/** A captured source row. Mirrors the GET /l1/sources wire shape. */
 interface CapturedEntry {
   id?: string
   title: string
   sourceUrl: string
-  category: 'A' | 'B' | 'C' | 'D' | 'E'
+  category: string
   contentsSummary: string
   publicationDate: string
   notionUrl?: string
@@ -35,7 +35,6 @@ interface CaptureStats {
 }
 
 function computeStats(entries: CapturedEntry[]): CaptureStats {
-  // Bucket entries by local-calendar day (YYYY-MM-DD via sv-SE locale).
   const dayKey = (d: Date) => d.toLocaleDateString('sv-SE')
   const byDay = new Map<string, number>()
   for (const e of entries) {
@@ -51,8 +50,6 @@ function computeStats(entries: CapturedEntry[]): CaptureStats {
     d.setDate(d.getDate() - i)
     last7 += byDay.get(dayKey(d)) ?? 0
   }
-  // Streak: consecutive days with ≥1 entry, ending today. Today=0 gets 1 grace
-  // day (the streak doesn't break until you miss yesterday too).
   let streak = 0
   const start = today > 0 ? 0 : 1
   for (let i = start; ; i++) {
@@ -81,83 +78,80 @@ function extractUrl(params: URLSearchParams): string {
   return match ? match[0] : ''
 }
 
-// ── Password gate ──────────────────────────────────────────────────────────
+// ── Token gate ───────────────────────────────────────────────────────────
+// The entered value IS the bearer token (Secrets Manager
+// wf/api/l1-source-write-token). We can't validate it client-side, so we store
+// it and let the API 401 surface a wrong token (which re-locks the page).
 
-const CAPTURE_PASSWORD = (import.meta.env.VITE_CAPTURE_PASSWORD as string | undefined) ?? ''
-const UNLOCK_KEY = 'capture-unlocked-v1'
+function readToken(): string {
+  try {
+    return localStorage.getItem(L1_TOKEN_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
 
-function PasswordGate({ children }: { children: React.ReactNode }) {
-  // No password configured at build time → page is open. Show a small
-  // banner so the operator knows the gate isn't active. We deliberately
-  // *don't* hide the page in this case: the operator may have set up
-  // capture before adding the password, and silently 404'ing is worse
-  // UX than a clearly visible warning.
-  const noPasswordSet = !CAPTURE_PASSWORD
-
-  const [unlocked, setUnlocked] = useState<boolean>(() => {
-    if (noPasswordSet) return true
-    try {
-      return localStorage.getItem(UNLOCK_KEY) === '1'
-    } catch {
-      return false
-    }
-  })
+function TokenGate({ children }: { children: (token: string, onAuthFail: () => void) => React.ReactNode }) {
+  const endpointMissing = !L1_REGISTER_URL
+  const [token, setToken] = useState<string>(() => readToken())
   const [input, setInput] = useState('')
-  const [error, setError] = useState('')
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (input === CAPTURE_PASSWORD) {
-      try {
-        localStorage.setItem(UNLOCK_KEY, '1')
-      } catch {
-        // localStorage might be disabled (private mode); fall back to
-        // session-scoped unlock — re-prompt on full reload.
-      }
-      setUnlocked(true)
-      setError('')
-    } else {
-      setError('Incorrect password')
-      setInput('')
+    const t = input.trim()
+    if (!t) return
+    try {
+      localStorage.setItem(L1_TOKEN_KEY, t)
+    } catch {
+      /* private mode — session-only */
     }
+    setToken(t)
+    setInput('')
   }
 
-  if (unlocked) {
+  function onAuthFail() {
+    try {
+      localStorage.removeItem(L1_TOKEN_KEY)
+    } catch {
+      /* ignore */
+    }
+    setToken('')
+  }
+
+  if (endpointMissing) {
     return (
-      <>
-        {noPasswordSet && (
-          <div className="bg-error/10 border-b border-error text-error text-[10px] font-bold tracking-widest uppercase px-6 py-2 text-center">
-            ⚠ VITE_CAPTURE_PASSWORD is unset — page is unprotected
+      <section className="min-h-[60vh] flex items-center justify-center px-6 text-center">
+        <div className="max-w-sm">
+          <h1 className="text-3xl font-black tracking-tighter uppercase mb-3">Capture</h1>
+          <div className="bg-error/10 border border-error text-error text-xs p-4">
+            VITE_L1_CAPTURE_ENDPOINT is unset at build time — the capture endpoint
+            is not configured, so this page can&rsquo;t save. Set it to the
+            <code className="mx-1">/l1/register</code> URL and rebuild.
           </div>
-        )}
-        {children}
-      </>
+        </div>
+      </section>
     )
   }
+
+  if (token) return <>{children(token, onAuthFail)}</>
 
   return (
     <section className="min-h-[60vh] flex items-center justify-center px-6">
       <form onSubmit={handleSubmit} className="w-full max-w-sm">
         <h1 className="text-3xl font-black tracking-tighter uppercase mb-2">Capture</h1>
         <p className="text-[11px] text-on-surface-variant mb-8">
-          This page is private. Enter the shared password to continue.
+          This page is private. Enter the capture token to continue.
         </p>
         <label className="text-[10px] font-bold tracking-widest text-outline uppercase block mb-2">
-          Password
+          Capture token
         </label>
         <input
           type="password"
           autoFocus
           value={input}
-          onChange={e => {
-            setInput(e.target.value)
-            setError('')
-          }}
+          onChange={e => setInput(e.target.value)}
           className="w-full bg-transparent border-b border-outline pb-3 text-base focus:outline-none focus:border-b-2 focus:border-primary"
         />
-        {error && (
-          <div className="mt-3 text-[11px] text-error">{error}</div>
-        )}
         <button
           type="submit"
           className="mt-6 w-full bg-primary text-on-primary px-6 py-3 text-xs font-bold tracking-widest uppercase hover:bg-primary-dim transition-colors"
@@ -171,16 +165,21 @@ function PasswordGate({ children }: { children: React.ReactNode }) {
 
 // ── Capture form ───────────────────────────────────────────────────────────
 
-function CaptureBody() {
+function CaptureBody({ token, onAuthFail }: { token: string; onAuthFail: () => void }) {
   const [entries, setEntries] = useState<CapturedEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [sourceUrl, setSourceUrl] = useState('')
+  const [title, setTitle] = useState('')
+  const [category, setCategory] = useState('')
   const [error, setError] = useState('')
   const [searchParams, setSearchParams] = useSearchParams()
   const autoSubmitted = useRef(false)
 
+  const authHeaders = { authorization: `Bearer ${token}`, 'content-type': 'application/json' }
+
   useEffect(() => {
     loadEntries()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Handle incoming share-target payload: prefill + auto-submit once.
@@ -190,23 +189,21 @@ function CaptureBody() {
     if (!shared) return
     autoSubmitted.current = true
     setSourceUrl(shared)
-    // Strip params from the URL so a pull-to-refresh doesn't re-submit.
     setSearchParams({}, { replace: true })
     void submit(shared)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, setSearchParams])
 
   async function loadEntries() {
     try {
-      const response = await fetch(GAS_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'L1_LIST' }),
-      })
+      const response = await fetch(L1_SOURCES_URL, { headers: authHeaders })
+      if (response.status === 401) {
+        onAuthFail()
+        return
+      }
       const data = await response.json()
-      if (data.success) {
+      if (data.ok) {
         const list: CapturedEntry[] = data.data || []
-        // Newest-first by save time (Notion `created_time`). Putting a
-        // freshly-captured entry at the top is the visible confirmation
-        // that the save round-trip succeeded.
         list.sort((a, b) => {
           const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0
           const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0
@@ -214,8 +211,8 @@ function CaptureBody() {
         })
         setEntries(list)
       }
-    } catch (error) {
-      console.error('Failed to load entries:', error)
+    } catch (err) {
+      console.error('Failed to load entries:', err)
     }
   }
 
@@ -223,13 +220,23 @@ function CaptureBody() {
     setLoading(true)
     setError('')
     try {
-      const response = await fetch(GAS_URL, {
+      const body: Record<string, string> = { url }
+      if (title.trim()) body.title = title.trim()
+      if (category) body.category = category
+      const response = await fetch(L1_REGISTER_URL, {
         method: 'POST',
-        body: JSON.stringify({ action: 'L1_SAVE', sourceUrl: url }),
+        headers: authHeaders,
+        body: JSON.stringify(body),
       })
+      if (response.status === 401) {
+        onAuthFail()
+        return
+      }
       const data = await response.json()
-      if (data.success) {
+      if (data.ok) {
         setSourceUrl('')
+        setTitle('')
+        setCategory('')
         await loadEntries()
       } else {
         setError(data.error || 'Failed to capture article')
@@ -253,7 +260,6 @@ function CaptureBody() {
 
   return (
     <>
-      {/* Header — compact on mobile so the input sits above the fold */}
       <section className="w-full bg-surface">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12 pt-6 md:pt-16 pb-6 md:pb-16">
           <Link to="/" className="inline-block text-[10px] font-bold tracking-widest text-outline uppercase mb-4 md:mb-10 hover:text-tertiary transition-colors">
@@ -266,7 +272,6 @@ function CaptureBody() {
             気になった記事の URL を保存します。後ほど自動で 解説記事 と 分析記事 に変換され、サイト上で公開されます。
           </p>
 
-          {/* Stats strip — "daily habit" signal */}
           {(() => {
             const { today, last7, streak } = computeStats(entries)
             const Stat = ({ label, value, suffix }: { label: string; value: number; suffix?: string }) => (
@@ -289,10 +294,8 @@ function CaptureBody() {
         </div>
       </section>
 
-      {/* Content */}
       <div className="max-w-[1440px] mx-auto px-6 md:px-12 pb-24 md:py-16">
         <div className="swiss-grid">
-          {/* Form */}
           <div className="col-span-12 lg:col-span-6">
             <div className="bg-surface-container-low p-5 md:p-8">
               <h2 className="hidden md:block text-2xl font-black tracking-tighter uppercase mb-8">Save a new article</h2>
@@ -315,8 +318,37 @@ function CaptureBody() {
                     className="w-full bg-transparent border-b border-outline pb-3 text-base md:text-lg focus:outline-none focus:border-b-2 focus:border-primary"
                   />
                   <p className="text-[11px] text-on-surface-variant mt-3">
-                    Paste a link, or share to <span className="font-bold">Capture</span> from your browser. Title, summary, category, and date are extracted automatically.
+                    Paste a link, or share to <span className="font-bold">Capture</span> from your browser. Title and category are optional and saved as entered — there is no auto-extraction.
                   </p>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold tracking-widest text-outline uppercase block mb-2">
+                    Title <span className="text-outline-variant">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="defaults to the URL"
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    className="w-full bg-transparent border-b border-outline pb-3 text-base focus:outline-none focus:border-b-2 focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold tracking-widest text-outline uppercase block mb-2">
+                    Category <span className="text-outline-variant">(optional)</span>
+                  </label>
+                  <select
+                    value={category}
+                    onChange={e => setCategory(e.target.value)}
+                    className="w-full bg-transparent border-b border-outline pb-3 text-base focus:outline-none focus:border-b-2 focus:border-primary"
+                  >
+                    <option value="">—</option>
+                    {CATEGORIES.map(c => (
+                      <option key={c.code} value={c.code}>{c.code}: {c.label}</option>
+                    ))}
+                  </select>
                 </div>
 
                 {error && (
@@ -336,7 +368,6 @@ function CaptureBody() {
             </div>
           </div>
 
-          {/* List */}
           <div className="col-span-12 lg:col-span-6 mt-10 lg:mt-0 lg:border-l lg:border-outline-variant/20 lg:pl-12">
             <h2 className="text-xl md:text-2xl font-black tracking-tighter uppercase mb-6 md:mb-8">
               Recent ({entries.length})
@@ -349,16 +380,18 @@ function CaptureBody() {
                   <div key={entry.id} className="pb-6">
                     <div className="flex justify-between items-start mb-2 gap-3">
                       <span className="text-[10px] font-bold tracking-widest text-tertiary uppercase">
-                        {CATEGORIES.find(c => c.code === entry.category)?.label}
+                        {CATEGORIES.find(c => c.code === entry.category)?.label ?? entry.category}
                       </span>
                       <span className="text-[10px] font-medium tracking-widest text-outline uppercase whitespace-nowrap">
                         {entry.publicationDate}
                       </span>
                     </div>
                     <h3 className="text-base font-black mb-2">{entry.title}</h3>
-                    <p className="text-sm text-on-surface-variant mb-3 line-clamp-2">
-                      {entry.contentsSummary}
-                    </p>
+                    {entry.contentsSummary && (
+                      <p className="text-sm text-on-surface-variant mb-3 line-clamp-2">
+                        {entry.contentsSummary}
+                      </p>
+                    )}
                     <a
                       href={entry.sourceUrl}
                       target="_blank"
@@ -379,9 +412,5 @@ function CaptureBody() {
 }
 
 export default function Capture() {
-  return (
-    <PasswordGate>
-      <CaptureBody />
-    </PasswordGate>
-  )
+  return <TokenGate>{(token, onAuthFail) => <CaptureBody token={token} onAuthFail={onAuthFail} />}</TokenGate>
 }

@@ -1,7 +1,7 @@
 # Governance Mechanisms — the self-driving machinery
 
-**Status:** v1.0
-**Last updated:** 2026-06-07
+**Status:** v1.1
+**Last updated:** 2026-07-03
 **Scope:** the working mechanisms that make this repo's governance *run itself* — gates, registries, loops
 **Audience:** any agent (or operator) who needs to operate, extend, or reason about the governance machinery
 **Decision record:** [ADR-0001](adr/adr-0001-self-driving-governance-mechanisms.md)
@@ -76,14 +76,16 @@ This implements `design-policy.md` D-2 (Software 2.0).
 | Memory→lint backlog | registry (process) | governance retrospective | [`memory-lint-backlog.md`](memory-lint-backlog.md) | (data for R-12) |
 | Risk-acceptance ledger | registry (process) | known-gap triage | [`risk-acceptance-ledger.md`](risk-acceptance-ledger.md) | (data for R-12) |
 | Content-insights loop | scheduled automation | Mondays 02:00 UTC | [`content-insights.mjs`](../scripts/content-insights.mjs) | — |
-| Shared truncation heuristic | library | imported by gates + skill | [`scripts/lib/truncation.mjs`](../scripts/lib/truncation.mjs) | underlies R-5/R-10 |
+| PR terminal-state sweep | scheduled automation (daily) | daily cron + manual dispatch | [`pr-autopilot-sweep.mjs`](../workforce/skills/pr-autopilot/pr-autopilot-sweep.mjs), [`check-escalation-labels.mjs`](../workforce/scripts/check-escalation-labels.mjs) | R-13 |
+| Shared truncation heuristic | library | imported by gates + skill | [`scripts/lib/truncation.mjs`](../scripts/lib/truncation.mjs) | underlies R-10 (historically R-5) |
 
 ### 2.1 How to operate each
 
 - **R-10 corpus truncation** — runs automatically in `deploy-article-site.yml`. If it fails, an
-  article is truncated *after a fresh Notion fetch*: fix the Notion row or run `L2_BACKFILL`, then
-  redeploy. Emergency escape hatch (operator-only): `ALLOW_TRUNCATED=1` to ship an unrelated fix
-  while regenerating; record it in the risk-acceptance ledger.
+  article is truncated *after a fresh Notion fetch*: fix the Notion row or re-run the relevant
+  workforce cadence (`article-level{2,3}`), then redeploy. Emergency escape hatch (operator-only):
+  `ALLOW_TRUNCATED=1` to ship an unrelated fix while regenerating; record it in the risk-acceptance
+  ledger.
 - **R-11 L1 citation** — runs on PRs. If you edit an L1 doc (governance.md §3.1 list, the two
   governance-axis docs, or any ADR under `docs/adr/`), put in the PR body either a reference to the
   doc you're changing, or `RULE-N/A: <reason>`. This is how "follow the ADR when implementing" is
@@ -92,6 +94,13 @@ This implements `design-policy.md` D-2 (Software 2.0).
   column, update the `<!-- registry:… columns: … -->` anchor in the doc to match.
 - **Content-insights** — inert until the operator provisions `GA4_PROPERTY_ID` + `GA4_SA_KEY`
   (RAL-002). Run a preview anytime: `DRY_RUN=1 npm run content-insights` (still inert without creds).
+- **R-13 terminal-state sweep** — runs daily via `workforce-pr-terminal-sweep.yml` with `--apply`:
+  any open PR the autopilot left in a non-terminal state (an unlabelled hand-off, a stalled review
+  cycle, a PR aged out of the discovery window) is escalated — labelled `autopilot:needs-human`
+  (plus a hand-off comment for the stale classes). Check-only anywhere:
+  `GITHUB_TOKEN=… npm run workforce:pr-sweep -- --repo <owner>/<repo>` (exit 2 = violations).
+  Promoted from ML-009 per the §6.1 ratchet; the ML-009 state check
+  (`npm run workforce:escalation-labels`) remains the narrow marker-vs-label lint.
 
 ---
 
@@ -114,7 +123,7 @@ Each mechanism maps to the problem it solves:
 | Converging audit loop (promote / accept / decline) | The audit backlog could grow without ever closing. |
 | Memory→lint promotion backlog | A failure that bit twice was re-discovered, not mechanised. |
 | Content-insights (analytics→issue) loop | Reader data died in a dashboard instead of driving the roadmap. |
-| Pre-publish health gate (R-10) | The finish_reason throw guards generation, not publication. |
+| Pre-publish health gate (R-10) | The generation-time W-1 guard (historically the GAS finish_reason throw) guards generation, not publication. |
 | ADRs as the decision-record vehicle | Architectural rationale lived in chat history, not the repo. |
 
 ---

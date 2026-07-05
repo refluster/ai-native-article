@@ -10,7 +10,7 @@
 // --needs-human flag OR the hidden body marker), and never on a plain routing
 // comment.
 import { describe, it, expect } from "vitest";
-import { resolveLabels, NEEDS_HUMAN_MARKER, REVIEWED_MARKER } from "./pr-autopilot-post.mjs";
+import { resolveLabels, findRawMentions, NEEDS_HUMAN_MARKER, REVIEWED_MARKER } from "./pr-autopilot-post.mjs";
 import { ESCALATION_LABEL, REVIEWED_LABEL } from "./pr-merge.mjs";
 
 describe("resolveLabels — escalation always carries the label", () => {
@@ -77,5 +77,53 @@ describe("resolveLabels — a green, merge-ready hand-off is flagged reviewed", 
 
   it("the reviewed marker constant is the canonical hidden token", () => {
     expect(REVIEWED_MARKER).toBe("<!-- autopilot:reviewed -->");
+  });
+});
+
+// Locks the operator directive (2026-07-04, ML-012): persona slugs are not
+// GitHub accounts — a raw `@<slug>` in a posted body notifies the real,
+// unrelated GitHub user who owns that name (`@yuki` pinged github.com/yuki).
+// findRawMentions is the mechanical half: the script refuses (exit 1) any
+// body where it finds a mention. Agents are referenced as `wf:<slug>` in
+// backticks, which must never trip the guard.
+describe("findRawMentions — no raw GitHub @-mentions leave the workforce", () => {
+  it("flags the incident shape: a routing comment @-mentioning a persona", () => {
+    expect(findRawMentions("- **@yuki** — owns the console surface")).toEqual(["@yuki"]);
+  });
+
+  it("flags a skip-line mention and de-dupes repeats", () => {
+    const body = "Skipping @maya — no surface. Also skipping @maya.\n@dario is seated.";
+    expect(findRawMentions(body).sort()).toEqual(["@dario", "@maya"]);
+  });
+
+  it("the canonical wf:<slug> reference in backticks is clean", () => {
+    const body = "Reviewers nominated (≥ 3):\n\n- **`wf:yuki`** — console surface\n\nSkipping `wf:maya` — no surface.";
+    expect(findRawMentions(body)).toEqual([]);
+  });
+
+  it("ignores @-tokens inside inline code spans and fenced blocks", () => {
+    const body = "Uses `@anthropic-ai/sdk`.\n\n```ts\n@Injectable()\nclass A {}\n// cc @yuki\n```\n";
+    expect(findRawMentions(body)).toEqual([]);
+  });
+
+  it("ignores double-backtick spans", () => {
+    expect(findRawMentions("quote ``@yuki`` verbatim")).toEqual([]);
+  });
+
+  it("flags a mention GitHub would linkify even when bolded or hyphenated", () => {
+    expect(findRawMentions("ping **@anthropic-ai** please")).toEqual(["@anthropic-ai"]);
+  });
+
+  it("does not flag emails (GitHub does not linkify them either)", () => {
+    expect(findRawMentions("contact refluster@gmail.com about it")).toEqual([]);
+  });
+
+  it("flags a mention at the very start of the body", () => {
+    expect(findRawMentions("@yuki take a look")).toEqual(["@yuki"]);
+  });
+
+  it("empty / markerless bodies are clean", () => {
+    expect(findRawMentions("")).toEqual([]);
+    expect(findRawMentions(`verdict\n\n${NEEDS_HUMAN_MARKER}\n`)).toEqual([]);
   });
 });

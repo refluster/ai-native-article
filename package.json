@@ -19,9 +19,6 @@
     "preview:workforce": "npm run preview -w @kohuehara/workforce",
     "build:agents": "node workforce/scripts/build-agent-manifest.mjs",
     "fetch-notion": "node newsletter/pipeline/fetch-notion.mjs",
-    "check-gas": "node newsletter/pipeline/check-gas-manifest.mjs",
-    "push-gas": "npm run check-gas && clasp push --force",
-    "deploy-gas": "npm run push-gas && clasp deploy -i AKfycbwT9brOVSZqKzpf9-yZ_O8BHKJiFuZxwxawKK4FAhBwq-sdloyv56rDgNec9uQ2N4u-",
     "lint:tokens": "node scripts/lint-design-tokens.mjs",
     "check-truncation": "node scripts/check-corpus-truncation.mjs",
     "check-l1-citation": "node scripts/check-l1-citation.mjs",
@@ -40,6 +37,7 @@
     "workforce:scan-drain": "node workforce/scripts/check-scan-drain.mjs",
     "workforce:escalation-labels": "node workforce/scripts/check-escalation-labels.mjs",
     "workforce:cycle-count": "node workforce/scripts/check-cycle-count.mjs",
+    "workforce:pr-sweep": "node workforce/skills/pr-autopilot/pr-autopilot-sweep.mjs",
     "workforce:pr-metrics": "node workforce/scripts/build-pr-metrics.mjs",
     "workforce:pr-metrics-gh": "node workforce/scripts/build-pr-metrics-github.mjs",
     "workforce:perf-backfill": "node workforce/scripts/backfill-performance-lifecycle.mjs"

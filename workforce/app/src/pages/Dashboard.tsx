@@ -154,7 +154,7 @@ export default function Dashboard() {
     <WorkforceLayout subnavRight={subnavRight}>
       {/* HERO ---------------------------------------------------------- */}
       <section className="mb-8 sm:mb-10">
-        <Typeplate label="DECK 01" value="PERFORMANCE · OVERVIEW" className="mb-4" />
+        <Typeplate label="OVERVIEW" value="PERFORMANCE · OVERVIEW" className="mb-4" />
         <h1 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-[1.02] mb-3 text-wf-on-surface">
           {personaCount} personas. One pipeline.<br className="hidden sm:block" /> Run state on a single readout.
         </h1>
@@ -200,7 +200,7 @@ export default function Dashboard() {
       {/* CREW TABLE --------------------------------------------------- */}
       <section className="mb-8 sm:mb-10">
         <div className="flex items-end justify-between mb-3">
-          <Typeplate label="DECK 02" value="CREW · LIVE STATE" />
+          <Typeplate label="CREW" value="CREW · LIVE STATE" />
           <Link
             to="/agents"
             className="font-wfmono text-[11px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
@@ -263,7 +263,7 @@ export default function Dashboard() {
       {/* PERFORMANCE ANALYTICS (Epic-016) ----------------------------- */}
       <section className="mb-8 sm:mb-10">
         <div className="mb-3">
-          <Typeplate label="DECK 03–04" value="PERFORMANCE · ANALYTICS" />
+          <Typeplate label="ANALYTICS" value="PERFORMANCE · ANALYTICS" />
           <p className="mt-1 text-sm text-wf-on-surface-variant max-w-prose leading-relaxed">
             The workforce as one organism: is hiring converting into delivered
             output, and is the delivery process shedding its humans?
