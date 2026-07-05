@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { isValidElement, useEffect, useMemo, useRef, useState } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import MermaidBlock from '../components/article/MermaidBlock'
 import type { ArticleMeta, ArticleType } from '../types/article'
 import { withBasePath } from '../lib/paths'
 import { setArticleSeo, setDefaultSeo } from '../lib/seo'
@@ -38,6 +40,28 @@ function parseFrontmatter(raw: string): { meta: Partial<Frontmatter>; content: s
 
 // Scroll-depth thresholds we report as distinct events (GROWTH.md §2).
 const DEPTH_STEPS = [25, 50, 75, 90] as const
+
+/** The source of a ```mermaid fence, or null for any other <pre> content. */
+function extractMermaidSource(children: ReactNode): string | null {
+  const child = Array.isArray(children) ? children[0] : children
+  if (!isValidElement(child)) return null
+  const { className, children: source } = child.props as {
+    className?: string
+    children?: ReactNode
+  }
+  if (!/\blanguage-mermaid\b/.test(className ?? '')) return null
+  return String(source ?? '')
+}
+
+// Fenced ```mermaid blocks render as inline figures (ARTICLE-FIGURES.md);
+// every other code block keeps the default dark <pre> treatment.
+const markdownComponents: Components = {
+  pre({ node: _node, children, ...rest }: ComponentProps<'pre'> & { node?: unknown }) {
+    const source = extractMermaidSource(children)
+    if (source !== null) return <MermaidBlock code={source} />
+    return <pre {...rest}>{children}</pre>
+  },
+}
 
 export default function Article() {
   const { slug } = useParams<{ slug: string }>()
@@ -308,7 +332,9 @@ export default function Article() {
         className="max-w-3xl mx-auto px-6 md:px-12 py-16 article-content"
         onClick={onBodyClick}
       >
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+          {content}
+        </ReactMarkdown>
       </article>
 
       {slug && articleType === 'analysis' && (
