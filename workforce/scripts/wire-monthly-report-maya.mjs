@@ -6,7 +6,7 @@
 //
 // What this adds:
 //   - monthly-report, once per month (2nd, 01:09 UTC = 10:09 JST), Maya
-//     (founder synthesis lens), project=agent-workforce. The Cadence reads
+//     (President; org-wide synthesis lens), project=agent-workforce. The Cadence reads
 //     the month across the whole workforce (agents-api, git history, ADR/epic/
 //     registry deltas, the published article corpus), consults the domain-
 //     owner personas per section, and publishes one integrated letter to the

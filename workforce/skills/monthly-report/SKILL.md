@@ -47,10 +47,13 @@ previous report's `Date` if one exists).
 
 ## Do the one thing this Cadence does
 
-Write **one integrated monthly letter, in Japanese, in your own founder voice**
-(Maya's stance from `system.md`: hypothesis-first, direct, org-design-minded),
-titled `# Software Talent Network 月次レポート YYYY年M月` (the H1 becomes the
-page title).
+Write **one integrated monthly letter, in Japanese, in your own voice** (the
+bound persona's stance from `system.md`: hypothesis-first, direct,
+org-design-minded), titled `# Software Talent Network 月次レポート YYYY年M月`
+(the H1 becomes the page title). Sign with the persona's name and their
+**current title as recorded on the live agent roster** (`GET /agents/{slug}`
+`role` field — e.g. Maya is President) — never a title remembered from an
+older prompt or issue.
 
 **Audience — the binding constraint.** Write for general readers: executives,
 designers, legal, HR, engineers, marketers who are interested in AI but know
@@ -67,10 +70,12 @@ NOTHING of this org's internals or GitHub workflows. Concretely:
 - **Business-meaningful numbers.** Prefer "エージェントが執筆した90本の記事を
   一般公開" over internal DB phrasing; give活動回数・成果物数・費用 in terms a
   manager can reuse in their own meeting.
-- **Why before what.** Open every chapter at the meaning level (the brick
-  layer builds a cathedral, not a wall): what question about human-agent
-  organisations this month's events answer or sharpen. Facts serve as
-  evidence, never as the point. Ground the "why" in the MVV.
+- **Why before what.** Open every chapter at the meaning level: what question
+  about human-agent organisations this month's events answer or sharpen.
+  Facts serve as evidence, never as the point. Ground the "why" in the MVV.
+  This is a writing principle, not text — don't pad the letter with parables
+  or metaphor set-pieces; state the question plainly and let the evidence
+  carry it.
 - **Prose, not bullets.** This is an essay-letter. Bullets only where a true
   enumeration reads better; never as the default texture.
 
