@@ -21,6 +21,7 @@ export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "hypothesis": ["notion.integration_token"] as const,
   "india-grid-watch": ["workforce.feed_write_token"] as const,
   "legal-amendment-review-committee": ["github.token"] as const,
+  "monthly-report": ["notion.integration_token"] as const,
   "pdm-charter": [],
   "podcast-publish": ["notion.integration_token", "github.token"] as const,
   "podcast-script": ["notion.integration_token"] as const,
