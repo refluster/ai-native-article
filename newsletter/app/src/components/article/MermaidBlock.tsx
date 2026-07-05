@@ -1,27 +1,17 @@
 import { useEffect, useState } from 'react'
 import type { Mermaid } from 'mermaid'
+import { FIGURE_CATEGORICAL, FIGURE_TOKENS as T } from '../../config/site'
 
 /**
  * Renders a ```mermaid fenced block from an article body as an inline figure.
  *
  * mermaid is ~1.5MB minified, so it is loaded on demand: articles without a
  * figure never pay for it (Vite code-splits the dynamic import into its own
- * chunk). The theme maps the Precision Editorial tokens (DESIGN.md /
- * tailwind.config.ts) onto mermaid's `base` theme — mermaid writes colors as
- * SVG attributes, so token values are repeated here rather than read from
- * Tailwind classes. Authoring rules live in newsletter/docs/ARTICLE-FIGURES.md.
+ * chunk). The theme maps the Precision Editorial tokens (DESIGN.md, via
+ * FIGURE_TOKENS in config/site.ts) onto mermaid's `base` theme — mermaid
+ * writes colors as SVG attributes, out of Tailwind's reach. Authoring rules
+ * live in newsletter/docs/ARTICLE-FIGURES.md.
  */
-
-// Categorical palette, fixed order (never cycled): ink first, tertiary red as
-// the second "surgical" accent, then grays by descending lightness. CVD
-// separation validated at ΔE ≥ 17 for adjacent pairs; the two lightest slots
-// are legal because pie always renders a legend and slice labels.
-const CATEGORICAL = ['#2d3338', '#c1000a', '#757c81', '#acb3b8', '#dde3e9']
-
-const INK = '#2d3338' // on-surface
-const INK_VARIANT = '#596065' // on-surface-variant
-const GRID = '#acb3b8' // outline-variant
-const FIGURE_SURFACE = '#f2f4f6' // surface-container-low — the figure block
 
 let mermaidPromise: Promise<Mermaid> | null = null
 
@@ -48,53 +38,53 @@ function loadMermaid(): Promise<Mermaid> {
         fontFamily: 'Inter, sans-serif',
         theme: 'base',
         themeVariables: {
-          background: FIGURE_SURFACE,
+          background: T.figureSurface,
           fontFamily: 'Inter, sans-serif',
           fontSize: '14px',
-          textColor: INK,
-          lineColor: '#5e5e5e',
+          textColor: T.ink,
+          lineColor: T.line,
           // Node fills: stacked paper stocks, boundaries by tone, not lines.
-          primaryColor: '#dde3e9',
-          primaryTextColor: INK,
-          primaryBorderColor: '#757c81',
-          secondaryColor: '#f9f9fb',
-          secondaryTextColor: INK,
-          secondaryBorderColor: GRID,
-          tertiaryColor: '#ffffff',
-          tertiaryTextColor: INK,
-          tertiaryBorderColor: GRID,
-          noteBkgColor: '#dde3e9',
-          noteTextColor: INK,
-          noteBorderColor: GRID,
+          primaryColor: T.raised,
+          primaryTextColor: T.ink,
+          primaryBorderColor: T.gridStrong,
+          secondaryColor: T.surface,
+          secondaryTextColor: T.ink,
+          secondaryBorderColor: T.grid,
+          tertiaryColor: T.lowest,
+          tertiaryTextColor: T.ink,
+          tertiaryBorderColor: T.grid,
+          noteBkgColor: T.raised,
+          noteTextColor: T.ink,
+          noteBorderColor: T.grid,
           // Pie: fixed categorical order; a 2px surface-colored stroke keeps
           // adjacent slices separated (the "gap between fills" mark rule).
-          pie1: CATEGORICAL[0],
-          pie2: CATEGORICAL[1],
-          pie3: CATEGORICAL[2],
-          pie4: CATEGORICAL[3],
-          pie5: CATEGORICAL[4],
-          pieStrokeColor: FIGURE_SURFACE,
+          pie1: FIGURE_CATEGORICAL[0],
+          pie2: FIGURE_CATEGORICAL[1],
+          pie3: FIGURE_CATEGORICAL[2],
+          pie4: FIGURE_CATEGORICAL[3],
+          pie5: FIGURE_CATEGORICAL[4],
+          pieStrokeColor: T.figureSurface,
           pieStrokeWidth: '2px',
           pieOuterStrokeWidth: '0px',
-          pieTitleTextColor: INK,
+          pieTitleTextColor: T.ink,
           pieTitleTextSize: '16px',
-          pieSectionTextColor: '#f8f8f8',
+          pieSectionTextColor: T.onDark,
           pieSectionTextSize: '13px',
-          pieLegendTextColor: INK,
+          pieLegendTextColor: T.ink,
           pieLegendTextSize: '13px',
           // XY chart (line / bar): recessive axes, ink-first series.
           xyChart: {
-            backgroundColor: FIGURE_SURFACE,
-            titleColor: INK,
-            xAxisLabelColor: INK_VARIANT,
-            xAxisTitleColor: INK_VARIANT,
-            xAxisTickColor: GRID,
-            xAxisLineColor: GRID,
-            yAxisLabelColor: INK_VARIANT,
-            yAxisTitleColor: INK_VARIANT,
-            yAxisTickColor: GRID,
-            yAxisLineColor: GRID,
-            plotColorPalette: CATEGORICAL.join(','),
+            backgroundColor: T.figureSurface,
+            titleColor: T.ink,
+            xAxisLabelColor: T.inkVariant,
+            xAxisTitleColor: T.inkVariant,
+            xAxisTickColor: T.grid,
+            xAxisLineColor: T.grid,
+            yAxisLabelColor: T.inkVariant,
+            yAxisTitleColor: T.inkVariant,
+            yAxisTickColor: T.grid,
+            yAxisLineColor: T.grid,
+            plotColorPalette: FIGURE_CATEGORICAL.join(','),
           },
         },
       })

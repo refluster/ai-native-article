@@ -71,8 +71,10 @@ mermaid の他のダイアグラムもそのまま使える。ノードは角丸
 - 図は `surface-container-low` のブロックに載り、幅は本文カラムに収まって
   スクロール／縮小する。印刷時はページ境界で分割されない。
 
-このテーマ定義は Zone A（デザイントークンの写像）。変更は
-`MermaidBlock.tsx` の `themeVariables` への diff 提案として出し、operator 承認を得る。
+このテーマ定義は Zone A（デザイントークンの写像）。パレットは
+`newsletter/app/src/config/site.ts` の `FIGURE_TOKENS` / `FIGURE_CATEGORICAL`、
+mermaid への写像は `MermaidBlock.tsx` の `themeVariables`。変更は diff 提案として出し、
+operator 承認を得る。
 
 ## 制約
 
