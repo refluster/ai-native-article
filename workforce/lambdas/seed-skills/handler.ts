@@ -4,9 +4,17 @@
 // bundle (the Makefile builder copies the tree into ARTIFACTS_DIR/skills/)
 // and registers SKILL#{name}/META rows in the workforce DDB table.
 //
-// ADR-0008: CREATE-ONLY. The row is authoritative for judgment-side fields
-// after first seed (mutations flow through agents-api PATCH /skills/{name}),
-// so existing rows are never overwritten — only new skill folders create.
+// ADR-0018 (supersedes ADR-0008 Decision §5): the seed is VERSION-GATED, not
+// flat create-only. New skill folders create. For an EXISTING row, the git
+// judgment-side fields (body/description/status/owners/cost_class/
+// improvement_agent) are synced ONLY when the git meta.json:version is
+// strictly newer than the live row's version — an intentional version bump is
+// the propagation trigger. An equal-or-older git version never overwrites the
+// row, so a live agents-api PATCH that bumps the version above git stays
+// authoritative (the two-master clobber ADR-0008 retired is still avoided —
+// it is now gated by version instead of blanket-forbidden). Every accepted
+// sync appends a SKILL#{name}/AUDIT# item (ADR-0008 §4). `deliverable` remains
+// git-authoritative and is reconciled on every seed regardless of version.
 //
 // Invoked automatically by the wf-seed-skills-postdeploy-{stage}
 // EventBridge rule on every successful stack CREATE/UPDATE. Operator
@@ -21,6 +29,8 @@ import type { SkillIdentity, SkillMetaRow } from "../shared/skill-row.js";
 import { skillPk } from "../shared/skill-row.js";
 import { skillIdentityHash } from "../shared/skill-identity-hash.js";
 import type { SkillMeta } from "../shared/skill.js";
+import { appendSkillAudit } from "../shared/skill-audit.js";
+import { diffChanges } from "../shared/agent-audit.js";
 
 interface SeedResult {
   upserts: Array<{ name: string; action: "created" | "updated" | "noop" }>;
@@ -29,15 +39,32 @@ interface SeedResult {
 }
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SKILLS_ROOT = process.env.SKILLS_ROOT ?? join(HERE, "skills");
+
+/** The actor recorded on seed-driven audit rows, distinct from the
+ *  "operator"/IAM-ARN actors the agents-api PATCH path records. */
+const SEED_ACTOR = "wf-seed-skills";
+
+/** Compare two semver strings. Returns >0 if `a` is newer than `b`, 0 if
+ *  equal, <0 if older. A non-semver string parses as 0.0.0, so a malformed
+ *  git version can never win the version gate (fails safe: no sync). */
+export function compareSemver(a: string, b: string): number {
+  const parse = (s: string): [number, number, number] => {
+    const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(String(s).trim());
+    return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [0, 0, 0];
+  };
+  const [aMaj, aMin, aPat] = parse(a);
+  const [bMaj, bMin, bPat] = parse(b);
+  return aMaj - bMaj || aMin - bMin || aPat - bPat;
+}
 
 export async function handler(): Promise<SeedResult> {
-  const names = await listSkillDirs(SKILLS_ROOT);
+  const skillsRoot = process.env.SKILLS_ROOT ?? join(HERE, "skills");
+  const names = await listSkillDirs(skillsRoot);
   const result: SeedResult = { upserts: [], errors: [], scanned: names.length };
 
   for (const name of names) {
     try {
-      const action = await seedOne(name);
+      const action = await seedOne(name, skillsRoot);
       result.upserts.push({ name, action });
     } catch (err) {
       result.errors.push({
@@ -61,8 +88,11 @@ async function listSkillDirs(root: string): Promise<string[]> {
   return dirs.sort();
 }
 
-async function seedOne(name: string): Promise<"created" | "updated" | "noop"> {
-  const dir = join(SKILLS_ROOT, name);
+async function seedOne(
+  name: string,
+  root: string,
+): Promise<"created" | "updated" | "noop"> {
+  const dir = join(root, name);
   const meta = JSON.parse(await readFile(join(dir, "meta.json"), "utf8")) as SkillMeta;
   if (meta.name !== name) {
     throw new Error(`meta.json:name "${meta.name}" does not match dir "${name}"`);
@@ -86,19 +116,57 @@ async function seedOne(name: string): Promise<"created" | "updated" | "noop"> {
   const hash = skillIdentityHash(identity);
 
   const existing = await getItem<SkillMetaRow>(skillPk(name), "META");
-  // ADR-0008 Decision §5: the seed is CREATE-ONLY for judgment-side fields.
-  // body / owners / status / … are API-writable on the live row, so an
-  // upsert from the git copy on the next deploy would silently revert
-  // those edits — the exact two-master clobber ADR-0007 retired on the
-  // agent side. The ONE exception (D2, PR #304 review): `deliverable` is
-  // git-authoritative (rejected by PATCH /skills), so reconciling it FROM
-  // git is the correct master writing its own field, not a clobber —
-  // without this, a meta.json deliverable change would have no write path
-  // at all. (`identity_hash` is a seed-era residue: stale after the first
-  // PATCH; nothing reads it any more.)
+
   if (existing) {
+    // ADR-0018: version-gated sync of the judgment-side fields. Only a git
+    // version STRICTLY newer than the live row propagates — an equal-or-older
+    // version leaves API edits intact (no blind clobber). The judgment-side
+    // fields authored in git (body/description/status/owners/cost_class/
+    // improvement_agent) are the ones the agents-api PATCH path also writes.
+    if (compareSemver(meta.version, existing.version) > 0) {
+      // Preserve computed (invocations_this_month/last_invoked_at) and
+      // operational (improvement_agent_override) state and the immutable
+      // created_at from the live row; overwrite the authored fields from git.
+      const authored = {
+        version: meta.version,
+        status: meta.status,
+        cost_class: meta.cost_class,
+        owners: meta.owners,
+        improvement_agent: meta.improvement_agent,
+        description,
+        body,
+        deliverable: meta.deliverable,
+      };
+      const synced: SkillMetaRow = {
+        ...existing,
+        ...authored,
+        identity_hash: hash,
+        updated_at: new Date().toISOString(),
+      };
+      await putItem(synced);
+      // Audit AFTER the row write, THROW on failure (W-4) — the same ordering
+      // the agents-api PATCH path uses, so wf-config-digest renders seed-driven
+      // and API-driven skill mutations through one path. diffChanges records
+      // only the fields that actually moved (long bodies digested, not stored).
+      const changes = diffChanges(
+        existing as unknown as Record<string, unknown>,
+        authored,
+      );
+      if (changes.length > 0) {
+        await appendSkillAudit(name, SEED_ACTOR, changes);
+      }
+      return "updated";
+    }
+
+    // git version not newer: keep ADR-0008's deliverable-only reconciliation.
+    // `deliverable` is git-authoritative (PATCH /skills rejects it), so the
+    // seed is the correct master writing its own field even without a bump.
     if (JSON.stringify(existing.deliverable) !== JSON.stringify(meta.deliverable)) {
-      await putItem({ ...existing, deliverable: meta.deliverable, updated_at: new Date().toISOString() });
+      await putItem({
+        ...existing,
+        deliverable: meta.deliverable,
+        updated_at: new Date().toISOString(),
+      });
       return "updated";
     }
     return "noop";

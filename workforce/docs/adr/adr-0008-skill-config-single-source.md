@@ -1,9 +1,9 @@
 # ADR-0008 — Skill judgment-config is single-sourced from DynamoDB; the console reads DDB live
 
-- **Status**: Proposed (operator ratifies by merging the implementation PR)
+- **Status**: Accepted — **§Decision-5 (create-only seed) superseded by [ADR-0018](adr-0018-skill-body-version-gated-sync.md)** (version-gated sync); all other decisions in force.
 - **Date**: 2026-06-12
 - **Deciders**: operator
-- **Related**: [ADR-0007](adr-0007-agent-config-single-source.md) (the agent-side precedent this extends), [Epic-008](../epics/epic-008-skill-repository.md)
+- **Related**: [ADR-0007](adr-0007-agent-config-single-source.md) (the agent-side precedent this extends), [ADR-0018](adr-0018-skill-body-version-gated-sync.md) (narrows §Decision-5's create-only seed to a version gate), [Epic-008](../epics/epic-008-skill-repository.md)
 
 ## Context
 
