@@ -6,6 +6,8 @@
 - **Implemented by**: substrate live (#89 tracker; (b)/(c) credited via Epic-012 Story 3 #216); 2 of 4 DoD gates remain.
 
 > **Status reconciliation (2026-06-23, Mateo).** Flipped Draft → In-progress: all §1–§10 substrate is built and live — `shared/project.ts` (`getCredential`/`appendExecution`/`listExecutions`, `PROJECT#{id}/EXEC#{ulid}`), the new `credential-injector.ts`, semantic recall (ADR-0002), the `migrate-credentials` Lambda, and the live `/projects` console (`ProjectDirectory`/`ProjectProfile`). It is **not yet Implemented**: the Epic's own four-gate DoD has two open items — (a) deleting the legacy bare `wf/{type}` keys (gated on the unbuilt Story-6 vault UI) and (d) the ≥1-week clean-audit observation window (`ROADMAP.md`).
+>
+> **Status reconciliation (2026-07-05, Nadia — backlog-reconcile).** The Story-6 vault UI that gated (a) is now built: #430 (2026-07-03) shipped `CredentialVault.tsx` (masked, paste-to-rotate, with tests) inside the refreshed `ProjectProfile.tsx` / `ProjectDirectory.tsx` console. Gate (a) is therefore down to the operational step itself — delete the legacy bare `wf/{type}` keys once `WfLegacyCredentialReads[fallback_bare]` graphs zero (`migrate-credentials` remains a copier by design until then). Gate (d) still open. Story-6 residuals (member editor, task-editor `project_id` selector, Discord end-to-end acceptance) noted on #95.
 
 ## Problem
 
@@ -199,7 +201,7 @@ This Epic is therefore **kept whole under the cheaper recall path**. The earlier
   - The presigned-URL emitter rejects an `exec_ulid` whose row lives under a different `project_id` prefix; verified by a deny test.
   - `self/{slug}` projects are filtered out of the default index view; visible from `/workforce/agents/:slug` and via `?include_self=true`.
   - The SPA falls back to a static `apps/workforce/public/workforce-projects-mock.json` until Story 1-B's dual-write is on; the flip to live data is a follow-up commit, not a separate Story.
-- This Epic's `Status` flips to `Implemented` only when (a) every `wf/{type}` legacy key is removed, (b) the dual-write window has ended, (c) the front-end agent-profile view reads from the new row family, and (d) Story 3's projects console is live on `workforce.kohuehara.xyz` reading live DDB data. **Status (reconciled 2026-06-05 by Epic-012 Story 3, [#216](https://github.com/refluster/ai-native-article/issues/216)): (b) ✅ done** — the success-path dual-write is removed (EXEC-only; enforced by the `dual-write-tests.ts` structural absence tests); **(c) ✅ done** — `AgentProfile.tsx` reads `fetchAgentExecutions` (GSI1 EXEC), legacy DELIV/RUN reads removed. **(a) and (d) remain**, so the Epic stays `Draft`.
+- This Epic's `Status` flips to `Implemented` only when (a) every `wf/{type}` legacy key is removed, (b) the dual-write window has ended, (c) the front-end agent-profile view reads from the new row family, and (d) Story 3's projects console is live on `workforce.kohuehara.xyz` reading live DDB data. **Status (reconciled 2026-06-05 by Epic-012 Story 3, [#216](https://github.com/refluster/ai-native-article/issues/216)): (b) ✅ done** — the success-path dual-write is removed (EXEC-only; enforced by the `dual-write-tests.ts` structural absence tests); **(c) ✅ done** — `AgentProfile.tsx` reads `fetchAgentExecutions` (GSI1 EXEC), legacy DELIV/RUN reads removed. **(a) and (d) remain**, so the Epic stays short of `Implemented` (status: In-progress since 2026-06-23).
 
 ## Open questions
 
