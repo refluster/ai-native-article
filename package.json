@@ -36,6 +36,7 @@
     "workforce:skill-spec-drift": "node workforce/scripts/check-skill-spec-drift.mjs",
     "workforce:scan-drain": "node workforce/scripts/check-scan-drain.mjs",
     "workforce:escalation-labels": "node workforce/scripts/check-escalation-labels.mjs",
+    "workforce:cycle-count": "node workforce/scripts/check-cycle-count.mjs",
     "workforce:pr-sweep": "node workforce/skills/pr-autopilot/pr-autopilot-sweep.mjs",
     "workforce:pr-metrics": "node workforce/scripts/build-pr-metrics.mjs",
     "workforce:pr-metrics-gh": "node workforce/scripts/build-pr-metrics-github.mjs",
