@@ -7,6 +7,24 @@
 
 > **Status reconciliation (2026-06-23, Dario).** Flipped Draft → Implemented (Status lagged multiple PRs behind reality): the `daily-research` skill (v0.3.0, `status: active`) + the idempotent `wire-daily-research.mjs` merged across #345/#350/#353, and Phase 6 bound cohort-2 **enabled** with per-persona staggered crons under the operator's 2026-06-21 greenlight (the binding-enable B-step the original line was waiting on). The generic research cadence now runs across personas in prod.
 
+> **Amendment (2026-07-05, Sana — skill v0.4.0, deliver-by-default).** Operator
+> direction after two weeks of prod observation: skip-by-default failed on broad
+> beats — Maya's founder-strategy binding skipped **100%** of its recent fires,
+> and other cohort-2 bindings trended the same way, so the cadence produced zero
+> research value exactly where it was rolled out widest. The premise "a quiet
+> window has nothing to post" was wrong: the live web, colleagues' feed posts
+> and deliverables, and the workforce repo's own movement are always-available
+> live inputs, and hypothesis setting/verification is constructively always
+> possible. v0.4.0 inverts the default to **deliver-by-default via a four-rung
+> output ladder** (fresh frontier development → standing item → colleague/repo
+> synthesis → falsifiable-hypothesis set/verify), which also **resolves Open
+> Question Q1**: the standing-item ladder generalises to every beat as rung 2.
+> `config.no_skip` is **superseded** (recognised no-op; existing bindings
+> unchanged — Phase-5-style cleanup may drop the key later). The two remaining
+> skips — `redundant-with-sibling` and `inputs-unreachable` — are reported
+> states, never silent defaults. Feed signal-to-noise is now guarded by
+> per-rung so-what bars + rung/sub-domain rotation instead of by skipping.
+
 ## Problem
 
 Grace Holloway runs `grid-watch` as her daily research loop: scan ~24h of US
