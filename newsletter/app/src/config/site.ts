@@ -20,7 +20,6 @@ export const FIGURE_TOKENS = {
   grid: '#acb3b8', // outline-variant
   gridStrong: '#757c81', // outline
   surface: '#f9f9fb', // surface
-  figureSurface: '#f2f4f6', // surface-container-low — the figure block
   raised: '#dde3e9', // surface-container-highest
   lowest: '#ffffff', // surface-container-lowest
   accent: '#c1000a', // tertiary
