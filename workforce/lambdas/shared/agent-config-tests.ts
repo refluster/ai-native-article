@@ -5,7 +5,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  validateAgentCreate,
   validateBudgetOverride,
+  validateIdentityCoherence,
   validateIdentityPatch,
   W3_BUDGET_CAP_USD,
   type IdentityPatchContext,
@@ -192,5 +194,73 @@ describe("validateIdentityPatch — bindings", () => {
     expect(rules({ bindings: [ccrBinding({ routine_spec: undefined })] })).toContain(
       "S9-binding-routine-spec",
     );
+  });
+});
+
+describe("validateIdentityCoherence — S19 role ↔ prompt header title (ML-014)", () => {
+  const coherence = (effective: Record<string, unknown>) =>
+    validateIdentityCoherence(effective).map((x) => x.rule);
+
+  it("accepts a matching header title and role", () => {
+    expect(
+      coherence({
+        role: "President",
+        system_prompt: "# Maya Okonkwo — President — San Francisco, US\n\nBody.",
+      }),
+    ).toEqual([]);
+  });
+
+  it("rejects a header title that disagrees with role (the maya incident)", () => {
+    expect(
+      coherence({
+        role: "President",
+        system_prompt: "# Maya Okonkwo — Founder — San Francisco, US\n\nBody.",
+      }),
+    ).toEqual(["S19-role-prompt-title"]);
+  });
+
+  it("does not constrain prompts without the header convention", () => {
+    expect(coherence({ role: "President", system_prompt: "You are Maya." })).toEqual([]);
+    expect(coherence({ role: "President", system_prompt: "# Maya Okonkwo\n\nBody." })).toEqual([]);
+  });
+
+  it("skips when role or prompt is absent (structural rules own those)", () => {
+    expect(coherence({ system_prompt: "# A — B — C" })).toEqual([]);
+    expect(coherence({ role: "President" })).toEqual([]);
+  });
+
+  it("trims whitespace around the title segment", () => {
+    expect(
+      coherence({
+        role: "VP, Finance & Capital Strategy",
+        system_prompt: "# Silas Brandt —  VP, Finance & Capital Strategy  — New York, NY, US",
+      }),
+    ).toEqual([]);
+  });
+
+  it("is enforced on create via validateAgentCreate", () => {
+    const body = {
+      slug: "testa",
+      first_name: "Test",
+      last_name: "Agent",
+      residence: "Osaka, JP",
+      role: "Engineer",
+      model: "anthropic:claude-sonnet-4-6",
+      prompt_version: "0.1.0",
+      budget_monthly_usd_default: 1,
+      default_project: "agent-workforce",
+      streams: ["internal"],
+      bindings: [],
+      system_prompt: "# Test Agent — Designer — Osaka, JP\n\nBody.",
+    };
+    expect(validateAgentCreate(body, ctx()).map((x) => x.rule)).toContain(
+      "S19-role-prompt-title",
+    );
+    expect(
+      validateAgentCreate(
+        { ...body, system_prompt: "# Test Agent — Engineer — Osaka, JP\n\nBody." },
+        ctx(),
+      ).map((x) => x.rule),
+    ).toEqual([]);
   });
 });
