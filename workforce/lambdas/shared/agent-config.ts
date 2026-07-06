@@ -236,7 +236,7 @@ export function promptHeaderTitle(systemPrompt: unknown): string | null {
   if (typeof systemPrompt !== "string") return null;
   const first = systemPrompt.split(/\r?\n/, 1)[0] ?? "";
   const m = first.match(/^#\s+[^—]+—\s*([^—]+?)\s*—/);
-  return m ? m[1].trim() : null;
+  return m?.[1]?.trim() ?? null;
 }
 
 export function validateIdentityCoherence(
