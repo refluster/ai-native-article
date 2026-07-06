@@ -38,7 +38,7 @@ function loadMermaid(): Promise<Mermaid> {
         fontFamily: 'Inter, sans-serif',
         theme: 'base',
         themeVariables: {
-          background: T.figureSurface,
+          background: T.surface,
           fontFamily: 'Inter, sans-serif',
           fontSize: '14px',
           textColor: T.ink,
@@ -63,7 +63,7 @@ function loadMermaid(): Promise<Mermaid> {
           pie3: FIGURE_CATEGORICAL[2],
           pie4: FIGURE_CATEGORICAL[3],
           pie5: FIGURE_CATEGORICAL[4],
-          pieStrokeColor: T.figureSurface,
+          pieStrokeColor: T.surface,
           pieStrokeWidth: '2px',
           pieOuterStrokeWidth: '0px',
           pieTitleTextColor: T.ink,
@@ -74,7 +74,7 @@ function loadMermaid(): Promise<Mermaid> {
           pieLegendTextSize: '13px',
           // XY chart (line / bar): recessive axes, ink-first series.
           xyChart: {
-            backgroundColor: T.figureSurface,
+            backgroundColor: 'transparent',
             titleColor: T.ink,
             xAxisLabelColor: T.inkVariant,
             xAxisTitleColor: T.inkVariant,
@@ -136,7 +136,7 @@ export default function MermaidBlock({ code }: { code: string }) {
 
   if (svg === null) {
     return (
-      <figure className="my-8 bg-surface-container-low p-6 min-h-[10rem] flex items-center justify-center">
+      <figure className="my-10 min-h-[10rem] flex items-center justify-center">
         <span className="text-[10px] font-bold tracking-widest text-outline uppercase animate-pulse">
           RENDERING FIGURE...
         </span>
@@ -144,9 +144,12 @@ export default function MermaidBlock({ code }: { code: string }) {
     )
   }
 
+  // The figure sits directly on the article surface (no tonal block), so the
+  // chart reads as part of the text column; vertical margin alone carries the
+  // separation (whitespace as a content element, DESIGN.md §1).
   return (
     <figure
-      className="mermaid-figure my-8 bg-surface-container-low px-4 py-6 md:px-8 overflow-x-auto"
+      className="mermaid-figure my-10 overflow-x-auto"
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   )

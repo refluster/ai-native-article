@@ -82,9 +82,10 @@
   @apply text-tertiary underline underline-offset-2 hover:no-underline;
 }
 
-/* Mermaid figures (```mermaid fences → MermaidBlock). The figure is a tonal
-   block (surface-container-low) per the No-Line rule; the SVG centers inside
-   it and scales down on narrow viewports. */
+/* Mermaid figures (```mermaid fences → MermaidBlock). The figure sits
+   directly on the article surface — no tonal block, no frame; vertical
+   margin separates it from the text. The SVG centers in the column and
+   scales down on narrow viewports. */
 .article-content .mermaid-figure svg {
   display: block;
   margin-inline: auto;
