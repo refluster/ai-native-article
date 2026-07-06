@@ -217,6 +217,43 @@ export function validateIdentityPatch(
   return out;
 }
 
+// ─── S19 — role ↔ system_prompt header coherence (ML-014) ──────────────────
+// Persona prompts open with `# {Name} — {Title} — {Location}` by convention
+// (32/33 conformed exactly when this landed; the 33rd was the incident). The
+// {Title} copy and the `role` field are two hand-written statements of the
+// same fact with no shared source: on AGENT#maya, `role` was flipped
+// Founder→President (mid-June 2026, pre-audit-trail) while the W-5-protected
+// prompt kept "Founder" — and every artefact generated FROM the prompt
+// inherited the stale title until an operator caught it in a published
+// report (2026-07-06). The check runs on the EFFECTIVE row (current row
+// merged with the mutation) whenever `role` or `system_prompt` is written:
+// a parseable header title must equal `role` exactly — a title change
+// updates both fields in one mutation. Prompts without the header
+// convention are not constrained (the convention is strong, not a schema).
+// The stock auditor is workforce/scripts/check-identity-drift.mjs.
+
+export function promptHeaderTitle(systemPrompt: unknown): string | null {
+  if (typeof systemPrompt !== "string") return null;
+  const first = systemPrompt.split(/\r?\n/, 1)[0] ?? "";
+  const m = first.match(/^#\s+[^—]+—\s*([^—]+?)\s*—/);
+  return m?.[1]?.trim() ?? null;
+}
+
+export function validateIdentityCoherence(
+  effective: Readonly<Record<string, unknown>>,
+): ConfigViolation[] {
+  const role = typeof effective.role === "string" ? effective.role.trim() : "";
+  const title = promptHeaderTitle(effective.system_prompt);
+  if (!role || title === null || title === role) return [];
+  return [
+    {
+      rule: "S19-role-prompt-title",
+      field: "system_prompt",
+      msg: `system_prompt header title "${title}" does not match role "${role}" — a title change writes both fields in one mutation (ML-014)`,
+    },
+  ];
+}
+
 // Fields a POST /agents create body must carry. Everything else writable
 // (jd / identity / experience / memory / org edges / owner_email) is
 // optional at create time and PATCHable later. `bindings` is required but
@@ -261,6 +298,9 @@ export function validateAgentCreate(
   }
   const { slug: _slug, ...identityFields } = body;
   out.push(...validateIdentityPatch(identityFields, ctx));
+  // A create carries the full row, so the S19 coherence check runs on the
+  // body directly — a seeded persona can't be born with a role↔prompt split.
+  out.push(...validateIdentityCoherence(body));
   return out;
 }
 

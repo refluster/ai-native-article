@@ -67,6 +67,7 @@ import {
   IDENTITY_PATCHABLE_FIELDS,
   validateAgentCreate,
   validateBudgetOverride,
+  validateIdentityCoherence,
   validateIdentityPatch,
   type ConfigViolation,
 } from "../shared/agent-config.js";
@@ -638,6 +639,13 @@ async function patchAgent(
     violations.push(
       ...validateIdentityPatch(patch, { otherAgentsEffectiveBudgetUsd, skillOwners, skillStatus }),
     );
+    // S19 (ML-014): role and the prompt's header title are two copies of one
+    // fact — when either is written, they must agree on the EFFECTIVE row.
+    if ("role" in patch || "system_prompt" in patch) {
+      violations.push(
+        ...validateIdentityCoherence({ ...(existing as unknown as Record<string, unknown>), ...patch }),
+      );
+    }
   }
   if ("budget_monthly_usd_override" in patch) {
     // The override is the effective budget when set, so it is what counts
