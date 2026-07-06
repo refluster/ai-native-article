@@ -53,6 +53,11 @@ const MIN_BODY_CHARS = 3000;
 // rich_text element.
 const BLOCKS_PER_REQUEST = 100;
 const RICH_TEXT_MAX = 2000;
+// Notion's code-block language enum doesn't include every fence tag; anything
+// unrecognised maps to "plain text" (mermaid IS in the enum and is the one
+// this Cadence actually uses). Declared up here because markdownToBlocks runs
+// at module top level, before bottom-of-file consts would initialize.
+const NOTION_CODE_LANGS = new Set(["mermaid", "javascript", "typescript", "json", "bash", "shell", "python", "sql", "yaml", "markdown", "plain text"]);
 const ARTEFACT_PRELUDE =
   /^\s*(as an ai|here is|here's|i apologize|i'm sorry|certainly!|sure,|of course)/i;
 
@@ -196,12 +201,16 @@ try {
 }
 
 // Minimal Markdown → Notion blocks (same dialect as publish-notion.mjs: H1-3,
-// bullets, blank-line paragraphs), except long text is split across multiple
+// bullets, blank-line paragraphs), plus fenced code blocks — a ```mermaid fence
+// becomes a Notion code block with language "mermaid", which fetch-notion.mjs
+// round-trips back to a fence and the reader renders as an inline figure
+// (newsletter/docs/ARTICLE-FIGURES.md). Long text is split across multiple
 // rich_text elements instead of sliced at 2000 chars — a report paragraph must
 // never be silently cut.
 function markdownToBlocks(md) {
   const out = [];
   let para = [];
+  let fence = null; // { lang, lines } while inside a ``` fence
   const flushPara = () => {
     if (para.length === 0) return;
     pushText("paragraph", para.join(" "));
@@ -219,6 +228,21 @@ function markdownToBlocks(md) {
   };
   for (const raw of md.split(/\r?\n/)) {
     const line = raw.trim();
+    if (fence) {
+      if (line.startsWith("```")) {
+        const lang = NOTION_CODE_LANGS.has(fence.lang) ? fence.lang : "plain text";
+        out.push({ object: "block", type: "code", code: { rich_text: chunk(fence.lines.join("\n")), language: lang } });
+        fence = null;
+      } else {
+        fence.lines.push(raw); // raw, not trimmed — indentation is significant
+      }
+      continue;
+    }
+    if (line.startsWith("```")) {
+      flushPara();
+      fence = { lang: line.slice(3).trim().toLowerCase(), lines: [] };
+      continue;
+    }
     if (line === "") { flushPara(); continue; }
     let m;
     if ((m = line.match(/^###\s+(.+)/))) { flushPara(); pushText("heading_3", m[1]); }
@@ -226,6 +250,12 @@ function markdownToBlocks(md) {
     else if ((m = line.match(/^#\s+(.+)/))) { flushPara(); pushText("heading_2", m[1]); }
     else if ((m = line.match(/^[-*]\s+(.+)/))) { flushPara(); pushText("bulleted_list_item", m[1]); }
     else { para.push(line); }
+  }
+  if (fence) {
+    // Unclosed fence = a truncated body that slipped past the guard — fail loud
+    // rather than publishing a half-figure (W-1/C-1).
+    console.error("post.mjs: unclosed ``` fence in body — refusing to publish (W-1)");
+    process.exit(2);
   }
   flushPara();
   return out;
