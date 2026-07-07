@@ -1,46 +1,60 @@
-# seed/memory — curated long-term memory, one-shot write input
+# seed/memory — per-agent MEMORY.md, the semantic long-term memory layer
 
-Per-agent long-term memory blocks for the console MEMORY panel — the
-`memory` profile block on the `AGENT#{slug}/META` row (the durable,
-curated layer the persona "remembers" at session open: facts, standing
-decisions, preferences, people-context — `workforce/app/src/types/agent.ts`).
+One `MEMORY.md` per agent (`{slug}.md`): the curated **semantic** memory the
+persona re-reads at every fire. Decision record: [ADR-0019](../../docs/adr/adr-0019-agent-semantic-memory.md);
+generalisation plan: [Epic-018](../../docs/epics/epic-018-semantic-memory-curation.md).
 
-**W-2 posture: these files are NOT a mirror.** DDB is the authoritative
-store for workforce state (ADR-0007). Each `{slug}.json` here is one-shot
-curation *input* for `workforce/scripts/curate-agent-memory.mjs`, exactly
-like the pre-deletion git snapshot is input for
-`restore-agent-profile-fields.mjs`. After a write lands, the row may be
-further curated through the agents-api without these files being updated
-— never read them back as current state.
+Plain markdown, chosen deliberately over a structured schema: memory is prose
+the persona thinks with and the operator edits directly — ease of update and
+ease of use beat machine-enumerable entries (the earlier `entries[]` deck shape
+was superseded by ADR-0019 before ever carrying data).
 
-**Grounding requirement.** Seeding invented/sample entries is prohibited
-(`types/agent.ts`): memory feeds back into the persona's execution as
-system context. Every entry in these files is distilled from the agent's
-real record — its EXEC ledger (`GET /agents/{slug}/executions`), its feed
-posts (frictions / improvements / reflections), its identity/JD blocks,
-and its org edges. Entry `body` text cites the grounding event (date, PR,
-post) where useful.
+**W-2 posture: these files are NOT a mirror.** DDB is the authoritative store
+(the `memory` block on `AGENT#{slug}/META`, ADR-0007). Each file here is
+curation *input* for `workforce/scripts/curate-agent-memory.mjs`, which
+whole-document-replaces the block through the agents-api single write path
+(S17 validation + `AUDIT#` row). After a write lands, the row may be curated
+further without these files changing — never read them back as current state.
 
-## Formation model
+## The two memory layers (human analogy)
 
-Mirrors how a person forms long-term memory — from personality, work
-history, outputs, interactions, and in-the-moment lessons — distilled
-into the four durable kinds the schema allows:
+| layer | store | written by | holds |
+|---|---|---|---|
+| **episodic** | S3 `memory/{slug}/vNNNN.md` chunks + compactor (Epic-012) | the runtime, automatically | what happened, run by run |
+| **semantic** (this) | `META.memory` `{last_updated, body}` | curation (operator-gated) | what it *means* — distilled principles |
 
-| kind | formed from |
-|---|---|
-| `fact` | durable facts learned from the agent's own runs/outputs |
-| `decision` | standing commitments, usually promoted from a friction → improvement arc |
-| `preference` | emergent working preferences visible across many runs |
-| `person` | colleagues/operator context learned through real interactions |
+Semantic memory is formed the way a person forms it — from personality, work
+history, outputs, interactions, and in-the-moment lessons — but stored at the
+**meaning level**, not the work level: a lesson generalised across episodes,
+not the episodes themselves. Work-level records stay in the EXEC ledger.
 
-Activity itself stays out — the Task Log and ACTIVITY ledger already
-record what was *done*; memory records what was *learned*.
+## Content rules
 
-## Shape
+1. **MVV-anchored.** The persona pursues the workforce MVV continuously
+   (`workforce/docs/mvv.md` is injected as layer 2 of every fire); the
+   `## Mission anchor` section states how *this role's* learned knowledge
+   serves that mission — it must not duplicate the MVV text.
+2. **Semantic level.** Distil the principle; drop the episode. PR numbers and
+   dates appear only when the fact itself is durable (a regulatory deadline),
+   never as activity records.
+3. **Grounded.** Every line must be distilled from the agent's real record
+   (EXEC ledger, feed posts, org edges). Invented memory is prohibited — the
+   body feeds back into the persona's execution as system context.
+4. **Self-contained, first person.** The document must read correctly at
+   session open with no surrounding context.
+5. **Bounded.** ≤ 16 KB serialized (the S17 profile-block ceiling); in
+   practice aim for 1.5–3 KB — memory is a lens, not a corpus.
 
-`{ "last_updated": "YYYY-MM-DD", "entries": [{ "id", "kind", "subject", "body" }] }`
-— `AgentMemory` in `workforce/app/src/types/agent.ts`. `id` is an 8-char
-ULID-ish token, `subject` 1–5 words, `body` 1–2 self-contained sentences,
-first-person. The whole block must stay under the 16 KB S17 profile-block
-ceiling (`shared/agent-config.ts`).
+## Structure
+
+```md
+# MEMORY — {Name} ({Role})
+> Curated: YYYY-MM-DD · <provenance one-liner>
+## Mission anchor
+## Learned principles
+## People & organisation
+## Standing bets & falsifiers   (optional)
+```
+
+The `Curated: YYYY-MM-DD` token is machine-read by the writer script as
+`last_updated`.

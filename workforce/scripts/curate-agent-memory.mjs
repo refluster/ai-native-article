@@ -1,27 +1,25 @@
 #!/usr/bin/env node
-// curate-agent-memory.mjs — write curated long-term memory blocks onto
+// curate-agent-memory.mjs — write curated semantic MEMORY.md documents onto
 // AGENT#{slug}/META rows through wf-agents-api (the single writer per
 // ADR-0007, so the S17 profile-block validation + AUDIT# trail apply).
 //
-// Input: workforce/seed/memory/{slug}.json — operator-approved, grounded
-// memory blocks (see that directory's README for the W-2 "one-shot input,
-// not a mirror" posture and the no-invented-entries rule).
+// Decision record: ADR-0019 (agent semantic memory). Input:
+// workforce/seed/memory/{slug}.md — operator-approved, grounded,
+// semantic-level memory documents (see that directory's README for the W-2
+// "one-shot input, not a mirror" posture and the content rules).
 //
-// Merge semantics (append-only by convention, types/agent.ts): the current
-// row's entries are kept and input entries with new ids are appended;
-// an input entry whose id already exists on the row is skipped. Use
-// --replace to overwrite the whole block instead (e.g. to amend wording
-// of an already-landed entry). `last_updated` always takes the input
-// file's value.
+// Write semantics: whole-document replace. The MEMORY.md document is the
+// curation unit — unlike the retired entries[] deck there is no id-level
+// merge; re-running with an unchanged file is a no-op (the API's diff
+// check writes nothing and audits nothing).
 //
-// Fail loud (W-4): shape violations, the 16 KB S17 ceiling, and any
+// Fail loud (W-4): a malformed document, the 16 KB S17 ceiling, and any
 // non-200 API response are reported and the script exits non-zero.
 //
 // Usage (operator machine or the dispatch workflow — AWS creds in scope):
 //   node workforce/scripts/curate-agent-memory.mjs [stage] [flags]
 //     stage        dev | prod (default: prod)
 //     --dry-run    print the would-be memory blocks, write nothing
-//     --replace    overwrite the row's memory block instead of merging
 //     --agents a,b restrict to a comma-separated slug list
 //
 // After a prod run the console needs no redeploy — the profile page
@@ -38,7 +36,6 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const MEMORY_KINDS = ["fact", "decision", "preference", "person"];
 // Mirrors PROFILE_BLOCK_MAX_CHARS in workforce/lambdas/shared/agent-config.ts
 // so a too-big block fails here with a named reason instead of a raw S17
 // violation from the API.
@@ -54,7 +51,6 @@ if (!/^(dev|prod)$/.test(stage)) {
   process.exit(2);
 }
 const dryRun = args.includes("--dry-run");
-const replace = args.includes("--replace");
 const agentsFlagIdx = args.indexOf("--agents");
 const onlyAgents =
   agentsFlagIdx !== -1 && args[agentsFlagIdx + 1]
@@ -100,100 +96,70 @@ function invokeRoute(method, slug, body) {
   return { statusCode: raw.statusCode, body: raw.body ? JSON.parse(raw.body) : undefined };
 }
 
-/** Validate one input file against the AgentMemory shape
- *  (workforce/app/src/types/agent.ts). Returns a list of violations. */
-function validateMemory(slug, mem) {
-  const v = [];
-  if (typeof mem !== "object" || mem === null || Array.isArray(mem)) {
-    return [`${slug}: memory must be a plain object`];
+/** Validate one MEMORY.md against the seed/memory README contract.
+ *  Returns { violations, last_updated }. */
+function validateMemoryDoc(slug, body) {
+  const violations = [];
+  if (!/^# MEMORY — /m.test(body)) {
+    violations.push(`${slug}: missing "# MEMORY — <Name> (<Role>)" title`);
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(mem.last_updated ?? "")) {
-    v.push(`${slug}: last_updated must be an ISO date (YYYY-MM-DD)`);
+  const curated = body.match(/Curated:\s*(\d{4}-\d{2}-\d{2})/);
+  if (!curated) {
+    violations.push(`${slug}: missing machine-readable "Curated: YYYY-MM-DD" token`);
   }
-  if (!Array.isArray(mem.entries)) {
-    v.push(`${slug}: entries must be an array`);
-    return v;
+  if (!/^## Mission anchor$/m.test(body)) {
+    violations.push(`${slug}: missing "## Mission anchor" section (the MVV anchor is mandatory)`);
   }
-  const seen = new Set();
-  for (const [i, e] of mem.entries.entries()) {
-    const at = `${slug}: entries[${i}]`;
-    if (!/^[0-9A-Z]{8}$/.test(e?.id ?? "")) v.push(`${at}.id must be 8 chars of [0-9A-Z]`);
-    if (seen.has(e?.id)) v.push(`${at}.id "${e.id}" is duplicated in the file`);
-    seen.add(e?.id);
-    if (!MEMORY_KINDS.includes(e?.kind)) v.push(`${at}.kind must be one of ${MEMORY_KINDS.join("|")}`);
-    if (typeof e?.subject !== "string" || e.subject.split(/\s+/).length > 5 || e.subject.length === 0) {
-      v.push(`${at}.subject must be 1-5 words`);
-    }
-    if (typeof e?.body !== "string" || e.body.length === 0) v.push(`${at}.body must be a non-empty string`);
+  if (body.trim().length < 200) {
+    violations.push(`${slug}: body suspiciously short (<200 chars) — refuse to write a hollow memory`);
   }
-  if (JSON.stringify(mem).length > PROFILE_BLOCK_MAX_CHARS) {
-    v.push(`${slug}: memory block exceeds the ${PROFILE_BLOCK_MAX_CHARS}-char S17 ceiling`);
+  if (body.length > PROFILE_BLOCK_MAX_CHARS) {
+    violations.push(`${slug}: body exceeds the ${PROFILE_BLOCK_MAX_CHARS}-char S17 ceiling`);
   }
-  return v;
+  return { violations, last_updated: curated?.[1] ?? null };
 }
 
-const files = readdirSync(SEED_DIR).filter((f) => /^[a-z]+\.json$/.test(f));
-const slugs = (onlyAgents ?? files.map((f) => f.replace(/\.json$/, ""))).sort();
+const files = readdirSync(SEED_DIR).filter((f) => /^[a-z]+\.md$/.test(f) && f !== "readme.md");
+const slugs = (onlyAgents ?? files.map((f) => f.replace(/\.md$/, ""))).sort();
 
 console.log(
-  `curate-agent-memory: ${slugs.length} agent(s), stage=${stage}${dryRun ? ", DRY-RUN" : ""}${replace ? ", REPLACE" : ""}`,
+  `curate-agent-memory: ${slugs.length} agent(s), stage=${stage}${dryRun ? ", DRY-RUN" : ""}`,
 );
 
 let written = 0;
-let unchanged = 0;
 const failures = [];
 
 for (const slug of slugs) {
-  let input;
+  let body;
   try {
-    input = JSON.parse(readFileSync(join(SEED_DIR, `${slug}.json`), "utf8"));
+    body = readFileSync(join(SEED_DIR, `${slug}.md`), "utf8");
   } catch (err) {
     failures.push({ slug, reason: `unreadable seed file: ${err.message}` });
     continue;
   }
-  const violations = validateMemory(slug, input);
+  const { violations, last_updated } = validateMemoryDoc(slug, body);
   if (violations.length > 0) {
     failures.push({ slug, reason: violations.join("; ") });
     continue;
   }
 
-  const current = invokeRoute("GET", slug);
-  if (current.statusCode !== 200) {
-    failures.push({ slug, reason: `GET -> HTTP ${current.statusCode} (row missing in DDB?)` });
-    continue;
-  }
-  const existing = current.body?.memory ?? { last_updated: "", entries: [] };
-  const existingEntries = Array.isArray(existing.entries) ? existing.entries : [];
-
-  let next;
-  if (replace) {
-    next = input;
-  } else {
-    const have = new Set(existingEntries.map((e) => e.id));
-    const fresh = input.entries.filter((e) => !have.has(e.id));
-    if (fresh.length === 0) {
-      console.log(`  ${slug}: all ${input.entries.length} entries already on the row — unchanged`);
-      unchanged += 1;
-      continue;
-    }
-    next = { last_updated: input.last_updated, entries: [...existingEntries, ...fresh] };
-  }
-  if (JSON.stringify(next).length > PROFILE_BLOCK_MAX_CHARS) {
-    failures.push({ slug, reason: `merged memory block exceeds the ${PROFILE_BLOCK_MAX_CHARS}-char S17 ceiling` });
+  const memory = { last_updated, body };
+  if (JSON.stringify(memory).length > PROFILE_BLOCK_MAX_CHARS) {
+    failures.push({ slug, reason: `serialized memory block exceeds the ${PROFILE_BLOCK_MAX_CHARS}-char S17 ceiling` });
     continue;
   }
 
   if (dryRun) {
     console.log(
-      `  ${slug}: would PATCH memory — ${next.entries.length} entries (${existingEntries.length} existing), last_updated ${next.last_updated}`,
+      `  ${slug}: would PATCH memory — ${body.length} chars, curated ${last_updated}`,
     );
     written += 1;
     continue;
   }
 
-  const res = invokeRoute("PATCH", slug, { memory: next });
+  const res = invokeRoute("PATCH", slug, { memory });
   if (res.statusCode === 200) {
-    console.log(`  ${slug}: PATCHed memory — ${next.entries.length} entries`);
+    console.log(`  ${slug}: PATCHed memory — ${body.length} chars, curated ${last_updated}`);
     written += 1;
   } else {
     failures.push({ slug, reason: `PATCH -> HTTP ${res.statusCode}: ${JSON.stringify(res.body)}` });
@@ -201,7 +167,7 @@ for (const slug of slugs) {
 }
 
 console.log(
-  `\ndone: ${written} ${dryRun ? "to write" : "written"}, ${unchanged} unchanged, ${failures.length} failed`,
+  `\ndone: ${written} ${dryRun ? "to write" : "written"}, ${failures.length} failed`,
 );
 if (failures.length > 0) {
   for (const f of failures) console.error(`  FAIL ${f.slug}: ${f.reason}`);

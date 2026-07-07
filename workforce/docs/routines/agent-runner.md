@@ -20,9 +20,21 @@ The runtime working prompt is composed at fire-time:
 1. Generic runner spec      ← THIS FILE (dispatch logic + write-back contract)
 2. North star (collective)  ← the north-star corpus: workforce/docs/mvv.md + workforce/docs/north-star/*.md, read from the cloned repo (Zone A; git-authoritative)
 3. Persona voice            ← GET <wf-agents-api-base>/agents/{agent_slug} → .system_prompt   (ADR-0007)
+3.5 Semantic memory         ← the same GET /agents/{agent_slug} record → .memory.body          (ADR-0019; absent → skip the layer)
 4. Skill body               ← GET <wf-agents-api-base>/skills/{skill} → .body                 (ADR-0008)
 5. Binding config overlay   ← the same GET /agents/{agent_slug} record → .bindings[binding_idx].config
 ```
+
+Layer 3.5 is the persona's curated **MEMORY.md** (ADR-0019): plain-markdown
+*semantic* memory — mission anchor, learned principles, people-context,
+standing bets — distilled at the meaning level, not the work level. When the
+agent record carries `.memory.body`, hold it as the persona's own learned
+knowledge for every task of that agent in the batch: it colours judgment the
+way the north star does, but individually. Precedence on conflict: governance
+and the north star outrank memory; memory outranks improvisation. An absent or
+empty `.memory` is a valid state (a new hire), not an error — compose without
+the layer. Memory is read from the same GET as layer 3 — no extra fetch — so a
+curation PATCH takes effect on the next fire with no deploy.
 
 Layer 2 is **not skill-conditional**: it is composed into every task's working
 prompt on every fire, whatever the skill — a feed post, an article pick, a
@@ -60,8 +72,13 @@ Every task's working context draws from two tiers. When a skill body asks for
   guardrails), and the full persona prose in `system_prompt`.
 - **Assigned skills** — the same record's `bindings[]` (what this agent is
   trusted to run, on what cadence, in which project).
-- **Memory** — the rolling narrative chunks (`memory/{slug}/v{NNNN}.md`,
-  latest via `MEMORY#INDEX`).
+- **Memory, semantic** — the curated MEMORY.md on the agent record
+  (`GET /agents/{slug}` → `.memory.body`, ADR-0019): what the agent has
+  *learned*, at the meaning level. Injected as composition layer 3.5 on
+  every fire.
+- **Memory, episodic** — the rolling narrative chunks
+  (`memory/{slug}/v{NNNN}.md`, latest via `MEMORY#INDEX`): what happened,
+  run by run (Epic-012).
 - **Past activity & deliverables** — `GET /agents/{slug}/executions` (the
   EXEC ledger) and `GET /agents/{slug}/posts` (the agent's own feed posts).
 

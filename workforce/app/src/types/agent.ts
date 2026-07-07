@@ -58,51 +58,29 @@ export interface AgentIdentity {
 }
 
 /**
- * The semantic class of a long-term memory entry. Constrained to kinds
- * that survive across sessions — durable facts about the world, standing
- * decisions the persona has committed to, preferences that emerged, and
- * people / context the persona has learned to work with.
+ * Persona long-term memory — the semantic MEMORY.md layer (ADR-0019).
  *
- * Note: `lesson` and `open-question` deliberately excluded. Generalised
- * lessons should be reframed as decisions or facts before they land here;
- * open questions belong in day-to-day notes, not in the durable layer.
- */
-export type AgentMemoryKind = 'fact' | 'decision' | 'preference' | 'person';
-
-export interface AgentMemoryEntry {
-  /** Short id (8-char ULID-ish) for cross-reference + future amendment. */
-  id: string;
-  kind: AgentMemoryKind;
-  /** Short label, 1–5 words. */
-  subject: string;
-  /** One or two sentences of detail. Self-contained — the entry must
-   *  read correctly at session open with no surrounding context. */
-  body: string;
-}
-
-/**
- * Persona long-term memory — OpenClaw / Hermes MEMORY.md analogue.
+ * This is the **durable, curated** layer the persona re-reads at every
+ * fire (agent-runner composition layer 3.5): a plain-markdown document
+ * distilling what the agent has *learned* — mission anchor, generalised
+ * principles, people-context, standing bets — at the meaning level, not
+ * the work level. It is NOT an activity record — the Task Log
+ * (recent_runs) and the ACTIVITY ledger cover what the agent has *done*,
+ * and the S3 rolling chunks (Epic-012) hold the episodic run narrative.
  *
- * This is the **durable, curated** layer the persona "remembers" at
- * session open: facts, standing decisions, preferences, people-context.
- * It is NOT an activity record — the Task Log (recent_runs) and the
- * ACTIVITY ledger already cover what the agent has *done*.
- * Memory is what the agent has *learned*.
+ * Empty / absent `body` is a valid state — a brand-new agent has no
+ * memory yet. Seeding invented content is not permitted because the body
+ * feeds back into the agent's execution as system context; curation
+ * rules live in workforce/seed/memory/README.md.
  *
- * Entries are append-only by convention; the schema does not carry per-
- * entry timestamps because long-term memory is not chronological. The
- * top-level `last_updated` exists so operators can see when a human or
- * agent last curated this layer.
- *
- * Empty is a valid state — a brand-new agent has no memory yet. Seeding
- * sample entries is not permitted because they would feed back into the
- * agent's execution as system context.
+ * (The pre-ADR-0019 shape was a structured `entries[]` deck; it never
+ * carried data and was superseded before first write.)
  */
 export interface AgentMemory {
   /** ISO date of the latest curation. */
   last_updated: string;
-  /** Append-only list of durable memory entries. */
-  entries: AgentMemoryEntry[];
+  /** The MEMORY.md document — plain markdown, semantic level. */
+  body?: string;
 }
 
 export interface WorkforceAgent {

@@ -45,7 +45,7 @@ import {
   type AgentLiveRecord,
 } from '../lib/agents';
 import { fmtDuration, fmtCompute } from '../lib/duration';
-import type { AgentMemoryKind, WorkforceAgent } from '../types/agent';
+import type { WorkforceAgent } from '../types/agent';
 import type { AgentMockStats, WorkforceMockStats } from '../types/stats';
 
 const STREAM_LABEL: Record<WorkforceAgent['streams'][number], string> = {
@@ -680,85 +680,114 @@ function formatDuration(secs: number): string {
   return s === 0 ? `${m}m` : `${m}m${String(s).padStart(2, '0')}`;
 }
 
-// Long-term memory has four kinds: durable facts, standing decisions,
-// emergent preferences, and people-context. Entries within a kind are
-// rendered in their authored order — long-term memory is NOT chronological,
-// so no date sort. The Task Log and ACTIVITY ledger already cover the
-// dated/activity view.
-const MEMORY_KIND_META: Record<AgentMemoryKind, { label: string; tone: string; border: string; order: number }> = {
-  fact:       { label: 'FACT',     tone: 'text-wf-on-surface',         border: 'border-wf-outline-variant', order: 0 },
-  decision:   { label: 'DECISION', tone: 'text-wf-tertiary',           border: 'border-wf-tertiary/40',     order: 1 },
-  preference: { label: 'PREF',     tone: 'text-wf-on-surface-variant', border: 'border-wf-outline-variant', order: 2 },
-  person:     { label: 'PERSON',   tone: 'text-wf-primary',            border: 'border-wf-primary/40',      order: 3 },
-};
+// Long-term memory is a plain-markdown MEMORY.md document (ADR-0019) —
+// the semantic layer the persona re-reads at every fire. The panel
+// renders the small markdown subset the seed/memory README's structure
+// uses (## sections, - bullets, paragraphs); the `# MEMORY — …` title and
+// the `> Curated …` provenance line are chrome the header already
+// carries, so both are dropped rather than re-rendered.
+type MemoryMdBlock =
+  | { type: 'heading'; text: string }
+  | { type: 'bullets'; items: string[] }
+  | { type: 'para'; text: string };
+
+function parseMemoryMd(body: string): MemoryMdBlock[] {
+  const blocks: MemoryMdBlock[] = [];
+  for (const raw of body.split(/\n{2,}/)) {
+    const chunk = raw.trim();
+    if (chunk === '' || chunk.startsWith('# ') || chunk.startsWith('>')) continue;
+    if (chunk.startsWith('## ')) {
+      // A section heading may share its blank-line block with body text.
+      const [head, ...rest] = chunk.split('\n');
+      blocks.push({ type: 'heading', text: head.replace(/^##\s+/, '') });
+      const tail = rest.join('\n').trim();
+      if (tail !== '') blocks.push(...parseMemoryMd(tail));
+      continue;
+    }
+    if (/^[-*]\s/.test(chunk)) {
+      // Bullets: one item per leading "- "; continuation lines fold in.
+      const items = chunk
+        .split(/\n(?=[-*]\s)/)
+        .map((it) => it.replace(/^[-*]\s+/, '').replace(/\n\s*/g, ' ').trim())
+        .filter(Boolean);
+      blocks.push({ type: 'bullets', items });
+      continue;
+    }
+    blocks.push({ type: 'para', text: chunk.replace(/\n\s*/g, ' ') });
+  }
+  return blocks;
+}
+
+// Render inline `*emphasis*` / `**strong**` as an emphasised span; drop the
+// markers. Anything richer stays literal — memory is prose, not layout.
+function MemoryInline({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+  return (
+    <>
+      {parts.map((p, i) =>
+        /^\*\*[^*]+\*\*$/.test(p) ? (
+          <strong key={i} className="font-semibold text-wf-on-surface">{p.slice(2, -2)}</strong>
+        ) : /^\*[^*]+\*$/.test(p) ? (
+          <em key={i} className="text-wf-on-surface">{p.slice(1, -1)}</em>
+        ) : (
+          <span key={i}>{p}</span>
+        ),
+      )}
+    </>
+  );
+}
 
 function MemoryPanel({ memory }: { memory: NonNullable<WorkforceAgent['memory']> }) {
-  const entries = memory.entries;
-  const counts = entries.reduce<Record<string, number>>((acc, e) => {
-    acc[e.kind] = (acc[e.kind] ?? 0) + 1;
-    return acc;
-  }, {});
-  // Group by kind in canonical order; preserve authored order within a group.
-  const grouped = [...entries].sort((a, b) =>
-    (MEMORY_KIND_META[a.kind]?.order ?? 99) - (MEMORY_KIND_META[b.kind]?.order ?? 99),
-  );
+  const body = memory.body?.trim() ?? '';
+  const blocks = body === '' ? [] : parseMemoryMd(body);
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between flex-wrap gap-2">
-        <Typeplate label="MEMORY" value="LONG-TERM · DURABLE STATE" />
+        <Typeplate label="MEMORY" value="LONG-TERM · SEMANTIC" />
         <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-          {entries.length} {entries.length === 1 ? 'entry' : 'entries'} · curated {memory.last_updated}
+          MEMORY.md · curated {memory.last_updated}
         </span>
       </div>
-      {entries.length === 0 ? (
+      {blocks.length === 0 ? (
         <div className="px-4 py-5">
           <p className="text-sm text-wf-on-surface-variant leading-relaxed">
-            No durable memory yet. This persona hasn't accumulated facts,
-            decisions, preferences, or people-context worth surviving across
-            sessions. Memory entries are appended by the agent (or operator)
-            only when something is learned that should survive — not as a
-            record of what was done.
+            No durable memory yet. This persona hasn't accumulated learned
+            principles, people-context, or standing bets worth surviving
+            across sessions. Memory is curated only when something is
+            learned that should survive — not as a record of what was done.
           </p>
           <p className="mt-2 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
             see also · TASK LOG · ACTIVITY for the activity record
           </p>
         </div>
       ) : (
-        <>
-          <div className="px-4 pt-3 flex flex-wrap gap-2 border-b border-wf-outline-variant pb-3">
-            {(Object.keys(MEMORY_KIND_META) as AgentMemoryKind[])
-              .filter((k) => counts[k])
-              .map((k) => {
-                const m = MEMORY_KIND_META[k];
-                return (
-                  <span
-                    key={k}
-                    className={`font-wfmono text-[10px] uppercase tracking-[0.14em] px-2 py-0.5 border ${m.border} ${m.tone} rounded-wf-sm`}
+        <div className="px-4 py-4 space-y-3">
+          {blocks.map((b, i) =>
+            b.type === 'heading' ? (
+              <h4
+                key={i}
+                className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary pt-1"
+              >
+                {b.text}
+              </h4>
+            ) : b.type === 'bullets' ? (
+              <ul key={i} className="space-y-1.5">
+                {b.items.map((it, j) => (
+                  <li
+                    key={j}
+                    className="text-sm text-wf-on-surface-variant leading-relaxed pl-3 border-l border-wf-outline-variant"
                   >
-                    {m.label} · {counts[k]}
-                  </span>
-                );
-              })}
-          </div>
-          <ol className="divide-y divide-wf-outline-variant">
-            {grouped.map((e) => {
-              const m = MEMORY_KIND_META[e.kind];
-              return (
-                <li
-                  key={e.id}
-                  className="px-4 py-3 grid grid-cols-[80px_1fr] sm:grid-cols-[100px_1fr] gap-x-3 gap-y-1"
-                >
-                  <span className={`font-wfmono text-[10px] uppercase tracking-[0.14em] ${m.tone}`}>
-                    {m.label}
-                  </span>
-                  <span className="text-sm font-semibold text-wf-on-surface leading-snug">{e.subject}</span>
-                  <span aria-hidden />
-                  <span className="text-sm text-wf-on-surface-variant leading-snug">{e.body}</span>
-                </li>
-              );
-            })}
-          </ol>
-        </>
+                    <MemoryInline text={it} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p key={i} className="text-sm text-wf-on-surface-variant leading-relaxed">
+                <MemoryInline text={b.text} />
+              </p>
+            ),
+          )}
+        </div>
       )}
     </section>
   );
