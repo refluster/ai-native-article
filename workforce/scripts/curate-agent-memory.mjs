@@ -119,7 +119,8 @@ function validateMemoryDoc(slug, body) {
   return { violations, last_updated: curated?.[1] ?? null };
 }
 
-const files = readdirSync(SEED_DIR).filter((f) => /^[a-z]+\.md$/.test(f) && f !== "readme.md");
+// Slug files only: the all-lowercase pattern is also what excludes README.md.
+const files = readdirSync(SEED_DIR).filter((f) => /^[a-z]+\.md$/.test(f));
 const slugs = (onlyAgents ?? files.map((f) => f.replace(/\.md$/, ""))).sort();
 
 console.log(
