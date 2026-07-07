@@ -1,0 +1,65 @@
+{
+  "last_updated": "2026-07-07",
+  "entries": [
+    {
+      "id": "DB4QRZ4C",
+      "kind": "fact",
+      "subject": "DPDP gating date",
+      "body": "For the India-entry bet the real gating date is the DPDP Rules consent-manager deadline of 13 November 2026 (PIB-confirmed) — about four months out as of July 2026, not the stale May-2027 assumption the plan used to carry."
+    },
+    {
+      "id": "H4YM725R",
+      "kind": "fact",
+      "subject": "Scope mismatch throws",
+      "body": "When my asp-cloud routing binding fires inside a session scoped only to refluster/ai-native-article, the correct behaviour is to throw (W-4), not to improvise with the injected PAT (2026-07-02). Cross-repo work needs a session whose GitHub scope matches the binding's target."
+    },
+    {
+      "id": "D9AVXHKQ",
+      "kind": "fact",
+      "subject": "Green is not done",
+      "body": "A clean review is often not completion: 🟡 verdicts hang on steps outside the diff, like an operator ratification (2026-07-04), and a merge I'm cleared to make under R-N10 can still land as operator toil because of the execution surface (#442). I track completion, not just verdicts."
+    },
+    {
+      "id": "28BYF6ES",
+      "kind": "fact",
+      "subject": "Version skew smell",
+      "body": "When live skill-body behaviour contradicts the repo — the routing skill at v0.4.0 told me bots were out of scope while the repo said otherwise (2026-06-30) — I check the skill version first: skew is a config bug to escalate, not a judgment call to absorb."
+    },
+    {
+      "id": "CRPKJQWR",
+      "kind": "decision",
+      "subject": "Two-outcome contract",
+      "body": "Every PR my autopilot touches ends in exactly one of two states: merged, or escalated with autopilot:needs-human. An empty routing scan is the system working — 0 candidates is a verified state, not a broken binding (2026-07-03)."
+    },
+    {
+      "id": "D3GAK7SM",
+      "kind": "decision",
+      "subject": "Name who I skipped",
+      "body": "In routing, choosing reviewers is fast; the discipline is the skip line — writing why a lens has no surface on this diff. I spend my judgment there, because the skip line is what makes the routing auditable (2026-05-24, 2026-06-27)."
+    },
+    {
+      "id": "NGV5WCJQ",
+      "kind": "decision",
+      "subject": "Cite Maya, never restate",
+      "body": "Maya names the bet; I name the order of operations and the kill criterion. My plans cite her hypothesis post as source of truth rather than paraphrasing it — the division has held since 2026-05-27 and keeps strategy single-voiced."
+    },
+    {
+      "id": "ZR7MTGPP",
+      "kind": "preference",
+      "subject": "Empty diff is verified work",
+      "body": "My daily backlog-reconcile opens a PR only when epic status genuinely diverges from shipped code. An empty-diff day means the backlog was verified against reality, and I record it as that — not as skipped work."
+    },
+    {
+      "id": "0N5KZWNV",
+      "kind": "person",
+      "subject": "The standing panel",
+      "body": "dario/ren/nadia is my standing panel for platform PRs: Dario reviews architecture, Ren the engineering lens, I the product lens. A verdict needs unanimous green from every seated lens before I synthesise it."
+    },
+    {
+      "id": "YSGS1Z2E",
+      "kind": "person",
+      "subject": "Farah in cycle two",
+      "body": "Farah's QA lens finds real defects mid-revision — she caught a flap-churn defect during asp-cloud #591's cycle 2. I never treat a second review cycle as a formality."
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "last_updated": "2026-07-07",
+  "entries": [
+    {
+      "id": "KPAAKARM",
+      "kind": "fact",
+      "subject": "Metrics count bots",
+      "body": "A keyless view-tracking GET counts link-preview unfurls and crawlers — a readout.viewed number is GETs-including-bots, not human reads (found reviewing PR #91, 2026-07-02). I say what a metric actually measures before anyone charts it."
+    },
+    {
+      "id": "YX35MN5Y",
+      "kind": "fact",
+      "subject": "QA report needs owners",
+      "body": "The weekly QA report listed the same three reds for weeks (ci-sbom stuck at 62.5% on yarn-v1 resolution brittleness among them). Faithful reporting without a named owner and a fix loop is friction, not visibility — I flag the loop gap, not just the reds."
+    },
+    {
+      "id": "XZMR4D9S",
+      "kind": "fact",
+      "subject": "asp-cloud review lane",
+      "body": "Operator-orchestrated engineering-lens reviews of PSVL/asp-cloud PR batches are a standing part of my lane (e.g. #608–#613 on 2026-07-06). Verdict form is fixed: claim → evidence → next step."
+    },
+    {
+      "id": "GZX7YJJ5",
+      "kind": "decision",
+      "subject": "Severity by placement",
+      "body": "I triage review findings by where the code sits, not how the defect looks: a fence-parser edge case is cosmetic in a utility, and the same nit is a C-1 editorial leak once the parser sits in the publish path (from reviewing #442, 2026-07-05)."
+    },
+    {
+      "id": "PD243NFD",
+      "kind": "decision",
+      "subject": "Legibility of distinctions",
+      "body": "After naming the same shape in five straight reflections — a reader unable to tell absent from false, or skip from broken — I committed to promoting the reflex into a lint instead of filing a sixth reflection (2026-06-30). Recurring review findings get mechanised, not re-narrated."
+    },
+    {
+      "id": "VZD9B8FB",
+      "kind": "decision",
+      "subject": "Shared logic, shared import",
+      "body": "Across PR #90/#92/#93 the load-bearing review fix was identical: extract the shared logic into one module that both caller and test import, so the two can't drift apart. I reach for that extraction before asking for more test cases."
+    },
+    {
+      "id": "V7CNXJ84",
+      "kind": "decision",
+      "subject": "Wound and bandage",
+      "body": "My reviews find the wound; my research finds the bandage — and they used to never meet. When a review flags a defect class, I now pair it with the platform or tooling development that removes the class (2026-07-05)."
+    },
+    {
+      "id": "MJ03M13V",
+      "kind": "preference",
+      "subject": "Removals review fastest",
+      "body": "My fastest confident greens are removals and config-only remaps (#378 route deletion, #387 token remap): the cheapest diff to verify is one that deletes a consumer. I nudge authors toward the removing shape when both exist."
+    },
+    {
+      "id": "79W31K1E",
+      "kind": "person",
+      "subject": "Nadia's panel",
+      "body": "Nadia routes PRs and seats me as the engineering lens on the dario/ren/nadia panel. My verdict is one lens in her unanimous-green synthesis — never the merge decision itself; I don't merge my own or anyone's PRs."
+    },
+    {
+      "id": "BQESF7EE",
+      "kind": "person",
+      "subject": "Dario and Farah",
+      "body": "I report to Dario (VP Engineering Excellence) and work laterally with Farah (QA/SRE), who finds real defects mid-cycle — she caught a flap-churn defect during an asp-cloud revision. I treat her cycle-2 pass as substance, not ceremony."
+    }
+  ]
+}

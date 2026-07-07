@@ -1,0 +1,85 @@
+name: Curate workforce agent long-term memory
+
+# Dispatch-only runner for workforce/scripts/curate-agent-memory.mjs —
+# writes operator-approved, grounded long-term memory blocks
+# (workforce/seed/memory/{slug}.json) onto the AGENT#/META rows through
+# wf-agents-api (single writer per ADR-0007; S17 profile-block validation
+# + AUDIT rows apply). See workforce/seed/memory/README.md for the W-2
+# "one-shot input, not a mirror" posture and the grounding rule.
+#
+# Why a workflow: the write needs AWS credentials (`aws lambda invoke` on
+# wf-agents-api-{stage}) which sandboxed/remote agent sessions don't hold.
+# Mirrors workforce-restore-agent-profile-fields.yml: one-click operator
+# run with the same OIDC role the deploys assume. Requires
+# lambda:InvokeFunction on wf-agents-api-* in secrets.AWS_ROLE_ARN — if
+# the role lacks it, the run fails loudly (W-4).
+#
+# Defaults to --dry-run: the first dispatch previews the merged blocks;
+# re-run with dry_run=false to write. No console redeploy needed — the
+# agent profile page hydrates memory live from GET /agents/{slug}.
+#
+# Zone A — agent proposes; human merges (workforce/docs/governance.md §3).
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: 'Target stage'
+        type: choice
+        options: [prod, dev]
+        default: prod
+      dry_run:
+        description: 'Preview the merged memory blocks without writing'
+        type: boolean
+        default: true
+      replace:
+        description: 'Overwrite the whole memory block instead of append-merging by entry id'
+        type: boolean
+        default: false
+      agents:
+        description: 'Optional comma-separated slug list (default: every file in workforce/seed/memory/)'
+        type: string
+        default: ''
+
+concurrency:
+  group: workforce-curate-agent-memory
+  # Two concurrent runs interleaving GET+PATCH against the same rows is
+  # never what the operator wants — queue, don't cancel.
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  # Required for aws-actions/configure-aws-credentials to mint a JWT and
+  # assume secrets.AWS_ROLE_ARN via the configured GitHub OIDC trust.
+  id-token: write
+
+jobs:
+  curate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Run curate-agent-memory
+        env:
+          STAGE: ${{ inputs.stage }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          REPLACE: ${{ inputs.replace }}
+          AGENTS: ${{ inputs.agents }}
+        run: |
+          set -euo pipefail
+          flags=()
+          [ "$DRY_RUN" = "true" ] && flags+=(--dry-run)
+          [ "$REPLACE" = "true" ] && flags+=(--replace)
+          [ -n "$AGENTS" ] && flags+=(--agents "$AGENTS")
+          node workforce/scripts/curate-agent-memory.mjs "$STAGE" "${flags[@]}"
