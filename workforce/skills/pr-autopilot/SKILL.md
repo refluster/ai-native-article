@@ -66,6 +66,17 @@ body:
   engineering-excellence, platform). If you honestly cannot seat 3 distinct
   lenses, the PR is not autopilot-eligible: hand it off per Step 5 with
   `--needs-human --reason cannot-seat-panel`, stating why.
+- **Nomination load cap (Epic-019 Story 2b — fairness + W-3).** A persona may
+  hold at most **`NOMINATION_SEAT_CAP` (5)** concurrent open lens-review
+  seats. The scan output carries `open_seat_counts` (one seat per open,
+  non-terminal PR whose routing comment nominates that `wf:<slug>`) and
+  `capped_personas`; run your candidate list through
+  `applyNominationCap(candidates, open_seat_counts)` (exported from
+  `pr-autopilot-scan.mjs`) and nominate only from its `eligible` remainder —
+  a capped persona is replaced by another eligible lens, never squeezed in.
+  If the cap leaves fewer than 3 seatable lenses, the PR is not routable this
+  tick: hand it off per Step 5 with `--needs-human --reason
+  cannot-seat-panel`, naming the capped personas.
 - Each nomination's `rationale` cites the PR surface (file paths / topics).
 - List in `skipped` only personas you considered and rejected.
 - **Epic PRs carry a VP-class reviewer.** When the diff touches the Epic /
@@ -218,6 +229,26 @@ post script also computes the verdict-time L0/L1 check itself and stamps
 set, fail-closed like the merge engine. These codes measure **wiring, never
 reviewer performance**.
 
+### Bounded flaky-check auto-rerun (Epic-019 Story 2c)
+
+A `checks-failing` hand-off is not posted immediately: `pr-autopilot-post.mjs
+--reason checks-failing` first attempts **one** bounded rerun via
+`flaky-rerun.mjs`. The rerun fires **only** when EVERY failing check is on
+the evidenced, unexpired allowlist (`flaky-checks.json` — validated by the
+`workforce:skills` gate; each entry is `{check_name, evidence, expires}`, no
+evergreen exemptions) **and** the PR has never been rerun before (the hidden
+`<!-- autopilot:rerun:… -->` marker is the once-ever latch, posted *before*
+the rerun triggers). A triggered rerun posts its audit comment (check names +
+allowlist evidence) + the `autopilot:reran` label and **defers the
+escalation** — the next tick re-verdicts on fresh checks; a rerun that still
+fails escalates `checks-failing` normally, never retried. Editorial/deploy
+gates (check names matching `/deploy|article|truncat|editorial/i` —
+R-10/W-1 class) are **categorically rerun-ineligible**. A check that
+repeatedly passes on rerun is racy, not flaky — `build-pr-metrics-github.mjs`
+WARNs over threshold; evicting the entry + opening the issue is a
+manual/sweep step. You never trigger a rerun by hand; the post script owns
+the whole attempt.
+
 ### The merge leg (R-N10; one shared engine)
 
 Emit a merge **only** when all hold: 🟢 unanimous-green; the bound project's
@@ -282,6 +313,15 @@ candidates — the sweep is how the contract survives runs that die mid-cycle.
   the target's governance L0/L1 always escalates to a human. No push or
   PR-open under any path.
 - **The sweep is part of every fire.** No PR is left in neither state.
+
+**OP-009 (operator-only runtime wiring).** The event trigger this contract is
+agnostic to — the CCR `agent-runner` routine's `pull_request`
+(opened / ready_for_review / synchronize) trigger + the target-repo webhook —
+is configured by the operator per
+[follow-ups.md OP-009](../../docs/follow-ups.md) (design:
+[adr-0013](../../docs/adr/adr-0013-event-driven-pr-autopilot.md)). Nothing in
+this repo implements it; until it is wired, the cron fire is both the latency
+floor and the backstop.
 
 Related: [agent-runner.md](../../docs/routines/agent-runner.md) (the generic
 CCR routine this runs under — this SKILL.md is the authoritative contract),

@@ -1,6 +1,6 @@
 # PR escalation-reason taxonomy
 
-- **Version**: v1 (2026-07-08)
+- **Version**: v1.1 (2026-07-08 — no new codes; Story 2 added emission sites to `cannot-seat-panel` (nomination load cap) and `checks-failing` (flaky-rerun engine). v1: 2026-07-08 initial taxonomy)
 - **Governing record**: [Epic-019 Story 1](epics/epic-019-autonomous-finalization-rate.md) — escalation-reason telemetry (measure → wire → judge)
 - **Code twin**: [`workforce/skills/pr-autopilot/escalation-reasons.mjs`](../skills/pr-autopilot/escalation-reasons.mjs) — `REASON_CODES` is the enforced list; every emitter validates against it and an unknown code **throws** (C-4), never becomes a quiet new bucket. A code added/renamed here is a version bump of this doc and a `REASON_CODES` change in the same PR.
 
@@ -20,13 +20,13 @@ Every `autopilot:needs-human` hand-off records **why** it escalated, on two carr
 | `never-routed` | `pr-autopilot-sweep.mjs` (verbatim) | Never picked up and now older than the scan's `--window-days` discovery window (default 7). |
 | `l0l1-path` | `pr-merge.mjs` refusal `touches L0/L1 path …`; `pr-autopilot-post.mjs` verdict-time L0/L1 check on every escalation; SKILL.md verdict-table "🟢 touches the target's L0/L1 paths" | The PR touches the target repo's declared L0/L1 path set — structurally human-gated, the system working as designed. |
 | `human-changes-requested` | `pr-merge.mjs` refusal `a reviewer has CHANGES_REQUESTED …` | A (human) GitHub review stands at CHANGES_REQUESTED. |
-| `checks-failing` | `pr-merge.mjs` refusal `check '<name>' = <conclusion>` | A required check completed non-green. (Story 2's bounded flaky-rerun escalates a rerun-that-still-fails as this code, never retried again.) |
+| `checks-failing` | `pr-merge.mjs` refusal `check '<name>' = <conclusion>`; `flaky-rerun.mjs` (invoked by `pr-autopilot-post.mjs --reason checks-failing`) when the bounded rerun is refused — a non-allowlisted / expired / editorial-class failing check, an already-used rerun, or an ambiguous check state | A required check completed non-green. Story 2c's bounded flaky-rerun runs BEFORE this escalation posts: only an all-allowlisted, never-rerun PR gets its one rerun (which defers the escalation); a rerun-that-still-fails escalates as this code, never retried again. |
 | `checks-pending-aged` | `pr-merge.mjs` refusal `check '<name>' is <status>` | A required check had not completed at verdict time. |
 | `no-reviewer-consensus` | `pr-merge.mjs` refusals `missing green marker(s) from …` and `only N distinct reviewer(s) signed off …`; 🔴 / non-consensus verdict hand-offs | The unanimous-green ≥3-reviewer consensus was not assembled. |
 | `not-mergeable` | `pr-merge.mjs` refusal `not mergeable (mergeable=…, state=…)` | GitHub reports the PR dirty/blocked/behind/unstable (conflicts, branch protection). |
 | `kill-switch-off` | `pr-merge.mjs` refusal `autopilot:off label set …`; a paused per-binding switch | A maintainer/operator kill-switch holds this PR out of the autonomous lane. |
 | `no-r-n10-delegation` | `pr-merge.mjs` refusals from `resolveL0L1Paths` (governance doc unreadable / no `autopilot:l0l1-paths` block / empty block); SKILL.md verdict-table "🟢, no R-N10 delegation" | The target repo declares no readable R-N10 delegation — the L0/L1 set is unknown, so everything fails closed. |
-| `cannot-seat-panel` | SKILL.md Step 2 hand-off via `pr-autopilot-post.mjs --reason` | The routing persona could not seat 3 distinct reviewer lenses with real surface. |
+| `cannot-seat-panel` | SKILL.md Step 2 hand-off via `pr-autopilot-post.mjs --reason`; `applyNominationCap()` (`pr-autopilot-scan.mjs`) when the Story-2b nomination load cap leaves fewer than 3 eligible lenses | The routing persona could not seat 3 distinct reviewer lenses with real surface — including when the per-persona seat cap (`NOMINATION_SEAT_CAP`, default 5 concurrent open seats) excludes too many candidates. |
 | `persona-escalation-trigger` | SKILL.md Step 4 hand-off via `pr-autopilot-post.mjs --reason` | A nominated reviewer's `escalation_triggers` matched — escalation posted instead of a lens review. |
 | `cycle-cap-exceeded` | `pr-merge.mjs` refusal `… exceeding the W-4 hard cap …`; 🔴 cycle > `cycle_cap` verdicts | The review cycle exceeded its cap — a process breakdown, not a content verdict. |
 | `merge-engine-refusal` | `pr-merge.mjs` refusals not tied to one predicate clause (PR closed, draft-flip failure, a rejected GitHub write); the session's re-post after an engine exit 2 | The engine refused for an operational reason outside the named clauses. Prefer the specific clause code when the engine has already stamped one. |

@@ -8,6 +8,10 @@
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+// Epic-019 Story 2c: the flake-allowlist validator is single-sourced from the
+// skill module that consumes it at runtime (same twin pattern as
+// escalation-reasons.mjs ↔ pr-escalation-reasons.md).
+import { validateFlakyChecks } from "../skills/pr-autopilot/flaky-rerun.mjs";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const WORKFORCE_ROOT = join(HERE, "..");
@@ -355,6 +359,30 @@ for (const name of skillDirs) {
   // pre-/post-processing (e.g. feed-post) or as a dormant library awaiting a
   // CCR rework (pr-review / pr-autopilot / pdm-charter). Neither required nor
   // forbidden — the CCR routine never switches on it.
+
+  // ── flaky-checks.json (Epic-019 Story 2c — Farah's rerun discipline) ─────
+  // A skill MAY ship a flake allowlist (today: pr-autopilot). When present it
+  // must be an array of { check_name, evidence, expires }: an entry without
+  // evidence or expiry is a violation (no evergreen exemptions), an
+  // editorial/deploy-class check name (R-10/W-1: /deploy|article|truncat|
+  // editorial/i) is a hard error (categorically rerun-ineligible), and an
+  // expired entry warns (inert at runtime — prune it).
+  const flakyPath = join(dir, "flaky-checks.json");
+  if (existsSync(flakyPath)) {
+    let flakyEntries;
+    try {
+      flakyEntries = JSON.parse(readFileSync(flakyPath, "utf8"));
+    } catch (err) {
+      v("K0-flaky-parse", flakyPath, `invalid JSON: ${err.message}`);
+    }
+    if (flakyEntries !== undefined) {
+      const { errors, warnings } = validateFlakyChecks(flakyEntries);
+      for (const msg of errors) v("K1-flaky-entry", flakyPath, msg);
+      for (const msg of warnings) {
+        console.warn(`WARN [K2-flaky-expired] ${relative(REPO_ROOT, flakyPath)}: ${msg}`);
+      }
+    }
+  }
 }
 
 if (violations.length === 0) {

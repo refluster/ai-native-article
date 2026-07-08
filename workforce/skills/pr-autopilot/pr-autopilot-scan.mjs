@@ -19,6 +19,16 @@
 // (2026-06-17 Autopilot widening, adr-0010). The only discovery filters are
 // the recency window and "already routed this cycle".
 //
+// NOMINATION LOAD CAP (Epic-019 Story 2b — fairness + W-3). Auto-nomination
+// must not degenerate into "the same 3 reviewers on everything": a persona
+// may hold at most NOMINATION_SEAT_CAP concurrent OPEN lens-review seats,
+// computed mechanically from the `wf:<slug>` nomination markers in routing
+// comments on open, non-terminal PRs. The scan emits `open_seat_counts` (and
+// `capped_personas`) in its output; the routing persona runs its candidate
+// panel through applyNominationCap() and seats only the eligible remainder.
+// When the cap leaves no seatable ≥3 panel, the PR escalates with reason
+// `cannot-seat-panel` (taxonomy v1 — an existing code, new emission site).
+//
 // Usage:
 //   GITHUB_TOKEN=<credentials['github.token'].token> \
 //     node workforce/skills/pr-autopilot/pr-autopilot-scan.mjs \
@@ -38,6 +48,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
+import { ESCALATION_LABEL, MIN_REVIEWERS } from "./pr-merge.mjs";
+import { assertReasonCode } from "./escalation-reasons.mjs";
 
 const GH_API = "https://api.github.com";
 const MAX_DIFF_CHARS = 48_000; // ~12K tokens; protects the CCR context budget
@@ -81,6 +93,81 @@ export function withinWindow(updatedAt, sinceDays, now = Date.now()) {
   const t = Date.parse(updatedAt);
   if (Number.isNaN(t)) return false;
   return now - t <= sinceDays * 24 * 60 * 60 * 1000;
+}
+
+// ── Nomination load cap (Epic-019 Story 2b) ─────────────────────────────────
+
+/** Max concurrent open lens-review seats one persona may hold. Operator knob:
+ *  raising it widens per-persona load; the panel floor (MIN_REVIEWERS) is the
+ *  merge engine's, never this. */
+export const NOMINATION_SEAT_CAP = 5;
+
+// A nomination SEAT is the routing-comment bullet from the SKILL.md Step 2
+// template: `- **`wf:<persona>`** — <rationale>`. Skip-lines ("Skipping
+// `wf:x` — …"), review sign-offs, and green markers never match.
+const NOMINATION_BULLET_RE = /^\s*[-*]\s+\*\*`wf:([a-z][a-z0-9-]*)`\*\*/gmu;
+
+/** Pure seat counter. Given every OPEN PR's { labels, bodies } (issue-comment
+ *  bodies — routing comments live there), return { slug → open seat count }.
+ *  A persona holds ONE seat per open PR that nominates it (a cycle-2 re-route
+ *  is the same seat, not a second one). Terminal/paused PRs release their
+ *  seats: `autopilot:needs-human` (escalated — the human's queue now) and
+ *  `autopilot:off` (maintainer pause) are skipped; merged/closed PRs are not
+ *  in the open list at all. */
+export function countOpenSeats(openPrs) {
+  const counts = {};
+  for (const pr of openPrs ?? []) {
+    const names = (pr.labels ?? []).map((l) => String(l || "").toLowerCase());
+    if (names.includes(ESCALATION_LABEL) || names.includes("autopilot:off")) continue;
+    const seated = new Set();
+    for (const b of pr.bodies ?? []) {
+      const re = new RegExp(NOMINATION_BULLET_RE.source, "gmu");
+      let m;
+      while ((m = re.exec(String(b ?? ""))) !== null) seated.add(m[1].toLowerCase());
+    }
+    for (const slug of seated) counts[slug] = (counts[slug] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/** Pure cap filter — the mechanical half of the Step 2 routing contract.
+ *  Given the persona's candidate reviewer slugs (preference-ordered), the
+ *  open seat counts (countOpenSeats), and the cap, return:
+ *    - eligible:   candidates still under the cap (order preserved, de-duped,
+ *                  case-folded) — seat the panel from these;
+ *    - overCap:    [{ slug, openSeats }] the cap excluded — the router picks
+ *                  another eligible persona instead;
+ *    - canSeatPanel: eligible.length >= MIN_REVIEWERS (the merge engine's
+ *                  panel floor);
+ *    - escalateWith: null, or "cannot-seat-panel" (taxonomy v1) when no ≥3
+ *                  panel can be seated under the cap.
+ *  Throws (C-4) on a non-positive/non-integer cap or a non-array candidate
+ *  list — a misconfigured cap must never silently un-cap. */
+export function applyNominationCap(candidates, openSeatCounts = {}, cap = NOMINATION_SEAT_CAP) {
+  if (!Number.isInteger(cap) || cap < 1) {
+    throw new Error(`applyNominationCap: cap must be a positive integer (got ${cap}) — a broken cap never silently un-caps (C-4)`);
+  }
+  if (!Array.isArray(candidates)) {
+    throw new Error("applyNominationCap: candidates must be an array of persona slugs (C-4)");
+  }
+  const seen = new Set();
+  const eligible = [];
+  const overCap = [];
+  for (const raw of candidates) {
+    const slug = String(raw ?? "").trim().toLowerCase();
+    if (!slug || seen.has(slug)) continue;
+    seen.add(slug);
+    const openSeats = Number(openSeatCounts[slug] ?? 0);
+    if (openSeats >= cap) overCap.push({ slug, openSeats });
+    else eligible.push(slug);
+  }
+  const canSeatPanel = eligible.length >= MIN_REVIEWERS;
+  return {
+    eligible,
+    overCap,
+    canSeatPanel,
+    escalateWith: canSeatPanel ? null : assertReasonCode("cannot-seat-panel"),
+  };
 }
 
 async function ghGet(token, path, accept) {
@@ -130,6 +217,28 @@ async function main() {
     die(e.httpStatus && e.httpStatus < 500 ? 2 : 3, e.message);
   }
 
+  // Nomination load cap (Epic-019 Story 2b): seat counts span EVERY open PR's
+  // routing comments, not just this tick's candidates — so fetch each open
+  // PR's comments once, up front, and reuse them for the already-routed check.
+  const commentsByPr = new Map();
+  for (const pr of prs) {
+    try {
+      commentsByPr.set(pr.number, await ghGet(token, `/repos/${owner}/${repo}/issues/${pr.number}/comments?per_page=100`));
+    } catch (e) {
+      die(e.httpStatus && e.httpStatus < 500 ? 2 : 3, e.message);
+    }
+  }
+  const openSeatCounts = countOpenSeats(
+    prs.map((pr) => ({
+      labels: Array.isArray(pr.labels) ? pr.labels.map((l) => l?.name) : [],
+      bodies: (commentsByPr.get(pr.number) ?? []).map((c) => c.body),
+    })),
+  );
+  const cappedPersonas = Object.entries(openSeatCounts)
+    .filter(([, n]) => n >= NOMINATION_SEAT_CAP)
+    .map(([slug]) => slug)
+    .sort();
+
   const candidates = [];
   for (const pr of prs) {
     if (candidates.length >= max) break;
@@ -137,12 +246,7 @@ async function main() {
     // review pass, and Dependabot PRs route through the same review→consensus
     // →merge path as human PRs (the dependabot-triage no-review lane retires).
     if (!withinWindow(pr.updated_at, sinceDays)) continue;
-    let comments;
-    try {
-      comments = await ghGet(token, `/repos/${owner}/${repo}/issues/${pr.number}/comments?per_page=100`);
-    } catch (e) {
-      die(e.httpStatus && e.httpStatus < 500 ? 2 : 3, e.message);
-    }
+    const comments = commentsByPr.get(pr.number) ?? [];
     if (alreadyRouted(comments, persona)) continue;
 
     let diff;
@@ -172,9 +276,29 @@ async function main() {
     });
   }
 
-  writeFileSync(out, JSON.stringify({ project_id: projectId, owner, repo, persona, candidates }, null, 2));
+  writeFileSync(
+    out,
+    JSON.stringify(
+      {
+        project_id: projectId,
+        owner,
+        repo,
+        persona,
+        // Epic-019 Story 2b: the routing persona filters its panel through
+        // applyNominationCap(candidates, open_seat_counts) — capped_personas
+        // (seats >= nomination_cap) are not nominatable this tick.
+        nomination_cap: NOMINATION_SEAT_CAP,
+        open_seat_counts: openSeatCounts,
+        capped_personas: cappedPersonas,
+        candidates,
+      },
+      null,
+      2,
+    ),
+  );
   console.log(
-    `pr-autopilot-scan: ${owner}/${repo} — ${candidates.length} candidate PR(s) need cycle-1 routing (scanned ${prs.length} open, max ${max}, window ${sinceDays}d) → ${out}`,
+    `pr-autopilot-scan: ${owner}/${repo} — ${candidates.length} candidate PR(s) need cycle-1 routing (scanned ${prs.length} open, max ${max}, window ${sinceDays}d; ` +
+      `seat cap ${NOMINATION_SEAT_CAP}, capped: ${cappedPersonas.length > 0 ? cappedPersonas.join(", ") : "none"}) → ${out}`,
   );
   process.exit(0);
 }
