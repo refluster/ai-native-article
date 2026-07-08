@@ -58,6 +58,14 @@
 // declared L0/L1 set — so the funnel's eligible (non-L0/L1) share is
 // derivable for every escalated PR, not just the merge leg.
 //
+// FLAKY-CHECK AUTO-RERUN (Epic-019 Story 2c). A `checks-failing` escalation
+// first attempts ONE bounded rerun via flaky-rerun.mjs: iff every failing
+// check is on the evidenced, unexpired allowlist (flaky-checks.json) and the
+// PR has never been rerun, the rerun is triggered (with its own audit
+// comment + `autopilot:reran` label) and THIS escalation is deferred (exit 0,
+// nothing posted) — the next tick re-verdicts. Any other state escalates
+// normally. See the Step 5 note in SKILL.md.
+//
 // Extra `--label <name>` values (repeatable) are merged in. Routing comments
 // (cycle 1) carry neither flag nor marker, so they stay unlabelled. Missing
 // labels are auto-created (each with its own colour/description).
@@ -86,6 +94,7 @@ import {
   reasonLabel,
   reasonMarker,
 } from "./escalation-reasons.mjs";
+import { attemptFlakyRerun } from "./flaky-rerun.mjs";
 
 const GH_API = "https://api.github.com";
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -290,6 +299,33 @@ async function main() {
       else if (!t.known) console.error(`pr-autopilot-post: WARN L0/L1 set unknown for ${owner}/${repo}#${prNumber} (${t.why}) — escalating without an eligibility record`);
     } catch (e) {
       console.error(`pr-autopilot-post: WARN verdict-time L0/L1 check failed (${e?.msg || e?.message || e}) — escalating without an eligibility record`);
+    }
+  }
+
+  // Bounded flaky-check auto-rerun (Epic-019 Story 2c). A `checks-failing`
+  // escalation first offers the failing checks ONE rerun — only when EVERY
+  // failing check is on the evidenced, unexpired allowlist (flaky-checks.json)
+  // and this PR has never been rerun (the hidden <!-- autopilot:rerun:… -->
+  // marker is the once-ever latch). A triggered rerun posts its own audit
+  // comment + `autopilot:reran` label and DEFERS this escalation (exit 0
+  // without posting the verdict) — the next tick re-verdicts on fresh checks.
+  // Every other state (non-allowlisted, editorial/deploy-class — those are
+  // categorically ineligible — expired entry, prior rerun, ambiguity, or the
+  // attempt itself throwing) falls through to the escalation, which is the
+  // loud direction (C-4). The R-N10 merge predicate is untouched.
+  if (labels.includes(ESCALATION_LABEL) && reasons.codes.includes("checks-failing")) {
+    try {
+      const rr = await attemptFlakyRerun(makeGh({ token, userAgent: "kohuehara-workforce" }), `${owner}/${repo}`, prNumber);
+      if (rr.reran) {
+        console.log(
+          `pr-autopilot-post: flaky rerun triggered on ${owner}/${repo}#${prNumber} (${rr.checks.join(", ")}) — ` +
+            `checks-failing escalation deferred to the post-rerun verdict (max 1 rerun per PR)`,
+        );
+        process.exit(0);
+      }
+      console.error(`pr-autopilot-post: no flaky rerun (${rr.why}) — escalating checks-failing`);
+    } catch (e) {
+      console.error(`pr-autopilot-post: WARN flaky-rerun attempt failed (${e?.msg || e?.message || e}) — escalating checks-failing`);
     }
   }
 

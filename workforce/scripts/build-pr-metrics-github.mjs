@@ -37,6 +37,17 @@ const NEEDS_HUMAN_LABEL = "autopilot:needs-human";
 // pr-autopilot scripts (taxonomy: workforce/docs/pr-escalation-reasons.md).
 // Mirrored here (like NEEDS_HUMAN_LABEL) rather than imported from the skill.
 const REASON_LABEL_PREFIX = "autopilot:reason:";
+// Epic-019 Story 2c: flaky-rerun telemetry. The rerun engine
+// (workforce/skills/pr-autopilot/flaky-rerun.mjs) stamps `autopilot:reran` +
+// an audit marker carrying the rerun check names; this builder counts reruns
+// and rerun-then-pass per check so a RACY check (repeatedly passing only on
+// rerun) is detectable — over-threshold checks get a WARN line (eviction +
+// issue-filing stays a manual/sweep step, never automated here).
+const RERAN_LABEL = "autopilot:reran";
+const RERUN_MARKER_RE = /<!--\s*autopilot:rerun:\d+\s+checks=([^>]*?)\s*-->/g;
+// A check that passed-on-rerun this many times in the window is racy, not
+// flaky — the allowlist entry should be evicted and an issue opened.
+const RERUN_PASS_WARN_THRESHOLD = 3;
 
 // ── pure aggregation (unit-tested) ───────────────────────────────────────────
 
@@ -130,6 +141,43 @@ export function aggregateEscalations(prs) {
   return { escalated_prs: prs.length, eligible_escalations: eligible, escalation_reasons };
 }
 
+/** Epic-019 Story 2c: aggregate `autopilot:reran` PRs into per-check rerun
+ *  counts. items = [{ merged, labels, bodies }] (one per reran-labelled PR).
+ *  A rerun "then passed" when the PR merged OR carries no
+ *  `autopilot:reason:checks-failing` label (i.e. the rerun did not end in the
+ *  still-failing escalation). A labelled PR whose audit marker is missing
+ *  buckets its checks as "unspecified" — the gap stays visible, never
+ *  dropped. Returns { reran_prs, per_check, warn } where warn lists checks at
+ *  or over RERUN_PASS_WARN_THRESHOLD rerun-then-passes (racy, not flaky). */
+export function aggregateReruns(items, { warnThreshold = RERUN_PASS_WARN_THRESHOLD } = {}) {
+  const per_check = {};
+  let reran_prs = 0;
+  for (const it of items) {
+    reran_prs += 1;
+    const labels = (it.labels || []).map((l) => String(l || "").toLowerCase());
+    const passed = it.merged === true || !labels.includes(`${REASON_LABEL_PREFIX}checks-failing`);
+    const checks = new Set();
+    for (const b of it.bodies || []) {
+      const re = new RegExp(RERUN_MARKER_RE.source, "g");
+      let m;
+      while ((m = re.exec(String(b || ""))) !== null) {
+        for (const name of m[1].split("|").map((s) => s.trim()).filter(Boolean)) checks.add(name);
+      }
+    }
+    if (checks.size === 0) checks.add("unspecified");
+    for (const name of checks) {
+      const c = (per_check[name] ??= { reruns: 0, rerun_then_pass: 0 });
+      c.reruns += 1;
+      if (passed) c.rerun_then_pass += 1;
+    }
+  }
+  const warn = Object.entries(per_check)
+    .filter(([name, c]) => name !== "unspecified" && c.rerun_then_pass >= warnThreshold)
+    .map(([name]) => name)
+    .sort();
+  return { reran_prs, per_check, warn };
+}
+
 // ── CLI / IO ─────────────────────────────────────────────────────────────────
 
 function arg(name, fallback) {
@@ -192,6 +240,36 @@ async function main() {
     escalatedItems.map((it) => ({ labels: Array.isArray(it.labels) ? it.labels.map((l) => l?.name) : [] })),
   );
 
+  // 1c. flaky-rerun telemetry (Epic-019 Story 2c): PRs labelled
+  // `autopilot:reran` in the window. The audit marker comment carries the
+  // rerun check names, so fetch each item's comments (reruns are rare — max 1
+  // per PR — so this stays cheap).
+  const reranItems = [];
+  for (let page = 1; page <= 10; page++) {
+    const q = encodeURIComponent(`repo:${repo} is:pr label:"${RERAN_LABEL}" updated:>=${sinceIso}`);
+    const r = await gh(`/search/issues?q=${q}&per_page=100&page=${page}`);
+    if (r.status !== 200) { console.error(`rerun search -> HTTP ${r.status} ${JSON.stringify(r.json).slice(0, 200)}`); return 3; }
+    const items = r.json.items ?? [];
+    reranItems.push(...items);
+    if (items.length < 100) break;
+  }
+  const reranFacts = [];
+  for (const it of reranItems) {
+    const c = await gh(`/repos/${repo}/issues/${it.number}/comments?per_page=100`);
+    reranFacts.push({
+      merged: Boolean(it.pull_request?.merged_at),
+      labels: Array.isArray(it.labels) ? it.labels.map((l) => l?.name) : [],
+      bodies: Array.isArray(c.json) ? c.json.map((x) => x.body) : [],
+    });
+  }
+  const reruns = aggregateReruns(reranFacts);
+  for (const name of reruns.warn) {
+    console.error(
+      `WARN check '${name}' passed on rerun ${reruns.per_check[name].rerun_then_pass}x in ${DAYS}d ` +
+        `(threshold ${RERUN_PASS_WARN_THRESHOLD}) — racy, not flaky: evict it from flaky-checks.json and open an issue (Epic-019 Story 2c)`,
+    );
+  }
+
   // 2. per PR: churn + merged_at + author + the autopilot signal.
   const prs = [];
   for (const it of merged) {
@@ -220,8 +298,11 @@ async function main() {
 
   const block = aggregate(prs, { sinceIso });
   // Epic-019: the escalation-reason funnel lives on the same PERF#{scope}/PR
-  // item (R-N2: no new store), inside pr_summary.
-  Object.assign(block.pr_summary, escalations);
+  // item (R-N2: no new store), inside pr_summary — as does the Story-2c
+  // flaky-rerun roll-up (warn is print-only, not stored).
+  Object.assign(block.pr_summary, escalations, {
+    flaky_reruns: { reran_prs: reruns.reran_prs, per_check: reruns.per_check },
+  });
   console.error(
     `${repo} (scope ${scope}): ${block.pr_summary.total_prs} merged PR(s) over ${DAYS}d ` +
       `(${block.window.start}→${block.window.end}); autopilot ${Math.round(block.pr_summary.autopilot_share * 100)}% ` +

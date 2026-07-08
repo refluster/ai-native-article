@@ -1,7 +1,7 @@
 // @ts-nocheck — the script under test is dependency-free ESM, not TS.
 // Tests the pure classification + aggregation of the GitHub-API PR builder.
 import { describe, it, expect } from "vitest";
-import { classifyPr, aggregate, aggregateEscalations } from "./build-pr-metrics-github.mjs";
+import { classifyPr, aggregate, aggregateEscalations, aggregateReruns } from "./build-pr-metrics-github.mjs";
 
 const GREEN = (slug) => `looks good\n<!-- autopilot:review:${slug}:green -->`;
 
@@ -74,5 +74,44 @@ describe("aggregateEscalations", () => {
 
   it("empty input yields an empty funnel", () => {
     expect(aggregateEscalations([])).toEqual({ escalated_prs: 0, eligible_escalations: 0, escalation_reasons: {} });
+  });
+});
+
+// Epic-019 Story 2c: `autopilot:reran` PRs roll up into per-check rerun /
+// rerun-then-pass counts (from the flaky-rerun audit markers), so a racy
+// check — repeatedly passing only on rerun — is detectable and gets a WARN.
+describe("aggregateReruns", () => {
+  const marker = (names: string[]) => `<!-- autopilot:rerun:1 checks=${names.join("|")} -->`;
+
+  it("counts reruns and rerun-then-pass per check from the audit markers", () => {
+    const r = aggregateReruns([
+      { merged: true, labels: ["autopilot:reran"], bodies: [`audit…\n${marker(["integration-e2e"])}`] },
+      { merged: false, labels: ["autopilot:reran", "autopilot:needs-human", "autopilot:reason:checks-failing"], bodies: [marker(["integration-e2e", "lambda-smoke"])] },
+    ]);
+    expect(r.reran_prs).toBe(2);
+    expect(r.per_check["integration-e2e"]).toEqual({ reruns: 2, rerun_then_pass: 1 });
+    expect(r.per_check["lambda-smoke"]).toEqual({ reruns: 1, rerun_then_pass: 0 });
+  });
+
+  it("an open, un-escalated reran PR counts as rerun-then-pass (no checks-failing label)", () => {
+    const r = aggregateReruns([{ merged: false, labels: ["autopilot:reran"], bodies: [marker(["e2e"])] }]);
+    expect(r.per_check["e2e"]).toEqual({ reruns: 1, rerun_then_pass: 1 });
+  });
+
+  it("a reran-labelled PR missing its marker buckets as unspecified — visible, not dropped", () => {
+    const r = aggregateReruns([{ merged: true, labels: ["autopilot:reran"], bodies: ["no marker here"] }]);
+    expect(r.per_check).toEqual({ unspecified: { reruns: 1, rerun_then_pass: 1 } });
+    expect(r.warn).toEqual([]); // unspecified never trips the racy WARN
+  });
+
+  it("a check at/over the rerun-then-pass threshold is flagged racy (WARN)", () => {
+    const items = [1, 2, 3].map(() => ({ merged: true, labels: ["autopilot:reran"], bodies: [marker(["racy-suite"])] }));
+    const r = aggregateReruns(items);
+    expect(r.warn).toEqual(["racy-suite"]);
+    expect(aggregateReruns(items.slice(0, 2)).warn).toEqual([]);
+  });
+
+  it("empty input yields an empty roll-up", () => {
+    expect(aggregateReruns([])).toEqual({ reran_prs: 0, per_check: {}, warn: [] });
   });
 });
