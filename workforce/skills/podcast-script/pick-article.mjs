@@ -8,7 +8,17 @@
 //
 // Eligibility (all must hold):
 //   - Type == "analysis"                          (the L3/L4 synthesis articles)
-//   - Status == "published"                        (only cast what's live)
+//   - Status ∈ {ready, published}                  ("live" = what the site serves.
+//                                                   fetch-notion.mjs exports every
+//                                                   row with NO Status filter, and
+//                                                   the post-GAS cadences write
+//                                                   Status=ready with nothing left
+//                                                   to flip it to published — that
+//                                                   value survives only on legacy
+//                                                   migrated rows. Requiring
+//                                                   "published" alone starved this
+//                                                   picker of every cadence-authored
+//                                                   article. draft/archived stay out.)
 //   - podcastStatus is empty or "none"             (no podcast exists yet)
 //   - SourceURLs is non-empty                      (citable — an article with no
 //                                                   sources can't produce a
@@ -93,11 +103,16 @@ try {
       propText(props["Source Article URLs"]) ||
       propText(props["Source URLs"])).trim();
 
-  // Base eligibility: a published Type=analysis article with no podcast yet.
+  // Base eligibility: a live (site-visible) Type=analysis article with no
+  // podcast yet. "Live" = Status ready OR published — see the header note:
+  // the site publishes every row regardless of Status, the cadences write
+  // `ready`, and nothing flips ready→published since the GAS L4 batch retired
+  // (2026-06-28). draft/archived (and any unknown value) remain excluded.
+  const LIVE_STATUSES = new Set(["ready", "published"]);
   const base = pages.filter((p) => {
     const props = p.properties ?? {};
     if (propText(props.Type) !== "analysis") return false;
-    if (propText(props.Status) !== "published") return false;
+    if (!LIVE_STATUSES.has(propText(props.Status).trim().toLowerCase())) return false;
     const podStatus = propText(props.podcastStatus).trim().toLowerCase();
     if (podStatus && podStatus !== "none") return false; // already has a podcast in flight/done
     return true;
@@ -122,7 +137,7 @@ try {
   }
 
   if (eligible.length === 0) {
-    console.log(JSON.stringify({ skip: true, reason: "no published analysis article with SourceURLs and without a podcast" }));
+    console.log(JSON.stringify({ skip: true, reason: "no live (ready/published) analysis article with SourceURLs and without a podcast" }));
     process.exit(0);
   }
 
