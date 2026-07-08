@@ -58,6 +58,7 @@
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { assertReasonCode, reasonLabel, reasonMarker, refusalReasonCode } from "./escalation-reasons.mjs";
 
 const GOVERNANCE_PATH = process.env["GOVERNANCE_PATH"] || "docs/governance.md";
 const L0L1_OPEN = "<!-- autopilot:l0l1-paths -->";
@@ -221,6 +222,54 @@ export function reviewerSignedOff(slug, reviewBodies) {
   return reviewBodies.some((b) => (b || "").toLowerCase().includes(marker));
 }
 
+// Epic-019 Story 1: verdict-time L0/L1 computation. The merge leg computes the
+// L0/L1 clause inside verifyMergeable; ESCALATIONS need the same answer so the
+// reason funnel can split eligible (non-L0/L1) hand-offs from structural ones.
+// This helper replicates the two clauses read-only — same source of truth
+// (resolveL0L1Paths, the TARGET repo's own statute) and same fail-closed
+// semantics: an unreadable/markerless governance doc returns known:false (the
+// L0/L1 set is UNKNOWN — callers escalate without guessing eligibility). It is
+// deliberately NOT wired into verifyMergeable: the R-N10 predicate's decision
+// flow stays byte-identical.
+export async function prTouchesL0L1(gh, repo, prNumber, baseRef) {
+  const l0l1 = await resolveL0L1Paths(gh, repo, baseRef);
+  if (!l0l1.ok) return { known: false, touches: null, why: l0l1.why };
+  const { status, json: files } = await gh("GET", `/repos/${repo}/pulls/${prNumber}/files?per_page=100`);
+  if (status !== 200 || !Array.isArray(files)) {
+    return { known: false, touches: null, why: `GET files -> HTTP ${status} — L0/L1 surface unknown` };
+  }
+  const hit = files.find((f) => l0l1.patterns.some((re) => re.test(f.filename)));
+  return hit
+    ? { known: true, touches: true, why: `touches L0/L1 path ${hit.filename}` }
+    : { known: true, touches: false, why: `no L0/L1 surface` };
+}
+
+// Epic-019 Story 1: a refused merge is the engine's hand-off leg — record WHY
+// on the PR itself (an `autopilot:reason:<code>` label + the hidden marker in
+// a comment) so the escalation-reason funnel renders with zero manual
+// counting. Pure telemetry: it runs strictly AFTER the refusal is decided
+// (the R-N10 predicate is untouched), and its own GitHub-write failures are
+// logged, not fatal — a telemetry hiccup must not mask a correct refusal.
+// The code mapping itself stays C-4-loud: reasonLabel/reasonMarker throw on a
+// code outside the taxonomy.
+export async function emitRefusalReason(gh, repo, pr, why) {
+  const code = refusalReasonCode(why);
+  const label = reasonLabel(code);
+  const body = [
+    `**Autopilot merge engine — refusal reason \`${code}\`.** ${why}`,
+    "",
+    "(Epic-019 escalation-reason telemetry — wiring, not reviewer performance; see workforce/docs/pr-escalation-reasons.md.)",
+    "",
+    reasonMarker(code, code === "other" ? why : ""),
+  ].join("\n");
+  await ensureLabels(gh, repo, [label]);
+  const l = await gh("POST", `/repos/${repo}/issues/${pr}/labels`, { labels: [label] });
+  if (l.status !== 200) console.error(`pr-merge: WARN reason label "${label}" on #${pr} → HTTP ${l.status}`);
+  const c = await gh("POST", `/repos/${repo}/issues/${pr}/comments`, { body });
+  if (c.status !== 201) console.error(`pr-merge: WARN reason comment on #${pr} → HTTP ${c.status}`);
+  return code;
+}
+
 // Server-side predicate re-check. Returns {ok, why, sha}.
 export async function verifyMergeable(gh, repo, pr, decision) {
   const { status, json: p } = await gh("GET", `/repos/${repo}/pulls/${pr}`);
@@ -305,11 +354,19 @@ export async function applyDecisions(gh, repo, decisions) {
     const pr = d.pr;
     if (d.action === "escalate") {
       const title = w1(d.issue_title, `#${pr} issue_title`);
-      const body = w1(d.issue_body, `#${pr} issue_body`);
+      let body = w1(d.issue_body, `#${pr} issue_body`);
       // Always stamp the canonical escalation label so the operator can find
       // every human-decision item with one search, in addition to any
       // PR-specific labels the caller supplied.
       const labels = [...new Set([...(Array.isArray(d.issue_labels) ? d.issue_labels : []), ESCALATION_LABEL])];
+      // Epic-019: an escalation may declare its reason code (`reason_code`, plus
+      // `reason_text` — mandatory for "other"). Validated loud (C-4: an unknown
+      // code throws via assertReasonCode) and carried as label + hidden marker.
+      if (d.reason_code) {
+        assertReasonCode(d.reason_code);
+        labels.push(reasonLabel(d.reason_code));
+        body = `${body.trimEnd()}\n\n${reasonMarker(d.reason_code, d.reason_text || "")}`;
+      }
       await ensureLabels(gh, repo, labels);
       const { status, json } = await gh("POST", `/repos/${repo}/issues`, { title, body, labels });
       if (status === 201) { escalated++; console.error(`pr-merge: escalated #${pr} -> issue ${json.html_url}`); }
@@ -322,7 +379,14 @@ export async function applyDecisions(gh, repo, decisions) {
     const comment = w1(d.comment, `#${pr} comment`);
     const subject = w1(d.squash_subject, `#${pr} squash_subject`);
     const verdict = await verifyMergeable(gh, repo, pr, d);
-    if (!verdict.ok) { refused++; console.error(`pr-merge: REFUSE merge #${pr}: ${verdict.why}`); continue; }
+    if (!verdict.ok) {
+      refused++; console.error(`pr-merge: REFUSE merge #${pr}: ${verdict.why}`);
+      // Epic-019: stamp the refusal's reason code on the PR (label + marker).
+      // Best-effort — a network failure here must not mask the refusal itself.
+      try { await emitRefusalReason(gh, repo, pr, verdict.why); }
+      catch (e) { console.error(`pr-merge: WARN could not emit refusal reason for #${pr}: ${e?.msg || e?.message || e}`); }
+      continue;
+    }
 
     // adr-0014: drafts are merge-eligible. GitHub refuses to merge a draft, so
     // flip it Ready for Review first (GraphQL — there is no REST endpoint). Do
@@ -366,7 +430,12 @@ export async function applyDecisions(gh, repo, decisions) {
     }
     const mg = await gh("PUT", `/repos/${repo}/pulls/${pr}/merge`, { merge_method: "squash", sha: verdict.sha, commit_title: subject, commit_message: d.squash_body || "" });
     if (mg.status === 200) { merged++; console.error(`pr-merge: MERGED #${pr} (${verdict.why})`); }
-    else { refused++; console.error(`pr-merge: merge #${pr} REJECTED HTTP ${mg.status}: ${JSON.stringify(mg.json).slice(0, 300)}`); }
+    else {
+      refused++; console.error(`pr-merge: merge #${pr} REJECTED HTTP ${mg.status}: ${JSON.stringify(mg.json).slice(0, 300)}`);
+      // Epic-019: a rejected merge PUT is also a refusal exit — record it.
+      try { await emitRefusalReason(gh, repo, pr, `merge PUT rejected HTTP ${mg.status}`); }
+      catch (e) { console.error(`pr-merge: WARN could not emit refusal reason for #${pr}: ${e?.msg || e?.message || e}`); }
+    }
   }
   return { repo, merged, escalated, refused };
 }

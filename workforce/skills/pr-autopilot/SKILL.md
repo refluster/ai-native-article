@@ -65,7 +65,7 @@ body:
   surface first, then fill to 3 with your standing broad lenses (product,
   engineering-excellence, platform). If you honestly cannot seat 3 distinct
   lenses, the PR is not autopilot-eligible: hand it off per Step 5 with
-  `--needs-human`, stating why.
+  `--needs-human --reason cannot-seat-panel`, stating why.
 - Each nomination's `rationale` cites the PR surface (file paths / topics).
 - List in `skipped` only personas you considered and rejected.
 - **Epic PRs carry a VP-class reviewer.** When the diff touches the Epic /
@@ -148,8 +148,8 @@ approve / request-changes per W-5). Do not wait on any external dispatch.
   vote. A blocking reviewer omits it. No marker ⇒ not green ⇒ no merge.
 - **Escalation instead of review**: if the PR matches the persona's
   `escalation_triggers`, post a single comment naming the trigger — as a
-  hand-off per Step 5 (`--needs-human` + the hidden marker), not a checklist
-  run.
+  hand-off per Step 5 (`--needs-human --reason persona-escalation-trigger` +
+  the hidden markers), not a checklist run.
 
 ## Step 5 — verdict by reviewer consensus → terminal action
 
@@ -186,18 +186,37 @@ verdict **into** this template so the markers are present by construction:
 — <PersonaName> (CCR persona; see workforce/skills/pr-autopilot/SKILL.md)
 
 <!-- autopilot:needs-human -->
-<!-- autopilot:reviewed -->   ⟵ keep this SECOND marker line ONLY on a 🟢 merge-ready hand-off; delete it on a 🔴 / non-consensus hand-off.
+<!-- autopilot:reason:<code> -->   ⟵ REQUIRED on every hand-off: the escalation-reason code (see "Reason codes" below); `other` carries its mandatory free text inside the marker.
+<!-- autopilot:reviewed -->   ⟵ keep this THIRD marker line ONLY on a 🟢 merge-ready hand-off; delete it on a 🔴 / non-consensus hand-off.
 ```
 
 ```sh
 GITHUB_TOKEN="…" node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
   --project "<project_id>" --pr <number> --body-file /tmp/verdict-<number>.md \
-  --needs-human [--reviewed]
+  --needs-human [--reviewed] [--reason <code> [--reason-text "…"]]
 ```
 
 `autopilot:reviewed` marks "reviewed to 🟢, merge-ready, held only by the
 human gate" — the operator's merge-click queue
 (`is:open label:autopilot:reviewed`). Never stamp it on a non-green hand-off.
+
+### Reason codes (Epic-019 escalation telemetry)
+
+Every hand-off carries **why**, as an `autopilot:reason:<code>` label plus the
+hidden `<!-- autopilot:reason:<code> -->` marker. The versioned taxonomy —
+each code mapped 1:1 to its emission site — is
+[workforce/docs/pr-escalation-reasons.md](../../docs/pr-escalation-reasons.md)
+(v1). `pr-autopilot-post.mjs` refuses (exit 1) a `--needs-human` post with no
+reason and throws on any code outside the taxonomy; `other` requires free text
+(`--reason other --reason-text "…"`). Pick the code naming the failed clause:
+`l0l1-path`, `no-r-n10-delegation`, `no-reviewer-consensus`,
+`cycle-cap-exceeded`, `cannot-seat-panel` (Step 2),
+`persona-escalation-trigger` (Step 4), `merge-engine-refusal` (Step 5 refusal
+re-post — prefer the specific clause code the engine already stamped). The
+post script also computes the verdict-time L0/L1 check itself and stamps
+`autopilot:reason:l0l1-path` on any escalation touching the target's declared
+set, fail-closed like the merge engine. These codes measure **wiring, never
+reviewer performance**.
 
 ### The merge leg (R-N10; one shared engine)
 
@@ -227,7 +246,9 @@ merge. A mis-judged 🟢 cannot cause a bad merge.
 **A refusal is a hand-off, not a no-op.** If `pr-merge.mjs` exits `2` (any
 decision refused server-side or a GitHub write rejected), do not retry blindly
 and do not stop: post the verdict for the affected PR again via
-`pr-autopilot-post.mjs --needs-human`, quoting the engine's refusal reason.
+`pr-autopilot-post.mjs --needs-human`, quoting the engine's refusal reason —
+the engine has already stamped the refusal's `autopilot:reason:<code>` on the
+PR; reuse that code (or `--reason merge-engine-refusal`) in the re-post.
 The run still ends in one of the two terminal states.
 
 ## Step 6 — terminal-state sweep (deterministic; run every fire)

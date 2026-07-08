@@ -17,6 +17,10 @@
 //     with no human hand-off). Everything else is human-involved.
 //   - contributors: the reviewer slugs that signed off (kind: agent) — the
 //     personas doing the review work — plus the PR authors (kind: human).
+//   - escalations (Epic-019 Story 1): PRs labelled `autopilot:needs-human` in
+//     the window, bucketed by their `autopilot:reason:*` labels into
+//     pr_summary.escalation_reasons, plus eligible_escalations (the non-L0/L1
+//     share). PRs missing a reason label bucket as "unspecified".
 //
 // Writes the same `PERF#{scope}/PR` roll-up the /performance endpoint reads
 // (shape mirrors PerfPrRow). Standalone (fetch + a token); preview with --dry-run.
@@ -29,6 +33,10 @@
 const GREEN_MARKER_RE = /<!--\s*autopilot:review:[a-z0-9-]+:green\s*-->/i;
 const REVIEWER_SLUG_RE = /<!--\s*autopilot:review:([a-z0-9-]+):green\s*-->/gi;
 const NEEDS_HUMAN_LABEL = "autopilot:needs-human";
+// Epic-019 Story 1: the escalation-reason label family stamped by the
+// pr-autopilot scripts (taxonomy: workforce/docs/pr-escalation-reasons.md).
+// Mirrored here (like NEEDS_HUMAN_LABEL) rather than imported from the skill.
+const REASON_LABEL_PREFIX = "autopilot:reason:";
 
 // ── pure aggregation (unit-tested) ───────────────────────────────────────────
 
@@ -96,6 +104,32 @@ export function aggregate(prs, { sinceIso } = {}) {
   };
 }
 
+/** Epic-019 Story 1: bucket escalated (needs-human) PRs by their
+ *  `autopilot:reason:*` labels. A PR carrying several reason labels counts in
+ *  each bucket; one carrying none lands in "unspecified" — the AC's coverage
+ *  gap made visible, never silently dropped. `eligible_escalations` = the
+ *  escalations NOT reasoned `l0l1-path`, i.e. the non-structural share the
+ *  Epic-019 Story-3 verdict gates on. */
+export function aggregateEscalations(prs) {
+  const escalation_reasons = {};
+  let eligible = 0;
+  for (const pr of prs) {
+    const codes = [
+      ...new Set(
+        (pr.labels || [])
+          .map((l) => String(l || "").toLowerCase())
+          .filter((l) => l.startsWith(REASON_LABEL_PREFIX))
+          .map((l) => l.slice(REASON_LABEL_PREFIX.length)),
+      ),
+    ];
+    for (const c of codes.length > 0 ? codes : ["unspecified"]) {
+      escalation_reasons[c] = (escalation_reasons[c] || 0) + 1;
+    }
+    if (!codes.includes("l0l1-path")) eligible += 1;
+  }
+  return { escalated_prs: prs.length, eligible_escalations: eligible, escalation_reasons };
+}
+
 // ── CLI / IO ─────────────────────────────────────────────────────────────────
 
 function arg(name, fallback) {
@@ -142,6 +176,22 @@ async function main() {
     if (items.length < 100) break;
   }
 
+  // 1b. escalated PRs in the window (Epic-019): every PR — open or closed —
+  // carrying the needs-human label and updated in the window. Reason labels
+  // ride along on the Search items, so no per-PR GETs are needed.
+  const escalatedItems = [];
+  for (let page = 1; page <= 10; page++) {
+    const q = encodeURIComponent(`repo:${repo} is:pr label:"${NEEDS_HUMAN_LABEL}" updated:>=${sinceIso}`);
+    const r = await gh(`/search/issues?q=${q}&per_page=100&page=${page}`);
+    if (r.status !== 200) { console.error(`escalation search -> HTTP ${r.status} ${JSON.stringify(r.json).slice(0, 200)}`); return 3; }
+    const items = r.json.items ?? [];
+    escalatedItems.push(...items);
+    if (items.length < 100) break;
+  }
+  const escalations = aggregateEscalations(
+    escalatedItems.map((it) => ({ labels: Array.isArray(it.labels) ? it.labels.map((l) => l?.name) : [] })),
+  );
+
   // 2. per PR: churn + merged_at + author + the autopilot signal.
   const prs = [];
   for (const it of merged) {
@@ -169,10 +219,14 @@ async function main() {
   }
 
   const block = aggregate(prs, { sinceIso });
+  // Epic-019: the escalation-reason funnel lives on the same PERF#{scope}/PR
+  // item (R-N2: no new store), inside pr_summary.
+  Object.assign(block.pr_summary, escalations);
   console.error(
     `${repo} (scope ${scope}): ${block.pr_summary.total_prs} merged PR(s) over ${DAYS}d ` +
       `(${block.window.start}→${block.window.end}); autopilot ${Math.round(block.pr_summary.autopilot_share * 100)}% ` +
-      `(${block.pr_summary.autopilot_merged}/${block.pr_summary.total_prs}); reviewers: ` +
+      `(${block.pr_summary.autopilot_merged}/${block.pr_summary.total_prs}); escalated ${escalations.escalated_prs} ` +
+      `(eligible ${escalations.eligible_escalations}); reviewers: ` +
       block.pr_contributors.filter((c) => c.kind === "agent").map((c) => `${c.handle}:${c.prs}`).join(", "),
   );
 

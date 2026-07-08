@@ -131,7 +131,7 @@ describe("classifySweep — never-routed (aged out of the discovery window)", ()
 
 describe("sweepHandoffBody — the escalation comment is a real hand-off", () => {
   it("carries the hidden needs-human marker (so ML-009 tooling recognises it)", () => {
-    for (const kind of ["stale-routed", "never-routed"]) {
+    for (const kind of ["unlabelled-handoff", "stale-routed", "never-routed"]) {
       const body = sweepHandoffBody(kind, { staleHours: 48, windowDays: 7 });
       expect(body).toContain(NEEDS_HUMAN_MARKER);
       expect(body.trim().length).toBeGreaterThan(50);
@@ -141,5 +141,16 @@ describe("sweepHandoffBody — the escalation comment is a real hand-off", () =>
   it("names the reason class in prose", () => {
     expect(sweepHandoffBody("stale-routed", { staleHours: 48, windowDays: 7 })).toContain("48h");
     expect(sweepHandoffBody("never-routed", { staleHours: 48, windowDays: 7 })).toContain("7-day");
+    expect(sweepHandoffBody("unlabelled-handoff", { staleHours: 48, windowDays: 7 })).toContain("ML-009");
+  });
+
+  // Epic-019 Story 1: the sweep kind IS the escalation-reason code, reused
+  // VERBATIM inside the hidden reason marker — never flattened or renamed.
+  it("embeds the Epic-019 reason marker with the kind verbatim", () => {
+    for (const kind of ["unlabelled-handoff", "stale-routed", "never-routed"]) {
+      expect(sweepHandoffBody(kind, { staleHours: 48, windowDays: 7 })).toContain(
+        `<!-- autopilot:reason:${kind} -->`,
+      );
+    }
   });
 });

@@ -61,6 +61,16 @@ export interface PrSummary {
   total_additions: number;
   total_deletions: number;
   humans_involved: string[];
+  /** Epic-019 Story 1 — escalation-reason funnel, written by
+   *  build-pr-metrics-github.mjs; absent on rows built before it shipped.
+   *  PRs labelled autopilot:needs-human in the window. */
+  escalated_prs?: number;
+  /** Escalated PRs NOT reasoned `autopilot:reason:l0l1-path` — the eligible
+   *  (non-L0/L1) share the Epic-019 verdict gates on. */
+  eligible_escalations?: number;
+  /** Counts per escalation-reason code (workforce/docs/pr-escalation-reasons.md
+   *  v1); "unspecified" = a hand-off missing its reason label. */
+  escalation_reasons?: Record<string, number>;
 }
 
 /** One scope's full performance series (workforce or a single project) —

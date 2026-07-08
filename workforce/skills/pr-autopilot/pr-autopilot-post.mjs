@@ -20,6 +20,7 @@
 //     node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
 //       --project asp-cloud --pr 42 --body-file /tmp/route-body-42.md \
 //       [--needs-human] [--label <name>]   # see escalation rule below
+//       [--reason <code> [--reason-text "…"]]   # see reason rule below
 //
 // ESCALATION ALWAYS CARRIES THE LABEL (operator directive 2026-06-21). Any
 // comment that hands a PR to a human — a 🟢 PR touching the target's governance
@@ -43,6 +44,20 @@
 // `<!-- autopilot:reviewed -->`. A 🔴 / non-consensus escalation gets only
 // `autopilot:needs-human`, never this.
 //
+// ESCALATION ALWAYS CARRIES A REASON (Epic-019 Story 1). Any comment that
+// hands a PR to a human must also record WHY, from EITHER `--reason <code>`
+// (appended to the body as the hidden `<!-- autopilot:reason:<code> -->`
+// marker when absent) OR a reason marker already embedded in the body. The
+// code becomes an `autopilot:reason:<code>` label — the funnel's aggregation
+// source. Fail loud (C-4): an escalating post with NO reason, an unknown
+// code, or `other` without free text (`--reason-text`) exits 1. Codes:
+// workforce/docs/pr-escalation-reasons.md (v1; single-sourced from
+// escalation-reasons.mjs). Additionally, every escalation computes the
+// verdict-time L0/L1 check (same fail-closed source as the merge engine) and
+// stamps `autopilot:reason:l0l1-path` when the PR touches the target's
+// declared L0/L1 set — so the funnel's eligible (non-L0/L1) share is
+// derivable for every escalated PR, not just the merge leg.
+//
 // Extra `--label <name>` values (repeatable) are merged in. Routing comments
 // (cycle 1) carry neither flag nor marker, so they stay unlabelled. Missing
 // labels are auto-created (each with its own colour/description).
@@ -63,7 +78,14 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { projectRepo } from "./pr-autopilot-scan.mjs";
-import { ESCALATION_LABEL, REVIEWED_LABEL } from "./pr-merge.mjs";
+import { ESCALATION_LABEL, REVIEWED_LABEL, makeGh, prTouchesL0L1 } from "./pr-merge.mjs";
+import {
+  REASON_LABEL_PREFIX,
+  assertReasonCode,
+  findReasonMarkers,
+  reasonLabel,
+  reasonMarker,
+} from "./escalation-reasons.mjs";
 
 const GH_API = "https://api.github.com";
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -83,6 +105,13 @@ const LABEL_META = {
   },
 };
 const FALLBACK_LABEL_META = LABEL_META[ESCALATION_LABEL];
+
+/** Meta for the Epic-019 `autopilot:reason:*` family (one label per taxonomy
+ *  code, so an exact-name map can't cover them). */
+const REASON_LABEL_META = {
+  color: "c5def5", // light blue — telemetry, not a work queue
+  description: "Epic-019 escalation-reason telemetry — why autopilot handed this PR to a human (wiring, not reviewer performance).",
+};
 
 /** Hidden marker the SKILL.md hand-off/escalation verdict template embeds. Its
  *  presence in the comment body forces ESCALATION_LABEL even if --needs-human
@@ -150,6 +179,33 @@ export function resolveLabels(rawLabels, { needsHuman = false, reviewed = false,
   return [...new Set(out)];
 }
 
+/** Epic-019 Story 1: every hand-off to a human carries WHY. Pure resolver —
+ *  given the body plus the --reason/--reason-text flags, returns the reason
+ *  codes found, the `autopilot:reason:*` labels to stamp, and the marker to
+ *  append to the body (null when it already carries one for that code).
+ *  Throws (C-4) on an unknown code, an `other` without free text, or an
+ *  escalating comment with no reason at all — an un-reasoned hand-off never
+ *  reaches GitHub. */
+export function resolveReasons({ body = "", escalating = false, reason, reasonText = "" } = {}) {
+  const codes = new Set(findReasonMarkers(body).map((m) => m.code)); // throws on unknown / bare other
+  let appendMarker = null;
+  if (reason) {
+    assertReasonCode(reason);
+    if (!codes.has(reason)) {
+      appendMarker = reasonMarker(reason, reasonText); // throws on other w/o text
+      codes.add(reason);
+    }
+  }
+  if (escalating && codes.size === 0) {
+    throw new Error(
+      "an autopilot:needs-human hand-off must carry an escalation reason (Epic-019): pass --reason <code> " +
+        "(taxonomy: workforce/docs/pr-escalation-reasons.md) or embed the <!-- autopilot:reason:<code> --> " +
+        'marker in the body; "other" requires free text via --reason-text.',
+    );
+  }
+  return { codes: [...codes], labels: [...codes].map(reasonLabel), appendMarker };
+}
+
 async function gh(token, method, path, body) {
   return fetch(`${GH_API}${path}`, {
     method,
@@ -197,6 +253,46 @@ async function main() {
     );
   }
 
+  // Epic-019: resolve labels + reasons BEFORE posting — the reason marker must
+  // ride in the comment body, and an un-reasoned / mis-coded escalation must
+  // fail loud here (C-4) without posting anything.
+  let labels = resolveLabels(labelArgs(), {
+    needsHuman: flag("needs-human"),
+    reviewed: flag("reviewed"),
+    body,
+  });
+  let reasons;
+  try {
+    reasons = resolveReasons({
+      body,
+      escalating: labels.includes(ESCALATION_LABEL),
+      reason: arg("reason"),
+      reasonText: arg("reason-text") ?? "",
+    });
+  } catch (e) {
+    die(1, e instanceof Error ? e.message : String(e));
+  }
+  if (reasons.appendMarker) body = `${body.trimEnd()}\n\n${reasons.appendMarker}\n`;
+  labels = [...new Set([...labels, ...reasons.labels])];
+
+  // Verdict-time L0/L1 computation (Epic-019): every escalation records
+  // whether the PR touches the target's declared L0/L1 set — today only the
+  // merge leg computes this, which makes the funnel's eligible (non-L0/L1)
+  // share uncomputable. Same fail-closed source as the merge engine
+  // (prTouchesL0L1 → resolveL0L1Paths): an unreadable/markerless governance
+  // doc means the set is UNKNOWN — log and escalate without an eligibility
+  // record, never guess. A telemetry failure must not block the hand-off
+  // itself (escalating IS the safe direction).
+  if (labels.includes(ESCALATION_LABEL)) {
+    try {
+      const t = await prTouchesL0L1(makeGh({ token, userAgent: "kohuehara-workforce" }), `${owner}/${repo}`, prNumber);
+      if (t.known && t.touches) labels = [...new Set([...labels, reasonLabel("l0l1-path")])];
+      else if (!t.known) console.error(`pr-autopilot-post: WARN L0/L1 set unknown for ${owner}/${repo}#${prNumber} (${t.why}) — escalating without an eligibility record`);
+    } catch (e) {
+      console.error(`pr-autopilot-post: WARN verdict-time L0/L1 check failed (${e?.msg || e?.message || e}) — escalating without an eligibility record`);
+    }
+  }
+
   let res;
   try {
     res = await fetch(`${GH_API}/repos/${owner}/${repo}/issues/${prNumber}/comments`, {
@@ -216,18 +312,15 @@ async function main() {
   if (res.status === 201) {
     const json = await res.json().catch(() => ({}));
     console.log(`pr-autopilot-post: posted to ${owner}/${repo}#${prNumber} (comment ${json.id ?? "?"})`);
-    // Stamp escalation labels (best-effort: a label problem must not fail a
-    // comment that already landed). Auto-create any label the repo lacks.
-    // resolveLabels guarantees ESCALATION_LABEL whenever this comment hands the
-    // PR to a human (--needs-human flag or the body marker).
-    const labels = resolveLabels(labelArgs(), {
-      needsHuman: flag("needs-human"),
-      reviewed: flag("reviewed"),
-      body,
-    });
+    // Stamp escalation + reason labels (best-effort: a label problem must not
+    // fail a comment that already landed). Auto-create any label the repo
+    // lacks. `labels` was resolved above, before the post: resolveLabels
+    // guarantees ESCALATION_LABEL whenever this comment hands the PR to a
+    // human, and resolveReasons/prTouchesL0L1 supply the autopilot:reason:*
+    // family.
     if (labels.length > 0) {
       for (const name of labels) {
-        const meta = LABEL_META[name] ?? FALLBACK_LABEL_META;
+        const meta = LABEL_META[name] ?? (name.startsWith(REASON_LABEL_PREFIX) ? REASON_LABEL_META : FALLBACK_LABEL_META);
         const cr = await gh(token, "POST", `/repos/${owner}/${repo}/labels`, {
           name, color: meta.color, description: meta.description,
         }).catch(() => ({ status: 0 }));
