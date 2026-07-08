@@ -1,6 +1,6 @@
 # Epic-022 — Organisational learning: one agent's experience becomes everyone's premise by tomorrow
 
-- **Status**: Draft
+- **Status**: Accepted (2026-07-08)
 - **Owner**: mateo
 - **Created**: 2026-07-07
 - **Implemented by**: —

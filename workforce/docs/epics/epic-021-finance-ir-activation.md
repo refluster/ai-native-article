@@ -1,6 +1,6 @@
 # Epic-021 — Put the finance & IR bench to work: job design, deliverables, and an idle-talent discipline
 
-- **Status**: Draft
+- **Status**: Accepted (2026-07-08)
 - **Owner**: silas
 - **Created**: 2026-07-07
 - **Implemented by**: —

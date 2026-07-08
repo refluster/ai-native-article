@@ -1,6 +1,6 @@
 # Epic-019 — Autonomous change finalization: from a 2.8% baseline to an order of magnitude more
 
-- **Status**: Draft
+- **Status**: Accepted (2026-07-08)
 - **Owner**: nadia
 - **Created**: 2026-07-07
 - **Implemented by**: —

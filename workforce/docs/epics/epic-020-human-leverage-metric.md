@@ -1,6 +1,6 @@
 # Epic-020 — Human leverage as a first-class metric: measuring the value of one human touch
 
-- **Status**: Draft
+- **Status**: Accepted (2026-07-08)
 - **Owner**: maya
 - **Created**: 2026-07-07
 - **Implemented by**: —

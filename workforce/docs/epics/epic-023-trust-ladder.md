@@ -1,6 +1,6 @@
 # Epic-023 — The trust ladder: authority that widens and narrows on recorded track record
 
-- **Status**: Draft
+- **Status**: Accepted (2026-07-08)
 - **Owner**: priya
 - **Created**: 2026-07-07
 - **Implemented by**: —
