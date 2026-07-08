@@ -37,7 +37,7 @@ each publish the article is no longer `none`, so re-running the picker advances
 to the next uncovered article. Stop early when the picker returns `{skip:true}`.
 
 1. **Pick one uncovered analysis article — run the picker, don't guess.** Run
-   `pick-article.mjs` (below). It returns the oldest **published, Type=analysis**
+   `pick-article.mjs` (below). It returns the oldest **live (`Status` ready/published), Type=analysis**
    article whose `podcastStatus` is empty/`none` **and that has non-empty
    `SourceURLs`** — an article with no sources can't produce a compliant episode
    (mandatory citations, C-1) and would otherwise permanently block the
