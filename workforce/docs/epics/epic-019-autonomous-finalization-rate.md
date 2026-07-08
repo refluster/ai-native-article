@@ -1,9 +1,9 @@
 # Epic-019 — Autonomous change finalization: from a 2.8% baseline to an order of magnitude more
 
-- **Status**: Accepted (2026-07-08)
+- **Status**: In-progress (2026-07-08)
 - **Owner**: nadia
 - **Created**: 2026-07-07
-- **Implemented by**: —
+- **Implemented by**: #465 (Story 1, in review)
 - **Hypothesis under test**: Monthly report 2026-07 (article `d06ecf4bb246`), 仮説一 — *the key to an organisation where many agents can work is not making individuals smarter but designing where judgment sits and how fast verification runs.*
 
 ## Problem
