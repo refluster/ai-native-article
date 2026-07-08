@@ -87,6 +87,7 @@ When the Status line flips, add a parenthetical date so the audit trail is one c
 | [015](epic-015-daily-research-cadence.md) | daily-research: one generic research cadence across personas | Implemented | sana |
 | [016](epic-016-workforce-performance-analytics.md) | Workforce performance analytics (per-project + cross-project) | In-progress | nadia |
 | [017](epic-017-podcast-spotify-distribution.md) | Podcast production & Spotify distribution from analysis articles | Implemented (2026-06-29) | Maya |
+| [018](epic-018-semantic-memory-curation.md) | Semantic memory curation: pilot five personas, then make it a technique | Draft | Maya |
 | [019](epic-019-autonomous-finalization-rate.md) | Autonomous change finalization: 2.8% baseline → an order of magnitude (仮説一) | Accepted (2026-07-08) | nadia |
 | [020](epic-020-human-leverage-metric.md) | Human leverage per intervention as a first-class metric (仮説二) | Accepted (2026-07-08) | maya |
 | [021](epic-021-finance-ir-activation.md) | Finance & IR bench activation + idle-talent discipline (仮説三) | Accepted (2026-07-08) | silas |
