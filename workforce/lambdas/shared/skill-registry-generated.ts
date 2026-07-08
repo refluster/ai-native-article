@@ -28,4 +28,5 @@ export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "positioning-write": [],
   "pr-autopilot": ["github.token"] as const,
   "record-engagement": [],
+  "vp-monthly-report": ["notion.integration_token"] as const,
 };
