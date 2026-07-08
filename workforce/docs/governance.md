@@ -26,7 +26,7 @@ Non-negotiable. A request that would force a violation must be refused or escala
 
 - **W-1 Editorial integrity.** Any article published under a persona byline on `kohuehara.xyz` must be free of mid-sentence truncation, empty bodies, and LLM-failure artefacts. Extends C-1 by attaching responsibility to the persona, not just the site.
 - **W-2 No double source-of-truth.** Article content is owned by Notion (inherits C-2). Workforce state — agent definitions, tasks, runs, deliverables, memory — is owned by DynamoDB + S3. The two domains never cross: Notion never holds workforce state, DDB never holds article body text.
-- **W-3 Cost ceiling.** A monthly token budget per agent is enforced at the LLM call site (throw on overrun). A CloudWatch Billing Alarm covers the deployment as a whole. **Current cap: USD 250/month combined.** Raising the cap is a Zone A change; every raise is one row in the amendment table below (per-hire rationale lives in the round docs under [`hires/`](hires/)).
+- **W-3 Cost ceiling.** A monthly token budget per agent is enforced at the LLM call site (throw on overrun). A CloudWatch Billing Alarm covers the deployment as a whole. **Current cap: USD 295/month combined.** Raising the cap is a Zone A change; every raise is one row in the amendment table below (per-hire rationale lives in the round docs under [`hires/`](hires/)).
 
   | Date | Cap (USD/mo) | Trigger |
   |---|---|---|
@@ -35,6 +35,7 @@ Non-negotiable. A request that would force a violation must be refused or escala
   | 2026-06-05 | 130 → 160 | Agent Workforce Platform group (Mateo / Hana / Freya / Sana) |
   | 2026-06-14 | 160 → 190 | Finance & Capital group (Silas / Delphine / Corinne) |
   | 2026-06-28 | 190 → 250 | Media & External Communications group (Celeste / Rhys / Odette / Idris; Epic-017) |
+  | 2026-07-08 | 250 → 295 | India Energy Market Research Desk — desk (Anjali / Rohan / Sneha / Sofia) + distributed hires (Jay → India desk, Amara → Policy/Research, Julian → Finance) |
 - **W-4 Fail loud.** `finish_reason==='length'`, Notion/GitHub API errors, memory `memver` conflicts, and 24h Engineer-PR timeouts (R-N1 exception path) all throw or DLQ. No silent degradation. Inherits C-4 with the new failure modes named.
 - **W-5 Persona stability.** An agent's identity/config — persona prompt (`system_prompt`), model, budget, streams, bindings — lives on the `AGENT#{slug}/META` row and is mutated **only** through the agents-api write path ([ADR-0007](adr/adr-0007-agent-config-single-source.md)): one persona per mutation, validated at the write boundary, appended to the immutable `AUDIT#` trail, and surfaced in the weekly config digest — the post-hoc review that replaced per-change PR review. The discipline AGENTS.md Rule 11 enforced via "a persona bump is its own PR" — atomic, reviewable, one-persona-at-a-time — is unchanged; ADR-0007 moved the *mechanism* from git PRs to audited writes. Skills stay file-based and keep the PR discipline: no PR may bump more than one skill's `SKILL.md` body; a `SKILL.md` bump must also bump that skill's `meta.json:version` in the same PR (the two are co-versioned); the first version of every skill is the documented exception — first version is not a bump.
 
