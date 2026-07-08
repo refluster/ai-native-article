@@ -33,9 +33,11 @@ const REGION = process.env.AWS_REGION ?? "us-west-2";
 const DRY_RUN = process.argv.includes("--dry-run");
 
 // Parent before children: the manifest builder derives org depth from
-// reports_to — anjali (reports to tessa, already registered) before her ICs.
-const SLUGS = ["anjali", "rohan", "sneha", "sofia"];
-const W3_CAP_USD = 275;
+// reports_to. anjali (reports to tessa) leads, then her desk ICs; jay also
+// reports to anjali so lands after her. amara (-> tessa) and julian (-> silas)
+// report to already-registered VPs, so their order is free — kept last.
+const SLUGS = ["anjali", "rohan", "sneha", "sofia", "jay", "amara", "julian"];
+const W3_CAP_USD = 295;
 
 function loadPayload(slug) {
   const body = JSON.parse(readFileSync(join(HERE, `${slug}.json`), "utf8"));
