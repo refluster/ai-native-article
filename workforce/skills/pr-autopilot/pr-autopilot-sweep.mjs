@@ -24,10 +24,12 @@
 //
 // Modes:
 //   default   — report violations, exit 2 if any (CI / audit usage).
-//   --apply   — enforce the contract: label every violation (and, for the two
-//               stale classes, post the hand-off comment carrying the hidden
-//               marker) so the operator's `is:open label:autopilot:needs-human`
-//               queue is complete. Exit 0 when everything applied.
+//   --apply   — enforce the contract: post the hand-off comment (hidden
+//               needs-human marker + Epic-019 reason marker) and stamp
+//               `autopilot:needs-human` + `autopilot:reason:<kind>` on every
+//               violation, so the operator's `is:open
+//               label:autopilot:needs-human` queue is complete and every
+//               escalation carries its reason. Exit 0 when everything applied.
 //
 // Usage:
 //   GITHUB_TOKEN=... node workforce/skills/pr-autopilot/pr-autopilot-sweep.mjs \
@@ -42,6 +44,7 @@ import { dirname, join } from "node:path";
 import { projectRepo } from "./pr-autopilot-scan.mjs";
 import { ESCALATION_LABEL, countRouterCycles, ensureLabels, makeGh } from "./pr-merge.mjs";
 import { NEEDS_HUMAN_MARKER } from "./pr-autopilot-post.mjs";
+import { reasonLabel, reasonMarker } from "./escalation-reasons.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..", "..", "..");
@@ -80,13 +83,17 @@ export function classifySweep(
   return age > windowDays * 86400_000 ? "never-routed" : null;
 }
 
-/** Hand-off comment for the two stale classes. Carries the hidden marker so
- *  the label logic (and the ML-009 guard) recognise it as an escalation. */
+/** Hand-off comment for the three violation classes. Carries the hidden
+ *  needs-human marker so the label logic (and the ML-009 guard) recognise it
+ *  as an escalation, plus the Epic-019 reason marker — the sweep kind IS the
+ *  reason code, reused verbatim (workforce/docs/pr-escalation-reasons.md v1). */
 export function sweepHandoffBody(kind, { staleHours, windowDays }) {
   const reason =
-    kind === "stale-routed"
-      ? `routed for review but reached no terminal state (merged / hand-off) within ${staleHours}h`
-      : `never picked up by the routing cadence within its ${windowDays}-day discovery window`;
+    kind === "unlabelled-handoff"
+      ? "handed off (a comment carries the hidden needs-human marker) but the label was dropped (ML-009)"
+      : kind === "stale-routed"
+        ? `routed for review but reached no terminal state (merged / hand-off) within ${staleHours}h`
+        : `never picked up by the routing cadence within its ${windowDays}-day discovery window`;
   return [
     "**Autopilot sweep — terminal-state enforcement.**",
     "",
@@ -97,6 +104,7 @@ export function sweepHandoffBody(kind, { staleHours, windowDays }) {
     "— pr-autopilot sweep (deterministic; see workforce/skills/pr-autopilot/SKILL.md)",
     "",
     NEEDS_HUMAN_MARKER,
+    reasonMarker(kind),
   ].join("\n");
 }
 
@@ -167,21 +175,21 @@ async function main() {
 
   let failedApplies = 0;
   if (apply && violations.length > 0) {
-    await ensureLabels(gh, repo, [ESCALATION_LABEL]);
+    await ensureLabels(gh, repo, [ESCALATION_LABEL, ...new Set(violations.map((v) => reasonLabel(v.kind)))]);
     for (const v of violations) {
-      // The stale classes get the hand-off comment (with the hidden marker);
-      // an unlabelled-handoff already has one — it only needs the label.
-      if (v.kind !== "unlabelled-handoff") {
-        const c = await gh("POST", `/repos/${repo}/issues/${v.number}/comments`, {
-          body: sweepHandoffBody(v.kind, { staleHours, windowDays }),
-        });
-        if (c.status !== 201) {
-          failedApplies++;
-          console.error(`pr-autopilot-sweep: FAILED comment on #${v.number} → HTTP ${c.status}`);
-          continue;
-        }
+      // Every class gets the hand-off comment: it carries the hidden
+      // needs-human marker plus the Epic-019 reason marker. An
+      // unlabelled-handoff already has a hand-off comment, but not necessarily
+      // a reason — the sweep's comment closes that telemetry gap too.
+      const c = await gh("POST", `/repos/${repo}/issues/${v.number}/comments`, {
+        body: sweepHandoffBody(v.kind, { staleHours, windowDays }),
+      });
+      if (c.status !== 201) {
+        failedApplies++;
+        console.error(`pr-autopilot-sweep: FAILED comment on #${v.number} → HTTP ${c.status}`);
+        continue;
       }
-      const l = await gh("POST", `/repos/${repo}/issues/${v.number}/labels`, { labels: [ESCALATION_LABEL] });
+      const l = await gh("POST", `/repos/${repo}/issues/${v.number}/labels`, { labels: [ESCALATION_LABEL, reasonLabel(v.kind)] });
       if (l.status === 200) console.error(`pr-autopilot-sweep: escalated #${v.number} (${v.kind})`);
       else {
         failedApplies++;

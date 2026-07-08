@@ -15,6 +15,7 @@ import {
   MIN_REVIEWERS,
   verifyMergeable,
   applyDecisions,
+  prTouchesL0L1,
   ESCALATION_LABEL,
 } from "./pr-merge.mjs";
 
@@ -277,6 +278,98 @@ describe("applyDecisions (escalation labelling)", () => {
     expect(res.escalated).toBe(1);
     const issueCall = gh.calls.find((c) => c.method === "POST" && /\/issues$/.test(c.path));
     expect(issueCall.body.labels).toContain(ESCALATION_LABEL);
+  });
+
+  // Epic-019 Story 1: an escalation may declare its reason code — validated
+  // loud, carried as label + hidden marker on the filed issue.
+  it("a reason_code rides along as label + marker", async () => {
+    const gh = mockGh([
+      [/POST \/repos\/o\/r\/labels/, { status: 422, json: {} }],
+      [/POST \/repos\/o\/r\/issues$/, { status: 201, json: { html_url: "u" } }],
+    ]);
+    const res = await applyDecisions(gh, "o/r", [
+      { pr: 9, action: "escalate", issue_title: "Hold #9", issue_body: "touches L0/L1", reason_code: "l0l1-path" },
+    ]);
+    expect(res.escalated).toBe(1);
+    const issueCall = gh.calls.find((c) => c.method === "POST" && /\/issues$/.test(c.path));
+    expect(issueCall.body.labels).toContain("autopilot:reason:l0l1-path");
+    expect(issueCall.body.body).toContain("<!-- autopilot:reason:l0l1-path -->");
+  });
+
+  it("an unknown reason_code throws (C-4) — never a quiet new bucket", async () => {
+    await expect(
+      applyDecisions(mockGh([]), "o/r", [
+        { pr: 9, action: "escalate", issue_title: "t", issue_body: "b", reason_code: "reviewer-was-slow" },
+      ]),
+    ).rejects.toThrow(/unknown escalation-reason code/);
+  });
+});
+
+describe("applyDecisions — refusal telemetry (Epic-019 Story 1)", () => {
+  const MERGE_DECISION = {
+    pr: 1, action: "merge", comment: "consensus-green, merging", reviewers: PANEL,
+    squash_subject: "feat: thing (#1)", squash_body: "Unanimous sign-off (dario, ren, mateo).",
+  };
+  it("a refused merge stamps autopilot:reason:<code> + posts the marker comment — and still never merges", async () => {
+    // L0/L1-touching PR → verifyMergeable refuses with the `touches L0/L1 path` clause.
+    const gh = mockGh([
+      ...routes([{ filename: "docs/governance.md" }], GREEN_CHECK, PANEL_REVIEWS),
+      [/POST \/repos\/o\/r\/labels/, { status: 422, json: {} }],
+      [/POST \/repos\/o\/r\/issues\/1\/labels/, { status: 200, json: [] }],
+      [/POST \/repos\/o\/r\/issues\/1\/comments/, { status: 201, json: {} }],
+    ]);
+    const res = await applyDecisions(gh, "o/r", [MERGE_DECISION]);
+    expect(res.merged).toBe(0);
+    expect(res.refused).toBe(1);
+    const labelCall = gh.calls.find((c) => c.method === "POST" && /issues\/1\/labels$/.test(c.path));
+    expect(labelCall.body.labels).toEqual(["autopilot:reason:l0l1-path"]);
+    const commentCall = gh.calls.find((c) => c.method === "POST" && /issues\/1\/comments$/.test(c.path));
+    expect(commentCall.body.body).toContain("<!-- autopilot:reason:l0l1-path -->");
+    // Telemetry never widens the predicate: the merge PUT was still not reached.
+    expect(gh.calls.some((c) => c.method === "PUT" && /\/merge$/.test(c.path))).toBe(false);
+  });
+  it("a consensus refusal maps to no-reviewer-consensus", async () => {
+    const gh = mockGh([
+      ...routes([{ filename: "src/app.ts" }], GREEN_CHECK, DARIO_REVIEW),
+      [/POST \/repos\/o\/r\/labels/, { status: 422, json: {} }],
+      [/POST \/repos\/o\/r\/issues\/1\/labels/, { status: 200, json: [] }],
+      [/POST \/repos\/o\/r\/issues\/1\/comments/, { status: 201, json: {} }],
+    ]);
+    const res = await applyDecisions(gh, "o/r", [{ ...MERGE_DECISION, reviewers: ["dario"] }]);
+    expect(res.refused).toBe(1);
+    const labelCall = gh.calls.find((c) => c.method === "POST" && /issues\/1\/labels$/.test(c.path));
+    expect(labelCall.body.labels).toEqual(["autopilot:reason:no-reviewer-consensus"]);
+  });
+});
+
+describe("prTouchesL0L1 (verdict-time L0/L1 computation — Epic-019 Story 1)", () => {
+  it("reports touches:true when a changed file matches the declared set", async () => {
+    const gh = mockGh([
+      [/GET .*contents/, govDoc(L0_BLOCK)],
+      [/GET \/repos\/o\/r\/pulls\/1\/files/, { status: 200, json: [{ filename: "docs/adr/adr-2.md" }] }],
+    ]);
+    const t = await prTouchesL0L1(gh, "o/r", 1, "main");
+    expect(t.known).toBe(true);
+    expect(t.touches).toBe(true);
+    expect(t.why).toMatch(/docs\/adr\/adr-2\.md/);
+  });
+  it("reports touches:false on a clean surface", async () => {
+    const gh = mockGh([
+      [/GET .*contents/, govDoc(L0_BLOCK)],
+      [/GET \/repos\/o\/r\/pulls\/1\/files/, { status: 200, json: [{ filename: "src/app.ts" }] }],
+    ]);
+    const t = await prTouchesL0L1(gh, "o/r", 1, "main");
+    expect(t).toMatchObject({ known: true, touches: false });
+  });
+  it("fails closed (known:false, touches:null) when the governance doc is unreadable — never guesses", async () => {
+    const t = await prTouchesL0L1(mockGh([[/GET .*contents/, { status: 404, json: {} }]]), "o/r", 1);
+    expect(t.known).toBe(false);
+    expect(t.touches).toBeNull();
+  });
+  it("fails closed when the files listing fails", async () => {
+    const gh = mockGh([[/GET .*contents/, govDoc(L0_BLOCK)]]); // files GET → 404 default
+    const t = await prTouchesL0L1(gh, "o/r", 1, "main");
+    expect(t.known).toBe(false);
   });
 });
 

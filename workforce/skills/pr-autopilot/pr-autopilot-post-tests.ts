@@ -10,7 +10,7 @@
 // --needs-human flag OR the hidden body marker), and never on a plain routing
 // comment.
 import { describe, it, expect } from "vitest";
-import { resolveLabels, findRawMentions, NEEDS_HUMAN_MARKER, REVIEWED_MARKER } from "./pr-autopilot-post.mjs";
+import { resolveLabels, resolveReasons, findRawMentions, NEEDS_HUMAN_MARKER, REVIEWED_MARKER } from "./pr-autopilot-post.mjs";
 import { ESCALATION_LABEL, REVIEWED_LABEL } from "./pr-merge.mjs";
 
 describe("resolveLabels — escalation always carries the label", () => {
@@ -77,6 +77,57 @@ describe("resolveLabels — a green, merge-ready hand-off is flagged reviewed", 
 
   it("the reviewed marker constant is the canonical hidden token", () => {
     expect(REVIEWED_MARKER).toBe("<!-- autopilot:reviewed -->");
+  });
+});
+
+// Locks Epic-019 Story 1: a hand-off to a human ALWAYS carries WHY. resolveReasons
+// is the mechanical half — an escalating post with no reason, an unknown code,
+// or a bare `other` never reaches GitHub (C-4, exit 1 in main()).
+describe("resolveReasons — escalation always carries a reason (Epic-019)", () => {
+  it("an escalating post with no reason at all throws", () => {
+    expect(() => resolveReasons({ body: `verdict\n${NEEDS_HUMAN_MARKER}`, escalating: true })).toThrow(
+      /must carry an escalation reason/,
+    );
+  });
+
+  it("--reason supplies the code: label + marker to append", () => {
+    const r = resolveReasons({ body: "verdict", escalating: true, reason: "cannot-seat-panel" });
+    expect(r.labels).toEqual(["autopilot:reason:cannot-seat-panel"]);
+    expect(r.appendMarker).toBe("<!-- autopilot:reason:cannot-seat-panel -->");
+  });
+
+  it("a marker already embedded in the body satisfies the requirement (nothing appended)", () => {
+    const body = `verdict\n${NEEDS_HUMAN_MARKER}\n<!-- autopilot:reason:no-reviewer-consensus -->`;
+    const r = resolveReasons({ body, escalating: true });
+    expect(r.labels).toEqual(["autopilot:reason:no-reviewer-consensus"]);
+    expect(r.appendMarker).toBeNull();
+  });
+
+  it("--reason matching an embedded marker is not appended twice", () => {
+    const body = "verdict\n<!-- autopilot:reason:l0l1-path -->";
+    const r = resolveReasons({ body, escalating: true, reason: "l0l1-path" });
+    expect(r.labels).toEqual(["autopilot:reason:l0l1-path"]);
+    expect(r.appendMarker).toBeNull();
+  });
+
+  it("an unknown code throws (C-4), flag or marker alike", () => {
+    expect(() => resolveReasons({ body: "v", escalating: true, reason: "sloppy-review" })).toThrow(/unknown/);
+    expect(() => resolveReasons({ body: "<!-- autopilot:reason:sloppy-review -->", escalating: true })).toThrow(/unknown/);
+  });
+
+  it("`other` requires free text", () => {
+    expect(() => resolveReasons({ body: "v", escalating: true, reason: "other" })).toThrow(/free text/);
+    const r = resolveReasons({ body: "v", escalating: true, reason: "other", reasonText: "repo archived" });
+    expect(r.labels).toEqual(["autopilot:reason:other"]);
+    expect(r.appendMarker).toBe("<!-- autopilot:reason:other repo archived -->");
+  });
+
+  it("a non-escalating routing comment needs no reason", () => {
+    expect(resolveReasons({ body: "**Nadia — cycle 1.**", escalating: false })).toEqual({
+      codes: [],
+      labels: [],
+      appendMarker: null,
+    });
   });
 });
 
