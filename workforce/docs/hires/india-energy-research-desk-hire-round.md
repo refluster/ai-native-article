@@ -88,7 +88,7 @@ cross-cutting capabilities sit where their function already lives.
 
 | Slug | Role | Reports to | Residence | Model | Budget |
 |---|---|---|---|---|---|
-| `anjali` | Research Director, India Energy Market Desk (lead) | `tessa` | Mumbai, IN | `anthropic:claude-sonnet-4-6` | USD 7/mo |
+| `anjali` | Research Director, India Energy Market Desk | `tessa` | Mumbai, IN | `anthropic:claude-sonnet-4-6` | USD 7/mo |
 | `rohan` | DISCOM, Subsidy & Program-Economics Analyst | `anjali` | Gurugram, IN | `anthropic:claude-sonnet-4-6` | USD 6/mo |
 | `sneha` | Residential Consumer & Field-Evidence Analyst | `anjali` | Pune, IN | `anthropic:claude-sonnet-4-6` | USD 6/mo |
 | `sofia` | Market Strategy & Willingness-to-Pay Analyst | `anjali` | Copenhagen, DK | `anthropic:claude-sonnet-4-6` | USD 6/mo |
@@ -245,6 +245,39 @@ closing the India channel/ecosystem gap. Amara Singh and the `private-capital-mo
 - [ ] governance.md §2: cap reads USD 295/month and the amendment table carries the
       2026-07-08 row (250 → 295).
 - [ ] Every persona hard-refuses outreach and carries the bias disclosure block.
+
+## §10a. Registration outcome & fix (2026-07-08)
+
+First `register.mjs` run (operator, profile `prdca-esrg`): **6 of 7 created and
+verified** (`rohan`, `sneha`, `sofia`, `jay`, `amara`, `julian`); the
+`wire-daily-cadences-all-agents.mjs` run then bound each of the six to daily
+`feed-post` + daily `daily-research` (minute-staggered, `agent-workforce`, enabled).
+
+`anjali` **failed with HTTP 422** on write-boundary rule
+`S19-role-prompt-title` (ML-014): the `role` field carried a ` (lead)` suffix
+that the `system_prompt` header title did not, and S19 requires the two to be
+identical (a title change must write both fields in one mutation). Root cause:
+the parenthetical leadership annotation leaked into the `role` string. **Fix**:
+dropped ` (lead)` from `anjali.json:role` so it matches the header
+`# Anjali Khurana — Research Director, India Energy Market Desk — Mumbai, IN` —
+consistent with house convention (tessa/silas/corinne roles carry no lead
+suffix; leadership is expressed by `reports_to` edges, and `rohan`/`sneha`/`sofia`/`jay`
+already point at `anjali`).
+
+**Transient graph state to close:** the four desk ICs were created with
+`reports_to: ["anjali"]` while `anjali` did not yet exist — a dangling parent
+the console manifest builder (`computeDepths`) rejects. Registering `anjali`
+closes it. Operator re-run (idempotent — the six 409-skip):
+
+```bash
+aws-vault exec prdca-esrg -- node workforce/seed/india-energy-group/register.mjs
+aws-vault exec prdca-esrg -- node workforce/scripts/wire-daily-cadences-all-agents.mjs
+```
+
+The second command binds only `anjali`'s two daily cadences (the six already-bound
+are skipped). Lesson for future rounds: keep `role` free of parenthetical
+role-status annotations, or mirror them verbatim into the system-prompt header —
+the S19/ML-014 pair enforces it at the write boundary.
 
 ## §11. Open questions sent up to Maya/operator
 
