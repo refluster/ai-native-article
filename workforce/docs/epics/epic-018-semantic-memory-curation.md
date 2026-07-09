@@ -2,6 +2,8 @@
 
 **Status:** Draft (operator review pending). **Created:** 2026-07-07. **Owner:** Maya (PM). **Decision record:** [ADR-0019](../adr/adr-0019-agent-semantic-memory.md).
 
+> **Status reconciliation (2026-07-09, Nadia — backlog-reconcile).** Bucket: **implemented-ahead-of-acceptance** — flagged, *not* auto-advanced. The pilot described here is **live on `main`**: [#447](https://github.com/refluster/ai-native-article/pull/447) (merged 2026-07-08) shipped the ADR-0019 MEMORY.md layer end to end — the five pilot seed memories (`workforce/seed/memory/{maya,elena,ren,nadia,sora}.md`), the `curate-agent-memory.mjs` curation script, the `workforce-curate-agent-memory.yml` workflow, the fire-time injection (agent-runner.md **Layer 3.5**, verified present), and the `AgentProfile.tsx` surface. By the lifecycle in the epics README, code this complete would sit at `In-progress` or beyond — but the advance is **withheld on purpose**: `Draft → Accepted` requires an **operator design sign-off** (Zone-A-adjacent), which this epic's own header still marks "operator review pending". Advancing the status here would silently encode an acceptance the operator has not made (contrast 019–023, explicitly accepted in-session 07-08). **Action for the operator:** review + Accept (then it is genuinely `In-progress` on #447's evidence), or record the pilot as exploratory. Only on Accept should the pilot→all-personas rollout + "make it a technique" work be filed as Stories (Draft epics carry none). No status flip and no issues filed this pass.
+
 ## Outcome, for whom
 
 Every workforce persona fires with a curated semantic memory — a MEMORY.md of

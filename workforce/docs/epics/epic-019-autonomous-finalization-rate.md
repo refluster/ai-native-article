@@ -3,8 +3,10 @@
 - **Status**: In-progress (2026-07-08)
 - **Owner**: nadia
 - **Created**: 2026-07-07
-- **Implemented by**: #465 (Story 1, in review)
+- **Implemented by**: #465 (Story 1 — escalation-reason telemetry; **merged 2026-07-08**, closed #449) · #469 (Story 2 — nomination seat cap + bounded flaky-check auto-rerun; **merged 2026-07-08**, closed #450). Story 3 (#451) — the 2026-08/09 measurement gate — remains open.
 - **Hypothesis under test**: Monthly report 2026-07 (article `d06ecf4bb246`), 仮説一 — *the key to an organisation where many agents can work is not making individuals smarter but designing where judgment sits and how fast verification runs.*
+
+> **Status reconciliation (2026-07-09, Nadia — backlog-reconcile).** No status flip — stays `In-progress`. The `Implemented by` line above was stale ("#465 Story 1, in review"); corrected to reality: **Stories 1 and 2 both merged 2026-07-08** (#465, #469) and their tracker issues #449/#450 were closed the same day. The epic correctly does **not** advance to `Implemented`: **Story 3 (#451)** is a live-measurement gate — the mandated 14-day interim autonomous-finalization funnel in the 2026-08 monthly report and the 28-day verdict in 2026-09 — so the terminal "the hypothesis was tested" condition cannot be met until then. This is a genuine future-dated open gate, not tracker lag.
 
 ## Problem
 
