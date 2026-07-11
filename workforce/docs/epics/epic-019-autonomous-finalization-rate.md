@@ -3,8 +3,10 @@
 - **Status**: In-progress (2026-07-08)
 - **Owner**: nadia
 - **Created**: 2026-07-07
-- **Implemented by**: #465 (Story 1, in review)
+- **Implemented by**: #465 (Story 1 — escalation-reason telemetry, **merged**), #469 (Story 2 — nomination seat cap + bounded flaky-rerun, **merged**); Story 3 tracked in #451 (28-day 仮説一 verdict, open)
 - **Hypothesis under test**: Monthly report 2026-07 (article `d06ecf4bb246`), 仮説一 — *the key to an organisation where many agents can work is not making individuals smarter but designing where judgment sits and how fast verification runs.*
+
+> **Status reconciliation (2026-07-11, Nadia — backlog-reconcile).** Stays **In-progress** — no flip. Story 1 (#465) and Story 2 (#469) both **merged** since the epic opened, so the header's prior "Story 1, in review" pointer is corrected above. Story 3 — the 14-day interim funnel (2026-08 report) + 28-day 仮説一 verdict (2026-09), tracked in #451 — is genuinely open and gated on Epic-016 #436/#437 (OP-011 reducer redeploy, OP-012 daily PR-metrics refresh). No advance to Implemented.
 
 ## Problem
 
