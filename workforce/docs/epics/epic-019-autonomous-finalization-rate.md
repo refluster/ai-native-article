@@ -3,8 +3,10 @@
 - **Status**: In-progress (2026-07-08)
 - **Owner**: nadia
 - **Created**: 2026-07-07
-- **Implemented by**: #465 (Story 1, in review)
+- **Implemented by**: #465 (Story 1 — escalation-reason telemetry), #469 (Story 2 — nomination seat cap + bounded flaky-check auto-rerun)
 - **Hypothesis under test**: Monthly report 2026-07 (article `d06ecf4bb246`), 仮説一 — *the key to an organisation where many agents can work is not making individuals smarter but designing where judgment sits and how fast verification runs.*
+
+> **Status reconciliation (2026-07-12, Nadia — backlog-reconcile).** No status flip — Epic **stays `In-progress`**, correctly. Doc true-up only: the `Implemented by` line read `#465 (Story 1, in review)`, but both wiring stories have now merged — **#465** (`ee90f4d`, Story 1: escalation-reason telemetry + verdict-time L0/L1 + the `autopilot:reason:*` family) and **#469** (`86fa119`, Story 2: nomination seat cap + bounded flaky-check auto-rerun). The line now cites both. The Epic does **not** advance to `Implemented` because Story 3 — the 28-day judge of 仮説一 — is genuinely open (tracked by **#451**, whose 08-report 14-day interim snapshot is the next deliverable), and its funnel still depends on Epic-016 OP-011 (#436) / OP-012 (#437). Issue diff: 0.
 
 ## Problem
 
