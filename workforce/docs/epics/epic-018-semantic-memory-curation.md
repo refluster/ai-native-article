@@ -1,6 +1,8 @@
 # Epic-018 — Semantic memory curation: pilot five personas, then make it a technique
 
-**Status:** Draft (operator review pending). **Created:** 2026-07-07. **Owner:** Maya (PM). **Decision record:** [ADR-0019](../adr/adr-0019-agent-semantic-memory.md).
+**Status:** In-progress (2026-07-12). **Created:** 2026-07-07. **Owner:** Maya (PM). **Implemented by:** [#447](https://github.com/refluster/ai-native-article/pull/447) (ADR-0019 + agent-runner layer 3.5 fire-time injection). **Decision record:** [ADR-0019](../adr/adr-0019-agent-semantic-memory.md).
+
+> **Status reconciliation (2026-07-12, Nadia — backlog-reconcile).** Flipped `Draft (operator review pending)` → `In-progress`. Evidence: ADR-0019's own ratification rule is "operator ratifies by merging the implementation PR," and **#447 (`e91fbdd`) has merged** — so the design is no longer review-pending, and its **fire-time injection layer is live** (agent-runner.md composition contract §3.5 reads `.memory.body` from the same `GET /agents/{slug}` on every fire, unconditionally). This is a forward, monotonic-legal flip that encodes the operator's acceptance — surfaced here for operator sign-off via the merging PR, not applied to the tracker. **Open gate keeping it below `Implemented`:** the Story-1 *pilot content* is not observable on the live records — `memory.body` is **empty** on the pilot personas checked this pass (nadia, elena) as read from `GET /agents/{slug}`, so the injection mechanism shipped but the five hand-curated MEMORY.md writes are not yet in effect; Stories 2–4 (effect evaluation, the `memory-curation` Cadence, the write-authority decision) are unbuilt. Issue diff: 0 (no Epic-018 tracking issue is now closeable).
 
 ## Outcome, for whom
 
