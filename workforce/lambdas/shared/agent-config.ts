@@ -72,13 +72,17 @@ export type IdentityPatchableField = (typeof IDENTITY_PATCHABLE_FIELDS)[number];
 // W-3 cap: sum of effective monthly budgets across non-archived agents.
 // The single enforced source of truth (validate-agent-json.mjs retired in
 // ADR-0007 migration step 6); governance.md §2 W-3 documents the same value.
-// Raised 190 → 250 on 2026-06-28 for the Media & External Communications group
-// (Epic-017, +USD 26/mo); previously 160 → 190 on 2026-06-14 for the Finance &
-// Capital group (+USD 18/mo). This constant is the *enforced* W-3 cap and MUST
-// stay in lockstep with governance.md §2 — raising one without the other is the
-// doc/code drift that lets a registration silently breach (or get wrongly
-// rejected by) the ceiling.
-export const W3_BUDGET_CAP_USD = 250;
+// Raised 295 → 500 on 2026-07-14 for continued roster expansion (operator
+// direction: positive consensus on growth, provisioning standing headroom so
+// routine hires don't each require a cap raise) — and to close the doc/code
+// drift this raise exposed: governance.md §2 had already recorded 250 → 295 on
+// 2026-07-08 (India Energy desk) while this enforced constant was never lifted
+// off 250, which wrongly rejected an in-envelope registration at 253/250.
+// Earlier raises: 190 → 250 on 2026-06-28 (Media group, Epic-017); 160 → 190 on
+// 2026-06-14 (Finance & Capital group). This constant is the *enforced* W-3 cap
+// and MUST stay in lockstep with governance.md §2 — raising one without the
+// other is exactly the drift that let the 253/250 false-reject happen.
+export const W3_BUDGET_CAP_USD = 500;
 
 const SLUG = /^[a-z]+$/;
 const MODEL = /^(anthropic|azure|claude-code):[a-z0-9-]+(?:-[a-z0-9.]+)*$/;
