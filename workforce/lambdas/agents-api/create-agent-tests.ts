@@ -14,6 +14,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
+import { W3_BUDGET_CAP_USD } from "../shared/agent-config";
 
 process.env.STAGE = "test";
 
@@ -260,8 +261,13 @@ describe("POST /agents — create (ADR-0007)", () => {
   });
 
   it("enforces the W-3 aggregate budget cap against the existing roster", async () => {
-    // Fixtures track the W-3 cap (250): 240 + 11 = 251 trips it, 240 + 10 = 250 fits.
-    seedAgent("ren", { slug: "ren", pk: "AGENT#ren", budget_monthly_usd_default: 240 });
+    // Fixtures anchor to W3_BUDGET_CAP_USD so they track cap raises: seed the
+    // roster to (cap - 10), then (cap-10) + 11 = cap+1 trips it, + 10 = cap fits.
+    seedAgent("ren", {
+      slug: "ren",
+      pk: "AGENT#ren",
+      budget_monthly_usd_default: W3_BUDGET_CAP_USD - 10,
+    });
     seedAgent("maya", {
       slug: "maya",
       pk: "AGENT#maya",
