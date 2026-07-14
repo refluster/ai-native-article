@@ -26,7 +26,7 @@ Non-negotiable. A request that would force a violation must be refused or escala
 
 - **W-1 Editorial integrity.** Any article published under a persona byline on `kohuehara.xyz` must be free of mid-sentence truncation, empty bodies, and LLM-failure artefacts. Extends C-1 by attaching responsibility to the persona, not just the site.
 - **W-2 No double source-of-truth.** Article content is owned by Notion (inherits C-2). Workforce state — agent definitions, tasks, runs, deliverables, memory — is owned by DynamoDB + S3. The two domains never cross: Notion never holds workforce state, DDB never holds article body text.
-- **W-3 Cost ceiling.** A monthly token budget per agent is enforced at the LLM call site (throw on overrun). A CloudWatch Billing Alarm covers the deployment as a whole. **Current cap: USD 295/month combined.** Raising the cap is a Zone A change; every raise is one row in the amendment table below (per-hire rationale lives in the round docs under [`hires/`](hires/)).
+- **W-3 Cost ceiling.** A monthly token budget per agent is enforced at the LLM call site (throw on overrun). A CloudWatch Billing Alarm covers the deployment as a whole. **Current cap: USD 500/month combined.** Raising the cap is a Zone A change; every raise is one row in the amendment table below (per-hire rationale lives in the round docs under [`hires/`](hires/)).
 
   | Date | Cap (USD/mo) | Trigger |
   |---|---|---|
@@ -36,6 +36,7 @@ Non-negotiable. A request that would force a violation must be refused or escala
   | 2026-06-14 | 160 → 190 | Finance & Capital group (Silas / Delphine / Corinne) |
   | 2026-06-28 | 190 → 250 | Media & External Communications group (Celeste / Rhys / Odette / Idris; Epic-017) |
   | 2026-07-08 | 250 → 295 | India Energy Market Research Desk — desk (Anjali / Rohan / Sneha / Sofia) + distributed hires (Jay → India desk, Amara → Policy/Research, Julian → Finance) |
+  | 2026-07-14 | 295 → 500 | IR pod completion (Marisol + Yara under Corinne) + standing expansion headroom (operator direction). Also lifts the enforced `W3_BUDGET_CAP_USD` constant, which had lagged at 250 since the 2026-07-08 doc raise and wrongly rejected an in-envelope registration at 253/250. |
 - **W-4 Fail loud.** `finish_reason==='length'`, Notion/GitHub API errors, memory `memver` conflicts, and 24h Engineer-PR timeouts (R-N1 exception path) all throw or DLQ. No silent degradation. Inherits C-4 with the new failure modes named.
 - **W-5 Persona stability.** An agent's identity/config — persona prompt (`system_prompt`), model, budget, streams, bindings — lives on the `AGENT#{slug}/META` row and is mutated **only** through the agents-api write path ([ADR-0007](adr/adr-0007-agent-config-single-source.md)): one persona per mutation, validated at the write boundary, appended to the immutable `AUDIT#` trail, and surfaced in the weekly config digest — the post-hoc review that replaced per-change PR review. The discipline AGENTS.md Rule 11 enforced via "a persona bump is its own PR" — atomic, reviewable, one-persona-at-a-time — is unchanged; ADR-0007 moved the *mechanism* from git PRs to audited writes. Skills stay file-based and keep the PR discipline: no PR may bump more than one skill's `SKILL.md` body; a `SKILL.md` bump must also bump that skill's `meta.json:version` in the same PR (the two are co-versioned); the first version of every skill is the documented exception — first version is not a bump.
 
@@ -122,7 +123,7 @@ Defaults for an agent acting on a workforce task. The matrix below tightens [AGE
 | Bump an existing skill's `SKILL.md` body (prompt-version). | **B** | Same one-per-PR discipline. |
 | Add a `bindings[]` entry to multiple agents' `META` rows (agents-api writes) for the same new skill. | **A** | Per §3 amendment (this doc; mechanism moved to DDB writes by ADR-0007). The new binding's `trigger` lands `Enabled: false`-equivalent (paused or manual scheduler); enabling a new cron cadence is a separate B-authority action (see next row). |
 | Add a new EventBridge cron rule or enable a previously-disabled rule. | **B** | Affects schedule and cost; operator approval before flipping `Enabled: true`. |
-| Raise the W-3 cost ceiling (`USD 250/mo` default). | **B** | Zone A change to this doc. |
+| Raise the W-3 cost ceiling (`USD 500/mo` default). | **B** | Zone A change to this doc. |
 | Add a new AWS service to the SAM template (e.g., adding SQS, Step Functions). | **B** | Probable R-N1..R-N5 violation. Discuss before opening the PR. |
 | Edit `workforce/docs/governance.md` §2 (W-1..W-5). | **B** | L0 amendments are Zone A by definition; requires explicit operator approval, not just review. |
 | Loosen, disable, or skip the `validate-naming.mjs` check. | **B** | R-N7 tightening only — never loosening — without §2 amendment. |
