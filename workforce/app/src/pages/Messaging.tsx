@@ -4,7 +4,7 @@
 // right. Threads are deterministic mock data (see lib/messages.ts) until
 // the live messaging store lands.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import WorkforceLayout from '../components/WorkforceLayout';
 import Sigil from '../components/Sigil';
@@ -17,6 +17,7 @@ import {
   sendMessage,
   markThreadRead,
   setThreadStar,
+  mergeMessages,
   messagingWriteEnabled,
   isAwaitingReply,
   lastMessage,
@@ -98,6 +99,26 @@ function senderName(slug: string, roster: Map<string, WorkforceAgent>): string {
   return a ? fullName(a) : slug;
 }
 
+/** Identity of a thread's newest message — the poll's change detector.
+ *  Message COUNT no longer works for this: the detail fetch returns a page
+ *  (Epic-024), so the length stays flat as new messages push old ones out. */
+function lastMsgKey(conv: Conversation): string {
+  const m = conv.messages[conv.messages.length - 1];
+  return m ? (m.id ?? `${m.from}|${m.at}|${m.body}`) : '';
+}
+
+/** Fold a freshly-fetched newest page into the cached conversation without
+ *  discarding already-loaded older history (or its walk cursor). */
+function mergeFreshPage(prev: Conversation | undefined, fresh: Conversation): Conversation {
+  if (!prev) return fresh;
+  return {
+    ...fresh,
+    messages: mergeMessages(prev.messages, fresh.messages),
+    // prev's cursor points further back than the fresh page's — keep it.
+    olderCursor: prev.olderCursor,
+  };
+}
+
 // Live when the agents-api base is configured (authenticated workforce
 // origin); mock on the public gh-pages mirror. Resolved once at module
 // scope — the build-time env var doesn't change within a session.
@@ -135,9 +156,9 @@ export default function Messaging() {
   // thread so the talent's async reply (wf-messaging-reply) surfaces without a
   // manual refresh. See ADR-0006 on why this is bounded polling, not SSE/WS.
   const [pendingReplyUntil, setPendingReplyUntil] = useState<Record<string, number>>({});
-  // Per-thread last-seen message count — the poll's change detector. A ref so
-  // updating it never itself triggers a render.
-  const seenLenRef = useRef<Record<string, number>>({});
+  // Per-thread last-seen newest-message key — the poll's change detector. A
+  // ref so updating it never itself triggers a render.
+  const seenLastKeyRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     document.title = `${SITE_DISPLAY_NAME} — Messaging`;
@@ -188,7 +209,7 @@ export default function Messaging() {
       .then((conv) => {
         if (conv) {
           setDetailCache((m) => ({ ...m, [conv.id]: conv }));
-          seenLenRef.current[conv.id] = conv.messages.length;
+          seenLastKeyRef.current[conv.id] = lastMsgKey(conv);
         }
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
@@ -214,11 +235,11 @@ export default function Messaging() {
         return; // transient; next tick retries
       }
       if (cancelled || !fresh) return;
-      const seen = seenLenRef.current[tid] ?? 0;
-      if (fresh.messages.length <= seen) return; // nothing new yet
-      seenLenRef.current[tid] = fresh.messages.length;
+      const freshKey = lastMsgKey(fresh);
+      if (freshKey === (seenLastKeyRef.current[tid] ?? '')) return; // nothing new yet
+      seenLastKeyRef.current[tid] = freshKey;
       const conv = fresh;
-      setDetailCache((m) => ({ ...m, [tid]: conv }));
+      setDetailCache((m) => ({ ...m, [tid]: mergeFreshPage(m[tid], conv) }));
       refreshSummaries();
       const last = conv.messages[conv.messages.length - 1];
       if (last && last.from !== OPERATOR_ID) {
@@ -290,25 +311,48 @@ export default function Messaging() {
     }, REPLY_WAIT_MS + 500);
   }
 
-  // Compose-to-new: create a 1:1 thread, then select it and refresh.
-  async function handleCreateThread(talentSlug: string, body: string): Promise<void> {
-    const threadId = await createThread(talentSlug, body);
+  // Compose-to-new: create a thread (1:1, or group when several talents are
+  // picked), then select it and refresh.
+  async function handleCreateThread(talentSlugs: string[], body: string): Promise<void> {
+    const threadId = await createThread(talentSlugs, body);
     setComposing(false);
     setSelectedId(threadId);
     refreshSummaries();
     armPendingReply(threadId);
   }
 
-  // Append to the open thread, then re-hydrate its transcript + the list.
+  // Append to the open thread, then re-hydrate its newest page + the list.
   async function handleSend(threadId: string, body: string): Promise<void> {
     await sendMessage(threadId, body);
     const fresh = await fetchThreadDetail(threadId);
     if (fresh) {
-      setDetailCache((m) => ({ ...m, [threadId]: fresh }));
-      seenLenRef.current[threadId] = fresh.messages.length;
+      setDetailCache((m) => ({ ...m, [threadId]: mergeFreshPage(m[threadId], fresh) }));
+      seenLastKeyRef.current[threadId] = lastMsgKey(fresh);
     }
     refreshSummaries();
     armPendingReply(threadId);
+  }
+
+  // Reverse history walk (Epic-024): fetch the page behind the thread's
+  // olderCursor and prepend it. The Thread pane owns the scroll-position
+  // preservation; this owns the cache shape.
+  async function handleLoadOlder(threadId: string): Promise<void> {
+    const cursor = detailCache[threadId]?.olderCursor;
+    if (!cursor) return;
+    const older = await fetchThreadDetail(threadId, { cursor });
+    if (!older) return;
+    setDetailCache((m) => {
+      const prev = m[threadId];
+      if (!prev) return m;
+      return {
+        ...m,
+        [threadId]: {
+          ...prev,
+          messages: mergeMessages(older.messages, prev.messages),
+          olderCursor: older.olderCursor,
+        },
+      };
+    });
   }
 
   async function handleToggleStar(threadId: string, starred: boolean): Promise<void> {
@@ -495,6 +539,7 @@ export default function Messaging() {
                   onBack={backToList}
                   onSend={handleSend}
                   onToggleStar={handleToggleStar}
+                  onLoadOlder={selected.olderCursor ? () => handleLoadOlder(selected.id) : undefined}
                   drafting={isAwaitingReply(selected, awaitingUntil, Date.now())}
                 />
               ) : (
@@ -560,6 +605,7 @@ function Thread({
   onBack,
   onSend,
   onToggleStar,
+  onLoadOlder,
   drafting,
 }: {
   conv: Conversation;
@@ -568,6 +614,9 @@ function Thread({
   onBack: () => void;
   onSend: (threadId: string, body: string) => Promise<void>;
   onToggleStar: (threadId: string, starred: boolean) => Promise<void>;
+  /** Fetch + prepend the next older history page; absent when the loaded
+   *  history already reaches the start of the thread (and on mock data). */
+  onLoadOlder?: () => Promise<void>;
   drafting: boolean;
 }) {
   const headAgent = roster.get(conv.participants[0]);
@@ -581,6 +630,59 @@ function Thread({
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+
+  // Scroll anchoring (Epic-024): a thread opens AT the latest message and
+  // stays pinned there while new messages append — unless the operator has
+  // scrolled up into history. Prepending an older page must not move the
+  // viewport, so we restore scrollTop against the height the prepend added.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const pinnedToBottomRef = useRef(true);
+  const prependAnchorRef = useRef<{ height: number; top: number } | null>(null);
+  const renderedConvIdRef = useRef<string | null>(null);
+
+  async function loadOlder(): Promise<void> {
+    const el = scrollRef.current;
+    if (!onLoadOlder || loadingOlder || !el) return;
+    setLoadingOlder(true);
+    prependAnchorRef.current = { height: el.scrollHeight, top: el.scrollTop };
+    try {
+      await onLoadOlder();
+    } catch {
+      prependAnchorRef.current = null; // nothing prepended — keep the viewport
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
+
+  function handleScroll(): void {
+    const el = scrollRef.current;
+    if (!el) return;
+    pinnedToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (el.scrollTop < 60 && onLoadOlder && !loadingOlder) void loadOlder();
+  }
+
+  // Runs after every transcript change: thread switch → jump to the latest
+  // message; older page prepended → hold the viewport; append while pinned
+  // → follow the bottom.
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (renderedConvIdRef.current !== conv.id) {
+      renderedConvIdRef.current = conv.id;
+      pinnedToBottomRef.current = true;
+      prependAnchorRef.current = null;
+      el.scrollTop = el.scrollHeight;
+      return;
+    }
+    if (prependAnchorRef.current) {
+      const { height, top } = prependAnchorRef.current;
+      prependAnchorRef.current = null;
+      el.scrollTop = el.scrollHeight - height + top;
+      return;
+    }
+    if (pinnedToBottomRef.current) el.scrollTop = el.scrollHeight;
+  }, [conv.id, conv.messages.length, drafting]);
 
   // Reset the composer when switching threads.
   useEffect(() => {
@@ -646,9 +748,21 @@ function Thread({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0 px-4 py-4 space-y-4">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto min-h-0 px-4 py-4 space-y-4">
+        {onLoadOlder && (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => void loadOlder()}
+              disabled={loadingOlder}
+              className="font-wfmono text-[10px] uppercase tracking-[0.12em] px-3 py-1 rounded-full border border-wf-outline-variant text-wf-on-surface-variant hover:bg-wf-surface-container disabled:opacity-60"
+            >
+              {loadingOlder ? 'Loading earlier messages…' : 'Load earlier messages'}
+            </button>
+          </div>
+        )}
         {conv.messages.map((m, i) => (
-          <MessageRow key={i} msg={m} roster={roster} />
+          <MessageRow key={m.id ?? `${m.at}-${i}`} msg={m} roster={roster} />
         ))}
         {drafting && (
           <div className="flex items-center gap-2 pl-[52px] text-[11px] text-wf-on-surface-variant font-wfmono">
@@ -710,7 +824,9 @@ function Thread({
   );
 }
 
-// ── Compose-to-new pane: pick a talent (single, 1:1) + first message ─────
+// ── Compose-to-new pane: pick one or more talents + first message ────────
+// Epic-024: multiple recipients create a group thread through the same
+// POST /threads contract (the backend derives `group` from the count).
 function Compose({
   roster,
   rosterMap,
@@ -725,11 +841,11 @@ function Compose({
   existing: Conversation[];
   onCancel: () => void;
   onBack: () => void;
-  onCreate: (talentSlug: string, body: string) => Promise<void>;
+  onCreate: (talentSlugs: string[], body: string) => Promise<void>;
   onOpenExisting: (id: string) => void;
 }) {
   const [pickQuery, setPickQuery] = useState('');
-  const [recipient, setRecipient] = useState<string | null>(null);
+  const [recipients, setRecipients] = useState<string[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -737,25 +853,44 @@ function Compose({
   const candidates = useMemo(() => {
     const q = pickQuery.trim().toLowerCase();
     return roster
+      .filter((a) => !recipients.includes(a.slug))
       .filter((a) => !q || fullName(a).toLowerCase().includes(q) || a.slug.includes(q) || a.role.toLowerCase().includes(q))
       .slice(0, 40);
-  }, [roster, pickQuery]);
+  }, [roster, pickQuery, recipients]);
 
-  // If the operator already has a 1:1 thread with this talent, offer to
-  // open it rather than silently creating a duplicate.
-  const existingThread = useMemo(
-    () => (recipient ? existing.find((c) => !c.group && c.participants[0] === recipient) : undefined),
-    [recipient, existing],
-  );
+  // If the operator already has a thread with exactly this participant set
+  // (1:1 or group), offer to open it rather than silently creating a
+  // duplicate.
+  const existingThread = useMemo(() => {
+    if (recipients.length === 0) return undefined;
+    if (recipients.length === 1) {
+      return existing.find((c) => !c.group && c.participants.length === 1 && c.participants[0] === recipients[0]);
+    }
+    const want = [...recipients].sort().join('|');
+    return existing.find((c) => c.group && [...c.participants].sort().join('|') === want);
+  }, [recipients, existing]);
 
-  const canSubmit = !!recipient && draft.trim().length > 0 && !busy;
+  // Picking mode while there is no recipient yet or a search is being
+  // typed; otherwise the composer for the first message.
+  const picking = recipients.length === 0 || pickQuery.trim().length > 0;
+
+  function addRecipient(slug: string): void {
+    setRecipients((r) => (r.includes(slug) ? r : [...r, slug]));
+    setPickQuery('');
+  }
+
+  function removeRecipient(slug: string): void {
+    setRecipients((r) => r.filter((s) => s !== slug));
+  }
+
+  const canSubmit = recipients.length > 0 && draft.trim().length > 0 && !busy;
 
   async function submit(): Promise<void> {
-    if (!canSubmit || !recipient) return;
+    if (!canSubmit) return;
     setBusy(true);
     setCreateError(null);
     try {
-      await onCreate(recipient, draft.trim());
+      await onCreate(recipients, draft.trim());
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : String(err));
       setBusy(false);
@@ -787,34 +922,35 @@ function Compose({
         </button>
       </div>
 
-      {/* Recipient row */}
+      {/* Recipient row: picked chips + an always-available add-more search */}
       <div className="px-4 py-2.5 border-b border-wf-outline-variant">
-        {recipient ? (
-          <div className="flex items-center gap-2">
-            <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant">To:</span>
-            <span className="inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full bg-wf-surface-container">
-              <Sigil slug={recipient} size={20} />
-              <span className="text-sm text-wf-on-surface">{rosterMap.get(recipient) ? fullName(rosterMap.get(recipient)!) : recipient}</span>
-              <button type="button" onClick={() => setRecipient(null)} className="text-wf-on-surface-variant hover:text-wf-on-surface" aria-label="Clear recipient">×</button>
+        <div className="flex items-center flex-wrap gap-2">
+          <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant">To:</span>
+          {recipients.map((slug) => (
+            <span key={slug} className="inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full bg-wf-surface-container">
+              <Sigil slug={slug} size={20} />
+              <span className="text-sm text-wf-on-surface">{rosterMap.get(slug) ? fullName(rosterMap.get(slug)!) : slug}</span>
+              <button type="button" onClick={() => removeRecipient(slug)} className="text-wf-on-surface-variant hover:text-wf-on-surface" aria-label={`Remove ${slug}`}>×</button>
             </span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 bg-wf-surface-container rounded-wf-sm px-2.5 h-8">
-            <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant">To:</span>
-            <input
-              type="search"
-              autoFocus
-              value={pickQuery}
-              onChange={(e) => setPickQuery(e.target.value)}
-              placeholder="Search talent…"
-              className="bg-transparent text-sm text-wf-on-surface placeholder:text-wf-on-surface-variant w-full focus:outline-none"
-            />
+          ))}
+          <input
+            type="search"
+            autoFocus
+            value={pickQuery}
+            onChange={(e) => setPickQuery(e.target.value)}
+            placeholder={recipients.length === 0 ? 'Search talent…' : 'Add another…'}
+            className="flex-1 min-w-[120px] bg-transparent text-sm text-wf-on-surface placeholder:text-wf-on-surface-variant h-8 px-1 focus:outline-none"
+          />
+        </div>
+        {recipients.length > 1 && (
+          <div className="mt-1 font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant">
+            Group thread · {recipients.length} talents
           </div>
         )}
       </div>
 
-      {/* Either the candidate list (no recipient yet) or the composer */}
-      {!recipient ? (
+      {/* Either the candidate list (picking) or the composer */}
+      {picking ? (
         <ul className="flex-1 overflow-y-auto min-h-0">
           {candidates.length === 0 ? (
             <li className="px-4 py-6 font-wfmono text-[11px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
@@ -825,7 +961,7 @@ function Compose({
               <li key={a.slug}>
                 <button
                   type="button"
-                  onClick={() => { setRecipient(a.slug); setPickQuery(''); }}
+                  onClick={() => addRecipient(a.slug)}
                   className="w-full text-left flex items-center gap-3 px-3 py-2.5 hover:bg-wf-surface-container"
                 >
                   <Sigil slug={a.slug} size={36} />
@@ -843,7 +979,7 @@ function Compose({
           <div className="flex-1 overflow-y-auto min-h-0 px-4 py-4">
             {existingThread && (
               <div className="mb-3 text-[11px] text-wf-on-surface-variant leading-relaxed">
-                You already have a thread with this talent.{' '}
+                You already have a thread with {recipients.length > 1 ? 'these talents' : 'this talent'}.{' '}
                 <button
                   type="button"
                   onClick={() => onOpenExisting(existingThread.id)}

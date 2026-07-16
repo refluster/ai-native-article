@@ -683,9 +683,12 @@ paths:
   /threads/{id}:
     get:
       tags: [threads]
-      summary: Single thread + messages
-      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
-      responses: { "200": { description: OK } }
+      summary: Single thread + one message page (newest by default; walk older via cursor)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: page_size, in: query, required: false, schema: { type: integer, default: 50, maximum: 100 }, description: 'Messages per page; the page is returned in chronological order.' }
+        - { name: cursor, in: query, required: false, schema: { type: string }, description: 'Opaque older_cursor from a previous page — resumes toward the start of the thread.' }
+      responses: { "200": { description: 'OK — body carries older_cursor while older history remains' } }
   /threads/{id}/messages:
     post:
       tags: [threads]
