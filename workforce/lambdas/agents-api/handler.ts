@@ -156,6 +156,7 @@ import {
   markThreadRead,
   setThreadStar,
   MESSAGING_OPERATOR_ID,
+  THREAD_MESSAGES_PAGE_DEFAULT,
   type ThreadFilter,
 } from "../shared/messaging.js";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
@@ -300,7 +301,7 @@ export async function handler(
     // API Gateway (decision D3), so the handler trusts the caller. `await`
     // on the writes so validation throws route through the 500 mapping.
     if (routeKey === "GET /threads") return listThreadsRoute(event);
-    if (routeKey === "GET /threads/{id}" && threadId) return getThreadRoute(threadId);
+    if (routeKey === "GET /threads/{id}" && threadId) return getThreadRoute(threadId, event);
     if (routeKey === "POST /threads") return await createThreadRoute(event);
     if (routeKey === "POST /threads/{id}/messages" && threadId) return await sendMessageRoute(threadId, event);
     if (routeKey === "POST /threads/{id}/read" && threadId) return await markReadRoute(threadId);
@@ -1812,12 +1813,21 @@ async function listThreadsRoute(
 }
 
 /**
- * GET /threads/{id} — one thread with its messages, oldest-first, each
- * body resolved (inline preview or S3 hydration). 404 when the thread has
- * no META row.
+ * GET /threads/{id} — one thread with one page of messages (Epic-024):
+ * the newest `?page_size=` (default 50) in chronological order, or the
+ * older page at `?cursor=`; `older_cursor` in the response resumes the
+ * walk toward the start of the thread. Bodies are resolved (inline
+ * preview or S3 hydration). 404 when the thread has no META row.
  */
-async function getThreadRoute(threadId: string): Promise<APIGatewayProxyResultV2> {
-  const detail = await getThreadDetail(threadId);
+async function getThreadRoute(
+  threadId: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const qs = event.queryStringParameters ?? {};
+  const detail = await getThreadDetail(threadId, {
+    pageSize: qs.page_size !== undefined ? parsePageSize(qs) : THREAD_MESSAGES_PAGE_DEFAULT,
+    cursor: qs.cursor,
+  });
   if (!detail) return reply(404, { error: "not_found", thread_id: threadId });
   return reply(200, detail);
 }

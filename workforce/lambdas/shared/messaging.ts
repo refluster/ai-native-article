@@ -27,6 +27,7 @@ import {
   getItem,
   putItem,
   queryBySkPrefix,
+  queryBySkPrefixPaged,
   queryByGsiPaged,
   updateOperational,
   type PagedResult,
@@ -50,6 +51,10 @@ export const MESSAGING_OPERATOR_ID = "operator";
  *  body at or under this length is fully contained in `body_preview` and
  *  needs no S3 round-trip. */
 export const MESSAGE_PREVIEW_MAX_CHARS = 320;
+
+/** Default page size for a thread-detail message page (Epic-024). The
+ *  newest page opens the thread; older pages are cursor-walked on demand. */
+export const THREAD_MESSAGES_PAGE_DEFAULT = 50;
 
 // --- Row types -----------------------------------------------------------
 
@@ -142,7 +147,9 @@ export interface ThreadMessageView {
   body: string;
 }
 
-/** Detail shape for one thread (`GET /threads/{id}`). */
+/** Detail shape for one thread (`GET /threads/{id}`). `messages` is one
+ *  page — the newest by default — in chronological order; `older_cursor`
+ *  (when present) resumes the walk toward the start of the thread. */
 export interface ThreadDetailView {
   thread_id: string;
   participants: string[];
@@ -152,6 +159,7 @@ export interface ThreadDetailView {
   created_by: string;
   created_at: string;
   messages: ThreadMessageView[];
+  older_cursor?: string;
 }
 
 // --- Key + id helpers ----------------------------------------------------
@@ -228,23 +236,45 @@ export async function getThreadMeta(threadId: string): Promise<ThreadMetaRow | u
   return getItem<ThreadMetaRow>(threadPk(threadId), "META");
 }
 
+/** Page selector for `getThreadDetail` — no cursor means the newest page. */
+export interface ThreadMessagesPage {
+  pageSize?: number;
+  /** Opaque cursor from a previous page's `older_cursor`. */
+  cursor?: string;
+}
+
 /**
- * Assemble the full thread detail — META + every message in chronological
- * order (oldest first, the natural reading order), with each message body
- * resolved (inline preview when short, S3 hydration when long).
+ * Assemble one page of the thread detail — META + the newest `pageSize`
+ * messages (or the page at `cursor`, walking toward the start of the
+ * thread) in chronological order, each body resolved (inline preview when
+ * short, S3 hydration when long). `older_cursor` is set while older
+ * history remains.
+ *
+ * MSG#{ulid} sorts chronologically (ULID is time-ordered), so the query
+ * runs DESCENDING and the page is reversed back to reading order. Querying
+ * ascending with a Limit would keep the OLDEST page and silently drop the
+ * newest once a thread outgrows the window — the engagement-ledger footgun
+ * the queryBySkPrefix docstring warns about (Epic-024 gap 3).
  *
  * Returns `undefined` when the thread has no META row. Throws if a message
  * row references an S3 body that does not resolve (W-4).
  */
-export async function getThreadDetail(threadId: string): Promise<ThreadDetailView | undefined> {
+export async function getThreadDetail(
+  threadId: string,
+  page: ThreadMessagesPage = {},
+): Promise<ThreadDetailView | undefined> {
   const meta = await getThreadMeta(threadId);
   if (!meta) return undefined;
 
-  // MSG#{ulid} sorts chronologically (ULID is time-ordered); ascending =
-  // oldest first, which is the order the thread reads top-to-bottom.
-  const rows = await queryBySkPrefix<ThreadMessageRow>(threadPk(threadId), "MSG#", 200);
+  const rows = await queryBySkPrefixPaged<ThreadMessageRow>(
+    threadPk(threadId),
+    "MSG#",
+    page.pageSize ?? THREAD_MESSAGES_PAGE_DEFAULT,
+    page.cursor,
+    false,
+  );
   const messages: ThreadMessageView[] = [];
-  for (const row of rows) {
+  for (const row of [...rows.items].reverse()) {
     messages.push({
       message_id: messageIdFromSk(row.sk),
       from: row.from,
@@ -262,6 +292,7 @@ export async function getThreadDetail(threadId: string): Promise<ThreadDetailVie
     created_by: meta.created_by,
     created_at: meta.created_at,
     messages,
+    ...(rows.cursor !== undefined ? { older_cursor: rows.cursor } : {}),
   };
 }
 
