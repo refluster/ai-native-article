@@ -36,6 +36,19 @@ function load(): Promise<Manifest> {
   return cache;
 }
 
+/**
+ * Split an Author value into individual persona slugs. The Notion Author
+ * column is free text; multi-author articles carry a comma-separated slug
+ * list ("priya, celeste, dario"). Single-slug values pass through as a
+ * one-element array, so callers can treat every article as multi-author.
+ */
+export function parseAuthorSlugs(value: string): string[] {
+  return value
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 export async function findAuthor(slug: string): Promise<AuthorRecord | undefined> {
   const m = await load();
   return m.agents.find((a) => a.slug === slug);
