@@ -451,6 +451,16 @@ Resources:
               Action: secretsmanager:GetSecretValue
               Resource:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/api/engagements-write-token-*
+            - Sid: AgentsApiMemoryWriteToken
+              # ADR-0020 — POST /agents/{slug}/memory validates the
+              # memory-curation Cadence's bearer token against this one
+              # secret (validateMemoryWriteBearer). Same scoping discipline
+              # as the feed/engagement tokens: exactly one secret path,
+              # GetSecretValue read at warm-cache time.
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/agent-workforce/workforce.memory_write_token-*
             # Issue #158 PR-β A1: project credentials LIST endpoint
             # (`GET /projects/{id}/credentials`) describes each
             # registered credential type's secret to surface metadata
@@ -682,6 +692,18 @@ Resources:
           Properties:
             ApiId: !Ref WfAgentsHttpApi
             Path: /agents/{slug}/engagements
+            Method: POST
+        # ADR-0020 — memory-curation bounded write. No API GW authorizer:
+        # the CCR session has no SigV4 creds, so auth is bearer-token at
+        # the handler layer (validateMemoryWriteBearer →
+        # wf/projects/agent-workforce/workforce.memory_write_token), same
+        # posture as CreateFeedPost / CreateEngagement. The handler gates
+        # the write behind the ADR-0019 content contract + shrink guard.
+        UpdateAgentMemory:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}/memory
             Method: POST
         ListProjects:
           Type: HttpApi

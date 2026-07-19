@@ -94,6 +94,21 @@ export interface WorkforceFeedWriteTokenSecret {
 }
 
 /**
+ * Workforce memory-write capability token (ADR-0020) — a shared secret
+ * the memory-curation Cadence presents as `Authorization: Bearer <token>`
+ * to the authenticated `POST /agents/{slug}/memory` endpoint. Same
+ * dual-principal shape as the feed token (orchestrator injects, agents-api
+ * validates), stored at
+ * `wf/projects/{project_id}/workforce.memory_write_token`. Capability, not
+ * identity — the ADR-0019 content contract + shrink guard run server-side
+ * regardless of who presents the token, and the token authorises writing
+ * the `memory` profile block only.
+ */
+export interface WorkforceMemoryWriteTokenSecret {
+  token: string;
+}
+
+/**
  * Type registry: maps each credential type literal to its TS shape.
  * Adding a new type requires extending this interface AND the five
  * sync points listed in the file header.
@@ -106,6 +121,7 @@ export interface CredentialShapes {
   "notion.integration_token": NotionSecret;
   "voyage.api_key": VoyageSecret;
   "workforce.feed_write_token": WorkforceFeedWriteTokenSecret;
+  "workforce.memory_write_token": WorkforceMemoryWriteTokenSecret;
 }
 
 export type CredentialType = keyof CredentialShapes;
@@ -145,6 +161,7 @@ export const CREDENTIAL_TYPES: ReadonlySet<CredentialType> = new Set([
   "notion.integration_token",
   "voyage.api_key",
   "workforce.feed_write_token",
+  "workforce.memory_write_token",
 ]);
 
 /**

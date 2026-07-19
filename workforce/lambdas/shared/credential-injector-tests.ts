@@ -61,12 +61,14 @@ beforeEach(() => {
 });
 
 describe("CREDENTIAL_TYPES allowlist", () => {
-  it("contains the base set plus discord.webhook_url and workforce.feed_write_token", () => {
+  it("contains the base set plus the workforce capability tokens", () => {
     // Provenance: `voyage.api_key` (Story 4 #93, embedding writes);
     // `discord.webhook_url` (CCR-foundation, discord-heartbeat);
     // `workforce.feed_write_token` (feed-post DDB write path — the
     // capability token the runner presents to the authenticated
-    // POST /feed endpoint). All 6 mirror points (see credential-
+    // POST /feed endpoint); `workforce.memory_write_token` (ADR-0020 —
+    // the memory-curation Cadence's bounded write to
+    // POST /agents/{slug}/memory). All mirror points (see credential-
     // injector.ts file header) move together; this assertion is the
     // visible canary that catches drift if a future mirror sync is
     // forgotten.
@@ -78,6 +80,7 @@ describe("CREDENTIAL_TYPES allowlist", () => {
       "notion.integration_token",
       "voyage.api_key",
       "workforce.feed_write_token",
+      "workforce.memory_write_token",
     ]);
   });
 

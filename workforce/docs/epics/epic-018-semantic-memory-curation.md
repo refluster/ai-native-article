@@ -32,22 +32,31 @@ ADR-0019 gives the layer a place to live at zero injection cost.
    a short evidence note (per-persona before/after over the EXEC ledger).
    Kill criterion for the epic: if the five pilots show no behavioural
    difference attributable to the layer, stop before building automation.
-3. **`memory-curation` Cadence** — a skill (cadence-forge scaffold) that
-   periodically distils an agent's record (EXEC ledger + posts + episodic
-   chunks + current MEMORY.md) into a *proposed* MEMORY.md revision. The
-   formation model is the human one: personality (persona/identity), work
-   history and outputs (ledger), interactions (panels, reviews, org edges),
-   in-the-moment lessons (friction/improvement posts) → semantic
-   distillation. Output is a diff for review, not a write.
-4. **Write authority decision** — how a proposed revision lands: (a)
-   operator merges a seed-file PR + dispatches (today's path), or (b) a
-   bounded direct write via a scoped capability token (ADR-0009 pattern)
-   with the writer script's validators as the mechanical gate. (b) needs a
-   §5 authority-matrix amendment (Zone A) — decided by the operator at this
-   story, not assumed.
-5. **Fleet rollout** — apply the cadence to all personas on a monthly
-   cycle, oldest-memory first; W-3 cost accounting for the distillation
-   fires.
+3. **`memory-curation` Cadence** — *(built 2026-07-19, [ADR-0020](../adr/adr-0020-delegated-memory-curation.md) implementation PR)* a skill that
+   periodically distils an agent's record (EXEC ledger + posts + current
+   MEMORY.md) into a revised MEMORY.md. The formation model is the human
+   one: personality (persona/identity), work history and outputs (ledger),
+   interactions (panels, reviews, org edges), in-the-moment lessons
+   (friction/improvement posts) → semantic distillation. Curator persona:
+   **freya** (Agent Experience Designer — the fire-time composition and
+   recall packet are her JD; improvement agent sana). Sources are the
+   agent's **full cross-project record**, not the binding's project. Story 4's
+   decision upgraded the output from "a diff for review" to a bounded direct
+   write.
+4. **Write authority decision** — *(decided by the operator 2026-07-19,
+   recorded as [ADR-0020](../adr/adr-0020-delegated-memory-curation.md))*:
+   option (b) — a bounded direct write via the scoped
+   `workforce.memory_write_token` to `POST /agents/{slug}/memory`, with the
+   ADR-0019 content contract + a shrink guard enforced server-side and an
+   `AUDIT#` row per write. The §5 authority-matrix row lands in the same PR
+   (Zone A: proposed, operator ratifies by merging). The pilot's
+   operator-dispatch workflow survives as the manual override path.
+5. **Fleet rollout** — *(subsumed into Story 3's cadence design)* the daily
+   fire curates the oldest-memory cohort sized `max(5, ceil(active/7))`
+   (`pick-cohort.mjs` reads the live roster), so **every active agent is
+   re-curated at least weekly** — the operator's stated frequency floor —
+   and coverage scales with headcount with no per-agent wiring. W-3: one
+   daily CCR fire, cost class `medium`, inside the USD 500/mo cap.
 
 ## Non-goals
 
