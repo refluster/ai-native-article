@@ -32,6 +32,10 @@ ADR-0019 gives the layer a place to live at zero injection cost.
    a short evidence note (per-persona before/after over the EXEC ledger).
    Kill criterion for the epic: if the five pilots show no behavioural
    difference attributable to the layer, stop before building automation.
+   *(The operator's 2026-07-19 direction reordered build-vs-evaluate — the
+   cadence ships first — but does not retire this falsifier: a null Story-2
+   readout still fires the kill criterion and unwinds the cadence too —
+   unbind + pause the memory-curation binding, not just the pilot.)*
 3. **`memory-curation` Cadence** — *(built 2026-07-19, [ADR-0020](../adr/adr-0020-delegated-memory-curation.md) implementation PR)* a skill that
    periodically distils an agent's record (EXEC ledger + posts + current
    MEMORY.md) into a revised MEMORY.md. The formation model is the human
