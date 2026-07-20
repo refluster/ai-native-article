@@ -17,7 +17,7 @@
 //   THU  00:47  rafael   red-team-audit
 //   THU  02:57  beatriz  research-sync
 //   FRI  00:07  owen     verification-sweep
-//   FRI  01:27  zoe      memory-curation
+//   FRI  01:27  zoe      memory-hygiene
 //   FRI  02:47  imogen   audience-loop
 //
 // PREREQ: the PRs adding the nine workforce/skills/* cadences above must
@@ -64,7 +64,7 @@ const WEEKLY = [
   { slug: "rafael",  skill: "red-team-audit",     cron: "cron(47 0 ? * THU *)", why: "weekly red-team audit" },
   { slug: "beatriz", skill: "research-sync",      cron: "cron(57 2 ? * THU *)", why: "cross-desk research sync" },
   { slug: "owen",    skill: "verification-sweep", cron: "cron(7 0 ? * FRI *)",  why: "weekly merged-PR verification sweep" },
-  { slug: "zoe",     skill: "memory-curation",    cron: "cron(27 1 ? * FRI *)", why: "weekly memory-curation sweep" },
+  { slug: "zoe",     skill: "memory-hygiene",    cron: "cron(27 1 ? * FRI *)", why: "weekly memory-hygiene sweep" },
   { slug: "imogen",  skill: "audience-loop",      cron: "cron(47 2 ? * FRI *)", why: "weekly audience experiment loop" },
 ];
 

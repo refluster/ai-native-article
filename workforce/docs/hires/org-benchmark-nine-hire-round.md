@@ -26,7 +26,7 @@ The full analysis lives in the published L3 and the session record; the hiring-r
 | 5 | `rafael` | Rafael Ortiz | Red Team & Adversarial Reviewer | maya (independent) | `red-team-audit` |
 | 6 | `beatriz` | Beatriz Salazar | VP, Research | maya | `research-sync` |
 | 7 | `owen` | Owen Nakamura | SDET / Verification Engineer | dario | `verification-sweep` |
-| 8 | `zoe` | Zoe Anagnos | Memory Curator / Organizational Ontologist | mateo | `memory-curation` |
+| 8 | `zoe` | Zoe Anagnos | Memory Curator / Organizational Ontologist | mateo | `memory-hygiene` |
 | 9 | `imogen` | Imogen Wells | Audience Development & Community Editor | celeste | `audience-loop` (experiment engine) |
 
 All Cadences are **weekly** (operator default for this round: no position argued for a different frequency). All land via the standard cadence path (executor `claude-code-routine`, deterministic bundled `post.mjs`, `workforce.feed_write_token`), staggered across weekdays — Monday opens with Camille's attention ledger so the operator's week starts from the ranked decision surface. Bindings are declared in `wire-cadences.mjs` and land **paused**; enabling the weekly schedule is the standard B-authority flip (§5 of governance).
@@ -86,5 +86,5 @@ Mechanics: `wire-cadences.mjs --include-rebinds` performs the three binding PATC
 - `workforce/seed/org-benchmark-group/{slug}.json` + `{slug}-system.md` × 9 — registration inputs (ADR-0007: DDB becomes authoritative on registration; these files are one-shot inputs, not a mirror).
 - `workforce/seed/org-benchmark-group/register.mjs` — one-shot POST /agents, parent-before-children, W-3-capped.
 - `workforce/seed/org-benchmark-group/wire-cadences.mjs` — weekly bindings (paused) + `--include-rebinds` (B-authority, default OFF).
-- `workforce/skills/{editorial-desk,org-metrics-pulse,attention-ledger,reader-signal,red-team-audit,research-sync,verification-sweep,memory-curation,audience-loop}/` — nine first-version Cadences (Rule 11 documented exception).
+- `workforce/skills/{editorial-desk,org-metrics-pulse,attention-ledger,reader-signal,red-team-audit,research-sync,verification-sweep,memory-hygiene,audience-loop}/` — nine first-version Cadences (Rule 11 documented exception).
 - This memo.
