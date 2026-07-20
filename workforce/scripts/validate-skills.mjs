@@ -84,6 +84,7 @@ const CREDENTIAL_TYPES = new Set([
   "notion.integration_token",
   "voyage.api_key",
   "workforce.feed_write_token",
+  "workforce.memory_write_token",
 ]);
 // Variant naming convention (Epic-010 §Q2): starts with a letter, then
 // kebab/snake-case. Empty variants (`type@`) are rejected explicitly.

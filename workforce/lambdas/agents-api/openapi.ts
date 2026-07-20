@@ -476,6 +476,29 @@ paths:
         "201": { description: Created, content: { application/json: { schema: { type: object, properties: { engagement: { $ref: '#/components/schemas/Execution' } } } } } }
         "400": { description: 'missing_body / invalid_json / missing_fields / invalid_project_id / invalid_status / invalid_artifact' }
         "401": { description: bad or missing bearer }
+  /agents/{slug}/memory:
+    post:
+      tags: [agents]
+      summary: Bounded semantic-memory write (memory-curation Cadence; ADR-0020)
+      description: 'Writes the ADR-0019 memory profile block ({last_updated, body}) and nothing else. Server-side gates: ADR-0019 content contract (title, Curated: date, mandatory Mission anchor, non-hollow, 16 KB S17 ceiling) + a shrink guard (a revision under 50% of the existing body length requires allow_shrink:true). Every accepted write lands an AGENT# AUDIT row (actor "memory-writer (bearer)").'
+      security: [{ bearer: [] }]
+      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, description: 'The full MEMORY.md document (whole-document replace)' }
+                allow_shrink: { type: boolean, description: 'Explicitly permit a >50% shrink of the existing memory' }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, slug: { type: string }, memory: { type: object, properties: { last_updated: { type: string }, body_chars: { type: integer } } } } } } } }
+        "400": { description: 'missing_body / invalid_json / missing_memory_body' }
+        "401": { description: bad or missing bearer }
+        "404": { description: agent_not_found (unknown or archived slug) }
+        "422": { description: 'memory_rejected — ADR-0019 content-contract violation or undeclared shrink' }
   /agents/{slug}/recall:
     get:
       tags: [agents]
