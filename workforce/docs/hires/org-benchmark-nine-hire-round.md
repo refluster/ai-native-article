@@ -70,8 +70,10 @@ Per adr-0012, binding is decoupled from ownership; per W-5/§5, mutating an **ex
 |---|---|---|---|
 | `article-level2` | elena | **ingrid** | The Managing Editor is the article pipeline's operational owner; Elena keeps brand/CX. |
 | `article-level3` | elena | **ingrid** | Same. |
-| `vp-monthly-report` | maya | **camille** | Report assembly is exactly the CoS absorption layer; Maya reads, Camille compiles. |
+| `vp-monthly-report` | ~~maya~~ → **WITHDRAWN** | — | Execution finding (2026-07-20): the binding was never maya's — it is a **per-VP fan-out** (elena, dario, priya, mateo, silas, celeste, tessa each write their own report; the skill's `owners:[maya]` records authorship, not binding — adr-0012). Moving it to camille would replace "each VP reports in their own voice" with "the CoS compiles", a design change this round doesn't own. Camille's aggregation need is already served by `attention-ledger`. |
 | (re-parent) `sora.reports_to` | maya | **beatriz** | The three-rounds-deferred question, answered per §3. |
+
+**Execution record (operator-approved, 2026-07-20).** register.mjs ran clean — all nine created + verified (+48/mo). wire-cadences.mjs wired all nine weekly bindings (Mon–Fri stagger as declared; live from the next orchestrator tick). `--include-rebinds` moved article-level2/3 elena → ingrid; the vp-monthly-report move was withdrawn per the finding above. `reparent-sora.mjs` (added post-merge) moved sora → beatriz, GET-verified. Roster: 44 → 53.
 
 Mechanics: `wire-cadences.mjs --include-rebinds` performs the three binding PATCHes behind a loud B-authority banner (default OFF); the `sora` re-parent is a single agents-api PATCH the operator runs (or approves in chat for an agent to run). `owners[]` amendments (authorship/improvement credit: ingrid onto article-level2/3, the nine onto `feed-post`) follow as the standard owners-amendment PR after the operator rules on the rebinds, mirroring the grid-watch precedent.
 
