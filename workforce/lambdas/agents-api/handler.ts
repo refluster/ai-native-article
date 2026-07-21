@@ -168,6 +168,7 @@ import {
 } from "../shared/messaging.js";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { DOCS_HTML, OPENAPI_YAML } from "./openapi.js";
+import { getProjectReportBody, listProjectReports } from "./reports.js";
 
 // Secrets Manager path holding the feed-write capability token. The
 // runner presents the same token (injected from this secret into its
@@ -305,6 +306,8 @@ export async function handler(
     if (routeKey === "GET /projects") return listProjects(event);
     if (routeKey === "GET /projects/{id}/executions" && projectId) return listProjectExecutions(projectId, event);
     if (routeKey === "GET /projects/{id}/credentials" && projectId) return listProjectCredentials(projectId);
+    if (routeKey === "GET /projects/{id}/reports" && projectId) return listProjectReportsRoute(projectId);
+    if (routeKey === "GET /projects/{id}/reports/{slug}" && projectId && slug) return getProjectReportRoute(projectId, slug);
     if (routeKey === "GET /projects/{id}/performance" && projectId) return getPerformanceRoute(projectId);
     if (routeKey === "PATCH /projects/{id}" && projectId) return patchProject(projectId, event.body);
     if (routeKey === "GET /projects/{id}" && projectId) return getProjectRoute(projectId);
@@ -1429,6 +1432,37 @@ interface CredentialMetadataView {
   last_changed_at?: string;
   last_rotated_at?: string;
   created_date?: string;
+}
+
+// --- Project reports (runtime read from the project's own repo) --------
+//
+// GET /projects/{id}/reports          manifest rows from reports/manifest.json
+// GET /projects/{id}/reports/{slug}   one markdown body (text/markdown)
+//
+// Content lives in the PROJECT'S storage (the repo the project record
+// points at), fetched here with the project-scoped github.token secret —
+// the browser never sees the token, and the console bundle carries no
+// report copy (W-2). Implementation: ./reports.ts.
+
+async function listProjectReportsRoute(rawId: string): Promise<APIGatewayProxyResultV2> {
+  const id = asProjectId(rawId);
+  const proj = await getProject(id);
+  if (!proj) return reply(404, { error: "not_found", project_id: rawId });
+  const items = await listProjectReports(proj);
+  return reply(200, { items });
+}
+
+async function getProjectReportRoute(rawId: string, slug: string): Promise<APIGatewayProxyResultV2> {
+  const id = asProjectId(rawId);
+  const proj = await getProject(id);
+  if (!proj) return reply(404, { error: "not_found", project_id: rawId });
+  const body = await getProjectReportBody(proj, slug);
+  if (body === null) return reply(404, { error: "not_found", project_id: rawId, slug });
+  return {
+    statusCode: 200,
+    headers: { "content-type": "text/markdown; charset=utf-8" },
+    body,
+  };
 }
 
 async function listProjectCredentials(rawId: string): Promise<APIGatewayProxyResultV2> {

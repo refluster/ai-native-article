@@ -636,6 +636,21 @@ paths:
       summary: Provisioned credential metadata (never values)
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       responses: { "200": { description: OK } }
+  /projects/{id}/reports:
+    get:
+      tags: [projects]
+      summary: Project report manifest, read at request time from the project repo (reports/manifest.json)
+      description: 'Reports live in the project''s own storage — the repo on the project record — fetched server-side with the project-scoped github.token. Empty list when no manifest exists yet.'
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK }, "404": { description: Unknown project } }
+  /projects/{id}/reports/{slug}:
+    get:
+      tags: [projects]
+      summary: One report body (text/markdown) from the project repo (reports/{slug}.md)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses: { "200": { description: OK (text/markdown) }, "404": { description: Unknown project, invalid slug, or no such report } }
   /projects/{id}/performance:
     get:
       tags: [projects]

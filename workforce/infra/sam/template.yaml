@@ -488,6 +488,16 @@ Resources:
               Action: secretsmanager:GetSecretValue
               Resource:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*/voyage.api_key-*
+            # Project reports (GET /projects/{id}/reports[/{slug}]) read the
+            # report files from the project's own repo with the project-
+            # scoped GitHub token. Same narrow-key discipline as the voyage
+            # grant above: only the github.token path, NOT a broad
+            # wf/projects/* GetSecretValue.
+            - Sid: AgentsApiReportsGithubToken
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*/github.token-*
             # Epic-013 Story 3 (ADR-0006) — the operator write routes async-
             # invoke the real-time reply Lambda. Scoped to that one function.
             - Sid: AgentsApiInvokeMessagingReply
@@ -731,6 +741,22 @@ Resources:
           Properties:
             ApiId: !Ref WfAgentsHttpApi
             Path: /projects/{id}/credentials
+            Method: GET
+        # Project reports: read-at-request-time from the project's own
+        # repo (reports/manifest.json + reports/{slug}.md) using the
+        # project-scoped github.token. Public GET on the CORS gate like
+        # the other project reads; the token never leaves the Lambda.
+        ListProjectReports:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects/{id}/reports
+            Method: GET
+        GetProjectReport:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects/{id}/reports/{slug}
             Method: GET
         PatchProject:
           Type: HttpApi

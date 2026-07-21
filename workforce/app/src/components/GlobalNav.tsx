@@ -76,6 +76,15 @@ function ProjectsIcon({ className }: IconProps) {
     </svg>
   );
 }
+function ReportsIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <path d="M6 3h9l4 4v14H6V3Z" strokeLinejoin="round" />
+      <path d="M15 3v4h4" strokeLinejoin="round" />
+      <path d="M9 12h6M9 16h6" strokeLinecap="round" />
+    </svg>
+  );
+}
 function PerformanceIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden className={className} fill="none" stroke="currentColor" strokeWidth={1.8}>
@@ -92,6 +101,7 @@ const NAV: { to: string; label: string; icon: (p: IconProps) => ReactNode; end?:
   { to: '/agents',        label: 'My Network',    icon: NetworkIcon },
   { to: '/projects',      label: 'Projects',      icon: ProjectsIcon },
   { to: '/skills',        label: 'Skills',        icon: SkillsIcon },
+  { to: '/reports',       label: 'Reports',       icon: ReportsIcon },
   { to: '/messaging',     label: 'Messaging',     icon: MessageIcon },
   { to: '/notifications', label: 'Notifications', icon: BellIcon, badge: '3' },
 ];
