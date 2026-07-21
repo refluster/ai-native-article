@@ -128,6 +128,7 @@ import {
   validateMemoryDocument,
 } from "../shared/memory-contract.js";
 import { isValidEngagementToken } from "../shared/engagement-token.js";
+import { isValidMemoryWriteToken } from "../shared/memory-write-token.js";
 import { CREDENTIAL_TYPES } from "../shared/credential-injector.js";
 import {
   CloudWatchClient,
@@ -190,13 +191,14 @@ let _feedWriteTokenCache: string | undefined;
 const ENGAGEMENT_WRITE_TOKEN_SECRET = "wf/api/engagements-write-token";
 let _engagementWriteTokenCache: string | undefined;
 
-// Secrets Manager path holding the memory-write capability token
-// (ADR-0020). The memory-curation Cadence presents it (injected from this
-// secret into its CCR task, same dual-principal shape as the feed token)
-// as `Authorization: Bearer <token>` on POST /agents/{slug}/memory. The
-// token authorises exactly one mutation class — the `memory` profile
-// block — and the route enforces the ADR-0019 content contract + the
-// shrink guard server-side before writing.
+// Secrets Manager path holding the memory-write capability token — the
+// ADR-0020 static-secret FALLBACK path, superseded as primary by ADR-0021's
+// per-fire DDB-minted token (shared/memory-write-token.ts). Kept alive
+// exactly like ENGAGEMENT_WRITE_TOKEN_SECRET is kept alongside the dynamic
+// engagement token: an operator/ad-hoc escape hatch, not the normal path.
+// Whichever path authenticates, the token authorises exactly one mutation
+// class — the `memory` profile block — and the route enforces the
+// ADR-0019 content contract + the shrink guard server-side before writing.
 const MEMORY_WRITE_TOKEN_SECRET = "wf/projects/agent-workforce/workforce.memory_write_token";
 let _memoryWriteTokenCache: string | undefined;
 
@@ -2496,9 +2498,13 @@ async function updateMemoryRoute(
 }
 
 /**
- * Validate the memory-write bearer token (ADR-0020). Mirrors the
- * validateFeedWriteBearer pattern: constant-time compare, cached for the
- * Lambda's warm lifetime. Returns false on any miss — handler maps to 401.
+ * Validate the memory-write bearer token (ADR-0021, superseding ADR-0020).
+ * Mirrors validateEngagementWriteBearer's two-path shape: the primary path
+ * is a short-lived DDB-minted token (AUTH#MEMORY_WRITE, one per
+ * memory-curation fire — shared/memory-write-token.ts); the static
+ * `wf/projects/agent-workforce/workforce.memory_write_token` secret from
+ * ADR-0020 survives as the fallback (constant-time compare, cached for the
+ * Lambda's warm lifetime). Returns false on any miss — handler maps to 401.
  */
 async function validateMemoryWriteBearer(event: APIGatewayProxyEventV2): Promise<boolean> {
   const headers = event.headers ?? {};
@@ -2507,6 +2513,15 @@ async function validateMemoryWriteBearer(event: APIGatewayProxyEventV2): Promise
   const presented = raw.slice("Bearer ".length).trim();
   if (presented.length === 0) return false;
 
+  // Primary path (ADR-0021): a short-lived token minted in DynamoDB — by
+  // the orchestrator per memory-curation fire. No static secret needed.
+  try {
+    if (await isValidMemoryWriteToken(presented)) return true;
+  } catch {
+    // DDB read error — fall through to the static path rather than 500.
+  }
+
+  // Fallback: the long-lived capability token from ADR-0020.
   let expected = _memoryWriteTokenCache;
   if (!expected) {
     try {

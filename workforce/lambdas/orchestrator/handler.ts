@@ -29,6 +29,7 @@ import { findRecentPRs } from "../shared/github.js";
 import { fireCcrRoutine, routineIdFromSpec, type CcrFireTask } from "../shared/ccr-fire.js";
 import { asProjectId, getCredential } from "../shared/project.js";
 import { mintEngagementToken } from "../shared/engagement-token.js";
+import { mintMemoryWriteToken } from "../shared/memory-write-token.js";
 import { SKILL_REQUIRES } from "../shared/skill-registry-generated.js";
 import type { DelivRow } from "../shared/task.js";
 
@@ -321,6 +322,18 @@ async function resolveCredentialsForTask(
   if (requires.length === 0) return out;
   const proj = asProjectId(projectId);
   for (const type of requires) {
+    // ADR-0021: workforce.memory_write_token is minted per-task into DDB
+    // (AUTH#MEMORY_WRITE) rather than read from Secrets Manager — the same
+    // dynamic-capability-token shape ADR-0005/ADR-0009 established for the
+    // engagement-write token. The credential key + shape presented to the
+    // skill script (`{token}`) is unchanged, so this is invisible to
+    // memory-curation's SKILL.md / update-memory.mjs contract: only the
+    // resolution mechanism moved from static-secret to per-fire mint.
+    if (type === "workforce.memory_write_token") {
+      const minted = await mintMemoryWriteToken();
+      out[type] = { token: minted.token };
+      continue;
+    }
     out[type] = await getCredential<unknown>(proj, type);
   }
   return out;
