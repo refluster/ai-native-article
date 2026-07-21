@@ -1,9 +1,9 @@
 # ADR-0020 — Delegated memory curation: a bounded token write for the memory profile block
 
-- **Status**: Proposed (operator ratifies by merging the implementation PR)
+- **Status**: Superseded by ADR-0021 (2026-07-21) — the authentication mechanism only (§Decision-3); the route design, content contract, shrink guard, curator assignment, and §5 authority grant below remain in force.
 - **Date**: 2026-07-19
 - **Deciders**: operator (refluster) — this is the Epic-018 Story-4 write-authority decision, made by the operator's in-message direction (「この長期記憶をworkforceの誰かが更新し続けるよう仕組み化したい…頻度は各エージェントの記憶が1週間に一度は更新されるように」); drafted by a Claude Code session
-- **Related**: [ADR-0019](adr-0019-agent-semantic-memory.md) (the layer + content contract this write path serves), [ADR-0009](adr-0009-scoped-capability-tokens.md) (the capability-token direction this instantiates), [ADR-0007](adr-0007-agent-config-single-source.md) (single-writer discipline; this route is inside agents-api), [Epic-018](../epics/epic-018-semantic-memory-curation.md)
+- **Related**: [ADR-0019](adr-0019-agent-semantic-memory.md) (the layer + content contract this write path serves), [ADR-0009](adr-0009-scoped-capability-tokens.md) (the capability-token direction this instantiates), [ADR-0007](adr-0007-agent-config-single-source.md) (single-writer discipline; this route is inside agents-api), [ADR-0021](adr-0021-dynamic-memory-write-token.md) (supersedes §Decision-3's static-secret mechanism with a dynamic minted token), [Epic-018](../epics/epic-018-semantic-memory-curation.md)
 
 ## Context
 
