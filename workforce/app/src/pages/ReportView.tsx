@@ -11,7 +11,7 @@ import remarkGfm from 'remark-gfm';
 import WorkforceLayout from '../components/WorkforceLayout';
 import MermaidBlock from '../components/MermaidBlock';
 import { splitFrontmatter } from './SkillProfile';
-import { extractMermaidSource, fetchReportBody, fetchReportManifest, type ReportMeta } from '../lib/reports';
+import { extractMermaidSource, fetchProjectReports, fetchReportBody, type ReportMeta } from '../lib/reports';
 
 const markdownComponents: Components = {
   pre({ node: _node, children, ...rest }: ComponentProps<'pre'> & { node?: unknown }) {
@@ -39,9 +39,9 @@ export default function ReportView() {
       .catch(() => {
         if (!cancelled) setError(true);
       });
-    fetchReportManifest()
+    fetchProjectReports(project)
       .then(rows => {
-        if (!cancelled) setMeta(rows.find(r => r.project === project && r.slug === slug) ?? null);
+        if (!cancelled) setMeta(rows.find(r => r.slug === slug) ?? null);
       })
       .catch(() => {
         /* meta is decorative — the body fetch drives the error state */

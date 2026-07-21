@@ -1,17 +1,28 @@
-// Project reports: markdown documents committed under public/reports/,
-// indexed by public/reports/manifest.json. Unlike posts/skills (which read
-// the live agents-api), reports are repo-authored deliverables — the .md in
-// git IS the source of truth (no Notion/DDB copy exists), so serving them
-// as static assets does not create a second authority (W-2).
+// Project reports: sponsor/management-facing markdown deliverables that
+// live in each PROJECT'S OWN storage (the GitHub repo on the project
+// record, under reports/), not in this bundle. The console reads them at
+// runtime through agents-api (GET /projects/{id}/reports[/{slug}]); the
+// Lambda authenticates to the repo with the project-scoped github.token
+// credential, which never reaches the browser.
+//
+// Base resolution mirrors lib/agents.ts (ADR-0008 §7): use the build-time
+// agents-api base when configured, else fall back to the prod custom
+// domain so dev builds still read the live report set. No static mock —
+// report content has exactly one home, the project repo (W-2).
 
 import type { ReactNode } from 'react';
 import { isValidElement } from 'react';
-import { withBasePath } from './paths';
+import { WORKFORCE_AGENTS_API_BASE } from '../config/api';
+
+const REPORTS_API_BASE =
+  WORKFORCE_AGENTS_API_BASE.length > 0
+    ? WORKFORCE_AGENTS_API_BASE
+    : 'https://workforce-api.kohuehara.xyz';
 
 export interface ReportMeta {
   /** Project the report belongs to, e.g. "project-ind". */
   project: string;
-  /** Filename stem under public/reports/{project}/, e.g. "2026-07-21-weekly". */
+  /** Filename stem under reports/ in the project repo, e.g. "2026-07-21-weekly". */
   slug: string;
   title: string;
   /** ISO date (YYYY-MM-DD) the report covers/was issued. */
@@ -26,15 +37,13 @@ export interface ReportMeta {
   lang?: string;
 }
 
-export function reportPath(meta: Pick<ReportMeta, 'project' | 'slug'>): string {
-  return `/reports/${meta.project}/${meta.slug}`;
+/** API row shape: manifest entry + owning project id. */
+interface ProjectReportRow extends Omit<ReportMeta, 'project'> {
+  project_id: string;
 }
 
-export async function fetchReportManifest(): Promise<ReportMeta[]> {
-  const res = await fetch(withBasePath('reports/manifest.json'));
-  if (!res.ok) throw new Error(`reports manifest: HTTP ${res.status}`);
-  const rows = (await res.json()) as ReportMeta[];
-  return sortReports(rows);
+export function reportPath(meta: Pick<ReportMeta, 'project' | 'slug'>): string {
+  return `/reports/${meta.project}/${meta.slug}`;
 }
 
 /** Newest first; ties broken by project then slug for a stable index. */
@@ -47,8 +56,34 @@ export function sortReports(rows: ReportMeta[]): ReportMeta[] {
   );
 }
 
+const encode = (id: string): string => encodeURIComponent(id);
+
+/** One project's reports (its repo's reports/manifest.json, via agents-api). */
+export async function fetchProjectReports(projectId: string): Promise<ReportMeta[]> {
+  const res = await fetch(`${REPORTS_API_BASE}/projects/${encode(projectId)}/reports`);
+  if (!res.ok) throw new Error(`reports list: HTTP ${res.status}`);
+  const data = (await res.json()) as { items: ProjectReportRow[] };
+  return data.items.map(({ project_id, ...rest }) => ({ project: project_id, ...rest }));
+}
+
+/**
+ * Every active project's reports, merged newest-first for the /reports
+ * index. Fan-out is bounded by the single-operator project count; a
+ * project whose repo/token is broken fails loud for the whole index
+ * rather than silently vanishing from it.
+ */
+export async function fetchReportManifest(): Promise<ReportMeta[]> {
+  const res = await fetch(`${REPORTS_API_BASE}/projects?status=active`);
+  if (!res.ok) throw new Error(`projects list: HTTP ${res.status}`);
+  const data = (await res.json()) as { items: Array<{ project_id: string }> };
+  const perProject = await Promise.all(data.items.map(p => fetchProjectReports(p.project_id)));
+  return sortReports(perProject.flat());
+}
+
 export async function fetchReportBody(project: string, slug: string): Promise<string> {
-  const res = await fetch(withBasePath(`reports/${encodeURIComponent(project)}/${encodeURIComponent(slug)}.md`));
+  const res = await fetch(
+    `${REPORTS_API_BASE}/projects/${encode(project)}/reports/${encodeURIComponent(slug)}`,
+  );
   if (!res.ok) throw new Error(`report body: HTTP ${res.status}`);
   return res.text();
 }
