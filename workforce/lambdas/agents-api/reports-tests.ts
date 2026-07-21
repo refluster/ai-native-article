@@ -9,6 +9,16 @@ vi.mock("../shared/secrets.js", () => ({
     if (!/^wf\/projects\/[^/]+\/github\.token$/.test(name)) {
       throw new Error(`unexpected secret path: ${name}`);
     }
+    if (name.includes("/no-token-project/")) {
+      const err = new Error("Secrets Manager can't find the specified secret.");
+      err.name = "ResourceNotFoundException";
+      throw err;
+    }
+    if (name.includes("/throttled-project/")) {
+      const err = new Error("Rate exceeded");
+      err.name = "ThrottlingException";
+      throw err;
+    }
     return { token: "ghp_test" };
   }),
 }));
@@ -102,6 +112,25 @@ describe("GitHub-backed reads", () => {
     const bare = { project_id: "conference" } as ReportProject;
     expect(await listProjectReports(bare)).toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("treats a repo-configured project with no github.token secret as unprovisioned (empty list)", async () => {
+    const noToken = {
+      project_id: "no-token-project",
+      github_owner: "PSVL",
+      github_repo: "somewhere",
+    } as ReportProject;
+    expect(await listProjectReports(noToken)).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("still throws on other Secrets Manager failures (fail loud)", async () => {
+    const throttled = {
+      project_id: "throttled-project",
+      github_owner: "PSVL",
+      github_repo: "somewhere",
+    } as ReportProject;
+    await expect(listProjectReports(throttled)).rejects.toThrow("Rate exceeded");
   });
 
   it("throws on a manifest that exists but is not JSON (fail loud)", async () => {

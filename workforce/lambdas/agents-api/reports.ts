@@ -94,7 +94,18 @@ export type ReportProject = Pick<ProjectMetaRow, "project_id" | "github_owner" |
  */
 async function fetchProjectFile(project: ReportProject, path: string): Promise<string | null> {
   if (!project.github_owner || !project.github_repo) return null;
-  const { token } = await getSecret<GithubSecret>(`wf/projects/${project.project_id}/github.token`);
+  let token: string;
+  try {
+    ({ token } = await getSecret<GithubSecret>(`wf/projects/${project.project_id}/github.token`));
+  } catch (err) {
+    // A project with a repo configured but no github.token provisioned is
+    // "reports not provisioned", not a server error — mirror the
+    // credentials-LIST convention (missing secret = omitted, not thrown).
+    // Any other Secrets Manager failure (throttle, access denied) still
+    // throws so the alarm fires (W-4).
+    if ((err as { name?: string }).name === "ResourceNotFoundException") return null;
+    throw err;
+  }
   const url = `${GITHUB_API}/repos/${project.github_owner}/${project.github_repo}/contents/${path}`;
   const res = await fetch(url, {
     headers: {

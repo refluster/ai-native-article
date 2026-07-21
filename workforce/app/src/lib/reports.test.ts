@@ -71,8 +71,33 @@ describe('runtime API fetches', () => {
       throw new Error(`unexpected url: ${url}`);
     });
     vi.stubGlobal('fetch', fetchMock);
-    const rows = await fetchReportManifest();
-    expect(rows.map(r => `${r.project}/${r.slug}`)).toEqual(['asp-cloud/w2', 'project-ind/w1']);
+    const { reports, failedProjects } = await fetchReportManifest();
+    expect(reports.map(r => `${r.project}/${r.slug}`)).toEqual(['asp-cloud/w2', 'project-ind/w1']);
+    expect(failedProjects).toEqual([]);
+  });
+
+  it('fetchReportManifest isolates a failing project instead of blanking the index', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (/\/projects\?status=active$/.test(url)) {
+        return {
+          ok: true,
+          json: async () => ({ items: [{ project_id: 'project-ind' }, { project_id: 'conference' }] }),
+        };
+      }
+      if (/\/projects\/project-ind\/reports$/.test(url)) {
+        return {
+          ok: true,
+          json: async () => ({
+            items: [{ project_id: 'project-ind', slug: 'w1', title: 't', date: '2026-07-21' }],
+          }),
+        };
+      }
+      return { ok: false, status: 500 };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { reports, failedProjects } = await fetchReportManifest();
+    expect(reports.map(r => r.slug)).toEqual(['w1']);
+    expect(failedProjects).toEqual(['conference']);
   });
 
   it('fetchReportManifest throws on a non-OK projects response', async () => {
