@@ -39,4 +39,5 @@ export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "research-sync": ["workforce.feed_write_token"] as const,
   "verification-sweep": ["workforce.feed_write_token"] as const,
   "vp-monthly-report": ["notion.integration_token"] as const,
+  "weekly-project-report": ["github.token"] as const,
 };
