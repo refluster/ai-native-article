@@ -1,7 +1,7 @@
-// Project reports index: every markdown report the workforce has published
-// under public/reports/, newest first, grouped by project. Reports are
-// repo-authored deliverables (sponsor/management-facing), distinct from the
-// feed (raw activity) and the performance dashboard (metrics).
+// Project reports index: every project's published reports, read at
+// runtime from each project's own repo via agents-api, newest first,
+// grouped by project. Reports are sponsor/management-facing deliverables,
+// distinct from the feed (raw activity) and the dashboard (metrics).
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -10,13 +10,16 @@ import { fetchReportManifest, reportPath, type ReportMeta } from '../lib/reports
 
 export default function Reports() {
   const [reports, setReports] = useState<ReportMeta[] | null>(null);
+  const [failedProjects, setFailedProjects] = useState<string[]>([]);
   const [error, setError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     fetchReportManifest()
-      .then(rows => {
-        if (!cancelled) setReports(rows);
+      .then(({ reports: rows, failedProjects: failed }) => {
+        if (cancelled) return;
+        setReports(rows);
+        setFailedProjects(failed);
       })
       .catch(() => {
         if (!cancelled) setError(true);
@@ -44,6 +47,11 @@ export default function Reports() {
         {error && (
           <div className="mt-6 border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-4 text-sm text-wf-throwing">
             Failed to load the report index.
+          </div>
+        )}
+        {!error && failedProjects.length > 0 && (
+          <div className="mt-6 border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-4 text-sm text-wf-throwing">
+            Reports for {failedProjects.join(', ')} failed to load — showing the rest.
           </div>
         )}
         {!error && reports === null && (

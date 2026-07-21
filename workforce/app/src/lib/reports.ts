@@ -66,18 +66,33 @@ export async function fetchProjectReports(projectId: string): Promise<ReportMeta
   return data.items.map(({ project_id, ...rest }) => ({ project: project_id, ...rest }));
 }
 
+export interface ReportIndex {
+  reports: ReportMeta[];
+  /** Projects whose reports request failed (rendered as a visible warning
+   *  — one broken project must not blank the whole index, but hiding the
+   *  failure would be a silent degrade). */
+  failedProjects: string[];
+}
+
 /**
  * Every active project's reports, merged newest-first for the /reports
- * index. Fan-out is bounded by the single-operator project count; a
- * project whose repo/token is broken fails loud for the whole index
- * rather than silently vanishing from it.
+ * index. Fan-out is bounded by the single-operator project count. Each
+ * project is isolated: a failing one lands in `failedProjects` (shown as
+ * a warning) while the rest still render. The projects list itself
+ * failing still throws — with no roster there is no index.
  */
-export async function fetchReportManifest(): Promise<ReportMeta[]> {
+export async function fetchReportManifest(): Promise<ReportIndex> {
   const res = await fetch(`${REPORTS_API_BASE}/projects?status=active`);
   if (!res.ok) throw new Error(`projects list: HTTP ${res.status}`);
   const data = (await res.json()) as { items: Array<{ project_id: string }> };
-  const perProject = await Promise.all(data.items.map(p => fetchProjectReports(p.project_id)));
-  return sortReports(perProject.flat());
+  const settled = await Promise.allSettled(data.items.map(p => fetchProjectReports(p.project_id)));
+  const reports: ReportMeta[] = [];
+  const failedProjects: string[] = [];
+  settled.forEach((s, i) => {
+    if (s.status === 'fulfilled') reports.push(...s.value);
+    else failedProjects.push(data.items[i].project_id);
+  });
+  return { reports: sortReports(reports), failedProjects };
 }
 
 export async function fetchReportBody(project: string, slug: string): Promise<string> {
