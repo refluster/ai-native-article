@@ -24,7 +24,7 @@ import {
 
 const project: ReportProject = {
   project_id: "project-ind",
-  github_owner: "refluster",
+  github_owner: "PSVL",
   github_repo: "project-ind",
 } as ReportProject;
 
@@ -88,7 +88,7 @@ describe("GitHub-backed reads", () => {
     const items = await listProjectReports(project);
     expect(items).toEqual([{ ...entry(), project_id: "project-ind" }]);
     const call = fetchMock.mock.calls[0] as [string, { headers: Record<string, string> }];
-    expect(call[0]).toBe("https://api.github.com/repos/refluster/project-ind/contents/reports/manifest.json");
+    expect(call[0]).toBe("https://api.github.com/repos/PSVL/project-ind/contents/reports/manifest.json");
     expect(call[1].headers.authorization).toBe("Bearer ghp_test");
     expect(call[1].headers.accept).toBe("application/vnd.github.raw+json");
   });
@@ -118,7 +118,7 @@ describe("GitHub-backed reads", () => {
     fetchMock.mockResolvedValue({ ok: true, status: 200, text: async () => "# report" });
     expect(await getProjectReportBody(project, "2026-07-21-weekly")).toBe("# report");
     expect((fetchMock.mock.calls[0] as [string, unknown])[0]).toBe(
-      "https://api.github.com/repos/refluster/project-ind/contents/reports/2026-07-21-weekly.md",
+      "https://api.github.com/repos/PSVL/project-ind/contents/reports/2026-07-21-weekly.md",
     );
 
     expect(await getProjectReportBody(project, "../evil")).toBeNull();
