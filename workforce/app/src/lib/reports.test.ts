@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
-import { extractMermaidSource, reportPath, sortReports, type ReportMeta } from './reports';
+import {
+  extractMermaidSource,
+  fetchReportBody,
+  fetchReportManifest,
+  reportPath,
+  sortReports,
+  type ReportMeta,
+} from './reports';
 
 const meta = (over: Partial<ReportMeta>): ReportMeta => ({
   project: 'project-ind',
@@ -28,6 +35,22 @@ describe('sortReports', () => {
 describe('reportPath', () => {
   it('builds the route for a report', () => {
     expect(reportPath(meta({ slug: '2026-07-21-weekly' }))).toBe('/reports/project-ind/2026-07-21-weekly');
+  });
+});
+
+describe('fetch error branches', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('fetchReportManifest throws on a non-OK response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+    await expect(fetchReportManifest()).rejects.toThrow('HTTP 404');
+  });
+
+  it('fetchReportBody throws on a non-OK response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+    await expect(fetchReportBody('project-ind', 'missing')).rejects.toThrow('HTTP 500');
   });
 });
 
