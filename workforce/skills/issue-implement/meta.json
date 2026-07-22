@@ -1,0 +1,14 @@
+{
+  "name": "issue-implement",
+  "version": "0.1.0",
+  "status": "active",
+  "cost_class": "large",
+  "owners": ["ren"],
+  "improvement_agent": "sana",
+  "created_at": "2026-07-22",
+  "requires": ["github.token"],
+  "deliverable": {
+    "type": "external-pr",
+    "publish_notion": false
+  }
+}
