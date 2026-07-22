@@ -23,6 +23,7 @@ export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "grid-watch": ["workforce.feed_write_token"] as const,
   "hypothesis": ["notion.integration_token"] as const,
   "india-grid-watch": ["workforce.feed_write_token"] as const,
+  "issue-implement": ["github.token"] as const,
   "legal-amendment-review-committee": ["github.token"] as const,
   "memory-curation": ["workforce.memory_write_token"] as const,
   "memory-hygiene": ["workforce.feed_write_token"] as const,
