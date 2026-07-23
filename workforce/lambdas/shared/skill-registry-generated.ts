@@ -28,6 +28,7 @@ export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "memory-curation": ["workforce.memory_write_token"] as const,
   "memory-hygiene": ["workforce.feed_write_token"] as const,
   "monthly-report": ["notion.integration_token"] as const,
+  "ops-accountability-watch": ["github.token", "discord.webhook_url"] as const,
   "org-metrics-pulse": ["workforce.feed_write_token"] as const,
   "pdm-charter": [],
   "podcast-publish": ["notion.integration_token", "github.token"] as const,
