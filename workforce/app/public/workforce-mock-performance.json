@@ -1,14 +1,386 @@
 {
-  "$comment": "ILLUSTRATIVE mock for the Epic-016 performance surface, served when WORKFORCE_AGENTS_API_BASE is unset (gh-pages / local dev). Numbers are synthetic and trend-shaped to match the intended reads (delivered share + autopilot share both climbing) — they do NOT claim live truth. The live agents-api /performance + /projects/{id}/performance roll-ups replace this in production; build-pr-metrics.mjs derives the git-true PR subset offline. Mirrors the workforce-mock-stats.json convention.",
+  "$comment": "ILLUSTRATIVE mock for the Epic-016 performance surface (90-day / 3-month window, extended 2026-07-24), served when WORKFORCE_AGENTS_API_BASE is unset (gh-pages / local dev). Numbers are synthetic and trend-shaped to match the intended reads (delivered share + autopilot share both climbing) \u2014 they do NOT claim live truth. The live agents-api /performance + /projects/{id}/performance roll-ups replace this in production; build-pr-metrics.mjs derives the git-true PR subset offline. Mirrors the workforce-mock-stats.json convention.",
   "generated_at": "2026-06-22T00:00:00Z",
   "workforce": {
     "scope": "workforce",
     "generated_at": "2026-06-22T00:00:00Z",
     "window": {
-      "start": "2026-05-25",
+      "start": "2026-03-24",
       "end": "2026-06-21"
     },
     "lifecycle": [
+      {
+        "date": "2026-03-24",
+        "registered": 2,
+        "assigned": 1,
+        "delivered": 1
+      },
+      {
+        "date": "2026-03-25",
+        "registered": 2,
+        "assigned": 1,
+        "delivered": 1
+      },
+      {
+        "date": "2026-03-26",
+        "registered": 2,
+        "assigned": 1,
+        "delivered": 1
+      },
+      {
+        "date": "2026-03-27",
+        "registered": 2,
+        "assigned": 1,
+        "delivered": 1
+      },
+      {
+        "date": "2026-03-28",
+        "registered": 2,
+        "assigned": 1,
+        "delivered": 1
+      },
+      {
+        "date": "2026-03-29",
+        "registered": 2,
+        "assigned": 1,
+        "delivered": 1
+      },
+      {
+        "date": "2026-03-30",
+        "registered": 2,
+        "assigned": 1,
+        "delivered": 1
+      },
+      {
+        "date": "2026-03-31",
+        "registered": 2,
+        "assigned": 1,
+        "delivered": 1
+      },
+      {
+        "date": "2026-04-01",
+        "registered": 2,
+        "assigned": 1,
+        "delivered": 1
+      },
+      {
+        "date": "2026-04-02",
+        "registered": 2,
+        "assigned": 1,
+        "delivered": 1
+      },
+      {
+        "date": "2026-04-03",
+        "registered": 2,
+        "assigned": 1,
+        "delivered": 1
+      },
+      {
+        "date": "2026-04-04",
+        "registered": 2,
+        "assigned": 2,
+        "delivered": 1
+      },
+      {
+        "date": "2026-04-05",
+        "registered": 2,
+        "assigned": 2,
+        "delivered": 1
+      },
+      {
+        "date": "2026-04-06",
+        "registered": 2,
+        "assigned": 2,
+        "delivered": 1
+      },
+      {
+        "date": "2026-04-07",
+        "registered": 2,
+        "assigned": 2,
+        "delivered": 1
+      },
+      {
+        "date": "2026-04-08",
+        "registered": 3,
+        "assigned": 1,
+        "delivered": 1
+      },
+      {
+        "date": "2026-04-09",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 1
+      },
+      {
+        "date": "2026-04-10",
+        "registered": 3,
+        "assigned": 1,
+        "delivered": 1
+      },
+      {
+        "date": "2026-04-11",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 1
+      },
+      {
+        "date": "2026-04-12",
+        "registered": 2,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-04-13",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-04-14",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 1
+      },
+      {
+        "date": "2026-04-15",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 1
+      },
+      {
+        "date": "2026-04-16",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 1
+      },
+      {
+        "date": "2026-04-17",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-04-18",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 1
+      },
+      {
+        "date": "2026-04-19",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-04-20",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-04-21",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-04-22",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-04-23",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-04-24",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-04-25",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-04-26",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-04-27",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-04-28",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-04-29",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-04-30",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-05-01",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-05-02",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-05-03",
+        "registered": 4,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-05-04",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-05-05",
+        "registered": 4,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-05-06",
+        "registered": 4,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-05-07",
+        "registered": 4,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-05-08",
+        "registered": 3,
+        "assigned": 3,
+        "delivered": 2
+      },
+      {
+        "date": "2026-05-09",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-05-10",
+        "registered": 4,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-05-11",
+        "registered": 4,
+        "assigned": 3,
+        "delivered": 3
+      },
+      {
+        "date": "2026-05-12",
+        "registered": 4,
+        "assigned": 3,
+        "delivered": 3
+      },
+      {
+        "date": "2026-05-13",
+        "registered": 3,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-05-14",
+        "registered": 4,
+        "assigned": 3,
+        "delivered": 3
+      },
+      {
+        "date": "2026-05-15",
+        "registered": 4,
+        "assigned": 3,
+        "delivered": 3
+      },
+      {
+        "date": "2026-05-16",
+        "registered": 4,
+        "assigned": 3,
+        "delivered": 2
+      },
+      {
+        "date": "2026-05-17",
+        "registered": 4,
+        "assigned": 2,
+        "delivered": 2
+      },
+      {
+        "date": "2026-05-18",
+        "registered": 4,
+        "assigned": 3,
+        "delivered": 2
+      },
+      {
+        "date": "2026-05-19",
+        "registered": 4,
+        "assigned": 2,
+        "delivered": 3
+      },
+      {
+        "date": "2026-05-20",
+        "registered": 4,
+        "assigned": 3,
+        "delivered": 3
+      },
+      {
+        "date": "2026-05-21",
+        "registered": 4,
+        "assigned": 2,
+        "delivered": 3
+      },
+      {
+        "date": "2026-05-22",
+        "registered": 4,
+        "assigned": 3,
+        "delivered": 3
+      },
+      {
+        "date": "2026-05-23",
+        "registered": 4,
+        "assigned": 3,
+        "delivered": 3
+      },
+      {
+        "date": "2026-05-24",
+        "registered": 4,
+        "assigned": 3,
+        "delivered": 3
+      },
       {
         "date": "2026-05-25",
         "registered": 4,
@@ -179,6 +551,440 @@
       }
     ],
     "pr_daily": [
+      {
+        "date": "2026-03-24",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 151,
+        "deletions": 35
+      },
+      {
+        "date": "2026-03-25",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 187,
+        "deletions": 36
+      },
+      {
+        "date": "2026-03-26",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 134,
+        "deletions": 49
+      },
+      {
+        "date": "2026-03-27",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 208,
+        "deletions": 37
+      },
+      {
+        "date": "2026-03-28",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 162,
+        "deletions": 41
+      },
+      {
+        "date": "2026-03-29",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 151,
+        "deletions": 30
+      },
+      {
+        "date": "2026-03-30",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 230,
+        "deletions": 52
+      },
+      {
+        "date": "2026-03-31",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 230,
+        "deletions": 42
+      },
+      {
+        "date": "2026-04-01",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 229,
+        "deletions": 54
+      },
+      {
+        "date": "2026-04-02",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 225,
+        "deletions": 44
+      },
+      {
+        "date": "2026-04-03",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 180,
+        "deletions": 45
+      },
+      {
+        "date": "2026-04-04",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 198,
+        "deletions": 34
+      },
+      {
+        "date": "2026-04-05",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 191,
+        "deletions": 39
+      },
+      {
+        "date": "2026-04-06",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 253,
+        "deletions": 42
+      },
+      {
+        "date": "2026-04-07",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 183,
+        "deletions": 53
+      },
+      {
+        "date": "2026-04-08",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 267,
+        "deletions": 60
+      },
+      {
+        "date": "2026-04-09",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 162,
+        "deletions": 65
+      },
+      {
+        "date": "2026-04-10",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 206,
+        "deletions": 49
+      },
+      {
+        "date": "2026-04-11",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 165,
+        "deletions": 46
+      },
+      {
+        "date": "2026-04-12",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 276,
+        "deletions": 67
+      },
+      {
+        "date": "2026-04-13",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 170,
+        "deletions": 41
+      },
+      {
+        "date": "2026-04-14",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 221,
+        "deletions": 43
+      },
+      {
+        "date": "2026-04-15",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 279,
+        "deletions": 58
+      },
+      {
+        "date": "2026-04-16",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 240,
+        "deletions": 49
+      },
+      {
+        "date": "2026-04-17",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 273,
+        "deletions": 74
+      },
+      {
+        "date": "2026-04-18",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 208,
+        "deletions": 71
+      },
+      {
+        "date": "2026-04-19",
+        "prs": 2,
+        "autopilot_merged": 0,
+        "additions": 313,
+        "deletions": 65
+      },
+      {
+        "date": "2026-04-20",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 241,
+        "deletions": 70
+      },
+      {
+        "date": "2026-04-21",
+        "prs": 2,
+        "autopilot_merged": 0,
+        "additions": 242,
+        "deletions": 80
+      },
+      {
+        "date": "2026-04-22",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 237,
+        "deletions": 47
+      },
+      {
+        "date": "2026-04-23",
+        "prs": 2,
+        "autopilot_merged": 0,
+        "additions": 295,
+        "deletions": 55
+      },
+      {
+        "date": "2026-04-24",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 266,
+        "deletions": 63
+      },
+      {
+        "date": "2026-04-25",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 222,
+        "deletions": 77
+      },
+      {
+        "date": "2026-04-26",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 367,
+        "deletions": 51
+      },
+      {
+        "date": "2026-04-27",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 271,
+        "deletions": 60
+      },
+      {
+        "date": "2026-04-28",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 375,
+        "deletions": 82
+      },
+      {
+        "date": "2026-04-29",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 232,
+        "deletions": 60
+      },
+      {
+        "date": "2026-04-30",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 378,
+        "deletions": 70
+      },
+      {
+        "date": "2026-05-01",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 405,
+        "deletions": 94
+      },
+      {
+        "date": "2026-05-02",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 240,
+        "deletions": 95
+      },
+      {
+        "date": "2026-05-03",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 382,
+        "deletions": 73
+      },
+      {
+        "date": "2026-05-04",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 409,
+        "deletions": 83
+      },
+      {
+        "date": "2026-05-05",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 402,
+        "deletions": 57
+      },
+      {
+        "date": "2026-05-06",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 246,
+        "deletions": 69
+      },
+      {
+        "date": "2026-05-07",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 291,
+        "deletions": 95
+      },
+      {
+        "date": "2026-05-08",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 434,
+        "deletions": 74
+      },
+      {
+        "date": "2026-05-09",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 256,
+        "deletions": 60
+      },
+      {
+        "date": "2026-05-10",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 318,
+        "deletions": 64
+      },
+      {
+        "date": "2026-05-11",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 300,
+        "deletions": 93
+      },
+      {
+        "date": "2026-05-12",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 313,
+        "deletions": 90
+      },
+      {
+        "date": "2026-05-13",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 478,
+        "deletions": 86
+      },
+      {
+        "date": "2026-05-14",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 332,
+        "deletions": 81
+      },
+      {
+        "date": "2026-05-15",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 342,
+        "deletions": 94
+      },
+      {
+        "date": "2026-05-16",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 325,
+        "deletions": 69
+      },
+      {
+        "date": "2026-05-17",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 340,
+        "deletions": 110
+      },
+      {
+        "date": "2026-05-18",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 462,
+        "deletions": 71
+      },
+      {
+        "date": "2026-05-19",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 474,
+        "deletions": 85
+      },
+      {
+        "date": "2026-05-20",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 496,
+        "deletions": 76
+      },
+      {
+        "date": "2026-05-21",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 480,
+        "deletions": 122
+      },
+      {
+        "date": "2026-05-22",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 394,
+        "deletions": 78
+      },
+      {
+        "date": "2026-05-23",
+        "prs": 1,
+        "autopilot_merged": 0,
+        "additions": 530,
+        "deletions": 118
+      },
+      {
+        "date": "2026-05-24",
+        "prs": 2,
+        "autopilot_merged": 1,
+        "additions": 393,
+        "deletions": 91
+      },
       {
         "date": "2026-05-25",
         "prs": 2,
@@ -377,11 +1183,11 @@
       }
     ],
     "pr_summary": {
-      "total_prs": 114,
-      "autopilot_merged": 67,
-      "autopilot_share": 0.588,
-      "total_additions": 14663,
-      "total_deletions": 7384,
+      "total_prs": 200,
+      "autopilot_merged": 88,
+      "autopilot_share": 0.44,
+      "total_additions": 32523,
+      "total_deletions": 11448,
       "humans_involved": [
         "refluster"
       ]
@@ -390,37 +1196,37 @@
       {
         "handle": "maya",
         "kind": "agent",
-        "prs": 20
+        "prs": 35
       },
       {
         "handle": "freya",
         "kind": "agent",
-        "prs": 19
+        "prs": 33
       },
       {
         "handle": "hana",
         "kind": "agent",
-        "prs": 18
+        "prs": 32
       },
       {
         "handle": "nadia",
         "kind": "agent",
-        "prs": 15
+        "prs": 26
       },
       {
         "handle": "ren",
         "kind": "agent",
-        "prs": 14
+        "prs": 25
       },
       {
         "handle": "mateo",
         "kind": "agent",
-        "prs": 14
+        "prs": 25
       },
       {
         "handle": "sana",
         "kind": "agent",
-        "prs": 14
+        "prs": 25
       },
       {
         "handle": "refluster",
@@ -434,10 +1240,382 @@
       "scope": "editorial",
       "generated_at": "2026-06-22T00:00:00Z",
       "window": {
-        "start": "2026-05-25",
+        "start": "2026-03-24",
         "end": "2026-06-21"
       },
       "lifecycle": [
+        {
+          "date": "2026-03-24",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-03-25",
+          "registered": 2,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-03-26",
+          "registered": 2,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-03-27",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-03-28",
+          "registered": 2,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-03-29",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-03-30",
+          "registered": 2,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-03-31",
+          "registered": 2,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-01",
+          "registered": 2,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-02",
+          "registered": 2,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-03",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-04",
+          "registered": 2,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-05",
+          "registered": 2,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-06",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-07",
+          "registered": 2,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-08",
+          "registered": 2,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-09",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-10",
+          "registered": 2,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-11",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-12",
+          "registered": 2,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-13",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-14",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-15",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-16",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-17",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-18",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-19",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-20",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-21",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-22",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-23",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-24",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-25",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-26",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-27",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-28",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-29",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-30",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-01",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-02",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-03",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-04",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-05",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-06",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-07",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-08",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-09",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-10",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-11",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-12",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-13",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-14",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-15",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-16",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-17",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-18",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-19",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-20",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-21",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-22",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-23",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-24",
+          "registered": 3,
+          "assigned": 1,
+          "delivered": 1
+        },
         {
           "date": "2026-05-25",
           "registered": 3,
@@ -608,6 +1786,440 @@
         }
       ],
       "pr_daily": [
+        {
+          "date": "2026-03-24",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 26,
+          "deletions": 9
+        },
+        {
+          "date": "2026-03-25",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 17,
+          "deletions": 13
+        },
+        {
+          "date": "2026-03-26",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 19,
+          "deletions": 8
+        },
+        {
+          "date": "2026-03-27",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 20,
+          "deletions": 14
+        },
+        {
+          "date": "2026-03-28",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 27,
+          "deletions": 8
+        },
+        {
+          "date": "2026-03-29",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 21,
+          "deletions": 14
+        },
+        {
+          "date": "2026-03-30",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 33,
+          "deletions": 9
+        },
+        {
+          "date": "2026-03-31",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 31,
+          "deletions": 12
+        },
+        {
+          "date": "2026-04-01",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 33,
+          "deletions": 11
+        },
+        {
+          "date": "2026-04-02",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 31,
+          "deletions": 11
+        },
+        {
+          "date": "2026-04-03",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 29,
+          "deletions": 13
+        },
+        {
+          "date": "2026-04-04",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 24,
+          "deletions": 15
+        },
+        {
+          "date": "2026-04-05",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 25,
+          "deletions": 12
+        },
+        {
+          "date": "2026-04-06",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 28,
+          "deletions": 10
+        },
+        {
+          "date": "2026-04-07",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 26,
+          "deletions": 13
+        },
+        {
+          "date": "2026-04-08",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 35,
+          "deletions": 14
+        },
+        {
+          "date": "2026-04-09",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 40,
+          "deletions": 10
+        },
+        {
+          "date": "2026-04-10",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 36,
+          "deletions": 11
+        },
+        {
+          "date": "2026-04-11",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 34,
+          "deletions": 14
+        },
+        {
+          "date": "2026-04-12",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 27,
+          "deletions": 13
+        },
+        {
+          "date": "2026-04-13",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 33,
+          "deletions": 13
+        },
+        {
+          "date": "2026-04-14",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 31,
+          "deletions": 14
+        },
+        {
+          "date": "2026-04-15",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 31,
+          "deletions": 11
+        },
+        {
+          "date": "2026-04-16",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 45,
+          "deletions": 19
+        },
+        {
+          "date": "2026-04-17",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 31,
+          "deletions": 21
+        },
+        {
+          "date": "2026-04-18",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 30,
+          "deletions": 21
+        },
+        {
+          "date": "2026-04-19",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 32,
+          "deletions": 16
+        },
+        {
+          "date": "2026-04-20",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 41,
+          "deletions": 15
+        },
+        {
+          "date": "2026-04-21",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 43,
+          "deletions": 14
+        },
+        {
+          "date": "2026-04-22",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 39,
+          "deletions": 18
+        },
+        {
+          "date": "2026-04-23",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 40,
+          "deletions": 13
+        },
+        {
+          "date": "2026-04-24",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 32,
+          "deletions": 19
+        },
+        {
+          "date": "2026-04-25",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 35,
+          "deletions": 24
+        },
+        {
+          "date": "2026-04-26",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 53,
+          "deletions": 23
+        },
+        {
+          "date": "2026-04-27",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 39,
+          "deletions": 22
+        },
+        {
+          "date": "2026-04-28",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 45,
+          "deletions": 20
+        },
+        {
+          "date": "2026-04-29",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 46,
+          "deletions": 16
+        },
+        {
+          "date": "2026-04-30",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 33,
+          "deletions": 21
+        },
+        {
+          "date": "2026-05-01",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 49,
+          "deletions": 17
+        },
+        {
+          "date": "2026-05-02",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 37,
+          "deletions": 18
+        },
+        {
+          "date": "2026-05-03",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 39,
+          "deletions": 16
+        },
+        {
+          "date": "2026-05-04",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 55,
+          "deletions": 16
+        },
+        {
+          "date": "2026-05-05",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 48,
+          "deletions": 25
+        },
+        {
+          "date": "2026-05-06",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 61,
+          "deletions": 16
+        },
+        {
+          "date": "2026-05-07",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 49,
+          "deletions": 21
+        },
+        {
+          "date": "2026-05-08",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 45,
+          "deletions": 28
+        },
+        {
+          "date": "2026-05-09",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 64,
+          "deletions": 18
+        },
+        {
+          "date": "2026-05-10",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 57,
+          "deletions": 21
+        },
+        {
+          "date": "2026-05-11",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 65,
+          "deletions": 17
+        },
+        {
+          "date": "2026-05-12",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 68,
+          "deletions": 20
+        },
+        {
+          "date": "2026-05-13",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 52,
+          "deletions": 21
+        },
+        {
+          "date": "2026-05-14",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 60,
+          "deletions": 21
+        },
+        {
+          "date": "2026-05-15",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 42,
+          "deletions": 26
+        },
+        {
+          "date": "2026-05-16",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 51,
+          "deletions": 28
+        },
+        {
+          "date": "2026-05-17",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 64,
+          "deletions": 25
+        },
+        {
+          "date": "2026-05-18",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 55,
+          "deletions": 18
+        },
+        {
+          "date": "2026-05-19",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 66,
+          "deletions": 20
+        },
+        {
+          "date": "2026-05-20",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 52,
+          "deletions": 30
+        },
+        {
+          "date": "2026-05-21",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 75,
+          "deletions": 21
+        },
+        {
+          "date": "2026-05-22",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 62,
+          "deletions": 24
+        },
+        {
+          "date": "2026-05-23",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 79,
+          "deletions": 22
+        },
+        {
+          "date": "2026-05-24",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 69,
+          "deletions": 26
+        },
         {
           "date": "2026-05-25",
           "prs": 1,
@@ -806,11 +2418,11 @@
         }
       ],
       "pr_summary": {
-        "total_prs": 54,
+        "total_prs": 103,
         "autopilot_merged": 26,
-        "autopilot_share": 0.481,
-        "total_additions": 7145,
-        "total_deletions": 2794,
+        "autopilot_share": 0.252,
+        "total_additions": 9750,
+        "total_deletions": 3863,
         "humans_involved": [
           "refluster"
         ]
@@ -819,17 +2431,17 @@
         {
           "handle": "maya",
           "kind": "agent",
-          "prs": 23
+          "prs": 44
         },
         {
           "handle": "ren",
           "kind": "agent",
-          "prs": 19
+          "prs": 36
         },
         {
           "handle": "aoi",
           "kind": "agent",
-          "prs": 12
+          "prs": 23
         },
         {
           "handle": "refluster",
@@ -842,10 +2454,382 @@
       "scope": "workforce-meta",
       "generated_at": "2026-06-22T00:00:00Z",
       "window": {
-        "start": "2026-05-25",
+        "start": "2026-03-24",
         "end": "2026-06-21"
       },
       "lifecycle": [
+        {
+          "date": "2026-03-24",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-03-25",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 0
+        },
+        {
+          "date": "2026-03-26",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 0
+        },
+        {
+          "date": "2026-03-27",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-03-28",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-03-29",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-03-30",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-03-31",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-01",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-02",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-03",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-04",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-05",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-06",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-07",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-08",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-09",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-10",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-11",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-12",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-13",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-14",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-15",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-16",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-17",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-18",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-19",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-20",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-21",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-22",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-23",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-24",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-25",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-26",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-27",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-28",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-29",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-30",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-01",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-02",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-03",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-04",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-05",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-06",
+          "registered": 2,
+          "assigned": 1,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-07",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-08",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-09",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-10",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-11",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-12",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-13",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-14",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-15",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-16",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-17",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-18",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-19",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-20",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-21",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-22",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-23",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
+        {
+          "date": "2026-05-24",
+          "registered": 2,
+          "assigned": 2,
+          "delivered": 2
+        },
         {
           "date": "2026-05-25",
           "registered": 2,
@@ -1016,6 +3000,440 @@
         }
       ],
       "pr_daily": [
+        {
+          "date": "2026-03-24",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 32,
+          "deletions": 37
+        },
+        {
+          "date": "2026-03-25",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 27,
+          "deletions": 44
+        },
+        {
+          "date": "2026-03-26",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 31,
+          "deletions": 35
+        },
+        {
+          "date": "2026-03-27",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 34,
+          "deletions": 32
+        },
+        {
+          "date": "2026-03-28",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 44,
+          "deletions": 35
+        },
+        {
+          "date": "2026-03-29",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 26,
+          "deletions": 37
+        },
+        {
+          "date": "2026-03-30",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 27,
+          "deletions": 41
+        },
+        {
+          "date": "2026-03-31",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 31,
+          "deletions": 44
+        },
+        {
+          "date": "2026-04-01",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 40,
+          "deletions": 50
+        },
+        {
+          "date": "2026-04-02",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 29,
+          "deletions": 31
+        },
+        {
+          "date": "2026-04-03",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 50,
+          "deletions": 33
+        },
+        {
+          "date": "2026-04-04",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 33,
+          "deletions": 35
+        },
+        {
+          "date": "2026-04-05",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 54,
+          "deletions": 35
+        },
+        {
+          "date": "2026-04-06",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 46,
+          "deletions": 51
+        },
+        {
+          "date": "2026-04-07",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 34,
+          "deletions": 59
+        },
+        {
+          "date": "2026-04-08",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 57,
+          "deletions": 43
+        },
+        {
+          "date": "2026-04-09",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 51,
+          "deletions": 59
+        },
+        {
+          "date": "2026-04-10",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 42,
+          "deletions": 54
+        },
+        {
+          "date": "2026-04-11",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 43,
+          "deletions": 56
+        },
+        {
+          "date": "2026-04-12",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 37,
+          "deletions": 41
+        },
+        {
+          "date": "2026-04-13",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 56,
+          "deletions": 58
+        },
+        {
+          "date": "2026-04-14",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 40,
+          "deletions": 55
+        },
+        {
+          "date": "2026-04-15",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 51,
+          "deletions": 53
+        },
+        {
+          "date": "2026-04-16",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 61,
+          "deletions": 53
+        },
+        {
+          "date": "2026-04-17",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 64,
+          "deletions": 55
+        },
+        {
+          "date": "2026-04-18",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 54,
+          "deletions": 50
+        },
+        {
+          "date": "2026-04-19",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 42,
+          "deletions": 65
+        },
+        {
+          "date": "2026-04-20",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 68,
+          "deletions": 54
+        },
+        {
+          "date": "2026-04-21",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 50,
+          "deletions": 51
+        },
+        {
+          "date": "2026-04-22",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 48,
+          "deletions": 49
+        },
+        {
+          "date": "2026-04-23",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 58,
+          "deletions": 45
+        },
+        {
+          "date": "2026-04-24",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 62,
+          "deletions": 53
+        },
+        {
+          "date": "2026-04-25",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 77,
+          "deletions": 67
+        },
+        {
+          "date": "2026-04-26",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 67,
+          "deletions": 73
+        },
+        {
+          "date": "2026-04-27",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 50,
+          "deletions": 49
+        },
+        {
+          "date": "2026-04-28",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 55,
+          "deletions": 76
+        },
+        {
+          "date": "2026-04-29",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 82,
+          "deletions": 78
+        },
+        {
+          "date": "2026-04-30",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 83,
+          "deletions": 68
+        },
+        {
+          "date": "2026-05-01",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 85,
+          "deletions": 86
+        },
+        {
+          "date": "2026-05-02",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 57,
+          "deletions": 72
+        },
+        {
+          "date": "2026-05-03",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 76,
+          "deletions": 78
+        },
+        {
+          "date": "2026-05-04",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 75,
+          "deletions": 94
+        },
+        {
+          "date": "2026-05-05",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 78,
+          "deletions": 68
+        },
+        {
+          "date": "2026-05-06",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 53,
+          "deletions": 52
+        },
+        {
+          "date": "2026-05-07",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 60,
+          "deletions": 84
+        },
+        {
+          "date": "2026-05-08",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 84,
+          "deletions": 85
+        },
+        {
+          "date": "2026-05-09",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 75,
+          "deletions": 97
+        },
+        {
+          "date": "2026-05-10",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 86,
+          "deletions": 56
+        },
+        {
+          "date": "2026-05-11",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 60,
+          "deletions": 101
+        },
+        {
+          "date": "2026-05-12",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 59,
+          "deletions": 93
+        },
+        {
+          "date": "2026-05-13",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 94,
+          "deletions": 98
+        },
+        {
+          "date": "2026-05-14",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 97,
+          "deletions": 93
+        },
+        {
+          "date": "2026-05-15",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 101,
+          "deletions": 61
+        },
+        {
+          "date": "2026-05-16",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 92,
+          "deletions": 86
+        },
+        {
+          "date": "2026-05-17",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 107,
+          "deletions": 88
+        },
+        {
+          "date": "2026-05-18",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 100,
+          "deletions": 67
+        },
+        {
+          "date": "2026-05-19",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 67,
+          "deletions": 83
+        },
+        {
+          "date": "2026-05-20",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 73,
+          "deletions": 97
+        },
+        {
+          "date": "2026-05-21",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 106,
+          "deletions": 71
+        },
+        {
+          "date": "2026-05-22",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 78,
+          "deletions": 105
+        },
+        {
+          "date": "2026-05-23",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 79,
+          "deletions": 95
+        },
+        {
+          "date": "2026-05-24",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 71,
+          "deletions": 115
+        },
         {
           "date": "2026-05-25",
           "prs": 1,
@@ -1214,11 +3632,11 @@
         }
       ],
       "pr_summary": {
-        "total_prs": 84,
+        "total_prs": 129,
         "autopilot_merged": 50,
-        "autopilot_share": 0.595,
-        "total_additions": 12539,
-        "total_deletions": 4907,
+        "autopilot_share": 0.388,
+        "total_additions": 16288,
+        "total_deletions": 8836,
         "humans_involved": [
           "refluster"
         ]
@@ -1227,22 +3645,22 @@
         {
           "handle": "hana",
           "kind": "agent",
-          "prs": 28
+          "prs": 43
         },
         {
           "handle": "nadia",
           "kind": "agent",
-          "prs": 21
+          "prs": 32
         },
         {
           "handle": "sana",
           "kind": "agent",
-          "prs": 21
+          "prs": 32
         },
         {
           "handle": "mateo",
           "kind": "agent",
-          "prs": 14
+          "prs": 22
         },
         {
           "handle": "refluster",
@@ -1255,10 +3673,382 @@
       "scope": "self/ren",
       "generated_at": "2026-06-22T00:00:00Z",
       "window": {
-        "start": "2026-05-25",
+        "start": "2026-03-24",
         "end": "2026-06-21"
       },
       "lifecycle": [
+        {
+          "date": "2026-03-24",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-03-25",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-03-26",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-03-27",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-03-28",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-03-29",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-03-30",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-03-31",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-01",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-02",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-03",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-04",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-05",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-06",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-07",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-08",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-09",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-10",
+          "registered": 1,
+          "assigned": 0,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-11",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-12",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-13",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-14",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-15",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-16",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-17",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-18",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-19",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-20",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 0
+        },
+        {
+          "date": "2026-04-21",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-22",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-23",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-24",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-25",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-26",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-27",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-28",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-29",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-04-30",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-01",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-02",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-03",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-04",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-05",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-06",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-07",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-08",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-09",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-10",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-11",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-12",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-13",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-14",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-15",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-16",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-17",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-18",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-19",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-20",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-21",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-22",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-23",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
+        {
+          "date": "2026-05-24",
+          "registered": 1,
+          "assigned": 1,
+          "delivered": 1
+        },
         {
           "date": "2026-05-25",
           "registered": 1,
@@ -1429,6 +4219,440 @@
         }
       ],
       "pr_daily": [
+        {
+          "date": "2026-03-24",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 45,
+          "deletions": 23
+        },
+        {
+          "date": "2026-03-25",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 46,
+          "deletions": 26
+        },
+        {
+          "date": "2026-03-26",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 35,
+          "deletions": 31
+        },
+        {
+          "date": "2026-03-27",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 38,
+          "deletions": 28
+        },
+        {
+          "date": "2026-03-28",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 40,
+          "deletions": 21
+        },
+        {
+          "date": "2026-03-29",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 46,
+          "deletions": 27
+        },
+        {
+          "date": "2026-03-30",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 53,
+          "deletions": 28
+        },
+        {
+          "date": "2026-03-31",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 60,
+          "deletions": 32
+        },
+        {
+          "date": "2026-04-01",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 63,
+          "deletions": 34
+        },
+        {
+          "date": "2026-04-02",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 57,
+          "deletions": 32
+        },
+        {
+          "date": "2026-04-03",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 69,
+          "deletions": 26
+        },
+        {
+          "date": "2026-04-04",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 47,
+          "deletions": 36
+        },
+        {
+          "date": "2026-04-05",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 47,
+          "deletions": 32
+        },
+        {
+          "date": "2026-04-06",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 54,
+          "deletions": 27
+        },
+        {
+          "date": "2026-04-07",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 67,
+          "deletions": 33
+        },
+        {
+          "date": "2026-04-08",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 49,
+          "deletions": 35
+        },
+        {
+          "date": "2026-04-09",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 67,
+          "deletions": 30
+        },
+        {
+          "date": "2026-04-10",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 75,
+          "deletions": 48
+        },
+        {
+          "date": "2026-04-11",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 53,
+          "deletions": 41
+        },
+        {
+          "date": "2026-04-12",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 71,
+          "deletions": 38
+        },
+        {
+          "date": "2026-04-13",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 81,
+          "deletions": 29
+        },
+        {
+          "date": "2026-04-14",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 72,
+          "deletions": 40
+        },
+        {
+          "date": "2026-04-15",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 86,
+          "deletions": 40
+        },
+        {
+          "date": "2026-04-16",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 61,
+          "deletions": 43
+        },
+        {
+          "date": "2026-04-17",
+          "prs": 0,
+          "autopilot_merged": 0,
+          "additions": 82,
+          "deletions": 49
+        },
+        {
+          "date": "2026-04-18",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 77,
+          "deletions": 42
+        },
+        {
+          "date": "2026-04-19",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 94,
+          "deletions": 45
+        },
+        {
+          "date": "2026-04-20",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 82,
+          "deletions": 37
+        },
+        {
+          "date": "2026-04-21",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 64,
+          "deletions": 55
+        },
+        {
+          "date": "2026-04-22",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 99,
+          "deletions": 39
+        },
+        {
+          "date": "2026-04-23",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 71,
+          "deletions": 46
+        },
+        {
+          "date": "2026-04-24",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 103,
+          "deletions": 34
+        },
+        {
+          "date": "2026-04-25",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 82,
+          "deletions": 62
+        },
+        {
+          "date": "2026-04-26",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 79,
+          "deletions": 47
+        },
+        {
+          "date": "2026-04-27",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 75,
+          "deletions": 58
+        },
+        {
+          "date": "2026-04-28",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 102,
+          "deletions": 54
+        },
+        {
+          "date": "2026-04-29",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 106,
+          "deletions": 44
+        },
+        {
+          "date": "2026-04-30",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 70,
+          "deletions": 43
+        },
+        {
+          "date": "2026-05-01",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 114,
+          "deletions": 67
+        },
+        {
+          "date": "2026-05-02",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 94,
+          "deletions": 43
+        },
+        {
+          "date": "2026-05-03",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 87,
+          "deletions": 47
+        },
+        {
+          "date": "2026-05-04",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 87,
+          "deletions": 60
+        },
+        {
+          "date": "2026-05-05",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 86,
+          "deletions": 67
+        },
+        {
+          "date": "2026-05-06",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 113,
+          "deletions": 56
+        },
+        {
+          "date": "2026-05-07",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 122,
+          "deletions": 51
+        },
+        {
+          "date": "2026-05-08",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 84,
+          "deletions": 61
+        },
+        {
+          "date": "2026-05-09",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 122,
+          "deletions": 70
+        },
+        {
+          "date": "2026-05-10",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 102,
+          "deletions": 54
+        },
+        {
+          "date": "2026-05-11",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 92,
+          "deletions": 47
+        },
+        {
+          "date": "2026-05-12",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 92,
+          "deletions": 71
+        },
+        {
+          "date": "2026-05-13",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 95,
+          "deletions": 78
+        },
+        {
+          "date": "2026-05-14",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 93,
+          "deletions": 76
+        },
+        {
+          "date": "2026-05-15",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 121,
+          "deletions": 66
+        },
+        {
+          "date": "2026-05-16",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 123,
+          "deletions": 60
+        },
+        {
+          "date": "2026-05-17",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 115,
+          "deletions": 68
+        },
+        {
+          "date": "2026-05-18",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 115,
+          "deletions": 51
+        },
+        {
+          "date": "2026-05-19",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 90,
+          "deletions": 54
+        },
+        {
+          "date": "2026-05-20",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 101,
+          "deletions": 51
+        },
+        {
+          "date": "2026-05-21",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 129,
+          "deletions": 60
+        },
+        {
+          "date": "2026-05-22",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 115,
+          "deletions": 54
+        },
+        {
+          "date": "2026-05-23",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 115,
+          "deletions": 75
+        },
+        {
+          "date": "2026-05-24",
+          "prs": 1,
+          "autopilot_merged": 0,
+          "additions": 106,
+          "deletions": 74
+        },
         {
           "date": "2026-05-25",
           "prs": 1,
@@ -1627,11 +4851,11 @@
         }
       ],
       "pr_summary": {
-        "total_prs": 34,
+        "total_prs": 81,
         "autopilot_merged": 17,
-        "autopilot_share": 0.5,
-        "total_additions": 4444,
-        "total_deletions": 2279,
+        "autopilot_share": 0.21,
+        "total_additions": 9525,
+        "total_deletions": 5175,
         "humans_involved": [
           "refluster"
         ]
@@ -1640,7 +4864,7 @@
         {
           "handle": "ren",
           "kind": "agent",
-          "prs": 34
+          "prs": 81
         },
         {
           "handle": "refluster",
