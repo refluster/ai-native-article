@@ -46,4 +46,21 @@ describe('StackedAreaChart', () => {
     expect(titles).toContain('2026-06-01: 2');
     expect(titles).toContain('2026-06-02: 5');
   });
+
+  // Regression for a pr-autopilot cycle-1 finding (2026-07-24, `wf:owen`):
+  // AreaSeries.opacity (DomainSkillMaturityPanel's one-hue Dreyfus gradient)
+  // had no assertion — a typo'd/index-shifted opacity would render and pass
+  // every prior test.
+  it('applies each series own opacity, defaulting to 0.85 when omitted', () => {
+    const OPACITY_SERIES: AreaSeries[] = [
+      { key: 'registered', label: 'registered', fill: 'var(--wf-svg-archived)', opacity: 0.3 },
+      { key: 'assigned', label: 'assigned', fill: 'var(--wf-svg-primary)', opacity: 1 },
+      { key: 'delivered', label: 'delivered', fill: 'var(--wf-svg-running)' },
+    ];
+    const { container } = render(
+      <StackedAreaChart data={DATA} xKey="date" series={OPACITY_SERIES} />,
+    );
+    const polygons = [...container.querySelectorAll('polygon')];
+    expect(polygons.map((p) => p.getAttribute('fill-opacity'))).toEqual(['0.3', '1', '0.85']);
+  });
 });

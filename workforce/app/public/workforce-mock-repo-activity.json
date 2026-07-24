@@ -1,0 +1,3954 @@
+{
+  "$comment": "REAL data — GitHub-derived repository activity (issues/PRs opened+closed, code churn) across every workforce project's repo. Built by workforce/scripts/build-repo-performance.mjs. This is a point-in-time snapshot (like build-pr-metrics-github.mjs before its daily-refresh wiring) — re-run periodically to refresh; it does not self-update. INCOMPLETE this run: failed to fetch conference — see stderr.",
+  "generated_at": "2026-07-24T15:32:58.451Z",
+  "days": 90,
+  "workforce": {
+    "scope": "workforce",
+    "window": {
+      "start": "2026-04-26",
+      "end": "2026-07-24"
+    },
+    "issues_daily": [
+      {
+        "date": "2026-04-26",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-04-27",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-04-28",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-04-29",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-04-30",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-01",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-02",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-03",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-04",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-05",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-06",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-07",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-08",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-09",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-10",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-11",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-12",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-13",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-14",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-15",
+        "opened": 0,
+        "closed": 14
+      },
+      {
+        "date": "2026-05-16",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-17",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-18",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-19",
+        "opened": 14,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-20",
+        "opened": 0,
+        "closed": 14
+      },
+      {
+        "date": "2026-05-21",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-22",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-23",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-24",
+        "opened": 7,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-25",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-26",
+        "opened": 0,
+        "closed": 1
+      },
+      {
+        "date": "2026-05-27",
+        "opened": 13,
+        "closed": 4
+      },
+      {
+        "date": "2026-05-28",
+        "opened": 19,
+        "closed": 6
+      },
+      {
+        "date": "2026-05-29",
+        "opened": 6,
+        "closed": 3
+      },
+      {
+        "date": "2026-05-30",
+        "opened": 13,
+        "closed": 5
+      },
+      {
+        "date": "2026-05-31",
+        "opened": 0,
+        "closed": 1
+      },
+      {
+        "date": "2026-06-01",
+        "opened": 19,
+        "closed": 22
+      },
+      {
+        "date": "2026-06-02",
+        "opened": 3,
+        "closed": 0
+      },
+      {
+        "date": "2026-06-03",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-06-04",
+        "opened": 7,
+        "closed": 3
+      },
+      {
+        "date": "2026-06-05",
+        "opened": 0,
+        "closed": 4
+      },
+      {
+        "date": "2026-06-06",
+        "opened": 6,
+        "closed": 4
+      },
+      {
+        "date": "2026-06-07",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-06-08",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-06-09",
+        "opened": 1,
+        "closed": 6
+      },
+      {
+        "date": "2026-06-10",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-06-11",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-06-12",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-06-13",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-06-14",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-06-15",
+        "opened": 6,
+        "closed": 0
+      },
+      {
+        "date": "2026-06-16",
+        "opened": 17,
+        "closed": 1
+      },
+      {
+        "date": "2026-06-17",
+        "opened": 3,
+        "closed": 13
+      },
+      {
+        "date": "2026-06-18",
+        "opened": 0,
+        "closed": 2
+      },
+      {
+        "date": "2026-06-19",
+        "opened": 2,
+        "closed": 2
+      },
+      {
+        "date": "2026-06-20",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-06-21",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-06-22",
+        "opened": 1,
+        "closed": 2
+      },
+      {
+        "date": "2026-06-23",
+        "opened": 1,
+        "closed": 0
+      },
+      {
+        "date": "2026-06-24",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-06-25",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-06-26",
+        "opened": 1,
+        "closed": 1
+      },
+      {
+        "date": "2026-06-27",
+        "opened": 8,
+        "closed": 0
+      },
+      {
+        "date": "2026-06-28",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-06-29",
+        "opened": 4,
+        "closed": 7
+      },
+      {
+        "date": "2026-06-30",
+        "opened": 6,
+        "closed": 1
+      },
+      {
+        "date": "2026-07-01",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-07-02",
+        "opened": 8,
+        "closed": 3
+      },
+      {
+        "date": "2026-07-03",
+        "opened": 0,
+        "closed": 4
+      },
+      {
+        "date": "2026-07-04",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-07-05",
+        "opened": 2,
+        "closed": 14
+      },
+      {
+        "date": "2026-07-06",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-07-07",
+        "opened": 1,
+        "closed": 2
+      },
+      {
+        "date": "2026-07-08",
+        "opened": 16,
+        "closed": 2
+      },
+      {
+        "date": "2026-07-09",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-07-10",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-07-11",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-07-12",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-07-13",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-07-14",
+        "opened": 3,
+        "closed": 0
+      },
+      {
+        "date": "2026-07-15",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-07-16",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-07-17",
+        "opened": 0,
+        "closed": 1
+      },
+      {
+        "date": "2026-07-18",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-07-19",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-07-20",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-07-21",
+        "opened": 0,
+        "closed": 1
+      },
+      {
+        "date": "2026-07-22",
+        "opened": 1,
+        "closed": 1
+      },
+      {
+        "date": "2026-07-23",
+        "opened": 1,
+        "closed": 0
+      },
+      {
+        "date": "2026-07-24",
+        "opened": 0,
+        "closed": 0
+      }
+    ],
+    "prs_daily": [
+      {
+        "date": "2026-04-26",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-04-27",
+        "opened": 24,
+        "closed": 39
+      },
+      {
+        "date": "2026-04-28",
+        "opened": 7,
+        "closed": 6
+      },
+      {
+        "date": "2026-04-29",
+        "opened": 1,
+        "closed": 3
+      },
+      {
+        "date": "2026-04-30",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-01",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-02",
+        "opened": 4,
+        "closed": 4
+      },
+      {
+        "date": "2026-05-03",
+        "opened": 2,
+        "closed": 2
+      },
+      {
+        "date": "2026-05-04",
+        "opened": 24,
+        "closed": 8
+      },
+      {
+        "date": "2026-05-05",
+        "opened": 1,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-06",
+        "opened": 0,
+        "closed": 1
+      },
+      {
+        "date": "2026-05-07",
+        "opened": 2,
+        "closed": 1
+      },
+      {
+        "date": "2026-05-08",
+        "opened": 0,
+        "closed": 1
+      },
+      {
+        "date": "2026-05-09",
+        "opened": 7,
+        "closed": 8
+      },
+      {
+        "date": "2026-05-10",
+        "opened": 1,
+        "closed": 2
+      },
+      {
+        "date": "2026-05-11",
+        "opened": 38,
+        "closed": 39
+      },
+      {
+        "date": "2026-05-12",
+        "opened": 2,
+        "closed": 2
+      },
+      {
+        "date": "2026-05-13",
+        "opened": 3,
+        "closed": 3
+      },
+      {
+        "date": "2026-05-14",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-15",
+        "opened": 9,
+        "closed": 8
+      },
+      {
+        "date": "2026-05-16",
+        "opened": 6,
+        "closed": 7
+      },
+      {
+        "date": "2026-05-17",
+        "opened": 0,
+        "closed": 0
+      },
+      {
+        "date": "2026-05-18",
+        "opened": 40,
+        "closed": 39
+      },
+      {
+        "date": "2026-05-19",
+        "opened": 21,
+        "closed": 54
+      },
+      {
+        "date": "2026-05-20",
+        "opened": 49,
+        "closed": 49
+      },
+      {
+        "date": "2026-05-21",
+        "opened": 16,
+        "closed": 14
+      },
+      {
+        "date": "2026-05-22",
+        "opened": 15,
+        "closed": 14
+      },
+      {
+        "date": "2026-05-23",
+        "opened": 10,
+        "closed": 11
+      },
+      {
+        "date": "2026-05-24",
+        "opened": 8,
+        "closed": 8
+      },
+      {
+        "date": "2026-05-25",
+        "opened": 46,
+        "closed": 37
+      },
+      {
+        "date": "2026-05-26",
+        "opened": 9,
+        "closed": 17
+      },
+      {
+        "date": "2026-05-27",
+        "opened": 29,
+        "closed": 24
+      },
+      {
+        "date": "2026-05-28",
+        "opened": 41,
+        "closed": 34
+      },
+      {
+        "date": "2026-05-29",
+        "opened": 17,
+        "closed": 21
+      },
+      {
+        "date": "2026-05-30",
+        "opened": 12,
+        "closed": 19
+      },
+      {
+        "date": "2026-05-31",
+        "opened": 19,
+        "closed": 12
+      },
+      {
+        "date": "2026-06-01",
+        "opened": 53,
+        "closed": 59
+      },
+      {
+        "date": "2026-06-02",
+        "opened": 19,
+        "closed": 14
+      },
+      {
+        "date": "2026-06-03",
+        "opened": 8,
+        "closed": 12
+      },
+      {
+        "date": "2026-06-04",
+        "opened": 15,
+        "closed": 12
+      },
+      {
+        "date": "2026-06-05",
+        "opened": 19,
+        "closed": 18
+      },
+      {
+        "date": "2026-06-06",
+        "opened": 18,
+        "closed": 21
+      },
+      {
+        "date": "2026-06-07",
+        "opened": 8,
+        "closed": 5
+      },
+      {
+        "date": "2026-06-08",
+        "opened": 12,
+        "closed": 6
+      },
+      {
+        "date": "2026-06-09",
+        "opened": 29,
+        "closed": 37
+      },
+      {
+        "date": "2026-06-10",
+        "opened": 11,
+        "closed": 11
+      },
+      {
+        "date": "2026-06-11",
+        "opened": 14,
+        "closed": 13
+      },
+      {
+        "date": "2026-06-12",
+        "opened": 16,
+        "closed": 15
+      },
+      {
+        "date": "2026-06-13",
+        "opened": 6,
+        "closed": 6
+      },
+      {
+        "date": "2026-06-14",
+        "opened": 6,
+        "closed": 5
+      },
+      {
+        "date": "2026-06-15",
+        "opened": 15,
+        "closed": 6
+      },
+      {
+        "date": "2026-06-16",
+        "opened": 23,
+        "closed": 24
+      },
+      {
+        "date": "2026-06-17",
+        "opened": 10,
+        "closed": 13
+      },
+      {
+        "date": "2026-06-18",
+        "opened": 15,
+        "closed": 23
+      },
+      {
+        "date": "2026-06-19",
+        "opened": 9,
+        "closed": 10
+      },
+      {
+        "date": "2026-06-20",
+        "opened": 2,
+        "closed": 1
+      },
+      {
+        "date": "2026-06-21",
+        "opened": 6,
+        "closed": 6
+      },
+      {
+        "date": "2026-06-22",
+        "opened": 16,
+        "closed": 17
+      },
+      {
+        "date": "2026-06-23",
+        "opened": 10,
+        "closed": 12
+      },
+      {
+        "date": "2026-06-24",
+        "opened": 2,
+        "closed": 2
+      },
+      {
+        "date": "2026-06-25",
+        "opened": 5,
+        "closed": 4
+      },
+      {
+        "date": "2026-06-26",
+        "opened": 4,
+        "closed": 4
+      },
+      {
+        "date": "2026-06-27",
+        "opened": 6,
+        "closed": 6
+      },
+      {
+        "date": "2026-06-28",
+        "opened": 8,
+        "closed": 9
+      },
+      {
+        "date": "2026-06-29",
+        "opened": 19,
+        "closed": 18
+      },
+      {
+        "date": "2026-06-30",
+        "opened": 9,
+        "closed": 10
+      },
+      {
+        "date": "2026-07-01",
+        "opened": 3,
+        "closed": 1
+      },
+      {
+        "date": "2026-07-02",
+        "opened": 16,
+        "closed": 11
+      },
+      {
+        "date": "2026-07-03",
+        "opened": 8,
+        "closed": 6
+      },
+      {
+        "date": "2026-07-04",
+        "opened": 4,
+        "closed": 11
+      },
+      {
+        "date": "2026-07-05",
+        "opened": 9,
+        "closed": 12
+      },
+      {
+        "date": "2026-07-06",
+        "opened": 10,
+        "closed": 3
+      },
+      {
+        "date": "2026-07-07",
+        "opened": 2,
+        "closed": 8
+      },
+      {
+        "date": "2026-07-08",
+        "opened": 6,
+        "closed": 7
+      },
+      {
+        "date": "2026-07-09",
+        "opened": 1,
+        "closed": 2
+      },
+      {
+        "date": "2026-07-10",
+        "opened": 1,
+        "closed": 1
+      },
+      {
+        "date": "2026-07-11",
+        "opened": 3,
+        "closed": 2
+      },
+      {
+        "date": "2026-07-12",
+        "opened": 1,
+        "closed": 1
+      },
+      {
+        "date": "2026-07-13",
+        "opened": 5,
+        "closed": 0
+      },
+      {
+        "date": "2026-07-14",
+        "opened": 2,
+        "closed": 8
+      },
+      {
+        "date": "2026-07-15",
+        "opened": 1,
+        "closed": 0
+      },
+      {
+        "date": "2026-07-16",
+        "opened": 1,
+        "closed": 1
+      },
+      {
+        "date": "2026-07-17",
+        "opened": 3,
+        "closed": 2
+      },
+      {
+        "date": "2026-07-18",
+        "opened": 1,
+        "closed": 1
+      },
+      {
+        "date": "2026-07-19",
+        "opened": 1,
+        "closed": 0
+      },
+      {
+        "date": "2026-07-20",
+        "opened": 9,
+        "closed": 4
+      },
+      {
+        "date": "2026-07-21",
+        "opened": 11,
+        "closed": 18
+      },
+      {
+        "date": "2026-07-22",
+        "opened": 7,
+        "closed": 6
+      },
+      {
+        "date": "2026-07-23",
+        "opened": 6,
+        "closed": 6
+      },
+      {
+        "date": "2026-07-24",
+        "opened": 6,
+        "closed": 2
+      }
+    ],
+    "code_churn_weekly": [
+      {
+        "week_start": "2026-04-26",
+        "additions": 13437,
+        "deletions": 1014
+      },
+      {
+        "week_start": "2026-05-03",
+        "additions": 39334,
+        "deletions": 5509
+      },
+      {
+        "week_start": "2026-05-10",
+        "additions": 39374,
+        "deletions": 21417
+      },
+      {
+        "week_start": "2026-05-17",
+        "additions": 86515,
+        "deletions": 30630
+      },
+      {
+        "week_start": "2026-05-24",
+        "additions": 83571,
+        "deletions": 13529
+      },
+      {
+        "week_start": "2026-05-31",
+        "additions": 84525,
+        "deletions": 53514
+      },
+      {
+        "week_start": "2026-06-07",
+        "additions": 40956,
+        "deletions": 10770
+      },
+      {
+        "week_start": "2026-06-14",
+        "additions": 27405,
+        "deletions": 7565
+      },
+      {
+        "week_start": "2026-06-21",
+        "additions": 26288,
+        "deletions": 4676
+      },
+      {
+        "week_start": "2026-06-28",
+        "additions": 38773,
+        "deletions": 21556
+      },
+      {
+        "week_start": "2026-07-05",
+        "additions": 17853,
+        "deletions": 3251
+      },
+      {
+        "week_start": "2026-07-12",
+        "additions": 9822,
+        "deletions": 2319
+      },
+      {
+        "week_start": "2026-07-19",
+        "additions": 19548,
+        "deletions": 2058
+      }
+    ],
+    "summary": {
+      "issues_opened": 189,
+      "issues_closed": 144,
+      "prs_opened": 1019,
+      "prs_closed": 1008,
+      "total_additions": 527401,
+      "total_deletions": 177808
+    }
+  },
+  "projects": {
+    "agent-workforce": {
+      "scope": "agent-workforce",
+      "repo": "refluster/ai-native-article",
+      "window": {
+        "start": "2026-04-26",
+        "end": "2026-07-24"
+      },
+      "issues_daily": [
+        {
+          "date": "2026-04-26",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-27",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-28",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-29",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-30",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-01",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-02",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-03",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-04",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-05",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-06",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-07",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-08",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-09",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-10",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-11",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-12",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-13",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-14",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-15",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-16",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-17",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-18",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-19",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-20",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-21",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-22",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-23",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-24",
+          "opened": 7,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-25",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-26",
+          "opened": 0,
+          "closed": 1
+        },
+        {
+          "date": "2026-05-27",
+          "opened": 9,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-28",
+          "opened": 4,
+          "closed": 4
+        },
+        {
+          "date": "2026-05-29",
+          "opened": 0,
+          "closed": 2
+        },
+        {
+          "date": "2026-05-30",
+          "opened": 0,
+          "closed": 3
+        },
+        {
+          "date": "2026-05-31",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-01",
+          "opened": 3,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-02",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-03",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-04",
+          "opened": 6,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-05",
+          "opened": 0,
+          "closed": 4
+        },
+        {
+          "date": "2026-06-06",
+          "opened": 6,
+          "closed": 2
+        },
+        {
+          "date": "2026-06-07",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-08",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-09",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-10",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-11",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-12",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-13",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-14",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-15",
+          "opened": 5,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-16",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-06-17",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-18",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-19",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-06-20",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-21",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-22",
+          "opened": 1,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-23",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-24",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-25",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-26",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-27",
+          "opened": 8,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-28",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-29",
+          "opened": 4,
+          "closed": 6
+        },
+        {
+          "date": "2026-06-30",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-01",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-02",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-03",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-04",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-05",
+          "opened": 2,
+          "closed": 14
+        },
+        {
+          "date": "2026-07-06",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-07",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-08",
+          "opened": 16,
+          "closed": 2
+        },
+        {
+          "date": "2026-07-09",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-10",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-11",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-12",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-13",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-14",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-15",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-16",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-17",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-18",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-19",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-20",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-21",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-22",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-23",
+          "opened": 1,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-24",
+          "opened": 0,
+          "closed": 0
+        }
+      ],
+      "prs_daily": [
+        {
+          "date": "2026-04-26",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-27",
+          "opened": 2,
+          "closed": 1
+        },
+        {
+          "date": "2026-04-28",
+          "opened": 5,
+          "closed": 6
+        },
+        {
+          "date": "2026-04-29",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-30",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-01",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-02",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-05-03",
+          "opened": 2,
+          "closed": 2
+        },
+        {
+          "date": "2026-05-04",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-05",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-06",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-07",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-08",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-09",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-10",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-11",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-12",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-13",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-14",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-15",
+          "opened": 2,
+          "closed": 2
+        },
+        {
+          "date": "2026-05-16",
+          "opened": 6,
+          "closed": 5
+        },
+        {
+          "date": "2026-05-17",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-18",
+          "opened": 27,
+          "closed": 27
+        },
+        {
+          "date": "2026-05-19",
+          "opened": 4,
+          "closed": 5
+        },
+        {
+          "date": "2026-05-20",
+          "opened": 11,
+          "closed": 10
+        },
+        {
+          "date": "2026-05-21",
+          "opened": 4,
+          "closed": 4
+        },
+        {
+          "date": "2026-05-22",
+          "opened": 6,
+          "closed": 5
+        },
+        {
+          "date": "2026-05-23",
+          "opened": 8,
+          "closed": 9
+        },
+        {
+          "date": "2026-05-24",
+          "opened": 6,
+          "closed": 6
+        },
+        {
+          "date": "2026-05-25",
+          "opened": 9,
+          "closed": 8
+        },
+        {
+          "date": "2026-05-26",
+          "opened": 8,
+          "closed": 7
+        },
+        {
+          "date": "2026-05-27",
+          "opened": 22,
+          "closed": 18
+        },
+        {
+          "date": "2026-05-28",
+          "opened": 15,
+          "closed": 14
+        },
+        {
+          "date": "2026-05-29",
+          "opened": 2,
+          "closed": 4
+        },
+        {
+          "date": "2026-05-30",
+          "opened": 5,
+          "closed": 10
+        },
+        {
+          "date": "2026-05-31",
+          "opened": 8,
+          "closed": 8
+        },
+        {
+          "date": "2026-06-01",
+          "opened": 16,
+          "closed": 16
+        },
+        {
+          "date": "2026-06-02",
+          "opened": 7,
+          "closed": 4
+        },
+        {
+          "date": "2026-06-03",
+          "opened": 2,
+          "closed": 5
+        },
+        {
+          "date": "2026-06-04",
+          "opened": 7,
+          "closed": 5
+        },
+        {
+          "date": "2026-06-05",
+          "opened": 16,
+          "closed": 18
+        },
+        {
+          "date": "2026-06-06",
+          "opened": 18,
+          "closed": 17
+        },
+        {
+          "date": "2026-06-07",
+          "opened": 7,
+          "closed": 5
+        },
+        {
+          "date": "2026-06-08",
+          "opened": 2,
+          "closed": 4
+        },
+        {
+          "date": "2026-06-09",
+          "opened": 5,
+          "closed": 3
+        },
+        {
+          "date": "2026-06-10",
+          "opened": 8,
+          "closed": 9
+        },
+        {
+          "date": "2026-06-11",
+          "opened": 10,
+          "closed": 10
+        },
+        {
+          "date": "2026-06-12",
+          "opened": 12,
+          "closed": 11
+        },
+        {
+          "date": "2026-06-13",
+          "opened": 5,
+          "closed": 5
+        },
+        {
+          "date": "2026-06-14",
+          "opened": 6,
+          "closed": 5
+        },
+        {
+          "date": "2026-06-15",
+          "opened": 3,
+          "closed": 2
+        },
+        {
+          "date": "2026-06-16",
+          "opened": 10,
+          "closed": 11
+        },
+        {
+          "date": "2026-06-17",
+          "opened": 5,
+          "closed": 5
+        },
+        {
+          "date": "2026-06-18",
+          "opened": 5,
+          "closed": 10
+        },
+        {
+          "date": "2026-06-19",
+          "opened": 2,
+          "closed": 1
+        },
+        {
+          "date": "2026-06-20",
+          "opened": 1,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-21",
+          "opened": 6,
+          "closed": 6
+        },
+        {
+          "date": "2026-06-22",
+          "opened": 9,
+          "closed": 9
+        },
+        {
+          "date": "2026-06-23",
+          "opened": 6,
+          "closed": 7
+        },
+        {
+          "date": "2026-06-24",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-06-25",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-06-26",
+          "opened": 1,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-27",
+          "opened": 5,
+          "closed": 6
+        },
+        {
+          "date": "2026-06-28",
+          "opened": 8,
+          "closed": 8
+        },
+        {
+          "date": "2026-06-29",
+          "opened": 14,
+          "closed": 12
+        },
+        {
+          "date": "2026-06-30",
+          "opened": 7,
+          "closed": 6
+        },
+        {
+          "date": "2026-07-01",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-07-02",
+          "opened": 2,
+          "closed": 2
+        },
+        {
+          "date": "2026-07-03",
+          "opened": 8,
+          "closed": 1
+        },
+        {
+          "date": "2026-07-04",
+          "opened": 3,
+          "closed": 10
+        },
+        {
+          "date": "2026-07-05",
+          "opened": 8,
+          "closed": 11
+        },
+        {
+          "date": "2026-07-06",
+          "opened": 3,
+          "closed": 3
+        },
+        {
+          "date": "2026-07-07",
+          "opened": 2,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-08",
+          "opened": 6,
+          "closed": 7
+        },
+        {
+          "date": "2026-07-09",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-07-10",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-07-11",
+          "opened": 3,
+          "closed": 2
+        },
+        {
+          "date": "2026-07-12",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-07-13",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-14",
+          "opened": 2,
+          "closed": 2
+        },
+        {
+          "date": "2026-07-15",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-16",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-07-17",
+          "opened": 2,
+          "closed": 1
+        },
+        {
+          "date": "2026-07-18",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-07-19",
+          "opened": 1,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-20",
+          "opened": 3,
+          "closed": 4
+        },
+        {
+          "date": "2026-07-21",
+          "opened": 4,
+          "closed": 4
+        },
+        {
+          "date": "2026-07-22",
+          "opened": 2,
+          "closed": 1
+        },
+        {
+          "date": "2026-07-23",
+          "opened": 4,
+          "closed": 4
+        },
+        {
+          "date": "2026-07-24",
+          "opened": 0,
+          "closed": 0
+        }
+      ],
+      "code_churn_weekly": [
+        {
+          "week_start": "2026-04-26",
+          "additions": 5002,
+          "deletions": 762
+        },
+        {
+          "week_start": "2026-05-03",
+          "additions": 8979,
+          "deletions": 704
+        },
+        {
+          "week_start": "2026-05-10",
+          "additions": 3488,
+          "deletions": 513
+        },
+        {
+          "week_start": "2026-05-17",
+          "additions": 36818,
+          "deletions": 23738
+        },
+        {
+          "week_start": "2026-05-24",
+          "additions": 42058,
+          "deletions": 4464
+        },
+        {
+          "week_start": "2026-05-31",
+          "additions": 49615,
+          "deletions": 45971
+        },
+        {
+          "week_start": "2026-06-07",
+          "additions": 16107,
+          "deletions": 6294
+        },
+        {
+          "week_start": "2026-06-14",
+          "additions": 9036,
+          "deletions": 3390
+        },
+        {
+          "week_start": "2026-06-21",
+          "additions": 12103,
+          "deletions": 896
+        },
+        {
+          "week_start": "2026-06-28",
+          "additions": 8958,
+          "deletions": 7934
+        },
+        {
+          "week_start": "2026-07-05",
+          "additions": 8088,
+          "deletions": 1299
+        },
+        {
+          "week_start": "2026-07-12",
+          "additions": 1754,
+          "deletions": 142
+        },
+        {
+          "week_start": "2026-07-19",
+          "additions": 9988,
+          "deletions": 54
+        }
+      ],
+      "summary": {
+        "issues_opened": 74,
+        "issues_closed": 40,
+        "prs_opened": 419,
+        "prs_closed": 414,
+        "total_additions": 211994,
+        "total_deletions": 96161
+      }
+    },
+    "asp-cloud": {
+      "scope": "asp-cloud",
+      "repo": "PSVL/asp-cloud",
+      "window": {
+        "start": "2026-04-26",
+        "end": "2026-07-24"
+      },
+      "issues_daily": [
+        {
+          "date": "2026-04-26",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-27",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-28",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-29",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-30",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-01",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-02",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-03",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-04",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-05",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-06",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-07",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-08",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-09",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-10",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-11",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-12",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-13",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-14",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-15",
+          "opened": 0,
+          "closed": 14
+        },
+        {
+          "date": "2026-05-16",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-17",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-18",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-19",
+          "opened": 14,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-20",
+          "opened": 0,
+          "closed": 14
+        },
+        {
+          "date": "2026-05-21",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-22",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-23",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-24",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-25",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-26",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-27",
+          "opened": 4,
+          "closed": 4
+        },
+        {
+          "date": "2026-05-28",
+          "opened": 4,
+          "closed": 2
+        },
+        {
+          "date": "2026-05-29",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-05-30",
+          "opened": 13,
+          "closed": 2
+        },
+        {
+          "date": "2026-05-31",
+          "opened": 0,
+          "closed": 1
+        },
+        {
+          "date": "2026-06-01",
+          "opened": 16,
+          "closed": 22
+        },
+        {
+          "date": "2026-06-02",
+          "opened": 3,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-03",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-04",
+          "opened": 1,
+          "closed": 3
+        },
+        {
+          "date": "2026-06-05",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-06",
+          "opened": 0,
+          "closed": 2
+        },
+        {
+          "date": "2026-06-07",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-08",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-09",
+          "opened": 1,
+          "closed": 6
+        },
+        {
+          "date": "2026-06-10",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-11",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-12",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-13",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-14",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-15",
+          "opened": 1,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-16",
+          "opened": 16,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-17",
+          "opened": 3,
+          "closed": 13
+        },
+        {
+          "date": "2026-06-18",
+          "opened": 0,
+          "closed": 2
+        },
+        {
+          "date": "2026-06-19",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-06-20",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-21",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-22",
+          "opened": 0,
+          "closed": 2
+        },
+        {
+          "date": "2026-06-23",
+          "opened": 1,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-24",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-25",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-26",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-06-27",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-28",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-29",
+          "opened": 0,
+          "closed": 1
+        },
+        {
+          "date": "2026-06-30",
+          "opened": 6,
+          "closed": 1
+        },
+        {
+          "date": "2026-07-01",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-02",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-03",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-04",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-05",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-06",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-07",
+          "opened": 1,
+          "closed": 2
+        },
+        {
+          "date": "2026-07-08",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-09",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-10",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-11",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-12",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-13",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-14",
+          "opened": 3,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-15",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-16",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-17",
+          "opened": 0,
+          "closed": 1
+        },
+        {
+          "date": "2026-07-18",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-19",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-20",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-21",
+          "opened": 0,
+          "closed": 1
+        },
+        {
+          "date": "2026-07-22",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-07-23",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-24",
+          "opened": 0,
+          "closed": 0
+        }
+      ],
+      "prs_daily": [
+        {
+          "date": "2026-04-26",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-27",
+          "opened": 22,
+          "closed": 38
+        },
+        {
+          "date": "2026-04-28",
+          "opened": 2,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-29",
+          "opened": 1,
+          "closed": 3
+        },
+        {
+          "date": "2026-04-30",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-01",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-02",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-03",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-04",
+          "opened": 23,
+          "closed": 8
+        },
+        {
+          "date": "2026-05-05",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-06",
+          "opened": 0,
+          "closed": 1
+        },
+        {
+          "date": "2026-05-07",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-08",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-09",
+          "opened": 0,
+          "closed": 1
+        },
+        {
+          "date": "2026-05-10",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-11",
+          "opened": 37,
+          "closed": 38
+        },
+        {
+          "date": "2026-05-12",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-13",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-14",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-15",
+          "opened": 4,
+          "closed": 3
+        },
+        {
+          "date": "2026-05-16",
+          "opened": 0,
+          "closed": 1
+        },
+        {
+          "date": "2026-05-17",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-18",
+          "opened": 11,
+          "closed": 10
+        },
+        {
+          "date": "2026-05-19",
+          "opened": 6,
+          "closed": 39
+        },
+        {
+          "date": "2026-05-20",
+          "opened": 38,
+          "closed": 39
+        },
+        {
+          "date": "2026-05-21",
+          "opened": 6,
+          "closed": 5
+        },
+        {
+          "date": "2026-05-22",
+          "opened": 7,
+          "closed": 6
+        },
+        {
+          "date": "2026-05-23",
+          "opened": 1,
+          "closed": 2
+        },
+        {
+          "date": "2026-05-24",
+          "opened": 2,
+          "closed": 2
+        },
+        {
+          "date": "2026-05-25",
+          "opened": 37,
+          "closed": 29
+        },
+        {
+          "date": "2026-05-26",
+          "opened": 1,
+          "closed": 9
+        },
+        {
+          "date": "2026-05-27",
+          "opened": 6,
+          "closed": 6
+        },
+        {
+          "date": "2026-05-28",
+          "opened": 26,
+          "closed": 20
+        },
+        {
+          "date": "2026-05-29",
+          "opened": 14,
+          "closed": 16
+        },
+        {
+          "date": "2026-05-30",
+          "opened": 7,
+          "closed": 9
+        },
+        {
+          "date": "2026-05-31",
+          "opened": 11,
+          "closed": 4
+        },
+        {
+          "date": "2026-06-01",
+          "opened": 37,
+          "closed": 43
+        },
+        {
+          "date": "2026-06-02",
+          "opened": 12,
+          "closed": 10
+        },
+        {
+          "date": "2026-06-03",
+          "opened": 6,
+          "closed": 7
+        },
+        {
+          "date": "2026-06-04",
+          "opened": 7,
+          "closed": 7
+        },
+        {
+          "date": "2026-06-05",
+          "opened": 3,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-06",
+          "opened": 0,
+          "closed": 4
+        },
+        {
+          "date": "2026-06-07",
+          "opened": 1,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-08",
+          "opened": 10,
+          "closed": 2
+        },
+        {
+          "date": "2026-06-09",
+          "opened": 24,
+          "closed": 34
+        },
+        {
+          "date": "2026-06-10",
+          "opened": 2,
+          "closed": 2
+        },
+        {
+          "date": "2026-06-11",
+          "opened": 4,
+          "closed": 3
+        },
+        {
+          "date": "2026-06-12",
+          "opened": 4,
+          "closed": 3
+        },
+        {
+          "date": "2026-06-13",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-06-14",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-15",
+          "opened": 12,
+          "closed": 4
+        },
+        {
+          "date": "2026-06-16",
+          "opened": 13,
+          "closed": 13
+        },
+        {
+          "date": "2026-06-17",
+          "opened": 5,
+          "closed": 8
+        },
+        {
+          "date": "2026-06-18",
+          "opened": 9,
+          "closed": 12
+        },
+        {
+          "date": "2026-06-19",
+          "opened": 7,
+          "closed": 9
+        },
+        {
+          "date": "2026-06-20",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-06-21",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-22",
+          "opened": 7,
+          "closed": 7
+        },
+        {
+          "date": "2026-06-23",
+          "opened": 4,
+          "closed": 5
+        },
+        {
+          "date": "2026-06-24",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-06-25",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-26",
+          "opened": 2,
+          "closed": 3
+        },
+        {
+          "date": "2026-06-27",
+          "opened": 1,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-28",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-29",
+          "opened": 5,
+          "closed": 6
+        },
+        {
+          "date": "2026-06-30",
+          "opened": 2,
+          "closed": 4
+        },
+        {
+          "date": "2026-07-01",
+          "opened": 2,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-02",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-03",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-04",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-05",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-06",
+          "opened": 6,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-07",
+          "opened": 0,
+          "closed": 8
+        },
+        {
+          "date": "2026-07-08",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-09",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-10",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-11",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-12",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-13",
+          "opened": 5,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-14",
+          "opened": 0,
+          "closed": 6
+        },
+        {
+          "date": "2026-07-15",
+          "opened": 1,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-16",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-17",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-07-18",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-19",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-20",
+          "opened": 6,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-21",
+          "opened": 4,
+          "closed": 11
+        },
+        {
+          "date": "2026-07-22",
+          "opened": 4,
+          "closed": 4
+        },
+        {
+          "date": "2026-07-23",
+          "opened": 2,
+          "closed": 2
+        },
+        {
+          "date": "2026-07-24",
+          "opened": 6,
+          "closed": 2
+        }
+      ],
+      "code_churn_weekly": [
+        {
+          "week_start": "2026-04-26",
+          "additions": 175,
+          "deletions": 204
+        },
+        {
+          "week_start": "2026-05-03",
+          "additions": 298,
+          "deletions": 5
+        },
+        {
+          "week_start": "2026-05-10",
+          "additions": 1849,
+          "deletions": 36
+        },
+        {
+          "week_start": "2026-05-17",
+          "additions": 10777,
+          "deletions": 1486
+        },
+        {
+          "week_start": "2026-05-24",
+          "additions": 18532,
+          "deletions": 4441
+        },
+        {
+          "week_start": "2026-05-31",
+          "additions": 16632,
+          "deletions": 3221
+        },
+        {
+          "week_start": "2026-06-07",
+          "additions": 7100,
+          "deletions": 660
+        },
+        {
+          "week_start": "2026-06-14",
+          "additions": 3964,
+          "deletions": 1186
+        },
+        {
+          "week_start": "2026-06-21",
+          "additions": 2796,
+          "deletions": 1865
+        },
+        {
+          "week_start": "2026-06-28",
+          "additions": 2201,
+          "deletions": 37
+        },
+        {
+          "week_start": "2026-07-05",
+          "additions": 1181,
+          "deletions": 41
+        },
+        {
+          "week_start": "2026-07-12",
+          "additions": 816,
+          "deletions": 3
+        },
+        {
+          "week_start": "2026-07-19",
+          "additions": 2406,
+          "deletions": 390
+        }
+      ],
+      "summary": {
+        "issues_opened": 91,
+        "issues_closed": 97,
+        "prs_opened": 523,
+        "prs_closed": 519,
+        "total_additions": 68727,
+        "total_deletions": 13575
+      }
+    },
+    "project-ind": {
+      "scope": "project-ind",
+      "repo": "PSVL/project-ind",
+      "window": {
+        "start": "2026-04-26",
+        "end": "2026-07-24"
+      },
+      "issues_daily": [
+        {
+          "date": "2026-04-26",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-27",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-28",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-29",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-30",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-01",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-02",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-03",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-04",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-05",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-06",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-07",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-08",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-09",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-10",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-11",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-12",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-13",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-14",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-15",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-16",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-17",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-18",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-19",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-20",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-21",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-22",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-23",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-24",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-25",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-26",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-27",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-28",
+          "opened": 11,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-29",
+          "opened": 5,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-30",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-31",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-01",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-02",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-03",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-04",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-05",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-06",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-07",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-08",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-09",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-10",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-11",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-12",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-13",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-14",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-15",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-16",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-17",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-18",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-19",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-20",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-21",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-22",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-23",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-24",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-25",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-26",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-27",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-28",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-29",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-30",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-01",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-02",
+          "opened": 8,
+          "closed": 3
+        },
+        {
+          "date": "2026-07-03",
+          "opened": 0,
+          "closed": 4
+        },
+        {
+          "date": "2026-07-04",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-05",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-06",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-07",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-08",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-09",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-10",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-11",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-12",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-13",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-14",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-15",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-16",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-17",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-18",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-19",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-20",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-21",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-22",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-23",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-24",
+          "opened": 0,
+          "closed": 0
+        }
+      ],
+      "prs_daily": [
+        {
+          "date": "2026-04-26",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-27",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-28",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-29",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-04-30",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-01",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-02",
+          "opened": 3,
+          "closed": 3
+        },
+        {
+          "date": "2026-05-03",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-04",
+          "opened": 1,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-05",
+          "opened": 1,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-06",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-07",
+          "opened": 2,
+          "closed": 1
+        },
+        {
+          "date": "2026-05-08",
+          "opened": 0,
+          "closed": 1
+        },
+        {
+          "date": "2026-05-09",
+          "opened": 7,
+          "closed": 7
+        },
+        {
+          "date": "2026-05-10",
+          "opened": 1,
+          "closed": 2
+        },
+        {
+          "date": "2026-05-11",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-05-12",
+          "opened": 2,
+          "closed": 2
+        },
+        {
+          "date": "2026-05-13",
+          "opened": 3,
+          "closed": 3
+        },
+        {
+          "date": "2026-05-14",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-15",
+          "opened": 3,
+          "closed": 3
+        },
+        {
+          "date": "2026-05-16",
+          "opened": 0,
+          "closed": 1
+        },
+        {
+          "date": "2026-05-17",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-18",
+          "opened": 2,
+          "closed": 2
+        },
+        {
+          "date": "2026-05-19",
+          "opened": 11,
+          "closed": 10
+        },
+        {
+          "date": "2026-05-20",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-21",
+          "opened": 6,
+          "closed": 5
+        },
+        {
+          "date": "2026-05-22",
+          "opened": 2,
+          "closed": 3
+        },
+        {
+          "date": "2026-05-23",
+          "opened": 1,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-24",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-25",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-26",
+          "opened": 0,
+          "closed": 1
+        },
+        {
+          "date": "2026-05-27",
+          "opened": 1,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-28",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-29",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-05-30",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-05-31",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-01",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-02",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-03",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-04",
+          "opened": 1,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-05",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-06",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-07",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-08",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-09",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-10",
+          "opened": 1,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-11",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-12",
+          "opened": 0,
+          "closed": 1
+        },
+        {
+          "date": "2026-06-13",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-14",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-15",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-16",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-17",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-18",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-06-19",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-20",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-21",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-22",
+          "opened": 0,
+          "closed": 1
+        },
+        {
+          "date": "2026-06-23",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-24",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-25",
+          "opened": 4,
+          "closed": 3
+        },
+        {
+          "date": "2026-06-26",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-06-27",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-28",
+          "opened": 0,
+          "closed": 1
+        },
+        {
+          "date": "2026-06-29",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-06-30",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-01",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-02",
+          "opened": 14,
+          "closed": 9
+        },
+        {
+          "date": "2026-07-03",
+          "opened": 0,
+          "closed": 5
+        },
+        {
+          "date": "2026-07-04",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-07-05",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-07-06",
+          "opened": 1,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-07",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-08",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-09",
+          "opened": 0,
+          "closed": 1
+        },
+        {
+          "date": "2026-07-10",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-11",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-12",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-13",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-14",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-15",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-16",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-17",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-18",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-19",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-20",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-21",
+          "opened": 3,
+          "closed": 3
+        },
+        {
+          "date": "2026-07-22",
+          "opened": 1,
+          "closed": 1
+        },
+        {
+          "date": "2026-07-23",
+          "opened": 0,
+          "closed": 0
+        },
+        {
+          "date": "2026-07-24",
+          "opened": 0,
+          "closed": 0
+        }
+      ],
+      "code_churn_weekly": [
+        {
+          "week_start": "2026-04-26",
+          "additions": 8260,
+          "deletions": 48
+        },
+        {
+          "week_start": "2026-05-03",
+          "additions": 30057,
+          "deletions": 4800
+        },
+        {
+          "week_start": "2026-05-10",
+          "additions": 34037,
+          "deletions": 20868
+        },
+        {
+          "week_start": "2026-05-17",
+          "additions": 38920,
+          "deletions": 5406
+        },
+        {
+          "week_start": "2026-05-24",
+          "additions": 22981,
+          "deletions": 4624
+        },
+        {
+          "week_start": "2026-05-31",
+          "additions": 18278,
+          "deletions": 4322
+        },
+        {
+          "week_start": "2026-06-07",
+          "additions": 17749,
+          "deletions": 3816
+        },
+        {
+          "week_start": "2026-06-14",
+          "additions": 14405,
+          "deletions": 2989
+        },
+        {
+          "week_start": "2026-06-21",
+          "additions": 11389,
+          "deletions": 1915
+        },
+        {
+          "week_start": "2026-06-28",
+          "additions": 27614,
+          "deletions": 13585
+        },
+        {
+          "week_start": "2026-07-05",
+          "additions": 8584,
+          "deletions": 1911
+        },
+        {
+          "week_start": "2026-07-12",
+          "additions": 7252,
+          "deletions": 2174
+        },
+        {
+          "week_start": "2026-07-19",
+          "additions": 7154,
+          "deletions": 1614
+        }
+      ],
+      "summary": {
+        "issues_opened": 24,
+        "issues_closed": 7,
+        "prs_opened": 77,
+        "prs_closed": 75,
+        "total_additions": 246680,
+        "total_deletions": 68072
+      }
+    }
+  }
+}

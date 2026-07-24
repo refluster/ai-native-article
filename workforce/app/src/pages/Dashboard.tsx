@@ -33,12 +33,28 @@ import KPIReadout from '../components/KPIReadout';
 import HeatStrip, { intensityClass } from '../components/HeatStrip';
 import LiveTrace from '../components/LiveTrace';
 import PerformancePanels from '../components/PerformancePanels';
+import SkillCatalogueGrowthPanel from '../components/SkillCatalogueGrowthPanel';
+import DomainSkillMaturityPanel from '../components/DomainSkillMaturityPanel';
+import AgentCapabilityOnboardingPanel from '../components/AgentCapabilityOnboardingPanel';
+import RepoPerformancePanel from '../components/RepoPerformancePanel';
 import { WORKFORCE_SCOPE } from '../lib/performance';
 import { loadWorkforceManifest, loadWorkforceStats, fullName } from '../lib/agents';
+import { loadWorkforceSkills } from '../lib/skills';
+import {
+  buildClassifiedSkills,
+  computeAgentCapabilityOnboarding,
+  computeDomainMaturity,
+  computeSkillCatalogueGrowth,
+} from '../lib/skillGrowth';
 import { fmtDuration, fmtCompute } from '../lib/duration';
 import { SITE_DISPLAY_NAME } from '../config/site';
 import type { WorkforceAgentManifest } from '../types/agent';
 import type { AgentMockStats, WorkforceMockStats } from '../types/stats';
+import type { WorkforceSkill } from '../types/skill';
+
+// 3-month basis (operator request, 2026-07-24) — the SKILL GROWTH charts
+// match the Epic-016 decks' window below.
+const SKILL_GROWTH_DAYS = 90;
 
 // Zero-stats stand-in for personas the mock JSON hasn't been backfilled
 // for. Matches the synthesised placeholder used in the Crew table below so
@@ -69,14 +85,16 @@ function lastNDaysUTC(n: number): string[] {
 export default function Dashboard() {
   const [manifest, setManifest] = useState<WorkforceAgentManifest | null>(null);
   const [stats, setStats] = useState<WorkforceMockStats | null>(null);
+  const [skills, setSkills] = useState<WorkforceSkill[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = `${SITE_DISPLAY_NAME} — Performance`;
-    Promise.all([loadWorkforceManifest(), loadWorkforceStats()])
-      .then(([m, s]) => {
+    Promise.all([loadWorkforceManifest(), loadWorkforceStats(), loadWorkforceSkills()])
+      .then(([m, s, sk]) => {
         setManifest(m);
         setStats(s);
+        setSkills(sk);
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
@@ -88,13 +106,21 @@ export default function Dashboard() {
       </WorkforceLayout>
     );
   }
-  if (!manifest || !stats) {
+  if (!manifest || !stats || !skills) {
     return (
       <WorkforceLayout>
         <div className="font-wfmono text-xs uppercase tracking-[0.14em] text-wf-on-surface-variant">Loading…</div>
       </WorkforceLayout>
     );
   }
+
+  // SKILL GROWTH (2026-07-24) — fully client-derived from the real skill +
+  // agent rosters already loaded above; see lib/skillGrowth.ts for the
+  // classification/derivation rules.
+  const classifiedSkills = buildClassifiedSkills(skills);
+  const skillGrowthPoints = computeSkillCatalogueGrowth(classifiedSkills, SKILL_GROWTH_DAYS);
+  const domainMaturityPoints = computeDomainMaturity(classifiedSkills, SKILL_GROWTH_DAYS);
+  const onboardingPoints = computeAgentCapabilityOnboarding(classifiedSkills, manifest.agents, SKILL_GROWTH_DAYS);
 
   // Per-agent rollup that synthesises paused-zero rows for personas the
   // ledger hasn't logged yet. Totals are re-aggregated from this so new
@@ -270,6 +296,35 @@ export default function Dashboard() {
           </p>
         </div>
         <PerformancePanels scope={WORKFORCE_SCOPE} />
+      </section>
+
+      {/* SKILL GROWTH (2026-07-24 operator request) -------------------- */}
+      <section className="mb-8 sm:mb-10">
+        <div className="mb-3">
+          <Typeplate label="SKILL GROWTH" value="CATALOGUE · MATURITY · ONBOARDING" />
+          <p className="mt-1 text-sm text-wf-on-surface-variant max-w-prose leading-relaxed">
+            Is the skill catalogue itself growing, and is it maturing — domain
+            skills climbing the Dreyfus ladder, agent-capability skills
+            actually reaching deployed?
+          </p>
+        </div>
+        <div className="space-y-6 sm:space-y-8">
+          <SkillCatalogueGrowthPanel points={skillGrowthPoints} />
+          <DomainSkillMaturityPanel points={domainMaturityPoints} />
+          <AgentCapabilityOnboardingPanel points={onboardingPoints} />
+        </div>
+      </section>
+
+      {/* REPOSITORY PERFORMANCE (2026-07-24 operator request) ---------- */}
+      <section className="mb-8 sm:mb-10">
+        <div className="mb-3">
+          <Typeplate label="REPOSITORY" value="REPOSITORY PERFORMANCE" />
+          <p className="mt-1 text-sm text-wf-on-surface-variant max-w-prose leading-relaxed">
+            Issue and PR throughput, plus code churn, summed across every
+            workforce project's repo.
+          </p>
+        </div>
+        <RepoPerformancePanel />
       </section>
 
       <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
