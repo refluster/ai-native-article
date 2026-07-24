@@ -60,4 +60,17 @@ describe('lib/performance (live path)', () => {
     // Values are preserved — only the date labels move.
     expect(r.series.lifecycle[r.series.lifecycle.length - 1].delivered).toBe(6);
   });
+
+  // Regression for a pr-autopilot cycle-1 finding (2026-07-24, `wf:owen`):
+  // lifecycle and pr_daily can have different lengths, so reaxis() computes
+  // two independent offsets (lcOffset/prOffset). This fixture's pr_daily
+  // (length 1) is shorter than its lifecycle (length 2), so a mix-up between
+  // the two offsets would pass the lifecycle-only assertion above while still
+  // mis-dating pr_daily — the exact series PrAutomationPanel renders from.
+  it('re-axises pr_daily to the same window-ending-today, independently of lifecycle length', async () => {
+    const r = await loadPerformance(WORKFORCE_SCOPE);
+    const today = new Date().toISOString().slice(0, 10);
+    expect(r.series.pr_daily[r.series.pr_daily.length - 1].date).toBe(today);
+    expect(r.series.pr_daily[r.series.pr_daily.length - 1].prs).toBe(4);
+  });
 });
