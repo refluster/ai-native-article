@@ -97,17 +97,59 @@ export function freshness(updatedAt, { staleHours = 30, now = Date.now() } = {})
   return { state: hours > staleHours ? "stale" : "fresh", hours: Math.round(hours * 10) / 10 };
 }
 
+async function secretsClient(region) {
+  const { createRequire } = await import("node:module");
+  const { pathToFileURL } = await import("node:url");
+  const req = createRequire(join(ROOT, "workforce", "lambdas", "package.json"));
+  const mod = await import(pathToFileURL(req.resolve("@aws-sdk/client-secrets-manager")).href);
+  return { sm: new mod.SecretsManagerClient({ region }), GetSecretValueCommand: mod.GetSecretValueCommand };
+}
+
+// AWS error names that mean "this session has no usable identity" rather than
+// "this one secret is missing". Distinguishing them is the whole point of H4
+// below — see assertAwsIdentity.
+const NO_IDENTITY_ERRORS = new Set([
+  "CredentialsProviderError",
+  "UnrecognizedClientException",
+  "InvalidClientTokenId",
+  "InvalidSignatureException",
+  "ExpiredToken",
+  "ExpiredTokenException",
+  "AccessDeniedException",
+  "AccessDenied",
+  "UnauthorizedOperation",
+]);
+
+export function isNoIdentityError(err) {
+  const name = err?.name ?? "";
+  const code = err?.Code ?? err?.$metadata?.httpStatusCode;
+  return NO_IDENTITY_ERRORS.has(name) || code === 403;
+}
+
+/** H4 (`wf:hana`, #502): a fire with NO ambient AWS identity would otherwise
+ *  fail every scope's secret lookup identically and report N separate
+ *  "token unresolved" gaps — sending the operator to provision four secrets
+ *  that were never the problem. One infrastructure fault must render as ONE
+ *  loud line, not N misattributed symptoms, especially in the surface whose
+ *  entire job is making faults legible. So: probe the identity ONCE up front
+ *  and abort the whole run if it is absent. */
+async function assertAwsIdentity(region) {
+  const { sm } = await secretsClient(region);
+  try {
+    const provider = sm.config.credentials;
+    const creds = typeof provider === "function" ? await provider() : await provider;
+    if (!creds?.accessKeyId) throw Object.assign(new Error("no accessKeyId"), { name: "CredentialsProviderError" });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? `${err.name}: ${err.message}` : String(err) };
+  }
+}
+
 /** Each project's PAT lives at wf/projects/{id}/github.token — a single
  *  ambient GITHUB_TOKEN would silently 404 on the external repos, so every PR
  *  leg gets its own resolved token injected into the child env. */
 async function resolveGithubToken(projectId, region) {
-  const { createRequire } = await import("node:module");
-  const { pathToFileURL } = await import("node:url");
-  const req = createRequire(join(ROOT, "workforce", "lambdas", "package.json"));
-  const { SecretsManagerClient, GetSecretValueCommand } = await import(
-    pathToFileURL(req.resolve("@aws-sdk/client-secrets-manager")).href
-  );
-  const sm = new SecretsManagerClient({ region });
+  const { sm, GetSecretValueCommand } = await secretsClient(region);
   const secretId = `wf/projects/${projectId}/github.token`;
   const out = await sm.send(new GetSecretValueCommand({ SecretId: secretId }));
   if (!out.SecretString) throw new Error(`${secretId} has no SecretString`);
@@ -209,6 +251,37 @@ async function main() {
     );
   }
 
+  // H4: one infrastructure fault must not render as N project gaps. Probe the
+  // identity once; if it is absent, that IS the finding — fail the whole run
+  // with a single line instead of blaming every project's secret in turn.
+  if (!dry) {
+    const identity = await assertAwsIdentity(REGION);
+    if (!identity.ok) {
+      const msg =
+        `refresh.mjs: no AWS identity available to this fire (${identity.error}) — ` +
+        `cannot resolve any wf/projects/*/github.token. This is ONE infrastructure condition, ` +
+        `not ${scopes.length} missing project secrets: do not provision secrets in response to this.`;
+      console.error(msg);
+      writeFileSync(
+        OUT,
+        `${JSON.stringify(
+          {
+            generated_at: new Date().toISOString(),
+            fatal: "aws-identity-absent",
+            detail: identity.error,
+            scopes: scopes.map((s) => s.scope),
+            legs: [],
+            observed: [],
+            verdict: { failed: ["aws-identity-absent"], degraded: [], stale_repo_scopes: [], missing_repo_scopes: [], lifecycle_last_dates: {} },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+      return 3;
+    }
+  }
+
   const legs = [];
 
   // 1. PR metrics, per scope (each needs its own repo + its own PAT).
@@ -218,8 +291,16 @@ async function main() {
       try {
         token = await resolveGithubToken(tokenProject, REGION);
       } catch (err) {
-        // A scope with no provisioned credential is a real, reportable gap —
-        // never a silent skip that reads as "this repo had no activity".
+        // Identity was proven present above, so an auth-class error here means
+        // it was revoked mid-run — again one fault, not a per-project gap.
+        if (isNoIdentityError(err)) {
+          console.error(
+            `refresh.mjs: AWS identity lost mid-run at scope "${scope}" (${err?.name}) — aborting rather than reporting per-project gaps`,
+          );
+          return 3;
+        }
+        // Otherwise: this scope's secret genuinely is not provisioned. A real,
+        // reportable gap — never a silent skip that reads as "no activity".
         legs.push({
           label: `pr:${scope}`,
           ok: false,
