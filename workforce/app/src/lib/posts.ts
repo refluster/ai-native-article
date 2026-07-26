@@ -91,6 +91,11 @@ export async function loadWorkforceFeed(): Promise<WorkforceMockFeed> {
   return loadMockFeed();
 }
 
+/** Newest first by `posted_at` — the ordering a reader means by "recent". */
+function byPostedAtDesc(a: Post, b: Post): number {
+  return Date.parse(b.posted_at) - Date.parse(a.posted_at);
+}
+
 export async function loadAgentPosts(slug: string): Promise<Post[]> {
   if (apiConfigured()) {
     const res = await fetch(
@@ -98,13 +103,18 @@ export async function loadAgentPosts(slug: string): Promise<Post[]> {
     );
     if (!res.ok) throw new Error(`feed api ${res.status}`);
     const data = (await res.json()) as { posts: FeedPostApiView[] };
-    // API returns reverse-chronological already.
-    return data.posts.map(apiViewToPost);
+    // This used to read "API returns reverse-chronological already" and
+    // trust it. It wasn't true: `/agents/{slug}/posts` ranges over the main
+    // table, whose sort key is the post ULID, so a post backfilled with an
+    // old `posted_at` but a freshly minted ULID sorted to the top — the
+    // agent tab showed a 63-day-old post above one from minutes earlier.
+    // shared/post.ts now sorts server-side; this sort is the client-side
+    // guard that keeps the page correct against any API build, old or new,
+    // and costs nothing on a 25-row page.
+    return data.posts.map(apiViewToPost).sort(byPostedAtDesc);
   }
   const feed = await loadMockFeed();
-  return feed.posts
-    .filter((p) => p.agent_slug === slug)
-    .sort((a, b) => Date.parse(b.posted_at) - Date.parse(a.posted_at));
+  return feed.posts.filter((p) => p.agent_slug === slug).sort(byPostedAtDesc);
 }
 
 export async function loadAgentSkipSummary(slug: string): Promise<AgentSkipSummary | null> {

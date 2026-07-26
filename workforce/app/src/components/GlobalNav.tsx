@@ -28,7 +28,7 @@
 // icons and labels), so the two breakpoints can't drift apart; it only
 // adds the grouping headers a vertical list needs to stay scannable.
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { SITE_DISPLAY_NAME, SITE_TAGLINE, OPERATOR } from '../config/site';
 import BrandMark from './BrandMark';
@@ -153,6 +153,15 @@ const DRAWER_GROUPS: { title: string; items: NavItem[] }[] = [
 /** Number shown on the hamburger when the drawer is closed. */
 const UNREAD = NAV.find((n) => n.to === '/notifications')?.badge;
 
+/** Drawer slide/fade duration. Short on purpose — the drawer is a
+ *  navigation affordance, so it should feel like the panel was already
+ *  there rather than like an animation you wait through. Must stay in sync
+ *  with the `duration-200` utilities on the panel and backdrop below; it is
+ *  the timer that unmounts the drawer after its exit transition. */
+const MENU_ANIM_MS = 200;
+
+type MenuState = 'closed' | 'open' | 'closing';
+
 function Badge({ value, className = '' }: { value: string; className?: string }) {
   return (
     <span
@@ -169,20 +178,38 @@ interface Props {
 }
 
 export default function GlobalNav({ right }: Props) {
-  const [menuOpen, setMenuOpen] = useState(false);
+  // Three states, not a boolean: the drawer has to stay mounted through its
+  // exit transition, so "the operator wants it closed" and "it is gone" are
+  // different moments. Every dismissal path — Escape, backdrop, ✕,
+  // navigation — goes through `closeMenu` so they all animate identically.
+  const [menuState, setMenuState] = useState<MenuState>('closed');
+  const menuOpen = menuState === 'open';
+  const closeMenu = useCallback(
+    () => setMenuState((s) => (s === 'open' ? 'closing' : s)),
+    [],
+  );
   const location = useLocation();
+
+  // Unmount once the exit transition has played out.
+  useEffect(() => {
+    if (menuState !== 'closing') return;
+    const t = setTimeout(() => setMenuState('closed'), MENU_ANIM_MS);
+    return () => clearTimeout(t);
+  }, [menuState]);
 
   // Close on navigation — otherwise the drawer covers the page it just
   // routed to.
   useEffect(() => {
-    setMenuOpen(false);
-  }, [location.pathname, location.search]);
+    closeMenu();
+  }, [location.pathname, location.search, closeMenu]);
 
-  // Escape closes; the page behind must not scroll while it's open.
+  // Escape closes; the page behind must not scroll while it's open. The
+  // scroll lock spans `closing` too, so the page doesn't lurch under a
+  // drawer that is still visibly on screen.
   useEffect(() => {
-    if (!menuOpen) return;
+    if (menuState === 'closed') return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpen(false);
+      if (e.key === 'Escape') closeMenu();
     };
     document.addEventListener('keydown', onKey);
     const prevOverflow = document.body.style.overflow;
@@ -191,7 +218,7 @@ export default function GlobalNav({ right }: Props) {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [menuOpen]);
+  }, [menuState, closeMenu]);
 
   return (
     <>
@@ -268,7 +295,7 @@ export default function GlobalNav({ right }: Props) {
         {/* Hamburger — phones and small tablets. */}
         <button
           type="button"
-          onClick={() => setMenuOpen(true)}
+          onClick={() => setMenuState('open')}
           aria-label="Open menu"
           aria-expanded={menuOpen}
           aria-haspopup="menu"
@@ -292,22 +319,45 @@ export default function GlobalNav({ right }: Props) {
           `backdrop-blur`, and a backdrop-filter establishes a containing
           block for fixed descendants — nesting the drawer there would pin
           `inset-0` to the 56px header box instead of the viewport. */}
-      {menuOpen && <MobileMenu onClose={() => setMenuOpen(false)} />}
+      {menuState !== 'closed' && <MobileMenu open={menuOpen} onClose={closeMenu} />}
     </>
   );
 }
 
 // ── Drawer ─────────────────────────────────────────────────────────────
-function MobileMenu({ onClose }: { onClose: () => void }) {
+// Slides in from the right with the backdrop fading alongside it. The
+// enter transition needs the panel to be painted OFF-screen for one frame
+// before it moves, or the browser has nothing to interpolate from and the
+// drawer just appears — hence `entered`, flipped on the frame after mount.
+// On exit the parent keeps this mounted (state `closing`) for exactly
+// MENU_ANIM_MS so the reverse transition can play.
+//
+// `motion-reduce:transition-none` keeps the same open/close semantics
+// without the movement, matching how the skeletons opt out of their
+// shimmer.
+function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setEntered(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const shown = open && entered;
+
   return (
     <div className="md:hidden fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label="Menu">
       <button
         type="button"
         aria-label="Close menu"
         onClick={onClose}
-        className="absolute inset-0 bg-wf-on-surface/40 w-full h-full cursor-default"
+        className={`absolute inset-0 bg-wf-on-surface/40 w-full h-full cursor-default transition-opacity duration-200 ease-out motion-reduce:transition-none ${
+          shown ? 'opacity-100' : 'opacity-0'
+        }`}
       />
-      <div className="absolute inset-y-0 right-0 w-[86%] max-w-[20rem] bg-wf-surface-container-lo border-l border-wf-outline-variant shadow-lg flex flex-col overflow-y-auto">
+      <div
+        className={`absolute inset-y-0 right-0 w-[86%] max-w-[20rem] bg-wf-surface-container-lo border-l border-wf-outline-variant shadow-lg flex flex-col overflow-y-auto transition-transform duration-200 ease-out motion-reduce:transition-none ${
+          shown ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
         {/* Operator card — the drawer's "Me" destination, given the space
             the header can't spare. */}
         <div className="flex items-start gap-3 p-4 border-b border-wf-outline-variant">
