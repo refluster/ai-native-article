@@ -19,7 +19,12 @@ export default function WorkforceLayout({ children, subnavRight, contained = tru
     <div className="workforce-section min-h-screen">
       <GlobalNav right={subnavRight} />
       {contained ? (
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 md:px-12 py-6 sm:py-8 md:py-10">
+        // The phone gutter is 0.75rem (px-3), matched exactly by the
+        // `wf-bleed-x` utility: a card that opts into full-bleed cancels
+        // this padding and spans the viewport, while prose and controls keep
+        // their breathing room. It used to be px-4, which cost ~8% of a
+        // 390px viewport to margin on every page.
+        <div className="max-w-[1440px] mx-auto px-3 sm:px-6 md:px-12 py-5 sm:py-8 md:py-10">
           {children}
         </div>
       ) : (
