@@ -1,0 +1,16 @@
+{
+  "name": "performance-refresh",
+  "version": "0.1.0",
+  "status": "active",
+  "archetype": "cadence",
+  "cost_class": "small",
+  "owners": [
+    "tomas"
+  ],
+  "improvement_agent": "sana",
+  "created_at": "2026-07-26",
+  "requires": [
+    "github.token",
+    "workforce.feed_write_token"
+  ]
+}

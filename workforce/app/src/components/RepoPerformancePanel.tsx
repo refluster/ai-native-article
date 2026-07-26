@@ -14,8 +14,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import Typeplate from './Typeplate';
 import StackedBarChart, { type BarSeries } from './StackedBarChart';
-import { loadRepoActivity } from '../lib/repoActivity';
-import type { RepoActivityDataset } from '../types/repoActivity';
+import { loadRepoActivity, type RepoActivityResult } from '../lib/repoActivity';
 
 const ISSUE_SERIES: BarSeries[] = [
   { key: 'opened', label: 'opened', fill: 'var(--wf-svg-primary)' },
@@ -30,15 +29,19 @@ const CHURN_SERIES: BarSeries[] = [
   { key: 'deletions', label: 'deletions', fill: 'var(--wf-svg-tertiary)' },
 ];
 
+// The refresh Cadence fires daily; a live block older than one cycle plus a
+// buffer means the refresh missed a run and the numbers below are not today's.
+const STALE_HOURS = 30;
+
 export default function RepoPerformancePanel() {
-  const [dataset, setDataset] = useState<RepoActivityDataset | undefined>(undefined);
+  const [result, setResult] = useState<RepoActivityResult | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     loadRepoActivity()
       .then((d) => {
-        if (!cancelled) setDataset(d);
+        if (!cancelled) setResult(d);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -55,7 +58,7 @@ export default function RepoPerformancePanel() {
       </p>
     );
   }
-  if (!dataset) {
+  if (!result) {
     return (
       <p className="font-wfmono text-xs uppercase tracking-[0.14em] text-wf-on-surface-variant">
         Loading repository performance…
@@ -63,8 +66,12 @@ export default function RepoPerformancePanel() {
     );
   }
 
-  const w = dataset.workforce;
-  const projectIds = Object.keys(dataset.projects).sort();
+  const w = result.workforce;
+  const projectIds = result.repos;
+  const stampedAt = new Date(result.generatedAt).toISOString().slice(0, 16);
+  const ageHours = (Date.now() - Date.parse(result.generatedAt)) / 3_600_000;
+  const isStale = result.source === 'live' && ageHours > STALE_HOURS;
+  const degraded = w.degraded_signals ?? [];
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -85,10 +92,30 @@ export default function RepoPerformancePanel() {
           />
           <Stat cap="TRACKED REPOS" value={String(projectIds.length)} sub={projectIds.join(', ')} />
         </div>
-        <p className="px-4 pb-3 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-          * real GitHub data · snapshot @ {new Date(dataset.generated_at).toISOString().slice(0, 16)}Z — re-run{' '}
-          workforce/scripts/build-repo-performance.mjs to refresh
-        </p>
+
+        {/* Provenance + freshness, always rendered: the numbers above must
+            never be readable without knowing how current they are. */}
+        {result.source === 'live' ? (
+          <p
+            className={`px-4 pb-3 font-wfmono text-[10px] uppercase tracking-[0.14em] ${
+              isStale ? 'text-wf-tertiary' : 'text-wf-on-surface-variant'
+            }`}
+          >
+            * real GitHub data · refreshed daily · last run {stampedAt}Z
+            {isStale && ' — over a day old; the performance-refresh cadence may have missed a run'}
+          </p>
+        ) : (
+          <p className="px-4 pb-3 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary">
+            * bundled snapshot @ {stampedAt}Z — the live daily refresh is unavailable, so these numbers
+            are frozen at the last committed build
+          </p>
+        )}
+
+        {degraded.length > 0 && (
+          <p className="px-4 pb-3 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary">
+            * degraded this run: {degraded.join(', ')} — those counts are undercounts, not real lows
+          </p>
+        )}
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

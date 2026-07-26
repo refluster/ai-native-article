@@ -258,7 +258,68 @@ export default function Dashboard() {
         )}
       </section>
 
+      {/* PERFORMANCE ANALYTICS (Epic-016) ----------------------------- */}
+      <section className="mb-8 sm:mb-10">
+        <div className="mb-3">
+          <Typeplate label="ANALYTICS" value="PERFORMANCE · ANALYTICS" />
+          <p className="mt-1 text-sm text-wf-on-surface-variant max-w-prose leading-relaxed">
+            The workforce as one organism: is hiring converting into delivered
+            output, and is the delivery process shedding its humans?
+          </p>
+        </div>
+        <PerformancePanels scope={WORKFORCE_SCOPE} />
+      </section>
+
+      {/* SKILL GROWTH (2026-07-24 operator request) -------------------- */}
+      <section className="mb-8 sm:mb-10">
+        <div className="mb-3">
+          <Typeplate label="SKILL GROWTH" value="CATALOGUE · MATURITY · ONBOARDING" />
+          <p className="mt-1 text-sm text-wf-on-surface-variant max-w-prose leading-relaxed">
+            Is the skill catalogue itself growing, and is it maturing — domain
+            skills climbing the Dreyfus ladder, agent-capability skills
+            actually reaching deployed?
+          </p>
+        </div>
+        <div className="space-y-6 sm:space-y-8">
+          {skillsState.error && (
+            <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary">
+              skill registry unavailable: {skillsState.error}
+            </p>
+          )}
+          {skillGrowthPoints && domainMaturityPoints && onboardingPoints ? (
+            <>
+              <SkillCatalogueGrowthPanel points={skillGrowthPoints} />
+              <DomainSkillMaturityPanel points={domainMaturityPoints} />
+              <AgentCapabilityOnboardingPanel points={onboardingPoints} />
+            </>
+          ) : (
+            !skillsState.error && (
+              <>
+                <SkeletonPanel label="Loading skill-catalogue growth" lines={5} />
+                <SkeletonPanel label="Loading domain-skill maturity" lines={5} />
+                <SkeletonPanel label="Loading capability onboarding" lines={5} />
+              </>
+            )
+          )}
+        </div>
+      </section>
+
+      {/* REPOSITORY PERFORMANCE (2026-07-24 operator request) ---------- */}
+      <section className="mb-8 sm:mb-10">
+        <div className="mb-3">
+          <Typeplate label="REPOSITORY" value="REPOSITORY PERFORMANCE" />
+          <p className="mt-1 text-sm text-wf-on-surface-variant max-w-prose leading-relaxed">
+            Issue and PR throughput, plus code churn, summed across every
+            workforce project's repo.
+          </p>
+        </div>
+        <RepoPerformancePanel />
+      </section>
+
       {/* CREW TABLE --------------------------------------------------- */}
+      {/* Ordered after the analytics decks (operator request, 2026-07-26):
+          the aggregate reads come first, the per-agent roster detail is the
+          drill-down you scroll to. */}
       <section className="mb-8 sm:mb-10">
         <div className="flex items-end justify-between mb-3">
           <Typeplate label="CREW" value="CREW · LIVE STATE" />
@@ -323,64 +384,6 @@ export default function Dashboard() {
           </ul>
         </div>
         )}
-      </section>
-
-      {/* PERFORMANCE ANALYTICS (Epic-016) ----------------------------- */}
-      <section className="mb-8 sm:mb-10">
-        <div className="mb-3">
-          <Typeplate label="ANALYTICS" value="PERFORMANCE · ANALYTICS" />
-          <p className="mt-1 text-sm text-wf-on-surface-variant max-w-prose leading-relaxed">
-            The workforce as one organism: is hiring converting into delivered
-            output, and is the delivery process shedding its humans?
-          </p>
-        </div>
-        <PerformancePanels scope={WORKFORCE_SCOPE} />
-      </section>
-
-      {/* SKILL GROWTH (2026-07-24 operator request) -------------------- */}
-      <section className="mb-8 sm:mb-10">
-        <div className="mb-3">
-          <Typeplate label="SKILL GROWTH" value="CATALOGUE · MATURITY · ONBOARDING" />
-          <p className="mt-1 text-sm text-wf-on-surface-variant max-w-prose leading-relaxed">
-            Is the skill catalogue itself growing, and is it maturing — domain
-            skills climbing the Dreyfus ladder, agent-capability skills
-            actually reaching deployed?
-          </p>
-        </div>
-        <div className="space-y-6 sm:space-y-8">
-          {skillsState.error && (
-            <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary">
-              skill registry unavailable: {skillsState.error}
-            </p>
-          )}
-          {skillGrowthPoints && domainMaturityPoints && onboardingPoints ? (
-            <>
-              <SkillCatalogueGrowthPanel points={skillGrowthPoints} />
-              <DomainSkillMaturityPanel points={domainMaturityPoints} />
-              <AgentCapabilityOnboardingPanel points={onboardingPoints} />
-            </>
-          ) : (
-            !skillsState.error && (
-              <>
-                <SkeletonPanel label="Loading skill-catalogue growth" lines={5} />
-                <SkeletonPanel label="Loading domain-skill maturity" lines={5} />
-                <SkeletonPanel label="Loading capability onboarding" lines={5} />
-              </>
-            )
-          )}
-        </div>
-      </section>
-
-      {/* REPOSITORY PERFORMANCE (2026-07-24 operator request) ---------- */}
-      <section className="mb-8 sm:mb-10">
-        <div className="mb-3">
-          <Typeplate label="REPOSITORY" value="REPOSITORY PERFORMANCE" />
-          <p className="mt-1 text-sm text-wf-on-surface-variant max-w-prose leading-relaxed">
-            Issue and PR throughput, plus code churn, summed across every
-            workforce project's repo.
-          </p>
-        </div>
-        <RepoPerformancePanel />
       </section>
 
       {manifest && stats ? (

@@ -18,7 +18,10 @@
  * its --publish-ddb path) — no new credential type, no new write surface.
  *
  * Usage:
- *   node workforce/scripts/build-repo-performance.mjs [--days 90] [--dry-run] [--write]
+ *   node workforce/scripts/build-repo-performance.mjs [--days 90] [--dry-run]
+ *     [--write]            # patch the bundled workforce-mock-repo-activity.json
+ *     [--publish-ddb]      # upsert PERF#{scope}/REPO for the live endpoint
+ *     [--table NAME]       # DDB table (default: $TABLE_NAME or wf-table-prod)
  *     [--project <id>]     # limit to one project id (default: every project
  *                          #   under workforce/projects/ with a github repo)
  *     [--region us-west-2] # Secrets Manager region (default us-west-2)
@@ -27,12 +30,17 @@
  * snapshot workforce/app/public/workforce-mock-repo-activity.json is only
  * overwritten with --write.
  *
- * This is a point-in-time snapshot, not a live endpoint (same operational
- * shape build-pr-metrics-github.mjs had before its daily-refresh wiring) —
- * re-run periodically to keep it fresh. A project whose token can't be
- * resolved or whose API calls fail is skipped LOUDLY (stderr WARN + a note
- * in the written dataset's $comment) rather than silently omitted or
- * papered over with a zero.
+ * --publish-ddb (2026-07-26) is what makes the console's Repository
+ * Performance deck actually refresh daily: it writes one PERF#{scope}/REPO
+ * roll-up per project plus the `workforce` aggregate, which the agents-api
+ * /performance endpoint composes into its response (same read path the
+ * LIFECYCLE + PR blocks already use). Without it this script only produces a
+ * committed snapshot that ages until someone re-commits it. The daily driver
+ * is the `performance-refresh` Cadence (workforce/skills/performance-refresh/).
+ *
+ * A project whose token can't be resolved or whose API calls fail is skipped
+ * LOUDLY (stderr WARN + a note in the written dataset's $comment) rather than
+ * silently omitted or papered over with a zero.
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -199,38 +207,52 @@ function makeGh(api, token) {
   };
 }
 
-// Search API carries its own tighter rate limit (30 req/min authenticated) —
-// pace multi-page walks so 4 projects x 4 queries never bursts it.
-async function searchAll(gh, q) {
+// GitHub's Search API caps authenticated callers at 30 req/min and enforces a
+// secondary limit on short bursts, so every search hop waits ≥ 60/30 s. (An
+// earlier 1200ms sustained ~50 req/min — over budget despite the comment
+// claiming otherwise; flagged in review 2026-07-24 by `wf:hana` H1.)
+const SEARCH_INTERVAL_MS = 2100;
+
+/** Returns { items, partial } — `partial` is TRUE when any page failed, so the
+ *  caller can mark the signal degraded instead of writing an undercounted
+ *  number that is indistinguishable from real low activity (`wf:hana` H2 /
+ *  `wf:tomas` T4). Silently-partial data is worse than no data on a surface
+ *  that now refreshes unattended every day. */
+export async function searchAll(gh, q) {
   const items = [];
+  let partial = false;
   for (let page = 1; page <= 10; page++) {
     const r = await gh(`/search/issues?q=${encodeURIComponent(q)}&per_page=100&page=${page}`);
     if (r.status !== 200) {
       console.error(`search failed (HTTP ${r.status}) for "${q}": ${JSON.stringify(r.json).slice(0, 200)}`);
+      partial = true;
       break;
     }
     const batch = r.json.items ?? [];
     items.push(...batch);
     if (batch.length < 100) break;
-    await sleep(1200);
+    await sleep(SEARCH_INTERVAL_MS);
   }
-  return items;
+  return { items, partial };
 }
 
-async function fetchCodeFrequency(gh, repo) {
+/** Returns { weeks, partial } — same contract as searchAll: a stats-cache
+ *  timeout or HTTP error yields partial:true rather than an empty array that
+ *  reads as "this repo had zero churn". */
+export async function fetchCodeFrequency(gh, repo) {
   for (let attempt = 0; attempt < 6; attempt++) {
     const r = await gh(`/repos/${repo}/stats/code_frequency`);
-    if (r.status === 200 && Array.isArray(r.json)) return r.json;
+    if (r.status === 200 && Array.isArray(r.json)) return { weeks: r.json, partial: false };
     if (r.status === 202) {
       // GitHub is still computing the stats cache — retry with backoff.
       await sleep(2500);
       continue;
     }
-    console.error(`${repo}: code_frequency -> HTTP ${r.status}; churn will be empty for this repo`);
-    return [];
+    console.error(`${repo}: code_frequency -> HTTP ${r.status}; churn marked degraded for this repo`);
+    return { weeks: [], partial: true };
   }
-  console.error(`${repo}: code_frequency still computing after retries; churn will be empty for this repo`);
-  return [];
+  console.error(`${repo}: code_frequency still computing after retries; churn marked degraded`);
+  return { weeks: [], partial: true };
 }
 
 async function fetchProjectActivity(project, { days, token, api }) {
@@ -243,19 +265,29 @@ async function fetchProjectActivity(project, { days, token, api }) {
   const todayIso = new Date().toISOString().slice(0, 10);
 
   const issuesOpened = await searchAll(gh, `repo:${repo} is:issue created:>=${sinceIso}`);
-  await sleep(1200);
+  await sleep(SEARCH_INTERVAL_MS);
   const issuesClosed = await searchAll(gh, `repo:${repo} is:issue closed:>=${sinceIso}`);
-  await sleep(1200);
+  await sleep(SEARCH_INTERVAL_MS);
   const prsOpened = await searchAll(gh, `repo:${repo} is:pr created:>=${sinceIso}`);
-  await sleep(1200);
+  await sleep(SEARCH_INTERVAL_MS);
   const prsClosed = await searchAll(gh, `repo:${repo} is:pr closed:>=${sinceIso}`);
 
-  const issues_daily = buildDailyActivity(issuesOpened, issuesClosed, days, todayIso);
-  const prs_daily = buildDailyActivity(prsOpened, prsClosed, days, todayIso);
+  const issues_daily = buildDailyActivity(issuesOpened.items, issuesClosed.items, days, todayIso);
+  const prs_daily = buildDailyActivity(prsOpened.items, prsClosed.items, days, todayIso);
 
-  const codeWeeks = await fetchCodeFrequency(gh, repo);
+  const churn = await fetchCodeFrequency(gh, repo);
   const sinceEpoch = Math.floor(new Date(`${sinceIso}T00:00:00Z`).getTime() / 1000);
-  const code_churn_weekly = buildWeeklyChurn(codeWeeks, sinceEpoch);
+  const code_churn_weekly = buildWeeklyChurn(churn.weeks, sinceEpoch);
+
+  // Name every signal that came back incomplete, so a degraded number is
+  // never presented as a real one (see searchAll's contract).
+  const degraded_signals = [
+    issuesOpened.partial && 'issues_opened',
+    issuesClosed.partial && 'issues_closed',
+    prsOpened.partial && 'prs_opened',
+    prsClosed.partial && 'prs_closed',
+    churn.partial && 'code_churn',
+  ].filter(Boolean);
 
   return {
     scope: project.id,
@@ -265,13 +297,14 @@ async function fetchProjectActivity(project, { days, token, api }) {
     prs_daily,
     code_churn_weekly,
     summary: {
-      issues_opened: issuesOpened.length,
-      issues_closed: issuesClosed.length,
-      prs_opened: prsOpened.length,
-      prs_closed: prsClosed.length,
+      issues_opened: issuesOpened.items.length,
+      issues_closed: issuesClosed.items.length,
+      prs_opened: prsOpened.items.length,
+      prs_closed: prsClosed.items.length,
       total_additions: code_churn_weekly.reduce((a, w) => a + w.additions, 0),
       total_deletions: code_churn_weekly.reduce((a, w) => a + w.deletions, 0),
     },
+    ...(degraded_signals.length > 0 ? { degraded_signals } : {}),
   };
 }
 
@@ -280,7 +313,9 @@ async function fetchProjectActivity(project, { days, token, api }) {
 async function main() {
   const DAYS = Number(arg("days", 90));
   const WRITE = process.argv.includes("--write");
-  const DRY = !WRITE || process.argv.includes("--dry-run");
+  const PUBLISH_DDB = process.argv.includes("--publish-ddb");
+  const TABLE = arg("table", process.env.TABLE_NAME || "wf-table-prod");
+  const DRY = (!WRITE && !PUBLISH_DDB) || process.argv.includes("--dry-run");
   const REGION = arg("region", "us-west-2");
   const ONLY = arg("project");
   const api = process.env.GITHUB_API_URL || "https://api.github.com";
@@ -333,16 +368,32 @@ async function main() {
     },
   };
 
+  // Degraded signals roll up to the aggregate too — if any contributing repo
+  // undercounted, the workforce total is undercounted by construction.
+  const degradedProjects = results.filter((r) => r.degraded_signals?.length);
+  if (degradedProjects.length > 0) {
+    workforce.degraded_signals = [
+      ...new Set(degradedProjects.flatMap((r) => r.degraded_signals)),
+    ];
+  }
+
   let comment =
     "REAL data — GitHub-derived repository activity (issues/PRs opened+closed, code churn) " +
     "across every workforce project's repo. Built by workforce/scripts/build-repo-performance.mjs. " +
-    "This is a point-in-time snapshot (like build-pr-metrics-github.mjs before its daily-refresh " +
-    "wiring) — re-run periodically to refresh; it does not self-update.";
+    "This committed copy is a point-in-time snapshot used as the console's offline fallback; the " +
+    "LIVE copy is refreshed daily into PERF#{scope}/REPO by the performance-refresh Cadence and " +
+    "served by the agents-api /performance endpoint.";
   if (failed.length > 0) comment += ` INCOMPLETE this run: failed to fetch ${failed.join(", ")} — see stderr.`;
+  if (degradedProjects.length > 0) {
+    comment += ` DEGRADED signals this run: ${degradedProjects
+      .map((r) => `${r.scope}(${r.degraded_signals.join("/")})`)
+      .join(", ")} — those counts are undercounts, not real lows.`;
+  }
 
+  const generatedAt = new Date().toISOString();
   const dataset = {
     $comment: comment,
-    generated_at: new Date().toISOString(),
+    generated_at: generatedAt,
     days: DAYS,
     workforce,
     projects: Object.fromEntries(results.map((r) => [r.scope, r])),
@@ -352,9 +403,49 @@ async function main() {
     console.log(JSON.stringify(dataset, null, 2));
     return 0;
   }
-  writeFileSync(OUT, `${JSON.stringify(dataset, null, 2)}\n`);
-  console.error(`wrote ${results.length} project(s) -> ${OUT.replace(`${ROOT}/`, "")}`);
-  return failed.length > 0 ? 2 : 0;
+
+  if (WRITE) {
+    writeFileSync(OUT, `${JSON.stringify(dataset, null, 2)}\n`);
+    console.error(`wrote ${results.length} project(s) -> ${OUT.replace(`${ROOT}/`, "")}`);
+  }
+
+  if (PUBLISH_DDB) {
+    const { DynamoDBClient } = await importLambdaDep("@aws-sdk/client-dynamodb");
+    const { DynamoDBDocumentClient, PutCommand } = await importLambdaDep("@aws-sdk/lib-dynamodb");
+    const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }), {
+      marshallOptions: { removeUndefinedValues: true },
+    });
+    // One PERF#{scope}/REPO row per project, plus the `workforce` aggregate —
+    // the same per-scope shape the LIFECYCLE and PR rows already use, so the
+    // /performance endpoint reads it with no special-casing.
+    const rows = [
+      { scope: "workforce", body: workforce, repos: results.map((r) => r.scope).sort() },
+      ...results.map((r) => ({ scope: r.scope, body: r, repos: [r.scope] })),
+    ];
+    for (const { scope, body, repos } of rows) {
+      await ddb.send(
+        new PutCommand({
+          TableName: TABLE,
+          Item: {
+            pk: `PERF#${scope}`,
+            sk: "REPO",
+            scope,
+            updated_at: generatedAt,
+            window: body.window,
+            issues_daily: body.issues_daily,
+            prs_daily: body.prs_daily,
+            code_churn_weekly: body.code_churn_weekly,
+            summary: body.summary,
+            repos,
+            ...(body.degraded_signals?.length ? { degraded_signals: body.degraded_signals } : {}),
+          },
+        }),
+      );
+    }
+    console.error(`published ${rows.length} PERF#{scope}/REPO row(s) to ${TABLE}`);
+  }
+
+  return failed.length > 0 || degradedProjects.length > 0 ? 2 : 0;
 }
 
 if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {

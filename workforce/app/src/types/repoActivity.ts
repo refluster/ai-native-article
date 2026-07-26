@@ -46,6 +46,11 @@ export interface RepoActivitySeries {
   prs_daily: RepoDailyPoint[];
   code_churn_weekly: RepoWeeklyChurnPoint[];
   summary: RepoActivitySummary;
+  /** Signals that came back incomplete on the run that built this series (a
+   *  rate-limited search page, a code_frequency timeout). Present means the
+   *  matching counts are UNDERCOUNTS, not real lows — the console says so
+   *  rather than letting a degraded number read as measurement. */
+  degraded_signals?: string[];
 }
 
 /** The bundled snapshot: every project + the workforce-wide sum in one file. */
