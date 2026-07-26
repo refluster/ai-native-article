@@ -67,6 +67,61 @@
   }
 }
 
+/* ── Mobile edge-to-edge ────────────────────────────────────────────────
+   The console's page container carries a gutter (px-3) so prose and form
+   controls don't touch the bezel. List/feed cards want the opposite: on a
+   phone they should span the full viewport, LinkedIn-style, with the gutter
+   cancelled and the side borders + corner radius dropped so the card reads
+   as a full-width band. `wf-bleed-x` cancels exactly the mobile gutter;
+   from `sm` up it is inert and the card returns to its inset, rounded form.
+   Kept as plain CSS (not @layer utilities) so the media query survives
+   Tailwind's utility extraction. */
+.wf-bleed-x {
+  margin-left: -0.75rem;
+  margin-right: -0.75rem;
+}
+@media (min-width: 640px) {
+  .wf-bleed-x {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+/* ── Skeleton screens ───────────────────────────────────────────────────
+   One shimmering placeholder surface, used by components/Skeleton.tsx.
+   The base tone is the recessed `wf-surface-container` token; the sweep is
+   a white highlight travelling left→right. Motion is opt-out per the OS
+   reduced-motion setting — the static box still communicates "loading". */
+@keyframes wf-skeleton-sweep {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.wf-skeleton {
+  background-color: #eceeef;
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.7) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  /* Rounding is a Tailwind utility on the element (rounded-wf-sm /
+     rounded-full), NOT set here: this rule sits after the utilities layer,
+     so a border-radius here would win over `rounded-full` and turn every
+     skeleton avatar into a square. */
+  animation: wf-skeleton-sweep 1.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wf-skeleton {
+    animation: none;
+  }
+}
+
 /* SKILL.md rendered through react-markdown on the skill profile page.
    The workforce SPA doesn't pull in @tailwindcss/typography, so this is a
    hand-rolled minimum: GitHub-README-ish spacing, no styling ambition
