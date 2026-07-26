@@ -5,6 +5,8 @@ import {
   bucketByDate,
   buildDailyActivity,
   buildWeeklyChurn,
+  fetchCodeFrequency,
+  searchAll,
   sumDailyActivity,
   sumWeeklyChurn,
 } from "./build-repo-performance.mjs";
@@ -94,5 +96,46 @@ describe("sumWeeklyChurn", () => {
       { week_start: "2026-06-15", additions: 15, deletions: 3 },
       { week_start: "2026-06-22", additions: 7, deletions: 3 },
     ]);
+  });
+});
+
+// Failure-path coverage (`wf:hana` H3, 2026-07-24). These paths now carry real
+// semantics: since the refresh runs unattended daily, a swallowed rate-limit
+// error would write an undercount that is indistinguishable from a genuine
+// low-activity day. `partial` is the flag that keeps that visible.
+describe("searchAll (failure path)", () => {
+  it("returns partial:false and all items on a clean single page", async () => {
+    const gh = async () => ({ status: 200, json: { items: [{ id: 1 }, { id: 2 }] } });
+    expect(await searchAll(gh, "q")).toEqual({ items: [{ id: 1 }, { id: 2 }], partial: false });
+  });
+
+  it("flags partial:true and keeps the pages it did get when a page fails", async () => {
+    let call = 0;
+    const gh = async () => {
+      call += 1;
+      // page 1 full (forces a second page), page 2 rate-limited
+      if (call === 1) return { status: 200, json: { items: Array.from({ length: 100 }, (_, i) => ({ id: i })) } };
+      return { status: 403, json: { message: "rate limit" } };
+    };
+    const r = await searchAll(gh, "q");
+    expect(r.partial).toBe(true);
+    expect(r.items).toHaveLength(100);
+  });
+
+  it("flags partial:true with zero items when the very first page fails", async () => {
+    const gh = async () => ({ status: 403, json: { message: "rate limit" } });
+    expect(await searchAll(gh, "q")).toEqual({ items: [], partial: true });
+  });
+});
+
+describe("fetchCodeFrequency (failure path)", () => {
+  it("returns the weeks with partial:false on success", async () => {
+    const gh = async () => ({ status: 200, json: [[1000, 5, -2]] });
+    expect(await fetchCodeFrequency(gh, "o/r")).toEqual({ weeks: [[1000, 5, -2]], partial: false });
+  });
+
+  it("flags partial:true on an HTTP error instead of an empty-looking zero", async () => {
+    const gh = async () => ({ status: 404, json: {} });
+    expect(await fetchCodeFrequency(gh, "o/r")).toEqual({ weeks: [], partial: true });
   });
 });

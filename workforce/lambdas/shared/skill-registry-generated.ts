@@ -31,6 +31,7 @@ export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "ops-accountability-watch": ["github.token", "discord.webhook_url"] as const,
   "org-metrics-pulse": ["workforce.feed_write_token"] as const,
   "pdm-charter": [],
+  "performance-refresh": ["github.token", "workforce.feed_write_token"] as const,
   "podcast-publish": ["notion.integration_token", "github.token"] as const,
   "podcast-script": ["notion.integration_token"] as const,
   "positioning-write": [],
