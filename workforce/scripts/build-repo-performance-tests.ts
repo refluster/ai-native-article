@@ -139,3 +139,21 @@ describe("fetchCodeFrequency (failure path)", () => {
     expect(await fetchCodeFrequency(gh, "o/r")).toEqual({ weeks: [], partial: true });
   });
 });
+
+// Production regression 2026-07-26: the first published PERF#{scope}/REPO rows
+// carried 0 churn with NO degraded flag, while the same repos returned 13
+// populated weeks minutes later. GitHub serves 200-with-empty-array while its
+// stats cache is cold, which is indistinguishable from a churn-free repo — so
+// it must read as "unknown", not "zero". This is the same false-zero class as
+// H2, through a case the original fix did not cover.
+describe("fetchCodeFrequency (200-but-empty is degraded, not a real zero)", () => {
+  it("flags partial:true when GitHub returns 200 with an empty array", async () => {
+    const gh = async () => ({ status: 200, json: [] });
+    expect(await fetchCodeFrequency(gh, "o/r")).toEqual({ weeks: [], partial: true });
+  });
+
+  it("still reports partial:false when 200 carries real weeks", async () => {
+    const gh = async () => ({ status: 200, json: [[1000, 5, -2]] });
+    expect(await fetchCodeFrequency(gh, "o/r")).toEqual({ weeks: [[1000, 5, -2]], partial: false });
+  });
+});
