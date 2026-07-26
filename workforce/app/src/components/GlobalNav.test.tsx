@@ -11,7 +11,7 @@
 // destination appears in both surfaces and that the drawer mounts/unmounts.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, within } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, within, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('../lib/agents', () => ({
@@ -36,6 +36,9 @@ const DESTINATIONS = [
   'Performance',
 ]
 
+/** Matches MENU_ANIM_MS in GlobalNav.tsx. */
+const ANIM_MS = 200
+
 function renderNav(path = '/') {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -44,10 +47,22 @@ function renderNav(path = '/') {
   )
 }
 
+/** The drawer stays mounted through its exit transition, so every close
+ *  assertion has to let that transition finish first. */
+function flushExit() {
+  act(() => {
+    vi.advanceTimersByTime(ANIM_MS)
+  })
+}
+
 beforeEach(() => {
   document.body.style.overflow = ''
+  vi.useFakeTimers({ shouldAdvanceTime: true })
 })
-afterEach(cleanup)
+afterEach(() => {
+  vi.useRealTimers()
+  cleanup()
+})
 
 describe('GlobalNav', () => {
   it('renders every destination in the desktop row', () => {
@@ -82,6 +97,7 @@ describe('GlobalNav', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
     expect(document.body.style.overflow).toBe('hidden')
     fireEvent.keyDown(document, { key: 'Escape' })
+    flushExit()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(document.body.style.overflow).not.toBe('hidden')
   })
@@ -93,6 +109,61 @@ describe('GlobalNav', () => {
     const closers = screen.getAllByRole('button', { name: 'Close menu' })
     expect(closers.length).toBe(2)
     fireEvent.click(closers[0])
+    flushExit()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  // ── Open/close animation ────────────────────────────────────────────
+  // The drawer slides; the risk that introduces is a drawer that never
+  // finishes leaving (stuck mounted over the page) or one that unmounts
+  // instantly (no exit transition to see). Both are asserted here.
+
+  it('keeps the scroll lock held while the exit transition plays', () => {
+    renderNav()
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    // Mid-flight: still mounted, page still locked — otherwise the page
+    // lurches under a drawer that is visibly still on screen.
+    act(() => {
+      vi.advanceTimersByTime(ANIM_MS / 2)
+    })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(document.body.style.overflow).toBe('hidden')
+
+    flushExit()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('animates in from off-screen rather than appearing', () => {
+    renderNav()
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    const panel = screen.getByRole('dialog').lastElementChild as HTMLElement
+
+    // The panel must paint off-screen for one frame, or the browser has
+    // no start value to interpolate from and the drawer just pops in.
+    expect(panel.className).toContain('translate-x-full')
+    expect(panel.className).toContain('transition-transform')
+
+    act(() => {
+      vi.advanceTimersByTime(50) // let the queued rAF run
+    })
+    expect(panel.className).toContain('translate-x-0')
+  })
+
+  it('slides back out before unmounting', () => {
+    renderNav()
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    act(() => {
+      vi.advanceTimersByTime(50)
+    })
+    const panel = screen.getByRole('dialog').lastElementChild as HTMLElement
+    expect(panel.className).toContain('translate-x-0')
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    // Still mounted, but already travelling back off-screen.
+    expect(panel.className).toContain('translate-x-full')
+    flushExit()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
