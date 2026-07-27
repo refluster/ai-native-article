@@ -23,7 +23,13 @@
 //     /stats endpoint emits this window directly; the mock fallback is
 //     re-axised at render time so it never shows a stale date window).
 
-import { useEffect, useState } from 'react';
+//   - Progressive rendering (2026-07-26): the three reads (roster, /stats,
+//     skill registry) are independent and each section gates on only what it
+//     needs. The self-fetching analytics panels below start their own
+//     requests on the first frame instead of queueing behind a page-level
+//     Promise.all — which is where most of this page's time-to-content went.
+
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import WorkforceLayout from '../components/WorkforceLayout';
 import Typeplate from '../components/Typeplate';
@@ -33,12 +39,35 @@ import KPIReadout from '../components/KPIReadout';
 import HeatStrip, { intensityClass } from '../components/HeatStrip';
 import LiveTrace from '../components/LiveTrace';
 import PerformancePanels from '../components/PerformancePanels';
+import SkillCatalogueGrowthPanel from '../components/SkillCatalogueGrowthPanel';
+import DomainSkillMaturityPanel from '../components/DomainSkillMaturityPanel';
+import AgentCapabilityOnboardingPanel from '../components/AgentCapabilityOnboardingPanel';
+import RepoPerformancePanel from '../components/RepoPerformancePanel';
 import { WORKFORCE_SCOPE } from '../lib/performance';
+import {
+  Skeleton,
+  SkeletonKPIReadout,
+  SkeletonPanel,
+  SkeletonRosterRows,
+} from '../components/Skeleton';
 import { loadWorkforceManifest, loadWorkforceStats, fullName } from '../lib/agents';
+import { useAsync } from '../lib/useAsync';
+import { loadWorkforceSkills } from '../lib/skills';
+import {
+  buildClassifiedSkills,
+  computeAgentCapabilityOnboarding,
+  computeDomainMaturity,
+  computeSkillCatalogueGrowth,
+} from '../lib/skillGrowth';
 import { fmtDuration, fmtCompute } from '../lib/duration';
 import { SITE_DISPLAY_NAME } from '../config/site';
 import type { WorkforceAgentManifest } from '../types/agent';
 import type { AgentMockStats, WorkforceMockStats } from '../types/stats';
+import type { WorkforceSkill } from '../types/skill';
+
+// 3-month basis (operator request, 2026-07-24) — the SKILL GROWTH charts
+// match the Epic-016 decks' window below.
+const SKILL_GROWTH_DAYS = 90;
 
 // Zero-stats stand-in for personas the mock JSON hasn't been backfilled
 // for. Matches the synthesised placeholder used in the Crew table below so
@@ -67,46 +96,57 @@ function lastNDaysUTC(n: number): string[] {
 }
 
 export default function Dashboard() {
-  const [manifest, setManifest] = useState<WorkforceAgentManifest | null>(null);
-  const [stats, setStats] = useState<WorkforceMockStats | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     document.title = `${SITE_DISPLAY_NAME} — Performance`;
-    Promise.all([loadWorkforceManifest(), loadWorkforceStats()])
-      .then(([m, s]) => {
-        setManifest(m);
-        setStats(s);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
 
-  if (error) {
+  const manifestState = useAsync(() => loadWorkforceManifest(), []);
+  const statsState = useAsync(() => loadWorkforceStats(), []);
+  const skillsState = useAsync(() => loadWorkforceSkills(), []);
+
+  const manifest: WorkforceAgentManifest | null = manifestState.data;
+  const stats: WorkforceMockStats | null = statsState.data;
+  const skills: WorkforceSkill[] | null = skillsState.data;
+
+  // The roster is the page's spine — without it there is no dashboard. A
+  // /stats or skill-registry failure degrades its own section instead
+  // (still loud: each renders its own error line).
+  if (manifestState.error) {
     return (
       <WorkforceLayout>
-        <div className="font-wfmono text-sm text-wf-tertiary">Failed to load dashboard: {error}</div>
+        <div className="font-wfmono text-sm text-wf-tertiary">
+          Failed to load dashboard: {manifestState.error}
+        </div>
       </WorkforceLayout>
     );
   }
-  if (!manifest || !stats) {
-    return (
-      <WorkforceLayout>
-        <div className="font-wfmono text-xs uppercase tracking-[0.14em] text-wf-on-surface-variant">Loading…</div>
-      </WorkforceLayout>
-    );
-  }
+
+  // SKILL GROWTH (2026-07-24) — fully client-derived from the real skill +
+  // agent rosters already loaded above; see lib/skillGrowth.ts for the
+  // classification/derivation rules.
+  const classifiedSkills = skills ? buildClassifiedSkills(skills) : null;
+  const skillGrowthPoints = classifiedSkills
+    ? computeSkillCatalogueGrowth(classifiedSkills, SKILL_GROWTH_DAYS)
+    : null;
+  const domainMaturityPoints = classifiedSkills
+    ? computeDomainMaturity(classifiedSkills, SKILL_GROWTH_DAYS)
+    : null;
+  const onboardingPoints =
+    classifiedSkills && manifest
+      ? computeAgentCapabilityOnboarding(classifiedSkills, manifest.agents, SKILL_GROWTH_DAYS)
+      : null;
 
   // Per-agent rollup that synthesises paused-zero rows for personas the
   // ledger hasn't logged yet. Totals are re-aggregated from this so new
   // agents flip CREW LIVE / RUNS · MTD / AVG DUR immediately.
-  const rollup = manifest.agents.map((a) => {
-    const s = stats.agents[a.slug] ?? PAUSED_PLACEHOLDER;
+  const rollup = (manifest?.agents ?? []).map((a) => {
+    const s = stats?.agents[a.slug] ?? PAUSED_PLACEHOLDER;
     const status = deriveStatus({ paused: s.paused, archived: s.archived, last_run_status: s.last_run_status });
     return { agent: a, stats: s, status };
   });
 
-  const personaCount = manifest.agents.length;
-  const cronCount = manifest.agents.reduce(
+  const personaCount = manifest?.agents.length ?? 0;
+  const cronCount = (manifest?.agents ?? []).reduce(
     (acc, a) =>
       acc + a.bindings.filter((b) => b.trigger.scheduler === 'eventbridge' && b.trigger.cron).length,
     0,
@@ -127,7 +167,7 @@ export default function Dashboard() {
   // has no per-agent breakdown, so fall back to the totals block there.
   const delivMTD = rollup.some((r) => r.stats.deliv_this_month !== undefined)
     ? t.deliv_this_month
-    : stats.totals.deliv_count_this_month;
+    : stats?.totals.deliv_count_this_month ?? 0;
   // AVG DUR is the spend-proxy KPI: real run duration, not a fabricated
   // token/dollar figure (per-run usage isn't observable from the CCR path).
   const avgDurMTD = t.runs_this_month > 0 ? t.compute_seconds_this_month / t.runs_this_month : 0;
@@ -148,7 +188,9 @@ export default function Dashboard() {
 
   // 30-day window ending today. Bars stay illustrative until the live
   // activity endpoint exists; only the date axis is "real".
-  const activity = { ...stats.activity, days: lastNDaysUTC(stats.activity.days.length) };
+  const activity = stats
+    ? { ...stats.activity, days: lastNDaysUTC(stats.activity.days.length) }
+    : null;
 
   return (
     <WorkforceLayout subnavRight={subnavRight}>
@@ -156,7 +198,8 @@ export default function Dashboard() {
       <section className="mb-8 sm:mb-10">
         <Typeplate label="OVERVIEW" value="PERFORMANCE · OVERVIEW" className="mb-4" />
         <h1 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-[1.02] mb-3 text-wf-on-surface">
-          {personaCount} personas. One pipeline.<br className="hidden sm:block" /> Run state on a single readout.
+          {manifest ? `${personaCount} personas.` : 'The workforce.'} One pipeline.
+          <br className="hidden sm:block" /> Run state on a single readout.
         </h1>
         <p className="text-wf-on-surface-variant max-w-prose text-sm sm:text-base leading-relaxed">
           The crew is on individual cron schedules. {t.agents_throwing > 0 && (
@@ -170,34 +213,113 @@ export default function Dashboard() {
 
       {/* KPIs ---------------------------------------------------------- */}
       <section className="mb-8 sm:mb-10">
-        <KPIReadout items={kpis} />
+        {manifest && stats ? <KPIReadout items={kpis} /> : <SkeletonKPIReadout />}
+        {statsState.error && (
+          <p className="mt-2 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary">
+            /stats unavailable: {statsState.error}
+          </p>
+        )}
       </section>
 
       {/* TWO-COLUMN: heat strip + live trace --------------------------- */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 sm:mb-10">
-        <div className="lg:col-span-2 border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
-          <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
-            <Typeplate label="HEAT · 30D" value="WORKFORCE TOTAL" />
-            <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-              {activity.days[0]} → {activity.days[activity.days.length - 1]}
-            </span>
-          </div>
-          <div className="p-4">
-            <HeatStrip activity={activity} />
-            <div className="mt-3 flex items-center gap-3 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-              <span>less</span>
-              {[0, 1, 2, 3, 4, 5].map((v) => (
-                <span key={v} className={`w-3 h-3 inline-block ${intensityClass(v)}`} />
-              ))}
-              <span>more</span>
+        {activity && stats ? (
+          <>
+            <div className="lg:col-span-2 border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
+              <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
+                <Typeplate label="HEAT · 30D" value="WORKFORCE TOTAL" />
+                <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+                  {activity.days[0]} → {activity.days[activity.days.length - 1]}
+                </span>
+              </div>
+              <div className="p-4">
+                <HeatStrip activity={activity} />
+                <div className="mt-3 flex items-center gap-3 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+                  <span>less</span>
+                  {[0, 1, 2, 3, 4, 5].map((v) => (
+                    <span key={v} className={`w-3 h-3 inline-block ${intensityClass(v)}`} />
+                  ))}
+                  <span>more</span>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <LiveTrace runs={stats.recent_runs} className="lg:col-span-1" />
+            <LiveTrace runs={stats.recent_runs} className="lg:col-span-1" />
+          </>
+        ) : (
+          <>
+            <div className="lg:col-span-2">
+              <SkeletonPanel label="Loading 30-day activity" lines={4} />
+            </div>
+            <div className="lg:col-span-1">
+              <SkeletonPanel label="Loading live trace" lines={5} />
+            </div>
+          </>
+        )}
+      </section>
+
+      {/* PERFORMANCE ANALYTICS (Epic-016) ----------------------------- */}
+      <section className="mb-8 sm:mb-10">
+        <div className="mb-3">
+          <Typeplate label="ANALYTICS" value="PERFORMANCE · ANALYTICS" />
+          <p className="mt-1 text-sm text-wf-on-surface-variant max-w-prose leading-relaxed">
+            The workforce as one organism: is hiring converting into delivered
+            output, and is the delivery process shedding its humans?
+          </p>
+        </div>
+        <PerformancePanels scope={WORKFORCE_SCOPE} />
+      </section>
+
+      {/* SKILL GROWTH (2026-07-24 operator request) -------------------- */}
+      <section className="mb-8 sm:mb-10">
+        <div className="mb-3">
+          <Typeplate label="SKILL GROWTH" value="CATALOGUE · MATURITY · ONBOARDING" />
+          <p className="mt-1 text-sm text-wf-on-surface-variant max-w-prose leading-relaxed">
+            Is the skill catalogue itself growing, and is it maturing — domain
+            skills climbing the Dreyfus ladder, agent-capability skills
+            actually reaching deployed?
+          </p>
+        </div>
+        <div className="space-y-6 sm:space-y-8">
+          {skillsState.error && (
+            <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary">
+              skill registry unavailable: {skillsState.error}
+            </p>
+          )}
+          {skillGrowthPoints && domainMaturityPoints && onboardingPoints ? (
+            <>
+              <SkillCatalogueGrowthPanel points={skillGrowthPoints} />
+              <DomainSkillMaturityPanel points={domainMaturityPoints} />
+              <AgentCapabilityOnboardingPanel points={onboardingPoints} />
+            </>
+          ) : (
+            !skillsState.error && (
+              <>
+                <SkeletonPanel label="Loading skill-catalogue growth" lines={5} />
+                <SkeletonPanel label="Loading domain-skill maturity" lines={5} />
+                <SkeletonPanel label="Loading capability onboarding" lines={5} />
+              </>
+            )
+          )}
+        </div>
+      </section>
+
+      {/* REPOSITORY PERFORMANCE (2026-07-24 operator request) ---------- */}
+      <section className="mb-8 sm:mb-10">
+        <div className="mb-3">
+          <Typeplate label="REPOSITORY" value="REPOSITORY PERFORMANCE" />
+          <p className="mt-1 text-sm text-wf-on-surface-variant max-w-prose leading-relaxed">
+            Issue and PR throughput, plus code churn, summed across every
+            workforce project's repo.
+          </p>
+        </div>
+        <RepoPerformancePanel />
       </section>
 
       {/* CREW TABLE --------------------------------------------------- */}
+      {/* Ordered after the analytics decks (operator request, 2026-07-26):
+          the aggregate reads come first, the per-agent roster detail is the
+          drill-down you scroll to. */}
       <section className="mb-8 sm:mb-10">
         <div className="flex items-end justify-between mb-3">
           <Typeplate label="CREW" value="CREW · LIVE STATE" />
@@ -209,7 +331,10 @@ export default function Dashboard() {
           </Link>
         </div>
 
-        <div className="border border-wf-outline-variant rounded-wf-md overflow-hidden bg-wf-surface-container-lo">
+        {!manifest ? (
+          <SkeletonRosterRows rows={6} />
+        ) : (
+        <div className="wf-bleed-x border-y sm:border border-wf-outline-variant rounded-none sm:rounded-wf-md sm:overflow-hidden bg-wf-surface-container-lo">
           {/* Desktop: table. Mobile: stacked cards. Rows reuse the
               `rollup` we already aggregated for the headline KPIs so a
               newly added persona renders here even before the mock JSON
@@ -258,23 +383,16 @@ export default function Dashboard() {
             })}
           </ul>
         </div>
+        )}
       </section>
 
-      {/* PERFORMANCE ANALYTICS (Epic-016) ----------------------------- */}
-      <section className="mb-8 sm:mb-10">
-        <div className="mb-3">
-          <Typeplate label="ANALYTICS" value="PERFORMANCE · ANALYTICS" />
-          <p className="mt-1 text-sm text-wf-on-surface-variant max-w-prose leading-relaxed">
-            The workforce as one organism: is hiring converting into delivered
-            output, and is the delivery process shedding its humans?
-          </p>
-        </div>
-        <PerformancePanels scope={WORKFORCE_SCOPE} />
-      </section>
-
-      <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-        manifest @ {new Date(manifest.generated_at).toISOString().slice(0, 16)}Z · stats @ {new Date(stats.generated_at).toISOString().slice(0, 16)}Z
-      </p>
+      {manifest && stats ? (
+        <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+          manifest @ {new Date(manifest.generated_at).toISOString().slice(0, 16)}Z · stats @ {new Date(stats.generated_at).toISOString().slice(0, 16)}Z
+        </p>
+      ) : (
+        <Skeleton className="h-3 w-72 max-w-full" />
+      )}
     </WorkforceLayout>
   );
 }

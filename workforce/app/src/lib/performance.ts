@@ -114,7 +114,9 @@ function rng(seed: number): () => number {
   };
 }
 
-const DAYS = 28;
+// 3-month basis (operator request, 2026-07-24) — every graph on /performance,
+// live/mock/synthesized alike, now windows to the trailing 90 days.
+const DAYS = 90;
 
 function synthesizeSeries(scopeId: string): PerformanceSeries {
   const days = lastNDaysUTC(DAYS);
@@ -189,7 +191,13 @@ export async function loadPerformance(scope: PerformanceScope): Promise<Performa
         : `${WORKFORCE_AGENTS_API_BASE}/projects/${encodeProjectId(scope.id)}/performance`;
     try {
       const res = await fetch(url);
-      if (res.ok) return { series: (await res.json()) as PerformanceSeries, source: 'live' };
+      // Re-axis the live series too, not just the mock fallback below. Epic-016's
+      // reducer redeploy + daily PR refresh (OP-011/OP-012) are still unwired, so
+      // the live endpoint can serve a window frozen at its last backfill — which
+      // read as "the graph's dates never update" (operator report, 2026-07-24).
+      // Until the backend catches up, the frontend keeps the displayed window
+      // honestly current: same days-ending-today remap the mock path already got.
+      if (res.ok) return { series: reaxis((await res.json()) as PerformanceSeries), source: 'live' };
       console.warn(`performance: live endpoint ${url} -> HTTP ${res.status}; serving illustrative data`);
     } catch (err) {
       console.warn(
