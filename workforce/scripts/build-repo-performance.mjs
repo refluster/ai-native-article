@@ -238,11 +238,24 @@ export async function searchAll(gh, q) {
 
 /** Returns { weeks, partial } — same contract as searchAll: a stats-cache
  *  timeout or HTTP error yields partial:true rather than an empty array that
- *  reads as "this repo had zero churn". */
+ *  reads as "this repo had zero churn".
+ *
+ *  `200` with an EMPTY array counts as degraded, not as a real zero. GitHub
+ *  serves that while its stats cache is cold (it more often 202s, but not
+ *  always), and it is indistinguishable from a genuinely churn-free repo — so
+ *  the honest read is "unknown", not "zero". Observed in production
+ *  2026-07-26: the first published REPO rows carried 0 churn with no degraded
+ *  flag while the same repos returned 13 populated weeks minutes later. */
 export async function fetchCodeFrequency(gh, repo) {
   for (let attempt = 0; attempt < 6; attempt++) {
     const r = await gh(`/repos/${repo}/stats/code_frequency`);
-    if (r.status === 200 && Array.isArray(r.json)) return { weeks: r.json, partial: false };
+    if (r.status === 200 && Array.isArray(r.json)) {
+      if (r.json.length === 0) {
+        console.error(`${repo}: code_frequency -> 200 but empty (cold stats cache); churn marked degraded`);
+        return { weeks: [], partial: true };
+      }
+      return { weeks: r.json, partial: false };
+    }
     if (r.status === 202) {
       // GitHub is still computing the stats cache — retry with backoff.
       await sleep(2500);
