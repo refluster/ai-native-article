@@ -38,11 +38,11 @@
  * --dry-run it prints the item instead of putting it.
  */
 
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { assertPerfProvenance, measuredZeroSignals, prSignals } from './perf-provenance.mjs';
+import { assertPerfProvenance, gitPrProvenance, prSignals, windowCovered } from './perf-provenance.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MOCK = join(ROOT, 'workforce/app/public/workforce-mock-performance.json');
@@ -186,28 +186,25 @@ const block = {
 // returns an empty list that looks exactly like a quiet month. That is the same
 // no-data-vs-data-showing-none conflation as #498/#503, on a third path. Mark
 // the git-derived signals unknown when the clone cannot cover the window.
-// Coverage, not shallowness, is the honest test: a clone reaching back past
-// the window start can answer the question whichever way `git clone --depth`
-// was called. If nothing reachable predates `sinceIso`, the window is
-// truncated and every derived count is an undercount — the same `partial`
-// semantics searchAll already uses in build-repo-performance.mjs.
-const windowCovered = (() => {
-  try {
-    return execSync(`git rev-list -1 --before=${sinceIso} ${BRANCH}`, { cwd: ROOT, encoding: 'utf8' }).trim() !== '';
-  } catch {
-    return false; // cannot tell -> unknown, never a measured zero
-  }
-})();
-if (!windowCovered) {
-  block.degraded_signals = ['total_prs', 'autopilot_merged', 'total_additions', 'total_deletions'];
+// Both the coverage probe and the derivation live in perf-provenance.mjs so a
+// test can drive each branch (cycle-1 `wf:owen` O2) — this file executes at
+// import time, so nothing exported from it would be reachable from a test.
+const covered = windowCovered(
+  (file, args) => execFileSync(file, args, { cwd: ROOT, encoding: 'utf8' }),
+  { sinceIso, branch: BRANCH },
+);
+if (!covered) {
   console.error(
     `WARN git history does not reach ${sinceIso} (shallow or new clone) — the ${DAYS}d PR signals are undercounts, marked degraded rather than published as real lows`,
   );
 }
-block.measured_zero = measuredZeroSignals(
-  prSignals(block.pr_summary),
-  Object.fromEntries((block.degraded_signals ?? []).map((s) => [s, true])),
-);
+{
+  const { degraded_signals, measured_zero } = gitPrProvenance(block.pr_summary, {
+    windowCovered: covered,
+  });
+  if (degraded_signals.length > 0) block.degraded_signals = degraded_signals;
+  block.measured_zero = measured_zero;
+}
 
 console.error(
   `derived ${totals.prs} PRs over ${DAYS}d (${block.window.start}→${block.window.end}); ` +

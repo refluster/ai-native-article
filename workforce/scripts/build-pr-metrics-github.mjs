@@ -30,7 +30,7 @@
 //     --repo PSVL/asp-cloud --scope asp-cloud [--days 28] \
 //     [--publish-ddb --table wf-table-prod] [--dry-run]
 
-import { assertPerfProvenance, measuredZeroSignals, prSignals } from "./perf-provenance.mjs";
+import { assertPerfProvenance, githubPrProvenance, prSignals } from "./perf-provenance.mjs";
 
 const GREEN_MARKER_RE = /<!--\s*autopilot:review:[a-z0-9-]+:green\s*-->/i;
 const REVIEWER_SLUG_RE = /<!--\s*autopilot:review:([a-z0-9-]+):green\s*-->/gi;
@@ -273,7 +273,18 @@ async function main() {
   }
 
   // 2. per PR: churn + merged_at + author + the autopilot signal.
+  //
+  // Unlike the three Search loops above, this fan-out is NOT fail-closed: a
+  // non-200 degrades `detail.json` to `{}` (so `additions`/`deletions` fall to
+  // 0) and the comment/review arrays to `[]` (so classifyPr sees no green
+  // marker and reclassifies an autopilot merge as human-involved). At 3
+  // requests per merged PR with no throttle, a secondary-rate-limit 403 partway
+  // through is the realistic case, and it produces `total_prs: 42,
+  // total_additions: 0` — exactly #503's shape. Record it as provenance rather
+  // than letting the aggregate present an undercount as a real number
+  // (cycle-1 `wf:ren` R1).
   const prs = [];
+  let prFetchPartial = false;
   for (const it of merged) {
     const n = it.number;
     const [detail, comments, reviews] = await Promise.all([
@@ -281,6 +292,13 @@ async function main() {
       gh(`/repos/${repo}/issues/${n}/comments?per_page=100`),
       gh(`/repos/${repo}/pulls/${n}/reviews?per_page=100`),
     ]);
+    if (detail.status !== 200 || comments.status !== 200 || reviews.status !== 200) {
+      console.error(
+        `PR #${n}: fan-out incomplete (detail ${detail.status}, comments ${comments.status}, ` +
+          `reviews ${reviews.status}) — churn + autopilot signals marked degraded for this window`,
+      );
+      prFetchPartial = true;
+    }
     const p = detail.json || {};
     const bodies = [
       ...(Array.isArray(comments.json) ? comments.json.map((c) => c.body) : []),
@@ -299,15 +317,17 @@ async function main() {
   }
 
   const block = aggregate(prs, { sinceIso });
-  // #505 provenance: every fetch on this path is fail-closed — a non-200 from
-  // any of the three searches returns 3 above rather than falling through with
-  // a short list — so reaching here means the searches really did return what
-  // they returned, and a zero here is a measured zero. That reasoning is the
-  // provenance; it is recorded on the row rather than left in this comment.
-  // If a future fetch on this path CAN come back partial, it must feed a
-  // `partial` flag in here, or the writer guard will refuse its zeros.
-  const prPartialBySignal = {};
-  block.measured_zero = measuredZeroSignals(prSignals(block.pr_summary), prPartialBySignal);
+  // #505 provenance, derived from the fetch bookkeeping above rather than
+  // asserted in prose. `githubPrProvenance` is the testable seam: the previous
+  // hardcoded empty map made the writer guard structurally unable to refuse
+  // anything on this path (cycle-1 D1/R1/N1).
+  {
+    const { degraded_signals, measured_zero } = githubPrProvenance(block.pr_summary, {
+      prFetchPartial,
+    });
+    if (degraded_signals.length > 0) block.degraded_signals = degraded_signals;
+    block.measured_zero = measured_zero;
+  }
   // Epic-019: the escalation-reason funnel lives on the same PERF#{scope}/PR
   // item (R-N2: no new store), inside pr_summary — as does the Story-2c
   // flaky-rerun roll-up (warn is print-only, not stored).

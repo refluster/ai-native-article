@@ -8,10 +8,13 @@ import { describe, it, expect } from "vitest";
 import {
   PerfProvenanceError,
   assertPerfProvenance,
+  gitPrProvenance,
+  githubPrProvenance,
   measuredZeroSignals,
   prSignals,
   repoSignals,
   unprovenancedZeros,
+  windowCovered,
 } from "./perf-provenance.mjs";
 
 describe("unprovenancedZeros", () => {
@@ -194,6 +197,173 @@ describe("end-to-end: the #503 row, before and after its fix", () => {
         metrics: repoSignals(summary),
         degraded_signals: [],
         measured_zero: ["code_churn"],
+      }),
+    ).not.toThrow();
+  });
+});
+
+// ── Call-site derivations ────────────────────────────────────────────────────
+// Cycle-1 review (`wf:owen` O1): the cases above all target the predicate, and
+// the predicate was never the bug. #498 and #503 were defects in what a caller
+// handed the predicate — and cycle 1 shipped a third instance of exactly that
+// class (`prPartialBySignal = {}`), which no predicate test could see, because
+// from the module's side an empty map is a valid argument handled correctly.
+// These exercise the derivations instead. The `githubPrProvenance` block below
+// FAILS against cycle-1's code: that is the point.
+
+describe("githubPrProvenance — the /PR GitHub-metadata writer", () => {
+  const summary = (over = {}) => ({
+    total_prs: 42,
+    autopilot_merged: 0,
+    total_additions: 0,
+    total_deletions: 0,
+    ...over,
+  });
+
+  // Catches: the cycle-1 defect at build-pr-metrics-github.mjs:306 —
+  // `const prPartialBySignal = {}` classified every zero as a measured zero,
+  // so assertPerfProvenance had nothing left to refuse and the guard was
+  // structurally unable to fire on this path (`wf:dario` D1 / `wf:nadia` N1).
+  it("does NOT call a zero measured when the per-PR fan-out came back partial", () => {
+    const { measured_zero } = githubPrProvenance(summary(), { prFetchPartial: true });
+    expect(measured_zero).toEqual([]);
+  });
+
+  // Catches: `wf:ren`'s R1 failure mode — a 403 partway through the fan-out
+  // yields `total_prs: 42, total_additions: 0`, literally #503's shape. The
+  // fan-out-derived signals must be named as degraded so the row reads as
+  // "unknown" on the deck rather than as a real low.
+  it("degrades exactly the fan-out-derived signals, leaving total_prs clean", () => {
+    const { degraded_signals } = githubPrProvenance(summary(), { prFetchPartial: true });
+    expect(degraded_signals).toEqual(["autopilot_merged", "total_additions", "total_deletions"]);
+    expect(degraded_signals).not.toContain("total_prs");
+  });
+
+  // Catches: a regression that over-corrects into blanket-degrading — the
+  // other way teams route around the guard (`wf:dario`'s #505 caveat). A clean
+  // fan-out must still get the measured-zero path for free.
+  it("keeps measured_zero free when the fan-out completed", () => {
+    const { degraded_signals, measured_zero } = githubPrProvenance(summary(), {
+      prFetchPartial: false,
+    });
+    expect(degraded_signals).toEqual([]);
+    expect(measured_zero).toEqual(["autopilot_merged", "total_additions", "total_deletions"]);
+  });
+
+  // Catches: a partial fetch on a row with no zeros at all being silently
+  // dropped — the undercount is still an undercount when the number is > 0.
+  it("still reports degraded signals on a fully-populated partial row", () => {
+    const { degraded_signals, measured_zero } = githubPrProvenance(
+      summary({ autopilot_merged: 7, total_additions: 900, total_deletions: 120 }),
+      { prFetchPartial: true },
+    );
+    expect(degraded_signals).toEqual(["autopilot_merged", "total_additions", "total_deletions"]);
+    expect(measured_zero).toEqual([]);
+  });
+
+  // Catches: the end-to-end contract — a partial fan-out row must survive the
+  // writer guard as an honest unknown rather than throwing or lying.
+  it("produces a row the writer guard accepts as unknown, not as a real low", () => {
+    const pr_summary = summary();
+    const { degraded_signals, measured_zero } = githubPrProvenance(pr_summary, {
+      prFetchPartial: true,
+    });
+    expect(() =>
+      assertPerfProvenance({
+        pk: "PERF#workforce",
+        sk: "PR",
+        metrics: prSignals(pr_summary),
+        degraded_signals,
+        measured_zero,
+      }),
+    ).not.toThrow();
+  });
+});
+
+describe("windowCovered — the git-derived writer's coverage probe", () => {
+  // Catches: reintroducing a shell-string interpolation of BRANCH
+  // (`wf:ren` R2). argv form means a branch name with a space is passed as one
+  // argument and fails honestly, instead of resolving to a different command
+  // that throws into the catch and lands on "degraded" by accident.
+  it("passes the branch as a single argv entry, never a shell string", () => {
+    const calls: Array<[string, string[]]> = [];
+    windowCovered(
+      (file, args) => {
+        calls.push([file, args]);
+        return "abc123\n";
+      },
+      { sinceIso: "2026-06-27", branch: "release branch" },
+    );
+    expect(calls).toEqual([
+      ["git", ["rev-list", "-1", "--before=2026-06-27", "release branch"]],
+    ]);
+  });
+
+  it("reports covered when a commit predates the window start", () => {
+    expect(windowCovered(() => "abc123\n", { sinceIso: "2026-06-27", branch: "main" })).toBe(true);
+  });
+
+  // Catches: a shallow clone (CI's `fetch-depth: 1`) reading as a quiet month.
+  it("reports uncovered when nothing reachable predates the window start", () => {
+    expect(windowCovered(() => "\n", { sinceIso: "2026-06-27", branch: "main" })).toBe(false);
+  });
+
+  // Catches: "cannot tell" being optimistically treated as covered — the most
+  // important sentence in the module, previously guaranteed only by a comment.
+  it("treats a throwing probe as uncovered, never as a measured zero", () => {
+    expect(
+      windowCovered(
+        () => {
+          throw new Error("fatal: bad revision");
+        },
+        { sinceIso: "2026-06-27", branch: "main" },
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("gitPrProvenance — the /PR git-derived writer", () => {
+  const quiet = {
+    total_prs: 0,
+    autopilot_merged: 0,
+    total_additions: 0,
+    total_deletions: 0,
+  };
+
+  // Catches: the third instance of the class found while wiring cycle 1 — a
+  // truncated clone publishing four zeros as a real month. These are the two
+  // rows of the PR body's hand-verified table, now pinned.
+  it("marks every git-derived signal degraded when the window is truncated", () => {
+    const { degraded_signals, measured_zero } = gitPrProvenance(quiet, { windowCovered: false });
+    expect(degraded_signals).toEqual([
+      "autopilot_merged",
+      "total_additions",
+      "total_deletions",
+      "total_prs",
+    ]);
+    expect(measured_zero).toEqual([]);
+  });
+
+  it("measures its zeros when the history covers the window", () => {
+    const { degraded_signals, measured_zero } = gitPrProvenance(
+      { ...quiet, total_prs: 31, total_additions: 4200, total_deletions: 900 },
+      { windowCovered: true },
+    );
+    expect(degraded_signals).toEqual([]);
+    expect(measured_zero).toEqual(["autopilot_merged"]);
+  });
+
+  // Catches: a truncated-window row being refused outright instead of
+  // published as an honest unknown (fail-loud must not mean fail-always).
+  it("produces a row the writer guard accepts when the window is truncated", () => {
+    const { degraded_signals, measured_zero } = gitPrProvenance(quiet, { windowCovered: false });
+    expect(() =>
+      assertPerfProvenance({
+        pk: "PERF#workforce",
+        sk: "PR",
+        metrics: prSignals(quiet),
+        degraded_signals,
+        measured_zero,
       }),
     ).not.toThrow();
   });

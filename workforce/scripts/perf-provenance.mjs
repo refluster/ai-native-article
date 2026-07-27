@@ -125,3 +125,100 @@ export function prSignals(pr_summary) {
     total_deletions: pr_summary.total_deletions,
   };
 }
+
+// ── Per-writer provenance derivations ────────────────────────────────────────
+// Cycle-1 review (`wf:owen` O1): every test targeted the predicate, while both
+// shipped defects (#498, #503) lived in what a *caller* handed the predicate.
+// A derivation that stays inline in a builder's `main()` cannot be driven by a
+// test, so it is asserted by the diff and by nothing else. These functions are
+// that derivation, lifted out so each call site is testable — the refactor is
+// the test more than the assertion is.
+
+/**
+ * `PERF#{scope}/PR` provenance for the **GitHub-metadata** builder
+ * (`build-pr-metrics-github.mjs`).
+ *
+ * Cycle-1 review (`wf:dario` D1 / `wf:ren` R1 / `wf:nadia` N1): this path
+ * previously handed the guard a hardcoded empty `partialBySignal`, which
+ * stamped every zero as a measured zero and left the assertion with nothing to
+ * refuse — routing around the guard by blanket-*measuring*, which is worse than
+ * the blanket-degrading D1 predicted on #505, because a degraded row at least
+ * renders as "unknown" instead of as a real low.
+ *
+ * The premise that empty map rested on ("every fetch on this path is
+ * fail-closed") is true of the three Search loops — each returns non-zero on a
+ * non-200 — and false of the per-PR fan-out, whose three unchecked GETs degrade
+ * to `{}` / `[]` on a 403 and contribute `0/0` churn plus a misclassified
+ * autopilot flag. So the fan-out's status is threaded in here instead.
+ *
+ * @param {object} pr_summary                    the aggregated `/PR` roll-up
+ * @param {object} [opts]
+ * @param {boolean} [opts.prFetchPartial]  a per-PR fan-out GET came back non-200
+ * @returns {{ degraded_signals: string[], measured_zero: string[] }}
+ */
+export function githubPrProvenance(pr_summary, { prFetchPartial = false } = {}) {
+  // `total_prs` legitimately stays clean: it is the length of the merged-PR
+  // Search result, and that loop is genuinely fail-closed. The other three are
+  // all derived from the fan-out, so they inherit its provenance — churn
+  // directly, `autopilot_merged` via classifyPr's comment/review bodies.
+  const partialBySignal = {
+    total_prs: false,
+    autopilot_merged: prFetchPartial,
+    total_additions: prFetchPartial,
+    total_deletions: prFetchPartial,
+  };
+  return {
+    degraded_signals: Object.entries(partialBySignal)
+      .filter(([, partial]) => partial)
+      .map(([signal]) => signal)
+      .sort(),
+    measured_zero: measuredZeroSignals(prSignals(pr_summary), partialBySignal),
+  };
+}
+
+/**
+ * Does the local clone's history reach back past the window start?
+ *
+ * git is authoritative for the commits it HAS — but a shallow clone (CI's
+ * default `fetch-depth: 1`) has almost none, so `git log --since` returns an
+ * empty list indistinguishable from a quiet month. Coverage, not shallowness,
+ * is the honest test: a clone reaching back past `sinceIso` can answer the
+ * question whichever way `git clone --depth` was called.
+ *
+ * `exec` is injected (cycle-1 `wf:owen` O2) so both branches are drivable from
+ * a test — the builder passes a real `execFileSync`. Argv-array form, not a
+ * shell string (cycle-1 `wf:ren` R2): the previous template interpolated
+ * `BRANCH` (from argv) unquoted, so a value containing a space resolved to a
+ * different command, threw, and landed in the `catch` — arriving at
+ * "degraded" by accident rather than by measurement.
+ *
+ * @param {(file: string, args: string[]) => string} exec  runs git, returns stdout
+ * @param {{ sinceIso: string, branch: string }} args
+ * @returns {boolean} false when the window is truncated OR undeterminable
+ */
+export function windowCovered(exec, { sinceIso, branch }) {
+  try {
+    return String(exec("git", ["rev-list", "-1", `--before=${sinceIso}`, branch])).trim() !== "";
+  } catch {
+    return false; // cannot tell -> unknown, and an unknown is never a measured zero
+  }
+}
+
+/**
+ * `PERF#{scope}/PR` provenance for the **git-derived** builder
+ * (`build-pr-metrics.mjs`). Every signal it derives comes from the same
+ * `git log --since` walk, so they share one provenance: the window either is
+ * covered or it isn't.
+ *
+ * @param {object} pr_summary
+ * @param {{ windowCovered: boolean }} args
+ */
+export function gitPrProvenance(pr_summary, { windowCovered: covered }) {
+  const partialBySignal = Object.fromEntries(
+    Object.keys(prSignals(pr_summary)).map((signal) => [signal, !covered]),
+  );
+  return {
+    degraded_signals: covered ? [] : Object.keys(partialBySignal).sort(),
+    measured_zero: measuredZeroSignals(prSignals(pr_summary), partialBySignal),
+  };
+}
