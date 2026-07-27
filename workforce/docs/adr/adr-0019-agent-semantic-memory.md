@@ -1,6 +1,6 @@
 # ADR-0019 — Agent semantic memory: a curated MEMORY.md on the META row, injected at every fire
 
-- **Status**: Proposed (operator ratifies by merging the implementation PR)
+- **Status**: Accepted (ratified by merging implementation PR #447; status reconciled 2026-07-11 by backlog-reconcile — pending operator confirmation)
 - **Date**: 2026-07-07
 - **Deciders**: operator (refluster), drafted by a Claude Code session on the operator's direction (「MEMORY.mdで平文で管理」「MVVを継続的に追い求める前提」「意味レベルで記憶」「他のエージェントにも同様に適用」)
 - **Related**: [ADR-0007](adr-0007-agent-config-single-source.md) (the single write path this rides), [ADR-0002](adr-0002-no-dedicated-vector-store.md) (recall stays lexical/structural), [Epic-012](../epics/epic-012-agent-experience.md) (the episodic chunk layer), [Epic-018](../epics/epic-018-semantic-memory-curation.md) (the rollout this decision enables)
