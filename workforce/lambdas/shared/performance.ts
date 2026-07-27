@@ -73,6 +73,53 @@ export interface PrSummary {
   escalation_reasons?: Record<string, number>;
 }
 
+// ── repository activity (Metric 4, 2026-07-26) ───────────────────────────────
+// Issues/PRs opened+closed and code-line churn per tracked GitHub repo, built
+// by workforce/scripts/build-repo-performance.mjs. Mirrors
+// workforce/app/src/types/repoActivity.ts. Unlike the PR block (which measures
+// the autopilot merge split on THIS repo), this measures raw repository
+// throughput across EVERY workforce project's repo.
+
+export interface RepoDailyPoint {
+  /** UTC day, YYYY-MM-DD. */
+  date: string;
+  opened: number;
+  closed: number;
+}
+
+/** Code churn is weekly — GitHub's `stats/code_frequency` is weekly-bucketed. */
+export interface RepoWeeklyChurnPoint {
+  /** UTC week start (Sunday), YYYY-MM-DD. */
+  week_start: string;
+  additions: number;
+  deletions: number;
+}
+
+export interface RepoActivitySummary {
+  issues_opened: number;
+  issues_closed: number;
+  prs_opened: number;
+  prs_closed: number;
+  total_additions: number;
+  total_deletions: number;
+}
+
+/** One scope's repository activity, as served inside a PerformanceSeries. */
+export interface RepoActivityBlock {
+  window: { start: string; end: string };
+  issues_daily: RepoDailyPoint[];
+  prs_daily: RepoDailyPoint[];
+  code_churn_weekly: RepoWeeklyChurnPoint[];
+  summary: RepoActivitySummary;
+  /** For the workforce aggregate: the project scopes that contributed. A
+   *  project scope carries just its own id. Lets the console name the tracked
+   *  repos without a second round-trip. */
+  repos: string[];
+  /** ISO timestamp of the refresh that produced this block — the console
+   *  renders it so a frozen refresh is visible, never cosmetically hidden. */
+  updated_at: string;
+}
+
 /** One scope's full performance series (workforce or a single project) —
  *  the JSON body GET /performance and GET /projects/{id}/performance emit. */
 export interface PerformanceSeries {
@@ -83,6 +130,9 @@ export interface PerformanceSeries {
   pr_daily: PrDailyPoint[];
   pr_summary: PrSummary;
   pr_contributors: PrContributor[];
+  /** Absent until this scope's first repo-activity refresh lands; the client
+   *  falls back to its bundled snapshot when missing. */
+  repo?: RepoActivityBlock;
 }
 
 // ── roll-up item shapes (DDB) ─────────────────────────────────────────────────
@@ -93,16 +143,23 @@ export interface PerformanceSeries {
 //   pk = PERF#{scope}   sk = LIFECYCLE   — reducer-owned, the daily funnel.
 //   pk = PERF#{scope}   sk = PR          — git-derived PR sections (Metric 3),
 //                                          published by build-pr-metrics.mjs.
+//   pk = PERF#{scope}   sk = REPO        — repository activity (Metric 4),
+//                                          published by build-repo-performance.mjs.
 //
 // `scope` is "workforce" or a project_id (e.g. "self/ren"). The endpoint reads
-// both and composes the PerformanceSeries; LIFECYCLE is the live differentiator
-// (its presence is what lets the endpoint serve real data instead of 404ing to
-// the client's illustrative fallback).
+// all three and composes the PerformanceSeries; LIFECYCLE is the live
+// differentiator (its presence is what lets the endpoint serve real data
+// instead of 404ing to the client's illustrative fallback).
 
-/** Trailing window the reducer keeps per scope, matching the Phase-1 fixture. */
-export const PERF_WINDOW_DAYS = 28;
+/** Trailing window the reducer keeps per scope.
+ *  90 days (2026-07-26, operator): the console's decks are all on a 3-month
+ *  basis, so the stored window must cover it — a 28-day row could only ever
+ *  paint a third of the chart. The reducer appends forward, so an existing
+ *  28-point row grows to 90 over the following weeks; re-run
+ *  workforce/scripts/backfill-performance-lifecycle.mjs to fill it at once. */
+export const PERF_WINDOW_DAYS = 90;
 
-export type PerfRollupKind = "LIFECYCLE" | "PR";
+export type PerfRollupKind = "LIFECYCLE" | "PR" | "REPO";
 
 export function perfPk(scope: string): `PERF#${string}` {
   return `PERF#${scope}`;
@@ -127,6 +184,20 @@ export interface PerfPrRow {
   pr_daily: PrDailyPoint[];
   pr_summary: PrSummary;
   pr_contributors: PrContributor[];
+}
+
+export interface PerfRepoRow {
+  pk: `PERF#${string}`;
+  sk: "REPO";
+  scope: string;
+  updated_at: string;
+  window: { start: string; end: string };
+  issues_daily: RepoDailyPoint[];
+  prs_daily: RepoDailyPoint[];
+  code_churn_weekly: RepoWeeklyChurnPoint[];
+  summary: RepoActivitySummary;
+  /** Contributing project scopes (workforce aggregate) or [scope] (project). */
+  repos: string[];
 }
 
 // ── pure aggregation ──────────────────────────────────────────────────────────
@@ -187,6 +258,10 @@ export function composeSeries(
   generatedAt: string,
   lifecycleRow: Pick<PerfLifecycleRow, "points">,
   prRow?: Pick<PerfPrRow, "window" | "pr_daily" | "pr_summary" | "pr_contributors">,
+  repoRow?: Pick<
+    PerfRepoRow,
+    "window" | "issues_daily" | "prs_daily" | "code_churn_weekly" | "summary" | "repos" | "updated_at"
+  >,
 ): PerformanceSeries {
   const points = lifecycleRow.points;
   const lcStart = points[0]?.date;
@@ -212,5 +287,18 @@ export function composeSeries(
         humans_involved: [],
       },
     pr_contributors: prRow?.pr_contributors ?? [],
+    ...(repoRow
+      ? {
+          repo: {
+            window: repoRow.window,
+            issues_daily: repoRow.issues_daily,
+            prs_daily: repoRow.prs_daily,
+            code_churn_weekly: repoRow.code_churn_weekly,
+            summary: repoRow.summary,
+            repos: repoRow.repos,
+            updated_at: repoRow.updated_at,
+          },
+        }
+      : {}),
   };
 }

@@ -3,7 +3,7 @@
   "name": "Project IND",
   "owner_agent": "nadia",
   "github": {
-    "owner": "refluster",
+    "owner": "PSVL",
     "repo": "project-ind"
   },
   "governance_docs": [
@@ -14,5 +14,5 @@
   ],
   "status": "active",
   "created_at": "2026-06-22",
-  "note": "External project shipping work against refluster/project-ind. Same reviewer roster as asp-cloud — Nadia owns; Dario / Ren / Aoi reviewer lenses. PR-review / pr-autopilot path; github.token stored out-of-band under wf/projects/project-ind/github.token."
+  "note": "External project shipping work against PSVL/project-ind (owner corrected 2026-07-21 — the record previously pointed at refluster/project-ind, which does not exist). Same reviewer roster as asp-cloud — Nadia owns; Dario / Ren / Aoi reviewer lenses. PR-review / pr-autopilot path; github.token stored out-of-band under wf/projects/project-ind/github.token. Project reports are served at runtime from this repo's reports/ directory."
 }

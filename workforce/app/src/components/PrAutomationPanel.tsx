@@ -7,16 +7,22 @@
 // pr-autopilot green consensus markers and no autopilot:needs-human label).
 
 import Typeplate from './Typeplate';
+import StackedBarChart, { type BarSeries } from './StackedBarChart';
 import type { PerformanceSeries } from '../types/performance';
 
 function pct(x: number): string {
   return `${Math.round(x * 100)}%`;
 }
 
+const BAR_SERIES: BarSeries[] = [
+  { key: 'autopilot_merged', label: 'autopilot-merged', fill: 'var(--wf-svg-running)' },
+  { key: 'human', label: 'human-involved', fill: 'var(--wf-svg-paused)' },
+];
+
 export default function PrAutomationPanel({ series }: { series: PerformanceSeries }) {
   const days = series.pr_daily;
   const s = series.pr_summary;
-  const maxPrs = Math.max(1, ...days.map((d) => d.prs));
+  const barData = days.map((d) => ({ ...d, human: Math.max(0, d.prs - d.autopilot_merged) }));
   const meanAdd = s.total_prs > 0 ? Math.round(s.total_additions / s.total_prs) : 0;
   const meanDel = s.total_prs > 0 ? Math.round(s.total_deletions / s.total_prs) : 0;
 
@@ -55,42 +61,15 @@ export default function PrAutomationPanel({ series }: { series: PerformanceSerie
         {/* Daily stacked bars: autopilot (green) over human-involved (amber).
             Y-axis shows the peak PRs/day (top) → 0 so the scale reads without
             hovering (Epic-016 Phase 3). */}
-        <div className="flex items-stretch">
-          <div
-            className="flex flex-col justify-between pr-1.5 text-right font-wfmono text-[10px] tabular-nums text-wf-on-surface-variant"
-            style={{ height: 120 }}
-            aria-hidden
-          >
-            <span>{maxPrs}</span>
-            <span>0</span>
-          </div>
-          <div className="overflow-x-auto flex-1 min-w-0">
-            <div className="flex items-end gap-[3px]" style={{ height: 120, minWidth: days.length * 10 }}>
-              {days.map((d) => {
-              const human = Math.max(0, d.prs - d.autopilot_merged);
-              const h = (d.prs / maxPrs) * 100;
-              const autoFrac = d.prs > 0 ? d.autopilot_merged / d.prs : 0;
-              return (
-                <div
-                  key={d.date}
-                  className="flex-1 min-w-[6px] flex flex-col justify-end"
-                  style={{ height: '100%' }}
-                  title={`${d.date} — ${d.prs} PR${d.prs === 1 ? '' : 's'} · ${d.autopilot_merged} autopilot · ${human} human · +${d.additions}/−${d.deletions}`}
-                >
-                  <div style={{ height: `${h}%` }} className="flex flex-col justify-end">
-                    {human > 0 && (
-                      <div className="bg-wf-paused" style={{ height: `${(1 - autoFrac) * 100}%` }} />
-                    )}
-                    {d.autopilot_merged > 0 && (
-                      <div className="bg-wf-running" style={{ height: `${autoFrac * 100}%` }} />
-                    )}
-                  </div>
-                </div>
-              );
-              })}
-            </div>
-          </div>
-        </div>
+        <StackedBarChart
+          data={barData as unknown as Array<Record<string, number | string>>}
+          xKey="date"
+          series={BAR_SERIES}
+          height={120}
+          tooltip={(d) =>
+            `${d.date} — ${d.prs} PR${d.prs === 1 ? '' : 's'} · ${d.autopilot_merged} autopilot · ${d.human} human · +${d.additions}/−${d.deletions}`
+          }
+        />
 
         {/* Legend + churn key. */}
         <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">

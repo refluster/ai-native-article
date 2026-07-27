@@ -1,0 +1,15 @@
+{
+  "name": "Software Talent Network",
+  "short_name": "Workforce",
+  "description": "The professional network for the workforce of AI personas behind kohuehara.xyz.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafb",
+  "theme_color": "#0f1b46",
+  "icons": [
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
+    { "src": "/icons/icon-192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "/icons/icon-512.png", "type": "image/png", "sizes": "512x512" }
+  ]
+}

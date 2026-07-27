@@ -110,6 +110,21 @@ spacing:
 
 The design system is engineered for cognitive clarity, organizational efficiency, and high-stakes judgment. It targets a professional audience within complex network environments—researchers, analysts, and system architects—who require a safe, systematic, and focused workspace.
 
+### The mark
+
+The console's identity mark is one solid node above two open ones, joined by
+two edges, white on an Indigo Ink rounded square. It is the MVV as a glyph:
+humans hold the constitutional layer and set direction (the filled steward
+node), agents carry execution beneath it (the open nodes), and the edges are
+the delegation an org chart is made of.
+
+`workforce/app/public/favicon.svg` is the source of truth for its geometry.
+`scripts/generate-icons.mjs` rasterises the same geometry to the PNG sizes
+that will not take an SVG (`apple-touch-icon`, the 192/512 manifest icons),
+and `components/BrandMark.tsx` re-draws it in React from design tokens for
+the in-app wordmark. Edit the SVG, then re-run the generator — three
+lookalikes that drift apart is the failure mode this arrangement prevents.
+
 The aesthetic follows a **Modern Corporate** approach with a **Technical** edge. It prioritizes information density without sacrificing legibility. The interface utilizes a structured, "grid-first" layout philosophy to evoke a sense of stability and institutional trust. Visual noise is aggressively reduced to elevate the data and decision-making pathways, ensuring that the UI acts as a silent, reliable partner in the user's workflow.
 
 ## Colors
@@ -130,7 +145,23 @@ This design system uses a dual-font strategy to separate narrative from data.
 
 The layout is built on a **12-column fluid grid** for desktop, transitioning to 8 columns for tablet and 4 for mobile. A strict 4px base-unit defines the spacing rhythm, ensuring all elements align to a systematic vertical and horizontal rhythm.
 
-Content containers are padded generously to prevent information overload. Gutters are fixed at 24px to provide clear visual separation between data modules. On mobile, margins shrink to 16px to maximize screen real estate, while complex data tables may utilize horizontal overflow to preserve the integrity of monospaced data columns.
+Content containers are padded generously to prevent information overload. Gutters are fixed at 24px to provide clear visual separation between data modules. On mobile, margins shrink to **12px** to maximize screen real estate, while complex data tables may utilize horizontal overflow to preserve the integrity of monospaced data columns.
+
+### Mobile edge-to-edge
+
+The 12px mobile margin is the floor for *prose and controls*, not for
+list-shaped content. Feed cards, roster rows, and any other repeating band
+go **full-bleed** on phones: they cancel the page gutter, drop their side
+borders and corner radius, and span the viewport, separated from each other
+by a single horizontal rule. On a 390px screen the old inset cost ~8% of the
+width to margin on both edges of every card — width the data wanted.
+
+Mechanically this is the `wf-bleed-x` utility (`index.css`), whose negative
+inline margin is defined to cancel exactly the container's mobile gutter and
+to become inert from `sm` up. A card that opts in pairs it with
+`border-y sm:border` and `rounded-none sm:rounded-wf-md`, so the inset,
+rounded card returns at tablet width and above. If the container gutter ever
+changes, `wf-bleed-x` moves with it — they are one decision in two places.
 
 ## Elevation & Depth
 
@@ -157,6 +188,36 @@ Data modules use a white background with a subtle border. Titles are Geist Semib
 
 ### Chips & Tags
 Used for network status or categories. They feature a low-saturation background (derived from Sage or Pale Copper) with high-contrast text. Use the `rounded-lg` (1rem) setting to make them distinct from square-ish buttons.
+
+### Loading states
+
+A page never blocks its whole render on its slowest fetch. Each region loads
+independently (`lib/useAsync.ts`) and paints a **skeleton** in the shape of
+the content that will replace it (`components/Skeleton.tsx`), so nothing
+reflows when the data lands. Page chrome that needs no data — headers,
+breadcrumbs, filter chips, tab bars — renders on the first frame and stays
+interactive throughout.
+
+Skeletons use the recessed `surface-container` tone with a white shimmer
+sweep, honour `prefers-reduced-motion`, and are `aria-hidden` behind a single
+`role="status"` announcement per region — a screen reader should hear
+"loading crew roster", not twelve empty boxes.
+
+Loading is not the only non-happy state: a failure in a *secondary* region
+degrades that region loudly (an inline error line in Pale Copper) while the
+rest of the page renders. Only a failure in the region the page exists to
+show may take the whole page. This is C-4 (fail loud) applied at region
+granularity rather than page granularity.
+
+### Global navigation
+
+The header carries every destination as an icon + label row from `md` up.
+Below `md` those destinations collapse behind a hamburger into a right-hand
+drawer; the brand mark, global search, and the unread badge stay in the bar.
+The drawer is built from the same list as the desktop row — same order, same
+icons, same labels, with grouping headers added because a vertical list needs
+scent that adjacency gives a horizontal one for free. Adding a destination
+means adding it once.
 
 ### Network Graphs
 Visualization components should use the secondary (Sage) and tertiary (Pale Copper) colors to denote different node types or connection strengths, ensuring the primary Indigo remains the dominant structural anchor.

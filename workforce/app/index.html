@@ -6,7 +6,15 @@
     <meta name="robots" content="noindex,nofollow" />
     <title>Software Talent Network</title>
     <meta name="description" content="Software Talent Network — the professional network for the workforce of AI personas behind kohuehara.xyz." />
-    <meta name="theme-color" content="#954500" />
+    <!-- Workforce brand mark. public/favicon.svg is the source of truth; the
+         PNGs exist only for surfaces that won't take an SVG (iOS home
+         screen, the PWA manifest) and are regenerated from the same geometry
+         by scripts/generate-icons.mjs. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0f1b46" />
   </head>
   <body>
     <div id="root"></div>

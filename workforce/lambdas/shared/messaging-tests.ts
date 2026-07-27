@@ -34,6 +34,27 @@ vi.mock("./ddb.js", () => ({
       // ascending by sk — mirrors DynamoDB default ScanIndexForward=true
       .sort((a, b) => (a.sk < b.sk ? -1 : a.sk > b.sk ? 1 : 0)),
   ),
+  queryBySkPrefixPaged: vi.fn(
+    async (pk: string, skPrefix: string, limit = 100, cursor?: string, scanIndexForward = true) => {
+      let items = Array.from(rows.values())
+        .filter((r) => r.pk === pk && typeof r.sk === "string" && r.sk.startsWith(skPrefix))
+        .sort((a, b) => (a.sk < b.sk ? -1 : a.sk > b.sk ? 1 : 0));
+      if (!scanIndexForward) items = items.reverse();
+      if (cursor) {
+        // Mock cursor = base64url(sk of the last item served), mirroring the
+        // real cursor's LastEvaluatedKey role (resume strictly after it).
+        const lastSk = Buffer.from(cursor, "base64url").toString("utf8");
+        const idx = items.findIndex((r) => r.sk === lastSk);
+        items = idx >= 0 ? items.slice(idx + 1) : items;
+      }
+      const page = items.slice(0, limit);
+      const next =
+        items.length > limit && page.length > 0
+          ? Buffer.from(String(page[page.length - 1]!.sk)).toString("base64url")
+          : undefined;
+      return { items: page, cursor: next };
+    },
+  ),
   queryByGsiPaged: vi.fn(
     async (
       _indexName: string,
@@ -279,6 +300,68 @@ describe("getThreadDetail", () => {
       body_ref: "messages/t1/missing.md",
     });
     await expect(getThreadDetail("t1")).rejects.toThrow(/message body not found/);
+  });
+});
+
+describe("getThreadDetail paging (Epic-024)", () => {
+  function seedLongThread(count: number) {
+    rows.set(key("THREAD#t2", "META"), {
+      pk: "THREAD#t2",
+      sk: "META",
+      thread_id: "t2",
+      participants: ["maya"],
+      group: false,
+      created_by: "operator",
+      created_at: "2026-07-01T00:00:00Z",
+      last_message_at: "2026-07-01T01:00:00Z",
+      starred: false,
+    });
+    for (let i = 0; i < count; i++) {
+      const id = `01${String(i).padStart(3, "0")}`;
+      rows.set(key("THREAD#t2", `MSG#${id}`), {
+        pk: "THREAD#t2",
+        sk: `MSG#${id}`,
+        thread_id: "t2",
+        from: i % 2 === 0 ? "operator" : "maya",
+        at: `2026-07-01T00:${String(i).padStart(2, "0")}:00Z`,
+        body_preview: `msg ${i}`,
+      });
+    }
+  }
+
+  it("returns the NEWEST page in chronological order, with an older_cursor", async () => {
+    seedLongThread(5);
+    const page = await getThreadDetail("t2", { pageSize: 2 });
+    expect(page!.messages.map((m) => m.message_id)).toEqual(["01003", "01004"]);
+    expect(page!.older_cursor).toBeDefined();
+  });
+
+  it("walks older pages via the cursor down to the first message, then exhausts", async () => {
+    seedLongThread(5);
+    const p1 = await getThreadDetail("t2", { pageSize: 2 });
+    const p2 = await getThreadDetail("t2", { pageSize: 2, cursor: p1!.older_cursor });
+    expect(p2!.messages.map((m) => m.message_id)).toEqual(["01001", "01002"]);
+    const p3 = await getThreadDetail("t2", { pageSize: 2, cursor: p2!.older_cursor });
+    expect(p3!.messages.map((m) => m.message_id)).toEqual(["01000"]);
+    expect(p3!.older_cursor).toBeUndefined();
+  });
+
+  it("keeps the newest messages when the thread outgrows the default window (regression)", async () => {
+    // The pre-Epic-024 ascending+Limit read kept the OLDEST window and
+    // silently dropped the newest past the cap.
+    seedLongThread(60);
+    const detail = await getThreadDetail("t2");
+    expect(detail!.messages).toHaveLength(50);
+    expect(detail!.messages.at(-1)!.message_id).toBe("01059");
+    expect(detail!.messages[0]!.message_id).toBe("01010");
+    expect(detail!.older_cursor).toBeDefined();
+  });
+
+  it("omits older_cursor when the whole thread fits in one page", async () => {
+    seedLongThread(3);
+    const detail = await getThreadDetail("t2", { pageSize: 10 });
+    expect(detail!.messages).toHaveLength(3);
+    expect(detail!.older_cursor).toBeUndefined();
   });
 });
 

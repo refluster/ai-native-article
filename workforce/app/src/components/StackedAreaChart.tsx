@@ -14,6 +14,10 @@ export interface AreaSeries {
   label: string;
   /** Fill value — a CSS var reference, e.g. 'var(--wf-svg-running)'. */
   fill: string;
+  /** Fill opacity, 0..1. Default 0.85. Lets a ladder/funnel chart reuse one
+   *  token across several rungs as a light→dark gradient instead of routing
+   *  every extra category through a brand-new design token. */
+  opacity?: number;
 }
 
 interface Props {
@@ -121,7 +125,12 @@ export default function StackedAreaChart({
               vectorEffect="non-scaling-stroke"
             />
             {bands.map((b) => (
-              <polygon key={b.series.key} points={b.points} fill={b.series.fill} fillOpacity={0.85} />
+              <polygon
+                key={b.series.key}
+                points={b.points}
+                fill={b.series.fill}
+                fillOpacity={b.series.opacity ?? 0.85}
+              />
             ))}
             {/* Transparent per-day hover columns carrying the breakdown title. */}
             {tooltip &&

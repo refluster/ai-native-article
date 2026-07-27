@@ -40,6 +40,7 @@ issue idempotently. Do not hand-apply or hand-remove these.
 | Label | Applied by | Meaning |
 |---|---|---|
 | `insights` | the weekly content-insights loop (`content-insights.mjs`) | This is *the* auto-generated reader-engagement issue. The loop keeps exactly one open at a time, updating it in place. It also carries `project:article` + `area:content` + `type:ops`. Triage it; don't relabel it. See [governance-mechanisms.md](governance-mechanisms.md). |
+| `owner:<slug>` | the `ops-accountability-watch` Cadence (`workforce/skills/ops-accountability-watch/sync-issues.mjs`) | Names the accountable owner (a real workforce persona or the operator) for an automation-detected follow-up, per [workforce/docs/runbooks/chat-notification-policy.md](../workforce/docs/runbooks/chat-notification-policy.md). One `owner:` label per issue this Cadence opens; `<slug>` is the routed owner (e.g. `owner:dario`, `owner:petra`). Deliberately absent from `.github/labels.json`'s static enumeration — the set of slugs is open-ended (grows with the roster), so the label is created on demand by the Cadence itself (same colour every time, §4.2) rather than pre-registered per persona. Never hand-apply; the routing logic that assigns it lives in `workforce/skills/ops-accountability-watch/owner-routing.mjs`. |
 
 ---
 
@@ -135,6 +136,12 @@ Colours are declarative in `.github/labels.json`. The palette below is the sourc
 | `wf:blocked` | `B60205` | Workflow stop-light, red |
 | `priority:p0` | `B60205` | Priority intensity, red |
 | `priority:p1` | `D93F0B` | Priority intensity, orange |
+
+`owner:<slug>` is the one family deliberately **not** mirrored in
+`.github/labels.json` — see §1.3: it's open-ended (grows with the roster)
+and machine-created on demand, always at `C2185B` (rose — one flat hue for
+every instance; an identity marker, not a severity gradient), rather than
+pre-declared per slug.
 
 ### 4.3 Adding a new label family
 

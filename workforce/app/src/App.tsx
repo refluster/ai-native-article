@@ -16,6 +16,8 @@ import OrgDAG from './pages/OrgDAG';
 import ProjectDirectory from './pages/ProjectDirectory';
 import ProjectProfile from './pages/ProjectProfile';
 import Feed from './pages/Feed';
+import Reports from './pages/Reports';
+import ReportView from './pages/ReportView';
 import Account from './pages/Account';
 import Messaging from './pages/Messaging';
 import Notifications from './pages/Notifications';
@@ -55,6 +57,8 @@ function ProtectedRoutes() {
                 parameter, accessible inside the page via
                 `useParams()['*']`. */}
             <Route path="/projects/*" element={<ProjectProfile />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/reports/:project/:slug" element={<ReportView />} />
             <Route path="/feed" element={<Navigate to="/" replace />} />
             <Route path="/account" element={<Account />} />
             <Route path="/messaging" element={<Messaging />} />

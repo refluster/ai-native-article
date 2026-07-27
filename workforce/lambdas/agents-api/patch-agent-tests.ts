@@ -15,6 +15,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
+import { W3_BUDGET_CAP_USD } from "../shared/agent-config";
 
 process.env.STAGE = "test";
 
@@ -253,8 +254,13 @@ describe("PATCH /agents/{slug} — identity writes (ADR-0007)", () => {
 
   it("enforces the W-3 aggregate budget cap across other live agents", async () => {
     seedAgent("sora");
-    // Fixtures track the W-3 cap (250): 190 + 60 = 250 fits, 190 + 61 = 251 trips it.
-    seedAgent("ren", { slug: "ren", pk: "AGENT#ren", budget_monthly_usd_default: 190 });
+    // Fixtures anchor to W3_BUDGET_CAP_USD: other live agents sum to (cap - 60),
+    // so patching sora to 60 = cap fits, to 61 = cap+1 trips it.
+    seedAgent("ren", {
+      slug: "ren",
+      pk: "AGENT#ren",
+      budget_monthly_usd_default: W3_BUDGET_CAP_USD - 60,
+    });
     seedAgent("maya", {
       slug: "maya",
       pk: "AGENT#maya",
@@ -315,8 +321,13 @@ describe("PATCH /agents/{slug} — operational writes still audit", () => {
 
   it("guards the budget override against the W-3 cap", async () => {
     seedAgent("sora");
-    // Fixtures track the W-3 cap (250): 240 + override 20 = 260 trips it.
-    seedAgent("ren", { slug: "ren", pk: "AGENT#ren", budget_monthly_usd_default: 240 });
+    // Fixtures anchor to W3_BUDGET_CAP_USD: other live agents sum to (cap - 10),
+    // so sora's override of 20 pushes the aggregate to cap+10 and trips the cap.
+    seedAgent("ren", {
+      slug: "ren",
+      pk: "AGENT#ren",
+      budget_monthly_usd_default: W3_BUDGET_CAP_USD - 10,
+    });
     const { status, json } = await call(
       makeEvent("PATCH", "PATCH /agents/{slug}", "sora", { budget_monthly_usd_override: 20 }),
     );
