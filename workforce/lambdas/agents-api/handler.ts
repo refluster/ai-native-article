@@ -10,6 +10,7 @@
 //   POST   /agents/{slug}/engagements       register a client-side engagement record (Phase 7 PR5; Bearer auth)
 //   GET    /agents/{slug}/recall            semantic recall over the agent's ledger (?q=&k=; Epic-012 Story 1)
 //   PATCH  /agents/{slug}                   config writes — operational + identity fields, validated + audited (IAM-auth at API GW; ADR-0007)
+//   POST   /agents/{slug}/memory            memory-curation bounded write — ADR-0019 contract + shrink guard (ADR-0020; Bearer auth)
 //   DELETE /agents/{slug}                   soft delete -> archived=true (IAM-auth at API GW)
 //   GET    /agents/{slug}/audit             config-mutation audit trail, newest-first (ADR-0007)
 //   GET    /docs/openapi                    OpenAPI 3.0 spec (YAML; source ./openapi.ts)
@@ -116,11 +117,19 @@ import {
 import {
   type PerfLifecycleRow,
   type PerfPrRow,
+  type PerfRepoRow,
   composeSeries,
   perfPk,
 } from "../shared/performance.js";
 import { recall, type RecallResult } from "../shared/recall.js";
+import {
+  MEMORY_BLOCK_MAX_CHARS,
+  MEMORY_SHRINK_FLOOR,
+  isSuspiciousShrink,
+  validateMemoryDocument,
+} from "../shared/memory-contract.js";
 import { isValidEngagementToken } from "../shared/engagement-token.js";
+import { isValidMemoryWriteToken } from "../shared/memory-write-token.js";
 import { CREDENTIAL_TYPES } from "../shared/credential-injector.js";
 import {
   CloudWatchClient,
@@ -161,6 +170,7 @@ import {
 } from "../shared/messaging.js";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { DOCS_HTML, OPENAPI_YAML } from "./openapi.js";
+import { getProjectReportBody, listProjectReports } from "./reports.js";
 
 // Secrets Manager path holding the feed-write capability token. The
 // runner presents the same token (injected from this secret into its
@@ -181,6 +191,17 @@ let _feedWriteTokenCache: string | undefined;
 // project's trusted clients hold the token.
 const ENGAGEMENT_WRITE_TOKEN_SECRET = "wf/api/engagements-write-token";
 let _engagementWriteTokenCache: string | undefined;
+
+// Secrets Manager path holding the memory-write capability token — the
+// ADR-0020 static-secret FALLBACK path, superseded as primary by ADR-0021's
+// per-fire DDB-minted token (shared/memory-write-token.ts). Kept alive
+// exactly like ENGAGEMENT_WRITE_TOKEN_SECRET is kept alongside the dynamic
+// engagement token: an operator/ad-hoc escape hatch, not the normal path.
+// Whichever path authenticates, the token authorises exactly one mutation
+// class — the `memory` profile block — and the route enforces the
+// ADR-0019 content contract + the shrink guard server-side before writing.
+const MEMORY_WRITE_TOKEN_SECRET = "wf/projects/agent-workforce/workforce.memory_write_token";
+let _memoryWriteTokenCache: string | undefined;
 
 const STAGE = process.env.STAGE ?? "dev";
 // One client per cold start. Metric emission is best-effort — failures
@@ -278,10 +299,18 @@ export async function handler(
     // `return await` so the audit-append throw (W-4 fail-loud contract,
     // see shared/agent-audit.ts) routes through the outer 500 mapping.
     if (routeKey === "PATCH /agents/{slug}" && slug) return await patchAgent(slug, event);
+    // POST /agents/{slug}/memory — the memory-curation Cadence's bounded
+    // write path (ADR-0020). Bearer-token auth at the handler layer (the
+    // CCR session has no SigV4 creds), scoped to exactly one mutation
+    // class: the `memory` profile block, behind the ADR-0019 content
+    // contract + shrink guard. `return await` for the 500 mapping.
+    if (routeKey === "POST /agents/{slug}/memory" && slug) return await updateMemoryRoute(slug, event);
     if (routeKey === "DELETE /agents/{slug}" && slug) return await deleteAgent(slug, event);
     if (routeKey === "GET /projects") return listProjects(event);
     if (routeKey === "GET /projects/{id}/executions" && projectId) return listProjectExecutions(projectId, event);
     if (routeKey === "GET /projects/{id}/credentials" && projectId) return listProjectCredentials(projectId);
+    if (routeKey === "GET /projects/{id}/reports" && projectId) return listProjectReportsRoute(projectId);
+    if (routeKey === "GET /projects/{id}/reports/{slug}" && projectId && slug) return getProjectReportRoute(projectId, slug);
     if (routeKey === "GET /projects/{id}/performance" && projectId) return getPerformanceRoute(projectId);
     if (routeKey === "PATCH /projects/{id}" && projectId) return patchProject(projectId, event.body);
     if (routeKey === "GET /projects/{id}" && projectId) return getProjectRoute(projectId);
@@ -1325,12 +1354,13 @@ async function getProjectRoute(rawId: string): Promise<APIGatewayProxyResultV2> 
 // item is optional — a scope with lifecycle but no published PR sections serves
 // an empty PR block rather than 404ing the whole series.
 async function getPerformanceRoute(scope: string): Promise<APIGatewayProxyResultV2> {
-  const [lifecycleRow, prRow] = await Promise.all([
+  const [lifecycleRow, prRow, repoRow] = await Promise.all([
     getItem<PerfLifecycleRow>(perfPk(scope), "LIFECYCLE"),
     getItem<PerfPrRow>(perfPk(scope), "PR"),
+    getItem<PerfRepoRow>(perfPk(scope), "REPO"),
   ]);
   if (!lifecycleRow) return reply(404, { error: "not_found", scope });
-  const series = composeSeries(scope, new Date().toISOString(), lifecycleRow, prRow);
+  const series = composeSeries(scope, new Date().toISOString(), lifecycleRow, prRow, repoRow);
   return reply(200, series);
 }
 
@@ -1406,6 +1436,37 @@ interface CredentialMetadataView {
   last_changed_at?: string;
   last_rotated_at?: string;
   created_date?: string;
+}
+
+// --- Project reports (runtime read from the project's own repo) --------
+//
+// GET /projects/{id}/reports          manifest rows from reports/manifest.json
+// GET /projects/{id}/reports/{slug}   one markdown body (text/markdown)
+//
+// Content lives in the PROJECT'S storage (the repo the project record
+// points at), fetched here with the project-scoped github.token secret —
+// the browser never sees the token, and the console bundle carries no
+// report copy (W-2). Implementation: ./reports.ts.
+
+async function listProjectReportsRoute(rawId: string): Promise<APIGatewayProxyResultV2> {
+  const id = asProjectId(rawId);
+  const proj = await getProject(id);
+  if (!proj) return reply(404, { error: "not_found", project_id: rawId });
+  const items = await listProjectReports(proj);
+  return reply(200, { items });
+}
+
+async function getProjectReportRoute(rawId: string, slug: string): Promise<APIGatewayProxyResultV2> {
+  const id = asProjectId(rawId);
+  const proj = await getProject(id);
+  if (!proj) return reply(404, { error: "not_found", project_id: rawId });
+  const body = await getProjectReportBody(proj, slug);
+  if (body === null) return reply(404, { error: "not_found", project_id: rawId, slug });
+  return {
+    statusCode: 200,
+    headers: { "content-type": "text/markdown; charset=utf-8" },
+    body,
+  };
 }
 
 async function listProjectCredentials(rawId: string): Promise<APIGatewayProxyResultV2> {
@@ -2345,6 +2406,133 @@ async function validateEngagementWriteBearer(
       if (typeof v.token !== "string" || v.token.length === 0) return false;
       expected = v.token;
       _engagementWriteTokenCache = expected;
+    } catch {
+      return false;
+    }
+  }
+
+  const a = Buffer.from(presented);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+/**
+ * POST /agents/{slug}/memory — the memory-curation Cadence's bounded write
+ * path (ADR-0020, Epic-018 Story 4). Body shape:
+ *   { body: string, allow_shrink?: boolean }
+ *
+ * The bearer token authorises exactly one mutation class — the `memory`
+ * profile block ({ last_updated, body }, ADR-0019) — never any other
+ * persona-row field; every other identity/config mutation stays on the
+ * IAM-authed PATCH path (W-5). Server-side gates, all fail-closed:
+ *   - ADR-0019 content contract (title, `Curated:` date → last_updated,
+ *     mandatory Mission anchor, non-hollow floor, 16 KB S17 ceiling)
+ *   - shrink guard: a revision under MEMORY_SHRINK_FLOOR of the existing
+ *     body is refused unless the caller declares allow_shrink — the
+ *     degenerate-LLM-output failure mode must not wipe a memory silently
+ *   - the write lands its own AUDIT# row (actor "memory-writer (bearer)")
+ *     so the weekly config digest reviews curation like any config change.
+ */
+async function updateMemoryRoute(
+  slug: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const authed = await validateMemoryWriteBearer(event);
+  if (!authed) {
+    return reply(401, { error: "unauthorized", detail: "POST /agents/{slug}/memory requires a valid memory-write bearer token." });
+  }
+
+  if (!event.body) return reply(400, { error: "missing_body" });
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(event.body) as Record<string, unknown>;
+  } catch {
+    return reply(400, { error: "invalid_json" });
+  }
+  const nextBody = parsed.body;
+  if (typeof nextBody !== "string" || nextBody.length === 0) {
+    return reply(400, { error: "missing_memory_body", detail: "body must be the non-empty MEMORY.md document string" });
+  }
+  const allowShrink = parsed.allow_shrink === true;
+
+  const existing = await getItem<AgentMetaRow>(agentPk(slug), "META");
+  if (!existing || existing.archived === true) {
+    return reply(404, { error: "agent_not_found", slug });
+  }
+
+  const check = validateMemoryDocument(nextBody);
+  if (check.violations.length > 0 || check.last_updated === null) {
+    return reply(422, { error: "memory_rejected", violations: check.violations });
+  }
+  const existingBody =
+    existing.memory && typeof (existing.memory as Record<string, unknown>).body === "string"
+      ? ((existing.memory as Record<string, unknown>).body as string)
+      : undefined;
+  if (!allowShrink && isSuspiciousShrink(existingBody, nextBody)) {
+    return reply(422, {
+      error: "memory_rejected",
+      violations: [
+        `revision shrinks the existing memory below ${MEMORY_SHRINK_FLOOR * 100}% of its prior length (${existingBody?.length} → ${nextBody.length} chars); re-send with allow_shrink:true only if the shrink is deliberate`,
+      ],
+    });
+  }
+  const memory = { last_updated: check.last_updated, body: nextBody };
+  if (JSON.stringify(memory).length > MEMORY_BLOCK_MAX_CHARS) {
+    return reply(422, { error: "memory_rejected", violations: [`serialized memory block exceeds the ${MEMORY_BLOCK_MAX_CHARS}-char S17 ceiling`] });
+  }
+
+  const updated = await updateOperational<AgentMetaRow>(agentPk(slug), "META", { memory });
+  // Same audit ledger as the IAM PATCH path — the bearer principal is
+  // named explicitly since there is no IAM identity on this route.
+  await appendAgentAudit(
+    slug,
+    "memory-writer (bearer)",
+    "identity",
+    diffChanges({ memory: existing.memory ?? null } as Record<string, unknown>, { memory }),
+  );
+  return reply(200, {
+    ok: true,
+    slug,
+    memory: { last_updated: memory.last_updated, body_chars: nextBody.length },
+    updated_at: (updated as unknown as Record<string, unknown>).updated_at,
+  });
+}
+
+/**
+ * Validate the memory-write bearer token (ADR-0021, superseding ADR-0020).
+ * Mirrors validateEngagementWriteBearer's two-path shape: the primary path
+ * is a short-lived DDB-minted token (AUTH#MEMORY_WRITE, one per
+ * memory-curation fire — shared/memory-write-token.ts); the static
+ * `wf/projects/agent-workforce/workforce.memory_write_token` secret from
+ * ADR-0020 survives as the fallback (constant-time compare, cached for the
+ * Lambda's warm lifetime). Returns false on any miss — handler maps to 401.
+ */
+async function validateMemoryWriteBearer(event: APIGatewayProxyEventV2): Promise<boolean> {
+  const headers = event.headers ?? {};
+  const raw = headers.authorization ?? headers.Authorization;
+  if (!raw || !raw.startsWith("Bearer ")) return false;
+  const presented = raw.slice("Bearer ".length).trim();
+  if (presented.length === 0) return false;
+
+  // Primary path (ADR-0021): a short-lived token minted in DynamoDB — by
+  // the orchestrator per memory-curation fire. No static secret needed.
+  try {
+    if (await isValidMemoryWriteToken(presented)) return true;
+  } catch {
+    // DDB read error — fall through to the static path rather than 500.
+  }
+
+  // Fallback: the long-lived capability token from ADR-0020.
+  let expected = _memoryWriteTokenCache;
+  if (!expected) {
+    try {
+      const out = await sm.send(new GetSecretValueCommand({ SecretId: MEMORY_WRITE_TOKEN_SECRET }));
+      if (!out.SecretString) return false;
+      const v = JSON.parse(out.SecretString) as { token?: unknown };
+      if (typeof v.token !== "string" || v.token.length === 0) return false;
+      expected = v.token;
+      _memoryWriteTokenCache = expected;
     } catch {
       return false;
     }

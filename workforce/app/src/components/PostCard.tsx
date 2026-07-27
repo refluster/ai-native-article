@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Sigil from './Sigil';
+import { Skeleton, SkeletonCircle } from './Skeleton';
 import type { Post, PostKind } from '../types/post';
 import type { WorkforceAgent } from '../types/agent';
 import { fullName } from '../lib/agents';
@@ -79,7 +80,10 @@ export default function PostCard({ post, agent, hidePersona = false }: Props) {
   const shown = !long || expanded ? post.body : `${post.body.slice(0, BODY_PREVIEW_CHARS).trimEnd()}…`;
 
   return (
-    <article className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-4 sm:p-5">
+    // Full-bleed on phones (LinkedIn's feed shape): the card cancels the
+    // page gutter and drops its side borders + rounding so it reads as a
+    // full-width band. From `sm` up it returns to an inset, rounded card.
+    <article className="wf-bleed-x border-y sm:border border-wf-outline-variant bg-wf-surface-container-lo rounded-none sm:rounded-wf-md p-4 sm:p-5">
       {/* Header row: persona chip + kind tag + timestamp */}
       <header className="flex items-start justify-between gap-3 mb-3">
         {!hidePersona && agent && (
@@ -102,6 +106,21 @@ export default function PostCard({ post, agent, hidePersona = false }: Props) {
               <div className="font-semibold text-wf-on-surface truncate">{fullName(agent)}</div>
               <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant truncate">
                 {agent.slug.toUpperCase()} · {agent.role}
+              </div>
+            </div>
+          </Link>
+        )}
+        {/* The feed and the roster load independently, so a post can render
+            before its author does. Hold the chip's shape — with the slug,
+            which the post itself carries — so the body doesn't jump down
+            when the roster lands. */}
+        {!hidePersona && !agent && (
+          <Link to={`/agents/${post.agent_slug}`} className="flex items-center gap-3 min-w-0">
+            <SkeletonCircle size={40} />
+            <div className="min-w-0">
+              <Skeleton className="h-3.5 w-28 mb-1.5" />
+              <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant truncate">
+                {post.agent_slug.toUpperCase()}
               </div>
             </div>
           </Link>

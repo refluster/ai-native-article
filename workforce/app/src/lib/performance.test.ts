@@ -91,6 +91,16 @@ describe('lib/performance (mock fallback)', () => {
     expect(r.series.window.end).toBe(today);
     expect(r.series.lifecycle[r.series.lifecycle.length - 1].date).toBe(today);
   });
+
+  // Regression for a pr-autopilot cycle-1 finding (2026-07-24, `wf:owen`):
+  // the fixture's lifecycle (2 points) and pr_daily (1 point) differ in
+  // length, so reaxis() computes independent offsets for each — assert both,
+  // not just lifecycle, so a lcOffset/prOffset mix-up would fail here too.
+  it('re-axises pr_daily to a window ending today too', async () => {
+    const r = await loadPerformance(WORKFORCE_SCOPE);
+    const today = new Date().toISOString().slice(0, 10);
+    expect(r.series.pr_daily[r.series.pr_daily.length - 1].date).toBe(today);
+  });
 });
 
 describe('deliveredShare', () => {

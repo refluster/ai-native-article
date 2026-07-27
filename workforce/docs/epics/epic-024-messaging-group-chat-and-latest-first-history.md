@@ -1,15 +1,34 @@
 # Epic-024 — Messaging: group compose + latest-first history paging
 
-- **Status**: In-progress (2026-07-16)
+- **Status**: Implemented (2026-07-17)
 - **Owner**: operator (refluster)
 - **Created**: 2026-07-16
-- **Implemented by**: (PR link set on open)
+- **Implemented by**: [#479](https://github.com/refluster/ai-native-article/pull/479)
 
 > **Lifecycle note.** The operator directed this improvement in-session on
 > 2026-07-15 ("複数人でグループチャット… 最新メッセージから見る… 私の承認なしで
 > 進めてもらって良い"), which is the operator sign-off the `Draft → Accepted`
 > gate exists to capture — so this Epic lands as `In-progress` in the same PR
 > as its implementation, with this note as the audit trail.
+
+> **Status reconciliation (2026-07-18, Nadia — backlog-reconcile).** Flipped
+> `In-progress (2026-07-16)` → `Implemented (2026-07-17)`; a forward,
+> monotonic-legal flip, bucket **Done**. Evidence: the single implementation
+> PR **[#479](https://github.com/refluster/ai-native-article/pull/479)**
+> (`e67fc4f`) merged all four acceptance surfaces — the newest-first paged
+> `GET /threads/{id}?page_size=&cursor=` + `getThreadDetail` rebase in
+> `lambdas/agents-api/handler.ts` + `lambdas/shared/messaging.ts`, and the
+> open-at-latest / reverse-infinite-scroll / group-compose chip row in
+> `app/src/pages/Messaging.tsx` + `app/src/lib/messages.ts` — each with vitest
+> coverage (`messaging-tests.ts`, `messages.test.ts`). The change is **live on
+> both target surfaces**: the merge fired `deploy-workforce-console` (CloudFront,
+> `workforce/app/**`) → **success** (2026-07-16, re-run 2026-07-17) and
+> `deploy-workforce-data-plane` (SAM, `workforce/lambdas/**`) → **success**
+> (2026-07-16). The `Implemented by` line, a placeholder `(PR link set on open)`
+> until this pass, now cites #479. **Open questions Q1 (unread jump-point) / Q2
+> (group-label input) stay deferred follow-ups per the body — not committed
+> remaining work, so no issue is filed.** Issue diff: 0 (no Epic-024 tracking
+> issue was ever filed; implementation-in-one-PR per the lifecycle note above).
 
 ## Problem
 

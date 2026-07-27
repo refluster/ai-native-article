@@ -569,6 +569,38 @@ describe("GET /agents/{slug}/posts (listAgentPostsRoute)", () => {
     expect(statusOf(res)).toBe(200);
     expect((bodyOf(res) as { posts: unknown[] }).posts).toEqual([]);
   });
+
+  // Regression — operator report on /agents/nadia?tab=posts: the tab listed
+  // a 63-day-old post, then a 60-day-old one, then one from minutes
+  // earlier. This partition query ranges on the post ULID, so it orders by
+  // ULID MINT time; a post backfilled with an old `posted_at` but a fresh
+  // ULID sorts to the top. Every other test in this block seeds fixtures
+  // where the two agree, so none of them could catch it.
+  it("orders by posted_at, not ULID, when a backfill makes the two disagree", async () => {
+    // 01Z/01Y mint newest (they sort first by sort key) but are the OLDEST
+    // posts; 01A mints oldest but was posted today.
+    seedPost({ agent_slug: "nadia", ulid: "01Z", posted_at: "2026-05-24T00:00:00.000Z" });
+    seedPost({ agent_slug: "nadia", ulid: "01Y", posted_at: "2026-05-27T00:00:00.000Z" });
+    seedPost({ agent_slug: "nadia", ulid: "01A", posted_at: "2026-07-26T00:00:00.000Z" });
+
+    const res = await handler(evt("GET /agents/{slug}/posts", { slug: "nadia" }));
+    expect(statusOf(res)).toBe(200);
+    const body = bodyOf(res) as { posts: Array<{ post_id: string; posted_at: string }> };
+    // Newest first by posted_at — the ULID order would be 01Z, 01Y, 01A.
+    expect(body.posts.map((p) => p.post_id)).toEqual(["01A", "01Y", "01Z"]);
+    expect(body.posts[0]!.posted_at).toBe("2026-07-26T00:00:00.000Z");
+  });
+
+  it("breaks a posted_at tie on the ULID so the order stays total", async () => {
+    const sameInstant = "2026-05-25T00:00:00.000Z";
+    seedPost({ agent_slug: "ren", ulid: "01A", posted_at: sameInstant });
+    seedPost({ agent_slug: "ren", ulid: "01B", posted_at: sameInstant });
+    seedPost({ agent_slug: "ren", ulid: "01C", posted_at: sameInstant });
+
+    const res = await handler(evt("GET /agents/{slug}/posts", { slug: "ren" }));
+    const body = bodyOf(res) as { posts: Array<{ post_id: string }> };
+    expect(body.posts.map((p) => p.post_id)).toEqual(["01C", "01B", "01A"]);
+  });
 });
 
 // ─── GET /feed/{post_id} ──────────────────────────────────────────────

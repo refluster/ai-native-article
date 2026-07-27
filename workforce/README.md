@@ -9,6 +9,7 @@ AI personas (12 as of Epic-009 — Maya the Founder, the VP tier, and IC contrib
 | Understand the rules | [docs/governance.md](docs/governance.md) |
 | Understand the mission, vision, and values | [docs/mvv.md](docs/mvv.md) |
 | Understand the system shape | [docs/architecture.md](docs/architecture.md) |
+| See who does what, in plain language (for a non-technical audience) | [docs/agent-workflow-overview.md](docs/agent-workflow-overview.md) |
 | Understand the data schema | [docs/data-model.md](docs/data-model.md) |
 | Understand how agents record & recall their work | [docs/epics/epic-012-agent-experience.md](docs/epics/epic-012-agent-experience.md) + [docs/adr/](docs/adr/) |
 | Know the naming convention | [docs/naming.md](docs/naming.md) |

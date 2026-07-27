@@ -451,6 +451,16 @@ Resources:
               Action: secretsmanager:GetSecretValue
               Resource:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/api/engagements-write-token-*
+            - Sid: AgentsApiMemoryWriteToken
+              # ADR-0020 — POST /agents/{slug}/memory validates the
+              # memory-curation Cadence's bearer token against this one
+              # secret (validateMemoryWriteBearer). Same scoping discipline
+              # as the feed/engagement tokens: exactly one secret path,
+              # GetSecretValue read at warm-cache time.
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/agent-workforce/workforce.memory_write_token-*
             # Issue #158 PR-β A1: project credentials LIST endpoint
             # (`GET /projects/{id}/credentials`) describes each
             # registered credential type's secret to surface metadata
@@ -478,6 +488,16 @@ Resources:
               Action: secretsmanager:GetSecretValue
               Resource:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*/voyage.api_key-*
+            # Project reports (GET /projects/{id}/reports[/{slug}]) read the
+            # report files from the project's own repo with the project-
+            # scoped GitHub token. Same narrow-key discipline as the voyage
+            # grant above: only the github.token path, NOT a broad
+            # wf/projects/* GetSecretValue.
+            - Sid: AgentsApiReportsGithubToken
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*/github.token-*
             # Epic-013 Story 3 (ADR-0006) — the operator write routes async-
             # invoke the real-time reply Lambda. Scoped to that one function.
             - Sid: AgentsApiInvokeMessagingReply
@@ -683,6 +703,18 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /agents/{slug}/engagements
             Method: POST
+        # ADR-0020 — memory-curation bounded write. No API GW authorizer:
+        # the CCR session has no SigV4 creds, so auth is bearer-token at
+        # the handler layer (validateMemoryWriteBearer →
+        # wf/projects/agent-workforce/workforce.memory_write_token), same
+        # posture as CreateFeedPost / CreateEngagement. The handler gates
+        # the write behind the ADR-0019 content contract + shrink guard.
+        UpdateAgentMemory:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}/memory
+            Method: POST
         ListProjects:
           Type: HttpApi
           Properties:
@@ -709,6 +741,22 @@ Resources:
           Properties:
             ApiId: !Ref WfAgentsHttpApi
             Path: /projects/{id}/credentials
+            Method: GET
+        # Project reports: read-at-request-time from the project's own
+        # repo (reports/manifest.json + reports/{slug}.md) using the
+        # project-scoped github.token. Public GET on the CORS gate like
+        # the other project reads; the token never leaves the Lambda.
+        ListProjectReports:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects/{id}/reports
+            Method: GET
+        GetProjectReport:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects/{id}/reports/{slug}
             Method: GET
         PatchProject:
           Type: HttpApi
