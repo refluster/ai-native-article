@@ -246,26 +246,31 @@ export async function searchAll(gh, q) {
  *  always), and it is indistinguishable from a genuinely churn-free repo — so
  *  the honest read is "unknown", not "zero". Observed in production
  *  2026-07-26: the first published REPO rows carried 0 churn with no degraded
- *  flag while the same repos returned 13 populated weeks minutes later. */
-export async function fetchCodeFrequency(gh, repo) {
-  for (let attempt = 0; attempt < 6; attempt++) {
+ *  flag while the same repos returned 13 populated weeks minutes later.
+ *
+ *  `202` and `200 []` share ONE retry budget (`wf:hana` H2b) — they are two
+ *  symptoms of the same cold stats cache, and the evidence above is that these
+ *  caches warm within minutes. Returning degraded on the first empty `200`
+ *  would trade a false zero for an avoidable unknown, which is not free on a
+ *  deck whose product is the measurement. A genuinely churn-free repo therefore
+ *  costs `attempts × delayMs` and then reports degraded forever — deliberate:
+ *  unknown beats a zero we cannot substantiate (`wf:owen` O3). */
+export async function fetchCodeFrequency(gh, repo, { attempts = 6, delayMs = 2500 } = {}) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
     const r = await gh(`/repos/${repo}/stats/code_frequency`);
-    if (r.status === 200 && Array.isArray(r.json)) {
-      if (r.json.length === 0) {
-        console.error(`${repo}: code_frequency -> 200 but empty (cold stats cache); churn marked degraded`);
-        return { weeks: [], partial: true };
-      }
+    if (r.status === 200 && Array.isArray(r.json) && r.json.length > 0) {
       return { weeks: r.json, partial: false };
     }
-    if (r.status === 202) {
-      // GitHub is still computing the stats cache — retry with backoff.
-      await sleep(2500);
+    if (r.status === 202 || (r.status === 200 && Array.isArray(r.json))) {
+      // Still computing (202) or served empty from a cold cache (200 []) —
+      // same symptom, same backoff.
+      await sleep(delayMs);
       continue;
     }
     console.error(`${repo}: code_frequency -> HTTP ${r.status}; churn marked degraded for this repo`);
     return { weeks: [], partial: true };
   }
-  console.error(`${repo}: code_frequency still computing after retries; churn marked degraded`);
+  console.error(`${repo}: code_frequency still cold after ${attempts} attempts (202 or empty 200); churn marked degraded`);
   return { weeks: [], partial: true };
 }
 

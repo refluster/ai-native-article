@@ -147,13 +147,86 @@ describe("fetchCodeFrequency (failure path)", () => {
 // it must read as "unknown", not "zero". This is the same false-zero class as
 // H2, through a case the original fix did not cover.
 describe("fetchCodeFrequency (200-but-empty is degraded, not a real zero)", () => {
+  // delayMs:0 keeps these off the real 2.5s backoff — `200 []` now consumes the
+  // retry budget (H2b), so the defaults would cost 15s per case.
+  const fast = { attempts: 3, delayMs: 0 };
+
   it("flags partial:true when GitHub returns 200 with an empty array", async () => {
     const gh = async () => ({ status: 200, json: [] });
-    expect(await fetchCodeFrequency(gh, "o/r")).toEqual({ weeks: [], partial: true });
+    expect(await fetchCodeFrequency(gh, "o/r", fast)).toEqual({ weeks: [], partial: true });
   });
 
   it("still reports partial:false when 200 carries real weeks", async () => {
     const gh = async () => ({ status: 200, json: [[1000, 5, -2]] });
-    expect(await fetchCodeFrequency(gh, "o/r")).toEqual({ weeks: [[1000, 5, -2]], partial: false });
+    expect(await fetchCodeFrequency(gh, "o/r", fast)).toEqual({ weeks: [[1000, 5, -2]], partial: false });
+  });
+});
+
+// `wf:hana` H2b + `wf:owen` O2/O3 (cycle 1 on #503, carried out of the verdict as
+// follow-up work). `202` and `200 []` are two symptoms of one cold stats cache,
+// so they now share a retry budget. These cases drive the loop across a status
+// TRANSITION — the sequence the #503 reproduction actually described — which the
+// constant-status stubs above cannot reach.
+describe("fetchCodeFrequency (shared retry budget across a status transition)", () => {
+  /** Stub `gh` that walks a scripted sequence of responses, one per attempt. */
+  const scripted = (responses: unknown[]) => {
+    let i = 0;
+    return async () => responses[Math.min(i++, responses.length - 1)];
+  };
+
+  it("recovers the real weeks when a cold 202 warms to a populated 200", async () => {
+    const gh = scripted([
+      { status: 202, json: null },
+      { status: 202, json: null },
+      { status: 200, json: [[1000, 5, -2]] },
+    ]);
+    expect(await fetchCodeFrequency(gh, "o/r", { attempts: 6, delayMs: 0 })).toEqual({
+      weeks: [[1000, 5, -2]],
+      partial: false,
+    });
+  });
+
+  it("recovers the real weeks when an empty 200 warms to a populated 200", async () => {
+    // The H2b case: before the shared budget this exited degraded on attempt 1
+    // and threw away a number the very next call would have returned.
+    const gh = scripted([
+      { status: 200, json: [] },
+      { status: 200, json: [[2000, 9, -3]] },
+    ]);
+    expect(await fetchCodeFrequency(gh, "o/r", { attempts: 6, delayMs: 0 })).toEqual({
+      weeks: [[2000, 9, -3]],
+      partial: false,
+    });
+  });
+
+  it("gives up degraded when 202 never warms past an empty 200", async () => {
+    const gh = scripted([{ status: 202, json: null }, { status: 200, json: [] }]);
+    expect(await fetchCodeFrequency(gh, "o/r", { attempts: 4, delayMs: 0 })).toEqual({
+      weeks: [],
+      partial: true,
+    });
+  });
+
+  it("stops retrying immediately on a hard HTTP error, mid-transition", async () => {
+    // A 404 is not a cold cache — it must not burn the budget waiting to warm.
+    let calls = 0;
+    const gh = async () => {
+      calls += 1;
+      return calls === 1 ? { status: 202, json: null } : { status: 404, json: {} };
+    };
+    expect(await fetchCodeFrequency(gh, "o/r", { attempts: 6, delayMs: 0 })).toEqual({ weeks: [], partial: true });
+    expect(calls).toBe(2);
+  });
+
+  // O3: this is a deliberate product decision, not an oversight. A repo with no
+  // commits in the window is indistinguishable from a cold cache, so it reports
+  // degraded forever rather than asserting a zero we cannot substantiate. Stated
+  // here so the next reader does not "fix" it back into a false zero.
+  it("reports a genuinely churn-free repo as degraded, by design", async () => {
+    const gh = async () => ({ status: 200, json: [] });
+    expect(await fetchCodeFrequency(gh, "o/r", { attempts: 3, delayMs: 0 })).toEqual({
+      weeks: [],
+      partial: true,
+    });
   });
 });

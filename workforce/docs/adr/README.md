@@ -85,7 +85,7 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0016](adr-0016-podcast-production-surface.md) | Podcast production & distribution execution surface (deterministic `wf-podcast` Lambda + Polly/public-RSS egress, within R-N1) | Proposed | [017](../epics/epic-017-podcast-spotify-distribution.md) |
 | [0017](adr-0017-skill-lifecycle-api.md) | Skill lifecycle API: display-name/slug split, archive soft-delete, API-first creation, per-skill run ledger | Proposed | [008](../epics/epic-008-skill-repository.md) |
 | [0018](adr-0018-skill-body-version-gated-sync.md) | Skill judgment-config syncs from git on a version gate (supersedes ADR-0008 §Decision-5's create-only seed) + a PR-time drift guard | Proposed | [008](../epics/epic-008-skill-repository.md) |
-| [0019](adr-0019-agent-semantic-memory.md) | Agent semantic memory: curated MEMORY.md on the META row, injected at every fire (layer 3.5) | Proposed | [018](../epics/epic-018-semantic-memory-curation.md) |
+| [0019](adr-0019-agent-semantic-memory.md) | Agent semantic memory: curated MEMORY.md on the META row, injected at every fire (layer 3.5) | Accepted | [018](../epics/epic-018-semantic-memory-curation.md) |
 | [0020](adr-0020-delegated-memory-curation.md) | Delegated memory curation: bounded token write for the memory profile block (POST /agents/{slug}/memory + shrink guard) | Superseded by [0021](adr-0021-dynamic-memory-write-token.md) | [018](../epics/epic-018-semantic-memory-curation.md) |
 | [0021](adr-0021-dynamic-memory-write-token.md) | Dynamic memory-write token: ADR-0009's minted-token pattern replaces the static secret | Accepted | [018](../epics/epic-018-semantic-memory-curation.md) |
 

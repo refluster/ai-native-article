@@ -70,6 +70,16 @@ jobs:
       - name: Workforce scan-drain guard (Dario L2 / FU-PROJ-SCAN)
         run: npm run workforce:scan-drain
 
+      - name: Workforce W-4 cycle-cap guard (FU-004)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node workforce/scripts/check-cycle-count.mjs --repo "$GITHUB_REPOSITORY"
+
+      - name: Workforce ML-009 escalation-label guard (OP-010)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node workforce/scripts/check-escalation-labels.mjs --repo "$GITHUB_REPOSITORY"
+
       - name: Workforce Lambda typecheck
         run: cd workforce/lambdas && npm ci && npm run typecheck
 
