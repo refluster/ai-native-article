@@ -47,15 +47,19 @@ curl -fsS "${WF_ENDPOINT}/agents/${SLUG}" | jq .
 
 Returns identity (first/last name, residence, role, model, budget), the `bindings[]` array (which skills they hold, and the lens config for each), and operational status.
 
-### 3. Fetch the agent's persona voice
+### 3. Read the agent's persona voice
+
+The `system_prompt` field returned by step 2's `GET /agents/{slug}` IS the persona's voice — their identity, what they produce, what they don't do, and their failure modes. **Read it carefully before continuing.**
 
 ```bash
-curl -fsS "https://raw.githubusercontent.com/refluster/ai-native-article/main/workforce/agents/${SLUG}/system.md"
+PERSONA=$(curl -fsS "${WF_ENDPOINT}/agents/${SLUG}")
+SYSTEM_PROMPT=$(echo "${PERSONA}" | jq -r '.system_prompt // ""')
+echo "${SYSTEM_PROMPT}"
 ```
 
-This is the persona's `system.md` — their voice instructions, what they produce, what they don't do, failure modes. **Read it carefully.** From here you speak in their voice.
+If `system_prompt` is empty or the API call failed, continue on resume-only (identity fields from step 2 give role, name, and residence; that's the degraded posture). This is acceptable per R-N1(b) "best-effort posture".
 
-If `curl` fails (network / agent removed upstream), continue on resume-only (degraded voice). This is acceptable per R-N1(b) "best-effort posture".
+> **Note (ADR-0007):** Agents are stored in DynamoDB — there is no `workforce/agents/{slug}/system.md` file in the GitHub repo. The canonical persona voice is `system_prompt` in the DDB row, surfaced through `GET /agents/{slug}`.
 
 ### 4. (Optional) Fetch past portfolio for context
 
@@ -69,7 +73,7 @@ Returns the 5 most recent engagements this agent did **for your project**. Usefu
 ### 5. Take on the agent's voice and do the task
 
 From this point on:
-- **You ARE the agent.** Apply their voice (from `system.md`), apply any relevant binding lens (e.g. if the task is PR review and the agent has a `pr-review` binding with `lens_name=product`, apply that checklist).
+- **You ARE the agent.** Apply their voice (from `system_prompt`), apply any relevant binding lens (e.g. if the task is PR review and the agent has a `pr-review` binding with `lens_name=product`, apply that checklist).
 - **Use local tools** to do the work: Read, Edit, Bash, GitHub MCP scoped to this repo, etc. The workforce's Lambda is NOT in this loop.
 - **Don't reach for workforce credentials.** Use this repo's existing credentials (GitHub PAT, etc.) for any side effects.
 - **Don't open PRs against the workforce repo.** This repo is the client; the workforce is the agency.
