@@ -46,6 +46,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { assertPerfProvenance, measuredZeroSignals, repoSignals } from "./perf-provenance.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const PROJECTS_DIR = join(ROOT, "workforce", "projects");
@@ -292,15 +293,33 @@ async function fetchProjectActivity(project, { days, token, api }) {
   const sinceEpoch = Math.floor(new Date(`${sinceIso}T00:00:00Z`).getTime() / 1000);
   const code_churn_weekly = buildWeeklyChurn(churn.weeks, sinceEpoch);
 
+  const partialBySignal = {
+    issues_opened: issuesOpened.partial,
+    issues_closed: issuesClosed.partial,
+    prs_opened: prsOpened.partial,
+    prs_closed: prsClosed.partial,
+    code_churn: churn.partial,
+  };
+
   // Name every signal that came back incomplete, so a degraded number is
   // never presented as a real one (see searchAll's contract).
-  const degraded_signals = [
-    issuesOpened.partial && 'issues_opened',
-    issuesClosed.partial && 'issues_closed',
-    prsOpened.partial && 'prs_opened',
-    prsClosed.partial && 'prs_closed',
-    churn.partial && 'code_churn',
-  ].filter(Boolean);
+  const degraded_signals = Object.entries(partialBySignal)
+    .filter(([, partial]) => partial)
+    .map(([signal]) => signal);
+
+  const summary = {
+    issues_opened: issuesOpened.items.length,
+    issues_closed: issuesClosed.items.length,
+    prs_opened: prsOpened.items.length,
+    prs_closed: prsClosed.items.length,
+    total_additions: code_churn_weekly.reduce((a, w) => a + w.additions, 0),
+    total_deletions: code_churn_weekly.reduce((a, w) => a + w.deletions, 0),
+  };
+
+  // The other half of the #505 provenance contract: a zero that we actually
+  // measured says so, so the writer guard can tell it apart from an unknown
+  // without anyone hand-maintaining a second list.
+  const measured_zero = measuredZeroSignals(repoSignals(summary), partialBySignal);
 
   return {
     scope: project.id,
@@ -309,15 +328,9 @@ async function fetchProjectActivity(project, { days, token, api }) {
     issues_daily,
     prs_daily,
     code_churn_weekly,
-    summary: {
-      issues_opened: issuesOpened.items.length,
-      issues_closed: issuesClosed.items.length,
-      prs_opened: prsOpened.items.length,
-      prs_closed: prsClosed.items.length,
-      total_additions: code_churn_weekly.reduce((a, w) => a + w.additions, 0),
-      total_deletions: code_churn_weekly.reduce((a, w) => a + w.deletions, 0),
-    },
+    summary,
     ...(degraded_signals.length > 0 ? { degraded_signals } : {}),
+    ...(measured_zero.length > 0 ? { measured_zero } : {}),
   };
 }
 
@@ -390,6 +403,16 @@ async function main() {
     ];
   }
 
+  // Aggregate provenance (#505): a zero total is a measured zero only when no
+  // contributing repo was degraded on that signal — otherwise the aggregate's
+  // zero is an unknown, and the degraded roll-up above already says so.
+  const aggregateDegraded = new Set(workforce.degraded_signals ?? []);
+  const workforceMeasuredZero = measuredZeroSignals(
+    repoSignals(workforce.summary),
+    Object.fromEntries([...aggregateDegraded].map((s) => [s, true])),
+  );
+  if (workforceMeasuredZero.length > 0) workforce.measured_zero = workforceMeasuredZero;
+
   let comment =
     "REAL data — GitHub-derived repository activity (issues/PRs opened+closed, code churn) " +
     "across every workforce project's repo. Built by workforce/scripts/build-repo-performance.mjs. " +
@@ -436,6 +459,16 @@ async function main() {
       ...results.map((r) => ({ scope: r.scope, body: r, repos: [r.scope] })),
     ];
     for (const { scope, body, repos } of rows) {
+      // #505 writer-boundary guard: refuse a zero that says nothing about
+      // which kind of zero it is. Throws (W-4) rather than publishing a false
+      // low onto the Repository Performance deck.
+      assertPerfProvenance({
+        pk: `PERF#${scope}`,
+        sk: "REPO",
+        metrics: repoSignals(body.summary),
+        degraded_signals: body.degraded_signals,
+        measured_zero: body.measured_zero,
+      });
       await ddb.send(
         new PutCommand({
           TableName: TABLE,
@@ -451,6 +484,7 @@ async function main() {
             summary: body.summary,
             repos,
             ...(body.degraded_signals?.length ? { degraded_signals: body.degraded_signals } : {}),
+            ...(body.measured_zero?.length ? { measured_zero: body.measured_zero } : {}),
           },
         }),
       );

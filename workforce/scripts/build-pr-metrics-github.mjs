@@ -30,6 +30,8 @@
 //     --repo PSVL/asp-cloud --scope asp-cloud [--days 28] \
 //     [--publish-ddb --table wf-table-prod] [--dry-run]
 
+import { assertPerfProvenance, measuredZeroSignals, prSignals } from "./perf-provenance.mjs";
+
 const GREEN_MARKER_RE = /<!--\s*autopilot:review:[a-z0-9-]+:green\s*-->/i;
 const REVIEWER_SLUG_RE = /<!--\s*autopilot:review:([a-z0-9-]+):green\s*-->/gi;
 const NEEDS_HUMAN_LABEL = "autopilot:needs-human";
@@ -297,6 +299,15 @@ async function main() {
   }
 
   const block = aggregate(prs, { sinceIso });
+  // #505 provenance: every fetch on this path is fail-closed — a non-200 from
+  // any of the three searches returns 3 above rather than falling through with
+  // a short list — so reaching here means the searches really did return what
+  // they returned, and a zero here is a measured zero. That reasoning is the
+  // provenance; it is recorded on the row rather than left in this comment.
+  // If a future fetch on this path CAN come back partial, it must feed a
+  // `partial` flag in here, or the writer guard will refuse its zeros.
+  const prPartialBySignal = {};
+  block.measured_zero = measuredZeroSignals(prSignals(block.pr_summary), prPartialBySignal);
   // Epic-019: the escalation-reason funnel lives on the same PERF#{scope}/PR
   // item (R-N2: no new store), inside pr_summary — as does the Story-2c
   // flaky-rerun roll-up (warn is print-only, not stored).
@@ -324,6 +335,13 @@ async function main() {
   const { DynamoDBClient } = await importLambdaDep("@aws-sdk/client-dynamodb");
   const { DynamoDBDocumentClient, PutCommand } = await importLambdaDep("@aws-sdk/lib-dynamodb");
   const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), { marshallOptions: { removeUndefinedValues: true } });
+  assertPerfProvenance({
+    pk: `PERF#${scope}`,
+    sk: "PR",
+    metrics: prSignals(block.pr_summary),
+    degraded_signals: block.degraded_signals,
+    measured_zero: block.measured_zero,
+  });
   await ddb.send(new PutCommand({ TableName: TABLE, Item: { pk: `PERF#${scope}`, sk: "PR", scope, updated_at: new Date().toISOString(), ...block } }));
   console.error(`published PERF#${scope}/PR to ${TABLE}`);
   return 0;

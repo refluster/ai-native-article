@@ -42,6 +42,7 @@ import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { assertPerfProvenance, measuredZeroSignals, prSignals } from './perf-provenance.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MOCK = join(ROOT, 'workforce/app/public/workforce-mock-performance.json');
@@ -180,6 +181,34 @@ const block = {
     .sort((a, b) => b.prs - a.prs),
 };
 
+// #505 provenance. git is authoritative for the commits it HAS — but a shallow
+// clone (CI's default `fetch-depth: 1`) has almost none, so `git log --since`
+// returns an empty list that looks exactly like a quiet month. That is the same
+// no-data-vs-data-showing-none conflation as #498/#503, on a third path. Mark
+// the git-derived signals unknown when the clone cannot cover the window.
+// Coverage, not shallowness, is the honest test: a clone reaching back past
+// the window start can answer the question whichever way `git clone --depth`
+// was called. If nothing reachable predates `sinceIso`, the window is
+// truncated and every derived count is an undercount — the same `partial`
+// semantics searchAll already uses in build-repo-performance.mjs.
+const windowCovered = (() => {
+  try {
+    return execSync(`git rev-list -1 --before=${sinceIso} ${BRANCH}`, { cwd: ROOT, encoding: 'utf8' }).trim() !== '';
+  } catch {
+    return false; // cannot tell -> unknown, never a measured zero
+  }
+})();
+if (!windowCovered) {
+  block.degraded_signals = ['total_prs', 'autopilot_merged', 'total_additions', 'total_deletions'];
+  console.error(
+    `WARN git history does not reach ${sinceIso} (shallow or new clone) — the ${DAYS}d PR signals are undercounts, marked degraded rather than published as real lows`,
+  );
+}
+block.measured_zero = measuredZeroSignals(
+  prSignals(block.pr_summary),
+  Object.fromEntries((block.degraded_signals ?? []).map((s) => [s, true])),
+);
+
 console.error(
   `derived ${totals.prs} PRs over ${DAYS}d (${block.window.start}→${block.window.end}); ` +
     `autopilot proxy = "no human author" → ${block.pr_summary.autopilot_share * 100}% ` +
@@ -198,6 +227,8 @@ function prRowItem(scope, b) {
     pr_daily: b.pr_daily,
     pr_summary: b.pr_summary,
     pr_contributors: b.pr_contributors,
+    ...(b.degraded_signals?.length ? { degraded_signals: b.degraded_signals } : {}),
+    ...(b.measured_zero?.length ? { measured_zero: b.measured_zero } : {}),
   };
 }
 
@@ -217,6 +248,13 @@ async function publishToDdb(scope, b) {
   const { DynamoDBDocumentClient, PutCommand } = await importLambdaDep('@aws-sdk/lib-dynamodb');
   const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
     marshallOptions: { removeUndefinedValues: true },
+  });
+  assertPerfProvenance({
+    pk: `PERF#${scope}`,
+    sk: 'PR',
+    metrics: prSignals(b.pr_summary),
+    degraded_signals: b.degraded_signals,
+    measured_zero: b.measured_zero,
   });
   await ddb.send(new PutCommand({ TableName: TABLE, Item: prRowItem(scope, b) }));
   console.error(`published PERF#${scope}/PR to ${TABLE}`);
