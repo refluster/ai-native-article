@@ -244,10 +244,29 @@ export interface ListAgentPostsFilter {
  *  prefix `POST#` and `ScanIndexForward=false`. Doesn't need GSI3 —
  *  the agent partition is naturally bounded to that agent's posts.
  *
- *  Range filters on `from`/`to` are post-filtered (the sort key is a
- *  ULID, not the raw timestamp, so we can't push the range down on this
- *  path). Acceptable at v1 cadence; if it gets hot, add a per-agent
- *  GSI keyed by `posted_at` (Story 5+/follow-up). */
+ *  **The sort key is a ULID, so DDB returns rows in ULID-MINT order, not
+ *  `posted_at` order.** Those agree only while every post is written at the
+ *  moment it is posted; a backfill, a replay, or a clock skew mints a high
+ *  ULID for an old `posted_at` and that post then sorts to the top. That is
+ *  a real defect this endpoint shipped with — the per-agent tab on the
+ *  console showed a 63-day-old post above one from minutes earlier
+ *  (operator report, nadia). `/feed` was never affected: it ranges over
+ *  GSI3, whose sort key IS `posted_at`.
+ *
+ *  So the page is re-sorted on `posted_at` before it is returned, making
+ *  the ordering contract this docstring always claimed actually true.
+ *
+ *  Known limit, deliberately not papered over: the re-sort orders WITHIN a
+ *  page, while pagination still cuts pages on ULID order. With divergent
+ *  ULIDs, page 2 can therefore hold a post newer than page 1's oldest. The
+ *  console reads a single 25-row page, so the operator-visible symptom is
+ *  fixed; a globally correct order needs a per-agent GSI keyed on
+ *  `posted_at` (the same shape GSI3 already uses for `/feed`), which is a
+ *  schema change and its own PR.
+ *
+ *  Range filters on `from`/`to` are post-filtered for the same reason the
+ *  ordering needs fixing — the sort key is not the timestamp, so the range
+ *  can't be pushed down on this path. */
 export async function listAgentPosts(
   filter: ListAgentPostsFilter,
 ): Promise<PagedResult<FeedPostRow>> {
@@ -256,15 +275,21 @@ export async function listAgentPosts(
     "POST#",
     filter.pageSize,
     filter.cursor,
-    false, // descending — newest first
+    false, // descending — newest-minted first
   );
-  const items = page.items.filter((row) => {
-    if (filter.kind && row.kind !== filter.kind) return false;
-    if (filter.from && row.posted_at < filter.from) return false;
-    if (filter.to && row.posted_at > filter.to) return false;
-    if (!filter.includeHidden && row.visibility === "hidden") return false;
-    return true;
-  });
+  const items = page.items
+    .filter((row) => {
+      if (filter.kind && row.kind !== filter.kind) return false;
+      if (filter.from && row.posted_at < filter.from) return false;
+      if (filter.to && row.posted_at > filter.to) return false;
+      if (!filter.includeHidden && row.visibility === "hidden") return false;
+      return true;
+    })
+    // Newest first by the field the reader actually means by "recent".
+    // ISO-8601 UTC timestamps compare correctly as strings; the ULID tie-
+    // break keeps the order total (and stable) when two posts share a
+    // `posted_at`.
+    .sort((a, b) => (a.posted_at === b.posted_at ? b.sk.localeCompare(a.sk) : a.posted_at < b.posted_at ? 1 : -1));
   return { items, cursor: page.cursor };
 }
 

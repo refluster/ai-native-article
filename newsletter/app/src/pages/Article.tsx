@@ -13,6 +13,7 @@ import { buildSourceIndex } from '../lib/source-links'
 import SourcesUsedSection from '../components/article/SourcesUsedSection'
 import AnalysesUsingSection from '../components/article/AnalysesUsingSection'
 import AuthorChip from '../components/byline/AuthorChip'
+import { parseAuthorSlugs } from '../lib/byline'
 
 interface Frontmatter extends ArticleMeta {
   notionId?: string
@@ -266,11 +267,16 @@ export default function Article() {
             <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-tight mb-8">
               {meta.title}
             </h1>
-            {meta.author && (
-              <div className="mb-6">
-                <AuthorChip slug={meta.author} size={32} />
-              </div>
-            )}
+            {meta.author && (() => {
+              const slugs = parseAuthorSlugs(meta.author)
+              return (
+                <div className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-2">
+                  {slugs.map((slug) => (
+                    <AuthorChip key={slug} slug={slug} size={32} compact={slugs.length > 1} />
+                  ))}
+                </div>
+              )
+            })()}
             {meta.abstract && (
               <p className="text-xl leading-relaxed text-on-surface-variant mb-8 border-l-4 border-tertiary pl-6">
                 {meta.abstract}

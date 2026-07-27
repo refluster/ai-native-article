@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Software Talent Network">
+  <title>Software Talent Network</title>
+  <!--
+    The workforce mark. One solid node above two open ones, joined by two
+    edges: the MVV in a glyph — humans hold the constitutional layer and set
+    direction (the filled steward node), agents carry the execution beneath
+    it (the open nodes), and the edges are the delegation the org chart is
+    made of. Ink ground (wf-primary #0f1b46), white figure, no gradients —
+    it has to survive being 16px tall in a browser tab.
+  -->
+  <rect width="32" height="32" rx="7" fill="#0f1b46"/>
+  <g stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" fill="none">
+    <path d="M14.6 12.4 11.6 19.6" opacity="0.65"/>
+    <path d="M17.4 12.4 20.4 19.6" opacity="0.65"/>
+    <circle cx="10.4" cy="22.4" r="2.6"/>
+    <circle cx="21.6" cy="22.4" r="2.6"/>
+  </g>
+  <circle cx="16" cy="9.6" r="3.1" fill="#ffffff"/>
+</svg>

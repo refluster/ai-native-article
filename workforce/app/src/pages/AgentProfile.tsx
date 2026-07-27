@@ -21,6 +21,15 @@
 // extension that re-enriches the EXEC row with notion_page_url /
 // pr_url so the affordance can come back).
 
+// Progressive rendering (2026-07-26). The page used to gate everything —
+// breadcrumb, hero, KPIs, tabs — on one `Promise.all([findAgent, roster,
+// stats])`, so the operator got a bare "Loading…" for the length of the
+// slowest of three live reads. The loads are now independent and each
+// region carries its own skeleton: the persona detail paints the hero, the
+// /stats roll-up fills the KPI tiles behind it, and the roster only gates
+// the org-graph card in the sidebar. The tab bar is interactive from the
+// first frame.
+
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import WorkforceLayout from '../components/WorkforceLayout';
@@ -33,6 +42,12 @@ import AgentOrgGraph from '../components/AgentOrgGraph';
 import RecentPostsSection from '../components/RecentPostsSection';
 import BindingsEditor from '../components/BindingsEditor';
 import ExecutionTimeline from '../components/ExecutionTimeline';
+import {
+  SkeletonKPIReadout,
+  SkeletonPanel,
+  SkeletonProfileHero,
+} from '../components/Skeleton';
+import { useAsync } from '../lib/useAsync';
 import {
   apiConfigured,
   fetchAgentExecutions,
@@ -85,58 +100,36 @@ export default function AgentProfile() {
     else searchParams.set('tab', next);
     setSearchParams(searchParams, { replace: true });
   };
-  const [agent, setAgent] = useState<WorkforceAgent | null | undefined>(undefined);
-  const [roster, setRoster] = useState<WorkforceAgent[]>([]);
-  const [mock, setMock] = useState<WorkforceMockStats | null>(null);
-  const [live, setLive] = useState<AgentLiveRecord | null | undefined>(undefined);
-  const [execs, setExecs] = useState<AgentExecution[] | null>(null);
-  const [liveError, setLiveError] = useState<string | null>(null);
+  // Four independent reads. `agentState` is the only one the page can't
+  // render without; the rest fill in their own regions as they land.
+  const agentState = useAsync(async () => (slug ? (await findAgent(slug)) ?? null : null), [slug]);
+  const rosterState = useAsync(async () => (await loadWorkforceManifest()).agents, []);
+  const mockState = useAsync(() => loadWorkforceStats(), []);
+  // Fetch a deeper window (not just 20) so the unified ACTIVITY ledger has a
+  // meaningful run of recent history to render; it shows the most recent
+  // ACTIVITY_LIMIT rows newest-first.
+  const liveState = useAsync(
+    async () => {
+      if (!slug || !apiConfigured()) return { live: null, execs: [] as AgentExecution[] };
+      const [l, d] = await Promise.all([fetchAgentLive(slug), fetchAgentExecutions(slug, 100)]);
+      return { live: l ?? null, execs: d };
+    },
+    [slug],
+  );
 
-  // Load persona + mock stats up front.
-  useEffect(() => {
-    if (!slug) return;
-    let cancelled = false;
-    Promise.all([findAgent(slug), loadWorkforceManifest(), loadWorkforceStats()])
-      .then(([a, m, s]) => {
-        if (cancelled) return;
-        setAgent(a ?? null);
-        setRoster(m.agents);
-        setMock(s);
-      })
-      .catch(() => {
-        if (!cancelled) setAgent(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [slug]);
+  const agent: WorkforceAgent | null | undefined = agentState.loading ? undefined : agentState.data;
+  const roster: WorkforceAgent[] = rosterState.data ?? [];
+  const mock: WorkforceMockStats | null = mockState.data;
+  const live: AgentLiveRecord | null = liveState.data?.live ?? null;
+  const execs: AgentExecution[] | null = liveState.loading ? null : liveState.data?.execs ?? [];
+  const liveError = liveState.error;
 
-  // Layer live data on top when the API is wired.
+  // The bindings editor PATCHes and gets the authoritative post-write array
+  // back; hold it locally so the tab reflects the write without re-reading
+  // the whole persona. Cleared on navigation to another agent.
+  const [bindingsOverride, setBindingsOverride] = useState<WorkforceAgent['bindings'] | null>(null);
   useEffect(() => {
-    if (!slug || !apiConfigured()) {
-      setLive(null);
-      setExecs([]);
-      return;
-    }
-    let cancelled = false;
-    // Fetch a deeper window (not just 20) so the unified ACTIVITY ledger
-    // has a meaningful run of recent history to render; it shows the most
-    // recent ACTIVITY_LIMIT rows newest-first.
-    Promise.all([fetchAgentLive(slug), fetchAgentExecutions(slug, 100)])
-      .then(([l, d]) => {
-        if (cancelled) return;
-        setLive(l ?? null);
-        setExecs(d);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setLive(null);
-        setExecs([]);
-        setLiveError(err instanceof Error ? err.message : String(err));
-      });
-    return () => {
-      cancelled = true;
-    };
+    setBindingsOverride(null);
   }, [slug]);
 
   useEffect(() => {
@@ -149,9 +142,21 @@ export default function AgentProfile() {
   );
 
   if (agent === undefined) {
+    // Skeleton in the shape of the real profile — breadcrumb and page
+    // chrome are real, so nothing below reflows when the persona lands.
     return (
       <WorkforceLayout>
-        <div className="font-wfmono text-xs uppercase tracking-[0.14em] text-wf-on-surface-variant">Loading…</div>
+        <Breadcrumb slug={slug} />
+        <section className="mb-8 sm:mb-10">
+          <SkeletonProfileHero />
+        </section>
+        <section className="mb-8 sm:mb-10">
+          <SkeletonKPIReadout />
+        </section>
+        <div className="space-y-6">
+          <SkeletonPanel label="Loading agent detail" lines={5} />
+          <SkeletonPanel label="Loading agent configuration" lines={3} />
+        </div>
       </WorkforceLayout>
     );
   }
@@ -201,14 +206,7 @@ export default function AgentProfile() {
 
   return (
     <WorkforceLayout>
-      {/* Breadcrumb */}
-      <div className="mb-4 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-        <Link to="/" className="hover:text-wf-on-surface">HOME</Link>
-        <span className="mx-2">/</span>
-        <Link to="/agents" className="hover:text-wf-on-surface">CREW</Link>
-        <span className="mx-2">/</span>
-        <span className="text-wf-on-surface">{agent.slug.toUpperCase()}</span>
-      </div>
+      <Breadcrumb slug={agent.slug} />
 
       {/* HERO */}
       <section className="mb-8 sm:mb-10 flex flex-col md:flex-row md:items-start gap-4 sm:gap-6">
@@ -232,9 +230,11 @@ export default function AgentProfile() {
         </div>
       </section>
 
-      {/* KPIs */}
+      {/* KPIs — the figures come from /stats + the live agent record, both
+          slower than the persona detail above. Hold the tile shape until at
+          least one of them lands rather than flashing four em-dashes. */}
       <section className="mb-8 sm:mb-10">
-        <KPIReadout items={kpis} />
+        {mockState.loading && liveState.loading ? <SkeletonKPIReadout /> : <KPIReadout items={kpis} />}
         {!apiConfigured() && (
           <p className="mt-2 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
             * mocked — wire WORKFORCE_AGENTS_API_BASE for live data
@@ -316,9 +316,14 @@ export default function AgentProfile() {
             </section>
           </div>
 
-          {/* SIDEBAR */}
+          {/* SIDEBAR — the org graph is the one region that needs the full
+              roster, so it (and only it) waits on that read. */}
           <aside className="lg:col-span-1 space-y-6">
-            {roster.length > 0 && <AgentOrgGraph agent={agent} roster={roster} />}
+            {rosterState.loading ? (
+              <SkeletonPanel label="Loading reporting graph" lines={5} />
+            ) : (
+              roster.length > 0 && <AgentOrgGraph agent={agent} roster={roster} />
+            )}
           </aside>
         </div>
       )}
@@ -385,12 +390,26 @@ export default function AgentProfile() {
         <div className="space-y-6">
           <BindingsEditor
             slug={agent.slug}
-            bindings={agent.bindings}
-            onUpdated={(next) => setAgent({ ...agent, bindings: next })}
+            bindings={bindingsOverride ?? agent.bindings}
+            onUpdated={setBindingsOverride}
           />
         </div>
       )}
     </WorkforceLayout>
+  );
+}
+
+/** Page chrome that needs no data — rendered in the skeleton state too, so
+ *  the operator has a way back out while the persona is still loading. */
+function Breadcrumb({ slug }: { slug: string | undefined }) {
+  return (
+    <div className="mb-4 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+      <Link to="/" className="hover:text-wf-on-surface">HOME</Link>
+      <span className="mx-2">/</span>
+      <Link to="/agents" className="hover:text-wf-on-surface">CREW</Link>
+      <span className="mx-2">/</span>
+      <span className="text-wf-on-surface">{(slug ?? '').toUpperCase()}</span>
+    </div>
   );
 }
 

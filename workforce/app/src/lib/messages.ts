@@ -14,6 +14,8 @@ import { assertSigv4Configured, signedFetch } from './sigv4';
 export const OPERATOR_ID = 'operator';
 
 export interface ChatMessage {
+  /** Server message ULID (live threads); absent on mock/summary messages. */
+  id?: string;
   /** Agent slug, or OPERATOR_ID for the human running the network. */
   from: string;
   /** ISO timestamp. */
@@ -32,7 +34,12 @@ export interface Conversation {
   starred: boolean;
   /** Unread message count (0 = read). */
   unread: number;
+  /** Loaded messages, chronological. Live threads hold the newest page(s);
+   *  older history is walked in via `olderCursor` (Epic-024). */
   messages: ChatMessage[];
+  /** Opaque cursor to the next OLDER message page; absent when the loaded
+   *  history reaches the start of the thread (and on mock threads). */
+  olderCursor?: string;
 }
 
 // Thread templates keyed by the talent the operator is talking to. Slugs
@@ -166,6 +173,9 @@ interface ThreadDetailDto {
   created_by: string;
   created_at: string;
   messages: Array<{ message_id: string; from: string; at: string; body: string }>;
+  /** Cursor to the next older message page (Epic-024); absent at the start
+   *  of the thread. */
+  older_cursor?: string;
 }
 
 function summaryToConversation(t: ThreadSummaryDto): Conversation {
@@ -190,7 +200,8 @@ function detailToConversation(d: ThreadDetailDto): Conversation {
     groupLabel: d.group_label,
     starred: d.starred,
     unread: 0,
-    messages: d.messages.map((m) => ({ from: m.from, at: m.at, body: m.body })),
+    messages: d.messages.map((m) => ({ id: m.message_id, from: m.from, at: m.at, body: m.body })),
+    olderCursor: d.older_cursor,
   };
 }
 
@@ -204,15 +215,54 @@ export async function fetchThreadSummaries(): Promise<Conversation[]> {
   return data.threads.map(summaryToConversation);
 }
 
-/** Fetch one thread's full transcript. Returns undefined on 404 / when the
- *  live API is not configured. */
-export async function fetchThreadDetail(id: string): Promise<Conversation | undefined> {
+/** Fetch one page of a thread's transcript — the NEWEST page by default,
+ *  or the older page at `cursor` (Epic-024 reverse history walk). Returns
+ *  undefined on 404 / when the live API is not configured. */
+export async function fetchThreadDetail(
+  id: string,
+  opts: { cursor?: string; pageSize?: number } = {},
+): Promise<Conversation | undefined> {
   if (!apiConfigured()) return undefined;
-  const res = await fetch(`${WORKFORCE_AGENTS_API_BASE}/threads/${encodeURIComponent(id)}`);
+  const params = new URLSearchParams();
+  if (opts.cursor) params.set('cursor', opts.cursor);
+  if (opts.pageSize !== undefined) params.set('page_size', String(opts.pageSize));
+  const qs = params.size > 0 ? `?${params.toString()}` : '';
+  const res = await fetch(`${WORKFORCE_AGENTS_API_BASE}/threads/${encodeURIComponent(id)}${qs}`);
   if (res.status === 404) return undefined;
   if (!res.ok) throw new Error(`agents-api ${res.status}`);
   const d = (await res.json()) as ThreadDetailDto;
   return detailToConversation(d);
+}
+
+/** Stable identity for de-duplicating merged pages: the server ULID when
+ *  present, else the (from, at, body) triple (mock / summary messages). */
+function messageKey(m: ChatMessage): string {
+  return m.id ?? `${m.from}|${m.at}|${m.body}`;
+}
+
+/**
+ * Union two loaded slices of one thread's history into a single
+ * chronological list, dropping duplicates (pages overlap when a poll
+ * re-fetches the newest page after older pages were prepended). Pure so
+ * the page can derive cache updates and the test can pin the ordering.
+ */
+export function mergeMessages(a: ChatMessage[], b: ChatMessage[]): ChatMessage[] {
+  const seen = new Set<string>();
+  const merged: ChatMessage[] = [];
+  for (const m of [...a, ...b]) {
+    const k = messageKey(m);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    merged.push(m);
+  }
+  return merged.sort((x, y) => {
+    const d = Date.parse(x.at) - Date.parse(y.at);
+    if (d !== 0) return d;
+    // ULIDs are time-ordered — tie-break same-second messages by id.
+    const xi = x.id ?? '';
+    const yi = y.id ?? '';
+    return xi < yi ? -1 : xi > yi ? 1 : 0;
+  });
 }
 
 // ----- Operator write path (Epic-013 Story 2b) -----
@@ -259,12 +309,20 @@ async function postSigned(path: string, body?: unknown): Promise<Response> {
   return res;
 }
 
-/** Start a 1:1 thread with `talentSlug`, seeded with `body`. v1 is
- *  operator-initiated and single-recipient (group threads deferred); the
- *  backend already supports `participants[]`/`group_label` for later.
- *  Returns the new thread id so the caller can select it. */
-export async function createThread(talentSlug: string, body: string): Promise<string> {
-  const res = await postSigned('/threads', { participants: [talentSlug], body });
+/** Start a thread with one or more talents, seeded with `body` (Epic-024:
+ *  >1 slug creates a group thread — the backend derives `group` from the
+ *  participant count). Returns the new thread id so the caller can select
+ *  it. */
+export async function createThread(
+  talentSlugs: string[],
+  body: string,
+  groupLabel?: string,
+): Promise<string> {
+  const res = await postSigned('/threads', {
+    participants: talentSlugs,
+    body,
+    ...(groupLabel !== undefined ? { group_label: groupLabel } : {}),
+  });
   const data = (await res.json()) as { thread_id: string };
   return data.thread_id;
 }

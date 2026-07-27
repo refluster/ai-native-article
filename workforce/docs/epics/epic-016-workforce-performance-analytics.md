@@ -1,6 +1,6 @@
 # Epic-016 — Workforce performance analytics (per-project + cross-project)
 
-- **Status**: In-progress. Phase 1 **shipped** (#357 / #359). Phase 2 (live lifecycle reducer + `/performance` endpoints, #361) is **deployed and serving** — the live endpoints return real reducer data (confirmed 2026-06-23 against the execute-api origin). Phase 3 (2026-06-23) **populated real data**: widened `delivered`, a 28-day lifecycle backfill, and an authoritative GitHub-API PR builder — all run against prod, so the decks now show 28-day curves + real PR/autopilot metrics (workforce 218 PRs / 2.8% autopilot; asp-cloud 214 / 4.2%). Q1/Q2/Q3 **resolved**. **Remaining**: redeploy the reducer (widened `delivered`, OP-011 — tracked as [#436](https://github.com/refluster/ai-native-article/issues/436)) + schedule the daily PR refresh (OP-012 — tracked as [#437](https://github.com/refluster/ai-native-article/issues/437)).
+- **Status**: In-progress. Phase 1 **shipped** (#357 / #359). Phase 2 (live lifecycle reducer + `/performance` endpoints, #361) is **deployed and serving** — the live endpoints return real reducer data (confirmed 2026-06-23 against the execute-api origin). Phase 3 (2026-06-23) **populated real data**: widened `delivered`, a 28-day lifecycle backfill, and an authoritative GitHub-API PR builder — all run against prod, so the decks now show 28-day curves + real PR/autopilot metrics (workforce 218 PRs / 2.8% autopilot; asp-cloud 214 / 4.2%). Q1/Q2/Q3 **resolved**. Phase 4 (2026-07-26) **closed OP-012**: the `performance-refresh` Cadence (owner tomas, daily) republishes the PR + the new repository-activity roll-ups and reports their freshness, ending the month-long silent freeze of the PR block. **Remaining**: redeploy the reducer (widened `delivered`, OP-011 — tracked as [#436](https://github.com/refluster/ai-native-article/issues/436)).
 
 > **Status reconciliation (2026-06-23, Nadia).** Phase 2 is live (the reducer ran and the `/performance` endpoints serve real data — the earlier "pending `sam deploy`" note is superseded). Phase 3 added real-data population on top; the only open work is the ongoing daily refresh wiring (OP-011 reducer redeploy for the widened `delivered`, OP-012 daily PR refresh; issue-tracked since 2026-07-05 as #436 / #437). Flip to Implemented once those land.
 - **Owner**: nadia
@@ -270,7 +270,46 @@ authored by the one push identity). Phase 3 makes the data real:
 
 **Remaining operator wiring (the "daily batch" so it stays fresh):**
 1. **Redeploy the reducer** (broadened `delivered`) so ongoing daily snapshots match the backfill.
-2. **Schedule a daily PR refresh** — run `build-pr-metrics-github.mjs --publish-ddb` per scope (workforce + each project with a repo) on a cron, OR fold it into the reducer Lambda (needs the project `github.token` in the reducer's Secrets-Manager grant). The backfill is one-shot (history can't be re-derived forward); the daily job keeps the trailing window current.
+2. ~~**Schedule a daily PR refresh**~~ — **DONE 2026-07-26, see Phase 4.**
+
+## Phase 4 — the daily refresh cadence (2026-07-26)
+
+Phase 3 populated real data but nothing kept it moving. The consequence was
+exactly the failure mode this epic exists to prevent: the **PR block sat frozen
+at its 2026-06-23 backfill for over a month** while the deck rendered it as
+live. The lifecycle funnel was fine the whole time (the reducer *is* on its
+02:00 UTC schedule) — only the un-scheduled blocks rotted, and nothing surfaced
+that they had.
+
+- **OP-012 resolved** by a **Cadence, not a cron** (`workforce/skills/performance-refresh/`,
+  owner **tomas**, daily 05:33 UTC on project `agent-workforce`). The bundled
+  `refresh.mjs` republishes `PERF#{scope}/PR` per repo scope and
+  `PERF#{scope}/REPO` for every scope + the workforce aggregate, then reads back
+  `GET /performance` and reports per-scope freshness. The persona layer is the
+  point: a pure cron would have refreshed the data and still told nobody when a
+  leg failed — the whole reason the month-long freeze went unnoticed. Tomas owns
+  it because `org-metrics-pulse` already makes him the measurement layer of this
+  epic; this fire keeps the numbers honest, that one interprets them.
+- **The `workforce` scope is not a project id.** `GET /performance` (no project)
+  reads scope `workforce`, which no `workforce/projects/*` iteration produces —
+  so a naive per-project refresh leaves the console's *default* deck frozen while
+  every per-project scope looks healthy. `refresh.mjs` publishes it explicitly
+  from the `agent-workforce` project's repo + credential. This was a live bug
+  found while building Phase 4.
+- **Metric 4 — repository activity** (`PERF#{scope}/REPO`, new): issues/PRs
+  opened+closed and code-line churn across every tracked repo, added to the
+  shared contract and served inside `PerformanceSeries.repo`. Previously a
+  committed JSON snapshot that only changed on a commit; now live, with the
+  bundled file demoted to an explicitly-labelled offline fallback.
+- **Degraded ≠ low.** A rate-limited search page or a `code_frequency` timeout
+  now yields `degraded_signals[]` on the row instead of an undercount that reads
+  as a real dip, and the console says so. Search pacing was also corrected to
+  actually meet the 30 req/min budget its own comment claimed.
+- **`PERF_WINDOW_DAYS` 28 → 90** so the stored window can fill the console's
+  3-month decks; the reducer appends forward, so existing rows grow into it (or
+  re-run `backfill-performance-lifecycle.mjs` to fill at once).
+
+**Still open:** OP-011 (reducer redeploy for the widened `delivered`, #436).
 
 ## Out of scope
 

@@ -125,7 +125,10 @@ export default function GlobalSearch() {
   const skillRows = rows.filter((r) => r.kind === 'skill')
 
   return (
-    <div ref={rootRef} className="relative hidden sm:block w-44 md:w-64">
+    // Phones get the search too (it used to be `hidden sm:block`): with the
+    // destinations collapsed behind the hamburger there is room for it, and
+    // search is the only way to reach a specific persona in one hop.
+    <div ref={rootRef} className="relative flex-1 min-w-0 sm:flex-none sm:w-44 md:w-64">
       <form
         onSubmit={submit}
         className="flex items-center gap-2 bg-wf-surface-container rounded-wf-sm px-3 h-9 focus-within:ring-1 focus-within:ring-wf-primary"
@@ -149,12 +152,14 @@ export default function GlobalSearch() {
         />
       </form>
 
+      {/* On phones the panel spans the (flexible) field rather than a fixed
+          18rem, which would overflow the viewport's right edge. */}
       {showDropdown && (
         <div
           id={listboxId}
           role="listbox"
           aria-label="Search results"
-          className="absolute left-0 right-0 mt-1 max-h-[70vh] overflow-y-auto bg-wf-surface border border-wf-outline-variant rounded-wf-sm shadow-lg z-40 py-1 w-[18rem] md:w-[22rem]"
+          className="absolute left-0 right-0 mt-1 max-h-[70vh] overflow-y-auto bg-wf-surface border border-wf-outline-variant rounded-wf-sm shadow-lg z-40 py-1 w-auto sm:w-[18rem] md:w-[22rem]"
         >
           {rows.length === 0 ? (
             <div className="px-3 py-2 text-xs text-wf-on-surface-variant">

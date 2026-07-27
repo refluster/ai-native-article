@@ -12,7 +12,7 @@ by the region/function rule below (the org tree is built from each agent's
 
 | Slug | Role | Residence | Reports to | USD/mo |
 |---|---|---|---|---|
-| `anjali` | Research Director, India Energy Market Desk (lead) | Mumbai, IN | `tessa` | 7 |
+| `anjali` | Research Director, India Energy Market Desk | Mumbai, IN | `tessa` | 7 |
 | `rohan` | DISCOM, Subsidy & Program-Economics Analyst | Gurugram, IN | `anjali` | 6 |
 | `sneha` | Residential Consumer & Field-Evidence Analyst | Pune, IN | `anjali` | 6 |
 | `sofia` | Market Strategy & Willingness-to-Pay Analyst | Copenhagen, DK | `anjali` | 6 |

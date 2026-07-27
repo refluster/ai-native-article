@@ -30,6 +30,9 @@ import {
   markThreadRead,
   setThreadStar,
   fetchThreadSummaries,
+  fetchThreadDetail,
+  mergeMessages,
+  type ChatMessage,
   type Conversation,
 } from './messages';
 
@@ -105,7 +108,7 @@ describe('createThread', () => {
   it('POSTs {participants:[slug], body} via signedFetch and returns thread_id', async () => {
     mockedSignedFetch.mockResolvedValueOnce(jsonResponse({ thread_id: '01THREAD' }, 201));
 
-    const id = await createThread('maya', 'hello there');
+    const id = await createThread(['maya'], 'hello there');
 
     expect(id).toBe('01THREAD');
     expect(mockedAssertSigv4).toHaveBeenCalledTimes(1);
@@ -116,12 +119,26 @@ describe('createThread', () => {
     expect(JSON.parse(init?.body as string)).toEqual({ participants: ['maya'], body: 'hello there' });
   });
 
+  it('POSTs multiple participants (group thread) and the optional label', async () => {
+    mockedSignedFetch.mockResolvedValueOnce(jsonResponse({ thread_id: '01GROUP' }, 201));
+
+    const id = await createThread(['elena', 'aoi', 'kai'], 'settling it here', 'Elena + reports');
+
+    expect(id).toBe('01GROUP');
+    const [, init] = mockedSignedFetch.mock.calls[0];
+    expect(JSON.parse(init?.body as string)).toEqual({
+      participants: ['elena', 'aoi', 'kai'],
+      body: 'settling it here',
+      group_label: 'Elena + reports',
+    });
+  });
+
   it('folds the handler error body into the thrown message', async () => {
     mockedSignedFetch.mockResolvedValueOnce(
       jsonResponse({ error: 'create_failed', detail: 'empty body' }, 400),
     );
 
-    await expect(createThread('maya', '')).rejects.toThrow(/agents-api 400.*create_failed.*empty body/);
+    await expect(createThread(['maya'], '')).rejects.toThrow(/agents-api 400.*create_failed.*empty body/);
   });
 });
 
@@ -166,6 +183,71 @@ describe('setThreadStar', () => {
     const [url, init] = mockedSignedFetch.mock.calls[0];
     expect(url).toBe('https://agents.example/api/threads/01THREAD/star');
     expect(JSON.parse(init?.body as string)).toEqual({ starred: true });
+  });
+});
+
+describe('fetchThreadDetail (Epic-024 paging)', () => {
+  const detailDto = {
+    thread_id: '01THREAD',
+    participants: ['maya'],
+    group: false,
+    starred: false,
+    created_by: 'operator',
+    created_at: '2026-07-01T00:00:00Z',
+    messages: [
+      { message_id: '01A', from: 'operator', at: '2026-07-01T00:01:00Z', body: 'ping' },
+      { message_id: '01B', from: 'maya', at: '2026-07-01T00:02:00Z', body: 'pong' },
+    ],
+    older_cursor: 'CURSOR1',
+  };
+
+  it('GETs the latest page with no query params by default', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(jsonResponse(detailDto));
+
+    const conv = await fetchThreadDetail('01THREAD');
+
+    expect(globalThis.fetch).toHaveBeenCalledWith('https://agents.example/api/threads/01THREAD');
+    expect(conv?.messages.map((m) => m.id)).toEqual(['01A', '01B']);
+    expect(conv?.olderCursor).toBe('CURSOR1');
+  });
+
+  it('passes cursor and page_size through as query params', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(
+      jsonResponse({ ...detailDto, older_cursor: undefined }),
+    );
+
+    const conv = await fetchThreadDetail('01THREAD', { cursor: 'CURSOR1', pageSize: 30 });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'https://agents.example/api/threads/01THREAD?cursor=CURSOR1&page_size=30',
+    );
+    expect(conv?.olderCursor).toBeUndefined();
+  });
+});
+
+describe('mergeMessages', () => {
+  const msg = (id: string, at: string): ChatMessage => ({ id, from: 'maya', at, body: `m-${id}` });
+
+  it('prepends an older page ahead of the loaded history, chronologically', () => {
+    const loaded = [msg('01C', '2026-07-01T00:03:00Z'), msg('01D', '2026-07-01T00:04:00Z')];
+    const older = [msg('01A', '2026-07-01T00:01:00Z'), msg('01B', '2026-07-01T00:02:00Z')];
+    expect(mergeMessages(older, loaded).map((m) => m.id)).toEqual(['01A', '01B', '01C', '01D']);
+  });
+
+  it('drops duplicates when a re-fetched newest page overlaps loaded history', () => {
+    const loaded = [msg('01A', '2026-07-01T00:01:00Z'), msg('01B', '2026-07-01T00:02:00Z')];
+    const fresh = [msg('01B', '2026-07-01T00:02:00Z'), msg('01C', '2026-07-01T00:03:00Z')];
+    expect(mergeMessages(loaded, fresh).map((m) => m.id)).toEqual(['01A', '01B', '01C']);
+  });
+
+  it('tie-breaks same-timestamp messages by ULID order', () => {
+    const at = '2026-07-01T00:01:00Z';
+    expect(mergeMessages([msg('01B', at)], [msg('01A', at)]).map((m) => m.id)).toEqual(['01A', '01B']);
+  });
+
+  it('de-dupes id-less (mock/summary) messages by content', () => {
+    const m: ChatMessage = { from: 'maya', at: '2026-07-01T00:01:00Z', body: 'hi' };
+    expect(mergeMessages([m], [{ ...m }])).toHaveLength(1);
   });
 });
 

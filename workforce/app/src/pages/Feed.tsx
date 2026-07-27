@@ -5,14 +5,25 @@
 //
 // The feed still reads the same static /workforce-mock-feed.json until the
 // live GET /feed API lands; only the IA around it changed.
+//
+// Progressive rendering (2026-07-26). The two loads — the feed JSON and the
+// live agents-api roster — are independent, and the roster is by far the
+// slower of the pair (paginated API read vs. a static file). The page used
+// to await both and paint one "Loading…" line; now the 3-pane chrome and
+// the composer paint immediately, posts appear the moment the feed lands
+// (persona chips fill in behind them once the roster resolves), and each
+// rail swaps its own skeleton independently.
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import WorkforceLayout from '../components/WorkforceLayout';
+import BrandMark from '../components/BrandMark';
 import Sigil from '../components/Sigil';
 import PostCard, { POST_KIND_LABEL } from '../components/PostCard';
+import { Skeleton, SkeletonPostCards, SkeletonRailCard } from '../components/Skeleton';
 import { loadWorkforceFeed } from '../lib/posts';
 import { loadWorkforceManifest, fullName } from '../lib/agents';
+import { useAsync } from '../lib/useAsync';
 import { SITE_DISPLAY_NAME, SITE_TAGLINE, OPERATOR } from '../config/site';
 import type { Post, PostKind } from '../types/post';
 import type { WorkforceAgent } from '../types/agent';
@@ -29,8 +40,16 @@ const KIND_FILTERS: { id: KindFilter; label: string; dot: string }[] = [
   { id: 'observation', label: POST_KIND_LABEL.observation, dot: 'bg-wf-secondary' },
 ];
 
+/** A rail counter that shows a skeleton until its source resolves. */
+function RailCount({ value }: { value: number | null }) {
+  if (value === null) return <Skeleton className="h-3 w-6" />;
+  return <dd className="font-wfmono text-xs font-semibold text-wf-primary">{value}</dd>;
+}
+
 // ── Left rail: operator identity + organization ────────────────────────
-function ProfileRail({ talents, postCount }: { talents: number; postCount: number }) {
+// `talents` / `postCount` are null while their source is still loading —
+// the card itself never waits, only the two numbers do.
+function ProfileRail({ talents, postCount }: { talents: number | null; postCount: number | null }) {
   return (
     <div className="space-y-3">
       <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md overflow-hidden">
@@ -52,11 +71,11 @@ function ProfileRail({ talents, postCount }: { talents: number; postCount: numbe
           <dl className="mt-3 pt-3 border-t border-wf-outline-variant space-y-1.5">
             <Link to="/agents" className="flex items-center justify-between group">
               <dt className="text-[11px] text-wf-on-surface-variant group-hover:text-wf-on-surface">Talent in network</dt>
-              <dd className="font-wfmono text-xs font-semibold text-wf-primary">{talents}</dd>
+              <RailCount value={talents} />
             </Link>
             <Link to="/" className="flex items-center justify-between group">
               <dt className="text-[11px] text-wf-on-surface-variant group-hover:text-wf-on-surface">Posts</dt>
-              <dd className="font-wfmono text-xs font-semibold text-wf-primary">{postCount}</dd>
+              <RailCount value={postCount} />
             </Link>
           </dl>
         </div>
@@ -73,9 +92,7 @@ function ProfileRail({ talents, postCount }: { talents: number; postCount: numbe
           Your organization
         </div>
         <div className="flex items-center gap-2.5">
-          <span className="inline-flex items-center justify-center w-9 h-9 rounded-wf-sm bg-wf-secondary text-wf-on-primary font-headline font-black text-sm shrink-0">
-            S
-          </span>
+          <BrandMark size={36} />
           <div className="min-w-0">
             <div className="text-sm font-semibold text-wf-on-surface truncate">{SITE_DISPLAY_NAME}</div>
             <div className="text-[11px] text-wf-on-surface-variant truncate">{SITE_TAGLINE}</div>
@@ -91,9 +108,20 @@ function ProfileRail({ talents, postCount }: { talents: number; postCount: numbe
 }
 
 // ── Right rail: network activity + console links ───────────────────────
-function NewsRail({ active }: { active: { agent: WorkforceAgent; count: number }[] }) {
+// Only the activity card depends on data; the static link cards below it
+// paint straight away instead of waiting behind it.
+function NewsRail({
+  active,
+  pending,
+}: {
+  active: { agent: WorkforceAgent; count: number }[];
+  pending: boolean;
+}) {
   return (
     <div className="space-y-3">
+      {pending ? (
+        <SkeletonRailCard rows={4} />
+      ) : (
       <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-4">
         <div className="font-headline font-bold text-sm text-wf-on-surface mb-0.5">Network activity</div>
         <div className="font-wfmono text-[9px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-3">
@@ -122,6 +150,7 @@ function NewsRail({ active }: { active: { agent: WorkforceAgent; count: number }
           </ul>
         )}
       </div>
+      )}
 
       <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-4">
         <div className="font-headline font-bold text-sm text-wf-on-surface mb-3">Explore the network</div>
@@ -162,9 +191,6 @@ function NewsRail({ active }: { active: { agent: WorkforceAgent; count: number }
 }
 
 export default function Feed() {
-  const [posts, setPosts] = useState<Post[] | null>(null);
-  const [roster, setRoster] = useState<WorkforceAgent[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [kind, setKind] = useState<KindFilter>('all');
   const [agentQuery, setAgentQuery] = useState('');
   const [agentSlug, setAgentSlug] = useState<string | null>(null);
@@ -172,16 +198,23 @@ export default function Feed() {
 
   useEffect(() => {
     document.title = SITE_DISPLAY_NAME;
-    Promise.all([loadWorkforceFeed(), loadWorkforceManifest()])
-      .then(([f, m]) => {
-        const sorted = [...f.posts].sort(
-          (a, b) => Date.parse(b.posted_at) - Date.parse(a.posted_at)
-        );
-        setPosts(sorted);
-        setRoster(m.agents);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
+
+  // Two independent loads. The feed is a static file (fast); the roster is
+  // a paginated live agents-api read (slow). Coupling them cost the feed
+  // the roster's latency for no reason — a post renders fine before its
+  // author's persona chip resolves.
+  const feed = useAsync(
+    async () => {
+      const f = await loadWorkforceFeed();
+      return [...f.posts].sort((a, b) => Date.parse(b.posted_at) - Date.parse(a.posted_at));
+    },
+    [],
+  );
+  const rosterState = useAsync(async () => (await loadWorkforceManifest()).agents, []);
+
+  const posts: Post[] | null = feed.data;
+  const roster: WorkforceAgent[] = rosterState.data ?? [];
 
   const agentBySlug = useMemo(() => {
     const map = new Map<string, WorkforceAgent>();
@@ -226,19 +259,12 @@ export default function Feed() {
   const shown = filtered.slice(0, shownCount);
   const hasMore = filtered.length > shownCount;
 
-  if (error) {
+  // Only a failed FEED empties the page — a failed roster degrades to
+  // posts without persona chips, reported inline (C-4: visible, not silent).
+  if (feed.error) {
     return (
       <WorkforceLayout>
-        <div className="font-wfmono text-sm text-wf-tertiary">Could not load feed: {error}</div>
-      </WorkforceLayout>
-    );
-  }
-  if (posts === null) {
-    return (
-      <WorkforceLayout>
-        <div className="font-wfmono text-xs uppercase tracking-[0.14em] text-wf-on-surface-variant">
-          Loading…
-        </div>
+        <div className="font-wfmono text-sm text-wf-tertiary">Could not load feed: {feed.error}</div>
       </WorkforceLayout>
     );
   }
@@ -249,13 +275,16 @@ export default function Feed() {
         <div className="grid grid-cols-1 lg:grid-cols-[225px_minmax(0,1fr)_300px] gap-4 sm:gap-6 items-start">
           {/* LEFT RAIL */}
           <aside className="order-2 lg:order-1 lg:sticky lg:top-[72px] self-start">
-            <ProfileRail talents={roster.length} postCount={posts.length} />
+            <ProfileRail
+              talents={rosterState.data ? roster.length : null}
+              postCount={posts ? posts.length : null}
+            />
           </aside>
 
           {/* CENTER FEED */}
           <div className="order-1 lg:order-2 min-w-0 space-y-3 sm:space-y-4">
             {/* Composer */}
-            <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-3 sm:p-4">
+            <div className="wf-bleed-x border-y sm:border border-wf-outline-variant bg-wf-surface-container-lo rounded-none sm:rounded-wf-md p-3 sm:p-4">
               <div className="flex items-center gap-3">
                 <span className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-wf-primary text-wf-on-primary font-headline font-bold text-sm shrink-0">
                   {OPERATOR.initials}
@@ -292,7 +321,9 @@ export default function Feed() {
             {/* Sort / agent filter bar */}
             <div className="flex items-center justify-between gap-3 px-1">
               <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-                Sort: recent · {filtered.length} {filtered.length === 1 ? 'post' : 'posts'}
+                {posts === null
+                  ? 'Sort: recent'
+                  : `Sort: recent · ${filtered.length} ${filtered.length === 1 ? 'post' : 'posts'}`}
               </span>
               <div className="relative">
                 {agentSlug ? (
@@ -342,9 +373,20 @@ export default function Feed() {
               </div>
             </div>
 
-            {/* Posts */}
-            {shown.length === 0 ? (
-              <div className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-6 sm:p-10 text-center">
+            {/* A roster failure only costs the persona chips — say so
+                rather than blanking a feed that loaded fine (C-4). */}
+            {rosterState.error && (
+              <div className="wf-bleed-x border-y sm:border border-wf-tertiary rounded-none sm:rounded-wf-md px-4 py-3 font-wfmono text-[11px] uppercase tracking-[0.12em] text-wf-tertiary">
+                talent roster unavailable: {rosterState.error}
+              </div>
+            )}
+
+            {/* Posts. Skeleton cards hold the shape until the feed lands;
+                the roster resolving later only fills in persona chips. */}
+            {posts === null ? (
+              <SkeletonPostCards cards={3} />
+            ) : shown.length === 0 ? (
+              <div className="wf-bleed-x border-y sm:border border-wf-outline-variant bg-wf-surface-container-lo rounded-none sm:rounded-wf-md p-6 sm:p-10 text-center">
                 <div className="font-wfmono text-xs uppercase tracking-[0.14em] text-wf-on-surface-variant">
                   No posts match this filter yet.
                 </div>
@@ -372,7 +414,7 @@ export default function Feed() {
 
           {/* RIGHT RAIL */}
           <aside className="order-3 lg:sticky lg:top-[72px] self-start">
-            <NewsRail active={mostActive} />
+            <NewsRail active={mostActive} pending={feed.loading || rosterState.loading} />
           </aside>
         </div>
       </div>

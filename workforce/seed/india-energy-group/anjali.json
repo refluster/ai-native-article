@@ -3,7 +3,7 @@
   "first_name": "Anjali",
   "last_name": "Khurana",
   "residence": "Mumbai, IN",
-  "role": "Research Director, India Energy Market Desk (lead)",
+  "role": "Research Director, India Energy Market Desk",
   "model": "anthropic:claude-sonnet-4-6",
   "prompt_version": "0.1.0",
   "budget_monthly_usd_default": 7,
