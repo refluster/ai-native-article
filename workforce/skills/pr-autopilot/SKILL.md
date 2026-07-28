@@ -141,9 +141,46 @@ raw GitHub `@`-mention (ML-012): agents are `wf:<slug>`, never `@<slug>`.
 
 ## Step 4 — obtain each nominated review (drive the cycle; do not stall)
 
-For **each** persona you nominated, apply that persona's review lens inline
-and post it as that persona — a COMMENT review (`event=COMMENT`, never
-approve / request-changes per W-5). Do not wait on any external dispatch.
+**Run each nominated lens as its own read-only subagent, in parallel** — one
+subagent per persona — then post each returned review as that persona: a
+COMMENT review (`event=COMMENT`, never approve / request-changes per W-5). Do
+not wait on any external dispatch. (`backlog-reconcile` fans out audit
+subagents on this same CCR path, so this is a proven capability, not a
+hypothesis.)
+
+**Why subagents and not inline (#512).** Producing every lens inline, in your
+own context, means each reviewer sees the diff's justification, your routing
+comment's framing, and every earlier reviewer's findings. Lenses that share a
+context do not converge independently — N of them agreeing is **one conclusion
+stated N times** — yet the verdict comment presents convergence as the
+strongest signal it has, and the operator merges on it. Observed on #510: four
+inline lenses found a real blocking defect but *all four accepted the author's
+framing of the change*, and none questioned its premise. Shared context catches
+implementation defects and suppresses premise questions.
+
+**Context isolation is the whole point — give each subagent exactly:**
+
+- the **unified diff** and the PR title/body;
+- that persona's **lens config** (fetched fresh from `GET /agents/{slug}`);
+- the **cycle number**, and on a re-route, that persona's *own* prior findings
+  (so `[NEW]` vs "cites the cycle-1 finding-ID" still works).
+
+**Withhold:** your routing comment, your summary of the PR, any other lens's
+output, and any opinion of yours about the change. If a lens needs repo context
+it reads the repo itself. **Never seed a subagent with another lens's finding
+to "check"** — that manufactures the agreement the verdict then reports as
+evidence.
+
+**Honest limit, and do not oversell it in the verdict.** Separate contexts
+remove *anchoring*, not *correlated priors*: the same base model across N
+subagents shares blind spots, so a defect class the model systematically misses
+is missed N times. Isolation raises convergence from "no evidence" to "real but
+correlated evidence" — never to independence in the sense a human panel means.
+
+**Fallback.** If subagents are unavailable in this runtime, run the lenses
+inline as before, but say so in the verdict (Step 5) so the operator discounts
+convergence correctly. Silent inline production is the failure this step exists
+to prevent.
 
 **Reviewer-lens contract (per nominated persona):**
 
@@ -179,6 +216,24 @@ Synthesise the reviewers' **collective** verdict (never your solo call):
 - **🔴** — any reviewer's veto, cycle > `cycle_cap`, or a scope question you
   cannot decide.
 
+**Weight convergence honestly (#512).** Two lenses landing on the same line is
+the strongest signal this cadence produces, and it is only a signal when the
+lenses could not see each other. State which it was — the operator is merging
+on this sentence:
+
+- lenses ran as **isolated subagents** → convergence is real but correlated
+  evidence (same base model, shared priors); say "converged independently" and
+  name the limit;
+- lenses ran **inline** (fallback) → say so plainly: they shared a context, so
+  agreement is one conclusion stated N times, not N readings.
+
+**Disclose an author↔router collapse.** If the session running this panel also
+authored the PR, say so in the verdict's first paragraph and discount the whole
+panel accordingly — it is the strongest discount available, and it also means
+the merge leg is structurally unavailable: R-N10's author≠merger separation
+(FU-028) *is* the panel, and there is no separation when the author is running
+it. Hand off instead, whatever the colour.
+
 Write a verdict comment that names each reviewer's load-bearing finding and
 the aggregated colour, then take the terminal action:
 
@@ -198,6 +253,8 @@ verdict **into** this template so the markers are present by construction:
 **<PersonaName> — verdict, cycle <n> of ≤ <cycle_cap>. <🟢 escalate / 🔴 / hand-off>.**
 
 <one-paragraph synthesis: each reviewer's load-bearing finding, the aggregated colour>
+
+<panel-provenance sentence — REQUIRED: isolated subagents (converged independently, correlated priors) or inline (shared context, discount convergence); plus an author↔router collapse disclosure if it applies>
 
 **Handing to the operator — <reason>.** Not merging. <If a DRAFT: "Still a draft — mark ready, then merge.">
 
