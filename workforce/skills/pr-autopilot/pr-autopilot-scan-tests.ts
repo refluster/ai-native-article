@@ -16,8 +16,11 @@ import {
   countOpenSeats,
   applyNominationCap,
   alreadyRouted,
+  headCommitDate,
+  isTerminal,
   nextRoutingCycle,
   routingState,
+  selectCandidates,
   withinWindow,
 } from "./pr-autopilot-scan.mjs";
 import { MIN_REVIEWERS } from "./pr-merge.mjs";
@@ -257,5 +260,135 @@ describe("nextRoutingCycle — the discovery gate", () => {
   it("keeps alreadyRouted as the has-ever-routed predicate", () => {
     expect(alreadyRouted(comments, "nadia")).toBe(true);
     expect(alreadyRouted(comments, "maya")).toBe(false);
+  });
+});
+
+
+// ── The candidate loop itself (cycle-2: wf:dario D1 + wf:owen O1) ────────────
+// Cycle 1 found that the re-route gate was correct but its CALLER was not, and
+// that no test could see the caller — the same finding that produced #507's
+// cycle-2. selectCandidates is that caller, extracted; these drive it.
+
+const NOW = Date.parse("2026-07-28T06:00:00Z");
+const openPr = (over: Record<string, unknown> = {}) => ({
+  number: 510,
+  updated_at: "2026-07-28T05:00:00Z",
+  labels: [],
+  head: { sha: "abc123" },
+  ...over,
+});
+const routedAt = (at: string) => [{ body: "**Nadia — cycle 1 of ≤ 7.**", created_at: at }];
+
+const select = (prs: unknown[], comments = new Map(), heads = new Map()) =>
+  selectCandidates({
+    prs,
+    commentsByPr: comments,
+    headDatesByPr: heads,
+    persona: "nadia",
+    sinceDays: 7,
+    max: 5,
+    now: NOW,
+  });
+
+describe("isTerminal — escalated / paused PRs leave discovery scope", () => {
+  it("matches the escalation label in either label shape", () => {
+    expect(isTerminal([{ name: "autopilot:needs-human" }])).toBe(true);
+    expect(isTerminal(["autopilot:needs-human"])).toBe(true);
+    expect(isTerminal([{ name: "AUTOPILOT:NEEDS-HUMAN" }])).toBe(true);
+  });
+  it("matches the maintainer pause", () => {
+    expect(isTerminal([{ name: "autopilot:off" }])).toBe(true);
+  });
+  it("is false for ordinary labels and for none at all", () => {
+    expect(isTerminal([{ name: "area:docs" }, { name: "layer:L2" }])).toBe(false);
+    expect(isTerminal([])).toBe(false);
+    expect(isTerminal(undefined)).toBe(false);
+  });
+});
+
+describe("headCommitDate — which timestamp means 'the author revised'", () => {
+  // Catches: a "simplification" to author.date, which would silently stop
+  // re-routing every rebased branch while every predicate test stayed green.
+  it("prefers the committer date, because a rebase rewrites it and IS a revision", () => {
+    expect(
+      headCommitDate({
+        commit: {
+          committer: { date: "2026-07-28T05:00:00Z" },
+          author: { date: "2026-07-20T01:00:00Z" },
+        },
+      }),
+    ).toBe("2026-07-28T05:00:00Z");
+  });
+  it("falls back to the author date, then to null", () => {
+    expect(headCommitDate({ commit: { author: { date: "2026-07-20T01:00:00Z" } } })).toBe(
+      "2026-07-20T01:00:00Z",
+    );
+    expect(headCommitDate({})).toBeNull();
+    expect(headCommitDate(undefined)).toBeNull();
+  });
+});
+
+describe("selectCandidates — the discovery decision", () => {
+  // THE CYCLE-1 BLOCKING FINDING (wf:dario D1). Fails without isTerminal in
+  // the loop: the PR is in-window, routed, and has a newer head, so the
+  // re-route gate alone would hand back cycle 2 — pulling an escalated PR out
+  // of a terminal state with no human involved.
+  it("does not re-route an escalated PR even when the author pushed", () => {
+    const prs = [openPr({ labels: [{ name: "autopilot:needs-human" }] })];
+    const comments = new Map([[510, routedAt("2026-07-27T07:35:00Z")]]);
+    const heads = new Map([[510, "2026-07-28T05:00:00Z"]]);
+    expect(select(prs, comments, heads)).toEqual([]);
+  });
+
+  // Catches: a push defeating the maintainer's explicit pause.
+  it("does not route a paused PR at all", () => {
+    const prs = [openPr({ labels: [{ name: "autopilot:off" }] })];
+    expect(select(prs)).toEqual([]);
+  });
+
+  it("routes an unrouted, in-window PR at cycle 1", () => {
+    const got = select([openPr()]);
+    expect(got.map((c) => [c.pr.number, c.cycle])).toEqual([[510, 1]]);
+  });
+
+  // The whole point of the PR, exercised through the caller rather than the
+  // predicate: #507's shape end to end.
+  it("re-routes a revised, non-terminal PR at cycle 2", () => {
+    const comments = new Map([[510, routedAt("2026-07-27T07:35:00Z")]]);
+    const heads = new Map([[510, "2026-07-27T14:48:00Z"]]);
+    expect(select([openPr()], comments, heads).map((c) => c.cycle)).toEqual([2]);
+  });
+
+  // Catches: a missing head-date entry (the fetch failed in main()) being
+  // read as "revised". This is the failed-fetch path, previously guaranteed
+  // only by a try/catch and a comment.
+  it("skips a routed PR whose head date could not be fetched", () => {
+    const comments = new Map([[510, routedAt("2026-07-27T07:35:00Z")]]);
+    expect(select([openPr()], comments, new Map())).toEqual([]);
+  });
+
+  it("honours the recency window against the injected clock", () => {
+    const stale = openPr({ updated_at: "2026-06-01T00:00:00Z" });
+    expect(select([stale])).toEqual([]);
+  });
+
+  // Catches: the terminal/window filters running AFTER the max slice, which
+  // would let skipped PRs consume candidate slots.
+  it("fills --max with routable PRs, not with skipped ones", () => {
+    const prs = [
+      openPr({ number: 1, labels: [{ name: "autopilot:needs-human" }] }),
+      openPr({ number: 2 }),
+      openPr({ number: 3 }),
+    ];
+    const got = selectCandidates({
+      prs,
+      commentsByPr: new Map(),
+      headDatesByPr: new Map(),
+      persona: "nadia",
+      sinceDays: 7,
+      max: 2,
+      now: NOW,
+    });
+    expect(got.map((c) => c.pr.number)).toEqual([2, 3]);
   });
 });
