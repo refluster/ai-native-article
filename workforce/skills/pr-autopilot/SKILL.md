@@ -216,23 +216,46 @@ Synthesise the reviewers' **collective** verdict (never your solo call):
 - **🔴** — any reviewer's veto, cycle > `cycle_cap`, or a scope question you
   cannot decide.
 
-**Weight convergence honestly (#512).** Two lenses landing on the same line is
-the strongest signal this cadence produces, and it is only a signal when the
-lenses could not see each other. State which it was — the operator is merging
-on this sentence:
+**Declare the panel's provenance — and know what the declaration is worth.**
+Every verdict body must carry exactly one of these markers, appended by
+`pr-autopilot-post.mjs --panel isolated|inline` (which refuses a verdict post
+carrying neither, the same treatment the escalation-reason code gets):
 
-- lenses ran as **isolated subagents** → convergence is real but correlated
-  evidence (same base model, shared priors); say "converged independently" and
-  name the limit;
-- lenses ran **inline** (fallback) → say so plainly: they shared a context, so
-  agreement is one conclusion stated N times, not N readings.
+```
+<!-- autopilot:panel:isolated -->   lenses ran as isolated subagents
+<!-- autopilot:panel:inline -->     lenses ran inline, in the router's context
+```
+
+**The marker is self-attested and is NOT proof of independence.** The router
+chooses the mode and writes the marker; nothing downstream can contradict it.
+The check is that the claim is *present, explicit and machine-readable* — never
+that it is true. Enforcing presence stops the mode from going unstated; it does
+not stop it from being stated falsely, and no reader should treat it as if it
+did (`wf:rafael` R1 on #513, which is the honest reading of what this buys).
+Real enforcement — a provenance artefact emitted by whatever spawns the
+lenses, not by the router's prose — is tracked separately and is not in force.
+
+Given that, weigh convergence like this in the synthesis:
+
+- **isolated** → two lenses landing on the same line is real evidence, but
+  correlated: one base model, shared priors. Say "converged independently" only
+  alongside that limit, never bare.
+- **inline** → say plainly that they shared a context, so agreement is one
+  conclusion stated N times, not N readings. Do not report it as convergence.
 
 **Disclose an author↔router collapse.** If the session running this panel also
 authored the PR, say so in the verdict's first paragraph and discount the whole
-panel accordingly — it is the strongest discount available, and it also means
-the merge leg is structurally unavailable: R-N10's author≠merger separation
-(FU-028) *is* the panel, and there is no separation when the author is running
-it. Hand off instead, whatever the colour.
+panel accordingly — it is the strongest discount available, and the reviews
+should be read as one session's self-critique wearing N lenses.
+
+**This disclosure does not change what may be merged.** The merge leg's rule is
+unchanged and stands as written: *authorship is not a hold* — a green,
+non-L0/L1 PR merges regardless of who opened it, because the panel **is** the
+author≠merger separation (adr-0011 / FU-028). Whether a collapsed panel should
+also suspend the merge leg is a real question and a genuine change to delegated
+merge authority — an L1 decision that belongs in a superseding ADR, not in this
+step (`wf:dario` D1/D2 on #513). Until such an ADR lands, disclose and proceed
+under the existing predicate.
 
 Write a verdict comment that names each reviewer's load-bearing finding and
 the aggregated colour, then take the terminal action:
@@ -254,7 +277,7 @@ verdict **into** this template so the markers are present by construction:
 
 <one-paragraph synthesis: each reviewer's load-bearing finding, the aggregated colour>
 
-<panel-provenance sentence — REQUIRED: isolated subagents (converged independently, correlated priors) or inline (shared context, discount convergence); plus an author↔router collapse disclosure if it applies>
+<panel-provenance sentence: isolated (real but correlated evidence) or inline (shared context — not convergence); plus an author↔router collapse disclosure if it applies. The marker below is what the post script enforces; this sentence is its prose.>
 
 **Handing to the operator — <reason>.** Not merging. <If a DRAFT: "Still a draft — mark ready, then merge.">
 
@@ -263,11 +286,13 @@ verdict **into** this template so the markers are present by construction:
 <!-- autopilot:needs-human -->
 <!-- autopilot:reason:<code> -->   ⟵ REQUIRED on every hand-off: the escalation-reason code (see "Reason codes" below); `other` carries its mandatory free text inside the marker.
 <!-- autopilot:reviewed -->   ⟵ keep this THIRD marker line ONLY on a 🟢 merge-ready hand-off; delete it on a 🔴 / non-consensus hand-off.
+<!-- autopilot:panel:isolated -->   ⟵ REQUIRED on every VERDICT post (isolated | inline). Self-attested — presence is enforced, truth is not. Pass `--panel isolated|inline` and the script appends it.
 ```
 
 ```sh
 GITHUB_TOKEN="…" node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
   --project "<project_id>" --pr <number> --body-file /tmp/verdict-<number>.md \
+  --panel isolated|inline \
   --needs-human [--reviewed] [--reason <code> [--reason-text "…"]]
 ```
 

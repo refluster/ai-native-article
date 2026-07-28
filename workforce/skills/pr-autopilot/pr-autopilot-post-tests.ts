@@ -10,7 +10,7 @@
 // --needs-human flag OR the hidden body marker), and never on a plain routing
 // comment.
 import { describe, it, expect } from "vitest";
-import { resolveLabels, resolveReasons, findRawMentions, NEEDS_HUMAN_MARKER, REVIEWED_MARKER } from "./pr-autopilot-post.mjs";
+import { resolveLabels, resolveReasons, findRawMentions, NEEDS_HUMAN_MARKER, REVIEWED_MARKER, isVerdictBody, resolvePanelProvenance } from "./pr-autopilot-post.mjs";
 import { ESCALATION_LABEL, REVIEWED_LABEL } from "./pr-merge.mjs";
 
 describe("resolveLabels — escalation always carries the label", () => {
@@ -176,5 +176,93 @@ describe("findRawMentions — no raw GitHub @-mentions leave the workforce", () 
   it("empty / markerless bodies are clean", () => {
     expect(findRawMentions("")).toEqual([]);
     expect(findRawMentions(`verdict\n\n${NEEDS_HUMAN_MARKER}\n`)).toEqual([]);
+  });
+});
+
+
+// ── Panel provenance (#513 / wf:rafael R1) ──────────────────────────────────
+// The verdict comment weighs convergence differently depending on whether the
+// lenses could see each other, and the operator merges on that sentence. These
+// pin that the claim must be PRESENT and machine-readable — not that it is
+// true, which this mechanism cannot establish and must not appear to.
+
+const verdict = (extra = "") =>
+  `**Nadia — verdict, cycle 1 of ≤ 3. 🟡 — author revision expected.**\n\nSynthesis…${extra}`;
+
+describe("isVerdictBody — only verdict posts carry the requirement", () => {
+  it("matches the Step-5 verdict header", () => {
+    expect(isVerdictBody(verdict())).toBe(true);
+  });
+  // Catches: the requirement leaking onto routing comments and lens reviews,
+  // which would break every non-verdict post the cadence makes.
+  it("does not match a routing comment or a lens review", () => {
+    expect(isVerdictBody("**Nadia — cycle 1 of ≤ 3.**\n\nReviewers nominated…")).toBe(false);
+    expect(isVerdictBody("🔴 **from the architecture lens** — …")).toBe(false);
+    expect(isVerdictBody("")).toBe(false);
+  });
+});
+
+describe("resolvePanelProvenance", () => {
+  // THE FINDING. Pre-fix, a verdict could assert convergence with no statement
+  // of how the lenses were produced, and nothing objected. Now the claim is
+  // always present — and an undeclared verdict gets the WEAKER one.
+  it("stamps inline on an undeclared verdict rather than asserting independence", () => {
+    expect(resolvePanelProvenance({ body: verdict() })).toEqual({
+      mode: "inline",
+      appendMarker: "<!-- autopilot:panel:inline -->",
+      defaulted: true,
+    });
+  });
+
+  // Catches: turning the default into a throw. That would break every verdict
+  // post between merging this and the OP-015 PATCH, because the script is live
+  // from the clone while the body telling the router to pass --panel is not
+  // (ADR-0008 / wf:sana S1). An outage is not a stronger guarantee.
+  it("never throws for a missing declaration — the activation window depends on it", () => {
+    expect(() => resolvePanelProvenance({ body: verdict() })).not.toThrow();
+  });
+
+  it("appends the marker from --panel", () => {
+    expect(resolvePanelProvenance({ body: verdict(), panel: "isolated" })).toEqual({
+      mode: "isolated",
+      appendMarker: "<!-- autopilot:panel:isolated -->",
+    });
+    expect(resolvePanelProvenance({ body: verdict(), panel: "inline" }).appendMarker).toBe(
+      "<!-- autopilot:panel:inline -->",
+    );
+  });
+
+  it("accepts a marker already embedded in the body, without duplicating it", () => {
+    const body = verdict("\n\n<!-- autopilot:panel:inline -->");
+    expect(resolvePanelProvenance({ body })).toEqual({ mode: "inline", appendMarker: null });
+    expect(resolvePanelProvenance({ body, panel: "inline" }).appendMarker).toBeNull();
+  });
+
+  // Catches: a flag and a marker disagreeing, which would publish two
+  // contradictory provenance claims in one verdict.
+  it("refuses a flag that contradicts an embedded marker", () => {
+    const body = verdict("\n\n<!-- autopilot:panel:inline -->");
+    expect(() => resolvePanelProvenance({ body, panel: "isolated" })).toThrow(/contradicts/);
+  });
+
+  it("refuses an unknown mode rather than stamping it", () => {
+    expect(() => resolvePanelProvenance({ body: verdict(), panel: "independent" })).toThrow(/--panel must be one of/);
+  });
+
+  // Non-verdict posts are unaffected — the requirement is scoped to the one
+  // comment whose reader is being asked to weigh convergence.
+  it("leaves routing comments and reviews alone", () => {
+    expect(resolvePanelProvenance({ body: "**Nadia — cycle 1 of ≤ 3.**" })).toEqual({
+      mode: null,
+      appendMarker: null,
+    });
+  });
+
+  // Catches: the mechanism drifting into a truth claim. This test exists to be
+  // read, not just to pass — `isolated` is accepted on a body that says the
+  // lenses ran inline, because the check is presence, not honesty.
+  it("cannot detect a false declaration, by construction", () => {
+    const lying = verdict("\n\nThe lenses ran inline, in my own context.");
+    expect(resolvePanelProvenance({ body: lying, panel: "isolated" }).mode).toBe("isolated");
   });
 });

@@ -21,6 +21,7 @@
 //       --project asp-cloud --pr 42 --body-file /tmp/route-body-42.md \
 //       [--needs-human] [--label <name>]   # see escalation rule below
 //       [--reason <code> [--reason-text "…"]]   # see reason rule below
+//       [--panel isolated|inline]                # REQUIRED on a verdict post
 //
 // ESCALATION ALWAYS CARRIES THE LABEL (operator directive 2026-06-21). Any
 // comment that hands a PR to a human — a 🟢 PR touching the target's governance
@@ -215,6 +216,67 @@ export function resolveReasons({ body = "", escalating = false, reason, reasonTe
   return { codes: [...codes], labels: [...codes].map(reasonLabel), appendMarker };
 }
 
+/** Panel provenance (#513 / `wf:rafael` R1). A VERDICT post must declare how
+ *  its reviewer lenses were produced — as isolated subagents, or inline in the
+ *  router's own context — because the synthesis weighs convergence differently
+ *  in each case and the operator merges on that sentence.
+ *
+ *  **What this enforces, exactly: presence. Not truth.** The router picks the
+ *  mode and passes the flag, so a router that ran inline can still declare
+ *  `isolated`. Nothing downstream can contradict it. This closes the failure
+ *  where the mode goes *unstated* and the reader infers independence from the
+ *  format; it does not close deliberate or careless misdeclaration, and the
+ *  SKILL.md text says so rather than letting the marker read as proof.
+ *  Real provenance — an artefact emitted by whatever spawns the lenses — is a
+ *  separate, unbuilt mechanism.
+ *
+ *  Verdict posts are identified by the marker the Step-5 template already
+ *  carries, so a routing comment or a plain review is unaffected. */
+export const PANEL_MODES = ["isolated", "inline"];
+export const PANEL_MARKER_RE = /<!--\s*autopilot:panel:(isolated|inline)\s*-->/i;
+const VERDICT_MARKER_RE = /^\*\*[^*]+—\s*verdict,\s*cycle\s+\d+/mu;
+
+export function isVerdictBody(body = "") {
+  return VERDICT_MARKER_RE.test(String(body));
+}
+
+export function resolvePanelProvenance({ body = "", panel } = {}) {
+  const present = PANEL_MARKER_RE.exec(String(body));
+  if (panel !== undefined && panel !== null && panel !== "") {
+    if (!PANEL_MODES.includes(panel)) {
+      throw new Error(
+        `--panel must be one of ${PANEL_MODES.join(" | ")} (got "${panel}") — it records how the reviewer lenses were produced (SKILL.md Step 5).`,
+      );
+    }
+    if (present && present[1].toLowerCase() !== panel) {
+      throw new Error(
+        `--panel ${panel} contradicts the <!-- autopilot:panel:${present[1].toLowerCase()} --> marker already in the body — one verdict, one provenance.`,
+      );
+    }
+    return { mode: panel, appendMarker: present ? null : `<!-- autopilot:panel:${panel} -->` };
+  }
+  if (present) return { mode: present[1].toLowerCase(), appendMarker: null };
+  if (!isVerdictBody(body)) return { mode: null, appendMarker: null };
+  // Undeclared verdict → stamp the WEAKER claim, never the stronger one, and
+  // say so on stderr. Two reasons this defaults rather than throws:
+  //
+  //  1. Correctness. Absence of a declaration is evidence for `inline`, not
+  //     against it — a router that does not know about this flag is running
+  //     the pre-0.23.0 body, whose Step 4 tells it to produce lenses inline.
+  //     Defaulting to `inline` records what actually happened. (Same idiom as
+  //     the PERF# provenance guard: an unknown is never a measured zero.)
+  //  2. Activation skew (`wf:sana` S1 on #513). This script runs from the
+  //     clone and is live on merge; the SKILL.md body that instructs the
+  //     router to pass --panel is not live until `PATCH /skills/pr-autopilot`
+  //     (ADR-0008, OP-015). Throwing here would break every verdict post in
+  //     the window between those two events — a self-inflicted outage of the
+  //     cadence, to enforce a sentence the running body never asked for.
+  //
+  // The reader is still protected: the marker is present and machine-readable
+  // on every verdict, and it errs toward "discount this convergence".
+  return { mode: "inline", appendMarker: `<!-- autopilot:panel:inline -->`, defaulted: true };
+}
+
 async function gh(token, method, path, body) {
   return fetch(`${GH_API}${path}`, {
     method,
@@ -283,6 +345,22 @@ async function main() {
   }
   if (reasons.appendMarker) body = `${body.trimEnd()}\n\n${reasons.appendMarker}\n`;
   labels = [...new Set([...labels, ...reasons.labels])];
+
+  // #513: a verdict must say how its lenses were produced. Fail loud here,
+  // before anything reaches GitHub — same posture as the reason code.
+  let panelProv;
+  try {
+    panelProv = resolvePanelProvenance({ body, panel: arg("panel") });
+  } catch (e) {
+    die(1, e instanceof Error ? e.message : String(e));
+  }
+  if (panelProv.defaulted) {
+    console.error(
+      "pr-autopilot-post: WARN verdict posted with no --panel — stamping the weaker claim " +
+        "<!-- autopilot:panel:inline -->. Pass --panel isolated when the lenses ran as isolated subagents (SKILL.md Step 5).",
+    );
+  }
+  if (panelProv.appendMarker) body = `${body.trimEnd()}\n\n${panelProv.appendMarker}\n`;
 
   // Verdict-time L0/L1 computation (Epic-019): every escalation records
   // whether the PR touches the target's declared L0/L1 set — today only the
