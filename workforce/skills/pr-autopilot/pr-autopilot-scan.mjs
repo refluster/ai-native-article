@@ -17,7 +17,9 @@
 // Discovery includes BOTH draft and non-draft PRs, and BOTH human- and
 // bot-authored (Dependabot) PRs — every open PR in the window is routable
 // (2026-06-17 Autopilot widening, adr-0010). The only discovery filters are
-// the recency window and "already routed this cycle".
+// the recency window and "already routed AND not revised since" (a 🟡 PR the
+// author has pushed a revision to comes back at cycle N+1 — see
+// nextRoutingCycle).
 //
 // NOMINATION LOAD CAP (Epic-019 Story 2b — fairness + W-3). Auto-nomination
 // must not degenerate into "the same 3 reviewers on everything": a persona
@@ -33,7 +35,8 @@
 //   GITHUB_TOKEN=<credentials['github.token'].token> \
 //     node workforce/skills/pr-autopilot/pr-autopilot-scan.mjs \
 //       --project asp-cloud --persona nadia \
-//       [--max 5] [--since-days 7] [--out /tmp/pr-autopilot-candidates.json]
+//       [--max 5] [--since-days 7] [--cycle-cap 7]
+//       [--out /tmp/pr-autopilot-candidates.json]
 //
 // Output: writes a JSON array of candidate PRs to --out and prints a
 // one-line summary to stdout. Exit 0 even when zero candidates (a valid
@@ -48,7 +51,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
-import { ESCALATION_LABEL, MIN_REVIEWERS } from "./pr-merge.mjs";
+import { ESCALATION_LABEL, MIN_REVIEWERS, W4_CYCLE_CAP } from "./pr-merge.mjs";
 import { assertReasonCode } from "./escalation-reasons.mjs";
 
 const GH_API = "https://api.github.com";
@@ -80,11 +83,87 @@ export function projectRepo(repoRoot, projectId) {
 
 /** A PR has already been routed (this cycle leg) if a comment from this
  *  persona opens with the router-comment marker. Mirrors the marker that
- *  pr-autopilot-post writes via the SKILL.md comment template. */
+ *  pr-autopilot-post writes via the SKILL.md comment template.
+ *
+ *  Kept as the single-cycle predicate the seat/telemetry callers want ("has
+ *  this persona ever routed here?"). **Discovery no longer uses it** — see
+ *  nextRoutingCycle below for why. */
 export function alreadyRouted(comments, personaSlug) {
+  return routingState(comments, personaSlug).cycle > 0;
+}
+
+/** The persona's routing history on one PR: the highest cycle number it has
+ *  opened, and when its most recent routing comment landed.
+ *
+ *  Only the *routing* comment matches — the verdict comment's header
+ *  ("**Nadia — verdict, cycle 1 of ≤ 3.**") does not, because the cycle token
+ *  is not adjacent to the persona name. That is deliberate: a cycle is opened
+ *  once, by the routing comment. */
+export function routingState(comments, personaSlug) {
   const personaName = personaSlug.charAt(0).toUpperCase() + personaSlug.slice(1);
-  const marker = new RegExp(`^\\*\\*${personaName} — cycle \\d+ of `, "m");
-  return comments.some((c) => marker.test(c.body ?? ""));
+  const marker = new RegExp(`^\\*\\*${personaName} — cycle (\\d+) of `, "m");
+  let cycle = 0;
+  let lastRoutedAt = null;
+  for (const c of comments ?? []) {
+    const m = marker.exec(String(c?.body ?? ""));
+    if (!m) continue;
+    const n = parseInt(m[1], 10);
+    if (Number.isFinite(n) && n > cycle) cycle = n;
+    const at = Date.parse(c?.created_at ?? "");
+    if (Number.isFinite(at) && (lastRoutedAt === null || at > lastRoutedAt)) lastRoutedAt = at;
+  }
+  return { cycle, lastRoutedAt };
+}
+
+/**
+ * Which cycle this PR should be routed at, or `null` when it should be
+ * skipped. This is the discovery gate.
+ *
+ * The bug this replaces: discovery used to skip any PR carrying a routing
+ * comment with ANY cycle number, while SKILL.md Step 5 promises a 🟡 verdict
+ * means "the author is expected to revise; next tick re-routes (cycle += 1)".
+ * The comment said "already routed *this cycle*"; the regex implemented
+ * "already routed *ever*". So a 🟡 PR could never reach cycle 2 on the cron
+ * path — the author would push a revision and the cadence would never look at
+ * it again, leaving the daily sweep to escalate it as `stale-routed` two days
+ * later. (Observed on #507, 2026-07-27: cycle-2 revision pushed at 14:48Z,
+ * three subsequent ticks all skipped it.)
+ *
+ * The fix is to ask the question the comment always claimed to ask: has the
+ * author revised **since** the last routing comment?
+ *
+ * Conservative in both directions:
+ *  - No routing comment           → cycle 1 (unchanged behaviour).
+ *  - Cycle ≥ cap                  → null. The W-4 hard cap is a process-
+ *                                   breakdown signal, not a retry budget;
+ *                                   pr-merge's verifyMergeable refuses past it
+ *                                   and the sweep escalates. Never loop.
+ *  - Head unchanged since routing → null. No revision, nothing new to review.
+ *  - Cannot determine either time → null. An unknown never triggers a re-route,
+ *                                   so a missing/garbled timestamp degrades to
+ *                                   today's (silent) behaviour rather than
+ *                                   spamming a PR every tick.
+ *
+ * @param {object}   args
+ * @param {Array}    args.comments         issue comments (need `body` + `created_at`)
+ * @param {string}   args.persona          the routing persona slug
+ * @param {?string}  args.headCommittedAt  ISO date of the PR head commit
+ * @param {number}   args.cycleCap         hard cap (default W4_CYCLE_CAP)
+ * @returns {?number} the cycle to route at, or null to skip
+ */
+export function nextRoutingCycle({
+  comments = [],
+  persona,
+  headCommittedAt = null,
+  cycleCap = W4_CYCLE_CAP,
+} = {}) {
+  const { cycle, lastRoutedAt } = routingState(comments, persona);
+  if (cycle === 0) return 1;
+  if (cycle >= cycleCap) return null;
+  if (lastRoutedAt === null) return null;
+  const revisedAt = Date.parse(headCommittedAt ?? "");
+  if (!Number.isFinite(revisedAt)) return null;
+  return revisedAt > lastRoutedAt ? cycle + 1 : null;
 }
 
 /** Recency gate: only route PRs updated within the window (avoids
@@ -194,12 +273,17 @@ async function main() {
   const max = Number(arg("max", "5"));
   const sinceDays = Number(arg("since-days", "7"));
   const out = arg("out", "/tmp/pr-autopilot-candidates.json");
+  // The HARD cap (W-4). The binding's softer `cycle_cap` (e.g. 3) is applied by
+  // the routing persona at verdict time; discovery only refuses to loop past
+  // the process-breakdown line.
+  const cycleCap = Number(arg("cycle-cap", String(W4_CYCLE_CAP)));
   const token = process.env.GITHUB_TOKEN;
 
   if (!projectId) die(1, "--project <id> is required");
   if (!persona) die(1, "--persona <agent-slug> is required (the routing persona)");
   if (!token) die(2, "GITHUB_TOKEN env is required (from credentials['github.token'].token)");
   if (!Number.isInteger(max) || max < 1) die(1, `--max must be a positive integer (got ${max})`);
+  if (!Number.isInteger(cycleCap) || cycleCap < 1) die(1, `--cycle-cap must be a positive integer (got ${cycleCap})`);
 
   let owner, repo;
   try {
@@ -247,7 +331,26 @@ async function main() {
     // →merge path as human PRs (the dependabot-triage no-review lane retires).
     if (!withinWindow(pr.updated_at, sinceDays)) continue;
     const comments = commentsByPr.get(pr.number) ?? [];
-    if (alreadyRouted(comments, persona)) continue;
+
+    // Re-route gate. A PR already routed at cycle N comes back at N+1 only
+    // when its head commit is NEWER than the last routing comment — i.e. the
+    // author actually pushed the revision a 🟡 verdict asked for. The head
+    // commit's date is only fetched for PRs that need the comparison, so an
+    // unrouted PR costs no extra call.
+    let headCommittedAt = null;
+    if (alreadyRouted(comments, persona) && pr.head?.sha) {
+      try {
+        const head = await ghGet(token, `/repos/${owner}/${repo}/commits/${pr.head.sha}`);
+        headCommittedAt = head?.commit?.committer?.date ?? head?.commit?.author?.date ?? null;
+      } catch (e) {
+        // Cannot tell whether the author revised → leave null, which
+        // nextRoutingCycle treats as "do not re-route" (never spam a PR on a
+        // transient read failure).
+        console.error(`pr-autopilot-scan: #${pr.number} head commit unreadable (${e.message}) — not re-routing`);
+      }
+    }
+    const cycle = nextRoutingCycle({ comments, persona, headCommittedAt, cycleCap });
+    if (cycle === null) continue;
 
     let diff;
     try {
@@ -260,6 +363,11 @@ async function main() {
     }
     candidates.push({
       number: pr.number,
+      // The cycle this PR is being routed at — 1 for a first pass, N+1 for a
+      // re-route after an author revision. The routing persona opens its
+      // comment with this number ("**{Persona} — cycle {cycle} of ≤ {cap}**")
+      // and applies its binding's own softer cycle_cap.
+      cycle,
       title: pr.title,
       body: pr.body ?? "",
       author: pr.user?.login ?? "(unknown)",
@@ -297,7 +405,9 @@ async function main() {
     ),
   );
   console.log(
-    `pr-autopilot-scan: ${owner}/${repo} — ${candidates.length} candidate PR(s) need cycle-1 routing (scanned ${prs.length} open, max ${max}, window ${sinceDays}d; ` +
+    `pr-autopilot-scan: ${owner}/${repo} — ${candidates.length} candidate PR(s) need routing ` +
+      `(${candidates.filter((c) => c.cycle === 1).length} first-pass, ${candidates.filter((c) => c.cycle > 1).length} re-route after revision; ` +
+      `scanned ${prs.length} open, max ${max}, window ${sinceDays}d, hard cycle cap ${cycleCap}; ` +
       `seat cap ${NOMINATION_SEAT_CAP}, capped: ${cappedPersonas.length > 0 ? cappedPersonas.join(", ") : "none"}) → ${out}`,
   );
   process.exit(0);

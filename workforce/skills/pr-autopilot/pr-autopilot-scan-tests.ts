@@ -16,6 +16,8 @@ import {
   countOpenSeats,
   applyNominationCap,
   alreadyRouted,
+  nextRoutingCycle,
+  routingState,
   withinWindow,
 } from "./pr-autopilot-scan.mjs";
 import { MIN_REVIEWERS } from "./pr-merge.mjs";
@@ -139,5 +141,121 @@ describe("alreadyRouted / withinWindow (existing discovery gates)", () => {
     expect(withinWindow("2026-07-05T00:00:00Z", 7, now)).toBe(true);
     expect(withinWindow("2026-06-20T00:00:00Z", 7, now)).toBe(false);
     expect(withinWindow("not-a-date", 7, now)).toBe(false);
+  });
+});
+
+
+// ── The re-route gate (cycle ≥ 2 discovery) ──────────────────────────────────
+// Regression corpus for the discovery bug found on #507 (2026-07-27): the old
+// alreadyRouted() gate matched `cycle \d+`, so ANY routed PR was excluded from
+// discovery forever. SKILL.md Step 5 promises a 🟡 verdict re-routes on the
+// next tick once the author revises; that promise had no implementation.
+
+const routed = (persona: string, cycle: number, at: string) => ({
+  body: `**${persona} — cycle ${cycle} of ≤ 7.**\n\nSummary…`,
+  created_at: at,
+});
+
+describe("routingState — the persona's routing history on a PR", () => {
+  it("reports zero cycles when the persona has never routed", () => {
+    expect(routingState([], "nadia")).toEqual({ cycle: 0, lastRoutedAt: null });
+    expect(routingState([routed("Maya", 1, "2026-07-27T07:35:00Z")], "nadia").cycle).toBe(0);
+  });
+
+  it("takes the HIGHEST cycle and the LATEST routing timestamp", () => {
+    const st = routingState(
+      [routed("Nadia", 1, "2026-07-25T07:35:00Z"), routed("Nadia", 2, "2026-07-27T07:35:00Z")],
+      "nadia",
+    );
+    expect(st.cycle).toBe(2);
+    expect(st.lastRoutedAt).toBe(Date.parse("2026-07-27T07:35:00Z"));
+  });
+
+  // Catches: counting the verdict comment as a second opened cycle, which
+  // would double-increment every round.
+  it("ignores the verdict comment — only the routing comment opens a cycle", () => {
+    const verdict = {
+      body: "**Nadia — verdict, cycle 1 of ≤ 3. Hand-off.**\n\n…",
+      created_at: "2026-07-27T07:43:00Z",
+    };
+    expect(routingState([verdict], "nadia").cycle).toBe(0);
+  });
+});
+
+describe("nextRoutingCycle — the discovery gate", () => {
+  const ROUTED_AT = "2026-07-27T07:35:00Z";
+  const comments = [routed("Nadia", 1, ROUTED_AT)];
+
+  it("routes an unrouted PR at cycle 1 (unchanged behaviour)", () => {
+    expect(nextRoutingCycle({ comments: [], persona: "nadia" })).toBe(1);
+  });
+
+  // THE REGRESSION. Against the pre-fix code this PR never came back.
+  it("re-routes at cycle 2 when the author pushed after the routing comment", () => {
+    expect(
+      nextRoutingCycle({ comments, persona: "nadia", headCommittedAt: "2026-07-27T14:48:00Z" }),
+    ).toBe(2);
+  });
+
+  it("does not re-route when the head predates the routing comment", () => {
+    expect(
+      nextRoutingCycle({ comments, persona: "nadia", headCommittedAt: "2026-07-27T05:45:00Z" }),
+    ).toBeNull();
+  });
+
+  // Catches: an off-by-one that re-routes a PR whose head is exactly the
+  // commit the routing comment already reviewed.
+  it("does not re-route on an equal timestamp", () => {
+    expect(nextRoutingCycle({ comments, persona: "nadia", headCommittedAt: ROUTED_AT })).toBeNull();
+  });
+
+  // Catches: turning the W-4 hard cap into a retry budget — a PR at the cap
+  // must escalate, never loop.
+  it("refuses to route at or past the hard cycle cap", () => {
+    const atCap = [routed("Nadia", 7, ROUTED_AT)];
+    expect(
+      nextRoutingCycle({ comments: atCap, persona: "nadia", headCommittedAt: "2026-07-28T00:00:00Z" }),
+    ).toBeNull();
+  });
+
+  it("honours a lowered cap", () => {
+    const atThree = [routed("Nadia", 3, ROUTED_AT)];
+    expect(
+      nextRoutingCycle({
+        comments: atThree,
+        persona: "nadia",
+        headCommittedAt: "2026-07-28T00:00:00Z",
+        cycleCap: 3,
+      }),
+    ).toBeNull();
+    expect(
+      nextRoutingCycle({
+        comments,
+        persona: "nadia",
+        headCommittedAt: "2026-07-28T00:00:00Z",
+        cycleCap: 3,
+      }),
+    ).toBe(2);
+  });
+
+  // Catches: an unreadable head commit (transient GitHub failure) spamming a
+  // routing comment onto the PR on every tick.
+  it("skips when the head commit date is missing or unparseable", () => {
+    expect(nextRoutingCycle({ comments, persona: "nadia", headCommittedAt: null })).toBeNull();
+    expect(nextRoutingCycle({ comments, persona: "nadia", headCommittedAt: "not-a-date" })).toBeNull();
+  });
+
+  // Catches: a routing comment with no created_at being treated as
+  // infinitely old and re-routing forever.
+  it("skips when the routing comment carries no timestamp", () => {
+    const undated = [{ body: "**Nadia — cycle 1 of ≤ 7.**" }];
+    expect(
+      nextRoutingCycle({ comments: undated, persona: "nadia", headCommittedAt: "2026-07-28T00:00:00Z" }),
+    ).toBeNull();
+  });
+
+  it("keeps alreadyRouted as the has-ever-routed predicate", () => {
+    expect(alreadyRouted(comments, "nadia")).toBe(true);
+    expect(alreadyRouted(comments, "maya")).toBe(false);
   });
 });

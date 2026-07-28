@@ -50,10 +50,17 @@ GITHUB_TOKEN="<credentials['github.token'].token>" \
     --max 5 --since-days 7 --out /tmp/pr-autopilot-candidates.json
 ```
 
-The scan lists every open PR updated within the window, skips PRs you already
-routed, caps at `--max`, and writes each candidate (title, body, diff,
-comments, `draft`/`is_bot` flags) to `--out`. **0 candidates → skip Steps 2–5,
-but still run the Step 6 sweep.**
+The scan lists every open PR updated within the window, caps at `--max`, and
+writes each candidate (title, body, diff, comments, `draft`/`is_bot` flags) to
+`--out`. **0 candidates → skip Steps 2–5, but still run the Step 6 sweep.**
+
+A PR you already routed comes back **only when its head commit is newer than
+your last routing comment** — i.e. the author pushed the revision a 🟡 verdict
+asked for (Step 5). Each candidate carries the `cycle` to route it at: `1` for
+a first pass, `N+1` for a re-route. Open your Step-2 comment with that number,
+and apply your `binding_config.cycle_cap` to it — the scan only enforces the
+W-4 hard cap (`--cycle-cap`, default 7), which is a process-breakdown line, not
+a retry budget.
 
 ## Step 2 — route each candidate (your judgment)
 
