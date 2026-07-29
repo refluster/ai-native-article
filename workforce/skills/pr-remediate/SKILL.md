@@ -44,10 +44,29 @@ reviewers' **verbatim** review bodies. **0 candidates is a first-class, cheap
 outcome** — record the no-op and stop.
 
 Never work a PR the scan classified `not-in-lane` or `terminal`, and never
-"just one more" attempt on a `cap-exceeded` one — go to Step 5 for those two
+"just one more" attempt on a `cap-exceeded` one — go to Step 6 for those two
 non-actionable classes (`cap-exceeded` → escalate; `unclear` → escalate).
 
-## Step 2 — work ONE PR at a time, in its own clone/worktree
+## Step 2 — claim the attempt BEFORE working (deterministic)
+
+```sh
+GITHUB_TOKEN="…" node workforce/skills/pr-remediate/pr-remediate-post.mjs \
+  --project "<project_id>" --pr <number> --attempt <candidate.attempt_next> --claim
+```
+
+The attempt is spent here, not when it succeeds. This is deliberate and it is the
+lane's real bound (`wf:farah` F1 on #518): a cap the bounded cadence increments
+only on success is not a cap — a run that dies after pushing to the head branch
+but before recording an outcome would refresh the PR's `updated_at` (resetting the
+sweep's staleness clock) while consuming no attempt, and could retry the same
+failing resolution forever. Claiming first inverts that: **a death costs an
+attempt.** Over-counting a crashed run is the safe direction.
+
+The script refuses to re-claim a spent attempt, and refuses to claim past the cap
+(escalate instead — Step 6). It is the same once-ever-latch idiom `flaky-rerun.mjs`
+uses.
+
+## Step 3 — work ONE PR at a time, in its own clone/worktree
 
 Sequential, like `issue-implement`: a shared working tree cannot hold two PRs'
 resolutions, and a half-resolved conflict pushed to a branch is worse than an
@@ -67,7 +86,7 @@ Then resolve each conflict **semantically**:
   step to a document your branch also edits, the resolution contains both steps.
 - If the two intents genuinely conflict (both sides changed the same logic and
   keeping one loses the other's behaviour), that is **not yours to decide** —
-  Step 5, `remediation-blocked`, quoting both sides.
+  Step 6, `remediation-blocked`, quoting both sides.
 - **Never resolve a conflict inside the target's L0/L1 / Zone A surface.** A
   governance doc, an ADR, an identity/prompt file, a workflow: resolving there
   is editing there, and those edits are the operator's. `pr-autopilot-post.mjs`
@@ -80,33 +99,33 @@ verifying the result still builds.
 **`review-findings`** — read every review body in the candidate **as written**.
 For each open blocking finding: implement the fix the reviewer named, or — when
 you believe the finding is wrong — leave the code and write the rebuttal in the
-Step 4 comment, citing the finding-ID. A rebuttal is a legitimate outcome; a
+Step 5 outcome comment, citing the finding-ID. A rebuttal is a legitimate outcome; a
 silently-ignored finding is not. Address findings by ID (`A1`, `B2`) so the next
 cycle's reviewers can check them off.
 
 **`checks-failing`** — read the failing job's log, fix the cause, and say in the
-comment what the cause was. If the check fails for a reason outside the diff
+outcome comment what the cause was. If the check fails for a reason outside the diff
 (infrastructure, a broken base branch), do **not** patch around it: escalate with
 `remediation-blocked` naming what you found. Bending a product failure into a
 green check is the worst outcome this cadence can produce (C-4).
 
-## Step 3 — verify before pushing
+## Step 4 — verify before pushing
 
 Discover and run the target repo's own gate — its `package.json` scripts, a
 Makefile, the CI workflow's own commands — exactly as `issue-implement` does. A
 conflict resolution that has not been run through the target's verification is
 not a resolution; it is a guess that happens to compile. If a command cannot be
-run, say so in the Step 4 comment rather than skipping it silently.
+run, say so in the Step 5 outcome comment rather than skipping it silently.
 
 Push to the head branch (`git push origin <head.ref>`; `--force-with-lease` only
 after a rebase — §5 permits feature-branch force-push, and only that).
 
-## Step 4 — record the attempt (deterministic)
+## Step 5 — record the outcome (deterministic)
 
-Write the body to `/tmp/remediation-<number>.md`:
+Write the outcome body to `/tmp/remediation-<number>.md`:
 
 ```md
-**<PersonaName> — remediation attempt <n> of ≤ 3.** <kind>
+**<PersonaName> — remediation attempt <n> of ≤ 3, outcome.** <kind>
 
 <what was wrong, in one sentence — the conflict/finding/check, not a summary of the PR>
 
@@ -132,7 +151,7 @@ labels, and leaves the PR for `pr-autopilot`. **Never `@`-mention a persona**
 MCP comment tool: that drops the label moves and strands the PR (ML-009's exact
 shape, one lane over).
 
-## Step 5 — escalate, with the same discipline (deterministic)
+## Step 6 — escalate, with the same discipline (deterministic)
 
 Three cases leave the lane for a human: `cap-exceeded` (attempts spent),
 `unclear` (parked with no recognisable cause), and any judgment call above that
@@ -151,19 +170,21 @@ conflict or the finding you could not resolve. "Could not fix" is not a hand-off
 it is a shrug. The script stamps `autopilot:needs-human` + the reason and clears
 the author label, so the PR is in exactly one queue.
 
-An attempt that escalates still **consumes an attempt** — the marker is written
-on both shapes. That is deliberate: a PR bouncing between "tried and blocked" and
-"re-parked" three times has a structural problem no fourth attempt will find.
+An attempt that escalates still **consumes an attempt** — it was claimed in Step
+2 before any of this ran. That is deliberate: a PR bouncing between "tried and
+blocked" and "re-parked" three times has a structural problem no fourth attempt
+will find.
 
 ## Scope
 
 - **Drive the lane to empty.** A run that discovers candidates and pushes
   nothing, escalating none, is an incomplete run — the same standard
   `pr-autopilot` holds itself to.
-- **Bounded by construction.** `REMEDIATION_CAP` (3) attempts per PR; the
-  attempt marker is the counter; `pr-autopilot-sweep.mjs` independently escalates
-  a PR that sits here untouched past `--author-stale-hours` (36) even if this
-  cadence never fires. The lane cannot become a place PRs go to die.
+- **Bounded by construction, and the bound is not self-reported.** `REMEDIATION_CAP`
+  (3) attempts per PR, each **claimed before the work** so a crashed run cannot
+  refund itself; and `pr-autopilot-sweep.mjs` independently escalates a PR that
+  sits here untouched past `--author-stale-hours` (36) even if this cadence never
+  fires at all. The lane cannot become a place PRs go to die.
 - **Author, never merger.** No merge, no approve, no request-changes, no push to
   the default branch, under any path (R-N9; `external-pr`).
 - **One PR at a time**, `max_prs_per_run` per fire.

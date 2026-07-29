@@ -4,9 +4,21 @@
 //
 // The remediation cadence's real work lands as commits on the PR's HEAD branch
 // (R-N9: never the default branch). This script writes the *record* of that
-// work and moves the PR out of the lane, in exactly two shapes:
+// work and moves the PR out of the lane, in exactly three shapes:
 //
-//   --resolved   an attempt was made and pushed. Posts the attempt comment
+//   --claim      FIRST, before any work. Posts the attempt marker
+//                `<!-- autopilot:remediation:<n> -->` and nothing else — the
+//                lane's bound is counted from these, so the attempt must be
+//                spent before it can fail. Without this ordering the cap is
+//                enforced by the cadence it bounds (`wf:farah` F1 on #518): a
+//                session that dies after pushing but before recording would
+//                refresh the PR's updated_at — resetting the sweep's staleness
+//                clock — while consuming no attempt, and could retry the same
+//                failing resolution forever. Same once-ever-latch idiom as
+//                flaky-rerun.mjs. Refuses to re-claim an attempt already
+//                claimed, so a re-run of the same fire cannot double-spend.
+//
+//   --resolved   an attempt was made and pushed. Posts the outcome comment
 //                (stamped with `<!-- autopilot:remediation:<n> -->`, the marker
 //                the lane's bound is counted from), REMOVES
 //                `autopilot:needs-author` and the author-lane reason labels, and
@@ -30,7 +42,9 @@
 //   GITHUB_TOKEN=… node workforce/skills/pr-remediate/pr-remediate-post.mjs \
 //     --project agent-workforce --pr 517 --attempt 1 \
 //     --body-file /tmp/remediation-517.md \
-//     ( --resolved | --blocked --reason remediation-blocked [--reason-text "…"] )
+//     ( --claim | --resolved | --blocked --reason remediation-blocked [--reason-text "…"] )
+//
+// --claim needs no --body-file (the marker IS the record); the other two do.
 //
 // Exit codes: 0 posted · 1 bad args / refused guard · 2 endpoint rejected ·
 //             3 network / unexpected.
@@ -43,6 +57,7 @@ import {
   AUTHOR_LABEL,
   ESCALATION_LABEL,
   REMEDIATION_CAP,
+  countRemediationAttempts,
   ensureLabels,
   makeGh,
   remediationMarker,
@@ -63,6 +78,22 @@ export function labelsToClearOnResolve(labels = []) {
   return labels
     .map((l) => String(l || ""))
     .filter((l) => l === AUTHOR_LABEL || authorReasonLabels.includes(l));
+}
+
+/** The claim comment. Deliberately minimal: it exists to spend the attempt
+ *  before the work, so it must not depend on anything the work produces. */
+export function claimBody(attempt, cap = REMEDIATION_CAP) {
+  return [
+    `**Remediation attempt ${attempt} of ≤ ${cap} — claimed.**`,
+    "",
+    "Starting work on this PR's author-lane blocker. This attempt is spent from here on: " +
+      "if this run dies before recording an outcome, the attempt still counts (adr-0022 / `wf:farah` F1 — " +
+      "a cap the bounded cadence increments only on success is not a cap). The outcome comment follows.",
+    "",
+    "— pr-remediate (see workforce/skills/pr-remediate/SKILL.md)",
+    "",
+    remediationMarker(attempt),
+  ].join("\n");
 }
 
 /** A `--blocked` hand-off leaves the agent lane, so its reason must be one no
@@ -92,14 +123,18 @@ async function main() {
   const prNumber = arg("pr");
   const bodyFile = arg("body-file");
   const attempt = Number(arg("attempt"));
+  const claim = flag("claim");
   const resolved = flag("resolved");
   const blocked = flag("blocked");
   let repo = arg("repo");
 
   if (!token) return die(2, "GITHUB_TOKEN (or GH_TOKEN) env is required");
   if (!prNumber || !/^\d+$/.test(prNumber)) return die(1, "--pr <number> is required (positive integer)");
-  if (!bodyFile) return die(1, "--body-file <path> is required");
-  if (resolved === blocked) return die(1, "pass exactly one of --resolved / --blocked — an attempt either moved the PR on, or handed it to a human");
+  const modes = [claim, resolved, blocked].filter(Boolean).length;
+  if (modes !== 1) {
+    return die(1, "pass exactly one of --claim / --resolved / --blocked — an attempt is claimed before the work, then recorded as one outcome");
+  }
+  if (!claim && !bodyFile) return die(1, "--body-file <path> is required for --resolved / --blocked");
   if (!repo && projectId) {
     try {
       const r = projectRepo(REPO_ROOT, projectId);
@@ -110,13 +145,24 @@ async function main() {
   }
   if (!repo || !/^[^/]+\/[^/]+$/.test(repo)) return die(1, "--repo <owner>/<repo> (or --project <id>) is required");
 
-  let body;
+  let marker;
   try {
-    body = readFileSync(bodyFile, "utf8");
-  } catch {
-    return die(1, `body-file unreadable: ${bodyFile}`);
+    marker = remediationMarker(attempt);
+  } catch (e) {
+    return die(1, `--attempt <n>: ${e instanceof Error ? e.message : String(e)}`);
   }
-  if (body.trim().length === 0) return die(1, "body-file is empty — refusing to post an empty remediation record (W-4)");
+
+  let body;
+  if (claim) {
+    body = claimBody(attempt);
+  } else {
+    try {
+      body = readFileSync(bodyFile, "utf8");
+    } catch {
+      return die(1, `body-file unreadable: ${bodyFile}`);
+    }
+    if (body.trim().length === 0) return die(1, "body-file is empty — refusing to post an empty remediation record (W-4)");
+  }
 
   // ML-012, imported from the sibling write surface: persona slugs are not
   // GitHub accounts and a raw @ notifies the real user who owns that name.
@@ -125,14 +171,9 @@ async function main() {
     return die(1, `body contains raw GitHub @-mention(s): ${mentions.join(", ")} — reference agents as \`wf:<slug>\` (ML-012)`);
   }
 
-  // The attempt marker is how the lane's bound is counted, so it is mandatory
-  // on BOTH shapes: an attempt that escalates still consumed an attempt.
-  let marker;
-  try {
-    marker = remediationMarker(attempt);
-  } catch (e) {
-    return die(1, `--attempt <n>: ${e instanceof Error ? e.message : String(e)}`);
-  }
+  // The outcome comments carry the marker too — harmless (the counter reads the
+  // MAXIMUM attempt number, not a tally), and it keeps each outcome legible
+  // beside the attempt it belongs to.
   if (!body.includes(marker)) body = `${body.trimEnd()}\n\n${marker}\n`;
 
   const labelsToAdd = [];
@@ -154,12 +195,30 @@ async function main() {
   const gh = makeGh({ token, userAgent: "workforce-pr-remediate" });
 
   let current = [];
+  let alreadyClaimed = 0;
   try {
-    const p = await gh("GET", `/repos/${repo}/pulls/${prNumber}`);
+    const [p, cs] = await Promise.all([
+      gh("GET", `/repos/${repo}/pulls/${prNumber}`),
+      gh("GET", `/repos/${repo}/issues/${prNumber}/comments?per_page=100`),
+    ]);
     if (p.status !== 200) return die(3, `GET pull ${prNumber} -> HTTP ${p.status}`);
     current = Array.isArray(p.json?.labels) ? p.json.labels.map((l) => l?.name) : [];
+    alreadyClaimed = countRemediationAttempts(Array.isArray(cs.json) ? cs.json.map((x) => x.body) : []);
   } catch (e) {
     return die(3, e?.msg || e?.message || String(e));
+  }
+
+  // A claim must be strictly the next attempt. Re-claiming one already spent
+  // would let a re-run of the same fire double-spend the budget in the loose
+  // direction (two claims, one increment); claiming past the cap is the lane's
+  // exit, not another try. Both refuse rather than guess (C-4).
+  if (claim) {
+    if (alreadyClaimed >= REMEDIATION_CAP) {
+      return die(1, `all ${REMEDIATION_CAP} attempts on #${prNumber} are already claimed — escalate with --blocked --reason remediation-cap-exceeded (adr-0022)`);
+    }
+    if (attempt !== alreadyClaimed + 1) {
+      return die(1, `--attempt ${attempt} does not follow the ${alreadyClaimed} attempt(s) already claimed on #${prNumber} — claim attempt ${alreadyClaimed + 1}`);
+    }
   }
 
   // Comment first: the record must exist before the labels move, so a failure
@@ -172,7 +231,13 @@ async function main() {
     return die(3, e?.msg || e?.message || String(e));
   }
   if (c.status !== 201) return die(c.status < 500 ? 2 : 3, `POST comment -> HTTP ${c.status}`);
-  console.error(`pr-remediate-post: recorded attempt ${attempt}/${REMEDIATION_CAP} on ${repo}#${prNumber} (${blocked ? "blocked" : "resolved"})`);
+  const mode = claim ? "claimed" : blocked ? "blocked" : "resolved";
+  console.error(`pr-remediate-post: attempt ${attempt}/${REMEDIATION_CAP} on ${repo}#${prNumber} (${mode})`);
+
+  // A claim only spends the attempt. The PR stays exactly where it is — in the
+  // lane, with its labels — because the work has not happened yet and the sweep
+  // must still be able to catch this run if it dies.
+  if (claim) return 0;
 
   if (labelsToAdd.length > 0) {
     await ensureLabels(gh, repo, labelsToAdd);

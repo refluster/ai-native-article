@@ -20,6 +20,13 @@
 //     rather than tomorrow. The daily loop is: triage 02:23 → implement 04:11 →
 //     design 04:47 → remediate 06:29.
 //
+// PREREQ — SEED THE SKILL BODY FIRST (`wf:ren` R2 on #518). A binding whose
+// skill has no `SKILL#` row fails EVERY fire: agent-runner.md step 2 resolves
+// the body with `GET /skills/issue-triage` and refuses to fall back to the git copy
+// on a non-2xx. Merging the PR puts the folder in git; it does NOT create the
+// DDB row. Run the data-plane seed and confirm `GET /skills/issue-triage` returns
+// 200 BEFORE running this script — see the runbook's Step 0.
+//
 // PREREQ: the project's github.token secret + the issue-triage SKILL# row
 // (data-plane seed). See workforce/docs/runbooks/issue-to-merge-flow.md.
 //

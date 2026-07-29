@@ -69,6 +69,27 @@ cron is B (governance.md §5). Each wire script declares its binding enabled in 
 write (`scheduler=external` + `invoked_by=api` + cron, atomically — never the
 `manual`+cron dead-cron state), so *running the script is the enable*.
 
+### Step 0 — seed the three skill bodies FIRST (`wf:ren` R2 on #518)
+
+A binding whose `skill` has no `SKILL#` row fails **every** fire, loudly and
+forever: `agent-runner.md` step 2 resolves the body with `GET /skills/{skill}` and
+refuses to fall back to the git copy on a non-2xx. Merging this PR puts the skill
+folders in git; it does **not** create the DDB rows. So the data-plane seed runs
+before any wire script:
+
+```sh
+# after the PR merges + the data-plane deploy that carries the seed
+aws-vault exec <profile> -- node workforce/scripts/seed-skills.mjs
+# verify all three resolve before wiring anything
+for s in issue-triage issue-design pr-remediate; do
+  curl -sS "$WF_AGENTS_API_BASE/skills/$s" -o /dev/null -w "$s %{http_code}\n"
+done   # each MUST be 200
+```
+
+If any is not 200, stop — wiring on top of it creates a cadence that throws on
+every fire until someone notices. The same gate applies to the `pr-autopilot`
+body bump (ADR-0018 version-gated sync, see the activation note below).
+
 ```sh
 # dry-run each first — they print the PATCH without sending it
 node workforce/scripts/wire-issue-triage-nadia-agent-workforce.mjs --dry-run

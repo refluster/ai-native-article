@@ -109,6 +109,18 @@ proposals instead of ageing. Epic-019's funnel should move without touching the
 R-N10 predicate — which is precisely the hypothesis it pre-committed to test, so
 the effect is measurable against a stated baseline rather than asserted.
 
+**A measurement debt this creates, and its condition.** (`wf:farah` F2 on #518.)
+A lane PR is neither escalated nor finalized, so it is absent from Epic-019's
+funnel by construction — correct, since it is not an escalation, but it means the
+funnel's rate can improve *partly by moving PRs out of its numerator*, and the only
+thing distinguishing a healthy lane from a dead one is `author-stale` firing. The
+lane therefore owes its own counter — entries, exits by kind, mean dwell — in
+`build-pr-metrics-github.mjs` (tracked as **FU-029**). **The condition attached to
+this decision: that counter ships before Epic-019's next funnel is published**, so
+the published number is never read without the lane's volume beside it. Until then
+the lane's health is observable only through the escalations it produces, and any
+funnel citing it must say so.
+
 **What gets worse, honestly.** (a) A third state is a third place to get stuck; the
 sweep bound is what makes that recoverable, and it is the part most worth watching
 in the first weeks. (b) `pr-remediate` resolving conflicts is the highest-risk

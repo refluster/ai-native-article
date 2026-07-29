@@ -176,6 +176,31 @@ it reads the repo itself. **Never seed a subagent with another lens's finding
 to "check"** — that manufactures the agreement the verdict then reports as
 evidence.
 
+**The session's working tree is NOT the PR (#518, cycle 1).** A CCR fire checks
+out the **base** branch. A lens that "verifies a claim against the branch" by
+reading files, or by `grep`ping the repo it is sitting in, is reading `main` —
+and will report every file and symbol the PR *adds* as missing. This is not
+hypothetical: on #518 all four lenses independently reported that three new skill
+directories, a `REASON_CODES` change and five named guards were "absent from the
+branch". Every one of them was in the diff; every claim matched `main` exactly,
+down to the pre-change function signature and its line number. The panel returned
+🔴 on a PR whose code it had not read, and each lens's bias disclosure stated it
+had verified against the branch — because from inside the session, it had.
+
+So, mechanically, before any lens reads repo state:
+
+```sh
+git fetch origin "<head.ref>" && git checkout "<head.ref>"   # or: git worktree add
+git rev-parse HEAD    # MUST equal the candidate's head.sha
+```
+
+and tell each lens, in its prompt, **which ref it is on**. A lens that cannot
+check out the head must say so and confine itself to the diff it was given —
+"file X is absent" is a claim about a ref, and a claim about the wrong ref reads
+exactly like a finding. When a lens reports something as *missing*, the verdict
+should treat it as unverified until the ref is confirmed: absence is the one
+class of finding this failure mode manufactures.
+
 **Honest limit, and do not oversell it in the verdict.** Separate contexts
 remove *anchoring*, not *correlated priors*: the same base model across N
 subagents shares blind spots, so a defect class the model systematically misses

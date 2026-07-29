@@ -105,11 +105,23 @@ export const AUTHOR_LABEL = "autopilot:needs-author";
 // that would be a cycle).
 export const AUTHOR_MARKER = "<!-- autopilot:needs-author -->";
 
-// Attempt-counter marker for the author lane, written by pr-remediate on every
-// attempt: `<!-- autopilot:remediation:<n> -->`. The lane is bounded by counting
-// these — REMEDIATION_CAP attempts, then the PR escalates to the human lane with
-// `remediation-cap-exceeded`. Kept next to the lane's other constants so the
-// counter, the marker and the cap cannot drift apart.
+// Attempt-counter marker for the author lane: `<!-- autopilot:remediation:<n> -->`.
+// The lane is bounded by counting these — REMEDIATION_CAP attempts, then the PR
+// escalates to the human lane with `remediation-cap-exceeded`.
+//
+// **The marker is CLAIMED BEFORE the attempt, never written after it**
+// (`pr-remediate-post.mjs --claim`), which is the same once-ever-latch idiom
+// flaky-rerun.mjs uses for its bounded rerun. The reason is `wf:farah`'s F1 on
+// #518: a counter the bounded thing writes on success is enforced by the thing
+// it bounds. Written afterwards, a cadence that dies mid-attempt — after pushing
+// to the head branch, before recording — would refresh the PR's `updated_at`
+// (resetting the sweep's staleness clock) while consuming no attempt, and could
+// retry the same failing resolution forever. Claiming first inverts that: a
+// death costs an attempt. Over-counting a crashed run is the safe direction;
+// under-counting an infinite one is not.
+//
+// Kept next to the lane's other constants so the counter, the marker and the cap
+// cannot drift apart.
 export const REMEDIATION_CAP = 3;
 const REMEDIATION_MARKER_RE = /<!--\s*autopilot:remediation:(\d+)\s*-->/g;
 

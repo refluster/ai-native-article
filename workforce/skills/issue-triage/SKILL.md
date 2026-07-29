@@ -114,8 +114,18 @@ the script.
 
 ## Step 4 — report what the dispatch revealed
 
-End the run with a short summary: counts per lane, how many were re-queued, and
-— the load-bearing part — **any issue you could not lane**, with why. An issue
+End the run with a short summary. Report, at minimum:
+
+- **counts per lane** assigned this fire;
+- **the parked-issue funnel**: how many were parked, re-examined, **re-parked**,
+  and **changed lane**. This line is not bookkeeping — it is the only thing that
+  distinguishes a working de-absorption rule from a slower absorbing state
+  (`wf:nadia` N2 on #518). An issue that cycles park → re-examine → park every
+  fortnight looks, from outside, exactly like one that was triaged once and left,
+  except that it now costs a triage slot each time. If the same issues re-park
+  repeatedly, say so by number: that is a finding about the issue or about the
+  lane vocabulary, and it is what the next router needs;
+- — the load-bearing part — **any issue you could not lane**, with why. An issue
 that fits no lane is a finding about the lane vocabulary (or about the issue),
 and it is the one thing this cadence must never do silently: leaving it
 unlaned recreates precisely the invisible backlog this skill exists to end.

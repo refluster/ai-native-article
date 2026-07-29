@@ -12,8 +12,8 @@
 //      sitting in the queue forever.
 import { describe, it, expect } from "vitest";
 import { classifyRemediation, reasonCodesFrom } from "./pr-remediate-scan.mjs";
-import { labelsToClearOnResolve, assertBlockedReason } from "./pr-remediate-post.mjs";
-import { AUTHOR_LABEL, ESCALATION_LABEL, REMEDIATION_CAP } from "../pr-autopilot/pr-merge.mjs";
+import { labelsToClearOnResolve, assertBlockedReason, claimBody } from "./pr-remediate-post.mjs";
+import { AUTHOR_LABEL, ESCALATION_LABEL, REMEDIATION_CAP, countRemediationAttempts } from "../pr-autopilot/pr-merge.mjs";
 
 const inLane = (over = {}) => ({ labels: [AUTHOR_LABEL], mergeable: true, mergeableState: "clean", reasons: [], attempts: 0, ...over });
 
@@ -117,5 +117,28 @@ describe("pr-remediate-post — leaving the lane cleanly", () => {
 
   it("an unknown blocked reason throws", () => {
     expect(() => assertBlockedReason("gave-up")).toThrow(/unknown/);
+  });
+});
+
+// wf:farah F1 on #518: a cap the bounded cadence increments only on success is
+// not a cap. The claim comment is what spends the attempt BEFORE the work, so a
+// run that dies mid-attempt cannot refund itself — these lock that the claim
+// carries the counter and nothing that depends on the work having succeeded.
+describe("claimBody — the attempt is spent before the work", () => {
+  it("carries the attempt marker the cap is counted from", () => {
+    expect(claimBody(2)).toContain("<!-- autopilot:remediation:2 -->");
+  });
+
+  it("is round-trippable by the counter", () => {
+    expect(countRemediationAttempts([claimBody(1), claimBody(2)])).toBe(2);
+  });
+
+  it("claims nothing about an outcome — it is posted before there is one", () => {
+    const body = claimBody(1).toLowerCase();
+    for (const word of ["resolved", "fixed", "pushed to", "verified"]) expect(body).not.toContain(word);
+  });
+
+  it("refuses to render an attempt past the cap", () => {
+    expect(() => claimBody(REMEDIATION_CAP + 1)).toThrow(/remediation-cap-exceeded/);
   });
 });

@@ -20,6 +20,13 @@
 //     untouched issue. max 2/fire because design work is slower and dearer per
 //     item than implementation (W-3).
 //
+// PREREQ — SEED THE SKILL BODY FIRST (`wf:ren` R2 on #518). A binding whose
+// skill has no `SKILL#` row fails EVERY fire: agent-runner.md step 2 resolves
+// the body with `GET /skills/issue-design` and refuses to fall back to the git copy
+// on a non-2xx. Merging the PR puts the folder in git; it does NOT create the
+// DDB row. Run the data-plane seed and confirm `GET /skills/issue-design` returns
+// 200 BEFORE running this script — see the runbook's Step 0.
+//
 // PREREQ: the project's github.token secret + the issue-design SKILL# row.
 // Wire issue-triage FIRST and let it run one cycle — until issues carry
 // wf:lane:design this cadence correctly finds nothing (a cheap no-op).

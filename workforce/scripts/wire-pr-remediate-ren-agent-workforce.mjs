@@ -23,6 +23,13 @@
 //     never share an orchestrator tick window) and gives the every-6h
 //     pr-autopilot a pass to have labelled the overnight PRs.
 //
+// PREREQ — SEED THE SKILL BODY FIRST (`wf:ren` R2 on #518). A binding whose
+// skill has no `SKILL#` row fails EVERY fire: agent-runner.md step 2 resolves
+// the body with `GET /skills/pr-remediate` and refuses to fall back to the git copy
+// on a non-2xx. Merging the PR puts the folder in git; it does NOT create the
+// DDB row. Run the data-plane seed and confirm `GET /skills/pr-remediate` returns
+// 200 BEFORE running this script — see the runbook's Step 0.
+//
 // PREREQ: the project's github.token secret (Contents R/W on the branch
 // namespace, Pull requests R/W) + the pr-remediate SKILL# row. Independent of
 // the issue lanes — it can be wired before or after issue-triage.
