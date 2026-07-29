@@ -1,6 +1,6 @@
 ---
 name: pr-autopilot
-description: Drive every open PR in the bound project's repo to one of exactly two terminal states — MERGED (unanimous-green ≥3-reviewer consensus, no L0/L1 surface, via the fail-closed pr-merge.mjs engine) or ESCALATED to a human with the `autopilot:needs-human` label. Routes each PR to a ≥3-persona reviewer panel, posts every review + the synthesised verdict as PR comments, merges when the R-N10 predicate holds (drafts included), and hands off with the label when it doesn't. A deterministic sweep (pr-autopilot-sweep.mjs) escalates anything that stalls, so no PR is ever left in neither state. Runs as a CCR task (ADR-0005), fired on cron or a pull_request event (adr-0013); github.token via the binding's project linkage.
+description: Drive every open PR in the bound project's repo to one of exactly two terminal states — MERGED (unanimous-green ≥3-reviewer consensus, no L0/L1 surface, via the fail-closed pr-merge.mjs engine) or ESCALATED to a human with the `autopilot:needs-human` label. Routes each PR to a ≥3-persona reviewer panel, posts every review + the synthesised verdict as PR comments, merges when the R-N10 predicate holds (drafts included), and hands off with the label when it doesn't — to the operator, or (adr-0022) to the bounded, agent-owned author lane `autopilot:needs-author` when the blocking cause is a base conflict, a behind branch, or open review findings. A deterministic sweep (pr-autopilot-sweep.mjs) escalates anything that stalls, so no PR is ever left in neither state. Runs as a CCR task (ADR-0005), fired on cron or a pull_request event (adr-0013); github.token via the binding's project linkage.
 ---
 
 # pr-autopilot
@@ -15,9 +15,14 @@ of two terminal states:
 
 A run that leaves a PR in neither state is a bug, not a finished run. The
 deterministic sweep (Step 6) enforces the contract mechanically even when a
-run stalls. The one legitimate *interim* state is 🟡 (an open review cycle
-awaiting the author's revision) — and it is bounded: a 🟡 PR untouched past the
-sweep's stale threshold is escalated.
+run stalls.
+
+The legitimate *interim* states are two, and both are bounded by that sweep:
+🟡 (an open review cycle awaiting a revision), and — since adr-0022 — the
+**author lane** (`autopilot:needs-author`), where a PR whose blocking cause is
+agent-fixable waits for the `pr-remediate` cadence rather than for a human. The
+author lane is a 🟡 with an owner; it is not a third terminal state, and a PR
+that sits in it without its head moving is escalated like any other stall.
 
 You are the routing persona (today Nadia's PdM lens). This runs as a **CCR
 task** fired by `wf-orchestrator-tick` on the binding's cron, or — when the
@@ -265,8 +270,57 @@ the aggregated colour, then take the terminal action:
 | 🟢 | no L0/L1 path + R-N10 delegation + predicate holds | **merge** via `pr-merge.mjs` (below) |
 | 🟢 | touches the target's L0/L1 paths | hand off `--needs-human --reviewed` |
 | 🟢 | no R-N10 delegation for this repo | hand off `--needs-human --reviewed` |
-| 🟡 | author revision pending | verdict comment only (no label); the Step 6 sweep bounds this state |
+| 🟢 / 🟡 | **conflicts with the base** (`mergeable_state=dirty`) or **behind** it | hand off `--needs-author --reason merge-conflict\|branch-behind` (below) |
+| 🟡 | open blocking lens findings | hand off `--needs-author --reason review-findings-open` |
 | 🔴 / non-consensus / can't seat 3 / unreadable governance | any | hand off `--needs-human` (no `--reviewed`) |
+
+### The author lane — a 🟡 with an owner (adr-0022)
+
+A 🟡 used to mean "the author is expected to revise, and the next tick re-routes".
+The author is a fire-and-forget session that ended when the PR opened, so what
+actually happened was: nothing, for 48h, then the sweep escalated it to the
+operator. Same for a PR that went `dirty` because another PR merged first — a
+failure caused by the system *working*, and getting commoner as throughput rises.
+
+So route the agent-fixable causes to an agent instead of to a human. Hand off with
+`--needs-author` and the PR joins **`pr-remediate`**'s queue
+(`autopilot:needs-author`): that cadence resolves the conflict / updates the
+branch / addresses the findings, pushes to the **head** branch, and clears the
+label — and your next tick sees a newer head commit and re-routes at cycle N+1.
+
+Three things to know before you use it:
+
+- **It is not a third terminal state.** MERGED and ESCALATED still are. The lane is
+  bounded by a 3-attempt cap and by the Step-6 sweep (`--author-stale-hours`, 36),
+  which escalates a PR the remediation cadence did not pick up — so a PR cannot
+  quietly live here.
+- **It is fail-closed on L0/L1, tighter than the merge leg.** A PR touching the
+  target's declared L0/L1 set is *refused* the lane by `pr-autopilot-post.mjs`
+  (exit 1) — resolving a conflict inside a governance file is an edit to it.
+  Re-post such a PR as `--needs-human --reason l0l1-path`.
+- **Only agent-fixable reasons may enter it.** The script refuses `l0l1-path`,
+  `no-r-n10-delegation`, `human-changes-requested`, `kill-switch-off`,
+  `cycle-cap-exceeded` and the remediation exits. `checks-failing` is *allowed but
+  never automatic*: route a red PR to the author only when your lenses located the
+  defect in the diff — the flaky-rerun latch owns the retry case, and bending a
+  genuine product failure into a patch attempt is worse than escalating.
+
+The verdict body is the same template with the lane's marker in place of the
+human one, and the hand-off sentence naming the fix expected:
+
+```sh
+GITHUB_TOKEN="…" node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
+  --project "<project_id>" --pr <number> --body-file /tmp/verdict-<number>.md \
+  --panel isolated|inline \
+  --needs-author --reason merge-conflict|branch-behind|review-findings-open
+```
+
+```
+<!-- autopilot:needs-author -->   ⟵ the lane marker (the script appends it from --needs-author)
+```
+
+A body may never carry both lane markers — `resolveLabels` throws, because a PR
+in two queues is a PR whose owner one reader gets wrong.
 
 **Every hand-off goes through `pr-autopilot-post.mjs`** — never a raw API
 call, `gh`, or an MCP comment tool (those drop the label; ML-009). Compose the
@@ -387,6 +441,11 @@ The sweep enforces the two-outcome contract mechanically. It escalates (label
   (default 48) without an update — a stalled run or an abandoned 🟡.
 - **never-routed** — never picked up and now older than the scan's discovery
   window (default 7 days), so the cadence would never see it again.
+- **author-stale** (adr-0022) — in the author lane but untouched for
+  `--author-stale-hours` (default 36): `pr-remediate` is not coming.
+- **remediation-cap-exceeded** (adr-0022) — in the author lane with all 3
+  attempts spent. Both author-lane kinds *move* the PR: the amber label is
+  cleared as the red one is stamped, so it is never in two queues.
 
 PRs labelled `autopilot:off` (maintainer pause) or already labelled
 `autopilot:needs-human` are never touched. Run it even when Step 1 found 0
@@ -402,6 +461,9 @@ candidates — the sweep is how the contract survives runs that die mid-cycle.
   the target's governance L0/L1 always escalates to a human. No push or
   PR-open under any path.
 - **The sweep is part of every fire.** No PR is left in neither state.
+- **Agent-fixable ≠ human-gated** (adr-0022). A conflict, a behind branch or an
+  open finding goes to the author lane (`pr-remediate`), bounded by the attempt
+  cap and the sweep; the human lane keeps what only a human may decide.
 
 **OP-009 (operator-only runtime wiring).** The event trigger this contract is
 agnostic to — the CCR `agent-runner` routine's `pull_request`
@@ -414,5 +476,5 @@ floor and the backstop.
 
 Related: [agent-runner.md](../../docs/routines/agent-runner.md) (the generic
 CCR routine this runs under — this SKILL.md is the authoritative contract),
-R-N10 in [workforce governance](../../docs/governance.md) + adr-0010/0011/0013/0014/0015
-(the merge predicate's decision trail), [dev-process.md](../../docs/runbooks/dev-process.md).
+R-N10 in [workforce governance](../../docs/governance.md) + adr-0010/0011/0013/0014/0015/0022
+(the merge predicate's decision trail), [dev-process.md](../../docs/runbooks/dev-process.md), [issue-to-merge-flow.md](../../docs/runbooks/issue-to-merge-flow.md), [pr-remediate](../pr-remediate/SKILL.md).

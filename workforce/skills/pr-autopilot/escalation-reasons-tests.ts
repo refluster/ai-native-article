@@ -93,7 +93,13 @@ describe("refusalReasonCode — pr-merge.mjs `why` strings map 1:1 (verbatim phr
     ["a reviewer has CHANGES_REQUESTED — not consensus-green", "human-changes-requested"],
     ["check 'ci' is in_progress", "checks-pending-aged"],
     ["check 'ci' = failure", "checks-failing"],
-    ["not mergeable (mergeable=false, state=dirty)", "not-mergeable"],
+    // adr-0022: the engine's single mergeability refusal splits by state —
+    // dirty/behind name an agent-fixable branch condition (author lane),
+    // every other state stays the human lane's `not-mergeable`.
+    ["not mergeable (mergeable=false, state=dirty)", "merge-conflict"],
+    ["not mergeable (mergeable=false, state=behind)", "branch-behind"],
+    ["not mergeable (mergeable=false, state=blocked)", "not-mergeable"],
+    ["not mergeable (mergeable=null, state=unknown)", "not-mergeable"],
     ["review reached cycle 8, exceeding the W-4 hard cap of 7 — process breakdown, escalate to human", "cycle-cap-exceeded"],
     ["missing green marker(s) from ren (expected <!-- autopilot:review:ren:green -->) — consensus not reached", "no-reviewer-consensus"],
     ["only 2 distinct reviewer(s) signed off — a merge requires a panel of at least 3 unanimous-green reviewers (operator directive 2026-06-29); under-reviewed merge refused", "no-reviewer-consensus"],
