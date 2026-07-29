@@ -168,6 +168,15 @@ approve / request-changes per W-5). Do not wait on any external dispatch.
   `escalation_triggers`, post a single comment naming the trigger — as a
   hand-off per Step 5 (`--needs-human --reason persona-escalation-trigger` +
   the hidden markers), not a checklist run.
+- **The lenses are not independent, and the verdict must say so.** Every lens
+  in this step is produced by one session, in one context window, in
+  sequence — each able to see the diff's own justification, your routing
+  comment, and every earlier lens's findings. That is a known property of the
+  inline contract, not a defect of a given run, and it has an observed
+  asymmetry: a shared-context panel reliably catches implementation defects
+  and does **not** reliably challenge the author's premises (#512, evidenced
+  on #510). Nothing here changes what you post per lens; it changes what
+  Step 5 may claim about agreement between them.
 
 ## Step 5 — verdict by reviewer consensus → terminal action
 
@@ -199,6 +208,8 @@ verdict **into** this template so the markers are present by construction:
 
 <one-paragraph synthesis: each reviewer's load-bearing finding, the aggregated colour>
 
+**Panel provenance.** All <n> lenses were produced by one session in a shared context, in sequence — each saw the diff's justification, the routing comment, and the earlier lenses' findings. Agreement between them is one reading stated <n> times, not <n> independent readings; discount convergence accordingly. <ONLY when the same session also authored the diff: "This session also authored this PR — author and router have collapsed, which is the strongest discount of all.">
+
 **Handing to the operator — <reason>.** Not merging. <If a DRAFT: "Still a draft — mark ready, then merge.">
 
 — <PersonaName> (CCR persona; see workforce/skills/pr-autopilot/SKILL.md)
@@ -217,6 +228,35 @@ GITHUB_TOKEN="…" node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
 `autopilot:reviewed` marks "reviewed to 🟢, merge-ready, held only by the
 human gate" — the operator's merge-click queue
 (`is:open label:autopilot:reviewed`). Never stamp it on a non-green hand-off.
+
+### Panel provenance — the line is mandatory, and its wording is bounded
+
+The **Panel provenance** line is required on every verdict comment, green or
+otherwise. The verdict is the artefact the operator reads to decide a merge,
+so an overstated independence claim is a truthfulness defect in the record,
+not merely a review-quality one (#512).
+
+Two rules on how it may be worded:
+
+- **Never present convergence as independent corroboration.** Phrasings like
+  "three lenses converged without coordinating" are false under the Step 4
+  contract — they shared a context by construction. State agreement as what it
+  is: the same session reaching the same reading N times.
+- **Disclose author↔router collapse whenever it holds.** If the session
+  running the panel also authored the diff, the sentence is mandatory, not
+  optional. It is the strongest discount available and the operator cannot
+  infer it from the comment's format.
+
+This constrains the verdict's *evidentiary wording only*. It does not change
+the merge predicate, `MIN_REVIEWERS`, or R-N10 / FU-028's author≠merger
+separation, none of which depend on the lenses being independent. Raising the
+lenses to genuinely separate contexts (one subagent per lens) is the proposal
+this does **not** implement: it gates on whether a CCR `agent-runner` session
+can spawn subagents mid-skill, which is unresolved from the repo alone and
+needs an empirical answer from a real tick (#512, "Open question"). Even if it
+ships, separate contexts remove anchoring, not correlated priors — N lenses on
+one base model share blind spots — so the ceiling on that wording is "real but
+correlated," never "independent."
 
 ### Reason codes (Epic-019 escalation telemetry)
 
@@ -315,7 +355,9 @@ candidates — the sweep is how the contract survives runs that die mid-cycle.
 - **Drive the whole cycle**: route → review → verdict → **merge or escalate**.
   Stopping at a routing comment or a bare 🟢 verdict is an incomplete run.
 - **The verdict is the panel's consensus** (≥3 distinct reviewers; the engine
-  fails closed below 3).
+  fails closed below 3) — reported with its provenance: the lenses share one
+  context, so the verdict states that and never claims independent
+  convergence.
 - **Merge is bounded to non-L0/L1 + consensus + delegation** (R-N10). A PR on
   the target's governance L0/L1 always escalates to a human. No push or
   PR-open under any path.
