@@ -35,6 +35,7 @@
     "workforce:api-routes": "node workforce/scripts/check-api-routes.mjs",
     "workforce:skill-spec-drift": "node workforce/scripts/check-skill-spec-drift.mjs",
     "workforce:skill-body-version": "node workforce/scripts/check-skill-body-version.mjs",
+    "workforce:skill-version-sync": "node workforce/scripts/check-skill-version-sync.mjs",
     "workforce:scan-drain": "node workforce/scripts/check-scan-drain.mjs",
     "workforce:escalation-labels": "node workforce/scripts/check-escalation-labels.mjs",
     "workforce:cycle-count": "node workforce/scripts/check-cycle-count.mjs",
