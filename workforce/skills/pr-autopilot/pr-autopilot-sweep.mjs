@@ -18,6 +18,20 @@
 //   - never-routed        no routing comment at all and the PR has fallen out of
 //                         the scan's --window-days discovery window (default 7)
 //                         — the cadence will never pick it up again on its own.
+//   - author-stale        (adr-0022) labelled `autopilot:needs-author` — the
+//                         agent-fixable lane worked by the pr-remediate cadence
+//                         — but untouched for --author-stale-hours (default 36).
+//                         The lane has a scheduled worker, so silence means the
+//                         worker is not coming; a human takes it.
+//   - remediation-cap-exceeded
+//                         (adr-0022) in the author lane with all REMEDIATION_CAP
+//                         attempts spent and still not terminal. No further
+//                         automatic attempt is permitted — bounded by design.
+//
+// The author lane is why this sweep matters more, not less, after adr-0022: it
+// is the mechanism that keeps a THIRD, agent-owned interim state from becoming
+// a place PRs quietly go to die. Both author-lane kinds MOVE the PR (the amber
+// label is cleared as the red one is stamped) so it is never in two queues.
 //
 // Skipped (never violations): PRs labelled `autopilot:off` (maintainer pause)
 // and PRs already labelled `autopilot:needs-human` (already terminal).
@@ -42,7 +56,7 @@
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { projectRepo } from "./pr-autopilot-scan.mjs";
-import { ESCALATION_LABEL, countRouterCycles, ensureLabels, makeGh } from "./pr-merge.mjs";
+import { AUTHOR_LABEL, ESCALATION_LABEL, REMEDIATION_CAP, countRemediationAttempts, countRouterCycles, ensureLabels, makeGh } from "./pr-merge.mjs";
 import { NEEDS_HUMAN_MARKER } from "./pr-autopilot-post.mjs";
 import { reasonLabel, reasonMarker } from "./escalation-reasons.mjs";
 
@@ -52,6 +66,16 @@ const AUTOPILOT_OFF_LABEL = "autopilot:off";
 
 export const DEFAULT_STALE_HOURS = 48;
 export const DEFAULT_WINDOW_DAYS = 7;
+// adr-0022: how long a PR may sit in the AUTHOR lane before the sweep decides
+// the remediation cadence is not coming and escalates it to a human. Shorter
+// than the routed-stale window because the author lane has a named, scheduled
+// worker: one missed daily fire is tolerable, two is a stall.
+export const DEFAULT_AUTHOR_STALE_HOURS = 36;
+
+/** Violation kinds that mean "this PR was in the author lane and is leaving it"
+ *  — the apply path clears `autopilot:needs-author` for these, so a PR is never
+ *  in both queues. */
+export const AUTHOR_LANE_SWEEP_KINDS = Object.freeze(["author-stale", "remediation-cap-exceeded"]);
 
 /**
  * Pure classifier. Given one open PR's state, return the violation class or
@@ -59,7 +83,12 @@ export const DEFAULT_WINDOW_DAYS = 7;
  */
 export function classifySweep(
   { createdAt, updatedAt, labels = [], bodies = [] },
-  { now = Date.now(), staleHours = DEFAULT_STALE_HOURS, windowDays = DEFAULT_WINDOW_DAYS } = {},
+  {
+    now = Date.now(),
+    staleHours = DEFAULT_STALE_HOURS,
+    windowDays = DEFAULT_WINDOW_DAYS,
+    authorStaleHours = DEFAULT_AUTHOR_STALE_HOURS,
+  } = {},
 ) {
   const names = labels.map((l) => String(l || "").toLowerCase());
   if (names.includes(AUTOPILOT_OFF_LABEL)) return null; // maintainer pause
@@ -72,6 +101,22 @@ export function classifySweep(
   const updated = Date.parse(updatedAt ?? "");
   const created = Date.parse(createdAt ?? updatedAt ?? "");
   if (Number.isNaN(updated)) return null; // unparseable → leave to the cadence
+
+  // adr-0022 — the AUTHOR lane is an interim state with a worker, so it is
+  // bounded exactly like a 🟡: escalate when the worker demonstrably did not
+  // finish. Two ways that shows up, checked before the routed-stale rule
+  // because the author label is the more specific signal:
+  //   - the attempt cap is spent (pr-remediate tried REMEDIATION_CAP times and
+  //     the PR is still parked) — no further attempt is permitted, so a human
+  //     is the only remaining owner;
+  //   - nothing has touched the PR for authorStaleHours — the cadence is not
+  //     coming (unbound, paused, or failing), and a PR nobody works is exactly
+  //     the "neither state" this sweep exists to forbid.
+  // Inside the window with attempts left it is legitimately in flight → null.
+  if (names.includes(AUTHOR_LABEL)) {
+    if (countRemediationAttempts(bodies) >= REMEDIATION_CAP) return "remediation-cap-exceeded";
+    return now - updated > authorStaleHours * 3600_000 ? "author-stale" : null;
+  }
 
   const routed = countRouterCycles(bodies) > 0;
   if (routed) {
@@ -87,13 +132,17 @@ export function classifySweep(
  *  needs-human marker so the label logic (and the ML-009 guard) recognise it
  *  as an escalation, plus the Epic-019 reason marker — the sweep kind IS the
  *  reason code, reused verbatim (workforce/docs/pr-escalation-reasons.md v1). */
-export function sweepHandoffBody(kind, { staleHours, windowDays }) {
+export function sweepHandoffBody(kind, { staleHours, windowDays, authorStaleHours = DEFAULT_AUTHOR_STALE_HOURS }) {
   const reason =
     kind === "unlabelled-handoff"
       ? "handed off (a comment carries the hidden needs-human marker) but the label was dropped (ML-009)"
       : kind === "stale-routed"
         ? `routed for review but reached no terminal state (merged / hand-off) within ${staleHours}h`
-        : `never picked up by the routing cadence within its ${windowDays}-day discovery window`;
+        : kind === "author-stale"
+          ? `parked in the author lane (\`${AUTHOR_LABEL}\`) but untouched for ${authorStaleHours}h — the pr-remediate cadence did not pick it up (adr-0022)`
+          : kind === "remediation-cap-exceeded"
+            ? `parked in the author lane and has spent all ${REMEDIATION_CAP} remediation attempts without reaching a terminal state (adr-0022) — no further automatic attempt is permitted`
+            : `never picked up by the routing cadence within its ${windowDays}-day discovery window`;
   return [
     "**Autopilot sweep — terminal-state enforcement.**",
     "",
@@ -119,6 +168,7 @@ async function main() {
   const asJson = process.argv.includes("--json");
   const staleHours = Number(arg("stale-hours", String(DEFAULT_STALE_HOURS)));
   const windowDays = Number(arg("window-days", String(DEFAULT_WINDOW_DAYS)));
+  const authorStaleHours = Number(arg("author-stale-hours", String(DEFAULT_AUTHOR_STALE_HOURS)));
   let repo = arg("repo");
   const projectId = arg("project");
 
@@ -134,6 +184,7 @@ async function main() {
   if (!repo || !/^[^/]+\/[^/]+$/.test(repo)) return die(1, "--repo <owner>/<repo> (or --project <id>) is required");
   if (!Number.isFinite(staleHours) || staleHours <= 0) return die(1, `--stale-hours must be positive (got ${staleHours})`);
   if (!Number.isFinite(windowDays) || windowDays <= 0) return die(1, `--window-days must be positive (got ${windowDays})`);
+  if (!Number.isFinite(authorStaleHours) || authorStaleHours <= 0) return die(1, `--author-stale-hours must be positive (got ${authorStaleHours})`);
 
   const gh = makeGh({ token, userAgent: "workforce-pr-autopilot-sweep" });
 
@@ -168,7 +219,7 @@ async function main() {
         labels: Array.isArray(pr.labels) ? pr.labels.map((l) => l?.name) : [],
         bodies,
       },
-      { staleHours, windowDays },
+      { staleHours, windowDays, authorStaleHours },
     );
     if (kind) violations.push({ number: pr.number, title: pr.title, url: pr.html_url, kind });
   }
@@ -182,12 +233,23 @@ async function main() {
       // unlabelled-handoff already has a hand-off comment, but not necessarily
       // a reason — the sweep's comment closes that telemetry gap too.
       const c = await gh("POST", `/repos/${repo}/issues/${v.number}/comments`, {
-        body: sweepHandoffBody(v.kind, { staleHours, windowDays }),
+        body: sweepHandoffBody(v.kind, { staleHours, windowDays, authorStaleHours }),
       });
       if (c.status !== 201) {
         failedApplies++;
         console.error(`pr-autopilot-sweep: FAILED comment on #${v.number} → HTTP ${c.status}`);
         continue;
+      }
+      // adr-0022: escalating an author-lane PR MOVES it — the amber label comes
+      // off as the red one goes on. Leaving both would show the PR in two
+      // queues at once, and the one whose worker can no longer act on it is
+      // precisely the misleading half. Best-effort (a 404 just means it was
+      // already removed); the escalation itself is what must land.
+      if (AUTHOR_LANE_SWEEP_KINDS.includes(v.kind)) {
+        const d = await gh("DELETE", `/repos/${repo}/issues/${v.number}/labels/${encodeURIComponent(AUTHOR_LABEL)}`);
+        if (d.status !== 200 && d.status !== 404) {
+          console.error(`pr-autopilot-sweep: WARN could not clear "${AUTHOR_LABEL}" from #${v.number} → HTTP ${d.status}`);
+        }
       }
       const l = await gh("POST", `/repos/${repo}/issues/${v.number}/labels`, { labels: [ESCALATION_LABEL, reasonLabel(v.kind)] });
       if (l.status === 200) console.error(`pr-autopilot-sweep: escalated #${v.number} (${v.kind})`);

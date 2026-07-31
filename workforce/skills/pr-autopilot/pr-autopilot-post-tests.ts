@@ -10,8 +10,18 @@
 // --needs-human flag OR the hidden body marker), and never on a plain routing
 // comment.
 import { describe, it, expect } from "vitest";
-import { resolveLabels, resolveReasons, findRawMentions, NEEDS_HUMAN_MARKER, REVIEWED_MARKER } from "./pr-autopilot-post.mjs";
-import { ESCALATION_LABEL, REVIEWED_LABEL } from "./pr-merge.mjs";
+import {
+  resolveLabels,
+  resolveReasons,
+  findRawMentions,
+  assertAuthorLaneReasons,
+  NEEDS_HUMAN_MARKER,
+  NEEDS_AUTHOR_MARKER,
+  REVIEWED_MARKER,
+  isVerdictBody,
+  resolvePanelProvenance,
+} from "./pr-autopilot-post.mjs";
+import { AUTHOR_LABEL, ESCALATION_LABEL, REVIEWED_LABEL } from "./pr-merge.mjs";
 
 describe("resolveLabels — escalation always carries the label", () => {
   it("a plain routing comment (no flag, no marker) gets no escalation label", () => {
@@ -86,7 +96,7 @@ describe("resolveLabels — a green, merge-ready hand-off is flagged reviewed", 
 describe("resolveReasons — escalation always carries a reason (Epic-019)", () => {
   it("an escalating post with no reason at all throws", () => {
     expect(() => resolveReasons({ body: `verdict\n${NEEDS_HUMAN_MARKER}`, escalating: true })).toThrow(
-      /must carry an escalation reason/,
+      /must carry a reason/,
     );
   });
 
@@ -176,5 +186,154 @@ describe("findRawMentions — no raw GitHub @-mentions leave the workforce", () 
   it("empty / markerless bodies are clean", () => {
     expect(findRawMentions("")).toEqual([]);
     expect(findRawMentions(`verdict\n\n${NEEDS_HUMAN_MARKER}\n`)).toEqual([]);
+  });
+});
+
+
+// ── Panel provenance (#513 / wf:rafael R1) ──────────────────────────────────
+// The verdict comment weighs convergence differently depending on whether the
+// lenses could see each other, and the operator merges on that sentence. These
+// pin that the claim must be PRESENT and machine-readable — not that it is
+// true, which this mechanism cannot establish and must not appear to.
+
+const verdict = (extra = "") =>
+  `**Nadia — verdict, cycle 1 of ≤ 3. 🟡 — author revision expected.**\n\nSynthesis…${extra}`;
+
+describe("isVerdictBody — only verdict posts carry the requirement", () => {
+  it("matches the Step-5 verdict header", () => {
+    expect(isVerdictBody(verdict())).toBe(true);
+  });
+  // Catches: the requirement leaking onto routing comments and lens reviews,
+  // which would break every non-verdict post the cadence makes.
+  it("does not match a routing comment or a lens review", () => {
+    expect(isVerdictBody("**Nadia — cycle 1 of ≤ 3.**\n\nReviewers nominated…")).toBe(false);
+    expect(isVerdictBody("🔴 **from the architecture lens** — …")).toBe(false);
+    expect(isVerdictBody("")).toBe(false);
+  });
+});
+
+describe("resolvePanelProvenance", () => {
+  // THE FINDING. Pre-fix, a verdict could assert convergence with no statement
+  // of how the lenses were produced, and nothing objected. Now the claim is
+  // always present — and an undeclared verdict gets the WEAKER one.
+  it("stamps inline on an undeclared verdict rather than asserting independence", () => {
+    expect(resolvePanelProvenance({ body: verdict() })).toEqual({
+      mode: "inline",
+      appendMarker: "<!-- autopilot:panel:inline -->",
+      defaulted: true,
+    });
+  });
+
+  // Catches: turning the default into a throw. That would break every verdict
+  // post between merging this and the OP-015 PATCH, because the script is live
+  // from the clone while the body telling the router to pass --panel is not
+  // (ADR-0008 / wf:sana S1). An outage is not a stronger guarantee.
+  it("never throws for a missing declaration — the activation window depends on it", () => {
+    expect(() => resolvePanelProvenance({ body: verdict() })).not.toThrow();
+  });
+
+  it("appends the marker from --panel", () => {
+    expect(resolvePanelProvenance({ body: verdict(), panel: "isolated" })).toEqual({
+      mode: "isolated",
+      appendMarker: "<!-- autopilot:panel:isolated -->",
+    });
+    expect(resolvePanelProvenance({ body: verdict(), panel: "inline" }).appendMarker).toBe(
+      "<!-- autopilot:panel:inline -->",
+    );
+  });
+
+  it("accepts a marker already embedded in the body, without duplicating it", () => {
+    const body = verdict("\n\n<!-- autopilot:panel:inline -->");
+    expect(resolvePanelProvenance({ body })).toEqual({ mode: "inline", appendMarker: null });
+    expect(resolvePanelProvenance({ body, panel: "inline" }).appendMarker).toBeNull();
+  });
+
+  // Catches: a flag and a marker disagreeing, which would publish two
+  // contradictory provenance claims in one verdict.
+  it("refuses a flag that contradicts an embedded marker", () => {
+    const body = verdict("\n\n<!-- autopilot:panel:inline -->");
+    expect(() => resolvePanelProvenance({ body, panel: "isolated" })).toThrow(/contradicts/);
+  });
+
+  it("refuses an unknown mode rather than stamping it", () => {
+    expect(() => resolvePanelProvenance({ body: verdict(), panel: "independent" })).toThrow(/--panel must be one of/);
+  });
+
+  // Non-verdict posts are unaffected — the requirement is scoped to the one
+  // comment whose reader is being asked to weigh convergence.
+  it("leaves routing comments and reviews alone", () => {
+    expect(resolvePanelProvenance({ body: "**Nadia — cycle 1 of ≤ 3.**" })).toEqual({
+      mode: null,
+      appendMarker: null,
+    });
+  });
+
+  // Catches: the mechanism drifting into a truth claim. This test exists to be
+  // read, not just to pass — `isolated` is accepted on a body that says the
+  // lenses ran inline, because the check is presence, not honesty.
+  it("cannot detect a false declaration, by construction", () => {
+    const lying = verdict("\n\nThe lenses ran inline, in my own context.");
+    expect(resolvePanelProvenance({ body: lying, panel: "isolated" }).mode).toBe("isolated");
+  });
+});
+
+// ── adr-0022: the AUTHOR lane ──────────────────────────────────────────────
+//
+// The third state is only safe because it is *bounded* and *typed*: it is
+// mutually exclusive with the human lane, it may only carry causes an agent can
+// actually resolve, and (in main(), against the live API) it is fail-closed on
+// the L0/L1 boundary. The first two are pure and locked here; the L0/L1 refusal
+// is exercised by the integration path, not by a unit.
+describe("resolveLabels — the author lane (adr-0022)", () => {
+  it("--needs-author stamps the author label, never the escalation label", () => {
+    expect(resolveLabels([], { needsAuthor: true, body: "verdict" })).toEqual([AUTHOR_LABEL]);
+  });
+
+  it("the hidden author marker stamps the label even if --needs-author was forgotten", () => {
+    expect(resolveLabels([], { body: `verdict\n${NEEDS_AUTHOR_MARKER}` })).toEqual([AUTHOR_LABEL]);
+  });
+
+  it("a PR cannot be handed to both lanes at once (flag + opposite marker)", () => {
+    expect(() => resolveLabels([], { needsHuman: true, body: `verdict\n${NEEDS_AUTHOR_MARKER}` })).toThrow(
+      /cannot hand a PR to BOTH lanes/,
+    );
+    expect(() => resolveLabels([], { needsAuthor: true, needsHuman: true, body: "verdict" })).toThrow(
+      /cannot hand a PR to BOTH lanes/,
+    );
+  });
+
+  it("a plain routing comment still gets neither lane", () => {
+    expect(resolveLabels([], { body: "**Nadia — cycle 1.**" })).toEqual([]);
+  });
+});
+
+describe("assertAuthorLaneReasons — an agent's queue only holds agent-fixable causes", () => {
+  it("accepts the three fixable causes", () => {
+    expect(() => assertAuthorLaneReasons(["merge-conflict", "branch-behind", "review-findings-open"])).not.toThrow();
+  });
+
+  it("accepts checks-failing (router-judged) and a free-texted other", () => {
+    expect(() => assertAuthorLaneReasons(["checks-failing"])).not.toThrow();
+    expect(() => assertAuthorLaneReasons(["other"])).not.toThrow();
+  });
+
+  it.each([
+    "l0l1-path",
+    "no-r-n10-delegation",
+    "human-changes-requested",
+    "kill-switch-off",
+    "cycle-cap-exceeded",
+    "remediation-cap-exceeded",
+    "remediation-blocked",
+  ])("refuses %s — no agent can clear it, so parking it in the agent queue strands the PR", (code) => {
+    expect(() => assertAuthorLaneReasons([code])).toThrow(/cannot carry reason/);
+  });
+});
+
+describe("resolveReasons — the author lane must say why too", () => {
+  it("an author-lane hand-off with no reason throws, exactly like an escalation", () => {
+    expect(() => resolveReasons({ body: `verdict\n${NEEDS_AUTHOR_MARKER}`, escalating: true })).toThrow(
+      /must carry a reason/,
+    );
   });
 });
