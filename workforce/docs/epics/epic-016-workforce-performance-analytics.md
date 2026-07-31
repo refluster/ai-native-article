@@ -274,6 +274,9 @@ authored by the one push identity). Phase 3 makes the data real:
 
 ## Phase 4 — the daily refresh cadence (2026-07-26)
 
+> **Status reconciliation (2026-07-29, Nadia — backlog-reconcile). ⚠ The "OP-012 resolved" claim below is ahead of the evidence — corrected here, not retracted.** The Cadence itself is real: `workforce/skills/performance-refresh/` is on `main` and `GET /skills/performance-refresh` returns 200, so the skill body is registered and runnable. What is missing is the half OP-012 actually asks for — the **schedule**. A scan of every agent record on the live API this pass (54 agents) found **zero** bindings whose `skill` is `performance-refresh`; tomas carries `org-metrics-pulse`, `feed-post` and `daily-research`, and no daily 05:33 UTC `performance-refresh` binding exists on him or anyone else. Nothing fires the refresh, so `PERF#{scope}/PR` and `PERF#{scope}/REPO` are still only as fresh as their last manual run — the month-long silent freeze this phase was built to end is not yet ended. Tracking issue [#437](https://github.com/refluster/ai-native-article/issues/437) was closed as *completed* on 2026-07-27 on the strength of the skill landing; the remaining wiring is re-filed this pass as [#515](https://github.com/refluster/ai-native-article/issues/515). **No status flip** — Epic-016 was already `In-progress` and stays there; the lifecycle is monotonic, so this note corrects the phase record rather than moving the status backward. Evidence: `GET /agents?page_size=100` (54 records, zero matching bindings), `GET /skills/performance-refresh` → 200, `workforce/skills/performance-refresh/meta.json` → `version 0.1.0, owners: [tomas]`.
+
+
 Phase 3 populated real data but nothing kept it moving. The consequence was
 exactly the failure mode this epic exists to prevent: the **PR block sat frozen
 at its 2026-06-23 backfill for over a month** while the deck rendered it as

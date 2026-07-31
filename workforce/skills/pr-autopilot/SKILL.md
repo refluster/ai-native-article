@@ -1,6 +1,6 @@
 ---
 name: pr-autopilot
-description: Drive every open PR in the bound project's repo to one of exactly two terminal states — MERGED (unanimous-green ≥3-reviewer consensus, no L0/L1 surface, via the fail-closed pr-merge.mjs engine) or ESCALATED to a human with the `autopilot:needs-human` label. Routes each PR to a ≥3-persona reviewer panel, posts every review + the synthesised verdict as PR comments, merges when the R-N10 predicate holds (drafts included), and hands off with the label when it doesn't. A deterministic sweep (pr-autopilot-sweep.mjs) escalates anything that stalls, so no PR is ever left in neither state. Runs as a CCR task (ADR-0005), fired on cron or a pull_request event (adr-0013); github.token via the binding's project linkage.
+description: Drive every open PR in the bound project's repo to one of exactly two terminal states — MERGED (unanimous-green ≥3-reviewer consensus, no L0/L1 surface, via the fail-closed pr-merge.mjs engine) or ESCALATED to a human with the `autopilot:needs-human` label. Routes each PR to a ≥3-persona reviewer panel, posts every review + the synthesised verdict as PR comments, merges when the R-N10 predicate holds (drafts included), and hands off with the label when it doesn't — to the operator, or (adr-0022) to the bounded, agent-owned author lane `autopilot:needs-author` when the blocking cause is a base conflict, a behind branch, or open review findings. A deterministic sweep (pr-autopilot-sweep.mjs) escalates anything that stalls, so no PR is ever left in neither state. Runs as a CCR task (ADR-0005), fired on cron or a pull_request event (adr-0013); github.token via the binding's project linkage.
 ---
 
 # pr-autopilot
@@ -15,9 +15,14 @@ of two terminal states:
 
 A run that leaves a PR in neither state is a bug, not a finished run. The
 deterministic sweep (Step 6) enforces the contract mechanically even when a
-run stalls. The one legitimate *interim* state is 🟡 (an open review cycle
-awaiting the author's revision) — and it is bounded: a 🟡 PR untouched past the
-sweep's stale threshold is escalated.
+run stalls.
+
+The legitimate *interim* states are two, and both are bounded by that sweep:
+🟡 (an open review cycle awaiting a revision), and — since adr-0022 — the
+**author lane** (`autopilot:needs-author`), where a PR whose blocking cause is
+agent-fixable waits for the `pr-remediate` cadence rather than for a human. The
+author lane is a 🟡 with an owner; it is not a third terminal state, and a PR
+that sits in it without its head moving is escalated like any other stall.
 
 You are the routing persona (today Nadia's PdM lens). This runs as a **CCR
 task** fired by `wf-orchestrator-tick` on the binding's cron, or — when the
@@ -141,9 +146,71 @@ raw GitHub `@`-mention (ML-012): agents are `wf:<slug>`, never `@<slug>`.
 
 ## Step 4 — obtain each nominated review (drive the cycle; do not stall)
 
-For **each** persona you nominated, apply that persona's review lens inline
-and post it as that persona — a COMMENT review (`event=COMMENT`, never
-approve / request-changes per W-5). Do not wait on any external dispatch.
+**Run each nominated lens as its own read-only subagent, in parallel** — one
+subagent per persona — then post each returned review as that persona: a
+COMMENT review (`event=COMMENT`, never approve / request-changes per W-5). Do
+not wait on any external dispatch. (`backlog-reconcile` fans out audit
+subagents on this same CCR path, so this is a proven capability, not a
+hypothesis.)
+
+**Why subagents and not inline (#512).** Producing every lens inline, in your
+own context, means each reviewer sees the diff's justification, your routing
+comment's framing, and every earlier reviewer's findings. Lenses that share a
+context do not converge independently — N of them agreeing is **one conclusion
+stated N times** — yet the verdict comment presents convergence as the
+strongest signal it has, and the operator merges on it. Observed on #510: four
+inline lenses found a real blocking defect but *all four accepted the author's
+framing of the change*, and none questioned its premise. Shared context catches
+implementation defects and suppresses premise questions.
+
+**Context isolation is the whole point — give each subagent exactly:**
+
+- the **unified diff** and the PR title/body;
+- that persona's **lens config** (fetched fresh from `GET /agents/{slug}`);
+- the **cycle number**, and on a re-route, that persona's *own* prior findings
+  (so `[NEW]` vs "cites the cycle-1 finding-ID" still works).
+
+**Withhold:** your routing comment, your summary of the PR, any other lens's
+output, and any opinion of yours about the change. If a lens needs repo context
+it reads the repo itself. **Never seed a subagent with another lens's finding
+to "check"** — that manufactures the agreement the verdict then reports as
+evidence.
+
+**The session's working tree is NOT the PR (#518, cycle 1).** A CCR fire checks
+out the **base** branch. A lens that "verifies a claim against the branch" by
+reading files, or by `grep`ping the repo it is sitting in, is reading `main` —
+and will report every file and symbol the PR *adds* as missing. This is not
+hypothetical: on #518 all four lenses independently reported that three new skill
+directories, a `REASON_CODES` change and five named guards were "absent from the
+branch". Every one of them was in the diff; every claim matched `main` exactly,
+down to the pre-change function signature and its line number. The panel returned
+🔴 on a PR whose code it had not read, and each lens's bias disclosure stated it
+had verified against the branch — because from inside the session, it had.
+
+So, mechanically, before any lens reads repo state:
+
+```sh
+git fetch origin "<head.ref>" && git checkout "<head.ref>"   # or: git worktree add
+git rev-parse HEAD    # MUST equal the candidate's head.sha
+```
+
+and tell each lens, in its prompt, **which ref it is on**. A lens that cannot
+check out the head must say so and confine itself to the diff it was given —
+"file X is absent" is a claim about a ref, and a claim about the wrong ref reads
+exactly like a finding. When a lens reports something as *missing*, the verdict
+should treat it as unverified until the ref is confirmed: absence is the one
+class of finding this failure mode manufactures.
+
+**Honest limit, and do not oversell it in the verdict.** Separate contexts
+remove *anchoring*, not *correlated priors*: the same base model across N
+subagents shares blind spots, so a defect class the model systematically misses
+is missed N times. Isolation raises convergence from "no evidence" to "real but
+correlated evidence" — never to independence in the sense a human panel means.
+
+**Fallback.** If subagents are unavailable in this runtime, run the lenses
+inline as before, but say so in the verdict (Step 5) so the operator discounts
+convergence correctly. Silent inline production is the failure this step exists
+to prevent.
 
 **Reviewer-lens contract (per nominated persona):**
 
@@ -188,6 +255,47 @@ Synthesise the reviewers' **collective** verdict (never your solo call):
 - **🔴** — any reviewer's veto, cycle > `cycle_cap`, or a scope question you
   cannot decide.
 
+**Declare the panel's provenance — and know what the declaration is worth.**
+Every verdict body must carry exactly one of these markers, appended by
+`pr-autopilot-post.mjs --panel isolated|inline` (which refuses a verdict post
+carrying neither, the same treatment the escalation-reason code gets):
+
+```
+<!-- autopilot:panel:isolated -->   lenses ran as isolated subagents
+<!-- autopilot:panel:inline -->     lenses ran inline, in the router's context
+```
+
+**The marker is self-attested and is NOT proof of independence.** The router
+chooses the mode and writes the marker; nothing downstream can contradict it.
+The check is that the claim is *present, explicit and machine-readable* — never
+that it is true. Enforcing presence stops the mode from going unstated; it does
+not stop it from being stated falsely, and no reader should treat it as if it
+did (`wf:rafael` R1 on #513, which is the honest reading of what this buys).
+Real enforcement — a provenance artefact emitted by whatever spawns the
+lenses, not by the router's prose — is tracked separately and is not in force.
+
+Given that, weigh convergence like this in the synthesis:
+
+- **isolated** → two lenses landing on the same line is real evidence, but
+  correlated: one base model, shared priors. Say "converged independently" only
+  alongside that limit, never bare.
+- **inline** → say plainly that they shared a context, so agreement is one
+  conclusion stated N times, not N readings. Do not report it as convergence.
+
+**Disclose an author↔router collapse.** If the session running this panel also
+authored the PR, say so in the verdict's first paragraph and discount the whole
+panel accordingly — it is the strongest discount available, and the reviews
+should be read as one session's self-critique wearing N lenses.
+
+**This disclosure does not change what may be merged.** The merge leg's rule is
+unchanged and stands as written: *authorship is not a hold* — a green,
+non-L0/L1 PR merges regardless of who opened it, because the panel **is** the
+author≠merger separation (adr-0011 / FU-028). Whether a collapsed panel should
+also suspend the merge leg is a real question and a genuine change to delegated
+merge authority — an L1 decision that belongs in a superseding ADR, not in this
+step (`wf:dario` D1/D2 on #513). Until such an ADR lands, disclose and proceed
+under the existing predicate.
+
 Write a verdict comment that names each reviewer's load-bearing finding and
 the aggregated colour, then take the terminal action:
 
@@ -196,8 +304,57 @@ the aggregated colour, then take the terminal action:
 | 🟢 | no L0/L1 path + R-N10 delegation + predicate holds | **merge** via `pr-merge.mjs` (below) |
 | 🟢 | touches the target's L0/L1 paths | hand off `--needs-human --reviewed` |
 | 🟢 | no R-N10 delegation for this repo | hand off `--needs-human --reviewed` |
-| 🟡 | author revision pending | verdict comment only (no label); the Step 6 sweep bounds this state |
+| 🟢 / 🟡 | **conflicts with the base** (`mergeable_state=dirty`) or **behind** it | hand off `--needs-author --reason merge-conflict\|branch-behind` (below) |
+| 🟡 | open blocking lens findings | hand off `--needs-author --reason review-findings-open` |
 | 🔴 / non-consensus / can't seat 3 / unreadable governance | any | hand off `--needs-human` (no `--reviewed`) |
+
+### The author lane — a 🟡 with an owner (adr-0022)
+
+A 🟡 used to mean "the author is expected to revise, and the next tick re-routes".
+The author is a fire-and-forget session that ended when the PR opened, so what
+actually happened was: nothing, for 48h, then the sweep escalated it to the
+operator. Same for a PR that went `dirty` because another PR merged first — a
+failure caused by the system *working*, and getting commoner as throughput rises.
+
+So route the agent-fixable causes to an agent instead of to a human. Hand off with
+`--needs-author` and the PR joins **`pr-remediate`**'s queue
+(`autopilot:needs-author`): that cadence resolves the conflict / updates the
+branch / addresses the findings, pushes to the **head** branch, and clears the
+label — and your next tick sees a newer head commit and re-routes at cycle N+1.
+
+Three things to know before you use it:
+
+- **It is not a third terminal state.** MERGED and ESCALATED still are. The lane is
+  bounded by a 3-attempt cap and by the Step-6 sweep (`--author-stale-hours`, 36),
+  which escalates a PR the remediation cadence did not pick up — so a PR cannot
+  quietly live here.
+- **It is fail-closed on L0/L1, tighter than the merge leg.** A PR touching the
+  target's declared L0/L1 set is *refused* the lane by `pr-autopilot-post.mjs`
+  (exit 1) — resolving a conflict inside a governance file is an edit to it.
+  Re-post such a PR as `--needs-human --reason l0l1-path`.
+- **Only agent-fixable reasons may enter it.** The script refuses `l0l1-path`,
+  `no-r-n10-delegation`, `human-changes-requested`, `kill-switch-off`,
+  `cycle-cap-exceeded` and the remediation exits. `checks-failing` is *allowed but
+  never automatic*: route a red PR to the author only when your lenses located the
+  defect in the diff — the flaky-rerun latch owns the retry case, and bending a
+  genuine product failure into a patch attempt is worse than escalating.
+
+The verdict body is the same template with the lane's marker in place of the
+human one, and the hand-off sentence naming the fix expected:
+
+```sh
+GITHUB_TOKEN="…" node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
+  --project "<project_id>" --pr <number> --body-file /tmp/verdict-<number>.md \
+  --panel isolated|inline \
+  --needs-author --reason merge-conflict|branch-behind|review-findings-open
+```
+
+```
+<!-- autopilot:needs-author -->   ⟵ the lane marker (the script appends it from --needs-author)
+```
+
+A body may never carry both lane markers — `resolveLabels` throws, because a PR
+in two queues is a PR whose owner one reader gets wrong.
 
 **Every hand-off goes through `pr-autopilot-post.mjs`** — never a raw API
 call, `gh`, or an MCP comment tool (those drop the label; ML-009). Compose the
@@ -217,11 +374,13 @@ verdict **into** this template so the markers are present by construction:
 <!-- autopilot:needs-human -->
 <!-- autopilot:reason:<code> -->   ⟵ REQUIRED on every hand-off: the escalation-reason code (see "Reason codes" below); `other` carries its mandatory free text inside the marker.
 <!-- autopilot:reviewed -->   ⟵ keep this THIRD marker line ONLY on a 🟢 merge-ready hand-off; delete it on a 🔴 / non-consensus hand-off.
+<!-- autopilot:panel:isolated -->   ⟵ REQUIRED on every VERDICT post (isolated | inline). Self-attested — presence is enforced, truth is not. Pass `--panel isolated|inline` and the script appends it.
 ```
 
 ```sh
 GITHUB_TOKEN="…" node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
   --project "<project_id>" --pr <number> --body-file /tmp/verdict-<number>.md \
+  --panel isolated|inline \
   --needs-human [--reviewed] [--reason <code> [--reason-text "…"]]
 ```
 
@@ -345,6 +504,11 @@ The sweep enforces the two-outcome contract mechanically. It escalates (label
   (default 48) without an update — a stalled run or an abandoned 🟡.
 - **never-routed** — never picked up and now older than the scan's discovery
   window (default 7 days), so the cadence would never see it again.
+- **author-stale** (adr-0022) — in the author lane but untouched for
+  `--author-stale-hours` (default 36): `pr-remediate` is not coming.
+- **remediation-cap-exceeded** (adr-0022) — in the author lane with all 3
+  attempts spent. Both author-lane kinds *move* the PR: the amber label is
+  cleared as the red one is stamped, so it is never in two queues.
 
 PRs labelled `autopilot:off` (maintainer pause) or already labelled
 `autopilot:needs-human` are never touched. Run it even when Step 1 found 0
@@ -362,6 +526,9 @@ candidates — the sweep is how the contract survives runs that die mid-cycle.
   the target's governance L0/L1 always escalates to a human. No push or
   PR-open under any path.
 - **The sweep is part of every fire.** No PR is left in neither state.
+- **Agent-fixable ≠ human-gated** (adr-0022). A conflict, a behind branch or an
+  open finding goes to the author lane (`pr-remediate`), bounded by the attempt
+  cap and the sweep; the human lane keeps what only a human may decide.
 
 **OP-009 (operator-only runtime wiring).** The event trigger this contract is
 agnostic to — the CCR `agent-runner` routine's `pull_request`
@@ -374,5 +541,5 @@ floor and the backstop.
 
 Related: [agent-runner.md](../../docs/routines/agent-runner.md) (the generic
 CCR routine this runs under — this SKILL.md is the authoritative contract),
-R-N10 in [workforce governance](../../docs/governance.md) + adr-0010/0011/0013/0014/0015
-(the merge predicate's decision trail), [dev-process.md](../../docs/runbooks/dev-process.md).
+R-N10 in [workforce governance](../../docs/governance.md) + adr-0010/0011/0013/0014/0015/0022
+(the merge predicate's decision trail), [dev-process.md](../../docs/runbooks/dev-process.md), [issue-to-merge-flow.md](../../docs/runbooks/issue-to-merge-flow.md), [pr-remediate](../pr-remediate/SKILL.md).
