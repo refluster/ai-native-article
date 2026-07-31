@@ -2,7 +2,7 @@
 
 - **作成日**: 2026-07-31
 - **比較対象**: `The PEAS Enterprise Blueprint v4.1`（他部門の Agentic AI による SaaS 開発プラットフォーム、47 スライド／CarePrevention 再構築の実績報告）
-- **比較主体**: 本リポジトリ `refluster/ai-native-article` の `workforce/` サブシステム
+- **比較主体**: 本リポジトリの `workforce/` サブシステム
 - **性格**: 分析メモ（informs, never decides）。ここでの「差異」は *decision か gap か* を明示するが、標準化の採否は operator と該当 VP が決める。エコシステム分析シート（`workforce/seed/ecosystem-landscape/`）の 7 軸を拡張して 18 観点で対置した。
 - **当 workforce 側の数値の出所**: **稼働中の AWS 本番環境を直接照会した実測値**（`wf-table-prod` DynamoDB / Lambda / EventBridge / S3 / AWS Budgets、`us-west-2`、2026-07-31 時点）＋ GitHub API。ドキュメント記載値ではない。取得方法とスナップショットは付録 A。**ドキュメントと実測が食い違った箇所は実測を採り、食い違い自体を所見として §19 に記録した。**
 - **PEAS 側の数値の出所**: 添付デッキ本文＋スピーカーノートに書かれている事実のみ。デッキに書かれていない挙動は推測せず「不明」と書いた。**当 workforce 側は実測、PEAS 側は自己申告**という非対称がある（§18）。
@@ -23,7 +23,7 @@
 |---|---|---|
 | 成立の由来 | 上位命令（Mission Directive）：「DCD 内で初めて AI 駆動開発による外注コスト削減を実証せよ」 | 個人サイトの記事パイプライン運用から自生。MVV が後から制定された |
 | 成功の定義 | 第三者部門 SAC が Axis 2（品質・正確性）を独立検証し、Axis 1（生産性）の実測値と併せて評価する | 「human-agent co-creation の operating model を作れたか」。検証者は operator 一人＋公開記事の読者反応 |
-| 題材 | CarePrevention（予防ケア、Fitbit／LINE／日本語高齢者 UX）の作り直し。**題材は使い捨て、フレームワークが成果物**（"The framework travels. The domain does not."） | kohuehara.xyz の記事・Podcast、および外部プロジェクト（`asp-cloud` / `project-ind` / `conference`）。**題材も組織も両方が成果物** |
+| 題材 | CarePrevention（予防ケア、Fitbit／LINE／日本語高齢者 UX）の作り直し。**題材は使い捨て、フレームワークが成果物**（"The framework travels. The domain does not."） | 自社公開サイトの記事・Podcast、および外部プロジェクト（`asp-cloud` / `project-ind` / `conference`）。**題材も組織も両方が成果物** |
 | 対外的主張 | 「外注より安い」という ROI の証明 | 「機関（institution）の運転モデル」というカテゴリ主張（MVV §External positioning） |
 
 **考察.** PEAS は *証明のための組織*である。証明対象（コスト削減）が外から与えられ、期限（6 週）と審査員（SAC）がある。当 workforce は *発明のための組織*で、何を証明すべきかを自分で仮説として立てて月次レポートで検証する（仮説一〜五 → Epic-019/020/022/023）。この違いが以下ほぼ全ての差の源流になっている。
@@ -190,7 +190,7 @@ PEAS の CI は **品質ゲート専用**である（デッキのゲート表：
 
 **実測（`PERF#workforce/PR`、window 2026-04-27〜07-26）**:
 
-- リポジトリ全体で **525 PR**。うち **エージェント・ペルソナ名義が 119 本**（dario 37 / nadia 26 / ren 17 / mateo 13 / aoi 6 / maya 4 / hana 3 / freya 3 / elena 2 / sana 2 / tomas・owen・grace・mei・levi・idris 各 1）、`refluster`（operator セッション）名義 403 本、`claude[bot]` 3 本。
+- リポジトリ全体で **525 PR**。うち **エージェント・ペルソナ名義が 119 本**（dario 37 / nadia 26 / ren 17 / mateo 13 / aoi 6 / maya 4 / hana 3 / freya 3 / elena 2 / sana 2 / tomas・owen・grace・mei・levi・idris 各 1）、operator アカウント（Claude Code セッション）名義 403 本、`claude[bot]` 3 本。
 - 外部委任先 `asp-cloud` では 342 PR 中 18 本がエージェント名義。
 
 **そして、その成果物には統治機構そのものが含まれる。** CI ステップ名に発見者のペルソナ名が焼き込まれている:
@@ -395,7 +395,7 @@ governance が R-N1(b)（クライアント側実行）について「**W-3 は�
 
 | PEAS | workforce |
 |---|---|
-| 完全に社内。外部露出なし | 記事が `kohuehara.xyz`（実測 105 本の公開 md）、Podcast が Spotify に**公開** |
+| 完全に社内。外部露出なし | 記事が自社公開サイト（実測 105 本の公開 md）、Podcast が Spotify に**公開** |
 | 第三者検証は社内他部門 SAC | 検証は operator ＋ 読者反応（GA4）＋ 公開月次レター |
 | 外部リポジトリへの書き込みなし | **R-N9**: 外部 git は PR のみ、直 commit 禁止（PAT スコープでワイヤレベル拒否）。**R-N10**: 委任された場合のみマージ。実測で `asp-cloud` に 18 本のエージェント名義 PR |
 | — | 資金調達・IR・政策提言のペルソナは全員 **outreach を hard-refuse**（起案するが行動しない） |
