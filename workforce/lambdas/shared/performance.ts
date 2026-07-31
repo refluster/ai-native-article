@@ -159,7 +159,13 @@ export interface PerformanceSeries {
  *  workforce/scripts/backfill-performance-lifecycle.mjs to fill it at once. */
 export const PERF_WINDOW_DAYS = 90;
 
-export type PerfRollupKind = "LIFECYCLE" | "PR" | "REPO";
+export type PerfRollupKind = "LIFECYCLE" | "PR" | "REPO" | "IDLE";
+
+/** Epic-021 §B.1 — the single global idleness window. One constant, no
+ *  per-team override: "configurability is where exemptions hide" (Q3,
+ *  farah/dario concur). A persona is idle when it has produced zero
+ *  NON-COMMONS deliverable rows in this many trailing days. */
+export const IDLE_WINDOW_DAYS = 30;
 
 export function perfPk(scope: string): `PERF#${string}` {
   return `PERF#${scope}`;
@@ -173,6 +179,28 @@ export interface PerfLifecycleRow {
   updated_at: string;
   /** Trailing PERF_WINDOW_DAYS of daily snapshots, oldest→newest. */
   points: LifecyclePoint[];
+}
+
+/** Epic-021 §B.1 — the idle-talent sweep, written by the same daily reducer
+ *  walk (mateo: no new cron, one idleness definition). Deliberately its own
+ *  `sk` so it never touches a persona's track record: the digest reads this
+ *  row, and Epic-023 tiering reads the EXEC ledger, which this does not
+ *  write to. */
+export interface PerfIdleRow {
+  pk: `PERF#${string}`;
+  sk: "IDLE";
+  scope: string;
+  updated_at: string;
+  /** The window this sweep evaluated, so a reader never has to assume it. */
+  window: { start: string; end: string; days: number };
+  /** Personas with zero non-commons deliverable rows in the window. */
+  idle: IdleAgentRecord[];
+  /** Cohort size the sweep ran over — the denominator for "N of M idle". */
+  cohort: number;
+  /** The commons skills discounted by this sweep, as actually resolved at run
+   *  time. Recorded so a digest reader can see the class the number depends
+   *  on rather than trusting the detector's word for it. */
+  commons_skills: string[];
 }
 
 export interface PerfPrRow {
@@ -229,6 +257,98 @@ export function tallyLifecycle(date: string, states: readonly LifecycleState[]):
   const point: LifecyclePoint = { date, registered: 0, assigned: 0, delivered: 0 };
   for (const state of states) point[state] += 1;
   return point;
+}
+
+// ── idle-talent detector (Epic-021 §B.1) ─────────────────────────────────────
+//
+// Keyed on OUTPUT, not paperwork. The RFC's load-bearing correction (theo,
+// tessa, priya, mateo): a binding is a declaration, and a bound-but-paused
+// skill would clear a binding-keyed flag while producing nothing — the day-29
+// token binding is the exact evasion. So the predicate asks one question:
+// did this persona produce a non-commons deliverable row in the window?
+//
+// The pending-action annotation exists so idleness lands on whoever can
+// actually clear it. Idleness is a JOB-DESIGN failure charged to the hiring
+// lead (priya) — these records live on their own PERF#{scope}/IDLE row and are
+// never written into the persona's track record, so they stay inadmissible to
+// Epic-023 tiers.
+
+/** Whose action is pending on an idle persona (Epic-021 §B.1). */
+export type IdlePendingAction =
+  /** No non-commons binding exists at all — the hiring lead owes job design. */
+  | "design"
+  /** A non-commons binding exists but nothing fires it (paused / dead cron) —
+   *  the operator owes the enable. Gate-limbo is attributed to the gate. */
+  | "enable"
+  /** A non-commons binding is live and firing, yet no deliverable row landed —
+   *  the persona owes output. */
+  | "output";
+
+/** The signals the detector needs per persona. Both lists are already
+ *  scoped/filtered by the caller; this function does no IO. */
+export interface AgentIdleSignal {
+  slug: string;
+  /** Skill names of this persona's ok EXEC rows inside the window. */
+  windowExecSkills: readonly string[];
+  /** Skill names of every non-commons binding the persona carries. */
+  nonCommonsBoundSkills: readonly string[];
+  /** Skill names of the non-commons bindings whose cron is load-bearing —
+   *  i.e. something actually fires them (shared/agent.ts
+   *  bindingCronIsLoadBearing, the same predicate the orchestrator uses). */
+  nonCommonsLiveSkills: readonly string[];
+}
+
+/** One idle persona, as written to the IDLE roll-up row. */
+export interface IdleAgentRecord {
+  slug: string;
+  pending: IdlePendingAction;
+  /** The non-commons skills this persona is bound to, if any — so the digest
+   *  can say *which* designed duty is silent, not merely that one is. */
+  bound_skills: string[];
+}
+
+/** Is this execution specialised work? Commons rows (the daily reflection /
+ *  daily research every persona shares) never count toward non-idleness. */
+export function isCommonsSkill(skill: string, commons: ReadonlySet<string>): boolean {
+  return commons.has(skill);
+}
+
+/** Classify one persona. Returns null when the persona is NOT idle — i.e. it
+ *  produced at least one non-commons deliverable row inside the window. */
+export function classifyIdleAgent(
+  signal: AgentIdleSignal,
+  commons: ReadonlySet<string>,
+): IdleAgentRecord | null {
+  const delivered = signal.windowExecSkills.some((s) => !isCommonsSkill(s, commons));
+  if (delivered) return null;
+
+  const bound = signal.nonCommonsBoundSkills;
+  const live = signal.nonCommonsLiveSkills;
+
+  // Order matters and is the RFC's attribution rule: no designed duty at all
+  // is the hiring lead's; a designed duty nobody schedules is the operator's;
+  // a live schedule producing nothing is the persona's.
+  const pending: IdlePendingAction =
+    bound.length === 0 ? "design" : live.length === 0 ? "enable" : "output";
+
+  return { slug: signal.slug, pending, bound_skills: [...bound].sort() };
+}
+
+/** Sweep a cohort. Ordered by slug so two runs over the same state produce
+ *  byte-identical rows (a diffable digest, not a shuffled one). */
+export function detectIdleAgents(
+  signals: readonly AgentIdleSignal[],
+  commons: ReadonlySet<string>,
+): IdleAgentRecord[] {
+  return signals
+    .map((s) => classifyIdleAgent(s, commons))
+    .filter((r): r is IdleAgentRecord => r !== null)
+    .sort((a, b) => a.slug.localeCompare(b.slug));
+}
+
+/** Inclusive lower bound of the idle window, as an ISO instant. */
+export function idleWindowStart(now: Date, windowDays: number = IDLE_WINDOW_DAYS): string {
+  return new Date(now.getTime() - windowDays * 86_400_000).toISOString();
 }
 
 /** delivered / (registered + assigned + delivered); 0 for an empty cohort. */

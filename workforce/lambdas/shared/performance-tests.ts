@@ -4,11 +4,16 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  IDLE_WINDOW_DAYS,
   appendDailyPoint,
   classifyAgentState,
+  classifyIdleAgent,
   composeSeries,
   deliveredShare,
+  detectIdleAgents,
+  idleWindowStart,
   tallyLifecycle,
+  type AgentIdleSignal,
   type LifecyclePoint,
 } from "./performance.js";
 
@@ -120,5 +125,124 @@ describe("composeSeries — endpoint assembly", () => {
     expect(s.window).toEqual({ start: "2026-05-26", end: "2026-06-22" });
     expect(s.pr_summary.autopilot_share).toBe(0.75);
     expect(s.lifecycle[s.lifecycle.length - 1]!.delivered).toBe(16);
+  });
+});
+
+// ── Epic-021 §B.1 — idle-talent detector ─────────────────────────────────────
+//
+// What bug would these catch? The evasion the RFC was written against: a
+// persona kept off the idle list by paperwork (a binding) or by commons
+// output (the daily reflection every persona runs), while producing no
+// specialised work at all. Each case below is one way that could slip through.
+
+const COMMONS = new Set(["feed-post", "daily-research"]);
+
+function signal(over: Partial<AgentIdleSignal> & { slug: string }): AgentIdleSignal {
+  return {
+    windowExecSkills: [],
+    nonCommonsBoundSkills: [],
+    nonCommonsLiveSkills: [],
+    ...over,
+  };
+}
+
+describe("classifyIdleAgent", () => {
+  it("does not flag a persona with one non-commons deliverable in the window", () => {
+    const r = classifyIdleAgent(
+      signal({ slug: "ren", windowExecSkills: ["feed-post", "issue-implement"] }),
+      COMMONS,
+    );
+    expect(r).toBeNull();
+  });
+
+  // The commons evasion: a full ledger of daily reflection + daily research is
+  // not specialised work, and a binding-keyed or row-count-keyed detector
+  // would clear this persona.
+  it("flags a persona whose entire window is commons output", () => {
+    const r = classifyIdleAgent(
+      signal({
+        slug: "corinne",
+        windowExecSkills: ["feed-post", "daily-research", "feed-post", "daily-research"],
+      }),
+      COMMONS,
+    );
+    expect(r).toEqual({ slug: "corinne", pending: "design", bound_skills: [] });
+  });
+
+  // The paperwork evasion (the day-29 token binding): a designed duty exists
+  // on paper but nothing fires it. That is the operator's gate, not the
+  // persona's failure — "bound, pending enable".
+  it("attributes a bound-but-unscheduled duty to the enable gate, not the persona", () => {
+    const r = classifyIdleAgent(
+      signal({
+        slug: "yara",
+        windowExecSkills: ["feed-post"],
+        nonCommonsBoundSkills: ["template-maintenance"],
+        nonCommonsLiveSkills: [],
+      }),
+      COMMONS,
+    );
+    expect(r?.pending).toBe("enable");
+    expect(r?.bound_skills).toEqual(["template-maintenance"]);
+  });
+
+  it("charges a live-but-silent duty to the persona", () => {
+    const r = classifyIdleAgent(
+      signal({
+        slug: "silas",
+        windowExecSkills: ["daily-research"],
+        nonCommonsBoundSkills: ["budget-review"],
+        nonCommonsLiveSkills: ["budget-review"],
+      }),
+      COMMONS,
+    );
+    expect(r?.pending).toBe("output");
+  });
+
+  // A commons binding must not read as a designed duty — otherwise every
+  // persona in the org would answer "enable"/"output" and "design" could
+  // never fire, which is the one attribution the epic most cares about.
+  it("never lets a commons binding count as a designed duty", () => {
+    const r = classifyIdleAgent(
+      signal({ slug: "marisol", windowExecSkills: ["feed-post"] }),
+      COMMONS,
+    );
+    expect(r?.pending).toBe("design");
+  });
+
+  it("reads an empty commons set as: every execution is specialised work", () => {
+    const r = classifyIdleAgent(
+      signal({ slug: "kai", windowExecSkills: ["feed-post"] }),
+      new Set<string>(),
+    );
+    expect(r).toBeNull();
+  });
+});
+
+describe("detectIdleAgents", () => {
+  it("returns only idle personas, ordered by slug for a diffable digest", () => {
+    const out = detectIdleAgents(
+      [
+        signal({ slug: "zoe", windowExecSkills: ["feed-post"] }),
+        signal({ slug: "ren", windowExecSkills: ["issue-implement"] }),
+        signal({ slug: "corinne", windowExecSkills: [] }),
+      ],
+      COMMONS,
+    );
+    expect(out.map((r) => r.slug)).toEqual(["corinne", "zoe"]);
+  });
+
+  it("is empty for a cohort that all delivered", () => {
+    expect(
+      detectIdleAgents([signal({ slug: "ren", windowExecSkills: ["pr-autopilot"] })], COMMONS),
+    ).toEqual([]);
+  });
+});
+
+describe("idleWindowStart", () => {
+  it("is exactly IDLE_WINDOW_DAYS before now", () => {
+    const now = new Date("2026-07-31T05:00:00.000Z");
+    expect(idleWindowStart(now)).toBe("2026-07-01T05:00:00.000Z");
+    expect(IDLE_WINDOW_DAYS).toBe(30);
   });
 });

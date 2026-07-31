@@ -86,6 +86,13 @@ export interface SkillMeta {
    *  shared/credential-injector.ts:injectCredentials. Absent/empty produces a
    *  sealed bag with no readable keys — undeclared access throws. */
   requires?: string[];
+  /** Epic-021 §B.1: this skill is part of the **commons** — the baseline
+   *  cadence every persona shares (daily reflection, daily research) rather
+   *  than a specialised, designed duty. The idle-talent detector discounts
+   *  commons executions, so a persona producing nothing but commons output
+   *  still reads as idle. Defined here, on the skill, so the detector never
+   *  carries a name list (Epic-021 Q3 / mateo's RFC finding). Absent → false. */
+  commons?: boolean;
   /** Epic-012 Story 1: how many past executions to semantically recall and
    *  inject into the prompt at run time. Omitted → runner default
    *  (RECALL_K_DEFAULT). Set `0` to opt a cheap/deterministic skill out of

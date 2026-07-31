@@ -45,14 +45,20 @@ import {
 } from "../shared/project.js";
 import { getItem, putItem, scanAllPrefix } from "../shared/ddb.js";
 import {
+  type AgentIdleSignal,
   type LifecyclePoint,
   type LifecycleState,
+  type PerfIdleRow,
   type PerfLifecycleRow,
+  IDLE_WINDOW_DAYS,
   appendDailyPoint,
   classifyAgentState,
+  detectIdleAgents,
+  idleWindowStart,
   perfPk,
   tallyLifecycle,
 } from "../shared/performance.js";
+import { COMMONS_SKILLS } from "../shared/skill-registry-generated.js";
 
 // Newest-N ok-status executions inspected per agent to decide "has delivered".
 // At C-3 single-operator scale an agent that ever delivered has a recent ok
@@ -66,10 +72,13 @@ export interface PerformanceReducerResult {
   agents: number;
   projects: number;
   workforce: Pick<LifecyclePoint, "registered" | "assigned" | "delivered">;
+  /** Epic-021 §B.1 — how many personas the idle sweep flagged today. */
+  idle: number;
 }
 
 export async function handler(): Promise<PerformanceReducerResult> {
-  const date = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10);
 
   // ── 1. the cohort: every hired persona (AGENT#{slug}/META) ────────────────
   const metas = await scanAllPrefix<AgentMetaRow>("AGENT#", "META");
@@ -95,15 +104,29 @@ export async function handler(): Promise<PerformanceReducerResult> {
 
   // ── 2. workforce-wide snapshot ────────────────────────────────────────────
   const workforceStates: LifecycleState[] = [];
+  const idleSignals: AgentIdleSignal[] = [];
+  const windowStart = idleWindowStart(now);
   for (const meta of metas) {
     const execs = await okExecs(meta.slug);
     // Delivered = any successful execution (Phase 3: artefact OR engagement).
     const hasDelivered = execs.length > 0;
     const hasTriggerable = hasTriggerableBinding(meta);
     workforceStates.push(classifyAgentState({ hasDelivered, hasTriggerableBinding: hasTriggerable }));
+    idleSignals.push(idleSignalFor(meta, execs, windowStart));
   }
   const workforcePoint = tallyLifecycle(date, workforceStates);
   await upsertLifecycle("workforce", workforcePoint);
+
+  // ── 2b. idle-talent sweep (Epic-021 §B.1) ─────────────────────────────────
+  // Rides the walk above rather than a second cron, so there is exactly one
+  // idleness definition in the org and it cannot drift from Epic-016's cohort.
+  const idle = detectIdleAgents(idleSignals, COMMONS_SKILLS);
+  await upsertIdle("workforce", {
+    window: { start: windowStart, end: now.toISOString(), days: IDLE_WINDOW_DAYS },
+    idle,
+    cohort: metas.length,
+    commons_skills: [...COMMONS_SKILLS].sort(),
+  });
 
   // ── 3. per-project snapshots (active projects only) ───────────────────────
   const projects = (await scanAllPrefix<ProjectMetaRow>("PROJECT#", "META")).filter(
@@ -142,9 +165,57 @@ export async function handler(): Promise<PerformanceReducerResult> {
       assigned: workforcePoint.assigned,
       delivered: workforcePoint.delivered,
     },
+    idle: idle.length,
   };
   console.log(JSON.stringify({ event: "performance_reducer_run", ...result }));
   return result;
+}
+
+/** Reduce one persona's meta + recent ok executions to the idle detector's
+ *  input. Keyed on output: bindings only decide *whose action is pending*
+ *  once the persona is already flagged, never whether it is flagged.
+ *
+ *  Note on the EXEC probe bound: `okExecs` reads the newest EXEC_PROBE_LIMIT
+ *  ok rows, which can be shorter than the idle window for a very busy
+ *  persona. That is safe in one direction only, and it is the safe one — a
+ *  persona busy enough to exhaust the probe inside 30 days has non-commons
+ *  rows in it, or is genuinely producing nothing but commons output. A
+ *  non-commons row older than the probe is outside the window anyway. */
+function idleSignalFor(
+  meta: AgentMetaRow,
+  execs: readonly ExecutionRow[],
+  windowStart: string,
+): AgentIdleSignal {
+  const bindings = meta.bindings ?? [];
+  const nonCommons = bindings.filter((b) => !COMMONS_SKILLS.has(b.skill));
+  return {
+    slug: meta.slug,
+    windowExecSkills: execs
+      // `ended_at` is the completion instant; fall back to `started_at` for
+      // rows written before it was populated rather than dropping them.
+      .filter((e) => (e.ended_at || e.started_at || "") >= windowStart)
+      .map((e) => e.skill_name),
+    nonCommonsBoundSkills: nonCommons.map((b) => b.skill),
+    nonCommonsLiveSkills: nonCommons.filter(bindingCronIsLoadBearing).map((b) => b.skill),
+  };
+}
+
+/** Overwrite the scope's idle sweep. Unlike LIFECYCLE this is a snapshot, not
+ *  a trailing series: the digest asks "who is idle now", and keeping 90 days
+ *  of daily idle lists would be a second, slower-moving copy of the EXEC
+ *  ledger it is derived from. */
+async function upsertIdle(
+  scope: string,
+  body: Pick<PerfIdleRow, "window" | "idle" | "cohort" | "commons_skills">,
+): Promise<void> {
+  const row: PerfIdleRow = {
+    pk: perfPk(scope),
+    sk: "IDLE",
+    scope,
+    updated_at: new Date().toISOString(),
+    ...body,
+  };
+  await putItem(row);
 }
 
 /** Read-modify-write the scope's trailing lifecycle window with today's point. */
