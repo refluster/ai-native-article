@@ -1,0 +1,14 @@
+{
+  "name": "pr-remediate",
+  "version": "0.1.0",
+  "status": "active",
+  "cost_class": "large",
+  "owners": ["ren", "nadia"],
+  "improvement_agent": "sana",
+  "created_at": "2026-07-29",
+  "requires": ["github.token"],
+  "deliverable": {
+    "type": "external-pr",
+    "publish_notion": false
+  }
+}

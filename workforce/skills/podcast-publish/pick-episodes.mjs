@@ -15,9 +15,7 @@
 //
 // Exit: 0 printed (pick or empty), 1 bad env, 3 Notion/network error.
 
-const NOTION_VERSION = "2022-06-28";
-const NOTION_API = "https://api.notion.com/v1";
-const UNIFIED_DB_ID = process.env.NOTION_DB_ID || "34fd0f0b-e61e-817a-9f6b-dc65b0d5b4cc";
+import { UNIFIED_DB_ID, propText, queryAll, slugFromId } from "../../scripts/lib/notion.mjs";
 
 function arg(name, def) {
   const i = process.argv.indexOf(`--${name}`);
@@ -29,36 +27,9 @@ const limit = Number(arg("limit", "5"));
 if (!apiKey) { console.error("pick-episodes.mjs: NOTION_API_KEY is required"); process.exit(1); }
 if (!status) { console.error("pick-episodes.mjs: --status <podcastStatus> is required"); process.exit(1); }
 
-function propText(prop) {
-  if (!prop) return "";
-  switch (prop.type) {
-    case "title": return (prop.title ?? []).map((t) => t.plain_text).join("");
-    case "rich_text": return (prop.rich_text ?? []).map((t) => t.plain_text).join("");
-    case "url": return prop.url ?? "";
-    case "select": return prop.select?.name ?? "";
-    case "status": return prop.status?.name ?? "";
-    default: return "";
-  }
-}
-async function queryAll(databaseId) {
-  const pages = []; let cursor;
-  do {
-    const res = await fetch(`${NOTION_API}/databases/${databaseId}/query`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${apiKey}`, "notion-version": NOTION_VERSION, "content-type": "application/json" },
-      body: JSON.stringify(cursor ? { start_cursor: cursor, page_size: 100 } : { page_size: 100 }),
-    });
-    if (!res.ok) throw new Error(`query ${databaseId} → HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
-    const data = await res.json();
-    pages.push(...(data.results ?? []));
-    cursor = data.has_more ? data.next_cursor : undefined;
-  } while (cursor);
-  return pages;
-}
-const slugFromId = (id) => String(id).replace(/-/g, "").slice(0, 12);
 
 try {
-  const pages = await queryAll(UNIFIED_DB_ID);
+  const pages = await queryAll(apiKey, UNIFIED_DB_ID);
   const episodes = pages
     .filter((p) => propText(p.properties?.podcastStatus).toLowerCase() === status)
     .sort((a, b) => (a.created_time ?? "").localeCompare(b.created_time ?? ""))

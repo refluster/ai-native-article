@@ -10,8 +10,18 @@
 // --needs-human flag OR the hidden body marker), and never on a plain routing
 // comment.
 import { describe, it, expect } from "vitest";
-import { resolveLabels, resolveReasons, findRawMentions, NEEDS_HUMAN_MARKER, REVIEWED_MARKER, isVerdictBody, resolvePanelProvenance } from "./pr-autopilot-post.mjs";
-import { ESCALATION_LABEL, REVIEWED_LABEL } from "./pr-merge.mjs";
+import {
+  resolveLabels,
+  resolveReasons,
+  findRawMentions,
+  assertAuthorLaneReasons,
+  NEEDS_HUMAN_MARKER,
+  NEEDS_AUTHOR_MARKER,
+  REVIEWED_MARKER,
+  isVerdictBody,
+  resolvePanelProvenance,
+} from "./pr-autopilot-post.mjs";
+import { AUTHOR_LABEL, ESCALATION_LABEL, REVIEWED_LABEL } from "./pr-merge.mjs";
 
 describe("resolveLabels — escalation always carries the label", () => {
   it("a plain routing comment (no flag, no marker) gets no escalation label", () => {
@@ -86,7 +96,7 @@ describe("resolveLabels — a green, merge-ready hand-off is flagged reviewed", 
 describe("resolveReasons — escalation always carries a reason (Epic-019)", () => {
   it("an escalating post with no reason at all throws", () => {
     expect(() => resolveReasons({ body: `verdict\n${NEEDS_HUMAN_MARKER}`, escalating: true })).toThrow(
-      /must carry an escalation reason/,
+      /must carry a reason/,
     );
   });
 
@@ -264,5 +274,66 @@ describe("resolvePanelProvenance", () => {
   it("cannot detect a false declaration, by construction", () => {
     const lying = verdict("\n\nThe lenses ran inline, in my own context.");
     expect(resolvePanelProvenance({ body: lying, panel: "isolated" }).mode).toBe("isolated");
+  });
+});
+
+// ── adr-0022: the AUTHOR lane ──────────────────────────────────────────────
+//
+// The third state is only safe because it is *bounded* and *typed*: it is
+// mutually exclusive with the human lane, it may only carry causes an agent can
+// actually resolve, and (in main(), against the live API) it is fail-closed on
+// the L0/L1 boundary. The first two are pure and locked here; the L0/L1 refusal
+// is exercised by the integration path, not by a unit.
+describe("resolveLabels — the author lane (adr-0022)", () => {
+  it("--needs-author stamps the author label, never the escalation label", () => {
+    expect(resolveLabels([], { needsAuthor: true, body: "verdict" })).toEqual([AUTHOR_LABEL]);
+  });
+
+  it("the hidden author marker stamps the label even if --needs-author was forgotten", () => {
+    expect(resolveLabels([], { body: `verdict\n${NEEDS_AUTHOR_MARKER}` })).toEqual([AUTHOR_LABEL]);
+  });
+
+  it("a PR cannot be handed to both lanes at once (flag + opposite marker)", () => {
+    expect(() => resolveLabels([], { needsHuman: true, body: `verdict\n${NEEDS_AUTHOR_MARKER}` })).toThrow(
+      /cannot hand a PR to BOTH lanes/,
+    );
+    expect(() => resolveLabels([], { needsAuthor: true, needsHuman: true, body: "verdict" })).toThrow(
+      /cannot hand a PR to BOTH lanes/,
+    );
+  });
+
+  it("a plain routing comment still gets neither lane", () => {
+    expect(resolveLabels([], { body: "**Nadia — cycle 1.**" })).toEqual([]);
+  });
+});
+
+describe("assertAuthorLaneReasons — an agent's queue only holds agent-fixable causes", () => {
+  it("accepts the three fixable causes", () => {
+    expect(() => assertAuthorLaneReasons(["merge-conflict", "branch-behind", "review-findings-open"])).not.toThrow();
+  });
+
+  it("accepts checks-failing (router-judged) and a free-texted other", () => {
+    expect(() => assertAuthorLaneReasons(["checks-failing"])).not.toThrow();
+    expect(() => assertAuthorLaneReasons(["other"])).not.toThrow();
+  });
+
+  it.each([
+    "l0l1-path",
+    "no-r-n10-delegation",
+    "human-changes-requested",
+    "kill-switch-off",
+    "cycle-cap-exceeded",
+    "remediation-cap-exceeded",
+    "remediation-blocked",
+  ])("refuses %s — no agent can clear it, so parking it in the agent queue strands the PR", (code) => {
+    expect(() => assertAuthorLaneReasons([code])).toThrow(/cannot carry reason/);
+  });
+});
+
+describe("resolveReasons — the author lane must say why too", () => {
+  it("an author-lane hand-off with no reason throws, exactly like an escalation", () => {
+    expect(() => resolveReasons({ body: `verdict\n${NEEDS_AUTHOR_MARKER}`, escalating: true })).toThrow(
+      /must carry a reason/,
+    );
   });
 });
