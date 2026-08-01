@@ -1,10 +1,20 @@
 # ADR-0018 — Skill judgment-config syncs from git on a version gate (supersedes ADR-0008 §Decision-5)
 
-- **Status**: Proposed (operator ratifies by merging the implementation PR)
+- **Status**: Accepted (2026-07-30 — ratified by the merged implementation, per this ADR's own rule; status reconciled by `backlog-reconcile`, ⚠ operator sign-off requested)
 - **Date**: 2026-07-05
 - **Deciders**: operator
 - **Epics**: [Epic-008](../epics/epic-008-skill-repository.md) (skill repository), [Epic-005](../epics/epic-005-agent-authored-article-pipeline.md) (the article pipeline that surfaced the drift)
 - **Related**: [ADR-0008](adr-0008-skill-config-single-source.md) (the create-only seed this narrows), [ADR-0007](adr-0007-agent-config-single-source.md)
+
+> **Status reconciliation (2026-07-30, Nadia — `backlog-reconcile`). `Proposed` → `Accepted`; ⚠ this encodes a ratification and needs operator sign-off via the merge.** The status line said "operator ratifies by merging the implementation PR" and that merge has happened — all three Decision legs are on `main` and one of them was observed executing in production:
+>
+> - **§Decision-1 (version-gated seed)** — `workforce/lambdas/seed-skills/handler.ts:126`, `if (compareSemver(meta.version, existing.version) > 0)`, with the create-only path preserved for equal-or-older git versions.
+> - **§Decision-3 (mandatory bump CI gate)** — `workforce/scripts/check-skill-body-version.mjs`, wired as `npm run workforce:skill-body-version` (`package.json:37`) and run in CI at `.github/workflows/ci.yml:65`.
+> - **Live behavioural proof** — PR [#513](https://github.com/refluster/ai-native-article/pull/513) merged `2026-07-29T06:10:09Z`; the `Deploy workforce data plane (SAM)` run for `0f7a423` ran `06:10:13Z → 06:11:43Z` (success); `GET /skills/pr-autopilot` now serves `version: 0.23.0` (== git `meta.json`) with `updated_at 2026-07-29T06:11:28.693Z` — inside that window, i.e. written by the postdeploy seed, not by a hand-authored `PATCH /skills`. The decision is in force and code depends on it, which is the `Accepted` semantics in [the ADR README](README.md#status-semantics).
+>
+> The record was also internally inconsistent: [ADR-0008](adr-0008-skill-config-single-source.md)'s own status line already reads "§Decision-5 (create-only seed) **superseded by ADR-0018**" — a `Proposed` ADR cannot supersede a clause of an `Accepted` one. Nothing in the Decision text is edited; only the status is reconciled to reality (per the README's "never silently rewrite a decided ADR" rule).
+>
+> **Scope note (skip reason, deliberate).** Six other ADRs in this tree still read `Proposed` (0009, 0012, 0013, 0015, 0016, 0017). This pass flips **only 0018**, because only 0018 was reached by today's evidence trail (the OP-015 finding). A ratification sweep across the other six is a separate, operator-owned decision — not something a reconciliation pass should apply unilaterally to six L1 records.
 
 ## Context
 
