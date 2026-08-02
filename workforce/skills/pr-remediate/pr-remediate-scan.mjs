@@ -35,6 +35,7 @@ import {
   makeGh,
 } from "../pr-autopilot/pr-merge.mjs";
 import { findReasonMarkers } from "../pr-autopilot/escalation-reasons.mjs";
+import { BRIEF_MARKER, parseRemediationBrief } from "../pr-autopilot/remediation-brief.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..", "..", "..");
@@ -95,8 +96,22 @@ export function classifyRemediation({
   if (state === "behind") {
     return { kind: "branch-behind", actionable: true, why: "head is out of date with the base branch" };
   }
+  // adr-0023 first: a 🔴 veto routed back here carries an ORDERED remediation
+  // brief (validated at the hand-off), so it is the better-specified of the two
+  // findings kinds and the session should work it from the brief, not from a
+  // re-read of every review body. Same `review-findings` kind — the work is the
+  // same shape — with the blocking flag so the outcome comment can say which
+  // loop it closed.
+  if (codes.has("review-findings-blocking")) {
+    return {
+      kind: "review-findings",
+      blocking: true,
+      actionable: true,
+      why: "a lens VETOED (🔴) and the router organised the blocking findings into a remediation brief (adr-0023)",
+    };
+  }
   if (codes.has("review-findings-open")) {
-    return { kind: "review-findings", actionable: true, why: "one or more lens reviews left an open blocking finding" };
+    return { kind: "review-findings", blocking: false, actionable: true, why: "one or more lens reviews left an open blocking finding" };
   }
   if (codes.has("checks-failing")) {
     return { kind: "checks-failing", actionable: true, why: "a required check completed non-green" };
@@ -107,6 +122,22 @@ export function classifyRemediation({
     escalate: "remediation-blocked",
     why: `parked in the author lane with no recognisable fixable cause (state=${state || "?"}, reasons=[${[...codes].join(", ") || "none"}])`,
   };
+}
+
+/** The newest usable remediation brief among the PR's comment/review bodies
+ *  (adr-0023), as `{ items, body }` — or `null` when none carries one. Newest
+ *  wins: a re-routed PR accumulates one brief per 🔴 cycle, and only the last
+ *  one describes the tree the session is about to fix. A brief that no longer
+ *  parses (hand-written, or predating the contract) is skipped rather than
+ *  half-consumed — the review bodies remain the fallback source. */
+export function latestBrief(bodies = []) {
+  for (let i = bodies.length - 1; i >= 0; i--) {
+    const body = String(bodies[i] ?? "");
+    if (!body.includes(BRIEF_MARKER)) continue;
+    const parsed = parseRemediationBrief(body);
+    if (parsed.present && parsed.problems.length === 0) return { items: parsed.items, body };
+  }
+  return null;
 }
 
 /** Reason codes carried by the PR's hand-off comments, de-duplicated, newest
@@ -214,6 +245,12 @@ async function main() {
       // address a finding by its finding-ID, and a scanner's paraphrase is
       // exactly how a finding gets "addressed" without being fixed.
       review_bodies: reviews.map((r) => ({ state: r.state, body: r.body })),
+      // adr-0023: the newest usable remediation brief, parsed into items. It is
+      // the router's ORDERED synthesis of the panel's blocking findings, with an
+      // acceptance clause per item — the work-list for a `review-findings`
+      // (blocking) run. `null` when the PR arrived via the 🟡 lane, which has no
+      // brief by construction; then the review bodies above are the source.
+      remediation_brief: latestBrief(bodies),
       remediation: verdict,
     });
   }
