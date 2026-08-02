@@ -15,6 +15,7 @@ import {
   resolveReasons,
   findRawMentions,
   assertAuthorLaneReasons,
+  assertAuthorLoopBounds,
   NEEDS_HUMAN_MARKER,
   NEEDS_AUTHOR_MARKER,
   REVIEWED_MARKER,
@@ -312,6 +313,10 @@ describe("assertAuthorLaneReasons — an agent's queue only holds agent-fixable 
     expect(() => assertAuthorLaneReasons(["merge-conflict", "branch-behind", "review-findings-open"])).not.toThrow();
   });
 
+  it("accepts adr-0023's blocking-findings code — a 🔴 whose veto is diff-local", () => {
+    expect(() => assertAuthorLaneReasons(["review-findings-blocking"])).not.toThrow();
+  });
+
   it("accepts checks-failing (router-judged) and a free-texted other", () => {
     expect(() => assertAuthorLaneReasons(["checks-failing"])).not.toThrow();
     expect(() => assertAuthorLaneReasons(["other"])).not.toThrow();
@@ -335,5 +340,44 @@ describe("resolveReasons — the author lane must say why too", () => {
     expect(() => resolveReasons({ body: `verdict\n${NEEDS_AUTHOR_MARKER}`, escalating: true })).toThrow(
       /must carry a reason/,
     );
+  });
+});
+
+describe("assertAuthorLoopBounds — the 🔴 loop's two extra guards (adr-0023)", () => {
+  const brief =
+    "**Remediation brief — 1 blocking finding, cycle 2 of ≤ 7.**\n\n" +
+    "1. `A1` (`workforce/skills/pr-autopilot/pr-merge.mjs:88`) — rethrow the swallowed refusal. Done when: the refusal exits non-zero.\n";
+
+  it("passes a briefed hand-off with room left in the cycle budget", () => {
+    const r = assertAuthorLoopBounds({ codes: ["review-findings-blocking"], body: brief, cycle: "2", cycleCap: "7" });
+    expect(r.items).toHaveLength(1);
+  });
+
+  it("refuses a briefless 🔴 hand-off — the cadence cannot re-derive the findings", () => {
+    expect(() =>
+      assertAuthorLoopBounds({ codes: ["review-findings-blocking"], body: "reviewers blocked", cycle: "2", cycleCap: "7" }),
+    ).toThrow(/remediation brief/i);
+  });
+
+  it("refuses the hand-off at the cycle cap and names the human-lane code", () => {
+    expect(() =>
+      assertAuthorLoopBounds({ codes: ["review-findings-blocking"], body: brief, cycle: "7", cycleCap: "7" }),
+    ).toThrow(/cycle-cap-exceeded/);
+  });
+
+  it("falls back to the W-4 hard cap when the binding cap is not passed", () => {
+    expect(() => assertAuthorLoopBounds({ codes: ["review-findings-blocking"], body: brief, cycle: "7" })).toThrow(
+      /cycle-cap-exceeded/,
+    );
+    expect(assertAuthorLoopBounds({ codes: ["review-findings-blocking"], body: brief, cycle: "3" })).not.toBeNull();
+  });
+
+  it("refuses a 🔴 hand-off that states no cycle at all — the bound is not optional", () => {
+    expect(() => assertAuthorLoopBounds({ codes: ["review-findings-blocking"], body: brief })).toThrow(/--cycle/);
+  });
+
+  it("leaves every other author-lane code alone (adr-0022 lane unchanged)", () => {
+    expect(assertAuthorLoopBounds({ codes: ["merge-conflict"], body: "main moved" })).toBeNull();
+    expect(assertAuthorLoopBounds({ codes: ["review-findings-open"], body: "revise please" })).toBeNull();
   });
 });

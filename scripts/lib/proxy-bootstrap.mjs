@@ -18,7 +18,7 @@
 // This is exactly how the L1→L2/L3 article pipeline silently stopped
 // producing on 2026-07-26: `pick-l1-source.mjs` exited 3 on every one of the
 // 28 dispatches that followed, while cadences whose only endpoint was the
-// AWS agents-api kept working. See docs/memory-lint-backlog.md (ML-016).
+// AWS agents-api kept working. See docs/memory-lint-backlog.md (ML-017).
 //
 // What it does
 // ------------

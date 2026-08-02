@@ -1,6 +1,6 @@
 ---
 name: pr-autopilot
-description: Drive every open PR in the bound project's repo to one of exactly two terminal states — MERGED (unanimous-green ≥3-reviewer consensus, no L0/L1 surface, via the fail-closed pr-merge.mjs engine) or ESCALATED to a human with the `autopilot:needs-human` label. Routes each PR to a ≥3-persona reviewer panel, posts every review + the synthesised verdict as PR comments, merges when the R-N10 predicate holds (drafts included), and hands off with the label when it doesn't — to the operator, or (adr-0022) to the bounded, agent-owned author lane `autopilot:needs-author` when the blocking cause is a base conflict, a behind branch, or open review findings. A deterministic sweep (pr-autopilot-sweep.mjs) escalates anything that stalls, so no PR is ever left in neither state. Runs as a CCR task (ADR-0005), fired on cron or a pull_request event (adr-0013); github.token via the binding's project linkage.
+description: Drive every open PR in the bound project's repo to one of exactly two terminal states — MERGED (unanimous-green ≥3-reviewer consensus, no L0/L1 surface, via the fail-closed pr-merge.mjs engine) or ESCALATED to a human with the `autopilot:needs-human` label. Routes each PR to a ≥3-persona reviewer panel, posts every review + the synthesised verdict as PR comments, merges when the R-N10 predicate holds (drafts included), and otherwise hands off — to the operator, or to the bounded, agent-owned author lane `autopilot:needs-author` (pr-remediate) on a base conflict, a behind branch, or open findings (adr-0022). A 🔴 no longer ends at a human by default (adr-0023): when the veto names a diff-local defect the router organises the blocking findings into a machine-checked remediation brief and hands the PR back for a re-reviewed cycle, escalating once the cycle budget is spent. A deterministic sweep escalates anything that stalls. Runs as a CCR task (ADR-0005), fired on cron or a pull_request event (adr-0013).
 ---
 
 # pr-autopilot
@@ -23,6 +23,13 @@ The legitimate *interim* states are two, and both are bounded by that sweep:
 agent-fixable waits for the `pr-remediate` cadence rather than for a human. The
 author lane is a 🟡 with an owner; it is not a third terminal state, and a PR
 that sits in it without its head moving is escalated like any other stall.
+
+Since **adr-0023** the lane also owns the **🔴 whose veto names a defect in the
+diff**: you organise the panel's blocking findings into a remediation brief and
+hand the PR back for a re-reviewed cycle, rather than spending an operator
+decision on a fix nobody needed a human for. What still ends at a human is the
+veto no agent may resolve (premise, scope, L0/L1, delegation) — and the review
+loop that has spent its cycle budget.
 
 You are the routing persona (today Nadia's PdM lens). This runs as a **CCR
 task** fired by `wf-orchestrator-tick` on the binding's cron, or — when the
@@ -253,7 +260,22 @@ Synthesise the reviewers' **collective** verdict (never your solo call):
 - **🟡** — one or more reviewers left an open blocking finding; the author is
   expected to revise; next tick re-routes (cycle += 1).
 - **🔴** — any reviewer's veto, cycle > `cycle_cap`, or a scope question you
-  cannot decide.
+  cannot decide. **A 🔴 is not automatically a human's problem (adr-0023).**
+  Split it by *what the veto is about*:
+  - the veto names a **defect in the diff** — a wrong implementation, a missing
+    guard, an unhandled case, a test that should exist: this is the **author
+    loop**. Write the remediation brief (below) and hand off with
+    `--needs-author --reason review-findings-blocking`. `pr-remediate` implements
+    or rebuts each item, and your next tick re-reviews at cycle N+1.
+  - the veto is about something **no agent may resolve** — the change's premise
+    or scope, an L0/L1 surface, a missing delegation, a human's
+    `CHANGES_REQUESTED`, a persona escalation trigger, or a panel you could not
+    seat: **human**, as before.
+  - the **cycle budget is spent** (this verdict closes cycle `n` and `n+1 >
+    cycle_cap`): **human**, `--reason cycle-cap-exceeded`. This is where the
+    human gate went — it is no longer "a lens said no", it is "the loop had its
+    chances". `pr-autopilot-post.mjs` refuses a `review-findings-blocking`
+    hand-off past the cap rather than trusting you to remember.
 
 **Declare the panel's provenance — and know what the declaration is worth.**
 Every verdict body must carry exactly one of these markers, appended by
@@ -306,7 +328,9 @@ the aggregated colour, then take the terminal action:
 | 🟢 | no R-N10 delegation for this repo | hand off `--needs-human --reviewed` |
 | 🟢 / 🟡 | **conflicts with the base** (`mergeable_state=dirty`) or **behind** it | hand off `--needs-author --reason merge-conflict\|branch-behind` (below) |
 | 🟡 | open blocking lens findings | hand off `--needs-author --reason review-findings-open` |
-| 🔴 / non-consensus / can't seat 3 / unreadable governance | any | hand off `--needs-human` (no `--reviewed`) |
+| 🔴 | a lens **vetoed a defect in the diff**, and cycle + 1 ≤ `cycle_cap` | hand off `--needs-author --reason review-findings-blocking` **+ remediation brief** (adr-0023) |
+| 🔴 | cycle + 1 > `cycle_cap` | hand off `--needs-human --reason cycle-cap-exceeded` |
+| 🔴 (premise/scope) / non-consensus / can't seat 3 / unreadable governance | any | hand off `--needs-human` (no `--reviewed`) |
 
 ### The author lane — a 🟡 with an owner (adr-0022)
 
@@ -334,10 +358,56 @@ Three things to know before you use it:
   Re-post such a PR as `--needs-human --reason l0l1-path`.
 - **Only agent-fixable reasons may enter it.** The script refuses `l0l1-path`,
   `no-r-n10-delegation`, `human-changes-requested`, `kill-switch-off`,
-  `cycle-cap-exceeded` and the remediation exits. `checks-failing` is *allowed but
+  `cycle-cap-exceeded` and the remediation exits. `review-findings-blocking`
+  (adr-0023) is allowed but carries two extra conditions of its own — a parsable
+  remediation brief and the cycle budget (see below). `checks-failing` is *allowed but
   never automatic*: route a red PR to the author only when your lenses located the
   defect in the diff — the flaky-rerun latch owns the retry case, and bending a
   genuine product failure into a patch attempt is worse than escalating.
+
+### The 🔴 loop — you organise the fix, then hand it back (adr-0023)
+
+adr-0022 gave the 🟡 an owner. adr-0023 gives the **🔴** one, for the class where
+the veto is a diff-local defect: instead of spending an operator decision on
+"a lens said no", you do the PdM work — turn the panel's blocking findings into
+an ordered work-list with acceptance criteria — and hand *that* to the author
+lane. Route this way only when you can write such a list; a veto you cannot
+reduce to concrete changes is a premise question, and premise questions are the
+human's (they always were).
+
+The hand-off body must carry a **remediation brief**, and
+`pr-autopilot-post.mjs` refuses the post (exit 1) unless it parses:
+
+```md
+**Remediation brief — <n> blocking finding(s), cycle <n> of ≤ <cycle_cap>.**
+
+1. `A1` (`workforce/skills/pr-autopilot/pr-merge.mjs:88`) — rethrow the swallowed refusal instead of logging it. Done when: a server-side refusal exits non-zero and the verdict re-posts.
+2. `B2` (`workforce/skills/pr-autopilot/pr-merge-tests.ts`) — add the case `B2` describes. Done when: the suite covers the refused-decision path.
+```
+
+Each item: the reviewer's **finding-ID**, the **location** in backticks, the
+**change to make**, and a `Done when:` clause the next cycle's panel can check
+off. Order them: what blocks the others first. Two rules on content —
+
+- **Do not re-litigate the finding in the brief.** It is a work-list, not a
+  second review. If you think a lens is wrong, say so in the synthesis above and
+  leave the item out; `pr-remediate` may also rebut an item by ID, which is a
+  legitimate outcome that the next panel then judges.
+- **Never widen the PR.** Items address the findings; "while you're in there"
+  work is a separate PR and a separate issue.
+
+The loop is bounded three ways, none of them your promise: the brief must parse,
+the post is refused when cycle + 1 exceeds the cap, and the lane's own 3-attempt
+remediation cap plus the Step-6 sweep still apply. A 🔴 PR therefore reaches a
+human after a bounded number of *organised* attempts — never after none, never
+after unbounded ones.
+
+```sh
+GITHUB_TOKEN="…" node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
+  --project "<project_id>" --pr <number> --body-file /tmp/verdict-<number>.md \
+  --panel isolated|inline --needs-author --reason review-findings-blocking \
+  --cycle <n> --cycle-cap <cycle_cap>
+```
 
 The verdict body is the same template with the lane's marker in place of the
 human one, and the hand-off sentence naming the fix expected:
@@ -346,7 +416,8 @@ human one, and the hand-off sentence naming the fix expected:
 GITHUB_TOKEN="…" node workforce/skills/pr-autopilot/pr-autopilot-post.mjs \
   --project "<project_id>" --pr <number> --body-file /tmp/verdict-<number>.md \
   --panel isolated|inline \
-  --needs-author --reason merge-conflict|branch-behind|review-findings-open
+  --needs-author --reason merge-conflict|branch-behind|review-findings-open|review-findings-blocking \
+  [--cycle <n> --cycle-cap <cycle_cap>]   # REQUIRED with review-findings-blocking
 ```
 
 ```
@@ -526,9 +597,12 @@ candidates — the sweep is how the contract survives runs that die mid-cycle.
   the target's governance L0/L1 always escalates to a human. No push or
   PR-open under any path.
 - **The sweep is part of every fire.** No PR is left in neither state.
-- **Agent-fixable ≠ human-gated** (adr-0022). A conflict, a behind branch or an
-  open finding goes to the author lane (`pr-remediate`), bounded by the attempt
-  cap and the sweep; the human lane keeps what only a human may decide.
+- **Agent-fixable ≠ human-gated** (adr-0022/adr-0023). A conflict, a behind
+  branch, an open finding — and a 🔴 veto that names a defect in the diff — go to
+  the author lane (`pr-remediate`) with the brief that says what to change,
+  bounded by the cycle budget, the attempt cap and the sweep; the human lane
+  keeps what only a human may decide: premise and scope, L0/L1, delegation, and
+  a review loop that has spent its cycles.
 
 **OP-009 (operator-only runtime wiring).** The event trigger this contract is
 agnostic to — the CCR `agent-runner` routine's `pull_request`
@@ -541,5 +615,5 @@ floor and the backstop.
 
 Related: [agent-runner.md](../../docs/routines/agent-runner.md) (the generic
 CCR routine this runs under — this SKILL.md is the authoritative contract),
-R-N10 in [workforce governance](../../docs/governance.md) + adr-0010/0011/0013/0014/0015/0022
+R-N10 in [workforce governance](../../docs/governance.md) + adr-0010/0011/0013/0014/0015/0022/0023
 (the merge predicate's decision trail), [dev-process.md](../../docs/runbooks/dev-process.md), [issue-to-merge-flow.md](../../docs/runbooks/issue-to-merge-flow.md), [pr-remediate](../pr-remediate/SKILL.md).

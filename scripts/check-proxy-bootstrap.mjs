@@ -10,7 +10,7 @@
 //
 // This gate exists because that failure mode silently stopped the L1→L2/L3
 // article pipeline for seven days (28 consecutive no-op dispatches) before
-// anyone noticed. See docs/memory-lint-backlog.md (ML-016).
+// anyone noticed. See docs/memory-lint-backlog.md (ML-017).
 //
 // Usage:  node scripts/check-proxy-bootstrap.mjs
 // Exit:   0 — every fetch() caller is bootstrapped

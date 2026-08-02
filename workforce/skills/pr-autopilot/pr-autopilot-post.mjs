@@ -22,6 +22,7 @@
 //       [--needs-human | --needs-author] [--label <name>]   # see lane rules below
 //       [--reason <code> [--reason-text "…"]]   # see reason rule below
 //       [--panel isolated|inline]                # REQUIRED on a verdict post
+//       [--cycle <n> --cycle-cap <m>]            # REQUIRED with --reason review-findings-blocking
 //
 // ESCALATION ALWAYS CARRIES THE LABEL (operator directive 2026-06-21). Any
 // comment that hands a PR to a human — a 🟢 PR touching the target's governance
@@ -61,6 +62,21 @@
 // The lane is bounded, not terminal: pr-autopilot-sweep.mjs escalates a PR that
 // sits here without its head moving (`author-stale`), and the remediation
 // attempt cap escalates the rest — so the two-outcome contract still holds.
+//
+// THE 🔴 LOOP (adr-0023). A reviewer VETO used to end the loop at a human, even
+// when the veto named a diff-local defect an agent could fix — one blocking lens
+// spent an operator decision. `--needs-author --reason review-findings-blocking`
+// routes that class back to the author instead: the router synthesises the
+// panel's blocking findings into an ordered **remediation brief**, `pr-remediate`
+// implements or rebuts each item, and the next tick re-reviews at cycle N+1. The
+// human gate moves from "any 🔴" to "the review loop is spent". Two guards make
+// that safe, both enforced here before anything is posted (assertAuthorLoopBounds):
+//   - the brief must PARSE (remediation-brief.mjs) — every item names a
+//     finding-ID, a location, the change, and its acceptance clause;
+//   - `--cycle`/`--cycle-cap` must leave room for cycle+1; at the cap the post
+//     is refused and must be re-posted as --needs-human --reason cycle-cap-exceeded.
+// The 🟡 code `review-findings-open` is untouched by both, so a running SKILL
+// body that predates adr-0023 keeps working exactly as adr-0022 shipped it.
 //
 // ESCALATION ALWAYS CARRIES A REASON (Epic-019 Story 1). Any comment that
 // hands a PR to a human must also record WHY, from EITHER `--reason <code>`
@@ -116,6 +132,13 @@ import {
   reasonMarker,
 } from "./escalation-reasons.mjs";
 import { attemptFlakyRerun } from "./flaky-rerun.mjs";
+import { W4_CYCLE_CAP } from "./pr-merge.mjs";
+import {
+  BLOCKING_FINDINGS_CODE,
+  BRIEF_MARKER,
+  assertBriefForCodes,
+  cycleBudgetAllowsAuthorLoop,
+} from "./remediation-brief.mjs";
 
 const GH_API = "https://api.github.com";
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -176,6 +199,30 @@ export const NEEDS_AUTHOR_MARKER = AUTHOR_MARKER;
  *  cycle/remediation cap) — routing one of those to the author lane would park
  *  the PR in a queue whose worker can never clear it, so it is refused here. */
 export const AUTHOR_LANE_REASONS = Object.freeze([...AUTHOR_LANE_CODES, "checks-failing", "other"]);
+
+/** adr-0023 — the 🔴 → author loop's two extra guards, applied only to a
+ *  `review-findings-blocking` hand-off (the code that means "a lens vetoed and
+ *  the router organised the fix"):
+ *
+ *   1. the verdict must carry a machine-checkable **remediation brief** — the
+ *      remediation cadence cannot re-derive a panel's blocking findings from a
+ *      paragraph of synthesis, and a loop fed ambiguity spends its budget on
+ *      guesses;
+ *   2. the **cycle budget** must still have room for the loop this hand-off
+ *      authorises (cycle+1 ≤ cap). This is where the human gate went: it is no
+ *      longer "any reviewer vetoed", it is "the review loop is spent".
+ *
+ *  Pure + exported so both guards are unit-tested rather than merely documented.
+ *  Returns the parsed brief (or null when the code isn't in play); throws with
+ *  the operator-facing remedy otherwise. */
+export function assertAuthorLoopBounds({ codes = [], body = "", cycle, cycleCap } = {}) {
+  if (!codes.includes(BLOCKING_FINDINGS_CODE)) return null;
+  const brief = assertBriefForCodes(codes, body); // throws on a missing/defective brief
+  const cap = cycleCap === undefined || cycleCap === null || cycleCap === "" ? W4_CYCLE_CAP : cycleCap;
+  const budget = cycleBudgetAllowsAuthorLoop(cycle, cap);
+  if (!budget.ok) throw new Error(`refusing --needs-author --reason ${BLOCKING_FINDINGS_CODE}: ${budget.why}`);
+  return brief;
+}
 
 export function assertAuthorLaneReasons(codes = []) {
   const bad = codes.filter((c) => !AUTHOR_LANE_REASONS.includes(c));
@@ -420,6 +467,16 @@ async function main() {
       reasonText: arg("reason-text") ?? "",
     });
     if (toAuthor) assertAuthorLaneReasons(reasons.codes);
+    // adr-0023: a 🔴 handed back to the author must carry the brief AND fit the
+    // cycle budget. Both are checked before anything reaches GitHub (C-4).
+    if (toAuthor) {
+      assertAuthorLoopBounds({
+        codes: reasons.codes,
+        body,
+        cycle: arg("cycle"),
+        cycleCap: arg("cycle-cap"),
+      });
+    }
   } catch (e) {
     die(1, e instanceof Error ? e.message : String(e));
   }
@@ -429,6 +486,13 @@ async function main() {
   // so the PR's own comment thread records which queue it was put in — the sweep
   // and any later reader classify from PR state, never from how it was invoked.
   if (toAuthor && !body.includes(NEEDS_AUTHOR_MARKER)) body = `${body.trimEnd()}\n\n${NEEDS_AUTHOR_MARKER}\n`;
+  // adr-0023: stamp the brief marker only after the brief PARSED — so the marker
+  // records a validated artefact rather than a claim the router made about its
+  // own prose (the same distinction the panel-provenance marker deliberately
+  // cannot make).
+  if (toAuthor && reasons.codes.includes(BLOCKING_FINDINGS_CODE) && !body.includes(BRIEF_MARKER)) {
+    body = `${body.trimEnd()}\n\n${BRIEF_MARKER}\n`;
+  }
 
   // #513: a verdict must say how its lenses were produced. Fail loud here,
   // before anything reaches GitHub — same posture as the reason code.
