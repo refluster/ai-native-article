@@ -5,16 +5,26 @@
 // Every workforce cadence script talks to the outside world with the global
 // `fetch()`. Node's fetch is undici, and undici does NOT read HTTPS_PROXY /
 // NO_PROXY unless the process was started with NODE_USE_ENV_PROXY=1 (Node
-// >= 22.21, or >= 24.0). In a CCR / Claude Code remote session outbound HTTPS
-// is only permitted through the agent proxy at $HTTPS_PROXY, so a bare fetch()
-// never reaches the policy-enforcing proxy at all — it is rejected upstream
-// with
+// >= 22.21, or >= 24.0). In a CCR / Claude Code remote session that means a
+// bare fetch() never reaches the agent proxy at $HTTPS_PROXY; it goes out on a
+// separate, transparently-filtered path, where a host that is not permitted is
+// rejected with
 //
 //     HTTP 403: Host not in allowlist: <host>
 //
-// …no matter how the session's egress allowlist is configured. That is not a
-// policy denial the operator can fix by opening the network: it is the script
-// bypassing the only path that is allowed to carry the traffic.
+// Two paths, two policies. Whether the bypassing path works depends on that
+// environment's egress configuration — opening it up does unblock bare fetch,
+// which is how production was actually restored on 2026-08-02 (article-level3
+// resumed publishing within one fire of the operator opening the network,
+// before any of this code shipped). What the proxy path buys is independence
+// from that configuration: a script that goes through $HTTPS_PROXY works
+// under the default-closed settings a fresh environment starts with, and does
+// not silently start failing when someone tightens them.
+//
+// So the 403 is genuinely ambiguous, and that ambiguity is what cost seven
+// days: the message names the egress policy, so it reads as "ask the operator
+// to allowlist api.notion.com" when the script could equally have routed
+// itself correctly and never asked.
 //
 // This is exactly how the L1→L2/L3 article pipeline silently stopped
 // producing on 2026-07-26: `pick-l1-source.mjs` exited 3 on every one of the
@@ -27,9 +37,11 @@
 // (or NODE_OPTIONS) exported once in the agent-runner's CCR session
 // environment fixes every script that exists and every script anyone writes
 // later, with no import discipline to maintain. That is a platform change
-// outside this repo. This module exists so the repo is correct in the
-// meantime and on any runner that lacks the env var — it is a second line of
-// defence, and the ML-017 row says so.
+// outside this repo. Widening the egress allowlist — what actually restored
+// production here — fixes it too, but only for the hosts and the environment
+// somebody remembered to widen. This module exists so the repo is correct
+// under either, and on any runner where neither has been done. It is a second
+// line of defence, and the ML-017 row says so.
 //
 // Entry scripts only — never a library side effect
 // ------------------------------------------------

@@ -16,11 +16,20 @@
 // was the one nobody was watching — whether new articles are still arriving.
 // This gate watches exactly that, and nothing else.
 //
-// It reads the deployed manifest (the same artefact the site serves) and fails
-// if the newest article of a given type is older than its budget. That makes a
-// dead generation path raise an alarm within a day instead of never (C-4). It
-// runs on a daily schedule (.github/workflows/corpus-freshness.yml), not as a
-// PR gate — see the note in ci.yml.
+// It reads the manifest that deploy-article-site.yml writes to gh-pages and
+// fails if the newest article of a given type is older than its budget, so a
+// dead generation path raises an alarm within a day instead of never (C-4).
+// It runs on a daily schedule (.github/workflows/corpus-freshness.yml), not as
+// a PR gate — see the note in ci.yml.
+//
+// Scope: gh-pages is the end of the *pipeline*, which is what this gate is
+// about. It is not necessarily what the public origin serves — as of
+// 2026-08-02 kohuehara.xyz answers with a different, create-react-app site,
+// and every /posts/* and /article/* path 404s there, including for articles
+// that have been in the corpus for months. Whether that is intended is a
+// separate question, and this gate deliberately does not try to answer it:
+// conflating "generation stopped" with "the domain points elsewhere" would
+// make the alarm mean two things and therefore nothing.
 //
 // Usage:
 //   node scripts/check-corpus-freshness.mjs
@@ -31,9 +40,8 @@
 import { ensureProxyAwareEntry } from "./lib/proxy-bootstrap.mjs";
 ensureProxyAwareEntry(import.meta.url);
 
-// The deploy artefact, read from the gh-pages branch rather than from
-// kohuehara.xyz: the SPA's rewrite rules serve 404.html for /posts/* to a
-// plain HTTP client, so the public origin cannot be polled for this.
+// Read from the gh-pages branch rather than from kohuehara.xyz — see the
+// scope note above: the public origin does not serve this artefact at all.
 const MANIFEST_URL =
   process.env.MANIFEST_URL ||
   "https://raw.githubusercontent.com/refluster/ai-native-article/gh-pages/posts/manifest.json";
