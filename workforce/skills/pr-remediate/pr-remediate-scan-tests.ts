@@ -11,7 +11,7 @@
 //      classified as actionable, and an unclassifiable PR escalates rather than
 //      sitting in the queue forever.
 import { describe, it, expect } from "vitest";
-import { classifyRemediation, reasonCodesFrom } from "./pr-remediate-scan.mjs";
+import { classifyRemediation, latestBrief, reasonCodesFrom } from "./pr-remediate-scan.mjs";
 import { labelsToClearOnResolve, assertBlockedReason, claimBody } from "./pr-remediate-post.mjs";
 import { AUTHOR_LABEL, ESCALATION_LABEL, REMEDIATION_CAP, countRemediationAttempts } from "../pr-autopilot/pr-merge.mjs";
 
@@ -65,6 +65,18 @@ describe("classifyRemediation — kind ordering", () => {
   it("a stated finding outranks a red check", () => {
     const v = classifyRemediation(inLane({ reasons: ["checks-failing", "review-findings-open"] }));
     expect(v.kind).toBe("review-findings");
+  });
+
+  it("adr-0023: a briefed 🔴 is the same work-kind, flagged blocking, and outranks the 🟡 code", () => {
+    const v = classifyRemediation(inLane({ reasons: ["review-findings-open", "review-findings-blocking"] }));
+    expect(v).toMatchObject({ kind: "review-findings", blocking: true, actionable: true });
+    expect(v.why).toMatch(/VETOED/);
+  });
+
+  it("a conflict still outranks a briefed 🔴", () => {
+    expect(classifyRemediation(inLane({ mergeableState: "dirty", reasons: ["review-findings-blocking"] })).kind).toBe(
+      "merge-conflict",
+    );
   });
 
   it("a red check alone is actionable", () => {
@@ -140,5 +152,23 @@ describe("claimBody — the attempt is spent before the work", () => {
 
   it("refuses to render an attempt past the cap", () => {
     expect(() => claimBody(REMEDIATION_CAP + 1)).toThrow(/remediation-cap-exceeded/);
+  });
+});
+
+describe("latestBrief — the 🔴 loop's work-list (adr-0023)", () => {
+  const brief = (id: string, text: string) =>
+    `**Remediation brief — 1 blocking finding.**\n\n1. \`${id}\` (\`a/b.mjs:2\`) — ${text}. Done when: the guard throws.\n\n<!-- autopilot:brief -->\n`;
+
+  it("returns null when no comment carries a brief (the 🟡 lane has none by construction)", () => {
+    expect(latestBrief(["**Nadia — verdict, cycle 1.** revise please"])).toBeNull();
+  });
+
+  it("returns the NEWEST brief — an earlier cycle describes a tree that no longer exists", () => {
+    const got = latestBrief([brief("A1", "add the first guard"), "unrelated", brief("B2", "add the second guard")]);
+    expect(got.items.map((i) => i.id)).toEqual(["B2"]);
+  });
+
+  it("skips a marked-but-unparsable body rather than half-consuming it", () => {
+    expect(latestBrief(["**Remediation brief — see above.**\n\nconcerns.\n\n<!-- autopilot:brief -->\n"])).toBeNull();
   });
 });
