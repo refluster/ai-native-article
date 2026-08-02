@@ -18,7 +18,9 @@
 //
 // It reads the deployed manifest (the same artefact the site serves) and fails
 // if the newest article of a given type is older than its budget. That makes a
-// dead generation path turn CI red within a day or two instead of never (C-4).
+// dead generation path raise an alarm within a day instead of never (C-4). It
+// runs on a daily schedule (.github/workflows/corpus-freshness.yml), not as a
+// PR gate — see the note in ci.yml.
 //
 // Usage:
 //   node scripts/check-corpus-freshness.mjs
