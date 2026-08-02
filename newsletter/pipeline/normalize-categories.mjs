@@ -26,7 +26,8 @@
  *   node --env-file=.env newsletter/pipeline/normalize-categories.mjs
  */
 
-import "../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 import { existsSync, readFileSync } from 'fs'
 import { dirname, join } from 'path'

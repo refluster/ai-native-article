@@ -43,7 +43,8 @@
 //   aws-vault exec <profile> -- \
 //     node workforce/scripts/wire-issue-triage-nadia-agent-workforce.mjs
 
-import "../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 import { spawnSync } from "node:child_process";
 

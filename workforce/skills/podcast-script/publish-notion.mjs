@@ -42,7 +42,8 @@
 //        prelude) OR empty citations (citation guard) OR 401/403 auth
 //   3  — Notion API error / network error
 
-import "../../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 import { readFileSync } from "node:fs";
 import { isTruncatedMarkdown, lastNonEmptyLine } from "../../../scripts/lib/truncation.mjs";

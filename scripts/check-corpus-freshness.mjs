@@ -28,7 +28,8 @@
 //
 // Exit: 0 fresh (or explicitly waived) · 1 stale · 3 manifest unreadable
 
-import "./lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "./lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 // The deploy artefact, read from the gh-pages branch rather than from
 // kohuehara.xyz: the SPA's rewrite rules serve 404.html for /posts/* to a
@@ -44,23 +45,59 @@ const MAX_AGE_DAYS = Number(process.env.MAX_AGE_DAYS || 5);
 // Escape hatch for a deliberate pause (cadence disabled on purpose, Notion
 // migration in flight). Set in the workflow with a reason, don't edit the
 // threshold — a lowered threshold is indistinguishable from a working gate.
-if (process.env.SKIP_FRESHNESS_CHECK) {
-  console.log(
-    `⚠️  R-15 skipped: SKIP_FRESHNESS_CHECK=${process.env.SKIP_FRESHNESS_CHECK}`,
-  );
+const waiver = (process.env.SKIP_FRESHNESS_CHECK ?? "").trim();
+if (waiver) {
+  // Truthiness alone would let SKIP_FRESHNESS_CHECK=0 or =false disable the
+  // gate, which is the opposite of what someone typing those means. The
+  // variable documents itself as taking a reason, so demand one.
+  if (/^(0|false|no|off)$/i.test(waiver) || waiver.length < 4) {
+    console.error(
+      `❌  R-15: SKIP_FRESHNESS_CHECK must be a reason, not "${waiver}". ` +
+        `A waiver with no durable record is the silent-absorption channel §6.2 exists to prevent.`,
+    );
+    process.exit(1);
+  }
+  const note = `⚠️  R-15 waived: ${waiver}`;
+  console.log(note);
+  // Make the waiver visible in the run that used it, not just in whoever's
+  // shell set the variable.
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    const { appendFileSync } = await import("node:fs");
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\n${note}\n`);
+  }
   process.exit(0);
 }
 
 const TYPES = ["explanation", "analysis"];
 
+// A 30-second blip on an external, unauthenticated host must not read as
+// "the pipeline is dead". Bounded timeout + two retries; still exits 3 (a
+// distinct code from "stale") if the artefact is genuinely unreadable.
+async function readManifest() {
+  const backoff = [2_000, 6_000];
+  let lastErr;
+  for (let attempt = 0; attempt <= backoff.length; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, backoff[attempt - 1]));
+    try {
+      const res = await fetch(MANIFEST_URL, {
+        redirect: "follow",
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr;
+}
+
 let manifest;
 try {
-  const res = await fetch(MANIFEST_URL, { redirect: "follow" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  manifest = await res.json();
+  manifest = await readManifest();
 } catch (err) {
   console.error(
-    `❌  R-15: could not read the published manifest at ${MANIFEST_URL}: ${err instanceof Error ? err.message : String(err)}`,
+    `❌  R-15: could not read the published manifest at ${MANIFEST_URL} after 3 attempts: ${err instanceof Error ? err.message : String(err)}`,
   );
   process.exit(3);
 }
@@ -79,7 +116,11 @@ for (const type of TYPES) {
   const dates = rows
     .filter((r) => (r.type ?? "") === type)
     .map((r) => Date.parse(r.date ?? ""))
-    .filter(Number.isFinite);
+    // `date` comes from the Notion Date property, which is agent/operator
+    // writable. One mistyped or future-dated row would pin `newest` forward
+    // and hold this gate green no matter how dead generation is — the gate
+    // would silently stop being a gate.
+    .filter((d) => Number.isFinite(d) && d <= now);
 
   if (dates.length === 0) {
     stale.push(`${type}: no articles of this type in the manifest at all`);

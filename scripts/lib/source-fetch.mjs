@@ -23,12 +23,25 @@
 // consent-wall page would violate C-1; padding from an empty L1 summary would
 // invent facts. Returning `{ok: false}` is the honest outcome.
 
-import "./proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "./proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 /** Below this, the extracted text cannot ground a ~3000-character article. */
 export const MIN_CHARS = 1200;
-/** English prose sanity check; CJK sources trip MIN_CHARS instead. */
+/** Whitespace-token floor. Only meaningful for space-delimited scripts — see
+ *  isGroundable, which makes it non-binding for CJK. */
 export const MIN_WORDS = 200;
+/** Scripts that do not delimit words with whitespace, so countWords is
+ *  meaningless for them: hiragana, katakana, CJK ideographs (incl. ext-A) and
+ *  compatibility ideographs. */
+const CJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
+/** Refuse to buffer more than this from one source. */
+const MAX_BODY_BYTES = 5_000_000;
+/** Only these render as prose. A PDF or an image decodes to mojibake that
+ *  clears every length threshold and would be handed to the generator as
+ *  "evidence" — an article grounded in garbage, which the W-1 guard cannot
+ *  catch because the resulting prose looks fine (C-1). */
+const TEXTUAL = /^(?:text\/html|text\/plain|application\/xhtml\+xml|text\/markdown|application\/json)/i;
 
 const DEFAULT_TIMEOUT_MS = 45_000;
 /** r.jina.ai throttles bursts with 403/429; give it room before judging. */
@@ -66,9 +79,20 @@ function countWords(text) {
   return text.split(/\s+/).filter(Boolean).length;
 }
 
-/** Enough text to ground an article? */
+/** Enough text to ground an article?
+ *
+ *  The word floor is deliberately non-binding for CJK. Japanese prose carries
+ *  no inter-word whitespace, so countWords collapses to roughly the paragraph
+ *  count: a 5,433-char note.com article measures ~30 "words" and would be
+ *  rejected. That is not hypothetical — of three note.com URLs that have
+ *  already produced published articles, two failed this predicate before the
+ *  `||` below replaced an `&&`. On a Japanese-first site an AND here is a
+ *  silent content-loss path for a whole language class, and because
+ *  pick-l1-source.mjs records a failure per rejection it would evict those
+ *  rows from the queue permanently after MAX_ATTEMPTS. */
 export function isGroundable(text) {
-  return text.length >= MIN_CHARS && countWords(text) >= MIN_WORDS;
+  if (text.length < MIN_CHARS) return false;
+  return countWords(text) >= MIN_WORDS || CJK.test(text);
 }
 
 async function get(url, timeoutMs) {
@@ -84,8 +108,13 @@ async function get(url, timeoutMs) {
         "accept-language": "en-US,en;q=0.9,ja;q=0.8",
       },
     });
-    const body = await res.text();
-    return { status: res.status, ok: res.ok, body };
+    const contentType = res.headers.get("content-type") ?? "";
+    const declared = Number(res.headers.get("content-length") ?? 0);
+    if (declared > MAX_BODY_BYTES) {
+      return { status: res.status, ok: false, body: "", contentType, oversize: true };
+    }
+    const body = (await res.text()).slice(0, MAX_BODY_BYTES);
+    return { status: res.status, ok: res.ok, body, contentType };
   } finally {
     clearTimeout(timer);
   }
@@ -105,9 +134,14 @@ export async function fetchSourceBody(url, { timeoutMs = DEFAULT_TIMEOUT_MS } = 
   // 1. Direct.
   try {
     const res = await get(url, timeoutMs);
-    const text = htmlToText(res.body);
-    attempts.push({ via: "direct", status: res.status, chars: text.length });
-    if (res.ok && isGroundable(text)) {
+    const textual = res.contentType === "" || TEXTUAL.test(res.contentType);
+    const text = textual ? htmlToText(res.body) : "";
+    attempts.push({
+      via: "direct",
+      status: textual ? res.status : `${res.status} non-text (${res.contentType.split(";")[0]})`,
+      chars: text.length,
+    });
+    if (res.ok && textual && isGroundable(text)) {
       return { ok: true, via: "direct", text, chars: text.length, words: countWords(text) };
     }
   } catch (err) {
@@ -127,7 +161,7 @@ export async function fetchSourceBody(url, { timeoutMs = DEFAULT_TIMEOUT_MS } = 
   for (let attempt = 0; attempt < JINA_RETRIES; attempt++) {
     if (attempt > 0) await sleep(JINA_BACKOFF_MS[attempt - 1]);
     try {
-      const res = await get(`https://r.jina.ai/${url}`, timeoutMs);
+      const res = await get(`https://r.jina.ai/${encodeURI(url)}`, timeoutMs);
       // Reader output is already Markdown; do not run it through htmlToText.
       const text = res.body.trim();
       attempts.push({ via: "jina", status: res.status, chars: text.length });
@@ -144,8 +178,21 @@ export async function fetchSourceBody(url, { timeoutMs = DEFAULT_TIMEOUT_MS } = 
         chars: 0,
       });
       jinaThrottled = aborted;
+      if (!aborted) break; // a DNS/TLS failure will not fix itself in 12s
     }
   }
+
+  // A definitive direct verdict (a bot wall's 401/403/404/410, or a 2xx page
+  // that simply has too little text) tells us about the SOURCE. Only when no
+  // leg reached such a verdict is a throttled reader the whole story — the
+  // distinction matters because callers use `transient` to decide whether a
+  // failure counts against a row's attempt budget, and r.jina.ai throttles
+  // often enough that treating every throttle as transient would stop the
+  // budget from ever advancing.
+  const directAttempt = attempts.find((a) => a.via === "direct");
+  const directWasDefinitive =
+    typeof directAttempt?.status === "number" &&
+    (directAttempt.status === 200 || [401, 403, 404, 410].includes(directAttempt.status));
 
   const detail = attempts
     .map((a) => `${a.via}=${a.status}/${a.chars}c`)
@@ -157,9 +204,9 @@ export async function fetchSourceBody(url, { timeoutMs = DEFAULT_TIMEOUT_MS } = 
     // next candidate, but an operator reading the recorded error needs to
     // know the difference between "this URL is a bot wall" and "we were
     // rate-limited at 04:00".
-    transient: jinaThrottled,
+    transient: jinaThrottled && !directWasDefinitive,
     reason:
-      `no groundable body (need >=${MIN_CHARS} chars & >=${MIN_WORDS} words): ${detail}` +
+      `no groundable body (need >=${MIN_CHARS} chars, plus >=${MIN_WORDS} words unless CJK): ${detail}` +
       (jinaThrottled ? " [reader throttled — may be transient]" : ""),
     attempts,
   };

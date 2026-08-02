@@ -17,7 +17,8 @@
 // Exit: 0 written, 1 bad args/env/file, 2 voice not in pool / empty notes / auth,
 //       3 Notion error.
 
-import "../../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 import { readFileSync } from "node:fs";
 

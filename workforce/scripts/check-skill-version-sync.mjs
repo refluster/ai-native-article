@@ -43,7 +43,8 @@
 //             or a git skill with no live row) · 2 lint-internal (unparseable
 //             meta.json) · 3 API unreachable.
 
-import "../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";

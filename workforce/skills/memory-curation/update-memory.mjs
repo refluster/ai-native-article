@@ -31,7 +31,8 @@
 //   2 — endpoint rejected the write (HTTP 422 contract/shrink, 401 auth, 404 slug)
 //   3 — network / unexpected error
 
-import "../../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 import { readFileSync } from "node:fs";
 

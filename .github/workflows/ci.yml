@@ -38,6 +38,9 @@ jobs:
       - name: Proxy-bootstrap gate (R-14)
         run: npm run check-proxy-bootstrap
 
+      - name: Script library tests
+        run: npm run test:scripts
+
       # R-15 (corpus freshness) is deliberately NOT here — see
       # .github/workflows/corpus-freshness.yml. Staleness is a property of
       # time, not of a diff: gating PRs on it blocks changes that neither

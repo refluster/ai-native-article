@@ -50,12 +50,21 @@
 //                                                 text is at bodyFile
 //   { "skip": true, "reason": "..." }           ← nothing coverable this fire
 //
+// Contract note — the body is handed over on the FILESYSTEM
+// ---------------------------------------------------------
+// `bodyFile` points at a file in os.tmpdir(). That assumes the picker and the
+// prompt that consumes it run in the same container, which is true of the
+// agent-runner today and is written down here because it is exactly the kind
+// of assumption that survives unnoticed until the runner topology changes.
+// If they are ever split, the body has to travel in the payload instead.
+//
 // Exit codes:
 //   0  — printed a pick OR a {skip:true} (both are valid outcomes)
 //   1  — bad env
 //   3  — Notion API / network error
 
-import "../../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -71,12 +80,32 @@ const NOTION_API = "https://api.notion.com/v1";
 const L1_DB_ID = process.env.L1_DB_ID || "32fd0f0b-e61e-80bd-89bf-f94965d05e80";
 const UNIFIED_DB_ID = process.env.UNIFIED_DB_ID || "34fd0f0b-e61e-817a-9f6b-dc65b0d5b4cc";
 
+/** Env override that fails loud instead of poisoning every comparison: a
+ *  typo'd L2_MAX_ATTEMPTS would otherwise yield NaN, make every `<` false,
+ *  and silently reduce the walk to `pending.slice(0, NaN)` === []. */
+function intEnv(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 1) {
+    console.error(`pick-l1-source.mjs: ${name} must be a positive integer (got "${raw}")`);
+    process.exit(1);
+  }
+  return Math.floor(n);
+}
+
 // How many rows we are willing to try fetching in one fire. Bounds the
 // runtime of a fire when the head of the queue is a run of dead URLs.
-const MAX_CANDIDATES = Number(process.env.L2_MAX_CANDIDATES || 6);
+const MAX_CANDIDATES = intEnv("L2_MAX_CANDIDATES", 6);
 // After this many failed fetches a row is considered blocked and leaves the
 // queue. Deliberately > 1: readers throttle, and hosts have bad days.
-const MAX_ATTEMPTS = Number(process.env.L2_MAX_ATTEMPTS || 5);
+const MAX_ATTEMPTS = intEnv("L2_MAX_ATTEMPTS", 5);
+// Hard wall-clock budget for the candidate walk. Worst case per candidate is
+// ~192s (45s direct + 3 reader legs at 45s + 12s backoff); six of those would
+// be ~19 minutes of a CCR session spent to return {skip:true}. The walk stops
+// at the budget and reports how many rows it never reached, rather than
+// running until the session is killed mid-walk.
+const WALK_BUDGET_MS = intEnv("L2_WALK_BUDGET_MS", 300_000);
 
 // Operational columns this script maintains on the L1 rows. Created on demand
 // (see ensureAttemptSchema) so no manual Notion migration is required.
@@ -166,8 +195,16 @@ async function ensureAttemptSchema() {
   schemaEnsured = true;
 }
 
+// Set when a bookkeeping write fails. If attempts can't be persisted, the
+// eviction budget never advances and a run of dead heads re-stalls the queue —
+// the exact ML-018 failure, bounded to MAX_CANDIDATES rows instead of one.
+// That must not be visible only on a stderr nobody reads (C-4), so it is
+// surfaced in the machine-readable {skip:true} reason.
+let bookkeepingBroken = null;
+
 /** Record a failed fetch on the L1 row. Best-effort: a bookkeeping failure
- *  must not abort the fire, but it is always reported on stderr. */
+ *  must not abort the fire, but it is always reported on stderr and in the
+ *  outcome payload. */
 async function recordFailure(page, reason) {
   try {
     await ensureAttemptSchema();
@@ -195,8 +232,9 @@ async function recordFailure(page, reason) {
         (next >= MAX_ATTEMPTS ? " [now blocked; leaves the queue]" : ""),
     );
   } catch (err) {
+    bookkeepingBroken = err instanceof Error ? err.message : String(err);
     console.error(
-      `pick-l1-source.mjs: could not record attempt on ${page.id}: ${err instanceof Error ? err.message : String(err)}`,
+      `pick-l1-source.mjs: could not record attempt on ${page.id}: ${bookkeepingBroken}`,
     );
   }
 }
@@ -244,13 +282,28 @@ try {
   }
 
   const tried = [];
-  for (const page of pending.slice(0, MAX_CANDIDATES)) {
+  const deadline = Date.now() + WALK_BUDGET_MS;
+  const willTry = pending.slice(0, MAX_CANDIDATES);
+  let untried = willTry.length;
+  for (const page of willTry) {
+    if (Date.now() > deadline) break;
+    untried--;
     const sourceUrl = page.properties?.["Source URL"]?.url ?? "";
     const result = await fetchSourceBody(sourceUrl);
 
     if (!result.ok) {
       tried.push(`${sourceUrl} (${result.reason})`);
-      await recordFailure(page, result.reason);
+      // A verdict that is only about the reader being throttled says nothing
+      // about the source, so it must not count toward eviction — otherwise a
+      // bad hour permanently drops a perfectly good row. The queue still
+      // advances either way, because we move to the next candidate regardless.
+      if (result.transient) {
+        console.error(
+          `pick-l1-source.mjs: transient failure for ${sourceUrl} (not counted toward ${MAX_ATTEMPTS}) — ${result.reason}`,
+        );
+      } else {
+        await recordFailure(page, result.reason);
+      }
       continue;
     }
 
@@ -279,10 +332,19 @@ try {
     `pick-l1-source.mjs: none of the ${tried.length} candidate(s) tried this fire yielded a groundable body:`,
   );
   for (const t of tried) console.error(`    ${t}`);
+  if (untried > 0) {
+    console.error(
+      `pick-l1-source.mjs: walk budget (${WALK_BUDGET_MS}ms) exhausted with ${untried} candidate(s) untried`,
+    );
+  }
   console.log(
     JSON.stringify({
       skip: true,
-      reason: `no groundable source among the ${tried.length} oldest uncovered row(s); ${pending.length} pending, ${blocked.length} blocked`,
+      reason:
+        `no groundable source among the ${tried.length} oldest uncovered row(s); ` +
+        `${pending.length} pending, ${blocked.length} blocked` +
+        (untried > 0 ? `, ${untried} untried (walk budget exhausted)` : "") +
+        (bookkeepingBroken ? `; ATTEMPTS NOT PERSISTED (${bookkeepingBroken}) — queue will re-stall` : ""),
     }),
   );
   process.exit(0);

@@ -45,7 +45,8 @@
 //   aws-vault exec <profile> -- \
 //     node workforce/scripts/wire-pr-autopilot-agent-workforce.mjs
 
-import "../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 import { spawnSync } from "node:child_process";
 

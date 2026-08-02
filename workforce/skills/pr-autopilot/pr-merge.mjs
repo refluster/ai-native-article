@@ -56,7 +56,8 @@
 // Exit codes: 0 all applied · 1 bad args/file · 2 a decision refused or a GitHub
 // write rejected · 3 network/unexpected.
 
-import "../../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

@@ -25,7 +25,8 @@
 // Exit codes: 0 clean (or advisories only) · 1 header↔role drift found
 //             (--strict: any finding) · 3 API unreachable.
 
-import "../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 const API_BASE = (
   process.env.WF_AGENTS_API_BASE ??

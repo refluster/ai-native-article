@@ -18,7 +18,8 @@
 //   node workforce/seed/vp-operations/wire-cadence.mjs --dry-run
 //   aws-vault exec <profile> -- node workforce/seed/vp-operations/wire-cadence.mjs
 
-import "../../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 import { spawnSync } from "node:child_process";
 

@@ -11,7 +11,8 @@
 // without any bundling step, the same way the skills already import
 // scripts/lib/truncation.mjs.
 
-import "../../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 export const NOTION_VERSION = "2022-06-28";
 export const NOTION_API = "https://api.notion.com/v1";

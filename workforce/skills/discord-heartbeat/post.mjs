@@ -29,7 +29,8 @@
 // Stdout: a single human-readable line (the same line format that
 // discord-ping writes to S3 for audit). Stderr: error detail.
 
-import "../../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 const COLOR_ALIVE = 0x3498db; // info blue — matches workforce/skills/discord-ping/handler.ts
 

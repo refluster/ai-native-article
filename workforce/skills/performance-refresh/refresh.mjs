@@ -37,7 +37,8 @@
 //       saying "X is stale/degraded" is the whole point of the cadence.
 //   3 — nothing could be refreshed at all (no scopes, or every leg threw)
 
-import "../../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";

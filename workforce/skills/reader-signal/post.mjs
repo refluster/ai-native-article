@@ -26,7 +26,8 @@
 //   2  — endpoint rejected (HTTP 401 auth / 422 validation)
 //   3  — network / unexpected error
 
-import "../../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 import { readFileSync } from "node:fs";
 

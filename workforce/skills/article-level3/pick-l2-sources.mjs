@@ -44,7 +44,8 @@
 //   1  — bad env
 //   3  — Notion API / network error
 
-import "../../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 import { validateTags } from "../../../scripts/lib/tags.mjs";
 

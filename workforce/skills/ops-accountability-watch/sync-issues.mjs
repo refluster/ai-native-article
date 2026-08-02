@@ -13,7 +13,8 @@
 // Exit codes: 0 done (see JSON per-item for created/updated), 1 bad args/env,
 // 2 GitHub API rejected a request, 3 network error.
 
-import "../../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 import { readFileSync } from "node:fs";
 import { buildIssueSpec } from "./payload.mjs";

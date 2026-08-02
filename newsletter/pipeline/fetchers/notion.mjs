@@ -12,7 +12,8 @@
  * Disable bridge mode (Phase E) once parity is confirmed.
  */
 
-import "../../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 const NOTION_VERSION = '2022-06-28'
 

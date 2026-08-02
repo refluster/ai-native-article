@@ -26,7 +26,8 @@
 //   2  — non-2xx response from Discord (e.g. 400 malformed, 401 bad URL)
 //   3  — network / fetch error
 
-import "../../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 import { readFileSync } from "node:fs";
 

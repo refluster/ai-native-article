@@ -41,7 +41,8 @@
 //   aws-vault exec <profile> -- node workforce/seed/org-benchmark-group/wire-cadences.mjs
 //   aws-vault exec <profile> -- node workforce/seed/org-benchmark-group/wire-cadences.mjs --include-rebinds
 
-import "../../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 import { spawnSync } from "node:child_process";
 

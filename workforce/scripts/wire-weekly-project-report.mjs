@@ -38,7 +38,8 @@
 //   node workforce/scripts/wire-weekly-project-report.mjs --dry-run
 //   node workforce/scripts/wire-weekly-project-report.mjs
 
-import "../../scripts/lib/proxy-bootstrap.mjs";
+import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
 
 import { spawnSync } from "node:child_process";
 
