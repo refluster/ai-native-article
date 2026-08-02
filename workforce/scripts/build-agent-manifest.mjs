@@ -26,6 +26,8 @@
 // per-app `predev` / `prebuild` lifecycle hooks in each app's
 // package.json.
 
+import "../../scripts/lib/proxy-bootstrap.mjs";
+
 import { readdirSync, readFileSync, statSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";

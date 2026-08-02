@@ -30,6 +30,8 @@
 //     --repo PSVL/asp-cloud --scope asp-cloud [--days 28] \
 //     [--publish-ddb --table wf-table-prod] [--dry-run]
 
+import "../../scripts/lib/proxy-bootstrap.mjs";
+
 const GREEN_MARKER_RE = /<!--\s*autopilot:review:[a-z0-9-]+:green\s*-->/i;
 const REVIEWER_SLUG_RE = /<!--\s*autopilot:review:([a-z0-9-]+):green\s*-->/gi;
 const NEEDS_HUMAN_LABEL = "autopilot:needs-human";

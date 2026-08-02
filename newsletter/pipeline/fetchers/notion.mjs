@@ -12,6 +12,8 @@
  * Disable bridge mode (Phase E) once parity is confirmed.
  */
 
+import "../../../scripts/lib/proxy-bootstrap.mjs";
+
 const NOTION_VERSION = '2022-06-28'
 
 // Notion's documented rate limit is ~3 req/sec per integration. With a

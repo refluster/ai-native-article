@@ -35,6 +35,8 @@
 //        cut-off last line, or 401/403 auth error)
 //   3  — Notion API error / network error
 
+import "../../../scripts/lib/proxy-bootstrap.mjs";
+
 import { readFileSync } from "node:fs";
 import { isTruncatedMarkdown, lastNonEmptyLine } from "../../../scripts/lib/truncation.mjs";
 import { validateTags } from "../../../scripts/lib/tags.mjs";

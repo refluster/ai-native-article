@@ -17,6 +17,8 @@
 //
 // Exit codes: 0 created/deduped · 1 bad args/env · 3 HTTP/network error
 
+import "./lib/proxy-bootstrap.mjs";
+
 const args = process.argv.slice(2);
 const url = args.find((a) => !a.startsWith("--"));
 const flag = (name) => {

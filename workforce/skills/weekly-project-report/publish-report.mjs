@@ -41,6 +41,8 @@
 //   2 — guard rejected (G1–G6, slug already exists, or GitHub 4xx)
 //   3 — network / unexpected error
 
+import "../../../scripts/lib/proxy-bootstrap.mjs";
+
 import { readFileSync } from "node:fs";
 import { isTruncatedMarkdown, stripFrontmatter } from "../../../scripts/lib/truncation.mjs";
 

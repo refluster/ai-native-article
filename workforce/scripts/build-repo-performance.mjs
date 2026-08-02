@@ -43,6 +43,8 @@
  * silently omitted or papered over with a zero.
  */
 
+import "../../scripts/lib/proxy-bootstrap.mjs";
+
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";

@@ -57,6 +57,8 @@
 //   aws-vault exec <profile> -- \
 //     node workforce/scripts/wire-issue-implement-ren-agent-workforce.mjs
 
+import "../../scripts/lib/proxy-bootstrap.mjs";
+
 import { spawnSync } from "node:child_process";
 
 const API_BASE = (

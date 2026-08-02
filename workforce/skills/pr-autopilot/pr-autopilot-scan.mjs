@@ -49,6 +49,8 @@
 //   2  — GitHub auth/4xx (token missing or lacks repo read)
 //   3  — network / unexpected error
 
+import "../../../scripts/lib/proxy-bootstrap.mjs";
+
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";

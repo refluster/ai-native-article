@@ -44,6 +44,8 @@
 //   1  — bad env
 //   3  — Notion API / network error
 
+import "../../../scripts/lib/proxy-bootstrap.mjs";
+
 import { validateTags } from "../../../scripts/lib/tags.mjs";
 
 const NOTION_VERSION = "2022-06-28";

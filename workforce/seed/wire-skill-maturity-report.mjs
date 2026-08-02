@@ -31,6 +31,8 @@
 //   node workforce/seed/wire-skill-maturity-report.mjs --dry-run
 //   aws-vault exec <profile> -- node workforce/seed/wire-skill-maturity-report.mjs
 
+import "../../scripts/lib/proxy-bootstrap.mjs";
+
 import { spawnSync } from "node:child_process";
 
 const API_BASE = (

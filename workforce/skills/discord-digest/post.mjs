@@ -26,6 +26,8 @@
 //   2  — non-2xx response from Discord (e.g. 400 malformed, 401 bad URL)
 //   3  — network / fetch error
 
+import "../../../scripts/lib/proxy-bootstrap.mjs";
+
 import { readFileSync } from "node:fs";
 
 const COLOR_DIGEST = 0x9b59b6; // amethyst — distinct from heartbeat's info-blue

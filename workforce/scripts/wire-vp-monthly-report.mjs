@@ -49,6 +49,8 @@
 //   node workforce/scripts/wire-vp-monthly-report.mjs --dry-run
 //   node workforce/scripts/wire-vp-monthly-report.mjs
 
+import "../../scripts/lib/proxy-bootstrap.mjs";
+
 import { spawnSync } from "node:child_process";
 
 const API_BASE = (

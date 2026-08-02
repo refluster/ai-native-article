@@ -17,6 +17,8 @@
 // Exit: 0 written, 1 bad args/env/file, 2 voice not in pool / empty notes / auth,
 //       3 Notion error.
 
+import "../../../scripts/lib/proxy-bootstrap.mjs";
+
 import { readFileSync } from "node:fs";
 
 const NOTION_VERSION = "2022-06-28";

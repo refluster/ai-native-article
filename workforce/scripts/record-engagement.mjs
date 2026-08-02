@@ -24,6 +24,8 @@
 //   WF_API_BASE          default https://workforce-api.kohuehara.xyz
 //   ENGAGEMENT_TTL_SEC   default 900 (15 min — ad-hoc tokens are short-lived)
 
+import "../../scripts/lib/proxy-bootstrap.mjs";
+
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 

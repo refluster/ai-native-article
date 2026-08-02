@@ -21,6 +21,8 @@
 //
 // Exit codes: 0 clean · 1 bad args / no token · 2 violation(s) found · 3 network.
 
+import "../../scripts/lib/proxy-bootstrap.mjs";
+
 import { ESCALATION_LABEL } from "../skills/pr-autopilot/pr-merge.mjs";
 import { NEEDS_HUMAN_MARKER } from "../skills/pr-autopilot/pr-autopilot-post.mjs";
 

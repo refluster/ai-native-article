@@ -100,6 +100,8 @@
 //   2  — endpoint rejected (auth/4xx)
 //   3  — network / unexpected error
 
+import "../../../scripts/lib/proxy-bootstrap.mjs";
+
 import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";

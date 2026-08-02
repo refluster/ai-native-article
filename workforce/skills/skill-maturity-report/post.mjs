@@ -26,6 +26,8 @@
 //   2  — endpoint rejected (HTTP 401 auth / 422 validation)
 //   3  — network / unexpected error
 
+import "../../../scripts/lib/proxy-bootstrap.mjs";
+
 import { readFileSync } from "node:fs";
 
 // Single source of truth for this Cadence's write endpoint. Same /feed

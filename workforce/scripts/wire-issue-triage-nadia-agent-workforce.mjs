@@ -43,6 +43,8 @@
 //   aws-vault exec <profile> -- \
 //     node workforce/scripts/wire-issue-triage-nadia-agent-workforce.mjs
 
+import "../../scripts/lib/proxy-bootstrap.mjs";
+
 import { spawnSync } from "node:child_process";
 
 const API_BASE = (

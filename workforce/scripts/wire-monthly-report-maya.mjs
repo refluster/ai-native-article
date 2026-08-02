@@ -41,6 +41,8 @@
 //   node workforce/scripts/wire-monthly-report-maya.mjs --dry-run
 //   node workforce/scripts/wire-monthly-report-maya.mjs
 
+import "../../scripts/lib/proxy-bootstrap.mjs";
+
 import { spawnSync } from "node:child_process";
 
 const API_BASE = (

@@ -35,6 +35,12 @@ jobs:
       - name: Governance registries (R-12)
         run: npm run check-registries
 
+      - name: Proxy-bootstrap gate (R-14)
+        run: npm run check-proxy-bootstrap
+
+      - name: Corpus freshness gate (R-15)
+        run: npm run check-corpus-freshness
+
       - name: L1 citation gate (R-11)
         if: github.event_name == 'pull_request'
         env:

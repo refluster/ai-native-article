@@ -41,6 +41,8 @@
 //   node workforce/scripts/wire-memory-curation.mjs --dry-run
 //   aws-vault exec <profile> -- node workforce/scripts/wire-memory-curation.mjs
 
+import "../../scripts/lib/proxy-bootstrap.mjs";
+
 import { spawnSync } from "node:child_process";
 
 const API_BASE = (

@@ -22,6 +22,8 @@
 //
 // Exit codes: 0 ok · 1 bad args · 3 network/API error (fail loud, W-4).
 
+import "../../../scripts/lib/proxy-bootstrap.mjs";
+
 const DEFAULT_API_BASE = "https://sjhikazsf9.execute-api.us-west-2.amazonaws.com/prod";
 const API_BASE = (process.env.MEMORY_API_BASE ?? DEFAULT_API_BASE).replace(/\/+$/, "");
 

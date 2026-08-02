@@ -27,6 +27,8 @@
 //   node workforce/seed/media-group/wire-cadences.mjs --dry-run
 //   aws-vault exec <profile> -- node workforce/seed/media-group/wire-cadences.mjs
 
+import "../../../scripts/lib/proxy-bootstrap.mjs";
+
 import { spawnSync } from "node:child_process";
 
 const API_BASE = (

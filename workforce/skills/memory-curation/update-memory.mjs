@@ -31,6 +31,8 @@
 //   2 — endpoint rejected the write (HTTP 422 contract/shrink, 401 auth, 404 slug)
 //   3 — network / unexpected error
 
+import "../../../scripts/lib/proxy-bootstrap.mjs";
+
 import { readFileSync } from "node:fs";
 
 const DEFAULT_API_BASE = "https://sjhikazsf9.execute-api.us-west-2.amazonaws.com/prod";

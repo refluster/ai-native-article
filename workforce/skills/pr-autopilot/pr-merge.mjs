@@ -56,6 +56,8 @@
 // Exit codes: 0 all applied · 1 bad args/file · 2 a decision refused or a GitHub
 // write rejected · 3 network/unexpected.
 
+import "../../../scripts/lib/proxy-bootstrap.mjs";
+
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { assertReasonCode, isAuthorLaneCode, reasonLabel, reasonMarker, refusalReasonCode } from "./escalation-reasons.mjs";

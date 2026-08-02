@@ -44,6 +44,8 @@
 //   aws-vault exec <profile> -- \
 //     node workforce/scripts/wire-backlog-reconcile-agent-workforce.mjs
 
+import "../../scripts/lib/proxy-bootstrap.mjs";
+
 import { spawnSync } from "node:child_process";
 
 const API_BASE = (
