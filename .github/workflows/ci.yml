@@ -35,6 +35,20 @@ jobs:
       - name: Governance registries (R-12)
         run: npm run check-registries
 
+      - name: Proxy-bootstrap gate (R-14)
+        run: npm run check-proxy-bootstrap
+
+      - name: Script library tests
+        run: npm run test:scripts
+
+      # R-15 (corpus freshness) is deliberately NOT here — see
+      # .github/workflows/corpus-freshness.yml. Staleness is a property of
+      # time, not of a diff: gating PRs on it blocks changes that neither
+      # caused nor can fix the condition, and (as observed on PR #532) an
+      # early-exiting freshness step aborts the job before R-11 and every
+      # workforce gate has run, so a dead pipeline silently disables the
+      # checks that actually inspect the change.
+
       - name: L1 citation gate (R-11)
         if: github.event_name == 'pull_request'
         env:

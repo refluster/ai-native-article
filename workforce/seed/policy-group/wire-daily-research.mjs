@@ -42,6 +42,9 @@
 //   node workforce/seed/policy-group/wire-daily-research.mjs --dry-run
 //   aws-vault exec <profile> -- node workforce/seed/policy-group/wire-daily-research.mjs
 
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { spawnSync } from "node:child_process";
 
 const API_BASE = (

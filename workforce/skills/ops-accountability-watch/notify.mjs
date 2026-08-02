@@ -13,6 +13,9 @@
 //
 // Exit codes: 0 posted, 1 bad args/env, 2 endpoint rejected (4xx/5xx), 3 network error.
 
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { readFileSync } from "node:fs";
 import { buildNotificationPayload, toDiscordWebhookBody } from "./payload.mjs";
 

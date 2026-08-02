@@ -20,6 +20,9 @@
 //
 // Exit codes: 0 clean · 1 bad args / no token · 2 violation(s) found · 3 network.
 
+import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { W4_CYCLE_CAP, countRouterCycles } from "../skills/pr-autopilot/pr-merge.mjs";
 
 /**

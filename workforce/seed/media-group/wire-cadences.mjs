@@ -27,6 +27,9 @@
 //   node workforce/seed/media-group/wire-cadences.mjs --dry-run
 //   aws-vault exec <profile> -- node workforce/seed/media-group/wire-cadences.mjs
 
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { spawnSync } from "node:child_process";
 
 const API_BASE = (

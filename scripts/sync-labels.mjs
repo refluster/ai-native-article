@@ -14,6 +14,9 @@
 //   - Never deletes. Orphans are reported in stdout for the operator to
 //     decide on. (Guard against nuking ad-hoc labels.)
 
+import { ensureProxyAwareEntry } from "./lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';

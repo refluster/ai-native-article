@@ -44,6 +44,9 @@
 //   aws-vault exec <profile> -- \
 //     node workforce/scripts/wire-issue-implement-ren-asp-cloud.mjs
 
+import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { spawnSync } from "node:child_process";
 
 const API_BASE = (
