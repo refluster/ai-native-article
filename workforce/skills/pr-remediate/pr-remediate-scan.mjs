@@ -23,6 +23,9 @@
 // Exit codes: 0 ok (including "0 candidates" — a cheap, normal outcome)
 //             1 bad args · 3 network / unexpected.
 
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { writeFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";

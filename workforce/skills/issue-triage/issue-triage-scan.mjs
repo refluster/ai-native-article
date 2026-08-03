@@ -15,6 +15,9 @@
 //
 // Exit codes: 0 ok (0 candidates included) · 1 bad args · 3 network.
 
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { writeFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";

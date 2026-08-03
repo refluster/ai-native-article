@@ -20,6 +20,9 @@
 //
 // Exit codes: 0 posted · 1 bad args / refused guard · 2 endpoint rejected · 3 network.
 
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
