@@ -74,7 +74,7 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0005](adr-0005-single-execution-model-ccr.md) | Single execution model: every (project × agent × skill) task runs as a CCR task | Accepted | [010](../epics/epic-010-project-trust-boundary.md), [011](../epics/epic-011-agent-feed.md), [012](../epics/epic-012-agent-experience.md) |
 | [0006](adr-0006-realtime-messaging-reply.md) | Real-time talent replies run on a dedicated async Lambda, not the CCR batch runner | Accepted | [013](../epics/epic-013-talent-messaging.md) |
 | [0007](adr-0007-agent-config-single-source.md) | Agent identity/config is single-sourced from DynamoDB; git definition files retire | Accepted | [006](../epics/epic-006-scalability.md), [007](../epics/epic-007-agent-management-api.md) |
-| [0008](adr-0008-skill-config-single-source.md) | Skill judgment-config is single-sourced from DynamoDB; the console reads DDB live | Proposed | [008](../epics/epic-008-skill-repository.md) |
+| [0008](adr-0008-skill-config-single-source.md) | Skill judgment-config is single-sourced from DynamoDB; the console reads DDB live | Accepted — §Decision-5 superseded by [0018](adr-0018-skill-body-version-gated-sync.md) | [008](../epics/epic-008-skill-repository.md) |
 | [0009](adr-0009-scoped-capability-tokens.md) | Scoped capability tokens: one minter, scope-claimed short-lived tokens, retiring per-service static bearers | Proposed | [010](../epics/epic-010-project-trust-boundary.md), [011](../epics/epic-011-agent-feed.md) |
 | [0010](adr-0010-autopilot-merge-consensus-widening.md) | Autopilot merge widens to "non-L0/L1 + unanimous reviewer consensus" | Accepted | [010](../epics/epic-010-project-trust-boundary.md) |
 | [0011](adr-0011-own-repo-autopilot-merge.md) | Own-repo autopilot merge: retire the self-repo carve-out; the L0/L1 boundary is the single line | Accepted | [010](../epics/epic-010-project-trust-boundary.md) |
@@ -84,7 +84,7 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0015](adr-0015-skill-bodies-not-l0l1.md) | Skill bodies (`SKILL.md`) are removed from the L0/L1 autopilot off-limits set | Proposed | [010](../epics/epic-010-project-trust-boundary.md) |
 | [0016](adr-0016-podcast-production-surface.md) | Podcast production & distribution execution surface (deterministic `wf-podcast` Lambda + Polly/public-RSS egress, within R-N1) | Proposed | [017](../epics/epic-017-podcast-spotify-distribution.md) |
 | [0017](adr-0017-skill-lifecycle-api.md) | Skill lifecycle API: display-name/slug split, archive soft-delete, API-first creation, per-skill run ledger | Proposed | [008](../epics/epic-008-skill-repository.md) |
-| [0018](adr-0018-skill-body-version-gated-sync.md) | Skill judgment-config syncs from git on a version gate (supersedes ADR-0008 §Decision-5's create-only seed) + a PR-time drift guard | Proposed | [008](../epics/epic-008-skill-repository.md) |
+| [0018](adr-0018-skill-body-version-gated-sync.md) | Skill judgment-config syncs from git on a version gate (supersedes ADR-0008 §Decision-5's create-only seed) + a PR-time drift guard | Accepted | [008](../epics/epic-008-skill-repository.md) |
 | [0019](adr-0019-agent-semantic-memory.md) | Agent semantic memory: curated MEMORY.md on the META row, injected at every fire (layer 3.5) | Accepted | [018](../epics/epic-018-semantic-memory-curation.md) |
 | [0020](adr-0020-delegated-memory-curation.md) | Delegated memory curation: bounded token write for the memory profile block (POST /agents/{slug}/memory + shrink guard) | Superseded by [0021](adr-0021-dynamic-memory-write-token.md) | [018](../epics/epic-018-semantic-memory-curation.md) |
 | [0021](adr-0021-dynamic-memory-write-token.md) | Dynamic memory-write token: ADR-0009's minted-token pattern replaces the static secret | Accepted | [018](../epics/epic-018-semantic-memory-curation.md) |
@@ -93,3 +93,24 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](../epics/README.md).
+
+> **Index reconciliation (2026-08-03, Nadia — `backlog-reconcile`).** Index-only
+> correction; **no ADR status was decided here.** A full sweep comparing every
+> `adr-*.md` header against this table found two cells that had drifted from
+> decisions already recorded in the ADR files themselves:
+>
+> - **0008** — the file has read `Accepted — §Decision-5 superseded by ADR-0018`
+>   since 0018 landed; the table still said `Proposed`.
+> - **0018** — the file was flipped `Proposed → Accepted` on 2026-07-30 by the
+>   `backlog-reconcile` pass in [#521](https://github.com/refluster/ai-native-article/pull/521)
+>   (ratified by its merged implementation, per that ADR's own status rule,
+>   ⚠ operator sign-off still requested there); the table was not updated in the
+>   same pass.
+>
+> Both edits make the table agree with the ADR of record — they encode no new
+> ratification. **Deliberately not touched:** the six ADRs that genuinely read
+> `Proposed` in their own files (0009, 0012, 0013, 0015, 0016, 0017) and the two
+> whose implementations merged this window (**0022** #518, **0023** #530).
+> Neither 0022 nor 0023 carries a self-ratification clause of the kind 0018 has,
+> so flipping them is an operator decision, not a reconciliation — the same skip
+> reason #521 recorded. Verified not-a-mismatch: 0021 reads `Accepted` in both.
