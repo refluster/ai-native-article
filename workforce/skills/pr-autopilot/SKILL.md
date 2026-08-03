@@ -541,7 +541,10 @@ or `draft` — a green draft is flipped Ready for Review then merged); no
 is a normal delegated target (adr-0011) — **authorship is not a hold**: a
 green, non-L0/L1 PR merges regardless of who opened it (FU-028).
 
-**These clauses are the complete set** (adr-0024). Do not add a hold in prose:
+**These clauses are the complete set of *predicate* conditions** (adr-0024) —
+alongside the holds already stated above, which the engine also enforces
+(`autopilot:off`, the W-4 cycle cap, a persona escalation trigger, a panel you
+could not seat). Do not add a hold in prose:
 panel provenance mode (`isolated` / `inline`), an author↔router collapse, or
 any other unenforced concern is **not** a merge condition, and a 🟢 that meets
 every clause above merges even when the panel ran inline. A genuinely new hold

@@ -4,6 +4,7 @@
 - **Date**: 2026-08-03
 - **Deciders**: operator, nadia
 - **Extends**: [adr-0011](adr-0011-own-repo-autopilot-merge.md) (the L0/L1 boundary as the single line) and [adr-0010](adr-0010-autopilot-merge-consensus-widening.md) (the non-L0/L1 + unanimous-consensus predicate). Neither is reversed; this ADR closes the open question those two left about panel independence.
+- **Narrows**: [adr-0022](adr-0022-issue-to-merge-flow.md) §Alternatives-rejected, whose "the panel **is** the author≠merger separation" is restated here as a claim about *seats*, not about panel execution mode (see §Reconciliation below). adr-0022's decision — that `pr-autopilot` must not fix the PRs it reviews — is untouched and still in force.
 - **Epics**: [epic-019](../epics/epic-019-autonomous-finalization-rate.md)
 
 ## Context
@@ -34,18 +35,29 @@ Two problems with that reading:
   governance, checks green, mergeable, R-N10 delegation, no `autopilot:off`. Panel
   execution mode appears nowhere in it, and `pr-merge.mjs` — the fail-closed
   server-side re-verification — has never checked it. The constraint existed only
-  in prose, and only as an unresolved question.
+  in prose: as an unresolved question in the skill body, and as an unexamined
+  premise in [adr-0022](adr-0022-issue-to-merge-flow.md)'s rejected alternatives
+  (reconciled below). It was never a clause of any predicate and never a check.
 - **The separation it appeals to is not supplied by lens isolation anyway.** Even
   an `isolated` panel is N subagents on one base model, spawned by the same
   session; SKILL.md already caps the strongest claim available to it at "real but
   correlated, never independent." So `isolated` would not clear the bar the
   citation demands either — which makes the constraint one that no reachable
   panel mode can satisfy. A gate nothing can pass is not a gate; it is a stall.
-- **The objective audit is not the panel.** In practice this repo's PRs are read
-  by several reviewers and merged by an operator who is a different party from the
-  session that authored them. The author≠merger separation is supplied by that
-  human merge step plus the server-side predicate re-verification, not by how many
-  contexts the lenses ran in.
+- **What actually audits a delegated merge is not the panel's context count.** Be
+  precise about which safeguard applies to which class of PR, because the appeal
+  to "a human merges it anyway" is only true for one of them. On an **escalated**
+  PR — any L0/L1 surface, this ADR included — the operator is a different party
+  from the authoring session and reads the panel's verdict before merging. On a
+  **delegated** (non-L0/L1) PR there is no human in the path at all, and — per
+  [FU-028](../follow-ups.md) — not even a distinct GitHub identity, since the
+  workforce authors under the same identity it merges with. What audits *that*
+  class is the fail-closed server-side re-verification in `pr-merge.mjs` (which
+  re-checks every clause independently of the router's judgment and refuses on
+  any miss), the L0/L1 boundary, `MIN_REVIEWERS`, and the target repo's own CI.
+  None of those depend on how many contexts the lenses ran in. The honest claim is
+  therefore not "a human still merges it" but "the safeguards that were doing the
+  work are untouched, and panel mode was never one of them."
 
 Escalating on this ground also mislabels the telemetry: an
 `autopilot:reason:other` on a PR that satisfies every clause of the predicate
@@ -79,6 +91,33 @@ Concretely:
    checks, `dirty`/`behind` branches, `autopilot:off`, the cycle cap, and every
    persona escalation trigger all escalate exactly as before.
 
+## Reconciliation with adr-0022
+
+[adr-0022](adr-0022-issue-to-merge-flow.md) §Alternatives-rejected turns down
+"let `pr-autopilot` fix the PRs it reviews" with: *"it collapses author, reviewer
+and merger into one session — the separation that makes the delegated merge
+trustworthy at all (FU-028 / adr-0011). Rejected: the panel is the author≠merger
+separation."* Both ADRs are live, so state plainly which half survives:
+
+- **Survives, unchanged.** adr-0022's *decision*: the reviewing cadence does not
+  become the fixing cadence. `pr-autopilot` still declares `external-pr-merge` and
+  `pr-remediate` still declares `external-pr`; the author lane stays a separate
+  skill with a separate binding. Nothing here lets the router push commits to a
+  PR it is reviewing.
+- **Narrowed.** The sentence "the panel **is** the author≠merger separation" is
+  read here as a claim about **seats** — that ≥3 nominated reviewer lenses, each
+  posting a machine-checked green marker the engine re-verifies, stand between
+  the author and the merge — and **not** as a claim about the panel's *execution
+  mode*. adr-0022 never examined isolated-vs-inline; it was arguing against
+  merging the review and remediation *roles*, which is a different collapse. Under
+  that reading the two records agree, and Decision-2 below does not disturb
+  adr-0022's rationale so much as decline to extend it to a question it did not
+  ask.
+
+If a future operator wants the stronger reading — that a shared context between
+author and lenses is itself disqualifying — that is a new decision, and per
+Decision-1 it ships as a superseding ADR **plus** an engine clause, not as prose.
+
 ## Consequences
 
 - **Merges that the predicate already permits actually happen.** The 🟢 →
@@ -95,7 +134,12 @@ Concretely:
   `SKILL.md`, so **the PR carrying it escalates to the operator by construction**;
   the workforce cannot self-merge the loosening of its own merge rule.
 - **What gets worse, honestly.** A shared-context panel's blind spots now reach a
-  merge without a human in the path on non-L0/L1 PRs. That risk is real; it is
+  merge without a human in the path on non-L0/L1 PRs. Name the sharpest case
+  rather than folding it in: Decision-2 explicitly blesses the **author↔router
+  collapse** — one session that authored the diff, produced every lens on it, and
+  emits the merge — subject only to the engine's server-side re-verification. That
+  is the configuration adr-0022 singled out as untrustworthy, and this ADR accepts
+  it for the delegated class. That risk is real; it is
   bounded by the fact that it was *already* reachable via an `isolated` panel
   (equally correlated, and always merge-eligible), by the target repo's own CI,
   and by C-4 fail-loud behaviour in the engine. What this ADR removes is the
@@ -108,10 +152,12 @@ Concretely:
 ## Alternatives considered
 
 - **Keep the hold and make it real** (add a `panel:inline` refusal to
-  `pr-merge.mjs`). Rejected by the operator: the review panel plus the operator's
-  own merge already supply the objective audit, so the hold buys no safety — it
-  only converts green PRs into operator queue depth, which is the exact cost
-  Epic-019 measures.
+  `pr-merge.mjs`). Rejected by the operator: the safeguards that actually audit a
+  delegated merge — the ≥3 seated lenses with engine-verified green markers, the
+  fail-closed server-side re-verification, the L0/L1 boundary, and the target's
+  CI — are all independent of panel mode, so the hold buys no safety it does not
+  already have. It only converts green PRs into operator queue depth, which is the
+  exact cost Epic-019 measures.
 - **Require `isolated` panels before merging.** Rejected: it gates merge
   authority on a runtime capability (can a CCR `agent-runner` session spawn
   subagents mid-skill?) that is unresolved and, by SKILL.md's own ceiling, would
