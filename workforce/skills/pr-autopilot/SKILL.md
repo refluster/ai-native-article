@@ -479,8 +479,13 @@ Two rules on how it may be worded:
   infer it from the comment's format.
 
 This constrains the verdict's *evidentiary wording only*. It does not change
-the merge predicate, `MIN_REVIEWERS`, or R-N10 / FU-028's author≠merger
-separation, none of which depend on the lenses being independent. Per
+the merge predicate, `MIN_REVIEWERS`, or R-N10, none of which depend on the
+lenses being independent. (This clause used to read "R-N10 / FU-028's
+author≠merger separation". **FU-028 states no such rule** — its subject is that
+the workforce authors and merges under the *same* GitHub identity, which is why
+self-approve returns 422 and why the approve step was made advisory. It was
+cited as the source of a separation it in fact contradicts; adr-0024 §Context
+records the correction.) Per
 [adr-0024](../../docs/adr/adr-0024-panel-mode-not-a-merge-condition.md), a
 `panel:inline` marker or an author↔router collapse **must not** produce a
 hand-off: if the only unmet item is panel independence, the PR merges. Raising the

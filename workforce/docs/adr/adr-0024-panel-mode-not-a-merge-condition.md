@@ -38,6 +38,17 @@ Two problems with that reading:
   in prose: as an unresolved question in the skill body, and as an unexamined
   premise in [adr-0022](adr-0022-issue-to-merge-flow.md)'s rejected alternatives
   (reconciled below). It was never a clause of any predicate and never a check.
+- **Both of its citations are loose, in the same way adr-0011 diagnosed.** The
+  constraint cited `adr-0011 / FU-028`. adr-0011 contains no "panel",
+  "separation" or "independence" claim at all — its predicate is the six clauses
+  above. And [FU-028](../follow-ups.md) states no separation rule either: its
+  subject is that the workforce authors PRs under the **same** GitHub identity it
+  merges with (hence the self-approve 422, hence the approve step becoming
+  advisory) — i.e. it documents the *absence* of an identity-level separation, the
+  opposite of what it was cited for. This is the pattern adr-0011 named when it
+  found the own-repo veto attributed to W-5, whose actual text is persona
+  stability: an over-broad reading hardening into a quoted rule. The SKILL.md
+  citation is corrected in this PR.
 - **The separation it appeals to is not supplied by lens isolation anyway.** Even
   an `isolated` panel is N subagents on one base model, spawned by the same
   session; SKILL.md already caps the strongest claim available to it at "real but
