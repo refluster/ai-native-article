@@ -91,7 +91,18 @@ export interface SkillMeta {
    *  than a specialised, designed duty. The idle-talent detector discounts
    *  commons executions, so a persona producing nothing but commons output
    *  still reads as idle. Defined here, on the skill, so the detector never
-   *  carries a name list (Epic-021 Q3 / mateo's RFC finding). Absent → false. */
+   *  carries a name list (Epic-021 Q3 / mateo's RFC finding). Absent → false.
+   *
+   *  Admission criterion: `true` IFF the skill is wired onto every active
+   *  persona as a baseline cadence and its output is not a designed,
+   *  persona-specific duty — see the schema description and
+   *  `workforce/docs/runbooks/bindings.md`.
+   *
+   *  **git-only.** `seedOne` builds `SkillIdentity` from an explicit field
+   *  list that excludes this (as it does `requires` / `recall_k`), so the
+   *  field is type-visible on the `SKILL#` row and the `GET /skills` view but
+   *  is never populated there. Read the class via `COMMONS_SKILLS` from the
+   *  generated registry, never through the API (sana). */
   commons?: boolean;
   /** Epic-012 Story 1: how many past executions to semantically recall and
    *  inject into the prompt at run time. Omitted → runner default

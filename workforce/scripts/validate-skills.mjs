@@ -226,7 +226,10 @@ for (const name of skillDirs) {
   // silently widen the class the idle detector discounts, which is exactly the
   // exemption surface the epic's Q3 closed by refusing configurability.
   if (meta.commons !== undefined && typeof meta.commons !== "boolean") {
-    v("J8-commons", metaJson, `commons must be a boolean (got ${typeof meta.commons})`);
+    // J14, not J8: J8 is already taken by the improvement_agent rules below,
+    // and a rule ID is the string an operator greps when CI goes red — two
+    // unrelated concerns under one ID makes it ambiguous forever (sana S1).
+    v("J14-commons", metaJson, `commons must be a boolean (got ${typeof meta.commons})`);
   }
   if (!STATUSES.has(meta.status)) {
     v("J4-status", metaJson, `status "${meta.status}" not in {active, stale, deprecated, archived}`);

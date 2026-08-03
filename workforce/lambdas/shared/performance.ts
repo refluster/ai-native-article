@@ -137,19 +137,29 @@ export interface PerformanceSeries {
 
 // ── roll-up item shapes (DDB) ─────────────────────────────────────────────────
 //
-// Two single-partition items per scope, one per writer, so the daily reducer
-// (LIFECYCLE) and the CI PR-metrics publisher (PR) never contend on one item:
+// FOUR single-partition items per scope, one per writer, so the daily reducer
+// (LIFECYCLE, IDLE) and the CI publishers (PR, REPO) never contend on one item:
 //
 //   pk = PERF#{scope}   sk = LIFECYCLE   — reducer-owned, the daily funnel.
 //   pk = PERF#{scope}   sk = PR          — git-derived PR sections (Metric 3),
 //                                          published by build-pr-metrics.mjs.
 //   pk = PERF#{scope}   sk = REPO        — repository activity (Metric 4),
 //                                          published by build-repo-performance.mjs.
+//   pk = PERF#{scope}   sk = IDLE        — reducer-owned, the Epic-021 §B.1 idle
+//                                          snapshot. NOT served by /performance
+//                                          yet: the endpoint reads LIFECYCLE /
+//                                          PR / REPO by explicit `sk`, so this
+//                                          item is additive and invisible to it
+//                                          until the digest PR renders it.
 //
 // `scope` is "workforce" or a project_id (e.g. "self/ren"). The endpoint reads
-// all three and composes the PerformanceSeries; LIFECYCLE is the live
+// the first three and composes the PerformanceSeries; LIFECYCLE is the live
 // differentiator (its presence is what lets the endpoint serve real data
 // instead of 404ing to the client's illustrative fallback).
+//
+// Keep this catalogue in step with the writers. A shape registry that stops
+// tracking its own shapes is how a second, drifting definition gets written by
+// someone who read the catalogue and believed it (PR #524 cycle-1, mateo M2).
 
 /** Trailing window the reducer keeps per scope.
  *  90 days (2026-07-26, operator): the console's decks are all on a 3-month
@@ -185,7 +195,17 @@ export interface PerfLifecycleRow {
  *  walk (mateo: no new cron, one idleness definition). Deliberately its own
  *  `sk` so it never touches a persona's track record: the digest reads this
  *  row, and Epic-023 tiering reads the EXEC ledger, which this does not
- *  write to. */
+ *  write to.
+ *
+ *  **Consumer contract — an unknown is never a measured zero.** This is the
+ *  first PERF# item with no dated series, so a reducer that stops running
+ *  leaves a stale row that renders as "nobody is idle" rather than as "we did
+ *  not look". Any consumer (the digest PR first) MUST treat a sweep whose
+ *  `window.end` is older than ~2 days as **unknown** and say so, never as an
+ *  empty idle list. The codebase already holds this line twice — "an unknown
+ *  is never a measured zero" (pr-autopilot-post.mjs) and "never let stale data
+ *  look current" (app/src/lib/repoActivity.ts). Stated here at definition time
+ *  so the digest inherits it instead of re-deciding it (mateo M4). */
 export interface PerfIdleRow {
   pk: `PERF#${string}`;
   sk: "IDLE";
@@ -195,8 +215,19 @@ export interface PerfIdleRow {
   window: { start: string; end: string; days: number };
   /** Personas with zero non-commons deliverable rows in the window. */
   idle: IdleAgentRecord[];
-  /** Cohort size the sweep ran over — the denominator for "N of M idle". */
+  /** Cohort size the sweep ran over — the denominator for "N of M idle".
+   *  Archived personas are NOT in it: they are excluded from the sweep the
+   *  way the orchestrator excludes them from firing, so they cannot sit on
+   *  the idle list forever (dario D1). This deliberately differs from the
+   *  LIFECYCLE head-count, which is a different question. */
   cohort: number;
+  /** Slugs whose window probe came back saturated — i.e. the persona had more
+   *  EXEC rows inside the window than one page, so "no non-commons row found"
+   *  is bounded evidence rather than a complete read. A digest must be able to
+   *  tell "we found nothing" from "we stopped looking" (C-4); a prose caveat
+   *  in a code comment is not a check (dario D2 / mateo M1). Empty in the
+   *  normal case. */
+  probe_truncated: string[];
   /** The commons skills discounted by this sweep, as actually resolved at run
    *  time. Recorded so a digest reader can see the class the number depends
    *  on rather than trusting the detector's word for it. */

@@ -31,6 +31,13 @@
 // alarm. PR sections (Metric 3) are NOT this reducer's job — they are git-derived
 // and published to PERF#{scope}#PR by build-pr-metrics.mjs (Epic-016 §"Metric 3"
 // keeps git as the PR source of truth).
+//
+// SECOND DUTY (Epic-021 §B.1): the same walk carries the org's idle-talent
+// sweep, written to PERF#{scope}/IDLE. It rides this function rather than a
+// second cron so there is exactly one idleness definition and it cannot drift
+// from the Epic-016 cohort above — which also means this function's missed-run
+// alarm now covers the idle signal too, and its blast radius grew accordingly
+// (mateo M2).
 
 import {
   type AgentMetaRow,
@@ -95,6 +102,34 @@ export async function handler(): Promise<PerformanceReducerResult> {
     return rows;
   }
 
+  // The idle sweep needs a WINDOW-scoped read, not a count-scoped one, and it
+  // must be a second query: `execCache` above deliberately holds the all-time
+  // probe that answers "has this persona EVER delivered", whose semantics are
+  // not windowed.
+  //
+  // Two properties of `listExecutions` this works around (dario D2 / mateo M1):
+  //   1. `status` is applied as a POST-filter, after DDB's `Limit` — so asking
+  //      for `status:"ok"` spends the page on rows of every status (`throw`
+  //      rows are real today). We therefore ask for the raw page and filter
+  //      status ourselves, which also makes saturation observable: with no
+  //      status filter the returned length IS the page length.
+  //   2. Without `from`, the page is unbounded in time. `gsi1sk` is
+  //      `started_at` and the agent path pushes `skGte` down, so passing
+  //      `from` makes the page window-scoped rather than volume-scoped.
+  //
+  // A saturated page still cannot prove absence, so we record the slug instead
+  // of asserting a clean read (C-4: fail loud, never silently bounded).
+  async function windowOkExecs(
+    slug: string,
+    from: string,
+  ): Promise<{ execs: ExecutionRow[]; truncated: boolean }> {
+    const page = await listExecutions({ agent_slug: slug, from, limit: EXEC_PROBE_LIMIT });
+    return {
+      execs: page.filter((r) => r.status === "ok"),
+      truncated: page.length >= EXEC_PROBE_LIMIT,
+    };
+  }
+
   function hasTriggerableBinding(meta: AgentMetaRow | undefined, projectId?: string): boolean {
     const bindings = meta?.bindings ?? [];
     return bindings.some(
@@ -105,6 +140,7 @@ export async function handler(): Promise<PerformanceReducerResult> {
   // ── 2. workforce-wide snapshot ────────────────────────────────────────────
   const workforceStates: LifecycleState[] = [];
   const idleSignals: AgentIdleSignal[] = [];
+  const probeTruncated: string[] = [];
   const windowStart = idleWindowStart(now);
   for (const meta of metas) {
     const execs = await okExecs(meta.slug);
@@ -112,7 +148,16 @@ export async function handler(): Promise<PerformanceReducerResult> {
     const hasDelivered = execs.length > 0;
     const hasTriggerable = hasTriggerableBinding(meta);
     workforceStates.push(classifyAgentState({ hasDelivered, hasTriggerableBinding: hasTriggerable }));
-    idleSignals.push(idleSignalFor(meta, execs, windowStart));
+
+    // An archived persona is out of the idle cohort entirely — the orchestrator
+    // will never fire it, so flagging it as idle is noise that never clears.
+    // It stays in the LIFECYCLE tally above: head-count is a different question
+    // from "who owes work" (dario D1; cf. agents-api "archived agents count in
+    // none of the three").
+    if (meta.archived) continue;
+    const { execs: windowExecs, truncated } = await windowOkExecs(meta.slug, windowStart);
+    if (truncated) probeTruncated.push(meta.slug);
+    idleSignals.push(idleSignalFor(meta, windowExecs, windowStart));
   }
   const workforcePoint = tallyLifecycle(date, workforceStates);
   await upsertLifecycle("workforce", workforcePoint);
@@ -124,9 +169,22 @@ export async function handler(): Promise<PerformanceReducerResult> {
   await upsertIdle("workforce", {
     window: { start: windowStart, end: now.toISOString(), days: IDLE_WINDOW_DAYS },
     idle,
-    cohort: metas.length,
+    // The swept cohort, not the head-count: archived personas are excluded
+    // above, so this is the denominator the idle number is actually over.
+    cohort: idleSignals.length,
     commons_skills: [...COMMONS_SKILLS].sort(),
+    probe_truncated: probeTruncated.sort(),
   });
+  if (probeTruncated.length > 0) {
+    console.warn(
+      JSON.stringify({
+        event: "idle_probe_truncated",
+        slugs: probeTruncated,
+        limit: EXEC_PROBE_LIMIT,
+        note: "window probe saturated — 'no non-commons row' is bounded evidence for these slugs",
+      }),
+    );
+  }
 
   // ── 3. per-project snapshots (active projects only) ───────────────────────
   const projects = (await scanAllPrefix<ProjectMetaRow>("PROJECT#", "META")).filter(
@@ -171,16 +229,25 @@ export async function handler(): Promise<PerformanceReducerResult> {
   return result;
 }
 
-/** Reduce one persona's meta + recent ok executions to the idle detector's
- *  input. Keyed on output: bindings only decide *whose action is pending*
- *  once the persona is already flagged, never whether it is flagged.
+/** Reduce one persona's meta + its WINDOW-SCOPED ok executions to the idle
+ *  detector's input. Keyed on output: bindings only decide *whose action is
+ *  pending* once the persona is already flagged, never whether it is flagged.
  *
- *  Note on the EXEC probe bound: `okExecs` reads the newest EXEC_PROBE_LIMIT
- *  ok rows, which can be shorter than the idle window for a very busy
- *  persona. That is safe in one direction only, and it is the safe one — a
- *  persona busy enough to exhaust the probe inside 30 days has non-commons
- *  rows in it, or is genuinely producing nothing but commons output. A
- *  non-commons row older than the probe is outside the window anyway. */
+ *  `execs` must already be window-scoped and ok-filtered — see
+ *  `windowOkExecs`. The all-time `okExecs` probe is NOT interchangeable here:
+ *  it is bounded by row count rather than by time, so on a busy persona it can
+ *  cover less than the window and hide a real deliverable (dario D2 / mateo
+ *  M1). The failure direction matters — a missed row means a FALSE idle flag
+ *  charged to a persona that did deliver, which is the one error this detector
+ *  must not make.
+ *
+ *  `fires` mirrors the orchestrator's own gate (`orchestrator/handler.ts`:
+ *  `if (agent.archived || agent.paused) continue;`). Pausing does not touch
+ *  `bindings[]`, so a paused persona keeps a load-bearing binding; without
+ *  this the persona would be charged `output` for silence the operator's gate
+ *  produced — the exact inversion of Epic-021 §B.1's "gate-limbo is attributed
+ *  to the gate, not the team" and of priya's RFC finding (dario D1). With it,
+ *  a paused persona degrades to `enable`, which is what `enable` means. */
 function idleSignalFor(
   meta: AgentMetaRow,
   execs: readonly ExecutionRow[],
@@ -188,6 +255,10 @@ function idleSignalFor(
 ): AgentIdleSignal {
   const bindings = meta.bindings ?? [];
   const nonCommons = bindings.filter((b) => !COMMONS_SKILLS.has(b.skill));
+  // Same predicate the orchestrator applies before dispatching anything.
+  // (`archived` personas never reach here — they are cut from the sweep
+  // cohort entirely, so they cannot sit on the idle list forever.)
+  const fires = !meta.archived && !meta.paused;
   return {
     slug: meta.slug,
     windowExecSkills: execs
@@ -196,7 +267,9 @@ function idleSignalFor(
       .filter((e) => (e.ended_at || e.started_at || "") >= windowStart)
       .map((e) => e.skill_name),
     nonCommonsBoundSkills: nonCommons.map((b) => b.skill),
-    nonCommonsLiveSkills: nonCommons.filter(bindingCronIsLoadBearing).map((b) => b.skill),
+    nonCommonsLiveSkills: fires
+      ? nonCommons.filter(bindingCronIsLoadBearing).map((b) => b.skill)
+      : [],
   };
 }
 
@@ -206,7 +279,7 @@ function idleSignalFor(
  *  ledger it is derived from. */
 async function upsertIdle(
   scope: string,
-  body: Pick<PerfIdleRow, "window" | "idle" | "cohort" | "commons_skills">,
+  body: Pick<PerfIdleRow, "window" | "idle" | "cohort" | "commons_skills" | "probe_truncated">,
 ): Promise<void> {
   const row: PerfIdleRow = {
     pk: perfPk(scope),
