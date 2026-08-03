@@ -311,12 +311,13 @@ should be read as one session's self-critique wearing N lenses.
 
 **This disclosure does not change what may be merged.** The merge leg's rule is
 unchanged and stands as written: *authorship is not a hold* — a green,
-non-L0/L1 PR merges regardless of who opened it, because the panel **is** the
-author≠merger separation (adr-0011 / FU-028). Whether a collapsed panel should
-also suspend the merge leg is a real question and a genuine change to delegated
-merge authority — an L1 decision that belongs in a superseding ADR, not in this
-step (`wf:dario` D1/D2 on #513). Until such an ADR lands, disclose and proceed
-under the existing predicate.
+non-L0/L1 PR merges regardless of who opened it (adr-0011 / FU-028). Whether a
+collapsed panel should *also* suspend the merge leg was once an open question;
+**[adr-0024](../../docs/adr/adr-0024-panel-mode-not-a-merge-condition.md)
+answers it: no.** Panel provenance mode is never a merge-eligibility condition.
+An `inline` panel — including one where you also authored the PR — is a
+disclosure and a discount on this verdict's *wording*, never a terminal action.
+Disclose, discount the prose, and proceed under the predicate.
 
 Write a verdict comment that names each reviewer's load-bearing finding and
 the aggregated colour, then take the terminal action:
@@ -479,7 +480,10 @@ Two rules on how it may be worded:
 
 This constrains the verdict's *evidentiary wording only*. It does not change
 the merge predicate, `MIN_REVIEWERS`, or R-N10 / FU-028's author≠merger
-separation, none of which depend on the lenses being independent. Raising the
+separation, none of which depend on the lenses being independent. Per
+[adr-0024](../../docs/adr/adr-0024-panel-mode-not-a-merge-condition.md), a
+`panel:inline` marker or an author↔router collapse **must not** produce a
+hand-off: if the only unmet item is panel independence, the PR merges. Raising the
 lenses to genuinely separate contexts (one subagent per lens) is the proposal
 this does **not** implement: it gates on whether a CCR `agent-runner` session
 can spawn subagents mid-skill, which is unresolved from the repo alone and
@@ -535,8 +539,14 @@ of the target's `docs/governance.md`; checks green; mergeable (state `clean`
 or `draft` — a green draft is flipped Ready for Review then merged); no
 `CHANGES_REQUESTED`. The workforce's own repo (`refluster/ai-native-article`)
 is a normal delegated target (adr-0011) — **authorship is not a hold**: a
-green, non-L0/L1 PR merges regardless of who opened it; the panel is the
-author≠merger separation (FU-028).
+green, non-L0/L1 PR merges regardless of who opened it (FU-028).
+
+**These clauses are the complete set** (adr-0024). Do not add a hold in prose:
+panel provenance mode (`isolated` / `inline`), an author↔router collapse, or
+any other unenforced concern is **not** a merge condition, and a 🟢 that meets
+every clause above merges even when the panel ran inline. A genuinely new hold
+takes an ADR *plus* a matching server-side check in `pr-merge.mjs`, so that a
+stated rule and an enforced rule cannot diverge.
 
 Build the decisions payload (schema in the script header) with `reviewers[]` =
 the ≥3 nominated personas whose green markers you verified, then:

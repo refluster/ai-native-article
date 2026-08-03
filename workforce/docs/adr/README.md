@@ -90,6 +90,7 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0021](adr-0021-dynamic-memory-write-token.md) | Dynamic memory-write token: ADR-0009's minted-token pattern replaces the static secret | Accepted | [018](../epics/epic-018-semantic-memory-curation.md) |
 | [0022](adr-0022-issue-to-merge-flow.md) | The issue→merge flow: a dispatcher at intake (issue lanes) + an agent-owned author lane on PRs (pr-remediate) | Proposed | [019](../epics/epic-019-autonomous-finalization-rate.md) |
 | [0023](adr-0023-red-verdict-author-loop.md) | A 🔴 verdict returns to the author with a machine-checked remediation brief; the human gate moves to the cycle cap | Proposed | [019](../epics/epic-019-autonomous-finalization-rate.md) |
+| [0024](adr-0024-panel-mode-not-a-merge-condition.md) | Panel provenance mode is not a merge condition: an inline panel is a wording discount, never a hold | Proposed | [019](../epics/epic-019-autonomous-finalization-rate.md) |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](../epics/README.md).
