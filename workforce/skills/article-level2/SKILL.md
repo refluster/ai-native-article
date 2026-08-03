@@ -41,17 +41,30 @@ genuinely separate DB — its id is a constant in `pick-l1-source.mjs`.)
 ## Instructions
 
 1. **Pick one uncovered L1 source — run the picker, don't guess.** Run
-   `pick-l1-source.mjs` (below). It queries L1 + the unified DB and returns the
-   oldest L1 source whose Source URL no explanation covers yet (same filters as
-   `handleL2Batch`). If it returns `{"skip": true, …}`, **stop — produce nothing
-   this fire.** Otherwise use the returned `{title, summary, sourceUrl}` as your
-   subject. **Ground every claim in that source** (fetch `sourceUrl` for the body
-   when it's reachable; otherwise work from `summary` only — see Hard rules).
+   `pick-l1-source.mjs` (below). It queries L1 + the unified DB, walks the
+   uncovered rows oldest-first, and returns the first one whose **source body it
+   could actually fetch** — writing that body to `bodyFile` for you. Rows it
+   could not fetch have their failure recorded on the L1 row and are stepped
+   over, so a bot-walled URL no longer stalls the queue.
+
+   If it returns `{"skip": true, …}`, **stop — produce nothing this fire.**
+   Otherwise your subject is the returned `{title, summary, sourceUrl}` and your
+   evidence is the contents of `bodyFile`.
 
    ```sh
    NOTION_API_KEY="<credentials['notion.integration_token'].apiKey>" \
      node workforce/skills/article-level2/pick-l1-source.mjs
    ```
+
+   ```json
+   {"l1PageId":"…","title":"…","summary":"…","sourceUrl":"https://…",
+    "category":"…","bodyFile":"/tmp/l2-source-<id>.md","bodyChars":20273,"fetchedVia":"direct"}
+   ```
+
+   **Read `bodyFile` and ground every claim in it.** You do not need to fetch
+   `sourceUrl` yourself — the picker already did, through a direct fetch with a
+   reader fallback, and it only returned this row because the result was
+   substantial enough to ground an article (`bodyChars` tells you how much).
 
 2. Produce **one** Japanese briefing-document explanation (target ~3000 字).
 3. Follow the L2 briefing format (identical to the GAS `buildL2Prompt` contract):
@@ -75,16 +88,19 @@ genuinely separate DB — its id is a constant in `pick-l1-source.mjs`.)
 - **Never invent facts.** Every concrete figure, proper noun, date, or quotation
   must come verbatim from the supplied source. Do not abstract, round, or alter
   them.
-- **For JS-only / paywalled hosts (x.com, twitter.com, linkedin.com, and CDN
-  consent-wall sites like nytimes/ft/wsj/bloomberg/mckinsey), fetch via Jina
-  Reader first**: `https://r.jina.ai/<source-url>` returns pre-extracted clean
-  Markdown. This mirrors the GAS `L2_SOURCE_FETCH_VIA_READER` routing in
-  `newsletter/gas/src/Code.gs` — a direct fetch of these hosts returns 402/HTML-bot-walls,
-  but the Jina-extracted body is groundable. Only fall back to the L1-summary-only
-  path if Jina *also* fails.
-- If the source body still could not be fetched, work from the L1 summary *only*
-  and do not supply facts, statistics, company names, or people the summary
-  doesn't contain.
+- **Source fetching is not your job — it already happened.** `pick-l1-source.mjs`
+  fetches directly, falls back to the reader (`https://r.jina.ai/<url>`) when the
+  direct body is thin, retries a throttled reader, and only hands you a row whose
+  body cleared the groundability threshold. The host-by-host routing rule that
+  used to live here (x.com / linkedin / nytimes / ft / wsj / bloomberg /
+  mckinsey → reader) has been **deleted on purpose**: it was a snapshot of which
+  hosts were walled when it was written, and it decayed in both directions —
+  the reader now 403s for x.com, while reuters.com was walled and was never on
+  the list. `scripts/lib/source-fetch.mjs` decides by *result*, not by hostname.
+- **Never write around a missing body.** If you did get a pick, `bodyFile` has
+  real text in it — use it. Do not pad from `summary` (L1 rows registered by the
+  capture endpoint have an empty summary by design) and never substitute your own
+  knowledge of the topic for what the source says.
 - If you cannot link to or quote the source, **do not publish** — escalate.
 - Objective, incisive tone. Avoid reviewer-voice hedges ("重要だ", "今後注目される")
   and throat-clearing preambles.
@@ -137,8 +153,8 @@ Steps:
 
 5. Report the script's exit code:
    - `0` — page created. The row carries `Author={agent_slug}, Type=explanation,
-     Status=ready`, plus `Abstract` + `Category`/`CategoriesMulti` (queued; the
-     GAS L4 batch flips Status to `published`). Done.
+     Status=ready`, plus `Abstract` + `Category`/`CategoriesMulti`. Done —
+     `Status=ready` is already publishable; nothing flips it later.
    - `2` — W-1 editorial guard failed (empty/short body, LLM-artefact prelude,
      or a last line that looks cut off mid-content — the shared
      `scripts/lib/truncation.mjs` heuristic), or `401/403` auth (project
@@ -156,9 +172,12 @@ fails loudly rather than landing on the site.
 **The page lands directly in Notion. No PR, no human-approval gate.** The page is
 written to the unified Articles DB with the live schema (`Title`, `Author` and
 `SourceURLs` as `rich_text`, `Type`/`Status` as `select`, `Date`) — the same
-property contract as the GAS L2 write. The existing GAS L4 batch picks up the row
-and publishes it to `kohuehara.xyz`; `newsletter/pipeline/fetch-notion.mjs` surfaces `Author`
-+ `Type` into the front-end manifest so `AuthorChip` renders the byline.
+property contract as the GAS L2 write. `newsletter/pipeline/fetch-notion.mjs`
+exports **every** row of the unified DB on each deploy — there is no `Status`
+filter and no L4 promotion step (the GAS L4 batch that once flipped `ready` →
+`published` was retired with the rest of the GAS engine), so the row goes live at
+the next `deploy-article-site.yml` run. That job also surfaces `Author` + `Type`
+into the front-end manifest so `AuthorChip` renders the byline.
 
 ## When NOT to use
 

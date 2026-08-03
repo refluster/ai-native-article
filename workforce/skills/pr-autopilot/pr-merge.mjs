@@ -56,9 +56,12 @@
 // Exit codes: 0 all applied · 1 bad args/file · 2 a decision refused or a GitHub
 // write rejected · 3 network/unexpected.
 
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { assertReasonCode, reasonLabel, reasonMarker, refusalReasonCode } from "./escalation-reasons.mjs";
+import { assertReasonCode, isAuthorLaneCode, reasonLabel, reasonMarker, refusalReasonCode } from "./escalation-reasons.mjs";
 
 const GOVERNANCE_PATH = process.env["GOVERNANCE_PATH"] || "docs/governance.md";
 const L0L1_OPEN = "<!-- autopilot:l0l1-paths -->";
@@ -84,6 +87,72 @@ const ESCALATION_LABEL_COLOR = "b60205"; // red — "an autopilot decision needs
 // here; pr-autopilot-post.mjs imports it (and a --reviewed flag) to stamp it.
 export const REVIEWED_LABEL = "autopilot:reviewed";
 
+// The AUTHOR lane (adr-0022). Stamped instead of ESCALATION_LABEL when the
+// hand-off's cause is agent-fixable — a merge conflict, an out-of-date branch,
+// or open blocking lens findings. It is the `pr-remediate` cadence's work
+// queue (`is:open label:autopilot:needs-author`), not the operator's.
+//
+// It is an INTERIM state, and bounded like every other one: a PR that sits here
+// without its head moving past the sweep's --author-stale-hours is escalated to
+// the human lane by pr-autopilot-sweep.mjs (`author-stale`), as is one that
+// exhausts the remediation attempt cap. The two-outcome contract is unchanged —
+// merged or escalated remain the only terminal states; this names who works the
+// PR while it is in neither.
+export const AUTHOR_LABEL = "autopilot:needs-author";
+
+// The author lane's hidden marker — the same mechanical pairing the human lane
+// has (`<!-- autopilot:needs-human -->` ↔ `autopilot:needs-human`), so a body
+// carrying it stamps the label even when the flag is forgotten, and the sweep
+// can recognise the lane from PR state alone. Defined here, next to the label,
+// because pr-autopilot-post.mjs imports this module (not the other way round —
+// that would be a cycle).
+export const AUTHOR_MARKER = "<!-- autopilot:needs-author -->";
+
+// Attempt-counter marker for the author lane: `<!-- autopilot:remediation:<n> -->`.
+// The lane is bounded by counting these — REMEDIATION_CAP attempts, then the PR
+// escalates to the human lane with `remediation-cap-exceeded`.
+//
+// **The marker is CLAIMED BEFORE the attempt, never written after it**
+// (`pr-remediate-post.mjs --claim`), which is the same once-ever-latch idiom
+// flaky-rerun.mjs uses for its bounded rerun. The reason is `wf:farah`'s F1 on
+// #518: a counter the bounded thing writes on success is enforced by the thing
+// it bounds. Written afterwards, a cadence that dies mid-attempt — after pushing
+// to the head branch, before recording — would refresh the PR's `updated_at`
+// (resetting the sweep's staleness clock) while consuming no attempt, and could
+// retry the same failing resolution forever. Claiming first inverts that: a
+// death costs an attempt. Over-counting a crashed run is the safe direction;
+// under-counting an infinite one is not.
+//
+// Kept next to the lane's other constants so the counter, the marker and the cap
+// cannot drift apart.
+export const REMEDIATION_CAP = 3;
+const REMEDIATION_MARKER_RE = /<!--\s*autopilot:remediation:(\d+)\s*-->/g;
+
+/** Highest remediation-attempt number recorded across the PR's comment bodies
+ *  (0 = never attempted). Pure + exported so the bound is unit-tested. */
+export function countRemediationAttempts(bodies = []) {
+  let max = 0;
+  for (const b of bodies) {
+    const re = new RegExp(REMEDIATION_MARKER_RE.source, "g");
+    let m;
+    while ((m = re.exec(String(b ?? ""))) !== null) max = Math.max(max, Number(m[1]) || 0);
+  }
+  return max;
+}
+
+/** The marker for attempt `n`. Throws past the cap — an unbounded retry loop is
+ *  exactly what this lane must not become (C-4). */
+export function remediationMarker(n) {
+  const attempt = Number(n);
+  if (!Number.isInteger(attempt) || attempt < 1 || attempt > REMEDIATION_CAP) {
+    throw new Error(
+      `remediation attempt ${n} is outside 1..${REMEDIATION_CAP} — a PR past the cap escalates to the human lane ` +
+        `with reason "remediation-cap-exceeded" (adr-0022), it is never retried again.`,
+    );
+  }
+  return `<!-- autopilot:remediation:${attempt} -->`;
+}
+
 // Minimum reviewer-panel size for an autonomous merge (operator directive
 // 2026-06-29). A merge is honoured only when at least this many DISTINCT
 // reviewer personas have each posted their `<!-- autopilot:review:{slug}:green
@@ -99,11 +168,21 @@ export const MIN_REVIEWERS = 3;
 // escalation label still receive it without a manual pre-create step.
 export async function ensureLabels(gh, repo, names) {
   for (const name of names) {
-    const { status } = await gh("POST", `/repos/${repo}/labels`, {
-      name,
-      color: ESCALATION_LABEL_COLOR,
-      description: "Autopilot handed this off — a human's call (merge / governance L0/L1 / blocked).",
-    });
+    // The author lane is a different queue from the human one and must not be
+    // created wearing the escalation label's red "a human's call" description —
+    // an operator filtering by colour/description would read it as their work.
+    const meta =
+      name === AUTHOR_LABEL
+        ? {
+            color: "fbca04", // amber — in-flight, agent-owned
+            description:
+              "Autopilot found an agent-fixable defect (conflict / out-of-date branch / open review findings). The pr-remediate cadence owns it; bounded — it escalates to autopilot:needs-human if remediation stalls or caps out.",
+          }
+        : {
+            color: ESCALATION_LABEL_COLOR,
+            description: "Autopilot handed this off — a human's call (merge / governance L0/L1 / blocked).",
+          };
+    const { status } = await gh("POST", `/repos/${repo}/labels`, { name, ...meta });
     if (status !== 201 && status !== 422) {
       console.error(`pr-merge: WARN could not ensure label "${name}" (HTTP ${status}) — continuing`);
     }
@@ -254,17 +333,26 @@ export async function prTouchesL0L1(gh, repo, prNumber, baseRef) {
 // code outside the taxonomy.
 export async function emitRefusalReason(gh, repo, pr, why) {
   const code = refusalReasonCode(why);
-  const label = reasonLabel(code);
+  // adr-0022: a refusal whose cause is agent-fixable (a conflict with the base,
+  // an out-of-date branch) is routed to the AUTHOR lane here, at the refusal
+  // itself — that is where the cause is first known, so the PR joins
+  // `pr-remediate`'s queue on the same tick instead of waiting for a session to
+  // notice. The predicate is untouched: this still refuses the merge.
+  const authorLane = isAuthorLaneCode(code);
+  const labels = [reasonLabel(code), ...(authorLane ? [AUTHOR_LABEL] : [])];
   const body = [
     `**Autopilot merge engine — refusal reason \`${code}\`.** ${why}`,
     "",
-    "(Epic-019 escalation-reason telemetry — wiring, not reviewer performance; see workforce/docs/pr-escalation-reasons.md.)",
+    authorLane
+      ? "Agent-fixable — handing to the **author lane** (`autopilot:needs-author`). The `pr-remediate` cadence picks this up, pushes the fix to the head branch, and the next autopilot tick re-verdicts. If it cannot (attempt cap, or a resolution only a human should make) it escalates to `autopilot:needs-human` with its own reason."
+      : "(Epic-019 escalation-reason telemetry — wiring, not reviewer performance; see workforce/docs/pr-escalation-reasons.md.)",
     "",
     reasonMarker(code, code === "other" ? why : ""),
+    ...(authorLane ? [AUTHOR_MARKER] : []),
   ].join("\n");
-  await ensureLabels(gh, repo, [label]);
-  const l = await gh("POST", `/repos/${repo}/issues/${pr}/labels`, { labels: [label] });
-  if (l.status !== 200) console.error(`pr-merge: WARN reason label "${label}" on #${pr} → HTTP ${l.status}`);
+  await ensureLabels(gh, repo, labels);
+  const l = await gh("POST", `/repos/${repo}/issues/${pr}/labels`, { labels });
+  if (l.status !== 200) console.error(`pr-merge: WARN reason label(s) "${labels.join(", ")}" on #${pr} → HTTP ${l.status}`);
   const c = await gh("POST", `/repos/${repo}/issues/${pr}/comments`, { body });
   if (c.status !== 201) console.error(`pr-merge: WARN reason comment on #${pr} → HTTP ${c.status}`);
   return code;

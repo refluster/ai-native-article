@@ -1,0 +1,49 @@
+name: Corpus freshness (R-15)
+
+# R-15 — is the article pipeline still producing?
+#
+# The L1→L2/L3 cadences fire every 6h, so in steady state the published corpus
+# gains several rows a day. On 2026-07-26 both cadences began failing inside
+# their CCR session and produced nothing for seven days across 28 dispatches
+# the orchestrator recorded as successful. Every existing signal stayed green:
+# CI, deploys, orchestrator logs. The outage was found by hand.
+#
+# This job watches the one observable that actually moved — whether new
+# articles are arriving — and fails when they stop. A failed scheduled run
+# notifies the repository owner, which for a single-operator repo (C-3) is the
+# whole alerting requirement.
+#
+# It is a *schedule*, not a PR gate, on purpose: staleness is a property of
+# time rather than of any particular diff. See the note in ci.yml.
+
+on:
+  schedule:
+    # 21:00 UTC — after the last deploy-article-site run of the day (cron
+    # '17 6,12,18', which GitHub routinely starts 1–2h late) has had time to
+    # land, so a green pipeline is never reported stale by a timing artefact.
+    - cron: '0 21 * * *'
+  workflow_dispatch:
+    inputs:
+      max_age_days:
+        description: 'Override the staleness budget (days)'
+        required: false
+        default: '5'
+
+concurrency:
+  group: corpus-freshness
+  cancel-in-progress: false
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Corpus freshness gate (R-15)
+        env:
+          MAX_AGE_DAYS: ${{ github.event.inputs.max_age_days || '5' }}
+        run: node scripts/check-corpus-freshness.mjs

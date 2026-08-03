@@ -12,6 +12,9 @@
 // directly via the shared fetcher. It is optional: with no NOTION_API_KEY the
 // gh-pages truncation sweep still runs (the primary C-1 guard).
 
+import { ensureProxyAwareEntry } from '../../../../scripts/lib/proxy-bootstrap.mjs'
+ensureProxyAwareEntry(import.meta.url)
+
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { isTruncatedMarkdown, stripFrontmatter, lastNonEmptyLine } from '../../../../scripts/lib/truncation.mjs'

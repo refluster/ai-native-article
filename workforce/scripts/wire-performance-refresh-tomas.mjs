@@ -52,6 +52,9 @@
 //   aws-vault exec <profile> -- \
 //     node workforce/scripts/wire-performance-refresh-tomas.mjs
 
+import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { spawnSync } from "node:child_process";
 
 const API_BASE = (

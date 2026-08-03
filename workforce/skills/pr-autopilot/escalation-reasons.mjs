@@ -20,15 +20,27 @@
 
 export const REASON_LABEL_PREFIX = "autopilot:reason:";
 
-// Taxonomy v1 (2026-07-08). The terminal-state sweep's three kind strings are
+// Taxonomy v3 (2026-08-02; v2 2026-07-29). The terminal-state sweep's kind strings are
 // reused VERBATIM as codes (never flattened); the merge-engine clauses map via
 // refusalReasonCode() below. Adding/renaming a code = a version bump of the
 // prose twin in the same PR.
+//
+// v2 (adr-0022) splits the hand-off into two lanes. A reason code now says
+// which lane a PR was handed to as well as why:
+//   - the HUMAN lane (`autopilot:needs-human`) — nothing an agent may do next;
+//   - the AUTHOR lane (`autopilot:needs-author`) — an agent-fixable defect the
+//     `pr-remediate` cadence owns (AUTHOR_LANE_CODES below).
+// The funnel is unaffected: build-pr-metrics-github.mjs searches
+// `label:autopilot:needs-human`, so an author-lane hand-off is never counted
+// as an escalation — which is the point, it is not one.
 export const REASON_CODES = Object.freeze([
   // pr-autopilot-sweep.mjs violation kinds — verbatim.
   "unlabelled-handoff",
   "stale-routed",
   "never-routed",
+  // adr-0022: a PR parked in the author lane whose head never moved — the
+  // remediation cadence failed to act, so the sweep escalates it to a human.
+  "author-stale",
   // Merge-engine refusal clauses (pr-merge.mjs `why` strings) + the SKILL.md
   // verdict-table / session hand-off causes.
   "l0l1-path",
@@ -43,6 +55,21 @@ export const REASON_CODES = Object.freeze([
   "persona-escalation-trigger",
   "cycle-cap-exceeded",
   "merge-engine-refusal",
+  // adr-0022 AUTHOR-lane causes: an agent-fixable defect, handed to the
+  // author-side `pr-remediate` cadence rather than to a human.
+  "merge-conflict",
+  "branch-behind",
+  "review-findings-open",
+  // adr-0023: a 🔴 verdict whose blocking cause is diff-local — a reviewer veto
+  // the router synthesised into an ordered remediation brief. Distinct from the
+  // 🟡 `review-findings-open` above so the funnel can tell "author was asked to
+  // revise" from "the panel blocked and the router organised the fix", and so
+  // the brief requirement attaches to exactly this code (remediation-brief.mjs).
+  "review-findings-blocking",
+  // adr-0022 author-lane EXITS to the human lane: remediation was tried and
+  // could not finish (bounded), or could not be tried safely.
+  "remediation-cap-exceeded",
+  "remediation-blocked",
   // Catch-all — REQUIRES free text (the codes we didn't anticipate are the
   // finding; a bare `other` would let the 100%-coverage criterion be met by
   // mislabeling).
@@ -51,12 +78,43 @@ export const REASON_CODES = Object.freeze([
 
 const CODE_SET = new Set(REASON_CODES);
 
+// adr-0022: the subset whose cause is AGENT-FIXABLE. A hand-off carrying one of
+// these goes to the author lane (`autopilot:needs-author`, worked by the
+// `pr-remediate` cadence), not to a human — the human lane is for decisions an
+// agent may not make, and "main moved under this branch" is not one of them.
+//
+// Deliberately NOT in this set: `checks-failing`. A failing check can be an
+// author-side defect OR a real product breakage, and the flaky-rerun latch
+// (Story 2c) already owns the bounded retry — routing every red check into an
+// automatic fix loop would launder a genuine failure into a patch attempt. The
+// router may still hand a checks-failing PR to the author lane explicitly
+// (SKILL.md Step 5) when the lens reviews located the defect in the diff; the
+// default direction stays the loud one (C-4).
+export const AUTHOR_LANE_CODES = Object.freeze([
+  "merge-conflict",
+  "branch-behind",
+  "review-findings-open",
+  // adr-0023 — the 🔴 loop. A reviewer veto is agent-fixable when the defect it
+  // names is in the diff; what makes it safe to route here rather than to a
+  // human is not the colour but the two bounds the post script enforces on this
+  // code specifically: a machine-checked remediation brief, and the review
+  // loop's own cycle budget (past the cap → `cycle-cap-exceeded`, a human).
+  "review-findings-blocking",
+]);
+const AUTHOR_LANE_SET = new Set(AUTHOR_LANE_CODES);
+
+/** True when `code` names an agent-fixable cause (the author lane). Throws on
+ *  an unknown code — the same C-4 posture as every other reader here. */
+export function isAuthorLaneCode(code) {
+  return AUTHOR_LANE_SET.has(assertReasonCode(code));
+}
+
 /** C-4 gate: an unknown code throws, never becomes a quiet new bucket. */
 export function assertReasonCode(code) {
   if (!CODE_SET.has(code)) {
     throw new Error(
       `unknown escalation-reason code "${code}" — must be one of: ${REASON_CODES.join(", ")} ` +
-        `(taxonomy v1, workforce/docs/pr-escalation-reasons.md; C-4: never invent a bucket)`,
+        `(taxonomy v2, workforce/docs/pr-escalation-reasons.md; C-4: never invent a bucket)`,
     );
   }
   return code;
@@ -74,7 +132,7 @@ export function reasonMarker(code, freeText = "") {
   // "--\x3e" inside the text would close the HTML comment early; neutralise it.
   const text = String(freeText || "").trim().replace(/-->/g, "→");
   if (code === "other" && !text) {
-    throw new Error(`escalation reason "other" requires free text — the unanticipated cause IS the finding (taxonomy v1)`);
+    throw new Error(`escalation reason "other" requires free text — the unanticipated cause IS the finding (taxonomy v2)`);
   }
   return text ? `<!-- autopilot:reason:${code} ${text} -->` : `<!-- autopilot:reason:${code} -->`;
 }
@@ -91,7 +149,7 @@ export function findReasonMarkers(body) {
     const code = assertReasonCode(m[1].toLowerCase());
     const text = m[2].trim();
     if (code === "other" && !text) {
-      throw new Error(`marker <!-- autopilot:reason:other --> is missing its mandatory free text (taxonomy v1)`);
+      throw new Error(`marker <!-- autopilot:reason:other --> is missing its mandatory free text (taxonomy v2)`);
     }
     found.push({ code, text });
   }
@@ -112,6 +170,15 @@ const REFUSAL_WHY_MAP = [
   [/changes_requested/i, "human-changes-requested"],
   [/check '.*' is /i, "checks-pending-aged"], // status ≠ completed at verdict time
   [/check '.*' = /i, "checks-failing"], // completed with a non-green conclusion
+  // adr-0022: split the engine's single `not mergeable (mergeable=…, state=…)`
+  // refusal by GitHub's mergeable_state, because two of its values name an
+  // agent-fixable branch condition rather than a human decision:
+  //   dirty  → the head conflicts with the base (main moved) → author lane
+  //   behind → the head is out of date under a strict branch rule → author lane
+  // Every other state (blocked / unstable / unknown) stays `not-mergeable`,
+  // the human lane, unchanged. Ordered before the generic pattern.
+  [/not mergeable.*state=dirty/i, "merge-conflict"],
+  [/not mergeable.*state=behind/i, "branch-behind"],
   [/not mergeable/i, "not-mergeable"],
   [/w-4 hard cap/i, "cycle-cap-exceeded"],
   [/missing green marker|unanimous-green reviewers|distinct reviewer/i, "no-reviewer-consensus"],

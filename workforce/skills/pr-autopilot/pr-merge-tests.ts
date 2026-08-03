@@ -17,6 +17,12 @@ import {
   applyDecisions,
   prTouchesL0L1,
   ESCALATION_LABEL,
+  AUTHOR_LABEL,
+  AUTHOR_MARKER,
+  REMEDIATION_CAP,
+  countRemediationAttempts,
+  remediationMarker,
+  emitRefusalReason,
 } from "./pr-merge.mjs";
 
 /** Route a `${method} ${path}` string to a canned {status,json} response. */
@@ -432,5 +438,52 @@ describe("applyDecisions (draft auto-ready then merge — adr-0014)", () => {
     expect(res.merged).toBe(0);
     expect(res.refused).toBe(1);
     expect(gh.calls.some((c) => c.method === "PUT" && /\/merge$/.test(c.path))).toBe(false);
+  });
+});
+
+// ── adr-0022: the author lane's bound, and the engine's routing into it ────
+describe("countRemediationAttempts / remediationMarker — the lane's bound", () => {
+  it("a never-attempted PR reads 0", () => {
+    expect(countRemediationAttempts(["**Nadia — cycle 1.**", "a review"])).toBe(0);
+  });
+
+  it("reads the highest attempt across every body, order-independently", () => {
+    expect(countRemediationAttempts([remediationMarker(2), "noise", remediationMarker(1)])).toBe(2);
+  });
+
+  it("markers outside 1..CAP are refused — the lane can never loop unbounded", () => {
+    expect(() => remediationMarker(0)).toThrow(/outside 1\.\./);
+    expect(() => remediationMarker(REMEDIATION_CAP + 1)).toThrow(/remediation-cap-exceeded/);
+  });
+});
+
+describe("emitRefusalReason — an agent-fixable refusal routes to the author lane", () => {
+  it("a dirty PR is labelled needs-author (not needs-human) and carries the lane marker", async () => {
+    const gh = mockGh([
+      [/^POST \/repos\/o\/r\/labels$/, { status: 201, json: {} }],
+      [/^POST \/repos\/o\/r\/issues\/7\/labels$/, { status: 200, json: {} }],
+      [/^POST \/repos\/o\/r\/issues\/7\/comments$/, { status: 201, json: {} }],
+    ]);
+    const calls = gh.calls;
+    const code = await emitRefusalReason(gh, "o/r", 7, "not mergeable (mergeable=false, state=dirty)");
+    expect(code).toBe("merge-conflict");
+    const labelCall = calls.find((c) => c.path === "/repos/o/r/issues/7/labels");
+    expect(labelCall.body.labels).toContain(AUTHOR_LABEL);
+    expect(labelCall.body.labels).not.toContain(ESCALATION_LABEL);
+    const comment = calls.find((c) => c.path === "/repos/o/r/issues/7/comments");
+    expect(comment.body.body).toContain(AUTHOR_MARKER);
+  });
+
+  it("a human-lane refusal is unchanged — no author label, no lane marker", async () => {
+    const gh = mockGh([
+      [/^POST \/repos\/o\/r\/labels$/, { status: 201, json: {} }],
+      [/^POST \/repos\/o\/r\/issues\/8\/labels$/, { status: 200, json: {} }],
+      [/^POST \/repos\/o\/r\/issues\/8\/comments$/, { status: 201, json: {} }],
+    ]);
+    const calls = gh.calls;
+    const code = await emitRefusalReason(gh, "o/r", 8, "touches L0/L1 path docs/governance.md — escalate to human");
+    expect(code).toBe("l0l1-path");
+    expect(calls.find((c) => c.path === "/repos/o/r/issues/8/labels").body.labels).not.toContain(AUTHOR_LABEL);
+    expect(calls.find((c) => c.path === "/repos/o/r/issues/8/comments").body.body).not.toContain(AUTHOR_MARKER);
   });
 });

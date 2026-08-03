@@ -1,0 +1,14 @@
+{
+  "name": "issue-design",
+  "version": "0.1.0",
+  "status": "active",
+  "cost_class": "large",
+  "owners": ["dario", "maya"],
+  "improvement_agent": "sana",
+  "created_at": "2026-07-29",
+  "requires": ["github.token"],
+  "deliverable": {
+    "type": "external-pr",
+    "publish_notion": false
+  }
+}

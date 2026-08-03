@@ -14,10 +14,13 @@ import { describe, it, expect } from "vitest";
 import {
   classifySweep,
   sweepHandoffBody,
+  AUTHOR_LANE_SWEEP_KINDS,
+  DEFAULT_AUTHOR_STALE_HOURS,
   DEFAULT_STALE_HOURS,
   DEFAULT_WINDOW_DAYS,
 } from "./pr-autopilot-sweep.mjs";
-import { NEEDS_HUMAN_MARKER } from "./pr-autopilot-post.mjs";
+import { NEEDS_AUTHOR_MARKER, NEEDS_HUMAN_MARKER } from "./pr-autopilot-post.mjs";
+import { AUTHOR_LABEL, REMEDIATION_CAP } from "./pr-merge.mjs";
 import { ESCALATION_LABEL } from "./pr-merge.mjs";
 
 const NOW = Date.parse("2026-07-01T12:00:00Z");
@@ -151,6 +154,68 @@ describe("sweepHandoffBody — the escalation comment is a real hand-off", () =>
       expect(sweepHandoffBody(kind, { staleHours: 48, windowDays: 7 })).toContain(
         `<!-- autopilot:reason:${kind} -->`,
       );
+    }
+  });
+});
+
+// ── adr-0022: the AUTHOR lane is bounded, not a parking space ──────────────
+//
+// The lane adds a third, agent-owned interim state. That is only acceptable if
+// the sweep can end it: a PR whose remediation worker never showed up, or which
+// spent its attempt budget, must leave for the human lane. These cases are the
+// mechanical proof that the two-outcome contract survives the new state.
+describe("classifySweep — the author lane (adr-0022)", () => {
+  const now = Date.parse("2026-07-29T12:00:00Z");
+  const hoursAgo = (h: number) => new Date(now - h * 3600_000).toISOString();
+  const inLane = (over: Record<string, unknown> = {}) => ({
+    createdAt: hoursAgo(200),
+    updatedAt: hoursAgo(1),
+    labels: [AUTHOR_LABEL],
+    bodies: ["**Nadia — cycle 1 of ≤ 5.**", `verdict ${NEEDS_AUTHOR_MARKER}`],
+    ...over,
+  });
+
+  it("a freshly parked PR with attempts left is in flight, not a violation", () => {
+    expect(classifySweep(inLane(), { now })).toBeNull();
+  });
+
+  it("escalates when nothing has touched it for --author-stale-hours", () => {
+    expect(classifySweep(inLane({ updatedAt: hoursAgo(DEFAULT_AUTHOR_STALE_HOURS + 1) }), { now })).toBe("author-stale");
+  });
+
+  it("respects a custom author-stale window", () => {
+    const pr = inLane({ updatedAt: hoursAgo(10) });
+    expect(classifySweep(pr, { now, authorStaleHours: 8 })).toBe("author-stale");
+    expect(classifySweep(pr, { now, authorStaleHours: 12 })).toBeNull();
+  });
+
+  it("escalates a PR that has spent every remediation attempt, even while fresh", () => {
+    const bodies = Array.from({ length: REMEDIATION_CAP }, (_, i) => `attempt <!-- autopilot:remediation:${i + 1} -->`);
+    expect(classifySweep(inLane({ bodies, updatedAt: hoursAgo(0.1) }), { now })).toBe("remediation-cap-exceeded");
+  });
+
+  it("does not escalate below the cap", () => {
+    const bodies = ["<!-- autopilot:remediation:1 -->", "<!-- autopilot:remediation:2 -->"];
+    expect(classifySweep(inLane({ bodies }), { now })).toBeNull();
+  });
+
+  it("the human lane still wins: an escalated PR is terminal even if the author label lingers", () => {
+    expect(classifySweep(inLane({ labels: [AUTHOR_LABEL, "autopilot:needs-human"] }), { now })).toBeNull();
+  });
+
+  it("autopilot:off still pauses the author lane too", () => {
+    expect(classifySweep(inLane({ labels: [AUTHOR_LABEL, "autopilot:off"], updatedAt: hoursAgo(500) }), { now })).toBeNull();
+  });
+
+  it("both author-lane kinds are declared as lane exits, so the apply path clears the label", () => {
+    expect(AUTHOR_LANE_SWEEP_KINDS).toEqual(["author-stale", "remediation-cap-exceeded"]);
+  });
+
+  it("each author-lane kind renders a hand-off body carrying the needs-human marker + its reason", () => {
+    for (const kind of AUTHOR_LANE_SWEEP_KINDS) {
+      const body = sweepHandoffBody(kind, { staleHours: 48, windowDays: 7, authorStaleHours: 36 });
+      expect(body).toContain(NEEDS_HUMAN_MARKER);
+      expect(body).toContain(`<!-- autopilot:reason:${kind} -->`);
     }
   });
 });
