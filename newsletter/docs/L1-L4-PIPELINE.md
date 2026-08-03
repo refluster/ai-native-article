@@ -43,7 +43,7 @@ The [`workforce/skills/article-level2`](../../workforce/skills/article-level2/SK
 - Fired on the **CCR execution model** by `wf-orchestrator-tick` (EventBridge → `agent-runner` routine). The schedule is the workforce orchestrator tick, not a GAS trigger.
 - `pick-l1-source.mjs` selects the oldest L1 source whose Source URL no explanation covers yet; if nothing is pending it returns `{"skip": true}` and the fire produces nothing.
 - The agent generates the prose; `publish-notion.mjs` owns the Notion write (schema, blocks, properties) and carries the **canonical truncation guard (W-1)** via `scripts/lib/truncation.mjs`. A truncated/empty body fails the write loud (C-1 / C-4).
-- For JS-only / paywalled hosts, the body is fetched through [Jina Reader](https://jina.ai/reader/) (`https://r.jina.ai/<url>`) before grounding.
+- Source bodies are fetched by `scripts/lib/source-fetch.mjs`: direct first, then [Jina Reader](https://jina.ai/reader/) (`https://r.jina.ai/<url>`) when the direct body is too thin to ground an article. The routing is decided **by result, not by hostname** — the former per-host list (x.com, nytimes, …) was deleted because it decayed in both directions. A source neither path can ground is recorded on the L1 row and stepped over, never padded.
 
 ### L3 — Analysis articles (`article-level3` cadence)
 

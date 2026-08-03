@@ -20,7 +20,7 @@
 
 export const REASON_LABEL_PREFIX = "autopilot:reason:";
 
-// Taxonomy v2 (2026-07-29). The terminal-state sweep's kind strings are
+// Taxonomy v3 (2026-08-02; v2 2026-07-29). The terminal-state sweep's kind strings are
 // reused VERBATIM as codes (never flattened); the merge-engine clauses map via
 // refusalReasonCode() below. Adding/renaming a code = a version bump of the
 // prose twin in the same PR.
@@ -60,6 +60,12 @@ export const REASON_CODES = Object.freeze([
   "merge-conflict",
   "branch-behind",
   "review-findings-open",
+  // adr-0023: a 🔴 verdict whose blocking cause is diff-local — a reviewer veto
+  // the router synthesised into an ordered remediation brief. Distinct from the
+  // 🟡 `review-findings-open` above so the funnel can tell "author was asked to
+  // revise" from "the panel blocked and the router organised the fix", and so
+  // the brief requirement attaches to exactly this code (remediation-brief.mjs).
+  "review-findings-blocking",
   // adr-0022 author-lane EXITS to the human lane: remediation was tried and
   // could not finish (bounded), or could not be tried safely.
   "remediation-cap-exceeded",
@@ -88,6 +94,12 @@ export const AUTHOR_LANE_CODES = Object.freeze([
   "merge-conflict",
   "branch-behind",
   "review-findings-open",
+  // adr-0023 — the 🔴 loop. A reviewer veto is agent-fixable when the defect it
+  // names is in the diff; what makes it safe to route here rather than to a
+  // human is not the colour but the two bounds the post script enforces on this
+  // code specifically: a machine-checked remediation brief, and the review
+  // loop's own cycle budget (past the cap → `cycle-cap-exceeded`, a human).
+  "review-findings-blocking",
 ]);
 const AUTHOR_LANE_SET = new Set(AUTHOR_LANE_CODES);
 

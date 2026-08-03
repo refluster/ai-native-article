@@ -26,6 +26,9 @@
 // per-app `predev` / `prebuild` lifecycle hooks in each app's
 // package.json.
 
+import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { readdirSync, readFileSync, statSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -52,6 +55,33 @@ const SKILLS_OUT_PATH = join(
   "public",
   "workforce-skills.json",
 );
+
+// Cap embedded file payloads to ~256 KiB so a stray large blob can't bloat
+// workforce-skills.json indefinitely. Anything past the cap shows path + size
+// only and the SPA renders a "file too large to preview" placeholder.
+const SKILL_FILE_MAX_BYTES = 256 * 1024;
+
+// `--check-skills` (issue #185): assert the COMMITTED workforce-skills.json
+// still matches what workforce/skills/* would produce, and exit non-zero if
+// not. Mirrors build-skill-registry.mjs --check, with one difference forced by
+// this manifest's shape: the file carries a `generated_at` stamp that changes
+// on every run, so a byte comparison would fail on a fresh file. The check
+// therefore compares the `skills` payload and ignores the stamp.
+//
+// It deliberately runs BEFORE the agents half and exits: the agents manifest is
+// sourced from the live agents-api (ADR-0007 6a) and is gitignored in both
+// public dirs, so it can neither go stale in git nor be checked offline. Only
+// the file-sourced skills half is a git artefact that can drift.
+// `--emit-skills` is the same skills-only early exit on the write side: it
+// regenerates workforce-skills.json without the agents fetch. It is what the
+// guard tests build their fixtures with, so the fixtures agree with the real
+// emitter instead of a hand-rolled copy of its shape.
+if (process.argv.includes("--check-skills")) {
+  checkSkillsManifest();
+}
+if (process.argv.includes("--emit-skills")) {
+  emitSkillsManifest();
+}
 
 async function apiGet(path) {
   const url = `${API_BASE}${path}`;
@@ -228,11 +258,11 @@ for (const out of OUT_PATHS) {
 
 // ----- Skills manifest (workforce SPA only) ----------------------------------
 
-function listSkillDirs() {
-  if (!existsSync(SKILLS_DIR)) return [];
-  return readdirSync(SKILLS_DIR)
+function listSkillDirs(skillsDir = SKILLS_DIR) {
+  if (!existsSync(skillsDir)) return [];
+  return readdirSync(skillsDir)
     .filter((name) => /^[a-z][a-z0-9-]*$/.test(name))
-    .filter((name) => statSync(join(SKILLS_DIR, name)).isDirectory())
+    .filter((name) => statSync(join(skillsDir, name)).isDirectory())
     .sort();
 }
 
@@ -252,11 +282,6 @@ function parseFrontmatter(md) {
   }
   return out;
 }
-
-// Cap embedded file payloads to ~256 KiB so a stray large blob can't bloat
-// workforce-skills.json indefinitely. Anything past the cap shows path + size
-// only and the SPA renders a "file too large to preview" placeholder.
-const SKILL_FILE_MAX_BYTES = 256 * 1024;
 
 function detectLanguage(path) {
   if (path === "SKILL.md") return "markdown";
@@ -317,8 +342,8 @@ function walkSkillDir(skillDir) {
   return out;
 }
 
-function loadOneSkill(name) {
-  const dir = join(SKILLS_DIR, name);
+function loadOneSkill(name, skillsDir = SKILLS_DIR) {
+  const dir = join(skillsDir, name);
   const meta = JSON.parse(readFileSync(join(dir, "meta.json"), "utf8"));
   const md = readFileSync(join(dir, "SKILL.md"), "utf8");
   const fm = parseFrontmatter(md);
@@ -336,17 +361,94 @@ function loadOneSkill(name) {
   };
 }
 
-const skills = listSkillDirs().map(loadOneSkill);
-const skillsManifest = {
-  generated_at: new Date().toISOString(),
-  skills,
-};
-const skillsBody = JSON.stringify(skillsManifest, null, 2) + "\n";
-{
-  const dir = dirname(SKILLS_OUT_PATH);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(SKILLS_OUT_PATH, skillsBody);
-  console.log(
-    `build-agent-manifest: wrote ${skills.length} skill(s) -> ${SKILLS_OUT_PATH.replace(REPO_ROOT + "/", "")}`,
-  );
+function buildSkills(skillsDir = SKILLS_DIR) {
+  return listSkillDirs(skillsDir).map((name) => loadOneSkill(name, skillsDir));
 }
+
+function skillsManifestBody(skills) {
+  return JSON.stringify({ generated_at: new Date().toISOString(), skills }, null, 2) + "\n";
+}
+
+/** Names whose committed entry differs from a fresh build, split by cause so
+ *  the CI failure names the file to regenerate rather than dumping a diff. */
+function skillManifestDrift(fresh, committed) {
+  const freshByName = new Map(fresh.map((s) => [s.name, s]));
+  const committedByName = new Map(committed.map((s) => [s.name, s]));
+  const added = fresh.filter((s) => !committedByName.has(s.name)).map((s) => s.name);
+  const removed = committed.filter((s) => !freshByName.has(s.name)).map((s) => s.name);
+  const changed = fresh
+    .filter((s) => committedByName.has(s.name))
+    .filter((s) => JSON.stringify(s) !== JSON.stringify(committedByName.get(s.name)))
+    .map((s) => s.name);
+  return { added, removed, changed };
+}
+
+/** Read an optional CLI override; used only by the check path so the guard is
+ *  drivable against a fixture tree from a test (the real run always uses the
+ *  constants above). */
+function optArg(name) {
+  const i = process.argv.indexOf(`--${name}`);
+  return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : undefined;
+}
+
+function checkSkillsManifest() {
+  const skillsDir = optArg("skills-dir") ?? SKILLS_DIR;
+  const manifestPath = optArg("manifest") ?? SKILLS_OUT_PATH;
+  const rel = manifestPath.replace(REPO_ROOT + "/", "");
+  const fresh = buildSkills(skillsDir);
+
+  if (!existsSync(manifestPath)) {
+    console.error(
+      `build-agent-manifest: ${rel} is missing. Run \`npm run build:agents\` and commit the result.`,
+    );
+    process.exit(1);
+  }
+
+  let committed;
+  try {
+    committed = JSON.parse(readFileSync(manifestPath, "utf8")).skills;
+  } catch (err) {
+    console.error(
+      `build-agent-manifest: ${rel} is not readable as JSON (${err instanceof Error ? err.message : String(err)}). ` +
+        "Run `npm run build:agents` and commit the result.",
+    );
+    process.exit(1);
+  }
+  if (!Array.isArray(committed)) {
+    console.error(
+      `build-agent-manifest: ${rel} has no \`skills\` array. Run \`npm run build:agents\` and commit the result.`,
+    );
+    process.exit(1);
+  }
+
+  const { added, removed, changed } = skillManifestDrift(fresh, committed);
+  if (added.length || removed.length || changed.length) {
+    const parts = [];
+    if (added.length) parts.push(`missing ${added.length} skill(s): ${added.join(", ")}`);
+    if (removed.length) parts.push(`stale ${removed.length} skill(s) no longer in workforce/skills/: ${removed.join(", ")}`);
+    if (changed.length) parts.push(`${changed.length} skill(s) out of date: ${changed.join(", ")}`);
+    console.error(
+      `build-agent-manifest: ${rel} is stale — ${parts.join("; ")}. ` +
+        "Run `npm run build:agents` and commit the result.",
+    );
+    process.exit(1);
+  }
+
+  console.log(`build-agent-manifest: OK (${fresh.length} skill(s) in ${rel})`);
+  process.exit(0);
+}
+
+function emitSkillsManifest() {
+  const skillsDir = optArg("skills-dir") ?? SKILLS_DIR;
+  const manifestPath = optArg("manifest") ?? SKILLS_OUT_PATH;
+  const skills = buildSkills(skillsDir);
+  const dir = dirname(manifestPath);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(manifestPath, skillsManifestBody(skills));
+  console.log(
+    `build-agent-manifest: wrote ${skills.length} skill(s) -> ${manifestPath.replace(REPO_ROOT + "/", "")}`,
+  );
+  if (process.argv.includes("--emit-skills")) process.exit(0);
+}
+
+emitSkillsManifest();

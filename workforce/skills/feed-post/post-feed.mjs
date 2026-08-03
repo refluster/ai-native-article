@@ -34,6 +34,9 @@
 //   2  — endpoint rejected the post (HTTP 422 — W-1 validation) or 401 (auth)
 //   3  — network / unexpected error
 
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { readFileSync } from "node:fs";
 
 // Single source of truth for this skill's write endpoint. The wf-agents-api

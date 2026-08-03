@@ -35,6 +35,9 @@
 //   3 — Notion API / network error (including a failed batch append — the page
 //       is then INCOMPLETE and the error says so; do not leave it silently)
 
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { readFileSync } from "node:fs";
 import { isTruncatedMarkdown, lastNonEmptyLine } from "../../../scripts/lib/truncation.mjs";
 import { validateTags } from "../../../scripts/lib/tags.mjs";

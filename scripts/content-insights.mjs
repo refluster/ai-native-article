@@ -24,6 +24,9 @@
 //   GA4_PROPERTY_ID, GA4_SA_KEY      — optional; see above
 //   DRY_RUN=1                        — compute + print, never write the issue
 
+import { ensureProxyAwareEntry } from "./lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { createSign } from 'node:crypto'
 
 const REPO = process.env.GITHUB_REPOSITORY || 'refluster/ai-native-article'

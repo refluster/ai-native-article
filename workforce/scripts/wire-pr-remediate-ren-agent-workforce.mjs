@@ -41,6 +41,9 @@
 //   aws-vault exec <profile> -- \
 //     node workforce/scripts/wire-pr-remediate-ren-agent-workforce.mjs
 
+import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { spawnSync } from "node:child_process";
 
 const API_BASE = (

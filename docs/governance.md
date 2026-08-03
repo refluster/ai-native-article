@@ -118,6 +118,8 @@ Whatever portion of L0/L1 a machine can check, it should. These are the guards a
 | R-11 | L1 citation gate (touch an L1 doc → cite it or `RULE-N/A:`) | `node scripts/check-l1-citation.mjs` | `ci.yml` (PRs only) | ✅ added 2026-06-07 |
 | R-12 | Governance registry integrity (backlog + ledger well-formed) | `node scripts/check-governance-registries.mjs` | `ci.yml` | ✅ added 2026-06-07 |
 | R-13 | PR terminal-state sweep — every PR in autopilot scope ends **merged** or **escalated** (`autopilot:needs-human`); auto-escalates ML-009 label drops, stalled cycles, and window-aged PRs | `node workforce/skills/pr-autopilot/pr-autopilot-sweep.mjs --apply` (state check: `workforce/scripts/check-escalation-labels.mjs`) | `workforce-pr-terminal-sweep.yml` (daily) | ✅ added 2026-07-03 |
+| R-14 | Proxy-bootstrap gate — every `.mjs` calling the global `fetch()` must import `scripts/lib/proxy-bootstrap.mjs`, so the process honours `HTTPS_PROXY` instead of bypassing the CCR agent proxy | `node scripts/check-proxy-bootstrap.mjs` | `ci.yml` | ✅ added 2026-08-02 (ML-017) |
+| R-15 | Corpus freshness gate — the newest published `explanation` / `analysis` must be within `MAX_AGE_DAYS` (5), so a silently dead generation path raises an alarm instead of never being noticed | `node scripts/check-corpus-freshness.mjs` | `corpus-freshness.yml` (daily 21:00 UTC) — **not** a PR gate: staleness is a property of time, not of a diff | ✅ added 2026-08-02 (ML-019) |
 
 R-numbers are never re-used: a retired row keeps its slot so older provenance (incident notes, ADRs, memory-lint rows) still resolves.
 

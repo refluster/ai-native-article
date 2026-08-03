@@ -17,6 +17,9 @@
 // Exit codes: 0 completed (see JSON for partial-failure findings), 1 bad
 // args/env, 3 fatal (couldn't even read the local backlog file).
 
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
