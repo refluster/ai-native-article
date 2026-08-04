@@ -53,6 +53,9 @@
 // Exit codes: 0 clean / all applied · 1 bad args · 2 violations found (check
 // mode) or an apply write failed · 3 network / unexpected.
 
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs"
+ensureProxyAwareEntry(import.meta.url)
+
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { projectRepo } from "./pr-autopilot-scan.mjs";
