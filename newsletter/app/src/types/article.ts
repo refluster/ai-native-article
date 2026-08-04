@@ -24,6 +24,21 @@ export interface ArticleMeta {
   categoriesMulti?: string[]
   date: string
   abstract: string
+  /**
+   * English edition title (ADR-0005). Present only when the article's Notion
+   * row carries an `EN` child page. The reader shows it in place of `title`
+   * when the active language is English; when absent it falls back to the
+   * Japanese title rather than hiding the article from the index.
+   */
+  titleEn?: string
+  /** English edition lead. Same presence/fallback rules as `titleEn`. */
+  abstractEn?: string
+  /**
+   * True when `<slug>.en.md` exists in the export. The reader gates the
+   * English body fetch on this so a Japanese-only article never issues a
+   * request it knows will 404.
+   */
+  hasEn?: boolean
   /** Hero image path under /posts/images/. Set by the L4 publish step. */
   image?: string
   /**

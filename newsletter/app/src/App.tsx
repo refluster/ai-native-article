@@ -10,6 +10,7 @@ import DesignSystem from './pages/design/DesignSystem'
 import DesignGuide from './pages/design/DesignGuide'
 import Capture from './pages/pipeline/Capture'
 import { routerBaseName } from './lib/paths'
+import { LanguageProvider } from './i18n/LanguageProvider'
 import { trackPageView } from '@kohuehara/shared/analytics'
 
 function RouteTracker() {
@@ -25,26 +26,30 @@ function RouteTracker() {
 }
 
 export default function App() {
+  // LanguageProvider wraps the router: the reader's edition is a property of
+  // the reader, not of the route, and every route needs it.
   return (
-    <BrowserRouter basename={routerBaseName()}>
-      <RouteTracker />
-      <div className="min-h-screen flex flex-col bg-surface">
-        <Header />
-        <main className="flex-1 pt-16">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/sources" element={<Sources />} />
-            <Route path="/operator" element={<Operator />} />
-            <Route path="/article/:slug" element={<Article />} />
-            <Route path="/design-system" element={<DesignSystem />} />
-            <Route path="/design-guide" element={<DesignGuide />} />
-            <Route path="/capture" element={<Capture />} />
-            {/* Legacy alias — the PWA share-target action points here. */}
-            <Route path="/l1-register" element={<Capture />} />
-          </Routes>
-        </main>
-        <Footer />
-      </div>
-    </BrowserRouter>
+    <LanguageProvider>
+      <BrowserRouter basename={routerBaseName()}>
+        <RouteTracker />
+        <div className="min-h-screen flex flex-col bg-surface">
+          <Header />
+          <main className="flex-1 pt-16">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/sources" element={<Sources />} />
+              <Route path="/operator" element={<Operator />} />
+              <Route path="/article/:slug" element={<Article />} />
+              <Route path="/design-system" element={<DesignSystem />} />
+              <Route path="/design-guide" element={<DesignGuide />} />
+              <Route path="/capture" element={<Capture />} />
+              {/* Legacy alias — the PWA share-target action points here. */}
+              <Route path="/l1-register" element={<Capture />} />
+            </Routes>
+          </main>
+          <Footer />
+        </div>
+      </BrowserRouter>
+    </LanguageProvider>
   )
 }

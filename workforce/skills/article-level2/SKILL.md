@@ -1,6 +1,6 @@
 ---
 name: article-level2
-description: Convert one L1 source entry into one L2 explanation (briefing-document) article in Japanese — the agent-workforce equivalent of the GAS L1→L2 batch. Use when an editorial-stream agent must turn an uncovered L1 source into a faithful, evidence-grounded explanation: an Executive Summary up front, source-specific section headings, and every number/name/date/quote taken verbatim from the source. Published to Notion as Type=explanation, Author={agent_slug}, Status=ready.
+description: Convert one L1 source entry into one L2 explanation (briefing-document) article, written in Japanese and then issued in both Japanese and English — the agent-workforce equivalent of the GAS L1→L2 batch. Use when an editorial-stream agent must turn an uncovered L1 source into a faithful, evidence-grounded explanation: an Executive Summary up front, source-specific section headings, and every number/name/date/quote taken verbatim from the source. Published to Notion as Type=explanation, Author={agent_slug}, Status=ready, with the English edition on an `EN` child page.
 ---
 
 # article-level2
@@ -82,6 +82,36 @@ genuinely separate DB — its id is a constant in `pick-l1-source.mjs`.)
    follows (Epic-011 §7 / Q9). In-body boilerplate duplicates that metadata,
    freezes a model id in prose, and was the trigger for the ML-006 deploy-gate
    false positive.
+5. **Then issue the same explanation in English** (ADR-0005). See the next
+   section — this is one more *output*, not one more *article*.
+
+## Two editions, one act of judgment (ADR-0005)
+
+Every article ships in Japanese **and** English. This does not double the work
+and must not double the thinking:
+
+- **Everything upstream of the writing is shared.** One pick, one source body,
+  one reading of the evidence, one set of tags, one set of conclusions. Do not
+  re-fetch the source for the English edition; do not re-decide what the article
+  argues; do not let the two editions reach different conclusions or carry
+  different numbers. If they disagree about a fact, one of them is wrong.
+- **Only the rendering differs.** Write the Japanese explanation first — it is
+  the article. Then write the English edition of *that* article: same structure,
+  same section order, same evidence, same figures, quotations restored to their
+  original English wording where the source was English.
+- **English is an edition, not a gloss.** Write it as an English-language
+  publication would: natural English prose, not transliterated Japanese
+  sentence order. Keep the headline concrete and specific in the same way the
+  Japanese one is. Japanese terms with no clean English equivalent keep the
+  original with a short parenthetical.
+- **The same hard rules apply to both.** No invented facts, no rounded figures,
+  no reviewer-voice hedges, no bias-disclosure footer.
+
+Format for the English edition, identical in shape to the Japanese one:
+
+- **Line 1**: a `#` H1 — the English title.
+- **Directly below**: a `## Executive Summary` section.
+- **Body**: the same `##` sections in the same order.
 
 ## Hard rules (editorial integrity — C-1, fail loud — C-4)
 
@@ -117,11 +147,12 @@ Steps:
 1. Write the full explanation markdown to a temp file (e.g. `/tmp/l2-article.md`)
    — a file, not a shell arg, so multi-line / Unicode prose isn't mangled by
    quoting. The first line must be the `# Title` H1 (used as the page Title and
-   stripped from the body blocks).
+   stripped from the body blocks). Write the **English edition** the same way to
+   `/tmp/l2-article.en.md`, also starting with its own `# Title` H1.
 2. Write the **abstract** — a faithful 2–3 sentence lead (your `## Executive
    Summary`, **not** the speculative L1 summary) — to a second temp file (e.g.
    `/tmp/l2-abstract.txt`). This populates the `Abstract` column, matching how
-   other rows lead.
+   other rows lead. Write the English lead to `/tmp/l2-abstract.en.txt`.
 3. **Choose 3–5 tags** from the controlled flat vocabulary (ADR-0003 /
    `scripts/lib/tags.mjs`) — pick by what the explanation genuinely covers,
    *by topic*, not by the L1 source's old letter. The vocabulary:
@@ -146,22 +177,36 @@ Steps:
        --type explanation \
        --status ready \
        --body-file /tmp/l2-article.md \
+       --body-en-file /tmp/l2-article.en.md \
        --abstract-file /tmp/l2-abstract.txt \
+       --abstract-en-file /tmp/l2-abstract.en.txt \
        --tags "Verification & Trust,Engineering Process" \
        --source-url "<sourceUrl from step 1>"   # omit if none
    ```
 
+   `--body-en-file` is **required**. There is no Japanese-only publish path —
+   an article without its English edition is an incomplete fire (ADR-0005).
+
 5. Report the script's exit code:
-   - `0` — page created. The row carries `Author={agent_slug}, Type=explanation,
-     Status=ready`, plus `Abstract` + `Category`/`CategoriesMulti`. Done —
-     `Status=ready` is already publishable; nothing flips it later.
-   - `2` — W-1 editorial guard failed (empty/short body, LLM-artefact prelude,
-     or a last line that looks cut off mid-content — the shared
-     `scripts/lib/truncation.mjs` heuristic), or `401/403` auth (project
-     credential bag misconfigured). Read stderr; do not retry blindly. A
-     sentence ending wrapped in emphasis (`*…。*`) is a valid ending — if the
-     guard trips, the body really is cut off; regenerate the ending.
-   - `1` / `3` — bad args / missing H1 title, or Notion API / network error.
+   - `0` — page created, in both editions. The row carries
+     `Author={agent_slug}, Type=explanation, Status=ready`, plus `Abstract` +
+     `Category`/`CategoriesMulti`, and an `EN` child page holding the English
+     edition. Done — `Status=ready` is already publishable; nothing flips it
+     later.
+   - `2` — W-1 editorial guard failed **in either edition** (empty/short body,
+     LLM-artefact prelude, or a last line that looks cut off mid-content — the
+     shared `scripts/lib/truncation.mjs` heuristic), or `401/403` auth (project
+     credential bag misconfigured). Read stderr; the message names which
+     edition. Nothing was written, so fix that edition and re-run the whole
+     command. Do not retry blindly. A sentence ending wrapped in emphasis
+     (`*…。*`) is a valid ending — if the guard trips, the body really is cut
+     off; regenerate the ending.
+   - `1` / `3` — bad args / missing H1 title in either edition, or Notion API /
+     network error. On `3` nothing was created.
+   - `4` — the row was created but its English edition failed to write. The
+     article is live and Japanese-only. **Do not re-run the publish command** —
+     that would create a duplicate row. stderr names the page; report the
+     failure so the operator can complete it with `backfill-en.mjs`.
 
 `NOTION_API_KEY` comes from your task's injected
 `credentials["notion.integration_token"].apiKey` — never read it from anywhere

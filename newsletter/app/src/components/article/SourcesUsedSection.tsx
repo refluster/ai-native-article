@@ -8,6 +8,8 @@ import {
 } from '../../lib/source-links'
 import { displayTag } from '../../lib/article-types'
 import { trackEvent } from '@kohuehara/shared/analytics'
+import { useLanguage } from '../../i18n/LanguageProvider'
+import { localizedAbstract, localizedTitle } from '../../i18n/article'
 
 interface Props {
   slug: string
@@ -16,6 +18,7 @@ interface Props {
 }
 
 export default function SourcesUsedSection({ slug, sourceUrls, index }: Props) {
+  const { language, t } = useLanguage()
   const urls = parseSourceUrls(sourceUrls)
   if (urls.length === 0) return null
 
@@ -30,7 +33,7 @@ export default function SourcesUsedSection({ slug, sourceUrls, index }: Props) {
     <section className="max-w-3xl mx-auto px-6 md:px-12 pb-12">
       <div className="border-t border-outline-variant/20 pt-10 mt-10">
         <h3 className="text-[10px] font-bold tracking-widest text-outline uppercase mb-6">
-          SOURCES USED — 元になった出典
+          {t('sources.used')}
         </h3>
         <ul className="space-y-6">
           {urls.map(rawUrl => {
@@ -49,7 +52,7 @@ export default function SourcesUsedSection({ slug, sourceUrls, index }: Props) {
                     </span>
                   ) : (
                     <span className="text-[10px] font-bold tracking-widest text-outline uppercase">
-                      外部のみ
+                      {t('sources.externalOnly')}
                     </span>
                   )}
                   <span className="text-[10px] font-bold tracking-widest text-outline uppercase">
@@ -62,11 +65,11 @@ export default function SourcesUsedSection({ slug, sourceUrls, index }: Props) {
                       to={`/article/${exp.slug}`}
                       className="text-base md:text-lg font-extrabold tracking-tight leading-snug block mb-1 hover:text-tertiary transition-colors"
                     >
-                      {exp.title}
+                      {localizedTitle(exp, language)}
                     </Link>
                     {exp.abstract && (
                       <p className="text-sm leading-relaxed text-on-surface-variant line-clamp-2 mb-3">
-                        {exp.abstract}
+                        {localizedAbstract(exp, language)}
                       </p>
                     )}
                   </>
@@ -81,7 +84,7 @@ export default function SourcesUsedSection({ slug, sourceUrls, index }: Props) {
                       to={`/article/${exp.slug}`}
                       className="border border-outline-variant/40 px-3 py-1.5 hover:border-tertiary hover:text-tertiary transition-colors"
                     >
-                      解説を読む →
+                      {t('sources.readExplanation')} →
                     </Link>
                   )}
                   <a
@@ -91,7 +94,7 @@ export default function SourcesUsedSection({ slug, sourceUrls, index }: Props) {
                     onClick={() => onExternalClick(rawUrl)}
                     className="border border-outline-variant/40 px-3 py-1.5 hover:border-tertiary hover:text-tertiary transition-colors inline-flex items-center gap-1"
                   >
-                    元記事 ↗
+                    {t('sources.original')} ↗
                   </a>
                 </div>
               </li>

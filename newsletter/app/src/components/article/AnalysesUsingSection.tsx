@@ -7,6 +7,8 @@ import {
 } from '../../lib/source-links'
 import { displayTag } from '../../lib/article-types'
 import { trackEvent } from '@kohuehara/shared/analytics'
+import { useLanguage } from '../../i18n/LanguageProvider'
+import { localizedAbstract, localizedTitle } from '../../i18n/article'
 
 interface Props {
   slug: string
@@ -15,6 +17,7 @@ interface Props {
 }
 
 export default function AnalysesUsingSection({ slug, sourceUrls, index }: Props) {
+  const { language, t } = useLanguage()
   const urls = parseSourceUrls(sourceUrls)
   if (urls.length === 0) return null
   const externalUrl = urls[0]
@@ -32,7 +35,7 @@ export default function AnalysesUsingSection({ slug, sourceUrls, index }: Props)
     <section className="max-w-3xl mx-auto px-6 md:px-12 pb-12">
       <div className="border-t border-outline-variant/20 pt-10 mt-10">
         <h3 className="text-[10px] font-bold tracking-widest text-outline uppercase mb-6">
-          ORIGINAL SOURCE — 元の外部記事
+          {t('sources.originalSource')}
         </h3>
         <a
           href={externalUrl}
@@ -48,7 +51,7 @@ export default function AnalysesUsingSection({ slug, sourceUrls, index }: Props)
         {analyses.length > 0 && (
           <>
             <h3 className="text-[10px] font-bold tracking-widest text-outline uppercase mb-6">
-              FEATURED IN ANALYSES — この出典を取り上げた分析
+              {t('sources.featuredIn')}
             </h3>
             <ul className="space-y-6">
               {analyses.map(a => (
@@ -65,10 +68,10 @@ export default function AnalysesUsingSection({ slug, sourceUrls, index }: Props)
                     to={`/article/${a.slug}`}
                     className="text-base md:text-lg font-extrabold tracking-tight leading-snug block mb-1 hover:text-tertiary transition-colors"
                   >
-                    {a.title}
+                    {localizedTitle(a, language)}
                   </Link>
                   <p className="text-sm leading-relaxed text-on-surface-variant line-clamp-2">
-                    {a.abstract}
+                    {localizedAbstract(a, language)}
                   </p>
                 </li>
               ))}

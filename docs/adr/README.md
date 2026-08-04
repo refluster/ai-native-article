@@ -51,5 +51,6 @@ headers:
 | [0002](adr-0002-daily-use-reader-ia.md) | Daily-use reader IA: analysis-default, flat tags, operator split | Proposed |
 | [0003](adr-0003-flat-tag-taxonomy.md) | Flat tag taxonomy (replacing the A–E hierarchy) | Proposed |
 | [0004](adr-0004-governance-consolidation.md) | Governance consolidation: de-duplicated statute, R-11 full-law coverage, R-13 terminal-state sweep | Proposed |
+| [0005](adr-0005-bilingual-article-editions.md) | Bilingual article editions (ja/en): one Notion row, an `EN` child page, one URL | Proposed |
 
 Keep this table in sync when an ADR is added or its Status flips.

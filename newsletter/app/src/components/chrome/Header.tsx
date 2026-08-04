@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import LanguageToggle from './LanguageToggle'
 
 // Daily-use first: the public header carries the reader's home and nothing
 // else. Operator surfaces (design system/guide, capture, workforce console,
@@ -33,9 +34,12 @@ export default function Header() {
           AI NATIVE ARTICLE
         </NavLink>
 
-        {/* Right cluster intentionally empty — kept as a flex spacer so the
-            wordmark stays centred between it and the left nav. */}
-        <div className="flex items-center gap-4 md:gap-6" aria-hidden="true" />
+        {/* Right cluster: the language switch, and nothing else. It is the one
+            reader-facing control the header carries — the daily-use IA
+            (ADR-0002) keeps operator tooling on /operator. */}
+        <div className="flex items-center gap-4 md:gap-6">
+          <LanguageToggle />
+        </div>
       </div>
     </header>
   )

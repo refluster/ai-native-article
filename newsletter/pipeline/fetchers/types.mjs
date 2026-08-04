@@ -15,6 +15,9 @@
  *  @property {string} date                  // ISO date "YYYY-MM-DD"
  *  @property {string} abstract
  *  @property {string} bodyMd                // Body Markdown (no frontmatter)
+ *  @property {string} [titleEn]             // ADR-0005: English edition title. '' when the row has no `EN` child page.
+ *  @property {string} [abstractEn]          // ADR-0005: English edition lead. '' when absent.
+ *  @property {string} [bodyEnMd]            // ADR-0005: English body Markdown. '' when the article is Japanese-only — the writer then emits no `<slug>.en.md`.
  *  @property {string} sourceUrls            // Comma-separated URLs (display)
  *  @property {string} legacySlug            // '' if unset
  *  @property {string} legacyNotionId        // '' if unset; original L2/L3 page id (set by migrate script)

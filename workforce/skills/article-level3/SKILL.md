@@ -1,6 +1,6 @@
 ---
 name: article-level3
-description: Synthesize 3 recent L2 explanation articles into one L3 analysis (insight) article in Japanese via inductive reasoning — the agent-workforce equivalent of the GAS L3_BATCH/handleL3Create pipeline. Use when an editorial-stream agent must find the deeper principle connecting several ostensibly-unrelated explanations and project its implications. Published to the unified Notion Articles DB as Type=analysis, Author={agent_slug}, Status=ready.
+description: Synthesize 3 recent L2 explanation articles into one L3 analysis (insight) article, written in Japanese and then issued in both Japanese and English, via inductive reasoning — the agent-workforce equivalent of the GAS L3_BATCH/handleL3Create pipeline. Use when an editorial-stream agent must find the deeper principle connecting several ostensibly-unrelated explanations and project its implications. Published to the unified Notion Articles DB as Type=analysis, Author={agent_slug}, Status=ready, with the English edition on an `EN` child page.
 ---
 
 # article-level3
@@ -105,7 +105,29 @@ them**, and build the article on that hypothesis. Not a summary of three article
   rewrite it into a claim with an edge.
 - **No generic titles**, no reviewer-voice hedges ("重要だ", "今後注目される"),
   no throat-clearing preambles. Objective, incisive tone.
-- **Output全文を日本語で.**
+- **日本語版は全文を日本語で.** (The English edition below is a second rendering
+  of the same analysis, not a second analysis.)
+
+### 3. Issue the same analysis in English (ADR-0005)
+
+Every article ships in Japanese **and** English. This does not double the work
+and must not double the thinking:
+
+- **Everything upstream of the writing is shared.** One pick, one sample of
+  three L2s, one induced principle, one set of tags, one set of predictions. Do
+  not re-run the picker, do not re-derive the principle, and never let the two
+  editions argue different things or carry different figures. If they disagree
+  about a fact, one of them is wrong.
+- **Only the rendering differs.** Write the Japanese analysis first — it is the
+  article. Then write the English edition of *that* analysis: same structure,
+  same section order, same evidence, same attributions to the three source L2s
+  (name them by their English titles when they have one, otherwise the Japanese
+  title).
+- **English is an edition, not a gloss.** Natural English prose, not
+  transliterated Japanese sentence order. The H1 keeps the same job: name the
+  underlying principle, not the topic, and keep the same edge.
+- **The same hard rules apply.** Synthesis not summary, every claim traceable to
+  one of the three sources, falsifiable principle, no bias-disclosure footer.
 
 ## Write the analysis — run the script, do NOT hand-edit any file
 
@@ -115,10 +137,12 @@ generate the *judgment* (the synthesis markdown); `publish-notion.mjs` owns the
 `analysis` page into the unified Articles DB with the injected integration token.
 
 1. Write the full analysis markdown to a temp file (e.g. `/tmp/l3-article.md`) —
-   a file, not a shell arg. The first line must be the `# Title` H1.
+   a file, not a shell arg. The first line must be the `# Title` H1. Write the
+   **English edition** the same way to `/tmp/l3-article.en.md`, also starting
+   with its own `# Title` H1.
 2. Write the **abstract** — a faithful 2–3 sentence lead (your opening thesis) —
    to a second temp file (e.g. `/tmp/l3-abstract.txt`). This populates the
-   `Abstract` column.
+   `Abstract` column. Write the English lead to `/tmp/l3-abstract.en.txt`.
 3. **Choose 3–5 tags** for the analysis from the controlled flat vocabulary
    (ADR-0003 / `scripts/lib/tags.mjs`). Start from the picker's `suggestedTags`
    (the union of the three sources' tags), then adjust to what the *synthesis*
@@ -146,23 +170,36 @@ generate the *judgment* (the synthesis markdown); `publish-notion.mjs` owns the
        --type analysis \
        --status ready \
        --body-file /tmp/l3-article.md \
+       --body-en-file /tmp/l3-article.en.md \
        --abstract-file /tmp/l3-abstract.txt \
+       --abstract-en-file /tmp/l3-abstract.en.txt \
        --source-urls "<sourceUrls from the picker>" \
        --tags "Org Transformation,Verification & Trust,AI Strategy"
    ```
 
+   `--body-en-file` is **required**. There is no Japanese-only publish path —
+   an article without its English edition is an incomplete fire (ADR-0005).
+
 5. Report the script's exit code:
-   - `0` — page created. The row carries `Author={agent_slug}, Type=analysis,
-     Status=ready`, plus `Abstract`, `SourceURLs` (the three source L2 URLs), and
-     `Category`/`CategoriesMulti` (the vocabulary tags you chose). The GAS
-     L4 batch generates the hero image and flips Status to `published`. Done.
-   - `2` — W-1 editorial guard failed (empty/short body, LLM-artefact prelude,
-     or a last line that looks cut off mid-content — the shared
-     `scripts/lib/truncation.mjs` heuristic), or `401/403` auth (project
-     credential bag misconfigured). Read stderr; do not retry blindly. A
-     sentence ending wrapped in emphasis (`*…。*`) is a valid ending — if the
-     guard trips, the body really is cut off; regenerate the ending.
-   - `1` / `3` — bad args / missing H1 title, or Notion API / network error.
+   - `0` — page created, in both editions. The row carries
+     `Author={agent_slug}, Type=analysis, Status=ready`, plus `Abstract`,
+     `SourceURLs` (the three source L2 URLs), `Category`/`CategoriesMulti` (the
+     vocabulary tags you chose), and an `EN` child page holding the English
+     edition. Done.
+   - `2` — W-1 editorial guard failed **in either edition** (empty/short body,
+     LLM-artefact prelude, or a last line that looks cut off mid-content — the
+     shared `scripts/lib/truncation.mjs` heuristic), or `401/403` auth (project
+     credential bag misconfigured). Read stderr; the message names which
+     edition. Nothing was written, so fix that edition and re-run the whole
+     command. Do not retry blindly. A sentence ending wrapped in emphasis
+     (`*…。*`) is a valid ending — if the guard trips, the body really is cut
+     off; regenerate the ending.
+   - `1` / `3` — bad args / missing H1 title in either edition, or Notion API /
+     network error. On `3` nothing was created.
+   - `4` — the row was created but its English edition failed to write. The
+     article is live and Japanese-only. **Do not re-run the publish command** —
+     that would create a duplicate row. stderr names the page; report the
+     failure so the operator can complete it with `backfill-en.mjs`.
 
 `NOTION_API_KEY` comes from your task's injected
 `credentials["notion.integration_token"].apiKey` — never read it from anywhere
