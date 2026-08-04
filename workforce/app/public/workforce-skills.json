@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-04T05:02:30.270Z",
+  "generated_at": "2026-08-04T05:03:42.456Z",
   "skills": [
     {
       "name": "article-level2",
@@ -28,9 +28,9 @@
         },
         {
           "path": "meta.json",
-          "size": 381,
+          "size": 365,
           "language": "json",
-          "contents": "{\n  \"name\": \"article-level2\",\n  \"version\": \"0.4.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": false,\n    \"article_type\": \"explanation\"\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\n    \"elena\"\n  ],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-06-01\",\n  \"requires\": [\n    \"notion.integration_token\"\n  ]\n}\n",
+          "contents": "{\n  \"name\": \"article-level2\",\n  \"version\": \"0.4.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": false,\n    \"article_type\": \"explanation\"\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"elena\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-06-01\",\n  \"requires\": [\"notion.integration_token\"]\n}\n",
           "truncated": false,
           "binary": false
         },

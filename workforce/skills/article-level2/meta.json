@@ -9,12 +9,8 @@
     "article_type": "explanation"
   },
   "cost_class": "medium",
-  "owners": [
-    "elena"
-  ],
+  "owners": ["elena"],
   "improvement_agent": "sana",
   "created_at": "2026-06-01",
-  "requires": [
-    "notion.integration_token"
-  ]
+  "requires": ["notion.integration_token"]
 }
