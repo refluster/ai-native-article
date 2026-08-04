@@ -19,6 +19,7 @@
     "preview:workforce": "npm run preview -w @kohuehara/workforce",
     "build:agents": "node workforce/scripts/build-agent-manifest.mjs",
     "fetch-notion": "node newsletter/pipeline/fetch-notion.mjs",
+    "backfill-en": "node newsletter/pipeline/backfill-en.mjs",
     "lint:tokens": "node scripts/lint-design-tokens.mjs",
     "check-truncation": "node scripts/check-corpus-truncation.mjs",
     "check-proxy-bootstrap": "node scripts/check-proxy-bootstrap.mjs",

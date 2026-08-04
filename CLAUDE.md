@@ -7,6 +7,8 @@ You are working in `ai-native-article`, a personal blog/insight site at `https:/
 
 Cross-cutting governance lives at root: [`docs/`](docs/) and [`AGENTS.md`](AGENTS.md). `packages/shared` is shared by both apps.
 
+The site is **bilingual (ja/en)** — see [`docs/adr/adr-0005-bilingual-article-editions.md`](docs/adr/adr-0005-bilingual-article-editions.md). One Notion row per article; its English edition is an `EN` child page under that row; one URL serves both (`?lang=` → `localStorage` → browser). Both cadences require `--body-en-file`, and `newsletter/pipeline/backfill-en.mjs` fills the pre-ADR corpus.
+
 Articles flow through a 4-stage pipeline: web sources → Notion blog drafts (L2) → Notion synthesis (L3) → published markdown (L4). Generation runs through the **workforce cadences** `workforce/skills/article-level2/` (L2 explanations) and `article-level3/` (L3 analyses) — bound to the persona **Ingrid** (`AGENT#ingrid` bindings 1 and 2, every 6h; Elena authored the corpus up to 2026-07-19 and the skill `owners` still name her), fired by the CCR / `wf-orchestrator-tick` schedule, writing directly to the Notion unified Articles DB via each skill's `publish-notion.mjs` (the canonical editorial guard **W-1**). Publication is `.github/workflows/deploy-article-site.yml`, which runs `newsletter/pipeline/fetch-notion.mjs` (exports every Articles-DB row) and deploys a React SPA built from that Notion content. Generation is increasingly run through a **multi-candidate, multi-judge quality layer** (see "The quality layer" below). (Governing record: `workforce/docs/epics/epic-005-agent-authored-article-pipeline.md`.)
 
 ## Doc map — what to read before editing
