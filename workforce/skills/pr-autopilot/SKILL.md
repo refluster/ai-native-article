@@ -331,7 +331,25 @@ the aggregated colour, then take the terminal action:
 | 🟡 | open blocking lens findings | hand off `--needs-author --reason review-findings-open` |
 | 🔴 | a lens **vetoed a defect in the diff**, and cycle + 1 ≤ `cycle_cap` | hand off `--needs-author --reason review-findings-blocking` **+ remediation brief** (adr-0023) |
 | 🔴 | cycle + 1 > `cycle_cap` | hand off `--needs-human --reason cycle-cap-exceeded` |
-| 🔴 (premise/scope) / non-consensus / can't seat 3 / unreadable governance | any | hand off `--needs-human` (no `--reviewed`) |
+| 🔴 (premise/scope) / **irreconcilable panel** / can't seat 3 / unreadable governance | any | hand off `--needs-human` (no `--reviewed`) |
+
+> **"Irreconcilable panel" is NOT "the panel wasn't unanimous green."** Read
+> literally, *every* 🔴 and *every* 🟡 is non-unanimous, so a row keyed on that
+> swallows the two rows above it and adr-0022/0023's author lane never fires —
+> the failure this note exists to prevent. It means the narrow case where the
+> lenses **contradict each other** on a point you cannot adjudicate (one says the
+> approach is right, another says it is wrong at the premise) and no synthesis is
+> honest. A single veto naming a concrete diff-local defect, with the other
+> lenses merely non-blocking, is **not** this — it is the `--needs-author` row,
+> however emphatic the veto. Ask: *is there a fix an agent could make that all
+> lenses would accept?* If yes, the author lane owns it.
+>
+> *(Recorded 2026-08-04 after PR #524: judged 2026-07-31 07:51Z, ~15h before
+> adr-0022 shipped the author lane, so the router had only merge-or-human and
+> stamped `no-reviewer-consensus` on a 🔴 whose findings were entirely
+> diff-local — and its own verdict prescribed the cycle-2 fixes. The label then
+> made `isTerminal()` skip the PR forever, so the revision it asked for could not
+> be produced by the workforce.)*
 
 ### The author lane — a 🟡 with an owner (adr-0022)
 
