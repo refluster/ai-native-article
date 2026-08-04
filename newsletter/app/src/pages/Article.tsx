@@ -14,9 +14,12 @@ import SourcesUsedSection from '../components/article/SourcesUsedSection'
 import AnalysesUsingSection from '../components/article/AnalysesUsingSection'
 import AuthorChip from '../components/byline/AuthorChip'
 import { parseAuthorSlugs } from '../lib/byline'
+import { useLanguage } from '../i18n/LanguageProvider'
 
 interface Frontmatter extends ArticleMeta {
   notionId?: string
+  /** Written by the L4 export; `'en'` on `<slug>.en.md`. Informational here. */
+  lang?: string
 }
 
 const TYPE_BADGE_EN: Record<ArticleType, string> = {
@@ -66,11 +69,16 @@ const markdownComponents: Components = {
 
 export default function Article() {
   const { slug } = useParams<{ slug: string }>()
+  const { language, t } = useLanguage()
   const [meta, setMeta] = useState<Partial<Frontmatter>>({})
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [manifest, setManifest] = useState<ArticleMeta[]>([])
+  // True when the reader asked for English and we served Japanese because no
+  // English edition exists yet. Surfaced as a notice rather than swallowed —
+  // an unexplained language change is worse than an explained one (C-4).
+  const [fellBackToJa, setFellBackToJa] = useState(false)
 
   // Refs so the scroll listener closes over mutable state without re-binding.
   const depthsHit = useRef<Set<number>>(new Set())
@@ -88,54 +96,77 @@ export default function Article() {
   }, [slug])
 
   useEffect(() => {
+    fetch(withBasePath('posts/manifest.json'))
+      .then(r => r.json())
+      .then((data: ArticleMeta[]) => setManifest(data))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
     if (!slug) return
+    let cancelled = false
     setLoading(true)
     setError(false)
 
-    fetch(withBasePath('posts/manifest.json'))
-      .then(r => r.json())
-      .then((data: ArticleMeta[]) => {
-        setManifest(data)
-      })
-      .catch(() => {})
+    /**
+     * Load the requested edition, falling back to Japanese.
+     *
+     * `<slug>.en.md` only exists for articles whose Notion row carries an EN
+     * child page (ADR-0005), so a 404 here is the ordinary "not translated
+     * yet" case during the backfill — not an error. We serve the Japanese body
+     * and say so.
+     */
+    async function loadArticle(articleSlug: string) {
+      if (language === 'en') {
+        const res = await fetch(withBasePath(`posts/${articleSlug}.en.md`))
+        if (res.ok) return { raw: await res.text(), servedLanguage: 'en' as const }
+      }
+      const res = await fetch(withBasePath(`posts/${articleSlug}.md`))
+      if (!res.ok) throw new Error('Not found')
+      return { raw: await res.text(), servedLanguage: 'ja' as const }
+    }
 
-    fetch(withBasePath(`posts/${slug}.md`))
-      .then(r => {
-        if (!r.ok) throw new Error('Not found')
-        return r.text()
-      })
-      .then(raw => {
+    loadArticle(slug)
+      .then(({ raw, servedLanguage }) => {
+        if (cancelled) return
         const { meta: m, content: c } = parseFrontmatter(raw)
         setMeta(m)
         setContent(c)
+        setFellBackToJa(language === 'en' && servedLanguage === 'ja')
         setLoading(false)
         categoryRef.current = m.category || ''
-        setArticleSeo({
-          title: m.title || 'Untitled',
-          description: m.abstract || '',
-          slug,
-          category: m.category,
-          date: m.date,
-          image: m.image,
-        })
+        setArticleSeo(
+          {
+            title: m.title || 'Untitled',
+            description: m.abstract || '',
+            slug,
+            category: m.category,
+            date: m.date,
+            image: m.image,
+          },
+          servedLanguage,
+        )
         trackEvent({
           name: 'article_view',
           params: {
             slug,
             category: m.category || '',
             date: m.date || '',
+            language: servedLanguage,
           },
-        })
+        } as never)
       })
       .catch(() => {
+        if (cancelled) return
         setError(true)
         setLoading(false)
       })
 
     return () => {
-      setDefaultSeo()
+      cancelled = true
+      setDefaultSeo(language)
     }
-  }, [slug])
+  }, [slug, language])
 
   // Scroll-depth tracking. We measure relative to the article body, not the
   // full page, so header/footer don't distort the signal.
@@ -211,7 +242,7 @@ export default function Article() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <span className="text-[10px] font-bold tracking-widest text-outline uppercase animate-pulse">
-          LOADING...
+          {t('article.loading')}
         </span>
       </div>
     )
@@ -223,9 +254,9 @@ export default function Article() {
         <span className="text-[10px] font-bold tracking-widest text-tertiary uppercase block mb-4">
           404
         </span>
-        <h1 className="text-4xl font-black tracking-tighter mb-8">Article not found</h1>
+        <h1 className="text-4xl font-black tracking-tighter mb-8">{t('article.notFound')}</h1>
         <Link to="/" className="text-xs font-bold tracking-widest uppercase hover:text-tertiary">
-          ← BACK TO INDEX
+          ← {t('article.backToIndex')}
         </Link>
       </div>
     )
@@ -249,7 +280,7 @@ export default function Article() {
             to="/"
             className="print-hide inline-block text-[10px] font-bold tracking-widest text-outline uppercase mb-10 hover:text-tertiary transition-colors"
           >
-            ← INDEX
+            ← {t('article.index')}
           </Link>
           <div className="max-w-3xl">
             {tags.length > 0 && (
@@ -291,9 +322,9 @@ export default function Article() {
                   fact-check "back drawer". */}
               {articleType === 'explanation' && (
                 <span className="text-tertiary">
-                  {ARTICLE_TYPE_LABELS.explanation}
-                  {' / '}
-                  {TYPE_BADGE_EN.explanation}
+                  {language === 'ja'
+                    ? `${ARTICLE_TYPE_LABELS.explanation} / ${TYPE_BADGE_EN.explanation}`
+                    : TYPE_BADGE_EN.explanation}
                 </span>
               )}
               {/* Epic-017: Spotify deep-link to the article's podcast episode.
@@ -306,7 +337,7 @@ export default function Article() {
                   href={meta.spotifyUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label="Spotifyでポッドキャストを聴く"
+                  aria-label={t('article.spotifyAria')}
                   onClick={() =>
                     trackEvent({
                       name: 'podcast_spotify_click',
@@ -331,6 +362,22 @@ export default function Article() {
           </div>
         </div>
       </section>
+
+      {/* No English edition yet — say so instead of silently serving Japanese
+          to a reader who asked for English. Disappears the moment the article's
+          EN child page lands in Notion and the next deploy exports it. */}
+      {fellBackToJa && (
+        <div className="max-w-3xl mx-auto px-6 md:px-12 pt-10">
+          <div className="border-l-4 border-outline-variant/40 pl-6 py-1">
+            <p className="text-[10px] font-bold tracking-widest text-outline uppercase mb-2">
+              {t('article.noTranslationTitle')}
+            </p>
+            <p className="text-sm leading-relaxed text-on-surface-variant">
+              {t('article.noTranslationBody')}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Article body */}
       <article
@@ -357,7 +404,7 @@ export default function Article() {
             to="/"
             className="text-xs font-bold tracking-widest uppercase hover:text-tertiary transition-colors"
           >
-            ← BACK TO ALL INSIGHTS
+            ← {t('article.backToAll')}
           </Link>
         </div>
       </div>

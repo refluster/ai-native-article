@@ -11,6 +11,12 @@ import type { ArticleMeta, ArticleType } from '../types/article'
 
 export const ARTICLE_TYPES = ['explanation', 'analysis'] as const
 
+/**
+ * Japanese type labels. Kept as a standalone export because non-reader
+ * surfaces (the operator pages) use them directly and are Japanese-only.
+ * Reader surfaces go through `useLanguage().t('type.explanation'|'type.analysis')`
+ * so the badge follows the reader's edition.
+ */
 export const ARTICLE_TYPE_LABELS: Record<ArticleType, string> = {
   explanation: '解説',
   analysis: '分析',

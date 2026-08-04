@@ -8,11 +8,30 @@
  */
 
 import { displayTag } from './article-types'
+import { LANGUAGES, type Language } from '../i18n/language'
 
 const SITE_NAME = 'AI NATIVE ARTICLE'
 const SITE_ORIGIN = 'https://kohuehara.xyz'
 const SITE_BASE = '/ai-native-article'
 const MAX_DESC = 160
+
+/**
+ * Site-level copy per edition. Japanese is the canonical voice; the English
+ * strings are the same promise, not a machine translation of the Japanese
+ * sentence structure.
+ */
+const SITE_COPY: Record<Language, { tagline: string; description: string }> = {
+  ja: {
+    tagline: 'AI時代の解説と分析',
+    description:
+      'AI変革、ソフトウェア開発、組織の未来。一次情報の解説記事と、それらを横断する分析記事を毎日更新。',
+  },
+  en: {
+    tagline: 'Explanations and analysis for the AI era',
+    description:
+      'AI transformation, software development, and the future of work — daily explanations of primary sources, and analyses that read across them.',
+  },
+}
 
 interface ArticleSeo {
   title: string
@@ -81,16 +100,43 @@ function removeJsonLd(id: string) {
   if (el) el.remove()
 }
 
-export function setDefaultSeo() {
-  document.title = `${SITE_NAME} — AI時代の解説と分析`
-  const desc =
-    'AI変革、ソフトウェア開発、組織の未来。一次情報の解説記事と、それらを横断する分析記事を毎日更新。'
+/**
+ * Declare the two editions of a page to crawlers (ADR-0005).
+ *
+ * Both editions live at the same URL — the reader's language decides which one
+ * renders — so the alternates are that URL plus an explicit `?lang=`, which
+ * `resolveLanguage` honours ahead of everything else. `x-default` points at the
+ * bare URL, whose language then follows the visitor's own browser.
+ */
+function upsertAlternates(url: string) {
+  for (const el of Array.from(
+    document.head.querySelectorAll('link[rel="alternate"][hreflang]'),
+  )) {
+    el.remove()
+  }
+  const add = (hreflang: string, href: string) => {
+    const el = document.createElement('link')
+    el.setAttribute('rel', 'alternate')
+    el.setAttribute('hreflang', hreflang)
+    el.setAttribute('href', href)
+    document.head.appendChild(el)
+  }
+  for (const lang of LANGUAGES) add(lang, `${url}?lang=${lang}`)
+  add('x-default', url)
+}
+
+export function setDefaultSeo(language: Language = 'ja') {
+  const url = `${SITE_ORIGIN}${SITE_BASE}/`
+  const { tagline, description: desc } = SITE_COPY[language]
+  document.title = `${SITE_NAME} — ${tagline}`
   upsertMeta('meta[name="description"]', 'name', 'description', desc)
-  upsertLink('canonical', `${SITE_ORIGIN}${SITE_BASE}/`)
+  upsertLink('canonical', url)
+  upsertAlternates(url)
   upsertMeta('meta[property="og:title"]', 'property', 'og:title', SITE_NAME)
   upsertMeta('meta[property="og:description"]', 'property', 'og:description', desc)
   upsertMeta('meta[property="og:type"]', 'property', 'og:type', 'website')
-  upsertMeta('meta[property="og:url"]', 'property', 'og:url', `${SITE_ORIGIN}${SITE_BASE}/`)
+  upsertMeta('meta[property="og:url"]', 'property', 'og:url', url)
+  upsertMeta('meta[property="og:locale"]', 'property', 'og:locale', language === 'ja' ? 'ja_JP' : 'en_US')
   upsertMeta('meta[name="twitter:card"]', 'name', 'twitter:card', 'summary_large_image')
   removeJsonLd('article')
 }
@@ -125,13 +171,15 @@ export function setOperatorSeo() {
   removeJsonLd('article')
 }
 
-export function setArticleSeo(article: ArticleSeo) {
+export function setArticleSeo(article: ArticleSeo, language: Language = 'ja') {
   const url = `${SITE_ORIGIN}${SITE_BASE}/article/${article.slug}`
   const title = `${article.title} — ${SITE_NAME}`
   const desc = summarize(article.description)
   document.title = title
   upsertMeta('meta[name="description"]', 'name', 'description', desc)
   upsertLink('canonical', url)
+  upsertAlternates(url)
+  upsertMeta('meta[property="og:locale"]', 'property', 'og:locale', language === 'ja' ? 'ja_JP' : 'en_US')
   upsertMeta('meta[property="og:title"]', 'property', 'og:title', article.title)
   upsertMeta('meta[property="og:description"]', 'property', 'og:description', desc)
   upsertMeta('meta[property="og:type"]', 'property', 'og:type', 'article')
@@ -148,7 +196,9 @@ export function setArticleSeo(article: ArticleSeo) {
     description: desc,
     mainEntityOfPage: { '@type': 'WebPage', '@id': url },
     url,
-    inLanguage: 'ja',
+    // The edition actually rendered, not the reader's preference — an English
+    // reader served the Japanese fallback is reading Japanese.
+    inLanguage: language,
     isPartOf: { '@type': 'WebSite', name: SITE_NAME, url: `${SITE_ORIGIN}${SITE_BASE}/` },
   }
   if (article.date) ld.datePublished = article.date
