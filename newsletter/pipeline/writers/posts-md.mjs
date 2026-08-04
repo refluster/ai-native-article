@@ -2,6 +2,10 @@
  * posts-md writer — turns ArticleRecord[] (see ../fetchers/types.mjs)
  * into Markdown files at public/posts/<slug>.md plus a manifest.json.
  *
+ * Bilingual output (ADR-0005): a record that carries an English edition also
+ * gets `public/posts/<slug>.en.md` — same slug, same metadata, English title /
+ * abstract / body. The URL does not change; the reader picks the edition.
+ *
  * The writer is intentionally fetcher-agnostic: it never imports from
  * `../fetchers/notion.mjs`. Anything that produces ArticleRecord[] can
  * feed it (DynamoDB / Postgres / a JSON dump for tests / …).
@@ -13,7 +17,7 @@
  * draft, …), the live site stays clean.
  */
 
-import { writeFileSync, mkdirSync, existsSync } from 'fs'
+import { writeFileSync, mkdirSync, existsSync, rmSync } from 'fs'
 import { join } from 'path'
 
 /**
@@ -65,15 +69,24 @@ function esc(str) {
     .replace(/"/g, '\\"')
 }
 
-/** Build the YAML frontmatter block for a single article. */
-function frontmatter(record) {
+/**
+ * Build the YAML frontmatter block for a single article.
+ *
+ * `lang` selects which edition's title/abstract go in. The English edition
+ * (ADR-0005) is written to a sibling `<slug>.en.md` with identical metadata
+ * apart from `title`/`abstract`/`lang`, so the reader can swap editions without
+ * re-deriving anything: same slug, same tags, same date, same byline, one URL.
+ */
+function frontmatter(record, lang = 'ja') {
+  const en = lang === 'en'
   const lines = [
     '---',
-    `title: "${esc(record.title)}"`,
+    `title: "${esc(en ? record.titleEn : record.title)}"`,
+    `lang: "${en ? 'en' : 'ja'}"`,
     `type: "${record.type}"`,
     `category: "${esc(record.category)}"`,
     `date: "${esc(record.date)}"`,
-    `abstract: "${esc(record.abstract)}"`,
+    `abstract: "${esc(en ? record.abstractEn : record.abstract)}"`,
     `notionId: "${esc(record.notionId)}"`,
   ]
   if (record.imagePath) lines.push(`image: "${esc(record.imagePath)}"`)
@@ -105,6 +118,7 @@ export async function writePosts(records, options) {
   const manifest = []
   let skipped = 0
   let withImage = 0
+  let withEn = 0
 
   for (const record of records) {
     if (!record.bodyMd || !record.bodyMd.trim()) {
@@ -129,6 +143,29 @@ export async function writePosts(records, options) {
     const md = frontmatter(recordWithImage) + '\n' + record.bodyMd
     writeFileSync(join(postsDir, `${record.slug}.md`), md)
 
+    // English edition (ADR-0005). Written only when the Notion row actually
+    // carries one — an untranslated article stays Japanese-only and the reader
+    // falls back rather than serving an empty English page (C-1). The same
+    // empty-body guard as the Japanese edition applies: a blank EN child page
+    // is treated as "no translation", not as a publishable article.
+    const hasEn = Boolean(record.bodyEnMd && record.bodyEnMd.trim())
+    if (hasEn) {
+      writeFileSync(
+        join(postsDir, `${record.slug}.en.md`),
+        frontmatter(recordWithImage, 'en') + '\n' + record.bodyEnMd,
+      )
+      withEn += 1
+    } else {
+      // Notion is the source of truth (C-2): an edition deleted there must not
+      // keep being served from a checked-in export. `posts/` is committed, so
+      // the write-only path would leave a stale translation live forever.
+      const stale = join(postsDir, `${record.slug}.en.md`)
+      if (existsSync(stale)) {
+        rmSync(stale)
+        logger?.(`  🧹  removed stale English edition ${record.slug}.en.md (no EN page in Notion)`)
+      }
+    }
+
     /** Public manifest shape. Keep field names stable — the SPA reads them
      *  directly. New fields are *optional* on the consumer side. */
     manifest.push({
@@ -139,6 +176,13 @@ export async function writePosts(records, options) {
       tags: record.tags,
       date: record.date,
       abstract: record.abstract,
+      // English edition (ADR-0005). `hasEn` is what the reader gates the
+      // language toggle and the `<slug>.en.md` fetch on; the two localized
+      // strings let the index, cards and search read English without fetching
+      // every body.
+      titleEn: hasEn ? record.titleEn : undefined,
+      abstractEn: hasEn ? record.abstractEn : undefined,
+      hasEn: hasEn || undefined,
       image: imagePath,
       sourceUrls: record.sourceUrls,
       author: record.author,
@@ -156,8 +200,8 @@ export async function writePosts(records, options) {
 
   logger?.(
     `\n✅  Done. ${manifest.length} articles written, ${skipped} skipped, ` +
-      `${withImage} with image.`,
+      `${withImage} with image, ${withEn} with an English edition.`,
   )
 
-  return { written: manifest.length, skipped, withImage }
+  return { written: manifest.length, skipped, withImage, withEn }
 }
