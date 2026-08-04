@@ -40,7 +40,7 @@ Define, compute, and publish a **human-leverage metric** from records that alrea
 
 - ~~Q1 (lower bound acceptable?)~~ → **Resolved: yes** (priya, silas, farah concur) — a defensible undercount beats a story; plus the one-week hand-tally to size the gap (elena).
 - ~~Q2 (work units vs dollars)~~ → **Resolved**: work units in V1 is acceptable **only with a dated Phase-2 commitment to the dollar column** (silas), and the V1 metric is labelled ordinal/leverage-not-price wherever published (elena).
-- ~~Q3 (where does the taxonomy live?)~~ → **Resolved**: a section of the Epic-016 design + the `PERF#workforce/HUMAN-TOUCH` item; no new directory (mateo).
+- ~~Q3 (where does the taxonomy live?)~~ → **Resolved**: a section of the Epic-016 design + the `PERF#workforce/HUMAN-TOUCH` item; no new directory (mateo). **Landed 2026-08-04** (Story 1, #452): [Epic-016 § Human-touch taxonomy](epic-016-workforce-performance-analytics.md#human-touch-taxonomy-epic-020-story-1), taxonomy v1.
 
 ## Out of scope
 
