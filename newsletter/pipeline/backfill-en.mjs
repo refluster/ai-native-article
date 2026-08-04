@@ -129,9 +129,9 @@ if (!NOTION_API_KEY) {
   console.error('❌  NOTION_API_KEY is not set.')
   process.exit(2)
 }
-if (!dryRun && (!AZURE_ENDPOINT || !AZURE_KEY)) {
-  console.error('❌  AZURE_OPENAPI_ENDPOINT and AZURE_OPENAPI_KEY are required to translate.')
-  console.error('    (--dry-run still needs them — it translates and prints, it just does not write.)')
+if (!AZURE_ENDPOINT || !AZURE_KEY) {
+  console.error('❌  AZURE_OPENAPI_ENDPOINT and AZURE_OPENAPI_KEY are required.')
+  console.error('    --dry-run needs them too: it translates and prints, it only skips the Notion write.')
   process.exit(2)
 }
 if (!Number.isFinite(limit) && arg('limit')) {
@@ -184,10 +184,27 @@ async function fetchAllBlocks(blockId) {
   return blocks
 }
 
-/** Notion rich_text → plain text. Formatting is not preserved into the prompt;
- *  the model gets prose and returns Markdown, which is what the writer wants. */
+/**
+ * Notion rich_text → Markdown, preserving bold/italic/code/links.
+ *
+ * Same mapping as the fetcher's `richTextToMd`. Plain text would be simpler,
+ * but it silently strips every inline link out of the article before the model
+ * ever sees it — and the English edition would then be the only one missing its
+ * citations.
+ */
 function plain(richText) {
-  return (richText ?? []).map(t => t.plain_text ?? '').join('')
+  return (richText ?? [])
+    .map(t => {
+      let text = t.plain_text
+      if (!text) return ''
+      if (t.annotations?.code) text = `\`${text}\``
+      if (t.annotations?.bold) text = `**${text}**`
+      if (t.annotations?.italic) text = `*${text}*`
+      if (t.annotations?.strikethrough) text = `~~${text}~~`
+      if (t.href) text = `[${text}](${t.href})`
+      return text
+    })
+    .join('')
 }
 
 /**

@@ -19,7 +19,6 @@ const ja = {
   // — chrome —
   'nav.index': 'INDEX',
   'nav.operator': 'OPERATOR',
-  'lang.switchTo': 'Switch to English',
   'lang.label': '表示言語',
 
   // — index —
@@ -66,7 +65,6 @@ export type MessageKey = keyof typeof ja
 const en: Record<MessageKey, string> = {
   'nav.index': 'INDEX',
   'nav.operator': 'OPERATOR',
-  'lang.switchTo': '日本語に切り替え',
   'lang.label': 'Language',
 
   'home.latest': 'Latest',
