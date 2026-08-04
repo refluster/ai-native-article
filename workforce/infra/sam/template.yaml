@@ -1672,6 +1672,36 @@ Resources:
       AlarmActions:
         - !Ref WfAlarmTopic
 
+  # FU-032: wf-audit is the Lambda whose whole job is to be the *witness* for
+  # Epic-010 criterion 4, yet it was the only scheduled Lambda without a
+  # missed-run alarm — making "a week of clean zeros" indistinguishable from
+  # "a week where wf-audit never fired" (TreatMissingData: notBreaching on
+  # both signal alarms made the gate trivially green). Mirrors the pattern
+  # used by WfConfigDigestMissedRunAlarm (weekly window) and
+  # WfPerformanceReducerMissedRunAlarm (2-day window). wf-audit fires daily
+  # (cron(0 4 * * ? *)), so a 2-day window (two daily buckets below 1
+  # invocation) fires if either daily run is missed — same logic as the
+  # performance reducer. This is the prerequisite for the ≥1-week all-zero
+  # soak that closes Epic-010 criterion 4 (ROADMAP.md §Status-transition).
+  WfAuditMissedRunAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-audit-missed-run-alarm-${Stage}
+      AlarmDescription: !Sub No wf-audit-${Stage} invocation in 2 days — the daily workforce audit sweep is not running (Epic-010 criterion 4 soak is stalled).
+      Namespace: AWS/Lambda
+      MetricName: Invocations
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfAuditFunction
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
   # Three signal alarms — any non-zero count over a 24h evaluation window
   # fires the existing SNS topic. The 24h Period matches the cron cadence;
   # one alarm event per problem-day rather than per-15-minute noise.
