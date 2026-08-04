@@ -53,6 +53,19 @@
 // Exit codes: 0 clean / all applied · 1 bad args · 2 violations found (check
 // mode) or an apply write failed · 3 network / unexpected.
 
+// This entry point issues no `fetch()` of its own — every request goes through
+// `makeGh` imported from pr-merge.mjs — so the R-14 gate, which looks for a
+// literal global fetch() call in the file, never required the bootstrap here.
+// The proxy is a property of the PROCESS, not of the module that happens to
+// call fetch: an entry point that re-execs is the only way HTTPS_PROXY is
+// honoured, and importing a helper that has the bootstrap does nothing, because
+// ensureProxyAwareEntry is a no-op unless it runs in the entry module. Without
+// this, the sweep's first GET returned HTTP 401 on every proxied fire while its
+// three siblings (scan / post / merge) worked — the one script whose whole job
+// is to enforce the two-outcome contract was the one that could not run.
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { projectRepo } from "./pr-autopilot-scan.mjs";
