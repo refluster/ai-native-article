@@ -53,6 +53,10 @@
  *   --force          re-translate even when an EN child page already exists
  *                    (the old edition is archived, not appended to)
  *   --dry-run        do everything except the Notion write; print a preview
+ *   --save-failures <dir>  where rejected translations are kept for inspection
+ *                    (default: .backfill-en-failures/ at the repo root)
+ *
+ *   AZURE_TIMEOUT_MS overrides the 300000ms per-request timeout.
  *
  * Exit codes:
  *   0  every row processed cleanly (including "nothing to do")
@@ -60,10 +64,15 @@
  *   2  bad configuration (missing env / unknown target)
  */
 
+// R-14. Keep this even though the fetch() calls now live one module away in
+// http-retry.mjs: the bootstrap re-execs the *process*, so it only works from
+// the entry point, and this file is it. Removing it because "this file doesn't
+// call fetch" is precisely the ML-017 failure — every request would silently
+// bypass the agent proxy and come back as "Host not in allowlist".
 import { ensureProxyAwareEntry } from '../../scripts/lib/proxy-bootstrap.mjs'
 ensureProxyAwareEntry(import.meta.url)
 
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -72,7 +81,8 @@ import {
   parseEnMarkdown,
   writeEnChildPage,
 } from '../../scripts/lib/notion-i18n.mjs'
-import { isTruncatedMarkdown, lastNonEmptyLine } from '../../scripts/lib/truncation.mjs'
+import { describeError, fetchWithRetry } from '../../scripts/lib/http-retry.mjs'
+import { isTruncatedMarkdown } from '../../scripts/lib/truncation.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..', '..')
@@ -101,6 +111,17 @@ const ARTEFACT_PRELUDE =
 // Heavy bracket — see the header note and newsletter/docs/azure-budget-rules.md.
 const MAX_COMPLETION_TOKENS = 16000
 
+// A long article is a long request. Retries here matter more than on the Notion
+// side, not less (ML-021).
+const AZURE_MAX_RETRIES = 3
+const AZURE_TIMEOUT_MS = Number(process.env.AZURE_TIMEOUT_MS) || 300_000
+
+// Where a rejected translation is written so the operator can read what the
+// model actually produced. A W-1 rejection that discards its own evidence makes
+// a reproducible failure undiagnosable — which is how the first backfill run
+// produced 9 identical, uninvestigable "looks cut off" errors (ML-021).
+const DEFAULT_FAILURE_DIR = '.backfill-en-failures'
+
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`)
   return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : undefined
@@ -124,6 +145,7 @@ const force = flag('force')
 const onlyPageId = arg('page-id')
 const onlySlug = arg('slug')
 const limit = arg('limit') ? Number(arg('limit')) : Infinity
+const failureDir = arg('save-failures') || join(ROOT, DEFAULT_FAILURE_DIR)
 
 if (!NOTION_API_KEY) {
   console.error('❌  NOTION_API_KEY is not set.')
@@ -141,12 +163,15 @@ if (!Number.isFinite(limit) && arg('limit')) {
 
 // ── Notion ────────────────────────────────────────────────────────────────
 
-/** One Notion request, throttled, with 429/5xx retry. Mirrors fetchers/notion.mjs. */
+/** One Notion request, throttled, with 429/5xx retry. */
 async function notionFetch(method, path, payload) {
-  let attempt = 0
-  for (;;) {
-    await sleep(NOTION_THROTTLE_MS)
-    const res = await fetch(`${NOTION_API}${path}`, {
+  await sleep(NOTION_THROTTLE_MS)
+  const res = await fetchWithRetry({
+    url: `${NOTION_API}${path}`,
+    label: `Notion ${method} ${path}`,
+    maxRetries: MAX_RETRIES,
+    baseMs: 1000,
+    init: {
       method,
       headers: {
         authorization: `Bearer ${NOTION_API_KEY}`,
@@ -154,22 +179,10 @@ async function notionFetch(method, path, payload) {
         'content-type': 'application/json',
       },
       body: payload === undefined ? undefined : JSON.stringify(payload),
-    })
-    if (res.ok) return res.json()
-
-    const retryable = res.status === 429 || (res.status >= 500 && res.status < 600)
-    const text = await res.text().catch(() => '')
-    if (!retryable || attempt >= MAX_RETRIES) {
-      throw new Error(`Notion ${method} ${path} → ${res.status}: ${text.slice(0, 300)}`)
-    }
-    const retryAfter = Number(res.headers.get('retry-after'))
-    const waitMs = Number.isFinite(retryAfter) && retryAfter >= 0
-      ? retryAfter * 1000
-      : 1000 * 2 ** attempt
-    console.log(`⏳  ${res.status} on ${path}; retrying in ${waitMs}ms`)
-    await sleep(waitMs)
-    attempt += 1
-  }
+    },
+    logger: msg => console.log(`⏳  ${msg}`),
+  })
+  return res.json()
 }
 
 async function fetchAllBlocks(blockId) {
@@ -294,14 +307,37 @@ const SYSTEM_PROMPT = [
 ].join('\n')
 
 /**
+ * One Azure chat completion, with retry/backoff and an explicit timeout.
+ *
+ * The Notion side of this script had retries from the start; the Azure side had
+ * none, so a single transport blip killed the article outright. A long article
+ * is a long request, which is precisely when a socket is most likely to be
+ * reset — so the calls that needed retry most had it least (ML-021).
+ */
+async function azureChat(payload) {
+  const res = await fetchWithRetry({
+    url:
+      `${AZURE_ENDPOINT}/openai/deployments/${AZURE_DEPLOYMENT}/chat/completions` +
+      `?api-version=${AZURE_API_VERSION}`,
+    label: 'Azure',
+    maxRetries: AZURE_MAX_RETRIES,
+    // Without a timeout a hung socket blocks the whole batch indefinitely.
+    timeoutMs: AZURE_TIMEOUT_MS,
+    init: {
+      method: 'POST',
+      headers: { 'api-key': AZURE_KEY, 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    logger: msg => console.log(`\n     ⏳ ${msg}`),
+  })
+  return res.json()
+}
+
+/**
  * Translate one article. Throws on any failure — the caller counts it and
  * moves to the next row, so one bad article never stalls the batch.
  */
 async function translate({ title, abstract, body }) {
-  const url =
-    `${AZURE_ENDPOINT}/openai/deployments/${AZURE_DEPLOYMENT}/chat/completions` +
-    `?api-version=${AZURE_API_VERSION}`
-
   const userPrompt = [
     `# ${title}`,
     abstract ? `\n> ${abstract}` : '',
@@ -309,38 +345,40 @@ async function translate({ title, abstract, body }) {
     body,
   ].join('\n')
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'api-key': AZURE_KEY, 'content-type': 'application/json' },
-    body: JSON.stringify({
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
-      ],
-      // Heavy bracket. `temperature` is deliberately omitted — gpt-5.4 rejects
-      // any non-default value with HTTP 400 (azure-budget-rules.md).
-      max_completion_tokens: MAX_COMPLETION_TOKENS,
-    }),
+  const data = await azureChat({
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: userPrompt },
+    ],
+    // Heavy bracket. `temperature` is deliberately omitted — gpt-5.4 rejects
+    // any non-default value with HTTP 400 (azure-budget-rules.md).
+    max_completion_tokens: MAX_COMPLETION_TOKENS,
   })
 
-  if (!res.ok) {
-    throw new Error(`Azure ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`)
-  }
-  const data = await res.json()
   const choice = data.choices?.[0]
   // Fail loud on a budget overrun rather than publishing the cut-off half.
   if (choice?.finish_reason === 'length') {
-    throw new Error(
+    const err = new Error(
       `hit max_completion_tokens (${MAX_COMPLETION_TOKENS}) — the translation is cut off. ` +
         'Raise the bracket or split the article; do not publish this.',
     )
+    err.fatal = true
+    throw err
   }
   const content = choice?.message?.content ?? ''
   if (!content.trim()) throw new Error('model returned an empty completion')
-  return parseEnMarkdown(content)
+  return { ...parseEnMarkdown(content), finishReason: choice?.finish_reason ?? '', raw: content }
 }
 
-/** The same W-1 guards the cadences apply, on the translated body. */
+/**
+ * The same W-1 guards the cadences apply, on the translated body.
+ *
+ * Messages carry the FULL offending line, not the 60-char `lastNonEmptyLine`
+ * preview. That preview is right for a findings table listing many articles; it
+ * is wrong here, where the whole question is what the last line actually ends
+ * with — a preview that elides the final characters hides the one fact needed to
+ * tell a real cut-off from a false positive (ML-021).
+ */
 function assertPublishable(en, label) {
   if (!en.title) throw new Error(`${label}: translation has no \`# Title\` heading (W-1)`)
   const body = en.body.trim()
@@ -351,7 +389,25 @@ function assertPublishable(en, label) {
     throw new Error(`${label}: translated body opens with an LLM-failure prelude (W-1)`)
   }
   if (isTruncatedMarkdown(body)) {
-    throw new Error(`${label}: translated body looks cut off (last line: "${lastNonEmptyLine(body)}") (W-1)`)
+    const lines = body.split('\n').filter(l => l.trim())
+    throw new Error(
+      `${label}: translated body looks cut off (W-1)\n` +
+        `       finish_reason: ${en.finishReason || 'unknown'}\n` +
+        `       last line in full: ${lines[lines.length - 1]}`,
+    )
+  }
+}
+
+/** Persist a rejected translation so the operator can read it. Best-effort. */
+function saveFailure(slug, en) {
+  if (!en?.raw) return ''
+  try {
+    mkdirSync(failureDir, { recursive: true })
+    const path = join(failureDir, `${slug}.en.md`)
+    writeFileSync(path, en.raw)
+    return path
+  } catch {
+    return ''
   }
 }
 
@@ -384,6 +440,7 @@ for (const page of rows) {
 
   const title = propText(page.properties?.Title) || propText(page.properties?.Name)
   const label = `${slugOf(page)} "${title}"`
+  let lastTranslation = null
 
   try {
     const topBlocks = await fetchAllBlocks(page.id)
@@ -407,6 +464,7 @@ for (const page of rows) {
     const abstract = propText(page.properties?.Abstract) || propText(page.properties?.['Contents Summary'])
     process.stdout.write(`  ↻  ${label} … `)
     const en = await translate({ title, abstract, body })
+    lastTranslation = en
     assertPublishable(en, label)
 
     if (dryRun) {
@@ -425,9 +483,11 @@ for (const page of rows) {
     translated += 1
   } catch (err) {
     console.log('FAILED')
-    const message = err instanceof Error ? err.message : String(err)
+    const message = describeError(err)
+    const saved = saveFailure(slugOf(page), lastTranslation)
     console.error(`  ✗  ${label}: ${message}`)
-    failures.push({ label, message })
+    if (saved) console.error(`       rejected translation saved to ${saved}`)
+    failures.push({ label, message, saved })
   }
 }
 
@@ -437,7 +497,10 @@ console.log(
 
 if (failures.length > 0) {
   console.error('\nFailed rows — re-run to retry just these:')
-  for (const f of failures) console.error(`  ✗ ${f.label}: ${f.message}`)
+  for (const f of failures) {
+    console.error(`  ✗ ${f.label}: ${f.message}`)
+    if (f.saved) console.error(`     evidence: ${f.saved}`)
+  }
   // C-4: a batch that degraded must not exit 0.
   process.exit(1)
 }

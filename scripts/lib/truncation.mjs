@@ -15,10 +15,24 @@
 // generation: a dangling heading, or a prose line that does not end on a
 // sentence-terminating glyph (Japanese 。！？」） or ASCII .!?)]> / closing code).
 // List items, blockquotes, rules and fences are structural, not prose, so they
-// are never treated as truncation. Trailing emphasis closers (* / _) are
-// unwrapped before the glyph test: an italic byline like `*…ください。*` is a
-// complete ending, not a truncation (incident e7fc028993e1, 2026-06-10 —
-// ML-006).
+// are never treated as truncation.
+//
+// Trailing *closers* are unwrapped before the glyph test, so the test sees the
+// punctuation that actually ends the sentence:
+//
+//   - emphasis (* / _) — an italic byline like `*…ください。*` is a complete
+//     ending, not a truncation (incident e7fc028993e1, 2026-06-10 — ML-006).
+//   - closing quotation marks (" ' ” ’ » ) — English puts the full stop INSIDE
+//     the quote, so a paragraph that ends on a quotation ends with `."`, and a
+//     glyph set carrying `」` but not `"` flags every one of them. That is
+//     ML-020: it made the ja→en backfill reject complete translations of any
+//     article whose closing paragraph ends on a 「…」 quote.
+//
+// Unwrapping (rather than adding `"` to the terminator set) is what keeps this
+// strict: a line ending on an *opening* quote — `and then he said "` — unwraps
+// to a letter and is still correctly flagged.
+
+const TRAILING_CLOSERS = /[*_"'”’»]+$/
 
 export function isTruncatedMarkdown (mdBody) {
   if (!mdBody) return false
@@ -29,7 +43,7 @@ export function isTruncatedMarkdown (mdBody) {
   const trimmed = lines[i].trim()
   if (/^#{1,6}\s+/.test(trimmed)) return true
   if (/^([-*]\s|\d+\.\s|>\s|---|```)/.test(trimmed)) return false
-  const unwrapped = trimmed.replace(/[*_]+$/, '')
+  const unwrapped = trimmed.replace(TRAILING_CLOSERS, '')
   if (unwrapped === '') return true
   return !/[。！？」）…\.!\?\)\]`>]$/.test(unwrapped)
 }
