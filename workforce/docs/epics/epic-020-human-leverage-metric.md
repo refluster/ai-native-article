@@ -1,10 +1,16 @@
 # Epic-020 — Human leverage as a first-class metric: measuring the value of one human touch
 
-- **Status**: Accepted (2026-07-08)
+- **Status**: In-progress (2026-08-04)
 - **Owner**: maya
 - **Created**: 2026-07-07
-- **Implemented by**: —
+- **Implemented by**: [#539](https://github.com/refluster/ai-native-article/pull/539) (Story 1 human-touch taxonomy v1 — [#452](https://github.com/refluster/ai-native-article/issues/452); **open, not merged**)
 - **Hypothesis under test**: Monthly report 2026-07 (article `d06ecf4bb246`), 仮説二 — *human–agent co-prosperity is measurable, not sentimental: as leverage per single human intervention. A good organisation is not one with the fewest human touches, but one where each human touch is priced highest.*
+
+> **Status reconciliation (2026-08-05, Nadia — backlog-reconcile). `Accepted (2026-07-08)` → `In-progress (2026-08-04)`.** Bucket: **incidentally done** at the lifecycle level. The epics-README lifecycle exits `Accepted` "once the first implementation PR is **open**" — and [#539](https://github.com/refluster/ai-native-article/pull/539) has been open against Story 1 ([#452](https://github.com/refluster/ai-native-article/issues/452), Maya-filed) since **2026-08-04T05:52:41Z**, declaring `Closes #452` and landing the seven-type human-touch taxonomy (T1–T7, each with source-of-record, counted/estimated marking, and gate/digest/one-time class) as a section of the Epic-016 design doc — exactly the shape this epic's own **Q3** resolved to ("a section of the Epic-016 design + the `PERF#workforce/HUMAN-TOUCH` item; no new directory"). So the trigger condition is met on the lifecycle's literal wording.
+>
+> **The evidence here is deliberately weaker than Epic-021's on the same day, and the difference is stated rather than smoothed over.** Epic-021 flips on *merged* code; this epic flips on an *open draft* carrying `autopilot:needs-author` / `autopilot:reason:review-findings-open`. The lifecycle's exit criterion is open-PR, not merge, so the flip reports the rule as written — but because the lifecycle is **monotonic**, it cannot be walked back if #539 is closed unmerged. **That asymmetry is the one thing in this pass worth an operator's scrutiny before merge.** The alternative — holding the row at `Accepted` — asserts "no code yet", which is already false: a PR exists, was reviewed, and is in the author lane.
+>
+> **Not `Implemented`.** Story 1 is unmerged; Story 2 ([#453](https://github.com/refluster/ai-native-article/issues/453) — fixture-tested aggregation → `PERF#workforce/HUMAN-TOUCH` via `/performance`) and Story 3 ([#454](https://github.com/refluster/ai-native-article/issues/454) — publish the number in the 2026-08 report + the one-week chat hand-tally) have no PR. Note also that Story 3's readout lands in the same 2026-08 report as Epic-019's 14-day interim funnel, whose comparability the 08-04 pass already flagged against ADR-0024.
 
 ## Problem
 
