@@ -132,6 +132,7 @@ routes conflicts into the lane.
 | Issues sitting untriaged | `issue-triage` unbound, or its `max_issues_per_run` too small for the backlog | Raise the cap for a few fires; it is oldest-first, so it drains the tail. |
 | An issue nobody can lane | the lane vocabulary is wrong for this project | The triage run reports it explicitly (Step 4). That report is the finding — amend the lanes in a new ADR, do not invent a label. |
 | `needs-author` on an L0/L1 PR | a label predating the fail-closed guard | Move it to `needs-human --reason l0l1-path` by hand; the guard refuses new ones. |
+| `autopilot:reason:no-reviewer-consensus` on a PR whose findings were **diff-local** | a label predating adr-0023 / the v3.1 rescope — the code used to mean "not unanimous green" | The PR is invisible to `pr-autopilot-scan.mjs` forever (`isTerminal()` keys on `autopilot:needs-human` alone; no sweep reaches an already-escalated PR). Re-post as `--needs-author --reason review-findings-blocking` with a remediation brief, **or** clear `autopilot:needs-human` so the next scan re-routes at cycle N+1. Enumerate the backlog with `is:open label:autopilot:needs-human label:autopilot:reason:no-reviewer-consensus`. Operator's button: clearing the label is a write on an existing PR, and note it also un-reds `check-escalation-labels.mjs` only once the PR leaves the open set — see FU-036. |
 
 ## What this deliberately does not change
 
@@ -142,4 +143,4 @@ The R-N10 predicate, the L0/L1 path set, the ≥3-reviewer unanimous-green rule,
 refuses those PRs outright rather than escalating them.
 
 Related: [bindings.md](bindings.md) (binding shape + the enable discipline),
-[dev-process.md](dev-process.md), [pr-escalation-reasons.md](../pr-escalation-reasons.md) (taxonomy v2).
+[dev-process.md](dev-process.md), [pr-escalation-reasons.md](../pr-escalation-reasons.md) (taxonomy v3.1).
