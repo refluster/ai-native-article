@@ -45,7 +45,7 @@ const META_REQUIRED = [
   "improvement_agent",
   "created_at",
 ];
-const META_OPTIONAL = ["deliverable", "requires", "archetype", "display_name", "recall_k"];
+const META_OPTIONAL = ["deliverable", "requires", "archetype", "display_name", "recall_k", "commons"];
 const STATUSES = new Set(["active", "stale", "deprecated", "archived"]);
 // Named skill archetypes (固有名詞). A skill MAY declare one; when it does,
 // the C-* rules below enforce that archetype's structural shape so a
@@ -221,6 +221,15 @@ for (const name of skillDirs) {
     if (typeof meta.display_name !== "string" || meta.display_name.trim().length === 0 || meta.display_name.length > 120) {
       v("N1-display-name", metaJson, `display_name must be a 1..120 char string`);
     }
+  }
+  // Epic-021 §B.1 — the commons class. Boolean-only: a truthy string would
+  // silently widen the class the idle detector discounts, which is exactly the
+  // exemption surface the epic's Q3 closed by refusing configurability.
+  if (meta.commons !== undefined && typeof meta.commons !== "boolean") {
+    // J14, not J8: J8 is already taken by the improvement_agent rules below,
+    // and a rule ID is the string an operator greps when CI goes red — two
+    // unrelated concerns under one ID makes it ambiguous forever (sana S1).
+    v("J14-commons", metaJson, `commons must be a boolean (got ${typeof meta.commons})`);
   }
   if (!STATUSES.has(meta.status)) {
     v("J4-status", metaJson, `status "${meta.status}" not in {active, stale, deprecated, archived}`);
