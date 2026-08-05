@@ -56,6 +56,9 @@
 //   2  — guard rejected (G2–G7) or endpoint rejected (HTTP 401 auth / 422)
 //   3  — network / unexpected error
 
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { readFileSync } from "node:fs";
 import { isTruncatedMarkdown } from "../../../scripts/lib/truncation.mjs";
 
