@@ -75,6 +75,7 @@ This implements `design-policy.md` D-2 (Software 2.0).
 | Governance registry integrity | CI gate | every PR | [`check-governance-registries.mjs`](../scripts/check-governance-registries.mjs) | R-12 |
 | Memory→lint backlog | registry (process) | governance retrospective | [`memory-lint-backlog.md`](memory-lint-backlog.md) | (data for R-12) |
 | Risk-acceptance ledger | registry (process) | known-gap triage | [`risk-acceptance-ledger.md`](risk-acceptance-ledger.md) | (data for R-12) |
+| CloudFormation/SAM lint | CI gate (PR) | every PR | `cfn-lint` over [`workforce/infra/**/template.yaml`](../workforce/infra/) (`ci.yml`) | candidate `R-NN` (ML-023) |
 | Content-insights loop | scheduled automation | Mondays 02:00 UTC | [`content-insights.mjs`](../scripts/content-insights.mjs) | — |
 | PR terminal-state sweep | scheduled automation (daily) | daily cron + manual dispatch | [`pr-autopilot-sweep.mjs`](../workforce/skills/pr-autopilot/pr-autopilot-sweep.mjs), [`check-escalation-labels.mjs`](../workforce/scripts/check-escalation-labels.mjs) | R-13 |
 | Shared truncation heuristic | library | imported by gates + skill | [`scripts/lib/truncation.mjs`](../scripts/lib/truncation.mjs) | underlies R-10 (historically R-5) |
@@ -92,6 +93,16 @@ This implements `design-policy.md` D-2 (Software 2.0).
   enforced: touching a law announces itself.
 - **R-12 registry integrity** — runs on PRs. Keeps the two registries parseable. If you add a
   column, update the `<!-- registry:… columns: … -->` anchor in the doc to match.
+- **CloudFormation/SAM lint** — runs on every PR as a step of the `ci.yml` `check` job (folded into
+  a sibling rather than given its own workflow). It lints every `template.yaml` under
+  `workforce/infra/` with a pinned `cfn-lint`, and `--non-zero-exit-code error` keeps it red only on
+  error-class findings — the EarlyValidation class that previously failed at deploy time (#391's
+  CloudFront `Tags` placement, and the duplicate `PointInTimeRecoverySpecification` key this gate
+  caught on its first run). Warnings and informational findings do not fail the build, so the gate
+  stays about "would this deploy have blown up", not template style. Reproduce locally with
+  `pipx run cfn-lint==1.53.3 --non-zero-exit-code error -- $(find workforce/infra -name template.yaml)`.
+  Not yet a numbered R-rule: the statute row is an L1 edit, proposed for operator sign-off (ML-023),
+  and the mechanical check does not wait on it.
 - **Content-insights** — inert until the operator provisions `GA4_PROPERTY_ID` + `GA4_SA_KEY`
   (RAL-002). Run a preview anytime: `DRY_RUN=1 npm run content-insights` (still inert without creds).
 - **R-13 terminal-state sweep** — runs daily via `workforce-pr-terminal-sweep.yml` with `--apply`:
