@@ -81,8 +81,8 @@ import {
   parseEnMarkdown,
   writeEnChildPage,
 } from '../../scripts/lib/notion-i18n.mjs'
-import { describeError, fetchWithRetry } from '../../scripts/lib/http-retry.mjs'
-import { isTruncatedMarkdown } from '../../scripts/lib/truncation.mjs'
+import { MIN_BODY_CHARS, checkEnPublishable } from '../../scripts/lib/en-publishable.mjs'
+import { describeError, fetchJsonWithRetry } from '../../scripts/lib/http-retry.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..', '..')
@@ -101,12 +101,10 @@ const NOTION_VERSION = '2022-06-28'
 const NOTION_THROTTLE_MS = 350 // ~3 req/sec, Notion's documented ceiling
 const MAX_RETRIES = 4
 
-// W-1 floor. Deliberately the LOWER of the two cadence floors (L2's 200): this
-// script processes both explanations and analyses, and a floor tuned for the
-// longer form would reject legitimate short explanations.
-const MIN_BODY_CHARS = 200
-const ARTEFACT_PRELUDE =
-  /^\s*(as an ai|here is|here's|i apologize|i'm sorry|certainly!|sure,|of course)/i
+// The W-1 floor and the artefact-prelude pattern now live with the checks
+// themselves, in scripts/lib/en-publishable.mjs. MIN_BODY_CHARS is imported
+// above because this file also uses it to decide whether a *Japanese* body is
+// substantial enough to be worth translating at all.
 
 // Heavy bracket — see the header note and newsletter/docs/azure-budget-rules.md.
 const MAX_COMPLETION_TOKENS = 16000
@@ -114,7 +112,20 @@ const MAX_COMPLETION_TOKENS = 16000
 // A long article is a long request. Retries here matter more than on the Notion
 // side, not less (ML-021).
 const AZURE_MAX_RETRIES = 3
-const AZURE_TIMEOUT_MS = Number(process.env.AZURE_TIMEOUT_MS) || 300_000
+// `Number(x) || default` would turn AZURE_TIMEOUT_MS=0 — which http-retry.mjs
+// documents as "disables the timeout" — silently back into 300s, and would
+// swallow a typo the same way. That coercion swallowing a falsy value is
+// literally ML-021's third bug; not repeating it two files away.
+const AZURE_TIMEOUT_MS = (() => {
+  const raw = process.env.AZURE_TIMEOUT_MS
+  if (raw === undefined || raw.trim() === '') return 300_000
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n < 0) {
+    console.error(`❌  AZURE_TIMEOUT_MS must be a non-negative number (got "${raw}")`)
+    process.exit(2)
+  }
+  return n
+})()
 
 // Where a rejected translation is written so the operator can read what the
 // model actually produced. A W-1 rejection that discards its own evidence makes
@@ -163,14 +174,30 @@ if (!Number.isFinite(limit) && arg('limit')) {
 
 // ── Notion ────────────────────────────────────────────────────────────────
 
-/** One Notion request, throttled, with 429/5xx retry. */
+/**
+ * One Notion request, throttled, with retry.
+ *
+ * The retry policy depends on whether the request MUTATES. A transport error on
+ * a write may mean the write committed and the socket then died, so retrying it
+ * can create a second `EN` child page under one row, or duplicate a block chunk
+ * inside a published body — damage that lands in Notion (C-2), is invisible to
+ * the export (every discovery site takes the first match) and invisible to R-10
+ * (which does not detect duplicated prose). Writes therefore keep only the 429
+ * retry, which is unambiguous: rate-limited means not applied.
+ *
+ * `POST /databases/{id}/query` is a read despite its verb, so it keeps the full
+ * policy — reads are where a long batch actually dies.
+ */
 async function notionFetch(method, path, payload) {
   await sleep(NOTION_THROTTLE_MS)
-  const res = await fetchWithRetry({
+  const isMutation = method !== 'GET' && !path.endsWith('/query')
+  const res = await fetchJsonWithRetry({
     url: `${NOTION_API}${path}`,
     label: `Notion ${method} ${path}`,
     maxRetries: MAX_RETRIES,
     baseMs: 1000,
+    retryTransport: !isMutation,
+    retryServerErrors: !isMutation,
     init: {
       method,
       headers: {
@@ -182,7 +209,7 @@ async function notionFetch(method, path, payload) {
     },
     logger: msg => console.log(`⏳  ${msg}`),
   })
-  return res.json()
+  return res
 }
 
 async function fetchAllBlocks(blockId) {
@@ -315,7 +342,7 @@ const SYSTEM_PROMPT = [
  * reset — so the calls that needed retry most had it least (ML-021).
  */
 async function azureChat(payload) {
-  const res = await fetchWithRetry({
+  return fetchJsonWithRetry({
     url:
       `${AZURE_ENDPOINT}/openai/deployments/${AZURE_DEPLOYMENT}/chat/completions` +
       `?api-version=${AZURE_API_VERSION}`,
@@ -330,7 +357,6 @@ async function azureChat(payload) {
     },
     logger: msg => console.log(`\n     ⏳ ${msg}`),
   })
-  return res.json()
 }
 
 /**
@@ -362,6 +388,10 @@ async function translate({ title, abstract, body }) {
       `hit max_completion_tokens (${MAX_COMPLETION_TOKENS}) — the translation is cut off. ` +
         'Raise the bracket or split the article; do not publish this.',
     )
+    // Set for symmetry with the HTTP errors, not because anything currently
+    // reads it: this throw happens after fetchJsonWithRetry has already
+    // returned, so no retry loop is in scope to consult it. It stays so the
+    // meaning survives if this check ever moves inside one.
     err.fatal = true
     throw err
   }
@@ -371,42 +401,36 @@ async function translate({ title, abstract, body }) {
 }
 
 /**
- * The same W-1 guards the cadences apply, on the translated body.
- *
- * Messages carry the FULL offending line, not the 60-char `lastNonEmptyLine`
- * preview. That preview is right for a findings table listing many articles; it
- * is wrong here, where the whole question is what the last line actually ends
- * with — a preview that elides the final characters hides the one fact needed to
- * tell a real cut-off from a false positive (ML-021).
+ * The same W-1 guards the cadences apply, on the translated body. The checks
+ * themselves live in `scripts/lib/en-publishable.mjs` — this script exits at
+ * module scope and so cannot be imported, which would leave the code that
+ * produced ML-020's nine false rejections as the one surface no test can reach.
  */
+class PublishGuardError extends Error {}
+
 function assertPublishable(en, label) {
-  if (!en.title) throw new Error(`${label}: translation has no \`# Title\` heading (W-1)`)
-  const body = en.body.trim()
-  if (body.length < MIN_BODY_CHARS) {
-    throw new Error(`${label}: translated body is ${body.length} chars (< ${MIN_BODY_CHARS}) (W-1)`)
-  }
-  if (ARTEFACT_PRELUDE.test(body.slice(0, 50))) {
-    throw new Error(`${label}: translated body opens with an LLM-failure prelude (W-1)`)
-  }
-  if (isTruncatedMarkdown(body)) {
-    const lines = body.split('\n').filter(l => l.trim())
-    throw new Error(
-      `${label}: translated body looks cut off (W-1)\n` +
-        `       finish_reason: ${en.finishReason || 'unknown'}\n` +
-        `       last line in full: ${lines[lines.length - 1]}`,
-    )
-  }
+  const verdict = checkEnPublishable(en)
+  if (!verdict.ok) throw new PublishGuardError(`${label}: ${verdict.message}`)
 }
 
-/** Persist a rejected translation so the operator can read it. Best-effort. */
+/**
+ * Persist a rejected translation so the operator can read it. Best-effort, but
+ * never silent: for a feature whose entire purpose is diagnosability, an EACCES
+ * or ENOSPC that leaves no evidence must say so rather than render identically
+ * to "there was no translation to save" (C-4 in spirit).
+ */
 function saveFailure(slug, en) {
   if (!en?.raw) return ''
+  // `slug` reaches join() directly; a slug carrying a path separator would
+  // otherwise land the write outside failureDir.
+  const safe = String(slug).replace(/[^a-z0-9-]/gi, '_')
   try {
     mkdirSync(failureDir, { recursive: true })
-    const path = join(failureDir, `${slug}.en.md`)
+    const path = join(failureDir, `${safe}.en.md`)
     writeFileSync(path, en.raw)
     return path
-  } catch {
+  } catch (err) {
+    console.error(`       (could not save evidence: ${describeError(err)})`)
     return ''
   }
 }
@@ -484,8 +508,11 @@ for (const page of rows) {
   } catch (err) {
     console.log('FAILED')
     const message = describeError(err)
-    const saved = saveFailure(slugOf(page), lastTranslation)
     console.error(`  ✗  ${label}: ${message}`)
+    // Only a W-1 rejection produces evidence worth keeping. A Notion write
+    // failure happens AFTER the guard passed, so filing that translation under
+    // "rejected" would label a perfectly good one as bad.
+    const saved = err instanceof PublishGuardError ? saveFailure(slugOf(page), lastTranslation) : ''
     if (saved) console.error(`       rejected translation saved to ${saved}`)
     failures.push({ label, message, saved })
   }

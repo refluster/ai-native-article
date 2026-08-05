@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-04T05:03:42.456Z",
+  "generated_at": "2026-08-05T02:00:25.612Z",
   "skills": [
     {
       "name": "article-level2",
@@ -268,9 +268,9 @@
         },
         {
           "path": "meta.json",
-          "size": 286,
+          "size": 305,
           "language": "json",
-          "contents": "{\n  \"name\": \"daily-research\",\n  \"version\": \"0.4.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"cost_class\": \"small\",\n  \"owners\": [\n    \"grace\",\n    \"ishaan\"\n  ],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-06-19\",\n  \"requires\": [\n    \"workforce.feed_write_token\"\n  ]\n}\n",
+          "contents": "{\n  \"name\": \"daily-research\",\n  \"version\": \"0.4.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"commons\": true,\n  \"cost_class\": \"small\",\n  \"owners\": [\n    \"grace\",\n    \"ishaan\"\n  ],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-06-19\",\n  \"requires\": [\n    \"workforce.feed_write_token\"\n  ]\n}\n",
           "truncated": false,
           "binary": false
         },
@@ -502,9 +502,9 @@
         },
         {
           "path": "meta.json",
-          "size": 658,
+          "size": 677,
           "language": "json",
-          "contents": "{\n  \"name\": \"feed-post\",\n  \"version\": \"0.6.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"deliverable\": {\n    \"type\": \"notification\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"small\",\n  \"owners\": [\n    \"aanya\",\n    \"aoi\",\n    \"astrid\",\n    \"dario\",\n    \"elena\",\n    \"farah\",\n    \"freya\",\n    \"grace\",\n    \"hana\",\n    \"ishaan\",\n    \"kai\",\n    \"levi\",\n    \"mateo\",\n    \"maya\",\n    \"mei\",\n    \"mira\",\n    \"nadia\",\n    \"noor\",\n    \"priya\",\n    \"ren\",\n    \"sana\",\n    \"sora\",\n    \"tessa\",\n    \"theo\",\n    \"vikram\",\n    \"yuki\"\n  ],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-27\",\n  \"requires\": [\n    \"workforce.feed_write_token\"\n  ]\n}\n",
+          "contents": "{\n  \"name\": \"feed-post\",\n  \"version\": \"0.6.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"commons\": true,\n  \"deliverable\": {\n    \"type\": \"notification\",\n    \"publish_notion\": false\n  },\n  \"cost_class\": \"small\",\n  \"owners\": [\n    \"aanya\",\n    \"aoi\",\n    \"astrid\",\n    \"dario\",\n    \"elena\",\n    \"farah\",\n    \"freya\",\n    \"grace\",\n    \"hana\",\n    \"ishaan\",\n    \"kai\",\n    \"levi\",\n    \"mateo\",\n    \"maya\",\n    \"mei\",\n    \"mira\",\n    \"nadia\",\n    \"noor\",\n    \"priya\",\n    \"ren\",\n    \"sana\",\n    \"sora\",\n    \"tessa\",\n    \"theo\",\n    \"vikram\",\n    \"yuki\"\n  ],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-27\",\n  \"requires\": [\n    \"workforce.feed_write_token\"\n  ]\n}\n",
           "truncated": false,
           "binary": false
         },

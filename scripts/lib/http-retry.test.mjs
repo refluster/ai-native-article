@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   backoffMs,
   describeError,
+  fetchJsonWithRetry,
   fetchWithRetry,
   isRetryableNetworkError,
   isRetryableStatus,
@@ -157,6 +158,139 @@ test('fetchWithRetry stops retrying a 5xx once the budget is spent, and marks it
     },
   )
   assert.equal(calls, 2)
+})
+
+test('a mutating caller does NOT retry transport errors — a retried write can duplicate', async () => {
+  // POST /pages and PATCH /blocks/{id}/children are non-idempotent: a transport
+  // error may mean the write committed and the socket then died, so retrying
+  // creates a second EN child page or a duplicated block chunk in Notion.
+  let calls = 0
+  await assert.rejects(
+    () => fetchWithRetry({
+      url: 'https://x.test',
+      retryTransport: false,
+      timeoutMs: 0,
+      sleepImpl: noSleep,
+      fetchImpl: async () => { calls += 1; throw new Error('fetch failed', { cause: new Error('ECONNRESET') }) },
+    }),
+    /fetch failed/,
+  )
+  assert.equal(calls, 1, 'a write must be attempted exactly once')
+})
+
+test('a mutating caller does NOT retry 5xx, but DOES retry 429', async () => {
+  // A 5xx is ambiguous about whether the write landed; a 429 is not.
+  let calls = 0
+  await assert.rejects(
+    () => fetchWithRetry({
+      url: 'https://x.test',
+      retryServerErrors: false,
+      timeoutMs: 0,
+      sleepImpl: noSleep,
+      fetchImpl: async () => { calls += 1; return res(503, 'unavailable') },
+    }),
+    err => err.status === 503,
+  )
+  assert.equal(calls, 1)
+
+  calls = 0
+  await fetchWithRetry({
+    url: 'https://x.test',
+    retryServerErrors: false,
+    timeoutMs: 0,
+    sleepImpl: noSleep,
+    fetchImpl: async () => (++calls === 1 ? res(429, 'slow down') : res(200, 'ok')),
+  })
+  assert.equal(calls, 2, '429 is unambiguous — not applied — so it still retries')
+})
+
+test('the per-attempt timeout is armed when timeoutMs > 0 and absent when 0', async () => {
+  // Every other case here passes timeoutMs: 0, which skips AbortSignal.timeout
+  // entirely — so without this, the branch both production call sites use is
+  // never executed by the suite.
+  let seen
+  await fetchWithRetry({
+    url: 'https://x.test',
+    timeoutMs: 50_000,
+    sleepImpl: noSleep,
+    fetchImpl: async (_u, init) => { seen = init.signal; return res(200) },
+  })
+  assert.ok(seen instanceof AbortSignal, 'timeoutMs > 0 must pass an AbortSignal')
+
+  await fetchWithRetry({
+    url: 'https://x.test',
+    timeoutMs: 0,
+    sleepImpl: noSleep,
+    fetchImpl: async (_u, init) => { seen = init.signal; return res(200) },
+  })
+  assert.equal(seen, undefined, 'timeoutMs 0 must not arm a timeout')
+})
+
+test('a real DOMException TimeoutError is classified as retryable', async () => {
+  // The classifier test above builds the error by hand; this pins the shape a
+  // genuine AbortSignal.timeout actually produces.
+  const real = new DOMException('The operation was aborted due to timeout', 'TimeoutError')
+  assert.equal(isRetryableNetworkError(real), true)
+  // …and describeError must not print DOMException's numeric legacy code as if
+  // it were an errno.
+  assert.equal(describeError(real), 'The operation was aborted due to timeout')
+
+  let calls = 0
+  await fetchWithRetry({
+    url: 'https://x.test',
+    timeoutMs: 0,
+    sleepImpl: noSleep,
+    fetchImpl: async () => { if (++calls === 1) throw real; return res(200) },
+  })
+  assert.equal(calls, 2)
+})
+
+test('fetchWithRetry reads the body inside the retry scope', async () => {
+  const out = await fetchWithRetry({
+    url: 'https://x.test',
+    timeoutMs: 0,
+    sleepImpl: noSleep,
+    fetchImpl: async () => res(200, '{"ok":true}'),
+  })
+  // Returning already-read text is what keeps a timeout from firing mid-read,
+  // outside the loop, as an unretried and unlabelled AbortError.
+  assert.equal(out.body, '{"ok":true}')
+  assert.equal(out.status, 200)
+})
+
+test('fetchJsonWithRetry parses, and treats an empty body as {}', async () => {
+  const parsed = await fetchJsonWithRetry({
+    url: 'https://x.test',
+    timeoutMs: 0,
+    sleepImpl: noSleep,
+    fetchImpl: async () => res(200, '{"id":"p1"}'),
+  })
+  assert.deepEqual(parsed, { id: 'p1' })
+
+  const empty = await fetchJsonWithRetry({
+    url: 'https://x.test',
+    timeoutMs: 0,
+    sleepImpl: noSleep,
+    fetchImpl: async () => res(200, ''),
+  })
+  assert.deepEqual(empty, {})
+})
+
+test('fetchJsonWithRetry fails loud on a non-JSON 2xx rather than returning junk', async () => {
+  await assert.rejects(
+    () => fetchJsonWithRetry({
+      url: 'https://x.test',
+      label: 'Notion',
+      timeoutMs: 0,
+      sleepImpl: noSleep,
+      fetchImpl: async () => res(200, '<html>proxy error</html>'),
+    }),
+    err => {
+      assert.match(err.message, /Notion → response was not JSON/)
+      assert.equal(err.fatal, true)
+      return true
+    },
+  )
 })
 
 test('fetchWithRetry logs each retry so a slow run is not silent', async () => {

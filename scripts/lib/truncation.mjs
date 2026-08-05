@@ -2,12 +2,17 @@
 //
 // Every consumer imports this module directly; there are no hand-kept copies
 // to keep in sync (the GAS Code.gs#isTruncatedMarkdown copy was removed when
-// the GAS L1→L4 pipeline was retired). Consumers:
-//   - scripts/check-corpus-truncation.mjs               (R-10, deploy gate)
+// the GAS L1→L4 pipeline was retired). All nine consumers — a change here
+// reaches every one of them, which is the blast radius to size before editing:
+//   - scripts/check-corpus-truncation.mjs                      (R-10, deploy gate)
 //   - .claude/skills/article-health/scripts/article-health.mjs (live-site sweep)
-//   - workforce/skills/article-level{2,3}/publish-notion.mjs  (W-1, the
-//     generation-time guard — the workforce cadences are now the only
-//     generation path)
+//   - workforce/skills/article-level2/publish-notion.mjs       (W-1, generation)
+//   - workforce/skills/article-level3/publish-notion.mjs       (W-1, generation)
+//   - workforce/skills/podcast-script/publish-notion.mjs       (W-1)
+//   - workforce/skills/hypothesis/publish-notion.mjs           (W-1)
+//   - workforce/skills/weekly-project-report/publish-report.mjs (W-1)
+//   - workforce/skills/monthly-report/post.mjs                 (W-1)
+//   - newsletter/pipeline/backfill-en.mjs                      (W-1, ja→en backfill)
 //
 // When the heuristic changes, cite the incident in docs/memory-lint-backlog.md.
 //
@@ -31,6 +36,21 @@
 // Unwrapping (rather than adding `"` to the terminator set) is what keeps this
 // strict: a line ending on an *opening* quote — `and then he said "` — unwraps
 // to a letter and is still correctly flagged.
+//
+// That leaves English STRICTER than Japanese, deliberately. `」` and `）` sit in
+// the terminator set below, so `…と述べた」` is accepted with no `。` under it,
+// while `…he said"` is still flagged. The asymmetry is not an oversight: the
+// Japanese bracket family closes a sentence on its own, and English is the
+// language whose guard just produced nine false positives, so it keeps the
+// stricter treatment.
+//
+// The Japanese bracket family is `」』】》〉`, and only `」` was ever listed —
+// so `…彼は『これは構造的だ』` and `…詳細は【注】`, both idiomatic complete
+// Japanese, were flagged exactly as the English quotations were. That is the
+// other half of ML-020's own rule ("cover the punctuation conventions of every
+// language the corpus publishes in"), and it belongs in the TERMINATOR set with
+// `」`, not in the closers: unwrapping `』` off `…構造的だ』` leaves `だ`, a
+// letter, so a closer-set fix would not have fixed it.
 
 const TRAILING_CLOSERS = /[*_"'”’»]+$/
 
@@ -45,7 +65,7 @@ export function isTruncatedMarkdown (mdBody) {
   if (/^([-*]\s|\d+\.\s|>\s|---|```)/.test(trimmed)) return false
   const unwrapped = trimmed.replace(TRAILING_CLOSERS, '')
   if (unwrapped === '') return true
-  return !/[。！？」）…\.!\?\)\]`>]$/.test(unwrapped)
+  return !/[。！？」』】》〉）…\.!\?\)\]`>]$/.test(unwrapped)
 }
 
 // Strip a leading YAML frontmatter block, if present.

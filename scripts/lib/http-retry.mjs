@@ -26,7 +26,11 @@ export function describeError(err) {
   const seen = new Set()
   while (current instanceof Error && !seen.has(current)) {
     seen.add(current)
-    parts.push(current.code ? `${current.message} (${current.code})` : current.message)
+    // Only string codes are errno-like and worth printing. DOMException carries
+    // a NUMERIC legacy `code` (a real timeout reports 23), which in a log whose
+    // entire job is naming causes reads exactly like an errno and isn't one.
+    const code = typeof current.code === 'string' ? current.code : ''
+    parts.push(code ? `${current.message} (${code})` : current.message)
     current = current.cause
   }
   return parts.join(' ← ')
@@ -72,20 +76,47 @@ export function backoffMs(attempt, retryAfterHeader, baseMs = 2000) {
 /**
  * Perform a request, retrying transport failures and retryable statuses.
  *
- * Returns the first `res.ok` Response. Throws on a non-retryable status (the
- * error carries `.status` and `.fatal = true`), on a retryable status whose
- * budget is exhausted, or on a transport error that will not settle.
+ * Returns `{ status, headers, body }` with the body already read as text.
+ * Reading it INSIDE the retry scope is deliberate: the per-attempt
+ * `AbortSignal.timeout` stays armed until the body is consumed, so a caller
+ * that reads it after this function returns can have the abort fire mid-read
+ * and surface as an unretried, unlabelled `AbortError`.
+ *
+ * Throws on a non-retryable status (the error carries `.status` and
+ * `.fatal = true`), on a retryable status whose budget is exhausted, or on a
+ * transport error that will not settle.
+ *
+ * ## Retrying a write is not the same as retrying a read
+ *
+ * A retryable *status* means the server answered and declined — nothing was
+ * applied. A *transport* error means the request may have committed server-side
+ * and then lost the socket, so retrying it can apply the same mutation twice.
+ * For `POST /pages` that is a duplicate `EN` child page under one article; for
+ * the `PATCH /blocks/{id}/children` chunk loop it is a duplicated block chunk
+ * inside a published body. Both are invisible to the export (every discovery
+ * site takes the first match) and to R-10 (which does not detect duplicated
+ * prose), while Notion — the C-2 source of truth — holds the damage.
+ *
+ * So a mutating caller passes `retryTransport: false` (and usually
+ * `retryServerErrors: false`, since a 5xx is equally ambiguous about whether the
+ * write landed), keeping only the 429 retry, which is unambiguous: rate-limited
+ * means not applied. Reads keep the full policy — reads are where the batch
+ * actually dies.
  *
  * @param {Object} options
  * @param {string} options.url
- * @param {RequestInit} [options.init]
+ * @param {RequestInit} [options.init]      a caller-supplied `signal` is NOT
+ *   supported — it would be overwritten by the per-attempt timeout below.
  * @param {number} [options.maxRetries]
  * @param {number} [options.timeoutMs]      per-attempt timeout; 0 disables
  * @param {number} [options.baseMs]         backoff base
+ * @param {boolean} [options.retryTransport] retry socket-level failures
+ * @param {boolean} [options.retryServerErrors] retry 5xx (429 always retries)
  * @param {string} [options.label]          used in error/log messages
  * @param {typeof fetch} [options.fetchImpl]
  * @param {(ms: number) => Promise<void>} [options.sleepImpl]
  * @param {(message: string) => void} [options.logger]
+ * @returns {Promise<{status: number, headers: Headers, body: string}>}
  */
 export async function fetchWithRetry(options) {
   const {
@@ -94,6 +125,8 @@ export async function fetchWithRetry(options) {
     maxRetries = 3,
     timeoutMs = 300_000,
     baseMs = 2000,
+    retryTransport = true,
+    retryServerErrors = true,
     label = url,
     fetchImpl = fetch,
     sleepImpl = ms => new Promise(resolve => setTimeout(resolve, ms)),
@@ -107,10 +140,12 @@ export async function fetchWithRetry(options) {
         ? { ...init, signal: AbortSignal.timeout(timeoutMs) }
         : init
       const res = await fetchImpl(url, requestInit)
-      if (res.ok) return res
-
       const body = await res.text().catch(() => '')
-      if (!isRetryableStatus(res.status) || attempt >= maxRetries) {
+      if (res.ok) return { status: res.status, headers: res.headers, body }
+
+      const statusRetryable =
+        res.status === 429 || (retryServerErrors && isRetryableStatus(res.status))
+      if (!statusRetryable || attempt >= maxRetries) {
         const err = new Error(`${label} → HTTP ${res.status}: ${body.slice(0, 300)}`)
         err.status = res.status
         // A 4xx fails identically on retry; an exhausted budget must not be
@@ -123,11 +158,24 @@ export async function fetchWithRetry(options) {
       await sleepImpl(waitMs)
       attempt += 1
     } catch (err) {
-      if (!isRetryableNetworkError(err) || attempt >= maxRetries) throw err
+      if (!retryTransport || !isRetryableNetworkError(err) || attempt >= maxRetries) throw err
       const waitMs = backoffMs(attempt, undefined, baseMs)
       logger?.(`${label} → ${describeError(err)}; retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxRetries})`)
       await sleepImpl(waitMs)
       attempt += 1
     }
+  }
+}
+
+/** `fetchWithRetry` + JSON parse. An empty body parses to `{}`. */
+export async function fetchJsonWithRetry(options) {
+  const { body } = await fetchWithRetry(options)
+  if (!body.trim()) return {}
+  try {
+    return JSON.parse(body)
+  } catch {
+    const err = new Error(`${options.label ?? options.url} → response was not JSON: ${body.slice(0, 200)}`)
+    err.fatal = true
+    throw err
   }
 }
