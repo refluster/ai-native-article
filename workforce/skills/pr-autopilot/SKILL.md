@@ -331,7 +331,38 @@ the aggregated colour, then take the terminal action:
 | 🟡 | open blocking lens findings | hand off `--needs-author --reason review-findings-open` |
 | 🔴 | a lens **vetoed a defect in the diff**, and cycle + 1 ≤ `cycle_cap` | hand off `--needs-author --reason review-findings-blocking` **+ remediation brief** (adr-0023) |
 | 🔴 | cycle + 1 > `cycle_cap` | hand off `--needs-human --reason cycle-cap-exceeded` |
-| 🔴 (premise/scope) / non-consensus / can't seat 3 / unreadable governance | any | hand off `--needs-human` (no `--reviewed`) |
+| 🔴 (premise/scope), **unanimous** | any | hand off `--needs-human --reason other --reason-text "…"` (no `--reviewed`) |
+| 🔴 / 🟡 with an **irreconcilable panel** | any | hand off `--needs-human --reason no-reviewer-consensus` (no `--reviewed`) |
+| can't seat 3 | any | hand off `--needs-human --reason cannot-seat-panel` (no `--reviewed`) |
+| unreadable governance | any | hand off `--needs-human --reason no-r-n10-delegation` (no `--reviewed`) |
+
+> **"Irreconcilable panel" is NOT "the panel wasn't unanimous green."** Read
+> literally, *every* 🔴 and *every* 🟡 is non-unanimous, so a row keyed on that
+> swallows the two rows above it and adr-0022/0023's author lane never fires —
+> the failure this note exists to prevent. It means the narrow case where the
+> lenses **contradict each other** on a point you cannot adjudicate (one says the
+> approach is right, another says it is wrong at the premise) and no synthesis is
+> honest. A single veto naming a concrete diff-local defect, with the other
+> lenses merely non-blocking, is **not** this — it is the `--needs-author` row,
+> however emphatic the veto. Ask: *is there a fix an agent could make that all
+> lenses would accept?* If yes, the author lane owns it.
+>
+> **Where a *unanimous* premise/scope 🔴 goes.** A panel that agrees the change
+> should not exist contradicts nothing, so it is not an irreconcilable panel
+> either — and there is no diff-local fix, so it is not the author lane. It has
+> no dedicated code: escalate it as `--reason other --reason-text "…"`, naming
+> what the panel agreed was wrong about the premise. (Raised by `wf:dario` A3 on
+> #543: the narrowing above would otherwise leave that case with no home, and a
+> router finding nothing that fits reaches for `no-reviewer-consensus` again —
+> which is the failure this whole note exists to stop. If that class turns out
+> to be common, mint a code; one occurrence does not justify one.)
+>
+> *(Recorded 2026-08-04 after PR #524: judged 2026-07-31 07:51Z, ~15h before
+> adr-0022 shipped the author lane, so the router had only merge-or-human and
+> stamped `no-reviewer-consensus` on a 🔴 whose findings were entirely
+> diff-local — and its own verdict prescribed the cycle-2 fixes. The label then
+> made `isTerminal()` skip the PR forever, so the revision it asked for could not
+> be produced by the workforce.)*
 
 ### The author lane — a 🟡 with an owner (adr-0022)
 
@@ -445,7 +476,7 @@ verdict **into** this template so the markers are present by construction:
 
 <!-- autopilot:needs-human -->
 <!-- autopilot:reason:<code> -->   ⟵ REQUIRED on every hand-off: the escalation-reason code (see "Reason codes" below); `other` carries its mandatory free text inside the marker.
-<!-- autopilot:reviewed -->   ⟵ keep this THIRD marker line ONLY on a 🟢 merge-ready hand-off; delete it on a 🔴 / non-consensus hand-off.
+<!-- autopilot:reviewed -->   ⟵ keep this THIRD marker line ONLY on a 🟢 merge-ready hand-off; delete it on any hand-off that is not 🟢 merge-ready.
 <!-- autopilot:panel:isolated -->   ⟵ REQUIRED on every VERDICT post (isolated | inline). Self-attested — presence is enforced, truth is not. Pass `--panel isolated|inline` and the script appends it.
 ```
 
@@ -503,13 +534,27 @@ Every hand-off carries **why**, as an `autopilot:reason:<code>` label plus the
 hidden `<!-- autopilot:reason:<code> -->` marker. The versioned taxonomy —
 each code mapped 1:1 to its emission site — is
 [workforce/docs/pr-escalation-reasons.md](../../docs/pr-escalation-reasons.md)
-(v1). `pr-autopilot-post.mjs` refuses (exit 1) a `--needs-human` post with no
+(v3.1). `pr-autopilot-post.mjs` refuses (exit 1) a `--needs-human` post with no
 reason and throws on any code outside the taxonomy; `other` requires free text
-(`--reason other --reason-text "…"`). Pick the code naming the failed clause:
-`l0l1-path`, `no-r-n10-delegation`, `no-reviewer-consensus`,
+(`--reason other --reason-text "…"`). Pick the code naming the failed clause.
+
+**Author lane** (`--needs-author`; `pr-remediate` clears these — reach here
+first, and only fall through to the human lane when none fits):
+`merge-conflict` / `branch-behind` (Step 5 base rows),
+`review-findings-open` (🟡 with open blocking findings),
+`review-findings-blocking` (🔴 whose veto names a **diff-local defect** —
+requires the remediation brief and is refused past the cycle cap).
+
+**Human lane** (`--needs-human`): `l0l1-path`, `no-r-n10-delegation`,
+`no-reviewer-consensus` — **narrowed: irreconcilable panel only, i.e. the
+lenses contradict each other; see the note under the Step-5 verdict table. A
+diff-local veto is `review-findings-blocking`, author lane** —
 `cycle-cap-exceeded`, `cannot-seat-panel` (Step 2),
 `persona-escalation-trigger` (Step 4), `merge-engine-refusal` (Step 5 refusal
-re-post — prefer the specific clause code the engine already stamped). The
+re-post — prefer the specific clause code the engine already stamped), and
+`other --reason-text "…"` for a **unanimous** premise/scope 🔴 (the panel agrees
+the change should not exist, so it contradicts nothing and is not
+`no-reviewer-consensus`). The
 post script also computes the verdict-time L0/L1 check itself and stamps
 `autopilot:reason:l0l1-path` on any escalation touching the target's declared
 set, fail-closed like the merge engine. These codes measure **wiring, never
