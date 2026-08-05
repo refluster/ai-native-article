@@ -162,6 +162,23 @@ W-1 guard, and names each one; those rows are simply left untranslated, so
 re-running retries exactly them. Then `gh workflow run deploy-article-site.yml`
 to publish.
 
+**When a row keeps failing.** Failures are per-article and deterministic, so a
+row that failed once will fail again until something changes. The script keeps
+the evidence:
+
+- **`… looks cut off (W-1)`** — the message prints the model's `finish_reason`
+  and the offending last line **in full**. If `finish_reason` is `stop`, the
+  model finished its sentence and the guard is the thing to question; the
+  rejected translation is saved under `.backfill-en-failures/<slug>.en.md`
+  (override with `--save-failures <dir>`) so you can read the ending yourself.
+  If it is `length`, the translation really is cut off — raise the bracket
+  (`azure-budget-rules.md`) rather than relaxing the guard.
+- **`fetch failed`** — now reported with its full cause chain
+  (`fetch failed ← read ECONNRESET (ECONNRESET)`), and retried three times with
+  backoff before it counts as a failure. A per-request timeout
+  (`AZURE_TIMEOUT_MS`, default 300000) keeps a hung socket from stalling the
+  batch instead of failing it.
+
 ### Pipeline has gone quiet
 
 `kohuehara.xyz` hasn't shown a new article for several days. The visible signal is the home-page list: its newest `date` is older than ~yesterday.
