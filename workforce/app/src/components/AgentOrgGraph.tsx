@@ -225,12 +225,18 @@ export default function AgentOrgGraph({ agent, roster }: Props) {
           </div>
         </div>
       )}
-      <div className="border-t border-wf-outline-variant px-4 py-2">
+      <div className="border-t border-wf-outline-variant px-4 py-2 flex flex-wrap gap-x-4 gap-y-1">
         <Link
           to={`/org?center=${agent.slug}`}
           className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
         >
           VIEW IN FULL ORG GRAPH →
+        </Link>
+        <Link
+          to="/org/chart"
+          className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
+        >
+          WHOLE-ORG CHART →
         </Link>
       </div>
     </div>
