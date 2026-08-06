@@ -5,11 +5,11 @@
 //
 // Why 2-up + 2-down? Operator constraint — anything wider becomes
 // noise on a single agent's page, and lateral peers already surface
-// in the agent's profile data and the standalone /workforce/org view.
+// in the agent's profile data and in the whole-org chart at /org/chart.
 //
-// Clicking any row navigates to that agent's profile (unlike /org,
-// which re-centers within the same view). The focused agent is shown
-// in the tree too, in its correct hierarchical slot, marked CENTER.
+// Clicking any row navigates to that agent's profile. The focused agent
+// is shown in the tree too, in its correct hierarchical slot, marked
+// CENTER.
 
 import { Link } from 'react-router-dom';
 import Sigil from './Sigil';
@@ -226,16 +226,10 @@ export default function AgentOrgGraph({ agent, roster }: Props) {
         </div>
       )}
       <div className="border-t border-wf-outline-variant px-4 py-2 flex flex-wrap gap-x-4 gap-y-1">
-        {/* The two destinations sit in one row, so their labels have to be
-            told apart at a glance. "Full org graph" next to "whole-org
-            chart" read as synonyms — and the one labelled *full* was the
-            narrower of the two (wf:freya F1). Each now names its scope. */}
-        <Link
-          to={`/org?center=${agent.slug}`}
-          className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
-        >
-          ORG NEIGHBOURHOOD →
-        </Link>
+        {/* One destination now. The sibling link went to /org?center=,
+            the egocentric 1-hop view, which has been retired — so the
+            label-ambiguity fix that once lived here (wf:freya F1) is moot:
+            there is nothing left to tell it apart from. */}
         <Link
           to="/org/chart"
           className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline"

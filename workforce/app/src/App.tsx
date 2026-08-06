@@ -12,7 +12,6 @@ import AgentProfile from './pages/AgentProfile';
 import SkillDirectory from './pages/SkillDirectory';
 import SkillProfile from './pages/SkillProfile';
 import SearchResults from './pages/SearchResults';
-import OrgDAG from './pages/OrgDAG';
 import OrgChart from './pages/OrgChart';
 import ProjectDirectory from './pages/ProjectDirectory';
 import ProjectProfile from './pages/ProjectProfile';
@@ -46,11 +45,13 @@ function ProtectedRoutes() {
                 the index so existing links keep working. */}
             <Route path="/" element={<Feed />} />
             <Route path="/performance" element={<Dashboard />} />
-            {/* /org stays the egocentric 1-hop view; /org/chart is the
-                whole-workforce chart. Ordered specific-before-general for
-                readability — v6 ranks routes by specificity regardless. */}
+            {/* /org/chart is the only org view. The egocentric 1-hop
+                /org (OrgDAG) was retired once the whole-org chart covered
+                the same question better; /org redirects rather than 404s,
+                the same treatment /feed gets below, because the old path
+                is in bookmarks and in older PR comments. */}
             <Route path="/org/chart" element={<OrgChart />} />
-            <Route path="/org" element={<OrgDAG />} />
+            <Route path="/org" element={<Navigate to="/org/chart" replace />} />
             <Route path="/agents" element={<AgentDirectory />} />
             <Route path="/agents/:slug" element={<AgentProfile />} />
             <Route path="/skills" element={<SkillDirectory />} />
