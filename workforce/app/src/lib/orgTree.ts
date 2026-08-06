@@ -280,8 +280,15 @@ export function estimateDivisionHeight(division: OrgDivision, m: PackMetrics): n
 }
 
 /**
- * Distributes divisions across `columns` explicit columns, tallest-first
- * into whichever column is currently shortest (LPT scheduling).
+ * Distributes divisions across **`min(columns, divisions.length)`** columns
+ * (at least one), tallest-first into whichever column is currently shortest
+ * (LPT scheduling).
+ *
+ * The clamp is part of the contract, not an implementation detail: every
+ * bucket becomes an equal-width track at the call site, so returning more
+ * buckets than there are cards renders those cards as slivers. It lives
+ * here so no caller can get it wrong — which means it has to be stated
+ * here too (wf:dario D11).
  *
  * CSS `column-width` was the first attempt and it packs badly here: with
  * `column-fill: balance` the browser targets a height no shorter than the

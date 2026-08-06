@@ -52,6 +52,7 @@ import { useAsync } from '../lib/useAsync';
 import {
   buildOrgChart,
   columnCountFor,
+  estimateDivisionHeight,
   matchesOrgQuery,
   packDivisions,
   type OrgDivision,
@@ -512,7 +513,13 @@ export default function OrgChart() {
     const el = outerRef.current;
     if (!el || innerHeight === 0) return;
     const available = availableHeight(el);
-    if (available <= 0) return;
+    // Clear the flag rather than freezing it at its last value — a viewport
+    // short enough to hit this branch would otherwise leave a stale
+    // at-floor message on screen (wf:dario D13).
+    if (available <= 0) {
+      setOverflowing(false);
+      return;
+    }
     const over = innerHeight * zoom > available;
     setOverflowing(over);
     if (over && zoomIdx < FIT_FLOOR_IDX) setZoomIdx(zoomIdx + 1);
@@ -567,9 +574,22 @@ export default function OrgChart() {
   const unplaced = model ? model.orphans.reduce((n, d) => n + d.size, 0) : 0;
   // When FIT has spent its budget and the chart still overflows, name the
   // constraint: a column can never be shorter than its tallest card, so the
-  // largest division is the bound. Divisions are size-desc, so it's [0]
-  // (wf:freya F5).
-  const largest = model?.divisions[0];
+  // tallest card is the bound (wf:freya F5).
+  //
+  // By HEIGHT, not row count, and across orphans too (wf:dario D10). Taking
+  // `divisions[0]` named the card with the most rows, which is a different
+  // card once secondary-reporting lines are in play — and on an all-orphan
+  // roster it was `undefined`, so the explanation vanished at exactly the
+  // moment the page was most broken.
+  const largest = model
+    ? [...model.divisions, ...model.orphans].reduce<OrgDivision | undefined>(
+        (tallest, d) =>
+          !tallest || estimateDivisionHeight(d, metrics) > estimateDivisionHeight(tallest, metrics)
+            ? d
+            : tallest,
+        undefined,
+      )
+    : undefined;
   const atFitFloor = fit && overflowing && zoomIdx >= FIT_FLOOR_IDX;
 
   return (
