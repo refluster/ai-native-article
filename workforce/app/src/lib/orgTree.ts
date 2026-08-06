@@ -191,10 +191,17 @@ export function buildOrgChart(agents: WorkforceAgent[]): OrgChartModel {
   // paragraph above promises not to do. Instead, climb from each leftover
   // to the top of its component (the entry point of the cycle that holds
   // it up) and seed there, so the whole component lands in one card.
+  //
+  // The `path.has(parent)` clause is the cycle guard and is load-bearing:
+  // without it this walk does not terminate on a cyclic component. A
+  // non-terminating loop is the wrong failure mode for a C-4 path — it
+  // hangs the render (and CI) rather than failing loudly — so the walk also
+  // carries a hard iteration bound that can only be reached if the guard is
+  // broken (wf:owen O13).
   const seedOf = (start: WorkforceAgent): WorkforceAgent => {
     const path = new Set<string>()
     let cur = start
-    for (;;) {
+    for (let step = 0; step <= agents.length; step++) {
       path.add(cur.slug)
       const parent = parentOf.get(cur.slug)
       // No parent, parent already placed, or we've come full circle: `cur`
@@ -202,6 +209,9 @@ export function buildOrgChart(agents: WorkforceAgent[]): OrgChartModel {
       if (!parent || visited.has(parent) || path.has(parent)) return cur
       cur = bySlug.get(parent)!
     }
+    throw new Error(
+      `orgTree: seedOf walked past ${agents.length} steps from "${start.slug}" — the reports_to cycle guard is broken`,
+    )
   }
 
   const orphans: OrgDivision[] = []
@@ -210,9 +220,13 @@ export function buildOrgChart(agents: WorkforceAgent[]): OrgChartModel {
     const node = build(seedOf(a), 0)
     if (node) orphans.push(toDivision(node, true))
   }
-  // A component whose seed was reached first can leave stragglers (a node
-  // whose primary parent sits below it in the same cycle). Sweep them up so
-  // the "every agent appears exactly once" invariant holds unconditionally.
+  // Backstop. `seedOf` climbs to the top of every component before seeding,
+  // so in principle nothing is left — and both reviewers who went looking
+  // confirmed it empirically (0 firings across ~20k random rosters and 11
+  // adversarial cyclic shapes; wf:owen O12 / wf:dario D12). It stays because
+  // "every agent appears exactly once" is the one property this module owes
+  // the page unconditionally, and the cost of being wrong about a proof is
+  // an agent silently missing from the org chart.
   for (const a of [...agents].sort(bySlugAsc)) {
     if (visited.has(a.slug)) continue
     const node = build(a, 0)

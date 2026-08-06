@@ -184,6 +184,27 @@ describe('buildOrgChart', () => {
     expect(model.orphans[0].size).toBe(3)
   })
 
+  // The seed walk's cycle guard is load-bearing: without it the walk does
+  // not terminate. A hang is the wrong failure mode on a C-4 path, so the
+  // walk carries a hard step bound that throws instead (wf:owen O13). This
+  // asserts the bound is generous enough never to fire on a valid roster —
+  // the throw itself is unreachable while the guard is intact.
+  it('completes the orphan seed walk well inside its step bound', () => {
+    // A 40-long chain hanging off a 2-cycle: the longest climb this shape
+    // admits, and comfortably under `agents.length`.
+    const chain = [agent('cyc1', ['cyc2'], 0), agent('cyc2', ['cyc1'], 0)]
+    for (let i = 0; i < 40; i++) {
+      chain.push(agent(`n${String(i).padStart(2, '0')}`, [i === 0 ? 'cyc1' : `n${String(i - 1).padStart(2, '0')}`], 0))
+    }
+    const model = buildOrgChart([agent('maya', [], 0), ...chain])
+    const placed = [
+      ...model.roots.map((r) => r.slug),
+      ...[...model.divisions, ...model.orphans].flatMap((d) => d.rows.map((r) => r.agent.slug)),
+    ]
+    expect(placed).toHaveLength(model.total)
+    expect(new Set(placed).size).toBe(model.total)
+  })
+
   it('surfaces a reports_to cycle as an orphan division instead of dropping it', () => {
     const cyclic = [
       ...SIMPLE,

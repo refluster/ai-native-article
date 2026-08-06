@@ -57,7 +57,27 @@ vi.mock('../lib/agents', () => ({
   fullName: (a: { first_name: string; last_name: string }) => `${a.first_name} ${a.last_name}`,
 }))
 
-import OrgChart from './OrgChart'
+import OrgChart, { packMetricsFor } from './OrgChart'
+
+// jsdom cannot measure a rendered row, so the balancing rule is asserted on
+// the choice rather than the outcome (wf:aoi A14).
+describe('packMetricsFor', () => {
+  it('uses the taller model whenever captions render, whatever the density', () => {
+    const compactNoCaption = packMetricsFor('compact', false)
+    const compactSearching = packMetricsFor('compact', true)
+    const detail = packMetricsFor('detail', true)
+
+    // A query in compact density must NOT keep compact's row height: the
+    // caption adds two lines and the balancer would under-estimate them.
+    expect(compactSearching).not.toEqual(compactNoCaption)
+    expect(compactSearching).toEqual(detail)
+    expect(compactSearching.rowHeight).toBeGreaterThan(compactNoCaption.rowHeight)
+  })
+
+  it('leaves detail density on its own model either way', () => {
+    expect(packMetricsFor('detail', false)).toEqual(packMetricsFor('detail', true))
+  })
+})
 
 function renderChart() {
   return render(
@@ -160,11 +180,31 @@ describe('OrgChart', () => {
     expect(screen.getByText('Celeste Test').closest('a')).toHaveStyle({ opacity: '0.45' })
     // …and the containment signal is the HITS chip, not full opacity.
     expect(screen.getByText(/2 HITS/)).toBeInTheDocument()
+    // The chip must sit OUTSIDE the link that dims, or it is suppressed in
+    // the one case it exists for (wf:aoi A13).
+    expect(screen.getByText(/2 HITS/).closest('a')).toBeNull()
     // A division with nothing matching gets no chip at all.
     const beatriz = screen
       .getAllByRole('article')
       .find((el) => within(el).queryByText('Beatriz Test'))!
-    expect(within(beatriz).queryByText(/HITS/)).not.toBeInTheDocument()
+    expect(within(beatriz).queryByText(/HITS?$/)).not.toBeInTheDocument()
+  })
+
+  // Regression (wf:aoi A15): `hits` counted the lead, so a lead matching
+  // alone rendered "· 1 HITS" — plural grammar on one, restating what the
+  // un-dimmed lead already says. The chip counts MEMBERS.
+  it('counts only members in the hits chip, and never shows it for a lead-only match', async () => {
+    renderChart()
+    await screen.findByText('Beatriz Test')
+    // "VP, Research" matches beatriz (the lead) and nobody under her.
+    fireEvent.change(screen.getByLabelText('Highlight agents'), { target: { value: 'VP, Research' } })
+    await screen.findByText(/1 of 6 highlighted/)
+
+    const beatriz = screen
+      .getAllByRole('article')
+      .find((el) => within(el).queryByText('Beatriz Test'))!
+    expect(within(beatriz).queryByText(/HITS?$/)).not.toBeInTheDocument()
+    expect(screen.getByText('Beatriz Test').closest('a')).toHaveStyle({ opacity: '1' })
   })
 
   // Regression (wf:aoi A5 / wf:freya F3): compact density hid the slug and
@@ -255,6 +295,11 @@ describe('OrgChart FIT', () => {
 
   let chartHeight = 0
   let originalRect: typeof HTMLElement.prototype.getBoundingClientRect
+  const originalWindow = {
+    innerHeight: window.innerHeight,
+    innerWidth: window.innerWidth,
+    scrollY: window.scrollY,
+  }
 
   /** Stub the three surfaces the component measures through. `rectTop` and
    *  `scrollY` are varied independently so a scroll-dependent measurement
@@ -300,6 +345,11 @@ describe('OrgChart FIT', () => {
     delete (HTMLElement.prototype as unknown as Record<string, unknown>).offsetHeight
     delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientWidth
     delete (globalThis as unknown as Record<string, unknown>).ResizeObserver
+    // The stub writes window.innerHeight/innerWidth/scrollY; leaving them
+    // set leaks a 1440px viewport into whatever runs next (wf:owen O15).
+    Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: originalWindow.innerHeight })
+    Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: originalWindow.innerWidth })
+    Object.defineProperty(window, 'scrollY', { configurable: true, writable: true, value: originalWindow.scrollY })
   })
 
   const zoomReadout = () => screen.getByText(/^\d+%$/).textContent
@@ -323,6 +373,41 @@ describe('OrgChart FIT', () => {
     // mid-descent.
     await waitFor(() => expect(zoomReadout()).toBe('84%'))
     expect(screen.getByRole('button', { name: 'fit' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  // The two end-of-ladder cases above are both satisfied by
+  // `setZoomIdx(FIT_FLOOR_IDX)` — i.e. by jumping straight to the floor and
+  // never descending (wf:owen O10). This pins an intermediate stop, which
+  // only a real step-by-step descent produces.
+  it('stops part-way down the ladder when that is enough to clear the fold', async () => {
+    // available = 800 - 200 - 48 = 552. 600 × 0.92 = 552 → fits at 92%,
+    // the third rung, with 100% and 96% both overflowing.
+    stubLayout({ height: 600, rectTop: DOC_TOP, scrollY: 0 })
+    renderChart()
+    await screen.findByText('Sora Test')
+    await waitFor(() => expect(zoomReadout()).toBe('92%'))
+    await waitFor(() => expect(zoomReadout()).toBe('92%'))
+  })
+
+  // Regression (wf:aoi A14 / wf:freya F10 / wf:dario D9): a live query
+  // forces captions on and grows the chart, so FIT descends — and the
+  // descent used to be a one-way ratchet, leaving the chart shrunk after
+  // the query was cleared.
+  it('returns to its pre-query zoom when the query is cleared', async () => {
+    stubLayout({ height: 400, rectTop: DOC_TOP, scrollY: 0 })
+    renderChart()
+    await screen.findByText('Sora Test')
+    await waitFor(() => expect(zoomReadout()).toBe('100%'))
+
+    // Typing grows the chart past the fold…
+    chartHeight = 5000
+    fireEvent.change(screen.getByLabelText('Highlight agents'), { target: { value: 'podcast' } })
+    await waitFor(() => expect(zoomReadout()).toBe('84%'))
+
+    // …and clearing it must give the zoom back, not strand it at the floor.
+    chartHeight = 400
+    fireEvent.change(screen.getByLabelText('Highlight agents'), { target: { value: '' } })
+    await waitFor(() => expect(zoomReadout()).toBe('100%'))
   })
 
   it('says why when it bottoms out with the chart still overflowing', async () => {

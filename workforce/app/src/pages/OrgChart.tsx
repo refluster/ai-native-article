@@ -100,6 +100,21 @@ const DENSITY: Record<Density, DensitySpec> = {
 /** Gutter between packed columns, px. */
 const COLUMN_GAP = 12;
 
+/**
+ * The height model the column balancer should use, given the density and
+ * whether captions are actually rendered.
+ *
+ * Exported so the rule is testable without layout: jsdom cannot measure a
+ * row, so a test can only check that the right model was *chosen*. A live
+ * query forces captions on regardless of density, adding two lines per row
+ * — and the balancer was still optimising against compact's shorter model,
+ * so the columns went ragged exactly while the operator was searching
+ * (wf:aoi A14).
+ */
+export function packMetricsFor(density: Density, showCaption: boolean): PackMetrics {
+  return showCaption ? DENSITY.detail.metrics : DENSITY[density].metrics;
+}
+
 // Zoom ladder, descending. The steps are deliberately fine — a coarse
 // ladder overshoots and leaves a band of dead page under a chart that only
 // needed 4% off.
@@ -121,9 +136,11 @@ const FIT_BOTTOM_GUTTER = 48;
 /** Viewport width at or above which auto-fit is on by default. */
 const FIT_MIN_VIEWPORT = 768;
 
-/** Opacity of a row that does not match the highlight query. Not lower:
- *  these rows stay readable and stay in the accessibility tree — they are
- *  de-emphasised, not disabled (wf:aoi A3). */
+/** Opacity of a row that does not match the highlight query. It composites
+ *  to roughly 2.3:1, so these rows are **de-emphasised, not readable** — an
+ *  earlier version of this comment claimed "readable", which the contrast
+ *  maths does not support. They stay in the accessibility tree and regain
+ *  full opacity on focus; they leave the tab order instead (wf:aoi A3). */
 const DIM_OPACITY = 0.45;
 
 // ── Connector rails ────────────────────────────────────────────────────
@@ -232,8 +249,12 @@ function DivisionCard({
   const [lead, ...members] = division.rows;
   const searching = query.trim().length > 0;
   const leadDim = searching && !matchesOrgQuery(lead.agent, query);
+  // MEMBERS only. Counting the lead produced "· 1 HITS" for a lead that
+  // matched alone — plural grammar on one, restating what the un-dimmed
+  // lead already says (wf:aoi A15). The chip's job is "this card contains
+  // matches you cannot see from the header".
   const hits = searching
-    ? division.rows.filter((r) => matchesOrgQuery(r.agent, query)).length
+    ? members.filter((r) => matchesOrgQuery(r.agent, query)).length
     : 0;
 
   return (
@@ -243,34 +264,44 @@ function DivisionCard({
       }`}
       aria-label={`${fullName(division.lead)} division, ${division.size} agents`}
     >
-      <Link
-        to={`/agents/${division.lead.slug}`}
-        // Dimmed by the lead's OWN match state, like every other row. It
-        // used to stay lit whenever any report matched, so one opacity
-        // meant "matched" on member rows and "contains a match" on lead
-        // rows — and the count of lit boxes disagreed with the readout
-        // above the chart. Containment now has its own signal, the HITS
-        // chip below (wf:aoi A4 / wf:freya F2).
-        tabIndex={leadDim ? -1 : undefined}
-        className="group flex items-start gap-2.5 px-2.5 pt-2.5 pb-2 border-b border-wf-outline-variant transition-opacity focus:!opacity-100"
-        style={{ opacity: leadDim ? DIM_OPACITY : 1 }}
-      >
-        <Sigil slug={division.lead.slug} size={LEAD_SIGIL} />
-        <span className="min-w-0 flex-1">
-          <span className="block font-wfmono text-[9px] uppercase tracking-[0.14em] text-wf-on-surface-variant truncate">
-            {division.lead.slug.toUpperCase()} · L{division.lead.depth}
-            {division.size > 1 ? ` · ${division.size} PPL` : ''}
-            {division.orphan ? ' · UNPLACED' : ''}
-            {hits > 0 && <span className="text-wf-tertiary"> · {hits} HITS</span>}
+      {/* The HITS chip sits OUTSIDE the link that dims. Inside it, the one
+          case the chip exists for — lead does not match, some reports do —
+          rendered it at DIM_OPACITY, suppressing the signal exactly when it
+          carried information (wf:aoi A13). Row opacity answers "does this
+          agent match"; the card answers "does this division contain one". */}
+      <div className="relative border-b border-wf-outline-variant">
+        {hits > 0 && (
+          <span className="absolute top-2 right-2 z-10 font-wfmono text-[9px] uppercase tracking-[0.14em] text-wf-tertiary">
+            {hits} HIT{hits === 1 ? '' : 'S'}
           </span>
-          <span className="block text-[13px] font-bold leading-tight text-wf-on-surface truncate group-hover:text-wf-primary">
-            {fullName(division.lead)}
+        )}
+        <Link
+          to={`/agents/${division.lead.slug}`}
+          // Dimmed by the lead's OWN match state, like every other row. It
+          // used to stay lit whenever any report matched, so one opacity
+          // meant "matched" on member rows and "contains a match" on lead
+          // rows — and the count of lit boxes disagreed with the readout
+          // above the chart (wf:aoi A4 / wf:freya F2).
+          tabIndex={leadDim ? -1 : undefined}
+          className="group flex items-start gap-2.5 px-2.5 pt-2.5 pb-2 transition-opacity focus:!opacity-100"
+          style={{ opacity: leadDim ? DIM_OPACITY : 1 }}
+        >
+          <Sigil slug={division.lead.slug} size={LEAD_SIGIL} />
+          <span className="min-w-0 flex-1">
+            <span className="block font-wfmono text-[9px] uppercase tracking-[0.14em] text-wf-on-surface-variant truncate">
+              {division.lead.slug.toUpperCase()} · L{division.lead.depth}
+              {division.size > 1 ? ` · ${division.size} PPL` : ''}
+              {division.orphan ? ' · UNPLACED' : ''}
+            </span>
+            <span className="block text-[13px] font-bold leading-tight text-wf-on-surface truncate group-hover:text-wf-primary">
+              {fullName(division.lead)}
+            </span>
+            <span className="block text-[10px] leading-tight text-wf-on-surface-variant line-clamp-2">
+              {division.lead.role}
+            </span>
           </span>
-          <span className="block text-[10px] leading-tight text-wf-on-surface-variant line-clamp-2">
-            {division.lead.role}
-          </span>
-        </span>
-      </Link>
+        </Link>
+      </div>
 
       {members.length > 0 && (
         <ul aria-label={`${fullName(division.lead)}'s reports`} className="p-1.5 space-y-0.5">
@@ -294,23 +325,27 @@ function PackedColumns({
   divisions,
   columns,
   spec,
+  metrics,
   showCaption,
   query,
 }: {
   divisions: OrgDivision[];
   columns: number;
   spec: DensitySpec;
+  metrics: PackMetrics;
   showCaption: boolean;
   query: string;
 }) {
-  // Memoised: packing depends on the divisions, the column count and the
-  // density metrics — never on the query — so it must not re-run on every
-  // keystroke (wf:dario D7). `packDivisions` clamps the column count to the
+  // Memoised on the divisions, the column count and the effective height
+  // model — never on the query text itself, so it does not re-run per
+  // keystroke (wf:dario D7). `metrics` does flip when a query turns the
+  // captions on, which is the point: the balancer must model the rows that
+  // are actually rendered. `packDivisions` clamps the column count to the
   // number of cards itself, so a near-empty section (UNPLACED) fills the
   // row instead of rendering as a sliver.
   const packed = useMemo(
-    () => packDivisions(divisions, columns, spec.metrics),
-    [divisions, columns, spec.metrics],
+    () => packDivisions(divisions, columns, metrics),
+    [divisions, columns, metrics],
   );
   return (
     <div className="flex items-start" style={{ gap: COLUMN_GAP }}>
@@ -415,6 +450,9 @@ export default function OrgChart() {
   // lit up rows with no visible reason, so a highlight forces them on
   // regardless of density (wf:aoi A5 / wf:freya F3).
   const showCaption = spec.showCaption || searching;
+  // The height model follows the captions that are actually rendered, not
+  // the density that nominally requested them — see packMetricsFor.
+  const metrics = packMetricsFor(density, showCaption);
 
   const model = useMemo(
     () => (roster.data ? buildOrgChart(roster.data.agents) : null),
@@ -443,7 +481,11 @@ export default function OrgChart() {
     if (inner) ro.observe(inner);
     if (outer) ro.observe(outer);
     return () => ro.disconnect();
-  }, [measure, model, density]);
+    // `showCaption` sits here for the same reason `density` does: both
+    // change every row's height, so the measurement is stale until it
+    // re-runs. The ResizeObserver would catch it in a browser; this keeps
+    // the two paths honest and makes the behaviour observable in a test.
+  }, [measure, model, density, showCaption]);
 
   // The chart's layout box is widened by 1/zoom before being scaled back
   // down, so shrinking buys COLUMNS, not empty margin. Column count is
@@ -476,10 +518,15 @@ export default function OrgChart() {
     if (over && zoomIdx < FIT_FLOOR_IDX) setZoomIdx(zoomIdx + 1);
   }, [fit, innerHeight, zoom, zoomIdx, availableHeight]);
 
+  // `searching` belongs here alongside `density` (wf:aoi A14 / wf:freya F10
+  // / wf:dario D9): a live query forces the captions on, which grows every
+  // row. Without it the FIT descent was a one-way ratchet — type a query,
+  // the chart shrinks to the floor; clear it, and it stays there
+  // permanently with dead page beneath it.
   useEffect(() => {
     if (!fit) return;
     setZoomIdx(0);
-  }, [fit, density]);
+  }, [fit, density, searching]);
 
   useEffect(() => {
     if (!fit) return;
@@ -505,9 +552,13 @@ export default function OrgChart() {
   };
 
   if (roster.error) {
+    // Same gutters as the success branch — the failure state should not
+    // sit in a differently-inset container (noted by wf:aoi alongside A1).
     return (
-      <WorkforceLayout>
-        <div className="font-wfmono text-sm text-wf-tertiary">Could not load org: {roster.error}</div>
+      <WorkforceLayout contained={false}>
+        <div className="px-3 sm:px-6 md:px-8 py-5 sm:py-8 md:py-10 font-wfmono text-sm text-wf-tertiary">
+          Could not load org: {roster.error}
+        </div>
       </WorkforceLayout>
     );
   }
@@ -699,6 +750,7 @@ export default function OrgChart() {
                 divisions={model.divisions}
                 columns={columns}
                 spec={spec}
+                metrics={metrics}
                 showCaption={showCaption}
                 query={query}
               />
@@ -716,6 +768,7 @@ export default function OrgChart() {
                     divisions={model.orphans}
                     columns={columns}
                     spec={spec}
+                    metrics={metrics}
                     showCaption={showCaption}
                     query={query}
                   />
