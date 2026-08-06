@@ -192,6 +192,9 @@ export default function OrgDAG() {
           <Link to={`/agents/${centerAgent.slug}`} className="text-wf-primary hover:underline">
             VIEW {centerAgent.slug.toUpperCase()} PROFILE →
           </Link>
+          <Link to="/org/chart" className="text-wf-primary hover:underline">
+            WHOLE-ORG CHART →
+          </Link>
           <span>
             showing {shownCount} of {allAgents.length}
             {hiddenCount > 0 ? ` (${hiddenCount} hidden — re-center to explore further)` : ''}

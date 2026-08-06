@@ -13,6 +13,7 @@ import SkillDirectory from './pages/SkillDirectory';
 import SkillProfile from './pages/SkillProfile';
 import SearchResults from './pages/SearchResults';
 import OrgDAG from './pages/OrgDAG';
+import OrgChart from './pages/OrgChart';
 import ProjectDirectory from './pages/ProjectDirectory';
 import ProjectProfile from './pages/ProjectProfile';
 import Feed from './pages/Feed';
@@ -45,6 +46,10 @@ function ProtectedRoutes() {
                 the index so existing links keep working. */}
             <Route path="/" element={<Feed />} />
             <Route path="/performance" element={<Dashboard />} />
+            {/* /org stays the egocentric 1-hop view; /org/chart is the
+                whole-workforce chart. Ordered specific-before-general for
+                readability — v6 ranks routes by specificity regardless. */}
+            <Route path="/org/chart" element={<OrgChart />} />
             <Route path="/org" element={<OrgDAG />} />
             <Route path="/agents" element={<AgentDirectory />} />
             <Route path="/agents/:slug" element={<AgentProfile />} />
