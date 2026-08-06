@@ -602,7 +602,24 @@ takes an ADR *plus* a matching server-side check in `pr-merge.mjs`, so that a
 stated rule and an enforced rule cannot diverge.
 
 Build the decisions payload (schema in the script header) with `reviewers[]` =
-the ≥3 nominated personas whose green markers you verified, then:
+the ≥3 nominated personas whose green markers you verified.
+
+**First, un-draft every PR you are about to merge — you, not the engine.**
+GitHub refuses to merge a draft, so the draft→ready flip has to happen before
+the merge PUT. That flip exists **only** as the GraphQL mutation
+`markPullRequestReadyForReview`; the REST "Update a pull request" endpoint has
+no `draft` field. `pr-merge.mjs` still carries the mutation as a fallback, but
+it cannot succeed from here: a CCR session's raw HTTPS to `api.github.com`
+goes through the agent proxy, which serves **no GraphQL at all** — even a
+read-only `{viewer{login}}` returns `403 "This GraphQL query is not enabled
+for this session"`. A deterministic script has only raw HTTPS, so the engine
+can never make this call. Your session can: the GitHub MCP connector
+(`agent-runner.md` §7) runs server-side, outside that proxy. So for each PR
+whose decision is `merge` and which is still a draft, call the MCP tool
+
+    update_pull_request(owner, repo, pullNumber, draft: false)
+
+and confirm it returns before invoking the engine. Then:
 
 ```sh
 TOKEN="…" node workforce/skills/pr-autopilot/pr-merge.mjs \
