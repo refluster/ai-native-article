@@ -86,4 +86,118 @@ describe("performance-reducer handler", () => {
       .find((row) => row.pk === "PERF#editorial");
     expect(projRow!.points.at(-1)).toMatchObject({ registered: 0, assigned: 1, delivered: 1 });
   });
+  // ── Epic-021 §B.1 idle sweep — the IO seam ─────────────────────────────────
+  //
+  // The nine detector tests in shared/performance-tests.ts cover the pure
+  // layer against a hand-built commons set. These cover `idleSignalFor` /
+  // `upsertIdle`, which is where every cycle-1 defect actually lived (dario D3
+  // / mateo M3): the window filter, the live-binding derivation, the real
+  // COMMONS_SKILLS binding, and the row a digest will read next PR.
+  //
+  // Note: shared/skill-registry-generated.js is deliberately NOT mocked, so
+  // these run against the real commons set (feed-post + daily-research).
+
+  const idleRow = () =>
+    putItem.mock.calls
+      .map((c) => c[0] as {
+        pk: string; sk: string; cohort: number; commons_skills: string[];
+        probe_truncated: string[]; window: { days: number };
+        idle: Array<{ slug: string; pending: string; bound_skills: string[] }>;
+      })
+      .find((row) => row.pk === "PERF#workforce" && row.sk === "IDLE");
+
+  it("writes a PERF#workforce/IDLE row with the shape the digest will read", async () => {
+    const res = await handler();
+    const row = idleRow();
+    expect(row).toBeDefined();
+    expect(row!.window.days).toBe(30);
+    expect(row!.cohort).toBe(3);
+    expect(row!.commons_skills).toEqual(["daily-research", "feed-post"]);
+    expect(row!.probe_truncated).toEqual([]);
+    expect(res.idle).toBe(row!.idle.length);
+  });
+
+  it("does not flag a persona whose non-commons row is inside the window", async () => {
+    listExecutions.mockImplementation(async (f: { agent_slug: string }) =>
+      f.agent_slug === "ren"
+        ? [{ project_id: "editorial", status: "ok", skill_name: "x", started_at: new Date().toISOString() }]
+        : [],
+    );
+    await handler();
+    expect(idleRow()!.idle.map((r) => r.slug)).not.toContain("ren");
+  });
+
+  it("still flags a persona whose entire window is commons output", async () => {
+    listExecutions.mockImplementation(async (f: { agent_slug: string }) =>
+      f.agent_slug === "ren"
+        ? [{ project_id: "editorial", status: "ok", skill_name: "feed-post", started_at: new Date().toISOString() }]
+        : [],
+    );
+    await handler();
+    expect(idleRow()!.idle.find((r) => r.slug === "ren")).toMatchObject({ pending: "output" });
+  });
+
+  // dario D1 — the inversion this PR's cycle-1 shipped: pausing does not touch
+  // bindings[], so a paused persona kept a load-bearing binding and was charged
+  // `output` for silence the operator's own gate produced.
+  it("attributes a PAUSED persona to the enable gate, never to the persona", async () => {
+    scanAllPrefix.mockImplementation(async (pkPrefix: string) =>
+      pkPrefix === "AGENT#"
+        ? [{ ...META[0], paused: true }, META[1], META[2]]
+        : [{ project_id: "editorial", status: "active" }],
+    );
+    listExecutions.mockResolvedValue([]);
+    await handler();
+    expect(idleRow()!.idle.find((r) => r.slug === "ren")).toMatchObject({
+      pending: "enable",
+      bound_skills: ["x"],
+    });
+  });
+
+  it("excludes an ARCHIVED persona from the idle cohort entirely", async () => {
+    scanAllPrefix.mockImplementation(async (pkPrefix: string) =>
+      pkPrefix === "AGENT#"
+        ? [{ ...META[0], archived: true }, META[1], META[2]]
+        : [{ project_id: "editorial", status: "active" }],
+    );
+    listExecutions.mockResolvedValue([]);
+    const res = await handler();
+    const row = idleRow()!;
+    expect(row.idle.map((r) => r.slug)).not.toContain("ren");
+    expect(row.cohort).toBe(2); // swept cohort, not head-count
+    expect(res.agents).toBe(3); // ...but LIFECYCLE still counts every persona
+  });
+
+  // dario D2 / mateo M1 — the probe must be window-scoped, and a saturated
+  // page must be recorded rather than read as a clean "found nothing".
+  it("scopes the idle probe to the window and marks a saturated page", async () => {
+    const inWindow = new Date().toISOString();
+    listExecutions.mockImplementation(async (f: { agent_slug: string; from?: string }) => {
+      // The all-time "has ever delivered" probe passes no `from`; the idle
+      // probe must pass one.
+      if (f.agent_slug !== "ren") return [];
+      if (!f.from) return [{ project_id: "editorial", status: "ok", skill_name: "x" }];
+      // A full page of commons rows: saturated, so absence is not proven.
+      return Array.from({ length: 100 }, () => ({
+        project_id: "editorial",
+        status: "ok",
+        skill_name: "feed-post",
+        started_at: inWindow,
+      }));
+    });
+    await handler();
+    expect(idleRow()!.probe_truncated).toEqual(["ren"]);
+  });
+
+  it("filters the idle probe by status itself rather than trusting the post-filter", async () => {
+    const inWindow = new Date().toISOString();
+    listExecutions.mockImplementation(async (f: { agent_slug: string; from?: string }) =>
+      f.agent_slug === "ren" && f.from
+        ? [{ project_id: "editorial", status: "throw", skill_name: "x", started_at: inWindow }]
+        : [],
+    );
+    await handler();
+    // A throwing non-commons run is not a deliverable — ren stays flagged.
+    expect(idleRow()!.idle.map((r) => r.slug)).toContain("ren");
+  });
 });
