@@ -75,7 +75,7 @@ This implements `design-policy.md` D-2 (Software 2.0).
 | Governance registry integrity | CI gate | every PR | [`check-governance-registries.mjs`](../scripts/check-governance-registries.mjs) | R-12 |
 | Memory→lint backlog | registry (process) | governance retrospective | [`memory-lint-backlog.md`](memory-lint-backlog.md) | (data for R-12) |
 | Risk-acceptance ledger | registry (process) | known-gap triage | [`risk-acceptance-ledger.md`](risk-acceptance-ledger.md) | (data for R-12) |
-| CloudFormation/SAM lint | CI gate (PR) | every PR | `cfn-lint` over [`workforce/infra/**/template.yaml`](../workforce/infra/) (`ci.yml`) | candidate `R-NN` (ML-023) |
+| CloudFormation/SAM lint | CI gate (PR) | every PR | `cfn-lint` over [`workforce/infra/**/template.yaml`](../workforce/infra/) (`ci.yml`) | candidate `R-NN` (ML-024) |
 | Content-insights loop | scheduled automation | Mondays 02:00 UTC | [`content-insights.mjs`](../scripts/content-insights.mjs) | — |
 | PR terminal-state sweep | scheduled automation (daily) | daily cron + manual dispatch | [`pr-autopilot-sweep.mjs`](../workforce/skills/pr-autopilot/pr-autopilot-sweep.mjs), [`check-escalation-labels.mjs`](../workforce/scripts/check-escalation-labels.mjs) | R-13 |
 | Shared truncation heuristic | library | imported by gates + skill | [`scripts/lib/truncation.mjs`](../scripts/lib/truncation.mjs) | underlies R-10 (historically R-5) |
@@ -101,7 +101,7 @@ This implements `design-policy.md` D-2 (Software 2.0).
   caught on its first run). Warnings and informational findings do not fail the build, so the gate
   stays about "would this deploy have blown up", not template style. Reproduce locally with
   `pipx run cfn-lint==1.53.3 --non-zero-exit-code error -- $(find workforce/infra -name template.yaml)`.
-  Not yet a numbered R-rule: the statute row is an L1 edit, proposed for operator sign-off (ML-023),
+  Not yet a numbered R-rule: the statute row is an L1 edit, proposed for operator sign-off (ML-024),
   and the mechanical check does not wait on it.
 - **Content-insights** — inert until the operator provisions `GA4_PROPERTY_ID` + `GA4_SA_KEY`
   (RAL-002). Run a preview anytime: `DRY_RUN=1 npm run content-insights` (still inert without creds).
