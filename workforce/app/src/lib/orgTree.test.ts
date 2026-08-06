@@ -13,7 +13,9 @@ import {
   flattenDivision,
   matchesOrgQuery,
   packDivisions,
+  type OrgDivision,
   type PackMetrics,
+  type RailShape,
 } from './orgTree'
 import type { WorkforceAgent } from '../types/agent'
 
@@ -114,11 +116,72 @@ describe('buildOrgChart', () => {
     expect(model.divisions.find((d) => d.key === 'camille')!.size).toBe(2)
   })
 
+  // Regression (wf:owen O1): deleting the `x.depth - y.depth` term from the
+  // manager sort left every shipped fixture green, because in each one slug
+  // order and depth order happened to agree. Here they disagree — `alpha`
+  // sorts first but `zed` is shallower — so only the depth rule produces
+  // this placement.
+  it('places a dual-reporting node under the SHALLOWEST manager, not the first by slug', () => {
+    const model = buildOrgChart([
+      agent('root', [], 0),
+      agent('zed', ['root'], 1),
+      agent('alpha', ['zed'], 2),
+      agent('kid', ['alpha', 'zed'], 3),
+    ])
+    const kid = model.divisions.flatMap((d) => d.rows).filter((r) => r.agent.slug === 'kid')
+    expect(kid).toHaveLength(1)
+    expect(kid[0].level).toBe(1)
+    expect(kid[0].alsoReportsTo).toEqual(['alpha'])
+  })
+
+  // Regression (wf:dario D5): a roster row naming the same manager twice
+  // rendered "⇄ also reports to camille, camille".
+  it('de-duplicates repeated secondary managers', () => {
+    const model = buildOrgChart([...SIMPLE, agent('dupe', ['bea', 'camille', 'camille'], 2)])
+    const row = model.divisions
+      .flatMap((d) => d.rows)
+      .find((r) => r.agent.slug === 'dupe')!
+    expect(row.alsoReportsTo).toEqual(['camille'])
+  })
+
+  // Regression (wf:dario D6): `depth` arrives over the wire and indexes an
+  // array directly — one bad record used to mint hundreds of empty level
+  // chips, and a negative one silently vanished from the tally.
+  it('ignores out-of-range depths in the level tally without dropping the agent', () => {
+    const model = buildOrgChart([
+      agent('maya', [], 0),
+      agent('huge', ['maya'], 400),
+      agent('neg', ['maya'], -3),
+    ])
+    expect(model.levelCounts).toEqual([1])
+    // Still placed and still counted in the roster total — only the tally
+    // ignores them.
+    expect(model.total).toBe(3)
+    expect(model.divisions.map((d) => d.key).sort()).toEqual(['huge', 'neg'])
+  })
+
   it('ignores reports_to entries that name an agent not on the roster', () => {
     const model = buildOrgChart([...SIMPLE, agent('ghosted', ['nobody'], 0)])
     // No resolvable manager → it is a root, not an orphan.
     expect(model.roots.map((r) => r.slug)).toEqual(['ghosted', 'maya'])
     expect(model.orphans).toEqual([])
+  })
+
+  // Regression (wf:owen O3): the orphan pass used to seed in slug order, so
+  // a detached cluster whose downstream report sorted first shredded into
+  // one card per node — the opposite of the "keeps its shape" promise. The
+  // pass now climbs to the top of the component before seeding.
+  it('keeps a detached cluster in one card regardless of slug order', () => {
+    const model = buildOrgChart([
+      agent('maya', [], 0),
+      // `aa` sorts first but hangs off the zz↔yy cycle.
+      agent('aa', ['zz'], 0),
+      agent('yy', ['zz'], 0),
+      agent('zz', ['yy'], 0),
+    ])
+    expect(model.orphans).toHaveLength(1)
+    expect(model.orphans[0].rows.map((r) => r.agent.slug).sort()).toEqual(['aa', 'yy', 'zz'])
+    expect(model.orphans[0].size).toBe(3)
   })
 
   it('surfaces a reports_to cycle as an orphan division instead of dropping it', () => {
@@ -212,14 +275,14 @@ describe('packDivisions', () => {
   }
 
   /** A division of `size` agents, without going through buildOrgChart. */
-  const div = (key: string, size: number) => ({
+  const div = (key: string, size: number): OrgDivision => ({
     key,
     lead: agent(key, [], 1),
     rows: Array.from({ length: size }, (_, i) => ({
       agent: agent(`${key}-${i}`, [], 2),
       level: i === 0 ? 0 : 1,
-      railShapes: [],
-      alsoReportsTo: [],
+      railShapes: [] as RailShape[],
+      alsoReportsTo: [] as string[],
     })),
     size,
     depth: size > 1 ? 1 : 0,
@@ -229,6 +292,28 @@ describe('packDivisions', () => {
   it('estimates height from the member count', () => {
     expect(estimateDivisionHeight(div('a', 1), metrics)).toBe(70)
     expect(estimateDivisionHeight(div('a', 3), metrics)).toBe(60 + 10 + 80 + 10)
+  })
+
+  // Regression (wf:owen O4): every fixture hardcoded `alsoReportsTo: []`,
+  // so the secondary-line term could be zeroed out with the suite green —
+  // on the height model the whole FIT convergence rides on.
+  it('adds a line of height per secondary reporting annotation', () => {
+    const withSecondary = div('a', 3)
+    withSecondary.rows[1].alsoReportsTo = ['x']
+    withSecondary.rows[2].alsoReportsTo = ['y']
+    expect(estimateDivisionHeight(withSecondary, metrics)).toBe(
+      estimateDivisionHeight(div('a', 3), metrics) + 2 * metrics.secondaryLineHeight,
+    )
+  })
+
+  // Regression (wf:dario D4): `Math.max(1, NaN)` is NaN and
+  // `Math.floor(NaN)` is NaN, so the old clamp did not clamp and
+  // `new Array(NaN)` threw RangeError. Unreachable from the page, but this
+  // module is exported for other callers.
+  it('falls back to one column on a non-finite column count', () => {
+    const divisions = [div('a', 3), div('b', 2)]
+    expect(packDivisions(divisions, Number.NaN, metrics)).toEqual([divisions])
+    expect(packDivisions(divisions, Number.POSITIVE_INFINITY, metrics)).toEqual([divisions])
   })
 
   it('places every division exactly once across the columns', () => {
@@ -244,8 +329,11 @@ describe('packDivisions', () => {
     const heights = packed.map((col) =>
       col.reduce((n, d) => n + estimateDivisionHeight(d, metrics), 0),
     )
-    // Naive in-order filling would put big+m1 (1130) against m2+s (350).
-    expect(Math.abs(heights[0] - heights[1])).toBeLessThan(200)
+    // Heights under `metrics`: big(12)=520, m1(5)=240, m2(5)=240, s(1)=70.
+    // Naive in-order filling would put big+m1 (760) against m2+s (310); LPT
+    // lands on 520 vs 550. The threshold is tight enough to fail either
+    // packing mutation (wf:owen O5).
+    expect(Math.abs(heights[0] - heights[1])).toBeLessThan(100)
   })
 
   it('collapses to a single column when asked for one or fewer', () => {
@@ -254,10 +342,22 @@ describe('packDivisions', () => {
     expect(packDivisions(divisions, 0, metrics)).toEqual([divisions])
   })
 
-  it('returns empty columns rather than dropping them when there is little to pack', () => {
-    const packed = packDivisions([div('a', 2)], 4, metrics)
-    expect(packed).toHaveLength(4)
-    expect(packed.flat()).toHaveLength(1)
+  // Regression (wf:dario D3): this used to return one bucket per requested
+  // column whether or not it filled them, and every bucket claims an equal
+  // width track — so a single card rendered at 1/7 of the row. The section
+  // that suffered most was UNPLACED, whose entire purpose is to be
+  // impossible to miss.
+  it('never returns more columns than there are divisions to fill them', () => {
+    expect(packDivisions([div('a', 2)], 7, metrics)).toEqual([[expect.objectContaining({ key: 'a' })]])
+    expect(packDivisions([div('a', 2), div('b', 2)], 7, metrics)).toHaveLength(2)
+    // …and it still fills every column it does return.
+    const packed = packDivisions([div('a', 5), div('b', 4), div('c', 3)], 3, metrics)
+    expect(packed).toHaveLength(3)
+    expect(packed.every((col) => col.length > 0)).toBe(true)
+  })
+
+  it('returns a single empty column for an empty division list', () => {
+    expect(packDivisions([], 5, metrics)).toEqual([[]])
   })
 })
 
@@ -274,6 +374,16 @@ describe('matchesOrgQuery', () => {
     expect(matchesOrgQuery(a, 'sora petersen')).toBe(true)
     expect(matchesOrgQuery(a, 'analyst')).toBe(true)
     expect(matchesOrgQuery(a, 'oslo')).toBe(true)
+  })
+
+  // Regression (wf:owen O2): the fixture above has slug `sora` inside name
+  // "Sora Petersen", so the slug clause could be deleted and every
+  // assertion still passed through the name clause. This slug appears
+  // nowhere else on the record.
+  it('matches on slug even when the slug is not part of the name', () => {
+    const odd = agent('k9', [], 2, { first_name: 'Sora', last_name: 'Petersen', role: 'Researcher', residence: 'Oslo, NO' })
+    expect(matchesOrgQuery(odd, 'k9')).toBe(true)
+    expect(matchesOrgQuery(odd, 'K9')).toBe(true)
   })
 
   it('rejects a non-match', () => {

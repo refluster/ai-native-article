@@ -226,17 +226,21 @@ export default function AgentOrgGraph({ agent, roster }: Props) {
         </div>
       )}
       <div className="border-t border-wf-outline-variant px-4 py-2 flex flex-wrap gap-x-4 gap-y-1">
+        {/* The two destinations sit in one row, so their labels have to be
+            told apart at a glance. "Full org graph" next to "whole-org
+            chart" read as synonyms — and the one labelled *full* was the
+            narrower of the two (wf:freya F1). Each now names its scope. */}
         <Link
           to={`/org?center=${agent.slug}`}
           className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
         >
-          VIEW IN FULL ORG GRAPH →
+          ORG NEIGHBOURHOOD →
         </Link>
         <Link
           to="/org/chart"
           className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
         >
-          WHOLE-ORG CHART →
+          WHOLE-ORG CHART ({roster.length}) →
         </Link>
       </div>
     </div>
