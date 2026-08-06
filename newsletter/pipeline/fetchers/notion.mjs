@@ -15,6 +15,8 @@
 import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
 ensureProxyAwareEntry(import.meta.url);
 
+import { isEnChildPageTitle, parseEnMarkdown } from '../../../scripts/lib/notion-i18n.mjs'
+
 const NOTION_VERSION = '2022-06-28'
 
 // Notion's documented rate limit is ~3 req/sec per integration. With a
@@ -140,7 +142,18 @@ async function fetchAllBlocks(blockId, apiKey) {
 
 /** Convert a Notion block tree (rooted at pageId) to Markdown. */
 async function blocksToMd(pageId, apiKey, depth = 0) {
-  const blocks = await fetchAllBlocks(pageId, apiKey)
+  return renderBlocks(await fetchAllBlocks(pageId, apiKey), apiKey, depth)
+}
+
+/**
+ * Render already-fetched sibling blocks to Markdown.
+ *
+ * Split out of `blocksToMd` so a caller that needs to *inspect* a page's
+ * top-level blocks (to find the `EN` child page — ADR-0005) can do so without
+ * paying for a second `/blocks/{id}/children` round-trip against a rate-limited
+ * API.
+ */
+async function renderBlocks(blocks, apiKey, depth = 0) {
   const indent = '  '.repeat(depth)
   const lines = []
 
@@ -371,7 +384,29 @@ async function pageToRecord(page, apiKey, legacyHint) {
   const hasPodcast =
     podcastStatus && podcastStatus !== 'none' ? 'true' : undefined
 
-  const bodyMd = await blocksToMd(page.id, apiKey)
+  // ADR-0005: the English edition is a child page titled `EN` under the row.
+  // Fetch the row's top-level blocks once, render the Japanese body from them,
+  // and — when the EN child page is present — pull its body separately. The
+  // `child_page` block itself is not a renderable type, so the Japanese body is
+  // unaffected whether or not a translation exists.
+  const topBlocks = await fetchAllBlocks(page.id, apiKey)
+  const bodyMd = await renderBlocks(topBlocks, apiKey)
+
+  const enBlock = topBlocks.find(
+    b => b.type === 'child_page' && isEnChildPageTitle(b.child_page?.title),
+  )
+  let titleEn = ''
+  let abstractEn = ''
+  let bodyEnMd = ''
+  if (enBlock) {
+    const parsed = parseEnMarkdown(await blocksToMd(enBlock.id, apiKey))
+    // Fall back to the row's own title when the EN page has no `# ` heading —
+    // an untitled translation should still publish, not vanish.
+    titleEn = parsed.title || title
+    abstractEn = parsed.abstract
+    bodyEnMd = parsed.body
+  }
+
   const slug = legacySlug || slugFromId(page.id)
 
   return {
@@ -383,6 +418,9 @@ async function pageToRecord(page, apiKey, legacyHint) {
     date,
     abstract,
     bodyMd,
+    titleEn,
+    abstractEn,
+    bodyEnMd,
     sourceUrls,
     legacySlug,
     legacyNotionId,

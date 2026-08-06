@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 import type { ArticleMeta } from '../../types/article'
 import { displayTag } from '../../lib/article-types'
+import { useLanguage } from '../../i18n/LanguageProvider'
+import { localizedAbstract, localizedTitle } from '../../i18n/article'
 
 interface Props {
   article: ArticleMeta
@@ -24,6 +26,7 @@ function cardTags(article: ArticleMeta): string[] {
 }
 
 export default function ArticleCard({ article }: Props) {
+  const { language } = useLanguage()
   const tags = cardTags(article)
 
   return (
@@ -46,10 +49,10 @@ export default function ArticleCard({ article }: Props) {
             </span>
           </div>
           <h4 className="text-xl font-extrabold tracking-tight leading-tight mb-4 group-hover:text-tertiary transition-colors">
-            {article.title}
+            {localizedTitle(article, language)}
           </h4>
           <p className="text-sm leading-relaxed text-on-surface-variant line-clamp-3">
-            {article.abstract}
+            {localizedAbstract(article, language)}
           </p>
         </div>
       </Link>

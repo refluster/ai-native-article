@@ -57,9 +57,18 @@ The [`workforce/skills/article-level3`](../../workforce/skills/article-level3/SK
 
 Publication to the live site is the [`.github/workflows/deploy-article-site.yml`](../../.github/workflows/deploy-article-site.yml) workflow. It is the only path that puts content on `kohuehara.xyz`.
 
-1. Runs `newsletter/pipeline/fetch-notion.mjs`, which queries the unified Notion Articles DB. **No `Status` filter — every row in the DB is exported.**
-2. Gates on `npm run check-truncation` (**R-10**): a truncated article fails the build red, so a degraded article never deploys (C-1 / C-4).
+1. Runs `newsletter/pipeline/fetch-notion.mjs`, which queries the unified Notion Articles DB. **No `Status` filter — every row in the DB is exported.** Each row's `EN` child page, when present, is exported alongside it as `posts/<slug>.en.md` (ADR-0005).
+2. Gates on `npm run check-truncation` (**R-10**): a truncated article fails the build red, so a degraded article never deploys (C-1 / C-4). The gate globs `*.md`, so English editions are covered by the same check with no extra wiring.
 3. Builds the reader SPA and deploys to `gh-pages`.
+
+### Both editions — ja/en (ADR-0005)
+
+Every article is published in Japanese **and** English, at **one URL**. There are no `/en/…` routes: `/article/<slug>` serves the edition the reader's language selects (`?lang=` → `localStorage` → browser preference → English), and `?lang=ja|en` is the shareable override the `hreflang` alternates point at.
+
+- **Generation** — both cadences require `--body-en-file`. The W-1 guards run over both bodies *before* anything is written, so a bad translation publishes nothing at all. Exit `4` is the one partial state: the row was created but its `EN` child page failed. Repair it with `backfill-en.mjs --page-id`; **never** by re-running the publish command, which would duplicate the row.
+- **Storage** — the English edition is a Notion child page titled `EN` under the article's row: `# ` title, `> ` lead, then the body. `scripts/lib/notion-i18n.mjs` is the single implementation of that contract, shared by both cadence writers, the fetcher, and the backfill script.
+- **Untranslated articles** still appear in the English index and still open; the reader sees the Japanese body with a visible "no English edition yet" notice. Nothing is hidden (C-4).
+- **Operator surfaces** (`/operator`, `/sources`, `/capture`, `/design-*`) are Japanese-only by design — tools for one operator (C-3), not reading destinations (ADR-0002).
 
 **Cover images:** the GAS L4 batch used to generate hero images; that path is gone. The site falls back to a placeholder when no `posts/images/<slug>.jpg` exists on disk (`newsletter/pipeline/writers/posts-md.mjs` `resolveImagePath`). No new auto-generated hero images are produced going forward — drop a `posts/images/<slug>.jpg` in by hand if you want a non-placeholder cover.
 
@@ -116,6 +125,59 @@ gh workflow run deploy-article-site.yml
 ```
 
 This re-runs `fetch-notion.mjs` against the current Notion DB and rebuilds gh-pages (~3 min). It's the manual lever in the deploy-cadence table above.
+
+### An article has no English edition
+
+The reader sees the "no English edition yet" notice on an article, or the whole
+corpus is Japanese-only because the ADR-0005 backfill hasn't run.
+
+`backfill-en.mjs` translates every row that has no `EN` child page and writes it
+back to Notion. It needs credentials the CI deploy job does not carry, so it is
+an **operator-run** script — run it from a machine with unrestricted egress
+(remote Claude Code sessions have an allowlist that blocks `api.notion.com` and
+Azure; see CLAUDE.md "Network allowlist").
+
+```bash
+# Preview: translate but write nothing. Start here.
+node --env-file=.env newsletter/pipeline/backfill-en.mjs --limit 3 --dry-run
+
+# The corpus, in batches. Skips rows that already have an edition, so it is
+# safe to stop and re-run — that IS the resume mechanism.
+npm run backfill-en -- --limit 25
+
+# One article (repairs a cadence run that exited 4).
+npm run backfill-en -- --page-id <notion page id>
+npm run backfill-en -- --slug c147314e5e76
+
+# Replace an existing translation (archives the old EN page first).
+npm run backfill-en -- --slug c147314e5e76 --force
+```
+
+Required env: `NOTION_API_KEY`, `AZURE_OPENAPI_ENDPOINT`, `AZURE_OPENAPI_KEY`
+(plus `AZURE_OPENAPI_DEPLOYMENT`, default `gpt-5.4`).
+
+Budget on the order of a minute per article — the full corpus is a couple of
+hours, which is why `--limit` exists. The script exits **1** if any row failed a
+W-1 guard, and names each one; those rows are simply left untranslated, so
+re-running retries exactly them. Then `gh workflow run deploy-article-site.yml`
+to publish.
+
+**When a row keeps failing.** Failures are per-article and deterministic, so a
+row that failed once will fail again until something changes. The script keeps
+the evidence:
+
+- **`… looks cut off (W-1)`** — the message prints the model's `finish_reason`
+  and the offending last line **in full**. If `finish_reason` is `stop`, the
+  model finished its sentence and the guard is the thing to question; the
+  rejected translation is saved under `.backfill-en-failures/<slug>.en.md`
+  (override with `--save-failures <dir>`) so you can read the ending yourself.
+  If it is `length`, the translation really is cut off — raise the bracket
+  (`azure-budget-rules.md`) rather than relaxing the guard.
+- **`fetch failed`** — now reported with its full cause chain
+  (`fetch failed ← read ECONNRESET (ECONNRESET)`), and retried three times with
+  backoff before it counts as a failure. A per-request timeout
+  (`AZURE_TIMEOUT_MS`, default 300000) keeps a hung socket from stalling the
+  batch instead of failing it.
 
 ### Pipeline has gone quiet
 

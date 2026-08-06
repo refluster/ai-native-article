@@ -137,19 +137,29 @@ export interface PerformanceSeries {
 
 // ── roll-up item shapes (DDB) ─────────────────────────────────────────────────
 //
-// Two single-partition items per scope, one per writer, so the daily reducer
-// (LIFECYCLE) and the CI PR-metrics publisher (PR) never contend on one item:
+// FOUR single-partition items per scope, one per writer, so the daily reducer
+// (LIFECYCLE, IDLE) and the CI publishers (PR, REPO) never contend on one item:
 //
 //   pk = PERF#{scope}   sk = LIFECYCLE   — reducer-owned, the daily funnel.
 //   pk = PERF#{scope}   sk = PR          — git-derived PR sections (Metric 3),
 //                                          published by build-pr-metrics.mjs.
 //   pk = PERF#{scope}   sk = REPO        — repository activity (Metric 4),
 //                                          published by build-repo-performance.mjs.
+//   pk = PERF#{scope}   sk = IDLE        — reducer-owned, the Epic-021 §B.1 idle
+//                                          snapshot. NOT served by /performance
+//                                          yet: the endpoint reads LIFECYCLE /
+//                                          PR / REPO by explicit `sk`, so this
+//                                          item is additive and invisible to it
+//                                          until the digest PR renders it.
 //
 // `scope` is "workforce" or a project_id (e.g. "self/ren"). The endpoint reads
-// all three and composes the PerformanceSeries; LIFECYCLE is the live
+// the first three and composes the PerformanceSeries; LIFECYCLE is the live
 // differentiator (its presence is what lets the endpoint serve real data
 // instead of 404ing to the client's illustrative fallback).
+//
+// Keep this catalogue in step with the writers. A shape registry that stops
+// tracking its own shapes is how a second, drifting definition gets written by
+// someone who read the catalogue and believed it (PR #524 cycle-1, mateo M2).
 
 /** Trailing window the reducer keeps per scope.
  *  90 days (2026-07-26, operator): the console's decks are all on a 3-month
@@ -159,7 +169,13 @@ export interface PerformanceSeries {
  *  workforce/scripts/backfill-performance-lifecycle.mjs to fill it at once. */
 export const PERF_WINDOW_DAYS = 90;
 
-export type PerfRollupKind = "LIFECYCLE" | "PR" | "REPO";
+export type PerfRollupKind = "LIFECYCLE" | "PR" | "REPO" | "IDLE";
+
+/** Epic-021 §B.1 — the single global idleness window. One constant, no
+ *  per-team override: "configurability is where exemptions hide" (Q3,
+ *  farah/dario concur). A persona is idle when it has produced zero
+ *  NON-COMMONS deliverable rows in this many trailing days. */
+export const IDLE_WINDOW_DAYS = 30;
 
 export function perfPk(scope: string): `PERF#${string}` {
   return `PERF#${scope}`;
@@ -173,6 +189,49 @@ export interface PerfLifecycleRow {
   updated_at: string;
   /** Trailing PERF_WINDOW_DAYS of daily snapshots, oldest→newest. */
   points: LifecyclePoint[];
+}
+
+/** Epic-021 §B.1 — the idle-talent sweep, written by the same daily reducer
+ *  walk (mateo: no new cron, one idleness definition). Deliberately its own
+ *  `sk` so it never touches a persona's track record: the digest reads this
+ *  row, and Epic-023 tiering reads the EXEC ledger, which this does not
+ *  write to.
+ *
+ *  **Consumer contract — an unknown is never a measured zero.** This is the
+ *  first PERF# item with no dated series, so a reducer that stops running
+ *  leaves a stale row that renders as "nobody is idle" rather than as "we did
+ *  not look". Any consumer (the digest PR first) MUST treat a sweep whose
+ *  `window.end` is older than ~2 days as **unknown** and say so, never as an
+ *  empty idle list. The codebase already holds this line twice — "an unknown
+ *  is never a measured zero" (pr-autopilot-post.mjs) and "never let stale data
+ *  look current" (app/src/lib/repoActivity.ts). Stated here at definition time
+ *  so the digest inherits it instead of re-deciding it (mateo M4). */
+export interface PerfIdleRow {
+  pk: `PERF#${string}`;
+  sk: "IDLE";
+  scope: string;
+  updated_at: string;
+  /** The window this sweep evaluated, so a reader never has to assume it. */
+  window: { start: string; end: string; days: number };
+  /** Personas with zero non-commons deliverable rows in the window. */
+  idle: IdleAgentRecord[];
+  /** Cohort size the sweep ran over — the denominator for "N of M idle".
+   *  Archived personas are NOT in it: they are excluded from the sweep the
+   *  way the orchestrator excludes them from firing, so they cannot sit on
+   *  the idle list forever (dario D1). This deliberately differs from the
+   *  LIFECYCLE head-count, which is a different question. */
+  cohort: number;
+  /** Slugs whose window probe came back saturated — i.e. the persona had more
+   *  EXEC rows inside the window than one page, so "no non-commons row found"
+   *  is bounded evidence rather than a complete read. A digest must be able to
+   *  tell "we found nothing" from "we stopped looking" (C-4); a prose caveat
+   *  in a code comment is not a check (dario D2 / mateo M1). Empty in the
+   *  normal case. */
+  probe_truncated: string[];
+  /** The commons skills discounted by this sweep, as actually resolved at run
+   *  time. Recorded so a digest reader can see the class the number depends
+   *  on rather than trusting the detector's word for it. */
+  commons_skills: string[];
 }
 
 export interface PerfPrRow {
@@ -229,6 +288,98 @@ export function tallyLifecycle(date: string, states: readonly LifecycleState[]):
   const point: LifecyclePoint = { date, registered: 0, assigned: 0, delivered: 0 };
   for (const state of states) point[state] += 1;
   return point;
+}
+
+// ── idle-talent detector (Epic-021 §B.1) ─────────────────────────────────────
+//
+// Keyed on OUTPUT, not paperwork. The RFC's load-bearing correction (theo,
+// tessa, priya, mateo): a binding is a declaration, and a bound-but-paused
+// skill would clear a binding-keyed flag while producing nothing — the day-29
+// token binding is the exact evasion. So the predicate asks one question:
+// did this persona produce a non-commons deliverable row in the window?
+//
+// The pending-action annotation exists so idleness lands on whoever can
+// actually clear it. Idleness is a JOB-DESIGN failure charged to the hiring
+// lead (priya) — these records live on their own PERF#{scope}/IDLE row and are
+// never written into the persona's track record, so they stay inadmissible to
+// Epic-023 tiers.
+
+/** Whose action is pending on an idle persona (Epic-021 §B.1). */
+export type IdlePendingAction =
+  /** No non-commons binding exists at all — the hiring lead owes job design. */
+  | "design"
+  /** A non-commons binding exists but nothing fires it (paused / dead cron) —
+   *  the operator owes the enable. Gate-limbo is attributed to the gate. */
+  | "enable"
+  /** A non-commons binding is live and firing, yet no deliverable row landed —
+   *  the persona owes output. */
+  | "output";
+
+/** The signals the detector needs per persona. Both lists are already
+ *  scoped/filtered by the caller; this function does no IO. */
+export interface AgentIdleSignal {
+  slug: string;
+  /** Skill names of this persona's ok EXEC rows inside the window. */
+  windowExecSkills: readonly string[];
+  /** Skill names of every non-commons binding the persona carries. */
+  nonCommonsBoundSkills: readonly string[];
+  /** Skill names of the non-commons bindings whose cron is load-bearing —
+   *  i.e. something actually fires them (shared/agent.ts
+   *  bindingCronIsLoadBearing, the same predicate the orchestrator uses). */
+  nonCommonsLiveSkills: readonly string[];
+}
+
+/** One idle persona, as written to the IDLE roll-up row. */
+export interface IdleAgentRecord {
+  slug: string;
+  pending: IdlePendingAction;
+  /** The non-commons skills this persona is bound to, if any — so the digest
+   *  can say *which* designed duty is silent, not merely that one is. */
+  bound_skills: string[];
+}
+
+/** Is this execution specialised work? Commons rows (the daily reflection /
+ *  daily research every persona shares) never count toward non-idleness. */
+export function isCommonsSkill(skill: string, commons: ReadonlySet<string>): boolean {
+  return commons.has(skill);
+}
+
+/** Classify one persona. Returns null when the persona is NOT idle — i.e. it
+ *  produced at least one non-commons deliverable row inside the window. */
+export function classifyIdleAgent(
+  signal: AgentIdleSignal,
+  commons: ReadonlySet<string>,
+): IdleAgentRecord | null {
+  const delivered = signal.windowExecSkills.some((s) => !isCommonsSkill(s, commons));
+  if (delivered) return null;
+
+  const bound = signal.nonCommonsBoundSkills;
+  const live = signal.nonCommonsLiveSkills;
+
+  // Order matters and is the RFC's attribution rule: no designed duty at all
+  // is the hiring lead's; a designed duty nobody schedules is the operator's;
+  // a live schedule producing nothing is the persona's.
+  const pending: IdlePendingAction =
+    bound.length === 0 ? "design" : live.length === 0 ? "enable" : "output";
+
+  return { slug: signal.slug, pending, bound_skills: [...bound].sort() };
+}
+
+/** Sweep a cohort. Ordered by slug so two runs over the same state produce
+ *  byte-identical rows (a diffable digest, not a shuffled one). */
+export function detectIdleAgents(
+  signals: readonly AgentIdleSignal[],
+  commons: ReadonlySet<string>,
+): IdleAgentRecord[] {
+  return signals
+    .map((s) => classifyIdleAgent(s, commons))
+    .filter((r): r is IdleAgentRecord => r !== null)
+    .sort((a, b) => a.slug.localeCompare(b.slug));
+}
+
+/** Inclusive lower bound of the idle window, as an ISO instant. */
+export function idleWindowStart(now: Date, windowDays: number = IDLE_WINDOW_DAYS): string {
+  return new Date(now.getTime() - windowDays * 86_400_000).toISOString();
 }
 
 /** delivered / (registered + assigned + delivered); 0 for an empty cohort. */

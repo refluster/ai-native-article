@@ -48,12 +48,24 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BOOTSTRAP = resolve(ROOT, "scripts/lib/proxy-bootstrap.mjs");
+const NETWORK_LIB = resolve(ROOT, "scripts/lib/http-retry.mjs");
 const SCAN_DIRS = ["workforce", "scripts", "newsletter", ".claude"];
 const IGNORE_DIRS = new Set(["node_modules", "dist", "build", ".git", "coverage"]);
 
 // A real global fetch() call. `fetchArticles(`, `this.fetch(` and
 // `client.fetch(` must not match; `globalThis.fetch(` must.
 const FETCH_CALL = /(?:(?:^|[^.\w])fetch\s*\(|\bglobalThis\.fetch\s*\()/;
+// A literal `fetch(` is no longer the only way to issue a request. Importing
+// scripts/lib/http-retry.mjs performs network I/O just as surely, and its own
+// call is `fetchImpl(...)` — which this file's FETCH_CALL deliberately does not
+// match, so the module and every future importer would drop out of the scan
+// set entirely. That is how backfill-en.mjs left it (74 → 73 callers) the
+// moment its fetch moved one module away, leaving a code comment as the only
+// thing holding its bootstrap in place. A comment is a memory; §6.1 says
+// memories become checks. Adding an indirection here is a tightening, not a
+// loosening — nothing that was scanned before stops being scanned.
+const NETWORK_MODULE_IMPORT =
+  /^[ \t]*import\s[\s\S]*?from\s+["'][^"']*scripts\/lib\/http-retry\.mjs["']/m;
 // The bootstrap import, as a statement, capturing its specifier.
 const BOOTSTRAP_IMPORT =
   /^[ \t]*import\s+\{[^}]*\}\s+from\s+["']([^"']*proxy-bootstrap\.mjs)["']/m;
@@ -110,7 +122,15 @@ for (const dir of SCAN_DIRS) {
   for (const file of walk(join(ROOT, dir))) {
     if (resolve(file) === BOOTSTRAP) continue;
     const src = readFileSync(file, "utf8");
-    if (!FETCH_CALL.test(stripNonCode(src))) continue;
+    const code = stripNonCode(src);
+    // http-retry.mjs is itself a library, never a process entry, so the
+    // bootstrap cannot apply to it — exclude it the same way BOOTSTRAP is.
+    if (resolve(file) === NETWORK_LIB) continue;
+    // NETWORK_MODULE_IMPORT runs on the RAW source, not on `code`: stripNonCode
+    // blanks string literals, and the import specifier IS a string literal, so
+    // matching against the stripped text can never fire. (BOOTSTRAP_IMPORT is
+    // matched against `src` for the same reason.)
+    if (!FETCH_CALL.test(code) && !NETWORK_MODULE_IMPORT.test(src)) continue;
     checked++;
 
     const rel = relative(ROOT, file);

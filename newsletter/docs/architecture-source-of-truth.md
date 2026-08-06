@@ -15,7 +15,8 @@ This is the one-paragraph doc I wish I'd had at the start of the L2 truncation f
 | Location | Mutability | Role |
 |---|---|---|
 | **Notion** (`unified_db_id`, also legacy `l1`/`l2`/`l3` DBs) | Authoritative — the only place with stable, edit-able article state | Source of truth for: titles, abstracts, categories, body blocks, source URLs, dates, status |
-| **`main:newsletter/app/public/posts/*.md`** | Stale derived export; **overwritten** by `newsletter/pipeline/fetch-notion.mjs` during CI | Historical / backup snapshot. **Not** what the user-facing site reads. The committed copy is allowed to drift from Notion — every CI build clobbers it. |
+| **Notion — the `EN` child page under each row** | Authoritative for the English edition (ADR-0005) | Source of truth for the English title (`# `), lead (`> `) and body. One row per article; the translation is a child page, **not** a second row. |
+| **`main:newsletter/app/public/posts/*.md`** (and `*.en.md`) | Stale derived export; **overwritten** by `newsletter/pipeline/fetch-notion.mjs` during CI | Historical / backup snapshot. **Not** what the user-facing site reads. The committed copy is allowed to drift from Notion — every CI build clobbers it. `<slug>.en.md` is written only when the row has an `EN` child page, and **deleted** when it no longer does. |
 | **gh-pages `posts/*.md` + `manifest.json`** | What the user actually reads at `kohuehara.xyz/...` | Built fresh from Notion every deploy. Lags Notion by up to ~6 hours (deploy cron: 06:17 / 12:17 / 18:17 UTC, plus push-to-`main` triggers) |
 | **`main:newsletter/app/public/posts/images/*.jpg`** | Authoritative for cover images (present = a non-placeholder cover for this slug) | Skipped by `fetch-notion.mjs`. The GAS L4 batch used to auto-generate these; that path is gone, so no new auto-generated covers are produced — add a `<slug>.jpg` by hand to override the placeholder fallback (`writers/posts-md.mjs` `resolveImagePath`). |
 
@@ -30,6 +31,8 @@ This is the one-paragraph doc I wish I'd had at the start of the L2 truncation f
 4. **Cover images are a separate concern.** Image presence on `main` is what makes a slug serve a non-placeholder cover; `fetch-notion.mjs` skips the image directory. The GAS L4 batch used to generate these automatically — that path is gone, so without a hand-added `<slug>.jpg` the site serves the placeholder. Don't conflate the markdown export with image generation.
 
 5. **`gh workflow run deploy-article-site.yml`** is the manual lever to force-pull current Notion content. Use it when you've just edited Notion (or re-run a cadence) and don't want to wait for the cron.
+
+6. **To fix an English edition, edit the row's `EN` child page in Notion** — same rule as the Japanese body, same reason (ADR-0005). Do not hand-write `posts/<slug>.en.md`; the next deploy overwrites it. To add a missing translation, run `npm run backfill-en -- --page-id <notion page id>`. The two editions are independent bodies under one row, so a fix to one does not touch the other — which also means an edit to only one side leaves them disagreeing, and nothing detects that yet.
 
 ## Common mistakes this prevents
 

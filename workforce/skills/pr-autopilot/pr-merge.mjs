@@ -477,19 +477,40 @@ export async function applyDecisions(gh, repo, decisions) {
     }
 
     // adr-0014: drafts are merge-eligible. GitHub refuses to merge a draft, so
-    // flip it Ready for Review first (GraphQL — there is no REST endpoint). Do
-    // this BEFORE any merge-intent side effect (comment/approve) so a failure to
+    // flip it Ready for Review first (GraphQL — there is no REST endpoint; the
+    // REST "Update a pull request" endpoint has no `draft` field). Do this
+    // BEFORE any merge-intent side effect (comment/approve) so a failure to
     // un-draft leaves no misleading "merging" trail. Fail closed: if the PR is
     // still a draft after the mutation, do not merge.
+    //
+    // NOTE: this path is a FALLBACK and normally does not run. A CCR session's
+    // raw HTTPS to api.github.com is served by the agent proxy, which serves no
+    // GraphQL at all — even `{viewer{login}}` returns 403 "This GraphQL query is
+    // not enabled for this session". A deterministic script has only raw HTTPS,
+    // so it can never make this call from a cadence fire. SKILL.md Step 5
+    // therefore requires the ROUTER SESSION to un-draft via the GitHub MCP
+    // connector (server-side, outside that proxy) before invoking this engine,
+    // which leaves verdict.draft false here. The mutation is kept for callers
+    // that do have GraphQL egress (a local operator run).
     if (verdict.draft) {
-      if (!verdict.nodeId) { refused++; console.error(`pr-merge: REFUSE merge #${pr}: draft PR but no node id to mark Ready`); continue; }
+      // Epic-019: every refusal must stamp its reason code, or the escalation
+      // telemetry cannot see it. This path used to `continue` without calling
+      // emitRefusalReason(), unlike the predicate path above — so a draft-flip
+      // refusal left no label and filed no issue, and the router had to carry
+      // the reason code by hand (#542 / #545 / #550).
+      const refuseDraft = async (why) => {
+        refused++; console.error(`pr-merge: REFUSE merge #${pr}: ${why}`);
+        try { await emitRefusalReason(gh, repo, pr, why); }
+        catch (e) { console.error(`pr-merge: WARN could not emit refusal reason for #${pr}: ${e?.msg || e?.message || e}`); }
+      };
+      if (!verdict.nodeId) { await refuseDraft("draft PR but no node id to mark Ready"); continue; }
       const rd = await gh("POST", `/graphql`, {
         query: "mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){pullRequest{isDraft}}}",
         variables: { id: verdict.nodeId },
       });
       const stillDraft = rd?.json?.data?.markPullRequestReadyForReview?.pullRequest?.isDraft;
       if (rd.status !== 200 || rd?.json?.errors || stillDraft !== false) {
-        refused++; console.error(`pr-merge: REFUSE merge #${pr}: could not mark draft Ready for Review (HTTP ${rd.status} ${JSON.stringify(rd.json).slice(0, 200)})`); continue;
+        await refuseDraft(`could not mark draft Ready for Review (HTTP ${rd.status} ${JSON.stringify(rd.json).slice(0, 200)})`); continue;
       }
       console.error(`pr-merge: #${pr} was a draft — marked Ready for Review (adr-0014), proceeding to merge`);
     }

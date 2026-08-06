@@ -1515,7 +1515,7 @@ Resources:
       FunctionName: !Sub wf-performance-reducer-${Stage}
       CodeUri: ../../lambdas/performance-reducer
       Handler: handler.handler
-      Description: Daily agent-lifecycle funnel roll-up for the console Performance surface. Epic-016 Phase 2.
+      Description: Daily agent-lifecycle funnel roll-up for the console Performance surface (Epic-016 Phase 2) + the idle-talent sweep written to PERF#{scope}/IDLE (Epic-021 §B.1).
       MemorySize: 512
       Timeout: 300
       Policies:

@@ -6,6 +6,8 @@ import { withBasePath } from '../lib/paths'
 import { setDefaultSeo } from '../lib/seo'
 import { trackEvent } from '@kohuehara/shared/analytics'
 import { displayTag, inferType } from '../lib/article-types'
+import { useLanguage } from '../i18n/LanguageProvider'
+import { localizedTitle } from '../i18n/article'
 
 // How many analyses fill one page. The homepage is a daily-use surface, not
 // an archive crawl, so we paginate rather than render the whole corpus.
@@ -47,6 +49,7 @@ function sectionLabel(dateStr: string): string {
 }
 
 export default function Home() {
+  const { language, t } = useLanguage()
   const [articles, setArticles] = useState<ArticleMeta[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
@@ -67,8 +70,8 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    setDefaultSeo()
-  }, [])
+    setDefaultSeo(language)
+  }, [language])
 
   // Analysis is the default — and only — list on the homepage. Explanation
   // articles are the "back drawer": reachable from each analysis's SOURCES
@@ -90,9 +93,14 @@ export default function Home() {
     return analyses.filter(a => {
       if (activeCategory && !tagsOf(a).includes(activeCategory)) return false
       if (q) {
+        // Search both editions regardless of the active language: a reader who
+        // knows an article by its Japanese title should still find it while
+        // reading in English, and vice versa.
         const hay = [
           a.title,
           a.abstract,
+          a.titleEn ?? '',
+          a.abstractEn ?? '',
           ...tagsOf(a).map(displayTag),
         ]
           .join(' ')
@@ -174,7 +182,7 @@ export default function Home() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <span className="text-[10px] font-bold tracking-widest text-outline uppercase animate-pulse">
-          LOADING…
+          {t('article.loading')}
         </span>
       </div>
     )
@@ -190,22 +198,22 @@ export default function Home() {
             <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
               <div className="flex items-baseline gap-4">
                 <h3 className="text-3xl font-black tracking-tighter uppercase">
-                  {activeCategory ? displayTag(activeCategory) : 'Latest'}
+                  {activeCategory ? displayTag(activeCategory) : t('home.latest')}
                 </h3>
                 <span className="text-[10px] font-bold text-outline tracking-widest uppercase">
-                  {filtered.length} ARTICLES
+                  {filtered.length} {t('home.articleCount')}
                 </span>
               </div>
               <label className="flex items-center gap-2 border-b-2 border-outline-variant/40 focus-within:border-tertiary transition-colors">
                 <span className="text-[10px] font-bold tracking-widest text-outline uppercase">
-                  検索
+                  {t('home.search')}
                 </span>
                 <input
                   type="search"
                   value={query}
                   onChange={e => onQueryChange(e.target.value)}
-                  placeholder="タイトル・タグ"
-                  aria-label="記事を絞り込み"
+                  placeholder={t('home.searchPlaceholder')}
+                  aria-label={t('home.searchAria')}
                   className="bg-transparent py-2 text-sm outline-none placeholder:text-outline/60 w-40 md:w-56"
                 />
               </label>
@@ -215,7 +223,7 @@ export default function Home() {
                 onClick={() => onTagClick(activeCategory)}
                 className="mt-4 text-[10px] font-bold tracking-widest text-tertiary uppercase hover:underline"
               >
-                × {displayTag(activeCategory)} を解除
+                × {displayTag(activeCategory)} {t('home.clearTag')}
               </button>
             )}
           </div>
@@ -223,7 +231,7 @@ export default function Home() {
           {filtered.length === 0 ? (
             <div className="py-24 text-center">
               <span className="text-[10px] font-bold tracking-widest text-outline uppercase">
-                該当する記事はありません
+                {t('home.empty')}
               </span>
             </div>
           ) : (
@@ -250,14 +258,14 @@ export default function Home() {
           {totalPages > 1 && (
             <nav
               className="mt-20 pt-8 border-t border-outline-variant/20 flex items-center justify-center gap-2"
-              aria-label="ページ送り"
+              aria-label={t('home.pagination')}
             >
               <button
                 onClick={() => goToPage(safePage - 1)}
                 disabled={safePage === 1}
                 className="px-3 py-2 text-[10px] font-bold tracking-widest uppercase text-outline hover:text-tertiary disabled:opacity-30 disabled:hover:text-outline transition-colors"
               >
-                ← PREV
+                ← {t('home.prev')}
               </button>
               {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
                 <button
@@ -278,7 +286,7 @@ export default function Home() {
                 disabled={safePage === totalPages}
                 className="px-3 py-2 text-[10px] font-bold tracking-widest uppercase text-outline hover:text-tertiary disabled:opacity-30 disabled:hover:text-outline transition-colors"
               >
-                NEXT →
+                {t('home.next')} →
               </button>
             </nav>
           )}
@@ -290,7 +298,7 @@ export default function Home() {
           <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto pr-1">
             <div className="mb-12">
               <h5 className="text-[10px] font-bold tracking-widest text-outline uppercase mb-6">
-                MUST READS
+                {t('home.mustReads')}
               </h5>
               <div className="space-y-8">
                 {mustReads.map((article, i) => (
@@ -302,7 +310,7 @@ export default function Home() {
                       to={`/article/${article.slug}`}
                       className="text-sm font-black leading-tight group-hover:underline block"
                     >
-                      {article.title}
+                      {localizedTitle(article, language)}
                     </Link>
                   </div>
                 ))}
@@ -312,7 +320,7 @@ export default function Home() {
             {tags.length > 0 && (
               <div>
                 <h5 className="text-[10px] font-bold tracking-widest text-outline uppercase mb-6">
-                  TAGS
+                  {t('home.tags')}
                 </h5>
                 <ul className="space-y-3">
                   {visibleTags.map(tag => (
@@ -338,7 +346,7 @@ export default function Home() {
                     onClick={() => setShowAllTags(v => !v)}
                     className="mt-6 text-[10px] font-bold tracking-widest text-outline uppercase hover:text-tertiary transition-colors"
                   >
-                    {showAllTags ? '− 閉じる' : `+ すべて見る (${tags.length})`}
+                    {showAllTags ? `− ${t('home.hideTags')}` : `+ ${t('home.showAllTags')} (${tags.length})`}
                   </button>
                 )}
               </div>
