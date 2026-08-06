@@ -76,6 +76,10 @@ export interface OrgChartModel {
   levelCounts: number[]
 }
 
+/** Deepest org level the header tally will render. Anything past this is a
+ *  bad `depth` off the wire, not an organisation. */
+const MAX_LEVEL = 32
+
 function bySlugAsc(a: WorkforceAgent, b: WorkforceAgent) {
   return a.slug.localeCompare(b.slug)
 }
@@ -153,7 +157,11 @@ export function buildOrgChart(agents: WorkforceAgent[]): OrgChartModel {
     return {
       agent,
       level,
-      alsoReportsTo: agent.reports_to.filter((s) => bySlug.has(s) && s !== primary),
+      // De-duplicated: a roster row that lists the same manager twice would
+      // otherwise render "⇄ also reports to b, b" (wf:dario D5).
+      alsoReportsTo: [
+        ...new Set(agent.reports_to.filter((s) => bySlug.has(s) && s !== primary)),
+      ],
       children: childrenOf
         .get(agent.slug)!
         .map((c) => build(c, level + 1))
@@ -175,7 +183,50 @@ export function buildOrgChart(agents: WorkforceAgent[]): OrgChartModel {
   // Anything still unvisited is unreachable from a root. Rebuild those as
   // their own divisions so a detached cluster keeps its shape on screen
   // instead of collapsing into a flat "missing agents" list.
+  //
+  // Seeding matters here (wf:owen O3). Walking the leftover agents in slug
+  // order seeds wherever the alphabet lands, so a cluster like
+  // `aa → zz ↔ yy` seeded at `aa` produced a one-row card for `aa` and a
+  // separate `yy → zz` card — the cluster shredded, exactly what the
+  // paragraph above promises not to do. Instead, climb from each leftover
+  // to the top of its component (the entry point of the cycle that holds
+  // it up) and seed there, so the whole component lands in one card.
+  //
+  // The `path.has(parent)` clause is the cycle guard and is load-bearing:
+  // without it this walk does not terminate on a cyclic component. A
+  // non-terminating loop is the wrong failure mode for a C-4 path — it
+  // hangs the render (and CI) rather than failing loudly — so the walk also
+  // carries a hard iteration bound that can only be reached if the guard is
+  // broken (wf:owen O13).
+  const seedOf = (start: WorkforceAgent): WorkforceAgent => {
+    const path = new Set<string>()
+    let cur = start
+    for (let step = 0; step <= agents.length; step++) {
+      path.add(cur.slug)
+      const parent = parentOf.get(cur.slug)
+      // No parent, parent already placed, or we've come full circle: `cur`
+      // is as high as this component goes.
+      if (!parent || visited.has(parent) || path.has(parent)) return cur
+      cur = bySlug.get(parent)!
+    }
+    throw new Error(
+      `orgTree: seedOf walked past ${agents.length} steps from "${start.slug}" — the reports_to cycle guard is broken`,
+    )
+  }
+
   const orphans: OrgDivision[] = []
+  for (const a of [...agents].sort(bySlugAsc)) {
+    if (visited.has(a.slug)) continue
+    const node = build(seedOf(a), 0)
+    if (node) orphans.push(toDivision(node, true))
+  }
+  // Backstop. `seedOf` climbs to the top of every component before seeding,
+  // so in principle nothing is left — and both reviewers who went looking
+  // confirmed it empirically (0 firings across ~20k random rosters and 11
+  // adversarial cyclic shapes; wf:owen O12 / wf:dario D12). It stays because
+  // "every agent appears exactly once" is the one property this module owes
+  // the page unconditionally, and the cost of being wrong about a proof is
+  // an agent silently missing from the org chart.
   for (const a of [...agents].sort(bySlugAsc)) {
     if (visited.has(a.slug)) continue
     const node = build(a, 0)
@@ -187,8 +238,13 @@ export function buildOrgChart(agents: WorkforceAgent[]): OrgChartModel {
   divisions.sort(bySizeDesc)
   orphans.sort(bySizeDesc)
 
+  // `depth` comes off the wire, so it is bounded before it indexes an array
+  // (wf:dario D6): one record with depth 400 turned the page header into 401
+  // "L{n} 0" chips, and a negative depth set a non-index property, silently
+  // dropping that agent from the tally — the C-4-wrong direction.
   const levelCounts: number[] = []
   for (const a of agents) {
+    if (!Number.isInteger(a.depth) || a.depth < 0 || a.depth > MAX_LEVEL) continue
     levelCounts[a.depth] = (levelCounts[a.depth] ?? 0) + 1
   }
   for (let i = 0; i < levelCounts.length; i++) levelCounts[i] = levelCounts[i] ?? 0
@@ -224,8 +280,15 @@ export function estimateDivisionHeight(division: OrgDivision, m: PackMetrics): n
 }
 
 /**
- * Distributes divisions across `columns` explicit columns, tallest-first
- * into whichever column is currently shortest (LPT scheduling).
+ * Distributes divisions across **`min(columns, divisions.length)`** columns
+ * (at least one), tallest-first into whichever column is currently shortest
+ * (LPT scheduling).
+ *
+ * The clamp is part of the contract, not an implementation detail: every
+ * bucket becomes an equal-width track at the call site, so returning more
+ * buckets than there are cards renders those cards as slivers. It lives
+ * here so no caller can get it wrong — which means it has to be stated
+ * here too (wf:dario D11).
  *
  * CSS `column-width` was the first attempt and it packs badly here: with
  * `column-fill: balance` the browser targets a height no shorter than the
@@ -239,17 +302,31 @@ export function packDivisions(
   columns: number,
   metrics: PackMetrics,
 ): OrgDivision[][] {
-  const n = Math.max(1, Math.floor(columns))
+  // `Math.max(1, NaN)` is NaN and `Math.floor(NaN)` is NaN, so the obvious
+  // clamp does not clamp — `new Array(NaN)` then throws RangeError
+  // (wf:dario D4). This module is exported for callers other than the page,
+  // so the contract is enforced here rather than assumed.
+  //
+  // Never more buckets than there are cards to put in them. Every bucket
+  // becomes an equal-width track at the call site, so returning 7 buckets
+  // for 1 division rendered that division at 1/7 of the row — and the
+  // section that hit hardest was UNPLACED, whose whole job is to be
+  // impossible to miss (wf:dario D3). Clamped here rather than at the call
+  // site so no caller can get it wrong.
+  const requested = Number.isFinite(columns) ? Math.max(1, Math.floor(columns)) : 1
+  const n = Math.max(1, Math.min(requested, divisions.length))
   const buckets: OrgDivision[][] = Array.from({ length: n }, () => [])
   if (n === 1) return [[...divisions]]
+  // Height is computed once per division, not twice per comparison — the
+  // comparator ran O(rows) work on every keystroke otherwise (wf:dario D7).
+  const heightOf = new Map(divisions.map((d) => [d.key, estimateDivisionHeight(d, metrics)]))
+  const h = (d: OrgDivision) => heightOf.get(d.key) ?? 0
   const heights = new Array<number>(n).fill(0)
-  for (const d of [...divisions].sort(
-    (a, b) => estimateDivisionHeight(b, metrics) - estimateDivisionHeight(a, metrics) || a.key.localeCompare(b.key),
-  )) {
+  for (const d of [...divisions].sort((a, b) => h(b) - h(a) || a.key.localeCompare(b.key))) {
     let target = 0
     for (let i = 1; i < n; i++) if (heights[i] < heights[target]) target = i
     buckets[target].push(d)
-    heights[target] += estimateDivisionHeight(d, metrics)
+    heights[target] += h(d)
   }
   return buckets
 }
