@@ -40,7 +40,7 @@ Define, compute, and publish a **human-leverage metric** from records that alrea
 
 - ~~Q1 (lower bound acceptable?)~~ → **Resolved: yes** (priya, silas, farah concur) — a defensible undercount beats a story; plus the one-week hand-tally to size the gap (elena).
 - ~~Q2 (work units vs dollars)~~ → **Resolved**: work units in V1 is acceptable **only with a dated Phase-2 commitment to the dollar column** (silas), and the V1 metric is labelled ordinal/leverage-not-price wherever published (elena).
-- ~~Q3 (where does the taxonomy live?)~~ → **Resolved**: a section of the Epic-016 design + the `PERF#workforce/HUMAN-TOUCH` item; no new directory (mateo).
+- ~~Q3 (where does the taxonomy live?)~~ → **Resolved**: a section of the Epic-016 design + the `PERF#workforce/HUMAN-TOUCH` item; no new directory (mateo). **Taxonomy half landed 2026-08-04** (Story 1, #452): [Epic-016 § Human-touch taxonomy](epic-016-workforce-performance-analytics.md#human-touch-taxonomy-epic-020-story-1), taxonomy v1. **The `PERF#workforce/HUMAN-TOUCH` item half is not landed** and is owned by Story 2 ([#453](https://github.com/refluster/ai-native-article/issues/453)) — `workforce/lambdas/shared/performance.ts:172` registers `LIFECYCLE | PR | REPO | IDLE` and no `HUMAN-TOUCH`. Q3 is resolved as a *decision*; only one of its two artefacts exists.
 
 ## Out of scope
 
