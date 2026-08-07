@@ -46,7 +46,7 @@ describe('/org → /org/chart', () => {
     await waitFor(() => expect(window.location.pathname).toBe('/somewhere'))
   })
 
-  // Regression (wf:freya F1, #558): the redirect used to serve the path and drop
+  // Regression (wf:freya F1, PR 558): the redirect used to serve the path and drop
   // the state, so a bookmarked `/org?center=elena` landed on the whole
   // roster with nothing highlighted.
   it('carries ?center= across as the chart’s ?q= highlight', async () => {

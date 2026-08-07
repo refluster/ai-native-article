@@ -41,7 +41,7 @@ function RouteTracker() {
  * footer generated it, while Home and the chart's stat band linked the
  * bare path. Both shapes are handled. A bare `<Navigate>` served the path
  * and dropped the state, landing an operator who followed a `?center=`
- * bookmark on 54 agents with nothing highlighted (wf:freya F1, #558).
+ * bookmark on 54 agents with nothing highlighted (wf:freya F1, PR 558).
  *
  * It maps to `q=`, not to a verbatim `center=`: the chart reads `q` and
  * `density` and nothing else, so passing `center` through would paste a
@@ -53,7 +53,12 @@ function RouteTracker() {
  * The carry is a best-effort **highlight**, not a **focus**: `center` was
  * an exact slug lookup on the retired view, `q` is not, so a short slug
  * can land more than one row lit. The header states `N of 54 highlighted`
- * honestly and the field is editable on arrival (wf:freya F7, #558).
+ * honestly and the field is editable on arrival (wf:freya F7, PR 558).
+ *
+ * (Finding-ids are per-review, so citations carry a PR anchor. Write it
+ * `PR 558`, not with a leading hash: a three-digit hash-number is a valid
+ * hex colour, so the R-2 design-token lint rejects it in app source. This
+ * comment cannot show the rejected form without tripping the lint itself.)
  *
  * `encodeURIComponent` is load-bearing, not decorative: without it
  * `/org?center=a%26density%3Ddetail` would smuggle a `density` the chart
