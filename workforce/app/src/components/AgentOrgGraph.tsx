@@ -4,8 +4,11 @@
 // slugs in flat groups.
 //
 // Why 2-up + 2-down? Operator constraint — anything wider becomes
-// noise on a single agent's page, and lateral peers already surface
-// in the agent's profile data and in the whole-org chart at /org/chart.
+// noise on a single agent's page, and lateral peers already surface in
+// the agent's profile data — see the LATERAL band below. Do NOT cite
+// /org/chart here: it models reporting edges only and never reads
+// `agent.lateral`, so naming it would send the next reader to a view
+// that cannot show what this sentence promises (wf:aoi A1 / wf:dario D4).
 //
 // Clicking any row navigates to that agent's profile. The focused agent
 // is shown in the tree too, in its correct hierarchical slot, marked
@@ -234,7 +237,7 @@ export default function AgentOrgGraph({ agent, roster }: Props) {
           to="/org/chart"
           className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
         >
-          WHOLE-ORG CHART ({roster.length}) →
+          ORG CHART ({roster.length}) →
         </Link>
       </div>
     </div>

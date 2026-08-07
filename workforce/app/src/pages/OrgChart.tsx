@@ -402,11 +402,10 @@ const CHIP_OFF =
 
 // ── Page ───────────────────────────────────────────────────────────────
 export default function OrgChart() {
-  // Query + density live in the URL: this
-  // page's whole purpose is to be configured until it shows you something,
-  // and that configuration should survive a click into an agent profile
-  // and Back, and be pasteable (wf:freya F6). Zoom/fit are viewport-derived
-  // and stay local.
+  // Query + density live in the URL: this page's whole purpose is to be
+  // configured until it shows you something, and that configuration should
+  // survive a click into an agent profile and Back, and be pasteable
+  // (wf:freya F6). Zoom/fit are viewport-derived and stay local.
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') ?? '';
   const density: Density = searchParams.get('density') === 'detail' ? 'detail' : 'compact';

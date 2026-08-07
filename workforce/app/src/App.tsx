@@ -34,6 +34,27 @@ function RouteTracker() {
   return null;
 }
 
+/**
+ * `/org` → `/org/chart`, carrying the one parameter the old route took.
+ *
+ * `?center=<slug>` was the only shape the console itself ever generated
+ * (the retired AgentOrgGraph footer link), so every `/org` URL in a
+ * bookmark or an old PR comment — exactly the population the redirect
+ * exists for — carries it. A bare `<Navigate>` served the path and
+ * dropped the state, landing the operator on 54 agents with nothing
+ * highlighted (wf:freya F1).
+ *
+ * It maps to `q=`, not to a verbatim `center=`: the chart reads `q` and
+ * `density` and nothing else, so passing `center` through would paste a
+ * param no page reads into the URL bar (wf:dario). `matchesOrgQuery`
+ * matches on slug, so `?center=elena` lands on the chart with elena lit.
+ */
+function OrgRedirect() {
+  const { search } = useLocation();
+  const center = new URLSearchParams(search).get('center');
+  return <Navigate to={center ? `/org/chart?q=${encodeURIComponent(center)}` : '/org/chart'} replace />;
+}
+
 function ProtectedRoutes() {
   return (
     <AuthBoundary>
@@ -51,7 +72,7 @@ function ProtectedRoutes() {
                 the same treatment /feed gets below, because the old path
                 is in bookmarks and in older PR comments. */}
             <Route path="/org/chart" element={<OrgChart />} />
-            <Route path="/org" element={<Navigate to="/org/chart" replace />} />
+            <Route path="/org" element={<OrgRedirect />} />
             <Route path="/agents" element={<AgentDirectory />} />
             <Route path="/agents/:slug" element={<AgentProfile />} />
             <Route path="/skills" element={<SkillDirectory />} />
