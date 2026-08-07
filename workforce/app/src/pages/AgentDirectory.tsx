@@ -141,7 +141,7 @@ export default function AgentDirectory() {
               to="/org/chart"
               className="inline-block mt-1.5 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
             >
-              WHOLE-ORG CHART →
+              ORG CHART →
             </Link>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
