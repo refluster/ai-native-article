@@ -64,6 +64,18 @@ This is exactly how the `daily-research` cadence (Epic-015) misled the console: 
 
 ## How to add each kind of binding
 
+> **Wiring a cadence across the WHOLE roster? Set `commons: true` on that skill.**
+> A skill bound onto every active persona is part of the commons — the baseline
+> cadence everyone shares — not a designed duty. The Epic-021 §B.1 idle detector
+> discounts commons executions when deciding whether a persona produced
+> specialised work, so an all-roster cadence that *omits* the flag makes every
+> persona bound to it read as productive on baseline output alone: the exact
+> evasion the detector exists to close, reintroduced by a binding PR that never
+> touches the detector's code. The wiring scripts are the criterion —
+> `wire-daily-cadences-all-agents.mjs` (all-roster ⇒ commons) versus
+> `wire-memory-curation.mjs` (one persona ⇒ not commons). Under-declaring fails
+> silently; over-declaring merely over-flags. (PR #524 cycle-1, sana S3.)
+
 ### `executor: lambda` — orchestrator-tick fires the wf-agent-runner
 
 This is the original v1 shape, unchanged behaviour. The skill folder under `workforce/skills/{name}/` carries `meta.json` (which sets `owners[]` — the authorship/Rule-11/improvement set; since [adr-0012](../adr/adr-0012-decouple-binding-from-ownership.md) it is **not** a binding prerequisite, so the binding agent need not appear in it) and either a `handler.ts` (deterministic) or `SKILL.md` (llm-prose / claude-code-routine).
