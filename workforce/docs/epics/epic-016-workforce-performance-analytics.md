@@ -314,6 +314,89 @@ that they had.
 
 **Still open:** OP-011 (reducer redeploy for the widened `delivered`, #436).
 
+## Human-touch taxonomy (Epic-020 Story 1)
+
+> **Taxonomy v1 (2026-08-04).** Home for [Epic-020](epic-020-human-leverage-metric.md)'s
+> touch taxonomy, per its Q3 resolution (*a section of the Epic-016 design doc; no new
+> directory*). Adding, renaming or re-classing a touch type = a version bump of this
+> block in the same PR, the same discipline the escalation-reason taxonomy keeps
+> (`workforce/skills/pr-autopilot/escalation-reasons.mjs`).
+
+Epic-020 measures **leverage per human touch**. Nothing can be counted before the
+touch types are enumerated, so this section is the enumeration: what a human touch
+*is*, where each type is mechanically readable, whether it is **counted** or
+**estimated**, and the closed set of work units each one unblocks. The aggregation
+that consumes it is Story 2 (#453).
+
+### Classes (never blended)
+
+Every type belongs to exactly one class, and the published table reports the three
+separately — **never a blended average across classes** (Epic-020 §Behaviour at
+N=100+: one weekly digest covering hundreds of mutations would otherwise inflate
+leverage mechanically).
+
+- **gate-class** — a recurring approval that releases a standing production line.
+- **digest-class** — one periodic review covering a batch of already-executed
+  mutations. High fan-out by construction; quarantined for exactly that reason.
+- **one-time** — a non-recurring unlock (e.g. the 2026-07-07 Spotify submission).
+  Never averaged with recurring gates.
+
+### The types
+
+| # | Touch type | Class | Source of record | Count | Work units unblocked (closed enumeration) |
+|---|---|---|---|---|---|
+| T1 | Operator terminal action on a labelled PR (merge or close) | gate | GitHub merge metadata via `workforce/scripts/build-pr-metrics-github.mjs` → `PERF#{scope}/PR`; split from delegated merges by the `autopilot:needs-human` label + `autopilot:reason:*` family (#449) | counted | the merged diff's changed files; nothing downstream of it |
+| T2 | Operator verdict on an `autopilot:needs-human` escalation | gate | the same `PERF#{scope}/PR` roll-up: PRs labelled `autopilot:needs-human` in the window, bucketed by reason code (`escalation-reasons.mjs`, taxonomy v3) | counted | the one PR unblocked, plus any PR the same verdict explicitly unblocks by reference — no transitive credit |
+| T3 | Podcast approval-gate flip (`script-ready → approved`) | gate | **write-time event row** appended by the podcast pipeline (see *Trap 1*); the Notion `Status` property itself is current-state only | estimated until the event row ships, counted after | the back half of the line only: voice params, synthesis, show notes, publish. Script authoring and the pre-gate verdict take no credit (Epic-020 §2, celeste) |
+| T4 | Weekly config digest review | digest | `AUDIT#` rows + `workforce/lambdas/config-digest/handler.ts` | counted | the `AUDIT#` mutations inside the digest window — enumerated, never estimated as "dozens" |
+| T5 | W-3 cost-cap amendment | one-time | the amendment table in `workforce/docs/governance.md` §W-3, one row per raise | counted | the spend headroom released; per-hire rationale in `workforce/docs/hires/` |
+| T6 | Epic status flip (`Draft → Accepted`) | gate | the status line of `workforce/docs/epics/epic-*.md`, read from git history — match **both** authored forms, `^- \*\*Status\*\*:` (23 of 24 files) and `^\*\*Status:\*\*` (epic-018 only, colon inside the bold, no leading dash). An aggregator written against the dashed form alone returns zero T6 touches for epic-018 and reports that as "no status flip", which is indistinguishable from the truth | counted | the epic's own directly-referenced stories — not their descendants |
+| T7 | Hire-round sign-off | one-time | the round doc under `workforce/docs/hires/` and its merging PR | counted | the personas registered by that round |
+
+**Falsifier denominator.** Six of seven types (T1, T2, T4, T5, T6, T7) are
+countable-designated; T3 is **estimated** until Trap 1's event row lands and is
+therefore excluded from the denominator, per Epic-020's anti-gaming clause. The
+metric fails as defined if fewer than 80% of the countable-designated types turn
+out to be mechanically countable — recorded honestly in the report either way.
+
+### Trap 1 — Notion property history is not transition-readable
+
+The Notion API serves a page's **current** `Status`, not its transitions, so
+"when did this episode flip to `approved`?" is unanswerable after the fact. The
+podcast pipeline therefore **appends the gate-flip as a row at write time**
+rather than reconstructing it later; every Notion-derived type is marked
+`estimated` from day one and stays so until its write-time event exists. Until
+then T3 contributes to no count.
+
+### Trap 2 — `merged_by` can render as the operator on a delegated merge
+
+R-N10 merges execute through the project-scoped PAT, so GitHub can attribute an
+**agent** merge to the operator's account. `merged_by` is therefore not admissible
+as the human-touch signal. An operator touch is defined instead by **terminal
+action on a labelled PR** — the `autopilot:needs-human` label plus the
+`autopilot:reason:*` reason record from Epic-019 Story 1 (#449, closed) — which is
+a hard dependency of T1 and T2. A PR with no reason label buckets as
+`unspecified` and is reported as such, never silently counted as human.
+
+### Leverage attribution rule
+
+- **Direct first-order only, no transitive credit.** A touch is credited with what
+  it *immediately* unblocks, not with everything that eventually followed.
+- **One-time unlocks are their own class**, never averaged with recurring gates.
+- **Ambiguous → count `1` and flag.** Under-claiming beats storytelling
+  (Epic-020 Q1: a defensible undercount beats a story).
+
+### Goodhart clause
+
+The metric is **informational, never a target**. If leverage-per-touch became a
+goal, the org would be incentivised to bundle approvals into fewer, bigger gates —
+mechanically raising leverage while thinning oversight. Accordingly the number is
+**always published alongside Epic-019's escalation-correctness data**, never alone,
+and always carries its V1 definition: what is measured here is **leverage
+(fan-out), not price**. The 仮説二 claim that human touches are "highest-priced" is
+only testable once the Phase-2 dollar column lands (Epic-020 Q2, tied to this
+epic's per-deliverable cost data).
+
 ## Out of scope
 
 - ~~**The live `/performance` endpoint** (Phase 2)~~ — **DONE 2026-06-22**, see
