@@ -97,7 +97,25 @@ export function classifySweep(
   if (names.includes(AUTOPILOT_OFF_LABEL)) return null; // maintainer pause
   if (names.includes(ESCALATION_LABEL)) return null; // already terminal (escalated)
 
-  if (bodies.some((b) => String(b || "").includes(NEEDS_HUMAN_MARKER))) {
+  // The ML-009 check must NOT run ahead of the author-lane branch below. A
+  // needs-human marker is immutable history in a comment body; the author label
+  // is current state. A PR that was escalated and then legitimately moved to the
+  // AUTHOR lane (adr-0022) therefore has both, and reading the marker first
+  // classifies that transition as a dropped label and re-stamps needs-human —
+  // which puts the PR in BOTH queues and makes pr-remediate skip it, because
+  // pr-remediate-scan.mjs treats the escalation label as terminal. The lane
+  // transition the ADR permits then cannot survive one sweep.
+  //
+  // Observed 2026-08-07T00:19Z: #537, #539 and #540 were re-stamped this way
+  // within twenty minutes of being moved into the lane. The author-lane rules
+  // below are the correct owner for a PR carrying that label — including its
+  // own escalation paths (cap spent, or untouched past authorStaleHours), so
+  // nothing stops being enforced by deferring to them; only the classification
+  // changes.
+  if (
+    !names.includes(AUTHOR_LABEL) &&
+    bodies.some((b) => String(b || "").includes(NEEDS_HUMAN_MARKER))
+  ) {
     return "unlabelled-handoff"; // ML-009: handed off, label dropped
   }
 
