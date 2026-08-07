@@ -3,9 +3,11 @@
 - **Status**: Implemented (2026-06-23)
 - **Owner**: Maya
 - **Created**: 2026-05-18
-- **Implemented by**: present at repo import (`65d7848`). Live surface: `workforce/app/src/pages/OrgDAG.tsx` (egocentric `/org`) + `components/AgentOrgGraph.tsx` (inline on profile).
+- **Implemented by**: present at repo import (`65d7848`). Live surface: `workforce/app/src/pages/OrgChart.tsx` (whole-org `/org/chart`) + `components/AgentOrgGraph.tsx` (inline on profile).
 
 > **Status reconciliation (2026-06-23, Nadia).** Flipped Draft → Implemented: the `/org` egocentric chart and the inline per-profile org graph both render from `reports_to` with no per-agent UI code. The Epic body's own three 2026-05-23 amendments already described the shipped state — the design record was kept current while the Status header lagged.
+
+> **Amendment (2026-08-07, PR #558).** The egocentric `/org` view (`pages/OrgDAG.tsx`) is **retired and deleted**; `/org/chart` (`pages/OrgChart.tsx`, PR #553) is the sole org-wide surface, and `/org` redirects to it, carrying `?center=<slug>` across as the chart's `?q=` highlight. The 2026-05-23 amendments below are superseded where they name `/org` behaviour: the `?center=` URL-state criterion and the `?hops=full` escape hatch are unmeetable by construction now, and `?hops` never existed on the successor. What survives unchanged is the per-profile inline graph (`AgentOrgGraph`, ±2 hops), which remains the only surface that renders `lateral` peers — the whole-org chart models reporting edges only. Recorded here because this file is the design record for this area and it named a file that is no longer on disk (lenses `wf:aoi` A6 / `wf:freya` F2 / `wf:dario` D3).
 
 ## Problem
 
