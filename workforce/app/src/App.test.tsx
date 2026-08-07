@@ -46,7 +46,7 @@ describe('/org → /org/chart', () => {
     await waitFor(() => expect(window.location.pathname).toBe('/somewhere'))
   })
 
-  // Regression (wf:freya F1): the redirect used to serve the path and drop
+  // Regression (wf:freya F1, #558): the redirect used to serve the path and drop
   // the state, so a bookmarked `/org?center=elena` landed on the whole
   // roster with nothing highlighted.
   it('carries ?center= across as the chart’s ?q= highlight', async () => {
@@ -56,6 +56,20 @@ describe('/org → /org/chart', () => {
     expect(await screen.findByText('ORG-CHART-MARKER')).toBeInTheDocument()
     await waitFor(() => expect(window.location.pathname).toBe('/org/chart'))
     expect(window.location.search).toBe('?q=elena')
+  })
+
+  // Regression (wf:dario D7): dropping `encodeURIComponent` was the one
+  // mutation the first version of this suite did not kill, and it is the
+  // line that stops a crafted link smuggling a param the chart reads —
+  // every other case uses a slug that encodes to itself.
+  it('escapes the carried value so a crafted link cannot smuggle a second param', async () => {
+    window.history.pushState({}, '', '/org?center=' + encodeURIComponent('a&density=detail'))
+    render(<App />)
+
+    await waitFor(() => expect(window.location.pathname).toBe('/org/chart'))
+    const params = new URLSearchParams(window.location.search)
+    expect(params.get('density')).toBeNull()
+    expect(params.get('q')).toBe('a&density=detail')
   })
 
   it('redirects without a query when there is nothing to carry', async () => {

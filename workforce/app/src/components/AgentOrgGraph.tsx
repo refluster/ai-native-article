@@ -231,7 +231,7 @@ export default function AgentOrgGraph({ agent, roster }: Props) {
       <div className="border-t border-wf-outline-variant px-4 py-2 flex flex-wrap gap-x-4 gap-y-1">
         {/* One destination now. The sibling link went to /org?center=,
             the egocentric 1-hop view, which has been retired — so the
-            label-ambiguity fix that once lived here (wf:freya F1) is moot:
+            label-ambiguity fix that once lived here (wf:freya F1, #554) is moot:
             there is nothing left to tell it apart from. */}
         <Link
           to="/org/chart"

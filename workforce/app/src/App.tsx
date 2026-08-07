@@ -37,17 +37,27 @@ function RouteTracker() {
 /**
  * `/org` → `/org/chart`, carrying the one parameter the old route took.
  *
- * `?center=<slug>` was the only shape the console itself ever generated
- * (the retired AgentOrgGraph footer link), so every `/org` URL in a
- * bookmark or an old PR comment — exactly the population the redirect
- * exists for — carries it. A bare `<Navigate>` served the path and
- * dropped the state, landing the operator on 54 agents with nothing
- * highlighted (wf:freya F1).
+ * `?center=<slug>` was the only parameter `/org` ever took: the profile
+ * footer generated it, while Home and the chart's stat band linked the
+ * bare path. Both shapes are handled. A bare `<Navigate>` served the path
+ * and dropped the state, landing an operator who followed a `?center=`
+ * bookmark on 54 agents with nothing highlighted (wf:freya F1, #558).
  *
  * It maps to `q=`, not to a verbatim `center=`: the chart reads `q` and
  * `density` and nothing else, so passing `center` through would paste a
- * param no page reads into the URL bar (wf:dario). `matchesOrgQuery`
- * matches on slug, so `?center=elena` lands on the chart with elena lit.
+ * param no page reads into the URL bar (wf:dario). Note `matchesOrgQuery`
+ * is a substring match over slug/name/role/residence, not a slug lookup,
+ * so a short slug can light more than one row — acceptable here, because
+ * the chart dims non-matches rather than filtering them out (wf:dario D6).
+ *
+ * The carry is a best-effort **highlight**, not a **focus**: `center` was
+ * an exact slug lookup on the retired view, `q` is not, so a short slug
+ * can land more than one row lit. The header states `N of 54 highlighted`
+ * honestly and the field is editable on arrival (wf:freya F7, #558).
+ *
+ * `encodeURIComponent` is load-bearing, not decorative: without it
+ * `/org?center=a%26density%3Ddetail` would smuggle a `density` the chart
+ * actually reads. Pinned by a test (wf:dario D7).
  */
 function OrgRedirect() {
   const { search } = useLocation();
