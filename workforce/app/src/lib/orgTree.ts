@@ -1,10 +1,11 @@
 // Whole-workforce org model — the data behind /org/chart.
 //
-// The console already had two reporting views, both deliberately narrow:
-// AgentOrgGraph (±2 hops around one agent) and /org (an egocentric 1-hop
-// spine). Neither answers "what does the whole organisation look like?",
-// and at 50+ agents the obvious answer — one deep indented tree — is a
-// column of text several screens tall.
+// The console's other reporting view is deliberately narrow —
+// AgentOrgGraph, ±2 hops around one agent. It does not answer "what does
+// the whole organisation look like?", and at 50+ agents the obvious
+// answer — one deep indented tree — is a column of text several screens
+// tall. (An egocentric 1-hop spine at /org was retired in favour of this
+// page.)
 //
 // This module reshapes the flat roster into the structure the wide chart
 // needs: the root band (L0), then one **division** per root-child, each
