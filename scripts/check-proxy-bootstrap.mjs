@@ -34,12 +34,37 @@
 //   4. the imported function is actually called;
 //   5. the fetch-call scan ignores comments and string literals.
 //
+// Direct AND indirect callers (the denominator bug)
+// -------------------------------------------------
+// Checking only files that contain a literal `fetch(` picks the wrong
+// denominator. A CLI entry script that reaches the network solely through an
+// imported helper — `makeGh()` from pr-merge.mjs, `queryAll()` from
+// scripts/lib/notion.mjs — contains no fetch call of its own, so it was never
+// counted, and it gets no bootstrap: the helper's own
+// `ensureProxyAwareEntry(import.meta.url)` is inert when the helper is
+// imported rather than run (by design — re-exec on import would restart its
+// host). Both halves are individually correct and the composition is not.
+//
+// This was not hypothetical. `pr-autopilot-sweep.mjs` took HTTP 401 on every
+// proxied fire while this gate reported "all 74 fetch()-calling scripts
+// bootstrap correctly" — and that sweep is what mechanically enforces
+// pr-autopilot's two-outcome contract, so PRs could sit in neither terminal
+// state with nothing red anywhere. `newsletter/pipeline/fetch-notion.mjs`,
+// the deploy-time export of the C-2 source of truth, was in the same class.
+// Found 2026-08-04 on a live agent-runner fire; ML-017's second occurrence.
+//
+// So the gate now follows relative imports transitively: a file "touches the
+// network" if it calls fetch() itself OR imports (however deeply) a file that
+// does. Requiring the bootstrap on the whole set is safe — on a module that
+// is imported rather than executed the call is a no-op, which is exactly the
+// property that made the leaf-level guard correct in the first place.
+//
 // Scope, deliberately: `.mjs` only, under workforce/ scripts/ newsletter/
 // .claude/. `workforce/lambdas/**/*.ts` is excluded on purpose — Lambdas run
 // in AWS, not behind the CCR proxy — so do not "fix" that by widening it.
 //
 // Usage:  node scripts/check-proxy-bootstrap.mjs
-// Exit:   0 — every fetch() caller is bootstrapped
+// Exit:   0 — every network-touching script is bootstrapped
 //         1 — one or more offenders (listed on stderr)
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -48,17 +73,34 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BOOTSTRAP = resolve(ROOT, "scripts/lib/proxy-bootstrap.mjs");
+const NETWORK_LIB = resolve(ROOT, "scripts/lib/http-retry.mjs");
 const SCAN_DIRS = ["workforce", "scripts", "newsletter", ".claude"];
 const IGNORE_DIRS = new Set(["node_modules", "dist", "build", ".git", "coverage"]);
 
 // A real global fetch() call. `fetchArticles(`, `this.fetch(` and
 // `client.fetch(` must not match; `globalThis.fetch(` must.
 const FETCH_CALL = /(?:(?:^|[^.\w])fetch\s*\(|\bglobalThis\.fetch\s*\()/;
+// A literal `fetch(` is no longer the only way to issue a request. Importing
+// scripts/lib/http-retry.mjs performs network I/O just as surely, and its own
+// call is `fetchImpl(...)` — which this file's FETCH_CALL deliberately does not
+// match, so the module and every future importer would drop out of the scan
+// set entirely. That is how backfill-en.mjs left it (74 → 73 callers) the
+// moment its fetch moved one module away, leaving a code comment as the only
+// thing holding its bootstrap in place. A comment is a memory; §6.1 says
+// memories become checks. Adding an indirection here is a tightening, not a
+// loosening — nothing that was scanned before stops being scanned.
+const NETWORK_MODULE_IMPORT =
+  /^[ \t]*import\s[\s\S]*?from\s+["'][^"']*scripts\/lib\/http-retry\.mjs["']/m;
 // The bootstrap import, as a statement, capturing its specifier.
 const BOOTSTRAP_IMPORT =
   /^[ \t]*import\s+\{[^}]*\}\s+from\s+["']([^"']*proxy-bootstrap\.mjs)["']/m;
 // Any import statement, to establish position.
 const ANY_IMPORT = /^[ \t]*import\s/m;
+// A relative import/export specifier, read off the RAW source. It must not be
+// read off stripNonCode() output — that blanks string literals, so every
+// specifier would come back as "" and the graph would be empty (which is
+// precisely the bug that let the indirect callers through unnoticed).
+const RELATIVE_DEP = /^\s*(?:import|export)[^;\n]*?from\s+["'](\.[^"']+)["']/gm;
 // The call itself — importing without calling does nothing.
 const BOOTSTRAP_CALL = /ensureProxyAwareEntry\s*\(\s*import\.meta\.url\s*\)/;
 
@@ -103,43 +145,110 @@ function walk(dir, out = []) {
   return out;
 }
 
-const offenders = [];
-let checked = 0;
+/** Resolve a relative specifier to the .mjs file it names. Extensionless and
+ *  directory specifiers are not used in this repo; anything that does not land
+ *  on a real .mjs is simply not an edge. */
+function resolveDep(fromFile, spec) {
+  const target = resolve(dirname(fromFile), spec);
+  return target.endsWith(".mjs") && existsSync(target) ? target : null;
+}
+
+// Pass 1 — read every candidate once: does it fetch directly, and what does it
+// import relatively?
+const sources = new Map();
+const deps = new Map();
+const fetchesDirectly = new Set();
 
 for (const dir of SCAN_DIRS) {
   for (const file of walk(join(ROOT, dir))) {
     if (resolve(file) === BOOTSTRAP) continue;
     const src = readFileSync(file, "utf8");
-    if (!FETCH_CALL.test(stripNonCode(src))) continue;
-    checked++;
+    sources.set(file, src);
+    // Two independent ways into the population, kept deliberately redundant.
+    // FETCH_CALL runs on stripped code (a fetch( inside a string or comment is
+    // not a call). NETWORK_MODULE_IMPORT runs on the RAW src, because
+    // stripNonCode blanks string literals and an import specifier IS a string
+    // literal — matching it against stripped text could never fire.
+    //
+    // The transitive pass below already reaches anything that imports
+    // http-retry.mjs relatively, so this seed is belt-and-braces rather than
+    // load-bearing today. It is kept because it fails in a different direction:
+    // it holds for a specifier the relative-import walk cannot resolve (an
+    // alias, a future package specifier), which is exactly the regression
+    // backfill-en.mjs demonstrated when its fetch moved one module away.
+    if (
+      FETCH_CALL.test(stripNonCode(src)) ||
+      NETWORK_MODULE_IMPORT.test(src)
+    ) {
+      fetchesDirectly.add(file);
+    }
+    deps.set(
+      file,
+      [...src.matchAll(RELATIVE_DEP)]
+        .map((m) => resolveDep(file, m[1]))
+        .filter(Boolean),
+    );
+  }
+}
 
-    const rel = relative(ROOT, file);
-    const importMatch = src.match(BOOTSTRAP_IMPORT);
-    if (!importMatch) {
-      offenders.push([rel, "no proxy-bootstrap import statement"]);
-      continue;
+// Pass 2 — transitive closure: a file touches the network if it fetches, or
+// imports something that does. Fixed-point over a graph this small (~140
+// nodes) is cheaper than the bookkeeping to avoid it, and cycles terminate
+// because the set only ever grows.
+const touchesNetwork = new Set(fetchesDirectly);
+for (let changed = true; changed; ) {
+  changed = false;
+  for (const [file, edges] of deps) {
+    if (touchesNetwork.has(file)) continue;
+    if (edges.some((d) => touchesNetwork.has(d))) {
+      touchesNetwork.add(file);
+      changed = true;
     }
-    if (!existsSync(resolve(dirname(file), importMatch[1]))) {
-      offenders.push([rel, `import path does not resolve: ${importMatch[1]}`]);
-      continue;
-    }
-    const firstImport = src.match(ANY_IMPORT);
-    if (firstImport && firstImport.index !== importMatch.index) {
-      offenders.push([rel, "proxy-bootstrap is not the first import"]);
-      continue;
-    }
-    if (!BOOTSTRAP_CALL.test(src)) {
-      offenders.push([
-        rel,
-        "imports the bootstrap but never calls ensureProxyAwareEntry(import.meta.url)",
-      ]);
-    }
+  }
+}
+
+const offenders = [];
+const direct = fetchesDirectly.size;
+let checked = 0;
+
+for (const file of touchesNetwork) {
+  // `scripts/lib/http-retry.mjs` is itself a library, never a process entry, so
+  // the bootstrap cannot apply to it — excluded exactly as BOOTSTRAP is. It
+  // stays a NODE in the graph above on purpose: every script that reaches
+  // fetch() *through* it must still be pulled into `touchesNetwork`, which is
+  // the whole point of the transitive pass. (Carried over from main, where the
+  // same exclusion sat in the single-pass read loop; in this two-pass design
+  // excluding it during pass 1 would delete the edge, not just the report.)
+  if (resolve(file) === NETWORK_LIB) continue;
+  const src = sources.get(file);
+  checked++;
+
+  const rel = relative(ROOT, file);
+  const importMatch = src.match(BOOTSTRAP_IMPORT);
+  if (!importMatch) {
+    offenders.push([rel, "no proxy-bootstrap import statement"]);
+    continue;
+  }
+  if (!existsSync(resolve(dirname(file), importMatch[1]))) {
+    offenders.push([rel, `import path does not resolve: ${importMatch[1]}`]);
+    continue;
+  }
+  const firstImport = src.match(ANY_IMPORT);
+  if (firstImport && firstImport.index !== importMatch.index) {
+    offenders.push([rel, "proxy-bootstrap is not the first import"]);
+    continue;
+  }
+  if (!BOOTSTRAP_CALL.test(src)) {
+    offenders.push([
+      rel,
+      "imports the bootstrap but never calls ensureProxyAwareEntry(import.meta.url)",
+    ]);
   }
 }
 
 if (offenders.length > 0) {
   console.error(
-    `❌  R-14: ${offenders.length} script(s) call fetch() without a valid proxy bootstrap:\n`,
+    `❌  R-14: ${offenders.length} script(s) reach the network without a valid proxy bootstrap:\n`,
   );
   for (const [file, why] of offenders) console.error(`      ${file} — ${why}`);
   console.error(
@@ -155,4 +264,7 @@ if (offenders.length > 0) {
   process.exit(1);
 }
 
-console.log(`✅  R-14: all ${checked} fetch()-calling script(s) bootstrap the proxy correctly.`);
+console.log(
+  `✅  R-14: all ${checked} network-touching script(s) bootstrap the proxy correctly ` +
+    `(${direct} direct fetch() caller(s), ${checked - direct} via an imported helper).`,
+);

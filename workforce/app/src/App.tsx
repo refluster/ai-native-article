@@ -12,7 +12,7 @@ import AgentProfile from './pages/AgentProfile';
 import SkillDirectory from './pages/SkillDirectory';
 import SkillProfile from './pages/SkillProfile';
 import SearchResults from './pages/SearchResults';
-import OrgDAG from './pages/OrgDAG';
+import OrgChart from './pages/OrgChart';
 import ProjectDirectory from './pages/ProjectDirectory';
 import ProjectProfile from './pages/ProjectProfile';
 import Feed from './pages/Feed';
@@ -34,6 +34,42 @@ function RouteTracker() {
   return null;
 }
 
+/**
+ * `/org` → `/org/chart`, carrying the one parameter the old route took.
+ *
+ * `?center=<slug>` was the only parameter `/org` ever took: the profile
+ * footer generated it, while Home and the chart's stat band linked the
+ * bare path. Both shapes are handled. A bare `<Navigate>` served the path
+ * and dropped the state, landing an operator who followed a `?center=`
+ * bookmark on 54 agents with nothing highlighted (wf:freya F1, PR 558).
+ *
+ * It maps to `q=`, not to a verbatim `center=`: the chart reads `q` and
+ * `density` and nothing else, so passing `center` through would paste a
+ * param no page reads into the URL bar (wf:dario). Note `matchesOrgQuery`
+ * is a substring match over slug/name/role/residence, not a slug lookup,
+ * so a short slug can light more than one row — acceptable here, because
+ * the chart dims non-matches rather than filtering them out (wf:dario D6).
+ *
+ * The carry is a best-effort **highlight**, not a **focus**: `center` was
+ * an exact slug lookup on the retired view, `q` is not, so a short slug
+ * can land more than one row lit. The header states `N of 54 highlighted`
+ * honestly and the field is editable on arrival (wf:freya F7, PR 558).
+ *
+ * (Finding-ids are per-review, so citations carry a PR anchor. Write it
+ * `PR 558`, not with a leading hash: a three-digit hash-number is a valid
+ * hex colour, so the R-2 design-token lint rejects it in app source. This
+ * comment cannot show the rejected form without tripping the lint itself.)
+ *
+ * `encodeURIComponent` is load-bearing, not decorative: without it
+ * `/org?center=a%26density%3Ddetail` would smuggle a `density` the chart
+ * actually reads. Pinned by a test (wf:dario D7).
+ */
+function OrgRedirect() {
+  const { search } = useLocation();
+  const center = new URLSearchParams(search).get('center');
+  return <Navigate to={center ? `/org/chart?q=${encodeURIComponent(center)}` : '/org/chart'} replace />;
+}
+
 function ProtectedRoutes() {
   return (
     <AuthBoundary>
@@ -45,7 +81,13 @@ function ProtectedRoutes() {
                 the index so existing links keep working. */}
             <Route path="/" element={<Feed />} />
             <Route path="/performance" element={<Dashboard />} />
-            <Route path="/org" element={<OrgDAG />} />
+            {/* /org/chart is the only org view. The egocentric 1-hop
+                /org (OrgDAG) was retired once the whole-org chart covered
+                the same question better; /org redirects rather than 404s,
+                the same treatment /feed gets below, because the old path
+                is in bookmarks and in older PR comments. */}
+            <Route path="/org/chart" element={<OrgChart />} />
+            <Route path="/org" element={<OrgRedirect />} />
             <Route path="/agents" element={<AgentDirectory />} />
             <Route path="/agents/:slug" element={<AgentProfile />} />
             <Route path="/skills" element={<SkillDirectory />} />

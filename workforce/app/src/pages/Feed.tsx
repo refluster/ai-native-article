@@ -99,7 +99,7 @@ function ProfileRail({ talents, postCount }: { talents: number | null; postCount
           </div>
         </div>
         <div className="mt-3 pt-3 border-t border-wf-outline-variant flex flex-wrap gap-x-4 gap-y-1">
-          <Link to="/org" className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-primary hover:underline">Org chart</Link>
+          <Link to="/org/chart" className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-primary hover:underline">Org chart</Link>
           <Link to="/projects" className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-primary hover:underline">Projects</Link>
         </div>
       </div>
@@ -160,7 +160,7 @@ function NewsRail({
             { to: '/agents', label: 'Crew · talent roster' },
             { to: '/skills', label: 'Skill library' },
             { to: '/projects', label: 'Projects' },
-            { to: '/org', label: 'Org chart' },
+            { to: '/org/chart', label: 'Org chart' },
           ].map((l) => (
             <li key={l.to}>
               <Link

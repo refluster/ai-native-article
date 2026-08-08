@@ -16,6 +16,7 @@ export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "attention-ledger": ["workforce.feed_write_token"] as const,
   "audience-loop": ["workforce.feed_write_token"] as const,
   "backlog-reconcile": ["github.token"] as const,
+  "budget-runway-review": ["workforce.feed_write_token"] as const,
   "code-task-brief": [],
   "daily-research": ["workforce.feed_write_token"] as const,
   "design-note": [],

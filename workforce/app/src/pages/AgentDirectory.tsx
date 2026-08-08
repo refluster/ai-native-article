@@ -131,9 +131,19 @@ export default function AgentDirectory() {
           <Skeleton className="h-4 w-40 mb-3" />
         )}
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-          <h1 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-[1.04] text-wf-on-surface">
-            The crew.
-          </h1>
+          <div className="min-w-0">
+            <h1 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-[1.04] text-wf-on-surface">
+              The crew.
+            </h1>
+            {/* The roster answers "who is here"; the chart answers "how is
+                it shaped". This is the natural place to hand off. */}
+            <Link
+              to="/org/chart"
+              className="inline-block mt-1.5 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
+            >
+              ORG CHART →
+            </Link>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             {FILTERS.map((f) => (
               <button

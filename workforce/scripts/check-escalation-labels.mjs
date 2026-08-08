@@ -24,19 +24,45 @@
 import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
 ensureProxyAwareEntry(import.meta.url);
 
-import { ESCALATION_LABEL } from "../skills/pr-autopilot/pr-merge.mjs";
+import { ESCALATION_LABEL, AUTHOR_LABEL } from "../skills/pr-autopilot/pr-merge.mjs";
 import { NEEDS_HUMAN_MARKER } from "../skills/pr-autopilot/pr-autopilot-post.mjs";
 
 /**
  * Pure predicate (unit-tested). A PR violates ML-009 when a human hand-off
  * marker is present in any comment/review body but the escalation label is
  * absent. Marker absent ⇒ not an escalation ⇒ never a violation.
+ *
+ * The author-lane exemption (adr-0022). A marker is immutable history: it
+ * lives in a comment body and stays there forever. A label is current state.
+ * So a PR that was escalated, then legitimately moved to the AUTHOR lane —
+ * either by `pr-remediate-post.mjs --resolved`, or by the operator re-parking
+ * it for the cadence — carries a permanent marker with no escalation label,
+ * and read literally that is a violation on every future run. It is not one:
+ * the invariant this guard protects is *"the operator's `is:open
+ * label:autopilot:needs-human` queue is complete"*, and a PR in the author
+ * lane is deliberately not in that queue.
+ *
+ * This narrows the population but does not weaken the invariant, because the
+ * two lanes are mutually exclusive by construction — `pr-remediate-post.mjs`
+ * clears one label whenever it sets the other, "so the PR is in exactly one
+ * queue" (its SKILL.md Step 6). A PR carrying BOTH labels is a real defect and
+ * still fails: the exemption requires the escalation label to be absent, which
+ * is the state the ADR says the author lane has.
+ *
+ * Without this, the needs-human → needs-author transition adr-0022 explicitly
+ * permits could not be performed without turning the whole repo's CI red —
+ * this check scans every open PR, so one mislabelled PR fails everyone's build.
+ * Observed 2026-08-06: five PRs re-parked into the author lane failed CI on
+ * every open PR in the repo, including unrelated ones.
  */
 export function violatesEscalationLabel({ bodies = [], labels = [] } = {}) {
   const handedOff = bodies.some((b) => String(b || "").includes(NEEDS_HUMAN_MARKER));
   if (!handedOff) return false;
-  const labelled = labels.some((l) => String(l || "").toLowerCase() === ESCALATION_LABEL);
-  return !labelled;
+  const has = (want) => labels.some((l) => String(l || "").toLowerCase() === want);
+  if (has(ESCALATION_LABEL)) return false;
+  // In the author lane ⇒ not awaiting a human ⇒ not owed the escalation label.
+  if (has(AUTHOR_LABEL)) return false;
+  return true;
 }
 
 function arg(name) {

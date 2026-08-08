@@ -4,12 +4,15 @@
 // slugs in flat groups.
 //
 // Why 2-up + 2-down? Operator constraint — anything wider becomes
-// noise on a single agent's page, and lateral peers already surface
-// in the agent's profile data and the standalone /workforce/org view.
+// noise on a single agent's page, and lateral peers already surface in
+// the agent's profile data — see the LATERAL band below. Do NOT cite
+// /org/chart here: it models reporting edges only and never reads
+// `agent.lateral`, so naming it would send the next reader to a view
+// that cannot show what this sentence promises (wf:aoi A1 / wf:dario D4).
 //
-// Clicking any row navigates to that agent's profile (unlike /org,
-// which re-centers within the same view). The focused agent is shown
-// in the tree too, in its correct hierarchical slot, marked CENTER.
+// Clicking any row navigates to that agent's profile. The focused agent
+// is shown in the tree too, in its correct hierarchical slot, marked
+// CENTER.
 
 import { Link } from 'react-router-dom';
 import Sigil from './Sigil';
@@ -225,12 +228,16 @@ export default function AgentOrgGraph({ agent, roster }: Props) {
           </div>
         </div>
       )}
-      <div className="border-t border-wf-outline-variant px-4 py-2">
+      <div className="border-t border-wf-outline-variant px-4 py-2 flex flex-wrap gap-x-4 gap-y-1">
+        {/* One destination now. The sibling link went to /org?center=,
+            the egocentric 1-hop view, which has been retired — so the
+            label-ambiguity fix that once lived here (wf:freya F1, PR 554) is moot:
+            there is nothing left to tell it apart from. */}
         <Link
-          to={`/org?center=${agent.slug}`}
+          to="/org/chart"
           className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
         >
-          VIEW IN FULL ORG GRAPH →
+          ORG CHART ({roster.length}) →
         </Link>
       </div>
     </div>
