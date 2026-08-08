@@ -4,8 +4,9 @@
 // Skills, each ranked by lib/search. A blank query prompts rather than
 // dumping the whole roster.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { trackEvent } from '@kohuehara/shared/analytics'
 import WorkforceLayout from '../components/WorkforceLayout'
 import Typeplate from '../components/Typeplate'
 import Sigil from '../components/Sigil'
@@ -59,6 +60,22 @@ export default function SearchResults() {
     () => (skillManifest ? searchSkills(skillManifest.skills, q) : []),
     [skillManifest, q],
   )
+
+  // F2 — one event per distinct query on this surface. Held until both
+  // manifests resolve: before that the hit counts are zero because nothing
+  // has loaded, not because the query missed.
+  const loaded = agentManifest !== null && skillManifest !== null
+  const loggedRef = useRef('')
+  useEffect(() => {
+    const query = q.trim()
+    if (!query || !loaded) return
+    if (loggedRef.current === query) return
+    loggedRef.current = query
+    trackEvent({
+      name: 'global_search',
+      params: { surface: 'page', has_results: agentHits.length + skillHits.length > 0 },
+    })
+  }, [q, loaded, agentHits.length, skillHits.length])
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
