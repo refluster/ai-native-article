@@ -10,6 +10,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { trackEvent } from '@kohuehara/shared/analytics'
 import { loadWorkforceManifest, fullName } from '../lib/agents'
 import { loadWorkforceSkillManifest } from '../lib/skills'
 import { searchAgents, searchSkills } from '../lib/search'
@@ -17,6 +18,11 @@ import type { WorkforceAgent } from '../types/agent'
 import type { WorkforceSkill } from '../types/skill'
 
 const TYPEAHEAD_LIMIT = 5 // per group
+// How long typing must pause before the query counts as "a search". Both the
+// screen-reader announcement and the telemetry hang off this: announcing on
+// every keystroke makes the live region chatter, and logging on every
+// keystroke turns one search into one event per character.
+const SETTLE_MS = 500
 
 function SearchIcon({ className }: { className?: string }) {
   return (
@@ -124,6 +130,36 @@ export default function GlobalSearch() {
   const agentRows = rows.filter((r) => r.kind === 'agent')
   const skillRows = rows.filter((r) => r.kind === 'skill')
 
+  // The settled query — the query as it stands once typing has paused.
+  const [settled, setSettled] = useState('')
+  useEffect(() => {
+    const q = query.trim()
+    if (!q) { setSettled(''); return }
+    const t = setTimeout(() => setSettled(q), SETTLE_MS)
+    return () => clearTimeout(t)
+  }, [query])
+
+  // The manifests load lazily, so `rows` is empty at first for reasons that
+  // have nothing to do with the query. Announcing "No matches" then would be
+  // wrong, and logging has_results:false would report a miss that never
+  // happened — the same "a zero that isn't a reading" trap. Both wait.
+  const ready = agents.length > 0 || skills.length > 0
+
+  // A1 — the count a sighted user reads off the dropdown, for screen readers.
+  const announcement =
+    settled && ready ? (rows.length === 0 ? 'No matches' : `${rows.length} result${rows.length === 1 ? '' : 's'}`) : ''
+
+  // F2 — one event per settled query, so GA4 can answer "is anyone using
+  // this?". The ref keeps a re-render (or a manifest arriving late) from
+  // re-logging a query already counted.
+  const loggedRef = useRef('')
+  useEffect(() => {
+    if (!settled || !ready) return
+    if (loggedRef.current === settled) return
+    loggedRef.current = settled
+    trackEvent({ name: 'global_search', params: { surface: 'nav', has_results: rows.length > 0 } })
+  }, [settled, ready, rows.length])
+
   return (
     // Phones get the search too (it used to be `hidden sm:block`): with the
     // destinations collapsed behind the hamburger there is room for it, and
@@ -151,6 +187,13 @@ export default function GlobalSearch() {
           className="bg-transparent text-sm text-wf-on-surface placeholder:text-wf-on-surface-variant w-full focus:outline-none"
         />
       </form>
+
+      {/* A1 — result count for screen readers. Rendered unconditionally so the
+          live region exists in the DOM before its content changes; a region
+          added at the same moment as its text is not reliably announced. */}
+      <div role="status" aria-live="polite" className="sr-only">
+        {showDropdown ? announcement : ''}
+      </div>
 
       {/* On phones the panel spans the (flexible) field rather than a fixed
           18rem, which would overflow the viewport's right edge. */}

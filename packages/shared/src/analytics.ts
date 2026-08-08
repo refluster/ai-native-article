@@ -35,6 +35,11 @@ export type AnalyticsEvent =
   | { name: 'internal_link_click'; params: { slug: string; href: string } }
   | { name: 'outbound_click'; params: { slug: string; href: string; host: string } }
   | { name: 'podcast_spotify_click'; params: { slug: string; href: string } }
+  // `surface` separates the nav typeahead from the /search page so "is anyone
+  // using this?" can be answered per affordance, not just in aggregate.
+  // `has_results` is only ever reported once the manifests the search reads
+  // have loaded — a miss caused by an unloaded manifest is not a real miss.
+  | { name: 'global_search'; params: { surface: 'nav' | 'page'; has_results: boolean } }
 
 let initialized = false
 let measurementId: string | null = null

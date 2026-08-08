@@ -25,6 +25,9 @@
  *   node --env-file=.env newsletter/pipeline/fetch-notion.mjs
  */
 
+import { ensureProxyAwareEntry } from '../../scripts/lib/proxy-bootstrap.mjs'
+ensureProxyAwareEntry(import.meta.url)
+
 import { existsSync, readFileSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'

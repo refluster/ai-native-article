@@ -76,6 +76,38 @@ describe("classifySweep — unlabelled-handoff (ML-009)", () => {
       ),
     ).toBe("unlabelled-handoff");
   });
+
+  // adr-0022: the marker is immutable history, the author label is current
+  // state. Re-stamping needs-human here puts the PR in BOTH queues and makes
+  // pr-remediate skip it (its scan treats the escalation label as terminal),
+  // so the lane transition the ADR permits cannot survive a sweep.
+  it("does NOT fire for a PR re-parked in the author lane — the marker is history", () => {
+    expect(
+      classifySweep(
+        {
+          createdAt: hoursAgo(2),
+          updatedAt: hoursAgo(1),
+          labels: [AUTHOR_LABEL],
+          bodies: [`verdict…\n${NEEDS_HUMAN_MARKER}`],
+        },
+        opts,
+      ),
+    ).toBe(null);
+  });
+
+  it("author-lane escalations still fire on a PR that also carries the marker", () => {
+    expect(
+      classifySweep(
+        {
+          createdAt: hoursAgo(200),
+          updatedAt: hoursAgo(100),
+          labels: [AUTHOR_LABEL],
+          bodies: [`verdict…\n${NEEDS_HUMAN_MARKER}`],
+        },
+        opts,
+      ),
+    ).toBe("author-stale");
+  });
 });
 
 describe("classifySweep — stale-routed (a cycle that never terminated)", () => {

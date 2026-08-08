@@ -4,7 +4,7 @@
 // on, keyboard select, click-to-navigate, and Escape-to-close.
 
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
-import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, act, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 const navigate = vi.fn()
@@ -12,6 +12,9 @@ vi.mock('react-router-dom', async (orig) => {
   const actual = await orig<typeof import('react-router-dom')>()
   return { ...actual, useNavigate: () => navigate }
 })
+
+const trackEvent = vi.fn()
+vi.mock('@kohuehara/shared/analytics', () => ({ trackEvent: (e: unknown) => trackEvent(e) }))
 
 vi.mock('../lib/agents', () => ({
   loadWorkforceManifest: vi.fn(),
@@ -34,8 +37,13 @@ const SKILLS = [
   { name: 'pr-autopilot', description: 'Route a PR.', owners: ['nadia'], status: 'active' },
 ]
 
+// Must match SETTLE_MS in GlobalSearch.tsx — the pause that turns typing
+// into "a search" for both the announcement and the telemetry.
+const SETTLE_MS = 500
+
 beforeEach(() => {
   navigate.mockReset()
+  trackEvent.mockReset()
   ;(loadWorkforceManifest as Mock).mockResolvedValue({ generated_at: '', agents: AGENTS })
   ;(loadWorkforceSkillManifest as Mock).mockResolvedValue({ generated_at: '', skills: SKILLS })
 })
@@ -96,5 +104,97 @@ describe('GlobalSearch', () => {
     expect(await screen.findByRole('listbox')).toBeInTheDocument()
     fireEvent.keyDown(input, { key: 'Escape' })
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+  })
+})
+
+// Issue 321 — A1 (aria-live result count) + F2 (search telemetry). Both hang off the
+// same settle delay, so both are exercised through it.
+describe('GlobalSearch — announcement + telemetry (issue 321)', () => {
+  /** Let the debounce elapse so the query counts as settled. */
+  const settle = async () => {
+    await act(async () => { await new Promise((r) => setTimeout(r, SETTLE_MS + 20)) })
+  }
+
+  it('announces the result count in a polite live region once typing settles', async () => {
+    const input = renderSearch()
+    await typeQuery(input, 'ren')
+    await screen.findByText('Ren Takahashi')
+
+    const live = screen.getByRole('status')
+    expect(live).toHaveAttribute('aria-live', 'polite')
+    // Nothing is announced mid-keystroke — that is what makes it usable.
+    expect(live).toHaveTextContent('')
+
+    await settle()
+    // "ren" matches agent Ren + skill pr-review (owner "ren") = 2 rows.
+    expect(live).toHaveTextContent('2 results')
+  })
+
+  it('announces "No matches" rather than staying silent on a miss', async () => {
+    const input = renderSearch()
+    await typeQuery(input, 'zzzznotathing')
+    await settle()
+    expect(screen.getByRole('status')).toHaveTextContent('No matches')
+  })
+
+  it('singularises a one-result announcement', async () => {
+    const input = renderSearch()
+    await typeQuery(input, 'aoi') // matches only the agent
+    await settle()
+    expect(screen.getByRole('status')).toHaveTextContent('1 result')
+  })
+
+  it('logs one global_search event per settled query, not one per keystroke', async () => {
+    const input = renderSearch()
+    await typeQuery(input, 'r')
+    fireEvent.change(input, { target: { value: 're' } })
+    fireEvent.change(input, { target: { value: 'ren' } })
+    // Three keystrokes, one pause.
+    expect(trackEvent).not.toHaveBeenCalled()
+
+    await settle()
+    await waitFor(() => expect(trackEvent).toHaveBeenCalledTimes(1))
+    expect(trackEvent).toHaveBeenCalledWith({
+      name: 'global_search',
+      params: { surface: 'nav', has_results: true },
+    })
+  })
+
+  it('reports has_results:false when the settled query genuinely misses', async () => {
+    const input = renderSearch()
+    await typeQuery(input, 'zzzznotathing')
+    await settle()
+    await waitFor(() => expect(trackEvent).toHaveBeenCalledTimes(1))
+    expect(trackEvent).toHaveBeenCalledWith({
+      name: 'global_search',
+      params: { surface: 'nav', has_results: false },
+    })
+  })
+
+  it('does not announce or log a miss while the manifests are still unloaded', async () => {
+    // A pending load is the state that would otherwise report zero results
+    // for a query that was never actually run against the data.
+    ;(loadWorkforceManifest as Mock).mockReturnValue(new Promise(() => {}))
+    ;(loadWorkforceSkillManifest as Mock).mockReturnValue(new Promise(() => {}))
+
+    const input = renderSearch()
+    await typeQuery(input, 'ren')
+    await settle()
+
+    expect(screen.getByRole('status')).toHaveTextContent('')
+    expect(trackEvent).not.toHaveBeenCalled()
+  })
+
+  it('does not re-log a query already counted', async () => {
+    const input = renderSearch()
+    await typeQuery(input, 'ren')
+    await settle()
+    await waitFor(() => expect(trackEvent).toHaveBeenCalledTimes(1))
+
+    // Re-render churn (here: reopening the dropdown) must not double-count.
+    fireEvent.keyDown(input, { key: 'Escape' })
+    fireEvent.focus(input)
+    await settle()
+    expect(trackEvent).toHaveBeenCalledTimes(1)
   })
 })

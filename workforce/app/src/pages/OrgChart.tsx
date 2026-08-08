@@ -1,12 +1,15 @@
 // /org/chart — the whole workforce on one screen.
 //
-// The console's other two reporting views are deliberately narrow: the
-// per-agent AgentOrgGraph shows ±2 hops, and /org shows a 1-hop egocentric
-// spine. Both answer "who is around this agent?". Neither answers "what
-// does the organisation look like?", and the obvious way to answer that —
-// one indented tree — is a single column several screens tall at 50+
-// agents, which is exactly the shape the operator asked us to stop
-// producing.
+// The console's other reporting view is deliberately narrow: the
+// per-agent AgentOrgGraph shows ±2 hops around one agent, answering "who
+// is around this agent?". It does not answer "what does the organisation
+// look like?", and the obvious way to answer that — one indented tree —
+// is a single column several screens tall at 50+ agents, which is exactly
+// the shape the operator asked us to stop producing.
+//
+// This is now the ONLY org-wide view. An egocentric 1-hop spine lived at
+// /org and was retired once this page covered the same question better;
+// /org redirects here.
 //
 // The layout rule here: **spend width, not height.** The root band sits at
 // the top, and every division (a root-child and its subtree) becomes a
@@ -399,11 +402,10 @@ const CHIP_OFF =
 
 // ── Page ───────────────────────────────────────────────────────────────
 export default function OrgChart() {
-  // Query + density live in the URL, the way /org keeps `?center=`: this
-  // page's whole purpose is to be configured until it shows you something,
-  // and that configuration should survive a click into an agent profile
-  // and Back, and be pasteable (wf:freya F6). Zoom/fit are viewport-derived
-  // and stay local.
+  // Query + density live in the URL: this page's whole purpose is to be
+  // configured until it shows you something, and that configuration should
+  // survive a click into an agent profile and Back, and be pasteable
+  // (wf:freya F6, PR 554). Zoom/fit are viewport-derived and stay local.
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') ?? '';
   const density: Density = searchParams.get('density') === 'detail' ? 'detail' : 'compact';
@@ -639,9 +641,6 @@ export default function OrgChart() {
                       run health on the crew index →
                     </Link>
                   </span>
-                  <Link to="/org" className="text-wf-primary hover:underline">
-                    1-HOP VIEW →
-                  </Link>
                 </div>
               )}
             </div>
