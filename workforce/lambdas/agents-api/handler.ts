@@ -115,6 +115,7 @@ import {
   type ProjectMetaRow,
 } from "../shared/project.js";
 import {
+  type PerfIdleRow,
   type PerfLifecycleRow,
   type PerfPrRow,
   type PerfRepoRow,
@@ -1354,13 +1355,21 @@ async function getProjectRoute(rawId: string): Promise<APIGatewayProxyResultV2> 
 // item is optional — a scope with lifecycle but no published PR sections serves
 // an empty PR block rather than 404ing the whole series.
 async function getPerformanceRoute(scope: string): Promise<APIGatewayProxyResultV2> {
-  const [lifecycleRow, prRow, repoRow] = await Promise.all([
+  const [lifecycleRow, prRow, repoRow, idleRow] = await Promise.all([
     getItem<PerfLifecycleRow>(perfPk(scope), "LIFECYCLE"),
     getItem<PerfPrRow>(perfPk(scope), "PR"),
     getItem<PerfRepoRow>(perfPk(scope), "REPO"),
+    getItem<PerfIdleRow>(perfPk(scope), "IDLE"),
   ]);
   if (!lifecycleRow) return reply(404, { error: "not_found", scope });
-  const series = composeSeries(scope, new Date().toISOString(), lifecycleRow, prRow, repoRow);
+  const series = composeSeries(
+    scope,
+    new Date().toISOString(),
+    lifecycleRow,
+    prRow,
+    repoRow,
+    idleRow ?? undefined,
+  );
   return reply(200, series);
 }
 
