@@ -126,6 +126,33 @@ describe("composeSeries — endpoint assembly", () => {
     expect(s.pr_summary.autopilot_share).toBe(0.75);
     expect(s.lifecycle[s.lifecycle.length - 1]!.delivered).toBe(16);
   });
+
+  // Epic-021 §B.1 / #458 — the IDLE roll-up is additive and absent by default
+  // (composeSeries pre-dates the sweep for most scopes); a consumer must be
+  // able to tell "no IDLE row published yet" from "swept, nobody idle".
+  it("omits `idle` entirely when no IDLE row has been published for this scope", () => {
+    const s = composeSeries("workforce", "2026-06-22T02:00:00Z", { points });
+    expect(s.idle).toBeUndefined();
+  });
+
+  it("serves the IDLE block verbatim when the reducer has swept this scope", () => {
+    const s = composeSeries("workforce", "2026-06-22T02:00:00Z", { points }, undefined, undefined, {
+      updated_at: "2026-06-22T01:00:00Z",
+      window: { start: "2026-05-23T00:00:00Z", end: "2026-06-22T00:00:00Z", days: 30 },
+      idle: [{ slug: "corinne", pending: "enable", bound_skills: ["monthly-investor-letter"] }],
+      cohort: 12,
+      probe_truncated: [],
+      commons_skills: ["feed-post", "daily-research"],
+    });
+    expect(s.idle).toEqual({
+      updated_at: "2026-06-22T01:00:00Z",
+      window: { start: "2026-05-23T00:00:00Z", end: "2026-06-22T00:00:00Z", days: 30 },
+      idle: [{ slug: "corinne", pending: "enable", bound_skills: ["monthly-investor-letter"] }],
+      cohort: 12,
+      probe_truncated: [],
+      commons_skills: ["feed-post", "daily-research"],
+    });
+  });
 });
 
 // ── Epic-021 §B.1 — idle-talent detector ─────────────────────────────────────

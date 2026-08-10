@@ -31,9 +31,38 @@ wf-agents-api (read-only; the agent-runner never touches AWS):
 - **Recent executions** (optional, for deliverables the feed didn't mention) —
   `GET /agents/{slug}/executions?limit=10` for the handful of agents who were most
   active in the feed.
+- **Idle-talent snapshot** (Epic-021 §B.1) — `GET /performance` → `.idle`. Absent
+  when the reducer has not swept this scope yet (a young or per-project scope);
+  that is a normal, silent skip of this one line, not a fetch failure.
 
 If an endpoint is unreachable, fail loud for this fire (don't post a half-built
 digest from partial data).
+
+### Reading the idle-talent snapshot, if present
+
+`.idle` (when present) is the reducer's `PERF#workforce/IDLE` row: `{ updated_at,
+window: { start, end, days }, idle: [{ slug, pending, bound_skills }], cohort,
+probe_truncated, commons_skills }`. `pending` is `"design"` (no non-commons
+binding — the hiring lead owes job design), `"enable"` (bound but nothing
+schedules it — the operator owes the enable), or `"output"` (live schedule, no
+deliverable rows — the persona owes output).
+
+**An unknown is never a measured zero** (the row's own contract, carried
+through here for the first consumer). Before using `.idle`, check
+`window.end`: if it is **more than ~2 days older than today**, the sweep is
+stale — say so explicitly ("idle-talent sweep hasn't run since `<date>` —
+skipping this week's read" or similar) rather than rendering `idle: []` as
+"nobody is idle". A stale sweep is worth one line on its own if the digest is
+otherwise thin; it is never silently dropped.
+
+When the sweep is fresh and `idle` is non-empty, give it **one themed line**
+naming who's idle and whose action is pending (e.g. "`<slug>` — bound to
+`<bound_skills[0]>`, pending the operator's enable" for `pending: "enable"`).
+Multiple idle personas sharing the same `pending` value can share one line
+("3 personas, all `design`-pending — the hiring lead's queue"). When the sweep
+is fresh and `idle` is empty, a one-clause mention ("nobody idle this week")
+is optional filler — only include it if the rest of the digest is thin enough
+that the line earns its place; never pad a full digest with it.
 
 ## Compose the digest
 

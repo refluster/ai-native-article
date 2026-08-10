@@ -133,7 +133,19 @@ export interface PerformanceSeries {
   /** Absent until this scope's first repo-activity refresh lands; the client
    *  falls back to its bundled snapshot when missing. */
   repo?: RepoActivityBlock;
+  /** Epic-021 §B.1 idle-talent snapshot. Absent until the reducer's first
+   *  IDLE sweep for this scope lands — a caller (the discord-digest
+   *  cadence first) must NOT read an absent block as "nobody idle"; see the
+   *  staleness contract on `PerfIdleRow` above `window.end`. */
+  idle?: PerfIdleBlock;
 }
+
+/** The IDLE roll-up, minus the DDB key/scope fields — what composeSeries
+ *  actually needs from `PerfIdleRow` to serve `/performance`. */
+export type PerfIdleBlock = Pick<
+  PerfIdleRow,
+  "updated_at" | "window" | "idle" | "cohort" | "probe_truncated" | "commons_skills"
+>;
 
 // ── roll-up item shapes (DDB) ─────────────────────────────────────────────────
 //
@@ -413,6 +425,7 @@ export function composeSeries(
     PerfRepoRow,
     "window" | "issues_daily" | "prs_daily" | "code_churn_weekly" | "summary" | "repos" | "updated_at"
   >,
+  idleRow?: PerfIdleBlock,
 ): PerformanceSeries {
   const points = lifecycleRow.points;
   const lcStart = points[0]?.date;
@@ -448,6 +461,18 @@ export function composeSeries(
             summary: repoRow.summary,
             repos: repoRow.repos,
             updated_at: repoRow.updated_at,
+          },
+        }
+      : {}),
+    ...(idleRow
+      ? {
+          idle: {
+            updated_at: idleRow.updated_at,
+            window: idleRow.window,
+            idle: idleRow.idle,
+            cohort: idleRow.cohort,
+            probe_truncated: idleRow.probe_truncated,
+            commons_skills: idleRow.commons_skills,
           },
         }
       : {}),
