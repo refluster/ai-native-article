@@ -365,6 +365,10 @@ Resources:
         # name after persisting the operator's message.
         Variables:
           MESSAGING_REPLY_FUNCTION: !Ref WfMessagingReplyFunction
+          # adr-0025: POST /dispatch async-invokes the orchestrator, which owns
+          # the CCR-fire secret + project credentials. This API resolves and
+          # rate-limits the request; it never fires the routine itself.
+          ORCHESTRATOR_FUNCTION: !Ref WfOrchestratorFunction
       Policies:
         - Statement:
             - Sid: AgentsApiTableAccess
@@ -505,6 +509,15 @@ Resources:
               Action: lambda:InvokeFunction
               Resource:
                 - !GetAtt WfMessagingReplyFunction.Arn
+            # adr-0025 — POST /dispatch hands one explicit (agent, binding_idx)
+            # to the orchestrator for an immediate CCR fire. Scoped to that one
+            # function; the API gains no Secrets Manager or CCR access of its
+            # own from this.
+            - Sid: AgentsApiInvokeOrchestratorDispatch
+              Effect: Allow
+              Action: lambda:InvokeFunction
+              Resource:
+                - !GetAtt WfOrchestratorFunction.Arn
       Events:
         ListAgents:
           Type: HttpApi
@@ -860,6 +873,17 @@ Resources:
             Method: POST
             Auth:
               Authorizer: AWS_IAM
+        # adr-0025 — on-demand fire of an already-declared binding. Same
+        # posture as CreateFeedPost: no API GW authorizer, because the caller
+        # is a CCR session with no SigV4 creds; auth is the per-fire dispatch
+        # capability token, validated at the handler layer against the
+        # AUTH#DISPATCH rows the orchestrator minted.
+        DispatchBinding:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /dispatch
+            Method: POST
       Tags:
         workforce: !Ref Stage
 

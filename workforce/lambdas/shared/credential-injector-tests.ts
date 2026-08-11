@@ -68,7 +68,10 @@ describe("CREDENTIAL_TYPES allowlist", () => {
     // capability token the runner presents to the authenticated
     // POST /feed endpoint); `workforce.memory_write_token` (ADR-0020 —
     // the memory-curation Cadence's bounded write to
-    // POST /agents/{slug}/memory). All mirror points (see credential-
+    // POST /agents/{slug}/memory); `workforce.dispatch_token` (adr-0025 —
+    // the per-fire capability a cadence presents to POST /dispatch when it
+    // hands work to another cadence and wants it fired now). All mirror
+    // points (see credential-
     // injector.ts file header) move together; this assertion is the
     // visible canary that catches drift if a future mirror sync is
     // forgotten.
@@ -79,6 +82,7 @@ describe("CREDENTIAL_TYPES allowlist", () => {
       "github.token",
       "notion.integration_token",
       "voyage.api_key",
+      "workforce.dispatch_token",
       "workforce.feed_write_token",
       "workforce.memory_write_token",
     ]);

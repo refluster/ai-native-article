@@ -169,6 +169,8 @@ import {
   type ThreadFilter,
 } from "../shared/messaging.js";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
+import { claimDispatchSlot, parseDispatchRequest, resolveDispatchTarget, selectDispatchAgents } from "../shared/dispatch.js";
+import { isValidDispatchToken } from "../shared/dispatch-token.js";
 import { DOCS_HTML, OPENAPI_YAML } from "./openapi.js";
 import { getProjectReportBody, listProjectReports } from "./reports.js";
 
@@ -335,6 +337,11 @@ export async function handler(
     if (routeKey === "POST /threads/{id}/messages" && threadId) return await sendMessageRoute(threadId, event);
     if (routeKey === "POST /threads/{id}/read" && threadId) return await markReadRoute(threadId);
     if (routeKey === "POST /threads/{id}/star" && threadId) return await setStarRoute(threadId, event);
+    // adr-0025 — on-demand fire of an already-declared binding. Same
+    // bearer-token shape as POST /feed and POST /agents/{slug}/memory (the
+    // caller is a CCR session with no SigV4 creds); the token is minted per
+    // fire by the orchestrator into the task's credential bag.
+    if (routeKey === "POST /dispatch") return await dispatchBindingRoute(event);
 
     return reply(404, { error: "route_not_found", routeKey, path, method });
   } catch (err) {
@@ -1277,6 +1284,10 @@ function emitMalformedProjectMeta(row: Partial<ProjectMetaRow>): void {
 // message already landed (W-4: "delivery pending", never a silent drop).
 const lambda = new LambdaClient({});
 const MESSAGING_REPLY_FUNCTION = process.env.MESSAGING_REPLY_FUNCTION;
+// adr-0025: POST /dispatch hands the actual fire to the orchestrator, which
+// already holds the Secrets Manager + project-credential privileges the CCR
+// fire needs. This API never reads `wf/ccr/*` itself.
+const ORCHESTRATOR_FUNCTION = process.env.ORCHESTRATOR_FUNCTION;
 
 /** Choose which talent should reply to an operator message. 1:1 → the sole
  *  talent. Group → the first @-addressed participant, else the primary
@@ -2497,6 +2508,168 @@ async function updateMemoryRoute(
     memory: { last_updated: memory.last_updated, body_chars: nextBody.length },
     updated_at: (updated as unknown as Record<string, unknown>).updated_at,
   });
+}
+
+/**
+ * POST /dispatch — fire an already-declared binding NOW (adr-0025).
+ *
+ * Body: `{ agent_slug, skill, project_id, reason? }`. The (skill, project_id)
+ * pair — not a binding index — is the contract: the caller is a skill script
+ * that knows which cadence should pick the work up, not which slot it occupies
+ * on some persona's META row.
+ *
+ * The route is deliberately thin and refuses rather than improvises:
+ *   401  the bearer is not a live dispatch token,
+ *   404  the pair names no binding on that agent (nothing is invented here —
+ *        R-N4 keeps "what may run" a bindings[] question),
+ *   409  the debounce slot is held by a dispatch inside the window,
+ *   202  handed to the orchestrator, which does the credential resolution and
+ *        the CCR fire on its own privileges.
+ *
+ * 409 is a normal, expected answer, not a failure: the work is on a queue that
+ * a live run will drain. Callers treat every non-2xx as "the cron backstop
+ * owns it" and carry on.
+ */
+async function dispatchBindingRoute(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> {
+  const authed = await validateDispatchBearer(event);
+  if (!authed) {
+    return reply(401, { error: "unauthorized", detail: "POST /dispatch requires a valid dispatch capability token." });
+  }
+  const body = parseJsonBody(event.body);
+  if (!body) return reply(400, { error: "invalid_json" });
+  const parsed = parseDispatchRequest(body);
+  if ("error" in parsed) return reply(400, { error: "invalid_request", detail: parsed.error });
+
+  // Resolve WHO runs this cadence. The caller may name the persona, but the
+  // normal case omits it: a skill script knows which cadence should pick the
+  // work up, not which persona is bound to it, and bindings[] is where that
+  // answer lives (R-N4). "Nobody is bound" is a first-class 404 — it is the
+  // failure that stranded PSVL/asp-cloud#692/#693 in the author lane.
+  let slug: string;
+  let bindingIdx: number;
+  if (parsed.agent_slug) {
+    const agent = await getItem<AgentMetaRow>(agentPk(parsed.agent_slug), "META");
+    const target = resolveDispatchTarget(agent, { ...parsed, agent_slug: parsed.agent_slug });
+    if (!target.ok) {
+      const status = target.code === "agent_not_found" || target.code === "binding_not_found" ? 404 : 409;
+      return reply(status, { error: target.code, detail: target.detail });
+    }
+    slug = parsed.agent_slug;
+    bindingIdx = target.binding_idx;
+  } else {
+    const owners = await findDispatchOwners(parsed.skill, parsed.project_id);
+    if (owners.length === 0) {
+      return reply(404, {
+        error: "binding_not_found",
+        detail:
+          `no active agent has a ${parsed.skill} binding on project ${parsed.project_id} — ` +
+          "the cadence is not wired for this project, so nothing can pick this queue up (wire it, or the sweep will escalate)",
+      });
+    }
+    if (owners.length > 1) {
+      return reply(409, {
+        error: "ambiguous_binding",
+        detail: `${owners.length} agents are bound to ${parsed.skill}@${parsed.project_id} (${owners.map((o) => o.slug).join(", ")}) — name one with agent_slug`,
+      });
+    }
+    slug = owners[0]!.slug;
+    bindingIdx = owners[0]!.binding_idx;
+  }
+
+  const claim = await claimDispatchSlot(slug, parsed.skill, parsed.project_id);
+  if (!claim.claimed) {
+    return reply(409, {
+      error: "debounced",
+      detail:
+        `a ${parsed.skill}@${parsed.project_id} dispatch already fired at ${claim.last_dispatched_at ?? "recently"} — ` +
+        "that run drains the queue this request would have created",
+      last_dispatched_at: claim.last_dispatched_at,
+    });
+  }
+
+  if (!ORCHESTRATOR_FUNCTION) {
+    console.error(JSON.stringify({ event: "dispatch_function_unset", slug, skill: parsed.skill }));
+    return reply(503, { error: "dispatch_unavailable", detail: "ORCHESTRATOR_FUNCTION is not configured" });
+  }
+  try {
+    await lambda.send(
+      new InvokeCommand({
+        FunctionName: ORCHESTRATOR_FUNCTION,
+        InvocationType: "Event",
+        Payload: Buffer.from(
+          JSON.stringify({
+            dispatch: {
+              agent_slug: slug,
+              binding_idx: bindingIdx,
+              reason: parsed.reason,
+              requested_by: "POST /dispatch",
+            },
+          }),
+        ),
+      }),
+    );
+  } catch (err) {
+    console.error(JSON.stringify({
+      event: "dispatch_invoke_failed",
+      slug,
+      skill: parsed.skill,
+      error: err instanceof Error ? err.message : String(err),
+    }));
+    return reply(502, { error: "dispatch_failed", detail: "orchestrator invoke failed — the binding's cron still owns this queue" });
+  }
+  console.log(JSON.stringify({
+    event: "dispatch_accepted",
+    slug,
+    skill: parsed.skill,
+    project_id: parsed.project_id,
+    binding_idx: bindingIdx,
+    dispatch_reason: parsed.reason,
+  }));
+  return reply(202, {
+    ok: true,
+    agent_slug: slug,
+    skill: parsed.skill,
+    project_id: parsed.project_id,
+    binding_idx: bindingIdx,
+  });
+}
+
+/** Scan the roster for active agents bound to (skill, project). Paged the same
+ *  way the orchestrator's own binding scan is; at single-operator scale
+ *  (C-3, ~15 personas) this is one page in practice. */
+async function findDispatchOwners(skill: string, projectId: string): Promise<Array<{ slug: string; binding_idx: number }>> {
+  const owners: Array<{ slug: string; binding_idx: number }> = [];
+  let cursor: string | undefined;
+  do {
+    const page = await scanPrefix<AgentMetaRow>("AGENT#", "META", 100, cursor);
+    cursor = page.cursor;
+    owners.push(...selectDispatchAgents(page.items, skill, projectId));
+  } while (cursor);
+  return owners;
+}
+
+/**
+ * Validate the dispatch bearer token (adr-0025). One path only — a
+ * short-lived DDB-minted token (AUTH#DISPATCH, one per fire that carries a
+ * dispatch-capable skill). Unlike the engagement/memory validators there is
+ * no static-secret fallback: this capability starts a *fire*, so the only
+ * legitimate holder is a session the orchestrator itself started.
+ */
+async function validateDispatchBearer(event: APIGatewayProxyEventV2): Promise<boolean> {
+  const headers = event.headers ?? {};
+  const raw = headers.authorization ?? headers.Authorization;
+  if (!raw || !raw.startsWith("Bearer ")) return false;
+  const presented = raw.slice("Bearer ".length).trim();
+  if (presented.length === 0) return false;
+  try {
+    return await isValidDispatchToken(presented);
+  } catch (err) {
+    console.error(JSON.stringify({
+      event: "dispatch_token_check_failed",
+      error: err instanceof Error ? err.message : String(err),
+    }));
+    return false;
+  }
 }
 
 /**

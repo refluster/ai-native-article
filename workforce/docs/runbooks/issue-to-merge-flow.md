@@ -95,11 +95,23 @@ body bump (ADR-0018 version-gated sync, see the activation note below).
 node workforce/scripts/wire-issue-triage-nadia-agent-workforce.mjs --dry-run
 node workforce/scripts/wire-issue-design-dario-agent-workforce.mjs --dry-run
 node workforce/scripts/wire-pr-remediate-ren-agent-workforce.mjs   --dry-run
+node workforce/scripts/wire-pr-remediate-ren-asp-cloud.mjs         --dry-run
 
 aws-vault exec <profile> -- node workforce/scripts/wire-issue-triage-nadia-agent-workforce.mjs
 aws-vault exec <profile> -- node workforce/scripts/wire-issue-design-dario-agent-workforce.mjs
 aws-vault exec <profile> -- node workforce/scripts/wire-pr-remediate-ren-agent-workforce.mjs
+aws-vault exec <profile> -- node workforce/scripts/wire-pr-remediate-ren-asp-cloud.mjs
 ```
+
+**One binding per (cadence × project) — the lane does not travel with the
+reviewer.** `pr-autopilot` runs on both `agent-workforce` and `asp-cloud`, so it
+routes PRs into `autopilot:needs-author` on both; `pr-remediate` was wired for
+`agent-workforce` only, which left `asp-cloud`'s lane with no worker from the
+day it shipped. Every PR parked there aged 36h and escalated `author-stale`
+(PSVL/asp-cloud#692 and #693 are the worked example). **Whenever `pr-autopilot`
+is wired for a new project, wire `pr-remediate` for it in the same session** —
+the reviewer creates the queue that the remediation cadence is the only consumer
+of.
 
 **Order matters, and there is a deliberate gap in the middle.**
 
@@ -126,13 +138,30 @@ routes conflicts into the lane.
 
 | Symptom | Likely cause | Action |
 |---|---|---|
-| PRs piling up in `needs-author` | `pr-remediate` unbound / paused / failing | Check the sweep — it should already be escalating them as `author-stale` (36h). Then check the binding's fire history. |
+| PRs piling up in `needs-author` | `pr-remediate` unbound / paused / failing | First check it is **bound for that project**: `GET /agents/ren` and look for `pr-remediate` with the matching `project_id` (this is what #692/#693 hit — the cadence existed, for a different project). The router's own log names it too: adr-0025's hand-off dispatch logs `404 binding_not_found` when nothing is wired. Then check the sweep (it should be escalating them as `author-stale` at 36h) and the binding's fire history. |
+| Hand-offs land but the worker still starts on its cron | the adr-0025 dispatch is not reaching the endpoint | Look for `request-dispatch: no-op` in the router's fire log. `no WF_DISPATCH_TOKEN` = the skill's `meta.json:requires[]` bump has not seeded to the live `SKILL#` row (ADR-0018 version gate) or the deploy carrying the mint has not landed; `409 debounced` is normal (a live run owns the queue); anything else is the endpoint. Latency-only in every case — the cron and the 36h sweep are unaffected. |
 | `author-stale` escalations every day | the cadence fires but cannot finish | Read its run log; the usual cause is a target-repo gate it cannot run. |
 | Same PR escalating `remediation-cap-exceeded` repeatedly | a structural conflict no attempt will resolve | Resolve it by hand, or close the PR and re-cut the branch from `main`. |
 | Issues sitting untriaged | `issue-triage` unbound, or its `max_issues_per_run` too small for the backlog | Raise the cap for a few fires; it is oldest-first, so it drains the tail. |
 | An issue nobody can lane | the lane vocabulary is wrong for this project | The triage run reports it explicitly (Step 4). That report is the finding — amend the lanes in a new ADR, do not invent a label. |
 | `needs-author` on an L0/L1 PR | a label predating the fail-closed guard | Move it to `needs-human --reason l0l1-path` by hand; the guard refuses new ones. |
 | `autopilot:reason:no-reviewer-consensus` on a PR whose findings were **diff-local** | a label predating adr-0023 / the v3.1 rescope — the code used to mean "not unanimous green" | The PR is invisible to `pr-autopilot-scan.mjs` forever (`isTerminal()` keys on `autopilot:needs-human` alone; no sweep reaches an already-escalated PR). Re-post as `--needs-author --reason review-findings-blocking` with a remediation brief, **or** clear `autopilot:needs-human` so the next scan re-routes at cycle N+1. Enumerate the backlog with `is:open label:autopilot:needs-human label:autopilot:reason:no-reviewer-consensus`. Operator's button: clearing the label is a write on an existing PR, and note it also un-reds `check-escalation-labels.mjs` only once the PR leaves the open set — see FU-036. |
+
+## Measuring whether the lane is healthy (adr-0025)
+
+The lane's own counter is still owed (FU-029, the condition adr-0022 attached to
+itself). Until it ships, the honest interim proxy is the **sweep's firing rate**:
+
+```sh
+# author-lane escalations that reached a human because nobody worked the PR
+gh search prs --repo PSVL/asp-cloud --label autopilot:reason:author-stale --state all
+```
+
+Read it as: every `author-stale` is a PR the lane failed to serve. Before
+adr-0025 the rate could not distinguish "the worker is slow", "the worker is
+broken" and "there is no worker"; now a dispatched hand-off means the worker
+*started*, so a surviving `author-stale` means it ran and could not finish —
+which is a run log worth reading, not a wiring question.
 
 ## What this deliberately does not change
 
