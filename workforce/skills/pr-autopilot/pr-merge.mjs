@@ -5,8 +5,10 @@
 //
 // The merge predicate is now: a PR is mergeable iff it touches **no L0/L1 path**
 // of the TARGET repo's own governance (read from that repo's docs/governance.md),
-// is open + mergeable (state "clean" OR "draft" — adr-0014), has **all required
-// checks green**, carries **no human CHANGES_REQUESTED**, and the routing
+// is open + mergeable (state "clean" OR "draft" — adr-0014), which is also how
+// **required checks green** is established (GitHub folds check status into
+// `mergeable_state`; a draft, whose state masks it, is the one case that still
+// reads check-runs), carries **no human CHANGES_REQUESTED**, and the routing
 // persona's nominated reviewers — **at least MIN_REVIEWERS (3) distinct
 // personas** (operator directive 2026-06-29) — have each posted their lens
 // review (the unanimous-green consensus). A panel of fewer than 3 green
@@ -392,12 +394,37 @@ export async function verifyMergeable(gh, repo, pr, decision) {
     }
   }
 
-  // All required checks green.
-  const { status: cs, json: checks } = await gh("GET", `/repos/${repo}/commits/${p.head.sha}/check-runs?per_page=100`);
-  if (cs !== 200) return { ok: false, why: `GET check-runs -> HTTP ${cs}` };
-  for (const c of checks.check_runs || []) {
-    if (c.status !== "completed") return { ok: false, why: `check '${c.name}' is ${c.status}` };
-    if (!["success", "neutral", "skipped"].includes(c.conclusion)) return { ok: false, why: `check '${c.name}' = ${c.conclusion}` };
+  // CI is NOT re-read from the commit here. `mergeable_state === "clean"`
+  // (asserted above) already means GitHub itself folded every required check
+  // into the answer: a red or pending required check reports "blocked", a
+  // failing non-required one reports "unstable", and neither passes the clause
+  // above. The old `GET /commits/{sha}/check-runs` call was therefore redundant
+  // on the clean path — and worse than redundant: reading the PR object needs
+  // only `pull-requests: read`, while check-runs/commit-status need the broader
+  // `checks: read` / `statuses: read`. A project token without those grants got
+  // 403 "Resource not accessible by integration" here and failed closed, which
+  // is what stalled psvl/asp-cloud #694 / #696 on
+  // `autopilot:reason:merge-engine-refusal` for two days while their own
+  // `mergeable_state` read "clean". asp-cloud's adr_autopilot_pr_merge.md §2.1
+  // clause 3 (amended 2026-08-11) now bars requiring either endpoint to
+  // establish this clause. One fewer credential, one fewer failure mode, same
+  // predicate.
+  //
+  // The DRAFT path is the one exception, and it is not a widening: GitHub
+  // reports a draft's mergeable_state as "draft" — the value masks the check
+  // state rather than reporting it — so the PR object genuinely cannot
+  // establish "checks green" for a draft, and adr-0014 kept that clause when it
+  // made drafts merge-eligible. Drafts are outside asp-cloud's clause 3 (which
+  // requires "clean"), so this costs asp-cloud's token nothing; the router
+  // un-drafts via the GitHub MCP before invoking the engine (SKILL.md Step 5),
+  // so in practice this branch only runs on a local operator run.
+  if (p.mergeable_state === "draft") {
+    const { status: cs, json: checks } = await gh("GET", `/repos/${repo}/commits/${p.head.sha}/check-runs?per_page=100`);
+    if (cs !== 200) return { ok: false, why: `GET check-runs -> HTTP ${cs}` };
+    for (const c of checks.check_runs || []) {
+      if (c.status !== "completed") return { ok: false, why: `check '${c.name}' is ${c.status}` };
+      if (!["success", "neutral", "skipped"].includes(c.conclusion)) return { ok: false, why: `check '${c.name}' = ${c.conclusion}` };
+    }
   }
 
   // Unanimous-green consensus: no human CHANGES_REQUESTED, and every nominated
