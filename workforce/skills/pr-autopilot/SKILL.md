@@ -597,11 +597,48 @@ the whole attempt.
 Emit a merge **only** when all hold: 🟢 unanimous-green; the bound project's
 target repo carries an **R-N10 delegation** in its own statute; the PR touches
 **no L0/L1 path** declared between the `<!-- autopilot:l0l1-paths -->` markers
-of the target's `docs/governance.md`; checks green; mergeable (state `clean`
-or `draft` — a green draft is flipped Ready for Review then merged); no
+of the target's `docs/governance.md`; **CI + mergeability green, read from the
+PR object alone** — `mergeable == true` and `mergeable_state` `clean` (or
+`draft`, which the engine flips Ready for Review then merges); no
 `CHANGES_REQUESTED`. The workforce's own repo (`refluster/ai-native-article`)
 is a normal delegated target (adr-0011) — **authorship is not a hold**: a
 green, non-L0/L1 PR merges regardless of who opened it (FU-028).
+
+> **Do not establish "checks green" with a `GET /commits/{sha}/status` or
+> `GET /commits/{sha}/check-runs` call** — not in the engine, not by hand in the
+> verdict step. GitHub folds the head commit's check state into
+> `mergeable_state` (failing check → `unstable`; red or pending *required*
+> check → `blocked`; neither is `clean`), so those endpoints add nothing to the
+> clause while demanding `checks: read` / `statuses: read` on top of the
+> `pull-requests: read` the PR object needs. A project token without them 403s
+> and the engine fails closed — which is exactly how psvl/asp-cloud #694 / #696
+> sat on `autopilot:reason:merge-engine-refusal` for two days while their own
+> `mergeable_state` read `clean`. Barred by asp-cloud's
+> [adr_autopilot_pr_merge.md §2.1 clause 3](https://github.com/psvl/asp-cloud/blob/main/docs/adr_autopilot_pr_merge.md)
+> (amended 2026-08-11).
+>
+> **This does not depend on the base having branch protection**, and you must
+> not add a condition that assumes it does. Protection decides only *which*
+> non-clean state a red check produces — `blocked` when the check is required,
+> `unstable` when it is not — and both fail the clause. Measured 2026-08-11:
+> `refluster/ai-native-article` #547 / #545 / #542 all have a `failure`
+> check-run on an unprotected `main` (`protected: false`, empty
+> `required_status_checks`) and all report `unstable`, while #567 / #565 / #561
+> / #551 are green and report `clean`.
+>
+> This was tried the other way (dario A1 → `db6d09d`), on the premise that
+> asp-cloud's `main` is protected and this repo's is not. **Both are
+> unprotected** — verified live the same day — so gating the skip on a
+> branch-protection read sent asp-cloud straight back to the check-runs path,
+> the 403, and the refusal, exactly reproducing the stall the clause-3
+> amendment exists to end. If you are about to condition this clause on
+> anything, read *both* targets' real protection state first.
+>
+> The lone exception is a **draft** whose `mergeable_state` is the literal
+> `draft`, which reports nothing about CI; the engine reads check-runs on that
+> branch. In practice drafts on these repos report their underlying state
+> (`clean` / `unstable` / `dirty`), so that branch is a compatibility fallback,
+> not the common path.
 
 **These clauses are the complete set of *predicate* conditions** (adr-0024) —
 alongside the holds already stated above, which the engine also enforces

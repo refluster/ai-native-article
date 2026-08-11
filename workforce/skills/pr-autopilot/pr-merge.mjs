@@ -5,8 +5,13 @@
 //
 // The merge predicate is now: a PR is mergeable iff it touches **no L0/L1 path**
 // of the TARGET repo's own governance (read from that repo's docs/governance.md),
-// is open + mergeable (state "clean" OR "draft" — adr-0014), has **all required
-// checks green**, carries **no human CHANGES_REQUESTED**, and the routing
+// is open + mergeable (state "clean" OR "draft" — adr-0014), which is also how
+// **checks green** is established: GitHub folds the head commit's check state
+// into `mergeable_state` (red check -> "unstable", red/pending REQUIRED check
+// -> "blocked"), and this does not depend on the base having branch protection
+// — protection only decides which of those two a red check produces, and both
+// fail the clause. A draft, whose state can mask CI, is the one case that still
+// reads check-runs. The predicate carries **no human CHANGES_REQUESTED**, and the routing
 // persona's nominated reviewers — **at least MIN_REVIEWERS (3) distinct
 // personas** (operator directive 2026-06-29) — have each posted their lens
 // review (the unanimous-green consensus). A panel of fewer than 3 green
@@ -424,12 +429,64 @@ export async function verifyMergeable(gh, repo, pr, decision) {
     }
   }
 
-  // All required checks green.
-  const { status: cs, json: checks } = await gh("GET", `/repos/${repo}/commits/${p.head.sha}/check-runs?per_page=100`);
-  if (cs !== 200) return { ok: false, why: `GET check-runs -> HTTP ${cs}` };
-  for (const c of checks.check_runs || []) {
-    if (c.status !== "completed") return { ok: false, why: `check '${c.name}' is ${c.status}` };
-    if (!["success", "neutral", "skipped"].includes(c.conclusion)) return { ok: false, why: `check '${c.name}' = ${c.conclusion}` };
+  // CI is NOT re-read from the commit here. `mergeable_state === "clean"`
+  // (asserted above) already means GitHub itself folded the head commit's check
+  // state into the answer: a failing check reports "unstable", a required check
+  // that is red or still pending reports "blocked", and neither passes the
+  // clause above.
+  //
+  // **This does NOT depend on the base having branch protection.** The only
+  // thing protection decides is WHICH of those two a red check produces —
+  // "blocked" when the check is required (so it bars the merge), "unstable"
+  // when it is not — and BOTH fail the clause. Measured 2026-08-11 against
+  // refluster/ai-native-article, whose `main` is `protected: false` with an
+  // empty `required_status_checks`:
+  //   #547 / #545 / #542   check-run "failure"  -> mergeable_state "unstable"
+  //   #567 / #565 / #561 / #551   "success"     -> "clean"
+  //   #546                  merge conflict      -> "dirty"
+  // An unprotected base moves off "clean" the moment CI is red, exactly as a
+  // protected one does.
+  //
+  // Do NOT "fix" this by gating the skip on a branch-protection read. That was
+  // tried (dario A1 -> db6d09d) on the premise that psvl/asp-cloud is protected
+  // and this repo is not. asp-cloud's `main` is ALSO `protected: false` with an
+  // empty `required_status_checks` (verified live, same day), so the gate sent
+  // asp-cloud straight back down the check-runs path -> 403 -> refusal, exactly
+  // reproducing the #694 / #696 stall this whole change exists to end. Its
+  // tests passed only because they mocked asp-cloud as a protected base. If you
+  // are about to add a condition here, check BOTH targets' real protection
+  // first.
+  //
+  // The old `GET /commits/{sha}/check-runs` call was therefore redundant
+  // on the clean path — and worse than redundant: reading the PR object needs
+  // only `pull-requests: read`, while check-runs/commit-status need the broader
+  // `checks: read` / `statuses: read`. A project token without those grants got
+  // 403 "Resource not accessible by integration" here and failed closed, which
+  // is what stalled psvl/asp-cloud #694 / #696 on
+  // `autopilot:reason:merge-engine-refusal` for two days while their own
+  // `mergeable_state` read "clean". asp-cloud's adr_autopilot_pr_merge.md §2.1
+  // clause 3 (amended 2026-08-11) now bars requiring either endpoint to
+  // establish this clause. One fewer credential, one fewer failure mode, same
+  // predicate.
+  //
+  // The DRAFT path is the one exception, and it is not a widening: where GitHub
+  // reports a draft's mergeable_state as the literal "draft" (the value adr-0014
+  // documents), it masks the check state rather than reporting it, so the PR
+  // object genuinely cannot establish "checks green" — and adr-0014 kept that
+  // clause when it made drafts merge-eligible. Kept as a compatibility fallback
+  // rather than the common path: in the same measurement, every open DRAFT on
+  // refluster/ai-native-article reported its underlying state ("clean" /
+  // "unstable" / "dirty"), not "draft" — #547 and #545 are drafts with red CI
+  // and both read "unstable", i.e. the clause caught them without this branch.
+  // Where GitHub does return "draft", failing closed on an unreadable CI state
+  // is the correct direction (C-4).
+  if (p.mergeable_state === "draft") {
+    const { status: cs, json: checks } = await gh("GET", `/repos/${repo}/commits/${p.head.sha}/check-runs?per_page=100`);
+    if (cs !== 200) return { ok: false, why: `GET check-runs -> HTTP ${cs}` };
+    for (const c of checks.check_runs || []) {
+      if (c.status !== "completed") return { ok: false, why: `check '${c.name}' is ${c.status}` };
+      if (!["success", "neutral", "skipped"].includes(c.conclusion)) return { ok: false, why: `check '${c.name}' = ${c.conclusion}` };
+    }
   }
 
   // Unanimous-green consensus: no human CHANGES_REQUESTED, and every nominated
