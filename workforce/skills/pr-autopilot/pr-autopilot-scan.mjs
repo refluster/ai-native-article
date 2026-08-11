@@ -52,7 +52,7 @@
 import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
 ensureProxyAwareEntry(import.meta.url);
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { ESCALATION_LABEL, MIN_REVIEWERS, W4_CYCLE_CAP } from "./pr-merge.mjs";
@@ -83,6 +83,36 @@ export function projectRepo(repoRoot, projectId) {
     );
   }
   return { owner: json.github.owner, repo: json.github.repo };
+}
+
+/** The inverse of projectRepo: which project declares this `owner/repo`?
+ *
+ *  The merge engine is repo-addressed (`--repo owner/name`) while the workforce
+ *  is project-addressed, and the author-lane dispatch (adr-0025) needs the
+ *  project id to ask for the right cadence. Returns undefined rather than
+ *  throwing — every caller treats "unknown project" as "no dispatch, the cron
+ *  owns it", never as a failure of the write it accompanies. */
+export function projectIdForRepo(repoRoot, ownerRepo) {
+  const want = String(ownerRepo || "").toLowerCase();
+  if (!want.includes("/")) return undefined;
+  const dir = join(repoRoot, "workforce", "projects");
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return undefined;
+  }
+  for (const e of entries) {
+    if (!e.isDirectory()) continue;
+    try {
+      const json = JSON.parse(readFileSync(join(dir, e.name, "project.json"), "utf8"));
+      const gh = json?.github;
+      if (gh?.owner && gh?.repo && `${gh.owner}/${gh.repo}`.toLowerCase() === want) return json.id ?? e.name;
+    } catch {
+      // A malformed/absent project.json is simply not a match.
+    }
+  }
+  return undefined;
 }
 
 /** A PR has already been routed (this cycle leg) if a comment from this

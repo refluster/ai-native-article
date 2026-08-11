@@ -15,6 +15,13 @@
 //      { agent, binding_idx }.
 //   D. Skip a binding if its (skill, agent) has fired within a per-skill
 //      dedup window — guards against same-window double-fire.
+//
+// The same handler also serves an EXPLICIT, single-binding fire (adr-0025).
+// When the event carries `{ dispatch: { agent_slug, binding_idx } }` — sent by
+// the agents-api's `POST /dispatch` route after it validated the capability
+// token, resolved the binding and claimed the debounce slot — the cron scan is
+// skipped entirely and that one binding is prepared and fired through the same
+// CCR path. Nothing about *what* runs changes; only *when* it starts.
 
 import type { Context } from "aws-lambda";
 import {
@@ -23,13 +30,15 @@ import {
   type AgentBinding,
   type AgentMetaRow,
 } from "../shared/agent.js";
-import { scanPrefix, queryBySkPrefix, updateOperational } from "../shared/ddb.js";
+import { scanPrefix, queryBySkPrefix, updateOperational, getItem } from "../shared/ddb.js";
+import { isOrchestratorDispatchEvent, type OrchestratorDispatchEvent } from "../shared/dispatch.js";
 import { matchesNow } from "../shared/cron-match.js";
 import { findRecentPRs } from "../shared/github.js";
 import { fireCcrRoutine, routineIdFromSpec, type CcrFireTask } from "../shared/ccr-fire.js";
 import { asProjectId, getCredential } from "../shared/project.js";
 import { mintEngagementToken } from "../shared/engagement-token.js";
 import { mintMemoryWriteToken } from "../shared/memory-write-token.js";
+import { mintDispatchToken } from "../shared/dispatch-token.js";
 import { SKILL_REQUIRES } from "../shared/skill-registry-generated.js";
 import type { DelivRow } from "../shared/task.js";
 
@@ -85,6 +94,14 @@ type CcrBatchSlot = {
 export async function handler(_event: unknown, _context: Context): Promise<OrchestratorResult> {
   const now = new Date();
   const tickedAt = now.toISOString();
+
+  // adr-0025 — explicit single-binding fire. Handled before the cron scan and
+  // returns without running it: an on-demand dispatch must not drag the whole
+  // tick's worth of crons along with it.
+  if (isOrchestratorDispatchEvent(_event)) {
+    return await handleDispatch(_event, tickedAt);
+  }
+
   const dispatched: OrchestratorResult["dispatched"] = [];
   const skipped: OrchestratorResult["skipped"] = [];
   const ccrBatchByRoutine = new Map<string, CcrBatchSlot>();
@@ -153,24 +170,7 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
         // task is skipped; other tasks in the batch still fire.
         try {
           const routineId = routineIdFromSpec(binding.routine_spec ?? "");
-          if (!binding.project_id) {
-            throw new Error(`binding missing project_id (CCR batch requires explicit project per PR β)`);
-          }
-          const requires = SKILL_REQUIRES[binding.skill];
-          if (requires === undefined) {
-            throw new Error(`skill "${binding.skill}" not in SKILL_REQUIRES map — re-run npm run workforce:skill-registry`);
-          }
-          const credentials = await resolveCredentialsForTask(binding.project_id, requires);
-          // Inject this fire's short-lived engagement-write token (minted
-          // above) so the CCR routine can record the task's activity row.
-          if (fireEngagementToken) (credentials as Record<string, unknown>).engagement_write_token = fireEngagementToken;
-          const task: CcrFireTask = {
-            agent_slug: agent.slug,
-            binding_idx: i,
-            project_id: binding.project_id,
-            ticked_at: tickedAt,
-            credentials,
-          };
+          const task = await prepareCcrTask(agent.slug, i, binding, tickedAt, fireEngagementToken);
           const slot = ccrBatchByRoutine.get(routineId) ?? { tasks: [], items: [] };
           slot.tasks.push(task);
           slot.items.push({ slug: agent.slug, binding_idx: i, skill: binding.skill });
@@ -217,6 +217,106 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
   const result: OrchestratorResult = { ticked_at: tickedAt, scanned, dispatched, skipped, pr_polls };
   console.log(JSON.stringify({ event: "tick-complete", result }));
   return result;
+}
+
+/** Build one CCR task from a binding: resolve the skill's declared credential
+ *  types for the binding's project and stamp the fire's engagement token in.
+ *  Shared by the cron scan and the on-demand dispatch path so the two can
+ *  never compose a task differently (R-N8 — no per-path branches). Throws on
+ *  a binding the orchestrator cannot prepare; both callers catch. */
+async function prepareCcrTask(
+  slug: string,
+  bindingIdx: number,
+  binding: AgentBinding,
+  tickedAt: string,
+  fireEngagementToken?: string,
+): Promise<CcrFireTask> {
+  if (!binding.project_id) {
+    throw new Error(`binding missing project_id (CCR batch requires explicit project per PR β)`);
+  }
+  const requires = SKILL_REQUIRES[binding.skill];
+  if (requires === undefined) {
+    throw new Error(`skill "${binding.skill}" not in SKILL_REQUIRES map — re-run npm run workforce:skill-registry`);
+  }
+  const credentials = await resolveCredentialsForTask(binding.project_id, requires);
+  // Inject this fire's short-lived engagement-write token (minted by the
+  // caller) so the CCR routine can record the task's activity row.
+  if (fireEngagementToken) (credentials as Record<string, unknown>).engagement_write_token = fireEngagementToken;
+  return {
+    agent_slug: slug,
+    binding_idx: bindingIdx,
+    project_id: binding.project_id,
+    ticked_at: tickedAt,
+    credentials,
+  };
+}
+
+/** adr-0025 — fire ONE explicitly-named binding now.
+ *
+ *  Everything the agents-api could check has already been checked there (token
+ *  valid, binding exists and is orchestrator-owned CCR, debounce slot claimed).
+ *  What is re-read here is the binding itself: the request carries an index,
+ *  and an index resolved against a row read seconds ago in another Lambda is a
+ *  claim, not a fact. A mismatch throws rather than firing the wrong skill.
+ *
+ *  The cron scan is NOT run: this returns a result shaped like a tick with one
+ *  dispatched (or skipped) entry, so the audit surface is the same either way. */
+async function handleDispatch(event: OrchestratorDispatchEvent, tickedAt: string): Promise<OrchestratorResult> {
+  const { agent_slug, binding_idx, reason, requested_by } = event.dispatch;
+  const empty: OrchestratorResult["pr_polls"] = { pending_seen: 0, promoted_ok: [], timed_out: [] };
+  const base = { ticked_at: tickedAt, scanned: 1, pr_polls: empty };
+  const skip = (skill: string, why: string): OrchestratorResult => {
+    console.error(JSON.stringify({ event: "dispatch-refused", slug: agent_slug, binding_idx, skill, reason: why, requested_by }));
+    return { ...base, dispatched: [], skipped: [{ slug: agent_slug, binding_idx, skill, reason: why }] };
+  };
+
+  const agent = await getItem<AgentMetaRow>(agentPk(agent_slug), "META");
+  if (!agent) return skip("?", `agent_not_found: ${agent_slug}`);
+  if (agent.archived || agent.paused) return skip("?", agent.archived ? "archived" : "paused");
+  const binding = agent.bindings?.[binding_idx];
+  if (!binding) return skip("?", `binding_idx ${binding_idx} out of range (${agent.bindings?.length ?? 0} bindings)`);
+  if (!isOrchestratorOwnedCcr(binding)) {
+    return skip(binding.skill, `non_orchestrator_executor: ${binding.executor}/${binding.trigger?.scheduler}`);
+  }
+
+  // The dedup window (evaluateBinding) is deliberately NOT applied. It exists
+  // to stop one cron matching twice inside a tick window; an on-demand fire is
+  // rate-limited by the agents-api's debounce claim, which is per (skill,
+  // project) rather than per agent — the right grain for "work just arrived on
+  // this queue" and one this path must not have re-suppressed by an unrelated
+  // skill's recent run.
+  let fireEngagementToken: string | undefined;
+  try {
+    fireEngagementToken = (await mintEngagementToken()).token;
+  } catch (err) {
+    console.warn(JSON.stringify({ event: "engagement-token-mint-failed", error: err instanceof Error ? err.message : String(err) }));
+  }
+
+  try {
+    const routineId = routineIdFromSpec(binding.routine_spec ?? "");
+    const task = await prepareCcrTask(agent_slug, binding_idx, binding, tickedAt, fireEngagementToken);
+    const fired = await fireCcrRoutine(routineId, { tasks: [task] });
+    console.log(JSON.stringify({
+      event: "ccr-dispatch-fired",
+      routine_id: routineId,
+      slug: agent_slug,
+      skill: binding.skill,
+      project_id: binding.project_id,
+      dispatch_reason: reason,
+      requested_by,
+      session_id: fired.session_id,
+      session_url: fired.session_url,
+    }));
+    return { ...base, dispatched: [{ slug: agent_slug, binding_idx, skill: binding.skill }], skipped: [] };
+  } catch (err) {
+    // W-4: loud, and loud in the orchestrator's own error metric — the caller
+    // (a CCR session mid-hand-off) treats dispatch as best-effort by design,
+    // so this log + the function's error alarm are where a broken dispatch
+    // path becomes visible. The cron backstop still owns the queue.
+    const why = err instanceof Error ? err.message : String(err);
+    console.error(JSON.stringify({ event: "ccr-dispatch-error", slug: agent_slug, skill: binding.skill, reason: why }));
+    throw err;
+  }
 }
 
 async function pollEngineerPRs(now: Date): Promise<OrchestratorResult["pr_polls"]> {
@@ -331,6 +431,16 @@ async function resolveCredentialsForTask(
     // resolution mechanism moved from static-secret to per-fire mint.
     if (type === "workforce.memory_write_token") {
       const minted = await mintMemoryWriteToken();
+      out[type] = { token: minted.token };
+      continue;
+    }
+    // adr-0025: same per-fire dynamic-token shape for the dispatch capability.
+    // A skill that hands work to another cadence (pr-autopilot → pr-remediate
+    // and back) declares `workforce.dispatch_token` in its requires[]; the
+    // token authorises `POST /dispatch` and nothing else, and expires with the
+    // fire. There is no static secret to fall back to by design.
+    if (type === "workforce.dispatch_token") {
+      const minted = await mintDispatchToken();
       out[type] = { token: minted.token };
       continue;
     }

@@ -762,6 +762,44 @@ paths:
       responses:
         "200": { description: OK }
         "400": { description: invalid_starred }
+  /dispatch:
+    post:
+      tags: [agents]
+      summary: Fire an already-declared binding now (adr-0025)
+      description: >
+        Event-driven counterpart to the orchestrator's cron scan. A running CCR
+        session that has just created work for another cadence (e.g. pr-autopilot
+        parking a PR in the author lane) asks for that cadence's binding to be
+        fired immediately. Authorised by the per-fire dispatch capability token
+        injected into the task's credentials (workforce.dispatch_token), never
+        by SigV4. Only an existing (skill, project_id) binding can be fired —
+        nothing new is scheduled here (R-N4), and "no agent is bound to this
+        cadence for this project" is a 404 rather than an improvised run.
+        agent_slug is optional: the owning persona is resolved from bindings[],
+        and is only needed to disambiguate when two agents share the binding.
+        Debounced per (agent, skill, project); a 409 means a live run already
+        owns the queue.
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [skill, project_id]
+              properties:
+                agent_slug: { type: string, example: ren, description: Optional — resolved from bindings when omitted. }
+                skill: { type: string, example: pr-remediate }
+                project_id: { type: string, example: asp-cloud }
+                reason: { type: string, example: author-lane hand-off on PSVL/asp-cloud#693 }
+      responses:
+        "202": { description: Accepted — handed to the orchestrator for an immediate fire }
+        "400": { description: invalid_json / invalid_request }
+        "401": { description: unauthorized (no live dispatch token) }
+        "404": { description: agent_not_found / binding_not_found (the cadence is not wired for this project) }
+        "409": { description: debounced / agent_inactive / binding_not_dispatchable / ambiguous_binding }
+        "502": { description: dispatch_failed (orchestrator invoke error) }
+        "503": { description: dispatch_unavailable (ORCHESTRATOR_FUNCTION unset) }
   /docs/openapi:
     get:
       tags: [meta]
