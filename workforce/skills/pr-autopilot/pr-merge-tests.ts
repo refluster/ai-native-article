@@ -209,17 +209,17 @@ describe("verifyMergeable (fail-closed predicate)", () => {
 // 403'd and failed closed on #694 / #696 while those PRs' own
 // `mergeable_state` read "clean" and asp-cloud's own `main` HAS required
 // status checks configured (the shape mocked below).
-const PROTECTED_BASE = { status: 200, json: { protected: true, protection: { required_status_checks: { contexts: ["ci"], checks: [{ context: "ci" }] } } } };
-const UNPROTECTED_BASE = { status: 200, json: { protected: false, protection: { required_status_checks: { enforcement_level: "off", contexts: [], checks: [] } } } };
-
-describe("verifyMergeable — clause 3 reads the PR object only when the base requires checks (asp-cloud ADR 2026-08-11)", () => {
+// asp-cloud adr_autopilot_pr_merge.md §2.1 clause 3 (amended 2026-08-11):
+// "CI + mergeability" is established from the PR object's own `mergeable` /
+// `mergeable_state` and NOTHING else. The regression this pins: the engine used
+// to call `GET /commits/{sha}/check-runs`, which needs `checks: read` — a grant
+// the asp-cloud project token does not carry — so it 403'd and failed closed on
+// #694 / #696 while those PRs' own `mergeable_state` read "clean".
+describe("verifyMergeable — clause 3 reads the PR object only (asp-cloud ADR 2026-08-11)", () => {
   const noCheckEndpoints = (files, reviews) => [
     [/GET \/repos\/o\/r\/pulls\/1$/, { status: 200, json: { state: "open", mergeable: true, mergeable_state: "clean", head: { sha: "abc" }, base: { ref: "main" } } }],
     [/GET .*contents/, govDoc(L0_BLOCK)],
     [/GET \/repos\/o\/r\/pulls\/1\/files/, { status: 200, json: files }],
-    // asp-cloud's own `main`: protected, with required status checks declared —
-    // the one shape where the clean-path skip is actually sound.
-    [/GET \/repos\/o\/r\/branches\/main$/, PROTECTED_BASE],
     // The two endpoints the token cannot read — answered exactly as GitHub does.
     [/GET \/repos\/o\/r\/commits\/abc\/(check-runs|status)/, { status: 403, json: { message: "Resource not accessible by integration" } }],
     [/GET \/repos\/o\/r\/pulls\/1\/reviews/, { status: 200, json: reviews }],
@@ -236,67 +236,38 @@ describe("verifyMergeable — clause 3 reads the PR object only when the base re
     await verifyMergeable(gh, "o/r", 1, { reviewers: PANEL });
     expect(gh.calls.some((c) => /\/commits\/.*\/(check-runs|status)/.test(c.path))).toBe(false);
   });
-});
 
-// dario A1 (refluster/ai-native-article 2026-08-11): a `clean` PR whose TARGET
-// base does not declare required status checks — this repo's own `main` is
-// exactly this shape (`protected: false`) — must still have its CI read from
-// check-runs. `clean` there means only "no conflict, no blocking review"; it
-// is not a CI signal, and the engine must not treat it as one.
-describe("verifyMergeable — clean-path skip is gated on the base's OWN required status checks (dario A1, refluster/ai-native-article 2026-08-11)", () => {
-  const unprotectedBaseRoutes = (checks, reviews) => [
-    [/GET \/repos\/o\/r\/pulls\/1$/, { status: 200, json: { state: "open", mergeable: true, mergeable_state: "clean", head: { sha: "abc" }, base: { ref: "main" } } }],
-    [/GET .*contents/, govDoc(L0_BLOCK)],
-    [/GET \/repos\/o\/r\/pulls\/1\/files/, { status: 200, json: [{ filename: "src/app.ts" }] }],
-    [/GET \/repos\/o\/r\/branches\/main$/, UNPROTECTED_BASE],
-    [/GET \/repos\/o\/r\/commits\/abc\/check-runs/, { status: 200, json: { check_runs: checks } }],
-    [/GET \/repos\/o\/r\/pulls\/1\/reviews/, { status: 200, json: reviews }],
-    [/GET \/repos\/o\/r\/issues\/1\/comments/, { status: 200, json: [] }],
+  // dario's A1 argued the skip is only safe when the base declares required
+  // status checks, and is a loosening on an UNPROTECTED base. Measured against
+  // refluster/ai-native-article AND psvl/asp-cloud on 2026-08-11 — BOTH are
+  // `protected: false` with an empty `required_status_checks` — that is not how
+  // GitHub behaves: a red check still moves an unprotected base to "unstable".
+  // Branch protection decides only "blocked" vs "unstable", and both fail the
+  // clause. The gate A1 asked for (db6d09d) therefore fixed nothing and sent
+  // asp-cloud back to the 403; these pin the real semantics so it is not
+  // reintroduced.
+  const unprotectedShape = (mergeableState, draft = false) => [
+    [/GET \/repos\/o\/r\/pulls\/1$/, { status: 200, json: { state: "open", draft, mergeable: true, mergeable_state: mergeableState, head: { sha: "abc" }, base: { ref: "main" } } }],
+    ...routes([{ filename: "src/app.ts" }], GREEN_CHECK, PANEL_REVIEWS),
   ];
 
-  it("still reads check-runs on a clean PR whose base has no required status checks, and passes when they're green", async () => {
-    const v = await verifyMergeable(mockGh(unprotectedBaseRoutes(GREEN_CHECK, PANEL_REVIEWS)), "o/r", 1, { reviewers: PANEL });
-    expect(v.ok).toBe(true);
-  });
-
-  it("refuses a clean-but-unprotected-base PR whose head commit's CI actually failed — the exact loosening A1 named", async () => {
-    const redCheck = [{ name: "ci", status: "completed", conclusion: "failure" }];
-    const v = await verifyMergeable(mockGh(unprotectedBaseRoutes(redCheck, PANEL_REVIEWS)), "o/r", 1, { reviewers: PANEL });
+  it("refuses red CI on an unprotected base — the state is 'unstable', not 'clean' (A1)", async () => {
+    const v = await verifyMergeable(mockGh(unprotectedShape("unstable")), "o/r", 1, { reviewers: PANEL });
     expect(v.ok).toBe(false);
-    expect(v.why).toMatch(/ci.*=.*failure/);
+    expect(v.why).toMatch(/state=unstable/);
   });
 
-  it("also reads check-runs when the base IS protected but declares no required checks (empty required_status_checks)", async () => {
-    const protectedNoRequiredChecks = { status: 200, json: { protected: true, protection: { required_status_checks: { contexts: [], checks: [] } } } };
-    const routes = [
-      [/GET \/repos\/o\/r\/pulls\/1$/, { status: 200, json: { state: "open", mergeable: true, mergeable_state: "clean", head: { sha: "abc" }, base: { ref: "main" } } }],
-      [/GET .*contents/, govDoc(L0_BLOCK)],
-      [/GET \/repos\/o\/r\/pulls\/1\/files/, { status: 200, json: [{ filename: "src/app.ts" }] }],
-      [/GET \/repos\/o\/r\/branches\/main$/, protectedNoRequiredChecks],
-      [/GET \/repos\/o\/r\/commits\/abc\/check-runs/, { status: 200, json: { check_runs: GREEN_CHECK } }],
-      [/GET \/repos\/o\/r\/pulls\/1\/reviews/, { status: 200, json: PANEL_REVIEWS }],
-      [/GET \/repos\/o\/r\/issues\/1\/comments/, { status: 200, json: [] }],
-    ];
-    const gh = mockGh(routes);
+  it("refuses a red DRAFT on an unprotected base without reaching the draft carve-out", async () => {
+    const gh = mockGh(unprotectedShape("unstable", true));
     const v = await verifyMergeable(gh, "o/r", 1, { reviewers: PANEL });
-    expect(v.ok).toBe(true);
-    expect(gh.calls.some((c) => /\/commits\/.*\/check-runs/.test(c.path))).toBe(true);
+    expect(v.ok).toBe(false);
+    expect(gh.calls.some((c) => /\/commits\/.*\/check-runs/.test(c.path))).toBe(false);
   });
 
-  it("falls back to reading check-runs when the branch-protection read itself fails (fails closed toward the safer default, never skips on a guess)", async () => {
-    const routes = [
-      [/GET \/repos\/o\/r\/pulls\/1$/, { status: 200, json: { state: "open", mergeable: true, mergeable_state: "clean", head: { sha: "abc" }, base: { ref: "main" } } }],
-      [/GET .*contents/, govDoc(L0_BLOCK)],
-      [/GET \/repos\/o\/r\/pulls\/1\/files/, { status: 200, json: [{ filename: "src/app.ts" }] }],
-      [/GET \/repos\/o\/r\/branches\/main$/, { status: 404, json: {} }],
-      [/GET \/repos\/o\/r\/commits\/abc\/check-runs/, { status: 200, json: { check_runs: GREEN_CHECK } }],
-      [/GET \/repos\/o\/r\/pulls\/1\/reviews/, { status: 200, json: PANEL_REVIEWS }],
-      [/GET \/repos\/o\/r\/issues\/1\/comments/, { status: 200, json: [] }],
-    ];
-    const gh = mockGh(routes);
-    const v = await verifyMergeable(gh, "o/r", 1, { reviewers: PANEL });
-    expect(v.ok).toBe(true);
-    expect(gh.calls.some((c) => /\/commits\/.*\/check-runs/.test(c.path))).toBe(true);
+  it("never reads branch protection — the skip is unconditional by design", async () => {
+    const gh = mockGh(noCheckEndpoints([{ filename: "src/app.ts" }], PANEL_REVIEWS));
+    await verifyMergeable(gh, "o/r", 1, { reviewers: PANEL });
+    expect(gh.calls.some((c) => /\/branches\//.test(c.path))).toBe(false);
   });
 });
 
