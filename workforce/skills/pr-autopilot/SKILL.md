@@ -585,28 +585,43 @@ the whole attempt.
 Emit a merge **only** when all hold: 🟢 unanimous-green; the bound project's
 target repo carries an **R-N10 delegation** in its own statute; the PR touches
 **no L0/L1 path** declared between the `<!-- autopilot:l0l1-paths -->` markers
-of the target's `docs/governance.md`; **CI + mergeability green, read from the
-PR object alone** — `mergeable == true` and `mergeable_state` `clean` (or
-`draft`, which the engine flips Ready for Review then merges); no
+of the target's `docs/governance.md`; **CI + mergeability green** — `mergeable
+== true` and `mergeable_state` `clean` (or `draft`, which the engine flips
+Ready for Review then merges), read from the PR object alone **only when the
+target's own base branch currently declares required status checks**; no
 `CHANGES_REQUESTED`. The workforce's own repo (`refluster/ai-native-article`)
 is a normal delegated target (adr-0011) — **authorship is not a hold**: a
 green, non-L0/L1 PR merges regardless of who opened it (FU-028).
 
-> **Do not establish "checks green" with a `GET /commits/{sha}/status` or
-> `GET /commits/{sha}/check-runs` call** — not in the engine, not by hand in the
-> verdict step. GitHub already folds required-check status into
-> `mergeable_state` (red/pending required check → `blocked`; failing
-> non-required check → `unstable`; neither is `clean`), so those endpoints add
-> nothing to the clause while demanding `checks: read` / `statuses: read` on top
-> of the `pull-requests: read` the PR object needs. A project token without them
-> 403s and the engine fails closed — which is exactly how psvl/asp-cloud #694 /
-> #696 sat on `autopilot:reason:merge-engine-refusal` for two days while their
-> own `mergeable_state` read `clean`. Barred by asp-cloud's
+> **Do not establish "checks green" with an unconditional `GET
+> /commits/{sha}/status` or `GET /commits/{sha}/check-runs` call** — not in the
+> engine, not by hand in the verdict step — **when the target's own base branch
+> declares required status checks**. GitHub folds required-check status into
+> `mergeable_state` in that case (red/pending required check → `blocked`;
+> failing non-required check → `unstable`; neither is `clean`), so those
+> endpoints add nothing to the clause while demanding `checks: read` /
+> `statuses: read` on top of the `pull-requests: read` the PR object needs. A
+> project token without them 403s and the engine fails closed — which is
+> exactly how psvl/asp-cloud #694 / #696 sat on
+> `autopilot:reason:merge-engine-refusal` for two days while their own
+> `mergeable_state` read `clean` and asp-cloud's own `main` has required status
+> checks configured. Barred, in that shape, by asp-cloud's
 > [adr_autopilot_pr_merge.md §2.1 clause 3](https://github.com/psvl/asp-cloud/blob/main/docs/adr_autopilot_pr_merge.md)
-> (amended 2026-08-11). The lone exception is a **draft**, whose
-> `mergeable_state` is `draft` and therefore reports nothing about CI; the
-> engine reads check-runs only on that branch, and only when the router did not
-> already un-draft the PR at Step 5.
+> (amended 2026-08-11).
+>
+> **That fold does NOT hold on a base with no required status checks
+> configured** (dario A1, refluster/ai-native-article 2026-08-11 — this repo's
+> own `main` is exactly that shape, `protected: false`): there, `clean` means
+> only "no merge conflict, no blocking human review" and carries zero CI
+> signal. The engine re-reads the target's own branch protection
+> (`GET /repos/{repo}/branches/{base}`, no scope beyond `contents: read`) fresh
+> on every call and skips the check-runs read only when that read confirms
+> required checks are configured; otherwise (including when the protection read
+> itself fails) it falls back to reading check-runs, the conservative default.
+> The other exception is a **draft**, whose `mergeable_state` is `draft` and
+> therefore reports nothing about CI regardless of the base's protection; the
+> engine reads check-runs unconditionally on that branch, and only when the
+> router did not already un-draft the PR at Step 5.
 
 **These clauses are the complete set of *predicate* conditions** (adr-0024) —
 alongside the holds already stated above, which the engine also enforces

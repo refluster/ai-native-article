@@ -5,10 +5,15 @@
 //
 // The merge predicate is now: a PR is mergeable iff it touches **no L0/L1 path**
 // of the TARGET repo's own governance (read from that repo's docs/governance.md),
-// is open + mergeable (state "clean" OR "draft" — adr-0014), which is also how
-// **required checks green** is established (GitHub folds check status into
-// `mergeable_state`; a draft, whose state masks it, is the one case that still
-// reads check-runs), carries **no human CHANGES_REQUESTED**, and the routing
+// is open + mergeable (state "clean" OR "draft" — adr-0014), which is ALSO how
+// **required checks green** is established, but only conditionally: GitHub
+// folds check status into `mergeable_state` only when the base branch's own
+// protection *declares required status checks* — so the clean-path skip of the
+// separate check-runs read is itself gated on a fresh read of that fact (dario
+// A1, refluster/ai-native-article 2026-08-11: this repo's own `main` is
+// unprotected, so `clean` here carries no CI signal at all). A draft, whose
+// state masks CI regardless, is the other case that still reads check-runs.
+// The predicate carries **no human CHANGES_REQUESTED**, and the routing
 // persona's nominated reviewers — **at least MIN_REVIEWERS (3) distinct
 // personas** (operator directive 2026-06-29) — have each posted their lens
 // review (the unanimous-green consensus). A panel of fewer than 3 green
@@ -360,6 +365,30 @@ export async function emitRefusalReason(gh, repo, pr, why) {
   return code;
 }
 
+// Whether the TARGET repo's own base branch currently declares required
+// status checks (branch protection → `required_status_checks` with ≥1
+// `contexts`/`checks` entry). Only then does GitHub fold CI status into
+// `mergeable_state`, and only then may `verifyMergeable`'s clean path skip the
+// separate check-runs read (dario A1, refluster/ai-native-article
+// 2026-08-11). `GET /repos/{repo}/branches/{base}` needs no scope beyond
+// `contents: read` — it does not reintroduce the `checks: read` /
+// `statuses: read` dependency this clause was written to drop.
+//
+// Fails to `false` — the conservative direction — on anything short of a
+// confirmed, non-empty required-checks block: a non-200 read, a branch that
+// isn't protected at all, or protection with an empty `required_status_checks`
+// (both arrays empty). `false` means "read check-runs instead", never "skip it
+// on a guess" — the exact failure mode this helper exists to close.
+export async function baseHasRequiredStatusChecks(gh, repo, baseRef) {
+  const { status, json: b } = await gh("GET", `/repos/${repo}/branches/${encodeURIComponent(baseRef)}`);
+  if (status !== 200 || !b || b.protected !== true) return false;
+  const rsc = b.protection?.required_status_checks;
+  if (!rsc) return false;
+  const contexts = Array.isArray(rsc.contexts) ? rsc.contexts.length : 0;
+  const checks = Array.isArray(rsc.checks) ? rsc.checks.length : 0;
+  return contexts > 0 || checks > 0;
+}
+
 // Server-side predicate re-check. Returns {ok, why, sha}.
 export async function verifyMergeable(gh, repo, pr, decision) {
   const { status, json: p } = await gh("GET", `/repos/${repo}/pulls/${pr}`);
@@ -394,31 +423,40 @@ export async function verifyMergeable(gh, repo, pr, decision) {
     }
   }
 
-  // CI is NOT re-read from the commit here. `mergeable_state === "clean"`
-  // (asserted above) already means GitHub itself folded every required check
-  // into the answer: a red or pending required check reports "blocked", a
-  // failing non-required one reports "unstable", and neither passes the clause
-  // above. The old `GET /commits/{sha}/check-runs` call was therefore redundant
-  // on the clean path — and worse than redundant: reading the PR object needs
-  // only `pull-requests: read`, while check-runs/commit-status need the broader
-  // `checks: read` / `statuses: read`. A project token without those grants got
-  // 403 "Resource not accessible by integration" here and failed closed, which
-  // is what stalled psvl/asp-cloud #694 / #696 on
-  // `autopilot:reason:merge-engine-refusal` for two days while their own
-  // `mergeable_state` read "clean". asp-cloud's adr_autopilot_pr_merge.md §2.1
-  // clause 3 (amended 2026-08-11) now bars requiring either endpoint to
-  // establish this clause. One fewer credential, one fewer failure mode, same
-  // predicate.
+  // CI is re-read from the commit UNLESS the target's own base branch
+  // currently declares required status checks — ONLY THEN does GitHub fold
+  // required-check status into `mergeable_state` (a red/pending required check
+  // reports "blocked", a failing non-required one "unstable", neither passes
+  // the clause above). `mergeable_state === "clean"` says nothing about CI on
+  // an unprotected base, or one whose protection carries no required checks —
+  // `clean` there means only "no merge conflict, no blocking review" (dario
+  // A1, refluster/ai-native-article 2026-08-11: this repo's own `main` is
+  // exactly that shape — `protected: false`). Skipping the check-runs read on
+  // a bare `clean` in that case is not a redundant call removed, it is the CI
+  // clause silently dropped.
   //
-  // The DRAFT path is the one exception, and it is not a widening: GitHub
-  // reports a draft's mergeable_state as "draft" — the value masks the check
-  // state rather than reporting it — so the PR object genuinely cannot
-  // establish "checks green" for a draft, and adr-0014 kept that clause when it
-  // made drafts merge-eligible. Drafts are outside asp-cloud's clause 3 (which
-  // requires "clean"), so this costs asp-cloud's token nothing; the router
-  // un-drafts via the GitHub MCP before invoking the engine (SKILL.md Step 5),
-  // so in practice this branch only runs on a local operator run.
-  if (p.mergeable_state === "draft") {
+  // So the skip is gated on a fresh, per-call read of the base branch's own
+  // protection (`baseHasRequiredStatusChecks` below) — not assumed from the
+  // caller's repo shape. On a base that DOES declare required status checks
+  // (psvl/asp-cloud's #694 / #696 shape), the skip still applies exactly as
+  // before: reading the PR object needs only `pull-requests: read`, while
+  // check-runs/commit-status need the broader `checks: read` / `statuses:
+  // read`, and a project token without those grants 403'd there and failed
+  // closed — asp-cloud's adr_autopilot_pr_merge.md §2.1 clause 3 (amended
+  // 2026-08-11) bars requiring either endpoint once the base's own protection
+  // already establishes the clause. `GET /repos/{repo}/branches/{base}` needs
+  // neither grant, so this read costs that token nothing.
+  //
+  // The DRAFT path is unconditional and unchanged: GitHub reports a draft's
+  // mergeable_state as "draft" — the value masks the check state rather than
+  // reporting it, regardless of branch protection — so the PR object genuinely
+  // cannot establish "checks green" for a draft, and adr-0014 kept that clause
+  // when it made drafts merge-eligible. The router un-drafts via the GitHub
+  // MCP before invoking the engine (SKILL.md Step 5), so in practice this
+  // branch only runs on a local operator run.
+  const isDraft = p.mergeable_state === "draft";
+  const skipCheckRuns = !isDraft && (await baseHasRequiredStatusChecks(gh, repo, p.base?.ref));
+  if (!skipCheckRuns) {
     const { status: cs, json: checks } = await gh("GET", `/repos/${repo}/commits/${p.head.sha}/check-runs?per_page=100`);
     if (cs !== 200) return { ok: false, why: `GET check-runs -> HTTP ${cs}` };
     for (const c of checks.check_runs || []) {
