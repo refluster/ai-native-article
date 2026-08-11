@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-11T19:09:04.970Z",
+  "generated_at": "2026-08-11T19:47:46.547Z",
   "skills": [
     {
       "name": "article-level2",
@@ -1420,7 +1420,7 @@
     },
     {
       "name": "pr-autopilot",
-      "version": "0.30.0",
+      "version": "0.31.0",
       "status": "active",
       "deliverable": {
         "type": "external-pr-merge",
@@ -1487,7 +1487,7 @@
           "path": "meta.json",
           "size": 361,
           "language": "json",
-          "contents": "{\n  \"name\": \"pr-autopilot\",\n  \"version\": \"0.30.0\",\n  \"status\": \"active\",\n  \"cost_class\": \"medium\",\n  \"owners\": [\n    \"nadia\",\n    \"maya\"\n  ],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-30\",\n  \"requires\": [\n    \"github.token\",\n    \"workforce.dispatch_token\"\n  ],\n  \"deliverable\": {\n    \"type\": \"external-pr-merge\",\n    \"publish_notion\": false\n  }\n}\n",
+          "contents": "{\n  \"name\": \"pr-autopilot\",\n  \"version\": \"0.31.0\",\n  \"status\": \"active\",\n  \"cost_class\": \"medium\",\n  \"owners\": [\n    \"nadia\",\n    \"maya\"\n  ],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-05-30\",\n  \"requires\": [\n    \"github.token\",\n    \"workforce.dispatch_token\"\n  ],\n  \"deliverable\": {\n    \"type\": \"external-pr-merge\",\n    \"publish_notion\": false\n  }\n}\n",
           "truncated": false,
           "binary": false
         },
