@@ -61,7 +61,12 @@ ensureProxyAwareEntry(import.meta.url);
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { assertReasonCode, isAuthorLaneCode, reasonLabel, reasonMarker, refusalReasonCode } from "./escalation-reasons.mjs";
+
+// Repo root, for the project.json lookup the author-lane dispatch needs
+// (workforce/skills/pr-autopilot → repo root).
+const MERGE_REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 const GOVERNANCE_PATH = process.env["GOVERNANCE_PATH"] || "docs/governance.md";
 const L0L1_OPEN = "<!-- autopilot:l0l1-paths -->";
@@ -355,7 +360,34 @@ export async function emitRefusalReason(gh, repo, pr, why) {
   if (l.status !== 200) console.error(`pr-merge: WARN reason label(s) "${labels.join(", ")}" on #${pr} → HTTP ${l.status}`);
   const c = await gh("POST", `/repos/${repo}/issues/${pr}/comments`, { body });
   if (c.status !== 201) console.error(`pr-merge: WARN reason comment on #${pr} → HTTP ${c.status}`);
+  // adr-0025 — the lane now has a doorbell. Parking the PR is the load-bearing
+  // write (above); this asks pr-remediate to start on it *now* rather than at
+  // its next cron. Best-effort by construction: requestDispatch never throws
+  // and its result is not consulted, because the cron + the sweep's 36h
+  // author-stale escalation remain the floor either way.
+  if (authorLane) await dispatchAuthorLane(repo, pr, code);
   return code;
+}
+
+/** Ring the author lane's doorbell for `repo`'s project. Shared by the merge
+ *  engine's refusal path and the verdict path (pr-autopilot-post) so both
+ *  entries into the lane wake the same worker. Never throws. */
+export async function dispatchAuthorLane(repo, pr, code, repoRoot = MERGE_REPO_ROOT) {
+  // Dynamic import: pr-autopilot-scan.mjs already imports this module, so a
+  // static import here would close an ESM cycle. Inside an async best-effort
+  // path the deferred load costs nothing.
+  const { projectIdForRepo } = await import("./pr-autopilot-scan.mjs");
+  const { requestDispatch } = await import("../../scripts/lib/request-dispatch.mjs");
+  const projectId = projectIdForRepo(repoRoot, repo);
+  if (!projectId) {
+    console.error(`pr-merge: no project declares ${repo} — author-lane dispatch skipped (its cron still owns the queue)`);
+    return { dispatched: false, why: "unknown project" };
+  }
+  return await requestDispatch({
+    skill: "pr-remediate",
+    project_id: projectId,
+    reason: `author-lane hand-off on ${repo}#${pr} (${code})`,
+  });
 }
 
 // Server-side predicate re-check. Returns {ok, why, sha}.

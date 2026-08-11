@@ -109,6 +109,22 @@ export interface WorkforceMemoryWriteTokenSecret {
 }
 
 /**
+ * Workforce dispatch capability token (adr-0025) — the per-fire token a
+ * cadence presents as `Authorization: Bearer <token>` to `POST /dispatch`
+ * when it hands work to ANOTHER cadence and wants that cadence fired now
+ * (pr-autopilot → pr-remediate on an author-lane hand-off, and back on the
+ * pushed fix). Same dual-principal shape as the memory-write token, and the
+ * same dynamic-mint resolution: the orchestrator mints it into DynamoDB per
+ * fire (shared/dispatch-token.ts) rather than reading a static secret, so
+ * there is no `wf/projects/{id}/workforce.dispatch_token` to provision.
+ * Capability, not identity — it authorises firing an already-declared
+ * binding and nothing else (R-N4).
+ */
+export interface WorkforceDispatchTokenSecret {
+  token: string;
+}
+
+/**
  * Type registry: maps each credential type literal to its TS shape.
  * Adding a new type requires extending this interface AND the five
  * sync points listed in the file header.
@@ -122,6 +138,7 @@ export interface CredentialShapes {
   "voyage.api_key": VoyageSecret;
   "workforce.feed_write_token": WorkforceFeedWriteTokenSecret;
   "workforce.memory_write_token": WorkforceMemoryWriteTokenSecret;
+  "workforce.dispatch_token": WorkforceDispatchTokenSecret;
 }
 
 export type CredentialType = keyof CredentialShapes;
@@ -162,6 +179,7 @@ export const CREDENTIAL_TYPES: ReadonlySet<CredentialType> = new Set([
   "voyage.api_key",
   "workforce.feed_write_token",
   "workforce.memory_write_token",
+  "workforce.dispatch_token",
 ]);
 
 /**

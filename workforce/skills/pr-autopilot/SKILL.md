@@ -378,8 +378,20 @@ So route the agent-fixable causes to an agent instead of to a human. Hand off wi
 branch / addresses the findings, pushes to the **head** branch, and clears the
 label — and your next tick sees a newer head commit and re-routes at cycle N+1.
 
-Three things to know before you use it:
+Four things to know before you use it:
 
+- **The hand-off rings the bell (adr-0025).** `pr-autopilot-post.mjs` asks the
+  workforce to fire `pr-remediate` for this project the moment the label lands,
+  so the lane's worker starts in seconds rather than at its next cron; when it
+  pushes the fix it asks for *you* in return, so cycle N+1 starts on the fresh
+  commit. Nothing about the protocol changes — same ≤ `cycle_cap` budget, same
+  one-commit-per-cycle hand-back, same brief. The call is best-effort and its
+  result is not yours to act on: if it does not land, the cron and the sweep
+  are the floors, exactly as before. One thing IS worth reading in your fire's
+  log: a `404 binding_not_found` means **no `pr-remediate` cadence is wired for
+  this project at all** — every PR you park will age out to `author-stale`
+  (this is what stranded PSVL/asp-cloud#692 and #693). Say so in your run
+  summary; the fix is a binding, and it is the operator's.
 - **It is not a third terminal state.** MERGED and ESCALATED still are. The lane is
   bounded by a 3-attempt cap and by the Step-6 sweep (`--author-stale-hours`, 36),
   which escalates a PR the remediation cadence did not pick up — so a PR cannot
