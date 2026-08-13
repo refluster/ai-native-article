@@ -66,6 +66,10 @@ import {
   tallyLifecycle,
 } from "../shared/performance.js";
 import { COMMONS_SKILLS } from "../shared/skill-registry-generated.js";
+import {
+  sweepPendingEmbeddings,
+  type EmbeddingRetrySweepResult,
+} from "../shared/embedding-retry.js";
 
 // Newest-N ok-status executions inspected per agent to decide "has delivered".
 // At C-3 single-operator scale an agent that ever delivered has a recent ok
@@ -86,6 +90,9 @@ export interface PerformanceReducerResult {
   workforce: Pick<LifecyclePoint, "registered" | "assigned" | "delivered">;
   /** Epic-021 §B.1 — how many personas the idle sweep flagged today. */
   idle: number;
+  /** #573 — this run's embedding retry-sweep outcome (rows attempted /
+   *  recovered / moved to terminal `failed` / still pending). */
+  embeddingRetry: EmbeddingRetrySweepResult;
 }
 
 export async function handler(): Promise<PerformanceReducerResult> {
@@ -234,9 +241,8 @@ export async function handler(): Promise<PerformanceReducerResult> {
   }
 
   // ── 3. per-project snapshots (active projects only) ───────────────────────
-  const projects = (await scanAllPrefix<ProjectMetaRow>("PROJECT#", "META")).filter(
-    (p) => p.status === "active",
-  );
+  const allProjects = await scanAllPrefix<ProjectMetaRow>("PROJECT#", "META");
+  const projects = allProjects.filter((p) => p.status === "active");
   let projectsWritten = 0;
   for (const project of projects) {
     const projectId = project.project_id;
@@ -261,6 +267,24 @@ export async function handler(): Promise<PerformanceReducerResult> {
     projectsWritten += 1;
   }
 
+  // ── 4. embedding retry sweep (#573) ───────────────────────────────────────
+  // Rides this walk rather than a new cron (same "no new schedule" precedent
+  // as the §2b idle sweep) — re-attempts EXEC rows stranded at
+  // embedding_status='pending' since their original write, bounded per run
+  // (see shared/embedding-retry.ts). Swept over every project this reducer
+  // already scanned above, active or not (a project going inactive should
+  // not orphan its pending rows from ever being retried).
+  const embeddingRetry = await sweepPendingEmbeddings(allProjects.map((p) => p.project_id));
+  if (embeddingRetry.failedTerminal > 0) {
+    console.warn(
+      JSON.stringify({
+        event: "exec_embedding_retry_terminal",
+        count: embeddingRetry.failedTerminal,
+        note: "row(s) moved to embedding_status='failed' after exhausting retry attempts — permanently excluded from semantic recall",
+      }),
+    );
+  }
+
   const result: PerformanceReducerResult = {
     date,
     agents: metas.length,
@@ -271,6 +295,7 @@ export async function handler(): Promise<PerformanceReducerResult> {
       delivered: workforcePoint.delivered,
     },
     idle: idle.length,
+    embeddingRetry,
   };
   console.log(JSON.stringify({ event: "performance_reducer_run", ...result }));
   return result;
