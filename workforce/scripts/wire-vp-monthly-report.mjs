@@ -51,6 +51,7 @@
 
 import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
 ensureProxyAwareEntry(import.meta.url);
+import { reconcileBinding } from "../../scripts/lib/binding-reconcile.mjs";
 
 import { spawnSync } from "node:child_process";
 
@@ -119,15 +120,6 @@ function curlJson(method, path, body) {
   return { status: Number(out.slice(nl + 1)), json: out.slice(0, nl) ? JSON.parse(out.slice(0, nl)) : undefined };
 }
 
-// Stable, key-order-independent serialization: distinguishes a true no-op from
-// drift (array order stays significant on purpose).
-const stable = (v) =>
-  v && typeof v === "object" && !Array.isArray(v)
-    ? `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${stable(v[k])}`).join(",")}}`
-    : Array.isArray(v)
-      ? `[${v.map(stable).join(",")}]`
-      : JSON.stringify(v);
-
 let failures = 0;
 for (const vp of VPS) {
   const BINDING = bindingFor(vp);
@@ -146,22 +138,15 @@ for (const vp of VPS) {
     continue;
   }
 
-  const idx = cur.bindings.findIndex(
+  const summary = `${BINDING.skill} @ ${PROJECT_ID} (${BINDING.trigger.cron})`;
+  const { bindings: next, verb, changed } = reconcileBinding(
+    cur.bindings,
+    BINDING,
     (b) => b.skill === BINDING.skill && b.project_id === BINDING.project_id,
   );
-  const summary = `${BINDING.skill} @ ${PROJECT_ID} (${BINDING.trigger.cron})`;
-  let next;
-  let verb;
-  if (idx >= 0) {
-    if (stable(cur.bindings[idx]) === stable(BINDING)) {
-      console.log(`  - ${SLUG}: ${summary} already bound + current, skipped (no-op).`);
-      continue;
-    }
-    next = cur.bindings.map((b, i) => (i === idx ? BINDING : b));
-    verb = "updated (in-place, binding_idx preserved)";
-  } else {
-    next = [...cur.bindings, BINDING];
-    verb = "bound";
+  if (!changed) {
+    console.log(`  - ${SLUG}: ${summary} already bound + current, skipped (no-op).`);
+    continue;
   }
   if (DRY_RUN) {
     console.log(`  [dry-run] ${SLUG}: would PATCH bindings -> ${verb} (${summary}); total ${next.length}`);

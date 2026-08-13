@@ -47,6 +47,7 @@
 
 import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
 ensureProxyAwareEntry(import.meta.url);
+import { reconcileBinding } from "../../scripts/lib/binding-reconcile.mjs";
 
 import { spawnSync } from "node:child_process";
 
@@ -143,44 +144,15 @@ if (!Array.isArray(cur.bindings)) {
   process.exit(1);
 }
 
-// Stable, key-order-independent serialization so a true no-op (the live binding
-// already equals what we declare) is distinguished from drift (e.g. a stale
-// note/config that must re-sync) — order of keys in the GET response is not
-// guaranteed to match our literal. Note: ARRAY order is preserved (significant)
-// on purpose — config.nomination_rules is first-match precedence, so a reorder
-// is semantic drift that SHOULD re-PATCH, not a cosmetic no-op.
-const stable = (v) =>
-  v && typeof v === "object" && !Array.isArray(v)
-    ? `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${stable(v[k])}`).join(",")}}`
-    : Array.isArray(v)
-      ? `[${v.map(stable).join(",")}]`
-      : JSON.stringify(v);
-
-// This script declares the DESIRED state of Nadia's (pr-autopilot @ agent-
-// workforce) binding. Match on (skill, project_id) — Nadia also has a separate
-// pr-autopilot binding for asp-cloud, which is preserved untouched.
-//   - not present  → append (existing bindings keep their binding_idx).
-//   - present, equal → true no-op.
-//   - present, drifted → REPLACE in place (same slot, binding_idx preserved)
-//     so a corrected note/config re-syncs to DDB. Earlier the script skipped on
-//     mere presence, which left the live binding's stale (pre-adr-0011) note in
-//     place after the prose was fixed — replace-on-drift closes that.
-const idx = cur.bindings.findIndex(
+const summary = `${BINDING.skill} @ ${PROJECT_ID} (${BINDING.trigger.cron})`;
+const { bindings: next, verb, changed } = reconcileBinding(
+  cur.bindings,
+  BINDING,
   (b) => b.skill === BINDING.skill && b.project_id === BINDING.project_id,
 );
-const summary = `${BINDING.skill} @ ${PROJECT_ID} (${BINDING.trigger.cron})`;
-let next;
-let verb;
-if (idx >= 0) {
-  if (stable(cur.bindings[idx]) === stable(BINDING)) {
-    console.log(`  - ${SLUG}: pr-autopilot @ ${PROJECT_ID} already bound + current, skipped (no-op).`);
-    process.exit(0);
-  }
-  next = cur.bindings.map((b, i) => (i === idx ? BINDING : b));
-  verb = "updated (in-place, binding_idx preserved)";
-} else {
-  next = [...cur.bindings, BINDING];
-  verb = "bound";
+if (!changed) {
+  console.log(`  - ${SLUG}: pr-autopilot @ ${PROJECT_ID} already bound + current, skipped (no-op).`);
+  process.exit(0);
 }
 if (DRY_RUN) {
   console.log(`  [dry-run] ${SLUG}: would PATCH bindings -> ${verb} (${summary}); total ${next.length}`);

@@ -95,6 +95,10 @@ function feedPostBinding(slug, cron) {
     routine_spec: ROUTINE_SPEC,
     project_id: PROJECT_ID,
     note: `Daily feed-post (Epic-011 §3 cadence); minute = djb2 stagger inside the 09:00-18:00 JST window (same algorithm as the retired stagger-feed-cron.mjs), globally collision-free. Fired by wf-orchestrator-tick; project_id=${PROJECT_ID} bundles workforce.feed_write_token. Wired at the all-agents daily-cadence roll-out (operator direction).`,
+    // #574: this script never replaces a binding (append-only, skip-if-present
+    // per hasBinding() below), so there is no drift-vs-create ambiguity —
+    // stamping bound_at here at construction time is safe and exact.
+    bound_at: new Date().toISOString(),
   };
 }
 
@@ -112,6 +116,9 @@ function dailyResearchBinding(slug, cron) {
     project_id: PROJECT_ID,
     config: { no_skip: false },
     note: `daily-research Cadence (Epic-015), landed ENABLED at the all-agents roll-out (operator direction). no_skip:false — non-grid beat, skips on quiet windows (skill default). Minute = djb2(slug+"#daily-research") spread over 24h, globally collision-free. project_id=${PROJECT_ID} supplies workforce.feed_write_token.`,
+    // #574: append-only script (see feedPostBinding's comment above) — safe
+    // to stamp bound_at at construction time.
+    bound_at: new Date().toISOString(),
   };
 }
 
