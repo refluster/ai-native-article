@@ -133,6 +133,124 @@ export interface PerformanceSeries {
   /** Absent until this scope's first repo-activity refresh lands; the client
    *  falls back to its bundled snapshot when missing. */
   repo?: RepoActivityBlock;
+  /** Epic-020 Story 2 — absent until this scope's first human-touch
+   *  aggregation lands. Never merged into the blocks above: the touch tables
+   *  are per-class by construction (see HumanTouchBlock). */
+  human_touch?: HumanTouchBlock;
+}
+
+// ── Epic-020 human leverage (the human side of the ledger) ────────────────────
+//
+// The taxonomy this consumes is Zone A prose — Epic-016 § "Human-touch
+// taxonomy (Epic-020 Story 1)" — and it is the authority on which types
+// exist, which class each belongs to, and which are counted vs estimated.
+// These types are the *computed* half; adding or re-classing a touch type is
+// a taxonomy edit first, and this block follows it in the same PR.
+
+/** The three touch classes. The published table reports them separately and
+ *  **never blends them** — Epic-020 §"Behaviour at N=100+": one weekly digest
+ *  covering hundreds of mutations would otherwise inflate leverage
+ *  mechanically. There is deliberately no cross-class total anywhere in this
+ *  block; a consumer that wants one has to write the blend itself, in the
+ *  open, rather than read it off a field we handed it. */
+export type HumanTouchClass = "gate" | "digest" | "one-time";
+
+export type HumanTouchTypeId = "T1" | "T2" | "T3" | "T4" | "T5" | "T6" | "T7";
+
+/** One touch type's result for one window.
+ *
+ *  **`touches: null` is "we did not look", never "there were none."** The
+ *  codebase holds this line in three places already — `an unknown is never a
+ *  measured zero` (pr-autopilot-post.mjs), `never let stale data look
+ *  current` (app/src/lib/repoActivity.ts), and the PerfIdleRow consumer
+ *  contract above. A collector whose source is unreachable MUST return null
+ *  plus an `unavailable_reason`; returning 0 would publish a scope statement
+ *  wearing a reading's clothes. `aggregateHumanTouches` enforces the
+ *  difference: nulls are excluded from every sum and listed by id. */
+export interface HumanTouchTypeResult {
+  type: HumanTouchTypeId;
+  /** Human-readable label, verbatim from the taxonomy table. */
+  label: string;
+  class: HumanTouchClass;
+  /** Taxonomy designation. Only `counted` types sit in the falsifier
+   *  denominator (Epic-020's anti-gaming clause: estimated types are
+   *  excluded, otherwise the falsifier is gameable). */
+  designation: "counted" | "estimated";
+  /** Touches observed in the window, or null when the source was unreadable. */
+  touches: number | null;
+  /** Work units the touches unblocked — direct first-order only, no
+   *  transitive credit. Null exactly when `touches` is null. */
+  work_units: number | null;
+  /** What one work unit *is* for this type, from the taxonomy's closed
+   *  enumeration (e.g. "changed-file", "pr", "persona", "usd-headroom").
+   *
+   *  Classes are never blended, but within a class the units can still
+   *  differ — T5 releases USD headroom and T7 registers personas, and both
+   *  are one-time. Summing those would be the same category error the
+   *  class rule exists to prevent, one level down, so the class table sums
+   *  and computes leverage only when every readable type in it shares a
+   *  unit; otherwise it reports null and names the units it saw. */
+  unit: string;
+  /** Set iff `touches === null`: why the source could not be read. */
+  unavailable_reason?: string;
+  /** Touches whose attribution was ambiguous, credited `1` and flagged
+   *  (Epic-020 Q1: a defensible undercount beats a story). */
+  ambiguous: number;
+}
+
+/** One class's table. `leverage` is within-class only and is null when the
+ *  class observed zero touches — a 0/0 rendered as `0` would read as "these
+ *  touches unblocked nothing" — or when its readable types disagree on what
+ *  a work unit is (see HumanTouchTypeResult.unit). */
+export interface HumanTouchClassTable {
+  class: HumanTouchClass;
+  types: HumanTouchTypeResult[];
+  touches: number;
+  /** Null when the class's readable types use more than one work unit. */
+  work_units: number | null;
+  leverage: number | null;
+  /** Distinct work units among the class's readable types, sorted. One entry
+   *  means the sums above are meaningful; more than one means they are null
+   *  by construction and the per-type rows are the only honest reading. */
+  units: string[];
+  /** Type ids whose source was unreadable, excluded from the sums above.
+   *  Non-empty means this class's numbers are a floor, not a count. */
+  unavailable: HumanTouchTypeId[];
+}
+
+/** Epic-020's falsifier, computed rather than asserted: the metric fails as
+ *  defined if fewer than 80% of the countable-designated types turn out to be
+ *  mechanically countable. Published either way — "recorded honestly in the
+ *  report" is the epic's own instruction. */
+export interface HumanTouchCoverage {
+  countable_designated: number;
+  mechanically_counted: number;
+  /** mechanically_counted / countable_designated, 0–1, rounded to 3dp. */
+  share: number;
+  /** share >= 0.8 — the epic's bar. */
+  meets_bar: boolean;
+  /** Countable-designated types that did not produce a count this run. */
+  missing: HumanTouchTypeId[];
+}
+
+/** One scope's human-leverage block, as served inside a PerformanceSeries. */
+export interface HumanTouchBlock {
+  /** The calendar month this aggregation replayed, e.g. "2026-07". */
+  month: string;
+  window: { start: string; end: string };
+  /** Version of the Epic-016 taxonomy block this run was computed against.
+   *  A rubric change invalidates prior tables, so the table carries the
+   *  version it was scored under rather than assuming the current one. */
+  taxonomy_version: string;
+  /** Always all three classes, in a stable order, even when empty — an
+   *  absent class is indistinguishable from a class with no touches. */
+  classes: HumanTouchClassTable[];
+  coverage: HumanTouchCoverage;
+  /** V1 measures fan-out, not price (Epic-020 Q2 / the Goodhart clause).
+   *  Carried in the payload so the caveat travels with any quotation of the
+   *  number instead of living only in the report's prose. */
+  definition: "leverage-not-price";
+  updated_at: string;
 }
 
 // ── roll-up item shapes (DDB) ─────────────────────────────────────────────────
@@ -151,6 +269,12 @@ export interface PerformanceSeries {
 //                                          PR / REPO by explicit `sk`, so this
 //                                          item is additive and invisible to it
 //                                          until the digest PR renders it.
+//   pk = PERF#{scope}   sk = HUMAN-TOUCH — Epic-020 Story 2, published by
+//                                          build-human-touch.mjs. Monthly, not
+//                                          daily: it replays a calendar month
+//                                          rather than appending to a trailing
+//                                          window, so it never contends with
+//                                          the reducer.
 //
 // `scope` is "workforce" or a project_id (e.g. "self/ren"). The endpoint reads
 // the first three and composes the PerformanceSeries; LIFECYCLE is the live
@@ -169,7 +293,7 @@ export interface PerformanceSeries {
  *  workforce/scripts/backfill-performance-lifecycle.mjs to fill it at once. */
 export const PERF_WINDOW_DAYS = 90;
 
-export type PerfRollupKind = "LIFECYCLE" | "PR" | "REPO" | "IDLE";
+export type PerfRollupKind = "LIFECYCLE" | "PR" | "REPO" | "IDLE" | "HUMAN-TOUCH";
 
 /** Epic-021 §B.1 — the single global idleness window. One constant, no
  *  per-team override: "configurability is where exemptions hide" (Q3,
@@ -257,6 +381,15 @@ export interface PerfRepoRow {
   summary: RepoActivitySummary;
   /** Contributing project scopes (workforce aggregate) or [scope] (project). */
   repos: string[];
+}
+
+/** Epic-020 Story 2 — the monthly human-leverage roll-up. One item per scope
+ *  per the same convention as the rows above; the block is stored inline so
+ *  the endpoint serves it without a second read or any recomputation. */
+export interface PerfHumanTouchRow extends HumanTouchBlock {
+  pk: `PERF#${string}`;
+  sk: "HUMAN-TOUCH";
+  scope: string;
 }
 
 // ── pure aggregation ──────────────────────────────────────────────────────────
@@ -413,6 +546,7 @@ export function composeSeries(
     PerfRepoRow,
     "window" | "issues_daily" | "prs_daily" | "code_churn_weekly" | "summary" | "repos" | "updated_at"
   >,
+  humanTouchRow?: HumanTouchBlock,
 ): PerformanceSeries {
   const points = lifecycleRow.points;
   const lcStart = points[0]?.date;
@@ -448,6 +582,19 @@ export function composeSeries(
             summary: repoRow.summary,
             repos: repoRow.repos,
             updated_at: repoRow.updated_at,
+          },
+        }
+      : {}),
+    ...(humanTouchRow
+      ? {
+          human_touch: {
+            month: humanTouchRow.month,
+            window: humanTouchRow.window,
+            taxonomy_version: humanTouchRow.taxonomy_version,
+            classes: humanTouchRow.classes,
+            coverage: humanTouchRow.coverage,
+            definition: humanTouchRow.definition,
+            updated_at: humanTouchRow.updated_at,
           },
         }
       : {}),
