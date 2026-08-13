@@ -26,6 +26,10 @@ export type AgentBinding = {
   project_id?: string;
   config?: Record<string, unknown>;
   note?: string;
+  /** ISO 8601 instant this binding was first created (issue 574). Absent on
+   *  bindings created before this field existed — treat as "age unknown",
+   *  never as "just bound". */
+  bound_at?: string;
 };
 
 /**
