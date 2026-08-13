@@ -10,6 +10,7 @@ const putItem = vi.fn();
 const members = vi.fn();
 const listExecutions = vi.fn();
 const queryByGsiPaged = vi.fn();
+const sweepPendingEmbeddings = vi.fn();
 
 vi.mock("../shared/ddb.js", () => ({ scanAllPrefix, getItem, putItem, queryByGsiPaged }));
 vi.mock("../shared/project.js", () => ({
@@ -23,6 +24,10 @@ vi.mock("../shared/agent.js", () => ({
   bindingCronIsLoadBearing: (b: { trigger?: { scheduler?: string } }) =>
     b.trigger?.scheduler === "eventbridge",
 }));
+// #573 — this reducer's own test file exercises the LIFECYCLE/IDLE logic;
+// the embedding retry sweep gets its own dedicated unit tests
+// (shared/embedding-retry-tests.ts). Mocked here purely for IO isolation.
+vi.mock("../shared/embedding-retry.js", () => ({ sweepPendingEmbeddings }));
 
 const { handler } = await import("./handler.js");
 
@@ -61,6 +66,12 @@ beforeEach(() => {
   // ren delivered (has ok+artifact), others none.
   mockDeliveredPages({ ren: [okExec("editorial")] });
   listExecutions.mockResolvedValue([]); // idle window probe default: nothing
+  sweepPendingEmbeddings.mockResolvedValue({
+    attempted: 0,
+    recovered: 0,
+    failedTerminal: 0,
+    stillPending: 0,
+  }); // #573 default: nothing pending
   members.mockResolvedValue(["ren", "maya"]);
 });
 
@@ -266,5 +277,29 @@ describe("performance-reducer handler", () => {
     await handler();
     // A throwing non-commons run is not a deliverable — ren stays flagged.
     expect(idleRow()!.idle.map((r) => r.slug)).toContain("ren");
+  });
+});
+
+// ── #573 — embedding retry sweep wiring ─────────────────────────────────────
+// The sweep's own logic (bounded retry, terminal failure, text derivation)
+// is unit-tested in shared/embedding-retry-tests.ts; this file only checks
+// the reducer wires it correctly — every scanned project (active AND
+// archived, so an inactive project doesn't orphan its pending rows) and
+// surfaces the result on the handler's own return value.
+describe("performance-reducer — embedding retry sweep wiring (#573)", () => {
+  it("sweeps every project this run scanned, including archived ones", async () => {
+    await handler();
+    expect(sweepPendingEmbeddings).toHaveBeenCalledWith(["editorial", "ghost"]);
+  });
+
+  it("surfaces the sweep's result on the handler's own return value", async () => {
+    sweepPendingEmbeddings.mockResolvedValueOnce({
+      attempted: 3,
+      recovered: 2,
+      failedTerminal: 1,
+      stillPending: 0,
+    });
+    const res = await handler();
+    expect(res.embeddingRetry).toEqual({ attempted: 3, recovered: 2, failedTerminal: 1, stillPending: 0 });
   });
 });
