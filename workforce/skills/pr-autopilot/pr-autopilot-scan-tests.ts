@@ -18,6 +18,7 @@ import {
   alreadyRouted,
   headCommitDate,
   isTerminal,
+  lastRemediationOutcomeAt,
   nextRoutingCycle,
   routingState,
   selectCandidates,
@@ -260,6 +261,74 @@ describe("nextRoutingCycle — the discovery gate", () => {
   it("keeps alreadyRouted as the has-ever-routed predicate", () => {
     expect(alreadyRouted(comments, "nadia")).toBe(true);
     expect(alreadyRouted(comments, "maya")).toBe(false);
+  });
+
+  // THE #565 REGRESSION. `pr-remediate` resolved the blocking finding by
+  // editing the PR body + opening a split-out issue — no commit, so the head
+  // never moved. Against the pre-fix code this PR never came back either:
+  // adr-0025's dispatch re-ran the scan, and the scan still found nothing.
+  it("re-routes at cycle 2 on a code-free remediation outcome, even with no head commit", () => {
+    expect(
+      nextRoutingCycle({
+        comments,
+        persona: "nadia",
+        headCommittedAt: null,
+        remediationOutcomeAt: Date.parse("2026-07-27T14:48:00Z"),
+      }),
+    ).toBe(2);
+  });
+
+  it("does not re-route on a remediation outcome that predates the routing comment", () => {
+    expect(
+      nextRoutingCycle({
+        comments,
+        persona: "nadia",
+        headCommittedAt: null,
+        remediationOutcomeAt: Date.parse("2026-07-27T05:45:00Z"),
+      }),
+    ).toBeNull();
+  });
+
+  it("takes whichever of head-commit / remediation-outcome is newer", () => {
+    expect(
+      nextRoutingCycle({
+        comments,
+        persona: "nadia",
+        headCommittedAt: "2026-07-27T05:45:00Z", // before routing
+        remediationOutcomeAt: Date.parse("2026-07-27T14:48:00Z"), // after routing
+      }),
+    ).toBe(2);
+  });
+});
+
+describe("lastRemediationOutcomeAt — the pr-remediate revision signal", () => {
+  const outcome = (persona, n, cap, createdAt) => ({
+    body: `**${persona} — remediation attempt ${n} of ≤ ${cap}, outcome.** review-findings (blocking)\n\nfixed it`,
+    created_at: createdAt,
+  });
+
+  it("reads the timestamp off a pr-remediate outcome comment", () => {
+    expect(
+      lastRemediationOutcomeAt([outcome("Ren", 1, 3, "2026-08-10T19:40:23Z")]),
+    ).toBe(Date.parse("2026-08-10T19:40:23Z"));
+  });
+
+  it("ignores the claim comment (no work has landed yet)", () => {
+    const claim = { body: "**Remediation attempt 1 of ≤ 3 — claimed.**\n\nStarting work…", created_at: "2026-08-10T19:38:42Z" };
+    expect(lastRemediationOutcomeAt([claim])).toBeNull();
+  });
+
+  it("takes the newest of several outcome comments", () => {
+    const cs = [
+      outcome("Ren", 1, 3, "2026-08-05T07:00:00Z"),
+      outcome("Ren", 2, 3, "2026-08-10T19:40:23Z"),
+    ];
+    expect(lastRemediationOutcomeAt(cs)).toBe(Date.parse("2026-08-10T19:40:23Z"));
+  });
+
+  it("returns null with no remediation comments at all", () => {
+    expect(lastRemediationOutcomeAt([])).toBeNull();
+    expect(lastRemediationOutcomeAt([routed("Nadia", 1, "2026-07-27T07:35:00Z")])).toBeNull();
   });
 });
 
