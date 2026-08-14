@@ -227,6 +227,26 @@ Iterate `payload.tasks` in order. For each task:
    - `status:"skipped"` with no `artifact` when the skill's skip-rule fired — set `summary` to the skip reason; the skip is worth recording too.
    - This is the **same `engagements` write surface** external clients use (one endpoint, not two); `execution_surface:"ccr"` is the only thing that marks it as a workforce CCR run.
    - The token is injected into the task by the orchestrator; never hard-code it. A 401 means it wasn't injected — fail loud for the task, don't silently drop the record.
+   - **Issue-585 hardening.** The `POST /agents/{agent_slug}/engagements` call for
+     task N **must** happen fully sequentially with task N's own execution — never
+     background it (`curl ... &`) and never build the request body via a shared
+     variable/tempfile reused across tasks in the batch loop. A backgrounded write
+     whose body is composed from a loop-scoped variable can still be in flight
+     when the loop advances and mutates that variable, so the request that
+     actually leaves the process carries a *later* task's content under an
+     *earlier* task's `agent_slug` in the URL — exactly the cross-contamination
+     `#585` reported (identical `started_at`/`ended_at`/`content_hash`/
+     `artifact.uri` landing under the wrong agent). A regression test
+     (`workforce/lambdas/agents-api/handler-tests.ts`, "#585: N concurrent agents
+     sharing one bearer token never cross-contaminate rows") confirms the
+     **endpoint itself** holds no shared mutable state across concurrent
+     requests — the failure mode this note guards against is a property of how
+     the *calling* session constructs and issues the POST, not of the Lambda.
+     After every engagement POST, **read it back**
+     (`GET /agents/{agent_slug}/executions?limit=1`) and assert the top row's
+     `agent_slug`, `summary`, and `artifact.uri` match what you just sent, before
+     moving to the next task — a mismatch is exactly this corruption class and
+     must be surfaced loudly (C-4), not silently trusted from the `201`.
 
 ## Write-back — via the skill's authenticated endpoint script
 
