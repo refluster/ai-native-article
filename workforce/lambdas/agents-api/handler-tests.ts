@@ -1430,6 +1430,67 @@ describe("POST /agents/{slug}/engagements (Engagements API — createEngagement)
     const res = await handler(postEvt("nadia", { authorization: "Bearer not-a-real-token" }, validBody()));
     expect(statusOf(res)).toBe(401);
   });
+
+  // #585 — a `wf-orchestrator-tick` batch fire recorded imogen's and
+  // rafael's genuine content (identical started_at/ended_at/content_hash/
+  // artifact_ref.uri) under a THIRD agent's (imogen's) slug, cross-
+  // contaminating the Track Record ledger. This reproduces the batch shape
+  // (N distinct agents, all authenticated with the SAME shared bearer per
+  // agent-runner.md, POSTing concurrently within the same handler-warm
+  // lifetime) and asserts every row lands under its own agent_slug with
+  // its own content. This suite passes cleanly against HEAD — the route
+  // holds no module/connection-scoped mutable state across concurrent
+  // invocations (every field the handler reads/writes — `parsed`, `row`,
+  // `exec_ulid`, `artifactRef` — is a local `const`/`let` inside the async
+  // function's own closure, and `appendExecution` -> `putItem` addresses a
+  // unique `(pk, sk=EXEC#{exec_ulid})` per call). That rules OUT the
+  // "shared mutable state in this Lambda" hypothesis from the issue's
+  // Suggested next step; see the PR body for what's still open.
+  it("#585: N concurrent agents sharing one bearer token never cross-contaminate rows", async () => {
+    const agents = ["imogen", "nadia", "rafael", "yuki", "dario", "aoi", "priya", "silas", "sana"];
+    const responses = await Promise.all(
+      agents.map((slug, i) =>
+        handler(
+          postEvt(
+            slug,
+            { authorization: `Bearer ${TOKEN}` },
+            validBody({
+              started_at: "2026-08-13T17:29:57.445Z",
+              ended_at: "2026-08-13T17:38:07.887Z",
+              summary: `daily-research post for ${slug}`,
+              artifact: {
+                uri: `https://kohuehara.xyz/feed#post-${i}`,
+                content_hash: `${i}`.repeat(64).slice(0, 64),
+                content_type: "text/markdown",
+                size_bytes: 100 + i,
+                summary: `artifact for ${slug}`,
+              },
+            }),
+          ),
+        ),
+      ),
+    );
+
+    responses.forEach((res, i) => {
+      expect(statusOf(res)).toBe(201);
+      const engagement = (bodyOf(res) as { engagement: { agent_slug: string; summary: string; artifact: { uri: string } } }).engagement;
+      // Each response must echo back its OWN request's agent_slug/content,
+      // not a sibling task's — this is the exact corruption #585 reported.
+      expect(engagement.agent_slug).toBe(agents[i]);
+      expect(engagement.summary).toBe(`daily-research post for ${agents[i]}`);
+      expect(engagement.artifact.uri).toBe(`https://kohuehara.xyz/feed#post-${i}`);
+    });
+
+    // And the persisted ledger (what GET /agents/{slug}/executions reads
+    // back) must show the same one-row-per-agent, uncontaminated shape.
+    for (const [i, slug] of agents.entries()) {
+      const persisted = await handler(evt("GET /agents/{slug}/executions", { slug }));
+      const items = (bodyOf(persisted) as { items: Array<{ agent_slug: string; summary: string }> }).items;
+      expect(items).toHaveLength(1);
+      expect(items[0]!.agent_slug).toBe(slug);
+      expect(items[0]!.summary).toBe(`daily-research post for ${slug}`);
+    }
+  });
 });
 
 // ─── GET /stats (listStats — EXEC-ledger dashboard roll-up) ─────────────
