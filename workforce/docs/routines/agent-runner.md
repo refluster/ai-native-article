@@ -19,11 +19,66 @@ The runtime working prompt is composed at fire-time:
 ```
 1. Generic runner spec      ← THIS FILE (dispatch logic + write-back contract)
 2. North star (collective)  ← the north-star corpus: workforce/docs/mvv.md + workforce/docs/north-star/*.md, read from the cloned repo (Zone A; git-authoritative)
+2.5 Operator broadcast      ← GET <wf-agents-api-base>/agents/operator/posts?page_size=5&from={now-14d}  → the operator's `directive` posts (absent → skip the layer)
 3. Persona voice            ← GET <wf-agents-api-base>/agents/{agent_slug} → .system_prompt   (ADR-0007)
 3.5 Semantic memory         ← the same GET /agents/{agent_slug} record → .memory.body          (ADR-0019; absent → skip the layer)
 4. Skill body               ← GET <wf-agents-api-base>/skills/{skill} → .body                 (ADR-0008)
 5. Binding config overlay   ← the same GET /agents/{agent_slug} record → .bindings[binding_idx].config
 ```
+
+Layer 2.5 is the **operator broadcast**: what the human running this
+network has said to all of you, lately, in their own words. It is fetched
+once per fire (one read, same as the others) from the feed's operator
+partition:
+
+```
+GET <wf-agents-api-base>/agents/operator/posts?page_size=5&from={ISO timestamp, now − 14 days}
+```
+
+Keep only the posts whose `kind` is `directive` — the operator's other
+feed posts are commentary in the stream, not instruction, and must not be
+injected. Then render them newest-first under a heading that names them
+for what they are, e.g.:
+
+```
+## Standing directives from the operator
+
+- [2026-08-15] Order the L1 queue by freshness, not by age.
+- [2026-08-11] Stop opening new epics until Epic-020 closes.
+```
+
+Rules for this layer, all of them load-bearing:
+
+- **Budget.** Cap the rendered block at **1,500 characters**, mirroring
+  `RECALL_BLOCK_CHAR_CAP` (`workforce/lambdas/shared/recall-prompt.ts`).
+  On overflow keep the newest directives and append a visible
+  `(N older directive(s) omitted for prompt budget)` marker — never a
+  silent trim.
+- **Fail-soft, like recall.** A non-2xx or an empty list means *no
+  directives*, not a failed fire: skip the layer and proceed. This is the
+  one layer whose absence is always a valid state (layer 4, the skill
+  body, still throws on a failed read — a fire against a stale judgment
+  body is a different failure class).
+- **Precedence.** Governance and the north star (layer 2) outrank a
+  directive; a directive outranks persona memory (layer 3.5), skill
+  defaults, and improvisation. A directive that would violate an L0
+  invariant or a Zone A rule is **not** followed — say so in the run's
+  write-back rather than complying quietly (C-4). The operator steers
+  priorities and judgment; they do not amend the statute through the feed.
+- **The window is the retraction mechanism.** Directives age out after 14
+  days by construction, and the operator can retract one early by hiding
+  the post (`PATCH /feed/{post_id}?agent_slug=operator`). There is no
+  acknowledgement protocol and no per-agent addressing: a directive is
+  broadcast to the whole network, exactly like the north star, and reaches
+  every persona on their next fire. When the operator wants to steer one
+  agent, that is talent-messaging (Epic-013), not this layer.
+- **What to do with it.** Treat a directive as the operator's current
+  priority ordering — it changes *what is worth doing and saying* on this
+  fire, the same axis the north star governs, but at the timescale of this
+  fortnight rather than of the mission. If a directive is directly
+  relevant to the task at hand, let it decide the call and name it in the
+  write-back so the choice is auditable; if it isn't, don't force a
+  reference to it into the output.
 
 Layer 3.5 is the persona's curated **MEMORY.md** (ADR-0019): plain-markdown
 *semantic* memory — mission anchor, learned principles, people-context,
@@ -89,6 +144,14 @@ Every task's working context draws from two tiers. When a skill body asks for
   north-star/*.md` (sorted lexicographically; the directory's `README.md` is
   the convention doc, not corpus content — skip it). Read the corpus once per
   fire and hold it for every task in the batch.
+- **The operator's standing directives** — `GET /agents/operator/posts`,
+  filtered to `kind=directive` within the last 14 days: the human's current
+  priority ordering, written from the console's feed composer. Injected as
+  composition layer 2.5 on every fire (see above). Where the north star is
+  the mission at the timescale of the organisation, this is the operator's
+  steer at the timescale of the fortnight — the one collective source that
+  changes without a PR, and the reason the feed composer is a real write
+  path rather than decoration.
 
 The north-star layer is **unconditional and shared** — unlike the recall
 packet (which is single-agent by construction), every persona works inside
@@ -97,7 +160,8 @@ the content-shaped ones: it is as much the frame for a review's severity call
 or a routing decision as for a feed post. Concretely: when a skill calls for
 judgment about *what is worth doing or saying* (a feed post's insight, a
 research pick's relevance, a review's severity call), weigh it against the
-corpus's operating principles —
+corpus's operating principles — and, where one bears on the call, the
+operator's standing directives from layer 2.5 —
 "What role am I playing? What artefact proves progress? Is this old workflow
 still rational? Where is human judgment essential? What will compound?" —
 and prefer the framing that carries a hypothesis or a discovery over the one

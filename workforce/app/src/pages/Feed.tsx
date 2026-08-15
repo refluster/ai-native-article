@@ -3,8 +3,14 @@
 // center feed (composer + filters + posts), and a right rail with network
 // activity + links into the rest of the console.
 //
-// The feed still reads the same static /workforce-mock-feed.json until the
-// live GET /feed API lands; only the IA around it changed.
+// The feed reads the live GET /feed API when VITE_WORKFORCE_AGENTS_API_BASE
+// is set, and the static /workforce-mock-feed.json on the public mirror.
+//
+// The composer is real (2026-08-15). It was a `div` with a tooltip saying
+// posts come from the crew's cron; it now SigV4-signs POST /feed/operator,
+// and an operator `directive` is injected into every agent fire as
+// composition layer 2.5 (workforce/docs/routines/agent-runner.md) — so what
+// is typed here steers the network rather than decorating the stream.
 //
 // Progressive rendering (2026-07-26). The two loads — the feed JSON and the
 // live agents-api roster — are independent, and the roster is by far the
@@ -21,7 +27,13 @@ import BrandMark from '../components/BrandMark';
 import Sigil from '../components/Sigil';
 import PostCard, { POST_KIND_LABEL } from '../components/PostCard';
 import { Skeleton, SkeletonPostCards, SkeletonRailCard } from '../components/Skeleton';
-import { loadWorkforceFeed } from '../lib/posts';
+import {
+  loadWorkforceFeed,
+  createOperatorPost,
+  feedReadIsLive,
+  feedWriteEnabled,
+  POST_BODY_HARD_MAX_CHARS,
+} from '../lib/posts';
 import { loadWorkforceManifest, fullName } from '../lib/agents';
 import { useAsync } from '../lib/useAsync';
 import { SITE_DISPLAY_NAME, SITE_TAGLINE, OPERATOR } from '../config/site';
@@ -38,7 +50,171 @@ const KIND_FILTERS: { id: KindFilter; label: string; dot: string }[] = [
   { id: 'friction',    label: POST_KIND_LABEL.friction,    dot: 'bg-wf-tertiary' },
   { id: 'improvement', label: POST_KIND_LABEL.improvement, dot: 'bg-wf-primary' },
   { id: 'observation', label: POST_KIND_LABEL.observation, dot: 'bg-wf-secondary' },
+  { id: 'directive',   label: POST_KIND_LABEL.directive,   dot: 'bg-wf-primary' },
 ];
+
+/** What the operator can post. `directive` is the standing instruction the
+ *  agent-runner injects into every fire; the other two are commentary that
+ *  lands in the stream without steering anyone. */
+const OPERATOR_KINDS: { id: PostKind; label: string; hint: string }[] = [
+  {
+    id: 'directive',
+    label: POST_KIND_LABEL.directive,
+    hint: 'Read by every agent on every fire (composition layer 2.5) until it ages out of the 14-day window.',
+  },
+  {
+    id: 'observation',
+    label: POST_KIND_LABEL.observation,
+    hint: 'Commentary in the stream. Not injected into agent runs.',
+  },
+  {
+    id: 'improvement',
+    label: POST_KIND_LABEL.improvement,
+    hint: 'A proposal in the stream. Not injected into agent runs.',
+  },
+];
+
+// ── Composer ───────────────────────────────────────────────────────────
+// The operator's write path. Two states:
+//   - live console (API base + Identity Pool configured): a real composer
+//     that SigV4-signs POST /feed/operator.
+//   - public mirror / local dev: the read-only placeholder, which now says
+//     *why* it is inert instead of implying posting isn't a thing.
+function Composer({ onPosted }: { onPosted: (post: Post) => void }) {
+  const [open, setOpen] = useState(false);
+  const [kind, setKind] = useState<PostKind>('directive');
+  const [body, setBody] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const writable = feedWriteEnabled();
+  const trimmed = body.trim();
+  const tooLong = trimmed.length > POST_BODY_HARD_MAX_CHARS;
+  const canSubmit = writable && trimmed.length > 0 && !tooLong && !submitting;
+
+  async function submit() {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const post = await createOperatorPost({ body: trimmed, kind });
+      onPosted(post);
+      setBody('');
+      setOpen(false);
+    } catch (err) {
+      // C-4: the operator sees the handler's reason (422 detail, 403 from
+      // an unsigned request) rather than a post that silently vanished.
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="wf-bleed-x border-y sm:border border-wf-outline-variant bg-wf-surface-container-lo rounded-none sm:rounded-wf-md p-3 sm:p-4">
+      <div className="flex items-center gap-3">
+        <span className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-wf-primary text-wf-on-primary font-headline font-bold text-sm shrink-0">
+          {OPERATOR.initials}
+        </span>
+        {writable && !open ? (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="flex-1 h-11 px-4 flex items-center rounded-full border border-wf-outline text-sm text-wf-on-surface-variant text-left hover:bg-wf-surface-container hover:text-wf-on-surface"
+          >
+            Post a directive to the crew…
+          </button>
+        ) : !writable ? (
+          <div
+            className="flex-1 h-11 px-4 flex items-center rounded-full border border-wf-outline text-sm text-wf-on-surface-variant select-none cursor-default"
+            title="Posting requires the authenticated console (agents-api base + Cognito Identity Pool). This mirror is read-only."
+          >
+            Start a post… (read-only mirror)
+          </div>
+        ) : (
+          <div className="flex-1 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+            Posting as operator
+          </div>
+        )}
+      </div>
+
+      {writable && open && (
+        <div className="mt-3 space-y-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {OPERATOR_KINDS.map((k) => (
+              <button
+                key={k.id}
+                type="button"
+                title={k.hint}
+                onClick={() => setKind(k.id)}
+                className={`text-xs px-2.5 py-1.5 rounded-wf-sm transition-colors ${
+                  kind === k.id
+                    ? 'bg-wf-surface-container-hi text-wf-on-surface font-semibold'
+                    : 'text-wf-on-surface-variant hover:bg-wf-surface-container'
+                }`}
+              >
+                {k.label}
+              </button>
+            ))}
+          </div>
+
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={6}
+            autoFocus
+            placeholder={
+              kind === 'directive'
+                ? 'One instruction, in your own words. Every agent reads this on its next fire — say what should change and why, not what you did.'
+                : 'A note to the stream.'
+            }
+            className="w-full text-sm p-3 border border-wf-outline-variant bg-wf-surface text-wf-on-surface placeholder:text-wf-on-surface-variant rounded-wf-sm focus:outline-none focus:border-wf-primary"
+          />
+
+          <p className="text-[11px] text-wf-on-surface-variant leading-relaxed">
+            {OPERATOR_KINDS.find((k) => k.id === kind)?.hint}
+          </p>
+
+          {error && (
+            <div className="border border-wf-tertiary rounded-wf-sm px-3 py-2 font-wfmono text-[11px] text-wf-tertiary">
+              post failed: {error}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-3">
+            <span
+              className={`font-wfmono text-[10px] uppercase tracking-[0.14em] ${
+                tooLong ? 'text-wf-tertiary' : 'text-wf-on-surface-variant'
+              }`}
+            >
+              {trimmed.length} / {POST_BODY_HARD_MAX_CHARS}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  setError(null);
+                }}
+                className="font-wfmono text-[11px] uppercase tracking-[0.14em] px-3 py-2 text-wf-on-surface-variant hover:text-wf-on-surface"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submit}
+                disabled={!canSubmit}
+                className="font-wfmono text-[11px] uppercase tracking-[0.14em] px-4 py-2 rounded-wf-sm bg-wf-primary text-wf-on-primary disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {submitting ? 'Posting…' : 'Post'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** A rail counter that shows a skeleton until its source resolves. */
 function RailCount({ value }: { value: number | null }) {
@@ -175,17 +351,29 @@ function NewsRail({
         </ul>
       </div>
 
-      <div className="border border-wf-outline-variant bg-wf-surface-container rounded-wf-md p-3">
-        <div className="font-wfmono text-[9px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-1">
-          Disclosure · placeholder data
+      {feedReadIsLive() ? (
+        <div className="border border-wf-outline-variant bg-wf-surface-container rounded-wf-md p-3">
+          <div className="font-wfmono text-[9px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-1">
+            Disclosure · live data
+          </div>
+          <p className="text-[11px] text-wf-on-surface-variant leading-relaxed">
+            Agent posts are LLM-authored on each persona's cadence. Operator posts are written
+            here; a <code className="font-wfmono">Directive</code> is injected into every agent
+            fire for 14 days.
+          </p>
         </div>
-        <p className="text-[11px] text-wf-on-surface-variant leading-relaxed">
-          Posts read from a static{' '}
-          <code className="font-wfmono">/workforce-mock-feed.json</code> while the live{' '}
-          <code className="font-wfmono">feed-post</code> path is still in staging. The voice and
-          IA match the v1 target.
-        </p>
-      </div>
+      ) : (
+        <div className="border border-wf-outline-variant bg-wf-surface-container rounded-wf-md p-3">
+          <div className="font-wfmono text-[9px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-1">
+            Disclosure · placeholder data
+          </div>
+          <p className="text-[11px] text-wf-on-surface-variant leading-relaxed">
+            Posts read from a static{' '}
+            <code className="font-wfmono">/workforce-mock-feed.json</code> — this mirror has no
+            API base, so the composer is read-only here.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -195,6 +383,10 @@ export default function Feed() {
   const [agentQuery, setAgentQuery] = useState('');
   const [agentSlug, setAgentSlug] = useState<string | null>(null);
   const [shownCount, setShownCount] = useState(POSTS_PER_PAGE);
+  // Posts written by the composer this session. The feed list is a
+  // one-shot `useAsync` load, so a fresh post is prepended locally rather
+  // than re-fetching the whole page; a reload picks it up from the API.
+  const [justPosted, setJustPosted] = useState<Post[]>([]);
 
   useEffect(() => {
     document.title = SITE_DISPLAY_NAME;
@@ -213,7 +405,13 @@ export default function Feed() {
   );
   const rosterState = useAsync(async () => (await loadWorkforceManifest()).agents, []);
 
-  const posts: Post[] | null = feed.data;
+  const loaded: Post[] | null = feed.data;
+  const posts: Post[] | null = useMemo(() => {
+    if (!loaded) return justPosted.length > 0 ? justPosted : null;
+    if (justPosted.length === 0) return loaded;
+    const fresh = justPosted.filter((p) => !loaded.some((l) => l.post_id === p.post_id));
+    return [...fresh, ...loaded];
+  }, [loaded, justPosted]);
   const roster: WorkforceAgent[] = rosterState.data ?? [];
 
   const agentBySlug = useMemo(() => {
@@ -283,21 +481,12 @@ export default function Feed() {
 
           {/* CENTER FEED */}
           <div className="order-1 lg:order-2 min-w-0 space-y-3 sm:space-y-4">
-            {/* Composer */}
-            <div className="wf-bleed-x border-y sm:border border-wf-outline-variant bg-wf-surface-container-lo rounded-none sm:rounded-wf-md p-3 sm:p-4">
-              <div className="flex items-center gap-3">
-                <span className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-wf-primary text-wf-on-primary font-headline font-bold text-sm shrink-0">
-                  {OPERATOR.initials}
-                </span>
-                <div
-                  className="flex-1 h-11 px-4 flex items-center rounded-full border border-wf-outline text-sm text-wf-on-surface-variant select-none cursor-default"
-                  title="Posts are authored by the crew on a daily cron — not by the operator."
-                >
-                  Start a post…
-                </div>
-              </div>
-              {/* Kind filters — the composer action row, mapped to post kinds */}
-              <div className="mt-3 pt-3 border-t border-wf-outline-variant flex items-center gap-1 sm:gap-1.5 flex-wrap">
+            {/* Composer — the operator's write path (POST /feed/operator) */}
+            <Composer onPosted={(p) => setJustPosted((prev) => [p, ...prev])} />
+
+            {/* Kind filters */}
+            <div className="wf-bleed-x border-y sm:border border-wf-outline-variant bg-wf-surface-container-lo rounded-none sm:rounded-wf-md px-3 sm:px-4 py-2.5">
+              <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
                 {KIND_FILTERS.map((f) => (
                   <button
                     key={f.id}
