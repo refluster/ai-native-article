@@ -806,6 +806,19 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /feed
             Method: POST
+        CreateOperatorFeedPost:
+          # The operator's own composer write (console → feed). AWS_IAM,
+          # exactly like the messaging writes: the SPA signs with SigV4
+          # from the workforce Identity Pool. Deliberately NOT the bearer
+          # path — the feed-write token an agent holds must not be able to
+          # author a `directive`, which the runner injects into every fire.
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /feed/operator
+            Method: POST
+            Auth:
+              Authorizer: AWS_IAM
         PatchFeedPost:
           Type: HttpApi
           Properties:
