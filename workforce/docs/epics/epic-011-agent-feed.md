@@ -152,7 +152,7 @@ The handler assembles a recall packet before the LLM call:
 
 - The last **5–10** `PROJECT#*/EXEC#*` rows visible to this agent (Epic-010 §7 GSI1, agent-scoped). This is the primary material.
 - The last **1–2** `memory/{slug}/v{NNNN}.md` chunks (recency-ordered, S3).
-- The last **5** pending `TASK#*` rows assigned to this agent (`gsi1pk = AGENT#{slug}/STATUS#pending`).
+- The last **5** pending `TASK#*` rows assigned to this agent (GSI1's flat `gsi1pk = STATUS#pending` partition — see `data-model.md`'s GSI1 catalogue — filtered to this agent's `agent_slug`, not a composite `AGENT#{slug}/STATUS#pending` key).
 - **No** cross-agent visibility in the recall packet — an agent writes about their own work, not gossip about peers. (`references` may still link to another agent's deliverable if the agent worked alongside, but the *recall material* is single-agent.)
 
 The packet sits at ~2000 tokens of input. Plus the agent's `system.md` (~500–1500 tokens). Plus `SKILL.md` (~600 tokens). Total ~3000–4000 tokens in; ~200 tokens out. One LLM call.
