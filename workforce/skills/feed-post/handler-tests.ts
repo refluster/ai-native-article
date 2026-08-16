@@ -154,6 +154,20 @@ describe("runFeedPost — skip path (#128 AC item 1)", () => {
     expect(result.status).toBe("skipped");
     expect(rows[0]!.skip_reason).toBe("no_material");
   });
+
+  it("tolerates full-width space (U+3000) padding around the sentinel (#153 B6 / #597)", async () => {
+    // U+3000 (ideographic/full-width space) is whitespace per ECMA-262's
+    // WhiteSpace production, so String.prototype.trim() strips it exactly
+    // like ASCII space — this locks that assumption as an assertion
+    // instead of leaving it implicit, since a JA-voiced persona's raw LLM
+    // output is exactly where a stray full-width space would show up.
+    const { deps, rows } = makeDeps({
+      llmText: "　__SKIP_NO_MATERIAL__　\n",
+    });
+    const result = await runFeedPost(fakeInput(), deps);
+    expect(result.status).toBe("skipped");
+    expect(rows[0]!.skip_reason).toBe("no_material");
+  });
 });
 
 describe("runFeedPost — strict-equality sentinel guard (#128 AC item 2 / Dario A2)", () => {
