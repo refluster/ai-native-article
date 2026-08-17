@@ -1,4 +1,10 @@
-export const SITE_BASE_PATH = '/ai-native-article/'
+// The site is deployed to the custom domain root (CNAME -> kohuehara.xyz,
+// force_orphan deploy in .github/workflows/deploy-article-site.yml), not to
+// a GitHub Pages project URL (owner.github.io/repo/) — so the base path is
+// "/", not the repo name. (#600: this was hardcoded to '/ai-native-article/'
+// and would have 404'd every asset once GitHub Pages actually served this
+// build from the custom domain.)
+export const SITE_BASE_PATH = '/'
 
 export const SITE_BASENAME = SITE_BASE_PATH.replace(/\/$/, '')
 
