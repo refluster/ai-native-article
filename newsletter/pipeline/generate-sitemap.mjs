@@ -16,7 +16,11 @@ import { fileURLToPath } from 'url'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const ARTICLE_PUBLIC = join(ROOT, 'newsletter', 'app', 'public')
 const ORIGIN = 'https://kohuehara.xyz'
-const BASE = '/ai-native-article'
+// The site deploys to the custom-domain root (kohuehara.xyz), not a GitHub
+// Pages project URL (owner.github.io/repo/) — see newsletter/app/src/config/
+// site.ts SITE_BASE_PATH, the app-side single source of truth for this same
+// fact (issue 600, remediation A1 on PR 606).
+const BASE = ''
 const MANIFEST = join(ARTICLE_PUBLIC, 'posts', 'manifest.json')
 const SITEMAP = join(ARTICLE_PUBLIC, 'sitemap.xml')
 const ROBOTS = join(ARTICLE_PUBLIC, 'robots.txt')
