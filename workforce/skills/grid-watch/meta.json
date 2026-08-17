@@ -1,6 +1,6 @@
 {
   "name": "grid-watch",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "status": "active",
   "archetype": "cadence",
   "cost_class": "small",

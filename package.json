@@ -23,6 +23,7 @@
     "lint:tokens": "node scripts/lint-design-tokens.mjs",
     "check-truncation": "node scripts/check-corpus-truncation.mjs",
     "check-proxy-bootstrap": "node scripts/check-proxy-bootstrap.mjs",
+    "check-cadence-readback-guard": "node scripts/check-cadence-readback-guard.mjs",
     "check-corpus-freshness": "node scripts/check-corpus-freshness.mjs",
     "test:scripts": "node --test scripts/lib/*.test.mjs",
     "check-l1-citation": "node scripts/check-l1-citation.mjs",

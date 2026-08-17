@@ -38,6 +38,9 @@ jobs:
       - name: Proxy-bootstrap gate (R-14)
         run: npm run check-proxy-bootstrap
 
+      - name: Cadence write-script read-back gate (R-16)
+        run: npm run check-cadence-readback-guard
+
       - name: Script library tests
         run: npm run test:scripts
 
