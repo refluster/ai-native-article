@@ -9,10 +9,15 @@
 
 import { displayTag } from './article-types'
 import { LANGUAGES, type Language } from '../i18n/language'
+import { SITE_BASENAME } from '../config/site'
 
 const SITE_NAME = 'AI NATIVE ARTICLE'
 const SITE_ORIGIN = 'https://kohuehara.xyz'
-const SITE_BASE = '/ai-native-article'
+// The domain-root-relative empty-string variant of site.ts's SITE_BASE_PATH —
+// the same value routerBaseName() (lib/paths.ts) uses for BrowserRouter's
+// `basename`, so every "where does this site live" answer traces to one
+// constant (issue 600, remediation A2 on PR 606).
+const SITE_BASE = SITE_BASENAME
 const MAX_DESC = 160
 
 /**
