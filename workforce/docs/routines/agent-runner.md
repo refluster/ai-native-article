@@ -257,6 +257,33 @@ Iterate `payload.tasks` in order. For each task:
    - `article-level2` → two scripts, one credential (`notion.integration_token` — only its `apiKey` is read; both DB ids are non-secret script constants): first `node workforce/skills/article-level2/pick-l1-source.mjs` (reads the L1 source library + checks unified coverage → prints the oldest uncovered source, or `{skip:true}` → produce nothing this fire); then generate the briefing markdown and `node workforce/skills/article-level2/publish-notion.mjs` (→ `POST https://api.notion.com/v1/pages` → unified Articles DB row with `Author`, `Type=explanation`, `Status=ready_for_L4`). The Notion API is an external capability endpoint (not an AWS resource); the injected integration token scopes the access, exactly like the feed-write token scopes `POST /feed`. The integration must be shared with both DBs in Notion.
    You do **not** hand-edit repo files and do **not** open a PR for these skills. The credential each script needs is in your task's `credentials` map.
 
+   **Temp-file paths MUST be task-unique — never a skill body's literal example path.**
+   A skill's SKILL.md may show an illustrative path (e.g. `/tmp/feed-body.md`); that
+   string is documentation, not a filename contract. When a batch fire runs multiple
+   tasks concurrently — whether as parallel subagents inside one runner session, or as
+   genuinely separate CCR sessions overlapping in wall-clock time — every process on
+   this host shares one `/tmp`. A literal shared path is a write-then-read race: a
+   sibling task's write can land between this task's `Write` and the script's `read`,
+   and the write-script has no way to detect it — it faithfully POSTs whatever bytes
+   are on disk at read time. The result is not a clean failure; it is a *silent*
+   misattribution (someone else's content published under **your** `agent_slug`,
+   sometimes to a public feed, always without a delete/correction endpoint — ML-028).
+   Generate a path unique to this task before writing anything — e.g.
+   `` `/tmp/agent-runner-${agent_slug}-${binding_idx}-${ticked_at replace non-alnum with '-'}-${a random suffix}.md` ``
+   (or, in a shell step, `mktemp`) — and pass that path to the write script's
+   `--body-file` / equivalent flag. **After the script's write call and before
+   trusting its exit code as success, re-read the deliverable back from its own
+   store** (the feed GET, the Notion page, etc.) and diff it against what you meant
+   to send — the mandatory step-8 engagement read-back catches a wrong `agent_slug`
+   on the ledger row, but only a content-level check on the *product* write catches a
+   wrong body under the *right* `agent_slug`, which is the failure mode actually
+   observed (ML-028, four independent occurrences on 2026-08-20 alone, at least one
+   spanning two different concurrently-firing sessions — see the memory-lint backlog
+   entry for incident detail). A mismatch here is not recoverable by editing the bad
+   row — supersede it with a correct one (as this note's `--body-file` guidance does)
+   and surface the stray artefact for operator cleanup (C-4); do not silently trust a
+   `201`.
+
 6. **Per-task isolation** — a failure in task N must not abort tasks N+1, N+2, etc. Wrap each task's execution in its own try/catch; record per-task outcomes in your session output so the operator can see which tasks succeeded vs failed within the same fire.
 
 7. **Record** — the script's exit code IS the per-task outcome. Surface each task's `(agent, skill, exit_code, one-line result)` in your session summary so the operator can scan one place. The skill's own backing store (DDB POST# row, Discord channel) is the *product* record.
