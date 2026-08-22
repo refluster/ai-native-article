@@ -237,6 +237,14 @@ export async function queryBySkPrefix<T extends object>(
       ExpressionAttributeValues: { ":pk": pk, ":skp": skPrefix },
       Limit: limit,
       ScanIndexForward: scanIndexForward,
+      // ML-029 / #613: this is a base-table primary-key query, so a
+      // strongly consistent read is available (unlike the GSI queries
+      // below — DynamoDB never supports ConsistentRead on a GSI). Without
+      // this, a read that races a same-flow write can be served from a
+      // replica that hasn't caught up yet, which is exactly the "stale
+      // head row at a small Limit" symptom `GET /agents/{slug}/posts`
+      // hit repeatedly (queryBySkPrefixPaged, same fix, below).
+      ConsistentRead: true,
     }),
   );
   return (res.Items ?? []) as T[];
@@ -279,6 +287,18 @@ export interface GsiQuery {
  *   - skLte only        → `<= :to`
  *   - skPrefix only     → `begins_with(:skp)`
  *   - none              → no SK constraint (full partition)
+ *
+ * **No `ConsistentRead` option, deliberately.** DynamoDB never supports
+ * strongly consistent reads on a GSI (the API rejects `ConsistentRead:
+ * true` on an indexed query with a `ValidationException`) — a GSI is an
+ * asynchronously-replicated projection of the base table by construction.
+ * `GET /agents/{slug}/executions` (via `listExecutions` → GSI1) inherits
+ * this: unlike the base-table `queryBySkPrefix` path above, a read here
+ * immediately after a same-flow write can still observe a stale/missing
+ * head row (ML-029 / #613). There is no code-level fix for that on this
+ * index; a caller that must read its own just-written EXEC row
+ * immediately should over-fetch (`limit` ≥ 3–5) rather than trust
+ * `limit=1`, or poll a couple of seconds later.
  */
 export async function queryByGsi<T extends object>(
   indexName: GsiName,
@@ -425,6 +445,11 @@ export async function queryBySkPrefixPaged<T extends object>(
       Limit: limit,
       ScanIndexForward: scanIndexForward,
       ExclusiveStartKey: exclusiveStartKey,
+      // ML-029 / #613: base-table primary-key query — see the
+      // ConsistentRead note on queryBySkPrefix above. This is the
+      // primitive `GET /agents/{slug}/posts` (listAgentPosts) is built
+      // on; it was the majority of the ML-029 incident hits.
+      ConsistentRead: true,
     }),
   );
 
