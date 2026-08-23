@@ -38,6 +38,17 @@ jobs:
       - name: Proxy-bootstrap gate (R-14)
         run: npm run check-proxy-bootstrap
 
+      # CloudFormation/SAM lint (#398). The CloudFront `Tags`-placement error
+      # in #391 was an EarlyValidation failure caught only at deploy time.
+      # `--non-zero-exit-code error` keeps the gate red on that class (E….)
+      # and quiet on warnings/informational, so it fails on what a deploy
+      # would have failed on. Version-pinned so a new upstream rule can't
+      # turn an unrelated PR red.
+      - name: CloudFormation lint (workforce/infra)
+        run: |
+          pipx install cfn-lint==1.53.3
+          cfn-lint --non-zero-exit-code error -- $(find workforce/infra -name template.yaml | sort)
+
       - name: Script library tests
         run: npm run test:scripts
 
