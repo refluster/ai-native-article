@@ -110,17 +110,23 @@ jobs:
       # corpus-freshness.yml stays as the drift catcher for Settings-side
       # changes that no deploy touches.
       #
-      # SETTLE, not RETRIES, is what absorbs Pages propagation. The first real
-      # run of this step (the #619 merge) went red on a correct site: Pages was
-      # still serving the previous build, so the shell answered 200 and *its*
-      # assets 404'd. Per-request retries never fired — nothing failed to
-      # answer. R17_SETTLE_ATTEMPTS re-runs the whole check instead: 10 attempts
-      # 30s apart is roughly a 5-minute propagation window, well past the ~4
-      # minutes observed, and a site that is genuinely broken still fails at the
-      # end of it. The script exits 2 — distinct from its exit 1 — when the
-      # network, not the site, is at fault, so a proxy blip is not an outage.
+      # SETTLE ON IDENTITY, not on "nothing failed". The first real run of this
+      # step (the #619 merge) went red on a correct site: Pages was still
+      # serving the previous build, so the shell answered 200 and *its* assets
+      # 404'd. The obvious fix — retry while failing — is worse, and was
+      # reproduced before it shipped: the stale build is normally HEALTHY, so
+      # the first attempt passes and the new deploy is never looked at. That is
+      # a false green on the one run that exists to catch a bad deploy.
+      #
+      # So R17_EXPECT_BUILD_DIR names the dist/ this job just published (it is
+      # `publish_dir` above, still on disk). Until the served shell references
+      # that build's hashed assets, the result is "not propagated yet" — retry,
+      # never pass. Exhausting the window exits 2 (inconclusive), never 0.
+      # 10 attempts x 30s is roughly a 5-minute window, well past the ~4
+      # minutes observed on the #619 deploy.
       - name: Live base-path smoke (R-17)
         env:
+          R17_EXPECT_BUILD_DIR: ./newsletter/app/dist
           R17_SETTLE_ATTEMPTS: '10'
           R17_SETTLE_DELAY_MS: '30000'
           R17_RETRIES: '2'

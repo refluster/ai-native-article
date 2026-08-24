@@ -36,11 +36,20 @@
 //     answered 200 with the *previous* build, whose assets 404'd, and the step
 //     went red on a site that was correct four minutes later. Per-request
 //     retries cannot see that — nothing failed to answer, the wrong thing
-//     answered successfully — so `R17_SETTLE_ATTEMPTS` re-runs the whole check
-//     while it is failing, and the deploy workflow sets a settle window. The
-//     daily run leaves it at 1: there, a failure is never propagation. A gate
-//     that cries wolf on every deploy is worse than no gate — it trains the
-//     operator to ignore the one run that matters.
+//     answered successfully.
+//
+//     The settle loop therefore waits for the *right build*, not for "nothing
+//     failed" (#620 review, Farah F1 / Dario D1). Waiting on failure alone
+//     inverts the bug into something worse: the stale build is normally
+//     HEALTHY, so the first attempt passes clean, the loop exits 0 — and the
+//     new deploy, broken or not, was never looked at. That is a false green on
+//     the one run that exists to catch a bad deploy, and it was reproduced
+//     before this was written. So the post-deploy caller passes
+//     `R17_EXPECT_BUILD_DIR` (the `dist/` it just published, on disk in the
+//     same job): until the served shell references that build's hashed assets,
+//     the result is "not propagated yet" — retry, never pass. A gate that
+//     cries wolf on every deploy is worse than no gate; a gate that says
+//     "green" without looking is worse still.
 //
 // It is a *schedule + post-deploy* check, never a PR gate — it asserts
 // deployed state, which no pull request controls.
@@ -53,20 +62,73 @@
 import { ensureProxyAwareEntry } from './lib/proxy-bootstrap.mjs'
 ensureProxyAwareEntry(import.meta.url)
 
+import { readFileSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { readSiteBasePath } from './lib/site-base-path.mjs'
-import { extractShellUrls, extractSpaBase } from './lib/base-path-literals.mjs'
+import { settle } from './lib/settle.mjs'
+import {
+  extractShellUrls, extractSpaBase, buildFingerprint, servesExpectedBuild,
+} from './lib/base-path-literals.mjs'
 
 const ORIGIN = process.env.SITE_ORIGIN || 'https://kohuehara.xyz'
 const BASE = readSiteBasePath()
 const PAGE = `${ORIGIN}${BASE}`
 
+/**
+ * Read a positive-integer knob from the environment.
+ *
+ * Fails loud on a malformed value (C-4). `Math.max(1, Number('abc'))` is NaN,
+ * which silently skipped the settle loop entirely and then threw on undefined
+ * state — surfacing as exit 1, i.e. this script's code for "the deployed site
+ * is broken". A config typo must never be filed as an outage (#620 review,
+ * Dario D2).
+ */
+function intFromEnv (name, fallback, { min = 0 } = {}) {
+  const raw = process.env[name]
+  if (raw === undefined || raw === '') return fallback
+  const value = Number(raw)
+  if (!Number.isFinite(value) || !Number.isInteger(value) || value < min) {
+    throw new Error(
+      `${name}="${raw}" is not an integer >= ${min} — refusing to run with an ` +
+      `ambiguous setting rather than reporting a config error as a site outage`
+    )
+  }
+  return value
+}
+
 // Per-request retries — for a request that never completes.
-const RETRIES = Number(process.env.R17_RETRIES || 1)
-const RETRY_DELAY_MS = Number(process.env.R17_RETRY_DELAY_MS || 3000)
+const RETRIES = intFromEnv('R17_RETRIES', 1)
+const RETRY_DELAY_MS = intFromEnv('R17_RETRY_DELAY_MS', 3000)
 // Whole-check retries — for a deploy that has not propagated. 1 = no settle
 // loop, which is what the daily run wants.
-const SETTLE_ATTEMPTS = Math.max(1, Number(process.env.R17_SETTLE_ATTEMPTS || 1))
-const SETTLE_DELAY_MS = Number(process.env.R17_SETTLE_DELAY_MS || 30000)
+const SETTLE_ATTEMPTS = intFromEnv('R17_SETTLE_ATTEMPTS', 1, { min: 1 })
+const SETTLE_DELAY_MS = intFromEnv('R17_SETTLE_DELAY_MS', 30000)
+// The dist/ this run just published, when the caller is the deploy workflow.
+// Its hashed asset names are what "the new build is live" actually means.
+const EXPECT_BUILD_DIR = process.env.R17_EXPECT_BUILD_DIR || ''
+
+/** Fingerprint of the build this run published, or [] when none was named. */
+function expectedFingerprint () {
+  if (!EXPECT_BUILD_DIR) return []
+  const index = join(EXPECT_BUILD_DIR, 'index.html')
+  if (!existsSync(index)) {
+    throw new Error(
+      `R17_EXPECT_BUILD_DIR="${EXPECT_BUILD_DIR}" has no index.html — cannot tell ` +
+      `the new deploy from a stale one, and passing without that check would be a ` +
+      `false green on the run that exists to catch a bad deploy`
+    )
+  }
+  const fingerprint = buildFingerprint(readFileSync(index, 'utf8'))
+  if (fingerprint.length === 0) {
+    throw new Error(
+      `${index} references no content-hashed /assets/ file — nothing to identify ` +
+      `this build by`
+    )
+  }
+  return fingerprint
+}
+
+const EXPECTED = expectedFingerprint()
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
@@ -112,8 +174,12 @@ function referencedAssets (html) {
 
 /**
  * One complete pass over the deployed site.
- * @returns {{fatal?: {code: number, message: string}, httpFailures: string[],
- *            networkErrors: string[], assetCount: number, notes: string[]}}
+ * @returns {{fatal?: {code: number, message: string}, stale?: string,
+ *            httpFailures: string[], networkErrors: string[],
+ *            assetCount: number, notes: string[]}}
+ *   `stale` is set when the origin is still serving a build other than the one
+ *   we published — never a pass and never a failure on its own, only a reason
+ *   to wait.
  */
 async function runCheck () {
   const httpFailures = []   // the site served something wrong  → exit 1
@@ -137,6 +203,20 @@ async function runCheck () {
   }
 
   const html = page.body
+
+  // Identity first: assert we are looking at the build we published before
+  // asserting anything *about* it. A stale build is usually healthy, so every
+  // check below would pass against the wrong bytes and report a green deploy.
+  if (servesExpectedBuild(html, EXPECTED) === false) {
+    const servedAssets = referencedAssets(html)
+      .map(u => u.replace(ORIGIN, ''))
+      .filter(u => /\/assets\//.test(u))
+    return done({
+      stale: `serving ${servedAssets.join(', ') || '(no hashed assets)'}; ` +
+        `expected one of ${EXPECTED.join(', ')}`,
+    })
+  }
+
   const assets = referencedAssets(html)
 
   // A bundled SPA always ships at least one hashed script. If the served HTML
@@ -231,23 +311,71 @@ async function runCheck () {
   return done({ assetCount: toFetch.length })
 }
 
-// --- driver: settle loop ----------------------------------------------------
+// --- driver: settle until the expected build is live, then assert -----------
 console.log(`R-17 live base-path smoke — ${PAGE}`)
-
-let result
-for (let attempt = 1; attempt <= SETTLE_ATTEMPTS; attempt++) {
-  result = await runCheck()
-  const clean = !result.fatal && result.httpFailures.length === 0 && result.networkErrors.length === 0
-  if (clean || attempt === SETTLE_ATTEMPTS) break
-  console.log(
-    `  … attempt ${attempt}/${SETTLE_ATTEMPTS} not clean yet ` +
-    `(${result.fatal ? 'fatal' : `${result.httpFailures.length} http, ${result.networkErrors.length} network`})` +
-    ` — the deploy may still be propagating; retrying in ${Math.round(SETTLE_DELAY_MS / 1000)}s`
-  )
-  await sleep(SETTLE_DELAY_MS)
+if (EXPECTED.length > 0) {
+  console.log(`  expecting the build that references ${EXPECTED.join(', ')}`)
 }
 
+/**
+ * Is this pass the answer, or is it worth waiting for a different one?
+ *
+ * Only two things are worth waiting for, and stating them positively is the
+ * whole #620 fix. The first version waited on "did anything fail", which let a
+ * healthy *stale* build end the loop green — the new deploy never looked at.
+ *
+ *   stale          → keep waiting. We are looking at the previous build; any
+ *                    verdict from it would be about the wrong bytes.
+ *   network-only   → keep waiting. Nothing answered; that is not evidence.
+ *   http failures  → THE ANSWER. Identity is confirmed, so a 404 here is the
+ *                    published build being broken, and re-checking it for five
+ *                    more minutes only delays the alarm.
+ *   fatal / clean  → THE ANSWER.
+ */
+const isSettled = r => {
+  if (r.stale) return false
+  if (r.fatal) return true
+  if (r.httpFailures.length > 0) return true
+  return r.networkErrors.length === 0
+}
+
+const { result } = await settle({
+  runOnce: runCheck,
+  isSettled,
+  attempts: SETTLE_ATTEMPTS,
+  delayMs: SETTLE_DELAY_MS,
+  // Say what is actually wrong on each attempt, not just how many things are
+  // (#620 review, Farah F3): "still the old build" and "the new build is
+  // broken" are different incidents and must not look identical in the log.
+  onRetry: ({ attempt, attempts, result: r, delayMs }) => {
+    const why = r.stale
+      ? `not the published build yet — ${r.stale}`
+      : r.fatal
+        ? r.fatal.message.split('\n')[0]
+        : [...r.httpFailures, ...r.networkErrors].slice(0, 3).join('; ')
+    console.log(
+      `  … attempt ${attempt}/${attempts}: ${why}` +
+      ` — retrying in ${Math.round(delayMs / 1000)}s`
+    )
+  },
+})
 for (const note of result.notes) console.warn(`  ⚠ ${note}`)
+
+// Settle exhausted while still on the old build: we never got to look at what
+// we published. That is inconclusive, not a verdict — exit 2 ("could not run"),
+// because calling it either way would be a claim we have no evidence for.
+if (result.stale) {
+  const windowMin = Math.round((SETTLE_ATTEMPTS - 1) * SETTLE_DELAY_MS / 60000)
+  console.error(
+    `\n✗ check could not run — ${PAGE} never served the build this run published, ` +
+    `after ${SETTLE_ATTEMPTS} attempt(s) over ~${windowMin} min.\n` +
+    `    ${result.stale}\n\n` +
+    '  GitHub Pages propagation overran the settle window. This says nothing\n' +
+    '  about whether the new build is correct — re-run the check, or widen\n' +
+    '  R17_SETTLE_ATTEMPTS, before drawing any conclusion about the site.'
+  )
+  process.exit(2)
+}
 
 if (result.fatal) {
   console.error(`✗ ${result.fatal.code === 2 ? 'check could not run — ' : ''}${result.fatal.message}`)
@@ -261,7 +389,13 @@ if (httpFailures.length > 0) {
   for (const f of httpFailures.sort()) console.error(`    ${f}`)
   console.error(
     `\n  The deployed site references paths this origin does not serve.\n` +
-    `  Usually SITE_BASE_PATH (newsletter/app/src/config/site.ts) no longer\n` +
+    (EXPECTED.length > 0
+      ? `  This IS the build this run published (identity confirmed), so the\n` +
+        `  fault is in the build, not in propagation.\n`
+      : `  First hypothesis to rule out: GitHub Pages may still be serving a\n` +
+        `  previous build — compare the 404'd asset hashes against this run's\n` +
+        `  dist/, or re-run with R17_EXPECT_BUILD_DIR set.\n`) +
+    `  Otherwise SITE_BASE_PATH (newsletter/app/src/config/site.ts) no longer\n` +
     `  matches where GitHub Pages actually publishes this repo — check where\n` +
     `  ${PAGE} is really served from before changing anything else.`
   )
@@ -286,6 +420,7 @@ if (networkErrors.length > 0) {
 }
 
 console.log(
-  `✓ shell, ${assetCount} asset(s) (incl. SW precache shell + manifest icons) ` +
+  `✓ ${EXPECTED.length > 0 ? 'the published build is live; ' : ''}` +
+  `shell, ${assetCount} asset(s) (incl. SW precache shell + manifest icons) ` +
   `and the deep-link round trip all load from ${PAGE}`
 )
