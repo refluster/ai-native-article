@@ -1,6 +1,6 @@
 # ADR-0025 — A hand-off is an event: the author lane dispatches its worker
 
-- **Status**: Accepted (2026-08-11 — ratified by the merged implementation, per the ADR-0018 precedent [operator ratifies by merging the implementation PR]; status reconciled by `backlog-reconcile`, ⚠ operator sign-off requested)
+- **Status**: Accepted (2026-08-11 — ratified by the merged implementation, per the ADR-0018 precedent [operator ratifies by merging the implementation PR]; status reconciled by `backlog-reconcile`, operator sign-off given 2026-08-24)
 - **Date**: 2026-08-11
 - **Deciders**: operator (ratifies — touches the trigger model and adds an API surface)
 - **Related**: [adr-0022](adr-0022-issue-to-merge-flow.md) (the author lane this accelerates), [adr-0013](adr-0013-event-driven-pr-autopilot.md) (the same event-vs-cron argument, one cadence earlier), [adr-0005](adr-0005-single-execution-model-ccr.md) (the one execution model this stays inside), [adr-0009](adr-0009-scoped-capability-tokens.md) / [adr-0021](adr-0021-dynamic-memory-write-token.md) (the token idiom reused), R-N4 ([governance.md §4](../governance.md))
