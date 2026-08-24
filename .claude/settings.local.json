@@ -1,1 +1,9 @@
-{ "permissions": { "allow": ["Bash(aws secretsmanager get-secret-value:*)"] } }
+{
+  "permissions": {
+    "allow": [
+      "Bash(aws secretsmanager get-secret-value:*)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  }
+}
