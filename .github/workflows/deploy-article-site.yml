@@ -108,11 +108,27 @@ jobs:
       # The step is deliberately NOT continue-on-error: a deploy that publishes
       # an unloadable site must turn this run red (C-4). The daily run in
       # corpus-freshness.yml stays as the drift catcher for Settings-side
-      # changes that no deploy touches. The retries absorb Pages propagation,
-      # and the script exits 2 — distinct from its exit 1 — when the network,
-      # not the site, is at fault, so a proxy blip is not filed as an outage.
+      # changes that no deploy touches.
+      #
+      # SETTLE ON IDENTITY, not on "nothing failed". The first real run of this
+      # step (the #619 merge) went red on a correct site: Pages was still
+      # serving the previous build, so the shell answered 200 and *its* assets
+      # 404'd. The obvious fix — retry while failing — is worse, and was
+      # reproduced before it shipped: the stale build is normally HEALTHY, so
+      # the first attempt passes and the new deploy is never looked at. That is
+      # a false green on the one run that exists to catch a bad deploy.
+      #
+      # So R17_EXPECT_BUILD_DIR names the dist/ this job just published (it is
+      # `publish_dir` above, still on disk). Until the served shell references
+      # that build's hashed assets, the result is "not propagated yet" — retry,
+      # never pass. Exhausting the window exits 2 (inconclusive), never 0.
+      # 10 attempts x 30s is roughly a 5-minute window, well past the ~4
+      # minutes observed on the #619 deploy.
       - name: Live base-path smoke (R-17)
         env:
-          R17_RETRIES: '5'
-          R17_RETRY_DELAY_MS: '15000'
+          R17_EXPECT_BUILD_DIR: ./newsletter/app/dist
+          R17_SETTLE_ATTEMPTS: '10'
+          R17_SETTLE_DELAY_MS: '30000'
+          R17_RETRIES: '2'
+          R17_RETRY_DELAY_MS: '5000'
         run: node scripts/check-live-base-path.mjs

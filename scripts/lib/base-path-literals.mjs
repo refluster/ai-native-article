@@ -148,3 +148,36 @@ export function checkRobots (source, base, origin) {
     problems: m[1] === expected ? [] : [`Sitemap: "${m[1]}" !== "${expected}"`],
   }
 }
+
+/**
+ * The hashed asset URLs a built `index.html` references — the fingerprint of
+ * one specific build.
+ *
+ * R-17 uses this to tell "the new deploy is live" from "GitHub Pages is still
+ * serving the previous one". Without it a post-deploy check cannot distinguish
+ * them: the stale build answers 200 and is usually internally consistent, so
+ * every assertion passes against the wrong bytes (#620 review, Farah F1 /
+ * Dario D1).
+ *
+ * Only content-hashed asset URLs count. Unhashed public files
+ * (manifest.webmanifest, icons) are identical across builds and so carry no
+ * identity; a build with none of them is not fingerprintable.
+ */
+export function buildFingerprint (indexHtml) {
+  const hashed = new Set()
+  for (const url of extractHtmlUrls(indexHtml)) {
+    if (/\/assets\/[^/]+-[A-Za-z0-9_-]{6,}\.(?:js|css)(?:\?|$)/.test(url)) hashed.add(url)
+  }
+  return [...hashed]
+}
+
+/**
+ * Does the served shell come from the build we expect?
+ * `expected` is a fingerprint from buildFingerprint(); an empty one means
+ * "no expectation given", which is not evidence either way.
+ */
+export function servesExpectedBuild (servedHtml, expected) {
+  if (expected.length === 0) return null
+  const served = new Set(extractHtmlUrls(servedHtml))
+  return expected.some(url => served.has(url))
+}
