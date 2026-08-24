@@ -1,6 +1,6 @@
 # CLAUDE.md — orientation for agents
 
-You are working in `ai-native-article`, a personal blog/insight site at `https://kohuehara.xyz`. The repo is split into two domain modules:
+You are working in `ai-native-article`, a personal blog/insight site published at `https://kohuehara.xyz/ai-native-article/` (a GitHub Pages *project* path — the apex `kohuehara.xyz` belongs to the separate user-site repo; see `newsletter/app/src/config/site.ts`). The repo is split into two domain modules:
 
 - **`newsletter/`** — the site's L1→L4 article pipeline: `newsletter/app` (Vite/React reader SPA), `newsletter/pipeline` (build/sync scripts run in CI — `fetch-notion.mjs`, sitemap, etc.), `newsletter/template`, and `newsletter/docs` (the pipeline's L1 statute docs). (The Apps Script generation engine `newsletter/gas/src/Code.gs` was retired 2026-06-28 — generation now lives in the workforce cadences below.)
 - **`workforce/`** — a separate agent-organisation subtree (console `workforce/app` + `agents/`, `skills/`, `lambdas/`, `infra/`, `client/`, `projects/`, …). **It has its own governance and decision log** — read [`workforce/docs/governance.md`](workforce/docs/governance.md) and [`workforce/docs/adr/`](workforce/docs/adr/README.md) before touching `workforce/**`; do not assume the root rules map onto it 1:1. The workforce authors articles into the newsletter via the `workforce/skills/article-level2` / `article-level3` cadences (the active generation path; their `publish-notion.mjs` carries the canonical truncation guard).
