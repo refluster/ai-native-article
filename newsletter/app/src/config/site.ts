@@ -1,10 +1,27 @@
-// The site is deployed to the custom domain root (CNAME -> kohuehara.xyz,
-// force_orphan deploy in .github/workflows/deploy-article-site.yml), not to
-// a GitHub Pages project URL (owner.github.io/repo/) — so the base path is
-// "/", not the repo name. (#600: this was hardcoded to '/ai-native-article/'
-// and would have 404'd every asset once GitHub Pages actually served this
-// build from the custom domain.)
-export const SITE_BASE_PATH = '/'
+// Where GitHub Pages actually serves this build.
+//
+// `kohuehara.xyz` is the custom domain of the *user* site repo
+// (refluster.github.io — the personal "Koh Uehara" page). A custom domain can
+// only be claimed by one repo, so this repo keeps its GitHub Pages *project*
+// URL and is served, under that same domain, at the repo-name subpath:
+//
+//   https://refluster.github.io/ai-native-article/  -> 301
+//   https://kohuehara.xyz/ai-native-article/        -> this app  (assets 200)
+//   https://kohuehara.xyz/                          -> the user site (CRA)
+//
+// PR #606 set this to '/' on the premise that the `cname: kohuehara.xyz` in
+// deploy-article-site.yml makes Pages serve this build from the domain root.
+// It does not — GitHub rejects the duplicate custom-domain claim — so every
+// asset reference in the deployed HTML pointed at the user site's origin path
+// and 404'd (index-*.js, index-*.css, manifest.webmanifest, and the sw.js
+// `addAll` of the app shell). That is the C-1 outage this constant now fixes.
+//
+// Moving the site to the domain root is a repo-Settings + DNS decision that
+// takes the apex away from the personal page (issue #600, still open on the
+// operator's side). When it happens, flip this one constant to '/': every
+// other base-path literal in the app is either derived from it or asserted
+// against it by `scripts/check-base-path.mjs` (R-16).
+export const SITE_BASE_PATH = '/ai-native-article/'
 
 export const SITE_BASENAME = SITE_BASE_PATH.replace(/\/$/, '')
 

@@ -16,7 +16,7 @@ L2: Explanation articles (unified Notion Articles DB, Type=explanation)
 L3: Analysis articles (unified Notion Articles DB, Type=analysis)
   ↓ [workforce article-level3 cadence — agent synthesis]
 
-L4: Published articles (gh-pages + https://kohuehara.xyz)
+L4: Published articles (gh-pages + https://kohuehara.xyz/ai-native-article/)
   ↓ [deploy-article-site.yml: fetch-notion.mjs → check-truncation (R-10) → build → deploy]
 ```
 

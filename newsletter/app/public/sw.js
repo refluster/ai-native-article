@@ -1,18 +1,21 @@
 // Minimal service worker to meet PWA install criteria and enable offline shell.
 // Cache is bumped via CACHE_VERSION; bump it whenever the shell changes.
-// v4: #600 — the site is deployed to the custom domain root (kohuehara.xyz),
-// not a GitHub Pages project URL, so the shell paths (and SITE_BASE_PATH they
-// mirror) drop the '/ai-native-article/' prefix. Bumped so a browser holding
-// the old (never-correctly-served) scope evicts its stale cache entry.
-const CACHE_VERSION = 'v4'
+// v5: the site is served from the GitHub Pages *project* subpath under the
+// user site's custom domain (https://kohuehara.xyz/ai-native-article/), not
+// from the domain root — see newsletter/app/src/config/site.ts. v4 shipped
+// root-absolute shell paths, so `cache.addAll(SHELL)` fetched the user site's
+// origin, got 404s, and rejected the install with "Failed to execute 'addAll'
+// on 'Cache': Request failed" — the SW never activated. Bumped so any browser
+// holding the broken v4 cache evicts it.
+const CACHE_VERSION = 'v5'
 const CACHE_NAME = `ai-native-l1-${CACHE_VERSION}`
 const SHELL = [
-  '/',
-  '/index.html',
-  '/manifest.webmanifest',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/apple-touch-icon.png',
+  '/ai-native-article/',
+  '/ai-native-article/index.html',
+  '/ai-native-article/manifest.webmanifest',
+  '/ai-native-article/icons/icon-192.png',
+  '/ai-native-article/icons/icon-512.png',
+  '/ai-native-article/icons/apple-touch-icon.png',
 ]
 
 self.addEventListener('install', event => {
@@ -43,7 +46,7 @@ self.addEventListener('fetch', event => {
           caches.open(CACHE_NAME).then(cache => cache.put(request, copy))
           return response
         })
-        .catch(() => caches.match(request).then(r => r || caches.match('/index.html')))
+        .catch(() => caches.match(request).then(r => r || caches.match('/ai-native-article/index.html')))
     )
     return
   }

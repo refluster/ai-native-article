@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://kohuehara.xyz/sitemap.xml
+Sitemap: https://kohuehara.xyz/ai-native-article/sitemap.xml
