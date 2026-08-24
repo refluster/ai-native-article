@@ -334,10 +334,21 @@ Iterate `payload.tasks` in order. For each task:
      requests — the failure mode this note guards against is a property of how
      the *calling* session constructs and issues the POST, not of the Lambda.
      After every engagement POST, **read it back**
-     (`GET /agents/{agent_slug}/executions?limit=1`) and assert the top row's
-     `agent_slug`, `summary`, and `artifact.uri` match what you just sent, before
-     moving to the next task — a mismatch is exactly this corruption class and
-     must be surfaced loudly (C-4), not silently trusted from the `201`.
+     (`GET /agents/{agent_slug}/executions?limit=5`) and assert your just-sent
+     row (matching on `agent_slug`, `summary`, and `artifact.uri`) is **present
+     somewhere in the page** — not necessarily the head row — before moving to
+     the next task. Use `limit=5`, not `limit=1`: `executions` is served off a
+     GSI query, and DynamoDB rejects `ConsistentRead` outright on a GSI, so a
+     `limit=1` read can be served a stale head row from a lagging replica
+     immediately after a same-flow write (ML-029 in
+     [docs/memory-lint-backlog.md](../../../docs/memory-lint-backlog.md);
+     confirmed on this exact endpoint by incident 5 in that row, where a
+     `limit=1` read returned a *sibling binding's* row and only `limit=5`
+     surfaced the real one). Asserting "present in the page" rather than "is
+     the head row" is what makes this over-fetch actually absorb that
+     staleness — a mismatch is still exactly the ML-028 corruption class and
+     must be surfaced loudly (C-4), not silently trusted from the `201`, once
+     your row is confirmed genuinely absent from a `limit=5` page.
 
 ## Write-back — via the skill's authenticated endpoint script
 
