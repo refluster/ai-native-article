@@ -8,21 +8,24 @@
 // it for `base`, the router reads it for `basename`, seo.ts derives canonical
 // URLs from it.
 //
-// But four artefacts cannot import it — index.html, public/404.html,
-// public/manifest.webmanifest and public/sw.js are static files that ship
-// as-is — so their prefixes are hand-written copies. PR #606 changed
-// SITE_BASE_PATH and those copies together, to a base GitHub Pages does not
-// serve this build from; nothing mechanical objected, and the deployed site
-// 404'd every asset (C-1). This gate asserts the copies agree with the
-// declared base, so the next base-path move is one constant plus a red check
-// instead of a silent outage.
+// But five artefacts cannot import it — index.html, public/404.html,
+// public/manifest.webmanifest, public/sw.js and public/robots.txt ship as-is —
+// so their prefixes are hand-written copies. PR #606 changed SITE_BASE_PATH and
+// those copies together, to a base GitHub Pages does not serve this build from;
+// nothing mechanical objected, and the deployed site 404'd every asset (C-1).
+// This gate asserts the copies agree with the declared base.
 //
-// Checked, per file:
-//   index.html                  <link>/<script> URLs + the SPA-restore `base`
-//   public/404.html             the SPA-redirect `base`
-//   public/manifest.webmanifest start_url, scope, icon srcs, share_target
-//   public/sw.js                the precached app-shell URLs
-//   public/robots.txt           the absolute Sitemap: URL
+// The comparison is **directional** (#619 review, Dario D1 / Owen O1): a
+// literal must sit under the base *and* must not repeat a base segment after
+// it. A plain prefix test is vacuous at base '/', where every root-absolute URL
+// "starts with" the base — so the migration site.ts promises is safe would
+// otherwise leave stale '/ai-native-article/…' literals green while
+// `cache.addAll()` 404s again, which is precisely this incident class.
+//
+// The comparisons themselves live in scripts/lib/base-path-literals.mjs so the
+// red path is unit-tested; this file is I/O, and it fails loud when a file it
+// was told to inspect yields no URLs at all — a silently-zero extractor is a
+// green no-op, not a passing check (Owen O2).
 //
 // Exit codes:
 //   0  every literal agrees with SITE_BASE_PATH
@@ -33,6 +36,9 @@ import { readFileSync, existsSync } from 'node:fs'
 import { dirname, resolve, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readSiteBasePath } from './lib/site-base-path.mjs'
+import {
+  checkHtml, checkManifest, checkServiceWorker, checkRobots,
+} from './lib/base-path-literals.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const APP = resolve(ROOT, 'newsletter', 'app')
@@ -42,27 +48,6 @@ const BASE = readSiteBasePath()
 const rel = f => relative(ROOT, f)
 
 let problems = 0
-const fail = (file, msg) => { console.error(`  ✗ ${rel(file)}: ${msg}`); problems++ }
-
-/**
- * Root-absolute URLs that must live under BASE. Cross-origin URLs, protocol-
- * relative URLs, fragments, query-only and relative URLs are not our business.
- */
-function isLocalAbsolute (url) {
-  return url.startsWith('/') && !url.startsWith('//')
-}
-
-// `/src/...` is the Vite *source* graph, not a shipped URL: vite build bundles
-// the entry and rewrites the emitted <script src> against `base`. It must stay
-// project-root-relative for `vite dev` to resolve it, so it is exempt.
-const VITE_SOURCE = /^\/src\//
-
-function expectUnderBase (file, url, where) {
-  if (!isLocalAbsolute(url)) return
-  if (VITE_SOURCE.test(url)) return
-  if (url === BASE || url.startsWith(BASE)) return
-  fail(file, `${where} "${url}" is not under SITE_BASE_PATH "${BASE}"`)
-}
 
 function read (file) {
   if (!existsSync(file)) {
@@ -72,90 +57,48 @@ function read (file) {
   return readFileSync(file, 'utf8')
 }
 
-// --- index.html -------------------------------------------------------------
-// Vite rewrites asset URLs in index.html against `base` at build time, but only
-// for the attributes it recognises; a <link rel="manifest"> or apple-touch-icon
-// written root-absolute ships verbatim. Check them all — a URL already under
-// BASE is correct either way.
-function checkHtml (file, { requireSpaBase }) {
-  const src = read(file)
-  for (const m of src.matchAll(/\b(?:href|src)="([^"]+)"/g)) {
-    expectUnderBase(file, m[1], 'asset URL')
+/** Apply one check, report its problems, and insist it actually saw URLs. */
+function apply (file, result, { expectUrls = true } = {}) {
+  for (const p of result.problems) {
+    console.error(`  ✗ ${rel(file)}: ${p}`)
+    problems++
   }
-  // The GitHub Pages SPA redirect pair: 404.html stashes the requested URL and
-  // bounces to `base`; index.html restores it. A wrong `base` here sends every
-  // deep link to whatever else lives at that path.
-  const spa = /var base = '([^']*)'/.exec(src)
-  if (requireSpaBase && !spa) {
-    fail(file, "SPA redirect `var base = '...'` not found")
-  } else if (spa && spa[1] !== BASE) {
-    fail(file, `SPA redirect base "${spa[1]}" !== SITE_BASE_PATH "${BASE}"`)
+  if (expectUrls && result.problems.length === 0 && result.urls.length === 0) {
+    console.error(
+      `  ✗ ${rel(file)}: no base-path URLs found — the extractor matched nothing, ` +
+      `so this file is unchecked rather than clean`
+    )
+    problems++
   }
 }
 
-// --- manifest.webmanifest ---------------------------------------------------
-function checkManifest (file) {
-  let manifest
+function parseManifest (file) {
   try {
-    manifest = JSON.parse(read(file))
+    return JSON.parse(read(file))
   } catch (err) {
     console.error(`  ✗ ${rel(file)}: not valid JSON — ${err.message}`)
     process.exit(2)
   }
-  // start_url/scope decide what an installed PWA opens and what it may
-  // navigate to; a root scope on a subpath deploy makes the install silently
-  // wrong rather than loudly broken.
-  for (const key of ['start_url', 'scope']) {
-    if (manifest[key] === undefined) fail(file, `missing "${key}"`)
-    else if (manifest[key] !== BASE) {
-      fail(file, `"${key}": "${manifest[key]}" !== SITE_BASE_PATH "${BASE}"`)
-    }
-  }
-  for (const icon of manifest.icons ?? []) {
-    expectUnderBase(file, icon.src ?? '', 'icon src')
-  }
-  const action = manifest.share_target?.action
-  if (action !== undefined) expectUnderBase(file, action, 'share_target action')
-}
-
-// --- sw.js ------------------------------------------------------------------
-function checkServiceWorker (file) {
-  const src = read(file)
-  const shell = /const SHELL = \[([\s\S]*?)\]/.exec(src)
-  if (!shell) {
-    fail(file, 'precache SHELL array not found')
-    return
-  }
-  const urls = [...shell[1].matchAll(/'([^']+)'/g)].map(m => m[1])
-  if (urls.length === 0) fail(file, 'precache SHELL is empty')
-  // install fails atomically: one 404 in addAll() rejects the whole install,
-  // so a single stale shell URL disables the service worker entirely.
-  for (const url of urls) expectUnderBase(file, url, 'precached shell URL')
-  for (const m of src.matchAll(/caches\.match\('([^']+)'\)/g)) {
-    expectUnderBase(file, m[1], 'offline fallback URL')
-  }
-}
-
-// --- robots.txt -------------------------------------------------------------
-function checkRobots (file) {
-  const src = read(file)
-  const sitemap = /^Sitemap:\s*(\S+)/m.exec(src)
-  if (!sitemap) {
-    fail(file, 'no Sitemap: line')
-    return
-  }
-  const expected = `${ORIGIN}${BASE}sitemap.xml`
-  if (sitemap[1] !== expected) {
-    fail(file, `Sitemap: "${sitemap[1]}" !== "${expected}"`)
-  }
 }
 
 console.log(`R-16 base-path gate — SITE_BASE_PATH = "${BASE}"`)
-checkHtml(resolve(APP, 'index.html'), { requireSpaBase: true })
-checkHtml(resolve(APP, 'public', '404.html'), { requireSpaBase: true })
-checkManifest(resolve(APP, 'public', 'manifest.webmanifest'))
-checkServiceWorker(resolve(APP, 'public', 'sw.js'))
-checkRobots(resolve(APP, 'public', 'robots.txt'))
+
+const indexHtml = resolve(APP, 'index.html')
+apply(indexHtml, checkHtml(read(indexHtml), BASE, { requireSpaBase: true }))
+
+// 404.html is the SPA redirect stub: it carries the `base` literal but no
+// same-origin asset of its own, so it is the one file with no URLs to find.
+const notFound = resolve(APP, 'public', '404.html')
+apply(notFound, checkHtml(read(notFound), BASE, { requireSpaBase: true }), { expectUrls: false })
+
+const manifest = resolve(APP, 'public', 'manifest.webmanifest')
+apply(manifest, checkManifest(parseManifest(manifest), BASE))
+
+const sw = resolve(APP, 'public', 'sw.js')
+apply(sw, checkServiceWorker(read(sw), BASE))
+
+const robots = resolve(APP, 'public', 'robots.txt')
+apply(robots, checkRobots(read(robots), BASE, ORIGIN))
 
 if (problems > 0) {
   console.error(

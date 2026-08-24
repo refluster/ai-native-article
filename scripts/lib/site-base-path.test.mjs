@@ -25,6 +25,21 @@ test('throws when the declaration is missing', () => {
   assert.throws(() => parseSiteBasePath('export const OTHER = 1\n'), /not found/)
 })
 
+test('throws on a protocol-relative value', () => {
+  // '//' satisfies "starts and ends with /" but resolves against a host.
+  assert.throws(
+    () => parseSiteBasePath("export const SITE_BASE_PATH = '//'\n"),
+    /protocol-relative/
+  )
+})
+
+test('throws on the likeliest typo — leading slash, no trailing', () => {
+  assert.throws(
+    () => parseSiteBasePath("export const SITE_BASE_PATH = '/ai-native-article'\n"),
+    /must start and end/
+  )
+})
+
 test('throws on a value missing its slashes', () => {
   assert.throws(
     () => parseSiteBasePath("export const SITE_BASE_PATH = 'ai-native-article'\n"),

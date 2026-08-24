@@ -36,6 +36,14 @@ export function parseSiteBasePath (source) {
       `SITE_BASE_PATH must start and end with "/" (got ${JSON.stringify(value)})`
     )
   }
+  // '//' passes the slash test but is protocol-relative: every URL built from
+  // it would resolve against a *host*, not this origin. Reject it explicitly
+  // rather than letting it reach vite's `base` (#619 review, Owen O3).
+  if (/^\/\//.test(value)) {
+    throw new Error(
+      `SITE_BASE_PATH must not start with "//" — that is protocol-relative, not a path (got ${JSON.stringify(value)})`
+    )
+  }
   return value
 }
 

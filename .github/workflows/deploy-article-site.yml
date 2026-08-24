@@ -93,3 +93,26 @@ jobs:
           publish_dir: ./newsletter/app/dist
           force_orphan: true
           cname: kohuehara.xyz
+
+      # R-17 — did the thing we just published actually load?
+      #
+      # Every gate above this line inspects the *inputs* to the deploy. None of
+      # them can see the one fact that made #606 a week-long blank page: whether
+      # GitHub Pages serves this build from the path the build was compiled for.
+      # That is a Settings-side fact, and the only way to learn it is to fetch
+      # the site. Running it here means a base-path regression is caught minutes
+      # after the deploy that caused it, instead of by the next daily run — or,
+      # as happened with #606, by a reader (#619 review: Farah F1, Dario D3,
+      # Rafael R1).
+      #
+      # The step is deliberately NOT continue-on-error: a deploy that publishes
+      # an unloadable site must turn this run red (C-4). The daily run in
+      # corpus-freshness.yml stays as the drift catcher for Settings-side
+      # changes that no deploy touches. The retries absorb Pages propagation,
+      # and the script exits 2 — distinct from its exit 1 — when the network,
+      # not the site, is at fault, so a proxy blip is not filed as an outage.
+      - name: Live base-path smoke (R-17)
+        env:
+          R17_RETRIES: '5'
+          R17_RETRY_DELAY_MS: '15000'
+        run: node scripts/check-live-base-path.mjs
