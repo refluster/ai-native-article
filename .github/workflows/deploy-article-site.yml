@@ -108,11 +108,21 @@ jobs:
       # The step is deliberately NOT continue-on-error: a deploy that publishes
       # an unloadable site must turn this run red (C-4). The daily run in
       # corpus-freshness.yml stays as the drift catcher for Settings-side
-      # changes that no deploy touches. The retries absorb Pages propagation,
-      # and the script exits 2 — distinct from its exit 1 — when the network,
-      # not the site, is at fault, so a proxy blip is not filed as an outage.
+      # changes that no deploy touches.
+      #
+      # SETTLE, not RETRIES, is what absorbs Pages propagation. The first real
+      # run of this step (the #619 merge) went red on a correct site: Pages was
+      # still serving the previous build, so the shell answered 200 and *its*
+      # assets 404'd. Per-request retries never fired — nothing failed to
+      # answer. R17_SETTLE_ATTEMPTS re-runs the whole check instead: 10 attempts
+      # 30s apart is roughly a 5-minute propagation window, well past the ~4
+      # minutes observed, and a site that is genuinely broken still fails at the
+      # end of it. The script exits 2 — distinct from its exit 1 — when the
+      # network, not the site, is at fault, so a proxy blip is not an outage.
       - name: Live base-path smoke (R-17)
         env:
-          R17_RETRIES: '5'
-          R17_RETRY_DELAY_MS: '15000'
+          R17_SETTLE_ATTEMPTS: '10'
+          R17_SETTLE_DELAY_MS: '30000'
+          R17_RETRIES: '2'
+          R17_RETRY_DELAY_MS: '5000'
         run: node scripts/check-live-base-path.mjs
