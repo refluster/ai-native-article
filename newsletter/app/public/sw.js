@@ -1,6 +1,13 @@
 // Minimal service worker to meet PWA install criteria and enable offline shell.
 // Cache is bumped via CACHE_VERSION; bump it whenever the shell changes.
-const CACHE_VERSION = 'v3'
+// v5: the site is served from the GitHub Pages *project* subpath under the
+// user site's custom domain (https://kohuehara.xyz/ai-native-article/), not
+// from the domain root — see newsletter/app/src/config/site.ts. v4 shipped
+// root-absolute shell paths, so `cache.addAll(SHELL)` fetched the user site's
+// origin, got 404s, and rejected the install with "Failed to execute 'addAll'
+// on 'Cache': Request failed" — the SW never activated. Bumped so any browser
+// holding the broken v4 cache evicts it.
+const CACHE_VERSION = 'v5'
 const CACHE_NAME = `ai-native-l1-${CACHE_VERSION}`
 const SHELL = [
   '/ai-native-article/',

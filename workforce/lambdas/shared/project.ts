@@ -204,14 +204,20 @@ export type ExecutionSurface = "lambda" | "client" | "ccr";
  *               a deterministic skill whose summary is the empty string
  *               — embedding the empty string costs ~10 tokens for zero
  *               recall signal).
+ * - `failed`  — the retry sweep (shared/embedding-retry.ts, #573) re-tried
+ *               a `pending` row `EMBEDDING_RETRY_MAX_ATTEMPTS` times and it
+ *               never recovered — a TERMINAL state so a permanently-bad row
+ *               (missing credential, persistently oversized text) stops
+ *               being retried forever instead of consuming a slice of every
+ *               future sweep's bounded budget.
  *
  * Rows missing `embedding_status` entirely are pre-Story-4 ledger rows.
- * The recall path treats both `pending` / `skipped` / missing-attribute
+ * The recall path treats `pending` / `skipped` / `failed` / missing-attribute
  * identically: EXCLUDED from semantic-recall candidates, still visible
  * via structured recall (W-4 — don't silently hide ledger rows from the
  * audit view because one optional sidecar attribute is missing).
  */
-export type EmbeddingStatus = "ok" | "pending" | "skipped";
+export type EmbeddingStatus = "ok" | "pending" | "skipped" | "failed";
 
 export interface ExecutionRow {
   pk: `PROJECT#${string}`;
@@ -275,6 +281,12 @@ export interface ExecutionRow {
   embedding_dim?: number;
   /** See `EmbeddingStatus` doc. */
   embedding_status?: EmbeddingStatus;
+  /** Count of failed retry attempts by the sweep (#573). Absent/0 on a row
+   *  that has never been retried; removed (not reset to 0) once the row
+   *  recovers to `embedding_status='ok'`, since a recovered row has no
+   *  further retry history worth carrying. Never written at row-creation
+   *  time — only `shared/embedding-retry.ts` touches this field. */
+  embedding_attempts?: number;
 }
 
 // --- Lifecycle -----------------------------------------------------------

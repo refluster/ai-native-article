@@ -12,11 +12,17 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { readSiteBaseName } from '../../scripts/lib/site-base-path.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const ARTICLE_PUBLIC = join(ROOT, 'newsletter', 'app', 'public')
 const ORIGIN = 'https://kohuehara.xyz'
-const BASE = '/ai-native-article'
+// Read, never restated: newsletter/app/src/config/site.ts SITE_BASE_PATH is
+// the single source of truth for where this build is served. PR 606 kept a
+// second copy of it here, the two drifted, and the sitemap advertised URLs
+// GitHub Pages does not serve (issue 600). As a basename: '' at the domain
+// root, '/ai-native-article' on the Pages project subpath.
+const BASE = readSiteBaseName()
 const MANIFEST = join(ARTICLE_PUBLIC, 'posts', 'manifest.json')
 const SITEMAP = join(ARTICLE_PUBLIC, 'sitemap.xml')
 const ROBOTS = join(ARTICLE_PUBLIC, 'robots.txt')

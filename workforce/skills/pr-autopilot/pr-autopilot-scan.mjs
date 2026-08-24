@@ -149,6 +149,26 @@ export function routingState(comments, personaSlug) {
   return { cycle, lastRoutedAt };
 }
 
+/** A `pr-remediate` outcome comment for a completed (`--resolved`) attempt —
+ *  the Step 5 template SKILL.md fixes: `**<PersonaName> — remediation attempt
+ *  <n> of ≤ <cap>, outcome.** <kind>`. Matched loosely on the load-bearing
+ *  words ("remediation attempt … outcome") rather than the whole template, so
+ *  a persona name or a cap number does not desync the regex from the doc. */
+const REMEDIATION_OUTCOME_RE = /^\*\*[^*\n]+—\s*remediation attempt \d+ of ≤\s*\d+,\s*outcome\.\*\*/mu;
+
+/** The most recent `pr-remediate` outcome comment's timestamp, or `null` when
+ *  none exists. See `nextRoutingCycle` for why this counts as a revision even
+ *  when it isn't. */
+export function lastRemediationOutcomeAt(comments = []) {
+  let last = null;
+  for (const c of comments ?? []) {
+    if (!REMEDIATION_OUTCOME_RE.test(String(c?.body ?? ""))) continue;
+    const at = Date.parse(c?.created_at ?? "");
+    if (Number.isFinite(at) && (last === null || at > last)) last = at;
+  }
+  return last;
+}
+
 /**
  * Which cycle this PR should be routed at, or `null` when it should be
  * skipped. This is the discovery gate.
@@ -166,46 +186,68 @@ export function routingState(comments, personaSlug) {
  * The fix is to ask the question the comment always claimed to ask: has the
  * author revised **since** the last routing comment?
  *
+ * A second bug of the same shape (observed on #565): "revised" was read as
+ * "the head commit moved", but adr-0023's author loop also produces
+ * code-free remediations — a PR-body edit (`Closes` → `Refs`), a split-out
+ * issue — that a lens's finding named as the fix. `pr-remediate --resolved`
+ * *does* ring pr-autopilot's bell on those (adr-0025), but the bell only
+ * re-triggers this scan; the scan itself still asked "is the head newer?" and
+ * answered no, so the dispatched run found 0 candidates and the PR sat
+ * `needs-author`-cleared-but-unrouted until the 48h `stale-routed` sweep
+ * caught it. A `pr-remediate` outcome comment IS the revision signal for a
+ * metadata-only fix, so it counts here exactly like a new head commit.
+ *
  * Conservative in both directions:
- *  - No routing comment           → cycle 1 (unchanged behaviour).
- *  - Cycle ≥ cap                  → null. The W-4 hard cap is a process-
- *                                   breakdown signal, not a retry budget;
- *                                   pr-merge's verifyMergeable refuses past it
- *                                   and the sweep escalates. Never loop.
- *                                   The `>=` here is NOT an off-by-one against
- *                                   verifyMergeable's `cycle > W4_CYCLE_CAP`
- *                                   (pr-merge.mjs:333) — the two bound
- *                                   different things. This bounds the cycle
- *                                   *opened* (so the highest reachable is
- *                                   exactly the cap); that one bounds the cycle
- *                                   *observed*. Discovery can therefore never
- *                                   manufacture a state the merge engine will
- *                                   reject.
- *  - Head unchanged since routing → null. No revision, nothing new to review.
- *  - Cannot determine either time → null. An unknown never triggers a re-route,
- *                                   so a missing/garbled timestamp degrades to
- *                                   today's (silent) behaviour rather than
- *                                   spamming a PR every tick.
+ *  - No routing comment                   → cycle 1 (unchanged behaviour).
+ *  - Cycle ≥ cap                          → null. The W-4 hard cap is a
+ *                                            process-breakdown signal, not a
+ *                                            retry budget; pr-merge's
+ *                                            verifyMergeable refuses past it
+ *                                            and the sweep escalates. Never
+ *                                            loop. The `>=` here is NOT an
+ *                                            off-by-one against
+ *                                            verifyMergeable's `cycle >
+ *                                            W4_CYCLE_CAP` (pr-merge.mjs:333)
+ *                                            — the two bound different
+ *                                            things. This bounds the cycle
+ *                                            *opened* (so the highest
+ *                                            reachable is exactly the cap);
+ *                                            that one bounds the cycle
+ *                                            *observed*. Discovery can
+ *                                            therefore never manufacture a
+ *                                            state the merge engine will
+ *                                            reject.
+ *  - Neither the head nor a remediation
+ *    outcome moved since routing         → null. Nothing new to review.
+ *  - Cannot determine either time         → null. An unknown never triggers a
+ *                                            re-route, so a missing/garbled
+ *                                            timestamp degrades to today's
+ *                                            (silent) behaviour rather than
+ *                                            spamming a PR every tick.
  *
  * @param {object}   args
- * @param {Array}    args.comments         issue comments (need `body` + `created_at`)
- * @param {string}   args.persona          the routing persona slug
- * @param {?string}  args.headCommittedAt  ISO date of the PR head commit
- * @param {number}   args.cycleCap         hard cap (default W4_CYCLE_CAP)
+ * @param {Array}    args.comments             issue comments (need `body` + `created_at`)
+ * @param {string}   args.persona              the routing persona slug
+ * @param {?string}  args.headCommittedAt      ISO date of the PR head commit
+ * @param {?number}  args.remediationOutcomeAt epoch ms of the latest `pr-remediate`
+ *                                              outcome comment (lastRemediationOutcomeAt)
+ * @param {number}   args.cycleCap             hard cap (default W4_CYCLE_CAP)
  * @returns {?number} the cycle to route at, or null to skip
  */
 export function nextRoutingCycle({
   comments = [],
   persona,
   headCommittedAt = null,
+  remediationOutcomeAt = null,
   cycleCap = W4_CYCLE_CAP,
 } = {}) {
   const { cycle, lastRoutedAt } = routingState(comments, persona);
   if (cycle === 0) return 1;
   if (cycle >= cycleCap) return null;
   if (lastRoutedAt === null) return null;
-  const revisedAt = Date.parse(headCommittedAt ?? "");
-  if (!Number.isFinite(revisedAt)) return null;
+  const candidates = [Date.parse(headCommittedAt ?? ""), remediationOutcomeAt].filter(Number.isFinite);
+  if (candidates.length === 0) return null;
+  const revisedAt = Math.max(...candidates);
   return revisedAt > lastRoutedAt ? cycle + 1 : null;
 }
 
@@ -278,10 +320,12 @@ export function selectCandidates({
     // Terminal/paused PRs are not.
     if (isTerminal(pr.labels)) continue;
     if (!withinWindow(pr.updated_at, sinceDays, now)) continue;
+    const comments = commentsByPr.get(pr.number) ?? [];
     const cycle = nextRoutingCycle({
-      comments: commentsByPr.get(pr.number) ?? [],
+      comments,
       persona,
       headCommittedAt: headDatesByPr.get(pr.number) ?? null,
+      remediationOutcomeAt: lastRemediationOutcomeAt(comments),
       cycleCap,
     });
     if (cycle === null) continue;

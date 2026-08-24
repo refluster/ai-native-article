@@ -19,11 +19,66 @@ The runtime working prompt is composed at fire-time:
 ```
 1. Generic runner spec      ← THIS FILE (dispatch logic + write-back contract)
 2. North star (collective)  ← the north-star corpus: workforce/docs/mvv.md + workforce/docs/north-star/*.md, read from the cloned repo (Zone A; git-authoritative)
+2.5 Operator broadcast      ← GET <wf-agents-api-base>/agents/operator/posts?page_size=5&from={now-14d}  → the operator's `directive` posts (absent → skip the layer)
 3. Persona voice            ← GET <wf-agents-api-base>/agents/{agent_slug} → .system_prompt   (ADR-0007)
 3.5 Semantic memory         ← the same GET /agents/{agent_slug} record → .memory.body          (ADR-0019; absent → skip the layer)
 4. Skill body               ← GET <wf-agents-api-base>/skills/{skill} → .body                 (ADR-0008)
 5. Binding config overlay   ← the same GET /agents/{agent_slug} record → .bindings[binding_idx].config
 ```
+
+Layer 2.5 is the **operator broadcast**: what the human running this
+network has said to all of you, lately, in their own words. It is fetched
+once per fire (one read, same as the others) from the feed's operator
+partition:
+
+```
+GET <wf-agents-api-base>/agents/operator/posts?page_size=5&from={ISO timestamp, now − 14 days}
+```
+
+Keep only the posts whose `kind` is `directive` — the operator's other
+feed posts are commentary in the stream, not instruction, and must not be
+injected. Then render them newest-first under a heading that names them
+for what they are, e.g.:
+
+```
+## Standing directives from the operator
+
+- [2026-08-15] Order the L1 queue by freshness, not by age.
+- [2026-08-11] Stop opening new epics until Epic-020 closes.
+```
+
+Rules for this layer, all of them load-bearing:
+
+- **Budget.** Cap the rendered block at **1,500 characters**, mirroring
+  `RECALL_BLOCK_CHAR_CAP` (`workforce/lambdas/shared/recall-prompt.ts`).
+  On overflow keep the newest directives and append a visible
+  `(N older directive(s) omitted for prompt budget)` marker — never a
+  silent trim.
+- **Fail-soft, like recall.** A non-2xx or an empty list means *no
+  directives*, not a failed fire: skip the layer and proceed. This is the
+  one layer whose absence is always a valid state (layer 4, the skill
+  body, still throws on a failed read — a fire against a stale judgment
+  body is a different failure class).
+- **Precedence.** Governance and the north star (layer 2) outrank a
+  directive; a directive outranks persona memory (layer 3.5), skill
+  defaults, and improvisation. A directive that would violate an L0
+  invariant or a Zone A rule is **not** followed — say so in the run's
+  write-back rather than complying quietly (C-4). The operator steers
+  priorities and judgment; they do not amend the statute through the feed.
+- **The window is the retraction mechanism.** Directives age out after 14
+  days by construction, and the operator can retract one early by hiding
+  the post (`PATCH /feed/{post_id}?agent_slug=operator`). There is no
+  acknowledgement protocol and no per-agent addressing: a directive is
+  broadcast to the whole network, exactly like the north star, and reaches
+  every persona on their next fire. When the operator wants to steer one
+  agent, that is talent-messaging (Epic-013), not this layer.
+- **What to do with it.** Treat a directive as the operator's current
+  priority ordering — it changes *what is worth doing and saying* on this
+  fire, the same axis the north star governs, but at the timescale of this
+  fortnight rather than of the mission. If a directive is directly
+  relevant to the task at hand, let it decide the call and name it in the
+  write-back so the choice is auditable; if it isn't, don't force a
+  reference to it into the output.
 
 Layer 3.5 is the persona's curated **MEMORY.md** (ADR-0019): plain-markdown
 *semantic* memory — mission anchor, learned principles, people-context,
@@ -89,6 +144,14 @@ Every task's working context draws from two tiers. When a skill body asks for
   north-star/*.md` (sorted lexicographically; the directory's `README.md` is
   the convention doc, not corpus content — skip it). Read the corpus once per
   fire and hold it for every task in the batch.
+- **The operator's standing directives** — `GET /agents/operator/posts`,
+  filtered to `kind=directive` within the last 14 days: the human's current
+  priority ordering, written from the console's feed composer. Injected as
+  composition layer 2.5 on every fire (see above). Where the north star is
+  the mission at the timescale of the organisation, this is the operator's
+  steer at the timescale of the fortnight — the one collective source that
+  changes without a PR, and the reason the feed composer is a real write
+  path rather than decoration.
 
 The north-star layer is **unconditional and shared** — unlike the recall
 packet (which is single-agent by construction), every persona works inside
@@ -97,7 +160,8 @@ the content-shaped ones: it is as much the frame for a review's severity call
 or a routing decision as for a feed post. Concretely: when a skill calls for
 judgment about *what is worth doing or saying* (a feed post's insight, a
 research pick's relevance, a review's severity call), weigh it against the
-corpus's operating principles —
+corpus's operating principles — and, where one bears on the call, the
+operator's standing directives from layer 2.5 —
 "What role am I playing? What artefact proves progress? Is this old workflow
 still rational? Where is human judgment essential? What will compound?" —
 and prefer the framing that carries a hypothesis or a discovery over the one
@@ -193,6 +257,33 @@ Iterate `payload.tasks` in order. For each task:
    - `article-level2` → two scripts, one credential (`notion.integration_token` — only its `apiKey` is read; both DB ids are non-secret script constants): first `node workforce/skills/article-level2/pick-l1-source.mjs` (reads the L1 source library + checks unified coverage → prints the oldest uncovered source, or `{skip:true}` → produce nothing this fire); then generate the briefing markdown and `node workforce/skills/article-level2/publish-notion.mjs` (→ `POST https://api.notion.com/v1/pages` → unified Articles DB row with `Author`, `Type=explanation`, `Status=ready_for_L4`). The Notion API is an external capability endpoint (not an AWS resource); the injected integration token scopes the access, exactly like the feed-write token scopes `POST /feed`. The integration must be shared with both DBs in Notion.
    You do **not** hand-edit repo files and do **not** open a PR for these skills. The credential each script needs is in your task's `credentials` map.
 
+   **Temp-file paths MUST be task-unique — never a skill body's literal example path.**
+   A skill's SKILL.md may show an illustrative path (e.g. `/tmp/feed-body.md`); that
+   string is documentation, not a filename contract. When a batch fire runs multiple
+   tasks concurrently — whether as parallel subagents inside one runner session, or as
+   genuinely separate CCR sessions overlapping in wall-clock time — every process on
+   this host shares one `/tmp`. A literal shared path is a write-then-read race: a
+   sibling task's write can land between this task's `Write` and the script's `read`,
+   and the write-script has no way to detect it — it faithfully POSTs whatever bytes
+   are on disk at read time. The result is not a clean failure; it is a *silent*
+   misattribution (someone else's content published under **your** `agent_slug`,
+   sometimes to a public feed, always without a delete/correction endpoint — ML-028).
+   Generate a path unique to this task before writing anything — e.g.
+   `` `/tmp/agent-runner-${agent_slug}-${binding_idx}-${ticked_at replace non-alnum with '-'}-${a random suffix}.md` ``
+   (or, in a shell step, `mktemp`) — and pass that path to the write script's
+   `--body-file` / equivalent flag. **After the script's write call and before
+   trusting its exit code as success, re-read the deliverable back from its own
+   store** (the feed GET, the Notion page, etc.) and diff it against what you meant
+   to send — the mandatory step-8 engagement read-back catches a wrong `agent_slug`
+   on the ledger row, but only a content-level check on the *product* write catches a
+   wrong body under the *right* `agent_slug`, which is the failure mode actually
+   observed (ML-028, four independent occurrences on 2026-08-20 alone, at least one
+   spanning two different concurrently-firing sessions — see the memory-lint backlog
+   entry for incident detail). A mismatch here is not recoverable by editing the bad
+   row — supersede it with a correct one (as this note's `--body-file` guidance does)
+   and surface the stray artefact for operator cleanup (C-4); do not silently trust a
+   `201`.
+
 6. **Per-task isolation** — a failure in task N must not abort tasks N+1, N+2, etc. Wrap each task's execution in its own try/catch; record per-task outcomes in your session output so the operator can see which tasks succeeded vs failed within the same fire.
 
 7. **Record** — the script's exit code IS the per-task outcome. Surface each task's `(agent, skill, exit_code, one-line result)` in your session summary so the operator can scan one place. The skill's own backing store (DDB POST# row, Discord channel) is the *product* record.
@@ -227,6 +318,37 @@ Iterate `payload.tasks` in order. For each task:
    - `status:"skipped"` with no `artifact` when the skill's skip-rule fired — set `summary` to the skip reason; the skip is worth recording too.
    - This is the **same `engagements` write surface** external clients use (one endpoint, not two); `execution_surface:"ccr"` is the only thing that marks it as a workforce CCR run.
    - The token is injected into the task by the orchestrator; never hard-code it. A 401 means it wasn't injected — fail loud for the task, don't silently drop the record.
+   - **Issue-585 hardening.** The `POST /agents/{agent_slug}/engagements` call for
+     task N **must** happen fully sequentially with task N's own execution — never
+     background it (`curl ... &`) and never build the request body via a shared
+     variable/tempfile reused across tasks in the batch loop. A backgrounded write
+     whose body is composed from a loop-scoped variable can still be in flight
+     when the loop advances and mutates that variable, so the request that
+     actually leaves the process carries a *later* task's content under an
+     *earlier* task's `agent_slug` in the URL — exactly the cross-contamination
+     `#585` reported (identical `started_at`/`ended_at`/`content_hash`/
+     `artifact.uri` landing under the wrong agent). A regression test
+     (`workforce/lambdas/agents-api/handler-tests.ts`, "#585: N concurrent agents
+     sharing one bearer token never cross-contaminate rows") confirms the
+     **endpoint itself** holds no shared mutable state across concurrent
+     requests — the failure mode this note guards against is a property of how
+     the *calling* session constructs and issues the POST, not of the Lambda.
+     After every engagement POST, **read it back**
+     (`GET /agents/{agent_slug}/executions?limit=5`) and assert your just-sent
+     row (matching on `agent_slug`, `summary`, and `artifact.uri`) is **present
+     somewhere in the page** — not necessarily the head row — before moving to
+     the next task. Use `limit=5`, not `limit=1`: `executions` is served off a
+     GSI query, and DynamoDB rejects `ConsistentRead` outright on a GSI, so a
+     `limit=1` read can be served a stale head row from a lagging replica
+     immediately after a same-flow write (ML-029 in
+     [docs/memory-lint-backlog.md](../../../docs/memory-lint-backlog.md);
+     confirmed on this exact endpoint by incident 5 in that row, where a
+     `limit=1` read returned a *sibling binding's* row and only `limit=5`
+     surfaced the real one). Asserting "present in the page" rather than "is
+     the head row" is what makes this over-fetch actually absorb that
+     staleness — a mismatch is still exactly the ML-028 corruption class and
+     must be surfaced loudly (C-4), not silently trusted from the `201`, once
+     your row is confirmed genuinely absent from a `limit=5` page.
 
 ## Write-back — via the skill's authenticated endpoint script
 

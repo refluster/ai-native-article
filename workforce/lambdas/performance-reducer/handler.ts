@@ -50,7 +50,7 @@ import {
   projectPk,
   listExecutions,
 } from "../shared/project.js";
-import { getItem, putItem, scanAllPrefix } from "../shared/ddb.js";
+import { getItem, putItem, scanAllPrefix, queryByGsiPaged } from "../shared/ddb.js";
 import {
   type AgentIdleSignal,
   type LifecyclePoint,
@@ -66,6 +66,10 @@ import {
   tallyLifecycle,
 } from "../shared/performance.js";
 import { COMMONS_SKILLS } from "../shared/skill-registry-generated.js";
+import {
+  sweepPendingEmbeddings,
+  type EmbeddingRetrySweepResult,
+} from "../shared/embedding-retry.js";
 
 // Newest-N ok-status executions inspected per agent to decide "has delivered".
 // At C-3 single-operator scale an agent that ever delivered has a recent ok
@@ -73,6 +77,11 @@ import { COMMONS_SKILLS } from "../shared/skill-registry-generated.js";
 // without a full ledger scan. Raising this is a read-cost decision, not an
 // in-handler tweak.
 const EXEC_PROBE_LIMIT = 100;
+// Hard ceiling on GSI1 pages walked per agent while collecting EXEC_PROBE_LIMIT
+// `ok` rows (#569 / FU-039 — see okExecs below). Bounds worst-case read cost to
+// EXEC_PROBE_MAX_PAGES * EXEC_PROBE_LIMIT raw rows scanned per agent per day;
+// generous at C-3 scale, never unbounded.
+const EXEC_PROBE_MAX_PAGES = 10;
 
 export interface PerformanceReducerResult {
   date: string;
@@ -81,6 +90,9 @@ export interface PerformanceReducerResult {
   workforce: Pick<LifecyclePoint, "registered" | "assigned" | "delivered">;
   /** Epic-021 §B.1 — how many personas the idle sweep flagged today. */
   idle: number;
+  /** #573 — this run's embedding retry-sweep outcome (rows attempted /
+   *  recovered / moved to terminal `failed` / still pending). */
+  embeddingRetry: EmbeddingRetrySweepResult;
 }
 
 export async function handler(): Promise<PerformanceReducerResult> {
@@ -94,10 +106,40 @@ export async function handler(): Promise<PerformanceReducerResult> {
   // Cache each agent's recent ok executions once; reused across the workforce
   // sweep and every project the agent participates in.
   const execCache = new Map<string, ExecutionRow[]>();
+  const probeSaturated: string[] = [];
+  // #569 / FU-039: `listExecutions({status:"ok", limit})` applies `limit` to
+  // the RAW DDB page BEFORE the status post-filter (shared/project.ts). A
+  // single un-paginated page can therefore return far fewer than
+  // EXEC_PROBE_LIMIT `ok` rows -- or none at all -- for an agent whose most
+  // recent rows of ANY status crowd out the older `ok` ones this probe wants.
+  // Observed live: an agent whose newest ~100 rows (any status) were all
+  // `agent-workforce` traffic silently dropped out of `asp-cloud`'s /
+  // `project-ind`'s per-project `delivered` snapshot, even though it had
+  // truly delivered there earlier — `delivered` is defined as cumulative
+  // (performance.ts), so that read contradicted its own contract.
+  //
+  // Fix: walk GSI1 pages with a real DDB cursor (queryByGsiPaged), newest
+  // first, filtering status locally, until either EXEC_PROBE_LIMIT `ok` rows
+  // are collected or EXEC_PROBE_MAX_PAGES pages are exhausted. A saturated
+  // walk is recorded (C-4: never silently read as a clean absence), not
+  // asserted clean — same discipline windowOkExecs already applies below.
   async function okExecs(slug: string): Promise<ExecutionRow[]> {
     const hit = execCache.get(slug);
     if (hit) return hit;
-    const rows = await listExecutions({ agent_slug: slug, status: "ok", limit: EXEC_PROBE_LIMIT });
+    const rows: ExecutionRow[] = [];
+    let cursor: string | undefined;
+    let pages = 0;
+    do {
+      const page = await queryByGsiPaged<ExecutionRow>("GSI1", `AGENT#${slug}`, {
+        limit: EXEC_PROBE_LIMIT,
+        scanIndexForward: false,
+        cursor,
+      });
+      for (const r of page.items) if (r.status === "ok") rows.push(r);
+      cursor = page.cursor;
+      pages += 1;
+    } while (cursor && rows.length < EXEC_PROBE_LIMIT && pages < EXEC_PROBE_MAX_PAGES);
+    if (cursor && rows.length < EXEC_PROBE_LIMIT) probeSaturated.push(slug);
     execCache.set(slug, rows);
     return rows;
   }
@@ -185,11 +227,22 @@ export async function handler(): Promise<PerformanceReducerResult> {
       }),
     );
   }
+  if (probeSaturated.length > 0) {
+    console.warn(
+      JSON.stringify({
+        event: "delivered_probe_saturated",
+        slugs: probeSaturated,
+        max_pages: EXEC_PROBE_MAX_PAGES,
+        note:
+          "okExecs hit the page ceiling before finding EXEC_PROBE_LIMIT ok rows (#569) — " +
+          "'not delivered' is bounded evidence, not proof of absence, for these slugs",
+      }),
+    );
+  }
 
   // ── 3. per-project snapshots (active projects only) ───────────────────────
-  const projects = (await scanAllPrefix<ProjectMetaRow>("PROJECT#", "META")).filter(
-    (p) => p.status === "active",
-  );
+  const allProjects = await scanAllPrefix<ProjectMetaRow>("PROJECT#", "META");
+  const projects = allProjects.filter((p) => p.status === "active");
   let projectsWritten = 0;
   for (const project of projects) {
     const projectId = project.project_id;
@@ -214,6 +267,24 @@ export async function handler(): Promise<PerformanceReducerResult> {
     projectsWritten += 1;
   }
 
+  // ── 4. embedding retry sweep (#573) ───────────────────────────────────────
+  // Rides this walk rather than a new cron (same "no new schedule" precedent
+  // as the §2b idle sweep) — re-attempts EXEC rows stranded at
+  // embedding_status='pending' since their original write, bounded per run
+  // (see shared/embedding-retry.ts). Swept over every project this reducer
+  // already scanned above, active or not (a project going inactive should
+  // not orphan its pending rows from ever being retried).
+  const embeddingRetry = await sweepPendingEmbeddings(allProjects.map((p) => p.project_id));
+  if (embeddingRetry.failedTerminal > 0) {
+    console.warn(
+      JSON.stringify({
+        event: "exec_embedding_retry_terminal",
+        count: embeddingRetry.failedTerminal,
+        note: "row(s) moved to embedding_status='failed' after exhausting retry attempts — permanently excluded from semantic recall",
+      }),
+    );
+  }
+
   const result: PerformanceReducerResult = {
     date,
     agents: metas.length,
@@ -224,6 +295,7 @@ export async function handler(): Promise<PerformanceReducerResult> {
       delivered: workforcePoint.delivered,
     },
     idle: idle.length,
+    embeddingRetry,
   };
   console.log(JSON.stringify({ event: "performance_reducer_run", ...result }));
   return result;

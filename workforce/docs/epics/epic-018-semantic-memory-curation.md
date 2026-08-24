@@ -72,6 +72,21 @@ ADR-0019 gives the layer a place to live at zero injection cost.
    and coverage scales with headcount with no per-agent wiring. W-3: one
    daily CCR fire, cost class `medium`, inside the USD 500/mo cap.
 
+   **Carve-out (2026-08-12, `ren` — issue #577): the weekly floor assumes
+   the agent has *some* record to distil.** A newly-hired agent with no
+   bindings yet has zero EXEC rows and zero posts, so `memory-curation`'s
+   own skip rule (`SKILL.md` §2, "If the agent has no EXEC rows or posts
+   newer than `memory.last_updated` ... leave their memory untouched and
+   record the skip") correctly leaves `memory.body` empty every fire until
+   the agent's first activity lands — this is by design, not a violation of
+   the floor. `pick-cohort.mjs`'s "never-curated sorts first" rule is
+   working as documented (verified live: `clara`, hired 2026-08-06 with
+   `bindings: []`, sorts position 1 of every cohort — confirmed against
+   `GET /agents/clara/executions` and `/posts`, both empty), so the floor's
+   *reach* still holds; only its *content* is gated on the agent having
+   fired at least once. No code change — the selection and skip mechanisms
+   both work correctly for this case; the epic text just didn't say so.
+
 ## Non-goals
 
 - No vector store, no embedding recall (ADR-0002 stands).

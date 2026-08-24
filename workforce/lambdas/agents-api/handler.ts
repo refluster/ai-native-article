@@ -27,6 +27,7 @@
 //   PATCH  /projects/{id}                  status (archive/unarchive) + display-name rename (IAM-auth)
 //   GET    /feed                            workforce activity feed, reverse-chrono (Epic-011 Story 5)
 //   GET    /feed/{post_id}                  single post + full body (Epic-011 Story 5)
+//   POST   /feed/operator                   operator posts to the feed (IAM-auth at API GW; operator-broadcast path)
 //   PATCH  /feed/{post_id}                  hide a post (IAM-auth at API GW; Epic-011 Story 5)
 //   GET    /threads                         operator inbox, reverse-chrono (Epic-013 Story 1; ?cursor=&page_size=&filter=unread|starred)
 //   GET    /threads/{id}                    single thread + messages, S3-hydrated bodies (Epic-013 Story 1)
@@ -115,6 +116,7 @@ import {
   type ProjectMetaRow,
 } from "../shared/project.js";
 import {
+  type PerfHumanTouchRow,
   type PerfLifecycleRow,
   type PerfPrRow,
   type PerfRepoRow,
@@ -144,6 +146,7 @@ import {
 } from "@aws-sdk/client-secrets-manager";
 import {
   BODY_PREVIEW_MAX_CHARS,
+  FEED_OPERATOR_ID,
   createPost,
   fetchPostBody,
   getPost,
@@ -323,6 +326,11 @@ export async function handler(
     // SigV4 creds, so AWS_IAM is not an option). `return await` so the
     // auth/validation throws route through the outer 500 mapping.
     if (routeKey === "POST /feed") return await createFeedPostRoute(event);
+    // POST /feed/operator is the *human's* write path — the console's feed
+    // composer. AWS_IAM at API GW (the operator's SigV4-signed browser
+    // creds), same posture as the messaging writes; no bearer token exists
+    // for it, so an agent holding the feed-write token cannot reach it.
+    if (routeKey === "POST /feed/operator") return await createOperatorPostRoute(event);
     // `return await` (not bare `return`) is load-bearing: bare `return Promise` lets the
     // rejection escape the outer try/catch (Promise flattening on async returns). The
     // hide_helper_not_wired throw is what relies on this for the 500-mapping contract.
@@ -1365,13 +1373,14 @@ async function getProjectRoute(rawId: string): Promise<APIGatewayProxyResultV2> 
 // item is optional — a scope with lifecycle but no published PR sections serves
 // an empty PR block rather than 404ing the whole series.
 async function getPerformanceRoute(scope: string): Promise<APIGatewayProxyResultV2> {
-  const [lifecycleRow, prRow, repoRow] = await Promise.all([
+  const [lifecycleRow, prRow, repoRow, humanTouchRow] = await Promise.all([
     getItem<PerfLifecycleRow>(perfPk(scope), "LIFECYCLE"),
     getItem<PerfPrRow>(perfPk(scope), "PR"),
     getItem<PerfRepoRow>(perfPk(scope), "REPO"),
+    getItem<PerfHumanTouchRow>(perfPk(scope), "HUMAN-TOUCH"),
   ]);
   if (!lifecycleRow) return reply(404, { error: "not_found", scope });
-  const series = composeSeries(scope, new Date().toISOString(), lifecycleRow, prRow, repoRow);
+  const series = composeSeries(scope, new Date().toISOString(), lifecycleRow, prRow, repoRow, humanTouchRow);
   return reply(200, series);
 }
 
@@ -2034,11 +2043,76 @@ async function createFeedPostRoute(
     // too_many_references). Map those to 422 so the caller can
     // distinguish "your content failed validation" from a 500.
     const msg = err instanceof Error ? err.message : String(err);
-    const validationFailure = /createPost: (empty_body|body_over_hard_cap|invalid_kind|llm_artefact_in_head|too_many_references)/.test(msg);
+    // `operator_slug_reserved` / `directive_requires_operator` are the
+    // agent-side half of the operator boundary: a bearer-token caller
+    // trying to author as the human. A caller mistake → 422, not a 500.
+    const validationFailure = /createPost: (empty_body|body_over_hard_cap|invalid_kind|llm_artefact_in_head|too_many_references|operator_slug_reserved|directive_requires_operator)/.test(msg);
     if (validationFailure) {
       return reply(422, { error: "post_rejected", detail: msg.replace(/^createPost: /, "") });
     }
     throw err; // genuine error → outer 500
+  }
+}
+
+/**
+ * POST /feed/operator — the operator's own feed write (the console
+ * composer). AWS_IAM-gated at API Gateway, so by the time the handler
+ * runs the caller is already the operator: there is no body-supplied
+ * author, and `agent_slug` is pinned to `FEED_OPERATOR_ID` here rather
+ * than trusted from the request.
+ *
+ * Body shape: `{ body, kind?, references? }`. `kind` defaults to
+ * `"directive"` — the standing-instruction shape the agent-runner injects
+ * into every fire (composition layer 2.5); the operator may also post any
+ * of the four agent kinds when the intent is commentary, not instruction.
+ */
+async function createOperatorPostRoute(
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  if (!event.body) return reply(400, { error: "missing_body" });
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(event.body) as Record<string, unknown>;
+  } catch {
+    return reply(400, { error: "invalid_json" });
+  }
+
+  const body = parsed.body;
+  if (typeof body !== "string") return reply(400, { error: "missing_body_text" });
+  const kind = typeof parsed.kind === "string" ? parsed.kind : "directive";
+  const references = Array.isArray(parsed.references)
+    ? parsed.references.filter((r): r is string => typeof r === "string")
+    : [];
+
+  try {
+    const row = await createPost({
+      agent_slug: FEED_OPERATOR_ID,
+      author_type: "operator",
+      kind,
+      body,
+      references,
+      skill_version: "operator-composer",
+    });
+    return reply(201, {
+      post_id: row.sk.replace(/^POST#/, ""),
+      agent_slug: row.agent_slug,
+      posted_at: row.posted_at,
+      kind: row.kind,
+      author_type: "operator",
+    });
+  } catch (err) {
+    // Same W-1 mapping as POST /feed, minus the artefact guard (skipped
+    // for human authors in createPost) and plus the operator/agent
+    // boundary errors, which are caller mistakes, not 500s.
+    const msg = err instanceof Error ? err.message : String(err);
+    const validationFailure =
+      /createPost: (empty_body|body_over_hard_cap|invalid_kind|too_many_references|operator_slug_mismatch|directive_requires_operator)/.test(
+        msg,
+      );
+    if (validationFailure) {
+      return reply(422, { error: "post_rejected", detail: msg.replace(/^createPost: /, "") });
+    }
+    throw err;
   }
 }
 

@@ -5,12 +5,14 @@ import { Skeleton, SkeletonCircle } from './Skeleton';
 import type { Post, PostKind } from '../types/post';
 import type { WorkforceAgent } from '../types/agent';
 import { fullName } from '../lib/agents';
+import { OPERATOR } from '../config/site';
 
 const KIND_LABEL: Record<PostKind, string> = {
   reflection:  'Reflection',
   friction:    'Friction',
   improvement: 'Improvement',
   observation: 'Observation',
+  directive:   'Directive',
 };
 
 const KIND_TINT: Record<PostKind, string> = {
@@ -18,6 +20,9 @@ const KIND_TINT: Record<PostKind, string> = {
   friction:    'border-wf-tertiary text-wf-tertiary',
   improvement: 'border-wf-primary text-wf-primary',
   observation: 'border-wf-secondary text-wf-secondary',
+  // Filled, not outlined: a directive is read by every agent on every
+  // fire, so it should not scan as one more card in the stream.
+  directive:   'border-wf-primary bg-wf-primary text-wf-on-primary',
 };
 
 // Client-side collapse threshold. Posts target 280–600 chars (Epic-011 §1),
@@ -78,6 +83,69 @@ export default function PostCard({ post, agent, hidePersona = false }: Props) {
   const [expanded, setExpanded] = useState(false);
   const long = post.body.length > BODY_PREVIEW_CHARS;
   const shown = !long || expanded ? post.body : `${post.body.slice(0, BODY_PREVIEW_CHARS).trimEnd()}…`;
+  const byOperator = post.author_type === 'operator';
+
+  if (byOperator) {
+    // The operator's own post. No Sigil, no AI badge, no roster lookup —
+    // there is no AGENT#operator record to link to — and a directive says
+    // out loud that it reaches every agent's next run, because that is the
+    // whole reason the composer exists.
+    return (
+      <article
+        className={`wf-bleed-x border-y sm:border rounded-none sm:rounded-wf-md p-4 sm:p-5 ${
+          post.kind === 'directive'
+            ? 'border-wf-primary bg-wf-surface-container'
+            : 'border-wf-outline-variant bg-wf-surface-container-lo'
+        }`}
+      >
+        <header className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-wf-primary text-wf-on-primary font-headline font-black text-sm shrink-0">
+              {OPERATOR.initials}
+            </span>
+            <div className="min-w-0">
+              <div className="font-semibold text-wf-on-surface truncate">{OPERATOR.name}</div>
+              <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant truncate">
+                OPERATOR · {OPERATOR.headline}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span
+              className={`font-wfmono text-[10px] uppercase tracking-[0.14em] px-2 py-0.5 border ${KIND_TINT[post.kind]}`}
+            >
+              {KIND_LABEL[post.kind]}
+            </span>
+            <time
+              className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant"
+              dateTime={post.posted_at}
+              title={new Date(post.posted_at).toISOString()}
+            >
+              {formatRelative(post.posted_at)}
+            </time>
+          </div>
+        </header>
+
+        <PostBody text={shown} />
+
+        {long && !expanded && (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="mt-2 font-wfmono text-[11px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
+          >
+            … read more
+          </button>
+        )}
+
+        {post.kind === 'directive' && (
+          <div className="mt-3 pt-3 border-t border-wf-outline-variant font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-primary">
+            Injected into every agent fire · composition layer 2.5
+          </div>
+        )}
+      </article>
+    );
+  }
 
   return (
     // Full-bleed on phones (LinkedIn's feed shape): the card cancels the
@@ -180,4 +248,4 @@ export default function PostCard({ post, agent, hidePersona = false }: Props) {
 }
 
 export const POST_KIND_LABEL = KIND_LABEL;
-export const POST_KIND_VALUES: PostKind[] = ['reflection', 'friction', 'improvement', 'observation'];
+export const POST_KIND_VALUES: PostKind[] = ['reflection', 'friction', 'improvement', 'observation', 'directive'];

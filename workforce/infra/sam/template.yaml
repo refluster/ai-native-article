@@ -806,6 +806,19 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /feed
             Method: POST
+        CreateOperatorFeedPost:
+          # The operator's own composer write (console → feed). AWS_IAM,
+          # exactly like the messaging writes: the SPA signs with SigV4
+          # from the workforce Identity Pool. Deliberately NOT the bearer
+          # path — the feed-write token an agent holds must not be able to
+          # author a `directive`, which the runner injects into every fire.
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /feed/operator
+            Method: POST
+            Auth:
+              Authorizer: AWS_IAM
         PatchFeedPost:
           Type: HttpApi
           Properties:
@@ -1037,6 +1050,11 @@ Resources:
       Description: One-shot backfill — fills TASK.project_id with self/{slug}. Epic-010 Story 1-B.
       MemorySize: 512
       Timeout: 300
+      # FU-009: cap to 1 concurrent execution so a double-trigger (operator
+      # fires manually while a prior run is still scanning) cannot race against
+      # itself and produce duplicate conditional-write conflicts or inflated
+      # WfBackfillTasksProcessed metrics.
+      ReservedConcurrentExecutions: 1
       Policies:
         - Statement:
             - Sid: BackfillTasksTableAccess
@@ -1057,6 +1075,29 @@ Resources:
                   cloudwatch:namespace: Workforce/Backfill
       Tags:
         workforce: !Ref Stage
+
+  # FU-009: mirrors the WfAuditErrorsAlarm pattern — any Lambda error on an
+  # operator-invoked one-shot is immediately actionable, so a 5-min window
+  # with TreatMissingData: notBreaching (the function normally never fires) is
+  # the right posture. Paired with ReservedConcurrentExecutions: 1 above.
+  WfBackfillTasksErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-backfill-tasks-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-backfill-tasks-${Stage} over 5 minutes (operator-invoked one-shot backfill Lambda).
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfBackfillTasksFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
 
   # --- Credentials write API (Epic-010 Story 2-C) ----------------------------
   # Operator-only write-side API for project credentials. Mirrors the
@@ -1669,6 +1710,36 @@ Resources:
       Threshold: 0
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  # FU-032: wf-audit is the Lambda whose whole job is to be the *witness* for
+  # Epic-010 criterion 4, yet it was the only scheduled Lambda without a
+  # missed-run alarm — making "a week of clean zeros" indistinguishable from
+  # "a week where wf-audit never fired" (TreatMissingData: notBreaching on
+  # both signal alarms made the gate trivially green). Mirrors the pattern
+  # used by WfConfigDigestMissedRunAlarm (weekly window) and
+  # WfPerformanceReducerMissedRunAlarm (2-day window). wf-audit fires daily
+  # (cron(0 4 * * ? *)), so a 2-day window (two daily buckets below 1
+  # invocation) fires if either daily run is missed — same logic as the
+  # performance reducer. This is the prerequisite for the ≥1-week all-zero
+  # soak that closes Epic-010 criterion 4 (ROADMAP.md §Status-transition).
+  WfAuditMissedRunAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-audit-missed-run-alarm-${Stage}
+      AlarmDescription: !Sub No wf-audit-${Stage} invocation in 2 days — the daily workforce audit sweep is not running (Epic-010 criterion 4 soak is stalled).
+      Namespace: AWS/Lambda
+      MetricName: Invocations
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfAuditFunction
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
       AlarmActions:
         - !Ref WfAlarmTopic
 

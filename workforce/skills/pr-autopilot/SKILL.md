@@ -222,18 +222,34 @@ to prevent.
 **Reviewer-lens contract (per nominated persona):**
 
 - **The lens** = that persona's voice + skill-judgment config (`lens_name`,
-  `values`, `checklist_sections`, `escalation_triggers`,
-  `bias_disclosure_template` on their `AGENT#{slug}` record). Scan the diff in
-  that lens only; post only real findings (or an explicit "no findings from
-  this lens").
-- **Inline findings** lead with a finding-ID (`A1`), name the checklist
-  section, cite `file:line`, suggest the fix concretely. Cycle-2+ comments
-  cite the cycle-1 finding-ID or flag `[NEW]`.
-- **Summary body**: verdict signal (🟢/🟡/🔴 from this lens) →
-  section-by-section notes → sign-off
-  `— {persona} (LLM persona; lens: {lens_name}; manual route via pr-autopilot)`
-  → a mandatory bias-disclosure paragraph (it is an LLM persona; what it DID /
-  did NOT do).
+  `values`, `checklist_sections`, `escalation_triggers` on their
+  `AGENT#{slug}` record). Scan the diff in that lens only; post only real
+  findings (or an explicit "no findings from this lens").
+- **Keep it short — 1/5 the length of a full-prose review.** The operator
+  reads every one of these; a review that re-justifies itself at paragraph
+  length per finding is not more rigorous, it is more to skim past. Say the
+  finding, not the essay around it.
+- **Inline findings, four lines each, no more:**
+  ```
+  `A1` <checklist section> — <file:line>
+  Problem: <one sentence — what's wrong>
+  Fix: <one sentence — the concrete change>
+  ```
+  Cycle-2+ comments cite the cycle-1 finding-ID or flag `[NEW]`; still four
+  lines. Do not add a justification paragraph beneath the fix — if the fix
+  needs defending, it is not yet concrete enough to state in one sentence.
+- **Summary body, in order:**
+  1. verdict signal (🟢/🟡/🔴 from this lens), one line;
+  2. each finding, four lines as above (skip entirely on 🟢 — no "what I
+     checked and found clean" tour of the diff; the green marker below
+     already says that);
+  3. sign-off: `— {persona} (LLM persona; lens: {lens_name})`;
+  4. bias disclosure, **one line, not a paragraph**:
+     `Bias: <what this lens did NOT verify — tests run? build run? repo cloned?>`
+     — name only the gaps that bear on trusting THIS review; drop the
+     What-I-DID enumeration, the "not independence" caveat (that belongs in
+     the verdict's Panel provenance line, once, not per-lens) and any restated
+     scope.
 - **Green sign-off marker (machine-checkable).** A non-blocking lens (no 🔴)
   **must embed the exact hidden marker** `<!-- autopilot:review:{slug}:green -->`.
   This is the only signal the merge engine accepts as that reviewer's green
@@ -242,15 +258,18 @@ to prevent.
   `escalation_triggers`, post a single comment naming the trigger — as a
   hand-off per Step 5 (`--needs-human --reason persona-escalation-trigger` +
   the hidden markers), not a checklist run.
-- **The lenses are not independent, and the verdict must say so.** Every lens
-  in this step is produced by one session, in one context window, in
-  sequence — each able to see the diff's own justification, your routing
-  comment, and every earlier lens's findings. That is a known property of the
-  inline contract, not a defect of a given run, and it has an observed
-  asymmetry: a shared-context panel reliably catches implementation defects
-  and does **not** reliably challenge the author's premises (#512, evidenced
-  on #510). Nothing here changes what you post per lens; it changes what
-  Step 5 may claim about agreement between them.
+- **The lenses are not independent, and the verdict must say so — once, in
+  the verdict, not in every lens's own comment.** Every lens in this step is
+  produced by one session, in one context window, in sequence — each able to
+  see the diff's own justification, your routing comment, and every earlier
+  lens's findings. That is a known property of the inline contract, not a
+  defect of a given run, and it has an observed asymmetry: a shared-context
+  panel reliably catches implementation defects and does **not** reliably
+  challenge the author's premises (#512, evidenced on #510). Nothing here
+  changes what you post per lens; it changes what Step 5 may claim about
+  agreement between them. The **Panel provenance** paragraph in the verdict
+  (Step 5) is where this gets said — each lens's own comment does not need to
+  restate it.
 
 ## Step 5 — verdict by reviewer consensus → terminal action
 

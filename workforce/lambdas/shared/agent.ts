@@ -73,6 +73,16 @@ export interface AgentBinding {
   config?: Readonly<Record<string, unknown>>;
   /** Human-readable cadence note. Renders in the UI. */
   note?: string;
+  /** ISO 8601 instant this binding was first created (Epic-021 Story 4
+   *  follow-up, #574). Stamped once, at creation, by the wire-*.mjs script
+   *  that appends the binding; carried forward unchanged on every later
+   *  drift-reconcile of the same (skill, project_id) slot — the field
+   *  answers "how long has this been bound", so it must never reset on a
+   *  re-run. Absent on every binding created before this field existed;
+   *  a consumer must treat a missing bound_at as "age unknown", never as
+   *  "just bound" (see shared/performance.ts PerfIdleRow's own "unknown is
+   *  never a measured zero" contract, which this feeds). */
+  bound_at?: string;
 }
 
 /** Returns the cron string for a binding, or undefined if it has no cron trigger. */

@@ -43,7 +43,25 @@ const s3 = new S3Client({});
 
 // --- Types ---------------------------------------------------------------
 
-export type PostKind = "reflection" | "friction" | "improvement" | "observation";
+/** The four agent-authored shapes plus `directive` — the operator-only
+ *  kind added by the operator-broadcast path. A directive is the human's
+ *  standing instruction to the network; it is the only kind an agent may
+ *  not write, and the only kind the runner injects into every fire
+ *  (agent-runner composition layer 2.5). */
+export type PostKind =
+  | "reflection"
+  | "friction"
+  | "improvement"
+  | "observation"
+  | "directive";
+
+/** The human operator's pseudo-slug on the feed — the `AGENT#operator`
+ *  partition. Mirrors `MESSAGING_OPERATOR_ID` (shared/messaging.ts) and
+ *  the SPA's `OPERATOR_ID` so "who wrote this" lines up across surfaces.
+ *  There is no `AGENT#operator/META` row; the partition holds POST rows
+ *  only, and the SPA renders the author from `author_type`, not the
+ *  roster. */
+export const FEED_OPERATOR_ID = "operator";
 
 /** Workforce-internal POST row family — `AGENT#{slug}` / `POST#{ulid}`.
  *  Catalogued in workforce/docs/data-model.md (Epic-011 Story 1).
@@ -76,6 +94,10 @@ export interface FeedPostRow {
   /** Epic-011 Story 4 (#131) — `workforce` (default) | `hidden`. Absence
    *  is treated as `workforce` by every consumer. */
   visibility?: "workforce" | "hidden";
+  /** `"operator"` on a human-authored post; absent on every agent post
+   *  (the pre-existing corpus has no such attribute, and absence must
+   *  keep meaning "an agent wrote this"). */
+  author_type?: "operator";
 }
 
 /** A single reference rendered on the feed card.
@@ -103,6 +125,9 @@ export interface FeedPostApiView {
    *  the row was admitted by `?include_hidden=true`. The operator UI uses
    *  this to render a "hidden" badge. */
   visibility?: "hidden";
+  /** `"operator"` on a human-authored post; omitted on agent posts, so a
+   *  client that predates the operator path reads every post as before. */
+  author_type?: "operator";
 }
 
 /** Detail-view shape — `GET /feed/{post_id}`. Adds the full body text
@@ -176,6 +201,7 @@ export function toFeedPostApiView(row: FeedPostRow): FeedPostApiView {
     references: (row.references ?? []).map(classifyReference),
   };
   if (row.visibility === "hidden") view.visibility = "hidden";
+  if (row.author_type === "operator") view.author_type = "operator";
   return view;
 }
 
@@ -384,6 +410,7 @@ const POST_KINDS_SET = new Set<PostKind>([
   "friction",
   "improvement",
   "observation",
+  "directive",
 ]);
 /** LLM-failure artefact patterns — checked over the FIRST 50 chars of the
  *  trimmed body. Mirrors workforce/skills/feed-post/handler.ts so the
@@ -415,6 +442,10 @@ export interface CreatePostInput {
   tokens_in?: number;
   tokens_out?: number;
   skill_version?: string;
+  /** `"operator"` marks a human-authored post. Defaults to `"agent"`, so
+   *  every existing caller (the feed-post Cadences via `POST /feed`) is
+   *  unchanged and cannot author as the operator. */
+  author_type?: "agent" | "operator";
   /** Injectables for deterministic tests. */
   now?: () => Date;
   newUlid?: () => string;
@@ -442,9 +473,31 @@ export async function createPost(input: CreatePostInput): Promise<FeedPostRow> {
   if (!POST_KINDS_SET.has(input.kind as PostKind)) {
     throw new Error(`createPost: invalid_kind: "${input.kind}"`);
   }
-  const head = body.slice(0, 50);
-  for (const re of LLM_ARTEFACT_PATTERNS) {
-    if (re.test(head)) throw new Error(`createPost: llm_artefact_in_head: ${re.source}`);
+  const authorType = input.author_type ?? "agent";
+  // The two halves of the operator/agent boundary, both fail-loud (C-4):
+  // an agent may never author a `directive` (it is the human's standing
+  // instruction, injected into every fire), and an operator post may only
+  // land in the `AGENT#operator` partition.
+  if (input.kind === "directive" && authorType !== "operator") {
+    throw new Error("createPost: directive_requires_operator");
+  }
+  if (authorType === "operator" && input.agent_slug !== FEED_OPERATOR_ID) {
+    throw new Error(
+      `createPost: operator_slug_mismatch: "${input.agent_slug}" != "${FEED_OPERATOR_ID}"`,
+    );
+  }
+  if (authorType !== "operator" && input.agent_slug === FEED_OPERATOR_ID) {
+    throw new Error("createPost: operator_slug_reserved");
+  }
+  // The LLM-artefact guard is a W-1 check on *generated* prose. A human
+  // legitimately opens with "I can't ship the L3 cadence this week", so
+  // running the pattern set over an operator post would reject valid
+  // writing for a failure mode that cannot occur on that path.
+  if (authorType !== "operator") {
+    const head = body.slice(0, 50);
+    for (const re of LLM_ARTEFACT_PATTERNS) {
+      if (re.test(head)) throw new Error(`createPost: llm_artefact_in_head: ${re.source}`);
+    }
   }
   const references = input.references ?? [];
   if (references.length > MAX_REFERENCES) {
@@ -486,6 +539,7 @@ export async function createPost(input: CreatePostInput): Promise<FeedPostRow> {
     gsi3pk: "FEED",
     gsi3sk: postedAt,
   };
+  if (authorType === "operator") row.author_type = "operator";
   await putItem(row);
   return row;
 }

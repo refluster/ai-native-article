@@ -1,4 +1,4 @@
-name: Corpus freshness (R-15)
+name: Site health (R-15 corpus freshness, R-17 live base path)
 
 # R-15 — is the article pipeline still producing?
 #
@@ -30,7 +30,7 @@ on:
         default: '5'
 
 concurrency:
-  group: corpus-freshness
+  group: site-health
   cancel-in-progress: false
 
 jobs:
@@ -47,3 +47,10 @@ jobs:
         env:
           MAX_AGE_DAYS: ${{ github.event.inputs.max_age_days || '5' }}
         run: node scripts/check-corpus-freshness.mjs
+
+      # R-17 — is the live site actually loadable? Runs even when R-15 fails:
+      # a stale corpus and a broken shell are independent faults, and the one
+      # that hides the other is exactly how #600/#606 stayed live for a week.
+      - name: Live base-path smoke (R-17)
+        if: always()
+        run: node scripts/check-live-base-path.mjs
