@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
 import LanguageToggle from './LanguageToggle'
 
-// Daily-use first: the public header carries the reader's home and nothing
-// else. Operator surfaces (design system/guide, capture, workforce console,
-// original sources) live behind the /operator page, linked discreetly from
-// the footer — they're tools, not reading destinations.
-const publicNav = [{ to: '/', label: 'INDEX', end: true }]
+// Keep the reader index primary, with one deliberate path for visitors who
+// want to understand the operating system behind the publication.
+const publicNav = [
+  { to: '/', label: 'INDEX', end: true },
+  { to: '/system', label: 'SYSTEM', end: true },
+]
 
 export default function Header() {
   return (
@@ -30,14 +31,19 @@ export default function Header() {
           ))}
         </nav>
 
-        <NavLink to="/" className="text-2xl font-black tracking-tighter text-on-surface uppercase">
+        <NavLink to="/" className="text-xl md:text-2xl font-black tracking-tighter text-on-surface uppercase">
           AI NATIVE ARTICLE
         </NavLink>
 
-        {/* Right cluster: the language switch, and nothing else. It is the one
-            reader-facing control the header carries — the daily-use IA
-            (ADR-0002) keeps operator tooling on /operator. */}
         <div className="flex items-center gap-4 md:gap-6">
+          <NavLink
+            to="/system"
+            className={({ isActive }) =>
+              `lg:hidden text-[10px] font-bold tracking-widest uppercase ${isActive ? 'text-tertiary' : 'text-outline'}`
+            }
+          >
+            SYSTEM
+          </NavLink>
           <LanguageToggle />
         </div>
       </div>
