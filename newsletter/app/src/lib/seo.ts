@@ -13,18 +13,9 @@ import { SITE_BASENAME } from '../config/site'
 
 const SITE_NAME = 'AI NATIVE ARTICLE'
 const SITE_ORIGIN = 'https://kohuehara.xyz'
-// The domain-root-relative empty-string variant of site.ts's SITE_BASE_PATH —
-// the same value routerBaseName() (lib/paths.ts) uses for BrowserRouter's
-// `basename`, so every "where does this site live" answer traces to one
-// constant (issue 600, remediation A2 on PR 606).
 const SITE_BASE = SITE_BASENAME
 const MAX_DESC = 160
 
-/**
- * Site-level copy per edition. Japanese is the canonical voice; the English
- * strings are the same promise, not a machine translation of the Japanese
- * sentence structure.
- */
 const SITE_COPY: Record<Language, { tagline: string; description: string }> = {
   ja: {
     tagline: 'AI時代の解説と分析',
@@ -47,16 +38,12 @@ interface ArticleSeo {
   image?: string
 }
 
-/** Resolve a manifest-style path (e.g. /posts/images/x.jpg) to an absolute URL
- *  under the site's base. Pass-through for already-absolute URLs. */
 function absoluteAsset(path: string): string {
   if (/^https?:\/\//.test(path)) return path
   const cleaned = path.startsWith('/') ? path : `/${path}`
   return `${SITE_ORIGIN}${SITE_BASE}${cleaned}`
 }
 
-/** Strip markdown noise, leading quote-artifacts from frontmatter multi-line
- *  parsing, and collapse whitespace for meta/OG descriptions. */
 function summarize(raw: string): string {
   const stripped = raw
     .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
@@ -105,14 +92,6 @@ function removeJsonLd(id: string) {
   if (el) el.remove()
 }
 
-/**
- * Declare the two editions of a page to crawlers (ADR-0005).
- *
- * Both editions live at the same URL — the reader's language decides which one
- * renders — so the alternates are that URL plus an explicit `?lang=`, which
- * `resolveLanguage` honours ahead of everything else. `x-default` points at the
- * bare URL, whose language then follows the visitor's own browser.
- */
 function upsertAlternates(url: string) {
   for (const el of Array.from(
     document.head.querySelectorAll('link[rel="alternate"][hreflang]'),
@@ -138,6 +117,27 @@ export function setDefaultSeo(language: Language = 'ja') {
   upsertLink('canonical', url)
   upsertAlternates(url)
   upsertMeta('meta[property="og:title"]', 'property', 'og:title', SITE_NAME)
+  upsertMeta('meta[property="og:description"]', 'property', 'og:description', desc)
+  upsertMeta('meta[property="og:type"]', 'property', 'og:type', 'website')
+  upsertMeta('meta[property="og:url"]', 'property', 'og:url', url)
+  upsertMeta('meta[property="og:locale"]', 'property', 'og:locale', language === 'ja' ? 'ja_JP' : 'en_US')
+  upsertMeta('meta[name="twitter:card"]', 'name', 'twitter:card', 'summary_large_image')
+  removeJsonLd('article')
+}
+
+export function setSystemSeo(language: Language = 'ja') {
+  const url = `${SITE_ORIGIN}${SITE_BASE}/system`
+  const title = language === 'ja'
+    ? `AIで組織をつくる — ${SITE_NAME}`
+    : `Build an organization with AI — ${SITE_NAME}`
+  const desc = language === 'ja'
+    ? '調査、分析、ソフトウェア開発、レビュー、運用まで。専門エージェントをチームとして配属し、知的労働そのものを継続運転するAI Workforce。'
+    : 'An AI workforce of specialist agents that continuously operates research, analysis, software delivery, review, and operations as a team.'
+  document.title = title
+  upsertMeta('meta[name="description"]', 'name', 'description', desc)
+  upsertLink('canonical', url)
+  upsertAlternates(url)
+  upsertMeta('meta[property="og:title"]', 'property', 'og:title', title)
   upsertMeta('meta[property="og:description"]', 'property', 'og:description', desc)
   upsertMeta('meta[property="og:type"]', 'property', 'og:type', 'website')
   upsertMeta('meta[property="og:url"]', 'property', 'og:url', url)
@@ -201,8 +201,6 @@ export function setArticleSeo(article: ArticleSeo, language: Language = 'ja') {
     description: desc,
     mainEntityOfPage: { '@type': 'WebPage', '@id': url },
     url,
-    // The edition actually rendered, not the reader's preference — an English
-    // reader served the Japanese fallback is reading Japanese.
     inLanguage: language,
     isPartOf: { '@type': 'WebSite', name: SITE_NAME, url: `${SITE_ORIGIN}${SITE_BASE}/` },
   }
