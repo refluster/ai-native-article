@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import Header from './components/chrome/Header'
 import Footer from './components/chrome/Footer'
 import Home from './pages/Home'
+import System from './pages/System'
 import Article from './pages/Article'
 import Sources from './pages/Sources'
 import Operator from './pages/Operator'
@@ -37,6 +38,7 @@ export default function App() {
           <main className="flex-1 pt-16">
             <Routes>
               <Route path="/" element={<Home />} />
+              <Route path="/system" element={<System />} />
               <Route path="/sources" element={<Sources />} />
               <Route path="/operator" element={<Operator />} />
               <Route path="/article/:slug" element={<Article />} />
