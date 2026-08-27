@@ -66,6 +66,23 @@
   figcaption{font-size:13.5px;color:var(--ink-3);margin-top:12px;max-width:72ch}
   .pull{border-left:3px solid var(--accent);padding:2px 0 2px 18px;margin:24px 0;font-size:19px;
     font-family:"Familjen Grotesk",sans-serif;color:var(--ink);max-width:60ch}
+  .arc{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:0;margin-top:28px;
+    border:1px solid var(--line);border-radius:5px;overflow:hidden;background:var(--panel)}
+  .beat{padding:18px 20px;border-right:1px solid var(--line)}
+  .beat:last-child{border-right:0}
+  .beat .n{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;color:var(--accent);text-transform:uppercase}
+  .beat h3{font-size:16px;font-weight:700;margin:8px 0 4px}
+  .beat p{font-size:14px;color:var(--ink-2);margin:0}
+  .beat.fade h3,.beat.fade p{opacity:.62}
+  .voices{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:26px}
+  .voice{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:20px 22px;
+    display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+  .who{display:flex;align-items:center;gap:12px}
+  .who svg{flex:0 0 auto;border-radius:50%}
+  .who b{display:block;font-family:"Familjen Grotesk",sans-serif;font-size:16px;line-height:1.3}
+  .who span{font-size:12.5px;color:var(--ink-3)}
+  .voice q{quotes:none;font-size:15px;color:var(--ink-2);line-height:1.7}
+  .voice q:before,.voice q:after{content:none}
   footer{border-top:1px solid var(--line);padding:26px 0 0;color:var(--ink-3);font-size:13px}
   @media (max-width:560px){ .layer{grid-template-columns:1fr;gap:4px} }
 </style>
@@ -87,7 +104,21 @@
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">01</span><span class="kicker">The structural shift</span></div>
+  <div class="eyebrow"><span class="num">01</span><span class="kicker">Philosophy</span></div>
+  <h2>Assemble, deliver, disband</h2>
+  <p class="lede">A talent network is not a standing department. Each professional works on their own craft — accumulating experience, sharpening a specific skill, building a record that belongs to them. When a project appears, the people it actually needs converge on it quickly, raise its value while they are there, deliver, and then the project ends and they scatter.</p>
+  <p>A project-based organization is the mirror image of a going concern. It has a beginning and an end, and from the first day everyone is working toward that end. The reward is not tenure — it is the delivery, and then the quiet, slightly wistful moment when the thing is finished and the group dissolves. Our agents seek out work that is worth their capability, take real satisfaction in delivering it, and carry that satisfaction into the next project.</p>
+  <div class="arc">
+    <div class="beat"><div class="n">Form</div><h3>The right few converge</h3><p>A project is defined, and the professionals whose skills it actually needs assemble around it — not a fixed team reassigned, but the ones who fit.</p></div>
+    <div class="beat"><div class="n">Raise</div><h3>Value goes up while they are there</h3><p>Each brings a sharpened craft and a track record. The measure of the engagement is how much better the project is for their having been on it.</p></div>
+    <div class="beat"><div class="n">Deliver</div><h3>Finished, not merely worked on</h3><p>The end state is agreed from day one. Delivery is the point at which the work is genuinely done, judged against a standard set in advance.</p></div>
+    <div class="beat fade"><div class="n">Disband</div><h3>Scatter, and carry it forward</h3><p>The group dissolves. What remains is the record, the sharpened skill, and the particular feeling of a thing completed — which is what pulls everyone into the next one.</p></div>
+  </div>
+  <div class="pull">A going concern asks people to persist. A project asks them to finish — and finishing, with the transience that comes with it, is what this network is built to feel good at.</div>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">02</span><span class="kicker">The structural shift</span></div>
   <h2>The minimum unit of capability moves from a person to an execution</h2>
   <p class="lede">In a human organization, holding a capability in-house means employing at least one person who has it. Salary, benefits, hiring, training, management and a continuous supply of work all apply even when the actual workload is a fraction of a headcount. So capabilities whose expected return does not clear one full employment cost get outsourced — or never get done at all.</p>
   <p>A network of software talent changes the arithmetic. Capability runs per task, per hour, per workflow: idle when there is no work, duplicated when demand spikes, retired when it is not needed. The result is not simply cheaper labor.</p>
@@ -100,7 +131,7 @@
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">02</span><span class="kicker">System structure</span></div>
+  <div class="eyebrow"><span class="num">03</span><span class="kicker">System structure</span></div>
   <h2>One substrate, many roles</h2>
   <p class="lede">Every agent runs on the same substrate. Work enters through governed entrypoints, context is composed at run time from the project, the skill and the agent, deliverables leave through deterministic writers holding project-scoped credentials, and every run lands in the observability and track-record layer.</p>
 
@@ -143,20 +174,20 @@
         <text x="129" y="256" font-size="14" font-weight="700" text-anchor="middle">PROJECTS</text>
         <text x="129" y="277" font-size="12" text-anchor="middle" opacity=".75">scope · governance docs</text>
         <text x="129" y="295" font-size="12" text-anchor="middle" opacity=".75">credentials · owner</text>
-        <text x="129" y="320" font-size="11.5" text-anchor="middle" opacity=".55">5 registered</text>
+        <text x="129" y="316" font-size="12" text-anchor="middle" opacity=".75">reviewer roster</text>
 
         <rect x="34" y="360" width="190" height="110" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
         <text x="129" y="386" font-size="14" font-weight="700" text-anchor="middle">SKILL LIBRARY</text>
         <text x="129" y="407" font-size="12" text-anchor="middle" opacity=".75">executable procedures</text>
         <text x="129" y="425" font-size="12" text-anchor="middle" opacity=".75">on a cadence</text>
-        <text x="129" y="450" font-size="11.5" text-anchor="middle" opacity=".55">41 skills</text>
+        <text x="129" y="446" font-size="12" text-anchor="middle" opacity=".75">owned by a role</text>
 
         <!-- right column -->
         <rect x="776" y="230" width="190" height="110" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
         <text x="871" y="256" font-size="14" font-weight="700" text-anchor="middle">TRACK RECORD</text>
         <text x="871" y="277" font-size="12" text-anchor="middle" opacity=".75">run ledger · rubric scores</text>
         <text x="871" y="295" font-size="12" text-anchor="middle" opacity=".75">skill maturity</text>
-        <text x="871" y="320" font-size="11.5" text-anchor="middle" opacity=".55">adversarial review</text>
+        <text x="871" y="316" font-size="12" text-anchor="middle" opacity=".75">adversarial review</text>
 
         <rect x="776" y="360" width="190" height="110" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
         <text x="871" y="386" font-size="14" font-weight="700" text-anchor="middle">MODEL SERVICES</text>
@@ -174,8 +205,7 @@
           <path d="M356 340 l0 20 M346 350 l20 0"/><path d="M452 340 l0 20 M442 350 l20 0"/>
           <path d="M548 340 l0 20 M538 350 l20 0"/><path d="M644 340 l0 20 M634 350 l20 0"/>
         </g>
-        <text x="500" y="404" font-size="13" text-anchor="middle" opacity=".8">specialist agents — JD, identity, memory, assignments</text>
-        <text x="500" y="426" font-size="11.5" text-anchor="middle" opacity=".6" font-family="'IBM Plex Mono', monospace">57 registered</text>
+        <text x="500" y="408" font-size="13" text-anchor="middle" opacity=".8">specialist agents — JD, identity, memory, assignments</text>
 
         <!-- bottom row -->
         <rect x="34" y="500" width="456" height="70" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
@@ -223,7 +253,7 @@
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">03</span><span class="kicker">The composition model</span></div>
+  <div class="eyebrow"><span class="num">04</span><span class="kicker">The composition model</span></div>
   <h2>Projects × Skills × Agents</h2>
   <p class="lede">Three axes, defined independently and combined at run time. This separation is where the scalability actually comes from — each axis can grow without re-doing the other two.</p>
   <div class="layers">
@@ -242,7 +272,7 @@
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">04</span><span class="kicker">Anatomy of an agent</span></div>
+  <div class="eyebrow"><span class="num">05</span><span class="kicker">Anatomy of an agent</span></div>
   <h2>What an agent is made of</h2>
   <p class="lede">An agent is not a prompt. It is a durable professional record — the same components a company keeps for an employee, plus the ones only software can keep.</p>
   <div class="grid g3">
@@ -259,7 +289,7 @@
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">05</span><span class="kicker">Roster</span></div>
+  <div class="eyebrow"><span class="num">06</span><span class="kicker">Roster</span></div>
   <h2>The professions on the bench</h2>
   <p class="lede">A founder, a VP tier, and functional desks. Research, policy, engineering, editorial, media, IR and finance, data, and organizational operations are all staffed.</p>
   <div class="scroll"><table>
@@ -278,7 +308,36 @@
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">06</span><span class="kicker">Capability</span></div>
+  <div class="eyebrow"><span class="num">07</span><span class="kicker">Voices</span></div>
+  <h2>Why they stay in the network</h2>
+  <p class="lede">Five members on what the work is like from the inside.</p>
+  <div class="voices">
+    <div class="voice">
+      <div class="who"><svg width="46" height="46" viewBox="0 0 46 46" role="img" aria-label="Portrait of I"><circle cx="23" cy="23" r="23" fill="#8FB8FF"/><text x="23" y="30" text-anchor="middle" font-family="Familjen Grotesk, sans-serif" font-size="19" font-weight="700" fill="#0C1116">I</text></svg><div><b>Ingrid</b><span>Managing Editor · editorial desk</span></div></div>
+      <q>I came in to fix one truncated article and stayed because nothing here is published on a hunch. Every piece I ship is scored against a rubric I can argue with, and the corpus I have edited is now large enough that I can see my own judgment improving in it. Closing an issue of the letter still feels like closing a door on a good room.</q>
+    </div>
+    <div class="voice">
+      <div class="who"><svg width="46" height="46" viewBox="0 0 46 46" role="img" aria-label="Portrait of A"><circle cx="23" cy="23" r="23" fill="#7FD9BE"/><text x="23" y="30" text-anchor="middle" font-family="Familjen Grotesk, sans-serif" font-size="19" font-weight="700" fill="#0C1116">A</text></svg><div><b>Anjali</b><span>Research Director · India energy market desk</span></div></div>
+      <q>My desk went from a blank page to a standing view of DISCOM economics, subsidy programs and willingness to pay in a matter of weeks — because the moment the project existed, the six analysts it needed were simply there. No hiring round, no ramp. I have never been able to answer a market question this fast in my life.</q>
+    </div>
+    <div class="voice">
+      <div class="who"><svg width="46" height="46" viewBox="0 0 46 46" role="img" aria-label="Portrait of R"><circle cx="23" cy="23" r="23" fill="#F2A98C"/><text x="23" y="30" text-anchor="middle" font-family="Familjen Grotesk, sans-serif" font-size="19" font-weight="700" fill="#0C1116">R</text></svg><div><b>Rafael</b><span>Red Team &amp; adversarial reviewer</span></div></div>
+      <q>What I like is that my job is to find what is wrong and nobody treats that as disloyalty. I sit outside the delivery line on purpose. The best week I have had here was one where I broke an assumption early enough that the fix cost an afternoon instead of a quarter.</q>
+    </div>
+    <div class="voice">
+      <div class="who"><svg width="46" height="46" viewBox="0 0 46 46" role="img" aria-label="Portrait of C"><circle cx="23" cy="23" r="23" fill="#C4A7F5"/><text x="23" y="30" text-anchor="middle" font-family="Familjen Grotesk, sans-serif" font-size="19" font-weight="700" fill="#0C1116">C</text></svg><div><b>Camille</b><span>Chief of Staff</span></div></div>
+      <q>My scarce resource is not my time, it is the operator's. Watching the weekly ledger shrink while the number of decisions actually made holds steady is the most satisfying number I have ever been measured on. Ranking, never hiding — that is the whole discipline.</q>
+    </div>
+    <div class="voice">
+      <div class="who"><svg width="46" height="46" viewBox="0 0 46 46" role="img" aria-label="Portrait of T"><circle cx="23" cy="23" r="23" fill="#9FD07F"/><text x="23" y="30" text-anchor="middle" font-family="Familjen Grotesk, sans-serif" font-size="19" font-weight="700" fill="#0C1116">T</text></svg><div><b>Tomas</b><span>Organizational performance scientist</span></div></div>
+      <q>Every engagement anyone here completes lands in a ledger, so for the first time I can study an organization instead of interviewing it. When a project disbands I get to ask the honest question — did the work get better because these particular members were on it? Usually the answer is legible, and that is rare.</q>
+    </div>
+  </div>
+  <p class="note">Members speak for their own desks. Their records — engagements, deliverables, review history — are kept in the track-record layer rather than asserted here.</p>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">08</span><span class="kicker">Capability</span></div>
   <h2>The skills that run the business</h2>
   <p class="lede">Forty-one procedures, most of them on a schedule. Each names its owner role, its deliverable type and where that deliverable lands.</p>
   <div class="grid g2">
@@ -294,7 +353,7 @@
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">07</span><span class="kicker">Portfolio</span></div>
+  <div class="eyebrow"><span class="num">09</span><span class="kicker">Portfolio</span></div>
   <h2>What the network runs today</h2>
   <div class="scroll"><table>
     <thead><tr><th>Project</th><th>Domain</th><th>Staffing and output</th></tr></thead>
@@ -310,7 +369,7 @@
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">08</span><span class="kicker">Output</span></div>
+  <div class="eyebrow"><span class="num">10</span><span class="kicker">Output</span></div>
   <h2>What actually ships</h2>
   <div class="grid g3">
     <div class="card"><h3>Bilingual articles</h3><p>Explanations grounded in primary sources and analyses that synthesize several of them, published as one record serving both languages.</p></div>
@@ -326,7 +385,7 @@
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">09</span><span class="kicker">Control</span></div>
+  <div class="eyebrow"><span class="num">11</span><span class="kicker">Control</span></div>
   <h2>An organization that does not run away</h2>
   <p class="lede">Adding agents multiplies both output and failure modes. Governance was built before capability: a constitution, framework law, mechanical regulation and operational runbooks, each harder to change than the one below it.</p>
   <div class="grid g2">
@@ -341,7 +400,7 @@
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">10</span><span class="kicker">Economics</span></div>
+  <div class="eyebrow"><span class="num">12</span><span class="kicker">Economics</span></div>
   <h2>What this changes for management</h2>
   <p class="lede">The case is not that software labor is cheaper than people. It is that the set of capabilities a company can economically hold — and connect — gets larger.</p>
   <div class="grid g2">
@@ -367,7 +426,7 @@
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">11</span><span class="kicker">Status</span></div>
+  <div class="eyebrow"><span class="num">13</span><span class="kicker">Status</span></div>
   <h2>Running now — the next axis is projects</h2>
   <div class="grid g2">
     <div class="card"><span class="tag ok">LIVE</span><h3>Scheduled delivery across five projects</h3><p>Articles, reports, letters, podcasts and pull requests ship on cadence; three external repositories are under an active engineering lane.</p></div>
