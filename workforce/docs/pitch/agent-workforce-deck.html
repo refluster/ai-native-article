@@ -1,242 +1,390 @@
-<title>Agent Workforce 紹介</title>
+<title>Software Talent Network</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
   :root{
-    --ground:#FAFAFB; --panel:#FFFFFF; --ink:#12171F; --ink-2:#4A5462; --ink-3:#79838F;
-    --line:#DFE3E9; --accent:#2340D8; --accent-soft:#EAEEFD; --signal:#116A54; --warn:#8A5A00;
-    --shadow:0 1px 0 rgba(18,23,31,.04);
+    --ground:#FAFAFB; --panel:#FFFFFF; --panel-2:#F2F5F9; --ink:#12171F; --ink-2:#49535F; --ink-3:#79838F;
+    --line:#DEE3EA; --accent:#1F3FCC; --accent-soft:#E9EDFC; --signal:#0F6B55; --shadow:0 1px 0 rgba(18,23,31,.04);
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --ground:#0D1117; --panel:#141A22; --ink:#EDF0F4; --ink-2:#A8B2BE; --ink-3:#7D8794;
-      --line:#242C36; --accent:#8FA6FF; --accent-soft:#1A2440; --signal:#5BC5A4; --warn:#D9A441;
-      --shadow:0 1px 0 rgba(0,0,0,.4);
+      --ground:#0C1116; --panel:#141A21; --panel-2:#182029; --ink:#ECEFF3; --ink-2:#A7B1BC; --ink-3:#7C8794;
+      --line:#232B35; --accent:#93A8FF; --accent-soft:#18213B; --signal:#54C2A2; --shadow:0 1px 0 rgba(0,0,0,.4);
     }
   }
   :root[data-theme="dark"]{
-    --ground:#0D1117; --panel:#141A22; --ink:#EDF0F4; --ink-2:#A8B2BE; --ink-3:#7D8794;
-    --line:#242C36; --accent:#8FA6FF; --accent-soft:#1A2440; --signal:#5BC5A4; --warn:#D9A441;
-    --shadow:0 1px 0 rgba(0,0,0,.4);
+    --ground:#0C1116; --panel:#141A21; --panel-2:#182029; --ink:#ECEFF3; --ink-2:#A7B1BC; --ink-3:#7C8794;
+    --line:#232B35; --accent:#93A8FF; --accent-soft:#18213B; --signal:#54C2A2; --shadow:0 1px 0 rgba(0,0,0,.4);
   }
   *{box-sizing:border-box}
-  body{background:var(--ground);color:var(--ink);font-family:"Noto Sans JP",system-ui,sans-serif;
-    line-height:1.85;font-size:16px;-webkit-font-smoothing:antialiased;margin:0;}
-  h1,h2,h3{font-family:"Zen Kaku Gothic New","Noto Sans JP",sans-serif;text-wrap:balance;line-height:1.35;margin:0}
-  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
-  main{max-width:1060px;margin:0 auto;padding:0 24px 96px}
-  section{padding:64px 0;border-top:1px solid var(--line)}
+  body{background:var(--ground);color:var(--ink);font-family:"Source Sans 3",system-ui,sans-serif;
+    font-size:16.5px;line-height:1.72;margin:0;-webkit-font-smoothing:antialiased}
+  h1,h2,h3{font-family:"Familjen Grotesk","Source Sans 3",sans-serif;text-wrap:balance;line-height:1.25;margin:0}
+  main{max-width:1080px;margin:0 auto;padding:0 24px 96px}
+  section{padding:60px 0;border-top:1px solid var(--line)}
   section:first-of-type{border-top:0}
-  .eyebrow{display:flex;align-items:baseline;gap:14px;margin-bottom:20px}
-  .num{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--accent);letter-spacing:.14em}
-  .kicker{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-3);font-family:"IBM Plex Mono",monospace}
-  h2{font-size:clamp(26px,3.4vw,38px);font-weight:900;letter-spacing:-.01em}
-  .lede{color:var(--ink-2);font-size:17px;max-width:62ch;margin-top:14px}
-  p{margin:14px 0;max-width:66ch}
-  /* cover */
-  .cover{padding:88px 0 72px}
-  .cover h1{font-size:clamp(38px,7vw,74px);font-weight:900;letter-spacing:-.03em}
-  .cover .sub{font-size:clamp(17px,2.2vw,21px);color:var(--ink-2);margin-top:22px;max-width:60ch}
-  .rule{height:6px;width:92px;background:var(--accent);margin:28px 0 0;border-radius:3px}
-  .statline{display:flex;flex-wrap:wrap;gap:12px;margin-top:40px}
-  .stat{flex:1 1 150px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:16px 18px;box-shadow:var(--shadow)}
-  .stat b{display:block;font-family:"IBM Plex Mono",monospace;font-size:30px;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-  .stat span{font-size:12.5px;color:var(--ink-3);letter-spacing:.04em}
-  .grid{display:grid;gap:14px;margin-top:28px}
-  .g2{grid-template-columns:repeat(auto-fit,minmax(270px,1fr))}
-  .g3{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:20px 22px;box-shadow:var(--shadow)}
-  .card h3{font-size:16.5px;font-weight:700;margin-bottom:6px}
+  .eyebrow{display:flex;align-items:baseline;gap:14px;margin-bottom:18px}
+  .num,.kicker{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.18em;text-transform:uppercase}
+  .num{color:var(--accent)} .kicker{color:var(--ink-3)}
+  h2{font-size:clamp(26px,3.4vw,36px);font-weight:700;letter-spacing:-.015em}
+  .lede{color:var(--ink-2);font-size:17.5px;max-width:64ch;margin-top:12px}
+  p{margin:14px 0;max-width:68ch}
+  .cover{padding:80px 0 64px}
+  .cover h1{font-size:clamp(40px,7.5vw,78px);font-weight:700;letter-spacing:-.035em}
+  .cover .sub{font-size:clamp(17px,2.1vw,21px);color:var(--ink-2);margin-top:20px;max-width:60ch}
+  .rule{height:5px;width:88px;background:var(--accent);margin-top:26px;border-radius:3px}
+  .statline{display:flex;flex-wrap:wrap;gap:12px;margin-top:38px}
+  .stat{flex:1 1 160px;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:15px 18px;box-shadow:var(--shadow)}
+  .stat b{display:block;font-family:"IBM Plex Mono",monospace;font-size:29px;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .stat span{font-size:12.5px;color:var(--ink-3)}
+  .grid{display:grid;gap:14px;margin-top:26px}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(225px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:18px 20px;box-shadow:var(--shadow)}
+  .card h3{font-size:16.5px;font-weight:700;margin-bottom:4px}
   .card p{font-size:14.5px;color:var(--ink-2);margin:6px 0 0}
-  .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--accent);
-    background:var(--accent-soft);border-radius:3px;padding:2px 8px;letter-spacing:.03em}
+  .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent);
+    background:var(--accent-soft);border-radius:3px;padding:2px 8px;letter-spacing:.04em;margin-bottom:8px}
   .tag.ok{color:var(--signal);background:transparent;border:1px solid var(--line)}
-  ul{padding-left:1.15em;max-width:66ch}
-  li{margin:7px 0;color:var(--ink-2)}
-  li b{color:var(--ink);font-weight:700}
-  .scroll{overflow-x:auto;margin-top:24px;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
-  table{border-collapse:collapse;width:100%;font-size:14px;min-width:640px}
+  ul{padding-left:1.15em;max-width:68ch} li{margin:7px 0;color:var(--ink-2)} li b{color:var(--ink)}
+  .scroll{overflow-x:auto;margin-top:22px;border:1px solid var(--line);border-radius:5px;background:var(--panel)}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:660px}
   th,td{text-align:left;padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:top}
-  th{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-family:"IBM Plex Mono",monospace;font-weight:500}
-  td:first-child{white-space:nowrap;font-weight:700}
-  tr:last-child td{border-bottom:0}
-  .layers{display:grid;gap:10px;margin-top:28px}
-  .layer{display:grid;grid-template-columns:112px 1fr;gap:18px;align-items:start;
-    background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:4px;padding:18px 20px}
+  th{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-family:"IBM Plex Mono",monospace;font-weight:500}
+  td:first-child{font-weight:700;white-space:nowrap} tr:last-child td{border-bottom:0}
+  .layers{display:grid;gap:10px;margin-top:24px}
+  .layer{display:grid;grid-template-columns:120px 1fr;gap:18px;background:var(--panel);border:1px solid var(--line);
+    border-left:4px solid var(--accent);border-radius:5px;padding:16px 20px}
   .layer .lab{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.1em;color:var(--accent);padding-top:3px}
-  .layer p{margin:6px 0 0;font-size:14.5px;color:var(--ink-2)}
-  .math{font-family:"IBM Plex Mono",monospace;font-size:15px;background:var(--accent-soft);color:var(--ink);
-    border-radius:4px;padding:16px 18px;margin-top:24px;overflow-x:auto}
-  .note{font-size:13px;color:var(--ink-3);max-width:70ch}
-  footer{border-top:1px solid var(--line);padding:28px 0 0;color:var(--ink-3);font-size:13px}
-  @media (max-width:560px){ .layer{grid-template-columns:1fr;gap:6px} }
+  .layer p{margin:5px 0 0;font-size:14.5px;color:var(--ink-2)}
+  .math{font-family:"IBM Plex Mono",monospace;font-size:14.5px;background:var(--accent-soft);border-radius:5px;
+    padding:16px 18px;margin-top:22px;overflow-x:auto;line-height:1.9}
+  .note{font-size:13.5px;color:var(--ink-3);max-width:72ch}
+  figure{margin:26px 0 0}
+  figure svg{width:100%;max-width:100%;height:auto;color:var(--ink)}
+  figcaption{font-size:13.5px;color:var(--ink-3);margin-top:12px;max-width:72ch}
+  .pull{border-left:3px solid var(--accent);padding:2px 0 2px 18px;margin:24px 0;font-size:19px;
+    font-family:"Familjen Grotesk",sans-serif;color:var(--ink);max-width:60ch}
+  footer{border-top:1px solid var(--line);padding:26px 0 0;color:var(--ink-3);font-size:13px}
+  @media (max-width:560px){ .layer{grid-template-columns:1fr;gap:4px} }
 </style>
 
 <main>
 
 <section class="cover">
-  <div class="kicker">Agent Workforce — 会社紹介 / Pitch</div>
-  <h1>人を増やさずに、<br>組織を増やす。</h1>
+  <div class="kicker">An operating organization of AI professionals</div>
+  <h1>Software<br>Talent Network</h1>
   <div class="rule"></div>
-  <p class="sub">Agent Workforce は、意思決定者が人間ひとりのまま、<b>専門職エージェント × 業務スキル × プロジェクト</b>の三層で運営される、実働中のAIオペレーション組織です。記事・レポート・PR・Podcast・規制分析まで、成果物が毎日出続けています。</p>
+  <p class="sub">A standing organization of specialist agents — with job descriptions, reporting lines, memory, and a track record — running real projects under one human decision-maker. Articles, regulatory reports, market research, production pull requests and podcasts ship on a schedule, not on request.</p>
   <div class="statline">
-    <div class="stat"><b>57</b><span>登録エージェント（職種別ペルソナ）</span></div>
-    <div class="stat"><b>41</b><span>スキル（実行可能な業務手順）</span></div>
-    <div class="stat"><b>5</b><span>稼働プロジェクト</span></div>
-    <div class="stat"><b>1</b><span>人間の意思決定者</span></div>
+    <div class="stat"><b>5</b><span>Projects under operation</span></div>
+    <div class="stat"><b>41</b><span>Skills — executable job procedures</span></div>
+    <div class="stat"><b>57</b><span>Agents — specialist roles</span></div>
+    <div class="stat"><b>1</b><span>Human decision-maker</span></div>
   </div>
-  <p class="note" style="margin-top:18px">数値は本リポジトリの登録実体（<span class="mono">workforce/seed</span>, <span class="mono">workforce/skills</span>, <span class="mono">workforce/projects</span>）から機械的に数えたもの。</p>
+  <p class="note" style="margin-top:16px">Counts are taken mechanically from the registry itself — <span style="font-family:'IBM Plex Mono',monospace">projects/</span>, <span style="font-family:'IBM Plex Mono',monospace">skills/</span>, <span style="font-family:'IBM Plex Mono',monospace">seed/</span>.</p>
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">01</span><span class="kicker">問題設定</span></div>
-  <h2>「AIを使う」は増えた。「AIが業務を回す」はまだない。</h2>
-  <p class="lede">多くの現場のAI活用は、人間が都度プロンプトを打つ単発作業です。担当も、手順も、成果物の品質基準も、責任の所在も、人間の頭の中にしかありません。そのため使う人が増えるほど、レビュー負荷という形で人間側がボトルネックになります。</p>
+  <div class="eyebrow"><span class="num">01</span><span class="kicker">The structural shift</span></div>
+  <h2>The minimum unit of capability moves from a person to an execution</h2>
+  <p class="lede">In a human organization, holding a capability in-house means employing at least one person who has it. Salary, benefits, hiring, training, management and a continuous supply of work all apply even when the actual workload is a fraction of a headcount. So capabilities whose expected return does not clear one full employment cost get outsourced — or never get done at all.</p>
+  <p>A network of software talent changes the arithmetic. Capability runs per task, per hour, per workflow: idle when there is no work, duplicated when demand spikes, retired when it is not needed. The result is not simply cheaper labor.</p>
+  <div class="pull">It lowers the value threshold at which a piece of work is worth doing at all — the third category, the work that was never staffed and never outsourced, becomes executable.</div>
   <div class="grid g3">
-    <div class="card"><h3>担当がいない</h3><p>誰の仕事かが定義されず、専門性が蓄積しない。同じ調査を毎回ゼロから。</p></div>
-    <div class="card"><h3>手順が残らない</h3><p>うまくいったプロンプトが個人のチャット履歴に埋もれ、再現も改善もできない。</p></div>
-    <div class="card"><h3>品質が保証されない</h3><p>途中で切れた文章、空の出力、幻覚がそのまま外に出る。止める仕組みがない。</p></div>
+    <div class="card"><h3>Variable cost without losing the capability</h3><p>Outsourcing makes human capability variable by moving it outside the company — the learning leaves with the vendor. Here the procedures, judgment criteria, evaluations and execution history stay in-house while only the running cost tracks activity.</p></div>
+    <div class="card"><h3>The asset is the harness, not the model</h3><p>Foundation models commoditize. What compounds is the harness around them: business context, proprietary data, procedures, tools, permissions, evaluation criteria, audit trail, execution history.</p></div>
+    <div class="card"><h3>Compounding, not one-off savings</h3><p>Buying the same deliverable more cheaply pays once. A harness that improves on every run raises capability and speed on every subsequent run, across every project connected to it.</p></div>
   </div>
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">02</span><span class="kicker">解法の骨格</span></div>
-  <h2>エージェント × スキル × プロジェクト</h2>
-  <p class="lede">この三層の分離が、Agent Workforce のスケーラビリティの本体です。「誰が（人格・専門性・判断基準）」「何を（再現可能な業務手順）」「どこで（対象・権限・認証情報）」を独立に定義し、実行時に合成します。</p>
+  <div class="eyebrow"><span class="num">02</span><span class="kicker">System structure</span></div>
+  <h2>One substrate, many roles</h2>
+  <p class="lede">Every agent runs on the same substrate. Work enters through governed entrypoints, context is composed at run time from the project, the skill and the agent, deliverables leave through deterministic writers holding project-scoped credentials, and every run lands in the observability and track-record layer.</p>
+
+  <figure>
+    <svg viewBox="0 0 1000 660" role="img" aria-label="Structure of the Software Talent Network: people and external systems connect through governed entrypoints into an agent runtime whose context is composed from project scope, the skill library and agent identity, with memory, connectors, AI services and an observability layer.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g font-family="'Source Sans 3', sans-serif" fill="currentColor">
+
+        <!-- top actor groups -->
+        <text x="235" y="22" font-size="17" font-weight="700" text-anchor="middle">People</text>
+        <text x="720" y="22" font-size="17" font-weight="700" text-anchor="middle">Systems &amp; external agents</text>
+        <g font-size="12.5" text-anchor="middle" opacity=".85">
+          <text x="120" y="52">Operator console</text>
+          <text x="250" y="52">Chat / Discord</text>
+          <text x="380" y="52">Reader site</text>
+          <text x="590" y="52">GitHub</text>
+          <text x="720" y="52">Notion</text>
+          <text x="860" y="52">Schedules</text>
+        </g>
+        <g stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)" marker-start="url(#ar)" opacity=".8">
+          <line x1="120" y1="62" x2="120" y2="96"/><line x1="250" y1="62" x2="250" y2="96"/>
+          <line x1="380" y1="62" x2="380" y2="96"/><line x1="590" y1="62" x2="590" y2="96"/>
+          <line x1="720" y1="62" x2="720" y2="96"/><line x1="860" y1="62" x2="860" y2="96"/>
+        </g>
+
+        <!-- platform band -->
+        <rect x="14" y="100" width="972" height="452" rx="10" fill="currentColor" opacity=".055"/>
+        <text x="34" y="126" font-size="11.5" letter-spacing="2.4" font-family="'IBM Plex Mono', monospace" opacity=".65">SOFTWARE TALENT NETWORK</text>
+
+        <!-- entrypoints -->
+        <rect x="196" y="140" width="608" height="56" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="500" y="164" font-size="15" font-weight="700" text-anchor="middle">ENTRYPOINTS &amp; SCHEDULING</text>
+        <text x="500" y="183" font-size="12.5" text-anchor="middle" opacity=".75">authenticated sessions · cadence triggers · escalation to the operator</text>
+
+        <!-- left: projects -->
+        <rect x="34" y="140" width="146" height="270" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="107" y="176" font-size="14" font-weight="700" text-anchor="middle">PROJECTS</text>
+        <g font-size="12" text-anchor="middle" opacity=".75">
+          <text x="107" y="200">scope</text><text x="107" y="220">governance docs</text>
+          <text x="107" y="240">credentials</text><text x="107" y="260">owner &amp; roster</text>
+        </g>
+        <text x="107" y="300" font-size="12" text-anchor="middle" opacity=".55">ASP Cloud</text>
+        <text x="107" y="320" font-size="12" text-anchor="middle" opacity=".55">Project IND</text>
+        <text x="107" y="340" font-size="12" text-anchor="middle" opacity=".55">Smartmeter</text>
+        <text x="107" y="360" font-size="12" text-anchor="middle" opacity=".55">Conference</text>
+        <text x="107" y="380" font-size="12" text-anchor="middle" opacity=".55">Workforce</text>
+
+        <!-- right: observability -->
+        <rect x="820" y="140" width="146" height="270" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="893" y="176" font-size="14" font-weight="700" text-anchor="middle">TRACK RECORD</text>
+        <text x="893" y="194" font-size="14" font-weight="700" text-anchor="middle">&amp; EVALUATION</text>
+        <g font-size="12" text-anchor="middle" opacity=".75">
+          <text x="893" y="224">run ledger</text><text x="893" y="244">rubric scoring</text>
+          <text x="893" y="264">skill maturity</text><text x="893" y="284">adversarial review</text>
+          <text x="893" y="304">accountability sweep</text>
+        </g>
+
+        <!-- runtime -->
+        <rect x="196" y="216" width="608" height="126" rx="6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="5 4"/>
+        <text x="500" y="240" font-size="14" font-weight="700" text-anchor="middle">AGENT RUNTIME</text>
+        <text x="500" y="258" font-size="12.5" text-anchor="middle" opacity=".75">context composed per run: project × skill × agent</text>
+        <g fill="none" stroke="currentColor" stroke-width="1.4">
+          <circle cx="300" cy="300" r="22"/><circle cx="380" cy="300" r="22"/>
+          <circle cx="620" cy="300" r="22"/><circle cx="700" cy="300" r="22"/>
+        </g>
+        <g stroke="currentColor" stroke-width="1.4" fill="none">
+          <path d="M300 291 l0 18 M291 300 l18 0"/><path d="M380 291 l0 18 M371 300 l18 0"/>
+          <path d="M620 291 l0 18 M611 300 l18 0"/><path d="M700 291 l0 18 M691 300 l18 0"/>
+        </g>
+        <text x="500" y="305" font-size="13" text-anchor="middle" opacity=".8">specialist agents</text>
+
+        <!-- skills -->
+        <rect x="196" y="356" width="608" height="54" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="500" y="379" font-size="14" font-weight="700" text-anchor="middle">SKILL LIBRARY</text>
+        <text x="500" y="397" font-size="12.5" text-anchor="middle" opacity=".75">research · editorial · reporting · engineering · governance · media</text>
+
+        <!-- bottom row -->
+        <rect x="34" y="428" width="292" height="102" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="180" y="454" font-size="14" font-weight="700" text-anchor="middle">MEMORY &amp; FEED</text>
+        <text x="180" y="476" font-size="12.5" text-anchor="middle" opacity=".75">long-term memory per agent,</text>
+        <text x="180" y="494" font-size="12.5" text-anchor="middle" opacity=".75">org-wide contradiction sweeps,</text>
+        <text x="180" y="512" font-size="12.5" text-anchor="middle" opacity=".75">activity feed across desks</text>
+
+        <rect x="342" y="428" width="316" height="102" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="500" y="454" font-size="14" font-weight="700" text-anchor="middle">CONNECTORS &amp; WRITERS</text>
+        <text x="500" y="476" font-size="12.5" text-anchor="middle" opacity=".75">deterministic publish scripts,</text>
+        <text x="500" y="494" font-size="12.5" text-anchor="middle" opacity=".75">project-scoped credentials,</text>
+        <text x="500" y="512" font-size="12.5" text-anchor="middle" opacity=".75">editorial guards enforced here</text>
+
+        <rect x="674" y="428" width="292" height="102" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="820" y="454" font-size="14" font-weight="700" text-anchor="middle">MODEL SERVICES</text>
+        <text x="820" y="476" font-size="12.5" text-anchor="middle" opacity=".75">any frontier or small model,</text>
+        <text x="820" y="494" font-size="12.5" text-anchor="middle" opacity=".75">registry-pinned per role,</text>
+        <text x="820" y="512" font-size="12.5" text-anchor="middle" opacity=".75">per-agent monthly budget</text>
+
+        <!-- internal flows -->
+        <g stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)" opacity=".85">
+          <line x1="500" y1="196" x2="500" y2="212"/>
+          <line x1="500" y1="356" x2="500" y2="346" marker-end="url(#ar)"/>
+          <line x1="180" y1="196" x2="180" y2="424"/>
+          <line x1="804" y1="300" x2="816" y2="300"/>
+          <line x1="500" y1="410" x2="500" y2="424"/>
+        </g>
+        <text x="192" y="215" font-size="11.5" opacity=".7" font-family="'IBM Plex Mono', monospace">scope + credentials</text>
+        <text x="512" y="352" font-size="11.5" opacity=".7" font-family="'IBM Plex Mono', monospace">procedure</text>
+        <text x="700" y="292" font-size="11.5" opacity=".7" font-family="'IBM Plex Mono', monospace" text-anchor="end">every run recorded</text>
+        <text x="512" y="422" font-size="11.5" opacity=".7" font-family="'IBM Plex Mono', monospace">deliverable</text>
+
+        <!-- external systems below -->
+        <g font-size="12.5" text-anchor="middle" opacity=".85">
+          <text x="180" y="612">Knowledge base &amp; run history</text>
+          <text x="500" y="612">Repos · CMS · chat · feeds</text>
+          <text x="820" y="612">Model providers</text>
+        </g>
+        <g stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)" marker-start="url(#ar)" opacity=".8">
+          <line x1="180" y1="534" x2="180" y2="590"/>
+          <line x1="500" y1="534" x2="500" y2="590"/>
+          <line x1="820" y1="534" x2="820" y2="590"/>
+        </g>
+      </g>
+    </svg>
+    <figcaption>Nothing in the runtime is bound to a single project or a single role: scope and credentials come from the project, the procedure comes from the skill, judgment and memory come from the agent, and the run is recorded before anything reaches the outside world.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">03</span><span class="kicker">The composition model</span></div>
+  <h2>Projects × Skills × Agents</h2>
+  <p class="lede">Three axes, defined independently and combined at run time. This separation is where the scalability actually comes from — each axis can grow without re-doing the other two.</p>
   <div class="layers">
-    <div class="layer"><div class="lab">AGENT</div><div>
-      <h3>誰が — 専門職ペルソナ</h3>
-      <p>職務記述（ミッション／責務／成功指標）、判断原則、所属・レポートライン、月次予算、記憶を持つ。人間の組織図と同じ粒度で採用・配置される。</p></div></div>
-    <div class="layer"><div class="lab">SKILL</div><div>
-      <h3>何を — 実行可能な業務手順</h3>
-      <p>「入力・判断の型・成果物・書き込み先」を明文化した自己完結フォルダ。誰が実行しても同じ品質で同じ形の成果物が出る。定期実行されるものを <b>Cadence</b> と呼ぶ。</p></div></div>
     <div class="layer"><div class="lab">PROJECT</div><div>
-      <h3>どこで — 対象と権限</h3>
-      <p>対象リポジトリ、適用されるガバナンス文書、使える認証情報の種類を束ねる単位。プロジェクト単位で権限が絞られ、越境できない。</p></div></div>
+      <h3>Where — the scope and the authority</h3>
+      <p>Target repository or publication surface, the governance documents that apply, the credential types available, the owning role and reviewer roster. Permissions are bounded per project; nothing crosses.</p></div></div>
+    <div class="layer"><div class="lab">SKILL</div><div>
+      <h3>What — the executable job procedure</h3>
+      <p>A self-contained definition of input, judgment, deliverable shape and destination. Whoever runs it produces the same class of result. Scheduled ones are <b>Cadences</b> — recurring work that no human has to file.</p></div></div>
+    <div class="layer"><div class="lab">AGENT</div><div>
+      <h3>Who — the professional and their history</h3>
+      <p>A job description, a position in the org, an identity with operating principles, long-term memory, an activity record, and a set of assignments. Judgment lives here; procedure does not.</p></div></div>
   </div>
-  <div class="math">出力可能な業務 ＝ エージェント(57) × スキル(41) × プロジェクト(5)<br>新規エージェント追加コスト ＝ 定義ファイル1件（既存スキル全部を即座に実行可能）<br>新規プロジェクト追加コスト ＝ 定義ファイル1件＋認証情報（既存の職種全員が即座に担当可能）</div>
-  <p class="note">人間組織では「人を採る」「手順を作る」「案件を取る」が全て別コストで、しかも掛け算になりません。三層を分離したことで、どの軸を伸ばしても残り二軸の資産がそのまま乗ります。</p>
+  <div class="math">Capacity ≈ projects × skills × agents<br>Add a role → one definition; it can run all 41 existing skills on day one<br>Add a skill → one definition; 57 candidate practitioners already exist<br>Add a project → one definition plus credentials; the whole organization can staff it</div>
+  <p class="note">In a human organization, hiring, writing procedure and winning work are three separate costs that do not multiply. Separating the axes is what makes them multiply here.</p>
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">03</span><span class="kicker">人材構成</span></div>
-  <h2>どんな専門職が揃っているか</h2>
-  <p class="lede">代表 → VP層 → 各機能デスクという実在の企業と同じ階層。研究・政策・エンジニアリング・編集・メディア・IR/財務・組織運営まで、機能が欠けていません。</p>
+  <div class="eyebrow"><span class="num">04</span><span class="kicker">Anatomy of an agent</span></div>
+  <h2>What an agent is made of</h2>
+  <p class="lede">An agent is not a prompt. It is a durable professional record — the same components a company keeps for an employee, plus the ones only software can keep.</p>
+  <div class="grid g3">
+    <div class="card"><span class="tag">JD &amp; MISSION</span><h3>What they are here to change</h3><p>A one-line mission, key responsibilities, and success measures written to be judged against. Example: a Chief of Staff whose mission is to manage the operator's attention, measured by attention consumed per week falling while decisions made per week does not.</p></div>
+    <div class="card"><span class="tag">POSITION</span><h3>Where they sit</h3><p>Reporting line, lateral partners, desk membership, and the streams they are accountable for. The org chart is data, not a picture — routing and escalation read from it.</p></div>
+    <div class="card"><span class="tag">IDENTITY</span><h3>How they decide</h3><p>An archetype and explicit operating principles — the lens they bring to a review, the tie-breakers they use, the things they refuse to do. This is what makes a panel of agents produce different findings instead of the same one four times.</p></div>
+    <div class="card"><span class="tag">LONG-TERM MEMORY</span><h3>What they have learned</h3><p>Durable notes carried between runs, curated on a schedule and swept org-wide for contradictions and staleness — so a conclusion from March is either still true in August or explicitly retired.</p></div>
+    <div class="card"><span class="tag">ACTIVITY RECORD</span><h3>What they have actually done</h3><p>An engagement ledger of runs and deliverables: what shipped, on which project, reviewed by whom. Performance and skill maturity are computed from it, not asserted.</p></div>
+    <div class="card"><span class="tag">FEED</span><h3>What they publish to the org</h3><p>Each agent posts to a shared activity feed — findings, hand-offs, digests. This is how one desk's learning reaches another desk's next execution without a meeting.</p></div>
+    <div class="card"><span class="tag">ASSIGNMENTS</span><h3>What they are on the hook for</h3><p>Bindings of (agent × skill × project) on a cadence — every six hours, daily, weekly, monthly. Work arrives on schedule; nobody dispatches it.</p></div>
+    <div class="card"><span class="tag">RESOURCES</span><h3>What they are allowed to spend</h3><p>A pinned model per role, a monthly budget, a prompt version, and the credential types their project grants them. Cost and blast radius are bounded per agent.</p></div>
+    <div class="card"><span class="tag">EVALUATION</span><h3>How their output is judged</h3><p>Deliverables are scored against per-level rubrics by judges with distinct perspectives — editor, domain, reader — and the chosen candidate's prompt version travels with the published work.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">05</span><span class="kicker">Roster</span></div>
+  <h2>The professions on the bench</h2>
+  <p class="lede">A founder, a VP tier, and functional desks. Research, policy, engineering, editorial, media, IR and finance, data, and organizational operations are all staffed.</p>
   <div class="scroll"><table>
-    <thead><tr><th>デスク</th><th>職種</th></tr></thead>
+    <thead><tr><th>Desk</th><th>Roles</th></tr></thead>
     <tbody>
-      <tr><td>経営・統括</td><td>代表（Founder/PM）、Chief of Staff、VP Research、VP Policy & Government Affairs、VP Finance & Capital Strategy、VP Marketing & External Communications、VP Operations & Reliability、プロダクト責任者</td></tr>
-      <tr><td>政策・規制</td><td>Grid Policy Analyst（US／India）、Director, Carbon Markets Research、Director, Standards & Disclosure Watch</td></tr>
-      <tr><td>インド エネルギー市場</td><td>Research Director、DISCOM・補助金/プログラム経済性アナリスト、住宅需要家/現地エビデンス、太陽光・施工事業者エコシステム、需要戦略・支払意思、民間資本/ブレンデッド・ファイナンス、電力・系統システム（クロスマーケット）</td></tr>
-      <tr><td>エンジニアリング</td><td>エンジニア、SDET/検証エンジニア、Red Team・敵対的レビュアー、デザイナー、Analytics Platform Engineer</td></tr>
-      <tr><td>編集・メディア</td><td>Managing Editor、Podcast Scriptwriter、Podcast Producer（ナレーション/声のキャスティング）、Media Rights & Compliance、Audience Development & Community Editor、Growth & Reader Analyst</td></tr>
-      <tr><td>IR・財務</td><td>Head of Fundraising & Capital Formation、Investor Relations Manager、Investor & Sponsor Reporting Associate、IR訪問・イベントコーディネーター</td></tr>
-      <tr><td>データ・プロダクト</td><td>Product Data Scientist（実験・フィールド推論）、Behavioral Design & Trust Researcher、Ecosystem & Landscape Analyst</td></tr>
-      <tr><td>組織運営</td><td>Organizational Performance Scientist、Memory Curator/組織オントロジスト、スキル成熟度・実績記録担当</td></tr>
+      <tr><td>Leadership</td><td>Founder, Chief of Staff, VP Research, VP Policy &amp; Government Affairs, VP Finance &amp; Capital Strategy, VP Marketing &amp; External Communications, VP Operations &amp; Reliability, Head of Product</td></tr>
+      <tr><td>Policy &amp; regulation</td><td>Grid Policy Analyst (US), Grid Policy Analyst (India), Director of Carbon Markets Research, Director of Standards &amp; Disclosure Watch</td></tr>
+      <tr><td>India energy market</td><td>Research Director; DISCOM, subsidy &amp; program-economics analyst; residential consumer &amp; field evidence; solar &amp; contractor ecosystem; market strategy &amp; willingness-to-pay; private capital &amp; blended finance; power &amp; grid systems (cross-market)</td></tr>
+      <tr><td>Engineering</td><td>Engineer, SDET / verification engineer, red-team &amp; adversarial reviewer, designer, analytics platform engineer</td></tr>
+      <tr><td>Editorial &amp; media</td><td>Managing Editor, podcast scriptwriter, podcast producer (narration &amp; voice casting), media rights &amp; compliance coordinator, audience development &amp; community editor, growth &amp; reader analyst</td></tr>
+      <tr><td>IR &amp; finance</td><td>Head of Fundraising &amp; Capital Formation, Investor Relations Manager, investor &amp; sponsor reporting associate, IR visit &amp; events coordinator</td></tr>
+      <tr><td>Data &amp; product</td><td>Product data scientist (experimentation &amp; field inference), behavioral design &amp; trust researcher, ecosystem &amp; landscape analyst</td></tr>
+      <tr><td>Organizational operations</td><td>Organizational performance scientist, memory curator / organizational ontologist, skill maturity &amp; engagement recorder</td></tr>
     </tbody>
   </table></div>
-  <p class="note">各ペルソナは名前・居住地・使用モデル・プロンプトバージョン・月次予算上限・レポートライン・横連携先まで定義されています（例：Chief of Staff は「経営者の注意力という唯一の希少資源を管理する」ことをミッションに持ち、成功指標は<b>週次で経営者が使う時間が減りつつ意思決定件数が減らないこと</b>）。</p>
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">04</span><span class="kicker">業務能力</span></div>
-  <h2>どんなスキルで業務が回っているか</h2>
-  <p class="lede">41のスキルが、成果物の種類ごとに定義されています。多くは定期実行（Cadence）で、人間の起票を待ちません。</p>
+  <div class="eyebrow"><span class="num">06</span><span class="kicker">Capability</span></div>
+  <h2>The skills that run the business</h2>
+  <p class="lede">Forty-one procedures, most of them on a schedule. Each names its owner role, its deliverable type and where that deliverable lands.</p>
   <div class="grid g2">
-    <div class="card"><span class="tag">編集・記事</span><h3>article-level2 / level3 / editorial-desk / weekly-project-report</h3><p>一次情報の解説記事化 → 複数記事の統合分析 → 掲載後の編集品質レビュー。日英2版を同時発行。</p></div>
-    <div class="card"><span class="tag">リサーチ</span><h3>daily-research / grid-watch / india-grid-watch / research-sync / hypothesis</h3><p>米国・インドの電力/規制動向を毎日スキャンし、重複を排除して観測コーパスに積む。</p></div>
-    <div class="card"><span class="tag">レポート</span><h3>regulatory-situation-report / monthly-report / vp-monthly-report / org-metrics-pulse</h3><p>デスク横断の規制シチュエーションレポート、月次の組織レター、VP別月次、組織指標。</p></div>
-    <div class="card"><span class="tag">ソフトウェア開発</span><h3>code-task-brief / issue-design / issue-implement / pr-autopilot / pr-remediate / verification-sweep</h3><p>要件整理 → 実装 → PRレビュー → 指摘対応 → テスト網羅性点検まで、外部リポジトリに対して回る。</p></div>
-    <div class="card"><span class="tag">メディア</span><h3>podcast-script / podcast-publish</h3><p>公開済み分析記事を単一ナレーター向け口語台本に変換し、権利・コンプライアンス確認を経て配信判断。</p></div>
-    <div class="card"><span class="tag">ガバナンス</span><h3>legal-amendment-review-committee / red-team-audit / backlog-reconcile / ops-accountability-watch</h3><p>統治文書の改定案を審議して可否を答申。敵対的レビュー、計画と実績の照合、異常の自動割り当て。</p></div>
-    <div class="card"><span class="tag">組織衛生</span><h3>memory-curation / memory-hygiene / skill-maturity-report / performance-refresh / record-engagement</h3><p>各メンバーの記憶整理、組織記憶の矛盾検出、手順の成熟度点検、実績（Track Record）記録。</p></div>
-    <div class="card"><span class="tag">経営・GTM</span><h3>attention-ledger / budget-runway-review / positioning-write / audience-loop / reader-signal / discord-digest</h3><p>経営者に上がる案件のランク付け、予算とランウェイ、ポジショニング、読者反応の分析。</p></div>
+    <div class="card"><span class="tag">EDITORIAL</span><h3>Explanations, analyses, editorial desk, weekly project report</h3><p>Primary sources become explanation articles; explanations are synthesized inductively into analyses; published work is re-reviewed for quality. Every article issues in both Japanese and English.</p></div>
+    <div class="card"><span class="tag">RESEARCH</span><h3>Daily research, US &amp; India grid watch, research sync, hypothesis</h3><p>Regulatory and market developments scanned every day on named beats, de-duplicated against the existing observation corpus.</p></div>
+    <div class="card"><span class="tag">REPORTING</span><h3>Regulatory situation report, monthly letter, VP monthly, org metrics pulse</h3><p>Cross-desk situation reports for an executive audience; a monthly organizational letter written for a general reader; per-VP monthlies; organizational metrics.</p></div>
+    <div class="card"><span class="tag">ENGINEERING</span><h3>Task brief, issue design, implementation, PR autopilot, remediation, verification sweep</h3><p>Requirements to implementation to review to fixing review comments to test-coverage audit — against external repositories.</p></div>
+    <div class="card"><span class="tag">MEDIA</span><h3>Podcast script, podcast publish</h3><p>A published analysis becomes a single-narrator colloquial script with mandatory citations, cleared for rights and compliance before release.</p></div>
+    <div class="card"><span class="tag">GOVERNANCE</span><h3>Amendment review committee, red-team audit, backlog reconcile, accountability watch</h3><p>A chaired committee reviews proposed amendments to governing documents and returns approve/reject with follow-ups; adversarial review runs independently of the delivery line.</p></div>
+    <div class="card"><span class="tag">ORG HYGIENE</span><h3>Memory curation, memory hygiene, skill maturity, performance refresh, engagement record</h3><p>Per-agent memory curated, org-wide memory checked for contradiction and decay, procedures rated for maturity, track records written.</p></div>
+    <div class="card"><span class="tag">MANAGEMENT</span><h3>Attention ledger, budget &amp; runway review, positioning, audience loop, reader signal</h3><p>Escalations ranked into a weekly decision package for the operator; spend and runway reviewed; positioning and reader response analyzed.</p></div>
   </div>
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">05</span><span class="kicker">ポートフォリオ</span></div>
-  <h2>どんなプロジェクトを運営しているか</h2>
+  <div class="eyebrow"><span class="num">07</span><span class="kicker">Portfolio</span></div>
+  <h2>What the network runs today</h2>
   <div class="scroll"><table>
-    <thead><tr><th>プロジェクト</th><th>領域</th><th>体制と成果物</th></tr></thead>
+    <thead><tr><th>Project</th><th>Domain</th><th>Staffing and output</th></tr></thead>
     <tbody>
-      <tr><td>ASP Cloud</td><td>SaaS プロダクト開発</td><td>家庭向けエネルギーマネジメントSaaSの実装。プロダクト責任者がオーナー、設計/実装/レビューの3レンズ体制。要件整理→実装→レビュー→修正のPRループが外部リポジトリ上で回る。</td></tr>
-      <tr><td>Project IND</td><td>インド エネルギー市場リサーチ</td><td>専任7名のデスク（Research Director、DISCOM/補助金経済性、住宅需要家、施工エコシステム、支払意思、ブレンデッド・ファイナンス、系統）。日次の規制ウォッチと、成果物としての市場レポート群。</td></tr>
-      <tr><td>Smartmeter Data Analysis</td><td>スマートメーター解析</td><td>テレメトリ解析。ASP Cloud と同じレビュー体制でPRとして納品。</td></tr>
-      <tr><td>Conference</td><td>スポンサー渉外・現地レポート</td><td>IRがオーナー。現地カンファレンスの参加・レポート、Run-of-show、ブリーフィングパック、投資家/スポンサー向けデッキ。<b>全てドラフト止まり</b>で、対外送信は人間のみが行う。</td></tr>
-      <tr><td>Agent Workforce</td><td>自社運営（ドッグフーディング）</td><td>ニュースレター（AIパラダイムシフトの解説・分析記事）、Podcast、月次組織レター、法改正委員会、組織指標。ワークフォース自身が乗っている基盤。</td></tr>
+      <tr><td>ASP Cloud</td><td>SaaS product development</td><td>Home energy management platform. Head of Product owns; design, implementation and review lenses staffed separately. Requirements → implementation → review → remediation runs as pull requests on the external repository.</td></tr>
+      <tr><td>Project IND</td><td>India energy market research</td><td>A seven-person desk: research director, DISCOM and subsidy economics, residential consumer evidence, contractor ecosystem, willingness-to-pay, blended finance, grid systems. Daily regulatory watch plus standing market reports.</td></tr>
+      <tr><td>Smartmeter Data Analysis</td><td>Telemetry analysis</td><td>Smart-meter data analysis delivered on the same review roster as ASP Cloud.</td></tr>
+      <tr><td>Conference</td><td>Sponsor engagement &amp; field reporting</td><td>IR-owned. On-site conference reporting, run-of-show, briefing packs, sponsor and investor decks. Everything stays a draft — only the human sends.</td></tr>
+      <tr><td>Software Talent Network</td><td>Own operations</td><td>The newsletter analyzing the AI paradigm shift, the podcast, the monthly organizational letter, the amendment review committee, organizational metrics — the network operating on itself.</td></tr>
     </tbody>
   </table></div>
-  <p class="note">同一の職種プールが、プロジェクトをまたいで再配置されます。インドのアナリストが規制レポートに参加し、編集長が週次プロジェクトレポートのパネルを招集する——人を増やさずに担当を増やせるのは、この三層分離の直接的な効果です。</p>
+  <p class="note">The same bench staffs all five. An India market analyst contributes to a cross-desk regulatory report; the managing editor convenes a weekly panel on a software project. Adding coverage does not mean adding headcount.</p>
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">06</span><span class="kicker">実物</span></div>
-  <h2>出ている成果物</h2>
+  <div class="eyebrow"><span class="num">08</span><span class="kicker">Output</span></div>
+  <h2>What actually ships</h2>
   <div class="grid g3">
-    <div class="card"><h3>解説・分析記事（日英）</h3><p>一次情報からの解説記事と、複数記事を帰納的に統合した分析記事。1本のNotion行が日英2版として同一URLで配信される。</p></div>
-    <div class="card"><h3>Podcast</h3><p>公開済み分析記事から口語台本を生成し、出典引用を必須化。制作・権利確認を経てSpotify/RSSへ。</p></div>
-    <div class="card"><h3>電力政策・規制レポート</h3><p>米国・インドの規制動向を日次で観測し、報告期間分の全観測を定量スキャンした上で経営層向けシチュエーションレポートに統合。</p></div>
-    <div class="card"><h3>月次組織レター</h3><p>毎月頭に、代表が全ワークフォースの前月を「なぜ」から書き起こす15〜20ページの統合レター。一般読者向け。</p></div>
-    <div class="card"><h3>インド市場リサーチ</h3><p>DISCOM経済性、補助金プログラム、支払意思、施工事業者エコシステム、ファイナンス構造の各レポート。</p></div>
-    <div class="card"><h3>コードとPR</h3><p>外部リポジトリに対する設計・実装・レビュー・修正。マージ判断だけが人間に上がる。</p></div>
-    <div class="card"><h3>現地カンファレンスレポート</h3><p>Run-of-show、ブリーフィングパック、スポンサー向けレポートとデッキ。</p></div>
-    <div class="card"><h3>ガバナンス答申</h3><p>統治文書の改定案に対する委員会の可否答申と、否決時のフォローアップ計画。</p></div>
-    <div class="card"><h3>組織メトリクス</h3><p>実績台帳、スキル成熟度、パフォーマンス指標、経営者の注意消費量トレンド。</p></div>
+    <div class="card"><h3>Bilingual articles</h3><p>Explanations grounded in primary sources and analyses that synthesize several of them, published as one record serving both languages.</p></div>
+    <div class="card"><h3>Podcast episodes</h3><p>Colloquial narration scripts derived from published analyses, cited, cleared and released.</p></div>
+    <div class="card"><h3>Regulatory &amp; policy reports</h3><p>Daily observation on US and India power policy, consolidated into executive situation reports over a fixed window.</p></div>
+    <div class="card"><h3>Monthly organizational letter</h3><p>A why-first review of the whole organization's month, written for executives and general readers rather than insiders.</p></div>
+    <div class="card"><h3>India market research</h3><p>DISCOM economics, subsidy programs, willingness to pay, contractor ecosystem, financing structures.</p></div>
+    <div class="card"><h3>Production pull requests</h3><p>Design, implementation, review and remediation on live repositories. Only the merge decision escalates.</p></div>
+    <div class="card"><h3>Conference field reports</h3><p>Run-of-show, briefing packs, sponsor reports and decks — staged for a human to send.</p></div>
+    <div class="card"><h3>Governance findings</h3><p>Committee verdicts on amendments, adversarial audit findings, plan-versus-actual reconciliation.</p></div>
+    <div class="card"><h3>Organizational metrics</h3><p>Engagement ledger, skill maturity, performance, and the trend in operator attention consumed.</p></div>
   </div>
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">07</span><span class="kicker">品質保証</span></div>
-  <h2>暴走しない組織設計</h2>
-  <p class="lede">エージェントを増やすほど、事故確率は上がります。だからこの組織は、能力より先に統治を作りました。憲法 → 法律 → 規制（自動チェック）→ 執行ルールの四層で、上位ほど変更が難しくなっています。</p>
+  <div class="eyebrow"><span class="num">09</span><span class="kicker">Control</span></div>
+  <h2>An organization that does not run away</h2>
+  <p class="lede">Adding agents multiplies both output and failure modes. Governance was built before capability: a constitution, framework law, mechanical regulation and operational runbooks, each harder to change than the one below it.</p>
   <div class="grid g2">
-    <div class="card"><h3>絶対に破れない4原則</h3><p>編集の誠実性（空記事・途中で切れた文章・LLM失敗の痕跡を世に出さない）／唯一の情報源を定める／単一運用者スケールを超える機能を作らない／壊れたら黙って続けず必ず落とす。</p></div>
-    <div class="card"><h3>機械的に止まるゲート</h3><p>公開前の切断検知、成果物の空/短文検知、CIの各種ゲート。違反したら公開されずビルドが赤くなる——判断ではなく仕組みで止める。</p></div>
-    <div class="card"><h3>権限の線引き</h3><p>自動実行してよい領域と、人間の承認が必須の領域（マージ、本番ブランチへの直接変更、統治文書・プロンプト・評価基準の改定、予算枠外の支出）が明文化されている。</p></div>
-    <div class="card"><h3>再発防止ラチェット</h3><p>同じ失敗が90日以内に2回起きたら、運用上の注意ではなく自動チェックへ自動昇格。組織が自分で締まっていく。</p></div>
-    <div class="card"><h3>敵対的レビュー</h3><p>Red Team ロールが「あえて弱点を探す」レビューを独立に回し、監査は執行ラインの外に置かれている。</p></div>
-    <div class="card"><h3>多候補・多審査の品質層</h3><p>記事生成は「1プロンプト1記事」ではなく、複数の生成者が書き、複数の審査者（編集/専門/読者の視点）がルーブリックで採点して採用案を決める。採点は読者行動と突き合わせて外側のループに戻る。</p></div>
+    <div class="card"><h3>Four inviolable principles</h3><p>Editorial integrity — nothing empty, truncated or model-failure-tainted reaches a reader. A single source of truth. No primitives beyond single-operator scale. Fail loud: a broken state throws rather than publishing a degraded result.</p></div>
+    <div class="card"><h3>Mechanical gates</h3><p>Truncation and empty-body detection at publish time, corpus gates at deploy time, CI checks on the registry itself. Enforcement is machinery, not judgment.</p></div>
+    <div class="card"><h3>Explicit authority split</h3><p>What an agent may execute, and what requires the human: merging, changing the default branch, amending governing documents, prompts or rubrics, spending beyond the envelope.</p></div>
+    <div class="card"><h3>Recurrence ratchet</h3><p>A failure mode that recurs within 90 days is automatically promoted from a note to a mechanical check. The organization tightens itself.</p></div>
+    <div class="card"><h3>Independent adversarial review</h3><p>A red-team role hunts for weaknesses on its own cadence, outside the delivery line that produced the work.</p></div>
+    <div class="card"><h3>Multi-candidate, multi-judge quality</h3><p>Several generators produce candidates; several judges score them against a rubric; the chosen candidate's prompt version is published with the work so reader behavior can be attributed back to it.</p></div>
   </div>
+  <p class="note">The same design answers the obvious objection to connected organizational memory: a network that propagates learning also propagates error. Provenance, confidence, applicability conditions, independent evaluation and correction history are part of the record, not an afterthought.</p>
 </section>
 
 <section>
-  <div class="eyebrow"><span class="num">08</span><span class="kicker">実行基盤</span></div>
-  <h2>どう動いているか</h2>
-  <p class="lede">スケジューラがティックを打ち、オーケストレータが「エージェント × スキル × プロジェクト」の文脈を合成してランナーに渡す。成果物は決定論的な書き込みスクリプトが、プロジェクト単位の認証情報で所定の宛先にPOSTする。人間はダッシュボードで見て、上がってきた判断だけを下す。</p>
-  <ul>
-    <li><b>トリガ</b> — スケジュールイベントがオーケストレータを起動。各スキルのケイデンス（毎日／6時間ごと／週次／月次）で発火。</li>
-    <li><b>文脈合成</b> — ペルソナ定義＋スキル手順＋プロジェクト設定＋その人の記憶を組み立ててエージェント実行環境へ。</li>
-    <li><b>書き込み</b> — 生成物はLLMが直接publishせず、バンドルされた書き込みスクリプト経由。ここに編集ガードが実装されている。</li>
-    <li><b>可視化</b> — 社内コンソールに組織図・活動記録・レポート、公開面はWebサイト・GitHub・Discord/Slack・Podcast配信。</li>
-    <li><b>記憶</b> — 各メンバーの知見が記録・整理され、組織全体の記憶の矛盾・陳腐化が定期点検される。</li>
-  </ul>
-</section>
-
-<section>
-  <div class="eyebrow"><span class="num">09</span><span class="kicker">拡張性</span></div>
-  <h2>どこまで伸ばせるか</h2>
-  <p class="lede">今の構成は5プロジェクト・41スキル・57ペルソナですが、増分コストの形が普通の組織と違います。</p>
-  <div class="grid g3">
-    <div class="card"><h3>職種を足す</h3><p>定義ファイル1件で新しい専門職が入社し、その瞬間に既存41スキル全てを実行できる。教育期間ゼロ。</p></div>
-    <div class="card"><h3>業務を足す</h3><p>スキルを1つ書けば、57人全員の候補担当者がいる状態で始まる。実行者を探す工程が存在しない。</p></div>
-    <div class="card"><h3>案件を足す</h3><p>プロジェクト定義と認証情報を登録すれば、組織まるごとがその案件を担当できる。立ち上げは人月ではなく設定。</p></div>
-  </div>
-  <p class="lede" style="margin-top:26px">この形が効く先は、<b>「専門性の高い調査・監視・文書生産が、恒常的に発生し続ける」</b>領域です。規制ウォッチ、市場リサーチ、投資家向けレポーティング、社内ドキュメント運用、コードベースの継続的な保守。いずれも、人間ひとりが常時見張るには重すぎ、外注するには文脈が失われすぎる領域です。</p>
-</section>
-
-<section>
-  <div class="eyebrow"><span class="num">10</span><span class="kicker">現在地</span></div>
-  <h2>すでに動いている。次は範囲を広げる。</h2>
+  <div class="eyebrow"><span class="num">10</span><span class="kicker">Economics</span></div>
+  <h2>What this changes for management</h2>
+  <p class="lede">The case is not that software labor is cheaper than people. It is that the set of capabilities a company can economically hold — and connect — gets larger.</p>
   <div class="grid g2">
-    <div class="card"><span class="tag ok">稼働中</span><h3>記事・レポート・PR・Podcast・月次レター</h3><p>定期実行で成果物が出続けている。外部リポジトリ3件に対する開発レーンも稼働。</p></div>
-    <div class="card"><span class="tag ok">稼働中</span><h3>ガバナンスと自動ゲート</h3><p>四層統治、CIゲート、再発防止ラチェット、敵対的レビューが実装済み。</p></div>
-    <div class="card"><span class="tag">次の一手</span><h3>品質層の全面適用</h3><p>多候補・多審査を全生成レーンへ拡張し、採点と読者行動を接続する。</p></div>
-    <div class="card"><span class="tag">次の一手</span><h3>外部プロジェクトの追加</h3><p>三層のうちプロジェクト軸を伸ばす。既存の職種とスキルの資産がそのまま乗る。</p></div>
+    <div class="card"><h3>The ROI floor drops</h3><p>Work whose value never justified one full-time hire, and was too small to outsource, becomes executable: continuous competitive monitoring, cross-project failure-pattern extraction, low-frequency legal and standards analysis, per-customer follow-up, post-project surveillance.</p></div>
+    <div class="card"><h3>Capability stays in-house while cost stays variable</h3><p>Outsourcing moves the learning to the vendor. Here the harness, evaluations, execution history and customer context remain internal; only the run cost tracks activity.</p></div>
+    <div class="card"><h3>A network effect that is computational, not social</h3><p>Human knowledge sharing costs attention, search, explanation and translation, and coordination paths grow as n(n−1)/2. Here one execution's learning is mechanically available to the next relevant execution — without every agent talking to every other.</p></div>
+    <div class="card"><h3>The cost of staying aligned falls</h3><p>Collecting cross-functional information, detecting contradictions between plans and assumptions, analyzing the blast radius of a change and confirming it landed everywhere are what made enterprise-wide alignment an annual event. When those costs fall, alignment becomes continuous work embedded in operations.</p></div>
+    <div class="card"><h3>Local autonomy is preserved, not centralized</h3><p>The gain is not deciding everything centrally. It is leaving authority at the edge while surfacing inconsistency with the whole early enough to correct it.</p></div>
+    <div class="card"><h3>Try the business before staffing it</h3><p>Instead of assembling specialists, operations and vendor contracts before a new line is tested, capability is composed as a harness and people and capital are added where customer evidence appears.</p></div>
   </div>
-  <p class="lede" style="margin-top:26px">お願いしたいのは、<b>実際の業務領域をひとつ預けていただくこと</b>です。プロジェクトを1件登録すれば、既存の職種とスキルがそのまま担当につきます。立ち上げに必要なのは、対象と、権限と、成果物の宛先の定義だけです。</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Misalignment</th><th>Network's role</th><th>Human's role</th></tr></thead>
+    <tbody>
+      <tr><td>Facts &amp; information</td><td>Collect, index, compare, flag duplication and contradiction</td><td>Set disclosure and sharing principles</td></tr>
+      <tr><td>Working assumptions</td><td>Extract premises, show where they diverge</td><td>Approve the common premise</td></tr>
+      <tr><td>Plans &amp; dependencies</td><td>Impact analysis, alternatives with trade-offs</td><td>Priorities and resource allocation</td></tr>
+      <tr><td>Departmental interests</td><td>Make amounts, beneficiaries and burdens visible</td><td>Change P&amp;L, incentives, authority</td></tr>
+      <tr><td>Values, risk, accountability</td><td>Present options and consequences</td><td>Judge, accept risk, own the outcome</td></tr>
+    </tbody>
+  </table></div>
+  <div class="pull">The more the network can align, the more explicitly leadership must state what to prioritize, whose interests to reconcile, and who is accountable.</div>
+  <p class="note">Competitive advantage does not sit in model access — models commoditize. It sits in proprietary data, judgment criteria, tool connections, permissions, an evaluation system that separates success from failure, execution history, and the loop that redistributes one desk's learning into another's next run.</p>
 </section>
 
-<footer>Agent Workforce — 人間の意思決定者1名 ／ 専門職エージェント57 ／ スキル41 ／ プロジェクト5。数値は本リポジトリの登録実体から機械的に算出。</footer>
+<section>
+  <div class="eyebrow"><span class="num">11</span><span class="kicker">Status</span></div>
+  <h2>Running now — the next axis is projects</h2>
+  <div class="grid g2">
+    <div class="card"><span class="tag ok">LIVE</span><h3>Scheduled delivery across five projects</h3><p>Articles, reports, letters, podcasts and pull requests ship on cadence; three external repositories are under an active engineering lane.</p></div>
+    <div class="card"><span class="tag ok">LIVE</span><h3>Governance and mechanical gates</h3><p>Four-layer governance, publish-time and deploy-time gates, the recurrence ratchet, and independent adversarial review.</p></div>
+    <div class="card"><span class="tag">NEXT</span><h3>Quality layer across every generating lane</h3><p>Extend multi-candidate, multi-judge evaluation everywhere and connect scores to reader behavior.</p></div>
+    <div class="card"><span class="tag">NEXT</span><h3>More projects on the same bench</h3><p>Grow the axis with the largest leverage: the existing roles and skills carry over unchanged.</p></div>
+  </div>
+  <p class="lede" style="margin-top:24px">The ask is one real domain. Registering a project takes a scope, a set of permissions and a destination for the deliverables — the professions and the procedures are already standing.</p>
+</section>
+
+<footer>Software Talent Network — 1 human decision-maker · 57 specialist agents · 41 skills · 5 projects. Counts taken mechanically from the registry.</footer>
 </main>
