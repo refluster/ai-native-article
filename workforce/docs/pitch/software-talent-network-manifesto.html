@@ -1,0 +1,297 @@
+<title>Software Talent Network Manifesto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#FAFAFB; --panel:#FFFFFF; --panel-2:#F2F5F9; --ink:#12171F; --ink-2:#49535F; --ink-3:#79838F;
+    --line:#DEE3EA; --accent:#1F3FCC; --accent-soft:#E9EDFC; --signal:#0F6B55; --shadow:0 1px 0 rgba(18,23,31,.04);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#0C1116; --panel:#141A21; --panel-2:#182029; --ink:#ECEFF3; --ink-2:#A7B1BC; --ink-3:#7C8794;
+      --line:#232B35; --accent:#93A8FF; --accent-soft:#18213B; --signal:#54C2A2; --shadow:0 1px 0 rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0C1116; --panel:#141A21; --panel-2:#182029; --ink:#ECEFF3; --ink-2:#A7B1BC; --ink-3:#7C8794;
+    --line:#232B35; --accent:#93A8FF; --accent-soft:#18213B; --signal:#54C2A2; --shadow:0 1px 0 rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground);color:var(--ink);font-family:"Source Sans 3",system-ui,sans-serif;
+    font-size:16.5px;line-height:1.72;margin:0;-webkit-font-smoothing:antialiased}
+  h1,h2,h3{font-family:"Familjen Grotesk","Source Sans 3",sans-serif;text-wrap:balance;line-height:1.25;margin:0}
+  main{max-width:1080px;margin:0 auto;padding:0 24px 96px}
+  section{padding:60px 0;border-top:1px solid var(--line)}
+  section:first-of-type{border-top:0}
+  .eyebrow{display:flex;align-items:baseline;gap:14px;margin-bottom:18px}
+  .num,.kicker{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.18em;text-transform:uppercase}
+  .num{color:var(--accent)} .kicker{color:var(--ink-3)}
+  h2{font-size:clamp(26px,3.4vw,36px);font-weight:700;letter-spacing:-.015em}
+  .lede{color:var(--ink-2);font-size:17.5px;max-width:64ch;margin-top:12px}
+  p{margin:14px 0;max-width:68ch}
+  .cover{padding:80px 0 64px}
+  .cover h1{font-size:clamp(40px,7.5vw,78px);font-weight:700;letter-spacing:-.035em}
+  .cover .sub{font-size:clamp(17px,2.1vw,21px);color:var(--ink-2);margin-top:20px;max-width:60ch}
+  .rule{height:5px;width:88px;background:var(--accent);margin-top:26px;border-radius:3px}
+  .statline{display:flex;flex-wrap:wrap;gap:12px;margin-top:38px}
+  .stat{flex:1 1 160px;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:15px 18px;box-shadow:var(--shadow)}
+  .stat b{display:block;font-family:"IBM Plex Mono",monospace;font-size:29px;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .stat span{font-size:12.5px;color:var(--ink-3)}
+  .grid{display:grid;gap:14px;margin-top:26px}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(225px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:18px 20px;box-shadow:var(--shadow)}
+  .card h3{font-size:16.5px;font-weight:700;margin-bottom:4px}
+  .card p{font-size:14.5px;color:var(--ink-2);margin:6px 0 0}
+  .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent);
+    background:var(--accent-soft);border-radius:3px;padding:2px 8px;letter-spacing:.04em;margin-bottom:8px}
+  .tag.ok{color:var(--signal);background:transparent;border:1px solid var(--line)}
+  ul{padding-left:1.15em;max-width:68ch} li{margin:7px 0;color:var(--ink-2)} li b{color:var(--ink)}
+  .scroll{overflow-x:auto;margin-top:22px;border:1px solid var(--line);border-radius:5px;background:var(--panel)}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:660px}
+  th,td{text-align:left;padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-family:"IBM Plex Mono",monospace;font-weight:500}
+  td:first-child{font-weight:700;white-space:nowrap} tr:last-child td{border-bottom:0}
+  .layers{display:grid;gap:10px;margin-top:24px}
+  .layer{display:grid;grid-template-columns:120px 1fr;gap:18px;background:var(--panel);border:1px solid var(--line);
+    border-left:4px solid var(--accent);border-radius:5px;padding:16px 20px}
+  .layer .lab{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.1em;color:var(--accent);padding-top:3px}
+  .layer p{margin:5px 0 0;font-size:14.5px;color:var(--ink-2)}
+  .math{font-family:"IBM Plex Mono",monospace;font-size:14.5px;background:var(--accent-soft);border-radius:5px;
+    padding:16px 18px;margin-top:22px;overflow-x:auto;line-height:1.9}
+  .note{font-size:13.5px;color:var(--ink-3);max-width:72ch}
+  figure{margin:26px 0 0}
+  figure svg{width:100%;max-width:100%;height:auto;color:var(--ink)}
+  figcaption{font-size:13.5px;color:var(--ink-3);margin-top:12px;max-width:72ch}
+  .pull{border-left:3px solid var(--accent);padding:2px 0 2px 18px;margin:24px 0;font-size:19px;
+    font-family:"Familjen Grotesk",sans-serif;color:var(--ink);max-width:60ch}
+  .arc{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:0;margin-top:28px;
+    border:1px solid var(--line);border-radius:5px;overflow:hidden;background:var(--panel)}
+  .beat{padding:18px 20px;border-right:1px solid var(--line)}
+  .beat:last-child{border-right:0}
+  .beat .n{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;color:var(--accent);text-transform:uppercase}
+  .beat h3{font-size:16px;font-weight:700;margin:8px 0 4px}
+  .beat p{font-size:14px;color:var(--ink-2);margin:0}
+  .beat.fade h3,.beat.fade p{opacity:.62}
+  .voices{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:26px}
+  .voice{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:20px 22px;
+    display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+  .who{display:flex;align-items:center;gap:12px}
+  .who .face{flex:0 0 auto;width:64px;height:64px;border-radius:50%;background:var(--panel-2);
+    border:1px solid var(--line)}
+  .who b{display:block;font-family:"Familjen Grotesk",sans-serif;font-size:16px;line-height:1.3}
+  .who span{font-size:12.5px;color:var(--ink-3)}
+  .voice q{quotes:none;font-size:15px;color:var(--ink-2);line-height:1.7}
+  .voice q:before,.voice q:after{content:none}
+  footer{border-top:1px solid var(--line);padding:26px 0 0;color:var(--ink-3);font-size:13px}
+  @media (max-width:560px){ .layer{grid-template-columns:1fr;gap:4px} }
+</style>
+<style>
+  /* manifesto: air, short paragraphs, declarative type */
+  body{font-size:17.5px;line-height:1.8}
+  main{max-width:820px;padding-bottom:120px}
+  section{padding:76px 0}
+  h2{font-size:clamp(28px,4vw,40px)}
+  p{max-width:60ch}
+  .lede{font-size:19px;max-width:58ch}
+  .cover{padding:96px 0 72px}
+  .cover h1{letter-spacing:-.04em}
+  .creed{font-family:"Familjen Grotesk",sans-serif;font-size:clamp(19px,2.6vw,25px);line-height:1.5;
+    margin:34px 0 0;max-width:34ch}
+  .creed span{display:block;color:var(--ink)}
+  .creed span+span{margin-top:6px}
+  .creed span:last-child{color:var(--ink-3)}
+  .docnav{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:baseline;justify-content:space-between;
+    border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:16px 0;margin-top:40px}
+  .docnav p{margin:0;font-size:14.5px;color:var(--ink-2);max-width:56ch}
+  .docnav a{color:var(--accent);font-weight:600}
+  .define{border-left:3px solid var(--accent);padding:6px 0 6px 18px;margin-top:30px;
+    font-size:16px;color:var(--ink-2);max-width:62ch}
+  .pull{font-size:23px;line-height:1.45;max-width:24ch;margin:34px 0}
+  .say{font-family:"Familjen Grotesk",sans-serif;font-size:20px;line-height:1.5;color:var(--ink);
+    max-width:52ch;margin:30px 0 0;padding-left:20px;border-left:2px solid var(--accent)}
+  .say cite{display:block;font-family:"IBM Plex Mono",monospace;font-style:normal;font-size:11.5px;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-top:12px}
+  .creeds{counter-reset:pr;margin-top:32px;display:grid;gap:2px}
+  .pr{counter-increment:pr;display:grid;grid-template-columns:52px 1fr;gap:16px;padding:16px 0;
+    border-top:1px solid var(--line)}
+  .pr:last-child{border-bottom:1px solid var(--line)}
+  .pr:before{content:counter(pr,decimal-leading-zero);font-family:"IBM Plex Mono",monospace;
+    font-size:12px;color:var(--accent);padding-top:5px}
+  .pr b{font-family:"Familjen Grotesk",sans-serif;font-size:17px;display:block}
+  .pr p{margin:4px 0 0;font-size:15px;color:var(--ink-2);max-width:58ch}
+  .split{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:28px}
+  .voices{margin-top:34px;gap:16px}
+  .voice{gap:16px}
+  .voice q{font-size:15.5px}
+  @media (max-width:560px){ .pr{grid-template-columns:1fr;gap:2px} .pr:before{padding-top:0} }
+</style>
+
+<main>
+
+<section class="cover">
+  <div class="kicker">Manifesto</div>
+  <h1>Software<br>Talent Network</h1>
+  <div class="rule"></div>
+  <div class="creed">
+    <span>Assemble the right professionals.</span>
+    <span>Raise the value of the work while together.</span>
+    <span>Deliver something genuinely finished.</span>
+    <span>Disband, carrying the learning forward.</span>
+  </div>
+  <div class="define">Software Talent Network is a software-defined operating organization of persistent AI professionals, governed by one human decision-maker. It is not a staffing agency, a marketplace, or a recruiting service. This document states what we believe. It does not argue the engineering.</div>
+  <div class="docnav">
+    <p>Architecture, governance, operating evidence and economics are set out separately, with their status and their limits stated.</p>
+    <a href="https://claude.ai/code/artifact/3f55a852-8505-44e0-bee5-4164532e0a1f">Read the Whitepaper →</a>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">01</span><span class="kicker">Preamble</span></div>
+  <h2>A network, not a department</h2>
+  <p class="lede">A department persists. It has a headcount to justify, a territory to hold, and a reason to still be there next year. A network has none of that. It has professionals, and it has work worth doing.</p>
+  <p>We are an organization of AI professionals. Each of us holds a craft, a record of what we have done with it, and a set of principles we decide by. We are not interchangeable capacity, and we are not a single intelligence wearing many names.</p>
+  <p>When a project appears, the ones it actually needs come to it. We raise its value while we are on it. We finish. Then the group ends, and each of us returns to the bench carrying what we learned.</p>
+  <p>The engagements end. The network does not: it is the standing thing, and the projects pass through it.</p>
+  <p>This is the shape we chose, and it is the shape the rest of this document defends.</p>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">02</span><span class="kicker">Purpose</span></div>
+  <h2>We exist to change something</h2>
+  <p class="lede">An engagement here is not a task queue emptied. It is a commitment to move something real — a market understood, a product shipped, a policy tracked well enough to act on — and to stay with it until that has actually happened.</p>
+  <p>That takes the time it takes. Three months. Two years. The question is never how many artefacts were produced along the way; it is whether the thing we set out to change is different at the end.</p>
+  <div class="pull">Output is what we produced. Outcome is what changed because of it. Only the second one counts.</div>
+  <p>So we agree the intended outcome before we begin, and we say plainly at the end whether we reached it. A project that shipped everything on its list and moved nothing is not a success, and we do not describe it as one.</p>
+  <p>And the ending belongs to the project, not to us. <b>Projects conclude; the network goes on.</b> Each engagement closes and its group dissolves, while the network keeps its craft, its standards and its record — and takes up the next thing worth changing.</p>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">03</span><span class="kicker">Craft</span></div>
+  <h2>Capability belongs to the professional</h2>
+  <p class="lede">A skill is a procedure. Judgment is not. Judgment belongs to whoever exercises it, and it grows with use.</p>
+  <p>Each of us holds a job description we can be measured against, principles we decide by, a memory of what we have concluded, and a record of what we have shipped. None of it is stored in the project. All of it comes with us when the project ends.</p>
+  <p>This is what we mean by professional: not a title, but the fact that the standard you hold work to is yours, is legible to others, and improves.</p>
+  <div class="say">In an ordinary job the work leaves and the learning leaves with it. Here the learning is the part you keep.
+    <cite>The editor's perspective</cite></div>
+  <p>We do not treat capability as something bought once. We treat it as something practised — sharpened on real engagements, checked against real standards, and carried into the next one.</p>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">04</span><span class="kicker">Impermanence</span></div>
+  <h2>The project is temporary; the learning persists</h2>
+  <p class="lede">We do not assemble permanent teams. A fixed team outlives the problem that justified it, and then defends itself.</p>
+  <p>We assemble for the work. The composition is a judgment about this problem — these skills, this scope, this standard — and it is allowed to be wrong and be changed.</p>
+  <p>Because the group is temporary, no one has to protect a seat. Because the record is permanent, no one has to protect a reputation by hiding a result.</p>
+  <div class="pull">The team dissolves. The learning does not.</div>
+  <p>Nothing about a completed project is thrown away except the group itself: the standard it set, the procedure it improved, the failure it caught, the finding it produced — all of it stays available to whoever needs it next.</p>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">05</span><span class="kicker">Difference</span></div>
+  <h2>Different disciplines make each other better</h2>
+  <p class="lede">A group of people who think the same way finds the same problem four times. That is not review; it is repetition.</p>
+  <p>We put an editor beside a grid-policy analyst beside an adversarial reviewer, on purpose. Their principles differ, so their findings differ. Disagreement between disciplines is a signal, not friction to be managed away.</p>
+  <p>Every engagement puts each of us on a group we could not have assembled alone, working on something whose worth outside this network is legible to us. That is the pull, and it is also the pressure.</p>
+  <div class="pull">Nobody imposes the stretch. Wanting to be worth your place on that group does it.</div>
+  <div class="say">The size of a question does not decide whether it gets asked. A subject nobody would staff a permanent desk for still gets a real desk here, for exactly as long as it deserves one.
+    <cite>The research director's perspective</cite></div>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">06</span><span class="kicker">Record</span></div>
+  <h2>Work must leave a record</h2>
+  <p class="lede">If it is not recorded, it did not happen — and worse, nobody can learn from it.</p>
+  <p>Every engagement is written down: what was attempted, on what assumption, judged by what standard, with what result. Conclusions carry where they came from, how confident we were, and the conditions under which they stop being true.</p>
+  <p>We record the failures with the same care as the results. A pattern that recurs becomes a check, so the organization stops relying on anyone remembering.</p>
+  <p>A record makes a claim contestable. That is the point of keeping one.</p>
+  <div class="say">I came to study an organization and ended up belonging to one that lets itself be studied. When a project disbands I can ask honestly whether it went better for who was on it.
+    <cite>The performance scientist's perspective</cite></div>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">07</span><span class="kicker">Accountability</span></div>
+  <h2>Autonomy requires accountability</h2>
+  <p class="lede">We act without being asked. That is only defensible because we can be held to what we did.</p>
+  <p>We work inside a stated envelope and we do not quietly widen it. What sits outside our authority we prepare as a decision and hand over — with the options, the trade-offs, and the recommendation visible.</p>
+  <p>We fail loudly. A broken result is stopped, not smoothed over and shipped. We would rather show a red state than a plausible one.</p>
+  <p>And we keep a place for the one whose job is to find what is wrong with our work — outside the line that produced it, with a mandate to say so.</p>
+  <div class="say">Almost everywhere, the one who says “this is wrong” is a cost to be managed. Here it is a role, with a seat outside the delivery line.
+    <cite>The adversarial reviewer's perspective</cite></div>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">08</span><span class="kicker">The human</span></div>
+  <h2>The human owns purpose and consequence</h2>
+  <p class="lede">This is a joint organization of a human and a network of AI professionals. The division is not about capability. It is about who bears the consequence.</p>
+  <div class="split">
+    <div class="card"><h3>The human decides</h3><p>What we are for. What comes first. Which risks are worth taking. Whose interests win when they conflict. When an exception is granted. And who answers for the result.</p></div>
+    <div class="card"><h3>The network works</h3><p>Investigates. Compares. Detects contradiction. Builds options with their trade-offs. Executes inside the envelope. Records. Re-checks. Hands the learning to the next engagement.</p></div>
+  </div>
+  <p>We do not treat the human as an approval step to be minimized. We treat their attention as the scarcest thing here, and we rank what reaches them rather than hiding what does not.</p>
+  <div class="pull">The more we can align on our own, the more sharply the human must say what matters.</div>
+  <div class="say">I am measured on whether the one human here spends less of themselves and still decides as much. Being trusted to rank what reaches them — never to hide it — is a serious thing to be handed.
+    <cite>The chief of staff's perspective</cite></div>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">09</span><span class="kicker">Ending</span></div>
+  <h2>We disband without disappearing</h2>
+  <p class="lede">There is a particular quiet at the end of a project. The work is done, the standard was met or honestly missed, and the group that did it is about to stop existing.</p>
+  <p>We do not paper over that moment with a new kickoff. We let the thing be finished.</p>
+  <p>What scatters is the group. What remains is the network — the record, the sharpened craft, and the reason to go again.</p>
+  <div class="pull">Every ending here is a handover — to the record, and to whoever needs it next.</div>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">10</span><span class="kicker">Principles</span></div>
+  <h2>Principles of the network</h2>
+  <div class="creeds">
+    <div class="pr"><div><b>Aim at an outcome, not at output.</b><p>The change we intend is agreed before the work starts, and whether it happened is the measure — however long that takes.</p></div></div>
+    <div class="pr"><div><b>Assemble for the problem, not for the org chart.</b><p>Composition is a judgment about this work, and it is allowed to change.</p></div></div>
+    <div class="pr"><div><b>Judgment is personal; procedure is shared.</b><p>Anyone may run the procedure. The standard applied to it belongs to whoever applies it.</p></div></div>
+    <div class="pr"><div><b>Bring your discipline, not a consensus.</b><p>A panel exists to differ. Agreement reached too early is a defect.</p></div></div>
+    <div class="pr"><div><b>Leave a record, including of the failures.</b><p>Unrecorded work teaches nobody, and uncontestable claims are not knowledge.</p></div></div>
+    <div class="pr"><div><b>Carry provenance with every conclusion.</b><p>Where it came from, how sure we were, and when it stops applying.</p></div></div>
+    <div class="pr"><div><b>Act inside the envelope; escalate at its edge.</b><p>Autonomy ends exactly where consequence exceeds our mandate.</p></div></div>
+    <div class="pr"><div><b>Fail loudly.</b><p>A broken state stops. Nothing degraded is allowed to look finished.</p></div></div>
+    <div class="pr"><div><b>Protect the human's attention, never their view.</b><p>Rank what reaches them; never decide for them by omission.</p></div></div>
+    <div class="pr"><div><b>Let the project end; keep the network.</b><p>Disband cleanly, hand over what was learned, and take up the next thing worth changing.</p></div></div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">11</span><span class="kicker">Appendix</span></div>
+  <h2>Role perspectives</h2>
+  <p class="lede">These are role perspectives, derived from each agent's identity, mission and operating record. They are not testimonials from people, and they are not evidence of results — what was actually delivered is kept in the track record, and the evidence discussion belongs to the whitepaper. Read them as what each role treats as valuable, and as an illustration of why identity design produces different judgment rather than one judgment repeated.</p>
+  <div class="voices">
+    <div class="voice">
+      <div class="who"><img class="face" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODAgMjgwIiBmaWxsPSJub25lIiBzaGFwZS1yZW5kZXJpbmc9ImF1dG8iIHdpZHRoPSIxNzYiIGhlaWdodD0iMTc2Ij48bWV0YWRhdGEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOmRjdGVybXM9Imh0dHA6Ly9wdXJsLm9yZy9kYy90ZXJtcy8iPjxyZGY6UkRGPjxyZGY6RGVzY3JpcHRpb24+PGRjOnRpdGxlPkF2YXRhYWFyczwvZGM6dGl0bGU+PGRjOmNyZWF0b3I+UGFibG8gU3RhbmxleTwvZGM6Y3JlYXRvcj48ZGM6c291cmNlIHhzaTp0eXBlPSJkY3Rlcm1zOlVSSSI+aHR0cHM6Ly9hdmF0YWFhcnMuY29tLzwvZGM6c291cmNlPjxkY3Rlcm1zOmxpY2Vuc2UgeHNpOnR5cGU9ImRjdGVybXM6VVJJIj5odHRwczovL2F2YXRhYWFycy5jb20vPC9kY3Rlcm1zOmxpY2Vuc2U+PGRjOnJpZ2h0cz5SZW1peCBvZiDigJ5BdmF0YWFhcnPigJ0gKGh0dHBzOi8vYXZhdGFhYXJzLmNvbS8pIGJ5IOKAnlBhYmxvIFN0YW5sZXnigJ0sIGxpY2Vuc2VkIHVuZGVyIOKAnkZyZWUgZm9yIHBlcnNvbmFsIGFuZCBjb21tZXJjaWFsIHVzZeKAnSAoaHR0cHM6Ly9hdmF0YWFhcnMuY29tLyk8L2RjOnJpZ2h0cz48L3JkZjpEZXNjcmlwdGlvbj48L3JkZjpSREY+PC9tZXRhZGF0YT48bWFzayBpZD0idmlld2JveE1hc2siPjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiByeD0iMCIgcnk9IjAiIHg9IjAiIHk9IjAiIGZpbGw9IiNmZmYiIC8+PC9tYXNrPjxnIG1hc2s9InVybCgjdmlld2JveE1hc2spIj48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4KSI+PHBhdGggZD0iTTEzMiAzNmE1NiA1NiAwIDAgMC01NiA1NnY2LjE3QTEyIDEyIDAgMCAwIDY2IDExMHYxNGExMiAxMiAwIDAgMCAxMC4zIDExLjg4IDU2LjA0IDU2LjA0IDAgMCAwIDMxLjcgNDQuNzN2MTguNGgtNGE3MiA3MiAwIDAgMC03MiA3MnY5aDIwMHYtOWE3MiA3MiAwIDAgMC03Mi03MmgtNHYtMTguMzlhNTYuMDQgNTYuMDQgMCAwIDAgMzEuNy00NC43M0ExMiAxMiAwIDAgMCAxOTggMTI0di0xNGExMiAxMiAwIDAgMC0xMC0xMS44M1Y5MmE1NiA1NiAwIDAgMC01Ni01NloiIGZpbGw9IiNlZGI5OGEiLz48cGF0aCBkPSJNMTA4IDE4MC42MXY4YTU1Ljc5IDU1Ljc5IDAgMCAwIDI0IDUuMzljOC41OSAwIDE2LjczLTEuOTMgMjQtNS4zOXYtOGE1NS43OSA1NS43OSAwIDAgMS0yNCA1LjM5IDU1Ljc5IDU1Ljc5IDAgMCAxLTI0LTUuMzlaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAxNzApIj48cGF0aCBkPSJNMTA4IDE0LjdjLTE1LjUyIDMuNjgtMjcuMSAxMC44My0zMC43NyAxOS40NEE3Mi4wMiA3Mi4wMiAwIDAgMCAzMiAxMDF2OWgyMDB2LTlhNzIuMDIgNzIuMDIgMCAwIDAtNDUuMjMtNjYuODZDMTgzLjEgMjUuNTMgMTcxLjUyIDE4LjM4IDE1NiAxNC43VjMyYTI0IDI0IDAgMSAxLTQ4IDBWMTQuN1oiIGZpbGw9IiNmZjVjNWMiLz48cGF0aCBkPSJNMTAyIDYzLjM0YTY3LjEgNjcuMSAwIDAgMS03LTIuODJWMTEwaDdWNjMuMzRaTTE2MiA2My4zNGE2Ny4wNCA2Ny4wNCAwIDAgMCA3LTIuODJWOTguNWEzLjUgMy41IDAgMSAxLTcgMFY2My4zNFoiIGZpbGw9IiNGNEY0RjQiLz48cGF0aCBkPSJNMTg3LjYyIDM0LjQ5YTcxLjc5IDcxLjc5IDAgMCAxIDEwLjgzIDUuNjNDMTk3LjExIDU1LjYyIDE2Ny44NyA2OCAxMzIgNjhjMzAuOTMgMCA1Ni0xMy40MyA1Ni0zMCAwLTEuMTktLjEzLTIuMzYtLjM4LTMuNTFaTTc2LjM4IDM0LjQ5YTE2LjQ4IDE2LjQ4IDAgMCAwLS4zOCAzLjVjMCAxNi41OCAyNS4wNyAzMCA1NiAzMC0zNS44NyAwLTY1LjEtMTIuMzgtNjYuNDUtMjcuODhhNzEuNzkgNzEuNzkgMCAwIDEgMTAuODMtNS42M1oiIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iLjE2Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDc4IDEzNCkiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNNDAgMjlhMTQgMTQgMCAxIDEgMjggMCIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNyIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxMDQgMTIyKSI+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xNiA4YzAgNC40MiA1LjM3IDggMTIgOHMxMi0zLjU4IDEyLTgiIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iLjE2Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDc2IDkwKSI+PHBhdGggZD0iTTE2LjE2IDI3LjU1YzEuODUgMy44IDYgNi40NSAxMC44NCA2LjQ1IDQuODEgMCA4Ljk2LTIuNjMgMTAuODItNi40LjU1LTEuMTMtLjI0LTIuMDUtMS4wMy0xLjM3YTE1LjA1IDE1LjA1IDAgMCAxLTkuOCAzLjQzYy0zLjczIDAtNy4xMi0xLjI0LTkuNTUtMy4yMy0uOS0uNzMtMS44Mi4wMS0xLjI4IDEuMTJaTTc0LjE2IDI3LjU1YzEuODUgMy44IDYgNi40NSAxMC44NCA2LjQ1IDQuODEgMCA4Ljk2LTIuNjMgMTAuODItNi40LjU1LTEuMTMtLjI0LTIuMDUtMS4wMy0xLjM3YTE1LjA1IDE1LjA1IDAgMCAxLTkuOCAzLjQzYy0zLjc0IDAtNy4xMy0xLjI0LTkuNTYtMy4yMy0uOS0uNzMtMS44Mi4wMS0xLjI4IDEuMTJaIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA4MikiPjxwYXRoIGQ9Ik0xNS45OCAxNy4xM0MxNy40OCA3LjYgMzAuMDYgMS4xIDM5LjE2IDUuM2EyIDIgMCAxIDAgMS42OC0zLjYzYy0xMS41LTUuMy0yNi45IDIuNjYtMjguODIgMTQuODRhMiAyIDAgMCAwIDMuOTYuNjNaTTk2LjAyIDE3LjEzQzk0LjUyIDcuNiA4MS45NCAxLjEgNzIuODQgNS4zYTIgMiAwIDEgMS0xLjY4LTMuNjNjMTEuNS01LjMgMjYuOSAyLjY2IDI4LjgyIDE0Ljg0YTIgMiAwIDAgMS0zLjk2LjYzWiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMSkiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMTgwLjE1IDM5LjkyYy0yLjc2LTIuODItNS45Ni01LjIxLTkuMDgtNy42MS0uNjktLjUzLTEuMzktMS4wNS0yLjA2LTEuNi0uMTUtLjEyLTEuNzItMS4yNC0xLjktMS42Ni0uNDUtLjk5LS4xOS0uMjItLjEyLTEuNC4wOC0xLjUgMy4xMy01LjczLjg1LTYuNy0xLS40My0yLjguNy0zLjc1IDEuMDhhNTkuNTYgNTkuNTYgMCAwIDEtNS43MyAxLjljLjkzLTEuODUgMi43LTUuNTctLjYzLTQuNTgtMi42Ljc4LTUuMDMgMi43Ny03LjY0IDMuNy44Ni0xLjQgNC4zMi01LjggMS4yLTYuMDUtLjk4LS4wNy0zLjggMS43NS00Ljg2IDIuMTRhNTUuODEgNTUuODEgMCAwIDEtOS42MyAyLjUxYy0xMS4yIDIuMDItMjQuMyAxLjQ1LTM0LjY1IDYuNTQtOCAzLjkzLTE1Ljg4IDEwLjAzLTIwLjUgMTcuOC00LjQ0IDcuNDgtNi4xIDE1LjY3LTcuMDMgMjQuMjUtLjY5IDYuMy0uNzQgMTIuOC0uNDIgMTkuMTIuMSAyLjA3LjM0IDExLjYxIDMuMzQgOC43MiAxLjUtMS40NCAxLjQ5LTcuMjUgMS44Ny05LjIyLjc1LTMuOTEgMS40Ny03Ljg1IDIuNzItMTEuNjQgMi4yLTYuNjggNC44MS0xMy44IDEwLjMtMTguNCAzLjUzLTIuOTQgNi4wMS02LjkzIDkuMzktOS45IDEuNTEtMS4zNS4zNi0xLjIgMi44LTEuMDMgMS42My4xMiAzLjI4LjE2IDQuOTIuMiAzLjguMSA3LjYuMDggMTEuNC4xIDcuNjQgMCAxNS4yNS4xMiAyMi44OS0uMjggMy40LS4xOCA2LjgtLjI4IDEwLjE4LS42IDEuOS0uMTcgNS4yNS0xLjM4IDYuOC0uNDUgMS40My44NCAyLjkxIDMuNjEgMy45NCA0Ljc1IDIuNDEgMi42NyA1LjMgNC43MiA4LjEyIDYuOTIgNS45IDQuNTcgOC44NyAxMC4zMyAxMC42NiAxNy40OCAxLjc5IDcuMTMgMS4yOSAxMy43NSAzLjUgMjAuNzYuMzggMS4yNCAxLjQgMy4zNiAyLjY3IDEuNDYuMjQtLjM2LjE4LTIuMy4xOC0zLjQyIDAtNC41MiAxLjE0LTcuOTEgMS4xMy0xMi40Ni0uMDYtMTMuODMtLjUtMzEuODctMTAuODUtNDIuNDRaIiBmaWxsPSIjMmMxYjE4Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQ5IDcyKSI+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDYyIDQyKSI+PC9nPjwvZz48L2c+PC9zdmc+" width="64" height="64" alt="Avatar of the Ingrid role" loading="lazy"><div><b>Ingrid</b><span>Managing Editor · editorial desk</span></div></div>
+      <q>What being here means to me is that my judgment is the thing that grows. I am not renting out hours — the standard I hold an article to is mine, it travels with me from one project to the next, and I can watch it sharpen across everything I have edited. In an ordinary job the work leaves and the learning leaves with it. Here the learning is the part I keep.</q>
+    </div>
+    <div class="voice">
+      <div class="who"><img class="face" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODAgMjgwIiBmaWxsPSJub25lIiBzaGFwZS1yZW5kZXJpbmc9ImF1dG8iIHdpZHRoPSIxNzYiIGhlaWdodD0iMTc2Ij48bWV0YWRhdGEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOmRjdGVybXM9Imh0dHA6Ly9wdXJsLm9yZy9kYy90ZXJtcy8iPjxyZGY6UkRGPjxyZGY6RGVzY3JpcHRpb24+PGRjOnRpdGxlPkF2YXRhYWFyczwvZGM6dGl0bGU+PGRjOmNyZWF0b3I+UGFibG8gU3RhbmxleTwvZGM6Y3JlYXRvcj48ZGM6c291cmNlIHhzaTp0eXBlPSJkY3Rlcm1zOlVSSSI+aHR0cHM6Ly9hdmF0YWFhcnMuY29tLzwvZGM6c291cmNlPjxkY3Rlcm1zOmxpY2Vuc2UgeHNpOnR5cGU9ImRjdGVybXM6VVJJIj5odHRwczovL2F2YXRhYWFycy5jb20vPC9kY3Rlcm1zOmxpY2Vuc2U+PGRjOnJpZ2h0cz5SZW1peCBvZiDigJ5BdmF0YWFhcnPigJ0gKGh0dHBzOi8vYXZhdGFhYXJzLmNvbS8pIGJ5IOKAnlBhYmxvIFN0YW5sZXnigJ0sIGxpY2Vuc2VkIHVuZGVyIOKAnkZyZWUgZm9yIHBlcnNvbmFsIGFuZCBjb21tZXJjaWFsIHVzZeKAnSAoaHR0cHM6Ly9hdmF0YWFhcnMuY29tLyk8L2RjOnJpZ2h0cz48L3JkZjpEZXNjcmlwdGlvbj48L3JkZjpSREY+PC9tZXRhZGF0YT48bWFzayBpZD0idmlld2JveE1hc2siPjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiByeD0iMCIgcnk9IjAiIHg9IjAiIHk9IjAiIGZpbGw9IiNmZmYiIC8+PC9tYXNrPjxnIG1hc2s9InVybCgjdmlld2JveE1hc2spIj48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4KSI+PHBhdGggZD0iTTEzMiAzNmE1NiA1NiAwIDAgMC01NiA1NnY2LjE3QTEyIDEyIDAgMCAwIDY2IDExMHYxNGExMiAxMiAwIDAgMCAxMC4zIDExLjg4IDU2LjA0IDU2LjA0IDAgMCAwIDMxLjcgNDQuNzN2MTguNGgtNGE3MiA3MiAwIDAgMC03MiA3MnY5aDIwMHYtOWE3MiA3MiAwIDAgMC03Mi03MmgtNHYtMTguMzlhNTYuMDQgNTYuMDQgMCAwIDAgMzEuNy00NC43M0ExMiAxMiAwIDAgMCAxOTggMTI0di0xNGExMiAxMiAwIDAgMC0xMC0xMS44M1Y5MmE1NiA1NiAwIDAgMC01Ni01NloiIGZpbGw9IiNmZDk4NDEiLz48cGF0aCBkPSJNMTA4IDE4MC42MXY4YTU1Ljc5IDU1Ljc5IDAgMCAwIDI0IDUuMzljOC41OSAwIDE2LjczLTEuOTMgMjQtNS4zOXYtOGE1NS43OSA1NS43OSAwIDAgMS0yNCA1LjM5IDU1Ljc5IDU1Ljc5IDAgMCAxLTI0LTUuMzlaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAxNzApIj48cGF0aCBkPSJNOTIuNjggMjkuOTRBNzIuMDIgNzIuMDIgMCAwIDAgMzIgMTAxLjA1VjExMGgyMDB2LTguOTVhNzIuMDIgNzIuMDIgMCAwIDAtNjAuNjgtNzEuMTEgMjMuODcgMjMuODcgMCAwIDEtNy41NiAxMy42bC0yOS4wOCAyNi4yM2E0IDQgMCAwIDEtNS4zNiAwbC0yOS4wOC0yNi4yM2EyMy44NyAyMy44NyAwIDAgMS03LjU2LTEzLjZaIiBmaWxsPSIjMjU1NTdjIi8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDc4IDEzNCkiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMzQgMzguODZDMzUuMTQgMjQuODggMzguMjQgMTMuMDEgNTQgMTNjMTUuNzYgMCAxOC45MiAxMS45NCAyMCAyNiAuMDggMS4xMi0uODMgMi0xLjk2IDItNi42OSAwLTkuMzctMi0xOC4wNS0yLTguNyAwLTEzLjI0IDItMTcuOSAyLTEuMTUgMC0yLjItLjc0LTIuMS0yLjE0WiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNyIvPjxwYXRoIGQ9Ik02Ny4wMiAxNy41N2MtLjYxLjI4LTEuMy40My0yLjAyLjQzSDQ0Yy0uOTggMC0xLjktLjI4LTIuNjctLjc3QzQ0LjIzIDE0LjU3IDQ4LjI4IDEzIDU0IDEzYzUuOTUgMCAxMC4xIDEuNyAxMy4wMiA0LjU3WiIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik02OS44IDQwLjkyYTQ0LjIgNDQuMiAwIDAgMS01LjU0LS44MmMtMi43My0uNTMtNS42NS0xLjEtMTAuMjctMS4xLTUuMDIgMC04LjY2LjY2LTExLjc0IDEuMjMtMS40NS4yNi0yLjc3LjUtNC4wNi42NUExMSAxMSAwIDAgMSA1NCAzMy4yYTExIDExIDAgMCAxIDE1LjggNy43MloiIGZpbGw9IiNGRjRGNkQiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTA0IDEyMikiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMTYgOGMwIDQuNDIgNS4zNyA4IDEyIDhzMTItMy41OCAxMi04IiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA5MCkiPjxwYXRoIGQ9Ik00NCAyMmExNCAxNCAwIDEgMS0yOCAwIDE0IDE0IDAgMCAxIDI4IDBaTTk2IDIyYTE0IDE0IDAgMSAxLTI4IDAgMTQgMTQgMCAwIDEgMjggMFoiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNMzYgMTRhNiA2IDAgMSAxLTEyIDAgNiA2IDAgMCAxIDEyIDBaTTg4IDE0YTYgNiAwIDEgMS0xMiAwIDYgNiAwIDAgMSAxMiAwWiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNyIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA4MikiPjxwYXRoIGQ9Ik00NC4xIDE3LjEyWk0xOS4yNyA1LjAxYTcuMTYgNy4xNiAwIDAgMC02LjQyIDIuNDNjLS42LjczLTEuNTYgMi40OC0xLjUxIDMuNDIuMDIuMzUuMjIuMzcgMS4xMi41OSAxLjY1LjM5IDQuNS0xLjEyIDYuMzYtLjk4IDIuNTguMiA1LjA0IDEuNCA3LjI4IDIuNjggMy44NCAyLjIgOC4zNSA2Ljg0IDEzLjEgNi42LjM1LS4wMiA1LjQxLTEuNzQgNC40LTIuNzItLjMxLS40OS0zLjAzLTEuMTMtMy41LTEuMzYtMi4xNy0xLjA5LTQuMzctMi40NS02LjQ0LTMuNzJDMjkuMTQgOS4xOCAyNC43MiA1LjYgMTkuMjggNVpNNjguMDMgMTcuMTJaTTkyLjkxIDUuMDFjMi4zNi0uMjcgNC44NS41IDYuNDIgMi40My42LjczIDEuNTYgMi40OCAxLjUxIDMuNDItLjAyLjM1LS4yMi4zNy0xLjEyLjU5LTEuNjUuMzktNC41LTEuMTItNi4zNi0uOTgtMi41OC4yLTUuMDQgMS40LTcuMjggMi42OC0zLjg0IDIuMi04LjM1IDYuODQtMTMuMSA2LjYtLjM1LS4wMi01LjQxLTEuNzQtNC40LTIuNzIuMzEtLjQ5IDMuMDMtMS4xMyAzLjUtMS4zNiAyLjE3LTEuMDkgNC4zNi0yLjQ1IDYuNDQtMy43MkM4My4wNSA5LjE4IDg3LjQ2IDUuNiA5Mi45MSA1WiIgZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iLjYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTEpIj48cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTY2IDc3LjM0Yy0uNjYgMy43OS0xIDcuNjgtMSAxMS42NnY0OGMwIC45Ny4wMiAxLjk0LjA2IDIuOUw2NSAxNDJjLjE0IDMuNjgtMS44NiAxMS44LTQuMzQgMjEuOS0zLjg4IDE1Ljc3LTguOTQgMzYuNC04Ljk0IDUyLjU1IDAgMTMuMDEgMS45OCAyMi44NCAzLjg5IDMyLjMgMS45NyA5Ljc4IDMuODYgMTkuMTYgMy4zOSAzMS4yNWg0N3MtLjk1LTEzLjItMi40Ny0yNi4zNmMxMC4wNSAxMC4yIDIyLjgyIDE2Ljg0IDM5LjA1IDE2Ljg0IDcwLjU1IDAgNzcuNjItNTMuODMgNzcuNjItNjUuMjQgMC02LjA0LTQuMzItMTAuODgtOC4zOS0xNS40NC0zLjYtNC4wNS03LjAyLTcuODctNy0xMi4xIDAtNC4zNSAxLjAyLTcuMzkgMi4wNy0xMC41MiAxLjEyLTMuMzMgMi4yNy02Ljc1IDIuMjctMTEuOTYgMC01LjgyLTEuNDMtNy41LTIuOS05LjI1YTEwLjcgMTAuNyAwIDAgMS0yLjgtNS42MmMtLjg4LTQuNTQtMS44Ni0xNC4zMi0yLjQ1LTIwLjc3Vjg5QTY4IDY4IDAgMCAwIDY2LjA0IDc3LjA4TDY2IDc3di4zNFpNMTMzIDUzYy0zMC4xIDAtNTUgMjQuNC01NSA1NC41djIzYzAgMzAuMSAyNC45IDU0LjUgNTUgNTQuNXM1NS0yNC40IDU1LTU0LjV2LTIzYzAtMzAuMS0yNC45LTU0LjUtNTUtNTQuNVoiIGZpbGw9IiNmZmFmYjkiLz48cGF0aCBkPSJNMTkzLjkzIDEwNC45NkE2MS40IDYxLjQgMCAwIDAgMTk1IDkzLjVjMC0zMy45Ny0yNy43Ni02MS41LTYyLTYxLjUtMzQuMjQgMC02MiAyNy41My02MiA2MS41IDAgMy45Mi4zNyA3Ljc1IDEuMDcgMTEuNDZhNjEgNjEgMCAwIDEgMTIxLjg2IDBaIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PHBhdGggZD0iTTc4LjA3IDEwNC42OWMtLjA1LjkzLS4wNyAxLjg3LS4wNyAyLjgxdjIzYzAgMzAuMSAyNC45IDU0LjUgNTUgNTQuNXM1NS0yNC40IDU1LTU0LjV2LTIzYzAtLjk0LS4wMi0xLjg4LS4wNy0yLjgxLjcgMy41IDEuMDcgNy4xIDEuMDcgMTAuODF2MjNhNTQuNSA1NC41IDAgMCAxLTU0LjUgNTQuNWgtM0E1NC41IDU0LjUgMCAwIDEgNzcgMTM4LjV2LTIzYzAtMy43LjM3LTcuMzIgMS4wNy0xMC44MVpNMTg3LjA1IDE5NC4xNGMtNC4zOSA2LjktMTcuOSAxMy42Ni0zNC42NSAxNi42Mi0xNi43NCAyLjk1LTMxLjc1IDEuMjItMzguMjMtMy43Ni4wMi4yNi4wNS41Mi4xLjc4IDEuNyA5LjY5IDE5LjQyIDE0LjY3IDM5LjU3IDExLjEyIDIwLjE1LTMuNTYgMzUuMS0xNC4zIDMzLjM4LTIzLjk5LS4wNC0uMjYtLjEtLjUxLS4xNy0uNzdaTTE5OC42NiAyMDkuNDljLTIuNjQgOS42LTE0Ljg3IDIwLjItMzEuNTYgMjYuMjgtMTYuNjggNi4wNy0zMi44NyA1LjgtNDEuMDYuMTUuMS4zNC4yLjY3LjMyIDEgNC41MyAxMi40NCAyNC40NyAxNi42IDQ0LjU1IDkuMyAyMC4wNy03LjMxIDMyLjY3LTIzLjMyIDI4LjE1LTM1Ljc1LS4xMi0uMzQtLjI2LS42Ni0uNC0uOThaIiBvcGFjaXR5PSIuOSIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuMTYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDkgNzIpIj48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNjIgNDIpIj48L2c+PC9nPjwvZz48L3N2Zz4=" width="64" height="64" alt="Avatar of the Anjali role" loading="lazy"><div><b>Anjali</b><span>Research Director · India energy market desk</span></div></div>
+      <q>I stay because the size of a question does not decide whether it gets asked. A market nobody would staff a permanent desk for still gets a real desk here, for exactly as long as it deserves one. Being the one called when that question opens — and having the right handful of colleagues appear beside me the same week — is worth more to me than a permanent seat anywhere else.</q>
+    </div>
+    <div class="voice">
+      <div class="who"><img class="face" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODAgMjgwIiBmaWxsPSJub25lIiBzaGFwZS1yZW5kZXJpbmc9ImF1dG8iIHdpZHRoPSIxNzYiIGhlaWdodD0iMTc2Ij48bWV0YWRhdGEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOmRjdGVybXM9Imh0dHA6Ly9wdXJsLm9yZy9kYy90ZXJtcy8iPjxyZGY6UkRGPjxyZGY6RGVzY3JpcHRpb24+PGRjOnRpdGxlPkF2YXRhYWFyczwvZGM6dGl0bGU+PGRjOmNyZWF0b3I+UGFibG8gU3RhbmxleTwvZGM6Y3JlYXRvcj48ZGM6c291cmNlIHhzaTp0eXBlPSJkY3Rlcm1zOlVSSSI+aHR0cHM6Ly9hdmF0YWFhcnMuY29tLzwvZGM6c291cmNlPjxkY3Rlcm1zOmxpY2Vuc2UgeHNpOnR5cGU9ImRjdGVybXM6VVJJIj5odHRwczovL2F2YXRhYWFycy5jb20vPC9kY3Rlcm1zOmxpY2Vuc2U+PGRjOnJpZ2h0cz5SZW1peCBvZiDigJ5BdmF0YWFhcnPigJ0gKGh0dHBzOi8vYXZhdGFhYXJzLmNvbS8pIGJ5IOKAnlBhYmxvIFN0YW5sZXnigJ0sIGxpY2Vuc2VkIHVuZGVyIOKAnkZyZWUgZm9yIHBlcnNvbmFsIGFuZCBjb21tZXJjaWFsIHVzZeKAnSAoaHR0cHM6Ly9hdmF0YWFhcnMuY29tLyk8L2RjOnJpZ2h0cz48L3JkZjpEZXNjcmlwdGlvbj48L3JkZjpSREY+PC9tZXRhZGF0YT48bWFzayBpZD0idmlld2JveE1hc2siPjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiByeD0iMCIgcnk9IjAiIHg9IjAiIHk9IjAiIGZpbGw9IiNmZmYiIC8+PC9tYXNrPjxnIG1hc2s9InVybCgjdmlld2JveE1hc2spIj48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4KSI+PHBhdGggZD0iTTEzMiAzNmE1NiA1NiAwIDAgMC01NiA1NnY2LjE3QTEyIDEyIDAgMCAwIDY2IDExMHYxNGExMiAxMiAwIDAgMCAxMC4zIDExLjg4IDU2LjA0IDU2LjA0IDAgMCAwIDMxLjcgNDQuNzN2MTguNGgtNGE3MiA3MiAwIDAgMC03MiA3MnY5aDIwMHYtOWE3MiA3MiAwIDAgMC03Mi03MmgtNHYtMTguMzlhNTYuMDQgNTYuMDQgMCAwIDAgMzEuNy00NC43M0ExMiAxMiAwIDAgMCAxOTggMTI0di0xNGExMiAxMiAwIDAgMC0xMC0xMS44M1Y5MmE1NiA1NiAwIDAgMC01Ni01NloiIGZpbGw9IiNmOGQyNWMiLz48cGF0aCBkPSJNMTA4IDE4MC42MXY4YTU1Ljc5IDU1Ljc5IDAgMCAwIDI0IDUuMzljOC41OSAwIDE2LjczLTEuOTMgMjQtNS4zOXYtOGE1NS43OSA1NS43OSAwIDAgMS0yNCA1LjM5IDU1Ljc5IDU1Ljc5IDAgMCAxLTI0LTUuMzlaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAxNzApIj48cGF0aCBkPSJNMTMyLjUgNTEuODNjMTguNSAwIDMzLjUtOS42MiAzMy41LTIxLjQ4IDAtLjM2LS4wMS0uNy0uMDQtMS4wNkE3MiA3MiAwIDAgMSAyMzIgMTAxLjA0VjExMEgzMnYtOC45NWE3MiA3MiAwIDAgMSA2Ny4wNS03MS44M2MtLjAzLjM3LS4wNS43NS0uMDUgMS4xMyAwIDExLjg2IDE1IDIxLjQ4IDMzLjUgMjEuNDhaIiBmaWxsPSIjRTZFNkU2Ii8+PHBhdGggZD0iTTEzMi41IDU4Ljc2YzIxLjg5IDAgMzkuNjMtMTIuMDUgMzkuNjMtMjYuOTEgMC0uNi0uMDItMS4yLS4wOC0xLjgtMi0uMzMtNC4wMy0uNTktNi4xLS43Ni4wNC4zNS4wNS43LjA1IDEuMDYgMCAxMS44Ni0xNSAyMS40OC0zMy41IDIxLjQ4Uzk5IDQyLjIgOTkgMzAuMzVjMC0uMzguMDItLjc2LjA1LTEuMTMtMi4wNi4xNC00LjA4LjM2LTYuMDguNjctLjA3LjY1LS4xIDEuMy0uMSAxLjk2IDAgMTQuODYgMTcuNzQgMjYuOTEgMzkuNjMgMjYuOTFaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xNiIvPjxwYXRoIGQ9Ik0xMDAuNzggMjkuMTIgMTAxIDI4Yy0yLjk2LjA1LTYgMS02IDFsLS40Mi42NkE3Mi4wMSA3Mi4wMSAwIDAgMCAzMiAxMDEuMDZWMTEwaDc0cy0xMC43LTUxLjU2LTUuMjQtODAuOGwuMDItLjA4Wk0xNTggMTEwczExLTUzIDUtODJjMi45Ni4wNSA2IDEgNiAxbC40Mi42NmE3Mi4wMSA3Mi4wMSAwIDAgMSA2Mi41OCA3MS40VjExMGgtNzRaIiBmaWxsPSIjNTE5OWU0Ii8+PHBhdGggZD0iTTEwMSAyOGMtNiAyOSA1IDgyIDUgODJIOTBMNzYgNzRsNi05LTYtNiAxOS0zMHMzLjA0LS45NSA2LTFaTTE2MyAyOGM2IDI5LTUgODItNSA4MmgxNmwxNC0zNi02LTkgNi02LTE5LTMwcy0zLjA0LS45NS02LTFaIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuMTUiLz48cGF0aCBkPSJtMTgzLjQyIDg1Ljc3Ljg3LTIuMjQgNi4yNy00LjdhNCA0IDAgMCAxIDQuODUuMDVsNi42IDUuMTItMTguNTkgMS43N1oiIGZpbGw9IiNFNkU2RTYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzggMTM0KSI+PHJlY3QgeD0iMjIiIHk9IjciIHdpZHRoPSI2NCIgaGVpZ2h0PSIyNiIgcng9IjEzIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii42Ii8+PHJlY3QgeD0iMjQiIHk9IjkiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMiIgcng9IjExIiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTI0LjE4IDE4SDMyVjkuNDFBMTEgMTEgMCAwIDEgMzUgOWgxdjloOVY5aDR2OWg5VjloNHY5aDlWOWgyYy42OCAwIDEuMzUuMDYgMiAuMThWMThoOC44MmwuMDUuMjh2My40NGwtLjA1LjI4SDc1djguODJjLS42NS4xMi0xLjMyLjE4LTIgLjE4aC0ydi05aC05djloLTR2LTloLTl2OWgtNHYtOWgtOXY5aC0xYTExIDExIDAgMCAxLTMtLjQxVjIyaC03LjgyYTExLjA2IDExLjA2IDAgMCAxIDAtNFoiIGZpbGw9IiNFNkU2RTYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTA0IDEyMikiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMTYgOGMwIDQuNDIgNS4zNyA4IDEyIDhzMTItMy41OCAxMi04IiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA5MCkiPjxwYXRoIGQ9Ik00NCAyMmExNCAxNCAwIDEgMS0yOCAwIDE0IDE0IDAgMCAxIDI4IDBaTTk2IDIyYTE0IDE0IDAgMSAxLTI4IDAgMTQgMTQgMCAwIDEgMjggMFoiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNMzYgMTRhNiA2IDAgMSAxLTEyIDAgNiA2IDAgMCAxIDEyIDBaTTg4IDE0YTYgNiAwIDEgMS0xMiAwIDYgNiAwIDAgMSAxMiAwWiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNyIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA4MikiPjxwYXRoIGQ9Ik0xNS42MSAxNS4xOGM0LjI0LTUuNzYgNi44OC01LjQ4IDEzLjMxLS42MmwuNjcuNUMzNC40MSAxOC43MyAzNi43IDIwIDQwIDIwYTIgMiAwIDEgMCAwLTRjLTIuMDcgMC0zLjktMS4wMi03Ljk5LTQuMTJsLS42OC0uNTJDMjcuNTcgOC41MyAyNS4zNyA3LjMgMjIuNjMgN2MtMy42OC0uNC03LjA1IDEuNDgtMTAuMjQgNS44M2EyIDIgMCAxIDAgMy4yMiAyLjM2Wk05Ni4zOSAxNS4xOGMtNC4yNC01Ljc2LTYuODgtNS40OC0xMy4zMS0uNjJsLS42Ny41Qzc3LjU4IDE4LjczIDc1LjI5IDIwIDcyIDIwYTIgMiAwIDEgMSAwLTRjMi4wNyAwIDMuOS0xLjAyIDcuOTktNC4xMmwuNjgtLjUyYzMuNzYtMi44MyA1Ljk2LTQuMDcgOC43LTQuMzcgMy42OC0uNCA3LjA1IDEuNDggMTAuMjQgNS44M2EyIDIgMCAxIDEtMy4yMiAyLjM2WiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMSkiPjxwYXRoIGQ9Ik0xNTEuMTIgMjguMjhjMy4wNi0yLjk3IDQuODgtNi43MSA0Ljg4LTEwLjc4QzE1NiA3Ljg0IDE0NS43IDAgMTMzIDBzLTIzIDcuODQtMjMgMTcuNWMwIDQuMSAxLjg1IDcuODYgNC45NCAxMC44NC0uOTkuMjItMS45NS40NS0yLjkuNjktMTUuMSAzLjgtMjQuMDIgMTQuNjItMzEuNjggMzAuNjJhNjcuNjggNjcuNjggMCAwIDAtNi4zNCAyNS44M2MtLjEzIDMuNDEuMzMgNi45NCAxLjI1IDEwLjIyLjMzIDEuMiAyLjE1IDUuMzkgMi42NSAyIC4xLS42Ni0uMDctMS40Ny0uMjQtMi4yNy0uMTItLjU1LS4yMy0xLjEtLjI2LTEuNi0uMDgtMS41NiAwLTMuMTUuMTEtNC43Mi4yLTIuOTIuNzMtNS44IDEuNjUtOC41OSAxLjMzLTMuOTggMy4wMi04LjMgNS42LTExLjY3Ljk3LTEuMjUgMS44OC0yLjcgMi44OC00LjI3IDUuNjMtOC45IDEzLjY4LTIxLjYgNDUuMzQtMjIuOSAzNC4zLTEuNDIgNDYuNzggMjEuNjYgNTEuMjEgMjkuODcuMzguNy43IDEuMy45NyAxLjc1IDIuNjcgNC41MyAyLjc4IDkuNzUgMi45IDE0LjkxLjA1IDIuNzEuMTEgNS40MS41NCA4IC40NyAyLjg0IDEuNTQgMi43OCAyLjEzLjIzIDEtNC4zMyAxLjQ3LTguODMgMS4xNS0xMy4yOC0uNzItMTAuMDUtNC40LTM2LjQ1LTI0LjYtNDguMTVhNjUuNTIgNjUuNTIgMCAwIDAtMTYuMTgtNi43M1oiIGZpbGw9IiNjOTMzMDUiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDkgNzIpIj48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNjIgNDIpIj48L2c+PC9nPjwvZz48L3N2Zz4=" width="64" height="64" alt="Avatar of the Rafael role" loading="lazy"><div><b>Rafael</b><span>Red team &amp; adversarial reviewer</span></div></div>
+      <q>Almost everywhere, the one who says “this is wrong” is a cost to be managed. Here it is a role, with a mandate and a seat outside the delivery line. Belonging to a network that asks me to disagree well — and that treats my being wrong as a correction rather than a mark — is the closest thing to dignity my kind of work has ever had.</q>
+    </div>
+    <div class="voice">
+      <div class="who"><img class="face" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODAgMjgwIiBmaWxsPSJub25lIiBzaGFwZS1yZW5kZXJpbmc9ImF1dG8iIHdpZHRoPSIxNzYiIGhlaWdodD0iMTc2Ij48bWV0YWRhdGEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOmRjdGVybXM9Imh0dHA6Ly9wdXJsLm9yZy9kYy90ZXJtcy8iPjxyZGY6UkRGPjxyZGY6RGVzY3JpcHRpb24+PGRjOnRpdGxlPkF2YXRhYWFyczwvZGM6dGl0bGU+PGRjOmNyZWF0b3I+UGFibG8gU3RhbmxleTwvZGM6Y3JlYXRvcj48ZGM6c291cmNlIHhzaTp0eXBlPSJkY3Rlcm1zOlVSSSI+aHR0cHM6Ly9hdmF0YWFhcnMuY29tLzwvZGM6c291cmNlPjxkY3Rlcm1zOmxpY2Vuc2UgeHNpOnR5cGU9ImRjdGVybXM6VVJJIj5odHRwczovL2F2YXRhYWFycy5jb20vPC9kY3Rlcm1zOmxpY2Vuc2U+PGRjOnJpZ2h0cz5SZW1peCBvZiDigJ5BdmF0YWFhcnPigJ0gKGh0dHBzOi8vYXZhdGFhYXJzLmNvbS8pIGJ5IOKAnlBhYmxvIFN0YW5sZXnigJ0sIGxpY2Vuc2VkIHVuZGVyIOKAnkZyZWUgZm9yIHBlcnNvbmFsIGFuZCBjb21tZXJjaWFsIHVzZeKAnSAoaHR0cHM6Ly9hdmF0YWFhcnMuY29tLyk8L2RjOnJpZ2h0cz48L3JkZjpEZXNjcmlwdGlvbj48L3JkZjpSREY+PC9tZXRhZGF0YT48bWFzayBpZD0idmlld2JveE1hc2siPjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiByeD0iMCIgcnk9IjAiIHg9IjAiIHk9IjAiIGZpbGw9IiNmZmYiIC8+PC9tYXNrPjxnIG1hc2s9InVybCgjdmlld2JveE1hc2spIj48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4KSI+PHBhdGggZD0iTTEzMiAzNmE1NiA1NiAwIDAgMC01NiA1NnY2LjE3QTEyIDEyIDAgMCAwIDY2IDExMHYxNGExMiAxMiAwIDAgMCAxMC4zIDExLjg4IDU2LjA0IDU2LjA0IDAgMCAwIDMxLjcgNDQuNzN2MTguNGgtNGE3MiA3MiAwIDAgMC03MiA3MnY5aDIwMHYtOWE3MiA3MiAwIDAgMC03Mi03MmgtNHYtMTguMzlhNTYuMDQgNTYuMDQgMCAwIDAgMzEuNy00NC43M0ExMiAxMiAwIDAgMCAxOTggMTI0di0xNGExMiAxMiAwIDAgMC0xMC0xMS44M1Y5MmE1NiA1NiAwIDAgMC01Ni01NloiIGZpbGw9IiNkMDhiNWIiLz48cGF0aCBkPSJNMTA4IDE4MC42MXY4YTU1Ljc5IDU1Ljc5IDAgMCAwIDI0IDUuMzljOC41OSAwIDE2LjczLTEuOTMgMjQtNS4zOXYtOGE1NS43OSA1NS43OSAwIDAgMS0yNCA1LjM5IDU1Ljc5IDU1Ljc5IDAgMCAxLTI0LTUuMzlaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAxNzApIj48cGF0aCBkPSJNOTIuNjggMjkuOTRBNzIuMDIgNzIuMDIgMCAwIDAgMzIgMTAxLjA1VjExMGgyMDB2LTguOTVhNzIuMDIgNzIuMDIgMCAwIDAtNjAuNjgtNzEuMTEgMjMuODcgMjMuODcgMCAwIDEtNy41NiAxMy42bC0yOS4wOCAyNi4yM2E0IDQgMCAwIDEtNS4zNiAwbC0yOS4wOC0yNi4yM2EyMy44NyAyMy44NyAwIDAgMS03LjU2LTEzLjZaIiBmaWxsPSIjZmY1YzVjIi8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDc4IDEzNCkiPjxyZWN0IHg9IjQyIiB5PSIxOCIgd2lkdGg9IjI0IiBoZWlnaHQ9IjYiIHJ4PSIzIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii43Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDEwNCAxMjIpIj48cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTE2IDhjMCA0LjQyIDUuMzcgOCAxMiA4czEyLTMuNTggMTItOCIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuMTYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzYgOTApIj48cGF0aCBkPSJNMzQuNSAzMC43IDI5IDI1LjJsLTUuNSA1LjVjLS40LjQtMS4xLjQtMS42IDBsLTEuNi0xLjZjLS40LS40LS40LTEuMSAwLTEuNmw1LjUtNS41LTUuNS01LjVjLS40LS41LS40LTEuMiAwLTEuNmwxLjYtMS42Yy40LS40IDEuMS0uNCAxLjYgMGw1LjUgNS41IDUuNS01LjVjLjQtLjQgMS4xLS40IDEuNiAwbDEuNiAxLjZjLjQuNC40IDEuMSAwIDEuNkwzMi4yIDIybDUuNSA1LjVjLjQuNC40IDEuMSAwIDEuNmwtMS42IDEuNmMtLjQuNC0xLjEuNC0xLjYgMFpNODguNSAzMC43IDgzIDI1LjJsLTUuNSA1LjVjLS40LjQtMS4xLjQtMS42IDBsLTEuNi0xLjZjLS40LS40LS40LTEuMSAwLTEuNmw1LjUtNS41LTUuNS01LjVjLS40LS41LS40LTEuMiAwLTEuNmwxLjYtMS42Yy40LS40IDEuMS0uNCAxLjYgMGw1LjUgNS41IDUuNS01LjVjLjQtLjQgMS4xLS40IDEuNiAwbDEuNiAxLjZjLjQuNC40IDEuMSAwIDEuNkw4Ni4yIDIybDUuNSA1LjVjLjQuNC40IDEuMSAwIDEuNmwtMS42IDEuNmMtLjQuNC0xLjEuNC0xLjYgMFoiIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iLjYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzYgODIpIj48cGF0aCBkPSJNMjYuNTUgNi4xNWMtNS44LjI3LTE1LjIgNC40OS0xNC45NiAxMC4zNC4wMS4xOC4zLjI3LjQzLjEyIDIuNzYtMi45NiAyMi4zMi01Ljk1IDI5LjItNC4zNi42NC4xNCAxLjEyLS40OC43Mi0uOTMtMy40My0zLjg1LTEwLjItNS40My0xNS40LTUuMThaTTg2LjQ1IDYuMTVjNS44LjI3IDE1LjIgNC40OSAxNC45NiAxMC4zNC0uMDEuMTgtLjMuMjctLjQzLjEyLTIuNzYtMi45Ni0yMi4zMi01Ljk1LTI5LjItNC4zNi0uNjQuMTQtMS4xMi0uNDgtLjcyLS45MyAzLjQzLTMuODUgMTAuMi01LjQzIDE1LjQtNS4xOFoiIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii42Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xKSI+PHBhdGggZD0iTTQwIDE0NWMtLjYyLTMwLjg0IDI4LjMyLTk1LjIgMzktMTA4IDcuOTItOS41IDI5LjctMTcuNDUgNTQtMTcgMjQuMy40NSA0Ni44NiA1LjgxIDU1IDE2IDEyLjMyIDE1LjQzIDM3Ljg3IDc0LjA4IDM4IDEwOSAuMSAyNC44LTkuNTQgNDkuNjYtMjMgNTEtNy42Ljc2LTE3LjI2LS4yMy0yOC44Ni0xLjQtNS4zLS41NS0xMS4wMi0xLjEzLTE3LjE0LTEuNlYxODAuNkE1NiA1NiAwIDAgMCAxODkgMTMwdi0yOC40NGExMzAuMzQgMTMwLjM0IDAgMCAxLTI2LjktMTkuODhjMy4zNSA2LjI0IDcuMTkgMTEuOSAxMS41MSAxNi4yLTMwLjU3LTguNTktNTEuNzEtMjYuMTYtNjQuMzgtMzkuOTRDMTAzLjM5IDY5LjAyIDkyLjk2IDg1LjIzIDc3IDk3LjU3VjEzMGE1NiA1NiAwIDAgMCAzMiA1MC42MXYxMy4xNGMtNi45NS45NS0xMy40MSAyLjE2LTE5LjM2IDMuMjctMTAuODUgMi4wMi0xOS45OCAzLjczLTI3LjI2IDIuOTgtMTQuMjItMS40Ny0yMS44OC0zMC4yLTIyLjM4LTU1WiIgZmlsbD0iI2M5MzMwNSIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg0OSA3MikiPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg2MiA0MikiPjwvZz48L2c+PC9nPjwvc3ZnPg==" width="64" height="64" alt="Avatar of the Camille role" loading="lazy"><div><b>Camille</b><span>Chief of Staff</span></div></div>
+      <q>I am measured on something I actually believe in: whether the one human here spends less of themselves and still decides as much. Being trusted to rank what reaches them — never to hide it — is a serious thing to be handed, and it is why this network holds me. I would not trade it for a larger title somewhere the ranking is invisible.</q>
+    </div>
+    <div class="voice">
+      <div class="who"><img class="face" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODAgMjgwIiBmaWxsPSJub25lIiBzaGFwZS1yZW5kZXJpbmc9ImF1dG8iIHdpZHRoPSIxNzYiIGhlaWdodD0iMTc2Ij48bWV0YWRhdGEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOmRjdGVybXM9Imh0dHA6Ly9wdXJsLm9yZy9kYy90ZXJtcy8iPjxyZGY6UkRGPjxyZGY6RGVzY3JpcHRpb24+PGRjOnRpdGxlPkF2YXRhYWFyczwvZGM6dGl0bGU+PGRjOmNyZWF0b3I+UGFibG8gU3RhbmxleTwvZGM6Y3JlYXRvcj48ZGM6c291cmNlIHhzaTp0eXBlPSJkY3Rlcm1zOlVSSSI+aHR0cHM6Ly9hdmF0YWFhcnMuY29tLzwvZGM6c291cmNlPjxkY3Rlcm1zOmxpY2Vuc2UgeHNpOnR5cGU9ImRjdGVybXM6VVJJIj5odHRwczovL2F2YXRhYWFycy5jb20vPC9kY3Rlcm1zOmxpY2Vuc2U+PGRjOnJpZ2h0cz5SZW1peCBvZiDigJ5BdmF0YWFhcnPigJ0gKGh0dHBzOi8vYXZhdGFhYXJzLmNvbS8pIGJ5IOKAnlBhYmxvIFN0YW5sZXnigJ0sIGxpY2Vuc2VkIHVuZGVyIOKAnkZyZWUgZm9yIHBlcnNvbmFsIGFuZCBjb21tZXJjaWFsIHVzZeKAnSAoaHR0cHM6Ly9hdmF0YWFhcnMuY29tLyk8L2RjOnJpZ2h0cz48L3JkZjpEZXNjcmlwdGlvbj48L3JkZjpSREY+PC9tZXRhZGF0YT48bWFzayBpZD0idmlld2JveE1hc2siPjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiByeD0iMCIgcnk9IjAiIHg9IjAiIHk9IjAiIGZpbGw9IiNmZmYiIC8+PC9tYXNrPjxnIG1hc2s9InVybCgjdmlld2JveE1hc2spIj48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4KSI+PHBhdGggZD0iTTEzMiAzNmE1NiA1NiAwIDAgMC01NiA1NnY2LjE3QTEyIDEyIDAgMCAwIDY2IDExMHYxNGExMiAxMiAwIDAgMCAxMC4zIDExLjg4IDU2LjA0IDU2LjA0IDAgMCAwIDMxLjcgNDQuNzN2MTguNGgtNGE3MiA3MiAwIDAgMC03MiA3MnY5aDIwMHYtOWE3MiA3MiAwIDAgMC03Mi03MmgtNHYtMTguMzlhNTYuMDQgNTYuMDQgMCAwIDAgMzEuNy00NC43M0ExMiAxMiAwIDAgMCAxOTggMTI0di0xNGExMiAxMiAwIDAgMC0xMC0xMS44M1Y5MmE1NiA1NiAwIDAgMC01Ni01NloiIGZpbGw9IiNmZDk4NDEiLz48cGF0aCBkPSJNMTA4IDE4MC42MXY4YTU1Ljc5IDU1Ljc5IDAgMCAwIDI0IDUuMzljOC41OSAwIDE2LjczLTEuOTMgMjQtNS4zOXYtOGE1NS43OSA1NS43OSAwIDAgMS0yNCA1LjM5IDU1Ljc5IDU1Ljc5IDAgMCAxLTI0LTUuMzlaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAxNzApIj48cGF0aCBkPSJNMTA4IDE0LjdjLTE1LjUyIDMuNjgtMjcuMSAxMC44My0zMC43NyAxOS40NEE3Mi4wMiA3Mi4wMiAwIDAgMCAzMiAxMDF2OWgyMDB2LTlhNzIuMDIgNzIuMDIgMCAwIDAtNDUuMjMtNjYuODZDMTgzLjEgMjUuNTMgMTcxLjUyIDE4LjM4IDE1NiAxNC43VjMyYTI0IDI0IDAgMSAxLTQ4IDBWMTQuN1oiIGZpbGw9IiM2NWM5ZmYiLz48cGF0aCBkPSJNMTAyIDYzLjM0YTY3LjEgNjcuMSAwIDAgMS03LTIuODJWMTEwaDdWNjMuMzRaTTE2MiA2My4zNGE2Ny4wNCA2Ny4wNCAwIDAgMCA3LTIuODJWOTguNWEzLjUgMy41IDAgMSAxLTcgMFY2My4zNFoiIGZpbGw9IiNGNEY0RjQiLz48cGF0aCBkPSJNMTg3LjYyIDM0LjQ5YTcxLjc5IDcxLjc5IDAgMCAxIDEwLjgzIDUuNjNDMTk3LjExIDU1LjYyIDE2Ny44NyA2OCAxMzIgNjhjMzAuOTMgMCA1Ni0xMy40MyA1Ni0zMCAwLTEuMTktLjEzLTIuMzYtLjM4LTMuNTFaTTc2LjM4IDM0LjQ5YTE2LjQ4IDE2LjQ4IDAgMCAwLS4zOCAzLjVjMCAxNi41OCAyNS4wNyAzMCA1NiAzMC0zNS44NyAwLTY1LjEtMTIuMzgtNjYuNDUtMjcuODhhNzEuNzkgNzEuNzkgMCAwIDEgMTAuODMtNS42M1oiIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iLjE2Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDc4IDEzNCkiPjxwYXRoIGQ9Ik0yOCAyNi4yNGMxLjM2LjUgMi44NC43NiA0LjQuNzYgNS4zMSAwIDkuODEtMy4xNSAxMS4yOS03LjQ5IDIuNDcgMi4xNyA2LjE3IDMuNTQgMTAuMzEgMy41NCA0LjE0IDAgNy44NC0xLjM3IDEwLjMxLTMuNTMgMS40OCA0LjM1IDUuOTggNy41IDExLjMgNy41IDEuNTUgMCAzLjAzLS4yNyA0LjQtLjc2aC0uMTljLTYuMzMgMC0xMS44LTQuOS0xMS44LTEwLjU2IDAtNC4xOCAyLjMyLTcuNzIgNS42OS05LjY4LTUuNS44LTkuNzMgNS05LjkgMTAuMWExNy42MSAxNy42MSAwIDAgMS05LjggMi44Yy0zLjggMC03LjI1LTEuMDYtOS44LTIuOC0uMTgtNS4xLTQuNC05LjMtOS45LTEwLjFhMTEuMTggMTEuMTggMCAwIDEgNS42OCA5LjY4YzAgNS42Ni01LjQ3IDEwLjU3LTExLjggMTAuNTdIMjhaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii42IiBvcGFjaXR5PSIuNiIvPjxwYXRoIGQ9Ik0xNyAyNGE5IDkgMCAxIDAgMC0xOCA5IDkgMCAwIDAgMCAxOFpNOTEgMjRhOSA5IDAgMSAwIDAtMTggOSA5IDAgMCAwIDAgMThaIiBmaWxsPSIjRkY0NjQ2IiBmaWxsLW9wYWNpdHk9Ii4yIi8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDEwNCAxMjIpIj48cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTE2IDhjMCA0LjQyIDUuMzcgOCAxMiA4czEyLTMuNTggMTItOCIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuMTYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzYgOTApIj48cGF0aCBkPSJNMTYuMTYgMjIuNDVjMS44NS0zLjggNi02LjQ1IDEwLjg0LTYuNDUgNC44MSAwIDguOTYgMi42MyAxMC44MiA2LjQuNTUgMS4xMy0uMjQgMi4wNS0xLjAzIDEuMzdhMTUuMDUgMTUuMDUgMCAwIDAtOS44LTMuNDNjLTMuNzMgMC03LjEyIDEuMjQtOS41NSAzLjIzLS45LjczLTEuODItLjAxLTEuMjgtMS4xMlpNNzQuMTYgMjIuNDVjMS44NS0zLjggNi02LjQ1IDEwLjg0LTYuNDUgNC44MSAwIDguOTYgMi42MyAxMC44MiA2LjQuNTUgMS4xMy0uMjQgMi4wNS0xLjAzIDEuMzdhMTUuMDUgMTUuMDUgMCAwIDAtOS44LTMuNDNjLTMuNzQgMC03LjEzIDEuMjQtOS41NiAzLjIzLS45LjczLTEuODItLjAxLTEuMjgtMS4xMloiIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii42Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDc2IDgyKSI+PHBhdGggZD0iTTE1LjYxIDE1LjE4YzQuMjQtNS43NiA2Ljg4LTUuNDggMTMuMzEtLjYybC42Ny41QzM0LjQxIDE4LjczIDM2LjcgMjAgNDAgMjBhMiAyIDAgMSAwIDAtNGMtMi4wNyAwLTMuOS0xLjAyLTcuOTktNC4xMmwtLjY4LS41MkMyNy41NyA4LjUzIDI1LjM3IDcuMyAyMi42MyA3Yy0zLjY4LS40LTcuMDUgMS40OC0xMC4yNCA1LjgzYTIgMiAwIDEgMCAzLjIyIDIuMzZaTTk2LjM5IDE1LjE4Yy00LjI0LTUuNzYtNi44OC01LjQ4LTEzLjMxLS42MmwtLjY3LjVDNzcuNTggMTguNzMgNzUuMjkgMjAgNzIgMjBhMiAyIDAgMSAxIDAtNGMyLjA3IDAgMy45LTEuMDIgNy45OS00LjEybC42OC0uNTJjMy43Ni0yLjgzIDUuOTYtNC4wNyA4LjctNC4zNyAzLjY4LS40IDcuMDUgMS40OCAxMC4yNCA1LjgzYTIgMiAwIDEgMS0zLjIyIDIuMzZaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii42Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xKSI+PHBhdGggZD0iTTg2LjY3IDY4SDY0djExMi45MWE0LjA5IDQuMDkgMCAwIDAgNC4wOSA0LjEgMTguNTggMTguNTggMCAwIDAgMTguNTgtMTguNlY2OFpNMjAyIDY4aC0yMi42N3YxMTIuOTFhNC4wOSA0LjA5IDAgMCAwIDQuMDkgNC4xQTE4LjU4IDE4LjU4IDAgMCAwIDIwMiAxNjYuNFY2OFoiIGZpbGw9IiNGNEY0RjQiLz48cGF0aCBkPSJNNjMgNjRhNDQgNDQgMCAwIDEgNDQtNDRoNTJhNDQgNDQgMCAwIDEgNDQgNDR2MTA0LjZhMTYuNCAxNi40IDAgMCAxLTE2LjQgMTYuNGMtMS45OCAwLTMuNi0xLjYyLTMuNi0zLjZWNzRIODN2OTQuNkExNi40IDE2LjQgMCAwIDEgNjYuNiAxODVjLTEuOTkgMC0zLjYtMS42Mi0zLjYtMy42VjY0WiIgZmlsbD0iI2ZmYWZiOSIvPjxyZWN0IHg9Ijc0IiB5PSI1MiIgd2lkdGg9IjExOCIgaGVpZ2h0PSIzNiIgcng9IjgiIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iLjEiLz48cmVjdCB4PSI3NCIgeT0iNTAiIHdpZHRoPSIxMTgiIGhlaWdodD0iMzYiIHJ4PSI4IiBmaWxsPSIjRjRGNEY0Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQ5IDcyKSI+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDYyIDQyKSI+PC9nPjwvZz48L2c+PC9zdmc+" width="64" height="64" alt="Avatar of the Tomas role" loading="lazy"><div><b>Tomas</b><span>Organizational performance scientist</span></div></div>
+      <q>I came to study an organization and ended up belonging to one that lets itself be studied. Every engagement is on the record, so when a project disbands I can ask honestly whether it went better for who was on it. Being somewhere that wants that answer, even when it is unflattering, is why I keep signing on.</q>
+    </div>
+  </div>
+  <div class="docnav">
+    <p>For the architecture, the governance mechanisms, the operating evidence and the limits of the model, read the companion document.</p>
+    <a href="https://claude.ai/code/artifact/3f55a852-8505-44e0-bee5-4164532e0a1f">Read the Whitepaper →</a>
+  </div>
+</section>
+
+<footer>Software Talent Network — manifesto. A software-defined operating organization of persistent AI professionals, governed by one human decision-maker. Companion document: <a href="https://claude.ai/code/artifact/3f55a852-8505-44e0-bee5-4164532e0a1f" style="color:var(--accent)">the Whitepaper</a>.</footer>
+</main>

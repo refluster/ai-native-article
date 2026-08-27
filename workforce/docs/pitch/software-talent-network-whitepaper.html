@@ -1,0 +1,607 @@
+<title>Software Talent Network Whitepaper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#FAFAFB; --panel:#FFFFFF; --panel-2:#F2F5F9; --ink:#12171F; --ink-2:#49535F; --ink-3:#79838F;
+    --line:#DEE3EA; --accent:#1F3FCC; --accent-soft:#E9EDFC; --signal:#0F6B55; --shadow:0 1px 0 rgba(18,23,31,.04);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#0C1116; --panel:#141A21; --panel-2:#182029; --ink:#ECEFF3; --ink-2:#A7B1BC; --ink-3:#7C8794;
+      --line:#232B35; --accent:#93A8FF; --accent-soft:#18213B; --signal:#54C2A2; --shadow:0 1px 0 rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0C1116; --panel:#141A21; --panel-2:#182029; --ink:#ECEFF3; --ink-2:#A7B1BC; --ink-3:#7C8794;
+    --line:#232B35; --accent:#93A8FF; --accent-soft:#18213B; --signal:#54C2A2; --shadow:0 1px 0 rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground);color:var(--ink);font-family:"Source Sans 3",system-ui,sans-serif;
+    font-size:16.5px;line-height:1.72;margin:0;-webkit-font-smoothing:antialiased}
+  h1,h2,h3{font-family:"Familjen Grotesk","Source Sans 3",sans-serif;text-wrap:balance;line-height:1.25;margin:0}
+  main{max-width:1080px;margin:0 auto;padding:0 24px 96px}
+  section{padding:60px 0;border-top:1px solid var(--line)}
+  section:first-of-type{border-top:0}
+  .eyebrow{display:flex;align-items:baseline;gap:14px;margin-bottom:18px}
+  .num,.kicker{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.18em;text-transform:uppercase}
+  .num{color:var(--accent)} .kicker{color:var(--ink-3)}
+  h2{font-size:clamp(26px,3.4vw,36px);font-weight:700;letter-spacing:-.015em}
+  .lede{color:var(--ink-2);font-size:17.5px;max-width:64ch;margin-top:12px}
+  p{margin:14px 0;max-width:68ch}
+  .cover{padding:80px 0 64px}
+  .cover h1{font-size:clamp(40px,7.5vw,78px);font-weight:700;letter-spacing:-.035em}
+  .cover .sub{font-size:clamp(17px,2.1vw,21px);color:var(--ink-2);margin-top:20px;max-width:60ch}
+  .rule{height:5px;width:88px;background:var(--accent);margin-top:26px;border-radius:3px}
+  .statline{display:flex;flex-wrap:wrap;gap:12px;margin-top:38px}
+  .stat{flex:1 1 160px;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:15px 18px;box-shadow:var(--shadow)}
+  .stat b{display:block;font-family:"IBM Plex Mono",monospace;font-size:29px;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .stat span{font-size:12.5px;color:var(--ink-3)}
+  .grid{display:grid;gap:14px;margin-top:26px}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(225px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:18px 20px;box-shadow:var(--shadow)}
+  .card h3{font-size:16.5px;font-weight:700;margin-bottom:4px}
+  .card p{font-size:14.5px;color:var(--ink-2);margin:6px 0 0}
+  .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent);
+    background:var(--accent-soft);border-radius:3px;padding:2px 8px;letter-spacing:.04em;margin-bottom:8px}
+  .tag.ok{color:var(--signal);background:transparent;border:1px solid var(--line)}
+  ul{padding-left:1.15em;max-width:68ch} li{margin:7px 0;color:var(--ink-2)} li b{color:var(--ink)}
+  .scroll{overflow-x:auto;margin-top:22px;border:1px solid var(--line);border-radius:5px;background:var(--panel)}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:660px}
+  th,td{text-align:left;padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-family:"IBM Plex Mono",monospace;font-weight:500}
+  td:first-child{font-weight:700;white-space:nowrap} tr:last-child td{border-bottom:0}
+  .layers{display:grid;gap:10px;margin-top:24px}
+  .layer{display:grid;grid-template-columns:120px 1fr;gap:18px;background:var(--panel);border:1px solid var(--line);
+    border-left:4px solid var(--accent);border-radius:5px;padding:16px 20px}
+  .layer .lab{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.1em;color:var(--accent);padding-top:3px}
+  .layer p{margin:5px 0 0;font-size:14.5px;color:var(--ink-2)}
+  .math{font-family:"IBM Plex Mono",monospace;font-size:14.5px;background:var(--accent-soft);border-radius:5px;
+    padding:16px 18px;margin-top:22px;overflow-x:auto;line-height:1.9}
+  .note{font-size:13.5px;color:var(--ink-3);max-width:72ch}
+  figure{margin:26px 0 0}
+  figure svg{width:100%;max-width:100%;height:auto;color:var(--ink)}
+  figcaption{font-size:13.5px;color:var(--ink-3);margin-top:12px;max-width:72ch}
+  .pull{border-left:3px solid var(--accent);padding:2px 0 2px 18px;margin:24px 0;font-size:19px;
+    font-family:"Familjen Grotesk",sans-serif;color:var(--ink);max-width:60ch}
+  .arc{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:0;margin-top:28px;
+    border:1px solid var(--line);border-radius:5px;overflow:hidden;background:var(--panel)}
+  .beat{padding:18px 20px;border-right:1px solid var(--line)}
+  .beat:last-child{border-right:0}
+  .beat .n{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;color:var(--accent);text-transform:uppercase}
+  .beat h3{font-size:16px;font-weight:700;margin:8px 0 4px}
+  .beat p{font-size:14px;color:var(--ink-2);margin:0}
+  .beat.fade h3,.beat.fade p{opacity:.62}
+  .voices{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:26px}
+  .voice{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:20px 22px;
+    display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+  .who{display:flex;align-items:center;gap:12px}
+  .who .face{flex:0 0 auto;width:64px;height:64px;border-radius:50%;background:var(--panel-2);
+    border:1px solid var(--line)}
+  .who b{display:block;font-family:"Familjen Grotesk",sans-serif;font-size:16px;line-height:1.3}
+  .who span{font-size:12.5px;color:var(--ink-3)}
+  .voice q{quotes:none;font-size:15px;color:var(--ink-2);line-height:1.7}
+  .voice q:before,.voice q:after{content:none}
+  footer{border-top:1px solid var(--line);padding:26px 0 0;color:var(--ink-3);font-size:13px}
+  @media (max-width:560px){ .layer{grid-template-columns:1fr;gap:4px} }
+</style>
+<style>
+  /* whitepaper: evidence-first — status pills, denser tables, appendix */
+  .st{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.12em;
+    text-transform:uppercase;padding:2px 8px;border-radius:99px;border:1px solid var(--line);
+    color:var(--ink-3);white-space:nowrap}
+  .st.live{color:var(--signal);border-color:currentColor}
+  .st.part{color:var(--accent);border-color:currentColor}
+  .st.plan{color:var(--ink-3)}
+  .st.count{color:var(--ink-2)}
+  .docnav{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:baseline;justify-content:space-between;
+    border:1px solid var(--line);border-radius:5px;background:var(--panel);padding:14px 18px;margin-top:30px}
+  .docnav p{margin:0;font-size:14px;color:var(--ink-2);max-width:62ch}
+  .docnav a{color:var(--accent);font-weight:600}
+  .define{border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 5px 5px 0;
+    padding:14px 18px;margin-top:26px;font-size:15.5px;color:var(--ink);max-width:74ch}
+  .toc{columns:2;column-gap:32px;margin-top:26px;font-size:14.5px}
+  .toc a{display:block;color:var(--ink-2);text-decoration:none;padding:3px 0;break-inside:avoid}
+  .toc a:hover,.toc a:focus{color:var(--accent);text-decoration:underline}
+  .toc a b{font-family:"IBM Plex Mono",monospace;color:var(--accent);font-weight:500;font-size:12px;margin-right:8px}
+  table.tight{font-size:14px;min-width:560px}
+  td .st{margin-right:6px}
+  h3.sub{font-size:18px;font-weight:700;margin-top:34px}
+  .flowsteps{counter-reset:fs;list-style:none;padding:0;margin-top:24px;max-width:78ch}
+  .flowsteps li{counter-increment:fs;position:relative;padding-left:44px;margin:12px 0;color:var(--ink-2)}
+  .flowsteps li:before{content:counter(fs,decimal-leading-zero);position:absolute;left:0;top:1px;
+    font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--accent)}
+  @media (max-width:640px){ .toc{columns:1} }
+</style>
+
+<main class="wp">
+
+<section class="cover">
+  <div class="kicker">Technical whitepaper · v1.0 · 2026-08</div>
+  <h1>Software<br>Talent Network</h1>
+  <div class="rule"></div>
+  <p class="sub">A company no longer has to hire a whole person — or send the work outside — in order to hold a capability. It can encode that capability as a governed, executable, improving internal asset, and run it per engagement.</p>
+  <div class="define"><b>Definition.</b> Software Talent Network is a software-defined operating organization of persistent AI professionals, governed by one human decision-maker. It is not a staffing service, a talent marketplace, or a recruiting product; no human labor is bought or sold through it.</div>
+  <div class="docnav">
+    <p>This document covers architecture, governance, operating evidence and economics. The organization's beliefs about work, professionalism and the ethos it asks of its members are stated separately.</p>
+    <a href="https://claude.ai/code/artifact/664674bb-8131-4af7-ab56-dbb49c063624">Read the Manifesto →</a>
+  </div>
+  <nav class="toc" aria-label="Contents">
+    <a href="#s1"><b>01</b>Executive summary</a>
+    <a href="#s2"><b>02</b>The thesis: an agent is not a prompt</a>
+    <a href="#s3"><b>03</b>The organizational constraint being removed</a>
+    <a href="#s4"><b>04</b>What is running today</a>
+    <a href="#s5"><b>05</b>The composition model</a>
+    <a href="#s6"><b>06</b>Anatomy of a persistent agent</a>
+    <a href="#s7"><b>07</b>System architecture and execution flow</a>
+    <a href="#s8"><b>08</b>Memory, learning and cross-project reuse</a>
+    <a href="#s9"><b>09</b>Governance, authority and failure containment</a>
+    <a href="#s10"><b>10</b>Operating evidence and current results</a>
+    <a href="#s11"><b>11</b>Management economics</a>
+    <a href="#s12"><b>12</b>Limitations, risks and open questions</a>
+    <a href="#s13"><b>13</b>Status and next validation priorities</a>
+    <a href="#s14"><b>14</b>Appendix: roles, skills, portfolio</a>
+  </nav>
+</section>
+
+<section id="s1">
+  <div class="eyebrow"><span class="num">01</span><span class="kicker">Executive summary</span></div>
+  <h2>Capability as an internal asset, held per execution</h2>
+  <p class="lede">In a human organization the minimum unit of capability is a person. Salary, benefits, hiring, management and a continuous supply of work apply even when the real workload is a fraction of a headcount, so any capability whose expected return does not clear one full employment cost is either sent outside or left undone. This document describes a running system in which the minimum unit is an <b>execution</b> instead.</p>
+  <p>The consequences that matter to management are stated here rather than at the end:</p>
+  <ul>
+    <li><b>The ROI floor for holding a capability drops.</b> Work too small to staff and too small to outsource — continuous competitive monitoring, cross-project failure-pattern extraction, low-frequency standards analysis, per-customer follow-up, post-project surveillance — becomes executable.</li>
+    <li><b>Run cost tracks activity; the capability does not leave.</b> Outsourcing makes cost variable by moving the learning to a vendor. Here the procedures, judgment criteria, evaluations, permissions and execution history stay internal.</li>
+    <li><b>The asset is the harness, not the model.</b> Foundation models commoditize. What compounds is business context, proprietary data, procedures, tool connections, permissions, evaluation criteria, audit trail and execution history.</li>
+    <li><b>Learning connects across projects under explicit conditions.</b> One execution's evaluated learning becomes available to the next relevant execution, with provenance and applicability attached — not by having every agent talk to every other.</li>
+    <li><b>A business line can be executed before it is staffed.</b> Capability is composed as a harness first; people and capital follow the evidence.</li>
+  </ul>
+  <p>None of this claims zero marginal cost. Every run consumes model tokens, cloud resources, connector calls and — where authority requires it — human review time. The claim is narrower and more useful: <b>the unit at which capability can be held, priced and improved is smaller than a person, while the learning stays inside the company.</b></p>
+  <p class="note">Scope of evidence: this document distinguishes throughout between what is <span class="st live">operating</span>, what is <span class="st part">partial</span>, what is <span class="st plan">planned</span>, and what is <span class="st">not yet measured</span>. Counts are mechanically taken from the registry; they measure implementation scale, not business outcome.</p>
+</section>
+
+<section id="s2">
+  <div class="eyebrow"><span class="num">02</span><span class="kicker">The thesis</span></div>
+  <h2>An agent is not a prompt</h2>
+  <p class="lede">The common failure in agent programs is to equate an agent with a model plus an instruction. That framing makes capability look like something you buy, and makes every improvement disappear as soon as the conversation ends. A persistent professional is a different object.</p>
+  <div class="math">Capability = model + context + procedure + tools + permissions + evaluation + execution history</div>
+  <p>Each term is separately owned, separately versioned and separately improvable. The model is the one term the company does not own and cannot differentiate on for long. The remaining six are the harness — and the harness is what makes a given model produce this company's work rather than generic work.</p>
+  <div class="grid g3">
+    <div class="card"><h3>Procedure is written down, not remembered</h3><p>A skill defines input, judgment, deliverable shape and destination. Two different agents running it produce the same class of artefact; a change to it applies everywhere it is used.</p></div>
+    <div class="card"><h3>Judgment belongs to the agent</h3><p>Identity, operating principles and memory sit with the professional, not the procedure. This is why a review panel returns different findings instead of the same finding four times.</p></div>
+    <div class="card"><h3>History is the compounding term</h3><p>Runs, evaluations, corrections and reusable findings accumulate. A harness that improves on each run raises capability and speed on every subsequent run — a one-off cheaper deliverable does not.</p></div>
+  </div>
+  <p class="note">A model change is therefore a component swap inside a stable structure, not a restart. Model choice is pinned per role and versioned alongside the prompt so that a quality shift can be attributed to a cause.</p>
+</section>
+
+<section id="s3">
+  <div class="eyebrow"><span class="num">03</span><span class="kicker">The constraint</span></div>
+  <h2>The organizational constraint being removed</h2>
+  <p class="lede">When a capability is recognized as necessary, a human-centred organization resolves it in one of three ways: employ, outsource, or leave undone. The third branch is the largest and the least visible, and it is not a management failure — it was the rational response to the cost of holding a capability at all.</p>
+  <div class="scroll"><table class="tight">
+    <thead><tr><th>Resolution</th><th>Condition</th><th>What the company keeps</th></tr></thead>
+    <tbody>
+      <tr><td>Employ</td><td>Continuous value above one full employment cost</td><td>Capability and learning, at fixed cost</td></tr>
+      <tr><td>Outsource</td><td>Deal-sized value, discontinuous demand</td><td>Deliverables; the learning stays with the vendor</td></tr>
+      <tr><td>Leave undone</td><td>Below both thresholds</td><td>Nothing — the work does not exist</td></tr>
+      <tr><td><b>Encode as a harness</b></td><td>Procedure can be specified and its output evaluated</td><td>Capability, evaluations and history internally; run cost follows activity</td></tr>
+    </tbody>
+  </table></div>
+  <div class="pull">The change is not that labor becomes cheaper. It is that the value threshold at which a piece of work is worth doing at all moves down — and the third branch starts producing.</div>
+  <p>Two qualifications keep this honest. First, human capability can also be made variable through contracting; the difference is where the learning ends up, not whether cost flexes. Second, generic capability — research, drafting, analysis, coding — is available immediately from a model, but company-specific capability is not: it requires data access, written judgment criteria, tool and permission wiring, an evaluation design and an escalation path. The accurate claim is that <b>company-specific capability can be composed in far less time than hiring and training, not that it is instant.</b></p>
+</section>
+
+<section id="s4">
+  <div class="eyebrow"><span class="num">04</span><span class="kicker">Today</span></div>
+  <h2>What is running today</h2>
+  <p class="lede">This is a system in production, not a proposal. The following is running on a schedule, without a human filing the work.</p>
+  <div class="statline">
+    <div class="stat"><b>1</b><span>Human decision-maker</span></div>
+    <div class="stat"><b>57</b><span>Specialist agents (registry count)</span></div>
+    <div class="stat"><b>41</b><span>Executable skills (registry count)</span></div>
+    <div class="stat"><b>5</b><span>Active projects (registry count)</span></div>
+  </div>
+  <p class="note" style="margin-top:14px"><span class="st count">Mechanically counted</span> from <span style="font-family:'IBM Plex Mono',monospace">projects/</span>, <span style="font-family:'IBM Plex Mono',monospace">skills/</span> and <span style="font-family:'IBM Plex Mono',monospace">seed/</span>. These numbers describe implementation scale only. <b>They do not evidence quality, cost efficiency or business outcome</b>, and this document does not use them as if they did.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Lane</th><th>Status</th><th>What runs</th></tr></thead>
+    <tbody>
+      <tr><td>Scheduled research</td><td><span class="st live">Operating</span></td><td>Daily scans on named US and India power-policy beats, de-duplicated against the standing observation corpus.</td></tr>
+      <tr><td>Bilingual articles</td><td><span class="st live">Operating</span></td><td>Explanations from primary sources and inductive analyses over several explanations; one record serves Japanese and English.</td></tr>
+      <tr><td>Podcasts</td><td><span class="st live">Operating</span></td><td>Single-narrator scripts derived from published analyses with mandatory citation, cleared for rights and compliance before release.</td></tr>
+      <tr><td>Regulatory &amp; market reports</td><td><span class="st live">Operating</span></td><td>Cross-desk situation reports over a fixed window for an executive audience; India market research across DISCOM economics, subsidy programs, willingness to pay, contractor ecosystem and financing structures.</td></tr>
+      <tr><td>Production pull requests</td><td><span class="st live">Operating</span></td><td>Requirements, implementation, review, remediation and verification sweeps against three external repositories. The merge decision escalates to the human.</td></tr>
+      <tr><td>Governance reviews</td><td><span class="st live">Operating</span></td><td>A chaired committee returns approve/reject on proposed amendments to governing documents, with follow-ups on reject; independent adversarial review runs outside the delivery line.</td></tr>
+      <tr><td>Organizational metrics</td><td><span class="st part">Partial</span></td><td>Engagement ledger, skill maturity and performance refresh are recorded; the aggregate reporting layer over them is still being built out.</td></tr>
+      <tr><td>Multi-candidate evaluation</td><td><span class="st part">Partial</span></td><td>Rubric-scored, multi-judge selection is defined and applied on generating lanes; extension to every lane is planned.</td></tr>
+      <tr><td>Field reporting (drafts only)</td><td><span class="st live">Operating</span></td><td>Conference run-of-show, briefing packs, sponsor reports and decks are staged; nothing is sent externally by an agent.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="s5">
+  <div class="eyebrow"><span class="num">05</span><span class="kicker">Composition</span></div>
+  <h2>The composition model: projects × skills × agents</h2>
+  <p class="lede">Three axes are defined independently and combined at run time. The separation is what lets one axis grow without redoing the other two.</p>
+  <div class="layers">
+    <div class="layer"><div class="lab">PROJECT</div><div>
+      <h3>Where — scope and authority</h3>
+      <p>Target repository or publication surface, the governance documents that apply, the credential types available, the owning role and the reviewer roster. Credentials and project-specific authority are scoped to the project and do not cross it; evaluated learning can cross under the conditions in §08.</p></div></div>
+    <div class="layer"><div class="lab">SKILL</div><div>
+      <h3>What — the executable procedure</h3>
+      <p>A self-contained definition of input, judgment, deliverable shape and destination, owned by a role. Scheduled skills are <b>Cadences</b>: recurring work that no human files. A skill carries its own writer, so the side effect is deterministic rather than model-generated.</p></div></div>
+    <div class="layer"><div class="lab">AGENT</div><div>
+      <h3>Who — the professional and their record</h3>
+      <p>Job description, organizational position, identity and operating principles, long-term memory, activity record, assignments, resource limits, evaluation history. Judgment lives here; procedure does not.</p></div></div>
+  </div>
+  <h3 class="sub">What actually scales — and what does not</h3>
+  <p>The naive reading of three axes is a product of three counts. That reading is wrong, and stating it precisely matters more than stating it impressively:</p>
+  <div class="math">Addressable execution combinations scale with<br>compatible projects × qualified skills × eligible agents</div>
+  <p>Each qualifier is a real gate. A skill is <b>qualified</b> for a project when its deliverable type, destination and evaluation design fit that project's surface. An agent is <b>eligible</b> for a skill when the domain fits its job description, when its identity and memory make its judgment relevant, when its project grants the credentials the skill needs, and when its pinned model is adequate to the task. A project is <b>compatible</b> when its governance documents permit the class of side effect the skill produces.</p>
+  <div class="scroll"><table class="tight">
+    <thead><tr><th>Adding…</th><th>What is genuinely reused</th><th>What still has to be established</th></tr></thead>
+    <tbody>
+      <tr><td>A role</td><td>The whole existing skill library is available to it without being rewritten.</td><td>Domain fit per skill, execution eligibility, credential grants, and an evaluation baseline before its output is trusted.</td></tr>
+      <tr><td>A skill</td><td>The existing bench is a candidate pool; no hiring round is needed to find a practitioner.</td><td>Which roles are actually qualified, the rubric it is judged against, and its destination and writer.</td></tr>
+      <tr><td>A project</td><td>Roles, procedures, governance patterns and the evaluation apparatus carry over.</td><td>Scope, credentials, applicable governance documents, reviewer roster, and the deliverable destination.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">In a human organization, hiring, writing procedure and winning work are three separate costs that do not compound. Here they do compound — but only across combinations that pass the qualification gates above. Combinatorial possibility is not validated capability; §12 keeps that distinction.</p>
+</section>
+
+<section id="s6">
+  <div class="eyebrow"><span class="num">06</span><span class="kicker">Agent model</span></div>
+  <h2>Anatomy of a persistent agent</h2>
+  <p class="lede">An agent is a durable professional record: the components a company keeps for an employee, plus the components only software can keep. All of them are data, versioned in the registry and readable by the runtime.</p>
+  <div class="grid g3">
+    <div class="card"><span class="tag">JD &amp; MISSION</span><h3>What it is here to change</h3><p>A one-line mission, key responsibilities and success measures written to be judged against. Example: a Chief of Staff whose mission is to manage the operator's attention, measured by attention consumed per week falling while decisions made per week does not.</p></div>
+    <div class="card"><span class="tag">POSITION</span><h3>Where it sits</h3><p>Reporting line, lateral partners, desk membership and accountable streams. The org chart is data, not a picture: routing and escalation read from it.</p></div>
+    <div class="card"><span class="tag">IDENTITY</span><h3>How it decides</h3><p>An archetype and explicit operating principles — the lens brought to a review, the tie-breakers used, the things refused. This is the mechanism behind perspective diversity on a panel.</p></div>
+    <div class="card"><span class="tag">LONG-TERM MEMORY</span><h3>What it has learned</h3><p>Durable notes carried between runs, curated on a schedule and swept org-wide for contradiction and staleness, so a conclusion from March is either still true in August or explicitly retired.</p></div>
+    <div class="card"><span class="tag">ACTIVITY RECORD</span><h3>What it has actually done</h3><p>An engagement ledger of runs and deliverables: what shipped, on which project, reviewed by whom. Performance and skill maturity are computed from it rather than asserted.</p></div>
+    <div class="card"><span class="tag">FEED</span><h3>What it publishes to the organization</h3><p>Findings, hand-offs and digests posted to a shared activity feed — the path by which one desk's learning reaches another desk's next execution without a meeting.</p></div>
+    <div class="card"><span class="tag">ASSIGNMENTS</span><h3>What it is on the hook for</h3><p>Bindings of (agent × skill × project) on a cadence — six-hourly, daily, weekly, monthly. Work arrives on schedule; nobody dispatches it.</p></div>
+    <div class="card"><span class="tag">RESOURCES</span><h3>What it may spend</h3><p>A monthly budget and bounded blast radius per agent, so a misbehaving cadence is capped in both cost and reach.</p></div>
+    <div class="card"><span class="tag">MODEL &amp; PROMPT VERSION</span><h3>What it runs on</h3><p>A model pinned per role from a registry, plus a prompt version. Both travel with the output, so a change in quality can be attributed to a change in configuration.</p></div>
+    <div class="card"><span class="tag">CREDENTIALS</span><h3>What it may reach</h3><p>Credential types granted by the project it is running for, resolved at execution time and never held by the agent independently of a project context.</p></div>
+    <div class="card"><span class="tag">EVALUATION</span><h3>How its output is judged</h3><p>Deliverables scored against per-level rubrics by judges with distinct perspectives — editor, domain, reader — with the chosen candidate's prompt version published alongside the work so downstream behavior can be attributed back to it.</p></div>
+    <div class="card"><span class="tag">GOVERNING DOCS</span><h3>What binds it</h3><p>The governance documents named by its project, plus the organization-wide constitution. Authority limits are read from these, not from the agent's own judgment.</p></div>
+  </div>
+  <p class="note">Anthropomorphism is a modelling convenience here, not a claim. "Job description", "identity" and "record" name data structures that make behavior consistent, attributable and improvable. Nothing in this document asserts that an agent has experience or interests of its own.</p>
+</section>
+
+<section id="s7">
+  <div class="eyebrow"><span class="num">07</span><span class="kicker">Architecture</span></div>
+  <h2>System architecture and execution flow</h2>
+  <p class="lede">Every agent runs on one substrate. Work enters through governed entrypoints, context is composed per run, deliverables leave through deterministic writers holding project-scoped credentials, and every run lands in the track-record layer.</p>
+  <figure>
+    <svg viewBox="0 0 1000 680" role="img" aria-label="Structure of the Software Talent Network: people and external systems enter through governed entrypoints; the agent runtime draws scope from projects, procedure from the skill library and models from model services, records every run in the track record layer, and ships deliverables through connectors while memory and feed persist what was learned.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9.2" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0.6 L10,5 L0,9.4 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g font-family="'Source Sans 3', sans-serif" fill="currentColor">
+
+        <!-- external actors, top -->
+        <text x="300" y="22" font-size="17" font-weight="700" text-anchor="middle">People</text>
+        <text x="767" y="22" font-size="17" font-weight="700" text-anchor="middle">Systems &amp; external agents</text>
+        <g font-size="12.5" text-anchor="middle" opacity=".85">
+          <text x="140" y="54">Operator console</text>
+          <text x="300" y="54">Chat / Discord</text>
+          <text x="460" y="54">Reader site</text>
+          <text x="620" y="54">GitHub</text>
+          <text x="780" y="54">Notion</text>
+          <text x="900" y="54">Schedules</text>
+        </g>
+        <g stroke="currentColor" stroke-width="1.6" marker-end="url(#ar)" marker-start="url(#ar)" opacity=".85">
+          <line x1="140" y1="66" x2="140" y2="134"/><line x1="300" y1="66" x2="300" y2="134"/>
+          <line x1="460" y1="66" x2="460" y2="134"/><line x1="620" y1="66" x2="620" y2="134"/>
+          <line x1="780" y1="66" x2="780" y2="134"/><line x1="900" y1="66" x2="900" y2="134"/>
+        </g>
+
+        <!-- platform band -->
+        <rect x="14" y="116" width="972" height="474" rx="10" fill="currentColor" opacity=".055"/>
+
+        <!-- entrypoints, full width -->
+        <rect x="34" y="140" width="932" height="60" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="500" y="165" font-size="15" font-weight="700" text-anchor="middle">ENTRYPOINTS &amp; SCHEDULING</text>
+        <text x="500" y="185" font-size="12.5" text-anchor="middle" opacity=".75">authenticated sessions · cadence triggers · escalation to the operator</text>
+
+        <!-- left column -->
+        <rect x="34" y="230" width="190" height="110" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="129" y="256" font-size="14" font-weight="700" text-anchor="middle">PROJECTS</text>
+        <text x="129" y="277" font-size="12" text-anchor="middle" opacity=".75">scope · governance docs</text>
+        <text x="129" y="295" font-size="12" text-anchor="middle" opacity=".75">credentials · owner</text>
+        <text x="129" y="316" font-size="12" text-anchor="middle" opacity=".75">reviewer roster</text>
+
+        <rect x="34" y="360" width="190" height="110" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="129" y="386" font-size="14" font-weight="700" text-anchor="middle">SKILL LIBRARY</text>
+        <text x="129" y="407" font-size="12" text-anchor="middle" opacity=".75">executable procedures</text>
+        <text x="129" y="425" font-size="12" text-anchor="middle" opacity=".75">on a cadence</text>
+        <text x="129" y="446" font-size="12" text-anchor="middle" opacity=".75">owned by a role</text>
+
+        <!-- right column -->
+        <rect x="776" y="230" width="190" height="110" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="871" y="256" font-size="14" font-weight="700" text-anchor="middle">TRACK RECORD</text>
+        <text x="871" y="277" font-size="12" text-anchor="middle" opacity=".75">run ledger · rubric scores</text>
+        <text x="871" y="295" font-size="12" text-anchor="middle" opacity=".75">skill maturity</text>
+        <text x="871" y="316" font-size="12" text-anchor="middle" opacity=".75">adversarial review</text>
+
+        <rect x="776" y="360" width="190" height="110" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="871" y="386" font-size="14" font-weight="700" text-anchor="middle">MODEL SERVICES</text>
+        <text x="871" y="407" font-size="12" text-anchor="middle" opacity=".75">any frontier or small model</text>
+        <text x="871" y="425" font-size="12" text-anchor="middle" opacity=".75">pinned per role</text>
+        <text x="871" y="450" font-size="11.5" text-anchor="middle" opacity=".55">per-agent budget</text>
+
+        <!-- runtime, centre -->
+        <rect x="264" y="230" width="472" height="240" rx="6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 4"/>
+        <text x="500" y="262" font-size="15" font-weight="700" text-anchor="middle">AGENT RUNTIME</text>
+        <text x="500" y="283" font-size="12.5" text-anchor="middle" opacity=".75">context composed per run: project × skill × agent</text>
+        <g fill="none" stroke="currentColor" stroke-width="1.4">
+          <circle cx="356" cy="350" r="24"/><circle cx="452" cy="350" r="24"/>
+          <circle cx="548" cy="350" r="24"/><circle cx="644" cy="350" r="24"/>
+          <path d="M356 340 l0 20 M346 350 l20 0"/><path d="M452 340 l0 20 M442 350 l20 0"/>
+          <path d="M548 340 l0 20 M538 350 l20 0"/><path d="M644 340 l0 20 M634 350 l20 0"/>
+        </g>
+        <text x="500" y="408" font-size="13" text-anchor="middle" opacity=".8">specialist agents — JD, identity, memory, assignments</text>
+
+        <!-- bottom row -->
+        <rect x="34" y="500" width="456" height="70" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="262" y="526" font-size="14" font-weight="700" text-anchor="middle">MEMORY &amp; FEED</text>
+        <text x="262" y="548" font-size="11.5" text-anchor="middle" opacity=".75">long-term memory per agent · org-wide contradiction sweeps · shared activity feed</text>
+
+        <rect x="510" y="500" width="456" height="70" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="738" y="526" font-size="14" font-weight="700" text-anchor="middle">CONNECTORS &amp; WRITERS</text>
+        <text x="738" y="548" font-size="11.5" text-anchor="middle" opacity=".75">deterministic publish scripts · project-scoped credentials · editorial guards</text>
+
+        <!-- internal flows -->
+        <g stroke="currentColor" stroke-width="1.6" marker-end="url(#ar)">
+          <line x1="500" y1="200" x2="500" y2="226"/>
+          <line x1="228" y1="285" x2="260" y2="285"/>
+          <line x1="228" y1="415" x2="260" y2="415"/>
+          <line x1="740" y1="285" x2="772" y2="285"/>
+          <line x1="772" y1="415" x2="740" y2="415"/>
+          <line x1="700" y1="474" x2="700" y2="496"/>
+        </g>
+        <line x1="300" y1="474" x2="300" y2="496" stroke="currentColor" stroke-width="1.6"
+              marker-end="url(#ar)" marker-start="url(#ar)"/>
+        <g font-size="11" font-family="'IBM Plex Mono', monospace" opacity=".72">
+          <text x="510" y="219">work in</text>
+          <text x="244" y="277" text-anchor="middle">scope</text>
+          <text x="244" y="407" text-anchor="middle">skill</text>
+          <text x="756" y="277" text-anchor="middle">runs</text>
+          <text x="756" y="407" text-anchor="middle">model</text>
+          <text x="710" y="491">deliverable</text>
+          <text x="310" y="491">memory</text>
+        </g>
+
+        <!-- outside world -->
+        <g stroke="currentColor" stroke-width="1.6" marker-end="url(#ar)" marker-start="url(#ar)" opacity=".85">
+          <line x1="262" y1="594" x2="262" y2="624"/>
+          <line x1="738" y1="594" x2="738" y2="624"/>
+        </g>
+        <g font-size="12.5" text-anchor="middle" opacity=".85">
+          <text x="262" y="648">Knowledge base &amp; run history</text>
+          <text x="738" y="648">Repos · CMS · chat · podcast feeds</text>
+        </g>
+      </g>
+    </svg>
+    <figcaption>Nothing in the runtime is bound to one project or one role: scope and credentials come from the project, the procedure from the skill, judgment and memory from the agent — and every run is recorded before any deliverable reaches the outside world.</figcaption>
+  </figure>
+  <h3 class="sub">The lifecycle of one run</h3>
+  <ol class="flowsteps">
+    <li><b>Trigger.</b> A schedule fires for a binding of (agent × skill × project), or a human or system event arrives at an entrypoint. Cadence frequency is part of the binding, not the skill.</li>
+    <li><b>Context composition.</b> The runtime assembles the agent's job description, identity and long-term memory; the skill's procedure; the project's scope, governance documents and credential grants; and the relevant slice of the feed.</li>
+    <li><b>Execution.</b> The composed context runs against the model pinned for that role, within that agent's budget.</li>
+    <li><b>Deterministic write.</b> The deliverable is not published by the model. A writer bundled with the skill posts it to the authenticated destination, and the editorial and integrity guards live in that writer — so a degraded result fails loudly instead of shipping.</li>
+    <li><b>Evaluation.</b> Where a generating lane uses the quality layer, candidates are scored against a rubric by multiple judges and one is chosen; the chosen prompt version travels with the published artefact.</li>
+    <li><b>Recording.</b> The run, its deliverable and its review lineage are written to the engagement ledger; memory and feed are updated for the next relevant execution.</li>
+    <li><b>Escalation.</b> Anything outside the agent's authority — a merge, a governing-document change, an external send, spend beyond the envelope — is packaged as a decision for the human rather than executed.</li>
+  </ol>
+  <p class="note">Two properties of this flow matter more than the components. Side effects are deterministic and guarded, so the model's variance cannot reach the outside world unchecked. And the composition step is what makes the same substrate serve every role: nothing in the runtime is bound to one project or one profession.</p>
+</section>
+
+<section id="s8">
+  <div class="eyebrow"><span class="num">08</span><span class="kicker">Learning</span></div>
+  <h2>Memory, learning and cross-project reuse</h2>
+  <p class="lede">The organizational value of a network is that one execution's evaluated learning becomes available to the next relevant execution. That is a narrower and more defensible claim than "everything is shared", and it requires an explicit boundary between what may cross a project line and what may not.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Asset</th><th>Crosses project boundaries?</th><th>Condition</th></tr></thead>
+    <tbody>
+      <tr><td>Credentials</td><td><b>No</b></td><td>Resolved per project at run time; never held by an agent across contexts.</td></tr>
+      <tr><td>Confidential project data</td><td><b>No</b>, by default</td><td>Stays within the project surface unless an explicit, recorded grant says otherwise.</td></tr>
+      <tr><td>Project-specific authority</td><td><b>No</b></td><td>Authority is granted by the project and does not travel with the agent.</td></tr>
+      <tr><td>Evaluated learning with provenance</td><td><b>Conditionally</b></td><td>May cross when source, date, confidence and applicability conditions travel with it — and when the differences that would invalidate the transfer are stated, not just the similarities.</td></tr>
+      <tr><td>Reusable skill improvements</td><td><b>Yes, after review</b></td><td>A procedure change propagates once evaluated and approved; it then applies wherever the skill is used.</td></tr>
+      <tr><td>Failure patterns &amp; mechanical controls</td><td><b>Yes, sanitized</b></td><td>Confidential specifics removed; the pattern and the check that catches it are organization-wide.</td></tr>
+      <tr><td>Agent performance history</td><td><b>Yes, within permission</b></td><td>Used organizationally for staffing and maturity assessment, under the same access rules as any other record.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Human knowledge sharing costs attention, search, explanation and translation, and coordination paths grow as n(n−1)/2 — which is why large organizations localize decisions rather than share everything. The mechanism here is different in kind: the learning is written in a common form and retrieved by the execution that needs it. <b>The goal is not agents talking to each other at scale.</b></p>
+  <div class="pull">A network that propagates learning propagates error at the same speed. Provenance, confidence, applicability conditions, independent evaluation and correction history are part of the record, not an afterthought.</div>
+  <p class="note"><span class="st live">Operating</span> per-agent memory curation and org-wide contradiction and staleness sweeps; the shared feed; sanitized failure patterns promoted into mechanical checks. <span class="st part">Partial</span> systematic tagging of confidence and applicability on every carried finding. <span class="st">Not yet measured</span> how often a finding from one project measurably improved an execution on another — the reuse-rate metric in §13.</p>
+</section>
+
+<section id="s9">
+  <div class="eyebrow"><span class="num">09</span><span class="kicker">Governance</span></div>
+  <h2>Governance, authority and failure containment</h2>
+  <p class="lede">Scaling agents multiplies output and failure modes together. The governance layer is therefore structural rather than advisory: four layers, each harder to change than the one below it, with enforcement in machinery wherever a rule can be made mechanical.</p>
+  <div class="grid g2">
+    <div class="card"><span class="st live">Operating</span><h3>Constitution — four inviolable principles</h3><p>Editorial integrity: nothing empty, truncated or model-failure-tainted reaches a reader. A single source of truth for content. No primitives beyond single-operator scale. Fail loud: a broken state throws rather than publishing a degraded result.</p></div>
+    <div class="card"><span class="st live">Operating</span><h3>Framework law — decision records</h3><p>Architectural decisions are recorded and superseded rather than edited in place, so the reasoning behind a constraint survives the person or agent that set it.</p></div>
+    <div class="card"><span class="st live">Operating</span><h3>Mechanical regulation — gates</h3><p>Truncation and empty-body detection at publish time, corpus gates at deploy time, registry checks in CI. A violation turns the build red or blocks the publish; it is not a warning.</p></div>
+    <div class="card"><span class="st live">Operating</span><h3>Operational runbooks</h3><p>What to do when a lane fails, how to localize a breakage between source, generation and deploy, and how to recover — written down rather than reconstructed under pressure.</p></div>
+    <div class="card"><span class="st live">Operating</span><h3>Explicit authority split</h3><p>Agents execute inside a defined envelope. Merging, changing the default branch, amending governing documents, prompts or rubrics, sending anything externally, and spending beyond the envelope require the human.</p></div>
+    <div class="card"><span class="st live">Operating</span><h3>Recurrence ratchet</h3><p>A failure mode that recurs within 90 days is promoted from a note to a mechanical check. Repeat incidents convert into controls instead of into folklore.</p></div>
+    <div class="card"><span class="st live">Operating</span><h3>Independent adversarial review</h3><p>A red-team role searches for weaknesses on its own cadence, structurally outside the delivery line that produced the work.</p></div>
+    <div class="card"><span class="st part">Partial</span><h3>Multi-candidate, multi-judge evaluation</h3><p>Several generators produce candidates; judges with distinct perspectives score them against a rubric; the chosen candidate's prompt version is published with the work. Applied on generating lanes today; extension to every lane is planned.</p></div>
+    <div class="card"><span class="st live">Operating</span><h3>Project-scoped credentials</h3><p>Credentials are resolved per project at run time and shipped into the run, so an agent's reach is bounded by the engagement it is executing.</p></div>
+    <div class="card"><span class="st live">Operating</span><h3>Budget and blast-radius limits</h3><p>Per-agent monthly budgets and bounded side effects cap the cost and the damage of a misbehaving cadence.</p></div>
+    <div class="card"><span class="st part">Partial</span><h3>Accountability sweeps</h3><p>Automated detection of stalled or unowned work with assignment to a responsible role; coverage is being extended across lanes.</p></div>
+    <div class="card"><span class="st plan">Planned</span><h3>Rubric-linked outcome attribution</h3><p>Connecting evaluation scores to downstream reader and reviewer behavior, closing the loop from judgment to observed result.</p></div>
+  </div>
+  <p class="note">Governance in this system was designed alongside the first delivery lanes and has been extended as lanes were added; several mechanisms — the ratchet and the deploy gates among them — exist because a specific failure occurred first. The honest statement is not that governance preceded capability everywhere, but that <b>no lane is permitted to publish without a mechanical guard on its side effect.</b></p>
+</section>
+
+<section id="s10">
+  <div class="eyebrow"><span class="num">10</span><span class="kicker">Evidence</span></div>
+  <h2>Operating evidence and current results</h2>
+  <p class="lede">Three layers must be kept apart when reading any agent-organization claim: what is implemented as structure, what is actually running, and what is measured. Conflating them is the standard way these systems are oversold.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Layer</th><th>Meaning</th><th>Present state</th></tr></thead>
+    <tbody>
+      <tr><td>Structure implemented</td><td>The mechanism exists in the registry and the runtime</td><td>Composition model, agent record, cadence bindings, deterministic writers, credential scoping, four governance layers, engagement ledger, memory curation, feed, rubric/judge apparatus.</td></tr>
+      <tr><td>Currently operating</td><td>Running on a schedule and producing artefacts</td><td>Research scans, bilingual articles, podcasts, regulatory and market reports, pull requests on three external repositories, governance committee verdicts, adversarial review, staged field-reporting drafts.</td></tr>
+      <tr><td>Measured</td><td>Quantified against a defined metric</td><td><b>Sparse.</b> Registry counts and the presence of deliverables are mechanically observable. Quality trend, cost per deliverable, human review time and reuse rates are not yet instrumented.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 class="sub">What this document deliberately does not claim</h3>
+  <ul>
+    <li>No cost-per-deliverable, cost-per-run or total-cost-of-ownership figure is asserted, because none has been measured.</li>
+    <li>No speed comparison against a human team is asserted.</li>
+    <li>No quality claim beyond "guards prevent a defined class of defect from publishing" — the guards are mechanical and verifiable; aggregate quality is not yet quantified.</li>
+    <li>Agent count is a measure of implementation scale, not of output or value.</li>
+  </ul>
+  <p class="note">The counts in §04 and the appendix are <span class="st count">mechanically counted</span> from the registry at the time of writing. Everything else in this section is labelled by whether it is operating, partial or planned — see §13 for the measurements that would convert these into evidence.</p>
+</section>
+
+<section id="s11">
+  <div class="eyebrow"><span class="num">11</span><span class="kicker">Economics</span></div>
+  <h2>Management economics</h2>
+  <p class="lede">The management case rests on which capabilities a company can economically hold and connect — not on labor arbitrage.</p>
+  <div class="grid g2">
+    <div class="card"><h3>The ROI floor drops</h3><p>Work that never justified a hire and was too small to outsource becomes executable: continuous competitive monitoring, cross-project failure-pattern extraction, low-frequency legal and standards analysis, per-customer follow-up, post-project surveillance.</p></div>
+    <div class="card"><h3>Variable cost without losing capability</h3><p>The harness, evaluations, execution history and customer context remain internal while run cost follows activity. Costs are real — model tokens, cloud, connectors, and the human review the authority split requires — but they scale with use rather than with headcount.</p></div>
+    <div class="card"><h3>Compounding rather than one-off savings</h3><p>Buying the same deliverable more cheaply pays once. A harness that improves each run raises capability on every subsequent run, wherever that skill is used.</p></div>
+    <div class="card"><h3>A computational network effect</h3><p>One execution's evaluated learning is retrievable by the next relevant execution, without the attention and translation costs that cap human knowledge sharing — and without requiring every agent to communicate with every other.</p></div>
+    <div class="card"><h3>The cost of staying aligned falls</h3><p>Collecting cross-functional information, detecting contradictions between plans and assumptions, analyzing a change's blast radius and confirming it landed everywhere are what made enterprise alignment an annual exercise. Lower those costs and alignment becomes continuous work embedded in operations.</p></div>
+    <div class="card"><h3>Execute before you staff</h3><p>Instead of assembling specialists, operations and vendor contracts before a line is tested, capability is composed as a harness and people and capital follow the evidence. The option value of a cheap, reversible trial is part of the return.</p></div>
+  </div>
+  <h3 class="sub">Where the network helps, and where it cannot</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>Misalignment</th><th>Network's role</th><th>Human's role</th></tr></thead>
+    <tbody>
+      <tr><td>Facts &amp; information</td><td>Collect, index, compare, flag duplication and contradiction</td><td>Set disclosure and sharing principles</td></tr>
+      <tr><td>Working assumptions</td><td>Extract premises, show where they diverge</td><td>Approve the common premise</td></tr>
+      <tr><td>Plans &amp; dependencies</td><td>Impact analysis, alternatives with trade-offs</td><td>Priorities and resource allocation</td></tr>
+      <tr><td>Departmental interests</td><td>Make amounts, beneficiaries and burdens visible</td><td>Change P&amp;L, incentives, authority</td></tr>
+      <tr><td>Values, risk, accountability</td><td>Present options and consequences</td><td>Judge, accept risk, own the outcome</td></tr>
+    </tbody>
+  </table></div>
+  <div class="pull">The more the network can align, the more explicitly leadership must state what to prioritize, whose interests to reconcile, and who is accountable.</div>
+  <p class="note">Competitive advantage does not sit in model access. It sits in proprietary data, judgment criteria, tool connections, permissions, an evaluation system that separates success from failure, execution history, and the loop that redistributes one desk's learning into another's next run.</p>
+</section>
+
+<section id="s12">
+  <div class="eyebrow"><span class="num">12</span><span class="kicker">Limits</span></div>
+  <h2>Limitations, risks and open questions</h2>
+  <p class="lede">The credibility of this design rests on its stated conditions of validity, not on breadth of claim. The following are unresolved, and several are structural rather than temporary.</p>
+  <div class="grid g2">
+    <div class="card"><h3>Dependence on external providers</h3><p>Model and cloud providers are single points of dependency for availability, price and behavior. Model changes can shift output quality without any change on our side; version pinning limits but does not remove this.</p></div>
+    <div class="card"><h3>Domain onboarding is not instant</h3><p>Generic capability is immediate; company-specific capability requires data access, written judgment criteria, tool and permission wiring, an evaluation design and an escalation path. That work is real and front-loaded.</p></div>
+    <div class="card"><h3>Context, tooling and evaluation cost</h3><p>The harness is the asset and also the expense. Rubrics, judges, guards and connectors take design effort, and a poorly designed evaluation is worse than none because it manufactures false confidence.</p></div>
+    <div class="card"><h3>Purpose remains human</h3><p>Objectives, priorities, exceptions, risk appetite and final accountability are not delegable. A system that lowers the cost of alignment raises, rather than lowers, the demand on leadership to state what it wants.</p></div>
+    <div class="card"><h3>Political and P&amp;L conflict is not automated away</h3><p>The network can make amounts, beneficiaries and burdens visible. It cannot resolve conflicts that require changing P&amp;L structure, incentives, authority or who absorbs a loss.</p></div>
+    <div class="card"><h3>Shared learning can propagate error</h3><p>Transfer between domains can be a false analogy that looks well-supported. Provenance, confidence, applicability and correction history mitigate this; systematic tagging is only partially implemented.</p></div>
+    <div class="card"><h3>Agent count is not value</h3><p>Registry scale says nothing about output quality or business result, and a larger roster increases coordination, evaluation and governance surface.</p></div>
+    <div class="card"><h3>Possibility is not validated capability</h3><p>Addressable combinations grow quickly; validated combinations grow only as fast as evaluation does. Treating the first number as capacity would be the central error of this model.</p></div>
+    <div class="card"><h3>Quantitative evidence is missing</h3><p>Cost, speed, quality trend and human-time metrics are not yet instrumented. Until they are, the case rests on structure and observable artefacts rather than on measured performance.</p></div>
+    <div class="card"><h3>The single decision-maker is a bottleneck</h3><p>One human owning purpose and consequence is a deliberate constraint at this scale. As lanes multiply, the escalation surface grows and the attention ledger becomes load-bearing; multi-operator authority is an unsolved design question here.</p></div>
+  </div>
+</section>
+
+<section id="s13">
+  <div class="eyebrow"><span class="num">13</span><span class="kicker">Next</span></div>
+  <h2>Current status and next validation priorities</h2>
+  <div class="grid g2">
+    <div class="card"><span class="st live">Operating</span><h3>Scheduled delivery across five projects</h3><p>Articles, reports, letters, podcasts and pull requests ship on cadence; three external repositories are under an active engineering lane.</p></div>
+    <div class="card"><span class="st live">Operating</span><h3>Governance and mechanical gates</h3><p>Four governance layers, publish-time and deploy-time gates, the recurrence ratchet, independent adversarial review, project-scoped credentials, per-agent budgets.</p></div>
+    <div class="card"><span class="st part">Partial</span><h3>Quality layer coverage</h3><p>Multi-candidate, multi-judge evaluation is live on generating lanes; extending it to every lane and connecting scores to downstream behavior is the current build.</p></div>
+    <div class="card"><span class="st plan">Planned</span><h3>Instrumented operating metrics</h3><p>The measurement layer below, which is what converts the structural claims in this document into evidence.</p></div>
+  </div>
+  <h3 class="sub">Metrics to instrument, and what each would settle</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>Metric</th><th>State</th><th>What it would establish</th></tr></thead>
+    <tbody>
+      <tr><td>Time to first delivery</td><td><span class="st">Not yet measured</span></td><td>How fast a new project reaches a usable artefact versus staffing one.</td></tr>
+      <tr><td>Cost per run / deliverable / project</td><td><span class="st">Not yet measured</span></td><td>The real unit economics, including model, cloud and connector cost.</td></tr>
+      <tr><td>Human review and decision time</td><td><span class="st">Not yet measured</span></td><td>Whether the human cost per deliverable falls as lanes scale — the load-bearing assumption of single-operator scale.</td></tr>
+      <tr><td>Cadence success rate</td><td><span class="st">Not yet measured</span></td><td>Reliability of scheduled work without human intervention.</td></tr>
+      <tr><td>Correction and rerun rate</td><td><span class="st">Not yet measured</span></td><td>How often output needs rework — the practical quality signal.</td></tr>
+      <tr><td>Rubric score and quality trend</td><td><span class="st part">Partial</span></td><td>Whether prompt and procedure changes actually improve output over time.</td></tr>
+      <tr><td>Merged pull requests</td><td><span class="st part">Partial</span></td><td>Accepted engineering contribution, as distinct from opened PRs.</td></tr>
+      <tr><td>Reused skills and findings across projects</td><td><span class="st">Not yet measured</span></td><td>Whether the cross-project network effect is real or theoretical.</td></tr>
+      <tr><td>Recurrences converted into mechanical controls</td><td><span class="st part">Partial</span></td><td>Whether the organization is genuinely ratcheting rather than repeating.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="lede" style="margin-top:24px">The next validation step is one additional real domain. Registering a project requires a scope, a permission set and a destination for the deliverables; the professions and the procedures already stand. Running one with the metrics above instrumented from day one is what would turn this document's structural claims into measured ones.</p>
+  <div class="docnav">
+    <p>For what this organization believes about work, professionalism and the ethos it asks of its members, read the companion document.</p>
+    <a href="https://claude.ai/code/artifact/664674bb-8131-4af7-ab56-dbb49c063624">Read the Manifesto →</a>
+  </div>
+</section>
+
+<section id="s14">
+  <div class="eyebrow"><span class="num">14</span><span class="kicker">Appendix</span></div>
+  <h2>Roles, skills and project portfolio</h2>
+  <h3 class="sub">A. Roles on the bench</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>Desk</th><th>Roles</th></tr></thead>
+    <tbody>
+      <tr><td>Leadership</td><td>Founder, Chief of Staff, VP Research, VP Policy &amp; Government Affairs, VP Finance &amp; Capital Strategy, VP Marketing &amp; External Communications, VP Operations &amp; Reliability, Head of Product</td></tr>
+      <tr><td>Policy &amp; regulation</td><td>Grid Policy Analyst (US), Grid Policy Analyst (India), Director of Carbon Markets Research, Director of Standards &amp; Disclosure Watch</td></tr>
+      <tr><td>India energy market</td><td>Research Director; DISCOM, subsidy &amp; program-economics analyst; residential consumer &amp; field evidence; solar &amp; contractor ecosystem; market strategy &amp; willingness-to-pay; private capital &amp; blended finance; power &amp; grid systems (cross-market)</td></tr>
+      <tr><td>Engineering</td><td>Engineer, SDET / verification engineer, red-team &amp; adversarial reviewer, designer, analytics platform engineer</td></tr>
+      <tr><td>Editorial &amp; media</td><td>Managing Editor, podcast scriptwriter, podcast producer (narration &amp; voice casting), media rights &amp; compliance coordinator, audience development &amp; community editor, growth &amp; reader analyst</td></tr>
+      <tr><td>IR &amp; finance</td><td>Head of Fundraising &amp; Capital Formation, Investor Relations Manager, investor &amp; sponsor reporting associate, IR visit &amp; events coordinator</td></tr>
+      <tr><td>Data &amp; product</td><td>Product data scientist (experimentation &amp; field inference), behavioral design &amp; trust researcher, ecosystem &amp; landscape analyst</td></tr>
+      <tr><td>Organizational operations</td><td>Organizational performance scientist, memory curator / organizational ontologist, skill maturity &amp; engagement recorder</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 class="sub">B. Skill library by family</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>Family</th><th>Skills</th><th>Deliverable</th></tr></thead>
+    <tbody>
+      <tr><td>Editorial</td><td>Explanation articles, analysis articles, editorial desk, weekly project report</td><td>Primary sources become explanations; explanations are synthesized inductively into analyses; published work is re-reviewed. Every article issues in Japanese and English.</td></tr>
+      <tr><td>Research</td><td>Daily research, US grid watch, India grid watch, research sync, hypothesis</td><td>Named-beat scans, de-duplicated against the standing corpus.</td></tr>
+      <tr><td>Reporting</td><td>Regulatory situation report, monthly letter, VP monthly, org metrics pulse</td><td>Executive situation reports; a monthly organizational letter for general readers; per-VP monthlies; organizational metrics.</td></tr>
+      <tr><td>Engineering</td><td>Task brief, issue design, issue implementation, PR autopilot, PR remediation, verification sweep</td><td>Requirements → implementation → review → remediation → test-coverage audit on external repositories.</td></tr>
+      <tr><td>Media</td><td>Podcast script, podcast publish</td><td>Single-narrator colloquial scripts with mandatory citation; rights and compliance clearance before release.</td></tr>
+      <tr><td>Governance</td><td>Amendment review committee, red-team audit, backlog reconcile, accountability watch</td><td>Approve/reject verdicts with follow-ups; adversarial findings; plan-versus-actual reconciliation; stalled-work detection.</td></tr>
+      <tr><td>Organizational hygiene</td><td>Memory curation, memory hygiene, skill maturity report, performance refresh, engagement record</td><td>Per-agent memory curation, org-wide contradiction and staleness sweeps, procedure maturity ratings, track-record writes.</td></tr>
+      <tr><td>Management</td><td>Attention ledger, budget &amp; runway review, positioning, audience loop, reader signal, digests</td><td>Ranked weekly decision packages for the operator; spend and runway; positioning; reader-response analysis.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 class="sub">C. Project portfolio</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>Project</th><th>Domain</th><th>Staffing and output</th></tr></thead>
+    <tbody>
+      <tr><td>ASP Cloud</td><td>SaaS product development</td><td>Home energy management platform. Head of Product owns; design, implementation and review lenses staffed separately. Requirements → implementation → review → remediation runs as pull requests on the external repository.</td></tr>
+      <tr><td>Project IND</td><td>India energy market research</td><td>A seven-role desk: research director, DISCOM and subsidy economics, residential consumer evidence, contractor ecosystem, willingness-to-pay, blended finance, grid systems. Daily regulatory watch plus standing market reports.</td></tr>
+      <tr><td>Smartmeter Data Analysis</td><td>Telemetry analysis</td><td>Smart-meter data analysis on the same review roster as ASP Cloud.</td></tr>
+      <tr><td>Conference</td><td>Sponsor engagement &amp; field reporting</td><td>IR-owned. On-site reporting, run-of-show, briefing packs, sponsor and investor decks. Draft-only: no agent sends anything externally.</td></tr>
+      <tr><td>Software Talent Network</td><td>Own operations</td><td>The newsletter analyzing the AI paradigm shift, the podcast, the monthly organizational letter, the amendment review committee, organizational metrics — the network operating on itself.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">The same bench staffs all five projects: an India market analyst contributes to a cross-desk regulatory report; the managing editor convenes a weekly panel on a software project. Coverage grows without a corresponding headcount decision — subject to the qualification gates in §05.</p>
+
+  <h3 class="sub">D. Deliverable catalogue</h3>
+  <div class="grid g3">
+    <div class="card"><h3>Bilingual articles</h3><p>Explanations grounded in primary sources; analyses synthesizing several of them; one record serving both languages.</p></div>
+    <div class="card"><h3>Podcast episodes</h3><p>Colloquial narration scripts derived from published analyses, cited, cleared and released.</p></div>
+    <div class="card"><h3>Regulatory &amp; policy reports</h3><p>Daily observation on US and India power policy, consolidated into executive situation reports over a fixed window.</p></div>
+    <div class="card"><h3>Monthly organizational letter</h3><p>A why-first review of the organization's month, written for executives and general readers rather than insiders.</p></div>
+    <div class="card"><h3>India market research</h3><p>DISCOM economics, subsidy programs, willingness to pay, contractor ecosystem, financing structures.</p></div>
+    <div class="card"><h3>Production pull requests</h3><p>Design, implementation, review and remediation on live repositories; the merge decision escalates.</p></div>
+    <div class="card"><h3>Conference field reports</h3><p>Run-of-show, briefing packs, sponsor reports and decks — staged for a human to send.</p></div>
+    <div class="card"><h3>Governance findings</h3><p>Committee verdicts on amendments, adversarial audit findings, plan-versus-actual reconciliation.</p></div>
+    <div class="card"><h3>Organizational metrics</h3><p>Engagement ledger, skill maturity, performance, and the trend in operator attention consumed.</p></div>
+  </div>
+</section>
+
+<footer>Software Talent Network — technical whitepaper. Registry counts are mechanically taken and describe implementation scale only; operating status is labelled per mechanism. Companion document: <a href="https://claude.ai/code/artifact/664674bb-8131-4af7-ab56-dbb49c063624" style="color:var(--accent)">the Manifesto</a>.</footer>
+</main>
