@@ -46,6 +46,7 @@ export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "reader-signal": ["workforce.feed_write_token"] as const,
   "record-engagement": [],
   "red-team-audit": ["workforce.feed_write_token"] as const,
+  "regulatory-situation-report": ["github.token"] as const,
   "research-sync": ["workforce.feed_write_token"] as const,
   "skill-maturity-report": ["workforce.feed_write_token"] as const,
   "verification-sweep": ["workforce.feed_write_token"] as const,
