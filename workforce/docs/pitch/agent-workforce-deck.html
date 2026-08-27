@@ -1,0 +1,242 @@
+<title>Agent Workforce 紹介</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#FAFAFB; --panel:#FFFFFF; --ink:#12171F; --ink-2:#4A5462; --ink-3:#79838F;
+    --line:#DFE3E9; --accent:#2340D8; --accent-soft:#EAEEFD; --signal:#116A54; --warn:#8A5A00;
+    --shadow:0 1px 0 rgba(18,23,31,.04);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#0D1117; --panel:#141A22; --ink:#EDF0F4; --ink-2:#A8B2BE; --ink-3:#7D8794;
+      --line:#242C36; --accent:#8FA6FF; --accent-soft:#1A2440; --signal:#5BC5A4; --warn:#D9A441;
+      --shadow:0 1px 0 rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0D1117; --panel:#141A22; --ink:#EDF0F4; --ink-2:#A8B2BE; --ink-3:#7D8794;
+    --line:#242C36; --accent:#8FA6FF; --accent-soft:#1A2440; --signal:#5BC5A4; --warn:#D9A441;
+    --shadow:0 1px 0 rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground);color:var(--ink);font-family:"Noto Sans JP",system-ui,sans-serif;
+    line-height:1.85;font-size:16px;-webkit-font-smoothing:antialiased;margin:0;}
+  h1,h2,h3{font-family:"Zen Kaku Gothic New","Noto Sans JP",sans-serif;text-wrap:balance;line-height:1.35;margin:0}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+  main{max-width:1060px;margin:0 auto;padding:0 24px 96px}
+  section{padding:64px 0;border-top:1px solid var(--line)}
+  section:first-of-type{border-top:0}
+  .eyebrow{display:flex;align-items:baseline;gap:14px;margin-bottom:20px}
+  .num{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--accent);letter-spacing:.14em}
+  .kicker{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-3);font-family:"IBM Plex Mono",monospace}
+  h2{font-size:clamp(26px,3.4vw,38px);font-weight:900;letter-spacing:-.01em}
+  .lede{color:var(--ink-2);font-size:17px;max-width:62ch;margin-top:14px}
+  p{margin:14px 0;max-width:66ch}
+  /* cover */
+  .cover{padding:88px 0 72px}
+  .cover h1{font-size:clamp(38px,7vw,74px);font-weight:900;letter-spacing:-.03em}
+  .cover .sub{font-size:clamp(17px,2.2vw,21px);color:var(--ink-2);margin-top:22px;max-width:60ch}
+  .rule{height:6px;width:92px;background:var(--accent);margin:28px 0 0;border-radius:3px}
+  .statline{display:flex;flex-wrap:wrap;gap:12px;margin-top:40px}
+  .stat{flex:1 1 150px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:16px 18px;box-shadow:var(--shadow)}
+  .stat b{display:block;font-family:"IBM Plex Mono",monospace;font-size:30px;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .stat span{font-size:12.5px;color:var(--ink-3);letter-spacing:.04em}
+  .grid{display:grid;gap:14px;margin-top:28px}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(270px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:20px 22px;box-shadow:var(--shadow)}
+  .card h3{font-size:16.5px;font-weight:700;margin-bottom:6px}
+  .card p{font-size:14.5px;color:var(--ink-2);margin:6px 0 0}
+  .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--accent);
+    background:var(--accent-soft);border-radius:3px;padding:2px 8px;letter-spacing:.03em}
+  .tag.ok{color:var(--signal);background:transparent;border:1px solid var(--line)}
+  ul{padding-left:1.15em;max-width:66ch}
+  li{margin:7px 0;color:var(--ink-2)}
+  li b{color:var(--ink);font-weight:700}
+  .scroll{overflow-x:auto;margin-top:24px;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:640px}
+  th,td{text-align:left;padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-family:"IBM Plex Mono",monospace;font-weight:500}
+  td:first-child{white-space:nowrap;font-weight:700}
+  tr:last-child td{border-bottom:0}
+  .layers{display:grid;gap:10px;margin-top:28px}
+  .layer{display:grid;grid-template-columns:112px 1fr;gap:18px;align-items:start;
+    background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:4px;padding:18px 20px}
+  .layer .lab{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.1em;color:var(--accent);padding-top:3px}
+  .layer p{margin:6px 0 0;font-size:14.5px;color:var(--ink-2)}
+  .math{font-family:"IBM Plex Mono",monospace;font-size:15px;background:var(--accent-soft);color:var(--ink);
+    border-radius:4px;padding:16px 18px;margin-top:24px;overflow-x:auto}
+  .note{font-size:13px;color:var(--ink-3);max-width:70ch}
+  footer{border-top:1px solid var(--line);padding:28px 0 0;color:var(--ink-3);font-size:13px}
+  @media (max-width:560px){ .layer{grid-template-columns:1fr;gap:6px} }
+</style>
+
+<main>
+
+<section class="cover">
+  <div class="kicker">Agent Workforce — 会社紹介 / Pitch</div>
+  <h1>人を増やさずに、<br>組織を増やす。</h1>
+  <div class="rule"></div>
+  <p class="sub">Agent Workforce は、意思決定者が人間ひとりのまま、<b>専門職エージェント × 業務スキル × プロジェクト</b>の三層で運営される、実働中のAIオペレーション組織です。記事・レポート・PR・Podcast・規制分析まで、成果物が毎日出続けています。</p>
+  <div class="statline">
+    <div class="stat"><b>57</b><span>登録エージェント（職種別ペルソナ）</span></div>
+    <div class="stat"><b>41</b><span>スキル（実行可能な業務手順）</span></div>
+    <div class="stat"><b>5</b><span>稼働プロジェクト</span></div>
+    <div class="stat"><b>1</b><span>人間の意思決定者</span></div>
+  </div>
+  <p class="note" style="margin-top:18px">数値は本リポジトリの登録実体（<span class="mono">workforce/seed</span>, <span class="mono">workforce/skills</span>, <span class="mono">workforce/projects</span>）から機械的に数えたもの。</p>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">01</span><span class="kicker">問題設定</span></div>
+  <h2>「AIを使う」は増えた。「AIが業務を回す」はまだない。</h2>
+  <p class="lede">多くの現場のAI活用は、人間が都度プロンプトを打つ単発作業です。担当も、手順も、成果物の品質基準も、責任の所在も、人間の頭の中にしかありません。そのため使う人が増えるほど、レビュー負荷という形で人間側がボトルネックになります。</p>
+  <div class="grid g3">
+    <div class="card"><h3>担当がいない</h3><p>誰の仕事かが定義されず、専門性が蓄積しない。同じ調査を毎回ゼロから。</p></div>
+    <div class="card"><h3>手順が残らない</h3><p>うまくいったプロンプトが個人のチャット履歴に埋もれ、再現も改善もできない。</p></div>
+    <div class="card"><h3>品質が保証されない</h3><p>途中で切れた文章、空の出力、幻覚がそのまま外に出る。止める仕組みがない。</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">02</span><span class="kicker">解法の骨格</span></div>
+  <h2>エージェント × スキル × プロジェクト</h2>
+  <p class="lede">この三層の分離が、Agent Workforce のスケーラビリティの本体です。「誰が（人格・専門性・判断基準）」「何を（再現可能な業務手順）」「どこで（対象・権限・認証情報）」を独立に定義し、実行時に合成します。</p>
+  <div class="layers">
+    <div class="layer"><div class="lab">AGENT</div><div>
+      <h3>誰が — 専門職ペルソナ</h3>
+      <p>職務記述（ミッション／責務／成功指標）、判断原則、所属・レポートライン、月次予算、記憶を持つ。人間の組織図と同じ粒度で採用・配置される。</p></div></div>
+    <div class="layer"><div class="lab">SKILL</div><div>
+      <h3>何を — 実行可能な業務手順</h3>
+      <p>「入力・判断の型・成果物・書き込み先」を明文化した自己完結フォルダ。誰が実行しても同じ品質で同じ形の成果物が出る。定期実行されるものを <b>Cadence</b> と呼ぶ。</p></div></div>
+    <div class="layer"><div class="lab">PROJECT</div><div>
+      <h3>どこで — 対象と権限</h3>
+      <p>対象リポジトリ、適用されるガバナンス文書、使える認証情報の種類を束ねる単位。プロジェクト単位で権限が絞られ、越境できない。</p></div></div>
+  </div>
+  <div class="math">出力可能な業務 ＝ エージェント(57) × スキル(41) × プロジェクト(5)<br>新規エージェント追加コスト ＝ 定義ファイル1件（既存スキル全部を即座に実行可能）<br>新規プロジェクト追加コスト ＝ 定義ファイル1件＋認証情報（既存の職種全員が即座に担当可能）</div>
+  <p class="note">人間組織では「人を採る」「手順を作る」「案件を取る」が全て別コストで、しかも掛け算になりません。三層を分離したことで、どの軸を伸ばしても残り二軸の資産がそのまま乗ります。</p>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">03</span><span class="kicker">人材構成</span></div>
+  <h2>どんな専門職が揃っているか</h2>
+  <p class="lede">代表 → VP層 → 各機能デスクという実在の企業と同じ階層。研究・政策・エンジニアリング・編集・メディア・IR/財務・組織運営まで、機能が欠けていません。</p>
+  <div class="scroll"><table>
+    <thead><tr><th>デスク</th><th>職種</th></tr></thead>
+    <tbody>
+      <tr><td>経営・統括</td><td>代表（Founder/PM）、Chief of Staff、VP Research、VP Policy & Government Affairs、VP Finance & Capital Strategy、VP Marketing & External Communications、VP Operations & Reliability、プロダクト責任者</td></tr>
+      <tr><td>政策・規制</td><td>Grid Policy Analyst（US／India）、Director, Carbon Markets Research、Director, Standards & Disclosure Watch</td></tr>
+      <tr><td>インド エネルギー市場</td><td>Research Director、DISCOM・補助金/プログラム経済性アナリスト、住宅需要家/現地エビデンス、太陽光・施工事業者エコシステム、需要戦略・支払意思、民間資本/ブレンデッド・ファイナンス、電力・系統システム（クロスマーケット）</td></tr>
+      <tr><td>エンジニアリング</td><td>エンジニア、SDET/検証エンジニア、Red Team・敵対的レビュアー、デザイナー、Analytics Platform Engineer</td></tr>
+      <tr><td>編集・メディア</td><td>Managing Editor、Podcast Scriptwriter、Podcast Producer（ナレーション/声のキャスティング）、Media Rights & Compliance、Audience Development & Community Editor、Growth & Reader Analyst</td></tr>
+      <tr><td>IR・財務</td><td>Head of Fundraising & Capital Formation、Investor Relations Manager、Investor & Sponsor Reporting Associate、IR訪問・イベントコーディネーター</td></tr>
+      <tr><td>データ・プロダクト</td><td>Product Data Scientist（実験・フィールド推論）、Behavioral Design & Trust Researcher、Ecosystem & Landscape Analyst</td></tr>
+      <tr><td>組織運営</td><td>Organizational Performance Scientist、Memory Curator/組織オントロジスト、スキル成熟度・実績記録担当</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">各ペルソナは名前・居住地・使用モデル・プロンプトバージョン・月次予算上限・レポートライン・横連携先まで定義されています（例：Chief of Staff は「経営者の注意力という唯一の希少資源を管理する」ことをミッションに持ち、成功指標は<b>週次で経営者が使う時間が減りつつ意思決定件数が減らないこと</b>）。</p>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">04</span><span class="kicker">業務能力</span></div>
+  <h2>どんなスキルで業務が回っているか</h2>
+  <p class="lede">41のスキルが、成果物の種類ごとに定義されています。多くは定期実行（Cadence）で、人間の起票を待ちません。</p>
+  <div class="grid g2">
+    <div class="card"><span class="tag">編集・記事</span><h3>article-level2 / level3 / editorial-desk / weekly-project-report</h3><p>一次情報の解説記事化 → 複数記事の統合分析 → 掲載後の編集品質レビュー。日英2版を同時発行。</p></div>
+    <div class="card"><span class="tag">リサーチ</span><h3>daily-research / grid-watch / india-grid-watch / research-sync / hypothesis</h3><p>米国・インドの電力/規制動向を毎日スキャンし、重複を排除して観測コーパスに積む。</p></div>
+    <div class="card"><span class="tag">レポート</span><h3>regulatory-situation-report / monthly-report / vp-monthly-report / org-metrics-pulse</h3><p>デスク横断の規制シチュエーションレポート、月次の組織レター、VP別月次、組織指標。</p></div>
+    <div class="card"><span class="tag">ソフトウェア開発</span><h3>code-task-brief / issue-design / issue-implement / pr-autopilot / pr-remediate / verification-sweep</h3><p>要件整理 → 実装 → PRレビュー → 指摘対応 → テスト網羅性点検まで、外部リポジトリに対して回る。</p></div>
+    <div class="card"><span class="tag">メディア</span><h3>podcast-script / podcast-publish</h3><p>公開済み分析記事を単一ナレーター向け口語台本に変換し、権利・コンプライアンス確認を経て配信判断。</p></div>
+    <div class="card"><span class="tag">ガバナンス</span><h3>legal-amendment-review-committee / red-team-audit / backlog-reconcile / ops-accountability-watch</h3><p>統治文書の改定案を審議して可否を答申。敵対的レビュー、計画と実績の照合、異常の自動割り当て。</p></div>
+    <div class="card"><span class="tag">組織衛生</span><h3>memory-curation / memory-hygiene / skill-maturity-report / performance-refresh / record-engagement</h3><p>各メンバーの記憶整理、組織記憶の矛盾検出、手順の成熟度点検、実績（Track Record）記録。</p></div>
+    <div class="card"><span class="tag">経営・GTM</span><h3>attention-ledger / budget-runway-review / positioning-write / audience-loop / reader-signal / discord-digest</h3><p>経営者に上がる案件のランク付け、予算とランウェイ、ポジショニング、読者反応の分析。</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">05</span><span class="kicker">ポートフォリオ</span></div>
+  <h2>どんなプロジェクトを運営しているか</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>プロジェクト</th><th>領域</th><th>体制と成果物</th></tr></thead>
+    <tbody>
+      <tr><td>ASP Cloud</td><td>SaaS プロダクト開発</td><td>家庭向けエネルギーマネジメントSaaSの実装。プロダクト責任者がオーナー、設計/実装/レビューの3レンズ体制。要件整理→実装→レビュー→修正のPRループが外部リポジトリ上で回る。</td></tr>
+      <tr><td>Project IND</td><td>インド エネルギー市場リサーチ</td><td>専任7名のデスク（Research Director、DISCOM/補助金経済性、住宅需要家、施工エコシステム、支払意思、ブレンデッド・ファイナンス、系統）。日次の規制ウォッチと、成果物としての市場レポート群。</td></tr>
+      <tr><td>Smartmeter Data Analysis</td><td>スマートメーター解析</td><td>テレメトリ解析。ASP Cloud と同じレビュー体制でPRとして納品。</td></tr>
+      <tr><td>Conference</td><td>スポンサー渉外・現地レポート</td><td>IRがオーナー。現地カンファレンスの参加・レポート、Run-of-show、ブリーフィングパック、投資家/スポンサー向けデッキ。<b>全てドラフト止まり</b>で、対外送信は人間のみが行う。</td></tr>
+      <tr><td>Agent Workforce</td><td>自社運営（ドッグフーディング）</td><td>ニュースレター（AIパラダイムシフトの解説・分析記事）、Podcast、月次組織レター、法改正委員会、組織指標。ワークフォース自身が乗っている基盤。</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">同一の職種プールが、プロジェクトをまたいで再配置されます。インドのアナリストが規制レポートに参加し、編集長が週次プロジェクトレポートのパネルを招集する——人を増やさずに担当を増やせるのは、この三層分離の直接的な効果です。</p>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">06</span><span class="kicker">実物</span></div>
+  <h2>出ている成果物</h2>
+  <div class="grid g3">
+    <div class="card"><h3>解説・分析記事（日英）</h3><p>一次情報からの解説記事と、複数記事を帰納的に統合した分析記事。1本のNotion行が日英2版として同一URLで配信される。</p></div>
+    <div class="card"><h3>Podcast</h3><p>公開済み分析記事から口語台本を生成し、出典引用を必須化。制作・権利確認を経てSpotify/RSSへ。</p></div>
+    <div class="card"><h3>電力政策・規制レポート</h3><p>米国・インドの規制動向を日次で観測し、報告期間分の全観測を定量スキャンした上で経営層向けシチュエーションレポートに統合。</p></div>
+    <div class="card"><h3>月次組織レター</h3><p>毎月頭に、代表が全ワークフォースの前月を「なぜ」から書き起こす15〜20ページの統合レター。一般読者向け。</p></div>
+    <div class="card"><h3>インド市場リサーチ</h3><p>DISCOM経済性、補助金プログラム、支払意思、施工事業者エコシステム、ファイナンス構造の各レポート。</p></div>
+    <div class="card"><h3>コードとPR</h3><p>外部リポジトリに対する設計・実装・レビュー・修正。マージ判断だけが人間に上がる。</p></div>
+    <div class="card"><h3>現地カンファレンスレポート</h3><p>Run-of-show、ブリーフィングパック、スポンサー向けレポートとデッキ。</p></div>
+    <div class="card"><h3>ガバナンス答申</h3><p>統治文書の改定案に対する委員会の可否答申と、否決時のフォローアップ計画。</p></div>
+    <div class="card"><h3>組織メトリクス</h3><p>実績台帳、スキル成熟度、パフォーマンス指標、経営者の注意消費量トレンド。</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">07</span><span class="kicker">品質保証</span></div>
+  <h2>暴走しない組織設計</h2>
+  <p class="lede">エージェントを増やすほど、事故確率は上がります。だからこの組織は、能力より先に統治を作りました。憲法 → 法律 → 規制（自動チェック）→ 執行ルールの四層で、上位ほど変更が難しくなっています。</p>
+  <div class="grid g2">
+    <div class="card"><h3>絶対に破れない4原則</h3><p>編集の誠実性（空記事・途中で切れた文章・LLM失敗の痕跡を世に出さない）／唯一の情報源を定める／単一運用者スケールを超える機能を作らない／壊れたら黙って続けず必ず落とす。</p></div>
+    <div class="card"><h3>機械的に止まるゲート</h3><p>公開前の切断検知、成果物の空/短文検知、CIの各種ゲート。違反したら公開されずビルドが赤くなる——判断ではなく仕組みで止める。</p></div>
+    <div class="card"><h3>権限の線引き</h3><p>自動実行してよい領域と、人間の承認が必須の領域（マージ、本番ブランチへの直接変更、統治文書・プロンプト・評価基準の改定、予算枠外の支出）が明文化されている。</p></div>
+    <div class="card"><h3>再発防止ラチェット</h3><p>同じ失敗が90日以内に2回起きたら、運用上の注意ではなく自動チェックへ自動昇格。組織が自分で締まっていく。</p></div>
+    <div class="card"><h3>敵対的レビュー</h3><p>Red Team ロールが「あえて弱点を探す」レビューを独立に回し、監査は執行ラインの外に置かれている。</p></div>
+    <div class="card"><h3>多候補・多審査の品質層</h3><p>記事生成は「1プロンプト1記事」ではなく、複数の生成者が書き、複数の審査者（編集/専門/読者の視点）がルーブリックで採点して採用案を決める。採点は読者行動と突き合わせて外側のループに戻る。</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">08</span><span class="kicker">実行基盤</span></div>
+  <h2>どう動いているか</h2>
+  <p class="lede">スケジューラがティックを打ち、オーケストレータが「エージェント × スキル × プロジェクト」の文脈を合成してランナーに渡す。成果物は決定論的な書き込みスクリプトが、プロジェクト単位の認証情報で所定の宛先にPOSTする。人間はダッシュボードで見て、上がってきた判断だけを下す。</p>
+  <ul>
+    <li><b>トリガ</b> — スケジュールイベントがオーケストレータを起動。各スキルのケイデンス（毎日／6時間ごと／週次／月次）で発火。</li>
+    <li><b>文脈合成</b> — ペルソナ定義＋スキル手順＋プロジェクト設定＋その人の記憶を組み立ててエージェント実行環境へ。</li>
+    <li><b>書き込み</b> — 生成物はLLMが直接publishせず、バンドルされた書き込みスクリプト経由。ここに編集ガードが実装されている。</li>
+    <li><b>可視化</b> — 社内コンソールに組織図・活動記録・レポート、公開面はWebサイト・GitHub・Discord/Slack・Podcast配信。</li>
+    <li><b>記憶</b> — 各メンバーの知見が記録・整理され、組織全体の記憶の矛盾・陳腐化が定期点検される。</li>
+  </ul>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">09</span><span class="kicker">拡張性</span></div>
+  <h2>どこまで伸ばせるか</h2>
+  <p class="lede">今の構成は5プロジェクト・41スキル・57ペルソナですが、増分コストの形が普通の組織と違います。</p>
+  <div class="grid g3">
+    <div class="card"><h3>職種を足す</h3><p>定義ファイル1件で新しい専門職が入社し、その瞬間に既存41スキル全てを実行できる。教育期間ゼロ。</p></div>
+    <div class="card"><h3>業務を足す</h3><p>スキルを1つ書けば、57人全員の候補担当者がいる状態で始まる。実行者を探す工程が存在しない。</p></div>
+    <div class="card"><h3>案件を足す</h3><p>プロジェクト定義と認証情報を登録すれば、組織まるごとがその案件を担当できる。立ち上げは人月ではなく設定。</p></div>
+  </div>
+  <p class="lede" style="margin-top:26px">この形が効く先は、<b>「専門性の高い調査・監視・文書生産が、恒常的に発生し続ける」</b>領域です。規制ウォッチ、市場リサーチ、投資家向けレポーティング、社内ドキュメント運用、コードベースの継続的な保守。いずれも、人間ひとりが常時見張るには重すぎ、外注するには文脈が失われすぎる領域です。</p>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="num">10</span><span class="kicker">現在地</span></div>
+  <h2>すでに動いている。次は範囲を広げる。</h2>
+  <div class="grid g2">
+    <div class="card"><span class="tag ok">稼働中</span><h3>記事・レポート・PR・Podcast・月次レター</h3><p>定期実行で成果物が出続けている。外部リポジトリ3件に対する開発レーンも稼働。</p></div>
+    <div class="card"><span class="tag ok">稼働中</span><h3>ガバナンスと自動ゲート</h3><p>四層統治、CIゲート、再発防止ラチェット、敵対的レビューが実装済み。</p></div>
+    <div class="card"><span class="tag">次の一手</span><h3>品質層の全面適用</h3><p>多候補・多審査を全生成レーンへ拡張し、採点と読者行動を接続する。</p></div>
+    <div class="card"><span class="tag">次の一手</span><h3>外部プロジェクトの追加</h3><p>三層のうちプロジェクト軸を伸ばす。既存の職種とスキルの資産がそのまま乗る。</p></div>
+  </div>
+  <p class="lede" style="margin-top:26px">お願いしたいのは、<b>実際の業務領域をひとつ預けていただくこと</b>です。プロジェクトを1件登録すれば、既存の職種とスキルがそのまま担当につきます。立ち上げに必要なのは、対象と、権限と、成果物の宛先の定義だけです。</p>
+</section>
+
+<footer>Agent Workforce — 人間の意思決定者1名 ／ 専門職エージェント57 ／ スキル41 ／ プロジェクト5。数値は本リポジトリの登録実体から機械的に算出。</footer>
+</main>
