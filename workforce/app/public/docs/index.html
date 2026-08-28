@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Software Talent Network Docs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#FAFAFB; --panel:#FFFFFF; --panel-2:#F2F5F9; --ink:#12171F; --ink-2:#49535F; --ink-3:#79838F;
+    --line:#DEE3EA; --accent:#1F3FCC; --accent-soft:#E9EDFC; --signal:#0F6B55; --shadow:0 1px 0 rgba(18,23,31,.04);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#0C1116; --panel:#141A21; --panel-2:#182029; --ink:#ECEFF3; --ink-2:#A7B1BC; --ink-3:#7C8794;
+      --line:#232B35; --accent:#93A8FF; --accent-soft:#18213B; --signal:#54C2A2; --shadow:0 1px 0 rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0C1116; --panel:#141A21; --panel-2:#182029; --ink:#ECEFF3; --ink-2:#A7B1BC; --ink-3:#7C8794;
+    --line:#232B35; --accent:#93A8FF; --accent-soft:#18213B; --signal:#54C2A2; --shadow:0 1px 0 rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground);color:var(--ink);font-family:"Source Sans 3",system-ui,sans-serif;
+    font-size:16.5px;line-height:1.72;margin:0;-webkit-font-smoothing:antialiased}
+  h1,h2,h3{font-family:"Familjen Grotesk","Source Sans 3",sans-serif;text-wrap:balance;line-height:1.25;margin:0}
+  main{max-width:1080px;margin:0 auto;padding:0 24px 96px}
+  section{padding:60px 0;border-top:1px solid var(--line)}
+  section:first-of-type{border-top:0}
+  .eyebrow{display:flex;align-items:baseline;gap:14px;margin-bottom:18px}
+  .num,.kicker{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.18em;text-transform:uppercase}
+  .num{color:var(--accent)} .kicker{color:var(--ink-3)}
+  h2{font-size:clamp(26px,3.4vw,36px);font-weight:700;letter-spacing:-.015em}
+  .lede{color:var(--ink-2);font-size:17.5px;max-width:64ch;margin-top:12px}
+  p{margin:14px 0;max-width:68ch}
+  .cover{padding:80px 0 64px}
+  .cover h1{font-size:clamp(40px,7.5vw,78px);font-weight:700;letter-spacing:-.035em}
+  .cover .sub{font-size:clamp(17px,2.1vw,21px);color:var(--ink-2);margin-top:20px;max-width:60ch}
+  .rule{height:5px;width:88px;background:var(--accent);margin-top:26px;border-radius:3px}
+  .statline{display:flex;flex-wrap:wrap;gap:12px;margin-top:38px}
+  .stat{flex:1 1 160px;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:15px 18px;box-shadow:var(--shadow)}
+  .stat b{display:block;font-family:"IBM Plex Mono",monospace;font-size:29px;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .stat span{font-size:12.5px;color:var(--ink-3)}
+  .grid{display:grid;gap:14px;margin-top:26px}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(225px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:18px 20px;box-shadow:var(--shadow)}
+  .card h3{font-size:16.5px;font-weight:700;margin-bottom:4px}
+  .card p{font-size:14.5px;color:var(--ink-2);margin:6px 0 0}
+  .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent);
+    background:var(--accent-soft);border-radius:3px;padding:2px 8px;letter-spacing:.04em;margin-bottom:8px}
+  .tag.ok{color:var(--signal);background:transparent;border:1px solid var(--line)}
+  ul{padding-left:1.15em;max-width:68ch} li{margin:7px 0;color:var(--ink-2)} li b{color:var(--ink)}
+  .scroll{overflow-x:auto;margin-top:22px;border:1px solid var(--line);border-radius:5px;background:var(--panel)}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:660px}
+  th,td{text-align:left;padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-family:"IBM Plex Mono",monospace;font-weight:500}
+  td:first-child{font-weight:700;white-space:nowrap} tr:last-child td{border-bottom:0}
+  .layers{display:grid;gap:10px;margin-top:24px}
+  .layer{display:grid;grid-template-columns:120px 1fr;gap:18px;background:var(--panel);border:1px solid var(--line);
+    border-left:4px solid var(--accent);border-radius:5px;padding:16px 20px}
+  .layer .lab{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.1em;color:var(--accent);padding-top:3px}
+  .layer p{margin:5px 0 0;font-size:14.5px;color:var(--ink-2)}
+  .math{font-family:"IBM Plex Mono",monospace;font-size:14.5px;background:var(--accent-soft);border-radius:5px;
+    padding:16px 18px;margin-top:22px;overflow-x:auto;line-height:1.9}
+  .note{font-size:13.5px;color:var(--ink-3);max-width:72ch}
+  figure{margin:26px 0 0}
+  figure svg{width:100%;max-width:100%;height:auto;color:var(--ink)}
+  figcaption{font-size:13.5px;color:var(--ink-3);margin-top:12px;max-width:72ch}
+  .pull{border-left:3px solid var(--accent);padding:2px 0 2px 18px;margin:24px 0;font-size:19px;
+    font-family:"Familjen Grotesk",sans-serif;color:var(--ink);max-width:60ch}
+  .arc{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:0;margin-top:28px;
+    border:1px solid var(--line);border-radius:5px;overflow:hidden;background:var(--panel)}
+  .beat{padding:18px 20px;border-right:1px solid var(--line)}
+  .beat:last-child{border-right:0}
+  .beat .n{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;color:var(--accent);text-transform:uppercase}
+  .beat h3{font-size:16px;font-weight:700;margin:8px 0 4px}
+  .beat p{font-size:14px;color:var(--ink-2);margin:0}
+  .beat.fade h3,.beat.fade p{opacity:.62}
+  .voices{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:26px}
+  .voice{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:20px 22px;
+    display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+  .who{display:flex;align-items:center;gap:12px}
+  .who .face{flex:0 0 auto;width:64px;height:64px;border-radius:50%;background:var(--panel-2);
+    border:1px solid var(--line)}
+  .who b{display:block;font-family:"Familjen Grotesk",sans-serif;font-size:16px;line-height:1.3}
+  .who span{font-size:12.5px;color:var(--ink-3)}
+  .voice q{quotes:none;font-size:15px;color:var(--ink-2);line-height:1.7}
+  .voice q:before,.voice q:after{content:none}
+  footer{border-top:1px solid var(--line);padding:26px 0 0;color:var(--ink-3);font-size:13px}
+  @media (max-width:560px){ .layer{grid-template-columns:1fr;gap:4px} }
+</style>
+<style>
+  /* shared docs chrome */
+  .sitebar{display:flex;align-items:center;justify-content:space-between;gap:16px;
+    max-width:1080px;margin:0 auto;padding:16px 24px;border-bottom:1px solid var(--line)}
+  .sitebar .brand{font-family:"Familjen Grotesk","Source Sans 3",sans-serif;font-weight:700;
+    font-size:15px;letter-spacing:-.01em;color:var(--ink);text-decoration:none}
+  .sitebar .back{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--ink-3);text-decoration:none}
+  .sitebar .brand:hover,.sitebar .back:hover,.sitebar .brand:focus-visible,.sitebar .back:focus-visible{color:var(--accent)}
+  main .cover{padding-top:56px}
+</style>
+<style>
+  main{max-width:900px}
+  .docs{display:grid;gap:14px;margin-top:34px}
+  .doccard{display:block;background:var(--panel);border:1px solid var(--line);border-radius:5px;
+    padding:24px 26px;text-decoration:none;color:inherit;box-shadow:var(--shadow)}
+  .doccard:hover,.doccard:focus-visible{border-color:var(--accent)}
+  .doccard .k{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--accent)}
+  .doccard h3{font-size:22px;font-weight:700;margin:8px 0 6px}
+  .doccard p{margin:0;font-size:15px;color:var(--ink-2);max-width:64ch}
+  .doccard .go{display:inline-block;margin-top:14px;font-family:"IBM Plex Mono",monospace;
+    font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+</style>
+</head>
+<body>
+<header class="sitebar">
+  <a class="brand" href="/">Software Talent Network</a>
+  <a class="back" href="/">Home</a>
+</header>
+<main>
+<section class="cover">
+  <div class="kicker">Documentation</div>
+  <h1>Docs</h1>
+  <div class="rule"></div>
+  <p class="sub">How this organization is built, and what it believes. Both documents stand alone; read either first.</p>
+  <div class="docs">
+    <a class="doccard" href="/docs/whitepaper.html">
+      <div class="k">Technical whitepaper</div>
+      <h3>Capability as a governed internal asset</h3>
+      <p>The claim, the organizational constraint it removes, the composition model, the anatomy of a persistent agent, the architecture and execution flow, memory and cross-project reuse, governance and failure containment, operating evidence, management economics, and the limits and open questions.</p>
+      <span class="go">Read the whitepaper →</span>
+    </a>
+    <a class="doccard" href="/docs/manifesto.html">
+      <div class="k">Manifesto</div>
+      <h3>Assemble, deliver, disband</h3>
+      <p>What the network believes about work: outcomes over output, capability that belongs to the professional, temporary projects and persistent learning, disciplinary difference, the record, accountability, and the human's ownership of purpose and consequence.</p>
+      <span class="go">Read the manifesto →</span>
+    </a>
+  </div>
+</section>
+<footer>Software Talent Network — a software-defined operating organization of persistent AI professionals, governed by one human decision-maker.</footer>
+</main>
+</body>
+</html>

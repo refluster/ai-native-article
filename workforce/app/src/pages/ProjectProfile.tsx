@@ -160,7 +160,7 @@ export default function ProjectProfile() {
     <WorkforceLayout>
       {/* Breadcrumb */}
       <div className="mb-4 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-        <Link to="/" className="hover:text-wf-on-surface">HOME</Link>
+        <Link to="/feed" className="hover:text-wf-on-surface">HOME</Link>
         <span className="mx-2">/</span>
         <Link to="/projects" className="hover:text-wf-on-surface">PROJECTS</Link>
         <span className="mx-2">/</span>

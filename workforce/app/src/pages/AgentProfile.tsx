@@ -404,7 +404,7 @@ export default function AgentProfile() {
 function Breadcrumb({ slug }: { slug: string | undefined }) {
   return (
     <div className="mb-4 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-      <Link to="/" className="hover:text-wf-on-surface">HOME</Link>
+      <Link to="/feed" className="hover:text-wf-on-surface">HOME</Link>
       <span className="mx-2">/</span>
       <Link to="/agents" className="hover:text-wf-on-surface">CREW</Link>
       <span className="mx-2">/</span>

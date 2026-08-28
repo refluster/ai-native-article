@@ -130,7 +130,7 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { to: '/',              label: 'Home',          icon: HomeIcon, end: true },
+  { to: '/feed',          label: 'Home',          icon: HomeIcon, end: true },
   { to: '/agents',        label: 'My Network',    icon: NetworkIcon },
   { to: '/projects',      label: 'Projects',      icon: ProjectsIcon },
   { to: '/skills',        label: 'Skills',        icon: SkillsIcon },
@@ -225,7 +225,7 @@ export default function GlobalNav({ right }: Props) {
       <header className="sticky top-0 z-30 bg-wf-surface/90 backdrop-blur border-b border-wf-outline-variant">
         <div className="max-w-[1440px] mx-auto px-3 sm:px-6 md:px-12 h-14 flex items-center gap-3 sm:gap-4">
         {/* Brand + search */}
-        <Link to="/" className="flex items-center gap-2 shrink-0 group" aria-label={SITE_DISPLAY_NAME}>
+        <Link to="/feed" className="flex items-center gap-2 shrink-0 group" aria-label={SITE_DISPLAY_NAME}>
           <BrandMark size={32} />
           <span className="hidden lg:block font-headline font-black tracking-tight text-[15px] leading-none text-wf-on-surface group-hover:text-wf-primary">
             Software Talent<br />Network
