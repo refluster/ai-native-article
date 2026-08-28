@@ -22,6 +22,7 @@ import Account from './pages/Account';
 import Messaging from './pages/Messaging';
 import Notifications from './pages/Notifications';
 import AuthCallback from './pages/AuthCallback';
+import Landing from './pages/Landing';
 import AuthBoundary from './components/AuthBoundary';
 import { routerBaseName } from './lib/paths';
 import { trackPageView } from '@kohuehara/shared/analytics';
@@ -70,22 +71,30 @@ function OrgRedirect() {
   return <Navigate to={center ? `/org/chart?q=${encodeURIComponent(center)}` : '/org/chart'} replace />;
 }
 
+function DocsIndexRedirect() {
+  useEffect(() => {
+    window.location.replace('/docs/index.html');
+  }, []);
+  return null;
+}
+
 function ProtectedRoutes() {
   return (
     <AuthBoundary>
       <div className="min-h-screen flex flex-col bg-wf-surface">
         <main className="flex-1">
           <Routes>
-            {/* The feed is the network's index. The operator overview
-                ("Performance") moved to /performance; /feed redirects to
-                the index so existing links keep working. */}
-            <Route path="/" element={<Feed />} />
+            {/* The feed is the console's index, at /feed. The apex now
+                serves the public landing page, so the console's own home
+                links point here; the operator overview ("Performance")
+                lives at /performance. */}
+            <Route path="/feed" element={<Feed />} />
             <Route path="/performance" element={<Dashboard />} />
             {/* /org/chart is the only org view. The egocentric 1-hop
                 /org (OrgDAG) was retired once the whole-org chart covered
                 the same question better; /org redirects rather than 404s,
-                the same treatment /feed gets below, because the old path
-                is in bookmarks and in older PR comments. */}
+                the same treatment old paths get here, because the old
+                path is in bookmarks and in older PR comments. */}
             <Route path="/org/chart" element={<OrgChart />} />
             <Route path="/org" element={<OrgRedirect />} />
             <Route path="/agents" element={<AgentDirectory />} />
@@ -101,7 +110,6 @@ function ProtectedRoutes() {
             <Route path="/projects/*" element={<ProjectProfile />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/reports/:project/:slug" element={<ReportView />} />
-            <Route path="/feed" element={<Navigate to="/" replace />} />
             <Route path="/account" element={<Account />} />
             <Route path="/messaging" element={<Messaging />} />
             <Route path="/notifications" element={<Notifications />} />
@@ -118,6 +126,13 @@ export default function App() {
       <RouteTracker />
       <Routes>
         <Route path="/auth/callback" element={<AuthCallback />} />
+        {/* Public surfaces. The apex is a landing page for visitors, and
+            /docs/ is a set of static documents served straight from S3;
+            the bare /docs path only reaches the router when CloudFront's
+            404 fallback runs (S3 has no directory index), so it forwards
+            to the real object. Everything else stays behind AuthBoundary. */}
+        <Route path="/" element={<Landing />} />
+        <Route path="/docs" element={<DocsIndexRedirect />} />
         <Route path="*" element={<ProtectedRoutes />} />
       </Routes>
     </BrowserRouter>
