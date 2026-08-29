@@ -2,6 +2,7 @@
 // Routes:
 //   GET    /agents                          list (paginated, filterable)
 //   POST   /agents                          create an agent — validated + audited (IAM-auth at API GW; ADR-0007 full CRUD)
+//   GET    /public/workforce-summary     cached public KPI roll-up (kohuehara.xyz agent-workforce card)
 //   GET    /stats                           dashboard aggregate — EXEC-ledger roll-up (runs/deliv/heat/trace; duration, not cost)
 //   GET    /agents/{slug}                   single agent
 //   GET    /agents/{slug}/executions        canonical activity ledger — EXEC rows via GSI1 (the agent-profile task log)
@@ -276,6 +277,9 @@ export async function handler(
     // await` so the audit-append throw routes through the 500 mapping.
     if (routeKey === "POST /agents") return await createAgent(event);
     if (routeKey === "GET /stats") return listStats(event);
+    // Public KPI card for kohuehara.xyz — the cached, projected-down
+    // sibling of /stats (see getPublicSummary).
+    if (routeKey === "GET /public/workforce-summary") return getPublicSummary();
     // Epic-016 Phase 2 — performance analytics (lifecycle funnel + PR
     // automation). Public read, same CORS-gated shape as /stats. Serves the
     // reducer's live lifecycle roll-up; 404 (→ client illustrative fallback)
@@ -619,6 +623,212 @@ async function listStats(
     activity: { days, by_slug: bySlug },
     recent_runs: allRecent.slice(0, STATS_RECENT_RUNS),
   });
+}
+
+// ─── GET /public/workforce-summary — public KPI card (kohuehara.xyz) ────
+//
+// The portfolio site at https://kohuehara.xyz renders a "working with
+// agents" section: how many agents ran today, how much work the workforce
+// executed over the past week, how many hours of agent compute went into
+// this month. That page is an anonymous, high-fan-out surface, so it needs
+// an endpoint that is:
+//
+//   (a) small — a phone on a cold network shouldn't download the ~17 KB
+//       operator dashboard payload to paint six numbers;
+//   (b) cheap — GET /stats fans out one ledger query per agent (4–6 s,
+//       ~60 DDB queries per call). Paying that per visitor is the wrong
+//       cost shape for a public page.
+//
+// So this route computes the same EXEC-ledger roll-up, projects it down to
+// the public KPI set, and memoises the result per Lambda container for
+// PUBLIC_SUMMARY_TTL_MS. Freshness is advertised in the payload
+// (`generated_at` + `cache_ttl_seconds`) rather than implied.
+//
+// Same C-1 rule as /stats: NO cost or token figures. Per-run token usage
+// isn't observable from the CCR execution path, so publishing a dollar
+// number on the public site would be fabricated truth. The honest compute
+// proxy is wall-clock run duration, surfaced as hours.
+//
+// Everything here is already public through GET /agents + GET /stats — the
+// route adds no new disclosure, only a cheaper shape.
+
+const PUBLIC_SUMMARY_TTL_MS = 5 * 60 * 1000;
+const PUBLIC_SUMMARY_HEAT_DAYS = 30;
+const PUBLIC_SUMMARY_WEEK_DAYS = 7;
+const PUBLIC_SUMMARY_RECENT = 8;
+const PUBLIC_SUMMARY_TOP_SKILLS = 5;
+
+interface PublicSummaryWindow {
+  /** Inclusive UTC date the window opens on (YYYY-MM-DD). */
+  from: string;
+  runs: number;
+  deliverables: number;
+  agents_active: number;
+  compute_hours: number;
+}
+
+interface PublicSummary {
+  generated_at: string;
+  cache_ttl_seconds: number;
+  roster: { agents_total: number; agents_active_today: number };
+  today: PublicSummaryWindow & { date: string };
+  week: PublicSummaryWindow;
+  month: PublicSummaryWindow & { month: string };
+  activity_30d: Array<{ date: string; runs: number }>;
+  top_skills_7d: Array<{ skill: string; runs: number }>;
+  recent_runs: Array<{
+    agent: string;
+    name: string;
+    role: string;
+    skill: string;
+    started_at: string;
+    duration_s: number;
+    status: "ok" | "throw" | "dlq";
+  }>;
+}
+
+let _publicSummaryCache: { expires_at: number; body: PublicSummary } | undefined;
+
+/** Test seam — the module-level memo would otherwise leak between cases.
+ *  Not reachable over HTTP; the route never invalidates on demand. */
+export function __clearPublicSummaryCache(): void {
+  _publicSummaryCache = undefined;
+}
+
+/** One accumulator per reporting window (today / 7d / MTD). */
+class PublicWindowAcc {
+  runs = 0;
+  deliverables = 0;
+  computeSeconds = 0;
+  readonly agents = new Set<string>();
+
+  add(slug: string, row: ExecutionRow, durationS: number): void {
+    this.runs += 1;
+    if (row.status === "ok") this.deliverables += 1;
+    this.computeSeconds += durationS;
+    this.agents.add(slug);
+  }
+
+  view(from: string): PublicSummaryWindow {
+    return {
+      from,
+      runs: this.runs,
+      deliverables: this.deliverables,
+      agents_active: this.agents.size,
+      // One decimal: "494.0 hours" reads as a measured figure, and the
+      // rounding never inflates a small window to a bogus whole hour.
+      compute_hours: Math.round((this.computeSeconds / 3600) * 10) / 10,
+    };
+  }
+}
+
+async function computePublicSummary(now: Date): Promise<PublicSummary> {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const todayMidnightMs = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+  const weekStartMs = todayMidnightMs - (PUBLIC_SUMMARY_WEEK_DAYS - 1) * dayMs;
+  const heatStartMs = todayMidnightMs - (PUBLIC_SUMMARY_HEAT_DAYS - 1) * dayMs;
+  const monthStartMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+
+  const todayIso = new Date(todayMidnightMs).toISOString();
+  const weekStartIso = new Date(weekStartMs).toISOString();
+  const monthStartIso = new Date(monthStartMs).toISOString();
+  // Read back to whichever window opens earliest (MTD vs the 30-day strip).
+  const queryFromIso = new Date(Math.min(monthStartMs, heatStartMs)).toISOString();
+
+  const days: string[] = [];
+  for (let i = 0; i < PUBLIC_SUMMARY_HEAT_DAYS; i++) {
+    days.push(new Date(heatStartMs + i * dayMs).toISOString().slice(0, 10));
+  }
+  const heat = new Array<number>(PUBLIC_SUMMARY_HEAT_DAYS).fill(0);
+
+  // Paginate the roster scan to completion — a silently truncated public
+  // number is worse than a slightly slower cache miss (C-4).
+  const agentRows: AgentMetaRow[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await scanPrefix<AgentMetaRow>("AGENT#", "META", 100, cursor);
+    agentRows.push(...page.items);
+    cursor = page.cursor;
+  } while (cursor);
+
+  const today = new PublicWindowAcc();
+  const week = new PublicWindowAcc();
+  const month = new PublicWindowAcc();
+  const skills7d = new Map<string, number>();
+  const recent: PublicSummary["recent_runs"] = [];
+
+  let agentsTotal = 0;
+
+  for (const meta of agentRows) {
+    if (meta.archived) continue;
+    agentsTotal += 1;
+    const slug = meta.slug;
+    const rows = await listExecutions({
+      agent_slug: slug,
+      from: queryFromIso,
+      limit: STATS_PER_AGENT_EXEC_LIMIT,
+    });
+
+    for (const r of rows) {
+      const tsMs = Date.parse(r.started_at);
+      const durationS = execDurationSeconds(r);
+      if (Number.isFinite(tsMs)) {
+        const idx = Math.floor((tsMs - heatStartMs) / dayMs);
+        if (idx >= 0 && idx < PUBLIC_SUMMARY_HEAT_DAYS) heat[idx] = (heat[idx] ?? 0) + 1;
+      }
+      if (r.started_at >= todayIso) today.add(slug, r, durationS);
+      if (r.started_at >= weekStartIso) {
+        week.add(slug, r, durationS);
+        skills7d.set(r.skill_name, (skills7d.get(r.skill_name) ?? 0) + 1);
+      }
+      if (r.started_at >= monthStartIso) month.add(slug, r, durationS);
+
+      recent.push({
+        agent: slug,
+        name: meta.first_name ?? slug,
+        role: meta.role ?? "",
+        skill: r.skill_name,
+        started_at: r.started_at,
+        duration_s: Math.round(durationS),
+        status: mapExecStatus(r.status),
+      });
+    }
+  }
+
+  recent.sort((a, b) =>
+    a.started_at < b.started_at ? 1 : a.started_at > b.started_at ? -1 : 0,
+  );
+
+  const topSkills = [...skills7d.entries()]
+    .sort((a, b) => (b[1] - a[1]) || (a[0] < b[0] ? -1 : 1))
+    .slice(0, PUBLIC_SUMMARY_TOP_SKILLS)
+    .map(([skill, runs]) => ({ skill, runs }));
+
+  return {
+    generated_at: now.toISOString(),
+    cache_ttl_seconds: PUBLIC_SUMMARY_TTL_MS / 1000,
+    roster: { agents_total: agentsTotal, agents_active_today: today.agents.size },
+    today: { ...today.view(todayIso.slice(0, 10)), date: todayIso.slice(0, 10) },
+    week: week.view(weekStartIso.slice(0, 10)),
+    month: { ...month.view(monthStartIso.slice(0, 10)), month: monthStartIso.slice(0, 7) },
+    activity_30d: days.map((date, i) => ({ date, runs: heat[i] ?? 0 })),
+    top_skills_7d: topSkills,
+    recent_runs: recent.slice(0, PUBLIC_SUMMARY_RECENT),
+  };
+}
+
+async function getPublicSummary(): Promise<APIGatewayProxyResultV2> {
+  const now = new Date();
+  if (_publicSummaryCache && _publicSummaryCache.expires_at > now.getTime()) {
+    return reply(200, _publicSummaryCache.body);
+  }
+  const body = await computePublicSummary(now);
+  _publicSummaryCache = { expires_at: now.getTime() + PUBLIC_SUMMARY_TTL_MS, body };
+  return reply(200, body);
 }
 
 // ADR-0007: PATCH /agents/{slug} is the single write path for agent config.

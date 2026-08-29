@@ -517,6 +517,12 @@ paths:
         - { name: q, in: query, required: true, schema: { type: string } }
         - { name: k, in: query, schema: { type: integer } }
       responses: { "200": { description: OK } }
+  /public/workforce-summary:
+    get:
+      tags: [meta]
+      summary: Public workforce KPI card (cached projection of /stats)
+      description: 'Small, anonymous-read roll-up powering the "working with agents" section on kohuehara.xyz: roster size + agents active today, runs/deliverables/compute-hours for today, the trailing 7 days and month-to-date, a 30-day run strip, the top skills of the week and the newest activity ribbon. Memoised per Lambda container for cache_ttl_seconds. Carries no cost or token figures (C-1) — wall-clock run duration is the honest compute proxy.'
+      responses: { "200": { description: OK } }
   /stats:
     get:
       tags: [meta]

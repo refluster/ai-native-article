@@ -334,7 +334,7 @@ vi.mock("../shared/engagement-token.js", () => ({
 }));
 
 // SUT must be imported AFTER all vi.mock() calls.
-const { handler } = await import("./handler.js");
+const { handler, __clearPublicSummaryCache } = await import("./handler.js");
 const recallMock = vi.mocked((await import("../shared/recall.js")).recall);
 const isValidEngagementTokenMock = vi.mocked((await import("../shared/engagement-token.js")).isValidEngagementToken);
 
@@ -1668,5 +1668,181 @@ describe("GET /stats (listStats)", () => {
     expect(body.totals.avg_duration_s).toBe(0);
     expect(body.activity.days).toHaveLength(30);
     expect(body.recent_runs).toEqual([]);
+  });
+});
+
+// ─── GET /public/workforce-summary (public KPI card for kohuehara.xyz) ──
+//
+// The cached, projected-down sibling of /stats. Covers: the three
+// reporting windows (today / 7d / MTD), the roster + active-today count,
+// the archived-agent exclusion, the 30-day strip, the container-level
+// memo, and the same C-1 no-cost/no-token contract /stats carries.
+describe("GET /public/workforce-summary (getPublicSummary)", () => {
+  type SummaryWindow = {
+    from: string;
+    runs: number;
+    deliverables: number;
+    agents_active: number;
+    compute_hours: number;
+  };
+  type SummaryBody = {
+    generated_at: string;
+    cache_ttl_seconds: number;
+    roster: { agents_total: number; agents_active_today: number };
+    today: SummaryWindow & { date: string };
+    week: SummaryWindow;
+    month: SummaryWindow & { month: string };
+    activity_30d: Array<{ date: string; runs: number }>;
+    top_skills_7d: Array<{ skill: string; runs: number }>;
+    recent_runs: Array<{
+      agent: string;
+      name: string;
+      role: string;
+      skill: string;
+      started_at: string;
+      duration_s: number;
+      status: string;
+    }>;
+  };
+
+  function seedAgent(slug: string, over: Partial<AnyRow> = {}) {
+    rows.set(key(`AGENT#${slug}`, "META"), {
+      pk: `AGENT#${slug}`,
+      sk: "META",
+      slug,
+      first_name: slug[0]!.toUpperCase() + slug.slice(1),
+      role: "Analyst",
+      paused: false,
+      archived: false,
+      last_run_status: "ok",
+      ...over,
+    });
+  }
+
+  /** `daysAgo` days before today, at 01:00 UTC — always inside the day
+   *  bucket it names, whatever hour the suite runs at. */
+  function daysAgoAt(daysAgo: number): string {
+    const d = new Date();
+    d.setUTCHours(1, 0, 0, 0);
+    return new Date(d.getTime() - daysAgo * 24 * 60 * 60 * 1000).toISOString();
+  }
+
+  function seedExec(
+    slug: string,
+    opts: { ulid: string; startedAt: string; durationS?: number; status?: string; skill?: string },
+  ) {
+    const started = new Date(opts.startedAt);
+    const ended = new Date(started.getTime() + (opts.durationS ?? 0) * 1000);
+    rows.set(key(`PROJECT#self/${slug}`, `EXEC#${opts.ulid}`), {
+      pk: `PROJECT#self/${slug}`,
+      sk: `EXEC#${opts.ulid}`,
+      project_id: `self/${slug}`,
+      agent_slug: slug,
+      skill_name: opts.skill ?? "daily-research",
+      skill_version: "1.0.0",
+      started_at: started.toISOString(),
+      ended_at: ended.toISOString(),
+      status: opts.status ?? "ok",
+      gsi1pk: `AGENT#${slug}`,
+      gsi1sk: started.toISOString(),
+    });
+  }
+
+  beforeEach(() => {
+    __clearPublicSummaryCache();
+  });
+
+  it("rolls today / 7-day / MTD windows out of the EXEC ledger", async () => {
+    seedAgent("nadia");
+    seedAgent("ren");
+    seedExec("nadia", { ulid: "01A", startedAt: daysAgoAt(0), durationS: 3600 });
+    seedExec("nadia", { ulid: "01B", startedAt: daysAgoAt(0), durationS: 1800, status: "throw" });
+    seedExec("ren", { ulid: "01C", startedAt: daysAgoAt(3), durationS: 7200 });
+
+    const res = await handler(evt("GET /public/workforce-summary"));
+    expect(statusOf(res)).toBe(200);
+    const body = bodyOf(res) as SummaryBody;
+
+    // Today: both of nadia's runs; one threw, so only one "delivered".
+    expect(body.today.runs).toBe(2);
+    expect(body.today.deliverables).toBe(1);
+    expect(body.today.agents_active).toBe(1);
+    expect(body.today.compute_hours).toBe(1.5);
+
+    // 7 days: adds ren's run 3 days back.
+    expect(body.week.runs).toBe(3);
+    expect(body.week.agents_active).toBe(2);
+    expect(body.week.compute_hours).toBe(3.5);
+
+    expect(body.roster.agents_total).toBe(2);
+    expect(body.roster.agents_active_today).toBe(1);
+    expect(body.cache_ttl_seconds).toBe(300);
+  });
+
+  it("excludes archived agents from the roster and reads no ledger for them", async () => {
+    seedAgent("nadia");
+    seedAgent("zed", { archived: true });
+    seedExec("nadia", { ulid: "01A", startedAt: daysAgoAt(0), durationS: 60 });
+
+    const body = bodyOf(await handler(evt("GET /public/workforce-summary"))) as SummaryBody;
+    expect(body.roster.agents_total).toBe(1);
+    expect(body.recent_runs.every((r) => r.agent !== "zed")).toBe(true);
+  });
+
+  it("emits a 30-day strip ending today and a newest-first activity ribbon", async () => {
+    seedAgent("nadia");
+    seedAgent("ren");
+    seedExec("nadia", { ulid: "01A", startedAt: daysAgoAt(1), durationS: 60, skill: "feed-post" });
+    seedExec("ren", { ulid: "01C", startedAt: daysAgoAt(0), durationS: 30, skill: "daily-research" });
+
+    const body = bodyOf(await handler(evt("GET /public/workforce-summary"))) as SummaryBody;
+    expect(body.activity_30d).toHaveLength(30);
+    expect(body.activity_30d[29]!.date).toBe(new Date().toISOString().slice(0, 10));
+    expect(body.activity_30d[29]!.runs).toBe(1);
+    expect(body.activity_30d[28]!.runs).toBe(1);
+
+    expect(body.recent_runs[0]!.agent).toBe("ren");
+    expect(body.recent_runs[0]!.name).toBe("Ren");
+    expect(body.recent_runs[0]!.role).toBe("Analyst");
+    expect(body.top_skills_7d[0]).toEqual({ skill: "daily-research", runs: 1 });
+  });
+
+  it("reports NO cost or token figures (C-1: no fabricated truth)", async () => {
+    seedAgent("nadia");
+    seedExec("nadia", { ulid: "01A", startedAt: daysAgoAt(0), durationS: 60 });
+
+    const body = bodyOf(await handler(evt("GET /public/workforce-summary")));
+    const blob = JSON.stringify(body);
+    expect(blob).not.toMatch(/cost/i);
+    expect(blob).not.toMatch(/token/i);
+    expect(blob).not.toMatch(/usd/i);
+  });
+
+  it("serves the memoised payload on a second call (public-traffic cost gate)", async () => {
+    seedAgent("nadia");
+    seedExec("nadia", { ulid: "01A", startedAt: daysAgoAt(0), durationS: 60 });
+    const first = bodyOf(await handler(evt("GET /public/workforce-summary"))) as SummaryBody;
+
+    // A run landing after the memo must NOT change the served payload until
+    // the TTL expires — that is the point of the cache.
+    seedExec("nadia", { ulid: "01B", startedAt: daysAgoAt(0), durationS: 60 });
+    const second = bodyOf(await handler(evt("GET /public/workforce-summary"))) as SummaryBody;
+    expect(second.generated_at).toBe(first.generated_at);
+    expect(second.today.runs).toBe(1);
+
+    // …and it does once the memo is dropped.
+    __clearPublicSummaryCache();
+    const third = bodyOf(await handler(evt("GET /public/workforce-summary"))) as SummaryBody;
+    expect(third.today.runs).toBe(2);
+  });
+
+  it("returns an empty-but-valid payload on an empty roster", async () => {
+    const body = bodyOf(await handler(evt("GET /public/workforce-summary"))) as SummaryBody;
+    expect(body.roster).toEqual({ agents_total: 0, agents_active_today: 0 });
+    expect(body.today.runs).toBe(0);
+    expect(body.week.compute_hours).toBe(0);
+    expect(body.activity_30d).toHaveLength(30);
+    expect(body.recent_runs).toEqual([]);
+    expect(body.top_skills_7d).toEqual([]);
   });
 });

@@ -536,6 +536,17 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /stats
             Method: GET
+        # Public KPI card for the portfolio site (kohuehara.xyz "working
+        # with agents" section). Same public, CORS-gated read posture as
+        # /stats, but a small, container-memoised projection: /stats fans
+        # out one ledger query per agent (4-6 s) and is the wrong cost
+        # shape to serve per anonymous visitor.
+        GetPublicWorkforceSummary:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /public/workforce-summary
+            Method: GET
         # Epic-016 Phase 2 — performance analytics (lifecycle funnel + PR
         # automation), workforce-wide and per-project. Public read, same
         # CORS-gated shape as /stats; reads the wf-performance-reducer
