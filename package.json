@@ -26,7 +26,7 @@
     "check-corpus-freshness": "node scripts/check-corpus-freshness.mjs",
     "check-base-path": "node scripts/check-base-path.mjs",
     "check-live-base-path": "node scripts/check-live-base-path.mjs",
-    "test:scripts": "node --test scripts/lib/*.test.mjs",
+    "test:scripts": "node --test scripts/lib/*.test.mjs workforce/pipeline/knowledge-backup/lib/*.test.mjs",
     "check-l1-citation": "node scripts/check-l1-citation.mjs",
     "check-registries": "node scripts/check-governance-registries.mjs",
     "content-insights": "node scripts/content-insights.mjs",

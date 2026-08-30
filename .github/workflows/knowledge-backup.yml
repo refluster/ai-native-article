@@ -1,0 +1,95 @@
+# Knowledge backup — Discord + Notion -> knowledge-store (ADR-0026, Layer 1).
+#
+# Deterministic ingest: no LLM, no persona, no judgment. This is the pipeline
+# half of the two-layer design in workforce/docs/adr/adr-0026 — the sense-making
+# Cadence that reads what this writes is deliberately NOT part of this workflow.
+#
+# GitHub Actions is the substrate because the sink is git: the scripts speak the
+# git data API directly, and a runner-scoped CI secret is the one place R-N3
+# permits a credential outside Secrets Manager. Nothing here touches AWS.
+#
+# Provisioning (operator, one-time):
+#   vars.KNOWLEDGE_STORE_REPO      "owner/name" — until this is set the workflow
+#                                  no-ops, so the cron is not red before the
+#                                  store exists.
+#   secrets.KNOWLEDGE_STORE_TOKEN  fine-grained PAT, contents:write on that repo
+#   secrets.DISCORD_BOT_TOKEN      bot token, Message Content intent enabled
+#   secrets.DISCORD_SERVER_ID      guild id
+#   secrets.NOTION_API_KEY         integration token, shared with the pages to back up
+
+name: Knowledge backup (Discord + Notion)
+
+on:
+  schedule:
+    # 01:23 UTC — after the UTC day the run archives has closed, and clear of
+    # the deploy (06/12/18:17), insights (02:00 Mon) and sweep (04:47) crons.
+    - cron: "23 1 * * *"
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "Window start (YYYYMMDDTHHMMSS or ISO-8601, UTC). Default: yesterday 00:00."
+        required: false
+      until:
+        description: "Window end (YYYYMMDDTHHMMSS or ISO-8601, UTC). Default: today 00:00."
+        required: false
+      dry_run:
+        description: "Scrape and render, but commit nothing."
+        type: boolean
+        default: false
+
+concurrency:
+  # A backfill and the nightly run must not race for the same branch head.
+  group: knowledge-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  discord:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Dependency-free scripts — no npm ci needed.
+      - name: Back up Discord
+        env:
+          KNOWLEDGE_REPO: ${{ vars.KNOWLEDGE_STORE_REPO }}
+          KNOWLEDGE_REPO_TOKEN: ${{ secrets.KNOWLEDGE_STORE_TOKEN }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_SERVER_ID: ${{ secrets.DISCORD_SERVER_ID }}
+        run: |
+          if [ -z "$KNOWLEDGE_REPO" ]; then
+            echo "::notice::vars.KNOWLEDGE_STORE_REPO is unset — knowledge backup is not provisioned yet; skipping."
+            exit 0
+          fi
+          node workforce/pipeline/knowledge-backup/backup-discord.mjs \
+            ${{ inputs.since && format('--since {0}', inputs.since) || '' }} \
+            ${{ inputs.until && format('--until {0}', inputs.until) || '' }} \
+            ${{ inputs.dry_run && '--dry-run' || '' }}
+
+  notion:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Back up Notion
+        env:
+          KNOWLEDGE_REPO: ${{ vars.KNOWLEDGE_STORE_REPO }}
+          KNOWLEDGE_REPO_TOKEN: ${{ secrets.KNOWLEDGE_STORE_TOKEN }}
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+        run: |
+          if [ -z "$KNOWLEDGE_REPO" ]; then
+            echo "::notice::vars.KNOWLEDGE_STORE_REPO is unset — knowledge backup is not provisioned yet; skipping."
+            exit 0
+          fi
+          node workforce/pipeline/knowledge-backup/backup-notion.mjs \
+            ${{ inputs.since && format('--since {0}', inputs.since) || '' }} \
+            ${{ inputs.until && format('--until {0}', inputs.until) || '' }} \
+            ${{ inputs.dry_run && '--dry-run' || '' }}
