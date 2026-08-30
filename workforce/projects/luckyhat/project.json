@@ -1,0 +1,15 @@
+{
+  "id": "luckyhat",
+  "name": "LuckyHat",
+  "owner_agent": "nobita",
+  "governance_docs": [
+    "AGENTS.md",
+    "workforce/docs/governance.md"
+  ],
+  "credential_types": [
+    "discord.bot_token"
+  ],
+  "status": "active",
+  "created_at": "2026-08-29",
+  "note": "Trust boundary for the character-persona Discord presence ported from refluster/luckyhat-ms (ai-instances/src/discord-bot). Holds the Discord BOT TOKEN — a read+write capability over every channel the bot app is in — which is why it is its own project rather than an addition to agent-workforce's bag: a bot token is strictly more powerful than the webhook URL that bag already holds, and the agent-workforce credentials (github.token, notion.integration_token, feed_write_token) have no business being reachable from a character bot's fire. Named for the originating service rather than for one persona: the boundary is the Discord app, so a second character on the same bot token is a new agent binding inside this project, not a new project. No github block: this project produces no repo artefacts, only chat messages."
+}
