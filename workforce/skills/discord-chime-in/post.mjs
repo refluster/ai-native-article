@@ -103,12 +103,24 @@ const ARTEFACTS = [
 ];
 const head = body.slice(0, 50).toLowerCase();
 
+// The two length checks deliberately measure differently, and the asymmetry
+// is load-bearing — do NOT "fix" it by making them match.
+//   floor: codepoints ([...body].length). A persona's "at least N characters"
+//     means N characters as a human counts them.
+//   cap:   UTF-16 units (body.length), which is >= the codepoint count. Whether
+//     Discord's 2000 counts codepoints or UTF-16 units, the larger measure
+//     rejects at or before Discord would, so a body full of astral-plane
+//     characters (emoji) fails here with a clear message instead of taking an
+//     HTTP 400 on the wire. Switching this to codepoints would be the unsafe
+//     direction.
+const bodyCodepoints = [...body].length;
+
 if (body.length === 0) fail(1, "comment body is empty (W-1)");
 if (ARTEFACTS.some((a) => head.startsWith(a))) {
   fail(1, `body opens with an LLM-failure artefact (W-1): "${head}"`);
 }
-if ([...body].length < minChars) {
-  fail(1, `comment is ${[...body].length} char(s); the floor for this binding is ${minChars} (W-1). Write a fuller comment — do not pad.`);
+if (bodyCodepoints < minChars) {
+  fail(1, `comment is ${bodyCodepoints} char(s); the floor for this binding is ${minChars} (W-1). Write a fuller comment — do not pad.`);
 }
 if (body.length > DISCORD_MESSAGE_MAX) {
   fail(1, `comment is ${body.length} chars; Discord's plain-message hard cap is ${DISCORD_MESSAGE_MAX}. Shorten it (do not truncate — C-1) and re-run.`);
