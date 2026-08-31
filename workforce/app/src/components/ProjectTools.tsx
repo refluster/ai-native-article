@@ -14,6 +14,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Typeplate from './Typeplate';
 import { LoadingRegion, SkeletonText } from './Skeleton';
+import ToolRunner from './ToolRunner';
 import { TOOL_REGISTRY, findTool, unprovisionedOnProject } from '../lib/tools';
 import { fetchCredentials } from '../lib/credentials';
 import { WORKFORCE_AGENTS_API_BASE } from '../config/api';
@@ -217,6 +218,13 @@ function ToolDetail({
         {credentials.status === 'loaded' && missing.length > 0 && (
           <MissingCredentials projectId={projectId} missing={missing} />
         )}
+
+        {/* The form renders regardless of the credential advisory: the
+            advisory is not authoritative (the resolver has two fallback
+            tiers the console cannot see), so blocking the run on it would
+            turn a heads-up into a false gate. A genuinely missing
+            credential fails loudly server-side, with the reason. */}
+        <ToolRunner projectId={projectId} tool={tool} />
       </div>
     </section>
   );

@@ -34,6 +34,8 @@
     "workforce:naming": "node workforce/scripts/validate-naming.mjs",
     "workforce:skills": "node workforce/scripts/validate-skills.mjs",
     "workforce:projects": "node workforce/scripts/validate-projects.mjs",
+    "workforce:tools": "node workforce/scripts/validate-tools.mjs",
+    "workforce:tool-registry:check": "node workforce/scripts/build-tool-registry.mjs --check",
     "workforce:projects:seed": "node workforce/scripts/seed-projects.mjs",
     "workforce:skill-registry": "node workforce/scripts/build-skill-registry.mjs",
     "workforce:skill-registry:check": "node workforce/scripts/build-skill-registry.mjs --check",

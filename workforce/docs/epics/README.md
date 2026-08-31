@@ -94,7 +94,7 @@ When the Status line flips, add a parenthetical date so the audit trail is one c
 | [022](epic-022-org-learning-loop.md) | Organisational learning: one agent's experience → everyone's premise (仮説四) | Accepted (2026-07-08) | mateo |
 | [023](epic-023-trust-ladder.md) | Trust ladder: record-computed review authority (仮説五) | Accepted (2026-07-08) | priya |
 | [024](epic-024-messaging-group-chat-and-latest-first-history.md) | Messaging: group compose + latest-first history paging | Implemented (2026-07-17) | operator |
-| [025](epic-025-project-tools-migration.md) | Project Tools: migrate the five luckyhat mini-apps into the workforce console | Draft (2026-08-30) | operator |
+| [025](epic-025-project-tools-migration.md) | Project Tools: migrate the five luckyhat mini-apps into the workforce console | In-progress (2026-08-31) | operator |
 
 The index is also the **canonical status view** — keep it in sync when a Status line in an individual Epic flips. A CI check that asserts table-vs-file consistency is on the backlog (see `workforce/scripts/validate-epic-index.mjs`, forthcoming).
 

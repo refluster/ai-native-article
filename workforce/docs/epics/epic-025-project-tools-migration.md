@@ -1,9 +1,16 @@
 # Epic-025 — Project Tools: migrate the five luckyhat mini-apps into the workforce console
 
-- **Status**: Draft
+- **Status**: In-progress (2026-08-31)
 - **Owner**: operator (refluster)
 - **Created**: 2026-08-30
-- **Implemented by**: (PR link set on open)
+- **Implemented by**: Phase 1 — [#642](https://github.com/refluster/ai-native-article/pull/642); Phase 2 — (PR link set on open)
+
+> **Lifecycle note.** The operator approved this Epic in-session on
+> 2026-08-30 ("EOLはエンドオブライフの意味？であればそれで進めよう" and the three
+> sibling answers recorded below), then directed Phase 1 and Phase 2 in turn
+> ("Phase 1 の実装に進めますか" → はい; "はい、進めて"). That is the operator
+> sign-off the `Draft → Accepted` gate exists to capture, so this Epic moves
+> straight to `In-progress` with this note as the audit trail.
 
 ## Problem
 

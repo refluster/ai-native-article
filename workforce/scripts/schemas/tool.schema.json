@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kohuehara.xyz/workforce/schemas/tool.schema.json",
+  "title": "Workforce interactive tool declaration",
+  "description": "One entry of the project-tools registry (ADR-0027 §3, Epic-025). A tool is declarative: the console renders its form and result from `input`/`output`, and tools-api runs it, so a new tool ships by committing this file plus system.md — no SPA change.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tool_id", "display_name", "summary", "version", "requires", "model", "input", "output"],
+  "properties": {
+    "tool_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "maxLength": 64,
+      "description": "Immutable id. MUST equal the containing directory name and match the console's TOOL_ID route pattern; it is the last path segment of /projects/{id}/tools/{tool_id} and the EXEC row's skill_name suffix, so renaming it breaks the link to past runs."
+    },
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "description": "One line on the tools index card. What the tool does, not how."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semver. Recorded on every EXEC row, so a behaviour change (prompt or schema) MUST bump it or the ledger cannot distinguish runs of different tools-in-name-only."
+    },
+    "requires": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 8,
+      "items": {
+        "type": "string",
+        "pattern": "^(anthropic\\.api_key|azure\\.openai|discord\\.bot_token|discord\\.webhook_url|github\\.token|notion\\.integration_token|voyage\\.api_key|workforce\\.feed_write_token|workforce\\.memory_write_token|workforce\\.dispatch_token)(@[a-z][a-z0-9_-]*)?$"
+      },
+      "description": "Credential types the run resolves from the project. Mirror point of credential-injector.ts:CREDENTIAL_TYPES — see that file's header for the full list of mirrors. A tool that calls the model needs azure.openai."
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_tokens"],
+      "properties": {
+        "deployment": {
+          "type": "string",
+          "description": "Azure deployment override. Omit to use the project credential's own deployment, which is the normal case — pinning one here couples the tool to one project's naming."
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 32000,
+          "description": "Completion-token cap. Exhausting it THROWS (W-1/W-4), so size it for the largest honest answer: too low turns a good run into a failed one, never into a shorter result."
+        },
+        "temperature": { "type": "number", "minimum": 0, "maximum": 2 }
+      }
+    },
+    "input": {
+      "type": "object",
+      "description": "JSON Schema for the operator's form. Only a flat object of string/enum/integer fields renders today; the console rejects what it cannot draw rather than dropping fields silently.",
+      "required": ["type", "properties"],
+      "properties": {
+        "type": { "const": "object" },
+        "properties": { "type": "object" },
+        "required": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "output": {
+      "type": "object",
+      "description": "JSON Schema the model is FORCED to answer with, via a single function call with a forced tool_choice (ADR-0027 §5). This is the tool's contract with the renderer.",
+      "required": ["type", "properties"],
+      "properties": {
+        "type": { "const": "object" },
+        "properties": { "type": "object" },
+        "required": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}
