@@ -78,6 +78,7 @@ const ARTICLE_TYPES = new Set(["explanation", "analysis"]);
 // suffix (`type@name`) per Epic-010 §Q2.
 const CREDENTIAL_TYPES = new Set([
   "anthropic.api_key",
+  "azure.openai",
   "discord.bot_token",
   "discord.webhook_url",
   "github.token",

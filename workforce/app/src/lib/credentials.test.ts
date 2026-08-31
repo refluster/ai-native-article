@@ -50,9 +50,10 @@ afterEach(() => {
 });
 
 describe('CREDENTIAL_TYPES', () => {
-  it('matches the 5 canonical types in declaration order', () => {
+  it('matches the 6 canonical types in declaration order', () => {
     expect([...CREDENTIAL_TYPES]).toEqual([
       'anthropic.api_key',
+      'azure.openai',
       'discord.bot_token',
       'github.token',
       'notion.integration_token',

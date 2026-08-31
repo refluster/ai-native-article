@@ -27,6 +27,7 @@ import type {
 /** Canonical credential types — declaration order = SPA render order. */
 export const CREDENTIAL_TYPES = [
   'anthropic.api_key',
+  'azure.openai',
   'discord.bot_token',
   'github.token',
   'notion.integration_token',

@@ -56,6 +56,22 @@ const SHAPE_HINTS: Record<CredentialTypeId, FieldSpec[]> = {
   'anthropic.api_key': [
     { key: 'apiKey', label: 'apiKey', placeholder: 'sk-ant-...', type: 'password' },
   ],
+  'azure.openai': [
+    // Four fields, one secret (ADR-0027 §4 / AzureOpenAISecret). An Azure
+    // call resolves only when the key, the resource endpoint, the
+    // deployment name, and the API version agree — split across two
+    // stores they drift into a 404 that reads like an auth failure, so
+    // the operator enters and rotates them together.
+    { key: 'apiKey', label: 'apiKey', placeholder: '32-hex key', type: 'password' },
+    {
+      key: 'endpoint',
+      label: 'endpoint',
+      placeholder: 'https://<resource>.openai.azure.com',
+      type: 'text',
+    },
+    { key: 'deployment', label: 'deployment', placeholder: 'gpt-5.4', type: 'text' },
+    { key: 'apiVersion', label: 'apiVersion', placeholder: '2024-10-21', type: 'text' },
+  ],
   'discord.bot_token': [
     { key: 'token', label: 'token', placeholder: 'MTAxN...', type: 'password' },
   ],
@@ -81,6 +97,7 @@ const SHAPE_HINTS: Record<CredentialTypeId, FieldSpec[]> = {
 
 const CREDENTIAL_TYPE_LABELS: Record<CredentialTypeId, string> = {
   'anthropic.api_key': 'Anthropic API Key',
+  'azure.openai': 'Azure OpenAI',
   'discord.bot_token': 'Discord Bot Token',
   'github.token': 'GitHub Token',
   'notion.integration_token': 'Notion Integration',

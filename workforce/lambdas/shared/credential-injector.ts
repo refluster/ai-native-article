@@ -41,6 +41,14 @@
 // types and the mirrors become drift-prone, codegen from #1+#2 to
 // #3+#4+#5 is the planned consolidation (Q1 Option B; not implemented).
 //
+// ADR-0027 added `azure.openai` — the project-scoped Azure OpenAI
+// credential the interactive project tools run on (a four-field secret;
+// see AzureOpenAISecret in secrets.ts for why the endpoint/deployment/
+// apiVersion travel with the key rather than as project attributes).
+// It is the SIXTH sync point's first exercise: the console's own
+// CREDENTIAL_TYPES in workforce/app/src/lib/credentials.ts mirrors this
+// set too, and the vault's SHAPE_HINTS must gain the type's fields.
+//
 // Story 4 (#93) added `voyage.api_key` — the Voyage AI embedding API
 // key used by the EXEC-row embedding-write path. The operator must
 // provision `wf/projects/_default/voyage.api_key` (or a per-project
@@ -51,6 +59,7 @@
 import { getCredential, type ProjectId } from "./project.js";
 import type {
   AnthropicSecret,
+  AzureOpenAISecret,
   GithubSecret,
   NotionSecret,
   VoyageSecret,
@@ -131,6 +140,7 @@ export interface WorkforceDispatchTokenSecret {
  */
 export interface CredentialShapes {
   "anthropic.api_key": AnthropicSecret;
+  "azure.openai": AzureOpenAISecret;
   "discord.bot_token": DiscordBotSecret;
   "discord.webhook_url": DiscordWebhookSecret;
   "github.token": GithubSecret;
@@ -172,6 +182,7 @@ export type BaseOf<K extends string> = K extends `${infer B}@${string}`
  */
 export const CREDENTIAL_TYPES: ReadonlySet<CredentialType> = new Set([
   "anthropic.api_key",
+  "azure.openai",
   "discord.bot_token",
   "discord.webhook_url",
   "github.token",
