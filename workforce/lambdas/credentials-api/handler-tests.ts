@@ -194,7 +194,7 @@ vi.mock("../shared/task.js", () => {
 });
 
 // The SUT must be imported AFTER all vi.mock() calls.
-const { handler } = await import("./handler.js");
+const { handler, validateSecretShape } = await import("./handler.js");
 
 // ─── Event factory ────────────────────────────────────────────────────
 
@@ -441,6 +441,41 @@ describe("PUT /projects/{slug}/credentials/{type}", () => {
     expect(bodyOf<{ error: string }>(r3).error).toBe("missing_value");
   });
 
+  it("400s an azure.openai secret missing fields, before any secret write", async () => {
+    // The write boundary is where the four-field contract has to hold —
+    // the console form is one writer among several.
+    const res = await handler(
+      event(
+        "PUT /projects/{slug}/credentials/{type}",
+        { slug: "editorial", type: "azure.openai" },
+        { value: { apiKey: "k", endpoint: "https://r.openai.azure.com" } },
+      ),
+    );
+    expect(res).toMatchObject({ statusCode: 400 });
+    const body = bodyOf<{ error: string; detail: string }>(res);
+    expect(body.error).toBe("invalid_credential_shape");
+    expect(body.detail).toContain("deployment");
+    expect(secrets.has("wf/projects/editorial/azure.openai")).toBe(false);
+  });
+
+  it("accepts a complete azure.openai secret", async () => {
+    const res = await handler(
+      event(
+        "PUT /projects/{slug}/credentials/{type}",
+        { slug: "editorial", type: "azure.openai" },
+        {
+          value: {
+            apiKey: "k",
+            endpoint: "https://r.openai.azure.com",
+            deployment: "d",
+            apiVersion: "2024-10-21",
+          },
+        },
+      ),
+    );
+    expect(res).toMatchObject({ statusCode: 200 });
+  });
+
   it("404s when the project doesn't exist (no secret write happens)", async () => {
     const res = await handler(
       event(
@@ -682,5 +717,60 @@ describe("fail-loud (W-4)", () => {
     );
     expect(res).toMatchObject({ statusCode: 500 });
     expect(execRows).toHaveLength(0);
+  });
+});
+
+// ─── secret-shape validation at the write boundary ────────────────────
+//
+// The four-field azure.openai contract (ADR-0027 §4) previously held only
+// in the console's own form, so any other writer could store a
+// three-of-four secret that reads as provisioned everywhere and fails at
+// call time as a 404 that looks like an auth error. These pin the check
+// that moved it server-side.
+
+describe("validateSecretShape", () => {
+  const complete = {
+    apiKey: "k",
+    endpoint: "https://r.openai.azure.com",
+    deployment: "d",
+    apiVersion: "2024-10-21",
+  };
+
+  it("accepts a complete azure.openai secret", () => {
+    expect(validateSecretShape("azure.openai", complete)).toBeNull();
+  });
+
+  it("names every missing azure.openai field", () => {
+    const { apiKey, endpoint } = complete;
+    const reason = validateSecretShape("azure.openai", { apiKey, endpoint });
+    expect(reason).toContain("deployment");
+    expect(reason).toContain("apiVersion");
+  });
+
+  it("rejects a blank or whitespace-only field", () => {
+    expect(validateSecretShape("azure.openai", { ...complete, deployment: "   " }))
+      .toContain("deployment");
+  });
+
+  it("rejects a non-string field", () => {
+    expect(validateSecretShape("azure.openai", { ...complete, apiVersion: 20241021 }))
+      .toContain("apiVersion");
+  });
+
+  it("rejects a bare string where an object is required", () => {
+    expect(validateSecretShape("azure.openai", "just-the-key")).toContain("requires an object");
+  });
+
+  it("rejects null and arrays", () => {
+    expect(validateSecretShape("azure.openai", null)).toContain("requires an object");
+    expect(validateSecretShape("azure.openai", [])).toContain("requires an object");
+  });
+
+  it("leaves types with no declared shape unconstrained", () => {
+    // Additive by design: single-field keys keep accepting what they
+    // always accepted, so this check cannot break an existing writer.
+    expect(validateSecretShape("github.token", { token: "ghp_x" })).toBeNull();
+    expect(validateSecretShape("anthropic.api_key", "sk-ant-x")).toBeNull();
+    expect(validateSecretShape("notion.integration_token", {})).toBeNull();
   });
 });
