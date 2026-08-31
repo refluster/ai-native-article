@@ -13,7 +13,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Typeplate from './Typeplate';
-import { TOOL_REGISTRY, findTool, missingCredentials } from '../lib/tools';
+import { TOOL_REGISTRY, findTool, unprovisionedOnProject } from '../lib/tools';
 import { fetchCredentials } from '../lib/credentials';
 import { WORKFORCE_AGENTS_API_BASE } from '../config/api';
 import { projectPath } from '../lib/paths';
@@ -26,20 +26,33 @@ interface Props {
   toolId?: string;
 }
 
+/**
+ * The credential LIST is one of three things, and the difference matters:
+ * still loading, loaded (so the advisory is meaningful), or unreadable
+ * (so no claim may be made either way).
+ */
+type CredentialState =
+  | { status: 'loading' }
+  | { status: 'loaded'; rows: CredentialMetadata[] }
+  | { status: 'unknown' };
+
 export default function ProjectTools({ projectId, toolId }: Props) {
-  // Credentials drive the readiness badge on every card, so they are
-  // fetched once here rather than per tool. A failure is not fatal: the
-  // tools still render, with readiness unknown rather than wrong.
-  const [credentials, setCredentials] = useState<CredentialMetadata[] | null>(null);
+  // Credentials drive the provisioning advisory on every card, so they
+  // are fetched once here rather than per tool. Three states, not two:
+  // collapsing a failed fetch to an empty list would render every tool as
+  // fully provisioned — the opposite of the truth, and the failure mode
+  // an advisory exists to prevent.
+  const [credentials, setCredentials] = useState<CredentialState>({ status: 'loading' });
 
   useEffect(() => {
     let cancelled = false;
+    setCredentials({ status: 'loading' });
     fetchCredentials(projectId, WORKFORCE_AGENTS_API_BASE)
       .then((rows) => {
-        if (!cancelled) setCredentials(rows);
+        if (!cancelled) setCredentials({ status: 'loaded', rows });
       })
       .catch(() => {
-        if (!cancelled) setCredentials(null);
+        if (!cancelled) setCredentials({ status: 'unknown' });
       });
     return () => {
       cancelled = true;
@@ -60,7 +73,7 @@ function ToolsIndex({
   credentials,
 }: {
   projectId: string;
-  credentials: CredentialMetadata[] | null;
+  credentials: CredentialState;
 }) {
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
@@ -118,9 +131,10 @@ function ToolCard({
 }: {
   projectId: string;
   tool: ToolDefinition;
-  credentials: CredentialMetadata[] | null;
+  credentials: CredentialState;
 }) {
-  const missing = credentials ? missingCredentials(tool, credentials) : [];
+  const missing =
+    credentials.status === 'loaded' ? unprovisionedOnProject(tool, credentials.rows) : [];
   return (
     <Link
       to={projectPath(projectId, 'tools', tool.tool_id)}
@@ -130,10 +144,16 @@ function ToolCard({
         <span className="font-wfmono text-xs text-wf-on-surface truncate">
           {tool.display_name}
         </span>
-        {missing.length > 0 && (
-          <span className="shrink-0 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary">
-            {missing.length} missing
+        {credentials.status === 'unknown' ? (
+          <span className="shrink-0 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+            creds unknown
           </span>
+        ) : (
+          missing.length > 0 && (
+            <span className="shrink-0 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary">
+              {missing.length} unprovisioned
+            </span>
+          )
         )}
       </div>
       <p className="mt-2 text-sm text-wf-on-surface-variant leading-relaxed">{tool.summary}</p>
@@ -148,9 +168,10 @@ function ToolDetail({
 }: {
   projectId: string;
   tool: ToolDefinition;
-  credentials: CredentialMetadata[] | null;
+  credentials: CredentialState;
 }) {
-  const missing = credentials ? missingCredentials(tool, credentials) : [];
+  const missing =
+    credentials.status === 'loaded' ? unprovisionedOnProject(tool, credentials.rows) : [];
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between gap-3">
@@ -167,25 +188,47 @@ function ToolDetail({
           {tool.display_name}
         </h2>
         <p className="text-sm text-wf-on-surface-variant leading-relaxed">{tool.summary}</p>
-        {missing.length > 0 && <MissingCredentials missing={missing} />}
+        {credentials.status === 'unknown' ? (
+          <CredentialsUnknown />
+        ) : (
+          missing.length > 0 && <MissingCredentials missing={missing} />
+        )}
       </div>
     </section>
   );
 }
 
-// A tool whose credentials are not provisioned says so here, with the
-// remedy named, rather than failing at the API boundary (Epic-025 AC4).
+// An advisory with a remedy, not a verdict (Epic-025 AC4). The wording
+// stops short of "cannot run" on purpose: the resolver also tries the
+// shared `_default` bag and the legacy path, neither of which the
+// project-scoped LIST can see — see unprovisionedOnProject() in lib/tools.ts.
 function MissingCredentials({ missing }: { missing: string[] }) {
   return (
     <div className="border border-wf-outline-variant bg-wf-surface-container rounded-wf-md p-3">
       <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary">
-        Credentials required
+        Not provisioned on this project
       </p>
       <p className="mt-2 text-sm text-wf-on-surface-variant leading-relaxed">
-        This tool cannot run until{' '}
         <span className="font-wfmono text-wf-on-surface">{missing.join(', ')}</span>{' '}
-        {missing.length === 1 ? 'is' : 'are'} provisioned in this project's credential
-        vault, on the Overview tab.
+        {missing.length === 1 ? 'is' : 'are'} not in this project's credential vault
+        (Overview tab). A run may still resolve one from the shared organisation
+        default, so this is a heads-up rather than a blocker.
+      </p>
+    </div>
+  );
+}
+
+// The LIST failed. Saying nothing would render the tool as fully
+// provisioned, which is the one thing this panel must never do.
+function CredentialsUnknown() {
+  return (
+    <div className="border border-wf-outline-variant bg-wf-surface-container rounded-wf-md p-3">
+      <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
+        Credential status unknown
+      </p>
+      <p className="mt-2 text-sm text-wf-on-surface-variant leading-relaxed">
+        This project's credential list could not be read, so this tool's requirements
+        could not be checked. The vault on the Overview tab is the source of truth.
       </p>
     </div>
   );

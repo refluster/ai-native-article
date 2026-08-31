@@ -1,6 +1,8 @@
 // Client-side helpers for the workforce credentials API surface.
 //
-// Three operations on five canonical credential types:
+// Three operations on the canonical credential types (CREDENTIAL_TYPES
+// below is the count of record — no prose copy of it here, which is how
+// the vault's "/ 5" denominator went stale):
 //
 //   - LIST   (GET)     — public via the agents-api base; metadata only.
 //   - PUT    (write)   — SigV4-protected via the credentials-api base.

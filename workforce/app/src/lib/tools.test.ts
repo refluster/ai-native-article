@@ -6,7 +6,7 @@
 // be correct when the first real tool lands in Phase 2.
 
 import { describe, it, expect } from 'vitest';
-import { TOOL_REGISTRY, findTool, missingCredentials } from './tools';
+import { TOOL_REGISTRY, findTool, unprovisionedOnProject } from './tools';
 import type { ToolDefinition } from '../types/tool';
 import type { CredentialMetadata } from '../types/project';
 
@@ -44,24 +44,24 @@ describe('findTool', () => {
   });
 });
 
-describe('missingCredentials', () => {
-  it('reports nothing when every requirement is provisioned', () => {
-    expect(missingCredentials(tool(), [cred('azure.openai')])).toEqual([]);
+describe('unprovisionedOnProject', () => {
+  it('reports nothing when every requirement is provisioned on the project', () => {
+    expect(unprovisionedOnProject(tool(), [cred('azure.openai')])).toEqual([]);
   });
 
   it('reports the unprovisioned requirements', () => {
     const t = tool({ requires: ['azure.openai', 'notion.integration_token'] });
-    expect(missingCredentials(t, [cred('azure.openai')])).toEqual([
+    expect(unprovisionedOnProject(t, [cred('azure.openai')])).toEqual([
       'notion.integration_token',
     ]);
   });
 
   it('reports every requirement when the project has no credentials', () => {
-    expect(missingCredentials(tool(), [])).toEqual(['azure.openai']);
+    expect(unprovisionedOnProject(tool(), [])).toEqual(['azure.openai']);
   });
 
   it('ignores credentials the tool does not require', () => {
-    expect(missingCredentials(tool(), [cred('azure.openai'), cred('github.token')])).toEqual(
+    expect(unprovisionedOnProject(tool(), [cred('azure.openai'), cred('github.token')])).toEqual(
       [],
     );
   });
@@ -71,12 +71,12 @@ describe('missingCredentials', () => {
     // different secret — treating it as the base type would gate a run
     // open that the injector will then fail to resolve.
     const t = tool({ requires: ['notion.integration_token'] });
-    expect(missingCredentials(t, [cred('notion.integration_token@tools')])).toEqual([
+    expect(unprovisionedOnProject(t, [cred('notion.integration_token@tools')])).toEqual([
       'notion.integration_token',
     ]);
   });
 
   it('reports nothing for a tool that needs no credentials', () => {
-    expect(missingCredentials(tool({ requires: [] }), [])).toEqual([]);
+    expect(unprovisionedOnProject(tool({ requires: [] }), [])).toEqual([]);
   });
 });

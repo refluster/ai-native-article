@@ -73,7 +73,7 @@ const DELIV_TYPES = new Set([
 const ARTICLE_TYPES = new Set(["explanation", "analysis"]);
 // Mirror of CREDENTIAL_TYPES in workforce/lambdas/shared/credential-injector.ts.
 // To extend: add the type here AND register its shape in CredentialShapes
-// in the injector module (see the injector file header for all 5 mirror points).
+// in the injector module (see the injector file header for all 6 mirror points).
 // Skill meta requires[] is checked against this set, modulo the variant
 // suffix (`type@name`) per Epic-010 §Q2.
 const CREDENTIAL_TYPES = new Set([

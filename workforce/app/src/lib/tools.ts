@@ -23,21 +23,39 @@ export function findTool(toolId: string): ToolDefinition | undefined {
 }
 
 /**
- * Which of a tool's required credentials the project has not provisioned.
+ * Which of a tool's required credentials are absent from the project's
+ * OWN credential list — an advisory, not a verdict on whether the run
+ * will resolve.
  *
- * The console gates the run on this rather than letting the request fail
- * at the API boundary (Epic-025 AC4) — an unprovisioned credential is an
- * operator to-do with a known remedy, not an error.
+ * The distinction is load-bearing. `getCredential` (lambdas/shared/
+ * project.ts) resolves in three tiers: `wf/projects/{id}/{type}`, then
+ * the shared `wf/projects/_default/{type}`, then legacy `wf/{type}`. The
+ * console's LIST only sees the first, so an org-wide credential
+ * provisioned at `_default` — the documented pattern for
+ * `voyage.api_key` — is invisible here and would be reported "missing"
+ * on every project even though every run resolves it.
+ *
+ * So the console words this as "not provisioned on this project" and
+ * never as "this tool cannot run", and never hard-blocks on it: the
+ * authoritative answer lives server-side, where the injector fails loud
+ * (W-4) if all three tiers miss. Epic-025 AC4 asks for a legible
+ * advisory with a remedy, which this gives, rather than for a client-side
+ * gate the client lacks the information to close.
+ *
+ * A second known gap, same direction: a secret inside its Secrets Manager
+ * recovery window still answers `DescribeSecret`, so it stays in the LIST
+ * and reads as present while `GetSecretValue` would fail. Both gaps make
+ * the advisory over-optimistic or over-pessimistic, never authoritative —
+ * which is exactly why it does not gate.
  *
  * Matching is exact, including any `@variant` suffix: a variant is a
- * separate secret at a separate Secrets Manager path, so
- * `notion.integration_token@tools` does not satisfy a requirement for
- * `notion.integration_token` (or the reverse).
+ * separate secret at a separate path, so `notion.integration_token@tools`
+ * does not satisfy a requirement for `notion.integration_token`.
  */
-export function missingCredentials(
+export function unprovisionedOnProject(
   tool: ToolDefinition,
-  provisioned: readonly CredentialMetadata[],
+  projectCredentials: readonly CredentialMetadata[],
 ): CredentialTypeId[] {
-  const have = new Set(provisioned.map((c) => c.credential_type));
+  const have = new Set(projectCredentials.map((c) => c.credential_type));
   return tool.requires.filter((r) => !have.has(r));
 }

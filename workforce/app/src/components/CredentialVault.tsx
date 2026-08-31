@@ -1,8 +1,12 @@
 // CredentialVault — project credentials panel on the project profile page.
 //
-// Five canonical credential types (anthropic / discord / github / notion /
-// voyage) render as a fixed-order list, each in one of three local
-// states:
+// The canonical credential types (CREDENTIAL_TYPES in lib/credentials.ts
+// — anthropic / azure / discord / github / notion / voyage) render as a
+// fixed-order list, each in one of three local states. The count is read
+// from that array, never restated here or in the header: the previous
+// hardcoded "/ 5" survived the list growing to six.
+//
+// States:
 //
 //   - 'unprovisioned' — no row from LIST; offers a CREATE action.
 //   - 'provisioned'   — backed by a real Secrets Manager row; offers
@@ -356,7 +360,7 @@ export default function CredentialVault({ projectId }: { projectId: string }) {
       <header className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between gap-3">
         <Typeplate
           label="CREDENTIALS"
-          value={`${provisionedCount} / 5 provisioned`}
+          value={`${provisionedCount} / ${CREDENTIAL_TYPES.length} provisioned`}
         />
         <button
           type="button"
