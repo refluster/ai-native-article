@@ -129,9 +129,20 @@ import { signedFetch, assertSigv4Configured } from './sigv4';
 
 export type ProjectStatus = 'active' | 'archived';
 
+/** The config fields `PATCH /projects/{id}` accepts (ADR-0029). `github:
+ *  null` clears the repo pair; the API rejects a half-set pair. */
+export interface ProjectConfigPatch {
+  status?: ProjectStatus;
+  name?: string;
+  owner_agent?: string;
+  github?: { owner: string; repo: string } | null;
+  governance_docs?: string[];
+  credential_types?: string[];
+}
+
 async function patchProject(
   projectId: string,
-  body: { status?: ProjectStatus; name?: string },
+  body: ProjectConfigPatch,
   agentsApiBase: string = WORKFORCE_AGENTS_API_BASE,
 ): Promise<ProjectDetail> {
   assertSigv4Configured();
@@ -168,4 +179,19 @@ export async function patchProjectName(
   agentsApiBase: string = WORKFORCE_AGENTS_API_BASE,
 ): Promise<ProjectDetail> {
   return patchProject(projectId, { name }, agentsApiBase);
+}
+
+
+/**
+ * Patch a project's descriptive config (ADR-0029). Every field is validated
+ * server-side against the same constraints `project.schema.json` puts on the
+ * seed, and the whole patch is validated before anything is written — so a
+ * rejected form leaves the project exactly as it was.
+ */
+export async function patchProjectConfig(
+  projectId: string,
+  patch: ProjectConfigPatch,
+  agentsApiBase: string = WORKFORCE_AGENTS_API_BASE,
+): Promise<ProjectDetail> {
+  return patchProject(projectId, patch, agentsApiBase);
 }

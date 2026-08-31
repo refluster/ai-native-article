@@ -39,6 +39,14 @@ export interface ProjectSummary {
    *  via project.json + seed (Epic-010 §10), not the PATCH API. */
   github_owner?: string;
   github_repo?: string;
+  /** Paths in the target repo that reviewer agents ground their lens
+   *  against. Editable from the console since ADR-0029. */
+  governance_docs?: string[];
+  /** Credential keys this project is expected to hold under
+   *  `wf/projects/{id}/{type}`. NAMES ONLY — values live in Secrets Manager
+   *  and never reach the browser; `GET /projects/{id}/credentials` reports
+   *  which of them actually exist. Editable from the console since ADR-0029. */
+  credential_types?: string[];
 }
 
 /** Shape of `GET /projects/{id}` — same as ProjectSummary today. */

@@ -50,6 +50,32 @@ The full operator runbook lives at [docs/runbooks/external-project-onboarding.md
 4. **Run `npm run workforce:projects:seed`** with operator AWS credentials in scope — writes `PROJECT#{id}/META` + a `MEMBER#{slug}` row for every member.
 5. **Invoke**: `Nadia, review PR https://github.com/{owner}/{repo}/pull/{N} on project {id}` — the routing skill reads project membership and credentials, posts the routing comment, and dispatches the reviewer skills.
 
+## Editing an EXISTING project (ADR-0029)
+
+**Do not edit `project.json` to change a live project's config — it will not
+apply.** Since [ADR-0029](../docs/adr/adr-0029-project-config-write-surface.md),
+`name`, `owner_agent`, `github`, `governance_docs` and `credential_types` are
+**create-only** in the seed: `seed-projects.mjs` carries the stored DDB value
+forward rather than the one the file declares, so a re-seed cannot revert an
+operator's edit. DDB is authoritative for these fields on an existing row;
+`project.json` is creation-time input. (This is [ADR-0007](../docs/adr/adr-0007-agent-config-single-source.md)'s
+posture for agents, applied to projects.)
+
+To change one, use the project page in the console —
+`https://workforce.kohuehara.xyz/projects/{id}` → **CONFIG** panel → **EDIT**.
+Every save is validated server-side and appends a `PROJECT#{id}/AUDIT#` row
+recording the actor and a field-level before/after diff.
+
+`project.json` remains the reviewable declaration of a NEW project, and the
+schema still governs it — the API validates against the same constraints, so
+the two cannot disagree.
+
+**Not editable from the console:** `project_id` (it keys the DDB partition, the
+URL and the Secrets Manager prefix), `created_at` / `archived_at` (facts, not
+settings), and `knowledge-backup.json` — that sibling file stays in git because
+its reader is a GitHub Actions runner with no AWS access
+([ADR-0028](../docs/adr/adr-0028-per-project-knowledge-backup.md)).
+
 ## Invariants (validator-enforced)
 
 | Rule | Description |
