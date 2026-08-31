@@ -17,6 +17,23 @@ const credential: AzureOpenAISecret = {
   apiVersion: "2024-10-21",
 };
 
+/**
+ * The first fetch call's [url, init], asserted rather than destructured
+ * blind: the lambdas tsconfig runs `noUncheckedIndexedAccess`, so
+ * `mock.calls[0]` is possibly-undefined, and "the mock was never called"
+ * is a more useful failure than a destructuring crash.
+ */
+function firstCall(f: typeof fetch): { url: string; init: RequestInit } {
+  const calls = (f as unknown as ReturnType<typeof vi.fn>).mock.calls;
+  expect(calls.length).toBeGreaterThan(0);
+  const [url, init] = calls[0] as [string, RequestInit];
+  return { url, init };
+}
+
+function bodyOf(f: typeof fetch): Record<string, unknown> {
+  return JSON.parse(firstCall(f).init.body as string) as Record<string, unknown>;
+}
+
 function mockResponse(payload: unknown, ok = true, status = 200) {
   return vi.fn(async () => ({
     ok,
@@ -55,20 +72,19 @@ describe("complete — transport", () => {
     const f = mockResponse(chatPayload());
     vi.stubGlobal("fetch", f);
     await complete(base);
-    const [url, init] = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    const { url, init } = firstCall(f);
     expect(url).toBe(
       "https://example-resource.openai.azure.com/openai/deployments/gpt-5.4" +
         "/chat/completions?api-version=2024-10-21",
     );
-    expect((init as RequestInit).headers).toMatchObject({ "api-key": "test-key" });
+    expect(init.headers).toMatchObject({ "api-key": "test-key" });
   });
 
   it("prefers the tool's deployment override over the credential's", async () => {
     const f = mockResponse(chatPayload());
     vi.stubGlobal("fetch", f);
     const res = await complete({ ...base, deployment: "gpt-5.4-mini" });
-    const [url] = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(url).toContain("/deployments/gpt-5.4-mini/");
+    expect(firstCall(f).url).toContain("/deployments/gpt-5.4-mini/");
     expect(res.deployment).toBe("gpt-5.4-mini");
   });
 
@@ -138,10 +154,9 @@ describe("complete — structured output", () => {
     const f = mockResponse(chatPayload({ tool_arguments: '{"ok":true}' }));
     vi.stubGlobal("fetch", f);
     await complete(withSchema);
-    const [, init] = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
-    const body = JSON.parse((init as RequestInit).body as string);
+    const body = bodyOf(f) as { tool_choice: unknown; tools: Array<{ function: { name: string } }> };
     expect(body.tool_choice).toEqual({ type: "function", function: { name: "emit_x" } });
-    expect(body.tools[0].function.name).toBe("emit_x");
+    expect(body.tools[0]?.function.name).toBe("emit_x");
   });
 
   it("returns the parsed arguments as data and leaves text empty", async () => {
@@ -168,8 +183,7 @@ describe("complete — structured output", () => {
     const f = mockResponse(chatPayload());
     vi.stubGlobal("fetch", f);
     await complete(base);
-    const [, init] = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
-    const body = JSON.parse((init as RequestInit).body as string);
+    const body = bodyOf(f);
     expect(body.tools).toBeUndefined();
     expect(body.tool_choice).toBeUndefined();
   });
