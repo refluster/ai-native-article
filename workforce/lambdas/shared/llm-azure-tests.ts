@@ -179,6 +179,24 @@ describe("complete — structured output", () => {
     await expect(complete(withSchema)).rejects.toThrow(/unparseable arguments for emit_x/);
   });
 
+  it("omits temperature entirely when unset, rather than sending a default", async () => {
+    // gpt-5.4 rejects any non-default temperature with HTTP 400
+    // unsupported_value, so "absent" and "sent as 1" are not the same
+    // thing on the wire. The tool registry cannot set the field at all
+    // (validate-tools.mjs T13); this pins the wrapper's half.
+    const f = mockResponse(chatPayload());
+    vi.stubGlobal("fetch", f);
+    await complete(base);
+    expect(bodyOf(f)).not.toHaveProperty("temperature");
+  });
+
+  it("sends temperature only when a caller explicitly sets it", async () => {
+    const f = mockResponse(chatPayload());
+    vi.stubGlobal("fetch", f);
+    await complete({ ...base, temperature: 0.2 });
+    expect(bodyOf(f).temperature).toBe(0.2);
+  });
+
   it("does not send tools when no schema is requested", async () => {
     const f = mockResponse(chatPayload());
     vi.stubGlobal("fetch", f);

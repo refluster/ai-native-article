@@ -30,7 +30,6 @@ export interface ToolModelConfig {
   deployment?: string;
   /** Completion-token cap. Exhausting it throws server-side (W-1/W-4). */
   max_tokens: number;
-  temperature?: number;
 }
 
 export interface ToolDefinition {

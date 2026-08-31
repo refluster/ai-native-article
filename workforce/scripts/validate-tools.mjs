@@ -163,8 +163,18 @@ for (const dir of listToolDirs()) {
     if (!Number.isInteger(model.max_tokens) || model.max_tokens < 256 || model.max_tokens > 32000) {
       v("T12-model", metaPath, `model.max_tokens=${model.max_tokens} must be an integer in [256, 32000]`);
     }
-    if (model.temperature !== undefined && (typeof model.temperature !== "number" || model.temperature < 0 || model.temperature > 2)) {
-      v("T12-model", metaPath, `model.temperature=${model.temperature} must be a number in [0, 2]`);
+    if (model.temperature !== undefined) {
+      // Not a range check — the field is forbidden outright. gpt-5.4
+      // rejects any non-default temperature with HTTP 400
+      // `unsupported_value` (newsletter/docs/azure-budget-rules.md: "do
+      // not re-add it"), and a stubbed-fetch test cannot catch it, so the
+      // only place this can be caught before a live call is here.
+      v(
+        "T13-temperature",
+        metaPath,
+        "model.temperature is not permitted: gpt-5.4 rejects a non-default temperature with " +
+          "HTTP 400 unsupported_value (see newsletter/docs/azure-budget-rules.md). Remove the field.",
+      );
     }
   }
 

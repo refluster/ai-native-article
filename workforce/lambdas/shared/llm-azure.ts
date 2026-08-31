@@ -48,6 +48,18 @@ export interface AzureCompletionRequest {
   maxTokens: number;
   /** Overrides the credential's default deployment (tool.json `model.deployment`). */
   deployment?: string;
+  /**
+   * Sampling temperature. **Omit it for `gpt-5.4`**, which rejects any
+   * non-default value with HTTP 400 `unsupported_value` — see
+   * `newsletter/docs/azure-budget-rules.md`, whose instruction on the
+   * retired `azureGenerateText` was "do not re-add it". Kept on the
+   * request type because this wrapper is a general client and a future
+   * deployment may support it; the TOOL REGISTRY cannot set it
+   * (validate-tools.mjs T13), so a tool cannot reintroduce the 400.
+   *
+   * Undefined means the key is absent from the request body entirely,
+   * not sent as a default.
+   */
   temperature?: number;
   /**
    * When present, the model is forced to answer by calling a single

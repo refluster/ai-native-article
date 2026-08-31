@@ -4,7 +4,7 @@
   "summary": "Turn a research goal and a segment into an interview guide: what to ask, what each question is testing, and the biases to avoid.",
   "version": "1.0.0",
   "requires": ["azure.openai"],
-  "model": { "max_tokens": 6000, "temperature": 0.7 },
+  "model": { "max_tokens": 6000 },
   "input": {
     "type": "object",
     "required": ["research_goal", "segment"],

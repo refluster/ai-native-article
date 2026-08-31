@@ -156,6 +156,18 @@ describe("validate-tools", () => {
     expect(output).toContain("T9-input-field");
   });
 
+  it("rejects model.temperature outright, not just out-of-range values", () => {
+    // gpt-5.4 400s on any non-default temperature (azure-budget-rules.md).
+    // A stubbed-fetch test cannot catch that, so the registry is where a
+    // tool must be stopped from reintroducing it.
+    const { code, output } = runValidator({
+      ...VALID,
+      model: { max_tokens: 4000, temperature: 0.7 },
+    });
+    expect(code).toBe(1);
+    expect(output).toContain("T13-temperature");
+  });
+
   it("rejects an output schema with no properties", () => {
     const { code, output } = runValidator({ ...VALID, output: { type: "object", properties: {} } });
     expect(code).toBe(1);

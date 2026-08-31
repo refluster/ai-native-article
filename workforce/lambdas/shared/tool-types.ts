@@ -12,7 +12,6 @@ export interface ToolModelConfig {
   deployment?: string;
   /** Completion-token cap; exhausting it throws (W-1/W-4). */
   max_tokens: number;
-  temperature?: number;
 }
 
 export interface ToolDefinition {

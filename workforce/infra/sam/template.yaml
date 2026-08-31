@@ -1219,15 +1219,34 @@ Resources:
                 - !GetAtt WfTable.Arn
                 - !Sub ${WfTable.Arn}/index/*
             - Sid: ToolsApiSecretsRead
-              # READ ONLY, and scoped to the project-credential namespace:
-              # this Lambda resolves a project's azure.openai secret and
-              # must never be able to write one (that is credentials-api).
+              # READ ONLY — this Lambda resolves a project's tool
+              # credentials and must never write one (that is
+              # credentials-api).
+              #
+              # Scoped PER CREDENTIAL TYPE, matching this file's own
+              # precedent (AgentsApiRecallVoyageKey scopes to
+              # `wf/projects/*/voyage.api_key-*`, not to `wf/projects/*`).
+              # An earlier revision granted `wf/projects/*` plus a bare
+              # `wf/*`; the latter reached the whole secret namespace —
+              # `wf/github-*`, `wf/ccr/*`, `wf/anthropic` — which no other
+              # Lambda here can see and nothing in this one needs.
+              #
+              # The legacy bare tier (`wf/{type}`, getCredential's third
+              # fallback) is deliberately NOT granted: `azure.openai` is a
+              # post-Epic-010 type introduced by ADR-0027, so no legacy
+              # `wf/azure.openai` secret exists or ever will.
+              #
+              # COUPLING, accepted: this list is static while the tool
+              # registry is data. A tool declaring a new credential type
+              # needs a Resource line added here, and until it has one the
+              # run fails loud with AccessDenied naming the secret — which
+              # is the right direction to fail compared with a standing
+              # broad read.
               Effect: Allow
               Action:
                 - secretsmanager:GetSecretValue
               Resource:
-                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*
-                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*/azure.openai-*
       Environment:
         Variables:
           TABLE_NAME: !Ref WfTable

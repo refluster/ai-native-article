@@ -17,8 +17,7 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
       "azure.openai"
     ],
     "model": {
-      "max_tokens": 6000,
-      "temperature": 0.7
+      "max_tokens": 6000
     },
     "input": {
       "type": "object",
@@ -128,8 +127,7 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
       "azure.openai"
     ],
     "model": {
-      "max_tokens": 6000,
-      "temperature": 0.7
+      "max_tokens": 6000
     },
     "input": {
       "type": "object",

@@ -3,7 +3,7 @@
 - **Status**: In-progress (2026-08-31)
 - **Owner**: operator (refluster)
 - **Created**: 2026-08-30
-- **Implemented by**: Phase 1 — [#642](https://github.com/refluster/ai-native-article/pull/642); Phase 2 — (PR link set on open)
+- **Implemented by**: Phase 1 — [#642](https://github.com/refluster/ai-native-article/pull/642); Phase 2 — [#644](https://github.com/refluster/ai-native-article/pull/644)
 
 > **Lifecycle note.** The operator approved this Epic in-session on
 > 2026-08-30 ("EOLはエンドオブライフの意味？であればそれで進めよう" and the three

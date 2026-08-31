@@ -146,7 +146,9 @@ async function runTool(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyRe
       user: renderUserMessage(tool, rawInput as Record<string, unknown>),
       maxTokens: tool.model.max_tokens,
       deployment: tool.model.deployment,
-      temperature: tool.model.temperature,
+      // No temperature: the registry cannot declare one (validate-tools
+      // T13) because gpt-5.4 400s on any non-default value, so there is
+      // nothing to forward and the key stays off the wire.
       outputSchema: { name: `emit_${tool.tool_id.replace(/-/g, "_")}`, schema: tool.output },
     });
 

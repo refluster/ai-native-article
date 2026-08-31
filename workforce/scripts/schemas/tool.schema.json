@@ -50,7 +50,7 @@
           "maximum": 32000,
           "description": "Completion-token cap. Exhausting it THROWS (W-1/W-4), so size it for the largest honest answer: too low turns a good run into a failed one, never into a shorter result."
         },
-        "temperature": { "type": "number", "minimum": 0, "maximum": 2 }
+        "_comment_temperature": "INTENTIONALLY ABSENT. gpt-5.4 rejects any non-default temperature with HTTP 400 unsupported_value (newsletter/docs/azure-budget-rules.md), which is why the retired azureGenerateText omitted the parameter. A registry that can express it is a registry that will ship a tool that 400s on its first live call, and no stubbed-fetch test can catch that. llm-azure.ts still accepts the parameter for a future caller with a deployment that supports it; a tool cannot set it."
       }
     },
     "input": {
