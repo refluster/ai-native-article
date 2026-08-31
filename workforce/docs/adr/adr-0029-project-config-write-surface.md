@@ -64,17 +64,35 @@ every mutation, and make the console the editing surface.**
    - each `credential_types` base type must be in the injector's registry, or
      the orchestrator fails to resolve it at fire time — a runtime failure the
      operator would only meet in a cadence's logs.
-4. **The whole patch is validated before anything is written.** A request that
+4. **The whole patch is VALIDATED before anything is written.** A request that
    fails on its third field leaves the first two unapplied. Half-applied
    config is the worst outcome for a form.
+
+   Note the precise scope, because looser phrasing would be wrong: the
+   *validation* is atomic, the *application* is not. Applying issues up to
+   three sequential writes (`patchMeta`, `rename`, `archive`/`unarchive`) and
+   then the audit append, none of them transactional, so an error partway
+   through leaves an earlier write persisted — and, if the audit append is what
+   fails, persisted without a trail. That gap is named here rather than implied
+   away; folding the applies and the audit into a `TransactWriteItems` is the
+   fix, and is a follow-up.
 5. **Every mutation appends a `PROJECT#{id}/AUDIT#{ts}#{nonce}` row** carrying
    the actor and a field-level before/after diff — the same shape, and the
    same `diffChanges` implementation, as the agent trail (R-N8). A patch that
    re-sends the stored values writes no audit row. The append runs after the
    row update and throws on failure (W-4), inherited from agent-audit.
 6. **`governance_docs` and `credential_types` are declared on `ProjectMetaRow`
-   and returned by the API.** A field the operator can set but not see is
-   worse than one they can do neither with.
+   and returned by the API — to authenticated callers only.** A field the
+   operator can set but not see is worse than one they can do neither with.
+   But `GET /projects` and `GET /projects/{id}` carry no API GW authorizer, and
+   `governance_docs` holds file paths inside what may be a private client repo.
+   Returning them anonymously would contradict
+   [ADR-0028](adr-0028-per-project-knowledge-backup.md), which keeps config out
+   of DDB *precisely* so private repo detail does not reach this route. So the
+   two fields are gated on the SigV4 principal, and the anonymous view is
+   byte-identical to the pre-ADR-0029 one. This costs the console nothing:
+   editing already requires SigV4, so a caller who cannot see these fields
+   could not have written them either.
 7. **The seed treats every API-owned field as create-only.** `name` already
    worked this way; the rule now covers all six. **Consequence, stated
    plainly: for an existing project, DDB is authoritative for these fields and
@@ -130,16 +148,21 @@ read by services that can reach DynamoDB; knowledge-backup.json's are not.**
   It is append-only and unbounded; the agent trail has the same property and
   no compaction, so this inherits that accepted risk rather than adding a new
   one.
-- **The audit trail has no read route yet.** `listProjectAudit` exists and is
-  tested, but no `GET /projects/{id}/audit` is wired and the console renders
-  nothing — the agent equivalent has both. Filed as the immediate follow-up;
-  until then the rows are queryable only from AWS.
-- **Validation is now duplicated** between `project.schema.json` (the seed's
-  input) and the API. They must agree — a value the console accepts but the
-  schema rejects would fail CI the next time anyone wrote that project out to
-  a file. Both sets live one function apart in `patchProject` with the schema
-  named in a comment; generating one from the other is a follow-up if they
-  drift.
+- **The audit trail is readable.** `GET /projects/{id}/audit` is wired,
+  mirroring `GET /agents/{slug}/audit`. This ADR's first draft deferred the
+  route and described `listProjectAudit` as "tested" when no test existed;
+  review caught both. The console does not yet render the trail — that is the
+  remaining follow-up, and it is a display gap, not a dead surface.
+- **Validation is duplicated** between `project.schema.json` (the seed's
+  input), `validate-projects.mjs` and the API. This ADR's first draft said they
+  "must agree" and deferred enforcement to "a follow-up if they drift" — review
+  established that they had *already* drifted three ways (the injector's
+  registry held 9 credential types, the schema enumerated 6, the validator 7)
+  and that the schema's `owner_agent` pattern rejected `_operator`, a value the
+  API accepts. All three are reconciled here, and
+  `workforce/scripts/credential-type-mirrors-tests.ts` now fails CI on any
+  future divergence. Generating one from the other remains the cleaner end
+  state; the check is the cheap half of the §6.1 ratchet.
 
 ## Related
 

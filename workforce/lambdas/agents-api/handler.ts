@@ -92,7 +92,7 @@ import {
   type SkillConfigViolation,
 } from "../shared/skill-config.js";
 import { appendSkillAudit, listSkillAudit } from "../shared/skill-audit.js";
-import { appendProjectAudit } from "../shared/project-audit.js";
+import { appendProjectAudit, listProjectAudit } from "../shared/project-audit.js";
 import {
   ConditionalCheckFailedException,
   conditionalPutItem,
@@ -323,8 +323,9 @@ export async function handler(
     if (routeKey === "GET /projects/{id}/reports" && projectId) return listProjectReportsRoute(projectId);
     if (routeKey === "GET /projects/{id}/reports/{slug}" && projectId && slug) return getProjectReportRoute(projectId, slug);
     if (routeKey === "GET /projects/{id}/performance" && projectId) return getPerformanceRoute(projectId);
+    if (routeKey === "GET /projects/{id}/audit" && projectId) return listProjectAuditRoute(projectId, event);
     if (routeKey === "PATCH /projects/{id}" && projectId) return await patchProject(projectId, event);
-    if (routeKey === "GET /projects/{id}" && projectId) return getProjectRoute(projectId);
+    if (routeKey === "GET /projects/{id}" && projectId) return getProjectRoute(projectId, event);
     if (routeKey === "GET /feed") return listFeedRoute(event);
     if (routeKey === "GET /feed/{post_id}" && postId) return getFeedPostRoute(postId, event);
     // POST /feed is the runner's write path (Epic-011 feed-post → DDB).
@@ -1100,6 +1101,31 @@ async function listAgentAuditRoute(
   return reply(200, { items: page.items, next_cursor: page.cursor });
 }
 
+/**
+ * GET /projects/{id}/audit — the project config trail (ADR-0029).
+ *
+ * Wired here rather than left as a follow-up: an audit trail nothing can read
+ * is not an audit trail, and the agent equivalent (`GET /agents/{slug}/audit`)
+ * has had one since ADR-0007. Public, like the other project reads and like
+ * the agent trail: the rows carry field names, an actor ARN and timestamps,
+ * not credential values.
+ */
+async function listProjectAuditRoute(
+  rawId: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const qs = event.queryStringParameters ?? {};
+  const pageSize = Math.min(
+    Math.max(parseInt(qs.page_size ?? `${PAGE_SIZE_DEFAULT}`, 10) || PAGE_SIZE_DEFAULT, 1),
+    PAGE_SIZE_MAX,
+  );
+  const id = asProjectId(rawId);
+  const existing = await getProject(id);
+  if (!existing) return reply(404, { error: "not_found", project_id: rawId });
+  const page = await listProjectAudit(id, pageSize, qs.cursor);
+  return reply(200, { items: page.items, next_cursor: page.cursor });
+}
+
 // ----- Skills (Epic-008 PR-D) -----
 
 async function listSkills(
@@ -1388,7 +1414,54 @@ interface ProjectApiView {
   credential_types?: string[];
 }
 
-function toProjectApiView(row: ProjectMetaRow): ProjectApiView {
+/**
+ * String lists on a project row reach us in two shapes, and only one of them
+ * is an array.
+ *
+ * `seed-projects.mjs` writes them through the raw AWS CLI, which stores a
+ * non-empty string array as `SS`; the DocumentClient in `shared/ddb.ts` is
+ * constructed without `unmarshallOptions`, so it hands an `SS` attribute back
+ * as a **JS `Set`**. A row last written by `patchMeta` instead carries a plain
+ * array. Returned unnormalised, the Set serialises as `{}` over the wire —
+ * which the console's `.join('\n')` then throws on — and compares unequal to
+ * an array in `diffChanges`, writing an audit row for a patch that changed
+ * nothing.
+ *
+ * Normalising at the read boundary fixes both, and is preferred to setting
+ * `unmarshallOptions` globally: that would change every other consumer of
+ * `shared/ddb.ts` in the same commit.
+ */
+function toStringList(value: unknown): string[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (value instanceof Set) return [...value] as string[];
+  if (Array.isArray(value)) return value as string[];
+  return undefined;
+}
+
+/**
+ * `GET /projects` and `GET /projects/{id}` carry no API GW authorizer — they
+ * are public reads on the CORS gate. `governance_docs` holds file paths inside
+ * what may be a private client repo, and `credential_types` names which
+ * credential classes a project holds; neither was reachable before ADR-0029.
+ *
+ * Publishing them would also contradict this change's own sibling reasoning:
+ * ADR-0028 keeps knowledge-backup config out of DDB precisely so private repo
+ * detail does not land on this route. So the two new fields are returned ONLY
+ * to a SigV4-authenticated caller. Nothing else about the view changes, and
+ * the anonymous view is byte-identical to the pre-ADR-0029 one.
+ *
+ * This costs the console nothing: editing project config already requires
+ * SigV4, so a session that cannot see these fields could not have written
+ * them either.
+ */
+function isIamAuthenticated(event: APIGatewayProxyEventV2): boolean {
+  const ctx = event.requestContext as unknown as {
+    authorizer?: { iam?: { userArn?: string } };
+  };
+  return Boolean(ctx.authorizer?.iam?.userArn);
+}
+
+function toProjectApiView(row: ProjectMetaRow, includeConfig = false): ProjectApiView {
   return {
     project_id: row.project_id,
     status: row.status,
@@ -1398,8 +1471,12 @@ function toProjectApiView(row: ProjectMetaRow): ProjectApiView {
     name: row.name,
     github_owner: row.github_owner,
     github_repo: row.github_repo,
-    governance_docs: row.governance_docs,
-    credential_types: row.credential_types,
+    ...(includeConfig
+      ? {
+          governance_docs: toStringList(row.governance_docs),
+          credential_types: toStringList(row.credential_types),
+        }
+      : {}),
   };
 }
 
@@ -1440,9 +1517,10 @@ async function listProjects(
   // Resolve last_execution_at concurrently per row. At v1 page sizes
   // (≤100) this is bounded and cheap; promote to a single GSI query if it
   // becomes hot.
+  const includeConfig = isIamAuthenticated(event);
   const items: ProjectApiView[] = await Promise.all(
     filtered.map(async (row) => {
-      const view = toProjectApiView(row);
+      const view = toProjectApiView(row, includeConfig);
       const lastExec = await getLastExecutionAt(row.project_id);
       if (lastExec !== undefined) view.last_execution_at = lastExec;
       return view;
@@ -1578,11 +1656,14 @@ async function dispatchReply(threadId: string, addressedSlug: string | undefined
   }
 }
 
-async function getProjectRoute(rawId: string): Promise<APIGatewayProxyResultV2> {
+async function getProjectRoute(
+  rawId: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
   const id = asProjectId(rawId);
   const row = await getItem<ProjectMetaRow>(projectPk(id), "META");
   if (!row) return reply(404, { error: "not_found", project_id: rawId });
-  const view = toProjectApiView(row);
+  const view = toProjectApiView(row, isIamAuthenticated(event));
   const lastExec = await getLastExecutionAt(rawId);
   if (lastExec !== undefined) view.last_execution_at = lastExec;
   return reply(200, view);
@@ -1967,7 +2048,14 @@ async function patchProject(
   // The diff is taken against the pre-mutation row, over the flattened
   // attribute names actually stored, so an audit line reads the same whether
   // the field arrived as `github` or as `github_owner`/`github_repo`.
-  const before: Record<string, unknown> = { ...existing };
+  // Normalised for the same reason toProjectApiView is: an un-normalised Set
+  // never deep-equals the array the patch carries, so every patch would look
+  // like a change and write a spurious audit row.
+  const before: Record<string, unknown> = {
+    ...existing,
+    governance_docs: toStringList(existing.governance_docs),
+    credential_types: toStringList(existing.credential_types),
+  };
   const after: Record<string, unknown> = {};
 
   if (Object.keys(meta).length > 0) {
@@ -1997,7 +2085,9 @@ async function patchProject(
   }
 
   const updated = await getProject(id);
-  return reply(200, updated ? toProjectApiView(updated) : { error: "vanished" });
+  // The PATCH route is AWS_IAM by definition, so the config fields are
+  // always included here — the editor must see what it just saved.
+  return reply(200, updated ? toProjectApiView(updated, true) : { error: "vanished" });
 }
 
 // Epic-010 ROADMAP §Status-transition criterion 3 (C3): the agent

@@ -164,14 +164,27 @@ function attrS(av) {
 }
 
 /** Decode a DynamoDB AttributeValue back to the plain JS value `ddbItem`
- *  would re-encode identically. Only the shapes a project META row uses. */
+ *  would re-encode identically. Only the shapes a project META row uses.
+ *
+ *  `SS` / `NS` are NOT optional here: `ddbItem` encodes a non-empty string
+ *  array as `SS`, so a decoder that omits it returns `undefined` for every
+ *  stored `governance_docs` / `credential_types`, and the create-only
+ *  carry-forward below then rewrites them as `{NULL:true}` — destroying on
+ *  re-seed exactly the fields it exists to protect. Any type `ddbItem` can
+ *  emit must round-trip through here; the test pins that property directly
+ *  rather than enumerating today's fields. */
 function fromAttr(av) {
   if (!av) return undefined;
   if (av.NULL) return null;
   if (av.S !== undefined) return av.S;
   if (av.N !== undefined) return Number(av.N);
   if (av.BOOL !== undefined) return av.BOOL;
+  if (av.SS !== undefined) return [...av.SS];
+  if (av.NS !== undefined) return av.NS.map(Number);
   if (av.L !== undefined) return av.L.map(fromAttr);
+  if (av.M !== undefined) {
+    return Object.fromEntries(Object.entries(av.M).map(([k, v]) => [k, fromAttr(v)]));
+  }
   return undefined;
 }
 
@@ -199,6 +212,27 @@ const API_OWNED_FIELDS = [
   "credential_types",
 ];
 
+/**
+ * Carry the API-owned fields forward from the stored row onto the row the seed
+ * is about to write, so a re-seed never reverts a console edit.
+ *
+ * The predicate is "the row exists", NOT "the attribute is present". An
+ * attribute the console CLEARED (`github: null` deletes both halves of the
+ * pair) is absent from the stored row, and keying on presence would fall back
+ * to project.json and silently restore the value the operator just removed —
+ * the same clobber this rule exists to stop, in the one direction that looks
+ * like normal seeding. So on an existing row the stored state wins for every
+ * API-owned field, including "absent".
+ */
+function mergeApiOwnedFields(next, existing) {
+  if (!existing) return next;
+  for (const field of API_OWNED_FIELDS) {
+    if (field in existing) next[field] = fromAttr(existing[field]);
+    else delete next[field];
+  }
+  return next;
+}
+
 function upsertMeta(data, now) {
   const existing = getItem(`PROJECT#${data.id}`, "META");
   const next = projectMetaRow(data, now);
@@ -208,15 +242,7 @@ function upsertMeta(data, now) {
   if (existing?.created_at?.S) {
     next.created_at = existing.created_at.S;
   }
-  // Create-only fields: carry the stored value forward rather than the one
-  // project.json declares. See API_OWNED_FIELDS above for why, and note the
-  // `in` test — a field explicitly stored as NULL is still "set", and
-  // reverting it to project.json's value would be the same clobber.
-  for (const field of API_OWNED_FIELDS) {
-    if (existing && field in existing) {
-      next[field] = fromAttr(existing[field]);
-    }
-  }
+  mergeApiOwnedFields(next, existing);
   putItem(next);
   return existing ? "updated" : "created";
 }
@@ -259,9 +285,17 @@ function main() {
   console.log(`\nSeed OK — ${files.length} project(s): ${summary}.`);
 }
 
-try {
-  main();
-} catch (err) {
-  console.error("seed-projects failed:", err.message ?? err);
-  process.exit(1);
+// Exported for seed-projects-tests.ts. The encode/decode pair and the
+// create-only merge are the parts with a correctness property worth pinning;
+// everything else in this file is AWS CLI plumbing.
+export { ddbItem, fromAttr, mergeApiOwnedFields, API_OWNED_FIELDS };
+
+// Run as a CLI only when invoked directly; importing (tests) has no side effect.
+if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+  try {
+    main();
+  } catch (err) {
+    console.error("seed-projects failed:", err.message ?? err);
+    process.exit(1);
+  }
 }

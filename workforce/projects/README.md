@@ -67,8 +67,12 @@ Every save is validated server-side and appends a `PROJECT#{id}/AUDIT#` row
 recording the actor and a field-level before/after diff.
 
 `project.json` remains the reviewable declaration of a NEW project, and the
-schema still governs it — the API validates against the same constraints, so
-the two cannot disagree.
+schema still governs it. The API validates against the same constraints — but
+"so the two cannot disagree" would be a claim about a property nothing was
+checking, and when it was checked they had already drifted three ways
+(registry 9 types, schema 6, validator 7). `credential-type-mirrors-tests.ts`
+now asserts the agreement, so the drift fails CI instead of surfacing as a
+project that the console accepts and `workforce:projects` later rejects.
 
 **Not editable from the console:** `project_id` (it keys the DDB partition, the
 URL and the Secrets Manager prefix), `created_at` / `archived_at` (facts, not

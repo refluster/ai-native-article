@@ -31,8 +31,12 @@ const v = (rule, path, msg) =>
   violations.push({ rule, path: relative(REPO_ROOT, path), msg });
 
 const ID = /^[a-z][a-z0-9-]*$/;
+// Mirror of credential-injector.ts CREDENTIAL_TYPES. Kept honest by
+// credential-type-mirrors-tests.ts, which fails if this list, the JSON schema's
+// pattern and the injector's registry stop agreeing — they had already drifted
+// three ways before that check existed (ADR-0029 review, wf:dario A1).
 const CREDENTIAL_KEY =
-  /^(anthropic\.api_key|discord\.bot_token|discord\.webhook_url|github\.token|notion\.integration_token|workforce\.feed_write_token|workforce\.memory_write_token)(@[a-z][a-z0-9_-]*)?$/;
+  /^(anthropic\.api_key|discord\.bot_token|discord\.webhook_url|github\.token|notion\.integration_token|voyage\.api_key|workforce\.dispatch_token|workforce\.feed_write_token|workforce\.memory_write_token)(@[a-z][a-z0-9_-]*)?$/;
 
 const schema = JSON.parse(readFileSync(SCHEMA_PATH, "utf8"));
 const requiredKeys = new Set(schema.required ?? []);

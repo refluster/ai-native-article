@@ -846,6 +846,53 @@ describe("GET /projects/{id}/credentials (listProjectCredentials)", () => {
   });
 });
 
+// ─── GET /projects/{id}/audit (ADR-0029) ──────────────────────────────
+
+describe("GET /projects/{id}/audit (listProjectAuditRoute)", () => {
+  it("returns 404 for a project that does not exist", async () => {
+    const res = await handler(evt("GET /projects/{id}/audit", { id: "ghost" }));
+    expect(statusOf(res)).toBe(404);
+    expect(bodyOf(res)).toMatchObject({ error: "not_found" });
+  });
+
+  it("returns an empty page for a project with no config changes yet", async () => {
+    rows.set(key("PROJECT#quiet", "META"), {
+      pk: "PROJECT#quiet",
+      sk: "META",
+      project_id: "quiet",
+      owner_agent: "_operator",
+      status: "active",
+      created_at: "2026-05-27T00:00:00.000Z",
+    });
+    const res = await handler(evt("GET /projects/{id}/audit", { id: "quiet" }));
+    expect(statusOf(res)).toBe(200);
+    expect(bodyOf(res)).toMatchObject({ items: [] });
+  });
+
+  it("surfaces the rows a PATCH wrote", async () => {
+    rows.set(key("PROJECT#acme2", "META"), {
+      pk: "PROJECT#acme2",
+      sk: "META",
+      project_id: "acme2",
+      owner_agent: "_operator",
+      status: "active",
+      created_at: "2026-05-27T00:00:00.000Z",
+    });
+    projectStatus.set("acme2", "active");
+    rows.set(key("AGENT#ren", "META"), { pk: "AGENT#ren", sk: "META", slug: "ren" });
+
+    const patch = evt("PATCH /projects/{id}", { id: "acme2" });
+    (patch as APIGatewayProxyEventV2 & { body?: string }).body = JSON.stringify({ owner_agent: "ren" });
+    await handler(patch);
+
+    const res = await handler(evt("GET /projects/{id}/audit", { id: "acme2" }));
+    expect(statusOf(res)).toBe(200);
+    const body = bodyOf(res) as { items: Array<{ changes: Array<{ field: string }> }> };
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0]!.changes.map((c) => c.field)).toContain("owner_agent");
+  });
+});
+
 // ─── PATCH /projects/{id} (Issue #158 PR-β A2) ────────────────────────
 
 describe("PATCH /projects/{id} (patchProject)", () => {
@@ -1078,6 +1125,109 @@ describe("PATCH /projects/{id} (patchProject)", () => {
     seedProject("acme");
     await handler(patchEvt("acme", { owner_agent: "ghost" }));
     expect(auditRows("acme")).toHaveLength(0);
+  });
+
+  /** An event carrying a SigV4 principal, as API GW supplies on the IAM routes. */
+  function signedEvt(routeKey: string, pathParams: Record<string, string> = {}) {
+    const e = evt(routeKey, pathParams);
+    (e.requestContext as unknown as { authorizer?: unknown }).authorizer = {
+      iam: { userArn: "arn:aws:iam::123456789012:user/operator" },
+    };
+    return e;
+  }
+
+  it("withholds governance_docs and credential_types from an ANONYMOUS read", async () => {
+    // GET /projects/{id} has no API GW authorizer. governance_docs holds file
+    // paths inside what may be a private client repo; publishing them would
+    // contradict ADR-0028's own reason for keeping config out of DDB.
+    seedProject("acme");
+    const row = rows.get(key("PROJECT#acme", "META"))!;
+    row.governance_docs = ["AGENTS.md", "docs/private-arch.md"];
+    row.credential_types = ["github.token"];
+
+    const res = await handler(evt("GET /projects/{id}", { id: "acme" }));
+    expect(statusOf(res)).toBe(200);
+    const view = bodyOf(res) as Record<string, unknown>;
+    expect("governance_docs" in view).toBe(false);
+    expect("credential_types" in view).toBe(false);
+    // The rest of the pre-ADR-0029 view is unchanged for anonymous callers.
+    expect(view.project_id).toBe("acme");
+    expect(view.status).toBe("active");
+    expect(JSON.stringify(view)).not.toContain("private-arch");
+  });
+
+  it("returns them to a SigV4-authenticated read", async () => {
+    seedProject("acme");
+    const row = rows.get(key("PROJECT#acme", "META"))!;
+    row.governance_docs = ["AGENTS.md"];
+    row.credential_types = ["github.token"];
+
+    const res = await handler(signedEvt("GET /projects/{id}", { id: "acme" }));
+    const view = bodyOf(res) as Record<string, unknown>;
+    expect(view.governance_docs).toEqual(["AGENTS.md"]);
+    expect(view.credential_types).toEqual(["github.token"]);
+  });
+
+  it("withholds them from the anonymous LIST route too", async () => {
+    seedProject("acme");
+    rows.get(key("PROJECT#acme", "META"))!.governance_docs = ["docs/private-arch.md"];
+    const res = await handler(evt("GET /projects"));
+    expect(JSON.stringify(bodyOf(res))).not.toContain("private-arch");
+  });
+
+  it("returns seed-written Set attributes as JSON arrays, not {}", async () => {
+    // seed-projects.mjs writes string lists as DDB `SS`; the DocumentClient
+    // hands those back as a JS Set. Unnormalised they serialise to {} and the
+    // console's .join() throws on them.
+    seedProject("acme");
+    const row = rows.get(key("PROJECT#acme", "META"))!;
+    row.governance_docs = new Set(["AGENTS.md", "docs/governance.md"]);
+    row.credential_types = new Set(["github.token"]);
+
+    const res = await handler(signedEvt("GET /projects/{id}", { id: "acme" }));
+    expect(statusOf(res)).toBe(200);
+    const view = bodyOf(res) as { governance_docs: string[]; credential_types: string[] };
+    expect(view.governance_docs).toEqual(["AGENTS.md", "docs/governance.md"]);
+    expect(view.credential_types).toEqual(["github.token"]);
+    // The regression this pins: JSON.stringify(new Set([...])) === "{}".
+    expect(JSON.stringify(view.governance_docs)).not.toBe("{}");
+  });
+
+  it("writes no audit row when a patch re-sends a Set-backed list unchanged", async () => {
+    // Without normalising the `before` snapshot, a Set never deep-equals the
+    // array in the patch, so every patch would look like a change.
+    seedProject("acme");
+    rows.get(key("PROJECT#acme", "META"))!.governance_docs = new Set(["AGENTS.md"]);
+
+    const res = await handler(patchEvt("acme", { governance_docs: ["AGENTS.md"] }));
+    expect(statusOf(res)).toBe(200);
+    expect(auditRows("acme")).toHaveLength(0);
+  });
+
+  it("records the actor, source and sk shape on the audit row, not just the diff", async () => {
+    // Without asserting these, actorFromEvent could return a constant and the
+    // "records who changed what" claim would still pass.
+    seedProject("acme");
+    seedAgent("ren");
+    const e = patchEvt("acme", { owner_agent: "ren" });
+    (e.requestContext as unknown as { authorizer?: unknown }).authorizer = {
+      iam: { userArn: "arn:aws:iam::123456789012:user/operator" },
+    };
+    await handler(e);
+
+    const [row] = auditRows("acme");
+    expect(row).toBeDefined();
+    expect(row!.actor).toBe("arn:aws:iam::123456789012:user/operator");
+    expect(row!.source).toBe("agents-api");
+    expect(row!.project_id).toBe("acme");
+    expect(String(row!.sk)).toMatch(/^AUDIT#\d{4}-\d{2}-\d{2}T[\d:.]+Z#[0-9a-f]{8}$/);
+  });
+
+  it("falls back to \"operator\" when the event carries no IAM principal", async () => {
+    seedProject("acme");
+    seedAgent("ren");
+    await handler(patchEvt("acme", { owner_agent: "ren" }));
+    expect(auditRows("acme")[0]!.actor).toBe("operator");
   });
 
   it("returns 404 for a project that does not exist, before validating", async () => {
