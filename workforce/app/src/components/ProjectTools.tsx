@@ -13,6 +13,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Typeplate from './Typeplate';
+import { LoadingRegion, SkeletonText } from './Skeleton';
 import { TOOL_REGISTRY, findTool, unprovisionedOnProject } from '../lib/tools';
 import { fetchCredentials } from '../lib/credentials';
 import { WORKFORCE_AGENTS_API_BASE } from '../config/api';
@@ -144,21 +145,40 @@ function ToolCard({
         <span className="font-wfmono text-xs text-wf-on-surface truncate">
           {tool.display_name}
         </span>
-        {credentials.status === 'unknown' ? (
-          <span className="shrink-0 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-            creds unknown
-          </span>
-        ) : (
-          missing.length > 0 && (
-            <span className="shrink-0 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary">
-              {missing.length} unprovisioned
-            </span>
-          )
-        )}
+        <CredentialBadge state={credentials} missing={missing} />
       </div>
       <p className="mt-2 text-sm text-wf-on-surface-variant leading-relaxed">{tool.summary}</p>
     </Link>
   );
+}
+
+/**
+ * The card's readiness mark. Every state gets its OWN mark, with a noun:
+ * an absent badge previously meant both "ready" and "could not check",
+ * and a blocking state must never be inferred from silence.
+ */
+function CredentialBadge({
+  state,
+  missing,
+}: {
+  state: CredentialState;
+  missing: string[];
+}) {
+  const cls = 'shrink-0 font-wfmono text-[10px] uppercase tracking-[0.14em]';
+  if (state.status === 'loading') {
+    return <span className={`${cls} text-wf-on-surface-variant`}>checking credentials…</span>;
+  }
+  if (state.status === 'unknown') {
+    return <span className={`${cls} text-wf-on-surface-variant`}>credentials unknown</span>;
+  }
+  if (missing.length > 0) {
+    return (
+      <span className={`${cls} text-wf-tertiary`}>
+        {missing.length} {missing.length === 1 ? 'credential' : 'credentials'} not on project
+      </span>
+    );
+  }
+  return <span className={`${cls} text-wf-on-surface-variant`}>credentials on project</span>;
 }
 
 function ToolDetail({
@@ -188,10 +208,14 @@ function ToolDetail({
           {tool.display_name}
         </h2>
         <p className="text-sm text-wf-on-surface-variant leading-relaxed">{tool.summary}</p>
-        {credentials.status === 'unknown' ? (
-          <CredentialsUnknown />
-        ) : (
-          missing.length > 0 && <MissingCredentials missing={missing} />
+        {credentials.status === 'loading' && (
+          <LoadingRegion label="Checking this project's credentials">
+            <SkeletonText lines={2} />
+          </LoadingRegion>
+        )}
+        {credentials.status === 'unknown' && <CredentialsUnknown />}
+        {credentials.status === 'loaded' && missing.length > 0 && (
+          <MissingCredentials projectId={projectId} missing={missing} />
         )}
       </div>
     </section>
@@ -202,7 +226,13 @@ function ToolDetail({
 // stops short of "cannot run" on purpose: the resolver also tries the
 // shared `_default` bag and the legacy path, neither of which the
 // project-scoped LIST can see — see unprovisionedOnProject() in lib/tools.ts.
-function MissingCredentials({ missing }: { missing: string[] }) {
+function MissingCredentials({
+  projectId,
+  missing,
+}: {
+  projectId: string;
+  missing: string[];
+}) {
   return (
     <div className="border border-wf-outline-variant bg-wf-surface-container rounded-wf-md p-3">
       <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary">
@@ -210,9 +240,16 @@ function MissingCredentials({ missing }: { missing: string[] }) {
       </p>
       <p className="mt-2 text-sm text-wf-on-surface-variant leading-relaxed">
         <span className="font-wfmono text-wf-on-surface">{missing.join(', ')}</span>{' '}
-        {missing.length === 1 ? 'is' : 'are'} not in this project's credential vault
-        (Overview tab). A run may still resolve one from the shared organisation
-        default, so this is a heads-up rather than a blocker.
+        {missing.length === 1 ? 'is' : 'are'} not in this project's credential vault —
+        provision{' '}
+        <Link
+          to={projectPath(projectId, 'overview')}
+          className="text-wf-on-surface underline underline-offset-2 hover:text-wf-primary"
+        >
+          on the Overview tab
+        </Link>
+        . A run may still resolve one from the shared organisation default, so this is a
+        heads-up rather than a blocker.
       </p>
     </div>
   );

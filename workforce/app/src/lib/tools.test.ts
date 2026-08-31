@@ -6,7 +6,12 @@
 // be correct when the first real tool lands in Phase 2.
 
 import { describe, it, expect } from 'vitest';
-import { TOOL_REGISTRY, findTool, unprovisionedOnProject } from './tools';
+import {
+  TOOL_REGISTRY,
+  duplicateToolIds,
+  findTool,
+  unprovisionedOnProject,
+} from './tools';
 import type { ToolDefinition } from '../types/tool';
 import type { CredentialMetadata } from '../types/project';
 
@@ -32,15 +37,46 @@ describe('TOOL_REGISTRY', () => {
     expect(TOOL_REGISTRY).toEqual([]);
   });
 
-  it('has no duplicate tool ids', () => {
-    const ids = TOOL_REGISTRY.map((t) => t.tool_id);
-    expect(new Set(ids).size).toBe(ids.length);
+  it('carries no duplicate ids', () => {
+    expect(duplicateToolIds()).toEqual([]);
   });
 });
 
 describe('findTool', () => {
-  it('returns undefined for an unregistered id', () => {
+  // Exercised against a real registry rather than the empty default:
+  // asserting that an empty array finds nothing tests the literal, not
+  // the lookup that Phase 2 will depend on.
+  const registry = [tool(), tool({ tool_id: 'user-research' })];
+
+  it('finds a registered tool by id', () => {
+    expect(findTool('user-research', registry)?.tool_id).toBe('user-research');
+  });
+
+  it('returns undefined for an id that is not in the registry', () => {
+    expect(findTool('insight-foundry', registry)).toBeUndefined();
+  });
+
+  it('does not match on display name or a partial id', () => {
+    expect(findTool('Problem Finding', registry)).toBeUndefined();
+    expect(findTool('problem', registry)).toBeUndefined();
+  });
+
+  it('defaults to the empty Phase-1 registry', () => {
     expect(findTool('problem-finding')).toBeUndefined();
+  });
+});
+
+describe('duplicateToolIds', () => {
+  it('names an id that appears twice', () => {
+    expect(duplicateToolIds([tool(), tool()])).toEqual(['problem-finding']);
+  });
+
+  it('reports each duplicated id once, not once per repeat', () => {
+    expect(duplicateToolIds([tool(), tool(), tool()])).toEqual(['problem-finding']);
+  });
+
+  it('is empty for a registry of distinct ids', () => {
+    expect(duplicateToolIds([tool(), tool({ tool_id: 'user-research' })])).toEqual([]);
   });
 });
 

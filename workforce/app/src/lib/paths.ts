@@ -41,15 +41,18 @@ export interface ProjectRoute {
  *   'asp-cloud/tools/user-research'
  *                                 → { …, view: 'tools', toolId: 'user-research' }
  *
- * Known ambiguity, carried over from the pre-ADR-0027 inline parser: a
- * project whose id genuinely ends in `/performance` or `/tools` is
- * unreachable, because the suffix always wins. Accepted rather than
- * fixed — disambiguating would need a route shape that no longer lets
- * ids carry slashes, and the id namespace is operator-assigned under C-3.
+ * Known ambiguities. A project whose id genuinely ends in `/performance`
+ * or `/tools` is unreachable, because the suffix always wins — carried
+ * over from the pre-ADR-0027 inline parser. The tools view adds one more:
+ * an id ending in `/tools/{kebab}` (say `self/tools/ren`) reads as
+ * project `self`, tool `ren`. Both are accepted rather than fixed —
+ * disambiguating needs a route shape that no longer lets ids carry
+ * slashes, and the id namespace is operator-assigned under C-3. They are
+ * pinned by tests so the boundary is a decision, not a surprise.
  *
- * A tool id is matched conservatively (kebab-case, the registry's own id
- * shape), so `.../tools/anything/else` degrades to the tools index rather
- * than inventing a tool id out of an arbitrary tail.
+ * The split is anchored to the FINAL TWO segments rather than to the last
+ * `/tools/` anywhere in the string, which keeps the second ambiguity as
+ * narrow as it can be: `a/tools/b/c` is one project id, not project `a`.
  */
 const TOOL_ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
@@ -72,12 +75,13 @@ export function parseProjectRoute(rawWildcard: string): ProjectRoute {
   if (rest.endsWith(TOOLS)) {
     return { projectId: rest.slice(0, -TOOLS.length), view: 'tools' };
   }
-  const toolMatch = rest.lastIndexOf(`${TOOLS}/`);
-  if (toolMatch !== -1) {
-    const toolId = rest.slice(toolMatch + TOOLS.length + 1);
+  const segments = rest.split('/');
+  if (segments.length >= 3 && segments[segments.length - 2] === 'tools') {
+    const toolId = segments[segments.length - 1];
+    const projectId = segments.slice(0, -2).join('/');
     return TOOL_ID.test(toolId)
-      ? { projectId: rest.slice(0, toolMatch), view: 'tools', toolId }
-      : { projectId: rest.slice(0, toolMatch), view: 'tools' };
+      ? { projectId, view: 'tools', toolId }
+      : { projectId, view: 'tools' };
   }
 
   return { projectId: rest, view: 'overview' };

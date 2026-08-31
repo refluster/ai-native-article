@@ -3,11 +3,14 @@
 // A tool is a *declarative registry entry*, not a React component: the
 // console renders its form, run button, and result from the JSON Schemas
 // below, so a new tool ships by committing a registry entry rather than
-// by editing the SPA. The two tools whose interaction is genuinely
-// bespoke (the Task Process chat panel, the Insight Foundry source
-// picker) opt into a custom renderer via `renderer`, while still running
-// through the same registry prompts and the same `/run` endpoint —
-// ADR-0027 §3's declared carve-out.
+// by editing the SPA.
+//
+// ADR-0027 §3 also reserves a custom-renderer carve-out for the two tools
+// whose interaction is genuinely bespoke (the Task Process chat panel,
+// the Insight Foundry source picker). That field is deliberately NOT
+// declared here: nothing branches on it yet, so a Phase-2 entry setting
+// it would silently render the default form. It lands in the phase that
+// implements the dispatch, together with an exhaustive switch.
 //
 // MIRROR: workforce/tools/{tool_id}/tool.json is the authoritative
 // declaration; this file is the shape the console reads it through. The
@@ -20,9 +23,6 @@ import type { CredentialTypeId } from '../lib/credentials';
 /** JSON Schema fragment. Kept deliberately loose — the authority is the
  *  schema file the Lambda validates against, not this type. */
 export type JsonSchema = Record<string, unknown>;
-
-/** Custom-renderer keys. `undefined` means the schema-driven default. */
-export type ToolRenderer = 'chat' | 'sources';
 
 export interface ToolDefinition {
   /** Immutable id; the last path segment of `/projects/{id}/tools/{toolId}`. */
@@ -40,5 +40,4 @@ export interface ToolDefinition {
   /** Forced structured output — carried here rather than in a foreign
    *  GPT record, so it is reviewable in a PR (ADR-0027 §5). */
   output: JsonSchema;
-  renderer?: ToolRenderer;
 }

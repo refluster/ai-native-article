@@ -17,9 +17,36 @@ import type { CredentialTypeId } from './credentials';
 /** Every declared tool, in display order. Empty until Phase 2. */
 export const TOOL_REGISTRY: readonly ToolDefinition[] = [];
 
-/** Look up one tool by its immutable id. */
-export function findTool(toolId: string): ToolDefinition | undefined {
-  return TOOL_REGISTRY.find((t) => t.tool_id === toolId);
+/**
+ * Look up one tool by its immutable id.
+ *
+ * `registry` is a parameter so the lookup is exercised against real
+ * entries today rather than only against the empty Phase-1 literal — a
+ * test that asserts an empty array finds nothing verifies nothing.
+ */
+export function findTool(
+  toolId: string,
+  registry: readonly ToolDefinition[] = TOOL_REGISTRY,
+): ToolDefinition | undefined {
+  return registry.find((t) => t.tool_id === toolId);
+}
+
+/**
+ * Tool ids that appear more than once. Duplicate ids would make
+ * `findTool` order-dependent and `/tools/{id}` ambiguous, so the
+ * invariant is checked rather than assumed — and checkable now, before
+ * Phase 2 adds the entries that could violate it.
+ */
+export function duplicateToolIds(
+  registry: readonly ToolDefinition[] = TOOL_REGISTRY,
+): string[] {
+  const seen = new Set<string>();
+  const dupes = new Set<string>();
+  for (const { tool_id } of registry) {
+    if (seen.has(tool_id)) dupes.add(tool_id);
+    seen.add(tool_id);
+  }
+  return [...dupes];
 }
 
 /**

@@ -77,20 +77,43 @@ describe('parseProjectRoute', () => {
     });
   });
 
-  it('degrades to the tools index when the tail is not a tool id', () => {
-    // Anything past the tool id is not a route we serve; falling back to
-    // the index beats inventing `user-research/extra` as a tool id.
+  it('treats a deeper tail as part of the project id, not a tool route', () => {
+    // The split is anchored to the final two segments, so `/tools/` in the
+    // middle of an id does not claim the route.
     expect(parseProjectRoute('asp-cloud/tools/user-research/extra')).toEqual({
+      projectId: 'asp-cloud/tools/user-research/extra',
+      view: 'overview',
+    });
+  });
+
+  it('degrades to the tools index when the final segment is not a tool id', () => {
+    expect(parseProjectRoute('asp-cloud/tools/User_Research')).toEqual({
       projectId: 'asp-cloud',
       view: 'tools',
     });
   });
 
-  it('does not read an upper-case or underscored tail as a tool id', () => {
-    const route = parseProjectRoute('asp-cloud/tools/User_Research');
-    expect(route.view).toBe('tools');
-    expect(route.toolId).toBeUndefined();
+  // ── pinned ambiguities (documented in parseProjectRoute's comment) ──
+  // These are not defects to fix silently; they are the accepted cost of
+  // letting project ids carry slashes on a wildcard route. A change in
+  // either direction should break these tests and be argued for.
+
+  it('pins: an id ending in /tools/{kebab} is read as a tool route', () => {
+    expect(parseProjectRoute('self/tools/ren')).toEqual({
+      projectId: 'self',
+      view: 'tools',
+      toolId: 'ren',
+    });
   });
+
+  it('pins: an id ending in /performance is read as the performance view', () => {
+    expect(parseProjectRoute('self/performance')).toEqual({
+      projectId: 'self',
+      view: 'performance',
+    });
+  });
+
+
 });
 
 describe('projectPath', () => {
