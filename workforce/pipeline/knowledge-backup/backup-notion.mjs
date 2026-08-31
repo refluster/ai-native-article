@@ -3,7 +3,7 @@ import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs"
 ensureProxyAwareEntry(import.meta.url);
 
 // Notion -> knowledge-store daily backup (Layer 1 ingest, ADR-0026),
-// scoped to one project (ADR-0027).
+// scoped to one project (ADR-0028).
 //
 // Deterministic: no LLM. Finds every page the project's integration can see
 // that was edited inside the window, exports each to markdown, and commits the

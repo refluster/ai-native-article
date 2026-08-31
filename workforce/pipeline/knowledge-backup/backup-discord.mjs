@@ -3,7 +3,7 @@ import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs"
 ensureProxyAwareEntry(import.meta.url);
 
 // Discord -> knowledge-store daily backup (Layer 1 ingest, ADR-0026),
-// scoped to one project (ADR-0027).
+// scoped to one project (ADR-0028).
 //
 // Deterministic: no LLM, no judgment, no persona. Reads one closed UTC day of
 // messages from every channel the project's bot can see and commits a markdown

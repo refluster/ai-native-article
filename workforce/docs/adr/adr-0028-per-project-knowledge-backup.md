@@ -1,4 +1,4 @@
-# ADR-0027 — The knowledge backup is scoped per Project, not per workforce
+# ADR-0028 — The knowledge backup is scoped per Project, not per workforce
 
 - **Status**: Proposed
 - **Date**: 2026-08-30

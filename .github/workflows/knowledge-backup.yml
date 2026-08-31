@@ -1,5 +1,5 @@
 # Knowledge backup — Discord + Notion -> per-project knowledge stores
-# (ADR-0026 Layer 1; ADR-0027 per-project scoping).
+# (ADR-0026 Layer 1; ADR-0028 per-project scoping).
 #
 # Deterministic ingest: no LLM, no persona, no judgment. A Discord guild and a
 # Notion workspace belong to a community, and a community is a Project — so the

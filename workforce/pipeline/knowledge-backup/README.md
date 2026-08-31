@@ -2,7 +2,7 @@
 
 Deterministic daily ingest (Layer 1 of
 [ADR-0026](../../docs/adr/adr-0026-knowledge-backup-ingest-pipeline.md), scoped
-per project by [ADR-0027](../../docs/adr/adr-0027-per-project-knowledge-backup.md)).
+per project by [ADR-0028](../../docs/adr/adr-0028-per-project-knowledge-backup.md)).
 Ported from `refluster/luckyhat-ms:knowledge-batch-service/`.
 
 **No LLM, no persona, no binding, no AWS.** This is a pipeline, not a Cadence —
