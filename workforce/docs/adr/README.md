@@ -94,6 +94,7 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0025](adr-0025-event-driven-lane-handoff.md) | A hand-off is an event: the author lane dispatches its worker via `POST /dispatch`; cron + the 36h sweep stay as the floors | Accepted (2026-08-11) | [019](../epics/epic-019-autonomous-finalization-rate.md) |
 | [0026](adr-0026-knowledge-backup-ingest-pipeline.md) | Knowledge backup is a deterministic GHA pipeline, not a Cadence: Discord/Notion ingest into a dedicated knowledge-store repo | Proposed | — |
 | [0027](adr-0027-project-tools-surface.md) | Interactive project tools: a project-scoped Tools surface, a synchronous `tools-api`, and a declarative tool registry | Proposed | [025](../epics/epic-025-project-tools-migration.md) |
+| [0028](adr-0028-per-project-knowledge-backup.md) | The knowledge backup is scoped per Project, not per workforce: each project declares its own store repo, sources and derived secrets (refines 0026) | Proposed | — |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](../epics/README.md).
