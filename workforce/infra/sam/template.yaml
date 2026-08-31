@@ -1158,6 +1158,127 @@ Resources:
       Tags:
         workforce: !Ref Stage
 
+  # ── Interactive project tools (ADR-0027, Epic-025) ─────────────────
+  #
+  # A separate HTTP API from the credentials one, on the same AWS_IAM
+  # posture: the SPA signs with SigV4 through the same broker, and a route
+  # added here without an explicit Authorizer still cannot become public.
+  # Split rather than shared because the two surfaces have different
+  # lifecycles and different blast radii — a credentials-write API and a
+  # run-an-LLM API should not be one CORS/authoriser configuration.
+  WfToolsHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Stage
+      CorsConfiguration:
+        AllowOrigins:
+          - https://kohuehara.xyz
+          - https://workforce.kohuehara.xyz
+          - http://localhost:5173
+        AllowMethods: [POST, OPTIONS]
+        # Same SigV4 preflight header set as WfCredentialsHttpApi — the
+        # x-amz-* headers are what aws4fetch sends and what the preflight
+        # must allow. Keep in sync with that API.
+        AllowHeaders:
+          - content-type
+          - authorization
+          - x-amz-date
+          - x-amz-content-sha256
+          - x-amz-security-token
+      Auth:
+        EnableIamAuthorizer: true
+        DefaultAuthorizer: AWS_IAM
+      Tags:
+        workforce: !Ref Stage
+
+  WfToolsApiFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-tools-api-${Stage}
+      CodeUri: ../../lambdas/tools-api
+      Handler: handler.handler
+      Description: Interactive project tools — synchronous run surface (ADR-0027, Epic-025).
+      MemorySize: 512
+      # A tool run is one LLM completion with an operator waiting on it.
+      # 120s is well above a normal run and below the API Gateway ceiling
+      # (29s for the integration response — see the Note below).
+      Timeout: 120
+      Policies:
+        - Statement:
+            - Sid: ToolsApiTableAccess
+              # getProject + appendExecution (ledger) + budget read/increment.
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:Query
+              Resource:
+                - !GetAtt WfTable.Arn
+                - !Sub ${WfTable.Arn}/index/*
+            - Sid: ToolsApiSecretsRead
+              # READ ONLY — this Lambda resolves a project's tool
+              # credentials and must never write one (that is
+              # credentials-api).
+              #
+              # Scoped PER CREDENTIAL TYPE, matching this file's own
+              # precedent (AgentsApiRecallVoyageKey scopes to
+              # `wf/projects/*/voyage.api_key-*`, not to `wf/projects/*`).
+              # An earlier revision granted `wf/projects/*` plus a bare
+              # `wf/*`; the latter reached the whole secret namespace —
+              # `wf/github-*`, `wf/ccr/*`, `wf/anthropic` — which no other
+              # Lambda here can see and nothing in this one needs.
+              #
+              # The legacy bare tier (`wf/{type}`, getCredential's third
+              # fallback) is deliberately NOT granted: `azure.openai` is a
+              # post-Epic-010 type introduced by ADR-0027, so no legacy
+              # `wf/azure.openai` secret exists or ever will.
+              #
+              # COUPLING, accepted: this list is static while the tool
+              # registry is data. A tool declaring a new credential type
+              # needs a Resource line added here, and until it has one the
+              # run fails loud with AccessDenied naming the secret — which
+              # is the right direction to fail compared with a standing
+              # broad read.
+              Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*/azure.openai-*
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref WfTable
+      Events:
+        RunTool:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfToolsHttpApi
+            Path: /projects/{slug}/tools/{tool_id}/run
+            Method: POST
+      Tags:
+        workforce: !Ref Stage
+
+  WfToolsApiErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-tools-api-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-tools-api-${Stage} over 5 minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfToolsApiFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
   WfCredentialsApiFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -2344,6 +2465,13 @@ Outputs:
     Value: !Ref WfAgentsHttpApi
     Export:
       Name: !Sub wf-agents-api-id-${Stage}
+  ToolsApiUrl:
+    # Includes the stage path — see AgentsApiUrl. Read into
+    # VITE_WORKFORCE_TOOLS_API_BASE by the console deploy.
+    Description: Base URL of the interactive project-tools HTTP API (incl. stage path). All routes are AWS_IAM-authorised (operator only).
+    Value: !Sub https://${WfToolsHttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}
+    Export:
+      Name: !Sub wf-tools-api-url-${Stage}
   CredentialsApiUrl:
     # Includes the stage path — see AgentsApiUrl. Read into
     # VITE_WORKFORCE_CREDENTIALS_API_BASE by the console deploy.

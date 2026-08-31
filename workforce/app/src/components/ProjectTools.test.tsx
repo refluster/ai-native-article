@@ -1,10 +1,10 @@
 // Rendering tests for the project Tools tab.
 //
-// Phase 1 ships an empty registry, so the reachable paths are the empty
-// index and the unknown-tool fallback — both of which must be honest
-// rather than blank. The per-tool card paths light up in Phase 2, when
-// the registry gains entries; their gating logic is covered in
-// lib/tools.test.ts today.
+// The registry is populated from workforce/tools/ (Phase 2), so these
+// exercise the real index cards, the unknown-tool fallback, and the
+// per-project credential fetch. The run panel itself is covered in
+// ToolRunner.test.tsx; here we only assert that a tool's detail view
+// reaches it.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
@@ -13,6 +13,14 @@ import ProjectTools from './ProjectTools';
 
 vi.mock('../lib/credentials', () => ({
   fetchCredentials: vi.fn(),
+}));
+
+// The runner is exercised on its own; stubbing it here keeps these tests
+// about the tab's own branching rather than about form rendering.
+vi.mock('./ToolRunner', () => ({
+  default: ({ tool }: { tool: { tool_id: string } }) => (
+    <div data-testid="tool-runner">{tool.tool_id}</div>
+  ),
 }));
 
 import { fetchCredentials } from '../lib/credentials';
@@ -36,12 +44,21 @@ afterEach(() => {
 });
 
 describe('ProjectTools', () => {
-  it('names the empty registry rather than rendering a blank panel', async () => {
+  it('lists every registered tool on the index', async () => {
     renderTools({ projectId: 'asp-cloud' });
-    expect(screen.getByText('NONE REGISTERED YET')).toBeInTheDocument();
-    expect(
-      screen.getByText(/No tools are registered on this project yet/),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Problem Finding')).toBeInTheDocument();
+    expect(screen.getByText('User Research')).toBeInTheDocument();
+  });
+
+  it('links each card to that tool, keeping a slash-bearing id encoded', () => {
+    renderTools({ projectId: 'self/ren' });
+    const link = screen.getByText('Problem Finding').closest('a');
+    expect(link).toHaveAttribute('href', '/projects/self%2Fren/tools/problem-finding');
+  });
+
+  it('renders the run panel on a tool detail view', () => {
+    renderTools({ projectId: 'asp-cloud', toolId: 'problem-finding' });
+    expect(screen.getByTestId('tool-runner')).toHaveTextContent('problem-finding');
   });
 
   it('reports an unregistered tool id instead of rendering nothing', async () => {
@@ -57,8 +74,10 @@ describe('ProjectTools', () => {
     mockedFetch.mockRejectedValueOnce(new Error('agents-api 500'));
     renderTools({ projectId: 'asp-cloud' });
     await waitFor(() => {
-      expect(screen.getByText('NONE REGISTERED YET')).toBeInTheDocument();
+      expect(screen.getAllByText('credentials unknown').length).toBeGreaterThan(0);
     });
+    // The registry still renders; only the readiness claim is withheld.
+    expect(screen.getByText('Problem Finding')).toBeInTheDocument();
   });
 
   it('re-reads credentials when the project changes', async () => {

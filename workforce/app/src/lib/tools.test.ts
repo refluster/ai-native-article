@@ -21,6 +21,7 @@ const tool = (over: Partial<ToolDefinition> = {}): ToolDefinition => ({
   summary: 'Decompose an objective into candidate problems.',
   version: '1.0.0',
   requires: ['azure.openai'],
+  model: { max_tokens: 4000 },
   input: {},
   output: {},
   ...over,
@@ -33,12 +34,43 @@ const cred = (credential_type: string): CredentialMetadata => ({
 });
 
 describe('TOOL_REGISTRY', () => {
-  it('is empty until Phase 2 populates it', () => {
-    expect(TOOL_REGISTRY).toEqual([]);
+  // Phase 2 populated the registry from workforce/tools/. These assert
+  // the invariants the console and the Lambda both depend on, against the
+  // real generated entries — not against a fixture, which is the whole
+  // point of generating it.
+  it('carries the tools declared in workforce/tools/', () => {
+    expect(TOOL_REGISTRY.map((t) => t.tool_id)).toEqual(['problem-finding', 'user-research']);
   });
 
   it('carries no duplicate ids', () => {
     expect(duplicateToolIds()).toEqual([]);
+  });
+
+  it('gives every tool a route-safe id', () => {
+    // Must match parseProjectRoute's TOOL_ID pattern or the tool is
+    // unreachable at /projects/{id}/tools/{tool_id}.
+    for (const t of TOOL_REGISTRY) {
+      expect(t.tool_id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+    }
+  });
+
+  it('gives every tool the fields the renderer reads', () => {
+    for (const t of TOOL_REGISTRY) {
+      expect(t.display_name.length).toBeGreaterThan(0);
+      expect(t.summary.length).toBeGreaterThan(0);
+      expect(t.version).toMatch(/^\d+\.\d+\.\d+$/);
+      expect(t.model.max_tokens).toBeGreaterThanOrEqual(256);
+      expect((t.input as { properties?: object }).properties).toBeTruthy();
+      expect((t.output as { properties?: object }).properties).toBeTruthy();
+    }
+  });
+
+  it('ships no system prompt to the browser bundle', () => {
+    // The generated console copy is prompt-free by construction
+    // (build-tool-registry.mjs); this is the assertion that keeps it so.
+    for (const t of TOOL_REGISTRY) {
+      expect(t as unknown as Record<string, unknown>).not.toHaveProperty('system');
+    }
   });
 });
 
@@ -61,8 +93,9 @@ describe('findTool', () => {
     expect(findTool('problem', registry)).toBeUndefined();
   });
 
-  it('defaults to the empty Phase-1 registry', () => {
-    expect(findTool('problem-finding')).toBeUndefined();
+  it('defaults to the real registry', () => {
+    expect(findTool('problem-finding')?.display_name).toBe('Problem Finding');
+    expect(findTool('nope')).toBeUndefined();
   });
 });
 

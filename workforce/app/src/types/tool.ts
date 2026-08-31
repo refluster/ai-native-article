@@ -24,6 +24,14 @@ import type { CredentialTypeId } from '../lib/credentials';
  *  schema file the Lambda validates against, not this type. */
 export type JsonSchema = Record<string, unknown>;
 
+/** Model configuration. Non-secret; the deployment name is operator-chosen. */
+export interface ToolModelConfig {
+  /** Overrides the project credential's deployment. Usually absent. */
+  deployment?: string;
+  /** Completion-token cap. Exhausting it throws server-side (W-1/W-4). */
+  max_tokens: number;
+}
+
 export interface ToolDefinition {
   /** Immutable id; the last path segment of `/projects/{id}/tools/{toolId}`. */
   tool_id: string;
@@ -35,9 +43,25 @@ export interface ToolDefinition {
   /** Credential types the run needs. Missing ones gate the run with an
    *  advisory rather than an opaque API error (Epic-025 AC4). */
   requires: CredentialTypeId[];
+  model: ToolModelConfig;
   /** Renders the input form. */
   input: JsonSchema;
   /** Forced structured output — carried here rather than in a foreign
    *  GPT record, so it is reviewable in a PR (ADR-0027 §5). */
   output: JsonSchema;
+}
+
+/** Successful response from `POST /projects/{id}/tools/{toolId}/run`. */
+export interface ToolRunResult {
+  tool_id: string;
+  version: string;
+  exec_ulid: string;
+  /** Matches the tool's `output` schema. */
+  data: unknown;
+  usage: {
+    tokens_in: number;
+    tokens_out: number;
+    cost_usd: number;
+    deployment: string;
+  };
 }
