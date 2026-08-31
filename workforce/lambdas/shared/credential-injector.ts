@@ -27,8 +27,12 @@
 //
 // ─── Mirror points (per cycle-1 review, Dario A4) ─────────────────────
 //
-// The credential-type set has FIVE sync points today (Q1 lands at
-// status-quo per operator 2026-05-27):
+// The credential-type set has EIGHT sync points today. The header said
+// FIVE until 2026-08-31 and listed only #1–#5; the three it omitted had
+// each already drifted (project.schema.json missed `voyage.api_key` and
+// `workforce.memory_write_token`; validate-projects.mjs missed
+// `voyage.api_key`), which is what an undercounted list produces — the
+// next author follows the list, not the prose.
 //
 //   1. CredentialShapes interface           (this file — type registry)
 //   2. CREDENTIAL_TYPES Set                 (this file — runtime allowlist)
@@ -36,10 +40,37 @@
 //   4. skill-meta.schema.json pattern       (JSON-schema allowlist mirror)
 //   5. The runtime allowlist re-check below (defense-in-depth, catches
 //      drift between #2 and #3/#4)
+//   6. app/src/lib/credentials.ts:CREDENTIAL_TYPES + the vault's
+//      SHAPE_HINTS/labels                   (console — subset A)
+//   7. scripts/schemas/project.schema.json:credential_types pattern
+//                                           (subset B)
+//   8. scripts/validate-projects.mjs:CREDENTIAL_KEY
+//                                           (subset B mirror)
 //
-// Adding a new base type touches all 5. If the count grows past ~10
-// types and the mirrors become drift-prone, codegen from #1+#2 to
-// #3+#4+#5 is the planned consolidation (Q1 Option B; not implemented).
+// #6–#8 are SUBSETS, not copies, and the two subsets differ:
+//
+//   - Subset A (console) lists what an operator TYPES INTO A FORM, so it
+//     omits `discord.webhook_url` and the `workforce.*` machine tokens.
+//   - Subset B (project registry) lists what an operator PROVISIONS AS A
+//     SECRET, so it includes the webhook URL and the feed/memory write
+//     tokens but omits `workforce.dispatch_token`, which adr-0025 mints
+//     per fire into DynamoDB rather than storing.
+//
+// So: a new operator-entered type touches all 8; a provisioned-but-not-
+// typed type touches 1–5, 7, 8; a minted token touches 1–5 only. A type
+// missed in #6 is invisible in the vault (nobody can provision it); a
+// type missed in #7/#8 fails `workforce:projects` CI the moment a project
+// declares it.
+//
+// If the count grows past ~10 types and the mirrors become drift-prone,
+// codegen from #1+#2 to the rest is the planned consolidation (Q1 Option
+// B; not implemented).
+//
+// ADR-0027 added `azure.openai` — the project-scoped Azure OpenAI
+// credential the interactive project tools run on (a four-field secret;
+// see AzureOpenAISecret in secrets.ts for why the endpoint/deployment/
+// apiVersion travel with the key rather than as project attributes). It
+// is operator-entered, so it lands in all eight sync points above.
 //
 // Story 4 (#93) added `voyage.api_key` — the Voyage AI embedding API
 // key used by the EXEC-row embedding-write path. The operator must
@@ -51,6 +82,7 @@
 import { getCredential, type ProjectId } from "./project.js";
 import type {
   AnthropicSecret,
+  AzureOpenAISecret,
   GithubSecret,
   NotionSecret,
   VoyageSecret,
@@ -131,6 +163,7 @@ export interface WorkforceDispatchTokenSecret {
  */
 export interface CredentialShapes {
   "anthropic.api_key": AnthropicSecret;
+  "azure.openai": AzureOpenAISecret;
   "discord.bot_token": DiscordBotSecret;
   "discord.webhook_url": DiscordWebhookSecret;
   "github.token": GithubSecret;
@@ -172,6 +205,7 @@ export type BaseOf<K extends string> = K extends `${infer B}@${string}`
  */
 export const CREDENTIAL_TYPES: ReadonlySet<CredentialType> = new Set([
   "anthropic.api_key",
+  "azure.openai",
   "discord.bot_token",
   "discord.webhook_url",
   "github.token",
