@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://kohuehara.xyz/workforce/schemas/project.schema.json",
   "title": "Workforce Project",
-  "description": "File-based seed for a PROJECT#{id} row per Epic-010 §3 + §7. The runner reads PROJECT#{id}/META from DDB at invocation time; this file is the authoritative creation-time source that workforce/scripts/seed-projects.mjs writes from (`name` is create-only on existing rows — renames go through PATCH /projects/{id}). `self/{slug}` projects are auto-seeded by the runner (Story 1-B) and MUST NOT have a project.json file. The membership concept was removed 2026-07-03 — every registered agent participates in every project.",
+  "description": "File-based seed for a PROJECT#{id} row per Epic-010 §3 + §7. The runner reads PROJECT#{id}/META from DDB at invocation time; this file is the authoritative creation-time source that workforce/scripts/seed-projects.mjs writes from (`name` is create-only on existing rows — renames go through PATCH /projects/{id}). Since ADR-0029 the create-only set is SIX fields, not just `name` — `name`, `owner_agent`, `github`, `governance_docs`, `credential_types` (see API_OWNED_FIELDS in seed-projects.mjs). `self/{slug}` projects are auto-seeded by the runner (Story 1-B) and MUST NOT have a project.json file. The membership concept was removed 2026-07-03 — every registered agent participates in every project.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -25,7 +25,7 @@
     },
     "owner_agent": {
       "type": "string",
-      "pattern": "^[a-z]+$",
+      "pattern": "^(_operator|[a-z]+)$",
       "description": "Agent slug responsible for the project's overall direction. Optional; defaults to no owner (operator-owned)."
     },
     "github": {

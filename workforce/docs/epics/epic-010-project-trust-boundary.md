@@ -125,6 +125,16 @@ Migration to a dedicated vector engine is preserved behind the `agent.recall(que
 
 ### 10. Projects console — operator UI surface (Story 3)
 
+> **Superseded in part by [ADR-0029](../adr/adr-0029-project-config-write-surface.md)
+> (2026-08-31).** This section's minimal write surface — `PATCH /projects/{id}`
+> limited to `status` (and `name`), with everything else edited in
+> `project.json` + seed — no longer describes the system. The route now also
+> accepts `owner_agent`, `github`, `governance_docs` and `credential_types`,
+> validated server-side and recorded in a `PROJECT#{id}/AUDIT#` trail, and the
+> seed treats all six as create-only on an existing row. The rest of §10 (the
+> read routes, the AWS_IAM gate on mutations, `POST /projects` staying
+> unexposed) stands as written.
+
 The console adds pages under the existing Workforce SPA and a thin read/write API layered onto the trust boundary defined in §1–§9. The UI **never resolves credential values** — it shows that a `(project, type)` pair exists, who owns it, and when it was last rotated; the value itself stays inside the runner.
 
 | Page | Path | Role |

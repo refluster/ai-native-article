@@ -673,6 +673,18 @@ paths:
       description: 'Same shape as /performance, scoped to one project. id is percent-encoded for ids containing "/" (e.g. self%2Fren). 404 until the reducer lands a roll-up for the scope.'
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       responses: { "200": { description: OK }, "404": { description: No roll-up yet for this scope } }
+  /projects/{id}/audit:
+    get:
+      tags: [projects]
+      summary: Project config-mutation audit trail (newest-first)
+      description: 'ADR-0029. One row per accepted PATCH /projects/{id}, carrying the IAM actor and a field-level before/after diff. Rows name fields and timestamps, never credential values, so the route is public like the other project reads and like /agents/{slug}/audit. id is percent-encoded for ids containing "/" (e.g. self%2Fren).'
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/pageSize'
+        - $ref: '#/components/parameters/cursor'
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/AuditItem' } }, next_cursor: { type: string, nullable: true } } } } } }
+        "404": { description: Unknown project }
   /feed:
     get:
       tags: [feed]

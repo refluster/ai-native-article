@@ -36,6 +36,10 @@ const ID = /^[a-z][a-z0-9-]*$/;
 // types an operator provisions as a secret; `workforce.dispatch_token` is
 // minted per fire, never declared). See the injector file header for the
 // full mirror-point list.
+//
+// The subset relation, and the exclusion list that defines it, are asserted by
+// credential-type-mirrors-tests.ts — the three lists had drifted three ways
+// before that check existed (ADR-0029 review, wf:dario A1).
 const CREDENTIAL_KEY =
   /^(anthropic\.api_key|azure\.openai|discord\.bot_token|discord\.webhook_url|github\.token|notion\.integration_token|voyage\.api_key|workforce\.feed_write_token|workforce\.memory_write_token)(@[a-z][a-z0-9_-]*)?$/;
 

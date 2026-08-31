@@ -136,6 +136,23 @@ export interface ProjectMetaRow {
    */
   github_owner?: string;
   github_repo?: string;
+  /**
+   * Paths (relative to the target repo's root) to governance docs reviewer
+   * agents ground their lens against. Written by `seed-projects.mjs` from
+   * `project.json:governance_docs` since the seed's first version; declared
+   * here as of ADR-0029, which made it operator-editable through
+   * `PATCH /projects/{id}` and therefore part of the row's contract rather
+   * than an undeclared attribute the seed happened to carry.
+   */
+  governance_docs?: string[];
+  /**
+   * Credential keys this project is expected to hold under
+   * `wf/projects/{id}/{type}`. Declaring a type here does NOT create the
+   * secret — the operator stores values out of band. Same provenance note as
+   * `governance_docs`: seeded from day one, declared and patchable as of
+   * ADR-0029.
+   */
+  credential_types?: string[];
 }
 
 export interface ArtifactRef {
@@ -370,6 +387,43 @@ export async function rename(projectId: ProjectId, name: string): Promise<void> 
   if (!meta) throw new Error(`project "${projectId}" not found`);
   meta.name = trimmed;
   await putItem(meta);
+}
+
+/**
+ * Apply an operator patch to a project's META row (ADR-0029).
+ *
+ * `rename` / `archive` / `unarchive` stay as they are — they encode
+ * lifecycle rules (the 1..80 bound, the `archived_at` set/clear pair) that a
+ * generic setter would have to special-case anyway. This helper covers the
+ * plain descriptive attributes, where the write really is "set these fields".
+ *
+ * A field set to `undefined` in the patch is DELETED from the row rather than
+ * stored as undefined, so "clear the governance docs" and "this project has
+ * no target repo" round-trip as absence — the shape every reader already
+ * expects from a project that never had the attribute.
+ *
+ * Validation lives at the API boundary (agents-api `patchProject`), not here:
+ * this is the storage primitive, and the seed calls the same row shape
+ * without going through the route.
+ */
+export async function patchMeta(
+  projectId: ProjectId,
+  patch: Partial<
+    Pick<
+      ProjectMetaRow,
+      "owner_agent" | "github_owner" | "github_repo" | "governance_docs" | "credential_types"
+    >
+  >,
+): Promise<ProjectMetaRow> {
+  const meta = await getItem<ProjectMetaRow>(projectPk(projectId), "META");
+  if (!meta) throw new Error(`project "${projectId}" not found`);
+  const writable = meta as unknown as Record<string, unknown>;
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) delete writable[key];
+    else writable[key] = value;
+  }
+  await putItem(meta);
+  return meta;
 }
 
 // --- Execution ledger ----------------------------------------------------

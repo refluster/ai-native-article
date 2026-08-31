@@ -757,6 +757,15 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /projects/{id}/executions
             Method: GET
+        # ADR-0029: the project config trail. Public read like the other
+        # project reads and like GET /agents/{slug}/audit — the rows carry
+        # field names, an actor ARN and timestamps, never credential values.
+        ListProjectAudit:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects/{id}/audit
+            Method: GET
         # Issue #158 PR-β: project credentials LIST (public read, metadata-only)
         # and project PATCH (AWS_IAM auth) so the operator can flip
         # status=archived from the SPA without dropping to the CLI.

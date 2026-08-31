@@ -17,6 +17,7 @@ import WorkforceLayout from '../components/WorkforceLayout';
 import Typeplate from '../components/Typeplate';
 import KPIReadout from '../components/KPIReadout';
 import ProjectArchiveButton from '../components/ProjectArchiveButton';
+import ProjectConfigEditor from '../components/ProjectConfigEditor';
 import ExecutionTimeline from '../components/ExecutionTimeline';
 import CredentialVault from '../components/CredentialVault';
 import PerformancePanels from '../components/PerformancePanels';
@@ -228,6 +229,11 @@ export default function ProjectProfile() {
           <div className="lg:col-span-2 space-y-6 sm:space-y-8">
             <OverviewPanel project={project} />
 
+            <ProjectConfigEditor
+              project={project}
+              onSaved={(next) => setProject((prev) => (prev ? { ...prev, ...next } : next))}
+            />
+
             <ExecutionHistoryPanel executions={executions} />
           </div>
 
@@ -287,41 +293,11 @@ function OverviewPanel({ project }: { project: ProjectDetail }) {
         <Fact label="PROJECT_ID" value={project.project_id} mono />
         {project.name && <Fact label="NAME" value={project.name} />}
         <Fact label="STATUS" value={project.status} />
-        <Fact label="OWNER" value={project.owner_agent} />
-        <RepoFact owner={project.github_owner} repo={project.github_repo} />
         <Fact label="CREATED" value={formatDate(project.created_at)} />
         <Fact label="LAST EXEC" value={formatRelative(project.last_execution_at)} />
         {project.archived_at && <Fact label="ARCHIVED" value={formatDate(project.archived_at)} />}
       </dl>
     </section>
-  );
-}
-
-// The GitHub repo is the standard project attribute (project.json
-// `github.{owner,repo}`, flattened to `github_owner`/`github_repo` on the
-// META row). Non-confidential — rendered as a deep link to the repo. When
-// a project declares no repo (e.g. `self/*` personal projects) the row is
-// omitted entirely rather than showing an empty cell. Edited via
-// project.json + seed (Epic-010 §10), so this is read-only here.
-function RepoFact({ owner, repo }: { owner?: string; repo?: string }) {
-  if (!owner || !repo) return null;
-  const slug = `${owner}/${repo}`;
-  return (
-    <div>
-      <dt className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-0.5">
-        GITHUB REPO
-      </dt>
-      <dd className="text-sm">
-        <a
-          href={`https://github.com/${owner}/${repo}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-mono text-wf-primary hover:underline"
-        >
-          {slug}
-        </a>
-      </dd>
-    </div>
   );
 }
 
