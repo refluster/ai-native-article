@@ -517,6 +517,12 @@ paths:
         - { name: q, in: query, required: true, schema: { type: string } }
         - { name: k, in: query, schema: { type: integer } }
       responses: { "200": { description: OK } }
+  /public/workforce-summary:
+    get:
+      tags: [meta]
+      summary: Public workforce KPI card (cached projection of /stats)
+      description: 'Small, anonymous-read roll-up powering the "working with agents" section on kohuehara.xyz: roster size + agents active today, runs/deliverables/compute-hours for today, the trailing 7 days and month-to-date, a 30-day run strip, the top skills of the week and the newest activity ribbon. Memoised per Lambda container for cache_ttl_seconds. Carries no cost or token figures (C-1) — wall-clock run duration is the honest compute proxy.'
+      responses: { "200": { description: OK } }
   /stats:
     get:
       tags: [meta]
@@ -667,6 +673,18 @@ paths:
       description: 'Same shape as /performance, scoped to one project. id is percent-encoded for ids containing "/" (e.g. self%2Fren). 404 until the reducer lands a roll-up for the scope.'
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       responses: { "200": { description: OK }, "404": { description: No roll-up yet for this scope } }
+  /projects/{id}/audit:
+    get:
+      tags: [projects]
+      summary: Project config-mutation audit trail (newest-first)
+      description: 'ADR-0029. One row per accepted PATCH /projects/{id}, carrying the IAM actor and a field-level before/after diff. Rows name fields and timestamps, never credential values, so the route is public like the other project reads and like /agents/{slug}/audit. id is percent-encoded for ids containing "/" (e.g. self%2Fren).'
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/pageSize'
+        - $ref: '#/components/parameters/cursor'
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/AuditItem' } }, next_cursor: { type: string, nullable: true } } } } } }
+        "404": { description: Unknown project }
   /feed:
     get:
       tags: [feed]

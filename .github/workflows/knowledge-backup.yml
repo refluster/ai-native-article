@@ -1,0 +1,117 @@
+# Knowledge backup — Discord + Notion -> per-project knowledge stores
+# (ADR-0026 Layer 1; ADR-0028 per-project scoping).
+#
+# Deterministic ingest: no LLM, no persona, no judgment. A Discord guild and a
+# Notion workspace belong to a community, and a community is a Project — so the
+# unit of configuration is the project, not the workforce. `discover` reads
+# every workforce/projects/{id}/knowledge-backup.json and emits one matrix row
+# per (project × source); each row runs isolated, with only that project's
+# credentials in scope.
+#
+# GitHub Actions is the substrate because the sink is git, and a runner-scoped
+# CI secret is the one place R-N3 permits a credential outside Secrets Manager.
+# Nothing here touches AWS.
+#
+# Adding a project (operator):
+#   1. Create its store repo.
+#   2. Add workforce/projects/{id}/knowledge-backup.json (see the runbook).
+#   3. Add its secrets, named by the convention the config derives:
+#        KB_{PROJECT}_STORE_TOKEN          PAT, contents:write on the store repo
+#        KB_{PROJECT}_DISCORD_BOT_TOKEN    if sources.discord is declared
+#        KB_{PROJECT}_NOTION_API_KEY       if sources.notion is declared
+#      ({PROJECT} = the id upper-cased, `-` -> `_`.)
+# A project whose secrets are not set yet is skipped with a notice rather than
+# failing the daily cron; every other misconfiguration fails loud.
+
+name: Knowledge backup (Discord + Notion)
+
+on:
+  schedule:
+    # 01:23 UTC — after the UTC day the run archives has closed, and clear of
+    # the deploy (06/12/18:17), insights (02:00 Mon) and sweep (04:47) crons.
+    - cron: "23 1 * * *"
+  workflow_dispatch:
+    inputs:
+      project:
+        description: "Back up only this project id. Default: every project that declares a backup."
+        required: false
+      since:
+        description: "Window start (YYYYMMDDTHHMMSS or ISO-8601, UTC). Default: yesterday 00:00."
+        required: false
+      until:
+        description: "Window end (YYYYMMDDTHHMMSS or ISO-8601, UTC). Default: today 00:00."
+        required: false
+      dry_run:
+        description: "Scrape and render, but commit nothing."
+        type: boolean
+        default: false
+
+concurrency:
+  # A backfill and the nightly run must not race for the same store branch.
+  group: knowledge-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      count: ${{ steps.plan.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Dependency-free scripts — no npm ci needed. This step also VALIDATES
+      # every project config, so a malformed one fails here, by name, before
+      # any credential reaches a runner.
+      - name: Plan the (project × source) runs
+        id: plan
+        run: |
+          MATRIX=$(node workforce/pipeline/knowledge-backup/plan.mjs \
+            ${{ inputs.project && format('--project {0}', inputs.project) || '' }})
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "count=$(echo "$MATRIX" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).length))')" >> "$GITHUB_OUTPUT"
+          node workforce/pipeline/knowledge-backup/plan.mjs --human \
+            ${{ inputs.project && format('--project {0}', inputs.project) || '' }} \
+            >> "$GITHUB_STEP_SUMMARY"
+
+  backup:
+    needs: discover
+    if: needs.discover.outputs.count != '0'
+    runs-on: ubuntu-latest
+    strategy:
+      # One project's outage must not cancel every other project's backup.
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.discover.outputs.matrix) }}
+    name: ${{ matrix.project }} · ${{ matrix.source }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Back up ${{ matrix.source }} for ${{ matrix.project }}
+        env:
+          # Only this project's two credentials are in scope for this job.
+          KNOWLEDGE_STORE_TOKEN: ${{ secrets[matrix.store_token_secret] }}
+          KNOWLEDGE_SOURCE_TOKEN: ${{ secrets[matrix.source_secret] }}
+        run: |
+          if [ -z "$KNOWLEDGE_STORE_TOKEN" ] || [ -z "$KNOWLEDGE_SOURCE_TOKEN" ]; then
+            echo "::notice::${{ matrix.project }} (${{ matrix.source }}) — secrets ${{ matrix.store_token_secret }} / ${{ matrix.source_secret }} are not set; skipping until provisioned."
+            exit 0
+          fi
+          # Re-export under the per-project names the scripts derive from the
+          # project id, so the scripts never learn a workflow-specific name.
+          export ${{ matrix.store_token_secret }}="$KNOWLEDGE_STORE_TOKEN"
+          export ${{ matrix.source_secret }}="$KNOWLEDGE_SOURCE_TOKEN"
+          node workforce/pipeline/knowledge-backup/backup-${{ matrix.source }}.mjs \
+            --project "${{ matrix.project }}" \
+            ${{ inputs.since && format('--since {0}', inputs.since) || '' }} \
+            ${{ inputs.until && format('--until {0}', inputs.until) || '' }} \
+            ${{ inputs.dry_run && '--dry-run' || '' }}

@@ -193,6 +193,23 @@ vi.mock("../shared/project.js", () => ({
       delete row.archived_at;
     }
   },
+  rename: async (id: string, name: string) => {
+    const row = rows.get(key(`PROJECT#${id}`, "META"));
+    if (!row) throw new Error(`project "${id}" not found`);
+    row.name = name.trim();
+  },
+  // ADR-0029: the generic descriptive-attribute writer. Mirrors the real
+  // helper's delete-on-undefined contract, which the github-clear path
+  // depends on.
+  patchMeta: async (id: string, patch: Record<string, unknown>) => {
+    const row = rows.get(key(`PROJECT#${id}`, "META"));
+    if (!row) throw new Error(`project "${id}" not found`);
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === undefined) delete row[k];
+      else row[k] = v;
+    }
+    return row;
+  },
   // Epic-010 C3 (listAgentExecutions): GSI1 query against AGENT#{slug}.
   // Reuses the same in-memory `rows` Map so test fixtures stay
   // co-located with the DDB mocks above.
@@ -334,7 +351,7 @@ vi.mock("../shared/engagement-token.js", () => ({
 }));
 
 // SUT must be imported AFTER all vi.mock() calls.
-const { handler } = await import("./handler.js");
+const { handler, __clearPublicSummaryCache } = await import("./handler.js");
 const recallMock = vi.mocked((await import("../shared/recall.js")).recall);
 const isValidEngagementTokenMock = vi.mocked((await import("../shared/engagement-token.js")).isValidEngagementToken);
 
@@ -829,6 +846,53 @@ describe("GET /projects/{id}/credentials (listProjectCredentials)", () => {
   });
 });
 
+// ─── GET /projects/{id}/audit (ADR-0029) ──────────────────────────────
+
+describe("GET /projects/{id}/audit (listProjectAuditRoute)", () => {
+  it("returns 404 for a project that does not exist", async () => {
+    const res = await handler(evt("GET /projects/{id}/audit", { id: "ghost" }));
+    expect(statusOf(res)).toBe(404);
+    expect(bodyOf(res)).toMatchObject({ error: "not_found" });
+  });
+
+  it("returns an empty page for a project with no config changes yet", async () => {
+    rows.set(key("PROJECT#quiet", "META"), {
+      pk: "PROJECT#quiet",
+      sk: "META",
+      project_id: "quiet",
+      owner_agent: "_operator",
+      status: "active",
+      created_at: "2026-05-27T00:00:00.000Z",
+    });
+    const res = await handler(evt("GET /projects/{id}/audit", { id: "quiet" }));
+    expect(statusOf(res)).toBe(200);
+    expect(bodyOf(res)).toMatchObject({ items: [] });
+  });
+
+  it("surfaces the rows a PATCH wrote", async () => {
+    rows.set(key("PROJECT#acme2", "META"), {
+      pk: "PROJECT#acme2",
+      sk: "META",
+      project_id: "acme2",
+      owner_agent: "_operator",
+      status: "active",
+      created_at: "2026-05-27T00:00:00.000Z",
+    });
+    projectStatus.set("acme2", "active");
+    rows.set(key("AGENT#ren", "META"), { pk: "AGENT#ren", sk: "META", slug: "ren" });
+
+    const patch = evt("PATCH /projects/{id}", { id: "acme2" });
+    (patch as APIGatewayProxyEventV2 & { body?: string }).body = JSON.stringify({ owner_agent: "ren" });
+    await handler(patch);
+
+    const res = await handler(evt("GET /projects/{id}/audit", { id: "acme2" }));
+    expect(statusOf(res)).toBe(200);
+    const body = bodyOf(res) as { items: Array<{ changes: Array<{ field: string }> }> };
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0]!.changes.map((c) => c.field)).toContain("owner_agent");
+  });
+});
+
 // ─── PATCH /projects/{id} (Issue #158 PR-β A2) ────────────────────────
 
 describe("PATCH /projects/{id} (patchProject)", () => {
@@ -894,15 +958,282 @@ describe("PATCH /projects/{id} (patchProject)", () => {
   });
 
   it("returns 400 non_patchable_fields when the body touches identity attrs", async () => {
+    // ADR-0029 widened the allowlist, but NOT to these: project_id keys the
+    // partition, the URL and the secret prefix, and created_at is a fact.
     seedProject("acme");
     const res = await handler(
-      patchEvt("acme", { owner_agent: "ren", project_id: "renamed" }),
+      patchEvt("acme", { project_id: "renamed", created_at: "2020-01-01T00:00:00.000Z" }),
     );
     expect(statusOf(res)).toBe(400);
     const body = bodyOf(res) as { error?: string; detail?: string };
     expect(body.error).toBe("non_patchable_fields");
-    expect(body.detail).toContain("owner_agent");
     expect(body.detail).toContain("project_id");
+    expect(body.detail).toContain("created_at");
+  });
+
+  // ─── ADR-0029: the widened, validated, audited write surface ──────
+
+  function auditRows(id: string) {
+    return [...rows.values()].filter(
+      (r) => r.pk === `PROJECT#${id}` && String(r.sk).startsWith("AUDIT#"),
+    );
+  }
+  function seedAgent(slug: string) {
+    rows.set(key(`AGENT#${slug}`, "META"), { pk: `AGENT#${slug}`, sk: "META", slug });
+  }
+
+  it("sets owner_agent when the agent exists, and returns it in the view", async () => {
+    seedProject("acme");
+    seedAgent("ren");
+    const res = await handler(patchEvt("acme", { owner_agent: "ren" }));
+    expect(statusOf(res)).toBe(200);
+    expect((bodyOf(res) as { owner_agent: string }).owner_agent).toBe("ren");
+    expect(rows.get(key("PROJECT#acme", "META"))!.owner_agent).toBe("ren");
+  });
+
+  it("rejects an owner_agent that names no registered agent", async () => {
+    // The failure this guards: a dangling owner silently breaks every
+    // "who owns this" read downstream, and nothing else would catch it.
+    seedProject("acme");
+    const res = await handler(patchEvt("acme", { owner_agent: "ghost" }));
+    expect(statusOf(res)).toBe(400);
+    expect(bodyOf(res)).toMatchObject({ error: "unknown_owner_agent" });
+    expect(rows.get(key("PROJECT#acme", "META"))!.owner_agent).toBe("_operator");
+  });
+
+  it("accepts _operator as owner without an agent lookup", async () => {
+    seedProject("acme");
+    const res = await handler(patchEvt("acme", { owner_agent: "_operator" }));
+    expect(statusOf(res)).toBe(200);
+  });
+
+  it("sets github as a flattened owner/repo pair", async () => {
+    seedProject("acme");
+    const res = await handler(
+      patchEvt("acme", { github: { owner: "refluster", repo: "ai-native-article" } }),
+    );
+    expect(statusOf(res)).toBe(200);
+    expect(bodyOf(res)).toMatchObject({
+      github_owner: "refluster",
+      github_repo: "ai-native-article",
+    });
+  });
+
+  it("clears the github pair on null — both attributes, never one", async () => {
+    seedProject("acme");
+    await handler(patchEvt("acme", { github: { owner: "o", repo: "r" } }));
+    const res = await handler(patchEvt("acme", { github: null }));
+    expect(statusOf(res)).toBe(200);
+    const row = rows.get(key("PROJECT#acme", "META"))!;
+    expect("github_owner" in row).toBe(false);
+    expect("github_repo" in row).toBe(false);
+  });
+
+  it("rejects a half-specified or over-specified github object", async () => {
+    seedProject("acme");
+    for (const github of [{ owner: "o" }, { repo: "r" }, { owner: "o", repo: "r", branch: "main" }]) {
+      const res = await handler(patchEvt("acme", { github }));
+      expect(statusOf(res)).toBe(400);
+      expect(bodyOf(res)).toMatchObject({ error: "invalid_github" });
+    }
+  });
+
+  it("validates governance_docs shape, uniqueness and bound", async () => {
+    seedProject("acme");
+    const ok = await handler(patchEvt("acme", { governance_docs: ["AGENTS.md", "docs/governance.md"] }));
+    expect(statusOf(ok)).toBe(200);
+    expect((bodyOf(ok) as { governance_docs: string[] }).governance_docs).toEqual([
+      "AGENTS.md",
+      "docs/governance.md",
+    ]);
+
+    for (const bad of [
+      "not-an-array",
+      ["dup.md", "dup.md"],
+      ["has space.md"],
+      Array.from({ length: 9 }, (_, i) => `d${i}.md`),
+    ]) {
+      const res = await handler(patchEvt("acme", { governance_docs: bad }));
+      expect(statusOf(res)).toBe(400);
+      expect(bodyOf(res)).toMatchObject({ error: "invalid_governance_docs" });
+    }
+  });
+
+  it("rejects a credential type that is not in the injector's registry", async () => {
+    // Shape-valid but unknown: the orchestrator would fail to resolve it at
+    // fire time, and the operator would only find out from a cadence's logs.
+    seedProject("acme");
+    const res = await handler(patchEvt("acme", { credential_types: ["stripe.api_key"] }));
+    expect(statusOf(res)).toBe(400);
+    expect(bodyOf(res)).toMatchObject({ error: "unknown_credential_types" });
+  });
+
+  it("accepts registry credential types, including a variant suffix", async () => {
+    // The variant is opaque; only the BASE type is looked up in the
+    // registry. (The registry is mocked here to two types — see the
+    // credential-injector mock — so the fixture uses one of those.)
+    seedProject("acme");
+    const res = await handler(
+      patchEvt("acme", {
+        credential_types: ["github.token", "notion.integration_token@archive"],
+      }),
+    );
+    expect(statusOf(res)).toBe(200);
+    expect((bodyOf(res) as { credential_types: string[] }).credential_types).toEqual([
+      "github.token",
+      "notion.integration_token@archive",
+    ]);
+  });
+
+  it("validates the WHOLE patch before writing any of it", async () => {
+    // A request that fails on its second field must not leave the first
+    // applied — a half-applied patch is the worst outcome for config the
+    // operator is editing in a form.
+    seedProject("acme");
+    seedAgent("ren");
+    const res = await handler(
+      patchEvt("acme", { owner_agent: "ren", credential_types: ["nope.nope"] }),
+    );
+    expect(statusOf(res)).toBe(400);
+    expect(rows.get(key("PROJECT#acme", "META"))!.owner_agent).toBe("_operator");
+  });
+
+  it("appends one AUDIT# row carrying the field-level diff", async () => {
+    seedProject("acme");
+    seedAgent("ren");
+    await handler(patchEvt("acme", { owner_agent: "ren", name: "ACME" }));
+
+    const audits = auditRows("acme");
+    expect(audits).toHaveLength(1);
+    const changes = audits[0]!.changes as Array<{ field: string; before: unknown; after: unknown }>;
+    expect(changes).toEqual(
+      expect.arrayContaining([
+        { field: "owner_agent", before: "_operator", after: "ren" },
+        { field: "name", before: null, after: "ACME" },
+      ]),
+    );
+  });
+
+  it("writes no audit row when the patch re-sends the values already stored", async () => {
+    seedProject("acme");
+    const res = await handler(patchEvt("acme", { owner_agent: "_operator" }));
+    expect(statusOf(res)).toBe(200);
+    expect(auditRows("acme")).toHaveLength(0);
+  });
+
+  it("writes no audit row and no mutation when validation fails", async () => {
+    seedProject("acme");
+    await handler(patchEvt("acme", { owner_agent: "ghost" }));
+    expect(auditRows("acme")).toHaveLength(0);
+  });
+
+  /** An event carrying a SigV4 principal, as API GW supplies on the IAM routes. */
+  function signedEvt(routeKey: string, pathParams: Record<string, string> = {}) {
+    const e = evt(routeKey, pathParams);
+    (e.requestContext as unknown as { authorizer?: unknown }).authorizer = {
+      iam: { userArn: "arn:aws:iam::123456789012:user/operator" },
+    };
+    return e;
+  }
+
+  it("withholds governance_docs and credential_types from an ANONYMOUS read", async () => {
+    // GET /projects/{id} has no API GW authorizer. governance_docs holds file
+    // paths inside what may be a private client repo; publishing them would
+    // contradict ADR-0028's own reason for keeping config out of DDB.
+    seedProject("acme");
+    const row = rows.get(key("PROJECT#acme", "META"))!;
+    row.governance_docs = ["AGENTS.md", "docs/private-arch.md"];
+    row.credential_types = ["github.token"];
+
+    const res = await handler(evt("GET /projects/{id}", { id: "acme" }));
+    expect(statusOf(res)).toBe(200);
+    const view = bodyOf(res) as Record<string, unknown>;
+    expect("governance_docs" in view).toBe(false);
+    expect("credential_types" in view).toBe(false);
+    // The rest of the pre-ADR-0029 view is unchanged for anonymous callers.
+    expect(view.project_id).toBe("acme");
+    expect(view.status).toBe("active");
+    expect(JSON.stringify(view)).not.toContain("private-arch");
+  });
+
+  it("returns them to a SigV4-authenticated read", async () => {
+    seedProject("acme");
+    const row = rows.get(key("PROJECT#acme", "META"))!;
+    row.governance_docs = ["AGENTS.md"];
+    row.credential_types = ["github.token"];
+
+    const res = await handler(signedEvt("GET /projects/{id}", { id: "acme" }));
+    const view = bodyOf(res) as Record<string, unknown>;
+    expect(view.governance_docs).toEqual(["AGENTS.md"]);
+    expect(view.credential_types).toEqual(["github.token"]);
+  });
+
+  it("withholds them from the anonymous LIST route too", async () => {
+    seedProject("acme");
+    rows.get(key("PROJECT#acme", "META"))!.governance_docs = ["docs/private-arch.md"];
+    const res = await handler(evt("GET /projects"));
+    expect(JSON.stringify(bodyOf(res))).not.toContain("private-arch");
+  });
+
+  it("returns seed-written Set attributes as JSON arrays, not {}", async () => {
+    // seed-projects.mjs writes string lists as DDB `SS`; the DocumentClient
+    // hands those back as a JS Set. Unnormalised they serialise to {} and the
+    // console's .join() throws on them.
+    seedProject("acme");
+    const row = rows.get(key("PROJECT#acme", "META"))!;
+    row.governance_docs = new Set(["AGENTS.md", "docs/governance.md"]);
+    row.credential_types = new Set(["github.token"]);
+
+    const res = await handler(signedEvt("GET /projects/{id}", { id: "acme" }));
+    expect(statusOf(res)).toBe(200);
+    const view = bodyOf(res) as { governance_docs: string[]; credential_types: string[] };
+    expect(view.governance_docs).toEqual(["AGENTS.md", "docs/governance.md"]);
+    expect(view.credential_types).toEqual(["github.token"]);
+    // The regression this pins: JSON.stringify(new Set([...])) === "{}".
+    expect(JSON.stringify(view.governance_docs)).not.toBe("{}");
+  });
+
+  it("writes no audit row when a patch re-sends a Set-backed list unchanged", async () => {
+    // Without normalising the `before` snapshot, a Set never deep-equals the
+    // array in the patch, so every patch would look like a change.
+    seedProject("acme");
+    rows.get(key("PROJECT#acme", "META"))!.governance_docs = new Set(["AGENTS.md"]);
+
+    const res = await handler(patchEvt("acme", { governance_docs: ["AGENTS.md"] }));
+    expect(statusOf(res)).toBe(200);
+    expect(auditRows("acme")).toHaveLength(0);
+  });
+
+  it("records the actor, source and sk shape on the audit row, not just the diff", async () => {
+    // Without asserting these, actorFromEvent could return a constant and the
+    // "records who changed what" claim would still pass.
+    seedProject("acme");
+    seedAgent("ren");
+    const e = patchEvt("acme", { owner_agent: "ren" });
+    (e.requestContext as unknown as { authorizer?: unknown }).authorizer = {
+      iam: { userArn: "arn:aws:iam::123456789012:user/operator" },
+    };
+    await handler(e);
+
+    const [row] = auditRows("acme");
+    expect(row).toBeDefined();
+    expect(row!.actor).toBe("arn:aws:iam::123456789012:user/operator");
+    expect(row!.source).toBe("agents-api");
+    expect(row!.project_id).toBe("acme");
+    expect(String(row!.sk)).toMatch(/^AUDIT#\d{4}-\d{2}-\d{2}T[\d:.]+Z#[0-9a-f]{8}$/);
+  });
+
+  it("falls back to \"operator\" when the event carries no IAM principal", async () => {
+    seedProject("acme");
+    seedAgent("ren");
+    await handler(patchEvt("acme", { owner_agent: "ren" }));
+    expect(auditRows("acme")[0]!.actor).toBe("operator");
+  });
+
+  it("returns 404 for a project that does not exist, before validating", async () => {
+    const res = await handler(patchEvt("ghost-project", { owner_agent: "_operator" }));
+    expect(statusOf(res)).toBe(404);
+    expect(bodyOf(res)).toMatchObject({ error: "not_found" });
   });
 
   it("returns 400 empty_patch when the body only contains unknown fields and no patch lands", async () => {
@@ -1668,5 +1999,181 @@ describe("GET /stats (listStats)", () => {
     expect(body.totals.avg_duration_s).toBe(0);
     expect(body.activity.days).toHaveLength(30);
     expect(body.recent_runs).toEqual([]);
+  });
+});
+
+// ─── GET /public/workforce-summary (public KPI card for kohuehara.xyz) ──
+//
+// The cached, projected-down sibling of /stats. Covers: the three
+// reporting windows (today / 7d / MTD), the roster + active-today count,
+// the archived-agent exclusion, the 30-day strip, the container-level
+// memo, and the same C-1 no-cost/no-token contract /stats carries.
+describe("GET /public/workforce-summary (getPublicSummary)", () => {
+  type SummaryWindow = {
+    from: string;
+    runs: number;
+    deliverables: number;
+    agents_active: number;
+    compute_hours: number;
+  };
+  type SummaryBody = {
+    generated_at: string;
+    cache_ttl_seconds: number;
+    roster: { agents_total: number; agents_active_today: number };
+    today: SummaryWindow & { date: string };
+    week: SummaryWindow;
+    month: SummaryWindow & { month: string };
+    activity_30d: Array<{ date: string; runs: number }>;
+    top_skills_7d: Array<{ skill: string; runs: number }>;
+    recent_runs: Array<{
+      agent: string;
+      name: string;
+      role: string;
+      skill: string;
+      started_at: string;
+      duration_s: number;
+      status: string;
+    }>;
+  };
+
+  function seedAgent(slug: string, over: Partial<AnyRow> = {}) {
+    rows.set(key(`AGENT#${slug}`, "META"), {
+      pk: `AGENT#${slug}`,
+      sk: "META",
+      slug,
+      first_name: slug[0]!.toUpperCase() + slug.slice(1),
+      role: "Analyst",
+      paused: false,
+      archived: false,
+      last_run_status: "ok",
+      ...over,
+    });
+  }
+
+  /** `daysAgo` days before today, at 01:00 UTC — always inside the day
+   *  bucket it names, whatever hour the suite runs at. */
+  function daysAgoAt(daysAgo: number): string {
+    const d = new Date();
+    d.setUTCHours(1, 0, 0, 0);
+    return new Date(d.getTime() - daysAgo * 24 * 60 * 60 * 1000).toISOString();
+  }
+
+  function seedExec(
+    slug: string,
+    opts: { ulid: string; startedAt: string; durationS?: number; status?: string; skill?: string },
+  ) {
+    const started = new Date(opts.startedAt);
+    const ended = new Date(started.getTime() + (opts.durationS ?? 0) * 1000);
+    rows.set(key(`PROJECT#self/${slug}`, `EXEC#${opts.ulid}`), {
+      pk: `PROJECT#self/${slug}`,
+      sk: `EXEC#${opts.ulid}`,
+      project_id: `self/${slug}`,
+      agent_slug: slug,
+      skill_name: opts.skill ?? "daily-research",
+      skill_version: "1.0.0",
+      started_at: started.toISOString(),
+      ended_at: ended.toISOString(),
+      status: opts.status ?? "ok",
+      gsi1pk: `AGENT#${slug}`,
+      gsi1sk: started.toISOString(),
+    });
+  }
+
+  beforeEach(() => {
+    __clearPublicSummaryCache();
+  });
+
+  it("rolls today / 7-day / MTD windows out of the EXEC ledger", async () => {
+    seedAgent("nadia");
+    seedAgent("ren");
+    seedExec("nadia", { ulid: "01A", startedAt: daysAgoAt(0), durationS: 3600 });
+    seedExec("nadia", { ulid: "01B", startedAt: daysAgoAt(0), durationS: 1800, status: "throw" });
+    seedExec("ren", { ulid: "01C", startedAt: daysAgoAt(3), durationS: 7200 });
+
+    const res = await handler(evt("GET /public/workforce-summary"));
+    expect(statusOf(res)).toBe(200);
+    const body = bodyOf(res) as SummaryBody;
+
+    // Today: both of nadia's runs; one threw, so only one "delivered".
+    expect(body.today.runs).toBe(2);
+    expect(body.today.deliverables).toBe(1);
+    expect(body.today.agents_active).toBe(1);
+    expect(body.today.compute_hours).toBe(1.5);
+
+    // 7 days: adds ren's run 3 days back.
+    expect(body.week.runs).toBe(3);
+    expect(body.week.agents_active).toBe(2);
+    expect(body.week.compute_hours).toBe(3.5);
+
+    expect(body.roster.agents_total).toBe(2);
+    expect(body.roster.agents_active_today).toBe(1);
+    expect(body.cache_ttl_seconds).toBe(300);
+  });
+
+  it("excludes archived agents from the roster and reads no ledger for them", async () => {
+    seedAgent("nadia");
+    seedAgent("zed", { archived: true });
+    seedExec("nadia", { ulid: "01A", startedAt: daysAgoAt(0), durationS: 60 });
+
+    const body = bodyOf(await handler(evt("GET /public/workforce-summary"))) as SummaryBody;
+    expect(body.roster.agents_total).toBe(1);
+    expect(body.recent_runs.every((r) => r.agent !== "zed")).toBe(true);
+  });
+
+  it("emits a 30-day strip ending today and a newest-first activity ribbon", async () => {
+    seedAgent("nadia");
+    seedAgent("ren");
+    seedExec("nadia", { ulid: "01A", startedAt: daysAgoAt(1), durationS: 60, skill: "feed-post" });
+    seedExec("ren", { ulid: "01C", startedAt: daysAgoAt(0), durationS: 30, skill: "daily-research" });
+
+    const body = bodyOf(await handler(evt("GET /public/workforce-summary"))) as SummaryBody;
+    expect(body.activity_30d).toHaveLength(30);
+    expect(body.activity_30d[29]!.date).toBe(new Date().toISOString().slice(0, 10));
+    expect(body.activity_30d[29]!.runs).toBe(1);
+    expect(body.activity_30d[28]!.runs).toBe(1);
+
+    expect(body.recent_runs[0]!.agent).toBe("ren");
+    expect(body.recent_runs[0]!.name).toBe("Ren");
+    expect(body.recent_runs[0]!.role).toBe("Analyst");
+    expect(body.top_skills_7d[0]).toEqual({ skill: "daily-research", runs: 1 });
+  });
+
+  it("reports NO cost or token figures (C-1: no fabricated truth)", async () => {
+    seedAgent("nadia");
+    seedExec("nadia", { ulid: "01A", startedAt: daysAgoAt(0), durationS: 60 });
+
+    const body = bodyOf(await handler(evt("GET /public/workforce-summary")));
+    const blob = JSON.stringify(body);
+    expect(blob).not.toMatch(/cost/i);
+    expect(blob).not.toMatch(/token/i);
+    expect(blob).not.toMatch(/usd/i);
+  });
+
+  it("serves the memoised payload on a second call (public-traffic cost gate)", async () => {
+    seedAgent("nadia");
+    seedExec("nadia", { ulid: "01A", startedAt: daysAgoAt(0), durationS: 60 });
+    const first = bodyOf(await handler(evt("GET /public/workforce-summary"))) as SummaryBody;
+
+    // A run landing after the memo must NOT change the served payload until
+    // the TTL expires — that is the point of the cache.
+    seedExec("nadia", { ulid: "01B", startedAt: daysAgoAt(0), durationS: 60 });
+    const second = bodyOf(await handler(evt("GET /public/workforce-summary"))) as SummaryBody;
+    expect(second.generated_at).toBe(first.generated_at);
+    expect(second.today.runs).toBe(1);
+
+    // …and it does once the memo is dropped.
+    __clearPublicSummaryCache();
+    const third = bodyOf(await handler(evt("GET /public/workforce-summary"))) as SummaryBody;
+    expect(third.today.runs).toBe(2);
+  });
+
+  it("returns an empty-but-valid payload on an empty roster", async () => {
+    const body = bodyOf(await handler(evt("GET /public/workforce-summary"))) as SummaryBody;
+    expect(body.roster).toEqual({ agents_total: 0, agents_active_today: 0 });
+    expect(body.today.runs).toBe(0);
+    expect(body.week.compute_hours).toBe(0);
+    expect(body.activity_30d).toHaveLength(30);
+    expect(body.recent_runs).toEqual([]);
+    expect(body.top_skills_7d).toEqual([]);
   });
 });

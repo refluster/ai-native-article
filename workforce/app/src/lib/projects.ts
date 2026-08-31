@@ -8,6 +8,9 @@
 // path goes through encodeProjectId() which percent-encodes the slash so
 // the API Gateway router treats the whole id as one path parameter.
 
+import { signedFetch } from './sigv4';
+import { SIGV4_IS_CONFIGURED } from '../config/auth';
+
 import { WORKFORCE_AGENTS_API_BASE } from '../config/api';
 import { withBasePath } from './paths';
 import type {
@@ -90,12 +93,34 @@ export async function fetchProjects(opts: ListProjectsOpts = {}): Promise<Projec
   return items;
 }
 
+/**
+ * Read one project.
+ *
+ * SIGNED when the SigV4 broker is configured, plain otherwise. The route is
+ * public either way, but since ADR-0029 the API returns `governance_docs` and
+ * `credential_types` only to an authenticated caller — they name paths inside
+ * what may be a private repo. An unsigned read still succeeds and still
+ * renders the page; the config panel just shows nothing to edit, which matches
+ * the fact that editing needs SigV4 anyway.
+ *
+ * A failure to sign is not fatal: fall back to the anonymous read rather than
+ * breaking the page for a broker misconfiguration.
+ */
 export async function fetchProject(projectId: string): Promise<ProjectDetail | undefined> {
   if (!apiConfigured()) {
     const mock = await loadProjectsMock();
     return mock.projects.find((p) => p.project_id === projectId);
   }
-  const res = await fetch(`${WORKFORCE_AGENTS_API_BASE}/projects/${encodeProjectId(projectId)}`);
+  const url = `${WORKFORCE_AGENTS_API_BASE}/projects/${encodeProjectId(projectId)}`;
+  let res: Response | undefined;
+  if (SIGV4_IS_CONFIGURED) {
+    try {
+      res = await signedFetch(url, { method: 'GET' });
+    } catch {
+      res = undefined; // fall through to the anonymous read
+    }
+  }
+  if (!res) res = await fetch(url);
   if (res.status === 404) return undefined;
   if (!res.ok) throw new Error(`agents-api ${res.status}`);
   return (await res.json()) as ProjectDetail;
@@ -125,13 +150,24 @@ export async function fetchProjectExecutions(
 // SAM events table. `name` is a display attribute decoupled from the
 // immutable project_id slug (URL and keys never move on rename).
 
-import { signedFetch, assertSigv4Configured } from './sigv4';
+import { assertSigv4Configured } from './sigv4';
 
 export type ProjectStatus = 'active' | 'archived';
 
+/** The config fields `PATCH /projects/{id}` accepts (ADR-0029). `github:
+ *  null` clears the repo pair; the API rejects a half-set pair. */
+export interface ProjectConfigPatch {
+  status?: ProjectStatus;
+  name?: string;
+  owner_agent?: string;
+  github?: { owner: string; repo: string } | null;
+  governance_docs?: string[];
+  credential_types?: string[];
+}
+
 async function patchProject(
   projectId: string,
-  body: { status?: ProjectStatus; name?: string },
+  body: ProjectConfigPatch,
   agentsApiBase: string = WORKFORCE_AGENTS_API_BASE,
 ): Promise<ProjectDetail> {
   assertSigv4Configured();
@@ -168,4 +204,19 @@ export async function patchProjectName(
   agentsApiBase: string = WORKFORCE_AGENTS_API_BASE,
 ): Promise<ProjectDetail> {
   return patchProject(projectId, { name }, agentsApiBase);
+}
+
+
+/**
+ * Patch a project's descriptive config (ADR-0029). Every field is validated
+ * server-side against the same constraints `project.schema.json` puts on the
+ * seed, and the whole patch is validated before anything is written — so a
+ * rejected form leaves the project exactly as it was.
+ */
+export async function patchProjectConfig(
+  projectId: string,
+  patch: ProjectConfigPatch,
+  agentsApiBase: string = WORKFORCE_AGENTS_API_BASE,
+): Promise<ProjectDetail> {
+  return patchProject(projectId, patch, agentsApiBase);
 }

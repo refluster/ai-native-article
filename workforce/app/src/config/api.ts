@@ -34,3 +34,20 @@ export const WORKFORCE_AGENTS_API_BASE: string = raw.replace(/\/+$/, '')
 const credsRaw = (import.meta.env.VITE_WORKFORCE_CREDENTIALS_API_BASE ?? '') as string
 
 export const WORKFORCE_CREDENTIALS_API_BASE: string = credsRaw.replace(/\/+$/, '')
+
+// Workforce tools-api endpoint configuration (ADR-0027 §2, Epic-025).
+//
+// Resolved at build time from VITE_WORKFORCE_TOOLS_API_BASE — the SAM
+// stack output ToolsApiUrl for the AWS_IAM-protected tools Lambda. A
+// third base rather than a reuse of the credentials one: the two are
+// separate HTTP APIs with separate CORS/authoriser configuration, since
+// a credentials-write surface and a run-an-LLM surface should not share
+// a blast radius.
+//
+// When this var is unset, the Tools tab still renders (registry, schemas,
+// credential advisories) and the run action reports that runs are not
+// configured — the same fail-legible posture as credentialsApiConfigured().
+
+const toolsRaw = (import.meta.env.VITE_WORKFORCE_TOOLS_API_BASE ?? '') as string;
+
+export const WORKFORCE_TOOLS_API_BASE: string = toolsRaw.replace(/\/+$/, '');

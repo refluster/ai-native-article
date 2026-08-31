@@ -2,6 +2,7 @@
 // Routes:
 //   GET    /agents                          list (paginated, filterable)
 //   POST   /agents                          create an agent — validated + audited (IAM-auth at API GW; ADR-0007 full CRUD)
+//   GET    /public/workforce-summary     cached public KPI roll-up (kohuehara.xyz agent-workforce card)
 //   GET    /stats                           dashboard aggregate — EXEC-ledger roll-up (runs/deliv/heat/trace; duration, not cost)
 //   GET    /agents/{slug}                   single agent
 //   GET    /agents/{slug}/executions        canonical activity ledger — EXEC rows via GSI1 (the agent-profile task log)
@@ -91,6 +92,7 @@ import {
   type SkillConfigViolation,
 } from "../shared/skill-config.js";
 import { appendSkillAudit, listSkillAudit } from "../shared/skill-audit.js";
+import { appendProjectAudit, listProjectAudit } from "../shared/project-audit.js";
 import {
   ConditionalCheckFailedException,
   conditionalPutItem,
@@ -107,6 +109,7 @@ import {
   getProject,
   listExecutions,
   projectPk,
+  patchMeta as patchProjectMeta,
   rename as renameProject,
   unarchive as unarchiveProject,
   type ArtifactRef,
@@ -276,6 +279,9 @@ export async function handler(
     // await` so the audit-append throw routes through the 500 mapping.
     if (routeKey === "POST /agents") return await createAgent(event);
     if (routeKey === "GET /stats") return listStats(event);
+    // Public KPI card for kohuehara.xyz — the cached, projected-down
+    // sibling of /stats (see getPublicSummary).
+    if (routeKey === "GET /public/workforce-summary") return getPublicSummary();
     // Epic-016 Phase 2 — performance analytics (lifecycle funnel + PR
     // automation). Public read, same CORS-gated shape as /stats. Serves the
     // reducer's live lifecycle roll-up; 404 (→ client illustrative fallback)
@@ -317,8 +323,9 @@ export async function handler(
     if (routeKey === "GET /projects/{id}/reports" && projectId) return listProjectReportsRoute(projectId);
     if (routeKey === "GET /projects/{id}/reports/{slug}" && projectId && slug) return getProjectReportRoute(projectId, slug);
     if (routeKey === "GET /projects/{id}/performance" && projectId) return getPerformanceRoute(projectId);
-    if (routeKey === "PATCH /projects/{id}" && projectId) return patchProject(projectId, event.body);
-    if (routeKey === "GET /projects/{id}" && projectId) return getProjectRoute(projectId);
+    if (routeKey === "GET /projects/{id}/audit" && projectId) return listProjectAuditRoute(projectId, event);
+    if (routeKey === "PATCH /projects/{id}" && projectId) return await patchProject(projectId, event);
+    if (routeKey === "GET /projects/{id}" && projectId) return getProjectRoute(projectId, event);
     if (routeKey === "GET /feed") return listFeedRoute(event);
     if (routeKey === "GET /feed/{post_id}" && postId) return getFeedPostRoute(postId, event);
     // POST /feed is the runner's write path (Epic-011 feed-post → DDB).
@@ -621,6 +628,212 @@ async function listStats(
   });
 }
 
+// ─── GET /public/workforce-summary — public KPI card (kohuehara.xyz) ────
+//
+// The portfolio site at https://kohuehara.xyz renders a "working with
+// agents" section: how many agents ran today, how much work the workforce
+// executed over the past week, how many hours of agent compute went into
+// this month. That page is an anonymous, high-fan-out surface, so it needs
+// an endpoint that is:
+//
+//   (a) small — a phone on a cold network shouldn't download the ~17 KB
+//       operator dashboard payload to paint six numbers;
+//   (b) cheap — GET /stats fans out one ledger query per agent (4–6 s,
+//       ~60 DDB queries per call). Paying that per visitor is the wrong
+//       cost shape for a public page.
+//
+// So this route computes the same EXEC-ledger roll-up, projects it down to
+// the public KPI set, and memoises the result per Lambda container for
+// PUBLIC_SUMMARY_TTL_MS. Freshness is advertised in the payload
+// (`generated_at` + `cache_ttl_seconds`) rather than implied.
+//
+// Same C-1 rule as /stats: NO cost or token figures. Per-run token usage
+// isn't observable from the CCR execution path, so publishing a dollar
+// number on the public site would be fabricated truth. The honest compute
+// proxy is wall-clock run duration, surfaced as hours.
+//
+// Everything here is already public through GET /agents + GET /stats — the
+// route adds no new disclosure, only a cheaper shape.
+
+const PUBLIC_SUMMARY_TTL_MS = 5 * 60 * 1000;
+const PUBLIC_SUMMARY_HEAT_DAYS = 30;
+const PUBLIC_SUMMARY_WEEK_DAYS = 7;
+const PUBLIC_SUMMARY_RECENT = 8;
+const PUBLIC_SUMMARY_TOP_SKILLS = 5;
+
+interface PublicSummaryWindow {
+  /** Inclusive UTC date the window opens on (YYYY-MM-DD). */
+  from: string;
+  runs: number;
+  deliverables: number;
+  agents_active: number;
+  compute_hours: number;
+}
+
+interface PublicSummary {
+  generated_at: string;
+  cache_ttl_seconds: number;
+  roster: { agents_total: number; agents_active_today: number };
+  today: PublicSummaryWindow & { date: string };
+  week: PublicSummaryWindow;
+  month: PublicSummaryWindow & { month: string };
+  activity_30d: Array<{ date: string; runs: number }>;
+  top_skills_7d: Array<{ skill: string; runs: number }>;
+  recent_runs: Array<{
+    agent: string;
+    name: string;
+    role: string;
+    skill: string;
+    started_at: string;
+    duration_s: number;
+    status: "ok" | "throw" | "dlq";
+  }>;
+}
+
+let _publicSummaryCache: { expires_at: number; body: PublicSummary } | undefined;
+
+/** Test seam — the module-level memo would otherwise leak between cases.
+ *  Not reachable over HTTP; the route never invalidates on demand. */
+export function __clearPublicSummaryCache(): void {
+  _publicSummaryCache = undefined;
+}
+
+/** One accumulator per reporting window (today / 7d / MTD). */
+class PublicWindowAcc {
+  runs = 0;
+  deliverables = 0;
+  computeSeconds = 0;
+  readonly agents = new Set<string>();
+
+  add(slug: string, row: ExecutionRow, durationS: number): void {
+    this.runs += 1;
+    if (row.status === "ok") this.deliverables += 1;
+    this.computeSeconds += durationS;
+    this.agents.add(slug);
+  }
+
+  view(from: string): PublicSummaryWindow {
+    return {
+      from,
+      runs: this.runs,
+      deliverables: this.deliverables,
+      agents_active: this.agents.size,
+      // One decimal: "494.0 hours" reads as a measured figure, and the
+      // rounding never inflates a small window to a bogus whole hour.
+      compute_hours: Math.round((this.computeSeconds / 3600) * 10) / 10,
+    };
+  }
+}
+
+async function computePublicSummary(now: Date): Promise<PublicSummary> {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const todayMidnightMs = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+  const weekStartMs = todayMidnightMs - (PUBLIC_SUMMARY_WEEK_DAYS - 1) * dayMs;
+  const heatStartMs = todayMidnightMs - (PUBLIC_SUMMARY_HEAT_DAYS - 1) * dayMs;
+  const monthStartMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+
+  const todayIso = new Date(todayMidnightMs).toISOString();
+  const weekStartIso = new Date(weekStartMs).toISOString();
+  const monthStartIso = new Date(monthStartMs).toISOString();
+  // Read back to whichever window opens earliest (MTD vs the 30-day strip).
+  const queryFromIso = new Date(Math.min(monthStartMs, heatStartMs)).toISOString();
+
+  const days: string[] = [];
+  for (let i = 0; i < PUBLIC_SUMMARY_HEAT_DAYS; i++) {
+    days.push(new Date(heatStartMs + i * dayMs).toISOString().slice(0, 10));
+  }
+  const heat = new Array<number>(PUBLIC_SUMMARY_HEAT_DAYS).fill(0);
+
+  // Paginate the roster scan to completion — a silently truncated public
+  // number is worse than a slightly slower cache miss (C-4).
+  const agentRows: AgentMetaRow[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await scanPrefix<AgentMetaRow>("AGENT#", "META", 100, cursor);
+    agentRows.push(...page.items);
+    cursor = page.cursor;
+  } while (cursor);
+
+  const today = new PublicWindowAcc();
+  const week = new PublicWindowAcc();
+  const month = new PublicWindowAcc();
+  const skills7d = new Map<string, number>();
+  const recent: PublicSummary["recent_runs"] = [];
+
+  let agentsTotal = 0;
+
+  for (const meta of agentRows) {
+    if (meta.archived) continue;
+    agentsTotal += 1;
+    const slug = meta.slug;
+    const rows = await listExecutions({
+      agent_slug: slug,
+      from: queryFromIso,
+      limit: STATS_PER_AGENT_EXEC_LIMIT,
+    });
+
+    for (const r of rows) {
+      const tsMs = Date.parse(r.started_at);
+      const durationS = execDurationSeconds(r);
+      if (Number.isFinite(tsMs)) {
+        const idx = Math.floor((tsMs - heatStartMs) / dayMs);
+        if (idx >= 0 && idx < PUBLIC_SUMMARY_HEAT_DAYS) heat[idx] = (heat[idx] ?? 0) + 1;
+      }
+      if (r.started_at >= todayIso) today.add(slug, r, durationS);
+      if (r.started_at >= weekStartIso) {
+        week.add(slug, r, durationS);
+        skills7d.set(r.skill_name, (skills7d.get(r.skill_name) ?? 0) + 1);
+      }
+      if (r.started_at >= monthStartIso) month.add(slug, r, durationS);
+
+      recent.push({
+        agent: slug,
+        name: meta.first_name ?? slug,
+        role: meta.role ?? "",
+        skill: r.skill_name,
+        started_at: r.started_at,
+        duration_s: Math.round(durationS),
+        status: mapExecStatus(r.status),
+      });
+    }
+  }
+
+  recent.sort((a, b) =>
+    a.started_at < b.started_at ? 1 : a.started_at > b.started_at ? -1 : 0,
+  );
+
+  const topSkills = [...skills7d.entries()]
+    .sort((a, b) => (b[1] - a[1]) || (a[0] < b[0] ? -1 : 1))
+    .slice(0, PUBLIC_SUMMARY_TOP_SKILLS)
+    .map(([skill, runs]) => ({ skill, runs }));
+
+  return {
+    generated_at: now.toISOString(),
+    cache_ttl_seconds: PUBLIC_SUMMARY_TTL_MS / 1000,
+    roster: { agents_total: agentsTotal, agents_active_today: today.agents.size },
+    today: { ...today.view(todayIso.slice(0, 10)), date: todayIso.slice(0, 10) },
+    week: week.view(weekStartIso.slice(0, 10)),
+    month: { ...month.view(monthStartIso.slice(0, 10)), month: monthStartIso.slice(0, 7) },
+    activity_30d: days.map((date, i) => ({ date, runs: heat[i] ?? 0 })),
+    top_skills_7d: topSkills,
+    recent_runs: recent.slice(0, PUBLIC_SUMMARY_RECENT),
+  };
+}
+
+async function getPublicSummary(): Promise<APIGatewayProxyResultV2> {
+  const now = new Date();
+  if (_publicSummaryCache && _publicSummaryCache.expires_at > now.getTime()) {
+    return reply(200, _publicSummaryCache.body);
+  }
+  const body = await computePublicSummary(now);
+  _publicSummaryCache = { expires_at: now.getTime() + PUBLIC_SUMMARY_TTL_MS, body };
+  return reply(200, body);
+}
+
 // ADR-0007: PATCH /agents/{slug} is the single write path for agent config.
 // Operational fields (paused / archived / budget override) behave as before;
 // identity fields (model, bindings, streams, …) became writable when the
@@ -885,6 +1098,31 @@ async function listAgentAuditRoute(
   const existing = await getItem<AgentMetaRow>(agentPk(slug), "META");
   if (!existing) return reply(404, { error: "not_found", slug });
   const page = await listAgentAudit(slug, pageSize, qs.cursor);
+  return reply(200, { items: page.items, next_cursor: page.cursor });
+}
+
+/**
+ * GET /projects/{id}/audit — the project config trail (ADR-0029).
+ *
+ * Wired here rather than left as a follow-up: an audit trail nothing can read
+ * is not an audit trail, and the agent equivalent (`GET /agents/{slug}/audit`)
+ * has had one since ADR-0007. Public, like the other project reads and like
+ * the agent trail: the rows carry field names, an actor ARN and timestamps,
+ * not credential values.
+ */
+async function listProjectAuditRoute(
+  rawId: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const qs = event.queryStringParameters ?? {};
+  const pageSize = Math.min(
+    Math.max(parseInt(qs.page_size ?? `${PAGE_SIZE_DEFAULT}`, 10) || PAGE_SIZE_DEFAULT, 1),
+    PAGE_SIZE_MAX,
+  );
+  const id = asProjectId(rawId);
+  const existing = await getProject(id);
+  if (!existing) return reply(404, { error: "not_found", project_id: rawId });
+  const page = await listProjectAudit(id, pageSize, qs.cursor);
   return reply(200, { items: page.items, next_cursor: page.cursor });
 }
 
@@ -1164,9 +1402,66 @@ interface ProjectApiView {
    *  both absent. Surfaced so the console can render the repo link. */
   github_owner?: string;
   github_repo?: string;
+  /** Paths in the target repo that reviewer agents ground their lens
+   *  against. Seeded since day one but only surfaced here as of ADR-0029,
+   *  which made it editable from the console — a field the operator can set
+   *  but not see is worse than one they can do neither with. */
+  governance_docs?: string[];
+  /** Credential keys the project is expected to hold under
+   *  `wf/projects/{id}/{type}`. Names only — the values live in Secrets
+   *  Manager and are never returned here. `GET /projects/{id}/credentials`
+   *  is the separate route that reports which of them actually exist. */
+  credential_types?: string[];
 }
 
-function toProjectApiView(row: ProjectMetaRow): ProjectApiView {
+/**
+ * String lists on a project row reach us in two shapes, and only one of them
+ * is an array.
+ *
+ * `seed-projects.mjs` writes them through the raw AWS CLI, which stores a
+ * non-empty string array as `SS`; the DocumentClient in `shared/ddb.ts` is
+ * constructed without `unmarshallOptions`, so it hands an `SS` attribute back
+ * as a **JS `Set`**. A row last written by `patchMeta` instead carries a plain
+ * array. Returned unnormalised, the Set serialises as `{}` over the wire —
+ * which the console's `.join('\n')` then throws on — and compares unequal to
+ * an array in `diffChanges`, writing an audit row for a patch that changed
+ * nothing.
+ *
+ * Normalising at the read boundary fixes both, and is preferred to setting
+ * `unmarshallOptions` globally: that would change every other consumer of
+ * `shared/ddb.ts` in the same commit.
+ */
+function toStringList(value: unknown): string[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (value instanceof Set) return [...value] as string[];
+  if (Array.isArray(value)) return value as string[];
+  return undefined;
+}
+
+/**
+ * `GET /projects` and `GET /projects/{id}` carry no API GW authorizer — they
+ * are public reads on the CORS gate. `governance_docs` holds file paths inside
+ * what may be a private client repo, and `credential_types` names which
+ * credential classes a project holds; neither was reachable before ADR-0029.
+ *
+ * Publishing them would also contradict this change's own sibling reasoning:
+ * ADR-0028 keeps knowledge-backup config out of DDB precisely so private repo
+ * detail does not land on this route. So the two new fields are returned ONLY
+ * to a SigV4-authenticated caller. Nothing else about the view changes, and
+ * the anonymous view is byte-identical to the pre-ADR-0029 one.
+ *
+ * This costs the console nothing: editing project config already requires
+ * SigV4, so a session that cannot see these fields could not have written
+ * them either.
+ */
+function isIamAuthenticated(event: APIGatewayProxyEventV2): boolean {
+  const ctx = event.requestContext as unknown as {
+    authorizer?: { iam?: { userArn?: string } };
+  };
+  return Boolean(ctx.authorizer?.iam?.userArn);
+}
+
+function toProjectApiView(row: ProjectMetaRow, includeConfig = false): ProjectApiView {
   return {
     project_id: row.project_id,
     status: row.status,
@@ -1176,6 +1471,12 @@ function toProjectApiView(row: ProjectMetaRow): ProjectApiView {
     name: row.name,
     github_owner: row.github_owner,
     github_repo: row.github_repo,
+    ...(includeConfig
+      ? {
+          governance_docs: toStringList(row.governance_docs),
+          credential_types: toStringList(row.credential_types),
+        }
+      : {}),
   };
 }
 
@@ -1216,9 +1517,10 @@ async function listProjects(
   // Resolve last_execution_at concurrently per row. At v1 page sizes
   // (≤100) this is bounded and cheap; promote to a single GSI query if it
   // becomes hot.
+  const includeConfig = isIamAuthenticated(event);
   const items: ProjectApiView[] = await Promise.all(
     filtered.map(async (row) => {
-      const view = toProjectApiView(row);
+      const view = toProjectApiView(row, includeConfig);
       const lastExec = await getLastExecutionAt(row.project_id);
       if (lastExec !== undefined) view.last_execution_at = lastExec;
       return view;
@@ -1354,11 +1656,14 @@ async function dispatchReply(threadId: string, addressedSlug: string | undefined
   }
 }
 
-async function getProjectRoute(rawId: string): Promise<APIGatewayProxyResultV2> {
+async function getProjectRoute(
+  rawId: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
   const id = asProjectId(rawId);
   const row = await getItem<ProjectMetaRow>(projectPk(id), "META");
   if (!row) return reply(404, { error: "not_found", project_id: rawId });
-  const view = toProjectApiView(row);
+  const view = toProjectApiView(row, isIamAuthenticated(event));
   const lastExec = await getLastExecutionAt(rawId);
   if (lastExec !== undefined) view.last_execution_at = lastExec;
   return reply(200, view);
@@ -1529,13 +1834,78 @@ async function listProjectCredentials(rawId: string): Promise<APIGatewayProxyRes
   return reply(200, { items });
 }
 
-const PATCHABLE_PROJECT_FIELDS = ["status", "name"] as const;
+// ADR-0029 widened this allowlist. It was `["status", "name"]` — Epic-010 §10
+// deliberately kept the write surface minimal, and everything descriptive was
+// edited in `workforce/projects/{id}/project.json` + `seed-projects.mjs`.
+// That made the console a read-only window onto config the operator could only
+// change through a PR round-trip. The fields below are now patchable; the
+// no-longer-patchable set is empty, so the 400 no longer points at the seed.
+//
+// `project_id`, `created_at` and `archived_at` remain unpatchable BY DESIGN
+// and are not merely omitted: the id keys the DDB partition, the URL and the
+// Secrets Manager prefix, and the two timestamps are facts about what happened
+// rather than settings. `status` still routes through archive/unarchive so the
+// `archived_at` set/clear pair stays in one place.
+const PATCHABLE_PROJECT_FIELDS = [
+  "status",
+  "name",
+  "owner_agent",
+  "github",
+  "governance_docs",
+  "credential_types",
+] as const;
 type PatchableProjectField = (typeof PATCHABLE_PROJECT_FIELDS)[number];
 
+// Mirrors workforce/scripts/schemas/project.schema.json. The schema governs
+// the seed's input; these govern the API's. They must agree — a value the
+// console accepts but the schema rejects would fail CI the next time anyone
+// wrote the same project out to `project.json`.
+const PROJECT_AGENT_SLUG = /^[a-z]+$/;
+const PROJECT_GITHUB_OWNER = /^[A-Za-z0-9][A-Za-z0-9-]*$/;
+const PROJECT_GITHUB_REPO = /^[A-Za-z0-9._-]+$/;
+const PROJECT_GOVERNANCE_DOC = /^[A-Za-z0-9._/-]+$/;
+const PROJECT_CREDENTIAL_KEY = /^([a-z_]+\.[a-z_]+)(@[a-z][a-z0-9_-]*)?$/;
+const PROJECT_LIST_MAX = 8;
+
+/** A string[] that is unique, bounded, and matches `item` elementwise. */
+function validateStringList(
+  value: unknown,
+  field: string,
+  item: RegExp,
+  maxItems = PROJECT_LIST_MAX,
+  maxLength = 200,
+): string | undefined {
+  if (!Array.isArray(value)) return `${field} must be an array of strings`;
+  if (value.length > maxItems) return `${field} accepts at most ${maxItems} entries (got ${value.length})`;
+  for (const entry of value) {
+    if (typeof entry !== "string" || entry.length === 0 || entry.length > maxLength) {
+      return `${field} entries must be 1..${maxLength} char strings (got ${JSON.stringify(entry)})`;
+    }
+    if (!item.test(entry)) {
+      return `${field} entry ${JSON.stringify(entry)} does not match ${item}`;
+    }
+  }
+  if (new Set(value).size !== value.length) return `${field} entries must be unique`;
+  return undefined;
+}
+
+/**
+ * PATCH /projects/{id} — the operator's write path for project config
+ * (ADR-0029). SigV4-gated by API Gateway; the console is the only caller.
+ *
+ * Every accepted field is validated here against the same constraints
+ * `project.schema.json` puts on the seed, and the whole patch is validated
+ * BEFORE anything is written, so a request that fails on its third field does
+ * not leave the first two applied. The mutation then appends one `AUDIT#` row
+ * carrying the field-level diff — the replacement for the git history that
+ * editing `project.json` used to provide, and the reason widening the surface
+ * does not lose accountability.
+ */
 async function patchProject(
   rawId: string,
-  body: string | undefined,
+  event: APIGatewayProxyEventV2,
 ): Promise<APIGatewayProxyResultV2> {
+  const body = event.body;
   if (!body) return reply(400, { error: "missing_body" });
 
   let parsed: Record<string, unknown>;
@@ -1557,7 +1927,7 @@ async function patchProject(
   if (invalid.length > 0) {
     return reply(400, {
       error: "non_patchable_fields",
-      detail: `the following fields cannot be PATCHed via this API (edit workforce/projects/{id}/project.json + seed instead): ${invalid.join(", ")}`,
+      detail: `the following fields cannot be PATCHed: ${invalid.join(", ")}. project_id keys the DDB partition, the URL and the Secrets Manager prefix; created_at / archived_at are facts, not settings.`,
       patchable: [...PATCHABLE_PROJECT_FIELDS],
     });
   }
@@ -1569,6 +1939,9 @@ async function patchProject(
   const existing = await getProject(id);
   if (!existing) return reply(404, { error: "not_found", project_id: rawId });
 
+  // ── Validate the WHOLE patch before writing any of it ──────────────
+  const meta: Parameters<typeof patchProjectMeta>[1] = {};
+
   if ("name" in patch) {
     const nextName = patch.name;
     if (typeof nextName !== "string" || nextName.trim().length === 0 || nextName.trim().length > 80) {
@@ -1577,30 +1950,144 @@ async function patchProject(
         detail: `name must be a 1..80 char string after trim (got ${JSON.stringify(nextName)})`,
       });
     }
-    await renameProject(id, nextName);
   }
 
-  if ("status" in patch) {
-    const next = patch.status;
-    if (next === "archived") {
-      // No-op if already archived — preserves the original
-      // `archived_at` timestamp.
-      if (existing.status === "active") {
-        await archiveProject(id);
-      }
-    } else if (next === "active") {
-      // unarchive() is itself idempotent on already-active rows.
-      await unarchiveProject(id);
-    } else {
+  if ("status" in patch && patch.status !== "archived" && patch.status !== "active") {
+    return reply(400, {
+      error: "invalid_status",
+      detail: `status must be 'active' or 'archived' (got ${JSON.stringify(patch.status)})`,
+    });
+  }
+
+  if ("owner_agent" in patch) {
+    const next = patch.owner_agent;
+    if (typeof next !== "string" || (next !== "_operator" && !PROJECT_AGENT_SLUG.test(next))) {
       return reply(400, {
-        error: "invalid_status",
-        detail: `status must be 'active' or 'archived' (got ${JSON.stringify(next)})`,
+        error: "invalid_owner_agent",
+        detail: `owner_agent must be '_operator' or an agent slug matching ${PROJECT_AGENT_SLUG} (got ${JSON.stringify(next)})`,
       });
+    }
+    // An owner pointing at an agent that does not exist is the failure this
+    // check exists for: the console offers a picker, but the API is the
+    // boundary, and a dangling owner silently breaks every "who owns this"
+    // read downstream.
+    if (next !== "_operator") {
+      const agent = await getItem<AgentMetaRow>(agentPk(next), "META");
+      if (!agent) {
+        return reply(400, {
+          error: "unknown_owner_agent",
+          detail: `no agent "${next}" exists; owner_agent must name a registered agent or '_operator'`,
+        });
+      }
+    }
+    meta.owner_agent = next as ProjectMetaRow["owner_agent"];
+  }
+
+  if ("github" in patch) {
+    const next = patch.github;
+    // `null` clears the pair — a project may stop shipping against a repo.
+    if (next === null) {
+      meta.github_owner = undefined;
+      meta.github_repo = undefined;
+    } else if (typeof next !== "object" || Array.isArray(next)) {
+      return reply(400, {
+        error: "invalid_github",
+        detail: `github must be an object {owner, repo} or null to clear it (got ${JSON.stringify(next)})`,
+      });
+    } else {
+      const { owner, repo, ...rest } = next as Record<string, unknown>;
+      if (Object.keys(rest).length > 0) {
+        return reply(400, {
+          error: "invalid_github",
+          detail: `github accepts only {owner, repo} (unexpected: ${Object.keys(rest).join(", ")})`,
+        });
+      }
+      // Both or neither — a half-set repo is not a state any reader handles.
+      if (typeof owner !== "string" || !PROJECT_GITHUB_OWNER.test(owner) || owner.length > 39) {
+        return reply(400, {
+          error: "invalid_github",
+          detail: `github.owner must match ${PROJECT_GITHUB_OWNER} and be at most 39 chars (got ${JSON.stringify(owner)})`,
+        });
+      }
+      if (typeof repo !== "string" || !PROJECT_GITHUB_REPO.test(repo) || repo.length > 100) {
+        return reply(400, {
+          error: "invalid_github",
+          detail: `github.repo must match ${PROJECT_GITHUB_REPO} and be at most 100 chars (got ${JSON.stringify(repo)})`,
+        });
+      }
+      meta.github_owner = owner;
+      meta.github_repo = repo;
     }
   }
 
+  if ("governance_docs" in patch) {
+    const problem = validateStringList(patch.governance_docs, "governance_docs", PROJECT_GOVERNANCE_DOC);
+    if (problem) return reply(400, { error: "invalid_governance_docs", detail: problem });
+    meta.governance_docs = patch.governance_docs as string[];
+  }
+
+  if ("credential_types" in patch) {
+    const problem = validateStringList(patch.credential_types, "credential_types", PROJECT_CREDENTIAL_KEY);
+    if (problem) return reply(400, { error: "invalid_credential_types", detail: problem });
+    // Beyond the shape: every base type must be one the injector knows, or
+    // the orchestrator will fail to resolve it at fire time — a runtime
+    // failure the operator would only see in a cadence's logs.
+    const unknown = (patch.credential_types as string[]).filter(
+      (key) => !(CREDENTIAL_TYPES as ReadonlySet<string>).has(key.split("@")[0] ?? key),
+    );
+    if (unknown.length > 0) {
+      return reply(400, {
+        error: "unknown_credential_types",
+        detail: `not in the credential-type registry: ${unknown.join(", ")}. Known: ${[...CREDENTIAL_TYPES].sort().join(", ")}`,
+      });
+    }
+    meta.credential_types = patch.credential_types as string[];
+  }
+
+  // ── Apply ──────────────────────────────────────────────────────────
+  // The diff is taken against the pre-mutation row, over the flattened
+  // attribute names actually stored, so an audit line reads the same whether
+  // the field arrived as `github` or as `github_owner`/`github_repo`.
+  // Normalised for the same reason toProjectApiView is: an un-normalised Set
+  // never deep-equals the array the patch carries, so every patch would look
+  // like a change and write a spurious audit row.
+  const before: Record<string, unknown> = {
+    ...existing,
+    governance_docs: toStringList(existing.governance_docs),
+    credential_types: toStringList(existing.credential_types),
+  };
+  const after: Record<string, unknown> = {};
+
+  if (Object.keys(meta).length > 0) {
+    await patchProjectMeta(id, meta);
+    for (const [k, v] of Object.entries(meta)) after[k] = v ?? null;
+  }
+
+  if ("name" in patch) {
+    await renameProject(id, patch.name as string);
+    after.name = (patch.name as string).trim();
+  }
+
+  if ("status" in patch) {
+    if (patch.status === "archived") {
+      // No-op if already archived — preserves the original `archived_at`.
+      if (existing.status === "active") await archiveProject(id);
+    } else {
+      // unarchive() is itself idempotent on already-active rows.
+      await unarchiveProject(id);
+    }
+    after.status = patch.status;
+  }
+
+  const changes = diffChanges(before, after);
+  if (changes.length > 0) {
+    await appendProjectAudit(id, actorFromEvent(event), changes);
+  }
+
   const updated = await getProject(id);
-  return reply(200, updated ? toProjectApiView(updated) : { error: "vanished" });
+  // The PATCH route is AWS_IAM by definition, so the config fields are
+  // always included here — the editor must see what it just saved.
+  return reply(200, updated ? toProjectApiView(updated, true) : { error: "vanished" });
 }
 
 // Epic-010 ROADMAP §Status-transition criterion 3 (C3): the agent

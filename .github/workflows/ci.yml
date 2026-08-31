@@ -70,6 +70,12 @@ jobs:
       - name: Workforce skill registry freshness
         run: npm run workforce:skill-registry:check
 
+      - name: Workforce tool schema (ADR-0027)
+        run: npm run workforce:tools
+
+      - name: Workforce tool registry freshness
+        run: npm run workforce:tool-registry:check
+
       - name: Workforce skill manifest freshness (#185)
         run: npm run workforce:skill-manifest:check
 

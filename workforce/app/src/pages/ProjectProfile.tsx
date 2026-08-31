@@ -17,11 +17,14 @@ import WorkforceLayout from '../components/WorkforceLayout';
 import Typeplate from '../components/Typeplate';
 import KPIReadout from '../components/KPIReadout';
 import ProjectArchiveButton from '../components/ProjectArchiveButton';
+import ProjectConfigEditor from '../components/ProjectConfigEditor';
 import ExecutionTimeline from '../components/ExecutionTimeline';
 import CredentialVault from '../components/CredentialVault';
 import PerformancePanels from '../components/PerformancePanels';
 import { projectScope } from '../lib/performance';
 import ProjectRenameButton from '../components/ProjectRenameButton';
+import ProjectTools from '../components/ProjectTools';
+import { parseProjectRoute, projectPath, type ProjectView } from '../lib/paths';
 import {
   apiConfigured,
   fetchProject,
@@ -63,23 +66,12 @@ export default function ProjectProfile() {
   const params = useParams();
   const rawId = params['*'] ?? '';
   // The route param arrives URL-encoded (`self%2Fren`); the API + the
-  // mock fixture key on the decoded form. A trailing `/performance` segment
-  // selects the Performance tab (Epic-016) — the `/projects/*` wildcard
-  // captures the whole remainder, so the view is parsed here rather than
-  // via a separate route (which would collide with slash-bearing ids).
-  const { projectId, view } = (() => {
-    let decoded = rawId;
-    try {
-      decoded = decodeURIComponent(rawId);
-    } catch {
-      /* keep raw on malformed input */
-    }
-    const PERF = '/performance';
-    if (decoded.endsWith(PERF)) {
-      return { projectId: decoded.slice(0, -PERF.length), view: 'performance' as const };
-    }
-    return { projectId: decoded, view: 'overview' as const };
-  })();
+  // mock fixture key on the decoded form. A trailing `/performance` or
+  // `/tools[/{toolId}]` segment selects a tab — the `/projects/*` wildcard
+  // captures the whole remainder, so the view is a suffix rather than its
+  // own route (which would collide with slash-bearing ids). The split
+  // lives in lib/paths.ts, tested there (ADR-0027 §1).
+  const { projectId, view, toolId } = parseProjectRoute(rawId);
 
   const [project, setProject] = useState<ProjectDetail | null | undefined>(undefined);
   const [executions, setExecutions] = useState<ProjectExecution[] | null>(null);
@@ -220,18 +212,27 @@ export default function ProjectProfile() {
         )}
       </section>
 
-      {/* Overview / Performance tabs (Epic-016) */}
+      {/* Overview / Performance / Tools tabs (Epic-016, Epic-025) */}
       <ProjectTabs projectId={project.project_id} view={view} />
 
       {view === 'performance' ? (
         <section className="mb-8 sm:mb-10">
           <PerformancePanels scope={projectScope(project.project_id)} />
         </section>
+      ) : view === 'tools' ? (
+        <section className="mb-8 sm:mb-10">
+          <ProjectTools projectId={project.project_id} toolId={toolId} />
+        </section>
       ) : (
         /* TWO COLUMN: main / sidebar */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6 sm:space-y-8">
             <OverviewPanel project={project} />
+
+            <ProjectConfigEditor
+              project={project}
+              onSaved={(next) => setProject((prev) => (prev ? { ...prev, ...next } : next))}
+            />
 
             <ExecutionHistoryPanel executions={executions} />
           </div>
@@ -245,18 +246,14 @@ export default function ProjectProfile() {
   );
 }
 
-function ProjectTabs({
-  projectId,
-  view,
-}: {
-  projectId: string;
-  view: 'overview' | 'performance';
-}) {
-  const enc = encodeURIComponent(projectId);
-  const tabs: { label: string; to: string; active: boolean }[] = [
-    { label: 'Overview', to: `/projects/${enc}`, active: view === 'overview' },
-    { label: 'Performance', to: `/projects/${enc}/performance`, active: view === 'performance' },
-  ];
+function ProjectTabs({ projectId, view }: { projectId: string; view: ProjectView }) {
+  const tabs: { label: string; to: string; active: boolean }[] = (
+    ['overview', 'performance', 'tools'] as const
+  ).map((v) => ({
+    label: v === 'overview' ? 'Overview' : v === 'performance' ? 'Performance' : 'Tools',
+    to: projectPath(projectId, v),
+    active: view === v,
+  }));
   return (
     <nav className="mb-6 flex items-stretch gap-1 border-b border-wf-outline-variant">
       {tabs.map((t) => (
@@ -296,41 +293,11 @@ function OverviewPanel({ project }: { project: ProjectDetail }) {
         <Fact label="PROJECT_ID" value={project.project_id} mono />
         {project.name && <Fact label="NAME" value={project.name} />}
         <Fact label="STATUS" value={project.status} />
-        <Fact label="OWNER" value={project.owner_agent} />
-        <RepoFact owner={project.github_owner} repo={project.github_repo} />
         <Fact label="CREATED" value={formatDate(project.created_at)} />
         <Fact label="LAST EXEC" value={formatRelative(project.last_execution_at)} />
         {project.archived_at && <Fact label="ARCHIVED" value={formatDate(project.archived_at)} />}
       </dl>
     </section>
-  );
-}
-
-// The GitHub repo is the standard project attribute (project.json
-// `github.{owner,repo}`, flattened to `github_owner`/`github_repo` on the
-// META row). Non-confidential — rendered as a deep link to the repo. When
-// a project declares no repo (e.g. `self/*` personal projects) the row is
-// omitted entirely rather than showing an empty cell. Edited via
-// project.json + seed (Epic-010 §10), so this is read-only here.
-function RepoFact({ owner, repo }: { owner?: string; repo?: string }) {
-  if (!owner || !repo) return null;
-  const slug = `${owner}/${repo}`;
-  return (
-    <div>
-      <dt className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-0.5">
-        GITHUB REPO
-      </dt>
-      <dd className="text-sm">
-        <a
-          href={`https://github.com/${owner}/${repo}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-mono text-wf-primary hover:underline"
-        >
-          {slug}
-        </a>
-      </dd>
-    </div>
   );
 }
 
