@@ -9,6 +9,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import Dashboard from './pages/Dashboard';
 import AgentDirectory from './pages/AgentDirectory';
 import AgentProfile from './pages/AgentProfile';
+import AgentRecall from './pages/AgentRecall';
 import SkillDirectory from './pages/SkillDirectory';
 import SkillProfile from './pages/SkillProfile';
 import SearchResults from './pages/SearchResults';
@@ -99,6 +100,10 @@ function ProtectedRoutes() {
             <Route path="/org" element={<OrgRedirect />} />
             <Route path="/agents" element={<AgentDirectory />} />
             <Route path="/agents/:slug" element={<AgentProfile />} />
+            {/* Epic-010 Story 4 (#93) — operator-facing semantic recall over
+                one agent's EXEC ledger. Declared before nothing else claims
+                the sub-path, so it can't be shadowed by /agents/:slug. */}
+            <Route path="/agents/:slug/recall" element={<AgentRecall />} />
             <Route path="/skills" element={<SkillDirectory />} />
             <Route path="/skills/:name" element={<SkillProfile />} />
             <Route path="/search" element={<SearchResults />} />

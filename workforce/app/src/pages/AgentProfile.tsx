@@ -357,11 +357,21 @@ export default function AgentProfile() {
             <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
               <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between gap-3">
                 <Typeplate label="ACTIVITY" value="RUNS · DELIVERABLES" />
-                {execs !== null && execs.length > 0 && (
-                  <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant shrink-0">
-                    {Math.min(execs.length, ACTIVITY_LIMIT)} of {execs.length}
-                  </span>
-                )}
+                <div className="flex items-center gap-3 shrink-0">
+                  {execs !== null && execs.length > 0 && (
+                    <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant">
+                      {Math.min(execs.length, ACTIVITY_LIMIT)} of {execs.length}
+                    </span>
+                  )}
+                  {/* The ledger shows the newest N; recall (Epic-010 Story 4)
+                      is how the operator reaches the rest by meaning. */}
+                  <Link
+                    to={`/agents/${agent.slug}/recall`}
+                    className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-primary hover:underline"
+                  >
+                    RECALL →
+                  </Link>
+                </div>
               </div>
               <div className="p-4">
                 {execs === null ? (
