@@ -301,9 +301,18 @@ export default function AgentProfile() {
               <Typeplate label="DISCLOSURE" value="LLM-DRIVEN PERSONA" className="mb-2" />
               <p className="text-xs text-wf-on-surface-variant leading-relaxed">
                 {fullName(agent)} is an LLM-driven persona on the Workforce platform. Articles bylined to{' '}
-                {agent.first_name} are produced by an Anthropic Claude model running on AWS Lambda; the
-                persona's full operating brief — voice, credentials, and boundaries — is documented in
-                the IDENTITY panel above and acknowledged in every article footer.
+                {agent.first_name} are produced by an Anthropic Claude model running on AWS Lambda
+                {agent.identity ? (
+                  <>
+                    ; the persona's full operating brief — voice, credentials, and boundaries — is
+                    documented in the IDENTITY panel above and acknowledged in every article footer.
+                  </>
+                ) : (
+                  <>
+                    ; the persona's identity profile hasn't been curated yet, and this disclosure is
+                    acknowledged in every article footer regardless.
+                  </>
+                )}
               </p>
             </section>
           </div>
