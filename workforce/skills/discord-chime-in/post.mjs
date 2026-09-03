@@ -24,7 +24,13 @@
 //   BOT_TOKEN=<from credentials['discord.bot_token'].token> \
 //     node workforce/skills/discord-chime-in/post.mjs \
 //       --channel <channel_id> --agent <slug> --body-file /tmp/comment.txt \
-//       [--min-chars 100] [--reply-to <message_id>] [--skill-version 0.1.0]
+//       [--min-chars 100] [--reply-to <message_id>] [--skill-version 0.1.0] \
+//       [--dry-run]
+//
+// --dry-run runs every W-1 guard and prints the exact payload that WOULD be
+// sent, then exits 0 without touching Discord. It needs no token, so the write
+// path can be rehearsed before the credential exists. Pair it with
+// preflight.mjs, which rehearses the read path against the live API.
 //
 // Exit codes:
 //   0  — posted (Discord returned 2xx)
@@ -63,8 +69,12 @@ const bodyFile = arg("body-file");
 const replyTo = arg("reply-to");
 const skillVersion = arg("skill-version");
 const minChars = Number(arg("min-chars") ?? DEFAULT_MIN_CHARS);
+const dryRun = process.argv.includes("--dry-run");
 
-if (!token) fail(1, "BOT_TOKEN env var is required (from credentials['discord.bot_token'].token)");
+// A dry run exercises the guards and the payload build, so it deliberately
+// does NOT require the credential — that is the whole point of being able to
+// rehearse before the token is provisioned.
+if (!token && !dryRun) fail(1, "BOT_TOKEN env var is required (from credentials['discord.bot_token'].token)");
 if (!channelId) fail(1, "--channel <channel_id> is required (from the binding's config.channel_id)");
 if (!/^\d{5,}$/.test(channelId)) fail(1, `--channel "${channelId}" is not a Discord snowflake — pass the channel ID, not the channel URL`);
 if (!agent) fail(1, "--agent <slug> is required");
@@ -137,6 +147,15 @@ if (replyTo) {
   // fail_if_not_exists:false — a deleted target degrades to a plain message
   // rather than failing the whole fire.
   payload.message_reference = { message_id: replyTo, fail_if_not_exists: false };
+}
+
+if (dryRun) {
+  console.log(`post.mjs: DRY RUN — every W-1 guard passed; nothing was sent.`);
+  console.log(`  POST ${API_BASE}/channels/${channelId}/messages`);
+  console.log(`  agent          ${agent}${skillVersion ? ` (skill v${skillVersion})` : ""}`);
+  console.log(`  length         ${bodyCodepoints} codepoints / ${body.length} UTF-16 units (floor ${minChars}, cap ${DISCORD_MESSAGE_MAX})`);
+  console.log(`  payload        ${JSON.stringify(payload)}`);
+  process.exit(0);
 }
 
 try {

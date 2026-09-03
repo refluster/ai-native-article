@@ -47,6 +47,44 @@ Read these from your fire payload's `config` (defaults in parentheses):
 plain sight. The bot token is the capability and lives only in the project's
 credential bag.
 
+## Before the first fire — rehearse it (operator)
+
+This Cadence has two live dependencies that a scheduled fire can only tell you
+about by failing: the bot token, and the Discord app's own configuration. Two
+bundled scripts rehearse both without waiting for the cron and without posting.
+
+**Read path, against the live API** — validates the token, the channel, the
+three channel permissions, and the MESSAGE CONTENT privileged intent, then
+shows the exact window the next fire would see:
+
+```sh
+BOT_TOKEN="<the bot token>" \
+  node workforce/skills/discord-chime-in/preflight.mjs --channel <channel_id>
+```
+
+Exit `0` means the cadence will work as soon as the token is stored at
+`wf/projects/{project_id}/discord.bot_token`. Exit `2` names which check failed
+and how to fix it.
+
+**Write path, offline** — runs every W-1 guard and prints the exact payload it
+would send, then exits without touching Discord. It needs no token, so the
+write path can be rehearsed before the credential exists:
+
+```sh
+node workforce/skills/discord-chime-in/post.mjs \
+  --channel <channel_id> --agent <slug> --body-file /tmp/comment.txt \
+  --min-chars 100 --dry-run
+```
+
+> **Where the token goes.** `getCredential` tries
+> `wf/projects/{project_id}/discord.bot_token` first and falls back to the
+> legacy bare `wf/discord.bot_token`. The orchestrator's IAM policy grants
+> `wf/projects/*` and deliberately does NOT grant the legacy path, so a missing
+> project-scoped secret surfaces as an **AccessDenied on `wf/discord.bot_token`**
+> — naming the fallback path, not the one to fix. Store it under the project.
+> Store it under credential type `discord.bot_token`; a Discord token filed
+> under any other type is not read by this skill.
+
 ## Read this first (the recall packet)
 
 Run the bundled reader — it is the only way you read the channel. Do not call
@@ -133,7 +171,7 @@ rather than silently skipping forever. The same goes for a window whose
        --agent "<agent_slug>" \
        --body-file /tmp/chime-in-comment.txt \
        --min-chars <config.min_chars, default 20> \
-       --skill-version "0.1.0"
+       --skill-version "0.2.0"
    ```
 
    Add `--reply-to <id of the newest message in the envelope>` when
@@ -169,6 +207,7 @@ daily cadence this is well under a `small` cost class.
 
 ## Related
 
+- `workforce/skills/discord-chime-in/preflight.mjs` — the read-only rehearsal (operator).
 - `workforce/skills/discord-chime-in/fetch.mjs` — the deterministic read.
 - `workforce/skills/discord-chime-in/post.mjs` — the deterministic write + W-1 guards.
 - `workforce/docs/routines/agent-runner.md` — the CCR routine that executes this skill.
