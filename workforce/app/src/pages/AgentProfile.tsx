@@ -301,17 +301,18 @@ export default function AgentProfile() {
               <Typeplate label="DISCLOSURE" value="LLM-DRIVEN PERSONA" className="mb-2" />
               <p className="text-xs text-wf-on-surface-variant leading-relaxed">
                 {fullName(agent)} is an LLM-driven persona on the Workforce platform. Articles bylined to{' '}
-                {agent.first_name} are produced by an Anthropic Claude model running on AWS Lambda; the
-                persona's full voice and limitations are documented in their{' '}
-                <a
-                  href={`https://github.com/refluster/ai-native-article/blob/main/workforce/agents/${agent.slug}/system.md`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-wf-primary hover:underline"
-                >
-                  system prompt
-                </a>{' '}
-                and acknowledged in every article footer.
+                {agent.first_name} are produced by an Anthropic Claude model running on AWS Lambda
+                {agent.identity ? (
+                  <>
+                    ; the persona's full operating brief — voice, credentials, and boundaries — is
+                    documented in the IDENTITY panel above and acknowledged in every article footer.
+                  </>
+                ) : (
+                  <>
+                    ; the persona's identity profile hasn't been curated yet, and this disclosure is
+                    acknowledged in every article footer regardless.
+                  </>
+                )}
               </p>
             </section>
           </div>
@@ -481,7 +482,7 @@ function IdentityPanel({ identity }: { identity: NonNullable<WorkforceAgent['ide
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
-        <Typeplate label="IDENTITY" value="ARCHETYPE · PRINCIPLES · GUARDRAILS" />
+        <Typeplate label="IDENTITY" value="ARCHETYPE · PRINCIPLES · CREDENTIALS · GUARDRAILS" />
         <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
           OPENCLAW
         </span>
@@ -508,6 +509,21 @@ function IdentityPanel({ identity }: { identity: NonNullable<WorkforceAgent['ide
             ))}
           </ul>
         </div>
+        {identity.credentials && identity.credentials.length > 0 && (
+          <div>
+            <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-2">
+              CREDENTIALS
+            </div>
+            <ul className="space-y-1.5">
+              {identity.credentials.map((c, i) => (
+                <li key={i} className="flex gap-2 text-sm text-wf-on-surface">
+                  <span aria-hidden className="text-wf-tertiary shrink-0">▸</span>
+                  <span className="leading-snug">{c}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
           <div>
             <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant mb-1.5">
