@@ -1,6 +1,6 @@
 # ADR-0027 — Interactive project tools: a project-scoped Tools surface, a synchronous `tools-api`, and a declarative tool registry
 
-- **Status**: Proposed (operator ratifies by merging the implementation PR)
+- **Status**: Accepted (2026-09-03 — ratified per this ADR's own clause: the operator merged both implementation PRs, [#642](https://github.com/refluster/ai-native-article/pull/642) [Phase 1] and [#644](https://github.com/refluster/ai-native-article/pull/644) [Phase 2]; status reconciled by `backlog-reconcile`)
 - **Date**: 2026-08-30
 - **Deciders**: operator (refluster), drafted by a Claude Code session on the operator's request ("リポジトリAのミニアプリをworkforceのフロントエンドの一部にツールとして移植したい")
 - **Related**: [Epic-025](../epics/epic-025-project-tools-migration.md) (the migration this decision serves), [ADR-0005](adr-0005-single-execution-model-ccr.md) (the async execution model this deliberately does *not* extend), [ADR-0007](adr-0007-agent-config-single-source.md), [governance §4 R-N1/R-N2/R-N3/R-N4/R-N6](../governance.md)
