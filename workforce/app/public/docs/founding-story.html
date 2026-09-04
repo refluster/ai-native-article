@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="量産商品開発、米国SaaS組織の運営、事業売却。Koh Ueharaの三つの実戦経験から、運営中のAI組織Cognitive Guildが生まれるまで。">
+<title>Cognitive Guildの創業ストーリー | Software Talent Network</title>
+<style>
+  :root{--ground:#FAFAFB;--panel:#FFFFFF;--panel-2:#F2F5F9;--ink:#12171F;--ink-2:#49535F;--line:#DEE3EA;--accent:#1F3FCC;--accent-soft:#E9EDFC;--signal:#0F6B55}
+  @media(prefers-color-scheme:dark){:root{--ground:#0C1116;--panel:#141A21;--panel-2:#182029;--ink:#ECEFF3;--ink-2:#A7B1BC;--line:#394653;--accent:#93A8FF;--accent-soft:#18213B;--signal:#54C2A2}}
+  *{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--ground);color:var(--ink);font:17px/1.95 system-ui,-apple-system,"Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;-webkit-font-smoothing:antialiased}
+  a{color:var(--accent);text-underline-offset:4px;overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}a:focus-visible,summary:focus-visible,.diagram:focus-visible{outline:3px solid var(--accent);outline-offset:5px}
+  .skip{position:absolute;left:16px;top:-100px;background:var(--panel);padding:12px;z-index:2}.skip:focus{top:12px}
+  .sitebar{max-width:1120px;margin:auto;padding:18px 28px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);font-size:14px}.sitebar a{text-decoration:none}.brand{font-weight:700;color:var(--ink)}
+  main{max-width:1120px;margin:auto;padding:0 28px 72px}h1,h2,h3{line-height:1.5;text-wrap:balance}h1{font-size:clamp(32px,4.8vw,54px);letter-spacing:-.035em;margin:14px 0 20px}h2{font-size:clamp(25px,3vw,34px);margin:8px 0 24px}h3{font-size:20px;margin:26px 0 12px}
+  p{margin:16px 0}.prose{max-width:800px}.cover{padding:64px 0 44px}.kicker,.section-label{font:500 13px/1.6 ui-monospace,monospace;letter-spacing:.12em;color:var(--accent)}.lead{font-size:clamp(19px,2.2vw,23px);line-height:1.85;max-width:850px}.meta,.note,figcaption{font-size:14px;color:var(--ink-2)}.meta{margin-top:28px}.rule{height:5px;width:88px;background:var(--accent);margin:24px 0}
+  section.chapter{padding:46px 0;border-top:1px solid var(--line)}.thesis{font-size:clamp(20px,2.4vw,25px);font-weight:650;border-left:4px solid var(--accent);padding:12px 0 12px 22px;margin:28px 0;max-width:850px}
+  .keywords{font-size:14px;color:var(--accent);word-spacing:.12em;margin:20px 0}.bridge{border:1px solid var(--line);background:var(--panel);padding:20px 24px;margin:24px 0;max-width:850px}.bridge strong{display:block;margin-bottom:8px}.bridge p{margin:0}
+  nav.toc{border-top:1px solid var(--line);padding:22px 0 30px}.toc ol{display:flex;flex-wrap:wrap;gap:10px 30px;list-style:none;padding:0;margin:10px 0;font-size:14px}
+  figure{margin:30px 0}.diagram{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px}.diagram svg{display:block;width:100%;height:auto;min-width:780px}.diagram.compact svg{min-width:660px}figcaption{margin-top:12px;max-width:850px}
+  svg text{font-family:system-ui,-apple-system,"Noto Sans JP",Meiryo,sans-serif;fill:var(--ink)}svg .small{font-size:16px;fill:var(--ink-2)}svg .label{font-size:17px;fill:var(--accent);font-weight:650}svg .heading{font-size:22px;font-weight:700}svg .box{fill:var(--panel-2);stroke:var(--line)}svg .accent-box{fill:var(--accent-soft);stroke:var(--accent)}svg .arrow{fill:none;stroke:var(--accent);stroke-width:2;marker-end:url(#arrow-origin)}
+  .table-wrap{overflow-x:auto;border:1px solid var(--line);background:var(--panel);margin:24px 0}table{border-collapse:collapse;min-width:720px;width:100%;font-size:15px;line-height:1.8}th,td{text-align:left;vertical-align:top;padding:16px 18px;border-bottom:1px solid var(--line)}th{background:var(--panel-2)}td:first-child{font-weight:650;width:23%}tr:last-child td{border-bottom:0}
+  .evidence{max-width:850px;border-left:4px solid var(--signal);padding:8px 0 8px 22px;margin:28px 0}.evidence h3{margin-top:0}.evidence p{font-size:16px}.closing{font-size:clamp(23px,3vw,33px);font-weight:700;max-width:850px;line-height:1.7}
+  details{max-width:900px;margin:22px 0;border:1px solid var(--line);padding:18px 22px;background:var(--panel)}summary{cursor:pointer;font-weight:650;font-size:16px}.sources{padding-left:24px;font-size:14px}.sources li{margin:12px 0}.source-ref{font-size:14px;white-space:nowrap}footer{border-top:1px solid var(--line);padding-top:26px;font-size:14px;color:var(--ink-2)}footer p{max-width:850px}
+  @media(max-width:600px){main{padding:0 20px 48px}.sitebar{padding:16px 20px}.cover{padding:38px 0 30px}section.chapter{padding:34px 0}.bridge{padding:16px}.diagram{padding:12px}.toc ol{display:grid;gap:8px}.thesis{padding-left:16px}}
+  @media print{body{background:white;color:black;font-size:11pt}.sitebar,.toc,.skip{display:none}main{max-width:none;padding:0}.cover,section.chapter{padding:20px 0}.diagram{overflow:visible}.diagram svg,.diagram.compact svg{min-width:0}figure,.bridge,.evidence{break-inside:avoid}a{color:inherit}.table-wrap{overflow:visible}table{min-width:0}}
+</style>
+</head>
+<body>
+<a class="skip" href="#story">本文へ</a>
+<header class="sitebar"><a class="brand" href="/">Software Talent Network</a><a href="/docs/index.html">Docs 一覧へ</a></header>
+<main id="story">
+<header class="cover">
+  <div class="kicker">COGNITIVE GUILD / FOUNDING STORY</div>
+  <h1>三つの実戦から、AI組織へ。</h1>
+  <div class="rule"></div>
+  <p class="lead">量産商品の品質を知る。米国SaaSの開発組織を動かす。事業売却を通じて、組織に蓄積される価値を見る。別々に見えた三つの経験が、いま一つのAI組織の設計につながっている。</p>
+  <p class="meta">Koh Uehara · 創業ストーリー · 2026年9月4日</p>
+  <p class="note">Cognitive Guildは、本稿で用いる運営中のAgent Workforceの仮称です。既存サイトのSoftware Talent Networkと同じ取り組みを指します。</p>
+</header>
+<nav class="toc" aria-label="記事の目次"><ol>
+  <li><a href="#constraint">出発点</a></li><li><a href="#three-foundations">三つの経験</a></li><li><a href="#product">品質</a></li><li><a href="#organization">統治</a></li><li><a href="#capital">資産</a></li><li><a href="#operating">動いている組織</a></li><li><a href="#next">目指すもの</a></li>
+</ol></nav>
+
+<section class="chapter" id="constraint">
+  <div class="section-label">00 / THE CONSTRAINT</div>
+  <h2>必要だったのは、もう一人のコーダーではなかった。</h2>
+  <div class="prose">
+    <p>いま私は、米国カリフォルニアのEWのR&amp;D拠点で、電力会社と家庭のエネルギー管理の実証に取り組んでいる。周囲には大きなテクノロジー企業が集まる。しかし、近くに技術があることと、自分たちのプロジェクトに実行能力があることは別の話だ。</p>
+    <p>この実証でソフトウェアを担う技術者は、私一人。必要な仕事は実装だけではない。要求を整理し、設計し、品質を確かめ、セキュリティを点検し、運用し、得られたデータを分析する。市場や制度も追い続けなければならない。</p>
+    <p>AIによってコードを書く速度が上がっても、この仕事の連鎖が自動的につながるわけではない。そこで考え始めたのが、個々の作業を補助するAIだけでなく、役割・権限・評価・学習を備えた実行組織を持つことだった。</p>
+  </div>
+  <p class="thesis">人を増やせないとき、組織が持てる能力まで増やせないのだろうか。</p>
+  <p class="prose">この問いへの取り組みが、Cognitive Guildだ。エネルギー実証は切実な動機であり、このリポジトリのソフトウェア開発と記事制作は、仕組みそのものを試し、改善する場になっている。</p>
+</section>
+
+<section class="chapter" id="three-foundations">
+  <div class="section-label">01 / THREE FOUNDATIONS</div>
+  <h2>AIの使い方より先に、組織の作り方を学んでいた。</h2>
+  <p class="prose">AI組織の設計に持ち込んだのは、フレームワークの知識だけではない。品質の厳しさ、人と仕事を動かす難しさ、そして買い手から見た事業の価値。その三つを、実務の異なる立場から経験してきた。</p>
+  <figure>
+    <div class="diagram" tabindex="0" role="region" aria-label="三つの経験とAI組織への接続図。狭い画面では横にスクロールできます。">
+      <svg viewBox="0 0 1020 470" role="img" aria-labelledby="origin-title origin-desc">
+        <title id="origin-title">三つの実戦経験をCognitive Guildの設計へ</title>
+        <desc id="origin-desc">量産商品開発から品質と部門連携、米国SaaS組織運営から役割と権限と改善、SaaS事業売却から再現性と無形資産の視点を得た。三つを、成果を届け、仕事を統治し、能力を蓄積するAI組織へ統合する。</desc>
+        <defs><marker id="arrow-origin" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="var(--accent)"/></marker></defs>
+        <rect class="box" x="10" y="12" width="320" height="250" rx="5"/><rect class="box" x="350" y="12" width="320" height="250" rx="5"/><rect class="box" x="690" y="12" width="320" height="250" rx="5"/>
+        <text class="label" x="32" y="47">PRODUCT DISCIPLINE</text><text class="heading" x="32" y="86">量産商品開発</text><text class="small" x="32" y="119">ソフトウェアエンジニアとして</text><text x="32" y="160" font-size="18">1商品に1,000人以上が関わる</text><text x="32" y="192" font-size="18">QCD・品質ゲート・量産立ち上げ</text><text x="32" y="224" font-size="18">開発から発売までの部門連携</text>
+        <text class="label" x="372" y="47">OPERATING DISCIPLINE</text><text class="heading" x="372" y="86">米国SaaS組織運営</text><text class="small" x="372" y="119">プロダクト組織マネージャとして</text><text x="372" y="160" font-size="18">採用・オンボード・評価・退出</text><text x="372" y="192" font-size="18">Scrum・検査と適応</text><text x="372" y="224" font-size="18">役割・権限・責任の設計</text>
+        <text class="label" x="712" y="47">VALUE DISCIPLINE</text><text class="heading" x="712" y="86">SaaS事業売却</text><text class="small" x="712" y="119">売却実務を担う立場から</text><text x="712" y="160" font-size="18">買い手・金融側の評価視点</text><text x="712" y="192" font-size="18">財務・非財務／有形・無形</text><text x="712" y="224" font-size="18">将来の成果を生む仕組み</text>
+        <path class="arrow" d="M170 263V297"/><path class="arrow" d="M510 263V297"/><path class="arrow" d="M850 263V297"/>
+        <rect class="accent-box" x="10" y="309" width="1000" height="62" rx="5"/><text class="heading" x="170" y="348" text-anchor="middle">成果を届ける</text><text class="heading" x="510" y="348" text-anchor="middle">仕事を統治する</text><text class="heading" x="850" y="348" text-anchor="middle">能力を蓄積する</text>
+        <path class="arrow" d="M510 372V403"/><text class="heading" x="510" y="441" text-anchor="middle">Cognitive Guild — 実行し、学習するAI組織</text>
+      </svg>
+    </div>
+    <figcaption>図1：経歴の列挙ではなく、現在の設計原則の出所。大規模開発への参画経験は、1,000人全体を指揮したという意味ではない。</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="product">
+  <div class="section-label">02 / PRODUCT DISCIPLINE</div>
+  <h2>「動いた」の先に、商品を届ける仕事がある。</h2>
+  <div class="prose">
+    <p>最初の土台は、コンシューマ機のソフトウェア開発だ。1商品に1,000人以上が関わる環境で、当社の商品開発プロセスを経験した。QCDは資料の中の指標ではなく、開発、デバッグ、品質確認、量産立ち上げを通じて向き合う制約だった。</p>
+    <p>発売日に向けて揃うのは、ソフトウェアだけではない。ハードウェア、工場、マーケティングのCM、流通の手配までがつながる。一つの部門だけが良い仕事をしても、顧客に届く商品にはならない。その部門間の依存関係と、最終的に商品として成立させる工程の厳しさを、開発の内側から学んだ。</p>
+    <p>この経験は、AIの出力を見るときの基準になっている。もっともらしい回答や動作するコードが得られた後に、何を検証し、誰が判断し、どの条件で次へ進めるのか。成果物を作る能力と、成果物を受け入れる仕組みを、セットで考えるようになった。</p>
+  </div>
+  <p class="keywords">QCD / Quality gates / Cross-functional orchestration / Release readiness</p>
+  <div class="bridge"><strong>Cognitive Guildへの接続</strong><p>作成者とレビュー担当を分ける。品質条件をテストやチェックに落とす。変更と判断の証拠を残す。異常が起きたら見える形で失敗させる。これらを、人の注意力だけに頼らない運営の土台にしている。<a class="source-ref" href="#source-governance">[1]</a></p></div>
+  <p class="note">持ち込んだのは商品開発で得た規律と判断基準であり、現行システムが当社の全品質審査や認証を通過したという意味ではない。</p>
+</section>
+
+<section class="chapter" id="organization">
+  <div class="section-label">03 / OPERATING DISCIPLINE</div>
+  <h2>不確実な仕事を、任せられる形にする。</h2>
+  <div class="prose">
+    <p>次の土台は、米国のSaaS開発組織での活動だ。Scrumの開発プロセスだけでなく、採用、オンボーディング、評価、そしてレイオフを含む退出のプロセスまで経験した。人材が加わってから組織を離れるまで、役割と権限と責任がどう設計され、引き継がれるかを学んだ。</p>
+    <p>Scrumで印象に残ったのは、手順の名前よりも、不確実性への向き合い方だった。最初からすべてを予測する代わりに、短い単位で実行し、結果を観測し、次の判断を変える。進捗の報告だけでなく、前提の誤りを発見できるプロセスにする。</p>
+    <p>その原則はAI組織にも生きる。何を任せるか、どこまで決めてよいか、何をもって完了とするか、判断に迷ったとき誰へ戻すか。Agentに専門家らしい名前を与えることより、その条件を明示することの方が重要になる。</p>
+    <p>ただし、人間の組織図やScrumの儀式をそのままコピーするつもりはない。実行の単位や速度が変われば、必要な分業やレビューの頻度も変わる。引き継ぐのは検査・適応・責任の原則であり、人間の工数制約に合わせてできた手続きは見直す。これは現行のMVVにも明記している。<a class="source-ref" href="#source-mvv">[2]</a></p>
+  </div>
+  <p class="keywords">Hiring &amp; onboarding / Empirical process / Decision rights / Accountability</p>
+  <div class="bridge"><strong>Cognitive Guildへの接続</strong><p>職務と能力の要件、担当する仕事、権限境界、評価と記録を揃える。採用ラウンドの記録には、担当範囲、既存の役割との境界、予算、登録と稼働開始の違いまで残す。「定義を作った」と「実際に動いた」を混同しない。<a class="source-ref" href="#source-hires">[3]</a></p></div>
+  <figure>
+    <div class="diagram compact" tabindex="0" role="region" aria-label="人間とAI組織の責任分担。狭い画面では横にスクロールできます。">
+      <svg viewBox="0 0 900 410" role="img" aria-labelledby="govern-title govern-desc">
+        <title id="govern-title">人間の責任を残した、実行とレビューの分業</title><desc id="govern-desc">人間が目的、統治原則、予算、対外的約束を決める。その境界内でAgentが実行し、別担当がレビューする。条件を満たす委任対象だけが反映され、判断不能や境界を越える変更は人間へ戻る。</desc>
+        <defs><marker id="arrow-govern" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="var(--accent)"/></marker></defs>
+        <rect class="accent-box" x="110" y="15" width="680" height="80" rx="5"/><text class="heading" x="450" y="49" text-anchor="middle">人間が持つ、目的と最終責任</text><text class="small" x="450" y="78" text-anchor="middle">統治原則・予算・対外的約束・例外判断</text>
+        <path d="M260 96V163" fill="none" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrow-govern)"/><text class="label" x="275" y="136">範囲を定めて委任</text>
+        <rect class="box" x="30" y="180" width="240" height="100" rx="5"/><rect class="box" x="330" y="180" width="240" height="100" rx="5"/><rect class="box" x="630" y="180" width="240" height="100" rx="5"/>
+        <text class="heading" x="150" y="217" text-anchor="middle">実行</text><text class="small" x="150" y="250" text-anchor="middle">役割 × Skill × 案件</text><text class="heading" x="450" y="217" text-anchor="middle">レビュー・検証</text><text class="small" x="450" y="250" text-anchor="middle">別担当の評価 ＋ CI</text><text class="heading" x="750" y="217" text-anchor="middle">成果の反映</text><text class="small" x="750" y="250" text-anchor="middle">委任条件を満たす範囲</text>
+        <path d="M271 230H318 M571 230H618" fill="none" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrow-govern)"/>
+        <path d="M450 179V152H700V107" fill="none" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrow-govern)"/><text class="small" x="711" y="129">境界外・判断不能</text>
+        <rect class="box" x="30" y="318" width="840" height="65" rx="5"/><text x="450" y="357" text-anchor="middle" font-size="18">全体を支える：実行記録・監査履歴・変更履歴・失敗の可視化</text>
+      </svg>
+    </div>
+    <figcaption>図2：統治の概念図。実装ではPRの全員合意、CI、変更対象、停止スイッチなどを確認する。原則変更や権限外の判断は人間へ戻す。<a href="#source-autopilot">[4]</a></figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="capital">
+  <div class="section-label">04 / VALUE DISCIPLINE</div>
+  <h2>仕事が終わった後、組織に何が残るのか。</h2>
+  <div class="prose">
+    <p>三つ目の土台は、SaaS事業の売却を担った経験だ。開発する側として見てきた事業を、買い手や金融側の視点から見直すことになった。</p>
+    <p>そこで得た大きな転換は、現在のプロダクトや売上だけでなく、将来の成果を繰り返し生む仕組みに目を向けることだった。財務数値と、その背後にある顧客との関係、知的財産、プロセス、組織能力。有形のものだけでなく、目に見えにくい蓄積も含めて事業を見る。</p>
+    <p>赤字、あるいは売上がまだない段階でも、なぜ事業に投資する判断があり得るのか。この問いから私が持ち帰ったのは、足元の成果だけを数えるのではなく、将来の成果を生む再現性と拡張性を見る姿勢だった。もちろん、仕組みがあれば資金調達や成長が保証されるわけではない。ここで語りたいのは投資条件の一般解ではなく、開発者として自分の評価軸が変わったことだ。</p>
+    <p>AI組織にも、この視点を持ち込んでいる。一つの仕事を終えるたび、回答だけが残るのか。それとも、次の仕事に使える手順、判断基準、評価方法、失敗からの教訓が残るのか。何を蓄積すべきかを先に設計することで、実行を一回限りの消費で終わらせない。</p>
+  </div>
+  <p class="keywords">Enterprise value / Intangible assets / Repeatability / Compounding capability</p>
+  <div class="bridge"><strong>Cognitive Guildへの接続</strong><p>Skillとして再利用する手順、実行履歴から抽出する意味のある記憶、判断を改善する評価基準、同じ失敗を防ぐ機械チェックを残す。能力を蓄積する対象と、次の実行で使う経路を、別々ではなく一緒に設計している。<a class="source-ref" href="#source-memory">[5]</a></p></div>
+  <figure>
+    <div class="diagram compact" tabindex="0" role="region" aria-label="経験を再利用可能な能力へ変える学習循環。狭い画面では横にスクロールできます。">
+      <svg viewBox="0 0 900 420" role="img" aria-labelledby="learning-title learning-desc">
+        <title id="learning-title">実行から学習資産へ、学習資産から次の実行へ</title><desc id="learning-desc">実行で成果と失敗を記録し、評価・選別して、再利用するSkill、意味記憶、評価基準、自動チェックへ変える。それらを次の実行へ読み込む。保存するだけでなく、選別と再利用と効果検証が必要。</desc>
+        <defs><marker id="arrow-learning" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="var(--accent)"/></marker></defs>
+        <rect class="box" x="35" y="30" width="330" height="100" rx="5"/><text class="heading" x="200" y="69" text-anchor="middle">実行する</text><text class="small" x="200" y="102" text-anchor="middle">成果物・判断・失敗を残す</text>
+        <rect class="box" x="535" y="30" width="330" height="100" rx="5"/><text class="heading" x="700" y="69" text-anchor="middle">評価し、選別する</text><text class="small" x="700" y="102" text-anchor="middle">根拠確認・教訓抽出・陳腐化点検</text>
+        <rect class="accent-box" x="535" y="240" width="330" height="125" rx="5"/><text class="heading" x="700" y="279" text-anchor="middle">再利用できる能力へ</text><text class="small" x="700" y="314" text-anchor="middle">Skill・意味記憶・評価基準</text><text class="small" x="700" y="342" text-anchor="middle">変更管理された自動チェック</text>
+        <rect class="box" x="35" y="240" width="330" height="125" rx="5"/><text class="heading" x="200" y="279" text-anchor="middle">次の実行に組み込む</text><text class="small" x="200" y="314" text-anchor="middle">別の案件にも再利用する</text><text class="small" x="200" y="342" text-anchor="middle">改善したかを再び確かめる</text>
+        <path d="M366 80H520 M700 132V226 M533 300H380 M200 238V146" fill="none" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrow-learning)"/>
+        <text class="label" x="450" y="185" text-anchor="middle">保存だけでは、複利にならない。</text><text class="small" x="450" y="212" text-anchor="middle">選別 × 再利用 × 検証</text>
+      </svg>
+    </div>
+    <figcaption>図3：「複利」は学習を次の実行へ再投資する設計の比喩。一定の成長率や自動的な性能向上を実証したという意味ではない。</figcaption>
+  </figure>
+  <p class="prose">AIでは、こうした知識を明示的に保存し、次の仕事へ渡す経路を作れる。しかし、誤った教訓を蓄積すれば、誤りも繰り返す。だからCognitive Guildでは記憶の更新も一つの仕事として扱い、根拠、更新権限、監査、劣化防止の条件を設けている。</p>
+</section>
+
+<section class="chapter" id="operating">
+  <div class="section-label">05 / AN OPERATING ORGANIZATION</div>
+  <h2>思想は、運営の細部に現れる。</h2>
+  <p class="prose">Cognitive Guildを説明するとき、Agentの人数だけを実績にはしたくない。役割が定義され、仕事が実行され、結果が確かめられ、その経験が次へ戻ること。その接続を、公開リポジトリの実装と記録からたどれるようにしたい。</p>
+  <div class="table-wrap"><table>
+    <caption class="note">設計意図と、それを支える確認可能な仕組み</caption>
+    <thead><tr><th scope="col">設計意図</th><th scope="col">実装・記録</th><th scope="col">組織としての意味</th></tr></thead>
+    <tbody>
+      <tr><td>能力を定義する</td><td>JD、役割境界、予算、登録手順を含む採用ラウンド記録 <a href="#source-hires">[3]</a></td><td>必要な能力と任せる範囲を、稼働前に明らかにする。</td></tr>
+      <tr><td>任せ方を統治する</td><td>Agent設定をDynamoDBへ集約し、APIで検証・変更履歴を記録 <a href="#source-config">[6]</a></td><td>誰が何を変えたかを追え、設定の二重管理を防ぐ。</td></tr>
+      <tr><td>成果を検証する</td><td>PRレビュー、合意判定、CIと変更対象を再確認するマージ処理 <a href="#source-autopilot">[4]</a></td><td>生成した本人の「できた」だけでは、変更を通さない。</td></tr>
+      <tr><td>経験を次へ渡す</td><td>全案件の記録から意味記憶を更新する仕組み、古い記憶から対象を選ぶ処理 <a href="#source-memory">[5]</a></td><td>一つの案件で得た教訓を、別の案件の判断にも使う。</td></tr>
+      <tr><td>同じ失敗を防ぐ</td><td>再発記録を機械チェックへ昇格させるルールと、受容するリスクの台帳 <a href="#source-ratchet">[7]</a></td><td>「次は気をつける」を、検出できる条件へ変える。</td></tr>
+      <tr><td>活動を確かめる</td><td>PR・リポジトリ指標の更新と、鮮度・欠損を確認する処理 <a href="#source-performance">[8]</a></td><td>仕事が止まった状態と、順調に動いている状態を区別する。</td></tr>
+    </tbody>
+  </table></div>
+  <div class="evidence">
+    <h3>実例：失敗を記録する仕組み自体を、改善する。</h3>
+    <p>2026年9月4日にマージされた<a href="https://github.com/refluster/ai-native-article/pull/652">PR #652</a>は、実行準備で失敗した際に実行台帳へ記録が残らない経路を修正したものだ。開発担当AgentのRenによる変更として、関連Issue、修正内容、テスト、実環境では未確認の点まで記載されている。</p>
+    <p>これは失敗しない組織の証拠ではない。失敗を発見し、修正し、観測できる範囲を広げる仕事が、実際に組織の中で行われている証拠だ。<a href="#source-operation">[9]</a></p>
+  </div>
+  <p class="prose">改善の対象はコードだけではない。Gitと実行時データの二重管理で設定反映が漏れた経験は、Agent設定の正本を一本化する設計へつながった。記録を残しても教訓が次の仕事に届かなかった問題は、意味記憶を毎回の実行へ読み込む設計につながった。最初から完成形があったのではなく、運営で露呈した問題に応じて、組織の仕組みを作り直している。<a class="source-ref" href="#source-config">[6]</a> <a class="source-ref" href="#source-memory">[5]</a></p>
+</section>
+
+<section class="chapter" id="next">
+  <div class="section-label">06 / WHY A GUILD</div>
+  <h2>一つの仕事を終えるたび、次の仕事を担う力が残る。</h2>
+  <div class="prose">
+    <p>Cognitive Guildという名前には、専門性の異なる担い手が仕事に集まり、成果を届け、経験を持ち帰る組織という意味を込めたい。案件の編成は変わっても、役割、仕事の記録、学んだ判断は残る。既存のマニフェストにある「Assemble, deliver, disband」は、その考え方を表している。</p>
+    <p>量産商品開発からは、品質を工程で成立させる視点。米国SaaSの組織運営からは、不確実性の中で仕事を任せ、学び直す視点。事業売却からは、将来の成果を生む仕組みを資産として見る視点。この三つが、何をAIに任せ、何を検証し、何を残すかの判断軸になっている。</p>
+    <p>目指しているのは、人間の責任を消すことではない。人間が目的と重要な判断を持ち続けながら、それを実行できる能力を、少しずつ組織の中に増やしていくことだ。</p>
+  </div>
+  <p class="closing">成果を届ける。仕事を統治する。能力を蓄積する。<br>Cognitive Guildは、その三つを同時に実装する試みだ。</p>
+  <p><a href="/docs/whitepaper.html">技術ホワイトペーパー：実装と設計を読む →</a></p>
+  <p><a href="/docs/manifesto.html">マニフェスト：組織の原則を読む →</a></p>
+</section>
+
+<section class="chapter" id="evidence">
+  <div class="section-label">NOTES / EVIDENCE</div>
+  <h2>経験、実装、これから確かめること。</h2>
+  <p class="prose note">経歴と実証での立場はKoh本人の説明をもとに構成した。システムの記述は、2026年9月4日のリポジトリ（確認コミット：<code>4b57990</code>）のコード、決定記録、マージ済みPRに基づく。初期版のREADMEや設計書に残る人数・構成を現行値として引用せず、以下の具体的な根拠を優先した。</p>
+  <p class="prose note">採用・Skill定義・コードの存在は、全Agent・全定期処理の最新の正常稼働を証明しない。本稿ではライブの稼働率、Agent人数、コスト削減率を新たに検証していない。企業全体への適用、量産商品水準の品質保証、学習の継続的な効果、経済価値は、対象業務と条件を定めて引き続き検証する。ここでいう「資産」は再利用できる組織能力であり、会計上の資産計上を意味しない。</p>
+  <details><summary>実装・運営記録への参照</summary><ol class="sources">
+    <li id="source-governance"><a href="https://github.com/refluster/ai-native-article/blob/4b57990/workforce/docs/governance.md">Workforce Governance</a> — 品質、不具合の可視化、予算、権限、状態の正本。</li>
+    <li id="source-mvv"><a href="https://github.com/refluster/ai-native-article/blob/4b57990/workforce/docs/mvv.md">Mission, Vision &amp; Values</a> — 人間とAgentの協働、仕事の再設計、人間が持つ統治責任。</li>
+    <li id="source-hires"><a href="https://github.com/refluster/ai-native-article/blob/4b57990/workforce/docs/hires/data-and-experience-three-hire-round.md">Data &amp; Experience採用ラウンド</a> — 役割境界と登録準備。記録時点では稼働済みでないことも開示。</li>
+    <li id="source-autopilot"><a href="https://github.com/refluster/ai-native-article/blob/4b57990/workforce/docs/adr/adr-0010-autopilot-merge-consensus-widening.md">ADR-0010</a> ／ <a href="https://github.com/refluster/ai-native-article/blob/4b57990/workforce/skills/pr-autopilot/pr-merge.mjs">マージ処理</a> — 合意、CI、保護対象、停止条件を確認する委任境界。</li>
+    <li id="source-memory"><a href="https://github.com/refluster/ai-native-article/blob/4b57990/workforce/docs/adr/adr-0019-agent-semantic-memory.md">ADR-0019</a> ／ <a href="https://github.com/refluster/ai-native-article/blob/4b57990/workforce/docs/adr/adr-0020-delegated-memory-curation.md">ADR-0020</a> ／ <a href="https://github.com/refluster/ai-native-article/blob/4b57990/workforce/docs/adr/adr-0021-dynamic-memory-write-token.md">ADR-0021</a> — 意味記憶、更新業務、限定された書き込み権限。<a href="https://github.com/refluster/ai-native-article/blob/4b57990/workforce/skills/memory-curation/pick-cohort.mjs">対象選定処理</a> ／ <a href="https://github.com/refluster/ai-native-article/blob/4b57990/workforce/lambdas/shared/memory-contract.ts">記憶の検証と縮退防止</a>。</li>
+    <li id="source-config"><a href="https://github.com/refluster/ai-native-article/blob/4b57990/workforce/docs/adr/adr-0007-agent-config-single-source.md">ADR-0007</a> ／ <a href="https://github.com/refluster/ai-native-article/blob/4b57990/workforce/lambdas/shared/agent-config.ts">設定検証</a> — 二重管理の失敗から、API経由の単一正本と監査へ。</li>
+    <li id="source-ratchet"><a href="https://github.com/refluster/ai-native-article/blob/4b57990/docs/governance.md">Repository Governance §6</a> ／ <a href="https://github.com/refluster/ai-native-article/blob/4b57990/docs/memory-lint-backlog.md">再発記録</a> ／ <a href="https://github.com/refluster/ai-native-article/blob/4b57990/docs/risk-acceptance-ledger.md">リスク受容台帳</a> — 教訓を機械チェックへ変える仕組み。</li>
+    <li id="source-performance"><a href="https://github.com/refluster/ai-native-article/blob/4b57990/workforce/skills/performance-refresh/refresh.mjs">Performance refresh</a> — 指標更新と鮮度・欠損確認の実装。</li>
+    <li id="source-operation"><a href="https://github.com/refluster/ai-native-article/pull/652">PR #652（2026年9月4日マージ）</a> — Agentが作成した実行準備エラーの記録改善。テストはPR記載の実施報告であり、本稿作成時に本番動作を再検証したものではない。</li>
+  </ol></details>
+</section>
+<footer><p>本稿は個人の経験と取り組みを記述したものです。勤務先による公式な品質保証・事業承認・投資判断を示すものではありません。</p><a href="/docs/index.html">← Docs 一覧へ戻る</a></footer>
+</main>
+<script>
+  // A citation opens its containing disclosure before the browser follows the fragment.
+  document.querySelectorAll('a[href^="#source-"]').forEach(function(link){
+    link.addEventListener('click',function(){document.querySelector('details').open=true;});
+  });
+  function revealSource(){if(location.hash.startsWith('#source-')){document.querySelector('details').open=true;}}
+  revealSource();window.addEventListener('hashchange',revealSource);
+</script>
+</body>
+</html>
