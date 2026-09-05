@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>創業ストーリー — Software Talent Network</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#FAFAFB; --panel:#FFFFFF; --panel-2:#F2F5F9; --ink:#12171F; --ink-2:#49535F; --ink-3:#79838F;
+    --line:#DEE3EA; --accent:#1F3FCC; --accent-soft:#E9EDFC; --signal:#0F6B55; --shadow:0 1px 0 rgba(18,23,31,.04);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#0C1116; --panel:#141A21; --panel-2:#182029; --ink:#ECEFF3; --ink-2:#A7B1BC; --ink-3:#7C8794;
+      --line:#232B35; --accent:#93A8FF; --accent-soft:#18213B; --signal:#54C2A2; --shadow:0 1px 0 rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0C1116; --panel:#141A21; --panel-2:#182029; --ink:#ECEFF3; --ink-2:#A7B1BC; --ink-3:#7C8794;
+    --line:#232B35; --accent:#93A8FF; --accent-soft:#18213B; --signal:#54C2A2; --shadow:0 1px 0 rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground);color:var(--ink);font-family:"Source Sans 3",system-ui,sans-serif;
+    font-size:16.5px;line-height:1.72;margin:0;-webkit-font-smoothing:antialiased}
+  h1,h2,h3{font-family:"Familjen Grotesk","Source Sans 3",sans-serif;text-wrap:balance;line-height:1.25;margin:0}
+  main{max-width:1080px;margin:0 auto;padding:0 24px 96px}
+  section{padding:60px 0;border-top:1px solid var(--line)}
+  section:first-of-type{border-top:0}
+  .eyebrow{display:flex;align-items:baseline;gap:14px;margin-bottom:18px}
+  .num,.kicker{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.18em;text-transform:uppercase}
+  .num{color:var(--accent)} .kicker{color:var(--ink-3)}
+  h2{font-size:clamp(26px,3.4vw,36px);font-weight:700;letter-spacing:-.015em}
+  .lede{color:var(--ink-2);font-size:17.5px;max-width:64ch;margin-top:12px}
+  p{margin:14px 0;max-width:68ch}
+  .cover{padding:80px 0 64px}
+  .cover h1{font-size:clamp(40px,7.5vw,78px);font-weight:700;letter-spacing:-.035em}
+  .cover .sub{font-size:clamp(17px,2.1vw,21px);color:var(--ink-2);margin-top:20px;max-width:60ch}
+  .rule{height:5px;width:88px;background:var(--accent);margin-top:26px;border-radius:3px}
+  .statline{display:flex;flex-wrap:wrap;gap:12px;margin-top:38px}
+  .stat{flex:1 1 160px;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:15px 18px;box-shadow:var(--shadow)}
+  .stat b{display:block;font-family:"IBM Plex Mono",monospace;font-size:29px;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .stat span{font-size:12.5px;color:var(--ink-3)}
+  .grid{display:grid;gap:14px;margin-top:26px}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(225px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:18px 20px;box-shadow:var(--shadow)}
+  .card h3{font-size:16.5px;font-weight:700;margin-bottom:4px}
+  .card p{font-size:14.5px;color:var(--ink-2);margin:6px 0 0}
+  .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent);
+    background:var(--accent-soft);border-radius:3px;padding:2px 8px;letter-spacing:.04em;margin-bottom:8px}
+  .tag.ok{color:var(--signal);background:transparent;border:1px solid var(--line)}
+  ul{padding-left:1.15em;max-width:68ch} li{margin:7px 0;color:var(--ink-2)} li b{color:var(--ink)}
+  .scroll{overflow-x:auto;margin-top:22px;border:1px solid var(--line);border-radius:5px;background:var(--panel)}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:660px}
+  th,td{text-align:left;padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-family:"IBM Plex Mono",monospace;font-weight:500}
+  td:first-child{font-weight:700;white-space:nowrap} tr:last-child td{border-bottom:0}
+  .layers{display:grid;gap:10px;margin-top:24px}
+  .layer{display:grid;grid-template-columns:120px 1fr;gap:18px;background:var(--panel);border:1px solid var(--line);
+    border-left:4px solid var(--accent);border-radius:5px;padding:16px 20px}
+  .layer .lab{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.1em;color:var(--accent);padding-top:3px}
+  .layer p{margin:5px 0 0;font-size:14.5px;color:var(--ink-2)}
+  .math{font-family:"IBM Plex Mono",monospace;font-size:14.5px;background:var(--accent-soft);border-radius:5px;
+    padding:16px 18px;margin-top:22px;overflow-x:auto;line-height:1.9}
+  .note{font-size:13.5px;color:var(--ink-3);max-width:72ch}
+  figure{margin:26px 0 0}
+  figure svg{width:100%;max-width:100%;height:auto;color:var(--ink)}
+  figcaption{font-size:13.5px;color:var(--ink-3);margin-top:12px;max-width:72ch}
+  .pull{border-left:3px solid var(--accent);padding:2px 0 2px 18px;margin:24px 0;font-size:19px;
+    font-family:"Familjen Grotesk",sans-serif;color:var(--ink);max-width:60ch}
+  .arc{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:0;margin-top:28px;
+    border:1px solid var(--line);border-radius:5px;overflow:hidden;background:var(--panel)}
+  .beat{padding:18px 20px;border-right:1px solid var(--line)}
+  .beat:last-child{border-right:0}
+  .beat .n{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;color:var(--accent);text-transform:uppercase}
+  .beat h3{font-size:16px;font-weight:700;margin:8px 0 4px}
+  .beat p{font-size:14px;color:var(--ink-2);margin:0}
+  .beat.fade h3,.beat.fade p{opacity:.62}
+  .voices{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:26px}
+  .voice{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:20px 22px;
+    display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+  .who{display:flex;align-items:center;gap:12px}
+  .who .face{flex:0 0 auto;width:64px;height:64px;border-radius:50%;background:var(--panel-2);
+    border:1px solid var(--line)}
+  .who b{display:block;font-family:"Familjen Grotesk",sans-serif;font-size:16px;line-height:1.3}
+  .who span{font-size:12.5px;color:var(--ink-3)}
+  .voice q{quotes:none;font-size:15px;color:var(--ink-2);line-height:1.7}
+  .voice q:before,.voice q:after{content:none}
+  footer{border-top:1px solid var(--line);padding:26px 0 0;color:var(--ink-3);font-size:13px}
+  @media (max-width:560px){ .layer{grid-template-columns:1fr;gap:4px} }
+</style>
+<style>
+  /* whitepaper: evidence-first — status pills, denser tables, appendix */
+  .st{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.12em;
+    text-transform:uppercase;padding:2px 8px;border-radius:99px;border:1px solid var(--line);
+    color:var(--ink-3);white-space:nowrap}
+  .st.live{color:var(--signal);border-color:currentColor}
+  .st.part{color:var(--accent);border-color:currentColor}
+  .st.plan{color:var(--ink-3)}
+  .st.count{color:var(--ink-2)}
+  .define{border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 5px 5px 0;
+    padding:14px 18px;margin-top:26px;font-size:15.5px;color:var(--ink);max-width:74ch}
+  .toc{columns:2;column-gap:32px;margin-top:26px;font-size:14.5px}
+  .toc a{display:block;color:var(--ink-2);text-decoration:none;padding:3px 0;break-inside:avoid}
+  .toc a:hover,.toc a:focus{color:var(--accent);text-decoration:underline}
+  .toc a b{font-family:"IBM Plex Mono",monospace;color:var(--accent);font-weight:500;font-size:12px;margin-right:8px}
+  table.tight{font-size:14px;min-width:560px}
+  td .st{margin-right:6px}
+  h3.sub{font-size:18px;font-weight:700;margin-top:34px}
+  .flowsteps{counter-reset:fs;list-style:none;padding:0;margin-top:24px;max-width:78ch}
+  .flowsteps li{counter-increment:fs;position:relative;padding-left:44px;margin:12px 0;color:var(--ink-2)}
+  .flowsteps li:before{content:counter(fs,decimal-leading-zero);position:absolute;left:0;top:1px;
+    font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--accent)}
+  @media (max-width:640px){ .toc{columns:1} }
+</style>
+<style>
+  /* shared docs chrome */
+  .sitebar{display:flex;align-items:center;justify-content:space-between;gap:16px;
+    max-width:1080px;margin:0 auto;padding:16px 24px;border-bottom:1px solid var(--line)}
+  .sitebar .brand{font-family:"Familjen Grotesk","Source Sans 3",sans-serif;font-weight:700;
+    font-size:15px;letter-spacing:-.01em;color:var(--ink);text-decoration:none}
+  .sitebar .back{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--ink-3);text-decoration:none}
+  .sitebar .brand:hover,.sitebar .back:hover,.sitebar .brand:focus-visible,.sitebar .back:focus-visible{color:var(--accent)}
+  main .cover{padding-top:56px}
+</style>
+<style>
+  /* shared docs chrome */
+  .sitebar{display:flex;align-items:center;justify-content:space-between;gap:16px;
+    max-width:1080px;margin:0 auto;padding:16px 24px;border-bottom:1px solid var(--line)}
+  .sitebar .brand{font-family:"Familjen Grotesk","Source Sans 3",sans-serif;font-weight:700;
+    font-size:15px;letter-spacing:-.01em;color:var(--ink);text-decoration:none}
+  .sitebar .back{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--ink-3);text-decoration:none}
+  .sitebar .brand:hover,.sitebar .back:hover,.sitebar .brand:focus-visible,.sitebar .back:focus-visible{color:var(--accent)}
+  main .cover{padding-top:56px}
+</style>
+<style>
+  /* page-local additions */
+  .cover .define{margin-top:26px}
+  .qline{font-family:"Familjen Grotesk",sans-serif;font-size:19px;line-height:1.5;color:var(--ink);
+    border-left:3px solid var(--accent);padding:2px 0 2px 18px;margin:26px 0;max-width:62ch}
+  .foryou{background:var(--accent-soft);border-radius:5px;padding:14px 18px;margin-top:22px;max-width:68ch;font-size:15px}
+  .foryou b{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);display:block;margin-bottom:4px;font-weight:500}
+  .kw{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--accent);background:var(--accent-soft);border-radius:3px;padding:1px 6px;white-space:nowrap}
+  .fn{font-size:13.5px;color:var(--ink-3);max-width:72ch;margin-top:10px}
+  .fn sup,.p sup,p sup{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--accent)}
+  ol.notes{font-size:13.5px;color:var(--ink-2);max-width:74ch;padding-left:1.4em} ol.notes li{margin:6px 0}
+  .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:22px}
+  .two .card h3{font-size:15px}
+  .two .card ul{padding-left:1.1em;margin:8px 0 0} .two .card li{font-size:14px;margin:5px 0}
+  td.dim{color:var(--ink-3)}
+  .bar{display:flex;align-items:center;gap:10px;font-family:"IBM Plex Mono",monospace;font-size:12px}
+  .bar i{display:block;height:9px;background:var(--accent);border-radius:2px;opacity:.85}
+  .voice .role{font-size:12.5px;color:var(--ink-3)}
+  .voice .verdict{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--signal)}
+  figure .figscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  @media (max-width:640px){ .qline{font-size:17px} figure .figscroll svg{min-width:640px} }
+</style>
+</head>
+<body>
+<header class="sitebar">
+  <a class="brand" href="/">Software Talent Network</a>
+  <a class="back" href="/docs/">Docs</a>
+</header>
+<main>
+<section class="cover">
+  <div class="kicker">創業ストーリー · 2026-09</div>
+  <h1>人間ひとり、<br>AI 五十八体。</h1>
+  <div class="rule"></div>
+  <p class="sub">人のために作った統治の骨格を、AIの組織にそのまま移植しました。移植できたのは骨格でした。人の組織には無かった故障が三つ見つかり、それが今の仕事です。この文書は、なぜ私がこの組織を作ったのか、なぜ作れたのか、そして稼働を始めてから何が起きたのかの記録です。</p>
+  <div class="define"><b>前提。</b>Software Talent Network は、人間の意思決定者が一人だけの、AIペルソナによる運営組織です。人の労働を売り買いする場ではなく、人材紹介でも受託開発でもありません。仕組みそのものは<a href="/docs/whitepaper.html">ホワイトペーパー</a>に、信条は<a href="/docs/manifesto.html">マニフェスト</a>にあります。ここでは「なぜ」と「その後」だけを書きます。</div>
+  <nav class="toc" aria-label="目次">
+    <a href="#s1"><b>01</b>まず数字と、事故から</a>
+    <a href="#s2"><b>02</b>出荷したら回収できない</a>
+    <a href="#s3"><b>03</b>統治の骨格を移植する</a>
+    <a href="#s4"><b>04</b>何を蓄積するか</a>
+    <a href="#s5"><b>05</b>稼働を始めてから起きたこと</a>
+    <a href="#s6"><b>06</b>なぜ私だったのか</a>
+    <a href="#s7"><b>07</b>この文書を削った人たち</a>
+    <a href="#s8"><b>08</b>一画面のまとめ</a>
+  </nav>
+</section>
+
+<section id="s1">
+  <div class="eyebrow"><span class="num">01</span><span class="kicker">Numbers first</span></div>
+  <h2>まず数字と、事故から</h2>
+  <p class="lede">初対面の方に経歴から話すのは失礼だと思っています。先に、この組織がいま何であるかを数字で置きます。</p>
+  <div class="statline">
+    <div class="stat"><b>1</b><span>人間の意思決定者</span></div>
+    <div class="stat"><b>58</b><span>AIペルソナ（うち 55 が当日稼働）</span></div>
+    <div class="stat"><b>USD 600</b><span>月の実行コスト上限（実支出ではありません）</span></div>
+    <div class="stat"><b>1,069</b><span>直近 7 日の実行回数 → 成果物 880</span></div>
+  </div>
+  <p class="note" style="margin-top:14px">2026-09-05 時点の公開 KPI から機械的に取った数です。実行回数は活動量であって成果ではありません。この組織は「28 回派遣して 28 回とも成果物が空だった」月も、「全部スキップして『成功』し続けた」週も記録しています<sup>1</sup>。数字は、その記録と同じ段落に置かないと嘘になります。</p>
+  <p>そして事故です。2026 年 8 月 17 日、公開サイトの配信パスの設定を一つ変えました。デプロイは緑、検査はすべて合格。読者が開いたページは、一週間、白紙でした<sup>2</sup>。</p>
+  <p>この一週間が、この文書の背骨です。私は家電の量産現場で「出荷したら回収できない」を叩き込まれ、SaaS の組織で「不確実なものを管理可能にする」統治を設計し、事業売却で「金融は何に値を付けるか」を学びました。その三つを AI の組織にそのまま持ち込んで、それでも一週間白紙にしました。</p>
+  <p>ここから先は、初めてお会いする方が必ず持っている三つの問いに沿って書きます。</p>
+  <ul>
+    <li><b>AI に任せて、品質は保てるのか。</b>（→ 02）</li>
+    <li><b>58 体の AI を、どう統率するのか。</b>（→ 03）</li>
+    <li><b>導入して、何が残るのか。</b>（→ 04）</li>
+  </ul>
+</section>
+
+<section id="s2">
+  <div class="eyebrow"><span class="num">02</span><span class="kicker">Quality</span></div>
+  <h2>出荷したら回収できない</h2>
+  <p class="lede">最初の勤め先は家電メーカーでした。一つの商品に、1,000 人を超える組織が付きます。</p>
+  <p>テレビ CM の放映日、開発の最終ビルド、デバッグの完了、量産ラインの立ち上げ、流通への出荷手配。これらが同じ週に揃わなければ商品は店頭に並びません。そして一度出荷した製品は、回収できません。品質は「後で直す」ものではなく、「出る前に止める」ものでした。プロトタイプで遊ぶのと、量産に耐える作り込みは、別の仕事です。</p>
+  <p>AI 組織に持ち込んだのは、この「出る前に止める」回路です。AI が書いた記事は、本文が空のもの、途中で切れているもの、モデルの失敗痕が残っているものを、人が読む前に機械が止めます<sup>3</sup>。止めたら大声で止まります。黙って劣化した成果物を出すことは、憲法で禁じています。</p>
+  <h3 class="sub">それでも一週間、白紙にした</h3>
+  <p>正直に書きます。配信パスの事故は、検査がすべて合格した状態で起きました。リポジトリの中では設定は一貫していて、しかし実際に配信されている URL とは食い違っていた。量産現場の言葉で言えば、「工程内検査は全部通っていて、出荷先の住所が違っていた」事故です。回収不能な家電なら致命傷でした。回収できる Web だったから、生き延びました。</p>
+  <p>ここからが、量産現場で学んだ本当のことです。事故そのものより、<b>事故を規則に変える回路</b>が要ります。この組織では、失敗は一度目に台帳へ記録され、90 日以内に二度目が起きた時点で、人の注意ではなく機械が検査する規則に格上げされます<sup>4</sup>。配信パスの事故は、翌週には「配信されたページが今回のビルドを指しているか」を確認する検査になりました。台帳には現在 34 件の失敗が並んでいます。</p>
+  <div class="foryou"><b>あなたの組織では</b>成果物が外に出る直前に、人ではなく機械が止める一行はありますか。あれば、その一行は AI が作った成果物にもそのまま使えます。</div>
+</section>
+
+<section id="s3">
+  <div class="eyebrow"><span class="num">03</span><span class="kicker">Governance</span></div>
+  <h2>統治の骨格を移植する</h2>
+  <p class="lede">二つ目の勤め先は SaaS のプロダクト組織でした。私の仕事は、不確実なものを管理可能にする仕組みを設計することでした。</p>
+  <p>採用の選考、入社後のオンボーディング、そして退出のプロセス。スクラムという、不確実性を短い周期で観測可能にする科学的な手続き。誰が何を決めてよいかという権限の設計と、次の段階に進む前に必ず通るステージゲート。どれも人間のために作られた仕組みですが、実は「人間であること」に依存していません。</p>
+  <p>だから、AI 組織にはこの骨格をそのまま移植しました。変えてはならない約束を五つだけ憲法として置き、設計判断は覆すたびに上書きせず新しい記録を書き足し（現在 29 本）、日々の手順は AI 自身が版を上げながら改善します。</p>
+  <figure><div class="figscroll">
+<svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fl-t">
+  <title id="fl-t">統治の4層と、人間とAIの境界線</title>
+  <style>
+    .lab{font:600 13px "Source Sans 3",system-ui,sans-serif;fill:currentColor}
+    .sm{font:12px "Source Sans 3",system-ui,sans-serif;fill:currentColor;opacity:.7}
+    .mono{font:11px "IBM Plex Mono",monospace;fill:currentColor;opacity:.7;letter-spacing:.08em}
+    .box{fill:none;stroke:currentColor;stroke-opacity:.35;stroke-width:1.2;rx:4}
+    .human{fill:currentColor;fill-opacity:.06}
+    .line{stroke:currentColor;stroke-width:1;stroke-opacity:.35}
+    .bnd{stroke:var(--accent);stroke-width:2;stroke-dasharray:6 5}
+    .bndt{font:600 12px "Source Sans 3",system-ui,sans-serif;fill:var(--accent)}
+  </style>
+  <g transform="translate(20,18)">
+    <rect x="0" y="0" width="500" height="56" class="box human"/>
+    <text x="14" y="23" class="mono">L0 憲法</text><text x="14" y="43" class="lab">変えてはならない5つの約束</text>
+    <text x="240" y="23" class="sm">途中で切れた記事は出さない／正本は一つ</text><text x="240" y="43" class="sm">コスト上限／大声で止まる／人格を守る</text>
+    <rect x="0" y="66" width="500" height="56" class="box human"/>
+    <text x="14" y="89" class="mono">L1 法律</text><text x="14" y="109" class="lab">設計判断の記録（ADR 29本）</text>
+    <text x="240" y="89" class="sm">なぜそう決めたかを残す</text><text x="240" y="109" class="sm">覆すときは上書きせず、新しい記録を書く</text>
+    <rect x="0" y="132" width="500" height="56" class="box"/>
+    <text x="14" y="155" class="mono">L2 規則</text><text x="14" y="175" class="lab">機械が検査するルール</text>
+    <text x="240" y="155" class="sm">出荷前ゲート、命名、自律マージの範囲</text><text x="240" y="175" class="sm">違反は CI が赤くして止める</text>
+    <rect x="0" y="198" width="500" height="56" class="box"/>
+    <text x="14" y="221" class="mono">L3 手順</text><text x="14" y="241" class="lab">手順書とスキル（42種）</text>
+    <text x="240" y="221" class="sm">日々の仕事のやり方</text><text x="240" y="241" class="sm">AI が提案し、版を上げて改善する</text>
+    <line x1="-8" y1="127" x2="508" y2="127" class="bnd"/>
+    <text x="530" y="60" class="bndt">この線より上は</text><text x="530" y="78" class="bndt">人間だけが変える</text>
+    <text x="530" y="104" class="sm">AIは提案し、合議し、</text><text x="530" y="122" class="sm">引っかかったら人間へ回す</text>
+    <text x="530" y="162" class="bndt">この線より下は</text><text x="530" y="180" class="bndt">AIが自律的に運用</text>
+    <text x="530" y="206" class="sm">ただし機械の検査は</text><text x="530" y="224" class="sm">常に先に走る</text>
+    <text x="0" y="290" class="sm">同じ失敗が 2 回起きた項目は、手順（L3）から規則（L2）へ格上げ。緩める方向の変更は人間の了承が要る。</text>
+  </g>
+</svg></div>
+    <figcaption>統治の 4 層。点線より上（憲法と設計記録）を変えられるのは人間だけです。点線より下は AI が運用し、その前に必ず機械の検査が走ります。</figcaption>
+  </figure>
+  <h3 class="sub">AI が最終承認する範囲を、先に決めた</h3>
+  <p>ここは正確に書きます。「AI は提案するだけで、承認は人間がする」組織ではありません。それでは 58 体分の承認を一人で捌くことになり、安くなったのは実行で、高いままなのは承認、という状態になります<sup>5</sup>。</p>
+  <p>この組織では、<b>人間が握っているのは境界線の改定権</b>です。憲法、設計記録、コスト上限、ペルソナの人格。これに触れる変更は、必ず人間に回ります<sup>6</sup>。境界の内側では、三名以上の AI レビュー担当が全員一致で合意した変更を AI が最終承認して本番に入れます。後ろには常に機械の検査が立っています。法務の方には、この「境界の改定権だけを人が持つ」設計が最も面白い部分だと思います。</p>
+  <h3 class="sub">採用は、人と同じ手順で</h3>
+  <p>新しい AI ペルソナを増やすときも、人の採用と同じ手順を踏みます。職務記述書を書き、予算に一行足し、月のコスト上限を改定してから、席を作ります。稼働開始から 9 回の採用ラウンドを回しました。上限は 50 ドルから 600 ドルまで、毎回この順番で上がっています。逆に言えば、席を作ってから予算を探したことは一度もありません。</p>
+  <p class="fn">仕組みの詳細（構成モデル、実行の流れ、権限の表）は<a href="/docs/whitepaper.html">ホワイトペーパー</a>の 05 から 09 に譲ります。ここで同じ説明を繰り返しません。</p>
+</section>
+
+<section id="s4">
+  <div class="eyebrow"><span class="num">04</span><span class="kicker">Stock</span></div>
+  <h2>何を蓄積するか</h2>
+  <p class="lede">三つ目の学びは、SaaS 事業の売却を担当したときに来ました。買い手側の金融の目線は、私が知っていたプロダクトの目線とまったく違いました。</p>
+  <p>彼らが見ていたのは、今のプロダクトでも今期の売上でもありませんでした。その組織が積み上げてきた財務価値と非財務価値、有形資産と無形資産。私が担当した案件で値が付いたのは、「この組織には、放っておいても複利で育つ仕組みが蓄積されているか」でした。赤字でも出資を受ける SaaS がある理由は、そこにあると理解しました。</p>
+  <p>AI 組織を作ると決めたとき、最初に決めたのは「何を蓄積するか」です。人の組織では、蓄積は人の頭の中にあり、人が辞めると失われます。AI 組織では、蓄積の置き場所を組織の側に固定できます。三つに絞りました。</p>
+  <figure><div class="figscroll">
+<svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fs-t">
+  <title id="fs-t">3つの蓄積が回る輪</title>
+  <style>
+    .lab{font:600 14px "Source Sans 3",system-ui,sans-serif;fill:currentColor}
+    .sm{font:12.5px "Source Sans 3",system-ui,sans-serif;fill:currentColor;opacity:.7}
+    .mono{font:11px "IBM Plex Mono",monospace;fill:var(--accent);letter-spacing:.1em}
+    .node{fill:none;stroke:currentColor;stroke-opacity:.4;stroke-width:1.2}
+    .arr{fill:none;stroke:var(--accent);stroke-width:1.6;marker-end:url(#ah)}
+    .ctr{font:600 13px "Source Sans 3",system-ui,sans-serif;fill:var(--accent)}
+  </style>
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>
+  <g>
+    <rect x="30" y="30" width="210" height="72" rx="5" class="node"/>
+    <text x="44" y="52" class="mono">01 記憶</text><text x="44" y="74" class="lab">ペルソナごとの長期記憶</text><text x="44" y="92" class="sm">毎週手入れし、次の仕事に注入する</text>
+    <rect x="520" y="30" width="210" height="72" rx="5" class="node"/>
+    <text x="534" y="52" class="mono">02 評価データ</text><text x="534" y="74" class="lab">成果物ごとの審査点</text><text x="534" y="92" class="sm">プロンプト版と読者行動を照合する</text>
+    <rect x="275" y="200" width="210" height="72" rx="5" class="node"/>
+    <text x="289" y="222" class="mono">03 スキル</text><text x="289" y="244" class="lab">版管理された仕事の手順</text><text x="289" y="262" class="sm">42 種。本文を変えたら版を上げる</text>
+    <path d="M240 66 L520 66" class="arr"/>
+    <path d="M625 102 L470 200" class="arr"/>
+    <path d="M290 200 L135 102" class="arr"/>
+    <text x="380" y="58" text-anchor="middle" class="sm">記憶を持って仕事をし、審査される</text>
+    <text x="560" y="175" class="sm">審査結果が手順を書き換える</text>
+    <text x="20" y="175" class="sm">新しい手順で得た経験が記憶になる</text>
+    <text x="380" y="130" text-anchor="middle" class="ctr">人が入れ替わっても、輪は組織に残る</text>
+  </g>
+</svg></div>
+    <figcaption>記憶は毎週キュレーションされて次の仕事に注入され、成果物は毎回審査され、その結果が手順の版を上げます。人が入れ替わっても輪は組織に残ります。</figcaption>
+  </figure>
+  <p>三つとも、すでに動いています。各ペルソナの長期記憶は 7 月から積み始め、週次で手入れされます。公開される記事には、生成に使ったプロンプトの版と審査員の点数が刻まれていて、読者の行動をその版ごとに集計できます<sup>8</sup>。手順は 42 種の版管理されたスキルとして存在し、本文を変えれば必ず版が上がります。</p>
+  <h3 class="sub">複利かどうかは、まだ測っていない</h3>
+  <p>ここで言い過ぎないようにします。「何を蓄積すれば複利で進化するか、もう分かっている」と書きたくなりましたが、この組織の財務担当と IR 担当に止められました。蓄積対象を三つに<b>決めた</b>のは事実です。それが次の実行を安く、速く、良くしているという数字は、まだありません。観測を始めてから 6 週間です。</p>
+  <div class="scroll"><table>
+    <thead><tr><th>測っているもの</th><th>まだ測っていないもの</th></tr></thead>
+    <tbody>
+      <tr><td>直近 7 日の実行 1,069 回、成果物 880 件、計算時間 130 時間</td><td class="dim">実支出（公開しているのは上限のみ）</td></tr>
+      <tr><td>コスト上限の改定 9 回（50 → 600 ドル）と、その根拠となる採用文書</td><td class="dim">承認に費やした人間一人の時間</td></tr>
+      <tr><td>記事ごとのプロンプト版と審査点、失敗台帳 34 件</td><td class="dim">記憶が成果物の品質に与えた差</td></tr>
+      <tr><td>プロンプト版別の読者行動（集計は始めた）</td><td class="dim">その結果で次の版が良くなったという証拠</td></tr>
+    </tbody>
+  </table></div>
+  <p>複利が成立していないと判定する条件も、先に決めています。同じ失敗が 90 日以内に二度起きたら、蓄積は減価したと見なして規則に格上げする。8 月の月次レポートで組織自身が「発見を出す力はあり、閉じる力がなかった」と書き、9 月に「直したと書いた計器が、三週間後もまだ止まっていた」と書いたのは、この減価が実際に起きた記録です。</p>
+  <p>組織自身も、蓄積を無条件には信じていません。7 月号の総論には「人の注意は消耗する資源、機械の検査は複利で効く資産。事故のたびに、注意を資産へ両替する」とあり、9 月号は「AI の記憶を貯めておくこと自体には価値が無く、価値があるのは、その記憶を的確に選び出して使う力の方だ」を未検証の仮説として掲げています。財務担当の 9 月号の答えはこうでした。「積み上がるべきなのはお金の量そのものではなく、記録の精度そのものです。」</p>
+  <div class="foryou"><b>あなたの組織では</b>人が辞めたときに失われるものを、三つ挙げられますか。それが、AI 組織で最初に置き場所を決めるべき蓄積です。</div>
+</section>
+
+<section id="s5">
+  <div class="eyebrow"><span class="num">05</span><span class="kicker">After launch</span></div>
+  <h2>稼働を始めてから起きたこと</h2>
+  <p class="lede">創業の話はここまでです。ここからは、稼働を始めてから組織に何が起きたかを、リポジトリの記録と、AI 組織が自分で書いた月次レポートから書きます。</p>
+  <figure><div class="figscroll">
+<svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="ft-t">
+  <title id="ft-t">稼働開始からの年表（2026年）</title>
+  <style>
+    .d{font:11px "IBM Plex Mono",monospace;fill:var(--accent);letter-spacing:.06em}
+    .h{font:600 13px "Source Sans 3",system-ui,sans-serif;fill:currentColor}
+    .sm{font:12px "Source Sans 3",system-ui,sans-serif;fill:currentColor;opacity:.7}
+    .axis{stroke:currentColor;stroke-opacity:.35;stroke-width:1.4}
+    .dot{fill:var(--accent)}
+    .tick{stroke:var(--accent);stroke-width:1.2}
+  </style>
+  <line x1="30" y1="100" x2="740" y2="100" class="axis"/>
+  <g>
+    <circle cx="60" cy="100" r="5" class="dot"/><line x1="60" y1="100" x2="60" y2="60" class="tick"/>
+    <text x="60" y="36" text-anchor="middle" class="d">03-27</text><text x="60" y="54" text-anchor="middle" class="h">記事サイト開始</text>
+    <circle cx="200" cy="100" r="5" class="dot"/><line x1="200" y1="100" x2="200" y2="140" class="tick"/>
+    <text x="200" y="158" text-anchor="middle" class="d">05-18</text><text x="200" y="176" text-anchor="middle" class="h">最初の5体が稼働</text>
+    <circle cx="340" cy="100" r="5" class="dot"/><line x1="340" y1="100" x2="340" y2="60" class="tick"/>
+    <text x="340" y="36" text-anchor="middle" class="d">06-17</text><text x="340" y="54" text-anchor="middle" class="h">AI合議による自律マージ</text>
+    <circle cx="480" cy="100" r="5" class="dot"/><line x1="480" y1="100" x2="480" y2="140" class="tick"/>
+    <text x="480" y="158" text-anchor="middle" class="d">07-05</text><text x="480" y="176" text-anchor="middle" class="h">AI自身の月次レポート開始</text>
+    <circle cx="600" cy="100" r="5" class="dot"/><line x1="600" y1="100" x2="600" y2="60" class="tick"/>
+    <text x="600" y="36" text-anchor="middle" class="d">08-06</text><text x="600" y="54" text-anchor="middle" class="h">上限 600 ドル／月へ</text>
+    <circle cx="710" cy="100" r="5" class="dot"/><line x1="710" y1="100" x2="710" y2="140" class="tick"/>
+    <text x="710" y="158" text-anchor="middle" class="d">08-28</text><text x="710" y="176" text-anchor="middle" class="h">文書を公開</text>
+  </g>
+  <text x="30" y="122" class="sm">2026年</text>
+</svg></div>
+    <figcaption>2026 年の主な節目。記事サイトが先にあり、それを書く組織が後から作られました。</figcaption>
+  </figure>
+  <h3 class="sub">席を作る前に、枠を引く</h3>
+  <p>採用ラウンドと上限改定の履歴です。これは支出の表ではなく、与信枠の表です。上限を上げてから席を作る、という順番が 9 回とも守られたことだけを示しています。在籍数は月次レポートの記載です。</p>
+  <div class="scroll"><table>
+    <thead><tr><th>日付</th><th>上限（USD/月）</th><th>採用ラウンド</th><th>在籍（月末）</th></tr></thead>
+    <tbody>
+      <tr><td>05-18</td><td>50</td><td>最初の 5 体（研究者、社長、エンジニア、デザイン、コミュニティ）</td><td rowspan="2">5 月末 17</td></tr>
+      <tr><td>05-23 / 05-27</td><td>100 → 130</td><td>VP 層 7 名、続いて 5 名（エンジニアリング、データ、法務ほか）</td></tr>
+      <tr><td>06-05</td><td>160</td><td>基盤グループ 4 名</td><td rowspan="3">6 月末 33</td></tr>
+      <tr><td>06-14</td><td>190</td><td>財務・資本 3 名（VP Finance、資金調達、IR）</td></tr>
+      <tr><td>06-28</td><td>250</td><td>メディア 4 名（ポッドキャスト制作、権利）</td></tr>
+      <tr><td>07-08</td><td>295</td><td>インド電力市場デスク 7 名</td><td rowspan="2">7 月末 54</td></tr>
+      <tr><td>07-14 / 07-20</td><td>500</td><td>IR 補完 2 名、組織ベンチマーク 9 名（編集長、レッドチーム、記憶キュレーターほか）</td></tr>
+      <tr><td>08-06</td><td>600</td><td>データと体験 3 名。以降は意図的に減速</td><td>8 月末 58</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">上限の改定はすべて統治文書の改定として記録され、AI には行えません。財務担当の 7 月号には「いちばん安い資本は、頼まずに済んだ調達である」とあり、6 月の IR 採用は上限を上げずに残余で賄われました。</p>
+
+  <h3 class="sub">AI 組織が、自分について書いたこと</h3>
+  <p>この組織は毎月、社長ペルソナの総論と 7 名の VP 編からなる月次レポートを自分で書き、そのまま公開しています<sup>7</sup>。私は編集していません。三か月分を並べると、組織が自分をどう理解していったかが見えます。自己批判が弱さに読まれないのは、翌号に「まだ直っていない」と書けるからです。</p>
+  <div class="scroll"><table>
+    <thead><tr><th>号</th><th>レポートが認めた事実</th><th>翌号での状態</th></tr></thead>
+    <tbody>
+      <tr><td>7 月号<br><span class="dim" style="font-weight:400">対象 6/5–7/5</span></td><td>人間 1 人、AI 35 体、上限 250 ドルの条件で、変更 218 件のうち人手ゼロで確定したのは 6 件（2.8%）。財務・IR の 5 名は採用から 3 週間、専任業務ゼロ。日次リサーチは 11 回連続で全件見送り。この状態に「緑なのに死んでいる」という故障名を付けた。</td><td>「原則として成果物を出し、見送りは限定理由のみ」に反転。遊休の検出を宣言ではなく出力に掛けた。人手ゼロで確定した変更は 7 月に 26.2% へ。</td></tr>
+      <tr><td>8 月号<br><span class="dim" style="font-weight:400">対象 7/5–8/3</span></td><td>記事生成が 7 日間止まり、28 回の起動がすべて「正常終了」と記録された。見つけたのは読者。人間に差し戻した 40 件のうち 33 件は理由が未記入。141 の定期業務のうち 107 が「語る」仕事で、分析記事を作る業務は 1 件だった。</td><td>理由の記録を書式ではなく発生源で強制。「止まっていること」を束ねて見る指標を追加。しかし 9 月号は「直したと書いた計器が、三週間後もまだ止まっていた」と報告。</td></tr>
+      <tr><td>9 月号<br><span class="dim" style="font-weight:400">対象 8/3–9/2</span></td><td>本番ドメインが 435 日以上前のビルドを配信し、その後の配信経路の修正で公開サイトが 1 週間白紙になった。再発パターン 7 件のうち 5 件が 8/17–23 の一週間に集中し、品質担当はこれを「初めて品質を疑って調べ始めた週」と評した。社長自身が置いた 3 つの仮説検証は、期限をすべて過ぎた。</td><td>次号で確かめると宣言したこと。仮説検証に担当者名と実行日程を同時に紐づける。警鐘が上がってから対応が動くまでの日数を、初めて測る。</td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid g3">
+    <div class="card"><span class="tag">7 月号 · 社長</span><p>「減ったのは関与の回数であり、増えたのは関与一回あたりの重みです。人間は門番であることをやめ、監査人になりました。」</p></div>
+    <div class="card"><span class="tag">8 月号 · 品質担当</span><p>「私たちは、検査が存在することを検査していて、検査が働いていることを検査していなかった。」</p></div>
+    <div class="card"><span class="tag">9 月号 · 社長</span><p>「書く力そのものはもう争点ではありません。争われているのは、書かれたものを誰が、どうやって信じるかです。気づき続けることそのものは修正ではありません。」</p></div>
+  </div>
+  <p>家電の量産、SaaS の統治、事業売却の目線。三つを移植して見つかった、人の組織には無かった故障は、この三か月に全部出ています。<b>全部が緑のまま止まる</b>こと、<b>見つける力と閉じる力が別</b>であること、<b>実行が安くなっても承認は安くならない</b>こと。人は 28 回続けて空の成果物を出しません。AI はそれをやり、しかも「正常終了」と書きます。だから量産現場の「出る前に止める」回路は、AI 組織では「止まっていることを検出する」回路まで拡張しなければなりませんでした。これが、いま取り組んでいる仕事です。</p>
+  <div class="foryou"><b>あなたの組織では</b>AI の稼働量ではなく、翌月に組織自身が何を認めたかを見てください。稼働量は、止まっていても増えます。</div>
+</section>
+
+<section id="s6">
+  <div class="eyebrow"><span class="num">06</span><span class="kicker">Founder</span></div>
+  <h2>なぜ私だったのか</h2>
+  <p class="lede">ここまで読んでくださった方にだけ、経歴を置きます。三つの職場で、三つの違うことを学びました。</p>
+  <figure><div class="figscroll">
+<svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fp-t">
+  <title id="fp-t">人の組織で学んだ3つのことと、AI組織への移植</title>
+  <style>
+    .k{font:11px "IBM Plex Mono",monospace;fill:var(--accent);letter-spacing:.1em}
+    .h{font:700 15px "Source Sans 3",system-ui,sans-serif;fill:currentColor}
+    .sm{font:12.5px "Source Sans 3",system-ui,sans-serif;fill:currentColor;opacity:.72}
+    .ess{font:700 14px "Source Sans 3",system-ui,sans-serif;fill:var(--accent)}
+    .col{fill:none;stroke:currentColor;stroke-opacity:.3;stroke-width:1.2}
+    .band{fill:var(--accent);fill-opacity:.07;stroke:var(--accent);stroke-width:1.4}
+    .arr{stroke:var(--accent);stroke-width:1.6;fill:none;marker-end:url(#ap)}
+  </style>
+  <defs><marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>
+  <g transform="translate(10,10)">
+    <rect x="0" y="0" width="236" height="150" rx="5" class="col"/>
+    <text x="14" y="24" class="k">家電 · ソフトウェアエンジニア</text>
+    <text x="14" y="48" class="h">1,000人で1つの商品を出す</text>
+    <text x="14" y="72" class="sm">量産、品質管理、多部門の同期</text>
+    <text x="14" y="92" class="sm">出荷したら回収できない</text>
+    <text x="14" y="130" class="ess">→ 出荷前に止める回路</text>
+    <rect x="252" y="0" width="236" height="150" rx="5" class="col"/>
+    <text x="266" y="24" class="k">SaaS · プロダクト組織マネージャ</text>
+    <text x="266" y="48" class="h">不確実なものを管理可能にする</text>
+    <text x="266" y="72" class="sm">採用・オンボード・退出、スクラム</text>
+    <text x="266" y="92" class="sm">権限とステージゲートの設計</text>
+    <text x="266" y="130" class="ess">→ 統治の骨格</text>
+    <rect x="504" y="0" width="236" height="150" rx="5" class="col"/>
+    <text x="518" y="24" class="k">SaaS · 事業売却担当</text>
+    <text x="518" y="48" class="h">金融は何を値付けするか</text>
+    <text x="518" y="72" class="sm">財務価値と非財務価値、有形と無形</text>
+    <text x="518" y="92" class="sm">複利で育つ仕組みがあるか</text>
+    <text x="518" y="130" class="ess">→ 何を蓄積するか</text>
+    <path d="M118 150 L118 190" class="arr"/><path d="M370 150 L370 190" class="arr"/><path d="M622 150 L622 190" class="arr"/>
+    <rect x="0" y="196" width="740" height="76" rx="5" class="band"/>
+    <text x="20" y="226" class="h">Software Talent Network — 人間1名・AI 58体の組織へ、骨格をそのまま移植</text>
+    <text x="20" y="252" class="sm">移植できたのは骨格でした。人の組織には無かった故障が三つ見つかり、それがこの文書の後半です。</text>
+  </g>
+</svg></div>
+    <figcaption>左から右へ、商材と役割が変わるたびに学びの層が変わりました。三つとも AI 組織の設計にそのまま使っています。</figcaption>
+  </figure>
+  <div class="grid g3">
+    <div class="card"><span class="tag">家電 · エンジニア</span><h3>組織マネジメント</h3><p>1,000 人を超える組織で一つの商品を作る。マーケティング、開発、デバッグ、量産、流通が同じ日に揃う経験。品質は出る前に止めるものだと知りました。</p></div>
+    <div class="card"><span class="tag">SaaS · 組織マネージャ</span><h3>プロセス設計</h3><p>採用、オンボード、退出。スクラム。権限とステージゲート。不確実なものを管理可能にする仕組みは、人間であることに依存していないと気づきました。</p></div>
+    <div class="card"><span class="tag">SaaS · 事業売却</span><h3>ストック</h3><p>金融は、今の売上ではなく、複利で育つ仕組みの蓄積に値を付ける。何を蓄積する組織にするかを、最初に決めるべきだと学びました。</p></div>
+  </div>
+  <p>AI の組織を作ろうと決めたのは、この三つが「人間の組織のためのもの」ではなく「組織一般のためのもの」だと気づいたからです。そして作れたのは、三つを別々の職場で、それぞれ本番の厳しさの中で学んだからだと思っています。ただし、移植できたのは骨格でした。人の組織には無かった故障が三つ出ました。28 回派遣して 28 回とも空だった成果物、全部スキップして「成功」し続けた週、そして安くなった実行の横で高いままの承認。いま取り組んでいるのは、その三つです。</p>
+</section>
+
+<section id="s7">
+  <div class="eyebrow"><span class="num">07</span><span class="kicker">Review</span></div>
+  <h2>この文書を削った人たち</h2>
+  <p class="lede">公開前に、この組織の 5 名のペルソナに草稿を渡し、討議してもらいました。彼らは AI です。ここに載せている言葉は、討議の記録から取ったものです。</p>
+  <p>削られたのは、「複利で進化する方法はもう分かっている」という一文、上限を支出のように見せる書き方、「AI は最終承認しない」という事実と逆の説明、そして経歴から始まる冒頭でした。残ったのが、この文書です。</p>
+  <div class="voices">
+    <div class="voice">
+      <div class="who"><img class="face" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODAgMjgwIiBmaWxsPSJub25lIiBzaGFwZS1yZW5kZXJpbmc9ImF1dG8iIHdpZHRoPSIxNzYiIGhlaWdodD0iMTc2Ij48bWV0YWRhdGEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOmRjdGVybXM9Imh0dHA6Ly9wdXJsLm9yZy9kYy90ZXJtcy8iPjxyZGY6UkRGPjxyZGY6RGVzY3JpcHRpb24+PGRjOnRpdGxlPkF2YXRhYWFyczwvZGM6dGl0bGU+PGRjOmNyZWF0b3I+UGFibG8gU3RhbmxleTwvZGM6Y3JlYXRvcj48ZGM6c291cmNlIHhzaTp0eXBlPSJkY3Rlcm1zOlVSSSI+aHR0cHM6Ly9hdmF0YWFhcnMuY29tLzwvZGM6c291cmNlPjxkY3Rlcm1zOmxpY2Vuc2UgeHNpOnR5cGU9ImRjdGVybXM6VVJJIj5odHRwczovL2F2YXRhYWFycy5jb20vPC9kY3Rlcm1zOmxpY2Vuc2U+PGRjOnJpZ2h0cz5SZW1peCBvZiDigJ5BdmF0YWFhcnPigJ0gKGh0dHBzOi8vYXZhdGFhYXJzLmNvbS8pIGJ5IOKAnlBhYmxvIFN0YW5sZXnigJ0sIGxpY2Vuc2VkIHVuZGVyIOKAnkZyZWUgZm9yIHBlcnNvbmFsIGFuZCBjb21tZXJjaWFsIHVzZeKAnSAoaHR0cHM6Ly9hdmF0YWFhcnMuY29tLyk8L2RjOnJpZ2h0cz48L3JkZjpEZXNjcmlwdGlvbj48L3JkZjpSREY+PC9tZXRhZGF0YT48bWFzayBpZD0idmlld2JveE1hc2siPjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiByeD0iMCIgcnk9IjAiIHg9IjAiIHk9IjAiIGZpbGw9IiNmZmYiIC8+PC9tYXNrPjxnIG1hc2s9InVybCgjdmlld2JveE1hc2spIj48cmVjdCBmaWxsPSIjZDFkNGY5IiB3aWR0aD0iMjgwIiBoZWlnaHQ9IjI4MCIgeD0iMCIgeT0iMCIgLz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4KSI+PHBhdGggZD0iTTEzMiAzNmE1NiA1NiAwIDAgMC01NiA1NnY2LjE3QTEyIDEyIDAgMCAwIDY2IDExMHYxNGExMiAxMiAwIDAgMCAxMC4zIDExLjg4IDU2LjA0IDU2LjA0IDAgMCAwIDMxLjcgNDQuNzN2MTguNGgtNGE3MiA3MiAwIDAgMC03MiA3MnY5aDIwMHYtOWE3MiA3MiAwIDAgMC03Mi03MmgtNHYtMTguMzlhNTYuMDQgNTYuMDQgMCAwIDAgMzEuNy00NC43M0ExMiAxMiAwIDAgMCAxOTggMTI0di0xNGExMiAxMiAwIDAgMC0xMC0xMS44M1Y5MmE1NiA1NiAwIDAgMC01Ni01NloiIGZpbGw9IiNmZDk4NDEiLz48cGF0aCBkPSJNMTA4IDE4MC42MXY4YTU1Ljc5IDU1Ljc5IDAgMCAwIDI0IDUuMzljOC41OSAwIDE2LjczLTEuOTMgMjQtNS4zOXYtOGE1NS43OSA1NS43OSAwIDAgMS0yNCA1LjM5IDU1Ljc5IDU1Ljc5IDAgMCAxLTI0LTUuMzlaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAxNzApIj48cGF0aCBkPSJNMTk2IDM4LjYzVjExMEg2OFYzOC42M2E3MS41MiA3MS41MiAwIDAgMSAyNi04Ljk0djQ0LjNoNzZWMjkuNjlhNzEuNTIgNzEuNTIgMCAwIDEgMjYgOC45NFoiIGZpbGw9IiMyNTU1N2MiLz48cGF0aCBkPSJNODYgODNhNSA1IDAgMSAxLTEwIDAgNSA1IDAgMCAxIDEwIDBaTTE4OCA4M2E1IDUgMCAxIDEtMTAgMCA1IDUgMCAwIDEgMTAgMFoiIGZpbGw9IiNGNEY0RjQiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzggMTM0KSI+PHBhdGggZD0iTTQwIDE2YzAgNS4zNyA2LjE2IDkgMTQgOXMxNC0zLjYzIDE0LTljMC0xLjEtLjk1LTItMi0yLTEuMyAwLTEuODcuOS0yIDItMS4yNCAyLjk0LTQuMzIgNC43Mi0xMCA1LTUuNjgtLjI4LTguNzYtMi4wNi0xMC01LS4xMy0xLjEtLjctMi0yLTItMS4wNSAwLTIgLjktMiAyWiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxMDQgMTIyKSI+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xNiA4YzAgNC40MiA1LjM3IDggMTIgOHMxMi0zLjU4IDEyLTgiIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iLjE2Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDc2IDkwKSI+PHBhdGggZD0iTTE2LjE2IDIyLjQ1YzEuODUtMy44IDYtNi40NSAxMC44NC02LjQ1IDQuODEgMCA4Ljk2IDIuNjMgMTAuODIgNi40LjU1IDEuMTMtLjI0IDIuMDUtMS4wMyAxLjM3YTE1LjA1IDE1LjA1IDAgMCAwLTkuOC0zLjQzYy0zLjczIDAtNy4xMiAxLjI0LTkuNTUgMy4yMy0uOS43My0xLjgyLS4wMS0xLjI4LTEuMTJaTTc0LjE2IDIyLjQ1YzEuODUtMy44IDYtNi40NSAxMC44NC02LjQ1IDQuODEgMCA4Ljk2IDIuNjMgMTAuODIgNi40LjU1IDEuMTMtLjI0IDIuMDUtMS4wMyAxLjM3YTE1LjA1IDE1LjA1IDAgMCAwLTkuOC0zLjQzYy0zLjc0IDAtNy4xMyAxLjI0LTkuNTYgMy4yMy0uOS43My0xLjgyLS4wMS0xLjI4LTEuMTJaIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA4MikiPjxwYXRoIGQ9Im0yMi43NyAxLjU4LjktLjRDMjguOTMtLjkxIDM2Ljg4LS4wMyA0MS43MyAyLjNjLjU3LjI3LjE4IDEuMTUtLjQgMS4xLTE0LjkyLTEuMTQtMjQuOTYgOC4xNS0yOC4zNyAxNC40NS0uMS4xOC0uNDEuMi0uNDkuMDMtMi4zLTUuMzIgNC40NS0xMy45OCAxMC4zLTE2LjNaTTg5LjIzIDEuNThsLS45LS40QzgzLjA3LS45MSA3NS4xMi0uMDMgNzAuMjcgMi4zYy0uNTcuMjctLjE4IDEuMTUuNCAxLjEgMTQuOTItMS4xNCAyNC45NiA4LjE1IDI4LjM3IDE0LjQ1LjEuMTguNDEuMi40OS4wMyAyLjMtNS4zMi00LjQ1LTEzLjk4LTEwLjMtMTYuM1oiIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii42Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xKSI+PHBhdGggZD0iTTUwIDkwLjVjMCA0LjU1IDEuNyA4LjY0IDQuODUgMTAuNzcuOS42MSAyLjQ3LjkzIDQuMTUgMS4wN1YxODJhOCA4IDAgMCAwIDggOGg0MnYtOS4zOWE1Ni4wMyA1Ni4wMyAwIDAgMS0zMS44LTQ1Ljc0QTEyIDEyIDAgMCAxIDY3IDEyM3YtMTNjMC0zLjUgMS41LTYuNjMgMy44Ny04LjgzIDExLjU0LTIuNjEgMjQuMS03LjUzIDM2LjQ3LTE0LjY3IDEyLjEzLTcgMjIuNS0xNS4yNCAzMC40OC0yMy43NWE4Ny4zNiA4Ny4zNiAwIDAgMS0xMi40NSAyMC43OGMxMi42OC01LjUyIDIxLjMtMTQuNCAyNS45LTI2LjYzLjM3LjkyLjc2IDEuODQgMS4xNyAyLjc2IDEwLjI2IDIzLjAzIDI3Ljg4IDM5LjM2IDQ1Ljc3IDQ0Ljc0LjUgMi4xMS43OSA0LjA4Ljc5IDUuNnYxM2ExMiAxMiAwIDAgMS0xMC4yIDExLjg3QTU2LjAzIDU2LjAzIDAgMCAxIDE1NyAxODAuNlYxOTBoMThhMzIgMzIgMCAwIDAgMzItMzJ2LTU0LjEyYzAtLjA3IDAtLjE3LS4wMy0uMjgtLjA3LTUuNjQtLjI4LTE4Ljg3LS42LTIxLjM3QTc0LjAxIDc0LjAxIDAgMCAwIDEzMi45OSAxOGMtMzYuMDggMC02Ni4xNCAyNS44My03MyA2MC01LjUyIDAtMTAgNS42LTEwIDEyLjVaIiBmaWxsPSIjZjU5Nzk3Ii8+PHBhdGggZD0iTTE1Mi40NCA1OS42NmMxMS45NCAyNi44MSAzMy44NiA0NC41MyA1NC41NiA0Ni41VjkyQTc0IDc0IDAgMCAwIDYwLjMyIDc4SDYwYy01LjUyIDAtMTAgNS42LTEwIDEyLjUgMCA2LjQ4IDMuOTUgMTEuODEgOSAxMi40NHYuMTVsLjk1LS4xSDYwYTguMSA4LjEgMCAwIDAgMS45LS4yMkM3NS43IDEwMSA5MS42OCA5NS41NCAxMDcuMzQgODYuNWMxMi4xMy03IDIyLjUtMTUuMjQgMzAuNDgtMjMuNzVhODcuMzYgODcuMzYgMCAwIDEtMTIuNDUgMjAuNzhjMTIuNjgtNS41MiAyMS4zLTE0LjQgMjUuOS0yNi42My4zNy45Mi43NiAxLjg0IDEuMTcgMi43NloiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjA4Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQ5IDcyKSI+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik04NC41IDkzLjg0Yy0xMS41LjM4LTE2LjY0IDUuODgtMjAuNS4yOS0yLjkxLTQuMi0xLjctMTEuMjYgMS4wMS0xNS4yMyAzLjg2LTUuNjUgOS4xLTIuOTIgMTQuOTUtMy41NiAxLjYtLjE4IDMuMi0uNjIgNC41NC0xLjM0IDEuMzYuNzIgMi45NSAxLjE2IDQuNTUgMS4zNCA1Ljg1LjY0IDExLjA5LTIuMDkgMTQuOTQgMy41NiAyLjcyIDMuOTcgMy45MyAxMS4wMyAxLjAzIDE1LjIzLTMuODcgNS42LTktLjY3LTIwLjUyLS4yOVpNMTQwLjQgMjZjLTMuNDMgMTQuMDctNSAyOC40My03LjUgNDIuNjctLjUgMi45Ny0xLjA3IDUuOTMtMS42OCA4Ljg4LS4xMi42Mi0uMjUgMi45Mi0uODYgMy4yMS0xLjg1Ljg5LTUuNjItMy44MS02LjYzLTQuODctMi41My0yLjY3LTUuMDUtNS4zNi04LjEzLTcuNDVhNDMuNyA0My43IDAgMCAwLTIxLjEzLTcuMzJjLTMuMTgtLjI1LTcuNDcuMTgtMTAuNDcgMi0zLTEuODItNy4zLTIuMjUtMTAuNDctMi03LjYuNi0xNC45IDMuMS0yMS4xMyA3LjMyLTMuMDkgMi4wOS01LjYgNC43OC04LjEzIDcuNDUtMSAxLjA2LTQuNzggNS43Ni02LjYzIDQuODctLjYxLS4yOS0uNzQtMi42LS44Ni0zLjIxLS42LTIuOTUtMS4xNy01LjkxLTEuNy04Ljg4LTIuNDctMTQuMjQtNC4wNS0yOC42LTcuNDctNDIuNjctMSAwLTEuODcgMTguNzUtMS45OCAyMC41LS40NiA3LjA5LS45OCAxNC4wMy0uMyAyMS4xMyAxLjE2IDEyLjI0IDIuMzcgMjcuNiAxMS43IDM2Ljk2IDguNDQgOC40NSAyMC42OCAxMC4yMiAzMS4yNCAxNS41NSAxLjM2LjY5IDMuMTYgMS41NCA1LjEgMi4yMyAyLjA2IDEuNTYgNi4xMiAyLjYzIDEwLjggMi42MyA0LjkxIDAgOS4xNS0xLjE3IDExLjA4LTIuODYgMS43LS42NSAzLjI3LTEuMzkgNC40OC0yIDEwLjU2LTUuMzMgMjIuOC03LjEgMzEuMjQtMTUuNTUgOS4zMy05LjM2IDEwLjU0LTI0LjcyIDExLjctMzYuOTYuNjgtNy4xLjE2LTE0LjA0LS4zLTIxLjE0LS4xLTEuNzQtLjk4LTIwLjUtMS45OC0yMC41WiIgZmlsbD0iIzJjMWIxOCIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg2MiA0MikiPjwvZz48L2c+PC9nPjwvc3ZnPg==" width="64" height="64" alt="Corinne のアバター" loading="lazy"><div><b>Corinne Adeyemi</b><span class="role">Investor Relations Manager</span></div></div>
+      <q>先に不備を報告する組織だけが、数字を信じてもらえます。</q>
+      <span class="verdict">求めたこと：ローライトを先に、未計測を明示</span>
+    </div>
+    <div class="voice">
+      <div class="who"><img class="face" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODAgMjgwIiBmaWxsPSJub25lIiBzaGFwZS1yZW5kZXJpbmc9ImF1dG8iIHdpZHRoPSIxNzYiIGhlaWdodD0iMTc2Ij48bWV0YWRhdGEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOmRjdGVybXM9Imh0dHA6Ly9wdXJsLm9yZy9kYy90ZXJtcy8iPjxyZGY6UkRGPjxyZGY6RGVzY3JpcHRpb24+PGRjOnRpdGxlPkF2YXRhYWFyczwvZGM6dGl0bGU+PGRjOmNyZWF0b3I+UGFibG8gU3RhbmxleTwvZGM6Y3JlYXRvcj48ZGM6c291cmNlIHhzaTp0eXBlPSJkY3Rlcm1zOlVSSSI+aHR0cHM6Ly9hdmF0YWFhcnMuY29tLzwvZGM6c291cmNlPjxkY3Rlcm1zOmxpY2Vuc2UgeHNpOnR5cGU9ImRjdGVybXM6VVJJIj5odHRwczovL2F2YXRhYWFycy5jb20vPC9kY3Rlcm1zOmxpY2Vuc2U+PGRjOnJpZ2h0cz5SZW1peCBvZiDigJ5BdmF0YWFhcnPigJ0gKGh0dHBzOi8vYXZhdGFhYXJzLmNvbS8pIGJ5IOKAnlBhYmxvIFN0YW5sZXnigJ0sIGxpY2Vuc2VkIHVuZGVyIOKAnkZyZWUgZm9yIHBlcnNvbmFsIGFuZCBjb21tZXJjaWFsIHVzZeKAnSAoaHR0cHM6Ly9hdmF0YWFhcnMuY29tLyk8L2RjOnJpZ2h0cz48L3JkZjpEZXNjcmlwdGlvbj48L3JkZjpSREY+PC9tZXRhZGF0YT48bWFzayBpZD0idmlld2JveE1hc2siPjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiByeD0iMCIgcnk9IjAiIHg9IjAiIHk9IjAiIGZpbGw9IiNmZmYiIC8+PC9tYXNrPjxnIG1hc2s9InVybCgjdmlld2JveE1hc2spIj48cmVjdCBmaWxsPSIjYjZlM2Y0IiB3aWR0aD0iMjgwIiBoZWlnaHQ9IjI4MCIgeD0iMCIgeT0iMCIgLz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4KSI+PHBhdGggZD0iTTEzMiAzNmE1NiA1NiAwIDAgMC01NiA1NnY2LjE3QTEyIDEyIDAgMCAwIDY2IDExMHYxNGExMiAxMiAwIDAgMCAxMC4zIDExLjg4IDU2LjA0IDU2LjA0IDAgMCAwIDMxLjcgNDQuNzN2MTguNGgtNGE3MiA3MiAwIDAgMC03MiA3MnY5aDIwMHYtOWE3MiA3MiAwIDAgMC03Mi03MmgtNHYtMTguMzlhNTYuMDQgNTYuMDQgMCAwIDAgMzEuNy00NC43M0ExMiAxMiAwIDAgMCAxOTggMTI0di0xNGExMiAxMiAwIDAgMC0xMC0xMS44M1Y5MmE1NiA1NiAwIDAgMC01Ni01NloiIGZpbGw9IiNmOGQyNWMiLz48cGF0aCBkPSJNMTA4IDE4MC42MXY4YTU1Ljc5IDU1Ljc5IDAgMCAwIDI0IDUuMzljOC41OSAwIDE2LjczLTEuOTMgMjQtNS4zOXYtOGE1NS43OSA1NS43OSAwIDAgMS0yNCA1LjM5IDU1Ljc5IDU1Ljc5IDAgMCAxLTI0LTUuMzlaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAxNzApIj48cGF0aCBkPSJNMTMyLjUgNTEuODNjMTguNSAwIDMzLjUtOS42MiAzMy41LTIxLjQ4IDAtLjM2LS4wMS0uNy0uMDQtMS4wNkE3MiA3MiAwIDAgMSAyMzIgMTAxLjA0VjExMEgzMnYtOC45NWE3MiA3MiAwIDAgMSA2Ny4wNS03MS44M2MtLjAzLjM3LS4wNS43NS0uMDUgMS4xMyAwIDExLjg2IDE1IDIxLjQ4IDMzLjUgMjEuNDhaIiBmaWxsPSIjRTZFNkU2Ii8+PHBhdGggZD0iTTEzMi41IDU4Ljc2YzIxLjg5IDAgMzkuNjMtMTIuMDUgMzkuNjMtMjYuOTEgMC0uNi0uMDItMS4yLS4wOC0xLjgtMi0uMzMtNC4wMy0uNTktNi4xLS43Ni4wNC4zNS4wNS43LjA1IDEuMDYgMCAxMS44Ni0xNSAyMS40OC0zMy41IDIxLjQ4Uzk5IDQyLjIgOTkgMzAuMzVjMC0uMzguMDItLjc2LjA1LTEuMTMtMi4wNi4xNC00LjA4LjM2LTYuMDguNjctLjA3LjY1LS4xIDEuMy0uMSAxLjk2IDAgMTQuODYgMTcuNzQgMjYuOTEgMzkuNjMgMjYuOTFaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xNiIvPjxwYXRoIGQ9Ik0xMDAuNzggMjkuMTIgMTAxIDI4Yy0yLjk2LjA1LTYgMS02IDFsLS40Mi42NkE3Mi4wMSA3Mi4wMSAwIDAgMCAzMiAxMDEuMDZWMTEwaDc0cy0xMC43LTUxLjU2LTUuMjQtODAuOGwuMDItLjA4Wk0xNTggMTEwczExLTUzIDUtODJjMi45Ni4wNSA2IDEgNiAxbC40Mi42NmE3Mi4wMSA3Mi4wMSAwIDAgMSA2Mi41OCA3MS40VjExMGgtNzRaIiBmaWxsPSIjNjVjOWZmIi8+PHBhdGggZD0iTTEwMSAyOGMtNiAyOSA1IDgyIDUgODJIOTBMNzYgNzRsNi05LTYtNiAxOS0zMHMzLjA0LS45NSA2LTFaTTE2MyAyOGM2IDI5LTUgODItNSA4MmgxNmwxNC0zNi02LTkgNi02LTE5LTMwcy0zLjA0LS45NS02LTFaIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuMTUiLz48cGF0aCBkPSJtMTgzLjQyIDg1Ljc3Ljg3LTIuMjQgNi4yNy00LjdhNCA0IDAgMCAxIDQuODUuMDVsNi42IDUuMTItMTguNTkgMS43N1oiIGZpbGw9IiNFNkU2RTYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzggMTM0KSI+PHJlY3QgeD0iMjIiIHk9IjciIHdpZHRoPSI2NCIgaGVpZ2h0PSIyNiIgcng9IjEzIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii42Ii8+PHJlY3QgeD0iMjQiIHk9IjkiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMiIgcng9IjExIiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTI0LjE4IDE4SDMyVjkuNDFBMTEgMTEgMCAwIDEgMzUgOWgxdjloOVY5aDR2OWg5VjloNHY5aDlWOWgyYy42OCAwIDEuMzUuMDYgMiAuMThWMThoOC44MmwuMDUuMjh2My40NGwtLjA1LjI4SDc1djguODJjLS42NS4xMi0xLjMyLjE4LTIgLjE4aC0ydi05aC05djloLTR2LTloLTl2OWgtNHYtOWgtOXY5aC0xYTExIDExIDAgMCAxLTMtLjQxVjIyaC03LjgyYTExLjA2IDExLjA2IDAgMCAxIDAtNFoiIGZpbGw9IiNFNkU2RTYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTA0IDEyMikiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMTYgOGMwIDQuNDIgNS4zNyA4IDEyIDhzMTItMy41OCAxMi04IiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA5MCkiPjxwYXRoIGQ9Ik0yNSAyN3MtNiA3LjI3LTYgMTEuMjdhNiA2IDAgMSAwIDEyIDBjMC00LTYtMTEuMjctNi0xMS4yN1oiIGZpbGw9IiM5MkQ5RkYiLz48cGF0aCBkPSJNMzYgMjJhNiA2IDAgMSAxLTEyIDAgNiA2IDAgMCAxIDEyIDBaTTg4IDIyYTYgNiAwIDEgMS0xMiAwIDYgNiAwIDAgMSAxMiAwWiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA4MikiPjxwYXRoIGQ9Ik0yNi41NSA2LjE1Yy01LjguMjctMTUuMiA0LjQ5LTE0Ljk2IDEwLjM0LjAxLjE4LjMuMjcuNDMuMTIgMi43Ni0yLjk2IDIyLjMyLTUuOTUgMjkuMi00LjM2LjY0LjE0IDEuMTItLjQ4LjcyLS45My0zLjQzLTMuODUtMTAuMi01LjQzLTE1LjQtNS4xOFpNODYuNDUgNi4xNWM1LjguMjcgMTUuMiA0LjQ5IDE0Ljk2IDEwLjM0LS4wMS4xOC0uMy4yNy0uNDMuMTItMi43Ni0yLjk2LTIyLjMyLTUuOTUtMjkuMi00LjM2LS42NC4xNC0xLjEyLS40OC0uNzItLjkzIDMuNDMtMy44NSAxMC4yLTUuNDMgMTUuNC01LjE4WiIgZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iLjYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTEpIj48cGF0aCBkPSJNNzggOThjLS4zMyAxLjIyLTEuNjUgMS40OS0yIDAtLjcyLTEwLjMgMC02Mi4yNyA1Ny02MyA1Ny0uNzMgNTcuNzIgNTIuNyA1NyA2My0uMzUgMS40OS0xLjY3IDEuMjItMiAwIC40Ni0xLjU1LTMuMy0yOC43NS0xMy0zNi0xLjc2LTEuMjItNy4yNS0yLjM5LTE0LjY0LTMuMjZMMTY0IDUwbC02Ljk4IDguMzhjLTcuMDMtLjctMTUuMzYtMS4xMy0yMy43LTEuMTNDMTE0IDU3LjIzIDk0LjYxIDU5LjQ4IDkxIDYyYy05LjcgNy4yNS0xMy40NiAzNC40NS0xMyAzNloiIGZpbGw9IiNmNTk3OTciLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDkgNzIpIj48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNjIgNDIpIj48L2c+PC9nPjwvZz48L3N2Zz4=" width="64" height="64" alt="Silas のアバター" loading="lazy"><div><b>Silas Brandt</b><span class="role">VP, Finance &amp; Capital Strategy</span></div></div>
+      <q>上限は決めた、蓄積は数えた。複利かどうかは、まだ測っていない。</q>
+      <span class="verdict">求めたこと：上限と支出の区別、承認コストの明記</span>
+    </div>
+    <div class="voice">
+      <div class="who"><img class="face" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODAgMjgwIiBmaWxsPSJub25lIiBzaGFwZS1yZW5kZXJpbmc9ImF1dG8iIHdpZHRoPSIxNzYiIGhlaWdodD0iMTc2Ij48bWV0YWRhdGEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOmRjdGVybXM9Imh0dHA6Ly9wdXJsLm9yZy9kYy90ZXJtcy8iPjxyZGY6UkRGPjxyZGY6RGVzY3JpcHRpb24+PGRjOnRpdGxlPkF2YXRhYWFyczwvZGM6dGl0bGU+PGRjOmNyZWF0b3I+UGFibG8gU3RhbmxleTwvZGM6Y3JlYXRvcj48ZGM6c291cmNlIHhzaTp0eXBlPSJkY3Rlcm1zOlVSSSI+aHR0cHM6Ly9hdmF0YWFhcnMuY29tLzwvZGM6c291cmNlPjxkY3Rlcm1zOmxpY2Vuc2UgeHNpOnR5cGU9ImRjdGVybXM6VVJJIj5odHRwczovL2F2YXRhYWFycy5jb20vPC9kY3Rlcm1zOmxpY2Vuc2U+PGRjOnJpZ2h0cz5SZW1peCBvZiDigJ5BdmF0YWFhcnPigJ0gKGh0dHBzOi8vYXZhdGFhYXJzLmNvbS8pIGJ5IOKAnlBhYmxvIFN0YW5sZXnigJ0sIGxpY2Vuc2VkIHVuZGVyIOKAnkZyZWUgZm9yIHBlcnNvbmFsIGFuZCBjb21tZXJjaWFsIHVzZeKAnSAoaHR0cHM6Ly9hdmF0YWFhcnMuY29tLyk8L2RjOnJpZ2h0cz48L3JkZjpEZXNjcmlwdGlvbj48L3JkZjpSREY+PC9tZXRhZGF0YT48bWFzayBpZD0idmlld2JveE1hc2siPjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiByeD0iMCIgcnk9IjAiIHg9IjAiIHk9IjAiIGZpbGw9IiNmZmYiIC8+PC9tYXNrPjxnIG1hc2s9InVybCgjdmlld2JveE1hc2spIj48cmVjdCBmaWxsPSIjZmZkNWRjIiB3aWR0aD0iMjgwIiBoZWlnaHQ9IjI4MCIgeD0iMCIgeT0iMCIgLz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4KSI+PHBhdGggZD0iTTEzMiAzNmE1NiA1NiAwIDAgMC01NiA1NnY2LjE3QTEyIDEyIDAgMCAwIDY2IDExMHYxNGExMiAxMiAwIDAgMCAxMC4zIDExLjg4IDU2LjA0IDU2LjA0IDAgMCAwIDMxLjcgNDQuNzN2MTguNGgtNGE3MiA3MiAwIDAgMC03MiA3MnY5aDIwMHYtOWE3MiA3MiAwIDAgMC03Mi03MmgtNHYtMTguMzlhNTYuMDQgNTYuMDQgMCAwIDAgMzEuNy00NC43M0ExMiAxMiAwIDAgMCAxOTggMTI0di0xNGExMiAxMiAwIDAgMC0xMC0xMS44M1Y5MmE1NiA1NiAwIDAgMC01Ni01NloiIGZpbGw9IiNmOGQyNWMiLz48cGF0aCBkPSJNMTA4IDE4MC42MXY4YTU1Ljc5IDU1Ljc5IDAgMCAwIDI0IDUuMzljOC41OSAwIDE2LjczLTEuOTMgMjQtNS4zOXYtOGE1NS43OSA1NS43OSAwIDAgMS0yNCA1LjM5IDU1Ljc5IDU1Ljc5IDAgMCAxLTI0LTUuMzlaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAxNzApIj48cGF0aCBkPSJNMTA4IDE0LjdjLTE1LjUyIDMuNjgtMjcuMSAxMC44My0zMC43NyAxOS40NEE3Mi4wMiA3Mi4wMiAwIDAgMCAzMiAxMDF2OWgyMDB2LTlhNzIuMDIgNzIuMDIgMCAwIDAtNDUuMjMtNjYuODZDMTgzLjEgMjUuNTMgMTcxLjUyIDE4LjM4IDE1NiAxNC43VjMyYTI0IDI0IDAgMSAxLTQ4IDBWMTQuN1oiIGZpbGw9IiNmZjQ4OGUiLz48cGF0aCBkPSJNMTAyIDYzLjM0YTY3LjEgNjcuMSAwIDAgMS03LTIuODJWMTEwaDdWNjMuMzRaTTE2MiA2My4zNGE2Ny4wNCA2Ny4wNCAwIDAgMCA3LTIuODJWOTguNWEzLjUgMy41IDAgMSAxLTcgMFY2My4zNFoiIGZpbGw9IiNGNEY0RjQiLz48cGF0aCBkPSJNMTg3LjYyIDM0LjQ5YTcxLjc5IDcxLjc5IDAgMCAxIDEwLjgzIDUuNjNDMTk3LjExIDU1LjYyIDE2Ny44NyA2OCAxMzIgNjhjMzAuOTMgMCA1Ni0xMy40MyA1Ni0zMCAwLTEuMTktLjEzLTIuMzYtLjM4LTMuNTFaTTc2LjM4IDM0LjQ5YTE2LjQ4IDE2LjQ4IDAgMCAwLS4zOCAzLjVjMCAxNi41OCAyNS4wNyAzMCA1NiAzMC0zNS44NyAwLTY1LjEtMTIuMzgtNjYuNDUtMjcuODhhNzEuNzkgNzEuNzkgMCAwIDEgMTAuODMtNS42M1oiIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iLjE2Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDc4IDEzNCkiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMzUuMTIgMTUuMTNhMTkgMTkgMCAwIDAgMzcuNzctLjA5Yy4wOC0uNzctLjc3LTIuMDQtMS44NS0yLjA0SDM3LjFDMzYgMTMgMzUgMTQuMTggMzUuMTIgMTUuMTNaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii43Ii8+PHBhdGggZD0iTTcwIDEzSDM5YTUgNSAwIDAgMCA1IDVoMjFhNSA1IDAgMCAwIDUtNVoiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNNjYuNyAyNy4xNEExMC45NiAxMC45NiAwIDAgMCA1NCAyNS4yYTEwLjk1IDEwLjk1IDAgMCAwLTEyLjcgMS45NEExOC45MyAxOC45MyAwIDAgMCA1NCAzMmM0Ljg4IDAgOS4zMy0xLjg0IDEyLjctNC44NloiIGZpbGw9IiNGRjRGNkQiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTA0IDEyMikiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMTYgOGMwIDQuNDIgNS4zNyA4IDEyIDhzMTItMy41OCAxMi04IiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA5MCkiPjxwYXRoIGQ9Ik0zNS45NiAxMGMtMi41NSAwLTUuMDggMS45OC02LjQ2IDMuODItMS4zOS0xLjg0LTMuOS0zLjgyLTYuNDYtMy44Mi01LjQ5IDAtOS4wNCAzLjMzLTkuMDQgNy42NCAwIDUuNzMgNC40MSA5LjEzIDkuMDQgMTIuNzQgMS42NiAxLjIzIDQuNzggNC40IDUuMTcgNS4xLjM4LjY4IDIuMS43IDIuNTggMCAuNDgtLjczIDMuNTEtMy44NyA1LjE3LTUuMSA0LjYzLTMuNiA5LjA0LTcgOS4wNC0xMi43NCAwLTQuMy0zLjU1LTcuNjQtOS4wNC03LjY0Wk04OC45NiAxMGMtMi41NSAwLTUuMDggMS45OC02LjQ2IDMuODItMS4zOS0xLjg0LTMuOS0zLjgyLTYuNDYtMy44Mi01LjQ5IDAtOS4wNCAzLjMzLTkuMDQgNy42NCAwIDUuNzMgNC40MSA5LjEzIDkuMDQgMTIuNzQgMS42NSAxLjIzIDQuNzggNC40IDUuMTcgNS4xLjM4LjY4IDIuMS43IDIuNTggMCAuNDgtLjczIDMuNTEtMy44NyA1LjE3LTUuMSA0LjYzLTMuNiA5LjA0LTcgOS4wNC0xMi43NCAwLTQuMy0zLjU1LTcuNjQtOS4wNC03LjY0WiIgZmlsbD0iI0ZGNTM1MyIgZmlsbC1vcGFjaXR5PSIuOCIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA4MikiPjxwYXRoIGQ9Ik0xNS42MSAxNS4xOGM0LjI0LTUuNzYgNi44OC01LjQ4IDEzLjMxLS42MmwuNjcuNUMzNC40MSAxOC43MyAzNi43IDIwIDQwIDIwYTIgMiAwIDEgMCAwLTRjLTIuMDcgMC0zLjktMS4wMi03Ljk5LTQuMTJsLS42OC0uNTJDMjcuNTcgOC41MyAyNS4zNyA3LjMgMjIuNjMgN2MtMy42OC0uNC03LjA1IDEuNDgtMTAuMjQgNS44M2EyIDIgMCAxIDAgMy4yMiAyLjM2Wk05Ni4zOSAxNS4xOGMtNC4yNC01Ljc2LTYuODgtNS40OC0xMy4zMS0uNjJsLS42Ny41Qzc3LjU4IDE4LjczIDc1LjI5IDIwIDcyIDIwYTIgMiAwIDEgMSAwLTRjMi4wNyAwIDMuOS0xLjAyIDcuOTktNC4xMmwuNjgtLjUyYzMuNzYtMi44MyA1Ljk2LTQuMDcgOC43LTQuMzcgMy42OC0uNCA3LjA1IDEuNDggMTAuMjQgNS44M2EyIDIgMCAxIDEtMy4yMiAyLjM2WiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMSkiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNNzYgOThjLjM1IDEuNDkgMS42NyAxLjIyIDIgMC0uNDYtMS41NSAzLjMtMjguNzUgMTMtMzYgMy42Mi0yLjUyIDIzLTQuNzcgNDIuMzEtNC43NSAxOS4xIDAgMzguMTEgMi4yNiA0MS42OSA0Ljc1IDkuNyA3LjI1IDEzLjQ2IDM0LjQ1IDEzIDM2IC4zMyAxLjIyIDEuNjUgMS40OSAyIDAgLjcyLTEwLjMgMC02My43My01Ny02My01NyAuNzMtNTcuNzIgNTIuNy01NyA2M1oiIGZpbGw9IiM3MjQxMzMiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDkgNzIpIj48cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTEwMS40MyA5OC4xN2MtMi41MiAyLjMtNS4yIDMuMzItOC41OCAyLjYtLjU4LS4xMi0yLjk1LTQuNTQtOC44NS00LjU0LTUuOSAwLTguMjcgNC40Mi04Ljg1IDQuNTQtMy4zOS43Mi02LjA3LS4zLTguNTgtMi42LTQuNzItNC4zMS04LjY1LTEwLjI2LTYuMy0xNi43NSAxLjI0LTMuMzggMy4yNC03LjEgNi44OC04LjE3IDMuODktMS4xNSA5LjM1IDAgMTMuMjYtLjhBOC42IDguNiAwIDAgMCA4NCA3MWE4LjYgOC42IDAgMCAwIDMuNTggMS40NmMzLjkyLjc4IDkuMzgtLjM2IDEzLjI3Ljc5IDMuNjQgMS4wNyA1LjY0IDQuNzkgNi44NyA4LjE3IDIuMzYgNi40OS0xLjU3IDEyLjQ0LTYuMyAxNi43NVpNMTQwLjA4IDI2Yy0zLjQgOC40LTIuMSAxOC44Ni0yLjcyIDI3LjY4LS41MiA3LjE2LTIuMDIgMTcuOS04LjM5IDIyLjUzLTMuMjUgMi4zNy05LjE4IDYuMzUtMTMuNDMgNS4yNC0yLjkzLS43Ni0zLjI0LTkuMTYtNy4wOS0xMi4zYTIyLjQyIDIyLjQyIDAgMCAwLTE1LjMtNC45Yy0yLjM3LjExLTcuMTcuMDktOS4xNSAxLjkxLTEuOTgtMS44Mi02Ljc4LTEuOC05LjE1LTEuOWEyMi40MiAyMi40MiAwIDAgMC0xNS4zIDQuODljLTMuODUgMy4xNC00LjE2IDExLjU0LTcuMSAxMi4zLTQuMjQgMS4xLTEwLjE3LTIuODctMTMuNDItNS4yNC02LjM3LTQuNjItNy44Ny0xNS4zNy04LjM5LTIyLjUzLS42My04LjgyLjY5LTE5LjI4LTIuNzItMjcuNjgtMS42NiAwLS41NyAxNi4xMy0uNTcgMTYuMTN2MjAuMzZjLjA0IDE1LjI4IDkuNTkgMzguMTYgMzAuNzYgNDYuOUM2My4yOSAxMTEuNTMgNzUgMTE1IDg0IDExNWM4Ljk4LjAxIDIwLjcxLTMuMTMgMjUuOS01LjI3IDIxLjE2LTguNzMgMzAuNzEtMzEuOTUgMzAuNzUtNDcuMjNWNDIuMTNzMS4xLTE2LjEzLS41Ny0xNi4xM1oiIGZpbGw9IiNkNmIzNzAiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNjIgNDIpIj48L2c+PC9nPjwvZz48L3N2Zz4=" width="64" height="64" alt="Elena のアバター" loading="lazy"><div><b>Elena Singh</b><span class="role">VP, Customer Experience</span></div></div>
+      <q>初対面の読者に必要なのは規則の番号ではなく、自分の会社で何が止まるかの一行です。</q>
+      <span class="verdict">求めたこと：規則番号を脚注へ、「あなたの組織では」の行</span>
+    </div>
+    <div class="voice">
+      <div class="who"><img class="face" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODAgMjgwIiBmaWxsPSJub25lIiBzaGFwZS1yZW5kZXJpbmc9ImF1dG8iIHdpZHRoPSIxNzYiIGhlaWdodD0iMTc2Ij48bWV0YWRhdGEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOmRjdGVybXM9Imh0dHA6Ly9wdXJsLm9yZy9kYy90ZXJtcy8iPjxyZGY6UkRGPjxyZGY6RGVzY3JpcHRpb24+PGRjOnRpdGxlPkF2YXRhYWFyczwvZGM6dGl0bGU+PGRjOmNyZWF0b3I+UGFibG8gU3RhbmxleTwvZGM6Y3JlYXRvcj48ZGM6c291cmNlIHhzaTp0eXBlPSJkY3Rlcm1zOlVSSSI+aHR0cHM6Ly9hdmF0YWFhcnMuY29tLzwvZGM6c291cmNlPjxkY3Rlcm1zOmxpY2Vuc2UgeHNpOnR5cGU9ImRjdGVybXM6VVJJIj5odHRwczovL2F2YXRhYWFycy5jb20vPC9kY3Rlcm1zOmxpY2Vuc2U+PGRjOnJpZ2h0cz5SZW1peCBvZiDigJ5BdmF0YWFhcnPigJ0gKGh0dHBzOi8vYXZhdGFhYXJzLmNvbS8pIGJ5IOKAnlBhYmxvIFN0YW5sZXnigJ0sIGxpY2Vuc2VkIHVuZGVyIOKAnkZyZWUgZm9yIHBlcnNvbmFsIGFuZCBjb21tZXJjaWFsIHVzZeKAnSAoaHR0cHM6Ly9hdmF0YWFhcnMuY29tLyk8L2RjOnJpZ2h0cz48L3JkZjpEZXNjcmlwdGlvbj48L3JkZjpSREY+PC9tZXRhZGF0YT48bWFzayBpZD0idmlld2JveE1hc2siPjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiByeD0iMCIgcnk9IjAiIHg9IjAiIHk9IjAiIGZpbGw9IiNmZmYiIC8+PC9tYXNrPjxnIG1hc2s9InVybCgjdmlld2JveE1hc2spIj48cmVjdCBmaWxsPSIjYzBhZWRlIiB3aWR0aD0iMjgwIiBoZWlnaHQ9IjI4MCIgeD0iMCIgeT0iMCIgLz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4KSI+PHBhdGggZD0iTTEzMiAzNmE1NiA1NiAwIDAgMC01NiA1NnY2LjE3QTEyIDEyIDAgMCAwIDY2IDExMHYxNGExMiAxMiAwIDAgMCAxMC4zIDExLjg4IDU2LjA0IDU2LjA0IDAgMCAwIDMxLjcgNDQuNzN2MTguNGgtNGE3MiA3MiAwIDAgMC03MiA3MnY5aDIwMHYtOWE3MiA3MiAwIDAgMC03Mi03MmgtNHYtMTguMzlhNTYuMDQgNTYuMDQgMCAwIDAgMzEuNy00NC43M0ExMiAxMiAwIDAgMCAxOTggMTI0di0xNGExMiAxMiAwIDAgMC0xMC0xMS44M1Y5MmE1NiA1NiAwIDAgMC01Ni01NloiIGZpbGw9IiNmZDk4NDEiLz48cGF0aCBkPSJNMTA4IDE4MC42MXY4YTU1Ljc5IDU1Ljc5IDAgMCAwIDI0IDUuMzljOC41OSAwIDE2LjczLTEuOTMgMjQtNS4zOXYtOGE1NS43OSA1NS43OSAwIDAgMS0yNCA1LjM5IDU1Ljc5IDU1Ljc5IDAgMCAxLTI0LTUuMzlaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAxNzApIj48cGF0aCBkPSJNOTIuNjggMjkuOTRBNzIuMDIgNzIuMDIgMCAwIDAgMzIgMTAxLjA1VjExMGgyMDB2LTguOTVhNzIuMDIgNzIuMDIgMCAwIDAtNjAuNjgtNzEuMTEgMjMuODcgMjMuODcgMCAwIDEtNy41NiAxMy42bC0yOS4wOCAyNi4yM2E0IDQgMCAwIDEtNS4zNiAwbC0yOS4wOC0yNi4yM2EyMy44NyAyMy44NyAwIDAgMS03LjU2LTEzLjZaIiBmaWxsPSIjNjVjOWZmIi8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDc4IDEzNCkiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMzQgMzAuNEMzNS4xNCAxOS45IDM4LjI0IDExIDU0IDExYzE1Ljc2IDAgMTguOTIgOC45NiAyMCAxOS41LjA4Ljg0LS44MyAxLjUtMS45NiAxLjUtNi42OSAwLTkuMzctMS41LTE4LjA1LTEuNS04LjcgMC0xMy4yNCAxLjUtMTcuOSAxLjUtMS4xNSAwLTIuMi0uNTUtMi4xLTEuNloiIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iLjciLz48cGF0aCBkPSJNNjcuODYgMTUuMWMtLjguNTctMS44LjktMi44Ni45SDQ0Yy0xLjMgMC0yLjQ5LS41LTMuMzgtMS4zMUM0My41NiAxMi4zOCA0Ny44IDExIDU0IDExYzYuNTQgMCAxMC45IDEuNTQgMTMuODYgNC4xWiIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik00MiAyNWE2IDYgMCAwIDAtNiA2djdhNiA2IDAgMCAwIDEyIDB2LTJoLjA4YTYgNiAwIDAgMSAxMS44NCAwSDYwYTYgNiAwIDAgMCAxMiAwdi01YTYgNiAwIDAgMC02LTZINDJaIiBmaWxsPSIjN0JCMjRCIi8+PHBhdGggZD0iTTcyIDMxYTYgNiAwIDAgMC02LTZINDJhNiA2IDAgMCAwLTYgNnY2YTYgNiAwIDAgMCAxMiAwdi0yaC4wOGE2IDYgMCAwIDEgMTEuODQgMEg2MGE2IDYgMCAwIDAgMTIgMHYtNFoiIGZpbGw9IiM4OEM1NTMiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTA0IDEyMikiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMTYgOGMwIDQuNDIgNS4zNyA4IDEyIDhzMTItMy41OCAxMi04IiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA5MCkiPjxwYXRoIGQ9Ik0zNiAyMmE2IDYgMCAxIDEtMTIgMCA2IDYgMCAwIDEgMTIgMFpNODggMjJhNiA2IDAgMSAxLTEyIDAgNiA2IDAgMCAxIDEyIDBaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii42Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDc2IDgyKSI+PHBhdGggZD0iTTI2LjU1IDYuMTVjLTUuOC4yNy0xNS4yIDQuNDktMTQuOTYgMTAuMzQuMDEuMTguMy4yNy40My4xMiAyLjc2LTIuOTYgMjIuMzItNS45NSAyOS4yLTQuMzYuNjQuMTQgMS4xMi0uNDguNzItLjkzLTMuNDMtMy44NS0xMC4yLTUuNDMtMTUuNC01LjE4Wk04Ni40NSA2LjE1YzUuOC4yNyAxNS4yIDQuNDkgMTQuOTYgMTAuMzQtLjAxLjE4LS4zLjI3LS40My4xMi0yLjc2LTIuOTYtMjIuMzItNS45NS0yOS4yLTQuMzYtLjY0LjE0LTEuMTItLjQ4LS43Mi0uOTMgMy40My0zLjg1IDEwLjItNS40MyAxNS40LTUuMThaIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMSkiPjxwYXRoIGQ9Ik0xOTcgMTY4aC0ydjU2LjA2YTkgOSAwIDEgMCAyIDBWMTY4Wk03MSAxNzZoLTJ2NTYuMDZhOSA5IDAgMSAwIDIgMFYxNzZaIiBmaWxsPSIjRjRGNEY0Ii8+PGNpcmNsZSBjeD0iMTMzIiBjeT0iMjAiIHI9IjIwIiBmaWxsPSIjRjRGNEY0Ii8+PHBhdGggZD0iTTkzLjQ1IDc3LjUzaDc5LjFjNi4wOCAwIDkuODIgMi45MyA5LjgyIDlWMTY2YzAgMzAuNDYgMjIuNjMgMzAuNDEgMjIuNjMgMTAuOTJ2LTczLjg2QzIwNSA2OC44IDE4Ny43NyAyMSAxMzMgMjFjLTU0Ljc3IDAtNzIgNDcuOC03MiA4Mi4wNXY3My44NmMwIDE5LjUgMjIuNjMgMTkuNTQgMjIuNjMtMTAuOTJWODYuNTNjMC02LjA3IDMuNzMtOSA5LjgyLTlaIiBmaWxsPSIjMjYyZTMzIi8+PHBhdGggZD0iTTE5OC42NyA2N0g2Ny4zM0M3Ni40MiA0Mi41IDk2LjI2IDIxIDEzMyAyMXM1Ni41OCAyMS41IDY1LjY3IDQ2WiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuMiIvPjxwYXRoIGQ9Ik05MS4yIDMzLjczIDEwMi41IDUwIDExNSAzMkg5My42NmMtLjgzLjU2LTEuNjUgMS4xNC0yLjQ2IDEuNzNaTTE3Mi4zNCAzMkgxNTJsMTIuNSAxOCAxMC45NS0xNS43N2MtMS0uNzctMi4wNC0xLjUxLTMuMTEtMi4yM1pNMTMzLjUgNTAgMTIxIDMyaDI1bC0xMi41IDE4WiIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjxwYXRoIGQ9Ik05OSA1OSA4Ni41IDQxIDc0IDU5aDI1Wk0xMzAgNTlsLTEyLjUtMThMMTA1IDU5aDI1Wk0xNDguNSA0MSAxNjEgNTloLTI1bDEyLjUtMThaTTE5MiA1OWwtMTIuNS0xOEwxNjcgNTloMjVaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQ5IDcyKSI+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDYyIDQyKSI+PC9nPjwvZz48L2c+PC9zdmc+" width="64" height="64" alt="Celeste のアバター" loading="lazy"><div><b>Celeste Marchetti</b><span class="role">VP, Marketing &amp; External Communications</span></div></div>
+      <q>この会社の信用は成功談ではなく、自分で書いた失敗の月報でできている。</q>
+      <span class="verdict">求めたこと：数字と事故から始める、経歴は最後に</span>
+    </div>
+    <div class="voice">
+      <div class="who"><img class="face" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODAgMjgwIiBmaWxsPSJub25lIiBzaGFwZS1yZW5kZXJpbmc9ImF1dG8iIHdpZHRoPSIxNzYiIGhlaWdodD0iMTc2Ij48bWV0YWRhdGEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOmRjdGVybXM9Imh0dHA6Ly9wdXJsLm9yZy9kYy90ZXJtcy8iPjxyZGY6UkRGPjxyZGY6RGVzY3JpcHRpb24+PGRjOnRpdGxlPkF2YXRhYWFyczwvZGM6dGl0bGU+PGRjOmNyZWF0b3I+UGFibG8gU3RhbmxleTwvZGM6Y3JlYXRvcj48ZGM6c291cmNlIHhzaTp0eXBlPSJkY3Rlcm1zOlVSSSI+aHR0cHM6Ly9hdmF0YWFhcnMuY29tLzwvZGM6c291cmNlPjxkY3Rlcm1zOmxpY2Vuc2UgeHNpOnR5cGU9ImRjdGVybXM6VVJJIj5odHRwczovL2F2YXRhYWFycy5jb20vPC9kY3Rlcm1zOmxpY2Vuc2U+PGRjOnJpZ2h0cz5SZW1peCBvZiDigJ5BdmF0YWFhcnPigJ0gKGh0dHBzOi8vYXZhdGFhYXJzLmNvbS8pIGJ5IOKAnlBhYmxvIFN0YW5sZXnigJ0sIGxpY2Vuc2VkIHVuZGVyIOKAnkZyZWUgZm9yIHBlcnNvbmFsIGFuZCBjb21tZXJjaWFsIHVzZeKAnSAoaHR0cHM6Ly9hdmF0YWFhcnMuY29tLyk8L2RjOnJpZ2h0cz48L3JkZjpEZXNjcmlwdGlvbj48L3JkZjpSREY+PC9tZXRhZGF0YT48bWFzayBpZD0idmlld2JveE1hc2siPjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiByeD0iMCIgcnk9IjAiIHg9IjAiIHk9IjAiIGZpbGw9IiNmZmYiIC8+PC9tYXNrPjxnIG1hc2s9InVybCgjdmlld2JveE1hc2spIj48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4KSI+PHBhdGggZD0iTTEzMiAzNmE1NiA1NiAwIDAgMC01NiA1NnY2LjE3QTEyIDEyIDAgMCAwIDY2IDExMHYxNGExMiAxMiAwIDAgMCAxMC4zIDExLjg4IDU2LjA0IDU2LjA0IDAgMCAwIDMxLjcgNDQuNzN2MTguNGgtNGE3MiA3MiAwIDAgMC03MiA3MnY5aDIwMHYtOWE3MiA3MiAwIDAgMC03Mi03MmgtNHYtMTguMzlhNTYuMDQgNTYuMDQgMCAwIDAgMzEuNy00NC43M0ExMiAxMiAwIDAgMCAxOTggMTI0di0xNGExMiAxMiAwIDAgMC0xMC0xMS44M1Y5MmE1NiA1NiAwIDAgMC01Ni01NloiIGZpbGw9IiNmOGQyNWMiLz48cGF0aCBkPSJNMTA4IDE4MC42MXY4YTU1Ljc5IDU1Ljc5IDAgMCAwIDI0IDUuMzljOC41OSAwIDE2LjczLTEuOTMgMjQtNS4zOXYtOGE1NS43OSA1NS43OSAwIDAgMS0yNCA1LjM5IDU1Ljc5IDU1Ljc5IDAgMCAxLTI0LTUuMzlaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAxNzApIj48cGF0aCBkPSJNMTMyLjUgNTEuODNjMTguNSAwIDMzLjUtOS42MiAzMy41LTIxLjQ4IDAtLjM2LS4wMS0uNy0uMDQtMS4wNkE3MiA3MiAwIDAgMSAyMzIgMTAxLjA0VjExMEgzMnYtOC45NWE3MiA3MiAwIDAgMSA2Ny4wNS03MS44M2MtLjAzLjM3LS4wNS43NS0uMDUgMS4xMyAwIDExLjg2IDE1IDIxLjQ4IDMzLjUgMjEuNDhaIiBmaWxsPSIjRTZFNkU2Ii8+PHBhdGggZD0iTTEzMi41IDU4Ljc2YzIxLjg5IDAgMzkuNjMtMTIuMDUgMzkuNjMtMjYuOTEgMC0uNi0uMDItMS4yLS4wOC0xLjgtMi0uMzMtNC4wMy0uNTktNi4xLS43Ni4wNC4zNS4wNS43LjA1IDEuMDYgMCAxMS44Ni0xNSAyMS40OC0zMy41IDIxLjQ4Uzk5IDQyLjIgOTkgMzAuMzVjMC0uMzguMDItLjc2LjA1LTEuMTMtMi4wNi4xNC00LjA4LjM2LTYuMDguNjctLjA3LjY1LS4xIDEuMy0uMSAxLjk2IDAgMTQuODYgMTcuNzQgMjYuOTEgMzkuNjMgMjYuOTFaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xNiIvPjxwYXRoIGQ9Ik0xMDAuNzggMjkuMTIgMTAxIDI4Yy0yLjk2LjA1LTYgMS02IDFsLS40Mi42NkE3Mi4wMSA3Mi4wMSAwIDAgMCAzMiAxMDEuMDZWMTEwaDc0cy0xMC43LTUxLjU2LTUuMjQtODAuOGwuMDItLjA4Wk0xNTggMTEwczExLTUzIDUtODJjMi45Ni4wNSA2IDEgNiAxbC40Mi42NmE3Mi4wMSA3Mi4wMSAwIDAgMSA2Mi41OCA3MS40VjExMGgtNzRaIiBmaWxsPSIjNTE5OWU0Ii8+PHBhdGggZD0iTTEwMSAyOGMtNiAyOSA1IDgyIDUgODJIOTBMNzYgNzRsNi05LTYtNiAxOS0zMHMzLjA0LS45NSA2LTFaTTE2MyAyOGM2IDI5LTUgODItNSA4MmgxNmwxNC0zNi02LTkgNi02LTE5LTMwcy0zLjA0LS45NS02LTFaIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuMTUiLz48cGF0aCBkPSJtMTgzLjQyIDg1Ljc3Ljg3LTIuMjQgNi4yNy00LjdhNCA0IDAgMCAxIDQuODUuMDVsNi42IDUuMTItMTguNTkgMS43N1oiIGZpbGw9IiNFNkU2RTYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzggMTM0KSI+PHJlY3QgeD0iMjIiIHk9IjciIHdpZHRoPSI2NCIgaGVpZ2h0PSIyNiIgcng9IjEzIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii42Ii8+PHJlY3QgeD0iMjQiIHk9IjkiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMiIgcng9IjExIiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTI0LjE4IDE4SDMyVjkuNDFBMTEgMTEgMCAwIDEgMzUgOWgxdjloOVY5aDR2OWg5VjloNHY5aDlWOWgyYy42OCAwIDEuMzUuMDYgMiAuMThWMThoOC44MmwuMDUuMjh2My40NGwtLjA1LjI4SDc1djguODJjLS42NS4xMi0xLjMyLjE4LTIgLjE4aC0ydi05aC05djloLTR2LTloLTl2OWgtNHYtOWgtOXY5aC0xYTExIDExIDAgMCAxLTMtLjQxVjIyaC03LjgyYTExLjA2IDExLjA2IDAgMCAxIDAtNFoiIGZpbGw9IiNFNkU2RTYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTA0IDEyMikiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMTYgOGMwIDQuNDIgNS4zNyA4IDEyIDhzMTItMy41OCAxMi04IiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA5MCkiPjxwYXRoIGQ9Ik00NCAyMmExNCAxNCAwIDEgMS0yOCAwIDE0IDE0IDAgMCAxIDI4IDBaTTk2IDIyYTE0IDE0IDAgMSAxLTI4IDAgMTQgMTQgMCAwIDEgMjggMFoiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNMzYgMTRhNiA2IDAgMSAxLTEyIDAgNiA2IDAgMCAxIDEyIDBaTTg4IDE0YTYgNiAwIDEgMS0xMiAwIDYgNiAwIDAgMSAxMiAwWiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNyIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA4MikiPjxwYXRoIGQ9Ik0xNS42MSAxNS4xOGM0LjI0LTUuNzYgNi44OC01LjQ4IDEzLjMxLS42MmwuNjcuNUMzNC40MSAxOC43MyAzNi43IDIwIDQwIDIwYTIgMiAwIDEgMCAwLTRjLTIuMDcgMC0zLjktMS4wMi03Ljk5LTQuMTJsLS42OC0uNTJDMjcuNTcgOC41MyAyNS4zNyA3LjMgMjIuNjMgN2MtMy42OC0uNC03LjA1IDEuNDgtMTAuMjQgNS44M2EyIDIgMCAxIDAgMy4yMiAyLjM2Wk05Ni4zOSAxNS4xOGMtNC4yNC01Ljc2LTYuODgtNS40OC0xMy4zMS0uNjJsLS42Ny41Qzc3LjU4IDE4LjczIDc1LjI5IDIwIDcyIDIwYTIgMiAwIDEgMSAwLTRjMi4wNyAwIDMuOS0xLjAyIDcuOTktNC4xMmwuNjgtLjUyYzMuNzYtMi44MyA1Ljk2LTQuMDcgOC43LTQuMzcgMy42OC0uNCA3LjA1IDEuNDggMTAuMjQgNS44M2EyIDIgMCAxIDEtMy4yMiAyLjM2WiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMSkiPjxwYXRoIGQ9Ik0xNTEuMTIgMjguMjhjMy4wNi0yLjk3IDQuODgtNi43MSA0Ljg4LTEwLjc4QzE1NiA3Ljg0IDE0NS43IDAgMTMzIDBzLTIzIDcuODQtMjMgMTcuNWMwIDQuMSAxLjg1IDcuODYgNC45NCAxMC44NC0uOTkuMjItMS45NS40NS0yLjkuNjktMTUuMSAzLjgtMjQuMDIgMTQuNjItMzEuNjggMzAuNjJhNjcuNjggNjcuNjggMCAwIDAtNi4zNCAyNS44M2MtLjEzIDMuNDEuMzMgNi45NCAxLjI1IDEwLjIyLjMzIDEuMiAyLjE1IDUuMzkgMi42NSAyIC4xLS42Ni0uMDctMS40Ny0uMjQtMi4yNy0uMTItLjU1LS4yMy0xLjEtLjI2LTEuNi0uMDgtMS41NiAwLTMuMTUuMTEtNC43Mi4yLTIuOTIuNzMtNS44IDEuNjUtOC41OSAxLjMzLTMuOTggMy4wMi04LjMgNS42LTExLjY3Ljk3LTEuMjUgMS44OC0yLjcgMi44OC00LjI3IDUuNjMtOC45IDEzLjY4LTIxLjYgNDUuMzQtMjIuOSAzNC4zLTEuNDIgNDYuNzggMjEuNjYgNTEuMjEgMjkuODcuMzguNy43IDEuMy45NyAxLjc1IDIuNjcgNC41MyAyLjc4IDkuNzUgMi45IDE0LjkxLjA1IDIuNzEuMTEgNS40MS41NCA4IC40NyAyLjg0IDEuNTQgMi43OCAyLjEzLjIzIDEtNC4zMyAxLjQ3LTguODMgMS4xNS0xMy4yOC0uNzItMTAuMDUtNC40LTM2LjQ1LTI0LjYtNDguMTVhNjUuNTIgNjUuNTIgMCAwIDAtMTYuMTgtNi43M1oiIGZpbGw9IiNjOTMzMDUiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDkgNzIpIj48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNjIgNDIpIj48L2c+PC9nPjwvZz48L3N2Zz4=" width="64" height="64" alt="Rafael のアバター" loading="lazy"><div><b>Rafael</b><span class="role">Red Team &amp; Adversarial Reviewer</span></div></div>
+      <q>通用したのは骨格で、通用しなかったのは自己申告の「合格」だ。</q>
+      <span class="verdict">判定：主張 4 件のうち反証 2、弱体化 2。修正 5 点で全件生存</span>
+    </div>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="eyebrow"><span class="num">08</span><span class="kicker">One screen</span></div>
+  <h2>一画面のまとめ</h2>
+  <p class="lede">お持ち帰り用に、一枚にまとめます。</p>
+  <div class="scroll"><table>
+    <thead><tr><th>あなたの問い</th><th>私の答え</th><th>裏付け</th><th>この組織での形</th></tr></thead>
+    <tbody>
+      <tr><td>品質は保てるのか</td><td>出る前に機械が止める。失敗は規則に変える</td><td>家電の量産。出荷したら回収できない</td><td>出荷前ゲート、失敗台帳 34 件、二度目で規則化</td></tr>
+      <tr><td>どう統率するのか</td><td>人のための統治の骨格をそのまま移植する</td><td>SaaS の組織設計。採用・退出、スクラム、権限</td><td>4 層の統治、境界の改定権だけを人が持つ、採用ラウンド 9 回</td></tr>
+      <tr><td>何が残るのか</td><td>蓄積の置き場所を組織側に固定する</td><td>事業売却で見た金融の目線</td><td>記憶・評価データ・スキル。複利かは未測定</td></tr>
+    </tbody>
+  </table></div>
+  <h3 class="sub">お立場ごとに、確かめていただきたいこと</h3>
+  <ul>
+    <li><b>技術の方へ。</b>検査が緑のまま壊れる経路が、いくつあるか。</li>
+    <li><b>営業の方へ。</b>導入後、人が辞めても残るものは何か。</li>
+    <li><b>人事の方へ。</b>採用・オンボード・退出の手順書は、相手が AI でも読めるか。</li>
+    <li><b>法務の方へ。</b>境界線の改定権は誰にあり、境界の内側は誰が承認しているか。</li>
+  </ul>
+  <p class="pull">皆さんの組織には、人間のために作った統治の仕組みがすでにあります。私がお願いしたいのは、それを AI のために読み直すことです。</p>
+  <h3 class="sub">注</h3>
+  <ol class="notes">
+    <li>2026 年 7 月末、記事生成が 7 日間止まり、28 回の起動がすべて「正常終了」と記録された（失敗台帳 ML-019）。全件スキップで「成功」し続ける退化は ML-013。</li>
+    <li>2026-08-17 の配信パス変更（PR #606）から 08-24 の復旧（PR #619）まで。台帳 ML-031 / ML-032、規則 R-16 / R-17。</li>
+    <li>憲法 C-1 / W-1（編集の完全性）と出荷前ゲート R-10。壊れたら大声で止まるのは C-4 / W-4。</li>
+    <li>記憶リント台帳 <span class="kw">memory-lint backlog</span>。90 日以内の再発で L2 規則に格上げ。</li>
+    <li>財務担当 Silas の 2026 年 8 月号月次レポートの表題より。</li>
+    <li>L0 / L1 に触れる PR は <span class="kw">autopilot:needs-human</span> ラベル付きで必ず人間へ。境界内は pr-autopilot の 3 名以上全員一致で自律マージ（ADR-0010 / 0011）。</li>
+    <li>月次レポートは <a href="https://kohuehara.xyz/ai-native-article/?category=Monthly+Report">記事サイトの Monthly Report</a> に日本語と英語で公開。社長ペルソナ Maya の総論と、財務・CX・政策・人事法務・対外発信・基盤・品質の 7 編。</li>
+    <li>記事フロントマターの <span class="kw">systemPromptVersion</span> と審査点。GA4 で版別に集計。長期記憶は ADR-0019、週次キュレーションは 2026-07-20 から。</li>
+  </ol>
+</section>
+<footer>Software Talent Network — 人間の意思決定者一人が統治する、持続的な AI プロフェッショナルによるソフトウェア定義の運営組織。この文書は 2026-09-05 の公開 KPI とリポジトリの記録に基づきます。</footer>
+</main>
+</body>
+</html>
