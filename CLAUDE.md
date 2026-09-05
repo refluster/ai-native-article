@@ -23,10 +23,11 @@ packages/shared/        @kohuehara/shared — ./analytics (GA4, DNT-aware) and .
 newsletter/app/         @kohuehara/article — React 18 + Vite 6 + Tailwind 3 reader SPA. Routes: / /system /sources /operator /article/:slug /capture /design-*
 newsletter/app/public/posts/   DERIVED corpus (*.md, *.en.md, manifest.json, images/) — CI overwrites from Notion every deploy
 newsletter/pipeline/    fetch-notion.mjs (Notion → posts/) · generate-sitemap.mjs · backfill-en.mjs · one-shot migrations
-newsletter/docs/        L1 statute docs for the pipeline (see doc map)
-newsletter/template/    static design mockup only — not built or served
+newsletter/docs/        L1 statute docs for the pipeline (see doc map) · archive/ = retired GAS-era notes
+newsletter/template/    index.html static design mockup only — not built or served
 workforce/app/          @kohuehara/workforce — console SPA (Cognito + Google)
-workforce/lambdas/      17 TypeScript Lambdas (agents-api, orchestrator, tools-api, wf-podcast, memory-compactor, …) + shared/
+workforce/docs/         README.md is the index: statute (governance, architecture, data-model, naming, mvv, adr/) · runbooks/ · routines/ · epics/ · hires/ · design/
+workforce/lambdas/      15 TypeScript Lambdas (agents-api, orchestrator, tools-api, wf-podcast, memory-compactor, …) + shared/; README.md lists them
 workforce/infra/        SAM stacks: sam (data plane), sam-web, sam-web-cert, sam-api-domain
 workforce/skills/       42 skill bundles: SKILL.md + meta.json + write-scripts (article-level2/3, pr-autopilot, feed-post, …)
 workforce/projects/     project.json seeds for external projects (asp-cloud, luckyhat, …); tools/ = ADR-0027 project tools
@@ -34,9 +35,7 @@ workforce/scripts/      validators + registry builders wired as `npm run workfor
 workforce/pipeline/     knowledge-backup (Discord + Notion → per-project git store; ADR-0026/0028)
 workforce/seed/         bootstrap data for hire groups and personas
 workforce/client/       drop-in package for external repos that outsource to the workforce
-skills/outsource-to-workforce/   operator-side skill: hand a unit of work to the workforce and record engagements
-.claude/skills/         session skills: article-health · cadence-forge · ship-pr · log-workforce-engagements
-public/posts/           STALE pre-monorepo copy of the corpus; nothing reads it (see "Known stale spots")
+.claude/skills/         session skills: article-health · cadence-forge · ship-pr · log-workforce-engagements · outsource-to-workforce (hand work to the workforce, record engagements)
 ```
 
 `npm run` targets you will actually use: `build`, `dev` / `dev:workforce`, `test:scripts`, `lint:tokens`, `check-truncation`, `check-base-path`, `check-l1-citation`, `workforce:skills`, `workforce:naming`, `workforce:skill-registry:check`. CI runs all of them (see `.github/workflows/ci.yml`); the Lambdas have their own `npm run typecheck && npm test` under `workforce/lambdas/`.
@@ -126,13 +125,11 @@ Note the merge rule precisely: *you* do not merge, but the workforce's `pr-autop
 
 Do not "fix" these silently — several are Zone A. Cite this list when you open the PR.
 
-- `workforce/docs/architecture.md` still describes five personas and a `wf-agent-runner` Lambda; execution is the CCR routine (ADR-0005) and the HTTP API + console exist.
-- `workforce/README.md` says the orchestrator tick defaults to disabled; `infra/sam/template.yaml` has it `Enabled: true`, `rate(2 hours)`.
-- `workforce/agents/` references in `workforce/README.md`, `docs/naming.md`, `validate-skills.mjs` are no-ops (tree retired, ADR-0007).
-- `.github/CODEOWNERS` lists pre-monorepo paths (`/DESIGN.md`, `/src/config/`, `/public/posts/`); the files now live under `newsletter/`.
-- Root `public/posts/` is a stale duplicate of `newsletter/app/public/posts/`; nothing reads it.
-- `newsletter/docs/azure-budget-rules.md` and `pipeline-daily-app.md` are marked historical; `newsletter/template/post.html` is empty.
-- `workforce/lambdas/README.md` lists 2 of 17 Lambdas.
+- `workforce/docs/architecture.md` body is v1 (five personas, a `wf-agent-runner` Lambda). Its status banner lists the ADRs that override it; the body itself awaits a Zone A rewrite.
+- `workforce/docs/governance.md §3` still carries a Frozen row for the retired `workforce/agents/` tree (ADR-0007); harmless, Zone A.
+- `newsletter/docs/azure-budget-rules.md` is marked historical but stays L1 (`check-l1-citation` lists it) because its bracket rule still binds every LLM call site.
+- `.github/labels.json` still defines `area:gas` although the Apps Script engine is gone.
+- `newsletter/app/src/types/quality.ts` is a spec: nothing in the app imports it yet; the cadences honour it by convention.
 
 ## When something breaks
 

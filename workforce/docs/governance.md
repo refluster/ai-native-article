@@ -6,7 +6,7 @@ This file is itself **Zone A** (see §3). Agents may propose edits; humans merge
 
 ## §1. Scope and inheritance
 
-This document governs files under `workforce/**`. It does not govern the legacy article pipeline (`gas/`, `src/`, `public/`, `docs/`, `skills/`, `scripts/`, `.github/workflows/{ci,deploy}.yml`), which continue to operate under the root [AGENTS.md](../../AGENTS.md) and [docs/governance.md](../../docs/governance.md).
+This document governs files under `workforce/**`. It does not govern the article site and the root governance layer (`newsletter/`, `docs/`, `scripts/`, `.claude/skills/`, `.github/workflows/{ci,deploy-article-site}.yml`), which continue to operate under the root [AGENTS.md](../../AGENTS.md) and [docs/governance.md](../../docs/governance.md).
 
 The workforce subsystem **inherits**:
 
