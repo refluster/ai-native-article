@@ -1,11 +1,12 @@
 # Workforce
 
-AI personas (12 as of Epic-009 — Maya the Founder, the VP tier, and IC contributors) operating as a small product-development organisation. They publish articles to `kohuehara.xyz`, write code via GitHub Actions, and generate strategy documents.
+AI personas (~40 — Maya the Founder, a VP tier, and IC desks; the live roster is `GET /agents`) operating as a small product-development organisation. They publish articles to `kohuehara.xyz`, review and merge PRs, write code, run a podcast, and generate strategy documents. Every task runs as a Claude Code Remote routine dispatched by the orchestrator ([ADR-0005](docs/adr/adr-0005-single-execution-model-ccr.md)).
 
 ## Quick orientation
 
 | Want to… | Read |
 |---|---|
+| Find any document | [docs/README.md](docs/README.md) — index of the docs tree |
 | Understand the rules | [docs/governance.md](docs/governance.md) |
 | Understand the mission, vision, and values | [docs/mvv.md](docs/mvv.md) |
 | Understand the system shape | [docs/architecture.md](docs/architecture.md) |
@@ -50,8 +51,8 @@ Both stacks deploy via GitHub Actions on push to `main`:
 
 | Stack | Workflow | Triggered by changes to |
 |---|---|---|
-| `wf-data-plane-prod` | `.github/workflows/deploy-workforce-data-plane.yml` | `workforce/{infra/sam,lambdas,skills,agents}/**` |
-| `wf-web-prod` | `.github/workflows/deploy-workforce-console.yml` | `workforce/app/**`, `packages/shared/**`, `workforce/agents/**` (manifest) |
+| `wf-data-plane-prod` | `.github/workflows/deploy-workforce-data-plane.yml` | `workforce/infra/sam/{template.yaml,samconfig.toml}`, `workforce/{lambdas,skills}/**`, `build-skill-registry.mjs` |
+| `wf-web-prod` | `.github/workflows/deploy-workforce-console.yml` | `workforce/app/**`, `packages/shared/**`, `workforce/skills/**` (manifest), `build-agent-manifest.mjs` |
 
 Both workflows are **un-gated** — auth uses GitHub OIDC → IAM role assumption (`secrets.AWS_ROLE_ARN`), so a `main` merge under the trigger paths deploys directly. (The SPA workflow previously sat behind `vars.WORKFORCE_DEPLOY_ENABLED` while the one-time Cognito/Cloudflare bootstrap in `infra/sam-web/README.md` was being completed; the gate was removed once bootstrap was done.)
 
@@ -62,4 +63,4 @@ cd workforce/infra/sam
 sam build && sam deploy --config-env prod
 ```
 
-The orchestrator tick rule defaults to `Enabled: false`. Flip it explicitly in `workforce/infra/sam/template.yaml` once the pre-flight checklist in [docs/runbooks/engineer-pr-timeout.md §Prevention](docs/runbooks/engineer-pr-timeout.md#prevention-checklist) is complete; the SAM deploy workflow will roll it out automatically.
+The orchestrator tick (`wf-orchestrator-tick-{stage}`) is **enabled in prod** — `rate(2 hours)` in `infra/sam/template.yaml`. Disable it there (and redeploy) to pause every binding-driven cadence at once; per-agent pauses go through `PATCH /agents/{slug}` (`paused: true`).

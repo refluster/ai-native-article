@@ -38,7 +38,7 @@ Checklist of implementation milestones. Items are picked up one PR at a time by 
 - [x] **Skill encapsulation refactor (PR #80)** — Each skill is now a self-contained folder (`workforce/skills/{name}/{SKILL.md, meta.json, handler.ts}`); deterministic handlers auto-registered via `workforce/scripts/build-skill-registry.mjs`. No `lambdas/` edits to add a skill. *(Zone B)*
 - [x] **VP tier + 7 new personas (Epic-009, PR #79)** — `workforce/agents/{dario,elena,kai,mira,noor,priya,theo}/`; W-3 cap raised to USD 100/mo. *(Zone B + Zone A for governance amend)*
 - [x] **SAM data-plane auto-deploy (PR #81)** — `.github/workflows/deploy-workforce-data-plane.yml` rolls out `wf-data-plane-prod` on push to `main` touching `workforce/{infra/sam,lambdas,skills,agents}/**`. Auth via GitHub OIDC → IAM role assumption (`secrets.AWS_ROLE_ARN`). *(Zone A)*
-- [x] **wf-builder bootstrap** — Add `workforce/README.md`, `workforce/ROADMAP.md`, `workforce/docs/routine-prompt.md`, `.github/workflows/workforce-builder-routine.yml`. Acceptance: `workforce-builder-routine.yml` is mergeable with CI green and the routine-prompt.md captures the full state-machine contract. *(Zone B + Zone A for the workflow)*
+- [x] **wf-builder bootstrap** — Add `workforce/README.md`, `workforce/ROADMAP.md`, `workforce/docs/routines/workforce-builder.md` (then `routine-prompt.md`), `.github/workflows/workforce-builder-routine.yml`. Acceptance: `workforce-builder-routine.yml` is mergeable with CI green and the routine-prompt.md captures the full state-machine contract. *(Zone B + Zone A for the workflow)*
 
 ## Phase 3 — Discord-ping live + first content cycle
 

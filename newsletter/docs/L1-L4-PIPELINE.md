@@ -2,7 +2,7 @@
 
 A four-stage system for researching, synthesizing, and publishing AI industry insights.
 
-> **History note (2026-06):** L2/L3 generation used to run on a Google Apps Script (GAS) engine (`newsletter/gas/src/Code.gs`) fired by GAS time-driven triggers, with a React operator UI (`/capture`, `/l2-blog`, `/l3-insight`, `/l4-publish`). **That engine has been removed.** Generation now runs through the **workforce article-level2 / article-level3 cadences**, and publication through the **`deploy-article-site.yml`** workflow. This doc describes the current pipeline. The GAS-era mechanics are summarized in [pipeline-daily-app.md](pipeline-daily-app.md) for historical context only.
+> **History note (2026-06):** L2/L3 generation used to run on a Google Apps Script (GAS) engine (`newsletter/gas/src/Code.gs`) fired by GAS time-driven triggers, with a React operator UI (`/capture`, `/l2-blog`, `/l3-insight`, `/l4-publish`). **That engine has been removed.** Generation now runs through the **workforce article-level2 / article-level3 cadences**, and publication through the **`deploy-article-site.yml`** workflow. This doc describes the current pipeline. The GAS-era mechanics are summarized in [archive/pipeline-daily-app.md](archive/pipeline-daily-app.md) for historical context only.
 
 ## Architecture
 
