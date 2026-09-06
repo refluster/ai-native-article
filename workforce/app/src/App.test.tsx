@@ -23,6 +23,9 @@ vi.mock('./components/AuthBoundary', () => ({
 vi.mock('@kohuehara/shared/analytics', () => ({ trackPageView: () => {} }))
 vi.mock('./pages/OrgChart', () => ({ default: () => <div>ORG-CHART-MARKER</div> }))
 vi.mock('./pages/Feed', () => ({ default: () => <div>FEED-MARKER</div> }))
+vi.mock('./pages/Landing', () => ({ default: () => <div>LANDING-MARKER</div> }))
+vi.mock('./pages/Research', () => ({ default: () => <div>RESEARCH-INDEX-MARKER</div> }))
+vi.mock('./pages/ResearchArticle', () => ({ default: () => <div>RESEARCH-ARTICLE-MARKER</div> }))
 
 import App from './App'
 
@@ -87,5 +90,33 @@ describe('/org → /org/chart', () => {
     expect(await screen.findByText('ORG-CHART-MARKER')).toBeInTheDocument()
     expect(window.location.pathname).toBe('/org/chart')
     expect(window.location.search).toBe('?q=maya')
+  })
+})
+
+// The Research surface is public: it must mount OUTSIDE the AuthBoundary
+// wrapper, beside the landing page, or the "Research" link in the public
+// header would bounce a visitor to the Cognito Hosted UI. AuthBoundary is
+// mocked to a pass-through above, so what this pins is the route table —
+// a typo'd or dropped path renders the ProtectedRoutes fallthrough (no
+// marker) instead.
+describe('public research routes', () => {
+  it('serves the index at /research', async () => {
+    window.history.pushState({}, '', '/research?tag=x&page=2')
+    render(<App />)
+    expect(await screen.findByText('RESEARCH-INDEX-MARKER')).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/research')
+  })
+
+  it('serves an article at /research/:slug', async () => {
+    window.history.pushState({}, '', '/research/c9197f05fbf0?lang=en')
+    render(<App />)
+    expect(await screen.findByText('RESEARCH-ARTICLE-MARKER')).toBeInTheDocument()
+    expect(screen.queryByText('RESEARCH-INDEX-MARKER')).not.toBeInTheDocument()
+  })
+
+  it('still serves the landing page at the apex', async () => {
+    window.history.pushState({}, '', '/')
+    render(<App />)
+    expect(await screen.findByText('LANDING-MARKER')).toBeInTheDocument()
   })
 })
