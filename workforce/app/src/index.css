@@ -230,3 +230,112 @@
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
+
+/* ── Research reading surface ───────────────────────────────────────────
+   Long-form article bodies under /research (pages/ResearchArticle.tsx).
+   The same markdown the reader site renders in its Precision-Editorial
+   style, re-set in the Cognitive Network system: Geist prose on the Cool
+   Mist canvas, Indigo Ink links, a Pale Copper rule for quotes, JetBrains
+   Mono for code. Measure is 780px (set on the container), 17px/1.8 body
+   for the Japanese-first corpus, headings as Geist Bold with tight
+   tracking. Tokens are applied through Tailwind utilities so the block
+   re-themes with tailwind.config.ts; see DESIGN.md §Research. */
+.research-prose {
+  @apply text-wf-on-surface;
+  font-size: 1.0625rem;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.research-prose h1,
+.research-prose h2,
+.research-prose h3,
+.research-prose h4 {
+  @apply font-headline font-bold text-wf-on-surface;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+  margin-top: 2.25em;
+  margin-bottom: 0.6em;
+}
+.research-prose h1 { font-size: 1.75rem; }
+.research-prose h2 {
+  @apply border-b border-wf-outline-variant;
+  font-size: 1.4rem;
+  padding-bottom: 0.3em;
+}
+.research-prose h3 { font-size: 1.15rem; }
+.research-prose h4 {
+  @apply font-wfmono uppercase text-wf-on-surface-variant;
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+}
+.research-prose p,
+.research-prose ul,
+.research-prose ol,
+.research-prose blockquote,
+.research-prose pre,
+.research-prose table,
+.research-prose figure { margin: 0 0 1.25em; }
+.research-prose ul { list-style: disc; padding-left: 1.4em; }
+.research-prose ol { list-style: decimal; padding-left: 1.4em; }
+.research-prose li { margin: 0.35em 0; }
+.research-prose li::marker { @apply text-wf-tertiary; }
+.research-prose strong { @apply font-bold text-wf-on-surface; }
+.research-prose em { font-style: italic; }
+.research-prose a {
+  @apply text-wf-primary underline;
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+.research-prose a:hover { @apply text-wf-tertiary; }
+.research-prose blockquote {
+  @apply border-l-2 border-wf-tertiary text-wf-on-surface-variant;
+  padding: 0.25em 0 0.25em 1.1em;
+}
+.research-prose blockquote p:last-child { margin-bottom: 0; }
+.research-prose code {
+  @apply font-wfmono bg-wf-surface-container rounded-wf-sm;
+  font-size: 0.85em;
+  padding: 0.1em 0.4em;
+}
+.research-prose pre {
+  @apply bg-wf-surface-container border border-wf-outline-variant rounded-wf-md;
+  padding: 1em 1.1em;
+  overflow-x: auto;
+  font-size: 0.85em;
+  line-height: 1.6;
+}
+.research-prose pre code { background: transparent; padding: 0; font-size: 1em; }
+.research-prose table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.92em;
+}
+.research-prose th,
+.research-prose td { @apply border border-wf-outline-variant; padding: 0.5em 0.8em; vertical-align: top; }
+.research-prose th { @apply bg-wf-surface-container font-semibold text-left; }
+.research-prose hr { @apply border-0 border-t border-wf-outline-variant; margin: 2.5em 0; }
+.research-prose img { @apply rounded-wf-md border border-wf-outline-variant; max-width: 100%; height: auto; }
+.research-prose > *:first-child { margin-top: 0; }
+.research-prose > *:last-child { margin-bottom: 0; }
+
+/* Mermaid figures inside research bodies (MermaidBlock renders a bare
+   <figure>). Neutral theme, scaled to the measure; the same treatment
+   reports get. */
+.research-prose figure svg {
+  display: block;
+  margin-inline: auto;
+  max-width: 100%;
+  height: auto;
+}
+
+@media print {
+  .research-prose h1,
+  .research-prose h2,
+  .research-prose h3 { break-after: avoid; }
+  .research-prose p,
+  .research-prose li,
+  .research-prose blockquote,
+  .research-prose pre { break-inside: avoid; }
+}

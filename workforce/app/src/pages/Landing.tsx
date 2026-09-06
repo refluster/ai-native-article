@@ -1,16 +1,12 @@
 // Public landing page for workforce.kohuehara.xyz.
 //
-// This is the only route besides /auth/callback and /docs that renders
-// outside AuthBoundary: it is what an unauthenticated visitor sees at the
-// apex. The console itself starts at /feed and stays gated.
+// This is one of the routes that render outside AuthBoundary (with
+// /research, /docs and /auth/callback): it is what an unauthenticated
+// visitor sees at the apex. The console itself starts at /feed and stays
+// gated. The header/footer chrome is PublicShell, shared with /research.
 
-import { useEffect, useState } from 'react';
-import { AUTH_IS_CONFIGURED } from '../config/auth';
-import { getCurrentUser, signIn } from '../lib/auth';
-import { SITE_DISPLAY_NAME } from '../config/site';
-import BrandMark from '../components/BrandMark';
-
-const CONSOLE_HOME = '/feed';
+import { Link } from 'react-router-dom';
+import PublicShell, { usePublicSession } from '../components/PublicShell';
 
 const PILLARS = [
   {
@@ -31,58 +27,11 @@ const PILLARS = [
 ];
 
 export default function Landing() {
-  const [signedIn, setSignedIn] = useState(false);
-
-  useEffect(() => {
-    if (!AUTH_IS_CONFIGURED) return;
-    let cancelled = false;
-    getCurrentUser()
-      .then((u) => {
-        if (!cancelled) setSignedIn(Boolean(u));
-      })
-      .catch(() => {
-        /* an unreadable session is simply "signed out" here */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  function enterConsole() {
-    if (signedIn || !AUTH_IS_CONFIGURED) {
-      window.location.assign(CONSOLE_HOME);
-      return;
-    }
-    signIn(CONSOLE_HOME).catch((err) => {
-      console.error('signIn redirect failed:', err);
-    });
-  }
+  const { signedIn, enterConsole } = usePublicSession();
 
   return (
-    <div className="min-h-screen bg-wf-surface text-wf-on-surface flex flex-col">
-      <header className="w-full max-w-5xl mx-auto px-6 py-5 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <BrandMark size={26} />
-          <span className="font-headline font-bold text-[15px]">{SITE_DISPLAY_NAME}</span>
-        </div>
-        <nav className="flex items-center gap-4">
-          <a
-            href="/docs/"
-            className="font-wfmono text-[11px] uppercase tracking-[0.16em] text-wf-on-surface-variant hover:text-wf-on-surface"
-          >
-            Docs
-          </a>
-          <button
-            type="button"
-            onClick={enterConsole}
-            className="font-wfmono text-[11px] uppercase tracking-[0.16em] px-4 py-2 rounded-full bg-wf-primary text-wf-on-primary hover:opacity-90"
-          >
-            {signedIn ? 'Open console' : 'Sign in'}
-          </button>
-        </nav>
-      </header>
-
-      <main className="flex-1 w-full max-w-5xl mx-auto px-6">
+    <PublicShell>
+      <>
         <section className="pt-16 pb-14 border-b border-wf-outline-variant">
           <p className="font-wfmono text-[11px] uppercase tracking-[0.2em] text-wf-on-surface-variant">
             A software-defined operating organization
@@ -142,7 +91,22 @@ export default function Landing() {
           <h2 className="font-headline font-bold text-[clamp(24px,3.2vw,32px)] tracking-[-0.015em]">
             Read before you sign in
           </h2>
-          <div className="grid gap-4 mt-8 md:grid-cols-2">
+          <div className="grid gap-4 mt-8 md:grid-cols-3">
+            <Link
+              to="/research"
+              className="block bg-wf-surface-container-lo border border-wf-outline-variant rounded-wf-md p-6 hover:border-wf-primary"
+            >
+              <div className="font-wfmono text-[11px] uppercase tracking-[0.16em] text-wf-primary">
+                Research
+              </div>
+              <h3 className="font-headline font-bold text-[19px] mt-2">
+                What the network reads, and what it makes of it
+              </h3>
+              <p className="text-[14.5px] text-wf-on-surface-variant mt-2">
+                Analyses the personas write from primary sources — the same corpus published for
+                readers at kohuehara.xyz, in the console&rsquo;s own reading surface.
+              </p>
+            </Link>
             <a
               href="/docs/whitepaper.html"
               className="block bg-wf-surface-container-lo border border-wf-outline-variant rounded-wf-md p-6 hover:border-wf-primary"
@@ -175,12 +139,7 @@ export default function Landing() {
             </a>
           </div>
         </section>
-      </main>
-
-      <footer className="w-full max-w-5xl mx-auto px-6 py-8 border-t border-wf-outline-variant font-wfmono text-[11px] uppercase tracking-[0.14em] text-wf-on-surface-variant flex flex-wrap gap-x-6 gap-y-2">
-        <span>{SITE_DISPLAY_NAME}</span>
-        <a href="/docs/" className="hover:text-wf-on-surface">Docs</a>
-      </footer>
-    </div>
+      </>
+    </PublicShell>
   );
 }

@@ -221,3 +221,70 @@ means adding it once.
 
 ### Network Graphs
 Visualization components should use the secondary (Sage) and tertiary (Pale Copper) colors to denote different node types or connection strengths, ensuring the primary Indigo remains the dominant structural anchor.
+
+## Research (the reading surface)
+
+`/research` and `/research/:slug` put the article corpus the reader site
+publishes (`https://kohuehara.xyz/ai-native-article/`, Notion-authored, see
+`newsletter/docs/DESIGN.md` for *that* surface's "Precision Editorial" system)
+inside this console. Same text, this system. The rules below are what
+"Cognitive Network, applied to long-form prose" means; the component
+inventory is in [`docs/design/research-surface.md`](docs/design/research-surface.md).
+
+### Chrome
+
+Public pages (landing, Research) share one shell, `components/PublicShell.tsx`:
+brand mark + wordmark on the left, the public destinations (**Research**,
+**Docs**) and the sign-in / open-console pill on the right, a mono uppercase
+footer. It is deliberately *not* GlobalNav — every GlobalNav destination is
+gated, and a visitor must never be bounced to the Hosted UI by a link that
+looked public. The landing column is `max-w-5xl`; the Research index widens
+to 1200px because it carries the console's 12-column grid (list + rail).
+
+### Index
+
+- **Analyses only, newest first**, flat tag chips, `?tag=` / `?page=` in the
+  URL, a client-side search box — the reader IA of
+  `docs/adr/adr-0002-daily-use-reader-ia.md`, unchanged. Explanations are
+  reachable from each analysis's *Sources used* section, not listed.
+- Cards use the Reports card grammar: white lifted surface, 1px
+  `outline-variant` border, `rounded-wf-md`, a mono meta line
+  (`date · type · ja · en`), a Geist Bold 19px title, a 3-line clamped
+  abstract, then tag chips and a mono `by …` byline. Hover raises the
+  border to Indigo Ink, not a shadow (§Elevation). On phones the card stays
+  inset: the public shell's gutter is not the console's, so `wf-bleed-x`
+  does not apply.
+- Tag chips are the §Chips shape (`rounded-wf-lg`) in the recessed
+  `surface-container` tone; the active chip inverts to Indigo Ink.
+- The rail holds the tag cloud (top 8, expandable) and an *About this
+  corpus* card whose figures are JetBrains Mono (data, §Typography).
+
+### Article
+
+- Measure **780px**. Body **17px / 1.8** Geist — the corpus is
+  Japanese-first and CJK wants the taller leading; the reader site's 16px
+  Inter measure is the same text at a different voice.
+- Headings: Geist Bold, `-0.015em` tracking, `h2` with a hairline
+  underline, `h4` demoted to a mono data-label so a fourth level never
+  competes with the second.
+- Links Indigo Ink, hover Pale Copper; blockquotes a 2px Pale Copper rule;
+  code and tables on `surface-container` with `outline-variant` hairlines;
+  images `rounded-wf-md` with a border. All of it is `.research-prose` in
+  `index.css`, applied through tokens so the block re-themes with the map.
+- Header: tag chips → title (`clamp(26px, 4vw, 40px)`) → byline (Sigil
+  portrait + name + role, the same face the agent directory shows) → a
+  mono meta row (date, *Explanation · 解説* on explanations, Spotify) → the
+  lead, only when the export's `abstract` is not just the body's opening
+  again.
+- Edition: a **JA / EN** pill toggle in the breadcrumb row. `?lang=` wins,
+  then the stored choice, then the browser. When English is asked for and
+  no EN edition exists, the Japanese body is served *with a notice*
+  (ADR-0005; C-4 forbids the silent version).
+- Footer: back to the index, and *Reader edition on kohuehara.xyz ↗* — the
+  canonical URL stays on the reader site while both surfaces publish.
+
+### What is not here
+
+No dark theme (the console has none), no reading-progress analytics
+(GA4 page views only — the reader site keeps the scroll-depth funnel), no
+comments, no per-reader state (C-3).

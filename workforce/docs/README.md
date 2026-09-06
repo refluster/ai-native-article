@@ -30,7 +30,7 @@ Everything under `workforce/**` is governed by [governance.md](governance.md). T
 | [hires/](hires/) | Hire-round documents — each W-3 cap raise cites one of these |
 | [team/](team/) | Platform charter and experience/skill metrics |
 | [landscape/](landscape/) | External comparisons and market research |
-| [design/](design/) | Console design notes (`feed-ui-v1.md`) and static reference mockups (`refs/`) |
+| [design/](design/) | Console design notes (`feed-ui-v1.md`, `research-surface.md` — the public article reader under `/research`) and static reference mockups (`refs/`) |
 | [agent-workflow-overview.md](agent-workflow-overview.md) | Plain-language (Japanese) overview of who does what, for non-technical readers |
 
 Related, outside this directory: [../ROADMAP.md](../ROADMAP.md) (milestones), [../DESIGN.md](../DESIGN.md) (console design tokens), [../README.md](../README.md) (infra, deploy, adding a skill), [../skills/](../skills/) (the skill bundles themselves), [../lambdas/README.md](../lambdas/README.md).
