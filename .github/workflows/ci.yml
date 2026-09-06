@@ -96,6 +96,9 @@ jobs:
       - name: Workforce scan-drain guard (Dario L2 / FU-PROJ-SCAN)
         run: npm run workforce:scan-drain
 
+      - name: Workforce no-RUN/DELIV-writes guard (FU-034 / ADR-0005 criterion 2)
+        run: npm run workforce:no-run-deliv-writes
+
       - name: Workforce W-4 cycle-cap guard (FU-004)
         env:
           GITHUB_TOKEN: ${{ github.token }}
