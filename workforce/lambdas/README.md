@@ -10,21 +10,27 @@ All Lambdas:
 
 ## Layout
 
-```
-lambdas/
-├── README.md                   (this file)
-├── package.json                shared dev deps (esbuild, typescript, @aws-sdk/*)
-├── tsconfig.json               shared TypeScript config
-├── shared/
-│   ├── agent.ts                AgentIdentity / Operational / Computed / MetaRow types
-│   ├── ddb.ts                  DynamoDBDocumentClient wrapper (get/put/update/scan/delete)
-│   └── identity-hash.ts        sha256 over identity fields + system.md (seed idempotency)
-├── agents-api/                 wf-agents-api Lambda — CRUD over AGENT#{slug}/META rows
-│   └── handler.ts
-    └── handler.ts
-```
+One directory per Lambda, each with a `handler.ts` (+ `Makefile` for `sam build`); `shared/` holds the runtime libs every handler imports (`ddb.ts`, `agent.ts`, `skill-config.ts`, `llm-azure.ts`, `performance.ts`, …). Deployed from `../infra/sam/template.yaml` unless noted.
 
-## Endpoints (after PR5 deploys)
+| Directory | Function | Purpose |
+|---|---|---|
+| `agents-api/` | `wf-agents-api` | HTTP API: agents, skills, feed, stats, projects, bindings, OpenAPI docs. The single writer for `AGENT#`/`SKILL#` rows (ADR-0007/0008). |
+| `orchestrator/` | `wf-orchestrator` | 2-hourly tick: evaluates `bindings[]`, enqueues `TASK#` rows, dispatches CCR routines (ADR-0005), polls engineer PRs. |
+| `tools-api/` | `wf-tools-api` | Synchronous LLM run surface for project tools (ADR-0027). |
+| `credentials-api/` | `wf-credentials-api` | Operator-only per-project credentials (ADR-0009). |
+| `migrate-credentials/` | `wf-migrate-credentials` | One-shot credential migration. |
+| `messaging-reply/` | `wf-messaging-reply` | Real-time operator ↔ talent reply path (ADR-0006). |
+| `l1-source-register/` | `wf-l1-source-register` | No-LLM L1 source capture into the Notion Articles DB (`/capture` share target). |
+| `wf-podcast/` | `wf-podcast` | Polly synthesis, S3/CloudFront distribution, RSS (ADR-0016). |
+| `memory-compactor/` | `wf-memory-compactor` | Nightly agent-memory folding (ADR-0019). |
+| `performance-reducer/` | `wf-performance-reducer` | Daily performance-lifecycle roll-up. |
+| `audit/` | `wf-audit` | Daily EXEC-row signal audit. |
+| `config-digest/` | `wf-config-digest` | Weekly agent-config review issue (ADR-0007). |
+| `backfill-tasks/` | `wf-backfill-tasks` | Backfill of task rows. |
+| `seed-skills/` | `wf-seed-skills` | Seeds `SKILL#` rows from the generated skill registry (ADR-0018 version gate). |
+| `wf-pre-signup/` | `wf-pre-signup` | Cognito pre-sign-up trigger (operator e-mail gate) — `../infra/sam-web`. |
+
+## Endpoints (agents-api, abridged)
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
@@ -40,7 +46,7 @@ lambdas/
 | `PATCH` | `/skills/{name}` | AWS_IAM | Update judgment-side skill config ([ADR-0008](../docs/adr/adr-0008-skill-config-single-source.md)): `body`, `description`, `version`, `status`, `owners`, `cost_class`, `improvement_agent[_override]`. Validated by `shared/skill-config.ts`, audited to `SKILL#{name}/AUDIT#`. Code-side fields (write-scripts, `requires[]`, `archetype`, `deliverable`) are git-owned and rejected `400`. |
 | `GET` | `/skills/{name}/audit` | public | Skill config-mutation audit trail, newest-first (ADR-0008). |
 
-New personas are registered via `POST /agents` (ADR-0007 retired the `workforce/agents/` git tree; the DDB row family is the single authoritative store and agents-api the single writer — see [runbooks/agent-registration.md](../docs/runbooks/agent-registration.md)). Skills split along the Software 2.0 seam ([ADR-0008](../docs/adr/adr-0008-skill-config-single-source.md)): judgment-side fields mutate via `PATCH /skills/{name}` (DDB-authoritative, write = live on the next fire); write-scripts and `requires[]` stay git-owned, so a NEW skill still enters via the `cadence-forge` scaffold + PR — no `POST /skills`.
+The table above is the original core; feed, stats, projects, bindings, credentials, tools and podcast routes are documented by `GET /docs/openapi` (kept in sync by `npm run workforce:openapi-routes`). New personas are registered via `POST /agents` (ADR-0007 retired the `workforce/agents/` git tree; the DDB row family is the single authoritative store and agents-api the single writer — see [runbooks/agent-registration.md](../docs/runbooks/agent-registration.md)). Skills split along the Software 2.0 seam ([ADR-0008](../docs/adr/adr-0008-skill-config-single-source.md)): judgment-side fields mutate via `PATCH /skills/{name}` (DDB-authoritative, write = live on the next fire); write-scripts and `requires[]` stay git-owned, so a NEW skill still enters via the `cadence-forge` scaffold + PR — no `POST /skills`.
 
 ## Local dev
 
@@ -65,7 +71,7 @@ formalise this in `workforce/docs/naming.md`.
 
 ## Build + deploy
 
-Both Lambdas use SAM's **Makefile builder** (per-function `Makefile`). The Makefiles call `../node_modules/.bin/esbuild`, so the **dependencies must be installed once** in the shared `workforce/lambdas/node_modules/` before `sam build`:
+All Lambdas use SAM's **Makefile builder** (per-function `Makefile`). The Makefiles call `../node_modules/.bin/esbuild`, so the **dependencies must be installed once** in the shared `workforce/lambdas/node_modules/` before `sam build`:
 
 ```bash
 # 1. Install lambda deps (one-time per checkout / on package.json change)
