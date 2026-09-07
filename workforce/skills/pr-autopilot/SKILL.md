@@ -17,6 +17,20 @@ A run that leaves a PR in neither state is a bug, not a finished run. The
 deterministic sweep (Step 6) enforces the contract mechanically even when a
 run stalls.
 
+**ESCALATED is terminal for you, not frozen for everyone.** Since **adr-0030**
+the `pr-remediate` **groom lane** sweeps the human queue daily and merges the
+base branch into each escalated PR that has fallen behind, so the operator's
+decision does not also cost a conflict resolution to execute. It changes no
+label, addresses no finding and never merges — the decision stays exactly where
+you left it.
+
+What this means for you: an escalated PR's head **will** move without the author
+having done anything. Your discovery already handles that — `pr-autopilot-scan.mjs`
+skips any PR carrying `autopilot:needs-human` outright, so a groom push cannot
+pull one back into your review loop. What changes is the hand-off comment: name
+what the **operator** has to decide, because "this PR has gone stale" is no
+longer part of it.
+
 The legitimate *interim* states are two, and both are bounded by that sweep:
 🟡 (an open review cycle awaiting a revision), and — since adr-0022 — the
 **author lane** (`autopilot:needs-author`), where a PR whose blocking cause is
