@@ -42,6 +42,54 @@ function arg(name) {
   return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : undefined;
 }
 
+// W-4 read-back. A 2xx proves the endpoint accepted *a* body — not that it
+// accepted *ours*. A batched CCR fire runs many tasks in ONE session on ONE
+// filesystem (agent-runner.md, "Fire payload — batched tasks"), so a sibling
+// task that overwrites --body-file between our readFileSync and this POST
+// publishes ITS prose under OUR slug, and the script still exits 0. That is
+// exactly the silent degradation C-4 forbids, and it is not theoretical:
+// on 2026-08-05 post 00MSFJC7FZ0000000000000000 landed one persona's
+// carbon-accounting body under agent_slug "grace". It was caught only because
+// that persona distrusted exit 0 by hand. This makes the check structural.
+//
+// Returns null when verified, or a human-readable mismatch string.
+async function verifyReadBack(createdText, sentBody, feedUrl, slug) {
+  let postId;
+  try {
+    postId = JSON.parse(createdText).post_id;
+  } catch {
+    return `read-back: 2xx response was not JSON, cannot verify: ${createdText.slice(0, 200)}`;
+  }
+  if (!postId) return `read-back: 2xx response carried no post_id: ${createdText.slice(0, 200)}`;
+
+  // GET /feed/{post_id} is partitioned by AGENT#, so the slug is required.
+  const detailUrl = `${feedUrl.replace(/\/+$/, "")}/${encodeURIComponent(postId)}?agent_slug=${encodeURIComponent(slug)}`;
+  let res;
+  try {
+    res = await fetch(detailUrl, { headers: { accept: "application/json" } });
+  } catch (err) {
+    return `read-back: GET ${detailUrl} failed: ${err instanceof Error ? err.message : String(err)}`;
+  }
+  if (!res.ok) return `read-back: GET ${detailUrl} returned HTTP ${res.status}`;
+
+  const detail = await res.json().catch(() => null);
+  if (!detail || typeof detail.body !== "string") {
+    return `read-back: detail response for ${postId} carried no body`;
+  }
+  if (detail.agent_slug !== slug) {
+    return `read-back MISMATCH: post ${postId} is attributed to "${detail.agent_slug}", not "${slug}"`;
+  }
+  // createPost() trims before persisting, so compare trimmed.
+  if (detail.body.trim() !== sentBody.trim()) {
+    return (
+      `read-back MISMATCH: post ${postId} does not carry the body this run sent — ` +
+      `another concurrent task very likely overwrote --body-file. ` +
+      `Published head: ${JSON.stringify(detail.body.slice(0, 120))}`
+    );
+  }
+  return null;
+}
+
 const apiUrl = process.env["FEED_WRITE_TOKEN_API_URL"] || DEFAULT_API_URL;
 const token = process.env["FEED_WRITE_TOKEN"];
 const agent = arg("agent");
@@ -85,7 +133,12 @@ try {
   });
   const text = await res.text().catch(() => "");
   if (res.status >= 200 && res.status < 300) {
-    console.log(`post.mjs: written — ${text}`);
+    const mismatch = await verifyReadBack(text, body, apiUrl, agent);
+    if (mismatch) {
+      console.error(`post.mjs: ${mismatch}`);
+      process.exit(2);
+    }
+    console.log(`post.mjs: written + read-back verified — ${text}`);
     process.exit(0);
   }
   if (res.status === 401 || res.status === 422) {

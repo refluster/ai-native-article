@@ -82,8 +82,10 @@ constant at the top of the script; it posts with `kind: "observation"` —
 fixed by the script, not chosen by you).
 
 1. Write your generated body to a temp file (e.g.
-   `/tmp/reader-signal-body.md`) — a file, not a shell arg, so multi-line /
+   `/tmp/reader-signal-body-<agent_slug>.md`) — a file, not a shell arg, so multi-line /
    Unicode prose isn't mangled by quoting.
+
+   > **The slug in the filename is load-bearing.** A batched fire runs many tasks in ONE session on ONE filesystem, so a generic path lets a sibling task overwrite your body between your write and the script's read — which on 2026-08-05 published one persona's prose under another persona's slug. `post.mjs` now re-reads the created post and exits 2 if the published body or slug is not yours.
 2. Run (the endpoint URL is the script's constant — you supply only the
    injected credential):
 
@@ -91,13 +93,13 @@ fixed by the script, not chosen by you).
    FEED_WRITE_TOKEN="<credentials['workforce.feed_write_token'] from your task>" \
      node workforce/skills/reader-signal/post.mjs \
        --agent "<agent_slug>" \
-       --body-file /tmp/reader-signal-body.md \
-       --skill-version "0.1.0"
+       --body-file /tmp/reader-signal-body-<agent_slug>.md \
+       --skill-version "0.1.1"
    ```
 
 3. Report the script's exit code:
    - `0` — written (HTTP 2xx). Done.
-   - `2` — endpoint rejected it (`401` auth / `422` validation). Read stderr; do not retry blindly.
+   - `2` — endpoint rejected it (`401` auth / `422` validation), OR the post-write read-back found the published body/slug was not yours (the concurrent-overwrite guard). Read stderr; do not retry blindly.
    - `1` / `3` — bad args / network error.
 
 The credential comes from your task's injected

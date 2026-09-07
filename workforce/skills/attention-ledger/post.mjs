@@ -40,7 +40,7 @@ function arg(name) {
   return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : undefined;
 }
 
-// W-4 read-back, ported from feed-post/post-feed.mjs (ML-020/ML-028; see #546).
+// W-4 read-back, ported from feed-post/post-feed.mjs (ML-035/ML-028; see #546).
 // A 2xx proves the endpoint accepted *a* body — not that it accepted *ours*. A
 // batched CCR fire runs many tasks in ONE session on ONE filesystem
 // (agent-runner.md, "Fire payload — batched tasks"), so a sibling task that

@@ -6,7 +6,7 @@
 // must verify the write by read-back before it exits 0. A 2xx only proves the
 // endpoint accepted *a* body — not that it accepted *ours*.
 //
-// Why this exists (ML-020 / ML-028; see PR #546)
+// Why this exists (ML-035 / ML-028; see PR #546)
 // ------------------------------------------------
 // A batched CCR fire runs every (agent x skill) task of a tick in ONE session
 // on ONE filesystem (workforce/docs/routines/agent-runner.md, "Fire payload —
@@ -58,13 +58,10 @@ const REPO_ROOT = new URL("..", import.meta.url).pathname;
 const SKILLS_DIR = join(REPO_ROOT, "workforce", "skills");
 
 // 2026-08-17: known to POST to the shared feed endpoint from a --body-file
-// without a read-back guard yet. Each is fixed in PR #546 (open since
-// 2026-08-05, unanimous-green review, blocked on a stale merge conflict) —
-// remove the entry as soon as #546 (or its rebase) merges.
+// without a read-back guard yet. The three PR #546 owned (feed-post,
+// daily-research, reader-signal) are guarded as of that PR's merge and have
+// been removed from this list; what remains is follow-up work.
 const KNOWN_GAPS = new Set([
-  "feed-post/post-feed.mjs", // PR #546 (open since 2026-08-05, unanimous-green, blocked on merge conflict)
-  "daily-research/post.mjs", // PR #546
-  "reader-signal/post.mjs", // PR #546
   // Discovered 2026-08-17 by this gate's own first run against `main` —
   // same vulnerable pattern, not yet ported to verifyReadBack(). Untracked
   // by any open PR as of this commit; follow-up, not a blocker for landing
@@ -151,7 +148,7 @@ function main() {
   if (missing.length > 0) {
     console.error(
       `R-18: ${missing.length} cadence write-script(s) POST a --body-file payload to the shared ` +
-        `feed endpoint without a verifyReadBack() read-back guard (ML-020/ML-028):`,
+        `feed endpoint without a verifyReadBack() read-back guard (ML-035/ML-028):`,
     );
     for (const s of missing) console.error(`  - ${s.rel}`);
     console.error(
@@ -166,8 +163,8 @@ function main() {
   const fixed = inPopulation.filter((s) => s.guarded).length;
   console.log(
     `✅ R-18: ${fixed} of ${inPopulation.length} feed-writing cadence script(s) carry the ` +
-      `read-back guard; the other ${KNOWN_GAPS.size} are cited, tracked KNOWN_GAPS (3 pending ` +
-      `PR #546, 11 pending follow-up — see docs/follow-ups.md).`,
+      `read-back guard; the other ${KNOWN_GAPS.size} are cited, tracked KNOWN_GAPS ` +
+      `(pending follow-up — see docs/follow-ups.md).`,
   );
 }
 

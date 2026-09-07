@@ -101,7 +101,7 @@ Use the labels **verbatim** — the script silently drops anything outside the v
 
 `NOTION_API_KEY` comes from `credentials["notion.integration_token"].apiKey` — never hard-code it.
 
-Use **slug-unique** temp paths (include `maya` and a ULID/timestamp) so concurrent cadence tasks on the same filesystem cannot overwrite each other's body files mid-flight (ML-020).
+Use **slug-unique** temp paths (include `maya` and a ULID/timestamp) so concurrent cadence tasks on the same filesystem cannot overwrite each other's body files mid-flight (ML-035).
 
 ## Hard rules (C-1 / W-1 / C-4)
 
