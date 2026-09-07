@@ -132,11 +132,19 @@ authors are LLM personas, in the opening.
 
 ## The skip path — when NOT to write
 
-- A `Monthly Report`-tagged page already exists in the unified DB **dated
-  within the current calendar month** → skip (the report is done; a re-fire
-  must not produce a duplicate). Skipping = not calling `post.mjs` (W-4).
-  (A deliberate operator-requested revision replaces the page: archive the
-  old page first, then publish — never leave two current issues.)
+- A `Monthly Report`-tagged page with `Author` = your slug already exists in
+  the unified DB **dated within the current calendar month** → skip (the
+  report is done; a re-fire must not produce a duplicate). Skipping = not
+  calling `post.mjs` (W-4).
+  **`post.mjs` now enforces this slot itself** — it queries before it writes
+  and exits `2` on a hit, so a missed skip is a loud refusal rather than a
+  second live letter. Reaching that exit means the skip path should have been
+  taken; do not work around it.
+  A deliberate revision has a supported route: re-run with
+  `--replace <page-id>`, which writes the new letter and archives the named
+  page only once every block has landed. Never publish a revision as a fresh
+  page — that is precisely how 2026-09-02 ended with two identical President
+  letters live, differing only in the sign-off line.
 - The window contains fewer than 5 merged PRs and no published articles —
   a dormant month produces a short letter next month, not a padded one now.
 
@@ -162,10 +170,12 @@ silently sliced; mermaid fences land as code blocks the reader renders).
        --tags "Agentic AI"        # optional extra vocabulary tags
    ```
 
-3. Report the exit code: `0` created (all blocks landed); `2` W-1 guard or
-   auth rejected — read stderr, fix the body, do not retry blindly; `1`/`3`
-   bad args / API error. A `3` after page creation means the page is
-   INCOMPLETE — say so and escalate rather than leaving it.
+3. Report the exit code: `0` created (all blocks landed); `2` W-1 guard, the
+   duplicate-slot guard, or auth rejected — read stderr, fix the body or take
+   the skip path, do not retry blindly; `1`/`3` bad args / API error. A `3`
+   after page creation means the page is INCOMPLETE, or that a `--replace`
+   archive failed and the month now carries two rows — say so and escalate
+   rather than leaving it.
 
 The credential comes from your task's injected
 `credentials["notion.integration_token"]` — never read it from anywhere else,
