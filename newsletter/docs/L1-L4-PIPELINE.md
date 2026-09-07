@@ -2,7 +2,7 @@
 
 A four-stage system for researching, synthesizing, and publishing AI industry insights.
 
-> **History note (2026-06):** L2/L3 generation used to run on a Google Apps Script (GAS) engine (`newsletter/gas/src/Code.gs`) fired by GAS time-driven triggers, with a React operator UI (`/capture`, `/l2-blog`, `/l3-insight`, `/l4-publish`). **That engine has been removed.** Generation now runs through the **workforce article-level2 / article-level3 cadences**, and publication through the **`deploy-article-site.yml`** workflow. This doc describes the current pipeline. The GAS-era mechanics are summarized in [pipeline-daily-app.md](pipeline-daily-app.md) for historical context only.
+> **History note (2026-06):** L2/L3 generation used to run on a Google Apps Script (GAS) engine (`newsletter/gas/src/Code.gs`) fired by GAS time-driven triggers, with a React operator UI (`/capture`, `/l2-blog`, `/l3-insight`, `/l4-publish`). **That engine has been removed.** Generation now runs through the **workforce article-level2 / article-level3 cadences**, and publication through the **`deploy-article-site.yml`** workflow. This doc describes the current pipeline. The GAS-era mechanics are summarized in [archive/pipeline-daily-app.md](archive/pipeline-daily-app.md) for historical context only.
 
 ## Architecture
 
@@ -16,7 +16,7 @@ L2: Explanation articles (unified Notion Articles DB, Type=explanation)
 L3: Analysis articles (unified Notion Articles DB, Type=analysis)
   ↓ [workforce article-level3 cadence — agent synthesis]
 
-L4: Published articles (gh-pages + https://kohuehara.xyz)
+L4: Published articles (gh-pages + https://kohuehara.xyz/ai-native-article/)
   ↓ [deploy-article-site.yml: fetch-notion.mjs → check-truncation (R-10) → build → deploy]
 ```
 
@@ -161,6 +161,23 @@ hours, which is why `--limit` exists. The script exits **1** if any row failed a
 W-1 guard, and names each one; those rows are simply left untranslated, so
 re-running retries exactly them. Then `gh workflow run deploy-article-site.yml`
 to publish.
+
+**When a row keeps failing.** Failures are per-article and deterministic, so a
+row that failed once will fail again until something changes. The script keeps
+the evidence:
+
+- **`… looks cut off (W-1)`** — the message prints the model's `finish_reason`
+  and the offending last line **in full**. If `finish_reason` is `stop`, the
+  model finished its sentence and the guard is the thing to question; the
+  rejected translation is saved under `.backfill-en-failures/<slug>.en.md`
+  (override with `--save-failures <dir>`) so you can read the ending yourself.
+  If it is `length`, the translation really is cut off — raise the bracket
+  (`azure-budget-rules.md`) rather than relaxing the guard.
+- **`fetch failed`** — now reported with its full cause chain
+  (`fetch failed ← read ECONNRESET (ECONNRESET)`), and retried three times with
+  backoff before it counts as a failure. A per-request timeout
+  (`AZURE_TIMEOUT_MS`, default 300000) keeps a hung socket from stalling the
+  batch instead of failing it.
 
 ### Pipeline has gone quiet
 

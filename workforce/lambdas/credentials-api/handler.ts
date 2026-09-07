@@ -189,6 +189,23 @@ async function putCredential(
     });
   }
   const valueRaw = (parsed as { value: unknown }).value;
+
+  // Shape check at the WRITE boundary. The allowlist above says the type
+  // is known; this says the value can actually be used. Without it the
+  // four-field azure.openai contract held only in the console's own form,
+  // so any other writer (curl, a script, a future UI) could store a
+  // three-of-four secret that reads as "provisioned" everywhere and then
+  // fails at call time as a 404 that looks like an auth error — the exact
+  // failure ADR-0027 §4 bundles the four fields to prevent.
+  const shapeError = validateSecretShape(baseTypeOf(credentialType), valueRaw);
+  if (shapeError) {
+    return reply(400, {
+      error: "invalid_credential_shape",
+      credential_type: credentialType,
+      detail: shapeError,
+    });
+  }
+
   const secretString =
     typeof valueRaw === "string" ? valueRaw : JSON.stringify(valueRaw);
 
@@ -417,4 +434,45 @@ function reply(statusCode: number, body: unknown): APIGatewayProxyResultV2 {
     },
     body: JSON.stringify(body),
   };
+}
+
+
+/** Base type of a possibly variant-suffixed key (`type@variant` → `type`). */
+function baseTypeOf(credentialType: string): string {
+  const at = credentialType.indexOf("@");
+  return at === -1 ? credentialType : credentialType.slice(0, at);
+}
+
+/**
+ * Required non-empty string fields per credential type. Only types whose
+ * value is a multi-field object need an entry — a single-field key
+ * (`{apiKey}` / `{token}`) is already unusable-if-wrong in an obvious way,
+ * whereas a partially-filled Azure secret fails much later and much less
+ * legibly. Absent from this map = no shape constraint, which keeps the
+ * check additive: existing writers are unaffected.
+ */
+const REQUIRED_SECRET_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  "azure.openai": ["apiKey", "endpoint", "deployment", "apiVersion"],
+};
+
+/**
+ * Returns a human-readable reason the value cannot be stored, or null
+ * when it is acceptable. Fails loud (W-4) at the write rather than
+ * letting an unusable secret into the store.
+ */
+export function validateSecretShape(baseType: string, value: unknown): string | null {
+  const required = REQUIRED_SECRET_FIELDS[baseType];
+  if (!required) return null;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return `${baseType} requires an object with {${required.join(", ")}}`;
+  }
+  const record = value as Record<string, unknown>;
+  const missing = required.filter((f) => {
+    const v = record[f];
+    return typeof v !== "string" || v.trim().length === 0;
+  });
+  if (missing.length > 0) {
+    return `${baseType} requires non-empty string field(s): ${missing.join(", ")}`;
+  }
+  return null;
 }

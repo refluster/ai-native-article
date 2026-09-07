@@ -1,0 +1,93 @@
+{
+  "tool_id": "user-research",
+  "display_name": "User Research",
+  "summary": "Turn a research goal and a segment into an interview guide: what to ask, what each question is testing, and the biases to avoid.",
+  "version": "1.0.0",
+  "requires": ["azure.openai"],
+  "model": { "max_tokens": 6000 },
+  "input": {
+    "type": "object",
+    "required": ["research_goal", "segment"],
+    "properties": {
+      "research_goal": {
+        "type": "string",
+        "title": "Research goal",
+        "description": "What you need to learn, and what decision it feeds. \"Whether to build X\" is a decision; \"how teams currently do Y\" is a goal.",
+        "maxLength": 2000
+      },
+      "segment": {
+        "type": "string",
+        "title": "Who you will talk to",
+        "description": "The people you can actually reach: role, context, and how they differ from the people you cannot reach.",
+        "maxLength": 2000
+      },
+      "assumptions": {
+        "type": "string",
+        "title": "Assumptions to test",
+        "description": "What you currently believe and would be expensive to be wrong about. One per line.",
+        "maxLength": 4000
+      },
+      "interview_length": {
+        "type": "string",
+        "title": "Interview length",
+        "enum": ["15-min", "30-min", "60-min"],
+        "default": "30-min"
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": ["framing", "sections", "sampling_risk"],
+    "properties": {
+      "framing": {
+        "type": "string",
+        "description": "The goal restated as what this guide can and cannot establish, so the reader knows the limits before the first interview."
+      },
+      "sections": {
+        "type": "array",
+        "minItems": 3,
+        "maxItems": 6,
+        "items": {
+          "type": "object",
+          "required": ["title", "minutes", "questions"],
+          "properties": {
+            "title": { "type": "string" },
+            "minutes": { "type": "integer", "minimum": 1, "maximum": 60 },
+            "purpose": { "type": "string", "description": "What this section is for; skip it if you are short on time and this is not load-bearing." },
+            "questions": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 6,
+              "items": {
+                "type": "object",
+                "required": ["ask", "testing"],
+                "properties": {
+                  "ask": { "type": "string", "description": "The question in the words you would actually say." },
+                  "testing": { "type": "string", "description": "The assumption or unknown this question is aimed at." },
+                  "follow_up": { "type": "string", "description": "The probe to use when the first answer is generic." },
+                  "listen_for": { "type": "string", "description": "The specific signal in an answer that would change your mind." }
+                }
+              }
+            }
+          }
+        }
+      },
+      "avoid": {
+        "type": "array",
+        "maxItems": 6,
+        "items": {
+          "type": "object",
+          "required": ["question", "why"],
+          "properties": {
+            "question": { "type": "string", "description": "A tempting question that would produce misleading data." },
+            "why": { "type": "string", "description": "The bias it introduces — leading, hypothetical, or self-report where behaviour is needed." }
+          }
+        }
+      },
+      "sampling_risk": {
+        "type": "string",
+        "description": "Who this segment excludes, and which conclusions would be unsafe as a result."
+      }
+    }
+  }
+}

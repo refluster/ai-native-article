@@ -20,7 +20,7 @@
 
 export const REASON_LABEL_PREFIX = "autopilot:reason:";
 
-// Taxonomy v3 (2026-08-02; v2 2026-07-29). The terminal-state sweep's kind strings are
+// Taxonomy v3.1 (2026-08-05; v3 2026-08-02; v2 2026-07-29). The terminal-state sweep's kind strings are
 // reused VERBATIM as codes (never flattened); the merge-engine clauses map via
 // refusalReasonCode() below. Adding/renaming a code = a version bump of the
 // prose twin in the same PR.
@@ -114,7 +114,7 @@ export function assertReasonCode(code) {
   if (!CODE_SET.has(code)) {
     throw new Error(
       `unknown escalation-reason code "${code}" — must be one of: ${REASON_CODES.join(", ")} ` +
-        `(taxonomy v2, workforce/docs/pr-escalation-reasons.md; C-4: never invent a bucket)`,
+        `(taxonomy v3.1, workforce/docs/pr-escalation-reasons.md; C-4: never invent a bucket)`,
     );
   }
   return code;
@@ -132,7 +132,7 @@ export function reasonMarker(code, freeText = "") {
   // "--\x3e" inside the text would close the HTML comment early; neutralise it.
   const text = String(freeText || "").trim().replace(/-->/g, "→");
   if (code === "other" && !text) {
-    throw new Error(`escalation reason "other" requires free text — the unanticipated cause IS the finding (taxonomy v2)`);
+    throw new Error(`escalation reason "other" requires free text — the unanticipated cause IS the finding (taxonomy v3.1)`);
   }
   return text ? `<!-- autopilot:reason:${code} ${text} -->` : `<!-- autopilot:reason:${code} -->`;
 }
@@ -149,7 +149,7 @@ export function findReasonMarkers(body) {
     const code = assertReasonCode(m[1].toLowerCase());
     const text = m[2].trim();
     if (code === "other" && !text) {
-      throw new Error(`marker <!-- autopilot:reason:other --> is missing its mandatory free text (taxonomy v2)`);
+      throw new Error(`marker <!-- autopilot:reason:other --> is missing its mandatory free text (taxonomy v3.1)`);
     }
     found.push({ code, text });
   }

@@ -43,6 +43,9 @@
 //   1  — bad env (no API key)
 //   3  — Notion API / network error
 
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs"
+ensureProxyAwareEntry(import.meta.url)
+
 import { UNIFIED_DB_ID, propText, queryAll, slugFromId } from "../../scripts/lib/notion.mjs";
 
 const apiKey = process.env.NOTION_API_KEY;

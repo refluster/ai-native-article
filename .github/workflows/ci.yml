@@ -38,6 +38,12 @@ jobs:
       - name: Proxy-bootstrap gate (R-14)
         run: npm run check-proxy-bootstrap
 
+      - name: Base-path consistency gate (R-16)
+        run: npm run check-base-path
+
+      - name: Cadence write-script read-back gate (R-18)
+        run: npm run check-cadence-readback-guard
+
       - name: Script library tests
         run: npm run test:scripts
 
@@ -67,6 +73,12 @@ jobs:
       - name: Workforce skill registry freshness
         run: npm run workforce:skill-registry:check
 
+      - name: Workforce tool schema (ADR-0027)
+        run: npm run workforce:tools
+
+      - name: Workforce tool registry freshness
+        run: npm run workforce:tool-registry:check
+
       - name: Workforce skill manifest freshness (#185)
         run: npm run workforce:skill-manifest:check
 
@@ -86,6 +98,9 @@ jobs:
 
       - name: Workforce scan-drain guard (Dario L2 / FU-PROJ-SCAN)
         run: npm run workforce:scan-drain
+
+      - name: Workforce no-RUN/DELIV-writes guard (FU-034 / ADR-0005 criterion 2)
+        run: npm run workforce:no-run-deliv-writes
 
       - name: Workforce W-4 cycle-cap guard (FU-004)
         env:

@@ -3,8 +3,8 @@
 // PATCH /agents/ren (ADR-0007 write path; W-5 one-persona-per-mutation).
 //
 // What this adds (adr-0022, the AUTHOR lane's worker):
-//   - pr-remediate, ONCE A DAY at 06:29 UTC, Ren (engineer persona),
-//     project=agent-workforce → refluster/ai-native-article. A CCR
+//   - pr-remediate, TWICE A DAY at 06:29 and 18:29 UTC, Ren (engineer
+//     persona), project=agent-workforce → refluster/ai-native-article. A CCR
 //     claude-code-routine (R-N1(a)) fired by the orchestrator-tick path.
 //
 //     Each fire it works up to 3 PRs labelled `autopilot:needs-author` — the
@@ -19,9 +19,16 @@
 //     per PR, and pr-autopilot-sweep.mjs escalates anything untouched for 36h
 //     even if this cadence never fires — so the two-outcome contract holds.
 //
-//     06:29 UTC sits after Ren's 04:11 issue-implement (so the two Ren fires
-//     never share an orchestrator tick window) and gives the every-6h
-//     pr-autopilot a pass to have labelled the overnight PRs.
+//     Both fires sit 6 min after a pr-autopilot tick (`cron(23 0,6,12,18)`),
+//     so each picks up the labels that tick just wrote. 06:29 also stays clear
+//     of Ren's 04:11 issue-implement, so no two Ren fires share an
+//     orchestrator tick window.
+//
+//     Twice a day rather than once: the author lane is what the 36h
+//     `author-stale` sweep escalates around. At one fire a day a PR gets at
+//     most one remediation attempt before the sweep hands it to a human; at
+//     two it gets ~3, which puts the sweep back in its intended role as the
+//     backstop for genuinely stuck PRs rather than the normal exit.
 //
 // PREREQ — SEED THE SKILL BODY FIRST (`wf:ren` R2 on #518). A binding whose
 // skill has no `SKILL#` row fails EVERY fire: agent-runner.md step 2 resolves
@@ -43,6 +50,7 @@
 
 import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
 ensureProxyAwareEntry(import.meta.url);
+import { reconcileBinding } from "../../scripts/lib/binding-reconcile.mjs";
 
 import { spawnSync } from "node:child_process";
 
@@ -65,7 +73,7 @@ const BINDING = {
     scheduler: "external",
     invoked_by: "api",
     fired_from: "wf-orchestrator-tick",
-    cron: "cron(29 6 ? * * *)",
+    cron: "cron(29 6,18 ? * * *)",
   },
   routine_spec: ROUTINE_SPEC,
   project_id: PROJECT_ID,
@@ -76,7 +84,7 @@ const BINDING = {
     max_prs_per_run: 3,
   },
   note:
-    "Ren's daily pr-remediate on refluster/ai-native-article (project agent-workforce), adr-0022. Works the autopilot:needs-author queue — base conflicts (the #517 shape: main moved under the branch), behind branches, and open blocking lens findings — resolving semantically, verifying with the repo's own gate, pushing to the PR's HEAD branch (never main), and clearing the label so pr-autopilot re-routes at cycle N+1. Never merges (external-pr). Bounded: 3 attempts per PR, plus the sweep's 36h author-stale escalation, so the lane can never absorb a PR. Fires 06:29 UTC, after Ren's 04:11 issue-implement.",
+    "Ren's twice-daily pr-remediate on refluster/ai-native-article (project agent-workforce), adr-0022. Works the autopilot:needs-author queue — base conflicts (the #517 shape: main moved under the branch), behind branches, and open blocking lens findings — resolving semantically, verifying with the repo's own gate, pushing to the PR's HEAD branch (never main), and clearing the label so pr-autopilot re-routes at cycle N+1. Never merges (external-pr). Bounded: 3 attempts per PR, plus the sweep's 36h author-stale escalation, so the lane can never absorb a PR. Fires 06:29 and 18:29 UTC — each 6 min after a pr-autopilot tick (23 0,6,12,18) so it picks up that tick's labels; 06:29 also clears Ren's 04:11 issue-implement. Author lane bound to Ren, not to the reviewer persona: adr-0022 rejects collapsing author into reviewer, which is what keeps the adr-0011 R-N10 delegated merge trustworthy.",
 };
 
 function curlJson(method, path, body) {
@@ -103,38 +111,15 @@ if (!Array.isArray(cur.bindings)) {
   process.exit(1);
 }
 
-// Stable, key-order-independent serialization so a true no-op (the live
-// binding already equals what we declare) is distinguished from drift.
-// ARRAY order is preserved (significant) on purpose — issue_selection's
-// deny_labels list is a real list, not a set, so a reorder is semantic
-// drift that SHOULD re-PATCH, not a cosmetic no-op.
-const stable = (v) =>
-  v && typeof v === "object" && !Array.isArray(v)
-    ? `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${stable(v[k])}`).join(",")}}`
-    : Array.isArray(v)
-      ? `[${v.map(stable).join(",")}]`
-      : JSON.stringify(v);
-
-// Match on (skill, project_id). Not present -> append; equal -> no-op;
-// drifted -> replace in place (binding_idx preserved) so a corrected
-// note/config re-syncs. Other bindings on this persona are matched out by
-// (skill, project_id) and preserved untouched.
-const idx = cur.bindings.findIndex(
+const summary = `${BINDING.skill} @ ${PROJECT_ID} (${BINDING.trigger.cron})`;
+const { bindings: next, verb, changed } = reconcileBinding(
+  cur.bindings,
+  BINDING,
   (b) => b.skill === BINDING.skill && b.project_id === BINDING.project_id,
 );
-const summary = `${BINDING.skill} @ ${PROJECT_ID} (${BINDING.trigger.cron})`;
-let next;
-let verb;
-if (idx >= 0) {
-  if (stable(cur.bindings[idx]) === stable(BINDING)) {
-    console.log(`  - ${SLUG}: ${BINDING.skill} @ ${PROJECT_ID} already bound + current, skipped (no-op).`);
-    process.exit(0);
-  }
-  next = cur.bindings.map((b, i) => (i === idx ? BINDING : b));
-  verb = "updated (in-place, binding_idx preserved)";
-} else {
-  next = [...cur.bindings, BINDING];
-  verb = "bound";
+if (!changed) {
+  console.log(`  - ${SLUG}: ${BINDING.skill} @ ${PROJECT_ID} already bound + current, skipped (no-op).`);
+  process.exit(0);
 }
 if (DRY_RUN) {
   console.log(`  [dry-run] ${SLUG}: would PATCH bindings -> ${verb} (${summary}); total ${next.length}`);

@@ -1,5 +1,11 @@
 # Workforce — Architecture (v1)
 
+> **Status (2026-09-05): partly superseded — read with the ADRs.** This v1 text predates several accepted decisions and has not been rewritten. Where they disagree, the ADRs win:
+> - Execution: every (project × agent × skill) task runs as a **Claude Code Remote routine** dispatched by `wf-orchestrator` ([ADR-0005](adr/adr-0005-single-execution-model-ccr.md)). There is no `wf-agent-runner` Lambda; the engineer path is the GHA routine described under R-N1.
+> - Agent config: the `workforce/agents/` git tree is retired; `AGENT#{slug}` rows in DynamoDB, written only through agents-api, are the single source ([ADR-0007](adr/adr-0007-agent-config-single-source.md)); skills likewise ([ADR-0008](adr/adr-0008-skill-config-single-source.md)).
+> - Surfaces: the HTTP API (`workforce-api.kohuehara.xyz`), the console SPA (`workforce/app/`), messaging ([ADR-0006](adr/adr-0006-realtime-messaging-reply.md)), the podcast ([ADR-0016](adr/adr-0016-podcast-production-surface.md)) and project tools ([ADR-0027](adr/adr-0027-project-tools-surface.md)) all exist; "five personas" is the founding roster, not the current one.
+> The data model in [data-model.md](data-model.md) and the rules in [governance.md](governance.md) are current. A full rewrite of this file is a Zone A change.
+
 This is the operating shape of the AI agent workforce. It governs every workforce PR until it's amended via a Zone A change (see [governance.md](governance.md)).
 
 ## What this subsystem is

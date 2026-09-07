@@ -67,6 +67,10 @@ const BINDING = {
   project_id: "agent-workforce",
   config: { cohort_size: 5 },
   note: "memory-curation Cadence (Epic-018 Story 3, ADR-0020), landed ENABLED per operator direction 2026-07-19 (weekly coverage per agent). Daily fire; pick-cohort.mjs takes the oldest-memory cohort sized max(5, ceil(active/7)). project_id=agent-workforce supplies workforce.memory_write_token; curation sources are the agent's FULL cross-project record (EXEC ledger + posts), not project-scoped.",
+  // #574: single-shot append, guarded by the bindings.some() check right
+  // below — never replaces an existing binding, so stamping bound_at here
+  // at construction time is safe and exact.
+  bound_at: new Date().toISOString(),
 };
 
 function curlJson(method, path, body) {

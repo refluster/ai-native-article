@@ -15,6 +15,9 @@
 //
 // Exit: 0 printed (pick or empty), 1 bad env, 3 Notion/network error.
 
+import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs"
+ensureProxyAwareEntry(import.meta.url)
+
 import { UNIFIED_DB_ID, propText, queryAll, slugFromId } from "../../scripts/lib/notion.mjs";
 
 function arg(name, def) {

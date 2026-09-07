@@ -54,3 +54,21 @@ export interface GithubSecret {
 export interface VoyageSecret {
   apiKey: string;
 }
+/**
+ * Azure OpenAI credential (ADR-0027 §4). Unlike the single-field
+ * provider keys above, an Azure call needs four values to resolve at
+ * all: the key, the resource endpoint, the *deployment* name (Azure's
+ * stand-in for a model id), and the API version. They are kept in ONE
+ * secret rather than split across a secret and project attributes —
+ * a mismatched endpoint/deployment pair surfaces as a 404 that reads
+ * like an auth failure, so the four values must rotate together.
+ *
+ * `deployment` is the project default; a tool registry entry may
+ * override it per call (`model.deployment`).
+ */
+export interface AzureOpenAISecret {
+  apiKey: string;
+  endpoint: string;
+  deployment: string;
+  apiVersion: string;
+}

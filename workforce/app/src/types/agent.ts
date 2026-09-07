@@ -26,6 +26,10 @@ export type AgentBinding = {
   project_id?: string;
   config?: Record<string, unknown>;
   note?: string;
+  /** ISO 8601 instant this binding was first created (issue 574). Absent on
+   *  bindings created before this field existed — treat as "age unknown",
+   *  never as "just bound". */
+  bound_at?: string;
 };
 
 /**
@@ -55,6 +59,14 @@ export interface AgentIdentity {
   voice: string;
   /** 2-4 hard refusals — things this persona will not do. */
   guardrails: string[];
+  /**
+   * LinkedIn-"Licenses & Certifications"-style credential lines
+   * ("Name — Issuing body / framework"), professional-market language
+   * naming the standards a persona's judgment is grounded in. Optional —
+   * most personas won't carry a formal-credential story; this is not the
+   * place to restate `operating_principles` in cert form.
+   */
+  credentials?: string[];
 }
 
 /**

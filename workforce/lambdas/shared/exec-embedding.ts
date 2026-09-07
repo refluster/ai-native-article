@@ -11,17 +11,18 @@
 // When the embedding API throws (network / 5xx / `voyage.api_key` not
 // provisioned / dim drift), THE EXECUTION ITSELF STILL SUCCEEDS. The
 // EXEC row lands with `embedding_status='pending'` and zero embedding
-// attributes — a future retry sweep (out of scope for this PR; named
-// in the follow-up list) will re-embed pending rows and update them in
-// place. The execution-write call site does NOT see the embedding
-// failure as an error; it sees a successful (degraded) write.
+// attributes — shared/embedding-retry.ts's daily-riding sweep (#573)
+// re-embeds pending rows and updates them in place (bounded per run;
+// a row that never recovers moves to the terminal `embedding_status=
+// 'failed'` after EMBEDDING_RETRY_MAX_ATTEMPTS). The execution-write
+// call site does NOT see the embedding failure as an error; it sees a
+// successful (degraded) write.
 //
 // This is enforced by wrapping the embed step in try/catch and emitting
 // a structured log + (best-effort) CloudWatch metric on the swallow
 // path. The metric (`WfExecEmbeddingFailed`) is the operator's signal
-// that the retry queue has work pending; if it climbs and the retry
-// path is still TBD, structured recall keeps working and semantic
-// recall just sees fewer candidates.
+// that the retry queue has work pending; shared/embedding-retry.ts is
+// what drains that queue.
 //
 // ─── Skip path ────────────────────────────────────────────────────────
 //
