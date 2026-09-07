@@ -1,22 +1,36 @@
 # CODEOWNERS — Zone A approvals enforced here.
-# See AGENTS.md for the full zone model.
+# See AGENTS.md for the full zone model. Paths follow the monorepo layout
+# (newsletter/ = article site, workforce/ = agent workforce).
 
 # Default: Zone B — any human maintainer can approve.
-*                               @refluster
+*                                           @refluster
 
-# Zone A — design identity, tokens, build surface. Humans only.
-/DESIGN.md                      @refluster
-/GROWTH.md                      @refluster
-/AGENTS.md                      @refluster
-/tailwind.config.ts             @refluster
-/src/config/                    @refluster
-/src/index.css                  @refluster
-/.github/CODEOWNERS             @refluster
-/.github/workflows/             @refluster
-/CNAME                          @refluster
+# Zone A — governance, design identity, tokens, build surface. Humans only.
+/AGENTS.md                                  @refluster
+/CLAUDE.md                                  @refluster
+/docs/governance.md                         @refluster
+/docs/design-policy.md                      @refluster
+/docs/adr/                                  @refluster
+/newsletter/docs/DESIGN.md                  @refluster
+/newsletter/docs/GROWTH.md                  @refluster
+/newsletter/app/tailwind.config.ts          @refluster
+/newsletter/app/src/config/                 @refluster
+/newsletter/app/src/index.css               @refluster
+/newsletter/app/src/types/quality.ts        @refluster
+/newsletter/app/public/CNAME                @refluster
+/workforce/docs/governance.md               @refluster
+/workforce/docs/architecture.md             @refluster
+/workforce/docs/naming.md                   @refluster
+/workforce/docs/data-model.md               @refluster
+/workforce/docs/mvv.md                      @refluster
+/workforce/docs/north-star/                 @refluster
+/workforce/docs/adr/                        @refluster
+/workforce/infra/sam/samconfig.toml         @refluster
+/.github/CODEOWNERS                         @refluster
+/.github/workflows/                         @refluster
 
 # Zone C — content. No approval required (empty owners list means default
 # branch-protection rules still apply, but no CODEOWNERS review is triggered).
-/public/posts/
-/public/sitemap.xml
-/public/robots.txt
+/newsletter/app/public/posts/
+/newsletter/app/public/sitemap.xml
+/newsletter/app/public/robots.txt

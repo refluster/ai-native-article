@@ -35,12 +35,12 @@ import { isOrchestratorDispatchEvent, type OrchestratorDispatchEvent } from "../
 import { matchesNow } from "../shared/cron-match.js";
 import { findRecentPRs } from "../shared/github.js";
 import { fireCcrRoutine, routineIdFromSpec, type CcrFireTask } from "../shared/ccr-fire.js";
-import { asProjectId, getCredential } from "../shared/project.js";
+import { appendExecution, asProjectId, getCredential, selfProjectId, type ProjectId } from "../shared/project.js";
 import { mintEngagementToken } from "../shared/engagement-token.js";
 import { mintMemoryWriteToken } from "../shared/memory-write-token.js";
 import { mintDispatchToken } from "../shared/dispatch-token.js";
 import { SKILL_REQUIRES } from "../shared/skill-registry-generated.js";
-import type { DelivRow } from "../shared/task.js";
+import { newUlid, type DelivRow } from "../shared/task.js";
 
 const STAGE = process.env.STAGE;
 const TICK_WINDOW_MINUTES = parseInt(process.env.TICK_WINDOW_MINUTES ?? "5", 10);
@@ -179,6 +179,37 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
           const reason = err instanceof Error ? err.message : String(err);
           console.error(JSON.stringify({ event: "ccr-prep-error", slug: agent.slug, skill: binding.skill, reason }));
           skipped.push({ slug: agent.slug, binding_idx: i, skill: binding.skill, reason: `ccr_prep_error: ${reason.slice(0, 200)}` });
+          // C-4 (#650): `skipped[]` is Lambda-invocation-local — visible only
+          // in CloudWatch, not on the agent's Track Record or
+          // GET /agents/{slug}/executions. A prep failure is still an
+          // attempted fire, so record it on the ledger too (status "throw",
+          // same convention tools-api/handler.ts uses for a failed run).
+          // Best-effort: a ledger-write failure must not stall the tick or
+          // mask the ccr_prep_error reason already logged/skipped above.
+          try {
+            await appendExecution({
+              project_id: ccrPrepErrorProjectId(agent.slug, binding.project_id),
+              agent_slug: agent.slug,
+              exec_ulid: newUlid(),
+              skill_name: binding.skill,
+              // No skill-version registry is available at orchestrator
+              // runtime (SKILL_REQUIRES carries only requires[]) — "unknown"
+              // is honest rather than guessed.
+              skill_version: "unknown",
+              started_at: tickedAt,
+              ended_at: new Date().toISOString(),
+              status: "throw",
+              used_credential_types: [],
+              error: reason.slice(0, 1000),
+            });
+          } catch (ledgerErr) {
+            console.error(JSON.stringify({
+              event: "ccr-prep-error-ledger-write-failed",
+              slug: agent.slug,
+              skill: binding.skill,
+              reason: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
+            }));
+          }
         }
       }
     }
@@ -217,6 +248,24 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
   const result: OrchestratorResult = { ticked_at: tickedAt, scanned, dispatched, skipped, pr_polls };
   console.log(JSON.stringify({ event: "tick-complete", result }));
   return result;
+}
+
+/** Which project a ccr-prep-error EXEC row (#650) should be attributed to:
+ *  the binding's own declared project when it's a syntactically valid
+ *  ProjectId, else the agent's reserved `self/{slug}` observability project
+ *  — selfProjectId's own doc comment names exactly this case ("own
+ *  observability"). Covers the "binding missing project_id" prep-error
+ *  itself, which by definition has no real target project to attribute to. */
+export function ccrPrepErrorProjectId(agentSlug: string, declaredProjectId: string | undefined): ProjectId {
+  if (declaredProjectId) {
+    try {
+      return asProjectId(declaredProjectId);
+    } catch {
+      // Falls through to self/{slug} — an unparseable declared id is no
+      // more usable as a ledger target than a missing one.
+    }
+  }
+  return selfProjectId(agentSlug);
 }
 
 /** Build one CCR task from a binding: resolve the skill's declared credential

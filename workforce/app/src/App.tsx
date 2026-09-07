@@ -23,6 +23,8 @@ import Messaging from './pages/Messaging';
 import Notifications from './pages/Notifications';
 import AuthCallback from './pages/AuthCallback';
 import Landing from './pages/Landing';
+import Research from './pages/Research';
+import ResearchArticle from './pages/ResearchArticle';
 import AuthBoundary from './components/AuthBoundary';
 import { routerBaseName } from './lib/paths';
 import { trackPageView } from '@kohuehara/shared/analytics';
@@ -126,12 +128,18 @@ export default function App() {
       <RouteTracker />
       <Routes>
         <Route path="/auth/callback" element={<AuthCallback />} />
-        {/* Public surfaces. The apex is a landing page for visitors, and
-            /docs/ is a set of static documents served straight from S3;
+        {/* Public surfaces. The apex is a landing page for visitors,
+            /research is the article corpus, and /docs/ is a set of static
+            documents served straight from S3;
             the bare /docs path only reaches the router when CloudFront's
             404 fallback runs (S3 has no directory index), so it forwards
             to the real object. Everything else stays behind AuthBoundary. */}
         <Route path="/" element={<Landing />} />
+        {/* Research is the article corpus (kohuehara.xyz/ai-native-article/)
+            read into the console's own chrome — public, like Docs, so the
+            landing header can link it beside Docs. */}
+        <Route path="/research" element={<Research />} />
+        <Route path="/research/:slug" element={<ResearchArticle />} />
         <Route path="/docs" element={<DocsIndexRedirect />} />
         <Route path="*" element={<ProtectedRoutes />} />
       </Routes>

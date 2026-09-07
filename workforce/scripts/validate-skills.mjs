@@ -2,7 +2,8 @@
 // Validates workforce/skills/{name}/SKILL.md + meta.json against:
 //   - The Anthropic Agent Skills spec subset (SKILL.md frontmatter: name + description).
 //   - The workforce-internal sidecar schema (workforce/scripts/schemas/skill-meta.schema.json).
-//   - Cross-checks against workforce/agents/{slug}/agent.json:skills owners.
+//   - Owner slugs are shape-checked only; the agent roster lives in DynamoDB
+//     (ADR-0007 retired the workforce/agents/ git tree).
 // Exits non-zero on violation. Wired into CI as `npm run workforce:skills`.
 
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
@@ -17,7 +18,6 @@ const HERE = fileURLToPath(new URL(".", import.meta.url));
 const WORKFORCE_ROOT = join(HERE, "..");
 const REPO_ROOT = join(WORKFORCE_ROOT, "..");
 const SKILLS_DIR = join(WORKFORCE_ROOT, "skills");
-const AGENTS_DIR = join(WORKFORCE_ROOT, "agents");
 const SCHEMA_PATH = join(HERE, "schemas", "skill-meta.schema.json");
 
 const violations = [];
@@ -113,15 +113,6 @@ if (skillDirs.length === 0) {
   console.log("workforce/scripts/validate-skills.mjs: OK (no skills yet)");
   process.exit(0);
 }
-
-// Build the set of valid agent slugs once for owners cross-check.
-const knownAgentSlugs = existsSync(AGENTS_DIR)
-  ? new Set(
-      readdirSync(AGENTS_DIR).filter((name) =>
-        statSync(join(AGENTS_DIR, name)).isDirectory(),
-      ),
-    )
-  : new Set();
 
 for (const name of skillDirs) {
   const dir = join(SKILLS_DIR, name);
@@ -284,17 +275,12 @@ for (const name of skillDirs) {
         v("J7-owner-duplicate", metaJson, `duplicate owner "${s}"`);
       }
       seen.add(s);
-      if (knownAgentSlugs.size > 0 && !knownAgentSlugs.has(s)) {
-        v("J7-owner-unknown", metaJson, `owner "${s}" is not an existing agent under workforce/agents/`);
-      }
     }
   }
 
   if (meta.improvement_agent !== null) {
     if (typeof meta.improvement_agent !== "string" || !AGENT_SLUG.test(meta.improvement_agent)) {
       v("J8-improvement-agent", metaJson, `improvement_agent "${meta.improvement_agent}" must be null or a valid slug`);
-    } else if (knownAgentSlugs.size > 0 && !knownAgentSlugs.has(meta.improvement_agent)) {
-      v("J8-improvement-agent-unknown", metaJson, `improvement_agent "${meta.improvement_agent}" is not an existing agent`);
     }
   }
 

@@ -1,106 +1,140 @@
 # CLAUDE.md — orientation for agents
 
-You are working in `ai-native-article`, a personal blog/insight site published at `https://kohuehara.xyz/ai-native-article/` (a GitHub Pages *project* path — the apex `kohuehara.xyz` belongs to the separate user-site repo; see `newsletter/app/src/config/site.ts`). The repo is split into two domain modules:
+Last survey: 2026-09-05. If this file and the code disagree, the code (and the ADRs) win — fix this file in the same PR.
 
-- **`newsletter/`** — the site's L1→L4 article pipeline: `newsletter/app` (Vite/React reader SPA), `newsletter/pipeline` (build/sync scripts run in CI — `fetch-notion.mjs`, sitemap, etc.), `newsletter/template`, and `newsletter/docs` (the pipeline's L1 statute docs). (The Apps Script generation engine `newsletter/gas/src/Code.gs` was retired 2026-06-28 — generation now lives in the workforce cadences below.)
-- **`workforce/`** — a separate agent-organisation subtree (console `workforce/app` + `agents/`, `skills/`, `lambdas/`, `infra/`, `client/`, `projects/`, …). **It has its own governance and decision log** — read [`workforce/docs/governance.md`](workforce/docs/governance.md) and [`workforce/docs/adr/`](workforce/docs/adr/README.md) before touching `workforce/**`; do not assume the root rules map onto it 1:1. The workforce authors articles into the newsletter via the `workforce/skills/article-level2` / `article-level3` cadences (the active generation path; their `publish-notion.mjs` carries the canonical truncation guard).
+`ai-native-article` is one monorepo with **two products** and one shared governance layer:
 
-Cross-cutting governance lives at root: [`docs/`](docs/) and [`AGENTS.md`](AGENTS.md). `packages/shared` is shared by both apps.
+| Module | What it is | Live at |
+|---|---|---|
+| `newsletter/` | Bilingual (ja/en) article site. Notion-authored content, exported at deploy time into a Vite/React reader SPA. | `https://kohuehara.xyz/ai-native-article/` (GitHub Pages *project* path; the apex belongs to another repo) |
+| `workforce/` | An AI-persona "company" (~40 agents) on AWS: DynamoDB + S3 state, SAM-deployed Lambdas, an HTTP API, and skills that fire as Claude Code Remote (CCR) routines. It writes the articles above, reviews and merges PRs, runs a podcast, etc. | `workforce.kohuehara.xyz` (console), `workforce-api.kohuehara.xyz` (API) |
+| `docs/`, `AGENTS.md`, `scripts/`, `packages/shared` | Cross-cutting law, CI gates, shared TS (GA4 analytics, avatars) | — |
 
-The site is **bilingual (ja/en)** — see [`docs/adr/adr-0005-bilingual-article-editions.md`](docs/adr/adr-0005-bilingual-article-editions.md). One Notion row per article; its English edition is an `EN` child page under that row; one URL serves both (`?lang=` → `localStorage` → browser). Both cadences require `--body-en-file`, and `newsletter/pipeline/backfill-en.mjs` fills the pre-ADR corpus.
+Workforce has **its own statute** — read [`workforce/docs/governance.md`](workforce/docs/governance.md) and skim [`workforce/docs/adr/`](workforce/docs/adr/README.md) (30 ADRs) before touching `workforce/**`. Root rules apply there too; the workforce doc only ever tightens.
 
-Articles flow through a 4-stage pipeline: web sources → Notion blog drafts (L2) → Notion synthesis (L3) → published markdown (L4). Generation runs through the **workforce cadences** `workforce/skills/article-level2/` (L2 explanations) and `article-level3/` (L3 analyses) — bound to the persona **Ingrid** (`AGENT#ingrid` bindings 1 and 2, every 6h; Elena authored the corpus up to 2026-07-19 and the skill `owners` still name her), fired by the CCR / `wf-orchestrator-tick` schedule, writing directly to the Notion unified Articles DB via each skill's `publish-notion.mjs` (the canonical editorial guard **W-1**). Publication is `.github/workflows/deploy-article-site.yml`, which runs `newsletter/pipeline/fetch-notion.mjs` (exports every Articles-DB row) and deploys a React SPA built from that Notion content. Generation is increasingly run through a **multi-candidate, multi-judge quality layer** (see "The quality layer" below). (Governing record: `workforce/docs/epics/epic-005-agent-authored-article-pipeline.md`.)
+## Repository map
 
-## Doc map — what to read before editing
+```
+.github/workflows/      ci.yml (PR gates) · deploy-article-site.yml (gh-pages) · deploy-workforce-{console,data-plane}.yml
+                        corpus-freshness · knowledge-backup · podcast-pipeline · weekly-content-insights · workforce-*.yml
+docs/                   governance.md · design-policy.md · governance-mechanisms.md · adr/ (5) · registries (memory-lint-backlog, risk-acceptance-ledger) · issue-labeling.md
+scripts/                R-rule checkers (check-*.mjs), lint-design-tokens, content-insights, sync-labels · lib/ (shared helpers + node:test)
+packages/shared/        @kohuehara/shared — ./analytics (GA4, DNT-aware) and ./dicebear; used by both SPAs
+newsletter/app/         @kohuehara/article — React 18 + Vite 6 + Tailwind 3 reader SPA. Routes: / /system /sources /operator /article/:slug /capture /design-*
+newsletter/app/public/posts/   DERIVED corpus (*.md, *.en.md, manifest.json, images/) — CI overwrites from Notion every deploy
+newsletter/pipeline/    fetch-notion.mjs (Notion → posts/) · generate-sitemap.mjs · backfill-en.mjs · one-shot migrations
+newsletter/docs/        L1 statute docs for the pipeline (see doc map) · archive/ = retired GAS-era notes
+newsletter/template/    index.html static design mockup only — not built or served
+workforce/app/          @kohuehara/workforce — console SPA (Cognito + Google)
+workforce/docs/         README.md is the index: statute (governance, architecture, data-model, naming, mvv, adr/) · runbooks/ · routines/ · epics/ · hires/ · design/
+workforce/lambdas/      15 TypeScript Lambdas (agents-api, orchestrator, tools-api, wf-podcast, memory-compactor, …) + shared/; README.md lists them
+workforce/infra/        SAM stacks: sam (data plane), sam-web, sam-web-cert, sam-api-domain
+workforce/skills/       42 skill bundles: SKILL.md + meta.json + write-scripts (article-level2/3, pr-autopilot, feed-post, …)
+workforce/projects/     project.json seeds for external projects (asp-cloud, luckyhat, …); tools/ = ADR-0027 project tools
+workforce/scripts/      validators + registry builders wired as `npm run workforce:*`; one-shot wire-*.mjs binding scripts
+workforce/pipeline/     knowledge-backup (Discord + Notion → per-project git store; ADR-0026/0028)
+workforce/seed/         bootstrap data for hire groups and personas
+workforce/client/       drop-in package for external repos that outsource to the workforce
+.claude/skills/         session skills: article-health · cadence-forge · ship-pr · log-workforce-engagements · outsource-to-workforce (hand work to the workforce, record engagements)
+```
 
-**The rules (start here):**
-1. **[docs/governance.md](docs/governance.md)** — the layered law. L0 invariants → L1 framework → L2 mechanical (R-rules) → L3 operational, plus the §8.1 action-authority (A/B) matrix. The single most important constraint: **C-2, Notion is the source of truth.**
-2. **[AGENTS.md](AGENTS.md)** — the multi-agent **Zone** model (A=human-owned design/identity/prompts/workflows, B=agent-assisted product code, C/D below). The Zone decides the approval bar; governance.md decides the layer. They're complementary — consult both.
+`npm run` targets you will actually use: `build`, `dev` / `dev:workforce`, `test:scripts`, `lint:tokens`, `check-truncation`, `check-base-path`, `check-l1-citation`, `workforce:skills`, `workforce:naming`, `workforce:skill-registry:check`. CI runs all of them (see `.github/workflows/ci.yml`); the Lambdas have their own `npm run typecheck && npm test` under `workforce/lambdas/`.
 
-**The direction:**
-3. **[docs/design-policy.md](docs/design-policy.md)** — the orthogonal "how/why we build" axis: Software 2.0, external-substrate-over-reinvention, and the D-1 *innovation-velocity* bias (default to A for reversible work).
+## How content flows
 
-**The self-driving machinery:**
-4. **[docs/governance-mechanisms.md](docs/governance-mechanisms.md)** (decision record: [docs/adr/adr-0001](docs/adr/adr-0001-self-driving-governance-mechanisms.md)) — the working mechanisms: the CI gates **R-10…R-12**, the **memory→lint ratchet**, the **content-insights loop**, the two registries. Read it before adding any gate/loop/registry — it carries the anti-reinvention reflex.
+1. **L1 sources** land in the Notion Articles DB (`/capture` PWA share target → `wf-l1-source-register` Lambda, or added by hand).
+2. **L2 explanations / L3 analyses** are generated by the workforce cadences `workforce/skills/article-level2/` and `article-level3/`. They are *not* run from a Claude Code session: the EventBridge `wf-orchestrator-tick` (every 2 h, enabled in prod) evaluates each agent's `bindings[]` and dispatches a CCR routine whose context is agent × skill × project (ADR-0005). Each cadence's `publish-notion.mjs` carries the canonical editorial guard **W-1** (empty / short / cut-off / LLM-artefact body → exit 2) and writes both editions (`--body-en-file` is mandatory, ADR-0005).
+3. **Publish** is `.github/workflows/deploy-article-site.yml` (push to `main`, dispatch, cron `06:17 / 12:17 / 18:17 UTC`): `fetch-notion` → R-10 truncation gate → token lint → sitemap → agent manifest → Vite build → gh-pages → R-17 live smoke.
+4. One URL serves both languages: `?lang=` → `localStorage` → browser (`newsletter/app/src/i18n/`). The EN edition is an `EN` child page under the article's Notion row.
 
-**The pipeline (read the one your task touches):**
-5. **[newsletter/docs/architecture-source-of-truth.md](newsletter/docs/architecture-source-of-truth.md)** — *where* content lives and which copies are stale. Reading this once saves the hour I lost on the L2 truncation fix.
-6. **[newsletter/docs/L1-L4-PIPELINE.md](newsletter/docs/L1-L4-PIPELINE.md)** — what each stage does, the daily cron schedule, and the operator runbooks.
-7. **[newsletter/docs/azure-budget-rules.md](newsletter/docs/azure-budget-rules.md)** — the 3-bracket token sizing for any LLM generation call site. The L2 truncation bug existed because this wasn't documented (it was first written for the since-retired GAS `azureGenerateText`).
-8. **[newsletter/docs/DESIGN.md](newsletter/docs/DESIGN.md)** — visual/IA system (L1) for `newsletter/app/src`.
-9. **[newsletter/docs/GROWTH.md](newsletter/docs/GROWTH.md)** — the Software 2.0 growth plan and the two-loop quality model + rubrics (the source of the quality layer below).
+Bindings (which persona runs which cadence) live in DynamoDB via agents-api, not in git — the `workforce/agents/` tree was retired by workforce ADR-0007. Query the API (or the console) rather than grepping for a persona name.
 
-## The four invariants you must not violate
+## Doc map — read before editing
 
-From [docs/governance.md §2](docs/governance.md#2-l0--constitution):
+1. [docs/governance.md](docs/governance.md) — the layered law: L0 invariants → L1 statute/ADRs → L2 mechanical R-rules → L3 runbooks, the §8.1 A/B action-authority matrix, and §4.4 (what `pr-autopilot` may merge).
+2. [AGENTS.md](AGENTS.md) — the Zone model (A human-owned · B agent-assisted code · C generated content · D frozen). Zone sets the approval bar; governance.md sets the layer.
+3. [docs/design-policy.md](docs/design-policy.md) — D-1 innovation velocity, D-2 Software 2.0 (prompt/eval before code), D-3 external substrate over reinvention.
+4. [docs/governance-mechanisms.md](docs/governance-mechanisms.md) — the memory→lint ratchet and the content-insights loop. Read before adding any gate, loop or registry.
+5. Pipeline statute: [architecture-source-of-truth.md](newsletter/docs/architecture-source-of-truth.md) (where content lives, which copies are stale) · [L1-L4-PIPELINE.md](newsletter/docs/L1-L4-PIPELINE.md) (stages, cron, runbooks) · [azure-budget-rules.md](newsletter/docs/azure-budget-rules.md) (token brackets for any LLM call site) · [DESIGN.md](newsletter/docs/DESIGN.md) · [GROWTH.md](newsletter/docs/GROWTH.md) (quality rubrics) · [ARTICLE-FIGURES.md](newsletter/docs/ARTICLE-FIGURES.md).
+6. Workforce statute: [governance.md](workforce/docs/governance.md) · [architecture.md](workforce/docs/architecture.md) (partly stale, see below) · [data-model.md](workforce/docs/data-model.md) · [naming.md](workforce/docs/naming.md) · [mvv.md](workforce/docs/mvv.md) · [ROADMAP.md](workforce/ROADMAP.md).
 
-- **C-1. Editorial integrity.** No empty articles, no mid-sentence truncations, no leaked LLM-failure artefacts on `kohuehara.xyz`.
-- **C-2. Notion is the source of truth.** Don't write authoritative content anywhere else. `newsletter/app/public/posts/*.md` is a derived export — CI overwrites it from Notion every deploy.
-- **C-3. Single-operator scale.** This is a hobby site. Don't propose multi-tenant primitives (auth, quotas, role-based access).
-- **C-4. Fail loud, not silent.** A broken state must throw (or turn CI red), never silently publish a degraded result.
+## The invariants you must not violate
 
-When a request would conflict with one of these, stop and report — don't ship a "creative interpretation" that violates them.
+Root L0 ([governance.md §2](docs/governance.md#2-l0--constitution)):
+
+- **C-1 Editorial integrity.** No empty, truncated, or LLM-failure-artefact article goes live.
+- **C-2 Notion is the source of truth.** `newsletter/app/public/posts/` is a derived export; never author there.
+- **C-3 Single-operator scale.** No multi-tenant primitives (auth tiers, quotas, RBAC).
+- **C-4 Fail loud, not silent.** Throw or turn CI red; never publish degraded.
+
+Workforce L0 ([workforce/docs/governance.md §2](workforce/docs/governance.md)): **W-1** editorial integrity under a byline · **W-2** no double source of truth (Notion owns article bodies; DDB + S3 own workforce state) · **W-3** cost ceiling, currently USD 600/month, raised only by a Zone A amendment · **W-4** fail loud · **W-5** persona stability (identity changes only via agents-api, audited).
+
+When a request conflicts with one of these, stop and report. Do not ship a creative interpretation.
+
+## Mechanical gates (L2) that will reject your PR
+
+Active R-rules ([governance.md §4](docs/governance.md#4-l2--regulations-mechanical-enforcement)); numbers are never reused:
+
+| Rule | Check | Where |
+|---|---|---|
+| R-2 | no raw hex colours in either app's `src/` | `lint:tokens` |
+| R-10 | corpus truncation gate before deploy | `check-truncation` |
+| R-11 | PR touching an L1 doc / ADR must cite it or carry `RULE-N/A: <reason>` | `check-l1-citation` |
+| R-12 | governance registries well-formed | `check-registries` |
+| R-13 | daily PR terminal-state sweep | `workforce-pr-terminal-sweep.yml` |
+| R-14 | scripts bootstrap the HTTPS proxy | `check-proxy-bootstrap` |
+| R-15 | corpus not older than 5 days (daily, not on PRs) | `corpus-freshness.yml` |
+| R-16 / R-17 | base path is `SITE_BASE_PATH` from `site.ts` everywhere; live smoke after deploy | `check-base-path`, `check-live-base-path` |
+| R-N1…R-N10 | workforce shape rules (naming, single state store, bindings-only scheduling, PR-only external git, bounded autopilot merge) | `workforce:*` scripts |
+
+R-1, R-3…R-6 were retired with the Apps Script engine on 2026-06-28. Tightening a rule is autonomous; loosening or disabling one needs the operator's explicit yes.
 
 ## The quality layer (Software 2.0)
 
-Generation is no longer "one prompt → one article." L2/L3 generation is moving onto a **multi-candidate, multi-judge** model (GROWTH.md §2–§5):
-
-- Each article can be generated by ≥1 **generator** on a panel, scored by ≥1 **judge** (editor / domain / reader perspectives) against a per-level **rubric**, with a panel-weighted aggregate and a `chosen` candidate. The schema is [`newsletter/app/src/types/quality.ts`](newsletter/app/src/types/quality.ts); per-article evidence is the operator-only `.eval.json` sidecar.
-- The **chosen** candidate's `systemPromptVersion` + aggregate score are copied into the published article's frontmatter, so GA4 can bucket reader behaviour by prompt version — this is the **outer loop** that the weekly content-insights loop feeds.
-- **Zone A (human-owned).** The rubric text/thresholds (`JUDGE_GATE`, `DIM_FLOOR`, `FALSIFIABILITY_FLOOR`), the panel rosters (`JUDGE_ROSTER`, `GENERATOR_ROSTER`), and the model registry (`MODEL_REGISTRY`, currently `gpt-5.4` on Azure) are **operator-approved** — propose diffs, don't self-merge. A rubric change invalidates every prior score; a roster/model change is a product-shape decision.
-
-When investigating a content-quality issue, the first reflex (design-policy.md D-2) is: *prompt problem, eval gap, or code problem?* — usually the first two.
-
-## Skills you should use, not reinvent
-
-Project-local skills under `.claude/skills/`:
-
-- **`article-health`** — sweep the published corpus on gh-pages, flag truncated articles, and (when `NOTION_API_KEY` is set) compare against the Notion Articles DB directly to surface Notion↔gh-pages drift. With no key, only the gh-pages truncation sweep runs. Run after any generation change (the workforce cadences) and any time a broken article is reported.
-- **`cadence-forge`** — scaffold a new workforce "Cadence" skill (scheduled, persona-voiced periodic task).
-- **`ship-pr`** — drive a freshly-opened draft PR to all-CI-green + no unresolved threads, then flip it ready.
-- **`log-workforce-engagements`** — batch-record workforce Track Record engagement rows for a session's contributors.
-
-The article-authoring skills (`article-level2`, `article-level3`) live under `workforce/skills/` — they're workforce-owned cadences validated by workforce CI, not Claude-Code session skills. They carry the W-1 guard in their `publish-notion.mjs`.
+L2/L3 generation is a **multi-candidate, multi-judge** model (GROWTH.md §2–§5): a generator panel produces candidates, a judge panel (editor / domain / reader) scores them against a per-level rubric, and the chosen candidate's `systemPromptVersion` + score go into the article frontmatter so GA4 can bucket reader behaviour by prompt version. Schema and constants: [`newsletter/app/src/types/quality.ts`](newsletter/app/src/types/quality.ts) (`MODEL_REGISTRY` — only `azure-gpt5` active — `GENERATOR_ROSTER`, `JUDGE_ROSTER`, `JUDGE_GATE`, `DIM_FLOOR`, `FALSIFIABILITY_FLOOR`). Every generation writes a `.eval.json` sidecar (AGENTS.md rule 10). Rubric text, thresholds, rosters and the model registry are **Zone A**: propose a diff, never self-merge. For a content-quality issue, ask first: prompt problem, eval gap, or code problem? (D-2) — usually one of the first two.
 
 ## Action authority — what to do autonomously
 
-Default to **A (auto-execute)** for L3 work and L2 tightening. Default to **B (escalate to operator)** for anything that mutates `main`, merges PRs, amends an L1 doc / ADR / Zone-A file, loosens an existing mechanical check, or spends money outside the existing pipeline envelope. Full matrix at [docs/governance.md §8.1](docs/governance.md#81-action-authority-matrix); cross-check the [AGENTS.md](AGENTS.md) Zone of the files you touch.
+Default **A (do it)**: read-only inspection, local build/test, L3 edits (runbooks, skills), L2 tightening, git on your own branch, opening draft PRs and issues, `article-health` sweeps, editing a `newsletter/pipeline/` script or a workforce cadence to fix a bug, adding an L1 source row in Notion, `gh workflow run deploy-article-site.yml`.
 
-- ✅ Edit a workforce cadence (`workforce/skills/article-level{2,3}/`) to fix a generation bug, validate via workforce CI, then run `article-health` (mind the workforce zone rules — see `workforce/docs/governance.md`).
-- ✅ Edit a `newsletter/pipeline/` script (`fetch-notion.mjs`, sitemap, etc.) to fix a bug.
-- ✅ Add a new L1 source row directly in Notion (read by `article-level2/pick-l1-source.mjs`); trigger a fresh publish with `gh workflow run deploy-article-site.yml`.
-- ✅ Open a PR (you author + draft). Add a runtime guard or new lint (L2 tightening). Edit a runbook.
-- 🚫 Merge any PR (incl. your own). Push directly to `main` (PR-only).
-- 🚫 Edit `docs/governance.md` §2 (L0 invariants) or any **Zone A** file (design tokens, prompts, rubric/roster/model registry, workflows) without operator approval.
-- 🚫 Loosen or disable any R-rule ([§4](docs/governance.md#4-l2--regulations-mechanical-enforcement)) — incl. the W-1 `publish-notion.mjs` guard and the R-10 corpus-truncation deploy gate.
-- 🚫 Change `package.json` deploy IDs, `.github/workflows/*` deploy config, GitHub repo settings.
+Default **B (ask, wait for an explicit yes)**: merging any PR yourself, pushing to `main`, force-push / history rewrite, editing L0 text, merging an L1 doc or ADR, loosening an R-rule (incl. W-1 and R-10), touching Zone A files (design tokens, `site.ts`, workflows, CODEOWNERS, rubric/roster/model registry, `SKILL.md` bodies, `samconfig.toml`), repo settings/secrets, destructive Notion mutations, spend outside the existing envelope or above W-3.
 
-When in doubt: ask in chat with a one-line description; wait for an explicit "yes."
+Note the merge rule precisely: *you* do not merge, but the workforce's `pr-autopilot` **does** autonomously merge a consensus-green PR that touches no L0/L1 path listed in [governance.md §4.4](docs/governance.md#44-autopilot-pr-merge--workforce-r-n10-delegation--l0l1-off-limits) (that list includes this file). Add the `autopilot:off` label to hold a PR back.
 
 ## Workflow expectations
 
-- **Before implementing, check for a governing ADR.** Skim [docs/adr/](docs/adr/README.md) (root/newsletter decisions) and [workforce/docs/adr/](workforce/docs/adr/README.md) (workforce decisions) for an ADR that governs the area you're about to change. If one exists, **follow it and cite it in the PR.** ADRs are L1 framework laws (governance.md §3); a reversal is a new *superseding* ADR, never an in-place edit of a decided one.
-- **Touching an L1 doc or ADR?** The R-11 citation gate requires the PR body to either reference the L1 doc / ADR you're changing or carry `RULE-N/A: <reason>`. (L1 = the statute docs in [governance.md §3.1](docs/governance.md#31-current-statute), governance.md / design-policy.md themselves, and any ADR under `docs/adr/`.)
-- **Plan before non-trivial implementation.** Use `EnterPlanMode` for any change that touches a workforce cadence's `publish-notion.mjs` substantively or that modifies multiple files.
-- **Verify after change.** A content-generation change (a workforce cadence edit) isn't done until `article-health` reports 0 truncated. A publish-pipeline change isn't done until `deploy-article-site.yml` is green.
-- **Commit messages cite the layer.** `L2: tighten W-1 cut-off guard in publish-notion.mjs` beats `fix: bug`.
-- **Label new issues per [docs/issue-labeling.md](docs/issue-labeling.md).** Mandatory axes: `project:` + `layer:` + `type:`. Reconcile colours via `node scripts/sync-labels.mjs` after editing `.github/labels.json`.
-- **Found a recurring failure mode?** Log it in [docs/memory-lint-backlog.md](docs/memory-lint-backlog.md); a second occurrence within 90 days promotes it to an `R-NN` gate (the §6.1 ratchet). A real-but-not-worth-a-check gap goes to [docs/risk-acceptance-ledger.md](docs/risk-acceptance-ledger.md) instead.
-- **One in_progress todo at a time** when running TodoWrite for multi-step tasks. Mark complete immediately on finish.
+- **Check for a governing ADR first** ([docs/adr/](docs/adr/README.md), [workforce/docs/adr/](workforce/docs/adr/README.md)); follow it and cite it in the PR body. Reversals are a new superseding ADR, never an in-place edit.
+- **PR title prefix** per `.github/pull_request_template.md` (`growth:` `fix:` `content:` `chore:` `governance:`), or the layer form used throughout history (`L2(workforce): …`, `L3: …`). One logical change per PR; never span zones.
+- **Plan before non-trivial work** (`EnterPlanMode`) when touching a cadence's `publish-notion.mjs` substantively or several files.
+- **Verify after change.** A generation change is done when `article-health` reports 0 truncated. A publish change is done when `deploy-article-site.yml` is green. A workforce Lambda change is done when `workforce/lambdas` typecheck + tests pass and the registry `--check` scripts are clean.
+- **Skill bundles** (`workforce/skills/*`): every body edit bumps `meta.json` version (ADR-0017/0018 gate) and passes `workforce:skills`; new cadences are scaffolded with `cadence-forge`, not copied by hand.
+- **Labels** per [docs/issue-labeling.md](docs/issue-labeling.md): `project:` + `layer:` + `type:` are mandatory; `node scripts/sync-labels.mjs` after editing `.github/labels.json`.
+- **Recurring failure?** Log it in [docs/memory-lint-backlog.md](docs/memory-lint-backlog.md) (ML-NNN); a second hit within 90 days becomes an R-rule. Tolerated gaps go to [docs/risk-acceptance-ledger.md](docs/risk-acceptance-ledger.md).
+- **Commit messages cite the layer**: `L2: tighten W-1 cut-off guard` beats `fix: bug`.
 
 ## Things that cost more than they look
 
-- **gh-pages cron.** Up to 6 hours between editing Notion and seeing it live (`06:17 / 12:17 / 18:17 UTC`, plus push-to-`main`). For "make it live now," run `gh workflow run deploy-article-site.yml`.
-- **Reasoning-token consumption.** The active model (`gpt-5.4`, via `MODEL_REGISTRY`) shares `max_completion_tokens` between hidden reasoning and visible output. The 2000-token default produced empty articles; 8000 is the floor for prose. See [azure-budget-rules.md](newsletter/docs/azure-budget-rules.md).
-- **Generation runs in the workforce, not in-session.** The article-level2/3 cadences fire on the `wf-orchestrator-tick` schedule and write to Notion asynchronously; you don't synchronously "generate an article" from a Claude Code session. To get new content live, add the L1 source row in Notion and let the cadence pick it up (or trigger the deploy once Notion is updated).
-- **Network allowlist (remote sessions).** Cloud/remote execution environments may block outbound hosts, so `article-health`'s Notion comparison (and other API calls) can 403 (`Host not in allowlist`). The gh-pages truncation sweep still works without a key; the Notion-drift comparison must run from an unrestricted machine with `NOTION_API_KEY` set.
+- **gh-pages latency**: up to 6 h between a Notion edit and the live site. `gh workflow run deploy-article-site.yml` for "now".
+- **Base path**: the site is served under `/ai-native-article/`. Every asset/route goes through `withBasePath()` from `newsletter/app/src/lib/paths.ts`; a stray `/` literal blanked the site for a week (ML-031/032, hence R-16/R-17).
+- **Reasoning tokens**: `gpt-5.4` shares `max_completion_tokens` between hidden reasoning and output; 8000 is the floor for prose ([azure-budget-rules.md](newsletter/docs/azure-budget-rules.md)).
+- **Remote-session network allowlist**: Notion, the workforce custom domain and other hosts may 403. The gh-pages truncation sweep works without a key; Notion drift comparison and most agents-api writes need an unrestricted machine (`log-workforce-engagements` resolves a reachable API base).
+- **DynamoDB scans**: `scanPrefix()` is single-page by design; `check-scan-drain` rejects new call sites that forget to drain (Limit-vs-Filter bug class).
+- **Workforce cost**: every new persona or binding adds to the W-3 ledger. Do not wire a binding without a budget line.
+
+## Known stale spots (as of the last survey)
+
+Do not "fix" these silently — several are Zone A. Cite this list when you open the PR.
+
+- `workforce/docs/architecture.md` body is v1 (five personas, a `wf-agent-runner` Lambda). Its status banner lists the ADRs that override it; the body itself awaits a Zone A rewrite.
+- `workforce/docs/governance.md §3` still carries a Frozen row for the retired `workforce/agents/` tree (ADR-0007); harmless, Zone A.
+- `newsletter/docs/azure-budget-rules.md` is marked historical but stays L1 (`check-l1-citation` lists it) because its bracket rule still binds every LLM call site.
+- `.github/labels.json` still defines `area:gas` although the Apps Script engine is gone.
+- `newsletter/app/src/types/quality.ts` is a spec: nothing in the app imports it yet; the cadences honour it by convention.
 
 ## When something breaks
 
-1. Run `article-health` to localise: breakage on `gh-pages`, in Notion, or both?
-2. Check the workforce run logs for the failed cadence (the `wf-orchestrator-tick` / agent-runner execution) for a thrown W-1 guard (empty/short body, LLM-failure prelude, cut-off last line → exit 2) or other generation error.
-3. Content issue → re-run the relevant cadence (`workforce/skills/article-level{2,3}/`), or fix/open the Notion row directly.
-4. Deploy issue → `gh workflow run deploy-article-site.yml` (R-10 will block a deploy that would publish a truncated article).
-5. Otherwise → [L1-L4-PIPELINE.md §Operator runbooks](newsletter/docs/L1-L4-PIPELINE.md#operator-runbooks).
-
-If the symptom is novel, after fixing it ask whether the rule that should have caught it lives at L1 (a doc/ADR), L2 (a mechanical check), or L3 (a runbook), record it in [memory-lint-backlog.md](docs/memory-lint-backlog.md), and update the corresponding layer. That's the §6 "governance retrospective" loop.
+1. `article-health` to localise: gh-pages, Notion, or both.
+2. Generation failure → the CCR run for the cadence (W-1 exit 2, empty body, budget). Deploy failure → the `deploy-article-site.yml` run (R-10 / R-17 will name the slug).
+3. Content → re-fire the cadence or fix the Notion row. Deploy → `gh workflow run deploy-article-site.yml`. Workforce API drift → `check-workforce-api-routes.yml` output.
+4. Otherwise → [L1-L4-PIPELINE.md §Operator runbooks](newsletter/docs/L1-L4-PIPELINE.md#operator-runbooks) or `workforce/docs/runbooks/`.
+5. Afterwards ask which layer should have caught it (L1 doc, L2 check, L3 runbook), record it in the memory-lint backlog, and update that layer.
