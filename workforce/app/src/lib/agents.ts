@@ -351,3 +351,37 @@ export async function fetchAgentExecutions(slug: string, limit = 20): Promise<Ag
   const data = (await res.json()) as { items: AgentExecution[] }
   return data.items
 }
+
+// Epic-010 Story 4 (#93) — semantic recall over one agent's EXEC ledger.
+// `GET /agents/{slug}/recall?q=&k=` embeds the query with voyage-3-lite and
+// brute-forces cosine kNN over that agent's partition only, so a recall can
+// never surface another agent's rows. The route returns the same row shape
+// the executions list does, plus the cosine `score`.
+export interface AgentRecallHit extends AgentExecution {
+  /** Cosine similarity against the embedded query, 0…1 (higher is closer). */
+  score: number
+}
+
+/** Upper bound the route itself enforces (PAGE_SIZE_MAX); mirrored here so
+ *  the console never sends a k the API will silently clamp. */
+export const RECALL_K_MAX = 100
+
+export async function fetchAgentRecall(
+  slug: string,
+  query: string,
+  k = 10,
+): Promise<AgentRecallHit[]> {
+  if (!apiConfigured()) return []
+  const q = query.trim()
+  // The route answers 400 on a blank q; treat "nothing asked" as "nothing
+  // found" rather than surfacing an error the operator can't act on.
+  if (q.length === 0) return []
+  const bounded = Math.min(Math.max(Math.trunc(k) || 1, 1), RECALL_K_MAX)
+  const url =
+    `${WORKFORCE_AGENTS_API_BASE}/agents/${encodeURIComponent(slug)}/recall` +
+    `?q=${encodeURIComponent(q)}&k=${bounded}`
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`agents-api ${res.status}`)
+  const data = (await res.json()) as { items: AgentRecallHit[] }
+  return data.items
+}
