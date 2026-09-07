@@ -14,10 +14,16 @@
 // git (the head branch, per R-N9 — never the default branch) or through
 // pr-remediate-post.mjs. Nothing here approves, merges, or comments.
 //
+// `--lane groom` scans the HUMAN lane instead (adr-0030): the same discovery,
+// but classified by `classifyGroom` and actionable only on a conflict or a
+// behind branch. That lane keeps an escalated PR applicable to a moved base; it
+// never touches why the PR is escalated. The two lanes never work one PR at
+// once — a PR carrying both labels is `not-in-lane` for the groomer.
+//
 // Usage:
 //   GITHUB_TOKEN=<credentials['github.token'].token> \
 //     node workforce/skills/pr-remediate/pr-remediate-scan.mjs \
-//       --project agent-workforce [--repo owner/repo] \
+//       --project agent-workforce [--repo owner/repo] [--lane author|groom] \
 //       [--max 3] [--out /tmp/pr-remediate-candidates.json] [--json]
 //
 // Exit codes: 0 ok (including "0 candidates" — a cheap, normal outcome)
@@ -37,6 +43,7 @@ import {
   countRemediationAttempts,
   makeGh,
 } from "../pr-autopilot/pr-merge.mjs";
+import { classifyGroom, GROOM_BLOCK_CAP } from "./groom.mjs";
 import { findReasonMarkers } from "../pr-autopilot/escalation-reasons.mjs";
 import { BRIEF_MARKER, parseRemediationBrief } from "../pr-autopilot/remediation-brief.mjs";
 
@@ -162,8 +169,10 @@ async function main() {
   const out = arg("out");
   const asJson = process.argv.includes("--json");
   const max = Number(arg("max", String(DEFAULT_MAX)));
+  const lane = arg("lane", "author");
   let repo = arg("repo");
 
+  if (!["author", "groom"].includes(lane)) return die(1, `--lane must be author|groom (got ${lane})`);
   if (!token) return die(1, "GITHUB_TOKEN (or GH_TOKEN) env is required (from credentials['github.token'].token)");
   if (!repo && projectId) {
     try {
@@ -177,11 +186,12 @@ async function main() {
   if (!Number.isFinite(max) || max <= 0) return die(1, `--max must be positive (got ${max})`);
 
   const gh = makeGh({ token, userAgent: "workforce-pr-remediate" });
+  const laneLabel = lane === "groom" ? ESCALATION_LABEL : AUTHOR_LABEL;
 
   // Search is the cheap filter: only PRs already in the lane are candidates.
   let numbers;
   try {
-    const q = encodeURIComponent(`repo:${repo} is:pr is:open label:"${AUTHOR_LABEL}"`);
+    const q = encodeURIComponent(`repo:${repo} is:pr is:open label:"${laneLabel}"`);
     const r = await gh("GET", `/search/issues?q=${q}&per_page=100`);
     if (r.status !== 200 || !Array.isArray(r.json?.items)) return die(3, `search -> HTTP ${r.status}`);
     numbers = r.json.items.map((it) => it.number);
@@ -220,13 +230,22 @@ async function main() {
     const labels = Array.isArray(pr.labels) ? pr.labels.map((l) => l?.name) : [];
     const attempts = countRemediationAttempts(bodies);
     const reasons = reasonCodesFrom(bodies);
-    const verdict = classifyRemediation({
-      labels,
-      mergeable: pr.mergeable,
-      mergeableState: pr.mergeable_state,
-      reasons,
-      attempts,
-    });
+    const verdict =
+      lane === "groom"
+        ? classifyGroom({
+            labels,
+            mergeable: pr.mergeable,
+            mergeableState: pr.mergeable_state,
+            baseSha: pr.base?.sha,
+            bodies,
+          })
+        : classifyRemediation({
+            labels,
+            mergeable: pr.mergeable,
+            mergeableState: pr.mergeable_state,
+            reasons,
+            attempts,
+          });
 
     candidates.push({
       number,
@@ -234,7 +253,10 @@ async function main() {
       url: pr.html_url,
       draft: pr.draft === true,
       head: { ref: pr.head?.ref, sha: pr.head?.sha },
-      base: { ref: pr.base?.ref },
+      // The groom lane's attempt marker is keyed by the base SHA (adr-0030), so
+      // the scan must carry it: it is what says "the base moved, this PR is
+      // owed another attempt" — an attempt counter cannot.
+      base: { ref: pr.base?.ref, sha: pr.base?.sha },
       mergeable: pr.mergeable,
       mergeable_state: pr.mergeable_state,
       labels,
@@ -258,14 +280,25 @@ async function main() {
     });
   }
 
-  const payload = { repo, cap: REMEDIATION_CAP, scanned: numbers.length, candidates };
+  const payload = {
+    repo,
+    lane,
+    lane_label: laneLabel,
+    cap: lane === "groom" ? GROOM_BLOCK_CAP : REMEDIATION_CAP,
+    scanned: numbers.length,
+    candidates,
+  };
   if (out) {
     writeFileSync(out, JSON.stringify(payload, null, 2));
-    console.error(`pr-remediate-scan: ${candidates.length} candidate(s) of ${numbers.length} in the lane -> ${out}`);
+    console.error(`pr-remediate-scan(${lane}): ${candidates.length} candidate(s) of ${numbers.length} in the lane -> ${out}`);
   }
   if (asJson || !out) console.log(JSON.stringify(payload, null, 2));
   for (const c of candidates) {
-    console.error(`  - #${c.number} [${c.remediation.kind}] attempt ${c.attempt_next}/${REMEDIATION_CAP} — ${c.remediation.why}`);
+    const bound =
+      lane === "groom"
+        ? `base ${String(c.base?.sha ?? "?").slice(0, 7)}`
+        : `attempt ${c.attempt_next}/${REMEDIATION_CAP}`;
+    console.error(`  - #${c.number} [${c.remediation.kind}] ${bound} — ${c.remediation.why}`);
   }
   return 0;
 }

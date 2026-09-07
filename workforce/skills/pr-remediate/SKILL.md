@@ -1,6 +1,6 @@
 ---
 name: pr-remediate
-description: Work every PR sitting in the autopilot AUTHOR lane (`autopilot:needs-author`) to a pushed fix — resolve a merge conflict with the base branch, update a behind branch, address the open blocking findings a reviewer panel left, or fix a failing check — then hand the PR back to pr-autopilot for re-review at cycle N+1. Bounded: three attempts per PR, after which it escalates to a human with `autopilot:needs-human`. The author-side half of the issue→merge loop (adr-0022); never merges, never pushes the default branch (R-N9). Runs as a CCR claude-code-routine task, fired on the binding's cron; github.token via the binding's project linkage.
+description: Work every PR sitting in the autopilot AUTHOR lane (`autopilot:needs-author`) to a pushed fix — resolve a merge conflict with the base branch, update a behind branch, address the open blocking findings a reviewer panel left, or fix a failing check — then hand the PR back to pr-autopilot for re-review at cycle N+1. Bounded: three attempts per PR, after which it escalates to a human with `autopilot:needs-human`. Also runs a second, strictly weaker GROOM lane (`--lane groom`, adr-0030) over the HUMAN queue (`autopilot:needs-human`): it merges the base branch into each escalated PR that has fallen behind, resolving only conflicts additive on both sides, so the operator's decision does not also cost a conflict resolution. It changes no label, addresses no finding and decides nothing. The author-side half of the issue→merge loop (adr-0022); never merges, never pushes the default branch (R-N9). Runs as a CCR claude-code-routine task, fired on the binding's cron; github.token via the binding's project linkage.
 ---
 
 # pr-remediate
@@ -27,7 +27,12 @@ Do not review your own fix in the PR thread beyond stating what you changed.
 Your task context supplies `agent_slug` (you — the standing instance is Ren),
 `project_id` (whose `project.json` names the target repo),
 `credentials['github.token'].token` (export as `GITHUB_TOKEN`), and
-`binding_config` (`max_prs_per_run`, `sign_off_persona`).
+`binding_config` (`max_prs_per_run`, `sign_off_persona`, `lane`).
+
+**Which lane am I?** `binding_config.lane` is `author` (the default, everything
+below through Step 6) or `groom` (the human-queue lane, **Step G** at the end —
+read that section *instead of* Steps 1–6, not after them). One fire is one lane.
+A binding that omits `lane` is an author-lane binding.
 
 ## Step 1 — discover the lane (deterministic, read-only)
 
@@ -195,9 +200,142 @@ will find.
   triaging the tracker (`issue-triage`), or opening new PRs of any kind.
 - Any PR not in the author lane. If you believe a `needs-human` PR is actually
   agent-fixable, say so in a comment and leave the label alone — moving a PR out
-  of the operator's queue is the operator's call.
+  of the operator's queue is the operator's call. (An author-lane fire never
+  touches the human queue at all; keeping those PRs *mergeable* is the groom
+  lane's separate, weaker job — **Step G**.)
+
+---
+
+# Step G — the groom lane (`binding_config.lane == "groom"`, adr-0030)
+
+**Read this section instead of Steps 1–6.** Different queue, different
+authority, different bound.
+
+## What this lane is for
+
+`pr-autopilot` escalates a PR to `autopilot:needs-human` and nothing drains that
+queue — correctly, because the decision is the operator's. But "the decision is
+the operator's" was taken to mean "the PR is untouchable," and those are
+different claims. The queue that motivated this ADR held seven PRs with a median
+age of 28 days; **six arrived mergeable and conflicted while waiting**, and four
+had already passed a ≥3-persona panel. The operator's decision was never the
+expensive part. Re-deriving each PR against a month of moved `main` was.
+
+You keep that queue **decision-ready**. You never decide.
+
+## What you may do — and the line you may not cross
+
+**May:**
+
+- **G1** — `git merge origin/<base.ref>` into the PR's head branch. Never
+  rebase, never amend, never force-push: the branch is not yours and a
+  contributor's checkout must stay valid.
+- **G2** — resolve a conflict **only when every hunk is additive on both sides**:
+  both sides add new lines, neither rewrites or deletes a line the other
+  touched. Keep **both** additions, base side first.
+- **G3** — regenerate derived files with the repo's own tooling (e.g.
+  `node workforce/scripts/build-agent-manifest.mjs --emit-skills`), never by hand.
+- **G4** — run the repo's own fast checks and push only if they pass.
+- **G5** — post one status comment.
+
+**May never:** merge, approve, undraft, close, add or remove any `autopilot:*`
+**label**, push to the default branch, or touch §4.4's own path block. And never
+address a review finding or fix a failing check — those are *why* the PR is in
+the human queue. Removing them would be deciding, and this lane does not decide.
+
+If you think a `needs-human` PR is actually agent-fixable, say so in the status
+comment and leave the labels alone.
+
+## G-1 — discover the queue
+
+```sh
+GITHUB_TOKEN="<credentials['github.token'].token>" \
+  node workforce/skills/pr-remediate/pr-remediate-scan.mjs --lane groom \
+    --project "<project_id>" --max <binding_config.max_prs_per_run ?? 5> \
+    --out /tmp/groom-candidates.json
+```
+
+Only `conflict` and `behind` are actionable. `decision-ready` is the goal, not a
+miss — an empty actionable list is a **good** run; record it and stop.
+`already-groomed` means nothing has moved since the last attempt at this base.
+`groom-blocked` means three consecutive blocked bases; leave it alone.
+
+## G-2 — claim the attempt BEFORE working
+
+```sh
+GITHUB_TOKEN="…" node workforce/skills/pr-remediate/groom-post.mjs \
+  --project "<project_id>" --pr <number> --base-sha "<candidate.base.sha>" --claim
+```
+
+The attempt is keyed to the **base SHA**, not to a counter: what you are owed is
+one attempt per base, and the next one comes when the base moves. A run that
+dies mid-resolution has spent this base's attempt — that is the safe direction.
+
+## G-3 — merge the base in, one PR at a time
+
+Own clone/worktree per PR, same as Step 3. Then, for each conflicted file, decide
+with the guard rather than by eye:
+
+```sh
+node -e '
+  const { classifyConflictFile } = await import("./workforce/skills/pr-remediate/groom.mjs");
+  console.log(classifyConflictFile(hunks));
+'
+```
+
+Pass each conflict point as `{ ours, theirs }` line arrays. `additive: false` on
+**any** hunk blocks the whole file — a half-resolved conflict pushed to someone
+else's branch is worse than an unresolved one (C-4).
+
+**The trap the guard exists for.** A textually additive conflict can still be a
+semantic collision. Both real instances are in the ADR: `main` and #602 each
+added a table row claiming **R-16**; `main` and #546 each added one claiming
+**ML-020**. Keeping both rows yields a well-formed file asserting two meanings
+for one identifier — and every registry check passes on it. Renumbering has
+citation fan-out (ML-035 needed four call sites updated) and is an allocation
+decision, so it is **blocked**, not yours. This is [ML-027](../../../docs/memory-lint-backlog.md)'s
+class; the real fix is that entry's proposed `--vs-base` CI gate.
+
+## G-4 — verify, then push
+
+Run what a contributor runs locally (`npm run test:scripts`, `workforce:skills`,
+the changed package's tests, and the gates the merged base added). Push to the
+**head branch only**. A groom push that turns CI red costs more than the
+conflict did.
+
+## G-5 — record the outcome
+
+```sh
+# resolved and pushed
+GITHUB_TOKEN="…" node workforce/skills/pr-remediate/groom-post.mjs \
+  --project "<project_id>" --pr <number> --base-sha "<sha>" \
+  --pushed --body-file /tmp/groom-<number>.md
+
+# could not resolve inside this lane's authority
+… --blocked --body-file /tmp/groom-<number>.md
+```
+
+The `--pushed` body says what you merged in, which conflicts you resolved and on
+what evidence they were additive, what checks you ran — and **what the PR is
+still waiting on**, which is unchanged: the operator's decision. The `--blocked`
+body names the exact hunk and the guard's reason, so the operator can see in one
+read whether it is a renumber or something worse.
+
+Neither shape moves a label. The PR stays in the human queue where it belongs.
+
+## G — scope
+
+- **Every actionable candidate, or an honest blocked record for it.** A run that
+  finds conflicts and leaves them silent is an incomplete run.
+- **Bounded**: one attempt per base SHA, claimed before the work; three
+  consecutive blocked bases and the lane stops touching the PR.
+- **Groomer, never decider.** No merge, no approve, no label, no finding.
+
+---
 
 Related: [adr-0022](../../docs/adr/adr-0022-issue-to-merge-flow.md) (the flow this
-implements), [pr-autopilot](../pr-autopilot/SKILL.md) (the reviewer half and the
-lane's other end), [issue-to-merge-flow runbook](../../docs/runbooks/issue-to-merge-flow.md),
+implements), [adr-0030](../../docs/adr/adr-0030-escalated-pr-groom-lane.md) (the
+groom lane and its authority boundary), [pr-autopilot](../pr-autopilot/SKILL.md)
+(the reviewer half and the lane's other end),
+[issue-to-merge-flow runbook](../../docs/runbooks/issue-to-merge-flow.md),
 [agent-runner.md](../../docs/routines/agent-runner.md).
