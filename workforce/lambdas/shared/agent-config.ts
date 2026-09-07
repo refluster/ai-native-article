@@ -374,6 +374,10 @@ function validateBindingUniqueness(bindings: unknown[]): ConfigViolation[] {
     // Only pairs already well-formed enough to be meaningful; a malformed
     // binding has its own violation and should not also produce this one.
     if (typeof b.skill !== "string" || !b.skill) return;
+    // An absent project_id and an empty one are deliberately the SAME key:
+    // both mean "no project", and two such bindings are the duplicate this
+    // rule is for. (`S9-binding-ccr-batch-project` separately rejects a
+    // missing project_id on the CCR path, where it actually matters.)
     const key = `${b.skill}@${b.project_id ?? ""}`;
     const first = firstSeen.get(key);
     if (first === undefined) {

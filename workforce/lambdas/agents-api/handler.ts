@@ -1683,12 +1683,20 @@ async function getProjectRoute(
 // item is optional — a scope with lifecycle but no published PR sections serves
 // an empty PR block rather than 404ing the whole series.
 async function getPerformanceRoute(scope: string): Promise<APIGatewayProxyResultV2> {
-  const [lifecycleRow, prRow, repoRow, humanTouchRow, idleRow] = await Promise.all([
+  // The ledger read joins the existing fan-out rather than trailing it: it
+  // depends on none of the five rows, and /performance is a hot console read
+  // (ren, #682 R1).
+  const [lifecycleRow, prRow, repoRow, humanTouchRow, idleRow, budget] = await Promise.all([
     getItem<PerfLifecycleRow>(perfPk(scope), "LIFECYCLE"),
     getItem<PerfPrRow>(perfPk(scope), "PR"),
     getItem<PerfRepoRow>(perfPk(scope), "REPO"),
     getItem<PerfHumanTouchRow>(perfPk(scope), "HUMAN-TOUCH"),
     getItem<PerfIdleRow>(perfPk(scope), "IDLE"),
+    // Workforce scope only: the W-3 ledger is keyed per agent, and an agent
+    // works across projects, so there is no honest way to attribute a fire's
+    // cost to one project. A project-scoped budget would invent an
+    // attribution the ledger does not carry.
+    scope === "workforce" ? readBudgetBlock() : Promise.resolve(undefined),
   ]);
   if (!lifecycleRow) return reply(404, { error: "not_found", scope });
   const series = composeSeries(
@@ -1699,11 +1707,7 @@ async function getPerformanceRoute(scope: string): Promise<APIGatewayProxyResult
     repoRow,
     humanTouchRow,
     idleRow ?? undefined,
-    // Workforce scope only: the W-3 ledger is keyed per agent, and an agent
-    // works across projects, so there is no honest way to attribute a fire's
-    // cost to one project. Emitting a project-scoped budget would invent an
-    // attribution the ledger does not carry.
-    scope === "workforce" ? await readBudgetBlock() : undefined,
+    budget,
   );
   return reply(200, series);
 }

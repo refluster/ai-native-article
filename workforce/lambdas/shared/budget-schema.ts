@@ -50,6 +50,13 @@ export interface BudgetRollup {
   fires: number;
   agents_charged: number;
   ceiling_usd: number;
+  /** Newest `last_updated_at` across the month's rows — when the ledger last
+   *  moved, not when it was read (farah, #682 F1). Without it a ledger that
+   *  stopped being written keeps serving a confident current-month figure
+   *  forever: not a fabricated number, a FROZEN one, which reads as alive.
+   *  Every sibling block in PerformanceSeries carries this for the same
+   *  reason; `PerfIdleRow` states the contract in full. */
+  updated_at: string;
 }
 
 /**
@@ -73,10 +80,16 @@ export function summariseBudgetRows(
   let modelled = 0;
   let measured = 0;
   let fires = 0;
+  let updated = "";
   for (const row of rows) {
     modelled += row.estimated_cost_usd ?? 0;
     measured += row.cost_usd ?? 0;
     fires += row.estimated_fires ?? 0;
+    // ISO-8601 UTC strings compare lexicographically, so max is a string
+    // compare. A row missing the field contributes nothing rather than
+    // dragging the roll-up down — a partial write must not read as frozen.
+    const at = row.last_updated_at ?? "";
+    if (at > updated) updated = at;
   }
   return {
     month,
@@ -87,5 +100,6 @@ export function summariseBudgetRows(
     fires,
     agents_charged: rows.length,
     ceiling_usd,
+    updated_at: updated,
   };
 }

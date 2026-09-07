@@ -173,6 +173,11 @@ export interface BudgetBlock {
   agents_charged: number;
   /** The W-3 combined ceiling in force, for rendering used-against-cap. */
   ceiling_usd: number;
+  /** When the ledger last MOVED (newest `last_updated_at` across the month's
+   *  rows) — not when it was read. Same contract as `PerfIdleRow.updated_at`:
+   *  a figure whose `updated_at` has gone quiet must render as "the writer has
+   *  stopped", never as a current total. A frozen number reads as alive. */
+  updated_at: string;
 }
 
 // ── Epic-020 human leverage (the human side of the ledger) ────────────────────

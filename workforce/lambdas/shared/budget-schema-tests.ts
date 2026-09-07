@@ -7,6 +7,7 @@ const row = (over: Partial<BudgetRow> = {}): Partial<BudgetRow> => ({
   estimated_cost_usd: 0.05,
   estimated_fires: 1,
   cost_usd: 0,
+  last_updated_at: "2026-09-07T17:30:01.363Z",
   ...over,
 });
 
@@ -86,6 +87,31 @@ describe("summariseBudgetRows", () => {
     expect(s.measured_usd).toBe(4);
     expect(s.fires).toBe(0);
     expect(Number.isNaN(s.modelled_usd)).toBe(false);
+  });
+
+  it("reports when the ledger last MOVED — the newest row, not the read time", () => {
+    // farah, #682 F1: without this a ledger that stopped being written keeps
+    // serving a confident current-month figure forever.
+    const s = summariseBudgetRows(
+      [
+        row({ last_updated_at: "2026-09-07T17:30:01.363Z" }),
+        row({ last_updated_at: "2026-09-07T17:30:01.600Z" }),
+        row({ last_updated_at: "2026-09-05T02:11:00.000Z" }),
+      ],
+      "2026-09",
+      600,
+    )!;
+    expect(s.updated_at).toBe("2026-09-07T17:30:01.600Z");
+  });
+
+  it("a row missing last_updated_at does not drag the roll-up backwards", () => {
+    // A partial write must not make a live ledger read as frozen.
+    const s = summariseBudgetRows(
+      [row({ last_updated_at: undefined }), row({ last_updated_at: "2026-09-07T17:30:01.600Z" })],
+      "2026-09",
+      600,
+    )!;
+    expect(s.updated_at).toBe("2026-09-07T17:30:01.600Z");
   });
 
   it("carries the ceiling it was given rather than assuming 600", () => {

@@ -105,6 +105,10 @@ export interface BudgetBlock {
   /** Agents with a ledger row this month — NOT the roster size. */
   agents_charged: number;
   ceiling_usd: number;
+  /** When the ledger last MOVED — newest row timestamp, not the read time.
+   *  A figure whose `updated_at` has gone quiet must render as "the writer has
+   *  stopped", never as a current total: a frozen number reads as alive. */
+  updated_at: string;
 }
 
 /** The bundled fallback: every scope in one file. */
