@@ -123,7 +123,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { projectRepo } from "./pr-autopilot-scan.mjs";
-import { AUTHOR_LABEL, AUTHOR_MARKER, ESCALATION_LABEL, REVIEWED_LABEL, makeGh, prTouchesL0L1 } from "./pr-merge.mjs";
+import { AUTHOR_LABEL, AUTHOR_MARKER, ESCALATION_LABEL, REVIEWED_LABEL, dispatchAuthorLane, makeGh, prTouchesL0L1 } from "./pr-merge.mjs";
 import {
   AUTHOR_LANE_CODES,
   REASON_LABEL_PREFIX,
@@ -619,6 +619,19 @@ async function main() {
       const lr = await gh(token, "POST", `/repos/${owner}/${repo}/issues/${prNumber}/labels`, { labels }).catch(() => ({ status: 0 }));
       if (lr.status === 200) console.log(`pr-autopilot-post: labelled #${prNumber} [${labels.join(", ")}]`);
       else console.error(`pr-autopilot-post: WARN could not label #${prNumber} → HTTP ${lr.status}`);
+    }
+    // adr-0025 — hand-off is now an EVENT, not just a label. The PR is parked
+    // in the author lane; ask pr-remediate to start on it in seconds instead of
+    // at its next cron. Strictly best-effort and deliberately last: the comment
+    // and the labels above are what the sweep, the funnel and the next tick
+    // read, and none of them depend on this call landing. It is also why the
+    // review protocol is untouched — the brief, the ≤7 cycle budget and the
+    // one-commit-per-cycle hand-back shape are exactly as adr-0022/0023 left
+    // them; only the worker's start time moves.
+    if (toAuthor) {
+      await dispatchAuthorLane(`${owner}/${repo}`, prNumber, reasons.codes.join(",") || "author-lane").catch((e) =>
+        console.error(`pr-autopilot-post: WARN author-lane dispatch failed (${e?.message || e}) — pr-remediate's cron still owns the queue`),
+      );
     }
     process.exit(0);
   }

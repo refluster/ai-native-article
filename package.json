@@ -24,7 +24,9 @@
     "check-truncation": "node scripts/check-corpus-truncation.mjs",
     "check-proxy-bootstrap": "node scripts/check-proxy-bootstrap.mjs",
     "check-corpus-freshness": "node scripts/check-corpus-freshness.mjs",
-    "test:scripts": "node --test scripts/lib/*.test.mjs",
+    "check-base-path": "node scripts/check-base-path.mjs",
+    "check-live-base-path": "node scripts/check-live-base-path.mjs",
+    "test:scripts": "node --test scripts/lib/*.test.mjs workforce/pipeline/knowledge-backup/lib/*.test.mjs",
     "check-l1-citation": "node scripts/check-l1-citation.mjs",
     "check-registries": "node scripts/check-governance-registries.mjs",
     "content-insights": "node scripts/content-insights.mjs",
@@ -32,6 +34,8 @@
     "workforce:naming": "node workforce/scripts/validate-naming.mjs",
     "workforce:skills": "node workforce/scripts/validate-skills.mjs",
     "workforce:projects": "node workforce/scripts/validate-projects.mjs",
+    "workforce:tools": "node workforce/scripts/validate-tools.mjs",
+    "workforce:tool-registry:check": "node workforce/scripts/build-tool-registry.mjs --check",
     "workforce:projects:seed": "node workforce/scripts/seed-projects.mjs",
     "workforce:skill-registry": "node workforce/scripts/build-skill-registry.mjs",
     "workforce:skill-registry:check": "node workforce/scripts/build-skill-registry.mjs --check",
@@ -42,11 +46,13 @@
     "workforce:skill-body-version": "node workforce/scripts/check-skill-body-version.mjs",
     "workforce:skill-version-sync": "node workforce/scripts/check-skill-version-sync.mjs",
     "workforce:scan-drain": "node workforce/scripts/check-scan-drain.mjs",
+    "workforce:no-run-deliv-writes": "node workforce/scripts/check-run-deliv-writes.mjs",
     "workforce:escalation-labels": "node workforce/scripts/check-escalation-labels.mjs",
     "workforce:cycle-count": "node workforce/scripts/check-cycle-count.mjs",
     "workforce:pr-sweep": "node workforce/skills/pr-autopilot/pr-autopilot-sweep.mjs",
     "workforce:pr-metrics": "node workforce/scripts/build-pr-metrics.mjs",
     "workforce:pr-metrics-gh": "node workforce/scripts/build-pr-metrics-github.mjs",
+    "workforce:human-touch": "node workforce/scripts/build-human-touch.mjs",
     "workforce:perf-backfill": "node workforce/scripts/backfill-performance-lifecycle.mjs"
   }
 }

@@ -136,7 +136,7 @@ describe("composeSeries — endpoint assembly", () => {
   });
 
   it("serves the IDLE block verbatim when the reducer has swept this scope", () => {
-    const s = composeSeries("workforce", "2026-06-22T02:00:00Z", { points }, undefined, undefined, {
+    const s = composeSeries("workforce", "2026-06-22T02:00:00Z", { points }, undefined, undefined, undefined, {
       updated_at: "2026-06-22T01:00:00Z",
       window: { start: "2026-05-23T00:00:00Z", end: "2026-06-22T00:00:00Z", days: 30 },
       idle: [{ slug: "corinne", pending: "enable", bound_skills: ["monthly-investor-letter"] }],

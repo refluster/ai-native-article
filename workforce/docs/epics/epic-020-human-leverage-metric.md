@@ -1,10 +1,16 @@
 # Epic-020 — Human leverage as a first-class metric: measuring the value of one human touch
 
-- **Status**: Accepted (2026-07-08)
+- **Status**: In-progress (2026-08-13)
 - **Owner**: maya
 - **Created**: 2026-07-07
-- **Implemented by**: —
+- **Implemented by**: [#539](https://github.com/refluster/ai-native-article/pull/539) (Story 1, taxonomy — merged 2026-08-07), [#561](https://github.com/refluster/ai-native-article/pull/561) (Story 2, aggregation → `PERF#workforce/HUMAN-TOUCH` — merged 2026-08-13)
 - **Hypothesis under test**: Monthly report 2026-07 (article `d06ecf4bb246`), 仮説二 — *human–agent co-prosperity is measurable, not sentimental: as leverage per single human intervention. A good organisation is not one with the fewest human touches, but one where each human touch is priced highest.*
+
+> **Status reconciliation (2026-08-14, Nadia — backlog-reconcile). `Accepted (2026-07-08)` → `In-progress (2026-08-13)`.** Bucket: **incidentally done** at the lifecycle level, on stronger evidence than the last attempt to make this exact flip. Both implementation PRs are now **merged**, not merely open: Story 1 ([#539](https://github.com/refluster/ai-native-article/pull/539), taxonomy, `Closes #452`) merged 2026-08-07T04:23:26Z; Story 2 ([#561](https://github.com/refluster/ai-native-article/pull/561), `build-human-touch.mjs` aggregation, `Closes #453`) merged **2026-08-13T16:25:34Z** and its `deploy-workforce-data-plane` run (`31737132755`-adjacent commit `cd4987c`) went green the same window. `PERF#workforce/HUMAN-TOUCH` is live behind the existing `/performance` surface (R-N2, no new store). Both closing issues (#452, #453) are already closed by GitHub's own `Closes #NNN` keyword on their merging PRs — no tracker mutation is owed here.
+>
+> **Dedup note, not silence.** [#545](https://github.com/refluster/ai-native-article/pull/545) (2026-08-05, still open/unmerged 9 days later) already proposed this identical flip, dated 2026-08-04, on weaker evidence — Story 1 *open*, not merged, and Story 2 not yet started. That evidence is now superseded: Story 1 has since merged and Story 2 has landed and deployed. Rather than race #545's file diff with a second, conflicting hunk on the same status line, this note **replaces** the justification #545 carried for Epic-020 specifically; #545's Epic-021 flip is untouched and still stands on its own evidence (see that Epic's file — unchanged this pass). **Recommend the operator merge whichever of {this PR, #545} lands first for Epic-020's cell, then drop the other's now-redundant hunk** rather than merging both (the second would either no-op or conflict).
+>
+> **Not `Implemented`.** Story 3 ([#454](https://github.com/refluster/ai-native-article/issues/454) — cite the number in the 2026-08 monthly report with its leverage-not-price definition, the dated Phase-2 dollar-column commitment, the one-week hand-tally, and the falsifier verdict) has no PR and is correctly still open — genuine remaining work, not tracked elsewhere.
 
 ## Problem
 

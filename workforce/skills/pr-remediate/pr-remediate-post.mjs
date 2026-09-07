@@ -55,7 +55,7 @@ ensureProxyAwareEntry(import.meta.url)
 import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
-import { projectRepo } from "../pr-autopilot/pr-autopilot-scan.mjs";
+import { projectIdForRepo, projectRepo } from "../pr-autopilot/pr-autopilot-scan.mjs";
 import {
   AUTHOR_LABEL,
   ESCALATION_LABEL,
@@ -253,6 +253,30 @@ async function main() {
   for (const name of labelsToClearOnResolve(current)) {
     const d = await gh("DELETE", `/repos/${repo}/issues/${prNumber}/labels/${encodeURIComponent(name)}`);
     if (d.status !== 200 && d.status !== 404) console.error(`pr-remediate-post: WARN could not clear "${name}" -> HTTP ${d.status}`);
+  }
+
+  // adr-0025 — close the loop. A `--resolved` attempt has pushed a fix and
+  // handed the PR back; ask pr-autopilot to re-review NOW rather than at its
+  // next 6-hourly tick. Only on --resolved: a `--blocked` hand-off goes to the
+  // human lane, and waking the reviewer for a PR nobody has changed would
+  // burn a cycle for nothing.
+  //
+  // Best-effort, like the outbound leg: the label moves above are what the
+  // scan re-routes from (a head commit newer than the last routing comment),
+  // and they stand whether or not this call lands. The ≤7 cycle budget is
+  // unchanged — this changes when cycle N+1 starts, not how many there are.
+  if (resolved) {
+    const laneProject = projectId ?? projectIdForRepo(REPO_ROOT, repo);
+    if (!laneProject) {
+      console.error(`pr-remediate-post: no project declares ${repo} — re-review dispatch skipped (pr-autopilot's cron still picks it up)`);
+    } else {
+      const { requestDispatch } = await import("../../scripts/lib/request-dispatch.mjs");
+      await requestDispatch({
+        skill: "pr-autopilot",
+        project_id: laneProject,
+        reason: `remediation attempt ${attempt} pushed on ${repo}#${prNumber} — re-review at cycle N+1`,
+      }).catch((e) => console.error(`pr-remediate-post: WARN re-review dispatch failed (${e?.message || e})`));
+    }
   }
 
   return 0;

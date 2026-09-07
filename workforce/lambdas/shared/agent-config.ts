@@ -438,5 +438,15 @@ function validateBinding(
   if (b.note !== undefined && typeof b.note !== "string") {
     v("S9-binding-note", "note must be a string if present");
   }
+  // #574: bound_at is a creation-time stamp, not a caller-recomputed value —
+  // the write boundary only checks *shape* (a parseable ISO instant); which
+  // wire-*.mjs scripts stamp it fresh vs. carry it forward is a client-side
+  // concern (scripts/lib/binding-reconcile.mjs), not something the validator
+  // can arbitrate from a single PATCH body.
+  if (b.bound_at !== undefined) {
+    if (typeof b.bound_at !== "string" || Number.isNaN(Date.parse(b.bound_at))) {
+      v("S9-binding-bound-at", "bound_at must be an ISO 8601 timestamp string if present");
+    }
+  }
   return out;
 }

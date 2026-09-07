@@ -26,14 +26,30 @@
 //       [--abstract-file /tmp/abstract.txt] \
 //       [--tags "AI Strategy,Agentic AI"]   # optional extra vocabulary tags
 //       [--status published]                # draft|ready|published|archived
+//       [--replace <page-id>]               # revise: archive that page after
+//                                           # the new one lands (see below)
+//
+// One letter per author per calendar month — enforced here, not asked for.
+// The "skip if a page already exists this month" rule used to live only in
+// SKILL.md prose, i.e. as LLM judgment, and the writer enforced nothing. On
+// 2026-09-02 that produced TWO `Monthly Report` rows for author `maya`, same
+// date, byte-identical bodies differing only in the sign-off line: a revision
+// re-posted as a new page, because the writer offered no way to revise. Both
+// went live. So the slot check is now a pre-flight query (exit 2 on a hit) and
+// revision is a first-class flag: `--replace <page-id>` writes the new letter
+// first and archives the named page only once every block has landed, so no
+// failure mode leaves the month with zero letters.
 //
 // Exit codes:
-//   0 — page created (all blocks landed)
-//   1 — bad args / env / body-file unreadable / no H1 title
+//   0 — page created (all blocks landed; with --replace, the old page is archived)
+//   1 — bad args / env / body-file unreadable / no H1 title / --replace names
+//       a page that is not the blocking row
 //   2 — W-1 editorial guard failed (short body, LLM-artefact prelude, cut-off
-//       last line) or auth rejected
-//   3 — Notion API / network error (including a failed batch append — the page
-//       is then INCOMPLETE and the error says so; do not leave it silently)
+//       last line), duplicate-slot guard, or auth rejected
+//   3 — Notion API / network error (including a failed pre-flight query, a
+//       failed batch append, or a failed --replace archive — in the last two
+//       cases the page is INCOMPLETE or the month now has two rows, and the
+//       error says so; do not leave it silently)
 
 import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
 ensureProxyAwareEntry(import.meta.url);
@@ -41,6 +57,7 @@ ensureProxyAwareEntry(import.meta.url);
 import { readFileSync } from "node:fs";
 import { isTruncatedMarkdown, lastNonEmptyLine } from "../../../scripts/lib/truncation.mjs";
 import { validateTags } from "../../../scripts/lib/tags.mjs";
+import { findExistingReport, describeExisting, currentMonth } from "../../../scripts/lib/monthly-report-dedupe.mjs";
 
 const NOTION_VERSION = "2022-06-28";
 const NOTION_API = "https://api.notion.com/v1";
@@ -75,6 +92,7 @@ const bodyFile = arg("body-file");
 const abstractFile = arg("abstract-file");
 const tagsArg = arg("tags");
 const status = arg("status") ?? "published";
+const replaceArg = arg("replace");
 
 const VALID_STATUS = new Set(["draft", "ready", "published", "archived"]);
 
@@ -164,6 +182,85 @@ async function notion(path, method, payload) {
   return { res, text };
 }
 
+/** Notion ids round-trip with or without dashes; compare them stripped. */
+const normalizeId = (id) => String(id || "").replace(/-/g, "").toLowerCase();
+
+// ── Duplicate-slot guard (pre-flight) ──────────────────────────────────────
+// Narrow the query on the two structural properties only — the series tag and
+// a date floor — and let the tested predicate decide on author / month /
+// retirement. A wrong filter can then only widen the result set, never hide a
+// blocking row.
+const month = currentMonth();
+
+async function fetchSlotRows() {
+  const rows = [];
+  let cursor;
+  do {
+    const { res, text } = await notion(`/databases/${UNIFIED_DB_ID}/query`, "POST", {
+      filter: {
+        and: [
+          { property: "Tags", multi_select: { contains: REPORT_TAG } },
+          { property: "Date", date: { on_or_after: `${month}-01` } },
+        ],
+      },
+      page_size: 100,
+      ...(cursor ? { start_cursor: cursor } : {}),
+    });
+    if (res.status === 401 || res.status === 403) {
+      console.error(`post.mjs: auth rejected on the duplicate-slot query (HTTP ${res.status}) — project credential bag misconfigured: ${text.slice(0, 400)}`);
+      process.exit(2);
+    }
+    if (!res.ok) {
+      // A guard that cannot run must stop the write, never wave it through —
+      // "the query failed so there is no duplicate" is the exact silent
+      // degradation W-4 refuses.
+      console.error(`post.mjs: duplicate-slot query failed (HTTP ${res.status}) — refusing to write blind: ${text.slice(0, 400)}`);
+      process.exit(3);
+    }
+    let payload;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      console.error("post.mjs: duplicate-slot query returned non-JSON — refusing to write blind");
+      process.exit(3);
+    }
+    rows.push(...(payload.results ?? []));
+    cursor = payload.has_more ? payload.next_cursor : undefined;
+  } while (cursor);
+  return rows;
+}
+
+let existing;
+try {
+  existing = findExistingReport(await fetchSlotRows(), { agent, month, tag: REPORT_TAG });
+} catch (err) {
+  console.error(`post.mjs: duplicate-slot query failed: ${err instanceof Error ? err.message : String(err)}`);
+  process.exit(3);
+}
+
+if (existing && !replaceArg) {
+  console.error(
+    `post.mjs: ${agent} already has a ${REPORT_TAG} page dated in ${month} — refusing to publish a second letter for the same slot.\n` +
+      `  existing: ${describeExisting(existing)}\n` +
+      "  This fire should have taken the skip path. To publish a deliberate revision instead, re-run with\n" +
+      `  --replace ${existing.id}  (writes the new letter, then archives that page).`,
+  );
+  process.exit(2);
+}
+if (replaceArg && existing && normalizeId(replaceArg) !== normalizeId(existing.id)) {
+  console.error(
+    `post.mjs: --replace ${replaceArg} does not name the page occupying this slot.\n` +
+      `  occupying: ${describeExisting(existing)}\n` +
+      "  Re-run with that page's id, or archive it by hand first.",
+  );
+  process.exit(1);
+}
+if (replaceArg && !existing) {
+  // The slot is already free (the page was archived out of band). The desired
+  // end state holds, so proceed rather than blocking a legitimate re-run.
+  console.log(`post.mjs: --replace ${replaceArg} given but the ${month} slot is already free — writing the new letter, nothing to archive.`);
+}
+
 try {
   const first = blocks.slice(0, BLOCKS_PER_REQUEST);
   const rest = blocks.slice(BLOCKS_PER_REQUEST);
@@ -194,6 +291,20 @@ try {
       console.error(`post.mjs: batch append failed at block ${BLOCKS_PER_REQUEST + i} (HTTP ${r2.status}) — page ${url} is INCOMPLETE: ${t2.slice(0, 400)}`);
       process.exit(3);
     }
+  }
+
+  // Only now, with every block landed, retire the page this revision replaces.
+  // Archiving first would risk a month with zero letters if the write failed.
+  if (replaceArg && existing) {
+    const { res: r3, text: t3 } = await notion(`/pages/${existing.id}`, "PATCH", { archived: true });
+    if (!r3.ok) {
+      console.error(
+        `post.mjs: the new letter is live at ${url}, but archiving the replaced page FAILED (HTTP ${r3.status}) — ` +
+          `${month} now carries TWO ${REPORT_TAG} rows for ${agent}. Archive ${existing.id} by hand: ${t3.slice(0, 400)}`,
+      );
+      process.exit(3);
+    }
+    console.log(`post.mjs: archived the replaced page — ${describeExisting(existing)}`);
   }
 
   console.log(`post.mjs: created — Author=${agent} Type=report Status=${status} blocks=${blocks.length} "${title}" ${url}`);
