@@ -23,6 +23,7 @@
     "lint:tokens": "node scripts/lint-design-tokens.mjs",
     "check-truncation": "node scripts/check-corpus-truncation.mjs",
     "check-proxy-bootstrap": "node scripts/check-proxy-bootstrap.mjs",
+    "check-cadence-readback-guard": "node scripts/check-cadence-readback-guard.mjs",
     "check-corpus-freshness": "node scripts/check-corpus-freshness.mjs",
     "check-base-path": "node scripts/check-base-path.mjs",
     "check-live-base-path": "node scripts/check-live-base-path.mjs",
