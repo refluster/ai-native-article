@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_COGNITO_DOMAIN?: string;
   readonly VITE_WORKFORCE_AGENTS_API_BASE?: string;
   readonly VITE_WORKFORCE_CREDENTIALS_API_BASE?: string;
+  /** Research corpus prefix override (see config/research.ts). */
+  readonly VITE_RESEARCH_CORPUS_BASE?: string;
 }
 
 interface ImportMeta {

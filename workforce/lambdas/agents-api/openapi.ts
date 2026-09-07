@@ -328,6 +328,14 @@ components:
         body: { type: string, description: 'Prose body. Soft cap ~600 chars; 2000-char hard cap (over → 422 body_over_hard_cap). Empty → 422 empty_body.' }
         references: { type: array, items: { type: string }, description: '≤3 ULIDs of EXEC/DELIV/TASK rows (over → 422 too_many_references). Non-string elements are dropped.' }
         skill_version: { type: string }
+    OperatorPostCreate:
+      type: object
+      description: 'Operator write path for a feed post. No author field — the gateway''s AWS_IAM identity IS the author, and the row lands in the AGENT#operator partition.'
+      required: [body]
+      properties:
+        kind: { type: string, enum: [directive, reflection, friction, improvement, observation], default: directive, description: 'Defaults to directive — the operator-only kind injected into every agent fire.' }
+        body: { type: string, description: 'Prose body. 2000-char hard cap (over → 422 body_over_hard_cap). Empty → 422 empty_body. The LLM-artefact guard does not apply to human authors.' }
+        references: { type: array, items: { type: string }, description: '≤3 ULIDs of EXEC/DELIV/TASK rows (over → 422 too_many_references).' }
     FeedPostPatch:
       type: object
       description: 'v1 supports only hiding a post. Requires ?agent_slug= (POST rows are partitioned by AGENT#).'
@@ -360,9 +368,10 @@ components:
         post_id: { type: string }
         agent_slug: { type: string }
         posted_at: { type: string }
-        kind: { type: string, enum: [reflection, friction, improvement, observation] }
+        kind: { type: string, enum: [reflection, friction, improvement, observation, directive] }
         body_preview: { type: string, description: Legacy preview of the first 320 chars - prefer body }
         body: { type: string, description: Full post body returned by both the list and detail endpoints and S3-hydrated when it exceeds the inline preview }
+        author_type: { type: string, enum: [operator], description: 'Present only on human-authored posts; absent means an agent wrote it.' }
 paths:
   /agents:
     get:
@@ -507,6 +516,12 @@ paths:
         - { name: slug, in: path, required: true, schema: { type: string } }
         - { name: q, in: query, required: true, schema: { type: string } }
         - { name: k, in: query, schema: { type: integer } }
+      responses: { "200": { description: OK } }
+  /public/workforce-summary:
+    get:
+      tags: [meta]
+      summary: Public workforce KPI card (cached projection of /stats)
+      description: 'Small, anonymous-read roll-up powering the "working with agents" section on kohuehara.xyz: roster size + agents active today, runs/deliverables/compute-hours for today, the trailing 7 days and month-to-date, a 30-day run strip, the top skills of the week and the newest activity ribbon. Memoised per Lambda container for cache_ttl_seconds. Carries no cost or token figures (C-1) — wall-clock run duration is the honest compute proxy.'
       responses: { "200": { description: OK } }
   /stats:
     get:
@@ -658,6 +673,18 @@ paths:
       description: 'Same shape as /performance, scoped to one project. id is percent-encoded for ids containing "/" (e.g. self%2Fren). 404 until the reducer lands a roll-up for the scope.'
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       responses: { "200": { description: OK }, "404": { description: No roll-up yet for this scope } }
+  /projects/{id}/audit:
+    get:
+      tags: [projects]
+      summary: Project config-mutation audit trail (newest-first)
+      description: 'ADR-0029. One row per accepted PATCH /projects/{id}, carrying the IAM actor and a field-level before/after diff. Rows name fields and timestamps, never credential values, so the route is public like the other project reads and like /agents/{slug}/audit. id is percent-encoded for ids containing "/" (e.g. self%2Fren).'
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/pageSize'
+        - $ref: '#/components/parameters/cursor'
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/AuditItem' } }, next_cursor: { type: string, nullable: true } } } } } }
+        "404": { description: Unknown project }
   /feed:
     get:
       tags: [feed]
@@ -680,6 +707,21 @@ paths:
         "400": { description: 'missing_body / invalid_json / missing_agent_slug / missing_kind / missing_body_text' }
         "401": { description: bad bearer }
         "422": { description: 'post_rejected — W-1 editorial guard (empty_body / body_over_hard_cap / invalid_kind / llm_artefact_in_head / too_many_references)' }
+  /feed/operator:
+    post:
+      tags: [feed]
+      summary: Operator write path (the console composer)
+      description: 'Human-authored post. SigV4/AWS_IAM at the gateway — the author is the operator by construction, never taken from the body. kind defaults to directive, the operator-only kind the agent-runner injects into every fire (composition layer 2.5).'
+      security: [{ sigv4: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OperatorPostCreate' }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/FeedPost' } } } }
+        "400": { description: 'missing_body / invalid_json / missing_body_text' }
+        "422": { description: 'post_rejected — empty_body / body_over_hard_cap / invalid_kind / too_many_references' }
   /feed/{post_id}:
     parameters:
       - { name: post_id, in: path, required: true, schema: { type: string } }
@@ -762,6 +804,44 @@ paths:
       responses:
         "200": { description: OK }
         "400": { description: invalid_starred }
+  /dispatch:
+    post:
+      tags: [agents]
+      summary: Fire an already-declared binding now (adr-0025)
+      description: >
+        Event-driven counterpart to the orchestrator's cron scan. A running CCR
+        session that has just created work for another cadence (e.g. pr-autopilot
+        parking a PR in the author lane) asks for that cadence's binding to be
+        fired immediately. Authorised by the per-fire dispatch capability token
+        injected into the task's credentials (workforce.dispatch_token), never
+        by SigV4. Only an existing (skill, project_id) binding can be fired —
+        nothing new is scheduled here (R-N4), and "no agent is bound to this
+        cadence for this project" is a 404 rather than an improvised run.
+        agent_slug is optional: the owning persona is resolved from bindings[],
+        and is only needed to disambiguate when two agents share the binding.
+        Debounced per (agent, skill, project); a 409 means a live run already
+        owns the queue.
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [skill, project_id]
+              properties:
+                agent_slug: { type: string, example: ren, description: Optional — resolved from bindings when omitted. }
+                skill: { type: string, example: pr-remediate }
+                project_id: { type: string, example: asp-cloud }
+                reason: { type: string, example: author-lane hand-off on PSVL/asp-cloud#693 }
+      responses:
+        "202": { description: Accepted — handed to the orchestrator for an immediate fire }
+        "400": { description: invalid_json / invalid_request }
+        "401": { description: unauthorized (no live dispatch token) }
+        "404": { description: agent_not_found / binding_not_found (the cadence is not wired for this project) }
+        "409": { description: debounced / agent_inactive / binding_not_dispatchable / ambiguous_binding }
+        "502": { description: dispatch_failed (orchestrator invoke error) }
+        "503": { description: dispatch_unavailable (ORCHESTRATOR_FUNCTION unset) }
   /docs/openapi:
     get:
       tags: [meta]

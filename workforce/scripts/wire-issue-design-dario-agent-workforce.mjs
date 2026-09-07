@@ -40,6 +40,7 @@
 
 import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
 ensureProxyAwareEntry(import.meta.url);
+import { reconcileBinding } from "../../scripts/lib/binding-reconcile.mjs";
 
 import { spawnSync } from "node:child_process";
 
@@ -98,38 +99,15 @@ if (!Array.isArray(cur.bindings)) {
   process.exit(1);
 }
 
-// Stable, key-order-independent serialization so a true no-op (the live
-// binding already equals what we declare) is distinguished from drift.
-// ARRAY order is preserved (significant) on purpose — issue_selection's
-// deny_labels list is a real list, not a set, so a reorder is semantic
-// drift that SHOULD re-PATCH, not a cosmetic no-op.
-const stable = (v) =>
-  v && typeof v === "object" && !Array.isArray(v)
-    ? `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${stable(v[k])}`).join(",")}}`
-    : Array.isArray(v)
-      ? `[${v.map(stable).join(",")}]`
-      : JSON.stringify(v);
-
-// Match on (skill, project_id). Not present -> append; equal -> no-op;
-// drifted -> replace in place (binding_idx preserved) so a corrected
-// note/config re-syncs. Other bindings on this persona are matched out by
-// (skill, project_id) and preserved untouched.
-const idx = cur.bindings.findIndex(
+const summary = `${BINDING.skill} @ ${PROJECT_ID} (${BINDING.trigger.cron})`;
+const { bindings: next, verb, changed } = reconcileBinding(
+  cur.bindings,
+  BINDING,
   (b) => b.skill === BINDING.skill && b.project_id === BINDING.project_id,
 );
-const summary = `${BINDING.skill} @ ${PROJECT_ID} (${BINDING.trigger.cron})`;
-let next;
-let verb;
-if (idx >= 0) {
-  if (stable(cur.bindings[idx]) === stable(BINDING)) {
-    console.log(`  - ${SLUG}: ${BINDING.skill} @ ${PROJECT_ID} already bound + current, skipped (no-op).`);
-    process.exit(0);
-  }
-  next = cur.bindings.map((b, i) => (i === idx ? BINDING : b));
-  verb = "updated (in-place, binding_idx preserved)";
-} else {
-  next = [...cur.bindings, BINDING];
-  verb = "bound";
+if (!changed) {
+  console.log(`  - ${SLUG}: ${BINDING.skill} @ ${PROJECT_ID} already bound + current, skipped (no-op).`);
+  process.exit(0);
 }
 if (DRY_RUN) {
   console.log(`  [dry-run] ${SLUG}: would PATCH bindings -> ${verb} (${summary}); total ${next.length}`);

@@ -72,6 +72,11 @@ export type IdentityPatchableField = (typeof IDENTITY_PATCHABLE_FIELDS)[number];
 // W-3 cap: sum of effective monthly budgets across non-archived agents.
 // The single enforced source of truth (validate-agent-json.mjs retired in
 // ADR-0007 migration step 6); governance.md §2 W-3 documents the same value.
+// Raised 500 → 600 on 2026-08-06 for the Data & Experience three-hire round
+// (operator direction): the three external-project seats add ~USD 18-21/mo and
+// would have fit under 500, but the ceiling moves with them to carry continued
+// expansion without a per-hire cap amendment. Raised in the SAME PR as the
+// governance.md §2 row — see the lockstep rule below.
 // Raised 295 → 500 on 2026-07-14 for continued roster expansion (operator
 // direction: positive consensus on growth, provisioning standing headroom so
 // routine hires don't each require a cap raise) — and to close the doc/code
@@ -82,7 +87,7 @@ export type IdentityPatchableField = (typeof IDENTITY_PATCHABLE_FIELDS)[number];
 // 2026-06-14 (Finance & Capital group). This constant is the *enforced* W-3 cap
 // and MUST stay in lockstep with governance.md §2 — raising one without the
 // other is exactly the drift that let the 253/250 false-reject happen.
-export const W3_BUDGET_CAP_USD = 500;
+export const W3_BUDGET_CAP_USD = 600;
 
 const SLUG = /^[a-z]+$/;
 const MODEL = /^(anthropic|azure|claude-code):[a-z0-9-]+(?:-[a-z0-9.]+)*$/;
@@ -432,6 +437,16 @@ function validateBinding(
   }
   if (b.note !== undefined && typeof b.note !== "string") {
     v("S9-binding-note", "note must be a string if present");
+  }
+  // #574: bound_at is a creation-time stamp, not a caller-recomputed value —
+  // the write boundary only checks *shape* (a parseable ISO instant); which
+  // wire-*.mjs scripts stamp it fresh vs. carry it forward is a client-side
+  // concern (scripts/lib/binding-reconcile.mjs), not something the validator
+  // can arbitrate from a single PATCH body.
+  if (b.bound_at !== undefined) {
+    if (typeof b.bound_at !== "string" || Number.isNaN(Date.parse(b.bound_at))) {
+      v("S9-binding-bound-at", "bound_at must be an ISO 8601 timestamp string if present");
+    }
   }
   return out;
 }

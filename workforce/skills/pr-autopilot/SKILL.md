@@ -222,18 +222,34 @@ to prevent.
 **Reviewer-lens contract (per nominated persona):**
 
 - **The lens** = that persona's voice + skill-judgment config (`lens_name`,
-  `values`, `checklist_sections`, `escalation_triggers`,
-  `bias_disclosure_template` on their `AGENT#{slug}` record). Scan the diff in
-  that lens only; post only real findings (or an explicit "no findings from
-  this lens").
-- **Inline findings** lead with a finding-ID (`A1`), name the checklist
-  section, cite `file:line`, suggest the fix concretely. Cycle-2+ comments
-  cite the cycle-1 finding-ID or flag `[NEW]`.
-- **Summary body**: verdict signal (🟢/🟡/🔴 from this lens) →
-  section-by-section notes → sign-off
-  `— {persona} (LLM persona; lens: {lens_name}; manual route via pr-autopilot)`
-  → a mandatory bias-disclosure paragraph (it is an LLM persona; what it DID /
-  did NOT do).
+  `values`, `checklist_sections`, `escalation_triggers` on their
+  `AGENT#{slug}` record). Scan the diff in that lens only; post only real
+  findings (or an explicit "no findings from this lens").
+- **Keep it short — 1/5 the length of a full-prose review.** The operator
+  reads every one of these; a review that re-justifies itself at paragraph
+  length per finding is not more rigorous, it is more to skim past. Say the
+  finding, not the essay around it.
+- **Inline findings, four lines each, no more:**
+  ```
+  `A1` <checklist section> — <file:line>
+  Problem: <one sentence — what's wrong>
+  Fix: <one sentence — the concrete change>
+  ```
+  Cycle-2+ comments cite the cycle-1 finding-ID or flag `[NEW]`; still four
+  lines. Do not add a justification paragraph beneath the fix — if the fix
+  needs defending, it is not yet concrete enough to state in one sentence.
+- **Summary body, in order:**
+  1. verdict signal (🟢/🟡/🔴 from this lens), one line;
+  2. each finding, four lines as above (skip entirely on 🟢 — no "what I
+     checked and found clean" tour of the diff; the green marker below
+     already says that);
+  3. sign-off: `— {persona} (LLM persona; lens: {lens_name})`;
+  4. bias disclosure, **one line, not a paragraph**:
+     `Bias: <what this lens did NOT verify — tests run? build run? repo cloned?>`
+     — name only the gaps that bear on trusting THIS review; drop the
+     What-I-DID enumeration, the "not independence" caveat (that belongs in
+     the verdict's Panel provenance line, once, not per-lens) and any restated
+     scope.
 - **Green sign-off marker (machine-checkable).** A non-blocking lens (no 🔴)
   **must embed the exact hidden marker** `<!-- autopilot:review:{slug}:green -->`.
   This is the only signal the merge engine accepts as that reviewer's green
@@ -242,15 +258,18 @@ to prevent.
   `escalation_triggers`, post a single comment naming the trigger — as a
   hand-off per Step 5 (`--needs-human --reason persona-escalation-trigger` +
   the hidden markers), not a checklist run.
-- **The lenses are not independent, and the verdict must say so.** Every lens
-  in this step is produced by one session, in one context window, in
-  sequence — each able to see the diff's own justification, your routing
-  comment, and every earlier lens's findings. That is a known property of the
-  inline contract, not a defect of a given run, and it has an observed
-  asymmetry: a shared-context panel reliably catches implementation defects
-  and does **not** reliably challenge the author's premises (#512, evidenced
-  on #510). Nothing here changes what you post per lens; it changes what
-  Step 5 may claim about agreement between them.
+- **The lenses are not independent, and the verdict must say so — once, in
+  the verdict, not in every lens's own comment.** Every lens in this step is
+  produced by one session, in one context window, in sequence — each able to
+  see the diff's own justification, your routing comment, and every earlier
+  lens's findings. That is a known property of the inline contract, not a
+  defect of a given run, and it has an observed asymmetry: a shared-context
+  panel reliably catches implementation defects and does **not** reliably
+  challenge the author's premises (#512, evidenced on #510). Nothing here
+  changes what you post per lens; it changes what Step 5 may claim about
+  agreement between them. The **Panel provenance** paragraph in the verdict
+  (Step 5) is where this gets said — each lens's own comment does not need to
+  restate it.
 
 ## Step 5 — verdict by reviewer consensus → terminal action
 
@@ -378,8 +397,20 @@ So route the agent-fixable causes to an agent instead of to a human. Hand off wi
 branch / addresses the findings, pushes to the **head** branch, and clears the
 label — and your next tick sees a newer head commit and re-routes at cycle N+1.
 
-Three things to know before you use it:
+Four things to know before you use it:
 
+- **The hand-off rings the bell (adr-0025).** `pr-autopilot-post.mjs` asks the
+  workforce to fire `pr-remediate` for this project the moment the label lands,
+  so the lane's worker starts in seconds rather than at its next cron; when it
+  pushes the fix it asks for *you* in return, so cycle N+1 starts on the fresh
+  commit. Nothing about the protocol changes — same ≤ `cycle_cap` budget, same
+  one-commit-per-cycle hand-back, same brief. The call is best-effort and its
+  result is not yours to act on: if it does not land, the cron and the sweep
+  are the floors, exactly as before. One thing IS worth reading in your fire's
+  log: a `404 binding_not_found` means **no `pr-remediate` cadence is wired for
+  this project at all** — every PR you park will age out to `author-stale`
+  (this is what stranded PSVL/asp-cloud#692 and #693). Say so in your run
+  summary; the fix is a binding, and it is the operator's.
 - **It is not a third terminal state.** MERGED and ESCALATED still are. The lane is
   bounded by a 3-attempt cap and by the Step-6 sweep (`--author-stale-hours`, 36),
   which escalates a PR the remediation cadence did not pick up — so a PR cannot
@@ -585,11 +616,48 @@ the whole attempt.
 Emit a merge **only** when all hold: 🟢 unanimous-green; the bound project's
 target repo carries an **R-N10 delegation** in its own statute; the PR touches
 **no L0/L1 path** declared between the `<!-- autopilot:l0l1-paths -->` markers
-of the target's `docs/governance.md`; checks green; mergeable (state `clean`
-or `draft` — a green draft is flipped Ready for Review then merged); no
+of the target's `docs/governance.md`; **CI + mergeability green, read from the
+PR object alone** — `mergeable == true` and `mergeable_state` `clean` (or
+`draft`, which the engine flips Ready for Review then merges); no
 `CHANGES_REQUESTED`. The workforce's own repo (`refluster/ai-native-article`)
 is a normal delegated target (adr-0011) — **authorship is not a hold**: a
 green, non-L0/L1 PR merges regardless of who opened it (FU-028).
+
+> **Do not establish "checks green" with a `GET /commits/{sha}/status` or
+> `GET /commits/{sha}/check-runs` call** — not in the engine, not by hand in the
+> verdict step. GitHub folds the head commit's check state into
+> `mergeable_state` (failing check → `unstable`; red or pending *required*
+> check → `blocked`; neither is `clean`), so those endpoints add nothing to the
+> clause while demanding `checks: read` / `statuses: read` on top of the
+> `pull-requests: read` the PR object needs. A project token without them 403s
+> and the engine fails closed — which is exactly how psvl/asp-cloud #694 / #696
+> sat on `autopilot:reason:merge-engine-refusal` for two days while their own
+> `mergeable_state` read `clean`. Barred by asp-cloud's
+> [adr_autopilot_pr_merge.md §2.1 clause 3](https://github.com/psvl/asp-cloud/blob/main/docs/adr_autopilot_pr_merge.md)
+> (amended 2026-08-11).
+>
+> **This does not depend on the base having branch protection**, and you must
+> not add a condition that assumes it does. Protection decides only *which*
+> non-clean state a red check produces — `blocked` when the check is required,
+> `unstable` when it is not — and both fail the clause. Measured 2026-08-11:
+> `refluster/ai-native-article` #547 / #545 / #542 all have a `failure`
+> check-run on an unprotected `main` (`protected: false`, empty
+> `required_status_checks`) and all report `unstable`, while #567 / #565 / #561
+> / #551 are green and report `clean`.
+>
+> This was tried the other way (dario A1 → `db6d09d`), on the premise that
+> asp-cloud's `main` is protected and this repo's is not. **Both are
+> unprotected** — verified live the same day — so gating the skip on a
+> branch-protection read sent asp-cloud straight back to the check-runs path,
+> the 403, and the refusal, exactly reproducing the stall the clause-3
+> amendment exists to end. If you are about to condition this clause on
+> anything, read *both* targets' real protection state first.
+>
+> The lone exception is a **draft** whose `mergeable_state` is the literal
+> `draft`, which reports nothing about CI; the engine reads check-runs on that
+> branch. In practice drafts on these repos report their underlying state
+> (`clean` / `unstable` / `dirty`), so that branch is a compatibility fallback,
+> not the common path.
 
 **These clauses are the complete set of *predicate* conditions** (adr-0024) —
 alongside the holds already stated above, which the engine also enforces
@@ -602,7 +670,24 @@ takes an ADR *plus* a matching server-side check in `pr-merge.mjs`, so that a
 stated rule and an enforced rule cannot diverge.
 
 Build the decisions payload (schema in the script header) with `reviewers[]` =
-the ≥3 nominated personas whose green markers you verified, then:
+the ≥3 nominated personas whose green markers you verified.
+
+**First, un-draft every PR you are about to merge — you, not the engine.**
+GitHub refuses to merge a draft, so the draft→ready flip has to happen before
+the merge PUT. That flip exists **only** as the GraphQL mutation
+`markPullRequestReadyForReview`; the REST "Update a pull request" endpoint has
+no `draft` field. `pr-merge.mjs` still carries the mutation as a fallback, but
+it cannot succeed from here: a CCR session's raw HTTPS to `api.github.com`
+goes through the agent proxy, which serves **no GraphQL at all** — even a
+read-only `{viewer{login}}` returns `403 "This GraphQL query is not enabled
+for this session"`. A deterministic script has only raw HTTPS, so the engine
+can never make this call. Your session can: the GitHub MCP connector
+(`agent-runner.md` §7) runs server-side, outside that proxy. So for each PR
+whose decision is `merge` and which is still a draft, call the MCP tool
+
+    update_pull_request(owner, repo, pullNumber, draft: false)
+
+and confirm it returns before invoking the engine. Then:
 
 ```sh
 TOKEN="…" node workforce/skills/pr-autopilot/pr-merge.mjs \

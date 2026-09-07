@@ -12,17 +12,17 @@ import type {
 } from '../types/project';
 
 vi.mock('../lib/credentials', async () => {
-  // Pull the canonical CREDENTIAL_TYPES + credentialsApiConfigured stubs
-  // from a slim factory; fetchCredentials / putCredential / deleteCredential
-  // are vi.fn()s the tests can configure per-case.
+  // Re-export the REAL CREDENTIAL_TYPES rather than a hand-copied list:
+  // a frozen copy here silently hid the vault's hardcoded "/ 5"
+  // denominator when the list grew to six (ADR-0027's azure.openai), so
+  // the mock now tracks the module it stands in for. Only the network
+  // functions are stubbed — fetchCredentials / putCredential /
+  // deleteCredential are vi.fn()s the tests configure per-case.
+  const actual = await vi.importActual<typeof import('../lib/credentials')>(
+    '../lib/credentials',
+  );
   return {
-    CREDENTIAL_TYPES: [
-      'anthropic.api_key',
-      'discord.bot_token',
-      'github.token',
-      'notion.integration_token',
-      'voyage.api_key',
-    ] as const,
+    CREDENTIAL_TYPES: actual.CREDENTIAL_TYPES,
     credentialsApiConfigured: vi.fn(() => true),
     fetchCredentials: vi.fn(),
     putCredential: vi.fn(),
@@ -37,6 +37,7 @@ vi.mock('../config/api', () => ({
 
 import CredentialVault from './CredentialVault';
 import {
+  CREDENTIAL_TYPES,
   credentialsApiConfigured,
   deleteCredential,
   fetchCredentials,
@@ -161,15 +162,17 @@ describe('error branch (initial fetch)', () => {
 // ─── empty / unprovisioned ────────────────────────────────────────────
 
 describe('empty / unprovisioned-only', () => {
-  it('renders all 5 types with CREATE buttons when LIST returns []', async () => {
+  it('renders every canonical type with a CREATE button when LIST returns []', async () => {
     mockedFetch.mockResolvedValueOnce([]);
     render(<CredentialVault projectId="foo" />);
 
     await waitFor(() => {
-      expect(screen.getByText('0 / 5 provisioned')).toBeInTheDocument();
+      expect(
+        screen.getByText(`0 / ${CREDENTIAL_TYPES.length} provisioned`),
+      ).toBeInTheDocument();
     });
     const createButtons = screen.getAllByRole('button', { name: 'CREATE' });
-    expect(createButtons).toHaveLength(5);
+    expect(createButtons).toHaveLength(CREDENTIAL_TYPES.length);
     expect(
       screen.getByText(
         'No credentials registered yet. Use “CREATE” on each type below.',
@@ -188,7 +191,9 @@ describe('provisioned rows', () => {
     render(<CredentialVault projectId="foo" />);
 
     await waitFor(() => {
-      expect(screen.getByText('1 / 5 provisioned')).toBeInTheDocument();
+      expect(
+        screen.getByText(`1 / ${CREDENTIAL_TYPES.length} provisioned`),
+      ).toBeInTheDocument();
     });
     expect(screen.getByRole('button', { name: 'ROTATE' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'DELETE' })).toBeInTheDocument();
@@ -203,10 +208,14 @@ describe('provisioned rows', () => {
     render(<CredentialVault projectId="foo" />);
 
     await waitFor(() => {
-      expect(screen.getByText('2 / 5 provisioned')).toBeInTheDocument();
+      expect(
+        screen.getByText(`2 / ${CREDENTIAL_TYPES.length} provisioned`),
+      ).toBeInTheDocument();
     });
     expect(screen.getAllByRole('button', { name: 'ROTATE' })).toHaveLength(2);
-    expect(screen.getAllByRole('button', { name: 'CREATE' })).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: 'CREATE' })).toHaveLength(
+      CREDENTIAL_TYPES.length - 2,
+    );
   });
 });
 
@@ -258,20 +267,28 @@ describe('rotate modal', () => {
 
 // ─── create modal ─────────────────────────────────────────────────────
 
+// The rows render in CREDENTIAL_TYPES order, so a CREATE button's index is
+// that type's index in the list. Deriving it (rather than hardcoding "the
+// 4th one") keeps these tests correct when the list grows — inserting
+// azure.openai second silently shifted every hardcoded index by one.
+function createButtonFor(type: (typeof CREDENTIAL_TYPES)[number]): HTMLElement {
+  const index = CREDENTIAL_TYPES.indexOf(type);
+  expect(index).toBeGreaterThanOrEqual(0);
+  return screen.getAllByRole('button', { name: 'CREATE' })[index];
+}
+
 describe('create modal', () => {
   it('renders ONE input for notion.integration_token (apiKey only; db ids are skill constants)', async () => {
     mockedFetch.mockResolvedValueOnce([]);
     render(<CredentialVault projectId="foo" />);
 
     await waitFor(() => {
-      expect(
-        screen.getAllByRole('button', { name: 'CREATE' }).length,
-      ).toBeGreaterThanOrEqual(5);
+      expect(screen.getAllByRole('button', { name: 'CREATE' })).toHaveLength(
+        CREDENTIAL_TYPES.length,
+      );
     });
     const user = userEvent.setup();
-    // Notion is the 4th CREATE in declaration order (index 3).
-    const createButtons = screen.getAllByRole('button', { name: 'CREATE' });
-    await user.click(createButtons[3]);
+    await user.click(createButtonFor('notion.integration_token'));
 
     expect(screen.getByText(/CREATE — notion\.integration_token/)).toBeInTheDocument();
     const dialog = screen.getByRole('dialog');
@@ -287,14 +304,12 @@ describe('create modal', () => {
     render(<CredentialVault projectId="foo" />);
 
     await waitFor(() => {
-      expect(
-        screen.getAllByRole('button', { name: 'CREATE' }).length,
-      ).toBeGreaterThanOrEqual(5);
+      expect(screen.getAllByRole('button', { name: 'CREATE' })).toHaveLength(
+        CREDENTIAL_TYPES.length,
+      );
     });
     const user = userEvent.setup();
-    const createButtons = screen.getAllByRole('button', { name: 'CREATE' });
-    // GitHub is the 3rd CREATE (index 2).
-    await user.click(createButtons[2]);
+    await user.click(createButtonFor('github.token'));
 
     const dialog = screen.getByRole('dialog');
     const tokenInput = within(dialog).getByPlaceholderText(/ghp_/);

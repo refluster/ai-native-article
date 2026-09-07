@@ -163,6 +163,76 @@ function attrS(av) {
   return av?.S;
 }
 
+/** Decode a DynamoDB AttributeValue back to the plain JS value `ddbItem`
+ *  would re-encode identically. Only the shapes a project META row uses.
+ *
+ *  `SS` / `NS` are NOT optional here: `ddbItem` encodes a non-empty string
+ *  array as `SS`, so a decoder that omits it returns `undefined` for every
+ *  stored `governance_docs` / `credential_types`, and the create-only
+ *  carry-forward below then rewrites them as `{NULL:true}` — destroying on
+ *  re-seed exactly the fields it exists to protect. Any type `ddbItem` can
+ *  emit must round-trip through here; the test pins that property directly
+ *  rather than enumerating today's fields. */
+function fromAttr(av) {
+  if (!av) return undefined;
+  if (av.NULL) return null;
+  if (av.S !== undefined) return av.S;
+  if (av.N !== undefined) return Number(av.N);
+  if (av.BOOL !== undefined) return av.BOOL;
+  if (av.SS !== undefined) return [...av.SS];
+  if (av.NS !== undefined) return av.NS.map(Number);
+  if (av.L !== undefined) return av.L.map(fromAttr);
+  if (av.M !== undefined) {
+    return Object.fromEntries(Object.entries(av.M).map(([k, v]) => [k, fromAttr(v)]));
+  }
+  return undefined;
+}
+
+/**
+ * Fields the API owns once a project row exists (ADR-0029).
+ *
+ * `name` was the first of these: the console could rename a project, so
+ * re-seeding from project.json had to stop overwriting the name. ADR-0029
+ * widened `PATCH /projects/{id}` to the rest of the descriptive attributes,
+ * so the same rule now has to cover them — otherwise the next re-seed for
+ * ANY unrelated reason (a changed `note`, a new project added next door)
+ * would silently revert every edit the operator made in the console.
+ *
+ * The consequence is deliberate and matches ADR-0007's direction for agents:
+ * for an EXISTING project, DDB is authoritative for these fields and
+ * project.json is creation-time input only. To change one on a live project,
+ * use the console (or PATCH); editing project.json will not apply.
+ */
+const API_OWNED_FIELDS = [
+  "name",
+  "owner_agent",
+  "github_owner",
+  "github_repo",
+  "governance_docs",
+  "credential_types",
+];
+
+/**
+ * Carry the API-owned fields forward from the stored row onto the row the seed
+ * is about to write, so a re-seed never reverts a console edit.
+ *
+ * The predicate is "the row exists", NOT "the attribute is present". An
+ * attribute the console CLEARED (`github: null` deletes both halves of the
+ * pair) is absent from the stored row, and keying on presence would fall back
+ * to project.json and silently restore the value the operator just removed —
+ * the same clobber this rule exists to stop, in the one direction that looks
+ * like normal seeding. So on an existing row the stored state wins for every
+ * API-owned field, including "absent".
+ */
+function mergeApiOwnedFields(next, existing) {
+  if (!existing) return next;
+  for (const field of API_OWNED_FIELDS) {
+    if (field in existing) next[field] = fromAttr(existing[field]);
+    else delete next[field];
+  }
+  return next;
+}
+
 function upsertMeta(data, now) {
   const existing = getItem(`PROJECT#${data.id}`, "META");
   const next = projectMetaRow(data, now);
@@ -172,13 +242,7 @@ function upsertMeta(data, now) {
   if (existing?.created_at?.S) {
     next.created_at = existing.created_at.S;
   }
-  // `name` is create-only: the API (PATCH /projects/{id}) owns renames of
-  // existing rows; project.json's name applies at creation only. Without
-  // this, a re-seed after any project.json change would clobber a
-  // PATCHed display name (the ADR-0008 create-only pattern).
-  if (existing?.name?.S) {
-    next.name = existing.name.S;
-  }
+  mergeApiOwnedFields(next, existing);
   putItem(next);
   return existing ? "updated" : "created";
 }
@@ -221,9 +285,17 @@ function main() {
   console.log(`\nSeed OK — ${files.length} project(s): ${summary}.`);
 }
 
-try {
-  main();
-} catch (err) {
-  console.error("seed-projects failed:", err.message ?? err);
-  process.exit(1);
+// Exported for seed-projects-tests.ts. The encode/decode pair and the
+// create-only merge are the parts with a correctness property worth pinning;
+// everything else in this file is AWS CLI plumbing.
+export { ddbItem, fromAttr, mergeApiOwnedFields, API_OWNED_FIELDS };
+
+// Run as a CLI only when invoked directly; importing (tests) has no side effect.
+if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+  try {
+    main();
+  } catch (err) {
+    console.error("seed-projects failed:", err.message ?? err);
+    process.exit(1);
+  }
 }

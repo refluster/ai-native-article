@@ -1,11 +1,11 @@
 ---
 name: hypothesis
-description: Maya's weekly product-hypothesis article in Japanese — a concrete, falsifiable claim about user needs, market direction, or AI-product dynamics, grounded in recent observations and structured with evidence, implications, and a test plan. Published to the unified Notion Articles DB as Type=analysis, Author=maya, Status=ready.
+description: Maya's weekly product-hypothesis article in Japanese and English — a concrete, falsifiable claim about user needs, market direction, or AI-product dynamics, grounded in recent observations and structured with evidence, implications, and a test plan. Published to the unified Notion Articles DB as Type=analysis, Author=maya, Status=ready, with the English edition on an `EN` child page.
 ---
 
 # hypothesis
 
-Write **one** product-hypothesis article in Japanese.
+Write **one** product-hypothesis article — in Japanese **and** English (ADR-0005).
 
 A hypothesis article is Maya's weekly product-thinking piece: a concrete, falsifiable claim about what users need, what the market is doing, or what an AI-native product should do next — grounded in recent observations and published under the Maya byline on `kohuehara.xyz`.
 
@@ -41,7 +41,25 @@ Structure — follow exactly:
 
 Do **not** append a byline, AI-disclosure footer, or boilerplate. The `Author=maya` property carries the byline and renders as the AuthorChip on `kohuehara.xyz`.
 
-### 3. Choose 3–5 tags
+### 3. Issue the same hypothesis in English (ADR-0005)
+
+Every article ships in Japanese **and** English. This does not double the thinking:
+
+- **Everything upstream of the writing is shared.** One hypothesis, one reasoning chain, one set of market signals, one set of conclusions. Do not re-derive the claim for the English edition; do not let the two editions reach different conclusions or carry different figures.
+- **Only the rendering differs.** Write the Japanese article first — it is the article. Then write the English edition of *that* article: same structure, same section order, same evidence.
+- **English is an edition, not a gloss.** Write it as an English-language publication would: natural English prose, not transliterated Japanese sentence order. Keep the headline concrete and specific in the same way the Japanese one is. Japanese terms with no clean English equivalent keep the original with a short parenthetical.
+- **The same hard rules apply to both.** No invented observations, no rounded figures, no boilerplate.
+
+Format for the English edition, identical in shape to the Japanese one:
+
+- **Line 1**: `#` H1 — the English title (the same specific claim, not a generic paraphrase).
+- `## Hypothesis` — the hypothesis in full, beginning "I believe…" or "My hypothesis is…"
+- `## Observations` — same signals, English prose.
+- `## Evidence` — same evidence bullets in English.
+- `## Implications` — same product implications.
+- `## How to test` — the same concrete observable outcome and measurement method.
+
+### 4. Choose 3–5 tags
 
 Pick from the controlled flat vocabulary (ADR-0003):
 
@@ -52,32 +70,42 @@ Pick from the controlled flat vocabulary (ADR-0003):
 
 Use the labels **verbatim** — the script silently drops anything outside the vocabulary.
 
-### 4. Run the write script
+### 5. Run the write script
 
-1. Write the full hypothesis markdown to a temp file (e.g. `/tmp/hypothesis.md`). The first line must be the `# Title` H1.
-2. Write a 2–3 sentence abstract (the `## 仮説` condensed) to `/tmp/hypothesis-abstract.txt`.
-3. Run:
+1. Write the full hypothesis markdown to a slug-unique temp file, e.g. `/tmp/hypothesis-maya-<ulid>.md`. The first line must be the `# Title` H1.
+2. Write the English edition to `/tmp/hypothesis-maya-<ulid>.en.md`, also starting with its own `# Title` H1.
+3. Write a 2–3 sentence abstract (the `## 仮説` condensed) to `/tmp/hypothesis-maya-<ulid>-abstract.txt`.
+4. Write a 2–3 sentence English abstract to `/tmp/hypothesis-maya-<ulid>-abstract.en.txt`.
+5. Run:
 
    ```sh
    NOTION_API_KEY="<credentials['notion.integration_token'].apiKey>" \
      node workforce/skills/hypothesis/publish-notion.mjs \
        --author maya \
        --status ready \
-       --body-file /tmp/hypothesis.md \
-       --abstract-file /tmp/hypothesis-abstract.txt \
+       --body-file /tmp/hypothesis-maya-<ulid>.md \
+       --body-en-file /tmp/hypothesis-maya-<ulid>.en.md \
+       --abstract-file /tmp/hypothesis-maya-<ulid>-abstract.txt \
+       --abstract-en-file /tmp/hypothesis-maya-<ulid>-abstract.en.txt \
        --tags "AI Strategy,Agentic AI"
    ```
 
-4. Report the exit code:
-   - `0` — page created. `Author=maya, Type=analysis, Status=ready` in Notion. Done. The GAS L4 batch picks it up and flips Status to `published` so it appears on `kohuehara.xyz`.
-   - `2` — W-1 guard failed (body too short, LLM-artefact prelude, or cut-off last line). Regenerate the missing content and retry.
-   - `1` — bad args or missing H1 title. Fix and retry.
-   - `3` — Notion API / network error. Retry once; escalate if it persists.
+   `--body-en-file` is **required**. There is no Japanese-only publish path — an article without its English edition is an incomplete fire (ADR-0005).
+
+6. Report the exit code:
+   - `0` — page created in both editions. `Author=maya, Type=analysis, Status=ready` in Notion. Done.
+   - `2` — W-1 guard failed in either edition (body too short, LLM-artefact prelude, or cut-off last line). Regenerate the missing content and retry.
+   - `1` — bad args, missing `--body-en-file`, or no H1 title. Fix and retry.
+   - `3` — Notion API / network error; nothing was created. Retry once; escalate if it persists.
+   - `4` — the Japanese row was created but the English edition failed. The article is live but Japanese-only. Repair with: `node newsletter/pipeline/backfill-en.mjs --page-id <id>`. **Do not** re-run the publish command — it would duplicate the Japanese row.
 
 `NOTION_API_KEY` comes from `credentials["notion.integration_token"].apiKey` — never hard-code it.
+
+Use **slug-unique** temp paths (include `maya` and a ULID/timestamp) so concurrent cadence tasks on the same filesystem cannot overwrite each other's body files mid-flight (ML-020).
 
 ## Hard rules (C-1 / W-1 / C-4)
 
 - **State a falsifiable claim.** A hypothesis that cannot be tested is an opinion piece — rename it or narrow it until the `## 検証方法` section has a concrete, measurable outcome.
 - **Do not invent observations.** Ground `## 観察` and `## 根拠` in patterns or signals you have genuine context for. Do not cite statistics you cannot trace.
 - **Never publish an empty or cut-off article.** The write script rejects short bodies, LLM-failure preludes, and truncated last lines (exit 2). Do not retry blindly on exit 2 — regenerate the content that is missing.
+- **Both editions or nothing.** A Japanese-only fire is a failed fire (ADR-0005 / C-4). Exit 4 (the row exists, EN write failed) is handled by `backfill-en.mjs`, not by re-running publish.

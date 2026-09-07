@@ -52,6 +52,10 @@ function newCcrBinding(skill: string, cron: string, projectId: string): AgentBin
     routine_spec: 'workforce/docs/routines/agent-runner.md',
     project_id: projectId,
     note: `Bound from the console on ${new Date().toISOString().slice(0, 10)}.`,
+    // Epic-021 Story 4 follow-up (issue 574): this is the console's
+    // "bind a new skill" path — always an append (line below), never a
+    // replace — so stamping bound_at here is exact.
+    bound_at: new Date().toISOString(),
   };
 }
 
