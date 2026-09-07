@@ -9,6 +9,9 @@
 //   COMMONS_SKILLS — workforce/skills/*/meta.json (.commons === true; Epic-021
 //                    §B.1 — the baseline cadence every persona shares, discounted
 //                    by the idle-talent detector in the performance-reducer walk)
+//   SKILL_COST_CLASS — workforce/skills/*/meta.json (.cost_class; #661 — the
+//                    orchestrator's modelled per-fire cost, since the CCR path
+//                    puts the LLM call outside the data plane's sight)
 
 export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "article-level2": ["notion.integration_token"] as const,
@@ -53,6 +56,53 @@ export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "verification-sweep": ["workforce.feed_write_token"] as const,
   "vp-monthly-report": ["notion.integration_token"] as const,
   "weekly-project-report": ["github.token"] as const,
+};
+
+/** Declared per-invocation cost class (#661). The USD model lives in
+ *  shared/fire-cost-estimate.ts; this is only the classification. */
+export const SKILL_COST_CLASS: Record<string, string> = {
+  "article-level2": "medium",
+  "article-level3": "large",
+  "attention-ledger": "small",
+  "audience-loop": "small",
+  "backlog-reconcile": "large",
+  "budget-runway-review": "small",
+  "code-task-brief": "medium",
+  "daily-research": "small",
+  "design-note": "medium",
+  "discord-chime-in": "small",
+  "discord-digest": "small",
+  "discord-heartbeat": "small",
+  "editorial-desk": "small",
+  "feed-post": "small",
+  "grid-watch": "small",
+  "hypothesis": "medium",
+  "india-grid-watch": "small",
+  "issue-design": "large",
+  "issue-implement": "large",
+  "issue-triage": "medium",
+  "legal-amendment-review-committee": "large",
+  "memory-curation": "medium",
+  "memory-hygiene": "small",
+  "monthly-report": "large",
+  "ops-accountability-watch": "small",
+  "org-metrics-pulse": "small",
+  "pdm-charter": "small",
+  "performance-refresh": "small",
+  "podcast-publish": "small",
+  "podcast-script": "medium",
+  "positioning-write": "medium",
+  "pr-autopilot": "medium",
+  "pr-remediate": "large",
+  "reader-signal": "small",
+  "record-engagement": "small",
+  "red-team-audit": "small",
+  "regulatory-situation-report": "large",
+  "research-sync": "small",
+  "skill-maturity-report": "small",
+  "verification-sweep": "small",
+  "vp-monthly-report": "large",
+  "weekly-project-report": "large",
 };
 
 /** Skills whose executions do NOT count as specialised work (Epic-021 §B.1).

@@ -221,11 +221,19 @@ export interface AgentApiView extends AgentIdentity, AgentOperational, AgentComp
   budget_monthly_usd_effective: number;
 }
 
+/** The cap actually in force for an agent: the operational override when set,
+ *  otherwise the configured default. One definition, so the API view and the
+ *  orchestrator's W-3 check (#661) can never disagree about what the cap is. */
+export function effectiveBudgetUsd(
+  row: Pick<AgentMetaRow, "budget_monthly_usd_override" | "budget_monthly_usd_default">,
+): number {
+  return row.budget_monthly_usd_override ?? row.budget_monthly_usd_default;
+}
+
 export function toApiView(row: AgentMetaRow): AgentApiView {
   return {
     ...row,
-    budget_monthly_usd_effective:
-      row.budget_monthly_usd_override ?? row.budget_monthly_usd_default,
+    budget_monthly_usd_effective: effectiveBudgetUsd(row),
   };
 }
 
