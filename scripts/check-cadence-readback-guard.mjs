@@ -57,27 +57,11 @@ import { join } from "node:path";
 const REPO_ROOT = new URL("..", import.meta.url).pathname;
 const SKILLS_DIR = join(REPO_ROOT, "workforce", "skills");
 
-// 2026-08-17: known to POST to the shared feed endpoint from a --body-file
-// without a read-back guard yet. The three PR #546 owned (feed-post,
-// daily-research, reader-signal) are guarded as of that PR's merge and have
-// been removed from this list; what remains is follow-up work.
-const KNOWN_GAPS = new Set([
-  // Discovered 2026-08-17 by this gate's own first run against `main` —
-  // same vulnerable pattern, not yet ported to verifyReadBack(). Untracked
-  // by any open PR as of this commit; follow-up, not a blocker for landing
-  // the gate itself (see docs/follow-ups.md FU-040 addendum).
-  "audience-loop/post.mjs",
-  "budget-runway-review/post.mjs",
-  "editorial-desk/post.mjs",
-  "india-grid-watch/post.mjs",
-  "memory-hygiene/post.mjs",
-  "org-metrics-pulse/post.mjs",
-  "performance-refresh/post.mjs",
-  "red-team-audit/post.mjs",
-  "research-sync/post.mjs",
-  "skill-maturity-report/post.mjs",
-  "verification-sweep/post.mjs",
-]);
+// All previously discovered gaps have been closed (2026-09-07, FU-040).
+// The three PR #546 owned (feed-post, daily-research, reader-signal) and
+// the two this gate's first run fixed (grid-watch, attention-ledger) were
+// already guarded; the remaining 11 are now ported in this PR.
+const KNOWN_GAPS = new Set([]);
 
 function listSkillScripts() {
   const out = [];
