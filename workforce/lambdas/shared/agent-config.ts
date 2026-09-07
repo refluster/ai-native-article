@@ -193,6 +193,7 @@ export function validateIdentityPatch(
       v("S9-bindings", "bindings", "bindings must be an array");
     } else {
       patch.bindings.forEach((b, i) => out.push(...validateBinding(b, i, ctx)));
+      out.push(...validateBindingUniqueness(patch.bindings));
     }
   }
   if ("owner_email" in patch) {
@@ -342,6 +343,53 @@ function budgetCeiling(
     ];
   }
   return [];
+}
+
+/**
+ * One (skill, project) per agent — a cross-binding invariant, so it lives here
+ * rather than inside the per-binding validator.
+ *
+ * The write tooling already assumes this: `scripts/lib/binding-reconcile.mjs`
+ * is keyed on (skill, project_id) and documents itself as "absent → appended;
+ * equal → no-op; drifted → replaced in place". Faced with two matches it edits
+ * the first and leaves the second stranded — which is how a duplicate survives
+ * unnoticed once it exists.
+ *
+ * Found live on 2026-09-07: `grace` carried `daily-research@agent-workforce`
+ * twice, once at `cron(20 13 ? * * *)` and once at `cron(20 0/2 ? * * *)`. The
+ * second fires 12x a day, so the roster's most-repeated cadence was running
+ * twelve times for one agent and once for everyone else — invisible until the
+ * #661 spend gauge started charging per fire.
+ *
+ * Not a false constraint on scheduling: a skill that should run at 09:00 and
+ * 17:00 says so in ONE cron (`cron(0 9,17 ? * * *)`), which is also the only
+ * form the reconciler can keep in sync.
+ */
+function validateBindingUniqueness(bindings: unknown[]): ConfigViolation[] {
+  const out: ConfigViolation[] = [];
+  const firstSeen = new Map<string, number>();
+  bindings.forEach((raw, i) => {
+    if (typeof raw !== "object" || raw === null) return;
+    const b = raw as Partial<AgentBinding>;
+    // Only pairs already well-formed enough to be meaningful; a malformed
+    // binding has its own violation and should not also produce this one.
+    if (typeof b.skill !== "string" || !b.skill) return;
+    const key = `${b.skill}@${b.project_id ?? ""}`;
+    const first = firstSeen.get(key);
+    if (first === undefined) {
+      firstSeen.set(key, i);
+      return;
+    }
+    out.push({
+      rule: "S9-binding-duplicate",
+      field: `bindings[${i}]`,
+      msg:
+        `duplicate binding: skill "${b.skill}" is already bound to project ` +
+        `"${b.project_id ?? "(none)"}" at bindings[${first}]. One (skill, project) ` +
+        "per agent — express multiple fire times in a single cron, e.g. cron(0 9,17 ? * * *).",
+    });
+  });
+  return out;
 }
 
 function validateBinding(

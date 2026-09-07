@@ -72,6 +72,7 @@ import {
   validateBudgetOverride,
   validateIdentityCoherence,
   validateIdentityPatch,
+  W3_BUDGET_CAP_USD,
   type ConfigViolation,
 } from "../shared/agent-config.js";
 import {
@@ -98,10 +99,12 @@ import {
   conditionalPutItem,
   getItem,
   queryBySkPrefix,
+  queryBySkPrefixPaged,
   scanAllPrefix,
   scanPrefix,
   updateOperational,
 } from "../shared/ddb.js";
+import { budgetMonthKey, summariseBudgetRows, type BudgetRow } from "../shared/budget-schema.js";
 import {
   appendExecution,
   archive as archiveProject,
@@ -124,6 +127,7 @@ import {
   type PerfLifecycleRow,
   type PerfPrRow,
   type PerfRepoRow,
+  type BudgetBlock,
   composeSeries,
   perfPk,
 } from "../shared/performance.js";
@@ -1695,8 +1699,43 @@ async function getPerformanceRoute(scope: string): Promise<APIGatewayProxyResult
     repoRow,
     humanTouchRow,
     idleRow ?? undefined,
+    // Workforce scope only: the W-3 ledger is keyed per agent, and an agent
+    // works across projects, so there is no honest way to attribute a fire's
+    // cost to one project. Emitting a project-scoped budget would invent an
+    // attribution the ledger does not carry.
+    scope === "workforce" ? await readBudgetBlock() : undefined,
   );
   return reply(200, series);
+}
+
+/**
+ * Month-to-date W-3 ledger, rolled up across the roster (#661).
+ *
+ * Until this existed, the modelled spend the orchestrator writes on every
+ * dispatch was readable only by querying DynamoDB by hand — an honest gauge
+ * nobody could see, which is half of the failure it was built to end (sana,
+ * 2026-09: 「誰も読まない数字は、間違っているのではなく、ただ役に立っていない」).
+ *
+ * One query over the month's partition rather than a GetItem per agent, and
+ * drained: a Limit-capped single page would silently under-report the total
+ * once the roster outgrows a page, which is the Limit-vs-Filter class
+ * `check-scan-drain` exists to prevent.
+ */
+async function readBudgetBlock(): Promise<BudgetBlock | undefined> {
+  const month = budgetMonthKey();
+  const rows: BudgetRow[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await queryBySkPrefixPaged<BudgetRow>(
+      `BUDGET#${month}`,
+      "AGENT#",
+      PAGE_SIZE_MAX,
+      cursor,
+    );
+    rows.push(...page.items);
+    cursor = page.cursor;
+  } while (cursor);
+  return summariseBudgetRows(rows, month, W3_BUDGET_CAP_USD);
 }
 
 async function listProjectExecutions(

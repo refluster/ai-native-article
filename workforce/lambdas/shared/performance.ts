@@ -142,6 +142,37 @@ export interface PerformanceSeries {
    *  aggregation lands. Never merged into the blocks above: the touch tables
    *  are per-class by construction (see HumanTouchBlock). */
   human_touch?: HumanTouchBlock;
+  /** #661 — the W-3 ledger for the current calendar month. Absent on a
+   *  project scope (the ledger is keyed per agent, not per project) and on a
+   *  month before the orchestrator's first charged dispatch. */
+  budget?: BudgetBlock;
+}
+
+/**
+ * Month-to-date spend against the W-3 ceiling (#661).
+ *
+ * `modelled` and `measured` stay apart on purpose and are never summed into a
+ * single headline here. The data plane cannot meter a CCR session, so almost
+ * everything the workforce spends arrives as `modelled` — a figure derived
+ * from each skill's declared `cost_class`, not an observation. Presenting one
+ * total would relabel a model as a measurement, which is the failure this
+ * whole ledger exists to end. A consumer that needs the number the cap is
+ * checked against adds them itself, knowingly.
+ */
+export interface BudgetBlock {
+  /** "YYYY-MM", UTC — the partition these figures were read from. */
+  month: string;
+  /** Sum of modelled per-fire cost across every agent charged this month. */
+  modelled_usd: number;
+  /** Sum of spend metered at an LLM call site. Near-zero by construction
+   *  today: only memory-compactor and tools-api run inside the data plane. */
+  measured_usd: number;
+  /** Dispatched CCR fires behind `modelled_usd`. */
+  fires: number;
+  /** Agents with a ledger row this month — NOT the roster size. */
+  agents_charged: number;
+  /** The W-3 combined ceiling in force, for rendering used-against-cap. */
+  ceiling_usd: number;
 }
 
 // ── Epic-020 human leverage (the human side of the ledger) ────────────────────
@@ -560,6 +591,7 @@ export function composeSeries(
   >,
   humanTouchRow?: HumanTouchBlock,
   idleRow?: PerfIdleBlock,
+  budget?: BudgetBlock,
 ): PerformanceSeries {
   const points = lifecycleRow.points;
   const lcStart = points[0]?.date;
@@ -623,5 +655,6 @@ export function composeSeries(
           },
         }
       : {}),
+    ...(budget ? { budget } : {}),
   };
 }

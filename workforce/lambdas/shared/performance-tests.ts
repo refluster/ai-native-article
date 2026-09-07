@@ -127,6 +127,41 @@ describe("composeSeries — endpoint assembly", () => {
     expect(s.lifecycle[s.lifecycle.length - 1]!.delivered).toBe(16);
   });
 
+  // #661 — the W-3 budget block is additive and absent by default. Absence
+  // must stay distinguishable from "$0 spent": a fresh month and a broken
+  // writer look identical from the client, so the block is omitted rather
+  // than zero-filled.
+  it("omits `budget` entirely when none is supplied", () => {
+    const s = composeSeries("workforce", "2026-06-22T02:00:00Z", { points });
+    expect(s.budget).toBeUndefined();
+    expect("budget" in s).toBe(false);
+  });
+
+  it("passes the budget block through untouched when supplied", () => {
+    const budget = {
+      month: "2026-09",
+      modelled_usd: 1.0,
+      measured_usd: 0,
+      fires: 9,
+      agents_charged: 9,
+      ceiling_usd: 600,
+    };
+    const s = composeSeries(
+      "workforce",
+      "2026-09-07T18:00:00Z",
+      { points },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      budget,
+    );
+    expect(s.budget).toEqual(budget);
+    // Modelled and measured are never summed into a headline by the composer —
+    // relabelling a model as a measurement is the failure the ledger ends.
+    expect(s.budget).not.toHaveProperty("total_usd");
+  });
+
   // Epic-021 §B.1 / #458 — the IDLE roll-up is additive and absent by default
   // (composeSeries pre-dates the sweep for most scopes); a consumer must be
   // able to tell "no IDLE row published yet" from "swept, nobody idle".

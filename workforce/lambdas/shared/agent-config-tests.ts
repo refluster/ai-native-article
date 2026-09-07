@@ -118,6 +118,93 @@ describe("validateIdentityPatch — bindings", () => {
     expect(rules({ bindings: [42] })).toContain("S9-binding-object");
   });
 
+  describe("S9-binding-duplicate — one (skill, project) per agent", () => {
+    const bound = (skill: string, project_id: string, cron: string) =>
+      ccrBinding({ skill, project_id }, { scheduler: "external", invoked_by: "api", cron });
+
+    it("rejects the live grace shape: the same skill twice on one project", () => {
+      // grace, 2026-09-07: daily-research@agent-workforce at cron(20 13 ? * * *)
+      // AND at cron(20 0/2 ? * * *) — the second firing 12x a day.
+      const violations = validateIdentityPatch(
+        {
+          bindings: [
+            bound("feed-post", "agent-workforce", "cron(20 13 ? * * *)"),
+            bound("feed-post", "agent-workforce", "cron(20 0/2 ? * * *)"),
+          ],
+        },
+        ctx(),
+      );
+      const dup = violations.filter((x) => x.rule === "S9-binding-duplicate");
+      expect(dup).toHaveLength(1);
+      // Points at the SECOND one — the first is the keeper — and names both.
+      expect(dup[0]!.field).toBe("bindings[1]");
+      expect(dup[0]!.msg).toContain("bindings[0]");
+    });
+
+    it("accepts the same skill on two different projects", () => {
+      // ren really does hold issue-implement on both agent-workforce and asp-cloud.
+      expect(
+        rules({
+          bindings: [
+            bound("feed-post", "agent-workforce", "cron(20 13 ? * * *)"),
+            bound("feed-post", "asp-cloud", "cron(20 13 ? * * *)"),
+          ],
+        }),
+      ).toEqual([]);
+    });
+
+    it("accepts two different skills on one project", () => {
+      const both = ctx({ skillOwners: (n) => (n === "feed-post" || n === "daily-research" ? ["grace"] : undefined) });
+      expect(
+        rules(
+          {
+            bindings: [
+              bound("feed-post", "agent-workforce", "cron(20 13 ? * * *)"),
+              bound("daily-research", "agent-workforce", "cron(40 13 ? * * *)"),
+            ],
+          },
+          both,
+        ),
+      ).toEqual([]);
+    });
+
+    it("flags each extra occurrence, not just the second", () => {
+      const dup = validateIdentityPatch(
+        {
+          bindings: [
+            bound("feed-post", "agent-workforce", "cron(1 1 ? * * *)"),
+            bound("feed-post", "agent-workforce", "cron(2 2 ? * * *)"),
+            bound("feed-post", "agent-workforce", "cron(3 3 ? * * *)"),
+          ],
+        },
+        ctx(),
+      ).filter((x) => x.rule === "S9-binding-duplicate");
+      expect(dup.map((x) => x.field)).toEqual(["bindings[1]", "bindings[2]"]);
+    });
+
+    it("treats a missing project_id as its own key rather than matching every binding", () => {
+      const withNoProject = { skill: "feed-post", executor: "lambda" };
+      const dup = validateIdentityPatch(
+        { bindings: [withNoProject, { ...withNoProject }] },
+        ctx(),
+      ).filter((x) => x.rule === "S9-binding-duplicate");
+      expect(dup).toHaveLength(1);
+    });
+
+    it("does not pile a duplicate violation onto a malformed binding", () => {
+      // 42 and {} already have their own violations; they must not also
+      // collide with each other on an empty key.
+      const dup = validateIdentityPatch({ bindings: [42, {}, {}] }, ctx()).filter(
+        (x) => x.rule === "S9-binding-duplicate",
+      );
+      expect(dup).toEqual([]);
+    });
+
+    it("a single binding is never a duplicate", () => {
+      expect(rules({ bindings: [ccrBinding()] })).toEqual([]);
+    });
+  });
+
   it("cross-checks skill existence against SKILL rows", () => {
     expect(rules({ bindings: [ccrBinding({ skill: "ghost-skill" })] })).toContain(
       "R8-binding-skill-exists",
