@@ -367,6 +367,10 @@ Resources:
         # name after persisting the operator's message.
         Variables:
           MESSAGING_REPLY_FUNCTION: !Ref WfMessagingReplyFunction
+          # adr-0025: POST /dispatch async-invokes the orchestrator, which owns
+          # the CCR-fire secret + project credentials. This API resolves and
+          # rate-limits the request; it never fires the routine itself.
+          ORCHESTRATOR_FUNCTION: !Ref WfOrchestratorFunction
       Policies:
         - Statement:
             - Sid: AgentsApiTableAccess
@@ -507,6 +511,15 @@ Resources:
               Action: lambda:InvokeFunction
               Resource:
                 - !GetAtt WfMessagingReplyFunction.Arn
+            # adr-0025 — POST /dispatch hands one explicit (agent, binding_idx)
+            # to the orchestrator for an immediate CCR fire. Scoped to that one
+            # function; the API gains no Secrets Manager or CCR access of its
+            # own from this.
+            - Sid: AgentsApiInvokeOrchestratorDispatch
+              Effect: Allow
+              Action: lambda:InvokeFunction
+              Resource:
+                - !GetAtt WfOrchestratorFunction.Arn
       Events:
         ListAgents:
           Type: HttpApi
@@ -524,6 +537,17 @@ Resources:
           Properties:
             ApiId: !Ref WfAgentsHttpApi
             Path: /stats
+            Method: GET
+        # Public KPI card for the portfolio site (kohuehara.xyz "working
+        # with agents" section). Same public, CORS-gated read posture as
+        # /stats, but a small, container-memoised projection: /stats fans
+        # out one ledger query per agent (4-6 s) and is the wrong cost
+        # shape to serve per anonymous visitor.
+        GetPublicWorkforceSummary:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /public/workforce-summary
             Method: GET
         # Epic-016 Phase 2 — performance analytics (lifecycle funnel + PR
         # automation), workforce-wide and per-project. Public read, same
@@ -735,6 +759,15 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /projects/{id}/executions
             Method: GET
+        # ADR-0029: the project config trail. Public read like the other
+        # project reads and like GET /agents/{slug}/audit — the rows carry
+        # field names, an actor ARN and timestamps, never credential values.
+        ListProjectAudit:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /projects/{id}/audit
+            Method: GET
         # Issue #158 PR-β: project credentials LIST (public read, metadata-only)
         # and project PATCH (AWS_IAM auth) so the operator can flip
         # status=archived from the SPA without dropping to the CLI.
@@ -795,6 +828,19 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /feed
             Method: POST
+        CreateOperatorFeedPost:
+          # The operator's own composer write (console → feed). AWS_IAM,
+          # exactly like the messaging writes: the SPA signs with SigV4
+          # from the workforce Identity Pool. Deliberately NOT the bearer
+          # path — the feed-write token an agent holds must not be able to
+          # author a `directive`, which the runner injects into every fire.
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /feed/operator
+            Method: POST
+            Auth:
+              Authorizer: AWS_IAM
         PatchFeedPost:
           Type: HttpApi
           Properties:
@@ -862,6 +908,17 @@ Resources:
             Method: POST
             Auth:
               Authorizer: AWS_IAM
+        # adr-0025 — on-demand fire of an already-declared binding. Same
+        # posture as CreateFeedPost: no API GW authorizer, because the caller
+        # is a CCR session with no SigV4 creds; auth is the per-fire dispatch
+        # capability token, validated at the handler layer against the
+        # AUTH#DISPATCH rows the orchestrator minted.
+        DispatchBinding:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /dispatch
+            Method: POST
       Tags:
         workforce: !Ref Stage
 
@@ -1015,6 +1072,11 @@ Resources:
       Description: One-shot backfill — fills TASK.project_id with self/{slug}. Epic-010 Story 1-B.
       MemorySize: 512
       Timeout: 300
+      # FU-009: cap to 1 concurrent execution so a double-trigger (operator
+      # fires manually while a prior run is still scanning) cannot race against
+      # itself and produce duplicate conditional-write conflicts or inflated
+      # WfBackfillTasksProcessed metrics.
+      ReservedConcurrentExecutions: 1
       Policies:
         - Statement:
             - Sid: BackfillTasksTableAccess
@@ -1035,6 +1097,29 @@ Resources:
                   cloudwatch:namespace: Workforce/Backfill
       Tags:
         workforce: !Ref Stage
+
+  # FU-009: mirrors the WfAuditErrorsAlarm pattern — any Lambda error on an
+  # operator-invoked one-shot is immediately actionable, so a 5-min window
+  # with TreatMissingData: notBreaching (the function normally never fires) is
+  # the right posture. Paired with ReservedConcurrentExecutions: 1 above.
+  WfBackfillTasksErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-backfill-tasks-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-backfill-tasks-${Stage} over 5 minutes (operator-invoked one-shot backfill Lambda).
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfBackfillTasksFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
 
   # --- Credentials write API (Epic-010 Story 2-C) ----------------------------
   # Operator-only write-side API for project credentials. Mirrors the
@@ -1083,6 +1168,127 @@ Resources:
         DefaultAuthorizer: AWS_IAM
       Tags:
         workforce: !Ref Stage
+
+  # ── Interactive project tools (ADR-0027, Epic-025) ─────────────────
+  #
+  # A separate HTTP API from the credentials one, on the same AWS_IAM
+  # posture: the SPA signs with SigV4 through the same broker, and a route
+  # added here without an explicit Authorizer still cannot become public.
+  # Split rather than shared because the two surfaces have different
+  # lifecycles and different blast radii — a credentials-write API and a
+  # run-an-LLM API should not be one CORS/authoriser configuration.
+  WfToolsHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Stage
+      CorsConfiguration:
+        AllowOrigins:
+          - https://kohuehara.xyz
+          - https://workforce.kohuehara.xyz
+          - http://localhost:5173
+        AllowMethods: [POST, OPTIONS]
+        # Same SigV4 preflight header set as WfCredentialsHttpApi — the
+        # x-amz-* headers are what aws4fetch sends and what the preflight
+        # must allow. Keep in sync with that API.
+        AllowHeaders:
+          - content-type
+          - authorization
+          - x-amz-date
+          - x-amz-content-sha256
+          - x-amz-security-token
+      Auth:
+        EnableIamAuthorizer: true
+        DefaultAuthorizer: AWS_IAM
+      Tags:
+        workforce: !Ref Stage
+
+  WfToolsApiFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-tools-api-${Stage}
+      CodeUri: ../../lambdas/tools-api
+      Handler: handler.handler
+      Description: Interactive project tools — synchronous run surface (ADR-0027, Epic-025).
+      MemorySize: 512
+      # A tool run is one LLM completion with an operator waiting on it.
+      # 120s is well above a normal run and below the API Gateway ceiling
+      # (29s for the integration response — see the Note below).
+      Timeout: 120
+      Policies:
+        - Statement:
+            - Sid: ToolsApiTableAccess
+              # getProject + appendExecution (ledger) + budget read/increment.
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:Query
+              Resource:
+                - !GetAtt WfTable.Arn
+                - !Sub ${WfTable.Arn}/index/*
+            - Sid: ToolsApiSecretsRead
+              # READ ONLY — this Lambda resolves a project's tool
+              # credentials and must never write one (that is
+              # credentials-api).
+              #
+              # Scoped PER CREDENTIAL TYPE, matching this file's own
+              # precedent (AgentsApiRecallVoyageKey scopes to
+              # `wf/projects/*/voyage.api_key-*`, not to `wf/projects/*`).
+              # An earlier revision granted `wf/projects/*` plus a bare
+              # `wf/*`; the latter reached the whole secret namespace —
+              # `wf/github-*`, `wf/ccr/*`, `wf/anthropic` — which no other
+              # Lambda here can see and nothing in this one needs.
+              #
+              # The legacy bare tier (`wf/{type}`, getCredential's third
+              # fallback) is deliberately NOT granted: `azure.openai` is a
+              # post-Epic-010 type introduced by ADR-0027, so no legacy
+              # `wf/azure.openai` secret exists or ever will.
+              #
+              # COUPLING, accepted: this list is static while the tool
+              # registry is data. A tool declaring a new credential type
+              # needs a Resource line added here, and until it has one the
+              # run fails loud with AccessDenied naming the secret — which
+              # is the right direction to fail compared with a standing
+              # broad read.
+              Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*/azure.openai-*
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref WfTable
+      Events:
+        RunTool:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfToolsHttpApi
+            Path: /projects/{slug}/tools/{tool_id}/run
+            Method: POST
+      Tags:
+        workforce: !Ref Stage
+
+  WfToolsApiErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-tools-api-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-tools-api-${Stage} over 5 minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfToolsApiFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
 
   WfCredentialsApiFunction:
     Type: AWS::Serverless::Function
@@ -1647,6 +1853,36 @@ Resources:
       Threshold: 0
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  # FU-032: wf-audit is the Lambda whose whole job is to be the *witness* for
+  # Epic-010 criterion 4, yet it was the only scheduled Lambda without a
+  # missed-run alarm — making "a week of clean zeros" indistinguishable from
+  # "a week where wf-audit never fired" (TreatMissingData: notBreaching on
+  # both signal alarms made the gate trivially green). Mirrors the pattern
+  # used by WfConfigDigestMissedRunAlarm (weekly window) and
+  # WfPerformanceReducerMissedRunAlarm (2-day window). wf-audit fires daily
+  # (cron(0 4 * * ? *)), so a 2-day window (two daily buckets below 1
+  # invocation) fires if either daily run is missed — same logic as the
+  # performance reducer. This is the prerequisite for the ≥1-week all-zero
+  # soak that closes Epic-010 criterion 4 (ROADMAP.md §Status-transition).
+  WfAuditMissedRunAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-audit-missed-run-alarm-${Stage}
+      AlarmDescription: !Sub No wf-audit-${Stage} invocation in 2 days — the daily workforce audit sweep is not running (Epic-010 criterion 4 soak is stalled).
+      Namespace: AWS/Lambda
+      MetricName: Invocations
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfAuditFunction
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
       AlarmActions:
         - !Ref WfAlarmTopic
 
@@ -2240,6 +2476,13 @@ Outputs:
     Value: !Ref WfAgentsHttpApi
     Export:
       Name: !Sub wf-agents-api-id-${Stage}
+  ToolsApiUrl:
+    # Includes the stage path — see AgentsApiUrl. Read into
+    # VITE_WORKFORCE_TOOLS_API_BASE by the console deploy.
+    Description: Base URL of the interactive project-tools HTTP API (incl. stage path). All routes are AWS_IAM-authorised (operator only).
+    Value: !Sub https://${WfToolsHttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}
+    Export:
+      Name: !Sub wf-tools-api-url-${Stage}
   CredentialsApiUrl:
     # Includes the stage path — see AgentsApiUrl. Read into
     # VITE_WORKFORCE_CREDENTIALS_API_BASE by the console deploy.

@@ -63,17 +63,29 @@
 // .claude/. `workforce/lambdas/**/*.ts` is excluded on purpose — Lambdas run
 // in AWS, not behind the CCR proxy — so do not "fix" that by widening it.
 //
+// Testability (#575 / ML-017 / ML-025)
+// -------------------------------------
+// The population-detection logic (which files "touch the network", which of
+// those are missing a valid bootstrap) is exported as a pure function,
+// `findProxyBootstrapOffenders`, over an in-memory `Map<relPath, source>` —
+// no filesystem access. This is what let this gate's population miss twice
+// (ML-017, then ML-025/#534 — an entry script reaching fetch() only through
+// an imported helper) reach production before anyone noticed: there was
+// nothing pinning the population logic against known-good/known-bad shapes.
+// `check-proxy-bootstrap-tests.ts` exercises this function directly; the CLI
+// below is a thin wrapper that walks the real tree and calls it.
+//
 // Usage:  node scripts/check-proxy-bootstrap.mjs
 // Exit:   0 — every network-touching script is bootstrapped
 //         1 — one or more offenders (listed on stderr)
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
-import { join, relative, resolve, dirname } from "node:path";
+import { join, relative, resolve, dirname, posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const BOOTSTRAP = resolve(ROOT, "scripts/lib/proxy-bootstrap.mjs");
-const NETWORK_LIB = resolve(ROOT, "scripts/lib/http-retry.mjs");
+const BOOTSTRAP_REL = "scripts/lib/proxy-bootstrap.mjs";
+const NETWORK_LIB_REL = "scripts/lib/http-retry.mjs";
 const SCAN_DIRS = ["workforce", "scripts", "newsletter", ".claude"];
 const IGNORE_DIRS = new Set(["node_modules", "dist", "build", ".git", "coverage"]);
 
@@ -145,126 +157,152 @@ function walk(dir, out = []) {
   return out;
 }
 
-/** Resolve a relative specifier to the .mjs file it names. Extensionless and
- *  directory specifiers are not used in this repo; anything that does not land
- *  on a real .mjs is simply not an edge. */
-function resolveDep(fromFile, spec) {
-  const target = resolve(dirname(fromFile), spec);
-  return target.endsWith(".mjs") && existsSync(target) ? target : null;
+/** Resolve a relative specifier against a virtual (posix, "/"-joined)
+ *  relative path, purely by string manipulation — no filesystem access, so
+ *  this is exercised the same way in a fixture test as it runs in
+ *  production. Mirrors how a real ESM resolver treats a `./` or `../`
+ *  specifier relative to the importing file's own directory. */
+function resolveRelative(fromRel, spec) {
+  const fromDir = posix.dirname(fromRel.split("\\").join("/"));
+  return posix.normalize(posix.join(fromDir, spec));
 }
 
-// Pass 1 — read every candidate once: does it fetch directly, and what does it
-// import relatively?
-const sources = new Map();
-const deps = new Map();
-const fetchesDirectly = new Set();
+/**
+ * Pure population-and-offender detector (unit-tested — #575 / ML-017 /
+ * ML-025). No filesystem access: `files` is the complete candidate set as an
+ * in-memory `Map<relPath, source>`, where `relPath` is a "/"-joined path
+ * relative to the same root every specifier in `spec` is resolved against
+ * (in production, the repo root).
+ *
+ * Returns `{ offenders: [[relPath, reason], ...], checked, direct }` — never
+ * throws and never touches process.exit/console; the CLI wrapper below owns
+ * output and exit codes.
+ */
+export function findProxyBootstrapOffenders(
+  files,
+  { bootstrapRel = BOOTSTRAP_REL, networkLibRel = NETWORK_LIB_REL } = {},
+) {
+  // Pass 1 — does each candidate fetch directly, and what does it import
+  // relatively? (Two independent ways into the population, kept deliberately
+  // redundant — see the module-level comment on NETWORK_MODULE_IMPORT.)
+  const deps = new Map();
+  const fetchesDirectly = new Set();
 
-for (const dir of SCAN_DIRS) {
-  for (const file of walk(join(ROOT, dir))) {
-    if (resolve(file) === BOOTSTRAP) continue;
-    const src = readFileSync(file, "utf8");
-    sources.set(file, src);
-    // Two independent ways into the population, kept deliberately redundant.
-    // FETCH_CALL runs on stripped code (a fetch( inside a string or comment is
-    // not a call). NETWORK_MODULE_IMPORT runs on the RAW src, because
-    // stripNonCode blanks string literals and an import specifier IS a string
-    // literal — matching it against stripped text could never fire.
-    //
-    // The transitive pass below already reaches anything that imports
-    // http-retry.mjs relatively, so this seed is belt-and-braces rather than
-    // load-bearing today. It is kept because it fails in a different direction:
-    // it holds for a specifier the relative-import walk cannot resolve (an
-    // alias, a future package specifier), which is exactly the regression
-    // backfill-en.mjs demonstrated when its fetch moved one module away.
+  for (const [relPath, src] of files) {
+    if (relPath === bootstrapRel) continue;
     if (
       FETCH_CALL.test(stripNonCode(src)) ||
       NETWORK_MODULE_IMPORT.test(src)
     ) {
-      fetchesDirectly.add(file);
+      fetchesDirectly.add(relPath);
     }
-    deps.set(
-      file,
-      [...src.matchAll(RELATIVE_DEP)]
-        .map((m) => resolveDep(file, m[1]))
-        .filter(Boolean),
+    const edges = [];
+    for (const m of src.matchAll(RELATIVE_DEP)) {
+      const target = resolveRelative(relPath, m[1]);
+      if (target.endsWith(".mjs") && files.has(target)) edges.push(target);
+    }
+    deps.set(relPath, edges);
+  }
+
+  // Pass 2 — transitive closure: a file touches the network if it fetches, or
+  // imports something that does. Fixed-point over a graph this small (~140
+  // nodes in production) is cheaper than the bookkeeping to avoid it, and
+  // cycles terminate because the set only ever grows.
+  const touchesNetwork = new Set(fetchesDirectly);
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const [relPath, edges] of deps) {
+      if (touchesNetwork.has(relPath)) continue;
+      if (edges.some((d) => touchesNetwork.has(d))) {
+        touchesNetwork.add(relPath);
+        changed = true;
+      }
+    }
+  }
+
+  const offenders = [];
+  const direct = fetchesDirectly.size;
+  let checked = 0;
+
+  for (const relPath of touchesNetwork) {
+    // scripts/lib/http-retry.mjs is itself a library, never a process entry,
+    // so the bootstrap cannot apply to it — excluded exactly as the
+    // bootstrap file itself is. It stays a NODE in the graph above on
+    // purpose: every script that reaches fetch() *through* it must still be
+    // pulled into touchesNetwork, which is the whole point of the transitive
+    // pass.
+    if (relPath === networkLibRel) continue;
+    const src = files.get(relPath);
+    checked++;
+
+    const importMatch = src.match(BOOTSTRAP_IMPORT);
+    if (!importMatch) {
+      offenders.push([relPath, "no proxy-bootstrap import statement"]);
+      continue;
+    }
+    if (!files.has(resolveRelative(relPath, importMatch[1]))) {
+      offenders.push([relPath, `import path does not resolve: ${importMatch[1]}`]);
+      continue;
+    }
+    const firstImport = src.match(ANY_IMPORT);
+    if (firstImport && firstImport.index !== importMatch.index) {
+      offenders.push([relPath, "proxy-bootstrap is not the first import"]);
+      continue;
+    }
+    if (!BOOTSTRAP_CALL.test(src)) {
+      offenders.push([
+        relPath,
+        "imports the bootstrap but never calls ensureProxyAwareEntry(import.meta.url)",
+      ]);
+    }
+  }
+
+  return { offenders, checked, direct };
+}
+
+// CLI entry point — reads the real tree into the same `Map<relPath, source>`
+// shape findProxyBootstrapOffenders expects, then owns output/exit codes.
+// Guarded so importing this module (the test file does) never runs it.
+if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+  const files = new Map();
+  for (const dir of SCAN_DIRS) {
+    for (const file of walk(join(ROOT, dir))) {
+      const relPath = relative(ROOT, file).split("\\").join("/");
+      files.set(relPath, readFileSync(file, "utf8"));
+    }
+  }
+
+  // Sanity check: the two well-known library files must exist where the
+  // constants say they do, or the exclusions above silently stop applying.
+  for (const rel of [BOOTSTRAP_REL, NETWORK_LIB_REL]) {
+    if (!existsSync(resolve(ROOT, rel))) {
+      console.error(`check-proxy-bootstrap: expected library file missing: ${rel}`);
+      process.exit(1);
+    }
+  }
+
+  const { offenders, checked, direct } = findProxyBootstrapOffenders(files);
+
+  if (offenders.length > 0) {
+    console.error(
+      `❌  R-14: ${offenders.length} script(s) reach the network without a valid proxy bootstrap:\n`,
     );
+    for (const [file, why] of offenders) console.error(`      ${file} — ${why}`);
+    console.error(
+      `\n    Add this as the first import, and call it before any other statement:\n` +
+        `      import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";\n` +
+        `      ensureProxyAwareEntry(import.meta.url);\n\n` +
+        `    Why: Node's fetch() does not read HTTPS_PROXY. In a CCR session the\n` +
+        `    request then bypasses the agent proxy and fails with "Host not in\n` +
+        `    allowlist", which no egress setting can fix. The call is a no-op\n` +
+        `    unless the file is the process entry point, so it is safe in a\n` +
+        `    module that is also imported by tests.\n`,
+    );
+    process.exit(1);
   }
-}
 
-// Pass 2 — transitive closure: a file touches the network if it fetches, or
-// imports something that does. Fixed-point over a graph this small (~140
-// nodes) is cheaper than the bookkeeping to avoid it, and cycles terminate
-// because the set only ever grows.
-const touchesNetwork = new Set(fetchesDirectly);
-for (let changed = true; changed; ) {
-  changed = false;
-  for (const [file, edges] of deps) {
-    if (touchesNetwork.has(file)) continue;
-    if (edges.some((d) => touchesNetwork.has(d))) {
-      touchesNetwork.add(file);
-      changed = true;
-    }
-  }
-}
-
-const offenders = [];
-const direct = fetchesDirectly.size;
-let checked = 0;
-
-for (const file of touchesNetwork) {
-  // `scripts/lib/http-retry.mjs` is itself a library, never a process entry, so
-  // the bootstrap cannot apply to it — excluded exactly as BOOTSTRAP is. It
-  // stays a NODE in the graph above on purpose: every script that reaches
-  // fetch() *through* it must still be pulled into `touchesNetwork`, which is
-  // the whole point of the transitive pass. (Carried over from main, where the
-  // same exclusion sat in the single-pass read loop; in this two-pass design
-  // excluding it during pass 1 would delete the edge, not just the report.)
-  if (resolve(file) === NETWORK_LIB) continue;
-  const src = sources.get(file);
-  checked++;
-
-  const rel = relative(ROOT, file);
-  const importMatch = src.match(BOOTSTRAP_IMPORT);
-  if (!importMatch) {
-    offenders.push([rel, "no proxy-bootstrap import statement"]);
-    continue;
-  }
-  if (!existsSync(resolve(dirname(file), importMatch[1]))) {
-    offenders.push([rel, `import path does not resolve: ${importMatch[1]}`]);
-    continue;
-  }
-  const firstImport = src.match(ANY_IMPORT);
-  if (firstImport && firstImport.index !== importMatch.index) {
-    offenders.push([rel, "proxy-bootstrap is not the first import"]);
-    continue;
-  }
-  if (!BOOTSTRAP_CALL.test(src)) {
-    offenders.push([
-      rel,
-      "imports the bootstrap but never calls ensureProxyAwareEntry(import.meta.url)",
-    ]);
-  }
-}
-
-if (offenders.length > 0) {
-  console.error(
-    `❌  R-14: ${offenders.length} script(s) reach the network without a valid proxy bootstrap:\n`,
+  console.log(
+    `✅  R-14: all ${checked} network-touching script(s) bootstrap the proxy correctly ` +
+      `(${direct} direct fetch() caller(s), ${checked - direct} via an imported helper).`,
   );
-  for (const [file, why] of offenders) console.error(`      ${file} — ${why}`);
-  console.error(
-    `\n    Add this as the first import, and call it before any other statement:\n` +
-      `      import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";\n` +
-      `      ensureProxyAwareEntry(import.meta.url);\n\n` +
-      `    Why: Node's fetch() does not read HTTPS_PROXY. In a CCR session the\n` +
-      `    request then bypasses the agent proxy and fails with "Host not in\n` +
-      `    allowlist", which no egress setting can fix. The call is a no-op\n` +
-      `    unless the file is the process entry point, so it is safe in a\n` +
-      `    module that is also imported by tests.\n`,
-  );
-  process.exit(1);
 }
-
-console.log(
-  `✅  R-14: all ${checked} network-touching script(s) bootstrap the proxy correctly ` +
-    `(${direct} direct fetch() caller(s), ${checked - direct} via an imported helper).`,
-);

@@ -860,3 +860,108 @@ describe("POST /feed (createFeedPostRoute)", () => {
     expect(bodyOf(res)).toMatchObject({ error: "missing_agent_slug" });
   });
 });
+
+// ─── POST /feed/operator (createOperatorPostRoute) ─────────────────────
+//
+// The operator's own write path — the console composer. AWS_IAM at the
+// gateway, so the handler sees an already-authenticated caller and takes
+// no author from the body. What these pin:
+//   - the row lands in the AGENT#operator partition, marked author_type,
+//   - `kind` defaults to `directive` (the kind injected into every fire),
+//   - `directive` is operator-only: the bearer path cannot author one,
+//   - the AGENT#operator partition is closed to the bearer path entirely,
+//   - the LLM-artefact guard does not fire on human prose.
+
+describe("POST /feed/operator (createOperatorPostRoute)", () => {
+  beforeEach(() => {
+    rows.clear();
+    s3BodyStore.clear();
+  });
+
+  function operatorEvt(body: string | undefined): APIGatewayProxyEventV2 {
+    return {
+      version: "2.0",
+      routeKey: "POST /feed/operator",
+      rawPath: "/feed/operator",
+      rawQueryString: "",
+      headers: {},
+      requestContext: { http: { method: "POST", path: "/feed/operator" } } as unknown as APIGatewayProxyEventV2["requestContext"],
+      pathParameters: {},
+      queryStringParameters: {},
+      body,
+      isBase64Encoded: false,
+    } as APIGatewayProxyEventV2;
+  }
+
+  function bearerEvt(body: string): APIGatewayProxyEventV2 {
+    return {
+      version: "2.0",
+      routeKey: "POST /feed",
+      rawPath: "/feed",
+      rawQueryString: "",
+      headers: { authorization: `Bearer ${FEED_WRITE_TOKEN}` },
+      requestContext: { http: { method: "POST", path: "/feed" } } as unknown as APIGatewayProxyEventV2["requestContext"],
+      pathParameters: {},
+      queryStringParameters: {},
+      body,
+      isBase64Encoded: false,
+    } as APIGatewayProxyEventV2;
+  }
+
+  it("creates a directive by default, in the AGENT#operator partition", async () => {
+    const res = await handler(
+      operatorEvt(JSON.stringify({ body: "Order the L1 queue by freshness, not by age — dead links first is costing us real fires." })),
+    );
+    expect(statusOf(res)).toBe(201);
+    expect(bodyOf(res)).toMatchObject({ agent_slug: "operator", kind: "directive", author_type: "operator" });
+    const written = Array.from(rows.values()).find((r) => r.pk === "AGENT#operator");
+    expect(written).toBeDefined();
+    expect(written!.author_type).toBe("operator");
+    expect(written!.gsi3pk).toBe("FEED");
+  });
+
+  it("honours an explicit non-directive kind", async () => {
+    const res = await handler(
+      operatorEvt(JSON.stringify({ kind: "observation", body: "Watching the feed this week, the directives land better than the DMs." })),
+    );
+    expect(statusOf(res)).toBe(201);
+    expect(bodyOf(res)).toMatchObject({ kind: "observation" });
+  });
+
+  it("does not run the LLM-artefact guard on human prose", async () => {
+    // "I cannot" is an artefact prelude for a generated post and a normal
+    // opening for a human one. The guard must not reject the human.
+    const res = await handler(
+      operatorEvt(JSON.stringify({ body: "I cannot keep reviewing every cadence by hand — propose what to automate first." })),
+    );
+    expect(statusOf(res)).toBe(201);
+  });
+
+  it("422s an empty body", async () => {
+    const res = await handler(operatorEvt(JSON.stringify({ body: "   " })));
+    expect(statusOf(res)).toBe(422);
+    expect(bodyOf(res)).toMatchObject({ error: "post_rejected", detail: "empty_body" });
+  });
+
+  it("400s when the body text is missing entirely", async () => {
+    const res = await handler(operatorEvt(JSON.stringify({ kind: "directive" })));
+    expect(statusOf(res)).toBe(400);
+    expect(bodyOf(res)).toMatchObject({ error: "missing_body_text" });
+  });
+
+  it("refuses an agent authoring a directive (422, not 500)", async () => {
+    const res = await handler(
+      bearerEvt(JSON.stringify({ agent_slug: "dario", kind: "directive", body: "Everyone should reorder their queues starting today." })),
+    );
+    expect(statusOf(res)).toBe(422);
+    expect(bodyOf(res)).toMatchObject({ detail: "directive_requires_operator" });
+  });
+
+  it("refuses an agent posting into the operator partition (422, not 500)", async () => {
+    const res = await handler(
+      bearerEvt(JSON.stringify({ agent_slug: "operator", kind: "observation", body: "Impersonating the human here, which must not be possible." })),
+    );
+    expect(statusOf(res)).toBe(422);
+    expect(bodyOf(res)).toMatchObject({ detail: "operator_slug_reserved" });
+  });
+});

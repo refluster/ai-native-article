@@ -195,6 +195,20 @@ describe("validateIdentityPatch — bindings", () => {
       "S9-binding-routine-spec",
     );
   });
+
+  it("#574: accepts a well-formed bound_at, and bindings without one (pre-existing bindings)", () => {
+    expect(rules({ bindings: [ccrBinding({ bound_at: "2026-08-12T03:41:30Z" })] })).toEqual([]);
+    expect(rules({ bindings: [ccrBinding()] })).toEqual([]);
+  });
+
+  it("#574: rejects a bound_at that isn't a parseable ISO instant", () => {
+    expect(rules({ bindings: [ccrBinding({ bound_at: "not-a-date" })] })).toContain(
+      "S9-binding-bound-at",
+    );
+    expect(rules({ bindings: [ccrBinding({ bound_at: 12345 })] })).toContain(
+      "S9-binding-bound-at",
+    );
+  });
 });
 
 describe("validateIdentityCoherence — S19 role ↔ prompt header title (ML-014)", () => {

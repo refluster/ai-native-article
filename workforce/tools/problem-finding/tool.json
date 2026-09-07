@@ -1,0 +1,66 @@
+{
+  "tool_id": "problem-finding",
+  "display_name": "Problem Finding",
+  "summary": "Decompose an objective into the candidate problems worth solving, each with the evidence that would confirm or kill it.",
+  "version": "1.0.0",
+  "requires": ["azure.openai"],
+  "model": { "max_tokens": 6000 },
+  "input": {
+    "type": "object",
+    "required": ["objective"],
+    "properties": {
+      "objective": {
+        "type": "string",
+        "title": "Objective",
+        "description": "The outcome you want, in one sentence. State the end, not the means — \"cut onboarding drop-off\", not \"add a tutorial\".",
+        "maxLength": 2000
+      },
+      "context": {
+        "type": "string",
+        "title": "Context",
+        "description": "What you already know: constraints, prior attempts, who is affected, anything that rules an answer out.",
+        "maxLength": 8000
+      },
+      "method": {
+        "type": "string",
+        "title": "Decomposition method",
+        "description": "How to break the objective down.",
+        "enum": ["five-whys", "first-principles", "stakeholder-friction"],
+        "default": "five-whys"
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": ["restated_objective", "problems"],
+    "properties": {
+      "restated_objective": {
+        "type": "string",
+        "description": "The objective restated as the analysis understood it, so a misread is visible before the problems are read."
+      },
+      "problems": {
+        "type": "array",
+        "minItems": 3,
+        "maxItems": 7,
+        "items": {
+          "type": "object",
+          "required": ["statement", "why_it_matters", "evidence_for", "evidence_against", "confidence"],
+          "properties": {
+            "statement": { "type": "string", "description": "The candidate problem, as a falsifiable claim about the world." },
+            "why_it_matters": { "type": "string", "description": "What is lost while this stays unsolved." },
+            "evidence_for": { "type": "string", "description": "What is already known that supports this, drawn from the supplied context." },
+            "evidence_against": { "type": "string", "description": "What would argue against it, or what is missing that should be there if it were true." },
+            "next_check": { "type": "string", "description": "The cheapest observation that would confirm or kill this, and roughly what it costs." },
+            "confidence": { "type": "string", "enum": ["low", "medium", "high"] }
+          }
+        }
+      },
+      "not_the_problem": {
+        "type": "array",
+        "maxItems": 4,
+        "items": { "type": "string" },
+        "description": "Plausible framings deliberately rejected, and why — so the reader can tell what was considered from what was missed."
+      }
+    }
+  }
+}
