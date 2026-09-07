@@ -41,6 +41,9 @@ jobs:
       - name: Base-path consistency gate (R-16)
         run: npm run check-base-path
 
+      - name: Cadence write-script read-back gate (R-18)
+        run: npm run check-cadence-readback-guard
+
       - name: Script library tests
         run: npm run test:scripts
 
