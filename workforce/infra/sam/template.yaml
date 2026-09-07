@@ -173,8 +173,10 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
+      # PointInTimeRecoverySpecification is declared once, above the
+      # AttributeDefinitions, with the ADR-0007 rationale. A second copy
+      # lived here until #398 — same value, but a duplicate YAML key, so
+      # CloudFormation silently kept the last one.
       SSESpecification:
         SSEEnabled: true
       Tags:
