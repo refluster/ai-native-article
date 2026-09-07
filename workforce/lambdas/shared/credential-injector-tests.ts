@@ -74,9 +74,12 @@ describe("CREDENTIAL_TYPES allowlist", () => {
     // points (see credential-
     // injector.ts file header) move together; this assertion is the
     // visible canary that catches drift if a future mirror sync is
-    // forgotten.
+    // forgotten. ADR-0027 added `azure.openai` — the four-field
+    // (key/endpoint/deployment/apiVersion) provider credential the
+    // interactive project tools run on.
     expect([...CREDENTIAL_TYPES].sort()).toEqual([
       "anthropic.api_key",
+      "azure.openai",
       "discord.bot_token",
       "discord.webhook_url",
       "github.token",

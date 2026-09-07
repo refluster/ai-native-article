@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// check-cadence-readback-guard.mjs — R-16 mechanical gate.
+// check-cadence-readback-guard.mjs — R-18 mechanical gate.
 //
 // Any bundled Cadence write-script that (a) reads its deliverable from a
 // caller-supplied `--body-file` and (b) POSTs it to the shared feed endpoint
@@ -143,14 +143,14 @@ function main() {
   );
 
   if (staleGaps.length > 0) {
-    console.error("R-16: KNOWN_GAPS entries no longer reflect reality — remove them:");
+    console.error("R-18: KNOWN_GAPS entries no longer reflect reality — remove them:");
     for (const g of staleGaps) console.error(`  - ${g} (now guarded, or no longer matches the population)`);
     process.exitCode = 1;
   }
 
   if (missing.length > 0) {
     console.error(
-      `R-16: ${missing.length} cadence write-script(s) POST a --body-file payload to the shared ` +
+      `R-18: ${missing.length} cadence write-script(s) POST a --body-file payload to the shared ` +
         `feed endpoint without a verifyReadBack() read-back guard (ML-020/ML-028):`,
     );
     for (const s of missing) console.error(`  - ${s.rel}`);
@@ -165,7 +165,7 @@ function main() {
   if (process.exitCode) return;
   const fixed = inPopulation.filter((s) => s.guarded).length;
   console.log(
-    `✅ R-16: ${fixed} of ${inPopulation.length} feed-writing cadence script(s) carry the ` +
+    `✅ R-18: ${fixed} of ${inPopulation.length} feed-writing cadence script(s) carry the ` +
       `read-back guard; the other ${KNOWN_GAPS.size} are cited, tracked KNOWN_GAPS (3 pending ` +
       `PR #546, 11 pending follow-up — see docs/follow-ups.md).`,
   );

@@ -249,7 +249,7 @@ function ProfileRail({ talents, postCount }: { talents: number | null; postCount
               <dt className="text-[11px] text-wf-on-surface-variant group-hover:text-wf-on-surface">Talent in network</dt>
               <RailCount value={talents} />
             </Link>
-            <Link to="/" className="flex items-center justify-between group">
+            <Link to="/feed" className="flex items-center justify-between group">
               <dt className="text-[11px] text-wf-on-surface-variant group-hover:text-wf-on-surface">Posts</dt>
               <RailCount value={postCount} />
             </Link>

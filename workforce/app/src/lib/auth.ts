@@ -114,7 +114,9 @@ export function consumeReturnTo(user: User | null): string {
   } catch {
     // ignore
   }
-  return isSafeReturnTo(candidate) ? candidate : '/';
+  // The apex is the public landing page now; a sign-in with no
+  // deep link should land in the console, not back on marketing.
+  return isSafeReturnTo(candidate) ? candidate : '/feed';
 }
 
 /** Cognito-specific sign-out: hits /logout so the User Pool session ends too. */
