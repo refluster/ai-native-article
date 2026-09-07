@@ -1521,6 +1521,13 @@ Resources:
               Action:
                 - dynamodb:Scan
                 - dynamodb:Query
+                # GetItem: the W-3 pre-dispatch check (#661) reads
+                # BUDGET#{yyyy-mm}/AGENT#{slug} once per agent per tick before
+                # it will fire anything. The guard is fail-closed — a read it
+                # cannot perform skips that agent's fires rather than
+                # dispatching unguarded — so this grant must ship in the SAME
+                # deploy as the handler change, or the tick stops firing.
+                - dynamodb:GetItem
                 - dynamodb:UpdateItem
               Resource: !GetAtt WfTable.Arn
             - Sid: OrchestratorGithubSecret

@@ -40,6 +40,9 @@ import { mintEngagementToken } from "../shared/engagement-token.js";
 import { mintMemoryWriteToken } from "../shared/memory-write-token.js";
 import { mintDispatchToken } from "../shared/dispatch-token.js";
 import { SKILL_REQUIRES } from "../shared/skill-registry-generated.js";
+import { getMonthSpend, recordEstimatedSpend, wouldBreachBudget } from "../shared/budget.js";
+import { estimateFireCostUsd } from "../shared/fire-cost-estimate.js";
+import { effectiveBudgetUsd } from "../shared/agent.js";
 import { newUlid, type DelivRow } from "../shared/task.js";
 
 const STAGE = process.env.STAGE;
@@ -129,6 +132,10 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
     cursor = page.cursor;
     for (const agent of page.items) {
       scanned++;
+      // This month's spend for this agent, read lazily on the first binding
+      // that would actually dispatch and then carried across the agent's
+      // remaining bindings (#661). `undefined` = not read yet.
+      let monthSpendUsd: number | undefined;
       if (agent.archived || agent.paused) {
         for (let i = 0; i < (agent.bindings?.length ?? 0); i++) {
           skipped.push({
@@ -164,6 +171,47 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
           skipped.push({ slug: agent.slug, binding_idx: i, skill: binding.skill, reason: decision.reason });
           continue;
         }
+        // W-3, enforced where it can actually be enforced (#661). The LLM call
+        // happens inside the CCR session, so the data plane cannot meter it —
+        // but it does own the decision to dispatch, and that is the only lever
+        // a cost ceiling needs. Charge a modelled cost per fire and refuse to
+        // dispatch past the agent's effective cap. Reading the month's spend
+        // once per agent (not per binding) keeps this one GET per agent-tick.
+        const capUsd = effectiveBudgetUsd(agent);
+        const planned = estimateFireCostUsd(binding.skill);
+        if (monthSpendUsd === undefined) {
+          try {
+            monthSpendUsd = (await getMonthSpend(agent.slug)).total_usd;
+          } catch (err) {
+            // A ledger read failure must not become a licence to spend, nor
+            // stall the tick: skip this agent's fires for this tick and say so.
+            const reason = err instanceof Error ? err.message : String(err);
+            console.error(JSON.stringify({ event: "budget-read-error", slug: agent.slug, reason }));
+            skipped.push({ slug: agent.slug, binding_idx: i, skill: binding.skill, reason: `budget_read_error: ${reason.slice(0, 160)}` });
+            continue;
+          }
+        }
+        if (wouldBreachBudget(monthSpendUsd, capUsd, planned)) {
+          console.warn(JSON.stringify({
+            event: "budget-cap-reached",
+            slug: agent.slug,
+            skill: binding.skill,
+            month_usd: Number(monthSpendUsd.toFixed(4)),
+            planned_usd: planned,
+            cap_usd: capUsd,
+          }));
+          skipped.push({
+            slug: agent.slug,
+            binding_idx: i,
+            skill: binding.skill,
+            reason: `budget_cap_reached: month=${monthSpendUsd.toFixed(2)} + planned=${planned.toFixed(2)} > cap=${capUsd.toFixed(2)} (W-3)`,
+          });
+          continue;
+        }
+        // Reserve against the cap for the rest of this tick, so an agent with
+        // several bindings in one tick cannot overshoot by racing itself. The
+        // ledger write happens only if the batch actually fires.
+        monthSpendUsd += planned;
         // ownedCcr — pre-resolve credentials, then collect into the
         // routine-id-keyed batch. A failure here (missing project_id,
         // unknown skill, credential read error) is per-task: the bad
@@ -224,6 +272,22 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
     try {
       const fired = await fireCcrRoutine(routineId, { tasks: slot.tasks });
       for (const item of slot.items) dispatched.push(item);
+      // #661: charge the modelled cost only for fires that actually happened.
+      // Best-effort — a ledger write failure must not turn a successful batch
+      // into a reported failure, but it must be loud, because an unrecorded
+      // fire is exactly how the counter reached zero in the first place.
+      for (const item of slot.items) {
+        try {
+          await recordEstimatedSpend(item.slug, estimateFireCostUsd(item.skill));
+        } catch (err) {
+          console.error(JSON.stringify({
+            event: "budget-estimate-write-failed",
+            slug: item.slug,
+            skill: item.skill,
+            reason: err instanceof Error ? err.message : String(err),
+          }));
+        }
+      }
       console.log(JSON.stringify({
         event: "ccr-batch-fired",
         routine_id: routineId,
