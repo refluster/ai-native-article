@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T15:19:41.605Z",
+  "generated_at": "2026-09-07T15:22:46.077Z",
   "skills": [
     {
       "name": "article-level2",
@@ -105,7 +105,7 @@
     },
     {
       "name": "attention-ledger",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "status": "active",
       "deliverable": null,
       "cost_class": "small",
@@ -128,7 +128,7 @@
           "path": "meta.json",
           "size": 274,
           "language": "json",
-          "contents": "{\n  \"name\": \"attention-ledger\",\n  \"version\": \"0.1.1\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"cost_class\": \"small\",\n  \"owners\": [\n    \"camille\"\n  ],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-07-17\",\n  \"requires\": [\n    \"workforce.feed_write_token\"\n  ]\n}\n",
+          "contents": "{\n  \"name\": \"attention-ledger\",\n  \"version\": \"0.1.2\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"cost_class\": \"small\",\n  \"owners\": [\n    \"camille\"\n  ],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-07-17\",\n  \"requires\": [\n    \"workforce.feed_write_token\"\n  ]\n}\n",
           "truncated": false,
           "binary": false
         },
@@ -622,7 +622,7 @@
     },
     {
       "name": "grid-watch",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "status": "active",
       "deliverable": null,
       "cost_class": "small",
@@ -645,7 +645,7 @@
           "path": "meta.json",
           "size": 266,
           "language": "json",
-          "contents": "{\n  \"name\": \"grid-watch\",\n  \"version\": \"0.2.1\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"cost_class\": \"small\",\n  \"owners\": [\n    \"grace\"\n  ],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-06-12\",\n  \"requires\": [\n    \"workforce.feed_write_token\"\n  ]\n}\n",
+          "contents": "{\n  \"name\": \"grid-watch\",\n  \"version\": \"0.2.2\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"cost_class\": \"small\",\n  \"owners\": [\n    \"grace\"\n  ],\n  \"improvement_agent\": null,\n  \"created_at\": \"2026-06-12\",\n  \"requires\": [\n    \"workforce.feed_write_token\"\n  ]\n}\n",
           "truncated": false,
           "binary": false
         },
@@ -661,7 +661,7 @@
     },
     {
       "name": "hypothesis",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "status": "active",
       "deliverable": {
         "type": "article",
@@ -686,9 +686,9 @@
         },
         {
           "path": "meta.json",
-          "size": 357,
+          "size": 373,
           "language": "json",
-          "contents": "{\n  \"name\": \"hypothesis\",\n  \"version\": \"0.2.0\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": false,\n    \"article_type\": \"analysis\"\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\"maya\"],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-07-03\",\n  \"requires\": [\"notion.integration_token\"]\n}\n",
+          "contents": "{\n  \"name\": \"hypothesis\",\n  \"version\": \"0.2.1\",\n  \"status\": \"active\",\n  \"archetype\": \"cadence\",\n  \"deliverable\": {\n    \"type\": \"article\",\n    \"publish_notion\": false,\n    \"article_type\": \"analysis\"\n  },\n  \"cost_class\": \"medium\",\n  \"owners\": [\n    \"maya\"\n  ],\n  \"improvement_agent\": \"sana\",\n  \"created_at\": \"2026-07-03\",\n  \"requires\": [\n    \"notion.integration_token\"\n  ]\n}\n",
           "truncated": false,
           "binary": false
         },
