@@ -96,6 +96,9 @@ jobs:
       - name: Workforce client skill-spec drift (Dario L2-1)
         run: npm run workforce:skill-spec-drift
 
+      - name: Workforce PerformanceSeries client↔server mirror drift (#686)
+        run: npm run workforce:performance-mirror-drift
+
       - name: Workforce skill-body version-bump gate (ADR-0017)
         if: github.event_name == 'pull_request'
         env:
