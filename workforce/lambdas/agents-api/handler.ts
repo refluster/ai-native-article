@@ -104,6 +104,11 @@ import {
   scanPrefix,
   updateOperational,
 } from "../shared/ddb.js";
+// Two budget-shaped types, deliberately from two modules (ren, #682 R4):
+// `BudgetRow` here is the STORED shape (one agent's DDB ledger row, read by
+// readBudgetBlock); `BudgetBlock` from ../shared/performance.js is the SERVED
+// shape (the roster roll-up on the wire, mirrored client-side). Row in,
+// block out — they are not two spellings of one thing.
 import { budgetMonthKey, summariseBudgetRows, type BudgetRow } from "../shared/budget-schema.js";
 import {
   appendExecution,
