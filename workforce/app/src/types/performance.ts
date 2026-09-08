@@ -77,6 +77,38 @@ export interface PerformanceSeries {
   pr_daily: PrDailyPoint[];
   pr_summary: PrSummary;
   pr_contributors: PrContributor[];
+  /** Issue 661 — month-to-date W-3 ledger. Workforce scope only (the ledger is
+   *  keyed per agent, and an agent works across projects, so there is no
+   *  honest per-project attribution), and absent before the month's first
+   *  charged dispatch. Absence is NOT "$0 spent": a fresh month and a writer
+   *  that stopped charging look the same from here. */
+  budget?: BudgetBlock;
+}
+
+/**
+ * Month-to-date spend against the W-3 ceiling (issue 661).
+ *
+ * `modelled_usd` and `measured_usd` are deliberately NOT summed into one
+ * headline. The data plane cannot meter a CCR session, so nearly everything
+ * the workforce spends arrives as `modelled` — derived from each skill's
+ * declared `cost_class`, not observed. A single total would render a model as
+ * a measurement, which is the failure this ledger exists to end. Render them
+ * apart, or add them knowingly.
+ */
+export interface BudgetBlock {
+  /** 'YYYY-MM', UTC — the partition these figures were read from. */
+  month: string;
+  modelled_usd: number;
+  measured_usd: number;
+  /** Dispatched CCR fires behind `modelled_usd`. */
+  fires: number;
+  /** Agents with a ledger row this month — NOT the roster size. */
+  agents_charged: number;
+  ceiling_usd: number;
+  /** When the ledger last MOVED — newest row timestamp, not the read time.
+   *  A figure whose `updated_at` has gone quiet must render as "the writer has
+   *  stopped", never as a current total: a frozen number reads as alive. */
+  updated_at: string;
 }
 
 /** The bundled fallback: every scope in one file. */

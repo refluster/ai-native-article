@@ -72,6 +72,7 @@ import {
   validateBudgetOverride,
   validateIdentityCoherence,
   validateIdentityPatch,
+  W3_BUDGET_CAP_USD,
   type ConfigViolation,
 } from "../shared/agent-config.js";
 import {
@@ -98,10 +99,17 @@ import {
   conditionalPutItem,
   getItem,
   queryBySkPrefix,
+  queryBySkPrefixPaged,
   scanAllPrefix,
   scanPrefix,
   updateOperational,
 } from "../shared/ddb.js";
+// Two budget-shaped types, deliberately from two modules (ren, #682 R4):
+// `BudgetRow` here is the STORED shape (one agent's DDB ledger row, read by
+// readBudgetBlock); `BudgetBlock` from ../shared/performance.js is the SERVED
+// shape (the roster roll-up on the wire, mirrored client-side). Row in,
+// block out — they are not two spellings of one thing.
+import { budgetMonthKey, summariseBudgetRows, type BudgetRow } from "../shared/budget-schema.js";
 import {
   appendExecution,
   archive as archiveProject,
@@ -124,6 +132,7 @@ import {
   type PerfLifecycleRow,
   type PerfPrRow,
   type PerfRepoRow,
+  type BudgetBlock,
   composeSeries,
   perfPk,
 } from "../shared/performance.js";
@@ -1679,12 +1688,20 @@ async function getProjectRoute(
 // item is optional — a scope with lifecycle but no published PR sections serves
 // an empty PR block rather than 404ing the whole series.
 async function getPerformanceRoute(scope: string): Promise<APIGatewayProxyResultV2> {
-  const [lifecycleRow, prRow, repoRow, humanTouchRow, idleRow] = await Promise.all([
+  // The ledger read joins the existing fan-out rather than trailing it: it
+  // depends on none of the five rows, and /performance is a hot console read
+  // (ren, #682 R1).
+  const [lifecycleRow, prRow, repoRow, humanTouchRow, idleRow, budget] = await Promise.all([
     getItem<PerfLifecycleRow>(perfPk(scope), "LIFECYCLE"),
     getItem<PerfPrRow>(perfPk(scope), "PR"),
     getItem<PerfRepoRow>(perfPk(scope), "REPO"),
     getItem<PerfHumanTouchRow>(perfPk(scope), "HUMAN-TOUCH"),
     getItem<PerfIdleRow>(perfPk(scope), "IDLE"),
+    // Workforce scope only: the W-3 ledger is keyed per agent, and an agent
+    // works across projects, so there is no honest way to attribute a fire's
+    // cost to one project. A project-scoped budget would invent an
+    // attribution the ledger does not carry.
+    scope === "workforce" ? readBudgetBlock() : Promise.resolve(undefined),
   ]);
   if (!lifecycleRow) return reply(404, { error: "not_found", scope });
   const series = composeSeries(
@@ -1695,8 +1712,39 @@ async function getPerformanceRoute(scope: string): Promise<APIGatewayProxyResult
     repoRow,
     humanTouchRow,
     idleRow ?? undefined,
+    budget,
   );
   return reply(200, series);
+}
+
+/**
+ * Month-to-date W-3 ledger, rolled up across the roster (#661).
+ *
+ * Until this existed, the modelled spend the orchestrator writes on every
+ * dispatch was readable only by querying DynamoDB by hand — an honest gauge
+ * nobody could see, which is half of the failure it was built to end (sana,
+ * 2026-09: 「誰も読まない数字は、間違っているのではなく、ただ役に立っていない」).
+ *
+ * One query over the month's partition rather than a GetItem per agent, and
+ * drained: a Limit-capped single page would silently under-report the total
+ * once the roster outgrows a page, which is the Limit-vs-Filter class
+ * `check-scan-drain` exists to prevent.
+ */
+async function readBudgetBlock(): Promise<BudgetBlock | undefined> {
+  const month = budgetMonthKey();
+  const rows: BudgetRow[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await queryBySkPrefixPaged<BudgetRow>(
+      `BUDGET#${month}`,
+      "AGENT#",
+      PAGE_SIZE_MAX,
+      cursor,
+    );
+    rows.push(...page.items);
+    cursor = page.cursor;
+  } while (cursor);
+  return summariseBudgetRows(rows, month, W3_BUDGET_CAP_USD);
 }
 
 async function listProjectExecutions(

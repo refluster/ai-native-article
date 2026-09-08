@@ -6,6 +6,7 @@
 // State lives in DDB BUDGET#{yyyy-mm}/AGENT#{slug}. Atomic ADD updates so
 // concurrent runs don't lose increments. Reads are fresh (no caching).
 
+import { budgetMonthKey, type BudgetRow } from "./budget-schema.js";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
   DynamoDBDocumentClient,
@@ -22,20 +23,7 @@ const ddb = DynamoDBDocumentClient.from(raw, {
   marshallOptions: { removeUndefinedValues: true },
 });
 
-export interface BudgetRow {
-  pk: `BUDGET#${string}`;
-  sk: `AGENT#${string}`;
-  tokens_in: number;
-  tokens_out: number;
-  cost_usd: number;
-  /** MODELLED spend from CCR fires the data plane dispatched but could not
-   *  meter (#661). Kept in its own field on purpose: it must never be
-   *  mistaken for `cost_usd`, which is measured at an LLM call site. */
-  estimated_cost_usd?: number;
-  /** Count of dispatched CCR fires behind `estimated_cost_usd`. */
-  estimated_fires?: number;
-  last_updated_at: string;
-}
+export type { BudgetRow } from "./budget-schema.js";
 
 /** What an agent has spent this month for the purpose of the W-3 cap:
  *  measured spend plus modelled spend. Both halves are reported separately so
@@ -52,11 +40,7 @@ export interface MonthSpend {
   total_usd: number;
 }
 
-function monthKey(now: Date = new Date()): string {
-  const y = now.getUTCFullYear();
-  const m = String(now.getUTCMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
-}
+const monthKey = budgetMonthKey;
 
 function pk(month: string): `BUDGET#${string}` {
   return `BUDGET#${month}`;
