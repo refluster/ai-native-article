@@ -202,7 +202,39 @@ These are what GA4 reports group by and what the operator UI filters on. They ar
 
 ### GA4 — register a custom dimension
 
-Register `prompt_version` as a user-scoped custom dimension in the GA4 property. The [analytics lib](src/lib/analytics.ts) then passes it on `article_view` and `article_read_complete`. Outer-loop reports group by `prompt_version`.
+Register `prompt_version` as a user-scoped custom dimension in the GA4 property. The [analytics lib](../../packages/shared/src/analytics.ts) then passes it on `article_view` and `article_read_complete`. Outer-loop reports group by `prompt_version`.
+
+### GA4 — event catalogue (canonical, reconciled 2026-09-08)
+
+This subsection did not exist before this reconciliation — the `AnalyticsEvent` union's own header comment in [`packages/shared/src/analytics.ts`](../../packages/shared/src/analytics.ts) has pointed readers at "GROWTH.md §2" (now §2 is the quality-loop section, not events) since before this doc's sections were last renumbered. There was no catalogue to reconcile; there is now.
+
+**Decision, in one line:** treat the event set below as canonical and bring [`packages/shared/src/analytics.ts`](../../packages/shared/src/analytics.ts)'s `AnalyticsEvent` union into line with it — dropping three members that no longer fire and declaring two that already fire undeclared — as a follow-up code change (not made in this PR; see "Implementation" below), so the file's own stated guarantee ("Unknown event names fail typecheck") holds again.
+
+**What forced it.** PR #406 (merged 2026-06-29, [ADR-0002](../../docs/adr/adr-0002-daily-use-reader-ia.md)) removed the homepage type-tab, period-filter, and hero surfaces. Both PR-406 review lenses flagged the resulting analytics drift as the one named follow-up, filed the same day as issue #408. Re-reading the *current* call sites (2026-09-08, ~10 weeks later, still unreconciled) shows the drift runs in both directions, not only the one #408 described:
+
+| Union member | Still fires? | Evidence |
+|---|---|---|
+| `type_filter_click` | No | Type-tab UI removed by #406; no remaining call site in `newsletter/app/src`. |
+| `range_filter_click` | No | Period-filter UI removed by #406; no remaining call site. |
+| `featured_click` | No | Hero removed by #406; no remaining call site. |
+| `category_click` | Yes, semantics changed | `Home.tsx:159` and `Sources.tsx:113` still pass `{ category: name }`, but `name` is now a flat tag (post flat-tag migration), not an A–E category — the field is stale in *meaning*, not in wiring. |
+| `language_switch` *(absent from the union)* | Yes | `LanguageToggle.tsx:22` fires an event name that does not exist in `AnalyticsEvent` at all, forced through with `as never`. |
+| `article_view` + `language` param *(param undeclared)* | Yes | `Article.tsx:149-157` passes `language: servedLanguage` alongside the three declared fields; the extra field is likewise forced through with `as never`. |
+
+The two `as never` casts above are load-bearing type escapes, not incidental style — they are exactly the failure mode analytics.ts's own header comment says the union prevents. (Four more call sites — the `article_read_25/50/75/90` steps in `Article.tsx:195` — also cast `as never`, but that is TypeScript's inability to narrow a computed `string` variable to a literal, not an undeclared event; no catalogue change is owed there, though a follow-up could resolve it more cleanly with a `Record<number, EventName>` lookup instead of the cast.)
+
+**Alternatives considered:**
+- *Keep the three dead members "for historical continuity"* (the option issue #408 itself floated) — rejected: the union types what the client is allowed to emit **going forward**; it is not a record of what GA4 has ever received, and GA4's historical `type_filter_click` rows are unaffected by removing the TS type. Keeping them risks a future author instantiating an event that looks live and isn't.
+- *Fix only the three-dead-member half named in #408, leave the two undeclared-live sites for a separate pass* — rejected: both halves are the same defect (the union no longer matches the running app), and closing only the half #408 named would leave `as never` in the two spots that matter most — a brand-new event name, and a parameter GA4 is already receiving unfiltered.
+- *Defer this doc change until the GA4/Looker dashboard reconciliation is also ready* — rejected: the type-level fix and the hosted-dashboard fix are independent (the union governs the TS build; dashboards read the GA4 property directly), and gating one on the other only extends the drift window.
+
+**What it costs.** Nothing to this doc change. The follow-up code change removes 3 union members (a breaking change only for code that pattern-matches on them — a repo-wide grep shows none does) and adds 2 (`language_switch`; `article_view`'s `language` field), plus drops the now-unneeded `as never` at the `article_view` and `language_switch` call sites. The GA4/Looker dashboard reconciliation named in #408 is unaffected by this decision either way and stays separately tracked — it is dashboard-console work, not a code or doc change; flag it to the operator if it turns out to need console access.
+
+**How this would be reversed.** Re-add a union member if a removed UI surface returns (e.g. the type-tab filter is reinstated) — a one-line addition, not a schema migration, since GA4 itself never depended on the TS union.
+
+**What would tell us it was wrong.** A build failure, or a GA4 gap after the follow-up ships, would mean this reconciliation missed a call site. `git grep -n "trackEvent(" newsletter/app/src` is the check the follow-up PR should re-run before merging.
+
+**Explicitly out of scope.** The `packages/shared/src/analytics.ts` code edit itself (Zone B) — tracked as the implementation this decision names, not made in this PR (workforce `issue-design`, R-N1(a): a decision and its implementation get two separate reviews). The GA4/Looker dashboard reconciliation (dashboard-console operational work). Renaming `category_click`'s `category` field to `tag` — a naming call left to whoever implements the code change, since either name typechecks once the semantics are documented here as they now are.
 
 ### Notion — add properties
 
