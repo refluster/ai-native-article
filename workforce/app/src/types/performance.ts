@@ -10,7 +10,7 @@
 // contract) — the two trees can't share a module, so a change to one is a
 // change to both; the endpoint serialises exactly this shape.
 // workforce/scripts/check-performance-mirror-drift.mjs enforces that the
-// `PerformanceSeries` field set stays identical across both files (#686 —
+// `PerformanceSeries` field set stays identical across both files (issue 686 —
 // three blocks landed server-side without this file for a full cycle before
 // anything caught it, because every one of them is optional).
 
