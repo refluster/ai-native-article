@@ -56,11 +56,46 @@ Per Epic-010 (Story 1, [#90](https://github.com/refluster/ai-native-article/issu
 
 `project_id = "self/{agent_slug}"` is the reserved per-agent project for personal artefacts (own observability outputs, per-agent model keys, notification webhooks). Seeded by `seed-agents` (Story 1-B follow-up).
 
+#### Lesson rows (proposed — Epic-022 Story 1, [#459](https://github.com/refluster/ai-native-article/issues/459))
+
+> **Status: proposed, not yet implemented.** This subsection is the Zone A
+> schema diff [ADR-0032](adr/adr-0032-lesson-partition-and-daily-distiller.md)
+> asks the operator to approve. No writer exists yet — the daily distiller
+> Lambda (Authority A once this schema lands) is tracked separately on #459.
+> The shape below is not live in `wf-table-{stage}` until this diff merges.
+
+Per [Epic-022](epics/epic-022-org-learning-loop.md) (Accepted 2026-07-08):
+the shared lesson stream that turns one persona's everyday, generalisable
+learning into every persona's premise by (within-a-week, V1) the next
+curation cycle — the gap between per-agent memory (`MEMORY#INDEX`, ADR-0019)
+and a constitutional doc/ADR/lint change (the ML backlog ratchet).
+
+| `pk` | `sk` | Purpose | Key attributes |
+|---|---|---|---|
+| `LESSON` | `LESSON#{scope}#{ulid}` | One candidate or promoted lesson. **Single global partition** — same shape as `FEED` (`gsi3pk="FEED"`) and `PERF#{scope}` (the two single-partition precedents Epic-022 names): the daily distillation volume is O(a day's cross-agent runs), pre-filtered and curated ruthlessly (Epic-022 "Behaviour at N=100+ agents" — curation quality is the scaling pressure, not partition throughput), so it stays in the same negligible-write-volume regime FEED's own headroom argument already establishes for a single-partition design at workforce scale. `sk` is time-ordered *within* a scope (the ULID suffix), so `Query pk="LESSON", sk begins_with "{scope}#"` returns one scope's lessons oldest/newest-first with no fan-out — the exact access pattern `GET /lessons?scope=…&active=true` (Epic-022 Story 3, injection) needs; `active=true` and TTL-not-expired are filtered client-side over that query result, following the same "filters are client-side over the current page" discipline GSI3/GSI4 already use. | `scope` (also duplicated into `sk` for at-a-glance browsability, matching no other row family's convention but deliberate here since `sk` alone must disambiguate a partition-key-shared row): **machine-derived only, never free-form** (Epic-022 §1 — "distiller-invented tags drift") — either `skill:{skill_name}` or `project:{project_id}` (derived from the source EXEC/RUN row's `skill_name`/`project_id`), **or** one value from a small **closed, registered cross-cutting vocabulary** (initial set: `org-wide`, `external-conduct` — see ADR-0032 §Decision for the registration mechanism and the closed-set extension rule). `status` ∈ `{candidate, rejected, active, expired}`. `body` (the distilled lesson statement — short and generalisable, capped to fit Epic-022's ~1,500–2,000 char per-task injection budget alongside sibling lessons in the same scope). `source_refs[]` (**mandatory, ≥1** — `{kind: RUN\|EXEC\|DLQ\|GUARD_TRIP, ref: <ulid or PROJECT#{id}/EXEC#{ulid}>}`; every entry must resolve to a real ledger row — "no provenance, no candidacy" is enforced at the write boundary, not by reviewer diligence). `distilled_at`, `distiller_run_id` (the producing Lambda invocation, for traceability). `pre_filter` (`{passed: bool, checks: string[]}` — the deterministic fail-closed pass: schema caps, citation-resolves, instruction-pattern reject, imperative/second-person auto-quarantine; runs **before** any LLM judgment, per the RFC's defense-in-depth). `curation` (`{reviewers: [{agent_slug, verdict, scope_confirmed: bool, at}], …}` — **≥2 reviewers**, and each attestation explicitly covers *scope classification*, not just content, since a conduct lesson mislabelled as skill-scoped is the injection bypass the RFC flagged). `lintable` (`"yes"|"no"` + `reason`, **mandatory**, validated at the write boundary — a `lintable: yes` promotion is blocked until `ml_backlog_ref` is set). `ml_backlog_ref?` (an `ML-NNN` row id in [memory-lint-backlog.md](../../docs/memory-lint-backlog.md), required before a `lintable: yes` candidate may reach `active`). `activated_at?`, `ttl_epoch` (DynamoDB TTL — renewed-on-use, hard cap per Epic-022 §Acceptance), `last_used_at?`, `injected_count` (drives age/priority eviction when a scope's active set exceeds the injection budget — Epic-022's eviction-must-work-end-to-end acceptance criterion). `audit_ref?` (pointer into the promoting agent's or the operator-digest's `AUDIT#` trail — promotions execute via an agents-api route per Epic-022 §2, "lessons are DDB rows, not PRs"). |
+
+**Closed cross-cutting vocabulary — registration mechanism (proposed, ADR-0032).**
+The initial set (`org-wide`, `external-conduct`) is closed and lives in
+[`workforce/scripts/schemas/lesson-scope-vocabulary.json`](../scripts/schemas/lesson-scope-vocabulary.json)
+(proposed path — not yet created); extending it is a Zone A schema amendment,
+the same discipline `skill-meta.schema.json`'s `deliverable.type` enum
+already uses ("Adding any further type is a Zone A amendment"). A skill
+*subscribes* to a cross-cutting scope — i.e. asks to have that scope's active
+lessons considered for injection into its own fires, on top of the
+`skill:{name}` + `project:{project_id}` scopes every skill gets automatically
+with no declaration — via a new optional `lesson_subscriptions: string[]`
+field on its `meta.json`, each entry validated against the closed vocabulary
+file at `validate-skills.mjs` time. No skill subscribes to anything by
+default; a cross-cutting lesson reaches no one until its target skills
+declare the subscription. (Injection wiring itself is Epic-022 Story 3, out
+of scope for both this diff and #459.)
+
 #### Budget rows
 
 | `pk` | `sk` | Purpose | Key attributes |
 |---|---|---|---|
 | `BUDGET#{yyyy-mm}` | `AGENT#{slug}` | Monthly token + cost roll-up | `tokens_in`, `tokens_out`, `cost_usd`, `last_updated_at`. Used by `lambdas/shared/budget.ts` to enforce W-3 before each LLM call |
+| `BUDGET#{yyyy-mm-dd}` (proposed — ADR-0032) | `SYSTEM#lesson-distiller` | **Daily**, system-scoped (not agent-scoped) token + cost roll-up for the Epic-022 daily distiller Lambda — the first budget row with no owning `AGENT#{slug}`, since the distiller is a standalone Lambda with no persona (same "system maintenance, not agent output" posture `memory-compactor` already has). `tokens_in`, `tokens_out`, `cost_usd`, `cap_tokens` (the throwing daily ceiling — Epic-022 §Cost / the W-3 call-site *pattern*, applied at daily rather than monthly granularity since there is no persona's monthly cap to ride). The pre-call guard mirrors `wouldBreachBudget` but reads/writes this daily row instead of the monthly `AGENT#{slug}` row; two consecutive overrun attempts on the same day throw and DLQ (W-4), same discipline as the existing per-agent guard. |
 
 #### Auth rows (ADR-0005 — ephemeral engagement-write tokens)
 
