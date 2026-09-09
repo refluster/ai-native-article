@@ -44,6 +44,7 @@
     "workforce:openapi-routes": "node workforce/scripts/check-openapi-routes.mjs",
     "workforce:api-routes": "node workforce/scripts/check-api-routes.mjs",
     "workforce:skill-spec-drift": "node workforce/scripts/check-skill-spec-drift.mjs",
+    "workforce:skill-lifecycle": "node workforce/scripts/check-skill-lifecycle.mjs",
     "workforce:performance-mirror-drift": "node workforce/scripts/check-performance-mirror-drift.mjs",
     "workforce:skill-body-version": "node workforce/scripts/check-skill-body-version.mjs",
     "workforce:skill-version-sync": "node workforce/scripts/check-skill-version-sync.mjs",
