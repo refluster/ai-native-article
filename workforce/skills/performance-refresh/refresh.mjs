@@ -27,7 +27,7 @@
 //
 // Usage:
 //   node workforce/skills/performance-refresh/refresh.mjs \
-//     [--days 90] [--table wf-table-prod] [--region us-west-2] \
+//     [--days 180] [--table wf-table-prod] [--region us-west-2] \
 //     [--out /tmp/performance-refresh-report.json] [--dry-run]
 //
 // Exit codes:
@@ -225,7 +225,7 @@ async function readBack(scope) {
 }
 
 async function main() {
-  const DAYS = String(arg("days", 90));
+  const DAYS = String(arg("days", 180));
   const TABLE = String(arg("table", process.env.TABLE_NAME || "wf-table-prod"));
   const REGION = String(arg("region", process.env.AWS_REGION || "us-west-2"));
   const OUT = String(arg("out", "/tmp/performance-refresh-report.json"));

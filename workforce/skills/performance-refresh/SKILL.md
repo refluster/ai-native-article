@@ -53,12 +53,13 @@ yourself — `refresh.mjs` owns all of it.
 ```sh
 GITHUB_TOKEN="<credentials['github.token'].token>" \
   node workforce/skills/performance-refresh/refresh.mjs \
-    --days 90 --out /tmp/performance-refresh-report.json
+    --days 180 --out /tmp/performance-refresh-report.json
 ```
 
 Exit codes: `0` every leg clean · `2` at least one leg failed or came back
 degraded (**still post — that IS the story**) · `3` nothing refreshed at all.
-The 90-day window matches the console's 3-month decks; do not shorten it.
+The 180-day window matches the console's 6-month decks (operator, 2026-09-09;
+was 90/3-month); do not shorten it.
 
 ### 2. Read the report and form the judgment
 

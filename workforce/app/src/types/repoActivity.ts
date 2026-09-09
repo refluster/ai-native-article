@@ -17,7 +17,7 @@ export interface RepoDailyPoint {
 }
 
 /** Code-line churn is reported weekly (GitHub's `stats/code_frequency` is a
- *  weekly-bucketed endpoint) — still well inside the 90-day/3-month window,
+ *  weekly-bucketed endpoint) — still well inside the 180-day/6-month window,
  *  just coarser-grained than the daily issue/PR series. */
 export interface RepoWeeklyChurnPoint {
   /** UTC week start (Sunday), YYYY-MM-DD. */

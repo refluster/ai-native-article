@@ -130,6 +130,11 @@ export interface PerformanceSeries {
   pr_daily: PrDailyPoint[];
   pr_summary: PrSummary;
   pr_contributors: PrContributor[];
+  /** ISO timestamp of the PR roll-up's last publish. Absent for a scope whose
+   *  PR block has never been published — which a reader must NOT round to
+   *  "fresh". Distinct from `generated_at`, which is this response's own
+   *  composition time and says nothing about how old the data is. */
+  pr_updated_at?: string;
   /** Absent until this scope's first repo-activity refresh lands; the client
    *  falls back to its bundled snapshot when missing. */
   repo?: RepoActivityBlock;
@@ -334,12 +339,15 @@ export type PerfIdleBlock = Pick<
 // someone who read the catalogue and believed it (PR #524 cycle-1, mateo M2).
 
 /** Trailing window the reducer keeps per scope.
- *  90 days (2026-07-26, operator): the console's decks are all on a 3-month
- *  basis, so the stored window must cover it — a 28-day row could only ever
- *  paint a third of the chart. The reducer appends forward, so an existing
- *  28-point row grows to 90 over the following weeks; re-run
- *  workforce/scripts/backfill-performance-lifecycle.mjs to fill it at once. */
-export const PERF_WINDOW_DAYS = 90;
+ *  180 days (2026-09-09, operator): the console's decks moved from a 3-month
+ *  to a 6-month basis, so the stored window must cover it — a shorter row
+ *  could only ever paint part of the chart. The reducer appends forward, so
+ *  an existing 90-point row grows to 180 over the following months; re-run
+ *  workforce/scripts/backfill-performance-lifecycle.mjs --days 180 to fill it
+ *  at once. Widening this is safe (appendDailyPoint only ever slices the tail
+ *  and a short row renders short); NARROWING it silently discards history the
+ *  reducer cannot reconstruct, so it is a backfill-first change. */
+export const PERF_WINDOW_DAYS = 180;
 
 export type PerfRollupKind = "LIFECYCLE" | "PR" | "REPO" | "IDLE" | "HUMAN-TOUCH";
 
@@ -589,7 +597,12 @@ export function composeSeries(
   scope: string,
   generatedAt: string,
   lifecycleRow: Pick<PerfLifecycleRow, "points">,
-  prRow?: Pick<PerfPrRow, "window" | "pr_daily" | "pr_summary" | "pr_contributors">,
+  // `updated_at` is Partial rather than part of the Pick: every row the
+  // builders write carries it, but a row written before it existed must
+  // still compose — and its absence then reads as "unknown age", which the
+  // client renders as stale rather than as fresh.
+  prRow?: Pick<PerfPrRow, "window" | "pr_daily" | "pr_summary" | "pr_contributors"> &
+    Partial<Pick<PerfPrRow, "updated_at">>,
   repoRow?: Pick<
     PerfRepoRow,
     "window" | "issues_daily" | "prs_daily" | "code_churn_weekly" | "summary" | "repos" | "updated_at"
@@ -622,6 +635,14 @@ export function composeSeries(
         humans_involved: [],
       },
     pr_contributors: prRow?.pr_contributors ?? [],
+    // When the PR roll-up was last WRITTEN — not when this response was
+    // composed. `generated_at` above is the endpoint's own clock and is
+    // therefore always "now", which made every client-side staleness check on
+    // the PR block vacuous: the block sat frozen at its 2026-07-26 publish for
+    // 45 days while the console reported the series as fresh (operator report,
+    // 2026-09-09). REPO already carried its own `updated_at` for exactly this
+    // reason; PR did not.
+    ...(prRow?.updated_at ? { pr_updated_at: prRow.updated_at } : {}),
     ...(repoRow
       ? {
           repo: {

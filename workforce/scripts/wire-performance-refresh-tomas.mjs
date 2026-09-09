@@ -92,9 +92,10 @@ const BINDING = {
   project_id: PROJECT_ID,
   config: {
     sign_off_persona: "tomas",
-    // Matches the console's 3-month decks; shortening it would silently
-    // truncate every chart the refresh feeds.
-    days: 90,
+    // Matches the console's 6-month decks (operator, 2026-09-09; was 3
+    // months); shortening it would silently truncate every chart the refresh
+    // feeds.
+    days: 180,
     // A REPO/PR block older than this many hours is reported as stale. One
     // daily cycle (24h) plus a 6h buffer for a late/slow fire.
     stale_hours: 30,
@@ -106,7 +107,7 @@ const BINDING = {
     },
   },
   note:
-    "Tomas's daily performance-refresh on project agent-workforce. Runs the bundled refresh.mjs, which republishes PERF#{scope}/PR (per repo scope, via build-pr-metrics-github.mjs --publish-ddb) and PERF#{scope}/REPO (every scope plus the workforce aggregate, via build-repo-performance.mjs --publish-ddb) from live GitHub data over a trailing 90 days, then reads back GET /performance and reports per-scope freshness. Posts one feed note per fire naming every block that came back stale, degraded (an undercount from a rate-limited page or a code_frequency timeout — never a real low), or missing. It does NOT refresh the lifecycle funnel: that stays the wf-performance-reducer Lambda's 02:00 UTC job, and this fire only observes it so a stalled reducer becomes visible instead of silently freezing the deck (the failure mode that left the PR block stuck at 2026-06-23 for a month — Epic-016 OP-012 / #437). No PR, no repo write; a frozen reducer or an unresolvable credential escalates via a PROPOSE-> line rather than being absorbed. Credentials: github.token + workforce.feed_write_token, both pre-existing on this project.",
+    "Tomas's daily performance-refresh on project agent-workforce. Runs the bundled refresh.mjs, which republishes PERF#{scope}/PR (per repo scope, via build-pr-metrics-github.mjs --publish-ddb) and PERF#{scope}/REPO (every scope plus the workforce aggregate, via build-repo-performance.mjs --publish-ddb) from live GitHub data over a trailing 180 days, then reads back GET /performance and reports per-scope freshness. Posts one feed note per fire naming every block that came back stale, degraded (an undercount from a rate-limited page or a code_frequency timeout — never a real low), or missing. It does NOT refresh the lifecycle funnel: that stays the wf-performance-reducer Lambda's 02:00 UTC job, and this fire only observes it so a stalled reducer becomes visible instead of silently freezing the deck (the failure mode that left the PR block stuck at 2026-06-23 for a month — Epic-016 OP-012 / #437). No PR, no repo write; a frozen reducer or an unresolvable credential escalates via a PROPOSE-> line rather than being absorbed. Credentials: github.token + workforce.feed_write_token, both pre-existing on this project.",
 };
 
 function curlJson(method, path, body) {
