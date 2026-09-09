@@ -111,6 +111,24 @@ async function secretsClient(region) {
 // AWS error names that mean "this session has no usable identity" rather than
 // "this one secret is missing". Distinguishing them is the whole point of H4
 // below — see assertAwsIdentity.
+//
+// AccessDenied is DELIBERATELY NOT in this set (2026-09-09). It used to be,
+// and the first real run of the daily refresh workflow proved that wrong: the
+// GitHub OIDC role authenticated fine but carried no
+// `secretsmanager:GetSecretValue`, so the very first scope threw
+// AccessDeniedException and the run reported
+//
+//     "AWS identity lost mid-run at scope \"workforce\" — aborting"
+//
+// which is false in both halves. The identity was present and never lost; what
+// was missing was one IAM statement. That message sends an operator to
+// re-provision credentials instead of to the policy, which is precisely the
+// misdiagnosis H4 exists to prevent — H4's point is one fault, one line, and a
+// line that is WRONG is worse than N lines that are right.
+//
+// Authentication failures (who are you?) and authorization failures (may you
+// read this?) are different faults with different fixes, so they are now
+// classified separately: this predicate covers only the first.
 const NO_IDENTITY_ERRORS = new Set([
   "CredentialsProviderError",
   "UnrecognizedClientException",
@@ -118,15 +136,21 @@ const NO_IDENTITY_ERRORS = new Set([
   "InvalidSignatureException",
   "ExpiredToken",
   "ExpiredTokenException",
-  "AccessDeniedException",
-  "AccessDenied",
-  "UnauthorizedOperation",
 ]);
 
+/** The caller could not be authenticated at all — no credentials, expired, or
+ *  malformed. The fix is credentials. */
 export function isNoIdentityError(err) {
+  return NO_IDENTITY_ERRORS.has(err?.name ?? "");
+}
+
+/** The caller WAS authenticated but is not permitted this action on this
+ *  resource. The fix is an IAM policy statement, never a credential. */
+export function isNotAuthorizedError(err) {
   const name = err?.name ?? "";
   const code = err?.Code ?? err?.$metadata?.httpStatusCode;
-  return NO_IDENTITY_ERRORS.has(name) || code === 403;
+  return name === "AccessDeniedException" || name === "AccessDenied" ||
+    name === "UnauthorizedOperation" || code === 403;
 }
 
 /** H4 (`wf:hana`, #502): a fire with NO ambient AWS identity would otherwise
@@ -224,6 +248,36 @@ async function readBack(scope) {
   }
 }
 
+/** Write the machine-readable report for a run that aborted before any leg
+ *  could publish. Both abort paths use it: a run that exits without a report
+ *  leaves its verdict step with nothing to name but "no report was written",
+ *  which is how the first real failure of the daily workflow reported an IAM
+ *  gap as an unexplained blank (2026-09-09). */
+function writeFatalReport(out, fatal, detail, scopes) {
+  writeFileSync(
+    out,
+    `${JSON.stringify(
+      {
+        generated_at: new Date().toISOString(),
+        fatal,
+        detail,
+        scopes: scopes.map((s) => s.scope),
+        legs: [],
+        observed: [],
+        verdict: {
+          failed: [fatal],
+          degraded: [],
+          stale_repo_scopes: [],
+          missing_repo_scopes: [],
+          lifecycle_last_dates: {},
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
 async function main() {
   const DAYS = String(arg("days", 180));
   const TABLE = String(arg("table", process.env.TABLE_NAME || "wf-table-prod"));
@@ -265,22 +319,7 @@ async function main() {
         `cannot resolve any wf/projects/*/github.token. This is ONE infrastructure condition, ` +
         `not ${scopes.length} missing project secrets: do not provision secrets in response to this.`;
       console.error(msg);
-      writeFileSync(
-        OUT,
-        `${JSON.stringify(
-          {
-            generated_at: new Date().toISOString(),
-            fatal: "aws-identity-absent",
-            detail: identity.error,
-            scopes: scopes.map((s) => s.scope),
-            legs: [],
-            observed: [],
-            verdict: { failed: ["aws-identity-absent"], degraded: [], stale_repo_scopes: [], missing_repo_scopes: [], lifecycle_last_dates: {} },
-          },
-          null,
-          2,
-        )}\n`,
-      );
+      writeFatalReport(OUT, "aws-identity-absent", identity.error, scopes);
       return 3;
     }
   }
@@ -294,12 +333,36 @@ async function main() {
       try {
         token = await resolveGithubToken(tokenProject, REGION);
       } catch (err) {
-        // Identity was proven present above, so an auth-class error here means
-        // it was revoked mid-run — again one fault, not a per-project gap.
+        // Identity was proven present above, so an authentication error here
+        // means it was revoked mid-run — one fault, not a per-project gap.
         if (isNoIdentityError(err)) {
-          console.error(
-            `refresh.mjs: AWS identity lost mid-run at scope "${scope}" (${err?.name}) — aborting rather than reporting per-project gaps`,
-          );
+          const msg =
+            `refresh.mjs: AWS credentials stopped authenticating mid-run at scope "${scope}" ` +
+            `(${err?.name}) — aborting rather than reporting per-project gaps.`;
+          console.error(msg);
+          writeFatalReport(OUT, "aws-identity-revoked", `${err?.name} at scope ${scope}`, scopes);
+          return 3;
+        }
+        // Authenticated but NOT PERMITTED. A different fault with a different
+        // fix: the caller is fine, one IAM statement is missing. If it is
+        // missing for one project's secret it is almost certainly missing for
+        // the whole `wf/projects/*` namespace, so abort on the first rather
+        // than emitting one identical line per scope — but say what is
+        // actually wrong, and name the resource and the action, so the
+        // operator lands on the policy instead of on the credentials.
+        if (isNotAuthorizedError(err)) {
+          const secretId = `wf/projects/${tokenProject}/github.token`;
+          const msg =
+            `refresh.mjs: NOT AUTHORIZED to read ${secretId} (${err?.name}). The caller ` +
+            `authenticated successfully — this is an IAM PERMISSION gap, not a credential ` +
+            `problem, so do NOT re-provision credentials or re-create the secret. The ` +
+            `execution role needs secretsmanager:GetSecretValue on ` +
+            `arn:aws:secretsmanager:${REGION}:*:secret:wf/projects/*/github.token-* ` +
+            `(and dynamodb:PutItem on the roll-up table, which this run never reached). ` +
+            `Aborting after the first scope: one missing statement covers the whole ` +
+            `wf/projects/* namespace, so the remaining scopes would repeat this line, not add to it.`;
+          console.error(msg);
+          writeFatalReport(OUT, "aws-not-authorized", `${err?.name} reading ${secretId}`, scopes);
           return 3;
         }
         // Otherwise: this scope's secret genuinely is not provisioned. A real,
