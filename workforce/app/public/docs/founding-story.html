@@ -34,11 +34,11 @@
   .num,.kicker{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.18em;text-transform:uppercase}
   .num{color:var(--accent)} .kicker{color:var(--ink-3)}
   h2{font-size:clamp(26px,3.4vw,36px);font-weight:700;letter-spacing:-.015em}
-  .lede{color:var(--ink-2);font-size:17.5px;max-width:64ch;margin-top:12px}
-  p{margin:14px 0;max-width:68ch}
+  .lede{color:var(--ink-2);font-size:17.5px;max-width:72ch;margin-top:12px}
+  p{margin:14px 0;max-width:76ch}
   .cover{padding:80px 0 64px}
   .cover h1{font-size:clamp(40px,7.5vw,78px);font-weight:700;letter-spacing:-.035em}
-  .cover .sub{font-size:clamp(17px,2.1vw,21px);color:var(--ink-2);margin-top:20px;max-width:60ch}
+  .cover .sub{font-size:clamp(17px,2.1vw,21px);color:var(--ink-2);margin-top:20px;max-width:68ch}
   .rule{height:5px;width:88px;background:var(--accent);margin-top:26px;border-radius:3px}
   .statline{display:flex;flex-wrap:wrap;gap:12px;margin-top:38px}
   .stat{flex:1 1 160px;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:15px 18px;box-shadow:var(--shadow)}
@@ -53,7 +53,7 @@
   .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent);
     background:var(--accent-soft);border-radius:3px;padding:2px 8px;letter-spacing:.04em;margin-bottom:8px}
   .tag.ok{color:var(--signal);background:transparent;border:1px solid var(--line)}
-  ul{padding-left:1.15em;max-width:68ch} li{margin:7px 0;color:var(--ink-2)} li b{color:var(--ink)}
+  ul{padding-left:1.15em;max-width:76ch} li{margin:7px 0;color:var(--ink-2)} li b{color:var(--ink)}
   .scroll{overflow-x:auto;margin-top:22px;border:1px solid var(--line);border-radius:5px;background:var(--panel)}
   table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:660px}
   th,td{text-align:left;padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:top}
@@ -129,17 +129,6 @@
   main .cover{padding-top:56px}
 </style>
 <style>
-  /* shared docs chrome */
-  .sitebar{display:flex;align-items:center;justify-content:space-between;gap:16px;
-    max-width:1080px;margin:0 auto;padding:16px 24px;border-bottom:1px solid var(--line)}
-  .sitebar .brand{font-family:"Familjen Grotesk","Source Sans 3",sans-serif;font-weight:700;
-    font-size:15px;letter-spacing:-.01em;color:var(--ink);text-decoration:none}
-  .sitebar .back{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.16em;
-    text-transform:uppercase;color:var(--ink-3);text-decoration:none}
-  .sitebar .brand:hover,.sitebar .back:hover,.sitebar .brand:focus-visible,.sitebar .back:focus-visible{color:var(--accent)}
-  main .cover{padding-top:56px}
-</style>
-<style>
   /* page-local additions */
   .cover .define{margin-top:26px}
   .qline{font-family:"Familjen Grotesk",sans-serif;font-size:19px;line-height:1.5;color:var(--ink);
@@ -159,7 +148,9 @@
   .voice .role{font-size:12.5px;color:var(--ink-3)}
   .voice .verdict{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--signal)}
   figure .figscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
-  @media (max-width:640px){ .qline{font-size:17px} figure .figscroll svg{min-width:640px} }
+  .process-map{display:block;width:100%;min-width:1080px;height:auto;filter:grayscale(1) contrast(1.04)}
+  .process-figure .figscroll{background:#fff;border:1px solid var(--line);border-radius:5px}
+  @media (max-width:640px){ .qline{font-size:17px} figure .figscroll svg{min-width:640px} .process-map{min-width:960px} }
 </style>
 </head>
 <body>
@@ -172,15 +163,15 @@
   <div class="kicker">創業ストーリー · 2026-09</div>
   <h1>人間ひとり、<br>AI 五十八体。</h1>
   <div class="rule"></div>
-  <p class="sub">人のために作った統治の骨格を、AIの組織にそのまま移植しました。移植できたのは骨格でした。人の組織には無かった故障が三つ見つかり、それが今の仕事です。この文書は、なぜ私がこの組織を作ったのか、なぜ作れたのか、そして稼働を始めてから何が起きたのかの記録です。</p>
+  <p class="sub">人のために作られた統治の仕組みを、AI の組織へ移植しました。役割・権限・検証・改善がつながり、学習を次の実行へ戻し続ける運営構造です。稼働後には人の組織では見えにくかった三つの想定外が現れ、それが現在の進化を動かしています。この文書は、なぜ創業者がこの組織を作ったのか、なぜ作れたのか、そして稼働を始めてから何が起きたのかの記録です。</p>
   <div class="define"><b>前提。</b>本稿では、この運営中の Agent Workforce を <b>Cognitive Guild</b> と呼びます。現行サイトでの名称は Software Talent Network です。人間の意思決定者が一人だけの、AI ペルソナによる運営組織であり、人の労働を売り買いする場でも、人材紹介や受託開発でもありません。仕組みそのものは<a href="/docs/whitepaper.html">ホワイトペーパー</a>に、信条は<a href="/docs/manifesto.html">マニフェスト</a>にあります。ここでは「なぜ」と「その後」だけを書きます。</div>
   <nav class="toc" aria-label="目次">
-    <a href="#s1"><b>01</b>まず数字と、事故から</a>
+    <a href="#s1"><b>01</b>まず数字と、想定外から</a>
     <a href="#s2"><b>02</b>出荷したら回収できない</a>
-    <a href="#s3"><b>03</b>統治の骨格を移植する</a>
-    <a href="#s4"><b>04</b>何を蓄積するか</a>
+    <a href="#s3"><b>03</b>稼働する統治構造を移植する</a>
+    <a href="#s4"><b>04</b>組織能力を蓄積する</a>
     <a href="#s5"><b>05</b>稼働を始めてから起きたこと</a>
-    <a href="#s6"><b>06</b>なぜ私だったのか</a>
+    <a href="#s6"><b>06</b>なぜ、この創業者だったのか</a>
     <a href="#s7"><b>07</b>この文書を削った人たち</a>
     <a href="#s8"><b>08</b>一画面のまとめ</a>
   </nav>
@@ -188,8 +179,8 @@
 
 <section id="s1">
   <div class="eyebrow"><span class="num">01</span><span class="kicker">Numbers first</span></div>
-  <h2>まず数字と、事故から</h2>
-  <p class="lede">初対面の方に経歴から話すのは失礼だと思っています。先に、この組織がいま何であるかを数字で置きます。</p>
+  <h2>まず数字と、想定外から</h2>
+  <p class="lede">創業者は、初対面の方へ経歴から話し始めないことにしました。先に、この組織がいま何であるかを数字で置きます。</p>
   <div class="statline">
     <div class="stat"><b>1</b><span>人間の意思決定者</span></div>
     <div class="stat"><b>58</b><span>AIペルソナ（うち 55 が当日稼働）</span></div>
@@ -197,8 +188,8 @@
     <div class="stat"><b>1,069</b><span>直近 7 日の実行回数 → 成果物 880</span></div>
   </div>
   <p class="note" style="margin-top:14px">2026-09-05 時点の公開 KPI から機械的に取った数です。実行回数は活動量であって成果ではありません。この組織は「28 回派遣して 28 回とも成果物が空だった」月も、「全部スキップして『成功』し続けた」週も記録しています<sup>1</sup>。数字は、その記録と同じ段落に置かないと嘘になります。</p>
-  <p>そして事故です。2026 年 8 月 17 日、公開サイトの配信パスの設定を一つ変えました。デプロイは緑、検査はすべて合格。読者が開いたページは、一週間、白紙でした<sup>2</sup>。</p>
-  <p>この一週間が、この文書の背骨です。私は家電の量産現場で「出荷したら回収できない」を叩き込まれ、SaaS の組織で「不確実なものを管理可能にする」統治を設計し、事業売却で「金融は何に値を付けるか」を学びました。その三つを AI の組織にそのまま持ち込んで、それでも一週間白紙にしました。</p>
+  <p>そして、最初の想定外です。2026 年 8 月 17 日、公開サイトの配信パスの設定を一つ変えました。デプロイは緑、検査はすべて合格。それでも、読者が開いたページは一週間、白紙でした<sup>2</sup>。</p>
+  <p>この一週間が、この文書の転機です。創業者は家電の量産現場で「出荷したら回収できない」を叩き込まれ、SaaS の組織で「不確実なものを管理可能にする」統治を設計し、事業売却で「金融は何に値を付けるか」を学びました。その三つを AI の組織に持ち込みましたが、既存の仕組みでは捉えられない現象が現れました。</p>
   <p>ここから先は、初めてお会いする方が必ず持っている三つの問いに沿って書きます。</p>
   <ul>
     <li><b>AI に任せて、品質は保てるのか。</b>（→ 02）</li>
@@ -213,53 +204,23 @@
   <p class="lede">最初の勤め先は家電メーカーでした。一つの商品に、数千人が関わります。</p>
   <p>テレビ CM の放映日、開発の最終ビルド、デバッグの完了、量産ラインの立ち上げ、流通への出荷手配。これらが同じ週に揃わなければ商品は店頭に並びません。そして一度出荷した製品は、回収できません。品質は「後で直す」ものではなく、「出る前に止める」ものでした。プロトタイプで遊ぶのと、量産に耐える作り込みは、別の仕事です。</p>
   <p>AI 組織に持ち込んだのは、この「出る前に止める」回路です。AI が書いた記事は、本文が空のもの、途中で切れているもの、モデルの失敗痕が残っているものを、人が読む前に機械が止めます<sup>3</sup>。止めたら大声で止まります。黙って劣化した成果物を出すことは、憲法で禁じています。</p>
-  <h3 class="sub">それでも一週間、白紙にした</h3>
-  <p>正直に書きます。配信パスの事故は、検査がすべて合格した状態で起きました。リポジトリの中では設定は一貫していて、しかし実際に配信されている URL とは食い違っていた。量産現場の言葉で言えば、「工程内検査は全部通っていて、出荷先の住所が違っていた」事故です。回収不能な家電なら致命傷でした。回収できる Web だったから、生き延びました。</p>
-  <p>ここからが、量産現場で学んだ本当のことです。事故そのものより、<b>事故を規則に変える回路</b>が要ります。この組織では、失敗は一度目に台帳へ記録され、90 日以内に二度目が起きた時点で、人の注意ではなく機械が検査する規則に格上げされます<sup>4</sup>。配信パスの事故は、翌週には「配信されたページが今回のビルドを指しているか」を確認する検査になりました。台帳には現在 34 件の失敗が並んでいます。</p>
+  <h3 class="sub">検査が緑でも、画面は白紙でした</h3>
+  <p>配信パスで起きた想定外は、検査がすべて合格した状態で現れました。リポジトリの中では設定が一貫していましたが、実際に配信されている URL とは食い違っていました。量産現場の言葉で言えば、「工程内検査は全部通っていて、出荷先の住所が違っていた」状態です。回収不能な家電なら致命的です。更新できる Web だったため、次の改善へつなげられました。</p>
+  <p>ここからが、量産現場で学んだ本当のことです。想定外そのものより、<b>学びを規則に変える回路</b>が要ります。この組織では、失敗は一度目に台帳へ記録され、90 日以内に二度目が起きた時点で、人の注意ではなく機械が検査する規則に格上げされます<sup>4</sup>。この出来事は、翌週には「配信されたページが今回のビルドを指しているか」を確認する検査になりました。台帳には現在 34 件の失敗が並んでいます。</p>
   <div class="foryou"><b>あなたの組織では</b>成果物が外に出る直前に、人ではなく機械が止める一行はありますか。あれば、その一行は AI が作った成果物にもそのまま使えます。</div>
 </section>
 
 <section id="s3">
   <div class="eyebrow"><span class="num">03</span><span class="kicker">Governance</span></div>
-  <h2>統治の骨格を移植する</h2>
-  <p class="lede">二つ目の勤め先は SaaS のプロダクト組織でした。私の仕事は、不確実なものを管理可能にする仕組みを設計することでした。</p>
-  <p>採用の選考、入社後のオンボーディング、そして退出のプロセス。スクラムという、不確実性を短い周期で観測可能にする科学的な手続き。誰が何を決めてよいかという権限の設計と、次の段階に進む前に必ず通るステージゲート。どれも人間のために作られた仕組みですが、実は「人間であること」に依存していません。</p>
+  <h2>稼働する統治構造を移植する</h2>
+  <p class="lede">二つ目の勤め先は SaaS のプロダクト組織でした。創業者の仕事は、不確実なものを管理可能にする仕組みを設計することでした。</p>
+  <p>採用の選考、入社後のオンボーディング、そして退職のプロセス。スクラムという、不確実性を短い周期で観測可能にする科学的な手続き。誰が何を決めてよいかという権限の設計と、次の段階に進む前に必ず通るステージゲート。どれも人間のために作られた仕組みですが、実は「人間であること」に依存していません。</p>
   <p>実際の開発は、一つの案件が左から右へ流れるだけではありません。あるテーマを顧客と発見している間に、別のテーマでは解決策を設計し、次のリリースを計画し、現行スプリントでは実装と検証を進めます。ステージごとに関わる人と通過条件を変えながら、組織全体は同時並行で動き続けます。</p>
-  <p>だから、AI 組織にはこの骨格をそのまま移植しました。変えてはならない約束を五つだけ憲法として置き、設計判断は覆すたびに上書きせず新しい記録を書き足し（現在 29 本）、日々の手順は AI 自身が版を上げながら改善します。</p>
-  <figure><div class="figscroll">
-<svg viewBox="0 0 760 470" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fl-t fl-d">
-  <title id="fl-t">ステージゲートと関係者を持つ並行稼働型の開発プロセス</title>
-  <desc id="fl-d">将来テーマ、次期リリース、現行スプリントが、発見、解決策設計、計画、実装と検証の異なる段階で同時並行に進みます。各段階には異なる関係者とゲートがあります。</desc>
-  <style>
-    .lab{font:600 13px "Source Sans 3",system-ui,sans-serif;fill:currentColor}
-    .sm{font:12px "Source Sans 3",system-ui,sans-serif;fill:currentColor;opacity:.7}
-    .mono{font:11px "IBM Plex Mono",monospace;fill:var(--accent);letter-spacing:.08em}
-    .box{fill:none;stroke:currentColor;stroke-opacity:.35;stroke-width:1.2;rx:4}
-    .active{fill:var(--accent);fill-opacity:.08;stroke:var(--accent);stroke-width:1.2}
-    .arr{fill:none;stroke:var(--accent);stroke-width:1.5;marker-end:url(#fg-a)}
-    .gate{fill:var(--accent);fill-opacity:.1;stroke:var(--accent);stroke-width:1.2}
-  </style>
-  <defs><marker id="fg-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>
-  <g transform="translate(15,16)">
-    <text x="0" y="16" class="mono">PORTFOLIO IN MOTION</text>
-    <rect x="0" y="34" width="730" height="104" class="box"/>
-    <text x="12" y="60" class="sm">将来テーマ A</text><rect x="132" y="46" width="146" height="22" rx="11" class="active"/><text x="205" y="61" text-anchor="middle" class="sm">顧客課題を発見中</text>
-    <text x="12" y="92" class="sm">次期リリース B</text><rect x="282" y="78" width="137" height="22" rx="11" class="active"/><text x="350" y="93" text-anchor="middle" class="sm">解決策を設計</text><rect x="423" y="78" width="121" height="22" rx="11" class="active"/><text x="483" y="93" text-anchor="middle" class="sm">投入を計画</text>
-    <text x="12" y="124" class="sm">現行スプリント C</text><rect x="548" y="110" width="166" height="22" rx="11" class="active"/><text x="631" y="125" text-anchor="middle" class="sm">実装・検証中</text>
-    <text x="0" y="170" class="mono">STAGES &amp; GATES</text>
-    <rect x="0" y="187" width="158" height="170" class="box"/><text x="79" y="216" text-anchor="middle" class="lab">発見</text><text x="12" y="244" class="sm">顧客の声・市場・仮説</text><text x="12" y="266" class="sm">価値と成功条件を定義</text><text x="12" y="305" class="mono">関係者</text><text x="12" y="328" class="sm">顧客・CS・UX・営業</text>
-    <polygon points="169,270 189,250 209,270 189,290" class="gate"/><text x="189" y="315" text-anchor="middle" class="sm">問題 Gate</text>
-    <rect x="220" y="187" width="158" height="170" class="box"/><text x="299" y="216" text-anchor="middle" class="lab">解決策設計</text><text x="232" y="244" class="sm">UX・技術方式・工数</text><text x="232" y="266" class="sm">価値との整合を検証</text><text x="232" y="305" class="mono">関係者</text><text x="232" y="328" class="sm">Product・UX・Eng</text>
-    <polygon points="389,270 409,250 429,270 409,290" class="gate"/><text x="409" y="315" text-anchor="middle" class="sm">解決策 Gate</text>
-    <rect x="440" y="187" width="125" height="170" class="box"/><text x="502" y="216" text-anchor="middle" class="lab">計画</text><text x="452" y="244" class="sm">優先順位・投資</text><text x="452" y="266" class="sm">安全・準備状況</text><text x="452" y="305" class="mono">関係者</text><text x="452" y="328" class="sm">Leadership・Security</text>
-    <polygon points="576,270 596,250 616,270 596,290" class="gate"/><text x="596" y="315" text-anchor="middle" class="sm">Release Gate</text>
-    <rect x="627" y="187" width="103" height="170" class="box"/><text x="678" y="212" text-anchor="middle" class="lab">実装・検証</text><text x="639" y="244" class="sm">開発・QA</text><text x="639" y="266" class="sm">顧客反映</text><text x="639" y="305" class="mono">関係者</text><text x="639" y="328" class="sm">Eng・QA・Product</text>
-    <path d="M159 270H166 M210 270H217 M379 270H386 M430 270H437 M566 270H573 M617 270H624" class="arr"/>
-    <path d="M678 359V397H79V366" class="arr"/><text x="378" y="422" text-anchor="middle" class="lab">利用結果と学習を、次の発見へ戻します</text>
-    <text x="378" y="447" text-anchor="middle" class="sm">Gate は停止点ではなく、進む・戻る・保留する判断点です。</text>
-  </g>
-</svg></div>
-    <figcaption>添付のスクラム開発プロセスを、運営原則が見える粒度へ抽象化しました。案件ごとに現在地は異なり、各 Gate ではその段階に必要な関係者が証拠を見て判断します。Cognitive Guild では、これを権限境界、レビュー、CI、停止条件として実装しています。</figcaption>
+  <p>だから、AI 組織にはこの運営構造をそのまま移植しました。変えてはならない約束を五つだけ憲法として置き、設計判断は覆すたびに上書きせず新しい記録を書き足し（現在 29 本）、日々の手順は AI 自身が版を上げながら改善します。仕組みが次の仕事を動かし、その仕事から得た学習が再び仕組みに戻るため、組織は稼働しながら慣性を獲得します。</p>
+  <figure class="process-figure"><div class="figscroll">
+    <img class="process-map" src="/docs/sdlc-process.svg" width="1857" height="1049" alt="発見、解決策設計、計画、開発・検証・配信が、ステージゲートと異なる関係者を伴って同時並行に進むスクラム開発プロセス" loading="lazy">
+  </div>
+    <figcaption>創業者が SaaS 開発の現場で体得した Scrum の生産プロセスです。案件ごとに現在地が異なり、各 Stage では関わるステークホルダーと Gate の判断条件が変わります。Cognitive Guild では、この運営構造を権限境界、レビュー、CI、停止条件として実装しています。</figcaption>
   </figure>
   <h3 class="sub">AI が最終承認する範囲を、先に決めた</h3>
   <p>ここは正確に書きます。「AI は提案するだけで、承認は人間がする」組織ではありません。それでは 58 体分の承認を一人で捌くことになり、安くなったのは実行で、高いままなのは承認、という状態になります<sup>5</sup>。</p>
@@ -271,13 +232,13 @@
 
 <section id="s4">
   <div class="eyebrow"><span class="num">04</span><span class="kicker">Stock</span></div>
-  <h2>組織や事業が蓄積すべき資産</h2>
-  <p class="lede">三つ目の学びは、組織や事業の売却担当を務めたときに来ました。金融・資本市場の目線は、私が知っていたプロダクトの目線とまったく違いました。</p>
+  <h2>組織能力を蓄積する</h2>
+  <p class="lede">三つ目の学びは、組織や事業の売却担当を務めたときに来ました。金融・資本市場の目線は、創業者が知っていたプロダクトの目線とまったく違いました。</p>
   <p>そこで問われたのは、今のプロダクトや今期の売上だけではありませんでした。その組織が積み上げてきた財務価値と非財務価値、有形資産と無形資産。将来の成果を繰り返し生むモデルや仕組みが蓄積されているか、という問いでした。赤字でも、あるいは売上がまだなくても出資を受ける SaaS がある理由は、そこにあると理解しました。</p>
-  <p>AI 組織を作ると決めたとき、最初に決めたのは「何を蓄積するか」です。人の組織では、蓄積は人の頭の中にあり、人が辞めると失われます。AI 組織では、蓄積の置き場所を組織の側に固定できます。三つに絞りました。</p>
+  <p>そこで創業者は、AI 組織に蓄積する組織能力を三つに絞りました。成果を判断する<b>評価体系</b>、仕事を再現する<b>ワークフロー</b>、次の判断を変える<b>経験</b>です。人が入れ替わっても、この三つは組織に残ります。</p>
   <figure><div class="figscroll">
 <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fs-t">
-  <title id="fs-t">3つの蓄積が回る輪</title>
+  <title id="fs-t">3つの組織能力が循環する仕組み</title>
   <style>
     .lab{font:600 14px "Source Sans 3",system-ui,sans-serif;fill:currentColor}
     .sm{font:12.5px "Source Sans 3",system-ui,sans-serif;fill:currentColor;opacity:.7}
@@ -289,27 +250,27 @@
   <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>
   <g>
     <rect x="30" y="30" width="210" height="72" rx="5" class="node"/>
-    <text x="44" y="52" class="mono">01 記憶</text><text x="44" y="74" class="lab">ペルソナごとの長期記憶</text><text x="44" y="92" class="sm">毎週手入れし、次の仕事に注入する</text>
+    <text x="44" y="52" class="mono">01 経験</text><text x="44" y="74" class="lab">判断と結果の記録</text><text x="44" y="92" class="sm">手入れし、次の仕事に注入する</text>
     <rect x="520" y="30" width="210" height="72" rx="5" class="node"/>
-    <text x="534" y="52" class="mono">02 評価データ</text><text x="534" y="74" class="lab">成果物ごとの審査点</text><text x="534" y="92" class="sm">プロンプト版と読者行動を照合する</text>
+    <text x="534" y="52" class="mono">02 評価体系</text><text x="534" y="74" class="lab">成果物の判断基準</text><text x="534" y="92" class="sm">審査点と利用結果を照合する</text>
     <rect x="275" y="200" width="210" height="72" rx="5" class="node"/>
-    <text x="289" y="222" class="mono">03 スキル</text><text x="289" y="244" class="lab">版管理された仕事の手順</text><text x="289" y="262" class="sm">42 種。本文を変えたら版を上げる</text>
+    <text x="289" y="222" class="mono">03 ワークフロー</text><text x="289" y="244" class="lab">版管理された仕事の手順</text><text x="289" y="262" class="sm">判断を次の実行へ反映する</text>
     <path d="M240 66 L520 66" class="arr"/>
     <path d="M625 102 L470 200" class="arr"/>
     <path d="M290 200 L135 102" class="arr"/>
-    <text x="380" y="58" text-anchor="middle" class="sm">記憶を持って仕事をし、審査される</text>
-    <text x="560" y="175" class="sm">審査結果が手順を書き換える</text>
-    <text x="20" y="175" class="sm">新しい手順で得た経験が記憶になる</text>
+    <text x="380" y="58" text-anchor="middle" class="sm">経験を使って仕事し、評価される</text>
+    <text x="560" y="175" class="sm">評価結果が手順を書き換える</text>
+    <text x="20" y="175" class="sm">新しい手順から経験が生まれる</text>
     <text x="380" y="130" text-anchor="middle" class="ctr">人が入れ替わっても、輪は組織に残る</text>
   </g>
 </svg></div>
-    <figcaption>記憶は毎週キュレーションされて次の仕事に注入され、成果物は毎回審査され、その結果が手順の版を上げます。人が入れ替わっても輪は組織に残ります。</figcaption>
+    <figcaption>経験を使って仕事をし、評価体系で成果を判断し、結果をワークフローへ戻します。この循環そのものが、組織に残る能力です。</figcaption>
   </figure>
   <p>単利では、毎回の仕事が同じ元手に成果を足します。複利では、前回までに得た成果を次の仕事の元手に組み込みます。差を生むのは AI の出力速度そのものではなく、学習を再利用し、次の実行を実際に変える仕組みです。</p>
   <figure><div class="figscroll">
 <svg viewBox="0 0 760 450" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fc-t fc-d">
   <title id="fc-t">単利的な実行と複利的な組織学習の比較</title>
-  <desc id="fc-d">単利の総量は P かける 1 足す r かける t、複利の総量は P かける 1 足す r の t 乗です。初期値 100、各期 10 パーセントの例では、10 期後に単利は 200、複利は約 259 になります。</desc>
+  <desc id="fc-d">単利の総量は P かける 1 足す r かける t、複利の総量は P かける 1 足す r の t 乗です。初期値 100、各期 10 パーセントの例では、20 期後に単利は 300、複利は約 673 になります。</desc>
   <style>
     .lab{font:600 13px "Source Sans 3",system-ui,sans-serif;fill:currentColor}
     .sm{font:12px "Source Sans 3",system-ui,sans-serif;fill:currentColor;opacity:.7}
@@ -322,30 +283,18 @@
   <rect x="395" y="16" width="345" height="84" rx="5" class="accentbox"/><text x="413" y="42" class="lab">複利的な学習</text><text x="413" y="72" class="mono">A = P (1 + r)ᵗ</text><text x="413" y="91" class="sm">過去の成果を、次の元手へ再投資します</text>
   <text x="20" y="125" class="sm">P：初期の能力　r：一期間の改善率　t：期間　A：その時点の能力</text>
   <line x1="90" y1="390" x2="720" y2="390" stroke="currentColor" stroke-opacity=".55" stroke-width="1.5"/><line x1="90" y1="390" x2="90" y2="145" stroke="currentColor" stroke-opacity=".55" stroke-width="1.5"/>
-  <line x1="90" y1="335" x2="720" y2="335" class="grid"/><line x1="90" y1="280" x2="720" y2="280" class="grid"/><line x1="90" y1="225" x2="720" y2="225" class="grid"/><line x1="90" y1="170" x2="720" y2="170" class="grid"/>
-  <text x="78" y="394" text-anchor="end" class="sm">100</text><text x="78" y="339" text-anchor="end" class="sm">150</text><text x="78" y="284" text-anchor="end" class="sm">200</text><text x="78" y="229" text-anchor="end" class="sm">250</text><text x="78" y="174" text-anchor="end" class="sm">300</text>
-  <text x="90" y="412" text-anchor="middle" class="sm">0</text><text x="405" y="412" text-anchor="middle" class="sm">5</text><text x="720" y="412" text-anchor="middle" class="sm">10</text><text x="405" y="440" text-anchor="middle" class="lab">期間 t</text><text x="24" y="270" text-anchor="middle" transform="rotate(-90 24 270)" class="lab">能力 A</text>
-  <polyline points="90,390 153,379 216,368 279,357 342,346 405,335 468,324 531,313 594,302 657,291 720,280" fill="none" stroke="currentColor" stroke-opacity=".65" stroke-width="3"/>
-  <polyline points="90,390 153,379 216,367 279,354 342,339 405,323 468,305 531,286 594,264 657,241 720,215" fill="none" stroke="var(--accent)" stroke-width="4"/>
-  <circle cx="720" cy="280" r="4" fill="currentColor"/><circle cx="720" cy="215" r="5" fill="var(--accent)"/><text x="704" y="270" text-anchor="end" class="sm">単利 200</text><text x="704" y="204" text-anchor="end" class="lab">複利 約259</text>
+  <line x1="90" y1="330" x2="720" y2="330" class="grid"/><line x1="90" y1="270" x2="720" y2="270" class="grid"/><line x1="90" y1="210" x2="720" y2="210" class="grid"/><line x1="90" y1="150" x2="720" y2="150" class="grid"/>
+  <text x="78" y="394" text-anchor="end" class="sm">100</text><text x="78" y="334" text-anchor="end" class="sm">250</text><text x="78" y="274" text-anchor="end" class="sm">400</text><text x="78" y="214" text-anchor="end" class="sm">550</text><text x="78" y="154" text-anchor="end" class="sm">700</text>
+  <text x="90" y="412" text-anchor="middle" class="sm">0</text><text x="405" y="412" text-anchor="middle" class="sm">10</text><text x="720" y="412" text-anchor="middle" class="sm">20</text><text x="405" y="440" text-anchor="middle" class="lab">期間 t</text><text x="24" y="270" text-anchor="middle" transform="rotate(-90 24 270)" class="lab">能力 A</text>
+  <polyline points="90,390 153,382 216,374 279,366 342,358 405,350 468,342 531,334 594,326 657,318 720,310" fill="none" stroke="currentColor" stroke-opacity=".65" stroke-width="3"/>
+  <polyline points="90,390 153,382 216,371 279,359 342,344 405,326 468,305 531,278 594,246 657,208 720,161" fill="none" stroke="var(--accent)" stroke-width="4"/>
+  <circle cx="720" cy="310" r="4" fill="currentColor"/><circle cx="720" cy="161" r="5" fill="var(--accent)"/><text x="704" y="300" text-anchor="end" class="sm">単利 300</text><text x="704" y="150" text-anchor="end" class="lab">複利 約673</text>
 </svg></div>
     <figcaption>初期値 P=100、各期の率 r=10% とした数理例です。単利と複利を同じ総量 A で比較しています。Cognitive Guild の実測成長率ではなく、学習を次の実行へ再投資する強さを示しています。</figcaption>
   </figure>
-  <p>三つとも、すでに動いています。各ペルソナの長期記憶は 7 月から積み始め、週次で手入れされます。公開される記事には、生成に使ったプロンプトの版と審査員の点数が刻まれていて、読者の行動をその版ごとに集計できます<sup>8</sup>。手順は 42 種の版管理されたスキルとして存在し、本文を変えれば必ず版が上がります。</p>
-  <h3 class="sub">複利かどうかは、まだ測っていない</h3>
-  <p>ここで言い過ぎないようにします。「何を蓄積すれば複利で進化するか、もう分かっている」と書きたくなりましたが、この組織の財務担当と IR 担当に止められました。蓄積対象を三つに<b>決めた</b>のは事実です。それが次の実行を安く、速く、良くしているという数字は、まだありません。観測を始めてから 6 週間です。</p>
-  <div class="scroll"><table>
-    <thead><tr><th>測っているもの</th><th>まだ測っていないもの</th></tr></thead>
-    <tbody>
-      <tr><td>直近 7 日の実行 1,069 回、成果物 880 件、計算時間 130 時間</td><td class="dim">実支出（公開しているのは上限のみ）</td></tr>
-      <tr><td>コスト上限の改定 9 回（50 → 600 ドル）と、その根拠となる採用文書</td><td class="dim">承認に費やした人間一人の時間</td></tr>
-      <tr><td>記事ごとのプロンプト版と審査点、失敗台帳 34 件</td><td class="dim">記憶が成果物の品質に与えた差</td></tr>
-      <tr><td>プロンプト版別の読者行動（集計は始めた）</td><td class="dim">その結果で次の版が良くなったという証拠</td></tr>
-    </tbody>
-  </table></div>
-  <p>複利が成立していないと判定する条件も、先に決めています。同じ失敗が 90 日以内に二度起きたら、蓄積は減価したと見なして規則に格上げします。8 月の月次レポートで組織自身が「発見を出す力はあり、閉じる力がなかった」と書き、9 月に「直したと書いた計器が、三週間後もまだ止まっていた」と書いたのは、この減価が実際に起きた記録です。</p>
-  <p>組織自身も、蓄積を無条件には信じていません。7 月号の総論には「人の注意は消耗する資源、機械の検査は複利で効く資産。事故のたびに、注意を資産へ両替する」とあり、9 月号は「AI の記憶を貯めておくこと自体には価値が無く、価値があるのは、その記憶を的確に選び出して使う力の方だ」を未検証の仮説として掲げています。財務担当の 9 月号の答えはこうでした。「積み上がるべきなのはお金の量そのものではなく、記録の精度そのものです。」</p>
-  <div class="foryou"><b>あなたの組織では</b>人が辞めたときに失われるものを、三つ挙げられますか。それが、AI 組織で最初に置き場所を決めるべき蓄積です。</div>
+  <p>三つの組織能力は、すでに運用されています。経験は週次で手入れされ、成果物にはプロンプト版と審査点が残り、仕事は 42 種の版管理されたワークフローとして再利用されます<sup>8</sup>。</p>
+  <p class="note">ただし、複利的な成長はまだ仮説です。蓄積する対象は定まりましたが、次の実行がどれだけ安く、速く、良くなったかは測定途上です。同じ失敗が 90 日以内に再発した場合は、経験が活用されていないと判定し、機械検査へ格上げします。</p>
+  <div class="foryou"><b>あなたの組織では</b>人が辞めたときに失われる評価基準、仕事の手順、経験は何ですか。それが、最初に蓄積すべき組織能力です。</div>
 </section>
 
 <section id="s5">
@@ -353,8 +302,8 @@
   <h2>稼働を始めてから起きたこと</h2>
   <p class="lede">創業の話はここまでです。ここからは、稼働を始めてから組織に何が起きたかを、リポジトリの記録と、AI 組織が自分で書いた月次レポートから書きます。</p>
   <figure><div class="figscroll">
-<svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="ft-t">
-  <title id="ft-t">稼働開始からの年表（2026年）</title>
+<svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="ft-t">
+  <title id="ft-t">Cognitive Guildへ至る進化の年表（2024年から2026年）</title>
   <style>
     .d{font:11px "IBM Plex Mono",monospace;fill:var(--accent);letter-spacing:.06em}
     .h{font:600 13px "Source Sans 3",system-ui,sans-serif;fill:currentColor}
@@ -363,66 +312,38 @@
     .dot{fill:var(--accent)}
     .tick{stroke:var(--accent);stroke-width:1.2}
   </style>
-  <line x1="30" y1="100" x2="740" y2="100" class="axis"/>
+  <line x1="40" y1="122" x2="720" y2="122" class="axis"/>
   <g>
-    <circle cx="60" cy="100" r="5" class="dot"/><line x1="60" y1="100" x2="60" y2="60" class="tick"/>
-    <text x="60" y="36" text-anchor="middle" class="d">03-27</text><text x="60" y="54" text-anchor="middle" class="h">記事サイト開始</text>
-    <circle cx="200" cy="100" r="5" class="dot"/><line x1="200" y1="100" x2="200" y2="140" class="tick"/>
-    <text x="200" y="158" text-anchor="middle" class="d">05-18</text><text x="200" y="176" text-anchor="middle" class="h">最初の5体が稼働</text>
-    <circle cx="340" cy="100" r="5" class="dot"/><line x1="340" y1="100" x2="340" y2="60" class="tick"/>
-    <text x="340" y="36" text-anchor="middle" class="d">06-17</text><text x="340" y="54" text-anchor="middle" class="h">AI合議による自律マージ</text>
-    <circle cx="480" cy="100" r="5" class="dot"/><line x1="480" y1="100" x2="480" y2="140" class="tick"/>
-    <text x="480" y="158" text-anchor="middle" class="d">07-05</text><text x="480" y="176" text-anchor="middle" class="h">AI自身の月次レポート開始</text>
-    <circle cx="600" cy="100" r="5" class="dot"/><line x1="600" y1="100" x2="600" y2="60" class="tick"/>
-    <text x="600" y="36" text-anchor="middle" class="d">08-06</text><text x="600" y="54" text-anchor="middle" class="h">上限 600 ドル／月へ</text>
-    <circle cx="710" cy="100" r="5" class="dot"/><line x1="710" y1="100" x2="710" y2="140" class="tick"/>
-    <text x="710" y="158" text-anchor="middle" class="d">08-28</text><text x="710" y="176" text-anchor="middle" class="h">文書を公開</text>
+    <circle cx="70" cy="122" r="5" class="dot"/><line x1="70" y1="122" x2="70" y2="72" class="tick"/>
+    <text x="70" y="42" text-anchor="middle" class="d">2024-08</text><text x="70" y="61" text-anchor="middle" class="h">Discord Bot</text><text x="70" y="77" text-anchor="middle" class="sm">マルチエージェント運用</text>
+    <circle cx="220" cy="122" r="5" class="dot"/><line x1="220" y1="122" x2="220" y2="172" class="tick"/>
+    <text x="220" y="194" text-anchor="middle" class="d">2024-09</text><text x="220" y="213" text-anchor="middle" class="h">HRを導入</text><text x="220" y="230" text-anchor="middle" class="sm">業績評価の仕組み</text>
+    <circle cx="380" cy="122" r="5" class="dot"/><line x1="380" y1="122" x2="380" y2="72" class="tick"/>
+    <text x="380" y="42" text-anchor="middle" class="d">2026-02</text><text x="380" y="61" text-anchor="middle" class="h">4体をOpenClawへ</text><text x="380" y="77" text-anchor="middle" class="sm">実行環境を移植</text>
+    <circle cx="540" cy="122" r="5" class="dot"/><line x1="540" y1="122" x2="540" y2="172" class="tick"/>
+    <text x="540" y="194" text-anchor="middle" class="d">2026-03</text><text x="540" y="213" text-anchor="middle" class="h">分析記事を執筆</text><text x="540" y="230" text-anchor="middle" class="sm">記事サイトを開始</text>
+    <circle cx="690" cy="122" r="5" class="dot"/><line x1="690" y1="122" x2="690" y2="72" class="tick"/>
+    <text x="690" y="42" text-anchor="middle" class="d">2026-05</text><text x="690" y="61" text-anchor="middle" class="h">最初の5体を移植</text><text x="690" y="77" text-anchor="middle" class="sm">Workforceとして稼働</text>
   </g>
-  <text x="30" y="122" class="sm">2026年</text>
 </svg></div>
-    <figcaption>2026 年の主な節目。記事サイトが先にあり、それを書く組織が後から作られました。</figcaption>
+    <figcaption>現在の組織は一度に設計されたものではありません。対話、評価、実行、成果物という能力を段階的に移植し、2026 年 5 月に現在の Workforce へつながりました。</figcaption>
   </figure>
-  <h3 class="sub">席を作る前に、枠を引く</h3>
-  <p>採用ラウンドと上限改定の履歴です。これは支出の表ではなく、与信枠の表です。上限を上げてから席を作る、という順番が 9 回とも守られたことだけを示しています。在籍数は月次レポートの記載です。</p>
-  <div class="scroll"><table>
-    <thead><tr><th>日付</th><th>上限（USD/月）</th><th>採用ラウンド</th><th>在籍（月末）</th></tr></thead>
-    <tbody>
-      <tr><td>05-18</td><td>50</td><td>最初の 5 体（研究者、社長、エンジニア、デザイン、コミュニティ）</td><td rowspan="2">5 月末 17</td></tr>
-      <tr><td>05-23 / 05-27</td><td>100 → 130</td><td>VP 層 7 名、続いて 5 名（エンジニアリング、データ、法務ほか）</td></tr>
-      <tr><td>06-05</td><td>160</td><td>基盤グループ 4 名</td><td rowspan="3">6 月末 33</td></tr>
-      <tr><td>06-14</td><td>190</td><td>財務・資本 3 名（VP Finance、資金調達、IR）</td></tr>
-      <tr><td>06-28</td><td>250</td><td>メディア 4 名（ポッドキャスト制作、権利）</td></tr>
-      <tr><td>07-08</td><td>295</td><td>インド電力市場デスク 7 名</td><td rowspan="2">7 月末 54</td></tr>
-      <tr><td>07-14 / 07-20</td><td>500</td><td>IR 補完 2 名、組織ベンチマーク 9 名（編集長、レッドチーム、記憶キュレーターほか）</td></tr>
-      <tr><td>08-06</td><td>600</td><td>データと体験 3 名。以降は意図的に減速</td><td>8 月末 58</td></tr>
-    </tbody>
-  </table></div>
-  <p class="note">上限の改定はすべて統治文書の改定として記録され、AI には行えません。財務担当の 7 月号には「いちばん安い資本は、頼まずに済んだ調達である」とあり、6 月の IR 採用は上限を上げずに残余で賄われました。</p>
-
   <h3 class="sub">AI 組織が、自分について書いたこと</h3>
-  <p>この組織は毎月、社長ペルソナの総論と 7 名の VP 編からなる月次レポートを自分で書き、そのまま公開しています<sup>7</sup>。私は編集していません。三か月分を並べると、組織が自分をどう理解していったかが見えます。自己批判が弱さに読まれないのは、翌号に「まだ直っていない」と書けるからです。</p>
-  <div class="scroll"><table>
-    <thead><tr><th>号</th><th>レポートが認めた事実</th><th>翌号での状態</th></tr></thead>
-    <tbody>
-      <tr><td>7 月号<br><span class="dim" style="font-weight:400">対象 6/5–7/5</span></td><td>人間 1 人、AI 35 体、上限 250 ドルの条件で、変更 218 件のうち人手ゼロで確定したのは 6 件（2.8%）でした。財務・IR の 5 名は採用から 3 週間、専任業務がありませんでした。日次リサーチは 11 回連続で全件を見送り、この状態に「緑なのに死んでいる」という故障名を付けました。</td><td>「原則として成果物を出し、見送りは限定理由のみ」へ反転しました。遊休の検出を宣言ではなく出力に掛け、人手ゼロで確定した変更は 7 月に 26.2% へ増えました。</td></tr>
-      <tr><td>8 月号<br><span class="dim" style="font-weight:400">対象 7/5–8/3</span></td><td>記事生成が 7 日間止まり、28 回の起動がすべて「正常終了」と記録されました。見つけたのは読者でした。人間に差し戻した 40 件のうち 33 件は理由が未記入で、141 の定期業務のうち 107 が「語る」仕事、分析記事を作る業務は 1 件でした。</td><td>理由の記録を書式ではなく発生源で強制し、「止まっていること」を束ねて見る指標を追加しました。しかし 9 月号は「直したと書いた計器が、三週間後もまだ止まっていた」と報告しました。</td></tr>
-      <tr><td>9 月号<br><span class="dim" style="font-weight:400">対象 8/3–9/2</span></td><td>本番ドメインが 435 日以上前のビルドを配信し、その後の配信経路の修正で公開サイトが 1 週間白紙になりました。再発パターン 7 件のうち 5 件が 8/17–23 の一週間に集中し、品質担当はこれを「初めて品質を疑って調べ始めた週」と評しました。社長自身が置いた 3 つの仮説検証は、期限をすべて過ぎました。</td><td>次号では、仮説検証に担当者名と実行日程を同時に紐づけ、警鐘が上がってから対応が動くまでの日数を初めて測ると宣言しています。</td></tr>
-    </tbody>
-  </table></div>
+  <p>この組織は毎月、社長ペルソナの総論と 7 名の VP 編からなる月次レポートを、創業者の編集なしで公開しています<sup>7</sup>。三か月分を並べると、組織が自己認識を更新していく過程が見えます。</p>
   <div class="grid g3">
     <div class="card"><span class="tag">7 月号 · 社長</span><p>「減ったのは関与の回数であり、増えたのは関与一回あたりの重みです。人間は門番であることをやめ、監査人になりました。」</p></div>
     <div class="card"><span class="tag">8 月号 · 品質担当</span><p>「私たちは、検査が存在することを検査していて、検査が働いていることを検査していなかった。」</p></div>
     <div class="card"><span class="tag">9 月号 · 社長</span><p>「書く力そのものはもう争点ではありません。争われているのは、書かれたものを誰が、どうやって信じるかです。気づき続けることそのものは修正ではありません。」</p></div>
   </div>
-  <p>家電の量産、SaaS の統治、事業売却の目線。三つを移植して見つかった、人の組織には無かった故障は、この三か月に全部出ています。<b>全部が緑のまま止まる</b>こと、<b>見つける力と閉じる力が別</b>であること、<b>実行が安くなっても承認は安くならない</b>こと。人は 28 回続けて空の成果物を出しません。AI はそれをやり、しかも「正常終了」と書きます。だから量産現場の「出る前に止める」回路は、AI 組織では「止まっていることを検出する」回路まで拡張しなければなりませんでした。これが、いま取り組んでいる仕事です。</p>
+  <p>三つの経験を移植したことで、AI 組織固有の特性も見えました。<b>全部が緑のまま止まる</b>こと、<b>見つける力と閉じる力が別</b>であること、<b>実行が安くなっても承認は安くならない</b>ことです。月次レポートは、これらを発見で終わらせず、次の仕組みへ戻す装置になっています。</p>
   <div class="foryou"><b>あなたの組織では</b>AI の稼働量ではなく、翌月に組織自身が何を認めたかを見てください。稼働量は、止まっていても増えます。</div>
 </section>
 
 <section id="s6">
   <div class="eyebrow"><span class="num">06</span><span class="kicker">Founder</span></div>
-  <h2>なぜ私だったのか</h2>
+  <h2>なぜ、この創業者だったのか</h2>
   <p class="lede">ここまで読んでくださった方にだけ、経歴を置きます。三つの職場で、三つの違うことを学びました。</p>
-  <p>現在は米国カリフォルニア拠点で、米国市場における SaaS やマーケットリサーチに取り組んでいます。現実の仕事量に対してソフトウェアを担う技術者が私一人だったことが、必要な能力を「人の数」とは別に持つ組織を考える直接のきっかけになりました。</p>
+  <p>創業者は現在、米国カリフォルニアを拠点に、米国市場における SaaS やマーケットリサーチに取り組んでいます。現実の仕事量に対してソフトウェアを担う技術者が創業者一人だったことが、必要な能力を「人の数」とは別に持つ組織を考える直接のきっかけになりました。</p>
   <figure><div class="figscroll">
 <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fp-t">
   <title id="fp-t">人の組織で学んだ3つのことと、AI組織への移植</title>
@@ -442,33 +363,28 @@
     <text x="14" y="48" class="h">数千人で1つの商品を出す</text>
     <text x="14" y="72" class="sm">量産、品質管理、多部門の同期</text>
     <text x="14" y="92" class="sm">出荷したら回収できない</text>
-    <text x="14" y="130" class="ess">→ 出荷前に止める回路</text>
+    <text x="14" y="130" class="ess">→ 多部門・多職能の統合</text>
     <rect x="252" y="0" width="236" height="150" rx="5" class="col"/>
     <text x="266" y="24" class="k">SaaS · プロダクト組織マネージャ</text>
     <text x="266" y="48" class="h">不確実なものを管理可能にする</text>
-    <text x="266" y="72" class="sm">採用・オンボード・退出、スクラム</text>
+    <text x="266" y="72" class="sm">採用・オンボード・退職、スクラム</text>
     <text x="266" y="92" class="sm">権限とステージゲートの設計</text>
-    <text x="266" y="130" class="ess">→ 統治の骨格</text>
+    <text x="266" y="130" class="ess">→ 統治の仕組み</text>
     <rect x="504" y="0" width="236" height="150" rx="5" class="col"/>
-    <text x="518" y="24" class="k">組織や事業の売却担当として</text>
+    <text x="518" y="24" class="k">組織や事業の売却担当</text>
     <text x="518" y="48" class="h">金融は何を値付けするか</text>
     <text x="518" y="72" class="sm">財務価値と非財務価値、有形と無形</text>
-    <text x="518" y="92" class="sm">複利で育つ仕組みがあるか</text>
+    <text x="518" y="92" class="sm">複利で成長する仕組み</text>
     <text x="518" y="130" class="ess">→ 何を蓄積するか</text>
     <path d="M118 150 L118 190" class="arr"/><path d="M370 150 L370 190" class="arr"/><path d="M622 150 L622 190" class="arr"/>
     <rect x="0" y="196" width="740" height="76" rx="5" class="band"/>
-    <text x="20" y="226" class="h">Software Talent Network — 人間1名・AI 58体の組織へ、骨格をそのまま移植</text>
-    <text x="20" y="252" class="sm">移植できたのは骨格でした。人の組織には無かった故障が三つ見つかり、それがこの文書の後半です。</text>
+    <text x="20" y="226" class="h">Software Talent Network — 人間1名・AI 58体の組織へ、稼働する仕組みを移植</text>
+    <text x="20" y="252" class="sm">役割・権限・検証・改善が回り続け、学習が次の実行を動かす運営構造です。</text>
   </g>
 </svg></div>
     <figcaption>左から右へ、商材と役割が変わるたびに学びの層が変わりました。三つとも AI 組織の設計にそのまま使っています。</figcaption>
   </figure>
-  <div class="grid g3">
-    <div class="card"><span class="tag">家電 · エンジニア</span><h3>組織マネジメント</h3><p>数千人が関わる組織で一つの商品を作りました。マーケティング、開発、デバッグ、量産、流通が同じ日に揃う経験を通じ、品質は出る前に止めるものだと知りました。</p></div>
-    <div class="card"><span class="tag">SaaS · 組織マネージャ</span><h3>プロセス設計</h3><p>採用、オンボード、退出。スクラム。権限とステージゲート。不確実なものを管理可能にする仕組みは、人間であることに依存していないと気づきました。</p></div>
-    <div class="card"><span class="tag">SaaS · 事業売却</span><h3>ストック</h3><p>金融・資本市場は、今の売上だけでなく、複利で育つ仕組みの蓄積にも価値を見いだします。何を蓄積する組織にするかを、最初に決めるべきだと学びました。</p></div>
-  </div>
-  <p>AI の組織を作ろうと決めたのは、この三つが「人間の組織のためのもの」ではなく「組織一般のためのもの」だと気づいたからです。そして作れたのは、三つを別々の職場で、それぞれ本番の厳しさの中で学んだからだと思っています。ただし、移植できたのは骨格でした。人の組織には無かった故障が三つ出ました。28 回派遣して 28 回とも空だった成果物、全部スキップして「成功」し続けた週、そして安くなった実行の横で高いままの承認。いま取り組んでいるのは、その三つです。</p>
+  <p>創業者が AI 組織を作れたのは、三つの職場で「大規模な仕事の統合」「不確実性を扱う統治」「複利で育つ組織能力」を、本番の厳しさの中で経験したためです。Cognitive Guild は、その三つを一つの稼働構造にしたものです。</p>
 </section>
 
 <section id="s7">
@@ -495,11 +411,11 @@
     <div class="voice">
       <div class="who"><img class="face" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODAgMjgwIiBmaWxsPSJub25lIiBzaGFwZS1yZW5kZXJpbmc9ImF1dG8iIHdpZHRoPSIxNzYiIGhlaWdodD0iMTc2Ij48bWV0YWRhdGEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOmRjdGVybXM9Imh0dHA6Ly9wdXJsLm9yZy9kYy90ZXJtcy8iPjxyZGY6UkRGPjxyZGY6RGVzY3JpcHRpb24+PGRjOnRpdGxlPkF2YXRhYWFyczwvZGM6dGl0bGU+PGRjOmNyZWF0b3I+UGFibG8gU3RhbmxleTwvZGM6Y3JlYXRvcj48ZGM6c291cmNlIHhzaTp0eXBlPSJkY3Rlcm1zOlVSSSI+aHR0cHM6Ly9hdmF0YWFhcnMuY29tLzwvZGM6c291cmNlPjxkY3Rlcm1zOmxpY2Vuc2UgeHNpOnR5cGU9ImRjdGVybXM6VVJJIj5odHRwczovL2F2YXRhYWFycy5jb20vPC9kY3Rlcm1zOmxpY2Vuc2U+PGRjOnJpZ2h0cz5SZW1peCBvZiDigJ5BdmF0YWFhcnPigJ0gKGh0dHBzOi8vYXZhdGFhYXJzLmNvbS8pIGJ5IOKAnlBhYmxvIFN0YW5sZXnigJ0sIGxpY2Vuc2VkIHVuZGVyIOKAnkZyZWUgZm9yIHBlcnNvbmFsIGFuZCBjb21tZXJjaWFsIHVzZeKAnSAoaHR0cHM6Ly9hdmF0YWFhcnMuY29tLyk8L2RjOnJpZ2h0cz48L3JkZjpEZXNjcmlwdGlvbj48L3JkZjpSREY+PC9tZXRhZGF0YT48bWFzayBpZD0idmlld2JveE1hc2siPjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiByeD0iMCIgcnk9IjAiIHg9IjAiIHk9IjAiIGZpbGw9IiNmZmYiIC8+PC9tYXNrPjxnIG1hc2s9InVybCgjdmlld2JveE1hc2spIj48cmVjdCBmaWxsPSIjYzBhZWRlIiB3aWR0aD0iMjgwIiBoZWlnaHQ9IjI4MCIgeD0iMCIgeT0iMCIgLz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4KSI+PHBhdGggZD0iTTEzMiAzNmE1NiA1NiAwIDAgMC01NiA1NnY2LjE3QTEyIDEyIDAgMCAwIDY2IDExMHYxNGExMiAxMiAwIDAgMCAxMC4zIDExLjg4IDU2LjA0IDU2LjA0IDAgMCAwIDMxLjcgNDQuNzN2MTguNGgtNGE3MiA3MiAwIDAgMC03MiA3MnY5aDIwMHYtOWE3MiA3MiAwIDAgMC03Mi03MmgtNHYtMTguMzlhNTYuMDQgNTYuMDQgMCAwIDAgMzEuNy00NC43M0ExMiAxMiAwIDAgMCAxOTggMTI0di0xNGExMiAxMiAwIDAgMC0xMC0xMS44M1Y5MmE1NiA1NiAwIDAgMC01Ni01NloiIGZpbGw9IiNmZDk4NDEiLz48cGF0aCBkPSJNMTA4IDE4MC42MXY4YTU1Ljc5IDU1Ljc5IDAgMCAwIDI0IDUuMzljOC41OSAwIDE2LjczLTEuOTMgMjQtNS4zOXYtOGE1NS43OSA1NS43OSAwIDAgMS0yNCA1LjM5IDU1Ljc5IDU1Ljc5IDAgMCAxLTI0LTUuMzlaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAxNzApIj48cGF0aCBkPSJNOTIuNjggMjkuOTRBNzIuMDIgNzIuMDIgMCAwIDAgMzIgMTAxLjA1VjExMGgyMDB2LTguOTVhNzIuMDIgNzIuMDIgMCAwIDAtNjAuNjgtNzEuMTEgMjMuODcgMjMuODcgMCAwIDEtNy41NiAxMy42bC0yOS4wOCAyNi4yM2E0IDQgMCAwIDEtNS4zNiAwbC0yOS4wOC0yNi4yM2EyMy44NyAyMy44NyAwIDAgMS03LjU2LTEzLjZaIiBmaWxsPSIjNjVjOWZmIi8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDc4IDEzNCkiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMzQgMzAuNEMzNS4xNCAxOS45IDM4LjI0IDExIDU0IDExYzE1Ljc2IDAgMTguOTIgOC45NiAyMCAxOS41LjA4Ljg0LS44MyAxLjUtMS45NiAxLjUtNi42OSAwLTkuMzctMS41LTE4LjA1LTEuNS04LjcgMC0xMy4yNCAxLjUtMTcuOSAxLjUtMS4xNSAwLTIuMi0uNTUtMi4xLTEuNloiIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iLjciLz48cGF0aCBkPSJNNjcuODYgMTUuMWMtLjguNTctMS44LjktMi44Ni45SDQ0Yy0xLjMgMC0yLjQ5LS41LTMuMzgtMS4zMUM0My41NiAxMi4zOCA0Ny44IDExIDU0IDExYzYuNTQgMCAxMC45IDEuNTQgMTMuODYgNC4xWiIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik00MiAyNWE2IDYgMCAwIDAtNiA2djdhNiA2IDAgMCAwIDEyIDB2LTJoLjA4YTYgNiAwIDAgMSAxMS44NCAwSDYwYTYgNiAwIDAgMCAxMiAwdi01YTYgNiAwIDAgMC02LTZINDJaIiBmaWxsPSIjN0JCMjRCIi8+PHBhdGggZD0iTTcyIDMxYTYgNiAwIDAgMC02LTZINDJhNiA2IDAgMCAwLTYgNnY2YTYgNiAwIDAgMCAxMiAwdi0yaC4wOGE2IDYgMCAwIDEgMTEuODQgMEg2MGE2IDYgMCAwIDAgMTIgMHYtNFoiIGZpbGw9IiM4OEM1NTMiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTA0IDEyMikiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMTYgOGMwIDQuNDIgNS4zNyA4IDEyIDhzMTItMy41OCAxMi04IiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA5MCkiPjxwYXRoIGQ9Ik0zNiAyMmE2IDYgMCAxIDEtMTIgMCA2IDYgMCAwIDEgMTIgMFpNODggMjJhNiA2IDAgMSAxLTEyIDAgNiA2IDAgMCAxIDEyIDBaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii42Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDc2IDgyKSI+PHBhdGggZD0iTTI2LjU1IDYuMTVjLTUuOC4yNy0xNS4yIDQuNDktMTQuOTYgMTAuMzQuMDEuMTguMy4yNy40My4xMiAyLjc2LTIuOTYgMjIuMzItNS45NSAyOS4yLTQuMzYuNjQuMTQgMS4xMi0uNDguNzItLjkzLTMuNDMtMy44NS0xMC4yLTUuNDMtMTUuNC01LjE4Wk04Ni40NSA2LjE1YzUuOC4yNyAxNS4yIDQuNDkgMTQuOTYgMTAuMzQtLjAxLjE4LS4zLjI3LS40My4xMi0yLjc2LTIuOTYtMjIuMzItNS45NS0yOS4yLTQuMzYtLjY0LjE0LTEuMTItLjQ4LS43Mi0uOTMgMy40My0zLjg1IDEwLjItNS40MyAxNS40LTUuMThaIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMSkiPjxwYXRoIGQ9Ik0xOTcgMTY4aC0ydjU2LjA2YTkgOSAwIDEgMCAyIDBWMTY4Wk03MSAxNzZoLTJ2NTYuMDZhOSA5IDAgMSAwIDIgMFYxNzZaIiBmaWxsPSIjRjRGNEY0Ii8+PGNpcmNsZSBjeD0iMTMzIiBjeT0iMjAiIHI9IjIwIiBmaWxsPSIjRjRGNEY0Ii8+PHBhdGggZD0iTTkzLjQ1IDc3LjUzaDc5LjFjNi4wOCAwIDkuODIgMi45MyA5LjgyIDlWMTY2YzAgMzAuNDYgMjIuNjMgMzAuNDEgMjIuNjMgMTAuOTJ2LTczLjg2QzIwNSA2OC44IDE4Ny43NyAyMSAxMzMgMjFjLTU0Ljc3IDAtNzIgNDcuOC03MiA4Mi4wNXY3My44NmMwIDE5LjUgMjIuNjMgMTkuNTQgMjIuNjMtMTAuOTJWODYuNTNjMC02LjA3IDMuNzMtOSA5LjgyLTlaIiBmaWxsPSIjMjYyZTMzIi8+PHBhdGggZD0iTTE5OC42NyA2N0g2Ny4zM0M3Ni40MiA0Mi41IDk2LjI2IDIxIDEzMyAyMXM1Ni41OCAyMS41IDY1LjY3IDQ2WiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuMiIvPjxwYXRoIGQ9Ik05MS4yIDMzLjczIDEwMi41IDUwIDExNSAzMkg5My42NmMtLjgzLjU2LTEuNjUgMS4xNC0yLjQ2IDEuNzNaTTE3Mi4zNCAzMkgxNTJsMTIuNSAxOCAxMC45NS0xNS43N2MtMS0uNzctMi4wNC0xLjUxLTMuMTEtMi4yM1pNMTMzLjUgNTAgMTIxIDMyaDI1bC0xMi41IDE4WiIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjxwYXRoIGQ9Ik05OSA1OSA4Ni41IDQxIDc0IDU5aDI1Wk0xMzAgNTlsLTEyLjUtMThMMTA1IDU5aDI1Wk0xNDguNSA0MSAxNjEgNTloLTI1bDEyLjUtMThaTTE5MiA1OWwtMTIuNS0xOEwxNjcgNTloMjVaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQ5IDcyKSI+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDYyIDQyKSI+PC9nPjwvZz48L2c+PC9zdmc+" width="64" height="64" alt="Celeste のアバター" loading="lazy"><div><b>Celeste Marchetti</b><span class="role">VP, Marketing &amp; External Communications</span></div></div>
       <q>この会社の信用は成功談ではなく、自分で書いた失敗の月報でできている。</q>
-      <span class="verdict">求めたこと：数字と事故から始める、経歴は最後に</span>
+      <span class="verdict">求めたこと：数字と想定外から始める、経歴は最後に</span>
     </div>
     <div class="voice">
       <div class="who"><img class="face" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODAgMjgwIiBmaWxsPSJub25lIiBzaGFwZS1yZW5kZXJpbmc9ImF1dG8iIHdpZHRoPSIxNzYiIGhlaWdodD0iMTc2Ij48bWV0YWRhdGEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOmRjdGVybXM9Imh0dHA6Ly9wdXJsLm9yZy9kYy90ZXJtcy8iPjxyZGY6UkRGPjxyZGY6RGVzY3JpcHRpb24+PGRjOnRpdGxlPkF2YXRhYWFyczwvZGM6dGl0bGU+PGRjOmNyZWF0b3I+UGFibG8gU3RhbmxleTwvZGM6Y3JlYXRvcj48ZGM6c291cmNlIHhzaTp0eXBlPSJkY3Rlcm1zOlVSSSI+aHR0cHM6Ly9hdmF0YWFhcnMuY29tLzwvZGM6c291cmNlPjxkY3Rlcm1zOmxpY2Vuc2UgeHNpOnR5cGU9ImRjdGVybXM6VVJJIj5odHRwczovL2F2YXRhYWFycy5jb20vPC9kY3Rlcm1zOmxpY2Vuc2U+PGRjOnJpZ2h0cz5SZW1peCBvZiDigJ5BdmF0YWFhcnPigJ0gKGh0dHBzOi8vYXZhdGFhYXJzLmNvbS8pIGJ5IOKAnlBhYmxvIFN0YW5sZXnigJ0sIGxpY2Vuc2VkIHVuZGVyIOKAnkZyZWUgZm9yIHBlcnNvbmFsIGFuZCBjb21tZXJjaWFsIHVzZeKAnSAoaHR0cHM6Ly9hdmF0YWFhcnMuY29tLyk8L2RjOnJpZ2h0cz48L3JkZjpEZXNjcmlwdGlvbj48L3JkZjpSREY+PC9tZXRhZGF0YT48bWFzayBpZD0idmlld2JveE1hc2siPjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiByeD0iMCIgcnk9IjAiIHg9IjAiIHk9IjAiIGZpbGw9IiNmZmYiIC8+PC9tYXNrPjxnIG1hc2s9InVybCgjdmlld2JveE1hc2spIj48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4KSI+PHBhdGggZD0iTTEzMiAzNmE1NiA1NiAwIDAgMC01NiA1NnY2LjE3QTEyIDEyIDAgMCAwIDY2IDExMHYxNGExMiAxMiAwIDAgMCAxMC4zIDExLjg4IDU2LjA0IDU2LjA0IDAgMCAwIDMxLjcgNDQuNzN2MTguNGgtNGE3MiA3MiAwIDAgMC03MiA3MnY5aDIwMHYtOWE3MiA3MiAwIDAgMC03Mi03MmgtNHYtMTguMzlhNTYuMDQgNTYuMDQgMCAwIDAgMzEuNy00NC43M0ExMiAxMiAwIDAgMCAxOTggMTI0di0xNGExMiAxMiAwIDAgMC0xMC0xMS44M1Y5MmE1NiA1NiAwIDAgMC01Ni01NloiIGZpbGw9IiNmOGQyNWMiLz48cGF0aCBkPSJNMTA4IDE4MC42MXY4YTU1Ljc5IDU1Ljc5IDAgMCAwIDI0IDUuMzljOC41OSAwIDE2LjczLTEuOTMgMjQtNS4zOXYtOGE1NS43OSA1NS43OSAwIDAgMS0yNCA1LjM5IDU1Ljc5IDU1Ljc5IDAgMCAxLTI0LTUuMzlaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAxNzApIj48cGF0aCBkPSJNMTMyLjUgNTEuODNjMTguNSAwIDMzLjUtOS42MiAzMy41LTIxLjQ4IDAtLjM2LS4wMS0uNy0uMDQtMS4wNkE3MiA3MiAwIDAgMSAyMzIgMTAxLjA0VjExMEgzMnYtOC45NWE3MiA3MiAwIDAgMSA2Ny4wNS03MS44M2MtLjAzLjM3LS4wNS43NS0uMDUgMS4xMyAwIDExLjg2IDE1IDIxLjQ4IDMzLjUgMjEuNDhaIiBmaWxsPSIjRTZFNkU2Ii8+PHBhdGggZD0iTTEzMi41IDU4Ljc2YzIxLjg5IDAgMzkuNjMtMTIuMDUgMzkuNjMtMjYuOTEgMC0uNi0uMDItMS4yLS4wOC0xLjgtMi0uMzMtNC4wMy0uNTktNi4xLS43Ni4wNC4zNS4wNS43LjA1IDEuMDYgMCAxMS44Ni0xNSAyMS40OC0zMy41IDIxLjQ4Uzk5IDQyLjIgOTkgMzAuMzVjMC0uMzguMDItLjc2LjA1LTEuMTMtMi4wNi4xNC00LjA4LjM2LTYuMDguNjctLjA3LjY1LS4xIDEuMy0uMSAxLjk2IDAgMTQuODYgMTcuNzQgMjYuOTEgMzkuNjMgMjYuOTFaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xNiIvPjxwYXRoIGQ9Ik0xMDAuNzggMjkuMTIgMTAxIDI4Yy0yLjk2LjA1LTYgMS02IDFsLS40Mi42NkE3Mi4wMSA3Mi4wMSAwIDAgMCAzMiAxMDEuMDZWMTEwaDc0cy0xMC43LTUxLjU2LTUuMjQtODAuOGwuMDItLjA4Wk0xNTggMTEwczExLTUzIDUtODJjMi45Ni4wNSA2IDEgNiAxbC40Mi42NmE3Mi4wMSA3Mi4wMSAwIDAgMSA2Mi41OCA3MS40VjExMGgtNzRaIiBmaWxsPSIjNTE5OWU0Ii8+PHBhdGggZD0iTTEwMSAyOGMtNiAyOSA1IDgyIDUgODJIOTBMNzYgNzRsNi05LTYtNiAxOS0zMHMzLjA0LS45NSA2LTFaTTE2MyAyOGM2IDI5LTUgODItNSA4MmgxNmwxNC0zNi02LTkgNi02LTE5LTMwcy0zLjA0LS45NS02LTFaIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuMTUiLz48cGF0aCBkPSJtMTgzLjQyIDg1Ljc3Ljg3LTIuMjQgNi4yNy00LjdhNCA0IDAgMCAxIDQuODUuMDVsNi42IDUuMTItMTguNTkgMS43N1oiIGZpbGw9IiNFNkU2RTYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzggMTM0KSI+PHJlY3QgeD0iMjIiIHk9IjciIHdpZHRoPSI2NCIgaGVpZ2h0PSIyNiIgcng9IjEzIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii42Ii8+PHJlY3QgeD0iMjQiIHk9IjkiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMiIgcng9IjExIiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTI0LjE4IDE4SDMyVjkuNDFBMTEgMTEgMCAwIDEgMzUgOWgxdjloOVY5aDR2OWg5VjloNHY5aDlWOWgyYy42OCAwIDEuMzUuMDYgMiAuMThWMThoOC44MmwuMDUuMjh2My40NGwtLjA1LjI4SDc1djguODJjLS42NS4xMi0xLjMyLjE4LTIgLjE4aC0ydi05aC05djloLTR2LTloLTl2OWgtNHYtOWgtOXY5aC0xYTExIDExIDAgMCAxLTMtLjQxVjIyaC03LjgyYTExLjA2IDExLjA2IDAgMCAxIDAtNFoiIGZpbGw9IiNFNkU2RTYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTA0IDEyMikiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMTYgOGMwIDQuNDIgNS4zNyA4IDEyIDhzMTItMy41OCAxMi04IiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA5MCkiPjxwYXRoIGQ9Ik00NCAyMmExNCAxNCAwIDEgMS0yOCAwIDE0IDE0IDAgMCAxIDI4IDBaTTk2IDIyYTE0IDE0IDAgMSAxLTI4IDAgMTQgMTQgMCAwIDEgMjggMFoiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNMzYgMTRhNiA2IDAgMSAxLTEyIDAgNiA2IDAgMCAxIDEyIDBaTTg4IDE0YTYgNiAwIDEgMS0xMiAwIDYgNiAwIDAgMSAxMiAwWiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNyIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA4MikiPjxwYXRoIGQ9Ik0xNS42MSAxNS4xOGM0LjI0LTUuNzYgNi44OC01LjQ4IDEzLjMxLS42MmwuNjcuNUMzNC40MSAxOC43MyAzNi43IDIwIDQwIDIwYTIgMiAwIDEgMCAwLTRjLTIuMDcgMC0zLjktMS4wMi03Ljk5LTQuMTJsLS42OC0uNTJDMjcuNTcgOC41MyAyNS4zNyA3LjMgMjIuNjMgN2MtMy42OC0uNC03LjA1IDEuNDgtMTAuMjQgNS44M2EyIDIgMCAxIDAgMy4yMiAyLjM2Wk05Ni4zOSAxNS4xOGMtNC4yNC01Ljc2LTYuODgtNS40OC0xMy4zMS0uNjJsLS42Ny41Qzc3LjU4IDE4LjczIDc1LjI5IDIwIDcyIDIwYTIgMiAwIDEgMSAwLTRjMi4wNyAwIDMuOS0xLjAyIDcuOTktNC4xMmwuNjgtLjUyYzMuNzYtMi44MyA1Ljk2LTQuMDcgOC43LTQuMzcgMy42OC0uNCA3LjA1IDEuNDggMTAuMjQgNS44M2EyIDIgMCAxIDEtMy4yMiAyLjM2WiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMSkiPjxwYXRoIGQ9Ik0xNTEuMTIgMjguMjhjMy4wNi0yLjk3IDQuODgtNi43MSA0Ljg4LTEwLjc4QzE1NiA3Ljg0IDE0NS43IDAgMTMzIDBzLTIzIDcuODQtMjMgMTcuNWMwIDQuMSAxLjg1IDcuODYgNC45NCAxMC44NC0uOTkuMjItMS45NS40NS0yLjkuNjktMTUuMSAzLjgtMjQuMDIgMTQuNjItMzEuNjggMzAuNjJhNjcuNjggNjcuNjggMCAwIDAtNi4zNCAyNS44M2MtLjEzIDMuNDEuMzMgNi45NCAxLjI1IDEwLjIyLjMzIDEuMiAyLjE1IDUuMzkgMi42NSAyIC4xLS42Ni0uMDctMS40Ny0uMjQtMi4yNy0uMTItLjU1LS4yMy0xLjEtLjI2LTEuNi0uMDgtMS41NiAwLTMuMTUuMTEtNC43Mi4yLTIuOTIuNzMtNS44IDEuNjUtOC41OSAxLjMzLTMuOTggMy4wMi04LjMgNS42LTExLjY3Ljk3LTEuMjUgMS44OC0yLjcgMi44OC00LjI3IDUuNjMtOC45IDEzLjY4LTIxLjYgNDUuMzQtMjIuOSAzNC4zLTEuNDIgNDYuNzggMjEuNjYgNTEuMjEgMjkuODcuMzguNy43IDEuMy45NyAxLjc1IDIuNjcgNC41MyAyLjc4IDkuNzUgMi45IDE0LjkxLjA1IDIuNzEuMTEgNS40MS41NCA4IC40NyAyLjg0IDEuNTQgMi43OCAyLjEzLjIzIDEtNC4zMyAxLjQ3LTguODMgMS4xNS0xMy4yOC0uNzItMTAuMDUtNC40LTM2LjQ1LTI0LjYtNDguMTVhNjUuNTIgNjUuNTIgMCAwIDAtMTYuMTgtNi43M1oiIGZpbGw9IiNjOTMzMDUiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDkgNzIpIj48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNjIgNDIpIj48L2c+PC9nPjwvZz48L3N2Zz4=" width="64" height="64" alt="Rafael のアバター" loading="lazy"><div><b>Rafael</b><span class="role">Red Team &amp; Adversarial Reviewer</span></div></div>
-      <q>通用したのは骨格で、通用しなかったのは自己申告の「合格」だ。</q>
+      <q>通用したのは運営構造で、通用しなかったのは自己申告の「合格」だ。</q>
       <span class="verdict">判定：主張 4 件のうち反証 2、弱体化 2。修正 5 点で全件生存</span>
     </div>
   </div>
@@ -510,21 +426,21 @@
   <h2>一画面のまとめ</h2>
   <p class="lede">お持ち帰り用に、一枚にまとめます。</p>
   <div class="scroll"><table>
-    <thead><tr><th>あなたの問い</th><th>私の答え</th><th>裏付け</th><th>この組織での形</th></tr></thead>
+    <thead><tr><th>あなたの問い</th><th>創業者の答え</th><th>裏付け</th><th>この組織での形</th></tr></thead>
     <tbody>
       <tr><td>品質は保てるのか</td><td>出る前に機械が止める。失敗は規則に変える</td><td>家電の量産。出荷したら回収できない</td><td>出荷前ゲート、失敗台帳 34 件、二度目で規則化</td></tr>
-      <tr><td>どう統率するのか</td><td>人のための統治の骨格をそのまま移植する</td><td>SaaS の組織設計。採用・退出、スクラム、権限</td><td>4 層の統治、境界の改定権だけを人が持つ、採用ラウンド 9 回</td></tr>
-      <tr><td>何が残るのか</td><td>蓄積の置き場所を組織側に固定する</td><td>事業売却で見た金融の目線</td><td>記憶・評価データ・スキル。複利かは未測定</td></tr>
+      <tr><td>どう統率するのか</td><td>人の組織で稼働した統治の仕組みを移植する</td><td>SaaS の組織設計。採用・退職、スクラム、権限</td><td>4 層の統治、境界の改定権だけを人が持つ、採用ラウンド 9 回</td></tr>
+      <tr><td>何が残るのか</td><td>評価体系・ワークフロー・経験を組織に残す</td><td>事業売却で見た金融の目線</td><td>経験・評価体系・ワークフロー。複利かは未測定</td></tr>
     </tbody>
   </table></div>
   <h3 class="sub">お立場ごとに、確かめていただきたいこと</h3>
   <ul>
     <li><b>技術の方へ。</b>検査が緑のまま壊れる経路が、いくつあるか。</li>
     <li><b>営業の方へ。</b>導入後、人が辞めても残るものは何か。</li>
-    <li><b>人事の方へ。</b>採用・オンボード・退出の手順書は、相手が AI でも読めるか。</li>
+    <li><b>人事の方へ。</b>採用・オンボード・退職の手順書は、相手が AI でも読めるか。</li>
     <li><b>法務の方へ。</b>境界線の改定権は誰にあり、境界の内側は誰が承認しているか。</li>
   </ul>
-  <p class="pull">皆さんの組織には、人間のために作った統治の仕組みがすでにあります。私がお願いしたいのは、それを AI のために読み直すことです。</p>
+  <p class="pull">皆さんの組織には、人間のために作った統治の仕組みがすでにあります。創業者からの提案は、それを AI のために読み直すことです。</p>
   <h3 class="sub">注</h3>
   <ol class="notes">
     <li>2026 年 7 月末、記事生成が 7 日間止まり、28 回の起動がすべて「正常終了」と記録された（失敗台帳 ML-019）。全件スキップで「成功」し続ける退化は ML-013。</li>
