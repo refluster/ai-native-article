@@ -1,0 +1,1 @@
+$(cat /tmp/agent-runner-dario-3-adr0031/adr-0031-spotify-url-automation-and-gate-retirement.md)
