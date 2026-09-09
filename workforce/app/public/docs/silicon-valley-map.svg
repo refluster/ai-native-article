@@ -1,66 +1,39 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
-  <title id="title">Cognitive Guildとシリコンバレーの主要テクノロジー拠点</title>
-  <desc id="desc">サンフランシスコ湾岸の概略地図。Cognitive Guildの拠点と、OpenAI、Anthropic、Salesforce、Uber、Airbnb、Y Combinator、Meta、Stanford University、Tesla、XとxAI、Google、Apple、NVIDIA、Adobeの主要拠点を番号付きで示す。</desc>
-  <style>
-
-    text{font-family:"Source Sans 3","Noto Sans JP",system-ui,sans-serif;fill:#161b22}
-    .eyebrow{font:600 13px "IBM Plex Mono",monospace;letter-spacing:.17em;fill:#2c3642}
-    .title{font-size:30px;font-weight:700;letter-spacing:-.02em}.subtitle{font-size:15px;fill:#687480}
-    .region{font:600 12px "IBM Plex Mono",monospace;letter-spacing:.16em;fill:#687480}
-    .city{font-size:11px;font-weight:600;fill:#687480;letter-spacing:.04em}
-    .water-name{font:500 11px "IBM Plex Mono",monospace;letter-spacing:.2em;fill:#687480}
-    .group{font:600 11px "IBM Plex Mono",monospace;letter-spacing:.13em;fill:#2c3642}
-    .company{font-size:14px;font-weight:700}.place{font-size:11.5px;fill:#687480}.note{font-size:11px;fill:#687480}
-    .land{fill:#ffffff;stroke:#c8d0d9;stroke-width:1.4;stroke-linejoin:round}
-    .county{fill:none;stroke:#c8d0d9;stroke-width:1;stroke-dasharray:4 7;opacity:.8}
-    .route{fill:none;stroke:#9ba6b2;stroke-width:1.6;stroke-dasharray:5 5;opacity:.75}
-    .leader{fill:none;stroke:#c8d0d9;stroke-width:1.1}
-    .pin circle:first-child{fill:#ffffff;stroke:#161b22;stroke-width:1.5}
-    .pin text{font:700 10px "IBM Plex Mono",monospace;text-anchor:middle;dominant-baseline:central}
-    .list-number{fill:#ffffff;stroke:#161b22;stroke-width:1.3}
-    .list-digit{font:700 10px "IBM Plex Mono",monospace;text-anchor:middle;dominant-baseline:central}
-    .card{fill:#ffffff;stroke:#c8d0d9;stroke-width:1.1}
-    .guild{fill:#161b22;stroke:#ffffff;stroke-width:3}.guild-ring{fill:none;stroke:#161b22;stroke-width:1.5;opacity:.28}
-  </style>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">Bay Area and Silicon Valley technology ecosystem</title>
+  <desc id="desc">A monochrome OpenStreetMap-based map showing representative locations of major AI, software, university, automotive and semiconductor organizations across San Francisco, the Peninsula and South Bay.</desc>
+  <defs>
+    <filter id="mapTone" color-interpolation-filters="sRGB"><feColorMatrix type="saturate" values="0"/></filter>
+    <style>
+      text{font-family:"Source Sans 3",Arial,sans-serif;fill:#161b22}.eyebrow{font:600 13px "IBM Plex Mono",monospace;letter-spacing:.17em;fill:#2c3642}.title{font-size:30px;font-weight:700;letter-spacing:-.02em}.subtitle{font-size:15px;fill:#687480}.leader{fill:none;stroke:#161b22;stroke-width:1.25;stroke-linecap:round;stroke-linejoin:round}.dot{fill:#161b22;stroke:#fff;stroke-width:2}.tag rect{fill:#fff;fill-opacity:.94;stroke:#161b22;stroke-width:1}.tag text{font-size:13px;font-weight:700;dominant-baseline:middle}.note{font-size:11px;fill:#687480}
+    </style>
+  </defs>
   <rect width="1200" height="900" fill="#f7f8fa"/>
-  <text x="48" y="45" class="eyebrow">BUILT IN SILICON VALLEY</text>
-  <text x="48" y="82" class="title">Built in the Bay Area</text>
-  <text x="48" y="110" class="subtitle">San Francisco AI &amp; SaaS · Peninsula research · South Bay product engineering</text>
-  <g transform="translate(34 142)">
-    <rect width="738" height="700" rx="10" fill="#e7ecf2" stroke="#c8d0d9"/>
-    <path class="land" d="M0 0H354c8 41 3 78-15 109-17 29-43 51-61 77-20 28-25 58-12 90 14 33 17 64 2 93-9 17-22 31-39 43-28-29-51-58-68-89-18-33-30-68-53-100-28-40-63-72-108-97Z"/>
-    <path class="land" d="M354 0H738V700H470c-7-43-18-84-37-121 37 12 75 2 105-27 31-30 52-68 62-114 10-47 5-92-18-131-22-38-55-65-97-80-42-16-72-39-91-70-19-32-26-70-25-113Z"/>
-    <path class="land" d="M229 412c28 3 55 17 79 42 29 30 53 70 73 117 22 50 42 93 89 129H246c27-57 35-113 24-167-9-45-25-84-41-121Z"/>
-    <path class="land" d="M329 347l18 8 5 18-17 11-15-12Z"/><path class="land" d="M355 314l10 5 2 12-11 5-7-9Z"/>
-    <path class="county" d="M67 185c89 18 157 47 207 87M380 126c63 31 120 73 166 126M425 493c77 16 144 7 203-29"/>
-    <path class="route" d="M185 308c33 43 58 81 72 118 17 43 35 90 61 133 27 44 57 86 95 127"/>
-    <path class="route" d="M260 421c32 54 61 106 83 157 21 48 38 88 64 120" opacity=".55"/>
-    <path class="route" d="M401 344c31 55 50 111 62 167 10 46 15 91 13 136"/>
-    <text x="303" y="519" class="note" transform="rotate(61 303 519)">US 101</text><text x="362" y="578" class="note" transform="rotate(66 362 578)">I-280</text><text x="461" y="496" class="note" transform="rotate(76 461 496)">I-880</text>
-    <text x="82" y="76" class="region">NORTH BAY</text><text x="514" y="95" class="region">EAST BAY</text><text x="270" y="575" class="region" transform="rotate(61 270 575)">PENINSULA</text><text x="520" y="625" class="region">SOUTH BAY</text>
-    <text x="24" y="548" class="water-name" transform="rotate(-90 24 548)">PACIFIC OCEAN</text><text x="348" y="267" class="water-name" transform="rotate(30 348 267)">SAN PABLO BAY</text><text x="359" y="445" class="water-name" transform="rotate(53 359 445)">SAN FRANCISCO BAY</text><text x="432" y="607" class="water-name" transform="rotate(68 432 607)">SOUTH BAY</text>
-    <text x="206" y="329" class="city">SAN RAFAEL</text><text x="382" y="142" class="city">NAPA</text><text x="373" y="263" class="city">VALLEJO</text><text x="373" y="365" class="city">BERKELEY</text><text x="399" y="410" class="city">OAKLAND</text><text x="502" y="356" class="city">WALNUT CREEK</text><text x="471" y="489" class="city">HAYWARD</text><text x="508" y="571" class="city">FREMONT</text>
-    <text x="220" y="455" class="city">SAN FRANCISCO</text>
-    <g class="pin" transform="translate(276 438)"><circle r="11"/><text y=".5">1</text></g><g class="pin" transform="translate(250 421)"><circle r="11"/><text y=".5">2</text></g><g class="pin" transform="translate(266 397)"><circle r="11"/><text y=".5">3</text></g><g class="pin" transform="translate(300 443)"><circle r="11"/><text y=".5">4</text></g><g class="pin" transform="translate(235 445)"><circle r="11"/><text y=".5">5</text></g><g class="pin" transform="translate(292 407)"><circle r="11"/><text y=".5">6</text></g>
-    <g class="pin" transform="translate(343 553)"><circle r="11"/><text y=".5">7</text></g><g class="pin" transform="translate(357 586)"><circle r="11"/><text y=".5">8</text></g><g class="pin" transform="translate(382 574)"><circle r="11"/><text y=".5">9</text></g><g class="pin" transform="translate(404 566)"><circle r="11"/><text y=".5">10</text></g><g class="pin" transform="translate(402 602)"><circle r="11"/><text y=".5">11</text></g><g class="pin" transform="translate(405 642)"><circle r="11"/><text y=".5">12</text></g><g class="pin" transform="translate(466 650)"><circle r="11"/><text y=".5">13</text></g><g class="pin" transform="translate(507 680)"><circle r="11"/><text y=".5">14</text></g>
-    <g transform="translate(435 603)"><circle r="27" class="guild-ring"/><circle r="15" class="guild"/><path d="M-6 0H6M0-6V6" stroke="#ffffff" stroke-width="2"/><path d="M17 0H51" class="leader"/><rect x="51" y="-23" width="184" height="47" rx="5" fill="#eef1f4" stroke="#2c3642"/><text x="64" y="-4" class="group">COGNITIVE GUILD</text><text x="64" y="14" class="place">Mountain View, CA</text></g>
-    <g transform="translate(690 31)"><path d="M0 29V0l-8 13h16Z" fill="#161b22"/><text x="0" y="45" text-anchor="middle" class="note">N</text></g><text x="18" y="680" class="note">Geographic relationships are approximate</text>
+  <text x="30" y="40" class="eyebrow">BUILT IN SILICON VALLEY</text>
+  <text x="30" y="78" class="title">The Bay Area technology ecosystem</text>
+  <text x="30" y="106" class="subtitle">Representative organizations across San Francisco, the Peninsula and South Bay</text>
+  <g aria-label="OpenStreetMap basemap">
+    <rect x="30" y="128" width="1140" height="700" rx="8" fill="#e8ebee" stroke="#c8d0d9"/>
+    <image x="30" y="128" width="1140" height="700" href="silicon-valley-basemap.jpg" xlink:href="silicon-valley-basemap.jpg" preserveAspectRatio="none" filter="url(#mapTone)"/>
   </g>
-  <g transform="translate(795 142)">
-    <rect width="371" height="700" rx="10" class="card"/><text x="24" y="34" class="eyebrow">THE BAY AREA NETWORK</text><text x="24" y="59" class="subtitle">Major campuses and offices</text>
-    <text x="24" y="96" class="group">SAN FRANCISCO · AI &amp; SaaS</text>
-    <g transform="translate(24 119)"><circle cx="10" r="10" class="list-number"/><text x="10" y=".5" class="list-digit">1</text><text x="31" y="-2" class="company">OpenAI</text><text x="31" y="14" class="place">Mission Bay</text></g><g transform="translate(190 119)"><circle cx="10" r="10" class="list-number"/><text x="10" y=".5" class="list-digit">2</text><text x="31" y="-2" class="company">Anthropic</text><text x="31" y="14" class="place">SoMa</text></g>
-    <g transform="translate(24 164)"><circle cx="10" r="10" class="list-number"/><text x="10" y=".5" class="list-digit">3</text><text x="31" y="-2" class="company">Salesforce</text><text x="31" y="14" class="place">Downtown SF</text></g><g transform="translate(190 164)"><circle cx="10" r="10" class="list-number"/><text x="10" y=".5" class="list-digit">4</text><text x="31" y="-2" class="company">Uber</text><text x="31" y="14" class="place">Mission Bay</text></g>
-    <g transform="translate(24 209)"><circle cx="10" r="10" class="list-number"/><text x="10" y=".5" class="list-digit">5</text><text x="31" y="-2" class="company">Airbnb</text><text x="31" y="14" class="place">SoMa</text></g><g transform="translate(190 209)"><circle cx="10" r="10" class="list-number"/><text x="10" y=".5" class="list-digit">6</text><text x="31" y="-2" class="company">Y Combinator</text><text x="31" y="14" class="place">San Francisco</text></g>
-    <line x1="24" y1="244" x2="347" y2="244" stroke="#c8d0d9"/><text x="24" y="276" class="group">PENINSULA · RESEARCH &amp; PLATFORMS</text>
-    <g transform="translate(24 302)"><circle cx="10" r="10" class="list-number"/><text x="10" y=".5" class="list-digit">7</text><text x="31" y="-2" class="company">Meta</text><text x="31" y="14" class="place">Menlo Park</text></g><g transform="translate(190 302)"><circle cx="10" r="10" class="list-number"/><text x="10" y=".5" class="list-digit">8</text><text x="31" y="-2" class="company">Stanford University</text><text x="31" y="14" class="place">Stanford</text></g>
-    <g transform="translate(24 347)"><circle cx="10" r="10" class="list-number"/><text x="10" y=".5" class="list-digit">9</text><text x="31" y="-2" class="company">Tesla</text><text x="31" y="14" class="place">Engineering HQ · Palo Alto</text></g><g transform="translate(190 347)"><circle cx="10" r="10" class="list-number"/><text x="10" y=".5" class="list-digit">10</text><text x="31" y="-2" class="company">X / xAI</text><text x="31" y="14" class="place">Bay Area engineering</text></g>
-    <g transform="translate(24 392)"><circle cx="10" r="10" class="list-number"/><text x="10" y=".5" class="list-digit">11</text><text x="31" y="-2" class="company">Google</text><text x="31" y="14" class="place">Mountain View</text></g>
-    <line x1="24" y1="427" x2="347" y2="427" stroke="#c8d0d9"/><text x="24" y="459" class="group">SOUTH BAY · PRODUCT, CHIPS &amp; SOFTWARE</text>
-    <g transform="translate(24 485)"><circle cx="10" r="10" class="list-number"/><text x="10" y=".5" class="list-digit">12</text><text x="31" y="-2" class="company">Apple</text><text x="31" y="14" class="place">Cupertino</text></g><g transform="translate(190 485)"><circle cx="10" r="10" class="list-number"/><text x="10" y=".5" class="list-digit">13</text><text x="31" y="-2" class="company">NVIDIA</text><text x="31" y="14" class="place">Santa Clara</text></g>
-    <g transform="translate(24 530)"><circle cx="10" r="10" class="list-number"/><text x="10" y=".5" class="list-digit">14</text><text x="31" y="-2" class="company">Adobe</text><text x="31" y="14" class="place">San Jose</text></g>
-    <rect x="24" y="578" width="323" height="77" rx="6" fill="#eef1f4" stroke="#2c3642"/><circle cx="48" cy="611" r="12" class="guild"/><path d="M42 611H54M48 605V617" stroke="#ffffff" stroke-width="2"/><text x="70" y="604" class="company">Cognitive Guild</text><text x="70" y="624" class="place">Built and operated in Silicon Valley</text><text x="24" y="681" class="note">Representative locations · September 2026</text>
-  </g>
-  <text x="48" y="878" class="note">X is shown by its Bay Area engineering presence; its corporate headquarters is outside California. This is a regional orientation map, not a navigation map.</text>
+  <!-- San Francisco -->
+  <g><path class="leader" d="M362 416 L250 304 L202 304"/><circle class="dot" cx="362" cy="416" r="5"/><g class="tag" transform="translate(54 287)"><rect width="148" height="34"/><text x="12" y="18">OpenAI</text></g></g>
+  <g><path class="leader" d="M351 408 L242 349 L202 349"/><circle class="dot" cx="351" cy="408" r="5"/><g class="tag" transform="translate(54 332)"><rect width="148" height="34"/><text x="12" y="18">Anthropic</text></g></g>
+  <g><path class="leader" d="M352 402 L232 394 L202 394"/><circle class="dot" cx="352" cy="402" r="5"/><g class="tag" transform="translate(54 377)"><rect width="148" height="34"/><text x="12" y="18">Salesforce</text></g></g>
+  <g><path class="leader" d="M339 418 L238 439 L202 439"/><circle class="dot" cx="339" cy="418" r="5"/><g class="tag" transform="translate(54 422)"><rect width="148" height="34"/><text x="12" y="18">Airbnb</text></g></g>
+  <g><path class="leader" d="M363 412 L430 337 L474 337"/><circle class="dot" cx="363" cy="412" r="5"/><g class="tag" transform="translate(474 320)"><rect width="132" height="34"/><text x="12" y="18">Uber</text></g></g>
+  <g><path class="leader" d="M345 399 L438 382 L474 382"/><circle class="dot" cx="345" cy="399" r="5"/><g class="tag" transform="translate(474 365)"><rect width="164" height="34"/><text x="12" y="18">Y Combinator</text></g></g>
+  <!-- Peninsula -->
+  <g><path class="leader" d="M666 615 L600 557 L570 557"/><circle class="dot" cx="666" cy="615" r="5"/><g class="tag" transform="translate(448 540)"><rect width="122" height="34"/><text x="12" y="18">Meta</text></g></g>
+  <g><path class="leader" d="M638 656 L610 602 L570 602"/><circle class="dot" cx="638" cy="656" r="5"/><g class="tag" transform="translate(410 585)"><rect width="160" height="34"/><text x="12" y="18">Stanford Univ.</text></g></g>
+  <g><path class="leader" d="M670 679 L610 755 L580 755"/><circle class="dot" cx="670" cy="679" r="5"/><g class="tag" transform="translate(448 738)"><rect width="132" height="34"/><text x="12" y="18">Tesla</text></g></g>
+  <g><path class="leader" d="M662 674 L700 782 L730 782"/><circle class="dot" cx="662" cy="674" r="5"/><g class="tag" transform="translate(730 765)"><rect width="132" height="34"/><text x="12" y="18">X / xAI</text></g></g>
+  <g><path class="leader" d="M747 659 L790 574 L820 574"/><circle class="dot" cx="747" cy="659" r="5"/><g class="tag" transform="translate(820 557)"><rect width="132" height="34"/><text x="12" y="18">Google</text></g></g>
+  <!-- South Bay -->
+  <g><path class="leader" d="M842 720 L810 737 L790 737"/><circle class="dot" cx="842" cy="720" r="5"/><g class="tag" transform="translate(658 720)"><rect width="132" height="34"/><text x="12" y="18">Apple</text></g></g>
+  <g><path class="leader" d="M900 696 L963 641 L993 641"/><circle class="dot" cx="900" cy="696" r="5"/><g class="tag" transform="translate(993 624)"><rect width="140" height="34"/><text x="12" y="18">NVIDIA</text></g></g>
+  <g><path class="leader" d="M988 722 L1025 782 L1055 782"/><circle class="dot" cx="988" cy="722" r="5"/><g class="tag" transform="translate(1055 765)"><rect width="100" height="34"/><text x="12" y="18">Adobe</text></g></g>
+  <rect x="30" y="828" width="1140" height="38" fill="#fff" fill-opacity=".92"/>
+  <text x="46" y="852" class="note">Representative locations · September 2026</text>
+  <a href="https://www.openstreetmap.org/copyright" target="_blank"><text x="1154" y="852" text-anchor="end" class="note">© OpenStreetMap contributors · ODbL</text></a>
 </svg>
