@@ -12,6 +12,7 @@ import {
   deliveredShare,
   detectIdleAgents,
   idleWindowStart,
+  PERF_WINDOW_DAYS,
   tallyLifecycle,
   type AgentIdleSignal,
   type LifecyclePoint,
@@ -81,6 +82,25 @@ describe("appendDailyPoint — idempotent trailing window", () => {
     expect(out[out.length - 1]!.date).toBe("2026-06-30");
     expect(out[0]!.date).toBe("2026-05-02"); // 2026-05-01 dropped
   });
+
+  // The console moved from a 3-month to a 6-month deck (operator, 2026-09-09).
+  // Widening PERF_WINDOW_DAYS must be non-destructive: the reducer appends
+  // forward, so a row already at the old length keeps every point it has and
+  // simply grows. (Narrowing is the dangerous direction — it would silently
+  // drop history the reducer cannot reconstruct.)
+  it("defaults to PERF_WINDOW_DAYS and never trims a row shorter than it", () => {
+    const day = (i: number) => new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10);
+    const ninety = Array.from({ length: 90 }, (_, i) => mk(day(i), i));
+    const out = appendDailyPoint(ninety, mk(day(90), 99));
+    expect(PERF_WINDOW_DAYS).toBe(180);
+    expect(out).toHaveLength(91);
+    expect(out[0]!.date).toBe(day(0)); // nothing dropped by the wider window
+
+    const full = Array.from({ length: PERF_WINDOW_DAYS }, (_, i) => mk(day(i), i));
+    const trimmed = appendDailyPoint(full, mk(day(PERF_WINDOW_DAYS), 99));
+    expect(trimmed).toHaveLength(PERF_WINDOW_DAYS);
+    expect(trimmed[0]!.date).toBe(day(1)); // the oldest day rolls off, one at a time
+  });
 });
 
 describe("deliveredShare", () => {
@@ -125,6 +145,45 @@ describe("composeSeries — endpoint assembly", () => {
     expect(s.window).toEqual({ start: "2026-05-26", end: "2026-06-22" });
     expect(s.pr_summary.autopilot_share).toBe(0.75);
     expect(s.lifecycle[s.lifecycle.length - 1]!.delivered).toBe(16);
+  });
+
+  // The PR block froze at one 2026-07-26 publish and served the same numbers
+  // for 45 days while the console reported the series fresh, because the only
+  // timestamp it exposed was `generated_at` — the endpoint's own clock, always
+  // "now". `pr_updated_at` is the block's real age, and it must survive
+  // composition or the client's staleness check goes vacuous again.
+  const prBlock = {
+    window: { start: "2026-05-26", end: "2026-06-22" },
+    pr_daily: [{ date: "2026-06-22", prs: 4, autopilot_merged: 3, additions: 120, deletions: 30 }],
+    pr_summary: {
+      total_prs: 4,
+      autopilot_merged: 3,
+      autopilot_share: 0.75,
+      total_additions: 120,
+      total_deletions: 30,
+      humans_involved: ["refluster"],
+    },
+    pr_contributors: [{ handle: "nadia", kind: "agent", prs: 3 } as const],
+  };
+
+  it("exposes the PR roll-up's own publish time, distinct from generated_at", () => {
+    const s = composeSeries("workforce", "2026-09-09T05:13:50Z", { points }, {
+      ...prBlock,
+      updated_at: "2026-07-26T23:31:02Z",
+    });
+    expect(s.pr_updated_at).toBe("2026-07-26T23:31:02Z");
+    expect(s.pr_updated_at).not.toBe(s.generated_at);
+  });
+
+  it("omits pr_updated_at rather than substituting generated_at when the row has none", () => {
+    const s = composeSeries("workforce", "2026-09-09T05:13:50Z", { points }, prBlock);
+    expect(s.pr_updated_at).toBeUndefined();
+    expect("pr_updated_at" in s).toBe(false);
+  });
+
+  it("omits pr_updated_at for a scope with no published PR block at all", () => {
+    const s = composeSeries("workforce", "2026-09-09T05:13:50Z", { points });
+    expect(s.pr_updated_at).toBeUndefined();
   });
 
   // #661 — the W-3 budget block is additive and absent by default. Absence

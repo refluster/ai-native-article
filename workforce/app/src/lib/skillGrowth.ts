@@ -103,7 +103,7 @@ function ageDaysAt(createdAt: string, date: string): number {
  *  from the day its real `created_at` lands, nothing earlier, nothing later. */
 export function computeSkillCatalogueGrowth(
   skills: ClassifiedSkill[],
-  days = 90,
+  days = 180,
   today: Date = new Date(),
 ): SkillGrowthPoint[] {
   const dates = lastNDaysUTC(days, today);
@@ -122,8 +122,11 @@ export function computeSkillCatalogueGrowth(
 
 // ── Domain Skill maturity — Dreyfus ladder (requirement 3) ─────────────────
 
-// 5 non-zero rungs × 18 days = 90 days — a skill created at the start of the
-// 3-month window reaches 'expert' by the window's end. `not_defined` is never
+// 5 non-zero rungs × 18 days = 90 days of AGE to reach 'expert'. This is a
+// property of the skill, not of the chart: widening the window to 180 days
+// (2026-09-09) deliberately does NOT restretch the rungs — it just means a
+// skill's climb is now visible for the 90 days after it tops out, instead of
+// the chart ending the day it does. `not_defined` is never
 // assigned here (see types/skillGrowth.ts) — it stays the ladder's documented
 // zero rung for domain areas with no skill built yet, which this function has
 // no data to enumerate.
@@ -143,7 +146,7 @@ function dreyfusStageForAge(ageDays: number, active: boolean): DreyfusStage {
 
 export function computeDomainMaturity(
   skills: ClassifiedSkill[],
-  days = 90,
+  days = 180,
   today: Date = new Date(),
 ): DomainMaturityPoint[] {
   const domainSkills = skills.filter((s) => s.kind === 'domain');
@@ -207,7 +210,7 @@ function onboardingStageForAge(ageDays: number, final: OnboardingFinalState): On
 export function computeAgentCapabilityOnboarding(
   skills: ClassifiedSkill[],
   agents: Pick<WorkforceAgent, 'bindings'>[],
-  days = 90,
+  days = 180,
   today: Date = new Date(),
 ): OnboardingPoint[] {
   const finals = skills.filter((s) => s.kind === 'agent-capability').map((s) => computeOnboardingFinalState(s, agents));

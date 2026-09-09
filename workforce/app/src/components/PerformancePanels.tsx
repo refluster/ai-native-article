@@ -4,12 +4,22 @@
 // visually + behaviourally identical. Handles loading / error / empty-scope
 // states and the "* mocked" advisory the rest of the console uses.
 //
-// pr-autopilot cycle-1 finding (`wf:tomas`, 2026-07-24): reaxis() relabels a
-// live series' dates to a window ending today without touching
-// `generated_at` — cosmetically resolving "the axis never updates" while
-// deleting the one visible tell that the Epic-016 backend refresh (daily,
-// 02:00 UTC) has actually stalled. So this panel now always renders
-// `generated_at`, and flags it when it's suspiciously old for a live source.
+// Staleness is measured PER BLOCK, against the writer that owns it — not
+// against the response's `generated_at`.
+//
+// The 2026-07-24 version of this panel checked `generated_at`, which the
+// endpoint sets to its own clock on every request. That check could therefore
+// never fire: it reported "live data as of <now>" every morning while the PR
+// roll-up underneath sat frozen at its 2026-07-26 publish for 45 days
+// (operator report, 2026-09-09). The two blocks on this panel have two
+// different daily writers and so need two different reads:
+//
+//   lifecycle — wf-performance-reducer Lambda, EventBridge 02:00 UTC. Its
+//               freshness tell is the last point's DATE (the reducer appends
+//               one point per day unconditionally, so a gap is a missed run).
+//   PR        — workforce-performance-refresh.yml, 05:33 UTC. Its tell is
+//               `pr_updated_at`; the last pr_daily date is NOT usable, because
+//               a genuinely quiet day merges no PRs and emits no point.
 
 import { useEffect, useState } from 'react';
 import AgentLifecyclePanel from './AgentLifecyclePanel';
@@ -17,14 +27,22 @@ import PrAutomationPanel from './PrAutomationPanel';
 import { loadPerformance, type PerformanceScope } from '../lib/performance';
 import type { PerformanceSeries } from '../types/performance';
 
-// The reducer refreshes daily at 02:00 UTC (Epic-016 Phase 2); a live
-// snapshot older than one refresh cycle plus a generous buffer means the
-// backend missed at least one run.
-const LIVE_STALE_HOURS = 26;
+// One daily cycle plus a generous buffer for a late or slow run. The two
+// writers fire at 02:00 and 05:33 UTC, so a block older than this has missed
+// at least one whole run.
+const LIVE_STALE_HOURS = 30;
 
-function hoursSince(iso: string, now: Date): number {
-  const t = Date.parse(iso);
+function hoursSince(iso: string | undefined, now: Date): number {
+  const t = Date.parse(iso ?? '');
   return Number.isFinite(t) ? (now.getTime() - t) / 3_600_000 : Infinity;
+}
+
+/** Age of the lifecycle funnel, from its last daily point. The reducer appends
+ *  a point every day, so a last date behind today means it missed a run. */
+function lifecycleStaleHours(series: PerformanceSeries, now: Date): number {
+  const last = series.lifecycle[series.lifecycle.length - 1]?.date;
+  // End-of-day: a point dated today is at most ~24h old, never "stale".
+  return last ? hoursSince(`${last}T23:59:59Z`, now) : Infinity;
 }
 
 export default function PerformancePanels({ scope }: { scope: PerformanceScope }) {
@@ -71,8 +89,19 @@ export default function PerformancePanels({ scope }: { scope: PerformanceScope }
     );
   }
 
-  const staleHours = hoursSince(series.generated_at, new Date());
-  const isLiveStale = source === 'live' && staleHours > LIVE_STALE_HOURS;
+  const now = new Date();
+  // An absent block reads as Infinity, i.e. stale — "we have never published
+  // this" is an unknown, and an unknown is never rounded to fresh (the
+  // PerfIdleRow consumer contract, applied here).
+  const lcStale = source === 'live' && lifecycleStaleHours(series, now) > LIVE_STALE_HOURS;
+  const prStale = source === 'live' && hoursSince(series.pr_updated_at, now) > LIVE_STALE_HOURS;
+  const isLiveStale = lcStale || prStale;
+  const staleBlocks = [lcStale ? 'agent lifecycle' : null, prStale ? 'PR automation' : null].filter(
+    Boolean,
+  ) as string[];
+  const prStamp = series.pr_updated_at
+    ? `${new Date(series.pr_updated_at).toISOString().slice(0, 16)}Z`
+    : 'never published';
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -85,14 +114,18 @@ export default function PerformancePanels({ scope }: { scope: PerformanceScope }
       )}
       {source === 'live' && isLiveStale && (
         <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary">
-          * live data last refreshed {new Date(series.generated_at).toISOString().slice(0, 16)}Z — over{' '}
-          {LIVE_STALE_HOURS}h old; the Epic-016 backend refresh may be behind (OP-011/OP-012). The date axis
-          above is re-mapped to end today, but the underlying values may not be current.
+          * stale — {staleBlocks.join(' and ')} {staleBlocks.length > 1 ? 'have' : 'has'} not been
+          refreshed in over {LIVE_STALE_HOURS}h. Lifecycle through{' '}
+          {series.lifecycle[series.lifecycle.length - 1]?.date ?? 'never'} (wf-performance-reducer,
+          02:00 UTC) · PR roll-up {prStamp} (workforce-performance-refresh.yml, 05:33 UTC). The
+          charts plot the dates the backend actually published — they are not re-mapped to today —
+          so a flat tail is missing data, not zero activity.
         </p>
       )}
       {source === 'live' && !isLiveStale && (
         <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-          live data as of {new Date(series.generated_at).toISOString().slice(0, 16)}Z
+          live · lifecycle through {series.lifecycle[series.lifecycle.length - 1]?.date} · PR roll-up{' '}
+          {prStamp}
         </p>
       )}
     </div>

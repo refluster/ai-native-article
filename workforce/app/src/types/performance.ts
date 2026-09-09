@@ -91,6 +91,12 @@ export interface PerformanceSeries {
   pr_daily: PrDailyPoint[];
   pr_summary: PrSummary;
   pr_contributors: PrContributor[];
+  /** ISO timestamp of the PR roll-up's last publish (mirrors the server's
+   *  `pr_updated_at`). This — NOT `generated_at`, which is the endpoint's own
+   *  composition time and is always "now" — is what a staleness check on the
+   *  PR deck must read. Absent for a scope whose PR block has never been
+   *  published; absence is "unknown", never "fresh". */
+  pr_updated_at?: string;
   /** Metric 4 (2026-07-26) — repository issue/PR/churn activity. Absent until
    *  this scope's first repo-activity refresh lands; a caller falls back to
    *  the bundled snapshot when missing (see lib/repoActivity.ts). */
