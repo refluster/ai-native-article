@@ -186,6 +186,54 @@ describe("composeSeries — endpoint assembly", () => {
     expect(s.pr_updated_at).toBeUndefined();
   });
 
+  // The repo builder flags a scope whose GitHub reads came back incomplete
+  // (a 401'd token yields empty result sets, so every count is 0 and every
+  // signal is degraded). On 2026-09-09 three projects were in exactly that
+  // state: DynamoDB held the flags, `lib/repoActivity.ts` was already written
+  // to render them, and composeSeries dropped them in between — so the console
+  // was served fresh-looking zeros with nothing to say they were unreadable.
+  // A measured zero and an unreadable repo must never look identical (C-4).
+  const repoBlock = {
+    window: { start: "2026-03-14", end: "2026-09-09" },
+    issues_daily: [{ date: "2026-09-09", opened: 0, closed: 0 }],
+    prs_daily: [{ date: "2026-09-09", opened: 0, closed: 0 }],
+    code_churn_weekly: [{ week_start: "2026-09-06", additions: 0, deletions: 0 }],
+    summary: {
+      issues_opened: 0,
+      issues_closed: 0,
+      prs_opened: 0,
+      prs_closed: 0,
+      total_additions: 0,
+      total_deletions: 0,
+    },
+    repos: ["agent-workforce"],
+    updated_at: "2026-09-09T21:01:59.524Z",
+  };
+
+  it("carries the repo block's degraded_signals through to the client", () => {
+    const s = composeSeries("workforce", "2026-09-09T21:05:00Z", { points }, undefined, {
+      ...repoBlock,
+      degraded_signals: ["issues_opened", "prs_opened", "code_churn"],
+    });
+    expect(s.repo?.degraded_signals).toEqual(["issues_opened", "prs_opened", "code_churn"]);
+    // The zeros still ship — but never unaccompanied by the reason they are zero.
+    expect(s.repo?.summary.prs_opened).toBe(0);
+  });
+
+  it("omits degraded_signals entirely when the scope reported none", () => {
+    const s = composeSeries("workforce", "2026-09-09T21:05:00Z", { points }, undefined, repoBlock);
+    expect(s.repo?.degraded_signals).toBeUndefined();
+    expect("degraded_signals" in (s.repo ?? {})).toBe(false);
+  });
+
+  it("omits degraded_signals when the writer reported an empty list", () => {
+    const s = composeSeries("workforce", "2026-09-09T21:05:00Z", { points }, undefined, {
+      ...repoBlock,
+      degraded_signals: [],
+    });
+    expect(s.repo?.degraded_signals).toBeUndefined();
+  });
+
   // #661 — the W-3 budget block is additive and absent by default. Absence
   // must stay distinguishable from "$0 spent": a fresh month and a broken
   // writer look identical from the client, so the block is omitted rather
