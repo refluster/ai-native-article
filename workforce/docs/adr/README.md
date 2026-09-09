@@ -97,9 +97,21 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0028](adr-0028-per-project-knowledge-backup.md) | The knowledge backup is scoped per Project, not per workforce: each project declares its own store repo, sources and derived secrets (refines 0026) | Proposed | — |
 | [0029](adr-0029-project-config-write-surface.md) | Project config is edited in the console: `PATCH /projects/{id}` widened past name/status, validated + audited; supersedes the Epic-010 §10 minimal write surface | Proposed | [010](../epics/epic-010-project-trust-boundary.md) |
 | [0030](adr-0030-escalated-pr-groom-lane.md) | The human lane is groomed, not frozen: a bounded agent keeps an escalated PR mergeable against a moved base — additive conflicts only, with a registry-id collision guard — while the merge decision stays the operator's | Proposed | — |
+| [0032](adr-0032-lesson-partition-and-daily-distiller.md) | The `LESSON` partition schema, its closed cross-cutting vocabulary, and the daily distiller Lambda's cost/shape contract | Proposed | [022](../epics/epic-022-org-learning-loop.md) |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](../epics/README.md).
+
+> **Numbering note (2026-09-09, `wf:dario` — `issue-design`).** This PR's
+> adr-0032 was drafted in parallel with another open draft PR's adr-0031
+> (#693, `dario/issue-400-spotify-url-automation-adr`) — both branched off
+> the same `main` commit the same day, so neither could see the other's
+> reservation. Both are `Proposed`; no collision exists until one merges.
+> Whichever merges second should renumber to the next free slot (or an
+> operator/`backlog-reconcile` pass reconciles it) rather than two ADRs
+> permanently sharing adjacent-but-order-dependent numbers — flagging this
+> now so it isn't silently forgotten, the same "say the blocker precisely"
+> discipline this skill's Step 5 asks for parked issues.
 
 > **Index reconciliation (2026-08-03, Nadia — `backlog-reconcile`).** Index-only
 > correction; **no ADR status was decided here.** A full sweep comparing every
