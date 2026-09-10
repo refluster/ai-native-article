@@ -154,7 +154,7 @@ export default function Article() {
             date: m.date || '',
             language: servedLanguage,
           },
-        } as never)
+        })
       })
       .catch(() => {
         if (cancelled) return

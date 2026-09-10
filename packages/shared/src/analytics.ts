@@ -21,7 +21,7 @@ declare global {
 }
 
 export type AnalyticsEvent =
-  | { name: 'article_view'; params: { slug: string; category: string; date: string } }
+  | { name: 'article_view'; params: { slug: string; category: string; date: string; language: 'ja' | 'en' } }
   | { name: 'article_read_25'; params: { slug: string; category: string } }
   | { name: 'article_read_50'; params: { slug: string; category: string } }
   | { name: 'article_read_75'; params: { slug: string; category: string } }
@@ -29,9 +29,7 @@ export type AnalyticsEvent =
   | { name: 'article_read_complete'; params: { slug: string; category: string; dwell_ms: number } }
   | { name: 'category_click'; params: { category: string } }
   | { name: 'page_change'; params: { page: number } }
-  | { name: 'type_filter_click'; params: { type: string } }
-  | { name: 'range_filter_click'; params: { range: string } }
-  | { name: 'featured_click'; params: { slug: string; category: string } }
+  | { name: 'language_switch'; params: { from: 'ja' | 'en'; to: 'ja' | 'en' } }
   | { name: 'internal_link_click'; params: { slug: string; href: string } }
   | { name: 'outbound_click'; params: { slug: string; href: string; host: string } }
   | { name: 'podcast_spotify_click'; params: { slug: string; href: string } }
