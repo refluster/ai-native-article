@@ -22,6 +22,7 @@
     "backfill-en": "node newsletter/pipeline/backfill-en.mjs",
     "lint:tokens": "node scripts/lint-design-tokens.mjs",
     "check-truncation": "node scripts/check-corpus-truncation.mjs",
+    "check-author-coverage": "node scripts/check-corpus-author-coverage.mjs",
     "check-proxy-bootstrap": "node scripts/check-proxy-bootstrap.mjs",
     "check-cadence-readback-guard": "node scripts/check-cadence-readback-guard.mjs",
     "check-corpus-freshness": "node scripts/check-corpus-freshness.mjs",
