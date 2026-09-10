@@ -118,6 +118,19 @@ export interface RepoActivityBlock {
   /** ISO timestamp of the refresh that produced this block — the console
    *  renders it so a frozen refresh is visible, never cosmetically hidden. */
   updated_at: string;
+  /** Signals that came back INCOMPLETE for this scope — e.g. "prs_opened",
+   *  "code_churn". A named signal's count is an UNDERCOUNT, never a real low,
+   *  and the console renders an advisory saying so.
+   *
+   *  This must survive the trip to the client. It did not: the builder wrote
+   *  it, `lib/repoActivity.ts` was already written to read it, and
+   *  `composeSeries` silently dropped it in between — so on 2026-09-09 three
+   *  projects whose GitHub token 401'd published all-zero rows correctly
+   *  flagged in DynamoDB, and /performance served those zeros to the console
+   *  with no flag at all. A measured zero and an unreadable repo looked
+   *  identical on the deck, which is the exact inversion this field exists to
+   *  prevent (C-4). */
+  degraded_signals?: string[];
 }
 
 /** One scope's full performance series (workforce or a single project) —
@@ -437,6 +450,8 @@ export interface PerfRepoRow {
   summary: RepoActivitySummary;
   /** Contributing project scopes (workforce aggregate) or [scope] (project). */
   repos: string[];
+  /** Signals that came back incomplete for this scope; see RepoActivityBlock. */
+  degraded_signals?: string[];
 }
 
 /** Epic-020 Story 2 — the monthly human-leverage roll-up. One item per scope
@@ -605,7 +620,14 @@ export function composeSeries(
     Partial<Pick<PerfPrRow, "updated_at">>,
   repoRow?: Pick<
     PerfRepoRow,
-    "window" | "issues_daily" | "prs_daily" | "code_churn_weekly" | "summary" | "repos" | "updated_at"
+    | "window"
+    | "issues_daily"
+    | "prs_daily"
+    | "code_churn_weekly"
+    | "summary"
+    | "repos"
+    | "updated_at"
+    | "degraded_signals"
   >,
   humanTouchRow?: HumanTouchBlock,
   idleRow?: PerfIdleBlock,
@@ -653,6 +675,11 @@ export function composeSeries(
             summary: repoRow.summary,
             repos: repoRow.repos,
             updated_at: repoRow.updated_at,
+            // Omitted when empty so "no degradation" stays distinguishable
+            // from "this writer does not report degradation at all".
+            ...(repoRow.degraded_signals?.length
+              ? { degraded_signals: repoRow.degraded_signals }
+              : {}),
           },
         }
       : {}),
