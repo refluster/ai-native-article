@@ -154,7 +154,7 @@ export default function Article() {
             date: m.date || '',
             language: servedLanguage,
           },
-        } as never)
+        })
       })
       .catch(() => {
         if (cancelled) return
@@ -187,15 +187,25 @@ export default function Article() {
       for (const step of DEPTH_STEPS) {
         if (pct >= step && !depthsHit.current.has(step)) {
           depthsHit.current.add(step)
-          const name =
-            step === 25 ? 'article_read_25' :
-            step === 50 ? 'article_read_50' :
-            step === 75 ? 'article_read_75' :
-            'article_read_90'
-          trackEvent({
-            name,
-            params: { slug: s, category: categoryRef.current },
-          } as never)
+          const params = { slug: s, category: categoryRef.current }
+          // Literal discriminant per branch (not a ternary-derived `name`) so
+          // each call site is checked against a single AnalyticsEvent member —
+          // no `as never` needed, same shape as the two casts this PR already
+          // removed (review finding A1, dario).
+          switch (step) {
+            case 25:
+              trackEvent({ name: 'article_read_25', params })
+              break
+            case 50:
+              trackEvent({ name: 'article_read_50', params })
+              break
+            case 75:
+              trackEvent({ name: 'article_read_75', params })
+              break
+            default:
+              trackEvent({ name: 'article_read_90', params })
+              break
+          }
         }
       }
 
