@@ -21,12 +21,15 @@
 //     - RUN#{ulid} with no matching PROJECT#{id}/EXEC#{ulid}
 //   Post-C2, the success path writes ONLY EXEC rows (no RUN sibling),
 //   so "EXEC without RUN" would fire for every run — pure noise.
-//   The remaining failure-path RUN writes (failRun / skipRun /
-//   throwRun in agent-runner) have no EXEC sibling by design — also
-//   noise. The metric, the WfAuditOrphanExecsAlarm, and the dashboard
-//   widget were retired by C2. The truncated check (1) is the
-//   informational successor for "EXEC arrived but has no artefact"
-//   regressions.
+//   The pre-C2 failure-path RUN writes (failRun / skipRun / throwRun
+//   in agent-runner) no longer exist — that Lambda was deleted in
+//   99aca10 (PR #241, ADR-0005 phase 4a). Failure-path coverage now
+//   depends on the CCR engagement write (agent-runner.md:213 —
+//   status: "ok" | "throw" | "skipped"); dispatch-level failures that
+//   produce no EXEC row at all are tracked as FU-031. The metric, the
+//   WfAuditOrphanExecsAlarm, and the dashboard widget were retired by
+//   C2. The truncated check (1) is the informational successor for
+//   "EXEC arrived but has no artefact" regressions.
 //
 //   2. WfAuditMalformedExecs     EXEC rows missing project_id /
 //                                agent_slug / started_at — a data-shape

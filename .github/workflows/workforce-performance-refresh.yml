@@ -1,0 +1,144 @@
+# Daily performance roll-up refresh — the PR (Metric 3) and REPO (Metric 4)
+# blocks behind https://workforce.kohuehara.xyz/performance.
+#
+# WHY THIS EXISTS
+# ---------------
+# The /performance decks read five DDB roll-ups. Three of them already have a
+# daily writer:
+#
+#   PERF#{scope}/LIFECYCLE  wf-performance-reducer Lambda, EventBridge 02:00 UTC
+#   PERF#{scope}/IDLE       same reducer walk
+#   budget block            the W-3 ledger writer
+#
+# The other two — PR and REPO — were designed to be refreshed by Tomas's
+# `performance-refresh` Cadence (workforce/skills/performance-refresh/), which
+# is fired by wf-orchestrator-tick off a DDB binding. That binding was never
+# wired: workforce/scripts/wire-performance-refresh-tomas.mjs needs AWS
+# credentials plus the operator's B-authority go-ahead, and running it was
+# never done. So both blocks froze at their one manual 2026-07-26 publish and
+# the console served 45-day-old PR and repository numbers under a date axis
+# that the client cosmetically re-mapped to end today (operator report,
+# 2026-09-09). Exactly the failure class Epic-016 OP-012 / #437 already logged
+# once — a metric whose upkeep depends on a step nobody scheduled.
+#
+# GitHub Actions is the substrate because it is the one daily driver in this
+# repo that cannot itself stop being scheduled: no binding to enable, no tick
+# to evaluate, no persona to be paused. The Cadence remains valid and can still
+# be wired for the judgment half (is anything frozen? did the numbers move?);
+# this workflow owns the deterministic write half, which is all the console
+# needs to stop showing stale data.
+#
+# WHAT IT RUNS
+# ------------
+# workforce/skills/performance-refresh/refresh.mjs — the same bundled script
+# the Cadence would run, unmodified. Per fire it:
+#   1. resolves each project's PAT from wf/projects/{id}/github.token,
+#   2. republishes PERF#{scope}/PR per repo scope + the `workforce` aggregate
+#      (build-pr-metrics-github.mjs --publish-ddb),
+#   3. republishes PERF#{scope}/REPO for every scope + the aggregate
+#      (build-repo-performance.mjs --publish-ddb),
+#   4. reads GET /performance back and reports per-scope freshness.
+#
+# W-4 / C-4: a failed leg reddens this workflow. A DEGRADED leg (a
+# rate-limited page or a code_frequency timeout — an undercount, never a real
+# low) is annotated as a warning and named in the summary, because it did
+# publish; a run where nothing could be refreshed exits non-zero.
+#
+# AWS auth: GitHub OIDC → secrets.AWS_ROLE_ARN, the same role the data-plane
+# deploy assumes. It needs secretsmanager:GetSecretValue on wf/projects/*/
+# github.token and dynamodb:PutItem on the data-plane table. If the role lacks
+# either, the run fails loudly rather than publishing a partial deck.
+
+name: Workforce performance refresh (PR + repository roll-ups)
+
+on:
+  schedule:
+    # 05:33 UTC daily — after the wf-performance-reducer's 02:00 lifecycle
+    # snapshot (so a read-back can tell a fresh funnel from a stalled one on
+    # the same day) and before the 06:17 console/site deploy (so a deploy that
+    # day ships against already-refreshed roll-ups). Clear of every other cron
+    # in this directory: 01:23 backup, 04:47 PR sweep, 06/12/18:17 deploy,
+    # 08:17 API routes, 18:37 podcast, 21:00 corpus freshness.
+    - cron: '33 5 * * *'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Trailing window to rebuild, in days (default: the console window, 180).'
+        required: false
+        default: '180'
+      dry_run:
+        description: 'Print the legs that would run without writing to DynamoDB.'
+        type: boolean
+        default: false
+
+concurrency:
+  # Two runs publishing the same PERF# items concurrently is never wanted —
+  # queue a manual dispatch behind the nightly run rather than cancelling it
+  # half-way through a scope.
+  group: workforce-performance-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  # Required for aws-actions/configure-aws-credentials to mint a JWT and
+  # assume secrets.AWS_ROLE_ARN via the configured GitHub OIDC trust.
+  id-token: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          # Pinned to the data-plane region rather than secrets.AWS_REGION:
+          # wf-table-prod and the wf/projects/* secrets both live in us-west-2,
+          # and refresh.mjs resolves per-project PATs from Secrets Manager
+          # there before it can publish anything.
+          aws-region: us-west-2
+
+      # refresh.mjs and both builders resolve @aws-sdk/* through
+      # workforce/lambdas/package.json (the createRequire trick), so the
+      # lambdas' deps — not the root ones — are what this run needs.
+      - name: Install workforce/lambdas dependencies
+        working-directory: workforce/lambdas
+        run: npm ci
+
+      - name: Refresh PR + repository roll-ups
+        id: refresh
+        env:
+          DAYS: ${{ inputs.days || '180' }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          AWS_REGION: us-west-2
+          # The read-back leg calls the public endpoint; the custom domain is
+          # what the console itself resolves.
+          WORKFORCE_AGENTS_API_BASE: https://workforce-api.kohuehara.xyz
+        run: |
+          set -uo pipefail
+          flags=()
+          [ "${DRY_RUN:-false}" = "true" ] && flags+=(--dry-run)
+          set +e
+          node workforce/skills/performance-refresh/refresh.mjs \
+            --days "$DAYS" \
+            --out "$RUNNER_TEMP/performance-refresh-report.json" \
+            "${flags[@]}"
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      # The script's exit code alone conflates "one leg came back degraded"
+      # (exit 2 — published, but undercounted) with "a leg failed outright".
+      # The report distinguishes them, so the verdict is read from there:
+      # failed legs redden the run, degraded legs annotate it.
+      - name: Report verdict
+        if: always()
+        env:
+          REPORT: ${{ runner.temp }}/performance-refresh-report.json
+          EXIT_CODE: ${{ steps.refresh.outputs.exit_code }}
+        run: node workforce/scripts/report-performance-refresh.mjs "$REPORT" "${EXIT_CODE:-1}"

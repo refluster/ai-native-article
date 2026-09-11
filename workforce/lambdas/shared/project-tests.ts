@@ -162,6 +162,17 @@ describe("ProjectId helpers", () => {
     expect(() => project.asProjectId("foo|bar")).toThrow(/must not contain/);
     expect(project.asProjectId("valid-id")).toBe("valid-id");
   });
+
+  it("asProjectId rejects colon, newline, and control chars (FU-010)", () => {
+    expect(() => project.asProjectId("wf:projects")).toThrow(/must not contain/);
+    expect(() => project.asProjectId("line\nnew")).toThrow(/control characters/);
+    expect(() => project.asProjectId("tab\there")).toThrow(/control characters/);
+    expect(() => project.asProjectId("\x00null")).toThrow(/control characters/);
+    expect(() => project.asProjectId("del\x7f")).toThrow(/control characters/);
+    // valid: hyphens, underscores, dots, slashes (self/{slug} shape)
+    expect(project.asProjectId("self/ren")).toBe("self/ren");
+    expect(project.asProjectId("asp-cloud")).toBe("asp-cloud");
+  });
 });
 
 // --- Lifecycle -----------------------------------------------------------

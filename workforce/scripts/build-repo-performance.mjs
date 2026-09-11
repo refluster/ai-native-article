@@ -18,7 +18,7 @@
  * its --publish-ddb path) — no new credential type, no new write surface.
  *
  * Usage:
- *   node workforce/scripts/build-repo-performance.mjs [--days 90] [--dry-run]
+ *   node workforce/scripts/build-repo-performance.mjs [--days 180] [--dry-run]
  *     [--write]            # patch the bundled workforce-mock-repo-activity.json
  *     [--publish-ddb]      # upsert PERF#{scope}/REPO for the live endpoint
  *     [--table NAME]       # DDB table (default: $TABLE_NAME or wf-table-prod)
@@ -332,7 +332,9 @@ async function fetchProjectActivity(project, { days, token, api }) {
 // ── CLI ──────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const DAYS = Number(arg("days", 90));
+  // 180 = the console's 6-month deck window (operator, 2026-09-09); keep in
+  // step with PERF_WINDOW_DAYS and lib/performance.ts DAYS.
+  const DAYS = Number(arg("days", 180));
   const WRITE = process.argv.includes("--write");
   const PUBLISH_DDB = process.argv.includes("--publish-ddb");
   const TABLE = arg("table", process.env.TABLE_NAME || "wf-table-prod");

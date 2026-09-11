@@ -96,7 +96,7 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0027](adr-0027-project-tools-surface.md) | Interactive project tools: a project-scoped Tools surface, a synchronous `tools-api`, and a declarative tool registry | Accepted (2026-09-03) | [025](../epics/epic-025-project-tools-migration.md) |
 | [0028](adr-0028-per-project-knowledge-backup.md) | The knowledge backup is scoped per Project, not per workforce: each project declares its own store repo, sources and derived secrets (refines 0026) | Proposed | — |
 | [0029](adr-0029-project-config-write-surface.md) | Project config is edited in the console: `PATCH /projects/{id}` widened past name/status, validated + audited; supersedes the Epic-010 §10 minimal write surface | Proposed | [010](../epics/epic-010-project-trust-boundary.md) |
-| [0030](adr-0030-escalated-pr-groom-lane.md) | The human lane is groomed, not frozen: a bounded agent keeps an escalated PR mergeable against a moved base — additive conflicts only, with a registry-id collision guard — while the merge decision stays the operator's | Proposed | — |
+| [0030](adr-0030-escalated-pr-groom-lane.md) | The human lane is groomed, not frozen: a bounded agent keeps an escalated PR mergeable against a moved base — additive conflicts only, with a registry-id collision guard — while the merge decision stays the operator's | Accepted (2026-09-07) | — |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](../epics/README.md).

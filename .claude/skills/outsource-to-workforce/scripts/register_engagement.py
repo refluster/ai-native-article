@@ -24,7 +24,18 @@ Auth/field mechanics it encodes (see references/workforce-api.md for the why):
   * records are append-only (no PATCH) — a re-post is a new row, hence the guard.
 
 Exit codes: 0 ok / created, 2 dedup hit (nothing posted), 3 missing token,
-4 HTTP/validation error.
+4 HTTP/validation error, 5 read-back verification failed (posted, but the
+stored summary does not match what was sent — see below).
+
+``summary`` is capped at 512 chars server-side (agents-api handler.ts hard-
+slices it on write, mid-word, silently). #684: this script now (a) truncates
+an over-long ``--summary`` itself, at a word boundary, with an explicit
+"...[truncated]" marker, BEFORE posting, so a caller writing past the limit
+sees exactly what was cut instead of losing the tail invisibly; and (b) reads
+the row back after the POST and exits 5 (not 0) if the stored summary does
+not match what this run actually sent — a 2xx only proves the endpoint
+accepted *a* body, not *ours* (the same discipline the feed writers'
+verifyReadBack() already applies; ML-020/R-18).
 """
 from __future__ import annotations
 
@@ -33,6 +44,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -51,6 +63,26 @@ RETIRED_SKILLS = {
     "pr-review": "pr-autopilot",
     "pr-route": "pr-autopilot",
 }
+
+# Server-side cap on the top-level `summary` (agents-api handler.ts slices to
+# this on write). Truncate here first, deliberately, so the loss is visible
+# rather than an invisible mid-word server-side cut (#684).
+SUMMARY_MAX = 512
+TRUNCATION_MARKER = " ...[truncated]"
+
+
+def truncate_summary(text: str, max_len: int = SUMMARY_MAX) -> tuple[str, bool]:
+    """Cut an over-long summary at a word boundary and mark it. Pure/testable."""
+    if len(text) <= max_len:
+        return text, False
+    budget = max_len - len(TRUNCATION_MARKER)
+    cut = text[:budget]
+    last_space = cut.rfind(" ")
+    # Only back off to the word boundary if it doesn't throw away more than
+    # half the budget (a single very long token should still get a hard cut).
+    if last_space > budget * 0.5:
+        cut = cut[:last_space]
+    return cut + TRUNCATION_MARKER, True
 
 
 def read_token(env_path: str) -> str:
@@ -84,6 +116,33 @@ def portfolio(slug: str, project_id: str) -> list:
         return _get(f"{BASE}/agents/{slug}/portfolio?{q}").get("items", [])
     except Exception:
         return []
+
+
+def verify_read_back(slug: str, project_id: str, engagement_id: str, sent_summary: str) -> str | None:
+    """Re-read the just-posted engagement and confirm the stored summary
+    matches what this run sent (post caller-side truncation). Returns None on
+    a verified match, or a message describing the failure otherwise. Mirrors
+    the feed writers' verifyReadBack() (ML-020/R-18), ported to the
+    engagement write path (#684): a 2xx proves the endpoint accepted *a*
+    body, not *ours*.
+
+    `/agents/{slug}/portfolio` reads via a GSI (agents-api handler.ts),
+    which is not eligible for ConsistentRead — retry briefly before treating
+    an absence as a failure rather than eventual-consistency noise.
+    """
+    attempts = 3
+    for attempt in range(1, attempts + 1):
+        items = portfolio(slug, project_id)
+        row = next((it for it in items if it.get("engagement_id") == engagement_id), None)
+        if row is not None:
+            stored = row.get("summary") or ""
+            if stored != sent_summary:
+                return (f"read-back MISMATCH: engagement {engagement_id} does not carry the "
+                        f"summary this run sent. sent={sent_summary[:120]!r} stored={stored[:120]!r}")
+            return None
+        if attempt < attempts:
+            time.sleep(0.4 * attempt)
+    return f"read-back: engagement {engagement_id} not found in the portfolio after {attempts} attempts"
 
 
 def main(argv=None) -> int:
@@ -124,6 +183,16 @@ def main(argv=None) -> int:
               f"(GET /skills/{args.skill_name}); pass --skill-version.", file=sys.stderr)
         return 4
 
+    # #684: truncate deliberately, at a word boundary, BEFORE the server ever
+    # sees an over-long string — its own 512-char slice is silent and
+    # mid-word, so relying on it loses the tail invisibly.
+    summary, did_truncate = truncate_summary(args.summary)
+    if did_truncate:
+        print(f"WARNING: --summary is {len(args.summary)} chars, over the server's "
+              f"{SUMMARY_MAX}-char cap — truncated at a word boundary with a marker before "
+              f"sending (was going to be silently cut mid-word otherwise). Stored text: "
+              f"{summary!r}", file=sys.stderr)
+
     if args.dedup_key and not args.allow_duplicate:
         for it in portfolio(args.slug, args.project_id):
             if args.dedup_key in (it.get("summary") or ""):
@@ -139,7 +208,7 @@ def main(argv=None) -> int:
         "started_at": args.started_at,
         "ended_at": args.ended_at,
         "status": args.status,
-        "summary": args.summary,
+        "summary": summary,
     }
     req = urllib.request.Request(
         f"{BASE}/agents/{args.slug}/engagements",
@@ -152,9 +221,27 @@ def main(argv=None) -> int:
         with urllib.request.urlopen(req, timeout=25) as r:
             body = json.load(r)
         eng = body.get("engagement", body)
-        persisted = bool((eng.get("summary") or "").strip())
-        print(f"OK {args.slug} [{args.skill_name} v{ver}] -> {eng.get('engagement_id')} "
-              f"| summary_persisted={'YES' if persisted else 'NO'}")
+        engagement_id = eng.get("engagement_id")
+
+        # #684: a 2xx proves the endpoint accepted *a* body, not *ours*. Read
+        # the row back (a fresh GET, not the POST's own echo) before
+        # reporting success — the same discipline the feed writers already
+        # apply (ML-020/R-18), now ported here.
+        mismatch = None
+        if engagement_id:
+            mismatch = verify_read_back(args.slug, args.project_id, engagement_id, summary)
+        else:
+            mismatch = "read-back: POST response carried no engagement_id, cannot verify"
+
+        if mismatch:
+            print(f"ERROR {mismatch}", file=sys.stderr)
+            print(f"(POSTED but NOT verified: {args.slug} [{args.skill_name} v{ver}] -> "
+                  f"{engagement_id}; the row was accepted but this run could not confirm the "
+                  f"stored summary matches what was sent.)", file=sys.stderr)
+            return 5
+
+        print(f"OK {args.slug} [{args.skill_name} v{ver}] -> {engagement_id} "
+              f"| read-back verified (summary matches what was sent)")
         return 0
     except urllib.error.HTTPError as e:
         detail = e.read().decode()[:300]

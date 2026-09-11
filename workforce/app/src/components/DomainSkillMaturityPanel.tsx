@@ -1,7 +1,7 @@
 // PANEL · DOMAIN SKILL MATURITY (2026-07-24 operator request). Dreyfus
 // skill-acquisition ladder (not_defined → novice → advanced_beginner →
 // competent → proficient → expert) applied to `domain`-kind skills only, as
-// a cumulative stacked-area chart over the trailing 90 days. Distinct from
+// a cumulative stacked-area chart over the trailing 180 days. Distinct from
 // Sana's L0–L5 maturity_score (agent-experience-and-skill-metrics.md §3,
 // execution-ledger based, all skills) — this ladder is age-derived and
 // domain-only. See lib/skillGrowth.ts for the derivation rule.
