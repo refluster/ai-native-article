@@ -86,8 +86,17 @@ node workforce/scripts/record-engagement.mjs \
 
 The script mints a short-lived `AUTH#ENGAGEMENT` token in DynamoDB
 (`dynamodb:UpdateItem` on `wf-table-{stage}` is the trust gate), then POSTs the
-engagement with that bearer. Exit non-zero = the POST was rejected; read stderr,
-do not retry blindly.
+engagement with that bearer. Exit non-zero = the POST was rejected (or, per
+below, accepted but unverifiable); read stderr, do not retry blindly.
+
+**`summary` is capped at 512 chars server-side** (agents-api hard-slices it on
+write). Since #684, the script truncates an over-long `--summary` itself first
+— at a word boundary, with an explicit "…[truncated]" marker — instead of
+letting the server cut it silently mid-word, and reads the row back after the
+POST to confirm the stored summary actually matches what this run sent, the
+same discipline `verifyReadBack()` applies on the feed-writer path
+(ML-020/R-18). A 2xx no longer means "trust it" — a read-back mismatch exits
+non-zero.
 
 ## Why this is not a Cadence
 

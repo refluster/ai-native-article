@@ -65,9 +65,9 @@ import type { WorkforceAgentManifest } from '../types/agent';
 import type { AgentMockStats, WorkforceMockStats } from '../types/stats';
 import type { WorkforceSkill } from '../types/skill';
 
-// 3-month basis (operator request, 2026-07-24) — the SKILL GROWTH charts
-// match the Epic-016 decks' window below.
-const SKILL_GROWTH_DAYS = 90;
+// 6-month basis (operator request, 2026-09-09; was 3 months from 2026-07-24)
+// — the SKILL GROWTH charts match the Epic-016 decks' window below.
+const SKILL_GROWTH_DAYS = 180;
 
 // Zero-stats stand-in for personas the mock JSON hasn't been backfilled
 // for. Matches the synthesised placeholder used in the Crew table below so

@@ -109,7 +109,11 @@ python3 scripts/register_engagement.py \
 ```
 
 Mechanics that bite (full detail in `references/workforce-api.md`): `skill_version`
-is **required**; top-level `summary` is the deliverable text; records are
+is **required**; top-level `summary` is the deliverable text, **capped at 512
+chars server-side** — write it to fit, or the script truncates it for you at a
+word boundary with an explicit marker (#684; it never silently loses the tail
+mid-word the way the raw API does) and reads the row back after posting to
+confirm the stored summary matches, exiting `5` if it can't verify; records are
 **append-only** (a re-post duplicates — the `--dedup-key` guard prevents silent
 dupes; only `--allow-duplicate` on explicit instruction). A `401` means the
 **wrong token** (engagement vs feed — each is scoped to one path), not a bad

@@ -1,7 +1,7 @@
 // PANEL · AGENT-CAPABILITY SKILL ONBOARDING (2026-07-24 operator request).
 // Deployment-readiness funnel (registered → org_placed → skill_equipped →
 // deployed) applied to `agent-capability`-kind skills only, as a cumulative
-// stacked-area chart over the trailing 90 days. Each skill's CURRENT stage is
+// stacked-area chart over the trailing 180 days. Each skill's CURRENT stage is
 // read from real signals (owners[], agent-roster bindings, status) — see
 // lib/skillGrowth.ts. Same funnel semantics/colours as AgentLifecyclePanel's
 // registered → assigned → delivered.

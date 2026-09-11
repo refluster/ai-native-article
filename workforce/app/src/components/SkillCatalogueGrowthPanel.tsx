@@ -1,6 +1,6 @@
 // PANEL · SKILL CATALOGUE GROWTH (2026-07-24 operator request). Cumulative
 // stacked-area chart of the skill catalogue split by kind — domain /
-// agent-capability / automation / claude-custom — over the trailing 90 days.
+// agent-capability / automation / claude-custom — over the trailing 180 days.
 // Every number is real: derived from each skill's actual created_at via
 // lib/skillGrowth.ts, not a mock/illustrative fixture.
 

@@ -74,8 +74,15 @@ export type ProjectId = string & { readonly __projectId: unique symbol };
  *   - empty strings
  *   - strings containing DDB partition-key delimiters (`#` / `|`) that would
  *     collide with the row-shape conventions
+ *   - colons (`:`) — injection-safety guard; a `:` in a caller-supplied id
+ *     would be silently misread as a segment separator in composed key paths
+ *     (e.g. Secrets Manager `wf/projects/{id}/{type}`) or URL segments
+ *   - ASCII control characters (U+0000–U+001F, U+007F, including `\n`/`\r`/
+ *     `\t`) — would corrupt DDB attribute values and invalidate log output
  *
  * Throws on rejection (W-4 fail-loud).
+ * Note: `selfProjectId()` constructs `self/{slug}` IDs without going through
+ * this guard — that shape is author-controlled and structurally safe.
  */
 export function asProjectId(id: string): ProjectId {
   if (id.length === 0) {
@@ -83,6 +90,13 @@ export function asProjectId(id: string): ProjectId {
   }
   if (id.includes("#") || id.includes("|")) {
     throw new Error(`invalid project_id "${id}": must not contain '#' or '|'`);
+  }
+  if (id.includes(":")) {
+    throw new Error(`invalid project_id "${id}": must not contain ':'`);
+  }
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f]/.test(id)) {
+    throw new Error(`invalid project_id "${id}": must not contain control characters`);
   }
   return id as ProjectId;
 }
