@@ -3,11 +3,21 @@
 // load time and the two branches (configured vs unconfigured) can't share a
 // mock within one file.
 //
-// Regression test for the 2026-07-24 operator report: the live endpoint can
-// serve a window frozen at its last backfill (Epic-016 OP-011/OP-012 still
-// unwired), which read as "the graph's dates never update". loadPerformance
-// must re-axis a live series to a window ending today, exactly like the mock
-// fallback already does.
+// This file used to assert the OPPOSITE of what it asserts now, and the
+// reversal is the point.
+//
+// 2026-07-24: the live endpoint served a window frozen at its last backfill
+// (the daily PR refresh was unwired), which read as "the graph's dates never
+// update". The fix re-axised the live series to a window ending today.
+//
+// 2026-09-09: that fix is what let the PR block sit unchanged from 2026-07-26
+// for 45 days without anyone noticing — the axis advanced every morning over
+// numbers that never moved, so the deck looked alive (operator report). The
+// refresh now has a scheduled owner that cannot quietly stop being scheduled
+// (.github/workflows/workforce-performance-refresh.yml), so a live series is
+// plotted on the dates the backend actually published, and staleness is
+// reported rather than papered over. Re-axising stays on the mock path, where
+// there are no real dates to misrepresent.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -21,7 +31,10 @@ import type { PerformanceSeries } from '../types/performance';
 function staleLiveSeries(): PerformanceSeries {
   return {
     scope: 'workforce',
-    generated_at: '2026-06-23T00:00:00Z',
+    // The endpoint stamps its own clock here on every request, so it is always
+    // "now" and says nothing about the data's age — the trap the panel's
+    // staleness check fell into. The real age lives in `pr_updated_at`.
+    generated_at: new Date().toISOString(),
     window: { start: '2026-05-27', end: '2026-06-23' },
     lifecycle: [
       { date: '2026-05-27', registered: 4, assigned: 3, delivered: 3 },
@@ -37,6 +50,7 @@ function staleLiveSeries(): PerformanceSeries {
       humans_involved: ['refluster'],
     },
     pr_contributors: [{ handle: 'nadia', kind: 'agent', prs: 1 }],
+    pr_updated_at: '2026-06-23T00:00:00Z',
   };
 }
 
@@ -51,26 +65,29 @@ afterEach(() => {
 });
 
 describe('lib/performance (live path)', () => {
-  it('re-axises a stale live series to a window ending today', async () => {
+  it('serves a live series on the dates the backend published, never re-axised', async () => {
     const r = await loadPerformance(WORKFORCE_SCOPE);
     expect(r.source).toBe('live');
     const today = new Date().toISOString().slice(0, 10);
-    expect(r.series.window.end).toBe(today);
-    expect(r.series.lifecycle[r.series.lifecycle.length - 1].date).toBe(today);
-    // Values are preserved — only the date labels move.
+    expect(today).not.toBe('2026-06-23'); // guard: the fixture must read as old
+    expect(r.series.window).toEqual({ start: '2026-05-27', end: '2026-06-23' });
+    expect(r.series.lifecycle[r.series.lifecycle.length - 1].date).toBe('2026-06-23');
     expect(r.series.lifecycle[r.series.lifecycle.length - 1].delivered).toBe(6);
   });
 
-  // Regression for a pr-autopilot cycle-1 finding (2026-07-24, `wf:owen`):
-  // lifecycle and pr_daily can have different lengths, so reaxis() computes
-  // two independent offsets (lcOffset/prOffset). This fixture's pr_daily
-  // (length 1) is shorter than its lifecycle (length 2), so a mix-up between
-  // the two offsets would pass the lifecycle-only assertion above while still
-  // mis-dating pr_daily — the exact series PrAutomationPanel renders from.
-  it('re-axises pr_daily to the same window-ending-today, independently of lifecycle length', async () => {
+  // pr_daily is the series PrAutomationPanel renders, and it is the one that
+  // actually froze. Asserted separately from lifecycle because the two have
+  // independent lengths — the old reaxis() computed two offsets, and a mix-up
+  // between them would pass a lifecycle-only assertion.
+  it('leaves pr_daily on its published dates too', async () => {
     const r = await loadPerformance(WORKFORCE_SCOPE);
-    const today = new Date().toISOString().slice(0, 10);
-    expect(r.series.pr_daily[r.series.pr_daily.length - 1].date).toBe(today);
+    expect(r.series.pr_daily[r.series.pr_daily.length - 1].date).toBe('2026-06-23');
     expect(r.series.pr_daily[r.series.pr_daily.length - 1].prs).toBe(4);
+  });
+
+  it('passes pr_updated_at through so the panel can measure the block, not the response', async () => {
+    const r = await loadPerformance(WORKFORCE_SCOPE);
+    expect(r.series.pr_updated_at).toBe('2026-06-23T00:00:00Z');
+    expect(r.series.pr_updated_at).not.toBe(r.series.generated_at);
   });
 });

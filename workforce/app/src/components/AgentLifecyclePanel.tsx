@@ -30,12 +30,23 @@ export default function AgentLifecyclePanel({ series }: { series: PerformanceSer
   const delta = deliveredNow - deliveredThen;
   const cohortNow = last ? last.registered + last.assigned + last.delivered : 0;
 
+  // Label this panel with the range of ITS OWN data, not `series.window`.
+  //
+  // `series.window` is the PR roll-up's window whenever a PR block exists
+  // (composeSeries prefers it), so while the PR refresh was frozen this header
+  // read "2026-04-27 → 2026-07-26" over a funnel whose points actually ran to
+  // today — the panel disclaiming its own chart (operator screenshot,
+  // 2026-09-09). Two blocks with two writers cannot share one honest date
+  // label, and the lifecycle series carries a point per day, so its own first
+  // and last points ARE its range.
+  const lifecycleRange = first && last ? `${first.date} → ${last.date}` : '—';
+
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between">
         <Typeplate label="AGENT LIFECYCLE" value="REGISTERED → ASSIGNED → DELIVERED" />
         <span className="hidden sm:inline font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-          {series.window.start} → {series.window.end}
+          {lifecycleRange}
         </span>
       </div>
 

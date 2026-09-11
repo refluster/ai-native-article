@@ -60,6 +60,10 @@
 //   4  — the row was created but its English edition could not be written.
 //        The article exists and is Japanese-only. Report the page URL on
 //        stderr; the operator (or a re-run of backfill-en.mjs) completes it.
+//   5  — read-back MISMATCH (#671): a 2xx from Notion proved the API accepted
+//        *a* page, not that the stored Author/Title are the ones THIS run
+//        sent. The page exists but must not be trusted; its URL is on
+//        stderr for manual correction.
 
 import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
 ensureProxyAwareEntry(import.meta.url);
@@ -256,6 +260,38 @@ async function notionFetch(method, path, payload) {
   try { return JSON.parse(text); } catch { return {}; }
 }
 
+// W-4 read-back (#671 byline integrity). A 2xx only proves Notion accepted *a*
+// page — not that the stored Author/Title are the ones THIS run sent. The
+// generation-side vulnerability that caused five confirmed mis-attributed
+// posts (a shared temp workspace across a batched CCR fire's tasks, so a
+// sibling task's body landed under this run's --author) was fixed
+// structurally by giving every run its own workspace — but nothing
+// downstream of that fix re-checked the one property that decides whose name
+// a reader sees. A Notion-side write race or a stale `page` reference would
+// still ship silently without this. Mirrors feed-post/post-feed.mjs's
+// verifyReadBack (R-18), adapted to Notion's page-property shape.
+//
+// Returns null when verified, or a human-readable mismatch string.
+async function verifyReadBack(pageId, expectedAuthor, expectedTitle) {
+  let detail;
+  try {
+    detail = await notionFetch("GET", `/pages/${pageId}`);
+  } catch (err) {
+    return `read-back: GET /pages/${pageId} failed: ${err instanceof Error ? err.message : String(err)}`;
+  }
+  const richText = (arr) => (Array.isArray(arr) ? arr : []).map((t) => t?.plain_text ?? "").join("");
+  const gotAuthor = richText(detail.properties?.Author?.rich_text);
+  const gotTitle = richText(detail.properties?.Title?.title);
+  const wantTitle = expectedTitle.slice(0, 2000);
+  if (gotAuthor !== expectedAuthor) {
+    return `read-back MISMATCH: page ${pageId} Author is ${JSON.stringify(gotAuthor)}, not ${JSON.stringify(expectedAuthor)}`;
+  }
+  if (gotTitle !== wantTitle) {
+    return `read-back MISMATCH: page ${pageId} Title is ${JSON.stringify(gotTitle)}, not ${JSON.stringify(wantTitle)}`;
+  }
+  return null;
+}
+
 let page;
 try {
   page = await notionFetch("POST", "/pages", {
@@ -273,6 +309,13 @@ try {
   }
   console.error(`publish-notion.mjs: ${err instanceof Error ? err.message : String(err)}`);
   process.exit(3);
+}
+
+const readBackMismatch = await verifyReadBack(page.id, author, title);
+if (readBackMismatch) {
+  console.error(`publish-notion.mjs: ${readBackMismatch}`);
+  console.error(`  Page: ${page.url ?? page.id} — do NOT trust this article's byline; investigate before treating it as published (#671).`);
+  process.exit(5);
 }
 
 // English edition (ADR-0005) — an `EN` child page under the row we just

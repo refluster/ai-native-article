@@ -19,8 +19,9 @@
 //
 // A project scope with no entry in the bundled fixture is **synthesized**
 // deterministically from its id so every project's tab shows content; the
-// dates on all series are re-axised to the last-N-days window ending today so
-// the illustrative data never looks stale.
+// dates on the ILLUSTRATIVE series are re-axised to the last-N-days window
+// ending today so the mock data never looks stale. A LIVE series is never
+// re-axised — see loadPerformance below.
 
 import type {
   LifecyclePoint,
@@ -65,10 +66,14 @@ export function loadPerformanceMock(): Promise<PerformanceDataset> {
   return datasetCache;
 }
 
-// ── date re-axis ────────────────────────────────────────────────────────────
+// ── date re-axis (ILLUSTRATIVE DATA ONLY) ───────────────────────────────────
 // The bundled fixture carries static dates that would age; re-map each series'
 // dates onto the N days ending today so the illustrative data always reads as
 // current (the same trick the Dashboard heat strip uses for its axis).
+//
+// Never apply this to a live series. Doing so relabels real, possibly frozen
+// data with today's dates — which is how a 45-day-old PR block went unnoticed
+// (see loadPerformance).
 
 function lastNDaysUTC(n: number): string[] {
   const today = new Date();
@@ -114,9 +119,13 @@ function rng(seed: number): () => number {
   };
 }
 
-// 3-month basis (operator request, 2026-07-24) — every graph on /performance,
-// live/mock/synthesized alike, now windows to the trailing 90 days.
-const DAYS = 90;
+// 6-month basis (operator request, 2026-09-09; was 3 months from 2026-07-24)
+// — every graph on /performance, live/mock/synthesized alike, windows to the
+// trailing 180 days. Kept in step with PERF_WINDOW_DAYS in
+// workforce/lambdas/shared/performance.ts, which bounds how much history the
+// live series can actually carry: raising this alone only lengthens the
+// illustrative fallback.
+const DAYS = 180;
 
 function synthesizeSeries(scopeId: string): PerformanceSeries {
   const days = lastNDaysUTC(DAYS);
@@ -191,13 +200,22 @@ export async function loadPerformance(scope: PerformanceScope): Promise<Performa
         : `${WORKFORCE_AGENTS_API_BASE}/projects/${encodeProjectId(scope.id)}/performance`;
     try {
       const res = await fetch(url);
-      // Re-axis the live series too, not just the mock fallback below. Epic-016's
-      // reducer redeploy + daily PR refresh (OP-011/OP-012) are still unwired, so
-      // the live endpoint can serve a window frozen at its last backfill — which
-      // read as "the graph's dates never update" (operator report, 2026-07-24).
-      // Until the backend catches up, the frontend keeps the displayed window
-      // honestly current: same days-ending-today remap the mock path already got.
-      if (res.ok) return { series: reaxis((await res.json()) as PerformanceSeries), source: 'live' };
+      // The live series is served with its OWN dates — never re-axised.
+      //
+      // It used to be. When the daily PR refresh (OP-011/OP-012) was unwired,
+      // the endpoint served a window frozen at its last backfill, and the
+      // frontend remapped those dates onto "the N days ending today" so the
+      // axis would at least read as current. That traded a visible symptom for
+      // an invisible one: from 2026-07-26 the PR block sat unchanged for 45
+      // days under an axis that advanced every morning, so the deck looked
+      // alive and the same numbers were served all summer (operator report,
+      // 2026-09-09). The refresh now has a scheduled owner that cannot quietly
+      // stop being scheduled (.github/workflows/workforce-performance-refresh.yml),
+      // so the honest thing — and the C-4 thing — is to plot the dates the
+      // backend actually published and let `pr_updated_at` drive the staleness
+      // advisory in PerformancePanels. The mock/synth path below keeps the
+      // remap: illustrative data has no real dates to misrepresent.
+      if (res.ok) return { series: (await res.json()) as PerformanceSeries, source: 'live' };
       console.warn(`performance: live endpoint ${url} -> HTTP ${res.status}; serving illustrative data`);
     } catch (err) {
       console.warn(

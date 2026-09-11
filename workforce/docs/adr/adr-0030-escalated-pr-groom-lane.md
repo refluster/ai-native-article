@@ -1,6 +1,6 @@
 # ADR-0030 — The human lane is groomed, not frozen: a bounded agent may keep an escalated PR mergeable, including on L0/L1 paths
 
-- **Status**: Proposed (operator ratifies by merging the implementation PR)
+- **Status**: Accepted (2026-09-07)
 - **Date**: 2026-09-07
 - **Deciders**: operator (refluster) — widens agent authority over L0/L1 paths, so it is the operator's call, not the cadence's
 - **Related**: [adr-0022](adr-0022-issue-to-merge-flow.md) (the author lane this extends), [adr-0010](adr-0010-autopilot-merge-consensus-widening.md) / [adr-0011](adr-0011-own-repo-autopilot-merge.md) (the merge predicate this deliberately does **not** touch), [adr-0005](adr-0005-single-execution-model-ccr.md) (the execution model), [governance §4.4](../../../docs/governance.md#44-autopilot-pr-merge--workforce-r-n10-delegation--l0l1-off-limits) (the L0/L1 off-limits list that sends PRs here in the first place), R-N9 / R-N10 ([governance.md §4](../governance.md)), [ML-027](../../../docs/memory-lint-backlog.md) (the id-collision class this ADR's guard is written against)

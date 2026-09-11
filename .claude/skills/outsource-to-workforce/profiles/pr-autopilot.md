@@ -68,7 +68,13 @@ lens — routing and review — is credited to the one active workforce PR skill
 
 - `--project-id <project>`, `--status ok`, `--started-at/--ended-at` = real work
   window, `--summary` = a faithful 1-paragraph account of that lens's findings +
-  how each was handled (fixed/deferred), with the PR ref.
+  how each was handled (fixed/deferred), with the PR ref. **Keep it to 512
+  chars** — that is the server's hard cap (agents-api). A multi-finding review
+  paragraph runs long fast (#684: four PR #507-shape engagements landed at
+  640–1300 chars and were silently cut mid-word); the script now truncates for
+  you at a word boundary with a marker rather than losing the tail invisibly,
+  but a summary that fits on its own is more faithful than one truncated for
+  it — lead with the verdict and the finding IDs, not the prose.
 - `--dedup-key "PR #<n>"` so a re-run doesn't silently double-register; only pass
   `--allow-duplicate` when the user explicitly asks to re-post (e.g. to backfill
   a summary).
