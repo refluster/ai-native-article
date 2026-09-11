@@ -11,11 +11,34 @@
 //      classified as actionable, and an unclassifiable PR escalates rather than
 //      sitting in the queue forever.
 import { describe, it, expect } from "vitest";
-import { classifyRemediation, latestBrief, reasonCodesFrom } from "./pr-remediate-scan.mjs";
+import { classifyRemediation, latestBrief, reasonCodesFrom, discoveryRequest } from "./pr-remediate-scan.mjs";
 import { labelsToClearOnResolve, assertBlockedReason, claimBody } from "./pr-remediate-post.mjs";
 import { AUTHOR_LABEL, ESCALATION_LABEL, REMEDIATION_CAP, countRemediationAttempts } from "../pr-autopilot/pr-merge.mjs";
 
 const inLane = (over = {}) => ({ labels: [AUTHOR_LABEL], mergeable: true, mergeableState: "clean", reasons: [], attempts: 0, ...over });
+
+// #710: a CCR remote session's outbound proxy 403s any GitHub API path that
+// is not repo-scoped, and `/search/issues` is a global (cross-repo) endpoint
+// — so this discovery request must never be that path again, for either
+// lane, regardless of repo or label spelling.
+describe("discoveryRequest — repo-scoped discovery, never /search/issues (#710)", () => {
+  it("hits the repo-scoped issues endpoint, not global search", () => {
+    const path = discoveryRequest("refluster/ai-native-article", AUTHOR_LABEL);
+    expect(path).toMatch(/^\/repos\/refluster\/ai-native-article\/issues\?/);
+    expect(path).not.toMatch(/search/);
+  });
+
+  it("filters by the lane label and open state", () => {
+    const path = discoveryRequest("refluster/ai-native-article", ESCALATION_LABEL);
+    expect(path).toContain("state=open");
+    expect(path).toContain(`labels=${encodeURIComponent(ESCALATION_LABEL)}`);
+  });
+
+  it("works the same shape for any owner/repo", () => {
+    const path = discoveryRequest("acme/widgets", AUTHOR_LABEL);
+    expect(path.startsWith("/repos/acme/widgets/issues?")).toBe(true);
+  });
+});
 
 describe("classifyRemediation — whose PR is this?", () => {
   it("a PR without the author label is never touched", () => {
