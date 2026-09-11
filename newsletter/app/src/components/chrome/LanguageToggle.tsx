@@ -19,7 +19,7 @@ export default function LanguageToggle() {
   function onSelect(next: Language) {
     if (next === language) return
     setLanguage(next)
-    trackEvent({ name: 'language_switch', params: { from: language, to: next } } as never)
+    trackEvent({ name: 'language_switch', params: { from: language, to: next } })
   }
 
   return (
