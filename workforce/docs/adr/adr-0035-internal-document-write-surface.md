@@ -1,0 +1,1 @@
+$(cat /tmp/claude-0/-home-user/1d581bd2-f853-5af7-8cfa-71d75761708c/scratchpad/adr-0035-internal-document-write-surface.md)
