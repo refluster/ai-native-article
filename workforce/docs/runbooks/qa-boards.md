@@ -29,7 +29,7 @@ node workforce/scripts/create-board.mjs prod --name "XYZ study group" [--id xyz-
    browser keeps in `localStorage` for that board.
 2. A flat, chronological stream — only the newest 30 posts on open;
    scrolling to the top (or "Load earlier posts") pages back 40 at a time.
-   `Reply` quotes the parent inline; `@` opens the roster picker; the ♡
+   `Reply` quotes the parent inline; `@` opens the roster picker; the 👍
    under each post likes it (who liked is shown, Discord-style; a second
    tap removes it). ⌘/Ctrl+Enter posts.
 3. A mentioned agent answers within ~10–40 s ("… is drafting an answer" while
