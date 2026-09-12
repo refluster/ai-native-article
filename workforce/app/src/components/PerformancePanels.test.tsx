@@ -74,8 +74,15 @@ describe('PerformancePanels — per-block staleness advisory', () => {
   // THE regression: a frozen PR block behind a fresh response. Under the old
   // generated_at check this rendered as healthy.
   it('flags a frozen PR block even though generated_at is current', async () => {
+    // Derived, never a literal date. An earlier revision asserted
+    // /PR roll-up 2026-07-26/ against a fixture built from isoDaysAgo(45) —
+    // true only on the day it was written, and it started failing three days
+    // later. A test for "the surface reports the real timestamp" must not
+    // itself depend on what day it runs.
+    const frozenAt = isoDaysAgo(45);
+    const frozenStamp = `${new Date(frozenAt).toISOString().slice(0, 16)}Z`;
     loadPerformanceMock.mockResolvedValue({
-      series: series({ prUpdatedAt: isoDaysAgo(45) }),
+      series: series({ prUpdatedAt: frozenAt }),
       source: 'live',
     });
     render(<PerformancePanels scope={WORKFORCE_SCOPE} />);
@@ -85,7 +92,13 @@ describe('PerformancePanels — per-block staleness advisory', () => {
     // The lifecycle funnel is fine here and must not be blamed for it.
     expect(screen.queryByText(/agent lifecycle and PR automation/i)).not.toBeInTheDocument();
     // …and the frozen block's real publish time is named, not generated_at.
-    expect(screen.getByText(/PR roll-up 2026-07-26/)).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(`PR roll-up ${frozenStamp}`))).toBeInTheDocument();
+    // ...and specifically NOT today's date, which is what `generated_at` would
+    // have supplied. Scoped to the "PR roll-up" prefix: a bare date regex also
+    // matches the lifecycle chart's own axis, which legitimately shows today.
+    expect(
+      screen.queryByText(new RegExp(`PR roll-up ${new Date().toISOString().slice(0, 10)}`)),
+    ).not.toBeInTheDocument();
   });
 
   it('flags a stalled lifecycle reducer from its last daily point', async () => {
