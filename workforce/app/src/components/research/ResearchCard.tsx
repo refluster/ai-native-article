@@ -1,12 +1,13 @@
-// One row of the Research index. Same card grammar as the Reports index
-// (white lifted surface, 1px border, mono date/kicker line, Geist title,
-// clamped abstract) so a reader moving between the two surfaces sees one
-// console, plus the article-specific bits: tag chips, the EN marker when
-// an English edition exists, and the persona byline. It stays inset on
-// phones: the public shell's gutter is not the console's, so the
-// `wf-bleed-x` trick the feed uses would not line up here.
+// One row of the Research index. The public site's card grammar
+// (components/public/styles.ts: white lifted surface, 1px hairline, mono
+// meta line, Geist title, clamped abstract) plus the article-specific
+// bits: tag chips, the EN marker when an English edition exists, and the
+// persona byline. It stays inset on phones: the public shell's gutter is
+// not the console's, so the `wf-bleed-x` trick the feed uses would not
+// line up here.
 
 import { Link } from 'react-router-dom';
+import { CARD_LINK, CHIP, CHIP_ACTIVE } from '../public/styles';
 import {
   displayTag,
   inferType,
@@ -38,7 +39,7 @@ export default function ResearchCard({ article, lang, onTagClick, activeTag }: P
   const type = inferType(article);
 
   return (
-    <article className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-4 sm:p-5 hover:border-wf-primary transition-colors">
+    <article className={`${CARD_LINK} p-4 sm:p-5`}>
       <div className="flex items-baseline gap-3 flex-wrap font-wfmono text-[11px]">
         <span className="text-wf-on-surface-variant">{article.date}</span>
         <span className="uppercase tracking-[0.14em] text-wf-tertiary">{type}</span>
@@ -67,18 +68,12 @@ export default function ResearchCard({ article, lang, onTagClick, activeTag }: P
                       type="button"
                       onClick={() => onTagClick(tag)}
                       aria-pressed={activeTag === tag}
-                      className={`font-wfmono text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-wf-lg border transition-colors ${
-                        activeTag === tag
-                          ? 'border-wf-primary bg-wf-primary text-wf-on-primary'
-                          : 'border-wf-outline-variant bg-wf-surface-container text-wf-on-surface-variant hover:border-wf-primary hover:text-wf-primary'
-                      }`}
+                      className={activeTag === tag ? CHIP_ACTIVE : CHIP}
                     >
                       {displayTag(tag)}
                     </button>
                   ) : (
-                    <span className="font-wfmono text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-wf-lg border border-wf-outline-variant bg-wf-surface-container text-wf-on-surface-variant">
-                      {displayTag(tag)}
-                    </span>
+                    <span className={CHIP}>{displayTag(tag)}</span>
                   )}
                 </li>
               ))}
