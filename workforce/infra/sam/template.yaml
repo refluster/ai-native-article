@@ -371,6 +371,9 @@ Resources:
           # the CCR-fire secret + project credentials. This API resolves and
           # rate-limits the request; it never fires the routine itself.
           ORCHESTRATOR_FUNCTION: !Ref WfOrchestratorFunction
+          # ADR-0034: POST /boards/{id}/posts async-invokes the board reply
+          # Lambda once per @-mentioned agent (same shape as MESSAGING_REPLY).
+          BOARD_REPLY_FUNCTION: !Ref WfBoardReplyFunction
       Policies:
         - Statement:
             - Sid: AgentsApiTableAccess
@@ -430,6 +433,16 @@ Resources:
               Action: s3:PutObject
               Resource:
                 - !Sub ${WfBucket.Arn}/messages/*
+            # ADR-0034 — board routes hydrate + store long post bodies
+            # (`boards/{board_id}/{ulid}.md`), same dual-store split as
+            # messages/*. Scoped to boards/*.
+            - Sid: AgentsApiBoardBodyReadWrite
+              Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/boards/*
             - Sid: AgentsApiPostBodyWrite
               # POST /feed writes the post body to posts/{slug}/{yyyy}/{mm}/{ulid}.md
               # before the DDB row (createPost ordering). Scoped to posts/*.
@@ -511,6 +524,13 @@ Resources:
               Action: lambda:InvokeFunction
               Resource:
                 - !GetAtt WfMessagingReplyFunction.Arn
+            # ADR-0034 — POST /boards/{id}/posts async-invokes the board
+            # reply Lambda per mentioned agent. Scoped to that one function.
+            - Sid: AgentsApiInvokeBoardReply
+              Effect: Allow
+              Action: lambda:InvokeFunction
+              Resource:
+                - !GetAtt WfBoardReplyFunction.Arn
             # adr-0025 — POST /dispatch hands one explicit (agent, binding_idx)
             # to the orchestrator for an immediate CCR fire. Scoped to that one
             # function; the API gains no Secrets Manager or CCR access of its
@@ -908,6 +928,43 @@ Resources:
             Method: POST
             Auth:
               Authorizer: AWS_IAM
+        # ADR-0034 — Q&A boards. Guest routes carry no API GW authorizer:
+        # guests have neither Cognito nor SigV4; the handler validates the
+        # board-scoped bearer token minted by /enter against the board's
+        # META row (every read AND write — board reads are not public).
+        # The moderation PATCH is operator-only via AWS_IAM, like the feed hide.
+        EnterBoard:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /boards/{id}/enter
+            Method: POST
+        GetBoard:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /boards/{id}
+            Method: GET
+        ListBoardPosts:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /boards/{id}/posts
+            Method: GET
+        CreateBoardPost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /boards/{id}/posts
+            Method: POST
+        PatchBoardPost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /boards/{id}/posts/{post_id}
+            Method: PATCH
+            Auth:
+              Authorizer: AWS_IAM
         # adr-0025 — on-demand fire of an already-declared binding. Same
         # posture as CreateFeedPost: no API GW authorizer, because the caller
         # is a CCR session with no SigV4 creds; auth is the per-fire dispatch
@@ -1048,6 +1105,100 @@ Resources:
       Dimensions:
         - Name: FunctionName
           Value: !Ref WfMessagingReplyFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  # --- Q&A board reply (ADR-0034) ------------------------------------------
+  # The board twin of wf-messaging-reply: async-invoked by agents-api once
+  # per @-mentioned agent on a guest post; composes persona + the bundled
+  # public knowledge pack + the agent's own record, calls Claude, writes
+  # the agent POST row. A hop-1 answer may pull in ONE colleague, answered
+  # inside the same invocation (never a self-invoke — R-N1 untouched).
+  WfBoardReplyFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-board-reply-${Stage}
+      CodeUri: ../../lambdas/board-reply
+      Handler: handler.handler
+      Description: Agent answers to @-mentions on the public Q&A boards (ADR-0034).
+      MemorySize: 512
+      # Up to two Claude calls (answer + one delegated answer) plus DDB/S3
+      # reads. Generous ceiling; a single answer lands in seconds.
+      Timeout: 240
+      Policies:
+        - Statement:
+            - Sid: BoardReplyTableAccess
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+                # Roster: scanAllPrefix over AGENT#/META (drained, not paged).
+                - dynamodb:Scan
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource:
+                - !GetAtt WfTable.Arn
+                - !Sub ${WfTable.Arn}/index/*
+            - Sid: BoardReplyBodyReadWrite
+              # Transcript hydration + storing long answers. Scoped to boards/*.
+              Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/boards/*
+            - Sid: BoardReplyMemoryRead
+              # The agent's latest rolling memory summary grounds the answer.
+              Effect: Allow
+              Action: s3:GetObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/memory/*
+            - Sid: BoardReplyRecallVoyageKey
+              # EXEC-ledger recall embeds the question via Voyage; voyage key
+              # path only. Fail-soft in the handler.
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*/voyage.api_key-*
+            - Sid: BoardReplyAnthropicKey
+              # Same key resolution as messaging-reply (llm-anthropic.ts).
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/_default/anthropic.api_key-*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/anthropic-*
+            - Sid: BoardReplyMetrics
+              Effect: Allow
+              Action: cloudwatch:PutMetricData
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace:
+                    - Workforce/Boards
+                    - Workforce/Recall
+      Tags:
+        workforce: !Ref Stage
+
+  # Any Errors metric on the board reply function publishes to the alarm
+  # topic — a thrown W-1 guard, a missing persona row, or the daily budget.
+  WfBoardReplyErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-board-reply-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-board-reply-${Stage} over 5 minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfBoardReplyFunction
       Statistic: Sum
       Period: 300
       EvaluationPeriods: 1

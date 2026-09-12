@@ -36,6 +36,11 @@
 //   POST   /threads/{id}/messages           operator appends a message (Epic-013 Story 2; AWS_IAM at GW)
 //   POST   /threads/{id}/read               clear operator unread (Epic-013 Story 2; AWS_IAM at GW)
 //   POST   /threads/{id}/star               set operator star (Epic-013 Story 2; AWS_IAM at GW)
+//   POST   /boards/{id}/enter              guest enters a Q&A board: password + nickname → board token (ADR-0034; public)
+//   GET    /boards/{id}                    board card + mentionable roster (board token)
+//   GET    /boards/{id}/posts              newest page | ?after= poll tail (board token)
+//   POST   /boards/{id}/posts              guest post; async-invokes wf-board-reply per @-mention (board token)
+//   PATCH  /boards/{id}/posts/{post_id}    operator hide/unhide (AWS_IAM at GW)
 //
 // See workforce/docs/epics/epic-007-agent-management-api.md (agents),
 // workforce/docs/epics/epic-008-skill-repository.md (skills),
@@ -188,6 +193,7 @@ import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { claimDispatchSlot, parseDispatchRequest, resolveDispatchTarget, selectDispatchAgents } from "../shared/dispatch.js";
 import { isValidDispatchToken } from "../shared/dispatch-token.js";
 import { DOCS_HTML, OPENAPI_YAML } from "./openapi.js";
+import { handleBoardsRoute, type BoardReplyDispatch } from "./boards.js";
 import { getProjectReportBody, listProjectReports } from "./reports.js";
 
 // Secrets Manager path holding the feed-write capability token. The
@@ -367,6 +373,22 @@ export async function handler(
     // caller is a CCR session with no SigV4 creds); the token is minted per
     // fire by the orchestrator into the task's credential bag.
     if (routeKey === "POST /dispatch") return await dispatchBindingRoute(event);
+
+    // Q&A boards (ADR-0034). The literals stay here (not only in boards.ts)
+    // because check-openapi-routes.mjs reads this file's routeKey set.
+    if (
+      routeKey === "POST /boards/{id}/enter" ||
+      routeKey === "GET /boards/{id}" ||
+      routeKey === "GET /boards/{id}/posts" ||
+      routeKey === "POST /boards/{id}/posts" ||
+      routeKey === "PATCH /boards/{id}/posts/{post_id}"
+    ) {
+      const res = await handleBoardsRoute(routeKey, event, {
+        dispatchReply: dispatchBoardReply,
+        isIamAuthenticated,
+      });
+      if (res) return res;
+    }
 
     return reply(404, { error: "route_not_found", routeKey, path, method });
   } catch (err) {
@@ -1608,6 +1630,23 @@ const MESSAGING_REPLY_FUNCTION = process.env.MESSAGING_REPLY_FUNCTION;
 // already holds the Secrets Manager + project-credential privileges the CCR
 // fire needs. This API never reads `wf/ccr/*` itself.
 const ORCHESTRATOR_FUNCTION = process.env.ORCHESTRATOR_FUNCTION;
+// ADR-0034: POST /boards/{id}/posts async-invokes the board reply Lambda
+// once per @-mentioned agent. Same async "Event" posture as dispatchReply.
+const BOARD_REPLY_FUNCTION = process.env.BOARD_REPLY_FUNCTION;
+
+/** Async-invoke wf-board-reply for one (post, agent). Throws on failure —
+ *  the boards module catches, logs and keeps the guest's post (W-4: the
+ *  post landed; the missing answer is visible, never silent). */
+async function dispatchBoardReply(payload: BoardReplyDispatch): Promise<void> {
+  if (!BOARD_REPLY_FUNCTION) throw new Error("board_reply_function_unset");
+  await lambda.send(
+    new InvokeCommand({
+      FunctionName: BOARD_REPLY_FUNCTION,
+      InvocationType: "Event",
+      Payload: Buffer.from(JSON.stringify(payload)),
+    }),
+  );
+}
 
 /** Choose which talent should reply to an operator message. 1:1 → the sole
  *  talent. Group → the first @-addressed participant, else the primary

@@ -25,9 +25,9 @@ newsletter/app/public/posts/   DERIVED corpus (*.md, *.en.md, manifest.json, ima
 newsletter/pipeline/    fetch-notion.mjs (Notion → posts/) · generate-sitemap.mjs · backfill-en.mjs · one-shot migrations
 newsletter/docs/        L1 statute docs for the pipeline (see doc map) · archive/ = retired GAS-era notes
 newsletter/template/    index.html static design mockup only — not built or served
-workforce/app/          @kohuehara/workforce — console SPA (Cognito + Google)
+workforce/app/          @kohuehara/workforce — console SPA (Cognito + Google); public /boards/:id Q&A boards (password + nickname, ADR-0034)
 workforce/docs/         README.md is the index: statute (governance, architecture, data-model, naming, mvv, adr/) · runbooks/ · routines/ · epics/ · hires/ · design/
-workforce/lambdas/      15 TypeScript Lambdas (agents-api, orchestrator, tools-api, wf-podcast, memory-compactor, …) + shared/; README.md lists them
+workforce/lambdas/      16 TypeScript Lambdas (agents-api, orchestrator, tools-api, wf-podcast, board-reply, memory-compactor, …) + shared/; README.md lists them
 workforce/infra/        SAM stacks: sam (data plane), sam-web, sam-web-cert, sam-api-domain
 workforce/skills/       42 skill bundles: SKILL.md + meta.json + write-scripts (article-level2/3, pr-autopilot, feed-post, …)
 workforce/projects/     project.json seeds for external projects (asp-cloud, luckyhat, …); tools/ = ADR-0027 project tools

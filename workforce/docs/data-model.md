@@ -113,6 +113,17 @@ Per [Epic-013 Story 1 (#248)](https://github.com/refluster/ai-native-article/iss
 | `THREAD#{thread_id}` | `MSG#{ulid}` | One message | `from` (talent slug \| `operator`), `at` (ISO), `body_preview` (≤320c inline), `body_ref?` (S3 key `messages/{thread_id}/{ulid}.md`, absent when the body fit inline), `finish_reason?` / `tokens_in?` / `tokens_out?` / `skill_version?` (set on talent messages authored by `messaging-reply`, Story 3) |
 | `THREAD#{thread_id}` | `PART#{slug}` | Per-participant inbox/unread row | `participant`, `unread` (int), `last_read_at?`, `gsi4pk="INBOX#{slug}"`, `gsi4sk=last_message_at`. **Denormalises the thread summary** (`participants[]`, `group`, `group_label?`, `starred`, `last_message_at`, `last_message_from`, `last_message_preview`) so `GET /threads` is a single GSI4 query with no per-thread META/MSG fan-out. The write path (Story 2, #249) keeps these fields in sync on each new message. |
 
+#### Board rows (public Q&A boards)
+
+Per [ADR-0034](adr/adr-0034-public-qa-boards.md). A board is a password-gated, nickname-identified guest surface at `workforce.kohuehara.xyz/boards/{board_id}`; posts are workforce state (DDB + S3 per R-N2), never editorial artefacts (W-2). `workforce/lambdas/shared/board.ts` exports the helpers; `workforce/scripts/create-board.mjs` writes the META row.
+
+| `pk` | `sk` | Purpose | Key attributes |
+|---|---|---|---|
+| `BOARD#{board_id}` | `META` | Board descriptor + entry credential | `board_id`, `name`, `password_salt` + `password_hash` (scrypt of the shared password — also the HMAC key of every guest token, so rotating the password revokes them all), `agents?` (mentionable slugs; absent ⇒ every non-archived agent), `archived`, `created_at`, `last_post_at?` |
+| `BOARD#{board_id}` | `POST#{ulid}` | One post — guest or agent | `author_kind` (`human` \| `agent`), `author` (nickname \| slug), `at`, `body_preview` (≤320c inline), `body_ref?` (S3 `boards/{board_id}/{ulid}.md`), `reply_to?` + denormalised `reply_to_author` / `reply_to_author_kind` / `reply_to_preview` (the inline quote), `root_post_id` (the human post that started the cascade), `hop` (0 human, 1 agent answer, 2 delegated answer — mentions on a hop-2 post are never honoured), `mentions[]`, `hidden?` (operator moderation), `finish_reason?` / `tokens_in?` / `tokens_out?` / `skill_version?` on agent posts |
+
+`POST#{ulid}` sorts chronologically; the page read is a DESC query reversed into reading order (newest page + `older_cursor`), the guest poll is an ascending `sk > POST#{last_seen}` key-range query, and the daily reply budget counts `author_kind="agent"` rows from `POST#{ulid-lower-bound(today)}` upward. There is no per-participant row: guests are anonymous nicknames carried in the token, not rows.
+
 `MSG#{ulid}` sorts chronologically (the ULID is time-ordered), so the per-thread read is an ascending `begins_with(sk, "MSG#")` partition query — oldest first, the natural reading order. Message bodies are dual-stored S3↔inline exactly like POST bodies (Epic-011) and `artifact_ref.summary` (Epic-010 §8): the common work-register message fits entirely in `body_preview`; only a message approaching the 2000-char hard cap needs the S3 fetch.
 
 ### GSI1 / GSI2 usage
@@ -185,6 +196,7 @@ design-docs/{slug}/{deliv-ulid}/img/{name}.{png,svg}    # Image attachments
 launches/{slug}/{deliv-ulid}/{name}.md                  # Yuki's positioning / launch docs
 posts/{slug}/{yyyy}/{mm}/{ulid}.md                      # Feed micro-post bodies (Epic-011)
 messages/{thread_id}/{ulid}.md                          # Talent-message bodies over the inline preview cap (Epic-013)
+boards/{board_id}/{ulid}.md                             # Q&A board post bodies over the inline preview cap (ADR-0034)
 exports/{stage}/{yyyy-mm-dd}/...                        # Weekly ExportTableToPointInTime output (ADR-0007 §7 — DDB is the org's source of truth; rebuild = restore, not re-seed)
 ```
 
