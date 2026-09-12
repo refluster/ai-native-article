@@ -17,9 +17,15 @@
 //   lifecycle — wf-performance-reducer Lambda, EventBridge 02:00 UTC. Its
 //               freshness tell is the last point's DATE (the reducer appends
 //               one point per day unconditionally, so a gap is a missed run).
-//   PR        — workforce-performance-refresh.yml, 05:33 UTC. Its tell is
+//   PR        — workforce-performance-refresh.yml, daily. Its tell is
 //               `pr_updated_at`; the last pr_daily date is NOT usable, because
 //               a genuinely quiet day merges no PRs and emits no point.
+//
+// Neither writer's clock hour is quoted to the reader. The reducer is
+// EventBridge and fires on time; the refresh is a GitHub `schedule`, which in
+// this repo runs ~4-4.5h after its nominal 05:33 slot (measured 09-10..09-12).
+// Naming an hour the job does not keep would be one more claim the surface
+// cannot substantiate — the failure this panel exists to stop.
 
 import { useEffect, useState } from 'react';
 import AgentLifecyclePanel from './AgentLifecyclePanel';
@@ -27,9 +33,11 @@ import PrAutomationPanel from './PrAutomationPanel';
 import { loadPerformance, type PerformanceScope } from '../lib/performance';
 import type { PerformanceSeries } from '../types/performance';
 
-// One daily cycle plus a generous buffer for a late or slow run. The two
-// writers fire at 02:00 and 05:33 UTC, so a block older than this has missed
-// at least one whole run.
+// One daily cycle plus a generous buffer. Both writers are daily, and the
+// GitHub-scheduled one drifts hours from its nominal slot (see above), so the
+// buffer absorbs that drift: 30h still flags a genuinely missed run while
+// tolerating a run that lands late. Observed refresh times were within ~30min
+// of each other across three days, so the margin is ample.
 const LIVE_STALE_HOURS = 30;
 
 function hoursSince(iso: string | undefined, now: Date): number {
@@ -117,7 +125,7 @@ export default function PerformancePanels({ scope }: { scope: PerformanceScope }
           * stale — {staleBlocks.join(' and ')} {staleBlocks.length > 1 ? 'have' : 'has'} not been
           refreshed in over {LIVE_STALE_HOURS}h. Lifecycle through{' '}
           {series.lifecycle[series.lifecycle.length - 1]?.date ?? 'never'} (wf-performance-reducer,
-          02:00 UTC) · PR roll-up {prStamp} (workforce-performance-refresh.yml, 05:33 UTC). The
+          daily) · PR roll-up {prStamp} (workforce-performance-refresh.yml, daily). The
           charts plot the dates the backend actually published — they are not re-mapped to today —
           so a flat tail is missing data, not zero activity.
         </p>
