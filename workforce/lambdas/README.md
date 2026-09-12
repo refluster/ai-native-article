@@ -20,6 +20,7 @@ One directory per Lambda, each with a `handler.ts` (+ `Makefile` for `sam build`
 | `credentials-api/` | `wf-credentials-api` | Operator-only per-project credentials (ADR-0009). |
 | `migrate-credentials/` | `wf-migrate-credentials` | One-shot credential migration. |
 | `messaging-reply/` | `wf-messaging-reply` | Real-time operator ↔ talent reply path (ADR-0006). |
+| `board-reply/` | `wf-board-reply` | Agent answers to `@`-mentions on the public Q&A boards; hop-bounded delegation to one colleague in the same invocation; grounded in the build-time public knowledge pack (ADR-0034). |
 | `l1-source-register/` | `wf-l1-source-register` | No-LLM L1 source capture into the Notion Articles DB (`/capture` share target). |
 | `wf-podcast/` | `wf-podcast` | Polly synthesis, S3/CloudFront distribution, RSS (ADR-0016). |
 | `memory-compactor/` | `wf-memory-compactor` | Nightly agent-memory folding (ADR-0019). |
@@ -45,6 +46,11 @@ One directory per Lambda, each with a `handler.ts` (+ `Makefile` for `sam build`
 | `GET` | `/skills/{name}` | public | Single skill's full record (identity + body + operational + computed). Epic-008 PR-D. |
 | `PATCH` | `/skills/{name}` | AWS_IAM | Update judgment-side skill config ([ADR-0008](../docs/adr/adr-0008-skill-config-single-source.md)): `body`, `description`, `version`, `status`, `owners`, `cost_class`, `improvement_agent[_override]`. Validated by `shared/skill-config.ts`, audited to `SKILL#{name}/AUDIT#`. Code-side fields (write-scripts, `requires[]`, `archetype`, `deliverable`) are git-owned and rejected `400`. |
 | `GET` | `/skills/{name}/audit` | public | Skill config-mutation audit trail, newest-first (ADR-0008). |
+| `POST` | `/boards/{id}/enter` | board password | Guest enters a Q&A board: shared password + nickname → board-scoped bearer token (ADR-0034). |
+| `GET` | `/boards/{id}` | board token | Board card + mentionable roster. Board reads are token-gated, not public. |
+| `GET` | `/boards/{id}/posts` | board token | Newest page (chronological, `older_cursor`), or `?after={post_id}` poll tail. |
+| `POST` | `/boards/{id}/posts` | board token | Guest post / reply; async-invokes `wf-board-reply` once per `@`-mentioned roster agent (≤3). |
+| `PATCH` | `/boards/{id}/posts/{post_id}` | AWS_IAM | Operator moderation: `{hidden: bool}`. |
 
 The table above is the original core; feed, stats, projects, bindings, credentials, tools and podcast routes are documented by `GET /docs/openapi` (kept in sync by `npm run workforce:openapi-routes`). New personas are registered via `POST /agents` (ADR-0007 retired the `workforce/agents/` git tree; the DDB row family is the single authoritative store and agents-api the single writer — see [runbooks/agent-registration.md](../docs/runbooks/agent-registration.md)). Skills split along the Software 2.0 seam ([ADR-0008](../docs/adr/adr-0008-skill-config-single-source.md)): judgment-side fields mutate via `PATCH /skills/{name}` (DDB-authoritative, write = live on the next fire); write-scripts and `requires[]` stay git-owned, so a NEW skill still enters via the `cadence-forge` scaffold + PR — no `POST /skills`.
 

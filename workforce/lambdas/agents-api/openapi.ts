@@ -48,6 +48,7 @@ tags:
   - name: projects
   - name: feed
   - name: threads
+  - name: boards
   - name: meta
 components:
   securitySchemes:
@@ -60,6 +61,13 @@ components:
       type: http
       scheme: bearer
       description: Capability token scoped to one write path (Secrets Manager-held).
+    boardToken:
+      type: http
+      scheme: bearer
+      description: >
+        Board-scoped guest token minted by POST /boards/{id}/enter (ADR-0034): an
+        HMAC over {board_id, nickname, exp} keyed on the board's own password hash.
+        Rotating the board password revokes every token for that board.
   parameters:
     pageSize:
       name: page_size
@@ -362,6 +370,23 @@ components:
       required: [starred]
       properties:
         starred: { type: boolean }
+    BoardEnter:
+      type: object
+      required: [password, nickname]
+      properties:
+        password: { type: string, description: 'The board''s shared entry password.' }
+        nickname: { type: string, maxLength: 32, description: 'Display name for this guest; may not start with @.' }
+    BoardPostCreate:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string, maxLength: 4000, description: 'Post text; @slug mentions summon roster agents.' }
+        reply_to: { type: string, description: 'Parent post id (renders as an inline quote, Discord-style).' }
+    BoardPostPatch:
+      type: object
+      required: [hidden]
+      properties:
+        hidden: { type: boolean }
     FeedPost:
       type: object
       properties:
@@ -804,6 +829,85 @@ paths:
       responses:
         "200": { description: OK }
         "400": { description: invalid_starred }
+  /boards/{id}/enter:
+    post:
+      tags: [boards]
+      summary: Enter a Q&A board with the shared password + a nickname (ADR-0034)
+      description: >
+        Public route (no API GW authorizer). Verifies the board's shared password
+        (scrypt) and mints the board-scoped bearer token every other board route
+        requires. The nickname is the guest's display identity for the token's
+        lifetime; it is trusted, not verified (invited-guest scale, C-3).
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BoardEnter' }
+      responses:
+        "200": { description: 'OK — { token, nickname, expires_at, board }' }
+        "400": { description: 'invalid_json / invalid_nickname / invalid_board_id' }
+        "401": { description: invalid_password }
+        "404": { description: not_found }
+        "410": { description: board_archived }
+  /boards/{id}:
+    get:
+      tags: [boards]
+      summary: Board card + mentionable roster
+      security: [{ boardToken: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: 'OK — { board: { board_id, name, created_at, agents[] }, session }' }
+        "401": { description: invalid_token }
+  /boards/{id}/posts:
+    get:
+      tags: [boards]
+      summary: Newest page of posts (chronological), or the poll tail after a post id
+      security: [{ boardToken: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: after, in: query, required: false, schema: { type: string }, description: 'Return only posts newer than this post id (the poll). Overrides paging.' }
+        - { name: page_size, in: query, required: false, schema: { type: integer, default: 50, maximum: 100 } }
+        - { name: cursor, in: query, required: false, schema: { type: string }, description: 'Opaque older_cursor from a previous page — resumes toward the start of the board.' }
+      responses:
+        "200": { description: 'OK — { posts[], older_cursor? }' }
+        "401": { description: invalid_token }
+    post:
+      tags: [boards]
+      summary: Guest posts (or replies); each @-mentioned agent is summoned to answer
+      description: >
+        Persists the guest's post under the token's nickname, then async-invokes
+        wf-board-reply once per mentioned roster agent (at most three). A reply to
+        an agent's post with no explicit mention addresses that agent. Dispatch is
+        best-effort — the post has already landed when it fails.
+      security: [{ boardToken: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BoardPostCreate' }
+      responses:
+        "201": { description: 'Created — { post, dispatched[] }' }
+        "400": { description: 'invalid_json / invalid_body / invalid_reply_to' }
+        "401": { description: invalid_token }
+  /boards/{id}/posts/{post_id}:
+    patch:
+      tags: [boards]
+      summary: Operator moderation — hide or unhide one post
+      security: [{ sigv4: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: post_id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BoardPostPatch' }
+      responses:
+        "200": { description: OK }
+        "400": { description: invalid_hidden }
+        "404": { description: not_found }
   /dispatch:
     post:
       tags: [agents]

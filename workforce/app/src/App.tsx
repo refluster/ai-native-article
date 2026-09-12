@@ -5,7 +5,7 @@
 // completion handler; gating it behind authentication would deadlock.
 
 import { useEffect } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import AgentDirectory from './pages/AgentDirectory';
 import AgentProfile from './pages/AgentProfile';
@@ -24,6 +24,7 @@ import Messaging from './pages/Messaging';
 import Notifications from './pages/Notifications';
 import AuthCallback from './pages/AuthCallback';
 import Landing from './pages/Landing';
+import Board from './pages/Board';
 import Research from './pages/Research';
 import ResearchArticle from './pages/ResearchArticle';
 import AuthBoundary from './components/AuthBoundary';
@@ -72,6 +73,15 @@ function OrgRedirect() {
   const { search } = useLocation();
   const center = new URLSearchParams(search).get('center');
   return <Navigate to={center ? `/org/chart?q=${encodeURIComponent(center)}` : '/org/chart'} replace />;
+}
+
+/** `/messaging/boards/:id` → `/boards/:id`. The board URL was first
+ *  written under /messaging, but that prefix is the operator's gated inbox;
+ *  boards are public (ADR-0034), so they live at the apex and the older
+ *  spelling forwards. */
+function MessagingBoardRedirect() {
+  const { id = '' } = useParams<{ id: string }>();
+  return <Navigate to={`/boards/${id}`} replace />;
 }
 
 function DocsIndexRedirect() {
@@ -146,6 +156,11 @@ export default function App() {
         <Route path="/research" element={<Research />} />
         <Route path="/research/:slug" element={<ResearchArticle />} />
         <Route path="/docs" element={<DocsIndexRedirect />} />
+        {/* Q&A boards (ADR-0034): public, password-gated, nickname-identified.
+            Guests have no Cognito account, so the route sits outside
+            AuthBoundary; the board token (lib/boards.ts) is the gate. */}
+        <Route path="/boards/:id" element={<Board />} />
+        <Route path="/messaging/boards/:id" element={<MessagingBoardRedirect />} />
         <Route path="*" element={<ProtectedRoutes />} />
       </Routes>
     </BrowserRouter>
