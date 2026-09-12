@@ -3,17 +3,14 @@
 // wf-board-reply Lambda grounds its answers in (ADR-0034 §Decision 3).
 //
 // Sources (all PUBLIC — nothing here is a credential, a budget line or a
-// client detail; the pack is served back to guests verbatim, in prose):
-//   - a hand-written orientation section (what these products are, where)
-//   - workforce/docs/mvv.md                         mission / vision / values
-//   - workforce/app/public/docs/{founding-story,manifesto,whitepaper}.html
-//                                                   the /docs/ pages, HTML → text
-//   - workforce/docs/agent-workflow-overview.md     plain-language (ja) overview
-//   - CLAUDE.md                                     repository map + content flow
-//   - workforce/lambdas/README.md                   the Lambda catalogue
-//   - workforce/docs/governance.md §2 + §4          W-1..W-5, R-N shape rules
-//   - workforce/docs/adr/adr-*.md                   one index line per decision
-//   - workforce/ROADMAP.md                          phases
+// client detail; the pack is spoken back to guests, in prose). Operator
+// direction 2026-09-12: the organisation's THESIS — MVV, manifesto,
+// founding story — plus the public research articles is the corpus; the
+// implementation catalogues are not. Pinned (always in the prompt, in
+// full): orientation, mvv.md, manifesto, founding story. Selected by the
+// question: the technical whitepaper, the plain-language (ja) workflow
+// overview, and every article of the AI Native Article corpus (the
+// console's /research reader; newsletter/app/public/posts/*.md).
 //
 // Output: one markdown file of `## [source] Title` sections (a `|pinned`
 // suffix marks always-included sections). The Lambda's Makefile runs this
@@ -137,11 +134,10 @@ function slice(md, fromHeading, toHeading) {
 // --- Sources -------------------------------------------------------------
 
 const ORIENTATION = `
-This knowledge pack describes two products in one codebase, built and run by a single human founder (referred to here only as "the founder" or "the operator") together with an AI agent workforce:
+This corpus describes an organisation built and run by a single human founder (referred to here only as "the founder" or "the operator") together with an AI agent workforce, and the article site that workforce writes:
 
-- **Software Talent Network / Agent Workforce** — an AI-persona "company" of roughly fifty agents running on cloud infrastructure (a database and object storage for state, small serverless functions, an HTTP API) whose recurring jobs fire as scheduled AI coding-assistant sessions. The agents write articles, review and merge code changes, run a podcast, research markets and report to the founder. It has a public console with a landing page, a research reader and a set of public documents (founding story, manifesto, technical whitepaper).
-- **AI Native Article** — a bilingual (Japanese / English) article site. Source material is captured into a Notion database; the workforce's article-writing jobs turn it into explanations and deeper analyses in both languages; an automated publish step exports the content and rebuilds the reader site several times a day.
-- **Governance** — the whole thing runs under layered, written rules: a handful of non-negotiable invariants, a statute of decision records, mechanical checks that block bad changes automatically, and step-by-step runbooks for humans.
+- **Software Talent Network / Agent Workforce** — an organisation of roughly fifty persistent AI professionals, each with a job description, a position, operating principles, long-term memory and a track record, assembling around projects, delivering, and disbanding — under written governance where the human owns purpose and consequence. It has a public console with a landing page, a research reader and public documents (founding story, manifesto, technical whitepaper). The documents below are that organisation's own account of why it exists and how it should work.
+- **AI Native Article** — a bilingual (Japanese / English) research site the workforce writes: source material is captured, the agents turn it into explanations and deeper analyses, and an automated publish step rebuilds the reader several times a day. Its articles are included below as the organisation's published thinking.
 
 Themes people ask about: multi-agent organisations, an AI workforce as "virtual labour capital", speeding up software delivery with agents, outsourcing work outside one's expertise to AI agents, and how governance keeps an autonomous organisation safe.
 `.trim();
@@ -161,6 +157,13 @@ Themes people ask about: multi-agent organisations, an AI workforce as "virtual 
 
 const EXTERNAL_PROJECT_PLACEHOLDER = "an external client project";
 
+/**
+ * Project ids that are ordinary words ("conference"): matching them would
+ * drop every line that uses the word. Their client identity is carried by
+ * CLIENT_TOPIC_TERMS instead. Mirrored in shared/board-redact.ts.
+ */
+export const GENERIC_PROJECT_TERMS = new Set(["conference"]);
+
 /** External client project identifiers read from workforce/projects/. */
 export function externalProjectTerms() {
   const dir = join(REPO_ROOT, "workforce", "projects");
@@ -176,7 +179,7 @@ export function externalProjectTerms() {
       continue;
     }
     for (const t of [data.id, data.name, data.github?.repo, data.github?.owner && data.github?.repo ? `${data.github.owner}/${data.github.repo}` : undefined]) {
-      if (typeof t === "string" && t.trim().length >= 3) terms.add(t.trim());
+      if (typeof t === "string" && t.trim().length >= 3 && !GENERIC_PROJECT_TERMS.has(t.trim().toLowerCase())) terms.add(t.trim());
     }
   }
   // Longest first so "Project IND" is replaced before "IND"-style prefixes.
@@ -239,6 +242,50 @@ export function scrub(text, projectTerms = externalProjectTerms()) {
   return s.replace(/\n{3,}/g, "\n\n").trim();
 }
 
+/** `<title>` of a docs page, cleaned of the site suffix. */
+export function htmlTitle(html) {
+  const m = /<title>([\s\S]*?)<\/title>/i.exec(html);
+  if (!m) return undefined;
+  return decodeEntities(m[1]).replace(/\s+/g, " ").replace(/\s*[—|-]\s*Software Talent Network\s*$/i, "").trim() || undefined;
+}
+
+const POSTS_DIR = join(REPO_ROOT, "newsletter", "app", "public", "posts");
+
+/**
+ * The AI Native Article corpus (the console's /research reader) as
+ * `{title, body}` articles. Frontmatter is dropped; images and links are
+ * reduced to their text. An article is EXCLUDED whole when its text
+ * mentions an external client project or a client topic — it is client
+ * work, and a line-dropped article would be a mutilated one.
+ */
+export function researchArticles(projectTerms = externalProjectTerms()) {
+  const articles = [];
+  let excluded = 0;
+  if (!existsSync(POSTS_DIR)) return { articles, excluded };
+  const files = readdirSync(POSTS_DIR).filter((f) => f.endsWith(".md") && !f.endsWith(".en.md")).sort();
+  const clientRes = [...projectTerms, ...CLIENT_TOPIC_TERMS].map(projectTermRe);
+  for (const f of files) {
+    const raw = readFileSync(join(POSTS_DIR, f), "utf8");
+    const fm = /^---\n([\s\S]*?)\n---\n/.exec(raw);
+    const front = fm ? fm[1] : "";
+    let body = fm ? raw.slice(fm[0].length) : raw;
+    const titleMatch = /^title:\s*"?(.*?)"?\s*$/m.exec(front);
+    const title = (titleMatch ? titleMatch[1] : basename(f, ".md")).replace(/[*_`]/g, "").trim();
+    body = body
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+      .replace(/^#{1,2} .*$/m, "")
+      .trim();
+    if (body.length < 200) continue;
+    if (clientRes.some((re) => re.test(body) || re.test(title))) {
+      excluded += 1;
+      continue;
+    }
+    articles.push({ title, body });
+  }
+  return { articles, excluded };
+}
+
 export function buildKnowledgePack({ now = new Date() } = {}) {
   const sections = [];
   const projectTerms = externalProjectTerms();
@@ -253,70 +300,39 @@ export function buildKnowledgePack({ now = new Date() } = {}) {
 
   add("about", "What this is (orientation)", ORIENTATION, true);
 
-  // MVV: mission + vision pinned; the rest selectable.
+  // MVV — pinned in full.
   const mvv = cleanMarkdown(read("workforce/docs/mvv.md"));
-  for (const [i, block] of splitSections(mvv, "Agent Workforce — MVV").entries()) {
-    const pinned = /^(mission|vision)$/i.test(block.title);
-    add("mvv", block.title, block.body, pinned || i === 0);
+  for (const block of splitSections(mvv, "Agent Workforce — MVV")) {
+    add("mvv", block.title, block.body, true);
   }
 
-  // The three public docs pages.
-  for (const [file, source] of [
-    ["founding-story.html", "founding-story"],
-    ["manifesto.html", "manifesto"],
-    ["whitepaper.html", "whitepaper"],
+  // The three public docs pages. Manifesto + founding story are the thesis
+  // (pinned in full); the whitepaper is the technical account (selected).
+  for (const [file, source, pinned] of [
+    ["founding-story.html", "founding-story", true],
+    ["manifesto.html", "manifesto", true],
+    ["whitepaper.html", "whitepaper", false],
   ]) {
-    const text = htmlToText(read(join("workforce/app/public/docs", file)));
-    const titleLine = text.split("\n").find((l) => l.startsWith("# ")) ?? `# ${source}`;
-    const docTitle = titleLine.replace(/^# /, "").trim();
+    const html = read(join("workforce/app/public/docs", file));
+    const text = htmlToText(html);
+    const docTitle = htmlTitle(html) ?? source;
     for (const block of splitSections(text, docTitle)) {
-      add(source, `${docTitle} — ${block.title}`, block.body);
+      add(source, `${docTitle} — ${block.title}`, block.body, pinned);
     }
   }
 
-  // Plain-language Japanese overview of who does what.
+  // Plain-language Japanese overview of who does what (selected).
   const overview = cleanMarkdown(read("workforce/docs/agent-workflow-overview.md"));
   for (const block of splitSections(overview, "Agent Workforce 全体像")) {
     add("workflow-overview", block.title, block.body);
   }
 
-  // Repository map + content flow from CLAUDE.md.
-  const claude = read("CLAUDE.md");
-  add("repo", "How content flows (L1 → L2/L3 → publish)", slice(claude, "## How content flows", "## Doc map"));
-  add("repo", "The quality layer (Software 2.0)", slice(claude, "## The quality layer", "## Action authority"));
-
-  // Lambda catalogue.
-  const lambdas = read("workforce/lambdas/README.md");
-  add("lambdas", "Workforce Lambdas (data plane catalogue)", slice(lambdas, "## Layout", "## Local dev"));
-
-  // Governance: invariants + shape rules.
-  const gov = read("workforce/docs/governance.md");
-  add(
-    "governance",
-    "Workforce L0 invariants (W-1..W-5)",
-    // The W-3 cap-amendment table is a budget ledger, not a rule — drop it.
-    slice(gov, "## §2.", "## §3.").split("\n").filter((l) => !/^\s*\|/.test(l)).join("\n"),
-  );
-  add("governance", "Workforce design rules (R-N1..R-N10)", slice(gov, "## §4.", "## §5."));
-
-  // ADR index: one line per decision, from each file's own header.
-  const adrDir = join(REPO_ROOT, "workforce/docs/adr");
-  const adrLines = readdirSync(adrDir)
-    .filter((f) => /^adr-\d{4}-.+\.md$/.test(f))
-    .sort()
-    .map((f) => {
-      const src = readFileSync(join(adrDir, f), "utf8");
-      const title = (src.split("\n").find((l) => l.startsWith("# ")) ?? `# ${basename(f, ".md")}`).slice(2).trim();
-      const status = (/\*\*Status\*\*:\s*([^\n]+)/.exec(src)?.[1] ?? "").trim();
-      return `- ${title}${status ? ` (${status})` : ""}`;
-    });
-  add("adr", "Architecture decision records (index)", adrLines.join("\n"));
-
-  // Roadmap phases.
-  const roadmap = cleanMarkdown(read("workforce/ROADMAP.md"));
-  for (const block of splitSections(roadmap, "Workforce — ROADMAP")) {
-    add("roadmap", block.title, block.body);
-  }
+  // The research corpus — every published article, one section each
+  // (selected by the question). An article whose text touches an external
+  // client project or client topic is left out whole: it is client work.
+  const { articles, excluded } = researchArticles(projectTerms);
+  for (const a of articles) add("research", a.title, a.body);
+  if (excluded > 0) console.error(`build-board-knowledge: ${excluded} research article(s) excluded (client-work terms)`);
 
   const banner = [
     "# Board knowledge pack",

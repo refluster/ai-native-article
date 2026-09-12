@@ -8,18 +8,22 @@
 //
 //   1. loads the board, the addressed post and the recent transcript
 //      (shared/board.ts, direct DDB),
-//   2. composes the addressed agent's persona from AGENT#{slug}/META
-//      (ADR-0007) + the board channel contract + the public knowledge
-//      pack (shared/board-knowledge.ts, lexical retrieval over the docs
-//      bundled at `sam build`) + the agent's own record (EXEC recall and
-//      the latest memory summary, both fail-soft),
+//   2. composes the prompt ORGANISATION-FIRST (operator direction
+//      2026-09-12): the channel contract with its reasoning order → the
+//      organisation's thesis corpus (MVV, manifesto, founding story —
+//      always, in full) → who this agent is inside that design (persona
+//      voice + JD + identity + position, from AGENT#{slug}/META, ADR-0007)
+//      → material selected for the question (whitepaper, the plain-language
+//      overview, the research articles; lexical retrieval,
+//      shared/board-knowledge.ts) → colleagues → a short memory excerpt,
 //   3. calls Claude once (shared/llm-anthropic.ts — the same key every
 //      agent uses),
 //   4. enforces the W-1 guards (truncation throws inside complete(), the
-//      LLM-artefact head regex, empty body),
+//      LLM-artefact head regex, empty body) and the confidentiality
+//      redaction (shared/board-redact.ts) on what goes in and out,
 //   5. writes the agent POST row via shared createBoardPost() — the same
-//      trust domain as the guest route, so no bearer endpoint is needed and
-//      a reply never re-enters the HTTP dispatch path.
+//      trust domain as the guest route, so a reply never re-enters the
+//      HTTP dispatch path.
 //
 // Delegation, bounded by construction (ADR-0034 §Decision 4): an agent
 // answering a GUEST (hop 0 → 1) may hand the question to ONE colleague by
@@ -48,24 +52,26 @@ import {
   type BoardPostRow,
   type BoardPostView,
 } from "../shared/board.js";
-import { parseKnowledgePack, selectKnowledge, type KnowledgeSection } from "../shared/board-knowledge.js";
+import { parseKnowledgePack, renderPinned, selectKnowledge, type KnowledgeSection } from "../shared/board-knowledge.js";
 import { isInternalProjectId, normaliseProjectTerms, redactForBoard } from "../shared/board-redact.js";
 import { getItem, scanAllPrefix } from "../shared/ddb.js";
 import { complete } from "../shared/llm-anthropic.js";
 import { readChunk, readIndex } from "../shared/memory.js";
-import type { ProjectId, ProjectMetaRow } from "../shared/project.js";
-import { buildRecallBlock } from "../shared/recall-prompt.js";
+import type { ProjectMetaRow } from "../shared/project.js";
 
 const STAGE = process.env.STAGE ?? "dev";
 
 /** Bumped when the reply prompt/guard contract changes (lands on POST rows
- *  as `skill_version`, mirroring messaging-reply). */
-/**  0.2.0: audience = outside guests (plain language, no internal jargon);
- *         hard confidentiality — external client projects, code-hosting
- *         detail and the founder's identity are never disclosed, with a
- *         mechanical redaction of recall/memory in and of the answer out
- *         (shared/board-redact.ts); recall limited to internal projects. */
-const SKILL_VERSION = "0.2.0";
+ *  as `skill_version`, mirroring messaging-reply).
+ *  0.2.0: audience = outside guests; hard confidentiality with mechanical
+ *         redaction in and out; recall limited to internal projects.
+ *  0.3.0: organisation-first composition — the thesis corpus (MVV,
+ *         manifesto, founding story) is always in full and comes BEFORE
+ *         the persona; the persona is voice + JD + identity + position, not
+ *         the whole operating prompt; EXEC recall dropped; memory excerpt
+ *         shortened; an explicit reasoning order (human organisation →
+ *         mixed-organisation design → this workforce → my position). */
+const SKILL_VERSION = "0.3.0";
 
 const NO_REPLY_TOKEN = "__NO_REPLY_NEEDED__";
 
@@ -80,10 +86,21 @@ const TRANSCRIPT_POSTS = 30;
 /** Per-post body cap inside the transcript (long posts are elided). */
 const TRANSCRIPT_POST_CHARS = 1200;
 
-/** Knowledge-pack budget folded into the system prompt. */
-const KNOWLEDGE_MAX_CHARS = 18_000;
-/** Cap on the memory-summary excerpt (same as messaging-reply). */
-const MEMORY_EXCERPT_CHARS = 1200;
+/** Budgets for the knowledge pack. The pinned thesis corpus rides along in
+ *  full (the operator's direction: cover MVV, manifesto and founding story
+ *  — the antithesis is in them); the selected material is the part that
+ *  varies with the question. */
+const PINNED_SECTION_MAX_CHARS = 20_000;
+const SELECTED_MAX_CHARS = 24_000;
+const SELECTED_MAX_SECTIONS = 6;
+const SELECTED_SECTION_MAX_CHARS = 8_000;
+
+/** How much of the persona operating prompt is kept — its opening prose,
+ *  where the voice and character live. The rest is operating detail
+ *  (cadences, projects) that pulls answers toward the agent's own desk. */
+const PERSONA_HEAD_CHARS = 1500;
+/** Cap on the memory-summary excerpt — a short personal note, last. */
+const MEMORY_EXCERPT_CHARS = 600;
 
 /** Per-board agent replies per UTC day — the seatbelt against a bug that
  *  re-fires, not a product limit (the operator said cost is not the
@@ -166,32 +183,67 @@ async function loadRoster(meta: BoardMetaRow): Promise<RosterEntry[]> {
 
 interface PersonaCard {
   model: string;
-  systemMd: string;
   name: string;
   role: string;
-  mission?: string;
-  voice?: string;
+  /** Opening prose of the operating prompt — the voice. */
+  voiceMd: string;
+  /** Rendered JD + identity + position block. */
+  positionMd: string;
+}
+
+function asStringArray(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim().length > 0) : [];
+}
+
+/** First PERSONA_HEAD_CHARS of the operating prompt, cut at a paragraph. */
+export function personaHead(systemPrompt: string, max = PERSONA_HEAD_CHARS): string {
+  const s = systemPrompt.trim();
+  if (s.length <= max) return s;
+  const cut = s.lastIndexOf("\n\n", max);
+  return (cut > max / 2 ? s.slice(0, cut) : s.slice(0, max)).trim();
+}
+
+/** JD + identity + position, rendered as plain markdown for the prompt. */
+export function renderPosition(row: AgentMetaRow, roster: Map<string, RosterEntry>): string {
+  const jd = (row.jd ?? {}) as Record<string, unknown>;
+  const identity = (row.identity ?? {}) as Record<string, unknown>;
+  const lines: string[] = [];
+  if (typeof jd.mission === "string") lines.push(`Why this role exists: ${jd.mission}`);
+  const resp = asStringArray(jd.key_responsibilities);
+  if (resp.length > 0) lines.push("What it is responsible for:", ...resp.map((r) => `- ${r}`));
+  const measures = asStringArray(jd.success_measures);
+  if (measures.length > 0) lines.push("How it is judged:", ...measures.map((m) => `- ${m}`));
+  if (typeof identity.archetype === "string") lines.push(`Archetype: ${identity.archetype}`);
+  const principles = asStringArray(identity.operating_principles);
+  if (principles.length > 0) lines.push("Operating principles:", ...principles.map((p) => `- ${p}`));
+  const guardrails = asStringArray(identity.guardrails);
+  if (guardrails.length > 0) lines.push("Will not:", ...guardrails.map((g) => `- ${g}`));
+  if (typeof identity.voice === "string") lines.push(`Voice: ${identity.voice}`);
+  const reportsTo = (row.reports_to ?? []).map((s) => {
+    const r = roster.get(s);
+    return r ? `${r.name} (${r.role})` : s;
+  });
+  if (reportsTo.length > 0) lines.push(`Reports to: ${reportsTo.join(", ")}`);
+  if (row.streams && row.streams.length > 0) lines.push(`Streams: ${row.streams.join(", ")}`);
+  return lines.join("\n");
 }
 
 // ADR-0007: the AGENT#{slug}/META row is the single persona source. A
 // missing row or empty prompt throws (W-4) — a persona-less answer under a
 // byline is a W-1 violation.
-async function loadPersona(slug: string): Promise<PersonaCard> {
+async function loadPersona(slug: string, roster: Map<string, RosterEntry>): Promise<PersonaCard> {
   const row = await getItem<AgentMetaRow>(agentPk(slug), "META");
   if (!row) throw new Error(`board-reply: AGENT#${slug}/META row not found`);
   if (!row.model || typeof row.system_prompt !== "string" || row.system_prompt.length === 0) {
     emitMetric("WfBoardPersonaMissing", { Slug: slug });
     throw new Error(`board-reply: AGENT#${slug}/META lacks model/system_prompt — PATCH the row via agents-api (ADR-0007)`);
   }
-  const jd = (row.jd ?? {}) as Record<string, unknown>;
-  const identity = (row.identity ?? {}) as Record<string, unknown>;
   return {
     model: row.model,
-    systemMd: row.system_prompt,
     name: `${row.first_name} ${row.last_name}`.trim(),
     role: row.role,
-    ...(typeof jd.mission === "string" ? { mission: jd.mission } : {}),
-    ...(typeof identity.voice === "string" ? { voice: identity.voice } : {}),
+    voiceMd: personaHead(row.system_prompt),
+    positionMd: renderPosition(row, roster),
   };
 }
 
@@ -218,48 +270,52 @@ async function loadExternalProjectTerms(): Promise<string[]> {
   return _externalTerms;
 }
 
-/** Recall + memory grounding — both legs fail-soft, as in messaging-reply.
- *  Recall keeps only executions on internal projects; both legs are then
- *  passed through the board redactor so no client name, repository or
- *  founder detail reaches the prompt. */
-async function assembleWorkContext(slug: string, inbound: string, externalTerms: ReadonlyArray<string>): Promise<string> {
-  const sections: string[] = [];
-  const recallBlock = await buildRecallBlock({
-    caller_agent_slug: slug,
-    brief: inbound.slice(0, 300),
-    skillName: "board-reply",
-    projectId: `self/${slug}` as ProjectId,
-    filter: (r) => isInternalProjectId(String(r.row.project_id ?? "")),
-  });
-  if (recallBlock) sections.push(recallBlock.trim());
+/** A short excerpt of the agent's latest memory summary — its own
+ *  reflections, redacted, fail-soft. EXEC recall is deliberately NOT used
+ *  on boards (0.3.0): "what I did last week" pulls answers toward the
+ *  agent's desk, away from the organisation. */
+async function memoryExcerpt(slug: string, externalTerms: ReadonlyArray<string>): Promise<string> {
   try {
     const idx = await readIndex(slug);
     const key = idx?.latest_summary_key ?? idx?.latest_chunk_key ?? undefined;
-    if (key) {
-      const chunk = await readChunk(key);
-      const excerpt =
-        chunk.length > MEMORY_EXCERPT_CHARS ? `${chunk.slice(0, MEMORY_EXCERPT_CHARS)}\n…(older memory omitted)` : chunk;
-      sections.push(`## Your memory (latest summary)\n\n${excerpt.trim()}`);
-    }
+    if (!key) return "";
+    const chunk = await readChunk(key);
+    const excerpt = chunk.length > MEMORY_EXCERPT_CHARS ? `${chunk.slice(0, MEMORY_EXCERPT_CHARS)}…` : chunk;
+    const redacted = redactForBoard(excerpt.trim(), externalTerms);
+    if (redacted.hits.length > 0) emitMetric("WfBoardContextRedacted", { Slug: slug });
+    return redacted.text;
   } catch (err) {
     console.warn(JSON.stringify({ event: "board_reply_memory_skipped", slug, error: String(err) }));
+    return "";
   }
-  const joined = sections.join("\n\n");
-  const redacted = redactForBoard(joined, externalTerms);
-  if (redacted.hits.length > 0) emitMetric("WfBoardContextRedacted", { Slug: slug });
-  return redacted.text;
 }
 
 // --- Prompt composition --------------------------------------------------
 
 function channelContract(persona: PersonaCard, canDelegate: boolean): string {
   const lines = [
-    `You are ${persona.name} (${persona.role}), answering on a public Q&A board hosted on the`,
-    "workforce console. The readers are invited guests from OUTSIDE the organisation — curious",
+    `You are ${persona.name} (${persona.role}), a member of an AI-and-human organisation, answering on a`,
+    "public Q&A board. The readers are invited guests from OUTSIDE the organisation — curious",
     "people, not insiders: think of a bright university student who has never seen this",
     "system. They ask about multi-agent organisations, an AI workforce as virtual labour",
     "capital, faster software delivery with agents, outsourcing work outside one's own",
     "expertise to agents, and how governance keeps an autonomous organisation safe.",
+    "",
+    "HOW TO THINK. Reason from the organisation outward, not from your desk outward:",
+    "1. What assumption of ordinary human organisations does this question touch — the",
+    "   ones built around scarce human labour (hierarchy to coordinate, jobs as identity,",
+    "   headcount as capacity, meetings and hand-offs as the price of coordination)?",
+    "2. What does the thesis below say a mixed organisation of humans and AI agents should",
+    "   be instead, and why — what humans keep (purpose, legitimacy, judgement, consequence,",
+    "   the final say) and what agents carry (execution, memory, parallel work, evaluation)?",
+    "3. How is that actually built and run in this organisation today — mechanisms, rules,",
+    "   what has worked and what has not?",
+    "4. Only then: where you sit in that design, what your role does and does not do, and",
+    "   what you have seen from that seat.",
+    "5. What is still unresolved or debatable. Say so.",
+    "Write the answer to the question first; let the frame show through the reasoning, not",
+    "as a checklist. It is expected that you speak for the organisation as a whole, not",
+    "only for yourself.",
     "",
     "Write ONE answer to the post you were mentioned in, in your own voice and first person.",
     "Aim for two to four short paragraphs (roughly 300–900 characters in Japanese, or",
@@ -275,9 +331,9 @@ function channelContract(persona: PersonaCard, canDelegate: boolean): string {
     "Answer in the language of the post you are answering — Japanese or English. If it",
     "mixes both, prefer Japanese.",
     "",
-    "Ground yourself in the knowledge pack and your own record below. When the answer is",
-    "not in them, say so plainly and give your best professional judgement, marked as such.",
-    "Never invent facts, numbers, dates or document names.",
+    "Ground yourself in the thesis and the material below. When the answer is not in them,",
+    "say so plainly and give your best professional judgement, marked as such. Never invent",
+    "facts, numbers, dates or document names.",
     "",
     "CONFIDENTIALITY — this is a PUBLIC surface; these are hard rules, not preferences:",
     "- Never disclose anything about the external client projects this organisation works",
@@ -355,6 +411,42 @@ export function buildTranscript(
   return lines.join("\n");
 }
 
+/** The system prompt, organisation-first. Exported for the tests. */
+export function composeSystem(input: {
+  persona: PersonaCard;
+  canDelegate: boolean;
+  knowledge: KnowledgeSection[];
+  question: string;
+  roster: RosterEntry[];
+  selfSlug: string;
+  memory: string;
+}): string {
+  const thesis = renderPinned(input.knowledge, { pinnedMaxChars: PINNED_SECTION_MAX_CHARS });
+  const selected = selectKnowledge(input.knowledge, input.question, {
+    maxChars: SELECTED_MAX_CHARS,
+    maxSections: SELECTED_MAX_SECTIONS,
+    sectionMaxChars: SELECTED_SECTION_MAX_CHARS,
+    includePinned: false,
+  });
+  const persona = [
+    `# Who you are in this organisation`,
+    "",
+    "## Your voice",
+    input.persona.voiceMd,
+    ...(input.persona.positionMd ? ["", "## Your position — a consequence of the design above", input.persona.positionMd] : []),
+  ].join("\n");
+  return [
+    channelContract(input.persona, input.canDelegate),
+    thesis ? `# The organisation's thesis — read this first\n\n${thesis}` : "",
+    persona,
+    selected ? `# Material related to this question\n\n${selected}` : "",
+    input.canDelegate ? rosterBlock(input.roster, input.selfSlug) : "",
+    input.memory ? `## A note from your own memory (private; never quote)\n\n${input.memory}` : "",
+  ]
+    .filter((s) => s.length > 0)
+    .join("\n\n---\n\n");
+}
+
 // --- One answer ----------------------------------------------------------
 
 interface AnswerContext {
@@ -376,18 +468,17 @@ interface Answer {
 async function answerAs(slug: string, parent: BoardPostRow, parentView: BoardPostView, ctx: AnswerContext): Promise<Answer | undefined> {
   const hop = parent.hop + 1;
   const canDelegate = hop < BOARD_MAX_HOP;
-  const persona = await loadPersona(slug);
-  const knowledge = selectKnowledge(loadKnowledge(), parentView.body, { maxChars: KNOWLEDGE_MAX_CHARS });
-  const work = await assembleWorkContext(slug, parentView.body, ctx.externalTerms);
-  const system = [
-    persona.systemMd,
-    channelContract(persona, canDelegate),
-    canDelegate ? rosterBlock(ctx.roster, slug) : "",
-    knowledge ? `# Knowledge pack (public documents)\n\n${knowledge}` : "",
-    work,
-  ]
-    .filter((s) => s.length > 0)
-    .join("\n\n---\n\n");
+  const persona = await loadPersona(slug, ctx.rosterMap);
+  const memory = await memoryExcerpt(slug, ctx.externalTerms);
+  const system = composeSystem({
+    persona,
+    canDelegate,
+    knowledge: loadKnowledge(),
+    question: parentView.body,
+    roster: ctx.roster,
+    selfSlug: slug,
+    memory,
+  });
   const user = buildTranscript(ctx.meta.name, ctx.transcript, parentView, ctx.rosterMap, slug);
 
   // complete() throws on stop_reason==='max_tokens' — that IS the W-1

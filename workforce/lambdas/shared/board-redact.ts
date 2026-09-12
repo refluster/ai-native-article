@@ -47,11 +47,16 @@ export function isInternalProjectId(id: string): boolean {
   return id.startsWith("self/") || id === "agent-workforce";
 }
 
+/** Project ids that are ordinary words ("conference"): redacting them would
+ *  hit every use of the word. Their client identity is carried by
+ *  CLIENT_TOPIC_TERMS. Mirrors GENERIC_PROJECT_TERMS in the pack builder. */
+export const GENERIC_PROJECT_TERMS: ReadonlySet<string> = new Set(["conference"]);
+
 /** Longest-first, deduplicated term list from raw project fields. */
 export function normaliseProjectTerms(raw: ReadonlyArray<string | undefined | null>): string[] {
   const out = new Set<string>();
   for (const t of raw) {
-    if (typeof t === "string" && t.trim().length >= 3) out.add(t.trim());
+    if (typeof t === "string" && t.trim().length >= 3 && !GENERIC_PROJECT_TERMS.has(t.trim().toLowerCase())) out.add(t.trim());
   }
   return [...out].sort((a, b) => b.length - a.length);
 }

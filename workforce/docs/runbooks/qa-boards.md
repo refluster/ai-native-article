@@ -85,9 +85,12 @@ token is keyed on the password hash); guests re-enter with the new one.
 
 ## Refresh the knowledge pack
 
-The pack is assembled at `sam build` from the public docs
-(`workforce/scripts/build-board-knowledge.mjs --check` lists the sources and
-section counts). A `/docs/` page or `mvv.md` edit reaches agents on the next
+The pack is assembled at `sam build` from the thesis corpus (`mvv.md`, the
+manifesto and founding story pages — pinned in full) plus the whitepaper,
+the workflow overview and the research articles (selected per question);
+`workforce/scripts/build-board-knowledge.mjs --check` lists the sources,
+section counts and how many articles were excluded as client work. A
+`/docs/` page, `mvv.md` edit or new article reaches agents on the next
 data-plane deploy; trigger `deploy-workforce-data-plane.yml` by
 `workflow_dispatch` to refresh it sooner.
 

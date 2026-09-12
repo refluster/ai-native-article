@@ -17,7 +17,10 @@ const TERMS = normaliseProjectTerms(["asp-cloud", "ASP Cloud", "PSVL/asp-cloud",
 
 describe("normaliseProjectTerms / isInternalProjectId", () => {
   it("dedupes, drops short or missing terms, sorts longest first", () => {
-    expect(normaliseProjectTerms(["ab", undefined, null, " asp-cloud ", "asp-cloud", "Project IND"])).toEqual(["Project IND", "asp-cloud"]);
+    expect(normaliseProjectTerms(["ab", undefined, null, " asp-cloud ", "asp-cloud", "Project IND", "conference", "Conference"])).toEqual([
+      "Project IND",
+      "asp-cloud",
+    ]);
   });
   it("treats self/* and agent-workforce as internal", () => {
     expect(isInternalProjectId("self/maya")).toBe(true);

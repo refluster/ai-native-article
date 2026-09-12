@@ -83,21 +83,42 @@ the identity the guest entered with, never a client-supplied field.
 
 The reply Lambda cannot read the repository. Instead
 `workforce/scripts/build-board-knowledge.mjs` assembles, at `sam build`, one
-markdown pack from the repository's **public** documents — the three
-`/docs/` pages (HTML → text), `mvv.md`, `agent-workflow-overview.md`, the
-repository map and content flow from `CLAUDE.md`, the Lambda catalogue,
-governance §2/§4, an ADR index and the roadmap — and the Makefile ships it
-beside the handler bundle. Nothing is committed; every data-plane deploy
-refreshes the pack.
+markdown pack and the Makefile ships it beside the handler bundle. Nothing
+is committed; every data-plane deploy refreshes the pack.
 
-Retrieval is lexical ([ADR-0002](adr-0002-no-dedicated-vector-store.md):
-no vector store): the question is tokenised into stemmed ASCII words and
-kanji/katakana bigrams, sections are scored by shared terms weighted by
-rarity, and the best ones are folded under a character budget behind two
-pinned sections (orientation, mission/vision). On top of the pack the
-handler adds what messaging-reply already adds — EXEC recall keyed on the
-question and the latest memory summary, both fail-soft — so an agent speaks
-from its own record as well as the documents.
+**What is in it, and in what role** (operator direction 2026-09-12, second
+round: answers must reason from the organisation's thesis — an AI
+organisation as the antithesis of one built around scarce human labour,
+what a mixed human-and-AI organisation should be — down to each agent's
+role, not from the agent's desk outward):
+
+- **Pinned, in full, before the persona**: an orientation paragraph,
+  `mvv.md`, the manifesto and the founding story (the `/docs/` pages,
+  HTML → text). This is the thesis; the antithesis is stated in these
+  documents, so no separate thesis document is authored.
+- **Selected by the question**: the technical whitepaper, the plain-language
+  workflow overview, and every article of the AI Native Article corpus
+  (`newsletter/app/public/posts/*.md`, the console's `/research` reader) —
+  the organisation's published thinking, one section per article.
+- **Not in it**: the repository map, the Lambda catalogue, the ADR index,
+  the roadmap, governance §2/§4. They are implementation catalogues; they
+  produced mechanism-centred answers and jargon.
+
+Retrieval for the selected part is lexical
+([ADR-0002](adr-0002-no-dedicated-vector-store.md): no vector store): the
+question is tokenised into stemmed ASCII words and kanji/katakana bigrams,
+sections are scored by shared terms weighted by rarity, and the best ones
+are folded under a character budget.
+
+The prompt is composed organisation-first: the channel contract (with an
+explicit reasoning order — human-organisation assumption → mixed-organisation
+design → how this workforce runs it → my position → what is unresolved) →
+the pinned thesis → **who this agent is inside that design** (the opening
+prose of its operating prompt for voice, then its JD, identity block and
+position from the META row, ADR-0007) → the selected material → colleagues
+→ a short excerpt of its memory summary. EXEC recall is deliberately not
+used on boards: "what I did last week" pulls the answer toward the agent's
+desk.
 
 The confidentiality line is the operator's (direction 2026-09-12, after the
 first live session): **nothing about external client projects, nothing
@@ -109,14 +130,15 @@ enforced in three layers, so a slip in one is caught by the next:
    `workforce/projects/*/project.json`, plus an operator-maintained list of
    client-work topics) and rewrites URLs, repository slugs, PR/issue
    numbers, file names, money figures and the founder's name/domain in
-   place. The repository-map section is not included at all.
+   place. A research article that touches a client project or client topic
+   is left out whole — it is client work, and a line-dropped article would
+   be a mutilated one.
 2. **Prompt** — the channel contract states the three rules as hard rules,
    tells the agent to refer to the operator only as "the founder", and asks
    for plain language a bright university student would follow (no
    internal jargon, rule numbers, layer labels or skill names).
 3. **Runtime** — `shared/board-redact.ts` applies the same three classes to
-   what goes *in* (recall is filtered to internal-project executions; recall
-   and memory text are redacted) and to what comes *out* (the finished
+   what goes *in* (the memory excerpt) and to what comes *out* (the finished
    answer is redacted before it is stored, with a `WfBoardAnswerRedacted`
    metric so a slipping persona is visible).
 
@@ -183,10 +205,17 @@ a conversation continues indefinitely only as long as a human keeps it going.
   passes the mechanical layers and rests on the prompt. The client-topic
   list is operator-maintained in two places (the builder and
   `board-redact.ts`) and should grow with each new external project.
-- **The pack lags the docs between deploys.** A `/docs/` edit reaches the
-  pack on the next data-plane deploy (the deploy workflow's path filter does
-  not include `workforce/docs/**` or `workforce/app/public/docs/**`); a
-  `workflow_dispatch` of `deploy-workforce-data-plane.yml` refreshes it.
+- **The pack lags the docs between deploys.** A `/docs/` edit, an `mvv.md`
+  edit or a new research article reaches the pack on the next data-plane
+  deploy (the deploy workflow's path filter includes none of
+  `workforce/docs/**`, `workforce/app/public/docs/**`,
+  `newsletter/app/public/posts/**`); a `workflow_dispatch` of
+  `deploy-workforce-data-plane.yml` refreshes it. The research corpus in
+  git is itself a derived export refreshed by the article deploy (C-2), so
+  the pack sees articles as of the last article deploy.
+- **Prompt size.** The pinned thesis is ~75k characters per answer, by the
+  operator's choice (cost is not the constraint); it lands as roughly
+  30–40k tokens and adds a few seconds of latency.
 - **Cost scales with guest activity**, bounded per post (≤ 6 calls) and per
   board per day (300 agent posts). Each agent's `model` from its META row is
   used as-is.

@@ -1116,9 +1116,9 @@ Resources:
 
   # --- Q&A board reply (ADR-0034) ------------------------------------------
   # The board twin of wf-messaging-reply: async-invoked by agents-api once
-  # per @-mentioned agent on a guest post; composes persona + the bundled
-  # public knowledge pack + the agent's own record, calls Claude, writes
-  # the agent POST row. A hop-1 answer may pull in ONE colleague, answered
+  # per @-mentioned agent on a guest post; composes the organisation's
+  # thesis corpus (bundled at build) + the persona's position + material
+  # selected for the question, calls Claude, writes the agent POST row. A hop-1 answer may pull in ONE colleague, answered
   # inside the same invocation (never a self-invoke — R-N1 untouched).
   WfBoardReplyFunction:
     Type: AWS::Serverless::Function
@@ -1161,13 +1161,6 @@ Resources:
               Action: s3:GetObject
               Resource:
                 - !Sub ${WfBucket.Arn}/memory/*
-            - Sid: BoardReplyRecallVoyageKey
-              # EXEC-ledger recall embeds the question via Voyage; voyage key
-              # path only. Fail-soft in the handler.
-              Effect: Allow
-              Action: secretsmanager:GetSecretValue
-              Resource:
-                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*/voyage.api_key-*
             - Sid: BoardReplyAnthropicKey
               # Same key resolution as messaging-reply (llm-anthropic.ts).
               Effect: Allow
@@ -1183,7 +1176,6 @@ Resources:
                 StringEquals:
                   cloudwatch:namespace:
                     - Workforce/Boards
-                    - Workforce/Recall
       Tags:
         workforce: !Ref Stage
 
