@@ -83,6 +83,13 @@ vi.mock("../shared/ddb.js", () => ({
   scanAllPrefix: (...args: unknown[]) => scanAllPrefix(...args),
 }));
 
+const PROJECTS = [
+  { pk: "PROJECT#agent-workforce", sk: "META", project_id: "agent-workforce", name: "Agent Workforce (internal trial)" },
+  { pk: "PROJECT#self/maya", sk: "META", project_id: "self/maya" },
+  { pk: "PROJECT#asp-cloud", sk: "META", project_id: "asp-cloud", name: "ASP Cloud", github_owner: "PSVL", github_repo: "asp-cloud" },
+  { pk: "PROJECT#luckyhat", sk: "META", project_id: "luckyhat", name: "LuckyHat" },
+];
+
 import { handler } from "./handler.js";
 
 const AGENTS = {
@@ -236,7 +243,7 @@ beforeEach(() => {
   getItem.mockReset();
   getItem.mockImplementation(async (pk: string) => AGENTS[pk.slice("AGENT#".length) as keyof typeof AGENTS]);
   scanAllPrefix.mockReset();
-  scanAllPrefix.mockResolvedValue(Object.values(AGENTS));
+  scanAllPrefix.mockImplementation(async (prefix: string) => (prefix === "PROJECT#" ? PROJECTS : Object.values(AGENTS)));
 });
 
 afterEach(() => {
@@ -263,7 +270,7 @@ describe("happy path", () => {
       finish_reason: "end_turn",
       tokens_in: 120,
       tokens_out: 60,
-      skill_version: "0.1.0",
+      skill_version: "0.2.0",
     });
     expect(createBoardPost.mock.calls[0]![0].reply_to.post_id).toBe("01H");
   });
@@ -277,7 +284,12 @@ describe("happy path", () => {
     expect(req.system).toContain("You are Maya, the product manager");
     expect(req.system).toContain("public Q&A board");
     expect(req.system).toContain("Answer in the language of the post");
-    expect(req.system).toContain("Do not disclose credentials");
+    expect(req.system).toContain("bright university student");
+    expect(req.system).toContain("Do not use the");
+    expect(req.system).toContain("CONFIDENTIALITY");
+    expect(req.system).toContain("external client projects");
+    expect(req.system).toContain("no repository names");
+    expect(req.system).toContain('only as "the founder"');
     // Pinned knowledge always rides along; the relevant section is selected.
     expect(req.system).toContain("What this is (orientation)");
     expect(req.system).toContain("wf-orchestrator dispatches CCR routines");
@@ -292,16 +304,34 @@ describe("happy path", () => {
     expect(req.maxTokens).toBe(2000);
   });
 
-  it("folds recall and memory into the prompt when present", async () => {
-    buildRecallBlock.mockResolvedValueOnce("## Relevant past work\n\n- Shipped the orchestrator tick.");
+  it("folds recall and memory into the prompt when present, redacted and recall-filtered to internal projects", async () => {
+    buildRecallBlock.mockResolvedValueOnce("## Relevant past work\n\n- Shipped the orchestrator tick for asp-cloud (PSVL/asp-cloud).");
     readIndex.mockResolvedValueOnce({ latest_summary_key: "memory/maya/summary.md" });
-    readChunk.mockResolvedValueOnce("I care about crisp kill criteria.");
+    readChunk.mockResolvedValueOnce("I care about crisp kill criteria. Koh Uehara wants LuckyHat done; see workforce/skills/x.mjs");
     complete.mockResolvedValueOnce(completion("Answer."));
     await handler(EVENT);
     const req = complete.mock.calls[0]![0] as { system: string };
     expect(req.system).toContain("Shipped the orchestrator tick");
     expect(req.system).toContain("## Your memory (latest summary)");
     expect(req.system).toContain("crisp kill criteria");
+    expect(req.system).not.toMatch(/asp-cloud|PSVL|LuckyHat|Uehara|x\.mjs/);
+    expect(req.system).toContain("an external client project");
+    expect(req.system).toContain("the founder wants");
+    // The recall hook keeps only internal-project executions.
+    const recallInput = buildRecallBlock.mock.calls[0]![0] as { filter: (r: { row: { project_id: string } }) => boolean };
+    expect(recallInput.filter({ row: { project_id: "asp-cloud" } })).toBe(false);
+    expect(recallInput.filter({ row: { project_id: "self/maya" } })).toBe(true);
+    expect(recallInput.filter({ row: { project_id: "agent-workforce" } })).toBe(true);
+  });
+
+  it("redacts a slipped client name, repository or founder detail from the stored answer", async () => {
+    complete.mockResolvedValueOnce(completion("We did this on asp-cloud; see https://github.com/refluster/ai-native-article. Koh Uehara decided."));
+    const res = await handler(EVENT);
+    expect(res.status).toBe("ok");
+    const stored = createBoardPost.mock.calls[0]![0].body as string;
+    expect(stored).not.toMatch(/asp-cloud|github|refluster|Uehara/i);
+    expect(stored).toContain("an external client project");
+    expect(stored).toContain("the founder decided");
   });
 });
 

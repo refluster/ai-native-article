@@ -99,11 +99,30 @@ handler adds what messaging-reply already adds — EXEC recall keyed on the
 question and the latest memory summary, both fail-soft — so an agent speaks
 from its own record as well as the documents.
 
-The confidentiality line is the operator's, enforced in two places: the
-pack's source list (public documents only), and the channel contract in the
-prompt (no credentials, hostnames, budgets or private client details;
-external projects in general terms). Recall and memory are **not** filtered
-mechanically — see Consequences.
+The confidentiality line is the operator's (direction 2026-09-12, after the
+first live session): **nothing about external client projects, nothing
+about where the code is hosted, nothing personal about the founder.** It is
+enforced in three layers, so a slip in one is caught by the next:
+
+1. **Build time** — `build-board-knowledge.mjs` `scrub()` drops every line
+   that names an external project (ids, display names and repos read from
+   `workforce/projects/*/project.json`, plus an operator-maintained list of
+   client-work topics) and rewrites URLs, repository slugs, PR/issue
+   numbers, file names, money figures and the founder's name/domain in
+   place. The repository-map section is not included at all.
+2. **Prompt** — the channel contract states the three rules as hard rules,
+   tells the agent to refer to the operator only as "the founder", and asks
+   for plain language a bright university student would follow (no
+   internal jargon, rule numbers, layer labels or skill names).
+3. **Runtime** — `shared/board-redact.ts` applies the same three classes to
+   what goes *in* (recall is filtered to internal-project executions; recall
+   and memory text are redacted) and to what comes *out* (the finished
+   answer is redacted before it is stored, with a `WfBoardAnswerRedacted`
+   metric so a slipping persona is visible).
+
+Redaction is by replacement or line-drop, never by refusing to answer: a
+guest still gets an answer, minus the sentence that should not have been
+there.
 
 ### 4. Delegation is one hop, answered in the same invocation; the API dispatches only on human posts
 
@@ -157,12 +176,13 @@ a conversation continues indefinitely only as long as a human keeps it going.
   gate. There is no rate limit beyond API Gateway defaults and scrypt's cost
   per password attempt. A brute-force on a weak shared password is the
   operator's risk to own by choosing the password; rotation is one command.
-- **Recall and memory are included unfiltered.** They can name external
-  projects (`asp-cloud`, `luckyhat`, …) or internal detail an agent worked
-  on. The prompt tells the agent to speak of such things in general terms;
-  the operator judged the content non-confidential by design. If that
-  changes, the fix is a `public` flag on projects and a filter in
-  `assembleWorkContext`, not a prompt tweak.
+- **Redaction is term-based, not semantic.** The three layers catch names,
+  ids, repositories, URLs, file names, money and the founder's identity, and
+  the client-topic list catches the desks the whitepaper describes by
+  subject. A paraphrase that identifies a client without any listed term
+  passes the mechanical layers and rests on the prompt. The client-topic
+  list is operator-maintained in two places (the builder and
+  `board-redact.ts`) and should grow with each new external project.
 - **The pack lags the docs between deploys.** A `/docs/` edit reaches the
   pack on the next data-plane deploy (the deploy workflow's path filter does
   not include `workforce/docs/**` or `workforce/app/public/docs/**`); a

@@ -137,24 +137,118 @@ function slice(md, fromHeading, toHeading) {
 // --- Sources -------------------------------------------------------------
 
 const ORIENTATION = `
-This knowledge pack describes two products in one repository, built and run by a single human operator (Koh Uehara) together with an AI agent workforce:
+This knowledge pack describes two products in one codebase, built and run by a single human founder (referred to here only as "the founder" or "the operator") together with an AI agent workforce:
 
-- **Software Talent Network / Agent Workforce** — an AI-persona "company" of roughly fifty agents on AWS (DynamoDB + S3 state, SAM-deployed Lambdas, an HTTP API) whose skills fire as Claude Code Remote routines. The agents write articles, review and merge pull requests, run a podcast, research markets and report to the operator. Console: https://workforce.kohuehara.xyz/ (public pages: the landing page, /research, /docs/). API: https://workforce-api.kohuehara.xyz/.
-- **AI Native Article** — a bilingual (Japanese / English) article site at https://kohuehara.xyz/ai-native-article/. Sources (L1) are captured into Notion; the workforce's article cadences write explanations (L2) and analyses (L3) in both languages; a GitHub Actions deploy exports Notion to markdown and publishes a React reader to GitHub Pages three times a day.
-- **Source code** — the monorepo https://github.com/refluster/ai-native-article holds both products plus the governance layer (layered rules: L0 invariants → L1 statute and ADRs → L2 mechanical CI gates → L3 runbooks).
+- **Software Talent Network / Agent Workforce** — an AI-persona "company" of roughly fifty agents running on cloud infrastructure (a database and object storage for state, small serverless functions, an HTTP API) whose recurring jobs fire as scheduled AI coding-assistant sessions. The agents write articles, review and merge code changes, run a podcast, research markets and report to the founder. It has a public console with a landing page, a research reader and a set of public documents (founding story, manifesto, technical whitepaper).
+- **AI Native Article** — a bilingual (Japanese / English) article site. Source material is captured into a Notion database; the workforce's article-writing jobs turn it into explanations and deeper analyses in both languages; an automated publish step exports the content and rebuilds the reader site several times a day.
+- **Governance** — the whole thing runs under layered, written rules: a handful of non-negotiable invariants, a statute of decision records, mechanical checks that block bad changes automatically, and step-by-step runbooks for humans.
 
 Themes people ask about: multi-agent organisations, an AI workforce as "virtual labour capital", speeding up software delivery with agents, outsourcing work outside one's expertise to AI agents, and how governance keeps an autonomous organisation safe.
 `.trim();
 
+// --- Redaction (ADR-0034 §Decision 3, operator direction 2026-09-12) ------
+//
+// The pack is spoken back to outside guests, so three classes of text are
+// scrubbed at build time regardless of which source they came from:
+//   1. external client projects — every project.json under workforce/projects/
+//      except the workforce's own `agent-workforce` (id, display name, repo);
+//   2. code-hosting detail — URLs, repository slugs, PR/issue numbers, file
+//      paths, workflow names;
+//   3. the founder's identity — the personal domain and name.
+// The reply Lambda applies the same class of scrub at runtime to recall,
+// memory and the finished answer (board-reply/handler.ts), so a slip in
+// one layer is caught by the other.
+
+const EXTERNAL_PROJECT_PLACEHOLDER = "an external client project";
+
+/** External client project identifiers read from workforce/projects/. */
+export function externalProjectTerms() {
+  const dir = join(REPO_ROOT, "workforce", "projects");
+  const terms = new Set();
+  if (!existsSync(dir)) return [];
+  for (const id of readdirSync(dir)) {
+    const file = join(dir, id, "project.json");
+    if (!existsSync(file) || id === "agent-workforce") continue;
+    let data;
+    try {
+      data = JSON.parse(readFileSync(file, "utf8"));
+    } catch {
+      continue;
+    }
+    for (const t of [data.id, data.name, data.github?.repo, data.github?.owner && data.github?.repo ? `${data.github.owner}/${data.github.repo}` : undefined]) {
+      if (typeof t === "string" && t.trim().length >= 3) terms.add(t.trim());
+    }
+  }
+  // Longest first so "Project IND" is replaced before "IND"-style prefixes.
+  return [...terms].sort((a, b) => b.length - a.length);
+}
+
+/**
+ * Client-work topics that identify an external project even when its name
+ * is absent (the whitepaper describes the desks by subject). Operator-
+ * maintained; a line mentioning one is dropped like a named mention.
+ * Mirrored in workforce/lambdas/shared/board-redact.ts CLIENT_TOPIC_TERMS.
+ */
+export const CLIENT_TOPIC_TERMS = [
+  "India", "インド", "DISCOM", "smart-meter", "smart meter", "smartmeter", "スマートメーター",
+  "home energy", "sponsor", "スポンサー", "run-of-show", "investor", "投資家",
+];
+
+/** The founder's identity: personal domain (→ "the site") and name. */
+const FOUNDER_DOMAIN_TERMS = ["workforce.kohuehara.xyz", "kohuehara.xyz", "kohuehara"];
+const FOUNDER_NAME_TERMS = ["Koh Uehara", "Uehara Koh", "Uehara", "上原"];
+
+function escapeRe(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function projectTermRe(term) {
+  // ASCII terms match as whole tokens; CJK terms have no word boundary.
+  return /^[\x00-\x7f]+$/.test(term)
+    ? new RegExp(`(?<![A-Za-z0-9_/-])${escapeRe(term)}(?![A-Za-z0-9_-])`, "i")
+    : new RegExp(escapeRe(term));
+}
+
+/**
+ * Scrub one block of text. A line that mentions an external client project
+ * is DROPPED whole (a table row or bullet about a client is about the
+ * client, not about this organisation); everything else is rewritten in
+ * place. Exported so the test can pin each class.
+ */
+export function scrub(text, projectTerms = externalProjectTerms()) {
+  const projectRes = [...projectTerms, ...CLIENT_TOPIC_TERMS].map(projectTermRe);
+  const kept = text
+    .split("\n")
+    .filter((line) => !projectRes.some((re) => re.test(line)));
+  let s = kept.join("\n");
+  // 2. code-hosting detail + money.
+  s = s
+    .replace(/https?:\/\/[^\s)\]>"']+/g, "")
+    .replace(/\b(?:refluster|PSVL)\/[A-Za-z0-9_.-]+/g, "the repository")
+    .replace(/\bgh-pages\b/gi, "the static host")
+    .replace(/\bGitHub(?: Actions| Pages)?\b/g, "the code host")
+    .replace(/\b(?:PR|pull request|issue)s?\s*#\d{1,5}\b/gi, "a code change")
+    .replace(/(?<![A-Za-z0-9])#\d{2,5}\b/g, "")
+    .replace(/\b(?:workforce|newsletter|scripts|docs|packages|\.github)\/[A-Za-z0-9_./{}*-]+/g, "(a file in the codebase)")
+    .replace(/\b[A-Za-z0-9_.-]+\.(?:mjs|cjs|ts|tsx|js|yml|yaml|toml)\b/g, "(a file in the codebase)")
+    .replace(/\bUSD\s?[\d,.]+(?:\s*(?:\/|per)\s*(?:mo|month))?/gi, "a fixed monthly amount")
+    .replace(/(?<![A-Za-z])\$\s?\d[\d,.]*(?:\s*(?:\/|per)\s*(?:mo|month))?/g, "a fixed amount");
+  // 3. the founder's identity.
+  for (const term of FOUNDER_DOMAIN_TERMS) s = s.replace(new RegExp(escapeRe(term), "gi"), "the site");
+  for (const term of FOUNDER_NAME_TERMS) s = s.replace(new RegExp(escapeRe(term), "g"), "the founder");
+  return s.replace(/\n{3,}/g, "\n\n").trim();
+}
+
 export function buildKnowledgePack({ now = new Date() } = {}) {
   const sections = [];
+  const projectTerms = externalProjectTerms();
   const add = (source, title, body, pinned = false) => {
     // One heading level belongs to the pack (`## [source] Title`); any
     // heading a source carries inside its body is demoted so the Lambda's
     // parser — and a reader — see exactly one section boundary per section.
-    const b = body.trim().replace(/^#{1,2} /gm, "### ");
+    const b = scrub(body.trim().replace(/^#{1,2} /gm, "### "), projectTerms);
     if (b.length === 0) return;
-    sections.push({ source, title: title.trim(), body: b, pinned });
+    sections.push({ source, title: scrub(title.trim(), projectTerms), body: b, pinned });
   };
 
   add("about", "What this is (orientation)", ORIENTATION, true);
@@ -188,7 +282,6 @@ export function buildKnowledgePack({ now = new Date() } = {}) {
 
   // Repository map + content flow from CLAUDE.md.
   const claude = read("CLAUDE.md");
-  add("repo", "Repository map", slice(claude, "## Repository map", "## How content flows"));
   add("repo", "How content flows (L1 → L2/L3 → publish)", slice(claude, "## How content flows", "## Doc map"));
   add("repo", "The quality layer (Software 2.0)", slice(claude, "## The quality layer", "## Action authority"));
 
@@ -198,7 +291,12 @@ export function buildKnowledgePack({ now = new Date() } = {}) {
 
   // Governance: invariants + shape rules.
   const gov = read("workforce/docs/governance.md");
-  add("governance", "Workforce L0 invariants (W-1..W-5)", slice(gov, "## §2.", "## §3."));
+  add(
+    "governance",
+    "Workforce L0 invariants (W-1..W-5)",
+    // The W-3 cap-amendment table is a budget ledger, not a rule — drop it.
+    slice(gov, "## §2.", "## §3.").split("\n").filter((l) => !/^\s*\|/.test(l)).join("\n"),
+  );
   add("governance", "Workforce design rules (R-N1..R-N10)", slice(gov, "## §4.", "## §5."));
 
   // ADR index: one line per decision, from each file's own header.

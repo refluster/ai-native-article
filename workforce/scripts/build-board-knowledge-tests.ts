@@ -8,7 +8,7 @@
 // instead, on the PR that renamed it.
 
 import { describe, expect, it } from "vitest";
-import { buildKnowledgePack, decodeEntities, htmlToText, splitSections } from "./build-board-knowledge.mjs";
+import { buildKnowledgePack, decodeEntities, externalProjectTerms, htmlToText, scrub, splitSections } from "./build-board-knowledge.mjs";
 
 describe("htmlToText", () => {
   it("keeps headings, lists and cells; drops head/script/style/svg", () => {
@@ -39,6 +39,33 @@ describe("splitSections", () => {
     const blocks = splitSections("intro\n# One\nbody\n### deep\n## Two\nmore", "Lead");
     expect(blocks.map((b) => b.title)).toEqual(["Lead", "One", "Two"]);
     expect(blocks[1]?.body).toBe("body\n### deep");
+  });
+});
+
+describe("scrub (redaction, operator direction 2026-09-12)", () => {
+  const terms = ["asp-cloud", "ASP Cloud", "Project IND"];
+
+  it("drops whole lines that mention an external client project or a client topic", () => {
+    const out = scrub("keep me\n| asp-cloud | product | detail |\nAlso ASP Cloud shipped.\nIndia energy desk scope.\nスマートメーターの分析\nstill here", terms);
+    expect(out).toBe("keep me\nstill here");
+  });
+
+  it("rewrites code-hosting detail, money and the founder's identity in place", () => {
+    const out = scrub(
+      "See https://github.com/refluster/ai-native-article/pull/717 and PR #12 in workforce/lambdas/x.ts; cap USD 600/month; Koh Uehara at kohuehara.xyz",
+      terms,
+    );
+    expect(out).not.toMatch(/https?:|refluster|#12|x\.ts|USD|Uehara|kohuehara/);
+    expect(out).toContain("a code change");
+    expect(out).toContain("a fixed monthly amount");
+    expect(out).toContain("the founder at the site");
+  });
+
+  it("reads every non-internal project id/name from workforce/projects/", () => {
+    const t = externalProjectTerms();
+    expect(t).toContain("asp-cloud");
+    expect(t).toContain("luckyhat");
+    expect(t).not.toContain("agent-workforce");
   });
 });
 
@@ -76,6 +103,17 @@ describe("buildKnowledgePack (live sources)", () => {
     expect(headings.length).toBe(pack.sections.length);
     for (const h of headings) expect(h).toMatch(/^## \[[a-z0-9-]+(\|pinned)?\] .+$/);
     expect(pack.markdown).not.toMatch(/<(div|p|span|script|style)[ >]/);
+  });
+
+  it("contains no external project, code-hosting, money or founder identity residue", () => {
+    for (const term of externalProjectTerms()) {
+      expect(pack.markdown.toLowerCase(), `external project term "${term}" leaked`).not.toContain(term.toLowerCase());
+    }
+    const body = pack.sections.map((s) => `${s.title}\n${s.body}`).join("\n");
+    expect(body).not.toMatch(/github\.com|refluster\/|kohuehara|Uehara|https?:\/\/|\bUSD\s?\d|\bIndia\b|DISCOM/);
+    expect(body).not.toMatch(/\b[A-Za-z0-9_.-]+\.(?:mjs|ts|yml)\b/);
+    expect(sources.has("repo")).toBe(true);
+    expect(pack.sections.some((s) => s.title === "Repository map")).toBe(false);
   });
 
   it("stays inside a sane size envelope", () => {

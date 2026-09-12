@@ -8,9 +8,11 @@
 // an inline quote of its parent, nothing is folded away) — with a
 // composer that offers @-completion over the board's agent roster.
 // Mentioned agents answer within seconds; the page polls `?after=` every
-// few seconds while the tab is visible and shows who is drafting.
+// few seconds while the tab is visible and shows who is drafting. Only the
+// newest page is loaded on open; scrolling to the top pages back through
+// history one cursor at a time.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import BrandMark from '../components/BrandMark';
 import Sigil from '../components/Sigil';
@@ -27,6 +29,7 @@ import {
   initialsOf,
   loadBoardSession,
   mergePosts,
+  pendingDelegates,
   probeMention,
   rankAgents,
   saveBoardSession,
@@ -39,6 +42,13 @@ import {
 } from '../lib/boards';
 
 const POLL_MS = 4000;
+/** First page: enough to fill a screen, not the whole log. Older history is
+ *  pulled one page at a time when the reader scrolls to the top (or taps
+ *  "Load earlier posts"), via the API's `older_cursor` (ADR-0034). */
+const FIRST_PAGE = 30;
+const OLDER_PAGE = 40;
+/** Distance from the top (px) at which the next older page is requested. */
+const LOAD_OLDER_THRESHOLD_PX = 120;
 /** How long "drafting…" stays up for a summoned agent before we stop
  *  promising an answer (the reply Lambda usually lands in 10–40 s; a
  *  delegated second answer can take a minute). */
@@ -350,6 +360,9 @@ export default function Board() {
   const [drafting, setDrafting] = useState<Record<string, number>>({});
   const listRef = useRef<HTMLDivElement | null>(null);
   const stickToBottom = useRef(true);
+  // Latest posts for the poll callback (it runs from an interval closure).
+  const postsRef = useRef<BoardPost[]>([]);
+  postsRef.current = posts;
 
   const agentMap = useMemo(() => new Map((board?.agents ?? []).map((a) => [a.slug, a])), [board]);
   const known = useMemo(() => new Set(agentMap.keys()), [agentMap]);
@@ -381,7 +394,10 @@ export default function Board() {
     let cancelled = false;
     (async () => {
       try {
-        const [info, page] = await Promise.all([fetchBoard(boardId, session.token), fetchPosts(boardId, session.token)]);
+        const [info, page] = await Promise.all([
+          fetchBoard(boardId, session.token),
+          fetchPosts(boardId, session.token, { pageSize: FIRST_PAGE }),
+        ]);
         if (cancelled) return;
         setBoard(info);
         setPosts(page.posts);
@@ -408,10 +424,20 @@ export default function Board() {
           ? await fetchPostsAfter(boardId, session.token, lastId)
           : (await fetchPosts(boardId, session.token)).posts;
         if (cancelled || fresh.length === 0) return;
-        setPosts((prev) => mergePosts(prev, fresh));
+        const merged = mergePosts(postsRef.current, fresh);
+        setPosts(merged);
+        // In arrival order: an agent that just posted is done drafting; if
+        // its answer hands over to a colleague (hop 1 → 2, ADR-0034), that
+        // colleague is drafting now — the Lambda answers them in the same
+        // invocation, so the chip appears before their post lands.
         setDrafting((prev) => {
           const next = { ...prev };
-          for (const p of fresh) if (p.author_kind === 'agent') delete next[p.author];
+          const until = Date.now() + DRAFTING_MS;
+          for (const p of fresh) {
+            if (p.author_kind !== 'agent') continue;
+            delete next[p.author];
+            for (const slug of pendingDelegates(p, merged, known)) next[slug] = until;
+          }
           return next;
         });
       } catch (err) {
@@ -423,7 +449,7 @@ export default function Board() {
       cancelled = true;
       window.clearInterval(handle);
     };
-  }, [session, board, boardId, lastId, bail]);
+  }, [session, board, boardId, lastId, bail, known]);
 
   // Expire stale "drafting…" chips.
   useEffect(() => {
@@ -447,18 +473,25 @@ export default function Board() {
     el.scrollTop = el.scrollHeight;
   }, [posts]);
 
-  function onScroll() {
+  // Prepending an older page grows the list above the viewport; restore the
+  // reader's place by adding the height delta back to scrollTop.
+  const restoreScrollRef = useRef<{ height: number; top: number } | null>(null);
+  useLayoutEffect(() => {
     const el = listRef.current;
-    if (!el) return;
-    stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-  }
+    const saved = restoreScrollRef.current;
+    if (!el || !saved) return;
+    restoreScrollRef.current = null;
+    el.scrollTop = saved.top + (el.scrollHeight - saved.height);
+  }, [posts]);
 
-  async function loadOlder() {
+  const loadOlder = useCallback(async () => {
     if (!session || !olderCursor || loadingOlder) return;
     setLoadingOlder(true);
     try {
-      const page = await fetchPosts(boardId, session.token, { cursor: olderCursor });
+      const page = await fetchPosts(boardId, session.token, { cursor: olderCursor, pageSize: OLDER_PAGE });
       stickToBottom.current = false;
+      const el = listRef.current;
+      if (el) restoreScrollRef.current = { height: el.scrollHeight, top: el.scrollTop };
       setPosts((prev) => mergePosts(page.posts, prev));
       setOlderCursor(page.older_cursor);
     } catch (err) {
@@ -466,6 +499,14 @@ export default function Board() {
     } finally {
       setLoadingOlder(false);
     }
+  }, [session, olderCursor, loadingOlder, boardId, bail]);
+
+  function onScroll() {
+    const el = listRef.current;
+    if (!el) return;
+    stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    // Reaching the top pulls the next older page (infinite scroll upward).
+    if (el.scrollTop < LOAD_OLDER_THRESHOLD_PX && olderCursor && !loadingOlder) void loadOlder();
   }
 
   async function send(body: string) {
@@ -566,7 +607,7 @@ export default function Board() {
                 disabled={loadingOlder}
                 className="font-wfmono text-[11px] uppercase tracking-[0.14em] px-4 py-1.5 rounded-full border border-wf-outline-variant text-wf-on-surface-variant hover:border-wf-primary hover:text-wf-primary disabled:opacity-50"
               >
-                {loadingOlder ? 'Loading…' : 'Load earlier posts / 以前の投稿'}
+                {loadingOlder ? 'Loading…' : 'Load earlier posts / さらに前の投稿'}
               </button>
             </div>
           )}
