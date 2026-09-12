@@ -59,6 +59,7 @@ vi.mock("../shared/board.js", async () => {
   const actual = await vi.importActual<typeof import("../shared/board.js")>("../shared/board.js");
   return {
     BOARD_MAX_HOP: actual.BOARD_MAX_HOP,
+    likersOf: actual.likersOf,
     parseMentions: actual.parseMentions,
     getBoardMeta: (...args: unknown[]) => getBoardMeta(...args),
     getBoardPost: (...args: unknown[]) => getBoardPost(...args),

@@ -6,13 +6,22 @@
 
 import { describe, expect, it, vi } from "vitest";
 
+const send = vi.fn();
 vi.mock("./ddb.js", () => ({
-  ddb: { send: vi.fn() },
+  ddb: { send: (...args: unknown[]) => send(...args) },
   getItem: vi.fn(),
   putItem: vi.fn(),
   updateOperational: vi.fn(),
 }));
 vi.mock("./task.js", () => ({ newUlid: () => "01TESTULID0000000000000000" }));
+vi.mock("@aws-sdk/lib-dynamodb", () => ({
+  QueryCommand: class {
+    constructor(public input: Record<string, unknown>) {}
+  },
+  UpdateCommand: class {
+    constructor(public input: Record<string, unknown>) {}
+  },
+}));
 vi.mock("@aws-sdk/client-s3", () => ({
   S3Client: class {
     send() {
@@ -29,6 +38,8 @@ vi.mock("@aws-sdk/client-s3", () => ({
 
 import {
   hashBoardPassword,
+  likersOf,
+  toggleBoardPostLike,
   mintBoardToken,
   newPasswordSalt,
   normaliseNickname,
@@ -149,6 +160,30 @@ describe("ulidLowerBound", () => {
   });
 });
 
+describe("likes", () => {
+  it("flattens a Set, an array or nothing into a sorted list", () => {
+    expect(likersOf({ likers: new Set(["Ken", "Hana"]) })).toEqual(["Hana", "Ken"]);
+    expect(likersOf({ likers: ["b", "a"] })).toEqual(["a", "b"]);
+    expect(likersOf({})).toEqual([]);
+  });
+
+  it("likes with a string-set ADD and unlikes with DELETE, returning the new likers", async () => {
+    send.mockReset();
+    send.mockResolvedValueOnce({ Attributes: { likers: new Set(["Hana"]) } });
+    expect(await toggleBoardPostLike("demo", "01A", "Hana", true)).toEqual(["Hana"]);
+    const add = (send.mock.calls[0]![0] as { input: Record<string, unknown> }).input;
+    expect(add.UpdateExpression).toBe("ADD #likers :who");
+    expect(add.ConditionExpression).toBe("attribute_exists(pk)");
+    expect((add.ExpressionAttributeValues as Record<string, Set<string>>)[":who"]).toEqual(new Set(["Hana"]));
+    expect(add.Key).toEqual({ pk: "BOARD#demo", sk: "POST#01A" });
+
+    send.mockResolvedValueOnce({ Attributes: {} });
+    expect(await toggleBoardPostLike("demo", "01A", "Hana", false)).toEqual([]);
+    const del = (send.mock.calls[1]![0] as { input: Record<string, unknown> }).input;
+    expect(del.UpdateExpression).toBe("DELETE #likers :who");
+  });
+});
+
 describe("toBoardPostView", () => {
   it("projects the row and carries the reply quote fields", () => {
     const row: BoardPostRow = {
@@ -167,6 +202,7 @@ describe("toBoardPostView", () => {
       root_post_id: "01A",
       hop: 1,
       mentions: [],
+      likers: new Set(["Ken", "Hana"]),
       tokens_in: 1,
     };
     expect(toBoardPostView(row, "short")).toEqual({
@@ -181,6 +217,7 @@ describe("toBoardPostView", () => {
       reply_to_preview: "the question",
       hop: 1,
       mentions: [],
+      likers: ["Hana", "Ken"],
     });
   });
 });

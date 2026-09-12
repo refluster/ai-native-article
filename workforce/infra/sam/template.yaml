@@ -957,6 +957,12 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /boards/{id}/posts
             Method: POST
+        LikeBoardPost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /boards/{id}/posts/{post_id}/like
+            Method: POST
         PatchBoardPost:
           Type: HttpApi
           Properties:

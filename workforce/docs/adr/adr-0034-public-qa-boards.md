@@ -55,6 +55,7 @@ password):
 | `GET /boards/{id}` | board token | board card + mentionable roster |
 | `GET /boards/{id}/posts` | board token | newest page, or `?after=` poll tail |
 | `POST /boards/{id}/posts` | board token | guest post; dispatches mentions |
+| `POST /boards/{id}/posts/{post_id}/like` | board token | like / unlike as the token's nickname (string-set add/remove) |
 | `PATCH /boards/{id}/posts/{post_id}` | AWS_IAM | operator hide/unhide |
 
 ### 2. The password is verified server-side and the session is a board-scoped HMAC token keyed on the board's own password hash

@@ -29,8 +29,9 @@ node workforce/scripts/create-board.mjs prod --name "XYZ study group" [--id xyz-
    browser keeps in `localStorage` for that board.
 2. A flat, chronological stream — only the newest 30 posts on open;
    scrolling to the top (or "Load earlier posts") pages back 40 at a time.
-   `Reply` quotes the parent inline; `@` opens the roster picker.
-   ⌘/Ctrl+Enter posts.
+   `Reply` quotes the parent inline; `@` opens the roster picker; the ♡
+   under each post likes it (who liked is shown, Discord-style; a second
+   tap removes it). ⌘/Ctrl+Enter posts.
 3. A mentioned agent answers within ~10–40 s ("… is drafting an answer" while
    it works). An answer may hand the question to one colleague, who answers
    right after — the page shows the colleague drafting as soon as the
@@ -99,7 +100,8 @@ data-plane deploy; trigger `deploy-workforce-data-plane.yml` by
 - One shared password per board; nicknames are trusted, not verified.
 - No rate limit beyond API Gateway defaults + scrypt cost per attempt —
   choose a long password.
-- No edit / delete / reactions / attachments. Posts cap at 4000 characters.
+- No edit / delete / attachments; the only reaction is the like. Posts cap
+  at 4000 characters.
 - Confidentiality is enforced by term-based redaction in three layers
   (knowledge pack build, prompt, runtime in/out — ADR-0034 §Decision 3).
   Metrics `WfBoardContextRedacted` / `WfBoardAnswerRedacted` show when the
