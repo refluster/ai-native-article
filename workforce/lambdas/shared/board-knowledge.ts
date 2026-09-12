@@ -120,8 +120,12 @@ export interface SelectKnowledgeOptions {
   maxSections?: number;
   /** Per-section body cap before it is folded in. */
   sectionMaxChars?: number;
-  /** Per-pinned-section body cap (pinned text should stay short). */
+  /** Per-pinned-section body cap. */
   pinnedMaxChars?: number;
+  /** Render the pinned sections ahead of the selection (default true).
+   *  The board reply renders them separately via renderPinned() so the
+   *  thesis corpus sits BEFORE the persona in the prompt. */
+  includePinned?: boolean;
 }
 
 export interface ScoredSection {
@@ -174,10 +178,21 @@ function renderSection(s: KnowledgeSection, bodyMax: number): string {
   return `### ${s.title}\n_Source: ${s.source}_\n\n${clip(s.body, bodyMax)}`;
 }
 
+/** Every pinned section, in pack order, rendered in full (up to
+ *  `pinnedMaxChars` each). The organisation's thesis corpus. */
+export function renderPinned(sections: KnowledgeSection[], opts: { pinnedMaxChars?: number } = {}): string {
+  const pinnedMax = opts.pinnedMaxChars ?? 3_000;
+  return sections
+    .filter((s) => s.pinned)
+    .map((s) => renderSection(s, pinnedMax))
+    .join("\n\n");
+}
+
 /**
  * Compose the knowledge block for one question: every pinned section (in
- * pack order) followed by the best-scoring sections that still fit the
- * character budget. Returns "" when the pack is empty.
+ * pack order, unless `includePinned` is false) followed by the best-scoring
+ * sections that still fit the character budget. Returns "" when nothing
+ * qualifies.
  */
 export function selectKnowledge(
   sections: KnowledgeSection[],
@@ -191,10 +206,12 @@ export function selectKnowledge(
 
   const parts: string[] = [];
   let used = 0;
-  for (const s of sections.filter((x) => x.pinned)) {
-    const rendered = renderSection(s, pinnedMax);
-    parts.push(rendered);
-    used += rendered.length;
+  if (opts.includePinned ?? true) {
+    for (const s of sections.filter((x) => x.pinned)) {
+      const rendered = renderSection(s, pinnedMax);
+      parts.push(rendered);
+      used += rendered.length;
+    }
   }
   let taken = 0;
   for (const { section } of rankSections(sections, question)) {

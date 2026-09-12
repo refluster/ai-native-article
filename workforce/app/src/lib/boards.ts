@@ -194,6 +194,40 @@ export function mergePosts(a: BoardPost[], b: BoardPost[]): BoardPost[] {
   return [...byId.values()].sort((x, y) => (x.post_id < y.post_id ? -1 : x.post_id > y.post_id ? 1 : 0));
 }
 
+/** Walk `reply_to` links up to the human post that started a cascade.
+ *  Returns the post itself when it has no loaded parent. */
+export function cascadeRootOf(post: BoardPost, byId: ReadonlyMap<string, BoardPost>): BoardPost {
+  let cur = post;
+  const seen = new Set<string>();
+  while (cur.reply_to && !seen.has(cur.post_id)) {
+    seen.add(cur.post_id);
+    const parent = byId.get(cur.reply_to);
+    if (!parent) break;
+    cur = parent;
+    if (cur.author_kind === 'human') break;
+  }
+  return cur;
+}
+
+/**
+ * Agents a freshly-arrived agent post hands over to — mirrors the reply
+ * Lambda's rule so the page can show "… is drafting" for the delegate while
+ * it writes: only a hop-1 answer delegates, to its first roster mention,
+ * never to itself, never to an agent that already answered in the same
+ * cascade. Returns at most one slug.
+ */
+export function pendingDelegates(post: BoardPost, all: ReadonlyArray<BoardPost>, roster: ReadonlySet<string>): string[] {
+  if (post.author_kind !== 'agent' || post.hop !== 1 || post.mentions.length === 0) return [];
+  const byId = new Map(all.map((p) => [p.post_id, p]));
+  const root = cascadeRootOf(post, byId).post_id;
+  const answered = new Set<string>();
+  for (const p of all) {
+    if (p.author_kind === 'agent' && cascadeRootOf(p, byId).post_id === root) answered.add(p.author);
+  }
+  const delegate = post.mentions.find((s) => roster.has(s) && s !== post.author && !answered.has(s));
+  return delegate ? [delegate] : [];
+}
+
 export type BodySegment = { kind: 'text'; text: string } | { kind: 'mention'; slug: string; text: string };
 
 const MENTION_SPLIT = /(^|[^A-Za-z0-9_@])(@[a-z0-9][a-z0-9-]{0,39})/gi;

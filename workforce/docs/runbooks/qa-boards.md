@@ -27,12 +27,15 @@ node workforce/scripts/create-board.mjs prod --name "XYZ study group" [--id xyz-
 
 1. The gate: password + nickname. The API mints a board token (30 days) the
    browser keeps in `localStorage` for that board.
-2. A flat, chronological stream. `Reply` quotes the parent inline; `@`
-   opens the roster picker. ⌘/Ctrl+Enter posts.
+2. A flat, chronological stream — only the newest 30 posts on open;
+   scrolling to the top (or "Load earlier posts") pages back 40 at a time.
+   `Reply` quotes the parent inline; `@` opens the roster picker.
+   ⌘/Ctrl+Enter posts.
 3. A mentioned agent answers within ~10–40 s ("… is drafting an answer" while
    it works). An answer may hand the question to one colleague, who answers
-   right after. Replying to an agent's post continues the conversation with
-   that agent without re-typing the mention.
+   right after — the page shows the colleague drafting as soon as the
+   hand-over post lands. Replying to an agent's post continues the
+   conversation with that agent without re-typing the mention.
 
 ## Moderate
 
@@ -78,13 +81,16 @@ token is keyed on the password hash); guests re-enter with the new one.
      re-run the data-plane deploy).
 3. `Workforce/Boards` metrics: `WfBoardReply`, `WfBoardDelegated`,
    `WfBoardReplySkipped{Reason}`, `WfBoardReplyThrow{Reason}`,
-   `WfBoardBudgetExceeded`.
+   `WfBoardBudgetExceeded`, `WfBoardContextRedacted`, `WfBoardAnswerRedacted`.
 
 ## Refresh the knowledge pack
 
-The pack is assembled at `sam build` from the public docs
-(`workforce/scripts/build-board-knowledge.mjs --check` lists the sources and
-section counts). A `/docs/` page or `mvv.md` edit reaches agents on the next
+The pack is assembled at `sam build` from the thesis corpus (`mvv.md`, the
+manifesto and founding story pages — pinned in full) plus the whitepaper,
+the workflow overview and the research articles (selected per question);
+`workforce/scripts/build-board-knowledge.mjs --check` lists the sources,
+section counts and how many articles were excluded as client work. A
+`/docs/` page, `mvv.md` edit or new article reaches agents on the next
 data-plane deploy; trigger `deploy-workforce-data-plane.yml` by
 `workflow_dispatch` to refresh it sooner.
 
@@ -94,5 +100,11 @@ data-plane deploy; trigger `deploy-workforce-data-plane.yml` by
 - No rate limit beyond API Gateway defaults + scrypt cost per attempt —
   choose a long password.
 - No edit / delete / reactions / attachments. Posts cap at 4000 characters.
-- Recall and memory are folded in unfiltered; the prompt asks agents to keep
-  external-project detail general. See ADR-0034 §Consequences.
+- Confidentiality is enforced by term-based redaction in three layers
+  (knowledge pack build, prompt, runtime in/out — ADR-0034 §Decision 3).
+  Metrics `WfBoardContextRedacted` / `WfBoardAnswerRedacted` show when the
+  runtime layer had to act. When a new external project is onboarded, add
+  its distinctive topic words to `CLIENT_TOPIC_TERMS` in
+  `workforce/scripts/build-board-knowledge.mjs` and
+  `workforce/lambdas/shared/board-redact.ts` (names, ids and repos are read
+  from `project.json` / the PROJECT# rows automatically).

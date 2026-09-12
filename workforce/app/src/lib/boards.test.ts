@@ -12,7 +12,9 @@ vi.mock('../config/api', () => ({
 import {
   BoardApiError,
   applyMention,
+  cascadeRootOf,
   clearBoardSession,
+  pendingDelegates,
   createPost,
   enterBoard,
   fetchPostsAfter,
@@ -36,6 +38,31 @@ describe('mergePosts', () => {
     const merged = mergePosts([post('01B'), post('01A')], [post('01C'), post('01B', { body: 'newer copy' })]);
     expect(merged.map((p) => p.post_id)).toEqual(['01A', '01B', '01C']);
     expect(merged[1].body).toBe('newer copy');
+  });
+});
+
+describe('cascadeRootOf / pendingDelegates', () => {
+  const roster = new Set(['maya', 'dario', 'ren']);
+  const guest = post('01A', { body: 'Q @maya', mentions: ['maya'] });
+  const answer = post('01B', { author_kind: 'agent', author: 'maya', hop: 1, reply_to: '01A', mentions: ['dario', 'ren'], body: 'ask @dario' });
+
+  it('walks reply links up to the guest post', () => {
+    const byId = new Map([guest, answer].map((p) => [p.post_id, p]));
+    expect(cascadeRootOf(answer, byId).post_id).toBe('01A');
+    expect(cascadeRootOf(guest, byId).post_id).toBe('01A');
+  });
+
+  it('names the first roster colleague a hop-1 answer hands over to', () => {
+    expect(pendingDelegates(answer, [guest, answer], roster)).toEqual(['dario']);
+  });
+
+  it('is empty for human posts, hop-2 answers, self-mentions and colleagues who already answered', () => {
+    expect(pendingDelegates(guest, [guest], roster)).toEqual([]);
+    expect(pendingDelegates({ ...answer, hop: 2 }, [guest, answer], roster)).toEqual([]);
+    expect(pendingDelegates({ ...answer, mentions: ['maya'] }, [guest, answer], roster)).toEqual([]);
+    const dariosEarlier = post('01C', { author_kind: 'agent', author: 'dario', hop: 1, reply_to: '01A', mentions: [] });
+    expect(pendingDelegates(answer, [guest, dariosEarlier, answer], roster)).toEqual(['ren']);
+    expect(pendingDelegates({ ...answer, mentions: ['nobody'] }, [guest, answer], roster)).toEqual([]);
   });
 });
 

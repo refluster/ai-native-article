@@ -30,11 +30,15 @@ Two products in one repository: the Software Talent Network and AI Native Articl
 
 Build the operating model for human-agent co-creation.
 
-## [lambdas] Workforce Lambdas
+## [manifesto|pinned] Manifesto — The human owns purpose and consequence
+
+Humans hold the constitutional layer; agents carry execution.
+
+## [whitepaper] Whitepaper — System architecture and execution flow
 
 wf-orchestrator dispatches CCR routines every two hours. wf-podcast synthesises audio.
 
-## [governance] Workforce design rules
+## [research] エージェント組織の統治
 
 R-N1 declares the execution surfaces; R-N2 keeps a single state store.
 `;
@@ -83,6 +87,13 @@ vi.mock("../shared/ddb.js", () => ({
   scanAllPrefix: (...args: unknown[]) => scanAllPrefix(...args),
 }));
 
+const PROJECTS = [
+  { pk: "PROJECT#agent-workforce", sk: "META", project_id: "agent-workforce", name: "Agent Workforce (internal trial)" },
+  { pk: "PROJECT#self/maya", sk: "META", project_id: "self/maya" },
+  { pk: "PROJECT#asp-cloud", sk: "META", project_id: "asp-cloud", name: "ASP Cloud", github_owner: "PSVL", github_repo: "asp-cloud" },
+  { pk: "PROJECT#luckyhat", sk: "META", project_id: "luckyhat", name: "LuckyHat" },
+];
+
 import { handler } from "./handler.js";
 
 const AGENTS = {
@@ -94,10 +105,12 @@ const AGENTS = {
     last_name: "Ishikawa",
     role: "Product manager",
     model: "anthropic:claude-sonnet-4-6",
-    system_prompt: "You are Maya, the product manager of the workforce.",
+    system_prompt: "You are Maya, the product manager of the workforce.\n\nOPERATING DETAIL: you run the hypothesis cadence on Tuesdays.",
     archived: false,
-    jd: { mission: "Own the roadmap." },
-    identity: { voice: "Direct, warm." },
+    jd: { mission: "Own the roadmap.", key_responsibilities: ["Write kill criteria"], success_measures: ["Every story has one"] },
+    identity: { voice: "Direct, warm.", archetype: "Boundary-setter", operating_principles: ["Boundary as language"], guardrails: ["Never ship without a criterion"] },
+    reports_to: ["dario"],
+    streams: ["product"],
   },
   dario: {
     pk: "AGENT#dario",
@@ -236,7 +249,7 @@ beforeEach(() => {
   getItem.mockReset();
   getItem.mockImplementation(async (pk: string) => AGENTS[pk.slice("AGENT#".length) as keyof typeof AGENTS]);
   scanAllPrefix.mockReset();
-  scanAllPrefix.mockResolvedValue(Object.values(AGENTS));
+  scanAllPrefix.mockImplementation(async (prefix: string) => (prefix === "PROJECT#" ? PROJECTS : Object.values(AGENTS)));
 });
 
 afterEach(() => {
@@ -263,24 +276,38 @@ describe("happy path", () => {
       finish_reason: "end_turn",
       tokens_in: 120,
       tokens_out: 60,
-      skill_version: "0.1.0",
+      skill_version: "0.3.0",
     });
     expect(createBoardPost.mock.calls[0]![0].reply_to.post_id).toBe("01H");
   });
 
-  it("composes persona + channel contract + knowledge + roster into the system prompt, the thread into user", async () => {
+  it("composes the prompt organisation-first: contract → thesis (pinned, full) → persona/position → selected → roster", async () => {
     complete.mockResolvedValueOnce(completion("Answer."));
     await handler(EVENT);
 
     const req = complete.mock.calls[0]![0] as { system: string; user: string; model: string; maxTokens: number };
     expect(req.model).toBe("anthropic:claude-sonnet-4-6");
-    expect(req.system).toContain("You are Maya, the product manager");
-    expect(req.system).toContain("public Q&A board");
-    expect(req.system).toContain("Answer in the language of the post");
-    expect(req.system).toContain("Do not disclose credentials");
-    // Pinned knowledge always rides along; the relevant section is selected.
-    expect(req.system).toContain("What this is (orientation)");
+    expect(req.system).toContain("HOW TO THINK. Reason from the organisation outward");
+    expect(req.system).toContain("bright university student");
+    expect(req.system).toContain("CONFIDENTIALITY");
+    expect(req.system).toContain('only as "the founder"');
+    // Order: thesis before persona, persona before selected material.
+    const iThesis = req.system.indexOf("# The organisation's thesis");
+    const iPersona = req.system.indexOf("# Who you are in this organisation");
+    const iSelected = req.system.indexOf("# Material related to this question");
+    expect(iThesis).toBeGreaterThan(0);
+    expect(iPersona).toBeGreaterThan(iThesis);
+    expect(iSelected).toBeGreaterThan(iPersona);
+    // Pinned thesis in full (all three), selected material by the question.
+    expect(req.system).toContain("### Mission");
+    expect(req.system).toContain("The human owns purpose and consequence");
     expect(req.system).toContain("wf-orchestrator dispatches CCR routines");
+    // Persona: voice head only (operating detail cut), plus JD/identity/position.
+    expect(req.system).toContain("You are Maya, the product manager");
+    expect(req.system).toContain("Why this role exists: Own the roadmap.");
+    expect(req.system).toContain("- Write kill criteria");
+    expect(req.system).toContain("Archetype: Boundary-setter");
+    expect(req.system).toContain("Reports to: Dario Bianchi (Governance architect)");
     // Roster excludes self and archived agents; hop-1 answers may delegate.
     expect(req.system).toContain("@dario — Dario Bianchi, Governance architect");
     expect(req.system).not.toContain("@maya —");
@@ -290,18 +317,46 @@ describe("happy path", () => {
     expect(req.user).toContain("Hana (guest)");
     expect(req.user).toContain("How does the orchestrator dispatch work?");
     expect(req.maxTokens).toBe(2000);
+    // EXEC recall is not used on boards.
+    expect(buildRecallBlock).not.toHaveBeenCalled();
   });
 
-  it("folds recall and memory into the prompt when present", async () => {
-    buildRecallBlock.mockResolvedValueOnce("## Relevant past work\n\n- Shipped the orchestrator tick.");
-    readIndex.mockResolvedValueOnce({ latest_summary_key: "memory/maya/summary.md" });
-    readChunk.mockResolvedValueOnce("I care about crisp kill criteria.");
+  it("keeps the persona's opening prose and cuts the operating detail", async () => {
+    getItem.mockImplementationOnce(async () => ({
+      ...AGENTS.maya,
+      system_prompt: `You are Maya.\n\n${"Operating detail. ".repeat(200)}\n\nMore.`,
+    }));
     complete.mockResolvedValueOnce(completion("Answer."));
     await handler(EVENT);
     const req = complete.mock.calls[0]![0] as { system: string };
-    expect(req.system).toContain("Shipped the orchestrator tick");
-    expect(req.system).toContain("## Your memory (latest summary)");
+    expect(req.system).toContain("You are Maya.");
+    expect(req.system).not.toContain("More.");
+    expect(req.system.indexOf("## Your voice")).toBeGreaterThan(0);
+  });
+
+  it("folds a short, redacted memory excerpt in last", async () => {
+    readIndex.mockResolvedValueOnce({ latest_summary_key: "memory/maya/summary.md" });
+    readChunk.mockResolvedValueOnce(`I care about crisp kill criteria. Koh Uehara wants LuckyHat done; see workforce/skills/x.mjs. ${"pad ".repeat(300)}`);
+    complete.mockResolvedValueOnce(completion("Answer."));
+    await handler(EVENT);
+    const req = complete.mock.calls[0]![0] as { system: string };
+    expect(req.system).toContain("## A note from your own memory");
     expect(req.system).toContain("crisp kill criteria");
+    expect(req.system).not.toMatch(/LuckyHat|Uehara|x\.mjs/);
+    expect(req.system).toContain("the founder wants");
+    expect(req.system.indexOf("## A note from your own memory")).toBeGreaterThan(req.system.indexOf("# Material related"));
+    // Capped: the 1200-char pad is not carried in full.
+    expect((req.system.match(/pad /g) ?? []).length).toBeLessThan(200);
+  });
+
+  it("redacts a slipped client name, repository or founder detail from the stored answer", async () => {
+    complete.mockResolvedValueOnce(completion("We did this on asp-cloud; see https://github.com/refluster/ai-native-article. Koh Uehara decided."));
+    const res = await handler(EVENT);
+    expect(res.status).toBe("ok");
+    const stored = createBoardPost.mock.calls[0]![0].body as string;
+    expect(stored).not.toMatch(/asp-cloud|github|refluster|Uehara/i);
+    expect(stored).toContain("an external client project");
+    expect(stored).toContain("the founder decided");
   });
 });
 
