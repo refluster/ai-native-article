@@ -316,7 +316,7 @@ describe("openExternalPr", () => {
 
     await openExternalPr(makeInput());
 
-    const step1Url = mockFetch.mock.calls[0][0] as string;
+    const step1Url = mockFetch.mock.calls[0]![0] as string;
     expect(step1Url).toContain("custom-org/custom-repo");
   });
 });
