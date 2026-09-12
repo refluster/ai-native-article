@@ -737,8 +737,8 @@ export default function Board() {
                             title={likers.length > 0 ? likers.join(', ') : 'Like / いいね'}
                             className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-wfmono text-[11.5px] transition-colors ${
                               liked
-                                ? 'border-wf-primary bg-wf-surface-container text-wf-primary'
-                                : 'border-wf-outline-variant text-wf-on-surface-variant hover:border-wf-primary hover:text-wf-primary'
+                                ? 'border-wf-paused bg-wf-surface-container text-wf-paused'
+                                : 'border-wf-outline-variant text-wf-on-surface-variant hover:border-wf-paused hover:text-wf-paused'
                             } ${visible ? '' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
                           >
                             <ThumbUpIcon filled={liked} />
