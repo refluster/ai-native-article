@@ -40,6 +40,7 @@
 //   GET    /boards/{id}                    board card + mentionable roster (board token)
 //   GET    /boards/{id}/posts              newest page | ?after= poll tail (board token)
 //   POST   /boards/{id}/posts              guest post; async-invokes wf-board-reply per @-mention (board token)
+//   POST   /boards/{id}/posts/{post_id}/like  like / unlike as the token's nickname (board token)
 //   PATCH  /boards/{id}/posts/{post_id}    operator hide/unhide (AWS_IAM at GW)
 //
 // See workforce/docs/epics/epic-007-agent-management-api.md (agents),
@@ -381,6 +382,7 @@ export async function handler(
       routeKey === "GET /boards/{id}" ||
       routeKey === "GET /boards/{id}/posts" ||
       routeKey === "POST /boards/{id}/posts" ||
+      routeKey === "POST /boards/{id}/posts/{post_id}/like" ||
       routeKey === "PATCH /boards/{id}/posts/{post_id}"
     ) {
       const res = await handleBoardsRoute(routeKey, event, {

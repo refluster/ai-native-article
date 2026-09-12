@@ -27,7 +27,9 @@ import {
   fetchPosts,
   fetchPostsAfter,
   initialsOf,
+  likePost,
   loadBoardSession,
+  mergeLikers,
   mergePosts,
   pendingDelegates,
   probeMention,
@@ -42,6 +44,10 @@ import {
 } from '../lib/boards';
 
 const POLL_MS = 4000;
+/** Every Nth poll also re-reads the newest page so likes on posts already
+ *  on screen stay live (the `?after=` poll only carries new posts). */
+const LIKES_REFRESH_EVERY = 3;
+const LIKES_REFRESH_PAGE = 40;
 /** First page: enough to fill a screen, not the whole log. Older history is
  *  pulled one page at a time when the reader scrolls to the top (or taps
  *  "Load earlier posts"), via the API's `older_cursor` (ADR-0034). */
@@ -417,8 +423,18 @@ export default function Board() {
   useEffect(() => {
     if (!session || !board) return;
     let cancelled = false;
+    let ticks = 0;
     const tick = async () => {
       if (typeof document !== 'undefined' && document.hidden) return;
+      ticks += 1;
+      if (ticks % LIKES_REFRESH_EVERY === 0) {
+        try {
+          const page = await fetchPosts(boardId, session.token, { pageSize: LIKES_REFRESH_PAGE });
+          if (!cancelled) setPosts((prev) => mergeLikers(prev, page.posts));
+        } catch {
+          /* transient; the next refresh retries */
+        }
+      }
       try {
         const fresh = lastId
           ? await fetchPostsAfter(boardId, session.token, lastId)
@@ -518,6 +534,22 @@ export default function Board() {
     if (res.dispatched.length > 0) {
       const until = Date.now() + DRAFTING_MS;
       setDrafting((prev) => ({ ...prev, ...Object.fromEntries(res.dispatched.map((s) => [s, until])) }));
+    }
+  }
+
+  async function toggleLike(p: BoardPost) {
+    if (!session) return;
+    const me = session.nickname;
+    const before = p.likers ?? [];
+    const liked = before.includes(me);
+    const optimistic = liked ? before.filter((n) => n !== me) : [...before, me].sort();
+    setPosts((prev) => prev.map((x) => (x.post_id === p.post_id ? { ...x, likers: optimistic } : x)));
+    try {
+      const res = await likePost(boardId, session.token, p.post_id, !liked);
+      setPosts((prev) => prev.map((x) => (x.post_id === p.post_id ? { ...x, likers: res.likers } : x)));
+    } catch (err) {
+      setPosts((prev) => prev.map((x) => (x.post_id === p.post_id ? { ...x, likers: before } : x)));
+      bail(err);
     }
   }
 
@@ -669,6 +701,36 @@ export default function Board() {
                     <div className="mt-1">
                       <Body text={p.body} known={known} />
                     </div>
+                    {(() => {
+                      const likers = p.likers ?? [];
+                      const liked = likers.includes(session.nickname);
+                      const visible = likers.length > 0 || liked;
+                      return (
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void toggleLike(p)}
+                            aria-pressed={liked}
+                            aria-label={liked ? 'Remove like / いいねを取り消す' : 'Like / いいね'}
+                            title={likers.length > 0 ? likers.join(', ') : 'Like / いいね'}
+                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-wfmono text-[11.5px] transition-colors ${
+                              liked
+                                ? 'border-wf-primary bg-wf-surface-container text-wf-primary'
+                                : 'border-wf-outline-variant text-wf-on-surface-variant hover:border-wf-primary hover:text-wf-primary'
+                            } ${visible ? '' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
+                          >
+                            <span aria-hidden>{liked ? '♥' : '♡'}</span>
+                            {likers.length > 0 && <span>{likers.length}</span>}
+                          </button>
+                          {likers.length > 0 && (
+                            <span className="hidden sm:inline text-[11.5px] text-wf-on-surface-variant truncate max-w-[40ch]">
+                              {likers.slice(0, 3).join(', ')}
+                              {likers.length > 3 ? ` +${likers.length - 3}` : ''}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </li>
               );

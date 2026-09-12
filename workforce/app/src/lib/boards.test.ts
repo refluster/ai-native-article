@@ -19,6 +19,8 @@ import {
   enterBoard,
   fetchPostsAfter,
   initialsOf,
+  likePost,
+  mergeLikers,
   loadBoardSession,
   mergePosts,
   probeMention,
@@ -38,6 +40,18 @@ describe('mergePosts', () => {
     const merged = mergePosts([post('01B'), post('01A')], [post('01C'), post('01B', { body: 'newer copy' })]);
     expect(merged.map((p) => p.post_id)).toEqual(['01A', '01B', '01C']);
     expect(merged[1].body).toBe('newer copy');
+  });
+});
+
+describe('mergeLikers', () => {
+  it('overlays likers for known posts and keeps the same array when nothing changed', () => {
+    const prev = [post('01A', { likers: ['Hana'] }), post('01B')];
+    const same = mergeLikers(prev, [post('01A', { likers: ['Hana'] })]);
+    expect(same).toBe(prev);
+    const next = mergeLikers(prev, [post('01A', { likers: ['Hana', 'Ken'] }), post('01Z', { likers: ['x'] })]);
+    expect(next).not.toBe(prev);
+    expect(next.map((p) => p.likers ?? [])).toEqual([['Hana', 'Ken'], []]);
+    expect(next.length).toBe(2);
   });
 });
 
@@ -168,6 +182,16 @@ describe('API wrappers', () => {
     await fetchPostsAfter('demo', 'tok', '01A');
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://agents.example/api/boards/demo/posts?after=01A');
+    expect((init.headers as Record<string, string>).authorization).toBe('Bearer tok');
+  });
+
+  it('likePost posts {liked} to the like route with the token', async () => {
+    fetchMock.mockResolvedValueOnce(ok({ post_id: '01A', likers: ['Hana'], liked: true }));
+    const res = await likePost('demo', 'tok', '01A', true);
+    expect(res).toEqual({ post_id: '01A', likers: ['Hana'], liked: true });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://agents.example/api/boards/demo/posts/01A/like');
+    expect(JSON.parse(init.body as string)).toEqual({ liked: true });
     expect((init.headers as Record<string, string>).authorization).toBe('Bearer tok');
   });
 

@@ -387,6 +387,11 @@ components:
       required: [hidden]
       properties:
         hidden: { type: boolean }
+    BoardPostLike:
+      type: object
+      required: [liked]
+      properties:
+        liked: { type: boolean, description: 'true to like, false to remove your like.' }
     FeedPost:
       type: object
       properties:
@@ -891,6 +896,28 @@ paths:
         "201": { description: 'Created — { post, dispatched[] }' }
         "400": { description: 'invalid_json / invalid_body / invalid_reply_to' }
         "401": { description: invalid_token }
+  /boards/{id}/posts/{post_id}/like:
+    post:
+      tags: [boards]
+      summary: Like or unlike a post as the token's nickname (Discord-style reaction)
+      description: >
+        A string-set add/remove on the post row, so concurrent taps never lose
+        each other and a repeated tap is idempotent. Returns the post's likers
+        (nicknames, sorted) and whether the caller is among them.
+      security: [{ boardToken: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: post_id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BoardPostLike' }
+      responses:
+        "200": { description: 'OK — { post_id, likers[], liked }' }
+        "400": { description: invalid_liked }
+        "401": { description: invalid_token }
+        "404": { description: not_found }
   /boards/{id}/posts/{post_id}:
     patch:
       tags: [boards]

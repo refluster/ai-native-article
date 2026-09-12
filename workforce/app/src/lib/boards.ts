@@ -30,6 +30,8 @@ export interface BoardPost {
   reply_to_preview?: string;
   hop: number;
   mentions: string[];
+  /** Nicknames who liked the post (sorted). */
+  likers?: string[];
 }
 
 export interface BoardAgent {
@@ -184,7 +186,38 @@ export async function createPost(boardId: string, token: string, body: string, r
   );
 }
 
+export interface LikeResult {
+  post_id: string;
+  likers: string[];
+  liked: boolean;
+}
+
+/** Like (or unlike) a post as the session's nickname. */
+export async function likePost(boardId: string, token: string, postId: string, liked: boolean): Promise<LikeResult> {
+  return call<LikeResult>(
+    `/boards/${encodeURIComponent(boardId)}/posts/${encodeURIComponent(postId)}/like`,
+    { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ liked }) },
+    token,
+  );
+}
+
 // ----- Pure helpers -----
+
+/** Overlay fresh `likers` onto already-loaded posts (the periodic likes
+ *  refresh); posts not in `fresh` are left as they are. */
+export function mergeLikers(prev: BoardPost[], fresh: ReadonlyArray<BoardPost>): BoardPost[] {
+  const byId = new Map(fresh.map((p) => [p.post_id, p.likers ?? []]));
+  let changed = false;
+  const next = prev.map((p) => {
+    const likers = byId.get(p.post_id);
+    if (!likers) return p;
+    const cur = p.likers ?? [];
+    if (cur.length === likers.length && cur.every((n, i) => n === likers[i])) return p;
+    changed = true;
+    return { ...p, likers };
+  });
+  return changed ? next : prev;
+}
 
 /** Union two slices of one board's history, deduplicated by post id and
  *  ordered by id (ULIDs are time-ordered, so id order is post order). */

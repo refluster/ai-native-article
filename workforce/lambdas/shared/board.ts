@@ -31,7 +31,7 @@
 import { randomBytes, scrypt as scryptCb, createHmac, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
 import { ddb, getItem, putItem, updateOperational } from "./ddb.js";
 import { newUlid } from "./task.js";
@@ -126,6 +126,10 @@ export interface BoardPostRow {
   mentions: string[];
   /** Operator moderation flag — hidden posts are dropped from reads. */
   hidden?: boolean;
+  /** Nicknames of guests who liked the post — a DynamoDB string set
+   *  (ADD / DELETE keep it a set under concurrent taps). The Document
+   *  client reads it back as a JS Set; the view flattens it to an array. */
+  likers?: Set<string> | string[];
   // LLM metadata on agent posts (mirrors MSG rows).
   finish_reason?: string;
   tokens_in?: number;
@@ -147,6 +151,9 @@ export interface BoardPostView {
   reply_to_preview?: string;
   hop: number;
   mentions: string[];
+  /** Nicknames who liked the post, sorted. Discord-style: who reacted is
+   *  visible to the board, not just the count. */
+  likers: string[];
 }
 
 export interface BoardPostsPage {
@@ -320,7 +327,16 @@ export function toBoardPostView(row: BoardPostRow, body: string): BoardPostView 
     ...(row.reply_to_preview !== undefined ? { reply_to_preview: row.reply_to_preview } : {}),
     hop: row.hop,
     mentions: row.mentions ?? [],
+    likers: likersOf(row),
   };
+}
+
+/** Flatten the stored like set (Set from the Document client, array from
+ *  tests/fixtures, absent when nobody liked) to a sorted array. */
+export function likersOf(row: Pick<BoardPostRow, "likers">): string[] {
+  const raw = row.likers;
+  const list = raw instanceof Set ? [...raw] : Array.isArray(raw) ? raw : [];
+  return list.filter((n): n is string => typeof n === "string").sort();
 }
 
 // --- Read helpers --------------------------------------------------------
@@ -573,6 +589,32 @@ export async function createBoardPost(input: CreateBoardPostInput): Promise<Crea
   await putItem(row);
   await updateOperational<BoardMetaRow>(boardPk(input.board_id), "META", { last_post_at: at });
   return { view: toBoardPostView(row, body), row };
+}
+
+/**
+ * Like or unlike one post as `nickname`. A string-set ADD / DELETE, so two
+ * guests tapping at once never lose each other's like and a double tap is
+ * idempotent. Throws when the post does not exist (the condition fails);
+ * returns the post's likers after the change.
+ */
+export async function toggleBoardPostLike(
+  boardId: string,
+  postId: string,
+  nickname: string,
+  liked: boolean,
+): Promise<string[]> {
+  const res = await ddb.send(
+    new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: { pk: boardPk(boardId), sk: postSk(postId) },
+      UpdateExpression: liked ? "ADD #likers :who" : "DELETE #likers :who",
+      ConditionExpression: "attribute_exists(pk)",
+      ExpressionAttributeNames: { "#likers": "likers" },
+      ExpressionAttributeValues: { ":who": new Set([nickname]) },
+      ReturnValues: "ALL_NEW",
+    }),
+  );
+  return likersOf((res.Attributes ?? {}) as Pick<BoardPostRow, "likers">);
 }
 
 /** Operator moderation: hide (or unhide) one post. Hidden rows stay in

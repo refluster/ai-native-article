@@ -45,6 +45,7 @@ import {
   createBoardPost,
   getBoardMeta,
   getBoardPost,
+  likersOf,
   listBoardPosts,
   listCascadeRows,
   parseMentions,
@@ -623,6 +624,7 @@ export async function handler(event: BoardReplyEvent): Promise<BoardReplyResult>
     body: parent.body_preview,
     hop: parent.hop,
     mentions: parent.mentions ?? [],
+    likers: likersOf(parent),
     ...(parent.reply_to !== undefined ? { reply_to: parent.reply_to } : {}),
     ...(parent.reply_to_author !== undefined ? { reply_to_author: parent.reply_to_author } : {}),
   };
