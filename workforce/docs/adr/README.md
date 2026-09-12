@@ -89,7 +89,7 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0020](adr-0020-delegated-memory-curation.md) | Delegated memory curation: bounded token write for the memory profile block (POST /agents/{slug}/memory + shrink guard) | Superseded by [0021](adr-0021-dynamic-memory-write-token.md) | [018](../epics/epic-018-semantic-memory-curation.md) |
 | [0021](adr-0021-dynamic-memory-write-token.md) | Dynamic memory-write token: ADR-0009's minted-token pattern replaces the static secret | Accepted | [018](../epics/epic-018-semantic-memory-curation.md) |
 | [0022](adr-0022-issue-to-merge-flow.md) | The issue→merge flow: a dispatcher at intake (issue lanes) + an agent-owned author lane on PRs (pr-remediate) | Proposed | [019](../epics/epic-019-autonomous-finalization-rate.md) |
-| [0023](adr-0023-red-verdict-author-loop.md) | A 🔴 verdict returns to the author with a machine-checked remediation brief; the human gate moves to the cycle cap | Proposed | [019](../epics/epic-019-autonomous-finalization-rate.md) |
+| [0023](adr-0023-red-verdict-author-loop.md) | 🔴 findings route to an ordered remediation brief the author lane works before re-review, never straight to escalation | Accepted (2026-08-30) | [019](../epics/epic-019-autonomous-finalization-rate.md) |
 | [0024](adr-0024-panel-mode-not-a-merge-condition.md) | Panel provenance mode is not a merge condition: an inline panel is a wording discount, never a hold | Proposed | [019](../epics/epic-019-autonomous-finalization-rate.md) |
 | [0025](adr-0025-event-driven-lane-handoff.md) | A hand-off is an event: the author lane dispatches its worker via `POST /dispatch`; cron + the 36h sweep stay as the floors | Accepted (2026-08-11) | [019](../epics/epic-019-autonomous-finalization-rate.md) |
 | [0026](adr-0026-knowledge-backup-ingest-pipeline.md) | Knowledge backup is a deterministic GHA pipeline, not a Cadence: Discord/Notion ingest into a dedicated knowledge-store repo | Proposed | — |
@@ -100,9 +100,22 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0031](adr-0031-spotify-url-automation-and-gate-retirement.md) | Automate `spotifyUrl` capture via a new deterministic `wf-podcast` route + `spotify.token` credential; define (not flip) the track-record criteria to retire the `script-ready → approved` human gate | Proposed | [017](../epics/epic-017-podcast-spotify-distribution.md) |
 | [0032](adr-0032-lesson-partition-and-daily-distiller.md) | The `LESSON` partition schema, its closed cross-cutting vocabulary, and the daily distiller Lambda's cost/shape contract | Proposed | [022](../epics/epic-022-org-learning-loop.md) |
 | [0033](adr-0033-seed-projects-lambda.md) | Promote `seed-projects.mjs` to a `WfSeedProjectsFunction` Lambda (META rows only, mirroring `WfSeedSkillsFunction`); the script is kept as an operator escape hatch, not retired | Proposed | [010](../epics/epic-010-project-trust-boundary.md) |
+| [0035](adr-0035-internal-document-write-surface.md) | Cadences write internal (non-published) documents to a second, non-exported "Internal Documents" Notion DB, sharing the existing notion.integration_token | Proposed | [021](../epics/epic-021-finance-ir-activation.md) |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](../epics/README.md).
+
+> **Numbering note (2026-09-12, `wf:dario` — `issue-design`).** This PR adds
+> **adr-0035**, not adr-0034: `adr-0034-public-qa-boards.md` is already
+> merged to `main`, and a separate open draft PR (**#714**,
+> `dario/issue-663-skill-capabilities-declaration`) also proposes an
+> `adr-0034-skill-capabilities-declaration.md` from a branch cut before
+> `public-qa-boards` merged — the same stale-reservation collision this
+> file's 2026-09-09 note already describes for adr-0031/0032. This PR does
+> not touch that collision; flagging only that `0035` was chosen precisely
+> to avoid adding a third file to it. Whoever resolves #714's collision
+> should leave this row's number alone — nothing here reserves or depends
+> on `0034`.
 
 > **Numbering note (2026-09-09, `wf:dario` — `issue-design`).** This PR's
 > adr-0032 was drafted in parallel with another open draft PR's adr-0031
