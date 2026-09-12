@@ -257,10 +257,11 @@
   margin-bottom: 0.6em;
 }
 .research-prose h1 { font-size: 1.75rem; }
+/* No hairline under h2: the public site separates by space, not rules
+   (components/public/styles.ts); the extra top margin does the work. */
 .research-prose h2 {
-  @apply border-b border-wf-outline-variant;
   font-size: 1.4rem;
-  padding-bottom: 0.3em;
+  margin-top: 2.6em;
 }
 .research-prose h3 { font-size: 1.15rem; }
 .research-prose h4 {
@@ -338,4 +339,331 @@
   .research-prose li,
   .research-prose blockquote,
   .research-prose pre { break-inside: avoid; }
+}
+
+/* ── Public documents ───────────────────────────────────────────────────
+   /docs/:slug bodies (pages/Doc.tsx) are bundled HTML fragments whose class
+   names are the documents' own vocabulary (cover, eyebrow, lede, card,
+   layer, st, toc, voice, …). This block gives that vocabulary the public
+   site's look — the same tokens, type and spacing as the landing page and
+   the Research reader (components/public/styles.ts) — so a document is
+   content plus this one stylesheet, never a design of its own. Sections
+   separate by whitespace; the only rules left are table rows and the
+   two-pixel quote rails. Applied through wf-* tokens so it re-themes with
+   tailwind.config.ts; the custom properties exist because the documents'
+   inline SVG figures paint with var(--accent) / var(--panel) / var(--line)
+   and cannot reach the Tailwind layer. Values mirror the tokens. */
+.docs-prose {
+  --accent: #0f1b46;       /* wf-primary */
+  --accent-soft: #e9ebf2;  /* wf-svg-surface-emphasis */
+  --signal: #1f7a4f;       /* wf-running */
+  --panel: #ffffff;        /* wf-surface-container-lo */
+  --panel-2: #eceeef;      /* wf-surface-container */
+  --line: #c6c5d0;         /* wf-outline-variant */
+  --ink: #191c1d;          /* wf-on-surface */
+  --ink-2: #45464f;        /* wf-on-surface-variant */
+  --ink-3: #767680;        /* wf-outline */
+  @apply text-wf-on-surface;
+  font-size: 1.0625rem;
+  line-height: 1.75;
+}
+.docs-prose.is-narrow { font-size: 1.125rem; line-height: 1.8; }
+
+/* rhythm */
+.docs-prose section { padding: 3rem 0; }
+.docs-prose section.cover { padding: 2rem 0 2.5rem; }
+.docs-prose.is-narrow section { padding: 3.75rem 0; }
+.docs-prose.is-narrow section.cover { padding: 2rem 0 2.5rem; }
+
+/* type */
+.docs-prose h1,
+.docs-prose h2,
+.docs-prose h3 {
+  @apply font-headline font-bold text-wf-on-surface;
+  margin: 0;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+.docs-prose .cover h1 {
+  font-size: clamp(36px, 6vw, 64px);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  margin-top: 1rem;
+}
+.docs-prose .cover .sub {
+  @apply text-wf-on-surface-variant;
+  font-size: clamp(16px, 1.8vw, 19px);
+  line-height: 1.6;
+  max-width: 60ch;
+  margin: 1.5rem 0 0;
+}
+/* The old accent bar under the cover title; the landing hero has none. */
+.docs-prose .rule { display: none; }
+.docs-prose h2 {
+  font-size: clamp(24px, 3.2vw, 32px);
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+.docs-prose h3.sub { font-size: 1.125rem; line-height: 1.3; margin-top: 2.125rem; }
+.docs-prose .eyebrow { display: flex; align-items: baseline; gap: 0.875rem; margin-bottom: 1rem; }
+.docs-prose .num,
+.docs-prose .kicker {
+  @apply font-wfmono uppercase;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+}
+.docs-prose .num { @apply text-wf-primary; }
+.docs-prose .kicker { @apply text-wf-on-surface-variant; }
+.docs-prose .lede {
+  @apply text-wf-on-surface-variant;
+  font-size: 1.125rem;
+  line-height: 1.65;
+  max-width: 64ch;
+  margin: 0.75rem 0 0;
+}
+.docs-prose.is-narrow .lede { font-size: 1.1875rem; max-width: 58ch; }
+.docs-prose p { margin: 0.875rem 0; max-width: 68ch; }
+.docs-prose.is-narrow p { max-width: 60ch; }
+.docs-prose a {
+  @apply text-wf-primary underline;
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+.docs-prose a:hover { @apply text-wf-tertiary; }
+.docs-prose b,
+.docs-prose strong { @apply font-bold; }
+.docs-prose ul { list-style: disc; padding-left: 1.15em; max-width: 68ch; }
+.docs-prose ol { list-style: decimal; padding-left: 1.4em; max-width: 68ch; }
+.docs-prose li { @apply text-wf-on-surface-variant; margin: 0.45em 0; }
+.docs-prose li b { @apply text-wf-on-surface; }
+.docs-prose li::marker { @apply text-wf-tertiary; }
+.docs-prose .note,
+.docs-prose .fn { @apply text-wf-on-surface-variant; font-size: 0.84375rem; line-height: 1.6; max-width: 72ch; }
+.docs-prose .fn { margin-top: 0.625rem; }
+.docs-prose sup { @apply font-wfmono text-wf-primary; font-size: 10px; }
+.docs-prose .kw {
+  @apply font-wfmono text-wf-primary bg-wf-surface-container rounded-wf-sm;
+  font-size: 0.8em;
+  padding: 0.1em 0.4em;
+  white-space: nowrap;
+}
+
+/* cards & grids — the landing page's card grammar */
+.docs-prose .grid { display: grid; gap: 1rem; margin-top: 1.5rem; }
+.docs-prose .g2,
+.docs-prose .split,
+.docs-prose .two { grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
+.docs-prose .g3 { grid-template-columns: repeat(auto-fit, minmax(225px, 1fr)); }
+.docs-prose .split,
+.docs-prose .two { display: grid; gap: 1rem; margin-top: 1.5rem; }
+.docs-prose .card,
+.docs-prose .stat,
+.docs-prose .layer,
+.docs-prose .voice,
+.docs-prose .scroll {
+  @apply bg-wf-surface-container-lo border border-wf-outline-variant rounded-wf-md;
+}
+.docs-prose .card { padding: 1.125rem 1.25rem; }
+.docs-prose .card h3 { font-size: 1.03125rem; line-height: 1.3; margin-bottom: 0.25rem; }
+.docs-prose .card p { @apply text-wf-on-surface-variant; font-size: 0.90625rem; line-height: 1.55; margin: 0.375rem 0 0; max-width: none; }
+.docs-prose .card ul { padding-left: 1.1em; margin: 0.5rem 0 0; }
+.docs-prose .card li { font-size: 0.875rem; margin: 0.3em 0; }
+.docs-prose .two .card h3 { font-size: 0.9375rem; }
+.docs-prose .tag {
+  @apply font-wfmono uppercase text-wf-primary bg-wf-surface-container rounded-wf-sm;
+  display: inline-block;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  padding: 2px 8px;
+  margin-bottom: 0.5rem;
+}
+.docs-prose .st {
+  @apply font-wfmono uppercase border border-wf-outline-variant text-wf-on-surface-variant;
+  display: inline-block;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+.docs-prose .st.live { @apply text-wf-running; border-color: currentColor; }
+.docs-prose .st.part { @apply text-wf-primary; border-color: currentColor; }
+.docs-prose .st.plan { @apply text-wf-on-surface-variant; }
+.docs-prose .st.count { @apply text-wf-on-surface; }
+.docs-prose .statline { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 2.25rem; }
+.docs-prose .stat { flex: 1 1 160px; padding: 1rem 1.125rem; }
+.docs-prose .stat b {
+  @apply font-wfmono;
+  display: block;
+  font-size: 1.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.docs-prose .stat span { @apply text-wf-on-surface-variant; font-size: 0.78125rem; }
+.docs-prose .layers { display: grid; gap: 0.625rem; margin-top: 1.5rem; }
+.docs-prose .layer {
+  @apply border-l-2 border-l-wf-primary;
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 1.125rem;
+  padding: 1rem 1.25rem;
+}
+.docs-prose .layer .lab { @apply font-wfmono text-wf-primary; font-size: 12px; letter-spacing: 0.1em; padding-top: 3px; }
+.docs-prose .layer h3 { font-size: 1.03125rem; }
+.docs-prose .layer p { @apply text-wf-on-surface-variant; font-size: 0.90625rem; margin: 0.3rem 0 0; }
+.docs-prose .math {
+  @apply font-wfmono bg-wf-surface-container rounded-wf-md;
+  font-size: 0.90625rem;
+  line-height: 1.9;
+  padding: 1rem 1.125rem;
+  margin-top: 1.375rem;
+  overflow-x: auto;
+}
+
+/* tables — the one place a hairline still separates content */
+.docs-prose .scroll { overflow-x: auto; margin-top: 1.375rem; }
+.docs-prose table { border-collapse: collapse; width: 100%; font-size: 0.90625rem; min-width: 660px; }
+.docs-prose table.tight { font-size: 0.875rem; min-width: 560px; }
+.docs-prose th,
+.docs-prose td { @apply border-b border-wf-outline-variant; text-align: left; padding: 11px 16px; vertical-align: top; }
+.docs-prose th { @apply font-wfmono uppercase text-wf-on-surface-variant; font-size: 11px; letter-spacing: 0.14em; font-weight: 500; }
+.docs-prose td:first-child { font-weight: 700; white-space: nowrap; }
+.docs-prose tr:last-child td { border-bottom: 0; }
+.docs-prose td.dim { @apply text-wf-on-surface-variant; font-weight: 400; }
+.docs-prose td .st { margin-right: 6px; }
+
+/* figures */
+.docs-prose figure { margin: 1.625rem 0 0; }
+.docs-prose figure svg { @apply text-wf-on-surface; width: 100%; max-width: 100%; height: auto; }
+.docs-prose figcaption { @apply text-wf-on-surface-variant; font-size: 0.84375rem; line-height: 1.6; margin-top: 0.75rem; max-width: 72ch; }
+.docs-prose .figscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.docs-prose .process-map { display: block; width: 100%; min-width: 1080px; height: auto; filter: grayscale(1) contrast(1.04); }
+.docs-prose .regional-map { display: block; width: 100%; min-width: 900px; height: auto; }
+.docs-prose .process-figure .figscroll { @apply bg-wf-surface-container-lo border border-wf-outline-variant rounded-wf-md; }
+.docs-prose .bar { @apply font-wfmono; display: flex; align-items: center; gap: 0.625rem; font-size: 12px; }
+.docs-prose .bar i { @apply bg-wf-primary rounded-wf-sm; display: block; height: 9px; opacity: 0.85; }
+
+/* callouts — quote rails, not boxes */
+.docs-prose .pull,
+.docs-prose .qline,
+.docs-prose .say {
+  @apply font-headline text-wf-on-surface border-l-2 border-wf-tertiary;
+  font-size: 1.1875rem;
+  line-height: 1.5;
+  padding: 0.125rem 0 0.125rem 1.25rem;
+  margin: 1.5rem 0;
+  max-width: 60ch;
+}
+.docs-prose.is-narrow .pull { font-size: 1.4375rem; line-height: 1.45; max-width: 26ch; margin: 2.125rem 0; }
+.docs-prose .say { font-size: 1.25rem; max-width: 52ch; margin: 1.875rem 0 0; }
+.docs-prose .say cite {
+  @apply font-wfmono uppercase text-wf-on-surface-variant;
+  display: block;
+  font-style: normal;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  margin-top: 0.75rem;
+}
+.docs-prose .define {
+  @apply text-wf-on-surface-variant border-l-2 border-wf-primary;
+  padding: 0.25rem 0 0.25rem 1.25rem;
+  margin-top: 1.625rem;
+  font-size: 0.96875rem;
+  line-height: 1.65;
+  max-width: 70ch;
+}
+.docs-prose .define b { @apply text-wf-on-surface; }
+.docs-prose .define a { @apply text-wf-primary; }
+.docs-prose .foryou {
+  @apply bg-wf-surface-container rounded-wf-md;
+  padding: 0.875rem 1.125rem;
+  margin-top: 1.375rem;
+  max-width: 68ch;
+  font-size: 0.9375rem;
+}
+.docs-prose .foryou b {
+  @apply font-wfmono uppercase text-wf-primary;
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  margin-bottom: 0.25rem;
+}
+.docs-prose .creed {
+  @apply font-headline;
+  font-size: clamp(19px, 2.6vw, 25px);
+  line-height: 1.5;
+  margin: 2.125rem 0 0;
+  max-width: 34ch;
+}
+.docs-prose .creed span { @apply text-wf-on-surface; display: block; }
+.docs-prose .creed span + span { margin-top: 0.375rem; }
+.docs-prose .creed span:last-child { @apply text-wf-on-surface-variant; }
+
+/* lists with counters */
+.docs-prose .toc { columns: 2; column-gap: 2rem; margin-top: 1.625rem; font-size: 0.90625rem; }
+.docs-prose .toc a { @apply text-wf-on-surface-variant; display: block; text-decoration: none; padding: 3px 0; break-inside: avoid; }
+.docs-prose .toc a:hover,
+.docs-prose .toc a:focus { @apply text-wf-primary underline; }
+.docs-prose .toc a b { @apply font-wfmono text-wf-primary; font-weight: 500; font-size: 12px; margin-right: 0.5rem; }
+.docs-prose .flowsteps { counter-reset: fs; list-style: none; padding: 0; margin-top: 1.5rem; max-width: 78ch; }
+.docs-prose .flowsteps li { counter-increment: fs; position: relative; padding-left: 44px; margin: 0.75rem 0; }
+.docs-prose .flowsteps li::before {
+  @apply font-wfmono text-wf-primary;
+  content: counter(fs, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: 1px;
+  font-size: 12px;
+}
+.docs-prose ol.notes { @apply text-wf-on-surface-variant; font-size: 0.84375rem; max-width: 74ch; padding-left: 1.4em; }
+.docs-prose ol.notes li { margin: 0.375rem 0; }
+.docs-prose .creeds { counter-reset: pr; display: grid; gap: 0.25rem; margin-top: 2rem; }
+.docs-prose .pr { counter-increment: pr; display: grid; grid-template-columns: 52px 1fr; gap: 1rem; padding: 0.875rem 0; }
+.docs-prose .pr::before {
+  @apply font-wfmono text-wf-primary;
+  content: counter(pr, decimal-leading-zero);
+  font-size: 12px;
+  padding-top: 5px;
+}
+.docs-prose .pr b { @apply font-headline; display: block; font-size: 1.0625rem; }
+.docs-prose .pr p { @apply text-wf-on-surface-variant; margin: 0.25rem 0 0; font-size: 0.9375rem; max-width: 58ch; }
+
+/* voices — persona quotes */
+.docs-prose .voices { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-top: 1.625rem; }
+.docs-prose .voice { display: flex; flex-direction: column; gap: 0.875rem; padding: 1.25rem 1.375rem; }
+.docs-prose .who { display: flex; align-items: center; gap: 0.75rem; }
+.docs-prose .who .face {
+  @apply bg-wf-surface-container border border-wf-outline-variant;
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+}
+.docs-prose .who b { @apply font-headline; display: block; font-size: 1rem; line-height: 1.3; }
+.docs-prose .who span,
+.docs-prose .voice .role { @apply text-wf-on-surface-variant; font-size: 0.78125rem; }
+.docs-prose .voice q { @apply text-wf-on-surface-variant; quotes: none; font-size: 0.9375rem; line-height: 1.7; }
+.docs-prose .voice q::before,
+.docs-prose .voice q::after { content: none; }
+.docs-prose .voice .verdict { @apply font-wfmono uppercase text-wf-running; font-size: 11px; letter-spacing: 0.12em; }
+
+@media (max-width: 640px) {
+  .docs-prose .toc { columns: 1; }
+  .docs-prose .layer { grid-template-columns: 1fr; gap: 0.25rem; }
+  .docs-prose .pr { grid-template-columns: 1fr; gap: 2px; }
+  .docs-prose .pr::before { padding-top: 0; }
+  .docs-prose .qline { font-size: 1.0625rem; }
+  .docs-prose figure .figscroll svg { min-width: 640px; }
+  .docs-prose .process-map { min-width: 960px; }
+}
+@media print {
+  .docs-prose h2,
+  .docs-prose h3 { break-after: avoid; }
+  .docs-prose .card,
+  .docs-prose .layer,
+  .docs-prose .voice,
+  .docs-prose p { break-inside: avoid; }
 }

@@ -7,6 +7,10 @@
 // one was written; an explanation lists the analyses that used it. The
 // canonical URL for every article stays on kohuehara.xyz while both
 // surfaces publish, and the page says so.
+//
+// Layout follows the public site's rule (components/public/styles.ts):
+// header, body, sources and footer are separated by whitespace and mono
+// kickers, not by horizontal rules.
 
 import { useEffect, useMemo, type ComponentProps } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -14,6 +18,7 @@ import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import PublicShell from '../components/PublicShell';
 import MermaidBlock from '../components/MermaidBlock';
+import { CARD, CHIP, H1_MD, KICKER, KICKER_ACCENT, TEXT_LINK } from '../components/public/styles';
 import AuthorByline from '../components/research/AuthorByline';
 import LanguageToggle from '../components/research/LanguageToggle';
 import { Skeleton, SkeletonText } from '../components/Skeleton';
@@ -140,48 +145,40 @@ export default function ResearchArticle() {
       ? (lookupSource(index, sourceUrls[0])?.analyses ?? []).filter(a => a.slug !== slug)
       : [];
 
-  const chip =
-    'font-wfmono text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-wf-lg border border-wf-outline-variant bg-wf-surface-container text-wf-on-surface-variant hover:border-wf-primary hover:text-wf-primary transition-colors';
-  const card = 'border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-4';
-  const kicker = 'font-wfmono text-[11px] font-semibold uppercase tracking-[0.14em] text-wf-on-surface-variant';
-
   return (
     <PublicShell>
       <div className="max-w-[780px] mx-auto">
-        <nav className="pt-8 font-wfmono text-[11px] text-wf-on-surface-variant flex items-center justify-between gap-4">
-          <span>
-            <Link to="/research" className="hover:text-wf-on-surface underline">
+        <nav className={`pt-8 ${KICKER} flex items-center justify-between gap-4`} aria-label="Breadcrumb">
+          <span className="flex items-center gap-1.5">
+            <Link to="/research" className="hover:text-wf-on-surface underline underline-offset-2">
               Research
             </Link>
-            <span className="mx-1.5">/</span>
+            <span aria-hidden>/</span>
             <span>{TYPE_LABEL[type]}</span>
           </span>
           <LanguageToggle value={lang} />
         </nav>
 
         {body.error && (
-          <div className="mt-10 border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-6">
-            <p className="font-wfmono text-[11px] uppercase tracking-[0.14em] text-wf-tertiary">Not found</p>
+          <div className={`mt-10 ${CARD} p-6`}>
+            <p className={KICKER_ACCENT}>Not found</p>
             <h1 className="mt-2 font-headline font-bold text-2xl">This article is not in the corpus.</h1>
             <p className="mt-2 text-sm text-wf-on-surface-variant">
               {body.error}. The slug may be wrong, or the reader site&rsquo;s export has not published it yet.
             </p>
-            <Link
-              to="/research"
-              className="inline-block mt-5 font-wfmono text-[11px] uppercase tracking-[0.14em] hover:text-wf-primary underline"
-            >
+            <Link to="/research" className={`inline-block mt-5 ${TEXT_LINK} underline underline-offset-2`}>
               ← Back to Research
             </Link>
           </div>
         )}
 
         {!body.error && (
-          <header className="mt-6 pb-8 border-b border-wf-outline-variant">
+          <header className="mt-8">
             {tags.length > 0 && (
               <ul className="flex flex-wrap gap-1.5 mb-5">
                 {tags.map(tag => (
                   <li key={tag}>
-                    <Link to={`/research?tag=${encodeURIComponent(tag)}`} className={chip}>
+                    <Link to={`/research?tag=${encodeURIComponent(tag)}`} className={CHIP}>
                       {displayTag(tag)}
                     </Link>
                   </li>
@@ -194,9 +191,7 @@ export default function ResearchArticle() {
                 <Skeleton className="mt-3 h-9 w-3/5" />
               </>
             ) : (
-              <h1 className="font-headline font-bold text-[clamp(26px,4vw,40px)] leading-[1.15] tracking-[-0.02em] text-wf-on-surface">
-                {title}
-              </h1>
+              <h1 className={H1_MD}>{title}</h1>
             )}
             <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
               {authors.length > 0 && <AuthorByline slugs={authors} />}
@@ -211,7 +206,7 @@ export default function ResearchArticle() {
               </div>
             </div>
             {showLead && (
-              <p className="mt-6 text-[17px] leading-relaxed text-wf-on-surface-variant border-l-2 border-wf-tertiary pl-5">
+              <p className="mt-7 text-[17px] leading-relaxed text-wf-on-surface-variant border-l-2 border-wf-tertiary pl-5">
                 {plain(meta?.abstract ?? '')}
               </p>
             )}
@@ -231,14 +226,14 @@ export default function ResearchArticle() {
         )}
 
         {body.loading && (
-          <div className="py-10" aria-busy>
+          <div className="py-12" aria-busy>
             <SkeletonText lines={6} />
             <SkeletonText lines={5} className="mt-8" />
           </div>
         )}
 
         {body.data && (
-          <article className="research-prose py-10" lang={body.data.servedLanguage}>
+          <article className="research-prose pt-12 pb-4" lang={body.data.servedLanguage}>
             {heroImage && (
               <figure className="mb-8">
                 <img src={resolveCorpusUrl(heroImage)} alt="" className="w-full" />
@@ -251,15 +246,15 @@ export default function ResearchArticle() {
         )}
 
         {body.data && type === 'analysis' && sources.length > 0 && (
-          <section className="border-t border-wf-outline-variant pt-8 pb-4">
-            <h2 className={kicker}>Sources used</h2>
+          <section className="mt-14">
+            <h2 className={KICKER}>Sources used</h2>
             <p className="mt-1 text-[13px] text-wf-on-surface-variant">
               Primary sources this analysis draws on; each links to the network&rsquo;s own explanation of
               it where one was written.
             </p>
             <ol className="mt-4 space-y-3">
               {sources.map(({ url, entry }, i) => (
-                <li key={url} className={`${card} flex gap-4`}>
+                <li key={url} className={`${CARD} p-4 flex gap-4`}>
                   <span className="font-wfmono text-[11px] text-wf-on-surface-variant pt-0.5 w-5 shrink-0">
                     {String(i + 1).padStart(2, '0')}
                   </span>
@@ -287,8 +282,8 @@ export default function ResearchArticle() {
         )}
 
         {body.data && type === 'explanation' && (
-          <section className="border-t border-wf-outline-variant pt-8 pb-4">
-            <h2 className={kicker}>{usedBy.length > 0 ? 'Analyses using this source' : 'Original source'}</h2>
+          <section className="mt-14">
+            <h2 className={KICKER}>{usedBy.length > 0 ? 'Analyses using this source' : 'Original source'}</h2>
             {sourceUrls[0] && (
               <a
                 href={sourceUrls[0]}
@@ -302,7 +297,7 @@ export default function ResearchArticle() {
             {usedBy.length > 0 && (
               <ul className="mt-4 space-y-3">
                 {usedBy.map(a => (
-                  <li key={a.slug} className={card}>
+                  <li key={a.slug} className={`${CARD} p-4`}>
                     <ArticleLink article={a} lang={lang} />
                   </li>
                 ))}
@@ -312,16 +307,11 @@ export default function ResearchArticle() {
         )}
 
         {body.data && (
-          <footer className="border-t border-wf-outline-variant py-8 mb-8 flex flex-wrap items-center justify-between gap-4 font-wfmono text-[11px] uppercase tracking-[0.14em]">
-            <Link to="/research" className="text-wf-on-surface hover:text-wf-primary">
+          <footer className="mt-14 mb-4 flex flex-wrap items-center justify-between gap-4">
+            <Link to="/research" className={`${TEXT_LINK} text-wf-on-surface`}>
               ← All research
             </Link>
-            <a
-              href={canonicalArticleUrl(slug, lang)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-wf-on-surface-variant hover:text-wf-primary"
-            >
+            <a href={canonicalArticleUrl(slug, lang)} target="_blank" rel="noopener noreferrer" className={TEXT_LINK}>
               Reader edition on kohuehara.xyz ↗
             </a>
           </footer>

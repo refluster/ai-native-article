@@ -103,9 +103,19 @@ describe("buildKnowledgePack (live sources)", () => {
     expect(pinnedChars).toBeLessThan(120_000);
   });
 
-  it("titles the docs pages from their <title>, not the split cover heading", () => {
+  it("titles the docs pages from the docs manifest, not the split cover heading", () => {
     expect(htmlTitle("<html><head><title>創業ストーリー — Software Talent Network</title></head></html>")).toBe("創業ストーリー");
     expect(pack.sections.some((s) => s.title.startsWith("Software — Software"))).toBe(false);
+    for (const [source, title] of [
+      ["founding-story", "創業ストーリー"],
+      ["manifesto", "Manifesto"],
+      ["whitepaper", "Technical whitepaper"],
+    ]) {
+      expect(
+        pack.sections.filter((s) => s.source === source).every((s) => s.title.startsWith(`${title} — `)),
+        `${source} sections titled from manifest.packTitle`,
+      ).toBe(true);
+    }
   });
 
   it("includes the research corpus, one article per section, excluding client-work articles whole", () => {

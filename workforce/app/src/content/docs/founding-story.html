@@ -1,171 +1,9 @@
-<!doctype html>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark">
-<title>創業ストーリー — Software Talent Network</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<style>
-  :root{
-    --ground:#FAFAFB; --panel:#FFFFFF; --panel-2:#F2F5F9; --ink:#12171F; --ink-2:#49535F; --ink-3:#79838F;
-    --line:#DEE3EA; --accent:#1F3FCC; --accent-soft:#E9EDFC; --signal:#0F6B55; --shadow:0 1px 0 rgba(18,23,31,.04);
-  }
-  @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]){
-      --ground:#0C1116; --panel:#141A21; --panel-2:#182029; --ink:#ECEFF3; --ink-2:#A7B1BC; --ink-3:#7C8794;
-      --line:#232B35; --accent:#93A8FF; --accent-soft:#18213B; --signal:#54C2A2; --shadow:0 1px 0 rgba(0,0,0,.4);
-    }
-  }
-  :root[data-theme="dark"]{
-    --ground:#0C1116; --panel:#141A21; --panel-2:#182029; --ink:#ECEFF3; --ink-2:#A7B1BC; --ink-3:#7C8794;
-    --line:#232B35; --accent:#93A8FF; --accent-soft:#18213B; --signal:#54C2A2; --shadow:0 1px 0 rgba(0,0,0,.4);
-  }
-  *{box-sizing:border-box}
-  body{background:var(--ground);color:var(--ink);font-family:"Source Sans 3",system-ui,sans-serif;
-    font-size:16.5px;line-height:1.72;margin:0;-webkit-font-smoothing:antialiased}
-  h1,h2,h3{font-family:"Familjen Grotesk","Source Sans 3",sans-serif;text-wrap:balance;line-height:1.25;margin:0}
-  main{max-width:1080px;margin:0 auto;padding:0 24px 96px}
-  section{padding:60px 0;border-top:1px solid var(--line)}
-  section:first-of-type{border-top:0}
-  .eyebrow{display:flex;align-items:baseline;gap:14px;margin-bottom:18px}
-  .num,.kicker{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.18em;text-transform:uppercase}
-  .num{color:var(--accent)} .kicker{color:var(--ink-3)}
-  h2{font-size:clamp(26px,3.4vw,36px);font-weight:700;letter-spacing:-.015em}
-  .lede{color:var(--ink-2);font-size:17.5px;max-width:72ch;margin-top:12px}
-  p{margin:14px 0;max-width:76ch}
-  .cover{padding:80px 0 64px}
-  .cover h1{font-size:clamp(40px,7.5vw,78px);font-weight:700;letter-spacing:-.035em}
-  .cover .sub{font-size:clamp(17px,2.1vw,21px);color:var(--ink-2);margin-top:20px;max-width:68ch}
-  .rule{height:5px;width:88px;background:var(--accent);margin-top:26px;border-radius:3px}
-  .statline{display:flex;flex-wrap:wrap;gap:12px;margin-top:38px}
-  .stat{flex:1 1 160px;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:15px 18px;box-shadow:var(--shadow)}
-  .stat b{display:block;font-family:"IBM Plex Mono",monospace;font-size:29px;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-  .stat span{font-size:12.5px;color:var(--ink-3)}
-  .grid{display:grid;gap:14px;margin-top:26px}
-  .g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
-  .g3{grid-template-columns:repeat(auto-fit,minmax(225px,1fr))}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:18px 20px;box-shadow:var(--shadow)}
-  .card h3{font-size:16.5px;font-weight:700;margin-bottom:4px}
-  .card p{font-size:14.5px;color:var(--ink-2);margin:6px 0 0}
-  .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent);
-    background:var(--accent-soft);border-radius:3px;padding:2px 8px;letter-spacing:.04em;margin-bottom:8px}
-  .tag.ok{color:var(--signal);background:transparent;border:1px solid var(--line)}
-  ul{padding-left:1.15em;max-width:76ch} li{margin:7px 0;color:var(--ink-2)} li b{color:var(--ink)}
-  .scroll{overflow-x:auto;margin-top:22px;border:1px solid var(--line);border-radius:5px;background:var(--panel)}
-  table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:660px}
-  th,td{text-align:left;padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:top}
-  th{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-family:"IBM Plex Mono",monospace;font-weight:500}
-  td:first-child{font-weight:700;white-space:nowrap} tr:last-child td{border-bottom:0}
-  .layers{display:grid;gap:10px;margin-top:24px}
-  .layer{display:grid;grid-template-columns:120px 1fr;gap:18px;background:var(--panel);border:1px solid var(--line);
-    border-left:4px solid var(--accent);border-radius:5px;padding:16px 20px}
-  .layer .lab{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.1em;color:var(--accent);padding-top:3px}
-  .layer p{margin:5px 0 0;font-size:14.5px;color:var(--ink-2)}
-  .math{font-family:"IBM Plex Mono",monospace;font-size:14.5px;background:var(--accent-soft);border-radius:5px;
-    padding:16px 18px;margin-top:22px;overflow-x:auto;line-height:1.9}
-  .note{font-size:13.5px;color:var(--ink-3);max-width:72ch}
-  figure{margin:26px 0 0}
-  figure svg{width:100%;max-width:100%;height:auto;color:var(--ink)}
-  figcaption{font-size:13.5px;color:var(--ink-3);margin-top:12px;max-width:72ch}
-  .pull{border-left:3px solid var(--accent);padding:2px 0 2px 18px;margin:24px 0;font-size:19px;
-    font-family:"Familjen Grotesk",sans-serif;color:var(--ink);max-width:60ch}
-  .arc{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:0;margin-top:28px;
-    border:1px solid var(--line);border-radius:5px;overflow:hidden;background:var(--panel)}
-  .beat{padding:18px 20px;border-right:1px solid var(--line)}
-  .beat:last-child{border-right:0}
-  .beat .n{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;color:var(--accent);text-transform:uppercase}
-  .beat h3{font-size:16px;font-weight:700;margin:8px 0 4px}
-  .beat p{font-size:14px;color:var(--ink-2);margin:0}
-  .beat.fade h3,.beat.fade p{opacity:.62}
-  .voices{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:26px}
-  .voice{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:20px 22px;
-    display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
-  .who{display:flex;align-items:center;gap:12px}
-  .who .face{flex:0 0 auto;width:64px;height:64px;border-radius:50%;background:var(--panel-2);
-    border:1px solid var(--line)}
-  .who b{display:block;font-family:"Familjen Grotesk",sans-serif;font-size:16px;line-height:1.3}
-  .who span{font-size:12.5px;color:var(--ink-3)}
-  .voice q{quotes:none;font-size:15px;color:var(--ink-2);line-height:1.7}
-  .voice q:before,.voice q:after{content:none}
-  footer{border-top:1px solid var(--line);padding:26px 0 0;color:var(--ink-3);font-size:13px}
-  @media (max-width:560px){ .layer{grid-template-columns:1fr;gap:4px} }
-</style>
-<style>
-  /* whitepaper: evidence-first — status pills, denser tables, appendix */
-  .st{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.12em;
-    text-transform:uppercase;padding:2px 8px;border-radius:99px;border:1px solid var(--line);
-    color:var(--ink-3);white-space:nowrap}
-  .st.live{color:var(--signal);border-color:currentColor}
-  .st.part{color:var(--accent);border-color:currentColor}
-  .st.plan{color:var(--ink-3)}
-  .st.count{color:var(--ink-2)}
-  .define{border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 5px 5px 0;
-    padding:14px 18px;margin-top:26px;font-size:15.5px;color:var(--ink);max-width:74ch}
-  .toc{columns:2;column-gap:32px;margin-top:26px;font-size:14.5px}
-  .toc a{display:block;color:var(--ink-2);text-decoration:none;padding:3px 0;break-inside:avoid}
-  .toc a:hover,.toc a:focus{color:var(--accent);text-decoration:underline}
-  .toc a b{font-family:"IBM Plex Mono",monospace;color:var(--accent);font-weight:500;font-size:12px;margin-right:8px}
-  table.tight{font-size:14px;min-width:560px}
-  td .st{margin-right:6px}
-  h3.sub{font-size:18px;font-weight:700;margin-top:34px}
-  .flowsteps{counter-reset:fs;list-style:none;padding:0;margin-top:24px;max-width:78ch}
-  .flowsteps li{counter-increment:fs;position:relative;padding-left:44px;margin:12px 0;color:var(--ink-2)}
-  .flowsteps li:before{content:counter(fs,decimal-leading-zero);position:absolute;left:0;top:1px;
-    font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--accent)}
-  @media (max-width:640px){ .toc{columns:1} }
-</style>
-<style>
-  /* shared docs chrome */
-  .sitebar{display:flex;align-items:center;justify-content:space-between;gap:16px;
-    max-width:1080px;margin:0 auto;padding:16px 24px;border-bottom:1px solid var(--line)}
-  .sitebar .brand{font-family:"Familjen Grotesk","Source Sans 3",sans-serif;font-weight:700;
-    font-size:15px;letter-spacing:-.01em;color:var(--ink);text-decoration:none}
-  .sitebar .back{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.16em;
-    text-transform:uppercase;color:var(--ink-3);text-decoration:none}
-  .sitebar .brand:hover,.sitebar .back:hover,.sitebar .brand:focus-visible,.sitebar .back:focus-visible{color:var(--accent)}
-  main .cover{padding-top:56px}
-</style>
-<style>
-  /* page-local additions */
-  .cover .define{margin-top:26px}
-  .qline{font-family:"Familjen Grotesk",sans-serif;font-size:19px;line-height:1.5;color:var(--ink);
-    border-left:3px solid var(--accent);padding:2px 0 2px 18px;margin:26px 0;max-width:62ch}
-  .foryou{background:var(--accent-soft);border-radius:5px;padding:14px 18px;margin-top:22px;max-width:68ch;font-size:15px}
-  .foryou b{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);display:block;margin-bottom:4px;font-weight:500}
-  .kw{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--accent);background:var(--accent-soft);border-radius:3px;padding:1px 6px;white-space:nowrap}
-  .fn{font-size:13.5px;color:var(--ink-3);max-width:72ch;margin-top:10px}
-  .fn sup,.p sup,p sup{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--accent)}
-  ol.notes{font-size:13.5px;color:var(--ink-2);max-width:74ch;padding-left:1.4em} ol.notes li{margin:6px 0}
-  .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:22px}
-  .two .card h3{font-size:15px}
-  .two .card ul{padding-left:1.1em;margin:8px 0 0} .two .card li{font-size:14px;margin:5px 0}
-  td.dim{color:var(--ink-3)}
-  .bar{display:flex;align-items:center;gap:10px;font-family:"IBM Plex Mono",monospace;font-size:12px}
-  .bar i{display:block;height:9px;background:var(--accent);border-radius:2px;opacity:.85}
-  .voice .role{font-size:12.5px;color:var(--ink-3)}
-  .voice .verdict{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--signal)}
-  figure .figscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
-  .process-map{display:block;width:100%;min-width:1080px;height:auto;filter:grayscale(1) contrast(1.04)}
-  .regional-map{display:block;width:100%;min-width:900px;height:auto}
-  .process-figure .figscroll{background:#fff;border:1px solid var(--line);border-radius:5px}
-  @media (max-width:640px){ .qline{font-size:17px} figure .figscroll svg{min-width:640px} .process-map{min-width:960px} }
-</style>
-</head>
-<body>
-<header class="sitebar">
-  <a class="brand" href="/">Software Talent Network</a>
-  <a class="back" href="/docs/">Docs</a>
-</header>
-<main>
 <section class="cover">
   <div class="kicker">創業ストーリー · 2026-09</div>
   <h1>人間ひとり、<br>AI 五十八体。</h1>
   <div class="rule"></div>
   <p class="sub">人のために作られた統治の仕組みを、AI の組織へ移植しました。役割・権限・検証・改善がつながり、学習を次の実行へ戻し続ける運営構造です。稼働後には人の組織では見えにくかった三つの想定外が現れ、それが現在の進化を動かしています。この文書は、なぜ創業者がこの組織を作ったのか、なぜ作れたのか、そして稼働を始めてから何が起きたのかの記録です。出発点は、創業者がノートに描いた三枚の図でした。</p>
-  <div class="define"><b>前提。</b>本稿では、この運営中の Agent Workforce を <b>Cognitive Guild</b> と呼びます。現行サイトでの名称は Software Talent Network です。人間の意思決定者が一人だけの、AI ペルソナによる運営組織であり、人の労働を売り買いする場でも、人材紹介や受託開発でもありません。仕組みそのものは<a href="/docs/whitepaper.html">ホワイトペーパー</a>に、信条は<a href="/docs/manifesto.html">マニフェスト</a>にあります。ここでは「なぜ」と「その後」だけを書きます。</div>
+  <div class="define"><b>前提。</b>本稿では、この運営中の Agent Workforce を <b>Cognitive Guild</b> と呼びます。現行サイトでの名称は Software Talent Network です。人間の意思決定者が一人だけの、AI ペルソナによる運営組織であり、人の労働を売り買いする場でも、人材紹介や受託開発でもありません。仕組みそのものは<a href="/docs/whitepaper">ホワイトペーパー</a>に、信条は<a href="/docs/manifesto">マニフェスト</a>にあります。ここでは「なぜ」と「その後」だけを書きます。</div>
   <nav class="toc" aria-label="目次">
     <a href="#s1"><b>01</b>まず数字と、想定外から</a>
     <a href="#s2"><b>02</b>紙に描いた三枚</a>
@@ -214,17 +52,17 @@
   <style>
     .fo-org{fill:none;stroke:currentColor;stroke-opacity:.45;stroke-width:1.4}
     .fo-node{fill:var(--panel);stroke:currentColor;stroke-opacity:.4;stroke-width:1.1}
-    .fo-nt{font:600 12px "Source Sans 3",system-ui,sans-serif;fill:currentColor}
-    .fo-ext{font:12px "Source Sans 3",system-ui,sans-serif;fill:currentColor;opacity:.72}
+    .fo-nt{font:600 12px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .fo-ext{font:12px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.72}
     .fo-arr{fill:none;stroke:currentColor;stroke-opacity:.6;stroke-width:1.3;marker-end:url(#fo-ah)}
     .fo-arr2{fill:none;stroke:var(--accent);stroke-width:1.6;marker-end:url(#fo-ah2)}
     .fo-hub{fill:var(--accent);fill-opacity:.1;stroke:var(--accent);stroke-width:1.6}
-    .fo-hubt{font:700 14px "Source Sans 3",system-ui,sans-serif;fill:var(--accent)}
-    .fo-k{font:11px "IBM Plex Mono",monospace;fill:var(--accent);letter-spacing:.14em}
-    .fo-cap{font:12.5px "Source Sans 3",system-ui,sans-serif;fill:currentColor;opacity:.7}
+    .fo-hubt{font:700 14px Geist,Inter,system-ui,sans-serif;fill:var(--accent)}
+    .fo-k{font:11px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent);letter-spacing:.14em}
+    .fo-cap{font:12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.7}
     .fo-big{fill:var(--accent);fill-opacity:.85}
     .fo-pill{fill:var(--accent);fill-opacity:.08;stroke:var(--accent);stroke-width:1.2}
-    .fo-pt{font:600 12.5px "Source Sans 3",system-ui,sans-serif;fill:currentColor}
+    .fo-pt{font:600 12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor}
   </style>
   <defs>
     <marker id="fo-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor" fill-opacity=".6"/></marker>
@@ -280,18 +118,18 @@
   <desc id="fm-d">横軸は管理に弱いから管理に長けるへ、縦軸は融通が利かないから柔軟な運営へ。左上にAgile、右下にWaterfall、右上の空白にAIネイティブSDLC。右側の注記は、組織全体の再整合コストが再整合の価値を上回っていた不等号が、AI組織のテクノロジーで逆転すること。</desc>
   <style>
     .fm-ax{stroke:currentColor;stroke-opacity:.5;stroke-width:1.4;marker-end:url(#fm-ah)}
-    .fm-axl{font:600 12.5px "Source Sans 3",system-ui,sans-serif;fill:currentColor;opacity:.75}
-    .fm-q{font:700 19px "Familjen Grotesk","Source Sans 3",system-ui,sans-serif;fill:currentColor}
-    .fm-qs{font:12px "Source Sans 3",system-ui,sans-serif;fill:currentColor;opacity:.65}
+    .fm-axl{font:600 12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.75}
+    .fm-q{font:700 19px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .fm-qs{font:12px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.65}
     .fm-goal{fill:var(--accent);fill-opacity:.07;stroke:var(--accent);stroke-width:1.6;stroke-dasharray:6 4}
-    .fm-gt{font:700 14.5px "Source Sans 3",system-ui,sans-serif;fill:var(--accent)}
-    .fm-gs{font:12px "Source Sans 3",system-ui,sans-serif;fill:var(--accent)}
+    .fm-gt{font:700 14.5px Geist,Inter,system-ui,sans-serif;fill:var(--accent)}
+    .fm-gs{font:12px Geist,Inter,system-ui,sans-serif;fill:var(--accent)}
     .fm-panel{fill:var(--panel);stroke:currentColor;stroke-opacity:.3;stroke-width:1.2}
-    .fm-k{font:11px "IBM Plex Mono",monospace;fill:var(--accent);letter-spacing:.14em}
-    .fm-b{font:700 13.5px "Source Sans 3",system-ui,sans-serif;fill:currentColor}
-    .fm-s{font:12.5px "Source Sans 3",system-ui,sans-serif;fill:currentColor;opacity:.72}
-    .fm-ineq{font:600 16px "IBM Plex Mono",monospace;fill:currentColor}
-    .fm-ineq2{font:600 16px "IBM Plex Mono",monospace;fill:var(--accent)}
+    .fm-k{font:11px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent);letter-spacing:.14em}
+    .fm-b{font:700 13.5px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .fm-s{font:12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.72}
+    .fm-ineq{font:600 16px "JetBrains Mono",ui-monospace,monospace;fill:currentColor}
+    .fm-ineq2{font:600 16px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent)}
     .fm-flip{fill:none;stroke:var(--accent);stroke-width:1.6;marker-end:url(#fm-ah2)}
     .fm-sep{stroke:currentColor;stroke-opacity:.2;stroke-width:1}
   </style>
@@ -393,7 +231,7 @@
   <p>この組織では、<b>人間が握っているのは境界線の改定権</b>です。憲法、設計記録、コスト上限、ペルソナの人格。これに触れる変更は、必ず人間に回ります<sup>6</sup>。境界の内側では、三名以上の AI レビュー担当が全員一致で合意した変更を AI が最終承認して本番に入れます。後ろには常に機械の検査が立っています。法務の方には、この「境界の改定権だけを人が持つ」設計が最も面白い部分だと思います。</p>
   <h3 class="sub">採用は、人と同じ手順で</h3>
   <p>新しい AI ペルソナを増やすときも、人の採用と同じ手順を踏みます。職務記述書を書き、予算に一行足し、月のコスト上限を改定してから、席を作ります。稼働開始から 9 回の採用ラウンドを回しました。上限は 50 ドルから 600 ドルまで、毎回この順番で上がっています。逆に言えば、席を作ってから予算を探したことは一度もありません。</p>
-  <p class="fn">仕組みの詳細（構成モデル、実行の流れ、権限の表）は<a href="/docs/whitepaper.html">ホワイトペーパー</a>の 05 から 09 に譲ります。ここで同じ説明を繰り返しません。</p>
+  <p class="fn">仕組みの詳細（構成モデル、実行の流れ、権限の表）は<a href="/docs/whitepaper">ホワイトペーパー</a>の 05 から 09 に譲ります。ここで同じ説明を繰り返しません。</p>
 </section>
 
 <section id="s5">
@@ -406,12 +244,12 @@
 <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fs-t">
   <title id="fs-t">3つの組織能力が循環する仕組み</title>
   <style>
-    .lab{font:600 14px "Source Sans 3",system-ui,sans-serif;fill:currentColor}
-    .sm{font:12.5px "Source Sans 3",system-ui,sans-serif;fill:currentColor;opacity:.7}
-    .mono{font:11px "IBM Plex Mono",monospace;fill:var(--accent);letter-spacing:.1em}
+    .lab{font:600 14px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .sm{font:12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.7}
+    .mono{font:11px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent);letter-spacing:.1em}
     .node{fill:none;stroke:currentColor;stroke-opacity:.4;stroke-width:1.2}
     .arr{fill:none;stroke:var(--accent);stroke-width:1.6;marker-end:url(#ah)}
-    .ctr{font:600 13px "Source Sans 3",system-ui,sans-serif;fill:var(--accent)}
+    .ctr{font:600 13px Geist,Inter,system-ui,sans-serif;fill:var(--accent)}
   </style>
   <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>
   <g>
@@ -438,9 +276,9 @@
   <title id="fc-t">単利的な実行と複利的な組織学習の比較</title>
   <desc id="fc-d">単利の総量は P かける 1 足す r かける t、複利の総量は P かける 1 足す r の t 乗です。初期値 100、各期 10 パーセントの例では、20 期後に単利は 300、複利は約 673 になります。</desc>
   <style>
-    .lab{font:600 13px "Source Sans 3",system-ui,sans-serif;fill:currentColor}
-    .sm{font:12px "Source Sans 3",system-ui,sans-serif;fill:currentColor;opacity:.7}
-    .mono{font:600 20px "IBM Plex Mono",monospace;fill:currentColor}
+    .lab{font:600 13px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .sm{font:12px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.7}
+    .mono{font:600 20px "JetBrains Mono",ui-monospace,monospace;fill:currentColor}
     .box{fill:none;stroke:currentColor;stroke-opacity:.35;stroke-width:1.2}
     .accentbox{fill:var(--accent);fill-opacity:.08;stroke:var(--accent);stroke-width:1.2}
     .grid{stroke:currentColor;stroke-opacity:.13;stroke-width:1}
@@ -471,9 +309,9 @@
 <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="ft-t">
   <title id="ft-t">Cognitive Guildへ至る進化の年表（2024年から2026年）</title>
   <style>
-    .d{font:11px "IBM Plex Mono",monospace;fill:var(--accent);letter-spacing:.06em}
-    .h{font:600 13px "Source Sans 3",system-ui,sans-serif;fill:currentColor}
-    .sm{font:12px "Source Sans 3",system-ui,sans-serif;fill:currentColor;opacity:.7}
+    .d{font:11px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent);letter-spacing:.06em}
+    .h{font:600 13px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .sm{font:12px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.7}
     .axis{stroke:currentColor;stroke-opacity:.35;stroke-width:1.4}
     .dot{fill:var(--accent)}
     .tick{stroke:var(--accent);stroke-width:1.2}
@@ -518,10 +356,10 @@
 <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fp-t">
   <title id="fp-t">人の組織で学んだ3つのことと、AI組織への移植</title>
   <style>
-    .k{font:11px "IBM Plex Mono",monospace;fill:var(--accent);letter-spacing:.1em}
-    .h{font:700 15px "Source Sans 3",system-ui,sans-serif;fill:currentColor}
-    .sm{font:12.5px "Source Sans 3",system-ui,sans-serif;fill:currentColor;opacity:.72}
-    .ess{font:700 14px "Source Sans 3",system-ui,sans-serif;fill:var(--accent)}
+    .k{font:11px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent);letter-spacing:.1em}
+    .h{font:700 15px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .sm{font:12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.72}
+    .ess{font:700 14px Geist,Inter,system-ui,sans-serif;fill:var(--accent)}
     .col{fill:none;stroke:currentColor;stroke-opacity:.3;stroke-width:1.2}
     .band{fill:var(--accent);fill-opacity:.07;stroke:var(--accent);stroke-width:1.4}
     .arr{stroke:var(--accent);stroke-width:1.6;fill:none;marker-end:url(#ap)}
@@ -628,7 +466,3 @@
     <li>記事フロントマターの <span class="kw">systemPromptVersion</span> と審査点。GA4 で版別に集計。長期記憶は ADR-0019、週次キュレーションは 2026-07-20 から。</li>
   </ol>
 </section>
-<footer>Software Talent Network — 人間の意思決定者一人が統治する、持続的な AI プロフェッショナルによるソフトウェア定義の運営組織。この文書は 2026-09-05 の公開 KPI とリポジトリの記録に基づきます。</footer>
-</main>
-</body>
-</html>

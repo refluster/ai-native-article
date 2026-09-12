@@ -222,6 +222,61 @@ means adding it once.
 ### Network Graphs
 Visualization components should use the secondary (Sage) and tertiary (Pale Copper) colors to denote different node types or connection strengths, ensuring the primary Indigo remains the dominant structural anchor.
 
+## Public surfaces (landing · Docs · Research)
+
+Everything a visitor can reach without signing in — the landing page at
+the apex, the documents under `/docs`, the article corpus under
+`/research` — is one site in one SPA, built from one vocabulary
+(`components/public/`). The landing page set the tone and the other two
+follow it:
+
+- **Space, not rules.** Sections are separated by vertical whitespace
+  (`SECTION` = `py-12 sm:py-14`), never by a horizontal hairline. The only
+  rules left on a public page are the ones inside data (table rows) and the
+  two-pixel Pale Copper / Indigo rails that mark a pulled quote or a
+  definition. The Research prose `h2` lost its underline for the same
+  reason; the shell's footer sits under space, not a line.
+- **One opening.** Every page starts with `PageHero`: a mono uppercase
+  kicker, a Geist Bold title (`H1` display size for landing and Docs,
+  `H1_MD` sentence size for Research and article titles), a lede in
+  `on-surface-variant` at 60ch, then pill actions. Document covers use the
+  same sizes through `.docs-prose .cover`.
+- **One card.** `LinkCard` (white lifted surface, 1px `outline-variant`
+  hairline, `rounded-wf-md`, Indigo kicker, hover raises the hairline to
+  Indigo — no shadow) presents a document or the corpus wherever it is
+  offered: the landing grid, the Docs index, a document's *Continue
+  reading*. Research cards and the documents' own `.card` blocks are the
+  same grammar.
+- **One chip, one pill.** `CHIP` / `CHIP_ACTIVE` for tags and filters
+  (recessed `surface-container`, inverts to Indigo when active);
+  `PILL_PRIMARY` / `PILL_SECONDARY` for the page's one or two actions;
+  `TEXT_LINK` for mono breadcrumbs and "← back" links.
+
+### Chrome
+
+Public pages share one shell, `components/PublicShell.tsx`: brand mark +
+wordmark on the left, the public destinations (**Docs**, **Research**, both
+router links) and the sign-in / open-console pill on the right, a mono
+uppercase footer under whitespace. It is deliberately *not* GlobalNav —
+every GlobalNav destination is gated, and a visitor must never be bounced
+to the Hosted UI by a link that looked public. The column is `max-w-5xl`;
+the Research index widens to 1200px because it carries the console's
+12-column grid (list + rail).
+
+### Docs
+
+`/docs` and `/docs/:slug` render the whitepaper, the founding story and
+the manifesto from HTML fragments bundled into the app (`src/content/docs/`,
+registered in `manifest.json`), painted by `.docs-prose` in `index.css`:
+the documents' own class vocabulary (`cover`, `eyebrow`, `lede`, `card`,
+`layer`, status pills, `toc`, persona `voice`s) mapped onto the tokens
+above. Body **17px / 1.75** Geist (the manifesto, marked `narrow`, reads at
+18px / 1.8 in an 820px measure); numbered mono eyebrows in Indigo above
+each `h2`; cards, stat tiles and tables in the card grammar; quotes as
+rails. No dark theme, no accent bar under the cover title, no section
+rules. Decision record and file map:
+[`docs/design/public-docs.md`](docs/design/public-docs.md).
+
 ## Research (the reading surface)
 
 `/research` and `/research/:slug` put the article corpus the reader site
@@ -230,16 +285,7 @@ publishes (`https://kohuehara.xyz/ai-native-article/`, Notion-authored, see
 inside this console. Same text, this system. The rules below are what
 "Cognitive Network, applied to long-form prose" means; the component
 inventory is in [`docs/design/research-surface.md`](docs/design/research-surface.md).
-
-### Chrome
-
-Public pages (landing, Research) share one shell, `components/PublicShell.tsx`:
-brand mark + wordmark on the left, the public destinations (**Research**,
-**Docs**) and the sign-in / open-console pill on the right, a mono uppercase
-footer. It is deliberately *not* GlobalNav — every GlobalNav destination is
-gated, and a visitor must never be bounced to the Hosted UI by a link that
-looked public. The landing column is `max-w-5xl`; the Research index widens
-to 1200px because it carries the console's 12-column grid (list + rail).
+Chrome and vocabulary are the public surfaces' (§ above).
 
 ### Index
 
@@ -264,9 +310,9 @@ to 1200px because it carries the console's 12-column grid (list + rail).
 - Measure **780px**. Body **17px / 1.8** Geist — the corpus is
   Japanese-first and CJK wants the taller leading; the reader site's 16px
   Inter measure is the same text at a different voice.
-- Headings: Geist Bold, `-0.015em` tracking, `h2` with a hairline
-  underline, `h4` demoted to a mono data-label so a fourth level never
-  competes with the second.
+- Headings: Geist Bold, `-0.015em` tracking, `h2` set off by extra top
+  margin (no underline — space, not rules), `h4` demoted to a mono
+  data-label so a fourth level never competes with the second.
 - Links Indigo Ink, hover Pale Copper; blockquotes a 2px Pale Copper rule;
   code and tables on `surface-container` with `outline-variant` hairlines;
   images `rounded-wf-md` with a border. All of it is `.research-prose` in

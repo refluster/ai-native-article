@@ -1,0 +1,35 @@
+[
+  {
+    "slug": "whitepaper",
+    "file": "whitepaper.html",
+    "lang": "en",
+    "kicker": "Technical whitepaper",
+    "title": "Capability as a governed internal asset",
+    "description": "The claim, the organizational constraint it removes, the composition model, the anatomy of a persistent agent, the architecture and execution flow, memory and cross-project reuse, governance and failure containment, operating evidence, management economics, and the limits and open questions.",
+    "cta": "Read the whitepaper",
+    "packTitle": "Technical whitepaper",
+    "measure": "wide"
+  },
+  {
+    "slug": "founding-story",
+    "file": "founding-story.html",
+    "lang": "ja",
+    "kicker": "Founding story · 日本語",
+    "title": "人間ひとり、AI 五十八体。",
+    "description": "なぜ一人の人間がこの組織を作ったのか、なぜ作れたのか、稼働を始めてから何が起きたのか。家電の量産、SaaS の組織統治、事業売却で学んだ三つのことと、AI 組織が自分で書いた月次レポートの記録。",
+    "cta": "創業ストーリーを読む",
+    "packTitle": "創業ストーリー",
+    "measure": "wide"
+  },
+  {
+    "slug": "manifesto",
+    "file": "manifesto.html",
+    "lang": "en",
+    "kicker": "Manifesto",
+    "title": "Assemble, deliver, disband",
+    "description": "What the network believes about work: outcomes over output, capability that belongs to the professional, temporary projects and persistent learning, disciplinary difference, the record, accountability, and the human's ownership of purpose and consequence.",
+    "cta": "Read the manifesto",
+    "packTitle": "Manifesto",
+    "measure": "narrow"
+  }
+]

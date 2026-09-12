@@ -47,7 +47,7 @@ export function decodeEntities(s) {
 }
 
 /**
- * Convert one of the static docs pages to markdown-ish text: headings keep
+ * Convert one of the public docs fragments to markdown-ish text: headings keep
  * their level, list items become `- `, table cells join with ` | `, block
  * elements break lines, everything else is stripped. Scripts, styles and
  * the head are dropped first.
@@ -251,6 +251,10 @@ export function htmlTitle(html) {
 
 const POSTS_DIR = join(REPO_ROOT, "newsletter", "app", "public", "posts");
 
+/** The public documents' fragments + manifest (repo-relative; see
+ *  workforce/app/src/lib/docs.ts for the SPA side of the same contract). */
+const DOCS_DIR = join("workforce", "app", "src", "content", "docs");
+
 /**
  * The AI Native Article corpus (the console's /research reader) as
  * `{title, body}` articles. Frontmatter is dropped; images and links are
@@ -306,16 +310,21 @@ export function buildKnowledgePack({ now = new Date() } = {}) {
     add("mvv", block.title, block.body, true);
   }
 
-  // The three public docs pages. Manifesto + founding story are the thesis
-  // (pinned in full); the whitepaper is the technical account (selected).
-  for (const [file, source, pinned] of [
-    ["founding-story.html", "founding-story", true],
-    ["manifesto.html", "manifesto", true],
-    ["whitepaper.html", "whitepaper", false],
+  // The three public docs pages — HTML fragments the console SPA renders
+  // at /docs/:slug, with their metadata in the manifest beside them (the
+  // same file the SPA's lib/docs.ts reads, so a document is registered in
+  // one place). Manifesto + founding story are the thesis (pinned in
+  // full); the whitepaper is the technical account (selected).
+  const docsManifest = JSON.parse(read(join(DOCS_DIR, "manifest.json")));
+  for (const [source, pinned] of [
+    ["founding-story", true],
+    ["manifesto", true],
+    ["whitepaper", false],
   ]) {
-    const html = read(join("workforce/app/public/docs", file));
-    const text = htmlToText(html);
-    const docTitle = htmlTitle(html) ?? source;
+    const meta = docsManifest.find((d) => d.slug === source);
+    if (!meta) throw new Error(`build-board-knowledge: ${source} missing from ${DOCS_DIR}/manifest.json`);
+    const text = htmlToText(read(join(DOCS_DIR, meta.file)));
+    const docTitle = meta.packTitle ?? source;
     for (const block of splitSections(text, docTitle)) {
       add(source, `${docTitle} — ${block.title}`, block.body, pinned);
     }

@@ -47,7 +47,8 @@ that sends the CORS header.
 | `src/config/research.ts` | corpus base, canonical article base, page size, storage key |
 | `src/lib/research.ts` | manifest/body fetchers, frontmatter grammar, tag + edition helpers, the analysis ⇄ explanation source index (ported from the reader's `source-links.ts`) |
 | `src/lib/useResearchLanguage.ts` | `?lang=` → localStorage → browser → `ja` |
-| `src/components/PublicShell.tsx` | header/footer for public pages (landing + research) and the sign-in state hook |
+| `src/components/PublicShell.tsx` | header/footer for public pages (landing + docs + research) and the sign-in state hook |
+| `src/components/public/` | the public surfaces' shared vocabulary — `PageHero`, `LinkCard`, and the class constants in `styles.ts` (see [`public-docs.md`](public-docs.md)) |
 | `src/components/research/ResearchCard.tsx` | index card |
 | `src/components/research/LanguageToggle.tsx` | JA / EN pill |
 | `src/components/research/AuthorByline.tsx` | Sigil portrait + name + role from the live roster |
