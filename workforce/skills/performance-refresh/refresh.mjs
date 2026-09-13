@@ -185,6 +185,24 @@ async function resolveGithubToken(projectId, region) {
   return parsed.token;
 }
 
+/** The last three lines of a builder's output are its epilogue ("published N
+ *  rows"), which is exactly where the CAUSE is not. Production 2026-09-13: five
+ *  repos logged `code_frequency -> HTTP 403` and every one of those lines was
+ *  truncated away, leaving a degraded run whose reason had to be re-derived by
+ *  hand against the live API. So prefer the diagnostic lines when there are any,
+ *  and keep the epilogue only when there is nothing louder to show. */
+const LOUD_LINE = /\b(ERROR|WARN|FATAL|failed|degraded|rate.?limited|HTTP \d{3})\b/i;
+
+export function digestOutput(text, { max = 6 } = {}) {
+  const lines = String(text ?? "")
+    .trim()
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const loud = lines.filter((l) => LOUD_LINE.test(l));
+  return (loud.length > 0 ? loud : lines).slice(-max).join(" | ");
+}
+
 function run(label, file, args, { dry, env }) {
   if (dry) {
     console.error(`[dry-run] would run: ${file} ${args.join(" ")}`);
@@ -198,7 +216,7 @@ function run(label, file, args, { dry, env }) {
       maxBuffer: 64 * 1024 * 1024,
       env: { ...process.env, ...(env ?? {}) },
     });
-    return { label, ok: true, tail: stdout.trim().split("\n").slice(-3).join(" | ") };
+    return { label, ok: true, tail: digestOutput(stdout) };
   } catch (err) {
     // exit 2 from a builder = published but degraded/partial, not a hard fail.
     const degraded = err?.status === 2;
@@ -207,8 +225,8 @@ function run(label, file, args, { dry, env }) {
       label,
       ok: degraded,
       degraded,
-      error: degraded ? undefined : stderr.split("\n").slice(-3).join(" | "),
-      tail: stderr.split("\n").slice(-3).join(" | "),
+      error: degraded ? undefined : digestOutput(stderr),
+      tail: digestOutput(stderr),
     };
   }
 }

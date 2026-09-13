@@ -6,6 +6,7 @@ import {
   buildDailyActivity,
   buildWeeklyChurn,
   fetchCodeFrequency,
+  isRateLimited,
   searchAll,
   sumDailyActivity,
   sumWeeklyChurn,
@@ -228,5 +229,61 @@ describe("fetchCodeFrequency (shared retry budget across a status transition)", 
       weeks: [],
       partial: true,
     });
+  });
+});
+
+// Production 2026-09-13: all four projects' churn dropped to 0/degraded in the
+// same run. The log said `code_frequency -> HTTP 403` — identical to the text a
+// scope/SSO problem produces — so the cause (one shared PAT whose 5000/h core
+// quota was spent) had to be re-derived by hand against the live API. A 403 the
+// builder cannot name is an unknown it reported as a known.
+describe("isRateLimited", () => {
+  it("reads a spent quota off the rate-limit headers", () => {
+    expect(isRateLimited({ status: 403, json: {}, rateLimit: { remaining: 0 } })).toBe(true);
+    expect(isRateLimited({ status: 429, json: {}, rateLimit: { remaining: 0 } })).toBe(true);
+  });
+
+  it("falls back to the message when headers are absent", () => {
+    expect(isRateLimited({ status: 403, json: { message: "API rate limit exceeded for user ID 1" } })).toBe(true);
+  });
+
+  it("does NOT claim a rate limit for a permission 403", () => {
+    expect(isRateLimited({ status: 403, json: { message: "Resource not accessible by personal access token" } })).toBe(
+      false,
+    );
+    expect(isRateLimited({ status: 403, json: {}, rateLimit: { remaining: 4321 } })).toBe(false);
+  });
+
+  it("ignores statuses that are not a refusal", () => {
+    expect(isRateLimited({ status: 200, json: [], rateLimit: { remaining: 0 } })).toBe(false);
+    expect(isRateLimited(undefined)).toBe(false);
+  });
+});
+
+describe("fetchCodeFrequency (rate-limited is not a cold cache)", () => {
+  it("gives up immediately instead of spending the retry budget on a quota that resets in an hour", async () => {
+    let calls = 0;
+    const gh = async () => {
+      calls += 1;
+      return {
+        status: 403,
+        json: { message: "API rate limit exceeded for user ID 1" },
+        rateLimit: { remaining: 0, resetAt: "2026-09-13T17:00:00.000Z" },
+      };
+    };
+    const r = await fetchCodeFrequency(gh, "o/r", { attempts: 6, delayMs: 0 });
+    expect(r).toEqual({ weeks: [], partial: true, rateLimited: true });
+    expect(calls).toBe(1);
+  });
+
+  it("still backs off for a cold cache, which a retry can actually fix", async () => {
+    let calls = 0;
+    const gh = async () => {
+      calls += 1;
+      return calls < 3 ? { status: 202, json: null } : { status: 200, json: [[1000, 5, -2]] };
+    };
+    const r = await fetchCodeFrequency(gh, "o/r", { attempts: 6, delayMs: 0 });
+    expect(r).toEqual({ weeks: [[1000, 5, -2]], partial: false });
+    expect(calls).toBe(3);
   });
 });
