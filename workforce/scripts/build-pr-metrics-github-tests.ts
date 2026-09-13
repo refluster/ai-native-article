@@ -1,7 +1,7 @@
 // @ts-nocheck — the script under test is dependency-free ESM, not TS.
 // Tests the pure classification + aggregation of the GitHub-API PR builder.
 import { describe, it, expect } from "vitest";
-import { classifyPr, aggregate, aggregateEscalations, aggregateReruns } from "./build-pr-metrics-github.mjs";
+import { classifyPr, aggregate, aggregateEscalations, aggregateReruns, fetchPrFacts } from "./build-pr-metrics-github.mjs";
 
 const GREEN = (slug) => `looks good\n<!-- autopilot:review:${slug}:green -->`;
 
@@ -113,5 +113,68 @@ describe("aggregateReruns", () => {
 
   it("empty input yields an empty roll-up", () => {
     expect(aggregateReruns([])).toEqual({ reran_prs: 0, per_check: {}, warn: [] });
+  });
+});
+
+// Production 2026-09-13: this loop spends three core-quota calls per merged PR
+// over a 180-day window — ~5300 calls across the scopes against a 5000/h quota
+// every project now shares through one PAT. It ran out mid-run, and the old
+// code read `p.additions || 0` off each refused response: every PR past the
+// limit entered the roll-up as a real PR that happened to change zero lines,
+// which is indistinguishable from a tiny PR and silently drags the average
+// down. An undercount announces itself; a false zero does not.
+describe("fetchPrFacts (a PR whose detail never arrived is dropped, not zeroed)", () => {
+  const item = (n) => ({ number: n, closed_at: "2026-09-01T00:00:00Z", labels: [], user: { login: "someone" } });
+  const ok = (n) => ({
+    status: 200,
+    json: { number: n, merged_at: "2026-09-01T00:00:00Z", additions: 100, deletions: 5, user: { login: "dev" } },
+  });
+  const empty = { status: 200, json: [] };
+
+  /** Routes the three per-PR calls, failing `/pulls/{n}` for the listed numbers. */
+  const router = (failures: Record<number, unknown>) => async (path: string) => {
+    const m = /\/pulls\/(\d+)$/.exec(path);
+    if (!m) return empty;
+    const n = Number(m[1]);
+    return failures[n] ?? ok(n);
+  };
+
+  it("keeps the PRs it could read and counts the ones it could not", async () => {
+    const gh = router({ 2: { status: 404, json: {} } });
+    const r = await fetchPrFacts(gh, "o/r", [item(1), item(2), item(3)]);
+    expect(r.prs).toHaveLength(2);
+    expect(r.skipped).toBe(1);
+    expect(r.quotaExhausted).toBe(false);
+    // The dropped PR contributes no churn AT ALL — not a zero-line PR.
+    expect(r.prs.every((p) => p.additions === 100)).toBe(true);
+  });
+
+  it("stops the loop on a spent quota instead of issuing doomed calls", async () => {
+    let calls = 0;
+    const limited = {
+      status: 403,
+      json: { message: "API rate limit exceeded for user ID 1" },
+      rateLimit: { remaining: 0, resetAt: "2026-09-13T17:00:00.000Z" },
+    };
+    const gh = async (path: string) => {
+      calls += 1;
+      const m = /\/pulls\/(\d+)$/.exec(path);
+      if (!m) return empty;
+      const n = Number(m[1]);
+      return n >= 3 ? limited : ok(n);
+    };
+    const merged = Array.from({ length: 50 }, (_, i) => item(i + 1));
+    const r = await fetchPrFacts(gh, "o/r", merged);
+    expect(r.prs).toHaveLength(2);
+    expect(r.quotaExhausted).toBe(true);
+    // Two PRs fetched (3 calls each) plus the one that hit the limit — and then
+    // nothing: 47 more PRs would have cost 141 refusals.
+    expect(calls).toBe(9);
+  });
+
+  it("reports a clean run as clean", async () => {
+    const r = await fetchPrFacts(router({}), "o/r", [item(1), item(2)]);
+    expect(r).toMatchObject({ skipped: 0, quotaExhausted: false });
+    expect(r.prs).toHaveLength(2);
   });
 });

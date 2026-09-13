@@ -344,7 +344,26 @@ async function main() {
 
   const legs = [];
 
-  // 1. PR metrics, per scope (each needs its own repo + its own PAT).
+  // 1. Repository activity — one pass writes every scope + the aggregate.
+  //
+  // FIRST, ahead of the PR legs, because the two legs share one GitHub REST
+  // quota and are wildly unequal in what they spend: this leg costs a handful
+  // of core calls, the PR loop below costs three PER MERGED PR (~5300 across
+  // the scopes over a 180-day window, against a 5000/h quota every project now
+  // draws on through one PAT). Run last, it was reliably starved — production
+  // 2026-09-13, where the PR roll-ups published fine and code churn came back
+  // 403 for every repo at once. Ordering does not create quota, but it spends
+  // it on the cheap leg first instead of leaving it the crumbs.
+  legs.push(
+    run("repo:all", join(ROOT, "workforce/scripts/build-repo-performance.mjs"), [
+      "--days", DAYS,
+      "--publish-ddb",
+      "--table", TABLE,
+      "--region", REGION,
+    ], { dry }),
+  );
+
+  // 2. PR metrics, per scope (each needs its own repo + its own PAT).
   for (const { scope, repo, tokenProject } of scopes) {
     let token;
     if (!dry) {
@@ -403,16 +422,6 @@ async function main() {
       ], { dry, env: token ? { GITHUB_TOKEN: token } : undefined }),
     );
   }
-
-  // 2. Repository activity — one pass writes every scope + the aggregate.
-  legs.push(
-    run("repo:all", join(ROOT, "workforce/scripts/build-repo-performance.mjs"), [
-      "--days", DAYS,
-      "--publish-ddb",
-      "--table", TABLE,
-      "--region", REGION,
-    ], { dry }),
-  );
 
   // 3. Read back what the console will actually serve.
   // `scopes` already leads with the workforce aggregate, so no need to prepend
