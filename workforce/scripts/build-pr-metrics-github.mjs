@@ -255,6 +255,23 @@ function arg(name, fallback) {
   return v && !v.startsWith("--") ? v : true;
 }
 
+/** Parses `--also-scope a,b,c` into the extra scope ids a build should also
+ *  publish under (blank/duplicate/self entries dropped). Extracted so the
+ *  parsing has a unit test independent of spawning the CLI — this argument is
+ *  what lets `collapseByRepo()` fold a duplicate build into one, which is the
+ *  single largest cut in the run's GitHub quota cost (production 2026-09-13:
+ *  ~3460 of ~5330 core calls). */
+export function parseAlsoScopes(raw, scope) {
+  // `arg()` returns the boolean `true` for a bare `--also-scope` with no
+  // value — String(true) is "true", which would otherwise survive the filter
+  // below as a bogus scope id. Only a real string is a list of scope ids.
+  if (typeof raw !== "string") return [];
+  return raw
+    .split(",")
+    .map((x) => x.trim())
+    .filter((x) => x.length > 0 && x !== scope);
+}
+
 async function main() {
   const repo = arg("repo");
   const scope = arg("scope");
@@ -263,10 +280,7 @@ async function main() {
   // refluster/ai-native-article — and building each separately paid the full
   // per-PR quota cost twice for a byte-identical body (production 2026-09-13:
   // ~3460 of the run's ~5330 core calls, which is what pushed it past 5000/h).
-  const alsoScopes = String(arg("also-scope", ""))
-    .split(",")
-    .map((x) => x.trim())
-    .filter((x) => x.length > 0 && x !== scope);
+  const alsoScopes = parseAlsoScopes(arg("also-scope", ""), scope);
   const DAYS = Number(arg("days", 28));
   const DRY = process.argv.includes("--dry-run");
   const PUBLISH = process.argv.includes("--publish-ddb");

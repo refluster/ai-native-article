@@ -149,10 +149,9 @@ export default function RepoPerformancePanel() {
         </ChartCard>
         <ChartCard title="CODE CHURN" sub="additions vs deletions · weekly">
           {churnUnknown ? (
-            <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary leading-relaxed">
-              GitHub did not serve churn statistics this run, so there is nothing to plot — a flat
-              zero series would read as a quiet week rather than as a missing measurement. The next
-              daily refresh restores the chart.
+            <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary">
+              * GitHub did not serve churn statistics this run — nothing to plot; not a quiet week,
+              restored next refresh
             </p>
           ) : (
           <StackedBarChart

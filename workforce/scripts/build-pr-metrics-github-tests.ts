@@ -1,7 +1,7 @@
 // @ts-nocheck — the script under test is dependency-free ESM, not TS.
 // Tests the pure classification + aggregation of the GitHub-API PR builder.
 import { describe, it, expect } from "vitest";
-import { classifyPr, aggregate, aggregateEscalations, aggregateReruns, fetchPrFacts } from "./build-pr-metrics-github.mjs";
+import { classifyPr, aggregate, aggregateEscalations, aggregateReruns, fetchPrFacts, parseAlsoScopes } from "./build-pr-metrics-github.mjs";
 
 const GREEN = (slug) => `looks good\n<!-- autopilot:review:${slug}:green -->`;
 
@@ -176,5 +176,30 @@ describe("fetchPrFacts (a PR whose detail never arrived is dropped, not zeroed)"
     const r = await fetchPrFacts(router({}), "o/r", [item(1), item(2)]);
     expect(r).toMatchObject({ skipped: 0, quotaExhausted: false });
     expect(r.prs).toHaveLength(2);
+  });
+});
+
+// pr-autopilot review (farah, QA/SRE lens), PR #729: `collapseByRepo()` in
+// refresh.mjs decides WHICH scopes to fold, but the CLI plumbing that actually
+// carries that decision into this script — `--also-scope`, i.e. the single
+// largest cut in the run's quota cost — had no direct test; only the grouping
+// logic (refresh-tests.ts) was covered. Extracted so it is.
+describe("parseAlsoScopes", () => {
+  it("splits, trims, and drops blanks", () => {
+    expect(parseAlsoScopes("agent-workforce, foo ,,bar", "workforce")).toEqual([
+      "agent-workforce",
+      "foo",
+      "bar",
+    ]);
+  });
+
+  it("drops an entry that duplicates the primary scope", () => {
+    expect(parseAlsoScopes("workforce,agent-workforce", "workforce")).toEqual(["agent-workforce"]);
+  });
+
+  it("returns [] for an absent or empty flag", () => {
+    expect(parseAlsoScopes(undefined, "workforce")).toEqual([]);
+    expect(parseAlsoScopes("", "workforce")).toEqual([]);
+    expect(parseAlsoScopes(true, "workforce")).toEqual([]); // arg() returns `true` for a bare flag
   });
 });
