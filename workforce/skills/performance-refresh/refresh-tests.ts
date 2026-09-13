@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error -- plain .mjs sibling, no type declarations
-import { digestOutput } from "./refresh.mjs";
+import { collapseByRepo, digestOutput } from "./refresh.mjs";
 
 // Production 2026-09-13: the repo roll-up leg published DEGRADED because every
 // project's code_frequency call came back 403 rate-limited — and the run log
@@ -36,5 +36,42 @@ describe("digestOutput", () => {
   it("returns an empty string for empty or missing output", () => {
     expect(digestOutput("")).toBe("");
     expect(digestOutput(undefined)).toBe("");
+  });
+});
+
+// Production 2026-09-13: `workforce` and `agent-workforce` name the SAME repo
+// over the same window and store byte-identical bodies under different `pk`s,
+// yet each was built from scratch — about 3460 of the run's ~5330 GitHub core
+// calls, spent to compute the same answer twice, against a 5000/h quota. That
+// duplication alone is the difference between fitting in the budget and not.
+describe("collapseByRepo", () => {
+  it("folds scopes sharing a repo and credential into one build", () => {
+    const groups = collapseByRepo([
+      { scope: "workforce", repo: "r/one", tokenProject: "agent-workforce" },
+      { scope: "agent-workforce", repo: "r/one", tokenProject: "agent-workforce" },
+      { scope: "asp-cloud", repo: "r/two", tokenProject: "asp-cloud" },
+    ]);
+    expect(groups).toHaveLength(2);
+    // The first scope of a group stays primary — the console's default deck
+    // reads `workforce`, so it must not become the mirror.
+    expect(groups[0]).toMatchObject({ scope: "workforce", alsoScopes: ["agent-workforce"] });
+    expect(groups[1]).toMatchObject({ scope: "asp-cloud", alsoScopes: [] });
+  });
+
+  it("does NOT fold scopes that share a repo but not the credential", () => {
+    const groups = collapseByRepo([
+      { scope: "a", repo: "r/one", tokenProject: "a" },
+      { scope: "b", repo: "r/one", tokenProject: "b" },
+    ]);
+    expect(groups).toHaveLength(2);
+    expect(groups.every((g: { alsoScopes: string[] }) => g.alsoScopes.length === 0)).toBe(true);
+  });
+
+  it("leaves a list of distinct repos untouched", () => {
+    const scopes = [
+      { scope: "a", repo: "r/one", tokenProject: "a" },
+      { scope: "b", repo: "r/two", tokenProject: "b" },
+    ];
+    expect(collapseByRepo(scopes).map((g: { scope: string }) => g.scope)).toEqual(["a", "b"]);
   });
 });

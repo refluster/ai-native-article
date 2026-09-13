@@ -258,6 +258,15 @@ function arg(name, fallback) {
 async function main() {
   const repo = arg("repo");
   const scope = arg("scope");
+  // Extra scope ids that publish the SAME block. Two scopes can name one repo
+  // over one window — `workforce` and `agent-workforce` both mean
+  // refluster/ai-native-article — and building each separately paid the full
+  // per-PR quota cost twice for a byte-identical body (production 2026-09-13:
+  // ~3460 of the run's ~5330 core calls, which is what pushed it past 5000/h).
+  const alsoScopes = String(arg("also-scope", ""))
+    .split(",")
+    .map((x) => x.trim())
+    .filter((x) => x.length > 0 && x !== scope);
   const DAYS = Number(arg("days", 28));
   const DRY = process.argv.includes("--dry-run");
   const PUBLISH = process.argv.includes("--publish-ddb");
@@ -375,8 +384,12 @@ async function main() {
       block.pr_contributors.filter((c) => c.kind === "agent").map((c) => `${c.handle}:${c.prs}`).join(", "),
   );
 
+  const targetScopes = [scope, ...alsoScopes];
+
   if (DRY || !PUBLISH) {
-    console.log(JSON.stringify({ pk: `PERF#${scope}`, sk: "PR", scope, ...block }, null, 2));
+    for (const sc of targetScopes) {
+      console.log(JSON.stringify({ pk: `PERF#${sc}`, sk: "PR", scope: sc, ...block }, null, 2));
+    }
     return skipped > 0 ? 2 : 0;
   }
 
@@ -388,8 +401,16 @@ async function main() {
   const { DynamoDBClient } = await importLambdaDep("@aws-sdk/client-dynamodb");
   const { DynamoDBDocumentClient, PutCommand } = await importLambdaDep("@aws-sdk/lib-dynamodb");
   const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), { marshallOptions: { removeUndefinedValues: true } });
-  await ddb.send(new PutCommand({ TableName: TABLE, Item: { pk: `PERF#${scope}`, sk: "PR", scope, updated_at: new Date().toISOString(), ...block } }));
-  console.error(`published PERF#${scope}/PR to ${TABLE}`);
+  const updatedAt = new Date().toISOString();
+  for (const sc of targetScopes) {
+    await ddb.send(
+      new PutCommand({
+        TableName: TABLE,
+        Item: { pk: `PERF#${sc}`, sk: "PR", scope: sc, updated_at: updatedAt, ...block },
+      }),
+    );
+  }
+  console.error(`published ${targetScopes.map((sc) => `PERF#${sc}/PR`).join(" + ")} to ${TABLE}`);
   // 2 = published but degraded, the contract refresh.mjs reads: a partial
   // roll-up still beats yesterday's, but the run must not report itself clean.
   return skipped > 0 ? 2 : 0;

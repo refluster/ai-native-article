@@ -203,6 +203,21 @@ export function digestOutput(text, { max = 6 } = {}) {
   return (loud.length > 0 ? loud : lines).slice(-max).join(" | ");
 }
 
+/** Collapses scopes that name the SAME repo and the same credential into one
+ *  build that publishes under all of them. Order is preserved and the first
+ *  scope of a group stays the primary, so the reported label still leads with
+ *  the scope the console's default deck reads. */
+export function collapseByRepo(scopes) {
+  const groups = new Map();
+  for (const s of scopes) {
+    const key = `${s.repo}\u0000${s.tokenProject}`;
+    const g = groups.get(key);
+    if (g) g.alsoScopes.push(s.scope);
+    else groups.set(key, { ...s, alsoScopes: [] });
+  }
+  return [...groups.values()];
+}
+
 function run(label, file, args, { dry, env }) {
   if (dry) {
     console.error(`[dry-run] would run: ${file} ${args.join(" ")}`);
@@ -363,8 +378,15 @@ async function main() {
     ], { dry }),
   );
 
-  // 2. PR metrics, per scope (each needs its own repo + its own PAT).
-  for (const { scope, repo, tokenProject } of scopes) {
+  // 2. PR metrics, per REPO (each needs its own repo + its own PAT).
+  //
+  // Per repo, not per scope: `workforce` and `agent-workforce` name the same
+  // repo over the same window and differ only in the `pk` their identical body
+  // is stored under, so building both cost the full per-PR quota twice — about
+  // 3460 of the run's ~5330 core calls, which is what pushed it past the
+  // 5000/h ceiling. One build now publishes under every scope that shares the
+  // repo and the credential (`--also-scope`).
+  for (const { scope, repo, tokenProject, alsoScopes } of collapseByRepo(scopes)) {
     let token;
     if (!dry) {
       try {
@@ -405,7 +427,7 @@ async function main() {
         // Otherwise: this scope's secret genuinely is not provisioned. A real,
         // reportable gap — never a silent skip that reads as "no activity".
         legs.push({
-          label: `pr:${scope}`,
+          label: `pr:${[scope, ...alsoScopes].join("+")}`,
           ok: false,
           error: `token unresolved: ${err instanceof Error ? err.message : String(err)}`,
         });
@@ -413,9 +435,10 @@ async function main() {
       }
     }
     legs.push(
-      run(`pr:${scope}`, join(ROOT, "workforce/scripts/build-pr-metrics-github.mjs"), [
+      run(`pr:${[scope, ...alsoScopes].join("+")}`, join(ROOT, "workforce/scripts/build-pr-metrics-github.mjs"), [
         "--repo", repo,
         "--scope", scope,
+        ...(alsoScopes.length > 0 ? ["--also-scope", alsoScopes.join(",")] : []),
         "--days", DAYS,
         "--publish-ddb",
         "--table", TABLE,
