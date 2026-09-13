@@ -25,7 +25,7 @@ function result(degraded?: string[]): RepoActivityResult {
   return {
     workforce: {
       scope: 'workforce',
-      window: { start: '2026-03-17', end: '2026-09-13', days: 180 },
+      window: { start: '2026-03-17', end: '2026-09-13' },
       issues_daily: [{ date: '2026-09-13', opened: 3, closed: 1 }],
       prs_daily: [{ date: '2026-09-13', opened: 5, closed: 4 }],
       code_churn_weekly: degraded?.includes('code_churn')
