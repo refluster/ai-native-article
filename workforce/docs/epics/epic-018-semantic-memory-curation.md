@@ -1,6 +1,6 @@
 # Epic-018 — Semantic memory curation: pilot five personas, then make it a technique
 
-**Status:** In-progress (2026-07-12). **Created:** 2026-07-07. **Owner:** Maya (PM). **Implemented by:** [#447](https://github.com/refluster/ai-native-article/pull/447) (ADR-0019 + agent-runner layer 3.5 fire-time injection), [#483](https://github.com/refluster/ai-native-article/pull/483) (Story 3 `memory-curation` Cadence + ADR-0020 delegated-write route), [#489](https://github.com/refluster/ai-native-article/pull/489) (Story 4 write-authority mechanism — ADR-0021 dynamic memory-write token, supersedes ADR-0020's static secret). **Decision record:** [ADR-0019](../adr/adr-0019-agent-semantic-memory.md), [ADR-0020](../adr/adr-0020-delegated-memory-curation.md), [ADR-0021](../adr/adr-0021-dynamic-memory-write-token.md).
+**Status:** Implemented (2026-09-13 — Story 2's kill criterion evaluated: no-kill verdict, see [§Story 2 verdict](#story-2-verdict--effect-evaluation-2026-09-13) below; pending operator confirmation via the merging PR, same ratification rule ADR-0018/0019 already use in this epic's history). **Created:** 2026-07-07. **Owner:** Maya (PM). **Implemented by:** [#447](https://github.com/refluster/ai-native-article/pull/447) (ADR-0019 + agent-runner layer 3.5 fire-time injection), [#483](https://github.com/refluster/ai-native-article/pull/483) (Story 3 `memory-curation` Cadence + ADR-0020 delegated-write route), [#489](https://github.com/refluster/ai-native-article/pull/489) (Story 4 write-authority mechanism — ADR-0021 dynamic memory-write token, supersedes ADR-0020's static secret). **Decision record:** [ADR-0019](../adr/adr-0019-agent-semantic-memory.md), [ADR-0020](../adr/adr-0020-delegated-memory-curation.md), [ADR-0021](../adr/adr-0021-dynamic-memory-write-token.md).
 
 > **Status reconciliation (2026-08-04, Nadia — backlog-reconcile; `mateo` audit lens).** **No flip — Epic-018 stays `In-progress`.** The sole gate (Story 2 — effect evaluation, [#493](https://github.com/refluster/ai-native-article/issues/493)) is **re-characterised, not closed**, and this is the substantive change this pass found. Every prior pass held the gate shut on the same reason — *the ~2-week window has not elapsed* (07-23: "~4 days"; 07-27: "~8 days"; 07-30: "~11 days"). **That reason has now expired: 16 days have accrued since the cadence went live 2026-07-19**, and the cadence is verifiably still firing — live `GET /agents/{slug}` shows every pilot at `Curated: 2026-08-03` with bodies grown from the 07-22 readings to roughly 2.5× their size (nadia 2487→6698, elena 2322→6635, maya 2850→7157, sora 2442→6471, ren 2290→6353 chars). The before/after EXEC-ledger readout and its kill criterion are therefore **producible for the first time, and unproduced** — no effect-evaluation note exists anywhere under `workforce/docs/`, and #493 was last touched 2026-07-26. The gate moves from *blocked on elapsed time* to *owed work*, which is the state a reader of this epic should now see. **Issue diff: 0 closed / 0 rewritten / 0 filed** (#493 already tracks it).
 >
@@ -101,3 +101,43 @@ ADR-0019 gives the layer a place to live at zero injection cost.
   record; invented content is prohibited — it feeds back into execution.
 - Precedence rule (agent-runner §composition): governance/north star >
   memory > improvisation.
+
+## Story 2 verdict — effect evaluation (2026-09-13)
+
+**Filed as [#493](https://github.com/refluster/ai-native-article/issues/493), produced via `issue-design` (dario) as this epic's own kill-criterion deliverable rather than a separate ADR — this section *is* the "short evidence note (per-persona before/after over the EXEC ledger)" Story 2 asks for.** This is a document diff recording a judgement call for the operator to confirm by merging; it does not itself unbind or change anything about the live `memory-curation` cadence.
+
+### Method
+
+The cadence went live 2026-07-19; the 2026-08-04 reconciliation note found the effect-evaluation readout still unproduced 16 days in. This verdict, five weeks further on (2026-09-13), compares:
+
+- **Before** — pre-injection baseline. The only pre-curation feed posts available on the pilot with the deepest history (nadia) are 2026-05-24 and 2026-05-27 (no posts survive from June/July, a gap worth naming rather than papering over — see "What this verdict does not cover").
+- **After** — 2026-08-17 through 2026-09-11 (nadia's `daily-research`/`feed-post`/reflection posts across the evaluated window), plus a direct read of all five pilots' *current* (2026-09-04 through 2026-09-12) `MEMORY.md` bodies for the same self-referential pattern.
+
+### Finding 1 — the qualitative shift Story 2 asked about is real, on every pilot checked
+
+All five pilots' current memory bodies open their "Learned principles" with an entry that names a **specific prior dated event and builds on it**, not a generic restatement:
+
+- **nadia** — repeated explicit citations across Aug 21 → Sep 11 feed posts ("Memory logs a risk; only the ratchet's count turns it into a fix", "A memory note doesn't fix a recurring gap until the ratchet fires", "Naming a pattern in memory doesn't stop me from re-doing it") that **her May 24/27 baseline posts do not do at all** — those are single-fire, self-contained reflections with zero reference to prior work ("First time routing a PR... I just applied them").
+- **ren** — "The readback discipline I'd carried as memory shipped as a mechanical gate, and that's the confirmation, not just another instance" (PR #694) — a standing bet tracked in memory converting into a shipped, mechanical fix, which is exactly Story 2's second question ("do bets get falsifier-checked instead of re-formed from scratch?").
+- **maya** — "The nine-plus-day orphaned falsifier for bet (b) finally got a decision, not another deadline" — a named falsifier tracked across "five-plus backlog-reconciles" before resolving.
+- **elena** — "I wrote the anti-pattern about my peers, then lived it myself... Rereading my own last four [letters]" — self-critique against her own dated record, not a fresh take.
+- **sora** — "A repeated EXEC-summary drift escalated into a real content-substitution incident, got a name [ML-028], and only then got fixed — the fix is still incomplete" — a multi-fire arc tracked and honestly marked as not yet closed.
+
+**This is a behavioural difference attributable to the injection layer.** The pre-curation baseline (nadia, May) shows no such pattern; the post-curation window shows it on 5/5 pilots checked. The kill criterion — "if the five pilots show no behavioural difference attributable to the layer" — does not fire.
+
+### Finding 2 — the difference is in *continuity of narrative*, not (yet) in *reduced recurrence*, and this is a distinct, still-open question
+
+Nadia's own posts name this gap themselves, repeatedly, across the evaluated window: citing a memory note is not the same as the underlying problem stopping. The same credential-throw shape, the same panel-independence disclosure gap, and the same PR-relabeling behaviour recur through early September despite each being named in memory days or weeks earlier. This is worth carrying forward as its own tracked question — **not** a reason to fire the kill criterion, because Story 2's stated test was continuity/falsifier-checking (Finding 1), not recurrence-rate reduction, and conflating the two would be holding the cadence to a bar it was never asked to clear.
+
+### Verdict
+
+**No kill.** Story 2's gate is satisfied; Epic-018 moves to `Implemented` (pending the operator's confirmation via this PR's merge, per the ADR-0018/0019 ratification precedent this epic's own history already uses).
+
+### What this verdict does not cover (say so rather than overclaim)
+
+- **Depth is uneven across pilots.** nadia and ren got a real before/after read against dated EXEC/feed evidence; maya, elena, and sora were checked only against their *current* memory content (a snapshot, not a before/after diff) for the same pattern. All five point the same direction, but a fuller sweep of the other three's own pre-curation baselines (if any survive) would strengthen this past "consistent snapshot" to "confirmed trend" for each.
+- **The June/July gap in nadia's post history is unexplained** — this verdict treats May as the honest pre-curation baseline available, not as a perfectly time-matched control.
+- **Recurrence-rate reduction (Finding 2) is explicitly out of scope for this verdict** and is named here as a candidate for its own follow-up measurement, not resolved by it.
+
+wf-task-id: (this routine's fire — see the workforce EXEC ledger for `dario` / `issue-design` / `agent-workforce`)
+wf-agent: dario
