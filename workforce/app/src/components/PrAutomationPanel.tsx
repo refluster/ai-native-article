@@ -25,6 +25,12 @@ export default function PrAutomationPanel({ series }: { series: PerformanceSerie
   const barData = days.map((d) => ({ ...d, human: Math.max(0, d.prs - d.autopilot_merged) }));
   const meanAdd = s.total_prs > 0 ? Math.round(s.total_additions / s.total_prs) : 0;
   const meanDel = s.total_prs > 0 ? Math.round(s.total_deletions / s.total_prs) : 0;
+  // build-pr-metrics-github.mjs drops a PR whose detail GitHub refused rather
+  // than entering it at additions:0, and says so via `degraded_signals` — the
+  // same undercount contract RepoPerformancePanel already renders for churn.
+  // Without this the signal reaches the API and dies there: nothing on this
+  // panel told the operator a degraded PR count wasn't the whole count.
+  const degraded = s.degraded_signals ?? [];
 
   return (
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
@@ -57,6 +63,12 @@ export default function PrAutomationPanel({ series }: { series: PerformanceSerie
             alarm={s.humans_involved.length > 0}
           />
         </div>
+
+        {degraded.length > 0 && (
+          <p className="mb-3 font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary">
+            * degraded this run: {degraded.join(', ')} — some merged PR(s) dropped, the count above is an undercount
+          </p>
+        )}
 
         {/* Daily stacked bars: autopilot (green) over human-involved (amber).
             Y-axis shows the peak PRs/day (top) → 0 so the scale reads without

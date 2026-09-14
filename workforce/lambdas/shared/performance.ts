@@ -71,6 +71,11 @@ export interface PrSummary {
   /** Counts per escalation-reason code (workforce/docs/pr-escalation-reasons.md
    *  v1); "unspecified" = a hand-off missing its reason label. */
   escalation_reasons?: Record<string, number>;
+  /** Set when build-pr-metrics-github.mjs dropped a merged PR whose detail
+   *  GitHub refused (e.g. a spent REST quota) — the counts above are an
+   *  undercount, never entered as a false zero. Same contract as the sibling
+   *  `RepoActivityBlock.degraded_signals`. */
+  degraded_signals?: string[];
 }
 
 // ── repository activity (Metric 4, 2026-07-26) ───────────────────────────────
