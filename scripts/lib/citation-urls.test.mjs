@@ -170,7 +170,9 @@ test("the real (non-injected) proxy probe is a no-op when HTTPS_PROXY/https_prox
   delete process.env.HTTPS_PROXY;
   delete process.env.https_proxy;
   const originalFetch = global.fetch;
+  let fetchCalled = false;
   global.fetch = async () => {
+    fetchCalled = true;
     throw new Error("must not fetch — no proxy configured, the probe must return before ever calling fetch");
   };
   try {
@@ -182,6 +184,14 @@ test("the real (non-injected) proxy probe is a no-op when HTTPS_PROXY/https_prox
     const result = await verifyCitationsResolve("https://example.com/no-proxy-env", { fetchImpl });
     assert.equal(result.ok, false);
     assert.match(result.checked[0].status, /^error: fetch failed$/);
+    // wf:ren's B1 (cycle 3): defaultProxyBlockProbe's own `catch { return
+    // null; }` swallows the stub's thrown error too, so the two assertions
+    // above alone converge on the identical status whether the env-guard
+    // returned early or was deleted and the resulting fetch failure was
+    // caught downstream instead. Assert directly that fetch was never
+    // reached — the only signal that actually distinguishes "guard fired"
+    // from "guard is silently broken".
+    assert.equal(fetchCalled, false, "defaultProxyBlockProbe must return before calling fetch when no proxy is configured");
   } finally {
     if (originalProxy !== undefined) process.env.HTTPS_PROXY = originalProxy;
     else delete process.env.HTTPS_PROXY;
