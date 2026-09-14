@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// check-budget-runway.mjs — does every agent's W-3 cap cover what its
-// bindings are modelled to burn in a month? (ML-038; candidate R-19)
+// check-budget-runway.mjs — R-19: is the roster's modelled monthly burn within
+// the W-3 ceiling, and which agents are over their advisory budget? (ML-038)
 //
 // #661 made the per-agent cap real: the orchestrator charges a modelled cost
 // per dispatched fire (small 0.05 / medium 0.20 / large 0.60 USD, the skill's
@@ -12,15 +12,18 @@
 // author lane) on 09-13, ingrid (the article pipeline) on 09-09. The only
 // trace was a CloudWatch WARN per tick.
 //
-// This reads the LIVE roster from the public agents-api (caps + bindings are
-// DDB config, not git — a PR cannot change them, so this is a scheduled audit
-// like R-13/R-15, not a PR gate) and reports, per non-archived agent, the
-// modelled monthly burn against the effective cap. Exit 1 when any agent's
-// cap is below its burn — that agent WILL be refused mid-month — so the daily
-// run reddens instead of the pipeline stopping unannounced.
+// ADR-0037 (operator direction 2026-09-14): the per-agent budget is ADVISORY.
+// Nothing refuses a fire because of it — output continuity outranks a planning
+// figure. So this audit reports, per non-archived agent, the modelled monthly
+// burn against the advisory budget (a `!` line, exit 0), and reddens (exit 1)
+// only on the one number that is a real ceiling: the roster's modelled burn
+// against the W-3 aggregate ceiling (governance.md §2, USD 600/month). It
+// reads the LIVE roster from the public agents-api (budgets + bindings are DDB
+// config, not git — a PR cannot change them, so this is a scheduled audit like
+// R-13/R-15, not a PR gate).
 //
 // The arithmetic lives in workforce/scripts/lib/budget-runway.mjs, a mirror of
-// workforce/lambdas/shared/budget-runway.ts (the write-time W3-runway guard);
+// workforce/lambdas/shared/budget-runway.ts (the same estimate the Lambdas carry);
 // budget-runway-parity-tests.ts keeps the two equal.
 //
 // Usage:
@@ -29,7 +32,8 @@
 //   node workforce/scripts/check-budget-runway.mjs --warn-ratio 0.8
 //   WF_AGENTS_API_BASE=… node workforce/scripts/check-budget-runway.mjs
 //
-// Exit: 0 every cap covers its burn · 1 at least one cap is outrun ·
+// Exit: 0 roster burn within the W-3 ceiling (per-agent overruns are listed
+//       as advisories) · 1 roster burn exceeds the W-3 ceiling ·
 //       3 roster unreadable (an audit that cannot run is not a pass)
 
 import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
@@ -46,6 +50,10 @@ const SKILLS_DIR = join(REPO_ROOT, "workforce", "skills");
 /** The execute-api origin — reachable from allowlists that block the custom
  *  domain (same default every write-script and request-dispatch.mjs use). */
 const DEFAULT_API_BASE = "https://sjhikazsf9.execute-api.us-west-2.amazonaws.com/prod";
+/** The enforced aggregate ceiling — mirrors W3_BUDGET_CAP_USD in
+ *  workforce/lambdas/shared/agent-config.ts and governance.md §2. The only
+ *  number this audit fails on; per-agent budgets are advisory (ADR-0037). */
+const W3_CEILING_USD = Number(process.env.W3_CEILING_USD || 600);
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`);
@@ -136,7 +144,7 @@ async function main() {
   } else {
     console.log(`${"agent".padEnd(10)} ${"cap".padStart(7)} ${"burn/mo".padStart(8)} ${"ratio".padStart(6)}  ${"caps on".padStart(7)}  heaviest bindings`);
     for (const r of rows) {
-      const flag = !r.fits ? "  ✗ OUTRUN" : r.warn ? "  ! near" : "";
+      const flag = !r.fits ? "  ! over advisory" : r.warn ? "  ! near" : "";
       console.log(
         `${r.slug.padEnd(10)} ${r.cap_usd.toFixed(2).padStart(7)} ${r.burn_usd.toFixed(2).padStart(8)} ${(r.ratio * 100).toFixed(0).padStart(5)}%  ${String(r.cap_reached_on_day ?? "—").padStart(7)}  ${r.heaviest.join(", ")}${flag}`,
       );
@@ -144,18 +152,24 @@ async function main() {
     console.log(`\n${rows.length} non-archived agent(s) · caps sum USD ${r2(capSum)} · modelled burn sum USD ${r2(burnSum)}/mo`);
   }
 
-  if (outrun.length > 0) {
+  if (burnSum > W3_CEILING_USD) {
     console.error(
-      `\n❌ ML-038: ${outrun.length} agent(s) whose cap is below their modelled monthly burn — the orchestrator will refuse ` +
-        `their fires mid-month (${outrun.map((r) => `${r.slug} day ${r.cap_reached_on_day}`).join(", ")}). ` +
-        `Raise budget_monthly_usd_default/_override via agents-api PATCH, or thin the bindings.`,
+      `\n❌ W-3: the roster's modelled burn USD ${r2(burnSum)}/mo exceeds the aggregate ceiling USD ${W3_CEILING_USD} ` +
+        `(governance.md §2). Thin a cadence or raise the ceiling (Zone A).`,
     );
     process.exit(1);
   }
-  if (warned.length > 0) {
-    console.error(`\n⚠️  ${warned.length} agent(s) within ${Math.round((1 - warnRatio) * 100)}% of their cap: ${warned.map((r) => r.slug).join(", ")}`);
+  if (outrun.length > 0) {
+    console.error(
+      `\n! ${outrun.length} agent(s) over their ADVISORY budget (ADR-0037 — they keep firing): ` +
+        `${outrun.map((r) => `${r.slug} (${r.burn_usd}/${r.cap_usd}, crosses day ${r.cap_reached_on_day})`).join(", ")}. ` +
+        `Right-size via agents-api PATCH budget_monthly_usd_default when the figure should mean something.`,
+    );
   }
-  console.log("\n✅ every non-archived agent's cap covers its modelled monthly burn.");
+  if (warned.length > 0) {
+    console.error(`! ${warned.length} agent(s) within ${Math.round((1 - warnRatio) * 100)}% of their advisory budget: ${warned.map((r) => r.slug).join(", ")}`);
+  }
+  console.log(`\n✅ roster modelled burn USD ${r2(burnSum)}/mo is within the W-3 ceiling USD ${W3_CEILING_USD}.`);
   process.exit(0);
 }
 

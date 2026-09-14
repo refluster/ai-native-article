@@ -23,9 +23,9 @@ export interface BudgetRow {
   estimated_cost_usd?: number;
   /** Count of dispatched CCR fires behind `estimated_cost_usd`. */
   estimated_fires?: number;
-  /** ISO timestamp of the first tick that refused a fire for this agent this
-   *  month because `total_usd + planned > cap` (ML-038). Set once, by
-   *  `recordCapReached`; its presence is what "this agent is capped" means. */
+  /** ISO timestamp of the first tick at which this agent's month crossed its
+   *  advisory budget (ML-038 / ADR-0037). Set once, by `recordCapReached`.
+   *  Nothing is refused on it; its presence is what "over budget" means. */
   cap_reached_at?: string;
   last_updated_at: string;
 }
@@ -54,6 +54,11 @@ export interface BudgetRollup {
   fires: number;
   agents_charged: number;
   ceiling_usd: number;
+  /** Agents whose month has crossed their ADVISORY per-agent budget
+   *  (ADR-0037): the ledger row carries `cap_reached_at`. They keep firing;
+   *  this is the list the operator reads to decide whose planning figure is
+   *  wrong. Sorted. */
+  over_budget_agents: string[];
   /** Newest `last_updated_at` across the month's rows — when the ledger last
    *  moved, not when it was read (farah, #682 F1). Without it a ledger that
    *  stopped being written keeps serving a confident current-month figure
@@ -85,7 +90,9 @@ export function summariseBudgetRows(
   let measured = 0;
   let fires = 0;
   let updated = "";
+  const over: string[] = [];
   for (const row of rows) {
+    if (row.cap_reached_at && row.sk) over.push(String(row.sk).replace(/^AGENT#/, ""));
     modelled += row.estimated_cost_usd ?? 0;
     measured += row.cost_usd ?? 0;
     fires += row.estimated_fires ?? 0;
@@ -104,6 +111,7 @@ export function summariseBudgetRows(
     fires,
     agents_charged: rows.length,
     ceiling_usd,
+    over_budget_agents: over.sort(),
     updated_at: updated,
   };
 }

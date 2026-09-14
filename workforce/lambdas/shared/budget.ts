@@ -1,7 +1,6 @@
-// Per-agent monthly token-budget guard. Enforces W-3 at the LLM call site:
-// the orchestrator/runner consults this before invoking complete(), and
-// throws (rather than silently overrun) if the projected cost would
-// breach the agent's cap.
+// Per-agent monthly token-budget ledger (W-3). Since ADR-0037 the per-agent
+// budget is ADVISORY: every caller measures and reports the month's position;
+// none refuses work because of it. Output continuity outranks the figure.
 //
 // State lives in DDB BUDGET#{yyyy-mm}/AGENT#{slug}. Atomic ADD updates so
 // concurrent runs don't lose increments. Reads are fresh (no caching).
@@ -73,17 +72,11 @@ export async function getMonthSpend(slug: string): Promise<MonthSpend> {
 }
 
 /**
- * Stamp the month's ledger row with the moment the cap was first reached
- * (ML-038). Returns TRUE only for the write that set it — the one tick per
- * agent per month that should also put a loud row on the execution ledger —
- * and FALSE on every later tick, where the cap is still reached but nothing is
- * new. Conditional on the attribute not existing, so two ticks cannot both be
- * "first".
- *
- * Why exactly-once and not per tick: a capped agent is refused at every one
- * of the ~12 daily ticks for the rest of the month. One ledger row says
- * "capped since"; 240 identical rows would bury the agent's own Track Record
- * under the message that it has none.
+ * Stamp the month's ledger row with the moment the advisory budget was first
+ * crossed (ML-038 / ADR-0037). Returns TRUE only for the write that set it and
+ * FALSE on every later call. Conditional on the attribute not existing, so two
+ * ticks cannot both be "first". `/performance` lists every agent whose row
+ * carries the stamp as over budget this month.
  */
 export async function recordCapReached(slug: string, now: Date = new Date()): Promise<boolean> {
   const month = monthKey(now);
@@ -106,26 +99,34 @@ export async function recordCapReached(slug: string, now: Date = new Date()): Pr
 }
 
 /**
- * Throws if a planned spend would breach the agent's monthly cap.
- * `cap_usd` is the *effective* cap (override or default).
- * `planned_cost_usd` is the worst-case spend the runner is about to incur.
+ * Report where a planned spend lands against the agent's monthly budget
+ * (ADR-0037). Never throws and never blocks: the budget is a planning figure,
+ * and output continuity outranks it. The position is logged so a caller that
+ * wants to react can, and the ledger stamp (`recordCapReached`) makes the
+ * first crossing of the month visible on /performance.
  */
-export async function assertWithinBudget(
+export async function reportBudgetPosition(
   slug: string,
-  cap_usd: number,
+  budget_usd: number,
   planned_cost_usd: number,
-): Promise<void> {
+): Promise<MonthSpend & { over_budget: boolean }> {
   const current = await getMonthSpend(slug);
-  if (wouldBreachBudget(current.total_usd, cap_usd, planned_cost_usd)) {
-    throw new Error(
-      `budget guard: agent ${slug} would exceed monthly cap. current=${current.total_usd.toFixed(2)} (measured ${current.cost_usd.toFixed(2)} + modelled ${current.estimated_cost_usd.toFixed(2)}) planned=${planned_cost_usd.toFixed(2)} cap=${cap_usd.toFixed(2)} (month=${monthKey()})`,
-    );
+  const over_budget = wouldBreachBudget(current.total_usd, budget_usd, planned_cost_usd);
+  if (over_budget) {
+    console.warn(JSON.stringify({
+      event: "budget-advisory-exceeded",
+      slug,
+      month: monthKey(),
+      current_usd: Number(current.total_usd.toFixed(4)),
+      planned_usd: planned_cost_usd,
+      budget_usd,
+    }));
   }
+  return { ...current, over_budget };
 }
 
-/** The cap predicate on its own, so callers that must not throw (the
- *  orchestrator skips a binding rather than failing a whole tick) share the
- *  comparison with the ones that do. Pure — trivially testable. */
+/** The over-budget predicate, shared by every reporter so they agree about
+ *  what "over" means. Pure — trivially testable. */
 export function wouldBreachBudget(current_usd: number, cap_usd: number, planned_cost_usd: number): boolean {
   return current_usd + planned_cost_usd > cap_usd;
 }

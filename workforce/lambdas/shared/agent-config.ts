@@ -25,7 +25,6 @@
 // context (aggregate budgets, skill ownership) via IdentityPatchContext.
 
 import type { AgentBinding, AgentIdentity } from "./agent.js";
-import { budgetRunway } from "./budget-runway.js";
 
 export interface ConfigViolation {
   rule: string;
@@ -125,15 +124,6 @@ export interface IdentityPatchContext {
    *  is a soft delete; history stays, new wiring stops). Callers that
    *  don't resolve status (older tests) skip the check. */
   skillStatus?: (name: string) => string | undefined;
-  /** The row as it stands, for the W3-runway check (ML-038) when a PATCH
-   *  moves only one side of the bindings↔budget pair. A PATCH that writes
-   *  `bindings` is checked against the cap it leaves in force; one that
-   *  writes a budget is checked against the bindings it leaves in place. Absent
-   *  on create (the body carries everything) and in callers that predate the
-   *  rule, where the check degrades to "only what the patch itself says". */
-  existingBindings?: readonly AgentBinding[];
-  existingBudgetDefaultUsd?: number;
-  existingBudgetOverrideUsd?: number | null;
 }
 
 export function validateIdentityPatch(
@@ -234,79 +224,12 @@ export function validateIdentityPatch(
       v("S18-org-edges", field, `${field} must be an array of agent slugs`);
     }
   }
-  out.push(...validateBudgetRunway(patch, ctx));
   return out;
 }
 
-// ─── W3-runway — the cap must cover the bindings' modelled burn (ML-038) ────
-// #661 made the W-3 cap real: the orchestrator charges a modelled cost per
-// dispatched fire and refuses to dispatch once the month's spend would cross
-// the agent's cap. So a cap below what the bindings are modelled to burn in a
-// month is not a budget, it is a date on which this agent stops working — and
-// it stops silently: on 2026-09-11 Nadia (the PR router) was refused at every
-// tick with a CloudWatch WARN and nothing else, the author lane (ren) and the
-// article pipeline (ingrid) followed, and nine open PRs sat unrouted for three
-// days. Every one of those caps had been written through this validator, which
-// checked the aggregate W-3 ceiling and never asked whether the number could
-// carry the cadence it was attached to.
-//
-// This is the write-time half of the fix. It runs whenever a write touches
-// either side of the pair — `bindings`, `budget_monthly_usd_default`, or
-// `budget_monthly_usd_override` — and refuses the write when the modelled
-// monthly burn of the orchestrator-owned bindings exceeds the cap that would
-// be in force after it. "Wire a binding, add the budget line in the same
-// write" (CLAUDE.md) stops being a norm and becomes a rule.
-
-/** The cap a patch leaves in force: the override when set (a patch may set
- *  or null it), else the default (from the patch, else the row). Undefined
- *  when neither the patch nor the context can say — in which case there is
- *  nothing honest to check against and S8-budget owns the shape error. */
-function effectiveCapAfterPatch(
-  patch: Readonly<Record<string, unknown>>,
-  ctx: Pick<IdentityPatchContext, "existingBudgetDefaultUsd" | "existingBudgetOverrideUsd">,
-): number | undefined {
-  const override =
-    "budget_monthly_usd_override" in patch ? patch.budget_monthly_usd_override : ctx.existingBudgetOverrideUsd;
-  if (typeof override === "number" && Number.isFinite(override) && override > 0) return override;
-  const def = "budget_monthly_usd_default" in patch ? patch.budget_monthly_usd_default : ctx.existingBudgetDefaultUsd;
-  return typeof def === "number" && Number.isFinite(def) && def > 0 ? def : undefined;
-}
-
-export function validateBudgetRunway(
-  patch: Readonly<Record<string, unknown>>,
-  ctx: Pick<IdentityPatchContext, "existingBindings" | "existingBudgetDefaultUsd" | "existingBudgetOverrideUsd">,
-): ConfigViolation[] {
-  const touchesBindings = "bindings" in patch;
-  const touchesBudget = "budget_monthly_usd_default" in patch || "budget_monthly_usd_override" in patch;
-  if (!touchesBindings && !touchesBudget) return [];
-
-  const bindings = touchesBindings ? patch.bindings : ctx.existingBindings;
-  // A malformed bindings array is S9's finding, not a runway one.
-  if (!Array.isArray(bindings)) return [];
-  const cap = effectiveCapAfterPatch(patch, ctx);
-  if (cap === undefined) return [];
-
-  const runway = budgetRunway(bindings as AgentBinding[], cap);
-  if (runway.fits) return [];
-
-  const heaviest = [...runway.per_binding]
-    .filter((b) => b.usd_per_month > 0)
-    .sort((a, b) => b.usd_per_month - a.usd_per_month)
-    .slice(0, 3)
-    .map((b) => `${b.skill}@${b.project_id ?? "?"} ${b.fires_per_month}×${b.usd_per_fire}=${b.usd_per_month}`)
-    .join(", ");
-  return [
-    {
-      rule: "W3-runway",
-      field: touchesBindings ? "bindings" : "budget_monthly_usd_override" in patch ? "budget_monthly_usd_override" : "budget_monthly_usd_default",
-      msg:
-        `modelled monthly burn USD ${runway.total_usd} exceeds the effective cap USD ${cap} ` +
-        `(${(runway.ratio * 100).toFixed(0)}%): the orchestrator would refuse this agent's fires from ` +
-        `day ${runway.cap_reached_on_day} of every month (ML-038). Heaviest: ${heaviest}. ` +
-        `Raise the budget in this same write, or drop/thin a binding — a cap the cadence outruns is a kill switch, not a budget.`,
-    },
-  ];
-}
+// The per-agent budget figure is ADVISORY (ADR-0037): no write-time check
+// asks whether it can carry the bindings' modelled burn, because nothing is
+// refused on it. The aggregate W3-cap below is the only budget rule here.
 
 // ─── S19 — role ↔ system_prompt header coherence (ML-014) ──────────────────
 // Persona prompts open with `# {Name} — {Title} — {Location}` by convention

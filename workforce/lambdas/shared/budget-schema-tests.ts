@@ -120,3 +120,19 @@ describe("summariseBudgetRows", () => {
     expect(summariseBudgetRows([row()], "2026-09", 900)!.ceiling_usd).toBe(900);
   });
 });
+
+// ADR-0037: the rollup names every agent whose month crossed its advisory
+// budget, from the ledger stamp — so /performance can say whose planning
+// figure is wrong while nothing stops them working.
+describe("summariseBudgetRows — over_budget_agents", () => {
+  it("lists stamped rows by slug, sorted, and none otherwise", () => {
+    const rows = [
+      { pk: "BUDGET#2026-09", sk: "AGENT#ren", cost_usd: 0, estimated_cost_usd: 15, cap_reached_at: "2026-09-13T07:30:01.000Z", last_updated_at: "2026-09-13T07:30:01.000Z" },
+      { pk: "BUDGET#2026-09", sk: "AGENT#nadia", cost_usd: 0, estimated_cost_usd: 8, cap_reached_at: "2026-09-11T15:29:57.000Z", last_updated_at: "2026-09-11T15:30:00.000Z" },
+      { pk: "BUDGET#2026-09", sk: "AGENT#farah", cost_usd: 0, estimated_cost_usd: 3, last_updated_at: "2026-09-13T13:36:21.000Z" },
+    ] as const;
+    const s = summariseBudgetRows(rows as never, "2026-09", 600);
+    expect(s?.over_budget_agents).toEqual(["nadia", "ren"]);
+    expect(summariseBudgetRows([rows[2]] as never, "2026-09", 600)?.over_budget_agents).toEqual([]);
+  });
+});

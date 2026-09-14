@@ -33,7 +33,7 @@ import { injectCredentials, type CredentialKey } from "../shared/credential-inje
 import { complete } from "../shared/llm-azure.js";
 import type { AzureOpenAISecret } from "../shared/secrets.js";
 import { appendExecution, getProject, type ProjectId } from "../shared/project.js";
-import { assertWithinBudget, recordSpend } from "../shared/budget.js";
+import { recordSpend, reportBudgetPosition } from "../shared/budget.js";
 import { W3_BUDGET_CAP_USD } from "../shared/agent-config.js";
 import { newUlid } from "../shared/task.js";
 
@@ -128,10 +128,10 @@ async function runTool(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyRe
   const execUlid = newUlid();
 
   try {
-    // W-3 pre-flight. Tool spend is attributed to the project's operator
-    // rather than to an agent (a tool run has no persona), but it is the
-    // same monthly ledger and the same cap.
-    await assertWithinBudget(OPERATOR_SLUG, W3_BUDGET_CAP_USD, PLANNED_COST_CEILING_USD);
+    // W-3 position, reported not enforced (ADR-0037). Tool spend is attributed
+    // to the project's operator rather than to an agent (a tool run has no
+    // persona), but it is the same monthly ledger and the same advisory figure.
+    await reportBudgetPosition(OPERATOR_SLUG, W3_BUDGET_CAP_USD, PLANNED_COST_CEILING_USD);
 
     const credentials = await injectCredentials(
       tool.requires as CredentialKey[],

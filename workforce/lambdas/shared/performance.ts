@@ -196,6 +196,9 @@ export interface BudgetBlock {
   agents_charged: number;
   /** The W-3 combined ceiling in force, for rendering used-against-cap. */
   ceiling_usd: number;
+  /** Agents whose month has crossed their advisory per-agent budget
+   *  (ADR-0037). They keep firing; this names whose planning figure is wrong. */
+  over_budget_agents: string[];
   /** When the ledger last MOVED (newest `last_updated_at` across the month's
    *  rows) — not when it was read. Same contract as `PerfIdleRow.updated_at`:
    *  a figure whose `updated_at` has gone quiet must render as "the writer has

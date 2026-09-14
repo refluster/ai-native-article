@@ -252,6 +252,7 @@ describe("composeSeries — endpoint assembly", () => {
       fires: 9,
       agents_charged: 9,
       ceiling_usd: 600,
+      over_budget_agents: [],
       updated_at: "2026-09-07T17:30:01.600Z",
     };
     const s = composeSeries(

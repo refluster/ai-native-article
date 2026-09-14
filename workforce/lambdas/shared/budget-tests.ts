@@ -27,7 +27,7 @@ vi.mock("@aws-sdk/lib-dynamodb", () => ({
   },
 }));
 
-const { wouldBreachBudget, getMonthSpend, recordEstimatedSpend, assertWithinBudget, recordCapReached } =
+const { wouldBreachBudget, getMonthSpend, recordEstimatedSpend, reportBudgetPosition, recordCapReached } =
   await import("./budget.js");
 
 beforeEach(() => sendMock.mockReset());
@@ -114,23 +114,25 @@ describe("recordEstimatedSpend", () => {
   });
 });
 
-describe("assertWithinBudget", () => {
-  it("counts modelled spend against the cap, not only measured spend", async () => {
-    // 0 measured, 9.9 modelled: a guard that looked at cost_usd alone would
-    // wave this through — which is exactly how the counter read zero while
-    // agents were demonstrably working (#661).
+describe("reportBudgetPosition (ADR-0037 — advisory, never a refusal)", () => {
+  it("counts modelled spend against the budget, not only measured spend, and reports over_budget", async () => {
+    // 0 measured, 9.9 modelled: a reader that looked at cost_usd alone would
+    // call this under budget — which is exactly how the counter read zero
+    // while agents were demonstrably working (#661).
     sendMock.mockResolvedValueOnce({ Item: { cost_usd: 0, estimated_cost_usd: 9.9 } });
-    await expect(assertWithinBudget("silas", 10, 0.6)).rejects.toThrow(/exceed monthly cap/);
+    const r = await reportBudgetPosition("silas", 10, 0.6);
+    expect(r.over_budget).toBe(true);
+    expect(r.total_usd).toBeCloseTo(9.9, 6);
   });
 
-  it("names both halves in the error so the reader can see which is which", async () => {
+  it("never throws when over budget — output continuity outranks the figure", async () => {
     sendMock.mockResolvedValueOnce({ Item: { cost_usd: 1, estimated_cost_usd: 9.5 } });
-    await expect(assertWithinBudget("silas", 10, 0.05)).rejects.toThrow(/measured 1\.00 \+ modelled 9\.50/);
+    await expect(reportBudgetPosition("silas", 10, 0.05)).resolves.toMatchObject({ over_budget: true, cost_usd: 1, estimated_cost_usd: 9.5 });
   });
 
-  it("stays silent when the fire fits", async () => {
+  it("reports under budget when the fire fits", async () => {
     sendMock.mockResolvedValueOnce({ Item: { cost_usd: 1, estimated_cost_usd: 1 } });
-    await expect(assertWithinBudget("silas", 10, 0.6)).resolves.toBeUndefined();
+    await expect(reportBudgetPosition("silas", 10, 0.6)).resolves.toMatchObject({ over_budget: false });
   });
 });
 
