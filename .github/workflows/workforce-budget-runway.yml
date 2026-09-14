@@ -1,0 +1,45 @@
+# R-19 — W-3 budget runway audit (docs/governance.md §4, ML-038).
+#
+# #661 made the per-agent cap real: the orchestrator charges a modelled cost
+# per dispatched fire and refuses to dispatch past the cap. A cap set below
+# what the agent's bindings are modelled to burn in a month is therefore the
+# day that agent stops working — and on 2026-09-11 the PR router stopped that
+# way, silently, with nine open PRs waiting. Caps and bindings are DDB config,
+# not git, so no PR gate can see this; a daily read of the live roster can.
+#
+# Read-only: one GET to the public agents-api, no AWS credentials, no writes.
+# Reddens (exit 1) when any non-archived agent's cap is below its modelled
+# burn; the run summary names the agent and the day of the month it caps.
+
+name: Workforce budget runway audit (R-19)
+
+on:
+  schedule:
+    - cron: "19 5 * * *" # daily ~05:19 UTC (best-effort; the scheduler runs this repo's crons hours late)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Dependency-free script — no npm ci needed.
+      - name: Budget runway (every cap must cover its cadence)
+        run: |
+          set -o pipefail
+          node workforce/scripts/check-budget-runway.mjs | tee "$RUNNER_TEMP/budget-runway.txt"
+          {
+            echo '## W-3 budget runway — ML-038 / R-19'
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/budget-runway.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
