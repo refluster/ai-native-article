@@ -100,6 +100,7 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0031](adr-0031-spotify-url-automation-and-gate-retirement.md) | Automate `spotifyUrl` capture via a new deterministic `wf-podcast` route + `spotify.token` credential; define (not flip) the track-record criteria to retire the `script-ready → approved` human gate | Proposed | [017](../epics/epic-017-podcast-spotify-distribution.md) |
 | [0032](adr-0032-lesson-partition-and-daily-distiller.md) | The `LESSON` partition schema, its closed cross-cutting vocabulary, and the daily distiller Lambda's cost/shape contract | Proposed | [022](../epics/epic-022-org-learning-loop.md) |
 | [0033](adr-0033-seed-projects-lambda.md) | Promote `seed-projects.mjs` to a `WfSeedProjectsFunction` Lambda (META rows only, mirroring `WfSeedSkillsFunction`); the script is kept as an operator escape hatch, not retired | Proposed | [010](../epics/epic-010-project-trust-boundary.md) |
+| [0037](adr-0037-advisory-per-agent-budget.md) | The per-agent W-3 budget is advisory: measured per fire and reported (`/performance`, R-19), but it never refuses a dispatch — output continuity outranks the planning figure; withdraws the `W3-runway` write-time refusal (0035/0036 are reserved by open PRs #719/#727) | Accepted (2026-09-14) | — |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](../epics/README.md).

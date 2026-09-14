@@ -1,15 +1,17 @@
-# R-19 — W-3 budget runway audit (docs/governance.md §4, ML-038).
+# R-19 — W-3 budget audit (docs/governance.md §4, ML-038, workforce ADR-0037).
 #
-# #661 made the per-agent cap real: the orchestrator charges a modelled cost
-# per dispatched fire and refuses to dispatch past the cap. A cap set below
-# what the agent's bindings are modelled to burn in a month is therefore the
-# day that agent stops working — and on 2026-09-11 the PR router stopped that
-# way, silently, with nine open PRs waiting. Caps and bindings are DDB config,
-# not git, so no PR gate can see this; a daily read of the live roster can.
+# #661 made the orchestrator charge a modelled cost per dispatched fire. Its
+# first version also refused to dispatch past the per-agent figure, and on
+# 2026-09-11 the PR router stopped that way, silently, with nine open PRs
+# waiting. ADR-0037 made the per-agent figure advisory: nothing is refused
+# on it any more, so this audit's job is to say who is over it and whether
+# the roster as a whole plans to burn more than the W-3 ceiling. Caps and
+# bindings are DDB config, not git, so no PR gate can see this; a daily read
+# of the live roster can.
 #
 # Read-only: one GET to the public agents-api, no AWS credentials, no writes.
-# Reddens (exit 1) when any non-archived agent's cap is below its modelled
-# burn; the run summary names the agent and the day of the month it caps.
+# Reddens (exit 1) only when the roster's modelled burn exceeds the aggregate
+# ceiling; per-agent overruns are listed in the run summary as advisory.
 
 name: Workforce budget runway audit (R-19)
 

@@ -15,9 +15,11 @@
 // unrouted with no surface saying why.
 //
 // A cap below the modelled burn is not a budget. It is a kill switch with a
-// date on it. This module computes the date so the write boundary can refuse
-// to create that state (`W3-runway` in agent-config.ts) and an audit can name
-// every agent already in it (workforce/scripts/check-budget-runway.mjs).
+// date on it. ADR-0037 removed the switch: the per-agent figure is advisory
+// and nothing is refused on it. This module still computes the date so the
+// daily audit (workforce/scripts/check-budget-runway.mjs, R-19) can name
+// every agent over its figure and the roster's total burn against the W-3
+// ceiling. It no longer backs a write-time refusal.
 //
 // Pure: no AWS, no environment. Mirrored in workforce/scripts/lib/budget-runway.mjs
 // for the in-repo audit script (which cannot import TypeScript); the parity

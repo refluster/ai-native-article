@@ -286,6 +286,9 @@ export interface BudgetBlock {
   /** Agents with a ledger row this month — NOT the roster size. */
   agents_charged: number;
   ceiling_usd: number;
+  /** Agents whose month has crossed their advisory per-agent budget
+   *  (ADR-0037). They keep firing; this names whose planning figure is wrong. */
+  over_budget_agents: string[];
   /** When the ledger last MOVED — newest row timestamp, not the read time.
    *  A figure whose `updated_at` has gone quiet must render as "the writer has
    *  stopped", never as a current total: a frozen number reads as alive. */
