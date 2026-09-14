@@ -31,6 +31,9 @@
 //     [--publish-ddb --table wf-table-prod] [--dry-run]
 
 import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
+// Shared with the repository-activity builder: both talk to the same API on the
+// same quota, and both have to tell a spent quota from a missing permission.
+import { isRateLimited } from "./build-repo-performance.mjs";
 ensureProxyAwareEntry(import.meta.url);
 
 const GREEN_MARKER_RE = /<!--\s*autopilot:review:[a-z0-9-]+:green\s*-->/i;
@@ -65,6 +68,68 @@ export function classifyPr({ bodies = [], labels = [] }) {
   }
   const hasGreen = bodies.some((b) => GREEN_MARKER_RE.test(String(b || "")));
   return { autopilotMerged: hasGreen && !needsHuman, reviewers: [...slugs] };
+}
+
+/** Fetches the per-PR facts the roll-up aggregates, and reports what it could
+ *  NOT fetch instead of averaging it in at zero.
+ *
+ *  THREE core-quota calls per merged PR, over a 180-day window — this is by far
+ *  the refresh's largest consumer of GitHub's 5000/h REST budget (production
+ *  2026-09-13: ~1780 merged PRs across the scopes, so ~5300 calls in one run,
+ *  against a quota every project now draws on through a single PAT). When that
+ *  quota runs out mid-loop, `p.additions || 0` on the refused response is a
+ *  fabricated zero the roll-up cannot tell from a genuinely tiny PR — so a PR
+ *  whose detail did not arrive is DROPPED and counted. An undercount announces
+ *  itself; a false zero does not (`wf:owen` O3).
+ *
+ *  Returns { prs, skipped, quotaExhausted }. A spent quota also ends the loop:
+ *  every remaining PR would cost three more doomed calls against a budget that
+ *  resets on the hour, and the repository-activity leg shares it. */
+export async function fetchPrFacts(gh, repo, merged) {
+  const prs = [];
+  let skipped = 0;
+  let quotaExhausted = false;
+  for (const it of merged) {
+    const n = it.number;
+    const [detail, comments, reviews] = await Promise.all([
+      gh(`/repos/${repo}/pulls/${n}`),
+      gh(`/repos/${repo}/issues/${n}/comments?per_page=100`),
+      gh(`/repos/${repo}/pulls/${n}/reviews?per_page=100`),
+    ]);
+    if (detail.status !== 200) {
+      skipped += 1;
+      if (isRateLimited(detail)) {
+        quotaExhausted = true;
+        const untried = merged.length - prs.length - skipped;
+        console.error(
+          `${repo}: PR #${n} detail -> HTTP ${detail.status} RATE-LIMITED` +
+            `${detail.rateLimit?.resetAt ? ` (quota resets ${detail.rateLimit.resetAt})` : ""}` +
+            `; leaving ${untried} further PR(s) untried rather than fabricating their churn`,
+        );
+        break;
+      }
+      console.error(
+        `${repo}: PR #${n} detail -> HTTP ${detail.status}; dropped from the roll-up (not counted as zero churn)`,
+      );
+      continue;
+    }
+    const p = detail.json || {};
+    const bodies = [
+      ...(Array.isArray(comments.json) ? comments.json.map((c) => c.body) : []),
+      ...(Array.isArray(reviews.json) ? reviews.json.map((c) => c.body) : []),
+    ];
+    const labels = Array.isArray(it.labels) ? it.labels.map((l) => l.name) : [];
+    const { autopilotMerged, reviewers } = classifyPr({ bodies, labels });
+    prs.push({
+      merged_at: p.merged_at || it.closed_at,
+      additions: p.additions || 0,
+      deletions: p.deletions || 0,
+      author: p.user?.login || it.user?.login,
+      autopilotMerged,
+      reviewers,
+    });
+  }
+  return { prs, skipped, quotaExhausted };
 }
 
 /** Aggregate per-PR facts into the PERF#{scope}/PR roll-up body. */
@@ -190,9 +255,32 @@ function arg(name, fallback) {
   return v && !v.startsWith("--") ? v : true;
 }
 
+/** Parses `--also-scope a,b,c` into the extra scope ids a build should also
+ *  publish under (blank/duplicate/self entries dropped). Extracted so the
+ *  parsing has a unit test independent of spawning the CLI — this argument is
+ *  what lets `collapseByRepo()` fold a duplicate build into one, which is the
+ *  single largest cut in the run's GitHub quota cost (production 2026-09-13:
+ *  ~3460 of ~5330 core calls). */
+export function parseAlsoScopes(raw, scope) {
+  // `arg()` returns the boolean `true` for a bare `--also-scope` with no
+  // value — String(true) is "true", which would otherwise survive the filter
+  // below as a bogus scope id. Only a real string is a list of scope ids.
+  if (typeof raw !== "string") return [];
+  return raw
+    .split(",")
+    .map((x) => x.trim())
+    .filter((x) => x.length > 0 && x !== scope);
+}
+
 async function main() {
   const repo = arg("repo");
   const scope = arg("scope");
+  // Extra scope ids that publish the SAME block. Two scopes can name one repo
+  // over one window — `workforce` and `agent-workforce` both mean
+  // refluster/ai-native-article — and building each separately paid the full
+  // per-PR quota cost twice for a byte-identical body (production 2026-09-13:
+  // ~3460 of the run's ~5330 core calls, which is what pushed it past 5000/h).
+  const alsoScopes = parseAlsoScopes(arg("also-scope", ""), scope);
   const DAYS = Number(arg("days", 28));
   const DRY = process.argv.includes("--dry-run");
   const PUBLISH = process.argv.includes("--publish-ddb");
@@ -209,7 +297,16 @@ async function main() {
     });
     const text = await res.text().catch(() => "");
     let json; try { json = text ? JSON.parse(text) : {}; } catch { json = {}; }
-    return { status: res.status, json };
+    const remaining = Number(res.headers.get("x-ratelimit-remaining"));
+    const reset = Number(res.headers.get("x-ratelimit-reset"));
+    return {
+      status: res.status,
+      json,
+      rateLimit: {
+        remaining: Number.isFinite(remaining) ? remaining : undefined,
+        resetAt: Number.isFinite(reset) ? new Date(reset * 1000).toISOString() : undefined,
+      },
+    };
   };
 
   const since = new Date();
@@ -274,30 +371,7 @@ async function main() {
   }
 
   // 2. per PR: churn + merged_at + author + the autopilot signal.
-  const prs = [];
-  for (const it of merged) {
-    const n = it.number;
-    const [detail, comments, reviews] = await Promise.all([
-      gh(`/repos/${repo}/pulls/${n}`),
-      gh(`/repos/${repo}/issues/${n}/comments?per_page=100`),
-      gh(`/repos/${repo}/pulls/${n}/reviews?per_page=100`),
-    ]);
-    const p = detail.json || {};
-    const bodies = [
-      ...(Array.isArray(comments.json) ? comments.json.map((c) => c.body) : []),
-      ...(Array.isArray(reviews.json) ? reviews.json.map((c) => c.body) : []),
-    ];
-    const labels = Array.isArray(it.labels) ? it.labels.map((l) => l.name) : [];
-    const { autopilotMerged, reviewers } = classifyPr({ bodies, labels });
-    prs.push({
-      merged_at: p.merged_at || it.closed_at,
-      additions: p.additions || 0,
-      deletions: p.deletions || 0,
-      author: p.user?.login || it.user?.login,
-      autopilotMerged,
-      reviewers,
-    });
-  }
+  const { prs, skipped, quotaExhausted } = await fetchPrFacts(gh, repo, merged);
 
   const block = aggregate(prs, { sinceIso });
   // Epic-019: the escalation-reason funnel lives on the same PERF#{scope}/PR
@@ -305,7 +379,17 @@ async function main() {
   // flaky-rerun roll-up (warn is print-only, not stored).
   Object.assign(block.pr_summary, escalations, {
     flaky_reruns: { reran_prs: reruns.reran_prs, per_check: reruns.per_check },
+    // Omitted when nothing was dropped, so "nothing missing" stays distinguishable
+    // from "this writer does not report what it dropped".
+    ...(skipped > 0 ? { degraded_signals: ["pr_detail"], pr_detail_skipped: skipped } : {}),
   });
+  if (skipped > 0) {
+    console.error(
+      `WARN ${repo} (scope ${scope}): ${skipped} of ${merged.length} merged PR(s) dropped — their detail never arrived` +
+        `${quotaExhausted ? " (GitHub REST quota exhausted mid-run)" : ""}. ` +
+        `The roll-up below is an UNDERCOUNT, not a real low.`,
+    );
+  }
   console.error(
     `${repo} (scope ${scope}): ${block.pr_summary.total_prs} merged PR(s) over ${DAYS}d ` +
       `(${block.window.start}→${block.window.end}); autopilot ${Math.round(block.pr_summary.autopilot_share * 100)}% ` +
@@ -314,9 +398,13 @@ async function main() {
       block.pr_contributors.filter((c) => c.kind === "agent").map((c) => `${c.handle}:${c.prs}`).join(", "),
   );
 
+  const targetScopes = [scope, ...alsoScopes];
+
   if (DRY || !PUBLISH) {
-    console.log(JSON.stringify({ pk: `PERF#${scope}`, sk: "PR", scope, ...block }, null, 2));
-    return 0;
+    for (const sc of targetScopes) {
+      console.log(JSON.stringify({ pk: `PERF#${sc}`, sk: "PR", scope: sc, ...block }, null, 2));
+    }
+    return skipped > 0 ? 2 : 0;
   }
 
   const { createRequire } = await import("node:module");
@@ -327,9 +415,19 @@ async function main() {
   const { DynamoDBClient } = await importLambdaDep("@aws-sdk/client-dynamodb");
   const { DynamoDBDocumentClient, PutCommand } = await importLambdaDep("@aws-sdk/lib-dynamodb");
   const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), { marshallOptions: { removeUndefinedValues: true } });
-  await ddb.send(new PutCommand({ TableName: TABLE, Item: { pk: `PERF#${scope}`, sk: "PR", scope, updated_at: new Date().toISOString(), ...block } }));
-  console.error(`published PERF#${scope}/PR to ${TABLE}`);
-  return 0;
+  const updatedAt = new Date().toISOString();
+  for (const sc of targetScopes) {
+    await ddb.send(
+      new PutCommand({
+        TableName: TABLE,
+        Item: { pk: `PERF#${sc}`, sk: "PR", scope: sc, updated_at: updatedAt, ...block },
+      }),
+    );
+  }
+  console.error(`published ${targetScopes.map((sc) => `PERF#${sc}/PR`).join(" + ")} to ${TABLE}`);
+  // 2 = published but degraded, the contract refresh.mjs reads: a partial
+  // roll-up still beats yesterday's, but the run must not report itself clean.
+  return skipped > 0 ? 2 : 0;
 }
 
 if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {

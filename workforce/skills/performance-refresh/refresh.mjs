@@ -185,6 +185,39 @@ async function resolveGithubToken(projectId, region) {
   return parsed.token;
 }
 
+/** The last three lines of a builder's output are its epilogue ("published N
+ *  rows"), which is exactly where the CAUSE is not. Production 2026-09-13: five
+ *  repos logged `code_frequency -> HTTP 403` and every one of those lines was
+ *  truncated away, leaving a degraded run whose reason had to be re-derived by
+ *  hand against the live API. So prefer the diagnostic lines when there are any,
+ *  and keep the epilogue only when there is nothing louder to show. */
+const LOUD_LINE = /\b(ERROR|WARN|FATAL|failed|degraded|rate.?limited|HTTP \d{3})\b/i;
+
+export function digestOutput(text, { max = 6 } = {}) {
+  const lines = String(text ?? "")
+    .trim()
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const loud = lines.filter((l) => LOUD_LINE.test(l));
+  return (loud.length > 0 ? loud : lines).slice(-max).join(" | ");
+}
+
+/** Collapses scopes that name the SAME repo and the same credential into one
+ *  build that publishes under all of them. Order is preserved and the first
+ *  scope of a group stays the primary, so the reported label still leads with
+ *  the scope the console's default deck reads. */
+export function collapseByRepo(scopes) {
+  const groups = new Map();
+  for (const s of scopes) {
+    const key = `${s.repo}\u0000${s.tokenProject}`;
+    const g = groups.get(key);
+    if (g) g.alsoScopes.push(s.scope);
+    else groups.set(key, { ...s, alsoScopes: [] });
+  }
+  return [...groups.values()];
+}
+
 function run(label, file, args, { dry, env }) {
   if (dry) {
     console.error(`[dry-run] would run: ${file} ${args.join(" ")}`);
@@ -198,7 +231,7 @@ function run(label, file, args, { dry, env }) {
       maxBuffer: 64 * 1024 * 1024,
       env: { ...process.env, ...(env ?? {}) },
     });
-    return { label, ok: true, tail: stdout.trim().split("\n").slice(-3).join(" | ") };
+    return { label, ok: true, tail: digestOutput(stdout) };
   } catch (err) {
     // exit 2 from a builder = published but degraded/partial, not a hard fail.
     const degraded = err?.status === 2;
@@ -207,8 +240,8 @@ function run(label, file, args, { dry, env }) {
       label,
       ok: degraded,
       degraded,
-      error: degraded ? undefined : stderr.split("\n").slice(-3).join(" | "),
-      tail: stderr.split("\n").slice(-3).join(" | "),
+      error: degraded ? undefined : digestOutput(stderr),
+      tail: digestOutput(stderr),
     };
   }
 }
@@ -326,8 +359,34 @@ async function main() {
 
   const legs = [];
 
-  // 1. PR metrics, per scope (each needs its own repo + its own PAT).
-  for (const { scope, repo, tokenProject } of scopes) {
+  // 1. Repository activity — one pass writes every scope + the aggregate.
+  //
+  // FIRST, ahead of the PR legs, because the two legs share one GitHub REST
+  // quota and are wildly unequal in what they spend: this leg costs a handful
+  // of core calls, the PR loop below costs three PER MERGED PR (~5300 across
+  // the scopes over a 180-day window, against a 5000/h quota every project now
+  // draws on through one PAT). Run last, it was reliably starved — production
+  // 2026-09-13, where the PR roll-ups published fine and code churn came back
+  // 403 for every repo at once. Ordering does not create quota, but it spends
+  // it on the cheap leg first instead of leaving it the crumbs.
+  legs.push(
+    run("repo:all", join(ROOT, "workforce/scripts/build-repo-performance.mjs"), [
+      "--days", DAYS,
+      "--publish-ddb",
+      "--table", TABLE,
+      "--region", REGION,
+    ], { dry }),
+  );
+
+  // 2. PR metrics, per REPO (each needs its own repo + its own PAT).
+  //
+  // Per repo, not per scope: `workforce` and `agent-workforce` name the same
+  // repo over the same window and differ only in the `pk` their identical body
+  // is stored under, so building both cost the full per-PR quota twice — about
+  // 3460 of the run's ~5330 core calls, which is what pushed it past the
+  // 5000/h ceiling. One build now publishes under every scope that shares the
+  // repo and the credential (`--also-scope`).
+  for (const { scope, repo, tokenProject, alsoScopes } of collapseByRepo(scopes)) {
     let token;
     if (!dry) {
       try {
@@ -368,7 +427,7 @@ async function main() {
         // Otherwise: this scope's secret genuinely is not provisioned. A real,
         // reportable gap — never a silent skip that reads as "no activity".
         legs.push({
-          label: `pr:${scope}`,
+          label: `pr:${[scope, ...alsoScopes].join("+")}`,
           ok: false,
           error: `token unresolved: ${err instanceof Error ? err.message : String(err)}`,
         });
@@ -376,25 +435,16 @@ async function main() {
       }
     }
     legs.push(
-      run(`pr:${scope}`, join(ROOT, "workforce/scripts/build-pr-metrics-github.mjs"), [
+      run(`pr:${[scope, ...alsoScopes].join("+")}`, join(ROOT, "workforce/scripts/build-pr-metrics-github.mjs"), [
         "--repo", repo,
         "--scope", scope,
+        ...(alsoScopes.length > 0 ? ["--also-scope", alsoScopes.join(",")] : []),
         "--days", DAYS,
         "--publish-ddb",
         "--table", TABLE,
       ], { dry, env: token ? { GITHUB_TOKEN: token } : undefined }),
     );
   }
-
-  // 2. Repository activity — one pass writes every scope + the aggregate.
-  legs.push(
-    run("repo:all", join(ROOT, "workforce/scripts/build-repo-performance.mjs"), [
-      "--days", DAYS,
-      "--publish-ddb",
-      "--table", TABLE,
-      "--region", REGION,
-    ], { dry }),
-  );
 
   // 3. Read back what the console will actually serve.
   // `scopes` already leads with the workforce aggregate, so no need to prepend

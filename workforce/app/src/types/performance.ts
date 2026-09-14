@@ -78,6 +78,10 @@ export interface PrSummary {
   /** The distinct human handles that touched any merged PR in the window —
    *  the set the workforce is trying to shrink. */
   humans_involved: string[];
+  /** Set when build-pr-metrics-github.mjs dropped a merged PR whose detail
+   *  GitHub refused (e.g. a spent REST quota) — the counts above are an
+   *  undercount, never entered as a false zero. */
+  degraded_signals?: string[];
 }
 
 /** One scope's full performance series (workforce or a single project). */
