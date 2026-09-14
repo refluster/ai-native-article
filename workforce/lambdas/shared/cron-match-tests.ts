@@ -5,7 +5,7 @@
 // rationale.
 
 import { describe, expect, it } from "vitest";
-import { matchesNow } from "./cron-match.js";
+import { countFires, matchesNow } from "./cron-match.js";
 
 // Helper: build a UTC Date from a "YYYY-MM-DDTHH:mm:ssZ" literal so the
 // test reads like the wall-clock time we care about, not a struct.
@@ -102,5 +102,36 @@ describe("matchesNow — past-window semantics", () => {
     it("throws on wrong field count", () => {
       expect(() => matchesNow("cron(0 12 * * ?)", new Date(), { windowMinutes: 30 })).toThrow();
     });
+  });
+});
+
+// ML-038: the W-3 runway estimate counts fires over a window with the same
+// predicate the tick uses, so "how often does this fire" and "did this fire
+// in the last 120 minutes" can never disagree.
+describe("countFires — fires in [from, to)", () => {
+  const day = (iso: string) => utc(iso);
+
+  it("counts a daily cron once per day, half-open at the end", () => {
+    expect(countFires("cron(30 1 ? * * *)", day("2026-06-01T00:00:00Z"), day("2026-06-04T00:00:00Z"))).toBe(3);
+  });
+
+  it("counts an hour list per listed hour", () => {
+    expect(countFires("cron(23 0,6,12,18 ? * * *)", day("2026-06-01T00:00:00Z"), day("2026-06-02T00:00:00Z"))).toBe(4);
+  });
+
+  it("reads `1/6` as 01,07,13,19 — the same way the tick does", () => {
+    expect(countFires("cron(45 1/6 ? * * *)", day("2026-06-01T00:00:00Z"), day("2026-06-02T00:00:00Z"))).toBe(4);
+  });
+
+  it("includes a fire exactly at `from` and excludes one exactly at `to`", () => {
+    expect(countFires("cron(0 0 ? * * *)", day("2026-06-01T00:00:00Z"), day("2026-06-02T00:00:00Z"))).toBe(1);
+  });
+
+  it("honours a fixed day-of-month", () => {
+    expect(countFires("cron(9 1 3 * ? *)", day("2026-06-01T00:00:00Z"), day("2026-07-01T00:00:00Z"))).toBe(1);
+  });
+
+  it("throws on a malformed expression exactly as matchesNow does", () => {
+    expect(() => countFires("cron(30 1 * *)", day("2026-06-01T00:00:00Z"), day("2026-06-02T00:00:00Z"))).toThrow(/6 fields/);
   });
 });

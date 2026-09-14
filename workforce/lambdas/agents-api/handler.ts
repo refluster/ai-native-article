@@ -80,6 +80,7 @@ import {
   validateIdentityPatch,
   W3_BUDGET_CAP_USD,
   type ConfigViolation,
+  validateBudgetRunway,
 } from "../shared/agent-config.js";
 import {
   appendAgentAudit,
@@ -926,10 +927,17 @@ async function patchAgent(
     ? await sumOtherEffectiveBudgets(slug)
     : 0;
 
+  // W3-runway (ML-038) needs the half of the bindings↔budget pair the patch
+  // does NOT carry, so the check is against the row the write would leave.
+  const runwayCtx = {
+    existingBindings: existing.bindings ?? [],
+    existingBudgetDefaultUsd: existing.budget_monthly_usd_default,
+    existingBudgetOverrideUsd: existing.budget_monthly_usd_override ?? null,
+  };
   if (identityKeys.length > 0) {
     const { skillOwners, skillStatus } = await buildSkillLookups(patch.bindings);
     violations.push(
-      ...validateIdentityPatch(patch, { otherAgentsEffectiveBudgetUsd, skillOwners, skillStatus }),
+      ...validateIdentityPatch(patch, { otherAgentsEffectiveBudgetUsd, skillOwners, skillStatus, ...runwayCtx }),
     );
     // S19 (ML-014): role and the prompt's header title are two copies of one
     // fact — when either is written, they must agree on the EFFECTIVE row.
@@ -948,6 +956,9 @@ async function patchAgent(
         otherAgentsEffectiveBudgetUsd,
       }),
     );
+    // An override-only PATCH never reaches validateIdentityPatch (the
+    // override is operational, not identity), so the runway check runs here.
+    if (identityKeys.length === 0) violations.push(...validateBudgetRunway(patch, runwayCtx));
   }
   if ("paused" in patch && typeof patch.paused !== "boolean") {
     violations.push({ rule: "S12-paused", field: "paused", msg: "paused must be a boolean" });

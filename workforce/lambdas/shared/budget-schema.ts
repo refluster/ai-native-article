@@ -23,6 +23,10 @@ export interface BudgetRow {
   estimated_cost_usd?: number;
   /** Count of dispatched CCR fires behind `estimated_cost_usd`. */
   estimated_fires?: number;
+  /** ISO timestamp of the first tick that refused a fire for this agent this
+   *  month because `total_usd + planned > cap` (ML-038). Set once, by
+   *  `recordCapReached`; its presence is what "this agent is capped" means. */
+  cap_reached_at?: string;
   last_updated_at: string;
 }
 

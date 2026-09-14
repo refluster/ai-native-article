@@ -1678,6 +1678,15 @@ Resources:
                 # deploy as the handler change, or the tick stops firing.
                 - dynamodb:GetItem
                 - dynamodb:UpdateItem
+                # PutItem: the execution-ledger rows the tick writes for a
+                # fire it could NOT make — a prep failure (#650) and, since
+                # ML-038, the first budget-cap refusal of the month. Both go
+                # through appendExecution (a Put). The #650 write shipped
+                # without this grant and failed on every prep error in prod
+                # ("ccr-prep-error-ledger-write-failed … not authorized to
+                # perform: dynamodb:PutItem"), so the loud row it promised
+                # was only ever loud in CloudWatch.
+                - dynamodb:PutItem
               Resource: !GetAtt WfTable.Arn
             - Sid: OrchestratorGithubSecret
               Effect: Allow
