@@ -155,9 +155,24 @@ test("verifyCitationsResolve never lets a failed proxy-status probe itself crash
   assert.match(result.checked[0].status, /^error: fetch failed$/);
 });
 
-test("the real (non-injected) proxy probe is a no-op when HTTPS_PROXY is unset (local dev / CI)", async () => {
+// wf:ren's B1 finding on #726, cycle 2: `defaultProxyBlockProbe` reads
+// `process.env.HTTPS_PROXY || process.env.https_proxy` — clearing only the
+// uppercase var leaves the lowercase one (set in this sandbox, and in any
+// real CCR session per proxy-bootstrap.mjs) to satisfy the "proxy configured"
+// check, so the claimed no-op path never actually ran; the test passed
+// before only because the live call it made happened to return no match, not
+// because the early return fired. Both casings are now cleared, and a
+// fetch stub proves the early return fires (no network call reaches it) —
+// the assertion no longer depends on a reachable proxy endpoint.
+test("the real (non-injected) proxy probe is a no-op when HTTPS_PROXY/https_proxy are both unset (local dev / CI)", async () => {
   const originalProxy = process.env.HTTPS_PROXY;
+  const originalProxyLower = process.env.https_proxy;
   delete process.env.HTTPS_PROXY;
+  delete process.env.https_proxy;
+  const originalFetch = global.fetch;
+  global.fetch = async () => {
+    throw new Error("must not fetch — no proxy configured, the probe must return before ever calling fetch");
+  };
   try {
     const fetchImpl = async () => {
       throw new Error("fetch failed");
@@ -169,5 +184,97 @@ test("the real (non-injected) proxy probe is a no-op when HTTPS_PROXY is unset (
     assert.match(result.checked[0].status, /^error: fetch failed$/);
   } finally {
     if (originalProxy !== undefined) process.env.HTTPS_PROXY = originalProxy;
+    else delete process.env.HTTPS_PROXY;
+    if (originalProxyLower !== undefined) process.env.https_proxy = originalProxyLower;
+    else delete process.env.https_proxy;
+    global.fetch = originalFetch;
+  }
+});
+
+// wf:ren's B2 finding on #726, cycle 2: every prior test exercised
+// `verifyCitationsResolve`'s wiring around an *injected* `probeProxyBlock` —
+// the real matching logic inside `defaultProxyBlockProbe` itself (host/port
+// equality, the `withinMs` recency arithmetic, the `connect_rejected` kind
+// filter, parsing `recentRelayFailures[]`) never ran against a realistic
+// payload. These two tests mock the status-endpoint `fetch` directly and
+// exercise the real (non-injected) default probe.
+test("the real proxy-status probe matches a recent connect_rejected entry for the exact host, and ignores non-matching entries in the same response", async () => {
+  const originalProxy = process.env.HTTPS_PROXY;
+  const originalProxyLower = process.env.https_proxy;
+  process.env.HTTPS_PROXY = "http://127.0.0.1:9999";
+  delete process.env.https_proxy;
+  const originalFetch = global.fetch;
+  const now = new Date().toISOString();
+  const stale = new Date(Date.now() - 60_000).toISOString(); // outside the default 30s window
+  global.fetch = async (url) => {
+    assert.equal(url, "http://127.0.0.1:9999/__agentproxy/status");
+    return {
+      ok: true,
+      json: async () => ({
+        recentRelayFailures: [
+          // Wrong host — must not match.
+          { host: "other.example:443", kind: "connect_rejected", ts: now, detail: "wrong host" },
+          // Right host, wrong kind — must not match.
+          { host: "blocked.example:443", kind: "timeout", ts: now, detail: "wrong kind" },
+          // Right host and kind, but stale — must not match.
+          { host: "blocked.example:443", kind: "connect_rejected", ts: stale, detail: "stale" },
+          // The real match: right host, right kind, recent.
+          {
+            host: "blocked.example:443",
+            kind: "connect_rejected",
+            ts: now,
+            detail: "gateway answered 502 to CONNECT (policy denial or upstream failure)",
+          },
+        ],
+      }),
+    };
+  };
+  try {
+    const fetchImpl = async () => {
+      throw new Error("fetch failed");
+    };
+    const result = await verifyCitationsResolve("https://blocked.example/path", { fetchImpl });
+    assert.equal(result.ok, false);
+    assert.match(result.checked[0].status, /network-policy-block, not a confirmed dead link/);
+    assert.match(result.checked[0].status, /policy denial or upstream failure/);
+  } finally {
+    if (originalProxy !== undefined) process.env.HTTPS_PROXY = originalProxy;
+    else delete process.env.HTTPS_PROXY;
+    if (originalProxyLower !== undefined) process.env.https_proxy = originalProxyLower;
+    else delete process.env.https_proxy;
+    global.fetch = originalFetch;
+  }
+});
+
+test("the real proxy-status probe returns no diagnosis when nothing in recentRelayFailures matches", async () => {
+  const originalProxy = process.env.HTTPS_PROXY;
+  const originalProxyLower = process.env.https_proxy;
+  process.env.HTTPS_PROXY = "http://127.0.0.1:9999";
+  delete process.env.https_proxy;
+  const originalFetch = global.fetch;
+  const now = new Date().toISOString();
+  global.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      recentRelayFailures: [
+        { host: "other.example:443", kind: "connect_rejected", ts: now, detail: "wrong host" },
+      ],
+    }),
+  });
+  try {
+    const fetchImpl = async () => {
+      throw new Error("fetch failed");
+    };
+    const result = await verifyCitationsResolve("https://not-blocked.example/path", { fetchImpl });
+    assert.equal(result.ok, false);
+    // No matching entry -> falls back to the bare fetch error, not the
+    // proxy-block diagnosis.
+    assert.match(result.checked[0].status, /^error: fetch failed$/);
+  } finally {
+    if (originalProxy !== undefined) process.env.HTTPS_PROXY = originalProxy;
+    else delete process.env.HTTPS_PROXY;
+    if (originalProxyLower !== undefined) process.env.https_proxy = originalProxyLower;
+    else delete process.env.https_proxy;
+    global.fetch = originalFetch;
   }
 });
