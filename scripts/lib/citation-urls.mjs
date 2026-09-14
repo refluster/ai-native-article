@@ -44,7 +44,49 @@ export function extractCitationUrls(text) {
   return [...new Set(cleaned)];
 }
 
-async function resolves(url, { timeoutMs, fetchImpl }) {
+// adr-0022/pr-autopilot review of #673's own PR (`wf:dario`, A1): a CCR
+// session's outbound network goes through the agent proxy
+// (workforce/docs — root CLAUDE.md "Remote-session network allowlist"), and a
+// host the org's egress policy denies fails a HEAD/GET with the exact same
+// bare connection error a genuinely dead URL produces — `fetch` gives no
+// `res.status` to tell them apart (verified empirically against this repo's
+// own proxy: both surface as `TypeError: fetch failed`). The one place that
+// *does* know which of the two happened is the proxy's own local status
+// endpoint (`$HTTPS_PROXY/__agentproxy/status` → `recentRelayFailures[]`,
+// keyed by host, kind `connect_rejected`). This best-effort probe is not a
+// certainty (the proxy's own `detail` string says "policy denial or upstream
+// failure" — it cannot always tell the two apart either), but it is strictly
+// more diagnostic signal than the bare `TypeError` an operator saw before,
+// so a `pr-remediate`/exit-2 log reader is pointed at "check the egress
+// policy" rather than "re-verify a citation that may have been fine all
+// along". Injectable (`probeProxyBlock`) so tests stay network-free.
+async function defaultProxyBlockProbe(url, { withinMs = 30_000 } = {}) {
+  const proxyBase = process.env.HTTPS_PROXY || process.env.https_proxy;
+  if (!proxyBase) return null; // no agent proxy in this environment (local dev, CI, Lambda)
+  let host;
+  try {
+    host = new URL(url).host;
+  } catch {
+    return null;
+  }
+  try {
+    const statusUrl = `${String(proxyBase).replace(/\/+$/, "")}/__agentproxy/status`;
+    const res = await fetch(statusUrl, { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) return null;
+    const status = await res.json();
+    const now = Date.now();
+    const hit = (Array.isArray(status?.recentRelayFailures) ? status.recentRelayFailures : []).find((f) => {
+      const sameHost = String(f?.host ?? "").split(":")[0] === host;
+      const recent = Number.isFinite(now - Date.parse(f?.ts ?? "")) && now - Date.parse(f?.ts ?? "") <= withinMs;
+      return sameHost && recent && f?.kind === "connect_rejected";
+    });
+    return hit?.detail ?? null;
+  } catch {
+    return null; // best-effort diagnostic only — a failed probe must never fail the citation check itself
+  }
+}
+
+async function resolves(url, { timeoutMs, fetchImpl, probeProxyBlock = defaultProxyBlockProbe }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -56,7 +98,15 @@ async function resolves(url, { timeoutMs, fetchImpl }) {
     return { url, ok: res.ok, status: res.status };
   } catch (err) {
     const timedOut = err?.name === "AbortError";
-    return { url, ok: false, status: timedOut ? "timeout" : `error: ${err?.message ?? err}` };
+    if (timedOut) return { url, ok: false, status: "timeout" };
+    // The probe is a best-effort diagnostic add-on, not part of the check
+    // itself — a broken/throwing probe (custom or default) must still leave
+    // the citation gate's own verdict intact, just without the extra detail.
+    const proxyDetail = await probeProxyBlock(url).catch(() => null);
+    if (proxyDetail) {
+      return { url, ok: false, status: `network-policy-block, not a confirmed dead link (agent proxy: ${proxyDetail})` };
+    }
+    return { url, ok: false, status: `error: ${err?.message ?? err}` };
   } finally {
     clearTimeout(timer);
   }
@@ -71,12 +121,15 @@ async function resolves(url, { timeoutMs, fetchImpl }) {
  *   checked: Array<{url: string, ok: boolean, status: number|string}>,
  * }>}
  */
-export async function verifyCitationsResolve(text, { timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl = fetch } = {}) {
+export async function verifyCitationsResolve(
+  text,
+  { timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl = fetch, probeProxyBlock = defaultProxyBlockProbe } = {},
+) {
   const urls = extractCitationUrls(text);
   if (urls.length === 0) {
     return { ok: false, reason: "no citation URL found in the citations text", checked: [] };
   }
-  const checked = await Promise.all(urls.map((u) => resolves(u, { timeoutMs, fetchImpl })));
+  const checked = await Promise.all(urls.map((u) => resolves(u, { timeoutMs, fetchImpl, probeProxyBlock })));
   const failed = checked.filter((c) => !c.ok);
   if (failed.length > 0) {
     const detail = failed.map((c) => `${c.url} (${c.status})`).join(", ");

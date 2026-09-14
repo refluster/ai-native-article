@@ -6,6 +6,12 @@
 // (which citations count as resolved, what a mixed pass/fail verdict looks
 // like), not live reachability of any particular URL.
 
+// citation-urls.mjs now issues a real fetch() of its own (the agent-proxy
+// status probe, wf:dario's A1 finding on #726) — R-14 (check-proxy-bootstrap)
+// follows transitive imports, so this test file is network-touching too.
+import { ensureProxyAwareEntry } from "./proxy-bootstrap.mjs";
+ensureProxyAwareEntry(import.meta.url);
+
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
@@ -96,4 +102,72 @@ test("verifyCitationsResolve treats a network error / timeout as non-resolving, 
   const result = await verifyCitationsResolve("https://example.com/times-out", { fetchImpl, timeoutMs: 5 });
   assert.equal(result.ok, false);
   assert.equal(result.checked[0].status, "timeout");
+});
+
+// wf:dario's A1 finding on #726: a CCR session's egress proxy denies some
+// hosts outright, and that failure is indistinguishable at the `fetch()`
+// layer from a genuinely dead URL — both throw the same bare error. The gate
+// must not report the two identically once it has a way to tell them apart.
+test("verifyCitationsResolve labels a plain network error distinctly from an egress-policy block", async () => {
+  const fetchImpl = async () => {
+    throw new Error("fetch failed");
+  };
+  const result = await verifyCitationsResolve("https://example.com/plain-network-error", {
+    fetchImpl,
+    probeProxyBlock: async () => null, // no proxy in this environment / host not in its recent failures
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.checked[0].status, /^error: fetch failed$/);
+});
+
+test("verifyCitationsResolve surfaces the agent proxy's own diagnosis when the proxy just rejected this exact host", async () => {
+  const fetchImpl = async () => {
+    throw new Error("fetch failed");
+  };
+  const seenHosts = [];
+  const probeProxyBlock = async (url) => {
+    seenHosts.push(url);
+    return "gateway answered 502 to CONNECT (policy denial or upstream failure)";
+  };
+  const result = await verifyCitationsResolve("https://blocked.example/path", { fetchImpl, probeProxyBlock });
+  assert.equal(result.ok, false);
+  assert.match(result.checked[0].status, /network-policy-block, not a confirmed dead link/);
+  assert.match(result.checked[0].status, /policy denial or upstream failure/);
+  assert.deepEqual(seenHosts, ["https://blocked.example/path"]);
+});
+
+test("verifyCitationsResolve never lets a failed proxy-status probe itself crash the check", async () => {
+  const fetchImpl = async () => {
+    throw new Error("fetch failed");
+  };
+  const probeProxyBlock = async () => {
+    throw new Error("status endpoint unreachable");
+  };
+  // Exercised indirectly: a real bug here would surface as an unhandled
+  // rejection / thrown error out of verifyCitationsResolve, not a status
+  // string, so asserting the call resolves at all is the regression this
+  // guards.
+  const result = await verifyCitationsResolve("https://example.com/probe-itself-fails", {
+    fetchImpl,
+    probeProxyBlock,
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.checked[0].status, /^error: fetch failed$/);
+});
+
+test("the real (non-injected) proxy probe is a no-op when HTTPS_PROXY is unset (local dev / CI)", async () => {
+  const originalProxy = process.env.HTTPS_PROXY;
+  delete process.env.HTTPS_PROXY;
+  try {
+    const fetchImpl = async () => {
+      throw new Error("fetch failed");
+    };
+    // No `probeProxyBlock` override — exercises the real default, which must
+    // stay inert (return null, not throw or hang) outside a proxied session.
+    const result = await verifyCitationsResolve("https://example.com/no-proxy-env", { fetchImpl });
+    assert.equal(result.ok, false);
+    assert.match(result.checked[0].status, /^error: fetch failed$/);
+  } finally {
+    if (originalProxy !== undefined) process.env.HTTPS_PROXY = originalProxy;
+  }
 });
