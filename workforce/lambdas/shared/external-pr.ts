@@ -26,6 +26,9 @@ export interface OpenExternalPrResult {
 
 const GH_API = "https://api.github.com";
 
+/** Per-step GitHub API call timeout (milliseconds). */
+export const STEP_TIMEOUT_MS = 30_000;
+
 function ghHeaders(token: string): Record<string, string> {
   return {
     authorization: `Bearer ${token}`,
@@ -41,6 +44,37 @@ async function throwGhError(step: string, res: Response): Promise<never> {
   throw new Error(
     `external-pr ${step}: GitHub API ${res.status} — ${body.slice(0, 500)}`,
   );
+}
+
+/**
+ * Wrapper around `fetch` that injects a per-step `AbortSignal.timeout` so a
+ * stalled upstream response never hangs the sequence until the Lambda's own
+ * execution timeout kills it. A `TimeoutError` or `AbortError` is re-thrown
+ * with a step-labelled message so CloudWatch logs identify which git-data call
+ * hung, not just that one did.
+ */
+export async function ghFetch(
+  step: string,
+  url: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(STEP_TIMEOUT_MS),
+    });
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      (err.name === "TimeoutError" || err.name === "AbortError")
+    ) {
+      throw new Error(
+        `external-pr ${step}: timed out after ${STEP_TIMEOUT_MS}ms — GitHub API did not respond`,
+        { cause: err },
+      );
+    }
+    throw err;
+  }
 }
 
 function buildPrBody(input: OpenExternalPrInput): string {
@@ -94,7 +128,7 @@ export async function openExternalPr(
   const branch = externalPrBranchName(input.agent_slug, input.run_id);
 
   // Step 1: GET /repos/{owner}/{repo} → default_branch
-  const repoRes = await fetch(`${GH_API}/repos/${owner}/${repo}`, {
+  const repoRes = await ghFetch("get-repo", `${GH_API}/repos/${owner}/${repo}`, {
     headers: h,
   });
   if (!repoRes.ok) await throwGhError("get-repo", repoRes);
@@ -102,7 +136,8 @@ export async function openExternalPr(
     (await repoRes.json()) as { default_branch: string };
 
   // Step 2: GET /repos/{owner}/{repo}/git/refs/heads/{default_branch} → tip commit SHA
-  const refRes = await fetch(
+  const refRes = await ghFetch(
+    "get-ref",
     `${GH_API}/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(defaultBranch)}`,
     { headers: h },
   );
@@ -112,7 +147,8 @@ export async function openExternalPr(
   } = (await refRes.json()) as { object: { sha: string } };
 
   // Step 3: GET /repos/{owner}/{repo}/git/commits/{sha} → base tree SHA
-  const tipCommitRes = await fetch(
+  const tipCommitRes = await ghFetch(
+    "get-tip-commit",
     `${GH_API}/repos/${owner}/${repo}/git/commits/${tipSha}`,
     { headers: h },
   );
@@ -122,7 +158,8 @@ export async function openExternalPr(
   } = (await tipCommitRes.json()) as { tree: { sha: string } };
 
   // Step 4: POST /repos/{owner}/{repo}/git/blobs → blob SHA
-  const blobRes = await fetch(
+  const blobRes = await ghFetch(
+    "create-blob",
     `${GH_API}/repos/${owner}/${repo}/git/blobs`,
     {
       method: "POST",
@@ -134,7 +171,8 @@ export async function openExternalPr(
   const { sha: blobSha } = (await blobRes.json()) as { sha: string };
 
   // Step 5: POST /repos/{owner}/{repo}/git/trees → new tree SHA
-  const treeRes = await fetch(
+  const treeRes = await ghFetch(
+    "create-tree",
     `${GH_API}/repos/${owner}/${repo}/git/trees`,
     {
       method: "POST",
@@ -160,7 +198,8 @@ export async function openExternalPr(
   const commitMessage =
     `${input.skill_name}: add ${input.path}\n\n` +
     `Agent: ${input.agent_slug} | Run: ${input.run_id} | Project: ${input.project_id}`;
-  const newCommitRes = await fetch(
+  const newCommitRes = await ghFetch(
+    "create-commit",
     `${GH_API}/repos/${owner}/${repo}/git/commits`,
     {
       method: "POST",
@@ -178,7 +217,8 @@ export async function openExternalPr(
   };
 
   // Step 7: POST /repos/{owner}/{repo}/git/refs → create branch pointing at new commit
-  const refCreateRes = await fetch(
+  const refCreateRes = await ghFetch(
+    "create-branch-ref",
     `${GH_API}/repos/${owner}/${repo}/git/refs`,
     {
       method: "POST",
@@ -193,7 +233,8 @@ export async function openExternalPr(
 
   // Step 8: POST /repos/{owner}/{repo}/pulls → PR URL + number
   const prTitle = `[${input.agent_slug}/${input.skill_name}] ${input.path}`;
-  const prRes = await fetch(
+  const prRes = await ghFetch(
+    "create-pr",
     `${GH_API}/repos/${owner}/${repo}/pulls`,
     {
       method: "POST",

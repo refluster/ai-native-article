@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ProjectMetaRow } from "./project.js";
 import type { OpenExternalPrInput } from "./external-pr.js";
+import { STEP_TIMEOUT_MS } from "./external-pr.js";
 
 // ---------------------------------------------------------------------------
 // Module mocks — must be declared before the dynamic import below
@@ -318,6 +319,67 @@ describe("openExternalPr", () => {
 
     const step1Url = mockFetch.mock.calls[0]![0] as string;
     expect(step1Url).toContain("custom-org/custom-repo");
+  });
+
+  it("each fetch call carries an AbortSignal", async () => {
+    getProject.mockResolvedValueOnce(makeProject());
+    for (const r of happyPathResponses()) {
+      mockFetch.mockResolvedValueOnce(r);
+    }
+
+    await openExternalPr(makeInput());
+
+    for (let i = 0; i < 8; i++) {
+      const opts = mockFetch.mock.calls[i]![1] as { signal?: unknown };
+      expect(opts.signal, `step ${i + 1} missing AbortSignal`).toBeInstanceOf(
+        AbortSignal,
+      );
+    }
+  });
+
+  it("wraps a TimeoutError on step 1 with a step-labelled message", async () => {
+    getProject.mockResolvedValueOnce(makeProject());
+    const timeoutErr = new DOMException("signal timed out", "TimeoutError");
+    mockFetch.mockRejectedValueOnce(timeoutErr);
+
+    await expect(openExternalPr(makeInput())).rejects.toThrow(
+      `external-pr get-repo: timed out after ${STEP_TIMEOUT_MS}ms`,
+    );
+  });
+
+  it("wraps a TimeoutError on step 4 (create-blob) with a step-labelled message", async () => {
+    getProject.mockResolvedValueOnce(makeProject());
+    // Steps 1-3 succeed
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ default_branch: "main" }), { status: 200 }),
+    );
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ object: { sha: "tip-sha-001" } }),
+        { status: 200 },
+      ),
+    );
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ tree: { sha: "base-tree-sha-001" } }),
+        { status: 200 },
+      ),
+    );
+    // Step 4 times out
+    const timeoutErr = new DOMException("signal timed out", "TimeoutError");
+    mockFetch.mockRejectedValueOnce(timeoutErr);
+
+    await expect(openExternalPr(makeInput())).rejects.toThrow(
+      "external-pr create-blob: timed out after",
+    );
+  });
+
+  it("propagates non-timeout fetch errors without wrapping", async () => {
+    getProject.mockResolvedValueOnce(makeProject());
+    const networkErr = new Error("ECONNRESET");
+    mockFetch.mockRejectedValueOnce(networkErr);
+
+    await expect(openExternalPr(makeInput())).rejects.toThrow("ECONNRESET");
   });
 });
 
