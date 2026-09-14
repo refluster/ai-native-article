@@ -35,6 +35,7 @@
     "sitemap": "node newsletter/pipeline/generate-sitemap.mjs",
     "workforce:naming": "node workforce/scripts/validate-naming.mjs",
     "workforce:skills": "node workforce/scripts/validate-skills.mjs",
+    "workforce:budget-runway": "node workforce/scripts/check-budget-runway.mjs",
     "workforce:projects": "node workforce/scripts/validate-projects.mjs",
     "workforce:tools": "node workforce/scripts/validate-tools.mjs",
     "workforce:tool-registry:check": "node workforce/scripts/build-tool-registry.mjs --check",

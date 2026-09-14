@@ -40,10 +40,46 @@ import { mintEngagementToken } from "../shared/engagement-token.js";
 import { mintMemoryWriteToken } from "../shared/memory-write-token.js";
 import { mintDispatchToken } from "../shared/dispatch-token.js";
 import { SKILL_REQUIRES } from "../shared/skill-registry-generated.js";
-import { getMonthSpend, recordEstimatedSpend, wouldBreachBudget } from "../shared/budget.js";
+import { getMonthSpend, recordCapReached, recordEstimatedSpend, wouldBreachBudget } from "../shared/budget.js";
 import { estimateFireCostUsd } from "../shared/fire-cost-estimate.js";
 import { effectiveBudgetUsd } from "../shared/agent.js";
+
 import { newUlid, type DelivRow } from "../shared/task.js";
+
+/** The execution-ledger row for the first budget-cap refusal of the month
+ *  (ML-038). Pure, so the shape is testable without the DDB harness the rest
+ *  of handler() lacks (see handler-tests.ts). Status "skipped" — the fire was
+ *  declined, not attempted and failed — attributed to the agent's own
+ *  `self/{slug}` observability project like a prep error (#650), because a
+ *  month's cap is a property of the agent, not of any one project. */
+export function budgetCapSkipRow(args: {
+  slug: string;
+  projectId: ProjectId;
+  tickedAt: string;
+  skill: string;
+  monthUsd: number;
+  plannedUsd: number;
+  capUsd: number;
+}): Parameters<typeof appendExecution>[0] {
+  const { slug, projectId, tickedAt, skill, monthUsd, plannedUsd, capUsd } = args;
+  const reason =
+    `budget_cap_reached: month=${monthUsd.toFixed(2)} + planned=${plannedUsd.toFixed(2)} > cap=${capUsd.toFixed(2)} (W-3). ` +
+    `Every orchestrator-fired binding of ${slug} is refused until the month rolls over or the cap is raised ` +
+    `(agents-api PATCH budget_monthly_usd_default / _override). First refused binding: ${skill}.`;
+  return {
+    project_id: projectId,
+    agent_slug: slug as Parameters<typeof appendExecution>[0]["agent_slug"],
+    exec_ulid: newUlid(),
+    skill_name: skill,
+    skill_version: "unknown",
+    started_at: tickedAt,
+    ended_at: new Date().toISOString(),
+    status: "skipped",
+    used_credential_types: [],
+    error: reason,
+    summary: `W-3 cap reached: USD ${monthUsd.toFixed(2)} of ${capUsd.toFixed(2)} spent this month; no further fires until it rolls over (ML-038).`,
+  };
+}
 
 const STAGE = process.env.STAGE;
 const TICK_WINDOW_MINUTES = parseInt(process.env.TICK_WINDOW_MINUTES ?? "5", 10);
@@ -136,6 +172,10 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
       // that would actually dispatch and then carried across the agent's
       // remaining bindings (#661). `undefined` = not read yet.
       let monthSpendUsd: number | undefined;
+      // ML-038: the cap-reached ledger event is per agent per tick (the cause
+      // is the agent's month, not any one binding), and per month on the
+      // ledger itself (recordCapReached is conditional).
+      let capEventAttempted = false;
       if (agent.archived || agent.paused) {
         for (let i = 0; i < (agent.bindings?.length ?? 0); i++) {
           skipped.push({
@@ -206,6 +246,41 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
             skill: binding.skill,
             reason: `budget_cap_reached: month=${monthSpendUsd.toFixed(2)} + planned=${planned.toFixed(2)} > cap=${capUsd.toFixed(2)} (W-3)`,
           });
+          // ML-038 / C-4: `skipped[]` and the WARN above live only in this
+          // invocation and CloudWatch. A capped agent stops working for the
+          // rest of the month, and until 2026-09-14 nothing on its Track
+          // Record, the executions API or the console said so — the PR router
+          // was refused at every tick for three days with nine open PRs
+          // waiting. So the FIRST refusal of the month also puts one loud row
+          // on the execution ledger (same #650 convention as a prep error:
+          // best-effort, a ledger failure must not stall the tick).
+          if (!capEventAttempted) {
+            capEventAttempted = true;
+            try {
+              const first = await recordCapReached(agent.slug, now);
+              if (first) {
+                await appendExecution(
+                  budgetCapSkipRow({
+                    slug: agent.slug,
+                    projectId: ccrPrepErrorProjectId(agent.slug, undefined),
+                    tickedAt,
+                    skill: binding.skill,
+                    monthUsd: monthSpendUsd,
+                    plannedUsd: planned,
+                    capUsd,
+                  }),
+                );
+                console.warn(JSON.stringify({ event: "budget-cap-ledger-row-written", slug: agent.slug, cap_usd: capUsd }));
+              }
+            } catch (ledgerErr) {
+              console.error(JSON.stringify({
+                event: "budget-cap-ledger-write-failed",
+                slug: agent.slug,
+                skill: binding.skill,
+                reason: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
+              }));
+            }
+          }
           continue;
         }
         // Reserve against the cap for the rest of this tick, so an agent with

@@ -170,6 +170,8 @@ Bindings are immutable per-PR (Rule 11 / R-N8: one prompt-version-bump per PR). 
 
 The agents-api write-time validator (`workforce/lambdas/shared/agent-config.ts`, ADR-0007 — formerly the `validate-agent-json.mjs` CI lint) enforces:
 
+- **`W3-runway` (ML-038)** — on any write that touches `bindings`, `budget_monthly_usd_default` or `budget_monthly_usd_override`, the modelled monthly burn of the orchestrator-owned cron bindings (fires in a fixed 30-day window × the skill's declared `cost_class`, `budget-runway.ts`) must not exceed the cap the write leaves in force. Since #661 the tick charges that model per fire and refuses to dispatch past the cap, so a cap below the burn is the day the agent stops. Wire a binding and its budget line in the **same** PATCH; `npm run workforce:budget-runway` prints the number for every agent.
+
 - shape rules (`S9-binding-*`)
 - executor × scheduler compatibility (`S9-binding-compat`)
 - cron presence when required (`S9-binding-cron`, `S9-binding-ccr-trigger`)

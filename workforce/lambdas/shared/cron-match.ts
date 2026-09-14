@@ -41,20 +41,7 @@ export function matchesNow(
   now: Date,
   opts: MatchOptions,
 ): boolean {
-  const m = /^cron\((.+)\)$/.exec(cronExpr.trim());
-  if (!m) throw new Error(`invalid cron expression "${cronExpr}"`);
-  const fields = m[1]!.split(/\s+/);
-  if (fields.length !== 6) {
-    throw new Error(`cron expression must have 6 fields, got ${fields.length}: "${cronExpr}"`);
-  }
-  const [minutes, hours, dom, month, dow, year] = fields as [
-    string,
-    string,
-    string,
-    string,
-    string,
-    string,
-  ];
+  const fields = parseCron(cronExpr);
 
   // Walk every minute in the past window (now, now-1min, ..., now-(W-1)min).
   // windowMinutes is small (120 at the 2-hourly tick) so this is trivially cheap. The first
@@ -62,26 +49,75 @@ export function matchesNow(
   // minute is caught — even when ticks are slightly delayed.
   for (let i = 0; i < opts.windowMinutes; i++) {
     const t = new Date(now.getTime() - i * 60_000);
-    const inMin = matchField(minutes, t.getUTCMinutes(), 0, 59);
-    const inHour = matchField(hours, t.getUTCHours(), 0, 23);
-    const inMonth = matchField(month, t.getUTCMonth() + 1, 1, 12);
-    const inYear = matchField(year, t.getUTCFullYear(), 1970, 9999);
-    const inDom = matchField(dom, t.getUTCDate(), 1, 31);
-    const inDow = matchDow(dow, t.getUTCDay()); // JS getUTCDay: 0=Sun..6=Sat
-
-    if (!inMin || !inHour || !inMonth || !inYear) continue;
-
-    // EventBridge: DoM and DoW are mutually exclusive — one must be '?'.
-    if (dom === "?") {
-      if (inDow) return true;
-    } else if (dow === "?") {
-      if (inDom) return true;
-    } else {
-      // Pre-2019 EventBridge or unusual: if neither '?', match if either.
-      if (inDom || inDow) return true;
-    }
+    if (firesAtMinute(fields, t)) return true;
   }
   return false;
+}
+
+/** The six EventBridge fields, validated once. Both evaluators below read
+ *  the same parse so a cron the tick can fire and a cron the runway
+ *  estimate can count are the same set by construction. */
+export interface CronFields {
+  minutes: string;
+  hours: string;
+  dom: string;
+  month: string;
+  dow: string;
+  year: string;
+}
+
+export function parseCron(cronExpr: string): CronFields {
+  const m = /^cron\((.+)\)$/.exec(cronExpr.trim());
+  if (!m) throw new Error(`invalid cron expression "${cronExpr}"`);
+  const fields = m[1]!.split(/\s+/);
+  if (fields.length !== 6) {
+    throw new Error(`cron expression must have 6 fields, got ${fields.length}: "${cronExpr}"`);
+  }
+  const [minutes, hours, dom, month, dow, year] = fields as [string, string, string, string, string, string];
+  return { minutes, hours, dom, month, dow, year };
+}
+
+/** Does this schedule fire at exactly minute `t` (UTC)? The single
+ *  fire-time predicate `matchesNow` (the tick) and `countFires` (the W-3
+ *  runway estimate) share. */
+export function firesAtMinute(f: CronFields, t: Date): boolean {
+  const inMin = matchField(f.minutes, t.getUTCMinutes(), 0, 59);
+  const inHour = matchField(f.hours, t.getUTCHours(), 0, 23);
+  const inMonth = matchField(f.month, t.getUTCMonth() + 1, 1, 12);
+  const inYear = matchField(f.year, t.getUTCFullYear(), 1970, 9999);
+  if (!inMin || !inHour || !inMonth || !inYear) return false;
+  const inDom = matchField(f.dom, t.getUTCDate(), 1, 31);
+  const inDow = matchDow(f.dow, t.getUTCDay()); // JS getUTCDay: 0=Sun..6=Sat
+
+  // EventBridge: DoM and DoW are mutually exclusive — one must be '?'.
+  if (f.dom === "?") return inDow;
+  if (f.dow === "?") return inDom;
+  // Pre-2019 EventBridge or unusual: if neither '?', match if either.
+  return inDom || inDow;
+}
+
+/**
+ * How many times the schedule fires in [from, to), walking every minute.
+ *
+ * This is the modelled-burn half of the W-3 runway check (ML-038): the
+ * orchestrator charges `estimateFireCostUsd(skill)` per dispatched fire, so an
+ * agent's monthly burn is fires × cost — and a cap set below that number is a
+ * kill switch with a date on it, not a budget. A 30-day window is 43,200
+ * iterations of the same cheap field matches the tick runs 120 of; it is
+ * meant for write-time validation and audits, not for a hot path.
+ *
+ * Throws on a malformed expression exactly as `matchesNow` does — a cron the
+ * tick cannot evaluate is one it never fires, and the caller decides whether
+ * that is "0 fires" or a validation error.
+ */
+export function countFires(cronExpr: string, from: Date, to: Date): number {
+  const fields = parseCron(cronExpr);
+  let n = 0;
+  const start = Math.floor(from.getTime() / 60_000) * 60_000;
+  for (let ms = start; ms < to.getTime(); ms += 60_000) {
+    if (firesAtMinute(fields, new Date(ms))) n++;
+  }
+  return n;
 }
 
 function matchField(field: string, value: number, min: number, max: number): boolean {

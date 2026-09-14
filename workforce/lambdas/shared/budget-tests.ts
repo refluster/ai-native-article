@@ -27,7 +27,7 @@ vi.mock("@aws-sdk/lib-dynamodb", () => ({
   },
 }));
 
-const { wouldBreachBudget, getMonthSpend, recordEstimatedSpend, assertWithinBudget } =
+const { wouldBreachBudget, getMonthSpend, recordEstimatedSpend, assertWithinBudget, recordCapReached } =
   await import("./budget.js");
 
 beforeEach(() => sendMock.mockReset());
@@ -131,5 +131,35 @@ describe("assertWithinBudget", () => {
   it("stays silent when the fire fits", async () => {
     sendMock.mockResolvedValueOnce({ Item: { cost_usd: 1, estimated_cost_usd: 1 } });
     await expect(assertWithinBudget("silas", 10, 0.6)).resolves.toBeUndefined();
+  });
+});
+
+// ML-038: the first refusal of the month stamps the ledger once; every later
+// tick's refusal is old news and must not write again.
+describe("recordCapReached", () => {
+  it("returns true on the write that sets cap_reached_at, and stamps it conditionally", async () => {
+    sendMock.mockResolvedValueOnce({});
+    expect(await recordCapReached("nadia", new Date("2026-09-11T15:29:57Z"))).toBe(true);
+    const cmd = sendMock.mock.calls[0]![0] as { input: { ConditionExpression: string; UpdateExpression: string; Key: { pk: string; sk: string }; ExpressionAttributeValues: Record<string, string> } };
+    expect(cmd.input.ConditionExpression).toBe("attribute_not_exists(#cap_reached_at)");
+    expect(cmd.input.Key).toEqual({ pk: "BUDGET#2026-09", sk: "AGENT#nadia" });
+    expect(cmd.input.ExpressionAttributeValues[":now"]).toBe("2026-09-11T15:29:57.000Z");
+  });
+
+  it("returns false — not an error — once the month is already stamped", async () => {
+    sendMock.mockRejectedValueOnce(Object.assign(new Error("conditional"), { name: "ConditionalCheckFailedException" }));
+    expect(await recordCapReached("nadia")).toBe(false);
+  });
+
+  it("rethrows anything that is not the conditional refusal", async () => {
+    sendMock.mockRejectedValueOnce(Object.assign(new Error("throttled"), { name: "ProvisionedThroughputExceededException" }));
+    await expect(recordCapReached("nadia")).rejects.toThrow(/throttled/);
+  });
+
+  it("getMonthSpend surfaces cap_reached_at only when the row carries it", async () => {
+    sendMock.mockResolvedValueOnce({ Item: { estimated_cost_usd: 8, cap_reached_at: "2026-09-11T15:29:57.000Z" } });
+    expect((await getMonthSpend("nadia")).cap_reached_at).toBe("2026-09-11T15:29:57.000Z");
+    sendMock.mockResolvedValueOnce({ Item: { estimated_cost_usd: 1 } });
+    expect((await getMonthSpend("nadia")).cap_reached_at).toBeUndefined();
   });
 });

@@ -38,6 +38,9 @@ export interface MonthSpend {
   estimated_fires: number;
   /** `cost_usd + estimated_cost_usd` — what the cap is checked against. */
   total_usd: number;
+  /** When the orchestrator first refused a fire for this agent this month
+   *  (ML-038). Absent while the cap has not been reached. */
+  cap_reached_at?: string;
 }
 
 const monthKey = budgetMonthKey;
@@ -65,7 +68,41 @@ export async function getMonthSpend(slug: string): Promise<MonthSpend> {
     estimated_cost_usd,
     estimated_fires: row?.estimated_fires ?? 0,
     total_usd: cost_usd + estimated_cost_usd,
+    ...(row?.cap_reached_at ? { cap_reached_at: row.cap_reached_at } : {}),
   };
+}
+
+/**
+ * Stamp the month's ledger row with the moment the cap was first reached
+ * (ML-038). Returns TRUE only for the write that set it — the one tick per
+ * agent per month that should also put a loud row on the execution ledger —
+ * and FALSE on every later tick, where the cap is still reached but nothing is
+ * new. Conditional on the attribute not existing, so two ticks cannot both be
+ * "first".
+ *
+ * Why exactly-once and not per tick: a capped agent is refused at every one
+ * of the ~12 daily ticks for the rest of the month. One ledger row says
+ * "capped since"; 240 identical rows would bury the agent's own Track Record
+ * under the message that it has none.
+ */
+export async function recordCapReached(slug: string, now: Date = new Date()): Promise<boolean> {
+  const month = monthKey(now);
+  try {
+    await ddb.send(
+      new UpdateCommand({
+        TableName: tableName,
+        Key: { pk: pk(month), sk: sk(slug) },
+        UpdateExpression: "SET #cap_reached_at = :now",
+        ConditionExpression: "attribute_not_exists(#cap_reached_at)",
+        ExpressionAttributeNames: { "#cap_reached_at": "cap_reached_at" },
+        ExpressionAttributeValues: { ":now": now.toISOString() },
+      }),
+    );
+    return true;
+  } catch (err) {
+    if ((err as { name?: string })?.name === "ConditionalCheckFailedException") return false;
+    throw err;
+  }
 }
 
 /**
