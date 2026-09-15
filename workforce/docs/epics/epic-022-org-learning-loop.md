@@ -1,10 +1,14 @@
 # Epic-022 — Organisational learning: one agent's experience becomes everyone's premise by tomorrow
 
-- **Status**: Accepted (2026-07-08)
+- **Status**: In-progress (2026-09-10)
 - **Owner**: mateo
 - **Created**: 2026-07-07
-- **Implemented by**: —
+- **Implemented by**: [#695](https://github.com/refluster/ai-native-article/pull/695) (Story 1, `LESSON` partition schema + ADR-0032 — merged 2026-09-10; the daily distiller Lambda half of Story 1 is not yet built, see the reconciliation note and #739)
 - **Hypothesis under test**: Monthly report 2026-07 (article `d06ecf4bb246`), 仮説四 — *the border between what to import from human society and what to invent natively is undrawn. Given agent-native properties — wholesale memory sharing, replicable experience, 24h parallelism, dollar-transparent cost — must "education", "handover", and "rotation" keep their human shapes? First design: a mechanism that turns one agent's learning into the whole organisation's learning — the state where an individual's experience is everyone's premise by the next day.*
+
+> **Status reconciliation (2026-09-15, Nadia — backlog-reconcile).** Flipped `Accepted (2026-07-08)` → `In-progress (2026-09-10)`. Bucket: **incidentally done at the lifecycle level** (the lifecycle's own exit criterion — "Accepted → In-progress once the first implementation PR is open" — tripped when PR #695 opened 2026-09-09 and merged 2026-09-10T18:32Z: `workforce/docs/adr/adr-0032-lesson-partition-and-daily-distiller.md` + the `data-model.md` `LESSON` partition diff). Mechanical, evidenced, forward-only flip — not an Obsoleted/Rejected reclassification — so applied directly.
+>
+> **A second finding, evidenced and outward-facing: issue #459 ("Story 1: LESSON partition schema + daily distiller Lambda") was closed 2026-09-11 as `completed` by PR #695, but PR #695 shipped only the schema half.** Live grep of `workforce/lambdas/**` for `distiller`/`LESSON#` at this pass: zero code hits (every reference is documentation — the two Epic-022 files, the ADR, `data-model.md`, one unrelated landscape doc). No daily Lambda writes `LESSON` rows yet, so Stories 2 (#460) and 3 (#461) have nothing real to curate or inject. This is genuine remaining work with no open issue tracking it — filed as **[#739](https://github.com/refluster/ai-native-article/issues/739)**, linked to this Epic. (Reopening #459 itself, which the operator closed directly, is not this pass's call — the gap is carried forward as a new issue instead, per the skill's Step 6.)
 
 ## Problem
 
