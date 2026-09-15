@@ -31,11 +31,9 @@
 //   feed-post fires in the 00:00–08:59 UTC window (djb2("yuki") % 540):
 //     11:47 UTC is >170 min past the 08:59 ceiling — well above the
 //     G1-cadence floor on any day the 9th or 23rd falls.
-//   daily-research fires at djb2("yuki"+"#daily-research") % 1440 minutes;
-//     the exact minute is DDB-resident (not available without AWS creds),
-//     but 11:47 UTC occupies a distinct window from the feed-post band and
-//     most daily-research slots. If the agents-api returns a G1-floor error
-//     on the first PATCH attempt, adjust the minute by ±30 before re-running.
+//   daily-research fires at 21:43 UTC (verified via the unauthenticated
+//     `GET /agents/yuki` — no AWS creds needed for a read) — 11:47 UTC is
+//     9h56m clear of it in both directions, well above the G1-cadence floor.
 //   Aoi's design-note fires at 10:23 UTC on the 7th/21st — the 9th/23rd
 //     are different days and 11:47 is 1h24m later, both safe separations.
 //
@@ -123,14 +121,25 @@ function curlJson(method, path, body) {
     if (AWS_SESSION_TOKEN) args.push("-H", `x-amz-security-token: ${AWS_SESSION_TOKEN}`);
     args.push("--data-binary", "@-");
   }
-  const res = spawnSync("curl", args, { input: method === "GET" ? undefined : JSON.stringify(body), encoding: "utf8" });
+  let res;
+  try {
+    res = spawnSync("curl", args, { input: method === "GET" ? undefined : JSON.stringify(body), encoding: "utf8" });
+  } catch (err) {
+    throw new Error(`curl transport failure: ${err.message}`);
+  }
   if (res.status !== 0) throw new Error(`curl failed: ${res.stderr}`);
   const out = res.stdout;
   const nl = out.lastIndexOf("\n");
   return { status: Number(out.slice(nl + 1)), json: out.slice(0, nl) ? JSON.parse(out.slice(0, nl)) : undefined };
 }
 
-const cur = await (await fetch(`${API_BASE}/agents/${SLUG}`)).json();
+let cur;
+try {
+  cur = await (await fetch(`${API_BASE}/agents/${SLUG}`)).json();
+} catch (err) {
+  console.error(`  ✗ ${SLUG}: ${err.message}`);
+  process.exit(1);
+}
 if (!Array.isArray(cur.bindings)) {
   console.error(`  ✗ ${SLUG}: GET returned no bindings[] (agent registered?)`);
   process.exit(1);
@@ -151,7 +160,13 @@ if (DRY_RUN) {
   process.exit(0);
 }
 
-const { status, json } = curlJson("PATCH", `/agents/${SLUG}`, { bindings: next });
+let status, json;
+try {
+  ({ status, json } = curlJson("PATCH", `/agents/${SLUG}`, { bindings: next }));
+} catch (err) {
+  console.error(`  ✗ ${SLUG}: ${err.message}`);
+  process.exit(1);
+}
 if (status === 200) {
   console.log(`  ✓ ${SLUG}: ${verb} ${summary}`);
   console.log("Done. Next orchestrator tick picks the binding up — no deploy needed (ADR-0007 write=live).");
