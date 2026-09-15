@@ -20,9 +20,11 @@ import {
   fetchBindableSkills,
   patchAgentBindings,
 } from '../lib/agents';
+import { fetchProjects } from '../lib/projects';
 import { SIGV4_IS_CONFIGURED } from '../config/auth';
 import { effectiveSchedule, scheduleLabel } from '../lib/effectiveSchedule';
 import type { AgentBinding } from '../types/agent';
+import type { ProjectSummary } from '../types/project';
 
 interface Props {
   slug: string;
@@ -35,7 +37,14 @@ interface Props {
 const CRON_SHAPE = /^cron\(.+\)$/;
 const CRON_PLACEHOLDER = 'cron(0 1 ? * * *)';
 const CRON_HINT = 'EventBridge cron, UTC. Minute must be a single value (hourly floor, G1).';
-const DEFAULT_PROJECT = 'agent-workforce';
+
+/** Every agent auto-owns a private `self/{slug}` project (Epic-010 §3).
+ *  The runner resolves a task's `project_id` to `self` when a binding
+ *  doesn't name one, so the add-binding form defaults here to match —
+ *  Epic-010 Story 6b's own stated default (issue GH-736). */
+function selfProjectId(slug: string): string {
+  return `self/${slug}`;
+}
 
 /** The CCR-batched binding shape wf-orchestrator-tick dispatches —
  *  see workforce/docs/runbooks/bindings.md. */
@@ -142,7 +151,13 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
   const [bindableSkills, setBindableSkills] = useState<string[] | 'error' | null>(null);
   const [addSkill, setAddSkill] = useState('');
   const [addCron, setAddCron] = useState(CRON_PLACEHOLDER);
-  const [addProject, setAddProject] = useState(DEFAULT_PROJECT);
+  // Defaults to this agent's own `self/{slug}` project (Epic-010 §2/§3,
+  // issue GH-736) — the operator can still pick any other project from the
+  // selector once it loads.
+  const [addProject, setAddProject] = useState(selfProjectId(slug));
+  // null = not yet loaded, 'error' = fetch failed (the selector falls back
+  // to a free-text input rather than blocking binding creation on it).
+  const [projectOptions, setProjectOptions] = useState<ProjectSummary[] | 'error' | null>(null);
 
   useEffect(() => {
     if (!success) return;
@@ -173,6 +188,28 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
       cancelled = true;
     };
   }, [adding, bindableSkills, slug, bindings]);
+
+  // Lazy-load the project list the first time the add form opens, mirroring
+  // the skill-list fetch above. `includeSelf` so this agent's own private
+  // project (the default, above) shows up in the list it's selected from.
+  useEffect(() => {
+    if (!adding || projectOptions !== null) return;
+    let cancelled = false;
+    fetchProjects({ includeSelf: true })
+      .then((projects) => {
+        if (cancelled) return;
+        setProjectOptions(projects);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Non-fatal (unlike the skill list): binding creation degrades to
+        // a free-text project id rather than blocking on this fetch.
+        setProjectOptions('error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [adding, projectOptions]);
 
   async function write(next: AgentBinding[], successMsg: string) {
     if (pending) return;
@@ -235,7 +272,7 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
       return;
     }
     void write(
-      [...bindings, newCcrBinding(addSkill, cron, addProject.trim() || DEFAULT_PROJECT)],
+      [...bindings, newCcrBinding(addSkill, cron, addProject.trim() || selfProjectId(slug))],
       `${addSkill} bound — next orchestrator tick picks it up`,
     );
   }
@@ -387,7 +424,35 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
               </select>
             )}
             <input className={inputCls} value={addCron} onChange={(e) => setAddCron(e.target.value)} spellCheck={false} aria-label="cron expression (UTC)" placeholder={CRON_PLACEHOLDER} />
-            <input className={inputCls} value={addProject} onChange={(e) => setAddProject(e.target.value)} spellCheck={false} aria-label="project id" placeholder={DEFAULT_PROJECT} />
+            {Array.isArray(projectOptions) ? (
+              <select
+                className={inputCls}
+                value={addProject}
+                onChange={(e) => setAddProject(e.target.value)}
+                aria-label="project id"
+              >
+                {/* The self project is always offered even if the API
+                    list hasn't caught up with this agent's auto-seeded
+                    row yet (Epic-010 §3) — it's the field's own default. */}
+                {!projectOptions.some((p) => p.project_id === addProject) && (
+                  <option value={addProject}>{addProject}</option>
+                )}
+                {projectOptions.map((p) => (
+                  <option key={p.project_id} value={p.project_id}>
+                    {p.project_id}{p.name ? ` — ${p.name}` : ''}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                className={inputCls}
+                value={addProject}
+                onChange={(e) => setAddProject(e.target.value)}
+                spellCheck={false}
+                aria-label="project id"
+                placeholder={selfProjectId(slug)}
+              />
+            )}
             <button type="button" disabled={pending || !addSkill} onClick={addBinding} className={`${btnCls} border-wf-tertiary text-wf-tertiary`}>BIND</button>
           </div>
           <span className="text-[10px] text-wf-on-surface-variant">{CRON_HINT}</span>
