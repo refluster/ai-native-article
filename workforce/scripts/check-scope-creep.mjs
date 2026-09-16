@@ -65,6 +65,21 @@ export function parseFindingOccurrences(body) {
 }
 
 /**
+ * Parse the RFC 5988 `Link` response header for the `rel="next"` URL, or
+ * `null` when there is no next page. GitHub REST pagination is drained by
+ * following this header rather than incrementing a `page` param by hand —
+ * some endpoints use opaque cursors, so only the header is authoritative.
+ */
+export function parseNextLink(linkHeader) {
+  if (!linkHeader) return null;
+  for (const part of String(linkHeader).split(",")) {
+    const m = part.match(/<([^>]+)>\s*;\s*rel="next"/);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+/**
  * Extract all finding-IDs from a collection of comment bodies.
  * Returns a Set<string> (e.g. {"A1", "B2"}).
  */
@@ -164,7 +179,8 @@ async function main() {
 
   const api = process.env.GITHUB_API_URL || "https://api.github.com";
   const gh = async (path) => {
-    const res = await fetch(`${api}${path}`, {
+    const url = /^https?:\/\//.test(path) ? path : `${api}${path}`;
+    const res = await fetch(url, {
       headers: {
         authorization: `Bearer ${token}`,
         accept: "application/vnd.github+json",
@@ -175,7 +191,25 @@ async function main() {
     const text = await res.text().catch(() => "");
     let json;
     try { json = text ? JSON.parse(text) : []; } catch { json = []; }
-    return { status: res.status, json };
+    return { status: res.status, json, link: res.headers.get("link") };
+  };
+
+  // Drains every page of a paginated list endpoint by following the `Link:
+  // rel="next"` header (S1 / FU-005 cycle 2) — `per_page=100` alone only
+  // returns page 1, so a PR whose comment/review history exceeds 100 records
+  // silently dropped its newest entries out of `laterBodies`.
+  const ghAll = async (path) => {
+    let items = [];
+    let next = path;
+    let status = 200;
+    while (next) {
+      const r = await gh(next);
+      status = r.status;
+      if (r.status !== 200 || !Array.isArray(r.json)) return { status, json: items };
+      items = items.concat(r.json);
+      next = parseNextLink(r.link);
+    }
+    return { status, json: items };
   };
 
   let prs;
@@ -196,8 +230,8 @@ async function main() {
     let records;
     try {
       const [c, rv] = await Promise.all([
-        gh(`/repos/${repo}/issues/${pr.number}/comments?per_page=100`),
-        gh(`/repos/${repo}/pulls/${pr.number}/reviews?per_page=100`),
+        ghAll(`/repos/${repo}/issues/${pr.number}/comments?per_page=100`),
+        ghAll(`/repos/${repo}/pulls/${pr.number}/reviews?per_page=100`),
       ]);
       const issueComments = Array.isArray(c.json)
         ? c.json.map((x) => ({ body: x.body ?? "", createdAt: x.created_at ?? "" }))

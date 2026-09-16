@@ -8,6 +8,7 @@ import {
   extractFindingIds,
   checkScopeCreep,
   groupByCycle,
+  parseNextLink,
 } from "./check-scope-creep.mjs";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -79,6 +80,39 @@ describe("parseFindingOccurrences", () => {
   it("is robust to null / undefined body", () => {
     expect(parseFindingOccurrences(null as unknown as string)).toEqual([]);
     expect(parseFindingOccurrences(undefined as unknown as string)).toEqual([]);
+  });
+});
+
+// ── parseNextLink (S1: pagination draining) ─────────────────────────────────
+
+describe("parseNextLink", () => {
+  it("returns null when the header is missing", () => {
+    expect(parseNextLink(null)).toBeNull();
+    expect(parseNextLink(undefined)).toBeNull();
+    expect(parseNextLink("")).toBeNull();
+  });
+
+  it("extracts the next URL from a multi-rel Link header", () => {
+    const header =
+      '<https://api.github.com/repos/o/r/issues/1/comments?page=2>; rel="next", ' +
+      '<https://api.github.com/repos/o/r/issues/1/comments?page=5>; rel="last"';
+    expect(parseNextLink(header)).toBe(
+      "https://api.github.com/repos/o/r/issues/1/comments?page=2",
+    );
+  });
+
+  it("returns null on the last page (no rel=\"next\" entry)", () => {
+    const header =
+      '<https://api.github.com/repos/o/r/issues/1/comments?page=1>; rel="prev", ' +
+      '<https://api.github.com/repos/o/r/issues/1/comments?page=1>; rel="first"';
+    expect(parseNextLink(header)).toBeNull();
+  });
+
+  it("handles a single-rel header with no surrounding entries", () => {
+    const header = '<https://api.github.com/repos/o/r/pulls/1/reviews?page=3>; rel="next"';
+    expect(parseNextLink(header)).toBe(
+      "https://api.github.com/repos/o/r/pulls/1/reviews?page=3",
+    );
   });
 });
 
