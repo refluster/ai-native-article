@@ -150,6 +150,18 @@ describe("checkScopeCreep", () => {
     const laterBodies = [reviewerBody("A1")];
     expect(checkScopeCreep(cycle1Ids, laterBodies).violations).toEqual([]);
   });
+
+  it("does NOT flag a cycle-3 re-citation of a finding-ID opened [NEW] in cycle-2 (R1)", () => {
+    // groupByCycle folds cycle-2 and cycle-3 into one laterBodies stream, so the
+    // allowed set must accumulate across it, not just compare against cycle1Ids.
+    const cycle1Ids = new Set(["A1"]);
+    const laterBodies = [
+      reviewerBody("B2", true), // cycle-2: [NEW] B2
+      reviewerBody("B2"), // cycle-3: B2 cited again, no [NEW]
+    ];
+    const { violations } = checkScopeCreep(cycle1Ids, laterBodies);
+    expect(violations).toEqual([]);
+  });
 });
 
 // ── groupByCycle ─────────────────────────────────────────────────────────────

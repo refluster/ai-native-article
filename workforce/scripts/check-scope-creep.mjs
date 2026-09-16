@@ -33,13 +33,16 @@
 import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
 ensureProxyAwareEntry(import.meta.url);
 
+import { ROUTING_CYCLE_RE } from "../skills/pr-autopilot/pr-merge.mjs";
+
 // Finding-ID format from SKILL.md: backtick-wrapped uppercase-letter + digits,
 // e.g. `A1`, `B2`, `D12`. The letter is typically the reviewer's persona initial.
 const FINDING_ID_RE = /`([A-Z]\d+)`/g;
 
-// Routing comment opening line (single-sourced with pr-merge.mjs's ROUTING_CYCLE_RE).
+// Routing comment opening line, imported from pr-merge.mjs (single source —
+// check-cycle-count.mjs's countRouterCycles/W4_CYCLE_CAP import is the
+// established pattern this follows).
 // Matches: **<PersonaName> — cycle N of ≤ M.**
-const ROUTING_CYCLE_RE = /\*\*[\w ]+\s*—\s*cycle\s+(\d+)\s+of\s+≤\s*\d+/u;
 
 /**
  * Parse finding-ID occurrences from a single comment body.
@@ -79,21 +82,30 @@ export function extractFindingIds(bodies) {
  * Check cycle-2+ comment bodies for scope-creep violations.
  *
  * A finding-ID in a cycle-2+ comment is a violation if it did NOT appear in
- * any cycle-1 comment (not in cycle1Ids) AND is NOT flagged [NEW] on the same
- * line. A violation means the reviewer introduced a new finding without
- * acknowledging it as novel (FU-005 / SKILL.md §Step 4).
+ * any cycle-1 comment and was NOT introduced with [NEW] earlier in the
+ * cycle-2+ stream. `laterBodies` spans every cycle from 2 onward (per
+ * `groupByCycle`, cycle boundaries are not preserved within it), so a finding
+ * legitimately opened `[NEW]` in cycle 2 must stay allowed when re-cited
+ * without `[NEW]` in cycle 3+ — the allowed set therefore accumulates as the
+ * stream is walked chronologically, seeded with cycle1Ids, rather than
+ * checking every occurrence against the static cycle-1 set alone
+ * (FU-005 / SKILL.md §Step 4).
  *
  * @param {Set<string>} cycle1Ids - all finding-IDs from cycle-1 comments
- * @param {string[]} laterBodies - comment bodies from cycle-2+
+ * @param {string[]} laterBodies - comment bodies from cycle-2+, chronological
  * @returns {{ violations: Array<{ id: string }> }}
  */
 export function checkScopeCreep(cycle1Ids, laterBodies) {
   const violations = [];
+  const allowedIds = new Set(cycle1Ids);
   for (const body of laterBodies) {
     for (const { id, hasNew } of parseFindingOccurrences(body)) {
-      if (!cycle1Ids.has(id) && !hasNew) {
-        violations.push({ id });
+      if (allowedIds.has(id)) continue;
+      if (hasNew) {
+        allowedIds.add(id);
+        continue;
       }
+      violations.push({ id });
     }
   }
   return { violations };
