@@ -284,7 +284,7 @@ export function makeGh({ token, api = process.env["GITHUB_API_URL"] || "https://
 // verifyMergeable() refuses a merge when that maximum exceeds W4_CYCLE_CAP
 // (cycle > 7 == process breakdown; W-4: fail loud, escalate to human).
 export const W4_CYCLE_CAP = 7;
-const ROUTING_CYCLE_RE = /\*\*[\w ]+\s*—\s*cycle\s+(\d+)\s+of\s+≤\s*\d+/u;
+export const ROUTING_CYCLE_RE = /\*\*[\w ]+\s*—\s*cycle\s+(\d+)\s+of\s+≤\s*\d+/u;
 export function countRouterCycles(bodies) {
   let max = 0;
   for (const b of bodies) {
