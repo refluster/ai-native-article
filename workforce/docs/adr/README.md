@@ -101,9 +101,25 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0032](adr-0032-lesson-partition-and-daily-distiller.md) | The `LESSON` partition schema, its closed cross-cutting vocabulary, and the daily distiller Lambda's cost/shape contract | Proposed | [022](../epics/epic-022-org-learning-loop.md) |
 | [0033](adr-0033-seed-projects-lambda.md) | Promote `seed-projects.mjs` to a `WfSeedProjectsFunction` Lambda (META rows only, mirroring `WfSeedSkillsFunction`); the script is kept as an operator escape hatch, not retired | Proposed | [010](../epics/epic-010-project-trust-boundary.md) |
 | [0037](adr-0037-advisory-per-agent-budget.md) | The per-agent W-3 budget is advisory: measured per fire and reported (`/performance`, R-19), but it never refuses a dispatch — output continuity outranks the planning figure; withdraws the `W3-runway` write-time refusal (0035/0036 are reserved by open PRs #719/#727) | Accepted (2026-09-14) | — |
+| [0038](adr-0038-hire-time-speculative-flag-and-kill-criterion.md) | Hire-time speculative-duty flag on `AgentBinding` + `bound_at` timestamp + a round-doc lint + mechanically-scheduled kill-criterion (Epic-021 §B.2, mechanical half only — the playbook prose stays People-owned) | Proposed | [021](../epics/epic-021-finance-ir-activation.md) |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](../epics/README.md).
+
+> **Numbering note (2026-09-16, `wf:dario` — `issue-design`).** Drafted this
+> row as `0037`, then rebased and found `main` had moved: `adr-0037-advisory-per-agent-budget.md`
+> merged 2026-09-14 via [#732](https://github.com/refluster/ai-native-article/pull/732)
+> (this worktree's base predated that merge, so the earlier check against `main`
+> missed it), and `adr-0034-public-qa-boards.md` is also already merged on `main`
+> despite carrying no index row here — a pre-existing gap, left as-is, not this
+> PR's to fix. Renumbered to `0038` to resolve the collision. `0035`/`0036` remain
+> reserved by open PRs [#719](https://github.com/refluster/ai-native-article/pull/719)/[#727](https://github.com/refluster/ai-native-article/pull/727);
+> `0034` is separately double-claimed by the merged `public-qa-boards` decision
+> *and* open PR [#714](https://github.com/refluster/ai-native-article/pull/714)
+> (skill-capabilities) — flagged here rather than silently worked around, same
+> "say the blocker precisely" discipline as the 2026-09-09 entry below; whichever
+> of #714/#719/#727 merges last should renumber, or an operator/`backlog-reconcile`
+> pass reconciles it.
 
 > **Numbering note (2026-09-09, `wf:dario` — `issue-design`).** This PR's
 > adr-0032 was drafted in parallel with another open draft PR's adr-0031
