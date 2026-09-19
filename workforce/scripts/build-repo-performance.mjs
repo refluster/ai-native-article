@@ -49,6 +49,7 @@ ensureProxyAwareEntry(import.meta.url);
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { assertProvenance } from "./lib/perf-provenance.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const PROJECTS_DIR = join(ROOT, "workforce", "projects");
@@ -56,6 +57,47 @@ const OUT = join(ROOT, "workforce", "app", "public", "workforce-mock-repo-activi
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Which `summary` metric keys a given `degraded_signals` name covers — the
+ *  mapping `#505`'s writer-boundary guard needs to turn "this signal degraded"
+ *  into "these metrics are not a confirmed measurement". `code_churn` covers
+ *  both churn fields because `fetchCodeFrequency` returns one `partial` flag
+ *  for the whole weeks array, not one per additions/deletions. */
+export const DEGRADED_SIGNAL_METRICS = Object.freeze({
+  issues_opened: ["issues_opened"],
+  issues_closed: ["issues_closed"],
+  prs_opened: ["prs_opened"],
+  prs_closed: ["prs_closed"],
+  code_churn: ["total_additions", "total_deletions"],
+});
+
+/** Expands a REPO row's `degraded_signals` list into the `unmeasured` metric
+ *  names `assertProvenance` wants — reusing the signal this writer already
+ *  computes rather than re-deriving anything from the numbers themselves. */
+export function unmeasuredRepoMetrics(degradedSignals = []) {
+  return [...new Set(degradedSignals.flatMap((s) => DEGRADED_SIGNAL_METRICS[s] ?? []))];
+}
+
+/** The per-row `{scope, sk, metrics, unmeasured}` inputs `assertProvenance`
+ *  needs, one per PERF#{scope}/REPO row about to be published — the `results`
+ *  (one per project, as `fetchProjectActivity` / `fetchCodeFrequency` actually
+ *  returned them, degraded or not) plus the `workforce` aggregate. Pulled out
+ *  of the publish loop so a test can drive the guard from a realistic degraded
+ *  fetch result instead of a hand-built metrics object (#752 O1). */
+export function perfRowInputs(results, workforce) {
+  const rows = [
+    { scope: "workforce", body: workforce, repos: results.map((r) => r.scope).sort() },
+    ...results.map((r) => ({ scope: r.scope, body: r, repos: [r.scope] })),
+  ];
+  return rows.map(({ scope, body, repos }) => ({
+    scope,
+    repos,
+    body,
+    sk: "REPO",
+    metrics: body.summary,
+    unmeasured: unmeasuredRepoMetrics(body.degraded_signals),
+  }));
 }
 
 function arg(name, fallback) {
@@ -315,9 +357,18 @@ export async function fetchCodeFrequency(gh, repo, { attempts = 6, delayMs = 250
   return { weeks: [], partial: true };
 }
 
-async function fetchProjectActivity(project, { days, token, api }) {
+/**
+ * `gh` and `sleepMs`/`codeFrequency` are injectable so a test can drive this
+ * real assembly path (not a hand-built stand-in for its output) with a fake
+ * `gh` — the same shape `fetchPrFacts` in build-pr-metrics-github.mjs already
+ * takes a `gh` parameter for (#752 O1: the wiring test below this file
+ * previously called `perfRowInputs` with hand-built `results`, which could
+ * not catch a bug in how this function actually derives `summary`/
+ * `degraded_signals` from a real fetch).
+ */
+export async function fetchProjectActivity(project, { days, token, api, gh: ghOverride, sleepMs = SEARCH_INTERVAL_MS, codeFrequency } = {}) {
   const repo = `${project.owner}/${project.repo}`;
-  const gh = makeGh(api, token);
+  const gh = ghOverride ?? makeGh(api, token);
 
   const since = new Date();
   since.setUTCDate(since.getUTCDate() - days);
@@ -325,17 +376,17 @@ async function fetchProjectActivity(project, { days, token, api }) {
   const todayIso = new Date().toISOString().slice(0, 10);
 
   const issuesOpened = await searchAll(gh, `repo:${repo} is:issue created:>=${sinceIso}`);
-  await sleep(SEARCH_INTERVAL_MS);
+  await sleep(sleepMs);
   const issuesClosed = await searchAll(gh, `repo:${repo} is:issue closed:>=${sinceIso}`);
-  await sleep(SEARCH_INTERVAL_MS);
+  await sleep(sleepMs);
   const prsOpened = await searchAll(gh, `repo:${repo} is:pr created:>=${sinceIso}`);
-  await sleep(SEARCH_INTERVAL_MS);
+  await sleep(sleepMs);
   const prsClosed = await searchAll(gh, `repo:${repo} is:pr closed:>=${sinceIso}`);
 
   const issues_daily = buildDailyActivity(issuesOpened.items, issuesClosed.items, days, todayIso);
   const prs_daily = buildDailyActivity(prsOpened.items, prsClosed.items, days, todayIso);
 
-  const churn = await fetchCodeFrequency(gh, repo);
+  const churn = await fetchCodeFrequency(gh, repo, codeFrequency);
   const sinceEpoch = Math.floor(new Date(`${sinceIso}T00:00:00Z`).getTime() / 1000);
   const code_churn_weekly = buildWeeklyChurn(churn.weeks, sinceEpoch);
 
@@ -480,31 +531,53 @@ async function main() {
     // One PERF#{scope}/REPO row per project, plus the `workforce` aggregate —
     // the same per-scope shape the LIFECYCLE and PR rows already use, so the
     // /performance endpoint reads it with no special-casing.
-    const rows = [
-      { scope: "workforce", body: workforce, repos: results.map((r) => r.scope).sort() },
-      ...results.map((r) => ({ scope: r.scope, body: r, repos: [r.scope] })),
-    ];
-    for (const { scope, body, repos } of rows) {
-      await ddb.send(
-        new PutCommand({
-          TableName: TABLE,
-          Item: {
-            pk: `PERF#${scope}`,
-            sk: "REPO",
-            scope,
-            updated_at: generatedAt,
-            window: body.window,
-            issues_daily: body.issues_daily,
-            prs_daily: body.prs_daily,
-            code_churn_weekly: body.code_churn_weekly,
-            summary: body.summary,
-            repos,
-            ...(body.degraded_signals?.length ? { degraded_signals: body.degraded_signals } : {}),
-          },
-        }),
-      );
+    const rows = perfRowInputs(results, workforce);
+    // H1 (#752 review, round 2): each row's guard AND its PutCommand are both
+    // inside the same try/catch, so a write failure (throttling, validation,
+    // network) skips that one scope exactly like a guard refusal does,
+    // instead of throwing out of the bare `for` loop and aborting every scope
+    // still queued after it — the same "skip loudly, don't abort" shape the
+    // per-project fetch loop above already uses. Round 1 isolated only
+    // `assertProvenance`; the `ddb.send` call sat unguarded right after it,
+    // so a DDB failure on scope 3 of 6 still crashed the batch and left
+    // scopes 4-6 unpublished, the exact H1 failure shape with a different
+    // trigger.
+    const skippedRows = [];
+    for (const { scope, sk, metrics, unmeasured, repos, body } of rows) {
+      try {
+        // #505: refuse to persist an all-zero row unless every zero metric is
+        // a confirmed measurement — the writer-boundary check, so a future
+        // fetch path need not re-derive this reasoning per signal.
+        assertProvenance({ scope, sk, metrics, unmeasured });
+        await ddb.send(
+          new PutCommand({
+            TableName: TABLE,
+            Item: {
+              pk: `PERF#${scope}`,
+              sk: "REPO",
+              scope,
+              updated_at: generatedAt,
+              window: body.window,
+              issues_daily: body.issues_daily,
+              prs_daily: body.prs_daily,
+              code_churn_weekly: body.code_churn_weekly,
+              summary: body.summary,
+              repos,
+              ...(body.degraded_signals?.length ? { degraded_signals: body.degraded_signals } : {}),
+            },
+          }),
+        );
+      } catch (err) {
+        console.error(`WARN PERF#${scope}/${sk}: ${err instanceof Error ? err.message : String(err)} — skipped, other scopes still publish`);
+        skippedRows.push(scope);
+        continue;
+      }
     }
-    console.error(`published ${rows.length} PERF#{scope}/REPO row(s) to ${TABLE}`);
+    console.error(
+      `published ${rows.length - skippedRows.length} of ${rows.length} PERF#{scope}/REPO row(s) to ${TABLE}` +
+        (skippedRows.length ? ` (refused: ${skippedRows.join(", ")})` : ""),
+    );
+    if (skippedRows.length > 0) return 2;
   }
 
   return failed.length > 0 || degradedProjects.length > 0 ? 2 : 0;

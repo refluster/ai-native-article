@@ -34,7 +34,30 @@ import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
 // Shared with the repository-activity builder: both talk to the same API on the
 // same quota, and both have to tell a spent quota from a missing permission.
 import { isRateLimited } from "./build-repo-performance.mjs";
+import { assertProvenance } from "./lib/perf-provenance.mjs";
 ensureProxyAwareEntry(import.meta.url);
+
+/** #505: a dropped (skipped) PR is missing from `total_prs` AND from the
+ *  churn totals alike (`fetchPrFacts` drops the whole PR, it does not
+ *  fabricate a zero-churn entry for it) — so a degraded `pr_detail` signal
+ *  puts all three headline metrics in doubt, not just churn. */
+export const PR_DETAIL_METRICS = ["total_prs", "total_additions", "total_deletions"];
+
+/** The `{metrics, unmeasured}` inputs `assertProvenance` needs for a PERF#{scope}/PR
+ *  row, derived from the block `aggregate()` actually produced plus the real
+ *  `skipped` count `fetchPrFacts` returned — pulled out of the publish loop so a
+ *  test can drive the guard from a realistic degraded `fetchPrFacts` result
+ *  instead of a hand-built metrics object (#752 O1). */
+export function prProvenanceInputs(block, skipped) {
+  return {
+    metrics: {
+      total_prs: block.pr_summary.total_prs,
+      total_additions: block.pr_summary.total_additions,
+      total_deletions: block.pr_summary.total_deletions,
+    },
+    unmeasured: skipped > 0 ? PR_DETAIL_METRICS : [],
+  };
+}
 
 const GREEN_MARKER_RE = /<!--\s*autopilot:review:[a-z0-9-]+:green\s*-->/i;
 const REVIEWER_SLUG_RE = /<!--\s*autopilot:review:([a-z0-9-]+):green\s*-->/gi;
@@ -416,7 +439,12 @@ async function main() {
   const { DynamoDBDocumentClient, PutCommand } = await importLambdaDep("@aws-sdk/lib-dynamodb");
   const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), { marshallOptions: { removeUndefinedValues: true } });
   const updatedAt = new Date().toISOString();
+  const { metrics: prMetrics, unmeasured: prUnmeasured } = prProvenanceInputs(block, skipped);
   for (const sc of targetScopes) {
+    // #505: the same writer-boundary guard build-repo-performance.mjs's REPO
+    // row uses — refuse an all-zero row unless every zero is a confirmed
+    // measurement (skipped === 0).
+    assertProvenance({ scope: sc, sk: "PR", metrics: prMetrics, unmeasured: prUnmeasured });
     await ddb.send(
       new PutCommand({
         TableName: TABLE,
