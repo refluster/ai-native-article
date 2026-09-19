@@ -49,6 +49,7 @@ ensureProxyAwareEntry(import.meta.url);
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { assertProvenance } from "./lib/perf-provenance.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const PROJECTS_DIR = join(ROOT, "workforce", "projects");
@@ -56,6 +57,26 @@ const OUT = join(ROOT, "workforce", "app", "public", "workforce-mock-repo-activi
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Which `summary` metric keys a given `degraded_signals` name covers — the
+ *  mapping `#505`'s writer-boundary guard needs to turn "this signal degraded"
+ *  into "these metrics are not a confirmed measurement". `code_churn` covers
+ *  both churn fields because `fetchCodeFrequency` returns one `partial` flag
+ *  for the whole weeks array, not one per additions/deletions. */
+export const DEGRADED_SIGNAL_METRICS = Object.freeze({
+  issues_opened: ["issues_opened"],
+  issues_closed: ["issues_closed"],
+  prs_opened: ["prs_opened"],
+  prs_closed: ["prs_closed"],
+  code_churn: ["total_additions", "total_deletions"],
+});
+
+/** Expands a REPO row's `degraded_signals` list into the `unmeasured` metric
+ *  names `assertProvenance` wants — reusing the signal this writer already
+ *  computes rather than re-deriving anything from the numbers themselves. */
+export function unmeasuredRepoMetrics(degradedSignals = []) {
+  return [...new Set(degradedSignals.flatMap((s) => DEGRADED_SIGNAL_METRICS[s] ?? []))];
 }
 
 function arg(name, fallback) {
@@ -485,6 +506,15 @@ async function main() {
       ...results.map((r) => ({ scope: r.scope, body: r, repos: [r.scope] })),
     ];
     for (const { scope, body, repos } of rows) {
+      // #505: refuse to persist an all-zero row unless every zero metric is a
+      // confirmed measurement — the writer-boundary check, so a future fetch
+      // path need not re-derive this reasoning per signal.
+      assertProvenance({
+        scope,
+        sk: "REPO",
+        metrics: body.summary,
+        unmeasured: unmeasuredRepoMetrics(body.degraded_signals),
+      });
       await ddb.send(
         new PutCommand({
           TableName: TABLE,

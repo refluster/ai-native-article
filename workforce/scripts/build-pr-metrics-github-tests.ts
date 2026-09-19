@@ -1,7 +1,16 @@
 // @ts-nocheck — the script under test is dependency-free ESM, not TS.
 // Tests the pure classification + aggregation of the GitHub-API PR builder.
 import { describe, it, expect } from "vitest";
-import { classifyPr, aggregate, aggregateEscalations, aggregateReruns, fetchPrFacts, parseAlsoScopes } from "./build-pr-metrics-github.mjs";
+import {
+  classifyPr,
+  aggregate,
+  aggregateEscalations,
+  aggregateReruns,
+  fetchPrFacts,
+  parseAlsoScopes,
+  PR_DETAIL_METRICS,
+} from "./build-pr-metrics-github.mjs";
+import { assertProvenance, UnprovenanceError } from "./lib/perf-provenance.mjs";
 
 const GREEN = (slug) => `looks good\n<!-- autopilot:review:${slug}:green -->`;
 
@@ -201,5 +210,32 @@ describe("parseAlsoScopes", () => {
     expect(parseAlsoScopes(undefined, "workforce")).toEqual([]);
     expect(parseAlsoScopes("", "workforce")).toEqual([]);
     expect(parseAlsoScopes(true, "workforce")).toEqual([]); // arg() returns `true` for a bare flag
+  });
+});
+
+// #505: end-to-end wiring of the shared writer-boundary guard onto this
+// builder's own PR-row shape — `skipped > 0` is exactly the "a fetch
+// degraded and the row would otherwise read as a confident zero" case.
+describe("PERF#{scope}/PR row provenance (#505)", () => {
+  it("a fully-quiet, fully-fetched window (0 merged PRs, skipped 0) publishes", () => {
+    expect(() =>
+      assertProvenance({
+        scope: "conference",
+        sk: "PR",
+        metrics: { total_prs: 0, total_additions: 0, total_deletions: 0 },
+        unmeasured: [],
+      }),
+    ).not.toThrow();
+  });
+
+  it("every merged PR's detail dropped (skipped > 0) refuses the all-zero row", () => {
+    expect(() =>
+      assertProvenance({
+        scope: "acme",
+        sk: "PR",
+        metrics: { total_prs: 0, total_additions: 0, total_deletions: 0 },
+        unmeasured: PR_DETAIL_METRICS,
+      }),
+    ).toThrow(UnprovenanceError);
   });
 });

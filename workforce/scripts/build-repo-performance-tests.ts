@@ -10,6 +10,7 @@ import {
   searchAll,
   sumDailyActivity,
   sumWeeklyChurn,
+  unmeasuredRepoMetrics,
 } from "./build-repo-performance.mjs";
 
 describe("bucketByDate", () => {
@@ -285,5 +286,29 @@ describe("fetchCodeFrequency (rate-limited is not a cold cache)", () => {
     const r = await fetchCodeFrequency(gh, "o/r", { attempts: 6, delayMs: 0 });
     expect(r).toEqual({ weeks: [[1000, 5, -2]], partial: false });
     expect(calls).toBe(3);
+  });
+});
+
+// #505: turning this writer's own `degraded_signals` into the `unmeasured`
+// metric names the shared perf-provenance guard (workforce/scripts/lib/
+// perf-provenance.mjs) checks against `summary`.
+describe("unmeasuredRepoMetrics", () => {
+  it("returns nothing for a fully-measured row", () => {
+    expect(unmeasuredRepoMetrics([])).toEqual([]);
+    expect(unmeasuredRepoMetrics(undefined)).toEqual([]);
+  });
+
+  it("maps a single-signal degradation to its one metric", () => {
+    expect(unmeasuredRepoMetrics(["prs_opened"])).toEqual(["prs_opened"]);
+  });
+
+  it("expands code_churn to BOTH churn metrics (one partial flag, two fields)", () => {
+    expect(unmeasuredRepoMetrics(["code_churn"])).toEqual(["total_additions", "total_deletions"]);
+  });
+
+  it("de-duplicates and combines multiple degraded signals", () => {
+    expect(unmeasuredRepoMetrics(["issues_opened", "code_churn"]).sort()).toEqual(
+      ["issues_opened", "total_additions", "total_deletions"].sort(),
+    );
   });
 });
