@@ -20,7 +20,7 @@
 //     --base main --branch workforce/research-study/202609-ieej-california-der \
 //     --title "content: 米国カリフォルニア州等 … 調査報告書 (research-study v0.1.0)" \
 //     --authors beatriz,amara,grace,sneha,sofia,owen,rafael,ingrid,aoi,nadia \
-//     [--min-sources 40] [--min-chars 20000] [--max-chars 120000] \
+//     [--min-sources 40] [--min-chars 20000] [--max-chars 200000] \
 //     [--skill-version 0.1.0] [--dry-run]
 //
 // Exit codes:
@@ -58,7 +58,7 @@ const authorsRaw = arg("authors");
 const skillVersion = arg("skill-version");
 const minSources = Number(arg("min-sources") ?? 40);
 const minChars = Number(arg("min-chars") ?? 20000);
-const maxChars = Number(arg("max-chars") ?? 120000);
+const maxChars = Number(arg("max-chars") ?? 200000);
 const dryRun = flag("dry-run");
 
 function fail(code, msg) {

@@ -180,7 +180,7 @@ then pushes the study directory to a new branch and opens a **draft** PR with
 the `autopilot:off` label so nothing merges without the operator:
 
 - `G1` report has the metadata block · `G2` prose length within
-  `[--min-chars, --max-chars]` (default 20,000–120,000 chars excl. fences)
+  `[--min-chars, --max-chars]` (default 20,000–200,000 chars excl. fences; tables count, code fences do not)
 - `G3` no LLM-failure prelude · `G4` not cut off mid-sentence · `G5` balanced fences
 - `G6` required sections present (目次, エグゼクティブ・サマリ, 限界, 用語集, 情報源一覧)
 - **`G7` citation floor** — ≥ `--min-sources` distinct `[S-x.y]` markers, all
