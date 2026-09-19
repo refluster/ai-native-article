@@ -29,7 +29,7 @@ workforce/app/          @kohuehara/workforce — console SPA (Cognito + Google);
 workforce/docs/         README.md is the index: statute (governance, architecture, data-model, naming, mvv, adr/) · runbooks/ · routines/ · epics/ · hires/ · design/
 workforce/lambdas/      16 TypeScript Lambdas (agents-api, orchestrator, tools-api, wf-podcast, board-reply, memory-compactor, …) + shared/; README.md lists them
 workforce/infra/        SAM stacks: sam (data plane), sam-web, sam-web-cert, sam-api-domain
-workforce/skills/       42 skill bundles: SKILL.md + meta.json + write-scripts (article-level2/3, pr-autopilot, feed-post, …)
+workforce/skills/       43 skill bundles: SKILL.md + meta.json + write-scripts (article-level2/3, pr-autopilot, feed-post, research-study, …)
 workforce/projects/     project.json seeds for external projects (asp-cloud, luckyhat, …); tools/ = ADR-0027 project tools
 workforce/scripts/      validators + registry builders wired as `npm run workforce:*`; one-shot wire-*.mjs binding scripts
 workforce/pipeline/     knowledge-backup (Discord + Notion → per-project git store; ADR-0026/0028)
