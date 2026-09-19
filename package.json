@@ -53,6 +53,7 @@
     "workforce:scan-drain": "node workforce/scripts/check-scan-drain.mjs",
     "workforce:no-run-deliv-writes": "node workforce/scripts/check-run-deliv-writes.mjs",
     "workforce:escalation-labels": "node workforce/scripts/check-escalation-labels.mjs",
+    "workforce:binding-queues": "node workforce/scripts/check-binding-queues.mjs",
     "workforce:cycle-count": "node workforce/scripts/check-cycle-count.mjs",
     "workforce:pr-sweep": "node workforce/skills/pr-autopilot/pr-autopilot-sweep.mjs",
     "workforce:pr-metrics": "node workforce/scripts/build-pr-metrics.mjs",
