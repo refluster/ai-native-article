@@ -36,8 +36,10 @@ claude-code-routine skill): `agent_slug` (the engineer persona — the standing
 instance is Ren), `project_id` (the bound project; its `project.json` declares
 the target `github.{owner,repo}` and `governance_docs`), `credentials['github.token'].token`
 (the project-scoped PAT — export it for every GitHub call below), and
-`binding_config` (this run's overlay — see fields below). `run_id` is the
-fire's own correlation id; you need it for the PR citation in Step 5.
+`binding_config` (this run's overlay — see fields below). `credentials['workforce.dispatch_token'].token` (exported by the runner as
+`WF_DISPATCH_TOKEN`; it lets a hand-off wake the next cadence now instead of at
+its next cron — adr-0025/adr-0038), and `run_id`, the fire's own correlation id,
+which you need for the PR citation in Step 5.
 
 `binding_config` fields this skill reads:
 
@@ -57,7 +59,8 @@ with strict FIFO order). An issue is **eligible** when all hold:
 - It is not already claimed: no open PR exists whose body references it
   (`Closes #N` / `Fixes #N` / `Resolves #N`, or a head branch matching this
   skill's naming convention below), and it does not carry this skill's
-  in-progress marker label (`issue-implement:in-progress`).
+  in-progress marker label (`issue-implement:in-progress`) or an unanswered
+  `wf:handback` (one you raised; the router clears it when it re-lanes).
 - It does not carry a label signalling it isn't ready for autonomous
   implementation — the illustrative default deny-list is `blocked`,
   `needs-design`, `discussion`, `duplicate`, `wontfix`, `question`; override
@@ -169,23 +172,52 @@ Push the branch, open the PR as a **draft**, replace the issue's
 `issue-implement:in-progress` label with `issue-implement:pr-open`, and post
 a short comment on the issue linking the PR.
 
-## Step 6 — skip with a reason (never silently drop an issue)
+Then wake the reviewer, so the PR is routed in seconds rather than at
+`pr-autopilot`'s next 6-hourly tick (adr-0038 — the last cron wait in the
+issue→merge chain):
+
+```sh
+node workforce/scripts/dispatch-cadence.mjs \
+  --skill pr-autopilot --project "<project_id>" \
+  --reason "draft PR #<pr> opened for issue #<issue>"
+```
+
+Best-effort: it always exits 0, and the reviewer's cron remains the floor. A
+failed dispatch costs latency, never correctness — never treat it as a failed
+hand-off.
+
+## Step 6 — hand it back to the router (never silently drop an issue)
 
 When Step 3 surfaces a blocker — ambiguous scope, a conflict with the
 target's own governance, or a decision only a human should make — do **not**
-implement a guess. Instead:
+implement a guess, and do **not** decide on the router's behalf that a human
+is required. You know one thing for certain: **the work is not yours.** Who it
+belongs to instead is the router's call (adr-0038).
 
-- Post a comment on the issue naming the specific blocker (quote the
-  ambiguous clause, cite the governance doc/ADR that conflicts, or state the
-  decision that's needed) so a human has exactly what they need to unblock
-  it.
-- Replace `issue-implement:in-progress` with `issue-implement:needs-human`.
-- Move on to the next candidate. A skip is a normal, cheap outcome — not a
-  failure of the run.
+Write the reason to a file and hand back:
 
-An issue already carrying `issue-implement:needs-human` is excluded by Step
-1's eligibility check; an operator (or the issue author) clears the label to
-requeue it once the blocker is resolved.
+```sh
+GITHUB_TOKEN="…" node workforce/skills/issue-triage/issue-handback.mjs \
+  --project "<project_id>" --issue <N> --from issue-implement \
+  --body-file /tmp/handback-<N>.md
+```
+
+The body states the specific blocker — quote the ambiguous clause, cite the
+governance doc/ADR that conflicts, or state the decision that is needed — so
+that whoever picks it up next has exactly what they need. Be concrete about
+which part is not yours: "this needs an ADR before any code" routes very
+differently from "this needs someone with AWS console access".
+
+The script posts the comment, stamps `wf:handback`, clears your
+`issue-implement:in-progress` marker, and asks `issue-triage` to fire now, so
+the issue is re-laned in seconds. Then move on to the next candidate. **A
+hand-back is a normal, cheap outcome — not a failure of the run.**
+
+> **Why this replaced `issue-implement:needs-human`.** That label asserted a
+> human was required, when all this cadence can actually establish is that the
+> work is not an engineer's. On PSVL/asp-cloud the difference parked 18 issues
+> — several of which needed a document drafted first, which `issue-design`
+> could have produced. Declining is your call; deciding *who instead* is not.
 
 ## Guardrails
 
