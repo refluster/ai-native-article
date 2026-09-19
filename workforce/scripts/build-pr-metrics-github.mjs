@@ -43,6 +43,22 @@ ensureProxyAwareEntry(import.meta.url);
  *  puts all three headline metrics in doubt, not just churn. */
 export const PR_DETAIL_METRICS = ["total_prs", "total_additions", "total_deletions"];
 
+/** The `{metrics, unmeasured}` inputs `assertProvenance` needs for a PERF#{scope}/PR
+ *  row, derived from the block `aggregate()` actually produced plus the real
+ *  `skipped` count `fetchPrFacts` returned — pulled out of the publish loop so a
+ *  test can drive the guard from a realistic degraded `fetchPrFacts` result
+ *  instead of a hand-built metrics object (#752 O1). */
+export function prProvenanceInputs(block, skipped) {
+  return {
+    metrics: {
+      total_prs: block.pr_summary.total_prs,
+      total_additions: block.pr_summary.total_additions,
+      total_deletions: block.pr_summary.total_deletions,
+    },
+    unmeasured: skipped > 0 ? PR_DETAIL_METRICS : [],
+  };
+}
+
 const GREEN_MARKER_RE = /<!--\s*autopilot:review:[a-z0-9-]+:green\s*-->/i;
 const REVIEWER_SLUG_RE = /<!--\s*autopilot:review:([a-z0-9-]+):green\s*-->/gi;
 const NEEDS_HUMAN_LABEL = "autopilot:needs-human";
@@ -423,12 +439,7 @@ async function main() {
   const { DynamoDBDocumentClient, PutCommand } = await importLambdaDep("@aws-sdk/lib-dynamodb");
   const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), { marshallOptions: { removeUndefinedValues: true } });
   const updatedAt = new Date().toISOString();
-  const prMetrics = {
-    total_prs: block.pr_summary.total_prs,
-    total_additions: block.pr_summary.total_additions,
-    total_deletions: block.pr_summary.total_deletions,
-  };
-  const prUnmeasured = skipped > 0 ? PR_DETAIL_METRICS : [];
+  const { metrics: prMetrics, unmeasured: prUnmeasured } = prProvenanceInputs(block, skipped);
   for (const sc of targetScopes) {
     // #505: the same writer-boundary guard build-repo-performance.mjs's REPO
     // row uses — refuse an all-zero row unless every zero is a confirmed

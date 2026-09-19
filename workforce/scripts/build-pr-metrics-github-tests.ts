@@ -8,6 +8,7 @@ import {
   aggregateReruns,
   fetchPrFacts,
   parseAlsoScopes,
+  prProvenanceInputs,
   PR_DETAIL_METRICS,
 } from "./build-pr-metrics-github.mjs";
 import { assertProvenance, UnprovenanceError } from "./lib/perf-provenance.mjs";
@@ -237,5 +238,41 @@ describe("PERF#{scope}/PR row provenance (#505)", () => {
         unmeasured: PR_DETAIL_METRICS,
       }),
     ).toThrow(UnprovenanceError);
+  });
+
+  // #752 O1: the two tests above call `assertProvenance` with hand-built
+  // `metrics`/`unmeasured` — they never exercise `prProvenanceInputs`, so a
+  // bug in how it actually derives those from `aggregate()`'s block + the
+  // real `skipped` count would pass both untouched. These two go through the
+  // full pipeline: a fake `gh` that drops a merged PR's detail (mirroring a
+  // degraded `fetchPrFacts` run) -> `aggregate` -> `prProvenanceInputs` ->
+  // `assertProvenance`.
+  const merged = [{ number: 1 }];
+  const ghDropsDetail = async (path: string) =>
+    path.includes("/pulls/1") && !path.includes("reviews")
+      ? { status: 502, json: {}, rateLimit: {} }
+      : { status: 200, json: [], rateLimit: {} };
+  const ghServesDetail = async (path: string) =>
+    path.includes("/pulls/1") && !path.includes("reviews")
+      ? { status: 200, json: { number: 1, merged_at: "2026-06-22T10:00:00Z", additions: 10, deletions: 2, user: { login: "refluster" } }, rateLimit: {} }
+      : { status: 200, json: [], rateLimit: {} };
+
+  it("a degraded fetchPrFacts run (detail dropped) produces inputs the guard refuses", async () => {
+    const { prs, skipped } = await fetchPrFacts(ghDropsDetail, "o/r", merged);
+    expect(skipped).toBe(1);
+    const block = aggregate(prs, { sinceIso: "2026-06-01" });
+    const { metrics, unmeasured } = prProvenanceInputs(block, skipped);
+    expect(metrics).toEqual({ total_prs: 0, total_additions: 0, total_deletions: 0 });
+    expect(unmeasured).toEqual(PR_DETAIL_METRICS);
+    expect(() => assertProvenance({ scope: "acme", sk: "PR", metrics, unmeasured })).toThrow(UnprovenanceError);
+  });
+
+  it("a clean fetchPrFacts run (detail served) produces inputs the guard publishes", async () => {
+    const { prs, skipped } = await fetchPrFacts(ghServesDetail, "o/r", merged);
+    expect(skipped).toBe(0);
+    const block = aggregate(prs, { sinceIso: "2026-06-01" });
+    const { metrics, unmeasured } = prProvenanceInputs(block, skipped);
+    expect(unmeasured).toEqual([]);
+    expect(() => assertProvenance({ scope: "acme", sk: "PR", metrics, unmeasured })).not.toThrow();
   });
 });

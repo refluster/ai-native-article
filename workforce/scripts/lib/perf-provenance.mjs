@@ -63,7 +63,19 @@ export class UnprovenanceError extends Error {
 export function assertProvenance({ scope, sk, metrics, unmeasured = [] }) {
   const keys = Object.keys(metrics ?? {});
   if (keys.length === 0) return; // nothing to be honest or dishonest about
-  const allZero = keys.every((k) => Number(metrics[k] ?? 0) === 0);
+  // O2 (#752 review): `Number(NaN ?? 0) === 0` is false, so a NaN metric (a
+  // computation error, not a confirmed reading) used to fail the `allZero`
+  // check and slip through unreported — the exact silent-publish shape this
+  // guard exists to prevent, just triggered by a bad number instead of a
+  // degraded fetch. A non-finite metric is never a confirmed measurement.
+  const nonFinite = keys.filter((k) => !Number.isFinite(Number(metrics[k])));
+  if (nonFinite.length > 0) {
+    throw new UnprovenanceError(
+      `PERF#${scope}/${sk}: refusing to publish — non-numeric metric value for ${nonFinite.join(", ")} ` +
+        `(a NaN/non-finite metric is a computation error, not a confirmed zero).`,
+    );
+  }
+  const allZero = keys.every((k) => Number(metrics[k]) === 0);
   if (!allZero) return;
   const unaccounted = keys.filter((k) => unmeasured.includes(k));
   if (unaccounted.length === 0) return; // every zero was positively measured

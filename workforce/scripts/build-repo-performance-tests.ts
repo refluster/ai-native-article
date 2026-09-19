@@ -7,11 +7,13 @@ import {
   buildWeeklyChurn,
   fetchCodeFrequency,
   isRateLimited,
+  perfRowInputs,
   searchAll,
   sumDailyActivity,
   sumWeeklyChurn,
   unmeasuredRepoMetrics,
 } from "./build-repo-performance.mjs";
+import { assertProvenance, UnprovenanceError } from "./lib/perf-provenance.mjs";
 
 describe("bucketByDate", () => {
   it("buckets items by the UTC day of the given date field", () => {
@@ -310,5 +312,62 @@ describe("unmeasuredRepoMetrics", () => {
     expect(unmeasuredRepoMetrics(["issues_opened", "code_churn"]).sort()).toEqual(
       ["issues_opened", "total_additions", "total_deletions"].sort(),
     );
+  });
+});
+
+// #752 O1: the `unmeasuredRepoMetrics` tests above call it directly with a
+// hand-built `degraded_signals` array — they never exercise `perfRowInputs`,
+// so a bug in how the publish loop actually derives a row's `metrics`/
+// `unmeasured` from a project's `fetchProjectActivity`/`fetchCodeFrequency`
+// result (the `body.summary` / `body.degraded_signals` shape at
+// build-repo-performance.mjs:394-409) would pass untouched. This exercises
+// the guard from that realistic shape through `perfRowInputs`, not a
+// re-derived metrics object.
+describe("perfRowInputs -> assertProvenance wiring (#752 O1)", () => {
+  const quietButConfirmed = {
+    scope: "quiet-project",
+    window: { start: "2026-07-01", end: "2026-07-31" },
+    summary: { issues_opened: 0, issues_closed: 0, prs_opened: 0, prs_closed: 0, total_additions: 0, total_deletions: 0 },
+    // no degraded_signals — every zero above is a real, confirmed reading.
+  };
+  const coldChurnCache = {
+    // Mirrors fetchCodeFrequency hitting a cold GitHub stats cache (#503):
+    // issues/PRs came back real and quiet, but churn never resolved.
+    scope: "cold-cache-project",
+    window: { start: "2026-07-01", end: "2026-07-31" },
+    summary: { issues_opened: 0, issues_closed: 0, prs_opened: 0, prs_closed: 0, total_additions: 0, total_deletions: 0 },
+    degraded_signals: ["code_churn"],
+  };
+  const workforce = {
+    scope: "workforce",
+    window: quietButConfirmed.window,
+    summary: {
+      issues_opened: 0,
+      issues_closed: 0,
+      prs_opened: 0,
+      prs_closed: 0,
+      total_additions: 0,
+      total_deletions: 0,
+    },
+    degraded_signals: ["code_churn"],
+  };
+
+  it("a confirmed-quiet project's row publishes", () => {
+    const rows = perfRowInputs([quietButConfirmed], workforce);
+    const row = rows.find((r) => r.scope === "quiet-project");
+    expect(() => assertProvenance(row)).not.toThrow();
+  });
+
+  it("a project whose churn fetch hit a cold cache refuses (#503 shape, via the real assembly path)", () => {
+    const rows = perfRowInputs([coldChurnCache], workforce);
+    const row = rows.find((r) => r.scope === "cold-cache-project");
+    expect(row.unmeasured).toEqual(["total_additions", "total_deletions"]);
+    expect(() => assertProvenance(row)).toThrow(UnprovenanceError);
+  });
+
+  it("the workforce aggregate row inherits the same refusal when it rolls up a degraded project", () => {
+    const rows = perfRowInputs([coldChurnCache], workforce);
+    const row = rows.find((r) => r.scope === "workforce");
+    expect(() => assertProvenance(row)).toThrow(UnprovenanceError);
   });
 });

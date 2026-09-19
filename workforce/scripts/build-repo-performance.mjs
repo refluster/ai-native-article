@@ -79,6 +79,27 @@ export function unmeasuredRepoMetrics(degradedSignals = []) {
   return [...new Set(degradedSignals.flatMap((s) => DEGRADED_SIGNAL_METRICS[s] ?? []))];
 }
 
+/** The per-row `{scope, sk, metrics, unmeasured}` inputs `assertProvenance`
+ *  needs, one per PERF#{scope}/REPO row about to be published — the `results`
+ *  (one per project, as `fetchProjectActivity` / `fetchCodeFrequency` actually
+ *  returned them, degraded or not) plus the `workforce` aggregate. Pulled out
+ *  of the publish loop so a test can drive the guard from a realistic degraded
+ *  fetch result instead of a hand-built metrics object (#752 O1). */
+export function perfRowInputs(results, workforce) {
+  const rows = [
+    { scope: "workforce", body: workforce, repos: results.map((r) => r.scope).sort() },
+    ...results.map((r) => ({ scope: r.scope, body: r, repos: [r.scope] })),
+  ];
+  return rows.map(({ scope, body, repos }) => ({
+    scope,
+    repos,
+    body,
+    sk: "REPO",
+    metrics: body.summary,
+    unmeasured: unmeasuredRepoMetrics(body.degraded_signals),
+  }));
+}
+
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`);
   if (i === -1) return fallback;
@@ -501,20 +522,25 @@ async function main() {
     // One PERF#{scope}/REPO row per project, plus the `workforce` aggregate —
     // the same per-scope shape the LIFECYCLE and PR rows already use, so the
     // /performance endpoint reads it with no special-casing.
-    const rows = [
-      { scope: "workforce", body: workforce, repos: results.map((r) => r.scope).sort() },
-      ...results.map((r) => ({ scope: r.scope, body: r, repos: [r.scope] })),
-    ];
-    for (const { scope, body, repos } of rows) {
-      // #505: refuse to persist an all-zero row unless every zero metric is a
-      // confirmed measurement — the writer-boundary check, so a future fetch
-      // path need not re-derive this reasoning per signal.
-      assertProvenance({
-        scope,
-        sk: "REPO",
-        metrics: body.summary,
-        unmeasured: unmeasuredRepoMetrics(body.degraded_signals),
-      });
+    const rows = perfRowInputs(results, workforce);
+    // H1 (#752 review): each row's guard + write is isolated so one refused
+    // scope (#505's UnprovenanceError) can't abort the rest of the batch — the
+    // same "skip loudly, don't abort" shape the per-project fetch loop above
+    // already uses. Without this, project 3 of 6 refusing left projects 4-6
+    // unpublished too, and the unguarded top-level `process.exit(await
+    // main())` turned that into a crash with no partial-success accounting.
+    const skippedRows = [];
+    for (const { scope, sk, metrics, unmeasured, repos, body } of rows) {
+      try {
+        // #505: refuse to persist an all-zero row unless every zero metric is
+        // a confirmed measurement — the writer-boundary check, so a future
+        // fetch path need not re-derive this reasoning per signal.
+        assertProvenance({ scope, sk, metrics, unmeasured });
+      } catch (err) {
+        console.error(`WARN PERF#${scope}/${sk}: ${err instanceof Error ? err.message : String(err)} — skipped, other scopes still publish`);
+        skippedRows.push(scope);
+        continue;
+      }
       await ddb.send(
         new PutCommand({
           TableName: TABLE,
@@ -534,7 +560,11 @@ async function main() {
         }),
       );
     }
-    console.error(`published ${rows.length} PERF#{scope}/REPO row(s) to ${TABLE}`);
+    console.error(
+      `published ${rows.length - skippedRows.length} of ${rows.length} PERF#{scope}/REPO row(s) to ${TABLE}` +
+        (skippedRows.length ? ` (refused: ${skippedRows.join(", ")})` : ""),
+    );
+    if (skippedRows.length > 0) return 2;
   }
 
   return failed.length > 0 || degradedProjects.length > 0 ? 2 : 0;

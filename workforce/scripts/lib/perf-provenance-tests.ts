@@ -98,4 +98,26 @@ describe("assertProvenance", () => {
       }),
     ).toThrow(UnprovenanceError);
   });
+
+  // #752 O2: `Number(NaN ?? 0) === 0` is false, so a NaN metric used to make
+  // `allZero` false and skip the guard entirely — the worst case this module
+  // exists to prevent (a computation error publishing silently). A non-finite
+  // metric must never be a free pass, whether or not it's named `unmeasured`.
+  it("refuses a NaN metric even when nothing is named unmeasured", () => {
+    let err: unknown;
+    try {
+      assertProvenance({ scope: "acme", sk: "REPO", metrics: { issues_opened: NaN, prs_opened: 3 } });
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(UnprovenanceError);
+    expect(String((err as Error).message)).toContain("issues_opened");
+  });
+
+  it("refuses a non-numeric metric value the same way", () => {
+    expect(() =>
+      // @ts-expect-error — deliberately malformed input, the failure mode under test
+      assertProvenance({ scope: "acme", sk: "PR", metrics: { total_prs: "not-a-number" } }),
+    ).toThrow(UnprovenanceError);
+  });
 });
