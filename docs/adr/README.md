@@ -53,5 +53,6 @@ headers:
 | [0004](adr-0004-governance-consolidation.md) | Governance consolidation: de-duplicated statute, R-11 full-law coverage, R-13 terminal-state sweep | Proposed |
 | [0005](adr-0005-bilingual-article-editions.md) | Bilingual article editions (ja/en): one Notion row, an `EN` child page, one URL | Proposed |
 | [0006](adr-0006-publication-disclosure-posture.md) | Publication disclosure: comply with the strictest reading instead of classifying ourselves | Proposed |
+| [0007](adr-0007-registry-state-owner-and-scheduled-trigger.md) | Registries record current state, not just events: owner + scheduled trigger on every dated commitment | Proposed |
 
 Keep this table in sync when an ADR is added or its Status flips.
