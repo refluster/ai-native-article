@@ -357,9 +357,18 @@ export async function fetchCodeFrequency(gh, repo, { attempts = 6, delayMs = 250
   return { weeks: [], partial: true };
 }
 
-async function fetchProjectActivity(project, { days, token, api }) {
+/**
+ * `gh` and `sleepMs`/`codeFrequency` are injectable so a test can drive this
+ * real assembly path (not a hand-built stand-in for its output) with a fake
+ * `gh` — the same shape `fetchPrFacts` in build-pr-metrics-github.mjs already
+ * takes a `gh` parameter for (#752 O1: the wiring test below this file
+ * previously called `perfRowInputs` with hand-built `results`, which could
+ * not catch a bug in how this function actually derives `summary`/
+ * `degraded_signals` from a real fetch).
+ */
+export async function fetchProjectActivity(project, { days, token, api, gh: ghOverride, sleepMs = SEARCH_INTERVAL_MS, codeFrequency } = {}) {
   const repo = `${project.owner}/${project.repo}`;
-  const gh = makeGh(api, token);
+  const gh = ghOverride ?? makeGh(api, token);
 
   const since = new Date();
   since.setUTCDate(since.getUTCDate() - days);
@@ -367,17 +376,17 @@ async function fetchProjectActivity(project, { days, token, api }) {
   const todayIso = new Date().toISOString().slice(0, 10);
 
   const issuesOpened = await searchAll(gh, `repo:${repo} is:issue created:>=${sinceIso}`);
-  await sleep(SEARCH_INTERVAL_MS);
+  await sleep(sleepMs);
   const issuesClosed = await searchAll(gh, `repo:${repo} is:issue closed:>=${sinceIso}`);
-  await sleep(SEARCH_INTERVAL_MS);
+  await sleep(sleepMs);
   const prsOpened = await searchAll(gh, `repo:${repo} is:pr created:>=${sinceIso}`);
-  await sleep(SEARCH_INTERVAL_MS);
+  await sleep(sleepMs);
   const prsClosed = await searchAll(gh, `repo:${repo} is:pr closed:>=${sinceIso}`);
 
   const issues_daily = buildDailyActivity(issuesOpened.items, issuesClosed.items, days, todayIso);
   const prs_daily = buildDailyActivity(prsOpened.items, prsClosed.items, days, todayIso);
 
-  const churn = await fetchCodeFrequency(gh, repo);
+  const churn = await fetchCodeFrequency(gh, repo, codeFrequency);
   const sinceEpoch = Math.floor(new Date(`${sinceIso}T00:00:00Z`).getTime() / 1000);
   const code_churn_weekly = buildWeeklyChurn(churn.weeks, sinceEpoch);
 
@@ -523,12 +532,16 @@ async function main() {
     // the same per-scope shape the LIFECYCLE and PR rows already use, so the
     // /performance endpoint reads it with no special-casing.
     const rows = perfRowInputs(results, workforce);
-    // H1 (#752 review): each row's guard + write is isolated so one refused
-    // scope (#505's UnprovenanceError) can't abort the rest of the batch — the
-    // same "skip loudly, don't abort" shape the per-project fetch loop above
-    // already uses. Without this, project 3 of 6 refusing left projects 4-6
-    // unpublished too, and the unguarded top-level `process.exit(await
-    // main())` turned that into a crash with no partial-success accounting.
+    // H1 (#752 review, round 2): each row's guard AND its PutCommand are both
+    // inside the same try/catch, so a write failure (throttling, validation,
+    // network) skips that one scope exactly like a guard refusal does,
+    // instead of throwing out of the bare `for` loop and aborting every scope
+    // still queued after it — the same "skip loudly, don't abort" shape the
+    // per-project fetch loop above already uses. Round 1 isolated only
+    // `assertProvenance`; the `ddb.send` call sat unguarded right after it,
+    // so a DDB failure on scope 3 of 6 still crashed the batch and left
+    // scopes 4-6 unpublished, the exact H1 failure shape with a different
+    // trigger.
     const skippedRows = [];
     for (const { scope, sk, metrics, unmeasured, repos, body } of rows) {
       try {
@@ -536,29 +549,29 @@ async function main() {
         // a confirmed measurement — the writer-boundary check, so a future
         // fetch path need not re-derive this reasoning per signal.
         assertProvenance({ scope, sk, metrics, unmeasured });
+        await ddb.send(
+          new PutCommand({
+            TableName: TABLE,
+            Item: {
+              pk: `PERF#${scope}`,
+              sk: "REPO",
+              scope,
+              updated_at: generatedAt,
+              window: body.window,
+              issues_daily: body.issues_daily,
+              prs_daily: body.prs_daily,
+              code_churn_weekly: body.code_churn_weekly,
+              summary: body.summary,
+              repos,
+              ...(body.degraded_signals?.length ? { degraded_signals: body.degraded_signals } : {}),
+            },
+          }),
+        );
       } catch (err) {
         console.error(`WARN PERF#${scope}/${sk}: ${err instanceof Error ? err.message : String(err)} — skipped, other scopes still publish`);
         skippedRows.push(scope);
         continue;
       }
-      await ddb.send(
-        new PutCommand({
-          TableName: TABLE,
-          Item: {
-            pk: `PERF#${scope}`,
-            sk: "REPO",
-            scope,
-            updated_at: generatedAt,
-            window: body.window,
-            issues_daily: body.issues_daily,
-            prs_daily: body.prs_daily,
-            code_churn_weekly: body.code_churn_weekly,
-            summary: body.summary,
-            repos,
-            ...(body.degraded_signals?.length ? { degraded_signals: body.degraded_signals } : {}),
-          },
-        }),
-      );
     }
     console.error(
       `published ${rows.length - skippedRows.length} of ${rows.length} PERF#{scope}/REPO row(s) to ${TABLE}` +

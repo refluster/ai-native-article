@@ -6,6 +6,7 @@ import {
   buildDailyActivity,
   buildWeeklyChurn,
   fetchCodeFrequency,
+  fetchProjectActivity,
   isRateLimited,
   perfRowInputs,
   searchAll,
@@ -369,5 +370,55 @@ describe("perfRowInputs -> assertProvenance wiring (#752 O1)", () => {
     const rows = perfRowInputs([coldChurnCache], workforce);
     const row = rows.find((r) => r.scope === "workforce");
     expect(() => assertProvenance(row)).toThrow(UnprovenanceError);
+  });
+});
+
+// #752 O1 (round 2): the tests above still hand-build the `results` shape
+// `perfRowInputs` expects — they never exercise `fetchProjectActivity`, the
+// function that actually derives `summary`/`degraded_signals` from `gh` calls
+// (searchAll x4 + fetchCodeFrequency). A bug in that assembly (e.g. a
+// degraded-signal label drifting, or churn totals miscomputed) would pass
+// every test above untouched. These drive a fake `gh` through the real
+// `fetchProjectActivity` -> `perfRowInputs` -> `assertProvenance` pipeline,
+// mirroring build-pr-metrics-github-tests.ts's fetchPrFacts wiring tests.
+describe("fetchProjectActivity -> perfRowInputs -> assertProvenance wiring (#752 O1, round 2)", () => {
+  const project = { id: "acme", owner: "o", repo: "r" };
+  const churnWeeks = [[1_700_000_000, 5, -2]];
+
+  it("a rate-limited issues-opened search degrades that one signal, and the guard refuses the all-zero row", async () => {
+    const gh = async (path) => {
+      if (path.includes("/search/issues") && path.includes("is%3Aissue") && path.includes("created%3A")) {
+        // A spent-quota 403 — searchAll marks this page partial and stops.
+        return { status: 403, json: { message: "API rate limit exceeded" }, rateLimit: { remaining: 0 } };
+      }
+      if (path.includes("/search/issues")) return { status: 200, json: { items: [] } };
+      if (path.includes("/stats/code_frequency")) return { status: 200, json: churnWeeks };
+      throw new Error(`unexpected path in test gh: ${path}`);
+    };
+
+    const activity = await fetchProjectActivity(project, { days: 30, gh, sleepMs: 0 });
+    expect(activity.degraded_signals).toEqual(["issues_opened"]);
+    expect(activity.summary.issues_opened).toBe(0);
+
+    const rows = perfRowInputs([activity], activity);
+    const row = rows.find((r) => r.scope === "acme");
+    expect(row.unmeasured).toEqual(["issues_opened"]);
+    expect(() => assertProvenance(row)).toThrow(UnprovenanceError);
+  });
+
+  it("a fully-served fetch (no degraded signal) produces a row the guard publishes", async () => {
+    const gh = async (path) => {
+      if (path.includes("/search/issues")) return { status: 200, json: { items: [] } };
+      if (path.includes("/stats/code_frequency")) return { status: 200, json: churnWeeks };
+      throw new Error(`unexpected path in test gh: ${path}`);
+    };
+
+    const activity = await fetchProjectActivity(project, { days: 30, gh, sleepMs: 0 });
+    expect(activity.degraded_signals ?? []).toEqual([]);
+
+    const rows = perfRowInputs([activity], activity);
+    const row = rows.find((r) => r.scope === "acme");
+    expect(row.unmeasured).toEqual([]);
+    expect(() => assertProvenance(row)).not.toThrow();
   });
 });
