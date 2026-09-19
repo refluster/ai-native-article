@@ -39,6 +39,10 @@ interface Row {
   // One entry per indent column. Last entry is the L-corner/branch at this
   // row; earlier entries continue (or skip) the ancestor rails passing through.
   railShapes: RailShape[];
+  /** Resolvable managers other than the one this agent is placed under.
+   *  Non-empty only on the focus row — mirrors orgTree's alsoReportsTo
+   *  so the two surfaces agree (FU-037). */
+  alsoReportsTo: string[];
 }
 
 function computeWindow(
@@ -114,7 +118,18 @@ function buildRows(
     if (indent > 0) {
       railShapes.push(siblingFlags[indent - 1] ? 'branch' : 'corner');
     }
-    rows.push({ agent: a, indent, isFocus: a.slug === focusSlug, railShapes });
+    let alsoReportsTo: string[] = [];
+    if (a.slug === focusSlug && a.reports_to.length > 1) {
+      const managers = a.reports_to
+        .map((s) => bySlug.get(s))
+        .filter((m): m is WorkforceAgent => !!m)
+        .sort((x, y) => x.depth - y.depth || x.slug.localeCompare(y.slug));
+      const primary = managers[0];
+      alsoReportsTo = [...new Set(
+        a.reports_to.filter((s) => bySlug.has(s) && s !== primary?.slug),
+      )];
+    }
+    rows.push({ agent: a, indent, isFocus: a.slug === focusSlug, railShapes, alsoReportsTo });
     const children = a.direct_reports
       .map((s) => bySlug.get(s))
       .filter((c): c is WorkforceAgent => !!c && visible.has(c.slug))
@@ -129,7 +144,7 @@ function buildRows(
   // Defensive: any visible agent not reachable via direct_reports.
   for (const a of roster) {
     if (visible.has(a.slug) && !seen.has(a.slug)) {
-      rows.push({ agent: a, indent: 0, isFocus: a.slug === focusSlug, railShapes: [] });
+      rows.push({ agent: a, indent: 0, isFocus: a.slug === focusSlug, railShapes: [], alsoReportsTo: [] });
       seen.add(a.slug);
     }
   }
@@ -178,6 +193,11 @@ function TreeRow({ row }: { row: Row }) {
           </div>
           <div className="text-sm font-semibold text-wf-on-surface truncate">{fullName(row.agent)}</div>
           <div className="text-xs text-wf-on-surface-variant truncate">{row.agent.role}</div>
+          {row.isFocus && row.alsoReportsTo.length > 0 && (
+            <div className="font-wfmono text-[9px] uppercase tracking-[0.12em] text-wf-tertiary truncate mt-0.5">
+              ⇄ also reports to {row.alsoReportsTo.join(', ')}
+            </div>
+          )}
         </div>
       </div>
     </Link>
