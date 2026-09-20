@@ -117,7 +117,7 @@ cheap there, ruinous at S9.
 | S0 | 受注・与件整理 | consulting intake | lead, client value | `brief.md` | **G0** every 調査項目 in the spec maps to ≥1 論点 ID; audience, deliverable format, deadline, fee and "what would make the client say this was worth it" stated |
 | S1 | 論点構造化・初期仮説 | issue tree, MECE, day-one answer | lead + domain | `issue-tree.md` | **G1** tree is MECE at each level; every leaf carries `H-x.y`: a falsifiable statement, the evidence that would confirm/refute it, ≥1 candidate primary source |
 | S2 | ワークプラン | consulting workplan | lead | `workplan.md` | **G2** every `H-x.y` has a workstream and an owner persona; each WS lists ≥2 primary source *types*; internal evidence (own reports) allocated |
-| S3 | 情報収集・ファクトパック | source hierarchy, extraction tables (systematic review); breadth-first sub-agents | analysts per WS | `sources/register.md`, `sources/ws*.md` | **G3** every finding = value · unit · period · `S-x.y` · confidence A/B/C; NOT FOUND is written, never filled; contradictions logged; register 区分 (一次/準一次/二次/内部) filled |
+| S3 | 情報収集・ファクトパック | source hierarchy, extraction tables (systematic review); breadth-first sub-agents with a per-WS search budget (the session's web-search quota is finite: locate candidates by search, then fetch primary documents by URL) | analysts per WS | `sources/register.md`, `sources/ws*.md` | **G3** every finding = value · unit · period · `S-x.y` · confidence A/B/C; NOT FOUND is written, never filled; contradictions logged; every new `S-x.y` registered as a table row with 区分 (一次/準一次/二次/内部) and URL — no "same as S-x.y" cross-references, so the register can be generated mechanically |
 | S4 | 分析・仮説判定 | hypothesis testing, ACH | analysts + lead | `analysis.md` | **G4** every `H-x.y` has 判定 ∈ {支持, 一部支持, 不支持, 未検証} + 確度 {高, 中, 低} + finding IDs; competing explanations listed for 一部支持/不支持 |
 | S5 | ストーリーライン | Pyramid Principle, ghost deck, "so what" | lead + editor + client value | `storyline.md` | **G5** governing thought ≤2 sentences; 3–6 key messages each on ≥2 findings; one lead sentence per chapter; exhibit list with source IDs; PM has signed the so-what line of every key message |
 | S6 | ドラフト | answer-first drafting; exhibits with source footers | editor + analysts | `report.md` v1, `figures/` | **G6** checker exits clean (structure, `[S-x.y]` resolve, figure captions carry 出典, glossary, 限界 section, verdict table) |
@@ -200,10 +200,10 @@ GITHUB_TOKEN="<credentials['github.token'].token from your task>" \
     --dir "<local path of research/<YYYYMM-slug>>" \
     --path "research/<YYYYMM-slug>" \
     --base main --branch "workforce/research-study/<YYYYMM-slug>" \
-    --title "content: <study title> (research-study v0.1.0)" \
+    --title "content: <study title> (research-study v0.1.1)" \
     --authors "<lead>,<seated,slugs>" \
     --min-sources 40 \
-    --skill-version "0.1.0" [--dry-run]
+    --skill-version "0.1.1" [--dry-run]
 ```
 
 Exit codes: `0` published (branch + draft PR) · `2` a guard rejected it

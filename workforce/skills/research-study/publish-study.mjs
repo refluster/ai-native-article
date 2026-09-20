@@ -18,10 +18,10 @@
 //     --dir /path/to/research/202609-ieej-california-der \
 //     --path research/202609-ieej-california-der \
 //     --base main --branch workforce/research-study/202609-ieej-california-der \
-//     --title "content: 米国カリフォルニア州等 … 調査報告書 (research-study v0.1.0)" \
+//     --title "content: 米国カリフォルニア州等 … 調査報告書 (research-study v0.1.1)" \
 //     --authors beatriz,amara,grace,sneha,sofia,owen,rafael,ingrid,aoi,nadia \
 //     [--min-sources 40] [--min-chars 20000] [--max-chars 200000] \
-//     [--skill-version 0.1.0] [--dry-run]
+//     [--skill-version 0.1.1] [--dry-run]
 //
 // Exit codes:
 //   0 — published (branch pushed + draft PR opened), or dry-run passed
