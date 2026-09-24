@@ -156,6 +156,30 @@ export function groupByCycle(sortedRecords) {
   };
 }
 
+/**
+ * Drain all pages of a paginated GitHub list endpoint.
+ *
+ * @param {(url: string) => Promise<{status: number, json: unknown, link: string|null}>} fetchPage
+ *   Function that fetches one page and returns `{status, json, link}`.
+ * @param {string} initialPath  Absolute URL or API path for the first page.
+ * @returns {Promise<unknown[]>}  Concatenated items from all pages.
+ * @throws {Error} If any page returns a non-200 status (D3/R3 fix — fail loud,
+ *   never silently return a partial result).
+ */
+export async function drainPages(fetchPage, initialPath) {
+  let items = [];
+  let next = initialPath;
+  while (next) {
+    const r = await fetchPage(next);
+    if (r.status !== 200 || !Array.isArray(r.json)) {
+      throw new Error(`check-scope-creep: HTTP ${r.status} paginating ${next}`);
+    }
+    items = items.concat(r.json);
+    next = parseNextLink(r.link);
+  }
+  return items;
+}
+
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
 function arg(name) {
@@ -198,18 +222,12 @@ async function main() {
   // rel="next"` header (S1 / FU-005 cycle 2) — `per_page=100` alone only
   // returns page 1, so a PR whose comment/review history exceeds 100 records
   // silently dropped its newest entries out of `laterBodies`.
+  // D3/R3 fix: throw on any non-200 page (including mid-drain) so callers
+  // never silently operate on a partial result. The outer try/catch returns
+  // exit code 3 for any thrown error.
   const ghAll = async (path) => {
-    let items = [];
-    let next = path;
-    let status = 200;
-    while (next) {
-      const r = await gh(next);
-      status = r.status;
-      if (r.status !== 200 || !Array.isArray(r.json)) return { status, json: items };
-      items = items.concat(r.json);
-      next = parseNextLink(r.link);
-    }
-    return { status, json: items };
+    const items = await drainPages(gh, path);
+    return { status: 200, json: items };
   };
 
   let prs;

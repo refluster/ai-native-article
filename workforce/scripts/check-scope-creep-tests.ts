@@ -9,6 +9,7 @@ import {
   checkScopeCreep,
   groupByCycle,
   parseNextLink,
+  drainPages,
 } from "./check-scope-creep.mjs";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -296,5 +297,52 @@ describe("end-to-end scope-creep detection", () => {
     const cycle1Ids = extractFindingIds(cycle1Bodies);
     const { violations } = checkScopeCreep(cycle1Ids, laterBodies);
     expect(violations).toEqual([]);
+  });
+});
+
+// ── drainPages (D3/R3 fix: fail loud on mid-drain non-200) ──────────────────
+
+describe("drainPages", () => {
+  it("returns all items from a single page with no next link", async () => {
+    const pages = [{ status: 200, json: [{ id: 1 }, { id: 2 }], link: null }];
+    let calls = 0;
+    const fetcher = async (_url: string) => pages[calls++];
+    await expect(drainPages(fetcher, "/page1")).resolves.toEqual([{ id: 1 }, { id: 2 }]);
+    expect(calls).toBe(1);
+  });
+
+  it("follows Link rel=next across multiple pages and concatenates items", async () => {
+    const pages: Array<{ status: number; json: unknown[]; link: string | null }> = [
+      { status: 200, json: [{ id: 1 }], link: '<https://api.github.com/page2>; rel="next"' },
+      { status: 200, json: [{ id: 2 }], link: '<https://api.github.com/page3>; rel="next"' },
+      { status: 200, json: [{ id: 3 }], link: null },
+    ];
+    let calls = 0;
+    const fetcher = async (_url: string) => pages[calls++];
+    await expect(drainPages(fetcher, "/page1")).resolves.toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
+    expect(calls).toBe(3);
+  });
+
+  it("throws immediately when the first page returns non-200", async () => {
+    const fetcher = async (_url: string) => ({ status: 404, json: [], link: null });
+    await expect(drainPages(fetcher, "/page1")).rejects.toThrow("HTTP 404");
+  });
+
+  it("throws on a mid-drain non-200 instead of returning partial results (D3/R3)", async () => {
+    // Page 1 succeeds; page 2 returns 500. Without the D3/R3 fix, page 1's items
+    // would be silently returned as if the fetch were complete.
+    const pages: Array<{ status: number; json: unknown[]; link: string | null }> = [
+      { status: 200, json: [{ id: 1 }], link: '<https://api.github.com/page2>; rel="next"' },
+      { status: 500, json: [], link: null },
+    ];
+    let calls = 0;
+    const fetcher = async (_url: string) => pages[calls++];
+    await expect(drainPages(fetcher, "/page1")).rejects.toThrow("HTTP 500");
+    expect(calls).toBe(2);
+  });
+
+  it("throws when json is not an array even with status 200", async () => {
+    const fetcher = async (_url: string) => ({ status: 200, json: null, link: null });
+    await expect(drainPages(fetcher, "/page1")).rejects.toThrow("HTTP 200");
   });
 });
