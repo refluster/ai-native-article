@@ -1,19 +1,35 @@
 // @ts-nocheck — the modules under test are dependency-free ESM scripts, not TS.
 // Discovered by workforce/lambdas/vitest.config.mjs (`../skills/**/*-tests.ts`).
 //
-// Locks the dispatcher's two invariants (adr-0022):
+// Locks the dispatcher's invariants (adr-0022, extended by adr-0038):
 //   1. every issue is in EXACTLY ONE lane — the question "who owns this?" has
 //      one answer, which is the whole reason the vocabulary exists;
-//   2. no state is absorbing — a parked issue is re-examined after the requeue
-//      window instead of ageing out of everyone's scan, which is how the
-//      2026-07 backlog tail formed.
+//   2. no state is absorbing — a hand-back is answered immediately and a legacy
+//      park is re-examined after the requeue window, instead of ageing out of
+//      everyone's scan (how the 2026-07 backlog tail, and asp-cloud's 18-issue
+//      one, both formed);
+//   3. routing is BOUNDED — the hop cap stops route → hand back → route from
+//      cycling forever now that each step takes seconds rather than a fortnight;
+//   4. "a human" is never an answer on its own — the operator lane names the
+//      human ACT (`wf:human:<role>`), which is what makes the design/residue
+//      split checkable.
 import { describe, it, expect } from "vitest";
 import {
+  HOP_CAP,
+  HUMAN_ROLE_NAMES,
   LANE_NAMES,
+  LANE_WORKER_SKILL,
+  LEGACY_PARKED_LABELS,
+  applyHopCap,
+  assertHumanRole,
   assertLane,
+  hopMarker,
+  humanRoleLabel,
+  humanRoleOf,
   laneLabel,
   laneOf,
   ownerLabel,
+  parseHops,
   triageAction,
   suggestLane,
   DEFAULT_REQUEUE_DAYS,
@@ -40,9 +56,38 @@ describe("the lane vocabulary is closed (C-4)", () => {
     expect(ownerLabel("dario")).toBe("wf:owner:dario");
     expect(() => ownerLabel("@dario")).toThrow(/agent slug/);
   });
+
+  it("every agent-worked lane names the cadence that consumes it — and only the operator lane has none", () => {
+    // The other half of "a lane exists only where a real consumer exists".
+    // check-binding-queues.mjs (R-N11) and the router's dispatch both read this.
+    for (const lane of LANE_NAMES) {
+      expect(LANE_WORKER_SKILL).toHaveProperty(lane);
+    }
+    expect(LANE_WORKER_SKILL.implement).toBe("issue-implement");
+    expect(LANE_WORKER_SKILL.design).toBe("issue-design");
+    expect(LANE_WORKER_SKILL.operator).toBeNull();
+  });
 });
 
-describe("labelsToRemove — one issue, one lane", () => {
+describe("the operator lane names the human act (adr-0038)", () => {
+  it("the role set is closed, like the lanes", () => {
+    expect(HUMAN_ROLE_NAMES).toContain("architect-ratify");
+    expect(HUMAN_ROLE_NAMES).toContain("legal");
+    expect(() => assertHumanRole("vibes")).toThrow(/unknown human role/);
+  });
+
+  it("role labels round-trip", () => {
+    expect(humanRoleLabel("legal")).toBe("wf:human:legal");
+    expect(humanRoleOf(["type:chore", "wf:human:architect-ratify"])).toBe("architect-ratify");
+    expect(humanRoleOf(["type:chore"])).toBeNull();
+  });
+
+  it("a typo'd role is refused rather than silently shelved in an unread queue", () => {
+    expect(() => humanRoleOf(["wf:human:leagl"])).toThrow(/unknown human role/);
+  });
+});
+
+describe("labelsToRemove — one issue, one lane, and the park is answered", () => {
   it("re-laning removes the previous lane label", () => {
     expect(labelsToRemove(["wf:lane:implement", "type:feature"], "design")).toEqual(["wf:lane:implement"]);
   });
@@ -51,14 +96,70 @@ describe("labelsToRemove — one issue, one lane", () => {
     expect(labelsToRemove(["wf:lane:design"], "design")).toEqual([]);
   });
 
-  it("--requeue also clears the parked needs-human labels — the absorbing state ends", () => {
-    const out = labelsToRemove(["issue-implement:needs-human", "wf:lane:implement"], "design", { requeue: true });
-    expect(out).toContain("issue-implement:needs-human");
-    expect(out).toContain("wf:lane:implement");
+  it("posting a lane always clears the hand-back — the answer IS the un-park (adr-0038)", () => {
+    // Pre-adr-0038 this needed an explicit `--requeue` flag; the flag existed
+    // only to decide whether to clear, and a router posting a lane has by
+    // definition decided. Removing it removed a state, not just an argument.
+    expect(labelsToRemove(["wf:handback", "wf:lane:implement"], "design")).toEqual(
+      expect.arrayContaining(["wf:handback", "wf:lane:implement"]),
+    );
   });
 
-  it("without --requeue a parked label is left alone", () => {
-    expect(labelsToRemove(["issue-implement:needs-human"], "implement")).toEqual([]);
+  it("the legacy needs-human parks are still cleared, so the existing backlog re-enters the loop", () => {
+    for (const legacy of LEGACY_PARKED_LABELS) {
+      expect(labelsToRemove([legacy], "implement")).toEqual([legacy]);
+    }
+  });
+
+  it("a stale human role is dropped when the issue leaves the operator lane", () => {
+    expect(labelsToRemove(["wf:human:legal", "wf:lane:operator"], "implement")).toEqual(
+      expect.arrayContaining(["wf:human:legal", "wf:lane:operator"]),
+    );
+  });
+
+  it("the role in force is kept when the issue stays on the operator lane", () => {
+    expect(labelsToRemove(["wf:human:legal", "wf:lane:operator"], "operator", { humanRole: "legal" })).toEqual([]);
+  });
+
+  it("swapping one human role for another drops only the old one", () => {
+    expect(labelsToRemove(["wf:human:legal"], "operator", { humanRole: "product" })).toEqual(["wf:human:legal"]);
+  });
+});
+
+describe("the hop bound — routing terminates (adr-0038)", () => {
+  it("counts the highest marker, so a failed post cannot reset the bound", () => {
+    expect(parseHops(["no marker here"])).toBe(0);
+    expect(parseHops([`a ${hopMarker(1)} b`, `c ${hopMarker(3)} d`, hopMarker(2)])).toBe(3);
+  });
+
+  it("refuses to write a nonsense marker (C-4)", () => {
+    expect(() => hopMarker(0)).toThrow(/positive integer/);
+    expect(() => hopMarker("two")).toThrow(/positive integer/);
+  });
+
+  it("passes the requested lane through below the cap", () => {
+    const r = applyHopCap("design", 0);
+    expect(r).toMatchObject({ lane: "design", hops: 1, capped: false });
+  });
+
+  it("forces the operator lane once the cap is spent, and says why", () => {
+    const r = applyHopCap("implement", HOP_CAP);
+    expect(r.lane).toBe("operator");
+    expect(r.capped).toBe(true);
+    expect(r.why).toMatch(/hop-cap-exceeded/);
+  });
+
+  it("route → hand back → route cannot cycle forever", () => {
+    // The ping-pong, played out: each iteration re-lanes, and the bound holds.
+    let hops = 0;
+    const lanes: string[] = [];
+    for (let i = 0; i < 10; i++) {
+      const r = applyHopCap("implement", hops);
+      hops = r.hops;
+      lanes.push(r.lane);
+    }
+    expect(lanes.slice(0, HOP_CAP)).toEqual(Array(HOP_CAP).fill("implement"));
+    expect(lanes.slice(HOP_CAP).every((l) => l === "operator")).toBe(true);
   });
 });
 
@@ -83,12 +184,28 @@ describe("triageAction — what the router should look at", () => {
     }
   });
 
-  it("a parked issue is re-examined once it goes stale — this is the un-absorbing rule", () => {
+  it("a hand-back is answered NOW, not in a fortnight — the latency fix (adr-0038)", () => {
+    // The worker read the issue this minute and declined. Waiting out the
+    // requeue window adds 14 days of latency and no information.
+    const handed = { labels: ["wf:handback", "wf:lane:implement"], updatedAt: daysAgo(0) };
+    expect(triageAction(handed, { now })).toMatchObject({ action: "requeue" });
+  });
+
+  it("a hand-back outranks the in-lane skip, or the router would never see it", () => {
+    expect(triageAction({ labels: ["wf:handback", "wf:lane:design"], updatedAt: daysAgo(0) }, { now }).action).toBe("requeue");
+  });
+
+  it("but a worker actively holding the issue still wins over a stale hand-back label", () => {
+    const both = { labels: ["wf:handback", "issue-implement:in-progress"], updatedAt: daysAgo(0) };
+    expect(triageAction(both, { now })).toMatchObject({ action: "skip" });
+  });
+
+  it("a legacy parked issue is re-examined once it goes stale — this is the un-absorbing rule", () => {
     const parked = { labels: ["issue-implement:needs-human"], updatedAt: daysAgo(DEFAULT_REQUEUE_DAYS + 1) };
     expect(triageAction(parked, { now })).toMatchObject({ action: "requeue" });
   });
 
-  it("a freshly parked issue is left to its window", () => {
+  it("a freshly parked legacy issue is left to its window", () => {
     const parked = { labels: ["issue-implement:needs-human"], updatedAt: daysAgo(2) };
     expect(triageAction(parked, { now })).toMatchObject({ action: "skip" });
   });

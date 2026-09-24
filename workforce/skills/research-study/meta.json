@@ -1,20 +1,20 @@
 {
-  "name": "issue-design",
-  "version": "0.2.0",
+  "name": "research-study",
+  "version": "0.1.1",
   "status": "active",
+  "display_name": "Research Study (RFP → sourced report)",
   "cost_class": "large",
   "owners": [
-    "dario",
-    "maya"
+    "beatriz"
   ],
   "improvement_agent": "sana",
-  "created_at": "2026-07-29",
+  "created_at": "2026-09-19",
   "requires": [
-    "github.token",
-    "workforce.dispatch_token"
+    "github.token"
   ],
   "deliverable": {
     "type": "external-pr",
     "publish_notion": false
-  }
+  },
+  "recall_k": 5
 }

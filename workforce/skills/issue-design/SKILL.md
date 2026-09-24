@@ -34,8 +34,8 @@ Eligible issues carry **`wf:lane:design`** (stamped by `issue-triage`) and:
 
 - are not already claimed — no open PR references them (`Closes #N`), no
   `issue-design:in-progress` / `issue-design:pr-open` label;
-- do not carry `issue-design:needs-human` (the parked state; `issue-triage`'s
-  re-queue window is what brings one back, not you);
+- do not carry an unanswered `wf:handback` (one you raised; `issue-triage`
+  clears it when it re-lanes) or a legacy `issue-design:needs-human` park;
 - are unassigned or assigned to this run's persona.
 
 Take the first `max_issues_per_run` (default 2), **oldest activity first** — the
@@ -111,24 +111,44 @@ decision; it does not make one. Verify before merging.
 ```
 
 Open it as a **draft**, replace `issue-design:in-progress` with
-`issue-design:pr-open`, and comment the PR link on the issue. Then stop: the PR
-goes to `pr-autopilot` like any other, and an L0/L1 artefact escalates to the
-operator by the existing predicate — which is correct and is the point. Your
-deliverable is the reviewable diff, not the merge.
+`issue-design:pr-open`, and comment the PR link on the issue. Then wake the
+reviewer so the PR routes in seconds rather than at `pr-autopilot`'s next tick
+(adr-0038):
 
-## Step 5 — park with a reason (never silently drop)
+```sh
+node workforce/scripts/dispatch-cadence.mjs \
+  --skill pr-autopilot --project "<project_id>" \
+  --reason "draft PR #<pr> opened for issue #<issue>"
+```
+
+It always exits 0 and the reviewer's cron remains the floor, so a failed
+dispatch costs latency, never correctness. Then stop: the PR goes to
+`pr-autopilot` like any other, and an L0/L1 artefact escalates to the operator
+by the existing predicate — which is correct and is the point. Your deliverable
+is the reviewable diff, not the merge.
+
+## Step 5 — hand it back to the router (never silently drop)
 
 When the issue cannot be turned into one artefact — the decision needs
 information only the operator has, the issue's premise is contradicted by a
-standing ADR, or it is really three decisions — comment saying **exactly that**
-(quote the clause, cite the ADR, name the three decisions), replace
-`issue-design:in-progress` with `issue-design:needs-human`, and move on. This is a
-normal outcome.
+standing ADR, or it is really three decisions — say **exactly that** (quote the
+clause, cite the ADR, name the three decisions) and hand it back:
 
-The park is **not** absorbing: `issue-triage`'s re-queue window brings it back for
-re-examination, so a blocker that resolves later does not bury the issue. That is
-the whole reason to state the blocker precisely — your comment is what the next
-router reads.
+```sh
+GITHUB_TOKEN="…" node workforce/skills/issue-triage/issue-handback.mjs \
+  --project "<project_id>" --issue <N> --from issue-design \
+  --body-file /tmp/handback-<N>.md
+```
+
+This is a normal outcome. The script stamps `wf:handback`, clears your
+`issue-design:in-progress` marker, and fires `issue-triage` now — so the issue
+is re-laned in seconds rather than waiting out a re-queue window (adr-0038).
+
+**Decline, but do not dispose.** What you know is that the issue is not one
+draftable artefact; whether a human is owed, or whether it is three issues for
+three lanes, is the router's call. State the blocker precisely and let it
+decide — your comment is what the router reads, and "it is really three
+decisions" is a complete and useful hand-back.
 
 ## Guardrails
 
