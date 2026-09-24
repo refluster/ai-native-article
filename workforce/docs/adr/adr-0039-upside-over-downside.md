@@ -3,7 +3,7 @@
 - **Status**: Proposed
 - **Date**: 2026-09-24
 - **Deciders**: operator
-- **Related**: [`north-star/10-upside.md`](../north-star/10-upside.md) (the corpus file this ADR ratifies), [`mvv.md`](../mvv.md) values 3 and 7, [adr-0034](adr-0034-public-qa-boards.md) (the public docs are pinned board knowledge, so the public statement and the corpus must agree), W-3 ([governance.md §2](../governance.md))
+- **Related**: [`north-star/upside-not-downside.md`](../north-star/upside-not-downside.md) (the corpus file this ADR ratifies), [`mvv.md`](../mvv.md) values 3 and 7, [adr-0034](adr-0034-public-qa-boards.md) (the public docs are pinned board knowledge, so the public statement and the corpus must agree), W-3 ([governance.md §2](../governance.md))
 - **Epics**: none — this is a direction decision that every later Epic is measured against
 
 ## Context
@@ -41,7 +41,7 @@ The record as of this date is mostly level 1 and a little of level 2.
 ## Decision
 
 1. **State the choice in the north-star corpus.** Add
-   `workforce/docs/north-star/10-upside.md` so that every persona holds it on
+   `workforce/docs/north-star/upside-not-downside.md` so that every persona holds it on
    every fire (agent-runner composition layer 2). It carries the contrast, the
    two levels, the direction (toward level 2), a list of what the workforce does
    not do, and one test question every proposal must pass.
@@ -75,7 +75,7 @@ The record as of this date is mostly level 1 and a little of level 2.
 ## Consequences
 
 - Every Epic, skill, hire and cadence proposal is measured against the test
-  question in `10-upside.md`. Proposals that fail it are not opened.
+  question in `upside-not-downside.md`. Proposals that fail it are not opened.
 - Monthly reports and feed posts gain a legitimate output: naming a running
   cadence as a retirement candidate. Retiring one frees W-3 budget for level-2
   work.

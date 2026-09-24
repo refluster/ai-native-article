@@ -35,6 +35,7 @@ line here is a per-fire token cost multiplied across all agents (W-3).
 
 Files here are **Zone A** — same bar as `mvv.md` itself: operator-merged only
 (listed in the `docs/governance.md` §4.4 L0/L1 block, so the pr-autopilot can
-never self-merge a change), and edits trip the R-11 citation gate. Naming
-files with a two-digit prefix (`10-strategy.md`, `20-quality-bar.md`) keeps
-the injection order deliberate.
+never self-merge a change), and edits trip the R-11 citation gate. File names must
+pass `workforce:naming` R4 (kebab-case, starting with a letter — a bare
+numeric prefix like `10-strategy.md` is rejected); if injection order ever
+matters, use a letter-first ordering key (`s10-strategy.md`, `s20-quality-bar.md`).
