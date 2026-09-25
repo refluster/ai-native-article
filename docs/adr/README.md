@@ -53,5 +53,12 @@ headers:
 | [0004](adr-0004-governance-consolidation.md) | Governance consolidation: de-duplicated statute, R-11 full-law coverage, R-13 terminal-state sweep | Proposed |
 | [0005](adr-0005-bilingual-article-editions.md) | Bilingual article editions (ja/en): one Notion row, an `EN` child page, one URL | Proposed |
 | [0006](adr-0006-publication-disclosure-posture.md) | Publication disclosure: comply with the strictest reading instead of classifying ourselves | Proposed |
+| [0008](adr-0008-egress-allowlist-named-l1-control.md) | The agent-egress allowlist becomes a named, owned, change-logged L1 control | Proposed |
 
 Keep this table in sync when an ADR is added or its Status flips.
+
+> **Numbering note (2026-09-15, `wf:dario` — `issue-design`).** ADR-0007
+> (registry owner + scheduled trigger, [#669](https://github.com/refluster/ai-native-article/issues/669))
+> is reserved on a sibling branch/PR from this same run and is not listed
+> here — this file's own git history is the source of truth for whichever of
+> the two merges first; do not renumber either speculatively.
