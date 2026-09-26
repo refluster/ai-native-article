@@ -70,6 +70,35 @@ export function classifyPr({ bodies = [], labels = [] }) {
   return { autopilotMerged: hasGreen && !needsHuman, reviewers: [...slugs] };
 }
 
+/** Retry a request that THREW, never one that answered.
+ *
+ *  An HTTP status is the server's answer, and the callers already classify it
+ *  (rate limit ends the loop, a refused PR is dropped). A thrown fetch is the
+ *  network not answering at all: a reset socket, a DNS blip, a TLS drop, or a
+ *  body cut off mid-read. The PR leg makes ~1,800 sequential calls per run, so
+ *  one of those is a matter of time: on 2026-09-26 a single `UND_ERR_SOCKET`
+ *  killed the workforce PR leg outright and /performance served the previous
+ *  day's PR block. Exponential backoff, then rethrow the last error so a
+ *  persistent outage still fails loud (W-4). */
+export async function fetchWithRetry(
+  doFetch,
+  { attempts = 3, baseDelayMs = 1000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), onRetry } = {},
+) {
+  let lastErr;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await doFetch();
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts) {
+        onRetry?.(err, i);
+        await sleep(baseDelayMs * 2 ** (i - 1));
+      }
+    }
+  }
+  throw lastErr;
+}
+
 /** Fetches the per-PR facts the roll-up aggregates, and reports what it could
  *  NOT fetch instead of averaging it in at zero.
  *
@@ -91,11 +120,23 @@ export async function fetchPrFacts(gh, repo, merged) {
   let quotaExhausted = false;
   for (const it of merged) {
     const n = it.number;
-    const [detail, comments, reviews] = await Promise.all([
-      gh(`/repos/${repo}/pulls/${n}`),
-      gh(`/repos/${repo}/issues/${n}/comments?per_page=100`),
-      gh(`/repos/${repo}/pulls/${n}/reviews?per_page=100`),
-    ]);
+    let detail, comments, reviews;
+    try {
+      [detail, comments, reviews] = await Promise.all([
+        gh(`/repos/${repo}/pulls/${n}`),
+        gh(`/repos/${repo}/issues/${n}/comments?per_page=100`),
+        gh(`/repos/${repo}/pulls/${n}/reviews?per_page=100`),
+      ]);
+    } catch (err) {
+      // The network never answered, even after `gh`'s own retries. Same rule as
+      // a refused detail: drop and count, so the block publishes as a flagged
+      // undercount instead of the whole leg dying on one PR.
+      skipped += 1;
+      console.error(
+        `${repo}: PR #${n} -> network error (${err?.cause?.code || err?.message || err}); dropped from the roll-up (not counted as zero churn)`,
+      );
+      continue;
+    }
     if (detail.status !== 200) {
       skipped += 1;
       if (isRateLimited(detail)) {
@@ -292,10 +333,17 @@ async function main() {
 
   const api = process.env.GITHUB_API_URL || "https://api.github.com";
   const gh = async (path) => {
-    const res = await fetch(`${api}${path}`, {
-      headers: { authorization: `Bearer ${token}`, accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28", "user-agent": "wf-pr-metrics-gh" },
-    });
-    const text = await res.text().catch(() => "");
+    const { res, text } = await fetchWithRetry(
+      async () => {
+        const res = await fetch(`${api}${path}`, {
+          headers: { authorization: `Bearer ${token}`, accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28", "user-agent": "wf-pr-metrics-gh" },
+        });
+        // Read the body inside the retry: a socket dropped mid-body used to be
+        // swallowed into "" and parsed as `{}`, i.e. a 200 with zero churn.
+        return { res, text: await res.text() };
+      },
+      { onRetry: (err, i) => console.error(`${path}: network error (${err?.cause?.code || err?.message || err}); retry ${i}`) },
+    );
     let json; try { json = text ? JSON.parse(text) : {}; } catch { json = {}; }
     const remaining = Number(res.headers.get("x-ratelimit-remaining"));
     const reset = Number(res.headers.get("x-ratelimit-reset"));
