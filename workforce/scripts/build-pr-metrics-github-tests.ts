@@ -1,7 +1,7 @@
 // @ts-nocheck — the script under test is dependency-free ESM, not TS.
 // Tests the pure classification + aggregation of the GitHub-API PR builder.
 import { describe, it, expect } from "vitest";
-import { classifyPr, aggregate, aggregateEscalations, aggregateReruns, fetchPrFacts, parseAlsoScopes } from "./build-pr-metrics-github.mjs";
+import { classifyPr, aggregate, aggregateEscalations, aggregateReruns, fetchPrFacts, fetchWithRetry, parseAlsoScopes } from "./build-pr-metrics-github.mjs";
 
 const GREEN = (slug) => `looks good\n<!-- autopilot:review:${slug}:green -->`;
 
@@ -201,5 +201,75 @@ describe("parseAlsoScopes", () => {
     expect(parseAlsoScopes(undefined, "workforce")).toEqual([]);
     expect(parseAlsoScopes("", "workforce")).toEqual([]);
     expect(parseAlsoScopes(true, "workforce")).toEqual([]); // arg() returns `true` for a bare flag
+  });
+});
+
+describe("fetchWithRetry (a request that threw is retried; one that answered is not)", () => {
+  const sleep = async () => {};
+  const socketError = () => Object.assign(new TypeError("fetch failed"), { cause: { code: "UND_ERR_SOCKET" } });
+
+  it("retries a thrown fetch and returns the first answer", async () => {
+    let calls = 0;
+    const r = await fetchWithRetry(async () => {
+      calls += 1;
+      if (calls < 3) throw socketError();
+      return "ok";
+    }, { attempts: 3, sleep });
+    expect(r).toBe("ok");
+    expect(calls).toBe(3);
+  });
+
+  it("rethrows the last error once attempts run out, so a real outage still fails loud", async () => {
+    let calls = 0;
+    await expect(
+      fetchWithRetry(async () => {
+        calls += 1;
+        throw socketError();
+      }, { attempts: 3, sleep }),
+    ).rejects.toThrow("fetch failed");
+    expect(calls).toBe(3);
+  });
+
+  it("does not retry a request that answered, whatever the status", async () => {
+    let calls = 0;
+    const r = await fetchWithRetry(async () => {
+      calls += 1;
+      return { status: 502 };
+    }, { attempts: 3, sleep });
+    expect(r).toEqual({ status: 502 });
+    expect(calls).toBe(1);
+  });
+
+  it("backs off exponentially between attempts", async () => {
+    const waits: number[] = [];
+    let calls = 0;
+    await fetchWithRetry(async () => {
+      calls += 1;
+      if (calls < 3) throw socketError();
+      return "ok";
+    }, { attempts: 3, baseDelayMs: 100, sleep: async (ms: number) => { waits.push(ms); } });
+    expect(waits).toEqual([100, 200]);
+  });
+});
+
+describe("fetchPrFacts (a PR whose calls throw is dropped, not fatal)", () => {
+  const item = (n) => ({ number: n, closed_at: "2026-09-01T00:00:00Z", labels: [], user: { login: "someone" } });
+  const ok = (n) => ({
+    status: 200,
+    json: { number: n, merged_at: "2026-09-01T00:00:00Z", additions: 100, deletions: 5, user: { login: "dev" } },
+  });
+
+  it("drops the PR whose network never answered and keeps the rest (2026-09-26 socket reset)", async () => {
+    const gh = async (path: string) => {
+      if (path.includes("/pulls/2") || path.includes("/issues/2/")) {
+        throw Object.assign(new TypeError("fetch failed"), { cause: { code: "UND_ERR_SOCKET" } });
+      }
+      const m = /\/pulls\/(\d+)$/.exec(path);
+      return m ? ok(Number(m[1])) : { status: 200, json: [] };
+    };
+    const r = await fetchPrFacts(gh, "o/r", [item(1), item(2), item(3)]);
+    expect(r.prs.map((p) => p.additions)).toEqual([100, 100]);
+    expect(r.skipped).toBe(1);
+    expect(r.quotaExhausted).toBe(false);
   });
 });
