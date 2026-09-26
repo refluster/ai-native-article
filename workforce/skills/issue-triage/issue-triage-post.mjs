@@ -42,6 +42,7 @@ import {
   LANE_WORKER_SKILL,
   HUMAN_ROLES,
   HUMAN_ROLE_LABEL_PREFIX,
+  OWNER_LABEL_PREFIX,
   PARKED_LABELS,
   applyHopCap,
   assertLane,
@@ -64,19 +65,25 @@ const LANE_LABEL_META = {
 const OWNER_LABEL_META = { color: "d4c5f9", description: "Assigned workforce persona (a slug, not a GitHub account — ML-012)." };
 const HUMAN_LABEL_META = (role) => ({ color: "e99695", description: `Operator lane: ${HUMAN_ROLES[role]}` });
 
-/** Labels to remove when applying `lane` to an issue currently carrying
- *  `current`:
+/** Labels to remove when applying `lane` (owned by `owner`) to an issue
+ *  currently carrying `current`:
  *    - every OTHER lane label (one lane per issue);
  *    - every hand-back / legacy parked label — posting a lane IS the router's
  *      answer to the park, so there is no "parked AND laned" state to preserve
  *      (adr-0038; this is what retired the old `--requeue` flag, which existed
  *      only to decide whether to clear them);
- *    - any stale `wf:human:*` role when the issue is leaving the operator lane.
+ *    - any stale `wf:human:*` role when the issue is leaving the operator lane;
+ *    - every OTHER `wf:owner:*` label — an issue has exactly one owner, same
+ *      invariant as the lane label above (#762: a re-lane that changes the
+ *      owner left both the old and the new owner label on the issue, because
+ *      this function never checked `OWNER_LABEL_PREFIX` even though it was
+ *      exported from issue-lanes.mjs for exactly this).
  *  Pure + exported: the "exactly one lane" invariant is unit-tested. */
-export function labelsToRemove(current = [], lane, { humanRole = null } = {}) {
+export function labelsToRemove(current = [], lane, { humanRole = null, owner = null } = {}) {
   assertLane(lane);
   const keep = laneLabel(lane);
   const keepRole = lane === "operator" && humanRole ? humanRoleLabel(humanRole) : null;
+  const keepOwner = owner ? ownerLabel(owner) : null;
   return current
     .map((l) => String(l || ""))
     .filter((l) => {
@@ -84,6 +91,7 @@ export function labelsToRemove(current = [], lane, { humanRole = null } = {}) {
       if (lc.startsWith(LANE_LABEL_PREFIX) && l !== keep) return true;
       if (PARKED_LABELS.includes(lc)) return true;
       if (lc.startsWith(HUMAN_ROLE_LABEL_PREFIX) && l !== keepRole) return true;
+      if (lc.startsWith(OWNER_LABEL_PREFIX) && l !== keepOwner) return true;
       return false;
     });
 }
@@ -214,7 +222,7 @@ async function main() {
   const l = await gh("POST", `/repos/${repo}/issues/${issue}/labels`, { labels: ensure.map(([name]) => name) });
   if (l.status !== 200) console.error(`issue-triage-post: WARN could not label #${issue} -> HTTP ${l.status}`);
 
-  for (const name of labelsToRemove(current, lane, { humanRole })) {
+  for (const name of labelsToRemove(current, lane, { humanRole, owner })) {
     const d = await gh("DELETE", `/repos/${repo}/issues/${issue}/labels/${encodeURIComponent(name)}`);
     if (d.status !== 200 && d.status !== 404) console.error(`issue-triage-post: WARN could not clear "${name}" -> HTTP ${d.status}`);
   }
