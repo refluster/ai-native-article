@@ -102,6 +102,7 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0033](adr-0033-seed-projects-lambda.md) | Promote `seed-projects.mjs` to a `WfSeedProjectsFunction` Lambda (META rows only, mirroring `WfSeedSkillsFunction`); the script is kept as an operator escape hatch, not retired | Proposed | [010](../epics/epic-010-project-trust-boundary.md) |
 | [0037](adr-0037-advisory-per-agent-budget.md) | The per-agent W-3 budget is advisory: measured per fire and reported (`/performance`, R-19), but it never refuses a dispatch — output continuity outranks the planning figure; withdraws the `W3-runway` write-time refusal (0035/0036 are reserved by open PRs #719/#727) | Accepted (2026-09-14) | — |
 | [0038](adr-0038-intake-lane-handoff-and-queue-invariant.md) | The intake lane gets what the PR lane had: `wf:handback` as one router-answered park, `wf:human:*` roles + the signature-not-investigation split rule, event-driven intake hand-offs, a `HOP_CAP` routing bound, and **R-N11** (a producer may not be bound without its consumer) over a declarative bindings manifest | Proposed | [019](../epics/epic-019-autonomous-finalization-rate.md) |
+| [0042](adr-0042-deprecation-removal-date-rule.md) | A `deprecated` skill must declare `deprecated_until` (90-day floor) in the same write; enforced at the agents-api write boundary, not by a CI lint | Proposed | [008](../epics/epic-008-skill-repository.md) |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](../epics/README.md).
@@ -116,6 +117,15 @@ canonical status view, same convention as [epics/README.md](../epics/README.md).
 > permanently sharing adjacent-but-order-dependent numbers — flagging this
 > now so it isn't silently forgotten, the same "say the blocker precisely"
 > discipline this skill's Step 5 asks for parked issues.
+>
+> **Renumbering note (2026-09-27, `wf:dario` — `issue-design`).** This PR's
+> adr-0042 (deprecation removal-date rule, #769) was drafted the same tick
+> as adr-0041 (AgentBinding retirement marker, #768) — both split from the
+> same parent #704. Both were first drafted as 0040/0041, then renumbered to
+> 0041/0042 on discovering open PR #766 already reserved adr-0040 for an
+> unrelated decision (#685's dispatch-dedup marker) from the same `main`
+> commit. Same collision class the 2026-09-09 note above describes; caught
+> before merge this time rather than after.
 
 > **Index reconciliation (2026-08-03, Nadia — `backlog-reconcile`).** Index-only
 > correction; **no ADR status was decided here.** A full sweep comparing every
