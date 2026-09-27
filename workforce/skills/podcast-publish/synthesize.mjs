@@ -50,7 +50,7 @@
 //        (fail loud — C-4)
 
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 const API_BASE = (
   process.env.WF_PODCAST_API_BASE ??
@@ -106,14 +106,18 @@ function post(payload) {
 // 15-min ceiling) with the operator/CI AWS credentials. Returns {status, text,
 // json} of the handler's {statusCode, body} result, like post().
 function invokeDirect(functionName, payload) {
-  const out = `${process.env.RUNNER_TEMP ?? "/tmp"}/wf-podcast-invoke-${process.pid}.json`;
+  const dir = process.env.RUNNER_TEMP ?? "/tmp";
+  const out = `${dir}/wf-podcast-invoke-${process.pid}.json`;
+  // fileb:// sends the file's bytes as-is on both AWS CLI v1 and v2 (v2 would
+  // otherwise expect a base64 --payload; v1 lacks --cli-binary-format).
+  const inFile = `${dir}/wf-podcast-payload-${process.pid}.json`;
+  writeFileSync(inFile, JSON.stringify(payload));
   const res = spawnSync("aws", [
     "lambda", "invoke",
     "--region", REGION,
     "--function-name", functionName,
-    "--cli-binary-format", "raw-in-base64-out",
     "--cli-read-timeout", "910",
-    "--payload", JSON.stringify(payload),
+    "--payload", `fileb://${inFile}`,
     out,
   ], { encoding: "utf8" });
   if (res.status !== 0) return { status: 0, text: `aws lambda invoke failed: ${res.stderr}`, json: undefined };
