@@ -21,7 +21,7 @@
 //   POST /podcast/rss                  — Story 6
 //       Build the podcast RSS from every audio-ready/published episode
 //       (enclosure = the public MP3, <description> = the mandatory citations,
-//       GUID = slug) and write it to the public podcast/feed.xml.
+//       GUID = the MP3's basename) and write it to the public podcast/feed.xml.
 //
 // Auth: IAM (the HttpApi authorizer), invoked by the operator/orchestrator who
 // hold AWS credentials — no new project credential type (the synthesis/RSS
@@ -216,11 +216,49 @@ async function queryAll(apiKey: string, databaseId: string): Promise<NotionPage[
   return pages;
 }
 
-function slugFromId(id: string): string {
-  return id.replace(/-/g, "").slice(0, 12);
+// The LAST 12 hex of the page id — the reader site's rule
+// (newsletter/pipeline/fetchers/notion.mjs). Never the first 12: this
+// workspace's ids are `XXXd0f0b-e61e-8…`, so the head is a time prefix plus a
+// workspace constant and every page created the same day shares it. The old
+// head-based slug gave same-day episodes one GUID and one MP3 key — later
+// syntheses overwrote earlier audio and Spotify dropped every duplicated GUID.
+export function slugFromId(id: string): string {
+  return id.replace(/-/g, "").slice(-12);
 }
 function pageSlug(p: NotionPage): string {
   return propText(p.properties?.LegacySlug) || slugFromId(p.id);
+}
+
+// An episode's feed GUID is the basename of the MP3 its audioUrl points at, not
+// a slug recomputed from the page: the audio key is fixed when the episode is
+// synthesised, so already-ingested episodes keep their GUID whatever the slug
+// rule later becomes.
+export function episodeGuid(audioUrl: string, fallback: string): string {
+  const m = /\/([^/?#]+)\.mp3(?:[?#].*)?$/.exec(audioUrl);
+  return m?.[1] ? decodeURIComponent(m[1]) : fallback;
+}
+
+// Refuse to overwrite another episode's audio. Every MP3 is written with its
+// page id as `page-id` metadata; an existing object owned by a different page
+// is a slug collision and fails loud (C-4). A pre-metadata object is accepted
+// only when it is this page's own current audio (a re-synthesis).
+//
+// Existence is decided by ListObjectsV2 (exact-key match), never by a
+// HeadObject 404: whether S3 answers a missing key with 404 or 403 depends on
+// the role's s3:ListBucket reach, and this role's ListBucket is conditioned on
+// s3:prefix, which a list request carries and a HeadObject does not. HeadObject
+// then runs only on a key known to exist, so any error it throws is real.
+async function claimAudioKey(apiKey: string, pageId: string, key: string): Promise<void> {
+  const listed = await s3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: key, MaxKeys: 10 }));
+  if (!(listed.Contents ?? []).some((o) => o.Key === key)) return;
+  const head = await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
+  const owner = head.Metadata?.["page-id"] ?? "";
+  if (owner === pageId) return;
+  if (owner === "") {
+    const page = (await notionFetch(apiKey, `/pages/${pageId}`, { method: "GET" })) as NotionPage;
+    if (propText(page.properties?.audioUrl).endsWith(`/${key}`)) return;
+  }
+  throw new Error(`audio key ${key} already holds another episode's audio (owner ${owner || "unknown"}) — refusing to overwrite it for page ${pageId}`);
 }
 
 async function patchPodcast(apiKey: string, pageId: string, props: Record<string, unknown>): Promise<void> {
@@ -322,11 +360,13 @@ async function finalizeOne(apiKey: string, h: SynthHandle): Promise<Record<strin
   if (!outputUri) throw new Error(`Polly task ${h.taskId} (${h.slug}) completed without an OutputUri`);
   const srcKey = decodeURIComponent(new URL(outputUri).pathname.replace(new RegExp(`^/${BUCKET}/`), "").replace(/^\//, ""));
   const destKey = `${PREFIX_AUDIO}/${h.slug}.mp3`;
+  await claimAudioKey(apiKey, h.pageId, destKey);
   await s3.send(new CopyObjectCommand({
     Bucket: BUCKET,
     CopySource: `/${BUCKET}/${srcKey}`,
     Key: destKey,
     ContentType: "audio/mpeg",
+    Metadata: { "page-id": h.pageId },
     MetadataDirective: "REPLACE",
   }));
   await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: srcKey })).catch(() => { /* best-effort temp cleanup */ });
@@ -398,8 +438,9 @@ async function stitchGemini(notionKey: string, p: GeminiPlan): Promise<Record<st
   const gap = Buffer.alloc(Math.round(sr * 0.4) * 2);
   const joined = { ...normalized[0]!, data: Buffer.concat(normalized.flatMap((n, i) => (i ? [gap, n.data] : [n.data]))) };
   const destKey = `${PREFIX_AUDIO}/${p.h.slug}.mp3`;
+  await claimAudioKey(notionKey, p.h.pageId, destKey);
   const mp3 = encodeMp3(joined, GEMINI_MP3_KBPS);
-  await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: destKey, Body: mp3, ContentType: "audio/mpeg" }));
+  await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: destKey, Body: mp3, ContentType: "audio/mpeg", Metadata: { "page-id": p.h.pageId } }));
   await s3
     .send(new DeleteObjectsCommand({ Bucket: BUCKET, Delete: { Objects: keys.map((Key) => ({ Key })) } }))
     .catch(() => { /* best-effort temp cleanup */ });
@@ -593,7 +634,7 @@ async function buildRss(): Promise<ProxyResult> {
     // <description>; the mandatory citations always follow it.
     const showNotes = propText(p.properties?.podcastShowNotes).trim();
     episodes.push({
-      slug: pageSlug(p),
+      slug: episodeGuid(audioUrl, pageSlug(p)),
       title: propText(p.properties?.Title) || pageSlug(p),
       description: showNotes ? `${showNotes}\n\n${citations}` : citations,
       audioUrl,

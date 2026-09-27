@@ -11,12 +11,14 @@ import {
   GetObjectCommand,
   ListObjectsV2Command,
   DeleteObjectsCommand,
+  HeadObjectCommand,
 } from "@aws-sdk/client-s3";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 
 const s3Mock = mockClient(S3Client);
 const smMock = mockClient(SecretsManagerClient);
 const store = new Map<string, Buffer>();
+const meta = new Map<string, Record<string, string>>();
 
 function wav(seconds: number): Buffer {
   const data = Buffer.alloc(Math.round(seconds * 24000) * 2);
@@ -48,16 +50,23 @@ beforeAll(async () => {
 
 beforeEach(() => {
   store.clear();
+  meta.clear();
   notionPatches = [];
   geminiCalls = 0;
   geminiMode = "ok";
   s3Mock.reset();
   smMock.reset();
   smMock.on(GetSecretValueCommand).callsFake(async (i: any) => ({ SecretString: JSON.stringify({ apiKey: `key-for-${i.SecretId}` }) }));
-  s3Mock.on(PutObjectCommand).callsFake(async (i: any) => { store.set(i.Key, Buffer.from(i.Body)); return {}; });
+  s3Mock.on(PutObjectCommand).callsFake(async (i: any) => { store.set(i.Key, Buffer.from(i.Body)); meta.set(i.Key, i.Metadata ?? {}); return {}; });
   s3Mock.on(GetObjectCommand).callsFake(async (i: any) => ({ Body: { transformToByteArray: async () => new Uint8Array(store.get(i.Key)!) } }));
   s3Mock.on(ListObjectsV2Command).callsFake(async (i: any) => ({ Contents: [...store.keys()].filter((k) => k.startsWith(i.Prefix)).map((Key) => ({ Key })) }));
   s3Mock.on(DeleteObjectsCommand).callsFake(async (i: any) => { for (const o of i.Delete.Objects) store.delete(o.Key); return {}; });
+  // A missing key answers 403, as S3 does for a role without an unconditioned
+  // s3:ListBucket — the ownership check must never reach HeadObject for one.
+  s3Mock.on(HeadObjectCommand).callsFake(async (i: any) => {
+    if (!store.has(i.Key)) throw Object.assign(new Error("Forbidden"), { name: "Forbidden", $metadata: { httpStatusCode: 403 } });
+    return { Metadata: meta.get(i.Key) ?? {} };
+  });
 
   const page = {
     id: "page-1",
@@ -169,6 +178,23 @@ describe("wf-podcast Gemini engine", () => {
     const r = await invoke(k.started);
     expect(r.status).toBe(500);
     expect(r.json.error).toMatch(/too short/);
+    expect(notionPatches).toEqual([]);
+  });
+
+  it("stamps the stitched MP3 with its page id", async () => {
+    const { json: k } = await call({});
+    await invoke(k.started);
+    expect(meta.get("podcast/audio/ep1.mp3")).toEqual({ "page-id": "page-1" });
+  });
+
+  it("refuses to overwrite another page's audio at stitch time (no Notion patch)", async () => {
+    store.set("podcast/audio/ep1.mp3", Buffer.from("other episode"));
+    meta.set("podcast/audio/ep1.mp3", { "page-id": "page-0" });
+    const { json: k } = await call({});
+    const r = await invoke(k.started);
+    expect(r.status).toBe(500);
+    expect(r.json.error).toMatch(/already holds another episode's audio/);
+    expect(store.get("podcast/audio/ep1.mp3")!.toString()).toBe("other episode");
     expect(notionPatches).toEqual([]);
   });
 });

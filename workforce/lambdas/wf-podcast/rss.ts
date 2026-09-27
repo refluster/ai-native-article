@@ -27,7 +27,7 @@ export interface PodcastChannel {
 }
 
 export interface PodcastEpisode {
-  slug: string; // GUID
+  slug: string; // GUID — must be unique across the feed
   title: string;
   description: string; // the source citations (mandatory)
   audioUrl: string; // the public MP3 enclosure (CDN)
@@ -65,7 +65,27 @@ function hms(totalSec: number): string {
   return hh > 0 ? `${hh}:${p(mm)}:${p(ss)}` : `${mm}:${p(ss)}`;
 }
 
+/**
+ * Throw on a duplicated GUID or enclosure (C-4). Spotify drops every item
+ * whose GUID repeats, and a shared enclosure means one episode's audio was
+ * overwritten by another's — both are silent losses, so the feed never ships
+ * with either.
+ */
+export function assertUniqueEpisodes(episodes: PodcastEpisode[]): void {
+  for (const field of ["slug", "audioUrl"] as const) {
+    const seen = new Map<string, string>();
+    for (const ep of episodes) {
+      const prev = seen.get(ep[field]);
+      if (prev !== undefined) {
+        throw new Error(`duplicate episode ${field === "slug" ? "GUID" : "enclosure"} ${ep[field]} ("${prev}" and "${ep.title}") — refusing to build a feed that drops or mis-plays episodes`);
+      }
+      seen.set(ep[field], ep.title);
+    }
+  }
+}
+
 export function buildPodcastRss(channel: PodcastChannel, episodes: PodcastEpisode[]): string {
+  assertUniqueEpisodes(episodes);
   const items = episodes
     .map((ep) => {
       const enclosureLen = ep.byteLength && ep.byteLength > 0 ? ep.byteLength : 0;
