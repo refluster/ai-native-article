@@ -169,16 +169,33 @@ Once an article is `approved` (and `podcast-publish` has set its voice/notes):
    (ADR-0043, §3a) that means chunk waves via direct `aws lambda invoke`; with
    Polly it is `StartSpeechSynthesisTask`. It writes the MP3 to
    `s3://…/podcast/audio/{slug}.mp3` and sets `audioUrl` +
-   `podcastStatus=audio-ready`. Up to 5 oldest `approved` per run.
+   `podcastStatus=audio-ready`. Up to 5 oldest `approved` per run. `{slug}` is
+   `LegacySlug`, else the **last** 12 hex of the page id (the reader site's
+   rule); each MP3 carries `page-id` metadata and synthesis refuses to
+   overwrite a key another page owns.
 2. **Publish + build RSS** — `node workforce/skills/podcast-publish/publish.mjs`
    → `wf-podcast` publish route. It flips up to 5 oldest `audio-ready` episodes to
    `published` and rebuilds the podcast RSS (enclosure = the CDN MP3,
    `<description>` = `podcastShowNotes` then the mandatory `podcastSources`
-   citations, GUID = slug) to the public `podcast/feed.xml`. (For a standalone
+   citations, GUID = the MP3 basename from `audioUrl`) to the public
+   `podcast/feed.xml`. The build fails loud on a duplicated GUID or enclosure —
+   Spotify silently drops every item whose GUID repeats. (For a standalone
    feed refresh without flipping status: `build-rss.mjs`.)
 3. The daily `.github/workflows/podcast-pipeline.yml` runs steps 1–2 in CI (AWS
    OIDC). Validate the feed against a podcast-feed checker (e.g. Cast Feed
    Validator, Podba.se) before the first Spotify submission.
+
+### 5a. Repairing episodes lost to the 2026 slug collision
+
+Until 2026-09 the slug was the **first** 12 hex of the page id, which is shared
+by every page created the same day (`XXXd0f0b-e61e-…`). Same-day episodes got
+one MP3 key and one GUID: later syntheses overwrote earlier audio and Spotify
+dropped all of them (56 of 168 episodes). The overwritten audio survives as S3
+object versions. `workforce/scripts/restore-podcast-collided-audio.mjs` copies
+each episode's version (from a committed page → version plan) to its own key,
+repoints `audioUrl`, and is dry-run by default; then run `build-rss.mjs`.
+Run it **before** the GUID fix deploys: the new feed guard rejects the
+remaining duplicates until they are restored.
 
 ---
 

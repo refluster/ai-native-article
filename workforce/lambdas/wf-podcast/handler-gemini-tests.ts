@@ -11,6 +11,7 @@ import {
   GetObjectCommand,
   ListObjectsV2Command,
   DeleteObjectsCommand,
+  HeadObjectCommand,
 } from "@aws-sdk/client-s3";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 
@@ -58,6 +59,10 @@ beforeEach(() => {
   s3Mock.on(GetObjectCommand).callsFake(async (i: any) => ({ Body: { transformToByteArray: async () => new Uint8Array(store.get(i.Key)!) } }));
   s3Mock.on(ListObjectsV2Command).callsFake(async (i: any) => ({ Contents: [...store.keys()].filter((k) => k.startsWith(i.Prefix)).map((Key) => ({ Key })) }));
   s3Mock.on(DeleteObjectsCommand).callsFake(async (i: any) => { for (const o of i.Delete.Objects) store.delete(o.Key); return {}; });
+  s3Mock.on(HeadObjectCommand).callsFake(async (i: any) => {
+    if (!store.has(i.Key)) throw Object.assign(new Error("NotFound"), { name: "NotFound", $metadata: { httpStatusCode: 404 } });
+    return { Metadata: { "page-id": "page-1" } };
+  });
 
   const page = {
     id: "page-1",
