@@ -11,7 +11,7 @@
 // Pattern modelled on patch-skill-tests.ts: in-memory row map behind the
 // DDB mock, real route dispatcher + real skill-config module under test.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
 
 process.env.STAGE = "test";
@@ -83,6 +83,40 @@ vi.mock("../shared/ddb.js", () => ({
 // itself is covered by shared/project-tests.ts; here we assert the route's
 // filtering + shaping contract.
 const execFixtures: Array<Record<string, unknown>> = [];
+
+// pr-remediate cycle 1 (finding O1): the original mock ignored `from` and
+// `limit` entirely, so it could not reproduce the SKILL_ACTIVITY_EXEC_LIMIT
+// truncation boundary `computeSkillActivity` depends on, nor the bounded
+// `from`-scoped month query it now issues (A1). This mirrors the real
+// `listExecutions` contract: filter by scope, then by the `from`/`to`
+// range, sort newest-first (DDB's ScanIndexForward:false), then apply
+// `limit` — in that order, since DDB applies Limit AFTER sorting. Defined
+// as a standalone default (rather than inline in the `vi.fn()` call) so
+// finding A2's degrade test can `.mockImplementationOnce` a throw for one
+// skill and fall back to this for every other call.
+async function defaultListExecutions(filter: {
+  skill_name?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+}) {
+  const scoped = execFixtures.filter(
+    (e) => !filter.skill_name || e.skill_name === filter.skill_name,
+  );
+  const ranged = scoped.filter((e) => {
+    const startedAt = e.started_at as string;
+    if (filter.from && startedAt < filter.from) return false;
+    if (filter.to && startedAt > filter.to) return false;
+    return true;
+  });
+  const sorted = [...ranged].sort((a, b) => {
+    const as = a.started_at as string;
+    const bs = b.started_at as string;
+    return as < bs ? 1 : as > bs ? -1 : 0;
+  });
+  return filter.limit ? sorted.slice(0, filter.limit) : sorted;
+}
+const listExecutionsMock = vi.fn(defaultListExecutions);
 vi.mock("../shared/project.js", () => ({
   asProjectId: (s: string) => s,
   projectPk: (id: string) => `PROJECT#${id}`,
@@ -90,9 +124,8 @@ vi.mock("../shared/project.js", () => ({
   archive: vi.fn(),
   unarchive: vi.fn(),
   rename: vi.fn(),
-  listExecutions: vi.fn(async (filter: { skill_name?: string }) =>
-    execFixtures.filter((e) => !filter.skill_name || e.skill_name === filter.skill_name),
-  ),
+  listExecutions: (...args: [Parameters<typeof defaultListExecutions>[0]]) =>
+    listExecutionsMock(...args),
   appendExecution: vi.fn(),
 }));
 vi.mock("../shared/credential-injector.js", () => ({
@@ -353,11 +386,15 @@ describe("GET /skills/{name}/executions — per-skill run ledger (ADR-0017 obser
 });
 
 describe("invocations_this_month / last_invoked_at — computed from the EXEC ledger (#767)", () => {
-  // Fixed against a UTC "now" (rather than the real clock) so the test
-  // doesn't flake on the 1st of a month: the SUT calls `new Date()`
-  // internally, so these fixture timestamps are anchored to the real
-  // current UTC month, computed the same way the SUT does.
-  const now = new Date();
+  // pr-remediate cycle 1 (finding O2): the original version read `new
+  // Date()` here at test-definition time and relied on the SUT reading
+  // `new Date()` again, independently, inside the request — two real-clock
+  // reads that happen to agree almost always, but a UTC month rollover
+  // landing between them (however rare) still flakes exactly the boundary
+  // this suite exists to pin down. Freeze the clock instead: `now` below is
+  // the only "current time" either side ever sees, so the flake this
+  // comment claims to avoid is actually eliminated, not narrowed.
+  const now = new Date("2026-06-15T12:00:00.000Z");
   const monthStartIso = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
   ).toISOString();
@@ -366,6 +403,8 @@ describe("invocations_this_month / last_invoked_at — computed from the EXEC le
   ).toISOString();
 
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
     seedSkill("alive", { invocations_this_month: 0 }); // the stored field stays the stale literal
     // Pushed newest-first, matching listExecutions' documented contract
     // (queryByGsi ScanIndexForward:false) that the mock stands in for.
@@ -416,5 +455,64 @@ describe("invocations_this_month / last_invoked_at — computed from the EXEC le
     const { json } = await call(makeEvent("GET /skills/{name}", { name: "untouched" }));
     expect(json.invocations_this_month).toBe(0);
     expect(json.last_invoked_at).toBeUndefined();
+  });
+
+  // pr-remediate cycle 1 (finding O1): the count query is separately bounded
+  // by SKILL_ACTIVITY_EXEC_LIMIT (1000, handler.ts) from the last-invoked
+  // query (limit:1) — this seeds past that ceiling to prove the month count
+  // truncates there instead of silently overcounting past it (or, before
+  // this fix's mock update, being unable to exercise the ceiling at all).
+  it("invocations_this_month truncates at SKILL_ACTIVITY_EXEC_LIMIT (1000) instead of overcounting past it", async () => {
+    seedSkill("prolific");
+    const minuteMs = 60 * 1000;
+    const monthStartMs = Date.parse(monthStartIso);
+    for (let i = 0; i < 1005; i++) {
+      const ts = new Date(monthStartMs + i * minuteMs).toISOString();
+      execFixtures.push({
+        pk: "PROJECT#p",
+        sk: `EXEC#${String(i).padStart(4, "0")}`,
+        project_id: "p",
+        agent_slug: "grace",
+        skill_name: "prolific",
+        skill_version: "0.1.0",
+        started_at: ts,
+        ended_at: ts,
+        status: "ok",
+      });
+    }
+    const { json } = await call(makeEvent("GET /skills/{name}", { name: "prolific" }));
+    expect(json.invocations_this_month).toBe(1000); // capped, not 1005
+    // last_invoked_at is a separate limit:1 query — unaffected by the count
+    // ceiling, so it still reports the true newest row (index 1004).
+    expect(json.last_invoked_at).toBe(
+      new Date(monthStartMs + 1004 * minuteMs).toISOString(),
+    );
+  });
+
+  // pr-remediate cycle 1 (finding A2): one skill's EXEC-ledger read failing
+  // must degrade that row to its stored fields, not fail the whole list —
+  // matching the endpoint's pre-#767 resilience (a scan-then-read shape
+  // where one bad row could never take the list down).
+  it("GET /skills degrades one skill to its stored fields when its ledger query throws, without failing the list", async () => {
+    seedSkill("flaky", { invocations_this_month: 0 });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    listExecutionsMock.mockImplementation(async (filter) => {
+      if (filter.skill_name === "flaky") throw new Error("ledger unavailable");
+      return defaultListExecutions(filter);
+    });
+    const { status, json } = await call(makeEvent("GET /skills"));
+    expect(status).toBe(200);
+    const flaky = json.items.find((s: any) => s.name === "flaky");
+    expect(flaky.invocations_this_month).toBe(0); // stored literal, not thrown through
+    expect(flaky.last_invoked_at).toBeUndefined();
+    const alive = json.items.find((s: any) => s.name === "alive");
+    expect(alive.invocations_this_month).toBe(1); // sibling row still computed normally
+    expect(errorSpy).toHaveBeenCalled(); // C-4: degraded silently to the caller, but not to the logs
+    errorSpy.mockRestore();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    listExecutionsMock.mockImplementation(defaultListExecutions);
   });
 });
