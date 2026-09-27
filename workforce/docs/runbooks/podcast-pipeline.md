@@ -117,11 +117,16 @@ outlasts the HTTP API's 30 s window. Cut over in this order:
    | `GEMINI_CHUNK_CHARS` | 2400 | Max 字 per Gemini request (≈7 min; longer requests degrade into hiss) |
    | `GEMINI_CONCURRENCY` | 2 | Chunks synthesised in parallel |
    | `GEMINI_VOICE_MAP` | `{"Takumi":"Charon","Kazuha":"Kore","Tomoko":"Aoede"}` | Casting name → Gemini voice |
-   | `GEMINI_TTS_STYLE` | (built-in) | Delivery direction, never spoken |
+   | `GEMINI_TTS_STYLE` | `落ち着いた一定のテンポで話すナレーター` | Delivery direction, never spoken. Keep it short: long persona prompts made chunks drift in pitch (ADR-0043 finding 9) |
    | `GEMINI_MIN_JI_PER_MIN` / `GEMINI_MAX_JI_PER_MIN` | 220 / 480 | Speech-rate guard band |
    | `GEMINI_HISS_MAX_DB` / `GEMINI_HISS_MAX_RISE_DB` | 0 / 6 | Progressive-hiss guard |
    | `GEMINI_GUARD_RETRIES` | 1 | Retakes of a chunk a guard rejects |
 
+- **Chunk joins** are normalised automatically at stitch time (tempo,
+  brightness, loudness; ADR-0043 Decision 6). The per-chunk corrections are
+  logged as `wf_podcast_normalize` and returned in the synthesize result
+  (`normalize: [{stretch, tilt, gainDb}]`). A correction pinned at its bound
+  (±12% stretch, ±6 dB) means that chunk drifted unusually far: listen to it.
 - **Rollback:** set the Lambda env `PODCAST_TTS_ENGINE=polly`. No code change;
   the Polly path is untouched.
 - **Free-tier quota: 10 requests/day.** A median episode is 2 requests; a
@@ -189,13 +194,20 @@ Once an article is `approved` (and `podcast-publish` has set its voice/notes):
 
 Until 2026-09 the slug was the **first** 12 hex of the page id, which is shared
 by every page created the same day (`XXXd0f0b-e61e-…`). Same-day episodes got
-one MP3 key and one GUID: later syntheses overwrote earlier audio and Spotify
-dropped all of them (56 of 168 episodes). The overwritten audio survives as S3
-object versions. `workforce/scripts/restore-podcast-collided-audio.mjs` copies
-each episode's version (from a committed page → version plan) to its own key,
-repoints `audioUrl`, and is dry-run by default; then run `build-rss.mjs`.
-Run it **before** the GUID fix deploys: the new feed guard rejects the
-remaining duplicates until they are restored.
+one MP3 key and one GUID: Spotify dropped every item whose GUID repeated —
+**88 episodes in 32 groups were hidden** — and later syntheses overwrote
+earlier audio, so **56 of those 88 lost their MP3**. The overwritten audio
+survives as S3 object versions. `workforce/scripts/restore-podcast-collided-audio.mjs`
+copies each episode's version (from a committed page → version plan) to its
+own key and repoints `audioUrl`; it is dry-run by default. Order matters:
+
+1. `node workforce/scripts/restore-podcast-collided-audio.mjs --apply`
+2. deploy `wf-podcast` with the GUID fix (the new feed guard rejects the
+   shared GUIDs, so it must land **after** step 1)
+3. `node workforce/skills/podcast-publish/build-rss.mjs` — a rebuild under the
+   old Lambda would still emit the shared GUIDs.
+
+Applied 2026-09-27 (88/88).
 
 ---
 

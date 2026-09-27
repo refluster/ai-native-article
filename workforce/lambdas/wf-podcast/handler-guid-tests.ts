@@ -4,7 +4,7 @@
 // dropped every duplicated GUID. These pin the fix.
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { mockClient } from "aws-sdk-client-mock";
-import { S3Client, PutObjectCommand, HeadObjectCommand, CopyObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, HeadObjectCommand, CopyObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import {
   PollyClient,
   StartSpeechSynthesisTaskCommand,
@@ -57,8 +57,13 @@ beforeEach(() => {
   pollyMock.reset();
   smMock.reset();
   smMock.on(GetSecretValueCommand).resolves({ SecretString: JSON.stringify({ apiKey: "k" }) });
+  // Missing keys answer HeadObject with 403 (no unconditioned s3:ListBucket);
+  // existence must come from the list call.
+  s3Mock.on(ListObjectsV2Command).callsFake(async (i: any) => ({
+    Contents: Object.keys(heads).filter((k) => k.startsWith(i.Prefix)).map((Key) => ({ Key })),
+  }));
   s3Mock.on(HeadObjectCommand).callsFake(async (i: any) => {
-    if (!(i.Key in heads)) throw Object.assign(new Error("NotFound"), { name: "NotFound", $metadata: { httpStatusCode: 404 } });
+    if (!(i.Key in heads)) throw Object.assign(new Error("Forbidden"), { name: "Forbidden", $metadata: { httpStatusCode: 403 } });
     return { Metadata: heads[i.Key], ContentLength: 1000 };
   });
   s3Mock.on(PutObjectCommand).callsFake(async (i: any) => { if (i.Key === "podcast/feed.xml") feed = String(i.Body); return {}; });
@@ -120,6 +125,12 @@ describe("wf-podcast audio-key ownership", () => {
     pages = [page("3e3d0f0b-e61e-8101-aaaa-a1a1a1a1a1a1", status("approved"))];
     const k = await post("/podcast/synthesize");
     expect(k.json.started[0].slug).toBe("a1a1a1a1a1a1");
+  });
+
+  it("treats a key that only shares a prefix as free", async () => {
+    heads["podcast/audio/k1.mp3.bak"] = { "page-id": "p0" };
+    pages = [page("p1", status("approved"))];
+    expect((await finalize("p1", "k1")).status).toBe(200);
   });
 
   it("writes a free key and stamps it with the page id", async () => {

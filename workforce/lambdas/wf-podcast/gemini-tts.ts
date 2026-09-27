@@ -6,10 +6,11 @@
 // an episode is:
 //
 //   script ─chunkScript→ N chunks ─(one Gemini call each)→ WAV/PCM
-//          ─durationGuard→ + inter-chunk silence ─encodeMp3→ per-chunk MP3 (S3 tmp)
-//          ─byte-concat→ podcast/audio/{slug}.mp3
+//          ─rate + hiss guards→ per-chunk WAV (S3 tmp)
+//          ─normalizeChunks (tempo / brightness / loudness)→ join with 0.4 s
+//          ─encodeMp3 once→ podcast/audio/{slug}.mp3
 //
-// Each chunk's MP3 is persisted to S3 as soon as it exists, so progress
+// Each chunk's WAV is persisted to S3 as soon as it exists, so progress
 // survives across invocations: every invocation synthesises only the missing
 // chunks. Script length therefore has no upper bound — a 30-min (or 2-hour)
 // script just takes more waves (and, on the free tier's 10 requests/day, more
@@ -36,9 +37,12 @@ export const DEFAULT_MODEL = "gemini-3.8-flash-tts";
  *  (not this constant) is the truncation guard. */
 export const MAX_AUDIO_SEC_PER_REQUEST = 16384 / 25;
 
-/** Default delivery direction, sent as speech_metadata.style (never spoken). */
-export const DEFAULT_STYLE =
-  "落ち着いた、知識のある友人が語りかけるような自然な日本語のナレーション。ニュース原稿の棒読みにしない。";
+/** Default delivery direction, sent as speech_metadata.style (never spoken).
+ *  Kept SHORT on purpose: Google's guidance is to let the voice carry identity
+ *  and keep per-request style minimal, and the ADR-0043 A/B on a 2-chunk
+ *  episode measured the cross-chunk pitch gap at −10% with the former long
+ *  persona prompt, −2.4% with none, −0.6% with this one. */
+export const DEFAULT_STYLE = "落ち着いた一定のテンポで話すナレーター";
 
 /**
  * Accepted speech rate, in 字/分. Measured on the live corpus: Polly median
@@ -223,6 +227,25 @@ export function assertNoHiss(p: Pcm, limits: HissLimits = DEFAULT_HISS_LIMITS): 
   if (max - median > limits.maxRiseDb) {
     throw new Error(`hiss: high-frequency ratio rises ${(max - median).toFixed(1)} dB above the chunk median at ~${at}s — degrading audio`);
   }
+}
+
+/** Serialise mono 16-bit PCM as a RIFF/WAVE buffer (parseWav's inverse). */
+export function wavFile(p: Pcm): Buffer {
+  const h = Buffer.alloc(44);
+  h.write("RIFF", 0, "latin1");
+  h.writeUInt32LE(36 + p.data.length, 4);
+  h.write("WAVE", 8, "latin1");
+  h.write("fmt ", 12, "latin1");
+  h.writeUInt32LE(16, 16);
+  h.writeUInt16LE(1, 20);
+  h.writeUInt16LE(1, 22);
+  h.writeUInt32LE(p.sampleRate, 24);
+  h.writeUInt32LE(p.sampleRate * 2, 28);
+  h.writeUInt16LE(2, 32);
+  h.writeUInt16LE(16, 34);
+  h.write("data", 36, "latin1");
+  h.writeUInt32LE(p.data.length, 40);
+  return Buffer.concat([h, p.data]);
 }
 
 // ── MP3 ──────────────────────────────────────────────────────────────────────

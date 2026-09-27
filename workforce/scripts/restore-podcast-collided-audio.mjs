@@ -7,8 +7,8 @@
 // plus a workspace constant — so every page created the same day got the same
 // slug. That slug was both the MP3 key (podcast/audio/{slug}.mp3) and the feed
 // GUID: each later synthesis overwrote the earlier episode's audio, and
-// Spotify dropped every item whose GUID repeated. 56 of 168 published
-// episodes were affected (32 collision groups).
+// Spotify dropped every item whose GUID repeated: 88 of 168 published
+// episodes were hidden (32 collision groups), 56 of them with overwritten audio.
 //
 // What this does: the overwritten audio survives as prior S3 object versions
 // (the bucket is versioned). The committed plan maps every affected page to
