@@ -88,6 +88,7 @@ import {
   type AgentAuditKind,
 } from "../shared/agent-audit.js";
 import {
+  type SkillComputed,
   type SkillMetaRow,
   skillPk,
   toSkillApiView,
@@ -1162,6 +1163,33 @@ async function listProjectAuditRoute(
 
 // ----- Skills (Epic-008 PR-D) -----
 
+// #767: `invocations_this_month` / `last_invoked_at` on the stored SKILL#
+// row are write-only — every call site sets them to a literal 0 / absent
+// (skill-row.ts's own comment names them "written by future stats
+// aggregator") and nothing ever increments them, so they read as zero
+// forever regardless of real activity. Rather than add a second,
+// independently-drifting counter (an incrementing write here would need
+// its own "first call of a new month" reset, the exact class of bug this
+// issue warns against), this computes both fields the same way `/stats`
+// already computes `runs_this_month` for agents (listStats, above): fresh
+// from the GSI2-backed EXEC ledger (`listExecutions({skill_name})`) on
+// every read. A skill genuinely never invoked still reads 0 — a skill that
+// ran gets the real count.
+const SKILL_ACTIVITY_EXEC_LIMIT = 1000; // generous ceiling, mirrors STATS_PER_AGENT_EXEC_LIMIT
+
+async function computeSkillActivity(
+  name: string,
+): Promise<Pick<SkillComputed, "invocations_this_month" | "last_invoked_at">> {
+  const now = new Date();
+  const monthStartIso = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+  const rows = await listExecutions({ skill_name: name, limit: SKILL_ACTIVITY_EXEC_LIMIT });
+  // Newest-first (listExecutions' contract) — rows[0] is the true last
+  // invocation even when it falls outside the current month.
+  const last_invoked_at = rows[0]?.started_at;
+  const invocations_this_month = rows.filter((r) => r.started_at >= monthStartIso).length;
+  return { invocations_this_month, last_invoked_at };
+}
+
 async function listSkills(
   event: APIGatewayProxyEventV2,
 ): Promise<APIGatewayProxyResultV2> {
@@ -1176,11 +1204,13 @@ async function listSkills(
   // Drain the whole SKILL#/META set (see scanAllPrefix / FU-PROJ-SCAN): a
   // Limit-capped scan window would hide skills that scan past it.
   const skillRows = await scanAllPrefix<SkillMetaRow>("SKILL#", "META");
-  const items = skillRows
+  const filtered = skillRows
     .filter((r) => includeArchived || r.status !== "archived")
     .filter((r) => !filterStatus || r.status === filterStatus)
-    .filter((r) => !filterOwner || r.owners.includes(filterOwner))
-    .map(toSkillApiView);
+    .filter((r) => !filterOwner || r.owners.includes(filterOwner));
+  const items = await Promise.all(
+    filtered.map(async (r) => ({ ...toSkillApiView(r), ...(await computeSkillActivity(r.name)) })),
+  );
 
   // Fully drained above — next_cursor retained for shape, always absent.
   return reply(200, { items, next_cursor: undefined });
@@ -1189,7 +1219,7 @@ async function listSkills(
 async function getSkill(name: string): Promise<APIGatewayProxyResultV2> {
   const row = await getItem<SkillMetaRow>(skillPk(name), "META");
   if (!row) return reply(404, { error: "not_found", name });
-  return reply(200, toSkillApiView(row));
+  return reply(200, { ...toSkillApiView(row), ...(await computeSkillActivity(name)) });
 }
 
 // ADR-0017: POST /skills — API-first creation of a JUDGMENT-ONLY skill

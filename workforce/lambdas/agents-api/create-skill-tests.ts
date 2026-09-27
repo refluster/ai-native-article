@@ -351,3 +351,70 @@ describe("GET /skills/{name}/executions — per-skill run ledger (ADR-0017 obser
     expect(status).toBe(404);
   });
 });
+
+describe("invocations_this_month / last_invoked_at — computed from the EXEC ledger (#767)", () => {
+  // Fixed against a UTC "now" (rather than the real clock) so the test
+  // doesn't flake on the 1st of a month: the SUT calls `new Date()`
+  // internally, so these fixture timestamps are anchored to the real
+  // current UTC month, computed the same way the SUT does.
+  const now = new Date();
+  const monthStartIso = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+  ).toISOString();
+  const lastMonthIso = new Date(
+    Date.parse(monthStartIso) - 24 * 60 * 60 * 1000,
+  ).toISOString();
+
+  beforeEach(() => {
+    seedSkill("alive", { invocations_this_month: 0 }); // the stored field stays the stale literal
+    // Pushed newest-first, matching listExecutions' documented contract
+    // (queryByGsi ScanIndexForward:false) that the mock stands in for.
+    execFixtures.push(
+      {
+        pk: "PROJECT#p",
+        sk: "EXEC#02B",
+        project_id: "p",
+        agent_slug: "grace",
+        skill_name: "alive",
+        skill_version: "0.1.0",
+        started_at: monthStartIso,
+        ended_at: monthStartIso,
+        status: "ok",
+      },
+      {
+        pk: "PROJECT#p",
+        sk: "EXEC#02A",
+        project_id: "p",
+        agent_slug: "grace",
+        skill_name: "alive",
+        skill_version: "0.1.0",
+        started_at: lastMonthIso,
+        ended_at: lastMonthIso,
+        status: "ok",
+      },
+    );
+  });
+
+  it("GET /skills/{name} reports the real count instead of the stale stored 0", async () => {
+    const { status, json } = await call(
+      makeEvent("GET /skills/{name}", { name: "alive" }),
+    );
+    expect(status).toBe(200);
+    expect(json.invocations_this_month).toBe(1); // only the in-month row counts
+    expect(json.last_invoked_at).toBe(monthStartIso); // the newest row overall, in- or out-of-month
+  });
+
+  it("GET /skills list computes it per-item too", async () => {
+    const { json } = await call(makeEvent("GET /skills"));
+    const alive = json.items.find((s: any) => s.name === "alive");
+    expect(alive.invocations_this_month).toBe(1);
+    expect(alive.last_invoked_at).toBe(monthStartIso);
+  });
+
+  it("a skill with zero EXEC rows still reads 0 / undefined, not stale data", async () => {
+    seedSkill("untouched");
+    const { json } = await call(makeEvent("GET /skills/{name}", { name: "untouched" }));
+    expect(json.invocations_this_month).toBe(0);
+    expect(json.last_invoked_at).toBeUndefined();
+  });
+});
