@@ -7,6 +7,16 @@
 - **Related**: [governance.md](../governance.md) R-N1(c) (amended by this PR), R-N2, R-N3, W-3, W-4; [ai-disclosure-v1](../design/ai-disclosure-v1.md) §2 (watermark requirement); [epic-017](../epics/epic-017-podcast-spotify-distribution.md) Phase 2 (multi-host)
 - **Epics**: [017](../epics/epic-017-podcast-spotify-distribution.md)
 
+> **Update (2026-09-27) — cross-chunk normalisation (finding 9, Decision 6).** On the
+> first production episode, the operator heard the voice quality and speed change
+> at the chunk join. Changes:
+> - The default style prompt is now short.
+> - Chunks are stored as WAV rather than MP3.
+> - At stitch time every chunk is pulled toward the episode median on tempo,
+>   brightness and loudness, then the episode is encoded once.
+>
+> Decision 2's storage bullets are amended accordingly. No other decision changes.
+
 ## Context
 
 The operator asked to synthesise podcast audio with **Google Gemini 3.8 Flash TTS**
@@ -75,6 +85,26 @@ Findings:
    - The 15-min output goes −8.7 dB → +1.8 dB at 8.5 min → +9 dB at the end.
    - Every clean output (87 s to 10.7 min) stays at or below −2.2 dB.
    - So long requests are a quality risk, not just the documented cap.
+9. **Independent requests drift (first production episode, 2 chunks).** The
+   operator heard the voice and the speed change at the join. Measured, second
+   chunk against first:
+   - pitch −10% (139.5 → 126.3 Hz median F0)
+   - high band −7.4 dB (duller)
+   - articulation (字 per second of speech, pauses excluded) −7%
+   - loudness +0.8 dB
+   - overall 字/分 identical, because the pauses compensated
+   
+   Re-synthesising the same two chunks, by style prompt:
+
+   | Style prompt | ΔF0 | Δhigh band | Δarticulation |
+   |---|---|---|---|
+   | long persona (the original default) | −10% | 7.4 dB | −7% |
+   | none | −2.4% | 5.1 dB | +12% |
+   | short `落ち着いた一定のテンポで話すナレーター` | **−0.6%** | 3.6 dB | −5.9% |
+
+   Google's guidance agrees: let the voice carry identity and keep style
+   minimal. Pitch is a prompt problem. Brightness and tempo drift regardless
+   of the prompt, so they are a post-processing problem.
 
 ## Options considered
 
@@ -96,12 +126,13 @@ Findings:
      at most `GEMINI_CHUNK_CHARS` (default **2,400字** ≈ 7 min). That is inside
      the documented cap and well short of the length where finding 8's
      degradation appeared.
-   - Each chunk's MP3 is written to `podcast/audio/tmp/{slug}-{hash}/{i}.mp3`.
-     The hash covers model + voice + style + chunk size + script text, so a
-     re-cast or an edited script never reuses stale chunks.
-   - When every chunk exists, the chunks are byte-concatenated (independently
-     encoded CBR MP3s concatenate into a valid stream) to
-     `podcast/audio/{slug}.mp3`, and the episode flips to `audio-ready`.
+   - Each chunk's guard-passed PCM is written as WAV to
+     `podcast/audio/tmp/{slug}-{hash}/{i}.wav`. The hash covers model + voice +
+     style + chunk size + script text, so a re-cast or an edited script never
+     reuses stale chunks.
+   - When every chunk exists, the chunks are normalised (Decision 6), joined
+     with 0.4 s of silence, and encoded **once** to `podcast/audio/{slug}.mp3`.
+     The episode then flips to `audio-ready`.
    - S3 is the only progress state (R-N2).
 
 3. **Invocation.**
@@ -137,6 +168,29 @@ Findings:
    unchanged. The Lambda maps them through `GEMINI_VOICE_MAP`, default
    `Takumi→Charon` (male, low, "informative and steady"), `Kazuha→Kore`,
    `Tomoko→Aoede` (female, "breezy, light"). Re-mapping is config, not code.
+
+6. **Cross-chunk normalisation (finding 9).**
+   - **Style.** The default `GEMINI_TTS_STYLE` is the short prompt from the
+     table above.
+   - **Normalisation at stitch** (`normalize.ts`, pure TS, deterministic).
+     Each chunk moves toward the episode median in this order:
+     1. **Tempo.** A pitch-preserving WSOLA time-stretch matches articulation
+        rate, with one refinement step. Bounded to ±12%; deviations under 2%
+        are left alone.
+     2. **Brightness.** A first-order tilt `y = x + g·(x[n]−x[n−1])` is solved
+        by bisection on the high-band ratio, measured after the stretch.
+        Bounded to ±6 dB; deviations under 1 dB are left alone.
+     3. **Loudness.** A gain to the median voiced RMS, peak-limited so it
+        never clips. Bounded to ±6 dB.
+   - Single-chunk episodes pass through untouched.
+   - **Measured on the finding-9 A/B.** After normalisation the two chunks
+     differ by 0.0 dB in the high band, 0.2% in articulation and 0–0.7 dB in
+     loudness. F0 stays within the estimator's noise. It costs about 13 s of
+     CPU per 9 min of audio.
+   - **Memory.** Every chunk's PCM is held during the stitch, about 17 MB/min
+     at peak with float buffers. 30 min fits comfortably in 1769 MB; beyond
+     about 60 min the stitch needs a streaming pass (stats first, then process
+     and encode chunk by chunk) or more memory.
 
 6. **Credential.** A Gemini API key `{apiKey}` lives in Secrets Manager at
    `wf/projects/agent-workforce/gemini.api_key` (R-N3). Only `wf-podcast` reads
