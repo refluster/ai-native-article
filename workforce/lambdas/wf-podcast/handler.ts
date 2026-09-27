@@ -52,10 +52,12 @@ import { getSecret } from "../shared/secrets.js";
 import { buildPodcastRss, type PodcastEpisode } from "./rss.js";
 import {
   DEFAULT_MODEL,
+  DEFAULT_HISS_LIMITS,
   DEFAULT_RATE_BAND,
   DEFAULT_STYLE,
   GeminiTtsError,
   assertDuration,
+  assertNoHiss,
   chunkScript,
   encodeMp3,
   pcmSeconds,
@@ -92,14 +94,16 @@ const TTS_ENGINE = (process.env.PODCAST_TTS_ENGINE ?? "polly").toLowerCase();
 const GEMINI_SECRET_ID = process.env.GEMINI_SECRET_ID ?? "wf/projects/agent-workforce/gemini.api_key";
 const GEMINI_MODEL = process.env.GEMINI_TTS_MODEL ?? DEFAULT_MODEL;
 const GEMINI_STYLE = process.env.GEMINI_TTS_STYLE ?? DEFAULT_STYLE;
-// Max 字 per Gemini request. 3,000字 ≈ 8.5 min of audio: under the documented
-// 655 s per-request cap, ~2 requests for a median episode (free tier = 10
-// requests/day), ~140 s latency per request (ADR-0043 PoC).
-const GEMINI_CHUNK_CHARS = Number(process.env.GEMINI_CHUNK_CHARS ?? "3000");
+// Max 字 per Gemini request. 2,400字 ≈ 7 min of audio: well inside the length
+// where the PoC heard/measured progressive hiss (a 15-min request degraded
+// from ~8 min; a 10.7-min one stayed clean), ~2 requests for a median episode
+// (free tier = 10 requests/day), ~60–120 s latency per request (ADR-0043).
+const GEMINI_CHUNK_CHARS = Number(process.env.GEMINI_CHUNK_CHARS ?? "2400");
 // Chunks synthesised in parallel per wave.
 const GEMINI_CONCURRENCY = Number(process.env.GEMINI_CONCURRENCY ?? "2");
 // Don't start a new wave with less than this much invocation time left (a
-// 3,000字 request ≈ 140 s + MP3 encode + S3/Notion).
+// 2,400字 request ≈ 60–120 s, possibly twice with a guard retake, + MP3
+// encode + S3/Notion).
 const GEMINI_WAVE_RESERVE_MS = Number(process.env.GEMINI_WAVE_RESERVE_MS ?? "300000");
 const GEMINI_MP3_KBPS = Number(process.env.GEMINI_MP3_KBPS ?? "64");
 const GEMINI_RATE_BAND = {
@@ -109,6 +113,13 @@ const GEMINI_RATE_BAND = {
 // The `podcastVoice` casting names (Odette's pool, set by podcast-publish) keep
 // their meaning across engines: each maps to a Gemini voice, so the casting
 // skill, set-params.mjs and existing Notion values need no change.
+const GEMINI_HISS_LIMITS = {
+  maxDb: Number(process.env.GEMINI_HISS_MAX_DB ?? DEFAULT_HISS_LIMITS.maxDb),
+  maxRiseDb: Number(process.env.GEMINI_HISS_MAX_RISE_DB ?? DEFAULT_HISS_LIMITS.maxRiseDb),
+};
+// Re-synthesise a chunk this many extra times when a quality guard (rate band
+// / hiss) rejects it — TTS is non-deterministic, a fresh take usually passes.
+const GEMINI_GUARD_RETRIES = Number(process.env.GEMINI_GUARD_RETRIES ?? "1");
 const GEMINI_VOICE_MAP: Record<string, string> = JSON.parse(
   process.env.GEMINI_VOICE_MAP ?? '{"Takumi":"Charon","Kazuha":"Kore","Tomoko":"Aoede"}',
 );
@@ -410,8 +421,18 @@ async function advanceGemini(
     await Promise.all(
       missing().slice(0, GEMINI_CONCURRENCY).map(async ({ p, i, text }) => {
         try {
-          const pcm = await synthesizeChunk({ apiKey: key, text, voice: p.voice, model: GEMINI_MODEL, style: GEMINI_STYLE });
-          assertDuration(text.length, pcmSeconds(pcm), GEMINI_RATE_BAND);
+          let pcm;
+          for (let attempt = 0; ; attempt++) {
+            pcm = await synthesizeChunk({ apiKey: key, text, voice: p.voice, model: GEMINI_MODEL, style: GEMINI_STYLE });
+            try {
+              assertDuration(text.length, pcmSeconds(pcm), GEMINI_RATE_BAND);
+              assertNoHiss(pcm, GEMINI_HISS_LIMITS);
+              break;
+            } catch (guard) {
+              if (attempt >= GEMINI_GUARD_RETRIES) throw guard;
+              console.warn(JSON.stringify({ event: "wf_podcast_guard_retry", slug: p.h.slug, chunk: i, error: String(guard) }));
+            }
+          }
           const last = i === p.chunks.length - 1;
           const mp3 = encodeMp3(pcm, GEMINI_MP3_KBPS, last ? 0 : 0.4);
           await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: `${p.prefix}${i}.mp3`, Body: mp3, ContentType: "audio/mpeg" }));

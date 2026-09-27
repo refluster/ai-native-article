@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   assertDuration,
+  assertNoHiss,
+  hissProfile,
   chunkScript,
   encodeMp3,
   GeminiTtsError,
@@ -182,5 +184,38 @@ describe("synthesizeChunk", () => {
   it("throws when the response has no audio part", async () => {
     const f = (async () => new Response(JSON.stringify({ status: "completed", steps: [] }), { status: 200 })) as unknown as typeof fetch;
     await expect(synthesizeChunk({ apiKey: "k", text: "x", voice: "Kore", fetchImpl: f })).rejects.toThrow(/no audio/);
+  });
+});
+
+describe("hiss guard (progressive-noise signature)", () => {
+  // Speech-like: 150–400 Hz harmonics with syllable-rate amplitude modulation.
+  function voice(seconds: number, hiss: (t: number) => number = () => 0): Pcm {
+    const sr = 24000;
+    const n = Math.round(seconds * sr);
+    const data = Buffer.alloc(n * 2);
+    let seed = 1;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1;
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      const env = 0.5 + 0.5 * Math.sin(2 * Math.PI * 4 * t);
+      const v = env * (0.5 * Math.sin(2 * Math.PI * 180 * t) + 0.3 * Math.sin(2 * Math.PI * 360 * t)) + hiss(t) * rnd();
+      data.writeInt16LE(Math.max(-32767, Math.min(32767, Math.round(v * 12000))), i * 2);
+    }
+    return { sampleRate: sr, channels: 1, bits: 16, data };
+  }
+
+  it("passes clean speech-like audio", () => {
+    const p = voice(120);
+    expect(hissProfile(p).length).toBe(4);
+    expect(() => assertNoHiss(p)).not.toThrow();
+  });
+
+  it("fails audio whose hiss grows over time (the 15-min PoC failure)", () => {
+    const p = voice(180, (t) => (t / 180) * 0.6);
+    expect(() => assertNoHiss(p)).toThrow(/hiss/);
+  });
+
+  it("ignores silence", () => {
+    expect(() => assertNoHiss({ sampleRate: 24000, channels: 1, bits: 16, data: Buffer.alloc(24000 * 2 * 40) })).not.toThrow();
   });
 });

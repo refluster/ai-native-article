@@ -160,6 +160,71 @@ export function assertDuration(chars: number, seconds: number, band: RateBand = 
   }
 }
 
+// ── Hiss guard ───────────────────────────────────────────────────────────────
+//
+// The PoC's single 15-min request degraded progressively: from ~8 min on, a
+// broadband hiss grew until it dominated (operator listening check,
+// 2026-09-27). The cheap signature is the energy of the SECOND DIFFERENCE of
+// the waveform (a strong high-pass) relative to the signal, over the louder
+// half of 20 ms frames in each 30 s window:
+//   clean outputs (87 s–10.7 min):  every window ≤ −2.2 dB
+//   degraded 15-min output:         −8.7 dB at the start → +1.8 dB at 8.5 min → +9 dB
+// A chunk fails if any window is above `maxDb`, or rises more than `maxRiseDb`
+// above the chunk's own median window (voice-independent).
+
+export interface HissLimits {
+  maxDb: number;
+  maxRiseDb: number;
+}
+export const DEFAULT_HISS_LIMITS: HissLimits = { maxDb: 0, maxRiseDb: 6 };
+
+/** Per-30 s-window high-frequency ratio in dB (see above). */
+export function hissProfile(p: Pcm, windowSec = 30): number[] {
+  const n = p.data.length >> 1;
+  const x = new Float64Array(n);
+  for (let i = 0; i < n; i++) x[i] = p.data.readInt16LE(i * 2);
+  const fr = Math.round(p.sampleRate * 0.02);
+  const win = Math.round(p.sampleRate * windowSec);
+  const out: number[] = [];
+  for (let w0 = 0; w0 + win / 2 <= n; w0 += win) {
+    const w1 = Math.min(n, w0 + win);
+    const frames: { e: number; d: number }[] = [];
+    for (let f0 = Math.max(w0, 2); f0 + fr <= w1; f0 += fr) {
+      let e = 0;
+      let d = 0;
+      for (let i = f0; i < f0 + fr; i++) {
+        const v = x[i]!;
+        const dd = v - 2 * x[i - 1]! + x[i - 2]!;
+        e += v * v;
+        d += dd * dd;
+      }
+      frames.push({ e, d });
+    }
+    if (frames.length === 0) continue;
+    const median = [...frames.map((f) => f.e)].sort((a, b) => a - b)[frames.length >> 1]!;
+    let e = 0;
+    let d = 0;
+    for (const f of frames) if (f.e > median) { e += f.e; d += f.d; }
+    if (e > 0) out.push(10 * Math.log10(d / e));
+  }
+  return out;
+}
+
+/** Throws if the chunk shows the progressive-hiss signature (C-1 guard). */
+export function assertNoHiss(p: Pcm, limits: HissLimits = DEFAULT_HISS_LIMITS): void {
+  const prof = hissProfile(p);
+  if (prof.length === 0) return;
+  const max = Math.max(...prof);
+  const median = [...prof].sort((a, b) => a - b)[prof.length >> 1]!;
+  const at = prof.indexOf(max) * 30;
+  if (max > limits.maxDb) {
+    throw new Error(`hiss: high-frequency ratio ${max.toFixed(1)} dB at ~${at}s > ${limits.maxDb} dB — degraded audio`);
+  }
+  if (max - median > limits.maxRiseDb) {
+    throw new Error(`hiss: high-frequency ratio rises ${(max - median).toFixed(1)} dB above the chunk median at ~${at}s — degrading audio`);
+  }
+}
+
 // ── MP3 ──────────────────────────────────────────────────────────────────────
 
 /**

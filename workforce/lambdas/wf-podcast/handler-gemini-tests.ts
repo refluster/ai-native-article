@@ -31,7 +31,7 @@ function wav(seconds: number): Buffer {
 const SCRIPT = Array.from({ length: 150 }, (_, i) => `これは${i}番目の説明の文です。`).join("");
 let notionPatches: any[] = [];
 let geminiCalls = 0;
-let geminiMode: "ok" | "daily" | "short" = "ok";
+let geminiMode: "ok" | "daily" | "short" | "shortOnce" = "ok";
 
 let handler: (e: any, ctx?: any) => Promise<{ statusCode: number; body: string }>;
 
@@ -82,7 +82,8 @@ beforeEach(() => {
       }
       const body = JSON.parse(String(init.body));
       const chars = body.input[0].content[0].text.length;
-      const sec = geminiMode === "short" ? 1 : (chars / 350) * 60; // 350字/分
+      const bad = geminiMode === "short" || (geminiMode === "shortOnce" && geminiCalls === 1);
+      const sec = bad ? 1 : (chars / 350) * 60; // 350字/分
       return new Response(JSON.stringify({ status: "completed", steps: [{ type: "model_output", content: [{ type: "audio", data: wav(sec).toString("base64") }] }] }));
     }
     throw new Error(`unexpected fetch ${url}`);
@@ -150,6 +151,15 @@ describe("wf-podcast Gemini engine", () => {
     geminiMode = "ok";
     const r3 = await invoke(k.started); // "tomorrow"
     expect(r3.json.done).toBe(true);
+  });
+
+  it("re-synthesises a chunk once when a quality guard rejects it", async () => {
+    const { json: k } = await call({});
+    geminiMode = "shortOnce";
+    const r = await invoke(k.started);
+    expect(r.status).toBe(200);
+    expect(r.json.done).toBe(true);
+    expect(geminiCalls).toBe(6); // 5 chunks + 1 retake
   });
 
   it("fails loud when a chunk's audio is far too short for its text (C-1)", async () => {

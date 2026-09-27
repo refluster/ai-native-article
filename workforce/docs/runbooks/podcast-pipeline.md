@@ -114,22 +114,25 @@ outlasts the HTTP API's 30 s window. Cut over in this order:
 
    | Variable | Default | Purpose |
    |---|---|---|
-   | `GEMINI_CHUNK_CHARS` | 3000 | Max 字 per Gemini request |
+   | `GEMINI_CHUNK_CHARS` | 2400 | Max 字 per Gemini request (≈7 min; longer requests degrade into hiss) |
    | `GEMINI_CONCURRENCY` | 2 | Chunks synthesised in parallel |
    | `GEMINI_VOICE_MAP` | `{"Takumi":"Charon","Kazuha":"Kore","Tomoko":"Aoede"}` | Casting name → Gemini voice |
    | `GEMINI_TTS_STYLE` | (built-in) | Delivery direction, never spoken |
    | `GEMINI_MIN_JI_PER_MIN` / `GEMINI_MAX_JI_PER_MIN` | 220 / 480 | Speech-rate guard band |
+   | `GEMINI_HISS_MAX_DB` / `GEMINI_HISS_MAX_RISE_DB` | 0 / 6 | Progressive-hiss guard |
+   | `GEMINI_GUARD_RETRIES` | 1 | Retakes of a chunk a guard rejects |
 
 - **Rollback:** set the Lambda env `PODCAST_TTS_ENGINE=polly`. No code change;
   the Polly path is untouched.
 - **Free-tier quota: 10 requests/day.** A median episode is 2 requests; a
-  30-min script is about 4. When the quota runs out, `synthesize.mjs` exits 3
+  30-min script is about 5. When the quota runs out, `synthesize.mjs` exits 3
   naming the episodes. They stay `approved`, and their finished chunks under
   `podcast/audio/tmp/` are reused by the next run. The only fixes are waiting a
   day or a paid key; re-running today just burns calls.
 - **Guard failures.** A chunk whose speech rate falls outside the band (skipped,
-  looped or truncated audio) fails the run loud. Re-run the pipeline: TTS is
-  non-deterministic, and finished chunks are kept.
+  looped or truncated audio), or that shows the growing-hiss signature, is
+  re-synthesised once. A second rejection fails the run loud. Re-run the
+  pipeline: TTS is non-deterministic, and finished chunks are kept.
 
 ---
 

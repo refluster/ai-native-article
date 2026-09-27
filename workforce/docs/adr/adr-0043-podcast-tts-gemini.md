@@ -66,6 +66,15 @@ Findings:
    `ja`. The prebuilt voices are multilingual (`Kore` read Japanese fluently).
 7. **MP3 encode in pure JS** (the Lambda has no ffmpeg): about 6 s per 5 min of
    audio at 64 kbps.
+8. **Long requests degrade: progressive hiss.** In the operator's listening
+   check, the 15-min single request grew a noise from about 10 min on that
+   worsened steadily. The 5-min and 10.7-min outputs were clean.
+   - Measured signature: the energy of the waveform's second difference (a
+     strong high-pass) relative to the signal, over the louder half of 20 ms
+     frames per 30 s window.
+   - The 15-min output goes −8.7 dB → +1.8 dB at 8.5 min → +9 dB at the end.
+   - Every clean output (87 s to 10.7 min) stays at or below −2.2 dB.
+   - So long requests are a quality risk, not just the documented cap.
 
 ## Options considered
 
@@ -84,8 +93,9 @@ Findings:
 
 2. **Chunked, resumable synthesis.**
    - The script is split on sentence and paragraph ends into balanced chunks of
-     at most `GEMINI_CHUNK_CHARS` (default **3,000字** ≈ 8.5 min, inside the
-     documented cap).
+     at most `GEMINI_CHUNK_CHARS` (default **2,400字** ≈ 7 min). That is inside
+     the documented cap and well short of the length where finding 8's
+     degradation appeared.
    - Each chunk's MP3 is written to `podcast/audio/tmp/{slug}-{hash}/{i}.mp3`.
      The hash covers model + voice + style + chunk size + script text, so a
      re-cast or an edited script never reuses stale chunks.
@@ -106,9 +116,15 @@ Findings:
    - The HTTP-API finalize **refuses** Gemini handles (400).
 
 4. **Fail loud, but not on quota (C-1 / C-4 / W-4).**
-   - A chunk whose speech rate falls outside **220–480字/分** throws. That
+   - A chunk whose speech rate falls outside **220–480字/分** is rejected. That
      covers skipped or truncated text; for example, a 5,572字 request cut at
      655 s would read as 510字/分. It also covers looped or inserted text.
+   - A chunk showing the **hiss signature** (finding 8) is rejected too: any
+     30 s window above 0 dB, or more than 6 dB above the chunk's own median.
+     On the PoC files this flags the degraded 15-min output and passes all
+     clean ones.
+   - A rejected chunk is re-synthesised **once** (TTS is non-deterministic);
+     a second rejection throws.
    - A non-200, a response without audio, or a 402 also throws → 500 → the
      alarm fires.
    - A per-minute 429 or a 503 backs off.
@@ -128,23 +144,28 @@ Findings:
 
 ## Scaling — does a 30-minute (or longer) script hold?
 
-Chunk 3,000字, speech ≈350字/分, free tier 10 requests/day:
+Chunk 2,400字, speech ≈350字/分, free tier 10 requests/day:
 
-| Script | 字 | Requests | Wall time (2 in parallel, ~140–260 s each) | Free-tier days |
+| Script | 字 | Requests | Wall time (2 in parallel, ~60–120 s each) | Free-tier days |
 |---|---|---|---|---|
-| median episode | 3,420 | 2 | ~2–4 min, 1 invocation | 1 |
-| longest today | 5,572 | 2 | ~3–5 min, 1 invocation | 1 |
-| **30 min** | ~10,500 | 4 | ~5–9 min, 1 invocation | 1 |
-| 60 min | ~21,000 | 7 | ~12–16 min, 2 invocations | 1 |
-| 2 hours | ~42,000 | 14 | 3–4 invocations | **2** (resumes next day) or paid tier |
+| median episode | 3,420 | 2 | ~1–2 min, 1 invocation | 1 |
+| longest today | 5,572 | 3 | ~2–4 min, 1 invocation | 1 |
+| **30 min** | ~10,500 | 5 | ~3–6 min, 1 invocation | 1 |
+| 60 min | ~21,000 | 9 | ~6–10 min, 1–2 invocations | 1 |
+| 2 hours | ~42,000 | 18 | 2–3 invocations | **2** (resumes next day) or paid tier |
+
+Each chunk stays about 7 min long regardless of script length, so the
+degradation in finding 8 never builds up: length scales by adding chunks, not
+by lengthening them.
 
 - **Nothing caps script length.** A longer script only means more waves, and on
   the free tier, more days.
 - **Daily volume.** Current volume is about 1.8 episodes/day ≈ 4 requests/day,
   inside 10/day.
 - **Paid tier.** Moving to a paid tier needs a new key only (no code change).
-  The paid tier also allows `GEMINI_CHUNK_CHARS` up to ~5,600 (finding 2:
-  1 request per ≤15-min episode) and higher concurrency.
+  The paid tier also allows higher concurrency. Chunks should stay about 7 min
+  even when paid (finding 8), even though a single request can technically
+  return 15 min.
 - **Paid-tier cost for reference.** $9 per 1M audio tokens at 25 tok/s ≈
   **$0.0135/min**: a 10-min episode ≈ $0.14, a 30-min ≈ $0.41 (doubling from
   2027-01-01). That is a few dollars a month at current volume, outside the W-3
@@ -185,5 +206,5 @@ Chunk 3,000字, speech ≈350字/分, free tier 10 requests/day:
 - **Gemini async.** If `background` starts returning full audio, or Batch opens
   to TTS, the kickoff can create one interaction per chunk and the finalize can
   collect them. The S3 chunk store and the stitch step stay as they are.
-- **Paid tier.** Swap the key, then raise `GEMINI_CHUNK_CHARS` /
-  `GEMINI_CONCURRENCY` via env.
+- **Paid tier.** Swap the key, then raise `GEMINI_CONCURRENCY` via env. Keep
+  chunks about 7 min (finding 8).
