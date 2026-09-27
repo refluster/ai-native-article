@@ -10,10 +10,15 @@
 //          ─byte-concat→ podcast/audio/{slug}.mp3
 //
 // Each chunk's MP3 is persisted to S3 as soon as it exists, so progress
-// survives across finalize polls: every poll synthesises only the missing
-// chunks within its time budget. Script length therefore has no upper bound —
-// a 30-min (or 2-hour) script just takes more polls — and no call approaches
-// the API Gateway HTTP-API 30s integration timeout.
+// survives across invocations: every invocation synthesises only the missing
+// chunks. Script length therefore has no upper bound — a 30-min (or 2-hour)
+// script just takes more waves (and, on the free tier's 10 requests/day, more
+// days) — and a timeout or quota stop never loses finished chunks.
+//
+// PoC (2026-09-27, real podcastScript bodies, ADR-0043): one request costs a
+// ~25–30 s fixed latency plus ~0.17× real time (404字 → 31 s, 1,772字 → 52 s,
+// 3,582字 → 142 s, 5,572字 → 262 s), so NO request fits the API Gateway HTTP-API
+// 30 s window — the Gemini path runs on direct Lambda invocation (≤15 min).
 //
 // Fail loud (C-4 / W-4): a non-200, a missing audio part, or a duration outside
 // the expected band throws. An LLM-based TTS can skip, repeat, or truncate
@@ -25,7 +30,10 @@ import { Mp3Encoder } from "@breezystack/lamejs";
 export const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta";
 export const DEFAULT_MODEL = "gemini-3.8-flash-tts";
 
-/** Per-request output ceiling: 16,384 audio tokens at 25 tokens/s. */
+/** Documented per-request output ceiling: 16,384 audio tokens at 25 tokens/s
+ *  (≈655 s). NOT enforced in practice — the PoC got 904 s from one 5,572字
+ *  request — so the chunk default stays under it for safety and the rate band
+ *  (not this constant) is the truncation guard. */
 export const MAX_AUDIO_SEC_PER_REQUEST = 16384 / 25;
 
 /** Default delivery direction, sent as speech_metadata.style (never spoken). */
@@ -33,16 +41,18 @@ export const DEFAULT_STYLE =
   "落ち着いた、知識のある友人が語りかけるような自然な日本語のナレーション。ニュース原稿の棒読みにしない。";
 
 /**
- * Accepted speech rate, in 字/分. Polly's measured median on the live corpus
- * is ~350 字/分 (range 300–410, 12 episodes). A chunk far outside the band
- * means the model dropped text (too fast / too short) or looped/inserted
- * (too slow / too long) — either is a C-1 defect, so it throws.
+ * Accepted speech rate, in 字/分. Measured on the live corpus: Polly median
+ * ~350 (300–410, 12 episodes); Gemini 3.8 Flash TTS 273–379 (9 requests,
+ * 404–5,572字). A chunk outside the band means the model dropped text (too
+ * fast / too short — e.g. a 5,572字 request cut at the 655 s documented cap
+ * would read as 510 字/分) or looped/inserted (too slow / too long). Either is
+ * a C-1 defect, so it throws.
  */
 export interface RateBand {
   minJiPerMin: number;
   maxJiPerMin: number;
 }
-export const DEFAULT_RATE_BAND: RateBand = { minJiPerMin: 200, maxJiPerMin: 600 };
+export const DEFAULT_RATE_BAND: RateBand = { minJiPerMin: 220, maxJiPerMin: 480 };
 
 // ── Script chunking ──────────────────────────────────────────────────────────
 
@@ -141,9 +151,6 @@ export function pcmSeconds(p: Pcm): number {
 /** Throws unless the chunk's speech rate sits inside the band (C-1 guard). */
 export function assertDuration(chars: number, seconds: number, band: RateBand = DEFAULT_RATE_BAND): void {
   if (seconds <= 0) throw new Error(`Gemini returned empty audio for a ${chars}字 chunk`);
-  if (seconds >= MAX_AUDIO_SEC_PER_REQUEST - 1) {
-    throw new Error(`chunk audio hit the per-request output cap (${seconds.toFixed(0)}s) — truncated; lower GEMINI_CHUNK_CHARS`);
-  }
   const rate = (chars / seconds) * 60;
   if (rate > band.maxJiPerMin) {
     throw new Error(`chunk too short: ${chars}字 in ${seconds.toFixed(1)}s = ${rate.toFixed(0)}字/分 > ${band.maxJiPerMin} — text likely skipped/truncated`);
@@ -193,6 +200,16 @@ export interface GeminiTtsRequest {
 export class GeminiTtsError extends Error {
   constructor(message: string, readonly status: number, readonly retryAfterSec?: number) {
     super(message);
+  }
+  /** Transient per-minute throttling / overload: back off and retry. */
+  get retryable(): boolean {
+    return (this.status === 429 && !this.dailyQuota) || this.status === 503;
+  }
+  /** The free tier's requests-per-day quota (10/day for gemini-3.8-flash-tts):
+   *  retrying today only burns calls — stop and resume on the next run. Its
+   *  retry-after header is misleading (seconds, not "tomorrow"). */
+  get dailyQuota(): boolean {
+    return this.status === 429 && /per day/i.test(this.message);
   }
 }
 

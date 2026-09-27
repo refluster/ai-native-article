@@ -4,7 +4,6 @@ import {
   chunkScript,
   encodeMp3,
   GeminiTtsError,
-  MAX_AUDIO_SEC_PER_REQUEST,
   parseWav,
   pcmSeconds,
   synthesisKey,
@@ -119,8 +118,12 @@ describe("assertDuration (C-1 guard)", () => {
   it("rejects audio too long for its text (repetition)", () => {
     expect(() => assertDuration(300, 300)).toThrow(/too long/);
   });
-  it("rejects a chunk that hit the per-request output cap", () => {
-    expect(() => assertDuration(4000, MAX_AUDIO_SEC_PER_REQUEST)).toThrow(/output cap/);
+  it("accepts the rates the PoC measured (273–379字/分)", () => {
+    expect(() => assertDuration(1669, 366.6)).not.toThrow(); // 273
+    expect(() => assertDuration(5572, 904.3)).not.toThrow(); // 370, one 15-min request
+  });
+  it("catches a long request cut at the documented 655 s cap", () => {
+    expect(() => assertDuration(5572, 16384 / 25)).toThrow(/too short/);
   });
   it("rejects empty audio", () => {
     expect(() => assertDuration(100, 0)).toThrow(/empty/);
@@ -164,6 +167,16 @@ describe("synthesizeChunk", () => {
     expect(err).toBeInstanceOf(GeminiTtsError);
     expect(err.status).toBe(429);
     expect(err.retryAfterSec).toBe(17);
+  });
+
+  it("classifies the free-tier daily quota apart from per-minute throttling", async () => {
+    const daily = new GeminiTtsError('gemini 429: {"error":{"message":"Rate limit exceeded for model gemini-3.8-flash-tts (limit: 10 requests per day on Free Tier). Please retry in 38s"}}', 429, 38);
+    expect(daily.dailyQuota).toBe(true);
+    expect(daily.retryable).toBe(false);
+    const rpm = new GeminiTtsError("gemini 429: Rate limit exceeded (per minute)", 429, 20);
+    expect(rpm.dailyQuota).toBe(false);
+    expect(rpm.retryable).toBe(true);
+    expect(new GeminiTtsError("gemini 402: prepayment credits are depleted", 402).retryable).toBe(false);
   });
 
   it("throws when the response has no audio part", async () => {

@@ -1,7 +1,8 @@
 // End-to-end (mocked) test of the ADR-0043 Gemini engine in the wf-podcast
-// handler: kickoff returns a task-less handle, finalize polls advance one wave
-// of chunks per call with S3 as the only progress state, and the episode is
-// stitched + flipped to audio-ready once every chunk exists.
+// handler: kickoff returns a task-less handle + the function to invoke, a direct
+// invocation advances waves of chunks while time remains with S3 as the only
+// progress state, and the episode is stitched + flipped to audio-ready once
+// every chunk exists. The HTTP-API finalize refuses Gemini handles (30 s).
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { mockClient } from "aws-sdk-client-mock";
 import {
@@ -30,9 +31,9 @@ function wav(seconds: number): Buffer {
 const SCRIPT = Array.from({ length: 150 }, (_, i) => `これは${i}番目の説明の文です。`).join("");
 let notionPatches: any[] = [];
 let geminiCalls = 0;
-let geminiMode: "ok" | "throttle" | "short" = "ok";
+let geminiMode: "ok" | "daily" | "short" = "ok";
 
-let handler: (e: any) => Promise<{ statusCode: number; body: string }>;
+let handler: (e: any, ctx?: any) => Promise<{ statusCode: number; body: string }>;
 
 beforeAll(async () => {
   process.env.PODCAST_TTS_ENGINE = "gemini";
@@ -40,6 +41,8 @@ beforeAll(async () => {
   process.env.PODCAST_PUBLIC_BASE_URL = "https://cdn.example";
   process.env.GEMINI_CHUNK_CHARS = "500";
   process.env.GEMINI_CONCURRENCY = "2";
+  process.env.GEMINI_WAVE_RESERVE_MS = "1000";
+  process.env.AWS_LAMBDA_FUNCTION_NAME = "wf-podcast-test";
   ({ handler } = await import("./handler.js"));
 });
 
@@ -74,7 +77,9 @@ beforeEach(() => {
     }
     if (url.includes("generativelanguage.googleapis.com")) {
       geminiCalls++;
-      if (geminiMode === "throttle") return new Response("quota", { status: 429, headers: { "retry-after": "12" } });
+      if (geminiMode === "daily") {
+        return new Response('{"error":{"message":"Rate limit exceeded for model gemini-3.8-flash-tts (limit: 10 requests per day on Free Tier). Please retry in 38s"}}', { status: 429, headers: { "retry-after": "38" } });
+      }
       const body = JSON.parse(String(init.body));
       const chars = body.input[0].content[0].text.length;
       const sec = geminiMode === "short" ? 1 : (chars / 350) * 60; // 350字/分
@@ -88,51 +93,71 @@ const call = async (body: unknown) => {
   const res = await handler({ rawPath: "/podcast/synthesize", body: JSON.stringify(body) });
   return { status: res.statusCode, json: JSON.parse(res.body) };
 };
+// A direct invocation with `waves` wave-starts' worth of remaining time.
+const invoke = async (handles: unknown, waves = 99) => {
+  let checks = 0;
+  const ctx = { getRemainingTimeInMillis: () => (checks++ < waves ? 600_000 : 0) };
+  const res = await handler({ source: "wf-podcast-direct", finalize: handles }, ctx);
+  return { status: res.statusCode, json: JSON.parse(res.body) };
+};
 
 describe("wf-podcast Gemini engine", () => {
-  it("kickoff returns a task-less gemini handle without calling Gemini", async () => {
+  it("kickoff returns a task-less gemini handle + the function to invoke, without calling Gemini", async () => {
     const k = await call({});
     expect(k.status).toBe(202);
     expect(k.json.started).toEqual([{ pageId: "page-1", slug: "ep1", voiceId: "Kazuha", engine: "gemini" }]);
+    expect(k.json.invoke).toEqual({ functionName: "wf-podcast-test" });
     expect(geminiCalls).toBe(0);
   });
 
-  it("finalize advances one wave per poll, resumes from S3, then stitches → audio-ready", async () => {
+  it("refuses to finalize gemini handles over the HTTP API (30 s window)", async () => {
     const { json: k } = await call({});
-    const handles = k.started;
+    const p = await call({ finalize: k.started });
+    expect(p.status).toBe(400);
+    expect(geminiCalls).toBe(0);
+  });
 
-    const p1 = await call({ finalize: handles });
-    expect(p1.status).toBe(200);
-    expect(p1.json.results[0]).toMatchObject({ done: false, chunksDone: 2, chunksTotal: 5 });
-    const p2 = await call({ finalize: handles });
-    expect(p2.json.results[0]).toMatchObject({ done: false, chunksDone: 4 });
-    const p3 = await call({ finalize: handles });
-    expect(p3.json.error).toBeUndefined();
-    expect(p3.json.done).toBe(true);
-    expect(p3.json.results[0]).toMatchObject({ status: "audio-ready", chunks: 5, geminiVoice: "Kore" });
-    expect(geminiCalls).toBe(5); // no chunk synthesised twice
-
-    const final = store.get("podcast/audio/ep1.mp3")!;
-    expect(final.length).toBeGreaterThan(0);
+  it("one direct invocation runs every wave, stitches, and flips audio-ready", async () => {
+    const { json: k } = await call({});
+    const r = await invoke(k.started);
+    expect(r.status).toBe(200);
+    expect(r.json.done).toBe(true);
+    expect(r.json.results[0]).toMatchObject({ status: "audio-ready", chunks: 5, geminiVoice: "Kore" });
+    expect(geminiCalls).toBe(5);
+    expect(store.get("podcast/audio/ep1.mp3")!.length).toBeGreaterThan(0);
     expect([...store.keys()].filter((key) => key.includes("/tmp/"))).toEqual([]); // tmp cleaned
     expect(notionPatches.at(-1).properties.podcastStatus.status.name).toBe("audio-ready");
     expect(notionPatches.at(-1).properties.audioUrl.url).toBe("https://cdn.example/podcast/audio/ep1.mp3");
   });
 
-  it("reports a 429 as a pending poll with retryAfterSec (not a 5xx)", async () => {
+  it("resumes from S3 when an invocation runs out of time (no chunk synthesised twice)", async () => {
     const { json: k } = await call({});
-    geminiMode = "throttle";
-    const p = await call({ finalize: k.started });
-    expect(p.status).toBe(200);
-    expect(p.json.results[0]).toMatchObject({ done: false, chunksDone: 0, retryAfterSec: 12 });
+    const r1 = await invoke(k.started, 1); // time for one wave only
+    expect(r1.json.results[0]).toMatchObject({ done: false, chunksDone: 2, chunksTotal: 5 });
+    expect(notionPatches).toEqual([]);
+    const r2 = await invoke(k.started);
+    expect(r2.json.done).toBe(true);
+    expect(geminiCalls).toBe(5);
+  });
+
+  it("stops on the free-tier daily quota without failing, keeping finished chunks", async () => {
+    const { json: k } = await call({});
+    await invoke(k.started, 1); // 2 chunks land
+    geminiMode = "daily";
+    const r = await invoke(k.started);
+    expect(r.status).toBe(200);
+    expect(r.json.results[0]).toMatchObject({ done: false, chunksDone: 2, quotaExhausted: true });
+    geminiMode = "ok";
+    const r3 = await invoke(k.started); // "tomorrow"
+    expect(r3.json.done).toBe(true);
   });
 
   it("fails loud when a chunk's audio is far too short for its text (C-1)", async () => {
     const { json: k } = await call({});
     geminiMode = "short";
-    const p = await call({ finalize: k.started });
-    expect(p.status).toBe(500);
-    expect(p.json.error).toMatch(/too short/);
+    const r = await invoke(k.started);
+    expect(r.status).toBe(500);
+    expect(r.json.error).toMatch(/too short/);
     expect(notionPatches).toEqual([]);
   });
 });

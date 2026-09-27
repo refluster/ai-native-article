@@ -2409,12 +2409,14 @@ Resources:
       CodeUri: ../../lambdas/wf-podcast
       Handler: handler.handler
       Description: Podcast synthesis (Gemini TTS chunked / Polly rollback → MP3 on S3) + RSS build (Epic-017; ADR-0016, ADR-0043).
-      # 1769 MB = one full vCPU: the Gemini path MP3-encodes each chunk in pure
-      # JS inside the finalize poll, which must fit the HTTP-API 30s window.
+      # 1769 MB = one full vCPU for the pure-JS MP3 encode of each chunk
+      # (~6 s per 5 min of audio in the PoC).
       MemorySize: 1769
-      # A finalize poll that overruns the 30s gateway window keeps running
-      # here and still persists its chunks (the caller retries the 503/504).
-      Timeout: 300
+      # 900 s = the Lambda ceiling: Gemini handles are advanced by DIRECT
+      # invocation from synthesize.mjs (one Gemini request takes 30 s–4 min,
+      # beyond the HTTP API's 30 s window); each invocation runs chunk waves
+      # while >GEMINI_WAVE_RESERVE_MS remains and persists every chunk to S3.
+      Timeout: 900
       Environment:
         Variables:
           # CloudFront/OAC domain over the wf bucket's podcast/* prefix — the
