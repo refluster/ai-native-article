@@ -57,7 +57,10 @@ const planIdx = args.indexOf("--plan");
 const planPath = planIdx >= 0 ? args[planIdx + 1] : join(HERE, "backups", "podcast-collision-restore-20260927.json");
 const plan = JSON.parse(readFileSync(planPath, "utf8")).entries;
 
-const aws = (...a) => execFileSync("aws", [...a, "--region", REGION, "--output", "json"], { encoding: "utf8" });
+// stderr is captured, not echoed: head-object's expected 404 for a not-yet-
+// restored key would otherwise print an alarming "[ERROR] … Not Found" per entry.
+const aws = (...a) =>
+  execFileSync("aws", [...a, "--region", REGION, "--output", "json"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 const headMeta = (key) => {
   try {
     return JSON.parse(aws("s3api", "head-object", "--bucket", BUCKET, "--key", key)).Metadata ?? {};
@@ -80,9 +83,11 @@ const notion = async (path, init = {}) => {
   return body;
 };
 
-// Pass 1 — validate everything before writing anything.
+// Pass 1 — validate everything before writing anything (read-only).
 const work = [];
+let checked = 0;
 for (const e of plan) {
+  process.stderr.write(`\rchecking ${++checked}/${plan.length} (read-only)…`);
   const page = await notion(`/pages/${e.pageId}`);
   const audioUrl = page.properties?.audioUrl?.url ?? "";
   const base = audioUrl.replace(/\/podcast\/audio\/[^/]+$/, "");
@@ -103,6 +108,7 @@ for (const e of plan) {
   work.push({ ...e, oldKey, newKey, newUrl });
 }
 
+process.stderr.write("\n");
 for (const w of work) console.log(`${apply ? "apply" : "plan "}  ${w.oldKey}@${w.versionId} → ${w.newKey}  ${w.title}`);
 if (!apply) {
   console.log(`\ndry run: ${work.length} to restore, ${plan.length - work.length} already done. Re-run with --apply to write.`);
@@ -110,6 +116,7 @@ if (!apply) {
 }
 
 // Pass 2 — copy the pinned version, then repoint Notion.
+let written = 0;
 for (const w of work) {
   aws(
     "s3api", "copy-object",
@@ -121,6 +128,6 @@ for (const w of work) {
     "--metadata-directive", "REPLACE",
   );
   await notion(`/pages/${w.pageId}`, { method: "PATCH", body: JSON.stringify({ properties: { audioUrl: { url: w.newUrl } } }) });
-  console.log(`done  ${w.newKey}`);
+  console.log(`done  ${++written}/${work.length}  ${w.newKey}`);
 }
 console.log(`\nrestored ${work.length}. Rebuild the feed: node workforce/skills/podcast-publish/build-rss.mjs`);
