@@ -117,11 +117,16 @@ outlasts the HTTP API's 30 s window. Cut over in this order:
    | `GEMINI_CHUNK_CHARS` | 2400 | Max 字 per Gemini request (≈7 min; longer requests degrade into hiss) |
    | `GEMINI_CONCURRENCY` | 2 | Chunks synthesised in parallel |
    | `GEMINI_VOICE_MAP` | `{"Takumi":"Charon","Kazuha":"Kore","Tomoko":"Aoede"}` | Casting name → Gemini voice |
-   | `GEMINI_TTS_STYLE` | (built-in) | Delivery direction, never spoken |
+   | `GEMINI_TTS_STYLE` | `落ち着いた一定のテンポで話すナレーター` | Delivery direction, never spoken. Keep it short: long persona prompts made chunks drift in pitch (ADR-0043 finding 9) |
    | `GEMINI_MIN_JI_PER_MIN` / `GEMINI_MAX_JI_PER_MIN` | 220 / 480 | Speech-rate guard band |
    | `GEMINI_HISS_MAX_DB` / `GEMINI_HISS_MAX_RISE_DB` | 0 / 6 | Progressive-hiss guard |
    | `GEMINI_GUARD_RETRIES` | 1 | Retakes of a chunk a guard rejects |
 
+- **Chunk joins** are normalised automatically at stitch time (tempo,
+  brightness, loudness; ADR-0043 Decision 6). The per-chunk corrections are
+  logged as `wf_podcast_normalize` and returned in the synthesize result
+  (`normalize: [{stretch, tilt, gainDb}]`). A correction pinned at its bound
+  (±12% stretch, ±6 dB) means that chunk drifted unusually far: listen to it.
 - **Rollback:** set the Lambda env `PODCAST_TTS_ENGINE=polly`. No code change;
   the Polly path is untouched.
 - **Free-tier quota: 10 requests/day.** A median episode is 2 requests; a

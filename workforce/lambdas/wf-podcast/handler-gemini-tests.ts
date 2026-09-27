@@ -124,6 +124,7 @@ describe("wf-podcast Gemini engine", () => {
     expect(r.status).toBe(200);
     expect(r.json.done).toBe(true);
     expect(r.json.results[0]).toMatchObject({ status: "audio-ready", chunks: 5, geminiVoice: "Kore" });
+    expect(r.json.results[0].normalize).toHaveLength(5); // every chunk went through normalizeChunks
     expect(geminiCalls).toBe(5);
     expect(store.get("podcast/audio/ep1.mp3")!.length).toBeGreaterThan(0);
     expect([...store.keys()].filter((key) => key.includes("/tmp/"))).toEqual([]); // tmp cleaned

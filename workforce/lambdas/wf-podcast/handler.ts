@@ -60,10 +60,13 @@ import {
   assertNoHiss,
   chunkScript,
   encodeMp3,
+  parseWav,
   pcmSeconds,
   synthesisKey,
   synthesizeChunk,
+  wavFile,
 } from "./gemini-tts.js";
+import { normalizeChunks } from "./normalize.js";
 
 const NOTION_VERSION = "2022-06-28";
 const NOTION_API = "https://api.notion.com/v1";
@@ -251,7 +254,7 @@ function scriptToPlainText(md: string): string {
 // between the 202 kickoff and the finalize polls.
 
 // `engine` absent = a Polly handle (the pre-ADR-0043 shape). A Gemini handle
-// carries no task id: its progress lives in S3 as per-chunk MP3s.
+// carries no task id: its progress lives in S3 as per-chunk WAVs.
 type SynthHandle = { pageId: string; slug: string; taskId?: string; voiceId?: string; engine?: "polly" | "gemini" };
 
 // Start one Polly task for an approved episode and return the handle the caller
@@ -342,7 +345,7 @@ async function finalizeOne(apiKey: string, h: SynthHandle): Promise<Record<strin
 // run behind the HTTP-API (30 s hard limit): synthesize.mjs invokes the
 // function directly (lambda:InvokeFunction, ≤15 min) with the kickoff handles.
 // Each invocation (1) re-derives every handle's chunk plan from the Notion
-// script, (2) lists the chunk MP3s already in S3 under a content-hashed tmp
+// script, (2) lists the chunk WAVs already in S3 under a content-hashed tmp
 // prefix, (3) synthesises waves of ≤GEMINI_CONCURRENCY missing chunks while
 // invocation time remains, and (4) stitches any episode whose chunks are all
 // present into podcast/audio/{slug}.mp3 → audio-ready. S3 is the only progress
@@ -372,22 +375,30 @@ async function planGemini(notionKey: string, h: SynthHandle): Promise<GeminiPlan
   const listed = await s3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: prefix }));
   const have = new Set<number>();
   for (const o of listed.Contents ?? []) {
-    const m = /\/(\d+)\.mp3$/.exec(o.Key ?? "");
+    const m = /\/(\d+)\.wav$/.exec(o.Key ?? "");
     if (m) have.add(Number(m[1]));
   }
   return { h, voice, chunks, prefix, have };
 }
 
+// Stitch: load every chunk's PCM, pull the chunks toward the episode median
+// (tempo / brightness / loudness — independent Gemini requests drift, ADR-0043
+// finding 9), join them with a short breath, and encode ONE continuous MP3.
 async function stitchGemini(notionKey: string, p: GeminiPlan): Promise<Record<string, unknown>> {
-  const keys = p.chunks.map((_, i) => `${p.prefix}${i}.mp3`);
-  const parts: Buffer[] = [];
+  const keys = p.chunks.map((_, i) => `${p.prefix}${i}.wav`);
+  const pcms = [];
   for (const Key of keys) {
     const obj = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key }));
     if (!obj.Body) throw new Error(`chunk ${Key} has no body`);
-    parts.push(Buffer.from(await obj.Body.transformToByteArray()));
+    pcms.push(parseWav(Buffer.from(await obj.Body.transformToByteArray())));
   }
+  const { pcms: normalized, report } = normalizeChunks(pcms, p.chunks.map((c) => c.length));
+  console.log(JSON.stringify({ event: "wf_podcast_normalize", slug: p.h.slug, ...report }));
+  const sr = normalized[0]!.sampleRate;
+  const gap = Buffer.alloc(Math.round(sr * 0.4) * 2);
+  const joined = { ...normalized[0]!, data: Buffer.concat(normalized.flatMap((n, i) => (i ? [gap, n.data] : [n.data]))) };
   const destKey = `${PREFIX_AUDIO}/${p.h.slug}.mp3`;
-  const mp3 = Buffer.concat(parts);
+  const mp3 = encodeMp3(joined, GEMINI_MP3_KBPS);
   await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: destKey, Body: mp3, ContentType: "audio/mpeg" }));
   await s3
     .send(new DeleteObjectsCommand({ Bucket: BUCKET, Delete: { Objects: keys.map((Key) => ({ Key })) } }))
@@ -398,7 +409,11 @@ async function stitchGemini(notionKey: string, p: GeminiPlan): Promise<Record<st
     audioUrl: { url: audioUrl },
     podcastStatus: { status: { name: "audio-ready" } },
   });
-  return { pageId: p.h.pageId, slug: p.h.slug, voiceId: p.h.voiceId, geminiVoice: p.voice, chunks: p.chunks.length, bytes: mp3.length, audioUrl, status: "audio-ready", done: true };
+  return {
+    pageId: p.h.pageId, slug: p.h.slug, voiceId: p.h.voiceId, geminiVoice: p.voice, chunks: p.chunks.length, bytes: mp3.length,
+    normalize: report.chunks.map((c) => ({ stretch: +c.stretch.toFixed(3), tilt: +c.tilt.toFixed(3), gainDb: +c.gainDb.toFixed(1) })),
+    audioUrl, status: "audio-ready", done: true,
+  };
 }
 
 async function advanceGemini(
@@ -433,9 +448,9 @@ async function advanceGemini(
               console.warn(JSON.stringify({ event: "wf_podcast_guard_retry", slug: p.h.slug, chunk: i, error: String(guard) }));
             }
           }
-          const last = i === p.chunks.length - 1;
-          const mp3 = encodeMp3(pcm, GEMINI_MP3_KBPS, last ? 0 : 0.4);
-          await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: `${p.prefix}${i}.mp3`, Body: mp3, ContentType: "audio/mpeg" }));
+          // Raw PCM (as WAV) — normalisation and the single MP3 encode happen
+          // at stitch time, once every chunk exists.
+          await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: `${p.prefix}${i}.wav`, Body: wavFile(pcm), ContentType: "audio/wav" }));
           p.have.add(i);
         } catch (err) {
           // Daily quota: stop for today (chunks already in S3 are kept).
