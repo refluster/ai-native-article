@@ -82,6 +82,58 @@ distribution scoped to the `wf` bucket's `podcast/*` prefix (OAC) — the bucket
 keeps its full `PublicAccessBlock`. Note the distribution domain; it is the
 Lambda's `PODCAST_PUBLIC_BASE_URL`.
 
+### 3a. Gemini TTS engine (ADR-0043 — B: new external egress + IAM)
+
+[ADR-0043](../adr/adr-0043-podcast-tts-gemini.md) switches synthesis to
+**Gemini 3.8 Flash TTS**. It is chunked and S3-resumable, and it is finalized by
+**direct `lambda:InvokeFunction`**, because one Gemini request (30 s–4 min)
+outlasts the HTTP API's 30 s window. Cut over in this order:
+
+1. **Gemini key** (free tier). Create an AI Studio key on a project *without*
+   prepaid billing; a depleted prepaid project returns 402. Then:
+   ```bash
+   aws secretsmanager create-secret --region us-west-2 \
+     --name wf/projects/agent-workforce/gemini.api_key \
+     --secret-string '{"apiKey":"<key>"}'
+   # rotate later with put-secret-value --secret-id … --secret-string …
+   ```
+2. **Let CI invoke the function directly.** The CI OIDC role
+   (`gha-cf-deploy-role`) keeps its policies outside SAM. Add:
+   ```bash
+   aws iam put-role-policy --role-name gha-cf-deploy-role \
+     --policy-name wf-podcast-lambda-invoke \
+     --policy-document '{"Version":"2012-10-17","Statement":[{"Sid":"PodcastDirectInvoke","Effect":"Allow","Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:us-west-2:533266988941:function:wf-podcast-prod"}]}'
+   ```
+3. **Deploy** (`sam build && sam deploy`, section 3). The template sets:
+   - `PODCAST_TTS_ENGINE=gemini`
+   - 1769 MB memory and a 900 s timeout
+   - prefix-scoped `s3:ListBucket`
+   - read access to the Gemini secret
+4. **Listen** to the first Gemini episode before trusting the cron. Tunables are
+   Lambda env vars and need no code change:
+
+   | Variable | Default | Purpose |
+   |---|---|---|
+   | `GEMINI_CHUNK_CHARS` | 2400 | Max 字 per Gemini request (≈7 min; longer requests degrade into hiss) |
+   | `GEMINI_CONCURRENCY` | 2 | Chunks synthesised in parallel |
+   | `GEMINI_VOICE_MAP` | `{"Takumi":"Charon","Kazuha":"Kore","Tomoko":"Aoede"}` | Casting name → Gemini voice |
+   | `GEMINI_TTS_STYLE` | (built-in) | Delivery direction, never spoken |
+   | `GEMINI_MIN_JI_PER_MIN` / `GEMINI_MAX_JI_PER_MIN` | 220 / 480 | Speech-rate guard band |
+   | `GEMINI_HISS_MAX_DB` / `GEMINI_HISS_MAX_RISE_DB` | 0 / 6 | Progressive-hiss guard |
+   | `GEMINI_GUARD_RETRIES` | 1 | Retakes of a chunk a guard rejects |
+
+- **Rollback:** set the Lambda env `PODCAST_TTS_ENGINE=polly`. No code change;
+  the Polly path is untouched.
+- **Free-tier quota: 10 requests/day.** A median episode is 2 requests; a
+  30-min script is about 5. When the quota runs out, `synthesize.mjs` exits 3
+  naming the episodes. They stay `approved`, and their finished chunks under
+  `podcast/audio/tmp/` are reused by the next run. The only fixes are waiting a
+  day or a paid key; re-running today just burns calls.
+- **Guard failures.** A chunk whose speech rate falls outside the band (skipped,
+  looped or truncated audio), or that shows the growing-hiss signature, is
+  re-synthesised once. A second rejection fails the run loud. Re-run the
+  pipeline: TTS is non-deterministic, and finished chunks are kept.
+
 ---
 
 ## 4. Enable the podcast cadences (Phase 1 — B: cron enable)
@@ -113,8 +165,10 @@ Once an article is `approved` (and `podcast-publish` has set its voice/notes):
 
 1. **Synthesize** — `node workforce/skills/podcast-publish/synthesize.mjs` →
    `wf-podcast` synthesize route. It reads the episode's `podcastVoice` (else a
-   random JA Neural Polly voice), `StartSpeechSynthesisTask`, writes the MP3 to
-   `s3://…/podcast/audio/{slug}.mp3`, and sets `audioUrl` +
+   random pool voice) and synthesises the script. With the Gemini engine
+   (ADR-0043, §3a) that means chunk waves via direct `aws lambda invoke`; with
+   Polly it is `StartSpeechSynthesisTask`. It writes the MP3 to
+   `s3://…/podcast/audio/{slug}.mp3` and sets `audioUrl` +
    `podcastStatus=audio-ready`. Up to 5 oldest `approved` per run.
 2. **Publish + build RSS** — `node workforce/skills/podcast-publish/publish.mjs`
    → `wf-podcast` publish route. It flips up to 5 oldest `audio-ready` episodes to
@@ -159,6 +213,7 @@ Once an article is `approved` (and `podcast-publish` has set its voice/notes):
 | Merge the Epic-017 PR | **B** | Agents never merge. |
 | Run `register.mjs` (persona existence) | **B** | priya/operator; gated by the W-3 raise. |
 | `sam deploy` (Polly = new AWS service) | **B** | §5 new-AWS-service row. |
+| Gemini key + CI `lambda:InvokeFunction` grant (§3a) | **B** | New external egress/credential + IAM (ADR-0043). |
 | Enable the `podcast-script` + `podcast-publish` crons | **B** | §5 cron-enable row. |
 | Submit the RSS feed to Spotify | **B** | External publication, one-time. |
 | Record `spotifyUrl` → `published` | **B** (Phase 1 manual) | Closes the loop; reader link goes live. |
