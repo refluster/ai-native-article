@@ -2395,9 +2395,11 @@ Resources:
         }
 
   # --- Podcast production & distribution (Epic-017 Stories 5 & 6; ADR-0016) ---
-  # Deterministic Lambda on the DEFAULT surface (R-N1): Polly Neural JA TTS →
-  # MP3 on the wf bucket's podcast/ prefix, plus the RSS builder. IAM-authorized
-  # (the operator/orchestrator SigV4-signs); no new project credential type.
+  # Deterministic Lambda on the DEFAULT surface (R-N1): JA TTS → MP3 on the wf
+  # bucket's podcast/ prefix, plus the RSS builder. IAM-authorized (the
+  # operator/orchestrator SigV4-signs). TTS engine per ADR-0043: Gemini 3.8
+  # Flash TTS (chunked, resumable; key in wf/projects/agent-workforce/
+  # gemini.api_key), with Polly kept as the PODCAST_TTS_ENGINE=polly rollback.
   WfPodcastFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -2406,9 +2408,12 @@ Resources:
       FunctionName: !Sub wf-podcast-${Stage}
       CodeUri: ../../lambdas/wf-podcast
       Handler: handler.handler
-      Description: Podcast synthesis (Polly Neural JA, random voice → S3) + RSS build (Epic-017; ADR-0016).
-      MemorySize: 512
-      # Polly StartSpeechSynthesisTask is async; the handler polls up to ~150s.
+      Description: Podcast synthesis (Gemini TTS chunked / Polly rollback → MP3 on S3) + RSS build (Epic-017; ADR-0016, ADR-0043).
+      # 1769 MB = one full vCPU: the Gemini path MP3-encodes each chunk in pure
+      # JS inside the finalize poll, which must fit the HTTP-API 30s window.
+      MemorySize: 1769
+      # A finalize poll that overruns the 30s gateway window keeps running
+      # here and still persists its chunks (the caller retries the 503/504).
       Timeout: 300
       Environment:
         Variables:
@@ -2422,6 +2427,10 @@ Resources:
           PODCAST_OWNER_EMAIL: refluster@gmail.com
           PODCAST_OWNER_NAME: kohuehara
           PODCAST_CATEGORY: Technology
+          # ADR-0043 engine switch — `polly` is the instant rollback (no deploy
+          # of code needed: flip the env var).
+          PODCAST_TTS_ENGINE: gemini
+          GEMINI_TTS_MODEL: gemini-3.8-flash-tts
       Policies:
         - Statement:
             - Sid: PodcastPolly
@@ -2441,6 +2450,22 @@ Resources:
                 - s3:DeleteObject
               Resource:
                 - !Sub ${WfBucket.Arn}/podcast/*
+            - Sid: PodcastS3ListChunks
+              # Gemini engine: list the per-episode chunk MP3s already written
+              # (the resumable progress state, ADR-0043) — podcast/ prefix only.
+              Effect: Allow
+              Action: s3:ListBucket
+              Resource: !GetAtt WfBucket.Arn
+              Condition:
+                StringLike:
+                  s3:prefix:
+                    - podcast/*
+            - Sid: PodcastGeminiSecret
+              # Gemini API key ({apiKey}) for the TTS call (ADR-0043).
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/agent-workforce/gemini.api_key-*
             - Sid: PodcastNotionSecret
               # The project-scoped Notion integration token ({apiKey}); the DB
               # id is a non-secret constant in the handler. No new credential
@@ -2475,7 +2500,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub wf-podcast-errors-alarm-${Stage}
-      AlarmDescription: A Polly/S3/Notion failure in wf-podcast (C-4 fail-loud).
+      AlarmDescription: A TTS (Gemini/Polly)/S3/Notion failure in wf-podcast (C-4 fail-loud).
       Namespace: AWS/Lambda
       MetricName: Errors
       Dimensions:

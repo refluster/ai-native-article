@@ -16,6 +16,14 @@
 // The taskId is the only state and it lives in THIS caller — no per-Lambda
 // nested invocation (R-N1).
 //
+// Gemini engine (ADR-0043, Lambda env PODCAST_TTS_ENGINE=gemini): the same two
+// phases, but the kickoff starts nothing and each finalize poll synthesises one
+// wave of script chunks (progress persists in S3), so a long script simply
+// takes more polls. A poll may report `retryAfterSec` (free-tier 429) — we
+// honour it. A poll that outlasts the HTTP-API 30s window surfaces as a 503/504
+// while the Lambda still finishes its wave, so up to MAX_GATEWAY_RETRIES
+// consecutive 503/504s are retried before failing loud.
+//
 // Auth is IAM (the CI OIDC role / the operator's AWS credentials sign each
 // request) — NOT the CCR cadence, which is Notion-only and never touches AWS.
 // The Notion token lives in the Lambda (its IAM role), never in this session.
@@ -35,7 +43,7 @@
 //   0  — synthesised (or a skip: no approved episode) — read the JSON
 //   1  — bad env / missing AWS creds
 //   2  — Lambda returned 4xx (bad request / auth)
-//   3  — Lambda 5xx / network / a Polly failure, or the poll budget expired with
+//   3  — Lambda 5xx / network / a TTS failure, or the poll budget expired with
 //        episodes still un-synthesised (fail loud — C-4)
 
 import { spawnSync } from "node:child_process";
@@ -47,6 +55,7 @@ const API_BASE = (
 const REGION = process.env.AWS_REGION ?? "us-west-2";
 const POLL_BUDGET_MS = Number(process.env.PODCAST_POLL_BUDGET_MS ?? "840000");
 const POLL_INTERVAL_MS = Number(process.env.PODCAST_POLL_INTERVAL_MS ?? "8000");
+const MAX_GATEWAY_RETRIES = 3;
 
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`);
@@ -110,23 +119,39 @@ if (handles.length === 0) {
   console.error("synthesize.mjs: kickoff returned 202 with no handles");
   process.exit(3);
 }
-console.error(`synthesize.mjs: started ${handles.length} Polly task(s); polling for completion (budget ${Math.round(POLL_BUDGET_MS / 1000)}s)…`);
+const engine = handles[0]?.engine ?? "polly";
+console.error(`synthesize.mjs: started ${handles.length} ${engine} episode(s); polling for completion (budget ${Math.round(POLL_BUDGET_MS / 1000)}s)…`);
 
 // ── 2. Poll until every started task is finalized → audio-ready ─────────────────
 let pending = handles;
 const deadline = Date.now() + POLL_BUDGET_MS;
+let waitMs = POLL_INTERVAL_MS;
+let gatewayRetries = 0;
 while (pending.length > 0) {
   if (Date.now() > deadline) {
     console.error(`synthesize.mjs: poll budget expired with ${pending.length} episode(s) still un-synthesised (fail loud)`);
     process.exit(3);
   }
-  await sleep(POLL_INTERVAL_MS);
+  await sleep(waitMs);
+  waitMs = POLL_INTERVAL_MS;
   const res = post({ finalize: pending });
-  if (res.status !== 200) bail("finalize", res); // a Polly failure throws → 5xx → exit 3
+  if ((res.status === 503 || res.status === 504) && gatewayRetries < MAX_GATEWAY_RETRIES) {
+    gatewayRetries++;
+    console.error(`  finalize HTTP ${res.status} (gateway window; the Lambda keeps working) — retry ${gatewayRetries}/${MAX_GATEWAY_RETRIES}`);
+    continue;
+  }
+  if (res.status !== 200) bail("finalize", res); // a TTS failure throws → 5xx → exit 3
+  gatewayRetries = 0;
   const results = Array.isArray(res.json?.results) ? res.json.results : [];
   const doneIds = new Set(results.filter((r) => r.done).map((r) => r.pageId));
   pending = pending.filter((h) => !doneIds.has(h.pageId));
-  console.error(`  audio-ready ${handles.length - pending.length}/${handles.length}`);
+  const retryAfter = Math.max(0, ...results.map((r) => Number(r.retryAfterSec) || 0));
+  if (retryAfter > 0) waitMs = Math.max(POLL_INTERVAL_MS, retryAfter * 1000);
+  const progress = results
+    .filter((r) => !r.done && r.chunksTotal)
+    .map((r) => `${r.slug} ${r.chunksDone}/${r.chunksTotal}`)
+    .join(", ");
+  console.error(`  audio-ready ${handles.length - pending.length}/${handles.length}${progress ? ` · chunks ${progress}` : ""}${retryAfter ? ` · rate-limited, retry in ${retryAfter}s` : ""}`);
 }
 
 console.log(JSON.stringify({ synthesized: handles.length, slugs: handles.map((h) => h.slug) }));

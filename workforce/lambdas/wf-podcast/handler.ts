@@ -41,12 +41,27 @@ import {
   S3Client,
   CopyObjectCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
+  GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 
 import { getSecret } from "../shared/secrets.js";
 import { buildPodcastRss, type PodcastEpisode } from "./rss.js";
+import {
+  DEFAULT_MODEL,
+  DEFAULT_RATE_BAND,
+  DEFAULT_STYLE,
+  GeminiTtsError,
+  assertDuration,
+  chunkScript,
+  encodeMp3,
+  pcmSeconds,
+  synthesisKey,
+  synthesizeChunk,
+} from "./gemini-tts.js";
 
 const NOTION_VERSION = "2022-06-28";
 const NOTION_API = "https://api.notion.com/v1";
@@ -70,6 +85,30 @@ const SITE_BASE = (process.env.PODCAST_SITE_BASE_URL ?? "https://kohuehara.xyz/a
 // the Producer (odette) hasn't set a per-episode `podcastVoice`. These are the
 // Amazon Polly voices that support the `neural` engine for ja-JP.
 const JA_NEURAL_VOICES = ["Takumi", "Kazuha", "Tomoko"];
+
+// TTS engine (ADR-0043). `gemini` = Gemini 3.8 Flash TTS, chunked + resumable;
+// `polly` = the ADR-0016 path, kept intact as the one-env-var rollback.
+const TTS_ENGINE = (process.env.PODCAST_TTS_ENGINE ?? "polly").toLowerCase();
+const GEMINI_SECRET_ID = process.env.GEMINI_SECRET_ID ?? "wf/projects/agent-workforce/gemini.api_key";
+const GEMINI_MODEL = process.env.GEMINI_TTS_MODEL ?? DEFAULT_MODEL;
+const GEMINI_STYLE = process.env.GEMINI_TTS_STYLE ?? DEFAULT_STYLE;
+// Max 字 per Gemini request. Sized so one chunk's synthesis finishes inside a
+// single finalize poll (API Gateway HTTP API: 30s hard limit) — see ADR-0043
+// for the PoC latency/rate measurements behind the default.
+const GEMINI_CHUNK_CHARS = Number(process.env.GEMINI_CHUNK_CHARS ?? "1800");
+// Chunks synthesised in parallel per finalize poll (free-tier RPM is the cap).
+const GEMINI_CONCURRENCY = Number(process.env.GEMINI_CONCURRENCY ?? "3");
+const GEMINI_MP3_KBPS = Number(process.env.GEMINI_MP3_KBPS ?? "64");
+const GEMINI_RATE_BAND = {
+  minJiPerMin: Number(process.env.GEMINI_MIN_JI_PER_MIN ?? DEFAULT_RATE_BAND.minJiPerMin),
+  maxJiPerMin: Number(process.env.GEMINI_MAX_JI_PER_MIN ?? DEFAULT_RATE_BAND.maxJiPerMin),
+};
+// The `podcastVoice` casting names (Odette's pool, set by podcast-publish) keep
+// their meaning across engines: each maps to a Gemini voice, so the casting
+// skill, set-params.mjs and existing Notion values need no change.
+const GEMINI_VOICE_MAP: Record<string, string> = JSON.parse(
+  process.env.GEMINI_VOICE_MAP ?? '{"Takumi":"Charon","Kazuha":"Kore","Tomoko":"Aoede"}',
+);
 
 // Per-run batch cap (operator: "1回の実施で5記事/podcastを上限"). synthesize and
 // publish each process at most this many episodes per call.
@@ -197,7 +236,9 @@ function scriptToPlainText(md: string): string {
 // introduced (R-N1): the Polly taskId is the only state, carried by the caller
 // between the 202 kickoff and the finalize polls.
 
-type SynthHandle = { pageId: string; slug: string; taskId: string; voiceId?: string };
+// `engine` absent = a Polly handle (the pre-ADR-0043 shape). A Gemini handle
+// carries no task id: its progress lives in S3 as per-chunk MP3s.
+type SynthHandle = { pageId: string; slug: string; taskId?: string; voiceId?: string; engine?: "polly" | "gemini" };
 
 // Start one Polly task for an approved episode and return the handle the caller
 // echoes back on each finalize poll. Does NOT wait for completion.
@@ -213,6 +254,14 @@ async function startSynthesis(page: NotionPage): Promise<SynthHandle> {
   // one is chosen at random from the JA Neural pool (D1/Q6). An unknown value
   // falls back to random rather than failing the cast.
   const casted = propText(page.properties?.podcastVoice).trim();
+
+  if (TTS_ENGINE === "gemini") {
+    // Nothing to start: the finalize polls synthesise chunk by chunk.
+    const names = Object.keys(GEMINI_VOICE_MAP);
+    const voiceId = names.includes(casted) ? casted : names[Math.floor(Math.random() * names.length)];
+    return { pageId: page.id, slug: theSlug, voiceId, engine: "gemini" };
+  }
+
   const voiceId = JA_NEURAL_VOICES.includes(casted)
     ? casted
     : JA_NEURAL_VOICES[Math.floor(Math.random() * JA_NEURAL_VOICES.length)];
@@ -240,6 +289,7 @@ async function startSynthesis(page: NotionPage): Promise<SynthHandle> {
 // (C-4). Idempotent — re-running on a finished episode overwrites the same key
 // and re-patches the same status. Returns {done:false} while still in progress.
 async function finalizeOne(apiKey: string, h: SynthHandle): Promise<Record<string, unknown>> {
+  if (!h.taskId) throw new Error(`Polly handle for ${h.slug} carries no taskId`);
   const got = await polly.send(new GetSpeechSynthesisTaskCommand({ TaskId: h.taskId }));
   const status = got.SynthesisTask?.TaskStatus;
   if (status === "failed") {
@@ -270,6 +320,113 @@ async function finalizeOne(apiKey: string, h: SynthHandle): Promise<Record<strin
     podcastStatus: { status: { name: "audio-ready" } },
   });
   return { pageId: h.pageId, slug: h.slug, voiceId: h.voiceId, audioUrl, status: "audio-ready", done: true };
+}
+
+// ── Gemini engine (ADR-0043): resumable, chunked synthesis ───────────────────
+//
+// Each finalize poll (1) re-derives every handle's chunk plan from the Notion
+// script, (2) lists the chunk MP3s already in S3 under a content-hashed tmp
+// prefix, (3) synthesises ONE wave of at most GEMINI_CONCURRENCY missing chunks
+// across all handles, and (4) stitches any episode whose chunks are all present
+// into podcast/audio/{slug}.mp3 → audio-ready. S3 is the only progress state
+// (R-N2); the caller just keeps polling — so script length is unbounded and no
+// poll outlasts the HTTP-API 30s window. No nested invocation (R-N1).
+
+type GeminiPlan = { h: SynthHandle; voice: string; chunks: string[]; prefix: string; have: Set<number> };
+
+async function geminiApiKey(): Promise<string> {
+  const sec = await getSecret<{ apiKey?: string }>(GEMINI_SECRET_ID);
+  if (!sec?.apiKey) throw new Error(`${GEMINI_SECRET_ID} secret missing apiKey`);
+  return sec.apiKey;
+}
+
+async function planGemini(notionKey: string, h: SynthHandle): Promise<GeminiPlan> {
+  const page = (await notionFetch(notionKey, `/pages/${h.pageId}`, { method: "GET" })) as NotionPage;
+  const plain = scriptToPlainText(propText(page.properties?.podcastScript));
+  if (plain.length < 200) {
+    throw new Error(`podcastScript for ${h.slug} is ${plain.length} chars after strip — refusing to synthesise a truncated/empty episode (C-1)`);
+  }
+  const voice = GEMINI_VOICE_MAP[h.voiceId ?? ""];
+  if (!voice) throw new Error(`no Gemini voice mapped for cast "${h.voiceId}" (${h.slug}) — check GEMINI_VOICE_MAP`);
+  const chunks = chunkScript(plain, GEMINI_CHUNK_CHARS);
+  const key = synthesisKey({ model: GEMINI_MODEL, voice, style: GEMINI_STYLE, text: plain, maxChars: GEMINI_CHUNK_CHARS });
+  const prefix = `${PREFIX_AUDIO}/tmp/${h.slug}-${key}/`;
+  const listed = await s3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: prefix }));
+  const have = new Set<number>();
+  for (const o of listed.Contents ?? []) {
+    const m = /\/(\d+)\.mp3$/.exec(o.Key ?? "");
+    if (m) have.add(Number(m[1]));
+  }
+  return { h, voice, chunks, prefix, have };
+}
+
+async function stitchGemini(notionKey: string, p: GeminiPlan): Promise<Record<string, unknown>> {
+  const keys = p.chunks.map((_, i) => `${p.prefix}${i}.mp3`);
+  const parts: Buffer[] = [];
+  for (const Key of keys) {
+    const obj = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key }));
+    if (!obj.Body) throw new Error(`chunk ${Key} has no body`);
+    parts.push(Buffer.from(await obj.Body.transformToByteArray()));
+  }
+  const destKey = `${PREFIX_AUDIO}/${p.h.slug}.mp3`;
+  const mp3 = Buffer.concat(parts);
+  await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: destKey, Body: mp3, ContentType: "audio/mpeg" }));
+  await s3
+    .send(new DeleteObjectsCommand({ Bucket: BUCKET, Delete: { Objects: keys.map((Key) => ({ Key })) } }))
+    .catch(() => { /* best-effort temp cleanup */ });
+
+  const audioUrl = `${PUBLIC_BASE}/${destKey}`;
+  await patchPodcast(notionKey, p.h.pageId, {
+    audioUrl: { url: audioUrl },
+    podcastStatus: { status: { name: "audio-ready" } },
+  });
+  return { pageId: p.h.pageId, slug: p.h.slug, voiceId: p.h.voiceId, geminiVoice: p.voice, chunks: p.chunks.length, bytes: mp3.length, audioUrl, status: "audio-ready", done: true };
+}
+
+async function advanceGemini(notionKey: string, handles: SynthHandle[]): Promise<Record<string, unknown>[]> {
+  const plans: GeminiPlan[] = [];
+  for (const h of handles) plans.push(await planGemini(notionKey, h));
+
+  const missing = plans.flatMap((p) => p.chunks.map((text, i) => ({ p, i, text })).filter((j) => !j.p.have.has(j.i)));
+  let retryAfterSec: number | undefined;
+  if (missing.length > 0) {
+    const apiKey = await geminiApiKey();
+    await Promise.all(
+      missing.slice(0, GEMINI_CONCURRENCY).map(async ({ p, i, text }) => {
+        try {
+          const pcm = await synthesizeChunk({ apiKey, text, voice: p.voice, model: GEMINI_MODEL, style: GEMINI_STYLE });
+          assertDuration(text.length, pcmSeconds(pcm), GEMINI_RATE_BAND);
+          const last = i === p.chunks.length - 1;
+          const mp3 = encodeMp3(pcm, GEMINI_MP3_KBPS, last ? 0 : 0.4);
+          await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: `${p.prefix}${i}.mp3`, Body: mp3, ContentType: "audio/mpeg" }));
+          p.have.add(i);
+        } catch (err) {
+          // Rate limit / overload is transient on the free tier: report it and
+          // let the caller back off. Everything else fails loud (C-4).
+          if (err instanceof GeminiTtsError && (err.status === 429 || err.status === 503)) {
+            retryAfterSec = Math.max(retryAfterSec ?? 0, err.retryAfterSec ?? 30);
+            return;
+          }
+          const msg = err instanceof Error ? err.message : String(err);
+          throw new Error(`Gemini chunk ${i + 1}/${p.chunks.length} of ${p.h.slug} failed: ${msg}`);
+        }
+      }),
+    );
+  }
+
+  const results: Record<string, unknown>[] = [];
+  for (const p of plans) {
+    if (p.have.size >= p.chunks.length) {
+      results.push(await stitchGemini(notionKey, p));
+    } else {
+      results.push({
+        pageId: p.h.pageId, slug: p.h.slug, status: "synthesizing", done: false,
+        chunksDone: p.have.size, chunksTotal: p.chunks.length,
+        ...(retryAfterSec ? { retryAfterSec } : {}),
+      });
+    }
+  }
+  return results;
 }
 
 // KICKOFF: start Polly tasks for up to BATCH_LIMIT oldest `approved` episodes
@@ -305,7 +462,9 @@ async function synthesizeFinalize(handles: SynthHandle[]): Promise<ProxyResult> 
   if (!PUBLIC_BASE) throw new Error("PODCAST_PUBLIC_BASE_URL env var is required");
   const { apiKey } = await notionHeaders();
   const results: Record<string, unknown>[] = [];
-  for (const h of handles) results.push(await finalizeOne(apiKey, h));
+  for (const h of handles.filter((x) => x.engine !== "gemini")) results.push(await finalizeOne(apiKey, h));
+  const gemini = handles.filter((x) => x.engine === "gemini");
+  if (gemini.length > 0) results.push(...(await advanceGemini(apiKey, gemini)));
   const pending = results.filter((r) => !r.done).length;
   return json(200, { done: pending === 0, pending, results });
 }
