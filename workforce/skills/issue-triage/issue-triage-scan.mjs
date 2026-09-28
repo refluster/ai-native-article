@@ -69,8 +69,9 @@ export async function collectOpenPrRefs(gh, repo) {
  * Lane → the agent slugs bound to that lane's worker skill on `projectId`,
  * read from the public agents-api (bindings are DDB config, ADR-0007 — the
  * git manifest is intent, the roster is fact). Only the slugs that actually
- * appear as owners are looked up; `null` for a slug the API could not return,
- * which makes the caller skip the owner check rather than guess.
+ * appear as owners are looked up. A 404 slug is bound to nothing; any other
+ * non-200 throws, and both callers then skip the owner check rather than
+ * guess.
  */
 export async function collectWorkerOwners(slugs, projectId, { apiBase = process.env.WF_AGENTS_API_BASE || DEFAULT_API_BASE } = {}) {
   const lanes = Object.entries(LANE_WORKER_SKILL).filter(([, skill]) => skill);
