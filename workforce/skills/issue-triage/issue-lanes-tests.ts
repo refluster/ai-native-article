@@ -124,6 +124,20 @@ describe("labelsToRemove — one issue, one lane, and the park is answered", () 
   it("swapping one human role for another drops only the old one", () => {
     expect(labelsToRemove(["wf:human:legal"], "operator", { humanRole: "product" })).toEqual(["wf:human:legal"]);
   });
+
+  it("#762: re-laning to a different owner drops the stale wf:owner:* label, not just the lane", () => {
+    expect(
+      labelsToRemove(["wf:lane:design", "wf:owner:dario"], "design", { owner: "nadia" }),
+    ).toEqual(["wf:owner:dario"]);
+  });
+
+  it("#762: re-applying the same owner keeps the label", () => {
+    expect(labelsToRemove(["wf:owner:dario"], "design", { owner: "dario" })).toEqual([]);
+  });
+
+  it("#762: mirrors humanRole's default — omitting `owner` keeps nothing, same as omitting `humanRole`", () => {
+    expect(labelsToRemove(["wf:owner:dario"], "design")).toEqual(["wf:owner:dario"]);
+  });
 });
 
 describe("the hop bound — routing terminates (adr-0038)", () => {

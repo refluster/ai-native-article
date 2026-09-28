@@ -1,0 +1,886 @@
+{
+ "description": "Podcast slug-collision repair (2026-09-27). Each entry maps a published episode page to the S3 object version of podcast/audio/{oldKey}.mp3 that holds its audio. Matched by transcribing the first 25 s of every version (faster-whisper small, ja) and scoring character-bigram overlap against each page's podcastScript opening; score = matched pair, margin = gap to the best competing pair in the same group.",
+ "bucket": "wf-bucket-533266988941-us-west-2-prod",
+ "entries": [
+  {
+   "oldKey": "369d0f0be61e",
+   "pageId": "369d0f0b-e61e-81c0-98d3-d6d24d4b0e94",
+   "title": "AI前提で再編される組織と仕事",
+   "versionId": "DwqJp3y.kAkNrZvLtEW3fSTQDCRVKLCj",
+   "size": 4199228,
+   "versionAt": "2026-07-11T19:44:24.000Z",
+   "score": 0.59,
+   "margin": 0.39
+  },
+  {
+   "oldKey": "369d0f0be61e",
+   "pageId": "369d0f0b-e61e-810d-a5ed-e80e1bb6043a",
+   "title": "AI普及が露呈する最適化と分断の逆説",
+   "versionId": "QfOYV5IQIg7Cy5VuTjMMN0IlyXD2Sq8O",
+   "size": 4278284,
+   "versionAt": "2026-07-11T19:44:25.000Z",
+   "score": 0.65,
+   "margin": 0.46
+  },
+  {
+   "oldKey": "36ad0f0be61e",
+   "pageId": "36ad0f0b-e61e-81ea-8d2e-fbe70975c3d2",
+   "title": "AIエージェント導入の重心は実装から運用証明へ",
+   "versionId": "HaO3z.LpfB5lOGWQJ32J9TEvVAlXGlO.",
+   "size": 5173964,
+   "versionAt": "2026-07-13T20:01:04.000Z",
+   "score": 0.64,
+   "margin": 0.52
+  },
+  {
+   "oldKey": "369d0f0be61e",
+   "pageId": "369d0f0b-e61e-8119-aa43-f6e00903bf16",
+   "title": "AI時代に問われる認知能力の再設計",
+   "versionId": "3XJR9k8NnoUxfL.4.LYr4Xk0Tw7Bv98L",
+   "size": 4378652,
+   "versionAt": "2026-07-14T19:52:34.000Z",
+   "score": 0.68,
+   "margin": 0.5
+  },
+  {
+   "oldKey": "369d0f0be61e",
+   "pageId": "369d0f0b-e61e-81bc-b6df-d277c49f0215",
+   "title": "人手不足時代のAI生産性再定義",
+   "versionId": "HhSrhIKlByTwnGWBhuDLFM6ZTphd1ia3",
+   "size": 4253804,
+   "versionAt": "2026-07-15T19:47:44.000Z",
+   "score": 0.52,
+   "margin": 0.29
+  },
+  {
+   "oldKey": "369d0f0be61e",
+   "pageId": "369d0f0b-e61e-81a4-8d03-f939bdbedaea",
+   "title": "AI導入が再設計する判断と役割",
+   "versionId": "vvhcJ.Ayi1JmQs2gq.rD_lga5pV.qVhb",
+   "size": 3681980,
+   "versionAt": "2026-07-15T19:47:45.000Z",
+   "score": 0.64,
+   "margin": 0.4
+  },
+  {
+   "oldKey": "369d0f0be61e",
+   "pageId": "369d0f0b-e61e-8144-af09-f1393d00e899",
+   "title": "生成AIの本命は導入運用基盤",
+   "versionId": "orwk4yLUkdaJ4cwSKAY5O..lFMcto.Mr",
+   "size": 3563468,
+   "versionAt": "2026-07-15T19:47:46.000Z",
+   "score": 0.54,
+   "margin": 0.39
+  },
+  {
+   "oldKey": "36ad0f0be61e",
+   "pageId": "36ad0f0b-e61e-81be-8dd4-e01a517d386a",
+   "title": "AI時代の価値は記録から実行知へ",
+   "versionId": "huV3DmGc2pexf8dZ.Itq71cOUsxvikjr",
+   "size": 4261724,
+   "versionAt": "2026-07-15T19:47:47.000Z",
+   "score": 0.58,
+   "margin": 0.44
+  },
+  {
+   "oldKey": "36ad0f0be61e",
+   "pageId": "36ad0f0b-e61e-8175-afc9-c68bba22ea1e",
+   "title": "AI時代の知能編成原理",
+   "versionId": "wWZ6Os0eKy5WAJ6rnCA613lQRqysfcpz",
+   "size": 3247244,
+   "versionAt": "2026-07-15T19:47:48.000Z",
+   "score": 0.71,
+   "margin": 0.57
+  },
+  {
+   "oldKey": "36ad0f0be61e",
+   "pageId": "36ad0f0b-e61e-819d-8c37-fa866ac43dd0",
+   "title": "AI時代の競争軸は現場接続で決まる",
+   "versionId": "PS6gOstd8CtlDllblJ0j4UmOjd_2YfBG",
+   "size": 4884524,
+   "versionAt": "2026-07-16T19:43:15.000Z",
+   "score": 0.59,
+   "margin": 0.45
+  },
+  {
+   "oldKey": "36ad0f0be61e",
+   "pageId": "36ad0f0b-e61e-8145-adae-daff72e64b58",
+   "title": "生成AIの社会実装を支える制御基盤",
+   "versionId": "3ssJijoC36gPksL5zQMp1QNvxHb9jSPY",
+   "size": 4036796,
+   "versionAt": "2026-07-16T19:43:16.000Z",
+   "score": 0.61,
+   "margin": 0.53
+  },
+  {
+   "oldKey": "36ad0f0be61e",
+   "pageId": "36ad0f0b-e61e-8189-848d-f13819791ff2",
+   "title": "AI前提で再編される知識と開発の競争軸",
+   "versionId": "cjLbPLpjse9wJwJ9LB2L4Ggy6XjCCx6S",
+   "size": 4150268,
+   "versionAt": "2026-07-16T19:43:17.000Z",
+   "score": 0.51,
+   "margin": 0.37
+  },
+  {
+   "oldKey": "36bd0f0be61e",
+   "pageId": "36bd0f0b-e61e-81b1-a0dd-eda1f88597d6",
+   "title": "AI実運用化が促す統制と組織変容",
+   "versionId": "Zo3BfXHjE5czLcnrteUfPKK3p3YtcPhr",
+   "size": 4466204,
+   "versionAt": "2026-07-16T19:43:18.000Z",
+   "score": 0.56,
+   "margin": 0.43
+  },
+  {
+   "oldKey": "36bd0f0be61e",
+   "pageId": "36bd0f0b-e61e-8172-91f0-d4b1b87fac90",
+   "title": "AI実務は導入から運用最適化へ",
+   "versionId": "LcTOI0WimpbznuWO3AvshEZDu1M9jTAL",
+   "size": 3915548,
+   "versionAt": "2026-07-16T19:43:19.000Z",
+   "score": 0.57,
+   "margin": 0.44
+  },
+  {
+   "oldKey": "36bd0f0be61e",
+   "pageId": "36bd0f0b-e61e-819d-98c9-d9d101889d7f",
+   "title": "AI実装に潜む応答制御原理",
+   "versionId": "ry_XczV9oacLLwhtj0vwCqMR0Sz1MqKQ",
+   "size": 4230764,
+   "versionAt": "2026-07-17T19:41:39.000Z",
+   "score": 0.59,
+   "margin": 0.36
+  },
+  {
+   "oldKey": "36bd0f0be61e",
+   "pageId": "36bd0f0b-e61e-813b-9a78-f624d37379a0",
+   "title": "AI普及の真因は性能より信頼構造",
+   "versionId": "avSHmK8bLdz6oSX7Q.J24QVmwuYMgJHy",
+   "size": 3672764,
+   "versionAt": "2026-07-17T19:41:40.000Z",
+   "score": 0.67,
+   "margin": 0.45
+  },
+  {
+   "oldKey": "373d0f0be61e",
+   "pageId": "373d0f0b-e61e-812f-b15a-fc4bd00964c3",
+   "title": "資本・学習・労働を貫くAI実装競争",
+   "versionId": "dvRf7ZLCU3_dKITqTf9P.qSYjBexu1Ez",
+   "size": 2654684,
+   "versionAt": "2026-07-18T19:44:35.000Z",
+   "score": 0.61,
+   "margin": 0.39
+  },
+  {
+   "oldKey": "373d0f0be61e",
+   "pageId": "373d0f0b-e61e-81ae-adb4-c2eea2d4b308",
+   "title": "Anthropicの覇権戦略を読む",
+   "versionId": "l1ib1WGhaMMFvVE7I2R8SybJ9XUvPbZ2",
+   "size": 2595500,
+   "versionAt": "2026-07-18T19:44:36.000Z",
+   "score": 0.57,
+   "margin": 0.35
+  },
+  {
+   "oldKey": "375d0f0be61e",
+   "pageId": "375d0f0b-e61e-81e8-aa90-dceccea18f87",
+   "title": "AI運用経済を左右する最適化原理",
+   "versionId": "10PV1Hned7DQOTnroayndLM7TB7Jkpzs",
+   "size": 2639852,
+   "versionAt": "2026-07-19T19:44:03.000Z",
+   "score": 0.58,
+   "margin": 0.5
+  },
+  {
+   "oldKey": "375d0f0be61e",
+   "pageId": "375d0f0b-e61e-8123-b8d6-fa45721b687c",
+   "title": "AI組織はオーケストレーションへ向かう",
+   "versionId": "J2.RKU1atofT1o40SdTlcvxp7Qc6xmup",
+   "size": 2686940,
+   "versionAt": "2026-07-19T19:44:03.000Z",
+   "score": 0.56,
+   "margin": 0.47
+  },
+  {
+   "oldKey": "377d0f0be61e",
+   "pageId": "377d0f0b-e61e-8136-bbac-f9d456b22cb0",
+   "title": "AI時代の価値は制御力で決まる",
+   "versionId": "9d5zyBL1UHI5rdG_Jk1jbdcSNIrQNx.f",
+   "size": 3191804,
+   "versionAt": "2026-07-19T19:44:06.000Z",
+   "score": 0.57,
+   "margin": 0.48
+  },
+  {
+   "oldKey": "377d0f0be61e",
+   "pageId": "377d0f0b-e61e-81ba-9cfe-c1eff0dd32f8",
+   "title": "AIの律速点はモデルの外へ移った",
+   "versionId": "OHXZUziz567Pppk0JZBFMtgyCVuswoS6",
+   "size": 3345596,
+   "versionAt": "2026-07-20T20:08:34.000Z",
+   "score": 0.68,
+   "margin": 0.59
+  },
+  {
+   "oldKey": "381d0f0be61e",
+   "pageId": "381d0f0b-e61e-811d-988d-c4502685358d",
+   "title": "人間が残る工程こそが次の隘路だ",
+   "versionId": "0iXXqX3Nmvf35rzaSeAsi__VBCd40_1R",
+   "size": 3850892,
+   "versionAt": "2026-07-22T19:54:26.000Z",
+   "score": 0.66,
+   "margin": 0.55
+  },
+  {
+   "oldKey": "381d0f0be61e",
+   "pageId": "381d0f0b-e61e-81ea-9513-ceef6eb2c607",
+   "title": "安くなったのは実行、希少になったのは削除",
+   "versionId": "Cx285aksTbDG.VTEX9d0vgY3HQTwy0cO",
+   "size": 3664124,
+   "versionAt": "2026-07-22T19:54:27.000Z",
+   "score": 0.59,
+   "margin": 0.49
+  },
+  {
+   "oldKey": "388d0f0be61e",
+   "pageId": "388d0f0b-e61e-8160-b479-f7348505ffd7",
+   "title": "賢さは商品化し、ループが堀になる",
+   "versionId": "Um1h0U6Y_h0KfrLWXS2QtKTQih1hgmpk",
+   "size": 2955212,
+   "versionAt": "2026-07-23T19:57:12.000Z",
+   "score": 0.69,
+   "margin": 0.48
+  },
+  {
+   "oldKey": "388d0f0be61e",
+   "pageId": "388d0f0b-e61e-8105-abdc-eff2d41b7bd5",
+   "title": "競争優位は最適化ではなく「削除」から生まれる",
+   "versionId": "eDUYBTXpOmQg4GeKteqSsy7BUpTfZfND",
+   "size": 3067100,
+   "versionAt": "2026-07-23T19:57:13.000Z",
+   "score": 0.72,
+   "margin": 0.51
+  },
+  {
+   "oldKey": "38bd0f0be61e",
+   "pageId": "38bd0f0b-e61e-819b-aa82-c87e884160cd",
+   "title": "差を生むのは最適化ではなく前提の解体",
+   "versionId": "dce1i5U0FVX0dia.C4IZfPk5BFWS0yEy",
+   "size": 3509324,
+   "versionAt": "2026-07-24T19:57:28.000Z",
+   "score": 0.54,
+   "margin": 0.36
+  },
+  {
+   "oldKey": "38bd0f0be61e",
+   "pageId": "38bd0f0b-e61e-81ae-9fc3-fb45d01c97b9",
+   "title": "性能ではなく『選別』が主導権を握る",
+   "versionId": "sPtGx.l8w1N90WUYtePbDK2b7flThh4c",
+   "size": 3458492,
+   "versionAt": "2026-07-24T19:57:29.000Z",
+   "score": 0.58,
+   "margin": 0.32
+  },
+  {
+   "oldKey": "38bd0f0be61e",
+   "pageId": "38bd0f0b-e61e-8117-a32e-f5a025753d87",
+   "title": "実行が無料化し、設計が希少になる",
+   "versionId": "6tUbgeS0UxVoKthRVdCVZW7bkb_zgi6b",
+   "size": 3581612,
+   "versionAt": "2026-07-24T19:57:29.000Z",
+   "score": 0.71,
+   "margin": 0.45
+  },
+  {
+   "oldKey": "38bd0f0be61e",
+   "pageId": "38bd0f0b-e61e-81ad-ba61-cd4372c8b966",
+   "title": "少数の正しい選択が全体へ汎化する",
+   "versionId": "OlhqFb1mv7J1TdbvHkn_V4BY1VlzH4O6",
+   "size": 3488588,
+   "versionAt": "2026-07-24T19:57:31.000Z",
+   "score": 0.62,
+   "margin": 0.37
+  },
+  {
+   "oldKey": "38cd0f0be61e",
+   "pageId": "38cd0f0b-e61e-816b-bba2-c91368439868",
+   "title": "能力配分をめぐる支配権の三層化",
+   "versionId": "P2SU6p0bKJN6Qrx332YmfwTSjOJTjj0Y",
+   "size": 3670316,
+   "versionAt": "2026-07-26T19:45:32.000Z",
+   "score": 0.57,
+   "margin": 0.46
+  },
+  {
+   "oldKey": "38cd0f0be61e",
+   "pageId": "38cd0f0b-e61e-810c-9b81-c7acc21e61d5",
+   "title": "継ぎ目の消滅が分業の前提を崩す",
+   "versionId": "4ZY1lSlpQtcCvqh.8btHTnL8g7evqVx0",
+   "size": 3917708,
+   "versionAt": "2026-07-26T19:45:32.000Z",
+   "score": 0.69,
+   "margin": 0.58
+  },
+  {
+   "oldKey": "38cd0f0be61e",
+   "pageId": "38cd0f0b-e61e-81f0-ac69-d0d2c715ecb2",
+   "title": "希少資源はモデルではなく投入物だ",
+   "versionId": "M1zjUGfSLT49c59GjKl3JszaYL6Vb3cR",
+   "size": 3950828,
+   "versionAt": "2026-07-26T19:45:33.000Z",
+   "score": 0.65,
+   "margin": 0.55
+  },
+  {
+   "oldKey": "38ed0f0be61e",
+   "pageId": "38ed0f0b-e61e-814e-b2f4-f6b60837cecd",
+   "title": "競争力は「指示」ではなく「基盤」に宿る",
+   "versionId": "2wCh4uPRPsMCIvc8nL2.Kr_Mdx4lIqGZ",
+   "size": 3445532,
+   "versionAt": "2026-07-26T19:45:34.000Z",
+   "score": 0.66,
+   "margin": 0.56
+  },
+  {
+   "oldKey": "38ed0f0be61e",
+   "pageId": "38ed0f0b-e61e-81c7-bbc5-e807bbf869ea",
+   "title": "コモディティ化する生成、希少化する検証",
+   "versionId": "1b7IerZfMoPhqrDhPThvyjNmVTMAKIjo",
+   "size": 3442508,
+   "versionAt": "2026-07-27T20:07:04.000Z",
+   "score": 0.66,
+   "margin": 0.55
+  },
+  {
+   "oldKey": "390d0f0be61e",
+   "pageId": "390d0f0b-e61e-81c0-82fc-c14c7e1cff7a",
+   "title": "実体の均質化が「線引き」を主役にする",
+   "versionId": "XQTgt7SZQIrH6F9iIIXjQ0yN0U.55p0o",
+   "size": 2648348,
+   "versionAt": "2026-07-27T20:07:05.000Z",
+   "score": 0.53,
+   "margin": 0.46
+  },
+  {
+   "oldKey": "390d0f0be61e",
+   "pageId": "390d0f0b-e61e-81a7-b471-c91c22603bd2",
+   "title": "希少性が動くと、経験は負債になる",
+   "versionId": "is09o.zpKmHPX8RNAsLAm69XiK6wUTsm",
+   "size": 2841164,
+   "versionAt": "2026-07-27T20:07:05.000Z",
+   "score": 0.62,
+   "margin": 0.54
+  },
+  {
+   "oldKey": "391d0f0be61e",
+   "pageId": "391d0f0b-e61e-815f-ad22-d02848e22eba",
+   "title": "競争軸は「能力」から「接続の連続性」へ",
+   "versionId": "hsK.R3x1xhejTMmBTysTFB1Vc4O7ATJO",
+   "size": 2775788,
+   "versionAt": "2026-07-27T20:07:06.000Z",
+   "score": 0.67,
+   "margin": 0.59
+  },
+  {
+   "oldKey": "391d0f0be61e",
+   "pageId": "391d0f0b-e61e-81cc-b294-ca8060ace2bb",
+   "title": "仕事の単位がターンからループへ移る",
+   "versionId": "sdvqCMa_siGm5spZ3vqDfVapqv5jMy1v",
+   "size": 2670524,
+   "versionAt": "2026-07-27T20:07:06.000Z",
+   "score": 0.69,
+   "margin": 0.62
+  },
+  {
+   "oldKey": "393d0f0be61e",
+   "pageId": "393d0f0b-e61e-81e4-812e-e8785b3affc7",
+   "title": "フロンティアAIの律速点は知能の外へ移った",
+   "versionId": "6R0ZuXsC6W2m9mF3p7YQDYDSLHaB8RRw",
+   "size": 3176108,
+   "versionAt": "2026-07-28T20:03:32.000Z",
+   "score": 0.61,
+   "margin": 0.43
+  },
+  {
+   "oldKey": "393d0f0be61e",
+   "pageId": "393d0f0b-e61e-81ce-a175-e9fe3059fb1b",
+   "title": "委ねる境界が、スタックを一段ずつ昇る",
+   "versionId": "D.kVaBQ4Q854omC9uBoWyApKOs8iGBAN",
+   "size": 3280508,
+   "versionAt": "2026-07-28T20:03:32.000Z",
+   "score": 0.6,
+   "margin": 0.42
+  },
+  {
+   "oldKey": "399d0f0be61e",
+   "pageId": "399d0f0b-e61e-8165-948e-d9b765fa5f97",
+   "title": "希少なのは能力ではなく流通と単価だ",
+   "versionId": "SoND9OfuF8e_e5niHGzFGFmW7yI8hiHL",
+   "size": 3533372,
+   "versionAt": "2026-07-29T19:54:38.000Z",
+   "score": 0.62,
+   "margin": 0.43
+  },
+  {
+   "oldKey": "399d0f0be61e",
+   "pageId": "399d0f0b-e61e-8146-b165-e98c2a5a7000",
+   "title": "決め手はモデルから基盤へ移った",
+   "versionId": "niIMsIUJQIpyjSjGZe9RXgxvSF.3Mvhf",
+   "size": 3486428,
+   "versionAt": "2026-07-29T19:54:39.000Z",
+   "score": 0.63,
+   "margin": 0.44
+  },
+  {
+   "oldKey": "39ad0f0be61e",
+   "pageId": "39ad0f0b-e61e-810a-bbab-ff9736eebcf3",
+   "title": "梯子の位置から、フロンティアへの距離へ",
+   "versionId": "MlIcMkuJw0MMStA8B2qNe1Ss.i1v0DQD",
+   "size": 3552812,
+   "versionAt": "2026-07-30T20:04:02.000Z",
+   "score": 0.35,
+   "margin": 0.31
+  },
+  {
+   "oldKey": "39ad0f0be61e",
+   "pageId": "39ad0f0b-e61e-8176-8211-f4a6e9eadbb0",
+   "title": "競争軸は「性能」から「境界の制御」へ",
+   "versionId": "Fg5bnQcawJdANd5rGPKzsFgtVxrtOG2Y",
+   "size": 3253292,
+   "versionAt": "2026-07-30T20:04:03.000Z",
+   "score": 0.61,
+   "margin": 0.58
+  },
+  {
+   "oldKey": "3a2d0f0be61e",
+   "pageId": "3a2d0f0b-e61e-8183-8ac2-e6d1c1ccbea1",
+   "title": "価値は成果物ではなく工程に宿る",
+   "versionId": "PYK2b7ZdP8fPWG1hzkbEd38JbIdXjic0",
+   "size": 3119516,
+   "versionAt": "2026-08-01T19:45:49.000Z",
+   "score": 0.56,
+   "margin": 0.48
+  },
+  {
+   "oldKey": "3a2d0f0be61e",
+   "pageId": "3a2d0f0b-e61e-812e-a912-c901347bd0f1",
+   "title": "主役はモデルから「配分の設計」へ",
+   "versionId": "8ALgtLs2RRatkYlR7Eco7VnoU79Rx3vp",
+   "size": 3043196,
+   "versionAt": "2026-08-01T19:45:49.000Z",
+   "score": 0.57,
+   "margin": 0.51
+  },
+  {
+   "oldKey": "39ed0f0be61e",
+   "pageId": "39ed0f0b-e61e-8105-9d1f-d73cd5e63ed3",
+   "title": "知能が余り、「指示と検証」が希少になる",
+   "versionId": "A1KG93DbEC9AzDq9W_lAFTtWijSAYU8k",
+   "size": 3451004,
+   "versionAt": "2026-08-02T19:45:18.000Z",
+   "score": 0.5,
+   "margin": 0.41
+  },
+  {
+   "oldKey": "39ed0f0be61e",
+   "pageId": "39ed0f0b-e61e-8113-bda6-f32c65f7916f",
+   "title": "AIの希少性は、モデルの外側へ移った",
+   "versionId": "_UpW2BQwDWOZLyNq9AZpE44AMjmk0UPR",
+   "size": 3168476,
+   "versionAt": "2026-08-02T19:45:19.000Z",
+   "score": 0.55,
+   "margin": 0.46
+  },
+  {
+   "oldKey": "39fd0f0be61e",
+   "pageId": "39fd0f0b-e61e-81ef-9ff9-fd3f3384b546",
+   "title": "知能が余るほど価値は隣接層へ逃げる",
+   "versionId": "9Ud693rGyFioNbvRvrQy6XBDhw3bxNyU",
+   "size": 3284396,
+   "versionAt": "2026-08-02T19:45:19.000Z",
+   "score": 0.49,
+   "margin": 0.44
+  },
+  {
+   "oldKey": "39fd0f0be61e",
+   "pageId": "39fd0f0b-e61e-8123-807a-f08d7b46bd25",
+   "title": "知能が余る時代、測定と構成が勝敗を分ける",
+   "versionId": ".CWBorzvr3kAo5uayLz5dkSApsCE9TgL",
+   "size": 3109004,
+   "versionAt": "2026-08-02T19:45:20.000Z",
+   "score": 0.48,
+   "margin": 0.43
+  },
+  {
+   "oldKey": "3a2d0f0be61e",
+   "pageId": "3a2d0f0b-e61e-8193-a82b-c1db8983b1e7",
+   "title": "AIが制度を作り替える側に回った",
+   "versionId": "vIYkButVRfG1cKWwkHyDwbO992X9Bi6O",
+   "size": 3788828,
+   "versionAt": "2026-08-04T20:11:36.000Z",
+   "score": 0.69,
+   "margin": 0.49
+  },
+  {
+   "oldKey": "3a2d0f0be61e",
+   "pageId": "3a2d0f0b-e61e-81e6-8176-e091cec6b996",
+   "title": "生成がタダになる世界で、検証が価格を決める",
+   "versionId": "ZDtkGi4racjBWr3ht1.o8PIT8T37DqqX",
+   "size": 3623084,
+   "versionAt": "2026-08-04T20:11:37.000Z",
+   "score": 0.59,
+   "margin": 0.39
+  },
+  {
+   "oldKey": "3a5d0f0be61e",
+   "pageId": "3a5d0f0b-e61e-8134-afb8-f626b0272715",
+   "title": "価値の源泉はモデルの外側へ移った",
+   "versionId": "x9jMxtzUP3Q.onD_NBxyPmNI4.ifAB9w",
+   "size": 3330620,
+   "versionAt": "2026-08-04T20:11:41.000Z",
+   "score": 0.57,
+   "margin": 0.48
+  },
+  {
+   "oldKey": "3a5d0f0be61e",
+   "pageId": "3a5d0f0b-e61e-81c6-bdc1-eb3be5571946",
+   "title": "知能が余るほど、配線の判断が希少になる",
+   "versionId": "IqJYvLCOYn8JI_5IDnsvDFuNlI8BfJbS",
+   "size": 4191884,
+   "versionAt": "2026-08-05T20:11:19.000Z",
+   "score": 0.66,
+   "margin": 0.57
+  },
+  {
+   "oldKey": "3a9d0f0be61e",
+   "pageId": "3a9d0f0b-e61e-814f-b22e-da497c191e48",
+   "title": "語りが上振れ、計測が真実を握る",
+   "versionId": "21X5H1_yQnBv0HlpmlUfQBgjXsU88VjH",
+   "size": 3552668,
+   "versionAt": "2026-08-05T20:11:20.000Z",
+   "score": 0.65,
+   "margin": 0.55
+  },
+  {
+   "oldKey": "3a9d0f0be61e",
+   "pageId": "3a9d0f0b-e61e-81bc-81e5-e740445e9445",
+   "title": "能力は安くなり、律速は検証へ移る",
+   "versionId": "6Bg6bYm9NAqj7MNvWE2CuM0eXjaoU1td",
+   "size": 3475484,
+   "versionAt": "2026-08-07T00:25:50.000Z",
+   "score": 0.63,
+   "margin": 0.49
+  },
+  {
+   "oldKey": "3a9d0f0be61e",
+   "pageId": "3a9d0f0b-e61e-813b-b66f-cc8e871abdde",
+   "title": "能力は安くなり、検証だけが高くなった",
+   "versionId": "qSFs9wmEa9u4sSv.ZgiXi8x0kDFVaDLy",
+   "size": 3201164,
+   "versionAt": "2026-08-07T00:25:51.000Z",
+   "score": 0.56,
+   "margin": 0.42
+  },
+  {
+   "oldKey": "3b1d0f0be61e",
+   "pageId": "3b1d0f0b-e61e-814a-a83c-f4b6084350c0",
+   "title": "委任を決めるのは能力ではなく巻き戻しコスト",
+   "versionId": ".kfs7PqqvWlFwwStVHVhGcVftInQrwRS",
+   "size": 4006844,
+   "versionAt": "2026-08-07T00:25:54.000Z",
+   "score": 0.7,
+   "margin": 0.6
+  },
+  {
+   "oldKey": "3b1d0f0be61e",
+   "pageId": "3b1d0f0b-e61e-815b-9212-e9fb704aa21d",
+   "title": "ボトルネックは関門から流量へ移った",
+   "versionId": "gh9y..R5EsFhsiEGUYgEVvfLM70RIqhN",
+   "size": 3354092,
+   "versionAt": "2026-08-08T19:09:49.000Z",
+   "score": 0.48,
+   "margin": 0.39
+  },
+  {
+   "oldKey": "3b1d0f0be61e",
+   "pageId": "3b1d0f0b-e61e-81f7-9fa6-dcb4c78fea93",
+   "title": "AIは労働ではなく調整を代替している",
+   "versionId": "KJ49ywEmD.XGOrrgpWvs1qFZxAn8jzgf",
+   "size": 3298220,
+   "versionAt": "2026-08-08T19:09:49.000Z",
+   "score": 0.58,
+   "margin": 0.46
+  },
+  {
+   "oldKey": "3b1d0f0be61e",
+   "pageId": "3b1d0f0b-e61e-8132-9406-c221da367ee7",
+   "title": "ボトルネックは動き、指標は残る",
+   "versionId": "wqvzt_3vI532l.Jg4cInDR5.fbN35f.g",
+   "size": 3413996,
+   "versionAt": "2026-08-08T19:09:50.000Z",
+   "score": 0.54,
+   "margin": 0.43
+  },
+  {
+   "oldKey": "3b4d0f0be61e",
+   "pageId": "3b4d0f0b-e61e-814d-8af3-d77333defaac",
+   "title": "上限を決めるのは受け手の処理能力",
+   "versionId": "9rvlcHN_S3XgpdAlpT9cdQpQHpJZ7udD",
+   "size": 3617468,
+   "versionAt": "2026-08-09T19:13:40.000Z",
+   "score": 0.69,
+   "margin": 0.55
+  },
+  {
+   "oldKey": "3b4d0f0be61e",
+   "pageId": "3b4d0f0b-e61e-8138-8154-c66437240be7",
+   "title": "ボトルネックは移り、指標は残る",
+   "versionId": "0QR.3.umQrB7FjbQ0t0n63X5F_FPN_29",
+   "size": 3338108,
+   "versionAt": "2026-08-09T19:13:41.000Z",
+   "score": 0.63,
+   "margin": 0.53
+  },
+  {
+   "oldKey": "3b4d0f0be61e",
+   "pageId": "3b4d0f0b-e61e-8194-9e9d-d4981d066c9d",
+   "title": "代替されるのは、ループが閉じない側",
+   "versionId": "HZrNT1SXXNwYMTjx38hna11nieXTiW4a",
+   "size": 3836780,
+   "versionAt": "2026-08-09T19:13:42.000Z",
+   "score": 0.67,
+   "margin": 0.53
+  },
+  {
+   "oldKey": "3b5d0f0be61e",
+   "pageId": "3b5d0f0b-e61e-8187-8dc1-e82c1a63a5ff",
+   "title": "実装遅延が物価をつくる——計上と稼働のずれ",
+   "versionId": "djVSJhMujEMF6PSuYE_p3aW_M.tbLjxw",
+   "size": 4887548,
+   "versionAt": "2026-08-10T19:34:04.000Z",
+   "score": 0.72,
+   "margin": 0.55
+  },
+  {
+   "oldKey": "3b5d0f0be61e",
+   "pageId": "3b5d0f0b-e61e-810e-a361-ea91a32ea367",
+   "title": "停止規則なき支出は計器では止まらない",
+   "versionId": "y0gDOXZxmKNG0OkMZa867SB42fBa8J6O",
+   "size": 3831740,
+   "versionAt": "2026-08-10T19:34:05.000Z",
+   "score": 0.62,
+   "margin": 0.45
+  },
+  {
+   "oldKey": "3b6d0f0be61e",
+   "pageId": "3b6d0f0b-e61e-812a-b195-fd6332264664",
+   "title": "安くなったのは生成であって、検証ではない",
+   "versionId": "nTcX72oEu5REbXLAwMWweiK7n8CEKlMf",
+   "size": 3454028,
+   "versionAt": "2026-08-10T19:34:05.000Z",
+   "score": 0.54,
+   "margin": 0.45
+  },
+  {
+   "oldKey": "3b6d0f0be61e",
+   "pageId": "3b6d0f0b-e61e-81a9-ac86-fa5f1fffeb93",
+   "title": "希少になったのは生産ではなく停止",
+   "versionId": "UtDitzTUiu1OGS0DrMUqiPfBbJC68i6n",
+   "size": 3546332,
+   "versionAt": "2026-08-10T19:34:06.000Z",
+   "score": 0.6,
+   "margin": 0.52
+  },
+  {
+   "oldKey": "3bbd0f0be61e",
+   "pageId": "3bbd0f0b-e61e-815c-a1d8-dd82c6dda130",
+   "title": "モデルから検証体制への重心移動",
+   "versionId": "c6cD17ImsdzwE9YZCJFEgFNNnx8LMbTS",
+   "size": 3046508,
+   "versionAt": "2026-08-15T18:58:35.000Z",
+   "score": 0.65,
+   "margin": 0.49
+  },
+  {
+   "oldKey": "3bbd0f0be61e",
+   "pageId": "3bbd0f0b-e61e-81c5-81cf-db2a17701097",
+   "title": "検証ループの有無が成否を分ける",
+   "versionId": "anjDwWieOg.pesc01pHUFhNVr8jNE9CF",
+   "size": 3101660,
+   "versionAt": "2026-08-15T18:58:35.000Z",
+   "score": 0.76,
+   "margin": 0.6
+  },
+  {
+   "oldKey": "3c1d0f0be61e",
+   "pageId": "3c1d0f0b-e61e-8176-96d8-cfff8e9a7527",
+   "title": "代理指標が実体から切り離される閾値",
+   "versionId": "JcrccEq_jzp74Q_znl7UtE5xoOkJ1_2U",
+   "size": 3291452,
+   "versionAt": "2026-08-23T18:58:48.000Z",
+   "score": 0.46,
+   "margin": 0.37
+  },
+  {
+   "oldKey": "3c1d0f0be61e",
+   "pageId": "3c1d0f0b-e61e-8113-9f88-d3d10a698635",
+   "title": "中立性を担保していたのは摩擦だった",
+   "versionId": "l5RQvOS9Vj88Kq75NgQjuatAHVS4h4IS",
+   "size": 4034780,
+   "versionAt": "2026-08-23T18:58:48.000Z",
+   "score": 0.71,
+   "margin": 0.61
+  },
+  {
+   "oldKey": "3cdd0f0be61e",
+   "pageId": "3cdd0f0b-e61e-810a-9f09-e6b2e13e796d",
+   "title": "判断の希少化に、対価配分が追いつかない",
+   "versionId": "VuG5YsfplRBE7HZ6zXFBKMal96ad2OLc",
+   "size": 2899196,
+   "versionAt": "2026-09-03T21:16:15.000Z",
+   "score": 0.64,
+   "margin": 0.55
+  },
+  {
+   "oldKey": "3cdd0f0be61e",
+   "pageId": "3cdd0f0b-e61e-8107-b668-eb7e02fe1e8c",
+   "title": "宣言と構造の乖離が生む新しい信頼検証軸",
+   "versionId": "fOpsBIWAriyn48IxVDXdi1BYk6L3hvJt",
+   "size": 2957516,
+   "versionAt": "2026-09-03T21:16:16.000Z",
+   "score": 0.68,
+   "margin": 0.59
+  },
+  {
+   "oldKey": "3cdd0f0be61e",
+   "pageId": "3cdd0f0b-e61e-8116-88b5-c2d74dbb3b6b",
+   "title": "設計なき移行コストは人で精算される",
+   "versionId": "2hSwlmlRM7ThzmAJ9pseMxZYa6qKkxpt",
+   "size": 3020300,
+   "versionAt": "2026-09-03T21:16:16.000Z",
+   "score": 0.6,
+   "margin": 0.54
+  },
+  {
+   "oldKey": "3ced0f0be61e",
+   "pageId": "3ced0f0b-e61e-818b-9790-d88732c09d5d",
+   "title": "第三者を当事者へ変える自律化の圧力",
+   "versionId": "29I7x5gE6495kWFMcw_3GebS8T8gBFbj",
+   "size": 3368636,
+   "versionAt": "2026-09-06T20:44:36.000Z",
+   "score": 0.55,
+   "margin": 0.41
+  },
+  {
+   "oldKey": "3ced0f0be61e",
+   "pageId": "3ced0f0b-e61e-8158-b978-ef76d65a7136",
+   "title": "生成の高速化、価値は編成層へ移る",
+   "versionId": "MZPUhjva8LeL0A4uCk6vf5Zdfb7aAJfA",
+   "size": 3428972,
+   "versionAt": "2026-09-06T20:44:37.000Z",
+   "score": 0.6,
+   "margin": 0.47
+  },
+  {
+   "oldKey": "3ced0f0be61e",
+   "pageId": "3ced0f0b-e61e-81fe-beff-e34e7932dab5",
+   "title": "仕事のループを持たない代替は崩壊する",
+   "versionId": "tg1BIsU4uIzd8cCxqUNXAihCtddLr5se",
+   "size": 3605660,
+   "versionAt": "2026-09-06T20:44:37.000Z",
+   "score": 0.62,
+   "margin": 0.5
+  },
+  {
+   "oldKey": "3dbd0f0be61e",
+   "pageId": "3dbd0f0b-e61e-81ef-b677-cb80186df35f",
+   "title": "検証の所在が資本と労働を分ける",
+   "versionId": "wDH_bNaHHUOIX0yqxRdvIzp.cwo_5NFG",
+   "size": 3606380,
+   "versionAt": "2026-09-16T21:37:13.000Z",
+   "score": 0.67,
+   "margin": 0.49
+  },
+  {
+   "oldKey": "3dbd0f0be61e",
+   "pageId": "3dbd0f0b-e61e-81fa-99ed-cc636c548268",
+   "title": "AIの勝負はモデルから構造へ移る",
+   "versionId": "KIXBGoTMwqpChRkIRT88fvj8LJaoKMBO",
+   "size": 3425804,
+   "versionAt": "2026-09-16T21:37:15.000Z",
+   "score": 0.61,
+   "margin": 0.45
+  },
+  {
+   "oldKey": "3dbd0f0be61e",
+   "pageId": "3dbd0f0b-e61e-81d1-bd38-e6b5c2964f44",
+   "title": "統制の重心、文面から基盤構造へ",
+   "versionId": "j1.U_AqbdQiP8U5eZ2q1Mj7XKgt8rRxX",
+   "size": 3331196,
+   "versionAt": "2026-09-16T21:37:15.000Z",
+   "score": 0.48,
+   "margin": 0.3
+  },
+  {
+   "oldKey": "3dcd0f0be61e",
+   "pageId": "3dcd0f0b-e61e-81ab-ae0a-c6d9df41398a",
+   "title": "検証は主体から構造へと移行する",
+   "versionId": "MeKD288MK6JEMmcpDQEijEvbMWuyIKK3",
+   "size": 3562748,
+   "versionAt": "2026-09-16T21:37:16.000Z",
+   "score": 0.67,
+   "margin": 0.54
+  },
+  {
+   "oldKey": "3dcd0f0be61e",
+   "pageId": "3dcd0f0b-e61e-8146-ad52-de0c653a3d70",
+   "title": "群れとして設計されないエージェント基盤の限界",
+   "versionId": "iR8jhIenMfhNS3aQg1cn6xuitBI3jpjV",
+   "size": 3427244,
+   "versionAt": "2026-09-16T21:37:17.000Z",
+   "score": 0.48,
+   "margin": 0.35
+  },
+  {
+   "oldKey": "3e3d0f0be61e",
+   "pageId": "3e3d0f0b-e61e-81e8-af7b-c78ef4af2f50",
+   "title": "生成が加速するほど検証は遅れる",
+   "versionId": "ooKK3agwm5F1CWZaFozUzkRsSlXnST4A",
+   "size": 4563692,
+   "versionAt": "2026-09-23T21:42:29.000Z",
+   "score": 0.43,
+   "margin": 0.26
+  },
+  {
+   "oldKey": "3e3d0f0be61e",
+   "pageId": "3e3d0f0b-e61e-8138-ac8c-c6e2fd58aa21",
+   "title": "生産の高速化が検証を後回しにする",
+   "versionId": "iNDkHnVTADU2gcsFkKIBSD0r4hyvrkUo",
+   "size": 3679532,
+   "versionAt": "2026-09-23T21:42:30.000Z",
+   "score": 0.39,
+   "margin": 0.27
+  },
+  {
+   "oldKey": "3e3d0f0be61e",
+   "pageId": "3e3d0f0b-e61e-8105-82a1-f2e864d7074d",
+   "title": "加速する能力が奪う、検証と分配の猶予",
+   "versionId": "Af4uuG1KCAT42WLemZVoc9qlr32SAwNh",
+   "size": 3946364,
+   "versionAt": "2026-09-23T21:42:30.000Z",
+   "score": 0.52,
+   "margin": 0.32
+  },
+  {
+   "oldKey": "3e3d0f0be61e",
+   "pageId": "3e3d0f0b-e61e-8126-9d0a-c95aa49fde73",
+   "title": "外部規制に先回りする自己検証の制度化",
+   "versionId": "fNhtF40K.HB3wlVgbwFVcD.DbhJ3Y948",
+   "size": 3489020,
+   "versionAt": "2026-09-25T21:46:30.000Z",
+   "score": 0.6,
+   "margin": 0.4
+  }
+ ]
+}

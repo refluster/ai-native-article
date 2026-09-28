@@ -21,7 +21,7 @@
 //   POST /podcast/rss                  — Story 6
 //       Build the podcast RSS from every audio-ready/published episode
 //       (enclosure = the public MP3, <description> = the mandatory citations,
-//       GUID = slug) and write it to the public podcast/feed.xml.
+//       GUID = the MP3's basename) and write it to the public podcast/feed.xml.
 //
 // Auth: IAM (the HttpApi authorizer), invoked by the operator/orchestrator who
 // hold AWS credentials — no new project credential type (the synthesis/RSS
@@ -41,12 +41,32 @@ import {
   S3Client,
   CopyObjectCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
+  GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 
 import { getSecret } from "../shared/secrets.js";
 import { buildPodcastRss, type PodcastEpisode } from "./rss.js";
+import {
+  DEFAULT_MODEL,
+  DEFAULT_HISS_LIMITS,
+  DEFAULT_RATE_BAND,
+  DEFAULT_STYLE,
+  GeminiTtsError,
+  assertDuration,
+  assertNoHiss,
+  chunkScript,
+  encodeMp3,
+  parseWav,
+  pcmSeconds,
+  synthesisKey,
+  synthesizeChunk,
+  wavFile,
+} from "./gemini-tts.js";
+import { normalizeChunks } from "./normalize.js";
 
 const NOTION_VERSION = "2022-06-28";
 const NOTION_API = "https://api.notion.com/v1";
@@ -70,6 +90,42 @@ const SITE_BASE = (process.env.PODCAST_SITE_BASE_URL ?? "https://kohuehara.xyz/a
 // the Producer (odette) hasn't set a per-episode `podcastVoice`. These are the
 // Amazon Polly voices that support the `neural` engine for ja-JP.
 const JA_NEURAL_VOICES = ["Takumi", "Kazuha", "Tomoko"];
+
+// TTS engine (ADR-0043). `gemini` = Gemini 3.8 Flash TTS, chunked + resumable;
+// `polly` = the ADR-0016 path, kept intact as the one-env-var rollback.
+const TTS_ENGINE = (process.env.PODCAST_TTS_ENGINE ?? "polly").toLowerCase();
+const GEMINI_SECRET_ID = process.env.GEMINI_SECRET_ID ?? "wf/projects/agent-workforce/gemini.api_key";
+const GEMINI_MODEL = process.env.GEMINI_TTS_MODEL ?? DEFAULT_MODEL;
+const GEMINI_STYLE = process.env.GEMINI_TTS_STYLE ?? DEFAULT_STYLE;
+// Max 字 per Gemini request. 2,400字 ≈ 7 min of audio: well inside the length
+// where the PoC heard/measured progressive hiss (a 15-min request degraded
+// from ~8 min; a 10.7-min one stayed clean), ~2 requests for a median episode
+// (free tier = 10 requests/day), ~60–120 s latency per request (ADR-0043).
+const GEMINI_CHUNK_CHARS = Number(process.env.GEMINI_CHUNK_CHARS ?? "2400");
+// Chunks synthesised in parallel per wave.
+const GEMINI_CONCURRENCY = Number(process.env.GEMINI_CONCURRENCY ?? "2");
+// Don't start a new wave with less than this much invocation time left (a
+// 2,400字 request ≈ 60–120 s, possibly twice with a guard retake, + MP3
+// encode + S3/Notion).
+const GEMINI_WAVE_RESERVE_MS = Number(process.env.GEMINI_WAVE_RESERVE_MS ?? "300000");
+const GEMINI_MP3_KBPS = Number(process.env.GEMINI_MP3_KBPS ?? "64");
+const GEMINI_RATE_BAND = {
+  minJiPerMin: Number(process.env.GEMINI_MIN_JI_PER_MIN ?? DEFAULT_RATE_BAND.minJiPerMin),
+  maxJiPerMin: Number(process.env.GEMINI_MAX_JI_PER_MIN ?? DEFAULT_RATE_BAND.maxJiPerMin),
+};
+// The `podcastVoice` casting names (Odette's pool, set by podcast-publish) keep
+// their meaning across engines: each maps to a Gemini voice, so the casting
+// skill, set-params.mjs and existing Notion values need no change.
+const GEMINI_HISS_LIMITS = {
+  maxDb: Number(process.env.GEMINI_HISS_MAX_DB ?? DEFAULT_HISS_LIMITS.maxDb),
+  maxRiseDb: Number(process.env.GEMINI_HISS_MAX_RISE_DB ?? DEFAULT_HISS_LIMITS.maxRiseDb),
+};
+// Re-synthesise a chunk this many extra times when a quality guard (rate band
+// / hiss) rejects it — TTS is non-deterministic, a fresh take usually passes.
+const GEMINI_GUARD_RETRIES = Number(process.env.GEMINI_GUARD_RETRIES ?? "1");
+const GEMINI_VOICE_MAP: Record<string, string> = JSON.parse(
+  process.env.GEMINI_VOICE_MAP ?? '{"Takumi":"Charon","Kazuha":"Kore","Tomoko":"Aoede"}',
+);
 
 // Per-run batch cap (operator: "1回の実施で5記事/podcastを上限"). synthesize and
 // publish each process at most this many episodes per call.
@@ -160,11 +216,49 @@ async function queryAll(apiKey: string, databaseId: string): Promise<NotionPage[
   return pages;
 }
 
-function slugFromId(id: string): string {
-  return id.replace(/-/g, "").slice(0, 12);
+// The LAST 12 hex of the page id — the reader site's rule
+// (newsletter/pipeline/fetchers/notion.mjs). Never the first 12: this
+// workspace's ids are `XXXd0f0b-e61e-8…`, so the head is a time prefix plus a
+// workspace constant and every page created the same day shares it. The old
+// head-based slug gave same-day episodes one GUID and one MP3 key — later
+// syntheses overwrote earlier audio and Spotify dropped every duplicated GUID.
+export function slugFromId(id: string): string {
+  return id.replace(/-/g, "").slice(-12);
 }
 function pageSlug(p: NotionPage): string {
   return propText(p.properties?.LegacySlug) || slugFromId(p.id);
+}
+
+// An episode's feed GUID is the basename of the MP3 its audioUrl points at, not
+// a slug recomputed from the page: the audio key is fixed when the episode is
+// synthesised, so already-ingested episodes keep their GUID whatever the slug
+// rule later becomes.
+export function episodeGuid(audioUrl: string, fallback: string): string {
+  const m = /\/([^/?#]+)\.mp3(?:[?#].*)?$/.exec(audioUrl);
+  return m?.[1] ? decodeURIComponent(m[1]) : fallback;
+}
+
+// Refuse to overwrite another episode's audio. Every MP3 is written with its
+// page id as `page-id` metadata; an existing object owned by a different page
+// is a slug collision and fails loud (C-4). A pre-metadata object is accepted
+// only when it is this page's own current audio (a re-synthesis).
+//
+// Existence is decided by ListObjectsV2 (exact-key match), never by a
+// HeadObject 404: whether S3 answers a missing key with 404 or 403 depends on
+// the role's s3:ListBucket reach, and this role's ListBucket is conditioned on
+// s3:prefix, which a list request carries and a HeadObject does not. HeadObject
+// then runs only on a key known to exist, so any error it throws is real.
+async function claimAudioKey(apiKey: string, pageId: string, key: string): Promise<void> {
+  const listed = await s3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: key, MaxKeys: 10 }));
+  if (!(listed.Contents ?? []).some((o) => o.Key === key)) return;
+  const head = await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
+  const owner = head.Metadata?.["page-id"] ?? "";
+  if (owner === pageId) return;
+  if (owner === "") {
+    const page = (await notionFetch(apiKey, `/pages/${pageId}`, { method: "GET" })) as NotionPage;
+    if (propText(page.properties?.audioUrl).endsWith(`/${key}`)) return;
+  }
+  throw new Error(`audio key ${key} already holds another episode's audio (owner ${owner || "unknown"}) — refusing to overwrite it for page ${pageId}`);
 }
 
 async function patchPodcast(apiKey: string, pageId: string, props: Record<string, unknown>): Promise<void> {
@@ -197,7 +291,9 @@ function scriptToPlainText(md: string): string {
 // introduced (R-N1): the Polly taskId is the only state, carried by the caller
 // between the 202 kickoff and the finalize polls.
 
-type SynthHandle = { pageId: string; slug: string; taskId: string; voiceId?: string };
+// `engine` absent = a Polly handle (the pre-ADR-0043 shape). A Gemini handle
+// carries no task id: its progress lives in S3 as per-chunk WAVs.
+type SynthHandle = { pageId: string; slug: string; taskId?: string; voiceId?: string; engine?: "polly" | "gemini" };
 
 // Start one Polly task for an approved episode and return the handle the caller
 // echoes back on each finalize poll. Does NOT wait for completion.
@@ -213,6 +309,14 @@ async function startSynthesis(page: NotionPage): Promise<SynthHandle> {
   // one is chosen at random from the JA Neural pool (D1/Q6). An unknown value
   // falls back to random rather than failing the cast.
   const casted = propText(page.properties?.podcastVoice).trim();
+
+  if (TTS_ENGINE === "gemini") {
+    // Nothing to start: the finalize polls synthesise chunk by chunk.
+    const names = Object.keys(GEMINI_VOICE_MAP);
+    const voiceId = names.includes(casted) ? casted : names[Math.floor(Math.random() * names.length)];
+    return { pageId: page.id, slug: theSlug, voiceId, engine: "gemini" };
+  }
+
   const voiceId = JA_NEURAL_VOICES.includes(casted)
     ? casted
     : JA_NEURAL_VOICES[Math.floor(Math.random() * JA_NEURAL_VOICES.length)];
@@ -240,6 +344,7 @@ async function startSynthesis(page: NotionPage): Promise<SynthHandle> {
 // (C-4). Idempotent — re-running on a finished episode overwrites the same key
 // and re-patches the same status. Returns {done:false} while still in progress.
 async function finalizeOne(apiKey: string, h: SynthHandle): Promise<Record<string, unknown>> {
+  if (!h.taskId) throw new Error(`Polly handle for ${h.slug} carries no taskId`);
   const got = await polly.send(new GetSpeechSynthesisTaskCommand({ TaskId: h.taskId }));
   const status = got.SynthesisTask?.TaskStatus;
   if (status === "failed") {
@@ -255,11 +360,13 @@ async function finalizeOne(apiKey: string, h: SynthHandle): Promise<Record<strin
   if (!outputUri) throw new Error(`Polly task ${h.taskId} (${h.slug}) completed without an OutputUri`);
   const srcKey = decodeURIComponent(new URL(outputUri).pathname.replace(new RegExp(`^/${BUCKET}/`), "").replace(/^\//, ""));
   const destKey = `${PREFIX_AUDIO}/${h.slug}.mp3`;
+  await claimAudioKey(apiKey, h.pageId, destKey);
   await s3.send(new CopyObjectCommand({
     Bucket: BUCKET,
     CopySource: `/${BUCKET}/${srcKey}`,
     Key: destKey,
     ContentType: "audio/mpeg",
+    Metadata: { "page-id": h.pageId },
     MetadataDirective: "REPLACE",
   }));
   await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: srcKey })).catch(() => { /* best-effort temp cleanup */ });
@@ -270,6 +377,154 @@ async function finalizeOne(apiKey: string, h: SynthHandle): Promise<Record<strin
     podcastStatus: { status: { name: "audio-ready" } },
   });
   return { pageId: h.pageId, slug: h.slug, voiceId: h.voiceId, audioUrl, status: "audio-ready", done: true };
+}
+
+// ── Gemini engine (ADR-0043): resumable, chunked synthesis ───────────────────
+//
+// One Gemini request takes 30 s–4 min (ADR-0043 PoC), so this path does NOT
+// run behind the HTTP-API (30 s hard limit): synthesize.mjs invokes the
+// function directly (lambda:InvokeFunction, ≤15 min) with the kickoff handles.
+// Each invocation (1) re-derives every handle's chunk plan from the Notion
+// script, (2) lists the chunk WAVs already in S3 under a content-hashed tmp
+// prefix, (3) synthesises waves of ≤GEMINI_CONCURRENCY missing chunks while
+// invocation time remains, and (4) stitches any episode whose chunks are all
+// present into podcast/audio/{slug}.mp3 → audio-ready. S3 is the only progress
+// state (R-N2), so script length is unbounded and a timeout / daily-quota stop
+// loses nothing — the next invocation (or tomorrow's run) resumes. The caller
+// invokes; the Lambda never invokes itself (R-N1).
+
+type GeminiPlan = { h: SynthHandle; voice: string; chunks: string[]; prefix: string; have: Set<number> };
+
+async function geminiApiKey(): Promise<string> {
+  const sec = await getSecret<{ apiKey?: string }>(GEMINI_SECRET_ID);
+  if (!sec?.apiKey) throw new Error(`${GEMINI_SECRET_ID} secret missing apiKey`);
+  return sec.apiKey;
+}
+
+async function planGemini(notionKey: string, h: SynthHandle): Promise<GeminiPlan> {
+  const page = (await notionFetch(notionKey, `/pages/${h.pageId}`, { method: "GET" })) as NotionPage;
+  const plain = scriptToPlainText(propText(page.properties?.podcastScript));
+  if (plain.length < 200) {
+    throw new Error(`podcastScript for ${h.slug} is ${plain.length} chars after strip — refusing to synthesise a truncated/empty episode (C-1)`);
+  }
+  const voice = GEMINI_VOICE_MAP[h.voiceId ?? ""];
+  if (!voice) throw new Error(`no Gemini voice mapped for cast "${h.voiceId}" (${h.slug}) — check GEMINI_VOICE_MAP`);
+  const chunks = chunkScript(plain, GEMINI_CHUNK_CHARS);
+  const key = synthesisKey({ model: GEMINI_MODEL, voice, style: GEMINI_STYLE, text: plain, maxChars: GEMINI_CHUNK_CHARS });
+  const prefix = `${PREFIX_AUDIO}/tmp/${h.slug}-${key}/`;
+  const listed = await s3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: prefix }));
+  const have = new Set<number>();
+  for (const o of listed.Contents ?? []) {
+    const m = /\/(\d+)\.wav$/.exec(o.Key ?? "");
+    if (m) have.add(Number(m[1]));
+  }
+  return { h, voice, chunks, prefix, have };
+}
+
+// Stitch: load every chunk's PCM, pull the chunks toward the episode median
+// (tempo / brightness / loudness — independent Gemini requests drift, ADR-0043
+// finding 9), join them with a short breath, and encode ONE continuous MP3.
+async function stitchGemini(notionKey: string, p: GeminiPlan): Promise<Record<string, unknown>> {
+  const keys = p.chunks.map((_, i) => `${p.prefix}${i}.wav`);
+  const pcms = [];
+  for (const Key of keys) {
+    const obj = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key }));
+    if (!obj.Body) throw new Error(`chunk ${Key} has no body`);
+    pcms.push(parseWav(Buffer.from(await obj.Body.transformToByteArray())));
+  }
+  const { pcms: normalized, report } = normalizeChunks(pcms, p.chunks.map((c) => c.length));
+  console.log(JSON.stringify({ event: "wf_podcast_normalize", slug: p.h.slug, ...report }));
+  const sr = normalized[0]!.sampleRate;
+  const gap = Buffer.alloc(Math.round(sr * 0.4) * 2);
+  const joined = { ...normalized[0]!, data: Buffer.concat(normalized.flatMap((n, i) => (i ? [gap, n.data] : [n.data]))) };
+  const destKey = `${PREFIX_AUDIO}/${p.h.slug}.mp3`;
+  await claimAudioKey(notionKey, p.h.pageId, destKey);
+  const mp3 = encodeMp3(joined, GEMINI_MP3_KBPS);
+  await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: destKey, Body: mp3, ContentType: "audio/mpeg", Metadata: { "page-id": p.h.pageId } }));
+  await s3
+    .send(new DeleteObjectsCommand({ Bucket: BUCKET, Delete: { Objects: keys.map((Key) => ({ Key })) } }))
+    .catch(() => { /* best-effort temp cleanup */ });
+
+  const audioUrl = `${PUBLIC_BASE}/${destKey}`;
+  await patchPodcast(notionKey, p.h.pageId, {
+    audioUrl: { url: audioUrl },
+    podcastStatus: { status: { name: "audio-ready" } },
+  });
+  return {
+    pageId: p.h.pageId, slug: p.h.slug, voiceId: p.h.voiceId, geminiVoice: p.voice, chunks: p.chunks.length, bytes: mp3.length,
+    normalize: report.chunks.map((c) => ({ stretch: +c.stretch.toFixed(3), tilt: +c.tilt.toFixed(3), gainDb: +c.gainDb.toFixed(1) })),
+    audioUrl, status: "audio-ready", done: true,
+  };
+}
+
+async function advanceGemini(
+  notionKey: string,
+  handles: SynthHandle[],
+  remainingMs: () => number,
+): Promise<Record<string, unknown>[]> {
+  const plans: GeminiPlan[] = [];
+  for (const h of handles) plans.push(await planGemini(notionKey, h));
+
+  let quotaExhausted = false;
+  let retryAfterSec: number | undefined;
+  const missing = () => plans.flatMap((p) => p.chunks.map((text, i) => ({ p, i, text })).filter((j) => !j.p.have.has(j.i)));
+  let apiKey: string | undefined;
+
+  while (!quotaExhausted && missing().length > 0 && remainingMs() > GEMINI_WAVE_RESERVE_MS) {
+    apiKey ??= await geminiApiKey();
+    const key = apiKey;
+    let throttledSec = 0;
+    await Promise.all(
+      missing().slice(0, GEMINI_CONCURRENCY).map(async ({ p, i, text }) => {
+        try {
+          let pcm;
+          for (let attempt = 0; ; attempt++) {
+            pcm = await synthesizeChunk({ apiKey: key, text, voice: p.voice, model: GEMINI_MODEL, style: GEMINI_STYLE });
+            try {
+              assertDuration(text.length, pcmSeconds(pcm), GEMINI_RATE_BAND);
+              assertNoHiss(pcm, GEMINI_HISS_LIMITS);
+              break;
+            } catch (guard) {
+              if (attempt >= GEMINI_GUARD_RETRIES) throw guard;
+              console.warn(JSON.stringify({ event: "wf_podcast_guard_retry", slug: p.h.slug, chunk: i, error: String(guard) }));
+            }
+          }
+          // Raw PCM (as WAV) — normalisation and the single MP3 encode happen
+          // at stitch time, once every chunk exists.
+          await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: `${p.prefix}${i}.wav`, Body: wavFile(pcm), ContentType: "audio/wav" }));
+          p.have.add(i);
+        } catch (err) {
+          // Daily quota: stop for today (chunks already in S3 are kept).
+          // Per-minute throttle / overload: back off and try again.
+          // Anything else fails loud (C-4).
+          if (err instanceof GeminiTtsError && err.dailyQuota) { quotaExhausted = true; return; }
+          if (err instanceof GeminiTtsError && err.retryable) { throttledSec = Math.max(throttledSec, err.retryAfterSec ?? 30); return; }
+          const msg = err instanceof Error ? err.message : String(err);
+          throw new Error(`Gemini chunk ${i + 1}/${p.chunks.length} of ${p.h.slug} failed: ${msg}`);
+        }
+      }),
+    );
+    if (throttledSec > 0) {
+      const waitMs = Math.min(throttledSec, 60) * 1000;
+      if (remainingMs() - waitMs <= GEMINI_WAVE_RESERVE_MS) { retryAfterSec = throttledSec; break; }
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+  }
+
+  const results: Record<string, unknown>[] = [];
+  for (const p of plans) {
+    if (p.have.size >= p.chunks.length) {
+      results.push(await stitchGemini(notionKey, p));
+    } else {
+      results.push({
+        pageId: p.h.pageId, slug: p.h.slug, status: "synthesizing", done: false,
+        chunksDone: p.have.size, chunksTotal: p.chunks.length,
+        ...(quotaExhausted ? { quotaExhausted: true } : {}),
+        ...(retryAfterSec ? { retryAfterSec } : {}),
+      });
+    }
+  }
+  return results;
 }
 
 // KICKOFF: start Polly tasks for up to BATCH_LIMIT oldest `approved` episodes
@@ -295,17 +550,29 @@ async function synthesizeKickoff(slug: string | undefined): Promise<ProxyResult>
 
   const started: SynthHandle[] = [];
   for (const page of targets) started.push(await startSynthesis(page));
-  return json(202, { status: "synthesizing", pending: started.length, started });
+  // Gemini handles are advanced by direct invocation of this function (the
+  // HTTP API's 30 s window is shorter than one Gemini request) — tell the
+  // caller where to send them.
+  const invoke = TTS_ENGINE === "gemini" ? { functionName: process.env.AWS_LAMBDA_FUNCTION_NAME ?? "" } : undefined;
+  return json(202, { status: "synthesizing", pending: started.length, started, ...(invoke ? { invoke } : {}) });
 }
 
 // FINALIZE: the caller echoes the kickoff handles back; for each completed
 // Polly task we flip the episode to audio-ready. done === all handles finished.
-async function synthesizeFinalize(handles: SynthHandle[]): Promise<ProxyResult> {
+async function synthesizeFinalize(
+  handles: SynthHandle[],
+  opts: { direct: boolean; remainingMs: () => number },
+): Promise<ProxyResult> {
   if (!BUCKET) throw new Error("BUCKET_NAME env var is required");
   if (!PUBLIC_BASE) throw new Error("PODCAST_PUBLIC_BASE_URL env var is required");
+  const gemini = handles.filter((x) => x.engine === "gemini");
+  if (gemini.length > 0 && !opts.direct) {
+    return json(400, { error: "gemini handles are finalized by direct lambda:InvokeFunction, not the HTTP API (30 s window) — ADR-0043" });
+  }
   const { apiKey } = await notionHeaders();
   const results: Record<string, unknown>[] = [];
-  for (const h of handles) results.push(await finalizeOne(apiKey, h));
+  for (const h of handles.filter((x) => x.engine !== "gemini")) results.push(await finalizeOne(apiKey, h));
+  if (gemini.length > 0) results.push(...(await advanceGemini(apiKey, gemini, opts.remainingMs)));
   const pending = results.filter((r) => !r.done).length;
   return json(200, { done: pending === 0, pending, results });
 }
@@ -367,7 +634,7 @@ async function buildRss(): Promise<ProxyResult> {
     // <description>; the mandatory citations always follow it.
     const showNotes = propText(p.properties?.podcastShowNotes).trim();
     episodes.push({
-      slug: pageSlug(p),
+      slug: episodeGuid(audioUrl, pageSlug(p)),
       title: propText(p.properties?.Title) || pageSlug(p),
       description: showNotes ? `${showNotes}\n\n${citations}` : citations,
       audioUrl,
@@ -422,12 +689,33 @@ async function buildRss(): Promise<ProxyResult> {
 }
 
 // ── Router ───────────────────────────────────────────────────────────────────
-export async function handler(event: ProxyEventV2): Promise<ProxyResult> {
-  const path = event.rawPath ?? event.requestContext?.http?.path ?? "";
-  let body: Record<string, unknown> = {};
-  if (event.body) {
+// Direct lambda:InvokeFunction payload used by synthesize.mjs for Gemini
+// handles (ADR-0043). IAM on the invoke is the auth, as on the HTTP API.
+interface DirectFinalizeEvent {
+  source: "wf-podcast-direct";
+  finalize: SynthHandle[];
+}
+
+export async function handler(
+  event: ProxyEventV2 | DirectFinalizeEvent,
+  context?: { getRemainingTimeInMillis?: () => number },
+): Promise<ProxyResult> {
+  const remainingMs = () => context?.getRemainingTimeInMillis?.() ?? 0;
+  if ("source" in event && event.source === "wf-podcast-direct") {
     try {
-      const raw = event.isBase64Encoded ? Buffer.from(event.body, "base64").toString("utf8") : event.body;
+      if (!Array.isArray(event.finalize)) return json(400, { error: "finalize[] required" });
+      return await synthesizeFinalize(event.finalize, { direct: true, remainingMs });
+    } catch (err) {
+      console.error(JSON.stringify({ event: "wf_podcast_error", path: "direct:finalize", error: String(err) }));
+      return json(500, { error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  const http = event as ProxyEventV2;
+  const path = http.rawPath ?? http.requestContext?.http?.path ?? "";
+  let body: Record<string, unknown> = {};
+  if (http.body) {
+    try {
+      const raw = http.isBase64Encoded ? Buffer.from(http.body, "base64").toString("utf8") : http.body;
       body = raw ? JSON.parse(raw) : {};
     } catch {
       return json(400, { error: "invalid JSON body" });
@@ -437,7 +725,7 @@ export async function handler(event: ProxyEventV2): Promise<ProxyResult> {
   try {
     if (path.endsWith("/podcast/synthesize")) {
       if (Array.isArray(body.finalize)) {
-        return await synthesizeFinalize(body.finalize as SynthHandle[]);
+        return await synthesizeFinalize(body.finalize as SynthHandle[], { direct: false, remainingMs });
       }
       return await synthesizeKickoff(typeof body.slug === "string" ? body.slug : undefined);
     }

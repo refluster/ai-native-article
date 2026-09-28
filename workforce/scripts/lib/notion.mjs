@@ -71,7 +71,12 @@ export async function queryAll(apiKey, databaseId) {
   return pages;
 }
 
-/** Stable fallback slug for a page with no LegacySlug. */
+/**
+ * Stable fallback slug for a page with no LegacySlug: the LAST 12 hex of the
+ * page id, the reader site's rule (newsletter/pipeline/fetchers/notion.mjs).
+ * Never the head — this workspace's ids share a time prefix + workspace
+ * constant there, so same-day pages collided (one podcast GUID and MP3 key).
+ */
 export function slugFromId(id) {
-  return String(id).replace(/-/g, "").slice(0, 12);
+  return String(id).replace(/-/g, "").slice(-12);
 }
