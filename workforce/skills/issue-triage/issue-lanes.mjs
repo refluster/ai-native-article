@@ -164,6 +164,75 @@ export const IN_PROGRESS_LABELS = Object.freeze([
   "issue-design:pr-open",
 ]);
 
+// ── A claim is only as good as the PR behind it ────────────────────────────
+//
+// The in-progress markers above were read as facts, and they are claims. Two
+// ways a claim outlives its work, both observed on this repo on 2026-09-28:
+//
+//   - `*:pr-open` after the PR MERGED AS A PARTIAL SLICE. issue-implement's
+//     Step 4 ships "the smallest complete, mergeable slice" and cites the issue
+//     without a closing keyword, so the merge leaves the issue open with its
+//     `pr-open` label on. #671/#672/#673 (PRs #708/#709/#726, merged
+//     2026-09-10..14) and #458 (since 2026-08-10) sat that way: the router
+//     skipped them ("a worker holds this"), the worker skipped them ("claimed"),
+//     and the remaining items were eligible for nobody.
+//   - `*:in-progress` after the worker's run DIED before Step 5/6 relabelled.
+//
+// So a claim label counts only while an OPEN PR references the issue. The scan
+// passes the set of issue numbers the repo's open PRs reference; a claim
+// without one is stale, and a stale claim is the router's to re-examine.
+export const PR_OPEN_LABELS = Object.freeze(["issue-implement:pr-open", "issue-design:pr-open"]);
+/** An in-progress marker with no PR is stale only after this long: a worker run
+ *  takes minutes to a couple of hours, so a day without a PR is a dead run, not
+ *  a slow one. */
+export const STALE_IN_PROGRESS_HOURS = 24;
+
+// `Closes #N`, `Fixes #N`, `Resolves #N` and `Refs #N` (issue-design cites the
+// issue with `Refs` when the document is not the whole deliverable). Same-repo
+// references only: `owner/repo#N` is a different tracker's N.
+const ISSUE_REF_RE = /(?:^|[^\w/])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs?)\b[:\s]+#(\d+)\b/gi;
+// Every lane worker's branch convention: `<slug>/issue-<N>-<kebab>`.
+const ISSUE_BRANCH_RE = /(?:^|\/)issue-(\d+)(?:-|$)/;
+
+/** The issue numbers one PR claims, from its body's closing/`Refs` keywords
+ *  and its head branch name. */
+export function issueRefsOfPr({ body = "", headRef = "" } = {}) {
+  const refs = new Set();
+  for (const m of String(body || "").matchAll(ISSUE_REF_RE)) refs.add(Number(m[1]));
+  const b = String(headRef || "").match(ISSUE_BRANCH_RE);
+  if (b) refs.add(Number(b[1]));
+  return refs;
+}
+
+// ── A lane must be one its worker can take ──────────────────────────────────
+//
+// The implement lane's worker is bound with a deny-list (bindings-manifest.mjs:
+// `issue_selection.deny_labels`) that refuses `layer:L0`, `layer:L1` and
+// `type:tracker` — the operator's surface and epics. Laning such an issue
+// `implement` therefore parks it in a queue whose only consumer is configured
+// never to take it: #572 (`layer:L1`, laned implement 2026-09-10) was eligible
+// for nobody from that day. The deliverable for those labels is a proposal or a
+// decomposition, which is the design lane (adr-0022). Kept in step with the
+// manifest by a test, so the two cannot drift.
+export const LANE_ENTRY_DENY = Object.freeze({
+  implement: Object.freeze(["layer:l0", "layer:l1", "type:tracker"]),
+});
+
+/** The labels that make `lane` a dead end for this issue (empty = fine). */
+export function laneEntryConflicts(lane, labels = []) {
+  const deny = LANE_ENTRY_DENY[lane] ?? [];
+  return labels.map((l) => String(l || "").toLowerCase()).filter((n) => deny.includes(n));
+}
+
+/** The `wf:owner:<slug>` an issue carries, or null. */
+export function ownerOf(labels = []) {
+  for (const l of labels) {
+    const name = String(l || "").toLowerCase();
+    if (name.startsWith(OWNER_LABEL_PREFIX)) return name.slice(OWNER_LABEL_PREFIX.length);
+  }
+  return null;
+}
+
 // ── The hop bound (adr-0038) ───────────────────────────────────────────────
 //
 // The PR half of this loop has had a mechanical attempt bound since adr-0022:
@@ -237,18 +306,47 @@ export function applyHopCap(lane, priorHops = 0, { cap = HOP_CAP } = {}) {
  *                 back (adr-0038: immediately — the worker has already done the
  *                 reading, so waiting adds latency and no information), or it
  *                 wears a legacy parked label and has been untouched for
- *                 requeueDays. NOT an automatic unblock — the router still
- *                 decides; this only guarantees somebody looks.
+ *                 requeueDays, or its current state is one no worker can ever
+ *                 act on (a stale claim, a lane its worker denies, an owner
+ *                 with no binding for the lane). NOT an automatic unblock — the
+ *                 router still decides; this only guarantees somebody looks.
+ *
+ * The last three checks need facts the labels do not carry, so they run only
+ * when the caller supplies them (the scan does): `number` + `openPrRefs` (the
+ * issue numbers the repo's open PRs reference, from `issueRefsOfPr`), and
+ * `workerOwners` (lane → the slugs bound to that lane's worker skill on this
+ * project). Without them the function behaves exactly as before.
  */
 export function triageAction(
-  { labels = [], updatedAt } = {},
-  { now = Date.now(), requeueDays = DEFAULT_REQUEUE_DAYS } = {},
+  { labels = [], updatedAt, number } = {},
+  { now = Date.now(), requeueDays = DEFAULT_REQUEUE_DAYS, openPrRefs, workerOwners } = {},
 ) {
   const names = labels.map((l) => String(l || "").toLowerCase());
   const current = laneOf(names);
 
-  if (names.some((n) => IN_PROGRESS_LABELS.includes(n))) {
-    return { action: "skip", why: "a worker holds this issue right now", current };
+  const claims = names.filter((n) => IN_PROGRESS_LABELS.includes(n));
+  if (claims.length > 0) {
+    const canVerify = openPrRefs instanceof Set && Number.isInteger(number);
+    if (!canVerify || openPrRefs.has(number)) {
+      return { action: "skip", why: "a worker holds this issue right now", current };
+    }
+    const prOpen = claims.filter((n) => PR_OPEN_LABELS.includes(n));
+    if (prOpen.length > 0) {
+      return {
+        action: "requeue",
+        why: `stale claim: ${prOpen.join(", ")} but no open PR references #${number} — its PR merged as a partial slice or was closed; re-examine what is left`,
+        current,
+      };
+    }
+    const updated = Date.parse(updatedAt ?? "");
+    if (!Number.isNaN(updated) && now - updated > STALE_IN_PROGRESS_HOURS * 3600_000) {
+      return {
+        action: "requeue",
+        why: `stale claim: ${claims.join(", ")} for >${STALE_IN_PROGRESS_HOURS}h with no PR — the worker's run died before handing back`,
+        current,
+      };
+    }
+    return { action: "skip", why: "a worker holds this issue right now (in progress, no PR yet)", current };
   }
   // A hand-back is an event, not a timer (adr-0038/adr-0025). The worker read
   // the issue and declined this minute; the router's answer is owed now.
@@ -257,6 +355,20 @@ export function triageAction(
   }
   const legacy = names.filter((n) => LEGACY_PARKED_LABELS.includes(n));
   if (legacy.length > 0) {
+    // Parked AND laned is the state adr-0038 §3 says no longer exists ("posting
+    // a lane is the router's answer to the park"). It exists anyway, on issues
+    // laned before that ADR retired `--requeue` and then parked by the worker
+    // the lane dispatched to (#664, #665, #739, #748 …). The 14-day window below
+    // never releases them in practice: it keys on `updated_at`, which every
+    // bot comment and label edit resets. The worker has already declined, so
+    // this is a hand-back in the old vocabulary — answer it now.
+    if (current) {
+      return {
+        action: "requeue",
+        why: `parked (${legacy.join(", ")}) while laned "${current}" — a worker declined its lane under the pre-adr-0038 label; route it now`,
+        current,
+      };
+    }
     const updated = Date.parse(updatedAt ?? "");
     if (Number.isNaN(updated)) return { action: "skip", why: "unparseable updated_at — leave it alone", current };
     if (now - updated > requeueDays * 86400_000) {
@@ -264,7 +376,29 @@ export function triageAction(
     }
     return { action: "skip", why: `parked (${legacy.join(", ")}), still inside the ${requeueDays}d re-examination window`, current };
   }
-  if (current) return { action: "skip", why: `already in lane "${current}"`, current };
+  if (current) {
+    const conflicts = laneEntryConflicts(current, names);
+    if (conflicts.length > 0) {
+      return {
+        action: "requeue",
+        why: `laned "${current}" but carries ${conflicts.join(", ")}, which that lane's worker is bound to refuse — nobody can take it there`,
+        current,
+      };
+    }
+    const workerSkill = LANE_WORKER_SKILL[current];
+    const bound = workerOwners?.[current];
+    if (workerSkill && Array.isArray(bound)) {
+      const owner = ownerOf(names);
+      if (!owner || !bound.includes(owner)) {
+        return {
+          action: "requeue",
+          why: `laned "${current}" with owner ${owner ? `wf:owner:${owner}` : "(none)"}, but ${workerSkill} on this project is bound only to ${bound.length ? bound.join(", ") : "nobody"} — no worker will pick it up`,
+          current,
+        };
+      }
+    }
+    return { action: "skip", why: `already in lane "${current}"`, current };
+  }
   return { action: "triage", why: "no lane assigned", current: null };
 }
 
