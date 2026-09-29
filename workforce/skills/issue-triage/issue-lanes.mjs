@@ -422,3 +422,124 @@ export function suggestLane({ labels = [] } = {}) {
   if (names.some((n) => n.startsWith("type:") || n.startsWith("area:"))) return "implement";
   return null;
 }
+
+// ── Settling an issue: consolidate a duplicate, close what is done or moot ──
+//
+// The lanes answer "who works this?", and the router used to be comment+label
+// only, so it had no answer for an issue nobody should work: a DUPLICATE of
+// another open issue, one a merged PR already COMPLETED (incidentally, or
+// without a closing keyword), or one a later decision made OBSOLETE. Those sat
+// in their lane forever — worst on the operator lane, which has no worker to
+// notice — and inflated every queue the operator reads. `backlog-reconcile`
+// closes shipped work too, but it is plan-driven (epics/specs), large-cost, and
+// bound to one repo; it never looked for duplicates at all.
+//
+// So the router gets a fourth answer, alongside the three lanes: SETTLE. Three
+// closing verdicts, each with the one piece of evidence that makes it
+// checkable, plus `still-valid` — the recorded "looked, it stands" that keeps a
+// long-idle laned issue from being re-reviewed every day.
+export const SETTLE_VERDICTS = Object.freeze({
+  duplicate: "the same deliverable as another open issue — consolidated into it (--of <canonical>)",
+  completed: "a merged PR already delivered it (--pr <merged PR>)",
+  obsolete: "a later decision or change made it moot (--superseded-by <ADR / issue / PR>)",
+  "still-valid": "reviewed after a long idle stretch and it still stands — recorded, left open in its lane",
+});
+export const SETTLE_VERDICT_NAMES = Object.freeze(Object.keys(SETTLE_VERDICTS));
+export const CLOSE_VERDICTS = Object.freeze(["duplicate", "completed", "obsolete"]);
+/** GitHub's close reason for each closing verdict. */
+export const CLOSE_STATE_REASON = Object.freeze({ duplicate: "not_planned", completed: "completed", obsolete: "not_planned" });
+/** Stamped on every issue the router closes, so a close is auditable in one
+ *  search and — load-bearing — a REOPEN is recognisable: an open issue wearing
+ *  it was reopened by a human, who has overruled the router. */
+export const CLOSED_LABEL_PREFIX = "wf:closed:";
+/** A laned issue untouched this long gets a settle review (is it still
+ *  wanted?). Long enough that live work is never reviewed, short enough that a
+ *  moot issue does not sit a quarter in a queue. */
+export const DEFAULT_REVIEW_DAYS = 30;
+/** Closing an L0/L1 issue as obsolete, or closing an epic at all, is a design
+ *  decision — `backlog-reconcile` and the operator own those. */
+export const SETTLE_DENY = Object.freeze(["layer:l0", "layer:l1", "type:tracker"]);
+
+export function assertSettleVerdict(v) {
+  if (!SETTLE_VERDICT_NAMES.includes(v)) {
+    throw new Error(`unknown verdict "${v}" — must be one of: ${SETTLE_VERDICT_NAMES.join(", ")} (C-4: never invent a verdict)`);
+  }
+  return v;
+}
+
+export function closedLabel(verdict) {
+  if (!CLOSE_VERDICTS.includes(verdict)) throw new Error(`"${verdict}" is not a closing verdict`);
+  return `${CLOSED_LABEL_PREFIX}${verdict}`;
+}
+
+/** True when the issue was closed by the router once and reopened since. */
+export function wasReopened(labels = []) {
+  return labels.some((l) => String(l || "").toLowerCase().startsWith(CLOSED_LABEL_PREFIX));
+}
+
+/**
+ * Should an issue `triageAction` skipped as "already in lane" get a settle
+ * review? Only a laned issue with no live claim, no open PR, idle for
+ * `reviewDays`, and not reopened by a human after a router close.
+ */
+export function needsSettleReview(
+  { labels = [], updatedAt, number } = {},
+  { now = Date.now(), reviewDays = DEFAULT_REVIEW_DAYS, openPrRefs } = {},
+) {
+  const names = labels.map((l) => String(l || "").toLowerCase());
+  if (!laneOf(names)) return false;
+  if (names.some((n) => IN_PROGRESS_LABELS.includes(n) || PARKED_LABELS.includes(n))) return false;
+  if (openPrRefs instanceof Set && openPrRefs.has(number)) return false;
+  if (wasReopened(names)) return false;
+  const updated = Date.parse(updatedAt ?? "");
+  if (Number.isNaN(updated)) return false;
+  return now - updated > reviewDays * 86400_000;
+}
+
+/**
+ * The guards a settle verdict must pass. Pure + exported (unit-tested);
+ * `null` = may be applied, else the refusal reason.
+ *
+ *  - `heldBy`: open PRs referencing the issue. A worker holds it — closing it
+ *    under a live branch strands that branch. For a duplicate, close the OTHER
+ *    one (the one nobody is working) instead.
+ *  - a human reopened it after a router close (`wf:closed:*`): the human has
+ *    overruled the router; a second close is an argument, not a verdict.
+ *  - `SETTLE_DENY`: an L0/L1 or tracker issue closes only through the operator
+ *    or `backlog-reconcile`; `still-valid` is always allowed.
+ *  - duplicate: the canonical must be another OPEN issue (not a PR). If the
+ *    "original" is already closed, this issue is completed or obsolete — say
+ *    which, with that evidence.
+ *  - completed: the cited PR must be MERGED.
+ *  - obsolete: must name what superseded it.
+ */
+export function settleRefusal({ verdict, issue, labels = [], heldBy = [], of = null, canonical = null, mergedPr = null, supersededBy = "" }) {
+  assertSettleVerdict(verdict);
+  if (verdict === "still-valid") return null;
+  if (heldBy.length > 0) {
+    return `#${issue} is held by open PR ${heldBy.map((n) => `#${n}`).join(", ")} — a worker has it; do not close it under a live branch${verdict === "duplicate" ? " (close the other issue into this one instead)" : ""}`;
+  }
+  const names = labels.map((l) => String(l || "").toLowerCase());
+  if (wasReopened(names)) {
+    return `#${issue} was closed by the router before and reopened by a human — that overrules the router; lane it or report it, do not close it again`;
+  }
+  const denied = names.filter((n) => SETTLE_DENY.includes(n));
+  if (denied.length > 0) {
+    return `#${issue} carries ${denied.join(", ")} — closing it is a design decision; route it to "operator" (role product / architect-ratify) or leave it to backlog-reconcile`;
+  }
+  if (verdict === "duplicate") {
+    if (!Number.isInteger(of) || of <= 0) return "--of <canonical issue number> is required for a duplicate";
+    if (of === Number(issue)) return "an issue cannot be a duplicate of itself";
+    if (!canonical) return `canonical #${of} could not be read`;
+    if (canonical.pull_request) return `#${of} is a pull request — a duplicate consolidates into an ISSUE; if that PR delivered this, the verdict is "completed"`;
+    if (canonical.state !== "open") return `canonical #${of} is ${canonical.state} — if it was done, this issue is "completed" (cite the PR) or "obsolete"; a duplicate needs a live issue to fold into`;
+    return null;
+  }
+  if (verdict === "completed") {
+    if (!mergedPr) return "--pr <merged PR number> is required for completed — evidence or it didn't ship";
+    if (!mergedPr.merged_at) return `PR #${mergedPr.number} is not merged — "completed" needs a merged PR`;
+    return null;
+  }
+  if (!String(supersededBy || "").trim()) return "--superseded-by <ADR path / issue / PR> is required for obsolete — name what replaced it";
+  return null;
+}

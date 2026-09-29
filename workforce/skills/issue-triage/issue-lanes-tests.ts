@@ -37,8 +37,18 @@ import {
   issueRefsOfPr,
   laneEntryConflicts,
   ownerOf,
+  CLOSE_STATE_REASON,
+  CLOSE_VERDICTS,
+  DEFAULT_REVIEW_DAYS,
+  SETTLE_VERDICT_NAMES,
+  assertSettleVerdict,
+  closedLabel,
+  needsSettleReview,
+  settleRefusal,
+  wasReopened,
 } from "./issue-lanes.mjs";
 import { labelsToRemove, laneRefusal } from "./issue-triage-post.mjs";
+import { settleComment } from "./issue-triage-settle.mjs";
 import { BINDINGS } from "../../scripts/lib/bindings-manifest.mjs";
 
 describe("the lane vocabulary is closed (C-4)", () => {
@@ -376,5 +386,76 @@ describe("suggestLane — a starting point, not the decision", () => {
   it("no usable labels -> no suggestion; the router reads the issue", () => {
     expect(suggestLane({ labels: ["insights"] })).toBeNull();
     expect(suggestLane({})).toBeNull();
+  });
+});
+
+describe("settling — duplicates consolidate, done and moot issues close", () => {
+  const NOW = Date.parse("2026-09-29T00:00:00Z");
+  const daysAgo = (d) => new Date(NOW - d * 86400_000).toISOString();
+
+  it("the verdict vocabulary is closed (C-4)", () => {
+    expect(SETTLE_VERDICT_NAMES).toEqual(["duplicate", "completed", "obsolete", "still-valid"]);
+    expect(CLOSE_VERDICTS).toEqual(["duplicate", "completed", "obsolete"]);
+    expect(() => assertSettleVerdict("wontfix")).toThrow(/unknown verdict/);
+    expect(() => closedLabel("still-valid")).toThrow(/not a closing verdict/);
+    expect(closedLabel("duplicate")).toBe("wf:closed:duplicate");
+    expect(CLOSE_STATE_REASON).toEqual({ duplicate: "not_planned", completed: "completed", obsolete: "not_planned" });
+  });
+
+  it("a long-idle laned issue gets a settle review — the operator lane included", () => {
+    const opts = { now: NOW, openPrRefs: new Set() };
+    expect(needsSettleReview({ labels: ["wf:lane:operator", "wf:human:console"], updatedAt: daysAgo(DEFAULT_REVIEW_DAYS + 1), number: 1 }, opts)).toBe(true);
+    expect(needsSettleReview({ labels: ["wf:lane:implement"], updatedAt: daysAgo(DEFAULT_REVIEW_DAYS - 1), number: 1 }, opts)).toBe(false);
+  });
+
+  it("never reviews live work, a park, an unlaned issue, or a human reopen", () => {
+    const old = daysAgo(90);
+    const opts = { now: NOW, openPrRefs: new Set([7]) };
+    expect(needsSettleReview({ labels: ["wf:lane:implement"], updatedAt: old, number: 7 }, opts)).toBe(false);
+    expect(needsSettleReview({ labels: ["wf:lane:implement", "issue-implement:in-progress"], updatedAt: old, number: 1 }, opts)).toBe(false);
+    expect(needsSettleReview({ labels: ["wf:lane:design", "wf:handback"], updatedAt: old, number: 1 }, opts)).toBe(false);
+    expect(needsSettleReview({ labels: ["type:chore"], updatedAt: old, number: 1 }, opts)).toBe(false);
+    expect(needsSettleReview({ labels: ["wf:lane:design", "wf:closed:obsolete"], updatedAt: old, number: 1 }, opts)).toBe(false);
+  });
+
+  it("a duplicate folds into another OPEN issue — never itself, a PR, or a closed one", () => {
+    const base = { verdict: "duplicate", issue: 12, labels: ["wf:lane:implement"] };
+    expect(settleRefusal({ ...base, of: 10, canonical: { state: "open" } })).toBeNull();
+    expect(settleRefusal({ ...base, of: null })).toMatch(/--of/);
+    expect(settleRefusal({ ...base, of: 12, canonical: { state: "open" } })).toMatch(/itself/);
+    expect(settleRefusal({ ...base, of: 10, canonical: { state: "open", pull_request: {} } })).toMatch(/completed/);
+    expect(settleRefusal({ ...base, of: 10, canonical: { state: "closed" } })).toMatch(/completed.*obsolete/);
+  });
+
+  it("completed needs a MERGED PR; obsolete needs what superseded it", () => {
+    expect(settleRefusal({ verdict: "completed", issue: 1, mergedPr: { number: 5, merged_at: "2026-09-01T00:00:00Z" } })).toBeNull();
+    expect(settleRefusal({ verdict: "completed", issue: 1 })).toMatch(/merged PR/);
+    expect(settleRefusal({ verdict: "completed", issue: 1, mergedPr: { number: 5, merged_at: null } })).toMatch(/not merged/);
+    expect(settleRefusal({ verdict: "obsolete", issue: 1, supersededBy: "adr-0038" })).toBeNull();
+    expect(settleRefusal({ verdict: "obsolete", issue: 1, supersededBy: "  " })).toMatch(/superseded-by/);
+  });
+
+  it("never closes under a live branch, over a human reopen, or an L0/L1/tracker issue", () => {
+    const ok = { verdict: "obsolete", issue: 3, supersededBy: "#9" };
+    expect(settleRefusal({ ...ok, heldBy: [44] })).toMatch(/held by open PR #44/);
+    expect(settleRefusal({ ...ok, labels: ["wf:closed:obsolete"] })).toMatch(/reopened by a human/);
+    expect(wasReopened(["wf:closed:duplicate"])).toBe(true);
+    for (const l of ["layer:L0", "layer:L1", "type:tracker"]) {
+      expect(settleRefusal({ ...ok, labels: [l] })).toMatch(/design decision/);
+    }
+    // still-valid only records a review, so nothing blocks it
+    expect(settleRefusal({ verdict: "still-valid", issue: 3, heldBy: [44], labels: ["layer:L1"] })).toBeNull();
+  });
+
+  it("the settle comment carries GitHub's duplicate marker and a greppable verdict marker", () => {
+    const dup = settleComment("Same deliverable as #10.", { verdict: "duplicate", of: 10 });
+    expect(dup).toContain("Duplicate of #10");
+    expect(dup).toContain("<!-- wf:settled:duplicate -->");
+    expect(dup).toMatch(/reopen it/);
+    expect(settleComment("x", { verdict: "completed", pr: 726 })).toContain("Completed by #726.");
+    expect(settleComment("x", { verdict: "obsolete", supersededBy: "adr-0038" })).toContain("Superseded by adr-0038.");
+    const keep = settleComment("Still wanted.", { verdict: "still-valid" });
+    expect(keep).toContain("<!-- wf:settled:still-valid -->");
+    expect(keep).not.toMatch(/reopen/);
   });
 });
