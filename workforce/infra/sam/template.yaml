@@ -2225,7 +2225,8 @@ Resources:
   #                                                            dual-write
   #                                                            integrity).
   #
-  #   Workforce/AgentsApi    WfMalformedProjectMeta           (FU-NEW-D —
+  #   Workforce/AgentsApi    WfMalformedRow{RowType=project}  (FU-NEW-D /
+  #                                                            FU-NEW-E —
   #                                                            listProjects
   #                                                            skip count;
   #                                                            target 0).
@@ -2244,7 +2245,7 @@ Resources:
               "type": "text",
               "x": 0, "y": 0, "width": 24, "height": 2,
               "properties": {
-                "markdown": "# Workforce / Epic-010 (${Stage})\n\nSurfaces every metric Epic-010 introduced. **Target state**: `WfLegacyCredentialReads{Reason=fallback_bare}` and `WfMalformedProjectMeta` graph to zero. `WfExecDualWriteFailed` stays at zero. `WfExecEmbeddingFailed` reflects pending retry-queue depth."
+                "markdown": "# Workforce / Epic-010 (${Stage})\n\nSurfaces every metric Epic-010 introduced. **Target state**: `WfLegacyCredentialReads{Reason=fallback_bare}` and `WfMalformedRow{RowType=project}` graph to zero. `WfExecDualWriteFailed` stays at zero. `WfExecEmbeddingFailed` reflects pending retry-queue depth."
               }
             },
             {
@@ -2273,13 +2274,13 @@ Resources:
               "type": "metric",
               "x": 12, "y": 2, "width": 12, "height": 6,
               "properties": {
-                "title": "Workforce/AgentsApi — WfMalformedProjectMeta",
+                "title": "Workforce/AgentsApi — WfMalformedRow{RowType=project}",
                 "view": "timeSeries",
                 "region": "${AWS::Region}",
                 "period": 300,
                 "stat": "Sum",
                 "metrics": [
-                  [ "Workforce/AgentsApi", "WfMalformedProjectMeta", "Stage", "${Stage}", { "color": "#d62728" } ]
+                  [ "Workforce/AgentsApi", "WfMalformedRow", "Stage", "${Stage}", "RowType", "project", { "color": "#d62728" } ]
                 ],
                 "yAxis": { "left": { "min": 0 } },
                 "annotations": {

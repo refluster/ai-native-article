@@ -53,7 +53,7 @@ function makeProject(overrides: Partial<ProjectMetaRow> = {}): Partial<ProjectMe
     owner_agent: "aoi",
     created_at: "2026-01-01",
     ...overrides,
-  };
+  } as Partial<ProjectMetaRow>;
 }
 
 function makeAgent(overrides: Partial<AgentMetaRow> = {}): Partial<AgentMetaRow> {
@@ -94,7 +94,7 @@ describe("isWellFormedProjectMeta", () => {
   });
 
   it("rejects empty project_id", () => {
-    expect(isWellFormedProjectMeta(makeProject({ project_id: "" }))).toBe(false);
+    expect(isWellFormedProjectMeta(makeProject({ project_id: "" as ProjectMetaRow["project_id"] }))).toBe(false);
   });
 
   it("rejects missing status", () => {
@@ -195,7 +195,7 @@ describe("emitMalformedRow", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     emitMalformedRow({ pk: "PROJECT#bad" }, "project", mockCw as any, "test");
     expect(warnSpy).toHaveBeenCalledOnce();
-    const logged = JSON.parse(warnSpy.mock.calls[0][0] as string) as Record<string, unknown>;
+    const logged = JSON.parse(warnSpy.mock.calls[0]![0] as string) as Record<string, unknown>;
     expect(logged.event).toBe("agents_api_malformed_row");
     expect(logged.row_type).toBe("project");
     expect(logged.pk).toBe("PROJECT#bad");
@@ -207,9 +207,9 @@ describe("emitMalformedRow", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     emitMalformedRow({ pk: "AGENT#bad" }, "agent", mockCw as any, "prod");
     await vi.waitFor(() => expect(metricBatches.length).toBeGreaterThan(0));
-    const batch = metricBatches[0];
+    const batch = metricBatches[0]!;
     expect(batch.Namespace).toBe("Workforce/AgentsApi");
-    const metric = batch.MetricData[0];
+    const metric = batch.MetricData[0]!;
     expect(metric.MetricName).toBe("WfMalformedRow");
     expect(metric.Dimensions).toContainEqual({ Name: "Stage", Value: "prod" });
     expect(metric.Dimensions).toContainEqual({ Name: "RowType", Value: "agent" });
@@ -221,7 +221,7 @@ describe("emitMalformedRow", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     emitMalformedRow({ pk: "SKILL#bad" }, "skill", mockCw as any, "dev");
     await vi.waitFor(() => expect(metricBatches.length).toBeGreaterThan(0));
-    const metric = metricBatches[0].MetricData[0];
+    const metric = metricBatches[0]!.MetricData[0]!;
     expect(metric.Dimensions).toContainEqual({ Name: "RowType", Value: "skill" });
     vi.restoreAllMocks();
   });
@@ -230,7 +230,7 @@ describe("emitMalformedRow", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     emitMalformedRow({}, "project", mockCw as any, "dev");
-    const logged = JSON.parse(warnSpy.mock.calls[0][0] as string) as Record<string, unknown>;
+    const logged = JSON.parse(warnSpy.mock.calls[0]![0] as string) as Record<string, unknown>;
     expect(logged.pk).toBe("<missing-pk>");
     warnSpy.mockRestore();
   });
