@@ -48,7 +48,8 @@ import {
   wasReopened,
 } from "./issue-lanes.mjs";
 import { labelsToRemove, laneRefusal } from "./issue-triage-post.mjs";
-import { settleComment } from "./issue-triage-settle.mjs";
+import { closeBudgetRemaining, runSettle, settleComment } from "./issue-triage-settle.mjs";
+import { selectCandidates } from "./issue-triage-scan.mjs";
 import { BINDINGS } from "../../scripts/lib/bindings-manifest.mjs";
 
 describe("the lane vocabulary is closed (C-4)", () => {
@@ -457,5 +458,156 @@ describe("settling — duplicates consolidate, done and moot issues close", () =
     const keep = settleComment("Still wanted.", { verdict: "still-valid" });
     expect(keep).toContain("<!-- wf:settled:still-valid -->");
     expect(keep).not.toMatch(/reopen/);
+  });
+});
+
+describe("the day-window edges are exclusive — exactly N days is still inside", () => {
+  const NOW = Date.parse("2026-09-29T00:00:00Z");
+  const daysAgo = (d) => new Date(NOW - d * 86400_000).toISOString();
+
+  it("a legacy park untouched for exactly requeue_days is not yet requeued", () => {
+    const labels = ["issue-implement:needs-human"];
+    expect(triageAction({ labels, updatedAt: daysAgo(DEFAULT_REQUEUE_DAYS) }, { now: NOW }).action).toBe("skip");
+    expect(triageAction({ labels, updatedAt: daysAgo(DEFAULT_REQUEUE_DAYS + 1 / 24) }, { now: NOW }).action).toBe("requeue");
+  });
+
+  it("a laned issue idle for exactly review_days is not yet due a settle review", () => {
+    const opts = { now: NOW, openPrRefs: new Set() };
+    expect(needsSettleReview({ labels: ["wf:lane:design"], updatedAt: daysAgo(DEFAULT_REVIEW_DAYS), number: 1 }, opts)).toBe(false);
+    expect(needsSettleReview({ labels: ["wf:lane:design"], updatedAt: daysAgo(DEFAULT_REVIEW_DAYS + 1 / 24), number: 1 }, opts)).toBe(true);
+  });
+});
+
+describe("selectCandidates — the batch bound keeps the oldest, per kind", () => {
+  const d = (number, action, day) => ({ number, updated_at: `2026-09-${String(day).padStart(2, "0")}T00:00:00Z`, decision: { action } });
+
+  it("caps routing and reviews independently, oldest first, and drops skips", () => {
+    const decided = [
+      d(1, "triage", 20), d(2, "requeue", 5), d(3, "triage", 10), d(4, "skip", 1),
+      d(5, "review", 15), d(6, "review", 2), d(7, "review", 8),
+    ];
+    const got = selectCandidates(decided, { max: 2, maxReview: 2 }).map((c) => c.number);
+    expect(got).toEqual([2, 3, 6, 7]);
+  });
+
+  it("a review flood never crowds out a hand-back", () => {
+    const decided = [d(9, "requeue", 28), ...Array.from({ length: 20 }, (_, i) => d(100 + i, "review", 1))];
+    const got = selectCandidates(decided, { max: 1, maxReview: 3 }).map((c) => c.number);
+    expect(got[0]).toBe(9);
+    expect(got).toHaveLength(4);
+  });
+});
+
+describe("runSettle — the write sequence, against a stubbed GitHub", () => {
+  const NOW = Date.parse("2026-09-29T12:00:00Z");
+  const REPO = "o/r";
+
+  /** A scripted gh: routes by "METHOD path" prefix, records every call. */
+  function stubGh(routes) {
+    const calls = [];
+    const gh = async (method, path, body) => {
+      calls.push(`${method} ${path.split("?")[0]}`);
+      for (const [key, res] of routes) {
+        const [m, p] = key.split(" ");
+        if (m === method && path.startsWith(p)) return typeof res === "function" ? res(path, body) : res;
+      }
+      return { status: 200, json: [] };
+    };
+    return { gh, calls };
+  }
+  const openIssue = (labels = ["wf:lane:implement"]) => ({ status: 200, json: { number: 12, state: "open", labels: labels.map((name) => ({ name })) } });
+  const base = { body: "Why.", now: NOW };
+  const writes = (calls) => calls.filter((c) => !c.startsWith("GET"));
+
+  it("duplicate: consolidates on the canonical, comments, CLOSES, then labels — in that order", async () => {
+    const { gh, calls } = stubGh([
+      ["GET /repos/o/r/issues/12", openIssue()],
+      ["GET /repos/o/r/issues/10", { status: 200, json: { number: 10, state: "open" } }],
+      ["POST /repos/o/r/issues/10/comments", { status: 201, json: {} }],
+      ["POST /repos/o/r/issues/12/comments", { status: 201, json: {} }],
+      ["PATCH /repos/o/r/issues/12", { status: 200, json: {} }],
+      ["POST /repos/o/r/labels", { status: 201, json: {} }],
+      ["POST /repos/o/r/issues/12/labels", { status: 200, json: {} }],
+    ]);
+    const r = await runSettle(gh, REPO, { ...base, issue: 12, verdict: "duplicate", of: 10, carry: "Adds a repro." });
+    expect(r.code).toBe(0);
+    expect(writes(calls)).toEqual([
+      "POST /repos/o/r/issues/10/comments",
+      "POST /repos/o/r/issues/12/comments",
+      "PATCH /repos/o/r/issues/12",
+      "POST /repos/o/r/labels",
+      "POST /repos/o/r/issues/12/labels",
+    ]);
+  });
+
+  it("a failed close leaves the issue UNLABELLED — never open-but-wearing wf:closed:*", async () => {
+    const { gh, calls } = stubGh([
+      ["GET /repos/o/r/issues/12", openIssue()],
+      ["GET /repos/o/r/pulls/726", { status: 200, json: { number: 726, merged_at: "2026-09-10T00:00:00Z" } }],
+      ["POST /repos/o/r/issues/12/comments", { status: 201, json: {} }],
+      ["PATCH /repos/o/r/issues/12", { status: 502, json: {} }],
+    ]);
+    const r = await runSettle(gh, REPO, { ...base, issue: 12, verdict: "completed", pr: 726 });
+    expect(r.code).toBe(3);
+    expect(calls.some((c) => c.includes("/labels"))).toBe(false);
+  });
+
+  it("obsolete closes; still-valid only comments", async () => {
+    const ok = [
+      ["GET /repos/o/r/issues/12", openIssue()],
+      ["POST /repos/o/r/issues/12/comments", { status: 201, json: {} }],
+      ["PATCH /repos/o/r/issues/12", { status: 200, json: {} }],
+      ["POST /repos/o/r/labels", { status: 422, json: {} }],
+      ["POST /repos/o/r/issues/12/labels", { status: 200, json: {} }],
+    ];
+    const a = stubGh(ok);
+    expect((await runSettle(a.gh, REPO, { ...base, issue: 12, verdict: "obsolete", supersededBy: "adr-0038" })).code).toBe(0);
+    expect(writes(a.calls)).toContain("PATCH /repos/o/r/issues/12");
+    const b = stubGh(ok);
+    expect((await runSettle(b.gh, REPO, { ...base, issue: 12, verdict: "still-valid" })).code).toBe(0);
+    expect(writes(b.calls)).toEqual(["POST /repos/o/r/issues/12/comments"]);
+  });
+
+  it("a refusal writes nothing (issue held by an open PR)", async () => {
+    const { gh, calls } = stubGh([
+      ["GET /repos/o/r/issues/12", openIssue()],
+      ["GET /repos/o/r/pulls", { status: 200, json: [{ number: 44, body: "Closes #12", head: { ref: "x" } }] }],
+    ]);
+    const r = await runSettle(gh, REPO, { ...base, issue: 12, verdict: "obsolete", supersededBy: "#9" });
+    expect(r.code).toBe(1);
+    expect(r.msg).toMatch(/held by open PR #44/);
+    expect(writes(calls)).toEqual([]);
+  });
+
+  it("the close budget is mechanical: past max_closes nothing is written", async () => {
+    const recent = new Date(NOW - 3600_000).toISOString();
+    const { gh, calls } = stubGh([
+      ["GET /repos/o/r/issues/12", openIssue()],
+      ["GET /repos/o/r/issues?state=closed", (path) => ({
+        status: 200,
+        json: path.includes("obsolete") ? [1, 2, 3].map((i) => ({ number: i, closed_at: recent })) : [],
+      })],
+    ]);
+    const r = await runSettle(gh, REPO, { ...base, issue: 12, verdict: "obsolete", supersededBy: "#9", maxCloses: 3 });
+    expect(r.code).toBe(1);
+    expect(r.msg).toMatch(/close budget spent/);
+    expect(writes(calls)).toEqual([]);
+  });
+
+  it("an uncountable budget fails closed", async () => {
+    const { gh, calls } = stubGh([
+      ["GET /repos/o/r/issues/12", openIssue()],
+      ["GET /repos/o/r/issues?state=closed", { status: 500, json: {} }],
+    ]);
+    const r = await runSettle(gh, REPO, { ...base, issue: 12, verdict: "obsolete", supersededBy: "#9" });
+    expect(r.code).toBe(3);
+    expect(writes(calls)).toEqual([]);
+  });
+
+  it("closeBudgetRemaining counts only closes inside the window", () => {
+    const at = (h) => new Date(NOW - h * 3600_000).toISOString();
+    expect(closeBudgetRemaining([at(1), at(2), at(30)], { now: NOW, windowHours: 20, max: 5 })).toBe(3);
+    expect(closeBudgetRemaining([at(1), at(2)], { now: NOW, windowHours: 20, max: 2 })).toBe(0);
+    expect(closeBudgetRemaining([null, "bad"], { now: NOW, max: 1 })).toBe(1);
   });
 });

@@ -191,14 +191,16 @@ hunch that an issue "probably no longer matters" is a `still-valid` or an
 GITHUB_TOKEN="…" node workforce/skills/issue-triage/issue-triage-settle.mjs \
   --project "<project_id>" --issue <number> --verdict <verdict> \
   [--of <canonical> --carry-file /tmp/carry-<number>.md] [--pr <merged>] \
-  [--superseded-by "<ref>"] --body-file /tmp/settle-<number>.md
+  [--superseded-by "<ref>"] --body-file /tmp/settle-<number>.md \
+  --max-closes <max_closes_per_run ?? 5>
 ```
 
 `/tmp/settle-<number>.md` is one short paragraph in your persona's voice: why
 this verdict, citing the evidence. The script posts the consolidation note on
 the canonical **first**, then closes the issue (`not_planned` for
 duplicate/obsolete with GitHub's `Duplicate of #N` marker, `completed` for
-completed) and stamps `wf:closed:<verdict>`. It **refuses** (exit 1, reason on
+completed) and only then stamps `wf:closed:<verdict>` — close before label,
+so a failed close never leaves an open issue that looks human-reopened. It **refuses** (exit 1, reason on
 stderr — pick again, do not retry the same call):
 
 - an issue an **open PR** references (a worker holds it — for a duplicate, close
@@ -209,10 +211,14 @@ stderr — pick again, do not retry the same call):
   decision (route to `operator` with `product` / `architect-ratify`, or leave it
   to `backlog-reconcile`);
 - a duplicate of a closed issue or a PR, or a `completed` whose PR is not merged.
+- a close past the per-fire budget (below).
 
-**Bounded.** At most `max_closes_per_run` (default 5) closes per fire; the rest
-wait for tomorrow and are named in the report. Closing is reversible (reopen),
-but a burst of closes is how a wrong heuristic does damage at scale.
+**Bounded, mechanically.** Before each close the script counts the router's
+own closes (`wf:closed:*`) on the tracker over the last 20 h and refuses past
+`--max-closes` (exit 1, `close budget spent`) — and refuses outright if it
+cannot count. Leave the rest for tomorrow and name them in the report. Closing
+is reversible (reopen), but a burst of closes is how a wrong heuristic does
+damage at scale.
 
 ## Step 3 — dispatch (deterministic)
 

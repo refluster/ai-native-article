@@ -132,6 +132,22 @@ export async function collectRecentMergedPrs(gh, repo, { days = MERGED_LOOKBACK_
   return out.sort((a, b) => Date.parse(b.merged_at) - Date.parse(a.merged_at));
 }
 
+/**
+ * The batch bound. Routing candidates (triage/requeue) and settle reviews are
+ * capped INDEPENDENTLY — reviews never crowd out a hand-back — and each keeps
+ * its oldest-activity N: the aged tail is what stopped being looked at. Pure +
+ * exported (unit-tested).
+ */
+export function selectCandidates(decided = [], { max = DEFAULT_MAX, maxReview = DEFAULT_MAX_REVIEW } = {}) {
+  const oldestFirst = (a, b) => Date.parse(a.updated_at) - Date.parse(b.updated_at);
+  const routing = decided
+    .filter((d) => d.decision.action === "triage" || d.decision.action === "requeue")
+    .sort(oldestFirst)
+    .slice(0, max);
+  const reviews = decided.filter((d) => d.decision.action === "review").sort(oldestFirst).slice(0, maxReview);
+  return [...routing, ...reviews];
+}
+
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : fallback;
@@ -243,13 +259,7 @@ async function main() {
   });
 
   // Oldest first: the whole point is that the aged tail stopped being looked at.
-  const oldestFirst = (a, b) => Date.parse(a.updated_at) - Date.parse(b.updated_at);
-  const routing = decided
-    .filter((d) => d.decision.action === "triage" || d.decision.action === "requeue")
-    .sort(oldestFirst)
-    .slice(0, max);
-  const reviews = decided.filter((d) => d.decision.action === "review").sort(oldestFirst).slice(0, maxReview);
-  const candidates = [...routing, ...reviews];
+  const candidates = selectCandidates(decided, { max, maxReview });
 
   const payload = {
     repo,
