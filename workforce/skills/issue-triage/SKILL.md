@@ -77,11 +77,24 @@ stopped being looked at — each with its labels, body, `decision.action`
 (`triage` | `requeue`) and a heuristic `lane_suggestion`. **0 candidates is a
 first-class outcome**: the tracker is fully dispatched; record the no-op and stop.
 
-A `requeue` candidate is either a **hand-back** (`wf:handback` — a worker
-declined it, and you are the answer; these arrive within seconds of the decline,
-so expect them mid-backlog) or a **legacy park** (`issue-implement:needs-human` /
-`issue-design:needs-human`, pre-adr-0038, surfaced once it goes `requeue_days`
-stale).
+A `requeue` candidate is one whose current state no worker will act on.
+`decision.why` says which kind:
+
+- a **hand-back** (`wf:handback` — a worker declined it, and you are the answer;
+  these arrive within seconds of the decline, so expect them mid-backlog);
+- a **legacy park** (`issue-implement:needs-human` / `issue-design:needs-human`,
+  pre-adr-0038) — immediately when the issue also wears a lane (the worker has
+  already declined that lane), otherwise once it goes `requeue_days` stale;
+- a **stale claim** — `*:pr-open` with no open PR referencing the issue (its PR
+  merged as a partial slice or was closed: check what the merged PR delivered
+  and lane the **remainder**, or say it is done), or `*:in-progress` for more
+  than a day with no PR (the worker's run died). `open_prs` on each candidate
+  lists the PRs that do reference it;
+- a **dead lane** — laned `implement` on a `layer:L0`/`layer:L1`/`type:tracker`
+  issue the implement worker is bound to refuse, or laned with a `wf:owner:*`
+  persona that has no binding for the lane's worker on this project
+  (`worker_owners` in the scan output lists who is bound). Re-lane it so a
+  worker can actually take it.
 
 ## Step 2 — decide each issue's lane (your judgment)
 
@@ -159,9 +172,21 @@ GITHUB_TOKEN="…" node workforce/skills/issue-triage/issue-triage-post.mjs \
 
 `--human-role` is **required** on the `operator` lane and refused elsewhere.
 
+The script also **refuses** (exit 1, reason on stderr) three lanes that would
+sit in a queue nobody drains — read the reason and pick again, do not retry
+the same call:
+
+- an issue an **open PR** still references (a worker holds it);
+- `--lane implement` on a `layer:L0` / `layer:L1` / `type:tracker` issue (the
+  implement worker is bound to refuse those — route to `design`);
+- an `--owner` with **no binding for the lane's worker** on this project. On an
+  agent lane the owner must be a persona that runs that lane's cadence here
+  (`binding_config.lane_owners`, or `worker_owners` in the scan output); name a
+  different persona only if it is bound too.
+
 The script stamps `wf:lane:<lane>` + `wf:owner:<slug>` (+ `wf:human:<role>`),
 removes any **other** lane label (one issue, one lane), clears the hand-back and
-legacy parked labels — posting a lane *is* the answer to the park, which is why
+legacy parked labels and any stale claim marker — posting a lane *is* the answer to the park, which is why
 there is no longer a `--requeue` flag — and then **dispatches the lane's worker**
 so it starts in seconds rather than at its next cron (adr-0025/adr-0038). Never
 apply these labels by hand or with an MCP tool: the one-lane invariant, the
@@ -204,9 +229,10 @@ unlaned recreates precisely the invisible backlog this skill exists to end.
 - **Bounded batch** (`max_issues_per_run`); the daily cadence works the backlog
   down, not a single fire.
 - **Comment + label only.** No issue closes, no body edits, no PRs (R-N9).
-- **You never change a lane an active worker holds** — `*:in-progress` /
-  `*:pr-open` issues are skipped by the scan; re-laning under a worker's feet
-  strands its branch.
+- **You never change a lane an active worker holds** — an issue an open PR
+  references is skipped by the scan and refused by the post script; re-laning
+  under a worker's feet strands its branch. A claim label with no PR behind it
+  is not a worker holding anything, and the scan hands it to you.
 
 ## Out of scope
 

@@ -33,8 +33,13 @@ import {
   triageAction,
   suggestLane,
   DEFAULT_REQUEUE_DAYS,
+  LANE_ENTRY_DENY,
+  issueRefsOfPr,
+  laneEntryConflicts,
+  ownerOf,
 } from "./issue-lanes.mjs";
-import { labelsToRemove } from "./issue-triage-post.mjs";
+import { labelsToRemove, laneRefusal } from "./issue-triage-post.mjs";
+import { BINDINGS } from "../../scripts/lib/bindings-manifest.mjs";
 
 describe("the lane vocabulary is closed (C-4)", () => {
   it("exposes exactly the three wired lanes", () => {
@@ -232,6 +237,120 @@ describe("triageAction — what the router should look at", () => {
 
   it("an unparseable timestamp is left alone rather than guessed at", () => {
     expect(triageAction({ labels: ["issue-implement:needs-human"], updatedAt: "soon" }, { now })).toMatchObject({ action: "skip" });
+  });
+});
+
+describe("no dead ends — a lane state no worker can act on goes back to the router", () => {
+  const now = Date.parse("2026-09-28T12:00:00Z");
+  const daysAgo = (d) => new Date(now - d * 86400_000).toISOString();
+  const hoursAgo = (h) => new Date(now - h * 3600_000).toISOString();
+  const bound = { implement: ["ren"], design: ["dario"] };
+
+  it("issueRefsOfPr reads closing keywords, Refs, and the worker branch convention", () => {
+    expect([...issueRefsOfPr({ body: "Closes #505\n\nsummary", headRef: "ren/issue-505-perf" })]).toEqual([505]);
+    expect([...issueRefsOfPr({ body: "Refs #768 — the ADR only", headRef: "dario/adr" })]).toEqual([768]);
+    expect([...issueRefsOfPr({ body: "fixes: #12 and resolves #13" })].sort()).toEqual([12, 13]);
+    expect([...issueRefsOfPr({ headRef: "dario/issue-769-deprecation-removal-date-rule" })]).toEqual([769]);
+  });
+
+  it("issueRefsOfPr ignores a bare mention and another repo's tracker", () => {
+    expect(issueRefsOfPr({ body: "see #12; related to #13" }).size).toBe(0);
+    expect(issueRefsOfPr({ body: "Closes PSVL/asp-cloud#866" }).size).toBe(0);
+    expect(issueRefsOfPr({ headRef: "claude/tissue-12-x" }).size).toBe(0);
+  });
+
+  it("a pr-open claim with a live PR is still held", () => {
+    const held = { labels: ["issue-implement:pr-open", "wf:lane:implement"], updatedAt: daysAgo(9), number: 505 };
+    expect(triageAction(held, { now, openPrRefs: new Set([505]) })).toMatchObject({ action: "skip" });
+  });
+
+  it("a pr-open claim whose PR merged as a partial slice is released (#671/#672/#673)", () => {
+    const orphan = { labels: ["issue-implement:pr-open", "type:bug"], updatedAt: daysAgo(18), number: 671 };
+    const r = triageAction(orphan, { now, openPrRefs: new Set([505]) });
+    expect(r.action).toBe("requeue");
+    expect(r.why).toMatch(/stale claim.*no open PR references #671/);
+  });
+
+  it("an in-progress marker is a dead run only after a day without a PR", () => {
+    const fresh = { labels: ["issue-design:in-progress"], updatedAt: hoursAgo(2), number: 9 };
+    const dead = { labels: ["issue-design:in-progress"], updatedAt: hoursAgo(30), number: 9 };
+    expect(triageAction(fresh, { now, openPrRefs: new Set() }).action).toBe("skip");
+    expect(triageAction(dead, { now, openPrRefs: new Set() })).toMatchObject({ action: "requeue" });
+  });
+
+  it("parked AND laned is answered now, not after a window every bot comment resets (#664)", () => {
+    const both = { labels: ["issue-implement:needs-human", "wf:lane:implement", "wf:owner:ren"], updatedAt: daysAgo(1), number: 664 };
+    expect(triageAction(both, { now })).toMatchObject({ action: "requeue" });
+    // An unlaned legacy park keeps the adr-0038 window.
+    const parkedOnly = { labels: ["issue-implement:needs-human"], updatedAt: daysAgo(1), number: 355 };
+    expect(triageAction(parkedOnly, { now }).action).toBe("skip");
+  });
+
+  it("an implement lane on a label its worker denies is a dead end (#572, layer:L1)", () => {
+    const dead = { labels: ["layer:L1", "wf:lane:implement", "wf:owner:ren"], updatedAt: daysAgo(18), number: 572 };
+    const r = triageAction(dead, { now });
+    expect(r.action).toBe("requeue");
+    expect(r.why).toMatch(/layer:l1/);
+    expect(laneEntryConflicts("design", ["layer:L1", "type:tracker"])).toEqual([]);
+  });
+
+  it("an owner with no binding for the lane's worker strands the issue (#739 sana, #659 nadia)", () => {
+    const stranded = { labels: ["wf:lane:implement", "wf:owner:sana"], updatedAt: daysAgo(3), number: 739 };
+    expect(triageAction(stranded, { now, workerOwners: bound })).toMatchObject({ action: "requeue" });
+    const fine = { labels: ["wf:lane:design", "wf:owner:dario"], updatedAt: daysAgo(3), number: 768 };
+    expect(triageAction(fine, { now, workerOwners: bound }).action).toBe("skip");
+    // Unknown roster (API unreachable) → the check is skipped, never guessed.
+    expect(triageAction(stranded, { now }).action).toBe("skip");
+    // The operator lane has no worker, so any owner is fine there.
+    const op = { labels: ["wf:lane:operator", "wf:owner:maya", "wf:human:console"], updatedAt: daysAgo(3), number: 687 };
+    expect(triageAction(op, { now, workerOwners: bound }).action).toBe("skip");
+  });
+
+  it("ownerOf reads the one owner label", () => {
+    expect(ownerOf(["wf:lane:design", "wf:owner:Dario"])).toBe("dario");
+    expect(ownerOf(["wf:lane:design"])).toBeNull();
+  });
+
+  it("LANE_ENTRY_DENY stays inside every issue-implement binding's deny-list — the two cannot drift", () => {
+    const implement = BINDINGS.filter((b) => b.skill === "issue-implement");
+    expect(implement.length).toBeGreaterThan(0);
+    for (const b of implement) {
+      const deny = b.config.issue_selection.deny_labels.map((l) => l.toLowerCase());
+      for (const label of LANE_ENTRY_DENY.implement) expect(deny).toContain(label);
+    }
+  });
+});
+
+describe("laneRefusal — the post script never writes a lane nobody drains", () => {
+  const base = { lane: "implement", labels: ["type:bug"], owner: "ren", heldBy: [], boundOwners: ["ren"], issue: 1 };
+
+  it("a clean dispatch passes", () => {
+    expect(laneRefusal(base)).toBeNull();
+  });
+
+  it("refuses to re-lane an issue a live PR holds", () => {
+    expect(laneRefusal({ ...base, heldBy: [752] })).toMatch(/held by open PR #752/);
+  });
+
+  it("refuses implement on a label the implement worker denies, and names the way out", () => {
+    expect(laneRefusal({ ...base, labels: ["layer:L1"] })).toMatch(/Route it to "design"/);
+    expect(laneRefusal({ ...base, lane: "design", owner: "dario", boundOwners: ["dario"], labels: ["layer:L1"] })).toBeNull();
+  });
+
+  it("refuses an owner outside the lane worker's bound personas — and skips the check when the roster is unknown", () => {
+    expect(laneRefusal({ ...base, owner: "sana" })).toMatch(/bound only to ren/);
+    expect(laneRefusal({ ...base, owner: "sana", boundOwners: null })).toBeNull();
+    expect(laneRefusal({ ...base, owner: "x", boundOwners: [] })).toMatch(/bound only to nobody/);
+  });
+
+  it("the operator lane has no worker, so no owner check", () => {
+    expect(laneRefusal({ ...base, lane: "operator", owner: "maya", boundOwners: null })).toBeNull();
+  });
+
+  it("clearClaims removes stale claim markers only when asked", () => {
+    const labels = ["issue-implement:pr-open", "wf:lane:implement"];
+    expect(labelsToRemove(labels, "implement", { owner: "ren" })).toEqual([]);
+    expect(labelsToRemove(labels, "implement", { owner: "ren", clearClaims: true })).toEqual(["issue-implement:pr-open"]);
   });
 });
 
