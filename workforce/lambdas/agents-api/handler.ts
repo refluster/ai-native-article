@@ -157,6 +157,12 @@ import {
   CloudWatchClient,
   PutMetricDataCommand,
 } from "@aws-sdk/client-cloudwatch";
+import {
+  emitMalformedRow,
+  isWellFormedAgentMeta,
+  isWellFormedProjectMeta,
+  isWellFormedSkillMeta,
+} from "../shared/row-validators.js";
 import { timingSafeEqual } from "node:crypto";
 import {
   DescribeSecretCommand,
@@ -415,7 +421,10 @@ async function listAgents(
   // window (FU-PROJ-SCAN — same root cause as the projects-console
   // disappearance). The roster is ≤ a few hundred at C-3 scale.
   const agentRows = await scanAllPrefix<AgentMetaRow>("AGENT#", "META");
-  const items = agentRows
+  const wellFormedAgents = agentRows.filter((r) =>
+    isWellFormedAgentMeta(r) ? true : (emitMalformedRow(r, "agent", cw, STAGE), false),
+  );
+  const items = wellFormedAgents
     .filter((r) => wantArchived || !r.archived)
     .filter((r) => !filterStream || r.streams.includes(filterStream))
     // The inline persona prompt (ADR-0007 step 2) and the profile decks
@@ -1239,7 +1248,10 @@ async function listSkills(
   // Drain the whole SKILL#/META set (see scanAllPrefix / FU-PROJ-SCAN): a
   // Limit-capped scan window would hide skills that scan past it.
   const skillRows = await scanAllPrefix<SkillMetaRow>("SKILL#", "META");
-  const filtered = skillRows
+  const wellFormedSkills = skillRows.filter((r) =>
+    isWellFormedSkillMeta(r) ? true : (emitMalformedRow(r, "skill", cw, STAGE), false),
+  );
+  const filtered = wellFormedSkills
     .filter((r) => includeArchived || r.status !== "archived")
     .filter((r) => !filterStatus || r.status === filterStatus)
     .filter((r) => !filterOwner || r.owners.includes(filterOwner));
@@ -1613,7 +1625,7 @@ async function listProjects(
   // honestly (a single-row GET 404s on a row that the brand validator
   // rejects), so this is *list-route defence*, not a silent papering-over.
   const wellFormed = projectRows.filter((r) =>
-    isWellFormedProjectMeta(r) ? true : (emitMalformedProjectMeta(r), false),
+    isWellFormedProjectMeta(r) ? true : (emitMalformedRow(r, "project", cw, STAGE), false),
   );
   const filtered = wellFormed
     .filter((r) => includeSelf || !r.project_id.startsWith("self/"))
@@ -1636,61 +1648,6 @@ async function listProjects(
   // Fully drained above (scanAllPrefix) — next_cursor retained for
   // response-shape stability, always absent.
   return reply(200, { items, next_cursor: undefined });
-}
-
-/**
- * True iff the row carries the canonical `ProjectMetaRow` attributes
- * `listProjects` consumes. Rejection drops the row from the list
- * response AND emits a metric (see `emitMalformedProjectMeta`). The
- * branded `asProjectId(row.project_id)` call inside the per-row map
- * would also throw on a bad value; this pre-check moves the rejection
- * BEFORE the Promise.all fan-out so one bad row doesn't fail the rest.
- */
-function isWellFormedProjectMeta(row: Partial<ProjectMetaRow>): row is ProjectMetaRow {
-  return (
-    typeof row.project_id === "string" &&
-    row.project_id.length > 0 &&
-    typeof row.status === "string" &&
-    typeof row.owner_agent === "string" &&
-    typeof row.created_at === "string"
-  );
-}
-
-/**
- * Structured log + best-effort CW metric on a skipped malformed row.
- * Fire-and-forget — a metric-emission failure must not block the list
- * response (the row is already skipped; we just lose the signal).
- */
-function emitMalformedProjectMeta(row: Partial<ProjectMetaRow>): void {
-  const pk = typeof row.pk === "string" ? row.pk : "<missing-pk>";
-  console.warn(
-    JSON.stringify({
-      event: "agents_api_malformed_project_meta",
-      pk,
-      attrs: Object.keys(row).sort(),
-      reason: "missing canonical attributes — fix the bootstrap runbook",
-    }),
-  );
-  cw.send(
-    new PutMetricDataCommand({
-      Namespace: "Workforce/AgentsApi",
-      MetricData: [
-        {
-          MetricName: "WfMalformedProjectMeta",
-          Value: 1,
-          Unit: "Count",
-          Dimensions: [{ Name: "Stage", Value: STAGE }],
-        },
-      ],
-    }),
-  ).catch((err) => {
-    console.warn(
-      JSON.stringify({
-        event: "agents_api_malformed_meta_metric_emit_failed",
-        error: err instanceof Error ? err.message : String(err),
-      }),
-    );
-  });
 }
 
 // ── Talent reply dispatch (Epic-013 Story 3, ADR-0006) ──────────────────
