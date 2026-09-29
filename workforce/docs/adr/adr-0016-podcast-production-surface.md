@@ -22,6 +22,8 @@
 
 > **Update (2026-06-30) — optional cadence→pipeline hand-off (operator-requested; AWS trust boundary unchanged).** `podcast-publish` gains an optional final leg, `trigger-pipeline.mjs`, that `workflow_dispatch`es `podcast-pipeline.yml` so the publish cadence can run as one continuous flow (cast + show-notes → kick the pipeline) instead of only waiting for the daily cron. This **refines** — does not reverse — the earlier note's "triggered by the daily CI workflow, never the Notion-only cadence": the daily cron remains; the cadence may now *also* dispatch the workflow on demand. Crucially this is **GitHub-only** — the dispatch uses the project `github.token` (added to `podcast-publish`'s `requires`; needs the `workflow` scope), and the dispatched CI workflow still does all Polly/S3/RSS work via its **own OIDC→AWS** role. The cadence holds **no AWS credentials** — the R-N1 / §"Decision" AWS trust boundary is intact; only a GitHub capability is added. (A Claude Code session's egress proxy injects a fixed session GitHub identity and cannot exercise the project PAT, so the leg is validated in the CCR runner / CI / an operator shell, not from such a session.)
 
+> **Update (2026-09-27) — synthesis engine superseded in part by [ADR-0043](adr-0043-podcast-tts-gemini.md).** The TTS engine moves from Amazon Polly to Gemini 3.8 Flash TTS (chunked, S3-resumable, finalized by direct `lambda:InvokeFunction` because one Gemini request outlasts the HTTP API's 30 s window). Polly remains the `PODCAST_TTS_ENGINE=polly` rollback, and the Polly kickoff/finalize mechanics below still describe that path. Every other decision here stands.
+
 ## Context
 
 Epic-017 repurposes the L3/L4 analysis articles on `kohuehara.xyz` into

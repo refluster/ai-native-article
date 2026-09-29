@@ -1,0 +1,20 @@
+{
+  "name": "research-study",
+  "version": "0.1.1",
+  "status": "active",
+  "display_name": "Research Study (RFP → sourced report)",
+  "cost_class": "large",
+  "owners": [
+    "beatriz"
+  ],
+  "improvement_agent": "sana",
+  "created_at": "2026-09-19",
+  "requires": [
+    "github.token"
+  ],
+  "deliverable": {
+    "type": "external-pr",
+    "publish_notion": false
+  },
+  "recall_k": 5
+}
