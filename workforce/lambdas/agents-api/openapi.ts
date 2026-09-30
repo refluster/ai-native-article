@@ -538,6 +538,34 @@ paths:
         "401": { description: bad or missing bearer }
         "404": { description: agent_not_found (unknown or archived slug) }
         "422": { description: 'memory_rejected — ADR-0019 content-contract violation or undeclared shrink' }
+  /agents/{slug}/open-external-pr:
+    post:
+      tags: [agents]
+      summary: Open a pull request on an external project's repo (Phase 7 PR6 / R-N9)
+      description: 'CCR write-script endpoint. The agent-runner calls this after the LLM generates the PR body; this Lambda resolves the project github.token from Secrets Manager and calls openExternalPr (R-N9 compliant). Auth: engagement-write bearer token.'
+      security: [{ bearer: [] }]
+      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_id, skill_name, run_id, path, body]
+              properties:
+                project_id: { type: string, description: 'Workforce project id whose github.token credential to use' }
+                skill_name: { type: string, description: 'Skill name that produced the deliverable (for the PR body)' }
+                run_id: { type: string, description: 'Execution ULID/UUID — used to compute the branch name' }
+                path: { type: string, description: 'Repo-relative file path to create/replace in the external repo' }
+                body: { type: string, description: 'UTF-8 PR body content (the skill deliverable)' }
+      responses:
+        "201": { description: 'Created — { pr_url, pr_number, branch_name }', content: { application/json: { schema: { type: object, properties: { pr_url: { type: string }, pr_number: { type: integer }, branch_name: { type: string } } } } } }
+        "400": { description: 'missing_body / invalid_json / missing_field' }
+        "401": { description: bad or missing bearer }
+        "404": { description: project_not_found }
+        "422": { description: 'project_missing_repo — project lacks github_owner or github_repo' }
+        "424": { description: 'credential_not_provisioned or credential_malformed — github.token not yet provisioned for the project' }
+        "502": { description: 'github_api_error — GitHub REST API returned a non-2xx response' }
   /agents/{slug}/recall:
     get:
       tags: [agents]

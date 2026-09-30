@@ -197,6 +197,8 @@ import { isValidDispatchToken } from "../shared/dispatch-token.js";
 import { DOCS_HTML, OPENAPI_YAML } from "./openapi.js";
 import { handleBoardsRoute, type BoardReplyDispatch } from "./boards.js";
 import { getProjectReportBody, listProjectReports } from "./reports.js";
+import { openExternalPr } from "../shared/external-pr.js";
+import { type GithubSecret } from "../shared/secrets.js";
 
 // Secrets Manager path holding the feed-write capability token. The
 // runner presents the same token (injected from this secret into its
@@ -334,6 +336,12 @@ export async function handler(
     // class: the `memory` profile block, behind the ADR-0019 content
     // contract + shrink guard. `return await` for the 500 mapping.
     if (routeKey === "POST /agents/{slug}/memory" && slug) return await updateMemoryRoute(slug, event);
+    // POST /agents/{slug}/open-external-pr — Phase 7 PR6 runner dispatch
+    // hookup. The CCR write-script calls this after the LLM generates the
+    // PR body; the Lambda resolves the project's GitHub credential from
+    // Secrets Manager and calls openExternalPr (R-N9 compliant). Auth:
+    // same engagement-write bearer token the CCR session already holds.
+    if (routeKey === "POST /agents/{slug}/open-external-pr" && slug) return await openExternalPrRoute(slug, event);
     if (routeKey === "DELETE /agents/{slug}" && slug) return await deleteAgent(slug, event);
     if (routeKey === "GET /projects") return listProjects(event);
     if (routeKey === "GET /projects/{id}/executions" && projectId) return listProjectExecutions(projectId, event);
@@ -3447,6 +3455,108 @@ async function validateMemoryWriteBearer(event: APIGatewayProxyEventV2): Promise
   const b = Buffer.from(expected);
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
+}
+
+/**
+ * POST /agents/{slug}/open-external-pr — Phase 7 PR6 runner dispatch hookup.
+ *
+ * The CCR agent-runner calls this endpoint from a skill's write-script after
+ * the LLM generates the PR body. This Lambda resolves the project's
+ * `github.token` from Secrets Manager (the CCR session never touches AWS
+ * resources directly) and calls `openExternalPr` (shared/external-pr.ts) to
+ * open a pull request on the external repo, per R-N9.
+ *
+ * Auth: engagement-write bearer token (same token the CCR session uses for
+ * `POST /agents/{slug}/engagements`). Same trust level: if a caller can record
+ * an engagement for this agent, it can open a PR on its behalf.
+ *
+ * Body fields:
+ *   project_id  — the workforce project id whose github.token credential to use
+ *   skill_name  — the skill that produced this deliverable (for the PR body)
+ *   run_id      — the ULID/UUID for this execution (for the branch name)
+ *   path        — repo-relative file path to create/replace in the external repo
+ *   body        — UTF-8 PR body (the skill's deliverable content)
+ *
+ * Returns: { pr_url, pr_number, branch_name }
+ */
+async function openExternalPrRoute(
+  slug: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const authed = await validateEngagementWriteBearer(event);
+  if (!authed) {
+    return reply(401, { error: "unauthorized", detail: "POST /agents/{slug}/open-external-pr requires the engagement-write bearer token." });
+  }
+
+  if (!event.body) return reply(400, { error: "missing_body" });
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(event.body) as Record<string, unknown>;
+  } catch {
+    return reply(400, { error: "invalid_json" });
+  }
+
+  const { project_id, skill_name, run_id, path: filePath, body: prBody } = parsed;
+  if (typeof project_id !== "string" || project_id.length === 0)
+    return reply(400, { error: "missing_field", field: "project_id" });
+  if (typeof skill_name !== "string" || skill_name.length === 0)
+    return reply(400, { error: "missing_field", field: "skill_name" });
+  if (typeof run_id !== "string" || run_id.length === 0)
+    return reply(400, { error: "missing_field", field: "run_id" });
+  if (typeof filePath !== "string" || filePath.length === 0)
+    return reply(400, { error: "missing_field", field: "path" });
+  if (typeof prBody !== "string" || prBody.length === 0)
+    return reply(400, { error: "missing_field", field: "body" });
+
+  const project = await getProject(asProjectId(project_id));
+  if (!project) return reply(404, { error: "project_not_found", project_id });
+
+  if (!project.github_owner || !project.github_repo) {
+    return reply(422, {
+      error: "project_missing_repo",
+      detail: `project "${project_id}" has no github_owner or github_repo configured`,
+    });
+  }
+
+  let github: GithubSecret;
+  try {
+    const secretName = `wf/projects/${project.project_id}/github.token`;
+    const raw = await sm.send(new GetSecretValueCommand({ SecretId: secretName }));
+    if (!raw.SecretString) {
+      return reply(424, { error: "credential_not_provisioned", credential_type: "github.token" });
+    }
+    const v = JSON.parse(raw.SecretString) as { token?: unknown };
+    if (typeof v.token !== "string" || v.token.length === 0) {
+      return reply(424, { error: "credential_malformed", credential_type: "github.token" });
+    }
+    github = { token: v.token };
+  } catch (err) {
+    if (err instanceof SmResourceNotFoundException) {
+      return reply(424, { error: "credential_not_provisioned", credential_type: "github.token" });
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("ResourceNotFoundException") || msg.includes("resource not found")) {
+      return reply(424, { error: "credential_not_provisioned", credential_type: "github.token" });
+    }
+    throw err;
+  }
+
+  try {
+    const result = await openExternalPr({
+      project_id,
+      agent_slug: slug,
+      skill_name: skill_name as string,
+      run_id: run_id as string,
+      path: filePath as string,
+      body: prBody as string,
+      github,
+    });
+    return reply(201, result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(JSON.stringify({ event: "open_external_pr_failed", slug, project_id, error: msg }));
+    return reply(502, { error: "github_api_error", detail: msg.slice(0, 500) });
+  }
 }
 
 function reply(statusCode: number, body: unknown): APIGatewayProxyResultV2 {
