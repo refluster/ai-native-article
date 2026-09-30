@@ -42,6 +42,8 @@ export function isWellFormedAgentMeta(
     typeof row.first_name === "string" &&
     typeof row.last_name === "string" &&
     typeof row.role === "string" &&
+    // listAgents dereferences `streams` under `?stream=`.
+    Array.isArray(row.streams) &&
     typeof row.created_at === "string"
   );
 }
@@ -54,6 +56,8 @@ export function isWellFormedSkillMeta(
     row.name.length > 0 &&
     typeof row.version === "string" &&
     typeof row.status === "string" &&
+    // listSkills dereferences `owners` under `?owner=`.
+    Array.isArray(row.owners) &&
     typeof row.created_at === "string"
   );
 }

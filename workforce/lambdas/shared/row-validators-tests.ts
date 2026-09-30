@@ -64,6 +64,7 @@ function makeAgent(overrides: Partial<AgentMetaRow> = {}): Partial<AgentMetaRow>
     first_name: "Aoi",
     last_name: "Tanaka",
     role: "Designer",
+    streams: [],
     created_at: "2026-01-01",
     ...overrides,
   } as Partial<AgentMetaRow>;
@@ -76,6 +77,7 @@ function makeSkill(overrides: Partial<SkillMetaRow> = {}): Partial<SkillMetaRow>
     name: "design-note",
     version: "1.0.0",
     status: "active",
+    owners: [],
     created_at: "2026-01-01",
     ...overrides,
   } as Partial<SkillMetaRow>;
@@ -147,6 +149,14 @@ describe("isWellFormedAgentMeta", () => {
   it("rejects missing created_at", () => {
     const { created_at: _, ...row } = makeAgent() as { created_at: string } & Partial<AgentMetaRow>;
     expect(isWellFormedAgentMeta(row)).toBe(false);
+  });
+});
+
+// (A2) streams guard placed with the agent cases above.
+describe("isWellFormedAgentMeta — streams (A2)", () => {
+  it("rejects a row missing streams", () => {
+    const { streams: _, ...row } = makeAgent() as { streams: unknown[] } & Partial<AgentMetaRow>;
+    expect(isWellFormedAgentMeta(row as Partial<AgentMetaRow>)).toBe(false);
   });
 });
 
@@ -246,5 +256,12 @@ describe("emitMalformedRow", () => {
       await new Promise((r) => setTimeout(r, 10));
     }).not.toThrow();
     vi.restoreAllMocks();
+  });
+});
+
+describe("isWellFormedSkillMeta — owners (A2)", () => {
+  it("rejects a row missing owners", () => {
+    const { owners: _, ...row } = makeSkill() as { owners: unknown[] } & Partial<SkillMetaRow>;
+    expect(isWellFormedSkillMeta(row as Partial<SkillMetaRow>)).toBe(false);
   });
 });
