@@ -480,7 +480,7 @@ describe("GET /projects (listProjects)", () => {
     expect(items.map((i) => i.project_id)).toEqual(["acme"]);
   });
 
-  it("emits WfMalformedProjectMeta with Stage dimension on the skip path (FU-NEW-D)", async () => {
+  it("emits WfMalformedRow with Stage + RowType dimensions on the skip path (FU-NEW-D)", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     rows.set(key("PROJECT#bad", "META"), {
       pk: "PROJECT#bad",
@@ -496,10 +496,13 @@ describe("GET /projects (listProjects)", () => {
     expect(metricBatches).toHaveLength(1);
     const batch = metricBatches[0]!;
     expect(batch.Namespace).toBe("Workforce/AgentsApi");
-    expect(batch.MetricData[0]!.MetricName).toBe("WfMalformedProjectMeta");
+    expect(batch.MetricData[0]!.MetricName).toBe("WfMalformedRow");
     expect(batch.MetricData[0]!.Value).toBe(1);
     expect(batch.MetricData[0]!.Dimensions).toEqual(
-      expect.arrayContaining([{ Name: "Stage", Value: "test" }]),
+      expect.arrayContaining([
+        { Name: "Stage", Value: "test" },
+        { Name: "RowType", Value: "project" },
+      ]),
     );
 
     // Structured log surfaces the PK + attribute snapshot so the
@@ -507,7 +510,8 @@ describe("GET /projects (listProjects)", () => {
     expect(warnSpy).toHaveBeenCalledOnce();
     const logged = JSON.parse(warnSpy.mock.calls[0]![0] as string);
     expect(logged).toMatchObject({
-      event: "agents_api_malformed_project_meta",
+      event: "agents_api_malformed_row",
+      row_type: "project",
       pk: "PROJECT#bad",
     });
     expect(logged.attrs).toContain("owner_agent");
