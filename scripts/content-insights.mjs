@@ -221,5 +221,16 @@ async function main () {
 main().catch(e => {
   // Credentials were present, so a failure here is real — fail loud.
   console.error(`content-insights error: ${e.stack || e.message}`)
+  if (/CONSUMER_INVALID|has been deleted/.test(e.message)) {
+    console.error([
+      '',
+      'Operator action needed: the GCP project behind GA4_SA_KEY is deleted/invalid (#783).',
+      '  1. Create or pick a live GCP project; enable the Google Analytics Data API.',
+      '  2. Create a service account there and issue a JSON key.',
+      '  3. Grant the SA predefinedRoles/viewer on the GA4 property via the Admin API',
+      '     accessBindings.create (the GA4 UI rejects SA emails — see RAL-002).',
+      '  4. Replace the GA4_SA_KEY repo secret, then re-run this workflow.'
+    ].join('\n'))
+  }
   process.exit(1)
 })

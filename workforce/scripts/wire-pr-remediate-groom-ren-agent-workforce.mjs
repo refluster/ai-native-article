@@ -132,7 +132,7 @@ const authorLane = cur.bindings.find(
 if (!authorLane) {
   console.error(
     `  ⚠ ${SLUG}: no AUTHOR-lane pr-remediate @ ${PROJECT_ID} binding found. The groom lane is an addition to it, ` +
-      `not a replacement — wire wire-pr-remediate-ren-agent-workforce.mjs first, or confirm the author lane was ` +
+      `not a replacement — wire the author-lane entry in lib/bindings-manifest.mjs (adr-0038; formerly wire-pr-remediate-ren-agent-workforce.mjs) first, or confirm the author lane was ` +
       `retired deliberately before re-running this.`,
   );
   process.exit(1);
