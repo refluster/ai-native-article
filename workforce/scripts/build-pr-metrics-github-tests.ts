@@ -1,7 +1,18 @@
 // @ts-nocheck — the script under test is dependency-free ESM, not TS.
 // Tests the pure classification + aggregation of the GitHub-API PR builder.
 import { describe, it, expect } from "vitest";
-import { classifyPr, aggregate, aggregateEscalations, aggregateReruns, fetchPrFacts, parseAlsoScopes } from "./build-pr-metrics-github.mjs";
+import {
+  classifyPr,
+  aggregate,
+  aggregateEscalations,
+  aggregateReruns,
+  fetchPrFacts,
+  fetchWithRetry,
+  parseAlsoScopes,
+  prProvenanceInputs,
+  PR_DETAIL_METRICS,
+} from "./build-pr-metrics-github.mjs";
+import { assertProvenance, UnprovenanceError } from "./lib/perf-provenance.mjs";
 
 const GREEN = (slug) => `looks good\n<!-- autopilot:review:${slug}:green -->`;
 
@@ -201,5 +212,138 @@ describe("parseAlsoScopes", () => {
     expect(parseAlsoScopes(undefined, "workforce")).toEqual([]);
     expect(parseAlsoScopes("", "workforce")).toEqual([]);
     expect(parseAlsoScopes(true, "workforce")).toEqual([]); // arg() returns `true` for a bare flag
+  });
+});
+
+// #505: end-to-end wiring of the shared writer-boundary guard onto this
+// builder's own PR-row shape — `skipped > 0` is exactly the "a fetch
+// degraded and the row would otherwise read as a confident zero" case.
+describe("PERF#{scope}/PR row provenance (#505)", () => {
+  it("a fully-quiet, fully-fetched window (0 merged PRs, skipped 0) publishes", () => {
+    expect(() =>
+      assertProvenance({
+        scope: "conference",
+        sk: "PR",
+        metrics: { total_prs: 0, total_additions: 0, total_deletions: 0 },
+        unmeasured: [],
+      }),
+    ).not.toThrow();
+  });
+
+  it("every merged PR's detail dropped (skipped > 0) refuses the all-zero row", () => {
+    expect(() =>
+      assertProvenance({
+        scope: "acme",
+        sk: "PR",
+        metrics: { total_prs: 0, total_additions: 0, total_deletions: 0 },
+        unmeasured: PR_DETAIL_METRICS,
+      }),
+    ).toThrow(UnprovenanceError);
+  });
+
+  // #752 O1: the two tests above call `assertProvenance` with hand-built
+  // `metrics`/`unmeasured` — they never exercise `prProvenanceInputs`, so a
+  // bug in how it actually derives those from `aggregate()`'s block + the
+  // real `skipped` count would pass both untouched. These two go through the
+  // full pipeline: a fake `gh` that drops a merged PR's detail (mirroring a
+  // degraded `fetchPrFacts` run) -> `aggregate` -> `prProvenanceInputs` ->
+  // `assertProvenance`.
+  const merged = [{ number: 1 }];
+  const ghDropsDetail = async (path: string) =>
+    path.includes("/pulls/1") && !path.includes("reviews")
+      ? { status: 502, json: {}, rateLimit: {} }
+      : { status: 200, json: [], rateLimit: {} };
+  const ghServesDetail = async (path: string) =>
+    path.includes("/pulls/1") && !path.includes("reviews")
+      ? { status: 200, json: { number: 1, merged_at: "2026-06-22T10:00:00Z", additions: 10, deletions: 2, user: { login: "refluster" } }, rateLimit: {} }
+      : { status: 200, json: [], rateLimit: {} };
+
+  it("a degraded fetchPrFacts run (detail dropped) produces inputs the guard refuses", async () => {
+    const { prs, skipped } = await fetchPrFacts(ghDropsDetail, "o/r", merged);
+    expect(skipped).toBe(1);
+    const block = aggregate(prs, { sinceIso: "2026-06-01" });
+    const { metrics, unmeasured } = prProvenanceInputs(block, skipped);
+    expect(metrics).toEqual({ total_prs: 0, total_additions: 0, total_deletions: 0 });
+    expect(unmeasured).toEqual(PR_DETAIL_METRICS);
+    expect(() => assertProvenance({ scope: "acme", sk: "PR", metrics, unmeasured })).toThrow(UnprovenanceError);
+  });
+
+  it("a clean fetchPrFacts run (detail served) produces inputs the guard publishes", async () => {
+    const { prs, skipped } = await fetchPrFacts(ghServesDetail, "o/r", merged);
+    expect(skipped).toBe(0);
+    const block = aggregate(prs, { sinceIso: "2026-06-01" });
+    const { metrics, unmeasured } = prProvenanceInputs(block, skipped);
+    expect(unmeasured).toEqual([]);
+    expect(() => assertProvenance({ scope: "acme", sk: "PR", metrics, unmeasured })).not.toThrow();
+  });
+});
+
+describe("fetchWithRetry (a request that threw is retried; one that answered is not)", () => {
+  const sleep = async () => {};
+  const socketError = () => Object.assign(new TypeError("fetch failed"), { cause: { code: "UND_ERR_SOCKET" } });
+
+  it("retries a thrown fetch and returns the first answer", async () => {
+    let calls = 0;
+    const r = await fetchWithRetry(async () => {
+      calls += 1;
+      if (calls < 3) throw socketError();
+      return "ok";
+    }, { attempts: 3, sleep });
+    expect(r).toBe("ok");
+    expect(calls).toBe(3);
+  });
+
+  it("rethrows the last error once attempts run out, so a real outage still fails loud", async () => {
+    let calls = 0;
+    await expect(
+      fetchWithRetry(async () => {
+        calls += 1;
+        throw socketError();
+      }, { attempts: 3, sleep }),
+    ).rejects.toThrow("fetch failed");
+    expect(calls).toBe(3);
+  });
+
+  it("does not retry a request that answered, whatever the status", async () => {
+    let calls = 0;
+    const r = await fetchWithRetry(async () => {
+      calls += 1;
+      return { status: 502 };
+    }, { attempts: 3, sleep });
+    expect(r).toEqual({ status: 502 });
+    expect(calls).toBe(1);
+  });
+
+  it("backs off exponentially between attempts", async () => {
+    const waits: number[] = [];
+    let calls = 0;
+    await fetchWithRetry(async () => {
+      calls += 1;
+      if (calls < 3) throw socketError();
+      return "ok";
+    }, { attempts: 3, baseDelayMs: 100, sleep: async (ms: number) => { waits.push(ms); } });
+    expect(waits).toEqual([100, 200]);
+  });
+});
+
+describe("fetchPrFacts (a PR whose calls throw is dropped, not fatal)", () => {
+  const item = (n) => ({ number: n, closed_at: "2026-09-01T00:00:00Z", labels: [], user: { login: "someone" } });
+  const ok = (n) => ({
+    status: 200,
+    json: { number: n, merged_at: "2026-09-01T00:00:00Z", additions: 100, deletions: 5, user: { login: "dev" } },
+  });
+
+  it("drops the PR whose network never answered and keeps the rest (2026-09-26 socket reset)", async () => {
+    const gh = async (path: string) => {
+      if (path.includes("/pulls/2") || path.includes("/issues/2/")) {
+        throw Object.assign(new TypeError("fetch failed"), { cause: { code: "UND_ERR_SOCKET" } });
+      }
+      const m = /\/pulls\/(\d+)$/.exec(path);
+      return m ? ok(Number(m[1])) : { status: 200, json: [] };
+    };
+    const r = await fetchPrFacts(gh, "o/r", [item(1), item(2), item(3)]);
+    expect(r.prs.map((p) => p.additions)).toEqual([100, 100]);
+    expect(r.skipped).toBe(1);
+    expect(r.quotaExhausted).toBe(false);
   });
 });

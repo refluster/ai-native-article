@@ -68,6 +68,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { assertReasonCode, isAuthorLaneCode, reasonLabel, reasonMarker, refusalReasonCode } from "./escalation-reasons.mjs";
+import { assertGithubIdentity, identityCheckRequired } from "../../scripts/lib/github-identity.mjs";
 
 // Repo root, for the project.json lookup the author-lane dispatch needs
 // (workforce/skills/pr-autopilot → repo root).
@@ -255,8 +256,21 @@ export async function resolveL0L1Paths(gh, repo, ref) {
 }
 
 // Build a thin GitHub REST client bound to one token + repo.
-export function makeGh({ token, api = process.env["GITHUB_API_URL"] || "https://api.github.com", userAgent = "workforce-pr-merge" }) {
-  return async function gh(method, path, body) {
+//
+// ML-040 (#781): inside a CCR fire, the first WRITE through this client is
+// preceded by one `GET /user` identity preflight (lib/github-identity.mjs).
+// Every workforce write-script builds its client here, so this is the single
+// shared gate. It passes on the account the operator's routines run as and
+// throws on anything else. Reads are never gated. `identityCheck` is injectable
+// for tests; by default it runs only where the CCR proxy substitutes identity.
+export function makeGh({
+  token,
+  api = process.env["GITHUB_API_URL"] || "https://api.github.com",
+  userAgent = "workforce-pr-merge",
+  identityCheck = identityCheckRequired(),
+}) {
+  let preflight = null;
+  const raw = async function gh(method, path, body) {
     let res;
     try {
       res = await fetch(`${api}${path}`, {
@@ -275,6 +289,16 @@ export function makeGh({ token, api = process.env["GITHUB_API_URL"] || "https://
     let json; try { json = text ? JSON.parse(text) : {}; } catch { json = { _raw: text }; }
     return { status: res.status, json };
   };
+  if (!identityCheck) return raw;
+  return async function gh(method, path, body) {
+    if (String(method).toUpperCase() !== "GET") {
+      // One preflight per client, shared by concurrent writes; a failed one
+      // stays failed (every later write re-throws the same refusal).
+      preflight ??= assertGithubIdentity(raw);
+      await preflight;
+    }
+    return raw(method, path, body);
+  };
 }
 
 // W-4 hard cycle cap (FU-004 / dev-process.md §"cycle counter").
@@ -284,7 +308,7 @@ export function makeGh({ token, api = process.env["GITHUB_API_URL"] || "https://
 // verifyMergeable() refuses a merge when that maximum exceeds W4_CYCLE_CAP
 // (cycle > 7 == process breakdown; W-4: fail loud, escalate to human).
 export const W4_CYCLE_CAP = 7;
-const ROUTING_CYCLE_RE = /\*\*[\w ]+\s*—\s*cycle\s+(\d+)\s+of\s+≤\s*\d+/u;
+export const ROUTING_CYCLE_RE = /\*\*[\w ]+\s*—\s*cycle\s+(\d+)\s+of\s+≤\s*\d+/u;
 export function countRouterCycles(bodies) {
   let max = 0;
   for (const b of bodies) {

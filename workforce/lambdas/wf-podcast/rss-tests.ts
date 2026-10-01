@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildPodcastRss, xmlEscape, toRfc822, type PodcastChannel } from "./rss.js";
+import { buildPodcastRss, xmlEscape, toRfc822, type PodcastChannel, type PodcastEpisode } from "./rss.js";
 
 const channel: PodcastChannel = {
   title: "AI Native Article — Podcast",
@@ -59,5 +59,14 @@ describe("rss builder", () => {
     const xml = buildPodcastRss(channel, []);
     expect(xml).toContain("<channel>");
     expect(xml).not.toContain("<item>");
+  });
+
+  it("refuses a duplicated GUID or enclosure (Spotify drops repeated GUIDs; a shared MP3 is overwritten audio)", () => {
+    const ep = (slug: string, audio: string, title: string): PodcastEpisode => ({
+      slug, title, description: "出典: https://example.com/a", audioUrl: `https://cdn.example/podcast/audio/${audio}.mp3`, pubDate: "2026-09-22",
+    });
+    expect(() => buildPodcastRss(channel, [ep("3e3d0f0be61e", "a", "回A"), ep("3e3d0f0be61e", "b", "回B")])).toThrow(/duplicate episode GUID 3e3d0f0be61e/);
+    expect(() => buildPodcastRss(channel, [ep("a", "same", "回A"), ep("b", "same", "回B")])).toThrow(/duplicate episode enclosure/);
+    expect(() => buildPodcastRss(channel, [ep("a", "a", "回A"), ep("b", "b", "回B")])).not.toThrow();
   });
 });

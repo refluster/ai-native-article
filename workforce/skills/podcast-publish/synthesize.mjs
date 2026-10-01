@@ -16,6 +16,16 @@
 // The taskId is the only state and it lives in THIS caller — no per-Lambda
 // nested invocation (R-N1).
 //
+// Gemini engine (ADR-0043, Lambda env PODCAST_TTS_ENGINE=gemini): the kickoff
+// is the same HTTP call, but it starts nothing and returns
+// `invoke.functionName`. One Gemini request takes 30 s–4 min — longer than the
+// HTTP API's 30 s window — so phase 2 invokes the function DIRECTLY
+// (`aws lambda invoke`, ≤15 min per call; needs lambda:InvokeFunction). Each
+// invocation synthesises chunk waves while it has time and persists every
+// chunk in S3, so we just re-invoke until done. A free-tier daily-quota stop
+// (10 requests/day) exits 3 naming the episodes; their finished chunks are kept
+// and the next run resumes them.
+//
 // Auth is IAM (the CI OIDC role / the operator's AWS credentials sign each
 // request) — NOT the CCR cadence, which is Notion-only and never touches AWS.
 // The Notion token lives in the Lambda (its IAM role), never in this session.
@@ -35,10 +45,12 @@
 //   0  — synthesised (or a skip: no approved episode) — read the JSON
 //   1  — bad env / missing AWS creds
 //   2  — Lambda returned 4xx (bad request / auth)
-//   3  — Lambda 5xx / network / a Polly failure, or the poll budget expired with
-//        episodes still un-synthesised (fail loud — C-4)
+//   3  — Lambda 5xx / network / a TTS failure, the Gemini daily quota ran out,
+//        or the poll budget expired with episodes still un-synthesised
+//        (fail loud — C-4)
 
 import { spawnSync } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
 
 const API_BASE = (
   process.env.WF_PODCAST_API_BASE ??
@@ -90,6 +102,32 @@ function post(payload) {
   return { status, text, json: parsed };
 }
 
+// One direct lambda:InvokeFunction (RequestResponse, up to the function's
+// 15-min ceiling) with the operator/CI AWS credentials. Returns {status, text,
+// json} of the handler's {statusCode, body} result, like post().
+function invokeDirect(functionName, payload) {
+  const dir = process.env.RUNNER_TEMP ?? "/tmp";
+  const out = `${dir}/wf-podcast-invoke-${process.pid}.json`;
+  // fileb:// sends the file's bytes as-is on both AWS CLI v1 and v2 (v2 would
+  // otherwise expect a base64 --payload; v1 lacks --cli-binary-format).
+  const inFile = `${dir}/wf-podcast-payload-${process.pid}.json`;
+  writeFileSync(inFile, JSON.stringify(payload));
+  const res = spawnSync("aws", [
+    "lambda", "invoke",
+    "--region", REGION,
+    "--function-name", functionName,
+    "--cli-read-timeout", "910",
+    "--payload", `fileb://${inFile}`,
+    out,
+  ], { encoding: "utf8" });
+  if (res.status !== 0) return { status: 0, text: `aws lambda invoke failed: ${res.stderr}`, json: undefined };
+  let meta; try { meta = JSON.parse(res.stdout); } catch { /* ignore */ }
+  let result; try { result = JSON.parse(readFileSync(out, "utf8")); } catch { /* ignore */ }
+  if (meta?.FunctionError || !result) return { status: 500, text: `lambda ${meta?.FunctionError ?? "no result"}: ${JSON.stringify(result ?? res.stdout)}`, json: undefined };
+  let parsed; try { parsed = JSON.parse(result.body); } catch { /* non-JSON */ }
+  return { status: Number(result.statusCode), text: String(result.body ?? ""), json: parsed };
+}
+
 // Map a non-2xx response to the documented exit code (fail loud on 5xx).
 function bail(label, res) {
   if (res.status >= 400 && res.status < 500) { console.error(`synthesize.mjs: ${label} HTTP ${res.status}: ${res.text}`); process.exit(2); }
@@ -110,6 +148,37 @@ if (handles.length === 0) {
   console.error("synthesize.mjs: kickoff returned 202 with no handles");
   process.exit(3);
 }
+
+// ── 2'. Gemini: direct invocation until every episode is audio-ready ──────────
+const fn = kicked.json?.invoke?.functionName;
+if (fn) {
+  console.error(`synthesize.mjs: ${handles.length} Gemini episode(s); invoking ${fn} directly (budget ${Math.round(POLL_BUDGET_MS / 1000)}s)…`);
+  let pending = handles;
+  const deadline = Date.now() + POLL_BUDGET_MS;
+  while (pending.length > 0) {
+    if (Date.now() > deadline) {
+      console.error(`synthesize.mjs: budget expired with ${pending.length} episode(s) still un-synthesised (fail loud; finished chunks are kept for the next run)`);
+      process.exit(3);
+    }
+    const res = invokeDirect(fn, { source: "wf-podcast-direct", finalize: pending });
+    if (res.status !== 200) bail("direct finalize", res); // a TTS failure throws → 500 → exit 3
+    const results = Array.isArray(res.json?.results) ? res.json.results : [];
+    const doneIds = new Set(results.filter((r) => r.done).map((r) => r.pageId));
+    pending = pending.filter((h) => !doneIds.has(h.pageId));
+    const progress = results.filter((r) => !r.done).map((r) => `${r.slug} ${r.chunksDone}/${r.chunksTotal}`).join(", ");
+    console.error(`  audio-ready ${handles.length - pending.length}/${handles.length}${progress ? ` · chunks ${progress}` : ""}`);
+    const quota = results.filter((r) => r.quotaExhausted).map((r) => r.slug);
+    if (quota.length > 0) {
+      console.error(`synthesize.mjs: Gemini daily request quota exhausted — ${quota.join(", ")} stay approved and resume on the next run (fail loud)`);
+      process.exit(3);
+    }
+    const retryAfter = Math.max(0, ...results.map((r) => Number(r.retryAfterSec) || 0));
+    if (pending.length > 0 && retryAfter > 0) await sleep(retryAfter * 1000);
+  }
+  console.log(JSON.stringify({ synthesized: handles.length, engine: "gemini", slugs: handles.map((h) => h.slug) }));
+  process.exit(0);
+}
+
 console.error(`synthesize.mjs: started ${handles.length} Polly task(s); polling for completion (budget ${Math.round(POLL_BUDGET_MS / 1000)}s)…`);
 
 // ── 2. Poll until every started task is finalized → audio-ready ─────────────────
