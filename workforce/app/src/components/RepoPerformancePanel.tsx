@@ -72,6 +72,10 @@ export default function RepoPerformancePanel() {
   const ageHours = (Date.now() - Date.parse(result.generatedAt)) / 3_600_000;
   const isStale = result.source === 'live' && ageHours > STALE_HOURS;
   const degraded = w.degraded_signals ?? [];
+  // A degraded churn signal means GitHub never served the stats, so the summed
+  // total is 0 by construction — a number the deck must not print as if it had
+  // been measured. The other signals undercount; this one has no floor at all.
+  const churnUnknown = degraded.includes('code_churn');
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -87,8 +91,12 @@ export default function RepoPerformancePanel() {
           <Stat cap="PULL REQUESTS" value={`+${w.summary.prs_opened} / −${w.summary.prs_closed}`} sub="opened / closed" />
           <Stat
             cap="CODE CHURN"
-            value={`+${w.summary.total_additions.toLocaleString()}`}
-            sub={`−${w.summary.total_deletions.toLocaleString()} lines`}
+            value={churnUnknown ? '—' : `+${w.summary.total_additions.toLocaleString()}`}
+            sub={
+              churnUnknown
+                ? 'unknown this run — not zero'
+                : `−${w.summary.total_deletions.toLocaleString()} lines`
+            }
           />
           <Stat cap="TRACKED REPOS" value={String(projectIds.length)} sub={projectIds.join(', ')} />
         </div>
@@ -140,6 +148,12 @@ export default function RepoPerformancePanel() {
           />
         </ChartCard>
         <ChartCard title="CODE CHURN" sub="additions vs deletions · weekly">
+          {churnUnknown ? (
+            <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary">
+              * GitHub did not serve churn statistics this run — nothing to plot; not a quiet week,
+              restored next refresh
+            </p>
+          ) : (
           <StackedBarChart
             data={w.code_churn_weekly as unknown as Array<Record<string, number | string>>}
             xKey="week_start"
@@ -148,6 +162,7 @@ export default function RepoPerformancePanel() {
             ariaLabel="Code line additions vs deletions, stacked by week, summed across projects"
             tooltip={(d) => `week of ${d.week_start} — +${d.additions} / −${d.deletions}`}
           />
+          )}
         </ChartCard>
       </div>
     </div>

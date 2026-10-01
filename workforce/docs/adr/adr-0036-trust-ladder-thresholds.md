@@ -1,6 +1,6 @@
 # ADR-0036 — Trust-ladder thresholds: N/M bars, incident taxonomy, reciprocity constraint, demotion parameters
 
-- **Status**: Proposed (2026-09-13)
+- **Status**: Accepted (operator direction 2026-09-14, PR #727; proposed 2026-09-13)
 - **Date**: 2026-09-13
 - **Deciders**: operator (Zone A — thresholds, incident taxonomy, and what
   counts as a reviewer's "own team" are human-owned, same bar as the quality

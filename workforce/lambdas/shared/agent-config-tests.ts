@@ -365,3 +365,37 @@ describe("validateIdentityCoherence — S19 role ↔ prompt header title (ML-014
     ).toEqual([]);
   });
 });
+
+// ─── the per-agent budget is advisory (ADR-0037) ─────────────────────────────
+// Between 2026-09-09 and 09-14 an enforced cap switched off the PR router,
+// the author lane and the article pipeline (ML-038). The operator's ruling:
+// output continuity outranks a planning figure. So bindings whose modelled
+// burn exceeds the budget are ACCEPTED here — the audit script says so, the
+// ledger stamps the crossing, and nothing refuses the work.
+describe("validateIdentityPatch — budget is advisory (ADR-0037)", () => {
+  const owned = (skill: string, cron: string, project_id = "agent-workforce") => ({
+    skill,
+    project_id,
+    executor: "claude-code-routine",
+    routine_spec: "workforce/docs/routines/agent-runner.md",
+    trigger: { scheduler: "external", invoked_by: "api", cron, fired_from: "wf-orchestrator-tick" },
+  });
+  const owners = (name: string) => (["pr-autopilot", "backlog-reconcile"].includes(name) ? ["nadia"] : undefined);
+
+  it("accepts bindings whose modelled burn outruns the budget in force", () => {
+    const c = ctx({ skillOwners: owners });
+    const v = rules(
+      {
+        bindings: [owned("pr-autopilot", "cron(23 0,6,12,18 ? * * *)"), owned("backlog-reconcile", "cron(41 2 ? * * *)")],
+        budget_monthly_usd_default: 8,
+      },
+      c,
+    );
+    expect(v).toEqual([]);
+  });
+
+  it("still holds the aggregate W-3 ceiling on the roster (that one is a ceiling, not a per-agent figure)", () => {
+    const c = ctx({ otherAgentsEffectiveBudgetUsd: W3_BUDGET_CAP_USD - 10 });
+    expect(rules({ budget_monthly_usd_default: 11 }, c)).toContain("W3-cap");
+  });
+});

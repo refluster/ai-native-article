@@ -78,6 +78,10 @@ export interface PrSummary {
   /** The distinct human handles that touched any merged PR in the window —
    *  the set the workforce is trying to shrink. */
   humans_involved: string[];
+  /** Set when build-pr-metrics-github.mjs dropped a merged PR whose detail
+   *  GitHub refused (e.g. a spent REST quota) — the counts above are an
+   *  undercount, never entered as a false zero. */
+  degraded_signals?: string[];
 }
 
 /** One scope's full performance series (workforce or a single project). */
@@ -282,6 +286,9 @@ export interface BudgetBlock {
   /** Agents with a ledger row this month — NOT the roster size. */
   agents_charged: number;
   ceiling_usd: number;
+  /** Agents whose month has crossed their advisory per-agent budget
+   *  (ADR-0037). They keep firing; this names whose planning figure is wrong. */
+  over_budget_agents: string[];
   /** When the ledger last MOVED — newest row timestamp, not the read time.
    *  A figure whose `updated_at` has gone quiet must render as "the writer has
    *  stopped", never as a current total: a frozen number reads as alive. */

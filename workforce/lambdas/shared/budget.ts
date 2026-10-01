@@ -1,7 +1,6 @@
-// Per-agent monthly token-budget guard. Enforces W-3 at the LLM call site:
-// the orchestrator/runner consults this before invoking complete(), and
-// throws (rather than silently overrun) if the projected cost would
-// breach the agent's cap.
+// Per-agent monthly token-budget ledger (W-3). Since ADR-0037 the per-agent
+// budget is ADVISORY: every caller measures and reports the month's position;
+// none refuses work because of it. Output continuity outranks the figure.
 //
 // State lives in DDB BUDGET#{yyyy-mm}/AGENT#{slug}. Atomic ADD updates so
 // concurrent runs don't lose increments. Reads are fresh (no caching).
@@ -38,6 +37,9 @@ export interface MonthSpend {
   estimated_fires: number;
   /** `cost_usd + estimated_cost_usd` — what the cap is checked against. */
   total_usd: number;
+  /** When the orchestrator first refused a fire for this agent this month
+   *  (ML-038). Absent while the cap has not been reached. */
+  cap_reached_at?: string;
 }
 
 const monthKey = budgetMonthKey;
@@ -65,30 +67,66 @@ export async function getMonthSpend(slug: string): Promise<MonthSpend> {
     estimated_cost_usd,
     estimated_fires: row?.estimated_fires ?? 0,
     total_usd: cost_usd + estimated_cost_usd,
+    ...(row?.cap_reached_at ? { cap_reached_at: row.cap_reached_at } : {}),
   };
 }
 
 /**
- * Throws if a planned spend would breach the agent's monthly cap.
- * `cap_usd` is the *effective* cap (override or default).
- * `planned_cost_usd` is the worst-case spend the runner is about to incur.
+ * Stamp the month's ledger row with the moment the advisory budget was first
+ * crossed (ML-038 / ADR-0037). Returns TRUE only for the write that set it and
+ * FALSE on every later call. Conditional on the attribute not existing, so two
+ * ticks cannot both be "first". `/performance` lists every agent whose row
+ * carries the stamp as over budget this month.
  */
-export async function assertWithinBudget(
-  slug: string,
-  cap_usd: number,
-  planned_cost_usd: number,
-): Promise<void> {
-  const current = await getMonthSpend(slug);
-  if (wouldBreachBudget(current.total_usd, cap_usd, planned_cost_usd)) {
-    throw new Error(
-      `budget guard: agent ${slug} would exceed monthly cap. current=${current.total_usd.toFixed(2)} (measured ${current.cost_usd.toFixed(2)} + modelled ${current.estimated_cost_usd.toFixed(2)}) planned=${planned_cost_usd.toFixed(2)} cap=${cap_usd.toFixed(2)} (month=${monthKey()})`,
+export async function recordCapReached(slug: string, now: Date = new Date()): Promise<boolean> {
+  const month = monthKey(now);
+  try {
+    await ddb.send(
+      new UpdateCommand({
+        TableName: tableName,
+        Key: { pk: pk(month), sk: sk(slug) },
+        UpdateExpression: "SET #cap_reached_at = :now",
+        ConditionExpression: "attribute_not_exists(#cap_reached_at)",
+        ExpressionAttributeNames: { "#cap_reached_at": "cap_reached_at" },
+        ExpressionAttributeValues: { ":now": now.toISOString() },
+      }),
     );
+    return true;
+  } catch (err) {
+    if ((err as { name?: string })?.name === "ConditionalCheckFailedException") return false;
+    throw err;
   }
 }
 
-/** The cap predicate on its own, so callers that must not throw (the
- *  orchestrator skips a binding rather than failing a whole tick) share the
- *  comparison with the ones that do. Pure — trivially testable. */
+/**
+ * Report where a planned spend lands against the agent's monthly budget
+ * (ADR-0037). Never throws and never blocks: the budget is a planning figure,
+ * and output continuity outranks it. The position is logged so a caller that
+ * wants to react can, and the ledger stamp (`recordCapReached`) makes the
+ * first crossing of the month visible on /performance.
+ */
+export async function reportBudgetPosition(
+  slug: string,
+  budget_usd: number,
+  planned_cost_usd: number,
+): Promise<MonthSpend & { over_budget: boolean }> {
+  const current = await getMonthSpend(slug);
+  const over_budget = wouldBreachBudget(current.total_usd, budget_usd, planned_cost_usd);
+  if (over_budget) {
+    console.warn(JSON.stringify({
+      event: "budget-advisory-exceeded",
+      slug,
+      month: monthKey(),
+      current_usd: Number(current.total_usd.toFixed(4)),
+      planned_usd: planned_cost_usd,
+      budget_usd,
+    }));
+  }
+  return { ...current, over_budget };
+}
+
+/** The over-budget predicate, shared by every reporter so they agree about
+ *  what "over" means. Pure — trivially testable. */
 export function wouldBreachBudget(current_usd: number, cap_usd: number, planned_cost_usd: number): boolean {
   return current_usd + planned_cost_usd > cap_usd;
 }

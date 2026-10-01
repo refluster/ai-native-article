@@ -39,3 +39,4 @@ describe("ccrPrepErrorProjectId", () => {
     expect(ccrPrepErrorProjectId("nobita", "")).toBe("self/nobita");
   });
 });
+

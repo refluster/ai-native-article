@@ -170,6 +170,8 @@ Bindings are immutable per-PR (Rule 11 / R-N8: one prompt-version-bump per PR). 
 
 The agents-api write-time validator (`workforce/lambdas/shared/agent-config.ts`, ADR-0007 — formerly the `validate-agent-json.mjs` CI lint) enforces:
 
+- **Budget is advisory ([ADR-0037](../adr/adr-0037-advisory-per-agent-budget.md))** — a bindings write is never refused because the agent's `budget_monthly_usd_*` figure cannot carry the cadence; the orchestrator dispatches every due binding regardless of the month's position. The figure is still a planning number: wire a binding and update its budget line in the same PATCH so `/performance` and `npm run workforce:budget-runway` (R-19) stay honest, and the aggregate `W3-cap` (sum of figures ≤ USD 600) still applies at the write boundary. The former `W3-runway` write-time refusal (#730, ML-038) was withdrawn the same day it shipped.
+
 - shape rules (`S9-binding-*`)
 - executor × scheduler compatibility (`S9-binding-compat`)
 - cron presence when required (`S9-binding-cron`, `S9-binding-ccr-trigger`)

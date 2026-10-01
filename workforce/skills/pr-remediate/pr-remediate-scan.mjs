@@ -54,6 +54,21 @@ const AUTOPILOT_OFF_LABEL = "autopilot:off";
 export const DEFAULT_MAX = 3;
 
 /**
+ * The repo-scoped discovery path for the lane's candidate PRs (#710). A CCR
+ * remote session's outbound proxy rejects any GitHub API path that is not
+ * `repos/{owner}/{repo}/...` — `/search/issues` (a global, cross-repo
+ * endpoint) 403s from inside the routine regardless of token scopes, every
+ * time, so this can never be the search variant again. `/repos/{owner}/{repo}
+ * /issues` accepts the same label filter and returns both issues and PRs
+ * carrying it; the caller filters to `pull_request` truthy to keep only PRs,
+ * mirroring `pr-autopilot-scan.mjs`'s repo-scoped equivalent.
+ */
+export function discoveryRequest(repo, laneLabel) {
+  const labels = encodeURIComponent(laneLabel);
+  return `/repos/${repo}/issues?state=open&labels=${labels}&per_page=100`;
+}
+
+/**
  * The pure decision: given one PR's state, what (if anything) should the
  * remediation cadence do about it?
  *
@@ -188,13 +203,21 @@ async function main() {
   const gh = makeGh({ token, userAgent: "workforce-pr-remediate" });
   const laneLabel = lane === "groom" ? ESCALATION_LABEL : AUTHOR_LABEL;
 
-  // Search is the cheap filter: only PRs already in the lane are candidates.
+  // The cheap filter: only PRs already in the lane are candidates. This used
+  // to be a `/search/issues` query (a global, cross-repo endpoint), which a
+  // CCR remote session's outbound proxy 403s unconditionally — sessions are
+  // bound to their configured repositories, and search is not repo-scoped
+  // (#710). `/repos/{owner}/{repo}/issues` accepts the same `labels` filter
+  // and is repo-scoped, so it passes the proxy; it returns issues AND pull
+  // requests for a label match, so the `pull_request` key (present only on
+  // PRs) is the filter `pr-autopilot-scan.mjs`'s repo-scoped equivalent
+  // already relies on for the same reason.
   let numbers;
   try {
-    const q = encodeURIComponent(`repo:${repo} is:pr is:open label:"${laneLabel}"`);
-    const r = await gh("GET", `/search/issues?q=${q}&per_page=100`);
-    if (r.status !== 200 || !Array.isArray(r.json?.items)) return die(3, `search -> HTTP ${r.status}`);
-    numbers = r.json.items.map((it) => it.number);
+    const path = discoveryRequest(repo, laneLabel);
+    const r = await gh("GET", path);
+    if (r.status !== 200 || !Array.isArray(r.json)) return die(3, `discovery -> HTTP ${r.status}`);
+    numbers = r.json.filter((it) => it && it.pull_request).map((it) => it.number);
   } catch (e) {
     return die(3, e?.msg || e?.message || String(e));
   }

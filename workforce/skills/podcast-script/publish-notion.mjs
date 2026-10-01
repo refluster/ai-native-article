@@ -9,9 +9,19 @@
 //   1. It UPDATES an existing article page (PATCH /pages/{page_id}) rather than
 //      creating one — the script attaches to the article it adapts (C-2: the
 //      article's Notion page stays the source of truth).
-//   2. It adds a CITATION GUARD: an empty/whitespace --citations-file is the
-//      mechanical implementation of the team's mandatory-citation policy
-//      (Idris / ADR-0016) — exit 2, never publish an uncited derivative.
+//   2. It adds a CITATION GUARD: the mechanical implementation of the team's
+//      mandatory-citation policy (Idris / ADR-0016) — exit 2, never publish
+//      an uncited derivative. Two checks, both mechanical:
+//        a) non-empty/non-whitespace (the original check), and
+//        b) every URL named in the citations text actually resolves
+//           (scripts/lib/citation-urls.mjs) — added by issue #673, which
+//           found the (a)-only guard passes on a single stray character.
+//      What this guard does NOT verify, mechanically or otherwise (issue
+//      #673 item 2 — a green verdict should name its own scope): that a
+//      citation *supports* the claim it is attached to (a semantic call,
+//      the generating LLM's judgement, not a script's); or that a
+//      platform's terms haven't since moved out from under an old citation
+//      (item 3, a recurring watch, not a one-time write-time check).
 //
 // Properties written (Story 4 schema — operator pre-creates them):
 //   podcastScript  (rich_text)  ← the narration script, chunked ≤2000-char/item
@@ -39,7 +49,8 @@
 //   0  — page updated (podcastStatus=script-ready)
 //   1  — bad args / env / file unreadable
 //   2  — W-1 editorial guard failed (empty/short/truncated script, artefact
-//        prelude) OR empty citations (citation guard) OR 401/403 auth
+//        prelude) OR citation guard failed (empty citations, or a cited URL
+//        does not resolve) OR 401/403 auth
 //   3  — Notion API error / network error
 
 import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
@@ -47,6 +58,7 @@ ensureProxyAwareEntry(import.meta.url);
 
 import { readFileSync } from "node:fs";
 import { isTruncatedMarkdown, lastNonEmptyLine } from "../../../scripts/lib/truncation.mjs";
+import { verifyCitationsResolve } from "../../../scripts/lib/citation-urls.mjs";
 
 const NOTION_VERSION = "2022-06-28";
 const NOTION_API = "https://api.notion.com/v1";
@@ -96,6 +108,17 @@ const citations = readFileOrDie(citationsFile, "--citations-file");
 // from third-party news must carry its sources, mechanically, every episode.
 if (citations.trim().length === 0) {
   console.error("publish-notion.mjs: --citations-file is empty — refusing to attach an uncited podcast script (mandatory-citation guard, ADR-0016). exit 2");
+  process.exit(2);
+}
+
+// Issue #673: a non-empty citations file previously passed on a single stray
+// character, citing nothing checkable. Every URL named in the citations must
+// actually resolve — this is the mechanical half of the policy; whether a
+// citation *supports* the claim it backs stays a judgement call the script
+// cannot make (see the file header).
+const citationCheck = await verifyCitationsResolve(citations);
+if (!citationCheck.ok) {
+  console.error(`publish-notion.mjs: citation guard failed — ${citationCheck.reason} (mandatory-citation policy, ADR-0016 + issue #673). exit 2`);
   process.exit(2);
 }
 
@@ -162,7 +185,11 @@ try {
   });
   const text = await res.text().catch(() => "");
   if (res.ok) {
-    console.log(`publish-notion.mjs: updated page ${pageId} — podcastStatus=${status}, script ${trimmed.length} chars, citations ${citations.trim().length} chars`);
+    console.log(
+      `publish-notion.mjs: updated page ${pageId} — podcastStatus=${status}, script ${trimmed.length} chars, ` +
+        `citations ${citations.trim().length} chars, ${citationCheck.checked.length}/${citationCheck.checked.length} cited URL(s) resolved. ` +
+        `Not verified: citation-supports-claim (semantic), post-contract platform-terms drift (issue #673 items 2-3).`,
+    );
     process.exit(0);
   }
   if (res.status === 401 || res.status === 403) {

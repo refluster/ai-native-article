@@ -227,6 +227,10 @@ export function validateIdentityPatch(
   return out;
 }
 
+// The per-agent budget figure is ADVISORY (ADR-0037): no write-time check
+// asks whether it can carry the bindings' modelled burn, because nothing is
+// refused on it. The aggregate W3-cap below is the only budget rule here.
+
 // ─── S19 — role ↔ system_prompt header coherence (ML-014) ──────────────────
 // Persona prompts open with `# {Name} — {Title} — {Location}` by convention
 // (32/33 conformed exactly when this landed; the 33rd was the incident). The

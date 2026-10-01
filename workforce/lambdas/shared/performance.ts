@@ -71,6 +71,11 @@ export interface PrSummary {
   /** Counts per escalation-reason code (workforce/docs/pr-escalation-reasons.md
    *  v1); "unspecified" = a hand-off missing its reason label. */
   escalation_reasons?: Record<string, number>;
+  /** Set when build-pr-metrics-github.mjs dropped a merged PR whose detail
+   *  GitHub refused (e.g. a spent REST quota) — the counts above are an
+   *  undercount, never entered as a false zero. Same contract as the sibling
+   *  `RepoActivityBlock.degraded_signals`. */
+  degraded_signals?: string[];
 }
 
 // ── repository activity (Metric 4, 2026-07-26) ───────────────────────────────
@@ -191,6 +196,9 @@ export interface BudgetBlock {
   agents_charged: number;
   /** The W-3 combined ceiling in force, for rendering used-against-cap. */
   ceiling_usd: number;
+  /** Agents whose month has crossed their advisory per-agent budget
+   *  (ADR-0037). They keep firing; this names whose planning figure is wrong. */
+  over_budget_agents: string[];
   /** When the ledger last MOVED (newest `last_updated_at` across the month's
    *  rows) — not when it was read. Same contract as `PerfIdleRow.updated_at`:
    *  a figure whose `updated_at` has gone quiet must render as "the writer has
