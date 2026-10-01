@@ -26,6 +26,8 @@ vi.mock('./pages/Feed', () => ({ default: () => <div>FEED-MARKER</div> }))
 vi.mock('./pages/Landing', () => ({ default: () => <div>LANDING-MARKER</div> }))
 vi.mock('./pages/Research', () => ({ default: () => <div>RESEARCH-INDEX-MARKER</div> }))
 vi.mock('./pages/ResearchArticle', () => ({ default: () => <div>RESEARCH-ARTICLE-MARKER</div> }))
+vi.mock('./pages/Docs', () => ({ default: () => <div>DOCS-INDEX-MARKER</div> }))
+vi.mock('./pages/Doc', () => ({ default: () => <div>DOC-MARKER</div> }))
 
 import App from './App'
 
@@ -118,5 +120,34 @@ describe('public research routes', () => {
     window.history.pushState({}, '', '/')
     render(<App />)
     expect(await screen.findByText('LANDING-MARKER')).toBeInTheDocument()
+  })
+})
+
+// Docs joined the SPA (they were static S3 objects under /docs/). Both
+// routes are public and must sit beside Landing and Research, outside the
+// ProtectedRoutes fallthrough; the pre-SPA object names reach the same
+// page (which forwards them — pinned in pages/Doc.test.tsx).
+describe('public docs routes', () => {
+  it('serves the index at /docs (with or without a trailing slash)', async () => {
+    window.history.pushState({}, '', '/docs')
+    render(<App />)
+    expect(await screen.findByText('DOCS-INDEX-MARKER')).toBeInTheDocument()
+    cleanup()
+    window.history.pushState({}, '', '/docs/')
+    render(<App />)
+    expect(await screen.findByText('DOCS-INDEX-MARKER')).toBeInTheDocument()
+  })
+
+  it('serves a document at /docs/:slug', async () => {
+    window.history.pushState({}, '', '/docs/whitepaper#s7')
+    render(<App />)
+    expect(await screen.findByText('DOC-MARKER')).toBeInTheDocument()
+    expect(screen.queryByText('DOCS-INDEX-MARKER')).not.toBeInTheDocument()
+  })
+
+  it('routes the old .html spellings to the document page', async () => {
+    window.history.pushState({}, '', '/docs/manifesto.html')
+    render(<App />)
+    expect(await screen.findByText('DOC-MARKER')).toBeInTheDocument()
   })
 })

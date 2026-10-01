@@ -1,9 +1,9 @@
-# ADR-0034 — Skills declare `capabilities`, not only `requires`; the runner reconciles and exercises them before the first LLM call
+# ADR-0040 — Skills declare `capabilities`, not only `requires`; the runner reconciles and exercises them before the first LLM call
 
-- **Status**: Proposed
+- **Status**: Accepted (operator direction 2026-09-14, PR #714; renumbered from 0034 at merge — 0034 is public Q&A boards)
 - **Date**: 2026-09-11
 - **Deciders**: operator (proposed by `dario`, workforce `issue-design`)
-- **Related**: [issue #663](https://github.com/refluster/ai-native-article/issues/663) (the finding this ADR resolves), [issue #670](https://github.com/refluster/ai-native-article/issues/670) (the egress allowlist's own missing ownership/record — related but distinct: #670 is about who owns and documents the allowlist itself; this ADR is about a skill *declaring* what it needs from it), R-14 (`check-proxy-bootstrap.mjs`, the point patch this ADR generalises), [ADR-0007](adr-0007-agents-live-in-ddb-not-git.md) / [ADR-0008](adr-0008-skill-body-authoritative-api.md) (the runner composition contract this extends with a new layer), [`credential-injector.ts`](../../lambdas/shared/credential-injector.ts) (the sibling mechanism this mirrors), [ML-027](../../../docs/memory-lint-backlog.md) (the declared-but-unexercised class this belongs to)
+- **Related**: [issue #663](https://github.com/refluster/ai-native-article/issues/663) (the finding this ADR resolves), [issue #670](https://github.com/refluster/ai-native-article/issues/670) (the egress allowlist's own missing ownership/record — related but distinct: #670 is about who owns and documents the allowlist itself; this ADR is about a skill *declaring* what it needs from it), R-14 (`check-proxy-bootstrap.mjs`, the point patch this ADR generalises), [ADR-0007](adr-0007-agent-config-single-source.md) / [ADR-0008](adr-0008-skill-config-single-source.md) (the runner composition contract this extends with a new layer), [`credential-injector.ts`](../../lambdas/shared/credential-injector.ts) (the sibling mechanism this mirrors), [ML-027](../../../docs/memory-lint-backlog.md) (the declared-but-unexercised class this belongs to)
 
 ## Context
 

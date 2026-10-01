@@ -4,8 +4,8 @@
 // /auth/callback bypasses AuthBoundary — that route IS the sign-in
 // completion handler; gating it behind authentication would deadlock.
 
-import { useEffect } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Suspense, lazy, useEffect } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import AgentDirectory from './pages/AgentDirectory';
 import AgentProfile from './pages/AgentProfile';
@@ -24,11 +24,30 @@ import Messaging from './pages/Messaging';
 import Notifications from './pages/Notifications';
 import AuthCallback from './pages/AuthCallback';
 import Landing from './pages/Landing';
+import Board from './pages/Board';
 import Research from './pages/Research';
 import ResearchArticle from './pages/ResearchArticle';
+import Docs from './pages/Docs';
 import AuthBoundary from './components/AuthBoundary';
+import PublicShell from './components/PublicShell';
+import { SkeletonText } from './components/Skeleton';
 import { routerBaseName } from './lib/paths';
 import { trackPageView } from '@kohuehara/shared/analytics';
+
+/** The document page carries the four documents' bodies (~250 KB of
+ *  HTML, lib/docs-bodies.ts). Lazy so the console's main bundle — which
+ *  every signed-in page load pays for — does not. */
+const Doc = lazy(() => import('./pages/Doc'));
+
+function DocLoading() {
+  return (
+    <PublicShell>
+      <div className="pt-16" aria-busy>
+        <SkeletonText lines={8} />
+      </div>
+    </PublicShell>
+  );
+}
 
 function RouteTracker() {
   const location = useLocation();
@@ -74,11 +93,13 @@ function OrgRedirect() {
   return <Navigate to={center ? `/org/chart?q=${encodeURIComponent(center)}` : '/org/chart'} replace />;
 }
 
-function DocsIndexRedirect() {
-  useEffect(() => {
-    window.location.replace('/docs/index.html');
-  }, []);
-  return null;
+/** `/messaging/boards/:id` → `/boards/:id`. The board URL was first
+ *  written under /messaging, but that prefix is the operator's gated inbox;
+ *  boards are public (ADR-0034), so they live at the apex and the older
+ *  spelling forwards. */
+function MessagingBoardRedirect() {
+  const { id = '' } = useParams<{ id: string }>();
+  return <Navigate to={`/boards/${id}`} replace />;
 }
 
 function ProtectedRoutes() {
@@ -133,19 +154,32 @@ export default function App() {
       <RouteTracker />
       <Routes>
         <Route path="/auth/callback" element={<AuthCallback />} />
-        {/* Public surfaces. The apex is a landing page for visitors,
-            /research is the article corpus, and /docs/ is a set of static
-            documents served straight from S3;
-            the bare /docs path only reaches the router when CloudFront's
-            404 fallback runs (S3 has no directory index), so it forwards
-            to the real object. Everything else stays behind AuthBoundary. */}
+        {/* Public surfaces — one SPA, one shell (PublicShell). The apex is
+            a landing page for visitors, /docs is the public documents and
+            /research is the article corpus. Everything else stays behind
+            AuthBoundary. */}
         <Route path="/" element={<Landing />} />
         {/* Research is the article corpus (kohuehara.xyz/ai-native-article/)
-            read into the console's own chrome — public, like Docs, so the
-            landing header can link it beside Docs. */}
+            read into the console's own chrome. */}
         <Route path="/research" element={<Research />} />
         <Route path="/research/:slug" element={<ResearchArticle />} />
-        <Route path="/docs" element={<DocsIndexRedirect />} />
+        {/* Docs were static S3 objects (/docs/<name>.html) before they were
+            folded into the SPA; those spellings still arrive through
+            CloudFront's 404 fallback and pages/Doc.tsx forwards them. */}
+        <Route path="/docs" element={<Docs />} />
+        <Route
+          path="/docs/:slug"
+          element={
+            <Suspense fallback={<DocLoading />}>
+              <Doc />
+            </Suspense>
+          }
+        />
+        {/* Q&A boards (ADR-0034): public, password-gated, nickname-identified.
+            Guests have no Cognito account, so the route sits outside
+            AuthBoundary; the board token (lib/boards.ts) is the gate. */}
+        <Route path="/boards/:id" element={<Board />} />
+        <Route path="/messaging/boards/:id" element={<MessagingBoardRedirect />} />
         <Route path="*" element={<ProtectedRoutes />} />
       </Routes>
     </BrowserRouter>

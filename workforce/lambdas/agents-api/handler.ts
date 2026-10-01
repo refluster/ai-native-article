@@ -36,6 +36,12 @@
 //   POST   /threads/{id}/messages           operator appends a message (Epic-013 Story 2; AWS_IAM at GW)
 //   POST   /threads/{id}/read               clear operator unread (Epic-013 Story 2; AWS_IAM at GW)
 //   POST   /threads/{id}/star               set operator star (Epic-013 Story 2; AWS_IAM at GW)
+//   POST   /boards/{id}/enter              guest enters a Q&A board: password + nickname → board token (ADR-0034; public)
+//   GET    /boards/{id}                    board card + mentionable roster (board token)
+//   GET    /boards/{id}/posts              newest page | ?after= poll tail (board token)
+//   POST   /boards/{id}/posts              guest post; async-invokes wf-board-reply per @-mention (board token)
+//   POST   /boards/{id}/posts/{post_id}/like  like / unlike as the token's nickname (board token)
+//   PATCH  /boards/{id}/posts/{post_id}    operator hide/unhide (AWS_IAM at GW)
 //
 // See workforce/docs/epics/epic-007-agent-management-api.md (agents),
 // workforce/docs/epics/epic-008-skill-repository.md (skills),
@@ -82,6 +88,7 @@ import {
   type AgentAuditKind,
 } from "../shared/agent-audit.js";
 import {
+  type SkillComputed,
   type SkillMetaRow,
   skillPk,
   toSkillApiView,
@@ -188,6 +195,7 @@ import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { claimDispatchSlot, parseDispatchRequest, resolveDispatchTarget, selectDispatchAgents } from "../shared/dispatch.js";
 import { isValidDispatchToken } from "../shared/dispatch-token.js";
 import { DOCS_HTML, OPENAPI_YAML } from "./openapi.js";
+import { handleBoardsRoute, type BoardReplyDispatch } from "./boards.js";
 import { getProjectReportBody, listProjectReports } from "./reports.js";
 
 // Secrets Manager path holding the feed-write capability token. The
@@ -367,6 +375,23 @@ export async function handler(
     // caller is a CCR session with no SigV4 creds); the token is minted per
     // fire by the orchestrator into the task's credential bag.
     if (routeKey === "POST /dispatch") return await dispatchBindingRoute(event);
+
+    // Q&A boards (ADR-0034). The literals stay here (not only in boards.ts)
+    // because check-openapi-routes.mjs reads this file's routeKey set.
+    if (
+      routeKey === "POST /boards/{id}/enter" ||
+      routeKey === "GET /boards/{id}" ||
+      routeKey === "GET /boards/{id}/posts" ||
+      routeKey === "POST /boards/{id}/posts" ||
+      routeKey === "POST /boards/{id}/posts/{post_id}/like" ||
+      routeKey === "PATCH /boards/{id}/posts/{post_id}"
+    ) {
+      const res = await handleBoardsRoute(routeKey, event, {
+        dispatchReply: dispatchBoardReply,
+        isIamAuthenticated,
+      });
+      if (res) return res;
+    }
 
     return reply(404, { error: "route_not_found", routeKey, path, method });
   } catch (err) {
@@ -1138,6 +1163,68 @@ async function listProjectAuditRoute(
 
 // ----- Skills (Epic-008 PR-D) -----
 
+// #767: `invocations_this_month` / `last_invoked_at` on the stored SKILL#
+// row are write-only — every call site sets them to a literal 0 / absent
+// (skill-row.ts's own comment names them "written by future stats
+// aggregator") and nothing ever increments them, so they read as zero
+// forever regardless of real activity. Rather than add a second,
+// independently-drifting counter (an incrementing write here would need
+// its own "first call of a new month" reset, the exact class of bug this
+// issue warns against), this computes both fields fresh from the
+// GSI2-backed EXEC ledger (`listExecutions({skill_name})`) on every read.
+// A skill genuinely never invoked still reads 0 — a skill that ran gets
+// the real count.
+//
+// **pr-remediate cycle 1 (findings A1/A2):** unlike `/stats`'s
+// `listExecutions({agent_slug, from: queryFromIso, limit})` (bounded by the
+// window it answers), the original version here queried with no `from` at
+// all — reading up to `SKILL_ACTIVITY_EXEC_LIMIT` (1000) EXEC rows from the
+// skill's entire lifetime on every `GET /skills` call, just to find one row
+// (`last_invoked_at`). Split into two independently-bounded queries:
+// `limit: 1` (DDB applies `Limit` server-side on the newest-first GSI2
+// query, so this is a single-item read regardless of the skill's total
+// history) for the last invocation, and a `from`-bounded query for the
+// month count — the same bounding shape `/stats` uses, applied to a
+// per-skill scope instead of a per-agent one. Also wrapped in try/catch: a
+// single skill's ledger query failing now degrades that one row to its
+// stored (stale) fields rather than failing the whole `GET /skills` list,
+// matching the endpoint's pre-existing resilience (a scan-then-read shape
+// where one bad row was never able to take down the list).
+const SKILL_ACTIVITY_EXEC_LIMIT = 1000; // generous ceiling, mirrors STATS_PER_AGENT_EXEC_LIMIT
+
+async function computeSkillActivity(
+  name: string,
+): Promise<Pick<SkillComputed, "invocations_this_month" | "last_invoked_at"> | null> {
+  try {
+    const now = new Date();
+    const monthStartIso = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+    const [latest, thisMonth] = await Promise.all([
+      // Newest-first (listExecutions' contract) with limit:1 — DDB applies
+      // `Limit` before returning, so this is a bounded single-item read even
+      // when the skill has thousands of historical EXEC rows.
+      listExecutions({ skill_name: name, limit: 1 }),
+      listExecutions({ skill_name: name, from: monthStartIso, limit: SKILL_ACTIVITY_EXEC_LIMIT }),
+    ]);
+    return {
+      invocations_this_month: thisMonth.length,
+      last_invoked_at: latest[0]?.started_at,
+    };
+  } catch (err) {
+    console.error(`computeSkillActivity(${name}): EXEC ledger read failed, degrading to stored fields`, err);
+    return null;
+  }
+}
+
+/** Merge a computed activity result into an API view; `null` (ledger read
+ *  failed — A2) means keep the row's own stored fields rather than
+ *  overwrite them with a partial/undefined value. */
+function withSkillActivity<T extends SkillComputed>(
+  view: T,
+  activity: Pick<SkillComputed, "invocations_this_month" | "last_invoked_at"> | null,
+): T {
+  return activity ? { ...view, ...activity } : view;
+}
+
 async function listSkills(
   event: APIGatewayProxyEventV2,
 ): Promise<APIGatewayProxyResultV2> {
@@ -1152,11 +1239,13 @@ async function listSkills(
   // Drain the whole SKILL#/META set (see scanAllPrefix / FU-PROJ-SCAN): a
   // Limit-capped scan window would hide skills that scan past it.
   const skillRows = await scanAllPrefix<SkillMetaRow>("SKILL#", "META");
-  const items = skillRows
+  const filtered = skillRows
     .filter((r) => includeArchived || r.status !== "archived")
     .filter((r) => !filterStatus || r.status === filterStatus)
-    .filter((r) => !filterOwner || r.owners.includes(filterOwner))
-    .map(toSkillApiView);
+    .filter((r) => !filterOwner || r.owners.includes(filterOwner));
+  const items = await Promise.all(
+    filtered.map(async (r) => withSkillActivity(toSkillApiView(r), await computeSkillActivity(r.name))),
+  );
 
   // Fully drained above — next_cursor retained for shape, always absent.
   return reply(200, { items, next_cursor: undefined });
@@ -1165,7 +1254,7 @@ async function listSkills(
 async function getSkill(name: string): Promise<APIGatewayProxyResultV2> {
   const row = await getItem<SkillMetaRow>(skillPk(name), "META");
   if (!row) return reply(404, { error: "not_found", name });
-  return reply(200, toSkillApiView(row));
+  return reply(200, withSkillActivity(toSkillApiView(row), await computeSkillActivity(name)));
 }
 
 // ADR-0017: POST /skills — API-first creation of a JUDGMENT-ONLY skill
@@ -1239,7 +1328,12 @@ async function createSkill(
   }
 
   await appendSkillAudit(name, actorFromEvent(event), diffChanges({}, parsed));
-  return reply(201, toSkillApiView(row));
+  // pr-remediate cycle 1 (finding M1): mirror listSkills/getSkill's computed
+  // view rather than the bare stored literal, for response-shape consistency
+  // across all four skill routes — a freshly created row has no EXEC rows
+  // yet, so this resolves to the same {0, undefined} the literal already
+  // held, but it no longer *assumes* that instead of computing it.
+  return reply(201, withSkillActivity(toSkillApiView(row), await computeSkillActivity(name)));
 }
 
 // ADR-0017 observability: GET /skills/{name}/executions — the per-skill run
@@ -1356,12 +1450,14 @@ async function patchSkill(
 
   const changes = diffChanges(existing as unknown as Record<string, unknown>, parsed);
   if (changes.length === 0) {
-    return reply(200, toSkillApiView(existing));
+    // pr-remediate cycle 1 (finding M1): compute, don't return the bare
+    // stored literal — same shape as listSkills/getSkill/createSkill.
+    return reply(200, withSkillActivity(toSkillApiView(existing), await computeSkillActivity(name)));
   }
 
   const updated = await updateOperational<SkillMetaRow>(skillPk(name), "META", parsed);
   await appendSkillAudit(name, actorFromEvent(event), changes);
-  return reply(200, toSkillApiView(updated));
+  return reply(200, withSkillActivity(toSkillApiView(updated), await computeSkillActivity(name)));
 }
 
 async function listSkillAuditRoute(
@@ -1608,6 +1704,23 @@ const MESSAGING_REPLY_FUNCTION = process.env.MESSAGING_REPLY_FUNCTION;
 // already holds the Secrets Manager + project-credential privileges the CCR
 // fire needs. This API never reads `wf/ccr/*` itself.
 const ORCHESTRATOR_FUNCTION = process.env.ORCHESTRATOR_FUNCTION;
+// ADR-0034: POST /boards/{id}/posts async-invokes the board reply Lambda
+// once per @-mentioned agent. Same async "Event" posture as dispatchReply.
+const BOARD_REPLY_FUNCTION = process.env.BOARD_REPLY_FUNCTION;
+
+/** Async-invoke wf-board-reply for one (post, agent). Throws on failure —
+ *  the boards module catches, logs and keeps the guest's post (W-4: the
+ *  post landed; the missing answer is visible, never silent). */
+async function dispatchBoardReply(payload: BoardReplyDispatch): Promise<void> {
+  if (!BOARD_REPLY_FUNCTION) throw new Error("board_reply_function_unset");
+  await lambda.send(
+    new InvokeCommand({
+      FunctionName: BOARD_REPLY_FUNCTION,
+      InvocationType: "Event",
+      Payload: Buffer.from(JSON.stringify(payload)),
+    }),
+  );
+}
 
 /** Choose which talent should reply to an operator message. 1:1 → the sole
  *  talent. Group → the first @-addressed participant, else the primary

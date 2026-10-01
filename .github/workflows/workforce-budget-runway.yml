@@ -1,0 +1,47 @@
+# R-19 — W-3 budget audit (docs/governance.md §4, ML-038, workforce ADR-0037).
+#
+# #661 made the orchestrator charge a modelled cost per dispatched fire. Its
+# first version also refused to dispatch past the per-agent figure, and on
+# 2026-09-11 the PR router stopped that way, silently, with nine open PRs
+# waiting. ADR-0037 made the per-agent figure advisory: nothing is refused
+# on it any more, so this audit's job is to say who is over it and whether
+# the roster as a whole plans to burn more than the W-3 ceiling. Caps and
+# bindings are DDB config, not git, so no PR gate can see this; a daily read
+# of the live roster can.
+#
+# Read-only: one GET to the public agents-api, no AWS credentials, no writes.
+# Reddens (exit 1) only when the roster's modelled burn exceeds the aggregate
+# ceiling; per-agent overruns are listed in the run summary as advisory.
+
+name: Workforce budget runway audit (R-19)
+
+on:
+  schedule:
+    - cron: "19 5 * * *" # daily ~05:19 UTC (best-effort; the scheduler runs this repo's crons hours late)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Dependency-free script — no npm ci needed.
+      - name: Budget runway (every cap must cover its cadence)
+        run: |
+          set -o pipefail
+          node workforce/scripts/check-budget-runway.mjs | tee "$RUNNER_TEMP/budget-runway.txt"
+          {
+            echo '## W-3 budget runway — ML-038 / R-19'
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/budget-runway.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

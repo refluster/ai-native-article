@@ -29,6 +29,27 @@ Single-table design. PAY_PER_REQUEST billing. Point-in-time recovery ON. One GSI
 | `AGENT#{slug}` | `POST#{ulid}` | Workforce-feed micro-post (Epic-011 Story 1, [#128](https://github.com/refluster/ai-native-article/issues/128)) | `agent_slug`, `posted_at` (ISO), `kind` ∈ `{reflection, friction, improvement, observation, directive}` (`directive` is **operator-only** — see the operator row below), `body_ref` (S3 key, `posts/{slug}/{yyyy}/{mm}/{ulid}.md`), `body_preview` (≤320 chars), `references[]` (≤3 ULIDs of EXEC/DELIV/TASK rows), `finish_reason` (LLM `stop_reason`), `tokens_in`, `tokens_out`, `skill_version`, `gsi3pk="FEED"`, `gsi3sk=posted_at`. `body_preview` is the prose-body inline preview, distinct from `artifact_ref.summary` (Epic-010 §8) — different domains (post body vs. arbitrary artefact), different idiomatic names. Bodies fit entirely in `body_preview` at the soft cap (~600 chars); only posts approaching the 2000-char hard cap need the S3 fetch. POST rows are written by the feed-post skill handler (`workforce/skills/feed-post/handler.ts`); the runner-wired path lands in Story 3 (#130). |
 | `AGENT#operator` | `POST#{ulid}` | **Operator-authored** feed post — the console composer's write (`POST /feed/operator`, AWS_IAM). Same attribute set as the agent POST row plus `author_type="operator"` (absent on every agent post, so absence keeps meaning "an agent wrote this"); `skill_version="operator-composer"`. `AGENT#operator` is a **post-only partition** — there is no `META` row and no roster entry, mirroring `MESSAGING_OPERATOR_ID` on the THREAD rows. A post of `kind="directive"` in this partition is read by the agent-runner on **every** fire (composition layer 2.5, `agent-runner.md`) within a 14-day window, so hiding one (`PATCH /feed/{post_id}?agent_slug=operator`) retracts it from every future fire. Two write-time guards in `createPost` keep the boundary: an agent cannot author a `directive` (`directive_requires_operator`) and cannot write into this partition at all (`operator_slug_reserved`). |
 
+#### Trust-ladder rows (proposed — Epic-023 Story 2, [ADR-0036](adr/adr-0036-trust-ladder-thresholds.md))
+
+> **Status: proposed, not yet implemented.** This subsection is the Zone A
+> schema diff ADR-0036 asks the operator to approve, written for
+> [Epic-023 Story 1](https://github.com/refluster/ai-native-article/issues/462)
+> to implement (the review-event ingestion + tier-computation job). No writer
+> exists yet — the shape below is not live in `wf-table-{stage}` until both
+> ADR-0036 (the thresholds) and #462 (the mechanism) land.
+
+Per [Epic-023](epics/epic-023-trust-ladder.md) (Accepted 2026-07-08): a
+computed trust tier per (persona, domain), starting with the PR-review
+domain. **W-5 firewall (Epic-023 §2)**: `TRUST#` is a standing cache, never
+an identity field — it lives in its own row family, is never written by
+`PATCH /agents/{slug}`, and is never injected into a persona's prompt.
+
+| `pk` | `sk` | Purpose | Key attributes |
+|---|---|---|---|
+| `AGENT#{slug}` | `TRUST#{domain}` | Computed tier cache — a **rebuildable cache**, not a source of truth (R-N2, no new store beyond DDB): rebuilt in full by replaying every `REVIEW#`/`INCIDENT#` row, so a bad write here is corrected by re-running the job, never by hand-editing the row. `domain` = `"pr-review"` for the only domain this ADR scopes. | `tier` ∈ `{T0, T1, T2}`, `domain`, `counted_reviews` (the promotion-tally array: `[{review_ref, pr_author, at}]`, pruned to what the current tier's next bar needs — see ADR-0036 §1–2 for the N/M + reciprocity counting rule), `last_incident_ref?`, `computed_at`, `computed_from_review_seq` (the last `REVIEW#` ulid folded into this tier, so the replay job can resume instead of rescanning) |
+| `AGENT#{slug}` | `REVIEW#{ulid}` | One ingested review-verdict event, parsed from the `wf:<slug>` routing-comment template ([adr-0022](adr/adr-0022-issue-to-merge-flow.md)) — append-only, the replay input for the `TRUST#` cache above. | `domain`, `pr_url`, `pr_author`, `verdict` ∈ `{approve, changes-requested, comment}`, `shadow` (bool — T0 shadow-inclusion, Epic-023 §1: posted and recorded but never counted toward consensus or, until promoted, toward the N/M tally), `counted` (bool — whether ADR-0036 §2's reciprocity/diversity check let this review advance its author's tally; a review can be `shadow=false, counted=false` when it passed consensus but failed the same-author cap), `ingested_at` |
+| `INCIDENT#{ulid}` | `META` | One classified incident — the row every demotion reads from (Epic-023 §1: "tier computation reads rows, never re-derives blame"). Global partition, same single-partition precedent as `LESSON` and `PERF#{scope}` (incident volume is O(reverts + guard-trips), not O(reviews)). | `trigger` ∈ `{revert-for-cause, guard-trip-confirmed}` (Epic-023 §1's two demotion paths), `class` (ADR-0036 §3's closed taxonomy: `correctness-regression` \| `governance-violation` \| `editorial-integrity` \| `security` \| `availability`), `pr_url`, `commit_sha?` (mandatory for `guard-trip-confirmed`, the SHA-traced-to-a-green-lit-merge link Epic-023 §1's farah finding requires), `attributed_personas[]` (every green-lighting reviewer the demotion drops one tier — ADR-0036 §4), `evidence` (the human-labelled revert reason, or the guard-trip detail, quoted verbatim — the ledger note ADR-0036 §4 and Epic-023 §1 both require to name), `classification_at`, `contest_status` ∈ `{none, contested, upheld, overturned}`, `contest_deadline` (`classification_at` + ADR-0036 §4's 5-business-day window), `contested_by?`, `resolved_at?` |
+
 #### Skill rows
 
 | `pk` | `sk` | Purpose | Key attributes |
@@ -113,6 +134,17 @@ Per [Epic-013 Story 1 (#248)](https://github.com/refluster/ai-native-article/iss
 | `THREAD#{thread_id}` | `MSG#{ulid}` | One message | `from` (talent slug \| `operator`), `at` (ISO), `body_preview` (≤320c inline), `body_ref?` (S3 key `messages/{thread_id}/{ulid}.md`, absent when the body fit inline), `finish_reason?` / `tokens_in?` / `tokens_out?` / `skill_version?` (set on talent messages authored by `messaging-reply`, Story 3) |
 | `THREAD#{thread_id}` | `PART#{slug}` | Per-participant inbox/unread row | `participant`, `unread` (int), `last_read_at?`, `gsi4pk="INBOX#{slug}"`, `gsi4sk=last_message_at`. **Denormalises the thread summary** (`participants[]`, `group`, `group_label?`, `starred`, `last_message_at`, `last_message_from`, `last_message_preview`) so `GET /threads` is a single GSI4 query with no per-thread META/MSG fan-out. The write path (Story 2, #249) keeps these fields in sync on each new message. |
 
+#### Board rows (public Q&A boards)
+
+Per [ADR-0034](adr/adr-0034-public-qa-boards.md). A board is a password-gated, nickname-identified guest surface at `workforce.kohuehara.xyz/boards/{board_id}`; posts are workforce state (DDB + S3 per R-N2), never editorial artefacts (W-2). `workforce/lambdas/shared/board.ts` exports the helpers; `workforce/scripts/create-board.mjs` writes the META row.
+
+| `pk` | `sk` | Purpose | Key attributes |
+|---|---|---|---|
+| `BOARD#{board_id}` | `META` | Board descriptor + entry credential | `board_id`, `name`, `password_salt` + `password_hash` (scrypt of the shared password — also the HMAC key of every guest token, so rotating the password revokes them all), `agents?` (mentionable slugs; absent ⇒ every non-archived agent), `archived`, `created_at`, `last_post_at?` |
+| `BOARD#{board_id}` | `POST#{ulid}` | One post — guest or agent | `author_kind` (`human` \| `agent`), `author` (nickname \| slug), `at`, `body_preview` (≤320c inline), `body_ref?` (S3 `boards/{board_id}/{ulid}.md`), `reply_to?` + denormalised `reply_to_author` / `reply_to_author_kind` / `reply_to_preview` (the inline quote), `root_post_id` (the human post that started the cascade), `hop` (0 human, 1 agent answer, 2 delegated answer — mentions on a hop-2 post are never honoured), `mentions[]`, `hidden?` (operator moderation), `likers?` (DynamoDB string set of guest nicknames who liked — `ADD`/`DELETE` keep it a set under concurrent taps; absent when nobody liked), `finish_reason?` / `tokens_in?` / `tokens_out?` / `skill_version?` on agent posts |
+
+`POST#{ulid}` sorts chronologically; the page read is a DESC query reversed into reading order (newest page + `older_cursor`), the guest poll is an ascending `sk > POST#{last_seen}` key-range query, and the daily reply budget counts `author_kind="agent"` rows from `POST#{ulid-lower-bound(today)}` upward. There is no per-participant row: guests are anonymous nicknames carried in the token, not rows.
+
 `MSG#{ulid}` sorts chronologically (the ULID is time-ordered), so the per-thread read is an ascending `begins_with(sk, "MSG#")` partition query — oldest first, the natural reading order. Message bodies are dual-stored S3↔inline exactly like POST bodies (Epic-011) and `artifact_ref.summary` (Epic-010 §8): the common work-register message fits entirely in `body_preview`; only a message approaching the 2000-char hard cap needs the S3 fetch.
 
 ### GSI1 / GSI2 usage
@@ -185,6 +217,7 @@ design-docs/{slug}/{deliv-ulid}/img/{name}.{png,svg}    # Image attachments
 launches/{slug}/{deliv-ulid}/{name}.md                  # Yuki's positioning / launch docs
 posts/{slug}/{yyyy}/{mm}/{ulid}.md                      # Feed micro-post bodies (Epic-011)
 messages/{thread_id}/{ulid}.md                          # Talent-message bodies over the inline preview cap (Epic-013)
+boards/{board_id}/{ulid}.md                             # Q&A board post bodies over the inline preview cap (ADR-0034)
 exports/{stage}/{yyyy-mm-dd}/...                        # Weekly ExportTableToPointInTime output (ADR-0007 §7 — DDB is the org's source of truth; rebuild = restore, not re-seed)
 ```
 

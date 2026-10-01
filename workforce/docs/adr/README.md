@@ -100,10 +100,29 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0031](adr-0031-spotify-url-automation-and-gate-retirement.md) | Automate `spotifyUrl` capture via a new deterministic `wf-podcast` route + `spotify.token` credential; define (not flip) the track-record criteria to retire the `script-ready → approved` human gate | Proposed | [017](../epics/epic-017-podcast-spotify-distribution.md) |
 | [0032](adr-0032-lesson-partition-and-daily-distiller.md) | The `LESSON` partition schema, its closed cross-cutting vocabulary, and the daily distiller Lambda's cost/shape contract | Proposed | [022](../epics/epic-022-org-learning-loop.md) |
 | [0033](adr-0033-seed-projects-lambda.md) | Promote `seed-projects.mjs` to a `WfSeedProjectsFunction` Lambda (META rows only, mirroring `WfSeedSkillsFunction`); the script is kept as an operator escape hatch, not retired | Proposed | [010](../epics/epic-010-project-trust-boundary.md) |
-| [0034](adr-0034-skill-capabilities-declaration.md) | Skills declare `capabilities` (egress hosts, read/write scope), not only `requires` (credential types); the runner reconciles and exercises each one, harmlessly, before the first LLM call | Proposed | — |
+| [0034](adr-0034-public-qa-boards.md) | Public Q&A boards: password-gated guest surface, board-scoped tokens, doc-pack grounding, hop-bounded delegation | Proposed | — |
+| [0035](adr-0035-internal-document-write-surface.md) | Cadences write internal (non-published) documents to a second, non-exported "Internal Documents" Notion DB, sharing the existing notion.integration_token | Proposed | [021](../epics/epic-021-finance-ir-activation.md) |
+| [0036](adr-0036-trust-ladder-thresholds.md) | Trust-ladder thresholds: N=8/M=20 promotion bars, a 5-class incident taxonomy, the `reports_to` + 40%-same-author reciprocity constraint, and demotion parameters (one-tier drop, 5-business-day contest window, no-pardon re-promotion) | Accepted (2026-09-14) | [023](../epics/epic-023-trust-ladder.md) |
+| [0037](adr-0037-advisory-per-agent-budget.md) | The per-agent W-3 budget is advisory: measured per fire and reported (`/performance`, R-19), but it never refuses a dispatch — output continuity outranks the planning figure; withdraws the `W3-runway` write-time refusal (0035/0036 are reserved by open PRs #719/#727) | Accepted (2026-09-14) | — |
+| [0038](adr-0038-intake-lane-handoff-and-queue-invariant.md) | The intake lane gets what the PR lane had: `wf:handback` as one router-answered park, `wf:human:*` roles + the signature-not-investigation split rule, event-driven intake hand-offs, a `HOP_CAP` routing bound, and **R-N11** (a producer may not be bound without its consumer) over a declarative bindings manifest | Proposed | [019](../epics/epic-019-autonomous-finalization-rate.md) |
+| [0039](adr-0039-upside-over-downside.md) | Upside over downside: the workforce optimises for new possibility, not for efficiency, and says what it will not do | Proposed | — |
+| [0040](adr-0040-skill-capabilities-declaration.md) | Skills declare `capabilities` (egress hosts, read/write scope), not only `requires` (credential types); the runner reconciles and exercises each one, harmlessly, before the first LLM call | Accepted (2026-09-14) | — |
+| [0043](adr-0043-podcast-tts-gemini.md) | Podcast TTS moves from Polly to Gemini 3.8 Flash TTS: chunked, S3-resumable synthesis on direct Lambda invocation (the HTTP API's 30 s window can't hold one Gemini request); supersedes ADR-0016's synthesis engine only; free tier (10 req/day) | Proposed | [017](../epics/epic-017-podcast-spotify-distribution.md) |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](../epics/README.md).
+
+> **Numbering note (2026-09-12, `wf:dario` — `issue-design`).** This PR adds
+> **adr-0035**, not adr-0034: `adr-0034-public-qa-boards.md` is already
+> merged to `main`, and a separate open draft PR (**#714**,
+> `dario/issue-663-skill-capabilities-declaration`) also proposes an
+> `adr-0034-skill-capabilities-declaration.md` from a branch cut before
+> `public-qa-boards` merged — the same stale-reservation collision this
+> file's 2026-09-09 note already describes for adr-0031/0032. This PR does
+> not touch that collision; flagging only that `0035` was chosen precisely
+> to avoid adding a third file to it. Whoever resolves #714's collision
+> should leave this row's number alone — nothing here reserves or depends
+> on `0034`.
 
 > **Numbering note (2026-09-09, `wf:dario` — `issue-design`).** This PR's
 > adr-0032 was drafted in parallel with another open draft PR's adr-0031
