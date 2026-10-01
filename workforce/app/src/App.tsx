@@ -34,7 +34,7 @@ import { SkeletonText } from './components/Skeleton';
 import { routerBaseName } from './lib/paths';
 import { trackPageView } from '@kohuehara/shared/analytics';
 
-/** The document page carries the three documents' bodies (~170 KB of
+/** The document page carries the four documents' bodies (~250 KB of
  *  HTML, lib/docs-bodies.ts). Lazy so the console's main bundle — which
  *  every signed-in page load pays for — does not. */
 const Doc = lazy(() => import('./pages/Doc'));

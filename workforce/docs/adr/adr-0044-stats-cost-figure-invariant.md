@@ -1,4 +1,4 @@
-# ADR-0038 — Narrow the "no cost figures" invariant on `GET /stats`, reaffirm it on `GET /public/workforce-summary`
+# ADR-0044 — Narrow the "no cost figures" invariant on `GET /stats`, reaffirm it on `GET /public/workforce-summary`
 
 - **Status**: Proposed
 - **Date**: 2026-09-17
@@ -74,7 +74,7 @@ accepted precedent; reaffirm it unchanged on `GET /public/workforce-summary`.**
   The test at line 2141 is reaffirmed as-is, with its comment rewritten to
   name the case explicitly considered and rejected: *"a modelled, labelled
   figure is honest enough for an operator dashboard (see `/stats`,
-  ADR-0038) but this route is public, and C-3's single-operator posture
+  ADR-0044) but this route is public, and C-3's single-operator posture
   gives no reason to disclose spend to an unauthenticated caller — reaffirmed
   independently of whether the figure is fabricated or modelled."* This is
   the reasoning #683 itself anticipated ("this half stays as-is regardless

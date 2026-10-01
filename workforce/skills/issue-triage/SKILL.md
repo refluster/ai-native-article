@@ -1,6 +1,6 @@
 ---
 name: issue-triage
-description: Assign every open issue in the bound project's tracker to exactly one worker lane — implement (issue-implement), design (issue-design), or operator (a human) — as machine-readable `wf:lane:*` + `wf:owner:*` labels plus a stated dispatch comment, and re-examine issues parked in a `*:needs-human` state longer than the re-queue window so no issue is permanently absorbed. The dispatcher end of the issue→merge loop (adr-0022): work is routed to a named worker rather than left for whoever happens to self-select. Runs as a CCR task on the binding's cron; github.token via the binding's project linkage.
+description: Assign every open issue in the bound project's tracker to exactly one worker lane — implement (issue-implement), design (issue-design), or operator (a human, with the human act named as a `wf:human:*` role) — as machine-readable `wf:lane:*` + `wf:owner:*` labels plus a stated dispatch comment, dispatch that lane's worker immediately, and answer every `wf:handback` so no issue is absorbed. An issue nobody should work is settled instead of laned — a duplicate is consolidated into its canonical issue, and one a merged PR completed or a later decision made moot is closed with that evidence; long-idle laned issues get the same review. The dispatcher end of the issue→merge loop (adr-0022, adr-0038): work is routed to a named worker rather than left for whoever happens to self-select. Runs as a CCR task on the binding's cron; github.token via the binding's project linkage.
 ---
 
 # issue-triage
@@ -21,9 +21,12 @@ the honest naming of the ones only the operator can.
 
 Your task context supplies `agent_slug`, `project_id` (whose `project.json`
 declares the repo), `credentials['github.token'].token` (export as
-`GITHUB_TOKEN`), and `binding_config`: `max_issues_per_run` (default 10),
-`requeue_days` (default 14), `lane_owners` (the lane → persona-slug map this
-binding dispatches to), `sign_off_persona`.
+`GITHUB_TOKEN`), `credentials['workforce.dispatch_token'].token` (exported by
+the runner as `WF_DISPATCH_TOKEN`; the post script uses it to wake the lane's
+worker), and `binding_config`: `max_issues_per_run` (default 10), `requeue_days`
+(default 14), `review_days` (default 30), `max_reviews_per_run` (default 5),
+`max_closes_per_run` (default 5), `lane_owners` (the lane → persona-slug map this binding dispatches
+to), `sign_off_persona`.
 
 ## The lanes
 
@@ -31,7 +34,7 @@ binding dispatches to), `sign_off_persona`.
 |---|---|---|
 | `implement` | A code or config change with a verifiable acceptance criterion. | `issue-implement` (engineer persona) |
 | `design` | A decision or document to be **drafted**: an ADR, an epic/story, a design record, a governance-amendment proposal. | `issue-design` (architecture/product persona) |
-| `operator` | Work no agent can perform: AWS console actions, credentials, spend, physical/live verification. | the operator |
+| `operator` | Work no agent can perform: AWS console actions, credentials, spend, physical/live verification. **Names the act** via `wf:human:<role>`. | the operator |
 
 **The design lane is the one that unlocks the stalled tail, and its logic is
 worth stating plainly:** an L0/L1 issue may not be *implemented* autonomously —
@@ -46,6 +49,20 @@ identified the specific action only a human can take — and say what it is in t
 dispatch comment. If you find yourself putting most issues here, the lane
 vocabulary is wrong and that is a finding to report, not a workaround to apply.
 
+### The human roles (`wf:human:<role>`)
+
+The operator lane requires one. "A human" is not an answer to "who owns this?" —
+it is the same non-answer the lanes replaced one level up, and it left the
+operator re-reading every issue to find the ones they could act on today.
+
+| Role | The act that is owed |
+|---|---|
+| `architect-ratify` | A drafted decision exists; an Architect's signature/ratification is what is missing. |
+| `legal` | A legal or consent review a persona cannot perform, and cannot be accountable for. |
+| `product` | A product/scope judgement with real-world consequences. |
+| `console` | AWS console, credential, or spend action outside git. |
+| `field` | Physical or live verification against real hardware/households. |
+
 ## Step 1 — discover (deterministic, read-only)
 
 ```sh
@@ -53,13 +70,43 @@ GITHUB_TOKEN="<credentials['github.token'].token>" \
   node workforce/skills/issue-triage/issue-triage-scan.mjs \
     --project "<project_id>" --max <max_issues_per_run ?? 10> \
     --requeue-days <requeue_days ?? 14> \
+    --review-days <review_days ?? 30> --max-review <max_reviews_per_run ?? 5> \
     --out /tmp/issue-triage-candidates.json
 ```
 
 Candidates come back **oldest-activity first** — the aged tail is exactly what
 stopped being looked at — each with its labels, body, `decision.action`
-(`triage` | `requeue`) and a heuristic `lane_suggestion`. **0 candidates is a
-first-class outcome**: the tracker is fully dispatched; record the no-op and stop.
+(`triage` | `requeue` | `review`) and a heuristic `lane_suggestion`, plus
+`merged_prs` (recently merged PRs that reference it) and `reopened_after_close`.
+The payload also carries `index` — every open issue, title-level, so a duplicate
+outside this batch is still visible — and `recent_merged_prs` (the last 30 days,
+each with the issues it references). **0 candidates is a first-class outcome**:
+the tracker is fully dispatched; record the no-op and stop.
+
+A `review` candidate is a **laned** issue with no live claim that has sat
+untouched for `review_days`: nobody is going to notice that it went moot unless
+you do — least of all on the operator lane, which has no worker at all. You do
+not re-lane it (its lane stands unless the lane itself is the problem); you
+**settle** it (Step 2a).
+
+A `requeue` candidate is one whose current state no worker will act on.
+`decision.why` says which kind:
+
+- a **hand-back** (`wf:handback` — a worker declined it, and you are the answer;
+  these arrive within seconds of the decline, so expect them mid-backlog);
+- a **legacy park** (`issue-implement:needs-human` / `issue-design:needs-human`,
+  pre-adr-0038) — immediately when the issue also wears a lane (the worker has
+  already declined that lane), otherwise once it goes `requeue_days` stale;
+- a **stale claim** — `*:pr-open` with no open PR referencing the issue (its PR
+  merged as a partial slice or was closed: check what the merged PR delivered
+  and lane the **remainder**, or say it is done), or `*:in-progress` for more
+  than a day with no PR (the worker's run died). `open_prs` on each candidate
+  lists the PRs that do reference it;
+- a **dead lane** — laned `implement` on a `layer:L0`/`layer:L1`/`type:tracker`
+  issue the implement worker is bound to refuse, or laned with a `wf:owner:*`
+  persona that has no binding for the lane's worker on this project
+  (`worker_owners` in the scan output lists who is bound). Re-lane it so a
+  worker can actually take it.
 
 ## Step 2 — decide each issue's lane (your judgment)
 
@@ -78,13 +125,100 @@ decision. **Read the issue** — body, comments, the epic it serves — and deci
   say why. The owner label is `wf:owner:<slug>` — **never** an `@`-mention
   (ML-012; the post script refuses a raw `@` outside backticks).
 
-**On a `requeue` candidate** (parked past the window), do the re-examination for
-real: read the parking comment, then check whether its stated blocker still
-holds — the blocking PR may have merged, the design may have landed, the question
-may have been answered. Then either re-lane it (the label is cleared with
-`--requeue`) or **restate the blocker with today's evidence** and leave it parked.
-"Still blocked, because <current fact>" is a complete and useful outcome; silently
-leaving it is what this step exists to prevent.
+### The split rule — ask this before routing anything to `operator`
+
+> **What document would make the human's act a signature rather than an
+> investigation?**
+
+If one exists, or could be drafted, then the issue is **not** wholly human and
+must not be parked as if it were. Route the **drafting half** to `design` now,
+and file the human-only **residue** as a linked follow-up on the `operator`
+lane with its role.
+
+This is adr-0022's own move applied one level deeper. That ADR observed that an
+L0/L1 issue cannot be *implemented* autonomously but can always be *proposed*;
+the same is true of most issues that look human-only. An Architect ratification
+(`architect-ratify`) needs a diff to ratify. A legal review (`legal`) needs the
+text it will review. A product call (`product`) needs the options written down.
+In every case the agent-draftable body was being held hostage by the human-only
+residue, and the whole issue aged.
+
+The worked example is PSVL/asp-cloud#866, where a human did this by hand: the
+engineer cadence's decline was correct, and the issue still moved only once
+someone separated "what the operator must decide" from "what can be written down
+first". Do that separation at routing time, every time.
+
+**On a `requeue` candidate** do the re-examination for real:
+
+- a **hand-back** carries the worker's stated reason in the comment directly
+  above. Read it. It tells you what the issue is *not* — your job is to say what
+  it *is*. Re-lane it, or route it to `operator` with a role.
+- a **legacy park** — read the parking comment, then check whether its stated
+  blocker still holds: the blocking PR may have merged, the design may have
+  landed, the question may have been answered. Then re-lane it, or route it to
+  `operator` with the role that names who is actually owed.
+
+Either way the issue **leaves** the parked state — posting a lane clears it.
+"Still blocked, because <current fact>" is a complete and useful outcome, and it
+is expressed as `operator` + the role + the evidence, not as silence.
+
+## Step 2a — settle before you lane: consolidate duplicates, close what is done or moot
+
+Before routing any candidate — and for every `review` candidate — ask whether
+it should be **worked at all**. Three answers close it; laning it instead would
+put a dead item in someone's queue:
+
+| Verdict | When | The evidence the script requires |
+|---|---|---|
+| `duplicate` | Another **open** issue asks for the same deliverable (scan `index` — titles first, then read both). | `--of <canonical>` + `--carry-file`: what this issue adds that the canonical lacks (acceptance criteria, repro, context), or an explicit "nothing new". |
+| `completed` | A merged PR already delivered it — often a partial slice that cited it without `Closes`, or an unrelated change that did it incidentally (`merged_prs`, `recent_merged_prs`, then the code). | `--pr <merged PR>` — verified merged. If only *part* shipped, it is not completed: lane the remainder. |
+| `obsolete` | A later ADR, a design change, or a removed surface made it moot. | `--superseded-by <ADR / issue / PR>`. |
+| `still-valid` | (`review` candidates only) you read it and it stands. | — Records the review and restarts its clock; the issue stays in its lane. |
+
+**Which one is canonical.** Keep the issue with the fuller description, then the
+one a worker has touched (a lane, a hop history), then the older one. Consolidate
+the other into it. Two issues that overlap only partly are **not** duplicates —
+lane each, or leave the overlap to the worker. A cluster of three or more
+near-duplicates is one canonical plus N `duplicate` closes, each with its own
+carry note.
+
+**Evidence or it stays open.** Close only what you can point at: the canonical
+issue, the merged PR (and the code it put there), the superseding decision. A
+hunch that an issue "probably no longer matters" is a `still-valid` or an
+`operator` lane with role `product` — not a close.
+
+```sh
+GITHUB_TOKEN="…" node workforce/skills/issue-triage/issue-triage-settle.mjs \
+  --project "<project_id>" --issue <number> --verdict <verdict> \
+  [--of <canonical> --carry-file /tmp/carry-<number>.md] [--pr <merged>] \
+  [--superseded-by "<ref>"] --body-file /tmp/settle-<number>.md \
+  --max-closes <max_closes_per_run ?? 5>
+```
+
+`/tmp/settle-<number>.md` is one short paragraph in your persona's voice: why
+this verdict, citing the evidence. The script posts the consolidation note on
+the canonical **first**, then closes the issue (`not_planned` for
+duplicate/obsolete with GitHub's `Duplicate of #N` marker, `completed` for
+completed) and only then stamps `wf:closed:<verdict>` — close before label,
+so a failed close never leaves an open issue that looks human-reopened. It **refuses** (exit 1, reason on
+stderr — pick again, do not retry the same call):
+
+- an issue an **open PR** references (a worker holds it — for a duplicate, close
+  the *other* one into it);
+- an issue a human **reopened** after a router close (`wf:closed:*` still on it):
+  the human overruled you; lane it or report it;
+- a `layer:L0` / `layer:L1` / `type:tracker` issue — closing those is a design
+  decision (route to `operator` with `product` / `architect-ratify`, or leave it
+  to `backlog-reconcile`);
+- a duplicate of a closed issue or a PR, or a `completed` whose PR is not merged.
+- a close past the per-fire budget (below).
+
+**Bounded, mechanically.** Before each close the script counts the router's
+own closes (`wf:closed:*`) on the tracker over the last 20 h and refuses past
+`--max-closes` (exit 1, `close budget spent`) — and refuses outright if it
+cannot count. Leave the rest for tomorrow and name them in the report. Closing
+is reversible (reopen), but a burst of closes is how a wrong heuristic does
+damage at scale.
 
 ## Step 3 — dispatch (deterministic)
 
@@ -95,7 +229,7 @@ Write `/tmp/dispatch-<number>.md`:
 
 <one paragraph: what the deliverable is and why this lane — in the issue's own terms>
 
-<For `operator`: the specific action only a human can take. For `requeue`: what changed since it was parked, or why the blocker still stands.>
+<For `operator`: the specific act only a human can take, and — per the split rule — what was routed to `design` instead, if anything. For a hand-back or a legacy park: what changed, or why the blocker still stands.>
 
 — <PersonaName> (CCR persona; see workforce/skills/issue-triage/SKILL.md)
 ```
@@ -103,28 +237,57 @@ Write `/tmp/dispatch-<number>.md`:
 ```sh
 GITHUB_TOKEN="…" node workforce/skills/issue-triage/issue-triage-post.mjs \
   --project "<project_id>" --issue <number> --lane <lane> --owner <slug> \
-  --body-file /tmp/dispatch-<number>.md [--requeue]
+  --body-file /tmp/dispatch-<number>.md [--human-role <role>]
 ```
 
-The script stamps `wf:lane:<lane>` + `wf:owner:<slug>`, removes any **other**
-lane label (one issue, one lane), and with `--requeue` clears the parked
-`*:needs-human` label that made the issue invisible. Never apply these labels by
-hand or with an MCP tool — the one-lane invariant and the ML-012 guard live in
-the script.
+`--human-role` is **required** on the `operator` lane and refused elsewhere.
+
+The script also **refuses** (exit 1, reason on stderr) three lanes that would
+sit in a queue nobody drains — read the reason and pick again, do not retry
+the same call:
+
+- an issue an **open PR** still references (a worker holds it);
+- `--lane implement` on a `layer:L0` / `layer:L1` / `type:tracker` issue (the
+  implement worker is bound to refuse those — route to `design`);
+- an `--owner` with **no binding for the lane's worker** on this project. On an
+  agent lane the owner must be a persona that runs that lane's cadence here
+  (`binding_config.lane_owners`, or `worker_owners` in the scan output); name a
+  different persona only if it is bound too.
+
+The script stamps `wf:lane:<lane>` + `wf:owner:<slug>` (+ `wf:human:<role>`),
+removes any **other** lane label (one issue, one lane), clears the hand-back and
+legacy parked labels and any stale claim marker — posting a lane *is* the answer to the park, which is why
+there is no longer a `--requeue` flag — and then **dispatches the lane's worker**
+so it starts in seconds rather than at its next cron (adr-0025/adr-0038). Never
+apply these labels by hand or with an MCP tool: the one-lane invariant, the
+ML-012 guard and the hop bound all live in the script.
+
+**The hop bound.** The script counts how many times an issue has been routed
+(`<!-- wf:hops:N -->` markers, the same idiom as the PR side's remediation
+count) and at `HOP_CAP` (3) **forces the `operator` lane** regardless of what you
+asked for. That is deliberate and it is not a failure of your judgment: an issue
+routed three times without resolving has a scope or vocabulary problem, and
+naming that is a human's call. Expect it, and report it (Step 4).
 
 ## Step 4 — report what the dispatch revealed
 
 End the run with a short summary. Report, at minimum:
 
-- **counts per lane** assigned this fire;
-- **the parked-issue funnel**: how many were parked, re-examined, **re-parked**,
-  and **changed lane**. This line is not bookkeeping — it is the only thing that
-  distinguishes a working de-absorption rule from a slower absorbing state
-  (`wf:nadia` N2 on #518). An issue that cycles park → re-examine → park every
-  fortnight looks, from outside, exactly like one that was triaged once and left,
-  except that it now costs a triage slot each time. If the same issues re-park
-  repeatedly, say so by number: that is a finding about the issue or about the
-  lane vocabulary, and it is what the next router needs;
+- **counts per lane** assigned this fire, and the `wf:human:*` role breakdown of
+  anything you sent to `operator`;
+- **what you settled**: consolidations (`#dup → #canonical`), closes as
+  completed (with the PR) and obsolete (with what superseded it), and
+  `still-valid` reviews — plus any close you held back for the per-run bound;
+- **the split rule's yield**: how many issues you *split* rather than parked —
+  drafting half to `design`, residue to `operator`. This is the number that says
+  whether the rule is doing anything;
+- **the hand-back funnel**: how many hand-backs you answered, how many you
+  re-laned to a *different* worker, and how many you returned to the lane that
+  just declined them (that last number should be ~0; if it is not, either the
+  worker or the lane definition is wrong, and which one is a finding);
+- **anything the hop cap forced**, by number. An issue that burns three hops is
+  the clearest signal this vocabulary has that something about it does not fit —
+  do not let it pass as routine;
 - — the load-bearing part — **any issue you could not lane**, with why. An issue
 that fits no lane is a finding about the lane vocabulary (or about the issue),
 and it is the one thing this cadence must never do silently: leaving it
@@ -138,18 +301,25 @@ unlaned recreates precisely the invisible backlog this skill exists to end.
   untouched and unmentioned is incomplete.
 - **Bounded batch** (`max_issues_per_run`); the daily cadence works the backlog
   down, not a single fire.
-- **Comment + label only.** No issue closes, no body edits, no PRs (R-N9).
-- **You never change a lane an active worker holds** — `*:in-progress` /
-  `*:pr-open` issues are skipped by the scan; re-laning under a worker's feet
-  strands its branch.
+- **Comment, label, and evidenced close only.** The only close is Step 2a's,
+  through `issue-triage-settle.mjs`, with its evidence. No body edits, no PRs
+  (R-N9), no closing an L0/L1/tracker issue, never a close under a live branch.
+- **You never change a lane an active worker holds** — an issue an open PR
+  references is skipped by the scan and refused by the post script; re-laning
+  under a worker's feet strands its branch. A claim label with no PR behind it
+  is not a worker holding anything, and the scan hands it to you.
 
 ## Out of scope
 
-- Closing stale issues or reconciling epic status — that is `backlog-reconcile`.
+- Reconciling epic/spec status against what shipped, and closing or splitting
+  tracker issues — that is `backlog-reconcile`. You close individual issues
+  that are duplicates, completed, or obsolete; it re-grounds the plan.
 - Filing new issues; deciding whether an issue is *worth doing*. Triage routes
-  what exists.
+  what exists. (The split rule's follow-up issue is the one exception, and it is
+  a *split* of an issue already filed, not new work.)
 - Anything on a PR — `pr-autopilot` (review) and `pr-remediate` (author-side).
 
 Related: [adr-0022](../../docs/adr/adr-0022-issue-to-merge-flow.md),
+[adr-0038](../../docs/adr/adr-0038-intake-lane-handoff-and-queue-invariant.md),
 [issue-to-merge-flow runbook](../../docs/runbooks/issue-to-merge-flow.md),
 [issue-implement](../issue-implement/SKILL.md), [issue-design](../issue-design/SKILL.md).
