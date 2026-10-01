@@ -89,7 +89,7 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0020](adr-0020-delegated-memory-curation.md) | Delegated memory curation: bounded token write for the memory profile block (POST /agents/{slug}/memory + shrink guard) | Superseded by [0021](adr-0021-dynamic-memory-write-token.md) | [018](../epics/epic-018-semantic-memory-curation.md) |
 | [0021](adr-0021-dynamic-memory-write-token.md) | Dynamic memory-write token: ADR-0009's minted-token pattern replaces the static secret | Accepted | [018](../epics/epic-018-semantic-memory-curation.md) |
 | [0022](adr-0022-issue-to-merge-flow.md) | The issue→merge flow: a dispatcher at intake (issue lanes) + an agent-owned author lane on PRs (pr-remediate) | Proposed | [019](../epics/epic-019-autonomous-finalization-rate.md) |
-| [0023](adr-0023-red-verdict-author-loop.md) | A 🔴 verdict returns to the author with a machine-checked remediation brief; the human gate moves to the cycle cap | Proposed | [019](../epics/epic-019-autonomous-finalization-rate.md) |
+| [0023](adr-0023-red-verdict-author-loop.md) | 🔴 findings route to an ordered remediation brief the author lane works before re-review, never straight to escalation | Accepted (2026-08-30) | [019](../epics/epic-019-autonomous-finalization-rate.md) |
 | [0024](adr-0024-panel-mode-not-a-merge-condition.md) | Panel provenance mode is not a merge condition: an inline panel is a wording discount, never a hold | Proposed | [019](../epics/epic-019-autonomous-finalization-rate.md) |
 | [0025](adr-0025-event-driven-lane-handoff.md) | A hand-off is an event: the author lane dispatches its worker via `POST /dispatch`; cron + the 36h sweep stay as the floors | Accepted (2026-08-11) | [019](../epics/epic-019-autonomous-finalization-rate.md) |
 | [0026](adr-0026-knowledge-backup-ingest-pipeline.md) | Knowledge backup is a deterministic GHA pipeline, not a Cadence: Discord/Notion ingest into a dedicated knowledge-store repo | Proposed | — |
@@ -100,12 +100,30 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0031](adr-0031-spotify-url-automation-and-gate-retirement.md) | Automate `spotifyUrl` capture via a new deterministic `wf-podcast` route + `spotify.token` credential; define (not flip) the track-record criteria to retire the `script-ready → approved` human gate | Proposed | [017](../epics/epic-017-podcast-spotify-distribution.md) |
 | [0032](adr-0032-lesson-partition-and-daily-distiller.md) | The `LESSON` partition schema, its closed cross-cutting vocabulary, and the daily distiller Lambda's cost/shape contract | Proposed | [022](../epics/epic-022-org-learning-loop.md) |
 | [0033](adr-0033-seed-projects-lambda.md) | Promote `seed-projects.mjs` to a `WfSeedProjectsFunction` Lambda (META rows only, mirroring `WfSeedSkillsFunction`); the script is kept as an operator escape hatch, not retired | Proposed | [010](../epics/epic-010-project-trust-boundary.md) |
+| [0034](adr-0034-public-qa-boards.md) | Public Q&A boards: password-gated guest surface, board-scoped tokens, doc-pack grounding, hop-bounded delegation | Proposed | — |
+| [0035](adr-0035-internal-document-write-surface.md) | Cadences write internal (non-published) documents to a second, non-exported "Internal Documents" Notion DB, sharing the existing notion.integration_token | Proposed | [021](../epics/epic-021-finance-ir-activation.md) |
+| [0036](adr-0036-trust-ladder-thresholds.md) | Trust-ladder thresholds: N=8/M=20 promotion bars, a 5-class incident taxonomy, the `reports_to` + 40%-same-author reciprocity constraint, and demotion parameters (one-tier drop, 5-business-day contest window, no-pardon re-promotion) | Accepted (2026-09-14) | [023](../epics/epic-023-trust-ladder.md) |
 | [0037](adr-0037-advisory-per-agent-budget.md) | The per-agent W-3 budget is advisory: measured per fire and reported (`/performance`, R-19), but it never refuses a dispatch — output continuity outranks the planning figure; withdraws the `W3-runway` write-time refusal (0035/0036 are reserved by open PRs #719/#727) | Accepted (2026-09-14) | — |
 | [0038](adr-0038-intake-lane-handoff-and-queue-invariant.md) | The intake lane gets what the PR lane had: `wf:handback` as one router-answered park, `wf:human:*` roles + the signature-not-investigation split rule, event-driven intake hand-offs, a `HOP_CAP` routing bound, and **R-N11** (a producer may not be bound without its consumer) over a declarative bindings manifest | Proposed | [019](../epics/epic-019-autonomous-finalization-rate.md) |
+| [0039](adr-0039-upside-over-downside.md) | Upside over downside: the workforce optimises for new possibility, not for efficiency, and says what it will not do | Proposed | — |
+| [0040](adr-0040-skill-capabilities-declaration.md) | Skills declare `capabilities` (egress hosts, read/write scope), not only `requires` (credential types); the runner reconciles and exercises each one, harmlessly, before the first LLM call | Accepted (2026-09-14) | — |
 | [0042](adr-0042-deprecation-removal-date-rule.md) | A `deprecated` skill must declare `deprecated_until` (90-day floor) in the same write; enforced at the agents-api write boundary, not by a CI lint | Proposed | [008](../epics/epic-008-skill-repository.md) |
+| [0043](adr-0043-podcast-tts-gemini.md) | Podcast TTS moves from Polly to Gemini 3.8 Flash TTS: chunked, S3-resumable synthesis on direct Lambda invocation (the HTTP API's 30 s window can't hold one Gemini request); supersedes ADR-0016's synthesis engine only; free tier (10 req/day) | Proposed | [017](../epics/epic-017-podcast-spotify-distribution.md) |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](../epics/README.md).
+
+> **Numbering note (2026-09-12, `wf:dario` — `issue-design`).** This PR adds
+> **adr-0035**, not adr-0034: `adr-0034-public-qa-boards.md` is already
+> merged to `main`, and a separate open draft PR (**#714**,
+> `dario/issue-663-skill-capabilities-declaration`) also proposes an
+> `adr-0034-skill-capabilities-declaration.md` from a branch cut before
+> `public-qa-boards` merged — the same stale-reservation collision this
+> file's 2026-09-09 note already describes for adr-0031/0032. This PR does
+> not touch that collision; flagging only that `0035` was chosen precisely
+> to avoid adding a third file to it. Whoever resolves #714's collision
+> should leave this row's number alone — nothing here reserves or depends
+> on `0034`.
 
 > **Numbering note (2026-09-09, `wf:dario` — `issue-design`).** This PR's
 > adr-0032 was drafted in parallel with another open draft PR's adr-0031
@@ -117,15 +135,6 @@ canonical status view, same convention as [epics/README.md](../epics/README.md).
 > permanently sharing adjacent-but-order-dependent numbers — flagging this
 > now so it isn't silently forgotten, the same "say the blocker precisely"
 > discipline this skill's Step 5 asks for parked issues.
->
-> **Renumbering note (2026-09-27, `wf:dario` — `issue-design`).** This PR's
-> adr-0042 (deprecation removal-date rule, #769) was drafted the same tick
-> as adr-0041 (AgentBinding retirement marker, #768) — both split from the
-> same parent #704. Both were first drafted as 0040/0041, then renumbered to
-> 0041/0042 on discovering open PR #766 already reserved adr-0040 for an
-> unrelated decision (#685's dispatch-dedup marker) from the same `main`
-> commit. Same collision class the 2026-09-09 note above describes; caught
-> before merge this time rather than after.
 
 > **Index reconciliation (2026-08-03, Nadia — `backlog-reconcile`).** Index-only
 > correction; **no ADR status was decided here.** A full sweep comparing every

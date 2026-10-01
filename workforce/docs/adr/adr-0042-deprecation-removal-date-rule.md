@@ -150,6 +150,13 @@ amendment), not that the rule should be dropped.
   skills — may be worth adding later, alongside the `check-skill-*` family,
   but is not this ADR's enforcement point.
 
+## Open review findings (carried at merge, PR #774 cycle 1 — 🟡, non-blocking)
+
+The implementing PR must resolve or explicitly accept each of these:
+
+- **D1 (`wf:dario`) — second `status` writer.** `seed-skills/handler.ts` writes `status` via `putItem` on every deploy, bypassing `validateSkillPatch`. The write-time rule must also cover the seed path (or the gap must be logged as an accepted risk), otherwise "agents-api `PATCH` is the only writer" does not hold.
+- **S1 (`wf:sana`) — no exit-side re-check.** Nothing re-checks a live `deprecated_until` once set; a skill can pass its own removal date silently. Add a check (e.g. in `check-skill-lifecycle.mjs`) or file a named follow-up.
+
 ## Related
 
 - [ADR-0017](adr-0017-skill-lifecycle-api.md) — the `status` enum this ADR
