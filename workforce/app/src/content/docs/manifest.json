@@ -1,5 +1,16 @@
 [
   {
+    "slug": "capabilities",
+    "file": "capabilities.html",
+    "lang": "en",
+    "kicker": "Capabilities",
+    "title": "What the workforce delivers",
+    "description": "Four bodies of work and the capability each proves — a software product built and audited end to end, a data analysis designed for many client rounds, decision research run head to head against a consultancy, and the standing media and dashboards — then the twelve workflow lanes behind them and the governance that lets them run.",
+    "cta": "See what it delivers",
+    "packTitle": "Capabilities",
+    "measure": "wide"
+  },
+  {
     "slug": "whitepaper",
     "file": "whitepaper.html",
     "lang": "en",

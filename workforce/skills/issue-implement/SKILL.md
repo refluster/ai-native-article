@@ -137,7 +137,11 @@ instead of guessing.
 - If the issue is genuinely too large for one coherent PR, implement the
   smallest complete, mergeable slice and say exactly what's left — both in
   the PR body and as a comment on the issue — rather than either stalling or
-  shipping something half-built.
+  shipping something half-built. Cite a slice with `Refs #<N>`, not `Closes`.
+  The issue then stays open after the merge, its `issue-implement:pr-open`
+  claim goes stale, and `issue-triage` re-lanes what is left (issue-lanes.mjs,
+  stale claims). Before that rule, #671/#672/#673 sat claimed and unworked for
+  weeks after their slices merged.
 
 ## Step 5 — open the draft PR (never merge, never push default branch)
 
@@ -152,7 +156,7 @@ doesn't have).
 The PR body **must** include, per R-N9's citation requirement:
 
 ```md
-Closes #<issue-number>
+Closes #<issue-number>   ← `Refs #<issue-number>` for a partial slice (Step 4)
 
 <one-paragraph summary: what changed and why, in the issue's own terms>
 
