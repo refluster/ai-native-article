@@ -1,4 +1,4 @@
-# ADR-0038 — Hire-time speculative-duty flag, round-doc lint, and mechanically-scheduled kill-criterion
+# ADR-0045 — Hire-time speculative-duty flag, round-doc lint, and mechanically-scheduled kill-criterion
 
 - **Status**: Proposed
 - **Date**: 2026-09-16
