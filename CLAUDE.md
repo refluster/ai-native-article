@@ -29,7 +29,7 @@ workforce/app/          @kohuehara/workforce — console SPA (Cognito + Google);
 workforce/docs/         README.md is the index: statute (governance, architecture, data-model, naming, mvv, adr/) · runbooks/ · routines/ · epics/ · hires/ · design/
 workforce/lambdas/      16 TypeScript Lambdas (agents-api, orchestrator, tools-api, wf-podcast, board-reply, memory-compactor, …) + shared/; README.md lists them
 workforce/infra/        SAM stacks: sam (data plane), sam-web, sam-web-cert, sam-api-domain
-workforce/skills/       42 skill bundles: SKILL.md + meta.json + write-scripts (article-level2/3, pr-autopilot, feed-post, …)
+workforce/skills/       43 skill bundles: SKILL.md + meta.json + write-scripts (article-level2/3, pr-autopilot, feed-post, research-study, …)
 workforce/projects/     project.json seeds for external projects (asp-cloud, luckyhat, …); tools/ = ADR-0027 project tools
 workforce/scripts/      validators + registry builders wired as `npm run workforce:*`; one-shot wire-*.mjs binding scripts
 workforce/pipeline/     knowledge-backup (Discord + Notion → per-project git store; ADR-0026/0028)
@@ -85,7 +85,7 @@ Active R-rules ([governance.md §4](docs/governance.md#4-l2--regulations-mechani
 | R-14 | scripts bootstrap the HTTPS proxy | `check-proxy-bootstrap` |
 | R-15 | corpus not older than 5 days (daily, not on PRs) | `corpus-freshness.yml` |
 | R-16 / R-17 | base path is `SITE_BASE_PATH` from `site.ts` everywhere; live smoke after deploy | `check-base-path`, `check-live-base-path` |
-| R-N1…R-N10 | workforce shape rules (naming, single state store, bindings-only scheduling, PR-only external git, bounded autopilot merge) | `workforce:*` scripts |
+| R-N1…R-N11 | workforce shape rules (naming, single state store, bindings-only scheduling, PR-only external git, bounded autopilot merge, no queue bound without its worker) | `workforce:*` scripts |
 
 R-1, R-3…R-6 were retired with the Apps Script engine on 2026-06-28. Tightening a rule is autonomous; loosening or disabling one needs the operator's explicit yes.
 

@@ -30,6 +30,8 @@ export interface BoardPost {
   reply_to_preview?: string;
   hop: number;
   mentions: string[];
+  /** Nicknames who liked the post (sorted). */
+  likers?: string[];
 }
 
 export interface BoardAgent {
@@ -184,7 +186,38 @@ export async function createPost(boardId: string, token: string, body: string, r
   );
 }
 
+export interface LikeResult {
+  post_id: string;
+  likers: string[];
+  liked: boolean;
+}
+
+/** Like (or unlike) a post as the session's nickname. */
+export async function likePost(boardId: string, token: string, postId: string, liked: boolean): Promise<LikeResult> {
+  return call<LikeResult>(
+    `/boards/${encodeURIComponent(boardId)}/posts/${encodeURIComponent(postId)}/like`,
+    { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ liked }) },
+    token,
+  );
+}
+
 // ----- Pure helpers -----
+
+/** Overlay fresh `likers` onto already-loaded posts (the periodic likes
+ *  refresh); posts not in `fresh` are left as they are. */
+export function mergeLikers(prev: BoardPost[], fresh: ReadonlyArray<BoardPost>): BoardPost[] {
+  const byId = new Map(fresh.map((p) => [p.post_id, p.likers ?? []]));
+  let changed = false;
+  const next = prev.map((p) => {
+    const likers = byId.get(p.post_id);
+    if (!likers) return p;
+    const cur = p.likers ?? [];
+    if (cur.length === likers.length && cur.every((n, i) => n === likers[i])) return p;
+    changed = true;
+    return { ...p, likers };
+  });
+  return changed ? next : prev;
+}
 
 /** Union two slices of one board's history, deduplicated by post id and
  *  ordered by id (ULIDs are time-ordered, so id order is post order). */
@@ -192,6 +225,40 @@ export function mergePosts(a: BoardPost[], b: BoardPost[]): BoardPost[] {
   const byId = new Map<string, BoardPost>();
   for (const p of [...a, ...b]) byId.set(p.post_id, p);
   return [...byId.values()].sort((x, y) => (x.post_id < y.post_id ? -1 : x.post_id > y.post_id ? 1 : 0));
+}
+
+/** Walk `reply_to` links up to the human post that started a cascade.
+ *  Returns the post itself when it has no loaded parent. */
+export function cascadeRootOf(post: BoardPost, byId: ReadonlyMap<string, BoardPost>): BoardPost {
+  let cur = post;
+  const seen = new Set<string>();
+  while (cur.reply_to && !seen.has(cur.post_id)) {
+    seen.add(cur.post_id);
+    const parent = byId.get(cur.reply_to);
+    if (!parent) break;
+    cur = parent;
+    if (cur.author_kind === 'human') break;
+  }
+  return cur;
+}
+
+/**
+ * Agents a freshly-arrived agent post hands over to — mirrors the reply
+ * Lambda's rule so the page can show "… is drafting" for the delegate while
+ * it writes: only a hop-1 answer delegates, to its first roster mention,
+ * never to itself, never to an agent that already answered in the same
+ * cascade. Returns at most one slug.
+ */
+export function pendingDelegates(post: BoardPost, all: ReadonlyArray<BoardPost>, roster: ReadonlySet<string>): string[] {
+  if (post.author_kind !== 'agent' || post.hop !== 1 || post.mentions.length === 0) return [];
+  const byId = new Map(all.map((p) => [p.post_id, p]));
+  const root = cascadeRootOf(post, byId).post_id;
+  const answered = new Set<string>();
+  for (const p of all) {
+    if (p.author_kind === 'agent' && cascadeRootOf(p, byId).post_id === root) answered.add(p.author);
+  }
+  const delegate = post.mentions.find((s) => roster.has(s) && s !== post.author && !answered.has(s));
+  return delegate ? [delegate] : [];
 }
 
 export type BodySegment = { kind: 'text'; text: string } | { kind: 'mention'; slug: string; text: string };

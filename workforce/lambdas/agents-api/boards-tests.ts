@@ -40,6 +40,9 @@ vi.mock("@aws-sdk/lib-dynamodb", () => ({
   QueryCommand: class {
     constructor(public input: Record<string, unknown>) {}
   },
+  UpdateCommand: class {
+    constructor(public input: Record<string, unknown>) {}
+  },
 }));
 
 import { hashBoardPassword, mintBoardToken, type BoardMetaRow } from "../shared/board.js";
@@ -284,6 +287,35 @@ describe("POST /boards/{id}/posts", () => {
       statusCode: 400,
       body: { error: "invalid_reply_to" },
     });
+  });
+});
+
+describe("POST /boards/{id}/posts/{post_id}/like", () => {
+  const route = "POST /boards/{id}/posts/{post_id}/like";
+
+  it("likes and unlikes as the token's nickname and reports the likers", async () => {
+    getItem.mockImplementation(async (pk: string, sk: string) => {
+      if (sk === "META") return META;
+      if (sk === "POST#01P") return { pk, sk, post_id: "01P", board_id: "demo", author_kind: "agent", author: "maya", at: "t", body_preview: "x", root_post_id: "01Q", hop: 1, mentions: [] };
+      return undefined;
+    });
+    send.mockResolvedValueOnce({ Attributes: { likers: new Set(["Ken", "Hana"]) } });
+    const r = parse(await handleBoardsRoute(route, event(route, { token: TOKEN, post_id: "01P", body: { liked: true } }), deps));
+    expect(r.statusCode).toBe(200);
+    expect(r.body).toEqual({ post_id: "01P", likers: ["Hana", "Ken"], liked: true });
+    const q = (send.mock.calls[0]![0] as { input: Record<string, unknown> }).input;
+    expect(q.UpdateExpression).toBe("ADD #likers :who");
+    expect((q.ExpressionAttributeValues as Record<string, Set<string>>)[":who"]).toEqual(new Set(["Hana"]));
+
+    send.mockResolvedValueOnce({ Attributes: { likers: new Set(["Ken"]) } });
+    const u = parse(await handleBoardsRoute(route, event(route, { token: TOKEN, post_id: "01P", body: { liked: false } }), deps));
+    expect(u.body).toEqual({ post_id: "01P", likers: ["Ken"], liked: false });
+  });
+
+  it("401s without a token, 400s a bad body, 404s a missing post", async () => {
+    expect(parse(await handleBoardsRoute(route, event(route, { post_id: "01P", body: { liked: true } }), deps)).statusCode).toBe(401);
+    expect(parse(await handleBoardsRoute(route, event(route, { token: TOKEN, post_id: "01P", body: { liked: "yes" } }), deps)).statusCode).toBe(400);
+    expect(parse(await handleBoardsRoute(route, event(route, { token: TOKEN, post_id: "01ZZ", body: { liked: true } }), deps)).statusCode).toBe(404);
   });
 });
 

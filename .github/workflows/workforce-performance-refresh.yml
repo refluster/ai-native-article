@@ -53,12 +53,29 @@ name: Workforce performance refresh (PR + repository roll-ups)
 
 on:
   schedule:
-    # 05:33 UTC daily — after the wf-performance-reducer's 02:00 lifecycle
-    # snapshot (so a read-back can tell a fresh funnel from a stalled one on
-    # the same day) and before the 06:17 console/site deploy (so a deploy that
-    # day ships against already-refreshed roll-ups). Clear of every other cron
-    # in this directory: 01:23 backup, 04:47 PR sweep, 06/12/18:17 deploy,
-    # 08:17 API routes, 18:37 podcast, 21:00 corpus freshness.
+    # Nominally 05:33 UTC. In practice GitHub runs this repo's scheduled
+    # workflows HOURS late — measured, not assumed:
+    #
+    #   this workflow   05:33 slot -> fired 09:57 (09-10), 09:55 (09-11), 09:30 (09-12)
+    #   PR sweep (R-13) 04:47 slot -> fired 09:11 (09-09), 09:05 (09-08)
+    #
+    # i.e. a consistent ~4-4.5h lag. GitHub documents `schedule` as best-effort
+    # and drops or delays it under load; there is no way to make it punctual.
+    #
+    # So this cron guarantees ONCE A DAY and nothing about the hour. An earlier
+    # revision of this comment claimed the run lands "before the 06:17
+    # console/site deploy, so a deploy that day ships against already-refreshed
+    # roll-ups" — that has never been true, and it did not matter: the console
+    # fetches GET /performance at runtime, so no deploy gates the deck's
+    # freshness. Do not reintroduce an ordering claim this substrate cannot
+    # keep. The one ordering that DOES hold is against the 02:00 UTC
+    # wf-performance-reducer, and only because a 4h lag cannot undercut a
+    # 3.5h head start — EventBridge, unlike this, fires on time.
+    #
+    # The slot is still chosen to be clear of the other crons here (01:23
+    # backup, 04:47 PR sweep, 06/12/18:17 deploy, 08:17 API routes, 18:37
+    # podcast, 21:00 corpus freshness) so that if GitHub ever does run them
+    # punctually they do not collide.
     - cron: '33 5 * * *'
   workflow_dispatch:
     inputs:

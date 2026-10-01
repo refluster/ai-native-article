@@ -40,10 +40,12 @@ import { mintEngagementToken } from "../shared/engagement-token.js";
 import { mintMemoryWriteToken } from "../shared/memory-write-token.js";
 import { mintDispatchToken } from "../shared/dispatch-token.js";
 import { SKILL_REQUIRES } from "../shared/skill-registry-generated.js";
-import { getMonthSpend, recordEstimatedSpend, wouldBreachBudget } from "../shared/budget.js";
+import { getMonthSpend, recordCapReached, recordEstimatedSpend, wouldBreachBudget } from "../shared/budget.js";
 import { estimateFireCostUsd } from "../shared/fire-cost-estimate.js";
 import { effectiveBudgetUsd } from "../shared/agent.js";
+
 import { newUlid, type DelivRow } from "../shared/task.js";
+
 
 const STAGE = process.env.STAGE;
 const TICK_WINDOW_MINUTES = parseInt(process.env.TICK_WINDOW_MINUTES ?? "5", 10);
@@ -136,6 +138,10 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
       // that would actually dispatch and then carried across the agent's
       // remaining bindings (#661). `undefined` = not read yet.
       let monthSpendUsd: number | undefined;
+      // ML-038 / ADR-0037: the advisory-budget stamp is attempted once per
+      // agent per tick, and lands once per month (recordCapReached is
+      // conditional).
+      let capEventAttempted = false;
       if (agent.archived || agent.paused) {
         for (let i = 0; i < (agent.bindings?.length ?? 0); i++) {
           skipped.push({
@@ -171,12 +177,12 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
           skipped.push({ slug: agent.slug, binding_idx: i, skill: binding.skill, reason: decision.reason });
           continue;
         }
-        // W-3, enforced where it can actually be enforced (#661). The LLM call
-        // happens inside the CCR session, so the data plane cannot meter it —
-        // but it does own the decision to dispatch, and that is the only lever
-        // a cost ceiling needs. Charge a modelled cost per fire and refuse to
-        // dispatch past the agent's effective cap. Reading the month's spend
-        // once per agent (not per binding) keeps this one GET per agent-tick.
+        // W-3, measured where it can be measured (#661): the LLM call happens
+        // inside the CCR session, so the data plane charges a MODELLED cost
+        // per fire it dispatches. Since ADR-0037 the per-agent budget is
+        // advisory — the tick reports the position and never refuses a fire.
+        // Reading the month's spend once per agent keeps this one GET per
+        // agent-tick.
         const capUsd = effectiveBudgetUsd(agent);
         const planned = estimateFireCostUsd(binding.skill);
         if (monthSpendUsd === undefined) {
@@ -192,21 +198,35 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
           }
         }
         if (wouldBreachBudget(monthSpendUsd, capUsd, planned)) {
+          // ADR-0037: the per-agent budget is ADVISORY. It never refuses a
+          // fire — output continuity outranks staying under a planning
+          // figure (operator direction 2026-09-14, after the enforced cap
+          // switched off the PR router for three days; ML-038). The month's
+          // position is still measured and said loudly: a WARN per tick, and
+          // the ledger row is stamped once so /performance can name every
+          // agent over its budget. Nothing here changes what is dispatched.
           console.warn(JSON.stringify({
-            event: "budget-cap-reached",
+            event: "budget-advisory-exceeded",
             slug: agent.slug,
             skill: binding.skill,
             month_usd: Number(monthSpendUsd.toFixed(4)),
             planned_usd: planned,
-            cap_usd: capUsd,
+            budget_usd: capUsd,
           }));
-          skipped.push({
-            slug: agent.slug,
-            binding_idx: i,
-            skill: binding.skill,
-            reason: `budget_cap_reached: month=${monthSpendUsd.toFixed(2)} + planned=${planned.toFixed(2)} > cap=${capUsd.toFixed(2)} (W-3)`,
-          });
-          continue;
+          if (!capEventAttempted) {
+            capEventAttempted = true;
+            try {
+              if (await recordCapReached(agent.slug, now)) {
+                console.warn(JSON.stringify({ event: "budget-advisory-first-crossed", slug: agent.slug, budget_usd: capUsd }));
+              }
+            } catch (ledgerErr) {
+              console.error(JSON.stringify({
+                event: "budget-advisory-stamp-failed",
+                slug: agent.slug,
+                reason: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
+              }));
+            }
+          }
         }
         // Reserve against the cap for the rest of this tick, so an agent with
         // several bindings in one tick cannot overshoot by racing itself. The

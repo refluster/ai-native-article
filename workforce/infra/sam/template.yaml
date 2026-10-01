@@ -957,6 +957,12 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /boards/{id}/posts
             Method: POST
+        LikeBoardPost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /boards/{id}/posts/{post_id}/like
+            Method: POST
         PatchBoardPost:
           Type: HttpApi
           Properties:
@@ -1116,9 +1122,9 @@ Resources:
 
   # --- Q&A board reply (ADR-0034) ------------------------------------------
   # The board twin of wf-messaging-reply: async-invoked by agents-api once
-  # per @-mentioned agent on a guest post; composes persona + the bundled
-  # public knowledge pack + the agent's own record, calls Claude, writes
-  # the agent POST row. A hop-1 answer may pull in ONE colleague, answered
+  # per @-mentioned agent on a guest post; composes the organisation's
+  # thesis corpus (bundled at build) + the persona's position + material
+  # selected for the question, calls Claude, writes the agent POST row. A hop-1 answer may pull in ONE colleague, answered
   # inside the same invocation (never a self-invoke — R-N1 untouched).
   WfBoardReplyFunction:
     Type: AWS::Serverless::Function
@@ -1161,13 +1167,6 @@ Resources:
               Action: s3:GetObject
               Resource:
                 - !Sub ${WfBucket.Arn}/memory/*
-            - Sid: BoardReplyRecallVoyageKey
-              # EXEC-ledger recall embeds the question via Voyage; voyage key
-              # path only. Fail-soft in the handler.
-              Effect: Allow
-              Action: secretsmanager:GetSecretValue
-              Resource:
-                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/*/voyage.api_key-*
             - Sid: BoardReplyAnthropicKey
               # Same key resolution as messaging-reply (llm-anthropic.ts).
               Effect: Allow
@@ -1183,7 +1182,6 @@ Resources:
                 StringEquals:
                   cloudwatch:namespace:
                     - Workforce/Boards
-                    - Workforce/Recall
       Tags:
         workforce: !Ref Stage
 
@@ -1680,6 +1678,15 @@ Resources:
                 # deploy as the handler change, or the tick stops firing.
                 - dynamodb:GetItem
                 - dynamodb:UpdateItem
+                # PutItem: the execution-ledger rows the tick writes for a
+                # fire it could NOT make — a prep failure (#650) and, since
+                # ML-038, the first budget-cap refusal of the month. Both go
+                # through appendExecution (a Put). The #650 write shipped
+                # without this grant and failed on every prep error in prod
+                # ("ccr-prep-error-ledger-write-failed … not authorized to
+                # perform: dynamodb:PutItem"), so the loud row it promised
+                # was only ever loud in CloudWatch.
+                - dynamodb:PutItem
               Resource: !GetAtt WfTable.Arn
             - Sid: OrchestratorGithubSecret
               Effect: Allow
@@ -2388,9 +2395,11 @@ Resources:
         }
 
   # --- Podcast production & distribution (Epic-017 Stories 5 & 6; ADR-0016) ---
-  # Deterministic Lambda on the DEFAULT surface (R-N1): Polly Neural JA TTS →
-  # MP3 on the wf bucket's podcast/ prefix, plus the RSS builder. IAM-authorized
-  # (the operator/orchestrator SigV4-signs); no new project credential type.
+  # Deterministic Lambda on the DEFAULT surface (R-N1): JA TTS → MP3 on the wf
+  # bucket's podcast/ prefix, plus the RSS builder. IAM-authorized (the
+  # operator/orchestrator SigV4-signs). TTS engine per ADR-0043: Gemini 3.8
+  # Flash TTS (chunked, resumable; key in wf/projects/agent-workforce/
+  # gemini.api_key), with Polly kept as the PODCAST_TTS_ENGINE=polly rollback.
   WfPodcastFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -2399,10 +2408,15 @@ Resources:
       FunctionName: !Sub wf-podcast-${Stage}
       CodeUri: ../../lambdas/wf-podcast
       Handler: handler.handler
-      Description: Podcast synthesis (Polly Neural JA, random voice → S3) + RSS build (Epic-017; ADR-0016).
-      MemorySize: 512
-      # Polly StartSpeechSynthesisTask is async; the handler polls up to ~150s.
-      Timeout: 300
+      Description: Podcast synthesis (Gemini TTS chunked / Polly rollback → MP3 on S3) + RSS build (Epic-017; ADR-0016, ADR-0043).
+      # 1769 MB = one full vCPU for the pure-JS MP3 encode of each chunk
+      # (~6 s per 5 min of audio in the PoC).
+      MemorySize: 1769
+      # 900 s = the Lambda ceiling: Gemini handles are advanced by DIRECT
+      # invocation from synthesize.mjs (one Gemini request takes 30 s–4 min,
+      # beyond the HTTP API's 30 s window); each invocation runs chunk waves
+      # while >GEMINI_WAVE_RESERVE_MS remains and persists every chunk to S3.
+      Timeout: 900
       Environment:
         Variables:
           # CloudFront/OAC domain over the wf bucket's podcast/* prefix — the
@@ -2415,6 +2429,10 @@ Resources:
           PODCAST_OWNER_EMAIL: refluster@gmail.com
           PODCAST_OWNER_NAME: kohuehara
           PODCAST_CATEGORY: Technology
+          # ADR-0043 engine switch — `polly` is the instant rollback (no deploy
+          # of code needed: flip the env var).
+          PODCAST_TTS_ENGINE: gemini
+          GEMINI_TTS_MODEL: gemini-3.8-flash-tts
       Policies:
         - Statement:
             - Sid: PodcastPolly
@@ -2434,6 +2452,22 @@ Resources:
                 - s3:DeleteObject
               Resource:
                 - !Sub ${WfBucket.Arn}/podcast/*
+            - Sid: PodcastS3ListChunks
+              # Gemini engine: list the per-episode chunk MP3s already written
+              # (the resumable progress state, ADR-0043) — podcast/ prefix only.
+              Effect: Allow
+              Action: s3:ListBucket
+              Resource: !GetAtt WfBucket.Arn
+              Condition:
+                StringLike:
+                  s3:prefix:
+                    - podcast/*
+            - Sid: PodcastGeminiSecret
+              # Gemini API key ({apiKey}) for the TTS call (ADR-0043).
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/agent-workforce/gemini.api_key-*
             - Sid: PodcastNotionSecret
               # The project-scoped Notion integration token ({apiKey}); the DB
               # id is a non-secret constant in the handler. No new credential
@@ -2468,7 +2502,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub wf-podcast-errors-alarm-${Stage}
-      AlarmDescription: A Polly/S3/Notion failure in wf-podcast (C-4 fail-loud).
+      AlarmDescription: A TTS (Gemini/Polly)/S3/Notion failure in wf-podcast (C-4 fail-loud).
       Namespace: AWS/Lambda
       MetricName: Errors
       Dimensions:

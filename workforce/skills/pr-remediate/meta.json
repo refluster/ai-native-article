@@ -1,6 +1,6 @@
 {
   "name": "pr-remediate",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "status": "active",
   "cost_class": "large",
   "owners": [

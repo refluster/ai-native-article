@@ -206,8 +206,33 @@ function makeGh(api, token) {
     } catch {
       json = {};
     }
-    return { status: res.status, json };
+    // Rate-limit headers travel with the response and are the only thing that
+    // separates "quota spent" from "no access" — both are a bare 403.
+    const remaining = Number(res.headers.get("x-ratelimit-remaining"));
+    const reset = Number(res.headers.get("x-ratelimit-reset"));
+    return {
+      status: res.status,
+      json,
+      rateLimit: {
+        remaining: Number.isFinite(remaining) ? remaining : undefined,
+        resetAt: Number.isFinite(reset) ? new Date(reset * 1000).toISOString() : undefined,
+      },
+    };
   };
+}
+
+/** TRUE when GitHub refused the call because the token's hourly REST quota is
+ *  spent, rather than for want of scope or SSO authorisation. Both arrive as a
+ *  403, and they need opposite responses — one waits for the reset, the other
+ *  needs the operator to fix the credential — so the log must not read the same
+ *  for both (`wf:owen` O3: an unknown is never a measured zero, and a
+ *  misattributed unknown is worse still). Production 2026-09-13: every project's
+ *  churn went to 0/degraded at once because one PAT now backs all of them and
+ *  its 5000/h core quota was exhausted; the log said only "HTTP 403". */
+export function isRateLimited(r) {
+  if (r?.status !== 403 && r?.status !== 429) return false;
+  if (r?.rateLimit?.remaining === 0) return true;
+  return /\brate limit\b/i.test(String(r?.json?.message ?? ""));
 }
 
 // GitHub's Search API caps authenticated callers at 30 req/min and enforces a
@@ -227,7 +252,10 @@ export async function searchAll(gh, q) {
   for (let page = 1; page <= 10; page++) {
     const r = await gh(`/search/issues?q=${encodeURIComponent(q)}&per_page=100&page=${page}`);
     if (r.status !== 200) {
-      console.error(`search failed (HTTP ${r.status}) for "${q}": ${JSON.stringify(r.json).slice(0, 200)}`);
+      const why = isRateLimited(r)
+        ? `RATE-LIMITED${r.rateLimit?.resetAt ? ` until ${r.rateLimit.resetAt}` : ""} — the token's quota is spent, not a permission problem`
+        : JSON.stringify(r.json).slice(0, 200);
+      console.error(`search failed (HTTP ${r.status}) for "${q}": ${why}`);
       partial = true;
       break;
     }
@@ -262,6 +290,17 @@ export async function fetchCodeFrequency(gh, repo, { attempts = 6, delayMs = 250
     const r = await gh(`/repos/${repo}/stats/code_frequency`);
     if (r.status === 200 && Array.isArray(r.json) && r.json.length > 0) {
       return { weeks: r.json, partial: false };
+    }
+    if (isRateLimited(r)) {
+      // A spent hourly quota does not warm up in `attempts × delayMs`, and the
+      // same token backs every remaining repo — so burn no more of the budget
+      // pretending otherwise, and say which of the two 403s this was.
+      console.error(
+        `${repo}: code_frequency -> HTTP ${r.status} RATE-LIMITED` +
+          `${r.rateLimit?.resetAt ? ` (quota resets ${r.rateLimit.resetAt})` : ""}` +
+          `; churn marked degraded — the token's REST quota is exhausted, so every repo sharing it degrades this run`,
+      );
+      return { weeks: [], partial: true, rateLimited: true };
     }
     if (r.status === 202 || (r.status === 200 && Array.isArray(r.json))) {
       // Still computing (202) or served empty from a cold cache (200 []) —

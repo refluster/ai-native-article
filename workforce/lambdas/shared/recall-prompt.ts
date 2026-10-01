@@ -43,6 +43,9 @@ export interface BuildRecallBlockInput {
   /** From skill.meta.recall_k; undefined → RECALL_K_DEFAULT. */
   recall_k?: number;
   projectId: ProjectId;
+  /** Optional post-retrieval filter (e.g. the board reply keeps only
+   *  internal-project executions, ADR-0034). Applied before rendering. */
+  filter?: (result: RecallResult) => boolean;
 }
 
 /**
@@ -71,7 +74,7 @@ export async function buildRecallBlock(input: BuildRecallBlockInput): Promise<st
     );
     return "";
   }
-  return renderRecallBlock(results);
+  return renderRecallBlock(input.filter ? results.filter(input.filter) : results);
 }
 
 /** Render recalled executions to a markdown block under

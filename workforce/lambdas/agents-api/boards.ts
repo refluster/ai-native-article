@@ -4,6 +4,7 @@
 //   GET   /boards/{id}                   board card + roster                (board token)
 //   GET   /boards/{id}/posts             newest page | ?after= poll         (board token)
 //   POST  /boards/{id}/posts             guest post; dispatches mentions    (board token)
+//   POST  /boards/{id}/posts/{post_id}/like   like / unlike as the token's nickname (board token)
 //   PATCH /boards/{id}/posts/{post_id}   operator hide/unhide               (AWS_IAM at GW)
 //
 // Kept in its own module so the route logic is testable without the
@@ -34,6 +35,7 @@ import {
   parseMentions,
   setBoardPostHidden,
   toBoardPostView,
+  toggleBoardPostLike,
   validateBoardBody,
   verifyBoardPassword,
   verifyBoardToken,
@@ -219,6 +221,20 @@ async function createPostRoute(
   return reply(201, { post: created.view, dispatched });
 }
 
+async function likePostRoute(
+  meta: BoardMetaRow,
+  session: BoardSession,
+  postId: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const body = parseJsonBody(event.body);
+  if (!body || typeof body.liked !== "boolean") return reply(400, { error: "invalid_liked" });
+  const post = await getBoardPost(meta.board_id, postId);
+  if (!post || post.hidden) return reply(404, { error: "not_found", post_id: postId });
+  const likers = await toggleBoardPostLike(meta.board_id, postId, session.nickname, body.liked);
+  return reply(200, { post_id: postId, likers, liked: likers.includes(session.nickname) });
+}
+
 async function patchPostRoute(
   meta: BoardMetaRow,
   postId: string,
@@ -261,5 +277,6 @@ export async function handleBoardsRoute(
   if (routeKey === "GET /boards/{id}") return getBoardRoute(meta, session);
   if (routeKey === "GET /boards/{id}/posts") return listPostsRoute(meta, event);
   if (routeKey === "POST /boards/{id}/posts") return createPostRoute(meta, session, event, deps);
+  if (routeKey === "POST /boards/{id}/posts/{post_id}/like" && postId) return likePostRoute(meta, session, postId, event);
   return undefined;
 }

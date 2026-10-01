@@ -91,8 +91,13 @@ to the next uncovered article. Stop early when the picker returns `{skip:true}`.
   Coordinator (Idris) owns and it is a hard no.
 - **Never invent facts.** Every figure, name, date, or quotation traces to the
   article or a cited source. No source, no claim.
-- **Mandatory citations.** The citations file must be non-empty — the write step
-  rejects an empty one (exit 2). A podcast with no credited sources does not ship.
+- **Mandatory citations.** The citations file must be non-empty AND every URL it
+  names must actually resolve — the write step rejects an empty file, or one
+  where a cited URL 404s / times out / errors (exit 2, issue #673). A podcast
+  with no credited, live sources does not ship. This checks that a source
+  *exists and is reachable*, not that it supports the specific claim it backs
+  (still your judgement) or that a platform's terms haven't since changed
+  (issue #673 items 2–3, still open).
 - **Write for the ear.** If it only works on the page (dense, nested, scannable),
   it isn't a script. Re-author it for listening.
 - **Skip a thin source.** A one-fact article is skipped, not padded into ten
@@ -103,7 +108,9 @@ to the next uncovered article. Stop early when the picker returns `{skip:true}`.
 1. Write the full narration script to a temp file (e.g. `/tmp/podcast-script.md`)
    — a file, not a shell arg, so multi-line / Unicode prose isn't mangled.
 2. Write the **citation list** (one source per line — title + URL) to a second
-   temp file (e.g. `/tmp/podcast-citations.txt`). **Non-empty.**
+   temp file (e.g. `/tmp/podcast-citations.txt`). **Non-empty, and every URL
+   must actually resolve** — the write step checks this mechanically now
+   (issue #673); a URL you haven't actually fetched will fail the gate.
 3. Run (the script PATCHes the article's existing Notion page — its id came from
    the picker):
 
@@ -121,10 +128,13 @@ to the next uncovered article. Stop early when the picker returns `{skip:true}`.
      set, `podcastStatus=script-ready`. It now awaits the operator's review +
      approval (`script-ready → approved`) before synthesis. Loop to the next
      article (up to 5 total), then done.
-   - `2` — a guard failed: empty citations, or a W-1 editorial guard (empty/short
-     script, LLM-artefact prelude, or a last line cut off mid-content), or
-     `401/403` auth. Read stderr; do not retry blindly. If the truncation guard
-     trips, the script really is cut off — regenerate the ending.
+   - `2` — a guard failed: empty citations, a cited URL that does not resolve
+     (issue #673), or a W-1 editorial guard (empty/short script, LLM-artefact
+     prelude, or a last line cut off mid-content), or `401/403` auth. Read
+     stderr; do not retry blindly. If the truncation guard trips, the script
+     really is cut off — regenerate the ending. If the citation guard trips
+     on a dead URL, re-check the source before re-citing it — don't just
+     retry the same URL.
    - `1` / `3` — bad args / missing file, or Notion API / network error.
 
 `NOTION_API_KEY` comes from your task's injected

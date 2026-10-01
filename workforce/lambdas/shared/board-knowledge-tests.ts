@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { parseKnowledgePack, rankSections, selectKnowledge, stem, tokenise } from "./board-knowledge.js";
+import { parseKnowledgePack, rankSections, renderPinned, selectKnowledge, stem, tokenise } from "./board-knowledge.js";
 
 const PACK = `# Board knowledge pack
 <!-- generated -->
@@ -103,6 +103,15 @@ describe("rankSections / selectKnowledge", () => {
     // the first scored one leave less than the 400-char floor, so exactly
     // one scored section is folded in.
     expect((out.match(/_Source:/g) ?? []).length).toBe(2);
+  });
+
+  it("can leave the pinned sections out, and renderPinned renders only them", () => {
+    const out = selectKnowledge(sections, "wf-podcast Polly", { includePinned: false });
+    expect(out).not.toContain("### What this is");
+    expect(out).toContain("### Workforce Lambdas");
+    const pinned = renderPinned(sections);
+    expect(pinned).toContain("### What this is");
+    expect(pinned).not.toContain("### Workforce Lambdas");
   });
 
   it("truncates an oversized section body and marks it", () => {

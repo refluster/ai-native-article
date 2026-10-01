@@ -8,9 +8,11 @@
 // an inline quote of its parent, nothing is folded away) — with a
 // composer that offers @-completion over the board's agent roster.
 // Mentioned agents answer within seconds; the page polls `?after=` every
-// few seconds while the tab is visible and shows who is drafting.
+// few seconds while the tab is visible and shows who is drafting. Only the
+// newest page is loaded on open; scrolling to the top pages back through
+// history one cursor at a time.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import BrandMark from '../components/BrandMark';
 import Sigil from '../components/Sigil';
@@ -25,8 +27,11 @@ import {
   fetchPosts,
   fetchPostsAfter,
   initialsOf,
+  likePost,
   loadBoardSession,
+  mergeLikers,
   mergePosts,
+  pendingDelegates,
   probeMention,
   rankAgents,
   saveBoardSession,
@@ -39,6 +44,17 @@ import {
 } from '../lib/boards';
 
 const POLL_MS = 4000;
+/** Every Nth poll also re-reads the newest page so likes on posts already
+ *  on screen stay live (the `?after=` poll only carries new posts). */
+const LIKES_REFRESH_EVERY = 3;
+const LIKES_REFRESH_PAGE = 40;
+/** First page: enough to fill a screen, not the whole log. Older history is
+ *  pulled one page at a time when the reader scrolls to the top (or taps
+ *  "Load earlier posts"), via the API's `older_cursor` (ADR-0034). */
+const FIRST_PAGE = 30;
+const OLDER_PAGE = 40;
+/** Distance from the top (px) at which the next older page is requested. */
+const LOAD_OLDER_THRESHOLD_PX = 120;
 /** How long "drafting…" stays up for a summoned agent before we stop
  *  promising an answer (the reply Lambda usually lands in 10–40 s; a
  *  delegated second answer can take a minute). */
@@ -63,6 +79,28 @@ function GuestAvatar({ name, size = 36 }: { name: string; size?: number }) {
     >
       {initialsOf(name)}
     </span>
+  );
+}
+
+/** The like button's glyph. An inline SVG rather than the 👍 emoji: emoji
+ *  rendering (colour, boldness) varies too much across platforms to read
+ *  reliably as "filled vs. outline" at 14px; a stroke/fill swap does not. */
+function ThumbUpIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 20 20"
+      width={13}
+      height={13}
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth={filled ? 0 : 1.6}
+      strokeLinejoin="round"
+      strokeLinecap="round"
+    >
+      <path d="M7 8.5 10.2 2.8c.9 0 1.8.8 1.8 2v2.7h4a1.6 1.6 0 0 1 1.55 1.95l-1.4 6A1.6 1.6 0 0 1 14.7 16.7H7Z" />
+      <path d="M7 8.5v8.2H4.4A1.4 1.4 0 0 1 3 15.3V9.9a1.4 1.4 0 0 1 1.4-1.4Z" />
+    </svg>
   );
 }
 
@@ -350,6 +388,9 @@ export default function Board() {
   const [drafting, setDrafting] = useState<Record<string, number>>({});
   const listRef = useRef<HTMLDivElement | null>(null);
   const stickToBottom = useRef(true);
+  // Latest posts for the poll callback (it runs from an interval closure).
+  const postsRef = useRef<BoardPost[]>([]);
+  postsRef.current = posts;
 
   const agentMap = useMemo(() => new Map((board?.agents ?? []).map((a) => [a.slug, a])), [board]);
   const known = useMemo(() => new Set(agentMap.keys()), [agentMap]);
@@ -381,7 +422,10 @@ export default function Board() {
     let cancelled = false;
     (async () => {
       try {
-        const [info, page] = await Promise.all([fetchBoard(boardId, session.token), fetchPosts(boardId, session.token)]);
+        const [info, page] = await Promise.all([
+          fetchBoard(boardId, session.token),
+          fetchPosts(boardId, session.token, { pageSize: FIRST_PAGE }),
+        ]);
         if (cancelled) return;
         setBoard(info);
         setPosts(page.posts);
@@ -401,17 +445,37 @@ export default function Board() {
   useEffect(() => {
     if (!session || !board) return;
     let cancelled = false;
+    let ticks = 0;
     const tick = async () => {
       if (typeof document !== 'undefined' && document.hidden) return;
+      ticks += 1;
+      if (ticks % LIKES_REFRESH_EVERY === 0) {
+        try {
+          const page = await fetchPosts(boardId, session.token, { pageSize: LIKES_REFRESH_PAGE });
+          if (!cancelled) setPosts((prev) => mergeLikers(prev, page.posts));
+        } catch {
+          /* transient; the next refresh retries */
+        }
+      }
       try {
         const fresh = lastId
           ? await fetchPostsAfter(boardId, session.token, lastId)
           : (await fetchPosts(boardId, session.token)).posts;
         if (cancelled || fresh.length === 0) return;
-        setPosts((prev) => mergePosts(prev, fresh));
+        const merged = mergePosts(postsRef.current, fresh);
+        setPosts(merged);
+        // In arrival order: an agent that just posted is done drafting; if
+        // its answer hands over to a colleague (hop 1 → 2, ADR-0034), that
+        // colleague is drafting now — the Lambda answers them in the same
+        // invocation, so the chip appears before their post lands.
         setDrafting((prev) => {
           const next = { ...prev };
-          for (const p of fresh) if (p.author_kind === 'agent') delete next[p.author];
+          const until = Date.now() + DRAFTING_MS;
+          for (const p of fresh) {
+            if (p.author_kind !== 'agent') continue;
+            delete next[p.author];
+            for (const slug of pendingDelegates(p, merged, known)) next[slug] = until;
+          }
           return next;
         });
       } catch (err) {
@@ -423,7 +487,7 @@ export default function Board() {
       cancelled = true;
       window.clearInterval(handle);
     };
-  }, [session, board, boardId, lastId, bail]);
+  }, [session, board, boardId, lastId, bail, known]);
 
   // Expire stale "drafting…" chips.
   useEffect(() => {
@@ -447,18 +511,25 @@ export default function Board() {
     el.scrollTop = el.scrollHeight;
   }, [posts]);
 
-  function onScroll() {
+  // Prepending an older page grows the list above the viewport; restore the
+  // reader's place by adding the height delta back to scrollTop.
+  const restoreScrollRef = useRef<{ height: number; top: number } | null>(null);
+  useLayoutEffect(() => {
     const el = listRef.current;
-    if (!el) return;
-    stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-  }
+    const saved = restoreScrollRef.current;
+    if (!el || !saved) return;
+    restoreScrollRef.current = null;
+    el.scrollTop = saved.top + (el.scrollHeight - saved.height);
+  }, [posts]);
 
-  async function loadOlder() {
+  const loadOlder = useCallback(async () => {
     if (!session || !olderCursor || loadingOlder) return;
     setLoadingOlder(true);
     try {
-      const page = await fetchPosts(boardId, session.token, { cursor: olderCursor });
+      const page = await fetchPosts(boardId, session.token, { cursor: olderCursor, pageSize: OLDER_PAGE });
       stickToBottom.current = false;
+      const el = listRef.current;
+      if (el) restoreScrollRef.current = { height: el.scrollHeight, top: el.scrollTop };
       setPosts((prev) => mergePosts(page.posts, prev));
       setOlderCursor(page.older_cursor);
     } catch (err) {
@@ -466,6 +537,14 @@ export default function Board() {
     } finally {
       setLoadingOlder(false);
     }
+  }, [session, olderCursor, loadingOlder, boardId, bail]);
+
+  function onScroll() {
+    const el = listRef.current;
+    if (!el) return;
+    stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    // Reaching the top pulls the next older page (infinite scroll upward).
+    if (el.scrollTop < LOAD_OLDER_THRESHOLD_PX && olderCursor && !loadingOlder) void loadOlder();
   }
 
   async function send(body: string) {
@@ -477,6 +556,22 @@ export default function Board() {
     if (res.dispatched.length > 0) {
       const until = Date.now() + DRAFTING_MS;
       setDrafting((prev) => ({ ...prev, ...Object.fromEntries(res.dispatched.map((s) => [s, until])) }));
+    }
+  }
+
+  async function toggleLike(p: BoardPost) {
+    if (!session) return;
+    const me = session.nickname;
+    const before = p.likers ?? [];
+    const liked = before.includes(me);
+    const optimistic = liked ? before.filter((n) => n !== me) : [...before, me].sort();
+    setPosts((prev) => prev.map((x) => (x.post_id === p.post_id ? { ...x, likers: optimistic } : x)));
+    try {
+      const res = await likePost(boardId, session.token, p.post_id, !liked);
+      setPosts((prev) => prev.map((x) => (x.post_id === p.post_id ? { ...x, likers: res.likers } : x)));
+    } catch (err) {
+      setPosts((prev) => prev.map((x) => (x.post_id === p.post_id ? { ...x, likers: before } : x)));
+      bail(err);
     }
   }
 
@@ -566,7 +661,7 @@ export default function Board() {
                 disabled={loadingOlder}
                 className="font-wfmono text-[11px] uppercase tracking-[0.14em] px-4 py-1.5 rounded-full border border-wf-outline-variant text-wf-on-surface-variant hover:border-wf-primary hover:text-wf-primary disabled:opacity-50"
               >
-                {loadingOlder ? 'Loading…' : 'Load earlier posts / 以前の投稿'}
+                {loadingOlder ? 'Loading…' : 'Load earlier posts / さらに前の投稿'}
               </button>
             </div>
           )}
@@ -628,6 +723,36 @@ export default function Board() {
                     <div className="mt-1">
                       <Body text={p.body} known={known} />
                     </div>
+                    {(() => {
+                      const likers = p.likers ?? [];
+                      const liked = likers.includes(session.nickname);
+                      const visible = likers.length > 0 || liked;
+                      return (
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void toggleLike(p)}
+                            aria-pressed={liked}
+                            aria-label={liked ? 'Remove like / いいねを取り消す' : 'Like / いいね'}
+                            title={likers.length > 0 ? likers.join(', ') : 'Like / いいね'}
+                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-wfmono text-[11.5px] transition-colors ${
+                              liked
+                                ? 'border-wf-paused bg-wf-surface-container text-wf-paused'
+                                : 'border-wf-outline-variant text-wf-on-surface-variant hover:border-wf-paused hover:text-wf-paused'
+                            } ${visible ? '' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
+                          >
+                            <ThumbUpIcon filled={liked} />
+                            {likers.length > 0 && <span>{likers.length}</span>}
+                          </button>
+                          {likers.length > 0 && (
+                            <span className="hidden sm:inline text-[11.5px] text-wf-on-surface-variant truncate max-w-[40ch]">
+                              {likers.slice(0, 3).join(', ')}
+                              {likers.length > 3 ? ` +${likers.length - 3}` : ''}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </li>
               );

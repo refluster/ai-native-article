@@ -12,11 +12,15 @@ vi.mock('../config/api', () => ({
 import {
   BoardApiError,
   applyMention,
+  cascadeRootOf,
   clearBoardSession,
+  pendingDelegates,
   createPost,
   enterBoard,
   fetchPostsAfter,
   initialsOf,
+  likePost,
+  mergeLikers,
   loadBoardSession,
   mergePosts,
   probeMention,
@@ -36,6 +40,43 @@ describe('mergePosts', () => {
     const merged = mergePosts([post('01B'), post('01A')], [post('01C'), post('01B', { body: 'newer copy' })]);
     expect(merged.map((p) => p.post_id)).toEqual(['01A', '01B', '01C']);
     expect(merged[1].body).toBe('newer copy');
+  });
+});
+
+describe('mergeLikers', () => {
+  it('overlays likers for known posts and keeps the same array when nothing changed', () => {
+    const prev = [post('01A', { likers: ['Hana'] }), post('01B')];
+    const same = mergeLikers(prev, [post('01A', { likers: ['Hana'] })]);
+    expect(same).toBe(prev);
+    const next = mergeLikers(prev, [post('01A', { likers: ['Hana', 'Ken'] }), post('01Z', { likers: ['x'] })]);
+    expect(next).not.toBe(prev);
+    expect(next.map((p) => p.likers ?? [])).toEqual([['Hana', 'Ken'], []]);
+    expect(next.length).toBe(2);
+  });
+});
+
+describe('cascadeRootOf / pendingDelegates', () => {
+  const roster = new Set(['maya', 'dario', 'ren']);
+  const guest = post('01A', { body: 'Q @maya', mentions: ['maya'] });
+  const answer = post('01B', { author_kind: 'agent', author: 'maya', hop: 1, reply_to: '01A', mentions: ['dario', 'ren'], body: 'ask @dario' });
+
+  it('walks reply links up to the guest post', () => {
+    const byId = new Map([guest, answer].map((p) => [p.post_id, p]));
+    expect(cascadeRootOf(answer, byId).post_id).toBe('01A');
+    expect(cascadeRootOf(guest, byId).post_id).toBe('01A');
+  });
+
+  it('names the first roster colleague a hop-1 answer hands over to', () => {
+    expect(pendingDelegates(answer, [guest, answer], roster)).toEqual(['dario']);
+  });
+
+  it('is empty for human posts, hop-2 answers, self-mentions and colleagues who already answered', () => {
+    expect(pendingDelegates(guest, [guest], roster)).toEqual([]);
+    expect(pendingDelegates({ ...answer, hop: 2 }, [guest, answer], roster)).toEqual([]);
+    expect(pendingDelegates({ ...answer, mentions: ['maya'] }, [guest, answer], roster)).toEqual([]);
+    const dariosEarlier = post('01C', { author_kind: 'agent', author: 'dario', hop: 1, reply_to: '01A', mentions: [] });
+    expect(pendingDelegates(answer, [guest, dariosEarlier, answer], roster)).toEqual(['ren']);
+    expect(pendingDelegates({ ...answer, mentions: ['nobody'] }, [guest, answer], roster)).toEqual([]);
   });
 });
 
@@ -141,6 +182,16 @@ describe('API wrappers', () => {
     await fetchPostsAfter('demo', 'tok', '01A');
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://agents.example/api/boards/demo/posts?after=01A');
+    expect((init.headers as Record<string, string>).authorization).toBe('Bearer tok');
+  });
+
+  it('likePost posts {liked} to the like route with the token', async () => {
+    fetchMock.mockResolvedValueOnce(ok({ post_id: '01A', likers: ['Hana'], liked: true }));
+    const res = await likePost('demo', 'tok', '01A', true);
+    expect(res).toEqual({ post_id: '01A', likers: ['Hana'], liked: true });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://agents.example/api/boards/demo/posts/01A/like');
+    expect(JSON.parse(init.body as string)).toEqual({ liked: true });
     expect((init.headers as Record<string, string>).authorization).toBe('Bearer tok');
   });
 
