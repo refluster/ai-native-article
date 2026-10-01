@@ -32,8 +32,9 @@ is slower and more expensive per item than implementation; `sign_off_persona`).
 
 Eligible issues carry **`wf:lane:design`** (stamped by `issue-triage`) and:
 
-- are not already claimed — no open PR references them (`Closes #N`), no
-  `issue-design:in-progress` / `issue-design:pr-open` label;
+- are not already claimed — no open PR references them (`Closes`/`Refs #N`,
+  or an `issue-<N>` head branch), no `issue-design:in-progress` label, and no
+  `issue-design:pr-open` label backed by such a PR;
 - do not carry an unanswered `wf:handback` (one you raised; `issue-triage`
   clears it when it re-lanes) or a legacy `issue-design:needs-human` park;
 - are unassigned or assigned to this run's persona.
@@ -57,6 +58,7 @@ discover rather than assume:
 
 | The issue asks for | Artefact |
 |---|---|
+| How to build or fix something **inside existing statute**: a `layer:L2`/`L3` bug's fix shape, a choice between code structures, a data-shape detail no later decision will cite | A **design note** in the repo's design-record location (for `agent-workforce`: `workforce/docs/design/`), **not an ADR** |
 | A decision between options, or a rule that will constrain later work | An **ADR** in the repo's ADR directory, following its existing template + index conventions |
 | A body of work to be broken into deliverable pieces | An **epic / story decomposition** in the repo's epic format, each story scoped to one coherent PR |
 | A change to an L0/L1 statute (governance, invariants, identity) | A **proposal diff** to that document — the amendment itself, written so the operator can read exactly what changes and reject it as easily as accept it |
@@ -65,6 +67,18 @@ discover rather than assume:
 If the issue does not scope to one artefact, produce the **decomposition** (a
 tracker with the pieces named) rather than a sprawling document — that is itself
 the deliverable, and say so.
+
+**Pick the lightest artefact that settles the question.** An ADR is L1 on every
+repo that lists its ADR directory as L0/L1 (this repo's §4.4 does). It can only
+land by the operator's merge, and the implementation waits behind that merge.
+When the issue is `layer:L2`/`L3` and the question is *how* to do something the
+statute already permits, the answer is a design note that the review panel can
+merge. An ADR there turns a bug fix into a ratification queue. Between
+2026-09-11 and 09-27 this lane answered the p1 bug #685 (ADR-0040), the bug
+#660 (ADR-0039), #663 (ADR-0034) and #669/#670 (root ADRs) with ADRs. All of
+them are still waiting on the operator, and none of the fixes has started.
+Reach for an ADR only when the decision will bind later work, or amends or
+defers to a standing ADR.
 
 ## Step 3 — write it so it can be rejected
 
@@ -88,10 +102,29 @@ a citation in the PR body (this repo's R-11 gate does), carry it.
 ## Step 4 — open the draft PR (never merge, never implement)
 
 Branch `<agent_slug>/issue-<N>-<short-kebab-slug>` off the default branch; one
-issue, one PR. Body:
+issue, one PR.
+
+**`Closes` or `Refs` — this decides whether the work continues after your
+merge.** Use `Closes #<N>` only when the document **is** the issue's whole
+deliverable (an epic decomposition, a record the issue asked for and nothing
+more). When the issue also needs the decision *implemented*, cite it with
+`Refs #<N>`. The merge then leaves the issue open, its `issue-design:pr-open`
+claim goes stale, and `issue-triage` re-lanes the remainder to `implement`
+against your merged document (issue-lanes.mjs, stale claims). With `Closes`,
+the implementation silently dies with the merge.
+
+**ADR numbers: allocate against open PRs, not just `main`.** Before numbering a
+new ADR, take the highest number in the ADR directory on the default branch
+**and** in every open PR that adds a file there, then add 1. Say in the PR body
+that the number is provisional until merge. Several open drafts carry numbers
+that collide with ADRs on `main` (ADR-0034, -0038 twice, -0039), and each such
+collision is a renumbering chore at merge time, with citation fan-out
+(adr-0030, ML-027).
+
+Body:
 
 ```md
-Closes #<issue-number>
+Closes #<issue-number>   ← or `Refs #<issue-number>` when implementation remains
 
 <one-paragraph summary: the decision proposed, in the issue's own terms>
 
@@ -100,7 +133,7 @@ Closes #<issue-number>
 **Governance consulted:** <the governance_docs + ADRs/CONTRIBUTING you read>
 **Decision, in one line:** <the proposal>
 **Alternatives rejected:** <one clause each>
-**Implementation:** not in this PR — <what would implement it, and where it is tracked>
+**Implementation:** not in this PR — <what would implement it; with `Refs`, this issue re-lanes to `implement` once this merges>
 
 wf-task-id: <run_id>
 wf-agent: <agent_slug>
@@ -111,7 +144,9 @@ decision; it does not make one. Verify before merging.
 ```
 
 Open it as a **draft**, replace `issue-design:in-progress` with
-`issue-design:pr-open`, and comment the PR link on the issue. Then wake the
+`issue-design:pr-open`, and comment the PR link on the issue. With `Refs`, say
+in that comment what implementation remains, because it is what the router
+reads when the claim goes stale. Then wake the
 reviewer so the PR routes in seconds rather than at `pr-autopilot`'s next tick
 (adr-0038):
 

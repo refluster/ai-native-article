@@ -2,8 +2,8 @@
 
 - **Status**: Implemented 2026-09-12 (this PR); design rules in
   [`../../DESIGN.md` §Public surfaces](../../DESIGN.md#public-surfaces-landing--docs--research)
-- **Routes**: `/docs` (index), `/docs/:slug` (whitepaper · founding-story ·
-  manifesto) — public, outside `AuthBoundary`, linked from the public header
+- **Routes**: `/docs` (index), `/docs/:slug` (capabilities · whitepaper ·
+  founding-story · manifesto) — public, outside `AuthBoundary`, linked from the public header
   beside **Research**
 - **Sibling note**: [`research-surface.md`](research-surface.md) — the other
   public reading surface, same shell

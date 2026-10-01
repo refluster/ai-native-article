@@ -159,6 +159,15 @@ to close.
 - Backfilling `retired_at` on bindings already deleted from any agent's
   array before this ADR ships.
 
+## Open review findings (carried at merge, PR #773 cycle 1 — 🟡, non-blocking)
+
+The implementing PR must resolve or explicitly accept each of these:
+
+- **D1 (`wf:dario`) — citation.** R-N2/R-N8 do not literally forbid a separate `RETIRED_BINDING#` row; the rejection of that alternative rests on "duplicates a query path for no benefit", not on those rules.
+- **D2 (`wf:dario`) — uniqueness check.** `validateBindingUniqueness` keys on `skill@project_id` with no `retired_at` awareness; it must skip retired entries, or a new binding for the same pair after a retirement will collide with the never-deleted retired one.
+- **H1 (`wf:hana`) — skip shape differs per call site.** `handleDispatch` can `return skip(...)`, but the tick-scan loop must push to `skipped[]` and `continue` (as the archived/paused skip does). Copying the shared snippet verbatim into the loop would `return` out of `handler()` and abort the rest of the tick.
+- **N1 (`wf:nadia`) — follow-up issue.** The audit-trail closure depends on an `issue-implement` follow-up that has no issue number yet; file it when implementation starts.
+
 ## Related
 
 - [ADR-0007](adr-0007-agent-config-single-source.md) — the `AGENT#{slug}/META`
