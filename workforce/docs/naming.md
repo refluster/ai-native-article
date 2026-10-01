@@ -46,10 +46,10 @@ The script runs in CI as `npm run workforce:naming` and exits non-zero on violat
 1. **Directory names under `workforce/{lambdas,skills}/`** must match `^[a-z][a-z0-9-]*$`. Caps, underscores, or trailing punctuation fail.
 2. **Agent slugs** (the `AGENT#{slug}` key in DynamoDB, and `owners[]` / `improvement_agent` in skill `meta.json`) must match `^[a-z]+$` — single lowercase token, no digits, no hyphens. The `workforce/agents/{slug}/` git tree was retired by [ADR-0007](adr/adr-0007-agent-config-single-source.md); the slug rule is now enforced by `validate-skills.mjs` (J7/J8) and agents-api.
 3. **TS source files under `workforce/lambdas/**` and `workforce/skills/**`** must be `kebab-case.ts` (lowercase with `-` separators) — no `PascalCase.ts`, no `camelCase.ts`. Skills can bundle their own `handler.ts` (and future co-bundled helpers) in the skill folder; the kebab-case rule applies there as well.
-7. **Test files** must use the `*-tests.ts` suffix, not `*.test.ts` or `*.spec.ts`. Vitest's include pattern (`**/*-tests.ts`) is the enforcement boundary; the naming convention is why. This is formalised from `workforce/lambdas/vitest.config.mjs` (FU-012).
 4. **Markdown files under `workforce/docs/`** must be `kebab-case.md`.
 5. **SAM template (`workforce/infra/sam/template.yaml`)** — when present, deployed resource names referenced via `FunctionName`, `TableName`, `BucketName`, `RuleName`, `TopicName`, `QueueName`, and similar `*Name` properties must start with `wf-` and end with `-{stage}` (or `-${Stage}` / `${WorkforceStage}` token references).
 6. *(retired with ADR-0007)* `agents/{slug}/agent.json:slug` equalling the directory name — no such tree exists any more.
+7. **Test files** must use the `*-tests.ts` suffix, not `*.test.ts` or `*.spec.ts`. Vitest's include pattern (`**/*-tests.ts`) is the enforcement boundary; the naming convention is why. This is formalised from `workforce/lambdas/vitest.config.mjs` (FU-012).
 
 Rules that depend on a file or directory that doesn't yet exist are no-ops — the linter degrades gracefully as the subsystem grows, and PR1 (which adds only this doc + the linter) passes without any agent or Lambda files in place.
 
