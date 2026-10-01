@@ -111,21 +111,11 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0042](adr-0042-deprecation-removal-date-rule.md) | A `deprecated` skill must declare `deprecated_until` (90-day floor) in the same write; enforced at the agents-api write boundary, not by a CI lint | Proposed | [008](../epics/epic-008-skill-repository.md) |
 | [0043](adr-0043-podcast-tts-gemini.md) | Podcast TTS moves from Polly to Gemini 3.8 Flash TTS: chunked, S3-resumable synthesis on direct Lambda invocation (the HTTP API's 30 s window can't hold one Gemini request); supersedes ADR-0016's synthesis engine only; free tier (10 req/day) | Proposed | [017](../epics/epic-017-podcast-spotify-distribution.md) |
 | [0044](adr-0044-stats-cost-figure-invariant.md) | Narrow the "no cost figures" test invariant on `GET /stats` to match `GET /performance`'s already-shipped modelled-figure precedent; reaffirm it unchanged on the public `GET /public/workforce-summary` | Proposed | — |
+| [0045](adr-0045-hire-time-speculative-flag-and-kill-criterion.md) | Hire-time speculative-duty flag on `AgentBinding` + `bound_at` timestamp + a round-doc lint + mechanically-scheduled kill-criterion (Epic-021 §B.2, mechanical half only — the playbook prose stays People-owned) | Proposed | [021](../epics/epic-021-finance-ir-activation.md) |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](../epics/README.md).
 
-> **Numbering note (2026-09-12, `wf:dario` — `issue-design`).** This PR adds
-> **adr-0035**, not adr-0034: `adr-0034-public-qa-boards.md` is already
-> merged to `main`, and a separate open draft PR (**#714**,
-> `dario/issue-663-skill-capabilities-declaration`) also proposes an
-> `adr-0034-skill-capabilities-declaration.md` from a branch cut before
-> `public-qa-boards` merged — the same stale-reservation collision this
-> file's 2026-09-09 note already describes for adr-0031/0032. This PR does
-> not touch that collision; flagging only that `0035` was chosen precisely
-> to avoid adding a third file to it. Whoever resolves #714's collision
-> should leave this row's number alone — nothing here reserves or depends
-> on `0034`.
 
 > **Numbering note (2026-09-09, `wf:dario` — `issue-design`).** This PR's
 > adr-0032 was drafted in parallel with another open draft PR's adr-0031
