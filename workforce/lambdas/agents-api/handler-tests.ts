@@ -171,6 +171,19 @@ vi.mock("../shared/project.js", () => ({
     return s;
   },
   projectPk: (id: string) => `PROJECT#${id}`,
+  // Mirrors the real getCredential: JSON-parses the SM secret and surfaces a
+  // missing one as a ResourceNotFoundException-named error.
+  getCredential: async (projectId: string, type: string) => {
+    const id = `wf/projects/${projectId}/${type}`;
+    const forced = smForcedErrorStore.get(id);
+    if (forced) throw forced;
+    if (!secretValueStore.has(id)) {
+      const e = new Error("Secrets Manager: secret not found");
+      e.name = "ResourceNotFoundException";
+      throw e;
+    }
+    return JSON.parse(secretValueStore.get(id) as string);
+  },
   getProject: async (id: string) => {
     const row = rows.get(key(`PROJECT#${id}`, "META"));
     return row;

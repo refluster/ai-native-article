@@ -121,6 +121,7 @@ import {
   appendExecution,
   archive as archiveProject,
   asProjectId,
+  getCredential,
   getProject,
   listExecutions,
   projectPk,
@@ -3572,40 +3573,28 @@ async function openExternalPrRoute(
 }
 
 /**
- * Resolves and validates a project's GitHub credential from Secrets Manager.
- * Returns the credential or a typed error object; throws for unexpected SM errors
- * so the outer handler's 500 mapping fires (W-4 fail-loud).
+ * Resolves a project's GitHub credential through the shared `getCredential`
+ * resolver (project-scoped path with the Epic-010 fallbacks) and maps its
+ * failures to typed errors. Unexpected SM errors re-throw so the outer
+ * handler's 500 mapping fires (W-4 fail-loud).
  */
 async function resolveGithubCredential(
   projectId: string,
 ): Promise<GithubSecret | { _err: "credential_not_provisioned" | "credential_malformed" }> {
-  const secretName = `wf/projects/${projectId}/github.token`;
-  let raw: { SecretString?: string };
+  let cred: GithubSecret;
   try {
-    raw = await sm.send(new GetSecretValueCommand({ SecretId: secretName }));
+    cred = await getCredential<GithubSecret>(asProjectId(projectId), "github.token");
   } catch (err) {
-    if (err instanceof SmResourceNotFoundException) {
+    if (err instanceof Error && err.name === "ResourceNotFoundException") {
       return { _err: "credential_not_provisioned" };
     }
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("ResourceNotFoundException") || msg.includes("resource not found")) {
-      return { _err: "credential_not_provisioned" };
-    }
+    if (err instanceof SyntaxError) return { _err: "credential_malformed" };
     throw err;
   }
-  if (!raw.SecretString) {
-    return { _err: "credential_not_provisioned" };
-  }
-  let parsed: { token?: unknown };
-  try {
-    parsed = JSON.parse(raw.SecretString) as { token?: unknown };
-  } catch {
+  if (!cred || typeof cred.token !== "string" || cred.token.length === 0) {
     return { _err: "credential_malformed" };
   }
-  if (typeof parsed.token !== "string" || parsed.token.length === 0) {
-    return { _err: "credential_malformed" };
-  }
-  return { token: parsed.token };
+  return { token: cred.token };
 }
 
 function reply(statusCode: number, body: unknown): APIGatewayProxyResultV2 {
