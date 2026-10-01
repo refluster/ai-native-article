@@ -33,8 +33,24 @@ import {
   triageAction,
   suggestLane,
   DEFAULT_REQUEUE_DAYS,
+  LANE_ENTRY_DENY,
+  issueRefsOfPr,
+  laneEntryConflicts,
+  ownerOf,
+  CLOSE_STATE_REASON,
+  CLOSE_VERDICTS,
+  DEFAULT_REVIEW_DAYS,
+  SETTLE_VERDICT_NAMES,
+  assertSettleVerdict,
+  closedLabel,
+  needsSettleReview,
+  settleRefusal,
+  wasReopened,
 } from "./issue-lanes.mjs";
-import { labelsToRemove } from "./issue-triage-post.mjs";
+import { labelsToRemove, laneRefusal } from "./issue-triage-post.mjs";
+import { closeBudgetRemaining, runSettle, settleComment } from "./issue-triage-settle.mjs";
+import { selectCandidates } from "./issue-triage-scan.mjs";
+import { BINDINGS } from "../../scripts/lib/bindings-manifest.mjs";
 
 describe("the lane vocabulary is closed (C-4)", () => {
   it("exposes exactly the three wired lanes", () => {
@@ -123,6 +139,20 @@ describe("labelsToRemove — one issue, one lane, and the park is answered", () 
 
   it("swapping one human role for another drops only the old one", () => {
     expect(labelsToRemove(["wf:human:legal"], "operator", { humanRole: "product" })).toEqual(["wf:human:legal"]);
+  });
+
+  it("#762: re-laning to a different owner drops the stale wf:owner:* label, not just the lane", () => {
+    expect(
+      labelsToRemove(["wf:lane:design", "wf:owner:dario"], "design", { owner: "nadia" }),
+    ).toEqual(["wf:owner:dario"]);
+  });
+
+  it("#762: re-applying the same owner keeps the label", () => {
+    expect(labelsToRemove(["wf:owner:dario"], "design", { owner: "dario" })).toEqual([]);
+  });
+
+  it("#762: mirrors humanRole's default — omitting `owner` keeps nothing, same as omitting `humanRole`", () => {
+    expect(labelsToRemove(["wf:owner:dario"], "design")).toEqual(["wf:owner:dario"]);
   });
 });
 
@@ -221,6 +251,120 @@ describe("triageAction — what the router should look at", () => {
   });
 });
 
+describe("no dead ends — a lane state no worker can act on goes back to the router", () => {
+  const now = Date.parse("2026-09-28T12:00:00Z");
+  const daysAgo = (d) => new Date(now - d * 86400_000).toISOString();
+  const hoursAgo = (h) => new Date(now - h * 3600_000).toISOString();
+  const bound = { implement: ["ren"], design: ["dario"] };
+
+  it("issueRefsOfPr reads closing keywords, Refs, and the worker branch convention", () => {
+    expect([...issueRefsOfPr({ body: "Closes #505\n\nsummary", headRef: "ren/issue-505-perf" })]).toEqual([505]);
+    expect([...issueRefsOfPr({ body: "Refs #768 — the ADR only", headRef: "dario/adr" })]).toEqual([768]);
+    expect([...issueRefsOfPr({ body: "fixes: #12 and resolves #13" })].sort()).toEqual([12, 13]);
+    expect([...issueRefsOfPr({ headRef: "dario/issue-769-deprecation-removal-date-rule" })]).toEqual([769]);
+  });
+
+  it("issueRefsOfPr ignores a bare mention and another repo's tracker", () => {
+    expect(issueRefsOfPr({ body: "see #12; related to #13" }).size).toBe(0);
+    expect(issueRefsOfPr({ body: "Closes PSVL/asp-cloud#866" }).size).toBe(0);
+    expect(issueRefsOfPr({ headRef: "claude/tissue-12-x" }).size).toBe(0);
+  });
+
+  it("a pr-open claim with a live PR is still held", () => {
+    const held = { labels: ["issue-implement:pr-open", "wf:lane:implement"], updatedAt: daysAgo(9), number: 505 };
+    expect(triageAction(held, { now, openPrRefs: new Set([505]) })).toMatchObject({ action: "skip" });
+  });
+
+  it("a pr-open claim whose PR merged as a partial slice is released (#671/#672/#673)", () => {
+    const orphan = { labels: ["issue-implement:pr-open", "type:bug"], updatedAt: daysAgo(18), number: 671 };
+    const r = triageAction(orphan, { now, openPrRefs: new Set([505]) });
+    expect(r.action).toBe("requeue");
+    expect(r.why).toMatch(/stale claim.*no open PR references #671/);
+  });
+
+  it("an in-progress marker is a dead run only after a day without a PR", () => {
+    const fresh = { labels: ["issue-design:in-progress"], updatedAt: hoursAgo(2), number: 9 };
+    const dead = { labels: ["issue-design:in-progress"], updatedAt: hoursAgo(30), number: 9 };
+    expect(triageAction(fresh, { now, openPrRefs: new Set() }).action).toBe("skip");
+    expect(triageAction(dead, { now, openPrRefs: new Set() })).toMatchObject({ action: "requeue" });
+  });
+
+  it("parked AND laned is answered now, not after a window every bot comment resets (#664)", () => {
+    const both = { labels: ["issue-implement:needs-human", "wf:lane:implement", "wf:owner:ren"], updatedAt: daysAgo(1), number: 664 };
+    expect(triageAction(both, { now })).toMatchObject({ action: "requeue" });
+    // An unlaned legacy park keeps the adr-0038 window.
+    const parkedOnly = { labels: ["issue-implement:needs-human"], updatedAt: daysAgo(1), number: 355 };
+    expect(triageAction(parkedOnly, { now }).action).toBe("skip");
+  });
+
+  it("an implement lane on a label its worker denies is a dead end (#572, layer:L1)", () => {
+    const dead = { labels: ["layer:L1", "wf:lane:implement", "wf:owner:ren"], updatedAt: daysAgo(18), number: 572 };
+    const r = triageAction(dead, { now });
+    expect(r.action).toBe("requeue");
+    expect(r.why).toMatch(/layer:l1/);
+    expect(laneEntryConflicts("design", ["layer:L1", "type:tracker"])).toEqual([]);
+  });
+
+  it("an owner with no binding for the lane's worker strands the issue (#739 sana, #659 nadia)", () => {
+    const stranded = { labels: ["wf:lane:implement", "wf:owner:sana"], updatedAt: daysAgo(3), number: 739 };
+    expect(triageAction(stranded, { now, workerOwners: bound })).toMatchObject({ action: "requeue" });
+    const fine = { labels: ["wf:lane:design", "wf:owner:dario"], updatedAt: daysAgo(3), number: 768 };
+    expect(triageAction(fine, { now, workerOwners: bound }).action).toBe("skip");
+    // Unknown roster (API unreachable) → the check is skipped, never guessed.
+    expect(triageAction(stranded, { now }).action).toBe("skip");
+    // The operator lane has no worker, so any owner is fine there.
+    const op = { labels: ["wf:lane:operator", "wf:owner:maya", "wf:human:console"], updatedAt: daysAgo(3), number: 687 };
+    expect(triageAction(op, { now, workerOwners: bound }).action).toBe("skip");
+  });
+
+  it("ownerOf reads the one owner label", () => {
+    expect(ownerOf(["wf:lane:design", "wf:owner:Dario"])).toBe("dario");
+    expect(ownerOf(["wf:lane:design"])).toBeNull();
+  });
+
+  it("LANE_ENTRY_DENY stays inside every issue-implement binding's deny-list — the two cannot drift", () => {
+    const implement = BINDINGS.filter((b) => b.skill === "issue-implement");
+    expect(implement.length).toBeGreaterThan(0);
+    for (const b of implement) {
+      const deny = b.config.issue_selection.deny_labels.map((l) => l.toLowerCase());
+      for (const label of LANE_ENTRY_DENY.implement) expect(deny).toContain(label);
+    }
+  });
+});
+
+describe("laneRefusal — the post script never writes a lane nobody drains", () => {
+  const base = { lane: "implement", labels: ["type:bug"], owner: "ren", heldBy: [], boundOwners: ["ren"], issue: 1 };
+
+  it("a clean dispatch passes", () => {
+    expect(laneRefusal(base)).toBeNull();
+  });
+
+  it("refuses to re-lane an issue a live PR holds", () => {
+    expect(laneRefusal({ ...base, heldBy: [752] })).toMatch(/held by open PR #752/);
+  });
+
+  it("refuses implement on a label the implement worker denies, and names the way out", () => {
+    expect(laneRefusal({ ...base, labels: ["layer:L1"] })).toMatch(/Route it to "design"/);
+    expect(laneRefusal({ ...base, lane: "design", owner: "dario", boundOwners: ["dario"], labels: ["layer:L1"] })).toBeNull();
+  });
+
+  it("refuses an owner outside the lane worker's bound personas — and skips the check when the roster is unknown", () => {
+    expect(laneRefusal({ ...base, owner: "sana" })).toMatch(/bound only to ren/);
+    expect(laneRefusal({ ...base, owner: "sana", boundOwners: null })).toBeNull();
+    expect(laneRefusal({ ...base, owner: "x", boundOwners: [] })).toMatch(/bound only to nobody/);
+  });
+
+  it("the operator lane has no worker, so no owner check", () => {
+    expect(laneRefusal({ ...base, lane: "operator", owner: "maya", boundOwners: null })).toBeNull();
+  });
+
+  it("clearClaims removes stale claim markers only when asked", () => {
+    const labels = ["issue-implement:pr-open", "wf:lane:implement"];
+    expect(labelsToRemove(labels, "implement", { owner: "ren" })).toEqual([]);
+    expect(labelsToRemove(labels, "implement", { owner: "ren", clearClaims: true })).toEqual(["issue-implement:pr-open"]);
+  });
+});
+
 describe("suggestLane — a starting point, not the decision", () => {
   it("routes the stalled tail to design: architecture / L1 / tracker", () => {
     expect(suggestLane({ labels: ["role:architecture", "type:feature"] })).toBe("design");
@@ -243,5 +387,227 @@ describe("suggestLane — a starting point, not the decision", () => {
   it("no usable labels -> no suggestion; the router reads the issue", () => {
     expect(suggestLane({ labels: ["insights"] })).toBeNull();
     expect(suggestLane({})).toBeNull();
+  });
+});
+
+describe("settling — duplicates consolidate, done and moot issues close", () => {
+  const NOW = Date.parse("2026-09-29T00:00:00Z");
+  const daysAgo = (d) => new Date(NOW - d * 86400_000).toISOString();
+
+  it("the verdict vocabulary is closed (C-4)", () => {
+    expect(SETTLE_VERDICT_NAMES).toEqual(["duplicate", "completed", "obsolete", "still-valid"]);
+    expect(CLOSE_VERDICTS).toEqual(["duplicate", "completed", "obsolete"]);
+    expect(() => assertSettleVerdict("wontfix")).toThrow(/unknown verdict/);
+    expect(() => closedLabel("still-valid")).toThrow(/not a closing verdict/);
+    expect(closedLabel("duplicate")).toBe("wf:closed:duplicate");
+    expect(CLOSE_STATE_REASON).toEqual({ duplicate: "not_planned", completed: "completed", obsolete: "not_planned" });
+  });
+
+  it("a long-idle laned issue gets a settle review — the operator lane included", () => {
+    const opts = { now: NOW, openPrRefs: new Set() };
+    expect(needsSettleReview({ labels: ["wf:lane:operator", "wf:human:console"], updatedAt: daysAgo(DEFAULT_REVIEW_DAYS + 1), number: 1 }, opts)).toBe(true);
+    expect(needsSettleReview({ labels: ["wf:lane:implement"], updatedAt: daysAgo(DEFAULT_REVIEW_DAYS - 1), number: 1 }, opts)).toBe(false);
+  });
+
+  it("never reviews live work, a park, an unlaned issue, or a human reopen", () => {
+    const old = daysAgo(90);
+    const opts = { now: NOW, openPrRefs: new Set([7]) };
+    expect(needsSettleReview({ labels: ["wf:lane:implement"], updatedAt: old, number: 7 }, opts)).toBe(false);
+    expect(needsSettleReview({ labels: ["wf:lane:implement", "issue-implement:in-progress"], updatedAt: old, number: 1 }, opts)).toBe(false);
+    expect(needsSettleReview({ labels: ["wf:lane:design", "wf:handback"], updatedAt: old, number: 1 }, opts)).toBe(false);
+    expect(needsSettleReview({ labels: ["type:chore"], updatedAt: old, number: 1 }, opts)).toBe(false);
+    expect(needsSettleReview({ labels: ["wf:lane:design", "wf:closed:obsolete"], updatedAt: old, number: 1 }, opts)).toBe(false);
+  });
+
+  it("a duplicate folds into another OPEN issue — never itself, a PR, or a closed one", () => {
+    const base = { verdict: "duplicate", issue: 12, labels: ["wf:lane:implement"] };
+    expect(settleRefusal({ ...base, of: 10, canonical: { state: "open" } })).toBeNull();
+    expect(settleRefusal({ ...base, of: null })).toMatch(/--of/);
+    expect(settleRefusal({ ...base, of: 12, canonical: { state: "open" } })).toMatch(/itself/);
+    expect(settleRefusal({ ...base, of: 10, canonical: { state: "open", pull_request: {} } })).toMatch(/completed/);
+    expect(settleRefusal({ ...base, of: 10, canonical: { state: "closed" } })).toMatch(/completed.*obsolete/);
+  });
+
+  it("completed needs a MERGED PR; obsolete needs what superseded it", () => {
+    expect(settleRefusal({ verdict: "completed", issue: 1, mergedPr: { number: 5, merged_at: "2026-09-01T00:00:00Z" } })).toBeNull();
+    expect(settleRefusal({ verdict: "completed", issue: 1 })).toMatch(/merged PR/);
+    expect(settleRefusal({ verdict: "completed", issue: 1, mergedPr: { number: 5, merged_at: null } })).toMatch(/not merged/);
+    expect(settleRefusal({ verdict: "obsolete", issue: 1, supersededBy: "adr-0038" })).toBeNull();
+    expect(settleRefusal({ verdict: "obsolete", issue: 1, supersededBy: "  " })).toMatch(/superseded-by/);
+  });
+
+  it("never closes under a live branch, over a human reopen, or an L0/L1/tracker issue", () => {
+    const ok = { verdict: "obsolete", issue: 3, supersededBy: "#9" };
+    expect(settleRefusal({ ...ok, heldBy: [44] })).toMatch(/held by open PR #44/);
+    expect(settleRefusal({ ...ok, labels: ["wf:closed:obsolete"] })).toMatch(/reopened by a human/);
+    expect(wasReopened(["wf:closed:duplicate"])).toBe(true);
+    for (const l of ["layer:L0", "layer:L1", "type:tracker"]) {
+      expect(settleRefusal({ ...ok, labels: [l] })).toMatch(/design decision/);
+    }
+    // still-valid only records a review, so nothing blocks it
+    expect(settleRefusal({ verdict: "still-valid", issue: 3, heldBy: [44], labels: ["layer:L1"] })).toBeNull();
+  });
+
+  it("the settle comment carries GitHub's duplicate marker and a greppable verdict marker", () => {
+    const dup = settleComment("Same deliverable as #10.", { verdict: "duplicate", of: 10 });
+    expect(dup).toContain("Duplicate of #10");
+    expect(dup).toContain("<!-- wf:settled:duplicate -->");
+    expect(dup).toMatch(/reopen it/);
+    expect(settleComment("x", { verdict: "completed", pr: 726 })).toContain("Completed by #726.");
+    expect(settleComment("x", { verdict: "obsolete", supersededBy: "adr-0038" })).toContain("Superseded by adr-0038.");
+    const keep = settleComment("Still wanted.", { verdict: "still-valid" });
+    expect(keep).toContain("<!-- wf:settled:still-valid -->");
+    expect(keep).not.toMatch(/reopen/);
+  });
+});
+
+describe("the day-window edges are exclusive — exactly N days is still inside", () => {
+  const NOW = Date.parse("2026-09-29T00:00:00Z");
+  const daysAgo = (d) => new Date(NOW - d * 86400_000).toISOString();
+
+  it("a legacy park untouched for exactly requeue_days is not yet requeued", () => {
+    const labels = ["issue-implement:needs-human"];
+    expect(triageAction({ labels, updatedAt: daysAgo(DEFAULT_REQUEUE_DAYS) }, { now: NOW }).action).toBe("skip");
+    expect(triageAction({ labels, updatedAt: daysAgo(DEFAULT_REQUEUE_DAYS + 1 / 24) }, { now: NOW }).action).toBe("requeue");
+  });
+
+  it("a laned issue idle for exactly review_days is not yet due a settle review", () => {
+    const opts = { now: NOW, openPrRefs: new Set() };
+    expect(needsSettleReview({ labels: ["wf:lane:design"], updatedAt: daysAgo(DEFAULT_REVIEW_DAYS), number: 1 }, opts)).toBe(false);
+    expect(needsSettleReview({ labels: ["wf:lane:design"], updatedAt: daysAgo(DEFAULT_REVIEW_DAYS + 1 / 24), number: 1 }, opts)).toBe(true);
+  });
+});
+
+describe("selectCandidates — the batch bound keeps the oldest, per kind", () => {
+  const d = (number, action, day) => ({ number, updated_at: `2026-09-${String(day).padStart(2, "0")}T00:00:00Z`, decision: { action } });
+
+  it("caps routing and reviews independently, oldest first, and drops skips", () => {
+    const decided = [
+      d(1, "triage", 20), d(2, "requeue", 5), d(3, "triage", 10), d(4, "skip", 1),
+      d(5, "review", 15), d(6, "review", 2), d(7, "review", 8),
+    ];
+    const got = selectCandidates(decided, { max: 2, maxReview: 2 }).map((c) => c.number);
+    expect(got).toEqual([2, 3, 6, 7]);
+  });
+
+  it("a review flood never crowds out a hand-back", () => {
+    const decided = [d(9, "requeue", 28), ...Array.from({ length: 20 }, (_, i) => d(100 + i, "review", 1))];
+    const got = selectCandidates(decided, { max: 1, maxReview: 3 }).map((c) => c.number);
+    expect(got[0]).toBe(9);
+    expect(got).toHaveLength(4);
+  });
+});
+
+describe("runSettle — the write sequence, against a stubbed GitHub", () => {
+  const NOW = Date.parse("2026-09-29T12:00:00Z");
+  const REPO = "o/r";
+
+  /** A scripted gh: routes by "METHOD path" prefix, records every call. */
+  function stubGh(routes) {
+    const calls = [];
+    const gh = async (method, path, body) => {
+      calls.push(`${method} ${path.split("?")[0]}`);
+      for (const [key, res] of routes) {
+        const [m, p] = key.split(" ");
+        if (m === method && path.startsWith(p)) return typeof res === "function" ? res(path, body) : res;
+      }
+      return { status: 200, json: [] };
+    };
+    return { gh, calls };
+  }
+  const openIssue = (labels = ["wf:lane:implement"]) => ({ status: 200, json: { number: 12, state: "open", labels: labels.map((name) => ({ name })) } });
+  const base = { body: "Why.", now: NOW };
+  const writes = (calls) => calls.filter((c) => !c.startsWith("GET"));
+
+  it("duplicate: consolidates on the canonical, comments, CLOSES, then labels — in that order", async () => {
+    const { gh, calls } = stubGh([
+      ["GET /repos/o/r/issues/12", openIssue()],
+      ["GET /repos/o/r/issues/10", { status: 200, json: { number: 10, state: "open" } }],
+      ["POST /repos/o/r/issues/10/comments", { status: 201, json: {} }],
+      ["POST /repos/o/r/issues/12/comments", { status: 201, json: {} }],
+      ["PATCH /repos/o/r/issues/12", { status: 200, json: {} }],
+      ["POST /repos/o/r/labels", { status: 201, json: {} }],
+      ["POST /repos/o/r/issues/12/labels", { status: 200, json: {} }],
+    ]);
+    const r = await runSettle(gh, REPO, { ...base, issue: 12, verdict: "duplicate", of: 10, carry: "Adds a repro." });
+    expect(r.code).toBe(0);
+    expect(writes(calls)).toEqual([
+      "POST /repos/o/r/issues/10/comments",
+      "POST /repos/o/r/issues/12/comments",
+      "PATCH /repos/o/r/issues/12",
+      "POST /repos/o/r/labels",
+      "POST /repos/o/r/issues/12/labels",
+    ]);
+  });
+
+  it("a failed close leaves the issue UNLABELLED — never open-but-wearing wf:closed:*", async () => {
+    const { gh, calls } = stubGh([
+      ["GET /repos/o/r/issues/12", openIssue()],
+      ["GET /repos/o/r/pulls/726", { status: 200, json: { number: 726, merged_at: "2026-09-10T00:00:00Z" } }],
+      ["POST /repos/o/r/issues/12/comments", { status: 201, json: {} }],
+      ["PATCH /repos/o/r/issues/12", { status: 502, json: {} }],
+    ]);
+    const r = await runSettle(gh, REPO, { ...base, issue: 12, verdict: "completed", pr: 726 });
+    expect(r.code).toBe(3);
+    expect(calls.some((c) => c.includes("/labels"))).toBe(false);
+  });
+
+  it("obsolete closes; still-valid only comments", async () => {
+    const ok = [
+      ["GET /repos/o/r/issues/12", openIssue()],
+      ["POST /repos/o/r/issues/12/comments", { status: 201, json: {} }],
+      ["PATCH /repos/o/r/issues/12", { status: 200, json: {} }],
+      ["POST /repos/o/r/labels", { status: 422, json: {} }],
+      ["POST /repos/o/r/issues/12/labels", { status: 200, json: {} }],
+    ];
+    const a = stubGh(ok);
+    expect((await runSettle(a.gh, REPO, { ...base, issue: 12, verdict: "obsolete", supersededBy: "adr-0038" })).code).toBe(0);
+    expect(writes(a.calls)).toContain("PATCH /repos/o/r/issues/12");
+    const b = stubGh(ok);
+    expect((await runSettle(b.gh, REPO, { ...base, issue: 12, verdict: "still-valid" })).code).toBe(0);
+    expect(writes(b.calls)).toEqual(["POST /repos/o/r/issues/12/comments"]);
+  });
+
+  it("a refusal writes nothing (issue held by an open PR)", async () => {
+    const { gh, calls } = stubGh([
+      ["GET /repos/o/r/issues/12", openIssue()],
+      ["GET /repos/o/r/pulls", { status: 200, json: [{ number: 44, body: "Closes #12", head: { ref: "x" } }] }],
+    ]);
+    const r = await runSettle(gh, REPO, { ...base, issue: 12, verdict: "obsolete", supersededBy: "#9" });
+    expect(r.code).toBe(1);
+    expect(r.msg).toMatch(/held by open PR #44/);
+    expect(writes(calls)).toEqual([]);
+  });
+
+  it("the close budget is mechanical: past max_closes nothing is written", async () => {
+    const recent = new Date(NOW - 3600_000).toISOString();
+    const { gh, calls } = stubGh([
+      ["GET /repos/o/r/issues/12", openIssue()],
+      ["GET /repos/o/r/issues?state=closed", (path) => ({
+        status: 200,
+        json: path.includes("obsolete") ? [1, 2, 3].map((i) => ({ number: i, closed_at: recent })) : [],
+      })],
+    ]);
+    const r = await runSettle(gh, REPO, { ...base, issue: 12, verdict: "obsolete", supersededBy: "#9", maxCloses: 3 });
+    expect(r.code).toBe(1);
+    expect(r.msg).toMatch(/close budget spent/);
+    expect(writes(calls)).toEqual([]);
+  });
+
+  it("an uncountable budget fails closed", async () => {
+    const { gh, calls } = stubGh([
+      ["GET /repos/o/r/issues/12", openIssue()],
+      ["GET /repos/o/r/issues?state=closed", { status: 500, json: {} }],
+    ]);
+    const r = await runSettle(gh, REPO, { ...base, issue: 12, verdict: "obsolete", supersededBy: "#9" });
+    expect(r.code).toBe(3);
+    expect(writes(calls)).toEqual([]);
+  });
+
+  it("closeBudgetRemaining counts only closes inside the window", () => {
+    const at = (h) => new Date(NOW - h * 3600_000).toISOString();
+    expect(closeBudgetRemaining([at(1), at(2), at(30)], { now: NOW, windowHours: 20, max: 5 })).toBe(3);
+    expect(closeBudgetRemaining([at(1), at(2)], { now: NOW, windowHours: 20, max: 2 })).toBe(0);
+    expect(closeBudgetRemaining([null, "bad"], { now: NOW, max: 1 })).toBe(1);
   });
 });
