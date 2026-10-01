@@ -36,12 +36,14 @@ import { dirname, join } from "node:path";
 import { projectRepo } from "../pr-autopilot/pr-autopilot-scan.mjs";
 import { makeGh } from "../pr-autopilot/pr-merge.mjs";
 import { findRawMentions } from "../pr-autopilot/pr-autopilot-post.mjs";
+import { collectOpenPrRefs, collectWorkerOwners } from "./issue-triage-scan.mjs";
 import {
   LANES,
   LANE_LABEL_PREFIX,
   LANE_WORKER_SKILL,
   HUMAN_ROLES,
   HUMAN_ROLE_LABEL_PREFIX,
+  IN_PROGRESS_LABELS,
   OWNER_LABEL_PREFIX,
   PARKED_LABELS,
   applyHopCap,
@@ -49,6 +51,7 @@ import {
   assertHumanRole,
   hopMarker,
   humanRoleLabel,
+  laneEntryConflicts,
   laneLabel,
   ownerLabel,
   parseHops,
@@ -77,9 +80,12 @@ const HUMAN_LABEL_META = (role) => ({ color: "e99695", description: `Operator la
  *      invariant as the lane label above (#762: a re-lane that changes the
  *      owner left both the old and the new owner label on the issue, because
  *      this function never checked `OWNER_LABEL_PREFIX` even though it was
- *      exported from issue-lanes.mjs for exactly this).
+ *      exported from issue-lanes.mjs for exactly this);
+ *    - with `clearClaims`, every `*:in-progress` / `*:pr-open` marker — set only
+ *      once the caller has verified no open PR backs the claim, so what is
+ *      removed is a stale claim, never a live worker's.
  *  Pure + exported: the "exactly one lane" invariant is unit-tested. */
-export function labelsToRemove(current = [], lane, { humanRole = null, owner = null } = {}) {
+export function labelsToRemove(current = [], lane, { humanRole = null, owner = null, clearClaims = false } = {}) {
   assertLane(lane);
   const keep = laneLabel(lane);
   const keepRole = lane === "operator" && humanRole ? humanRoleLabel(humanRole) : null;
@@ -92,8 +98,42 @@ export function labelsToRemove(current = [], lane, { humanRole = null, owner = n
       if (PARKED_LABELS.includes(lc)) return true;
       if (lc.startsWith(HUMAN_ROLE_LABEL_PREFIX) && l !== keepRole) return true;
       if (lc.startsWith(OWNER_LABEL_PREFIX) && l !== keepOwner) return true;
+      if (clearClaims && IN_PROGRESS_LABELS.includes(lc)) return true;
       return false;
     });
+}
+
+/**
+ * The guards a lane must pass before it is written — each one a way an issue
+ * used to be laned into a queue nobody drains. Pure + exported (unit-tested);
+ * returns `null` when the lane may be posted, else the refusal reason.
+ *
+ *  - `heldBy`: open PR numbers that reference the issue. A worker holds it;
+ *    re-laning under a live branch strands that branch (SKILL.md Scope).
+ *  - lane-entry conflicts: `implement` on an issue carrying a label the
+ *    implement worker is bound to refuse (#572).
+ *  - `boundOwners`: the slugs bound to the lane's worker skill on this project
+ *    (null = unknown, check skipped). An owner outside it is an issue no
+ *    worker will ever select (#739 → sana, #748 → dario on the implement lane).
+ */
+export function laneRefusal({ lane, labels = [], owner, heldBy = [], boundOwners = null, issue }) {
+  if (heldBy.length > 0) {
+    return `#${issue} is held by open PR ${heldBy.map((n) => `#${n}`).join(", ")} — a worker has it; re-lane only after that PR merges or closes`;
+  }
+  const conflicts = laneEntryConflicts(lane, labels);
+  if (conflicts.length > 0) {
+    return (
+      `lane "${lane}" refused: #${issue} carries ${conflicts.join(", ")}, which ${LANE_WORKER_SKILL[lane]} is bound to refuse — ` +
+      `it would sit in a queue nobody drains. Route it to "design" (the deliverable becomes a proposal or decomposition) or "operator"`
+    );
+  }
+  if (LANE_WORKER_SKILL[lane] && Array.isArray(boundOwners) && !boundOwners.includes(owner)) {
+    return (
+      `owner "${owner}" refused for lane "${lane}": ${LANE_WORKER_SKILL[lane]} on this project is bound only to ` +
+      `${boundOwners.length ? boundOwners.join(", ") : "nobody"} — name a bound worker (binding_config.lane_owners), or the issue is eligible for nobody`
+    );
+  }
+  return null;
 }
 
 function arg(name) {
@@ -198,6 +238,24 @@ async function main() {
         `"a human" is not an answer to "who owns this". One of: ${Object.keys(HUMAN_ROLES).join(", ")}`,
     );
   }
+  // Every lane must be one a worker will actually pick up — checked against
+  // live facts (open PRs, the roster), not the labels' say-so.
+  let heldBy = [];
+  try {
+    heldBy = (await collectOpenPrRefs(gh, repo)).get(Number(issue)) ?? [];
+  } catch (e) {
+    return die(3, `could not verify whether a worker holds #${issue}: ${e?.msg || e?.message || String(e)}`);
+  }
+  let boundOwners = null;
+  if (LANE_WORKER_SKILL[lane] && projectId) {
+    try {
+      boundOwners = (await collectWorkerOwners([owner], projectId))[lane];
+    } catch (e) {
+      console.error(`issue-triage-post: WARN roster read failed (${e?.message || e}) — owner/worker check skipped`);
+    }
+  }
+  const refusal = laneRefusal({ lane, labels: current, owner: String(owner).toLowerCase(), heldBy, boundOwners, issue });
+  if (refusal) return die(1, refusal);
   if (capped.capped) {
     console.error(`issue-triage-post: #${issue} ${capped.why} — forcing lane "operator" over requested "${requestedLane}"`);
     body =
@@ -222,7 +280,10 @@ async function main() {
   const l = await gh("POST", `/repos/${repo}/issues/${issue}/labels`, { labels: ensure.map(([name]) => name) });
   if (l.status !== 200) console.error(`issue-triage-post: WARN could not label #${issue} -> HTTP ${l.status}`);
 
-  for (const name of labelsToRemove(current, lane, { humanRole, owner })) {
+  // heldBy is empty here (laneRefusal refused otherwise), so any claim label
+  // still on the issue is stale — the partial-slice merge or the dead run it
+  // outlived — and leaving it would make the scan skip the issue again.
+  for (const name of labelsToRemove(current, lane, { humanRole, owner, clearClaims: true })) {
     const d = await gh("DELETE", `/repos/${repo}/issues/${issue}/labels/${encodeURIComponent(name)}`);
     if (d.status !== 200 && d.status !== 404) console.error(`issue-triage-post: WARN could not clear "${name}" -> HTTP ${d.status}`);
   }
