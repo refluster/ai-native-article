@@ -34,7 +34,30 @@ import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
 // Shared with the repository-activity builder: both talk to the same API on the
 // same quota, and both have to tell a spent quota from a missing permission.
 import { isRateLimited } from "./build-repo-performance.mjs";
+import { assertProvenance } from "./lib/perf-provenance.mjs";
 ensureProxyAwareEntry(import.meta.url);
+
+/** #505: a dropped (skipped) PR is missing from `total_prs` AND from the
+ *  churn totals alike (`fetchPrFacts` drops the whole PR, it does not
+ *  fabricate a zero-churn entry for it) — so a degraded `pr_detail` signal
+ *  puts all three headline metrics in doubt, not just churn. */
+export const PR_DETAIL_METRICS = ["total_prs", "total_additions", "total_deletions"];
+
+/** The `{metrics, unmeasured}` inputs `assertProvenance` needs for a PERF#{scope}/PR
+ *  row, derived from the block `aggregate()` actually produced plus the real
+ *  `skipped` count `fetchPrFacts` returned — pulled out of the publish loop so a
+ *  test can drive the guard from a realistic degraded `fetchPrFacts` result
+ *  instead of a hand-built metrics object (#752 O1). */
+export function prProvenanceInputs(block, skipped) {
+  return {
+    metrics: {
+      total_prs: block.pr_summary.total_prs,
+      total_additions: block.pr_summary.total_additions,
+      total_deletions: block.pr_summary.total_deletions,
+    },
+    unmeasured: skipped > 0 ? PR_DETAIL_METRICS : [],
+  };
+}
 
 const GREEN_MARKER_RE = /<!--\s*autopilot:review:[a-z0-9-]+:green\s*-->/i;
 const REVIEWER_SLUG_RE = /<!--\s*autopilot:review:([a-z0-9-]+):green\s*-->/gi;
@@ -464,18 +487,37 @@ async function main() {
   const { DynamoDBDocumentClient, PutCommand } = await importLambdaDep("@aws-sdk/lib-dynamodb");
   const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), { marshallOptions: { removeUndefinedValues: true } });
   const updatedAt = new Date().toISOString();
+  const { metrics: prMetrics, unmeasured: prUnmeasured } = prProvenanceInputs(block, skipped);
+  const published = [];
+  const refusedScopes = [];
   for (const sc of targetScopes) {
-    await ddb.send(
-      new PutCommand({
-        TableName: TABLE,
-        Item: { pk: `PERF#${sc}`, sk: "PR", scope: sc, updated_at: updatedAt, ...block },
-      }),
-    );
+    // #505: the same writer-boundary guard build-repo-performance.mjs's REPO
+    // row uses — refuse an all-zero row unless every zero is a confirmed
+    // measurement (skipped === 0). Guard and write share one per-scope try,
+    // mirroring build-repo-performance.mjs: a refusal or DDB failure on one
+    // scope is logged and skipped, later --also-scope targets still publish,
+    // and the run exits 2 instead of crashing on an uncaught throw.
+    try {
+      assertProvenance({ scope: sc, sk: "PR", metrics: prMetrics, unmeasured: prUnmeasured });
+      await ddb.send(
+        new PutCommand({
+          TableName: TABLE,
+          Item: { pk: `PERF#${sc}`, sk: "PR", scope: sc, updated_at: updatedAt, ...block },
+        }),
+      );
+      published.push(sc);
+    } catch (err) {
+      console.error(`WARN PERF#${sc}/PR: ${err instanceof Error ? err.message : String(err)} — skipped, other scopes still publish`);
+      refusedScopes.push(sc);
+    }
   }
-  console.error(`published ${targetScopes.map((sc) => `PERF#${sc}/PR`).join(" + ")} to ${TABLE}`);
-  // 2 = published but degraded, the contract refresh.mjs reads: a partial
-  // roll-up still beats yesterday's, but the run must not report itself clean.
-  return skipped > 0 ? 2 : 0;
+  if (published.length) {
+    console.error(`published ${published.map((sc) => `PERF#${sc}/PR`).join(" + ")} to ${TABLE}`);
+  }
+  // 2 = published but degraded (or a scope was refused/failed), the contract
+  // refresh.mjs reads: a partial roll-up still beats yesterday's, but the run
+  // must not report itself clean.
+  return skipped > 0 || refusedScopes.length > 0 ? 2 : 0;
 }
 
 if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
