@@ -63,8 +63,14 @@ describe("propText", () => {
 });
 
 describe("slugFromId", () => {
-  it("strips dashes and truncates to 12 chars", () => {
-    expect(slugFromId("34fd0f0b-e61e-817a-9f6b-dc65b0d5b4cc")).toBe("34fd0f0be61e");
+  it("strips dashes and keeps the LAST 12 chars (the reader site's rule)", () => {
+    expect(slugFromId("34fd0f0b-e61e-817a-9f6b-dc65b0d5b4cc")).toBe("dc65b0d5b4cc");
+  });
+
+  it("gives same-day pages distinct slugs (their ids share the head)", () => {
+    const a = slugFromId("3e3d0f0b-e61e-8101-aaaa-a1a1a1a1a1a1");
+    const b = slugFromId("3e3d0f0b-e61e-8102-bbbb-b2b2b2b2b2b2");
+    expect(a).not.toBe(b);
   });
 });
 

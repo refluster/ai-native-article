@@ -110,6 +110,18 @@ body:
   If the cap leaves fewer than 3 seatable lenses, the PR is not routable this
   tick: hand it off per Step 5 with `--needs-human --reason
   cannot-seat-panel`, naming the capped personas.
+- **Never seat yourself as a counted reviewer.** The ≥3 panel means ≥3
+  personas *other than* the router (`agent_slug`). The runtime's permission
+  layer treats a router whose own lens is one of the votes authorising its own
+  merge as self-approval, and it refuses the merge write. On 2026-09-26 that
+  turned three unanimous-green, non-L0/L1 PRs into human escalations (#771 here,
+  asp-cloud #941 / #942). #775, whose panel did not include the router, merged
+  the next day. Where a `nomination_rules` entry names you (a "router
+  self-include" / PdM read), seat another persona with surface in that vote
+  instead. You may still post your own lens as an **extra, uncounted** seat when
+  the PR has real product surface. It never appears in the merge decision's
+  `reviewers[]` (Step 5). If you cannot seat 3 others, hand off with
+  `cannot-seat-panel` as above.
 - Each nomination's `rationale` cites the PR surface (file paths / topics).
 - List in `skipped` only personas you considered and rejected.
 - **Epic PRs carry a VP-class reviewer.** When the diff touches the Epic /
@@ -684,7 +696,8 @@ takes an ADR *plus* a matching server-side check in `pr-merge.mjs`, so that a
 stated rule and an enforced rule cannot diverge.
 
 Build the decisions payload (schema in the script header) with `reviewers[]` =
-the ≥3 nominated personas whose green markers you verified.
+the ≥3 nominated personas whose green markers you verified. Never include
+yourself (Step 2: the router is not a counted vote).
 
 **First, un-draft every PR you are about to merge — you, not the engine.**
 GitHub refuses to merge a draft, so the draft→ready flip has to happen before

@@ -84,32 +84,39 @@ const BINDING = {
     max_prs_per_tick: 5,
     // EVERY rule seats a panel of AT LEAST 3 distinct reviewers (operator
     // directive 2026-06-29; pr-merge.mjs MIN_REVIEWERS=3 fails closed below it).
-    // The standing trio — nadia (PdM), dario (Eng Excellence: feasibility / cost
-    // / architecture), mateo (Agent Workforce Platform / system-shape) — has
-    // plausible surface on nearly any PR in this repo and backfills domain rules
-    // to 3. Seat domain lenses first, then fill to 3 from the trio; swap in the
-    // VP whose functional area a change concerns when one clearly fits.
+    // The standing trio — dario (Eng Excellence: feasibility / cost /
+    // architecture), mateo (Agent Workforce Platform / system-shape), owen
+    // (verification) — has plausible surface on nearly any PR in this repo and
+    // backfills domain rules to 3. Seat domain lenses first, then fill to 3 from
+    // the trio; swap in the VP whose functional area a change concerns when one
+    // clearly fits.
+    //
+    // The router (nadia) is NOT one of the counted three (pr-autopilot SKILL.md
+    // Step 2, 0.35.0): the runtime's permission layer refuses a merge whose
+    // votes include the session's own router persona as self-approval, which
+    // escalated three unanimous-green PRs on 2026-09-26 (#771, asp-cloud
+    // #941/#942). Her PdM read survives as an extra, uncounted seat.
     nomination_rules: [
       {
         when: "diff touches workforce/docs/epics/** (an Epic spec or the epics index)",
-        nominate: ["nadia", "dario", "mateo"],
+        nominate: ["dario", "mateo", "owen"],
         rationale:
-          "Epic reviews ALWAYS include a VP-class senior lens AND seat the full ≥3 panel — never PdM self-review alone (operator directive 2026-06-27), never fewer than 3 (operator directive 2026-06-29). nadia keeps the PdM lens (epic format, sizing, decomposability, authority-gating); dario the Eng-Excellence lens (feasibility / cost / architecture); mateo the Agent-Workforce-Platform lens. When a single domain VP clearly fits the Epic's functional area — the Media/Marketing VP (external comms), silas (Finance), tessa (Policy), elena (CX) — swap that VP in as the 3rd seat in place of mateo, keeping nadia + dario.",
+          "Epic reviews ALWAYS include a VP-class senior lens AND seat the full ≥3 panel — never PdM self-review alone (operator directive 2026-06-27), never fewer than 3 (operator directive 2026-06-29). dario the Eng-Excellence lens (feasibility / cost / architecture); mateo the Agent-Workforce-Platform lens; owen the verification lens (are the stories' acceptance criteria checkable). nadia's PdM lens (epic format, sizing, decomposability, authority-gating) is posted as the router's extra, uncounted seat. When a single domain VP clearly fits the Epic's functional area — the Media/Marketing VP (external comms), silas (Finance), tessa (Policy), elena (CX) — swap that VP in as the 3rd counted seat in place of owen, keeping dario + mateo.",
       },
       {
         when: "diff touches workforce/lambdas/**, workforce/infra/**, any docs/adr/** or governance.md",
-        nominate: ["dario", "mateo", "nadia"],
-        rationale: "architecture / governance / infra lens (dario) + platform / system-shape lens (mateo) + PdM read (nadia) — a ≥3 panel on infra/governance surface.",
+        nominate: ["dario", "mateo", "owen"],
+        rationale: "architecture / governance / infra lens (dario) + platform / system-shape lens (mateo) + verification lens (owen) — a ≥3 panel on infra/governance surface.",
       },
       {
         when: "diff touches newsletter/** (GAS L1→L4 pipeline, reader SPA)",
-        nominate: ["dario", "nadia", "mateo"],
-        rationale: "pipeline-architecture lens (dario) + PdM read (nadia) + platform lens (mateo) — ≥3 panel on the newsletter pipeline / reader SPA.",
+        nominate: ["dario", "mateo", "owen"],
+        rationale: "pipeline-architecture lens (dario) + platform lens (mateo) + verification lens (owen) — ≥3 panel on the newsletter pipeline / reader SPA; nadia's PdM read is the router's extra, uncounted seat.",
       },
       {
         when: "docs-only / product-framing / roadmap surface (and the default fallback)",
-        nominate: ["nadia", "dario", "mateo"],
-        rationale: "PdM self-review (nadia, router self-include) + Eng-Excellence breadth lens (dario) + platform breadth lens (mateo) — the standing ≥3 trio; broad lenses with surface on nearly any docs/product change.",
+        nominate: ["dario", "mateo", "owen"],
+        rationale: "Eng-Excellence breadth lens (dario) + platform breadth lens (mateo) + verification lens (owen) — the standing ≥3 trio; broad lenses with surface on nearly any docs/product change. nadia's PdM read is the router's extra, uncounted seat, never one of the three.",
       },
     ],
     skip_list_default: ["yuki", "elena", "priya", "theo", "vikram", "noor", "aanya"],
