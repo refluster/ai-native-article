@@ -110,6 +110,7 @@ did." (Same spirit as W-4 / C-4 — the record fails loud, not silent.)
 | [0041](adr-0041-agent-binding-retirement-marker.md) | A binding retires by marking `retired_at`/`retired_reason` in place on `AgentBinding`, never by deletion from `bindings[]` | Proposed | [008](../epics/epic-008-skill-repository.md) |
 | [0042](adr-0042-deprecation-removal-date-rule.md) | A `deprecated` skill must declare `deprecated_until` (90-day floor) in the same write; enforced at the agents-api write boundary, not by a CI lint | Proposed | [008](../epics/epic-008-skill-repository.md) |
 | [0043](adr-0043-podcast-tts-gemini.md) | Podcast TTS moves from Polly to Gemini 3.8 Flash TTS: chunked, S3-resumable synthesis on direct Lambda invocation (the HTTP API's 30 s window can't hold one Gemini request); supersedes ADR-0016's synthesis engine only; free tier (10 req/day) | Proposed | [017](../epics/epic-017-podcast-spotify-distribution.md) |
+| [0044](adr-0044-stats-cost-figure-invariant.md) | Narrow the "no cost figures" test invariant on `GET /stats` to match `GET /performance`'s already-shipped modelled-figure precedent; reaffirm it unchanged on the public `GET /public/workforce-summary` | Proposed | — |
 
 Keep this table in sync when an ADR is added or its Status flips — it is the
 canonical status view, same convention as [epics/README.md](../epics/README.md).
