@@ -302,6 +302,10 @@ class FakeSmResourceNotFoundException extends Error {
 // by SecretId. `undefined` value = the path resolves but has no
 // SecretString (returns auth failure, not 500).
 const secretValueStore = new Map<string, string | undefined>();
+// smForcedErrorStore: maps SecretId to an Error to throw unconditionally,
+// for testing the rethrow path in resolveGithubCredential (non-ResourceNotFound
+// SM errors, e.g. AccessDeniedException).
+const smForcedErrorStore = new Map<string, Error>();
 
 vi.mock("@aws-sdk/client-secrets-manager", () => ({
   SecretsManagerClient: class {
@@ -314,6 +318,8 @@ vi.mock("@aws-sdk/client-secrets-manager", () => ({
       }
       if (cmd._kind === "get-value") {
         const id = cmd.input.SecretId as string;
+        const forced = smForcedErrorStore.get(id);
+        if (forced) throw forced;
         if (!secretValueStore.has(id)) throw new FakeSmResourceNotFoundException();
         return { SecretString: secretValueStore.get(id) };
       }
@@ -2211,6 +2217,19 @@ describe("POST /agents/{slug}/open-external-pr", () => {
     });
   }
 
+  function seedAgent(slug: string) {
+    rows.set(key(`AGENT#${slug}`, "META"), {
+      pk: `AGENT#${slug}`,
+      sk: "META",
+      slug,
+      first_name: slug[0]!.toUpperCase() + slug.slice(1),
+      role: "Analyst",
+      paused: false,
+      archived: false,
+      last_run_status: "ok",
+    });
+  }
+
   function postEvt(slug: string, headers: Record<string, string>, body: unknown): APIGatewayProxyEventV2 {
     return {
       version: "2.0",
@@ -2240,9 +2259,12 @@ describe("POST /agents/{slug}/open-external-pr", () => {
   beforeEach(() => {
     rows.clear();
     secretValueStore.clear();
+    smForcedErrorStore.clear();
     openExternalPrMock.mockClear();
     secretValueStore.set(ENGAGEMENT_TOKEN_SECRET, JSON.stringify({ token: ENGAGEMENT_TOKEN }));
     secretValueStore.set(GITHUB_TOKEN_SECRET, JSON.stringify({ token: GITHUB_TOKEN }));
+    // Seed the default agent so agent-existence check passes in the happy path.
+    seedAgent("nadia");
   });
 
   it("401s on missing Authorization header", async () => {
@@ -2285,6 +2307,45 @@ describe("POST /agents/{slug}/open-external-pr", () => {
     },
   );
 
+  // A1: slug format validation
+  it("400s when slug contains disallowed characters (A1)", async () => {
+    const res = await handler(postEvt("nadia test", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody()));
+    expect(statusOf(res)).toBe(400);
+    expect((bodyOf(res) as { error: string; field: string }).error).toBe("invalid_field");
+    expect((bodyOf(res) as { field: string }).field).toBe("slug");
+  });
+
+  it("400s when run_id contains disallowed characters (A1)", async () => {
+    seedProject("asp-cloud");
+    const res = await handler(postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody({ run_id: "01JF ULID 00" })));
+    expect(statusOf(res)).toBe(400);
+    expect((bodyOf(res) as { error: string; field: string }).error).toBe("invalid_field");
+    expect((bodyOf(res) as { field: string }).field).toBe("run_id");
+  });
+
+  // A1: path traversal / forbidden segment validation
+  it.each([
+    "/reports/foo.md",
+    "reports/../../../etc/passwd",
+    "reports/.git/config",
+    "reports/.github/workflows/ci.yml",
+  ] as const)("400s on forbidden path '%s' (A1)", async (badPath) => {
+    seedProject("asp-cloud");
+    const res = await handler(postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody({ path: badPath })));
+    expect(statusOf(res)).toBe(400);
+    expect((bodyOf(res) as { error: string; field: string }).error).toBe("invalid_field");
+    expect((bodyOf(res) as { field: string }).field).toBe("path");
+  });
+
+  // E2: agent existence check
+  it("404s when the agent slug is unknown (E2)", async () => {
+    seedProject("asp-cloud");
+    // "ghost" has no agent row in DDB.
+    const res = await handler(postEvt("ghost", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody()));
+    expect(statusOf(res)).toBe(404);
+    expect((bodyOf(res) as { error: string }).error).toBe("agent_not_found");
+  });
+
   it("404s when the project does not exist", async () => {
     const res = await handler(postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody()));
     expect(statusOf(res)).toBe(404);
@@ -2302,12 +2363,30 @@ describe("POST /agents/{slug}/open-external-pr", () => {
     expect((bodyOf(res) as { error: string }).error).toBe("project_missing_repo");
   });
 
-  it("424s when github.token is not provisioned for the project", async () => {
+  it("424s when github.token is not provisioned for the project (ResourceNotFoundException)", async () => {
     seedProject("asp-cloud");
     secretValueStore.delete(GITHUB_TOKEN_SECRET);
     const res = await handler(postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody()));
     expect(statusOf(res)).toBe(424);
     expect((bodyOf(res) as { error: string }).error).toBe("credential_not_provisioned");
+  });
+
+  // E4: credential_malformed — secret exists but token field is absent/empty
+  it("424s when github.token secret is malformed (E4)", async () => {
+    seedProject("asp-cloud");
+    secretValueStore.set(GITHUB_TOKEN_SECRET, JSON.stringify({ not_a_token: "oops" }));
+    const res = await handler(postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody()));
+    expect(statusOf(res)).toBe(424);
+    expect((bodyOf(res) as { error: string }).error).toBe("credential_malformed");
+  });
+
+  // E4: non-ResourceNotFoundException SM errors rethrow → outer 500 mapping
+  it("500s when SM throws an unexpected non-ResourceNotFoundException error (E4)", async () => {
+    seedProject("asp-cloud");
+    smForcedErrorStore.set(GITHUB_TOKEN_SECRET, new Error("AccessDeniedException: not authorized to GetSecretValue"));
+    const res = await handler(postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody()));
+    expect(statusOf(res)).toBe(500);
+    expect((bodyOf(res) as { error: string }).error).toBe("internal");
   });
 
   it("201s and returns pr_url/pr_number/branch_name on the happy path", async () => {

@@ -761,6 +761,17 @@ Resources:
             ApiId: !Ref WfAgentsHttpApi
             Path: /agents/{slug}/memory
             Method: POST
+        # Phase 7 PR6 / R-N9 — CCR write-scripts open external PRs
+        # server-side via this endpoint. Same bearer-token-at-handler
+        # posture as CreateEngagement / UpdateAgentMemory (no SigV4
+        # creds in a CCR session). Lambda resolves the project's
+        # github.token from Secrets Manager and calls openExternalPr.
+        OpenExternalPr:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}/open-external-pr
+            Method: POST
         ListProjects:
           Type: HttpApi
           Properties:

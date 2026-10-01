@@ -37,8 +37,19 @@ import {
   issueRefsOfPr,
   laneEntryConflicts,
   ownerOf,
+  CLOSE_STATE_REASON,
+  CLOSE_VERDICTS,
+  DEFAULT_REVIEW_DAYS,
+  SETTLE_VERDICT_NAMES,
+  assertSettleVerdict,
+  closedLabel,
+  needsSettleReview,
+  settleRefusal,
+  wasReopened,
 } from "./issue-lanes.mjs";
 import { labelsToRemove, laneRefusal } from "./issue-triage-post.mjs";
+import { closeBudgetRemaining, runSettle, settleComment } from "./issue-triage-settle.mjs";
+import { selectCandidates } from "./issue-triage-scan.mjs";
 import { BINDINGS } from "../../scripts/lib/bindings-manifest.mjs";
 
 describe("the lane vocabulary is closed (C-4)", () => {
@@ -376,5 +387,227 @@ describe("suggestLane — a starting point, not the decision", () => {
   it("no usable labels -> no suggestion; the router reads the issue", () => {
     expect(suggestLane({ labels: ["insights"] })).toBeNull();
     expect(suggestLane({})).toBeNull();
+  });
+});
+
+describe("settling — duplicates consolidate, done and moot issues close", () => {
+  const NOW = Date.parse("2026-09-29T00:00:00Z");
+  const daysAgo = (d) => new Date(NOW - d * 86400_000).toISOString();
+
+  it("the verdict vocabulary is closed (C-4)", () => {
+    expect(SETTLE_VERDICT_NAMES).toEqual(["duplicate", "completed", "obsolete", "still-valid"]);
+    expect(CLOSE_VERDICTS).toEqual(["duplicate", "completed", "obsolete"]);
+    expect(() => assertSettleVerdict("wontfix")).toThrow(/unknown verdict/);
+    expect(() => closedLabel("still-valid")).toThrow(/not a closing verdict/);
+    expect(closedLabel("duplicate")).toBe("wf:closed:duplicate");
+    expect(CLOSE_STATE_REASON).toEqual({ duplicate: "not_planned", completed: "completed", obsolete: "not_planned" });
+  });
+
+  it("a long-idle laned issue gets a settle review — the operator lane included", () => {
+    const opts = { now: NOW, openPrRefs: new Set() };
+    expect(needsSettleReview({ labels: ["wf:lane:operator", "wf:human:console"], updatedAt: daysAgo(DEFAULT_REVIEW_DAYS + 1), number: 1 }, opts)).toBe(true);
+    expect(needsSettleReview({ labels: ["wf:lane:implement"], updatedAt: daysAgo(DEFAULT_REVIEW_DAYS - 1), number: 1 }, opts)).toBe(false);
+  });
+
+  it("never reviews live work, a park, an unlaned issue, or a human reopen", () => {
+    const old = daysAgo(90);
+    const opts = { now: NOW, openPrRefs: new Set([7]) };
+    expect(needsSettleReview({ labels: ["wf:lane:implement"], updatedAt: old, number: 7 }, opts)).toBe(false);
+    expect(needsSettleReview({ labels: ["wf:lane:implement", "issue-implement:in-progress"], updatedAt: old, number: 1 }, opts)).toBe(false);
+    expect(needsSettleReview({ labels: ["wf:lane:design", "wf:handback"], updatedAt: old, number: 1 }, opts)).toBe(false);
+    expect(needsSettleReview({ labels: ["type:chore"], updatedAt: old, number: 1 }, opts)).toBe(false);
+    expect(needsSettleReview({ labels: ["wf:lane:design", "wf:closed:obsolete"], updatedAt: old, number: 1 }, opts)).toBe(false);
+  });
+
+  it("a duplicate folds into another OPEN issue — never itself, a PR, or a closed one", () => {
+    const base = { verdict: "duplicate", issue: 12, labels: ["wf:lane:implement"] };
+    expect(settleRefusal({ ...base, of: 10, canonical: { state: "open" } })).toBeNull();
+    expect(settleRefusal({ ...base, of: null })).toMatch(/--of/);
+    expect(settleRefusal({ ...base, of: 12, canonical: { state: "open" } })).toMatch(/itself/);
+    expect(settleRefusal({ ...base, of: 10, canonical: { state: "open", pull_request: {} } })).toMatch(/completed/);
+    expect(settleRefusal({ ...base, of: 10, canonical: { state: "closed" } })).toMatch(/completed.*obsolete/);
+  });
+
+  it("completed needs a MERGED PR; obsolete needs what superseded it", () => {
+    expect(settleRefusal({ verdict: "completed", issue: 1, mergedPr: { number: 5, merged_at: "2026-09-01T00:00:00Z" } })).toBeNull();
+    expect(settleRefusal({ verdict: "completed", issue: 1 })).toMatch(/merged PR/);
+    expect(settleRefusal({ verdict: "completed", issue: 1, mergedPr: { number: 5, merged_at: null } })).toMatch(/not merged/);
+    expect(settleRefusal({ verdict: "obsolete", issue: 1, supersededBy: "adr-0038" })).toBeNull();
+    expect(settleRefusal({ verdict: "obsolete", issue: 1, supersededBy: "  " })).toMatch(/superseded-by/);
+  });
+
+  it("never closes under a live branch, over a human reopen, or an L0/L1/tracker issue", () => {
+    const ok = { verdict: "obsolete", issue: 3, supersededBy: "#9" };
+    expect(settleRefusal({ ...ok, heldBy: [44] })).toMatch(/held by open PR #44/);
+    expect(settleRefusal({ ...ok, labels: ["wf:closed:obsolete"] })).toMatch(/reopened by a human/);
+    expect(wasReopened(["wf:closed:duplicate"])).toBe(true);
+    for (const l of ["layer:L0", "layer:L1", "type:tracker"]) {
+      expect(settleRefusal({ ...ok, labels: [l] })).toMatch(/design decision/);
+    }
+    // still-valid only records a review, so nothing blocks it
+    expect(settleRefusal({ verdict: "still-valid", issue: 3, heldBy: [44], labels: ["layer:L1"] })).toBeNull();
+  });
+
+  it("the settle comment carries GitHub's duplicate marker and a greppable verdict marker", () => {
+    const dup = settleComment("Same deliverable as #10.", { verdict: "duplicate", of: 10 });
+    expect(dup).toContain("Duplicate of #10");
+    expect(dup).toContain("<!-- wf:settled:duplicate -->");
+    expect(dup).toMatch(/reopen it/);
+    expect(settleComment("x", { verdict: "completed", pr: 726 })).toContain("Completed by #726.");
+    expect(settleComment("x", { verdict: "obsolete", supersededBy: "adr-0038" })).toContain("Superseded by adr-0038.");
+    const keep = settleComment("Still wanted.", { verdict: "still-valid" });
+    expect(keep).toContain("<!-- wf:settled:still-valid -->");
+    expect(keep).not.toMatch(/reopen/);
+  });
+});
+
+describe("the day-window edges are exclusive — exactly N days is still inside", () => {
+  const NOW = Date.parse("2026-09-29T00:00:00Z");
+  const daysAgo = (d) => new Date(NOW - d * 86400_000).toISOString();
+
+  it("a legacy park untouched for exactly requeue_days is not yet requeued", () => {
+    const labels = ["issue-implement:needs-human"];
+    expect(triageAction({ labels, updatedAt: daysAgo(DEFAULT_REQUEUE_DAYS) }, { now: NOW }).action).toBe("skip");
+    expect(triageAction({ labels, updatedAt: daysAgo(DEFAULT_REQUEUE_DAYS + 1 / 24) }, { now: NOW }).action).toBe("requeue");
+  });
+
+  it("a laned issue idle for exactly review_days is not yet due a settle review", () => {
+    const opts = { now: NOW, openPrRefs: new Set() };
+    expect(needsSettleReview({ labels: ["wf:lane:design"], updatedAt: daysAgo(DEFAULT_REVIEW_DAYS), number: 1 }, opts)).toBe(false);
+    expect(needsSettleReview({ labels: ["wf:lane:design"], updatedAt: daysAgo(DEFAULT_REVIEW_DAYS + 1 / 24), number: 1 }, opts)).toBe(true);
+  });
+});
+
+describe("selectCandidates — the batch bound keeps the oldest, per kind", () => {
+  const d = (number, action, day) => ({ number, updated_at: `2026-09-${String(day).padStart(2, "0")}T00:00:00Z`, decision: { action } });
+
+  it("caps routing and reviews independently, oldest first, and drops skips", () => {
+    const decided = [
+      d(1, "triage", 20), d(2, "requeue", 5), d(3, "triage", 10), d(4, "skip", 1),
+      d(5, "review", 15), d(6, "review", 2), d(7, "review", 8),
+    ];
+    const got = selectCandidates(decided, { max: 2, maxReview: 2 }).map((c) => c.number);
+    expect(got).toEqual([2, 3, 6, 7]);
+  });
+
+  it("a review flood never crowds out a hand-back", () => {
+    const decided = [d(9, "requeue", 28), ...Array.from({ length: 20 }, (_, i) => d(100 + i, "review", 1))];
+    const got = selectCandidates(decided, { max: 1, maxReview: 3 }).map((c) => c.number);
+    expect(got[0]).toBe(9);
+    expect(got).toHaveLength(4);
+  });
+});
+
+describe("runSettle — the write sequence, against a stubbed GitHub", () => {
+  const NOW = Date.parse("2026-09-29T12:00:00Z");
+  const REPO = "o/r";
+
+  /** A scripted gh: routes by "METHOD path" prefix, records every call. */
+  function stubGh(routes) {
+    const calls = [];
+    const gh = async (method, path, body) => {
+      calls.push(`${method} ${path.split("?")[0]}`);
+      for (const [key, res] of routes) {
+        const [m, p] = key.split(" ");
+        if (m === method && path.startsWith(p)) return typeof res === "function" ? res(path, body) : res;
+      }
+      return { status: 200, json: [] };
+    };
+    return { gh, calls };
+  }
+  const openIssue = (labels = ["wf:lane:implement"]) => ({ status: 200, json: { number: 12, state: "open", labels: labels.map((name) => ({ name })) } });
+  const base = { body: "Why.", now: NOW };
+  const writes = (calls) => calls.filter((c) => !c.startsWith("GET"));
+
+  it("duplicate: consolidates on the canonical, comments, CLOSES, then labels — in that order", async () => {
+    const { gh, calls } = stubGh([
+      ["GET /repos/o/r/issues/12", openIssue()],
+      ["GET /repos/o/r/issues/10", { status: 200, json: { number: 10, state: "open" } }],
+      ["POST /repos/o/r/issues/10/comments", { status: 201, json: {} }],
+      ["POST /repos/o/r/issues/12/comments", { status: 201, json: {} }],
+      ["PATCH /repos/o/r/issues/12", { status: 200, json: {} }],
+      ["POST /repos/o/r/labels", { status: 201, json: {} }],
+      ["POST /repos/o/r/issues/12/labels", { status: 200, json: {} }],
+    ]);
+    const r = await runSettle(gh, REPO, { ...base, issue: 12, verdict: "duplicate", of: 10, carry: "Adds a repro." });
+    expect(r.code).toBe(0);
+    expect(writes(calls)).toEqual([
+      "POST /repos/o/r/issues/10/comments",
+      "POST /repos/o/r/issues/12/comments",
+      "PATCH /repos/o/r/issues/12",
+      "POST /repos/o/r/labels",
+      "POST /repos/o/r/issues/12/labels",
+    ]);
+  });
+
+  it("a failed close leaves the issue UNLABELLED — never open-but-wearing wf:closed:*", async () => {
+    const { gh, calls } = stubGh([
+      ["GET /repos/o/r/issues/12", openIssue()],
+      ["GET /repos/o/r/pulls/726", { status: 200, json: { number: 726, merged_at: "2026-09-10T00:00:00Z" } }],
+      ["POST /repos/o/r/issues/12/comments", { status: 201, json: {} }],
+      ["PATCH /repos/o/r/issues/12", { status: 502, json: {} }],
+    ]);
+    const r = await runSettle(gh, REPO, { ...base, issue: 12, verdict: "completed", pr: 726 });
+    expect(r.code).toBe(3);
+    expect(calls.some((c) => c.includes("/labels"))).toBe(false);
+  });
+
+  it("obsolete closes; still-valid only comments", async () => {
+    const ok = [
+      ["GET /repos/o/r/issues/12", openIssue()],
+      ["POST /repos/o/r/issues/12/comments", { status: 201, json: {} }],
+      ["PATCH /repos/o/r/issues/12", { status: 200, json: {} }],
+      ["POST /repos/o/r/labels", { status: 422, json: {} }],
+      ["POST /repos/o/r/issues/12/labels", { status: 200, json: {} }],
+    ];
+    const a = stubGh(ok);
+    expect((await runSettle(a.gh, REPO, { ...base, issue: 12, verdict: "obsolete", supersededBy: "adr-0038" })).code).toBe(0);
+    expect(writes(a.calls)).toContain("PATCH /repos/o/r/issues/12");
+    const b = stubGh(ok);
+    expect((await runSettle(b.gh, REPO, { ...base, issue: 12, verdict: "still-valid" })).code).toBe(0);
+    expect(writes(b.calls)).toEqual(["POST /repos/o/r/issues/12/comments"]);
+  });
+
+  it("a refusal writes nothing (issue held by an open PR)", async () => {
+    const { gh, calls } = stubGh([
+      ["GET /repos/o/r/issues/12", openIssue()],
+      ["GET /repos/o/r/pulls", { status: 200, json: [{ number: 44, body: "Closes #12", head: { ref: "x" } }] }],
+    ]);
+    const r = await runSettle(gh, REPO, { ...base, issue: 12, verdict: "obsolete", supersededBy: "#9" });
+    expect(r.code).toBe(1);
+    expect(r.msg).toMatch(/held by open PR #44/);
+    expect(writes(calls)).toEqual([]);
+  });
+
+  it("the close budget is mechanical: past max_closes nothing is written", async () => {
+    const recent = new Date(NOW - 3600_000).toISOString();
+    const { gh, calls } = stubGh([
+      ["GET /repos/o/r/issues/12", openIssue()],
+      ["GET /repos/o/r/issues?state=closed", (path) => ({
+        status: 200,
+        json: path.includes("obsolete") ? [1, 2, 3].map((i) => ({ number: i, closed_at: recent })) : [],
+      })],
+    ]);
+    const r = await runSettle(gh, REPO, { ...base, issue: 12, verdict: "obsolete", supersededBy: "#9", maxCloses: 3 });
+    expect(r.code).toBe(1);
+    expect(r.msg).toMatch(/close budget spent/);
+    expect(writes(calls)).toEqual([]);
+  });
+
+  it("an uncountable budget fails closed", async () => {
+    const { gh, calls } = stubGh([
+      ["GET /repos/o/r/issues/12", openIssue()],
+      ["GET /repos/o/r/issues?state=closed", { status: 500, json: {} }],
+    ]);
+    const r = await runSettle(gh, REPO, { ...base, issue: 12, verdict: "obsolete", supersededBy: "#9" });
+    expect(r.code).toBe(3);
+    expect(writes(calls)).toEqual([]);
+  });
+
+  it("closeBudgetRemaining counts only closes inside the window", () => {
+    const at = (h) => new Date(NOW - h * 3600_000).toISOString();
+    expect(closeBudgetRemaining([at(1), at(2), at(30)], { now: NOW, windowHours: 20, max: 5 })).toBe(3);
+    expect(closeBudgetRemaining([at(1), at(2)], { now: NOW, windowHours: 20, max: 2 })).toBe(0);
+    expect(closeBudgetRemaining([null, "bad"], { now: NOW, max: 1 })).toBe(1);
   });
 });

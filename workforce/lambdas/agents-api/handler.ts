@@ -3479,6 +3479,10 @@ async function validateMemoryWriteBearer(event: APIGatewayProxyEventV2): Promise
  *
  * Returns: { pr_url, pr_number, branch_name }
  */
+
+/** Allowed characters for slug and run_id path/body parameters. */
+const SAFE_IDENT = /^[A-Za-z0-9_-]{1,64}$/;
+
 async function openExternalPrRoute(
   slug: string,
   event: APIGatewayProxyEventV2,
@@ -3486,6 +3490,11 @@ async function openExternalPrRoute(
   const authed = await validateEngagementWriteBearer(event);
   if (!authed) {
     return reply(401, { error: "unauthorized", detail: "POST /agents/{slug}/open-external-pr requires the engagement-write bearer token." });
+  }
+
+  // A1: validate slug from path parameter
+  if (!SAFE_IDENT.test(slug)) {
+    return reply(400, { error: "invalid_field", field: "slug" });
   }
 
   if (!event.body) return reply(400, { error: "missing_body" });
@@ -3503,10 +3512,29 @@ async function openExternalPrRoute(
     return reply(400, { error: "missing_field", field: "skill_name" });
   if (typeof run_id !== "string" || run_id.length === 0)
     return reply(400, { error: "missing_field", field: "run_id" });
+  // A1: validate run_id format
+  if (!SAFE_IDENT.test(run_id))
+    return reply(400, { error: "invalid_field", field: "run_id" });
   if (typeof filePath !== "string" || filePath.length === 0)
     return reply(400, { error: "missing_field", field: "path" });
+  // A1: reject path with .. segments, leading /, or .git/.github segments
+  if (
+    filePath.startsWith("/") ||
+    filePath.split("/").some((seg) => seg === ".." || seg === ".git" || seg === ".github")
+  ) {
+    return reply(400, { error: "invalid_field", field: "path" });
+  }
   if (typeof prBody !== "string" || prBody.length === 0)
     return reply(400, { error: "missing_field", field: "body" });
+
+  // E2: verify the agent exists and is not archived before touching Secrets
+  // Manager. The "bound to project_id" check (RAL-007) is accepted risk —
+  // bindings live in DDB and querying them adds a cross-partition read;
+  // the engagement-write bearer already scopes the caller to known agents.
+  const agentRow = await getItem<AgentMetaRow>(agentPk(slug), "META");
+  if (!agentRow || agentRow.archived) {
+    return reply(404, { error: "agent_not_found", slug });
+  }
 
   const project = await getProject(asProjectId(project_id));
   if (!project) return reply(404, { error: "project_not_found", project_id });
@@ -3518,27 +3546,11 @@ async function openExternalPrRoute(
     });
   }
 
-  let github: GithubSecret;
-  try {
-    const secretName = `wf/projects/${project.project_id}/github.token`;
-    const raw = await sm.send(new GetSecretValueCommand({ SecretId: secretName }));
-    if (!raw.SecretString) {
-      return reply(424, { error: "credential_not_provisioned", credential_type: "github.token" });
-    }
-    const v = JSON.parse(raw.SecretString) as { token?: unknown };
-    if (typeof v.token !== "string" || v.token.length === 0) {
-      return reply(424, { error: "credential_malformed", credential_type: "github.token" });
-    }
-    github = { token: v.token };
-  } catch (err) {
-    if (err instanceof SmResourceNotFoundException) {
-      return reply(424, { error: "credential_not_provisioned", credential_type: "github.token" });
-    }
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("ResourceNotFoundException") || msg.includes("resource not found")) {
-      return reply(424, { error: "credential_not_provisioned", credential_type: "github.token" });
-    }
-    throw err;
+  // A2: resolve credential through a single helper — no inline secret parse
+  // in the route handler itself.
+  const credResult = await resolveGithubCredential(project.project_id);
+  if ("_err" in credResult) {
+    return reply(424, { error: credResult._err, credential_type: "github.token" });
   }
 
   try {
@@ -3549,7 +3561,7 @@ async function openExternalPrRoute(
       run_id: run_id as string,
       path: filePath as string,
       body: prBody as string,
-      github,
+      github: credResult,
     });
     return reply(201, result);
   } catch (err) {
@@ -3557,6 +3569,43 @@ async function openExternalPrRoute(
     console.error(JSON.stringify({ event: "open_external_pr_failed", slug, project_id, error: msg }));
     return reply(502, { error: "github_api_error", detail: msg.slice(0, 500) });
   }
+}
+
+/**
+ * Resolves and validates a project's GitHub credential from Secrets Manager.
+ * Returns the credential or a typed error object; throws for unexpected SM errors
+ * so the outer handler's 500 mapping fires (W-4 fail-loud).
+ */
+async function resolveGithubCredential(
+  projectId: string,
+): Promise<GithubSecret | { _err: "credential_not_provisioned" | "credential_malformed" }> {
+  const secretName = `wf/projects/${projectId}/github.token`;
+  let raw: { SecretString?: string };
+  try {
+    raw = await sm.send(new GetSecretValueCommand({ SecretId: secretName }));
+  } catch (err) {
+    if (err instanceof SmResourceNotFoundException) {
+      return { _err: "credential_not_provisioned" };
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("ResourceNotFoundException") || msg.includes("resource not found")) {
+      return { _err: "credential_not_provisioned" };
+    }
+    throw err;
+  }
+  if (!raw.SecretString) {
+    return { _err: "credential_not_provisioned" };
+  }
+  let parsed: { token?: unknown };
+  try {
+    parsed = JSON.parse(raw.SecretString) as { token?: unknown };
+  } catch {
+    return { _err: "credential_malformed" };
+  }
+  if (typeof parsed.token !== "string" || parsed.token.length === 0) {
+    return { _err: "credential_malformed" };
+  }
+  return { token: parsed.token };
 }
 
 function reply(statusCode: number, body: unknown): APIGatewayProxyResultV2 {
