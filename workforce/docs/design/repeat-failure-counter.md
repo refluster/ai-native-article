@@ -21,8 +21,8 @@ open streaks as its third signal. Failure reasons are classified by a small clos
 - **The data we would normalise does not exist.** A live read of 600 recent EXEC rows across six
   agents (2026-10-02) shows `status:"throw"` rows carry **no `error` attribute**; the reason is
   only free text in `summary`. A "normalised failure reason" computed from prose would be a
-  regex over LLM-written sentences, which is the same fragility #785's CONSUMER_INVALID hint was
-  criticised for.
+  regex over LLM-written sentences, the same fragility the 2026-09-30 audit of #785 flagged in
+  its error-text regex.
 - **`skipped` already hides failures.** Of the same 600 rows, 23 `skipped` rows mention
   failure words (identity pre-flight failed, 401, rejected). Ren's `issue-implement` and
   `pr-remediate` skips for the ML-040 identity collapse are recorded as `skipped`, the same word
