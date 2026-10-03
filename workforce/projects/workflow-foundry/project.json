@@ -1,0 +1,15 @@
+{
+  "id": "workflow-foundry",
+  "name": "Workflow Foundry",
+  "owner_agent": "nadia",
+  "github": {
+    "owner": "refluster",
+    "repo": "workflow-foundry"
+  },
+  "credential_types": [
+    "github.token"
+  ],
+  "status": "active",
+  "created_at": "2026-10-03",
+  "note": "External project shipping work against refluster/workflow-foundry. Same reviewer roster as asp-cloud / project-ind / smartmeter-data-analysis: Nadia owns; Dario / Ren / Aoi reviewer lenses. PR-review / pr-autopilot path; github.token stored out-of-band under wf/projects/workflow-foundry/github.token. No governance_docs yet — the repo carries no AGENTS.md, so reviewers fall back to per-persona principles until one lands (add it via the console CONFIG panel, ADR-0029)."
+}
