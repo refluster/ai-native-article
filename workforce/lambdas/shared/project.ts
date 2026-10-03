@@ -250,6 +250,9 @@ export type ExecutionSurface = "lambda" | "client" | "ccr";
  */
 export type EmbeddingStatus = "ok" | "pending" | "skipped" | "failed";
 
+import type { ReasonCode } from "./reason-codes.js";
+export type { ReasonCode } from "./reason-codes.js";
+
 export interface ExecutionRow {
   pk: `PROJECT#${string}`;
   sk: `EXEC#${string}`;
@@ -276,6 +279,15 @@ export interface ExecutionRow {
    * `artifact_ref.summary`, then "".
    */
   summary?: string;
+  /**
+   * Index of the agent binding that fired this run (the fire payload's
+   * `binding_idx`). Absent on rows written before 2026-10-03 and on external
+   * client engagements; lets two bindings of one skill on one agent be told
+   * apart (#664 slice 1).
+   */
+  binding_idx?: number;
+  /** Why a `throw` (or a `source_unreachable` skip) happened; see `REASON_CODES`. */
+  reason_code?: ReasonCode;
   /**
    * Where the LLM call ran. `lambda` = workforce agent-runner (default; the
    * historical-and-still-canonical path). `client` = client-side execution
@@ -459,6 +471,10 @@ export interface AppendExecutionInput {
    *  must slice). Distinct from `artifact_ref.summary` — see
    *  `ExecutionRow.summary`. */
   summary?: string;
+  /** Fire-payload binding index (#664 slice 1). */
+  binding_idx?: number;
+  /** Closed-enum failure reason (#664 slice 1). */
+  reason_code?: ReasonCode;
   /** Where the LLM call ran. Omit (or set `lambda`) for workforce
    *  agent-runner executions; set `client` when the row is written via
    *  the `POST /agents/{slug}/engagements` route for R-N1(b) client-side
@@ -540,6 +556,8 @@ export async function appendExecution(input: AppendExecutionInput): Promise<Exec
     artifact_ref: input.artifact_ref,
     error: input.error,
     summary: input.summary,
+    binding_idx: input.binding_idx,
+    reason_code: input.reason_code,
     execution_surface: input.execution_surface,
     gsi1pk: `AGENT#${input.agent_slug}`,
     gsi1sk: input.started_at,
