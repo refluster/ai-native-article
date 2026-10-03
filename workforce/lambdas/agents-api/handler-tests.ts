@@ -248,6 +248,8 @@ vi.mock("../shared/project.js", () => ({
     artifact_ref?: unknown;
     summary?: string;
     error?: string;
+    binding_idx?: number;
+    reason_code?: string;
     execution_surface?: "lambda" | "client";
   }) => {
     const row = {
@@ -263,6 +265,8 @@ vi.mock("../shared/project.js", () => ({
       artifact_ref: input.artifact_ref,
       summary: input.summary,
       error: input.error,
+      binding_idx: input.binding_idx,
+      reason_code: input.reason_code,
       execution_surface: input.execution_surface,
       gsi1pk: `AGENT#${input.agent_slug}`,
       gsi1sk: input.started_at,
@@ -1680,6 +1684,72 @@ describe("POST /agents/{slug}/engagements (Engagements API — createEngagement)
     expect((bodyOf(res) as { engagement: { summary: string } }).engagement.summary).toBe(
       "business summary wins",
     );
+  });
+
+  describe("#664 slice 1 — binding_idx + reason_code", () => {
+    const auth = () => ({ authorization: `Bearer ${TOKEN}` });
+    type View = { binding_idx?: number; reason_code?: string };
+
+    it("round-trips binding_idx and reason_code on a throw", async () => {
+      const res = await handler(
+        postEvt("dario", auth(), validBody({ status: "throw", binding_idx: 3, reason_code: "identity" })),
+      );
+      expect(statusOf(res)).toBe(201);
+      const e = (bodyOf(res) as { engagement: View }).engagement;
+      expect(e.binding_idx).toBe(3);
+      expect(e.reason_code).toBe("identity");
+    });
+
+    it("accepts binding_idx 0 (falsy but valid)", async () => {
+      const res = await handler(postEvt("dario", auth(), validBody({ binding_idx: 0 })));
+      expect(statusOf(res)).toBe(201);
+      expect((bodyOf(res) as { engagement: View }).engagement.binding_idx).toBe(0);
+    });
+
+    it("old clients that omit both fields still 201 with neither on the view", async () => {
+      const res = await handler(postEvt("dario", auth(), validBody({ status: "throw" })));
+      expect(statusOf(res)).toBe(201);
+      const e = (bodyOf(res) as { engagement: View }).engagement;
+      expect(e.binding_idx).toBeUndefined();
+      expect(e.reason_code).toBeUndefined();
+    });
+
+    it.each([-1, 1.5, "2", true])("400s on invalid binding_idx %p", async (bad) => {
+      const res = await handler(postEvt("dario", auth(), validBody({ binding_idx: bad })));
+      expect(statusOf(res)).toBe(400);
+      expect((bodyOf(res) as { error: string }).error).toBe("invalid_binding_idx");
+    });
+
+    it.each(["nope", 7, ""])("400s on reason_code outside the closed enum (%p)", async (bad) => {
+      const res = await handler(postEvt("dario", auth(), validBody({ status: "throw", reason_code: bad })));
+      expect(statusOf(res)).toBe(400);
+      expect((bodyOf(res) as { error: string }).error).toBe("invalid_reason_code");
+    });
+
+    it.each(["auth", "permission", "egress", "identity", "validation", "write_failed", "other"])(
+      "422s status=skipped carrying reason_code=%s (a refused write is a throw)",
+      async (code) => {
+        const res = await handler(
+          postEvt("dario", auth(), validBody({ status: "skipped", reason_code: code })),
+        );
+        expect(statusOf(res)).toBe(422);
+        expect((bodyOf(res) as { error: string }).error).toBe("skipped_with_failure_reason");
+        expect(rows.size).toBe(0);
+      },
+    );
+
+    it("allows status=skipped with reason_code=source_unreachable", async () => {
+      const res = await handler(
+        postEvt("dario", auth(), validBody({ status: "skipped", reason_code: "source_unreachable" })),
+      );
+      expect(statusOf(res)).toBe(201);
+      expect((bodyOf(res) as { engagement: View }).engagement.reason_code).toBe("source_unreachable");
+    });
+
+    it("allows a plain skip with no reason_code", async () => {
+      const res = await handler(postEvt("dario", auth(), validBody({ status: "skipped" })));
+      expect(statusOf(res)).toBe(201);
+    });
   });
 
   it("slices an over-long summary to 512 chars", async () => {

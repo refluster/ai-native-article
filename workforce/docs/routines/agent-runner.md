@@ -311,6 +311,8 @@ Iterate `payload.tasks` in order. For each task:
      "started_at":        "{ISO you began the task}",
      "ended_at":          "{ISO the skill write finished}",
      "status":            "ok" | "throw" | "skipped",
+     "binding_idx":       {task.binding_idx},
+     "reason_code":       "auth" | "permission" | "egress" | "identity" | "validation" | "source_unreachable" | "write_failed" | "other",   // throw only (see below)
      "execution_surface": "ccr",
      "summary":           "{ONE business-level line, lead with the title — e.g. 'Published L2: 2026年のデータセンターインフラ…' — a human result, NOT a technical/machine string; ≤512 chars}",
      "artifact": {                         // OMIT on skip / no deliverable
@@ -324,6 +326,7 @@ Iterate `payload.tasks` in order. For each task:
    ```
 
    - The top-level **`summary`** is the business sentence the operator reads in the portfolio / RUNS·DELIVERABLES UI — write it as an accomplishment, title-first, never a machine blob. It is the canonical field and is **independent of `artifact`**: set it even on a `skipped`/no-deliverable run, so an artifact-less engagement (e.g. a `pr-review`) no longer renders "no summary". `artifact.summary` is the preview of a produced *file* and may differ; the UI prefers the top-level `summary` and falls back to `artifact.summary` only for legacy rows.
+   - **`binding_idx` and `reason_code` (design note [repeat-failure-counter](../design/repeat-failure-counter.md), #664 slice 1).** Always send the task's `binding_idx` so two bindings of one skill on one agent can be told apart. On `status:"throw"`, send a `reason_code` chosen from what you already have — HTTP 401 → `auth`; 403 on a repo or API → `permission`; the CCR egress or proxy refusing a host → `egress`; a GitHub identity pre-flight mismatch (ML-040) → `identity`; HTTP 422 or a W-1 exit → `validation`; exit 2 on a read-back mismatch → `write_failed`; anything else → `other`. Never normalise the free-text `summary` to guess one. **Skip vs. failure is structural:** `skipped` means nothing to say, a sibling already covered it, or no eligible work. A run that attempted a write or a pre-flight and was refused is `throw` with a `reason_code`, never `skipped`. The endpoint enforces it: `status:"skipped"` with any `reason_code` other than `source_unreachable` is HTTP 422 `skipped_with_failure_reason`. Both fields are optional on the wire, so older callers keep working.
    - `status:"skipped"` with no `artifact` when the skill's skip-rule fired — set `summary` to the skip reason; the skip is worth recording too.
    - This is the **same `engagements` write surface** external clients use (one endpoint, not two); `execution_surface:"ccr"` is the only thing that marks it as a workforce CCR run.
    - The token is injected into the task by the orchestrator; never hard-code it. A 401 means it wasn't injected — fail loud for the task, don't silently drop the record.
