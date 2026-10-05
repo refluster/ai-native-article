@@ -35,7 +35,7 @@
 ## Markdown の約束
 
 - 1 行目は `# 篇名 — 副題`（例：`# 始計篇 — 戦う前に、数える`）。
-- `quote` / `connect` / `note` のフェンスは `book-content-contract.md` の形式どおり。
+- `quote` / `connect` / `note` のフェンスは `references/content-contract.md` の形式どおり。
 - 図：`![図1 五事七計 — 勝算を数える五つの軸](figures/01-five-factors.svg)`。キャプションは「図N 題 — 一行説明」。
 - 表は GFM。URL は本文に出さない（出典は巻末）。
 - ふりがなは `訓読` の難読字に「殆（あや）うからず」の形で初出のみ。本文中の難読語も同じ形で初出のみ。

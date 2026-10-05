@@ -44,7 +44,9 @@ Why inside `workforce/app/`: a content change must redeploy the console
 lazily from there. Agents reference the Markdown by path later. Notion is NOT the source of truth
 for a book (C-2 governs *articles*); the repo Markdown is — say so in the PR body.
 
-**The gate** is `node workforce/scripts/check-book.mjs [slug]`, run by the console's `prebuild`
+**The gate** is `node workforce/scripts/check-book.mjs [slug]`, run by the console's `prebuild`. It lands
+with the reader surface (tracker #799, the `/books` PR); until that PR is on `main` this paragraph
+describes the design, not a check you can run from a fresh checkout. It is run by the console's `prebuild`
 (so `npm run build` and the deploy refuse a broken book, C-4): manifest shape, every chapter file
 present, exactly one `# ` title, no raw HTML, every ```quote carrying 原文/訓読/出典 **with 原文
 verbatim in quotes.md**, ```connect with a `title:`, figures present and hex-free, ≥ 2,000
@@ -92,8 +94,8 @@ otherwise.
 | S6 | 校閲 | rafael: attempt to refute every factual claim (dates, names, textual variants, "Napoleon read it" legends → 伝説); astrid: citations and the AI-authorship disclosure; idris: no borrowed translation; beatriz: every quote card's 訓読/訳 against the 原文. Findings in a queries ledger; every query resolved. | `queries.md` | **G6** zero open queries; register unchanged or re-verified |
 | S7 | 図版・組版 | Reader build: `npm run build:workforce`, `npm run lint:tokens`, `cd workforce/app && npx vitest run`; figures legible at 360px; `/books/<slug>` cover, TOC, resume position. Regenerate the appendix: `node workforce/scripts/build-book-quotes-appendix.mjs <slug>`. | built app | **G7** build + lint + tests green; `check-book.mjs` clean |
 | S8 | 校正 | Proof pass on the rendered pages (mira reads, farah checks layout on phone/laptop widths, kai checks 表記). Three rounds max; the third only confirms the diff of the second. | `proof-N.md` | **G8** round 3 adds ≤ 5 corrections |
-| S9 | 校了・公開 | Sign-off in the PR body (ingrid, astrid, idris, owen). Draft PR (`L3(workforce): …` or `content: …`; template sections; cite this skill), **no L0/L1 path** touched (`docs/governance.md §4.4` list), `subscribe_pr_activity`, then let `pr-autopilot` route → ≥3 lenses → merge. Answer findings by pushing fixes to the head branch. After merge: `deploy-workforce-console.yml` green, then `curl -I https://workforce.kohuehara.xyz/books/<slug>` and open one chapter. | PR, deploy | **G9** merged + live |
-| — | 公開後 | `log-workforce-engagements` for every persona that did a WP (one row per persona per WP kind, title-first summary, PR URL). Retrospective: which gate caught what; feed it back into this file. | engagements, `retro.md` | — |
+| S9 | 校了・公開 | Sign-off in the PR body — written as **operator-orchestrated role-play**: the session, not a binding, ran the ingrid / astrid / idris / owen sub-agents, and the body says so (W-5: a persona acts on its own only through its bindings). Draft PR (`L3(workforce): …` or `content: …`; template sections; cite this skill), **no L0/L1 path** touched (`docs/governance.md §4.4` list), `subscribe_pr_activity`, then let `pr-autopilot` route → ≥3 lenses → merge. Answer findings by pushing fixes to the head branch. After merge: `deploy-workforce-console.yml` green, then `curl -I https://workforce.kohuehara.xyz/books/<slug>` and open one chapter. | PR, deploy | **G9** merged + live |
+| — | 公開後 | `log-workforce-engagements` for every persona that did a WP (one row per persona per WP kind, title-first summary, PR URL; the summary states the run was operator-orchestrated — the API records `execution_surface=client`). Retrospective: which gate caught what; feed it back into this file. | engagements, `retro.md` | — |
 
 ## Sub-agent briefs — the shape that works
 
@@ -117,7 +119,11 @@ otherwise.
   Zone A. If the book needs a design decision recorded, write a design note under
   `workforce/docs/design/` and say in the PR body which Zone A doc should eventually absorb it.
 - The reader stores position/settings in `localStorage` only. No server state, no accounts (C-3).
-- Cost: a 20-chapter book is ~25 Opus sub-agent runs. Say so in S0 against W-3.
+- Cost (W-3): the first run (22 chapters, 22 figures, 3 review ledgers, research pack, reader build)
+  took about 35 Opus sub-agent runs and roughly 6 M tokens in total (writers 80–130 k each; the research
+  pack and the reader build 200–500 k each; reviewers 200–400 k each). Price it at the current Opus list
+  rate in S0 and put the line in the proposal. The cheaper shape: run S5 (copy pass) and S8 (proof pass)
+  on Sonnet — they are pattern work against a ledger — and keep Opus for S1, S3, S4 and S6.
 
 ## Precedent
 
