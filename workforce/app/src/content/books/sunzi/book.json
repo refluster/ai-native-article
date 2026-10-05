@@ -1,0 +1,27 @@
+{
+  "slug": "sunzi",
+  "title": "孫子の兵法",
+  "subtitle": "不確実性を減らし、勝算を高める古典を原文から読む",
+  "lang": "ja",
+  "kicker": "Web book · 日本語",
+  "description": "【仮原稿】二千五百年前の兵書を、原文・訓読・現代語訳で一篇ずつ読み、経営・設計・研究の現場へ接続する。本文はリーダー開発用のプレースホルダーで、正式な原稿に差し替えられる。",
+  "authors": ["ingrid", "sora"],
+  "version": "0.1.0",
+  "updated": "2026-10-05",
+  "parts": [
+    {
+      "id": "front",
+      "title": "はじめに",
+      "chapters": [
+        { "id": "preface", "file": "chapters/00-preface.md", "title": "序 — なぜいま孫子か", "kicker": "序" }
+      ]
+    },
+    {
+      "id": "part-1",
+      "title": "前編 原文を読む",
+      "chapters": [
+        { "id": "01-ji", "file": "chapters/01-ji.md", "title": "始計篇 — 戦う前に、数える", "kicker": "第一篇" }
+      ]
+    }
+  ]
+}

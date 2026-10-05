@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 540" role="img" aria-labelledby="fig-01-five-factors-title" font-family="inherit">
+  <title id="fig-01-five-factors-title">図1 五事 — 勝算を数える五つの軸</title>
+  <!-- Vertical layout so the labels stay legible at 360px wide (contract §SVG figure rules).
+       Painted with the reader's CSS variables only, so it follows paper / sepia / night. -->
+  <g>
+    <rect x="40" y="16" width="600" height="72" rx="10" style="fill: var(--book-panel); stroke: var(--book-line)" stroke-width="1.5"/>
+    <circle cx="100" cy="52" r="26" style="fill: none; stroke: var(--book-accent)" stroke-width="2"/>
+    <text x="100" y="62" text-anchor="middle" font-size="30" style="fill: var(--book-accent)">道</text>
+    <text x="150" y="61" font-size="24" style="fill: var(--book-ink)">目的の共有</text>
+  </g>
+  <g>
+    <rect x="40" y="100" width="600" height="72" rx="10" style="fill: var(--book-panel); stroke: var(--book-line)" stroke-width="1.5"/>
+    <circle cx="100" cy="136" r="26" style="fill: none; stroke: var(--book-accent)" stroke-width="2"/>
+    <text x="100" y="146" text-anchor="middle" font-size="30" style="fill: var(--book-accent)">天</text>
+    <text x="150" y="145" font-size="24" style="fill: var(--book-ink)">時機・外部環境</text>
+  </g>
+  <g>
+    <rect x="40" y="184" width="600" height="72" rx="10" style="fill: var(--book-panel); stroke: var(--book-line)" stroke-width="1.5"/>
+    <circle cx="100" cy="220" r="26" style="fill: none; stroke: var(--book-accent)" stroke-width="2"/>
+    <text x="100" y="230" text-anchor="middle" font-size="30" style="fill: var(--book-accent)">地</text>
+    <text x="150" y="229" font-size="24" style="fill: var(--book-ink)">地形・前提条件</text>
+  </g>
+  <g>
+    <rect x="40" y="268" width="600" height="72" rx="10" style="fill: var(--book-panel); stroke: var(--book-line)" stroke-width="1.5"/>
+    <circle cx="100" cy="304" r="26" style="fill: none; stroke: var(--book-accent)" stroke-width="2"/>
+    <text x="100" y="314" text-anchor="middle" font-size="30" style="fill: var(--book-accent)">将</text>
+    <text x="150" y="313" font-size="24" style="fill: var(--book-ink)">指揮者の資質</text>
+  </g>
+  <g>
+    <rect x="40" y="352" width="600" height="72" rx="10" style="fill: var(--book-panel); stroke: var(--book-line)" stroke-width="1.5"/>
+    <circle cx="100" cy="388" r="26" style="fill: none; stroke: var(--book-accent)" stroke-width="2"/>
+    <text x="100" y="398" text-anchor="middle" font-size="30" style="fill: var(--book-accent)">法</text>
+    <text x="150" y="397" font-size="24" style="fill: var(--book-ink)">組織・規律</text>
+  </g>
+  <path d="M340 432 L340 462" style="stroke: var(--book-ink-2)" stroke-width="2" fill="none"/>
+  <path d="M330 454 L340 466 L350 454" style="stroke: var(--book-ink-2)" stroke-width="2" fill="none"/>
+  <rect x="160" y="472" width="360" height="56" rx="28" style="fill: var(--book-bg); stroke: var(--book-accent)" stroke-width="2"/>
+  <text x="340" y="508" text-anchor="middle" font-size="24" font-weight="600" style="fill: var(--book-ink)">七計で比べ、勝算を得る</text>
+</svg>
