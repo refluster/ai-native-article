@@ -72,15 +72,27 @@ function arg(name) {
 
 /** Closes recorded in the budget file inside the window. The file is per
  *  machine (a CCR session's /tmp), so the bound is per run — which is the
- *  bound the skill body states. */
+ *  bound the skill body states.
+ *
+ *  Fail loud (C-4): a budget file that cannot be parsed, or is not a list,
+ *  throws — a corrupt file must not read as "0 closes so far". A row whose
+ *  `at` is missing or unparseable is COUNTED (kept), never dropped: the
+ *  direction of every uncertainty here is "spend the budget", because the
+ *  budget exists to bound a wrong heuristic, not to be bounded by one. */
 export function readCloseBudget(file, { now = Date.now(), windowHours = BUDGET_WINDOW_HOURS } = {}) {
   if (!existsSync(file)) return [];
+  let rows;
   try {
-    const rows = JSON.parse(readFileSync(file, "utf8"));
-    return Array.isArray(rows) ? rows.filter((r) => now - Date.parse(r?.at ?? 0) < windowHours * 3600_000) : [];
-  } catch {
-    return [];
+    rows = JSON.parse(readFileSync(file, "utf8"));
+  } catch (e) {
+    throw new Error(`close-budget file ${file} is not valid JSON (${e?.message || e}) — refusing to treat it as empty; fix or delete it`);
   }
+  if (!Array.isArray(rows)) throw new Error(`close-budget file ${file} must hold a JSON array, got ${typeof rows}`);
+  return rows.filter((r) => {
+    const at = Date.parse(r?.at ?? "");
+    if (Number.isNaN(at)) return true; // unreadable timestamp counts against the budget
+    return now - at < windowHours * 3600_000;
+  });
 }
 
 async function readAllComments(gh, repo, issue) {
@@ -214,7 +226,12 @@ async function main() {
       if (r.status === 200) mergedPr = r.json;
       else return die(3, `GET pull ${prArg} -> HTTP ${r.status}`);
     }
-    const spent = readCloseBudget(budgetFile);
+    let spent;
+    try {
+      spent = readCloseBudget(budgetFile);
+    } catch (e) {
+      return die(1, e instanceof Error ? e.message : String(e));
+    }
     const refusal = closeRefusal({
       reason,
       issue: Number(issue),
