@@ -1,39 +1,100 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 540" role="img" aria-labelledby="fig-01-five-factors-title" font-family="inherit">
-  <title id="fig-01-five-factors-title">図1 五事 — 勝算を数える五つの軸</title>
-  <!-- Vertical layout so the labels stay legible at 360px wide (contract §SVG figure rules).
-       Painted with the reader's CSS variables only, so it follows paper / sepia / night. -->
-  <g>
-    <rect x="40" y="16" width="600" height="72" rx="10" style="fill: var(--book-panel); stroke: var(--book-line)" stroke-width="1.5"/>
-    <circle cx="100" cy="52" r="26" style="fill: none; stroke: var(--book-accent)" stroke-width="2"/>
-    <text x="100" y="62" text-anchor="middle" font-size="30" style="fill: var(--book-accent)">道</text>
-    <text x="150" y="61" font-size="24" style="fill: var(--book-ink)">目的の共有</text>
-  </g>
-  <g>
-    <rect x="40" y="100" width="600" height="72" rx="10" style="fill: var(--book-panel); stroke: var(--book-line)" stroke-width="1.5"/>
-    <circle cx="100" cy="136" r="26" style="fill: none; stroke: var(--book-accent)" stroke-width="2"/>
-    <text x="100" y="146" text-anchor="middle" font-size="30" style="fill: var(--book-accent)">天</text>
-    <text x="150" y="145" font-size="24" style="fill: var(--book-ink)">時機・外部環境</text>
-  </g>
-  <g>
-    <rect x="40" y="184" width="600" height="72" rx="10" style="fill: var(--book-panel); stroke: var(--book-line)" stroke-width="1.5"/>
-    <circle cx="100" cy="220" r="26" style="fill: none; stroke: var(--book-accent)" stroke-width="2"/>
-    <text x="100" y="230" text-anchor="middle" font-size="30" style="fill: var(--book-accent)">地</text>
-    <text x="150" y="229" font-size="24" style="fill: var(--book-ink)">地形・前提条件</text>
-  </g>
-  <g>
-    <rect x="40" y="268" width="600" height="72" rx="10" style="fill: var(--book-panel); stroke: var(--book-line)" stroke-width="1.5"/>
-    <circle cx="100" cy="304" r="26" style="fill: none; stroke: var(--book-accent)" stroke-width="2"/>
-    <text x="100" y="314" text-anchor="middle" font-size="30" style="fill: var(--book-accent)">将</text>
-    <text x="150" y="313" font-size="24" style="fill: var(--book-ink)">指揮者の資質</text>
-  </g>
-  <g>
-    <rect x="40" y="352" width="600" height="72" rx="10" style="fill: var(--book-panel); stroke: var(--book-line)" stroke-width="1.5"/>
-    <circle cx="100" cy="388" r="26" style="fill: none; stroke: var(--book-accent)" stroke-width="2"/>
-    <text x="100" y="398" text-anchor="middle" font-size="30" style="fill: var(--book-accent)">法</text>
-    <text x="150" y="397" font-size="24" style="fill: var(--book-ink)">組織・規律</text>
-  </g>
-  <path d="M340 432 L340 462" style="stroke: var(--book-ink-2)" stroke-width="2" fill="none"/>
-  <path d="M330 454 L340 466 L350 454" style="stroke: var(--book-ink-2)" stroke-width="2" fill="none"/>
-  <rect x="160" y="472" width="360" height="56" rx="28" style="fill: var(--book-bg); stroke: var(--book-accent)" stroke-width="2"/>
-  <text x="340" y="508" text-anchor="middle" font-size="24" font-weight="600" style="fill: var(--book-ink)">七計で比べ、勝算を得る</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 910" role="img" aria-labelledby="f1-title f1-desc">
+<title id="f1-title">図1 五事七計</title>
+<desc id="f1-desc">上段は道・天・地・将・法の五事を五本の軸に取った図で、我と敵の例を重ねる。下段は七計の七つの問いを中央に置き、左に我、右に敵を比べる表。</desc>
+<style>
+.f1-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+.f1-boxa{fill:var(--book-panel);stroke:var(--book-accent);stroke-width:1.5}
+.f1-ln{fill:none;stroke:var(--book-line);stroke-width:1.2}
+.f1-ln2{fill:none;stroke:var(--book-ink-2);stroke-width:1.3}
+.f1-dash{fill:none;stroke:var(--book-ink-2);stroke-width:1.2;stroke-dasharray:4 4}
+.f1-acc{fill:none;stroke:var(--book-accent);stroke-width:1.6}
+.f1-arr{fill:none;stroke:var(--book-ink-2);stroke-width:1.3;marker-end:url(#f1-ah)}
+.f1-arra{fill:none;stroke:var(--book-accent);stroke-width:1.6;marker-end:url(#f1-aha)}
+.f1-ahp{fill:var(--book-ink-2)}
+.f1-ahap{fill:var(--book-accent)}
+.f1-h{font-family:inherit;font-size:20px;font-weight:600;fill:var(--book-ink)}
+.f1-t{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-ink)}
+.f1-b{font-family:inherit;font-size:16px;fill:var(--book-ink)}
+.f1-s{font-family:inherit;font-size:15px;fill:var(--book-ink-2)}
+.f1-xs{font-family:inherit;font-size:14px;fill:var(--book-ink-2)}
+.f1-k{font-family:inherit;font-size:14px;font-weight:600;fill:var(--book-accent);letter-spacing:.08em}
+.f1-ta{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-accent)}
+.f1-big{font-family:inherit;font-size:30px;font-weight:600;fill:var(--book-ink)}
+
+.f1-us{fill:var(--book-accent);fill-opacity:.12;stroke:var(--book-accent);stroke-width:1.6}
+.f1-enemy{fill:none;stroke:var(--book-ink-2);stroke-width:1.3;stroke-dasharray:5 4}
+.f1-enemyl{fill:none;stroke:var(--book-ink-2);stroke-width:1.3;stroke-dasharray:5 4}
+.f1-ax{font-family:inherit;font-size:24px;font-weight:600;fill:var(--book-ink)}
+.f1-cell{fill:var(--book-bg);stroke:var(--book-ink-2);stroke-width:1}
+</style>
+<defs><marker id="f1-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f1-ahp" d="M0 0L10 5L0 10z"/></marker><marker id="f1-aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="f1-ahap" d="M0 0L10 5L0 10z"/></marker></defs>
+<text x="24" y="32" class="f1-k">五事 — 測る五つの軸</text>
+<polygon points="340.0,215.0 392.3,253.0 372.3,314.5 307.7,314.5 287.7,253.0" class="f1-ln"/>
+<polygon points="340.0,160.0 444.6,236.0 404.7,359.0 275.3,359.0 235.4,236.0" class="f1-ln"/>
+<line x1="340" y1="270" x2="340" y2="160" class="f1-ln"/>
+<line x1="340" y1="270" x2="444.6" y2="236" class="f1-ln"/>
+<line x1="340" y1="270" x2="404.7" y2="359" class="f1-ln"/>
+<line x1="340" y1="270" x2="275.3" y2="359" class="f1-ln"/>
+<line x1="340" y1="270" x2="235.4" y2="236" class="f1-ln"/>
+<polygon points="340.0,201.8 425.8,242.1 376.2,319.8 301.2,323.4 271.0,247.6" class="f1-enemy"/>
+<polygon points="340.0,175.4 413.2,246.2 391.7,341.2 281.8,350.1 260.5,244.2" class="f1-us"/>
+<text x="340" y="108" class="f1-ax" text-anchor="middle">道</text>
+<text x="340" y="130" class="f1-s" text-anchor="middle">民と上の心が一つ</text>
+<text x="470" y="238" class="f1-ax" text-anchor="start">天</text>
+<text x="470" y="260" class="f1-s" text-anchor="start">陰陽・寒暑・時</text>
+<text x="420" y="392" class="f1-ax" text-anchor="start">地</text>
+<text x="420" y="414" class="f1-s" text-anchor="start">遠近・険易・広狭</text>
+<text x="260" y="392" class="f1-ax" text-anchor="end">将</text>
+<text x="260" y="414" class="f1-s" text-anchor="end">智・信・仁・勇・厳</text>
+<text x="210" y="238" class="f1-ax" text-anchor="end">法</text>
+<text x="210" y="260" class="f1-s" text-anchor="end">編制・職分・物資</text>
+<line x1="530" y1="54" x2="556" y2="54" class="f1-us"/>
+<text x="564" y="59" class="f1-b">我</text>
+<line x1="530" y1="78" x2="556" y2="78" class="f1-enemyl"/>
+<text x="564" y="83" class="f1-b">敵</text>
+<text x="600" y="83" class="f1-xs">（例）</text>
+<text x="24" y="466" class="f1-k">七計 — 我と敵を比べる</text>
+<rect x="40" y="482" width="600" height="352" rx="4" class="f1-box"/>
+<text x="95" y="509" class="f1-t" text-anchor="middle">我</text>
+<text x="340" y="509" class="f1-t" text-anchor="middle">七計の問い</text>
+<text x="585" y="509" class="f1-t" text-anchor="middle">敵</text>
+<line x1="40" y1="524" x2="640" y2="524" class="f1-ln2"/>
+<line x1="150" y1="482" x2="150" y2="834" class="f1-ln"/>
+<line x1="530" y1="482" x2="530" y2="834" class="f1-ln"/>
+<text x="170" y="552" class="f1-t">主孰有道</text>
+<text x="262" y="552" class="f1-s">君主は民の心を得るか</text>
+<rect x="87" y="538" width="16" height="16" rx="2" class="f1-cell"/>
+<rect x="577" y="538" width="16" height="16" rx="2" class="f1-cell"/>
+<line x1="40" y1="568" x2="640" y2="568" class="f1-ln"/>
+<text x="170" y="596" class="f1-t">將孰有能</text>
+<text x="262" y="596" class="f1-s">将は有能か</text>
+<rect x="87" y="582" width="16" height="16" rx="2" class="f1-cell"/>
+<rect x="577" y="582" width="16" height="16" rx="2" class="f1-cell"/>
+<line x1="40" y1="612" x2="640" y2="612" class="f1-ln"/>
+<text x="170" y="640" class="f1-t">天地孰得</text>
+<text x="262" y="640" class="f1-s">天の時・地の利</text>
+<rect x="87" y="626" width="16" height="16" rx="2" class="f1-cell"/>
+<rect x="577" y="626" width="16" height="16" rx="2" class="f1-cell"/>
+<line x1="40" y1="656" x2="640" y2="656" class="f1-ln"/>
+<text x="170" y="684" class="f1-t">法令孰行</text>
+<text x="262" y="684" class="f1-s">法令は守られるか</text>
+<rect x="87" y="670" width="16" height="16" rx="2" class="f1-cell"/>
+<rect x="577" y="670" width="16" height="16" rx="2" class="f1-cell"/>
+<line x1="40" y1="700" x2="640" y2="700" class="f1-ln"/>
+<text x="170" y="728" class="f1-t">兵衆孰強</text>
+<text x="262" y="728" class="f1-s">軍は強いか</text>
+<rect x="87" y="714" width="16" height="16" rx="2" class="f1-cell"/>
+<rect x="577" y="714" width="16" height="16" rx="2" class="f1-cell"/>
+<line x1="40" y1="744" x2="640" y2="744" class="f1-ln"/>
+<text x="170" y="772" class="f1-t">士卒孰練</text>
+<text x="262" y="772" class="f1-s">兵は訓練されているか</text>
+<rect x="87" y="758" width="16" height="16" rx="2" class="f1-cell"/>
+<rect x="577" y="758" width="16" height="16" rx="2" class="f1-cell"/>
+<line x1="40" y1="788" x2="640" y2="788" class="f1-ln"/>
+<text x="170" y="816" class="f1-t">賞罰孰明</text>
+<text x="262" y="816" class="f1-s">賞罰は明らかか</text>
+<rect x="87" y="802" width="16" height="16" rx="2" class="f1-cell"/>
+<rect x="577" y="802" width="16" height="16" rx="2" class="f1-cell"/>
+<line x1="340" y1="840" x2="340" y2="860" class="f1-arr"/>
+<text x="340" y="886" class="f1-ta" text-anchor="middle">多算は勝ち、少算は勝たず</text>
 </svg>

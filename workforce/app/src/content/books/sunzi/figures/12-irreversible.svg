@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 600" role="img" aria-labelledby="f12-title f12-desc" class="f12">
+  <title id="f12-title">図12 可逆と不可逆 — 戻れる扉と戻れない扉</title>
+  <desc id="f12-desc">火攻篇の結語。怒は喜に、慍は悦に戻れるが、亡んだ国は再び存せず、死者は再び生きない。だから明主は之を慎み、良将は之を警む。</desc>
+  <style>
+    .f12 text{font-family:inherit}
+    .f12-h{font-size:14px;fill:var(--book-ink-2);letter-spacing:.08em}
+    .f12-c{font-size:26px;font-weight:700;fill:var(--book-ink)}
+    .f12-c2{font-size:20px;font-weight:700;fill:var(--book-ink)}
+    .f12-s{font-size:15px;fill:var(--book-ink-2)}
+    .f12-k{font-size:22px;font-weight:700;fill:var(--book-ink)}
+    .f12-o{font-size:13px;fill:var(--book-ink-2)}
+    .f12-panel{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+    .f12-node{fill:var(--book-bg);stroke:var(--book-ink-2);stroke-width:1.4}
+    .f12-gone{fill:var(--book-bg);stroke:var(--book-ink);stroke-width:2}
+    .f12-arr{fill:none;stroke:var(--book-ink-2);stroke-width:1.5;marker-end:url(#fig12-ah)}
+    .f12-back{fill:none;stroke:var(--book-ink-2);stroke-width:1.3;stroke-dasharray:4 4}
+    .f12-x{fill:none;stroke:var(--book-accent);stroke-width:2.5;stroke-linecap:round}
+    .f12-ahp{fill:var(--book-ink-2)}
+    .f12-end{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+    .f12-bar{fill:var(--book-accent)}
+  </style>
+  <defs>
+    <marker id="fig12-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="f12-ahp"/></marker>
+  </defs>
+
+  <!-- reversible -->
+  <rect x="30" y="24" width="660" height="196" rx="6" class="f12-panel"/>
+  <text x="50" y="52" class="f12-h">戻れる（可逆）</text>
+
+  <circle cx="150" cy="96" r="30" class="f12-node"/>
+  <text x="150" y="105" text-anchor="middle" class="f12-c">怒</text>
+  <circle cx="390" cy="96" r="30" class="f12-node"/>
+  <text x="390" y="105" text-anchor="middle" class="f12-c">喜</text>
+  <path d="M184 86 Q270 66 351 87" class="f12-arr"/>
+  <path d="M356 108 Q270 128 191 109" class="f12-arr"/>
+  <text x="450" y="102" class="f12-s">怒りは喜びに戻る</text>
+
+  <circle cx="150" cy="172" r="30" class="f12-node"/>
+  <text x="150" y="181" text-anchor="middle" class="f12-c">慍</text>
+  <circle cx="390" cy="172" r="30" class="f12-node"/>
+  <text x="390" y="181" text-anchor="middle" class="f12-c">悦</text>
+  <path d="M184 162 Q270 142 351 163" class="f12-arr"/>
+  <path d="M356 184 Q270 204 191 185" class="f12-arr"/>
+  <text x="450" y="178" class="f12-s">慍りは悦びに戻る</text>
+
+  <!-- irreversible -->
+  <rect x="30" y="240" width="660" height="196" rx="6" class="f12-panel"/>
+  <text x="50" y="268" class="f12-h">戻れない（不可逆）</text>
+
+  <circle cx="150" cy="312" r="30" class="f12-node"/>
+  <text x="150" y="321" text-anchor="middle" class="f12-c">存</text>
+  <rect x="340" y="284" width="100" height="56" rx="28" class="f12-gone"/>
+  <text x="390" y="319" text-anchor="middle" class="f12-c2">亡国</text>
+  <path d="M184 302 Q262 282 334 302" class="f12-arr"/>
+  <path d="M336 324 Q262 344 186 324" class="f12-back"/>
+  <path d="M252 326 L272 346 M272 326 L252 346" class="f12-x"/>
+  <text x="460" y="318" class="f12-s">復た存すべからず</text>
+
+  <circle cx="150" cy="388" r="30" class="f12-node"/>
+  <text x="150" y="397" text-anchor="middle" class="f12-c">生</text>
+  <rect x="340" y="360" width="100" height="56" rx="28" class="f12-gone"/>
+  <text x="390" y="395" text-anchor="middle" class="f12-c2">死者</text>
+  <path d="M184 378 Q262 358 334 378" class="f12-arr"/>
+  <path d="M336 400 Q262 420 186 400" class="f12-back"/>
+  <path d="M252 402 L272 422 M272 402 L252 422" class="f12-x"/>
+  <text x="460" y="394" class="f12-s">復た生くべからず</text>
+
+  <!-- conclusion -->
+  <rect x="150" y="466" width="420" height="110" rx="6" class="f12-end"/>
+  <rect x="152" y="474" width="4" height="94" class="f12-bar"/>
+  <text x="360" y="506" text-anchor="middle" class="f12-k">明主は之を慎み</text>
+  <text x="360" y="540" text-anchor="middle" class="f12-k">良将は之を警む</text>
+  <text x="360" y="564" text-anchor="middle" class="f12-o">明主慎之、良將警之</text>
+</svg>

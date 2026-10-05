@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 640" role="img" aria-labelledby="f3-title f3-desc">
+<title id="f3-title">図3 上兵伐謀の四段階</title>
+<desc id="f3-desc">謀を伐つ、交を伐つ、兵を伐つ、城を攻めるの四段が左から右へ下る階段。下段ほど費用・時間・損害が大きくなる。最上段は「全きを上とす」。</desc>
+<style>
+.f3-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+.f3-boxa{fill:var(--book-panel);stroke:var(--book-accent);stroke-width:1.5}
+.f3-ln{fill:none;stroke:var(--book-line);stroke-width:1.2}
+.f3-ln2{fill:none;stroke:var(--book-ink-2);stroke-width:1.3}
+.f3-dash{fill:none;stroke:var(--book-ink-2);stroke-width:1.2;stroke-dasharray:4 4}
+.f3-acc{fill:none;stroke:var(--book-accent);stroke-width:1.6}
+.f3-arr{fill:none;stroke:var(--book-ink-2);stroke-width:1.3;marker-end:url(#f3-ah)}
+.f3-arra{fill:none;stroke:var(--book-accent);stroke-width:1.6;marker-end:url(#f3-aha)}
+.f3-ahp{fill:var(--book-ink-2)}
+.f3-ahap{fill:var(--book-accent)}
+.f3-h{font-family:inherit;font-size:20px;font-weight:600;fill:var(--book-ink)}
+.f3-t{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-ink)}
+.f3-b{font-family:inherit;font-size:16px;fill:var(--book-ink)}
+.f3-s{font-family:inherit;font-size:15px;fill:var(--book-ink-2)}
+.f3-xs{font-family:inherit;font-size:14px;fill:var(--book-ink-2)}
+.f3-k{font-family:inherit;font-size:14px;font-weight:600;fill:var(--book-accent);letter-spacing:.08em}
+.f3-ta{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-accent)}
+.f3-big{font-family:inherit;font-size:30px;font-weight:600;fill:var(--book-ink)}
+
+.f3-ch{font-family:inherit;font-size:38px;font-weight:600;fill:var(--book-ink)}
+.f3-cha{font-family:inherit;font-size:38px;font-weight:600;fill:var(--book-accent)}
+.f3-bar{fill:var(--book-ink-2);fill-opacity:.35;stroke:none}
+</style>
+<defs><marker id="f3-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f3-ahp" d="M0 0L10 5L0 10z"/></marker><marker id="f3-aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="f3-ahap" d="M0 0L10 5L0 10z"/></marker></defs>
+<text x="30" y="40" class="f3-ta">全きを上とす</text>
+<text x="30" y="62" class="f3-s">壊さずに丸ごと得る</text>
+<rect x="30" y="130" width="150" height="350" rx="4" class="f3-boxa"/>
+<text x="105" y="118" class="f3-s" text-anchor="middle">上兵</text>
+<text x="105" y="184" class="f3-cha" text-anchor="middle">謀</text>
+<text x="105" y="216" class="f3-t" text-anchor="middle">謀を伐つ</text>
+<text x="105" y="238" class="f3-s" text-anchor="middle">相手の計画を崩す</text>
+<rect x="75" y="582" width="60" height="18" rx="2" class="f3-bar"/>
+<text x="105" y="622" class="f3-s" text-anchor="middle">小</text>
+<rect x="190" y="190" width="150" height="290" rx="4" class="f3-box"/>
+<text x="265" y="178" class="f3-s" text-anchor="middle">其の次</text>
+<text x="265" y="244" class="f3-ch" text-anchor="middle">交</text>
+<text x="265" y="276" class="f3-t" text-anchor="middle">交を伐つ</text>
+<text x="265" y="298" class="f3-s" text-anchor="middle">同盟を断つ</text>
+<rect x="235" y="564" width="60" height="36" rx="2" class="f3-bar"/>
+<text x="265" y="622" class="f3-s" text-anchor="middle">中</text>
+<rect x="350" y="250" width="150" height="230" rx="4" class="f3-box"/>
+<text x="425" y="238" class="f3-s" text-anchor="middle">其の次</text>
+<text x="425" y="304" class="f3-ch" text-anchor="middle">兵</text>
+<text x="425" y="336" class="f3-t" text-anchor="middle">兵を伐つ</text>
+<text x="425" y="358" class="f3-s" text-anchor="middle">軍と戦う</text>
+<rect x="395" y="542" width="60" height="58" rx="2" class="f3-bar"/>
+<text x="425" y="622" class="f3-s" text-anchor="middle">大</text>
+<rect x="510" y="310" width="150" height="170" rx="4" class="f3-box"/>
+<text x="585" y="298" class="f3-s" text-anchor="middle">其の下</text>
+<text x="585" y="364" class="f3-ch" text-anchor="middle">城</text>
+<text x="585" y="396" class="f3-t" text-anchor="middle">城を攻める</text>
+<text x="585" y="418" class="f3-s" text-anchor="middle">已むを得ずの手</text>
+<rect x="555" y="510" width="60" height="90" rx="2" class="f3-bar"/>
+<text x="585" y="622" class="f3-s" text-anchor="middle">最大</text>
+<path d="M140 92 L600 272" class="f3-arr"/>
+<line x1="30" y1="600" x2="650" y2="600" class="f3-ln2"/>
+<text x="30" y="520" class="f3-s">費用・時間・損害 →</text>
+</svg>

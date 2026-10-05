@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 840" role="img" aria-labelledby="f7-title f7-desc">
+<title id="f7-title">図7 迂直の計</title>
+<desc id="f7-desc">出発点から争う地点まで、直線の道は短いが疲弊して輜重を失い、百里を急げば十に一しか着かない。迂回路は長いが隊列と輜重が整った状態で着く。下に軍争篇の六句（風・林・火・山・陰・雷）を並べ、信玄の旗が最初の四句の抜粋であることを示す。</desc>
+<style>
+.f7-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+.f7-boxa{fill:var(--book-panel);stroke:var(--book-accent);stroke-width:1.5}
+.f7-ln{fill:none;stroke:var(--book-line);stroke-width:1.2}
+.f7-ln2{fill:none;stroke:var(--book-ink-2);stroke-width:1.3}
+.f7-dash{fill:none;stroke:var(--book-ink-2);stroke-width:1.2;stroke-dasharray:4 4}
+.f7-acc{fill:none;stroke:var(--book-accent);stroke-width:1.6}
+.f7-arr{fill:none;stroke:var(--book-ink-2);stroke-width:1.3;marker-end:url(#f7-ah)}
+.f7-arra{fill:none;stroke:var(--book-accent);stroke-width:1.6;marker-end:url(#f7-aha)}
+.f7-ahp{fill:var(--book-ink-2)}
+.f7-ahap{fill:var(--book-accent)}
+.f7-h{font-family:inherit;font-size:20px;font-weight:600;fill:var(--book-ink)}
+.f7-t{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-ink)}
+.f7-b{font-family:inherit;font-size:16px;fill:var(--book-ink)}
+.f7-s{font-family:inherit;font-size:15px;fill:var(--book-ink-2)}
+.f7-xs{font-family:inherit;font-size:14px;fill:var(--book-ink-2)}
+.f7-k{font-family:inherit;font-size:14px;font-weight:600;fill:var(--book-accent);letter-spacing:.08em}
+.f7-ta{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-accent)}
+.f7-big{font-family:inherit;font-size:30px;font-weight:600;fill:var(--book-ink)}
+
+.f7-straight{fill:none;stroke:var(--book-ink-2);stroke-width:1.6}
+.f7-drop{fill:none;stroke:var(--book-ink-2);stroke-width:1;stroke-dasharray:3 2}
+.f7-pt{fill:var(--book-ink)}
+.f7-goal{fill:var(--book-panel);stroke:var(--book-accent);stroke-width:2}
+.f7-dfull{fill:var(--book-ink-2)}
+.f7-dempty{fill:none;stroke:var(--book-ink-2);stroke-width:1;stroke-dasharray:2 2}
+.f7-dacc{fill:var(--book-accent);fill-opacity:.85}
+.f7-ch{font-family:inherit;font-size:30px;font-weight:600;fill:var(--book-ink)}
+.f7-q{font-family:inherit;font-size:15px;font-weight:600;fill:var(--book-ink)}
+</style>
+<defs><marker id="f7-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f7-ahp" d="M0 0L10 5L0 10z"/></marker><marker id="f7-aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="f7-ahap" d="M0 0L10 5L0 10z"/></marker></defs>
+<text x="24" y="34" class="f7-k">以迂為直</text>
+<text x="24" y="56" class="f7-s">迂を以て直と為す</text>
+<line x1="90" y1="340" x2="600" y2="110" class="f7-straight"/>
+<path d="M90 340 C280 470 640 440 650 260 C655 180 630 130 606 114" class="f7-arra"/>
+<rect x="312.5" y="250.5" width="14" height="14" rx="1" class="f7-drop"/>
+<rect x="399.2" y="211.4" width="14" height="14" rx="1" class="f7-drop"/>
+<rect x="480.8" y="174.6" width="14" height="14" rx="1" class="f7-drop"/>
+<text x="406" y="252" class="f7-s" text-anchor="middle">輜重を失う</text>
+<text x="250" y="222" class="f7-b" text-anchor="middle">直：短いが疲弊</text>
+<text x="420" y="458" class="f7-ta" text-anchor="middle">迂：長いが整って着く</text>
+<circle cx="90" cy="340" r="7" class="f7-pt"/>
+<text x="90" y="370" class="f7-s" text-anchor="middle">出発</text>
+<circle cx="600" cy="110" r="10" class="f7-goal"/>
+<text x="600" y="88" class="f7-t" text-anchor="middle">争う地点</text>
+<text x="24" y="528" class="f7-b">直で着くと</text>
+<text x="24" y="574" class="f7-b">迂で着くと</text>
+<circle cx="136" cy="523" r="9" class="f7-dfull"/>
+<circle cx="136" cy="569" r="9" class="f7-dacc"/>
+<circle cx="164" cy="523" r="9" class="f7-dempty"/>
+<circle cx="164" cy="569" r="9" class="f7-dacc"/>
+<circle cx="192" cy="523" r="9" class="f7-dempty"/>
+<circle cx="192" cy="569" r="9" class="f7-dacc"/>
+<circle cx="220" cy="523" r="9" class="f7-dempty"/>
+<circle cx="220" cy="569" r="9" class="f7-dacc"/>
+<circle cx="248" cy="523" r="9" class="f7-dempty"/>
+<circle cx="248" cy="569" r="9" class="f7-dacc"/>
+<circle cx="276" cy="523" r="9" class="f7-dempty"/>
+<circle cx="276" cy="569" r="9" class="f7-dacc"/>
+<circle cx="304" cy="523" r="9" class="f7-dempty"/>
+<circle cx="304" cy="569" r="9" class="f7-dacc"/>
+<circle cx="332" cy="523" r="9" class="f7-dempty"/>
+<circle cx="332" cy="569" r="9" class="f7-dacc"/>
+<circle cx="360" cy="523" r="9" class="f7-dempty"/>
+<circle cx="360" cy="569" r="9" class="f7-dacc"/>
+<circle cx="388" cy="523" r="9" class="f7-dempty"/>
+<circle cx="388" cy="569" r="9" class="f7-dacc"/>
+<text x="426" y="528" class="f7-s">百里で十に一が至る</text>
+<text x="426" y="574" class="f7-s">隊列と輜重が整う</text>
+<line x1="24" y1="604" x2="676" y2="604" class="f7-ln"/>
+<text x="24" y="638" class="f7-k">軍争篇の六句</text>
+<text x="24" y="660" class="f7-s">風林火山は四句の抜粋</text>
+<rect x="24" y="676" width="104" height="110" rx="4" class="f7-box"/>
+<text x="76" y="718" class="f7-ch" text-anchor="middle">風</text>
+<text x="76" y="746" class="f7-q" text-anchor="middle">其疾如風</text>
+<text x="76" y="770" class="f7-xs" text-anchor="middle">速く動く</text>
+<rect x="134" y="676" width="104" height="110" rx="4" class="f7-box"/>
+<text x="186" y="718" class="f7-ch" text-anchor="middle">林</text>
+<text x="186" y="746" class="f7-q" text-anchor="middle">其徐如林</text>
+<text x="186" y="770" class="f7-xs" text-anchor="middle">静かに待つ</text>
+<rect x="244" y="676" width="104" height="110" rx="4" class="f7-box"/>
+<text x="296" y="718" class="f7-ch" text-anchor="middle">火</text>
+<text x="296" y="746" class="f7-q" text-anchor="middle">侵掠如火</text>
+<text x="296" y="770" class="f7-xs" text-anchor="middle">一気に攻める</text>
+<rect x="354" y="676" width="104" height="110" rx="4" class="f7-box"/>
+<text x="406" y="718" class="f7-ch" text-anchor="middle">山</text>
+<text x="406" y="746" class="f7-q" text-anchor="middle">不動如山</text>
+<text x="406" y="770" class="f7-xs" text-anchor="middle">動かない</text>
+<rect x="464" y="676" width="104" height="110" rx="4" class="f7-box"/>
+<text x="516" y="718" class="f7-ch" text-anchor="middle">陰</text>
+<text x="516" y="746" class="f7-q" text-anchor="middle">難知如陰</text>
+<text x="516" y="770" class="f7-xs" text-anchor="middle">読ませない</text>
+<rect x="574" y="676" width="104" height="110" rx="4" class="f7-box"/>
+<text x="626" y="718" class="f7-ch" text-anchor="middle">雷</text>
+<text x="626" y="746" class="f7-q" text-anchor="middle">動如雷震</text>
+<text x="626" y="770" class="f7-xs" text-anchor="middle">不意に撃つ</text>
+<path d="M26 796 V804 H456 V796" class="f7-acc"/>
+<text x="241" y="826" class="f7-k" text-anchor="middle">信玄の旗（四句）</text>
+</svg>

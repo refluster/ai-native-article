@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 560" role="img" aria-labelledby="f8-title f8-desc" class="f8">
+  <title id="f8-title">図8 将の五危 — 美徳も過ぎれば危険になる</title>
+  <desc id="f8-desc">九変篇の五危。必死は殺され、必生は捕らえられ、忿速は侮られ、廉潔は辱められ、愛民は煩わされる。覆軍殺将は必ずこの五危による。</desc>
+  <style>
+    .f8 text{font-family:inherit}
+    .f8-h{font-size:14px;fill:var(--book-ink-2);letter-spacing:.08em}
+    .f8-t{font-size:22px;font-weight:700;fill:var(--book-ink)}
+    .f8-d{font-size:20px;font-weight:700;fill:var(--book-ink)}
+    .f8-s{font-size:14px;fill:var(--book-ink-2)}
+    .f8-k{font-size:18px;font-weight:700;fill:var(--book-ink)}
+    .f8-rail{fill:none;stroke:var(--book-line);stroke-width:1.2}
+    .f8-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+    .f8-arr{fill:none;stroke:var(--book-ink-2);stroke-width:1.4;marker-end:url(#fig8-ah)}
+    .f8-ahp{fill:var(--book-ink-2)}
+    .f8-end{fill:var(--book-panel);stroke:var(--book-accent);stroke-width:1.5}
+  </style>
+  <defs>
+    <marker id="fig8-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="f8-ahp"/></marker>
+  </defs>
+
+  <text x="165" y="44" text-anchor="middle" class="f8-h">美徳</text>
+  <text x="360" y="44" text-anchor="middle" class="f8-h">過ぎれば</text>
+  <text x="555" y="44" text-anchor="middle" class="f8-h">過ぎた危険</text>
+
+  <!-- ladder rails -->
+  <path d="M165 62 L165 460" class="f8-rail"/>
+  <path d="M555 62 L555 460" class="f8-rail"/>
+
+  <!-- row 1 -->
+  <rect x="40" y="70" width="250" height="62" rx="6" class="f8-box"/>
+  <text x="165" y="98" text-anchor="middle" class="f8-t">必死</text>
+  <text x="165" y="121" text-anchor="middle" class="f8-s">死を覚悟して退かない</text>
+  <path d="M296 101 L424 101" class="f8-arr"/>
+  <rect x="430" y="70" width="250" height="62" rx="6" class="f8-box"/>
+  <text x="555" y="98" text-anchor="middle" class="f8-d">殺される</text>
+  <text x="555" y="121" text-anchor="middle" class="f8-s">可殺也</text>
+
+  <!-- row 2 -->
+  <rect x="40" y="148" width="250" height="62" rx="6" class="f8-box"/>
+  <text x="165" y="176" text-anchor="middle" class="f8-t">必生</text>
+  <text x="165" y="199" text-anchor="middle" class="f8-s">生き延びることを優先</text>
+  <path d="M296 179 L424 179" class="f8-arr"/>
+  <rect x="430" y="148" width="250" height="62" rx="6" class="f8-box"/>
+  <text x="555" y="176" text-anchor="middle" class="f8-d">捕らえられる</text>
+  <text x="555" y="199" text-anchor="middle" class="f8-s">可虜也</text>
+
+  <!-- row 3 -->
+  <rect x="40" y="226" width="250" height="62" rx="6" class="f8-box"/>
+  <text x="165" y="254" text-anchor="middle" class="f8-t">忿速</text>
+  <text x="165" y="277" text-anchor="middle" class="f8-s">憤りやすく決断が速い</text>
+  <path d="M296 257 L424 257" class="f8-arr"/>
+  <rect x="430" y="226" width="250" height="62" rx="6" class="f8-box"/>
+  <text x="555" y="254" text-anchor="middle" class="f8-d">侮られる</text>
+  <text x="555" y="277" text-anchor="middle" class="f8-s">可侮也</text>
+
+  <!-- row 4 -->
+  <rect x="40" y="304" width="250" height="62" rx="6" class="f8-box"/>
+  <text x="165" y="332" text-anchor="middle" class="f8-t">廉潔</text>
+  <text x="165" y="355" text-anchor="middle" class="f8-s">清廉で名誉を重んじる</text>
+  <path d="M296 335 L424 335" class="f8-arr"/>
+  <rect x="430" y="304" width="250" height="62" rx="6" class="f8-box"/>
+  <text x="555" y="332" text-anchor="middle" class="f8-d">辱められる</text>
+  <text x="555" y="355" text-anchor="middle" class="f8-s">可辱也</text>
+
+  <!-- row 5 -->
+  <rect x="40" y="382" width="250" height="62" rx="6" class="f8-box"/>
+  <text x="165" y="410" text-anchor="middle" class="f8-t">愛民</text>
+  <text x="165" y="433" text-anchor="middle" class="f8-s">民を深く思いやる</text>
+  <path d="M296 413 L424 413" class="f8-arr"/>
+  <rect x="430" y="382" width="250" height="62" rx="6" class="f8-box"/>
+  <text x="555" y="410" text-anchor="middle" class="f8-d">煩わされる</text>
+  <text x="555" y="433" text-anchor="middle" class="f8-s">可煩也</text>
+
+  <!-- conclusion -->
+  <rect x="140" y="480" width="440" height="56" rx="6" class="f8-end"/>
+  <text x="360" y="514" text-anchor="middle" class="f8-k">覆軍殺将、必以五危</text>
+</svg>

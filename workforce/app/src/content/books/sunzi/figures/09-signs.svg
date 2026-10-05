@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 600" role="img" aria-labelledby="f9-title f9-desc" class="f9">
+  <title id="f9-title">図9 兆候→推論 — 見えるものから意図を読む</title>
+  <desc id="f9-desc">行軍篇の相敵の条から六例。鳥が立てば伏兵、獣が駭けば奇襲、塵が高く鋭ければ車、低く広ければ歩兵。言葉が低姿勢で備えを増せば進む兆し、言葉が強く進み出れば退く兆し。</desc>
+  <style>
+    .f9 text{font-family:inherit}
+    .f9-h{font-size:14px;fill:var(--book-ink-2);letter-spacing:.08em}
+    .f9-t{font-size:18px;font-weight:700;fill:var(--book-ink)}
+    .f9-o{font-size:13px;fill:var(--book-ink-2)}
+    .f9-n{font-size:15px;fill:var(--book-ink-2)}
+    .f9-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+    .f9-inv{fill:var(--book-panel);stroke:var(--book-accent);stroke-width:1.4}
+    .f9-arr{fill:none;stroke:var(--book-ink-2);stroke-width:1.4;marker-end:url(#fig9-ah)}
+    .f9-arra{fill:none;stroke:var(--book-accent);stroke-width:1.5;marker-end:url(#fig9-aha)}
+    .f9-ahp{fill:var(--book-ink-2)}
+    .f9-ahpa{fill:var(--book-accent)}
+    .f9-sep{fill:none;stroke:var(--book-line);stroke-width:1;stroke-dasharray:3 4}
+  </style>
+  <defs>
+    <marker id="fig9-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="f9-ahp"/></marker>
+    <marker id="fig9-aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="f9-ahpa"/></marker>
+  </defs>
+
+  <text x="175" y="44" text-anchor="middle" class="f9-h">観測（兆候）</text>
+  <text x="545" y="44" text-anchor="middle" class="f9-h">推論（意図）</text>
+
+  <!-- 1 -->
+  <rect x="30" y="64" width="290" height="64" rx="6" class="f9-box"/>
+  <text x="50" y="93" class="f9-t">鳥が立つ</text>
+  <text x="50" y="115" class="f9-o">鳥起者</text>
+  <path d="M326 96 L394 96" class="f9-arr"/>
+  <rect x="400" y="64" width="290" height="64" rx="6" class="f9-box"/>
+  <text x="420" y="93" class="f9-t">伏兵がいる</text>
+  <text x="420" y="115" class="f9-o">伏也</text>
+
+  <!-- 2 -->
+  <rect x="30" y="142" width="290" height="64" rx="6" class="f9-box"/>
+  <text x="50" y="171" class="f9-t">獣が駭く</text>
+  <text x="50" y="193" class="f9-o">獸駭者</text>
+  <path d="M326 174 L394 174" class="f9-arr"/>
+  <rect x="400" y="142" width="290" height="64" rx="6" class="f9-box"/>
+  <text x="420" y="171" class="f9-t">奇襲が来る</text>
+  <text x="420" y="193" class="f9-o">覆也</text>
+
+  <!-- 3 -->
+  <rect x="30" y="220" width="290" height="64" rx="6" class="f9-box"/>
+  <text x="50" y="249" class="f9-t">塵が高く鋭い</text>
+  <text x="50" y="271" class="f9-o">塵高而銳者</text>
+  <path d="M326 252 L394 252" class="f9-arr"/>
+  <rect x="400" y="220" width="290" height="64" rx="6" class="f9-box"/>
+  <text x="420" y="249" class="f9-t">車が来る</text>
+  <text x="420" y="271" class="f9-o">車來也</text>
+
+  <!-- 4 -->
+  <rect x="30" y="298" width="290" height="64" rx="6" class="f9-box"/>
+  <text x="50" y="327" class="f9-t">塵が低く広い</text>
+  <text x="50" y="349" class="f9-o">卑而廣者</text>
+  <path d="M326 330 L394 330" class="f9-arr"/>
+  <rect x="400" y="298" width="290" height="64" rx="6" class="f9-box"/>
+  <text x="420" y="327" class="f9-t">歩兵が来る</text>
+  <text x="420" y="349" class="f9-o">徒來也</text>
+
+  <path d="M30 382 L690 382" class="f9-sep"/>
+
+  <!-- 5 : appearance and intent run opposite -->
+  <rect x="30" y="398" width="290" height="64" rx="6" class="f9-box"/>
+  <text x="50" y="427" class="f9-t">使者の言葉が低姿勢</text>
+  <text x="50" y="449" class="f9-o">備えは増す（辭卑而益備）</text>
+  <path d="M326 430 L394 430" class="f9-arra"/>
+  <rect x="400" y="398" width="290" height="64" rx="6" class="f9-inv"/>
+  <text x="420" y="427" class="f9-t">進もうとしている</text>
+  <text x="420" y="449" class="f9-o">進也</text>
+
+  <!-- 6 -->
+  <rect x="30" y="476" width="290" height="64" rx="6" class="f9-box"/>
+  <text x="50" y="505" class="f9-t">言葉が強く進み出る</text>
+  <text x="50" y="527" class="f9-o">辭強而進驅者</text>
+  <path d="M326 508 L394 508" class="f9-arra"/>
+  <rect x="400" y="476" width="290" height="64" rx="6" class="f9-inv"/>
+  <text x="420" y="505" class="f9-t">退こうとしている</text>
+  <text x="420" y="527" class="f9-o">退也</text>
+
+  <text x="360" y="578" text-anchor="middle" class="f9-n">見かけと意図は逆にもなる</text>
+</svg>

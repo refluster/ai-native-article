@@ -171,29 +171,29 @@ describe('BookChapter', () => {
 
   it('renders the chapter in its own chrome and sets the title', async () => {
     const { container } = mount('/books/sunzi/01-ji');
-    expect(await screen.findByRole('heading', { level: 1, name: '始計篇 — 戦う前に、数える' })).toBeInTheDocument();
-    expect(document.title).toBe('始計篇 — 戦う前に、数える — 孫子の兵法');
+    expect(await screen.findByRole('heading', { level: 1, name: '計篇 — 戦う前に、数える' })).toBeInTheDocument();
+    expect(document.title).toBe('計篇 — 戦う前に、数える — 孫子の兵法');
     expect(container.querySelector('.book-root.book-theme-paper.book-size-m.book-family-serif')).not.toBeNull();
     expect(container.querySelector('.book-progress')).not.toBeNull();
     expect(container.querySelector('figure.book-quote')).not.toBeNull();
-    expect(screen.getByRole('navigation', { name: '前後の章' })).toHaveTextContent('序 — なぜいま孫子か');
+    expect(screen.getByRole('navigation', { name: '前後の章' })).toHaveTextContent('孫子とは何か — 人・本・時代');
   });
 
   it('stores the position on arrival, and → / ← page through the chapters', async () => {
     mount('/books/sunzi/preface');
-    await screen.findByRole('heading', { level: 1, name: '序 — なぜいま孫子か' });
+    await screen.findByRole('heading', { level: 1, name: '序 — なぜ、いま孫子を原文で読むのか' });
     await waitFor(() => expect(JSON.parse(localStorage.getItem('kohuehara.book.sunzi')!)).toMatchObject({ chapterId: 'preface' }));
 
     fireEvent.keyDown(window, { key: 'ArrowRight' });
-    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/books/sunzi/01-ji'));
-    expect(await screen.findByRole('heading', { level: 1, name: '始計篇 — 戦う前に、数える' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/books/sunzi/intro'));
+    expect(await screen.findByRole('heading', { level: 1, name: '孫子とは何か — 人・本・時代' })).toBeInTheDocument();
 
-    fireEvent.keyDown(window, { key: 'ArrowRight' }); // last chapter: nowhere to go
-    expect(screen.getByTestId('location')).toHaveTextContent('/books/sunzi/01-ji');
     fireEvent.keyDown(window, { key: 'ArrowLeft', altKey: true }); // browser back, not ours
-    expect(screen.getByTestId('location')).toHaveTextContent('/books/sunzi/01-ji');
+    expect(screen.getByTestId('location')).toHaveTextContent('/books/sunzi/intro');
     fireEvent.keyDown(window, { key: 'ArrowLeft' });
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/books/sunzi/preface'));
+    fireEvent.keyDown(window, { key: 'ArrowLeft' }); // first chapter: nowhere to go
+    expect(screen.getByTestId('location')).toHaveTextContent('/books/sunzi/preface');
   });
 
   it('restores a stored position only when sent with ?resume=1', async () => {
@@ -234,7 +234,7 @@ describe('BookChapter', () => {
     fireEvent.click(screen.getByRole('button', { name: '目次' }));
     const toc = screen.getByRole('navigation', { name: '目次' });
     const current = toc.querySelector('[aria-current="page"]');
-    expect(current).toHaveTextContent('始計篇 — 戦う前に、数える');
+    expect(current).toHaveTextContent('計篇 — 戦う前に、数える');
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(toc).not.toHaveClass('is-open');
   });

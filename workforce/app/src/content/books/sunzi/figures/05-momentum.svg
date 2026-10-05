@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 770" role="img" aria-labelledby="f5-title f5-desc">
+<title id="f5-title">図5 奇正の循環と節</title>
+<desc id="f5-desc">千仞の山の高所に置いた円石（形＝位置）を、放つ瞬間（節）に転がすと、斜面を下る運動（勢）になる。下に形・節・勢の三段と、正と奇が互いに生じ合う循環を示す。</desc>
+<style>
+.f5-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+.f5-boxa{fill:var(--book-panel);stroke:var(--book-accent);stroke-width:1.5}
+.f5-ln{fill:none;stroke:var(--book-line);stroke-width:1.2}
+.f5-ln2{fill:none;stroke:var(--book-ink-2);stroke-width:1.3}
+.f5-dash{fill:none;stroke:var(--book-ink-2);stroke-width:1.2;stroke-dasharray:4 4}
+.f5-acc{fill:none;stroke:var(--book-accent);stroke-width:1.6}
+.f5-arr{fill:none;stroke:var(--book-ink-2);stroke-width:1.3;marker-end:url(#f5-ah)}
+.f5-arra{fill:none;stroke:var(--book-accent);stroke-width:1.6;marker-end:url(#f5-aha)}
+.f5-ahp{fill:var(--book-ink-2)}
+.f5-ahap{fill:var(--book-accent)}
+.f5-h{font-family:inherit;font-size:20px;font-weight:600;fill:var(--book-ink)}
+.f5-t{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-ink)}
+.f5-b{font-family:inherit;font-size:16px;fill:var(--book-ink)}
+.f5-s{font-family:inherit;font-size:15px;fill:var(--book-ink-2)}
+.f5-xs{font-family:inherit;font-size:14px;fill:var(--book-ink-2)}
+.f5-k{font-family:inherit;font-size:14px;font-weight:600;fill:var(--book-accent);letter-spacing:.08em}
+.f5-ta{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-accent)}
+.f5-big{font-family:inherit;font-size:30px;font-weight:600;fill:var(--book-ink)}
+
+.f5-ghost{fill:none;stroke:var(--book-ink-2);stroke-width:1.2;stroke-dasharray:3 3}
+.f5-stone{fill:var(--book-bg);stroke:var(--book-ink);stroke-width:1.6}
+.f5-stone2{fill:var(--book-ink-2);fill-opacity:.35;stroke:var(--book-ink);stroke-width:1.4}
+.f5-ring{fill:none;stroke:var(--book-accent);stroke-width:2}
+.f5-ch{font-family:inherit;font-size:26px;font-weight:600;fill:var(--book-ink)}
+.f5-cha{font-family:inherit;font-size:26px;font-weight:600;fill:var(--book-accent)}
+.f5-ch2{font-family:inherit;font-size:24px;font-weight:600;fill:var(--book-ink)}
+.f5-ch2a{font-family:inherit;font-size:24px;font-weight:600;fill:var(--book-accent)}
+.f5-node{fill:var(--book-panel);stroke:var(--book-ink-2);stroke-width:1.3}
+.f5-nodea{fill:var(--book-panel);stroke:var(--book-accent);stroke-width:1.5}
+</style>
+<defs><marker id="f5-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f5-ahp" d="M0 0L10 5L0 10z"/></marker><marker id="f5-aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="f5-ahap" d="M0 0L10 5L0 10z"/></marker></defs>
+<path d="M24 380 L24 120 L130 120 L656 362 L656 380 Z" class="f5-box"/>
+<text x="40" y="362" class="f5-s">千仞の山</text>
+<circle cx="260.8" cy="164.4" r="22" class="f5-ghost"/>
+<circle cx="400.8" cy="228.8" r="22" class="f5-ghost"/>
+<circle cx="540.8" cy="293.2" r="22" class="f5-ghost"/>
+<circle cx="620.8" cy="330" r="22" class="f5-stone2"/>
+<circle cx="106" cy="98" r="22" class="f5-stone"/>
+<circle cx="134" cy="112" r="8" class="f5-ring"/>
+<line x1="140" y1="105" x2="206" y2="54" class="f5-acc"/>
+<text x="212" y="50" class="f5-ta">節＝放つ瞬間</text>
+<text x="24" y="30" class="f5-t">形＝位置</text>
+<text x="24" y="52" class="f5-xs">高い所に置く</text>
+<path d="M195 107 L535 263" class="f5-arr"/>
+<text x="420" y="176" class="f5-t">勢＝動き出す力</text>
+<text x="656" y="404" class="f5-s" text-anchor="end">円石を千仞の山に転ず</text>
+<rect x="24" y="430" width="180" height="104" rx="6" class="f5-box"/>
+<text x="114" y="468" class="f5-ch" text-anchor="middle">形</text>
+<text x="114" y="496" class="f5-b" text-anchor="middle">位置に置く</text>
+<text x="114" y="518" class="f5-xs" text-anchor="middle">円石を高所に</text>
+<line x1="208" y1="482" x2="246" y2="482" class="f5-arr"/>
+<rect x="250" y="430" width="180" height="104" rx="6" class="f5-boxa"/>
+<text x="340" y="468" class="f5-cha" text-anchor="middle">節</text>
+<text x="340" y="496" class="f5-b" text-anchor="middle">放つ瞬間</text>
+<text x="340" y="518" class="f5-xs" text-anchor="middle">其の節は短し</text>
+<line x1="434" y1="482" x2="472" y2="482" class="f5-arr"/>
+<rect x="476" y="430" width="180" height="104" rx="6" class="f5-box"/>
+<text x="566" y="468" class="f5-ch" text-anchor="middle">勢</text>
+<text x="566" y="496" class="f5-b" text-anchor="middle">動き出す力</text>
+<text x="566" y="518" class="f5-xs" text-anchor="middle">其の勢は険し</text>
+<text x="24" y="590" class="f5-k">奇正の循環</text>
+<text x="24" y="612" class="f5-s">以正合、以奇勝</text>
+<path d="M322 650 C360 610 440 610 478 650" class="f5-arr"/>
+<path d="M478 690 C440 730 360 730 322 690" class="f5-arr"/>
+<circle cx="300" cy="670" r="28" class="f5-node"/>
+<circle cx="500" cy="670" r="28" class="f5-nodea"/>
+<text x="300" y="679" class="f5-ch2" text-anchor="middle">正</text>
+<text x="500" y="679" class="f5-ch2a" text-anchor="middle">奇</text>
+<text x="262" y="676" class="f5-b" text-anchor="end">正面で合う</text>
+<text x="538" y="676" class="f5-b">意表で勝つ</text>
+<text x="400" y="675" class="f5-xs" text-anchor="middle">相生</text>
+<text x="400" y="750" class="f5-s" text-anchor="middle">循環して端なし</text>
+</svg>

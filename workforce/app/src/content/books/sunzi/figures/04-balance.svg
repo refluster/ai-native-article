@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 790" role="img" aria-labelledby="f4-title f4-desc">
+<title id="f4-title">図4 先勝の天秤</title>
+<desc id="f4-desc">上段は地から度・量・数・称・勝へ続く計量の連鎖。中段は重い鎰と軽い銖を載せた天秤で、戦う前に差が決まることを示す。下段は高所にせき止めた積水を千仞の谿へ切って落とす図で、形とは落差であることを示す。</desc>
+<style>
+.f4-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+.f4-boxa{fill:var(--book-panel);stroke:var(--book-accent);stroke-width:1.5}
+.f4-ln{fill:none;stroke:var(--book-line);stroke-width:1.2}
+.f4-ln2{fill:none;stroke:var(--book-ink-2);stroke-width:1.3}
+.f4-dash{fill:none;stroke:var(--book-ink-2);stroke-width:1.2;stroke-dasharray:4 4}
+.f4-acc{fill:none;stroke:var(--book-accent);stroke-width:1.6}
+.f4-arr{fill:none;stroke:var(--book-ink-2);stroke-width:1.3;marker-end:url(#f4-ah)}
+.f4-arra{fill:none;stroke:var(--book-accent);stroke-width:1.6;marker-end:url(#f4-aha)}
+.f4-ahp{fill:var(--book-ink-2)}
+.f4-ahap{fill:var(--book-accent)}
+.f4-h{font-family:inherit;font-size:20px;font-weight:600;fill:var(--book-ink)}
+.f4-t{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-ink)}
+.f4-b{font-family:inherit;font-size:16px;fill:var(--book-ink)}
+.f4-s{font-family:inherit;font-size:15px;fill:var(--book-ink-2)}
+.f4-xs{font-family:inherit;font-size:14px;fill:var(--book-ink-2)}
+.f4-k{font-family:inherit;font-size:14px;font-weight:600;fill:var(--book-accent);letter-spacing:.08em}
+.f4-ta{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-accent)}
+.f4-big{font-family:inherit;font-size:30px;font-weight:600;fill:var(--book-ink)}
+
+.f4-c{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+.f4-ca{fill:var(--book-panel);stroke:var(--book-accent);stroke-width:1.6}
+.f4-ax{font-family:inherit;font-size:24px;font-weight:600;fill:var(--book-ink)}
+.f4-axa{font-family:inherit;font-size:24px;font-weight:600;fill:var(--book-accent)}
+.f4-ax2{font-family:inherit;font-size:22px;fill:var(--book-ink-2)}
+.f4-stand{fill:none;stroke:var(--book-ink);stroke-width:1.5}
+.f4-beam{fill:none;stroke:var(--book-ink);stroke-width:2.5;stroke-linecap:round}
+.f4-fill{fill:var(--book-ink)}
+.f4-pan{fill:var(--book-panel);stroke:var(--book-ink);stroke-width:1.3}
+.f4-water{fill:var(--book-accent);fill-opacity:.18;stroke:none}
+.f4-wave{fill:none;stroke:var(--book-accent);stroke-width:1}
+.f4-dim{fill:none;stroke:var(--book-ink-2);stroke-width:1.2;marker-start:url(#f4-ah);marker-end:url(#f4-ah)}
+</style>
+<defs><marker id="f4-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f4-ahp" d="M0 0L10 5L0 10z"/></marker><marker id="f4-aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="f4-ahap" d="M0 0L10 5L0 10z"/></marker></defs>
+<text x="24" y="34" class="f4-k">測って比べる連鎖</text>
+<text x="50" y="108" class="f4-ax2" text-anchor="middle">地</text>
+<line x1="68" y1="100" x2="106" y2="100" class="f4-arr"/>
+<circle cx="140" cy="100" r="30" class="f4-c"/>
+<text x="140" y="109" class="f4-ax" text-anchor="middle">度</text>
+<text x="140" y="158" class="f4-s" text-anchor="middle">土地を測る</text>
+<line x1="173" y1="100" x2="217" y2="100" class="f4-arr"/>
+<circle cx="250" cy="100" r="30" class="f4-c"/>
+<text x="250" y="109" class="f4-ax" text-anchor="middle">量</text>
+<text x="250" y="158" class="f4-s" text-anchor="middle">物量を量る</text>
+<line x1="283" y1="100" x2="327" y2="100" class="f4-arr"/>
+<circle cx="360" cy="100" r="30" class="f4-c"/>
+<text x="360" y="109" class="f4-ax" text-anchor="middle">数</text>
+<text x="360" y="158" class="f4-s" text-anchor="middle">兵数を数える</text>
+<line x1="393" y1="100" x2="437" y2="100" class="f4-arr"/>
+<circle cx="470" cy="100" r="30" class="f4-c"/>
+<text x="470" y="109" class="f4-ax" text-anchor="middle">称</text>
+<text x="470" y="158" class="f4-s" text-anchor="middle">彼我を比べる</text>
+<line x1="503" y1="100" x2="547" y2="100" class="f4-arr"/>
+<circle cx="580" cy="100" r="30" class="f4-ca"/>
+<text x="580" y="109" class="f4-axa" text-anchor="middle">勝</text>
+<text x="580" y="158" class="f4-s" text-anchor="middle">勝ちが決まる</text>
+<text x="24" y="214" class="f4-k">勝兵は鎰を以て銖を称る</text>
+<line x1="340" y1="270" x2="340" y2="410" class="f4-stand"/>
+<line x1="290" y1="410" x2="390" y2="410" class="f4-stand"/>
+<path d="M330 282 L340 266 L350 282 Z" class="f4-fill"/>
+<line x1="180" y1="306" x2="500" y2="234" class="f4-beam"/>
+<circle cx="340" cy="270" r="4" class="f4-fill"/>
+<path d="M180 306 L134 372 M180 306 L226 372" class="f4-ln2"/>
+<rect x="154" y="330" width="52" height="40" rx="3" class="f4-boxa"/>
+<text x="180" y="358" class="f4-axa" text-anchor="middle">鎰</text>
+<path d="M128 372 H232 Q180 400 128 372 Z" class="f4-pan"/>
+<text x="180" y="424" class="f4-t" text-anchor="middle">我（鎰）</text>
+<path d="M500 234 L454 300 M500 234 L546 300" class="f4-ln2"/>
+<rect x="493" y="288" width="14" height="12" rx="2" class="f4-box"/>
+<path d="M448 300 H552 Q500 328 448 300 Z" class="f4-pan"/>
+<text x="500" y="350" class="f4-t" text-anchor="middle">敵（銖）</text>
+<text x="340" y="444" class="f4-s" text-anchor="middle">戦う前に差が決まる</text>
+<text x="24" y="494" class="f4-k">積水を千仞の谿に決す</text>
+<text x="24" y="516" class="f4-s">形とは、落差のこと</text>
+<path d="M24 548 L110 548 L130 600 L330 600 L330 540 L346 540 L346 560 L362 560 L384 740 L560 740 L590 610 L656 610 L656 780 L24 780 Z" class="f4-box"/>
+<path d="M113 556 L330 556 L330 600 L130 600 Z" class="f4-water"/>
+<path d="M146 574 q10 -5 20 0 t20 0 M268 574 q10 -5 20 0 t20 0" class="f4-wave"/>
+<text x="222" y="590" class="f4-t" text-anchor="middle">積水</text>
+<path d="M334 552 C372 556 386 610 398 700" class="f4-arra"/>
+<text x="410" y="600" class="f4-ta">決す（一気に放つ）</text>
+<line x1="346" y1="556" x2="476" y2="556" class="f4-dash"/>
+<path d="M470 560 V734" class="f4-dim"/>
+<text x="480" y="680" class="f4-b">千仞の落差</text>
+<text x="472" y="766" class="f4-s" text-anchor="middle">千仞の谿</text>
+</svg>

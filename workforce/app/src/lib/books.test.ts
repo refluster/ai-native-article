@@ -177,7 +177,10 @@ describe('the bundle', () => {
   it('ships the sunzi book', () => {
     const book = findBook('sunzi');
     expect(book?.title).toBe('孫子の兵法');
-    expect(flattenChapters(book!).map(c => c.id)).toEqual(['preface', '01-ji']);
+    const ids = flattenChapters(book!).map(c => c.id);
+    expect(ids).toHaveLength(23);
+    expect(ids.slice(0, 3)).toEqual(['preface', 'intro', '01-ji']);
+    expect(ids.slice(-2)).toEqual(['epilogue', 'quotes']);
     expect(findBook('nope')).toBeUndefined();
   });
 

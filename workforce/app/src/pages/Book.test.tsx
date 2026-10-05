@@ -32,10 +32,10 @@ describe('Book cover', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('孫子の兵法');
     expect(screen.getByRole('link', { name: 'はじめから読む' })).toHaveAttribute('href', '/books/sunzi/preface');
     expect(screen.queryByRole('link', { name: '続きから読む' })).not.toBeInTheDocument();
-    expect(screen.getByText('by ingrid · sora')).toBeInTheDocument();
+    expect(screen.getByText(/^by ingrid · sora/)).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: '前編 原文を読む' })).toBeInTheDocument();
     // Reading times arrive once the chapter chunks load.
-    expect(await screen.findByText(/2章 · 約\d+分/)).toBeInTheDocument();
+    expect(await screen.findByText(/23章 · 約\d+時間/)).toBeInTheDocument();
     expect(document.title).toMatch(/^孫子の兵法 — /);
   });
 
@@ -47,7 +47,7 @@ describe('Book cover', () => {
     expect(screen.getByText('42%')).toBeInTheDocument();
     const rows = screen.getAllByRole('listitem');
     expect(within(rows[0]).getByText('読了')).toBeInTheDocument();
-    expect(within(rows[1]).getByText('読書中 42%')).toBeInTheDocument();
+    expect(within(rows[2]).getByText('読書中 42%')).toBeInTheDocument();
   });
 
   it('ignores a stored position for a chapter that no longer exists', () => {
