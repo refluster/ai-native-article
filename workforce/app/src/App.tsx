@@ -28,6 +28,8 @@ import Board from './pages/Board';
 import Research from './pages/Research';
 import ResearchArticle from './pages/ResearchArticle';
 import Docs from './pages/Docs';
+import Books from './pages/Books';
+import Book from './pages/Book';
 import AuthBoundary from './components/AuthBoundary';
 import PublicShell from './components/PublicShell';
 import { SkeletonText } from './components/Skeleton';
@@ -38,6 +40,10 @@ import { trackPageView } from '@kohuehara/shared/analytics';
  *  HTML, lib/docs-bodies.ts). Lazy so the console's main bundle — which
  *  every signed-in page load pays for — does not. */
 const Doc = lazy(() => import('./pages/Doc'));
+
+/** The reading view carries react-markdown's book components and its own
+ *  chrome; the chapter bodies are separate lazy chunks (lib/books.ts). */
+const BookChapter = lazy(() => import('./pages/BookChapter'));
 
 function DocLoading() {
   return (
@@ -172,6 +178,21 @@ export default function App() {
           element={
             <Suspense fallback={<DocLoading />}>
               <Doc />
+            </Suspense>
+          }
+        />
+        {/* Web books: the shelf and a book's cover in PublicShell; the
+            chapter reader in its own chrome (components/book/BookShell),
+            lazy so the console bundle does not carry it. The fallback is
+            blank on purpose — the reader paints its own skeleton within a
+            frame, and a PublicShell flash would be the wrong chrome. */}
+        <Route path="/books" element={<Books />} />
+        <Route path="/books/:slug" element={<Book />} />
+        <Route
+          path="/books/:slug/:chapterId"
+          element={
+            <Suspense fallback={<div className="min-h-screen" aria-busy />}>
+              <BookChapter />
             </Suspense>
           }
         />

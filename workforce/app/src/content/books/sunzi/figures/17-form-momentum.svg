@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 540" role="img" aria-labelledby="f17-title f17-desc" class="f17">
+  <title id="f17-title">図19 形→勢→節 — 準備し、配置し、放つ</title>
+  <desc id="f17-desc">形は着手前の準備（環境・合意・資源）、勢は配置（役割・順序）、節は放つ瞬間（リリースや会議の時機）。積水の落差を作り、円石を斜面に置き、短く鋭い一瞬に放つ。</desc>
+  <style>
+    .f17 text{font-family:inherit}
+    .f17-t{font-size:22px;font-weight:700;fill:var(--book-ink)}
+    .f17-g{font-size:17px;fill:var(--book-ink)}
+    .f17-o{font-size:13px;fill:var(--book-ink-2)}
+    .f17-v{font-size:14px;fill:var(--book-ink-2)}
+    .f17-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+    .f17-key{fill:var(--book-panel);stroke:var(--book-accent);stroke-width:1.6}
+    .f17-ln{fill:none;stroke:var(--book-ink-2);stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+    .f17-wall{fill:none;stroke:var(--book-ink);stroke-width:3;stroke-linecap:round}
+    .f17-water{fill:var(--book-line)}
+    .f17-rock{fill:var(--book-bg);stroke:var(--book-ink);stroke-width:1.6}
+    .f17-tick{fill:none;stroke:var(--book-ink-2);stroke-width:1.3}
+    .f17-mark{fill:none;stroke:var(--book-accent);stroke-width:3;stroke-linecap:round}
+    .f17-arr{fill:none;stroke:var(--book-ink-2);stroke-width:1.4;marker-end:url(#fig17-ah)}
+    .f17-ahp{fill:var(--book-ink-2)}
+  </style>
+  <defs>
+    <marker id="fig17-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="f17-ahp"/></marker>
+  </defs>
+
+  <!-- 形 -->
+  <rect x="40" y="30" width="640" height="130" rx="6" class="f17-box"/>
+  <path d="M64 70 L132 70 L132 140 L204 140" class="f17-ln"/>
+  <rect x="66" y="50" width="62" height="20" class="f17-water"/>
+  <path d="M130 44 L130 70" class="f17-wall"/>
+  <path d="M150 96 L150 132" class="f17-arr"/>
+  <text x="240" y="76" class="f17-t">準備（形）</text>
+  <text x="240" y="108" class="f17-g">環境・合意・資源</text>
+  <text x="240" y="138" class="f17-o">先為不可勝（形篇）</text>
+
+  <path d="M360 166 L360 196" class="f17-arr"/>
+  <text x="376" y="186" class="f17-v">置く</text>
+
+  <!-- 勢 -->
+  <rect x="40" y="200" width="640" height="130" rx="6" class="f17-box"/>
+  <path d="M60 236 L200 311" class="f17-ln"/>
+  <circle cx="102" cy="242" r="14" class="f17-rock"/>
+  <path d="M132 258 L178 283" class="f17-arr"/>
+  <text x="240" y="246" class="f17-t">配置（勢）</text>
+  <text x="240" y="278" class="f17-g">役割・順序</text>
+  <text x="240" y="308" class="f17-o">求之於勢（勢篇）</text>
+
+  <path d="M360 336 L360 366" class="f17-arr"/>
+  <text x="376" y="356" class="f17-v">放つ</text>
+
+  <!-- 節 -->
+  <rect x="40" y="370" width="640" height="130" rx="6" class="f17-key"/>
+  <path d="M62 450 L206 450" class="f17-ln"/>
+  <path d="M70 442 L70 458 M92 442 L92 458 M114 442 L114 458 M136 442 L136 458 M180 442 L180 458 M202 442 L202 458" class="f17-tick"/>
+  <path d="M158 418 L158 466" class="f17-mark"/>
+  <text x="240" y="416" class="f17-t">放つ瞬間（節）</text>
+  <text x="240" y="448" class="f17-g">リリース・会議の時機</text>
+  <text x="240" y="478" class="f17-o">其節短（勢篇）</text>
+</svg>

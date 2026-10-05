@@ -28,6 +28,9 @@ vi.mock('./pages/Research', () => ({ default: () => <div>RESEARCH-INDEX-MARKER</
 vi.mock('./pages/ResearchArticle', () => ({ default: () => <div>RESEARCH-ARTICLE-MARKER</div> }))
 vi.mock('./pages/Docs', () => ({ default: () => <div>DOCS-INDEX-MARKER</div> }))
 vi.mock('./pages/Doc', () => ({ default: () => <div>DOC-MARKER</div> }))
+vi.mock('./pages/Books', () => ({ default: () => <div>BOOKS-SHELF-MARKER</div> }))
+vi.mock('./pages/Book', () => ({ default: () => <div>BOOK-COVER-MARKER</div> }))
+vi.mock('./pages/BookChapter', () => ({ default: () => <div>BOOK-CHAPTER-MARKER</div> }))
 
 import App from './App'
 
@@ -149,5 +152,28 @@ describe('public docs routes', () => {
     window.history.pushState({}, '', '/docs/manifesto.html')
     render(<App />)
     expect(await screen.findByText('DOC-MARKER')).toBeInTheDocument()
+  })
+})
+
+// Web books: shelf, cover and the (lazy) chapter reader are public, beside
+// Docs and Research, outside the ProtectedRoutes fallthrough.
+describe('public book routes', () => {
+  it('serves the shelf at /books', async () => {
+    window.history.pushState({}, '', '/books')
+    render(<App />)
+    expect(await screen.findByText('BOOKS-SHELF-MARKER')).toBeInTheDocument()
+  })
+
+  it('serves a cover at /books/:slug', async () => {
+    window.history.pushState({}, '', '/books/sunzi')
+    render(<App />)
+    expect(await screen.findByText('BOOK-COVER-MARKER')).toBeInTheDocument()
+  })
+
+  it('serves a chapter at /books/:slug/:chapterId', async () => {
+    window.history.pushState({}, '', '/books/sunzi/01-ji?resume=1')
+    render(<App />)
+    expect(await screen.findByText('BOOK-CHAPTER-MARKER')).toBeInTheDocument()
+    expect(screen.queryByText('BOOK-COVER-MARKER')).not.toBeInTheDocument()
   })
 })
