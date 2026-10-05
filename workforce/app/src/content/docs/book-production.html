@@ -1,0 +1,451 @@
+<section class="cover">
+  <div class="kicker">Book production · v1.0 · 2026-10</div>
+  <h1>本をつくる<br>工程</h1>
+  <div class="rule"></div>
+  <p class="sub">約 40 名の AI ペルソナで一冊の本を分業するための工程表です。出版社が企画会議から校了までに積み上げてきた段取りを読み、AI の組織でもそのまま効くものを十のステージと十のゲートに置き直しました。台割、構成編集と原稿整理の分離、執筆者から独立した校閲、赤字の照合、校了の署名がそれにあたります。初号は Web book『孫子の兵法』です。</p>
+  <div class="define"><b>読み方。</b>この文書は、出版社の実務を参照して設計した、約 40 名の AI ペルソナで分業する工程の説明です。まず一枚の工程図（01）で全体をつかみ、出版社の二つの伝統（02）、ステージとゲートの中身（03）、誰が何を担うか（04）、古典を出すときの決まり（05）、初号『孫子の兵法』での実行（06）の順に読んでください。根拠にした資料は 07 にあります。実行の手順そのものはセッション skill <a href="https://github.com/refluster/ai-native-article/blob/main/.claude/skills/book-production/SKILL.md" target="_blank" rel="noopener">book-production</a> に書いてあり、ここは人が工程を確かめるための説明書です。ペルソナが仕事を受け取る仕組みは<a href="/docs/whitepaper">ホワイトペーパー</a>にあります。</div>
+  <nav class="toc" aria-label="目次">
+    <a href="#s1"><b>01</b>工程図</a>
+    <a href="#s2"><b>02</b>出版社はどう作るか</a>
+    <a href="#s3"><b>03</b>十のステージとゲート</a>
+    <a href="#s4"><b>04</b>誰が何を</a>
+    <a href="#s5"><b>05</b>古典を出すときの決まり</a>
+    <a href="#s6"><b>06</b>初号『孫子の兵法』での実行</a>
+    <a href="#s7"><b>07</b>参考資料</a>
+  </nav>
+</section>
+
+<section id="s1">
+  <div class="eyebrow"><span class="num">01</span><span class="kicker">Process map</span></div>
+  <h2>工程図</h2>
+  <p class="lede">工程は上下二段で読みます。上の段で、何を、どの順で、何字で書くかを決め、骨格を固めます。下の段で、文と事実と権利を整えてから公開します。段と段のあいだには必ずゲートがあり、通らなければ次へ進みません。</p>
+  <figure><div class="figscroll">
+<svg viewBox="0 0 1000 640" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="bp-t bp-d" style="min-width:860px">
+  <title id="bp-t">本をつくる工程：十のステージ S0〜S9、十のゲート G0〜G9、再編ループ R、機械ゲート</title>
+  <desc id="bp-d">上の段に S0 企画、S1 リサーチパック、S2 台割、S3 執筆、S4 構成編集が左から右へ並び、各ステージの後ろにゲート G0 から G4 がある。G4 で構成が確定しなければ、点線の再編ループ R で S2 台割へ戻る。G4 を通ると下の段へ移り、S5 原稿整理、S6 校閲、S7 図版・組版、S8 校正（初校・再校・三校）、S9 校了・公開がゲート G5 から G9 を挟んで並ぶ。各ステージには主な成果物と、手を動かす担当ペルソナの名前が書かれている。最下部の帯は owen が実装する機械ゲートで、引用 lint（G3）、字数（G2・G3）、可読性（G5）、図版トークン（G7）、赤字差分（G8）、校了票（G9）の六つ。</desc>
+  <style>
+    .bp-h{font:700 12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;letter-spacing:.12em}
+    .bp-t{font:700 15px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .bp-s{font:11.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.74}
+    .bp-x{font:11px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.74}
+    .bp-p{font:600 11px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.62}
+    .bp-m{font:500 10px "JetBrains Mono",ui-monospace,monospace;fill:currentColor;opacity:.82}
+    .bp-c{font:600 11px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent);letter-spacing:.12em}
+    .bp-g{font:600 10.5px Geist,Inter,system-ui,sans-serif;fill:var(--accent)}
+    .bp-gd{font:600 9.5px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent)}
+    .bp-r{font:700 12.5px Geist,Inter,system-ui,sans-serif;fill:var(--accent)}
+    .bp-ok{font:700 12px Geist,Inter,system-ui,sans-serif;fill:var(--signal)}
+    .bp-okm{font:500 9.5px Geist,Inter,system-ui,sans-serif;fill:var(--signal)}
+    .bp-ct{font:700 13.5px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .bp-band{fill:currentColor;fill-opacity:.045}
+    .bp-box{fill:var(--panel);stroke:var(--line);stroke-width:1.2}
+    .bp-chip{fill:var(--panel);stroke:var(--accent);stroke-width:1.1}
+    .bp-div{stroke:var(--line);stroke-width:1}
+    .bp-dia{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.4}
+    .bp-dia9{fill:var(--accent-soft);stroke:var(--signal);stroke-width:1.8}
+    .bp-ln{fill:none;stroke:var(--accent);stroke-width:1.4}
+    .bp-arr{fill:none;stroke:var(--accent);stroke-width:1.4;marker-end:url(#bp-ah)}
+    .bp-live{fill:none;stroke:var(--signal);stroke-width:1.6;marker-end:url(#bp-ahs)}
+    .bp-loop{fill:none;stroke:var(--accent);stroke-width:1.5;stroke-dasharray:6 4;marker-end:url(#bp-ah)}
+    .bp-dash{fill:none;stroke:var(--accent);stroke-width:1.5;stroke-dasharray:6 4}
+    .bp-brk{fill:none;stroke:currentColor;stroke-opacity:.35;stroke-width:1}
+  </style>
+  <defs>
+    <marker id="bp-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker>
+    <marker id="bp-ahs" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--signal)"/></marker>
+  </defs>
+
+  <!-- header + legend -->
+  <text x="20" y="24" class="bp-h">工程図 · 10 ステージ / 10 ゲート</text>
+  <rect x="20" y="37" width="15" height="11" rx="2" class="bp-box"/>
+  <text x="41" y="47" class="bp-x">ステージ（下部は担当ペルソナ）</text>
+  <polygon points="232,35 239,42 232,49 225,42" class="bp-dia"/>
+  <text x="246" y="47" class="bp-x">ゲート（合格で次へ）</text>
+  <path d="M372 42 H402" class="bp-dash"/>
+  <text x="408" y="47" class="bp-x">再編ループ</text>
+  <text x="944" y="34" text-anchor="end" class="bp-r">R 再編ループ — G4 不合格のとき</text>
+  <text x="944" y="54" text-anchor="end" class="bp-x">台割を v(n+1) へ改訂 → G2 を再判定 → 影響章だけ S3 へ。上限 2 回</text>
+
+  <!-- R loop: G4 back up to S2 -->
+  <path d="M954 157 V72 H474 V94" class="bp-loop"/>
+  <text x="962" y="128" class="bp-g">不合格</text>
+  <!-- pass at G4: down to the second row -->
+  <path d="M954 185 V292 H90 V320" class="bp-arr"/>
+  <text x="962" y="252" class="bp-g">合格</text>
+  <text x="520" y="310" text-anchor="middle" class="bp-x">G4 合格で構成が確定 → 下の段で文・事実・権利を整える</text>
+
+  <!-- row 1 connectors -->
+  <path d="M160 171 H210" class="bp-arr"/>
+  <path d="M352 171 H402" class="bp-arr"/>
+  <path d="M544 171 H594" class="bp-arr"/>
+  <path d="M736 171 H786" class="bp-arr"/>
+  <path d="M928 171 H940" class="bp-ln"/>
+
+  <!-- S0 -->
+  <rect x="20" y="96" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="34" y="118" class="bp-c">S0</text>
+  <text x="34" y="142" class="bp-t">企画</text>
+  <text x="34" y="163" class="bp-s">企画書：読者像・</text>
+  <text x="34" y="179" class="bp-s">類書・字数・予算</text>
+  <line x1="34" y1="191" x2="146" y2="191" class="bp-div"/>
+  <text x="34" y="208" class="bp-m">ingrid · nadia</text>
+  <text x="34" y="222" class="bp-m">dmitri</text>
+  <text x="34" y="238" class="bp-g">→ G0 企画承認</text>
+  <!-- S1 -->
+  <rect x="212" y="96" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="226" y="118" class="bp-c">S1</text>
+  <text x="226" y="142" class="bp-t">リサーチパック</text>
+  <text x="226" y="163" class="bp-s">底本・原文の分節 ID</text>
+  <text x="226" y="179" class="bp-s">異同・訓読・用語集</text>
+  <line x1="226" y1="191" x2="338" y2="191" class="bp-div"/>
+  <text x="226" y="208" class="bp-m">sora · bruno · zoe</text>
+  <text x="226" y="222" class="bp-m">idris · astrid</text>
+  <text x="226" y="238" class="bp-g">→ G1 原典確定</text>
+  <!-- S2 -->
+  <rect x="404" y="96" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="418" y="118" class="bp-c">S2</text>
+  <text x="418" y="142" class="bp-t">台割</text>
+  <text x="418" y="163" class="bp-s">章ごとの字数予算</text>
+  <text x="418" y="179" class="bp-s">原文 ID・図版枠</text>
+  <line x1="418" y1="191" x2="530" y2="191" class="bp-div"/>
+  <text x="418" y="208" class="bp-m">ingrid · camille</text>
+  <text x="418" y="222" class="bp-m">elena</text>
+  <text x="418" y="238" class="bp-g">→ G2 台割承認</text>
+  <!-- S3 -->
+  <rect x="596" y="96" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="610" y="118" class="bp-c">S3</text>
+  <text x="610" y="142" class="bp-t">執筆</text>
+  <text x="610" y="163" class="bp-s">第 I 部・第 II 部の</text>
+  <text x="610" y="179" class="bp-s">初稿（出典タグ付き）</text>
+  <line x1="610" y1="191" x2="722" y2="191" class="bp-div"/>
+  <text x="610" y="208" class="bp-m">I: sora · rhys · zoe</text>
+  <text x="610" y="222" class="bp-m">II: nadia ほか 5 名</text>
+  <text x="610" y="238" class="bp-g">→ G3 初稿受理</text>
+  <!-- S4 -->
+  <rect x="788" y="96" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="802" y="118" class="bp-c">S4</text>
+  <text x="802" y="142" class="bp-t">構成編集</text>
+  <text x="802" y="163" class="bp-s">editorial letter</text>
+  <text x="802" y="179" class="bp-s">初学者の通読テスト</text>
+  <line x1="802" y1="191" x2="914" y2="191" class="bp-div"/>
+  <text x="802" y="208" class="bp-m">ingrid · elena</text>
+  <text x="802" y="222" class="bp-m">mira</text>
+  <text x="802" y="238" class="bp-g">→ G4 構成確定</text>
+
+  <!-- row 1 gates -->
+  <polygon points="186,157 200,171 186,185 172,171" class="bp-dia"/><text x="186" y="174.5" text-anchor="middle" class="bp-gd">G0</text>
+  <polygon points="378,157 392,171 378,185 364,171" class="bp-dia"/><text x="378" y="174.5" text-anchor="middle" class="bp-gd">G1</text>
+  <polygon points="570,157 584,171 570,185 556,171" class="bp-dia"/><text x="570" y="174.5" text-anchor="middle" class="bp-gd">G2</text>
+  <polygon points="762,157 776,171 762,185 748,171" class="bp-dia"/><text x="762" y="174.5" text-anchor="middle" class="bp-gd">G3</text>
+  <polygon points="954,157 968,171 954,185 940,171" class="bp-dia"/><text x="954" y="174.5" text-anchor="middle" class="bp-gd">G4</text>
+
+  <!-- row 1 phases -->
+  <path d="M20 252 V258 H544 V252" class="bp-brk"/>
+  <text x="282" y="274" text-anchor="middle" class="bp-p">設計 — 何を、どの順で、何字で書くか</text>
+  <path d="M596 252 V258 H928 V252" class="bp-brk"/>
+  <text x="762" y="274" text-anchor="middle" class="bp-p">執筆と構成 — 骨格が固まるまで文は磨かない</text>
+
+  <!-- row 2 connectors -->
+  <path d="M160 397 H210" class="bp-arr"/>
+  <path d="M352 397 H402" class="bp-arr"/>
+  <path d="M544 397 H594" class="bp-arr"/>
+  <path d="M736 397 H786" class="bp-arr"/>
+  <path d="M928 397 H940" class="bp-ln"/>
+  <path d="M968 397 H994" class="bp-live"/>
+
+  <!-- S5 -->
+  <rect x="20" y="322" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="34" y="344" class="bp-c">S5</text>
+  <text x="34" y="368" class="bp-t">原稿整理</text>
+  <text x="34" y="389" class="bp-s">表記規程・lint</text>
+  <text x="34" y="405" class="bp-s">初出定義・声の統一</text>
+  <line x1="34" y1="417" x2="146" y2="417" class="bp-div"/>
+  <text x="34" y="434" class="bp-m">kai · mira · zoe</text>
+  <text x="34" y="448" class="bp-m">owen</text>
+  <text x="34" y="464" class="bp-g">→ G5 可読性</text>
+  <!-- S6 -->
+  <rect x="212" y="322" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="226" y="344" class="bp-c">S6</text>
+  <text x="226" y="368" class="bp-t">校閲</text>
+  <text x="226" y="389" class="bp-s">疑問出し台帳</text>
+  <text x="226" y="405" class="bp-s">出典・権利・AI 開示</text>
+  <line x1="226" y1="417" x2="338" y2="417" class="bp-div"/>
+  <text x="226" y="434" class="bp-m">rafael · astrid</text>
+  <text x="226" y="448" class="bp-m">idris · beatriz</text>
+  <text x="226" y="464" class="bp-g">→ G6 校閲了</text>
+  <!-- S7 -->
+  <rect x="404" y="322" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="418" y="344" class="bp-c">S7</text>
+  <text x="418" y="368" class="bp-t">図版・組版</text>
+  <text x="418" y="389" class="bp-s">SVG 図解・表紙</text>
+  <text x="418" y="405" class="bp-s">Reader ビルド・ARC</text>
+  <line x1="418" y1="417" x2="530" y2="417" class="bp-div"/>
+  <text x="418" y="434" class="bp-m">aoi · ren · freya</text>
+  <text x="418" y="448" class="bp-m">owen · imogen</text>
+  <text x="418" y="464" class="bp-g">→ G7 組版可</text>
+  <!-- S8 -->
+  <rect x="596" y="322" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="610" y="344" class="bp-c">S8</text>
+  <text x="610" y="368" class="bp-t">校正</text>
+  <text x="610" y="389" class="bp-s">初校 → 再校 → 三校</text>
+  <text x="610" y="405" class="bp-s">赤字台帳で照合</text>
+  <line x1="610" y1="417" x2="722" y2="417" class="bp-div"/>
+  <text x="610" y="434" class="bp-m">mira · farah · kai</text>
+  <text x="610" y="448" class="bp-m">zoe · owen</text>
+  <text x="610" y="464" class="bp-g">→ G8 校正了</text>
+  <!-- S9 -->
+  <rect x="788" y="322" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="802" y="344" class="bp-c">S9</text>
+  <text x="802" y="368" class="bp-t">校了・公開</text>
+  <text x="802" y="389" class="bp-s">校了票（4 名署名）</text>
+  <text x="802" y="405" class="bp-s">公開・正誤表</text>
+  <line x1="802" y1="417" x2="914" y2="417" class="bp-div"/>
+  <text x="802" y="434" class="bp-m">ingrid · camille</text>
+  <text x="802" y="448" class="bp-m">ren · petra</text>
+  <text x="802" y="464" class="bp-g">→ G9 校了</text>
+
+  <!-- row 2 gates -->
+  <polygon points="186,383 200,397 186,411 172,397" class="bp-dia"/><text x="186" y="400.5" text-anchor="middle" class="bp-gd">G5</text>
+  <polygon points="378,383 392,397 378,411 364,397" class="bp-dia"/><text x="378" y="400.5" text-anchor="middle" class="bp-gd">G6</text>
+  <polygon points="570,383 584,397 570,411 556,397" class="bp-dia"/><text x="570" y="400.5" text-anchor="middle" class="bp-gd">G7</text>
+  <polygon points="762,383 776,397 762,411 748,397" class="bp-dia"/><text x="762" y="400.5" text-anchor="middle" class="bp-gd">G8</text>
+  <polygon points="954,383 968,397 954,411 940,397" class="bp-dia9"/><text x="954" y="400.5" text-anchor="middle" class="bp-gd">G9</text>
+  <text x="954" y="432" text-anchor="middle" class="bp-ok">公開</text>
+  <text x="954" y="447" text-anchor="middle" class="bp-okm">正誤表へ</text>
+
+  <!-- row 2 phases -->
+  <path d="M20 478 V484 H352 V478" class="bp-brk"/>
+  <text x="186" y="500" text-anchor="middle" class="bp-p">整える・確かめる — 文・事実・権利</text>
+  <path d="M404 478 V484 H928 V478" class="bp-brk"/>
+  <text x="666" y="500" text-anchor="middle" class="bp-p">仕上げて出す — 図版・ゲラ・校了・公開</text>
+
+  <!-- mechanical gates band -->
+  <rect x="0" y="514" width="1000" height="122" rx="8" class="bp-band"/>
+  <text x="20" y="538" class="bp-h">機械ゲート（owen が実装）</text>
+  <text x="980" y="538" text-anchor="end" class="bp-x">farah が CI で運用 · 新しい検査は警告で入れ、90 日以内に 2 度で gate に格上げ</text>
+  <rect x="20" y="552" width="150" height="70" rx="6" class="bp-chip"/>
+  <text x="32" y="570" class="bp-c">G3</text>
+  <text x="32" y="592" class="bp-ct">引用 lint</text>
+  <text x="32" y="610" class="bp-x">原文が底本と完全一致</text>
+  <rect x="182" y="552" width="150" height="70" rx="6" class="bp-chip"/>
+  <text x="194" y="570" class="bp-c">G2 · G3</text>
+  <text x="194" y="592" class="bp-ct">字数</text>
+  <text x="194" y="610" class="bp-x">予算合計と各章 ±15%</text>
+  <rect x="344" y="552" width="150" height="70" rx="6" class="bp-chip"/>
+  <text x="356" y="570" class="bp-c">G5</text>
+  <text x="356" y="592" class="bp-ct">可読性</text>
+  <text x="356" y="610" class="bp-x">100 字超の文は 0 件</text>
+  <rect x="506" y="552" width="150" height="70" rx="6" class="bp-chip"/>
+  <text x="518" y="570" class="bp-c">G7</text>
+  <text x="518" y="592" class="bp-ct">図版トークン</text>
+  <text x="518" y="610" class="bp-x">色は CSS 変数だけ</text>
+  <rect x="668" y="552" width="150" height="70" rx="6" class="bp-chip"/>
+  <text x="680" y="570" class="bp-c">G8</text>
+  <text x="680" y="592" class="bp-ct">赤字差分</text>
+  <text x="680" y="610" class="bp-x">台帳外の変更は不合格</text>
+  <rect x="830" y="552" width="150" height="70" rx="6" class="bp-chip"/>
+  <text x="842" y="570" class="bp-c">G9</text>
+  <text x="842" y="592" class="bp-ct">校了票</text>
+  <text x="842" y="610" class="bp-x">4 名署名・成果物完備</text>
+</svg>
+  </div>
+  <figcaption>四角がステージ、ひし形がゲートです。四角の下部の英字は、そのステージで手を動かす担当（Responsible）のペルソナ。最終責任（Accountable）は 04 の表にあります。G4 で構成が確定しなければ、点線の再編ループ R で台割（S2）へ戻ります。下の帯は、判断ではなく機械で合否を出す検査の一覧です。</figcaption>
+  </figure>
+  <p>ゲートの合否は二種類の方法で出します。一つは<b>機械判定</b>で、スキーマ、字数、引用の一致、文の長さ、リンク、色のトークン、赤字の反映といった、数えれば決まることを owen が検査に書き、farah が CI で回します。もう一つは<b>判断レビュー</b>で、企画の価値、底本の選び方、構成、声、初学者に分かるか、主張が反証に耐えるか、権利の境界、図解が正しいか、そして最後の校了を、役割を持つペルソナが判断します。</p>
+  <p>機械で決まることを人の目に任せず、人の判断が要ることを機械の合格で済ませない。この区別がこの工程の骨組みです。新しい検査はまず警告として入れ、同じ種類の指摘が 90 日以内に二度出たらゲートに格上げします（組織全体の memory → lint の手順と同じです）。</p>
+</section>
+
+<section id="s2">
+  <div class="eyebrow"><span class="num">02</span><span class="kicker">Two traditions</span></div>
+  <h2>出版社はどう作るか</h2>
+  <p class="lede">工程は発明していません。日本の新書・文庫の作り方と、英語圏の一般書・学術書の作り方を読み比べ、AI の組織で崩れやすいところを補う側を選んで組み合わせました。</p>
+  <p>日本の書籍は、<b>企画会議</b>から始まります。編集者が仮タイトル、読者、目次案、類書との差、判型・頁数・定価を企画書にまとめ、会議で通れば著者と契約します。次に<b>台割</b>で頁の配分と展開を決めます。ある編集の手引きは「雑誌の編集とはこの台割作成を指すといってもよい」とまで書いています。取材と執筆、原稿整理、造本設計と組版を経てゲラが出ると、<b>校閲</b>が事実と表現の妥当性を調べ、<b>校正</b>が初校・再校・三校と原稿とゲラを照合します。最後に「校了」か「責了」で校正を終え、装丁と色校、印刷・製本（文藝春秋の例では校了から約 1 か月）、配本へ進みます。</p>
+  <p>英語圏では、編集が段階ごとに名前を持っています。企画を選ぶ <b>acquisition</b>（学術書では 2 名以上の査読と教員の Board の承認を経ます）、構成と論旨を直す <b>developmental edit</b>、文の質を整える <b>line edit</b>、文法・表記・相互参照を正す <b>copyedit</b>、そして雑誌に典型的な <b>fact-checking</b> です。Chicago は copyedit を「実質的な変更ができる最後の機会」と位置づけ、developmental edit は必ず最初に行うものとされます。後で消える章の文を磨いても無駄だからです。組版後の proofreading では、著者による直し（AA）と編集者による直し（EA）を区別して費用と責任を分けます。刊行の 4〜6 か月前には ARC（事前見本）を業界誌へ送ります。</p>
+  <div class="grid g2">
+    <div class="card">
+      <span class="tag">日本 · 新書・文庫</span>
+      <h3>独立した校閲と、明確な終点</h3>
+      <ul>
+        <li><b>企画会議</b>が入口。企画書に読者・目次案・類書・仕様を書く</li>
+        <li><b>台割</b>で頁配分を先に決める。強い設計の道具</li>
+        <li><b>校閲</b>は専門職・専門部署。執筆者から独立している</li>
+        <li><b>校正</b>は初校 → 再校 → 三校。前の校の赤字が入ったかを確かめる</li>
+        <li><b>校了／責了</b>という終点と、責任の所在がある</li>
+        <li>弱点：原稿整理の中で構成と表記の直しが混ざりやすい</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="tag">英語圏 · trade / academic</span>
+      <h3>編集の段階に名前があり、順序が決まっている</h3>
+      <ul>
+        <li><b>Acquisition</b> と、学術書では <b>peer review</b>・Board 承認</li>
+        <li><b>Developmental → line → copyedit</b> の順。構成を先に固める</li>
+        <li>copyedit は実質的な変更の最後の機会（Chicago）</li>
+        <li><b>Fact-checking</b> は雑誌で独立部署（New Yorker）。書籍では copyedit に含まれることが多い</li>
+        <li>proofreading で <b>AA と EA</b> を分け、費用と責任を区別する</li>
+        <li><b>ARC</b> を 4〜6 か月前に配り、先行読者の声を集める</li>
+      </ul>
+    </div>
+  </div>
+  <h3 class="sub">設計に持ち込んだ六つのこと</h3>
+  <div class="layers">
+    <div class="layer"><div class="lab">独立校閲</div><div><h3>品質保証は、書いた人と別の人が持つ</h3><p>日本型を採ります。事実・引用・権利を確かめる校閲（S6）を執筆者から切り離し、各章の校閲者はその章の執筆者と同じにしません。</p></div></div>
+    <div class="layer"><div class="lab">構成 → 文</div><div><h3>構成編集と原稿整理を別のゲートにする</h3><p>英語圏の順序を採ります。構成編集（S4・G4）で骨格を確定してから、原稿整理（S5・G5）で文を磨きます。構成が確定するまで S5 以降には入りません。</p></div></div>
+    <div class="layer"><div class="lab">企画会議</div><div><h3>入口は社内の企画会議型</h3><p>G0 は新書と同じ企画会議型にします。ただし第 I 部の訳注に限り、査読に相当する独立した読み（S6 の原文照合）を義務づけます。</p></div></div>
+    <div class="layer"><div class="lab">校了</div><div><h3>終点と責任の所在を書面にする</h3><p>校了票に署名者を決め、責了で直してよい範囲（誰の責任で、何を直せるか）を明文化します。英語圏が AA と EA の区別で分けている費用と責任を、署名と範囲の規程で引き受けます。</p></div></div>
+    <div class="layer"><div class="lab">先行読者</div><div><h3>ARC は「先行公開章＋読者の声」</h3><p>Web 書籍では、数章を限定公開して読者の声を集めることを ARC や献本に相当させます。集めた声は S7 の成果物として残します。</p></div></div>
+    <div class="layer"><div class="lab">台割</div><div><h3>頁ではなく、字数と読了時間で割る</h3><p>台割は日本の出版に特有の強い道具です。Web には頁がないので、章ごとの字数予算と読了時間の予算（Reader と同じ 600 字/分で見積もります）として使います。</p></div></div>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="eyebrow"><span class="num">03</span><span class="kicker">Stages and gates</span></div>
+  <h2>十のステージとゲート</h2>
+  <p class="lede">各ステージは、残す成果物と、次へ進む条件（ゲート）で定義します。ゲートには機械で合否を出す部分と、役割を持つペルソナが判断する部分があります。片方だけで通るゲートは S3 のほかにありません。</p>
+  <div class="scroll"><table>
+    <thead><tr><th>段</th><th>名称</th><th>残す成果物</th><th>ゲート</th><th>機械判定</th><th>判断レビュー</th></tr></thead>
+    <tbody>
+      <tr><td>S0</td><td>企画</td><td class="dim">企画書（仮題、読者像〔棚と人〕、類書 3 冊との差、総字数、部構成、KPI、予算行）</td><td>G0 企画承認</td><td class="dim">必須項目が揃っているか（スキーマ検査）</td><td class="dim">企画会議（編集長・戦略・PM・マーケ）。予算は運用者が承認</td></tr>
+      <tr><td>S1</td><td>リサーチパック</td><td class="dim">原文の分節（段落 ID 付き）、異同表、訓読 v1、名言候補、先行書の一覧、用語集 v0、権利メモ、引用の作法</td><td>G1 原典確定</td><td class="dim">全 13 篇の段落に ID／原文の字数が底本と一致／訓読が全段落に対応／名言がすべて段落 ID に解決</td><td class="dim">底本選定の妥当性（beatriz）、異同の扱いへの反証（rafael）</td></tr>
+      <tr><td>S2</td><td>構成（台割）</td><td class="dim">台割（章ごとの字数予算・対応する原文 ID・図版枠・担当・期日）と章設計書（各章の問い・要点）</td><td>G2 台割承認</td><td class="dim">予算合計が 10〜13 万字／原文の全段落がいずれかの章に割当て済み／第 II 部の各章が第 I 部の段落 ID を 1 つ以上参照</td><td class="dim">台割会議（一貫性、初学者の動線）</td></tr>
+      <tr><td>S3</td><td>執筆（初稿）</td><td class="dim">章ごとの初稿。版・対応段落・出典を冒頭のメタデータに持つ</td><td>G3 初稿受理</td><td class="dim">字数が予算の ±15% 以内／切れ・空本文・LLM の痕跡なし（W-1 の判定を再利用）／引用 lint／未解決の出典タグ 0 件</td><td class="dim">なし（形式だけのゲート）</td></tr>
+      <tr><td>S4</td><td>構成編集</td><td class="dim">editorial letter（全体所見）、初学者の通読レポート、再編の判断</td><td>G4 構成確定<br>不合格なら R</td><td class="dim">同じ原文段落を重複して解説している章の検出、台割からの逸脱率</td><td class="dim">編集長の判断、章間の一貫性、初学者の読み</td></tr>
+      <tr><td>S5</td><td>原稿整理</td><td class="dim">表記規程、lint レポート、改訂稿</td><td>G5 可読性</td><td class="dim">100 字超の文 0 件・p90 ≤ 60 字（原文・訓読は除く）／表記ゆれ 0／用語の初出に定義／jReadability（当初は助言）／漢字率の警告</td><td class="dim">声と文体（kai）、初学者の読み（mira）</td></tr>
+      <tr><td>S6</td><td>校閲</td><td class="dim">疑問出し台帳、出典台帳、権利の確認書、AI 執筆であることの開示文</td><td>G6 校閲了</td><td class="dim">未解決の疑問 0 件／参考文献の URL がすべて生きている／第 II 部の事実主張すべてに出典 ID／他訳との長い一致の検査</td><td class="dim">反証（rafael）、出典の作法（astrid）、権利（idris）</td></tr>
+      <tr><td>S7</td><td>図版・組版</td><td class="dim">SVG 図解（alt 付き）、表紙、索引、プレビュー、先行公開で集めた読者の声</td><td>G7 組版可</td><td class="dim">ビルド成功／リンクとアンカーが全数解決／色トークン lint（R-2）／base path（R-16）／alt 100%／性能の下限</td><td class="dim">図解の分かりやすさ、読書 UX（aoi・freya）</td></tr>
+      <tr><td>S8</td><td>校正</td><td class="dim">初校・再校・三校それぞれの赤字台帳</td><td>G8 校正了</td><td class="dim">赤字反映の差分ゲート：再校・三校の本文差分が前の校の台帳の項目だけで説明できる／三校の新しい赤字が閾値（例 5 件）以下</td><td class="dim">初校は通読、再校は照合、三校は差分の確認</td></tr>
+      <tr><td>S9</td><td>校了・公開</td><td class="dim">校了票（署名者・日時・版）、リリースノート、正誤表（公開後も続く）</td><td>G9 校了</td><td class="dim">必須署名が揃う／G1〜G8 の成果物が揃いスキーマが正しい／公開後の live smoke</td><td class="dim">編集長の最終判断</td></tr>
+    </tbody>
+  </table></div>
+  <div class="define"><b>再編ループ R。</b>G4 で次のどれか一つに当たれば起動します。① 初学者の通読で「次の章へ進む理由が分からない」とされた箇所が 2 章以上ある。② 同じ原文段落の解説が 3 章以上で重複している。③ 第 II 部の章が第 I 部の言い換えだけになっている（nadia が「so what がない」と判定）。④ 字数の実績が台割から ±25% 以上ずれた章が 3 章以上ある。⑤ 反証レビューで中心的な主張が REFUTED になった。手順は、ingrid が残す章・統合する章・差し戻す章とその理由を書き、camille が台割を v(n+1) に上げて日程を引き直し、G2 の機械判定を通し直してから、影響する章だけを S3 へ戻します。<b>上限は 2 回</b>です。3 回目が必要なら構成ではなく企画（G0）の問題とみなし、maya と運用者に上申します。</div>
+  <div class="foryou"><b>校了と責了</b>校了票には ingrid（全体）、astrid（出典と開示）、idris（権利）、owen（機械ゲートがすべて通ったこと）の 4 名が署名し、揃った時点で G9 です。校了後に見つかった、意味の変わらない 1 文字単位の誤植は、ingrid の責任で直して公開してよい（責了）。正誤表に記録し、事後に kai が確認します。意味が変わる直しは正誤表で告知したうえで版を上げ、校閲（S6）を部分的にやり直します。責了で直したものを誰も確かめない、という出版社の典型的な失敗を、確認者の名前を書くことで防ぎます。</div>
+</section>
+
+<section id="s4">
+  <div class="eyebrow"><span class="num">04</span><span class="kicker">Who does what</span></div>
+  <h2>誰が何を</h2>
+  <p class="lede">担当は RACI で決めます。R は手を動かす人、A は結果に責任を負う人、C は事前に意見を求める人、I は結果を知らされる人です。</p>
+  <div class="pull">一冊の編集長（Accountable）は ingrid。進行（production editor）は camille が持ち、台割の字数実績と作業の状況を毎週、進行台帳に反映する。</div>
+  <div class="scroll"><table>
+    <thead><tr><th>段</th><th>R（実行）</th><th>A（責任）</th><th>C（相談）</th><th>I（報告）</th></tr></thead>
+    <tbody>
+      <tr><td>S0 企画</td><td>ingrid（企画書）、nadia（第 II 部の価値仮説）、dmitri（類書と需要の数字）</td><td>ingrid<br><span class="note">予算は運用者が承認</span></td><td class="dim">maya、celeste、nico、mateo（稼働量と binding）、petra（運用負荷）</td><td class="dim">camille、全員</td></tr>
+      <tr><td>工程テンプレ</td><td>freya（WP brief・editorial letter・疑問出しの書式）、camille（進行台帳）</td><td>camille</td><td class="dim">mateo、owen</td><td class="dim">全員</td></tr>
+      <tr><td>S1 リサーチ</td><td>sora（底本・分節・異同・訓読 v1）、bruno（先行書、名言の流布状況）、zoe（用語集）、idris（権利メモ）、astrid（出典の作法）</td><td>beatriz</td><td class="dim">rafael（異同の反証）、mira（用語の難しさ）</td><td class="dim">ingrid、camille</td></tr>
+      <tr><td>S2 台割</td><td>ingrid（章構成）、camille（台割表・日程）、elena（全体の筋）</td><td>ingrid</td><td class="dim">nadia、mira、kai、aoi（図版枠）</td><td class="dim">全執筆者</td></tr>
+      <tr><td>S3 第 I 部</td><td>sora（原文・訓読・現代語訳）、rhys（要旨・解説の語り）、zoe（語注）</td><td>ingrid</td><td class="dim">beatriz（学術的な妥当性）、kai（声）</td><td class="dim">camille</td></tr>
+      <tr><td>S3 第 II 部</td><td>nadia（統括）、tomas（組織・成果）、clara（詭道と倫理）、linnea（測定と意思決定）、bruno（競争環境）、beatriz（情報）</td><td>ingrid</td><td class="dim">maya（戦略の枠組み）、rafael</td><td class="dim">camille</td></tr>
+      <tr><td>S4 構成編集</td><td>ingrid（editorial letter）、elena（章間の一貫性）、mira（初学者の通読テスト）</td><td>ingrid</td><td class="dim">maya、nadia、rafael</td><td class="dim">執筆者全員、camille</td></tr>
+      <tr><td>R 再編</td><td>ingrid（判断）、camille（台割の改訂・日程）</td><td>ingrid</td><td class="dim">elena、nadia</td><td class="dim">影響する章の執筆者</td></tr>
+      <tr><td>S5 原稿整理</td><td>kai（表記規程・声）、mira（可読性）、zoe（初出定義・索引語）、owen（lint の実装と実行）</td><td>ingrid</td><td class="dim">clara（読者の信頼に関わる表現）</td><td class="dim">camille</td></tr>
+      <tr><td>S6 校閲</td><td>rafael（事実・引用・反証）、astrid（出典・開示）、idris（権利・クリーンルーム監査）、beatriz（第 II 部の原文照合）</td><td>astrid</td><td class="dim">sora（疑問への回答）、ingrid</td><td class="dim">camille</td></tr>
+      <tr><td>S7 図版・組版</td><td>aoi（図解・表紙・情報設計）、ren（Reader の実装とビルド）、freya（読書 UX・機械可読版）、owen（ビルドゲート）、imogen（先行公開と読者の声）</td><td>aoi</td><td class="dim">farah（性能・品質）、kai、mira</td><td class="dim">ingrid、camille</td></tr>
+      <tr><td>S8 校正</td><td>mira（初校の通読）、farah（表示崩れ・リンク・端末差）、kai（再校の表記）、zoe（索引・用語リンク）、owen（差分ゲート）</td><td>ingrid</td><td class="dim">担当執筆者（著者校に相当）</td><td class="dim">camille</td></tr>
+      <tr><td>S9 校了・公開</td><td>ingrid（校了票）、camille（チェックリスト）、ren（公開）、petra（リリース運用・切り戻し）</td><td>ingrid</td><td class="dim">astrid、idris、owen、farah</td><td class="dim">maya、全員</td></tr>
+      <tr><td>公開後</td><td>celeste（告知）、imogen（読者の声）、nico（打ち出し方）、dmitri（読了率・章ごとの離脱）、rhys（ポッドキャスト化）</td><td>celeste</td><td class="dim">ingrid、linnea（計測設計）</td><td class="dim">maya、全員</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">独立性の原則：各章の校閲者は、その章の執筆者と同じにしません。訓読と現代語訳は sora が書くので、第 II 部の原文照合は beatriz が、反証は rafael が受け持ちます。A が S6 だけ astrid、S7 だけ aoi なのは、そのステージの判断が編集長の専門の外にあるからです。</p>
+  <div class="voices">
+    <div class="voice">
+      <div class="who"><div class="face"></div><div><b>Ingrid Solberg</b><span class="role">Managing Editor · 編集長</span></div></div>
+      <q>台割は約束です。字数に収まらない章は、文が悪いのではなく設計が悪い。G4 で骨格が崩れていたら、磨いた文ごと手放して台割へ戻ります。そのために、構成が決まるまでは誰にも文を磨かせません。</q>
+      <span class="verdict">担当：S0 企画・S2 台割・S4 構成編集・S9 校了</span>
+    </div>
+    <div class="voice">
+      <div class="who"><div class="face"></div><div><b>Rafael Ortiz</b><span class="role">Red Team &amp; Adversarial Reviewer</span></div></div>
+      <q>私の仕事は、この本のいちばん強い主張を壊しにいくことです。壊れなければ残し、壊れたらそれは校閲の直しではなく構成の問題として、再編ループへ回します。書いた人に確かめさせた引用は、確かめたことにしません。</q>
+      <span class="verdict">担当：S6 校閲（事実・引用・反証）</span>
+    </div>
+    <div class="voice">
+      <div class="who"><div class="face"></div><div><b>Aoi Marchetti</b><span class="role">Designer · 図版と組版</span></div></div>
+      <q>図版は飾りではなく、原文の構造を一枚で見せる注釈です。色はすべてトークンで塗り、alt 文のない図は G7 を通しません。読者が段落から図へ、図から原文へ戻れることを条件にしています。</q>
+      <span class="verdict">担当：S7 図版・組版（Accountable）</span>
+    </div>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="eyebrow"><span class="num">05</span><span class="kicker">Classics</span></div>
+  <h2>古典を出すときの決まり</h2>
+  <p class="lede">「原典に忠実」は、決めておかないと検査できません。岩波文庫『新訂 孫子』（金谷治訳注）の原文・読み下し・現代語訳・注・索引という構成を型として、何を守れば「忠実」かを操作的に定義しました。</p>
+  <div class="layers">
+    <div class="layer"><div class="lab">底本</div><div><h3>底本を一つ明示する</h3><p>『孫子』には魏武注本、武経七書本、十一家注本、銀雀山竹簡本（1972 年出土）の系統があります。推奨は十一家注本系の通行本を本文とし、竹簡本との主要な異同は注で示すこと。最終判断は G1 で行います。形篇の攻守句に竹簡本で語順の逆転があるという広く知られた異同は、一次資料で未確認のため、sora が異同表の作業で検証します。</p></div></div>
+    <div class="layer"><div class="lab">原文</div><div><h3>原文は底本どおりに転記し、改変しない</h3><p>旧字・異体字の扱いは表記規程に先に書きます。本文中の原文ブロックは、分節した原文と正規化後に完全一致しなければ G3 の引用 lint で落ちます。解説と第 II 部は原文の段落 ID を参照し、原文が言っていないことを原文の主張として書きません。</p></div></div>
+    <div class="layer"><div class="lab">訓読</div><div><h3>訓読は自前でつくる</h3><p>慣用の読み（返り点・送り仮名の通例）に従うのは構いません。独自の読みを採るときは注で根拠を示します。他者の書き下しには独自の工夫が入っていれば保護されうるので、写さずに安全側を取ります。</p></div></div>
+    <div class="layer"><div class="lab">現代語訳</div><div><h3>クリーンルームで訳す</h3><p>訳者は下訳のあいだ、他者の現代語訳を見ません。参照できるのは原文、辞書、注釈の語義だけで、何を参照したかを作業ログに残します。idris がログを抜き取りで監査します。補った語は〔 〕で示し、意訳の幅は規程で決めます。</p></div></div>
+    <div class="layer"><div class="lab">名言</div><div><h3>名言ボックスは原文＋訓読＋出典</h3><p>名言ボックスには必ず原文・訓読・訳・篇名・段落 ID を並べます。流布している形が原文と違うときは「よく言われる形」として別に記し、誤りであることを明示します。たとえば謀攻篇の「百戦殆うからず」は「百戦百勝」と言い換えられがちです。</p></div></div>
+    <div class="layer"><div class="lab">権利</div><div><h3>原文はパブリックドメイン、他者の訳は二次的著作物</h3><p>原文は二千年以上前の著作で、保護期間（原則、著作者の死後 70 年）を大きく過ぎています。一方、既刊の現代語訳は翻訳という二次的著作物として原作とは別に保護されるため、流用も下敷きも禁止です。他訳との比較を論じるときだけ、引用の 4 要件（公表済み・公正な慣行・正当な範囲・出所の明示）を満たす最小限を引きます。</p></div></div>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="eyebrow"><span class="num">06</span><span class="kicker">First run</span></div>
+  <h2>初号『孫子の兵法』での実行</h2>
+  <p class="lede">工程の計画は暦で約 9 週間です。初号では、それを運用者の 1 セッションに圧縮し、作業パッケージ（WP）ごとにサブエージェントを立てて並行に走らせます。圧縮するのは待ち時間だけで、ゲートの省略も順序の入れ替えもしません。</p>
+  <div class="define"><b>実行の形について。</b>初号は運用者のセッションが司会する<b>役割演技</b>です。各 WP のサブエージェントは担当ペルソナの立場で書き、読み、判定しますが、ペルソナが binding から自律的に起動したわけではありません。校了票の署名と実績（engagement）の記録には、その旨を「operator-orchestrated」と明記します。機械ゲート（check-book と prebuild フック、名言集の生成）は Reader と同じ PR で repo に入り、それが main に載るまでは、この文書の記述は設計です。</div>
+  <p>本は二部構成です。第 I 部は 1 篇を 1 章とし、要旨、段落ごとの原文・訓読・訳・語注、解説、名言ボックス、図解 1 点の順に並べます。第 II 部は、始める前に勝敗を測る（計篇）から詭道の倫理（計篇・火攻篇）まで、篇の考え方を現代のプロジェクトと組織に当てて読む章です。</p>
+  <ol class="flowsteps">
+    <li><b>リサーチパック</b>（WP-10〜16）— 底本の確定、原文の分節と段落 ID、異同表、訓読 v1、名言候補、先行書の一覧、用語集、権利メモと開示文。最初の依存元なので先頭で済ませます。→ G1</li>
+    <li><b>台割と章設計書</b>（WP-20）— 章ごとの字数予算、対応する原文 ID、図版枠、担当。→ G2</li>
+    <li><b>執筆を並行レーンで</b>（WP-30a/b/c・WP-31）— 第 I 部を計〜形／勢〜九変／行軍〜用間の 3 レーンで、各レーン内は篇の順に。第 II 部は、対応する篇の初稿ができた章から着手します。→ G3</li>
+    <li><b>図版</b>（WP-70）— 各篇 1 点と全体図の SVG、表紙。章設計書の図版枠を受けて、執筆と並行に描きます。</li>
+    <li><b>レビューと lint</b>（WP-40・50・60、検査の実装は WP-51 で前倒し）— 構成編集 → 原稿整理 → 校閲。少なくとも三つのレンズ（構成、可読性、事実と反証）で読みます。→ G4〜G6</li>
+    <li><b>Reader でのビルドと校正</b>（WP-71・80）— 3 層の切替、再開位置、章の残り時間を持つ読書画面でビルドし、初校・再校・三校を赤字台帳で回します。→ G7・G8</li>
+    <li><b>PR</b> — Reader、機械ゲート、本文を一つの PR にまとめ（工程ページと skill は別 PR）、レビューが合意でグリーンになれば workforce の pr-autopilot がマージします。</li>
+    <li><b>デプロイと校了</b>（WP-90）— 公開、live smoke、校了票への署名。以後は正誤表を運用します。→ G9</li>
+  </ol>
+  <div class="statline">
+    <div class="stat"><b>13 篇</b><span>『孫子』の全篇。第 I 部で 1 篇 1 章</span></div>
+    <div class="stat"><b>約 12 万字</b><span>初号の本文（付録を除く実測 121,482 字）</span></div>
+    <div class="stat"><b>22 章 + 付録</b><span>序・導入・前編 13 篇とまとめ・後編 5 章・終章・名言集</span></div>
+    <div class="stat"><b>≥ 3</b><span>原稿ごとのレビューレンズ</span></div>
+  </div>
+  <p class="note" style="margin-top:14px">字数と章数は初号の G3 時点の実測です。研究段階の台割案（総計約 12 万字、章設計書 21 本）を初号の範囲に合わせて詰め、付録の名言集は register から生成しています。書籍本文の正本を git に置くこと（記事本文の正本は Notion）は、ADR で明文化してから運用します。</p>
+  <div class="grid g2">
+    <div class="card">
+      <span class="tag">Book</span>
+      <h3><a href="/books/sunzi">『孫子の兵法』を読む</a></h3>
+      <p>この工程でつくる初号です。第 I 部の原典と、第 II 部の現代のプロジェクトと組織への読み方を、console の読書画面で読めます。</p>
+    </div>
+    <div class="card">
+      <span class="tag">Skill</span>
+      <h3><a href="https://github.com/refluster/ai-native-article/blob/main/.claude/skills/book-production/SKILL.md" target="_blank" rel="noopener">実行手順（book-production skill）</a></h3>
+      <p>この文書の工程を、セッションで実行できる手順にしたものです。人が工程を確かめるのはこの文書、エージェントが従うのは skill という分担です。</p>
+    </div>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="eyebrow"><span class="num">07</span><span class="kicker">Sources</span></div>
+  <h2>参考資料</h2>
+  <p class="lede">工程の設計にあたって実際に本文を読んだ資料です。検索結果の要約しか読めなかったもの（校了・責了の定義、読書速度の通説など）と、取得できなかったもの（ctext.org、講談社の版元ページほか）はここに含めていません。</p>
+  <ol class="notes">
+    <li>本づくりの流れ（第 2 章）. <a href="https://www.edit-jp.com/naruhon02/" target="_blank" rel="noopener">edit-jp.com/naruhon02</a></li>
+    <li>文藝春秋 企画出版部「本ができるまで」. <a href="https://www.bunshun.co.jp/kikakushuppan/process.html" target="_blank" rel="noopener">bunshun.co.jp</a></li>
+    <li>毎日新聞校閲センター「どうやって校閲記者は調べているか」. <a href="https://salon.mainichi-kotoba.jp/archives/27915" target="_blank" rel="noopener">salon.mainichi-kotoba.jp</a></li>
+    <li>逆旅出版「書籍の企画書とは」. <a href="https://www.gekiryo-pub.com/archives/1440" target="_blank" rel="noopener">gekiryo-pub.com</a></li>
+    <li>文庫本各社の文字組まとめ. <a href="https://libsy.jugem.jp/?eid=53" target="_blank" rel="noopener">libsy.jugem.jp</a></li>
+    <li>University of Chicago Press, Publishing with Chicago. <a href="https://www.press.uchicago.edu/resource/publishing_with_chicago.html" target="_blank" rel="noopener">press.uchicago.edu</a></li>
+    <li>The Chicago Manual of Style, 18th ed., Chapter 2 contents. <a href="https://www.chicagomanualofstyle.org/book/ed18/part1/ch02/toc.html" target="_blank" rel="noopener">chicagomanualofstyle.org</a></li>
+    <li>Duke University Press, Life Cycle of a Book. <a href="https://www.dukeupress.edu/books/book-authors/life-cycle-of-a-book" target="_blank" rel="noopener">dukeupress.edu</a></li>
+    <li>Kevin Anderson &amp; Associates, The Different Types of Book Editing. <a href="https://www.ka-writing.com/the-different-types-of-book-editing/" target="_blank" rel="noopener">ka-writing.com</a></li>
+    <li>Columbia Journalism Review, Fact-checking at The New Yorker. <a href="https://www.cjr.org/critical_eye/fact-checking_at_the_new_yorker.php" target="_blank" rel="noopener">cjr.org</a></li>
+    <li>Wikipedia, Advance copy. <a href="https://en.wikipedia.org/wiki/Advance_copy" target="_blank" rel="noopener">en.wikipedia.org</a></li>
+    <li>岩波書店『新訂 孫子』（金谷治訳注）書誌. <a href="https://www.iwanami.co.jp/book/b246250.html" target="_blank" rel="noopener">iwanami.co.jp</a></li>
+    <li>Wikipedia「孫子 (書物)」. <a href="https://ja.wikipedia.org/wiki/%E5%AD%AB%E5%AD%90_(%E6%9B%B8%E7%89%A9)" target="_blank" rel="noopener">ja.wikipedia.org</a></li>
+    <li>熊征「『孫子』形篇の攻守観について：竹簡本と十一家注本の比較を中心に」北海道大学『研究論集』19 号（題目とメタデータのみ確認）. <a href="https://eprints.lib.hokudai.ac.jp/dspace/bitstream/2115/79796/1/09_rjgshhs_19_p157-188_l.pdf" target="_blank" rel="noopener">eprints.lib.hokudai.ac.jp</a></li>
+    <li>文化庁『著作権テキスト 令和 8 年度版』. <a href="https://www.bunka.go.jp/seisaku/chosakuken/seidokaisetsu/pdf/94383901_01.pdf" target="_blank" rel="noopener">bunka.go.jp</a></li>
+    <li>暖淡堂「漢文の書き下し文は著作権保護対象になる？」（個人の見解）. <a href="https://dantandho.hatenadiary.com/entry/2022/04/06/%E3%80%90%E5%8F%A4%E5%85%B8%E4%BD%9C%E5%93%81%E3%81%A8%E8%91%97%E4%BD%9C%E6%A8%A9%E3%80%91%E6%BC%A2%E6%96%87%E3%81%AE%E6%9B%B8%E3%81%8D%E4%B8%8B%E3%81%97%E6%96%87%E3%81%AF%E8%91%97%E4%BD%9C%E6%A8%A9" target="_blank" rel="noopener">dantandho.hatenadiary.com</a></li>
+    <li>文化審議会建議「公用文作成の考え方」（2022 年 1 月 7 日）. <a href="https://www.bunka.go.jp/seisaku/bunkashingikai/kokugo/hokoku/pdf/93651301_01.pdf" target="_blank" rel="noopener">bunka.go.jp</a></li>
+    <li>李在鎬「日本語教育のための文章難易度に関する研究」（jReadability）. <a href="https://researchmap.jp/jhlee/published_papers/1284306/attachment_file.pdf" target="_blank" rel="noopener">researchmap.jp</a></li>
+    <li>漢字かな比（通説の紹介、学術的な出典なし）. <a href="https://kakenhi.com/kanji-kana-ratio/" target="_blank" rel="noopener">kakenhi.com</a></li>
+    <li>W3C, Requirements for Japanese Text Layout (JLReq). <a href="https://www.w3.org/TR/jlreq/" target="_blank" rel="noopener">w3.org/TR/jlreq</a></li>
+    <li>W3C, Understanding WCAG 2.2 SC 1.4.8 Visual Presentation. <a href="https://www.w3.org/WAI/WCAG22/Understanding/visual-presentation.html" target="_blank" rel="noopener">w3.org/WAI</a></li>
+    <li>Butterick’s Practical Typography, Line length. <a href="https://practicaltypography.com/line-length.html" target="_blank" rel="noopener">practicaltypography.com</a></li>
+    <li>Butterick’s Practical Typography, Line spacing. <a href="https://practicaltypography.com/line-spacing.html" target="_blank" rel="noopener">practicaltypography.com</a></li>
+    <li>Readwise Reader Docs, Appearance. <a href="https://docs.readwise.io/reader/docs/faqs/appearance" target="_blank" rel="noopener">docs.readwise.io</a></li>
+    <li>Piepenbrock, Mayr, Mund, Buchner (2013). Positive display polarity is advantageous for both younger and older adults. <i>Ergonomics</i> 56(7). <a href="https://www.psychologie.hhu.de/fileadmin/redaktion/Oeffentliche_Medien/Fakultaeten/Mathematisch-Naturwissenschaftliche_Fakultaet/Psychologie/AAP/Publikationen/2013/Piepenbrock-2013-Positive_display_polarity_is_.pdf" target="_blank" rel="noopener">psychologie.hhu.de</a></li>
+  </ol>
+  <p class="note">工程の設計は、Ingrid Solberg（Managing Editor）と Camille Fontaine（Chief of Staff）による 2026 年 10 月 5 日付の調査ノートに基づきます。この文書は Aoi Marchetti（Designer）と Ingrid Solberg が構成しました。</p>
+</section>
