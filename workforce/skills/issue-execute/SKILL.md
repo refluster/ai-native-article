@@ -32,8 +32,11 @@ is:issue is:open label:stage:assigned label:owner:<agent_slug>
 
 Drop any issue an **open PR** already references (`Closes` / `Fixes` /
 `Resolves` / `Refs #N`, or an `issue-N` head branch) — that PR is the claim
-and the review lane owns it now. Take the oldest `max_issues_per_run`.
-**Zero is a first-class, cheap outcome**: record a one-line no-op and stop.
+and the review lane owns it now. Take the oldest `max_issues_per_run`. That
+rule is `executeQueue()` in `workforce/skills/issue-execute/issue-execute-queue.mjs`
+(unit-tested); apply it to the open issues and the open-PR claim map rather
+than re-deriving it. **Zero is a first-class, cheap outcome**: record a
+one-line no-op and stop.
 
 There is no in-progress label. The branch and the draft PR are the only
 claim; a run that dies before opening one leaves nothing behind to clean up.
