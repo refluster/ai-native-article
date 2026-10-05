@@ -3,7 +3,7 @@
 - **Status**: Proposed (operator ratifies by merging)
 - **Date**: 2026-10-05
 - **Deciders**: operator (directed the refactor); drafted by the operator's Claude Code session with the workforce (nadia routes, ren / dario execute, pr-autopilot reviews)
-- **Supersedes**: [adr-0022](adr-0022-issue-to-merge-flow.md) §2 (lanes at intake) and [adr-0038](adr-0038-intake-lane-handoff-and-queue-invariant.md) §3–§6 (`wf:handback`, `wf:human:*`, the split rule as a label, `HOP_CAP` markers). adr-0022 §1 (the PR author lane, `pr-remediate`) and adr-0038 §1–§2 (R-N11, the bindings manifest) stand unchanged.
+- **Supersedes**: [adr-0022](adr-0022-issue-to-merge-flow.md) §2 (lanes at intake) and [adr-0038](adr-0038-intake-lane-handoff-and-queue-invariant.md) §3–§7 (`wf:handback`, `wf:human:*`, the split rule as a label, the intake hand-off events, `HOP_CAP` markers, and §7's `issue-implement` deny-list, which goes with the skill it configured). adr-0022 §1 (the PR author lane, `pr-remediate`) and adr-0038 §1–§2 (R-N11, the bindings manifest) stand unchanged. adr-0038 §5's mechanism — every hand-off dispatches the next cadence (adr-0025) — is kept; only its call sites move, into the one write surface (§2 below).
 - **Related**: [adr-0025](adr-0025-event-driven-lane-handoff.md) (dispatch; reused as is), [adr-0017](adr-0017-skill-lifecycle-api.md) (archiving the two retired skills), PSVL/asp-cloud `docs/runbooks/issue_lifecycle.md` (the same model, written first on the project side; PSVL/asp-cloud#995 / #996)
 - **Epics**: [019](../epics/epic-019-autonomous-finalization-rate.md)
 
@@ -110,9 +110,14 @@ removed from `bindings[]`; adr-0041's in-place marker is still Proposed and
 unimplemented, so deletion is the only retirement the API offers today —
 the manifest's `RETIRED_BINDINGS` records what was removed and why.
 
-Routing terminates by a count, not a marker: the router assigns an issue at
-most three times (its own assignment comments are the count); the fourth
-answer is `owner:operator`.
+Routing terminates by counting the router's own assignment comments — each
+carries the signature `<!-- stage:assigned -->` — and the fourth answer is
+`owner:operator`. This is the same comment-signature idiom `wf:hops:N` used,
+with one marker instead of a numbered family; it is deliberately not a label.
+The count is read fresh from the thread on every assignment (`countMarker`),
+so an edited or deleted comment lowers the count — the bound is advisory
+against drift, not tamper-proof, and that is accepted: the people who can
+edit a router comment are the operator and the router itself.
 
 ### 4. R-N11 keeps the same shape with new queues
 
@@ -150,6 +155,25 @@ change (the operator asked for it: "既存のまだオープンなイシュー�
 *accountability* marker; under rule 2 an owner label means Assigned. The
 reconcile treats such a label on a non-assigned issue as a routing hint,
 strips it, and the watch's own filing shape is a follow-up issue for ren.
+
+**Cost (W-3).** At the schema's cost-class rates (small 0.05 / medium 0.20 /
+large 0.60 USD per fire) the manifest adds, per month: `backlog-reconcile` on
+asp-cloud (30 × 0.60 = 18), `issue-triage` on asp-cloud (30 × 0.20 = 6),
+dario's `issue-execute` on asp-cloud (30 × 0.60 = 18) and `pr-remediate` on
+asp-cloud (60 × 0.60 = 36); ren's two `issue-execute` bindings and dario's on
+`agent-workforce` replace `issue-implement` / `issue-design` one for one (net
+0). Ceiling delta ≈ +78 USD/month before the no-op short-circuit (a fire whose
+scan finds 0 candidates ends in minutes and costs a fraction of its class),
+inside the 600 USD ceiling and offset in practice by the end of the daily
+patrol fires that read the whole asp-cloud tracker. Each new binding's note in
+the manifest is its budget line.
+
+**Verification.** The mechanism PRs ship the pure module with unit tests for
+every guard named in §2 (one stage, one owner, served owner, held-by-PR,
+evidence per close reason, the per-run close budget, the assignment cap) and
+for the executor's selection rule; the I/O layer's two readers (the close
+budget file, the open-PR claim map) are tested with stubs. The write surface
+runs every guard before its first write by construction.
 
 **Reversal.** Re-add the five scripts from git history, unarchive the two
 skills, restore the old manifest rows. Labels are additive; nothing in the
