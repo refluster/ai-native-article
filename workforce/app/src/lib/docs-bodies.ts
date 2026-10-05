@@ -10,12 +10,14 @@ import capabilities from '../content/docs/capabilities.html?raw';
 import whitepaper from '../content/docs/whitepaper.html?raw';
 import foundingStory from '../content/docs/founding-story.html?raw';
 import manifesto from '../content/docs/manifesto.html?raw';
+import bookProduction from '../content/docs/book-production.html?raw';
 
 const BODIES: Readonly<Record<string, string>> = {
   capabilities,
   whitepaper,
   'founding-story': foundingStory,
   manifesto,
+  'book-production': bookProduction,
 };
 
 for (const d of PUBLIC_DOCS) {
