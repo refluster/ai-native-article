@@ -34,6 +34,11 @@ export const OPERATOR = "operator";
 /** Issues in this label follow their own flow (incident response) and carry
  *  no stage. Every scan skips them; the set script refuses them. */
 export const INCIDENT_LABEL = "incident";
+/** A Verified issue wearing this label waits on the blocker its body names
+ *  (another issue, an ADR ratification): the router skips it instead of
+ *  parking it on the operator; the reconcile's 30-day re-check still asks
+ *  whether the blocker has cleared. */
+export const BLOCKED_LABEL = "wf:blocked";
 /** The executor skill an owner must be bound to (adr-0046 §3). */
 export const EXECUTOR_SKILL = "issue-execute";
 
@@ -204,7 +209,10 @@ export function routeAction({ labels = [], number } = {}, { roster = null, openP
   const stage = stageOf(labels);
   const owners = ownersOf(labels);
   const owner = owners[0] ?? null;
-  if (stage === "verified") return { action: "route", why: "verified — needs an owner", stage, owner: null };
+  if (stage === "verified") {
+    if (labels.map(lc).includes(BLOCKED_LABEL)) return { action: "skip", why: `verified but ${BLOCKED_LABEL} — waits on the blocker its body names`, stage, owner: null };
+    return { action: "route", why: "verified — needs an owner", stage, owner: null };
+  }
   if (stage === "proposed") return { action: "skip", why: "proposed — the reconcile verifies it first", stage, owner: null };
   if (openPrRefs instanceof Set && Number.isInteger(number) && openPrRefs.has(number)) {
     return { action: "skip", why: `assigned and an open PR references #${number}`, stage, owner };

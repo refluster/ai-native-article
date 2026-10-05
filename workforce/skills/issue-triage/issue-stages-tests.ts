@@ -130,8 +130,9 @@ describe("reconcile decisions", () => {
 
 describe("route decisions (rule 3 — the #760 shape)", () => {
   const roster = ["ren", "dario"];
-  it("routes Verified, leaves Proposed to the reconcile, skips incidents", () => {
+  it("routes Verified, leaves Proposed to the reconcile, skips incidents and blocked issues", () => {
     expect(routeAction({ labels: ["stage:verified"] }, { roster }).action).toBe("route");
+    expect(routeAction({ labels: ["stage:verified", "wf:blocked"] }, { roster }).action).toBe("skip");
     expect(routeAction({ labels: [] }, { roster }).action).toBe("skip");
     expect(routeAction({ labels: ["incident"] }, { roster }).action).toBe("skip");
   });

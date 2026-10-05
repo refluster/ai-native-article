@@ -47,7 +47,10 @@ Two kinds of candidate:
   roster. Choose again; the previous owner label is removed for you.
 
 Nothing Proposed reaches you; the reconcile verifies first. Nothing an open PR
-references reaches you; that owner holds it.
+references reaches you; that owner holds it. A Verified issue wearing
+`wf:blocked` waits on the blocker its body names (another issue, a
+ratification) and is not routed until that clears — the reconcile re-checks
+it every 30 days.
 
 ## Step 2 — choose the owner (your judgment)
 

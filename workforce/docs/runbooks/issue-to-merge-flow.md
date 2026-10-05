@@ -72,6 +72,7 @@ Incidents (`incident` label) follow incident response and carry no stage.
 | Verified | `stage:verified` | `issue-triage` (nadia) | daily + dispatched on every verify / hand-back; `max_issues_per_run` (15) |
 | Assigned to a member | `stage:assigned` + `owner:<slug>` | that member's `issue-execute` | daily + dispatched on assignment; `max_issues_per_run` (3 ren / 2 dario) |
 | Assigned to the human | `stage:assigned` + `owner:operator` | the operator | — (a visible queue, one search) |
+| Verified but blocked | `stage:verified` + `wf:blocked` (blocker named in the body) | nobody yet — the router skips it | the reconcile's 30-day re-check asks whether the blocker cleared |
 | Idle ≥ 30 days (Verified / Assigned, no open PR) | (its stage) | `backlog-reconcile` re-check | the same three closing rows; a still-valid issue keeps its stage and owner |
 | Claimed | an **open PR** that references the issue (`Closes` / `Refs #N`, or an `issue-N` branch) | the PR's author | every scan skips it; the set script refuses to move it |
 | Routed 3× without closing | `owner:operator` (forced) | the operator | `ASSIGN_CAP` (3), counted from the router's own comments |
