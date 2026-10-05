@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 640" role="img" aria-labelledby="f3-title f3-desc">
-<title id="f3-title">図3 上兵伐謀の四段階</title>
+<title id="f3-title">図5 上兵伐謀の四段階</title>
 <desc id="f3-desc">謀を伐つ、交を伐つ、兵を伐つ、城を攻めるの四段が左から右へ下る階段。下段ほど費用・時間・損害が大きくなる。最上段は「全きを上とす」。</desc>
 <style>
 .f3-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}

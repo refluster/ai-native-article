@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 770" role="img" aria-labelledby="f5-title f5-desc">
-<title id="f5-title">図5 奇正の循環と節</title>
+<title id="f5-title">図7 奇正の循環と節</title>
 <desc id="f5-desc">千仞の山の高所に置いた円石（形＝位置）を、放つ瞬間（節）に転がすと、斜面を下る運動（勢）になる。下に形・節・勢の三段と、正と奇が互いに生じ合う循環を示す。</desc>
 <style>
 .f5-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}

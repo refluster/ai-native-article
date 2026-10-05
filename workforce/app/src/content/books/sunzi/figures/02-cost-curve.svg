@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 470" role="img" aria-labelledby="f2-title f2-desc">
-<title id="f2-title">図2 長期戦のコスト曲線</title>
+<title id="f2-title">図4 長期戦のコスト曲線</title>
 <desc id="f2-desc">横軸は時間。日に千金の費用は直線的に積み上がり、疲弊は加速して国力の限界を越える。その先は第三者が乗じる領域。早い時点に拙速の印。</desc>
 <style>
 .f2-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
