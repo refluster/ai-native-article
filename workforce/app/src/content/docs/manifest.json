@@ -42,5 +42,16 @@
     "cta": "Read the manifesto",
     "packTitle": "Manifesto",
     "measure": "narrow"
+  },
+  {
+    "slug": "book-production",
+    "file": "book-production.html",
+    "lang": "ja",
+    "kicker": "Process · 日本語",
+    "title": "本をつくる工程",
+    "description": "出版社の実務（企画・台割・執筆・編集・校閲・校正・組版・校了）を参照して設計した、約40名のAIペルソナで一冊を分業する十のステージとゲート、担当の割り振り、初号『孫子の兵法』での実行。",
+    "cta": "工程を見る",
+    "packTitle": "本をつくる工程",
+    "measure": "wide"
   }
 ]

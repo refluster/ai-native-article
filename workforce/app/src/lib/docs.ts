@@ -1,5 +1,5 @@
 // Public documents — the capabilities account, the whitepaper, the founding
-// story and the manifesto,
+// story, the manifesto and the book production process,
 // rendered by the SPA at /docs/:slug.
 //
 // The documents are HTML fragments under src/content/docs/ (one `<section>`
