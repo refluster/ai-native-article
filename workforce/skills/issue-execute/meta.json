@@ -1,14 +1,14 @@
 {
-  "name": "issue-design",
-  "version": "0.4.0",
-  "status": "archived",
+  "name": "issue-execute",
+  "version": "0.1.0",
+  "status": "active",
   "cost_class": "large",
   "owners": [
-    "dario",
-    "maya"
+    "ren",
+    "dario"
   ],
   "improvement_agent": "sana",
-  "created_at": "2026-07-29",
+  "created_at": "2026-10-05",
   "requires": [
     "github.token",
     "workforce.dispatch_token"

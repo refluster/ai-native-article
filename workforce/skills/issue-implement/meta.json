@@ -1,7 +1,7 @@
 {
   "name": "issue-implement",
-  "version": "0.2.1",
-  "status": "active",
+  "version": "0.3.0",
+  "status": "archived",
   "cost_class": "large",
   "owners": [
     "ren"
