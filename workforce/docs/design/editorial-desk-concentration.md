@@ -33,16 +33,17 @@ metric). Revisit a split only if one of the two kill criteria below fires.
   articles landing on nearly the same claim; Kai located the cause in the worked examples inside
   each skill bundle, not the brand guide. Splitting personas while they share those examples
   would add a second byline over the same house style.
-- **A second desk is mechanically non-trivial today.** `pick-l1-source.mjs` always returns the
-  oldest uncovered L1 source. Two desks firing in the same window would race to the same row and
-  produce duplicates unless the picker gains a claim mechanism — a code change, not a binding
-  edit.
+- **A second desk is mechanically non-trivial today.** `pick-l1-source.mjs` (skill 0.3.0,
+  lines ~245-261) returns the oldest *coverable* uncovered L1 row — it steps past fetch
+  failures and blocks a row after `MAX_ATTEMPTS` (ML-018) — but holds no claim or lock. Two
+  desks firing in the same window would race to the same row and produce duplicates unless the
+  picker gains a claim mechanism — a code change, not a binding edit.
 
 ## Options
 
 | | Option | Availability | Consistency / diversity | Cost |
 |---|---|---|---|---|
-| A | **Keep single desk + machine detector** (recommended) | Stall detected in hours; recovery is a human or a re-fire | Unchanged; measured per bundle version | Near zero: reuses #664's repeat counter and R-15 |
+| A | **Keep single desk + machine detector** (recommended) | Stall detected in ≤ 18 h once the outcome ledger exists (≈ 5 days via R-15 alone until then); recovery is a human or a re-fire | Unchanged; measured per bundle version | Low, not zero: #664's counter (unmerged) plus the unbuilt per-fire outcome ledger (ML-019), which must be costed as its own slice |
 | B | Same persona, second staggered binding | Helps only for per-fire flakiness, not for common-mode faults like ML-017 | Unchanged | +1 binding per level on the W-3 ledger (≈ medium 0.20 / large 0.60 USD per fire) |
 | C | Split: second editor persona, own examples | Independent persona does not make the runner, Notion token or egress independent | Possible divergence — or merely a second copy of the same house style | New persona + 2 bindings + picker claim logic + per-persona examples to write |
 | D | Split by desk (L2 vs L3 owners) | Partial: one level can survive the other's stall | Splits the voice by function, not by viewpoint | As C, smaller |
@@ -61,14 +62,30 @@ metric). Revisit a split only if one of the two kill criteria below fires.
 ## Design
 
 1. **Detector first.** The falsifier #674 already states — "the next single-path stall is caught
-   by a machine within hours, not by a reader after six days" — is delivered by the
-   repeat-failure counter (`repeat-failure-counter.md`, #664) plus a per-fire outcome signal
-   (ML-019's unbuilt ledger). This note adds only the requirement: an *N consecutive
-   zero-deliverable fires* streak on `article-level2` or `article-level3` must open an issue
-   routed to the operator, with N sized so it fires inside 24 h at the current 6-hourly cadence
-   (N = 4).
-2. **Documented fallback.** If the desk stalls and the cause is not fixable same-day, the
-   operator may bind `article-level2` to a second persona *temporarily* (one `PATCH` via
+   by a machine within hours, not by a reader after six days" — needs a data source that does
+   not exist today. ML-019 records that the per-fire outcome ledger (produced / skipped-with-
+   reason / failed, written by the agent-runner routine) is unbuilt, and #664's repeat-failure
+   counter is not yet merged. So:
+   - **Hard prerequisite:** the outcome ledger (ML-019, shared with ML-013) and #664's counter.
+     Owner: the workforce platform lane that owns the agent-runner routine; tracking issue: none
+     filed yet — one must be opened and linked here before this note is accepted (it is the
+     one open ownership gap this note does not close on its own).
+   - **Interim signal until then:** R-15 (`corpus-freshness.yml`) is the *only* detector. It is a
+     daily, 5-day freshness gate, so the interim detection latency is up to ~5 days — no better
+     than the 2026-07/08 outage. The "within hours" claim holds only after the prerequisite ships.
+   - **Requirement once the prerequisite exists:** an *N consecutive zero-deliverable fires*
+     streak on `article-level2` or `article-level3` opens an issue routed to the operator, with
+     **N = 3**. At the 6-hourly cadence the third consecutive empty fire lands 12-18 h after
+     onset, so the detection-latency budget is ≤ 18 h, inside the 24 h kill-criterion line.
+     "Unflagged" below means no issue opened within that budget.
+   - **Acceptance test (owned by the detector slice):** 3 consecutive zero-deliverable fires
+     open an issue; 2 do not; a produced or skipped-with-reason fire resets the streak.
+2. **Documented fallback.** Owner: the operator (runbook line in
+   `workforce/docs/runbooks/`; W-5 audit via agents-api). Budget: it *moves* the existing
+   `article-level2` line (≈ 0.20 USD per medium fire, 4 fires/day) to the temporary persona while
+   `ingrid`'s binding is paused, so there is no net W-3 change; ceiling: the temporary binding is
+   removed at the earlier of root-cause fix or 7 days. If the desk stalls and the cause is not
+   fixable same-day, the operator may bind `article-level2` to a second persona *temporarily* (one `PATCH` via
    agents-api, W-5 audited), accepting the picker-race caveat by pausing `ingrid`'s binding in
    the same edit. This is a runbook line, not standing infrastructure.
 3. **Measure before splitting.** Adopt Kai's cheaper metric: the rate of the tell-tale phrasings
@@ -84,16 +101,21 @@ metric). Revisit a split only if one of the two kill criteria below fires.
 - A stall still silences the external voice until the detector fires and someone acts; the
   recommendation accepts hours, not zero.
 - Convergence stays unmeasured until step 3 ships; the homogenisation risk persists meanwhile.
-- The detector depends on #664 slices that are not yet merged.
+- The detector depends on #664 slices that are not yet merged *and* on the unbuilt outcome ledger
+  (ML-019); until both ship, detection latency is R-15's ~5 days.
 
 ## How it would be reversed
 
 Choose C (or D) instead if **either**:
 
-1. **Detector fails its job**: a single-path stall of ≥ 24 h goes unflagged by the machine again,
+1. **Detector fails its job** (once the prerequisite ships): a single-path stall of ≥ 24 h goes
+   unflagged by the machine again (no issue opened within the ≤ 18 h budget),
    or two detected stalls in 90 days each lasted > 48 h to recover; or
 2. **Examples swap does not move the phrasing rate** in the step 3 test within one bundle
-   revision, which would show convergence is the persona/process and not the examples.
+   revision, which would show convergence is the persona/process and not the examples. Proposed
+   operator-signed values: phrase set = Kai's tell-tale list, frozen in the measurement slice
+   before the swap; baseline = per-version rate over the preceding bundle revision; sample ≥ 12
+   articles per arm; "moves" = ≥ 25 % relative reduction versus baseline.
 
 Review date: the first of the two events, or 2026-12-06 if neither occurs.
 
