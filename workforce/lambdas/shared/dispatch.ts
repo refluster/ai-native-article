@@ -166,6 +166,9 @@ export const dispatchSlotSk = (skill: string, projectId: string): string => `DIS
 
 export interface DispatchSlotClaim {
   claimed: boolean;
+  /** Set when `claimed` is true — the stamp this claim wrote, which
+   *  `releaseDispatchSlot` needs to undo exactly this claim and no later one. */
+  claimed_at?: string;
   /** Set when `claimed` is false — the stamp that blocked this attempt. */
   last_dispatched_at?: string;
 }
@@ -198,7 +201,7 @@ export async function claimDispatchSlot(
         ReturnValuesOnConditionCheckFailure: "ALL_OLD",
       }),
     );
-    return { claimed: true };
+    return { claimed: true, claimed_at: now.toISOString() };
   } catch (err) {
     const name = (err as { name?: string })?.name;
     if (name === "ConditionalCheckFailedException") {
@@ -206,6 +209,37 @@ export async function claimDispatchSlot(
       const stamp = old && typeof old.last_dispatched_at === "string" ? old.last_dispatched_at : undefined;
       return { claimed: false, last_dispatched_at: stamp };
     }
+    throw err;
+  }
+}
+
+/** Give a claimed slot back because the fire it guarded never happened.
+ *
+ *  The cron tick claims before it fires (#685), so a batch POST that then
+ *  fails would otherwise leave a stamp behind and a Lambda retry of the same
+ *  tick would be deduped away — a lost fire instead of a double one. The
+ *  condition pins the release to the caller's own stamp: if a later claim has
+ *  overwritten it, that later dispatch is real and must stand. Best-effort by
+ *  the caller; a failed release costs one skipped window, never a double fire. */
+export async function releaseDispatchSlot(
+  slug: string,
+  skill: string,
+  projectId: string,
+  claimedAt: string,
+): Promise<boolean> {
+  try {
+    await ddb.send(
+      new UpdateCommand({
+        TableName: tableName(),
+        Key: { pk: agentPk(slug), sk: dispatchSlotSk(skill, projectId) },
+        UpdateExpression: "REMOVE last_dispatched_at",
+        ConditionExpression: "last_dispatched_at = :claimed",
+        ExpressionAttributeValues: { ":claimed": claimedAt },
+      }),
+    );
+    return true;
+  } catch (err) {
+    if ((err as { name?: string })?.name === "ConditionalCheckFailedException") return false;
     throw err;
   }
 }
