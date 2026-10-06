@@ -21,6 +21,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
+import { budgetMonthKey, summariseBudgetRows } from "../shared/budget-schema.js";
 
 process.env.STAGE = "test";
 
@@ -1933,20 +1934,55 @@ describe("GET /stats (listStats)", () => {
     expect(body.agents.maya!.avg_duration_s).toBe(150);
   });
 
-  it("reports NO cost or token figures (C-1: no fabricated truth)", async () => {
+  // ADR-0044: /stats may carry the MODELLED month-to-date cost, but only the
+  // figure /performance serves (same readBudgetBlock()), never a bespoke one,
+  // and never token counts. The old blanket "no cost figures" assertion was
+  // written when the ledger read a fabricated zero (#661); #678/#682 made it real.
+  it("serves the same modelled cost as /performance and no token figures (ADR-0044)", async () => {
     seedAgent("maya");
     seedExec("maya", { ulid: "01A", startedAt: todayAt(1), durationS: 100 });
+    const month = budgetMonthKey();
+    rows.set(key(`BUDGET#${month}`, "AGENT#maya"), {
+      pk: `BUDGET#${month}`,
+      sk: "AGENT#maya",
+      estimated_cost_usd: 1.25,
+      estimated_fires: 5,
+      cost_usd: 0,
+      last_updated_at: "2026-10-01T00:00:00.000Z",
+    });
+    rows.set(key(`BUDGET#${month}`, "AGENT#ren"), {
+      pk: `BUDGET#${month}`,
+      sk: "AGENT#ren",
+      estimated_cost_usd: 2.5,
+      estimated_fires: 7,
+      cost_usd: 0,
+      last_updated_at: "2026-10-02T00:00:00.000Z",
+    });
 
     const body = bodyOf(await handler(evt("GET /stats"))) as Record<string, unknown> & {
       totals: Record<string, unknown>;
       agents: Record<string, Record<string, unknown>>;
     };
-    const blob = JSON.stringify(body);
-    expect(blob).not.toMatch(/cost/i);
-    expect(blob).not.toMatch(/token/i);
-    expect(blob).not.toMatch(/usd/i);
-    expect(body.totals).not.toHaveProperty("cost_this_month_usd");
+    // Consistency with the shared reader /performance uses, not a literal.
+    const expected = summariseBudgetRows(
+      [...rows.values()].filter((r) => r.pk === `BUDGET#${month}`) as Parameters<typeof summariseBudgetRows>[0],
+      month,
+      0,
+    )!;
+    expect(body.totals.cost_this_month_usd).toBe(expected.modelled_usd);
+    expect(body.totals.cost_this_month_usd).toBe(3.75);
+    expect(body.totals.cost_updated_at).toBe(expected.updated_at);
     expect(body.agents.maya).not.toHaveProperty("cost_this_month_usd");
+    expect(JSON.stringify(body)).not.toMatch(/token/i);
+  });
+
+  it("omits the cost figure when the ledger month is empty (unknown is not zero)", async () => {
+    seedAgent("maya");
+    seedExec("maya", { ulid: "01A", startedAt: todayAt(1), durationS: 100 });
+
+    const body = bodyOf(await handler(evt("GET /stats"))) as { totals: Record<string, unknown> };
+    expect(body.totals).not.toHaveProperty("cost_this_month_usd");
+    expect(body.totals).not.toHaveProperty("cost_updated_at");
   });
 
   it("rolls up status mirroring deriveStatus (throwing > paused; archived counts none)", async () => {
@@ -2138,7 +2174,11 @@ describe("GET /public/workforce-summary (getPublicSummary)", () => {
     expect(body.top_skills_7d[0]).toEqual({ skill: "daily-research", runs: 1 });
   });
 
-  it("reports NO cost or token figures (C-1: no fabricated truth)", async () => {
+  // ADR-0044 reaffirms this on the PUBLIC route: publishing spend is a
+  // different question from whether the figure is honest, and nothing argues
+  // for disclosing it anonymously (C-3). /stats may show a modelled cost;
+  // this route stays cost-blind.
+  it("reports NO cost or token figures (ADR-0044: public route stays cost-blind)", async () => {
     seedAgent("nadia");
     seedExec("nadia", { ulid: "01A", startedAt: daysAgoAt(0), durationS: 60 });
 
