@@ -59,6 +59,7 @@ ensureProxyAwareEntry(import.meta.url);
 import { readFileSync } from "node:fs";
 import { isTruncatedMarkdown, lastNonEmptyLine } from "../../../scripts/lib/truncation.mjs";
 import { verifyCitationsResolve } from "../../../scripts/lib/citation-urls.mjs";
+import { defaultFrontStates, scopedVerdict } from "../../../scripts/lib/rights-scope.mjs";
 
 const NOTION_VERSION = "2022-06-28";
 const NOTION_API = "https://api.notion.com/v1";
@@ -163,15 +164,23 @@ const properties = {
   podcastStatus: { status: { name: status } },
 };
 
-// Idris's compliance verdict (optional) — no-verbatim-reproduction +
-// citation-completeness check the operator reads before approving. Written to
-// the `complianceVerdict` text property alongside the script.
+// Idris's compliance verdict — no-verbatim-reproduction + citation-completeness
+// check the operator reads before approving. Written to the `complianceVerdict`
+// text property alongside the script. Issue #673 item 2: the verdict always
+// carries a code-rendered scope trailer ("N of 7 fronts"), computed from the
+// per-front state of the checks this script actually ran, so the green mark
+// never claims wider assurance than the gate implements. It is written even
+// when no --compliance-file was given (then it says no LLM verdict was supplied).
+let llmVerdict = "";
 if (complianceFile) {
-  let verdict = "";
-  try { verdict = readFileSync(complianceFile, "utf8").trim(); }
+  try { llmVerdict = readFileSync(complianceFile, "utf8").trim(); }
   catch (err) { console.error(`publish-notion.mjs: cannot read --compliance-file "${complianceFile}": ${err instanceof Error ? err.message : String(err)}`); process.exit(1); }
-  if (verdict) properties.complianceVerdict = { rich_text: richTextChunks(verdict) };
 }
+properties.complianceVerdict = {
+  rich_text: richTextChunks(
+    scopedVerdict(llmVerdict, defaultFrontStates({ citationsChecked: citationCheck.checked.length })),
+  ),
+};
 
 try {
   const res = await fetch(`${NOTION_API}/pages/${pageId}`, {
