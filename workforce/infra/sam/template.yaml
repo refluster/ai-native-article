@@ -2181,16 +2181,31 @@ Resources:
       Description: Daily lesson distiller — LESSON candidates from the previous day's EXEC ledger. Epic-022 Story 1.
       MemorySize: 512
       Timeout: 300
+      # A retry after a post-LLM throw would re-charge tokens; fail once, loudly
+      # (WfLessonDistillerErrorsAlarm), and let the next day's run proceed.
+      EventInvokeConfig:
+        MaximumRetryAttempts: 0
       Policies:
         - Statement:
+            # Scan cannot carry a LeadingKeys condition, so the table-wide read
+            # is its own statement; every write/point-read is confined to the
+            # LESSON partition and the daily BUDGET# rows.
+            - Sid: DistillerTableScan
+              Effect: Allow
+              Action: dynamodb:Scan
+              Resource: !GetAtt WfTable.Arn
             - Sid: DistillerTableRw
               Effect: Allow
               Action:
-                - dynamodb:Scan
                 - dynamodb:GetItem
                 - dynamodb:PutItem
                 - dynamodb:UpdateItem
               Resource: !GetAtt WfTable.Arn
+              Condition:
+                ForAllValues:StringLike:
+                  dynamodb:LeadingKeys:
+                    - LESSON
+                    - "BUDGET#*"
             - Sid: DistillerAnthropicRead
               Effect: Allow
               Action: secretsmanager:GetSecretValue
@@ -2214,6 +2229,49 @@ Resources:
             Enabled: false
       Tags:
         workforce: !Ref Stage
+
+  WfLessonDistillerErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-lesson-distiller-errors-alarm-${Stage}
+      AlarmDescription: !Sub The wf-lesson-distiller-${Stage} Lambda threw (budget ceiling, malformed model reply, or a write error).
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfLessonDistillerFunction
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  # Absence must not read green: the handler emits Runs=1 on every invocation
+  # (skipped days included, with a separate Skipped metric), so no datapoint in
+  # a day means the schedule never fired. Actions stay off while the schedule is
+  # DISABLED (it ships disabled); flip ActionsEnabled with the schedule.
+  WfLessonDistillerMissedRunAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-lesson-distiller-missed-run-alarm-${Stage}
+      AlarmDescription: !Sub wf-lesson-distiller-${Stage} emitted no Runs datapoint in 24h (schedule did not fire or the Lambda died before emitting).
+      ActionsEnabled: false
+      Namespace: Workforce/Lessons
+      MetricName: WfLessonDistillerRuns
+      Dimensions:
+        - Name: Stage
+          Value: !Ref Stage
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
 
   WfMemoryCompactorErrorsAlarm:
     Type: AWS::CloudWatch::Alarm

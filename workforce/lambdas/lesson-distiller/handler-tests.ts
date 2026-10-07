@@ -10,10 +10,16 @@ const puts: Record<string, unknown>[] = [];
 const spend: unknown[] = [];
 let llmCalls = 0;
 
+class ConditionalCheckFailedException extends Error {}
+
 vi.mock("../shared/ddb.js", () => ({
   scanExecWindow: async () => execRows,
   getItem: async () => spent,
-  putItem: async (i: Record<string, unknown>) => { puts.push(i); },
+  conditionalPutItem: async (i: Record<string, unknown>) => {
+    if (puts.some((p) => p.sk === i.sk)) throw new ConditionalCheckFailedException();
+    puts.push(i);
+  },
+  ConditionalCheckFailedException,
   ddb: { send: async (c: unknown) => { spend.push(c); } },
 }));
 vi.mock("../shared/llm-anthropic.js", () => ({
@@ -48,6 +54,15 @@ describe("lesson-distiller handler", () => {
     expect(puts).toHaveLength(1);
     expect(puts[0]).toMatchObject({ pk: "LESSON", status: "candidate" });
     expect(spend).toHaveLength(1);
+  });
+  it("a retried day writes no duplicate candidates (deterministic sk)", async () => {
+    llmText = JSON.stringify([
+      { scope: "skill:feed-post", body: "Feed posts 422 on empty bodies.", source_refs: ["PROJECT#p1/EXEC#B"], lintable: "no", lintable_reason: "judgment" },
+    ]);
+    await handler({ now: NOW });
+    const r = await handler({ now: NOW });
+    expect(puts).toHaveLength(1);
+    expect(r).toMatchObject({ written: 0, duplicates: 1 });
   });
   it("throws before the LLM call when the daily budget is spent", async () => {
     spent = { tokens_in: 149_000, tokens_out: 0 };

@@ -13,9 +13,8 @@
 
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { CloudWatchClient, PutMetricDataCommand } from "@aws-sdk/client-cloudwatch";
-import { ddb, getItem, putItem, scanExecWindow } from "../shared/ddb.js";
+import { ConditionalCheckFailedException, conditionalPutItem, ddb, getItem, scanExecWindow } from "../shared/ddb.js";
 import { complete } from "../shared/llm-anthropic.js";
-import { newUlid } from "../shared/task.js";
 import type { ExecLedgerRow } from "../shared/exec-ledger-types.js";
 import {
   DISTILLER_CAP_TOKENS,
@@ -27,9 +26,10 @@ import {
   buildDistillerUserPrompt,
   buildLessonRow,
   estimateTokens,
-  execRef,
+  lessonId,
   parseCandidates,
   previousUtcDay,
+  refRowsFor,
   selectSourceRows,
   validateCandidate,
 } from "../shared/lesson-distiller.js";
@@ -44,6 +44,8 @@ export interface DistillerResult {
   proposed: number;
   written: number;
   rejected: Record<string, number>;
+  duplicates: number;
+  tokens: number;
   skipped?: "no_rows";
 }
 
@@ -58,7 +60,7 @@ export async function handler(event?: { now?: string }): Promise<DistillerResult
   const now = event?.now ? new Date(event.now) : new Date();
   const runId = `lesson-distiller-${now.toISOString()}`;
   const { day, from, to } = previousUtcDay(now);
-  const result: DistillerResult = { day, scanned: 0, fed: 0, proposed: 0, written: 0, rejected: {} };
+  const result: DistillerResult = { day, scanned: 0, fed: 0, proposed: 0, written: 0, duplicates: 0, tokens: 0, rejected: {} };
 
   const all = await scanExecWindow<ExecLedgerRow>(from, to);
   result.scanned = all.length;
@@ -73,7 +75,7 @@ export async function handler(event?: { now?: string }): Promise<DistillerResult
   const system = buildDistillerSystemPrompt();
   const user = buildDistillerUserPrompt(day, rows);
 
-  // Pre-call guard: throws (W-4 → DLQ) rather than truncating.
+  // Pre-call guard: throws (W-4 → WfLessonDistillerErrorsAlarm, no retry) rather than truncating.
   const budgetPk = `BUDGET#${now.toISOString().slice(0, 10)}`;
   const spent = await getItem<DailyBudgetRow>(budgetPk, BUDGET_SK);
   const planned = estimateTokens(system + user) + DISTILLER_MAX_TOKENS;
@@ -81,20 +83,29 @@ export async function handler(event?: { now?: string }): Promise<DistillerResult
 
   const llm = await complete({ model: DISTILLER_MODEL, system, user, maxTokens: DISTILLER_MAX_TOKENS });
   await recordDailySpend(budgetPk, llm.tokens_in, llm.tokens_out, llm.cost_usd);
+  result.tokens = llm.tokens_in + llm.tokens_out;
 
   const candidates = parseCandidates(llm.text);
   result.proposed = candidates.length;
   const scopes = allowedScopesFor(rows);
-  const refs = new Set(rows.map(execRef));
+  const refRows = refRowsFor(rows);
 
   for (const c of candidates) {
-    const verdict = validateCandidate(c, scopes, refs);
+    const verdict = validateCandidate(c, scopes, refRows);
     if (!verdict.ok) {
       result.rejected[verdict.reason] = (result.rejected[verdict.reason] ?? 0) + 1;
       continue;
     }
-    await putItem(buildLessonRow(verdict.lesson, newUlid(), runId, now));
-    result.written++;
+    // Deterministic sk + conditional put: a retry after a mid-loop throw
+    // skips rows already written instead of duplicating them.
+    const id = lessonId(day, verdict.lesson.scope, verdict.lesson.body);
+    try {
+      await conditionalPutItem(buildLessonRow(verdict.lesson, id, runId, now), "attribute_not_exists(pk)");
+      result.written++;
+    } catch (err) {
+      if (!(err instanceof ConditionalCheckFailedException)) throw err;
+      result.duplicates++;
+    }
   }
 
   await emitMetrics(result);
@@ -122,6 +133,9 @@ async function emitMetrics(r: DistillerResult): Promise<void> {
       new PutMetricDataCommand({
         Namespace: "Workforce/Lessons",
         MetricData: [
+          { MetricName: "WfLessonDistillerRuns", Value: 1, Unit: "Count", Dimensions: dims },
+          { MetricName: "WfLessonDistillerSkipped", Value: r.skipped ? 1 : 0, Unit: "Count", Dimensions: dims },
+          { MetricName: "WfLessonDistillerTokensSpent", Value: r.tokens, Unit: "Count", Dimensions: dims },
           { MetricName: "WfLessonCandidatesWritten", Value: r.written, Unit: "Count", Dimensions: dims },
           { MetricName: "WfLessonCandidatesRejected", Value: Object.values(r.rejected).reduce((a, b) => a + b, 0), Unit: "Count", Dimensions: dims },
         ],

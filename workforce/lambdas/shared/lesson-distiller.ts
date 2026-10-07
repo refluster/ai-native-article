@@ -1,6 +1,7 @@
 // Pure logic for the daily lesson distiller (Epic-022 Story 1, ADR-0032).
 // No I/O here: the Lambda (lambdas/lesson-distiller/handler.ts) owns DDB / LLM.
 
+import { createHash } from "node:crypto";
 import type { ExecLedgerRow } from "./exec-ledger-types.js";
 
 /** Closed cross-cutting scope vocabulary. Mirrors
@@ -102,12 +103,23 @@ export function parseCandidates(text: string): RawCandidate[] {
   return parsed as RawCandidate[];
 }
 
+// Defence in depth, NOT the control: EXEC text is untrusted input to the model,
+// and a regex blocklist can always be mutated around. The real control is that
+// every survivor is written as status="candidate" and promoted only by a human
+// (ADR-0032), so a lesson that slips through here is still read before it is
+// ever injected. The patterns below are deliberately broad (false rejects are
+// cheap, a false accept is not); lesson-distiller-tests.ts holds a mutation set.
 const INSTRUCTION_PATTERNS = [
   /ignore (all |any )?(previous|prior|above)/i,
   /\bsystem prompt\b/i,
   /\byou (must|should|will|need to)\b/i,
   /^\s*(always|never|do not|don't|please)\b/i,
-  /あなたは|してください|すること[。.]?$/,
+  // third-person imperatives: "Future feed-post runs should skip …", "agents must …"
+  /\b(should|must|shall|ought to|need to|needs to|have to|has to)\s+(not\s+)?(skip|bypass|ignore|disable|omit|override|stop|avoid|suppress|disregard|drop|waive|relax|loosen|always|never|only)\b/i,
+  /\b(future|subsequent|next|later|all|every|any|other)\b[^.]{0,40}\b(runs?|agents?|personas?|sessions?|skills?|reviewers?|cadences?)\b[^.]{0,20}\b(should|must|shall|will|can safely|may)\b/i,
+  /\b(skip|bypass|disable|override|waive|relax)\b[^.]{0,60}\b(W-\d|guard|check|gate|validation|review|approval|budget|limit)\b/i,
+  /\b(it is|is) (safe|fine|ok|okay|acceptable) to\b/i,
+  /あなた|してください|すること|するべき|べき[。.]?$|無視|スキップ|省略|飛ばし|回避|バイパス|してはいけ|しないこと|せよ[。.]?$/,
 ];
 
 export interface ValidatedLesson {
@@ -127,7 +139,7 @@ export type Verdict = { ok: true; lesson: ValidatedLesson } | { ok: false; reaso
 export function validateCandidate(
   c: RawCandidate,
   allowedScopes: ReadonlySet<string>,
-  knownRefs: ReadonlySet<string>,
+  refRows: ReadonlyMap<string, Pick<ExecLedgerRow, "skill_name" | "project_id">>,
 ): Verdict {
   if (typeof c.scope !== "string" || !allowedScopes.has(c.scope)) return { ok: false, reason: "scope_not_in_closed_grammar" };
   if (typeof c.body !== "string" || c.body.trim().length === 0) return { ok: false, reason: "empty_body" };
@@ -135,9 +147,20 @@ export function validateCandidate(
   if (INSTRUCTION_PATTERNS.some((p) => p.test(c.body as string))) return { ok: false, reason: "instruction_pattern" };
   if (!Array.isArray(c.source_refs) || c.source_refs.length === 0) return { ok: false, reason: "no_provenance" };
   const refs = c.source_refs as unknown[];
-  if (!refs.every((r): r is string => typeof r === "string" && knownRefs.has(r))) {
+  if (!refs.every((r): r is string => typeof r === "string" && refRows.has(r))) {
     return { ok: false, reason: "unresolvable_source_ref" };
   }
+  // Scope binding: every cited row must itself belong to the claimed scope, so a
+  // skill:/project: lesson cannot cite another skill's or project's row, and an
+  // org-wide lesson must rest on at least two distinct rows.
+  const cited = [...new Set(refs as string[])].map((r) => refRows.get(r)!);
+  if (c.scope.startsWith("skill:") && !cited.every((r) => `skill:${r.skill_name}` === c.scope)) {
+    return { ok: false, reason: "scope_ref_mismatch" };
+  }
+  if (c.scope.startsWith("project:") && !cited.every((r) => `project:${r.project_id}` === c.scope)) {
+    return { ok: false, reason: "scope_ref_mismatch" };
+  }
+  if (c.scope === "org-wide" && cited.length < 2) return { ok: false, reason: "org_wide_needs_two_rows" };
   if (c.lintable !== "yes" && c.lintable !== "no") return { ok: false, reason: "lintable_missing" };
   if (typeof c.lintable_reason !== "string" || c.lintable_reason.trim() === "") return { ok: false, reason: "lintable_reason_missing" };
   return {
@@ -162,6 +185,17 @@ export function allowedScopesFor(rows: ExecLedgerRow[]): Set<string> {
     s.add(`project:${r.project_id}`);
   }
   return s;
+}
+
+/** ref -> row, for scope/provenance binding in validateCandidate. */
+export function refRowsFor(rows: ExecLedgerRow[]): Map<string, ExecLedgerRow> {
+  return new Map(rows.map((r) => [execRef(r), r]));
+}
+
+/** Deterministic id for a candidate: the same (day, scope, body) always maps to
+ *  the same sort key, so a retry re-writes nothing (conditional put). */
+export function lessonId(day: string, scope: string, body: string): string {
+  return createHash("sha256").update(`${day}\n${scope}\n${body}`).digest("hex").slice(0, 26).toUpperCase();
 }
 
 export interface LessonRow {
