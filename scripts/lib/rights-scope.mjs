@@ -2,10 +2,14 @@
 // design note workforce/docs/design/podcast-rights-gate.md §1).
 //
 // A green verdict must state its own scope. The trailer is rendered by code,
-// from per-front state set by the code that actually ran, so it cannot drift
-// from the gate: N is COUNTED, never typed. An LLM-judged front is shown but
-// not counted (the generating model auditing its own script is
-// self-attestation, not a check).
+// from per-front state REPORTED by the checks that actually ran (each check
+// returns its own {state, note}; `assembleFrontStates` collects them), so it
+// cannot drift from the gate: N is COUNTED, never typed, and a front whose
+// check did not report is "not-examined" by construction. An LLM-judged front
+// is shown but not counted (the generating model auditing its own script is
+// self-attestation, not a check). A partial front is shown separately and is
+// not part of N. LLM text that makes its own "N of 7"/"fronts" claim is
+// replaced, never kept next to the code-rendered scope.
 
 export const FRONTS = [
   { id: 1, label: "reproduction" },
@@ -19,40 +23,51 @@ export const FRONTS = [
 
 export const STATES = ["machine", "machine-partial", "llm-judged", "not-examined"];
 
-/** State of each front for today's code (design note §1 table). */
-export function defaultFrontStates({ citationsChecked = 0 } = {}) {
+/**
+ * Collect per-front reports from the checks that ran. `reports` maps front id to
+ * the `{state, note}` that check returned; any front without a report is
+ * "not-examined". There is deliberately no table of default states: skipping a
+ * check removes its report and the trailer follows.
+ */
+export function assembleFrontStates(reports = {}) {
+  const states = {};
+  for (const f of FRONTS) states[f.id] = reports[f.id] ?? { state: "not-examined" };
+  return states;
+}
+
+/** Front 4 (CMI removal) report from the citation-resolution guard. Presence only. */
+export function citationFrontReport(checkedCount) {
   return {
-    1: { state: "llm-judged", note: "self-attested, not counted until a script compares script to sources" },
-    2: { state: "not-examined" },
-    3: { state: "not-examined", note: "stock TTS voice only" },
-    4: {
-      state: "machine-partial",
-      note: `presence only (citations non-empty, every URL resolved ${citationsChecked}/${citationsChecked})`,
-    },
-    5: { state: "not-examined", note: "human" },
-    6: { state: "not-examined" },
-    7: { state: "not-examined" },
+    state: "machine-partial",
+    note: `presence only (citations non-empty, every URL resolved ${checkedCount}/${checkedCount})`,
   };
+}
+
+/** Front 1 (reproduction) report: an LLM verdict was supplied, nothing compared script to sources. */
+export function llmFrontReport() {
+  return { state: "llm-judged", note: "self-attested, not counted until a script compares script to sources" };
 }
 
 /** Counts derived from the states. Throws on a missing/unknown state (C-4). */
 export function countScope(states) {
   let machine = 0;
+  let partial = 0;
   let llm = 0;
   for (const f of FRONTS) {
     const s = states?.[f.id]?.state;
     if (!STATES.includes(s)) {
       throw new Error(`rights-scope: front ${f.id} (${f.label}) has no valid state (got ${JSON.stringify(s)})`);
     }
-    if (s === "machine" || s === "machine-partial") machine += 1;
+    if (s === "machine") machine += 1;
+    else if (s === "machine-partial") partial += 1;
     else if (s === "llm-judged") llm += 1;
   }
-  return { machine, llm };
+  return { machine, partial, llm };
 }
 
 export function scopeSummary(states) {
-  const { machine, llm } = countScope(states);
-  return `scope: ${machine} of ${FRONTS.length} fronts machine-examined; ${llm} more LLM-judged only`;
+  const { machine, partial, llm } = countScope(states);
+  return `scope: ${machine} of ${FRONTS.length} fronts fully machine-examined; ${partial} partial (presence only); ${llm} more LLM-judged only`;
 }
 
 const STATE_TEXT = {
@@ -72,6 +87,14 @@ export function renderTrailer(states) {
   }).join("\n");
 }
 
+const SCOPE_CLAIM = /\b\d+\s*(?:of|\/|out of)\s*(?:7|seven)\b|\b(?:all|every)\s+(?:7|seven)\b|\bfronts?\b|\bscope\b/i;
+const SCOPE_CLAIM_REMOVED = "[LLM-typed scope claim removed — scope is rendered by code below]";
+
+/** The scope is the code's to state; a line where the LLM states one is replaced. */
+export function stripScopeClaim(line) {
+  return SCOPE_CLAIM.test(line) ? SCOPE_CLAIM_REMOVED : line;
+}
+
 /**
  * Combine the LLM's verdict text with the code-rendered scope. The first line
  * can never read as a bare PASS: it always carries "N of 7".
@@ -80,7 +103,7 @@ export function renderTrailer(states) {
  */
 export function scopedVerdict(llmVerdict, states) {
   const summary = scopeSummary(states);
-  const lines = String(llmVerdict ?? "").trim().split("\n");
+  const lines = String(llmVerdict ?? "").trim().split("\n").map(stripScopeClaim);
   let first = lines[0].trim();
   let rest = lines.slice(1);
   if (first === "") {

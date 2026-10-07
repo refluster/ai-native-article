@@ -59,7 +59,7 @@ ensureProxyAwareEntry(import.meta.url);
 import { readFileSync } from "node:fs";
 import { isTruncatedMarkdown, lastNonEmptyLine } from "../../../scripts/lib/truncation.mjs";
 import { verifyCitationsResolve } from "../../../scripts/lib/citation-urls.mjs";
-import { defaultFrontStates, scopedVerdict } from "../../../scripts/lib/rights-scope.mjs";
+import { assembleFrontStates, citationFrontReport, llmFrontReport, scopedVerdict } from "../../../scripts/lib/rights-scope.mjs";
 
 const NOTION_VERSION = "2022-06-28";
 const NOTION_API = "https://api.notion.com/v1";
@@ -176,9 +176,14 @@ if (complianceFile) {
   try { llmVerdict = readFileSync(complianceFile, "utf8").trim(); }
   catch (err) { console.error(`publish-notion.mjs: cannot read --compliance-file "${complianceFile}": ${err instanceof Error ? err.message : String(err)}`); process.exit(1); }
 }
+// Each check reports its own front; the citation guard above exits 2 unless it
+// passed, so reaching here means it ran and held. Front 1 is only reported when
+// an LLM verdict exists. Every other front has no check and stays not-examined.
+const frontReports = { 4: citationFrontReport(citationCheck.checked.length) };
+if (llmVerdict) frontReports[1] = llmFrontReport();
 properties.complianceVerdict = {
   rich_text: richTextChunks(
-    scopedVerdict(llmVerdict, defaultFrontStates({ citationsChecked: citationCheck.checked.length })),
+    scopedVerdict(llmVerdict, assembleFrontStates(frontReports)),
   ),
 };
 
