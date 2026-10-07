@@ -18,7 +18,7 @@ export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "article-level3": ["notion.integration_token"] as const,
   "attention-ledger": ["workforce.feed_write_token"] as const,
   "audience-loop": ["workforce.feed_write_token"] as const,
-  "backlog-reconcile": ["github.token"] as const,
+  "backlog-reconcile": ["github.token", "workforce.dispatch_token"] as const,
   "budget-runway-review": ["workforce.feed_write_token"] as const,
   "code-task-brief": [],
   "daily-research": ["workforce.feed_write_token"] as const,

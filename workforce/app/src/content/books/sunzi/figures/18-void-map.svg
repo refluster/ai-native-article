@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 570" role="img" aria-labelledby="f18-title f18-desc" class="f18">
+  <title id="f18-title">図20 実と虚の地図 — 実を避け、迂って虚を撃つ</title>
+  <desc id="f18-desc">顧客と課題の格子に、競合が厚い領域（実）と、備えが薄く未充足の領域（虚）を置く。自社からまっすぐ進めば実にぶつかる。迂回路を取って虚の一区画に入る。</desc>
+  <style>
+    .f18 text{font-family:inherit}
+    .f18-h{font-size:14px;fill:var(--book-ink-2);letter-spacing:.08em}
+    .f18-j{font-size:18px;font-weight:700;fill:var(--book-ink)}
+    .f18-k{font-size:16px;fill:var(--book-ink-2)}
+    .f18-ka{font-size:22px;font-weight:700;fill:var(--book-accent)}
+    .f18-u{font-size:24px;font-weight:700;fill:var(--book-accent)}
+    .f18-d{font-size:18px;font-weight:700;fill:var(--book-ink)}
+    .f18-me{font-size:15px;font-weight:600;fill:var(--book-ink)}
+    .f18-l{font-size:15px;fill:var(--book-ink)}
+    .f18-cell{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1}
+    .f18-jc{fill:var(--book-ink-2);fill-opacity:.24;stroke:var(--book-line);stroke-width:1}
+    .f18-kc{fill:var(--book-bg);stroke:var(--book-ink-2);stroke-width:1.2;stroke-dasharray:4 3}
+    .f18-kt{fill:var(--book-accent);fill-opacity:.1;stroke:var(--book-accent);stroke-width:2.2}
+    .f18-me-pt{fill:var(--book-ink)}
+    .f18-path{fill:none;stroke:var(--book-accent);stroke-width:2.4;stroke-linejoin:round;stroke-linecap:round;marker-end:url(#fig18-aha)}
+    .f18-direct{fill:none;stroke:var(--book-ink);stroke-width:1.6;stroke-dasharray:5 5}
+    .f18-stop{fill:none;stroke:var(--book-ink);stroke-width:2.2;stroke-linecap:round}
+    .f18-ahpa{fill:var(--book-accent)}
+  </style>
+  <defs>
+    <marker id="fig18-aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="f18-ahpa"/></marker>
+  </defs>
+
+  <text x="120" y="40" class="f18-h">市場（顧客 × 課題）</text>
+
+  <!-- base grid 6 x 5, cell 80 -->
+  <g>
+    <rect x="120" y="60" width="80" height="80" class="f18-cell"/><rect x="200" y="60" width="80" height="80" class="f18-cell"/><rect x="280" y="60" width="80" height="80" class="f18-cell"/><rect x="360" y="60" width="80" height="80" class="f18-cell"/><rect x="440" y="60" width="80" height="80" class="f18-cell"/><rect x="520" y="60" width="80" height="80" class="f18-cell"/>
+    <rect x="120" y="140" width="80" height="80" class="f18-cell"/><rect x="200" y="140" width="80" height="80" class="f18-cell"/><rect x="280" y="140" width="80" height="80" class="f18-cell"/><rect x="360" y="140" width="80" height="80" class="f18-cell"/><rect x="440" y="140" width="80" height="80" class="f18-cell"/><rect x="520" y="140" width="80" height="80" class="f18-cell"/>
+    <rect x="120" y="220" width="80" height="80" class="f18-cell"/><rect x="200" y="220" width="80" height="80" class="f18-cell"/><rect x="280" y="220" width="80" height="80" class="f18-cell"/><rect x="360" y="220" width="80" height="80" class="f18-cell"/><rect x="440" y="220" width="80" height="80" class="f18-cell"/><rect x="520" y="220" width="80" height="80" class="f18-cell"/>
+    <rect x="120" y="300" width="80" height="80" class="f18-cell"/><rect x="200" y="300" width="80" height="80" class="f18-cell"/><rect x="280" y="300" width="80" height="80" class="f18-cell"/><rect x="360" y="300" width="80" height="80" class="f18-cell"/><rect x="440" y="300" width="80" height="80" class="f18-cell"/><rect x="520" y="300" width="80" height="80" class="f18-cell"/>
+    <rect x="120" y="380" width="80" height="80" class="f18-cell"/><rect x="200" y="380" width="80" height="80" class="f18-cell"/><rect x="280" y="380" width="80" height="80" class="f18-cell"/><rect x="360" y="380" width="80" height="80" class="f18-cell"/><rect x="440" y="380" width="80" height="80" class="f18-cell"/><rect x="520" y="380" width="80" height="80" class="f18-cell"/>
+  </g>
+
+  <!-- 実 : where competitors are thick -->
+  <g>
+    <rect x="200" y="140" width="80" height="80" class="f18-jc"/><rect x="280" y="140" width="80" height="80" class="f18-jc"/><rect x="360" y="140" width="80" height="80" class="f18-jc"/>
+    <rect x="200" y="220" width="80" height="80" class="f18-jc"/><rect x="280" y="220" width="80" height="80" class="f18-jc"/><rect x="360" y="220" width="80" height="80" class="f18-jc"/><rect x="440" y="220" width="80" height="80" class="f18-jc"/>
+    <rect x="280" y="300" width="80" height="80" class="f18-jc"/><rect x="360" y="300" width="80" height="80" class="f18-jc"/>
+  </g>
+  <text x="240" y="186" text-anchor="middle" class="f18-j">実</text>
+  <text x="320" y="266" text-anchor="middle" class="f18-j">実</text>
+  <text x="480" y="266" text-anchor="middle" class="f18-j">実</text>
+
+  <!-- 虚 : thin, unserved -->
+  <rect x="124" y="64" width="72" height="72" rx="3" class="f18-kc"/>
+  <text x="160" y="106" text-anchor="middle" class="f18-k">虚</text>
+  <rect x="124" y="144" width="72" height="72" rx="3" class="f18-kc"/>
+  <text x="160" y="186" text-anchor="middle" class="f18-k">虚</text>
+  <rect x="363" y="63" width="74" height="74" rx="3" class="f18-kt"/>
+  <text x="400" y="108" text-anchor="middle" class="f18-ka">虚</text>
+
+  <!-- 直 : straight at the thick -->
+  <path d="M400 410 L400 318" class="f18-direct"/>
+  <path d="M386 310 L414 310" class="f18-stop"/>
+  <text x="416" y="364" class="f18-d">直</text>
+
+  <!-- 迂 : the detour into the thin -->
+  <path d="M410 420 L520 420 Q560 420 560 380 L560 140 Q560 100 520 100 L447 100" class="f18-path"/>
+  <text x="612" y="270" class="f18-u">迂</text>
+
+  <!-- us -->
+  <circle cx="400" cy="420" r="6" class="f18-me-pt"/>
+  <text x="400" y="446" text-anchor="middle" class="f18-me">自社</text>
+
+  <!-- legend -->
+  <rect x="120" y="487" width="26" height="18" class="f18-jc"/>
+  <text x="156" y="501" class="f18-l">実：競合が厚い</text>
+  <rect x="380" y="487" width="26" height="18" rx="2" class="f18-kc"/>
+  <text x="416" y="501" class="f18-l">虚：備えが薄い・未充足</text>
+  <path d="M120 532 L146 532" class="f18-direct"/>
+  <text x="156" y="537" class="f18-l">直：実にぶつかる</text>
+  <path d="M380 532 L402 532" class="f18-path"/>
+  <text x="416" y="537" class="f18-l">迂：回って虚を撃つ</text>
+</svg>

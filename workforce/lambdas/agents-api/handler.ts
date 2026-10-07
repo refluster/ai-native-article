@@ -476,14 +476,17 @@ async function getAgent(slug: string): Promise<APIGatewayProxyResultV2> {
 // runs · MTD, deliverables · MTD, the 30-day heat strip, and the
 // live-trace ribbon.
 //
-// It deliberately reports NO cost or token figures. Per-run token usage
-// is not observable from the CCR execution path — the agent's Claude Code
-// session writes its EXEC row via POST /agents/{slug}/engagements but has
-// no access to its own usage, and the orchestrator's CCR fire returns
-// only a session id. Inventing a dollar/token number would violate C-1
-// (no fabricated truth on the operator surface), so the 4th KPI is run
-// DURATION, a real proxy for compute that IS derivable from started_at /
-// ended_at on every row.
+// Cost (ADR-0044, narrowing the earlier "no cost figures" rule): it reports
+// ONE cost figure, the modelled month-to-date spend from the same
+// readBudgetBlock() that GET /performance serves, as
+// `totals.cost_this_month_usd` (+ `cost_updated_at`). It is modelled from
+// each skill's declared cost_class, never metered: per-run token usage is
+// not observable from the CCR execution path. There is deliberately no
+// second derivation here, so /stats and /performance cannot disagree. An
+// empty ledger month omits both fields (an unknown is never a measured
+// zero, #661). Per-run token figures stay absent, and the 4th KPI is run
+// DURATION (derivable from started_at / ended_at on every row).
+// GET /public/workforce-summary stays cost-blind (ADR-0044, reaffirmed).
 
 const STATS_HEAT_DAYS = 30;
 const STATS_RECENT_RUNS = 8;
@@ -654,10 +657,16 @@ async function listStats(
     a.started_at < b.started_at ? 1 : a.started_at > b.started_at ? -1 : 0,
   );
 
+  // Same reader as GET /performance (ADR-0044): no parallel cost derivation.
+  const budget = await readBudgetBlock();
+
   return reply(200, {
     generated_at: now.toISOString(),
     month: monthStartIso.slice(0, 7),
     totals: {
+      ...(budget
+        ? { cost_this_month_usd: budget.modelled_usd, cost_updated_at: budget.updated_at }
+        : {}),
       agents_running: agentsRunning,
       agents_paused: agentsPaused,
       agents_throwing: agentsThrowing,

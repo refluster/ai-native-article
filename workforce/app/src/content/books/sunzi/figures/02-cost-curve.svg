@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 470" role="img" aria-labelledby="f2-title f2-desc">
+<title id="f2-title">図4 長期戦のコスト曲線</title>
+<desc id="f2-desc">横軸は時間。日に千金の費用は直線的に積み上がり、疲弊は加速して国力の限界を越える。その先は第三者が乗じる領域。早い時点に拙速の印。</desc>
+<style>
+.f2-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+.f2-boxa{fill:var(--book-panel);stroke:var(--book-accent);stroke-width:1.5}
+.f2-ln{fill:none;stroke:var(--book-line);stroke-width:1.2}
+.f2-ln2{fill:none;stroke:var(--book-ink-2);stroke-width:1.3}
+.f2-dash{fill:none;stroke:var(--book-ink-2);stroke-width:1.2;stroke-dasharray:4 4}
+.f2-acc{fill:none;stroke:var(--book-accent);stroke-width:1.6}
+.f2-arr{fill:none;stroke:var(--book-ink-2);stroke-width:1.3;marker-end:url(#f2-ah)}
+.f2-arra{fill:none;stroke:var(--book-accent);stroke-width:1.6;marker-end:url(#f2-aha)}
+.f2-ahp{fill:var(--book-ink-2)}
+.f2-ahap{fill:var(--book-accent)}
+.f2-h{font-family:inherit;font-size:20px;font-weight:600;fill:var(--book-ink)}
+.f2-t{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-ink)}
+.f2-b{font-family:inherit;font-size:16px;fill:var(--book-ink)}
+.f2-s{font-family:inherit;font-size:15px;fill:var(--book-ink-2)}
+.f2-xs{font-family:inherit;font-size:14px;fill:var(--book-ink-2)}
+.f2-k{font-family:inherit;font-size:14px;font-weight:600;fill:var(--book-accent);letter-spacing:.08em}
+.f2-ta{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-accent)}
+.f2-big{font-family:inherit;font-size:30px;font-weight:600;fill:var(--book-ink)}
+
+.f2-zone{fill:var(--book-ink-2);fill-opacity:.12;stroke:none}
+.f2-cost{fill:none;stroke:var(--book-ink-2);stroke-width:1.6}
+.f2-tire{fill:none;stroke:var(--book-ink);stroke-width:2}
+.f2-axis{fill:none;stroke:var(--book-ink);stroke-width:1.2}
+.f2-accd{fill:none;stroke:var(--book-accent);stroke-width:1.5;stroke-dasharray:5 4}
+.f2-dota{fill:var(--book-accent)}
+</style>
+<defs><marker id="f2-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f2-ahp" d="M0 0L10 5L0 10z"/></marker><marker id="f2-aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="f2-ahap" d="M0 0L10 5L0 10z"/></marker></defs>
+<rect x="529" y="50" width="131" height="350" rx="0" class="f2-zone"/>
+<text x="594" y="362" class="f2-t" text-anchor="middle">第三者が乗じる</text>
+<text x="594" y="382" class="f2-xs" text-anchor="middle">諸侯が弊に乗ず</text>
+<line x1="80" y1="200" x2="660" y2="200" class="f2-dash"/>
+<text x="88" y="192" class="f2-s">国用不足（国力の限界）</text>
+<path d="M80 390 L660 230" class="f2-cost"/>
+<text x="110" y="336" class="f2-s">費用（日に千金）</text>
+<path d="M80 395 Q370 395 660 70" class="f2-tire"/>
+<text x="462" y="244" class="f2-b" text-anchor="end">疲弊（鈍兵挫鋭）</text>
+<path d="M80 50 V400 H664" class="f2-axis"/>
+<text x="80" y="38" class="f2-s" text-anchor="middle">負担</text>
+<text x="664" y="452" class="f2-s" text-anchor="end">時間 →</text>
+<line x1="170" y1="400" x2="170" y2="128" class="f2-accd"/>
+<circle cx="170" cy="400" r="5" class="f2-dota"/>
+<text x="170" y="118" class="f2-ta" text-anchor="middle">拙速</text>
+<text x="180" y="148" class="f2-xs">拙くとも速く</text>
+<text x="170" y="424" class="f2-s" text-anchor="middle">早く終える</text>
+<text x="594" y="424" class="f2-s" text-anchor="middle">長引く</text>
+</svg>

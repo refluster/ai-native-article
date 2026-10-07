@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 720" role="img" aria-labelledby="f6-title f6-desc">
+<title id="f6-title">図8 実を避け虚を撃つ</title>
+<desc id="f6-desc">上段は十に分かれた敵の列で、備えの厚い実と薄い虚がある。一つに集中した我が虚の一点を撃つ。下段は岩（実）を避けて低い所（虚）へ流れる水。</desc>
+<style>
+.f6-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+.f6-boxa{fill:var(--book-panel);stroke:var(--book-accent);stroke-width:1.5}
+.f6-ln{fill:none;stroke:var(--book-line);stroke-width:1.2}
+.f6-ln2{fill:none;stroke:var(--book-ink-2);stroke-width:1.3}
+.f6-dash{fill:none;stroke:var(--book-ink-2);stroke-width:1.2;stroke-dasharray:4 4}
+.f6-acc{fill:none;stroke:var(--book-accent);stroke-width:1.6}
+.f6-arr{fill:none;stroke:var(--book-ink-2);stroke-width:1.3;marker-end:url(#f6-ah)}
+.f6-arra{fill:none;stroke:var(--book-accent);stroke-width:1.6;marker-end:url(#f6-aha)}
+.f6-ahp{fill:var(--book-ink-2)}
+.f6-ahap{fill:var(--book-accent)}
+.f6-h{font-family:inherit;font-size:20px;font-weight:600;fill:var(--book-ink)}
+.f6-t{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-ink)}
+.f6-b{font-family:inherit;font-size:16px;fill:var(--book-ink)}
+.f6-s{font-family:inherit;font-size:15px;fill:var(--book-ink-2)}
+.f6-xs{font-family:inherit;font-size:14px;fill:var(--book-ink-2)}
+.f6-k{font-family:inherit;font-size:14px;font-weight:600;fill:var(--book-accent);letter-spacing:.08em}
+.f6-ta{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-accent)}
+.f6-big{font-family:inherit;font-size:30px;font-weight:600;fill:var(--book-ink)}
+
+.f6-en{fill:var(--book-ink-2);fill-opacity:.55;stroke:none}
+.f6-ena{fill:var(--book-accent);stroke:none}
+.f6-ghost{fill:none;stroke:var(--book-line);stroke-width:1;stroke-dasharray:3 3}
+.f6-us{fill:var(--book-accent);fill-opacity:.18;stroke:var(--book-accent);stroke-width:1.6}
+.f6-arra2{fill:none;stroke:var(--book-accent);stroke-width:2.4;marker-end:url(#f6-aha)}
+.f6-rock{fill:var(--book-panel);stroke:var(--book-ink);stroke-width:1.4}
+</style>
+<defs><marker id="f6-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f6-ahp" d="M0 0L10 5L0 10z"/></marker><marker id="f6-aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="f6-ahap" d="M0 0L10 5L0 10z"/></marker></defs>
+<text x="24" y="34" class="f6-k">我は専、敵は分</text>
+<text x="24" y="56" class="f6-s">十を以て其の一を攻む</text>
+<rect x="44" y="105" width="52" height="30" rx="2" class="f6-en"/>
+<rect x="104" y="105" width="52" height="30" rx="2" class="f6-en"/>
+<rect x="164" y="105" width="52" height="30" rx="2" class="f6-ghost"/>
+<rect x="164" y="116" width="52" height="8" rx="1" class="f6-en"/>
+<rect x="224" y="105" width="52" height="30" rx="2" class="f6-en"/>
+<rect x="284" y="105" width="52" height="30" rx="2" class="f6-en"/>
+<rect x="344" y="105" width="52" height="30" rx="2" class="f6-en"/>
+<rect x="404" y="105" width="52" height="30" rx="2" class="f6-ghost"/>
+<rect x="404" y="116" width="52" height="8" rx="1" class="f6-ena"/>
+<rect x="464" y="105" width="52" height="30" rx="2" class="f6-en"/>
+<rect x="524" y="105" width="52" height="30" rx="2" class="f6-en"/>
+<rect x="584" y="105" width="52" height="30" rx="2" class="f6-en"/>
+<text x="130" y="92" class="f6-s" text-anchor="middle">実（備え厚い）</text>
+<text x="430" y="92" class="f6-ta" text-anchor="middle">虚（備え薄い）</text>
+<text x="40" y="164" class="f6-s">敵：分かれて十となる</text>
+<rect x="380" y="250" width="100" height="60" rx="4" class="f6-us"/>
+<text x="430" y="286" class="f6-t" text-anchor="middle">我（専）</text>
+<line x1="430" y1="246" x2="430" y2="140" class="f6-arra2"/>
+<text x="446" y="200" class="f6-b">一点に集中する</text>
+<line x1="24" y1="350" x2="656" y2="350" class="f6-ln"/>
+<text x="24" y="388" class="f6-k">兵の形は水に象る</text>
+<text x="24" y="410" class="f6-s">実を避けて虚を撃つ</text>
+<ellipse cx="250" cy="520" rx="58" ry="40" class="f6-rock"/>
+<ellipse cx="470" cy="590" rx="56" ry="36" class="f6-rock"/>
+<text x="250" y="527" class="f6-t" text-anchor="middle">実</text>
+<text x="470" y="597" class="f6-t" text-anchor="middle">実</text>
+<path d="M40 452 C160 452 200 436 250 436 C300 436 340 452 460 452 L640 452" class="f6-arr"/>
+<path d="M40 500 C150 500 180 466 250 466 C320 466 350 500 420 500 L640 500" class="f6-arr"/>
+<path d="M40 604 C300 604 380 644 470 644 C560 644 600 610 640 608" class="f6-arr"/>
+<path d="M40 662 C320 662 400 672 470 672 C560 672 600 662 640 662" class="f6-arr"/>
+<path d="M40 548 C150 548 190 578 250 578 C320 578 380 538 470 538 C560 538 600 548 640 548" class="f6-arra"/>
+<text x="374" y="530" class="f6-ta" text-anchor="middle">虚へ流れる</text>
+<text x="640" y="704" class="f6-s" text-anchor="end">水に常形なし</text>
+</svg>
