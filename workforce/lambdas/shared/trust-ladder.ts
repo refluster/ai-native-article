@@ -72,7 +72,7 @@ export interface ReplayInput {
   slug: string;
   reviews: ReviewEvent[];
   incidents: IncidentEvent[];
-  /** `reports_to` of an agent slug (agent record field). Unknown → []. */
+  /** `reports_to` of an agent slug (agent record field). Unknown → [] (and then never counts). */
   reportsTo: (slug: string) => readonly string[];
 }
 
@@ -102,7 +102,9 @@ function demote(t: Tier): Tier {
  * - Reviews and incidents are merged into one timeline ordered by (at, id), so
  *   the result does not depend on input order.
  * - A review counts toward the tally of the tier's next bar only if the PR
- *   author shares no manager with the reviewer AND adding it keeps any single
+ *   author shares no manager with the reviewer, both sides' managers are known,
+ *   the PR is not the persona's own, the PR has not already counted once, AND
+ *   adding it keeps any single
  *   author at or under `floor(maxAuthorShare × bar)` of the counted set.
  *   At T0 shadow reviews count (shadow-inclusion); at T1 only non-shadow
  *   consensus participations count. A failing review is recorded
@@ -119,9 +121,15 @@ export function replayTrust(input: ReplayInput): TrustResult {
   const timeline: Timeline[] = [
     ...reviews.map((ev): Timeline => ({ kind: "review", at: ev.at, id: ev.id, ev })),
     ...incidents.map((ev): Timeline => ({ kind: "incident", at: ev.at, id: ev.id, ev })),
-  ].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0));
+  ].sort((a, b) => {
+    // Compare instants, not strings: "…:00Z" vs "…:00.250Z" must order by time.
+    const dt = Date.parse(a.at) - Date.parse(b.at);
+    if (dt !== 0 && !Number.isNaN(dt)) return dt < 0 ? -1 : 1;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0;
+  });
 
   const myManagers = reportsTo(slug);
+  const countedPrs = new Set<string>();
   let tier: Tier = "T0";
   let tally: CountedReview[] = [];
   let lastIncident: string | undefined;
@@ -144,11 +152,17 @@ export function replayTrust(input: ReplayInput): TrustResult {
     reviewCounted[ev.id] = false;
     if (!bar) continue; // T2: nothing left to promote to
     if (tier === "T1" && ev.shadow) continue; // only consensus participations toward T2
-    if (sharesManager(myManagers, reportsTo(ev.pr_author))) continue;
+    if (ev.pr_author === slug) continue; // reviewing one's own PR is never independent
+    const authorManagers = reportsTo(ev.pr_author);
+    // Absence must not read as independence (W-4): unknown managers on either side do not count.
+    if (myManagers.length === 0 || authorManagers.length === 0) continue;
+    if (sharesManager(myManagers, authorManagers)) continue;
+    if (countedPrs.has(ev.pr_url)) continue; // one counted review per PR, however many cycles/rows
     const cap = Math.floor(TRUST_PARAMS.maxAuthorShare * bar.reviews);
     if (tally.filter((c) => c.pr_author === ev.pr_author).length >= cap) continue;
 
     tally.push({ review_ref: ev.id, pr_author: ev.pr_author, at: ev.at });
+    countedPrs.add(ev.pr_url);
     reviewCounted[ev.id] = true;
 
     if (tally.length >= bar.reviews && new Set(tally.map((c) => c.pr_author)).size >= bar.authors) {

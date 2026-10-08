@@ -57,6 +57,36 @@ describe("reciprocity and diversity (ADR-0036 §2)", () => {
   });
 });
 
+describe("fail-closed reciprocity, PR dedupe, ordering (cycle-1 findings)", () => {
+  it("a review of the persona's own PR never counts", () => {
+    const r = run(Array.from({ length: 10 }, () => review("ren")));
+    expect(r.counted_reviews).toHaveLength(0);
+  });
+  it("an unknown author (no reports_to) does not count; absence is not independence", () => {
+    const r = run(Array.from({ length: 10 }, () => review("nobody")));
+    expect(r.tier).toBe("T0");
+    expect(r.counted_reviews).toHaveLength(0);
+  });
+  it("an unknown reviewer (no reports_to) counts nothing", () => {
+    const rs = many(10);
+    expect(replayTrust({ slug: "ghost", reviews: rs, incidents: [], reportsTo }).counted_reviews).toHaveLength(0);
+  });
+  it("re-reviews of one pr_url count once (8 rows on one PR stay T0)", () => {
+    const authors = ["a", "a", "a", "b", "b", "b", "c", "c"];
+    const rs = authors.map((x) => review(x, { pr_url: "https://x/pr/same" }));
+    const r = run(rs);
+    expect(r.tier).toBe("T0");
+    expect(r.counted_reviews).toHaveLength(1);
+  });
+  it("orders mixed-precision timestamps by instant, so an incident in the same second lands correctly", () => {
+    const rs = many(8).map((r, i) => ({ ...r, at: `2026-10-01T00:00:0${i}Z` }));
+    // By instant the incident (:07.500Z) follows the promoting review (:07Z): demote, tally empty.
+    // A raw string sort puts it first, so the 8th review would then sit in the tally (length 1).
+    const inc: IncidentEvent = { id: "I9", at: "2026-10-01T00:00:07.500Z", attributed_personas: ["ren"], contest_status: "none" };
+    expect(run(rs, [inc])).toMatchObject({ tier: "T0", counted_reviews: [] });
+  });
+});
+
 describe("demotion (ADR-0036 §4)", () => {
   const incident = (over: Partial<IncidentEvent> = {}): IncidentEvent => ({
     id: "I0001", at: "2026-10-02T00:00:00Z", attributed_personas: ["ren"], contest_status: "none", ...over,
