@@ -33,9 +33,11 @@ last slice ships, GROWTH.md:205 must stop saying the wiring exists.
   multi-candidate panel. `newsletter/app/src/types/quality.ts` is a spec nothing imports (root
   CLAUDE.md, "Known stale spots"), and GROWTH.md:250 itself says there is now a single generation
   path per level. A reader-side key cannot be wired to a generator id nobody computes.
-- **Two workforce cadences already assume the bucketing works.** `reader-signal` and
-  `editorial-desk` compare "prompt versions" in their weekly notes; with the key absent from the
-  corpus they can only say the data is not flowing.
+- **A workforce cadence already assumes the bucketing works.** `reader-signal`
+  (`workforce/skills/reader-signal/SKILL.md`, lines 3, 20, 47, 56) reads `promptVersion` from the
+  manifest and compares across prompt versions; with the key absent from the corpus it can only say
+  the data is not flowing. (`org-metrics-pulse` only names prompt-version performance as
+  `reader-signal`'s lane, line 106; `editorial-desk` makes no such comparison.)
 - **Scope of the miss.** Every `article_view` / `article_read_complete` event since the site
   launched carries no version. Those cannot be backfilled in GA4; only events after the wiring
   can be bucketed.
@@ -54,28 +56,48 @@ last slice ships, GROWTH.md:205 must stop saying the wiring exists.
 3. **Export.** `fetchers/notion.mjs` reads `Prompt Version`; `posts-md.mjs` writes
    `promptVersion` to frontmatter and the manifest only when non-empty (older rows omit it, as
    `author` does today). `ArticleMeta` gains `promptVersion?: string`.
-4. **Events.** `article_view` and `article_read_complete` gain `prompt_version?: string` in the
-   `AnalyticsEvent` union and are sent with the value, or `'unversioned'` when absent, so GA4
-   shows the legacy corpus as one explicit bucket rather than an unset parameter. `Article.tsx`
-   already holds the meta (`m`) at `article_view` and a `categoryRef` for the completion event;
-   a sibling ref carries the version.
+4. **Events.** `article_view`, `article_read_25/50/75/90` and `article_read_complete` all gain
+   `prompt_version: string` in the `AnalyticsEvent` union, **required**, not optional. Optional
+   would let a call site drop it and still typecheck; required makes the union the guard. The
+   value is the article's version; `'unversioned'` for a legacy article (published before the
+   wiring); `'missing'` for an article published after the wiring whose `promptVersion` is empty
+   (a dropped link, the failure the Reversal section tells the first verification to look for).
+   The depth events are included so engagement depth can be bucketed too; leaving them out would
+   make "read 50%" unanalysable by version. `Article.tsx` already holds the meta (`m`) at
+   `article_view` and a `categoryRef` for the milestone events; a sibling ref carries the version.
 5. **GA4 console.** Register `prompt_version` as an **event-scoped** custom dimension. GROWTH.md:205
    says "user-scoped"; that looks wrong for a per-article event parameter, because a user-scoped
    dimension attributes one value to a user across events, and a reader who opens two articles
    would be bucketed under whichever was set last. The operator confirms in the GA4 admin UI.
-   The dimension only collects from the day it is registered.
+   The dimension only collects from the day it is registered, so register it **before or with**
+   slice 3 ships; record that date in this note as the start of the analysable window (events
+   sent earlier are not recoverable into the dimension).
 6. **Interim truth.** Until slice 3 (below) merges, GROWTH.md:205 should read as target state. The
-   proposed wording is the diff in the next section.
+   edit is offered in two steps in the next section, so the retraction can land without
+   pre-committing the value.
 
-### Proposed GROWTH.md:205 edit (L1; for the operator, not in this PR)
+### Proposed GROWTH.md edits (L1; for the operator, not in this PR)
+
+**Step 1, interim retraction** (can merge first; commits to no value):
 
 ```diff
 -Register `prompt_version` as a user-scoped custom dimension in the GA4 property. The [analytics lib](../../packages/shared/src/analytics.ts) then passes it on `article_view` and `article_read_complete`. Outer-loop reports group by `prompt_version`.
-+Register `prompt_version` as an **event-scoped** custom dimension in the GA4 property. **Status: not yet wired** (see workforce/docs/design/prompt-version-ga4-bucketing.md, #572). Once wired, the [analytics lib](../../packages/shared/src/analytics.ts) passes it on `article_view` and `article_read_complete`, with value `<skill>@<meta.json version>` of the generating cadence (`unversioned` for articles published before the wiring). Outer-loop reports then group by `prompt_version`.
++Register `prompt_version` as an **event-scoped** custom dimension in the GA4 property. **Status: not yet wired** (see workforce/docs/design/prompt-version-ga4-bucketing.md, #572); nothing sends `prompt_version` today.
 ```
 
-Lines 67 and 73 (the "winning candidate's generator" wording) should be marked as the
-panel-era definition in the same edit; the diff is left to whoever applies this.
+**Step 2, value definition** (applies when slice 3 merges):
+
+```diff
+-**Status: not yet wired** (see workforce/docs/design/prompt-version-ga4-bucketing.md, #572); nothing sends `prompt_version` today.
++The [analytics lib](../../packages/shared/src/analytics.ts) passes it on `article_view`, `article_read_25/50/75/90` and `article_read_complete`, with value `<skill>@<meta.json version>` of the generating cadence (`unversioned` for articles published before the wiring). Outer-loop reports group by `prompt_version`.
+```
+
+The same edit should mark the other panel-era places as such: GROWTH.md:58 (generator panel with
+distinct `systemPromptVersion`s), :67 and :73 (GA4 "bucketed by prompt_version", where
+`prompt_version` is "the winning candidate's generator", e.g. `l3-claude-pattern-2026-04-23a`),
+:180 (`generator: { id, model, systemPromptVersion }`), :304 (leaderboard bucketed by the winning
+candidate's `systemPromptVersion`), and AGENTS.md rule 11 (attribution by
+`generator.systemPromptVersion`). The diffs are left to whoever applies this.
 
 ## Alternatives rejected
 
@@ -137,7 +159,12 @@ skill body), ADR-0005 (bilingual editions; the property is edition-independent).
    existing read-back already checks `Author`/`Title`); `meta.json` bumps and `PATCH /skills`.
 2. `fetchers/notion.mjs` + `fetchers/types.mjs` + `writers/posts-md.mjs` + `ArticleMeta`: carry
    `promptVersion`; pipeline tests for present and absent.
-3. `analytics.ts` union + `Article.tsx`: send `prompt_version` on the two events; typecheck is
-   the guard. R-16/R-17 unaffected.
-4. **Operator**: register the event-scoped GA4 dimension; apply the GROWTH.md edit above (or its
-   interim form first); verify one live `article_view` carries a non-`unversioned` value.
+3. `analytics.ts` union + `Article.tsx`: send `prompt_version` on `article_view`, the four
+   `article_read_NN` events and `article_read_complete`. The field is required in the union, so
+   typecheck rejects a call site that drops it (an optional field would not be caught; the union
+   is typed per event and `trackEvent` is called without casts at `article_view`). Add a small
+   test or smoke check that the built `article_view` params carry the key. R-16/R-17 unaffected.
+4. **Operator**: register the event-scoped GA4 dimension (**before or with slice 3**, and note the
+   date as the start of the analysable window); apply the GROWTH.md edits above (step 1 first);
+   verify one live `article_view` for a post-wiring article carries a value other than
+   `unversioned` and `missing`.
