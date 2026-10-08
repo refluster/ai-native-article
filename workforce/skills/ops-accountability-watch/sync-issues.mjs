@@ -17,7 +17,7 @@ import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs"
 ensureProxyAwareEntry(import.meta.url);
 
 import { readFileSync } from "node:fs";
-import { buildIssueSpec } from "./payload.mjs";
+import { buildIssueSpec, labelsForCreate, labelsForUpdate } from "./payload.mjs";
 
 const GITHUB_API = process.env.GITHUB_API_URL ?? "https://api.github.com";
 
@@ -127,7 +127,7 @@ async function main() {
           }),
         });
         if (!commentRes.ok) throw new Error(`comment on #${existing.number} failed: HTTP ${commentRes.status}`);
-        const mergedLabels = Array.from(new Set([...(existing.labels ?? []).map((l) => l.name ?? l), ...spec.labels]));
+        const mergedLabels = labelsForUpdate(existing.labels, spec);
         const relabelRes = await ghFetch(`${GITHUB_API}/repos/${args.repo}/issues/${existing.number}`, token, {
           method: "PATCH",
           body: JSON.stringify({ labels: mergedLabels }),
@@ -137,7 +137,7 @@ async function main() {
       } else {
         const createRes = await ghFetch(`${GITHUB_API}/repos/${args.repo}/issues`, token, {
           method: "POST",
-          body: JSON.stringify({ title: spec.title, body: spec.body, labels: spec.createLabels }),
+          body: JSON.stringify({ title: spec.title, body: spec.body, labels: labelsForCreate(spec) }),
         });
         if (!createRes.ok) throw new Error(`create issue failed: HTTP ${createRes.status}`);
         const created = await createRes.json();

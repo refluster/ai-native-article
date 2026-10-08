@@ -148,3 +148,25 @@ export function toDiscordWebhookBody(payload) {
     embeds: [{ title: payload.title, description: payload.description, color: payload.color }],
   };
 }
+
+/**
+ * Labels sent when a new issue is created: includes `stage:proposed`.
+ * @param {IssueSpec} spec
+ * @returns {string[]}
+ */
+export function labelsForCreate(spec) {
+  return [...spec.createLabels];
+}
+
+/**
+ * Labels sent when a re-fire updates an existing issue: the union of what the
+ * issue already carries (incl. a legacy `owner:<slug>` or a router-set stage)
+ * and `spec.labels`. Never adds `stage:proposed`, so a re-fire cannot demote an
+ * issue the router has since moved on.
+ * @param {Array<string | {name?: string}>} existingLabels
+ * @param {IssueSpec} spec
+ * @returns {string[]}
+ */
+export function labelsForUpdate(existingLabels, spec) {
+  return Array.from(new Set([...(existingLabels ?? []).map((l) => l.name ?? l), ...spec.labels]));
+}
