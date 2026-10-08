@@ -54,6 +54,24 @@ test("LLM-typed scope claims are replaced, never kept beside the code-rendered s
   assert.equal(stripScopeClaim("no verbatim reproduction found"), "no verbatim reproduction found");
 });
 
+test("a FLAG keeps its text even when it uses the words front or scope (cycle-2 A1/A3)", () => {
+  const s = today();
+  for (const text of ["FLAG: para 2 copies source verbatim, front page of Nikkei", "FLAG: front 1 copied para 2 verbatim\nsee scope note"]) {
+    const v = scopedVerdict(text, s);
+    assert.match(v.split("\n")[0], /^FLAG: /);
+    assert.match(v, /copies source verbatim|copied para 2 verbatim/);
+    assert.doesNotMatch(v, /scope claim removed/);
+    assert.match(v.split("\n")[0], /\d of 7/);
+  }
+  assert.equal(stripScopeClaim("FLAG: all 7 fronts clean but para 3 copied"), "FLAG: [LLM-typed scope claim removed — scope is rendered by code below] clean but para 3 copied");
+});
+
+test("PASSED / 'pass.' first-line variants are treated as PASS", () => {
+  const first = scopedVerdict("PASSED. no copying found", today()).split("\n")[0];
+  assert.match(first, /^PASS \(scope: /);
+  assert.doesNotMatch(first, /^PASS\s*$/);
+});
+
 test("an empty verdict does not read as a pass", () => {
   const first = scopedVerdict("", today()).split("\n")[0];
   assert.match(first, /^NO LLM VERDICT SUPPLIED/);

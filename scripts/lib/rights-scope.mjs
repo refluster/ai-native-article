@@ -87,12 +87,18 @@ export function renderTrailer(states) {
   }).join("\n");
 }
 
-const SCOPE_CLAIM = /\b\d+\s*(?:of|\/|out of)\s*(?:7|seven)\b|\b(?:all|every)\s+(?:7|seven)\b|\bfronts?\b|\bscope\b/i;
+// Coverage claims only ("N of 7", "all/every 7|seven [fronts]", "fully verified", "full scope"). The bare words
+// "front"/"scope" are NOT claims: a FLAG that says "front page of Nikkei" must survive intact.
+const SCOPE_CLAIM = /\b\d+\s*(?:of|\/|out of)\s*(?:7|seven)\b|\b(?:all|every)\s+(?:7|seven)(?:\s+fronts?)?\b|\b(?:all|every)\s+fronts?\b|\b(?:fully|completely)\s+(?:verified|examined|checked)\b|\b(?:full|complete|entire)\s+scope\b/gi;
 const SCOPE_CLAIM_REMOVED = "[LLM-typed scope claim removed — scope is rendered by code below]";
 
-/** The scope is the code's to state; a line where the LLM states one is replaced. */
+/**
+ * The scope is the code's to state; an LLM-typed coverage claim is replaced inline.
+ * Only the claim is replaced, never the line: a leading FLAG/FAIL/BLOCK token and its
+ * reason keep their text (C-4 — a negative verdict must not be erasable by wording).
+ */
 export function stripScopeClaim(line) {
-  return SCOPE_CLAIM.test(line) ? SCOPE_CLAIM_REMOVED : line;
+  return String(line).replace(SCOPE_CLAIM, SCOPE_CLAIM_REMOVED);
 }
 
 /**
@@ -108,8 +114,8 @@ export function scopedVerdict(llmVerdict, states) {
   let rest = lines.slice(1);
   if (first === "") {
     first = `NO LLM VERDICT SUPPLIED (${summary})`;
-  } else if (/^PASS\b/i.test(first)) {
-    first = first.replace(/^PASS\b[:\s-]*/i, "").trim();
+  } else if (/^PASS(?:ED)?\b/i.test(first)) {
+    first = first.replace(/^PASS(?:ED)?\b[:\s.-]*/i, "").trim();
     first = `PASS (${summary})${first ? ` ${first}` : ""}`;
   } else {
     first = `${first} (${summary})`;
