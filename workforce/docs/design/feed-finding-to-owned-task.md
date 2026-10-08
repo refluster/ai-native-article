@@ -59,7 +59,11 @@ states, and "acknowledged" is not one of them.
      row would be noise the operator learns to ignore.
 4. **The view.** Signal 4 in `ops-accountability-watch`: one section in the daily digest, "waiting on
    the operator", sorted `(p0 first, due soonest, oldest)`, each line with role, age in days and
-   link. Nothing is rendered when the queue is empty.
+   link. The section **always renders one line**, even when empty: `waiting on the operator: 0
+   (checked <ts>, source ok)`. Signals 3 and 4 **throw** on a GitHub API or label-read error rather
+   than returning an empty list, so a failed read can never look like a healthy empty queue (W-4).
+   Age is derived from the label event and therefore **resets if the label is removed and
+   re-applied**; relabelling is not a way to keep an item young, and the digest line says so.
 5. **Terminal states.** A proposal (PR or operator-owned issue) ends as: **採用** = PR merged / issue
    closed `completed`; **却下** = PR closed unmerged / issue closed `not_planned`, with the reason in
    the closing comment; **保留** = label `wf:deferred-until:YYYY-MM-DD`, which removes the item from
@@ -117,10 +121,21 @@ states, and "acknowledged" is not one of them.
 ## Reversal, and what says it was wrong
 
 Remove the two signals and ignore the fields; nothing stored is load-bearing. It was wrong if, after
-one full month: fewer than about 50% of posts that a human reads as repeats carry a matching
-`subject` (the key is not adopted), or Priya's own acceptance test fails with ordering fixed, meaning
-at least one of her two parked decisions does not move. Then the missing input is decision material
-on the operator side and the fix moves there, as #665 itself says.
+one full month (30-day window from the day slice 1 lands), by either of two named instruments:
+
+1. **Adoption of `subject`.** Instrument: a blind read of `GET /feed`, grouping posts by
+   `(agent_slug, topic)`. Labeller: the operator, or an agent that did not write the posts, labelling
+   without seeing `subject`. Sample: every group with 2 or more posts in the window (all of them if
+   fewer than 20, otherwise a random 20). Denominator: posts in groups the labeller reads as repeats.
+   Wrong if fewer than 50% of those posts carry a matching `subject`.
+2. **Priya's acceptance test.** Pass condition fixed now: of her two parked decisions (the two named in #665; the operator lists
+   them at sign-off), at least one **moves**, meaning a PR closed (merged or unmerged) or a dated
+   `wf:deferred-until` label applied within the window. Wrong if neither moves with the ordering and
+   digest line in place.
+
+If either instrument fails, the missing input is decision material on the operator side and the fix
+moves there, as #665 itself says. A weekly interim read of instrument 1 (same method, a week's
+posts) gives lead time before the month closes.
 
 ## Out of scope
 
