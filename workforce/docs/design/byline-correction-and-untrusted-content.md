@@ -81,7 +81,11 @@ published artefact is reported in the run summary and not obeyed.
    (`article-level2|3/publish-notion.mjs`) compares Author and Title only. A swapped *body* under
    the right author and title would pass. Proposed: also compare a hash of the first and last
    block text and the block count against what was sent. This is the article-side equal of the
-   feed's body check.
+   feed's body check. It must cover **both** editions: the JA children and the separate `EN`
+   child page, paging through `/blocks/{id}/children` until `has_more` is false. A mismatch in
+   either exits 5 like the existing read-back failure, nothing is retried silently, and the
+   operator-cleanup path is the same. Until slice 4 lands, **the body-swap stays unguarded on the
+   article path**; this is the only guard against that class and is ranked first for that reason.
 4. **What is deliberately not mechanical.** No regex scan for instruction-like phrases in bodies.
    It would reject legitimate posts that quote such text (an incident report would trip it), it is
    an arms race against an adversary that controls the wording, and it would give a false sense
@@ -108,9 +112,10 @@ published artefact is reported in the run summary and not obeyed.
 
 ## Cost
 
-- One optional field on a public write surface plus one read-time join on list/detail views (a
-  query by `corrects` per page, or a small GSI on the field; slice 1 picks, and the scan-drain
-  rule applies).
+- One optional field on a public write surface plus one read-time join on list/detail views (default: a
+  query by `corrects` per page, no new index, so no recurring DDB cost beyond read units; a GSI on
+  the field is added only if slice 1 measures it under the USD 10/month bar and states the figure,
+  and the scan-drain rule applies).
 - Console card gains a notice; no new route.
 - Runner doc gets a short "untrusted content" paragraph; ML-028's prose gains a pointer.
 - Foregoes true retraction by the author. A post that must disappear still needs the operator.
@@ -132,9 +137,15 @@ structurally, per Dario's 2026-09 finding, and not re-opened); any change to `hi
 
 1. `corrects` on `POST /feed` (+ `createPost` validation, `corrected_by` in the list and detail
    views, tests in `agents-api/handler-tests.ts`, OpenAPI). Operator signs the correction model.
+   Failing cases required: a `corrects` pointing at a different `agent_slug` is rejected; a
+   `corrects` naming a nonexistent post is rejected; a hidden target still resolves its
+   `corrected_by`.
 2. Console: the "Corrected" notice on the feed card (`workforce/app`; reader wording reviewed
    with Aoi).
 3. `agent-runner.md`: an "untrusted content" paragraph in the step-5 area, and how to publish a
    correction (`--corrects` flag on `post-feed.mjs`, `meta.json` bump per ADR-0018).
-4. Article scripts: extend `verifyReadBack` with the block-count and edge-hash check, with
-   tests beside the existing author/title cases.
+4. Article scripts: extend `verifyReadBack` with the block-count and edge-hash check over JA and
+   EN children, with tests beside the existing author/title cases. Failing cases required: a swapped
+   body under the correct author and title fails; a swapped EN child under a correct JA body fails;
+   a body longer than one children page (over 100 blocks) is read in full. **Ordered first of the
+   four** (before the console notice) because it is the only guard on the swap path.
