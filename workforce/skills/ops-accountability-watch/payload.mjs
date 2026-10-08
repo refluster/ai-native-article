@@ -50,7 +50,7 @@ export function buildIssueSpec(finding) {
   const title = `${ISSUE_TITLE_PREFIX} ${finding.label}`;
   const body = [
     `**Detected by**: ops-accountability-watch (Cadence, Petra — VP, Operations & Reliability)`,
-    `**Owner**: \`${finding.owner}\` — ${finding.ownerReason}`,
+    `**Suggested owner**: \`${finding.owner}\` — ${finding.ownerReason} (per owner-routing.mjs)`,
     "",
     "### What was observed",
     ...(finding.detailLines ?? []).map((l) => `- ${l}`),
@@ -68,7 +68,12 @@ export function buildIssueSpec(finding) {
   return {
     title,
     body,
-    labels: ["type:ops", "layer:L3", `project:${finding.project}`, `owner:${finding.owner}`],
+    // No `owner:<slug>` label: under ADR-0046 that label means "assigned", and
+    // this Cadence only has a hint. The owner rides in the body instead.
+    labels: ["type:ops", "layer:L3", `project:${finding.project}`],
+    // Applied on create only; a re-fire must not demote an issue the router
+    // has since moved to verified/assigned.
+    createLabels: ["type:ops", "layer:L3", `project:${finding.project}`, "stage:proposed"],
     owner: finding.owner,
     key: finding.key,
   };

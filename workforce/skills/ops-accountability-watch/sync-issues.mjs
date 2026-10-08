@@ -29,12 +29,8 @@ const LABEL_DEFAULTS = {
   "layer:L3": { color: "2EA043", description: "Operational: runbook, skill SKILL.md, post-deploy verification, scripts/." },
   "project:workforce": { color: "5319E7", description: "Workforce subsystem (workforce.kohuehara.xyz). Mandatory project axis." },
   "project:article": { color: "1D76DB", description: "Article pipeline (kohuehara.xyz blog). Mandatory project axis." },
+  "stage:proposed": { color: "C5DEF5", description: "Lifecycle stage: filed, not yet verified or assigned (ADR-0046)." },
 };
-// owner:<slug> labels all share one hue (an identity marker, not a severity
-// gradient) — see docs/issue-labeling.md's owner: family entry.
-const OWNER_LABEL_COLOR = "C2185B";
-const OWNER_LABEL_DESC = (slug) =>
-  `Accountable owner for an ops-accountability-watch finding: ${slug}. Machine-created; format owner:<slug>.`;
 
 function parseArgs(argv) {
   const args = {};
@@ -71,10 +67,7 @@ async function ensureLabelExists(repo, token, label) {
   if (check.status !== 404) {
     throw new Error(`label lookup for "${label}" failed: HTTP ${check.status}`);
   }
-  const isOwnerLabel = label.startsWith("owner:");
-  const meta = isOwnerLabel
-    ? { color: OWNER_LABEL_COLOR, description: OWNER_LABEL_DESC(label.slice("owner:".length)) }
-    : (LABEL_DEFAULTS[label] ?? { color: "EEEEEE", description: "Auto-created by ops-accountability-watch." });
+  const meta = LABEL_DEFAULTS[label] ?? { color: "EEEEEE", description: "Auto-created by ops-accountability-watch." };
   const create = await ghFetch(`${GITHUB_API}/repos/${repo}/labels`, token, {
     method: "POST",
     body: JSON.stringify({ name: label, color: meta.color, description: meta.description }),
@@ -122,7 +115,7 @@ async function main() {
   try {
     for (const finding of findings) {
       const spec = buildIssueSpec(finding);
-      for (const label of spec.labels) {
+      for (const label of spec.createLabels) {
         await ensureLabelExists(args.repo, token, label);
       }
       const existing = await findOpenIssueByTitle(args.repo, token, spec.title);
@@ -144,7 +137,7 @@ async function main() {
       } else {
         const createRes = await ghFetch(`${GITHUB_API}/repos/${args.repo}/issues`, token, {
           method: "POST",
-          body: JSON.stringify({ title: spec.title, body: spec.body, labels: spec.labels }),
+          body: JSON.stringify({ title: spec.title, body: spec.body, labels: spec.createLabels }),
         });
         if (!createRes.ok) throw new Error(`create issue failed: HTTP ${createRes.status}`);
         const created = await createRes.json();

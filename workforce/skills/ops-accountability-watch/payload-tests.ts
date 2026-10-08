@@ -25,14 +25,21 @@ describe("buildIssueSpec", () => {
     expect(spec.title).toBe(`${ISSUE_TITLE_PREFIX} deploy-article-site.yml — failure`);
   });
 
-  it("always carries type:ops + layer:L3 + a project: label + an owner: label", () => {
+  it("carries type:ops + layer:L3 + a project: label and never an owner: label", () => {
     const spec = buildIssueSpec(finding());
-    expect(spec.labels).toEqual(expect.arrayContaining(["type:ops", "layer:L3", "project:article", "owner:elena"]));
+    expect(spec.labels).toEqual(["type:ops", "layer:L3", "project:article"]);
+    expect(spec.createLabels.some((l) => l.startsWith("owner:"))).toBe(false);
+  });
+
+  it("files new issues as stage:proposed, but re-fires never re-stamp the stage", () => {
+    const spec = buildIssueSpec(finding());
+    expect(spec.createLabels).toEqual(["type:ops", "layer:L3", "project:article", "stage:proposed"]);
+    expect(spec.labels).not.toContain("stage:proposed");
   });
 
   it("embeds the owner, the reason, and the close condition in the body", () => {
     const spec = buildIssueSpec(finding());
-    expect(spec.body).toContain("`elena`");
+    expect(spec.body).toContain("**Suggested owner**: `elena`");
     expect(spec.body).toContain("article publish/content pipeline");
     expect(spec.body).toContain("Close when the next run succeeds.");
   });
