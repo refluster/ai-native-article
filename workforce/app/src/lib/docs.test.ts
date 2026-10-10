@@ -18,13 +18,14 @@ describe('PUBLIC_DOCS', () => {
     expect(html.length).toBeGreaterThan(10_000);
   });
 
-  it('registers the five documents, each with a bundled body', () => {
+  it('registers the six documents, each with a bundled body', () => {
     expect(PUBLIC_DOCS.map(d => d.slug)).toEqual([
       'capabilities',
       'whitepaper',
       'founding-story',
       'manifesto',
       'book-production',
+      'asp-cloud-dev-review',
     ]);
     for (const d of DOCS) {
       expect(d.html.length, `${d.slug} body`).toBeGreaterThan(10_000);
