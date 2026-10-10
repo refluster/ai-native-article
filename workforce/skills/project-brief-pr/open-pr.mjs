@@ -34,8 +34,8 @@
 // Exit codes:
 //   0 — PR opened; outputs "pr_url=<url>  pr_number=<n>  branch=<name>" on stdout
 //   1 — bad args / env / body-file unreadable
-//   2 — guard rejected (G1–G5: empty/short body, LLM-failure prelude, cut-off,
-//       malformed path) or API returned a hard 4xx (invalid_field, agent_not_found,
+//   2 — guard rejected (G1–G6: empty/short body, LLM-failure prelude, cut-off,
+//       malformed path, malformed --agent / --run-id) or API returned a hard 4xx (invalid_field, agent_not_found,
 //       project_not_found, credential_not_provisioned)
 //   3 — network / unexpected error / 5xx from the workforce API
 
@@ -52,6 +52,12 @@ const DEFAULT_API_BASE = "https://workforce-api.kohuehara.xyz";
 // (GitHub's PR body limit is 65536 chars).
 const BODY_MIN = 500;
 const BODY_MAX = 8000;
+
+// Mirrors SAFE_IDENT in workforce/lambdas/agents-api/handler.ts. agent and
+// run-id become the URL path and the deterministic branch name
+// (workforce/{agent}/{run_id}); a bad value is caught here as exit 2 rather
+// than costing a round-trip that ends in a 400.
+const SAFE_IDENT = /^[A-Za-z0-9_-]{1,64}$/;
 
 // G4 — LLM-failure preludes. Matched against the first non-blank, non-heading
 // line so a title + prelude (e.g. "# Brief\n\nSure! Here is...") is caught.
@@ -82,6 +88,10 @@ const dryRun = flag("dry-run");
 for (const [k, v] of Object.entries({ agent: agentSlug, project: projectId, "run-id": runId, path: filePath, "body-file": bodyFile })) {
   if (!v) fail(1, `--${k} is required`);
 }
+
+// ── G6 — identifier safety (before the dry-run exit) ─────────────────────────
+if (!SAFE_IDENT.test(agentSlug)) fail(2, `G6: --agent "${agentSlug}" must match ${SAFE_IDENT}`);
+if (!SAFE_IDENT.test(runId)) fail(2, `G6: --run-id "${runId}" must match ${SAFE_IDENT}`);
 
 const token = process.env.ENGAGEMENT_WRITE_TOKEN;
 if (!dryRun && !token) fail(1, "ENGAGEMENT_WRITE_TOKEN env var is required (from credentials['engagement_write_token'])");

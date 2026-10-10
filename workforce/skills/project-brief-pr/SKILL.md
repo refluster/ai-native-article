@@ -40,14 +40,17 @@ or the workforce API — never AWS, never a write at this stage.
    Note any existing brief slugs to avoid a duplicate path (same slug = same
    content already delivered; skip rather than reopen a duplicate PR).
 
-4. **Binding config** — `config.brief_path_prefix` (default `docs/briefs`),
-   `config.brief_lang` (default `en`), `config.brief_max_chars` (default
-   `4000`), `config.pr_base_branch` (default `main`).
+4. **Binding config** — `config.brief_path_prefix` (default `docs/briefs`) is
+   the only key this skill reads. The PR always targets the repo's default
+   branch (the endpoint decides; there is no base-branch setting), the brief is
+   written in English, and the length band is fixed (see below).
 
 ## Do the one thing this skill does
 
-Draft one **project brief** — 1,500–4,000 characters of prose (adjust within
-config.brief_max_chars); the floor is firm. Structure:
+Draft one **project brief** — aim for 1,500–4,000 characters of prose. The
+script's hard guard is 500–8000 characters (`BODY_MIN` / `BODY_MAX` in
+`open-pr.mjs`): below 500 or above 8000 exits 2. The 1,500–4,000 target is
+writing guidance, not an enforced band. Structure:
 
 ```
 # <project name> — Brief: <ISO date>
@@ -114,19 +117,28 @@ to `POST /agents/{slug}/open-external-pr`, with the W-1-family guards
 3. Report the script's exit code:
    - `0` — PR opened. Log the `pr_url` and `branch_name` in your EXEC summary.
    - `2` — guard rejected it (body too short/long, LLM-failure prelude, path
-     unsafe, or API returned a hard 4xx such as `agent_not_found`,
-     `project_not_found`, or `credential_not_provisioned`). Read stderr; fix
-     the body or the config and retry at most once — never bypass a guard.
-   - `1` / `3` — bad args / network error. Check ENGAGEMENT_WRITE_TOKEN is set
-     and the API base is reachable; retry once if a transient network error.
+     unsafe, `--agent` / `--run-id` not matching `[A-Za-z0-9_-]{1,64}`, or API
+     returned a hard 4xx such as `agent_not_found`, `project_not_found`, or
+     `credential_not_provisioned`). Read stderr; fix the body or the config and
+     retry at most once — never bypass a guard.
+   - `1` — bad args / missing env. Fix the invocation; nothing reached the API.
+   - `3` — network error or 5xx. **Do not blind-retry with the same `run_id`.**
+     The branch name is deterministic (`workforce/{agent}/{run_id}`), so a 5xx
+     raised after the branch ref was created makes a same-`run_id` retry fail
+     with "ref exists". First check the project repo for an existing
+     `workforce/nadia/<run_id>` branch or draft PR: if one exists, report its
+     URL and stop; if none, a single retry is safe; if you cannot tell,
+     escalate rather than guess.
 
 The PR is opened as a **draft** by the Lambda (R-N9: the external git surface
 is PR-only; the project maintainer alone sends it to the default branch).
 
 ## What you don't do
 
-- **Don't call GitHub directly.** The write-script does NOT use a GitHub token —
-  that is the whole point of this endpoint. The Lambda holds the credential.
+- **Don't write to GitHub directly.** The write-script does NOT use a GitHub
+  token — that is the whole point of this endpoint. The Lambda holds the
+  credential. (The read-only, unauthenticated `docs/briefs/` listing in the
+  recall packet is the only GitHub call this skill makes.)
 - **Don't open a non-draft PR.** The Lambda always opens a draft; you cannot
   override this.
 - **Don't publish the brief to the workforce feed.** The brief is for the
