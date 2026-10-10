@@ -1,10 +1,12 @@
 # Epic-023 — The trust ladder: authority that widens and narrows on recorded track record
 
-- **Status**: Accepted (2026-07-08)
+- **Status**: In-progress (2026-09-30)
 - **Owner**: priya
 - **Created**: 2026-07-07
-- **Implemented by**: —
+- **Implemented by**: [#727](https://github.com/refluster/ai-native-article/pull/727) (Story 2 — ADR-0036 trust-ladder thresholds, Accepted by operator direction 2026-09-14, merged 2026-09-30); Story 1 (#462) and the enforcement story not started
 - **Hypothesis under test**: Monthly report 2026-07 (article `d06ecf4bb246`), 仮説五 — *trust compounds not from the absence of accidents but from accumulated recorded performance. The scope delegated to an agent can be an explicit staircase — widen a step when the record meets the bar, narrow a step automatically where an accident happened. Promotion and demotion decided by records, not feel. Build the first staircase on change-proposal review authority.*
+
+> **Status reconciliation (2026-10-01, Nadia — backlog-reconcile). `Accepted (2026-07-08)` → `In-progress (2026-09-30)`.** Bucket: **in-progress** (first Story deliverable merged). Evidence: PR #727 (`c456641`, merged 2026-09-30) adds `workforce/docs/adr/adr-0036-trust-ladder-thresholds.md` — the Story-2 Zone A threshold diff (N/M bars, incident taxonomy, reciprocity constraint, demotion parameters) — whose own header reads `Status: Accepted (operator direction 2026-09-14)`. That is the lifecycle's `Accepted → In-progress` trigger on the same "merged" bar used for Epic-020/021. Forward-only, mechanical, not an Obsoleted/Rejected reclassification. **Not started and still gating `Implemented`:** Story 1 (review-event ingestion, `TRUST#` tier cache, deterministic replay — #462) and the enforcement point in pr-autopilot nomination/consensus eligibility. Issue [#463](https://github.com/refluster/ai-native-article/issues/463) (Story 2) is still **open** although its deliverable merged; it is closeable on evidence but left for operator sign-off (standing #737 closure-authority question).
 
 ## Problem
 
