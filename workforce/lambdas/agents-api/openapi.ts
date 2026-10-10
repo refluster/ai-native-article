@@ -303,6 +303,8 @@ components:
         artifact_ref: { allOf: [{ $ref: '#/components/schemas/ArtifactRef' }], nullable: true }
         summary: { type: string, description: 'Top-level business summary of the engagement (≤512c). The portfolio / RUNS·DELIVERABLES UI renders this, falling back to artifact_ref.summary for legacy rows.' }
         execution_surface: { type: string, enum: [lambda, client, ccr], description: 'Where the work ran. Absent → lambda by convention.' }
+        binding_idx: { type: integer, minimum: 0, description: 'Agent binding index that fired the run (CCR fire payload). Absent on older rows.' }
+        reason_code: { type: string, enum: [auth, permission, egress, identity, validation, source_unreachable, write_failed, other], description: 'Closed-enum failure reason supplied by the runner. Absent on older rows.' }
         error: { type: string }
     EngagementCreate:
       type: object
@@ -325,6 +327,8 @@ components:
         used_credential_types: { type: array, items: { type: string } }
         inputs_hash: { type: string }
         execution_surface: { type: string, enum: [client, ccr], default: client, description: 'client = external R-N1(b) POST-back (default); ccr = workforce CCR routine write-back. lambda is not accepted from the wire.' }
+        binding_idx: { type: integer, minimum: 0, description: 'Binding index from the fire payload (CCR runner). Non-integer or negative is 400 invalid_binding_idx.' }
+        reason_code: { type: string, enum: [auth, permission, egress, identity, validation, source_unreachable, write_failed, other], description: 'Why a run failed. A bad value is 400 invalid_reason_code. status=skipped may carry only source_unreachable; any other code on a skip is 422 skipped_with_failure_reason (a refused write or pre-flight is status=throw).' }
         error: { type: string, description: Populated when status=throw. }
     FeedPostCreate:
       type: object

@@ -59,7 +59,12 @@ import { ESCALATION_LABEL, MIN_REVIEWERS, W4_CYCLE_CAP } from "./pr-merge.mjs";
 import { assertReasonCode } from "./escalation-reasons.mjs";
 
 const GH_API = "https://api.github.com";
-const MAX_DIFF_CHARS = 48_000; // ~12K tokens; protects the CCR context budget
+// Bounds only the inline `diff` excerpt the ROUTER reads (~12K tokens of its
+// context). It never bounds what a lens reviews: the full diff is written to
+// `diff_path` for each isolated lens to read in its own context. The old
+// head-slice cut whole files out of view — asp-cloud #1027 (7 files, ~164 KB)
+// reached the panel with 3 files unseen and could only escalate.
+export const MAX_DIFF_CHARS = 48_000;
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..", "..", ".."); // workforce/skills/pr-autopilot → repo root
 
@@ -417,6 +422,74 @@ export function applyNominationCap(candidates, openSeatCounts = {}, cap = NOMINA
   };
 }
 
+// ── Diff excerpt (router context budget) ────────────────────────────────────
+
+/** Pure. Split a unified diff into per-file chunks with +/- line counts.
+ *  Counts only hunk lines, so a `+++`/`---` file header is never a change. */
+export function splitDiffByFile(diff) {
+  const chunks = String(diff ?? "").split(/^(?=diff --git )/m).filter((c) => c.length > 0);
+  return chunks.map((text) => {
+    const m = /^diff --git a\/.+? b\/(.+)$/m.exec(text);
+    let additions = 0;
+    let deletions = 0;
+    let inHunk = false;
+    for (const line of text.split("\n")) {
+      if (line.startsWith("@@")) inHunk = true;
+      else if (!inHunk) continue;
+      else if (line.startsWith("+")) additions++;
+      else if (line.startsWith("-")) deletions++;
+    }
+    return { path: m ? m[1] : "(unparsed)", text, additions, deletions };
+  });
+}
+
+/** Pure. Bound a diff to ~`max` chars for the router WITHOUT dropping a file:
+ *  every file keeps its header (up to the first hunk) and the budget is
+ *  water-filled across files, so small files stay whole and large ones share
+ *  the rest. Returns { excerpt, truncated, files[] } where each file entry is
+ *  { path, additions, deletions, chars, truncated }. Headers are always kept,
+ *  so a PR with very many files can exceed `max` by its header total. */
+export function boundDiff(diff, max = MAX_DIFF_CHARS) {
+  const text = String(diff ?? "");
+  const chunks = splitDiffByFile(text);
+  const files = chunks.map((c) => ({
+    path: c.path,
+    additions: c.additions,
+    deletions: c.deletions,
+    chars: c.text.length,
+    truncated: false,
+  }));
+  if (text.length <= max) return { excerpt: text, truncated: false, files };
+
+  const budget = new Array(chunks.length).fill(0);
+  let remaining = max;
+  let left = chunks.length;
+  const bySize = chunks.map((_, i) => i).sort((a, b) => chunks[a].text.length - chunks[b].text.length);
+  for (const i of bySize) {
+    budget[i] = Math.min(chunks[i].text.length, Math.floor(remaining / left));
+    remaining -= budget[i];
+    left--;
+  }
+
+  const excerpt = chunks
+    .map((c, i) => {
+      if (c.text.length <= budget[i]) return c.text;
+      files[i].truncated = true;
+      // Keep the file header whole; text that is not a `diff --git` chunk
+      // (should not happen) has no header to protect.
+      const hunkAt = c.text.indexOf("\n@@");
+      const isFile = c.text.startsWith("diff --git ");
+      const header = !isFile ? 0 : hunkAt >= 0 ? hunkAt + 1 : c.text.length;
+      const keep = Math.max(budget[i], header);
+      return (
+        c.text.slice(0, keep) +
+        `\n... [${c.path}: excerpt ${keep} of ${c.text.length} chars — full diff at diff_path] ...\n`
+      );
+    })
+    .join("");
+  return { excerpt, truncated: true, files };
+}
+
 async function ghGet(token, path, accept) {
   const res = await fetch(`${GH_API}${path}`, {
     headers: {
@@ -528,9 +601,9 @@ async function main() {
     } catch (e) {
       die(e.httpStatus && e.httpStatus < 500 ? 2 : 3, e.message);
     }
-    if (diff.length > MAX_DIFF_CHARS) {
-      diff = diff.slice(0, MAX_DIFF_CHARS) + `\n\n... [diff truncated at ${MAX_DIFF_CHARS} chars] ...\n`;
-    }
+    const diffPath = join(dirname(out), `pr-autopilot-${owner}-${repo}-${pr.number}.diff`);
+    writeFileSync(diffPath, diff);
+    const bounded = boundDiff(diff);
     candidates.push({
       number: pr.number,
       // The cycle this PR is being routed at — 1 for a first pass, N+1 for a
@@ -550,7 +623,13 @@ async function main() {
       comments: comments
         .slice(0, 30)
         .map((c) => ({ author: c.user?.login ?? "(unknown)", body: (c.body ?? "").slice(0, 240).replace(/\n+/g, " ") })),
-      diff,
+      // Router-sized excerpt; when diff_truncated, every file still appears
+      // (header + a fair share) and a lens reads diff_path, never this.
+      diff: bounded.excerpt,
+      diff_truncated: bounded.truncated,
+      diff_chars: diff.length,
+      diff_path: diffPath,
+      diff_files: bounded.files,
     });
   }
 
