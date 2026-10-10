@@ -26,6 +26,7 @@ const {
   resolveDispatchTarget,
   selectDispatchAgents,
   claimDispatchSlot,
+  releaseDispatchSlot,
   dispatchSlotSk,
   isOrchestratorDispatchEvent,
   DEFAULT_DEBOUNCE_SECONDS,
@@ -178,6 +179,78 @@ describe("claimDispatchSlot", () => {
       throw Object.assign(new Error("boom"), { name: "ProvisionedThroughputExceededException" });
     });
     await expect(claimDispatchSlot("ren", "pr-remediate", "asp-cloud")).rejects.toThrow("boom");
+  });
+});
+
+// #685: the cron tick claims this same slot with the per-skill dedup window.
+// A stateful stand-in for the conditional write lets the retry case be
+// asserted end to end rather than by reading the expression.
+const statefulSlot = () => {
+  let stamp: string | undefined;
+  return (cmd: unknown) => {
+    const { UpdateExpression, ExpressionAttributeValues: v } = (cmd as {
+      input: { UpdateExpression: string; ExpressionAttributeValues: Record<string, string> };
+    }).input;
+    const conditionError = () =>
+      Object.assign(new Error("conditional"), { name: "ConditionalCheckFailedException", Item: stamp ? { last_dispatched_at: stamp } : undefined });
+    if (UpdateExpression.startsWith("SET")) {
+      if (stamp !== undefined && !(stamp < v[":cutoff"]!)) throw conditionError();
+      stamp = v[":now"];
+      return {};
+    }
+    if (stamp !== v[":claimed"]) throw conditionError();
+    stamp = undefined;
+    return {};
+  };
+};
+
+describe("tick dedup via claimDispatchSlot (#685)", () => {
+  const t0 = new Date("2026-10-06T04:11:00.000Z");
+  const window30m = 30 * 60;
+
+  it("rejects a retry of the same tick dispatched inside the window", async () => {
+    useSend(statefulSlot());
+    const first = await claimDispatchSlot("ren", "feed-post", "agent-workforce", t0, window30m);
+    const retry = await claimDispatchSlot("ren", "feed-post", "agent-workforce", new Date(t0.getTime() + 60_000), window30m);
+    expect(first).toEqual({ claimed: true, claimed_at: t0.toISOString() });
+    expect(retry).toEqual({ claimed: false, last_dispatched_at: t0.toISOString() });
+  });
+
+  it("is keyed per skill, so an unrelated skill's dispatch does not suppress this one", async () => {
+    // Two slots, two stamps: the any-skill key the old guard read would have
+    // skipped the second.
+    const slots = new Map<string, (cmd: unknown) => unknown>();
+    useSend((cmd) => {
+      const sk = (cmd as { input: { Key: { sk: string } } }).input.Key.sk;
+      if (!slots.has(sk)) slots.set(sk, statefulSlot());
+      return slots.get(sk)!(cmd);
+    });
+    expect((await claimDispatchSlot("ren", "article-level2", "p", t0, window30m)).claimed).toBe(true);
+    expect((await claimDispatchSlot("ren", "feed-post", "p", t0, window30m)).claimed).toBe(true);
+  });
+
+  it("claims again once the window has elapsed (next cron match)", async () => {
+    useSend(statefulSlot());
+    await claimDispatchSlot("ren", "feed-post", "p", t0, window30m);
+    const later = new Date(t0.getTime() + 31 * 60_000);
+    expect((await claimDispatchSlot("ren", "feed-post", "p", later, window30m)).claimed).toBe(true);
+  });
+
+  it("a released slot (failed fire) lets the retry dispatch", async () => {
+    useSend(statefulSlot());
+    const c = await claimDispatchSlot("ren", "feed-post", "p", t0, window30m);
+    expect(await releaseDispatchSlot("ren", "feed-post", "p", c.claimed_at!)).toBe(true);
+    const retry = await claimDispatchSlot("ren", "feed-post", "p", new Date(t0.getTime() + 60_000), window30m);
+    expect(retry.claimed).toBe(true);
+  });
+
+  it("never releases a later claim: the release is pinned to the caller's own stamp", async () => {
+    useSend(statefulSlot());
+    const mine = await claimDispatchSlot("ren", "feed-post", "p", t0, window30m);
+    const later = new Date(t0.getTime() + 31 * 60_000);
+    await claimDispatchSlot("ren", "feed-post", "p", later, window30m);
+    expect(await releaseDispatchSlot("ren", "feed-post", "p", mine.claimed_at!)).toBe(false);
+    expect((await claimDispatchSlot("ren", "feed-post", "p", later, window30m)).claimed).toBe(false);
   });
 });
 

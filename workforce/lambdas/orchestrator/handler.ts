@@ -13,8 +13,11 @@
 //      For each binding, evaluate its cron against a 120-minute window. If
 //      matchesNow returns true, async-invoke wf-agent-runner-{stage} with
 //      { agent, binding_idx }.
-//   D. Skip a binding if its (skill, agent) has fired within a per-skill
-//      dedup window — guards against same-window double-fire.
+//   D. Skip a binding if its (agent, skill, project) slot was claimed within a
+//      per-skill dedup window — guards against same-window double-fire (a
+//      Lambda retry of the same tick). The claim is the atomic conditional
+//      write of shared/dispatch.ts, so it is also what keeps the budget charge
+//      to one per logical fire (#685).
 //
 // The same handler also serves an EXPLICIT, single-binding fire (adr-0025).
 // When the event carries `{ dispatch: { agent_slug, binding_idx } }` — sent by
@@ -31,7 +34,12 @@ import {
   type AgentMetaRow,
 } from "../shared/agent.js";
 import { scanPrefix, queryBySkPrefix, updateOperational, getItem } from "../shared/ddb.js";
-import { isOrchestratorDispatchEvent, type OrchestratorDispatchEvent } from "../shared/dispatch.js";
+import {
+  claimDispatchSlot,
+  isOrchestratorDispatchEvent,
+  releaseDispatchSlot,
+  type OrchestratorDispatchEvent,
+} from "../shared/dispatch.js";
 import { matchesNow } from "../shared/cron-match.js";
 import { findRecentPRs } from "../shared/github.js";
 import { fireCcrRoutine, routineIdFromSpec, type CcrFireTask } from "../shared/ccr-fire.js";
@@ -51,16 +59,16 @@ const STAGE = process.env.STAGE;
 const TICK_WINDOW_MINUTES = parseInt(process.env.TICK_WINDOW_MINUTES ?? "5", 10);
 if (!STAGE) throw new Error("STAGE env var is required");
 
-// Per-skill dedup window. The orchestrator skips a binding when the
-// agent's last RUN for the same skill is within this many minutes. The
-// table is keyed by skill name so the dedup tracks the actual cadence
+// Per-skill dedup window. The orchestrator skips a binding when its
+// (agent, skill, project) dispatch slot was claimed within this many minutes.
+// The table is keyed by skill name so the dedup tracks the actual cadence
 // (a 6h heartbeat skill needs a shorter dedup than a biweekly plan).
 //
 // Fallback DEFAULT_DEDUP_MINUTES applies to skills not listed here.
 const DEFAULT_DEDUP_MINUTES = 60;
 const DEDUP_MINUTES_BY_SKILL: Record<string, number> = {
   "discord-heartbeat": 30,     // 30m — well under the 2-hourly cadence (cron(20 0/2 …)); skip-safe with wide margin
-  "feed-post": 30,             // 30m — guards same-window double-fire of the daily cadence (cron(M H ? * * *)). Must stay short: dedup keys on agent.last_run_at (any skill), so a long window would starve feed-post on multi-binding agents whose other skills run more often.
+  "feed-post": 30,             // 30m — guards same-window double-fire of the daily cadence (cron(M H ? * * *)).
   "article-level2": 30,        // 30m — well under Elena's 2-hourly L1→L2 cadence (cron(0 0/2 …)); skip-safe with wide margin
   "design-note": 60 * 24 * 6,
   "positioning-write": 60 * 24 * 6,
@@ -94,7 +102,29 @@ export interface OrchestratorResult {
 type CcrBatchSlot = {
   tasks: CcrFireTask[];
   items: Array<{ slug: string; binding_idx: number; skill: string }>;
+  /** Parallel to `items`: the slot each one claimed, given back if the batch POST fails. */
+  held: HeldSlot[];
 };
+
+/** A dispatch slot this tick claimed and has not yet fired against. */
+type HeldSlot = { slug: string; skill: string; project: string; claimed_at: string };
+
+/** Best-effort give-back of a claimed slot whose fire did not happen, so a
+ *  retry of the tick is not deduped away. Failure is logged, never thrown: the
+ *  worst case is one skipped window, which the next cron match recovers. */
+async function releaseHeldSlot(held: HeldSlot | undefined): Promise<void> {
+  if (!held) return;
+  try {
+    await releaseDispatchSlot(held.slug, held.skill, held.project, held.claimed_at);
+  } catch (err) {
+    console.error(JSON.stringify({
+      event: "dispatch-slot-release-failed",
+      slug: held.slug,
+      skill: held.skill,
+      reason: err instanceof Error ? err.message : String(err),
+    }));
+  }
+}
 
 export async function handler(_event: unknown, _context: Context): Promise<OrchestratorResult> {
   const now = new Date();
@@ -172,9 +202,35 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
           });
           continue;
         }
-        const decision = await evaluateBinding(agent, i, binding, now);
+        const decision = evaluateBinding(binding, now);
         if (decision.action !== "dispatch") {
           skipped.push({ slug: agent.slug, binding_idx: i, skill: binding.skill, reason: decision.reason });
+          continue;
+        }
+        // #685: the cron matched; now claim the (agent, skill, project) slot.
+        // Atomic and conditional, so a retried tick landing in the same window
+        // is refused here — before the budget reservation and the ledger charge
+        // below, which therefore happen once per logical fire. A claim that
+        // cannot be made (DDB error) skips rather than dispatches unguarded.
+        const dedupMin = DEDUP_MINUTES_BY_SKILL[binding.skill] ?? DEFAULT_DEDUP_MINUTES;
+        const slotProject = binding.project_id ?? "-";
+        let held: HeldSlot | undefined;
+        try {
+          const claim = await claimDispatchSlot(agent.slug, binding.skill, slotProject, now, dedupMin * 60);
+          if (!claim.claimed) {
+            skipped.push({
+              slug: agent.slug,
+              binding_idx: i,
+              skill: binding.skill,
+              reason: `dedup_window (last dispatched ${claim.last_dispatched_at ?? "recently"}, window ${dedupMin}m)`,
+            });
+            continue;
+          }
+          held = { slug: agent.slug, skill: binding.skill, project: slotProject, claimed_at: claim.claimed_at! };
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          console.error(JSON.stringify({ event: "dispatch-claim-error", slug: agent.slug, skill: binding.skill, reason }));
+          skipped.push({ slug: agent.slug, binding_idx: i, skill: binding.skill, reason: `dispatch_claim_error: ${reason.slice(0, 160)}` });
           continue;
         }
         // W-3, measured where it can be measured (#661): the LLM call happens
@@ -194,6 +250,7 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
             const reason = err instanceof Error ? err.message : String(err);
             console.error(JSON.stringify({ event: "budget-read-error", slug: agent.slug, reason }));
             skipped.push({ slug: agent.slug, binding_idx: i, skill: binding.skill, reason: `budget_read_error: ${reason.slice(0, 160)}` });
+            await releaseHeldSlot(held);
             continue;
           }
         }
@@ -239,14 +296,16 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
         try {
           const routineId = routineIdFromSpec(binding.routine_spec ?? "");
           const task = await prepareCcrTask(agent.slug, i, binding, tickedAt, fireEngagementToken);
-          const slot = ccrBatchByRoutine.get(routineId) ?? { tasks: [], items: [] };
+          const slot = ccrBatchByRoutine.get(routineId) ?? { tasks: [], items: [], held: [] };
           slot.tasks.push(task);
           slot.items.push({ slug: agent.slug, binding_idx: i, skill: binding.skill });
+          slot.held.push(held);
           ccrBatchByRoutine.set(routineId, slot);
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err);
           console.error(JSON.stringify({ event: "ccr-prep-error", slug: agent.slug, skill: binding.skill, reason }));
           skipped.push({ slug: agent.slug, binding_idx: i, skill: binding.skill, reason: `ccr_prep_error: ${reason.slice(0, 200)}` });
+          await releaseHeldSlot(held);
           // C-4 (#650): `skipped[]` is Lambda-invocation-local — visible only
           // in CloudWatch, not on the agent's Track Record or
           // GET /agents/{slug}/executions. A prep failure is still an
@@ -318,6 +377,7 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       console.error(JSON.stringify({ event: "ccr-batch-error", routine_id: routineId, task_count: slot.tasks.length, reason }));
+      for (const held of slot.held) await releaseHeldSlot(held);
       for (const item of slot.items) {
         skipped.push({
           slug: item.slug,
@@ -412,7 +472,7 @@ async function handleDispatch(event: OrchestratorDispatchEvent, tickedAt: string
     return skip(binding.skill, `non_orchestrator_executor: ${binding.executor}/${binding.trigger?.scheduler}`);
   }
 
-  // The dedup window (evaluateBinding) is deliberately NOT applied. It exists
+  // The tick's dedup-window claim (step D) is deliberately NOT applied. It exists
   // to stop one cron matching twice inside a tick window; an on-demand fire is
   // rate-limited by the agents-api's debounce claim, which is per (skill,
   // project) rather than per agent — the right grain for "work just arrived on
@@ -501,12 +561,7 @@ async function pollEngineerPRs(now: Date): Promise<OrchestratorResult["pr_polls"
 
 type Decision = { action: "dispatch" } | { action: "skip"; reason: string };
 
-async function evaluateBinding(
-  agent: AgentMetaRow,
-  bindingIdx: number,
-  binding: AgentBinding,
-  now: Date,
-): Promise<Decision> {
+function evaluateBinding(binding: AgentBinding, now: Date): Decision {
   const cron = binding.trigger?.cron;
   if (!cron) {
     return { action: "skip", reason: "binding_missing_cron" };
@@ -519,23 +574,6 @@ async function evaluateBinding(
   }
   if (!fires) return { action: "skip", reason: "not_scheduled" };
 
-  // Per-skill dedup: scan recent RUN rows for this agent + same skill.
-  const dedupMin = DEDUP_MINUTES_BY_SKILL[binding.skill] ?? DEFAULT_DEDUP_MINUTES;
-  // For v1 simplicity we reuse the agent's last_run_at (any skill). This
-  // is correct for single-binding agents (the common case) and conservative
-  // for multi-binding agents (skipping when a *different* skill ran recently
-  // is a false positive that resolves on the next tick). A per-skill last-run
-  // index lives at GSI1 in v2.
-  if (agent.last_run_at) {
-    const lastMs = Date.parse(agent.last_run_at);
-    if (Number.isFinite(lastMs)) {
-      const sinceMin = (now.getTime() - lastMs) / 60_000;
-      if (sinceMin < dedupMin) {
-        return { action: "skip", reason: `dedup_window (${sinceMin.toFixed(0)}m < ${dedupMin}m)` };
-      }
-    }
-  }
-  void bindingIdx;
   return { action: "dispatch" };
 }
 
