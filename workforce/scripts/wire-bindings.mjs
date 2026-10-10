@@ -18,8 +18,12 @@
 // the body with `GET /skills/{skill}` and refuses to fall back to the git copy
 // on a non-2xx. `--check-skills` does that verification for you.
 //
-// Idempotent, keyed on (skill, project_id): absent -> appended; equal -> no-op;
-// drifted -> replaced in place (binding_idx preserved).
+// Idempotent, keyed on (skill, project_id, lane) within one agent: absent ->
+// appended; equal -> no-op; drifted -> replaced in place (binding_idx
+// preserved). A live binding listed in the manifest's RETIRED_BINDINGS is
+// REMOVED from the agent's bindings[] in the same PATCH (adr-0046: the
+// issue-implement / issue-design bindings; adr-0041's in-place marker is not
+// implemented, so removal is the retirement the API offers).
 //
 // Usage:
 //   node workforce/scripts/wire-bindings.mjs --dry-run            # all managed
@@ -31,7 +35,7 @@
 import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
 ensureProxyAwareEntry(import.meta.url);
 import { reconcileBinding } from "../../scripts/lib/binding-reconcile.mjs";
-import { BINDINGS, bindingMatcher, managedBindings, queueViolations, toBindingLiteral } from "./lib/bindings-manifest.mjs";
+import { BINDINGS, RETIRED_BINDINGS, bindingMatcher, isRetired, managedBindings, queueViolations, toBindingLiteral } from "./lib/bindings-manifest.mjs";
 
 import { spawnSync } from "node:child_process";
 
@@ -116,6 +120,11 @@ async function liveReport() {
     for (const b of a.bindings ?? []) live.push({ agent: slug, skill: b.skill, project_id: b.project_id });
   }
   let drift = 0;
+  for (const l of live) {
+    if (!isRetired(l)) continue;
+    drift++;
+    console.log(`  ✗ ${l.agent}: ${l.skill} @ ${l.project_id}  (RETIRED — still live; run this script to remove it)`);
+  }
   for (const want of BINDINGS) {
     const got = live.some((l) => l.agent === want.agent && l.skill === want.skill && l.project_id === want.project_id);
     if (!got) drift++;
@@ -131,7 +140,7 @@ async function liveReport() {
       console.error(`    ${v.why}`);
     }
   }
-  if (drift > 0) console.error(`\n✗ ${drift} declared binding(s) are not live — run this script (without --live) to wire them.`);
+  if (drift > 0) console.error(`\n✗ ${drift} binding(s) differ from the manifest (declared-but-not-live, or retired-but-live) — run this script (without --live) to reconcile.`);
   if (drift === 0 && violations.length === 0) console.log("\n✓ live bindings match the manifest, and every queue has a worker.");
   return drift > 0 || violations.length > 0 ? 1 : 0;
 }
@@ -169,6 +178,14 @@ async function main() {
     }
     let next = cur.bindings;
     const verbs = [];
+    // Retirement first, so a retired slot can never be matched and "updated"
+    // back into existence by a manifest entry of the same key.
+    for (const b of cur.bindings) {
+      if (!isRetired(b)) continue;
+      const r = RETIRED_BINDINGS.find((x) => x.skill === b.skill && x.project_id === b.project_id);
+      next = next.filter((x) => x !== b);
+      verbs.push(`retired (removed): ${b.skill} @ ${b.project_id} — ${r?.reason ?? ""}`);
+    }
     for (const entry of entries) {
       const desired = toBindingLiteral(entry);
       // (skill, project_id, lane) — the coarse key would clobber adr-0030's

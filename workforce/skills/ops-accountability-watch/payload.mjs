@@ -50,7 +50,7 @@ export function buildIssueSpec(finding) {
   const title = `${ISSUE_TITLE_PREFIX} ${finding.label}`;
   const body = [
     `**Detected by**: ops-accountability-watch (Cadence, Petra — VP, Operations & Reliability)`,
-    `**Owner**: \`${finding.owner}\` — ${finding.ownerReason}`,
+    `**Suggested owner**: \`${finding.owner}\` — ${finding.ownerReason} (per owner-routing.mjs)`,
     "",
     "### What was observed",
     ...(finding.detailLines ?? []).map((l) => `- ${l}`),
@@ -68,7 +68,12 @@ export function buildIssueSpec(finding) {
   return {
     title,
     body,
-    labels: ["type:ops", "layer:L3", `project:${finding.project}`, `owner:${finding.owner}`],
+    // No `owner:<slug>` label: under ADR-0046 that label means "assigned", and
+    // this Cadence only has a hint. The owner rides in the body instead.
+    labels: ["type:ops", "layer:L3", `project:${finding.project}`],
+    // Applied on create only; a re-fire must not demote an issue the router
+    // has since moved to verified/assigned.
+    createLabels: ["type:ops", "layer:L3", `project:${finding.project}`, "stage:proposed"],
     owner: finding.owner,
     key: finding.key,
   };
@@ -142,4 +147,26 @@ export function toDiscordWebhookBody(payload) {
     username: payload.username,
     embeds: [{ title: payload.title, description: payload.description, color: payload.color }],
   };
+}
+
+/**
+ * Labels sent when a new issue is created: includes `stage:proposed`.
+ * @param {IssueSpec} spec
+ * @returns {string[]}
+ */
+export function labelsForCreate(spec) {
+  return [...spec.createLabels];
+}
+
+/**
+ * Labels sent when a re-fire updates an existing issue: the union of what the
+ * issue already carries (incl. a legacy `owner:<slug>` or a router-set stage)
+ * and `spec.labels`. Never adds `stage:proposed`, so a re-fire cannot demote an
+ * issue the router has since moved on.
+ * @param {Array<string | {name?: string}>} existingLabels
+ * @param {IssueSpec} spec
+ * @returns {string[]}
+ */
+export function labelsForUpdate(existingLabels, spec) {
+  return Array.from(new Set([...(existingLabels ?? []).map((l) => l.name ?? l), ...spec.labels]));
 }

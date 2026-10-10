@@ -121,6 +121,7 @@ import {
   appendExecution,
   archive as archiveProject,
   asProjectId,
+  getCredential,
   getProject,
   listExecutions,
   projectPk,
@@ -133,6 +134,7 @@ import {
   type ExecutionSurface,
   type ProjectMetaRow,
 } from "../shared/project.js";
+import { REASON_CODES, type ReasonCode } from "../shared/reason-codes.js";
 import {
   type PerfHumanTouchRow,
   type PerfIdleRow,
@@ -157,6 +159,12 @@ import {
   CloudWatchClient,
   PutMetricDataCommand,
 } from "@aws-sdk/client-cloudwatch";
+import {
+  emitMalformedRow,
+  isWellFormedAgentMeta,
+  isWellFormedProjectMeta,
+  isWellFormedSkillMeta,
+} from "../shared/row-validators.js";
 import { timingSafeEqual } from "node:crypto";
 import {
   DescribeSecretCommand,
@@ -197,6 +205,8 @@ import { isValidDispatchToken } from "../shared/dispatch-token.js";
 import { DOCS_HTML, OPENAPI_YAML } from "./openapi.js";
 import { handleBoardsRoute, type BoardReplyDispatch } from "./boards.js";
 import { getProjectReportBody, listProjectReports } from "./reports.js";
+import { openExternalPr } from "../shared/external-pr.js";
+import { type GithubSecret } from "../shared/secrets.js";
 
 // Secrets Manager path holding the feed-write capability token. The
 // runner presents the same token (injected from this secret into its
@@ -334,6 +344,12 @@ export async function handler(
     // class: the `memory` profile block, behind the ADR-0019 content
     // contract + shrink guard. `return await` for the 500 mapping.
     if (routeKey === "POST /agents/{slug}/memory" && slug) return await updateMemoryRoute(slug, event);
+    // POST /agents/{slug}/open-external-pr — Phase 7 PR6 runner dispatch
+    // hookup. The CCR write-script calls this after the LLM generates the
+    // PR body; the Lambda resolves the project's GitHub credential from
+    // Secrets Manager and calls openExternalPr (R-N9 compliant). Auth:
+    // same engagement-write bearer token the CCR session already holds.
+    if (routeKey === "POST /agents/{slug}/open-external-pr" && slug) return await openExternalPrRoute(slug, event);
     if (routeKey === "DELETE /agents/{slug}" && slug) return await deleteAgent(slug, event);
     if (routeKey === "GET /projects") return listProjects(event);
     if (routeKey === "GET /projects/{id}/executions" && projectId) return listProjectExecutions(projectId, event);
@@ -415,7 +431,10 @@ async function listAgents(
   // window (FU-PROJ-SCAN — same root cause as the projects-console
   // disappearance). The roster is ≤ a few hundred at C-3 scale.
   const agentRows = await scanAllPrefix<AgentMetaRow>("AGENT#", "META");
-  const items = agentRows
+  const wellFormedAgents = agentRows.filter((r) =>
+    isWellFormedAgentMeta(r) ? true : (emitMalformedRow(r, "agent", cw, STAGE), false),
+  );
+  const items = wellFormedAgents
     .filter((r) => wantArchived || !r.archived)
     .filter((r) => !filterStream || r.streams.includes(filterStream))
     // The inline persona prompt (ADR-0007 step 2) and the profile decks
@@ -467,14 +486,17 @@ async function getAgent(slug: string): Promise<APIGatewayProxyResultV2> {
 // runs · MTD, deliverables · MTD, the 30-day heat strip, and the
 // live-trace ribbon.
 //
-// It deliberately reports NO cost or token figures. Per-run token usage
-// is not observable from the CCR execution path — the agent's Claude Code
-// session writes its EXEC row via POST /agents/{slug}/engagements but has
-// no access to its own usage, and the orchestrator's CCR fire returns
-// only a session id. Inventing a dollar/token number would violate C-1
-// (no fabricated truth on the operator surface), so the 4th KPI is run
-// DURATION, a real proxy for compute that IS derivable from started_at /
-// ended_at on every row.
+// Cost (ADR-0044, narrowing the earlier "no cost figures" rule): it reports
+// ONE cost figure, the modelled month-to-date spend from the same
+// readBudgetBlock() that GET /performance serves, as
+// `totals.cost_this_month_usd` (+ `cost_updated_at`). It is modelled from
+// each skill's declared cost_class, never metered: per-run token usage is
+// not observable from the CCR execution path. There is deliberately no
+// second derivation here, so /stats and /performance cannot disagree. An
+// empty ledger month omits both fields (an unknown is never a measured
+// zero, #661). Per-run token figures stay absent, and the 4th KPI is run
+// DURATION (derivable from started_at / ended_at on every row).
+// GET /public/workforce-summary stays cost-blind (ADR-0044, reaffirmed).
 
 const STATS_HEAT_DAYS = 30;
 const STATS_RECENT_RUNS = 8;
@@ -645,10 +667,16 @@ async function listStats(
     a.started_at < b.started_at ? 1 : a.started_at > b.started_at ? -1 : 0,
   );
 
+  // Same reader as GET /performance (ADR-0044): no parallel cost derivation.
+  const budget = await readBudgetBlock();
+
   return reply(200, {
     generated_at: now.toISOString(),
     month: monthStartIso.slice(0, 7),
     totals: {
+      ...(budget
+        ? { cost_this_month_usd: budget.modelled_usd, cost_updated_at: budget.updated_at }
+        : {}),
       agents_running: agentsRunning,
       agents_paused: agentsPaused,
       agents_throwing: agentsThrowing,
@@ -1239,7 +1267,10 @@ async function listSkills(
   // Drain the whole SKILL#/META set (see scanAllPrefix / FU-PROJ-SCAN): a
   // Limit-capped scan window would hide skills that scan past it.
   const skillRows = await scanAllPrefix<SkillMetaRow>("SKILL#", "META");
-  const filtered = skillRows
+  const wellFormedSkills = skillRows.filter((r) =>
+    isWellFormedSkillMeta(r) ? true : (emitMalformedRow(r, "skill", cw, STAGE), false),
+  );
+  const filtered = wellFormedSkills
     .filter((r) => includeArchived || r.status !== "archived")
     .filter((r) => !filterStatus || r.status === filterStatus)
     .filter((r) => !filterOwner || r.owners.includes(filterOwner));
@@ -1375,6 +1406,8 @@ async function listSkillExecutions(
       summary: r.summary,
       artifact_ref: r.artifact_ref,
       error: r.error,
+      binding_idx: r.binding_idx,
+      reason_code: r.reason_code,
     }));
   return reply(200, { items });
 }
@@ -1613,7 +1646,7 @@ async function listProjects(
   // honestly (a single-row GET 404s on a row that the brand validator
   // rejects), so this is *list-route defence*, not a silent papering-over.
   const wellFormed = projectRows.filter((r) =>
-    isWellFormedProjectMeta(r) ? true : (emitMalformedProjectMeta(r), false),
+    isWellFormedProjectMeta(r) ? true : (emitMalformedRow(r, "project", cw, STAGE), false),
   );
   const filtered = wellFormed
     .filter((r) => includeSelf || !r.project_id.startsWith("self/"))
@@ -1636,61 +1669,6 @@ async function listProjects(
   // Fully drained above (scanAllPrefix) — next_cursor retained for
   // response-shape stability, always absent.
   return reply(200, { items, next_cursor: undefined });
-}
-
-/**
- * True iff the row carries the canonical `ProjectMetaRow` attributes
- * `listProjects` consumes. Rejection drops the row from the list
- * response AND emits a metric (see `emitMalformedProjectMeta`). The
- * branded `asProjectId(row.project_id)` call inside the per-row map
- * would also throw on a bad value; this pre-check moves the rejection
- * BEFORE the Promise.all fan-out so one bad row doesn't fail the rest.
- */
-function isWellFormedProjectMeta(row: Partial<ProjectMetaRow>): row is ProjectMetaRow {
-  return (
-    typeof row.project_id === "string" &&
-    row.project_id.length > 0 &&
-    typeof row.status === "string" &&
-    typeof row.owner_agent === "string" &&
-    typeof row.created_at === "string"
-  );
-}
-
-/**
- * Structured log + best-effort CW metric on a skipped malformed row.
- * Fire-and-forget — a metric-emission failure must not block the list
- * response (the row is already skipped; we just lose the signal).
- */
-function emitMalformedProjectMeta(row: Partial<ProjectMetaRow>): void {
-  const pk = typeof row.pk === "string" ? row.pk : "<missing-pk>";
-  console.warn(
-    JSON.stringify({
-      event: "agents_api_malformed_project_meta",
-      pk,
-      attrs: Object.keys(row).sort(),
-      reason: "missing canonical attributes — fix the bootstrap runbook",
-    }),
-  );
-  cw.send(
-    new PutMetricDataCommand({
-      Namespace: "Workforce/AgentsApi",
-      MetricData: [
-        {
-          MetricName: "WfMalformedProjectMeta",
-          Value: 1,
-          Unit: "Count",
-          Dimensions: [{ Name: "Stage", Value: STAGE }],
-        },
-      ],
-    }),
-  ).catch((err) => {
-    console.warn(
-      JSON.stringify({
-        event: "agents_api_malformed_meta_metric_emit_failed",
-        error: err instanceof Error ? err.message : String(err),
-      }),
-    );
-  });
 }
 
 // ── Talent reply dispatch (Epic-013 Story 3, ADR-0006) ──────────────────
@@ -2921,6 +2899,8 @@ interface EngagementView {
   summary: string;
   artifact?: ArtifactRef;
   error?: string;
+  binding_idx?: number;
+  reason_code?: ReasonCode;
 }
 
 function toEngagementView(row: ExecutionRow): EngagementView {
@@ -2941,6 +2921,8 @@ function toEngagementView(row: ExecutionRow): EngagementView {
     summary: row.summary ?? row.artifact_ref?.summary ?? "",
     artifact: row.artifact_ref,
     error: row.error,
+    binding_idx: row.binding_idx,
+    reason_code: row.reason_code,
   };
 }
 
@@ -3013,6 +2995,32 @@ async function createEngagementRoute(
     return reply(400, { error: "invalid_status", detail: "status must be one of ok|throw|skipped|failed_artefact_redaction" });
   }
 
+  // Optional structured failure fields (#664 slice 1). Both are closed-shape:
+  // a bad value is a 400, never silently dropped (W-4).
+  let bindingIdx: number | undefined;
+  if (parsed.binding_idx !== undefined && parsed.binding_idx !== null) {
+    if (typeof parsed.binding_idx !== "number" || !Number.isInteger(parsed.binding_idx) || parsed.binding_idx < 0) {
+      return reply(400, { error: "invalid_binding_idx", detail: "binding_idx must be a non-negative integer" });
+    }
+    bindingIdx = parsed.binding_idx;
+  }
+  let reasonCode: ReasonCode | undefined;
+  if (parsed.reason_code !== undefined && parsed.reason_code !== null) {
+    if (typeof parsed.reason_code !== "string" || !(REASON_CODES as readonly string[]).includes(parsed.reason_code)) {
+      return reply(400, { error: "invalid_reason_code", detail: `reason_code must be one of ${REASON_CODES.join("|")}` });
+    }
+    reasonCode = parsed.reason_code as ReasonCode;
+  }
+  // Skip vs failure is structural: a run that attempted a write or pre-flight
+  // and was refused is `throw`, not `skipped`. Only `source_unreachable` may
+  // ride on a skip (the live inputs were down; nothing was attempted).
+  if (status === "skipped" && reasonCode !== undefined && reasonCode !== "source_unreachable") {
+    return reply(422, {
+      error: "skipped_with_failure_reason",
+      detail: "status=skipped may only carry reason_code=source_unreachable; a refused write or pre-flight is status=throw",
+    });
+  }
+
   // Validate the optional artifact shape if present.
   const rawArtifact = parsed.artifact;
   let artifactRef: ArtifactRef | undefined;
@@ -3079,6 +3087,8 @@ async function createEngagementRoute(
       inputs_hash: typeof parsed.inputs_hash === "string" ? parsed.inputs_hash : undefined,
       artifact_ref: artifactRef,
       summary,
+      binding_idx: bindingIdx,
+      reason_code: reasonCode,
       // This single write surface records every off-Lambda execution. The
       // optional `execution_surface` says which produced it: `ccr` for the
       // generic CCR agent-runner routine's per-task write-back (ADR-0005
@@ -3447,6 +3457,145 @@ async function validateMemoryWriteBearer(event: APIGatewayProxyEventV2): Promise
   const b = Buffer.from(expected);
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
+}
+
+/**
+ * POST /agents/{slug}/open-external-pr — Phase 7 PR6 runner dispatch hookup.
+ *
+ * The CCR agent-runner calls this endpoint from a skill's write-script after
+ * the LLM generates the PR body. This Lambda resolves the project's
+ * `github.token` from Secrets Manager (the CCR session never touches AWS
+ * resources directly) and calls `openExternalPr` (shared/external-pr.ts) to
+ * open a pull request on the external repo, per R-N9.
+ *
+ * Auth: engagement-write bearer token (same token the CCR session uses for
+ * `POST /agents/{slug}/engagements`). Same trust level: if a caller can record
+ * an engagement for this agent, it can open a PR on its behalf.
+ *
+ * Body fields:
+ *   project_id  — the workforce project id whose github.token credential to use
+ *   skill_name  — the skill that produced this deliverable (for the PR body)
+ *   run_id      — the ULID/UUID for this execution (for the branch name)
+ *   path        — repo-relative file path to create/replace in the external repo
+ *   body        — UTF-8 PR body (the skill's deliverable content)
+ *
+ * Returns: { pr_url, pr_number, branch_name }
+ */
+
+/** Allowed characters for slug and run_id path/body parameters. */
+const SAFE_IDENT = /^[A-Za-z0-9_-]{1,64}$/;
+
+async function openExternalPrRoute(
+  slug: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const authed = await validateEngagementWriteBearer(event);
+  if (!authed) {
+    return reply(401, { error: "unauthorized", detail: "POST /agents/{slug}/open-external-pr requires the engagement-write bearer token." });
+  }
+
+  // A1: validate slug from path parameter
+  if (!SAFE_IDENT.test(slug)) {
+    return reply(400, { error: "invalid_field", field: "slug" });
+  }
+
+  if (!event.body) return reply(400, { error: "missing_body" });
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(event.body) as Record<string, unknown>;
+  } catch {
+    return reply(400, { error: "invalid_json" });
+  }
+
+  const { project_id, skill_name, run_id, path: filePath, body: prBody } = parsed;
+  if (typeof project_id !== "string" || project_id.length === 0)
+    return reply(400, { error: "missing_field", field: "project_id" });
+  if (typeof skill_name !== "string" || skill_name.length === 0)
+    return reply(400, { error: "missing_field", field: "skill_name" });
+  if (typeof run_id !== "string" || run_id.length === 0)
+    return reply(400, { error: "missing_field", field: "run_id" });
+  // A1: validate run_id format
+  if (!SAFE_IDENT.test(run_id))
+    return reply(400, { error: "invalid_field", field: "run_id" });
+  if (typeof filePath !== "string" || filePath.length === 0)
+    return reply(400, { error: "missing_field", field: "path" });
+  // A1: reject path with .. segments, leading /, or .git/.github segments
+  if (
+    filePath.startsWith("/") ||
+    filePath.split("/").some((seg) => seg === ".." || seg === ".git" || seg === ".github")
+  ) {
+    return reply(400, { error: "invalid_field", field: "path" });
+  }
+  if (typeof prBody !== "string" || prBody.length === 0)
+    return reply(400, { error: "missing_field", field: "body" });
+
+  // E2: verify the agent exists and is not archived before touching Secrets
+  // Manager. The "bound to project_id" check (RAL-007) is accepted risk —
+  // bindings live in DDB and querying them adds a cross-partition read;
+  // the engagement-write bearer already scopes the caller to known agents.
+  const agentRow = await getItem<AgentMetaRow>(agentPk(slug), "META");
+  if (!agentRow || agentRow.archived) {
+    return reply(404, { error: "agent_not_found", slug });
+  }
+
+  const project = await getProject(asProjectId(project_id));
+  if (!project) return reply(404, { error: "project_not_found", project_id });
+
+  if (!project.github_owner || !project.github_repo) {
+    return reply(422, {
+      error: "project_missing_repo",
+      detail: `project "${project_id}" has no github_owner or github_repo configured`,
+    });
+  }
+
+  // A2: resolve credential through a single helper — no inline secret parse
+  // in the route handler itself.
+  const credResult = await resolveGithubCredential(project.project_id);
+  if ("_err" in credResult) {
+    return reply(424, { error: credResult._err, credential_type: "github.token" });
+  }
+
+  try {
+    const result = await openExternalPr({
+      project_id,
+      agent_slug: slug,
+      skill_name: skill_name as string,
+      run_id: run_id as string,
+      path: filePath as string,
+      body: prBody as string,
+      github: credResult,
+    });
+    return reply(201, result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(JSON.stringify({ event: "open_external_pr_failed", slug, project_id, error: msg }));
+    return reply(502, { error: "github_api_error", detail: msg.slice(0, 500) });
+  }
+}
+
+/**
+ * Resolves a project's GitHub credential through the shared `getCredential`
+ * resolver (project-scoped path with the Epic-010 fallbacks) and maps its
+ * failures to typed errors. Unexpected SM errors re-throw so the outer
+ * handler's 500 mapping fires (W-4 fail-loud).
+ */
+async function resolveGithubCredential(
+  projectId: string,
+): Promise<GithubSecret | { _err: "credential_not_provisioned" | "credential_malformed" }> {
+  let cred: GithubSecret;
+  try {
+    cred = await getCredential<GithubSecret>(asProjectId(projectId), "github.token");
+  } catch (err) {
+    if (err instanceof Error && err.name === "ResourceNotFoundException") {
+      return { _err: "credential_not_provisioned" };
+    }
+    if (err instanceof SyntaxError) return { _err: "credential_malformed" };
+    throw err;
+  }
+  if (!cred || typeof cred.token !== "string" || cred.token.length === 0) {
+    return { _err: "credential_malformed" };
+  }
+  return { token: cred.token };
 }
 
 function reply(statusCode: number, body: unknown): APIGatewayProxyResultV2 {

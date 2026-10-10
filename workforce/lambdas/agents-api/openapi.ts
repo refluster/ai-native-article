@@ -303,6 +303,8 @@ components:
         artifact_ref: { allOf: [{ $ref: '#/components/schemas/ArtifactRef' }], nullable: true }
         summary: { type: string, description: 'Top-level business summary of the engagement (≤512c). The portfolio / RUNS·DELIVERABLES UI renders this, falling back to artifact_ref.summary for legacy rows.' }
         execution_surface: { type: string, enum: [lambda, client, ccr], description: 'Where the work ran. Absent → lambda by convention.' }
+        binding_idx: { type: integer, minimum: 0, description: 'Agent binding index that fired the run (CCR fire payload). Absent on older rows.' }
+        reason_code: { type: string, enum: [auth, permission, egress, identity, validation, source_unreachable, write_failed, other], description: 'Closed-enum failure reason supplied by the runner. Absent on older rows.' }
         error: { type: string }
     EngagementCreate:
       type: object
@@ -325,6 +327,8 @@ components:
         used_credential_types: { type: array, items: { type: string } }
         inputs_hash: { type: string }
         execution_surface: { type: string, enum: [client, ccr], default: client, description: 'client = external R-N1(b) POST-back (default); ccr = workforce CCR routine write-back. lambda is not accepted from the wire.' }
+        binding_idx: { type: integer, minimum: 0, description: 'Binding index from the fire payload (CCR runner). Non-integer or negative is 400 invalid_binding_idx.' }
+        reason_code: { type: string, enum: [auth, permission, egress, identity, validation, source_unreachable, write_failed, other], description: 'Why a run failed. A bad value is 400 invalid_reason_code. status=skipped may carry only source_unreachable; any other code on a skip is 422 skipped_with_failure_reason (a refused write or pre-flight is status=throw).' }
         error: { type: string, description: Populated when status=throw. }
     FeedPostCreate:
       type: object
@@ -538,6 +542,34 @@ paths:
         "401": { description: bad or missing bearer }
         "404": { description: agent_not_found (unknown or archived slug) }
         "422": { description: 'memory_rejected — ADR-0019 content-contract violation or undeclared shrink' }
+  /agents/{slug}/open-external-pr:
+    post:
+      tags: [agents]
+      summary: Open a pull request on an external project's repo (Phase 7 PR6 / R-N9)
+      description: 'CCR write-script endpoint. The agent-runner calls this after the LLM generates the PR body; this Lambda resolves the project github.token from Secrets Manager and calls openExternalPr (R-N9 compliant). Auth: engagement-write bearer token.'
+      security: [{ bearer: [] }]
+      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_id, skill_name, run_id, path, body]
+              properties:
+                project_id: { type: string, description: 'Workforce project id whose github.token credential to use' }
+                skill_name: { type: string, description: 'Skill name that produced the deliverable (for the PR body)' }
+                run_id: { type: string, description: 'Execution ULID/UUID — used to compute the branch name' }
+                path: { type: string, description: 'Repo-relative file path to create/replace in the external repo' }
+                body: { type: string, description: 'UTF-8 PR body content (the skill deliverable)' }
+      responses:
+        "201": { description: 'Created — { pr_url, pr_number, branch_name }', content: { application/json: { schema: { type: object, properties: { pr_url: { type: string }, pr_number: { type: integer }, branch_name: { type: string } } } } } }
+        "400": { description: 'missing_body / invalid_json / missing_field' }
+        "401": { description: bad or missing bearer }
+        "404": { description: project_not_found }
+        "422": { description: 'project_missing_repo — project lacks github_owner or github_repo' }
+        "424": { description: 'credential_not_provisioned or credential_malformed — github.token not yet provisioned for the project' }
+        "502": { description: 'github_api_error — GitHub REST API returned a non-2xx response' }
   /agents/{slug}/recall:
     get:
       tags: [agents]

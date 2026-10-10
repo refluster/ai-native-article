@@ -1,150 +1,144 @@
-# Runbook — the issue→merge flow (adr-0022)
+# Runbook — the issue→merge flow (adr-0046, adr-0022 §1)
 
-How a ticket becomes a merge without stopping, who owns each state, and what the
-operator has to do to switch the new legs on.
+How a ticket becomes a merge without stopping, who owns each state, and what
+the operator has to do to switch it on for a project.
 
-Decision record: [adr-0022](../adr/adr-0022-issue-to-merge-flow.md). Metric:
-[Epic-019](../epics/epic-019-autonomous-finalization-rate.md).
+Decision records: [adr-0046](../adr/adr-0046-issue-lifecycle-stages-and-owners.md)
+(the intake half: four stages, owners) and [adr-0022](../adr/adr-0022-issue-to-merge-flow.md)
+§1 (the PR half: the author lane). Metric: [Epic-019](../epics/epic-019-autonomous-finalization-rate.md).
+The same model, written for the project side, is PSVL/asp-cloud
+`docs/runbooks/issue_lifecycle.md`.
 
 ## The loop
 
 ```
-                    ┌──────────────── issue-triage (nadia, daily) ───────────────┐
-                    │  every open issue → exactly one lane + owner               │
-                    │  wf:handback → answered NOW · legacy park >14d → re-examined│
-                    │  bounded: HOP_CAP 3 routings → forced to operator          │
-                    └───────────────┬───────────────┬───────────────┬────────────┘
-                     wf:lane:implement   wf:lane:design   wf:lane:operator
-                            │                   │            + wf:human:<role>
-                            │                   │                   │
-                    issue-implement        issue-design          (operator)
-                       (ren, daily)        (dario, daily)      the act is named
-                            │                   │
-                            │  can't take it? ──┴──► wf:handback ──┐
-                            │  (issue-handback.mjs)                │
-                            │                    dispatches issue-triage, seconds
-                            │                                      │
-                            └─────────┬─────────┘◄─────────────────┘
-                                 draft PR (R-N9: never a direct push to main)
-                                      │  dispatches pr-autopilot, seconds
-                                      │
-                    ┌─────────────────▼──────────────── pr-autopilot (nadia) ────┐
-                    │  route → ≥3 isolated lens reviews → verdict                │
-                    └──┬────────────────┬───────────────────────────┬────────────┘
-                  🟢 predicate      agent-fixable                only-a-human
-                       │        (conflict / behind / findings)         │
-                    MERGED       autopilot:needs-author        autopilot:needs-human
-                  (R-N10)                │                        (operator)
-                                  pr-remediate (ren, daily)
-                                  push to HEAD branch → clear label
-                                         │
-                                  back to pr-autopilot at cycle N+1
-                                         │
-                          bounded: 3 attempts, or 36h untouched → needs-human
+                 backlog-reconcile (nadia)        issue-triage (nadia)              the owner
+   Proposed ───────────────────────────▶ Verified ─────────────────────▶ Assigned ──────────▶ draft PR
+      │        done / duplicate / stale      ▲      stage:assigned + owner:<slug>    │               │
+      └──────────────────────────▶ Closed    └────────── hand-back ──────────────────┘               │
+                                                 (back to Verified, one comment)                     │
+                                                                                                     ▼
+                                 ┌──────────────────────────── pr-autopilot (nadia) ─────────────────┐
+                                 │  route → ≥3 isolated lens reviews → verdict                       │
+                                 └──┬────────────────────┬──────────────────────────────┬────────────┘
+                               🟢 predicate          agent-fixable                  only-a-human
+                                    │            (conflict / behind / findings)          │
+                                 MERGED            autopilot:needs-author        autopilot:needs-human
+                               (R-N10)                     │                          (operator)
+                           closes the issue        pr-remediate (ren)
+                                                   push to HEAD → clear label → re-review at N+1
+                                                   bounded: 3 attempts, or 36h untouched → needs-human
 ```
 
-**The invariant that makes this safe:** the terminal states are still exactly two
-(MERGED / ESCALATED). Every interim state has a named worker *and* a mechanical
-bound, so "in flight" can never quietly become "forgotten". `pr-autopilot-sweep.mjs`
-enforces that on every PR fire; on the intake side the bound is `HOP_CAP` (3
-routings, then the operator lane) and the worker of last resort is always the
-router, because `wf:handback` is addressed to it rather than to a human.
-
-**Every arrow is also a dispatch** (adr-0025/adr-0038): the label is the
-load-bearing write and the cadence is woken directly, so the crons are the
+**Every arrow is also a dispatch** (adr-0025): the label is the load-bearing
+write and the next cadence is woken directly, so the crons are the
 completeness floor rather than the latency. A dropped dispatch costs latency,
 never correctness.
+
+## The model
+
+| Stage | Label | Meaning | Moved on by |
+|---|---|---|---|
+| **Proposed** | `stage:proposed` — or no `stage:*` label at all | Filed. Nobody has checked it. | `backlog-reconcile` |
+| **Verified** | `stage:verified` | Still true on the default branch, not a duplicate, labelled, has checkable acceptance criteria. Waiting for an owner. | `issue-triage` |
+| **Assigned** | `stage:assigned` + exactly one `owner:<slug>` | One named owner is responsible for closing it. | the owner |
+| **Closed** | GitHub closed: `completed` / `duplicate` / `not_planned` | Labels are left as history. | — |
+
+Six rules, the same on every project:
+
+1. Every open issue carries **exactly one** `stage:*` (none counts as Proposed).
+2. `stage:assigned` ⇔ **exactly one** `owner:*`. No other stage carries an owner.
+3. **Only the owner acts on an assigned issue.** No other member comments on,
+   labels, or opens a PR for it. Nobody acts on a Proposed or Verified issue
+   except the reconcile and the router. There are no patrols.
+4. **Hand-back** is one comment and a move back to Verified with the owner
+   label removed (`issue-stage-set.mjs --to verified`). The router re-assigns.
+5. Only the router — or the operator — changes an owner.
+6. The **operator** may perform any transition. A Claude Code session the
+   operator directs acts as `owner:operator`.
+
+`owner:operator` is valid on every project. Any other `owner:<slug>` must be a
+member whose **`issue-execute` binding is live on that project** — the router
+reads the roster from `GET /agents`, and the write surface refuses anything
+else. That one guard is what makes "assigned" mean "somebody will do it".
+
+Incidents (`incident` label) follow incident response and carry no stage.
 
 ## Who owns what
 
 | State | Label | Owner | Bound |
 |---|---|---|---|
-| Untriaged issue | — | `issue-triage` (nadia) | daily fire; oldest-first |
-| Implementable | `wf:lane:implement` | `issue-implement` (ren) | `max_issues_per_run` |
-| Decision/document | `wf:lane:design` | `issue-design` (dario) | `max_issues_per_run` (2) |
-| Human-only | `wf:lane:operator` + `wf:human:<role>` | operator | — (visible queue, the act named) |
-| Handed back by a worker | `wf:handback` | `issue-triage` (nadia) | answered on the next fire — dispatched, so seconds |
-| Parked pre-adr-0038 | `issue-*:needs-human` | `issue-triage` re-queue | immediately if the issue also wears a lane (the worker already declined it); otherwise `requeue_days` (14). Read-only legacy, never written |
-| Claimed by a worker | `issue-*:in-progress` / `issue-*:pr-open` | the worker | only while an **open PR** references the issue (`Closes`/`Refs #N` or an `issue-<N>` branch); a `pr-open` with no open PR, or an `in-progress` older than 24h with none, is a stale claim and goes back to `issue-triage` |
-| Duplicate / completed / obsolete | `wf:closed:<verdict>` (closed) | `issue-triage` (nadia), via `issue-triage-settle.mjs` | evidence required (canonical open issue / merged PR / superseding ref); ≤ `max_closes_per_run` (5); never under an open PR, never L0/L1/tracker, never a human-reopened issue |
-| Laned, idle ≥ `review_days` (30) | (its lane) | `issue-triage` settle review | ≤ `max_reviews_per_run` (5); `still-valid` restarts the clock |
+| Proposed | `stage:proposed` / none | `backlog-reconcile` (nadia) | daily, oldest first, `max_issues_per_run` (15); closes ≤ `max_closes_per_run` (10) per run, each with evidence |
+| Verified | `stage:verified` | `issue-triage` (nadia) | daily + dispatched on every verify / hand-back; `max_issues_per_run` (15) |
+| Assigned to a member | `stage:assigned` + `owner:<slug>` | that member's `issue-execute` | daily + dispatched on assignment; `max_issues_per_run` (3 ren / 2 dario) |
+| Assigned to the human | `stage:assigned` + `owner:operator` | the operator | — (a visible queue, one search) |
+| Verified but blocked | `stage:verified` + `wf:blocked` (blocker named in the body) | nobody yet — the router skips it | the reconcile's 30-day re-check asks whether the blocker cleared |
+| Idle ≥ 30 days (Verified / Assigned, no open PR) | (its stage) | `backlog-reconcile` re-check | the same three closing rows; a still-valid issue keeps its stage and owner |
+| Claimed | an **open PR** that references the issue (`Closes` / `Refs #N`, or an `issue-N` branch) | the PR's author | every scan skips it; the set script refuses to move it |
+| Routed 3× without closing | `owner:operator` (forced) | the operator | `ASSIGN_CAP` (3), counted from the router's own comments |
 | PR in review | (routing comment) | `pr-autopilot` (nadia) | `cycle_cap`, W-4 cap 7 |
 | PR, agent-fixable | `autopilot:needs-author` | `pr-remediate` (ren) | 3 attempts / 36h sweep |
 | PR, human-gated | `autopilot:needs-human` | operator | — |
 
-Operator queues, in one search each:
+Operator queues, one search each:
 
 ```
-is:open label:autopilot:needs-human          # PRs that are mine
-is:open label:autopilot:reviewed             # …of those, the merge-ready ones
-is:open label:wf:lane:operator               # issues that are mine
-is:open label:wf:human:architect-ratify      # …of those, the ones needing only my signature
-is:open label:wf:human:legal                 # …the ones needing a legal lens
-is:open label:autopilot:needs-author         # what the agents are fixing right now
-is:open label:wf:handback                    # declined by a worker, awaiting the router
-is:closed label:wf:closed:duplicate          # what the router consolidated (reopen to overrule)
+is:issue is:open label:stage:assigned label:owner:operator   # issues that are mine
+is:issue is:open label:stage:verified                        # waiting for the router
+is:issue is:open -label:stage:verified -label:stage:assigned -label:incident   # the reconcile queue
+is:issue is:open label:stage:assigned label:owner:ren        # a member's work (ren)
+is:open label:autopilot:needs-human                          # PRs that are mine
+is:open label:autopilot:needs-author                         # what the agents are fixing right now
 ```
 
-The `wf:human:*` split is the point of the operator lane, not decoration: an
-`architect-ratify` row means a document already exists and only the signature is
-missing, which is a two-minute act. If a `wf:lane:operator` issue has **no**
-`wf:human:*` label it was routed before adr-0038 (or by hand) — re-run triage on
-it rather than working it, because the split rule has not been applied.
+## The scripts (three files, one vocabulary)
+
+| File | Role |
+|---|---|
+| `workforce/skills/issue-triage/issue-stages.mjs` | The vocabulary and every pure decision: stages, owners, the roster check, reconcile / route decisions, the label plan, the assignment cap, the close guards. Unit-tested (`issue-stages-tests.ts`). |
+| `issue-stage-scan.mjs --queue reconcile\|route` | The only reader. Candidates oldest-first under a cap, plus the index of every open issue, the last 30 days of merged PRs, the open-PR claims and the live roster. |
+| `issue-stage-set.mjs --to verified\|assigned\|closed` | The only writer. Posts the one comment, applies the label plan (one stage, one owner, retired labels stripped), runs the guards, closes with GitHub's reason, dispatches the next cadence. Never edits a body, never opens a PR. |
+
+Retired and stripped on sight: `wf:lane:*`, `wf:owner:*`, `wf:human:*`,
+`wf:handback`, `issue-implement:*`, `issue-design:*`, `wf:closed:*`, and the
+`<!-- wf:hops:N -->` comment marker (the count is now the router's own
+`<!-- stage:assigned -->` comments).
 
 ## Enabling it (operator, B-authority)
 
 The loop's bindings are **data**, in
 [`workforce/scripts/lib/bindings-manifest.mjs`](../../scripts/lib/bindings-manifest.mjs),
-driven by one script. That replaced the per-`(skill × project)` `wire-*.mjs`
-family, which had let a cadence be bound for one project and not another three
-times running (adr-0038 §Context) — the shape R-N11 now refuses.
+driven by one script. `wire-bindings.mjs` declares each binding enabled in one
+write (`scheduler=external` + `invoked_by=api` + cron, atomically), **removes**
+the bindings the manifest retires (`RETIRED_BINDINGS` — adr-0041's in-place
+marker is not implemented, so removal is the retirement), and refuses a set
+that would leave a queue unworked (R-N11).
 
-Adding a binding is A-authority; **enabling a cron is B** (governance.md §5).
-`wire-bindings.mjs` declares each binding enabled in one write
-(`scheduler=external` + `invoked_by=api` + cron, atomically — never the
-`manual`+cron dead-cron state), so **running it is the enable.**
+### Step 0 — seed the skill bodies first
 
-### Step 0 — seed the skill bodies FIRST (`wf:ren` R2 on #518)
-
-A binding whose `skill` has no `SKILL#` row fails **every** fire, loudly and
-forever: `agent-runner.md` step 2 resolves the body with `GET /skills/{skill}`
-and refuses to fall back to the git copy on a non-2xx. Merging a PR puts the
-skill folders in git; it does **not** create the DDB rows. So the data-plane
-seed runs before any wiring:
+A binding whose skill has no `SKILL#` row fails every fire. Merging a PR puts
+the skill folder in git; the data-plane deploy bundles it; `wf-seed-skills`
+creates or version-bumps the row. New skill (`issue-execute`) or a body bump →
+after the deploy:
 
 ```sh
-# after the PR merges + the data-plane deploy that carries the seed
-aws-vault exec <profile> -- node workforce/scripts/seed-skills.mjs
-
-# verify every skill the manifest binds resolves — read-only, no creds needed
-node workforce/scripts/wire-bindings.mjs --check-skills   # each MUST be 200
+node workforce/scripts/seed-skills.mjs prod          # needs AWS creds (lambda:InvokeFunction)
+node workforce/scripts/wire-bindings.mjs --check-skills   # read-only; each MUST be 200
 ```
-
-If any is not 200, stop — wiring on top of it creates a cadence that throws on
-every fire until someone notices. The same gate applies to a version-gated
-`SKILL.md` body bump (ADR-0018): `npm run workforce:skill-version-sync` reports
-a git-ahead-of-live skew, which is normal immediately after a merge and must
-clear once the seed runs.
 
 ### Step 1 — wire
 
 ```sh
-# always dry-run first: it prints the PATCH without sending it
-node workforce/scripts/wire-bindings.mjs --dry-run
+node workforce/scripts/wire-bindings.mjs --dry-run                 # prints the PATCHes, sends nothing
 node workforce/scripts/wire-bindings.mjs --project asp-cloud --dry-run
-
-aws-vault exec <profile> -- node workforce/scripts/wire-bindings.mjs --project asp-cloud
 aws-vault exec <profile> -- node workforce/scripts/wire-bindings.mjs            # everything
 ```
 
-Idempotent, keyed on `(skill, project_id, lane)`: absent → appended, equal →
-no-op, drifted → replaced in place with `binding_idx` and `bound_at` preserved.
-
-> **The key includes the lane, and that matters.** adr-0030 gave `pr-remediate`
-> a second binding on the same project (`config.lane: "groom"`). A coarser
-> `(skill, project_id)` key would match the groom slot and overwrite it with the
-> author lane's config. Any new driver or matcher must use `bindingMatcher()`
-> from the manifest, never re-derive the key.
+Idempotent, keyed on `(skill, project_id, lane)` **within one agent**: absent
+→ appended, equal → no-op, drifted → replaced in place (`binding_idx` and
+`bound_at` preserved), retired → removed. The same `(skill, project_id)` on
+two agents — ren and dario both carry `issue-execute @ asp-cloud` — is two
+bindings, not a collision.
 
 ### Step 2 — verify against live state
 
@@ -152,77 +146,38 @@ no-op, drifted → replaced in place with `binding_idx` and `bound_at` preserved
 node workforce/scripts/wire-bindings.mjs --live
 ```
 
-This is the check that would have caught all three incidents: it reports every
-declared binding that is not live (**a script that was written but never run
-looks exactly like one that was** — OP-016 sat that way for five weeks) and runs
-R-N11 against the live bindings rather than the manifest.
+Reports every declared binding that is not live, every retired binding that
+still is, and runs R-N11 against the live bindings rather than the manifest.
 
-**Order matters, and there is a deliberate gap in the middle.**
+### Adding a member to a project's roster
 
-1. **Wire `issue-triage` first, and let it run for at least one full cycle.**
-   Until issues carry `wf:lane:*` labels, nothing downstream can filter on them.
-2. **Then `issue-design`** — its Step 1 is lane-filtered, so before step 1 has
-   run it simply finds nothing (a cheap no-op, not an error).
-3. **`issue-implement` keeps taking un-laned issues until you say otherwise.**
-   Its binding deliberately carries no
-   `issue_selection.allow_labels: ["wf:lane:implement"]`: narrowing the engineer
-   cadence to the lane is a separate operator edit, made once triage has
-   demonstrably laned that project's backlog. Doing it earlier stops the cadence
-   dead for a cycle.
-4. **`pr-remediate` can be wired any time** — it is independent of the lanes, and
-   the PRs it works are labelled by `pr-autopilot`/`pr-merge` already.
-
-**Skill-body activation (ADR-0018).** Merging a PR changes git only. A running
-cadence keeps its current body until the matching version-gated
-`PATCH /skills/{name}` lands — so, for example, the router will not pass
-`--human-role` or dispatch its lane's worker until then. Everything degrades
-safely in that window: the scripts accept the new flags, an old body simply
-never sends them, and every dispatch is best-effort over a cron that still fires.
-
+Add an `issue-execute` row for them in the manifest and wire it. Nothing else:
+the router reads the roster live, and the write surface refuses an owner that
+is not on it. On PSVL/asp-cloud, also add the `owner:<slug>` row to that
+repo's `issue_lifecycle.md` §5 and `labels.yml` in the same change.
 
 ## When it stalls
 
 | Symptom | Likely cause | Action |
 |---|---|---|
-| PRs piling up in `needs-author` | `pr-remediate` unbound / paused / failing | First check it is **bound for that project**: `GET /agents/ren` and look for `pr-remediate` with the matching `project_id` (this is what #692/#693 hit — the cadence existed, for a different project). The router's own log names it too: adr-0025's hand-off dispatch logs `404 binding_not_found` when nothing is wired. Then check the sweep (it should be escalating them as `author-stale` at 36h) and the binding's fire history. |
-| Hand-offs land but the worker still starts on its cron | the adr-0025 dispatch is not reaching the endpoint | Look for `request-dispatch: no-op` in the router's fire log. `no WF_DISPATCH_TOKEN` = the skill's `meta.json:requires[]` bump has not seeded to the live `SKILL#` row (ADR-0018 version gate) or the deploy carrying the mint has not landed; `409 debounced` is normal (a live run owns the queue); anything else is the endpoint. Latency-only in every case — the cron and the 36h sweep are unaffected. |
-| `author-stale` escalations every day | the cadence fires but cannot finish | Read its run log; the usual cause is a target-repo gate it cannot run. |
-| Same PR escalating `remediation-cap-exceeded` repeatedly | a structural conflict no attempt will resolve | Resolve it by hand, or close the PR and re-cut the branch from `main`. |
-| Issues sitting untriaged | `issue-triage` unbound for that project, or its `max_issues_per_run` too small for the backlog | **First check it is bound for that project**: `node workforce/scripts/wire-bindings.mjs --live`. This is the #1 cause and the hardest to see — asp-cloud ran with no router at all from 2026-05 to 2026-09 while `issue-implement` was bound, so the tracker looked worked. If it is bound, raise the cap for a few fires; it is oldest-first, so it drains the tail. |
-| A queue fills and nothing drains it | A producer cadence bound for a project whose consumer is not (R-N11) | `npm run workforce:binding-queues` for the manifest, `wire-bindings.mjs --live` for reality. Then declare the consumer in `lib/bindings-manifest.mjs` and wire it — or unbind the producer, which the rule accepts equally. Do **not** "fix" it by shortening the producer's cron: that hides the orphan, which is how this shipped three times (adr-0038 §Context). |
-| `wf:handback` issues piling up | The router is unbound, paused, or failing; or its dispatch is not reaching the endpoint | A hand-back is answered on the router's next fire, and the hand-off dispatches it, so a pile means the router itself is not running. Check the binding first (`--live`), then the fire log: `request-dispatch: no-op` with `no WF_DISPATCH_TOKEN` means the skill's `meta.json:requires[]` bump has not seeded to the live `SKILL#` row (ADR-0018 version gate); `409 debounced` is normal; `404` means nothing is bound. Latency-only in every case — the cron still fires. |
-| An issue escalated `hop-cap-exceeded` that looks perfectly routable | It was routed 3× without resolving (`<!-- wf:hops:N -->` markers in its comments) | Read the three dispatch comments together: they usually disagree about what the issue *is*, which is the finding. Split it, or rewrite its body so one lane plainly owns it, then clear the lane label to re-triage. Raising `HOP_CAP` is not the fix — the cap found something. |
-| A `wf:lane:operator` issue with no `wf:human:*` label | Routed before adr-0038, or labelled by hand | Re-run triage on it. Without a role the split rule was never applied, and the majority of pre-adr-0038 operator-lane issues turned out to have a draftable body and only a small human residue. |
-| An issue open for weeks with `issue-implement:pr-open` and no PR | Its PR merged as a **partial slice** (cited the issue without a closing keyword) or was closed; the claim label outlived it. Before 2026-09-28 the router and the worker both skipped such an issue forever (#458, #671–#673) | Nothing, once the scan runs: a claim label counts only while an open PR references the issue, so `issue-triage-scan.mjs` re-queues it as a stale claim and `issue-triage-post.mjs` clears the marker when it re-lanes. |
-| `wf:lane:implement` on a `layer:L0`/`layer:L1`/`type:tracker` issue | Laned into a queue whose only worker is bound to refuse it (#572) | The scan re-queues it and `issue-triage-post.mjs` now refuses that lane (`LANE_ENTRY_DENY`, kept in step with the manifest's deny-lists by a test). Route it to `design`. |
-| A laned issue whose `wf:owner:*` persona has no binding for the lane's worker | An owner override to a persona that is not bound to `issue-implement`/`issue-design` on this project — the worker skips it as someone else's (#659/#212 → nadia, #739/#760/#770 → sana) | The scan re-queues it (roster read from `GET /agents/{slug}`) and the post script refuses such an owner. If the persona *should* do design work, wire the binding in `lib/bindings-manifest.mjs`; do not relabel by hand. |
-| An issue nobody can lane | the lane vocabulary is wrong for this project | The triage run reports it explicitly (Step 4). That report is the finding — amend the lanes in a new ADR, do not invent a label. |
-| `needs-author` on an L0/L1 PR | a label predating the fail-closed guard | Move it to `needs-human --reason l0l1-path` by hand; the guard refuses new ones. |
-| `autopilot:reason:no-reviewer-consensus` on a PR whose findings were **diff-local** | a label predating adr-0023 / the v3.1 rescope — the code used to mean "not unanimous green" | The PR is invisible to `pr-autopilot-scan.mjs` forever (`isTerminal()` keys on `autopilot:needs-human` alone; no sweep reaches an already-escalated PR). Re-post as `--needs-author --reason review-findings-blocking` with a remediation brief, **or** clear `autopilot:needs-human` so the next scan re-routes at cycle N+1. Enumerate the backlog with `is:open label:autopilot:needs-human label:autopilot:reason:no-reviewer-consensus`. Operator's button: clearing the label is a write on an existing PR, and note it also un-reds `check-escalation-labels.mjs` only once the PR leaves the open set — see FU-036. |
-
-## Measuring whether the lane is healthy (adr-0025)
-
-The lane's own counter is still owed (FU-029, the condition adr-0022 attached to
-itself). Until it ships, the honest interim proxy is the **sweep's firing rate**:
-
-```sh
-# author-lane escalations that reached a human because nobody worked the PR
-gh search prs --repo PSVL/asp-cloud --label autopilot:reason:author-stale --state all
-```
-
-Read it as: every `author-stale` is a PR the lane failed to serve. Before
-adr-0025 the rate could not distinguish "the worker is slow", "the worker is
-broken" and "there is no worker"; now a dispatched hand-off means the worker
-*started*, so a surviving `author-stale` means it ran and could not finish —
-which is a run log worth reading, not a wiring question.
+| Proposed issues piling up | `backlog-reconcile` unbound / paused / failing for that project | `wire-bindings.mjs --live` first; then its fire log. Raise `max_issues_per_run` for a few fires if it is bound and just behind. |
+| Verified issues piling up | `issue-triage` unbound, or every candidate refused for an unserved owner | `--live`; then the router's report (Step 4): it names what it could not assign and why. |
+| An Assigned issue nobody works | its owner's `issue-execute` is not bound here (the #760 shape) | The next router fire re-assigns it (`reassign`). Wire the member if they should be on this project. |
+| The same issue bounces owner ↔ Verified | a scope or vocabulary problem | The third hand-back lands it on the operator (`ASSIGN_CAP`). Read the comments together; split or rewrite the issue. |
+| A member comments on an issue it does not own | an old `issue-implement` / `issue-design` binding is still live | `--live` shows it as retired-but-live; run the wire script to remove it. |
+| A close you disagree with | — | Reopen it. The reconcile sees the `<!-- stage:closed -->` marker and will verify rather than close again. |
+| An issue with `owner:*` but not Assigned | filed by `ops-accountability-watch` (its accountability hint), or hand-labelled | The reconcile strips it and records the hint in its comment; the router restores it as a real assignment if the member is bound. |
+| PRs piling up in `needs-author` | `pr-remediate` unbound / paused / failing | `--live`; then the sweep (36h `author-stale`) and the binding's fire history. |
+| Hand-offs land but the worker starts on its cron | the adr-0025 dispatch is not reaching the endpoint | Look for `request-dispatch: no-op` in the fire log: `no WF_DISPATCH_TOKEN` = the skill's `requires[]` has not seeded (ADR-0018); `404` = no binding for that (skill, project); `409 debounced` is normal. Latency only. |
+| `author-stale` escalations every day | the cadence fires but cannot finish | Read its run log; usually a target-repo gate it cannot run. |
+| `needs-author` on an L0/L1 PR | a label predating the fail-closed guard | Move it to `needs-human --reason l0l1-path` by hand. |
 
 ## What this deliberately does not change
 
-The R-N10 predicate, the L0/L1 path set, the ≥3-reviewer unanimous-green rule,
-`MIN_REVIEWERS`, the kill-switches, W-5. No agent gained merge authority:
-`pr-remediate` and `issue-design` both declare `external-pr`, never
-`external-pr-merge`. The author lane is *tighter* than the merge leg on L0/L1 — it
-refuses those PRs outright rather than escalating them.
+The R-N10 predicate, the L0/L1 path set, the ≥3-reviewer unanimous-green
+rule, `MIN_REVIEWERS`, the kill-switches, W-5. No agent gained merge
+authority: `issue-execute` and `pr-remediate` both declare `external-pr`,
+never `external-pr-merge`.
 
 Related: [bindings.md](bindings.md) (binding shape + the enable discipline),
-[dev-process.md](dev-process.md), [pr-escalation-reasons.md](../pr-escalation-reasons.md) (taxonomy v3.1).
+[dev-process.md](dev-process.md), [pr-escalation-reasons.md](../pr-escalation-reasons.md).
