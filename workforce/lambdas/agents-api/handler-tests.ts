@@ -172,6 +172,19 @@ vi.mock("../shared/project.js", () => ({
     return s;
   },
   projectPk: (id: string) => `PROJECT#${id}`,
+  // Mirrors the real getCredential: JSON-parses the SM secret and surfaces a
+  // missing one as a ResourceNotFoundException-named error.
+  getCredential: async (projectId: string, type: string) => {
+    const id = `wf/projects/${projectId}/${type}`;
+    const forced = smForcedErrorStore.get(id);
+    if (forced) throw forced;
+    if (!secretValueStore.has(id)) {
+      const e = new Error("Secrets Manager: secret not found");
+      e.name = "ResourceNotFoundException";
+      throw e;
+    }
+    return JSON.parse(secretValueStore.get(id) as string);
+  },
   getProject: async (id: string) => {
     const row = rows.get(key(`PROJECT#${id}`, "META"));
     return row;
@@ -307,6 +320,10 @@ class FakeSmResourceNotFoundException extends Error {
 // by SecretId. `undefined` value = the path resolves but has no
 // SecretString (returns auth failure, not 500).
 const secretValueStore = new Map<string, string | undefined>();
+// smForcedErrorStore: maps SecretId to an Error to throw unconditionally,
+// for testing the rethrow path in resolveGithubCredential (non-ResourceNotFound
+// SM errors, e.g. AccessDeniedException).
+const smForcedErrorStore = new Map<string, Error>();
 
 vi.mock("@aws-sdk/client-secrets-manager", () => ({
   SecretsManagerClient: class {
@@ -319,6 +336,8 @@ vi.mock("@aws-sdk/client-secrets-manager", () => ({
       }
       if (cmd._kind === "get-value") {
         const id = cmd.input.SecretId as string;
+        const forced = smForcedErrorStore.get(id);
+        if (forced) throw forced;
         if (!secretValueStore.has(id)) throw new FakeSmResourceNotFoundException();
         return { SecretString: secretValueStore.get(id) };
       }
@@ -353,6 +372,17 @@ vi.mock("../shared/recall.js", () => ({
 // false → the existing static-token tests exercise the fallback path).
 vi.mock("../shared/engagement-token.js", () => ({
   isValidEngagementToken: vi.fn(async () => false),
+}));
+
+// Phase 7 PR6: openExternalPr is mocked so the route tests control the
+// outcome without making real GitHub REST calls.
+const openExternalPrMock = vi.fn(async (_input: unknown) => ({
+  pr_url: "https://github.com/test-owner/test-repo/pull/1",
+  pr_number: 1,
+  branch_name: "workforce/nadia/RUN01",
+}));
+vi.mock("../shared/external-pr.js", () => ({
+  openExternalPr: (arg: unknown) => openExternalPrMock(arg),
 }));
 
 // SUT must be imported AFTER all vi.mock() calls.
@@ -2289,5 +2319,231 @@ describe("GET /public/workforce-summary (getPublicSummary)", () => {
     expect(body.activity_30d).toHaveLength(30);
     expect(body.recent_runs).toEqual([]);
     expect(body.top_skills_7d).toEqual([]);
+  });
+});
+
+// ─── POST /agents/{slug}/open-external-pr (Phase 7 PR6) ─────────────────────
+
+describe("POST /agents/{slug}/open-external-pr", () => {
+  const ENGAGEMENT_TOKEN_SECRET = "wf/api/engagements-write-token";
+  // Must match the engagements suite token: handler caches _engagementWriteTokenCache module-wide.
+  const ENGAGEMENT_TOKEN = "test-engagement-bearer-xxxxx";
+  const GITHUB_TOKEN_SECRET = "wf/projects/asp-cloud/github.token";
+  const GITHUB_TOKEN = "ghp_test_token_pr6";
+
+  function seedProject(id: string, opts: { github_owner?: string; github_repo?: string } = {}) {
+    rows.set(key(`PROJECT#${id}`, "META"), {
+      pk: `PROJECT#${id}`,
+      sk: "META",
+      project_id: id,
+      owner_agent: "_operator",
+      status: "active",
+      created_at: "2026-05-27T00:00:00.000Z",
+      github_owner: opts.github_owner ?? "test-owner",
+      github_repo: opts.github_repo ?? "test-repo",
+    });
+  }
+
+  function seedAgent(slug: string) {
+    rows.set(key(`AGENT#${slug}`, "META"), {
+      pk: `AGENT#${slug}`,
+      sk: "META",
+      slug,
+      first_name: slug[0]!.toUpperCase() + slug.slice(1),
+      role: "Analyst",
+      paused: false,
+      archived: false,
+      last_run_status: "ok",
+    });
+  }
+
+  function postEvt(slug: string, headers: Record<string, string>, body: unknown): APIGatewayProxyEventV2 {
+    return {
+      version: "2.0",
+      routeKey: "POST /agents/{slug}/open-external-pr",
+      rawPath: `/agents/${slug}/open-external-pr`,
+      rawQueryString: "",
+      headers,
+      requestContext: { http: { method: "POST", path: `/agents/${slug}/open-external-pr` } } as unknown as APIGatewayProxyEventV2["requestContext"],
+      pathParameters: { slug },
+      queryStringParameters: {},
+      isBase64Encoded: false,
+      body: typeof body === "string" ? body : JSON.stringify(body),
+    } as APIGatewayProxyEventV2;
+  }
+
+  function validBody(overrides: Record<string, unknown> = {}) {
+    return {
+      project_id: "asp-cloud",
+      skill_name: "weekly-project-report",
+      run_id: "01JFAKEULID00000",
+      path: "reports/2026-09-30.md",
+      body: "# Weekly report\n\nContent here.",
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    rows.clear();
+    secretValueStore.clear();
+    smForcedErrorStore.clear();
+    openExternalPrMock.mockClear();
+    secretValueStore.set(ENGAGEMENT_TOKEN_SECRET, JSON.stringify({ token: ENGAGEMENT_TOKEN }));
+    secretValueStore.set(GITHUB_TOKEN_SECRET, JSON.stringify({ token: GITHUB_TOKEN }));
+    // Seed the default agent so agent-existence check passes in the happy path.
+    seedAgent("nadia");
+  });
+
+  it("401s on missing Authorization header", async () => {
+    seedProject("asp-cloud");
+    const res = await handler(postEvt("nadia", {}, validBody()));
+    expect(statusOf(res)).toBe(401);
+  });
+
+  it("401s on wrong bearer", async () => {
+    seedProject("asp-cloud");
+    const res = await handler(postEvt("nadia", { authorization: "Bearer wrong-token" }, validBody()));
+    expect(statusOf(res)).toBe(401);
+  });
+
+  it("400s on missing body", async () => {
+    seedProject("asp-cloud");
+    const evt: APIGatewayProxyEventV2 = postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, "");
+    delete (evt as { body?: string }).body;
+    const res = await handler(evt);
+    expect(statusOf(res)).toBe(400);
+    expect((bodyOf(res) as { error: string }).error).toBe("missing_body");
+  });
+
+  it("400s on invalid JSON", async () => {
+    seedProject("asp-cloud");
+    const res = await handler(postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, "not-json"));
+    expect(statusOf(res)).toBe(400);
+    expect((bodyOf(res) as { error: string }).error).toBe("invalid_json");
+  });
+
+  it.each(["project_id", "skill_name", "run_id", "path", "body"] as const)(
+    "400s when %s is missing",
+    async (field) => {
+      seedProject("asp-cloud");
+      const b = { ...validBody() };
+      delete (b as Record<string, unknown>)[field];
+      const res = await handler(postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, b));
+      expect(statusOf(res)).toBe(400);
+      expect((bodyOf(res) as { error: string; field: string }).field).toBe(field);
+    },
+  );
+
+  // A1: slug format validation
+  it("400s when slug contains disallowed characters (A1)", async () => {
+    const res = await handler(postEvt("nadia test", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody()));
+    expect(statusOf(res)).toBe(400);
+    expect((bodyOf(res) as { error: string; field: string }).error).toBe("invalid_field");
+    expect((bodyOf(res) as { field: string }).field).toBe("slug");
+  });
+
+  it("400s when run_id contains disallowed characters (A1)", async () => {
+    seedProject("asp-cloud");
+    const res = await handler(postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody({ run_id: "01JF ULID 00" })));
+    expect(statusOf(res)).toBe(400);
+    expect((bodyOf(res) as { error: string; field: string }).error).toBe("invalid_field");
+    expect((bodyOf(res) as { field: string }).field).toBe("run_id");
+  });
+
+  // A1: path traversal / forbidden segment validation
+  it.each([
+    "/reports/foo.md",
+    "reports/../../../etc/passwd",
+    "reports/.git/config",
+    "reports/.github/workflows/ci.yml",
+  ] as const)("400s on forbidden path '%s' (A1)", async (badPath) => {
+    seedProject("asp-cloud");
+    const res = await handler(postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody({ path: badPath })));
+    expect(statusOf(res)).toBe(400);
+    expect((bodyOf(res) as { error: string; field: string }).error).toBe("invalid_field");
+    expect((bodyOf(res) as { field: string }).field).toBe("path");
+  });
+
+  // E2: agent existence check
+  it("404s when the agent slug is unknown (E2)", async () => {
+    seedProject("asp-cloud");
+    // "ghost" has no agent row in DDB.
+    const res = await handler(postEvt("ghost", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody()));
+    expect(statusOf(res)).toBe(404);
+    expect((bodyOf(res) as { error: string }).error).toBe("agent_not_found");
+  });
+
+  it("404s when the project does not exist", async () => {
+    const res = await handler(postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody()));
+    expect(statusOf(res)).toBe(404);
+    expect((bodyOf(res) as { error: string }).error).toBe("project_not_found");
+  });
+
+  it("422s when the project has no github_owner", async () => {
+    seedProject("asp-cloud", { github_owner: undefined, github_repo: "test-repo" });
+    rows.set(key("PROJECT#asp-cloud", "META"), {
+      pk: "PROJECT#asp-cloud", sk: "META", project_id: "asp-cloud",
+      owner_agent: "_operator", status: "active", created_at: "2026-05-27T00:00:00.000Z",
+    });
+    const res = await handler(postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody()));
+    expect(statusOf(res)).toBe(422);
+    expect((bodyOf(res) as { error: string }).error).toBe("project_missing_repo");
+  });
+
+  it("424s when github.token is not provisioned for the project (ResourceNotFoundException)", async () => {
+    seedProject("asp-cloud");
+    secretValueStore.delete(GITHUB_TOKEN_SECRET);
+    const res = await handler(postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody()));
+    expect(statusOf(res)).toBe(424);
+    expect((bodyOf(res) as { error: string }).error).toBe("credential_not_provisioned");
+  });
+
+  // E4: credential_malformed — secret exists but token field is absent/empty
+  it("424s when github.token secret is malformed (E4)", async () => {
+    seedProject("asp-cloud");
+    secretValueStore.set(GITHUB_TOKEN_SECRET, JSON.stringify({ not_a_token: "oops" }));
+    const res = await handler(postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody()));
+    expect(statusOf(res)).toBe(424);
+    expect((bodyOf(res) as { error: string }).error).toBe("credential_malformed");
+  });
+
+  // E4: non-ResourceNotFoundException SM errors rethrow → outer 500 mapping
+  it("500s when SM throws an unexpected non-ResourceNotFoundException error (E4)", async () => {
+    seedProject("asp-cloud");
+    smForcedErrorStore.set(GITHUB_TOKEN_SECRET, new Error("AccessDeniedException: not authorized to GetSecretValue"));
+    const res = await handler(postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody()));
+    expect(statusOf(res)).toBe(500);
+    expect((bodyOf(res) as { error: string }).error).toBe("internal");
+  });
+
+  it("201s and returns pr_url/pr_number/branch_name on the happy path", async () => {
+    seedProject("asp-cloud");
+    const res = await handler(postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody()));
+    expect(statusOf(res)).toBe(201);
+    const b = bodyOf(res) as { pr_url: string; pr_number: number; branch_name: string };
+    expect(b.pr_url).toBe("https://github.com/test-owner/test-repo/pull/1");
+    expect(b.pr_number).toBe(1);
+    expect(b.branch_name).toBe("workforce/nadia/RUN01");
+  });
+
+  it("passes the correct inputs to openExternalPr on the happy path", async () => {
+    seedProject("asp-cloud");
+    await handler(postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody()));
+    expect(openExternalPrMock).toHaveBeenCalledOnce();
+    const call = openExternalPrMock.mock.calls[0]![0] as unknown as Record<string, unknown>;
+    expect(call.project_id).toBe("asp-cloud");
+    expect(call.agent_slug).toBe("nadia");
+    expect(call.skill_name).toBe("weekly-project-report");
+    expect(call.run_id).toBe("01JFAKEULID00000");
+    expect(call.path).toBe("reports/2026-09-30.md");
+    expect((call.github as { token: string }).token).toBe(GITHUB_TOKEN);
+  });
+
+  it("502s when openExternalPr throws a GitHub API error", async () => {
+    seedProject("asp-cloud");
+    openExternalPrMock.mockRejectedValueOnce(new Error("external-pr create-pr: GitHub API 403 — not allowed"));
+    const res = await handler(postEvt("nadia", { authorization: `Bearer ${ENGAGEMENT_TOKEN}` }, validBody()));
+    expect(statusOf(res)).toBe(502);
+    expect((bodyOf(res) as { error: string }).error).toBe("github_api_error");
   });
 });

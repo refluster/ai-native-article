@@ -121,6 +121,7 @@ import {
   appendExecution,
   archive as archiveProject,
   asProjectId,
+  getCredential,
   getProject,
   listExecutions,
   projectPk,
@@ -204,6 +205,8 @@ import { isValidDispatchToken } from "../shared/dispatch-token.js";
 import { DOCS_HTML, OPENAPI_YAML } from "./openapi.js";
 import { handleBoardsRoute, type BoardReplyDispatch } from "./boards.js";
 import { getProjectReportBody, listProjectReports } from "./reports.js";
+import { openExternalPr } from "../shared/external-pr.js";
+import { type GithubSecret } from "../shared/secrets.js";
 
 // Secrets Manager path holding the feed-write capability token. The
 // runner presents the same token (injected from this secret into its
@@ -341,6 +344,12 @@ export async function handler(
     // class: the `memory` profile block, behind the ADR-0019 content
     // contract + shrink guard. `return await` for the 500 mapping.
     if (routeKey === "POST /agents/{slug}/memory" && slug) return await updateMemoryRoute(slug, event);
+    // POST /agents/{slug}/open-external-pr — Phase 7 PR6 runner dispatch
+    // hookup. The CCR write-script calls this after the LLM generates the
+    // PR body; the Lambda resolves the project's GitHub credential from
+    // Secrets Manager and calls openExternalPr (R-N9 compliant). Auth:
+    // same engagement-write bearer token the CCR session already holds.
+    if (routeKey === "POST /agents/{slug}/open-external-pr" && slug) return await openExternalPrRoute(slug, event);
     if (routeKey === "DELETE /agents/{slug}" && slug) return await deleteAgent(slug, event);
     if (routeKey === "GET /projects") return listProjects(event);
     if (routeKey === "GET /projects/{id}/executions" && projectId) return listProjectExecutions(projectId, event);
@@ -3448,6 +3457,145 @@ async function validateMemoryWriteBearer(event: APIGatewayProxyEventV2): Promise
   const b = Buffer.from(expected);
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
+}
+
+/**
+ * POST /agents/{slug}/open-external-pr — Phase 7 PR6 runner dispatch hookup.
+ *
+ * The CCR agent-runner calls this endpoint from a skill's write-script after
+ * the LLM generates the PR body. This Lambda resolves the project's
+ * `github.token` from Secrets Manager (the CCR session never touches AWS
+ * resources directly) and calls `openExternalPr` (shared/external-pr.ts) to
+ * open a pull request on the external repo, per R-N9.
+ *
+ * Auth: engagement-write bearer token (same token the CCR session uses for
+ * `POST /agents/{slug}/engagements`). Same trust level: if a caller can record
+ * an engagement for this agent, it can open a PR on its behalf.
+ *
+ * Body fields:
+ *   project_id  — the workforce project id whose github.token credential to use
+ *   skill_name  — the skill that produced this deliverable (for the PR body)
+ *   run_id      — the ULID/UUID for this execution (for the branch name)
+ *   path        — repo-relative file path to create/replace in the external repo
+ *   body        — UTF-8 PR body (the skill's deliverable content)
+ *
+ * Returns: { pr_url, pr_number, branch_name }
+ */
+
+/** Allowed characters for slug and run_id path/body parameters. */
+const SAFE_IDENT = /^[A-Za-z0-9_-]{1,64}$/;
+
+async function openExternalPrRoute(
+  slug: string,
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  const authed = await validateEngagementWriteBearer(event);
+  if (!authed) {
+    return reply(401, { error: "unauthorized", detail: "POST /agents/{slug}/open-external-pr requires the engagement-write bearer token." });
+  }
+
+  // A1: validate slug from path parameter
+  if (!SAFE_IDENT.test(slug)) {
+    return reply(400, { error: "invalid_field", field: "slug" });
+  }
+
+  if (!event.body) return reply(400, { error: "missing_body" });
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(event.body) as Record<string, unknown>;
+  } catch {
+    return reply(400, { error: "invalid_json" });
+  }
+
+  const { project_id, skill_name, run_id, path: filePath, body: prBody } = parsed;
+  if (typeof project_id !== "string" || project_id.length === 0)
+    return reply(400, { error: "missing_field", field: "project_id" });
+  if (typeof skill_name !== "string" || skill_name.length === 0)
+    return reply(400, { error: "missing_field", field: "skill_name" });
+  if (typeof run_id !== "string" || run_id.length === 0)
+    return reply(400, { error: "missing_field", field: "run_id" });
+  // A1: validate run_id format
+  if (!SAFE_IDENT.test(run_id))
+    return reply(400, { error: "invalid_field", field: "run_id" });
+  if (typeof filePath !== "string" || filePath.length === 0)
+    return reply(400, { error: "missing_field", field: "path" });
+  // A1: reject path with .. segments, leading /, or .git/.github segments
+  if (
+    filePath.startsWith("/") ||
+    filePath.split("/").some((seg) => seg === ".." || seg === ".git" || seg === ".github")
+  ) {
+    return reply(400, { error: "invalid_field", field: "path" });
+  }
+  if (typeof prBody !== "string" || prBody.length === 0)
+    return reply(400, { error: "missing_field", field: "body" });
+
+  // E2: verify the agent exists and is not archived before touching Secrets
+  // Manager. The "bound to project_id" check (RAL-007) is accepted risk —
+  // bindings live in DDB and querying them adds a cross-partition read;
+  // the engagement-write bearer already scopes the caller to known agents.
+  const agentRow = await getItem<AgentMetaRow>(agentPk(slug), "META");
+  if (!agentRow || agentRow.archived) {
+    return reply(404, { error: "agent_not_found", slug });
+  }
+
+  const project = await getProject(asProjectId(project_id));
+  if (!project) return reply(404, { error: "project_not_found", project_id });
+
+  if (!project.github_owner || !project.github_repo) {
+    return reply(422, {
+      error: "project_missing_repo",
+      detail: `project "${project_id}" has no github_owner or github_repo configured`,
+    });
+  }
+
+  // A2: resolve credential through a single helper — no inline secret parse
+  // in the route handler itself.
+  const credResult = await resolveGithubCredential(project.project_id);
+  if ("_err" in credResult) {
+    return reply(424, { error: credResult._err, credential_type: "github.token" });
+  }
+
+  try {
+    const result = await openExternalPr({
+      project_id,
+      agent_slug: slug,
+      skill_name: skill_name as string,
+      run_id: run_id as string,
+      path: filePath as string,
+      body: prBody as string,
+      github: credResult,
+    });
+    return reply(201, result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(JSON.stringify({ event: "open_external_pr_failed", slug, project_id, error: msg }));
+    return reply(502, { error: "github_api_error", detail: msg.slice(0, 500) });
+  }
+}
+
+/**
+ * Resolves a project's GitHub credential through the shared `getCredential`
+ * resolver (project-scoped path with the Epic-010 fallbacks) and maps its
+ * failures to typed errors. Unexpected SM errors re-throw so the outer
+ * handler's 500 mapping fires (W-4 fail-loud).
+ */
+async function resolveGithubCredential(
+  projectId: string,
+): Promise<GithubSecret | { _err: "credential_not_provisioned" | "credential_malformed" }> {
+  let cred: GithubSecret;
+  try {
+    cred = await getCredential<GithubSecret>(asProjectId(projectId), "github.token");
+  } catch (err) {
+    if (err instanceof Error && err.name === "ResourceNotFoundException") {
+      return { _err: "credential_not_provisioned" };
+    }
+    if (err instanceof SyntaxError) return { _err: "credential_malformed" };
+    throw err;
+  }
+  if (!cred || typeof cred.token !== "string" || cred.token.length === 0) {
+    return { _err: "credential_malformed" };
+  }
+  return { token: cred.token };
 }
 
 function reply(statusCode: number, body: unknown): APIGatewayProxyResultV2 {
