@@ -133,6 +133,7 @@ import {
   type ExecutionSurface,
   type ProjectMetaRow,
 } from "../shared/project.js";
+import { REASON_CODES, type ReasonCode } from "../shared/reason-codes.js";
 import {
   type PerfHumanTouchRow,
   type PerfIdleRow,
@@ -467,14 +468,17 @@ async function getAgent(slug: string): Promise<APIGatewayProxyResultV2> {
 // runs · MTD, deliverables · MTD, the 30-day heat strip, and the
 // live-trace ribbon.
 //
-// It deliberately reports NO cost or token figures. Per-run token usage
-// is not observable from the CCR execution path — the agent's Claude Code
-// session writes its EXEC row via POST /agents/{slug}/engagements but has
-// no access to its own usage, and the orchestrator's CCR fire returns
-// only a session id. Inventing a dollar/token number would violate C-1
-// (no fabricated truth on the operator surface), so the 4th KPI is run
-// DURATION, a real proxy for compute that IS derivable from started_at /
-// ended_at on every row.
+// Cost (ADR-0044, narrowing the earlier "no cost figures" rule): it reports
+// ONE cost figure, the modelled month-to-date spend from the same
+// readBudgetBlock() that GET /performance serves, as
+// `totals.cost_this_month_usd` (+ `cost_updated_at`). It is modelled from
+// each skill's declared cost_class, never metered: per-run token usage is
+// not observable from the CCR execution path. There is deliberately no
+// second derivation here, so /stats and /performance cannot disagree. An
+// empty ledger month omits both fields (an unknown is never a measured
+// zero, #661). Per-run token figures stay absent, and the 4th KPI is run
+// DURATION (derivable from started_at / ended_at on every row).
+// GET /public/workforce-summary stays cost-blind (ADR-0044, reaffirmed).
 
 const STATS_HEAT_DAYS = 30;
 const STATS_RECENT_RUNS = 8;
@@ -645,10 +649,16 @@ async function listStats(
     a.started_at < b.started_at ? 1 : a.started_at > b.started_at ? -1 : 0,
   );
 
+  // Same reader as GET /performance (ADR-0044): no parallel cost derivation.
+  const budget = await readBudgetBlock();
+
   return reply(200, {
     generated_at: now.toISOString(),
     month: monthStartIso.slice(0, 7),
     totals: {
+      ...(budget
+        ? { cost_this_month_usd: budget.modelled_usd, cost_updated_at: budget.updated_at }
+        : {}),
       agents_running: agentsRunning,
       agents_paused: agentsPaused,
       agents_throwing: agentsThrowing,
@@ -1375,6 +1385,8 @@ async function listSkillExecutions(
       summary: r.summary,
       artifact_ref: r.artifact_ref,
       error: r.error,
+      binding_idx: r.binding_idx,
+      reason_code: r.reason_code,
     }));
   return reply(200, { items });
 }
@@ -2921,6 +2933,8 @@ interface EngagementView {
   summary: string;
   artifact?: ArtifactRef;
   error?: string;
+  binding_idx?: number;
+  reason_code?: ReasonCode;
 }
 
 function toEngagementView(row: ExecutionRow): EngagementView {
@@ -2941,6 +2955,8 @@ function toEngagementView(row: ExecutionRow): EngagementView {
     summary: row.summary ?? row.artifact_ref?.summary ?? "",
     artifact: row.artifact_ref,
     error: row.error,
+    binding_idx: row.binding_idx,
+    reason_code: row.reason_code,
   };
 }
 
@@ -3013,6 +3029,32 @@ async function createEngagementRoute(
     return reply(400, { error: "invalid_status", detail: "status must be one of ok|throw|skipped|failed_artefact_redaction" });
   }
 
+  // Optional structured failure fields (#664 slice 1). Both are closed-shape:
+  // a bad value is a 400, never silently dropped (W-4).
+  let bindingIdx: number | undefined;
+  if (parsed.binding_idx !== undefined && parsed.binding_idx !== null) {
+    if (typeof parsed.binding_idx !== "number" || !Number.isInteger(parsed.binding_idx) || parsed.binding_idx < 0) {
+      return reply(400, { error: "invalid_binding_idx", detail: "binding_idx must be a non-negative integer" });
+    }
+    bindingIdx = parsed.binding_idx;
+  }
+  let reasonCode: ReasonCode | undefined;
+  if (parsed.reason_code !== undefined && parsed.reason_code !== null) {
+    if (typeof parsed.reason_code !== "string" || !(REASON_CODES as readonly string[]).includes(parsed.reason_code)) {
+      return reply(400, { error: "invalid_reason_code", detail: `reason_code must be one of ${REASON_CODES.join("|")}` });
+    }
+    reasonCode = parsed.reason_code as ReasonCode;
+  }
+  // Skip vs failure is structural: a run that attempted a write or pre-flight
+  // and was refused is `throw`, not `skipped`. Only `source_unreachable` may
+  // ride on a skip (the live inputs were down; nothing was attempted).
+  if (status === "skipped" && reasonCode !== undefined && reasonCode !== "source_unreachable") {
+    return reply(422, {
+      error: "skipped_with_failure_reason",
+      detail: "status=skipped may only carry reason_code=source_unreachable; a refused write or pre-flight is status=throw",
+    });
+  }
+
   // Validate the optional artifact shape if present.
   const rawArtifact = parsed.artifact;
   let artifactRef: ArtifactRef | undefined;
@@ -3079,6 +3121,8 @@ async function createEngagementRoute(
       inputs_hash: typeof parsed.inputs_hash === "string" ? parsed.inputs_hash : undefined,
       artifact_ref: artifactRef,
       summary,
+      binding_idx: bindingIdx,
+      reason_code: reasonCode,
       // This single write surface records every off-Lambda execution. The
       // optional `execution_surface` says which produced it: `ccr` for the
       // generic CCR agent-runner routine's per-task write-back (ADR-0005

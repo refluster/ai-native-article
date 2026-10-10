@@ -1,215 +1,131 @@
 ---
 name: backlog-reconcile
-description: Reconcile a repo's planning artifacts — epics/specs and their open issues — against what has actually shipped in the current deployment, so the backlog reflects reality instead of intent. Use when the tracker has drifted; items marked open that already shipped, designs quietly obsoleted by a later evolution, work completed incidentally, or issues that no longer match the code. It discovers the planning surface and the issue tracker, fans out subsystem-owner agents to audit each item against the live codebase plus git history, classifies every item (done, in-progress, not-started, obsoleted-by-evolution, incidentally-done), rewrites statuses with dated evidence notes, then trues up the issues — closing shipped ones, retiring obsolete ones, splitting or rewriting stale ones, and filing fresh issues for the genuine remaining work it surfaces. Ships as a draft PR and hands the merge plus any reclassification sign-off to the operator; never self-merges.
+description: Move every Proposed issue in the bound project's tracker to Verified or Closed — closing what a merged PR already delivered, folding duplicates into their open survivor, retiring what is stale or superseded, and verifying what still stands with the labels and acceptance criteria an owner will need — and re-check any Verified or Assigned issue untouched for 30 days the same way. The first step of the four-stage lifecycle (adr-0046; Proposed → Verified → Assigned → Closed). Evidence or it stays open; closes are budgeted per run; never routes, never works an issue, never opens a PR. Runs as a CCR task on the binding's cron, daily before issue-triage; github.token via the binding's project linkage.
 ---
 
 # backlog-reconcile
 
-A **claude-code-routine** skill (R-N1(a)): it runs in a Claude Code session because it
-fans out audit subagents, edits planning docs, and drives a PR + the issue tracker —
-none of which a Lambda can host. It runs **on a daily binding** (the standing instance is
-Nadia × the workforce's own repo, fired once a day by the orchestrator-tick CCR path —
-see `workforce/scripts/wire-backlog-reconcile-agent-workforce.mjs`) **and** is invocable
-on demand by the operator. It is **not** the persona-voiced `cadence` archetype — it
-publishes no Notion/feed artefact; its side effect is a draft PR plus issue-tracker edits.
+You are the gate between "someone filed it" and "someone will be asked to do
+it" (Nadia's PM lens). Everything that enters the tracker is Proposed; nothing
+reaches an owner until you have checked it against what actually shipped.
+The router (`issue-triage`) assigns only what you verify, so what you let
+through is what the workforce spends its runs on.
 
-The job: a repository's *plan* (its epics/specs and the open issues under them) drifts away
-from its *shipped reality* over time. Items sit at `open`/`draft` long after the work landed;
-some designs are quietly **obsoleted** by a later evolution before they were ever built; some
-work **completed incidentally** as a side effect of unrelated changes; and the remaining issue
-set no longer maps cleanly onto the code. This skill re-grounds the plan against the current
-deployment and leaves the tracker telling the truth — **including the net change to the open
-issues** (close, retire, rewrite, split, and *file new ones* for the real remaining work).
+Your task context supplies `agent_slug`, `project_id` (whose `project.json`
+names the repo), `credentials['github.token'].token` (export as
+`GITHUB_TOKEN`), `credentials['workforce.dispatch_token'].token` (exported as
+`WF_DISPATCH_TOKEN`; the write surface wakes the router with it), and
+`binding_config`: `max_issues_per_run` (default 15), `max_closes_per_run`
+(default 10), `stale_days` (default 30), `sign_off_persona`.
 
-> **Nothing here is hard-coded to one repo.** Paths, status vocabularies, and who-audits-what
-> are all **discovered or derived** at run time (Step 0–2). When this document gives an example
-> it labels it as such. Do not assume a fixed planning-doc path or a fixed roster.
+## Step 1 — scan (deterministic, read-only)
 
-## Inputs / run context
+```sh
+GITHUB_TOKEN="…" node workforce/skills/issue-triage/issue-stage-scan.mjs \
+  --project "<project_id>" --queue reconcile --max <max_issues_per_run ?? 15> \
+  --stale-days <stale_days ?? 30> --out /tmp/issue-reconcile-candidates.json
+```
 
-When fired on the daily binding, the generic agent-runner supplies the task context (same
-shape as every claude-code-routine): `agent_slug` (the owning persona — the standing instance
-is Nadia's PM lens), `project_id` (the bound project, whose `project.json` declares the GitHub
-`owner`/`repo`), `credentials['github.token'].token` (the project-scoped PAT — export it for the
-GitHub calls that read, label, close, and open issues and open the PR), and `binding_config`
-(the persona overlay below). When invoked conversationally, the operator supplies the same
-inputs inline.
+Candidates come back oldest-activity first: every Proposed issue (`check`)
+and every Verified / Assigned issue untouched for `stale_days` with no open PR
+(`stale-check`). The payload also carries `index` (every open issue,
+title-level, so a duplicate outside the batch is visible),
+`recent_merged_prs` (the last 30 days, each with the issues it cites) and,
+per candidate, its open PRs and last comment. **0 candidates is a
+first-class, cheap outcome**: record the no-op and stop.
 
-- **Repo + tracker.** The bound project's repo + its `github.token` (declared in
-  `meta.json:requires`).
-- **Optional scope hint.** The operator (or `binding_config.scope`) may name a subset ("just the
-  platform epics", "everything under the 2026-Q2 milestone"). Absent a hint, **every** open
-  planning item is in scope.
-- **Routing config (`binding_config`).** The standing partition owners, the routing rules that
-  pull in additional specialists, and the skip list — see Step 2. The persona overlay lives in
-  the binding, not in this portable spec, so the same skill re-uses cleanly across repos with a
-  different roster.
+## Step 2 — decide each candidate (your judgment, in this order)
 
-## Step 0 — establish the two ground truths
+Read the issue — body, comments, the epic it serves — then check the
+codebase, `git log` and the merged PRs. **Evidence discipline: never call
+something done unless you can point at the code or the PR that does it**, and
+never call something a duplicate without reading both.
 
-You are comparing **the plan** against **the deployment**. Pin both before judging anything.
+| Finding | Action |
+|---|---|
+| **Already delivered** — a merged PR or a commit on the default branch did it (often a partial slice that cited the issue without `Closes`, or unrelated work that did it incidentally) | close `completed`, citing the PR / commit / file. If only *part* shipped, it is not completed: verify the remainder and say what is left. |
+| **Duplicate** — another **open** issue asks for the same deliverable | close `duplicate` into the survivor (the newer or more complete one). Your comment carries what the duplicate adds that the survivor lacks — acceptance items, evidence, context — or says "nothing new". Two issues that overlap only partly are not duplicates. |
+| **Stale or superseded** — the premise expired, a later ADR / decision / removal made it moot, or it is not worth doing at this repo's scale | close `not_planned` with a one-line reason and what superseded it. A hunch that it "probably no longer matters" is not a reason — verify it instead. |
+| **Still valid** | make sure it has the labels the repo's labelling runbook requires (discover that runbook; this repo: `project:` + `layer:` + `type:`; PSVL/asp-cloud: one `type:*`, ≥ 1 `area:*`, one `priority:*`) and acceptance criteria that can be checked objectively — add them in your comment if the body lacks them — then set Verified. |
 
-1. **The planning surface.** Discover, don't assume. Look for the repo's planning artifacts and
-   its *status index*:
-   - a directory of specs/epics with a status line per file and an index/table that claims to be
-     the canonical status view (example shape: an `epics/` or `specs/` dir with a `README` index);
-   - and/or a GitHub Projects board / milestones / a `STATUS.md`.
-   - **Read the repo's own status-definition doc if it has one** — capture the exact lifecycle
-     states (e.g. `Draft → Accepted → In-progress → Implemented | Rejected`), whether the
-     lifecycle is declared **monotonic**, and what each state's exit criteria are. You will write
-     statuses back in *that* vocabulary, not a generic one.
-2. **The shipped reality.** What is actually live: the deployed code on the default branch, the
-   infra/IaC, the merged PRs, the release/deploy history. `git log`, the IaC templates, and the
-   running app/endpoints are the evidence — not the plan's own prose.
+A `stale-check` candidate gets the same three closing rows; if it stands, say
+so in one line and set Verified **only if it was Verified** — an Assigned
+issue that still stands keeps its stage and owner (post nothing; the next
+re-check is in `stale_days`).
 
-If the repo has **no** planning surface at all, stop and tell the operator — there is nothing to
-reconcile; this is not the skill for greenfield planning.
+Issues outside this table: an `incident` never reaches you; an issue an open
+PR references never reaches you. An issue that is **Assigned** and still
+valid is left exactly as it is.
 
-## Step 1 — inventory both sides
+**Retired labels.** The scan lists each candidate's `retired_labels`
+(`wf:lane:*`, `wf:owner:*`, `wf:human:*`, `wf:handback`, `issue-*:*`,
+`wf:closed:*`). The write surface strips them on every transition; treat a
+`wf:owner:<slug>` or `owner:<slug>` on a non-assigned issue as a routing hint
+for your comment, never as an assignment.
 
-- Enumerate every in-scope planning item with its **current** status line, owner, and any
-  "implemented by / tracked by" pointers.
-- Enumerate every **open issue** in scope (and the closed-recently set, to catch double-work),
-  with labels, milestone, and the epic/spec it claims to serve.
-- Produce a flat work-list. This is the fan-out unit for Step 2.
+## Step 3 — write (deterministic)
 
-## Step 2 — partition by subsystem, then **route** auditors (standing core + specialists)
+Write `/tmp/reconcile-<number>.md` — one short paragraph in your voice: the
+finding and its evidence; for a still-valid issue, the acceptance criteria if
+you had to add them and anything the owner will need to know.
 
-Divide the work-list into partitions **by subsystem / domain**, then staff each partition by
-**routing**, not a fixed roster. This is the same first-match nomination model `pr-autopilot`
-uses, applied to audit lenses:
+```sh
+# still valid
+GITHUB_TOKEN="…" node workforce/skills/issue-triage/issue-stage-set.mjs \
+  --project "<project_id>" --issue <number> --to verified \
+  --body-file /tmp/reconcile-<number>.md
 
-1. **Standing core.** `binding_config.partition_owners` gives the small set of owners that audit
-   on **every** run — each pairs a `lens` (the surface it owns) with an agent slug, chosen to
-   blanket the repo's primary subsystems. For the workforce's own repo the standing core is
-   **Mateo** (backend / substrate / data-plane), **Dario** (engineering quality / governance /
-   CI), **Nadia** (product / console / IA / roadmap framing — the router, self-included), and
-   **Aoi** (design system / agent-experience / content & article surfaces / brand voice). This
-   is the fixed skeleton — it is intentionally *not* all-engineers, so the design/experience
-   surface gets a first-class auditor.
-2. **Routed specialists.** Apply `binding_config.routing_rules` (first-match) to the *actual*
-   partition surfaces this run: when a partition touches a surface the standing core does not
-   cover, **nominate the specialist whose lens it is** — pipeline/content, legal/policy, finance,
-   reliability/SRE, market/GTM, memory/recall, … A specialist joins **only** for the partitions
-   that implicate them, each nomination citing the partition surface (file paths / topics).
-3. **Skip list.** `binding_config.skip_list_default` names personas with no plausible audit
-   surface on this repo — do not fan out to them unless a routing rule pulls them in.
+# delivered / duplicate / stale
+GITHUB_TOKEN="…" node workforce/skills/issue-triage/issue-stage-set.mjs \
+  --project "<project_id>" --issue <number> --to closed \
+  --reason completed --pr <merged PR>            # or --commit <sha>
+  --reason duplicate --of <open survivor>        # carry note lands on the survivor first
+  --reason not_planned
+  --body-file /tmp/reconcile-<number>.md --max-closes <max_closes_per_run ?? 10>
+```
 
-So the partition set = **standing core ∪ routed specialists**, sized to the run. The roster is
-declarative (it lives in the binding), so adapting to another repo is a config change, not a
-spec edit.
+The script posts the comment, applies the labels (one stage, no owner,
+retired labels gone), closes with GitHub's matching reason, and — on
+`verified` — dispatches `issue-triage` so routing follows in seconds. It
+**refuses** (exit 1, reason on stderr — pick again, do not retry the same
+call): a close without its evidence; a duplicate of a closed issue or of a
+PR; an issue an open PR references; an issue a human **reopened** after one of
+your closes (the human overruled you — verify it); an incident; a close past
+the per-run budget. Leave the rest for tomorrow and name them in the report.
 
-Launch the auditors **in parallel** (one read-only subagent per partition). Give each the same
-contract:
+The repo's required labels (`type:*` and friends) are applied with the
+repo's own tooling or the GitHub API as that repo's labelling runbook
+directs; the write surface owns only `stage:*` / `owner:*`.
 
-> For each item in your partition: read its acceptance criteria / definition-of-done, then
-> **verify against the live codebase + git history whether the behaviour actually exists** —
-> cite concrete files, line refs, PR numbers, and any superseding decision record. Classify the
-> item into exactly one bucket (Step 3). **Evidence discipline: never call something done unless
-> you can point at the code that does it.** Return a structured report; do not edit files.
+## Step 4 — report
 
-Auditors are **read-only**. All writes happen after synthesis (Step 5+), so the classification
-stays consistent across partitions.
+End with a short summary: verified (count), closed by reason (with each
+survivor / PR), closes held back for the budget, re-checks that stood, and
+anything you could not decide — an issue whose premise you cannot verify
+either way is verified with that said in the comment, never left Proposed and
+never closed on a hunch.
 
-## Step 3 — the classification buckets
+## Scope
 
-Every item lands in exactly one, expressed in the repo's own status vocabulary:
-
-| Bucket | Meaning | Typical status write |
-|---|---|---|
-| **Done** | Behaviour is live; cite files + PRs. | the terminal "shipped" state |
-| **Incidentally done** | Was open/draft, but shipped as a side effect of other work (status lagged reality). | terminal "shipped" state + a note that it skipped intermediate states |
-| **In-progress** | Partially built; real open gates remain. Name the gates. | the mid-lifecycle state |
-| **Not started** | Genuinely unbuilt; still valid intent. | unchanged |
-| **Obsoleted by evolution** | The design was overtaken by a later decision/architecture before it shipped; the *goal* may have been met a different way. | the "rejected/superseded" state, with a pointer to what replaced it |
-
-The last two buckets are the high-value finds and the easiest to get wrong — be skeptical, and
-make the **superseding decision record** explicit for every "obsoleted".
-
-## Step 4 — synthesize + resolve the judgment calls
-
-Merge the partition reports into one verdict table. Resolve the ambiguous cases yourself:
-disputed "done vs in-progress" gates, the date to stamp a status flip (prefer a documented
-go-live event; otherwise the reconciliation date, with the imprecision noted), and whether a
-"goal met a different way" is a *supersession* (rejected) or a genuine *completion*.
-
-## Step 5 — write the plan back
-
-For each item whose status changed:
-
-- Update the **status line** (and any "implemented/tracked by" pointer) in the repo's vocabulary.
-- Add a **dated reconciliation note** to the item body: who audited it, the bucket, and the
-  evidence (files / PRs / superseding decision record). This is the audit trail that survives the
-  next personnel/model migration.
-- **Keep the canonical index in sync** — if the planning surface has a status table/board, update
-  every changed cell and add rows for any item missing from it. If the repo documents a
-  monotonic lifecycle, respect it: a forward jump to reflect reality is fine; a *backward* move
-  is not — open a follow-up item instead.
-
-## Step 6 — true up the issues (the net increase/decrease + rewrites)
-
-Reconciliation is not done until the **open issue set** matches the new reality. For each open
-issue in scope:
-
-- **Shipped** → close it, referencing the merged PR(s) / the now-"done" planning item.
-- **Obsoleted** → close as "won't do / superseded", pointing at the decision that replaced it.
-- **Stale but still valid** → rewrite the body to match the current code (correct file paths,
-  renamed surfaces, changed acceptance criteria). If the original issue has grown to cover two or
-  more separable pieces, **split** it into focused issues.
-- **Untouched & still accurate** → leave it.
-
-Then **close the gap the audit opened**: every "In-progress" and "Obsoleted-but-goal-still-wanted"
-item from Step 3 usually surfaces **genuine remaining work that has no issue yet** (a carved-out
-sub-task of an obsoleted epic, an open definition-of-done gate, a follow-up the supersession
-created). **File a new issue for each**, linked to its planning item and labelled per the repo's
-scheme. The deliverable of this step is an explicit **diff to the backlog** — N closed, M
-rewritten/split, K newly filed — not just edited docs.
-
-> Issue mutations (close / rewrite / open) are outward-facing and harder to reverse than a doc
-> edit. Batch the proposed diff and, if the operator hasn't pre-authorised the issue churn, show
-> it for a yes before applying — especially bulk closes.
-
-## Step 7 — if nothing changed, say so cheaply (no forced PR)
-
-Most daily runs will find the backlog already true. **"Nothing changed" is a first-class, cheap
-outcome — never a forced PR.** If a run produces **no status flips and an empty issue diff**
-(0 closed / 0 rewritten·split / 0 filed):
-
-- **Do not open a PR.** Record a one-line no-op in the run output (and, if the binding tracks it,
-  bump an empty-run counter), and stop.
-- **After K consecutive empty runs** (default 5), surface a recommendation that the cadence could
-  **downgrade to weekly** — a *daily* reconciliation only earns its recurring cost while the
-  codebase is actively outrunning the plan. Re-wiring the binding cron is an operator decision,
-  not a self-applied one.
-
-This is load-bearing because the cadence is `cost_class: large` (~$0.60/run, ≈$18/mo at daily): the
-**audit fan-out is the cost**, so skipping the write-up on a quiet day keeps the standing daily
-commitment honest. Only proceed to Step 8 when there is a real diff to ship.
-
-## Step 8 — ship it, hand off the merge
-
-- Commit the planning-doc changes with a message that **cites the layer/area** (not "fix: stuff").
-- Open a **draft PR** describing the verdict table, the bucket counts, the **issue diff**, and the
-  remaining genuine open work. Then drive it to review-ready (all CI green, no unresolved threads,
-  flip to Ready) — reuse the repo's existing "ship a draft PR to green" routine rather than
-  re-implementing it.
-- **Never self-merge.** Hand the merge to the operator. Call out explicitly any **reclassification
-  that is a design decision** — every "Obsoleted/Rejected" is one — because those normally require
-  operator (or governing-body) sign-off, and merging encodes that decision.
-
-## Guardrails
-
-- **Evidence or it didn't ship.** No status flips to "done" without a file/PR you can point at.
-- **Read-then-write split.** Audit subagents never edit; writes happen once, post-synthesis.
-- **Respect the lifecycle contract.** Use the repo's own status vocabulary and monotonicity rule.
-- **Outward actions get a confirmation bar.** Bulk issue closes and the merge are the operator's;
-  surface, don't assume.
-- **Stay inside scope.** Reconcile the plan to the code — do **not** start *building* the
-  remaining work in the same pass. New work becomes issues (Step 6), not commits.
+- **Decide, never work.** No code, no drafts, no PRs (R-N9), no routing.
+  Comment + label + evidenced close through the write surface only.
+- **Proposed and idle issues only.** Live Verified / Assigned issues, held
+  issues and incidents are not yours.
+- **Bounded**: `max_issues_per_run`, `max_closes_per_run`. Closing is
+  reversible (reopen), but a burst of closes is how a wrong heuristic does
+  damage at scale.
+- **No new issues.** Filing is anyone's; this cadence only checks what was
+  filed. (Carrying a remainder onto a survivor is a comment, not a new issue.)
+- **Never `@`-mention a persona slug** (ML-012).
 
 ## Out of scope
 
-- Greenfield planning / authoring brand-new epics (this skill reconciles an *existing* plan).
-- Merging the PR, or merging/closing issues the operator hasn't signed off when they're design
-  decisions.
-- Implementing the remaining work it surfaces — that ships as filed issues, not code here.
+- Epic / spec status true-ups and planning-doc rewrites. The earlier shape of
+  this skill (v0.1.x) audited the plan against the deployment with a fan-out
+  of lens subagents and shipped a PR; that is a separate, occasional,
+  operator-invoked exercise now, not the daily gate.
+- Routing (`issue-triage`), working (`issue-execute`), anything on a PR.
+
+Related: [adr-0046](../../docs/adr/adr-0046-issue-lifecycle-stages-and-owners.md),
+[issue-to-merge-flow runbook](../../docs/runbooks/issue-to-merge-flow.md),
+[issue-triage](../issue-triage/SKILL.md), [issue-execute](../issue-execute/SKILL.md).
