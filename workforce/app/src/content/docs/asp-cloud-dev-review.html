@@ -509,7 +509,7 @@
   <text x="20" y="348" class="f3-xs">③ = 失敗 deploy run ÷ 全 run（立ち上げ期・0-step の失敗を除く）。C の 12 件中 10 件は grafana-cloud の 1 原因。③④ は同じ 0–20% の目盛り。</text>
   <text x="20" y="366" class="f3-xs">④ = fix / revert / follow-up のうち、14 日以内にマージ済みの PR 番号を参照するもの ÷ マージ PR（dependabot・bot-audit 除く）。</text>
 </svg>
-</div><figcaption>デプロイの件数と失敗率は構築期と定常期でほぼ変わらず、デプロイ日は約 2 倍に分散した。悪化したのは手戻り率で、8% から 20% に上がった。07 は件数が少なく（デプロイ 8 件・対象 PR 19 本）、比率の比較には使えない（付録 01 §1b・§3a・§5a・§7）。</figcaption></figure>
+</div><figcaption>デプロイの件数と失敗率は構築期と定常期でほぼ変わらず、デプロイ日は約 2 倍に分散した。悪化したのは手戻り率で、8% から 20% に上がった。07 は件数が少なく（デプロイ 8 件・対象 PR 19 本）、比率の比較には向かない（付録 01 §1b・§3a・§5a・§7）。</figcaption></figure>
 
   <div class="scroll"><table class="tight">
     <thead><tr><th>指標</th><th>A 構築期（03–05）</th><th>WF-start（06）</th><th>July dip（07）</th><th>C 定常期（08-01 → 10-09）</th></tr></thead>
@@ -559,91 +559,96 @@
   <text x="20" y="44" class="f2-x">merge → 本番は p50 1.5 分で一定（exact 一致 179/212 本、p90 2.4 分）— 待ちは PR の側にある</text>
   <path d="M410 66H428" class="f2-la"/><text x="434" y="70" class="f2-x">全 PR</text>
   <path d="M482 66H500" class="f2-lb"/><text x="506" y="70" class="f2-x">agent-branch</text>
-  <line x1="70" y1="268.57" x2="570" y2="268.57" class="f2-grid"/>
-  <text x="64" y="272.57" text-anchor="end" class="f2-ms">4h</text>
-  <line x1="70" y1="197.14" x2="570" y2="197.14" class="f2-grid"/>
-  <text x="64" y="201.14" text-anchor="end" class="f2-ms">8h</text>
-  <line x1="70" y1="125.71" x2="570" y2="125.71" class="f2-grid"/>
-  <text x="64" y="129.71" text-anchor="end" class="f2-ms">12h</text>
-  <line x1="70" y1="340" x2="570" y2="340" class="f2-base"/>
-  <text x="64" y="344" text-anchor="end" class="f2-ms">0h</text>
-  <polyline points="148.57,340 217.14,334.64 285.71,329.29 354.29,273.93 422.86,327.5 491.43,315 560,315" class="f2-lb"/>
-  <polyline points="80,331.07 148.57,316.79 217.14,323.93 285.71,300.71 354.29,122.14 422.86,307.86 491.43,240 560,268.57" class="f2-la"/>
-  <circle cx="148.57" cy="340" r="4" class="f2-pb"><title>04 月 agent-branch p50 0.0h</title></circle>
-  <text x="148.57" y="357" text-anchor="middle" class="f2-ms">0.0h</text>
-  <circle cx="217.14" cy="334.64" r="4" class="f2-pb"><title>05 月 agent-branch p50 0.3h</title></circle>
-  <text x="217.14" y="351.64" text-anchor="middle" class="f2-ms">0.3h</text>
-  <circle cx="285.71" cy="329.29" r="4" class="f2-pb"><title>06 月 agent-branch p50 0.6h</title></circle>
-  <text x="285.71" y="346.29" text-anchor="middle" class="f2-ms">0.6h</text>
-  <circle cx="354.29" cy="273.93" r="4" class="f2-pb"><title>07 月 agent-branch p50 3.7h</title></circle>
-  <text x="354.29" y="290.93" text-anchor="middle" class="f2-ms">3.7h</text>
-  <circle cx="422.86" cy="327.5" r="4" class="f2-pb"><title>08 月 agent-branch p50 0.7h</title></circle>
-  <text x="422.86" y="344.5" text-anchor="middle" class="f2-ms">0.7h</text>
-  <circle cx="491.43" cy="315" r="4" class="f2-pb"><title>09 月 agent-branch p50 1.4h</title></circle>
-  <text x="491.43" y="332" text-anchor="middle" class="f2-ms">1.4h</text>
-  <circle cx="560" cy="315" r="4" class="f2-pb"><title>10* 月 agent-branch p50 1.4h</title></circle>
-  <text x="560" y="332" text-anchor="middle" class="f2-ms">1.4h</text>
-  <circle cx="80" cy="331.07" r="4.5" class="f2-pa"><title>03 月 全 PR p50 0.5h</title></circle>
-  <text x="80" y="322.07" text-anchor="middle" class="f2-ma">0.5h</text>
-  <circle cx="148.57" cy="316.79" r="4.5" class="f2-pa"><title>04 月 全 PR p50 1.3h</title></circle>
-  <text x="148.57" y="307.79" text-anchor="middle" class="f2-ma">1.3h</text>
-  <circle cx="217.14" cy="323.93" r="4.5" class="f2-pa"><title>05 月 全 PR p50 0.9h</title></circle>
-  <text x="217.14" y="314.93" text-anchor="middle" class="f2-ma">0.9h</text>
-  <circle cx="285.71" cy="300.71" r="4.5" class="f2-pa"><title>06 月 全 PR p50 2.2h</title></circle>
-  <text x="285.71" y="291.71" text-anchor="middle" class="f2-ma">2.2h</text>
-  <circle cx="354.29" cy="122.14" r="4.5" class="f2-pa"><title>07 月 全 PR p50 12.2h</title></circle>
-  <text x="354.29" y="113.14" text-anchor="middle" class="f2-ma">12.2h</text>
-  <circle cx="422.86" cy="307.86" r="4.5" class="f2-pa"><title>08 月 全 PR p50 1.8h</title></circle>
-  <text x="422.86" y="298.86" text-anchor="middle" class="f2-ma">1.8h</text>
-  <circle cx="491.43" cy="240" r="4.5" class="f2-pa"><title>09 月 全 PR p50 5.6h</title></circle>
-  <text x="491.43" y="231" text-anchor="middle" class="f2-ma">5.6h</text>
-  <circle cx="560" cy="268.57" r="4.5" class="f2-pa"><title>10* 月 全 PR p50 4.0h</title></circle>
-  <text x="560" y="259.57" text-anchor="middle" class="f2-ma">4.0h</text>
-  <text x="582" y="272.57" class="f2-x">全 PR</text>
-  <text x="582" y="319" class="f2-x">agent-branch</text>
-  <path d="M368.29 100.14L384.29 92.14" class="f2-an"/>
-  <text x="388.29" y="95.14" class="f2-x">7 月がピーク（同月の成功デプロイは 8 件）</text>
-  <text x="80" y="376" text-anchor="middle" class="f2-mb">03</text>
-  <text x="148.57" y="376" text-anchor="middle" class="f2-mb">04</text>
-  <text x="217.14" y="376" text-anchor="middle" class="f2-mb">05</text>
-  <text x="285.71" y="376" text-anchor="middle" class="f2-mb">06</text>
-  <text x="354.29" y="376" text-anchor="middle" class="f2-mb">07</text>
-  <text x="422.86" y="376" text-anchor="middle" class="f2-mb">08</text>
-  <text x="491.43" y="376" text-anchor="middle" class="f2-mb">09</text>
-  <text x="560" y="376" text-anchor="middle" class="f2-mb">10*</text>
-  <text x="64" y="376" text-anchor="end" class="f2-xs">2026</text>
-  <text x="80" y="400" class="f2-xs">03 月の agent-branch は該当 PR なし。10* は 10-01〜10-10。</text>
-  <line x1="655" y1="14" x2="655" y2="406" class="f2-dv"/>
-  <text x="672" y="24" class="f2-h">人手ハンドオフの有無で比べる</text>
-  <text x="672" y="44" class="f2-x">2026-08 以降 merged、dependabot 除外</text>
-  <text x="672" y="96" class="f2-mb">p50</text>
-  <text x="672" y="120" class="f2-x">ラベルあり<tspan dx="4" class="f2-ms">n=105</tspan></text>
-  <rect x="790" y="106" width="30.6" height="20" rx="2" class="f2-ba"><title>p50 ラベルあり 15.3h</title></rect>
-  <text x="826.6" y="120.5" class="f2-ma">15.3h</text>
-  <text x="672" y="148" class="f2-x">ラベルなし<tspan dx="4" class="f2-ms">n=143</tspan></text>
-  <rect x="790" y="134" width="2" height="20" rx="2" class="f2-bb"><title>p50 ラベルなし 0.8h</title></rect>
-  <text x="798" y="148.5" class="f2-ma">0.8h</text>
-  <text x="672" y="196" class="f2-mb">p90</text>
-  <text x="672" y="220" class="f2-x">ラベルあり<tspan dx="4" class="f2-ms">n=105</tspan></text>
-  <rect x="790" y="206" width="161" height="20" rx="2" class="f2-ba"><title>p90 ラベルあり 80.5h</title></rect>
-  <text x="957" y="220.5" class="f2-ma">80.5h</text>
-  <text x="672" y="248" class="f2-x">ラベルなし<tspan dx="4" class="f2-ms">n=143</tspan></text>
-  <rect x="790" y="234" width="14.6" height="20" rx="2" class="f2-bb"><title>p90 ラベルなし 7.3h</title></rect>
-  <text x="810.6" y="248.5" class="f2-ma">7.3h</text>
-  <line x1="790" y1="266" x2="970.0" y2="266" class="f2-base"/>
-  <line x1="790" y1="266" x2="790" y2="270" class="f2-base"/>
-  <text x="790" y="283" text-anchor="middle" class="f2-ms">0h</text>
-  <line x1="850" y1="266" x2="850" y2="270" class="f2-base"/>
-  <text x="850" y="283" text-anchor="middle" class="f2-ms">30h</text>
-  <line x1="910" y1="266" x2="910" y2="270" class="f2-base"/>
-  <text x="910" y="283" text-anchor="middle" class="f2-ms">60h</text>
-  <line x1="970" y1="266" x2="970" y2="270" class="f2-base"/>
-  <text x="970" y="283" text-anchor="middle" class="f2-ms">90h</text>
-  <text x="905" y="124" text-anchor="middle" class="f2-big">約 19 倍</text>
-  <text x="905" y="142" text-anchor="middle" class="f2-ms">15.3h ÷ 0.8h</text>
-  <text x="672" y="318" class="f2-x">ラベル = autopilot:needs-human。</text>
-  <text x="672" y="336" class="f2-x">自動マージせず、人のマージ待ちに回された PR。</text>
-  <text x="672" y="354" class="f2-x">遅れはこのハンドオフに集中している。</text>
+  <line x1="70" y1="248.57" x2="570" y2="248.57" class="f2-grid"/>
+  <text x="64" y="252.57" text-anchor="end" class="f2-ms">4h</text>
+  <line x1="70" y1="181.14" x2="570" y2="181.14" class="f2-grid"/>
+  <text x="64" y="185.14" text-anchor="end" class="f2-ms">8h</text>
+  <line x1="70" y1="113.71" x2="570" y2="113.71" class="f2-grid"/>
+  <text x="64" y="117.71" text-anchor="end" class="f2-ms">12h</text>
+  <line x1="70" y1="316" x2="570" y2="316" class="f2-base"/>
+  <text x="64" y="320" text-anchor="end" class="f2-ms">0h</text>
+  <polyline points="148.57,316 217.14,310.94 285.71,305.89 354.29,253.63 422.86,304.2 491.43,292.4 560,292.4" class="f2-lb"/>
+  <polyline points="80,307.57 148.57,294.09 217.14,300.83 285.71,278.91 354.29,110.34 422.86,285.66 491.43,221.6 560,248.57" class="f2-la"/>
+  <circle cx="148.57" cy="316" r="4" class="f2-pb"><title>04 月 agent-branch p50 0.0h</title></circle>
+  <circle cx="217.14" cy="310.94" r="4" class="f2-pb"><title>05 月 agent-branch p50 0.3h</title></circle>
+  <circle cx="285.71" cy="305.89" r="4" class="f2-pb"><title>06 月 agent-branch p50 0.6h</title></circle>
+  <circle cx="354.29" cy="253.63" r="4" class="f2-pb"><title>07 月 agent-branch p50 3.7h</title></circle>
+  <circle cx="422.86" cy="304.2" r="4" class="f2-pb"><title>08 月 agent-branch p50 0.7h</title></circle>
+  <circle cx="491.43" cy="292.4" r="4" class="f2-pb"><title>09 月 agent-branch p50 1.4h</title></circle>
+  <circle cx="560" cy="292.4" r="4" class="f2-pb"><title>10* 月 agent-branch p50 1.4h</title></circle>
+  <circle cx="80" cy="307.57" r="4.5" class="f2-pa"><title>03 月 全 PR p50 0.5h</title></circle>
+  <circle cx="148.57" cy="294.09" r="4.5" class="f2-pa"><title>04 月 全 PR p50 1.3h</title></circle>
+  <circle cx="217.14" cy="300.83" r="4.5" class="f2-pa"><title>05 月 全 PR p50 0.9h</title></circle>
+  <circle cx="285.71" cy="278.91" r="4.5" class="f2-pa"><title>06 月 全 PR p50 2.2h</title></circle>
+  <circle cx="354.29" cy="110.34" r="4.5" class="f2-pa"><title>07 月 全 PR p50 12.2h</title></circle>
+  <circle cx="422.86" cy="285.66" r="4.5" class="f2-pa"><title>08 月 全 PR p50 1.8h</title></circle>
+  <circle cx="491.43" cy="221.6" r="4.5" class="f2-pa"><title>09 月 全 PR p50 5.6h</title></circle>
+  <circle cx="560" cy="248.57" r="4.5" class="f2-pa"><title>10* 月 全 PR p50 4.0h</title></circle>
+  <text x="354.29" y="100.34" text-anchor="middle" class="f2-ma">12.2h</text>
+  <text x="582" y="252.57" class="f2-x">全 PR</text>
+  <text x="582" y="296.4" class="f2-x">agent-branch</text>
+  <path d="M368.29 88.34L384.29 80.34" class="f2-an"/>
+  <text x="388.29" y="83.34" class="f2-x">7 月がピーク（同月の成功デプロイは 8 件）</text>
+  <text x="80" y="338" text-anchor="middle" class="f2-mb">03</text>
+  <text x="80" y="360" text-anchor="middle" class="f2-ma">0.5h</text>
+  <text x="80" y="378" text-anchor="middle" class="f2-m">–</text>
+  <text x="148.57" y="338" text-anchor="middle" class="f2-mb">04</text>
+  <text x="148.57" y="360" text-anchor="middle" class="f2-ma">1.3h</text>
+  <text x="148.57" y="378" text-anchor="middle" class="f2-m">0.0h</text>
+  <text x="217.14" y="338" text-anchor="middle" class="f2-mb">05</text>
+  <text x="217.14" y="360" text-anchor="middle" class="f2-ma">0.9h</text>
+  <text x="217.14" y="378" text-anchor="middle" class="f2-m">0.3h</text>
+  <text x="285.71" y="338" text-anchor="middle" class="f2-mb">06</text>
+  <text x="285.71" y="360" text-anchor="middle" class="f2-ma">2.2h</text>
+  <text x="285.71" y="378" text-anchor="middle" class="f2-m">0.6h</text>
+  <text x="354.29" y="338" text-anchor="middle" class="f2-mb">07</text>
+  <text x="354.29" y="360" text-anchor="middle" class="f2-ma">12.2h</text>
+  <text x="354.29" y="378" text-anchor="middle" class="f2-m">3.7h</text>
+  <text x="422.86" y="338" text-anchor="middle" class="f2-mb">08</text>
+  <text x="422.86" y="360" text-anchor="middle" class="f2-ma">1.8h</text>
+  <text x="422.86" y="378" text-anchor="middle" class="f2-m">0.7h</text>
+  <text x="491.43" y="338" text-anchor="middle" class="f2-mb">09</text>
+  <text x="491.43" y="360" text-anchor="middle" class="f2-ma">5.6h</text>
+  <text x="491.43" y="378" text-anchor="middle" class="f2-m">1.4h</text>
+  <text x="560" y="338" text-anchor="middle" class="f2-mb">10*</text>
+  <text x="560" y="360" text-anchor="middle" class="f2-ma">4.0h</text>
+  <text x="560" y="378" text-anchor="middle" class="f2-m">1.4h</text>
+  <text x="64" y="338" text-anchor="end" class="f2-xs">2026</text>
+  <path d="M22 356H34" class="f2-la"/><text x="64" y="360" text-anchor="end" class="f2-xs">全</text>
+  <path d="M22 374H34" class="f2-lb"/><text x="64" y="378" text-anchor="end" class="f2-xs">agt</text>
+  <line x1="20" y1="346" x2="570" y2="346" class="f2-grid"/>
+  <text x="20" y="404" class="f2-xs">p50（h）。agt = agent-branch（03 月は該当 PR なし）。10* は 10-01〜10-10。</text>
+  <line x1="665" y1="14" x2="665" y2="406" class="f2-dv"/>
+  <text x="682" y="24" class="f2-h">人手ハンドオフの有無で比べる</text>
+  <text x="682" y="44" class="f2-x">2026-08 以降 merged、dependabot 除外</text>
+  <text x="682" y="96" class="f2-mb">p50</text>
+  <text x="682" y="120" class="f2-x">ラベルあり<tspan dx="4" class="f2-ms">n=105</tspan></text>
+  <rect x="798" y="106" width="29.07" height="20" rx="2" class="f2-ba"><title>p50 ラベルあり 15.3h</title></rect>
+  <text x="833.07" y="120.5" class="f2-ma">15.3h</text>
+  <text x="682" y="148" class="f2-x">ラベルなし<tspan dx="4" class="f2-ms">n=143</tspan></text>
+  <rect x="798" y="134" width="2" height="20" rx="2" class="f2-bb"><title>p50 ラベルなし 0.8h</title></rect>
+  <text x="806" y="148.5" class="f2-ma">0.8h</text>
+  <text x="682" y="196" class="f2-mb">p90</text>
+  <text x="682" y="220" class="f2-x">ラベルあり<tspan dx="4" class="f2-ms">n=105</tspan></text>
+  <rect x="798" y="206" width="152.95" height="20" rx="2" class="f2-ba"><title>p90 ラベルあり 80.5h</title></rect>
+  <text x="956.95" y="220.5" class="f2-ma">80.5h</text>
+  <text x="682" y="248" class="f2-x">ラベルなし<tspan dx="4" class="f2-ms">n=143</tspan></text>
+  <rect x="798" y="234" width="13.87" height="20" rx="2" class="f2-bb"><title>p90 ラベルなし 7.3h</title></rect>
+  <text x="817.87" y="248.5" class="f2-ma">7.3h</text>
+  <line x1="798" y1="266" x2="969.0" y2="266" class="f2-base"/>
+  <line x1="798" y1="266" x2="798" y2="270" class="f2-base"/>
+  <text x="798" y="283" text-anchor="middle" class="f2-ms">0h</text>
+  <line x1="855" y1="266" x2="855" y2="270" class="f2-base"/>
+  <text x="855" y="283" text-anchor="middle" class="f2-ms">30h</text>
+  <line x1="912" y1="266" x2="912" y2="270" class="f2-base"/>
+  <text x="912" y="283" text-anchor="middle" class="f2-ms">60h</text>
+  <line x1="969" y1="266" x2="969" y2="270" class="f2-base"/>
+  <text x="969" y="283" text-anchor="middle" class="f2-ms">90h</text>
+  <text x="910" y="124" text-anchor="middle" class="f2-big">約 19 倍</text>
+  <text x="910" y="142" text-anchor="middle" class="f2-ms">15.3h ÷ 0.8h</text>
+  <text x="682" y="318" class="f2-x">ラベル = autopilot:needs-human。</text>
+  <text x="682" y="336" class="f2-x">自動マージせず、人のマージ待ちに回された PR。</text>
+  <text x="682" y="354" class="f2-x">遅れはこのハンドオフに集中している。</text>
 </svg>
 </div><figcaption>マージ後の本番反映は約 2 分で一定のまま、待ちは PR がマージされるまでの側で伸びた。08 月以降は、人手ハンドオフのラベルが付いた PR だけが p50 15.3h と遅く、付かない PR は 0.8h で済んでいる（付録 01 §2a・§2b）。</figcaption></figure>
 
@@ -688,7 +693,7 @@
     .f4-an{font:600 12px Geist,Inter,system-ui,sans-serif;fill:currentColor}
   </style>
   <defs>
-    <pattern id="f4-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" style="fill:var(--accent);fill-opacity:.32"/><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--accent);stroke-width:1.6"/></pattern>
+    <pattern id="f4-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" style="fill:var(--accent);fill-opacity:.32"/><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--accent);stroke-width:1.2;stroke-opacity:.6"/></pattern>
     <marker id="f4-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
   </defs>
   <text x="20" y="24" class="f4-h">週次 error budget 判定 · W22–W41（ISO 週、20 週）</text>
@@ -1243,12 +1248,227 @@
     </tbody>
   </table></div>
 
-  
+  <figure><div class="figscroll">
+<svg viewBox="0 0 1000 432" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="f8-t f8-d" style="min-width:820px">
+  <title id="f8-t">自律 run の成果、Autopilot ファネル、環境障害の入れ替わり</title>
+  <desc id="f8-d">上は自律（CCR）で動いた 530 回の run の成果。実作業 157 回（30%）、無作業 239 回（45%）、環境障害 58 回（11%）、bot PR のため対象外 37 回（7%）、全 Issue が人待ちで空振り 39 回（7%）。左下は autopilot ラベル付き PR 204 本の結末で、人手マージ 168 本（82%）、レーン経由 13 本、証拠なしのマージ 19 本、未マージでクローズ 4 本。右下は環境障害 5 種の発生期間で、repo スコープ外（06-19〜07-25、17 行）、PAT 401（07-27〜08-02、20 行）、PAT 403（08-17、1 行）、ID 崩壊（08-19〜10-02、9 行）、runtime 権限層の拒否（10-04〜10-08、12 行）が、対症療法のたびに入れ替わって現れた。</desc>
+  <style>
+    .f8-h{font:700 13px Geist,Inter,system-ui,sans-serif;fill:currentColor;letter-spacing:.08em}
+    .f8-t{font:700 13px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .f8-l{font:600 12px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .f8-s{font:11.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.72}
+    .f8-x{font:11px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.72}
+    .f8-p{font:600 11px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.62}
+    .f8-c{font:600 10.5px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent);letter-spacing:.06em}
+    .f8-v{font:600 12px "JetBrains Mono",ui-monospace,monospace;fill:currentColor;font-variant-numeric:tabular-nums}
+    .f8-vs{font:500 11px "JetBrains Mono",ui-monospace,monospace;fill:currentColor;opacity:.72;font-variant-numeric:tabular-nums}
+    .f8-ax{font:10.5px "JetBrains Mono",ui-monospace,monospace;fill:currentColor;opacity:.62}
+    .f8-in{font:600 11px Geist,Inter,system-ui,sans-serif;fill:var(--panel)}
+    .f8-inm{font:600 11px "JetBrains Mono",ui-monospace,monospace;fill:var(--panel)}
+    .f8-g{font:600 11px Geist,Inter,system-ui,sans-serif;fill:var(--accent)}
+    .f8-a{fill:var(--accent)}
+    .f8-a2{fill:var(--accent);fill-opacity:.45}
+    .f8-soft{fill:var(--accent-soft)}
+    .f8-sig{fill:var(--signal)}
+    .f8-ink{fill:currentColor;fill-opacity:.78}
+    .f8-grey{fill:currentColor;fill-opacity:.18}
+    .f8-grid{stroke:var(--line);stroke-width:1}
+    .f8-base{stroke:currentColor;stroke-opacity:.35;stroke-width:1}
+    .f8-band{fill:currentColor;fill-opacity:.045}
+    .f8-box{fill:var(--panel);stroke:var(--line);stroke-width:1.2}
+    .f8-empty{fill:var(--panel);stroke:currentColor;stroke-opacity:.4;stroke-width:1}
+    .f8-dbox{fill:none;stroke:currentColor;stroke-opacity:.45;stroke-width:1.2;stroke-dasharray:4 3}
+    .f8-hl{fill:var(--accent);fill-opacity:.07;stroke:var(--accent);stroke-width:1;stroke-dasharray:4 3}
+    .f8-ln{fill:none;stroke:var(--accent);stroke-width:1.2}
+    .f8-arr{fill:none;stroke:var(--accent);stroke-width:1.4;marker-end:url(#f8-ah)}
+    .f8-dash{fill:none;stroke:var(--accent);stroke-width:1.2;stroke-dasharray:3 3;marker-end:url(#f8-ah)}
+  </style>
+  <defs><marker id="f8-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>
+  <text x="20" y="27" class="f8-h">自律 run 530 回は何を生んだか（06〜10 月*）</text>
+  <rect x="20.0" y="44" width="282.4" height="24" class="f8-sig"/>
+  <text x="20.0" y="86" class="f8-l">実作業</text>
+  <text x="20.0" y="102" class="f8-v">157 · 30%</text>
+  <rect x="304.4" y="44" width="430.9" height="24" class="f8-soft"/>
+  <text x="304.4" y="86" class="f8-l">無作業</text>
+  <text x="304.4" y="102" class="f8-v">239 · 45%</text>
+  <rect x="737.3" y="44" width="103.1" height="24" class="f8-ink"/>
+  <text x="737.3" y="86" class="f8-l">環境障害</text>
+  <text x="737.3" y="102" class="f8-v">58 · 11%</text>
+  <rect x="842.3" y="44" width="65.0" height="24" class="f8-grey"/>
+  <text x="842.3" y="86" text-anchor="start" class="f8-l">bot PR</text>
+  <text x="842.3" y="101" text-anchor="start" class="f8-l">対象外</text>
+  <text x="842.3" y="117" text-anchor="start" class="f8-v">37 · 7%</text>
+  <path d="M909.4 44 H976.0 Q980.0 44 980.0 48.0 V64.0 Q980.0 68 976.0 68 H909.4 Z" class="f8-a"/>
+  <text x="980.0" y="86" text-anchor="end" class="f8-l">人待ちで</text>
+  <text x="980.0" y="101" text-anchor="end" class="f8-l">空振り</text>
+  <text x="980.0" y="117" text-anchor="end" class="f8-v">39 · 7%</text>
+  <text x="20" y="136" class="f8-x">実作業 = PR 番号つきの routed / verdict / merged / escalate / draft PR。月別の実作業：06 月 18/61 · 07 月 18/127 · 08 月 37/153 · 09 月 60/133 · 10 月* 24/56。</text>
+  <line x1="20" y1="148" x2="980" y2="148" class="f8-grid"/>
+  <text x="20" y="174" class="f8-p">Autopilot ファネル（autopilot:* ラベル付き PR 204 本の結末）</text>
+  <rect x="20" y="184" width="12" height="10" rx="2" class="f8-a"/>
+  <text x="37" y="193" class="f8-x">人手マージ</text>
+  <rect x="108" y="184" width="12" height="10" rx="2" class="f8-sig"/>
+  <text x="125" y="193" class="f8-x">lane</text>
+  <rect x="199" y="184" width="12" height="10" rx="2" class="f8-grey"/>
+  <text x="216" y="193" class="f8-x">証拠なしマージ</text>
+  <rect x="309" y="184" width="12" height="10" rx="2" class="f8-ink"/>
+  <text x="326" y="193" class="f8-x">クローズ</text>
+  <text x="110" y="223.0" text-anchor="end" class="f8-l">計</text>
+  <rect x="118.0" y="208" width="236.8" height="22" class="f8-a"/>
+  <rect x="356.8" y="208" width="16.5" height="22" class="f8-sig"/>
+  <rect x="375.3" y="208" width="25.0" height="22" class="f8-grey"/>
+  <path d="M402.3 208 H405.2 Q408.0 208 408.0 210.8 V227.2 Q408.0 230 405.2 230 H402.3 Z" class="f8-ink"/>
+  <text x="416.0" y="223.0" class="f8-vs">168 · 13 · 19 · 4</text>
+  <text x="126" y="223" class="f8-in">人手マージ 168（82%）</text>
+  <text x="110" y="257.0" text-anchor="end" class="f8-l">P1 〜08-10</text>
+  <rect x="118.0" y="246" width="100.4" height="14" class="f8-a"/>
+  <rect x="220.4" y="246" width="1.0" height="14" class="f8-sig"/>
+  <rect x="223.2" y="246" width="3.7" height="14" class="f8-grey"/>
+  <path d="M228.9 246 H229.6 Q230.3 246 230.3 246.7 V259.3 Q230.3 260 229.6 260 H228.9 Z" class="f8-ink"/>
+  <text x="238.3" y="257.0" class="f8-vs">72 · 2 · 4 · 1</text>
+  <text x="110" y="281.0" text-anchor="end" class="f8-l">P2 〜09-23</text>
+  <rect x="118.0" y="270" width="87.6" height="14" class="f8-a"/>
+  <rect x="207.6" y="270" width="8.0" height="14" class="f8-sig"/>
+  <rect x="217.5" y="270" width="8.0" height="14" class="f8-grey"/>
+  <path d="M227.5 270 H228.2 Q228.9 270 228.9 270.7 V283.3 Q228.9 284 228.2 284 H227.5 Z" class="f8-ink"/>
+  <text x="236.9" y="281.0" class="f8-vs">63 · 7 · 7 · 1</text>
+  <text x="110" y="305.0" text-anchor="end" class="f8-l">P3 09-24〜</text>
+  <rect x="118.0" y="294" width="44.9" height="14" class="f8-a"/>
+  <rect x="164.9" y="294" width="3.7" height="14" class="f8-sig"/>
+  <rect x="170.6" y="294" width="9.4" height="14" class="f8-grey"/>
+  <path d="M182.0 294 H183.4 Q184.8 294 184.8 295.4 V306.6 Q184.8 308 183.4 308 H182.0 Z" class="f8-ink"/>
+  <text x="192.8" y="305.0" class="f8-vs">33 · 4 · 8 · 2</text>
+  <text x="20" y="330" class="f8-x">hand-off → マージ待ち p50 14.1 h / p90 48.9 h（n=42）。</text>
+  <text x="20" y="346" class="f8-x">標本 42 本のマージ実行者は 42/42 がオペレーター。</text>
+  <line x1="520" y1="160" x2="520" y2="418" class="f8-grid"/>
+  <text x="544" y="174" class="f8-p">環境障害 5 種の入れ替わり（分類表の 59 行）</text>
+  <text x="544" y="192" class="f8-g">対症療法のたびに、次の拒否層が現れた</text>
+  <line x1="602.3" y1="204" x2="602.3" y2="392" class="f8-grid"/>
+  <text x="602.3" y="406" text-anchor="middle" class="f8-ax">7 月</text>
+  <line x1="715.1" y1="204" x2="715.1" y2="392" class="f8-grid"/>
+  <text x="715.1" y="406" text-anchor="middle" class="f8-ax">8 月</text>
+  <line x1="828.0" y1="204" x2="828.0" y2="392" class="f8-grid"/>
+  <text x="828.0" y="406" text-anchor="middle" class="f8-ax">9 月</text>
+  <line x1="937.2" y1="204" x2="937.2" y2="392" class="f8-grid"/>
+  <text x="937.2" y="406" text-anchor="middle" class="f8-ax">10 月</text>
+  <path d="M558.6 226 H689.3 Q693.3 226 693.3 230.0 V234.0 Q693.3 238 689.3 238 H558.6 Z" class="f8-ink"/>
+  <text x="701.3" y="236" class="f8-l">repo スコープ外</text>
+  <text x="802.3" y="236" class="f8-v">17</text>
+  <text x="826.3" y="236" class="f8-ax">06-19〜07-25</text>
+  <path d="M696.9 260 H718.4 Q722.4 260 722.4 264.0 V268.0 Q722.4 272 718.4 272 H696.9 Z" class="f8-ink"/>
+  <path d="M690.3 239 V266 H699.3" class="f8-ln" stroke-dasharray="3 3"/>
+  <text x="730.4" y="270" class="f8-l">PAT 401</text>
+  <text x="785.4" y="270" class="f8-v">20</text>
+  <text x="809.4" y="270" class="f8-ax">07-27〜08-02</text>
+  <path d="M773.4 294 H775.4 Q777.4 294 777.4 296.0 V304.0 Q777.4 306 775.4 306 H773.4 Z" class="f8-ink"/>
+  <path d="M719.4 273 V300 H770.4" class="f8-ln" stroke-dasharray="3 3"/>
+  <text x="785.4" y="304" class="f8-l">PAT 403</text>
+  <text x="840.4" y="304" class="f8-v">1</text>
+  <text x="857.4" y="304" class="f8-ax">08-17</text>
+  <path d="M780.7 328 H940.5 Q944.5 328 944.5 332.0 V336.0 Q944.5 340 940.5 340 H780.7 Z" class="f8-ink"/>
+  <path d="M774.4 307 V334 H783.4" class="f8-ln" stroke-dasharray="3 3"/>
+  <text x="768.7" y="338" text-anchor="end" class="f8-v">9</text>
+  <text x="753.5" y="338" text-anchor="end" class="f8-l">ID 崩壊（proxy 置換）</text>
+  <text x="608.5" y="338" text-anchor="end" class="f8-ax">08-19〜10-02</text>
+  <path d="M948.2 362 H962.4 Q966.4 362 966.4 366.0 V370.0 Q966.4 374 962.4 374 H948.2 Z" class="f8-ink"/>
+  <path d="M941.5 341 V368 H950.5" class="f8-ln" stroke-dasharray="3 3"/>
+  <text x="936.2" y="372" text-anchor="end" class="f8-v">12</text>
+  <text x="913.8" y="372" text-anchor="end" class="f8-l">runtime 権限層の拒否</text>
+  <text x="775.8" y="372" text-anchor="end" class="f8-ax">10-04〜10-08</text>
+  <text x="544" y="424" class="f8-x">止めたのは毎回オペレーターの手作業（PAT 再発行・スコープ追加など）。</text>
+</svg>
+</div><figcaption>自律 run の 3 割が実作業で、半分近くは「やることがなかった」run でした。autopilot ラベルの PR も 8 割強は最後に人がマージしています。環境障害は 1 種類を直すと次の種類が現れ、4 か月途切れませんでした（付録 04 §2.4–2.5、§4）。</figcaption></figure>
 
   <h3 class="sub">オペレーター負荷 — ID 崩壊を補正して</h3>
   <p><span class="kw">refluster</span> 名義のコメント 1,436 件のうち <b>917 件はペルソナ文体</b>で、682 件は pr-autopilot の cron 窓に投稿されています。CCR の egress が GitHub API 呼び出しをすべてオペレーターの ID に差し替えるため（workforce ML-040）、<b>コメント数は人の負荷の指標として使えません</b>。人手と判定できるコメントは約 44 件で、7 月以降は週 0〜3 件。負荷は「書く」から「セッションを運転し、まとめてクリックする」に移っています。</p>
 
-  
+  <figure><div class="figscroll">
+<svg viewBox="0 0 1000 346" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="f9-t f9-d" style="min-width:760px">
+  <title id="f9-t">人手マージ約 287 件の曜日別・月別の分布</title>
+  <desc id="f9-d">左は 06-16〜10-09 の人手マージ約 287 件の曜日別件数で、月 74、火 79、水 27、木 29、金 49、土 19、日 10。月曜と火曜の 2 日で 153 件、53% を占める。右は月別で、6 月 57、7 月 34、8 月 60、9 月 100、10 月（1〜10 日の部分月）36。refluster 名義のコメント 1,436 件のうち人が書いたと判定できるのは約 44 件にとどまり、オペレーターは 116 日のうち 82 日稼働していた。</desc>
+  <style>
+    .f9-h{font:700 13px Geist,Inter,system-ui,sans-serif;fill:currentColor;letter-spacing:.08em}
+    .f9-t{font:700 13px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .f9-l{font:600 12px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .f9-s{font:11.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.72}
+    .f9-x{font:11px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.72}
+    .f9-p{font:600 11px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.62}
+    .f9-c{font:600 10.5px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent);letter-spacing:.06em}
+    .f9-v{font:600 12px "JetBrains Mono",ui-monospace,monospace;fill:currentColor;font-variant-numeric:tabular-nums}
+    .f9-vs{font:500 11px "JetBrains Mono",ui-monospace,monospace;fill:currentColor;opacity:.72;font-variant-numeric:tabular-nums}
+    .f9-ax{font:10.5px "JetBrains Mono",ui-monospace,monospace;fill:currentColor;opacity:.62}
+    .f9-in{font:600 11px Geist,Inter,system-ui,sans-serif;fill:var(--panel)}
+    .f9-inm{font:600 11px "JetBrains Mono",ui-monospace,monospace;fill:var(--panel)}
+    .f9-g{font:600 11px Geist,Inter,system-ui,sans-serif;fill:var(--accent)}
+    .f9-a{fill:var(--accent)}
+    .f9-a2{fill:var(--accent);fill-opacity:.45}
+    .f9-soft{fill:var(--accent-soft)}
+    .f9-sig{fill:var(--signal)}
+    .f9-ink{fill:currentColor;fill-opacity:.78}
+    .f9-grey{fill:currentColor;fill-opacity:.18}
+    .f9-grid{stroke:var(--line);stroke-width:1}
+    .f9-base{stroke:currentColor;stroke-opacity:.35;stroke-width:1}
+    .f9-band{fill:currentColor;fill-opacity:.045}
+    .f9-box{fill:var(--panel);stroke:var(--line);stroke-width:1.2}
+    .f9-empty{fill:var(--panel);stroke:currentColor;stroke-opacity:.4;stroke-width:1}
+    .f9-dbox{fill:none;stroke:currentColor;stroke-opacity:.45;stroke-width:1.2;stroke-dasharray:4 3}
+    .f9-hl{fill:var(--accent);fill-opacity:.07;stroke:var(--accent);stroke-width:1;stroke-dasharray:4 3}
+    .f9-ln{fill:none;stroke:var(--accent);stroke-width:1.2}
+    .f9-arr{fill:none;stroke:var(--accent);stroke-width:1.4;marker-end:url(#f9-ah)}
+  </style>
+  <defs><marker id="f9-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>
+  <text x="20" y="27" class="f9-h">人手マージ ≈287 件はいつ行われたか（06-16〜10-09）</text>
+  <text x="20" y="58" class="f9-p">曜日別</text>
+  <rect x="70" y="66" width="116" height="208" rx="6" class="f9-hl"/>
+  <text x="128" y="84" text-anchor="middle" class="f9-g">月火で 153 件（53%）</text>
+  <path d="M82.0 246 V124.2 Q82.0 120.2 86.0 120.2 H102.0 Q106.0 120.2 106.0 124.2 V246 Z" class="f9-a"/>
+  <text x="94" y="113" text-anchor="middle" class="f9-v">74</text>
+  <text x="94" y="264" text-anchor="middle" class="f9-l">月</text>
+  <path d="M150.0 246 V115.7 Q150.0 111.7 154.0 111.7 H170.0 Q174.0 111.7 174.0 115.7 V246 Z" class="f9-a"/>
+  <text x="162" y="105" text-anchor="middle" class="f9-v">79</text>
+  <text x="162" y="264" text-anchor="middle" class="f9-l">火</text>
+  <path d="M218.0 246 V204.1 Q218.0 200.1 222.0 200.1 H238.0 Q242.0 200.1 242.0 204.1 V246 Z" class="f9-a"/>
+  <text x="230" y="193" text-anchor="middle" class="f9-v">27</text>
+  <text x="230" y="264" text-anchor="middle" class="f9-l">水</text>
+  <path d="M286.0 246 V200.7 Q286.0 196.7 290.0 196.7 H306.0 Q310.0 196.7 310.0 200.7 V246 Z" class="f9-a"/>
+  <text x="298" y="190" text-anchor="middle" class="f9-v">29</text>
+  <text x="298" y="264" text-anchor="middle" class="f9-l">木</text>
+  <path d="M354.0 246 V166.7 Q354.0 162.7 358.0 162.7 H374.0 Q378.0 162.7 378.0 166.7 V246 Z" class="f9-a"/>
+  <text x="366" y="156" text-anchor="middle" class="f9-v">49</text>
+  <text x="366" y="264" text-anchor="middle" class="f9-l">金</text>
+  <path d="M422.0 246 V217.7 Q422.0 213.7 426.0 213.7 H442.0 Q446.0 213.7 446.0 217.7 V246 Z" class="f9-a"/>
+  <text x="434" y="207" text-anchor="middle" class="f9-v">19</text>
+  <text x="434" y="264" text-anchor="middle" class="f9-l">土</text>
+  <path d="M490.0 246 V233.0 Q490.0 229.0 494.0 229.0 H510.0 Q514.0 229.0 514.0 233.0 V246 Z" class="f9-a"/>
+  <text x="502" y="222" text-anchor="middle" class="f9-v">10</text>
+  <text x="502" y="264" text-anchor="middle" class="f9-l">日</text>
+  <line x1="40" y1="246" x2="536" y2="246" class="f9-base"/>
+  <path d="M414 274 V279 H522 V274" fill="none" stroke="currentColor" stroke-opacity=".35"/>
+  <text x="468" y="292" text-anchor="middle" class="f9-x">週末 29 件</text>
+  <line x1="560" y1="48" x2="560" y2="282" class="f9-grid"/>
+  <text x="584" y="58" class="f9-p">月別</text>
+  <path d="M620.0 246 V164.5 Q620.0 160.5 624.0 160.5 H638.0 Q642.0 160.5 642.0 164.5 V246 Z" class="f9-a"/>
+  <text x="631" y="154" text-anchor="middle" class="f9-v">57</text>
+  <text x="631" y="264" text-anchor="middle" class="f9-l">6 月</text>
+  <path d="M692.0 246 V199.0 Q692.0 195.0 696.0 195.0 H710.0 Q714.0 195.0 714.0 199.0 V246 Z" class="f9-a"/>
+  <text x="703" y="188" text-anchor="middle" class="f9-v">34</text>
+  <text x="703" y="264" text-anchor="middle" class="f9-l">7 月</text>
+  <path d="M764.0 246 V160.0 Q764.0 156.0 768.0 156.0 H782.0 Q786.0 156.0 786.0 160.0 V246 Z" class="f9-a"/>
+  <text x="775" y="149" text-anchor="middle" class="f9-v">60</text>
+  <text x="775" y="264" text-anchor="middle" class="f9-l">8 月</text>
+  <path d="M836.0 246 V100.0 Q836.0 96.0 840.0 96.0 H854.0 Q858.0 96.0 858.0 100.0 V246 Z" class="f9-a"/>
+  <text x="847" y="89" text-anchor="middle" class="f9-v">100</text>
+  <text x="847" y="264" text-anchor="middle" class="f9-l">9 月</text>
+  <path d="M908.0 246 V196.0 Q908.0 192.0 912.0 192.0 H926.0 Q930.0 192.0 930.0 196.0 V246 Z" class="f9-a2"/>
+  <text x="919" y="185" text-anchor="middle" class="f9-v">36</text>
+  <text x="919" y="264" text-anchor="middle" class="f9-l">10 月*</text>
+  <line x1="584" y1="246" x2="964" y2="246" class="f9-base"/>
+  <text x="964" y="292" text-anchor="end" class="f9-x">* 10 月は 1〜10 日の部分月。6 月は 16 日から</text>
+  <rect x="10" y="304" width="980" height="38" rx="8" class="f9-band"/>
+  <text x="24" y="330" class="f9-l">refluster 名義コメント 1,436 のうち、人手と判定できるのは約 44</text>
+  <text x="560" y="330" class="f9-l">稼働 82/116 日 · 週末 18/32 日 · 最長 12 日連続</text>
+</svg>
+</div><figcaption>人手のマージは月曜と火曜に集中します。週末に届く監査 PR の束を週明けにまとめて処理する形です。コメント数は ID 崩壊のため人の負荷の指標にならないので、マージ・PR 作成・セッションの記録から稼働日を数え直しました（付録 04 §3.3）。</figcaption></figure>
 
   <h3 class="sub">レビューの質と 🔴 の行方</h3>
   <div class="two">
@@ -1437,7 +1657,145 @@
   <h2>価値と、作らなかったもの</h2>
   <p class="lede">ソフトウェアは「①接続が閉じる」の手前まで出荷済みで、価値の律速は物理施工に移っています。測る物差しが揺れていることが、価値の読み違いを生む余地になっています。</p>
 
-  
+  <figure><div class="figscroll">
+<svg viewBox="0 0 1000 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="f13-t f13-d" style="min-width:820px">
+  <title id="f13-t">パイロットの到達状況：機器クラス別の稼働台数、25 世帯の状態、制御実行数</title>
+  <desc id="f13-d">2026-10-09 時点の稼働機器は 17 台で、SolaX 蓄電池 11、eGauge2 5、Emporia2 EV 1、OCPP 0、SkyCentrics 給湯器 0。EV 充電器は 14 世帯、給湯器は 17 世帯に予定されている。25 世帯のうち施工完了は 0、一部完了は Home 13 の 1、機器登録済みは 9 世帯（09-05 と 10-09 時点）。28 日窓の制御実行数は W38 13、W39 13、W40 257、W41 656 と増えたが、合意 KPI は 18 項目中 0 項目が測定開始、Home Report の実世帯向け版は 0。</desc>
+  <style>
+    .f13-h{font:700 12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;letter-spacing:.12em}
+    .f13-ph{font:700 13px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .f13-as{font:500 10.5px "JetBrains Mono",ui-monospace,monospace;fill:currentColor;opacity:.62}
+    .f13-x{font:11px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.62}
+    .f13-rl{font:12px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.85}
+    .f13-rv{font:700 12px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent)}
+    .f13-rv0{font:700 12px "JetBrains Mono",ui-monospace,monospace;fill:currentColor;opacity:.72}
+    .f13-pl{font:11px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.72}
+    .f13-bar{fill:var(--accent)}
+    .f13-plan{fill:var(--panel-2);stroke:currentColor;stroke-opacity:.3;stroke-width:1}
+    .f13-zero{stroke:currentColor;stroke-width:2.5}
+    .f13-axis{stroke:currentColor;stroke-opacity:.35;stroke-width:1}
+    .f13-lg{font:11.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.78}
+    .f13-tot{font:700 12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .f13-done{fill:var(--accent)}
+    .f13-part{fill:url(#f13-hatch)}
+    .f13-partl{fill:none;stroke:var(--accent);stroke-width:1.2}
+    .f13-reg{fill:none;stroke:var(--accent);stroke-width:2.2}
+    .f13-none{fill:var(--panel);stroke:var(--line);stroke-width:1.5}
+    .f13-ln{fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linejoin:round}
+    .f13-dot{fill:var(--accent);stroke:var(--panel);stroke-width:2}
+    .f13-ax{font:500 10.5px "JetBrains Mono",ui-monospace,monospace;fill:currentColor;opacity:.62}
+    .f13-v{font:700 11.5px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent)}
+    .f13-vb{font:800 14px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent)}
+    .f13-tile{fill:var(--panel);stroke:var(--line);stroke-width:1.2}
+    .f13-tl{font:600 11.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.78}
+    .f13-tb{font:800 22px "JetBrains Mono",ui-monospace,monospace;fill:currentColor}
+    .f13-div{stroke:var(--line);stroke-width:1}
+    .f13-ft{font:12px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.85}
+    .f13-fb{font:700 12px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+  </style>
+  <defs>
+    <pattern id="f13-hatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="4" height="4" fill="var(--accent)" fill-opacity=".18"/><line x1="0" y1="0" x2="0" y2="4" stroke="var(--accent)" stroke-width="1.5"/></pattern>
+  </defs>
+
+  <text x="20" y="26" class="f13-h">パイロットの到達状況</text>
+  <text x="980" y="26" text-anchor="end" class="f13-x">目標 ≈25 世帯 · 100–200 台（pilot-scope ADR）</text>
+  <line x1="364" y1="44" x2="364" y2="340" class="f13-div"/>
+  <line x1="648" y1="44" x2="648" y2="340" class="f13-div"/>
+
+    <text x="20" y="60" text-anchor="start" class="f13-ph">機器クラス別 · 稼働台数 vs 予定</text>
+  <text x="20" y="77" text-anchor="start" class="f13-as">as-of 2026-10-09（device map）</text>
+  <rect x="150" y="166" width="145.6" height="64" rx="3" class="f13-plan"/>
+  <text x="289.6" y="202" text-anchor="end" class="f13-pl">予定 EVSE 14 世帯</text>
+  <rect x="150" y="246" width="176.8" height="28" rx="3" class="f13-plan"/>
+  <text x="320.8" y="264" text-anchor="end" class="f13-pl">予定 17 世帯</text>
+  <text x="20" y="112" text-anchor="start" class="f13-rl">SolaX 蓄電池</text>
+  <rect x="150" y="99" width="114.4" height="18" rx="2" class="f13-bar"/>
+  <text x="271.4" y="112.5" text-anchor="start" class="f13-rv">11 台</text>
+  <text x="20" y="148" text-anchor="start" class="f13-rl">eGauge2 計測</text>
+  <rect x="150" y="135" width="52.0" height="18" rx="2" class="f13-bar"/>
+  <text x="209.0" y="148.5" text-anchor="start" class="f13-rv">5 台</text>
+  <text x="20" y="184" text-anchor="start" class="f13-rl">Emporia2 EV</text>
+  <rect x="150" y="171" width="10.4" height="18" rx="2" class="f13-bar"/>
+  <text x="167.4" y="184.5" text-anchor="start" class="f13-rv">1 台</text>
+  <text x="20" y="220" text-anchor="start" class="f13-rl">OCPP EV</text>
+  <line x1="150" y1="207" x2="150" y2="225" class="f13-zero"/>
+  <text x="157" y="220.5" text-anchor="start" class="f13-rv0">0 台</text>
+  <text x="20" y="264" text-anchor="start" class="f13-rl">SkyCentrics 給湯器</text>
+  <line x1="150" y1="251" x2="150" y2="269" class="f13-zero"/>
+  <text x="157" y="264.5" text-anchor="start" class="f13-rv0">0 台</text>
+  <line x1="150" y1="90" x2="150" y2="278" class="f13-axis"/>
+  <rect x="20" y="294" width="16" height="10" rx="2" class="f13-bar"/>
+  <text x="42" y="303" text-anchor="start" class="f13-lg">稼働台数</text>
+  <rect x="110" y="293" width="20" height="12" rx="2" class="f13-plan"/>
+  <text x="136" y="303" text-anchor="start" class="f13-lg">予定（世帯数）</text>
+  <text x="20" y="328" text-anchor="start" class="f13-tot">計 17 台 / 目標 100–200 台</text>
+  <text x="380" y="60" text-anchor="start" class="f13-ph">25 世帯の状態</text>
+  <text x="380" y="77" text-anchor="start" class="f13-as">施工 as-of 09-05 · 機器登録 10-09</text>
+  <circle cx="446" cy="106" r="11.5" class="f13-part"/>
+  <circle cx="446" cy="106" r="11.5" class="f13-reg"/>
+  <circle cx="478" cy="106" r="11.5" class="f13-reg"/>
+  <circle cx="510" cy="106" r="11.5" class="f13-reg"/>
+  <circle cx="542" cy="106" r="11.5" class="f13-reg"/>
+  <circle cx="574" cy="106" r="11.5" class="f13-reg"/>
+  <circle cx="446" cy="138" r="11.5" class="f13-reg"/>
+  <circle cx="478" cy="138" r="11.5" class="f13-reg"/>
+  <circle cx="510" cy="138" r="11.5" class="f13-reg"/>
+  <circle cx="542" cy="138" r="11.5" class="f13-reg"/>
+  <circle cx="574" cy="138" r="11.5" class="f13-none"/>
+  <circle cx="446" cy="170" r="11.5" class="f13-none"/>
+  <circle cx="478" cy="170" r="11.5" class="f13-none"/>
+  <circle cx="510" cy="170" r="11.5" class="f13-none"/>
+  <circle cx="542" cy="170" r="11.5" class="f13-none"/>
+  <circle cx="574" cy="170" r="11.5" class="f13-none"/>
+  <circle cx="446" cy="202" r="11.5" class="f13-none"/>
+  <circle cx="478" cy="202" r="11.5" class="f13-none"/>
+  <circle cx="510" cy="202" r="11.5" class="f13-none"/>
+  <circle cx="542" cy="202" r="11.5" class="f13-none"/>
+  <circle cx="574" cy="202" r="11.5" class="f13-none"/>
+  <circle cx="446" cy="234" r="11.5" class="f13-none"/>
+  <circle cx="478" cy="234" r="11.5" class="f13-none"/>
+  <circle cx="510" cy="234" r="11.5" class="f13-none"/>
+  <circle cx="542" cy="234" r="11.5" class="f13-none"/>
+  <circle cx="574" cy="234" r="11.5" class="f13-none"/>
+  <text x="434.5" y="264" text-anchor="start" class="f13-x">左上 = Home 13（08-21 に初の実宅施工）</text>
+  <circle cx="388" cy="282" r="6" class="f13-done"/>
+  <text x="402" y="286" text-anchor="start" class="f13-lg">施工完了 0</text>
+  <circle cx="508" cy="282" r="6" class="f13-part"/><circle cx="508" cy="282" r="6" class="f13-partl"/>
+  <text x="522" y="286" text-anchor="start" class="f13-lg">一部完了 1</text>
+  <circle cx="388" cy="302" r="6" class="f13-reg"/>
+  <text x="402" y="306" text-anchor="start" class="f13-lg">機器登録済み 9（Home 13 含む）</text>
+  <circle cx="388" cy="322" r="6" class="f13-none"/>
+  <text x="402" y="326" text-anchor="start" class="f13-lg">未登録 16 · ほか UC Davis Lab 2</text>
+  <text x="664" y="60" text-anchor="start" class="f13-ph">制御実行数（28 日窓）</text>
+  <text x="664" y="77" text-anchor="start" class="f13-as">SLI-2 executed · W38–W41（09-14 → 10-05）</text>
+  <line x1="688" y1="222" x2="974" y2="222" class="f13-axis"/>
+  <path d="M704 219.7 L790 219.7 L876 175.8 L962 104.0" class="f13-ln"/>
+  <circle cx="704" cy="219.7" r="4.5" class="f13-dot"/>
+  <text x="704" y="240" text-anchor="middle" class="f13-ax">W38</text>
+  <circle cx="790" cy="219.7" r="4.5" class="f13-dot"/>
+  <text x="790" y="240" text-anchor="middle" class="f13-ax">W39</text>
+  <circle cx="876" cy="175.8" r="4.5" class="f13-dot"/>
+  <text x="876" y="240" text-anchor="middle" class="f13-ax">W40</text>
+  <circle cx="962" cy="104.0" r="4.5" class="f13-dot"/>
+  <text x="962" y="240" text-anchor="middle" class="f13-ax">W41</text>
+  <text x="704" y="209.7" text-anchor="middle" class="f13-v">13</text>
+  <text x="790" y="209.7" text-anchor="middle" class="f13-v">13</text>
+  <text x="867" y="169.8" text-anchor="end" class="f13-v">257</text>
+  <text x="952" y="108.0" text-anchor="end" class="f13-vb">656</text>
+  <rect x="664" y="262" width="152" height="72" rx="6" class="f13-tile"/>
+  <text x="676" y="280" text-anchor="start" class="f13-tl">KPI 測定開始</text>
+  <text x="676" y="309" text-anchor="start" class="f13-tb">0 / 18</text>
+  <text x="676" y="326" text-anchor="start" class="f13-as">as-of 09-05</text>
+  <rect x="826" y="262" width="152" height="72" rx="6" class="f13-tile"/>
+  <text x="838" y="280" text-anchor="start" class="f13-tl">Home Report 実世帯</text>
+  <text x="838" y="309" text-anchor="start" class="f13-tb">0 版</text>
+  <text x="838" y="326" text-anchor="start" class="f13-as">as-of 10-05</text>
+
+  <line x1="20" y1="354" x2="980" y2="354" class="f13-div"/>
+  <text x="20" y="378" class="f13-fb">到達：9 パイロット宅 + UC Davis Lab 2 · 17 台</text>
+  <text x="330" y="378" class="f13-ft">施工完了 0/25 · 許認可 承認 1 / 申請中 8 / 未申請 16（09-05）· 合意 KPI 0/18 測定</text>
+</svg>
+</div><figcaption>ソフトは 7 アダプタを出荷済みだが、稼働しているのは蓄電池・計測・EV の 3 種 17 台で、給湯器（17 世帯予定）と OCPP は 0 台。28 日窓の制御実行は W38 の 13 回から W41 の 656 回に増えた一方、施工完了は 0/25、合意 KPI の測定開始も 0/18 で、住人に届いた価値はまだ測れない（付録 05 §3.1）。</figcaption></figure>
 
   <div class="scroll"><table class="tight">
     <thead><tr><th>EBM 領域</th><th>事実</th><th>解釈</th></tr></thead>
@@ -1588,7 +1946,113 @@
 </div><figcaption>公表 SLI-1 は SLO を割った直後に 2 回（W24→25、W37→38）定義が変わり、どちらも翌週 100% になった。raw の実測値は最大でも 82.9%（W28–W34）で、95% に届いた週はない。raw は W24・W25・W28・W34・W37〜W41 のみ実測で、間は点線で補間（付録 05 §3.3）。</figcaption></figure>
   <p>SLO 割れの直後に 2 回（W24→25、W37→38）定義が変わり、どちらも翌週 100% になりました。各変更は ADR で根拠づけられていますが、旧定義との比較が残りません。W31〜W35 の Green は「8 台で fleet が動かなかった期間」の反映が大きい（解釈）。raw を併記しないと、I-7（Green なら改善しない）が誤った方向に働く余地があります。</p>
 
-  
+  <figure><div class="figscroll">
+<svg viewBox="0 0 1000 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="f12-t f12-d" style="min-width:820px">
+  <title id="f12-t">2026-04〜10 のマージ PR 637 本の配分と、L0 の優先順位</title>
+  <desc id="f12-d">マージ PR 637 本のうち 302 本（47%）が統治・監査・開発自動化で、内訳は監査 115、統治・ADR・docs 157、autopilot・workforce 30。L0 の ① 接続が閉じる は 95 本（15%）、② 運用が回る は 70 本（11%）、③ 生活を壊さない は 6 本＋α。ほかに評価・報告 35、依存更新 62、CI/security 22、その他 45。L0 で後回しの最適化・スケールは実装 0 行だが、開発プロセスの自動化（E-010）には台帳 505 行、条文改定約 16 件、機構変更約 6 件が投じられた。</desc>
+  <style>
+    .f12-h{font:700 12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;letter-spacing:.12em}
+    .f12-x{font:11px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.62}
+    .f12-gov{fill:currentColor;fill-opacity:.78}
+    .f12-l0{fill:var(--accent)}
+    .f12-ev{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1}
+    .f12-oth{fill:var(--panel-2);stroke:var(--line);stroke-width:1}
+    .f12-in{font:700 12px Geist,Inter,system-ui,sans-serif;fill:var(--panel)}
+    .f12-inp{font:600 11px "JetBrains Mono",ui-monospace,monospace;fill:var(--panel);opacity:.8}
+    .f12-ino{font:600 11.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.82}
+    .f12-bl{font:11.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.78}
+    .f12-pc{font:600 11px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent)}
+    .f12-lead{stroke:currentColor;stroke-opacity:.45;stroke-width:1}
+    .f12-brk{fill:none;stroke:currentColor;stroke-opacity:.55;stroke-width:1.2}
+    .f12-brka{fill:none;stroke:var(--accent);stroke-width:1.2}
+    .f12-gh{font:700 13px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .f12-lh{font:700 13px Geist,Inter,system-ui,sans-serif;fill:var(--accent)}
+    .f12-div{stroke:var(--line);stroke-width:1}
+    .f12-chip{fill:var(--panel);stroke:var(--accent);stroke-width:1.3}
+    .f12-chipl{fill:var(--panel-2);stroke:var(--line);stroke-width:1.2}
+    .f12-ct{font:700 13.5px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .f12-cn{font:600 11.5px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent)}
+    .f12-cm{font:11.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.72}
+    .f12-zero{font:700 13px Geist,Inter,system-ui,sans-serif;fill:var(--signal)}
+    .f12-arr{fill:none;stroke:var(--accent);stroke-width:1.4;marker-end:url(#f12-ah)}
+    .f12-p{font:600 11px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.62;letter-spacing:.08em}
+    .f12-f{font:12px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.85}
+    .f12-fb{font:700 12px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .f12-hyp{fill:none;stroke:currentColor;stroke-opacity:.5;stroke-width:1.2;stroke-dasharray:5 4}
+    .f12-fn{font:11px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.62}
+  </style>
+  <defs>
+    <marker id="f12-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker>
+  </defs>
+
+  <text x="20" y="26" class="f12-h">マージ PR 637 本の配分 · 2026-04 → 10*</text>
+  <text x="980" y="26" text-anchor="end" class="f12-x">横幅 = 本数（100% 積み上げ）</text>
+
+    <rect x="20" y="74" width="172.3" height="46" class="f12-gov"/>
+  <text x="106.2" y="101.5" text-anchor="middle" class="f12-in">監査 115</text>
+  <rect x="193.3" y="74" width="235.6" height="46" class="f12-gov"/>
+  <text x="311.1" y="101.5" text-anchor="middle" class="f12-in">統治・ADR・docs 157</text>
+  <rect x="429.9" y="74" width="43.2" height="46" class="f12-gov"/>
+  <text x="451.5" y="101.5" text-anchor="middle" class="f12-in">30</text>
+  <path d="M451.5 123 V132" class="f12-lead"/>
+  <text x="451.5" y="145" text-anchor="middle" class="f12-bl">autopilot・workforce 30</text>
+  <rect x="475.1" y="74" width="141.2" height="46" class="f12-l0"/>
+  <text x="545.7" y="94" text-anchor="middle" class="f12-in">① 接続 95</text>
+  <text x="545.7" y="111" text-anchor="middle" class="f12-inp">15%</text>
+  <rect x="618.3" y="74" width="103.5" height="46" class="f12-l0"/>
+  <text x="670.1" y="94" text-anchor="middle" class="f12-in">② 運用 70</text>
+  <text x="670.1" y="111" text-anchor="middle" class="f12-inp">11%</text>
+  <rect x="723.8" y="74" width="7.0" height="46" class="f12-l0"/>
+  <path d="M727.3 123 V132" class="f12-lead"/>
+  <text x="731.3" y="145" text-anchor="end" class="f12-bl">③ 生活 6+α</text>
+  <rect x="732.8" y="74" width="50.7" height="46" class="f12-ev"/>
+  <text x="758.2" y="101.5" text-anchor="middle" class="f12-ino">35</text>
+  <path d="M758.2 123 V132" class="f12-lead"/>
+  <text x="754.2" y="145" text-anchor="start" class="f12-bl">評価・報告 35</text>
+  <rect x="785.6" y="74" width="91.4" height="46" class="f12-oth"/>
+  <text x="831.3" y="101.5" text-anchor="middle" class="f12-ino">依存更新 62</text>
+  <rect x="879.0" y="74" width="31.2" height="46" class="f12-oth"/>
+  <text x="894.6" y="101.5" text-anchor="middle" class="f12-ino">22</text>
+  <path d="M894.6 123 V149" class="f12-lead"/>
+  <text x="894.6" y="162" text-anchor="middle" class="f12-bl">CI/security 22</text>
+  <rect x="912.2" y="74" width="67.8" height="46" class="f12-oth"/>
+  <text x="946.1" y="101.5" text-anchor="middle" class="f12-ino">その他 45</text>
+  <path d="M20 68 V62 H473.1 V68" class="f12-brk"/>
+  <text x="20" y="56" class="f12-gh">統治・監査・開発自動化 302 本（47%）</text>
+  <path d="M475.1 68 V62 H730.8 V68" class="f12-brka"/>
+  <text x="475.1" y="56" class="f12-lh">L0 ①②③ 直結 約 171 本（27%）</text>
+
+  <line x1="20" y1="166" x2="980" y2="166" class="f12-div"/>
+  <text x="20" y="188" class="f12-p">L0 の優先順位（憲法）</text>
+
+  <rect x="20" y="198" width="196" height="52" rx="6" class="f12-chip"/>
+  <text x="34" y="220" class="f12-ct">① 接続が閉じる</text>
+  <text x="34" y="240" class="f12-cn">95 本 · 15%</text>
+  <path d="M220 224 H244" class="f12-arr"/>
+  <rect x="248" y="198" width="196" height="52" rx="6" class="f12-chip"/>
+  <text x="262" y="220" class="f12-ct">② 運用が回る</text>
+  <text x="262" y="240" class="f12-cn">70 本 · 11%</text>
+  <path d="M448 224 H472" class="f12-arr"/>
+  <rect x="476" y="198" width="196" height="52" rx="6" class="f12-chip"/>
+  <text x="490" y="220" class="f12-ct">③ 生活を壊さない</text>
+  <text x="490" y="240" class="f12-cn">6+α 本</text>
+  <line x1="690" y1="194" x2="690" y2="254" class="f12-div"/>
+  <rect x="708" y="198" width="272" height="52" rx="6" class="f12-chipl"/>
+  <text x="722" y="220" class="f12-ct">後回し：最適化・スケール・完全自動化</text>
+  <text x="722" y="240" class="f12-zero">最適化・スケール：実装 0 行</text>
+
+  <text x="708" y="276" class="f12-fb">開発プロセスの自動化（E-010）</text>
+  <text x="708" y="294" class="f12-f">台帳 505 行 · 条文改定 約 16 · 機構変更 約 6</text>
+  <text x="708" y="312" class="f12-cm">L0 の「完全自動化」は運用側を指す（解釈）</text>
+
+  <rect x="20" y="266" width="652" height="50" rx="6" class="f12-hyp"/>
+  <text x="34" y="287" class="f12-fb">L0 の否定側（作らない）は機能している ── 一方で時間配分は逆転（解釈）</text>
+  <text x="34" y="305" class="f12-cm">①②③ の進捗を測る指標がないまま、マージの約半分が統治・監査・開発自動化に向かった</text>
+
+  <text x="20" y="352" class="f12-fn">※ タイトル・ラベルのキーワード分類で誤差 ±10%。③ はキーワードが拾いにくく（I-6・同意・isActive を含む）「6+α」。</text>
+  <text x="20" y="369" class="f12-fn">* 10 月は 1〜10 日の部分月。①②③ 直結 約 171 本 = 95 + 70 + 6（+α）。</text>
+</svg>
+</div><figcaption>4〜10 月のマージ 637 本のうち 47% が統治・監査・開発自動化で、L0 の ①②③ に直結するのは 27%。L0 が後回しとする最適化・スケールは実装 0 行で「作らない」判断は効いているが、開発プロセスの自動化には条文改定と台帳が積み上がった（付録 05 §3.5）。</figcaption></figure>
   <p>L0 の否定側（作らない）は機能しています。一方、L0 が後回しとする「完全自動化」のうち、開発プロセスの自動化（E-010）に条文改定約 16 件・機構変更約 6 件・台帳 505 行が投じられました。L0 の文言はパイロット運用の自動化を指すので違反とは言えませんが、①②③ の進捗指標がないまま時間配分が逆転しています（解釈）。</p>
 
   <h3 class="sub">意図的に作らなかったもの</h3>
