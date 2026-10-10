@@ -33,7 +33,7 @@ metric). Revisit a split only if one of the two kill criteria below fires.
   articles landing on nearly the same claim; Kai located the cause in the worked examples inside
   each skill bundle, not the brand guide. Splitting personas while they share those examples
   would add a second byline over the same house style.
-- **A second desk is mechanically non-trivial today.** `pick-l1-source.mjs` (skill 0.3.0,
+- **A second desk is mechanically non-trivial today.** `pick-l1-source.mjs` (`article-level2` 0.4.0,
   lines ~245-261) returns the oldest *coverable* uncovered L1 row — it steps past fetch
   failures and blocks a row after `MAX_ATTEMPTS` (ML-018) — but holds no claim or lock. Two
   desks firing in the same window would race to the same row and produce duplicates unless the
@@ -67,9 +67,9 @@ metric). Revisit a split only if one of the two kill criteria below fires.
    reason / failed, written by the agent-runner routine) is unbuilt, and #664's repeat-failure
    counter is not yet merged. So:
    - **Hard prerequisite:** the outcome ledger (ML-019, shared with ML-013) and #664's counter.
-     Owner: the workforce platform lane that owns the agent-runner routine; tracking issue: none
-     filed yet — one must be opened and linked here before this note is accepted (it is the
-     one open ownership gap this note does not close on its own).
+     Owner: the workforce platform lane that owns the agent-runner routine. Tracking: the
+     counter half is #664 (slice 1 landed in #795); the outcome-ledger half (ML-019) has no
+     issue yet and is filed as a follow-up when #674 is decided — it does not gate this note.
    - **Interim signal until then:** R-15 (`corpus-freshness.yml`) is the *only* detector. It is a
      daily, 5-day freshness gate, so the interim detection latency is up to ~5 days — no better
      than the 2026-07/08 outage. The "within hours" claim holds only after the prerequisite ships.
