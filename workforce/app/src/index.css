@@ -2,8 +2,10 @@
    body). JetBrains Mono — typeplate / KPI / data mono. Both loaded via the
    Google Fonts CDN so the workforce console carries the design without a
    self-hosted file in this repo. Must precede @tailwind directives per the
-   CSS spec. Inter stays in the family stack as a graceful fallback. */
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800;900&family=Inter:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+   CSS spec. Inter stays in the family stack as a graceful fallback.
+   Noto Serif JP is the book reader's Mincho fallback where the OS has
+   none (Android, Linux); its files download only when a page uses it. */
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800;900&family=Inter:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -666,4 +668,566 @@
   .docs-prose .layer,
   .docs-prose .voice,
   .docs-prose p { break-inside: avoid; }
+}
+
+/* ── Book reader ── */
+
+/* The web books (/books/:slug/:chapterId, components/book/). A reading
+   surface for hours, not a console page, so it has its own small system:
+   three page themes (paper / sepia / night) as CSS variables on
+   `.book-root`, three sizes, two families. The SVG figures paint with the
+   same variable names (book-content-contract v1), so a figure follows the
+   theme. Raw hex lives here only (R-2 allows it in index.css).
+
+   Type: the 文庫 line — ~38 全角 per line (max-width 38em), 1.95 leading,
+   justified, kinsoku via `line-break: strict`, proportional kana off
+   ("palt" 0) so the grid of full-width characters stays even. Base rules
+   use :where() so every block class below wins without !important. */
+
+.book-root {
+  --book-serif: "Hiragino Mincho ProN", "Hiragino Mincho Pro", "Yu Mincho", "YuMincho", "Noto Serif JP",
+    "Source Han Serif JP", "BIZ UDPMincho", serif;
+  --book-sans: "Geist", "Inter", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic",
+    "YuGothic", sans-serif;
+  --book-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
+  --book-font: var(--book-serif);
+  --book-fs: 18px;
+  --book-bar-h: 48px;
+  --book-toc-w: 340px;
+  --book-bg: #f6f1e7;
+  --book-ink: #1d1b16;
+  --book-ink-2: #5a554b;
+  --book-accent: #8a3a1a;
+  --book-line: #d9d2c3;
+  --book-panel: #fbf8f1;
+  --book-error: #9a3b12;
+  min-height: 100vh;
+  background-color: var(--book-bg);
+  color: var(--book-ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+.book-theme-paper {
+  --book-bg: #f6f1e7;
+  --book-ink: #1d1b16;
+  --book-ink-2: #5a554b;
+  --book-accent: #8a3a1a;
+  --book-line: #d9d2c3;
+  --book-panel: #fbf8f1;
+  --book-error: #9a3b12;
+}
+.book-theme-sepia {
+  --book-bg: #efe4cf;
+  --book-ink: #2b2419;
+  --book-ink-2: #64563f;
+  --book-accent: #8a3a1a;
+  --book-line: #d5c6a8;
+  --book-panel: #f6eddb;
+  --book-error: #9a3b12;
+}
+.book-theme-night {
+  --book-bg: #141518;
+  --book-ink: #d8d4ca;
+  --book-ink-2: #a09b90;
+  --book-accent: #d9a066;
+  --book-line: #2c2e33;
+  --book-panel: #1c1e22;
+  --book-error: #e0846a;
+  color-scheme: dark;
+}
+/* The canvas past the page (overscroll, a short chapter) is the page. */
+html[data-book-theme="paper"] body { background-color: #f6f1e7; }
+html[data-book-theme="sepia"] body { background-color: #efe4cf; }
+html[data-book-theme="night"] body { background-color: #141518; }
+
+.book-size-s { --book-fs: 16px; }
+.book-size-m { --book-fs: 18px; }
+.book-size-l { --book-fs: 20px; }
+.book-family-serif { --book-font: var(--book-serif); }
+.book-family-sans { --book-font: var(--book-sans); }
+
+.book-root ::selection {
+  background-color: color-mix(in srgb, var(--book-accent) 26%, transparent);
+  color: var(--book-ink);
+}
+.book-theme-night ::selection { background-color: #5b4630; color: #f3eee4; }
+
+/* chrome: progress line + top bar */
+.book-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2px;
+  z-index: 70;
+  pointer-events: none;
+}
+.book-progress-fill {
+  height: 100%;
+  background-color: var(--book-accent);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+.book-topbar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: var(--book-bar-h);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background-color: var(--book-panel);
+  background-color: color-mix(in srgb, var(--book-panel) 84%, transparent);
+  -webkit-backdrop-filter: saturate(1.2) blur(8px);
+  backdrop-filter: saturate(1.2) blur(8px);
+  border-bottom: 1px solid var(--book-line);
+  font-family: var(--book-mono);
+  transition: transform 0.22s ease, left 0.25s ease;
+}
+.book-topbar.is-hidden { transform: translateY(-100%); }
+.book-topbar-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  color: var(--book-ink);
+  font-size: 16px;
+  text-decoration: none;
+}
+.book-topbar-back:hover { background-color: color-mix(in srgb, var(--book-ink) 7%, transparent); }
+.book-topbar-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  white-space: nowrap;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+.book-topbar-book { overflow: hidden; text-overflow: ellipsis; color: var(--book-ink); }
+.book-topbar-kicker { flex-shrink: 0; color: var(--book-ink-2); }
+.book-topbar-button {
+  flex-shrink: 0;
+  font-family: var(--book-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--book-line);
+  border-radius: 999px;
+  color: var(--book-ink);
+  background-color: transparent;
+}
+.book-topbar-button:hover,
+.book-topbar-button[aria-expanded="true"] { border-color: var(--book-accent); color: var(--book-accent); }
+.book-root :focus-visible { outline: 2px solid var(--book-accent); outline-offset: 2px; }
+
+/* settings popover */
+.book-settings {
+  position: fixed;
+  top: calc(var(--book-bar-h) + 8px);
+  right: 12px;
+  z-index: 65;
+  width: min(280px, calc(100vw - 24px));
+  padding: 14px 16px 16px;
+  display: grid;
+  gap: 14px;
+  background-color: var(--book-panel);
+  border: 1px solid var(--book-line);
+  border-radius: 10px;
+  color: var(--book-ink);
+  font-family: var(--book-sans);
+}
+.book-settings-group { border: 0; margin: 0; padding: 0; min-width: 0; }
+.book-settings-group legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-family: var(--book-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--book-ink-2);
+}
+.book-settings-options { display: flex; gap: 6px; }
+.book-settings-options button {
+  flex: 1;
+  padding: 7px 0;
+  font-size: 13px;
+  border: 1px solid var(--book-line);
+  border-radius: 999px;
+  color: var(--book-ink);
+  background-color: transparent;
+}
+.book-settings-options button:hover { border-color: var(--book-accent); }
+.book-settings-options button[aria-pressed="true"] {
+  background-color: var(--book-ink);
+  border-color: var(--book-ink);
+  color: var(--book-bg);
+}
+
+/* 目次 drawer: slides in on phones, docks as a side panel from 1024px */
+.book-toc {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: min(86vw, var(--book-toc-w));
+  z-index: 80;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 32px;
+  background-color: var(--book-panel);
+  border-right: 1px solid var(--book-line);
+  color: var(--book-ink);
+  font-family: var(--book-sans);
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition: transform 0.25s ease, visibility 0s linear 0.25s;
+}
+.book-toc.is-open { transform: none; visibility: visible; transition: transform 0.25s ease; }
+.book-toc-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  background-color: color-mix(in srgb, var(--book-ink) 28%, transparent);
+}
+.book-toc-head {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: var(--book-bar-h);
+  padding: 0 12px 0 16px;
+  background-color: var(--book-panel);
+  border-bottom: 1px solid var(--book-line);
+}
+.book-toc-book {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--book-ink);
+  text-decoration: none;
+}
+.book-toc-book:hover { color: var(--book-accent); }
+.book-toc-part-title {
+  margin: 0;
+  padding: 20px 16px 6px;
+  font-family: var(--book-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--book-ink-2);
+}
+.book-toc-item {
+  display: grid;
+  grid-template-columns: 4.75em 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 16px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--book-ink);
+  text-decoration: none;
+}
+.book-toc-item:hover { background-color: color-mix(in srgb, var(--book-ink) 5%, transparent); }
+.book-toc-item[aria-current="page"] {
+  color: var(--book-accent);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--book-accent);
+}
+.book-toc-kicker { font-family: var(--book-mono); font-size: 11px; color: var(--book-ink-2); }
+.book-toc-mark { color: var(--book-accent); align-self: center; }
+.book-mark { display: inline-flex; align-items: center; }
+.book-mark svg { display: block; }
+
+/* the page */
+.book-main {
+  padding: calc(var(--book-bar-h) + 28px) 20px 72px;
+  transition: padding-left 0.25s ease;
+}
+.book-body {
+  max-width: 38em;
+  margin: 0 auto;
+  font-family: var(--book-font);
+  font-size: var(--book-fs);
+  line-height: 1.95;
+  text-align: justify;
+  overflow-wrap: anywhere;
+  line-break: strict;
+  font-feature-settings: "palt" 0;
+  -webkit-font-smoothing: antialiased;
+  font-kerning: normal;
+}
+.book-body :where(p) { margin: 0 0 1.25em; }
+.book-body :where(h1, h2, h3, h4) {
+  text-align: left;
+  text-wrap: balance;
+  scroll-margin-top: calc(var(--book-bar-h) + 8px);
+  font-weight: 600;
+}
+.book-body :where(h2) { margin: 2.75em 0 1em; font-size: 1.35em; line-height: 1.55; letter-spacing: 0.02em; }
+.book-body :where(h3) { margin: 2.25em 0 0.75em; font-size: 1.1em; line-height: 1.6; }
+.book-body :where(h4) { margin: 1.75em 0 0.5em; font-size: 1em; line-height: 1.7; }
+.book-body :where(ul, ol) { margin: 0 0 1.25em; padding-left: 1.6em; text-align: left; }
+.book-body :where(ul) { list-style: disc; }
+.book-body :where(ol) { list-style: decimal; }
+.book-body :where(li) { margin: 0.3em 0; }
+.book-body :where(li > p) { margin: 0; }
+.book-body :where(strong) { font-weight: 600; }
+/* Emphasis in Japanese is 傍点 (sesame dots), not a slanted Mincho. */
+.book-body :where(em) { font-style: normal; -webkit-text-emphasis: sesame; text-emphasis: sesame; }
+.book-body :where(a) {
+  color: var(--book-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
+  text-decoration-color: color-mix(in srgb, var(--book-accent) 45%, transparent);
+}
+.book-body :where(a:hover) { text-decoration-color: var(--book-accent); }
+.book-body :where(blockquote) {
+  margin: 1.5em 0;
+  padding: 0.1em 0 0.1em 1.1em;
+  border-left: 2px solid var(--book-line);
+  color: var(--book-ink-2);
+}
+.book-body :where(hr) { border: 0; height: 1px; width: 6em; margin: 3em auto; background-color: var(--book-line); }
+.book-body :where(code) {
+  font-family: var(--book-mono);
+  font-size: 0.86em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background-color: var(--book-panel);
+}
+.book-body :where(pre) {
+  margin: 1.5em 0;
+  padding: 1em 1.2em;
+  overflow-x: auto;
+  text-align: left;
+  font-size: 0.85em;
+  line-height: 1.65;
+  border: 1px solid var(--book-line);
+  border-radius: 6px;
+  background-color: var(--book-panel);
+}
+.book-body :where(pre code) { padding: 0; background: none; font-size: inherit; }
+.book-body :where(img) { max-width: 100%; height: auto; margin: 1.5em auto; border-radius: 4px; }
+
+.book-chapter-head { margin: 0.5em 0 2.75em; text-align: left; }
+.book-chapter-kicker {
+  margin: 0 0 0.9em;
+  font-family: var(--book-mono);
+  font-size: 0.72em;
+  letter-spacing: 0.16em;
+  color: var(--book-accent);
+}
+.book-chapter-head h1 { margin: 0; font-size: 1.6em; line-height: 1.45; letter-spacing: 0.02em; }
+
+/* ```quote — 原文 / 訓読 / 出典 / 訳 */
+.book-quote {
+  margin: 2em 0;
+  padding: 1.25em 1.4em 1.2em;
+  text-align: left;
+  background-color: var(--book-panel);
+  border: 1px solid var(--book-line);
+  border-left: 3px solid var(--book-accent);
+  border-radius: 4px;
+}
+.book-quote-original {
+  margin: 0;
+  font-family: var(--book-serif);
+  font-size: 1.25em;
+  line-height: 1.8;
+  letter-spacing: 0.06em;
+  color: var(--book-ink);
+}
+.book-quote-kundoku { margin: 0.65em 0 0; font-size: 1.02em; line-height: 1.85; }
+.book-quote-meta { margin: 0.8em 0 0; line-height: 1; }
+.book-quote-source {
+  display: inline-block;
+  padding: 0.3em 0.75em;
+  font-family: var(--book-mono);
+  font-style: normal;
+  font-size: 0.7em;
+  letter-spacing: 0.08em;
+  color: var(--book-ink-2);
+  border: 1px solid var(--book-line);
+  border-radius: 999px;
+}
+.book-quote-translation { margin: 0.9em 0 0; font-size: 0.95em; line-height: 1.85; color: var(--book-ink-2); }
+
+/* ```connect — 異分野への接続 */
+.book-connect {
+  margin: 2.25em 0;
+  padding: 1.2em 1.4em 1.25em;
+  text-align: left;
+  font-size: 0.95em;
+  background-color: var(--book-panel);
+  border: 1px solid var(--book-line);
+  border-radius: 4px;
+}
+.book-connect-kicker {
+  margin: 0 0 0.35em;
+  font-family: var(--book-mono);
+  font-size: 0.72em;
+  letter-spacing: 0.22em;
+  font-variant-caps: all-small-caps;
+  color: var(--book-accent);
+}
+.book-connect-title { margin: 0 0 0.6em; font-weight: 700; font-size: 1.08em; line-height: 1.6; }
+.book-connect-body > :last-child { margin-bottom: 0; }
+
+/* ```note — 補注 */
+.book-note {
+  margin: 1.75em 0;
+  padding: 0.85em 0;
+  text-align: left;
+  font-size: 0.9em;
+  line-height: 1.85;
+  color: var(--book-ink-2);
+  border-top: 1px solid var(--book-line);
+  border-bottom: 1px solid var(--book-line);
+}
+.book-note > :last-child { margin-bottom: 0; }
+.book-note :where(p) { margin: 0 0 0.6em; }
+
+/* figures (inline SVG) and tables */
+.book-figure { margin: 2.25em 0; text-align: center; }
+.book-figure-art svg { display: block; width: 100%; height: auto; max-width: 680px; margin: 0 auto; }
+.book-figure-art.is-loading {
+  max-width: 680px;
+  aspect-ratio: 4 / 3;
+  margin: 0 auto;
+  border-radius: 4px;
+  background-color: var(--book-panel);
+}
+.book-figure figcaption {
+  margin-top: 0.85em;
+  font-size: 0.875em;
+  line-height: 1.6;
+  color: var(--book-ink-2);
+  text-align: center;
+}
+.book-table { margin: 1.75em 0; overflow-x: auto; -webkit-overflow-scrolling: touch; overflow-wrap: normal; }
+.book-table table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9em; line-height: 1.7; }
+.book-table th,
+.book-table td { padding: 0.55em 0.9em; border-bottom: 1px solid var(--book-line); vertical-align: top; }
+.book-table td { min-width: 5em; }
+.book-table th { font-weight: 600; white-space: nowrap; border-bottom-color: var(--book-ink-2); }
+
+/* a visible defect (C-4): malformed block, missing figure, unloadable chapter */
+.book-error {
+  margin: 1.5em 0;
+  padding: 1em 1.2em;
+  text-align: left;
+  font-family: var(--book-sans);
+  font-size: 0.9em;
+  line-height: 1.7;
+  color: var(--book-ink);
+  background-color: var(--book-panel);
+  border: 1px solid var(--book-error);
+  border-left-width: 3px;
+  border-radius: 4px;
+}
+.book-error-kicker { margin: 0 0 0.25em; font-weight: 700; color: var(--book-error); }
+.book-error-detail { margin: 0; }
+.book-error-raw { margin: 0.75em 0 0; font-size: 0.85em; white-space: pre-wrap; }
+
+/* loading */
+.book-loading-title { margin: 0 0 1.5em; font-size: 1.6em; font-weight: 600; line-height: 1.45; }
+.book-loading-line {
+  display: block;
+  height: 0.85em;
+  margin: 1.1em 0;
+  border-radius: 3px;
+  background-color: var(--book-line);
+  opacity: 0.55;
+}
+.book-loading-line:last-child { width: 60%; }
+
+/* footer: previous / next, back to the contents */
+.book-footer { max-width: 38em; margin: 4.5em auto 0; font-size: var(--book-fs); font-family: var(--book-sans); }
+.book-pager { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.book-pager-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 16px;
+  text-decoration: none;
+  color: var(--book-ink);
+  background-color: var(--book-panel);
+  border: 1px solid var(--book-line);
+  border-radius: 8px;
+  transition: border-color 0.15s ease;
+}
+.book-pager-card:hover { border-color: var(--book-accent); }
+.book-pager-card.is-next { text-align: right; }
+.book-pager-dir { font-family: var(--book-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--book-ink-2); }
+.book-pager-kicker { font-family: var(--book-mono); font-size: 11px; letter-spacing: 0.08em; color: var(--book-accent); }
+.book-pager-title { font-size: 0.85em; font-weight: 600; line-height: 1.55; }
+.book-footer-toc {
+  display: block;
+  width: fit-content;
+  margin: 2.25em auto 0;
+  font-family: var(--book-mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--book-ink-2);
+  text-decoration: none;
+}
+.book-footer-toc:hover { color: var(--book-accent); }
+
+@media (max-width: 479px) {
+  .book-pager { grid-template-columns: 1fr; }
+  .book-quote,
+  .book-connect { padding-left: 1.1em; padding-right: 1.1em; }
+}
+@media (min-width: 768px) {
+  .book-main { padding: calc(var(--book-bar-h) + 64px) 40px 112px; }
+  .book-topbar { padding: 0 20px; }
+}
+@media (min-width: 1024px) {
+  /* Docked: the panel sits beside the page instead of over it. */
+  .book-toc { z-index: 45; }
+  .book-toc-backdrop { display: none; }
+  .book-root.is-toc-open .book-topbar { left: var(--book-toc-w); }
+  .book-root.is-toc-open .book-main { padding-left: calc(var(--book-toc-w) + 40px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .book-topbar,
+  .book-toc,
+  .book-toc.is-open,
+  .book-main,
+  .book-pager-card { transition: none; }
+}
+@media print {
+  .book-progress,
+  .book-topbar,
+  .book-toc,
+  .book-toc-backdrop,
+  .book-settings,
+  .book-pager,
+  .book-footer-toc { display: none !important; }
+  .book-root {
+    --book-bg: #ffffff;
+    --book-ink: #000000;
+    --book-ink-2: #444444;
+    --book-accent: #000000;
+    --book-line: #bbbbbb;
+    --book-panel: #ffffff;
+    min-height: 0;
+  }
+  html[data-book-theme] body { background-color: #ffffff; }
+  .book-main { padding: 0 !important; }
+  .book-body { max-width: none; font-size: 11pt; }
+  .book-body h2,
+  .book-body h3 { break-after: avoid; }
+  .book-quote,
+  .book-connect,
+  .book-note,
+  .book-figure,
+  .book-table { break-inside: avoid; }
 }

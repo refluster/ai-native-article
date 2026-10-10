@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 660" role="img" aria-labelledby="f19-title f19-desc" class="f19">
+  <title id="f19-title">図21 ワークフォースへの写像 — 篇・句から仕組みへ</title>
+  <desc id="f19-desc">率然はエージェント×スキル×プロジェクトの結合、令文斉武はL0〜L3の層と機械ゲート、用間はリサーチへの投資、将の五危はエージェントの失敗モード、君命有所不受は自律と人間の境界、多算勝は開始時の勝算見積り、不戦而屈人之兵は外部基盤の利用に対応する。限界として、ワークフォースの多くは敵のいない協調ゲームである。</desc>
+  <style>
+    .f19 text{font-family:inherit}
+    .f19-h{font-size:14px;fill:var(--book-ink-2);letter-spacing:.08em}
+    .f19-q{font-size:19px;font-weight:700;fill:var(--book-ink)}
+    .f19-t{font-size:17px;font-weight:700;fill:var(--book-ink)}
+    .f19-s{font-size:13px;fill:var(--book-ink-2)}
+    .f19-n{font-size:15px;fill:var(--book-ink-2)}
+    .f19-src{fill:var(--book-bg);stroke:var(--book-line);stroke-width:1.2}
+    .f19-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+    .f19-key{fill:var(--book-panel);stroke:var(--book-accent);stroke-width:1.6}
+    .f19-ln{fill:none;stroke:var(--book-ink-2);stroke-width:1.3}
+    .f19-lna{fill:none;stroke:var(--book-accent);stroke-width:1.8}
+    .f19-dot{fill:var(--book-ink-2)}
+    .f19-dota{fill:var(--book-accent)}
+    .f19-rule{fill:none;stroke:var(--book-line);stroke-width:1;stroke-dasharray:3 4}
+  </style>
+
+  <text x="150" y="48" text-anchor="middle" class="f19-h">孫子（篇・句）</text>
+  <text x="510" y="48" text-anchor="middle" class="f19-h">ワークフォースの仕組み</text>
+
+  <!-- 1 率然 -->
+  <rect x="30" y="70" width="240" height="64" rx="6" class="f19-src"/>
+  <text x="48" y="98" class="f19-q">率然</text>
+  <text x="48" y="122" class="f19-s">九地篇</text>
+  <rect x="330" y="70" width="360" height="64" rx="6" class="f19-key"/>
+  <path d="M270 102 L330 102" class="f19-lna"/>
+  <circle cx="270" cy="102" r="3.5" class="f19-dota"/><circle cx="330" cy="102" r="3.5" class="f19-dota"/>
+  <text x="350" y="98" class="f19-t">エージェント×スキル</text>
+  <text x="350" y="122" class="f19-s">×プロジェクトの結合</text>
+
+  <!-- 2 令文斉武 -->
+  <rect x="30" y="148" width="240" height="64" rx="6" class="f19-src"/>
+  <text x="48" y="176" class="f19-q">令文斉武</text>
+  <text x="48" y="200" class="f19-s">行軍篇</text>
+  <rect x="330" y="148" width="360" height="64" rx="6" class="f19-box"/>
+  <path d="M270 180 L330 180" class="f19-ln"/>
+  <circle cx="270" cy="180" r="3.5" class="f19-dot"/><circle cx="330" cy="180" r="3.5" class="f19-dot"/>
+  <text x="350" y="176" class="f19-t">L0〜L3と機械ゲート</text>
+  <text x="350" y="200" class="f19-s">信頼が先、規律が後</text>
+
+  <!-- 3 用間 -->
+  <rect x="30" y="226" width="240" height="64" rx="6" class="f19-src"/>
+  <text x="48" y="254" class="f19-q">用間</text>
+  <text x="48" y="278" class="f19-s">用間篇</text>
+  <rect x="330" y="226" width="360" height="64" rx="6" class="f19-box"/>
+  <path d="M270 258 L330 258" class="f19-ln"/>
+  <circle cx="270" cy="258" r="3.5" class="f19-dot"/><circle cx="330" cy="258" r="3.5" class="f19-dot"/>
+  <text x="350" y="254" class="f19-t">リサーチへの投資</text>
+  <text x="350" y="278" class="f19-s">知らないことに払う</text>
+
+  <!-- 4 将の五危 -->
+  <rect x="30" y="304" width="240" height="64" rx="6" class="f19-src"/>
+  <text x="48" y="332" class="f19-q">将の五危</text>
+  <text x="48" y="356" class="f19-s">九変篇</text>
+  <rect x="330" y="304" width="360" height="64" rx="6" class="f19-box"/>
+  <path d="M270 336 L330 336" class="f19-ln"/>
+  <circle cx="270" cy="336" r="3.5" class="f19-dot"/><circle cx="330" cy="336" r="3.5" class="f19-dot"/>
+  <text x="350" y="332" class="f19-t">エージェントの失敗モード</text>
+  <text x="350" y="356" class="f19-s">止まらない・早計など</text>
+
+  <!-- 5 君命有所不受 -->
+  <rect x="30" y="382" width="240" height="64" rx="6" class="f19-src"/>
+  <text x="48" y="410" class="f19-q">君命有所不受</text>
+  <text x="48" y="434" class="f19-s">九変篇</text>
+  <rect x="330" y="382" width="360" height="64" rx="6" class="f19-box"/>
+  <path d="M270 414 L330 414" class="f19-ln"/>
+  <circle cx="270" cy="414" r="3.5" class="f19-dot"/><circle cx="330" cy="414" r="3.5" class="f19-dot"/>
+  <text x="350" y="410" class="f19-t">自律と人間の境界</text>
+  <text x="350" y="434" class="f19-s">A/B の行動権限</text>
+
+  <!-- 6 多算勝 -->
+  <rect x="30" y="460" width="240" height="64" rx="6" class="f19-src"/>
+  <text x="48" y="488" class="f19-q">多算勝</text>
+  <text x="48" y="512" class="f19-s">計篇</text>
+  <rect x="330" y="460" width="360" height="64" rx="6" class="f19-box"/>
+  <path d="M270 492 L330 492" class="f19-ln"/>
+  <circle cx="270" cy="492" r="3.5" class="f19-dot"/><circle cx="330" cy="492" r="3.5" class="f19-dot"/>
+  <text x="350" y="488" class="f19-t">開始時の勝算見積り</text>
+  <text x="350" y="512" class="f19-s">始める前に数える</text>
+
+  <!-- 7 不戦而屈人之兵 -->
+  <rect x="30" y="538" width="240" height="64" rx="6" class="f19-src"/>
+  <text x="48" y="566" class="f19-q">不戦而屈人之兵</text>
+  <text x="48" y="590" class="f19-s">謀攻篇</text>
+  <rect x="330" y="538" width="360" height="64" rx="6" class="f19-box"/>
+  <path d="M270 570 L330 570" class="f19-ln"/>
+  <circle cx="270" cy="570" r="3.5" class="f19-dot"/><circle cx="330" cy="570" r="3.5" class="f19-dot"/>
+  <text x="350" y="566" class="f19-t">外部基盤の利用</text>
+  <text x="350" y="590" class="f19-s">車輪を再発明しない</text>
+
+  <path d="M30 620 L690 620" class="f19-rule"/>
+  <text x="360" y="644" text-anchor="middle" class="f19-n">限界：多くは協調ゲーム</text>
+</svg>

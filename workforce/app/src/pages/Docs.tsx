@@ -22,7 +22,7 @@ export default function Docs() {
       <PageHero
         kicker="Documentation"
         title="Docs"
-        lede="How this organization is built, and what it believes. The documents stand alone; read any first. The founding story is in Japanese."
+        lede="What this organization delivers, how it is built, and what it believes. The documents stand alone; read any first. The founding story is in Japanese."
       />
       <section className="pb-6 grid gap-4">
         {PUBLIC_DOCS.map(doc => (

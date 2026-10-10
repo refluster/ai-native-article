@@ -66,6 +66,8 @@ never correctness.
 | Handed back by a worker | `wf:handback` | `issue-triage` (nadia) | answered on the next fire — dispatched, so seconds |
 | Parked pre-adr-0038 | `issue-*:needs-human` | `issue-triage` re-queue | immediately if the issue also wears a lane (the worker already declined it); otherwise `requeue_days` (14). Read-only legacy, never written |
 | Claimed by a worker | `issue-*:in-progress` / `issue-*:pr-open` | the worker | only while an **open PR** references the issue (`Closes`/`Refs #N` or an `issue-<N>` branch); a `pr-open` with no open PR, or an `in-progress` older than 24h with none, is a stale claim and goes back to `issue-triage` |
+| Duplicate / completed / obsolete | `wf:closed:<verdict>` (closed) | `issue-triage` (nadia), via `issue-triage-settle.mjs` | evidence required (canonical open issue / merged PR / superseding ref); ≤ `max_closes_per_run` (5); never under an open PR, never L0/L1/tracker, never a human-reopened issue |
+| Laned, idle ≥ `review_days` (30) | (its lane) | `issue-triage` settle review | ≤ `max_reviews_per_run` (5); `still-valid` restarts the clock |
 | PR in review | (routing comment) | `pr-autopilot` (nadia) | `cycle_cap`, W-4 cap 7 |
 | PR, agent-fixable | `autopilot:needs-author` | `pr-remediate` (ren) | 3 attempts / 36h sweep |
 | PR, human-gated | `autopilot:needs-human` | operator | — |
@@ -80,6 +82,7 @@ is:open label:wf:human:architect-ratify      # …of those, the ones needing onl
 is:open label:wf:human:legal                 # …the ones needing a legal lens
 is:open label:autopilot:needs-author         # what the agents are fixing right now
 is:open label:wf:handback                    # declined by a worker, awaiting the router
+is:closed label:wf:closed:duplicate          # what the router consolidated (reopen to overrule)
 ```
 
 The `wf:human:*` split is the point of the operator lane, not decoration: an

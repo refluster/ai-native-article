@@ -8,8 +8,24 @@ import { docBody } from './docs-bodies';
 const DOCS = PUBLIC_DOCS.map(d => ({ ...d, html: docBody(d.slug) }));
 
 describe('PUBLIC_DOCS', () => {
-  it('registers the three documents, each with a bundled body', () => {
-    expect(PUBLIC_DOCS.map(d => d.slug)).toEqual(['whitepaper', 'founding-story', 'manifesto']);
+  it('resolves the book-production process page with a Japanese body', () => {
+    const doc = findDoc('book-production');
+    expect(doc?.lang).toBe('ja');
+    expect(doc?.packTitle).toBe('本をつくる工程');
+    const html = docBody('book-production');
+    expect(html).toContain('<section class="cover">');
+    expect(html).toContain('工程図');
+    expect(html.length).toBeGreaterThan(10_000);
+  });
+
+  it('registers the five documents, each with a bundled body', () => {
+    expect(PUBLIC_DOCS.map(d => d.slug)).toEqual([
+      'capabilities',
+      'whitepaper',
+      'founding-story',
+      'manifesto',
+      'book-production',
+    ]);
     for (const d of DOCS) {
       expect(d.html.length, `${d.slug} body`).toBeGreaterThan(10_000);
       expect(d.html.trimStart().startsWith('<section class="cover">'), `${d.slug} opens with its cover`).toBe(true);

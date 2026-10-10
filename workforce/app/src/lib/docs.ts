@@ -1,4 +1,5 @@
-// Public documents — the whitepaper, the founding story and the manifesto,
+// Public documents — the capabilities account, the whitepaper, the founding
+// story, the manifesto and the book production process,
 // rendered by the SPA at /docs/:slug.
 //
 // The documents are HTML fragments under src/content/docs/ (one `<section>`
@@ -15,7 +16,7 @@
 // one place and reaches both.
 //
 // This module is metadata only (the landing page and the Docs index need
-// nothing more). The bodies — ~170 KB of HTML — live in docs-bodies.ts,
+// nothing more). The bodies — ~250 KB of HTML — live in docs-bodies.ts,
 // which only pages/Doc.tsx imports, and that page is lazy-loaded from
 // App.tsx so the console's main bundle does not carry them.
 
