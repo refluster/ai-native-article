@@ -1,4 +1,7 @@
 // The public documents' bodies, bundled with Vite's `?raw` import.
+// The asp-cloud development review (asp-cloud-dev-review) is the first
+// document whose numbers come from an external project's repo — the
+// source report is PSVL/asp-cloud docs/reports/dev-review-pr1000-2026-10-10.md.
 //
 // Kept apart from lib/docs.ts (the metadata) so only the document page
 // pulls the ~250 KB of HTML into its chunk; App.tsx lazy-loads that page.
@@ -11,6 +14,7 @@ import whitepaper from '../content/docs/whitepaper.html?raw';
 import foundingStory from '../content/docs/founding-story.html?raw';
 import manifesto from '../content/docs/manifesto.html?raw';
 import bookProduction from '../content/docs/book-production.html?raw';
+import aspCloudDevReview from '../content/docs/asp-cloud-dev-review.html?raw';
 
 const BODIES: Readonly<Record<string, string>> = {
   capabilities,
@@ -18,6 +22,7 @@ const BODIES: Readonly<Record<string, string>> = {
   'founding-story': foundingStory,
   manifesto,
   'book-production': bookProduction,
+  'asp-cloud-dev-review': aspCloudDevReview,
 };
 
 for (const d of PUBLIC_DOCS) {

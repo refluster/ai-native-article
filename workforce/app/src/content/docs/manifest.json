@@ -53,5 +53,16 @@
     "cta": "工程を見る",
     "packTitle": "本をつくる工程",
     "measure": "wide"
+  },
+  {
+    "slug": "asp-cloud-dev-review",
+    "file": "asp-cloud-dev-review.html",
+    "lang": "ja",
+    "kicker": "Development review · 日本語",
+    "title": "1,000 本の PR を、どう作ったか",
+    "description": "外部プロジェクト asp-cloud の PR / Issue 番号が 1,000 を超えた時点での開発の健全性診断。58 体のエージェントと 1 人のオペレーターが半年でどう作り、どこで待ち、何が形だけになっていたかを、Squad Health Check・DORA・Value Stream Mapping で PR 831 本・デプロイ 531 回・実績台帳 861 行から再構成し、次の 6〜8 週間で試す 3 件に絞る。",
+    "cta": "診断を読む",
+    "packTitle": "asp-cloud 開発レビュー",
+    "measure": "wide"
   }
 ]
