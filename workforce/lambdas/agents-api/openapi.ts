@@ -305,6 +305,7 @@ components:
         execution_surface: { type: string, enum: [lambda, client, ccr], description: 'Where the work ran. Absent → lambda by convention.' }
         binding_idx: { type: integer, minimum: 0, description: 'Agent binding index that fired the run (CCR fire payload). Absent on older rows.' }
         reason_code: { type: string, enum: [auth, permission, egress, identity, validation, source_unreachable, write_failed, other], description: 'Closed-enum failure reason supplied by the runner. Absent on older rows.' }
+        repeat_count: { type: integer, minimum: 1, description: 'On a throw: how many consecutive failures of this (agent, skill, reason_code) this is, 1 on the first. Reset by an ok run; a skipped run neither extends nor resets it. Absent on other statuses and on rows written before the counter shipped.' }
         error: { type: string }
     EngagementCreate:
       type: object

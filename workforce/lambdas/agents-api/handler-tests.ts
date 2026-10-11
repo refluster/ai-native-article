@@ -264,6 +264,7 @@ vi.mock("../shared/project.js", () => ({
     error?: string;
     binding_idx?: number;
     reason_code?: string;
+    repeat_count?: number;
     execution_surface?: "lambda" | "client";
   }) => {
     const row = {
@@ -281,6 +282,7 @@ vi.mock("../shared/project.js", () => ({
       error: input.error,
       binding_idx: input.binding_idx,
       reason_code: input.reason_code,
+      repeat_count: input.repeat_count,
       execution_surface: input.execution_surface,
       gsi1pk: `AGENT#${input.agent_slug}`,
       gsi1sk: input.started_at,
@@ -383,6 +385,24 @@ const openExternalPrMock = vi.fn(async (_input: unknown) => ({
 }));
 vi.mock("../shared/external-pr.js", () => ({
   openExternalPr: (arg: unknown) => openExternalPrMock(arg),
+}));
+
+// #664 slice 2: in-memory stand-in for the streak store (the real module owns
+// its own DDB client). Mirrors the contract: throw -> +1 per (agent, skill,
+// reason), ok -> clears the cadence, anything else -> undefined.
+const streakCounts = new Map<string, number>();
+vi.mock("../shared/streak.js", () => ({
+  recordStreakEvent: async (ev: { agent_slug: string; skill_name: string; status: string; reason_code?: string }) => {
+    const cadence = `${ev.agent_slug}#${ev.skill_name}#`;
+    if (ev.status === "ok") {
+      for (const key of [...streakCounts.keys()]) if (key.startsWith(cadence)) streakCounts.delete(key);
+      return undefined;
+    }
+    if (ev.status !== "throw") return undefined;
+    const key = cadence + (ev.reason_code ?? "other");
+    streakCounts.set(key, (streakCounts.get(key) ?? 0) + 1);
+    return streakCounts.get(key);
+  },
 }));
 
 // SUT must be imported AFTER all vi.mock() calls.
@@ -1719,6 +1739,30 @@ describe("POST /agents/{slug}/engagements (Engagements API — createEngagement)
     expect((bodyOf(res) as { engagement: { summary: string } }).engagement.summary).toBe(
       "business summary wins",
     );
+  });
+
+  describe("#664 slice 2 — repeat_count", () => {
+    const auth = () => ({ authorization: `Bearer ${TOKEN}` });
+    type View = { repeat_count?: number };
+    const post = async (over: Record<string, unknown>) => {
+      const res = await handler(postEvt("dario", auth(), validBody(over)));
+      expect(statusOf(res)).toBe(201);
+      return (bodyOf(res) as { engagement: View }).engagement;
+    };
+
+    it("stamps 1, 2, 3 on consecutive same-reason throws, then drops it on ok", async () => {
+      streakCounts.clear();
+      expect((await post({ status: "throw", reason_code: "auth" })).repeat_count).toBe(1);
+      expect((await post({ status: "throw", reason_code: "auth" })).repeat_count).toBe(2);
+      expect((await post({ status: "throw", reason_code: "auth" })).repeat_count).toBe(3);
+      expect((await post({ status: "ok" })).repeat_count).toBeUndefined();
+      expect((await post({ status: "throw", reason_code: "auth" })).repeat_count).toBe(1);
+    });
+
+    it("a skipped run carries no repeat_count", async () => {
+      streakCounts.clear();
+      expect((await post({ status: "skipped" })).repeat_count).toBeUndefined();
+    });
   });
 
   describe("#664 slice 1 — binding_idx + reason_code", () => {
