@@ -289,6 +289,12 @@ export interface ExecutionRow {
   /** Why a `throw` (or a `source_unreachable` skip) happened; see `REASON_CODES`. */
   reason_code?: ReasonCode;
   /**
+   * Length of the consecutive-failure streak this `throw` extended for its
+   * `(agent, skill, reason_code)` — 1 on the first occurrence (#664 slice 2).
+   * Absent on non-`throw` rows and on rows written before the counter shipped.
+   */
+  repeat_count?: number;
+  /**
    * Where the LLM call ran. `lambda` = workforce agent-runner (default; the
    * historical-and-still-canonical path). `client` = client-side execution
    * under R-N1(b) — the consumer fetched agent metadata + persona, ran the
@@ -475,6 +481,8 @@ export interface AppendExecutionInput {
   binding_idx?: number;
   /** Closed-enum failure reason (#664 slice 1). */
   reason_code?: ReasonCode;
+  /** Streak length stamped by the engagement write (#664 slice 2). */
+  repeat_count?: number;
   /** Where the LLM call ran. Omit (or set `lambda`) for workforce
    *  agent-runner executions; set `client` when the row is written via
    *  the `POST /agents/{slug}/engagements` route for R-N1(b) client-side
@@ -558,6 +566,7 @@ export async function appendExecution(input: AppendExecutionInput): Promise<Exec
     summary: input.summary,
     binding_idx: input.binding_idx,
     reason_code: input.reason_code,
+    repeat_count: input.repeat_count,
     execution_surface: input.execution_surface,
     gsi1pk: `AGENT#${input.agent_slug}`,
     gsi1sk: input.started_at,

@@ -135,6 +135,7 @@ import {
   type ProjectMetaRow,
 } from "../shared/project.js";
 import { REASON_CODES, type ReasonCode } from "../shared/reason-codes.js";
+import { recordStreakEvent } from "../shared/streak.js";
 import {
   type PerfHumanTouchRow,
   type PerfIdleRow,
@@ -1408,6 +1409,7 @@ async function listSkillExecutions(
       error: r.error,
       binding_idx: r.binding_idx,
       reason_code: r.reason_code,
+      repeat_count: r.repeat_count,
     }));
   return reply(200, { items });
 }
@@ -2901,6 +2903,7 @@ interface EngagementView {
   error?: string;
   binding_idx?: number;
   reason_code?: ReasonCode;
+  repeat_count?: number;
 }
 
 function toEngagementView(row: ExecutionRow): EngagementView {
@@ -2923,6 +2926,7 @@ function toEngagementView(row: ExecutionRow): EngagementView {
     error: row.error,
     binding_idx: row.binding_idx,
     reason_code: row.reason_code,
+    repeat_count: row.repeat_count,
   };
 }
 
@@ -3070,6 +3074,25 @@ async function createEngagementRoute(
       ? (parsed.engagement_id as string)
       : generateUlid();
 
+  // #664 slice 2: extend / reset the repeat-failure streak, and stamp the
+  // resulting count on the row. The streak is a derived projection (W-2), so a
+  // store failure must not lose the engagement itself: log loudly (W-4) and
+  // write the row without a count; `replayStreaks` can rebuild the projection.
+  let repeatCount: number | undefined;
+  try {
+    repeatCount = await recordStreakEvent({
+      agent_slug: slug,
+      skill_name: parsed.skill_name as string,
+      status,
+      reason_code: reasonCode,
+      exec_ulid,
+      started_at: parsed.started_at as string,
+      binding_idx: bindingIdx,
+    });
+  } catch (err) {
+    console.error(JSON.stringify({ evt: "streak-update-failed", agent_slug: slug, skill: parsed.skill_name, error: String(err) }));
+  }
+
   try {
     const row = await appendExecution({
       project_id: asProjectId(projectId),
@@ -3089,6 +3112,7 @@ async function createEngagementRoute(
       summary,
       binding_idx: bindingIdx,
       reason_code: reasonCode,
+      repeat_count: repeatCount,
       // This single write surface records every off-Lambda execution. The
       // optional `execution_surface` says which produced it: `ccr` for the
       // generic CCR agent-runner routine's per-task write-back (ADR-0005
