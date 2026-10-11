@@ -27,6 +27,7 @@
   <div class="statline">
     <div class="stat"><b>#1032</b><span>PR 831 本 + Issue 201 件（10-10）</span></div>
     <div class="stat"><b>641</b><span>マージされた PR（うち docs のみ 234）</span></div>
+    <div class="stat"><b>431</b><span>本番デプロイ成功（push / dispatch）</span></div>
     <div class="stat"><b>17 台 / 9 宅</b><span>接続済み機器（目標 100–200 台 / 25 宅）</span></div>
     <div class="stat"><b>0 / 25</b><span>施工完了世帯（一部完了 1）</span></div>
     <div class="stat"><b>94.22%</b><span>SLI-1 データ連続性（目標 95%、Red）</span></div>
@@ -40,7 +41,7 @@
   <figure><div class="figscroll">
 <svg viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="f0-t f0-d" style="min-width:820px">
   <title id="f0-t">Squad Health Check の 12 軸ボード：良好 0、懸念 9、問題 3</title>
-  <desc id="f0-d">Product・Process・Tech・Team の 4 グループ 12 軸を、判定の丸（良好・懸念・問題）、傾向の矢印、一行の根拠で並べたボード。問題は Suitable process（文書上のゲート 4 つが実質無効、傾向 ↓）、Support（自律 run の 11% が環境障害）、Pawns or players（自律 run の実作業は 30%）の 3 軸。残る 9 軸はすべて懸念で、良好は 0。悪化傾向（↓ ↘）は Mission、Speed、Suitable process、Support、Fun / Health の 5 軸で、改善傾向は Easy to release の 1 軸だけ。</desc>
+  <desc id="f0-d">Product・Process・Tech・Team の 4 グループ 12 軸を、判定の丸（良好・懸念・問題）、傾向の矢印、一行の根拠で並べたボード。問題は Suitable process（ゲート 2 つが無効、2 つが非ブロッキングまたは据え置き、傾向 ↓）、Support（自律 run の 11% が環境障害）、Pawns or players（自律 run の実作業は 30%）の 3 軸。残る 9 軸はすべて懸念で、良好は 0。悪化傾向（↓ ↘）は Mission、Speed、Suitable process、Support、Fun / Health の 5 軸で、改善傾向は Easy to release の 1 軸だけ。</desc>
   <style>
     .f0-h{font:700 12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;letter-spacing:.12em}
     .f0-n{font:700 12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor}
@@ -92,7 +93,7 @@
   <rect x="20" y="260" width="470" height="34" rx="5" class="f0-card f0-cardr"/>
   <circle cx="39" cy="277" r="9" class="f0-r"/><text x="39" y="281.5" text-anchor="middle" class="f0-rx">!</text>
   <text x="56" y="281.5" class="f0-n">Suitable process</text>
-  <text x="242" y="281.5" class="f0-w">文書上のゲート 4 つが実質無効</text>
+  <text x="242" y="281.5" class="f0-w">無効 2・非ブロッキング/据え置き 2</text>
   <text x="476" y="283" text-anchor="end" class="f0-tw">↓</text>
   <text x="510" y="60" class="f0-h">TECH · 2 軸</text>
   <rect x="510" y="70" width="470" height="34" rx="5" class="f0-card"/>
@@ -162,7 +163,7 @@
   <h3 class="sub">次の 6〜8 週間で試す 3 件（09 に詳細）</h3>
   <div class="grid g3">
     <div class="card"><span class="tag">改善 1</span><h3>人のキューを細くする</h3><p>author レーンの worker を配線し、非 L0/L1 で全員 🟢 の PR を人のキューから外し、hand-off を日次 digest にまとめる。🔴 を上書きしたマージには理由を 1 行残す。</p></div>
-    <div class="card"><span class="tag">改善 2</span><h3>形骸化したゲートを実効化する</h3><p>restapi lint の <span class="kw">|| true</span> を外し、pip-audit を動く状態に戻し、カバレッジ floor を実測に合わせ、必須チェックを 3 本だけ入れる。</p></div>
+    <div class="card"><span class="tag">改善 2</span><h3>形骸化したゲートを実効化する</h3><p>restapi lint の <span class="kw">|| true</span> を外し、pip-audit を動く状態に戻し、カバレッジ floor を実測に合わせる。必須チェックは ADR 改正提案（L1）として出す。</p></div>
     <div class="card"><span class="tag">改善 3</span><h3>成果の物差しを 1 つにする</h3><p>週報の冒頭に「価値の 1 行」、SLI-1 の raw 併記、lane マージ数の単一定義、Epic/ADR 状態ドリフトの CI 検査。</p></div>
   </div>
 </section>
@@ -184,7 +185,7 @@
   </table></div>
   <h3 class="sub">データ源と作り方</h3>
   <ul>
-    <li><b>GitHub REST</b> — PR 831 本、Issue 201 件、コメント 3,610 件、deploy ワークフロー 12 本の run 531 回、主要 CI の直近 run、PR 42 本のタイムライン、レビュー 204 本。</li>
+    <li><b>GitHub REST</b> — PR 831 本、Issue 201 件、コメント 3,610 件、deploy ワークフロー 12 本の run 531 回（うち main への push / dispatch 493、成功 431）、主要 CI の直近 run、PR 42 本のタイムライン、レビュー 204 本。</li>
     <li><b>git</b> — <span class="kw">origin/main</span> の 1,453 コミット（2025-09-08 → 2026-10-09）。パッケージ別の行数は月末スナップショットから。</li>
     <li><b>workforce 台帳</b> — DynamoDB の asp-cloud プロジェクト行 861 件（06-13 → 10-10）と <span class="kw">GET /agents</span> の 58 体。</li>
     <li><b>asp-cloud の文書</b> — 週次 QA 23 本、error budget 20 本、監査 78 本、Epic 19 本、pilot 文書、ADR 22 本、インシデント 2 本。</li>
@@ -368,20 +369,20 @@
   <div class="scroll"><table class="tight">
     <thead><tr><th>フェーズ</th><th>期間</th><th>体制</th><th>月間マージ PR</th><th>製品コード主体コミットの比率</th><th>特徴</th></tr></thead>
     <tbody>
-      <tr><td>前史</td><td>2025-09 → 2026-03</td><td>1 人、直接 push</td><td class="dim">–</td><td>67〜92%</td><td class="dim">PR なし。eGauge → Timestream、adapter-utils 標準化、SolaX</td></tr>
+      <tr><td>前史</td><td>2025-09 → 2026-03</td><td>1 人、直接 push（最初の PR は #5、03-18）</td><td class="dim">–</td><td>29〜89%（2025-12 と 2026-03 は 29〜39%、他の月は 77〜89%）</td><td class="dim">03-18 まで PR なし。eGauge → Timestream、adapter-utils 標準化、SolaX</td></tr>
       <tr><td>A 構築期</td><td>2026-04 → 05</td><td>1 人 + Claude Code セッション、PR 化</td><td>21 → 118</td><td>67% → 42%</td><td class="dim">governance.md 新設（04-22）、週次監査開始（05-04〜）、Epic 層と workforce project 作成（05-27）</td></tr>
       <tr><td>B 立ち上げ期</td><td>2026-06 → 07</td><td>+ workforce（台帳 06-13〜）、Autopilot ADR 06-16〜19、squash merge 化</td><td>177 → 48</td><td>22% → 29%</td><td class="dim">6 月は E-008 Emporia・法務同意・Alerting を日単位で出荷。7 月は W26 から供給が細り、デプロイ 8 回、マージの 44% が監査レポート</td></tr>
       <tr><td>C 定常期</td><td>2026-08 → 10</td><td>同上 + 実宅施工（08-21 Home 13）</td><td>95 → 130 → 48*</td><td>25% → 21% → 24%</td><td class="dim">E-017/018/019 を日単位で出荷。Sev-2/Sev-3 インシデント、SLI-1 Red（W40–41）、Autopilot の根本原因診断（10-09）</td></tr>
     </tbody>
   </table></div>
-  <p class="note">* 10 月は 1〜9 日。製品コード主体 = そのコミットで最も多く触ったファイルが restapi / client / optimizer / reporter / alerting / adapter-* のもの。</p>
+  <p class="note">* 10 月は 1〜10 日（コミットは 10-09 まで）。製品コード主体 = そのコミットで最も多く触ったファイルが restapi / client / optimizer / reporter / alerting / adapter-* のもの。</p>
 
   <h3 class="sub">4Ls — フェーズごとに</h3>
   <div class="scroll"><table class="tight">
     <thead><tr><th></th><th>A 構築期（〜05）</th><th>B 立ち上げ期（06–07）</th><th>C 定常期（08–10）</th></tr></thead>
     <tbody>
-      <tr><td>Liked</td><td class="dim">骨格→取得→制御まで単独到達。安全側の不変条件（I-6 ハードリミット、DLQ）を先に入れた。パイロット規模を ADR で固定</td><td class="dim">機能速度（E-008 Emporia 一式を 1 日）。スコープ規律（E-012/013 を提案同日にキャンセル）。SLI で「Red と言える」ようになった</td><td class="dim">実宅接続が始まった（9 宅 17 台）。E-017/018/019 を日単位で出荷。沈黙検知の自動化。診断 → 根本原因の自己訂正</td></tr>
-      <tr><td>Lacked</td><td class="dim">03-23 まで PR なし、計測なし。ADR と実装の乖離 5 件</td><td class="dim">Autopilot の法は出たが機構が動かない（hook は permit 側が最初から不動）。7 月の供給枯渇。原因は記録なし</td><td class="dim">SLI-1 Red。インシデント write-up に 14 日 / 29 日、2 件とも Draft。toil 見積欄は 20/20 週 Pending。監査緩和は 4 週 eligible でも未署名</td></tr>
+      <tr><td>Liked</td><td class="dim">骨格→取得→制御まで単独到達。安全側の不変条件（I-6 ハードリミット、DLQ）を先に入れた。パイロット規模を ADR で固定</td><td class="dim">機能速度（E-008 Emporia 一式を 1 日）。スコープ規律（E-012/013 を提案同日にキャンセル）。SLI で「Red と言える」ようになった</td><td class="dim">実宅接続が始まった（9 宅 17 台）。E-017/018/019 を日単位で出荷（E-018 は Epic → Phase 5 で 7.5 日）。沈黙検知の自動化。診断 → 根本原因の自己訂正</td></tr>
+      <tr><td>Lacked</td><td class="dim">03-18 の #5 まで PR なし（4 月末までにマージされた PR は 25 本: 3 月 4、4 月 21）、計測なし。ADR と実装の乖離 5 件</td><td class="dim">Autopilot の法は出たが機構が動かない（hook は permit 側が最初から不動）。7 月の供給枯渇。原因は記録なし</td><td class="dim">SLI-1 Red。インシデント write-up に 14 日 / 29 日、2 件とも Draft。toil 見積欄は 20/20 週 Pending。監査緩和は 4 週 eligible でも未署名</td></tr>
       <tr><td>Learned</td><td class="dim">RAL-2026-008 を到達性分析の誤りで撤回（受容前に経路を確かめる）</td><td class="dim">SLI 定義は初回実測で崩れる。監査は人がいなくても回るが、それだけでは進まない</td><td class="dim">「1 回の施工訪問で取り切る」。成果指標が壊れていると診断も誤る。拒否権を持つ層が L1 の外に 4 つある</td></tr>
       <tr><td>Longed for</td><td class="dim">実宅と、安定した SLI 定義</td><td class="dim">Autopilot の成果指標、人の承認を待たない修正ループ</td><td class="dim">合意 KPI の 1 つでも実測開始。Epic の成果を週 1 行で見る面</td></tr>
     </tbody>
@@ -655,7 +656,7 @@
   <h3 class="sub">読み取り</h3>
   <ul>
     <li><b>パイプラインは律速ではない。</b>merge → 本番は p50 1.5 分、p90 2.4 分。deploy path を触った 212 本すべてが最終的にデプロイされ、24 時間を超えた 10 本はすべて「デプロイ失敗の放置」か「ワークフロー未整備」でした。</li>
-    <li><b>待ちは人のハンドオフに集中している。</b>8 月以降、<span class="kw">autopilot:needs-human</span> 付き 105 本は p50 15.3h / p90 80.5h、なし 143 本は p50 0.8h / p90 7.3h。約 19 倍の差です。</li>
+    <li><b>待ちは人のハンドオフに集中している。</b>8 月以降、<span class="kw">autopilot:needs-human</span> 付き 105 本は p50 15.3h（<a href="#wait-defs">待ち時間の 3 つの定義</a>の 1 行目） / p90 80.5h、なし 143 本は p50 0.8h / p90 7.3h。約 19 倍の差です。</li>
     <li><b>デプロイは平準化した。</b>5 月は 87 回が 10 日に集中、9 月は 69 回が 23 日に分散しています。</li>
     <li><b>変更失敗率は横ばい、本番の安定性は改善せず。</b>SLI-1 は W40 で 87.58%（budget 消費 248%）。Sev-2 / Sev-3 とも自動アラームではなく人が検知しました（約 4 時間 / 約 8 日）。</li>
     <li><b>「休眠失敗」が最長の回復時間を作った。</b>grafana-cloud は 06-09 の失敗が、path filter に掛かる変更が来るまで 76 日間誰にも再実行されず、08-24 に 10 連続失敗として再表面化しました。失敗した main デプロイを open のまま追う仕組みがありません。</li>
@@ -1052,7 +1053,7 @@
     <tbody>
       <tr><td>A E-019 emporia2</td><td>速い</td><td>仕様受領 → 本番 <b>40.8h</b></td><td class="dim">≥13.4h（33%）: レビュー周期 4.6h、人のマージ 7.9h</td><td class="dim">レビュー周期、人のマージ</td><td class="dim">3（レビュー 2、本番 501 を 11 分で修正）</td><td class="dim">部分（世帯別 cut-over 未実施、Epic は Proposed のまま）</td></tr>
       <tr><td>B E-018 Home Report</td><td>速い → 停滞</td><td>Epic → Phase 5 <b>7.5 日</b></td><td class="dim">#909（1 コミットの revert）が l0l1-path で人待ち 79.3h = 44%。その間 reporter スタック停止 90.6h</td><td class="dim">人のマージ</td><td class="dim">3（本番デプロイ失敗 2、レビュー修正の 21 秒前にマージ → 再投入）</td><td class="dim">未到達（allow-list 空、実世帯 0 版）</td></tr>
-      <tr><td>C E-010 Autopilot</td><td>停滞</td><td><b>116 日</b>、open</td><td class="dim">批准待ち 35〜88 日。hand-off 168 件 p50 21.3h / p90 128.3h</td><td class="dim">人のマージ、Architect 批准、配線</td><td class="dim">条文改定 約 16 vs 機構変更 約 6（明確に効いたのは 1 件）</td><td class="dim">部分（lane マージ約 17%。QA は 10 週「0 件」と誤報）</td></tr>
+      <tr><td>C E-010 Autopilot</td><td>停滞</td><td><b>116 日</b>、open</td><td class="dim">批准待ち 35〜88 日。needs-human PR 168 件（作成 → マージ）p50 21.3h / p90 128.3h</td><td class="dim">人のマージ、Architect 批准、配線</td><td class="dim">条文改定 約 16 vs 機構変更 約 6（明確に効いたのは 1 件）</td><td class="dim">部分（lane マージ約 17%。QA は 10 週「0 件」と誤報）</td></tr>
       <tr><td>D 判断待ちキュー</td><td>停滞</td><td>8〜101 日</td><td class="dim">ほぼ全区間</td><td class="dim">Architect の判断</td><td class="dim">同じ Issue を 6〜9 回 pickup → skip</td><td class="dim">未到達（3 件が 87〜101 日 open。DRAFT ADR と共に出荷されたコードが 114 日）</td></tr>
       <tr><td>E egauge2 -0.0（Sev-2）</td><td>手戻り</td><td>点修正 9 分 + 欠陥クラス 4 日 + 下流 10 日</td><td class="dim">squash で落ちた修正の再投入 #783 が 67.8h 人待ち</td><td class="dim">再投入 PR の人のマージ</td><td class="dim">再投入 1、段階修正 3、下流誤報 2、重複修正 1</td><td class="dim">到達</td></tr>
       <tr><td>F Home 13 CT（Sev-3）</td><td>手戻り</td><td><b>36 日以上</b>、open</td><td class="dim">検知 8.1 日（アラーム 0）、#881 の 🔴 → マージ 58.7h、#862（P0）27 日</td><td class="dim">検知の欠落、author レーン不在、現地作業</td><td class="dim">3 + 放棄 1</td><td class="dim">未到達（物理是正未実施）</td></tr>
@@ -1068,7 +1069,7 @@
       <li><b>非 L0/L1 の PR は lane が数分でマージ</b> — 判定 → マージ 2〜4 分</li>
     </ul></div>
     <div class="card"><span class="tag">ボトルネック</span><h3>待ちが集中した場所</h3><ul>
-      <li><b>B1 人のマージ待ち</b> — 168 件 p50 21.3h / p90 128.3h</li>
+      <li><b>B1 人のマージ待ち</b> — needs-human PR 168 件（作成 → マージ）p50 21.3h / p90 128.3h（<a href="#wait-defs">3 つの測り方</a>）</li>
       <li><b>B2 Architect の判断</b> — 決着 8 件の中央値 34 日、open 3 件 87〜101 日</li>
       <li><b>B3 bot PR で CI が走らない</b> — 拒否 60 件中 34 件（09-24 の修正後、bot PR 中央値 36.4h → 2.9h）</li>
       <li><b>B4 author レーンの worker 不在</b> — author-stale 10 件 p50 128.3h。🔴 のままマージされ後続 PR で回収</li>
@@ -1382,6 +1383,17 @@
   <h3 class="sub">オペレーター負荷 — ID 崩壊を補正して</h3>
   <p><span class="kw">refluster</span> 名義のコメント 1,436 件のうち <b>917 件はペルソナ文体</b>で、682 件は pr-autopilot の cron 窓に投稿されています。CCR の egress が GitHub API 呼び出しをすべてオペレーターの ID に差し替えるため（workforce ML-040）、<b>コメント数は人の負荷の指標として使えません</b>。人手と判定できるコメントは約 44 件で、7 月以降は週 0〜3 件。負荷は「書く」から「セッションを運転し、まとめてクリックする」に移っています。</p>
 
+  <h3 class="sub" id="wait-defs">待ち時間の 3 つの定義</h3>
+  <p>この文書には「待ち時間」が 3 通り出てきます。数え始めと母集団が違うので、値も違います。改善 1 の成功判定が使うのは 3 行目です。</p>
+  <div class="scroll"><table class="tight">
+    <thead><tr><th>測り方</th><th>母集団</th><th>p50 / p90</th><th>使いどころ</th></tr></thead>
+    <tbody>
+      <tr><td>PR 作成 → マージ（08 月〜）</td><td class="dim">needs-human 付き、08 月以降にマージ、dependabot 除く。n=105</td><td>15.3h / 80.5h</td><td class="dim">04 の DORA 比較（ラベルなし n=143 の 0.8h / 7.3h と対）</td></tr>
+      <tr><td>同（04 月〜、全件）</td><td class="dim">needs-human 付き、04 月以降にマージした全件。n=168</td><td>21.3h / 128.3h</td><td class="dim">05 の VSM（ケース C、B1）</td></tr>
+      <tr><td>hand-off 付与 → マージ</td><td class="dim">ラベル付与時刻から（timeline API）、期間別の層化抽出。n=42</td><td><b>14.1h / 48.9h</b></td><td class="dim"><b>改善 1 の成功判定。ベースラインはこの値</b></td></tr>
+    </tbody>
+  </table></div>
+
   <figure><div class="figscroll">
 <svg viewBox="0 0 1000 346" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="f9-t f9-d" style="min-width:760px">
   <title id="f9-t">人手マージ約 287 件の曜日別・月別の分布</title>
@@ -1505,17 +1517,17 @@
 <section id="s7">
   <div class="eyebrow"><span class="num">07</span><span class="kicker">Tech health</span></div>
   <h2>技術健全性</h2>
-  <p class="lede">不変条件の多くは守られています。問題は、文書上「✅」と書かれたゲートのうち 4 つが実際には何も止めていないことです。週 6 本の監査エージェントはこれを検出していません。</p>
+  <p class="lede">不変条件の多くは守られています。問題は、文書上「✅」と書かれたゲートのうち 2 つが実際には何も止めておらず（restapi lint、pip-audit のステップ）、2 つが設計上非ブロッキングか据え置きのままであること（checkov、coverage floor）です。前者の 2 つは週 6 本の監査エージェントが検出していません。</p>
 
   <div class="scroll"><table class="tight">
     <thead><tr><th>ゲート</th><th>文書上</th><th>実態</th><th>根拠</th></tr></thead>
     <tbody>
-      <tr><td>restapi lint（R-2）</td><td><span class="st live">✅</span></td><td><span class="kw">"lint": "eslint . --ext .ts || true"</span> — 初コミット（2025-09-08）以来、CI・pre-commit・deploy の 3 箇所で常に成功</td><td class="dim">restapi/package.json:26、CI ログ 10-08</td></tr>
-      <tr><td>pip-audit（R-10）</td><td><span class="st live">✅</span> PR audit live</td><td><span class="kw">continue-on-error: true</span> の下で「adapter-utils: Dependency not found on PyPI」により毎回 exit 1。手順は 04-22 以降不変で、監査結果が一度も出ていない可能性が高い（仮説）</td><td class="dim">ci-python-package.yml:117-121</td></tr>
-      <tr><td>checkov（R-8）</td><td>「I-2 違反を捕まえる」</td><td>非ブロッキング。adapter ごとに 11 件 fail（optimizer 4）を毎回出して成功扱い</td><td class="dim">ci-python-package.yml:129</td></tr>
-      <tr><td>coverage ratchet（R-5）</td><td>「上方にのみ ratchet」</td><td>core パッケージの floor は 05-30 以降据え置き。実測 − floor: restapi 36.8pt（55.8 vs 19）、ocpp 20.3、optimizer 16.8、client 13.6（floor 0）</td><td class="dim">docs/coverage-baseline.md、各 config</td></tr>
-      <tr><td>merge ゲート</td><td class="dim">—</td><td><b>main に branch protection なし</b>。ci-* は main で走らない（<span class="kw">branches-ignore</span>）。deploy は unit test を実行しない。secret-scan が赤のままマージ 5 件</td><td class="dim">governance.md §4.2、各 workflow</td></tr>
-      <tr><td>依存の脆弱性</td><td class="dim">Dependabot security-only</td><td>GitHub は main に <b>88 件の脆弱性アラート</b>（high 47 / moderate 38 / low 3）。emporia2 / emporia / reporter / alerting は dependabot.yml 対象外</td><td class="dim">10-10 push 時メッセージ、.github/dependabot.yml</td></tr>
+      <tr><td>restapi lint（R-2）</td><td><span class="st live">✅</span></td><td><span class="st part">無効</span> <span class="kw">"lint": "eslint . --ext .ts || true"</span> — 初コミット（2025-09-08）以来、CI・pre-commit・deploy の 3 箇所で常に成功</td><td class="dim">restapi/package.json:26、CI ログ 10-08</td></tr>
+      <tr><td>pip-audit（R-10）</td><td><span class="st live">✅</span> PR audit live（governance.md 自身が non-blocking と明記）</td><td><span class="st part">無効</span> non-blocking は設計どおり。しかしステップ自体が「adapter-utils: Dependency not found on PyPI」により毎回 exit 1 で終わり、監査結果を出していない。手順は 04-22 以降不変で、一度も結果が出ていない可能性が高い（仮説）。Dependabot alert baseline が 403 で取れない点は QA W41 と #885 が既に記録済みで、ここで足すのはステップ自体の失敗</td><td class="dim">ci-python-package.yml:117-121</td></tr>
+      <tr><td>checkov（R-8）</td><td>「✅ … Required」（governance.md §4.1 は無条件）</td><td><span class="st plan">設計上非ブロッキング</span> ワークフローは非ブロッキングと明記（adapter 側は「Phase 4 依存監査 closeout まで」、restapi 側は「Phase 0 ramp-up」）。§4.1 の R-8 行とワークフローの食い違い自体も直す対象。adapter ごとに 11 件 fail（optimizer 4）を毎回出して成功扱いで、I-2 の IAM 検査としては機能していない</td><td class="dim">ci-python-package.yml:129</td></tr>
+      <tr><td>coverage ratchet（R-5）</td><td>「上方にのみ ratchet」</td><td><span class="st plan">据え置き</span> floor 自体は効いている（下回れば赤）。ただし core パッケージの floor は 05-30 以降据え置きで回帰ガードになっていない。実測 − floor: restapi 36.8pt（55.8 vs 19）、ocpp 20.3、optimizer 16.8、client 13.6（floor 0）</td><td class="dim">docs/coverage-baseline.md、各 config</td></tr>
+      <tr><td>merge ゲート</td><td class="dim">—</td><td><span class="st plan">設定なし</span> <b>main に branch protection なし</b>。ci-* は main で走らない（<span class="kw">branches-ignore</span>）。deploy は unit test を実行しない。secret-scan が赤のままマージ 5 件</td><td class="dim">governance.md §4.2、各 workflow</td></tr>
+      <tr><td>依存の脆弱性</td><td class="dim">Dependabot security-only（04-27〜）</td><td><span class="st plan">未確認あり</span> 6 月以降 47/53 マージ、open 0。emporia2 / emporia / reporter / alerting は dependabot.yml 対象外。<b>未確認（事実としては扱わない）:</b> 10-10 の push 時に GitHub は main に 88 件の脆弱性アラート（high 47 / moderate 38 / low 3）と表示した。内訳・重複・dev 依存の割合は未確認で、事実としては扱わない</td><td class="dim">10-10 push 時メッセージ、.github/dependabot.yml</td></tr>
     </tbody>
   </table></div>
 
@@ -1649,7 +1661,7 @@
   <text x="56" y="390" class="f11-fact">本レビュー文書自身もこの比率を悪化させる 1 本である。</text>
 </svg>
 </div><figcaption>4/30 → 10/10 で製品は ×1.98、docs は ×7.1。docs÷製品のストック比は 0.45 から 1.73 へ一度も下がっていない。7 月は製品の追加 206 行に対し監査文書 3,333 行で、監査出力は変更量ではなく暦で駆動されている（付録 03 §5）。</figcaption></figure>
-  <p>デプロイの成功率そのものは改善しています（4 月・6 月の失敗 20% → 9 月 2/72、10 月 1/33）。配線も 12 本すべてが push-to-main + path filter で、アラーム検証スクリプトを 11/12 本が実行しています。改善していないのは「赤いものが main に入ることを止める層」と、「文書と実物の一致」です。<b>この診断文書自身も docs ÷ 製品コードの比率を悪化させる 1 本です。</b>その自覚の上で、付録は根拠として最小限（5 本）に留めました。</p>
+  <p>デプロイの成功率そのものは改善しています（main への push / dispatch のみで、4 月 14/93 = 15%・6 月 22/97 = 23%・8 月 11/54 = 20%（うち 10 件が grafana-cloud の 1 原因）の失敗 → 9 月 2/71（2 件とも立ち上げ失敗）、10 月 1/33）。配線も 12 本すべてが push-to-main + path filter で、アラーム検証スクリプトを 11/12 本が実行しています。改善していないのは「赤いものが main に入ることを止める層」と、「文書と実物の一致」です。<b>この診断文書自身も docs ÷ 製品コードの比率を悪化させる 1 本です。</b>その自覚の上で、付録は根拠として最小限（5 本）に留めました。</p>
 </section>
 
 <section id="s8">
@@ -2083,16 +2095,17 @@
     <tbody>
       <tr><td>観測事実</td><td class="dim">needs-human 付き PR は p50 15.3h / p90 80.5h、なしは 0.8h。hand-off 後に変更なしでマージ 30/42。🔴 後に変更なしでマージ 18/29。author-stale 10 件 p50 128.3h。author レーンの worker 未配線で OP-016 が 08-12 から open。稼働 82/116 日、週末 18/32 日</td><td class="dim">restapi lint は <span class="kw">|| true</span> で常に成功。pip-audit は毎回 exit 1 を握り潰し。checkov は 11 件 fail で成功扱い。coverage floor は据え置きで実測との差 13〜37pt。main に保護なし、ci-* は main で走らない、deploy はテストなし</td><td class="dim">lane マージ数が 0 / 約 30 / 61 / 65 に割れ、QA は 10 週「0 件」と誤報。SLI-1 は定義が 4 回変わり、SLO 割れ直後に 2 回変わって翌週 100%。接続世帯・台数・制御回数・KPI 測定数は散在。Epic の受入基準は文書形か未更新</td></tr>
       <tr><td>原因仮説</td><td class="dim">本来エージェント間で閉じるべき 🔴 → 修正ループが worker 不在で人のキューに落ち、設計どおりの hand-off と配線失敗の hand-off が同じキューに混ざって散発的に届く</td><td class="dim">ゲートの成否を誰も観測していない。監査は文書を読み、CI の exit code を読まない</td><td class="dim">成果を測る面がなく、週次で出るのは SLI と監査だけ。測定の前提が散文で書かれ、検査がない</td></tr>
-      <tr><td>試す変更</td><td class="dim">(a) <span class="kw">wire-bindings.mjs --project asp-cloud</span> で ren の pr-remediate を bind。(b) #1030 §0 の R4/R5 を批准するか差し戻す。(c) camille の attention-ledger を asp-cloud にも bind し、needs-human を 1 日 1 回の digest に。(d) 🔴 を上書きしたマージに <span class="kw">autopilot:override</span> を sweep が付け、週次 QA で件数と 30 日後の修正 PR 数を出す</td><td class="dim">(a) <span class="kw">"lint": "eslint ."</span> に修正。(b) <span class="kw">uv export --no-emit-project --no-emit-package adapter-utils</span> に変更し、1 週間後に high/critical のみ blocking。(c) floor を「実測 − 3pt」に一括更新し、差が 10pt 超なら警告。(d) 必須チェックを 3 本だけ設定し、deploy-* の先頭に既存のテストを 1 ステップ追加。(e) QA 週報に「continue-on-error 付きで直近 run が失敗しているステップ」の一覧</td><td class="dim">(a) error budget 週報の冒頭に「価値の 1 行」（施工完了宅 / 機器クラス別稼働台数 / 制御実行数 / 測定開始 KPI 数）を自動で。(b) SLI 表に raw 列を常設し、定義変更 PR は新旧を 2 週並走。(c) lane がマージ時に <span class="kw">autopilot:merged</span> を付け、QA は workforce API の値を併記。(d) ci-adr-presence に Epic/ADR の状態ドリフト検査を 1 ステップ</td></tr>
-      <tr><td>担当</td><td class="dim">operator（a の実行・b の批准）、ren、nadia、camille</td><td class="dim">ren（a〜c、e）、operator（d は repo 設定）、farah（e の集計）</td><td class="dim">farah / linnea（a、b）、nadia（c）、ren（d）、tomas（c の整合）</td></tr>
-      <tr><td>成功判定</td><td class="dim">4 週で author-stale 0。hand-off → マージ p50 &lt; 8h、p90 &lt; 36h。🔴 後に変更なしマージの比率が半減。週末稼働が月 2 日以下。マージ総数は維持</td><td class="dim">意図的に違反を入れた検証ブランチで CI が赤になる。8 週間で赤いチェックのままマージされた PR 0 件。floor と実測の差 ≤ 10pt。デプロイ失敗率 3% 以下を維持</td><td class="dim">W43 から 4 週連続で「価値の 1 行」が自動で埋まる。W42〜43 で QA・API・git の lane マージ数が ±2 件以内で一致。次の SLI 定義変更で新旧が並ぶ。次の ADR audit で状態ドリフト 0 件</td></tr>
+      <tr><td>試す変更</td><td class="dim">(a) OP-016 を完遂する（asp-cloud と agent-workforce の両スライスを manifest どおりに同時に配線。<span class="kw">--project asp-cloud</span> 単独では agent-workforce 側の 2 本が外れて後継が付かない）。モデル化コストは +約 78 USD/月が下限で、組織全体では 約 484 → 約 562 USD/月（W-3 合算上限 600 の 94%）。予算の改定と実行は operator の B 権限。手順と内訳は asp-cloud 側の本文 §9。(b) #1030 §0 の R4/R5 を批准するか差し戻す。(c) camille の attention-ledger を asp-cloud にも bind し、needs-human を 1 日 1 回の digest に（週 1 → 毎日、+約 1.5 USD/月）。(d) 🔴 を上書きしたマージに <span class="kw">autopilot:override</span> を sweep が付け、週次 QA で件数と 30 日後の修正 PR 数を出す</td><td class="dim">(a) <span class="kw">"lint": "eslint ."</span> に修正。(b) <span class="kw">uv export --no-emit-project --no-emit-package adapter-utils</span> に変更し、1 週間後に high/critical のみ blocking。(c) floor を「実測 − 3pt」に一括更新し、差が 10pt 超なら警告。(d) deploy-* の先頭に既存のテストを 1 ステップ追加（L2）。必須チェック（branch protection）は、asp-cloud の governance.md §4.1 の「required 化」目標と、ADR §2.4 の「前提にしない」が食い違っているので、ADR 改正（L1）で整合させる必要があり、本書では設定せず、ADR 改正提案（必須チェック 3 本）を Architect 宛に Issue として出すところまでにする。bot PR との共存は #933 以降可能な見込みだが、W42 の bot PR で実測してから。(e) QA 週報に「continue-on-error 付きで直近 run が失敗しているステップ」の一覧</td><td class="dim">(a) error budget 週報の冒頭に「価値の 1 行」（施工完了宅 / 機器クラス別稼働台数 / 制御実行数 / 測定開始 KPI 数）を自動で。(b) SLI 表に raw 列を常設し、定義変更 PR は新旧を 2 週並走。(c) lane がマージ時に <span class="kw">autopilot:merged</span> を付け、QA は workforce API の値を併記。(d) ci-adr-presence に Epic/ADR の状態ドリフト検査を 1 ステップ</td></tr>
+      <tr><td>担当</td><td class="dim">operator（a の実行・b の批准）、ren、nadia、camille</td><td class="dim">ren（a〜c、d のテスト追加、e）、operator / Architect（d の ADR 改正提案の受け手）、farah（e の集計）</td><td class="dim">farah / linnea（a、b）、nadia（c）、ren（d）、tomas（c の整合）</td></tr>
+      <tr><td>成功判定</td><td class="dim">4 週で author-stale 0。hand-off 付与 → マージ（<a href="#wait-defs">06「待ち時間の 3 つの定義」</a>の 3 行目、ベースライン 14.1h / 48.9h）が p50 &lt; 8h、p90 &lt; 36h。🔴 後に変更なしマージの比率が半減。週末稼働が月 2 日以下。マージ総数は維持</td><td class="dim">意図的に違反を入れた検証ブランチで CI が赤になる。8 週間で赤いチェックのままマージされた PR 0 件。floor と実測の差 ≤ 10pt。デプロイ失敗率 3% 以下を維持</td><td class="dim">W43 から 4 週連続で「価値の 1 行」が自動で埋まる。W42〜43 で QA・API・git の lane マージ数が ±2 件以内で一致。次の SLI 定義変更で新旧が並ぶ。次の ADR audit で状態ドリフト 0 件</td></tr>
+      <tr><td>I-7</td><td class="dim">プロセス変更。I-7（net-new hardening の停止）の対象外</td><td class="dim">(a) と (b) の <span class="kw">uv export</span> 修復は、既に ✅ とされている R-2・R-10 を記載どおりに戻すもので net-new ではない（本書の解釈）。(e) は計測。(b) の blocking 化、(c)、(d) は net-new で I-7 の対象。W40–41 が Red の間は I-7 が発動しないので今は着手でき、Green 2 週で止める</td><td class="dim">(a)〜(c) は計測。(d) は警告だけの L2 ステップで、計測系として対象外</td></tr>
       <tr><td>確認日</td><td><b>2026-11-21</b>（W47 retro）</td><td><b>2026-11-07</b>（a〜c）、<b>12-05</b>（d、e）</td><td><b>2026-11-23</b>（W47）</td></tr>
     </tbody>
   </table></div>
 
   <div class="two">
     <div class="card"><span class="tag">維持する強み</span><h3>変えないこと</h3><ul>
-      <li>連続セッションでの機能出荷速度（E-019 40.8h、E-018 Phase 1–5 を 5 日）</li>
+      <li>連続セッションでの機能出荷速度（E-019 40.8h、E-018 Phase 1–5 を 7.5 日、ADR 着手からは 4.1 日）</li>
       <li>L0 による「作らない」規律（E-012/013 同日キャンセル、最適化・スケール 0 行）</li>
       <li>レビューの具体性と自己開示（Bias 76%、不一致 25%、provenance の明示）</li>
       <li>小さなデプロイ単位と 2 分のパイプライン</li>
@@ -2114,7 +2127,7 @@
     <thead><tr><th>リスク</th><th>今なぜ問題になっていないか</th><th>カバーが外れる条件</th><th>外れたときのシナリオ</th></tr></thead>
     <tbody>
       <tr><td>オペレーター 1 人が全キューの処理者</td><td class="dim">本人が 116 日中 82 日稼働し、月火にまとめてクリックしている</td><td class="dim">2 週間の不在（7 月の谷が前例: W26〜W29）</td><td class="dim">L0/L1 PR と needs-human が溜まり、デプロイが週 2 回以下に落ちる。本番は走り続けるが、インシデント修正の再投入 PR（#783 型）が週末をまたいで 3 日止まる。監査は止まらず文書だけ増える</td></tr>
-      <tr><td>形骸化したゲート</td><td class="dim">開発者が実質 1 人 + 同じ基盤モデルのレビューで、lint 違反・脆弱な依存が偶然入っていない</td><td class="dim">新しい貢献者・新しい adapter・依存の CVE</td><td class="dim">lint 違反や既知 CVE が CI 緑のまま main に入り、deploy はテストを走らせずに本番へ出す。R-2/R-10 を「✅」と信じた監査は検出しない</td></tr>
+      <tr><td>無効なゲート（lint、pip-audit）</td><td class="dim">開発者が実質 1 人 + 同じ基盤モデルのレビューで、lint 違反・脆弱な依存が偶然入っていない</td><td class="dim">新しい貢献者・新しい adapter・依存の CVE</td><td class="dim">lint 違反や既知 CVE が CI 緑のまま main に入り、deploy はテストを走らせずに本番へ出す。R-2/R-10 を「✅」と信じた監査は検出しない</td></tr>
       <tr><td>SLI-1 の定義揺れ</td><td class="dim">各変更に ADR 根拠があり、Red のときは I-7 が外れている</td><td class="dim">SLO 割れ直後の定義変更が Green を作る</td><td class="dim">raw 64% の fleet に対し I-7 が「Green 2 週 → hardening 停止」を発動し、施工ラッシュ中に検知層の改善が止まる</td></tr>
       <tr><td>🔴 の上書き</td><td class="dim">上書きの多くは監査文書への 🔴 で、人が受容判断している</td><td class="dim">製品コードの 🔴 が上書きされる（#810 型）</td><td class="dim">main 赤化、または #881 型の集計欠陥が週次レポートに 1 週載る。レビューの価値が測れないので、パネルを維持する根拠も失う</td></tr>
       <tr><td>現地作業の未予定</td><td class="dim">ソフトは出荷済みで待てる状態。Home 13 の 1 宅で成立条件を確認済み</td><td class="dim">24 世帯の施工が集中する</td><td class="dim">E-019 cut-over・#862 の物理是正・test_checklist の初回実行が同時に必要になり、現場起因の不具合が同時多発。検知は手作業（8 日）、修正は人のキュー</td></tr>
@@ -2138,6 +2151,8 @@
     <li><b>2026-10 は部分月</b>（1〜10 日）。</li>
     <li><b>7 月の谷の原因、secret-scan / ci-sbom の慢性赤の原因、analytics lake ADR の批准状態は未特定</b>。</li>
     <li><b>workforce 台帳のコスト欄は全 58 体で 0</b>（API が返さない）。コストは <span class="kw">/stats</span> のモデル化値です。</li>
+    <li><b>Health Check の Mission は分析ごとに割れた</b>（プロダクト分析は 懸念〜良好、ワークフォース分析は 問題）。本文は「方向は明確、時間配分が逆」として 🟡↘ に一本化しています。Easy to release の ↑ は立ち上げ失敗が減ったことを指します（8 月は 11/54 = 20%、うち 10 件が grafana-cloud の 1 原因）。立ち上げ失敗を除いた変更失敗率は 6% → 8% で横ばいです。</li>
+    <li><b>asp-cloud 側のレビュー（dario / ren / mateo、2026-10-10）</b>で指摘された数値のずれ（デプロイ件数の定義、前史の比率、W30 の状態、待ち時間の 3 定義、改善 2 の (d) の L1 分類）と、2026-10-11 の 2 回目のレビュー（提案 1(a) の配線範囲とコスト、I-7 の根拠、checkov の出典）は、この版に反映済みです。</li>
   </ol>
   <h3 class="sub">出典</h3>
   <ul>
