@@ -70,6 +70,11 @@ export const SYSTEM_PROMPT_MAX_CHARS = 32 * 1024;
 export type IdentityPatchableField = (typeof IDENTITY_PATCHABLE_FIELDS)[number];
 
 // W-3 cap: sum of effective monthly budgets across non-archived agents.
+// Raised 600 → 800 on 2026-10-17 for the Client Studies Office reorg round (operator
+// direction): 11 seats add USD 78/mo planned (fits under 600), but the round
+// brings the previously unmetered operator-session study runs under the ledger
+// via the personal-goal PROJECT, so the ceiling moves to leave measuring room.
+// Raised in the SAME PR as the governance.md §2 row (lockstep rule below).
 // The single enforced source of truth (validate-agent-json.mjs retired in
 // ADR-0007 migration step 6); governance.md §2 W-3 documents the same value.
 // Raised 500 → 600 on 2026-08-06 for the Data & Experience three-hire round
@@ -87,7 +92,7 @@ export type IdentityPatchableField = (typeof IDENTITY_PATCHABLE_FIELDS)[number];
 // 2026-06-14 (Finance & Capital group). This constant is the *enforced* W-3 cap
 // and MUST stay in lockstep with governance.md §2 — raising one without the
 // other is exactly the drift that let the 253/250 false-reject happen.
-export const W3_BUDGET_CAP_USD = 600;
+export const W3_BUDGET_CAP_USD = 800;
 
 const SLUG = /^[a-z]+$/;
 const MODEL = /^(anthropic|azure|claude-code):[a-z0-9-]+(?:-[a-z0-9.]+)*$/;
