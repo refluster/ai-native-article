@@ -369,6 +369,7 @@ R-N11（キューの生産側と消費側を同じプロジェクトに同時に
 - [x] `workforce/projects/personal-goal/project.json`（別 PR）／ [ ] PAT と Secrets Manager、`workforce:projects:seed`（操作者）
 - [ ] `register.mjs` の本実行（操作者の AWS 資格情報。W-3 改正 PR のマージ後）
 - [ ] プロファイル 9 本の移植
+- [x] 共通の日次 cadence を 11 席に結線（2026-10-18、操作者指示「毎日、自分で考えて行動し、その結果をアウトプットする」）: `daily-research` と `feed-post` を `agent-workforce` プロジェクトで各 1 日 1 回、全体と衝突しない分に分散して有効化。`node workforce/scripts/wire-daily-cadences-all-agents.mjs --only=<11 席>` で実行し、読み戻しで 22 件を確認
 - [ ] cadence 5 本の scaffold（cadence-forge）
 - [ ] `research-study` 改訂 PR（Zone A）
 - [x] W-3 改正 PR（Zone A）— 起票済み、操作者マージ待ち
