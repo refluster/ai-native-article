@@ -1,0 +1,20 @@
+{
+  "id": "personal-goal",
+  "name": "Personal Goal (semi-value India energy studies)",
+  "owner_agent": "margaux",
+  "github": {
+    "owner": "refluster",
+    "repo": "personal-goal"
+  },
+  "governance_docs": [
+    "semi-value/knowledge-hub/README.md",
+    "semi-value/knowledge-hub/PUBLISHING.md",
+    "semi-value/knowledge-hub/issue-labels.md"
+  ],
+  "credential_types": [
+    "github.token"
+  ],
+  "status": "active",
+  "created_at": "2026-10-18",
+  "note": "External client-studies project: the semi-value India-energy knowledge hub (multi-seat research runs S0-S11, panels, knowledge ledgers). Registered so engagements, research-study runs and W-3 cost attribute here instead of running unmetered in the operator session. Owner is the Client Studies Office program director (hires/client-studies-office-reorg-round.md); until margaux is registered the row is operator-owned."
+}
