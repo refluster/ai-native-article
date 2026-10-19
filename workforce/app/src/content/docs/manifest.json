@@ -1,68 +1,140 @@
 [
   {
     "slug": "capabilities",
-    "file": "capabilities.html",
-    "lang": "en",
-    "kicker": "Capabilities",
-    "title": "What the workforce delivers",
-    "description": "Four bodies of work and the capability each proves — a software product built and audited end to end, a data analysis designed for many client rounds, decision research run head to head against a consultancy, and the standing media and dashboards — then the twelve workflow lanes behind them and the governance that lets them run.",
-    "cta": "See what it delivers",
-    "packTitle": "Capabilities",
-    "measure": "wide"
+    "original": "en",
+    "measure": "wide",
+    "editions": {
+      "ja": {
+        "file": "capabilities.ja.html",
+        "kicker": "Capabilities",
+        "title": "What the workforce delivers",
+        "description": "Four bodies of work and the capability each proves — a software product built and audited end to end, a data analysis designed for many client rounds, decision research run head to head against a consultancy, and the standing media and dashboards — then the twelve workflow lanes behind them and the governance that lets them run.",
+        "cta": "See what it delivers",
+        "packTitle": "Capabilities"
+      },
+      "en": {
+        "file": "capabilities.en.html",
+        "kicker": "Capabilities",
+        "title": "What the workforce delivers",
+        "description": "Four bodies of work and the capability each proves — a software product built and audited end to end, a data analysis designed for many client rounds, decision research run head to head against a consultancy, and the standing media and dashboards — then the twelve workflow lanes behind them and the governance that lets them run.",
+        "cta": "See what it delivers",
+        "packTitle": "Capabilities"
+      }
+    }
   },
   {
     "slug": "whitepaper",
-    "file": "whitepaper.html",
-    "lang": "en",
-    "kicker": "Technical whitepaper",
-    "title": "Capability as a governed internal asset",
-    "description": "The claim, the organizational constraint it removes, the composition model, the anatomy of a persistent agent, the architecture and execution flow, memory and cross-project reuse, governance and failure containment, operating evidence, management economics, and the limits and open questions.",
-    "cta": "Read the whitepaper",
-    "packTitle": "Technical whitepaper",
-    "measure": "wide"
+    "original": "en",
+    "measure": "wide",
+    "editions": {
+      "ja": {
+        "file": "whitepaper.ja.html",
+        "kicker": "Technical whitepaper",
+        "title": "Capability as a governed internal asset",
+        "description": "The claim, the organizational constraint it removes, the composition model, the anatomy of a persistent agent, the architecture and execution flow, memory and cross-project reuse, governance and failure containment, operating evidence, management economics, and the limits and open questions.",
+        "cta": "Read the whitepaper",
+        "packTitle": "Technical whitepaper"
+      },
+      "en": {
+        "file": "whitepaper.en.html",
+        "kicker": "Technical whitepaper",
+        "title": "Capability as a governed internal asset",
+        "description": "The claim, the organizational constraint it removes, the composition model, the anatomy of a persistent agent, the architecture and execution flow, memory and cross-project reuse, governance and failure containment, operating evidence, management economics, and the limits and open questions.",
+        "cta": "Read the whitepaper",
+        "packTitle": "Technical whitepaper"
+      }
+    }
   },
   {
     "slug": "founding-story",
-    "file": "founding-story.html",
-    "lang": "ja",
-    "kicker": "Founding story · 日本語",
-    "title": "人間ひとり、AI 五十八体。",
-    "description": "なぜ一人の人間がこの組織を作ったのか、なぜ作れたのか、稼働を始めてから何が起きたのか。家電の量産、SaaS の組織統治、事業売却で学んだ三つのことと、AI 組織が自分で書いた月次レポートの記録。",
-    "cta": "創業ストーリーを読む",
-    "packTitle": "創業ストーリー",
-    "measure": "wide"
+    "original": "ja",
+    "measure": "wide",
+    "editions": {
+      "ja": {
+        "file": "founding-story.ja.html",
+        "kicker": "Founding story",
+        "title": "人間ひとり、AI 58体",
+        "description": "なぜ一人の人間がこの組織を作ったのか、なぜ作れたのか、稼働を始めてから何が起きたのか。家電の量産、SaaS の組織統治、事業売却で学んだ三つのことと、AI 組織が自分で書いた月次レポートの記録。",
+        "cta": "創業ストーリーを読む",
+        "packTitle": "創業ストーリー"
+      },
+      "en": {
+        "file": "founding-story.en.html",
+        "kicker": "Founding story",
+        "title": "人間ひとり、AI 58体",
+        "description": "なぜ一人の人間がこの組織を作ったのか、なぜ作れたのか、稼働を始めてから何が起きたのか。家電の量産、SaaS の組織統治、事業売却で学んだ三つのことと、AI 組織が自分で書いた月次レポートの記録。",
+        "cta": "創業ストーリーを読む",
+        "packTitle": "創業ストーリー"
+      }
+    }
   },
   {
     "slug": "manifesto",
-    "file": "manifesto.html",
-    "lang": "en",
-    "kicker": "Manifesto",
-    "title": "Assemble, deliver, disband",
-    "description": "What the network believes about work: outcomes over output, the upside it aims at and what it will not do, capability that belongs to the professional, temporary projects and persistent learning, disciplinary difference, the record, accountability, and the human's ownership of purpose and consequence.",
-    "cta": "Read the manifesto",
-    "packTitle": "Manifesto",
-    "measure": "narrow"
+    "original": "en",
+    "measure": "narrow",
+    "editions": {
+      "ja": {
+        "file": "manifesto.ja.html",
+        "kicker": "Manifesto",
+        "title": "Assemble, deliver, disband",
+        "description": "What the network believes about work: outcomes over output, the upside it aims at and what it will not do, capability that belongs to the professional, temporary projects and persistent learning, disciplinary difference, the record, accountability, and the human's ownership of purpose and consequence.",
+        "cta": "Read the manifesto",
+        "packTitle": "Manifesto"
+      },
+      "en": {
+        "file": "manifesto.en.html",
+        "kicker": "Manifesto",
+        "title": "Assemble, deliver, disband",
+        "description": "What the network believes about work: outcomes over output, the upside it aims at and what it will not do, capability that belongs to the professional, temporary projects and persistent learning, disciplinary difference, the record, accountability, and the human's ownership of purpose and consequence.",
+        "cta": "Read the manifesto",
+        "packTitle": "Manifesto"
+      }
+    }
   },
   {
     "slug": "book-production",
-    "file": "book-production.html",
-    "lang": "ja",
-    "kicker": "Process · 日本語",
-    "title": "本をつくる工程",
-    "description": "出版社の実務（企画・台割・執筆・編集・校閲・校正・組版・校了）を参照して設計した、約40名のAIペルソナで一冊を分業する十のステージとゲート、担当の割り振り、初号『孫子の兵法』での実行。",
-    "cta": "工程を見る",
-    "packTitle": "本をつくる工程",
-    "measure": "wide"
+    "original": "ja",
+    "measure": "wide",
+    "editions": {
+      "ja": {
+        "file": "book-production.ja.html",
+        "kicker": "Process",
+        "title": "本をつくる工程",
+        "description": "出版社の実務（企画・台割・執筆・編集・校閲・校正・組版・校了）を参照して設計した、約40名のAIペルソナで一冊を分業する十のステージとゲート、担当の割り振り、初号『孫子の兵法』での実行。",
+        "cta": "工程を見る",
+        "packTitle": "本をつくる工程"
+      },
+      "en": {
+        "file": "book-production.en.html",
+        "kicker": "Process",
+        "title": "本をつくる工程",
+        "description": "出版社の実務（企画・台割・執筆・編集・校閲・校正・組版・校了）を参照して設計した、約40名のAIペルソナで一冊を分業する十のステージとゲート、担当の割り振り、初号『孫子の兵法』での実行。",
+        "cta": "工程を見る",
+        "packTitle": "本をつくる工程"
+      }
+    }
   },
   {
     "slug": "asp-cloud-dev-review",
-    "file": "asp-cloud-dev-review.html",
-    "lang": "ja",
-    "kicker": "Development review · 日本語",
-    "title": "1,000 本の PR を、どう作ったか",
-    "description": "外部プロジェクト asp-cloud の PR / Issue 番号が 1,000 を超えた時点での開発の健全性診断。58 体のエージェントと 1 人のオペレーターが半年でどう作り、どこで待ち、何が形だけになっていたかを、Squad Health Check・DORA・Value Stream Mapping で PR 831 本・デプロイ 531 回・実績台帳 861 行から再構成し、次の 6〜8 週間で試す 3 件に絞る。",
-    "cta": "診断を読む",
-    "packTitle": "asp-cloud 開発レビュー",
-    "measure": "wide"
+    "original": "ja",
+    "measure": "wide",
+    "editions": {
+      "ja": {
+        "file": "asp-cloud-dev-review.ja.html",
+        "kicker": "Development review",
+        "title": "1,000 本の PR を、どう作ったか",
+        "description": "外部プロジェクト asp-cloud の PR / Issue 番号が 1,000 を超えた時点での開発の健全性診断。58 体のエージェントと 1 人のオペレーターが半年でどう作り、どこで待ち、何が形だけになっていたかを、Squad Health Check・DORA・Value Stream Mapping で PR 831 本・デプロイ 531 回・実績台帳 861 行から再構成し、次の 6〜8 週間で試す 3 件に絞る。",
+        "cta": "診断を読む",
+        "packTitle": "asp-cloud 開発レビュー"
+      },
+      "en": {
+        "file": "asp-cloud-dev-review.en.html",
+        "kicker": "Development review",
+        "title": "1,000 本の PR を、どう作ったか",
+        "description": "外部プロジェクト asp-cloud の PR / Issue 番号が 1,000 を超えた時点での開発の健全性診断。58 体のエージェントと 1 人のオペレーターが半年でどう作り、どこで待ち、何が形だけになっていたかを、Squad Health Check・DORA・Value Stream Mapping で PR 831 本・デプロイ 531 回・実績台帳 861 行から再構成し、次の 6〜8 週間で試す 3 件に絞る。",
+        "cta": "診断を読む",
+        "packTitle": "asp-cloud 開発レビュー"
+      }
+    }
   }
 ]

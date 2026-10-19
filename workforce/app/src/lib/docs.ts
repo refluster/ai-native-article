@@ -1,6 +1,7 @@
 // Public documents — the capabilities account, the whitepaper, the founding
-// story, the manifesto and the book production process,
-// rendered by the SPA at /docs/:slug.
+// story, the manifesto, the book production process and the asp-cloud
+// development review, rendered by the SPA at /docs/:slug in two editions
+// (Japanese and English).
 //
 // The documents are HTML fragments under src/content/docs/ (one `<section>`
 // sequence each, nothing else) painted through the `.docs-prose`
@@ -9,23 +10,38 @@
 // the SPA and the styling into tokens is what makes Docs, Research and
 // the landing page one site.
 //
+// Every document exists in both languages: `<slug>.ja.html` and
+// `<slug>.en.html`, one written first (`original`) and the other a
+// translation of it. Which edition a reader sees is resolved exactly as the
+// Research surface resolves an article edition — `?lang=` → localStorage →
+// browser preference → `ja` (lib/research.ts resolveLanguage, ADR-0005) —
+// so the same JA / EN pill switches both surfaces. The slug is the
+// document's identity; the edition is never a route.
+//
 // `manifest.json` beside the fragments is the one place a document's
 // metadata lives: this module reads it for the SPA, and
 // workforce/scripts/build-board-knowledge.mjs reads the same file to build
-// the Q&A boards' knowledge pack (ADR-0034), so a new document is added in
-// one place and reaches both.
+// the Q&A boards' knowledge pack (ADR-0034) from the original edition, so
+// a new document is added in one place and reaches both.
 //
 // This module is metadata only (the landing page and the Docs index need
-// nothing more). The bodies — ~250 KB of HTML — live in docs-bodies.ts,
-// which only pages/Doc.tsx imports, and that page is lazy-loaded from
-// App.tsx so the console's main bundle does not carry them.
+// nothing more). The bodies — ~1 MB of HTML across both editions — live in
+// docs-bodies.ts, which only pages/Doc.tsx imports, and that page is
+// lazy-loaded from App.tsx so the console's main bundle does not carry them.
 
 import manifest from '../content/docs/manifest.json';
+import type { ResearchLanguage } from './research';
 
-export interface PublicDocMeta {
-  slug: string;
+/** The two editions every public document has. Same type as the Research
+ *  surface's, on purpose: one reader preference drives both. */
+export type DocLanguage = ResearchLanguage;
+
+export const DOC_LANGUAGES: readonly DocLanguage[] = ['ja', 'en'];
+
+/** One edition of a document: its body file and the words the cards and
+ *  the breadcrumb show for it. */
+export interface PublicDocEdition {
   file: string;
-  lang: 'en' | 'ja';
   /** Mono label above the title on cards ("Technical whitepaper"). */
   kicker: string;
   /** Title as shown on cards — the document's claim, not its type. */
@@ -35,32 +51,42 @@ export interface PublicDocMeta {
   cta: string;
   /** Title used for `document.title` and by the boards knowledge pack. */
   packTitle: string;
-  /** `narrow` (820px, the manifesto's air) or `wide` (the shell column). */
-  measure: 'narrow' | 'wide';
 }
 
-function isLang(v: unknown): v is PublicDocMeta['lang'] {
+export interface PublicDocMeta {
+  slug: string;
+  /** The language the document was written in; the other edition is a
+   *  translation. The boards knowledge pack reads this edition. */
+  original: DocLanguage;
+  /** `narrow` (820px, the manifesto's air) or `wide` (the shell column). */
+  measure: 'narrow' | 'wide';
+  editions: Record<DocLanguage, PublicDocEdition>;
+}
+
+function isLang(v: unknown): v is DocLanguage {
   return v === 'en' || v === 'ja';
 }
 function isMeasure(v: unknown): v is PublicDocMeta['measure'] {
   return v === 'narrow' || v === 'wide';
 }
+function isEdition(v: unknown): v is PublicDocEdition {
+  const e = v as Partial<PublicDocEdition> | null;
+  return Boolean(e && e.file && e.kicker && e.title && e.description && e.cta && e.packTitle);
+}
 
-/** Every public document, in index order. A malformed manifest row is a
- *  build defect and throws at module load (C-4): the Docs index must never
- *  quietly list fewer documents. */
+/** Every public document, in index order. A malformed manifest row — or a
+ *  row missing either edition — is a build defect and throws at module
+ *  load (C-4): the Docs index must never quietly list fewer documents, and
+ *  a reader must never be handed a document that has no body in the
+ *  edition they chose. */
 export const PUBLIC_DOCS: readonly PublicDocMeta[] = (manifest as unknown[]).map(raw => {
   const m = raw as Partial<PublicDocMeta>;
   if (
     !m.slug ||
-    !m.file ||
-    !isLang(m.lang) ||
+    !isLang(m.original) ||
     !isMeasure(m.measure) ||
-    !m.kicker ||
-    !m.title ||
-    !m.description ||
-    !m.cta ||
-    !m.packTitle
+    !m.editions ||
+    !DOC_LANGUAGES.every(lang => isEdition(m.editions?.[lang]))
   ) {
     throw new Error(`docs manifest: malformed row ${JSON.stringify(raw)}`);
   }
@@ -69,6 +95,12 @@ export const PUBLIC_DOCS: readonly PublicDocMeta[] = (manifest as unknown[]).map
 
 export function findDoc(slug: string): PublicDocMeta | undefined {
   return PUBLIC_DOCS.find(d => d.slug === slug);
+}
+
+/** The edition of a document in the reader's language. Every document has
+ *  both, so this never falls back. */
+export function docEdition(doc: PublicDocMeta, lang: DocLanguage): PublicDocEdition {
+  return doc.editions[lang];
 }
 
 export function docPath(slug: string): string {
