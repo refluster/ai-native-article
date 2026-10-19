@@ -5,7 +5,7 @@
   `/books/:slug/:chapterId` (the reading view) — public, outside `AuthBoundary`, linked from the
   public header as **Books** beside Docs and Research
 - **Process**: how a book is produced is the public document
-  [`/docs/book-production`](../../app/src/content/docs/book-production.html) and the session skill
+  [`/docs/book-production`](../../app/src/content/docs/book-production.ja.html) and the session skill
   [`.claude/skills/book-production`](../../../.claude/skills/book-production/SKILL.md)
 - **Sibling notes**: [`public-docs.md`](public-docs.md) (the `/docs` fragments),
   [`research-surface.md`](research-surface.md) (the article reader)

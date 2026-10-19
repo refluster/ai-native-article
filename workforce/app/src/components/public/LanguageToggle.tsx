@@ -1,13 +1,17 @@
-// JA / EN edition switch for the Research surface. Writes `?lang=` so the
-// choice is shareable, and remembers it in localStorage so it sticks
-// across visits. The chrome around the articles stays English; this
-// toggles only the article edition.
+// JA / EN edition switch shared by the public reading surfaces (Research
+// articles, Docs documents). Writes `?lang=` so the choice is shareable,
+// and remembers it in localStorage so it sticks across visits — one key
+// for both surfaces, so a reader has one language. The chrome around the
+// text stays English; this toggles only the edition.
 
 import { useSearchParams } from 'react-router-dom';
 import { storeLanguage, type ResearchLanguage } from '../../lib/research';
 
 interface Props {
   value: ResearchLanguage;
+  /** Accessible name of the group: what is being switched ("Article
+   *  edition" on Research, "Document edition" on Docs). */
+  label?: string;
 }
 
 const OPTIONS: { value: ResearchLanguage; label: string; title: string }[] = [
@@ -15,7 +19,7 @@ const OPTIONS: { value: ResearchLanguage; label: string; title: string }[] = [
   { value: 'en', label: 'EN', title: 'English' },
 ];
 
-export default function LanguageToggle({ value }: Props) {
+export default function LanguageToggle({ value, label = 'Article edition' }: Props) {
   const [params, setParams] = useSearchParams();
 
   function choose(next: ResearchLanguage) {
@@ -29,7 +33,7 @@ export default function LanguageToggle({ value }: Props) {
   return (
     <div
       role="group"
-      aria-label="Article edition"
+      aria-label={label}
       className="inline-flex items-center rounded-full border border-wf-outline-variant bg-wf-surface-container-lo p-0.5"
     >
       {OPTIONS.map(o => (

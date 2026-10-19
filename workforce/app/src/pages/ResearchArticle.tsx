@@ -20,7 +20,7 @@ import PublicShell from '../components/PublicShell';
 import MermaidBlock from '../components/MermaidBlock';
 import { CARD, CHIP, H1_MD, KICKER, KICKER_ACCENT, TEXT_LINK } from '../components/public/styles';
 import AuthorByline from '../components/research/AuthorByline';
-import LanguageToggle from '../components/research/LanguageToggle';
+import LanguageToggle from '../components/public/LanguageToggle';
 import { Skeleton, SkeletonText } from '../components/Skeleton';
 import { SITE_DISPLAY_NAME } from '../config/site';
 import { extractMermaidSource } from '../lib/reports';

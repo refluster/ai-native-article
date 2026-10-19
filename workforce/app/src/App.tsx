@@ -36,9 +36,9 @@ import { SkeletonText } from './components/Skeleton';
 import { routerBaseName } from './lib/paths';
 import { trackPageView } from '@kohuehara/shared/analytics';
 
-/** The document page carries the four documents' bodies (~250 KB of
- *  HTML, lib/docs-bodies.ts). Lazy so the console's main bundle — which
- *  every signed-in page load pays for — does not. */
+/** The document page is lazy, and each edition's body is its own chunk
+ *  loaded on demand (lib/docs-bodies.ts), so the console's main bundle —
+ *  which every signed-in page load pays for — carries neither. */
 const Doc = lazy(() => import('./pages/Doc'));
 
 /** The reading view carries react-markdown's book components and its own

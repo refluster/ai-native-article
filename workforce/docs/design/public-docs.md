@@ -21,9 +21,10 @@ They are now **content in the SPA**:
 
 | Path | Role |
 |---|---|
-| `src/content/docs/<slug>.html` | the document body — the page's former `<main>` minus its footer: a sequence of `<section>`s, the first one `.cover`. Nothing else: no head, no styles, no chrome |
-| `src/content/docs/manifest.json` | slug, language, kicker, card title/description/CTA, knowledge-pack title, measure. **The one place a document is registered** |
-| `src/lib/docs.ts` | reads the manifest, bundles the bodies (`?raw`), throws at load if a row has no body (C-4); the legacy-URL and in-body-link helpers |
+| `src/content/docs/<slug>.<lang>.html` | the document body, one file per edition (`ja`, `en`) — the page's former `<main>` minus its footer: a sequence of `<section>`s, the first one `.cover`. Nothing else: no head, no styles, no chrome. Both editions share one skeleton of ids (see [`public-docs-bilingual.md`](public-docs-bilingual.md)) |
+| `src/content/docs/manifest.json` | slug, `original` language, measure, and per edition: file, kicker, card title/description/CTA, knowledge-pack title. **The one place a document is registered** |
+| `src/lib/docs.ts` | reads the manifest, throws at load if a row lacks either edition or any field (C-4); the legacy-URL, in-body-link and `?lang=` carry-over helpers |
+| `src/lib/docs-bodies.ts` | loads one edition's body on demand (`import.meta.glob` … `?raw`, one chunk per file); throws at load if a manifest edition has no file (C-4) |
 | `src/pages/Docs.tsx` | the index — `PageHero` + one `LinkCard` per manifest row |
 | `src/pages/Doc.tsx` | one document — breadcrumb, the body injected as-is, a *Continue reading* pair of cards |
 | `src/index.css` `.docs-prose` | the documents' class vocabulary (`cover`, `eyebrow`, `lede`, `card`, `layer`, `st`, `toc`, `voice`, …) painted with the public site's tokens |

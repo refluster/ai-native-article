@@ -265,17 +265,22 @@ the Research index widens to 1200px because it carries the console's
 
 ### Docs
 
-`/docs` and `/docs/:slug` render the whitepaper, the founding story and
-the manifesto from HTML fragments bundled into the app (`src/content/docs/`,
-registered in `manifest.json`), painted by `.docs-prose` in `index.css`:
+`/docs` and `/docs/:slug` render the public documents (the capabilities
+account, the whitepaper, the founding story, the manifesto, the book
+production process, the asp-cloud development review) from HTML fragments
+bundled into the app (`src/content/docs/<slug>.<lang>.html`, registered in
+`manifest.json`), painted by `.docs-prose` in `index.css`:
 the documents' own class vocabulary (`cover`, `eyebrow`, `lede`, `card`,
 `layer`, status pills, `toc`, persona `voice`s) mapped onto the tokens
 above. Body **17px / 1.75** Geist (the manifesto, marked `narrow`, reads at
 18px / 1.8 in an 820px measure); numbered mono eyebrows in Indigo above
 each `h2`; cards, stat tiles and tables in the card grammar; quotes as
 rails. No dark theme, no accent bar under the cover title, no section
-rules. Decision record and file map:
-[`docs/design/public-docs.md`](docs/design/public-docs.md).
+rules. Every document has a Japanese and an English edition; the JA / EN
+pill is the Research surface's `LanguageToggle` and the edition resolves
+the same way (`?lang=` → localStorage → browser → `ja`). Decision record
+and file map: [`docs/design/public-docs.md`](docs/design/public-docs.md);
+the editions: [`docs/design/public-docs-bilingual.md`](docs/design/public-docs-bilingual.md).
 
 ## Research (the reading surface)
 
