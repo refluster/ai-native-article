@@ -255,15 +255,18 @@ export function isResearchLanguage(v: unknown): v is ResearchLanguage {
 
 /**
  * Which edition to show. `?lang=` wins (shareable), then the stored
- * choice, then the browser's preference list, then Japanese — the corpus
- * is written Japanese-first, and 'ja' is also what the reader site
- * defaults to. Never a route: the slug is the article's identity on both
+ * choice, then the browser's preference list, then `fallback` — Japanese
+ * for Research (the corpus is written Japanese-first, and 'ja' is also
+ * what the reader site defaults to); the Docs surface passes English, the
+ * ADR-0005 fallback, because its originals were English before they had
+ * editions. Never a route: the slug is the article's identity on both
  * surfaces.
  */
 export function resolveLanguage(
   search: string,
   storage: Pick<Storage, 'getItem'> | undefined,
   navigatorLanguages: readonly string[],
+  fallback: ResearchLanguage = 'ja',
 ): ResearchLanguage {
   const fromQuery = new URLSearchParams(search).get('lang');
   if (isResearchLanguage(fromQuery)) return fromQuery;
@@ -277,7 +280,7 @@ export function resolveLanguage(
     const primary = tag.toLowerCase().split('-')[0];
     if (primary === 'ja' || primary === 'en') return primary;
   }
-  return 'ja';
+  return fallback;
 }
 
 export function storeLanguage(lang: ResearchLanguage, storage: Pick<Storage, 'setItem'> | undefined): void {

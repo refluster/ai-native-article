@@ -123,6 +123,7 @@ founding-story の日本語タイトルは「人間ひとり、AI 58体」（運
 | `/docs/:slug`（未知の slug） | Not found カード。切り替える版が無いのでトグルなし。`← All docs` は `?lang=` を引き継ぐ |
 | ランディング | 解決済みの版に従う。トグルなし |
 | ストレージ不可（Safari プライベート） | 毎回ブラウザ設定から解決。トグル後は `?lang=` の引き継ぎで同一セッション内は一貫 |
+| 本文の読み込み中 | 版ごとに一ファイルを遅延読み込みする（レビュー M2/D2）。パンくずとトグルは即時、本文はスケルトン → 到着次第差し替え。切替時の位置復元は新しい本文の到着後 |
 | 「英語版未着」 | **存在しない**。欠けた版はビルドで落ちる |
 
 ## ユーザーが間違えたとき
@@ -137,7 +138,7 @@ founding-story の日本語タイトルは「人間ひとり、AI 58体」（運
 ## 受け入れ基準
 
 - [ ] `?lang=en` 付きで開くと en 本文、`article[lang="en"]`。保存値 `ja` があっても en、かつ `kohuehara.lang` は書き換わらない
-- [ ] クエリ無し・保存 `ja`・`navigator ['en-US']` → ja。クエリ無し・保存無し・`['en-US']` → en。`['fr']` → ja。`?lang=EN` → 無視
+- [ ] クエリ無し・保存 `ja`・`navigator ['en-US']` → ja。クエリ無し・保存無し・`['en-US']` → en。`['fr']` → en（ADR-0005 の既定、実装注参照）。`?lang=EN` → 無視
 - [ ] 文書ページ：`nav[aria-label="Breadcrumb"]` 内に `role=group` `aria-label="Document edition"`。EN 押下で URL に `lang=en`、ストレージ `en`、本文 en、`aria-pressed` が移る
 - [ ] `/docs`：トグルが PageHero の aside にある。カードの kicker/title/description/CTA が版に従う
 - [ ] 文書カード（索引・Continue reading・ランディング）は ja 版のとき `lang="ja"`、en 版のとき `lang` 属性なし
@@ -157,6 +158,7 @@ founding-story の日本語タイトルは「人間ひとり、AI 58体」（運
 
 - UI クロームの日本語化（文字列表）。クロームは英語のまま。
 - `resolveLanguage` の最終フォールバックの変更。ADR-0005 は読者サイトで「どちらも無ければ English」としているが、コンソールの実装は `ja` で終わる。Docs はコンソールの関数をそのまま使うので、ja/en どちらも挙げないブラウザ（`fr` のみ等）は日本語に着地する。直すならコンソール全体（Research 含む）の判断として運営者へ。
+  *実装注（運営者、レビュー D1 を受けて）*：`resolveLanguage` に `fallback` 引数を足し、Docs は `en`（`DOCS_FALLBACK_LANGUAGE`、ADR-0005 の既定）、Research は従来どおり `ja` を渡す。英語原本だった三文書を、言語を挙げないブラウザがこれまでどおり英語で開けるようにするため。
 - `hreflang` / OG / canonical。SPA の `index.html` は `noindex` のまま（[`public-docs.md`](public-docs.md) と同じ理由）。
 - 版の内容ずれの検出（片方だけ編集された文書）。ADR-0005 の Consequences と同じ未解決の穴として残す。
 - トグルのボタンの読み上げ名（"JA" / "EN" が `title` より優先される）。Research と共通の課題として別の小さな PR で。

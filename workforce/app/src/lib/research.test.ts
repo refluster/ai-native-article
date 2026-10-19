@@ -149,6 +149,11 @@ describe('source index', () => {
 });
 
 describe('resolveLanguage', () => {
+  it('falls back to the caller\'s language when nothing names one (Research: ja)', () => {
+    expect(resolveLanguage('', undefined, ['fr'])).toBe('ja');
+    expect(resolveLanguage('', undefined, ['fr'], 'en')).toBe('en');
+    expect(resolveLanguage('?lang=ja', undefined, ['fr'], 'en')).toBe('ja');
+  });
   const store = (v: string | null) => ({ getItem: () => v });
   it('prefers ?lang=, then storage, then the browser, then ja', () => {
     expect(resolveLanguage('?lang=en', store('ja'), ['ja'])).toBe('en');

@@ -1,6 +1,7 @@
 // One public document (/docs/:slug), in the public shell.
 //
-// The body is a bundled HTML fragment (lib/docs-bodies.ts) injected as-is and
+// The body is an HTML fragment loaded on demand for the edition being read
+// (lib/docs-bodies.ts, one chunk per file), injected as-is and
 // styled by `.docs-prose` (index.css) — the same tokens, type and spacing
 // the rest of the public site uses. Links inside the body that point at
 // this origin are routed through the SPA so a reader moving between the
@@ -19,14 +20,16 @@
 // Pre-SPA spellings (`/docs/whitepaper.html`, `/docs/index.html`) reach
 // this route through CloudFront's 404 fallback and are forwarded.
 
-import { useEffect, useRef, type MouseEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, type MouseEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import PublicShell from '../components/PublicShell';
 import LinkCard from '../components/public/LinkCard';
 import LanguageToggle from '../components/public/LanguageToggle';
+import { SkeletonText } from '../components/Skeleton';
 import { CARD, KICKER, KICKER_ACCENT, TEXT_LINK } from '../components/public/styles';
 import { SITE_DISPLAY_NAME } from '../config/site';
 import {
+  DOCS_FALLBACK_LANGUAGE,
   PUBLIC_DOCS,
   docEdition,
   docPath,
@@ -36,7 +39,8 @@ import {
   legacyDocRedirect,
   withEdition,
 } from '../lib/docs';
-import { docBody } from '../lib/docs-bodies';
+import { loadDocBody } from '../lib/docs-bodies';
+import { useAsync } from '../lib/useAsync';
 import { useResearchLanguage } from '../lib/useResearchLanguage';
 
 /**
@@ -63,13 +67,23 @@ export default function Doc() {
   const { slug = '' } = useParams<{ slug: string }>();
   const { search, hash } = useLocation();
   const navigate = useNavigate();
-  const lang = useResearchLanguage();
+  const lang = useResearchLanguage(DOCS_FALLBACK_LANGUAGE);
   const legacy = legacyDocRedirect(slug, search, hash);
   const doc = legacy ? undefined : findDoc(slug);
   const edition = doc ? docEdition(doc, lang) : undefined;
+  // The body carries the edition it was loaded for: between the toggle
+  // press and the new body's arrival the route already says the new
+  // language while the DOM still holds the old body, and the scroll
+  // bookkeeping below must follow the DOM, not the route.
+  const body = useAsync(
+    async () => (doc ? { lang, html: await loadDocBody(doc.slug, lang) } : null),
+    [doc?.slug, lang],
+  );
+  const html = body.data?.html;
+  const htmlLang = body.data?.lang;
   const articleRef = useRef<HTMLElement>(null);
   const sectionRef = useRef<string | null>(null);
-  const shownLang = useRef(lang);
+  const shown = useRef<{ slug: string; lang: string } | null>(null);
 
   useEffect(() => {
     if (!edition) return;
@@ -79,42 +93,40 @@ export default function Doc() {
     };
   }, [edition]);
 
-  // A fresh document opens at its top; a link into a section (`#s7`) opens
-  // at that section. The body is synchronous, so the target exists on the
-  // first paint and one scroll after mount is enough.
-  useEffect(() => {
-    const target = hash ? document.getElementById(hash.slice(1)) : null;
-    if (target) reveal(target);
-    else window.scrollTo({ top: 0 });
-    sectionRef.current = null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
-
-  // Remember which section the reader is in, so a switch of edition — the
-  // two bodies differ in length, so neither a kept pixel offset nor the
-  // top of the page would be where they were — can land on the same
-  // section of the other edition.
-  useEffect(() => {
-    if (!doc) return;
-    function track() {
-      const article = articleRef.current;
-      if (!article) return;
-      const sections = [...article.querySelectorAll<HTMLElement>('section[id]')].map(el => ({
-        id: el.id,
-        top: el.getBoundingClientRect().top,
-      }));
-      sectionRef.current = currentSectionId(sections);
-    }
-    window.addEventListener('scroll', track, { passive: true });
-    return () => window.removeEventListener('scroll', track);
-  }, [doc]);
-
-  useEffect(() => {
-    if (shownLang.current === lang) return;
-    shownLang.current = lang;
-    const id = sectionRef.current;
-    reveal((id && document.getElementById(id)) || articleRef.current);
+  // The moment the route's edition changes, note which section the reader
+  // is in — while the body they were reading is still in the DOM and the
+  // scroll position is still theirs. (A scroll listener would see the page
+  // collapse to its skeleton and lose the section.) A switch of edition
+  // then lands on that section of the other body: the two bodies differ
+  // in length, so neither a kept pixel offset nor the top of the page
+  // would be where they were.
+  useLayoutEffect(() => {
+    const article = articleRef.current;
+    if (!article || !shown.current || shown.current.lang === lang) return;
+    sectionRef.current = currentSectionId(
+      [...article.querySelectorAll<HTMLElement>('section[id]')].map(el => ({ id: el.id, top: el.getBoundingClientRect().top })),
+    );
   }, [lang]);
+
+  // Once a body is in the DOM: a fresh document opens at its top, or at
+  // the section a `#s7` link names; a switch of edition on the same
+  // document returns to the section the reader was in. The body arrives
+  // asynchronously, so this runs on the body, not on the route.
+  useLayoutEffect(() => {
+    if (!html || !htmlLang || !doc) return;
+    const prev = shown.current;
+    shown.current = { slug: doc.slug, lang: htmlLang };
+    if (!prev || prev.slug !== doc.slug) {
+      sectionRef.current = null;
+      const target = hash ? document.getElementById(hash.slice(1)) : null;
+      if (target) reveal(target);
+      else window.scrollTo({ top: 0 });
+    } else if (prev.lang !== htmlLang) {
+      const id = sectionRef.current;
+      reveal((id && document.getElementById(id)) || articleRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [html, htmlLang, doc?.slug]);
 
   if (legacy) return <Navigate to={legacy} replace />;
 
@@ -169,15 +181,29 @@ export default function Doc() {
           <LanguageToggle value={lang} label="Document edition" />
         </nav>
 
+        {body.error && (
+          <div role="alert" className={`mt-8 ${CARD} p-6`}>
+            <p className={KICKER_ACCENT}>Could not load this edition</p>
+            <p className="mt-2 text-sm text-wf-on-surface-variant">{body.error}</p>
+          </div>
+        )}
+        {body.loading && (
+          <div className="pt-12" aria-busy="true" aria-live="polite" aria-label="Loading document">
+            <SkeletonText lines={3} />
+            <SkeletonText lines={8} className="mt-8" />
+          </div>
+        )}
         {/* The fragment is repo-authored and bundled at build time — the
             same trust as any component in src/ — so innerHTML is safe. */}
-        <article
-          ref={articleRef}
-          className={`docs-prose${doc.measure === 'narrow' ? ' is-narrow' : ''}`}
-          lang={lang}
-          onClick={onBodyClick}
-          dangerouslySetInnerHTML={{ __html: docBody(doc.slug, lang) }}
-        />
+        {html && (
+          <article
+            ref={articleRef}
+            className={`docs-prose${doc.measure === 'narrow' ? ' is-narrow' : ''}`}
+            lang={htmlLang}
+            onClick={onBodyClick}
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        )}
 
         <section className="pt-10 pb-6" aria-label="Continue reading">
           <h2 className={KICKER}>Continue reading</h2>

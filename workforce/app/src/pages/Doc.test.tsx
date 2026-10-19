@@ -17,6 +17,13 @@ function LocationProbe() {
   return <div data-testid="location">{loc.pathname + loc.search + loc.hash}</div>;
 }
 
+/** Mounts the route and waits for the edition's body to arrive. */
+async function mountLoaded(path: string) {
+  const r = mount(path);
+  await waitFor(() => expect(r.container.querySelector('article.docs-prose')).not.toBeNull());
+  return r;
+}
+
 function mount(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -44,8 +51,8 @@ afterEach(() => {
 });
 
 describe('Doc', () => {
-  it('renders the whitepaper body, its title and the breadcrumb', () => {
-    mount('/docs/whitepaper');
+  it('renders the whitepaper body, its title and the breadcrumb', async () => {
+    await mountLoaded('/docs/whitepaper');
     // The cover title is "Software<br>Talent Network"; jsdom joins the
     // two text nodes without a space.
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Software\s*Talent Network/);
@@ -54,57 +61,64 @@ describe('Doc', () => {
     expect(document.title).toBe('Technical whitepaper — Software Talent Network');
   });
 
-  it('serves the edition the URL names and marks the body with it', () => {
-    const { container } = mount('/docs/founding-story?lang=ja');
+  it('serves the edition the URL names and marks the body with it', async () => {
+    const { container } = await mountLoaded('/docs/founding-story?lang=ja');
     expect(container.querySelector('article.docs-prose')?.getAttribute('lang')).toBe('ja');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/人間ひとり、\s*AI 58体/);
     expect(document.title).toBe('創業ストーリー — Software Talent Network');
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent(/Docs\s*\/\s*創業ストーリー/);
     cleanup();
-    mount('/docs/founding-story?lang=en');
+    await mountLoaded('/docs/founding-story?lang=en');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/One human,\s*58 AIs/);
     expect(document.title).toBe('Founding story — Software Talent Network');
   });
 
-  it('lets a shared ?lang= win over the stored choice without overwriting it', () => {
+  it('lets a shared ?lang= win over the stored choice without overwriting it', async () => {
     window.localStorage.setItem(RESEARCH_LANGUAGE_STORAGE_KEY, 'ja');
-    const { container } = mount('/docs/founding-story?lang=en');
+    const { container } = await mountLoaded('/docs/founding-story?lang=en');
     expect(container.querySelector('article.docs-prose')?.getAttribute('lang')).toBe('en');
     expect(window.localStorage.getItem(RESEARCH_LANGUAGE_STORAGE_KEY)).toBe('ja');
   });
 
-  it('falls back to the stored choice, then the browser, and ignores a bad value', () => {
+  it('falls back to the stored choice, then the browser, then English; ignores a bad value', async () => {
+    const langOf = async (path: string) => {
+      const l = (await mountLoaded(path)).container.querySelector('article')?.getAttribute('lang');
+      cleanup();
+      return l;
+    };
     window.localStorage.setItem(RESEARCH_LANGUAGE_STORAGE_KEY, 'ja');
-    expect(mount('/docs/whitepaper').container.querySelector('article')?.getAttribute('lang')).toBe('ja');
-    cleanup();
+    expect(await langOf('/docs/whitepaper')).toBe('ja');
+    // A bad value is ignored: the stored choice still wins, not the query's "EN".
+    expect(await langOf('/docs/whitepaper?lang=EN')).toBe('ja');
     window.localStorage.removeItem(RESEARCH_LANGUAGE_STORAGE_KEY);
-    expect(mount('/docs/whitepaper').container.querySelector('article')?.getAttribute('lang')).toBe('en');
-    cleanup();
-    expect(mount('/docs/whitepaper?lang=EN').container.querySelector('article')?.getAttribute('lang')).toBe('en');
+    expect(await langOf('/docs/whitepaper')).toBe('en'); // jsdom: navigator.languages = en-US
+    const languages = vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['fr-FR', 'fr']);
+    expect(await langOf('/docs/whitepaper')).toBe('en'); // neither language named → ADR-0005 fallback
+    expect(await langOf('/docs/founding-story')).toBe('en');
+    languages.mockRestore();
   });
 
   it('switches edition from the breadcrumb row, writing ?lang= and the stored choice', async () => {
-    const { container } = mount('/docs/manifesto?lang=ja');
+    const { container } = await mountLoaded('/docs/manifesto?lang=ja');
     const nav = screen.getByRole('navigation', { name: 'Breadcrumb' });
     const group = within(nav).getByRole('group', { name: 'Document edition' });
     expect(within(group).getByRole('button', { name: 'JA' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(within(group).getByRole('button', { name: 'EN' }));
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/docs/manifesto?lang=en'));
-    expect(container.querySelector('article')?.getAttribute('lang')).toBe('en');
+    await waitFor(() => expect(container.querySelector('article')?.getAttribute('lang')).toBe('en'));
     expect(screen.getByText('Assemble the right professionals.')).toBeInTheDocument();
     expect(within(group).getByRole('button', { name: 'EN' })).toHaveAttribute('aria-pressed', 'true');
     expect(window.localStorage.getItem(RESEARCH_LANGUAGE_STORAGE_KEY)).toBe('en');
   });
 
   it('returns to the section being read after a switch, never to the top', async () => {
-    mount('/docs/whitepaper?lang=en');
+    await mountLoaded('/docs/whitepaper?lang=en');
     const s4 = document.getElementById('s4')!;
     // Sections s1–s4 have scrolled past the viewport top; s5 onward are below.
     for (const section of document.querySelectorAll<HTMLElement>('article section[id]')) {
       const past = Number(section.id.slice(1)) <= 4;
       section.getBoundingClientRect = () => ({ top: past ? -100 : 500 }) as DOMRect;
     }
-    fireEvent.scroll(window);
     const intoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
     const scrollTo = vi.mocked(window.scrollTo);
     scrollTo.mockClear();
@@ -118,7 +132,7 @@ describe('Doc', () => {
   });
 
   it('carries ?lang= onto every Docs link it renders, and keeps #hash order', async () => {
-    const { container } = mount('/docs/founding-story?lang=en');
+    const { container } = await mountLoaded('/docs/founding-story?lang=en');
     const nav = screen.getByRole('navigation', { name: 'Breadcrumb' });
     expect(within(nav).getByRole('link', { name: 'Docs' })).toHaveAttribute('href', '/docs?lang=en');
     const more = screen.getByRole('region', { name: 'Continue reading' });
@@ -139,7 +153,7 @@ describe('Doc', () => {
   });
 
   it('localizes the cards under the body and marks them lang="ja" only in the Japanese edition', () => {
-    mount('/docs/manifesto?lang=ja');
+    mount('/docs/manifesto?lang=ja'); // the cards come from the manifest, not the body: no wait
     const more = screen.getByRole('region', { name: 'Continue reading' });
     expect(more).toHaveTextContent('創業ストーリー');
     expect(more).toHaveTextContent('人間ひとり、AI 58体');
@@ -179,7 +193,7 @@ describe('Doc', () => {
   // A plain anchor in injected HTML would reload the page; the click is
   // intercepted and routed instead.
   it('routes an in-body link to another document through the router', async () => {
-    const { container } = mount('/docs/founding-story');
+    const { container } = await mountLoaded('/docs/founding-story');
     const link = container.querySelector('article a[href="/docs/whitepaper"]') as HTMLAnchorElement;
     expect(link).not.toBeNull();
     fireEvent.click(link);
@@ -190,11 +204,11 @@ describe('Doc', () => {
   it('forwards the pre-SPA .html spellings, keeping ?lang= and #hash', async () => {
     mount('/docs/manifesto.html');
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/docs/manifesto'));
-    expect(screen.getByText('Assemble the right professionals.')).toBeInTheDocument();
+    expect(await screen.findByText('Assemble the right professionals.')).toBeInTheDocument();
     cleanup();
     mount('/docs/founding-story.html?lang=en#s3');
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/docs/founding-story?lang=en#s3'));
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/One human/);
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/One human/));
   });
 
   it('offers no toggle on the not-found card but still carries ?lang= home', () => {

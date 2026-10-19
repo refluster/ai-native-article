@@ -83,6 +83,15 @@ describe('Docs index', () => {
   });
 });
 
+describe('Docs index fallback', () => {
+  it('shows English to a reader whose browser names neither language', () => {
+    const languages = vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['fr-FR']);
+    mount('/docs');
+    expect(screen.getByText('One human, 58 AIs')).toBeInTheDocument();
+    languages.mockRestore();
+  });
+});
+
 describe('Landing document cards', () => {
   it('follow the resolved edition and offer no toggle', () => {
     window.localStorage.setItem(RESEARCH_LANGUAGE_STORAGE_KEY, 'ja');

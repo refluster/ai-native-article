@@ -25,9 +25,9 @@
 // a new document is added in one place and reaches both.
 //
 // This module is metadata only (the landing page and the Docs index need
-// nothing more). The bodies — ~1 MB of HTML across both editions — live in
-// docs-bodies.ts, which only pages/Doc.tsx imports, and that page is
-// lazy-loaded from App.tsx so the console's main bundle does not carry them.
+// nothing more). The bodies — ~1 MB of HTML across both editions — are
+// loaded one file at a time by docs-bodies.ts, which only pages/Doc.tsx
+// imports, and that page is itself lazy-loaded from App.tsx.
 
 import manifest from '../content/docs/manifest.json';
 import { isResearchLanguage, type ResearchLanguage } from './research';
@@ -37,6 +37,13 @@ import { isResearchLanguage, type ResearchLanguage } from './research';
 export type DocLanguage = ResearchLanguage;
 
 export const DOC_LANGUAGES: readonly DocLanguage[] = ['ja', 'en'];
+
+/** The edition a reader gets when nothing resolves one (no `?lang=`, no
+ *  stored choice, a browser that lists neither language): English, the
+ *  ADR-0005 fallback. Three of the six documents were English-only before
+ *  they had editions, so that reader keeps what they used to get. Research
+ *  keeps its own `ja` fallback (lib/research.ts). */
+export const DOCS_FALLBACK_LANGUAGE: DocLanguage = 'en';
 
 /** One edition of a document: its body file and the words the cards and
  *  the breadcrumb show for it. */
@@ -74,14 +81,12 @@ function isEdition(v: unknown): v is PublicDocEdition {
   return Boolean(e && e.file && e.kicker && e.title && e.description && e.cta && e.packTitle);
 }
 
-/** Every public document, in index order. A malformed manifest row — or a
- *  row missing either edition — is a build defect and throws at module
- *  load (C-4): the Docs index must never quietly list fewer documents, and
- *  a reader must never be handed a document that has no body in the
- *  edition they chose. */
-export const PUBLIC_DOCS: readonly PublicDocMeta[] = (manifest as unknown[]).map(raw => {
-  const m = raw as Partial<PublicDocMeta>;
+/** One manifest row, checked field by field. A malformed row — or a row
+ *  missing either edition or any of an edition's fields — throws (C-4). */
+export function validateDocRow(raw: unknown): PublicDocMeta {
+  const m = raw as Partial<PublicDocMeta> | null;
   if (
+    !m ||
     !m.slug ||
     !isLang(m.original) ||
     !isMeasure(m.measure) ||
@@ -91,7 +96,14 @@ export const PUBLIC_DOCS: readonly PublicDocMeta[] = (manifest as unknown[]).map
     throw new Error(`docs manifest: malformed row ${JSON.stringify(raw)}`);
   }
   return m as PublicDocMeta;
-});
+}
+
+/** Every public document, in index order. A malformed manifest row — or a
+ *  row missing either edition — is a build defect and throws at module
+ *  load (C-4): the Docs index must never quietly list fewer documents, and
+ *  a reader must never be handed a document that has no body in the
+ *  edition they chose. */
+export const PUBLIC_DOCS: readonly PublicDocMeta[] = (manifest as unknown[]).map(validateDocRow);
 
 export function findDoc(slug: string): PublicDocMeta | undefined {
   return PUBLIC_DOCS.find(d => d.slug === slug);

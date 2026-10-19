@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   DOC_LANGUAGES,
+  DOCS_FALLBACK_LANGUAGE,
   PUBLIC_DOCS,
   docEdition,
   docPath,
@@ -12,15 +13,26 @@ import {
   findDoc,
   internalNavigationTarget,
   legacyDocRedirect,
+  validateDocRow,
   withEdition,
   type DocLanguage,
 } from './docs';
-import { docBody } from './docs-bodies';
+import { loadDocBody } from './docs-bodies';
 
 /** Every (document, edition) pair with its body. */
-const EDITIONS = PUBLIC_DOCS.flatMap(d =>
-  DOC_LANGUAGES.map(lang => ({ slug: d.slug, lang, edition: d.editions[lang], html: docBody(d.slug, lang) })),
+const EDITIONS = await Promise.all(
+  PUBLIC_DOCS.flatMap(d =>
+    DOC_LANGUAGES.map(async lang => ({ slug: d.slug, lang, edition: d.editions[lang], html: await loadDocBody(d.slug, lang) })),
+  ),
 );
+const BODY = new Map(EDITIONS.map(e => [`${e.slug}/${e.lang}`, e.html]));
+const docBody = (slug: string, lang: DocLanguage) => BODY.get(`${slug}/${lang}`)!;
+
+/** The body's cover kicker, first `·` segment — what the manifest kicker must equal. */
+function coverKicker(html: string): string {
+  const m = html.match(/<div class="kicker">([^<]*)<\/div>/);
+  return (m?.[1] ?? '').split('·')[0].trim();
+}
 
 /** The `id`s a body declares, in order — the skeleton a translation must keep. */
 function idsOf(html: string): string[] {
@@ -42,7 +54,7 @@ describe('PUBLIC_DOCS', () => {
     expect(docEdition(doc!, 'en').packTitle).not.toBe(docEdition(doc!, 'ja').packTitle);
   });
 
-  it('registers the six documents, each with a bundled body in both languages', () => {
+  it('registers the six documents, each with a bundled body in both languages', async () => {
     expect(PUBLIC_DOCS.map(d => d.slug)).toEqual([
       'capabilities',
       'whitepaper',
@@ -56,7 +68,33 @@ describe('PUBLIC_DOCS', () => {
       expect(e.html.trimStart().startsWith('<section class="cover">'), `${e.slug} ${e.lang} opens with its cover`).toBe(true);
       expect(e.edition.file, `${e.slug} ${e.lang} file name`).toBe(`${e.slug}.${e.lang}.html`);
     }
-    expect(() => docBody('roadmap', 'en')).toThrow(/unknown document/);
+    await expect(loadDocBody('roadmap', 'en')).rejects.toThrow(/unknown document/);
+  });
+
+  it('refuses a malformed manifest row at load (C-4)', () => {
+    const good = () => JSON.parse(JSON.stringify(PUBLIC_DOCS[0])) as Record<string, unknown>;
+    expect(validateDocRow(good()).slug).toBe('capabilities');
+    const bad: [string, (m: Record<string, unknown>) => void][] = [
+      ['no editions', m => delete m.editions],
+      ['no en edition', m => delete (m.editions as Record<string, unknown>).en],
+      ['no ja edition', m => delete (m.editions as Record<string, unknown>).ja],
+      ['an empty cta', m => (((m.editions as Record<string, Record<string, unknown>>).ja.cta = ''), undefined)],
+      ['no file', m => delete (m.editions as Record<string, Record<string, unknown>>).en.file],
+      ['no packTitle', m => delete (m.editions as Record<string, Record<string, unknown>>).en.packTitle],
+      ['a bad original', m => (m.original = 'fr')],
+      ['a bad measure', m => (m.measure = 'huge')],
+      ['no slug', m => delete m.slug],
+    ];
+    for (const [name, mutate] of bad) {
+      const row = good();
+      mutate(row);
+      expect(() => validateDocRow(row), name).toThrow(/malformed row/);
+    }
+    expect(() => validateDocRow(null)).toThrow(/malformed row/);
+  });
+
+  it('falls back to English for a reader who names neither language', () => {
+    expect(DOCS_FALLBACK_LANGUAGE).toBe('en');
   });
 
   it('names the founding story with the numeral and no trailing full stop', () => {
@@ -91,7 +129,8 @@ describe('PUBLIC_DOCS', () => {
       expect(en, `${d.slug}: English edition has no Japanese body text`).toBeLessThan(ja / 20);
       for (const lang of DOC_LANGUAGES as DocLanguage[]) {
         const e = d.editions[lang];
-        expect(e.kicker, `${d.slug} ${lang}: no language marker in the kicker`).not.toMatch(/日本語|English/);
+        expect(e.kicker, `${d.slug} ${lang}: no language marker in the kicker`).not.toMatch(/日本語|Japanese|English/);
+        expect(e.kicker, `${d.slug} ${lang}: manifest kicker = cover kicker's first segment`).toBe(coverKicker(docBody(d.slug, lang)));
       }
     }
   });

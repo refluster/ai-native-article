@@ -16,11 +16,11 @@ import PageHero from '../components/public/PageHero';
 import LinkCard from '../components/public/LinkCard';
 import LanguageToggle from '../components/public/LanguageToggle';
 import { SITE_DISPLAY_NAME } from '../config/site';
-import { PUBLIC_DOCS, docEdition, docPath } from '../lib/docs';
+import { DOCS_FALLBACK_LANGUAGE, PUBLIC_DOCS, docEdition, docPath } from '../lib/docs';
 import { useResearchLanguage } from '../lib/useResearchLanguage';
 
 export default function Docs() {
-  const lang = useResearchLanguage();
+  const lang = useResearchLanguage(DOCS_FALLBACK_LANGUAGE);
   const { search } = useLocation();
 
   useEffect(() => {

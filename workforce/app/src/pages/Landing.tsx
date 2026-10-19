@@ -12,7 +12,7 @@ import PublicShell, { usePublicSession } from '../components/PublicShell';
 import PageHero from '../components/public/PageHero';
 import LinkCard from '../components/public/LinkCard';
 import { CARD, H2, KICKER_ACCENT, PILL_PRIMARY, PILL_SECONDARY, SECTION, SECTION_LEDE } from '../components/public/styles';
-import { PUBLIC_DOCS, docEdition, docPath } from '../lib/docs';
+import { DOCS_FALLBACK_LANGUAGE, PUBLIC_DOCS, docEdition, docPath } from '../lib/docs';
 import { useResearchLanguage } from '../lib/useResearchLanguage';
 
 const PILLARS = [
@@ -35,7 +35,7 @@ const PILLARS = [
 
 export default function Landing() {
   const { signedIn, enterConsole } = usePublicSession();
-  const lang = useResearchLanguage();
+  const lang = useResearchLanguage(DOCS_FALLBACK_LANGUAGE);
   const { search } = useLocation();
 
   return (
