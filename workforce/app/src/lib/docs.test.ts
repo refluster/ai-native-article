@@ -7,9 +7,12 @@ import {
   PUBLIC_DOCS,
   docEdition,
   docPath,
+  docsIndexPath,
+  editionQuery,
   findDoc,
   internalNavigationTarget,
   legacyDocRedirect,
+  withEdition,
   type DocLanguage,
 } from './docs';
 import { docBody } from './docs-bodies';
@@ -135,12 +138,42 @@ describe('legacyDocRedirect', () => {
     expect(legacyDocRedirect('whitepaper.html')).toBe('/docs/whitepaper');
     expect(legacyDocRedirect('founding-story.html')).toBe('/docs/founding-story');
   });
+  it('keeps the edition and the section of a shared legacy link', () => {
+    expect(legacyDocRedirect('founding-story.html', '?lang=en', '#s3')).toBe('/docs/founding-story?lang=en#s3');
+    expect(legacyDocRedirect('index.html', '?lang=ja', '')).toBe('/docs?lang=ja');
+  });
   it('leaves current slugs alone', () => {
     expect(legacyDocRedirect('whitepaper')).toBeNull();
     expect(legacyDocRedirect('')).toBeNull();
   });
   it('docPath encodes', () => {
     expect(docPath('founding-story')).toBe('/docs/founding-story');
+  });
+});
+
+describe('edition carry-over', () => {
+  it('reads only a valid ?lang= from the current URL', () => {
+    expect(editionQuery('?lang=en')).toBe('?lang=en');
+    expect(editionQuery('?tag=x&lang=ja')).toBe('?lang=ja');
+    expect(editionQuery('?lang=EN')).toBe('');
+    expect(editionQuery('?lang=fr')).toBe('');
+    expect(editionQuery('')).toBe('');
+  });
+  it('adds the edition to a target that names none, after the query and before the hash', () => {
+    expect(withEdition('/docs/whitepaper', '?lang=en')).toBe('/docs/whitepaper?lang=en');
+    expect(withEdition('/docs/whitepaper#s10', '?lang=en')).toBe('/docs/whitepaper?lang=en#s10');
+    expect(withEdition('/docs/whitepaper?x=1#s10', '?lang=ja')).toBe('/docs/whitepaper?x=1&lang=ja#s10');
+    expect(withEdition('/docs/whitepaper?lang=ja', '?lang=en')).toBe('/docs/whitepaper?lang=ja');
+    expect(withEdition('/docs/whitepaper#s10', '')).toBe('/docs/whitepaper#s10');
+  });
+  it('docPath and docsIndexPath carry the current edition', () => {
+    expect(docPath('manifesto', '?lang=en')).toBe('/docs/manifesto?lang=en');
+    expect(docPath('manifesto', '?page=2')).toBe('/docs/manifesto');
+    expect(docsIndexPath('?lang=ja')).toBe('/docs?lang=ja');
+    expect(docsIndexPath()).toBe('/docs');
+  });
+  it('no document body hard-codes an edition into a link', () => {
+    for (const e of EDITIONS) expect(e.html, `${e.slug} ${e.lang}`).not.toMatch(/href="[^"]*[?&]lang=/);
   });
 });
 

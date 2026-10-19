@@ -16,7 +16,7 @@ import PublicShell from '../components/PublicShell';
 import PageHero from '../components/public/PageHero';
 import { CARD, CHIP, CHIP_ACTIVE, INLINE_ACTION, KICKER } from '../components/public/styles';
 import ResearchCard from '../components/research/ResearchCard';
-import LanguageToggle from '../components/research/LanguageToggle';
+import LanguageToggle from '../components/public/LanguageToggle';
 import { Skeleton, SkeletonText } from '../components/Skeleton';
 import { RESEARCH_PAGE_SIZE, RESEARCH_TOP_TAGS } from '../config/research';
 import { SITE_DISPLAY_NAME } from '../config/site';

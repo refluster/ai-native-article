@@ -1,0 +1,451 @@
+<section class="cover">
+  <div class="kicker">Book production · v1.0 · 2026-10</div>
+  <h1>How a book<br>gets made</h1>
+  <div class="rule"></div>
+  <p class="sub">This is the process chart for dividing the work of one book among about 40 AI personas. We read the procedures publishers have built up from the planning meeting through to sign-off, and recast the ones that still hold in an AI organization as ten stages and ten gates: the page plan (台割), the separation of structural editing from copy-editing, fact review (校閲) independent of the writer, checking that corrections (赤字) were made, and a signed sign-off. The first title is the web book The Art of War (Sunzi).</p>
+  <div class="define"><b>How to read this.</b> This document explains a process for dividing a book among about 40 AI personas, designed with reference to how publishers actually work. Take in the whole with the single process map (01) first, then read the two publishing traditions (02), what the stages and gates contain (03), who does what (04), the rules for publishing a classic (05), and the first run on The Art of War (06). The sources it rests on are in 07. The execution procedure itself is written in the session skill <a href="https://github.com/refluster/ai-native-article/blob/main/.claude/skills/book-production/SKILL.md" target="_blank" rel="noopener">book-production</a>; this document is the manual people use to check the process. How personas receive work is covered in the <a href="/docs/whitepaper">whitepaper</a>.</div>
+  <nav class="toc" aria-label="Contents">
+    <a href="#s1"><b>01</b>Process map</a>
+    <a href="#s2"><b>02</b>How publishers make books</a>
+    <a href="#s3"><b>03</b>Ten stages and gates</a>
+    <a href="#s4"><b>04</b>Who does what</a>
+    <a href="#s5"><b>05</b>Rules for publishing a classic</a>
+    <a href="#s6"><b>06</b>The first run: The Art of War</a>
+    <a href="#s7"><b>07</b>Sources</a>
+  </nav>
+</section>
+
+<section id="s1">
+  <div class="eyebrow"><span class="num">01</span><span class="kicker">Process map</span></div>
+  <h2>Process map</h2>
+  <p class="lede">Read the process in two rows. The upper row decides what to write, in what order and at what length, and sets the skeleton. The lower row puts the prose, the facts and the rights in order before publication. Between one stage and the next there is always a gate, and nothing moves on until it passes.</p>
+  <figure><div class="figscroll">
+<svg viewBox="0 0 1000 640" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="bp-t bp-d" style="min-width:860px">
+  <title id="bp-t">How a book gets made: ten stages S0–S9, ten gates G0–G9, restructure loop R, mechanical gates</title>
+  <desc id="bp-d">The upper row runs left to right through S0 planning, S1 research pack, S2 page plan, S3 writing and S4 structural editing, with gates G0 to G4 after each stage. If G4 does not lock the structure, the dotted restructure loop R returns to S2, the page plan. Passing G4 moves the work to the lower row, where S5 copy-editing, S6 fact review, S7 figures and typesetting, S8 proofreading (first, second and third proofs) and S9 sign-off and publication follow, with gates G5 to G9 between them. Each stage lists its main deliverables and the names of the personas who do the work. The band at the bottom holds the six mechanical gates that owen implements: quote lint (G3), length (G2, G3), readability (G5), figure tokens (G7), correction diff (G8) and sign-off sheet (G9).</desc>
+  <style>
+    .bp-h{font:700 12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;letter-spacing:.12em}
+    .bp-t{font:700 15px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .bp-s{font:11.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.74}
+    .bp-x{font:11px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.74}
+    .bp-p{font:600 11px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.62}
+    .bp-m{font:500 10px "JetBrains Mono",ui-monospace,monospace;fill:currentColor;opacity:.82}
+    .bp-c{font:600 11px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent);letter-spacing:.12em}
+    .bp-g{font:600 10.5px Geist,Inter,system-ui,sans-serif;fill:var(--accent)}
+    .bp-gd{font:600 9.5px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent)}
+    .bp-r{font:700 12.5px Geist,Inter,system-ui,sans-serif;fill:var(--accent)}
+    .bp-ok{font:700 12px Geist,Inter,system-ui,sans-serif;fill:var(--signal)}
+    .bp-okm{font:500 9.5px Geist,Inter,system-ui,sans-serif;fill:var(--signal)}
+    .bp-ct{font:700 13.5px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .bp-band{fill:currentColor;fill-opacity:.045}
+    .bp-box{fill:var(--panel);stroke:var(--line);stroke-width:1.2}
+    .bp-chip{fill:var(--panel);stroke:var(--accent);stroke-width:1.1}
+    .bp-div{stroke:var(--line);stroke-width:1}
+    .bp-dia{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.4}
+    .bp-dia9{fill:var(--accent-soft);stroke:var(--signal);stroke-width:1.8}
+    .bp-ln{fill:none;stroke:var(--accent);stroke-width:1.4}
+    .bp-arr{fill:none;stroke:var(--accent);stroke-width:1.4;marker-end:url(#bp-ah)}
+    .bp-live{fill:none;stroke:var(--signal);stroke-width:1.6;marker-end:url(#bp-ahs)}
+    .bp-loop{fill:none;stroke:var(--accent);stroke-width:1.5;stroke-dasharray:6 4;marker-end:url(#bp-ah)}
+    .bp-dash{fill:none;stroke:var(--accent);stroke-width:1.5;stroke-dasharray:6 4}
+    .bp-brk{fill:none;stroke:currentColor;stroke-opacity:.35;stroke-width:1}
+  </style>
+  <defs>
+    <marker id="bp-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker>
+    <marker id="bp-ahs" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--signal)"/></marker>
+  </defs>
+
+  <!-- header + legend -->
+  <text x="20" y="24" class="bp-h">Process map · 10 stages / 10 gates</text>
+  <rect x="20" y="37" width="15" height="11" rx="2" class="bp-box"/>
+  <text x="41" y="47" class="bp-x">Stage (personas at the bottom)</text>
+  <polygon points="232,35 239,42 232,49 225,42" class="bp-dia"/>
+  <text x="246" y="47" class="bp-x">Gate (pass → next)</text>
+  <path d="M372 42 H402" class="bp-dash"/>
+  <text x="408" y="47" class="bp-x">Restructure loop</text>
+  <text x="944" y="34" text-anchor="end" class="bp-r">R  Restructure loop — when G4 fails</text>
+  <text x="944" y="54" text-anchor="end" class="bp-x">Page plan → v(n+1) → re-check G2 → affected chapters to S3. Max 2 rounds</text>
+
+  <!-- R loop: G4 back up to S2 -->
+  <path d="M954 157 V72 H474 V94" class="bp-loop"/>
+  <text x="962" y="128" class="bp-g">fail</text>
+  <!-- pass at G4: down to the second row -->
+  <path d="M954 185 V292 H90 V320" class="bp-arr"/>
+  <text x="962" y="252" class="bp-g">pass</text>
+  <text x="520" y="310" text-anchor="middle" class="bp-x">G4 pass locks the structure → the lower row settles prose, facts and rights</text>
+
+  <!-- row 1 connectors -->
+  <path d="M160 171 H210" class="bp-arr"/>
+  <path d="M352 171 H402" class="bp-arr"/>
+  <path d="M544 171 H594" class="bp-arr"/>
+  <path d="M736 171 H786" class="bp-arr"/>
+  <path d="M928 171 H940" class="bp-ln"/>
+
+  <!-- S0 -->
+  <rect x="20" y="96" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="34" y="118" class="bp-c">S0</text>
+  <text x="34" y="142" class="bp-t">Planning</text>
+  <text x="34" y="163" class="bp-s">Proposal: readers,</text>
+  <text x="34" y="179" class="bp-s">comps, size, budget</text>
+  <line x1="34" y1="191" x2="146" y2="191" class="bp-div"/>
+  <text x="34" y="208" class="bp-m">ingrid · nadia</text>
+  <text x="34" y="222" class="bp-m">dmitri</text>
+  <text x="34" y="238" class="bp-g">→ G0 proposal OK</text>
+  <!-- S1 -->
+  <rect x="212" y="96" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="226" y="118" class="bp-c">S1</text>
+  <text x="226" y="142" class="bp-t">Research pack</text>
+  <text x="226" y="163" class="bp-s">Base text, IDs, variants</text>
+  <text x="226" y="179" class="bp-s">kundoku, glossary</text>
+  <line x1="226" y1="191" x2="338" y2="191" class="bp-div"/>
+  <text x="226" y="208" class="bp-m">sora · bruno · zoe</text>
+  <text x="226" y="222" class="bp-m">idris · astrid</text>
+  <text x="226" y="238" class="bp-g">→ G1 source text fixed</text>
+  <!-- S2 -->
+  <rect x="404" y="96" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="418" y="118" class="bp-c">S2</text>
+  <text x="418" y="142" class="bp-t">Page plan</text>
+  <text x="418" y="163" class="bp-s">Length budget per ch.</text>
+  <text x="418" y="179" class="bp-s">source IDs, fig. slots</text>
+  <line x1="418" y1="191" x2="530" y2="191" class="bp-div"/>
+  <text x="418" y="208" class="bp-m">ingrid · camille</text>
+  <text x="418" y="222" class="bp-m">elena</text>
+  <text x="418" y="238" class="bp-g">→ G2 page plan OK</text>
+  <!-- S3 -->
+  <rect x="596" y="96" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="610" y="118" class="bp-c">S3</text>
+  <text x="610" y="142" class="bp-t">Writing</text>
+  <text x="610" y="163" class="bp-s">Parts I &amp; II first</text>
+  <text x="610" y="179" class="bp-s">drafts, source-tagged</text>
+  <line x1="610" y1="191" x2="722" y2="191" class="bp-div"/>
+  <text x="610" y="208" class="bp-m">I: sora · rhys · zoe</text>
+  <text x="610" y="222" class="bp-m">II: nadia + 5 more</text>
+  <text x="610" y="238" class="bp-g">→ G3 draft accepted</text>
+  <!-- S4 -->
+  <rect x="788" y="96" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="802" y="118" class="bp-c">S4</text>
+  <text x="802" y="142" class="bp-t">Structural edit</text>
+  <text x="802" y="163" class="bp-s">editorial letter</text>
+  <text x="802" y="179" class="bp-s">novice read-through</text>
+  <line x1="802" y1="191" x2="914" y2="191" class="bp-div"/>
+  <text x="802" y="208" class="bp-m">ingrid · elena</text>
+  <text x="802" y="222" class="bp-m">mira</text>
+  <text x="802" y="238" class="bp-g">→ G4 structure locked</text>
+
+  <!-- row 1 gates -->
+  <polygon points="186,157 200,171 186,185 172,171" class="bp-dia"/><text x="186" y="174.5" text-anchor="middle" class="bp-gd">G0</text>
+  <polygon points="378,157 392,171 378,185 364,171" class="bp-dia"/><text x="378" y="174.5" text-anchor="middle" class="bp-gd">G1</text>
+  <polygon points="570,157 584,171 570,185 556,171" class="bp-dia"/><text x="570" y="174.5" text-anchor="middle" class="bp-gd">G2</text>
+  <polygon points="762,157 776,171 762,185 748,171" class="bp-dia"/><text x="762" y="174.5" text-anchor="middle" class="bp-gd">G3</text>
+  <polygon points="954,157 968,171 954,185 940,171" class="bp-dia"/><text x="954" y="174.5" text-anchor="middle" class="bp-gd">G4</text>
+
+  <!-- row 1 phases -->
+  <path d="M20 252 V258 H544 V252" class="bp-brk"/>
+  <text x="282" y="274" text-anchor="middle" class="bp-p">Design — what, in what order, at what length</text>
+  <path d="M596 252 V258 H928 V252" class="bp-brk"/>
+  <text x="762" y="274" text-anchor="middle" class="bp-p">Writing &amp; structure — no polishing until the skeleton holds</text>
+
+  <!-- row 2 connectors -->
+  <path d="M160 397 H210" class="bp-arr"/>
+  <path d="M352 397 H402" class="bp-arr"/>
+  <path d="M544 397 H594" class="bp-arr"/>
+  <path d="M736 397 H786" class="bp-arr"/>
+  <path d="M928 397 H940" class="bp-ln"/>
+  <path d="M968 397 H994" class="bp-live"/>
+
+  <!-- S5 -->
+  <rect x="20" y="322" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="34" y="344" class="bp-c">S5</text>
+  <text x="34" y="368" class="bp-t">Copy-editing</text>
+  <text x="34" y="389" class="bp-s">Style sheet, lint</text>
+  <text x="34" y="405" class="bp-s">term defs, one voice</text>
+  <line x1="34" y1="417" x2="146" y2="417" class="bp-div"/>
+  <text x="34" y="434" class="bp-m">kai · mira · zoe</text>
+  <text x="34" y="448" class="bp-m">owen</text>
+  <text x="34" y="464" class="bp-g">→ G5 readability</text>
+  <!-- S6 -->
+  <rect x="212" y="322" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="226" y="344" class="bp-c">S6</text>
+  <text x="226" y="368" class="bp-t">Fact review</text>
+  <text x="226" y="389" class="bp-s">Query log, sources,</text>
+  <text x="226" y="405" class="bp-s">rights, AI disclosure</text>
+  <line x1="226" y1="417" x2="338" y2="417" class="bp-div"/>
+  <text x="226" y="434" class="bp-m">rafael · astrid</text>
+  <text x="226" y="448" class="bp-m">idris · beatriz</text>
+  <text x="226" y="464" class="bp-g">→ G6 fact review done</text>
+  <!-- S7 -->
+  <rect x="404" y="322" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="418" y="344" class="bp-c">S7</text>
+  <text x="418" y="368" class="bp-t">Figs &amp; typeset</text>
+  <text x="418" y="389" class="bp-s">SVG figures, cover</text>
+  <text x="418" y="405" class="bp-s">Reader build, ARC</text>
+  <line x1="418" y1="417" x2="530" y2="417" class="bp-div"/>
+  <text x="418" y="434" class="bp-m">aoi · ren · freya</text>
+  <text x="418" y="448" class="bp-m">owen · imogen</text>
+  <text x="418" y="464" class="bp-g">→ G7 typesetting OK</text>
+  <!-- S8 -->
+  <rect x="596" y="322" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="610" y="344" class="bp-c">S8</text>
+  <text x="610" y="368" class="bp-t">Proofreading</text>
+  <text x="610" y="389" class="bp-s">Proofs 1 → 2 → 3</text>
+  <text x="610" y="405" class="bp-s">via corrections ledger</text>
+  <line x1="610" y1="417" x2="722" y2="417" class="bp-div"/>
+  <text x="610" y="434" class="bp-m">mira · farah · kai</text>
+  <text x="610" y="448" class="bp-m">zoe · owen</text>
+  <text x="610" y="464" class="bp-g">→ G8 proofs done</text>
+  <!-- S9 -->
+  <rect x="788" y="322" width="140" height="150" rx="6" class="bp-box"/>
+  <text x="802" y="344" class="bp-c">S9</text>
+  <text x="802" y="368" class="bp-t">Sign-off/publish</text>
+  <text x="802" y="389" class="bp-s">Sign-off sheet (4 sigs)</text>
+  <text x="802" y="405" class="bp-s">publish, errata</text>
+  <line x1="802" y1="417" x2="914" y2="417" class="bp-div"/>
+  <text x="802" y="434" class="bp-m">ingrid · camille</text>
+  <text x="802" y="448" class="bp-m">ren · petra</text>
+  <text x="802" y="464" class="bp-g">→ G9 sign-off</text>
+
+  <!-- row 2 gates -->
+  <polygon points="186,383 200,397 186,411 172,397" class="bp-dia"/><text x="186" y="400.5" text-anchor="middle" class="bp-gd">G5</text>
+  <polygon points="378,383 392,397 378,411 364,397" class="bp-dia"/><text x="378" y="400.5" text-anchor="middle" class="bp-gd">G6</text>
+  <polygon points="570,383 584,397 570,411 556,397" class="bp-dia"/><text x="570" y="400.5" text-anchor="middle" class="bp-gd">G7</text>
+  <polygon points="762,383 776,397 762,411 748,397" class="bp-dia"/><text x="762" y="400.5" text-anchor="middle" class="bp-gd">G8</text>
+  <polygon points="954,383 968,397 954,411 940,397" class="bp-dia9"/><text x="954" y="400.5" text-anchor="middle" class="bp-gd">G9</text>
+  <text x="954" y="432" text-anchor="middle" class="bp-ok">Published</text>
+  <text x="954" y="447" text-anchor="middle" class="bp-okm">then errata</text>
+
+  <!-- row 2 phases -->
+  <path d="M20 478 V484 H352 V478" class="bp-brk"/>
+  <text x="186" y="500" text-anchor="middle" class="bp-p">Settle &amp; verify — prose, facts, rights</text>
+  <path d="M404 478 V484 H928 V478" class="bp-brk"/>
+  <text x="666" y="500" text-anchor="middle" class="bp-p">Finish &amp; ship — figures, proofs, sign-off, publication</text>
+
+  <!-- mechanical gates band -->
+  <rect x="0" y="514" width="1000" height="122" rx="8" class="bp-band"/>
+  <text x="20" y="538" class="bp-h">Mechanical gates (built by owen)</text>
+  <text x="980" y="538" text-anchor="end" class="bp-x">farah runs them in CI · new checks start as warnings; 2 hits in 90 days → gate</text>
+  <rect x="20" y="552" width="150" height="70" rx="6" class="bp-chip"/>
+  <text x="32" y="570" class="bp-c">G3</text>
+  <text x="32" y="592" class="bp-ct">Quote lint</text>
+  <text x="32" y="610" class="bp-x">exact match to base text</text>
+  <rect x="182" y="552" width="150" height="70" rx="6" class="bp-chip"/>
+  <text x="194" y="570" class="bp-c">G2 · G3</text>
+  <text x="194" y="592" class="bp-ct">Length</text>
+  <text x="194" y="610" class="bp-x">budget total; ch. ±15%</text>
+  <rect x="344" y="552" width="150" height="70" rx="6" class="bp-chip"/>
+  <text x="356" y="570" class="bp-c">G5</text>
+  <text x="356" y="592" class="bp-ct">Readability</text>
+  <text x="356" y="610" class="bp-x">no sentence &gt; 100 chars</text>
+  <rect x="506" y="552" width="150" height="70" rx="6" class="bp-chip"/>
+  <text x="518" y="570" class="bp-c">G7</text>
+  <text x="518" y="592" class="bp-ct">Figure tokens</text>
+  <text x="518" y="610" class="bp-x">colors via CSS vars only</text>
+  <rect x="668" y="552" width="150" height="70" rx="6" class="bp-chip"/>
+  <text x="680" y="570" class="bp-c">G8</text>
+  <text x="680" y="592" class="bp-ct">Correction diff</text>
+  <text x="680" y="610" class="bp-x">off-ledger edits fail</text>
+  <rect x="830" y="552" width="150" height="70" rx="6" class="bp-chip"/>
+  <text x="842" y="570" class="bp-c">G9</text>
+  <text x="842" y="592" class="bp-ct">Sign-off sheet</text>
+  <text x="842" y="610" class="bp-x">4 signers, all outputs</text>
+</svg>
+  </div>
+  <figcaption>Rectangles are stages; diamonds are gates. The Latin-script names at the bottom of each rectangle are the personas who do the work at that stage (Responsible). Final accountability (Accountable) is in the table in 04. If G4 does not lock the structure, the dotted restructure loop R returns to the page plan (S2). The band at the bottom lists the checks whose pass or fail comes from a machine rather than from judgment.</figcaption>
+  </figure>
+  <p>A gate is passed or failed in one of two ways. One is the <b>mechanical check</b>: owen writes checks for what can be settled by counting — schema, length, quotation matches, sentence length, links, color tokens, whether corrections were applied — and farah runs them in CI. The other is <b>judgment review</b>: personas who hold the relevant role judge the value of the proposal, the choice of base text, the structure, the voice, whether a beginner can follow it, whether the claims survive refutation, the boundaries of rights, whether the figures are correct, and, last, the sign-off.</p>
+  <p>What a machine can decide is not left to human eyes, and what needs human judgment is not settled by a machine pass. That distinction is the frame of this process. A new check enters as a warning first, and is promoted to a gate when the same kind of finding comes up twice within 90 days (the same procedure as the organization-wide memory → lint ratchet).</p>
+</section>
+
+<section id="s2">
+  <div class="eyebrow"><span class="num">02</span><span class="kicker">Two traditions</span></div>
+  <h2>How publishers make books</h2>
+  <p class="lede">We did not invent the process. We read how Japanese shinsho and bunko paperbacks are made side by side with how English-language trade and scholarly books are made, and combined them, taking in each case the side that shores up the places where an AI organization tends to break down.</p>
+  <p>A Japanese book starts with a <b>planning meeting</b>. The editor puts a working title, the readership, a draft table of contents, how it differs from comparable titles, and the trim size, page count and list price into a proposal; if it passes the meeting, the publisher signs the author. Next, the <b>page plan</b> fixes how pages are allocated and how the book unfolds. One editing guide goes as far as to say that “magazine editing could be said to mean making this page plan.” After reporting and writing, copy-editing, and book design and typesetting, the galleys come out: <b>fact review</b> examines whether facts and expressions hold up, and <b>proofreading</b> checks the galleys against the manuscript through first, second and third proofs. Proofreading ends with either sign-off (校了) or responsibility sign-off (責了), and the book moves on to cover design and color proofs, printing and binding (about one month from sign-off in Bungeishunjū’s example), and distribution.</p>
+  <p>In the English-speaking world, each stage of editing has its own name: <b>acquisition</b>, which chooses the project (for scholarly books, after two or more peer reviews and approval by a faculty Board); the <b>developmental edit</b>, which fixes structure and argument; the <b>line edit</b>, which improves the quality of the prose; the <b>copyedit</b>, which corrects grammar, style and cross-references; and <b>fact-checking</b>, typical of magazines. Chicago treats the copyedit as “the last opportunity for substantive changes,” and the developmental edit is always done first, because polishing the prose of a chapter that will later disappear is wasted effort. In proofreading after typesetting, author’s alterations (AA) are distinguished from editor’s alterations (EA) to separate cost and responsibility. Four to six months before publication, ARCs (advance reader copies) go out to the trade press.</p>
+  <div class="grid g2">
+    <div class="card">
+      <span class="tag">Japan · shinsho and bunko</span>
+      <h3>Independent fact review and a clear end point</h3>
+      <ul>
+        <li>The <b>planning meeting</b> is the entry point. The proposal sets out readers, a draft table of contents, comparable titles and specifications</li>
+        <li>The <b>page plan</b> fixes page allocation first. A powerful design tool</li>
+        <li><b>Fact review</b> is a specialist profession with its own department, independent of the writer</li>
+        <li><b>Proofreading</b> runs first → second → third proofs, checking that the previous round’s corrections went in</li>
+        <li><b>Sign-off / responsibility sign-off</b>: a defined end point, with a clear owner of responsibility</li>
+        <li>Weakness: structural and stylistic fixes tend to get mixed together inside copy-editing</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="tag">English-speaking · trade / academic</span>
+      <h3>Editing stages have names and a fixed order</h3>
+      <ul>
+        <li><b>Acquisition</b>, plus <b>peer review</b> and Board approval for scholarly books</li>
+        <li>In the order <b>developmental → line → copyedit</b>. Structure is fixed first</li>
+        <li>The copyedit is the last chance for substantive changes (Chicago)</li>
+        <li><b>Fact-checking</b> is a separate department at magazines (New Yorker). In books it is often folded into the copyedit</li>
+        <li>Proofreading separates <b>AA and EA</b>, distinguishing cost from responsibility</li>
+        <li><b>ARCs</b> go out 4–6 months ahead to gather early readers’ responses</li>
+      </ul>
+    </div>
+  </div>
+  <h3 class="sub">Six things carried into the design</h3>
+  <div class="layers">
+    <div class="layer"><div class="lab">Independent review</div><div><h3>Quality assurance belongs to someone other than the writer</h3><p>We take the Japanese model. Fact review (S6), which checks facts, quotations and rights, is separated from the writers, and no chapter’s fact reviewer is the same persona as that chapter’s writer.</p></div></div>
+    <div class="layer"><div class="lab">Structure → prose</div><div><h3>Structural editing and copy-editing are separate gates</h3><p>We take the English-language order. Structural editing (S4, G4) locks the skeleton before copy-editing (S5, G5) polishes the prose. Nothing enters S5 or later until the structure is locked.</p></div></div>
+    <div class="layer"><div class="lab">Planning meeting</div><div><h3>The entry point is an in-house planning meeting</h3><p>G0 follows the same planning-meeting model as a shinsho. For Part I’s translation notes only, however, an independent reading equivalent to peer review (the source-text check in S6) is mandatory.</p></div></div>
+    <div class="layer"><div class="lab">Sign-off</div><div><h3>Put the end point and who is responsible in writing</h3><p>The sign-off sheet names its signatories, and the scope of what may be fixed under responsibility sign-off (on whose responsibility, and what may be fixed) is written down. The cost and responsibility that the English-speaking world separates through the AA/EA distinction are carried here by rules on signatures and scope.</p></div></div>
+    <div class="layer"><div class="lab">Early readers</div><div><h3>The ARC becomes “early-release chapters plus readers’ responses”</h3><p>For a web book, releasing a few chapters to a limited audience and gathering readers’ responses stands in for ARCs and review copies. The responses gathered are kept as an S7 deliverable.</p></div></div>
+    <div class="layer"><div class="lab">Page plan</div><div><h3>Divide by characters and reading time, not pages</h3><p>The page plan is a powerful tool peculiar to Japanese publishing. The web has no pages, so we use it as a per-chapter budget of characters and of reading time (estimated at 600 characters per minute, as the Reader does).</p></div></div>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="eyebrow"><span class="num">03</span><span class="kicker">Stages and gates</span></div>
+  <h2>Ten stages and gates</h2>
+  <p class="lede">Each stage is defined by the deliverables it leaves and the condition for moving on (the gate). A gate has a part a machine passes or fails and a part that personas with the relevant role judge. Apart from S3, no gate can be passed on one of the two alone.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Stage</th><th>Name</th><th>Deliverables kept</th><th>Gate</th><th>Mechanical check</th><th>Judgment review</th></tr></thead>
+    <tbody>
+      <tr><td>S0</td><td>Planning</td><td class="dim">Proposal (working title, readership [the shelf and the person], how it differs from 3 comparable titles, total character count, part structure, KPIs, budget line)</td><td>G0 proposal approved</td><td class="dim">All required fields present (schema check)</td><td class="dim">Planning meeting (editor-in-chief, strategy, PM, marketing). The operator approves the budget</td></tr>
+      <tr><td>S1</td><td>Research pack</td><td class="dim">Segmented source text (with paragraph IDs), variant table, kundoku v1, candidate maxims, list of earlier books, glossary v0, rights memo, citation conventions</td><td>G1 source text fixed</td><td class="dim">Paragraph IDs across all 13 chapters / source character count matches the base text / kundoku covers every paragraph / every maxim resolves to a paragraph ID</td><td class="dim">Soundness of the base-text choice (beatriz), refutation of how variants are handled (rafael)</td></tr>
+      <tr><td>S2</td><td>Structure (page plan)</td><td class="dim">Page plan (per-chapter character budget, corresponding source IDs, figure slots, owner, due date) and chapter design briefs (each chapter’s question and key points)</td><td>G2 page plan approved</td><td class="dim">Budgets total 100,000–130,000 characters / every source paragraph assigned to a chapter / every Part II chapter references at least one Part I paragraph ID</td><td class="dim">Page-plan meeting (consistency, the beginner’s path)</td></tr>
+      <tr><td>S3</td><td>Writing (first draft)</td><td class="dim">A first draft of each chapter, carrying its version, corresponding paragraphs and sources in the header metadata</td><td>G3 first draft accepted</td><td class="dim">Length within ±15% of budget / no cut-offs, empty bodies or LLM traces (reusing the W-1 check) / quote lint / 0 unresolved source tags</td><td class="dim">None (a format-only gate)</td></tr>
+      <tr><td>S4</td><td>Structural editing</td><td class="dim">Editorial letter (overall assessment), beginner read-through report, restructure decision</td><td>G4 structure locked<br>R if it fails</td><td class="dim">Detection of chapters that explain the same source paragraph twice; deviation rate from the page plan</td><td class="dim">The editor-in-chief’s judgment, consistency across chapters, a beginner’s reading</td></tr>
+      <tr><td>S5</td><td>Copy-editing</td><td class="dim">Style sheet, lint report, revised draft</td><td>G5 readability</td><td class="dim">0 sentences over 100 characters and p90 ≤ 60 characters (source text and kundoku excluded) / 0 inconsistent spellings / every term defined at first use / jReadability (advisory at first) / kanji-ratio warning</td><td class="dim">Voice and style (kai), a beginner’s reading (mira)</td></tr>
+      <tr><td>S6</td><td>Fact review</td><td class="dim">Query ledger, source ledger, rights confirmation, a statement disclosing that the book was written by AI</td><td>G6 fact review complete</td><td class="dim">0 open queries / every bibliography URL live / a source ID on every factual claim in Part II / check for long matches with other translations</td><td class="dim">Refutation (rafael), citation conventions (astrid), rights (idris)</td></tr>
+      <tr><td>S7</td><td>Figures and typesetting</td><td class="dim">SVG figures (with alt), cover, index, preview, readers’ responses gathered from the early release</td><td>G7 typesetting cleared</td><td class="dim">Build succeeds / every link and anchor resolves / color-token lint (R-2) / base path (R-16) / 100% alt / performance floor</td><td class="dim">Clarity of the figures, reading UX (aoi, freya)</td></tr>
+      <tr><td>S8</td><td>Proofreading</td><td class="dim">A corrections ledger for each of the first, second and third proofs</td><td>G8 proofreading complete</td><td class="dim">Correction-diff gate: the text diff of the second and third proofs is fully explained by items in the previous round’s ledger / new corrections in the third proof at or below a threshold (e.g. 5)</td><td class="dim">First proof: read-through; second: cross-check; third: confirm the diff</td></tr>
+      <tr><td>S9</td><td>Sign-off and publication</td><td class="dim">Sign-off sheet (signers, date and time, version), release notes, errata (maintained after publication)</td><td>G9 sign-off</td><td class="dim">All required signatures present / G1–G8 deliverables present with valid schemas / live smoke after publication</td><td class="dim">The editor-in-chief’s final judgment</td></tr>
+    </tbody>
+  </table></div>
+  <div class="define"><b>Restructure loop R.</b> It starts at G4 if any one of the following applies. ① A beginner’s read-through marks places where “it is unclear why I should go on to the next chapter” in two or more chapters. ② Explanations of the same source paragraph are duplicated across three or more chapters. ③ A Part II chapter is no more than a rewording of Part I (nadia judges that it has “no so what”). ④ Three or more chapters deviate from the page plan by ±25% or more in actual length. ⑤ A central claim is found REFUTED in refutation review. The procedure: ingrid writes down which chapters to keep, which to merge and which to send back, with reasons; camille raises the page plan to v(n+1) and redraws the schedule; the G2 mechanical checks are passed again; and only the affected chapters go back to S3. <b>The limit is two rounds.</b> If a third is needed, the problem is treated as one of planning (G0) rather than structure, and escalated to maya and the operator.</div>
+  <div class="foryou"><b>Sign-off and responsibility sign-off</b>The sign-off sheet is signed by four people — ingrid (the whole book), astrid (sources and disclosure), idris (rights) and owen (every mechanical gate passed) — and G9 is reached once all four signatures are in. A single-character typo found after sign-off that does not change the meaning may be fixed and published on ingrid’s responsibility (responsibility sign-off). It is recorded in the errata, and kai checks it afterwards. A fix that changes the meaning is announced in the errata, the version is raised, and fact review (S6) is partly redone. Writing down the name of the person who checks prevents the typical publisher’s failure in which nobody verifies what was fixed under responsibility sign-off.</div>
+</section>
+
+<section id="s4">
+  <div class="eyebrow"><span class="num">04</span><span class="kicker">Who does what</span></div>
+  <h2>Who does what</h2>
+  <p class="lede">Assignments follow RACI. R is whoever does the work, A whoever is accountable for the result, C whoever is consulted beforehand, and I whoever is informed of the result.</p>
+  <div class="pull">The book’s editor-in-chief (Accountable) is ingrid. Production is run by camille (production editor), who updates the production ledger every week with the page plan’s actual character counts and the status of the work.</div>
+  <div class="scroll"><table>
+    <thead><tr><th>Stage</th><th>R (Responsible)</th><th>A (Accountable)</th><th>C (Consulted)</th><th>I (Informed)</th></tr></thead>
+    <tbody>
+      <tr><td>S0 Planning</td><td>ingrid (proposal), nadia (Part II value hypothesis), dmitri (comparable titles and demand figures)</td><td>ingrid<br><span class="note">The operator approves the budget</span></td><td class="dim">maya, celeste, nico, mateo (workload and bindings), petra (operational load)</td><td class="dim">camille, everyone</td></tr>
+      <tr><td>Process templates</td><td>freya (formats for the WP brief, editorial letter and queries), camille (production ledger)</td><td>camille</td><td class="dim">mateo, owen</td><td class="dim">Everyone</td></tr>
+      <tr><td>S1 Research</td><td>sora (base text, segmentation, variants, kundoku v1), bruno (earlier books, how the maxims circulate), zoe (glossary), idris (rights memo), astrid (citation conventions)</td><td>beatriz</td><td class="dim">rafael (refuting the variants), mira (difficulty of terms)</td><td class="dim">ingrid, camille</td></tr>
+      <tr><td>S2 Page plan</td><td>ingrid (chapter structure), camille (page-plan sheet, schedule), elena (the through-line of the whole)</td><td>ingrid</td><td class="dim">nadia, mira, kai, aoi (figure slots)</td><td class="dim">All writers</td></tr>
+      <tr><td>S3 Part I</td><td>sora (source text, kundoku, modern translation), rhys (summaries, the narrative of the commentary), zoe (word notes)</td><td>ingrid</td><td class="dim">beatriz (scholarly soundness), kai (voice)</td><td class="dim">camille</td></tr>
+      <tr><td>S3 Part II</td><td>nadia (lead), tomas (organization and outcomes), clara (deception and ethics), linnea (measurement and decision-making), bruno (competitive environment), beatriz (intelligence)</td><td>ingrid</td><td class="dim">maya (strategic framework), rafael</td><td class="dim">camille</td></tr>
+      <tr><td>S4 Structural editing</td><td>ingrid (editorial letter), elena (consistency across chapters), mira (beginner read-through test)</td><td>ingrid</td><td class="dim">maya, nadia, rafael</td><td class="dim">All writers, camille</td></tr>
+      <tr><td>R Restructure</td><td>ingrid (decision), camille (page-plan revision, schedule)</td><td>ingrid</td><td class="dim">elena, nadia</td><td class="dim">Writers of the affected chapters</td></tr>
+      <tr><td>S5 Copy-editing</td><td>kai (style sheet, voice), mira (readability), zoe (first-use definitions, index terms), owen (implementing and running the lint)</td><td>ingrid</td><td class="dim">clara (wording that bears on readers’ trust)</td><td class="dim">camille</td></tr>
+      <tr><td>S6 Fact review</td><td>rafael (facts, quotations, refutation), astrid (sources, disclosure), idris (rights, clean-room audit), beatriz (source-text check for Part II)</td><td>astrid</td><td class="dim">sora (answers to queries), ingrid</td><td class="dim">camille</td></tr>
+      <tr><td>S7 Figures and typesetting</td><td>aoi (figures, cover, information design), ren (Reader implementation and build), freya (reading UX, machine-readable edition), owen (build gate), imogen (early release and readers’ responses)</td><td>aoi</td><td class="dim">farah (performance, quality), kai, mira</td><td class="dim">ingrid, camille</td></tr>
+      <tr><td>S8 Proofreading</td><td>mira (read-through of the first proofs), farah (display breakage, links, device differences), kai (style in the second proofs), zoe (index, term links), owen (diff gate)</td><td>ingrid</td><td class="dim">The chapter’s writer (the equivalent of author’s proofs)</td><td class="dim">camille</td></tr>
+      <tr><td>S9 Sign-off and publication</td><td>ingrid (sign-off sheet), camille (checklist), ren (publishing), petra (release operations, rollback)</td><td>ingrid</td><td class="dim">astrid, idris, owen, farah</td><td class="dim">maya, everyone</td></tr>
+      <tr><td>After publication</td><td>celeste (announcement), imogen (readers’ responses), nico (positioning), dmitri (completion rate, drop-off by chapter), rhys (podcast adaptation)</td><td>celeste</td><td class="dim">ingrid, linnea (measurement design)</td><td class="dim">maya, everyone</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">The independence principle: no chapter’s fact reviewer is the same persona as that chapter’s writer. Because sora writes the kundoku and the modern translation, beatriz takes the source-text check for Part II and rafael takes refutation. A is astrid for S6 alone and aoi for S7 alone because the judgments at those stages lie outside the editor-in-chief’s expertise.</p>
+  <div class="voices">
+    <div class="voice">
+      <div class="who"><div class="face"></div><div><b>Ingrid Solberg</b><span class="role">Managing Editor · Editor-in-chief</span></div></div>
+      <q>The page plan is a promise. A chapter that won’t fit its character count has a design problem, not a prose problem. If the skeleton has collapsed at G4, we let go of the polished prose with it and go back to the page plan. That is why nobody polishes prose until the structure is settled.</q>
+      <span class="verdict">Owns: S0 planning, S2 page plan, S4 structural editing, S9 sign-off</span>
+    </div>
+    <div class="voice">
+      <div class="who"><div class="face"></div><div><b>Rafael Ortiz</b><span class="role">Red Team &amp; Adversarial Reviewer</span></div></div>
+      <q>My job is to go after this book’s strongest claim and try to break it. If it doesn’t break, it stays; if it breaks, that is not a fact-review fix but a structural problem, and it goes to the restructure loop. A quotation checked by the person who wrote it does not count as checked.</q>
+      <span class="verdict">Owns: S6 fact review (facts, quotations, refutation)</span>
+    </div>
+    <div class="voice">
+      <div class="who"><div class="face"></div><div><b>Aoi Marchetti</b><span class="role">Designer · Figures and typesetting</span></div></div>
+      <q>A figure is not decoration; it is an annotation that shows the structure of the source text in a single image. Every color is painted with tokens, and no figure without alt text gets through G7. The condition is that readers can move from a paragraph to the figure, and from the figure back to the source text.</q>
+      <span class="verdict">Owns: S7 figures and typesetting (Accountable)</span>
+    </div>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="eyebrow"><span class="num">05</span><span class="kicker">Classics</span></div>
+  <h2>Rules for publishing a classic</h2>
+  <p class="lede">“Faithful to the original” cannot be checked unless it is pinned down in advance. Taking as our model the structure of the Iwanami Bunko edition Shintei Sonshi (translated and annotated by Kanaya Osamu) — source text, kundoku transcription, modern translation, notes and index — we defined operationally what has to be kept for a text to count as “faithful.”</p>
+  <div class="layers">
+    <div class="layer"><div class="lab">Base text</div><div><h3>Name a single base text</h3><p>The Sunzi comes down in several lineages: the Wei Wu (Cao Cao) annotated text, the Seven Military Classics text, the Eleven Commentators text and the Yinqueshan bamboo-slip text (excavated in 1972). The recommendation is to use the received text of the Eleven Commentators lineage as the main text and to show the main variants from the bamboo-slip text in the notes. The final decision is made at G1. A widely known variant — that the bamboo-slip text reverses the word order of the attack-and-defense lines in the Xing (Dispositions) chapter — has not been confirmed in a primary source, so sora will verify it while compiling the variant table.</p></div></div>
+    <div class="layer"><div class="lab">Source text</div><div><h3>Transcribe the source text exactly as the base text has it, without alteration</h3><p>How older character forms and variant characters are handled is written into the style sheet first. A source-text block in the body that does not match the segmented source text exactly after normalization fails the quote lint at G3. The commentary and Part II refer to source paragraph IDs, and never present as the source’s claim something the source does not say.</p></div></div>
+    <div class="layer"><div class="lab">Kundoku</div><div><h3>We make our own kundoku</h3><p>Following the conventional readings (the customary return marks and okurigana) is fine. Where we adopt a reading of our own, a note gives the grounds. Someone else’s kundoku transcription may be protected if it contains original choices, so we stay on the safe side and do not copy it.</p></div></div>
+    <div class="layer"><div class="lab">Modern translation</div><div><h3>Translate in a clean room</h3><p>While drafting, the translator does not look at anyone else’s modern translation. Only the source text, dictionaries and the glosses in commentaries may be consulted, and what was consulted is recorded in the work log. idris audits the logs by sampling. Words supplied by the translator are shown in 〔 〕, and the latitude for free translation is set by the rules.</p></div></div>
+    <div class="layer"><div class="lab">Maxims</div><div><h3>A maxim box is source text + kundoku + citation</h3><p>A maxim box always sets out the source text, the kundoku, the translation, the chapter name and the paragraph ID. Where the form in circulation differs from the source, it is recorded separately as “the commonly quoted form” and marked as an error. For example, the Mougong (Attack by Stratagem) chapter’s “you will not be imperiled in a hundred battles” is often reworded as “a hundred victories in a hundred battles.”</p></div></div>
+    <div class="layer"><div class="lab">Rights</div><div><h3>The source text is in the public domain; other translations are derivative works</h3><p>The source text was written more than two thousand years ago, far beyond the term of protection (in principle, 70 years after the author’s death). Published modern translations, on the other hand, are protected as translations — derivative works — separately from the original, so both borrowing from them and working from them as a base are prohibited. Only when discussing a comparison with other translations do we quote the minimum that meets the four requirements for quotation (already published, consistent with fair practice, within a justified scope, source indicated).</p></div></div>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="eyebrow"><span class="num">06</span><span class="kicker">First run</span></div>
+  <h2>The first run: The Art of War</h2>
+  <p class="lede">On the calendar, the process is planned at about nine weeks. For the first title, it was compressed into a single operator session, with a sub-agent started for each work package (WP) and run in parallel. Only waiting time is compressed: no gate is skipped and nothing is reordered.</p>
+  <div class="define"><b>On how it was run.</b> The first title is <b>role-play</b> chaired by the operator’s session. Each WP’s sub-agent writes, reads and judges from the standpoint of the responsible persona, but the personas did not start on their own from their bindings. The signatures on the sign-off sheet and the engagement records state this explicitly as “operator-orchestrated.” The mechanical gates (check-book and the prebuild hook, and generation of the book of maxims) enter the repo in the same PR as the Reader; until that lands on main, what this document describes is a design.</div>
+  <p>The book has two parts. Part I gives each Sunzi chapter a chapter of its own, in this order: summary; source text, kundoku, translation and word notes for each paragraph; commentary; a maxim box; and one figure. Part II is made up of chapters that read the ideas of the Sunzi chapters against modern projects and organizations, from measuring the odds of victory before starting (Ji, “Laying Plans”) to the ethics of deception (Ji, and Huogong, “Attack by Fire”).</p>
+  <ol class="flowsteps">
+    <li><b>Research pack</b> (WP-10–16) — fixing the base text, segmenting the source text with paragraph IDs, the variant table, kundoku v1, candidate maxims, the list of earlier books, the glossary, the rights memo and the disclosure statement. Everything else depends on it, so it is finished first. → G1</li>
+    <li><b>Page plan and chapter design briefs</b> (WP-20) — per-chapter character budgets, corresponding source IDs, figure slots, owners. → G2</li>
+    <li><b>Writing in parallel lanes</b> (WP-30a/b/c, WP-31) — Part I in three lanes, Ji–Xing / Shi–Jiubian / Xingjun–Yongjian, in chapter order within each lane. Each Part II chapter starts as soon as the first drafts of the chapters it draws on are done. → G3</li>
+    <li><b>Figures</b> (WP-70) — an SVG for each chapter and one for the whole, plus the cover. Drawn in parallel with the writing, from the figure slots in the chapter design briefs.</li>
+    <li><b>Review and lint</b> (WP-40, 50, 60; the checks brought forward and implemented in WP-51) — structural editing → copy-editing → fact review. Every manuscript is read through at least three lenses (structure, readability, facts and refutation). → G4–G6</li>
+    <li><b>Reader build and proofreading</b> (WP-71, 80) — build into a reading screen with switching between three layers, a resume position and the time left in the chapter, and run the first, second and third proofs through the corrections ledger. → G7, G8</li>
+    <li><b>PR</b> — the Reader, the mechanical gates and the text go into one PR (the process page and the skill in a separate PR), and once review turns green by consensus, the workforce’s pr-autopilot merges it.</li>
+    <li><b>Deploy and sign-off</b> (WP-90) — publication, live smoke, signatures on the sign-off sheet. From then on, the errata are maintained. → G9</li>
+  </ol>
+  <div class="statline">
+    <div class="stat"><b>13 chapters</b><span>Every chapter of the Sunzi. One book chapter each in Part I</span></div>
+    <div class="stat"><b>~120,000 characters</b><span>Body text of the first title (measured at 121,482 characters, excluding the appendix)</span></div>
+    <div class="stat"><b>22 chapters + appendix</b><span>Preface, introduction, Part I’s 13 chapters and summary, Part II’s 5 chapters, epilogue, book of maxims</span></div>
+    <div class="stat"><b>≥ 3</b><span>Review lenses per manuscript</span></div>
+  </div>
+  <p class="note" style="margin-top:14px">The character and chapter counts were measured at the first title’s G3. The research-stage page plan (about 120,000 characters in total, 21 chapter design briefs) was tightened to fit the first title’s scope, and the appendix of maxims is generated from the register. Keeping the canonical text of book bodies in git (the canonical text of article bodies is in Notion) will be put into practice only after an ADR sets it down.</p>
+  <div class="grid g2">
+    <div class="card">
+      <span class="tag">Book</span>
+      <h3><a href="/books/sunzi">Read The Art of War</a></h3>
+      <p>The first title made by this process. Part I’s source text and Part II’s readings for modern projects and organizations can be read in the console’s reading screen.</p>
+    </div>
+    <div class="card">
+      <span class="tag">Skill</span>
+      <h3><a href="https://github.com/refluster/ai-native-article/blob/main/.claude/skills/book-production/SKILL.md" target="_blank" rel="noopener">Execution procedure (book-production skill)</a></h3>
+      <p>The process in this document turned into a procedure a session can run. The division is this: people check the process against this document; agents follow the skill.</p>
+    </div>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="eyebrow"><span class="num">07</span><span class="kicker">Sources</span></div>
+  <h2>Sources</h2>
+  <p class="lede">These are the sources whose text we actually read in designing the process. Sources we could read only as search-result summaries (the definitions of sign-off and responsibility sign-off, the received wisdom on reading speed, and so on) and sources we could not retrieve (ctext.org, Kodansha’s publisher page and others) are not included here.</p>
+  <ol class="notes">
+    <li>The book-making process (Chapter 2). <a href="https://www.edit-jp.com/naruhon02/" target="_blank" rel="noopener">edit-jp.com/naruhon02</a></li>
+    <li>Bungeishunjū Planning and Publishing Division, “How a book is made.” <a href="https://www.bunshun.co.jp/kikakushuppan/process.html" target="_blank" rel="noopener">bunshun.co.jp</a></li>
+    <li>Mainichi Shimbun Fact Review Center, “How fact reviewers do their research.” <a href="https://salon.mainichi-kotoba.jp/archives/27915" target="_blank" rel="noopener">salon.mainichi-kotoba.jp</a></li>
+    <li>Gekiryo Publishing, “What is a book proposal?” <a href="https://www.gekiryo-pub.com/archives/1440" target="_blank" rel="noopener">gekiryo-pub.com</a></li>
+    <li>A summary of text layouts across bunko publishers. <a href="https://libsy.jugem.jp/?eid=53" target="_blank" rel="noopener">libsy.jugem.jp</a></li>
+    <li>University of Chicago Press, Publishing with Chicago. <a href="https://www.press.uchicago.edu/resource/publishing_with_chicago.html" target="_blank" rel="noopener">press.uchicago.edu</a></li>
+    <li>The Chicago Manual of Style, 18th ed., Chapter 2 contents. <a href="https://www.chicagomanualofstyle.org/book/ed18/part1/ch02/toc.html" target="_blank" rel="noopener">chicagomanualofstyle.org</a></li>
+    <li>Duke University Press, Life Cycle of a Book. <a href="https://www.dukeupress.edu/books/book-authors/life-cycle-of-a-book" target="_blank" rel="noopener">dukeupress.edu</a></li>
+    <li>Kevin Anderson &amp; Associates, The Different Types of Book Editing. <a href="https://www.ka-writing.com/the-different-types-of-book-editing/" target="_blank" rel="noopener">ka-writing.com</a></li>
+    <li>Columbia Journalism Review, Fact-checking at The New Yorker. <a href="https://www.cjr.org/critical_eye/fact-checking_at_the_new_yorker.php" target="_blank" rel="noopener">cjr.org</a></li>
+    <li>Wikipedia, Advance copy. <a href="https://en.wikipedia.org/wiki/Advance_copy" target="_blank" rel="noopener">en.wikipedia.org</a></li>
+    <li>Iwanami Shoten, Shintei Sonshi (translated and annotated by Kanaya Osamu), bibliographic page. <a href="https://www.iwanami.co.jp/book/b246250.html" target="_blank" rel="noopener">iwanami.co.jp</a></li>
+    <li>Wikipedia, “Sunzi (book).” <a href="https://ja.wikipedia.org/wiki/%E5%AD%AB%E5%AD%90_(%E6%9B%B8%E7%89%A9)" target="_blank" rel="noopener">ja.wikipedia.org</a></li>
+    <li>Xiong Zheng, “On the view of attack and defense in the Xing chapter of the Sunzi: centering on a comparison of the bamboo-slip and Eleven Commentators texts,” Hokkaido University, Kenkyū Ronshū (Research Papers) no. 19 (only the title and metadata were checked). <a href="https://eprints.lib.hokudai.ac.jp/dspace/bitstream/2115/79796/1/09_rjgshhs_19_p157-188_l.pdf" target="_blank" rel="noopener">eprints.lib.hokudai.ac.jp</a></li>
+    <li>Agency for Cultural Affairs, Copyright Text, fiscal 2026 edition. <a href="https://www.bunka.go.jp/seisaku/chosakuken/seidokaisetsu/pdf/94383901_01.pdf" target="_blank" rel="noopener">bunka.go.jp</a></li>
+    <li>Dantandho, “Is a kundoku transcription of classical Chinese protected by copyright?” (a personal view). <a href="https://dantandho.hatenadiary.com/entry/2022/04/06/%E3%80%90%E5%8F%A4%E5%85%B8%E4%BD%9C%E5%93%81%E3%81%A8%E8%91%97%E4%BD%9C%E6%A8%A9%E3%80%91%E6%BC%A2%E6%96%87%E3%81%AE%E6%9B%B8%E3%81%8D%E4%B8%8B%E3%81%97%E6%96%87%E3%81%AF%E8%91%97%E4%BD%9C%E6%A8%A9" target="_blank" rel="noopener">dantandho.hatenadiary.com</a></li>
+    <li>Council for Cultural Affairs recommendation, “Approaches to writing official documents” (January 7, 2022). <a href="https://www.bunka.go.jp/seisaku/bunkashingikai/kokugo/hokoku/pdf/93651301_01.pdf" target="_blank" rel="noopener">bunka.go.jp</a></li>
+    <li>Jae-ho Lee, “A study of text difficulty for Japanese-language education” (jReadability). <a href="https://researchmap.jp/jhlee/published_papers/1284306/attachment_file.pdf" target="_blank" rel="noopener">researchmap.jp</a></li>
+    <li>Kanji–kana ratio (an introduction to the received view; no scholarly source). <a href="https://kakenhi.com/kanji-kana-ratio/" target="_blank" rel="noopener">kakenhi.com</a></li>
+    <li>W3C, Requirements for Japanese Text Layout (JLReq). <a href="https://www.w3.org/TR/jlreq/" target="_blank" rel="noopener">w3.org/TR/jlreq</a></li>
+    <li>W3C, Understanding WCAG 2.2 SC 1.4.8 Visual Presentation. <a href="https://www.w3.org/WAI/WCAG22/Understanding/visual-presentation.html" target="_blank" rel="noopener">w3.org/WAI</a></li>
+    <li>Butterick’s Practical Typography, Line length. <a href="https://practicaltypography.com/line-length.html" target="_blank" rel="noopener">practicaltypography.com</a></li>
+    <li>Butterick’s Practical Typography, Line spacing. <a href="https://practicaltypography.com/line-spacing.html" target="_blank" rel="noopener">practicaltypography.com</a></li>
+    <li>Readwise Reader Docs, Appearance. <a href="https://docs.readwise.io/reader/docs/faqs/appearance" target="_blank" rel="noopener">docs.readwise.io</a></li>
+    <li>Piepenbrock, Mayr, Mund, Buchner (2013). Positive display polarity is advantageous for both younger and older adults. <i>Ergonomics</i> 56(7). <a href="https://www.psychologie.hhu.de/fileadmin/redaktion/Oeffentliche_Medien/Fakultaeten/Mathematisch-Naturwissenschaftliche_Fakultaet/Psychologie/AAP/Publikationen/2013/Piepenbrock-2013-Positive_display_polarity_is_.pdf" target="_blank" rel="noopener">psychologie.hhu.de</a></li>
+  </ol>
+  <p class="note">The process design is based on a research note dated October 5, 2026, by Ingrid Solberg (Managing Editor) and Camille Fontaine (Chief of Staff). This document was put together by Aoi Marchetti (Designer) and Ingrid Solberg.</p>
+</section>

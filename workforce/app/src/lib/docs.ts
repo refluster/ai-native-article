@@ -30,7 +30,7 @@
 // lazy-loaded from App.tsx so the console's main bundle does not carry them.
 
 import manifest from '../content/docs/manifest.json';
-import type { ResearchLanguage } from './research';
+import { isResearchLanguage, type ResearchLanguage } from './research';
 
 /** The two editions every public document has. Same type as the Research
  *  surface's, on purpose: one reader preference drives both. */
@@ -103,21 +103,60 @@ export function docEdition(doc: PublicDocMeta, lang: DocLanguage): PublicDocEdit
   return doc.editions[lang];
 }
 
-export function docPath(slug: string): string {
-  return `/docs/${encodeURIComponent(slug)}`;
+/**
+ * The `?lang=` to carry from the current URL onto the next Docs link, or
+ * '' when the URL names no edition. A shared link with `?lang=en` must
+ * keep its edition across cards, breadcrumbs and in-body links — without
+ * this the next page would fall back to the receiver's stored choice and
+ * the edition would change under them (the design note's most likely
+ * failure). Nothing is carried when the URL carries nothing: the stored
+ * or browser preference then resolves each page the same way.
+ */
+export function editionQuery(search: string): string {
+  const lang = new URLSearchParams(search).get('lang');
+  return isResearchLanguage(lang) ? `?lang=${lang}` : '';
+}
+
+/** Add the current URL's `?lang=` to an in-app target that does not name
+ *  one itself. The target may carry its own query and `#hash`. */
+export function withEdition(to: string, search: string): string {
+  const carry = editionQuery(search);
+  if (!carry) return to;
+  const hashAt = to.indexOf('#');
+  const hash = hashAt === -1 ? '' : to.slice(hashAt);
+  const beforeHash = hashAt === -1 ? to : to.slice(0, hashAt);
+  const queryAt = beforeHash.indexOf('?');
+  const path = queryAt === -1 ? beforeHash : beforeHash.slice(0, queryAt);
+  const params = new URLSearchParams(queryAt === -1 ? '' : beforeHash.slice(queryAt + 1));
+  if (!params.has('lang')) params.set('lang', carry.slice('?lang='.length));
+  const query = params.toString();
+  return `${path}${query ? `?${query}` : ''}${hash}`;
+}
+
+/** Console route for a document, carrying the current URL's edition. */
+export function docPath(slug: string, search = ''): string {
+  return withEdition(`/docs/${encodeURIComponent(slug)}`, search);
+}
+
+/** The Docs index, carrying the current URL's edition. */
+export function docsIndexPath(search = ''): string {
+  return withEdition('/docs', search);
 }
 
 /**
  * Where a pre-SPA docs URL should go. The documents were S3 objects at
  * `/docs/<name>.html` (and `/docs/index.html`); those links exist in
  * bookmarks, posts and the founding story's own footnotes, so the router
- * forwards them rather than 404ing. Returns null for a slug that is not a
- * legacy spelling.
+ * forwards them rather than 404ing, keeping the query (`?lang=`) and the
+ * `#hash` so a shared `…/founding-story.html?lang=en#s3` lands on that
+ * edition and section. Returns null for a slug that is not a legacy
+ * spelling.
  */
-export function legacyDocRedirect(slug: string): string | null {
+export function legacyDocRedirect(slug: string, search = '', hash = ''): string | null {
   if (!slug.endsWith('.html')) return null;
   const bare = slug.slice(0, -'.html'.length);
-  return bare === 'index' || bare === '' ? '/docs' : docPath(bare);
+  const path = bare === 'index' || bare === '' ? '/docs' : `/docs/${encodeURIComponent(bare)}`;
+  return `${path}${search}${hash}`;
 }
 
 /**

@@ -6,11 +6,11 @@
     "editions": {
       "ja": {
         "file": "capabilities.ja.html",
-        "kicker": "Capabilities",
-        "title": "What the workforce delivers",
-        "description": "Four bodies of work and the capability each proves — a software product built and audited end to end, a data analysis designed for many client rounds, decision research run head to head against a consultancy, and the standing media and dashboards — then the twelve workflow lanes behind them and the governance that lets them run.",
-        "cta": "See what it delivers",
-        "packTitle": "Capabilities"
+        "kicker": "ケイパビリティ",
+        "title": "ワークフォースが届けるもの",
+        "description": "四つの仕事と、それぞれが証明するケイパビリティ。端から端まで作り監査したソフトウェア製品、顧客との何度ものラウンドを前提に設計したデータ分析、コンサルティング会社と正面から比べた意思決定リサーチ、そして常設のメディアとダッシュボード。さらに、それらを支える 12 本のワークフローのレーンと、それを回し続ける統治をまとめました。",
+        "cta": "届けるものを見る",
+        "packTitle": "ケイパビリティ"
       },
       "en": {
         "file": "capabilities.en.html",
@@ -29,11 +29,11 @@
     "editions": {
       "ja": {
         "file": "whitepaper.ja.html",
-        "kicker": "Technical whitepaper",
-        "title": "Capability as a governed internal asset",
-        "description": "The claim, the organizational constraint it removes, the composition model, the anatomy of a persistent agent, the architecture and execution flow, memory and cross-project reuse, governance and failure containment, operating evidence, management economics, and the limits and open questions.",
-        "cta": "Read the whitepaper",
-        "packTitle": "Technical whitepaper"
+        "kicker": "テクニカルホワイトペーパー",
+        "title": "統治された社内資産としての能力",
+        "description": "中心となる主張、それが取り除く組織上の制約、構成モデル、持続するエージェントの構造、アーキテクチャと実行の流れ、記憶とプロジェクト横断の再利用、統治と障害の封じ込め、稼働の証拠、経営の経済性、そして限界と未解決の問い。",
+        "cta": "ホワイトペーパーを読む",
+        "packTitle": "テクニカルホワイトペーパー"
       },
       "en": {
         "file": "whitepaper.en.html",
@@ -52,7 +52,7 @@
     "editions": {
       "ja": {
         "file": "founding-story.ja.html",
-        "kicker": "Founding story",
+        "kicker": "創業ストーリー",
         "title": "人間ひとり、AI 58体",
         "description": "なぜ一人の人間がこの組織を作ったのか、なぜ作れたのか、稼働を始めてから何が起きたのか。家電の量産、SaaS の組織統治、事業売却で学んだ三つのことと、AI 組織が自分で書いた月次レポートの記録。",
         "cta": "創業ストーリーを読む",
@@ -61,10 +61,10 @@
       "en": {
         "file": "founding-story.en.html",
         "kicker": "Founding story",
-        "title": "人間ひとり、AI 58体",
-        "description": "なぜ一人の人間がこの組織を作ったのか、なぜ作れたのか、稼働を始めてから何が起きたのか。家電の量産、SaaS の組織統治、事業売却で学んだ三つのことと、AI 組織が自分で書いた月次レポートの記録。",
-        "cta": "創業ストーリーを読む",
-        "packTitle": "創業ストーリー"
+        "title": "One human, 58 AIs",
+        "description": "Why one human built this organization, why they were able to, and what happened once it started running. Three lessons from mass-producing consumer electronics, governing a SaaS organization and selling a business — and the record of the monthly reports the AI organization wrote about itself.",
+        "cta": "Read the founding story",
+        "packTitle": "Founding story"
       }
     }
   },
@@ -75,11 +75,11 @@
     "editions": {
       "ja": {
         "file": "manifesto.ja.html",
-        "kicker": "Manifesto",
-        "title": "Assemble, deliver, disband",
-        "description": "What the network believes about work: outcomes over output, the upside it aims at and what it will not do, capability that belongs to the professional, temporary projects and persistent learning, disciplinary difference, the record, accountability, and the human's ownership of purpose and consequence.",
-        "cta": "Read the manifesto",
-        "packTitle": "Manifesto"
+        "kicker": "マニフェスト",
+        "title": "集まり、届け、解散する",
+        "description": "ネットワークが仕事について信じていること。アウトプットよりアウトカム、狙うアップサイドとやらないこと、専門家に帰属する能力、一時的なプロジェクトと持続する学び、職能の違い、記録、説明責任、そして目的と帰結を人間が引き受けること。",
+        "cta": "マニフェストを読む",
+        "packTitle": "マニフェスト"
       },
       "en": {
         "file": "manifesto.en.html",
@@ -98,7 +98,7 @@
     "editions": {
       "ja": {
         "file": "book-production.ja.html",
-        "kicker": "Process",
+        "kicker": "書籍制作",
         "title": "本をつくる工程",
         "description": "出版社の実務（企画・台割・執筆・編集・校閲・校正・組版・校了）を参照して設計した、約40名のAIペルソナで一冊を分業する十のステージとゲート、担当の割り振り、初号『孫子の兵法』での実行。",
         "cta": "工程を見る",
@@ -106,11 +106,11 @@
       },
       "en": {
         "file": "book-production.en.html",
-        "kicker": "Process",
-        "title": "本をつくる工程",
-        "description": "出版社の実務（企画・台割・執筆・編集・校閲・校正・組版・校了）を参照して設計した、約40名のAIペルソナで一冊を分業する十のステージとゲート、担当の割り振り、初号『孫子の兵法』での実行。",
-        "cta": "工程を見る",
-        "packTitle": "本をつくる工程"
+        "kicker": "Book production",
+        "title": "How a book gets made",
+        "description": "Ten stages and gates for dividing one book among about 40 AI personas, designed with reference to how publishers work (planning, page plan, writing, editing, fact review, proofreading, typesetting, sign-off); who is assigned to what; and the run on the first title, The Art of War.",
+        "cta": "See the process",
+        "packTitle": "How a book gets made"
       }
     }
   },
@@ -121,7 +121,7 @@
     "editions": {
       "ja": {
         "file": "asp-cloud-dev-review.ja.html",
-        "kicker": "Development review",
+        "kicker": "開発レビュー",
         "title": "1,000 本の PR を、どう作ったか",
         "description": "外部プロジェクト asp-cloud の PR / Issue 番号が 1,000 を超えた時点での開発の健全性診断。58 体のエージェントと 1 人のオペレーターが半年でどう作り、どこで待ち、何が形だけになっていたかを、Squad Health Check・DORA・Value Stream Mapping で PR 831 本・デプロイ 531 回・実績台帳 861 行から再構成し、次の 6〜8 週間で試す 3 件に絞る。",
         "cta": "診断を読む",
