@@ -201,6 +201,25 @@ describe('Doc', () => {
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent('Technical whitepaper');
   });
 
+  // The page stays mounted across documents, and the next body arrives
+  // later than the route change: the section a cross-document link names
+  // must be revealed in the body that arrives, not looked for in the one
+  // being left (which scrolled to the top instead — cycle-2 D5).
+  it('reveals the section an in-body link to another document names, once that body arrives', async () => {
+    const { container } = await mountLoaded('/docs/capabilities?lang=en');
+    const link = container.querySelector('article a[href="/docs/whitepaper#s10"]') as HTMLAnchorElement;
+    expect(link).not.toBeNull();
+    const intoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
+    const scrollTo = vi.mocked(window.scrollTo);
+    scrollTo.mockClear();
+    fireEvent.click(link);
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/docs/whitepaper?lang=en#s10'));
+    await waitFor(() => expect(container.querySelector('article h1')).toHaveTextContent(/Software\s*Talent Network/));
+    await waitFor(() => expect(intoView).toHaveBeenCalled());
+    expect(intoView.mock.contexts).toContain(document.getElementById('s10'));
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
   it('forwards the pre-SPA .html spellings, keeping ?lang= and #hash', async () => {
     mount('/docs/manifesto.html');
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/docs/manifesto'));
@@ -220,6 +239,17 @@ describe('Doc', () => {
   it('forwards /docs/index.html to the index', async () => {
     mount('/docs/index.html');
     expect(await screen.findByText('DOCS-INDEX-MARKER')).toBeInTheDocument();
+  });
+
+  it('fails loudly when an edition body cannot be loaded (C-4)', async () => {
+    const bodies = await import('../lib/docs-bodies');
+    const load = vi.spyOn(bodies, 'loadDocBody').mockRejectedValueOnce(new Error('chunk gone after a deploy'));
+    const { container } = mount('/docs/whitepaper?lang=en');
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Could not load this edition');
+    expect(alert).toHaveTextContent('chunk gone after a deploy');
+    expect(container.querySelector('article.docs-prose')).toBeNull();
+    load.mockRestore();
   });
 
   it('says so for a document that does not exist', () => {

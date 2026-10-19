@@ -76,10 +76,11 @@ export default function Doc() {
   // language while the DOM still holds the old body, and the scroll
   // bookkeeping below must follow the DOM, not the route.
   const body = useAsync(
-    async () => (doc ? { lang, html: await loadDocBody(doc.slug, lang) } : null),
+    async () => (doc ? { slug: doc.slug, lang, html: await loadDocBody(doc.slug, lang) } : null),
     [doc?.slug, lang],
   );
   const html = body.data?.html;
+  const htmlSlug = body.data?.slug;
   const htmlLang = body.data?.lang;
   const articleRef = useRef<HTMLElement>(null);
   const sectionRef = useRef<string | null>(null);
@@ -111,12 +112,16 @@ export default function Doc() {
   // Once a body is in the DOM: a fresh document opens at its top, or at
   // the section a `#s7` link names; a switch of edition on the same
   // document returns to the section the reader was in. The body arrives
-  // asynchronously, so this runs on the body, not on the route.
+  // asynchronously and this component stays mounted across documents, so
+  // the bookkeeping follows the loaded body's slug and edition, never the
+  // route's — between a click on `/docs/whitepaper#s10` and the
+  // whitepaper's arrival, the route already says whitepaper while the DOM
+  // still holds the previous document.
   useLayoutEffect(() => {
-    if (!html || !htmlLang || !doc) return;
+    if (!html || !htmlSlug || !htmlLang) return;
     const prev = shown.current;
-    shown.current = { slug: doc.slug, lang: htmlLang };
-    if (!prev || prev.slug !== doc.slug) {
+    shown.current = { slug: htmlSlug, lang: htmlLang };
+    if (!prev || prev.slug !== htmlSlug) {
       sectionRef.current = null;
       const target = hash ? document.getElementById(hash.slice(1)) : null;
       if (target) reveal(target);
@@ -126,7 +131,7 @@ export default function Doc() {
       reveal((id && document.getElementById(id)) || articleRef.current);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [html, htmlLang, doc?.slug]);
+  }, [html, htmlSlug, htmlLang]);
 
   if (legacy) return <Navigate to={legacy} replace />;
 
