@@ -541,14 +541,16 @@ Resources:
               Resource:
                 - !GetAtt WfOrchestratorFunction.Arn
       # ROUTE BUDGET. SAM turns every HttpApi event below into one
-      # AWS::Lambda::Permission, i.e. one statement (~370 B) in this
+      # AWS::Lambda::Permission, i.e. one statement (≈385 B measured) in this
       # function's resource-based policy, and Lambda caps that policy at
       # 20 480 bytes. With 57 routes it reached 20 639: the six /rooms
       # permissions failed and CloudFormation rolled the whole stack back
       # (deploy-workforce-data-plane.yml run 40126740456, #847). The Rooms
       # family moved to WfRoomsApiFunction behind this same API. This function
-      # is at the wall: a NEW route family goes on its own function, never
-      # here. Enforced by workforce/scripts/check-route-permission-budget.mjs:
+      # is at the wall (19 628 B of 20 480 after #850 — two statements of
+      # headroom, so do not rename or re-path an event here either: a
+      # Permission is replaced create-before-delete): a NEW route family goes
+      # on its own function, never here. Enforced by workforce/scripts/check-route-permission-budget.mjs:
       # ≤ 48 HttpApi events per function, and this one ratcheted at its
       # current 51 — the count may only go down.
       Events:

@@ -60,6 +60,16 @@ describe("countHttpApiRoutes", () => {
     expect(raw).toBe(3);
   });
 
+  it("counts quoted HttpApi scalars (Type: \"HttpApi\" / 'HttpApi') like the bare form — never a silent undercount", () => {
+    const t = template(
+      fn("WfA", [httpEvent("ListA", "/a"), httpEvent("GetB", "/b")]),
+    ).replace('Type: HttpApi', 'Type: "HttpApi"').replace(/Type: HttpApi(?![\s\S]*Type: HttpApi)/, "Type: 'HttpApi'");
+    const { counts, unattributed, raw } = countHttpApiRoutes(t);
+    expect(Object.fromEntries(counts)).toEqual({ WfA: 2 });
+    expect(unattributed).toBe(0);
+    expect(raw).toBe(2);
+  });
+
   it("ignores comment lines that mention Type: HttpApi", () => {
     const t = template(fn("WfA", ["        # Type: HttpApi (commented out)", httpEvent("ListA", "/a")]));
     const { counts, unattributed } = countHttpApiRoutes(t);
