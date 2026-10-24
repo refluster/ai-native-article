@@ -151,7 +151,7 @@ declared one such chain — `wf-messaging-reply` invoking itself only, inside
 an operator-caused, fixed-length round — but left R-N1's text as it was. This
 ADR declares its **twin and nothing wider**, and the same PR adds sub-bullet
 **(d)** to R-N1 naming both chains and the three properties they share
-(self-only, operator-caused, bounded at start with retries off): `wf-room-debate` may `lambda:InvokeFunction` itself only
+(self-only, operator-caused, bounded at start — kept here by retries off plus the `CLAIM#` slot row, and in `wf-messaging-reply` by its default retries plus the `already_replied` guard, as ADR-0047 decided): `wf-room-debate` may `lambda:InvokeFunction` itself only
 (IAM Sid `RoomDebateTurnHandoff`, resource
 `arn:…:function:wf-room-debate-${Stage}`), only to continue a schedule fixed
 at start, only within one `run_id`. No Lambda gains the right to invoke a
@@ -341,6 +341,15 @@ accepted for threads (agents-api `handler.ts` header, PR #132).
   [README.md](README.md), the `#### Room rows` section and GSI3 note in
   `workforce/docs/data-model.md`, and R-N1 sub-bullet (d) in
   `workforce/docs/governance.md`.
+- **Follow-ups declared here, not shipped.** (1) A `workforce:*` lint that
+  asserts, for every function in `template.yaml` holding
+  `lambda:InvokeFunction` on its own ARN, either `MaximumRetryAttempts: 0`
+  or a comment naming the guard that bounds a retry (`wf:owen` O1 on the
+  ADR review — today the property is checked by reading the template).
+  (2) A TTL on `CLAIM#` rows: they are inert once the turn lands and
+  accumulate one row per agent turn; at operator-paced volume (C-3) that is
+  a few hundred rows a month, so v1 ships without a TTL and a later change
+  adds `ttl` (`wf:mateo` M1 on the ADR review).
 - **What would need a later ADR.** Agent-initiated rooms (an agent or a
   cadence opening a Room — that makes the chain agent-caused and puts it
   under R-N4); human guests in a Room (a public or second-identity write
