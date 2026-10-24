@@ -20,10 +20,18 @@
 // Loop safety (the property that bounds cost — Epic §6): a reply is caused
 // ONLY by an inbound operator/peer message, and an agent never replies to
 // its own last message. This Lambda writes via the shared module, not the
-// HTTP route, so a reply never re-invokes this function — the chain
-// terminates by construction. A per-thread daily budget is the backstop.
+// HTTP route, so a reply never starts a new round. A per-thread daily budget
+// is the backstop.
+//
+// Group rounds (workforce/adr-0047): in a group thread one operator message
+// starts a round — every member (or every @-addressed member) replies once,
+// in order. The API invokes the first member with the rest of the round in
+// `then`; after replying (or skipping, or failing) this Lambda invokes itself
+// for the next member. `then` only ever shrinks, so a round is at most
+// `participants.length` replies and terminates by construction.
 
 import { CloudWatchClient, PutMetricDataCommand } from "@aws-sdk/client-cloudwatch";
+import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 
 import { type AgentMetaRow, agentPk } from "../shared/agent.js";
 import { getItem } from "../shared/ddb.js";
@@ -32,6 +40,7 @@ import {
   MESSAGING_OPERATOR_ID,
   getThreadDetail,
   sendMessage,
+  type ThreadDetailView,
 } from "../shared/messaging.js";
 import { buildRecallBlock } from "../shared/recall-prompt.js";
 import { readIndex, readChunk } from "../shared/memory.js";
@@ -49,8 +58,11 @@ const STAGE = process.env.STAGE ?? "dev";
  *         sentences" to two-to-three short paragraphs (~2–3× the volume),
  *         asking the agent to surface the iceberg under the surface
  *         activity (current standing, thoughts/worries, proposals). Visible
- *         cap raised 400 → 1100 accordingly. */
-const SKILL_VERSION = "0.4.0";
+ *         cap raised 400 → 1100 accordingly.
+ *  0.5.0: group rounds (adr-0047) — every member speaks once per operator
+ *         message; the prompt names the members and no longer lets a member
+ *         pass because the message was "addressed to someone else". */
+const SKILL_VERSION = "0.5.0";
 
 /** Cap on the memory-summary excerpt folded into the system prompt. The
  *  rolling summary can grow; a reply needs the gist, not the archive. */
@@ -112,13 +124,31 @@ const REPLY_INSTRUCTIONS = [
   "verbatim or mention that you were given notes.",
   "",
   `If the last message genuinely needs no reply — a bare acknowledgement ("Nice.`,
-  `Ship it."), a closing, or a message clearly addressed to someone else in a`,
-  `group — output the literal token ${NO_REPLY_TOKEN} and nothing else.`,
+  `Ship it.") or a closing — output the literal token ${NO_REPLY_TOKEN} and`,
+  "nothing else.",
   "",
   "Never address yourself, never start an unrelated new topic, never reply to your own message.",
 ].join("\n");
 
+// Group-thread contract (adr-0047), appended only when the thread is a group.
+// The operator expects every member to speak; the risk to steer away from is
+// N members restating the same status in turn.
+function groupInstructions(selfSlug: string, participants: readonly string[]): string {
+  const others = participants.filter((p) => p !== selfSlug);
+  return [
+    "This is a GROUP thread. Members: the Operator, you, and " +
+      `${others.map((p) => `\`${p}\``).join(", ")}. Colleagues' messages are labelled`,
+    "with their slug. The operator expects every member to speak in turn, so do",
+    "reply even when the operator's message was addressed to the whole group or",
+    "another member has already answered. Read what colleagues have said in this",
+    "round and build on it: answer any question put to you by name, agree or push",
+    "back from your own role, and add what only you know. Do not restate what a",
+    "colleague already said, and do not speak for another member.",
+  ].join("\n");
+}
+
 const cw = new CloudWatchClient({});
+const lambda = new LambdaClient({});
 
 /** Fire-and-forget metric. Never awaited, never throws — a metric failure
  *  must not mask the reply outcome (same discipline as project.ts). */
@@ -146,6 +176,10 @@ function emitMetric(name: string, dims: Record<string, string> = {}): void {
 export interface MessagingReplyEvent {
   thread_id: string;
   addressed_slug: string;
+  /** Members still to speak in this round, in order (adr-0047). */
+  then?: string[];
+  /** The operator message this round answers. Absent on a pre-0.5.0 event. */
+  trigger_message_id?: string;
 }
 
 interface AgentCard {
@@ -229,12 +263,65 @@ export interface MessagingReplyResult {
   message_id?: string;
 }
 
+/** Message ids are ULIDs, so string order is time order. */
+function isAfter(messageId: string, triggerId: string): boolean {
+  return messageId > triggerId;
+}
+
+/** Hand the round to the next member. Throws on failure (W-4): the Lambda
+ *  then errors, its async retry finds this member already answered (the
+ *  `already_replied` skip) and tries the hand-off again. */
+async function passRound(event: MessagingReplyEvent): Promise<void> {
+  const [next, ...rest] = event.then ?? [];
+  if (!next || !event.thread_id) return;
+  const self = process.env.AWS_LAMBDA_FUNCTION_NAME;
+  if (!self) throw new Error("messaging-reply: AWS_LAMBDA_FUNCTION_NAME unset — cannot continue the round");
+  const payload: MessagingReplyEvent = {
+    thread_id: event.thread_id,
+    addressed_slug: next,
+    then: rest,
+    ...(event.trigger_message_id ? { trigger_message_id: event.trigger_message_id } : {}),
+  };
+  try {
+    await lambda.send(
+      new InvokeCommand({
+        FunctionName: self,
+        InvocationType: "Event",
+        Payload: Buffer.from(JSON.stringify(payload)),
+      }),
+    );
+  } catch (err) {
+    emitMetric("WfMsgRoundHandoffFailed");
+    throw err;
+  }
+}
+
 export async function handler(event: MessagingReplyEvent): Promise<MessagingReplyResult> {
-  const { thread_id, addressed_slug } = event ?? {};
+  let result: MessagingReplyResult | undefined;
+  try {
+    result = await replyOnce(event);
+    return result;
+  } finally {
+    // Also on a throw: one member's failed reply must not silence the rest of
+    // the round. A superseded round stops — the newer round covers everyone.
+    if (result?.reason !== "superseded") await passRound(event);
+  }
+}
+
+async function replyOnce(event: MessagingReplyEvent): Promise<MessagingReplyResult> {
+  const { thread_id, addressed_slug, trigger_message_id } = event ?? {};
   // Structured entry log: with async fire-and-forget dispatch, "was the
   // Lambda even invoked?" is the first triage question — answer it in one
   // log line rather than by inference.
-  console.log(JSON.stringify({ event: "messaging_reply_invoked", thread_id, addressed_slug }));
+  console.log(
+    JSON.stringify({
+      event: "messaging_reply_invoked",
+      thread_id,
+      addressed_slug,
+      then: event?.then,
+      trigger_message_id,
+    }),
+  );
   if (!thread_id || !addressed_slug) {
     throw new Error("messaging-reply: missing thread_id or addressed_slug");
   }
@@ -249,6 +336,14 @@ export async function handler(event: MessagingReplyEvent): Promise<MessagingRepl
     throw new Error(`messaging-reply: ${addressed_slug} is not a participant of ${thread_id}`);
   }
 
+  if (trigger_message_id) {
+    const roundSkip = checkRound(detail, addressed_slug, trigger_message_id);
+    if (roundSkip) {
+      emitMetric("WfMsgReplySkipped", { Reason: roundSkip });
+      return { status: "skipped", reason: roundSkip };
+    }
+  }
+
   // Loop safety: reply only to an inbound message. If the last message is
   // already ours, there is nothing to answer — a stale/duplicate invoke.
   const last = detail.messages[detail.messages.length - 1];
@@ -256,6 +351,8 @@ export async function handler(event: MessagingReplyEvent): Promise<MessagingRepl
     emitMetric("WfMsgReplySkipped", { Reason: "no_inbound" });
     return { status: "skipped", reason: "no_inbound" };
   }
+  // Recall keys on what the operator asked, not on the previous member's reply.
+  const trigger = detail.messages.find((m) => m.message_id === trigger_message_id) ?? last;
 
   // Cost backstop: cap replies per thread per UTC day.
   const today = new Date().toISOString().slice(0, 10);
@@ -271,14 +368,15 @@ export async function handler(event: MessagingReplyEvent): Promise<MessagingRepl
 
   const agent = await loadAgent(addressed_slug);
   const transcript = buildTranscript(detail.messages, addressed_slug);
-  const workContext = await assembleWorkContext(addressed_slug, last.body);
+  const workContext = await assembleWorkContext(addressed_slug, trigger.body);
+  const groupContext = detail.group ? groupInstructions(addressed_slug, detail.participants) : "";
 
   // complete() throws on stop_reason==='max_tokens' — that IS the W-1
   // finish_reason==='length' guard (a 1–4 sentence reply that truncates is a
   // real signal, not an expected case). We let it propagate.
   const out = await complete({
     model: agent.model,
-    system: [agent.systemMd, REPLY_INSTRUCTIONS, workContext]
+    system: [agent.systemMd, REPLY_INSTRUCTIONS, groupContext, workContext]
       .filter((s) => s.length > 0)
       .join("\n\n---\n\n"),
     user: transcript,
@@ -317,4 +415,18 @@ export async function handler(event: MessagingReplyEvent): Promise<MessagingRepl
 
   emitMetric("WfMsgReply", { Slug: addressed_slug });
   return { status: "ok", message_id };
+}
+
+/** Round guards (adr-0047). `superseded`: the operator has written again, so
+ *  a newer round is already under way and this one stops. `already_replied`:
+ *  this member has answered this round — a duplicate or retried invoke. */
+function checkRound(
+  detail: ThreadDetailView,
+  slug: string,
+  triggerId: string,
+): "superseded" | "already_replied" | undefined {
+  const sinceTrigger = detail.messages.filter((m) => isAfter(m.message_id, triggerId));
+  if (sinceTrigger.some((m) => m.from === MESSAGING_OPERATOR_ID)) return "superseded";
+  if (sinceTrigger.some((m) => m.from === slug)) return "already_replied";
+  return undefined;
 }

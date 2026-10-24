@@ -1034,7 +1034,7 @@ Resources:
       FunctionName: !Sub wf-messaging-reply-${Stage}
       CodeUri: ../../lambdas/messaging-reply
       Handler: handler.handler
-      Description: Real-time talent reply to operator messages (Epic-013 Story 3).
+      Description: Real-time talent reply to operator messages (Epic-013 Story 3; group rounds adr-0047).
       MemorySize: 512
       # One Claude call + a handful of DDB/S3 ops. Generous ceiling; replies
       # land in seconds in the normal case.
@@ -1094,6 +1094,15 @@ Resources:
               Resource:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/_default/anthropic.api_key-*
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/anthropic-*
+            - Sid: MessagingReplyRoundHandoff
+              # Group rounds (adr-0047): after one member replies, the Lambda
+              # async-invokes itself for the next member of the round. Built
+              # from the function name, not !GetAtt, so the policy does not
+              # depend on the function it belongs to.
+              Effect: Allow
+              Action: lambda:InvokeFunction
+              Resource:
+                - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:wf-messaging-reply-${Stage}
             - Sid: MessagingReplyMetrics
               Effect: Allow
               Action: cloudwatch:PutMetricData

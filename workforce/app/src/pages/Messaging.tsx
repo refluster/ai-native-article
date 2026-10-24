@@ -20,6 +20,7 @@ import {
   mergeMessages,
   messagingWriteEnabled,
   isAwaitingReply,
+  isGroupRoundComplete,
   lastMessage,
   lastAt,
   OPERATOR_ID,
@@ -220,7 +221,7 @@ export default function Messaging() {
   // Poll the open thread while an awaiting-reply window is active, so the
   // talent's async reply lands without a refresh. Bounded: runs only between a
   // send and `until`, pauses when the tab is hidden, and stops the moment a
-  // non-operator message arrives. Single-operator scale (C-3) → trivial load.
+  // non-operator message arrives (in a group: once every member has spoken). Single-operator scale (C-3) → trivial load.
   const awaitingUntil = selectedId ? pendingReplyUntil[selectedId] : undefined;
   useEffect(() => {
     if (!LIVE || !selectedId || !awaitingUntil || awaitingUntil <= Date.now()) return;
@@ -243,6 +244,12 @@ export default function Messaging() {
       refreshSummaries();
       const last = conv.messages[conv.messages.length - 1];
       if (last && last.from !== OPERATOR_ID) {
+        if (conv.group && !isGroupRoundComplete(conv)) {
+          // A group round is still under way (adr-0047): the next member
+          // speaks after this one — give them a fresh window.
+          armPendingReply(tid);
+          return;
+        }
         // The reply landed — disarm (stops this poll, hides "drafting…").
         setPendingReplyUntil((p) => {
           const { [tid]: _done, ...rest } = p;

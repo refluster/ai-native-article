@@ -196,6 +196,7 @@ import {
   sendMessage,
   markThreadRead,
   setThreadStar,
+  pickRepliers,
   MESSAGING_OPERATOR_ID,
   THREAD_MESSAGES_PAGE_DEFAULT,
   type ThreadFilter,
@@ -1702,21 +1703,16 @@ async function dispatchBoardReply(payload: BoardReplyDispatch): Promise<void> {
   );
 }
 
-/** Choose which talent should reply to an operator message. 1:1 → the sole
- *  talent. Group → the first @-addressed participant, else the primary
- *  (`participants[0]`). Keeps a group post to ONE reply (Epic §6/§7). */
-function pickAddressedSlug(participants: readonly string[], body: string): string | undefined {
-  if (participants.length === 0) return undefined;
-  if (participants.length === 1) return participants[0];
-  const at = body.match(/@([a-z0-9-]+)/i);
-  if (at && at[1]) {
-    const slug = at[1].toLowerCase();
-    if (participants.includes(slug)) return slug;
-  }
-  return participants[0];
-}
-
-async function dispatchReply(threadId: string, addressedSlug: string | undefined): Promise<void> {
+/** Start the reply round for one operator message (workforce/adr-0047):
+ *  invoke the first replier; the reply Lambda hands the rest of the round on
+ *  one member at a time (`then`), so later speakers read earlier replies.
+ *  `trigger_message_id` is the operator message the round answers. */
+async function dispatchReply(
+  threadId: string,
+  repliers: readonly string[],
+  triggerMessageId: string,
+): Promise<void> {
+  const [addressedSlug, ...then] = repliers;
   if (!addressedSlug) return;
   if (!MESSAGING_REPLY_FUNCTION) {
     console.warn(
@@ -1729,7 +1725,14 @@ async function dispatchReply(threadId: string, addressedSlug: string | undefined
       new InvokeCommand({
         FunctionName: MESSAGING_REPLY_FUNCTION,
         InvocationType: "Event",
-        Payload: Buffer.from(JSON.stringify({ thread_id: threadId, addressed_slug: addressedSlug })),
+        Payload: Buffer.from(
+          JSON.stringify({
+            thread_id: threadId,
+            addressed_slug: addressedSlug,
+            then,
+            trigger_message_id: triggerMessageId,
+          }),
+        ),
       }),
     );
   } catch (err) {
@@ -2584,8 +2587,8 @@ async function createThreadRoute(event: APIGatewayProxyEventV2): Promise<APIGate
       from: MESSAGING_OPERATOR_ID,
       ...(typeof body.group_label === "string" ? { group_label: body.group_label } : {}),
     });
-    await dispatchReply(out.thread_id, pickAddressedSlug(participants as string[], messageBody));
-    return reply(201, out);
+    await dispatchReply(out.thread_id, pickRepliers(participants as string[], messageBody), out.message_id);
+    return reply(201, { thread_id: out.thread_id });
   } catch (err) {
     return reply(400, { error: "create_failed", detail: err instanceof Error ? err.message : String(err) });
   }
@@ -2594,7 +2597,8 @@ async function createThreadRoute(event: APIGatewayProxyEventV2): Promise<APIGate
 /**
  * POST /threads/{id}/messages — operator appends a message. Body:
  *   { body: string }
- * The reply TASK that wakes the addressed talent is enqueued in Story 3.
+ * Then starts the reply round (pickRepliers — every group member, or the
+ * @-addressed ones; workforce/adr-0047).
  */
 async function sendMessageRoute(
   threadId: string,
@@ -2606,7 +2610,7 @@ async function sendMessageRoute(
   try {
     const out = await sendMessage({ thread_id: threadId, from: MESSAGING_OPERATOR_ID, body: body.body });
     const meta = await getThreadMeta(threadId);
-    if (meta) await dispatchReply(threadId, pickAddressedSlug(meta.participants, body.body));
+    if (meta) await dispatchReply(threadId, pickRepliers(meta.participants, body.body), out.message_id);
     return reply(201, out);
   } catch (err) {
     return reply(400, { error: "send_failed", detail: err instanceof Error ? err.message : String(err) });

@@ -108,6 +108,7 @@ const {
   messageIdFromSk,
   inboxGsiPk,
   createThread,
+  pickRepliers,
   sendMessage,
   markThreadRead,
   setThreadStar,
@@ -473,5 +474,34 @@ describe("markThreadRead / setThreadStar", () => {
     await setThreadStar("ULID0000", true);
     expect(rows.get(key("THREAD#ULID0000", "META"))!.starred).toBe(true);
     expect(rows.get(key("THREAD#ULID0000", "PART#operator"))!.starred).toBe(true);
+  });
+});
+
+describe("pickRepliers (adr-0047)", () => {
+  it("1:1 → the sole talent", () => {
+    expect(pickRepliers(["nadia"], "hi")).toEqual(["nadia"]);
+  });
+
+  it("group without an @-address → every member, in thread order", () => {
+    expect(pickRepliers(["nadia", "dario", "aanya"], "このグループでは全員何らか会話を発して")).toEqual([
+      "nadia",
+      "dario",
+      "aanya",
+    ]);
+  });
+
+  it("group with @-addresses → only those members, in mention order, deduped", () => {
+    expect(pickRepliers(["nadia", "dario", "aanya"], "@Dario and @nadia — and @dario again")).toEqual([
+      "dario",
+      "nadia",
+    ]);
+  });
+
+  it("an @-mention of a non-member does not narrow the round", () => {
+    expect(pickRepliers(["nadia", "dario"], "cc @someone-else")).toEqual(["nadia", "dario"]);
+  });
+
+  it("no participants → no repliers", () => {
+    expect(pickRepliers([], "hi")).toEqual([]);
   });
 });

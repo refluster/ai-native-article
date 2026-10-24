@@ -25,6 +25,7 @@ import { signedFetch, assertSigv4Configured } from '../lib/sigv4';
 import {
   messagingWriteEnabled,
   isAwaitingReply,
+  isGroupRoundComplete,
   createThread,
   sendMessage,
   markThreadRead,
@@ -59,6 +60,32 @@ afterEach(() => {
 describe('messagingWriteEnabled', () => {
   it('is true when the API base is set AND SigV4 is configured', () => {
     expect(messagingWriteEnabled()).toBe(true);
+  });
+});
+
+describe('isGroupRoundComplete', () => {
+  const group = (messages: Conversation['messages']): Conversation => ({
+    id: '01THREAD',
+    participants: ['nadia', 'dario'],
+    group: true,
+    starred: false,
+    unread: 0,
+    messages,
+  });
+  const m = (from: string) => ({ from, at: 'x', body: '…' });
+
+  it('is false while a member has not spoken since the operator', () => {
+    expect(isGroupRoundComplete(group([m('operator'), m('nadia')]))).toBe(false);
+  });
+
+  it('is true once every member has spoken since the operator', () => {
+    expect(isGroupRoundComplete(group([m('operator'), m('nadia'), m('dario')]))).toBe(true);
+  });
+
+  it('only counts replies after the latest operator message', () => {
+    expect(
+      isGroupRoundComplete(group([m('operator'), m('nadia'), m('dario'), m('operator'), m('nadia')])),
+    ).toBe(false);
   });
 });
 
