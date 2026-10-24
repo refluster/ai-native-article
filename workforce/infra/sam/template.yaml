@@ -374,6 +374,10 @@ Resources:
           # ADR-0034: POST /boards/{id}/posts async-invokes the board reply
           # Lambda once per @-mentioned agent (same shape as MESSAGING_REPLY).
           BOARD_REPLY_FUNCTION: !Ref WfBoardReplyFunction
+          # adr-0048 (proposed): the room writes (create / reopening steer /
+          # conclude) async-invoke the room debate Lambda with the run's head
+          # turn; the Lambda hands the run on itself (ADR-0047 precedent).
+          ROOM_DEBATE_FUNCTION: !Ref WfRoomDebateFunction
       Policies:
         - Statement:
             - Sid: AgentsApiTableAccess
@@ -408,6 +412,10 @@ Resources:
                     # Epic-012 Story 4: GET /agents/{slug}/recall emits
                     # WfRecallLatencyMs / WfRecallVintageMismatch via recall().
                     - Workforce/Recall
+                    # adr-0048 (proposed): a failed wf-room-debate dispatch
+                    # emits WfRoomDispatchFailed (the room still lands with
+                    # META last_error set — W-4 visible, never silent).
+                    - Workforce/Rooms
             # Epic-011 Story 5 (#132) — `GET /feed/{post_id}` hydrates
             # post bodies from S3 (`posts/{slug}/{yyyy}/{mm}/{ulid}.md`).
             # No write needed — the feed-post skill (Story 1) writes; the
@@ -443,6 +451,16 @@ Resources:
                 - s3:PutObject
               Resource:
                 - !Sub ${WfBucket.Arn}/boards/*
+            # adr-0048 (proposed) — room routes hydrate + store long turn
+            # bodies (`rooms/{room_id}/{ulid}.md`), same dual-store split as
+            # messages/* and boards/*. Scoped to rooms/*.
+            - Sid: AgentsApiRoomBodyReadWrite
+              Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/rooms/*
             - Sid: AgentsApiPostBodyWrite
               # POST /feed writes the post body to posts/{slug}/{yyyy}/{mm}/{ulid}.md
               # before the DDB row (createPost ordering). Scoped to posts/*.
@@ -531,6 +549,13 @@ Resources:
               Action: lambda:InvokeFunction
               Resource:
                 - !GetAtt WfBoardReplyFunction.Arn
+            # adr-0048 (proposed) — the room writes async-invoke the room
+            # debate Lambda for a run's first turn. Scoped to that one function.
+            - Sid: AgentsApiInvokeRoomDebate
+              Effect: Allow
+              Action: lambda:InvokeFunction
+              Resource:
+                - !GetAtt WfRoomDebateFunction.Arn
             # adr-0025 — POST /dispatch hands one explicit (agent, binding_idx)
             # to the orchestrator for an immediate CCR fire. Scoped to that one
             # function; the API gains no Secrets Manager or CCR access of its
@@ -982,6 +1007,54 @@ Resources:
             Method: PATCH
             Auth:
               Authorizer: AWS_IAM
+        # adr-0048 (proposed) — Rooms. Operator surface, same posture as the
+        # thread routes: reads public on the CORS gate, every write behind
+        # AWS_IAM (the console signs with SigV4; rooms.ts re-checks the
+        # principal as defence in depth). Not a public surface like boards.
+        ListRooms:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /rooms
+            Method: GET
+        GetRoom:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /rooms/{id}
+            Method: GET
+        CreateRoom:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /rooms
+            Method: POST
+            Auth:
+              Authorizer: AWS_IAM
+        SteerRoom:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /rooms/{id}/turns
+            Method: POST
+            Auth:
+              Authorizer: AWS_IAM
+        ConcludeRoom:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /rooms/{id}/conclude
+            Method: POST
+            Auth:
+              Authorizer: AWS_IAM
+        PatchRoom:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /rooms/{id}
+            Method: PATCH
+            Auth:
+              Authorizer: AWS_IAM
         # adr-0025 — on-demand fire of an already-declared binding. Same
         # posture as CreateFeedPost: no API GW authorizer, because the caller
         # is a CCR session with no SigV4 creds; auth is the per-fire dispatch
@@ -1217,6 +1290,107 @@ Resources:
       Dimensions:
         - Name: FunctionName
           Value: !Ref WfBoardReplyFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  # --- Room debate (adr-0048, proposed) -------------------------------------
+  # The Room twin of wf-messaging-reply: async-invoked by agents-api when the
+  # operator opens, reopens or re-concludes a room. One invocation = one
+  # speaker's turn = one Claude call (persona from AGENT#{slug}/META, the
+  # debate or chair-conclusion contract, the transcript), W-1 guards, the TURN
+  # row via shared/room.ts. It then invokes itself for the next scheduled turn
+  # — the ADR-0047 round hand-off, declared in adr-0048 as its Room twin: the
+  # schedule is fixed when the run starts and `then` only shrinks, so a run is
+  # at most participants × rounds + 1 calls and ends by construction.
+  WfRoomDebateFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-room-debate-${Stage}
+      CodeUri: ../../lambdas/room-debate
+      Handler: handler.handler
+      Description: One agent turn in a purpose-first Room; hands the run to the next speaker (adr-0048).
+      MemorySize: 512
+      # One Claude call (a conclusion is up to 2400 visible + 2048 reasoning
+      # tokens) plus a handful of DDB/S3 ops. Generous ceiling.
+      Timeout: 120
+      Policies:
+        - Statement:
+            - Sid: RoomDebateTableAccess
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource:
+                - !GetAtt WfTable.Arn
+                - !Sub ${WfTable.Arn}/index/*
+            - Sid: RoomDebateBodyReadWrite
+              # Transcript hydration + storing long turns (>preview cap)
+              # before the DDB TURN row. Scoped to rooms/*.
+              Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/rooms/*
+            - Sid: RoomDebateMemoryRead
+              # The speaker's latest rolling memory summary grounds the turn.
+              # Read-only on memory/*; chunks are written by the compactor.
+              Effect: Allow
+              Action: s3:GetObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/memory/*
+            - Sid: RoomDebateAnthropicKey
+              # Same key resolution as messaging-reply (llm-anthropic.ts):
+              # typed-first, legacy bare wf/anthropic fallback. Both granted.
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/_default/anthropic.api_key-*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/anthropic-*
+            - Sid: RoomDebateTurnHandoff
+              # adr-0048 (proposed), after the adr-0047 MessagingReplyRoundHandoff:
+              # after one speaker's turn the Lambda async-invokes itself for
+              # the next turn of the run. Built from the function name, not
+              # !GetAtt, so the policy does not depend on the function it
+              # belongs to.
+              Effect: Allow
+              Action: lambda:InvokeFunction
+              Resource:
+                - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:wf-room-debate-${Stage}
+            - Sid: RoomDebateMetrics
+              Effect: Allow
+              Action: cloudwatch:PutMetricData
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace:
+                    - Workforce/Rooms
+      Tags:
+        workforce: !Ref Stage
+
+  # Any Errors metric on the room debate function publishes to the alarm topic
+  # — a thrown W-1 guard, a missing persona row, the daily turn budget, or a
+  # failed hand-off.
+  WfRoomDebateErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-room-debate-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-room-debate-${Stage} over 5 minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfRoomDebateFunction
       Statistic: Sum
       Period: 300
       EvaluationPeriods: 1

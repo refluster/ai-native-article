@@ -42,6 +42,12 @@
 //   POST   /boards/{id}/posts              guest post; async-invokes wf-board-reply per @-mention (board token)
 //   POST   /boards/{id}/posts/{post_id}/like  like / unlike as the token's nickname (board token)
 //   PATCH  /boards/{id}/posts/{post_id}    operator hide/unhide (AWS_IAM at GW)
+//   GET    /rooms                          purpose-first deliberation rooms, newest first (adr-0048 proposed; ?page_size=&cursor=)
+//   GET    /rooms/{id}                     room + every turn, S3-hydrated; ?after={turn_id} poll tail
+//   POST   /rooms                          create a room; async-invokes wf-room-debate for the first turn (AWS_IAM at GW)
+//   POST   /rooms/{id}/turns               operator steer; reopens a concluded room (AWS_IAM at GW)
+//   POST   /rooms/{id}/conclude            re-dispatch only the chair's conclusion under a new run (AWS_IAM at GW)
+//   PATCH  /rooms/{id}                     {archived?, title?} (AWS_IAM at GW)
 //
 // See workforce/docs/epics/epic-007-agent-management-api.md (agents),
 // workforce/docs/epics/epic-008-skill-repository.md (skills),
@@ -206,6 +212,7 @@ import { claimDispatchSlot, parseDispatchRequest, resolveDispatchTarget, selectD
 import { isValidDispatchToken } from "../shared/dispatch-token.js";
 import { DOCS_HTML, OPENAPI_YAML } from "./openapi.js";
 import { handleBoardsRoute, type BoardReplyDispatch } from "./boards.js";
+import { handleRoomsRoute, type RoomTurnDispatch } from "./rooms.js";
 import { getProjectReportBody, listProjectReports } from "./reports.js";
 import { openExternalPr } from "../shared/external-pr.js";
 import { type GithubSecret } from "../shared/secrets.js";
@@ -406,6 +413,24 @@ export async function handler(
     ) {
       const res = await handleBoardsRoute(routeKey, event, {
         dispatchReply: dispatchBoardReply,
+        isIamAuthenticated,
+      });
+      if (res) return res;
+    }
+
+    // Rooms (adr-0048, proposed). Same posture as /threads: reads public on
+    // the CORS gate, writes AWS_IAM at GW (re-checked in rooms.ts). The
+    // literals stay here because check-openapi-routes.mjs reads this file.
+    if (
+      routeKey === "GET /rooms" ||
+      routeKey === "GET /rooms/{id}" ||
+      routeKey === "POST /rooms" ||
+      routeKey === "POST /rooms/{id}/turns" ||
+      routeKey === "POST /rooms/{id}/conclude" ||
+      routeKey === "PATCH /rooms/{id}"
+    ) {
+      const res = await handleRoomsRoute(routeKey, event, {
+        dispatchTurn: dispatchRoomTurn,
         isIamAuthenticated,
       });
       if (res) return res;
@@ -1701,6 +1726,44 @@ async function dispatchBoardReply(payload: BoardReplyDispatch): Promise<void> {
       Payload: Buffer.from(JSON.stringify(payload)),
     }),
   );
+}
+
+// adr-0048 (proposed): the room writes async-invoke wf-room-debate with the
+// run's head turn and the rest of the schedule in `then`; the Lambda hands
+// the run on itself (the ADR-0047 hand-off). Same async "Event" posture.
+const ROOM_DEBATE_FUNCTION = process.env.ROOM_DEBATE_FUNCTION;
+
+/** Async-invoke wf-room-debate for a run's first turn. Throws on failure —
+ *  the rooms module catches, logs `room_dispatch_failed` and records META
+ *  `last_error` (W-4: the room landed; the stalled run is visible). */
+async function dispatchRoomTurn(payload: RoomTurnDispatch): Promise<void> {
+  try {
+    if (!ROOM_DEBATE_FUNCTION) throw new Error("room_debate_function_unset");
+    await lambda.send(
+      new InvokeCommand({
+        FunctionName: ROOM_DEBATE_FUNCTION,
+        InvocationType: "Event",
+        Payload: Buffer.from(JSON.stringify(payload)),
+      }),
+    );
+  } catch (err) {
+    cw.send(
+      new PutMetricDataCommand({
+        Namespace: "Workforce/Rooms",
+        MetricData: [
+          {
+            MetricName: "WfRoomDispatchFailed",
+            Value: 1,
+            Unit: "Count",
+            Dimensions: [{ Name: "Stage", Value: STAGE }],
+          },
+        ],
+      }),
+    ).catch(() => {
+      /* metric emission is itself best-effort */
+    });
+    throw err;
+  }
 }
 
 /** Start the reply round for one operator message (workforce/adr-0047):
