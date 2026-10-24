@@ -298,8 +298,8 @@ accepted for threads (agents-api `handler.ts` header, PR #132).
   `WF_ROOM_TURN_BUDGET` needs a stated reason, like `WF_MSG_REPLY_BUDGET`.
 - **New IAM and function config.** `wf-room-debate` may invoke itself only
   (`RoomDebateTurnHandoff`) and runs with async retries disabled
-  (`MaximumRetryAttempts: 0`); DDB Get/Query/Put/Update on the table and its
-  indexes; S3 Get/Put on `rooms/*`; S3 Get on `memory/*`; the Anthropic key
+  (`MaximumRetryAttempts: 0`); DDB Get/Query/Put/Update on the base
+  table only (it queries no GSI — the `ROOMS` listing is agents-api's); S3 Get/Put on `rooms/*`; S3 Get on `memory/*`; the Anthropic key
   under both secret names; `cloudwatch:PutMetricData` on `Workforce/Rooms`.
   agents-api gains `lambda:InvokeFunction` on `WfRoomDebateFunction`
   (`AgentsApiInvokeRoomDebate`), S3 Get/Put on `rooms/*`
