@@ -44,6 +44,7 @@
     "workforce:skill-registry:check": "node workforce/scripts/build-skill-registry.mjs --check",
     "workforce:skill-manifest:check": "node workforce/scripts/build-agent-manifest.mjs --check-skills",
     "workforce:openapi-routes": "node workforce/scripts/check-openapi-routes.mjs",
+    "workforce:route-permission-budget": "node workforce/scripts/check-route-permission-budget.mjs",
     "workforce:api-routes": "node workforce/scripts/check-api-routes.mjs",
     "workforce:skill-spec-drift": "node workforce/scripts/check-skill-spec-drift.mjs",
     "workforce:skill-lifecycle": "node workforce/scripts/check-skill-lifecycle.mjs",

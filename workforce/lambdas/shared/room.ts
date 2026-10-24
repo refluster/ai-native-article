@@ -9,7 +9,7 @@
 // construction.
 //
 // Mirrors the posture of shared/messaging.ts and shared/board.ts: the
-// runtime *shape* lives here so the agents-api routes (operator writes) and
+// runtime *shape* lives here so the wf-rooms-api routes (operator writes) and
 // the wf-room-debate Lambda (agent turns) share one trust domain and one
 // row shape. An agent turn is written via `appendTurn`, never through the
 // HTTP route, so a turn can never re-enter the dispatch path (loop safety by
@@ -603,7 +603,7 @@ export async function resolveTurnBody(row: RoomTurnRow): Promise<string> {
 
 /** S3 body reads in flight at once while hydrating a room. A room
  *  reopened many times carries dozens of long turns; serial reads could
- *  outlast the agents-api timeout, an unbounded fan-out would burst S3. */
+ *  outlast the wf-rooms-api timeout, an unbounded fan-out would burst S3. */
 export const ROOM_BODY_FETCH_CONCURRENCY = 8;
 
 /** `Promise.all(items.map(fn))` with at most `limit` calls in flight;

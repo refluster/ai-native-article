@@ -1,4 +1,4 @@
-// Unit tests for agents-api/rooms.ts (Rooms v1, workforce/adr-0048 proposed)
+// Unit tests for rooms-api/routes.ts (Rooms v1, workforce/adr-0048 proposed)
 // — the six routes end to end through the REAL shared/room.ts (validation,
 // schedule, row shapes, conditional META patches) over an in-memory fake of
 // the single table + S3. Pins: create → META + opening turn + the first
@@ -129,7 +129,7 @@ vi.mock("@aws-sdk/client-s3", () => ({
   },
 }));
 
-import { handleRoomsRoute, type RoomsDeps } from "./rooms.js";
+import { handleRoomsRoute, type RoomsDeps } from "./routes.js";
 import type { RoomTurnDispatch } from "../shared/room.js";
 
 // --- Fixtures -----------------------------------------------------------

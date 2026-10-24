@@ -9,8 +9,14 @@
 // hand, mechanised — the memory→lint ratchet (governance §6.1) applied to a
 // once-observed gap.
 //
-// Method: extract `routeKey === "METHOD /path"` literals from handler.ts and
-// `path:` × method keys from the OPENAPI_YAML block, normalise, diff. Any
+// Method: extract `routeKey === "METHOD /path"` literals from every handler
+// behind the one HTTP API (WfAgentsHttpApi) and union them, then diff against
+// the `path:` × method keys of the OPENAPI_YAML block. Since the Rooms split
+// (deploy run 40126740456: wf-agents-api hit Lambda's 20 KB resource-policy
+// cap) that is TWO handlers — agents-api/handler.ts and rooms-api/handler.ts
+// — documented by ONE spec, because the API is one API. A new function that
+// takes routes on WfAgentsHttpApi joins HANDLERS below; its route literals
+// must appear verbatim as `routeKey === "…"` in its handler.ts. Any
 // route live-but-undocumented OR documented-but-dead is a hard failure
 // (C-4: fail loud). The two `/docs/*` routes ARE in both (the spec
 // documents itself).
@@ -24,19 +30,29 @@ import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..", "..");
-const HANDLER = join(ROOT, "workforce", "lambdas", "agents-api", "handler.ts");
+const HANDLERS = [
+  join(ROOT, "workforce", "lambdas", "agents-api", "handler.ts"),
+  join(ROOT, "workforce", "lambdas", "rooms-api", "handler.ts"),
+];
 const OPENAPI = join(ROOT, "workforce", "lambdas", "agents-api", "openapi.ts");
 
 const METHODS = new Set(["get", "post", "put", "patch", "delete"]);
 
-/** Routes the handler actually dispatches: `routeKey === "METHOD /path"`. */
+/** Routes the handlers actually dispatch: `routeKey === "METHOD /path"`,
+ *  unioned across HANDLERS. A handler with no literals is a hard failure —
+ *  a moved or renamed file must not shrink the set silently (C-4). */
 function handlerRoutes() {
-  const src = readFileSync(HANDLER, "utf8");
   const out = new Set();
-  const re = /routeKey === "([A-Z]+) ([^"]+)"/g;
-  let m;
-  while ((m = re.exec(src)) !== null) {
-    out.add(`${m[1].toLowerCase()} ${m[2]}`);
+  for (const file of HANDLERS) {
+    const src = readFileSync(file, "utf8");
+    const re = /routeKey === "([A-Z]+) ([^"]+)"/g;
+    let m;
+    let n = 0;
+    while ((m = re.exec(src)) !== null) {
+      out.add(`${m[1].toLowerCase()} ${m[2]}`);
+      n++;
+    }
+    if (n === 0) throw new Error(`check-openapi-routes: no routeKey literals in ${file}`);
   }
   return out;
 }
@@ -72,12 +88,12 @@ const undocumented = [...handler].filter((r) => !spec.has(r)).sort();
 const dead = [...spec].filter((r) => !handler.has(r)).sort();
 
 if (undocumented.length === 0 && dead.length === 0) {
-  console.log(`check-openapi-routes.mjs: OK (${handler.size} routes, spec↔handler in sync)`);
+  console.log(`check-openapi-routes.mjs: OK (${handler.size} routes across ${HANDLERS.length} handlers, spec↔handler in sync)`);
   process.exit(0);
 }
 
 console.error("check-openapi-routes.mjs: spec↔handler drift");
 for (const r of undocumented) console.error(`  live but UNDOCUMENTED in openapi.ts:  ${r}`);
 for (const r of dead) console.error(`  documented but NO handler route:       ${r}`);
-console.error("Fix: update workforce/lambdas/agents-api/openapi.ts to match the handler routeKey dispatch.");
+console.error("Fix: update workforce/lambdas/agents-api/openapi.ts to match the routeKey dispatch of agents-api/ + rooms-api/ handler.ts.");
 process.exit(1);

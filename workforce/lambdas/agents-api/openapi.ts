@@ -50,6 +50,7 @@ tags:
   - name: threads
   - name: boards
   - name: rooms
+    description: Purpose-first deliberation rooms (adr-0048). These routes are served by the wf-rooms-api Lambda behind this same HTTP API — not by wf-agents-api, whose resource policy is at Lambda's 20 KB cap — and are documented here because this spec covers the one API.
   - name: meta
 components:
   securitySchemes:
