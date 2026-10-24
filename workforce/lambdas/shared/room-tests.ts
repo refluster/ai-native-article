@@ -57,7 +57,7 @@ import {
   createRoom,
   listRoomTurns,
   listRooms,
-  maxDebateRound,
+  maxAgentRound,
   parsePosition,
   toDispatch,
   toRoomSummaryView,
@@ -161,16 +161,28 @@ describe("buildSchedule", () => {
     });
   });
 
-  it("maxDebateRound counts statements only", () => {
-    expect(maxDebateRound([])).toBe(0);
+  it("maxAgentRound counts statements AND conclusions (never operator turns)", () => {
+    expect(maxAgentRound([])).toBe(0);
+    expect(maxAgentRound([{ kind: "opening", round: 0 }, { kind: "steer", round: 0 }])).toBe(0);
     expect(
-      maxDebateRound([
+      maxAgentRound([
         { kind: "opening", round: 0 },
         { kind: "statement", round: 2 },
         { kind: "conclusion", round: 3 },
         { kind: "steer", round: 0 },
       ]),
-    ).toBe(2);
+    ).toBe(3);
+  });
+
+  it("round numbers never collide across runs (3 × 2 room → reopen → conclude-now)", () => {
+    const slugs = ["maya", "dario", "ren"];
+    const run1 = buildSchedule(slugs, 2, "dario");
+    expect(run1.at(-1)).toEqual({ speaker: "dario", round: 3, kind: "conclusion" });
+    const run2 = buildSchedule(slugs, 1, "dario", maxAgentRound(run1) + 1);
+    expect(run2.filter((s) => s.kind === "statement").map((s) => s.round)).toEqual([4, 4, 4]);
+    expect(run2.at(-1)).toEqual({ speaker: "dario", round: 5, kind: "conclusion" });
+    const run3 = buildSchedule(slugs, 0, "dario", maxAgentRound([...run1, ...run2]) + 1);
+    expect(run3).toEqual([{ speaker: "dario", round: 6, kind: "conclusion" }]);
   });
 });
 

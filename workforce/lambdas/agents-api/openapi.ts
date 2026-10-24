@@ -428,6 +428,56 @@ components:
       properties:
         archived: { type: boolean, description: 'Archived rooms stay readable; steer/conclude 409 room_archived.' }
         title: { type: string, maxLength: 120 }
+    RoomSummary:
+      type: object
+      description: One room in GET /rooms (newest first).
+      required: [room_id, title, question, status, participants, chair, rounds, run_count, created_at, last_turn_at, turn_count]
+      properties:
+        room_id: { type: string, description: ULID. }
+        title: { type: string }
+        question: { type: string }
+        status: { type: string, enum: [debating, concluded], description: 'debating while any run is in flight (including a conclude-now run); concluded once the chair''s conclusion for the current run lands.' }
+        participants: { type: array, items: { type: string } }
+        chair: { type: string }
+        rounds: { type: integer, description: Debate rounds per run as chosen at creation (1..3). The current run's shape is run_start_round / run_rounds. }
+        run_count: { type: integer, description: 'Number of schedule runs: 1 at creation, +1 per reopen (a steer on a concluded room) and per conclude-now.' }
+        created_at: { type: string }
+        last_turn_at: { type: string }
+        turn_count: { type: integer, description: All turns, operator turns included. }
+        conclusion_preview: { type: string, description: 'First 320 chars of the latest conclusion.' }
+        archived: { type: boolean }
+    RoomView:
+      description: GET /rooms/{id} and PATCH /rooms/{id} — the summary plus the current run.
+      allOf:
+        - { $ref: '#/components/schemas/RoomSummary' }
+        - type: object
+          required: [run_id]
+          properties:
+            context: { type: string }
+            run_id: { type: string, description: 'ULID of the current/last run; turns of older runs carry their own run_id.' }
+            run_start_round:
+              type: integer
+              description: >
+                First round of the current run: 1 on the first run; on a reopen or
+                conclude-now, the round after every earlier agent turn (statements and
+                conclusions), so round numbers never repeat across runs. For a
+                conclude-only run it is the conclusion's round.
+            run_rounds: { type: integer, description: 'Debate rounds in the current run: rounds on the first run, 1 on a reopen, 0 on a conclude-now (conclusion only). The run''s conclusion is at run_start_round + run_rounds.' }
+            conclusion_turn_id: { type: string }
+            last_error: { type: string, description: 'Last dispatch / turn / hand-off failure of the current run (W-4: shown as a banner; cleared when a new run starts).' }
+    TurnView:
+      type: object
+      required: [turn_id, room_id, run_id, round, kind, from, at, body]
+      properties:
+        turn_id: { type: string, description: ULID (time-ordered). }
+        room_id: { type: string }
+        run_id: { type: string }
+        round: { type: integer, description: '0 = operator (opening / steer); statements and conclusions are numbered across runs without reuse.' }
+        kind: { type: string, enum: [opening, statement, steer, conclusion] }
+        from: { type: string, description: 'Agent slug, or "operator".' }
+        at: { type: string }
+        position: { type: string, maxLength: 140, description: 'Statements only — the one-line stance from the model''s POSITION line (absent when not emitted).' }
+        body: { type: string, description: Full body (S3-hydrated when long). Conclusions are Markdown. }
     FeedPost:
       type: object
       properties:
@@ -1007,7 +1057,15 @@ paths:
         - { $ref: '#/components/parameters/pageSize' }
         - { name: cursor, in: query, required: false, schema: { type: string }, description: 'Opaque cursor from the previous page''s cursor.' }
       responses:
-        "200": { description: 'OK — { rooms: RoomSummary[], cursor? }' }
+        "200":
+          description: 'OK — { rooms: RoomSummary[], cursor? }'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rooms: { type: array, items: { $ref: '#/components/schemas/RoomSummary' } }
+                  cursor: { type: string }
         "400": { description: invalid_cursor }
     post:
       tags: [rooms]
@@ -1036,7 +1094,15 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string } }
         - { name: after, in: query, required: false, schema: { type: string }, description: 'Return only turns newer than this turn id (the console poll). The room is still returned.' }
       responses:
-        "200": { description: 'OK — { room: RoomView, turns: TurnView[] }' }
+        "200":
+          description: 'OK — { room: RoomView, turns: TurnView[] } (turns chronological)'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  room: { $ref: '#/components/schemas/RoomView' }
+                  turns: { type: array, items: { $ref: '#/components/schemas/TurnView' } }
         "400": { description: 'invalid_room_id / invalid_after' }
         "404": { description: not_found }
     patch:
@@ -1050,7 +1116,14 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/RoomPatch' }
       responses:
-        "200": { description: 'OK — { room: RoomView }' }
+        "200":
+          description: 'OK — { room: RoomView }'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  room: { $ref: '#/components/schemas/RoomView' }
         "400": { description: 'invalid_json / invalid_archived / invalid_title / invalid_patch' }
         "403": { description: forbidden }
         "404": { description: not_found }
@@ -1076,8 +1149,10 @@ paths:
       tags: [rooms]
       summary: Re-dispatch only the chair's conclusion under a new run (no request body)
       description: >
-        For a conclusion that failed, to cut a debate short, or to rewrite an
-        existing conclusion. The new run supersedes any turns still in flight.
+        For a conclusion that failed, a stalled run, to cut a debate short, or to
+        rewrite an existing conclusion. Starts a new run (run_count +1, run_rounds 0,
+        run_start_round = the round after every earlier agent turn) that supersedes
+        any turns still in flight.
       security: [{ sigv4: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       responses:

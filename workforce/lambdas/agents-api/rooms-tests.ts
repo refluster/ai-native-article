@@ -398,7 +398,9 @@ describe("POST /rooms/{id}/turns (steer)", () => {
     expect(r).toMatchObject({ statusCode: 201, body: { reopened: true } });
     const m = meta(id);
     expect(m.run_id).not.toBe(firstRun);
-    expect(m).toMatchObject({ status: "debating", run_count: 2, run_start_round: 2, run_rounds: 1 });
+    // The old conclusion sat at round 2, so the reopened round is 3 (never a
+    // reused round number).
+    expect(m).toMatchObject({ status: "debating", run_count: 2, run_start_round: 3, run_rounds: 1 });
     expect(m.last_error).toBeUndefined();
     const steer = turnRows(id).find((t) => t.turn_id === r.body.turn_id)!;
     expect(steer).toMatchObject({ kind: "steer", round: 0, run_id: m.run_id });
@@ -407,14 +409,40 @@ describe("POST /rooms/{id}/turns (steer)", () => {
       room_id: id,
       run_id: m.run_id,
       speaker: "maya",
-      round: 2,
+      round: 3,
       kind: "statement",
       then: [
-        { speaker: "dario", round: 2, kind: "statement" },
-        { speaker: "ren", round: 2, kind: "statement" },
-        { speaker: "dario", round: 3, kind: "conclusion" },
+        { speaker: "dario", round: 3, kind: "statement" },
+        { speaker: "ren", round: 3, kind: "statement" },
+        { speaker: "dario", round: 4, kind: "conclusion" },
       ],
     });
+  });
+
+  it("a 3 × 2 room: conclusion round 3 → reopen statements round 4 + conclusion 5 → conclude-now round 6", async () => {
+    const id = await createRoom(); // 3 participants × 2 rounds, chair dario
+    let n = 0;
+    const tid = () => `01J9${String(++n).padStart(22, "0")}`;
+    for (const round of [1, 2]) for (const from of ["maya", "dario", "ren"]) agentTurn(id, tid(), { from, round });
+    agentTurn(id, tid(), { from: "dario", round: 3, kind: "conclusion" });
+    table.get(key(`ROOM#${id}`, "META"))!.status = "concluded";
+    dispatchTurn.mockClear();
+
+    await call("POST /rooms/{id}/turns", { id, body: { body: "And the cost?" } });
+    const reopen = dispatchTurn.mock.calls[0]![0] as RoomTurnDispatch;
+    expect(meta(id)).toMatchObject({ run_start_round: 4, run_rounds: 1 });
+    expect([reopen, ...reopen.then].map((s) => `${s.kind}:${s.round}`)).toEqual([
+      "statement:4", "statement:4", "statement:4", "conclusion:5",
+    ]);
+
+    // The reopened run lands, including its conclusion at round 5.
+    for (const from of ["maya", "dario", "ren"]) agentTurn(id, tid(), { from, round: 4 });
+    agentTurn(id, tid(), { from: "dario", round: 5, kind: "conclusion" });
+    dispatchTurn.mockClear();
+
+    await call("POST /rooms/{id}/conclude", { id });
+    expect(dispatchTurn.mock.calls[0]![0]).toMatchObject({ speaker: "dario", round: 6, kind: "conclusion", then: [] });
+    expect(meta(id)).toMatchObject({ run_start_round: 6, run_rounds: 0, run_count: 3 });
   });
 
   it("400s an empty / over-cap body, 409s an archived room", async () => {

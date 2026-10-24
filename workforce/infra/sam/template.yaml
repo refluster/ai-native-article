@@ -1321,6 +1321,13 @@ Resources:
       # One Claude call (a conclusion is up to 2400 visible + 2048 reasoning
       # tokens) plus a handful of DDB/S3 ops. Generous ceiling.
       Timeout: 120
+      # No async retries. Every invocation passes the baton in its `finally`,
+      # so a retried throw would hand the run on a second (and third) time and
+      # fork the chain down the rest of the schedule — and re-charge the Claude
+      # call. Fail once, loudly (WfRoomDebateErrorsAlarm + META last_error);
+      # the operator recovers a stalled room with "Conclude now".
+      EventInvokeConfig:
+        MaximumRetryAttempts: 0
       Policies:
         - Statement:
             - Sid: RoomDebateTableAccess

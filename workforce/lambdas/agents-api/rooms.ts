@@ -42,7 +42,7 @@ import {
   listRoomTurns,
   listRoomTurnsAfter,
   listRooms,
-  maxDebateRound,
+  maxAgentRound,
   toDispatch,
   toRoomSummaryView,
   toRoomView,
@@ -205,7 +205,8 @@ async function createRoomRoute(event: APIGatewayProxyEventV2, deps: RoomsDeps): 
  * Operator steer. While debating it is just a turn in the transcript — the
  * speakers still to come read it (no dispatch, the run is already moving).
  * On a concluded room it REOPENS: a new run of one more round each, from
- * the round after the existing statements, plus a fresh conclusion.
+ * the round after every earlier agent turn (the old conclusion included),
+ * plus a fresh conclusion.
  */
 async function steerRoute(
   meta: RoomMetaRow,
@@ -233,7 +234,7 @@ async function steerRoute(
     return reply(201, { turn_id: out.view.turn_id, reopened: false });
   }
 
-  const startRound = maxDebateRound(await listRoomTurnRows(meta.room_id)) + 1;
+  const startRound = maxAgentRound(await listRoomTurnRows(meta.room_id)) + 1;
   const runId = newUlid();
   const out = await appendTurn({
     room_id: meta.room_id,
@@ -259,7 +260,7 @@ async function steerRoute(
  * `debating` until the conclusion lands, so the console keeps polling.
  */
 async function concludeRoute(meta: RoomMetaRow, deps: RoomsDeps): Promise<APIGatewayProxyResultV2> {
-  const round = maxDebateRound(await listRoomTurnRows(meta.room_id)) + 1;
+  const round = maxAgentRound(await listRoomTurnRows(meta.room_id)) + 1;
   const runId = newUlid();
   await updateRoomMeta(
     meta.room_id,

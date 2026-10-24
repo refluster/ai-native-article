@@ -114,10 +114,10 @@ export interface RoomMetaRow {
   rounds: number;
   /** ULID of the current/last schedule run. */
   run_id: string;
-  /** Number of runs (start = 1; every reopen / re-conclude +1). */
+  /** Number of runs (start = 1; +1 per reopen and per conclude-now). */
   run_count: number;
-  /** First debate round of the current run (1 on the first run; the next
-   *  round after the existing statements on a reopen). For a
+  /** First debate round of the current run (1 on the first run; the round
+   *  after every earlier agent turn on a reopen). For a
    *  conclusion-only run it is the conclusion's round. */
   run_start_round?: number;
   /** Debate rounds in the current run (`rounds` on the first run, 1 on a
@@ -269,10 +269,15 @@ export function toDispatch(
   return { room_id: roomId, run_id: runId, speaker: head.speaker, round: head.round, kind: head.kind, then };
 }
 
-/** Highest debate (statement) round among the given turns; 0 when none. */
-export function maxDebateRound(turns: ReadonlyArray<Pick<RoomTurnRow, "kind" | "round">>): number {
+/** Highest round any agent has spoken in (statements AND conclusions); 0
+ *  when none. A reopen / conclude-now starts at the round after it, so no
+ *  new turn ever shares a round number with an earlier one — a conclusion
+ *  at round 3 is followed by reopened statements at round 4, not 3. */
+export function maxAgentRound(turns: ReadonlyArray<Pick<RoomTurnRow, "kind" | "round">>): number {
   let max = 0;
-  for (const t of turns) if (t.kind === "statement" && t.round > max) max = t.round;
+  for (const t of turns) {
+    if ((t.kind === "statement" || t.kind === "conclusion") && t.round > max) max = t.round;
+  }
   return max;
 }
 

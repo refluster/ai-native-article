@@ -29,6 +29,12 @@
 // reopen or re-conclude mints a new `run_id`, and every older event drops out
 // at the `superseded` guard (and stops passing its baton). A per-room daily
 // turn budget is the backstop.
+//
+// No async retries (`MaximumRetryAttempts: 0` on WfRoomDebateFunction). The
+// baton is passed in a `finally`, so a retried invocation would hand the run
+// on again and fork the chain. A failed turn throws once (alarm + META
+// `last_error`) while the run continues; a failed hand-off is a stalled room
+// the operator recovers with "Conclude now" — never a retry.
 
 import { CloudWatchClient, PutMetricDataCommand } from "@aws-sdk/client-cloudwatch";
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
@@ -314,8 +320,9 @@ function buildTranscript(turns: readonly TurnView[], selfSlug: string): string {
 }
 
 /** Hand the run to the next scheduled speaker. Throws on failure (W-4): the
- *  Lambda then errors, its async retry finds this turn already spoken (the
- *  `already_spoke` skip) and tries the hand-off again. */
+ *  Lambda errors (alarm + META `last_error`) and the run stalls there — async
+ *  retries are off, so the operator recovers it with "Conclude now". The
+ *  `already_spoke` skip still passes the baton, for a duplicate invoke. */
 async function passTurn(event: RoomDebateEvent): Promise<void> {
   const [next, ...rest] = event.then ?? [];
   if (!next || !event.room_id || !event.run_id) return;
@@ -372,8 +379,19 @@ export async function handler(event: RoomDebateEvent): Promise<RoomDebateResult>
     throw err;
   } finally {
     // Also on a throw: one member's failed turn must not silence the rest of
-    // the run. A superseded run stops — the newer run covers everyone.
-    if (result?.reason !== "superseded") await passTurn(event);
+    // the run. A superseded run stops — the newer run covers everyone — and
+    // so does an archived room: walking the rest of the schedule as no-ops
+    // would only spend invocations.
+    if (result?.reason !== "superseded" && result?.reason !== "archived") {
+      try {
+        await passTurn(event);
+      } catch (err) {
+        // With retries off, a lost hand-off stalls the room: put it on META
+        // so the console shows it and offers "Conclude now".
+        await recordError(event, new Error(`hand-off failed: ${err instanceof Error ? err.message : String(err)}`));
+        throw err;
+      }
+    }
   }
 }
 
@@ -416,7 +434,7 @@ async function speakOnce(event: RoomDebateEvent): Promise<RoomDebateResult> {
   // 2. A reopen / re-conclude minted a newer run: this one stops here.
   if (meta.run_id !== run_id) return skip("superseded");
 
-  // 3. Duplicate / retried invoke: this speaker already took this turn.
+  // 3. Duplicate invoke: this speaker already took this turn.
   const turns = await listRoomTurns(room_id);
   const spoke = turns.some(
     (t) => t.run_id === run_id && t.round === round && t.kind === kind && t.from === speaker,

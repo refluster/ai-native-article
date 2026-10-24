@@ -266,7 +266,7 @@ describe("run guards", () => {
     expect(metrics).toContain("WfRoomTurnSkipped{Reason=superseded}");
   });
 
-  it("already_spoke (retried invoke): skips but keeps the run going", async () => {
+  it("already_spoke (duplicate invoke): skips but keeps the run going", async () => {
     listRoomTurns.mockResolvedValueOnce([turn({}), turn({ turn_id: "01J00000000000000000000011", from: "maya", round: 1, kind: "statement", body: "Already said." })]);
     const res = await handler(EVENT);
     expect(res).toEqual({ status: "skipped", reason: "already_spoke" });
@@ -280,11 +280,12 @@ describe("run guards", () => {
     expect((await handler({ ...EVENT, then: [] })).status).toBe("ok");
   });
 
-  it("archived room: skips (and the bounded run walks on as no-ops)", async () => {
+  it("archived room: skips AND stops the chain (no self-invoke), like superseded", async () => {
     META.archived = true;
     expect(await handler(EVENT)).toEqual({ status: "skipped", reason: "archived" });
     expect(complete).not.toHaveBeenCalled();
-    expect(lambdaSend).toHaveBeenCalledTimes(1);
+    expect(lambdaSend).not.toHaveBeenCalled();
+    expect(metrics).toContain("WfRoomTurnSkipped{Reason=archived}");
   });
 
   it("throws when the room META is missing (and still hands off)", async () => {
@@ -349,11 +350,15 @@ describe("a failed turn still passes the baton (W-4: throw, metric, room continu
     expect(lambdaSend).toHaveBeenCalledTimes(1);
   });
 
-  it("a hand-off failure throws (so the async retry re-tries it) and is counted", async () => {
+  it("a hand-off failure throws, is counted, and lands on META last_error (retries are off: the room stalls visibly)", async () => {
     complete.mockResolvedValueOnce(completion("POSITION: Ship.\nYes."));
     lambdaSend.mockRejectedValueOnce(new Error("throttled"));
     await expect(handler(EVENT)).rejects.toThrow(/throttled/);
     expect(metrics).toContain("WfRoomHandoffFailed");
+    // [0] is the turn's own META bump; [1] is the stalled-run marker.
+    const patch = metaUpdates()[1]!;
+    expect(patch.ExpressionAttributeValues).toMatchObject({ ":if_run_id": RUN });
+    expect(String((patch.ExpressionAttributeValues as Record<string, string>)[":last_error"])).toMatch(/hand-off failed: throttled/);
   });
 });
 
