@@ -126,6 +126,14 @@ threads (`MessagingReplyRoundHandoff`), with the same three properties:
   `run_id` + `round` + `kind` skips with `already_spoke` and, like `superseded`, stops the chain — the
   delivery that wrote the turn already passed the baton, so passing it again
   would fork the run.
+- **Atomic slot claim.** A transcript read followed by a write is
+  check-then-act across a 10–90 s Claude call, and Lambda async delivery is
+  at-least-once, so two overlapping copies of one event could both speak
+  and both pass the baton. Before the call the Lambda therefore writes
+  `ROOM#{id}/CLAIM#{run_id}#{round}#{kind}#{speaker}` with
+  `attribute_not_exists(sk)`; the copy that loses the condition skips as
+  `already_spoke` and stops its chain. The deterministic key is what makes
+  the bound exact rather than probable (cycle-1 review of the code PR).
 - **No automatic retries.** The function sets `EventInvokeConfig:
   MaximumRetryAttempts: 0` (as `WfLessonDistillerFunction` does). Lambda's
   default two async retries would re-run the hand-off of every failed slot
