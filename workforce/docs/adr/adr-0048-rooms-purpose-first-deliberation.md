@@ -80,7 +80,7 @@ whose every consumer (inbox list, unread counter, reply Lambda) assumes
 there is none. Same reasoning as adr-0034 §1 for boards: a different
 object, not a variant.
 
-Routes (`agents-api/rooms.ts`, exporting `handleRoomsRoute(routeKey, event,
+Routes (`rooms-api/routes.ts`, served by `wf-rooms-api`, exporting `handleRoomsRoute(routeKey, event,
 deps)` — the `boards.ts` pattern — wired from `handler.ts`, where the route
 literals must appear for `check-openapi-routes.mjs`, and documented in
 `openapi.ts`):
@@ -346,7 +346,7 @@ accepted for threads (agents-api `handler.ts` header, PR #132).
 - **Zone classification of every new path.** Zone B (code PR, merge-eligible
   under [docs/governance.md §4.4](../../../docs/governance.md)):
   `workforce/lambdas/room-debate/**`, `workforce/lambdas/shared/room.ts` (+
-  tests), `workforce/lambdas/agents-api/rooms.ts` and its `handler.ts` /
+  tests), `workforce/lambdas/rooms-api/routes.ts` and its `handler.ts` /
   `openapi.ts` wiring, `workforce/infra/sam/template.yaml` (one new
   function, alarm and routes; no cost-envelope or schedule change),
   `workforce/app/src/lib/rooms.ts`, `pages/Rooms.tsx`, `pages/Room.tsx`, the
@@ -394,7 +394,7 @@ accepted for threads (agents-api `handler.ts` header, PR #132).
 - `workforce/docs/design/rooms-v1.md` — the purpose-first thesis and what v1
   leaves out.
 - Implementation: `workforce/lambdas/shared/room.ts` (`buildSchedule`,
-  `appendTurn`, caps), `workforce/lambdas/agents-api/rooms.ts`,
+  `appendTurn`, caps), `workforce/lambdas/rooms-api/routes.ts`,
   `workforce/lambdas/room-debate/handler.ts` (`speakOnce`, `passTurn`),
   `workforce/app/src/pages/Rooms.tsx`, `workforce/app/src/pages/Room.tsx`,
   `workforce/infra/sam/template.yaml` (`WfRoomDebateFunction`,
