@@ -50,6 +50,7 @@ import {
   getRoomMeta,
   listRoomTurns,
   parsePosition,
+  questionLanguage,
   updateRoomMeta,
   type RoomMetaRow,
   type RoomTurnDispatch,
@@ -115,17 +116,20 @@ const STATEMENT_CONTRACT = [
   "",
   "Write your turn for this round:",
   "- The FIRST line must be exactly `POSITION: <one sentence>` — your stance on the",
-  "  question right now.",
-  "- Then two to four short paragraphs of flowing prose. No headers, no bullet",
-  "  lists, no greeting, no sign-off.",
+  "  question right now, at most 140 characters. Keep the label `POSITION:` in",
+  "  English whatever language you write in.",
+  "- Then two to four short paragraphs of flowing prose (about 300 words, or 800",
+  "  Japanese characters, at most). No headers, no bullet lists, no greeting, no",
+  "  sign-off.",
   "- Take a clear position from your own role and your own record. Ground it in",
   "  what you actually know; never invent facts to fill the space.",
-  "- Engage the colleagues who have spoken BY NAME: agree or disagree with",
-  "  specifics, answer any question put to you.",
+  "- Engage the colleagues who have spoken BY NAME (their name from the member",
+  "  list, not their slug): agree or disagree with specifics, answer any question",
+  "  put to you.",
   "- In the opening round, state your opening position. In later rounds, respond:",
   "  refine, concede a point that was well made, or hold your ground and say why.",
   "- Never restate what a colleague already said, and never speak for another member.",
-  "- Write in the language of the question (Japanese or English).",
+  "- Write in the language of the question, as stated below.",
   "- A steer from the Operator is a direction to follow from that point on.",
   "",
   `Every summoned member speaks in a room: never output ${NO_REPLY_TOKEN}.`,
@@ -137,17 +141,19 @@ const CONCLUSION_CONTRACT = [
   "convened it; `You` are your own past turns; colleagues are labelled by slug).",
   "",
   "Write the room's conclusion — neutral and specific, faithful to what was",
-  "actually argued, in the language of the question. Use exactly these Markdown",
-  "sections, Japanese headings when the question is Japanese, English otherwise:",
+  "actually argued, in the language of the question. Use exactly these five",
+  "Markdown sections, in this order — the Japanese set when the question is",
+  "Japanese, the English set otherwise, never both:",
   "",
   "  ## 結論            / ## Conclusion",
   "  ## 合意点          / ## Where we agree",
   "  ## 対立点          / ## Where we differ   (name who holds which view)",
-  "  ## 推奨アクション  / ## Recommended action",
+  "  ## 推奨アクション  / ## Recommended action   (who should do what next)",
   "  ## 未解決の論点    / ## Open questions",
   "",
-  "Bullets are allowed inside the sections. Do not write a `POSITION:` line, a",
-  "preamble or a sign-off. At most ~900 words (stay under 5,500 characters).",
+  "Start with the first heading. Bullets are allowed inside the sections. Do not",
+  "write a `POSITION:` line, a preamble or a sign-off. At most ~900 words (about",
+  "2,500 characters in Japanese).",
   "Where the room genuinely did not agree, say so — do not manufacture consensus.",
 ].join("\n");
 
@@ -274,8 +280,14 @@ function roleBlock(event: RoomDebateEvent, meta: RoomMetaRow, roster: readonly R
     members,
     "",
   ];
+  const ja = questionLanguage(meta.question) === "ja";
   if (event.kind === "conclusion") {
     lines.push("The debate rounds are over. You are writing the conclusion as the chair.");
+    lines.push(
+      ja
+        ? "The question is in Japanese: write the conclusion in Japanese, under the Japanese headings (## 結論 … ## 未解決の論点)."
+        : "The question is in English: write the conclusion in English, under the English headings (## Conclusion … ## Open questions).",
+    );
   } else {
     const last = lastDebateRound(meta);
     lines.push(`This is round ${event.round} of ${last}.`);
@@ -283,6 +295,14 @@ function roleBlock(event: RoomDebateEvent, meta: RoomMetaRow, roster: readonly R
     else if ((meta.run_start_round ?? 1) > 1 && event.round === meta.run_start_round) {
       lines.push("The operator reopened the room with a follow-up: answer it, and say whether it changes your position.");
     } else lines.push("Respond to the round before: refine, concede or hold.");
+    if (event.round === last) {
+      lines.push("This is the last round before the chair concludes: say plainly what you would accept as the room's answer.");
+    }
+    lines.push(
+      ja
+        ? "The question is in Japanese: write this turn in Japanese (keep the `POSITION:` label as is)."
+        : "The question is in English: write this turn in English.",
+    );
   }
   return lines.join("\n");
 }
@@ -321,8 +341,7 @@ function buildTranscript(turns: readonly TurnView[], selfSlug: string): string {
 
 /** Hand the run to the next scheduled speaker. Throws on failure (W-4): the
  *  Lambda errors (alarm + META `last_error`) and the run stalls there — async
- *  retries are off, so the operator recovers it with "Conclude now". The
- *  `already_spoke` skip still passes the baton, for a duplicate invoke. */
+ *  retries are off, so the operator recovers it with "Conclude now". */
 async function passTurn(event: RoomDebateEvent): Promise<void> {
   const [next, ...rest] = event.then ?? [];
   if (!next || !event.room_id || !event.run_id) return;
@@ -381,8 +400,11 @@ export async function handler(event: RoomDebateEvent): Promise<RoomDebateResult>
     // Also on a throw: one member's failed turn must not silence the rest of
     // the run. A superseded run stops — the newer run covers everyone — and
     // so does an archived room: walking the rest of the schedule as no-ops
-    // would only spend invocations.
-    if (result?.reason !== "superseded" && result?.reason !== "archived") {
+    // would only spend invocations. `already_spoke` stops too: the copy that
+    // wrote the turn already passed the baton, so passing it again (retries
+    // are off — this is a duplicate delivery) would invoke the next speaker
+    // twice and fork the run past participants × rounds + 1.
+    if (!result?.reason || !CHAIN_STOPS.has(result.reason)) {
       try {
         await passTurn(event);
       } catch (err) {
@@ -394,6 +416,9 @@ export async function handler(event: RoomDebateEvent): Promise<RoomDebateResult>
     }
   }
 }
+
+/** Skip reasons that end the chain instead of passing the baton. */
+const CHAIN_STOPS: ReadonlySet<string> = new Set(["superseded", "archived", "already_spoke"]);
 
 function skip(reason: string): RoomDebateResult {
   emitMetric("WfRoomTurnSkipped", { Reason: reason });
@@ -429,7 +454,14 @@ async function speakOnce(event: RoomDebateEvent): Promise<RoomDebateResult> {
   // 1. The room exists (throw — a dispatch to nowhere is a bug) and is live.
   const meta = await getRoomMeta(room_id);
   if (!meta) throw new Error(`room-debate: room ${room_id} not found`);
-  if (meta.archived) return skip("archived");
+  if (meta.archived) {
+    // The chain stops here, so a still-debating room would read
+    // "Deliberating" forever once unarchived: say why on META (W-4).
+    if (meta.status === "debating" && meta.run_id === run_id) {
+      await recordError(event, new Error("run stopped: the room was archived mid-run — unarchive, then Conclude now"));
+    }
+    return skip("archived");
+  }
 
   // 2. A reopen / re-conclude minted a newer run: this one stops here.
   if (meta.run_id !== run_id) return skip("superseded");

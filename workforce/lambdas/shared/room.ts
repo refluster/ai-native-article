@@ -55,10 +55,20 @@ function tableName(): string {
 
 // --- Caps + constants ----------------------------------------------------
 
-/** Hard cap on one turn body. An operator steer or an agent statement of
- *  two–four paragraphs fits comfortably; a chair's five-section conclusion
- *  (~900 words) is the longest legitimate turn. */
+/** Hard cap on an operator turn body (the opening question, a steer) —
+ *  what `POST /rooms/{id}/turns` accepts and the console composer allows. */
 export const ROOM_TURN_HARD_MAX_CHARS = 6000;
+
+/** Sanity cap on an AGENT turn body (statement / conclusion). It must sit
+ *  above anything a complete reply can be: `complete()` throws on
+ *  `max_tokens`, so a reply that reaches here is at most the wire cap — a
+ *  conclusion's 2400 visible + 2048 reasoning-headroom tokens = 4448 —
+ *  i.e. ≈ 18–20k chars of English prose (≈ 4.5 chars/token; Japanese is
+ *  ~1–1.5 chars/token, far below). At 6000 an over-long but complete
+ *  English conclusion was rejected after the call was paid for, leaving
+ *  the room without one. The length itself is the prompt's job (~900
+ *  words); this only refuses a runaway. */
+export const ROOM_AGENT_TURN_MAX_CHARS = 20000;
 
 /** Inline preview cap — a body at or under this is fully contained in
  *  `body_preview` and needs no S3 round-trip (same split as MSG / POST rows). */
@@ -381,20 +391,33 @@ export function validateRoomCreate(body: Record<string, unknown>): RoomValidatio
   };
 }
 
-/** Trim + validate a turn body. Throws on empty / over-cap (C-4 fail-loud). */
-export function validateTurnBody(body: unknown): string {
+/** Trim + validate a turn body. Throws on empty / over-cap (C-4 fail-loud).
+ *  `max` defaults to the operator cap; agent turns pass ROOM_AGENT_TURN_MAX_CHARS. */
+export function validateTurnBody(body: unknown, max: number = ROOM_TURN_HARD_MAX_CHARS): string {
   if (typeof body !== "string") throw new Error("room_turn: invalid_body");
   const trimmed = body.trim();
   if (trimmed.length === 0) throw new Error("room_turn: empty_body");
-  if (trimmed.length > ROOM_TURN_HARD_MAX_CHARS) {
-    throw new Error(`room_turn: body_over_hard_cap: ${trimmed.length} > ${ROOM_TURN_HARD_MAX_CHARS}`);
+  if (trimmed.length > max) {
+    throw new Error(`room_turn: body_over_hard_cap: ${trimmed.length} > ${max}`);
   }
   return trimmed;
+}
+
+const JA_RE = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]/;
+
+/** The question's language — 'ja' if it carries any kana or CJK ideograph,
+ *  else 'en'. Same rule as the console (workforce/app/src/lib/rooms.ts), so
+ *  the turns, the conclusion headings and the page chrome agree. */
+export function questionLanguage(q: string): "ja" | "en" {
+  return JA_RE.test(q) ? "ja" : "en";
 }
 
 // --- POSITION parsing ----------------------------------------------------
 
 const POSITION_LINE = /^\**\s*POSITION\s*\**\s*[:：]\s*\**\s*(.+?)\s*\**\s*$/i;
+
+/** First sentence of a line (Latin or Japanese terminator) + the rest. */
+const FIRST_SENTENCE = /^(.+?[.!?。！？])\s*(\S[\s\S]*)$/u;
 
 /**
  * Split a statement into its one-line stance and its prose. The debate
@@ -402,6 +425,11 @@ const POSITION_LINE = /^\**\s*POSITION\s*\**\s*[:：]\s*\**\s*(.+?)\s*\**\s*$/i;
  * parse tolerates the drift models actually produce (bold markers, a
  * full-width colon in a Japanese answer) and is fail-soft — no such line
  * means no `position`, the whole text stays the body.
+ *
+ * It never drops text (W-1: no partial body under a byline). A stance line
+ * over ROOM_POSITION_MAX_CHARS is the model running its prose onto it: a
+ * first sentence that fits becomes the stance and the rest of the line
+ * leads the body; otherwise there is no stance and the line stays prose.
  */
 export function parsePosition(text: string): { position?: string; body: string } {
   const trimmed = text.trim();
@@ -409,9 +437,14 @@ export function parsePosition(text: string): { position?: string; body: string }
   const first = nl === -1 ? trimmed : trimmed.slice(0, nl);
   const m = POSITION_LINE.exec(first);
   if (!m) return { body: trimmed };
-  const position = m[1]!.trim().slice(0, ROOM_POSITION_MAX_CHARS);
-  const body = nl === -1 ? "" : trimmed.slice(nl + 1).trim();
-  return position.length > 0 ? { position, body } : { body };
+  const stance = m[1]!.trim();
+  const rest = nl === -1 ? "" : trimmed.slice(nl + 1).trim();
+  if (stance.length === 0) return { body: rest };
+  if (stance.length <= ROOM_POSITION_MAX_CHARS) return { position: stance, body: rest };
+  const join = (head: string) => [head, rest].filter((s) => s.length > 0).join("\n\n");
+  const s = FIRST_SENTENCE.exec(stance);
+  if (s && s[1]!.length <= ROOM_POSITION_MAX_CHARS) return { position: s[1]!.trim(), body: join(s[2]!.trim()) };
+  return { body: join(stance) };
 }
 
 // --- Row → view ----------------------------------------------------------
@@ -755,7 +788,8 @@ export async function appendTurn(input: AppendTurnInput): Promise<AppendedTurn> 
   const existing = await getRoomMeta(input.room_id);
   if (!existing) throw new Error(`appendTurn: no room META for ${input.room_id}`);
 
-  const body = validateTurnBody(input.body);
+  const agentTurn = input.kind === "statement" || input.kind === "conclusion";
+  const body = validateTurnBody(input.body, agentTurn ? ROOM_AGENT_TURN_MAX_CHARS : ROOM_TURN_HARD_MAX_CHARS);
   const at = (input.now ?? (() => new Date()))().toISOString();
   const turnId = (input.newUlid ?? newUlid)();
   const preview = body.slice(0, ROOM_TURN_PREVIEW_MAX_CHARS);

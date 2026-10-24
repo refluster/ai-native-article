@@ -344,6 +344,17 @@ describe("GET /rooms and GET /rooms/{id}", () => {
     expect(rooms[0]).toMatchObject({ title: "second", status: "debating", turn_count: 1, rounds: 2 });
   });
 
+  it("400s a cursor that is not a ROOMS key (never a DynamoDB 500), accepts one that is", async () => {
+    const enc = (v: unknown) => Buffer.from(JSON.stringify(v)).toString("base64url");
+    for (const cursor of ["not-base64-json", enc(123), enc(["x"]), enc({ pk: "AGENT#maya", sk: "META", gsi3pk: "FEED" })]) {
+      const r = await call("GET /rooms", { qs: { cursor } });
+      expect(r.statusCode).toBe(400);
+      expect(r.body.error).toBe("invalid_cursor");
+    }
+    const ok = enc({ pk: "ROOM#01J0", sk: "META", gsi3pk: "ROOMS", gsi3sk: "2026-10-24T00:00:00.000Z" });
+    expect((await call("GET /rooms", { qs: { cursor: ok } })).statusCode).toBe(200);
+  });
+
   it("returns the room view + every turn chronologically, S3-hydrating long bodies", async () => {
     const id = await createRoom({ ...CREATE, question: `Q: ${"long ".repeat(100)}` });
     agentTurn(id, "01J90000000000000000000001", { position: "Hold.", body_preview: "short" });

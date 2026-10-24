@@ -31,6 +31,7 @@ import {
   mergeTurns,
   paragraphsOf,
   patchRoom,
+  pollCursor,
   questionLanguage,
   roomsWriteEnabled,
   roundProgress,
@@ -134,6 +135,24 @@ describe('mergeTurns', () => {
   it('lastTurnId is the max ULID', () => {
     expect(lastTurnId([])).toBeUndefined();
     expect(lastTurnId([{ ...opening(), turn_id: '01C' }, { ...opening(), turn_id: '01Z' }, { ...opening(), turn_id: '01A' }])).toBe('01Z');
+  });
+
+  it('pollCursor trails the newest turn by the overlap window, so a late-visible smaller id is not skipped', () => {
+    const at = (s: number) => new Date(Date.UTC(2026, 9, 24, 0, 0, s)).toISOString();
+    const a = { ...opening(), turn_id: '01A', at: at(0) };
+    const b = { ...opening(), turn_id: '01B', at: at(20) };
+    const steer = { ...opening(), turn_id: '01D', at: at(50) };
+    // Young room: nothing is older than the window → full read.
+    expect(pollCursor([a, b], 30_000)).toBeUndefined();
+    // The cursor is the newest turn ≥ 30 s older than the newest (01B at
+    // 20 s vs 01D at 50 s), so an agent turn 01C minted at 49 s but stored
+    // after the steer was polled still comes back on the next tail …
+    expect(pollCursor([a, b, steer], 30_000)).toBe('01B');
+    const late = { ...opening(), turn_id: '01C', at: at(49) };
+    expect('01C' > '01B').toBe(true);
+    // … and the overlap re-read folds in without duplicates.
+    expect(mergeTurns([a, b, steer], [steer, late]).map((t) => t.turn_id)).toEqual(['01A', '01B', '01C', '01D']);
+    expect(pollCursor([])).toBeUndefined();
   });
 });
 

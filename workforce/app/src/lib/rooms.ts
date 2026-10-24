@@ -254,6 +254,30 @@ export function lastTurnId(turns: ReadonlyArray<TurnView>): string | undefined {
   return max;
 }
 
+/** How far behind the newest turn the poll cursor trails. */
+export const POLL_OVERLAP_MS = 30_000;
+
+/**
+ * The `?after=` cursor for the poll tail — deliberately NOT the newest id.
+ * A turn's ULID is minted before its body is stored, and two writers can
+ * overlap (an operator steer while an agent turn is being written; "Conclude
+ * now" racing an in-flight statement), so a turn with a smaller id can
+ * become visible after a larger one was already polled. Polling after the
+ * max id would skip it for good. The cursor is the newest turn at least
+ * `overlapMs` older than the newest one (undefined → a full read; rooms are
+ * bounded), and `mergeTurns` folds the re-read overlap in by `turn_id`.
+ */
+export function pollCursor(turns: ReadonlyArray<TurnView>, overlapMs = POLL_OVERLAP_MS): string | undefined {
+  const newest = turns.reduce((m, t) => Math.max(m, Date.parse(t.at) || 0), 0);
+  let cursor: TurnView | undefined;
+  for (const t of turns) {
+    const at = Date.parse(t.at);
+    if (Number.isNaN(at) || at > newest - overlapMs) continue;
+    if (!cursor || t.turn_id > cursor.turn_id) cursor = t;
+  }
+  return cursor?.turn_id;
+}
+
 /** A room is deliberating while its schedule is running: status
  *  `debating` and not archived (an archived room's Lambda skips). */
 export function isDeliberating(room: Pick<RoomSummary, 'status' | 'archived'> | null | undefined): boolean {

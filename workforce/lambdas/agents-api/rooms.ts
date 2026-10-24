@@ -30,6 +30,7 @@ import { getItem } from "../shared/ddb.js";
 import { newUlid } from "../shared/task.js";
 import {
   ROOMS_PAGE_DEFAULT,
+  ROOMS_GSI3_PK,
   ROOMS_PAGE_MAX,
   ROOM_OPERATOR_ID,
   appendTurn,
@@ -102,6 +103,20 @@ function parsePageSize(qs: Record<string, string | undefined>): number {
   return Math.min(n, ROOMS_PAGE_MAX);
 }
 
+/** A `GET /rooms` cursor is the base64url JSON of a GSI3 `ROOMS` key (the
+ *  queryByGsiPaged encoding). Check it here so a garbled or foreign cursor
+ *  is a 400 — never a DynamoDB ValidationException surfacing as a 500. */
+function isRoomsCursor(raw: string): boolean {
+  try {
+    const key: unknown = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
+    if (typeof key !== "object" || key === null || Array.isArray(key)) return false;
+    const values = Object.values(key as Record<string, unknown>);
+    return (key as Record<string, unknown>).gsi3pk === ROOMS_GSI3_PK && values.every((v) => typeof v === "string");
+  } catch {
+    return false;
+  }
+}
+
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
@@ -153,14 +168,8 @@ async function dispatchRun(
 
 async function listRoomsRoute(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> {
   const qs = event.queryStringParameters ?? {};
-  let page;
-  try {
-    page = await listRooms({ pageSize: parsePageSize(qs), cursor: qs.cursor });
-  } catch (err) {
-    // A malformed cursor fails the base64/JSON decode inside the query helper.
-    if (qs.cursor && err instanceof SyntaxError) return reply(400, { error: "invalid_cursor" });
-    throw err;
-  }
+  if (qs.cursor !== undefined && !isRoomsCursor(qs.cursor)) return reply(400, { error: "invalid_cursor" });
+  const page = await listRooms({ pageSize: parsePageSize(qs), cursor: qs.cursor });
   return reply(200, {
     rooms: page.items.map(toRoomSummaryView),
     ...(page.cursor !== undefined ? { cursor: page.cursor } : {}),

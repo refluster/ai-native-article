@@ -49,6 +49,7 @@ vi.mock("@aws-sdk/client-s3", () => ({
 }));
 
 import {
+  ROOM_AGENT_TURN_MAX_CHARS,
   ROOM_TURN_HARD_MAX_CHARS,
   ROOM_TURN_PREVIEW_MAX_CHARS,
   appendTurn,
@@ -59,6 +60,7 @@ import {
   listRooms,
   maxAgentRound,
   parsePosition,
+  questionLanguage,
   toDispatch,
   toRoomSummaryView,
   toRoomView,
@@ -237,6 +239,15 @@ describe("validateRoomCreate", () => {
     expect(() => validateTurnBody("   ")).toThrow(/empty_body/);
     expect(() => validateTurnBody(42)).toThrow(/invalid_body/);
     expect(() => validateTurnBody("x".repeat(ROOM_TURN_HARD_MAX_CHARS + 1))).toThrow(/over_hard_cap/);
+    expect(validateTurnBody("x".repeat(ROOM_TURN_HARD_MAX_CHARS + 1), ROOM_AGENT_TURN_MAX_CHARS)).toHaveLength(
+      ROOM_TURN_HARD_MAX_CHARS + 1,
+    );
+  });
+
+  it("questionLanguage: ja on any kana / kanji (half-width katakana too), else en", () => {
+    expect(questionLanguage("今週Roomsを出すべきか？")).toBe("ja");
+    expect(questionLanguage("Should we ship ｶﾞｲﾄﾞ?")).toBe("ja");
+    expect(questionLanguage("Should we ship Rooms this week?")).toBe("en");
   });
 });
 
@@ -253,9 +264,23 @@ describe("parsePosition", () => {
     expect(parsePosition("POSITION：見送る\n本文")).toEqual({ position: "見送る", body: "本文" });
   });
 
-  it("caps the position at 140 chars", () => {
-    const p = parsePosition(`POSITION: ${"x".repeat(200)}\nbody`);
-    expect(p.position).toHaveLength(140);
+  it("never drops text: an over-long stance line keeps its first sentence and moves the rest into the body", () => {
+    const run = "the console is ready and the runbook can follow next week, so nothing here blocks a flagged launch on Friday and the operator has already signed off on the residual risk";
+    expect(parsePosition(`POSITION: Ship behind a flag. ${run}.\nSecond paragraph.`)).toEqual({
+      position: "Ship behind a flag.",
+      body: `${run}.\n\nSecond paragraph.`,
+    });
+    const ja = "今週出すべき。" + "理由はコンソールが完成しており、ドキュメントは翌週に追いつけるからだ。".repeat(4);
+    expect(parsePosition(`POSITION：${ja}\n次の段落。`)).toEqual({
+      position: "今週出すべき。",
+      body: `${ja.slice("今週出すべき。".length)}\n\n次の段落。`,
+    });
+  });
+
+  it("an over-long stance with no sentence that fits is no stance — the whole line stays prose", () => {
+    const long = "x".repeat(200);
+    expect(parsePosition(`POSITION: ${long}\nbody`)).toEqual({ body: `${long}\n\nbody` });
+    expect(parsePosition(`POSITION: ${long}`)).toEqual({ body: long });
   });
 
   it("is fail-soft: no POSITION line leaves the whole text as body", () => {
@@ -406,6 +431,19 @@ describe("appendTurn", () => {
     expect(out.row.body_ref).toBe(put.Key);
     expect(out.row.body_preview).toHaveLength(ROOM_TURN_PREVIEW_MAX_CHARS);
     expect(out.view.body).toBe(body);
+  });
+
+  it("caps agent turns at the agent cap, not the operator cap: a complete long conclusion lands", async () => {
+    // ~900 English words of conclusion can pass 6000 chars; the call is
+    // already paid for, so only a runaway past the agent cap is refused.
+    const long = "z".repeat(ROOM_TURN_HARD_MAX_CHARS + 2000);
+    const out = await appendTurn({ ...base, kind: "conclusion", round: 3, from: "dario", body: long });
+    expect(out.view.body).toHaveLength(long.length);
+    await expect(appendTurn({ ...base, body: "z".repeat(ROOM_AGENT_TURN_MAX_CHARS + 1) })).rejects.toThrow(/over_hard_cap/);
+    // An operator steer keeps the 6000 cap.
+    await expect(
+      appendTurn({ ...base, kind: "steer", round: 0, from: "operator", body: "z".repeat(ROOM_TURN_HARD_MAX_CHARS + 1) }),
+    ).rejects.toThrow(/over_hard_cap/);
   });
 
   it("throws (never a dangling turn) when META is missing", async () => {

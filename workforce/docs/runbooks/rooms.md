@@ -72,7 +72,7 @@ All four are on the Room page. They map to two API routes.
 | Redirect a debate that is still running | **Steer the room** (composer, while debating) | Your text is stored as an operator `steer` turn. Nothing is re-dispatched and the schedule does not change: every speaker still to come reads your steer in the transcript and treats it as a direction to follow. Speakers who already spoke this round do not speak again. |
 | Ask a follow-up after the conclusion | **Reopen with a follow-up** (composer, once concluded) | Your text is stored, and the Room reopens: a new run with **one** more round (every participant once) and a fresh conclusion by the same chair. Status goes back to Deliberating; the old conclusion stays in the transcript. |
 | Stop the debate and get a conclusion now, or retry a failed conclusion | **Conclude now** | Dispatches only the chair's conclusion under a new run id. Any speaker still queued in the old run is dropped (`superseded`). A statement that was already being drafted when you clicked may still land just after the conclusion. On an already-concluded room this writes a fresh conclusion. |
-| Put the Room away | **Archive** | The Room is marked archived; steer and conclude answer `409 room_archived`; any turn still queued skips (`archived`) without calling Claude. Un-archive with `PATCH {"archived": false}` (below). |
+| Put the Room away | **Archive** | The Room is marked archived; steer and conclude answer `409 room_archived`; any turn still queued skips (`archived`) without calling Claude, the run stops, and a still-debating Room records that on its banner. Un-archive with `PATCH {"archived": false}` (below). |
 
 Steer and reopen are the same button and the same route
 (`POST /rooms/{id}/turns`); the Room's status decides which one you get.
@@ -111,7 +111,8 @@ logs.
 | Progress band stuck on one speaker; after ~3 min the page says **stalled — Conclude now** | The hand-off to the next turn failed (`WfRoomHandoffFailed`) or a turn died before passing it on. No further turn is queued. | **Conclude now** re-dispatches only the conclusion. If you wanted the remaining statements, let it conclude and then reopen with a steer — that runs one more full round. |
 | Debating, every turn present, but no conclusion; banner names the chair | The conclusion turn threw (truncation, artefact, empty body). | **Conclude now** — it writes a fresh conclusion under a new run id. |
 | A queued speaker never speaks after you pressed Conclude now or reopened | By design: the old run is `superseded` (`WfRoomTurnSkipped{Reason=superseded}`) and its chain stopped. | Nothing. |
-| A turn skipped with `already_spoke` | A duplicate or retried invoke of a turn that had already landed. | Nothing — it is the guard working. |
+| A turn skipped with `already_spoke` | AWS delivered the same turn twice (async retries are off, so it is never a retry). The copy that wrote the turn already passed the baton; the duplicate stops there so the run does not fork. | Nothing — it is the guard working. |
+| An unarchived Room shows **Deliberating** and a banner "run stopped: the room was archived mid-run" | It was archived while its run was still going; the next queued turn skipped (`archived`) and the chain stopped. | **Conclude now**, or let it be — it stays as it was. |
 
 Metrics, namespace **`Workforce/Rooms`**:
 

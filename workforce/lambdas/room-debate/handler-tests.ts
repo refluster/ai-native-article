@@ -5,9 +5,10 @@
 // shared/room.ts appendTurn / updateRoomMeta over a mocked DDB, so the tests
 // see the exact TURN row and META patch a turn produces. They pin the run
 // guards (archived / superseded / already spoke / participant / budget /
-// chair-only), the hand-off (a superseded run stops, every other outcome —
-// including a throw — passes the baton), the W-1 guards, POSITION parsing,
-// and the conclusion's META flip.
+// chair-only), the hand-off (a superseded / archived / already-spoken turn
+// stops the chain, every other outcome — including a throw — passes the
+// baton), the W-1 guards, POSITION parsing, the language line, and the
+// conclusion's META flip.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -266,12 +267,16 @@ describe("run guards", () => {
     expect(metrics).toContain("WfRoomTurnSkipped{Reason=superseded}");
   });
 
-  it("already_spoke (duplicate invoke): skips but keeps the run going", async () => {
+  it("already_spoke (duplicate delivery): skips AND stops — the copy that wrote the turn already passed the baton", async () => {
+    // Passing it again would invoke the next speaker twice and fork the run
+    // past participants × rounds + 1 (async retries are off, so a duplicate
+    // is never a recovery path).
     listRoomTurns.mockResolvedValueOnce([turn({}), turn({ turn_id: "01J00000000000000000000011", from: "maya", round: 1, kind: "statement", body: "Already said." })]);
     const res = await handler(EVENT);
     expect(res).toEqual({ status: "skipped", reason: "already_spoke" });
     expect(complete).not.toHaveBeenCalled();
-    expect(handoff()).toMatchObject({ speaker: "dario", kind: "statement" });
+    expect(lambdaSend).not.toHaveBeenCalled();
+    expect(metrics).toContain("WfRoomTurnSkipped{Reason=already_spoke}");
   });
 
   it("the same speaker in another run or round is NOT already_spoke", async () => {
@@ -286,6 +291,19 @@ describe("run guards", () => {
     expect(complete).not.toHaveBeenCalled();
     expect(lambdaSend).not.toHaveBeenCalled();
     expect(metrics).toContain("WfRoomTurnSkipped{Reason=archived}");
+    // W-4: the stopped run is said on META (run-guarded), so an unarchived
+    // room does not read "Deliberating" forever.
+    const patch = metaUpdates()[0]!;
+    expect(patch.ExpressionAttributeValues).toMatchObject({ ":if_run_id": RUN });
+    expect(String((patch.ExpressionAttributeValues as Record<string, string>)[":last_error"])).toMatch(/room was archived/);
+  });
+
+  it("archived skip of a concluded room or a stale run writes nothing", async () => {
+    Object.assign(META, { archived: true, status: "concluded" });
+    await handler(EVENT);
+    Object.assign(META, { status: "debating", run_id: "01J0000000000000000000NEWR" });
+    await handler(EVENT);
+    expect(ddbSend).not.toHaveBeenCalled();
   });
 
   it("throws when the room META is missing (and still hands off)", async () => {
@@ -432,6 +450,41 @@ describe("conclusion (chair)", () => {
     expect(metaUpdates()[1]!.ExpressionAttributeValues).not.toHaveProperty(":status");
     expect(metrics).not.toContain("WfRoomConcluded");
     expect(warn.mock.calls.some((c) => String(c[0]).includes("room_conclusion_superseded"))).toBe(true);
+  });
+});
+
+describe("language + round lines", () => {
+  it("a Japanese question: the turn is told to write Japanese and keep the POSITION label", async () => {
+    META.question = "今週Roomsを出すべきか？";
+    complete.mockResolvedValueOnce(completion("POSITION: 出すべき。\nマヤとして賛成です。"));
+    await handler({ ...EVENT, then: [] });
+    const system = complete.mock.calls[0]![0].system as string;
+    expect(system).toContain("write this turn in Japanese (keep the `POSITION:` label as is)");
+    expect(system).toContain("Keep the label `POSITION:` in");
+  });
+
+  it("an English question is told English; the last debate round is told to converge", async () => {
+    complete.mockResolvedValueOnce(completion("POSITION: Ship.\nYes."));
+    await handler({ ...EVENT, then: [] }); // rounds 1 → round 1 is the last
+    const system = complete.mock.calls[0]![0].system as string;
+    expect(system).toContain("write this turn in English");
+    expect(system).toContain("last round before the chair concludes");
+  });
+
+  it("not the last round: no converge line", async () => {
+    Object.assign(META, { rounds: 2, run_rounds: 2 });
+    complete.mockResolvedValueOnce(completion("POSITION: Ship.\nYes."));
+    await handler({ ...EVENT, then: [] });
+    expect(complete.mock.calls[0]![0].system).not.toContain("last round before the chair concludes");
+  });
+
+  it("a Japanese conclusion is told the Japanese heading set, in order", async () => {
+    META.question = "今週Roomsを出すべきか？";
+    complete.mockResolvedValueOnce(completion("## 結論\n出す。"));
+    await handler({ room_id: ROOM, run_id: RUN, speaker: "dario", round: 2, kind: "conclusion", then: [] });
+    const system = complete.mock.calls[0]![0].system as string;
+    expect(system).toContain("write the conclusion in Japanese, under the Japanese headings");
+    expect(system).toContain("Start with the first heading.");
   });
 });
 

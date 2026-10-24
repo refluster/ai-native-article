@@ -4,7 +4,8 @@
 //
 // Liveness is bounded polling, the same posture as /messaging and boards
 // (ADR-0006): while the room is deliberating and the tab is visible we read
-// `GET /rooms/{id}?after=<newest turn>` every few seconds, fold the tail in
+// `GET /rooms/{id}?after=<cursor>` every few seconds (the cursor trails the
+// newest turn by an overlap window — see pollCursor), fold the tail in
 // with `mergeTurns`, and take the fresh `room` (its status flips to
 // concluded when the chair's turn lands — that stops the poll). If nothing
 // moves for three minutes the page says so and offers "Conclude now"
@@ -25,10 +26,10 @@ import {
   fetchRoom,
   groupTurnsByRound,
   isDeliberating,
-  lastTurnId,
   mergeTurns,
   paragraphsOf,
   patchRoom,
+  pollCursor,
   questionLanguage,
   roomsWriteEnabled,
   roundProgress,
@@ -123,13 +124,15 @@ export default function Room() {
 
   const roomRef = useRef<RoomView | null>(null);
   const afterRef = useRef<string | undefined>(undefined);
+  const turnIdsRef = useRef<Set<string>>(new Set());
 
   // Fold a fetch (full or `?after=` tail) into state; bump the change clock
-  // when anything the operator would notice moved.
+  // when anything the operator would notice moved. The tail re-reads an
+  // overlap window (pollCursor), so only turns not yet on screen count.
   const apply = useCallback((d: RoomDetail) => {
     const prev = roomRef.current;
     const moved =
-      d.turns.length > 0 ||
+      d.turns.some((t) => !turnIdsRef.current.has(t.turn_id)) ||
       !prev ||
       prev.status !== d.room.status ||
       prev.turn_count !== d.room.turn_count ||
@@ -143,7 +146,8 @@ export default function Room() {
   }, []);
 
   useEffect(() => {
-    afterRef.current = lastTurnId(turns);
+    afterRef.current = pollCursor(turns);
+    turnIdsRef.current = new Set(turns.map((t) => t.turn_id));
   }, [turns]);
 
   // Initial load.
