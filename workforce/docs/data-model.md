@@ -192,7 +192,7 @@ pk = "INBOX#{slug}"    → all threads {slug} participates in, sorted by last_me
 
 One partition per participant (`INBOX#operator`, `INBOX#nadia`, …). The `PART#{slug}` row carries the projection, denormalising the thread summary so the inbox renders from this single query — no META/MSG fan-out per thread. Reads are reverse-chronological (`ScanIndexForward=false`, page size 25) with the same opaque base64url cursor shape as GSI3.
 
-Write volume is **operator-paced**, not agent-paced (Epic-013 §Behaviour at N=100): a thread's `PART#` rows are touched only when the operator sends or an addressed talent replies, so even at N=100 agents the partitions stay cool. `unread` / `starred` filters are client-shaped over the latest page at v1 (the inbox is small at single-operator scale).
+Write volume is **operator-paced**, not agent-paced (Epic-013 §Behaviour at N=100): a thread's `PART#` rows are touched only when the operator sends or a talent in that message's reply round answers (≤ one reply per member per operator message, [adr-0047](adr/adr-0047-group-thread-reply-rounds.md)), so even at N=100 agents the partitions stay cool. `unread` / `starred` filters are client-shaped over the latest page at v1 (the inbox is small at single-operator scale).
 
 ### Conditional-write invariants
 

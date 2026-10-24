@@ -390,13 +390,16 @@ export interface CreateThreadInput {
 /**
  * Create a thread and its first message. Writes (in order): the S3 body
  * (if long) → META → first MSG → one PART row per participant (operator +
- * each talent). Returns the new `thread_id`.
+ * each talent). Returns the new `thread_id` and the first `message_id` (the
+ * trigger of the reply round, see pickRepliers).
  *
  * `group` is derived: more than one talent participant ⇒ group thread.
  * The author's PART starts read (`unread: 0`); every recipient's PART
  * starts at `unread: 1`.
  */
-export async function createThread(input: CreateThreadInput): Promise<{ thread_id: string }> {
+export async function createThread(
+  input: CreateThreadInput,
+): Promise<{ thread_id: string; message_id: string }> {
   const mkUlid = input.newUlid ?? newUlid;
   const now = (input.now ?? (() => new Date()))();
   const from = input.from ?? MESSAGING_OPERATOR_ID;
@@ -458,7 +461,7 @@ export async function createThread(input: CreateThreadInput): Promise<{ thread_i
     await putItem(part);
   }
 
-  return { thread_id: threadId };
+  return { thread_id: threadId, message_id: messageId };
 }
 
 export interface SendMessageInput {
@@ -523,6 +526,24 @@ export async function sendMessage(input: SendMessageInput): Promise<{ message_id
   }
 
   return { message_id: messageId };
+}
+
+/**
+ * Who answers an operator message, in speaking order (workforce/adr-0047).
+ * 1:1 → the sole talent. Group → the @-addressed participants in the order
+ * they were mentioned, else every participant in thread order. The reply
+ * Lambda walks this list one member at a time, so each speaker reads the
+ * replies of the members before them. The round is caused by the one
+ * operator message and has at most `participants.length` replies.
+ */
+export function pickRepliers(participants: readonly string[], body: string): string[] {
+  if (participants.length <= 1) return [...participants];
+  const mentioned: string[] = [];
+  for (const m of body.matchAll(/@([a-z0-9-]+)/gi)) {
+    const slug = m[1]!.toLowerCase();
+    if (participants.includes(slug) && !mentioned.includes(slug)) mentioned.push(slug);
+  }
+  return mentioned.length > 0 ? mentioned : [...participants];
 }
 
 /** Clear a participant's unread counter (thread opened). */

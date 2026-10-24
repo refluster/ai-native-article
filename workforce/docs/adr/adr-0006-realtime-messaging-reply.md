@@ -5,6 +5,12 @@
 - **Deciders**: operator
 - **Epics**: [epic-013](../epics/epic-013-talent-messaging.md)
 
+> **Amendment pointer (2026-10-24).** The group clause under §Consequences
+> ("Only the @-addressed (or primary) participant replies") is superseded by
+> [adr-0047](adr-0047-group-thread-reply-rounds.md) (Proposed): in a group,
+> every member (or every @-addressed member) replies once per operator message,
+> in turn. The rest of this ADR stands. The body below is left as decided.
+
 ## Context
 
 [ADR-0005](adr-0005-single-execution-model-ccr.md) settled that **scheduled

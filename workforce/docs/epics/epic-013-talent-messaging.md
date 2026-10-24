@@ -262,6 +262,13 @@ replies to its own message.** Consequences:
 
 ### 7. Group threads
 
+> **Superseded (2026-10-24) by [adr-0047](../adr/adr-0047-group-thread-reply-rounds.md).**
+> A group post now starts a reply round: every member (or every @-addressed
+> member) replies once, in turn, each reading the replies before theirs. The
+> round is bounded at `participants.length` replies and only an operator
+> message starts one, so §6's operator-paced bound still holds. The text below
+> is the original v1 decision.
+
 Group threads (the mock's "Elena + reports") are real in v1 but constrained:
 when the operator posts to a group, **only @-addressed talents** get a reply
 TASK; absent an explicit address, only the thread's primary participant
