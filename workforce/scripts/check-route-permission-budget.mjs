@@ -81,7 +81,10 @@ export function countHttpApiRoutes(text) {
   let raw = 0;
 
   for (const line of lines) {
-    if (/^\s*Type:\s*HttpApi\s*(#.*)?$/.test(line)) raw++;
+    // Quoted scalars (`Type: "HttpApi"`, `Type: 'HttpApi'`) are valid YAML and
+    // SAM still emits the permission — count them too, or the undercount is
+    // silent (wf:owen O2 on #850).
+    if (/^\s*Type:\s*["']?HttpApi["']?\s*(#.*)?$/.test(line)) raw++;
     if (/^\s*(#.*)?$/.test(line)) continue; // blank or comment-only
 
     if (/^\S/.test(line)) {
@@ -117,7 +120,7 @@ export function countHttpApiRoutes(text) {
       inEvents = false;
       continue;
     }
-    if (inEvents && resourceType === "AWS::Serverless::Function" && /^ {10}Type:\s*HttpApi\s*(#.*)?$/.test(line)) {
+    if (inEvents && resourceType === "AWS::Serverless::Function" && /^ {10}Type:\s*["']?HttpApi["']?\s*(#.*)?$/.test(line)) {
       counts.set(resource, (counts.get(resource) ?? 0) + 1);
       attributed++;
     }
