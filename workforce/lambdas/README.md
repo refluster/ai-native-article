@@ -21,6 +21,7 @@ One directory per Lambda, each with a `handler.ts` (+ `Makefile` for `sam build`
 | `migrate-credentials/` | `wf-migrate-credentials` | One-shot credential migration. |
 | `messaging-reply/` | `wf-messaging-reply` | Real-time operator ↔ talent reply path (ADR-0006). |
 | `board-reply/` | `wf-board-reply` | Agent answers to `@`-mentions on the public Q&A boards; hop-bounded delegation to one colleague in the same invocation; grounded in the build-time public knowledge pack (ADR-0034). |
+| `room-debate/` | `wf-room-debate` | One agent turn in a purpose-first Room (adr-0048, proposed): persona + debate / chair-conclusion contract over the room transcript, W-1 guards, then a self-invoke hand-off to the next scheduled speaker (the ADR-0047 round pattern — a run is at most participants × rounds + 1 calls). |
 | `l1-source-register/` | `wf-l1-source-register` | No-LLM L1 source capture into the Notion Articles DB (`/capture` share target). |
 | `wf-podcast/` | `wf-podcast` | Polly synthesis, S3/CloudFront distribution, RSS (ADR-0016). |
 | `memory-compactor/` | `wf-memory-compactor` | Nightly agent-memory folding (ADR-0019). |
@@ -51,6 +52,12 @@ One directory per Lambda, each with a `handler.ts` (+ `Makefile` for `sam build`
 | `GET` | `/boards/{id}/posts` | board token | Newest page (chronological, `older_cursor`), or `?after={post_id}` poll tail. |
 | `POST` | `/boards/{id}/posts` | board token | Guest post / reply; async-invokes `wf-board-reply` once per `@`-mentioned roster agent (≤3). |
 | `PATCH` | `/boards/{id}/posts/{post_id}` | AWS_IAM | Operator moderation: `{hidden: bool}`. |
+| `GET` | `/rooms` | public | Rooms, newest first (one GSI3 `ROOMS` partition query; `?page_size=` ≤100, `?cursor=`) → `{rooms, cursor?}`. adr-0048 (proposed). |
+| `GET` | `/rooms/{id}` | public | Room view + every turn, chronological, S3-hydrated; `?after={turn_id}` returns only newer turns (the console poll). |
+| `POST` | `/rooms` | AWS_IAM | Open a room: `{title, question, context?, participants[2..6], chair?, rounds?=2}` → `201 {room_id}`; writes META + the opening turn, async-invokes `wf-room-debate` with the full schedule. |
+| `POST` | `/rooms/{id}/turns` | AWS_IAM | Operator steer `{body}` → `201 {turn_id, reopened}`. Debating: a transcript turn, no dispatch. Concluded: reopens (new run, one more round each, fresh conclusion). `409 room_archived`; `409 room_concluding` once only the chair's conclusion is left in the run. |
+| `POST` | `/rooms/{id}/conclude` | AWS_IAM | Re-dispatch only the chair's conclusion under a new run → `202 {run_id}`. `409 room_archived`. |
+| `PATCH` | `/rooms/{id}` | AWS_IAM | `{archived?, title?}` → `200 {room}`. |
 
 The table above is the original core; feed, stats, projects, bindings, credentials, tools and podcast routes are documented by `GET /docs/openapi` (kept in sync by `npm run workforce:openapi-routes`). New personas are registered via `POST /agents` (ADR-0007 retired the `workforce/agents/` git tree; the DDB row family is the single authoritative store and agents-api the single writer — see [runbooks/agent-registration.md](../docs/runbooks/agent-registration.md)). Skills split along the Software 2.0 seam ([ADR-0008](../docs/adr/adr-0008-skill-config-single-source.md)): judgment-side fields mutate via `PATCH /skills/{name}` (DDB-authoritative, write = live on the next fire); write-scripts and `requires[]` stay git-owned, so a NEW skill still enters via the `cadence-forge` scaffold + PR — no `POST /skills`.
 
