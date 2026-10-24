@@ -151,6 +151,10 @@ export default function Room() {
     setRoom(d.room);
     if (d.turns.length > 0) setTurns((t) => mergeTurns(t, d.turns));
     if (moved && prev) setLastChangeAt(Date.now());
+    // Every successful read comes through here, so the poll-failure banner
+    // clears even when the read that succeeded was not a poll tick (an
+    // archive, a steer): otherwise it could outlive polling itself.
+    setPollHealth({ failures: 0 });
   }, []);
 
   useEffect(() => {

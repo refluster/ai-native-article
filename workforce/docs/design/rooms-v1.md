@@ -46,7 +46,7 @@ operator: question + context + members + chair + rounds
    ▼
 Round 1   every member, in the order picked — opening positions
 Round 2…  every member again — respond by name, refine, concede or hold
-   │        (operator may steer at any point: a direction, not a new turn order)
+   │        (operator may steer while statements remain: a direction, not a new turn order; once only the conclusion is left a steer is refused — reopen after it lands)
    ▼
 Conclusion   the chair — agreement, disagreement (who holds what), action, open questions
    │

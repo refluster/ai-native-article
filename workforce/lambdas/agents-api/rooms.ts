@@ -271,6 +271,20 @@ async function steerRoute(
       from: ROOM_OPERATOR_ID,
       body: text,
     });
+    // The chair's `concluded` flip (or a newer run) can land between the META
+    // read above and this write — a window of milliseconds that opens only
+    // after a statement of the run failed, so `onlyConclusionLeft` never
+    // turned true (cycle-2 review, wf:hana H3). appendTurn returns META after
+    // the bump, so the steer that lost that race is visible here: flag it on
+    // the room (W-4) rather than hand back a 201 nobody will act on. The
+    // other ordering — bump first, flip second — is caught by the Lambda's
+    // flagSteerDuringConclusion, which lists turns after the flip.
+    if (out.meta.status === "concluded" || out.meta.run_id !== meta.run_id) {
+      await updateRoomMeta(meta.room_id, {
+        last_error: "a steer landed after the conclusion — reopen with a follow-up to address it",
+      });
+      return reply(201, { turn_id: out.view.turn_id, reopened: false, landed_after_conclusion: true });
+    }
     return reply(201, { turn_id: out.view.turn_id, reopened: false });
   }
 

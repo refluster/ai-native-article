@@ -18,6 +18,9 @@ import type { APIGatewayProxyEventV2 } from "aws-lambda";
 type Item = Record<string, unknown> & { pk: string; sk: string };
 const table = new Map<string, Item>();
 const key = (pk: string, sk: string) => `${pk}\u0000${sk}`;
+/** H3 race fixture: the chair's `concluded` flip lands on META just before
+ *  the steer's own META bump (set by a test, consumed by the next bump). */
+let concludeOnNextMetaBump = false;
 
 function conditionalFailure(): Error {
   return Object.assign(new Error("The conditional request failed"), { name: "ConditionalCheckFailedException" });
@@ -61,6 +64,10 @@ async function fakeSend(cmd: { kind: string; input: Record<string, unknown> }): 
           delete next[names[part]!];
         }
       }
+    }
+    if (concludeOnNextMetaBump && k.sk === "META") {
+      next.status = "concluded";
+      concludeOnNextMetaBump = false;
     }
     table.set(key(k.pk, k.sk), next);
     return { Attributes: { ...next } };
@@ -421,6 +428,21 @@ describe("POST /rooms/{id}/turns (steer)", () => {
     expect(r).toMatchObject({ statusCode: 409, body: { error: "room_concluding" } });
     expect(turnRows(id)).toHaveLength(before);
     expect(meta(id).turn_count).toBe(turnCount);
+    expect(dispatchTurn).not.toHaveBeenCalled();
+  });
+
+  it("a steer that loses the race with the chair's flip is flagged on META, never a silent 201 (H3)", async () => {
+    const id = await createRoom(); // 3 × 2; one statement of round 2 "failed", so the conclusion check stays false
+    let n = 0;
+    const tid = () => `01J9${String(++n).padStart(22, "0")}`;
+    for (const from of ["maya", "dario", "ren"]) agentTurn(id, tid(), { from, round: 1 });
+    for (const from of ["maya", "dario"]) agentTurn(id, tid(), { from, round: 2 });
+    dispatchTurn.mockClear();
+    concludeOnNextMetaBump = true;
+    const r = await call("POST /rooms/{id}/turns", { id, body: { body: "One more angle." } });
+    expect(r).toMatchObject({ statusCode: 201, body: { reopened: false, landed_after_conclusion: true } });
+    expect(meta(id).status).toBe("concluded");
+    expect(String(meta(id).last_error)).toMatch(/reopen/);
     expect(dispatchTurn).not.toHaveBeenCalled();
   });
 

@@ -1139,7 +1139,7 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/RoomSteer' }
       responses:
-        "201": { description: 'Created — { turn_id, reopened }' }
+        "201": { description: 'Created — { turn_id, reopened, landed_after_conclusion? } (the last flag: the room concluded between the read and the write; last_error is set — reopen with a follow-up)' }
         "400": { description: 'invalid_json / invalid_body' }
         "403": { description: forbidden }
         "404": { description: not_found }
