@@ -48,7 +48,20 @@ turn. Four decisions had to be made against today's tree.
 
 ## Decision
 
-### 1. A new `ROOM#` row family and a `/rooms` route set on agents-api — not a "room mode" on THREAD rows
+### 1. A new `ROOM#` row family and a `/rooms` route set on the agents HTTP API — not a "room mode" on THREAD rows
+
+> **Amendment (2026-10-24, after the first deploy).** The six `/rooms`
+> routes stay on the one agents HTTP API (`WfAgentsHttpApi`, one base URL,
+> one OpenAPI spec) but are **served by their own function,
+> `wf-rooms-api`** (`workforce/lambdas/rooms-api/`), not by
+> `wf-agents-api`. The first deploy of #847 rolled back: SAM emits one
+> resource-based-policy statement per HttpApi route on a function, and the
+> six routes took `wf-agents-api`'s policy to 20639 bytes against Lambda's
+> 20480-byte cap (run 40126740456). The route module (`rooms-api/routes.ts`)
+> is unchanged; the split is a deployment fact, and the rule it leaves
+> behind — a new route family gets its own function, and
+> `workforce/scripts/check-route-permission-budget.mjs` counts routes per
+> function — is recorded in `docs/memory-lint-backlog.md` ML-042.
 
 Rooms are `ROOM#{room_id}/META` + `ROOM#{room_id}/TURN#{ulid}` in the single
 table (R-N2), with long turn bodies dual-stored under `rooms/{room_id}/{ulid}.md`
@@ -299,13 +312,15 @@ accepted for threads (agents-api `handler.ts` header, PR #132).
 - **New IAM and function config.** `wf-room-debate` may invoke itself only
   (`RoomDebateTurnHandoff`) and runs with async retries disabled
   (`MaximumRetryAttempts: 0`); DDB Get/Query/Put/Update on the base
-  table only (it queries no GSI — the `ROOMS` listing is agents-api's); S3 Get/Put on `rooms/*`; S3 Get on `memory/*`; the Anthropic key
+  table only (it queries no GSI — the `ROOMS` listing is `wf-rooms-api`'s); S3 Get/Put on `rooms/*`; S3 Get on `memory/*`; the Anthropic key
   under both secret names; `cloudwatch:PutMetricData` on `Workforce/Rooms`.
-  agents-api gains `lambda:InvokeFunction` on `WfRoomDebateFunction`
-  (`AgentsApiInvokeRoomDebate`), S3 Get/Put on `rooms/*`
-  (`AgentsApiRoomBodyReadWrite`) and the env var `ROOM_DEBATE_FUNCTION`. No
-  new secret (R-N3), no new AWS service, no schedule (R-N4: a Room is
-  event-caused, never a binding).
+  `wf-rooms-api` (the route function, see Decision 1's amendment) holds
+  `lambda:InvokeFunction` on `WfRoomDebateFunction`, DDB Get/Query/Put/Update
+  on the table and its indexes (the GSI3 `ROOMS` listing), S3 Get/Put on
+  `rooms/*`, metrics on `Workforce/Rooms`, and the env var
+  `ROOM_DEBATE_FUNCTION`; `wf-agents-api` gains nothing. No new secret
+  (R-N3), no new AWS service, no schedule (R-N4: a Room is event-caused,
+  never a binding).
 - **Failure semantics (W-4).** A failed turn throws (logged,
   `WfRoomTurnThrow{Reason}`, best-effort `last_error` on META, the
   `wf-room-debate-errors-alarm-{stage}` alarm), but the next speaker is
