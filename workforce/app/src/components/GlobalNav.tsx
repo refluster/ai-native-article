@@ -11,6 +11,8 @@
 //   Skills        → /skills      (the capability library)
 //   Reports       → /reports     (published reports)
 //   Messaging     → /messaging   (placeholder — talent-to-talent comms)
+//   Rooms         → /rooms       (purpose-first deliberation — a question,
+//                                  the members summoned to settle it)
 //   Notifications → /notifications (placeholder — network activity)
 //   Performance   → /performance (the operator overview / dashboard)
 //   Me            → /account     (the operator's own account)
@@ -20,7 +22,7 @@
 // destination beside it. Sign-out moved out of the header onto the
 // account page; it does not belong as a permanent top-level control.
 //
-// Responsive shape (2026-07-26). Nine destinations no longer fit a phone
+// Responsive shape (2026-07-26). Nine (now ten) destinations no longer fit a phone
 // header — the icon row used to overflow the viewport. From `md` up the
 // row renders exactly as before; below it the destinations collapse into a
 // hamburger that opens a right-hand drawer. The drawer is built from the
@@ -66,6 +68,18 @@ function MessageIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden className={className} fill="none" stroke="currentColor" strokeWidth={1.8}>
       <path d="M4 5h16v11H8l-4 3.5V5Z" strokeLinejoin="round" />
+    </svg>
+  );
+}
+// A round table seen from above with seats around it — people gathered
+// around one question (Rooms), distinct from Messaging's speech bubble.
+function RoomsIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <circle cx="12" cy="12" r="4.2" />
+      <circle cx="12" cy="3.8" r="1.6" />
+      <circle cx="19.1" cy="16.1" r="1.6" />
+      <circle cx="4.9" cy="16.1" r="1.6" />
     </svg>
   );
 }
@@ -136,6 +150,7 @@ const NAV: NavItem[] = [
   { to: '/skills',        label: 'Skills',        icon: SkillsIcon },
   { to: '/reports',       label: 'Reports',       icon: ReportsIcon },
   { to: '/messaging',     label: 'Messaging',     icon: MessageIcon },
+  { to: '/rooms',         label: 'Rooms',         icon: RoomsIcon },
   { to: '/notifications', label: 'Notifications', icon: BellIcon, badge: '3' },
 ];
 
@@ -147,7 +162,7 @@ const PERFORMANCE: NavItem = { to: '/performance', label: 'Performance', icon: P
 const DRAWER_GROUPS: { title: string; items: NavItem[] }[] = [
   { title: 'Network', items: NAV.slice(0, 4) },
   { title: 'Work',    items: [NAV[4], PERFORMANCE] },
-  { title: 'Inbox',   items: NAV.slice(5) },
+  { title: 'Inbox',   items: NAV.slice(5) }, // Messaging, Rooms, Notifications
 ];
 
 /** Number shown on the hamburger when the drawer is closed. */
