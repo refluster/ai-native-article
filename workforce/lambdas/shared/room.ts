@@ -18,6 +18,12 @@
 // Row family (catalogued in workforce/docs/data-model.md, Zone A PR):
 //   ROOM#{room_id} / META          — room descriptor + current run
 //   ROOM#{room_id} / TURN#{ulid}   — one turn (operator or agent)
+//   ROOM#{room_id} / CLAIM#{run_id}#{round}#{kind}#{speaker}
+//                                  — wf-room-debate's turn-slot claim: a
+//                                    conditional put taken before the
+//                                    Claude call, so one scheduled turn is
+//                                    spoken once even when AWS delivers its
+//                                    event twice and both copies overlap
 //
 // Listing is one GSI3 partition (`gsi3pk="ROOMS"`, `gsi3sk=created_at`),
 // the same single-partition precedent as the activity FEED (shared/post.ts
@@ -37,7 +43,7 @@ import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3
 import { QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
 import { ulidLowerBound } from "./board.js";
-import { ddb, getItem, putItem, queryByGsiPaged, type PagedResult } from "./ddb.js";
+import { conditionalPutItem, ddb, getItem, putItem, queryByGsiPaged, type PagedResult } from "./ddb.js";
 import { newUlid } from "./task.js";
 
 const s3 = new S3Client({});
@@ -62,13 +68,13 @@ export const ROOM_TURN_HARD_MAX_CHARS = 6000;
 /** Sanity cap on an AGENT turn body (statement / conclusion). It must sit
  *  above anything a complete reply can be: `complete()` throws on
  *  `max_tokens`, so a reply that reaches here is at most the wire cap — a
- *  conclusion's 2400 visible + 2048 reasoning-headroom tokens = 4448 —
- *  i.e. ≈ 18–20k chars of English prose (≈ 4.5 chars/token; Japanese is
+ *  conclusion's 3200 visible + 2048 reasoning-headroom tokens = 5248 —
+ *  i.e. ≈ 22–24k chars of English prose (≈ 4.5 chars/token; Japanese is
  *  ~1–1.5 chars/token, far below). At 6000 an over-long but complete
  *  English conclusion was rejected after the call was paid for, leaving
  *  the room without one. The length itself is the prompt's job (~900
  *  words); this only refuses a runaway. */
-export const ROOM_AGENT_TURN_MAX_CHARS = 20000;
+export const ROOM_AGENT_TURN_MAX_CHARS = 24000;
 
 /** Inline preview cap — a body at or under this is fully contained in
  *  `body_preview` and needs no S3 round-trip (same split as MSG / POST rows). */
@@ -234,6 +240,17 @@ export function turnSk(turnId: string): `TURN#${string}` {
   return `TURN#${turnId}`;
 }
 
+/** Sort key of one scheduled turn's slot claim. Fixed by the schedule step
+ *  (run, round, kind, speaker), so two deliveries of one event collide. */
+export function claimSk(
+  runId: string,
+  round: number,
+  kind: RoomAgentTurnKind,
+  speaker: string,
+): `CLAIM#${string}` {
+  return `CLAIM#${runId}#${round}#${kind}#${speaker}`;
+}
+
 export function isValidRoomId(id: string): boolean {
   return ULID_PATTERN.test(id);
 }
@@ -277,6 +294,28 @@ export function toDispatch(
   const [head, ...then] = schedule;
   if (!head) throw new Error("toDispatch: empty schedule");
   return { room_id: roomId, run_id: runId, speaker: head.speaker, round: head.round, kind: head.kind, then };
+}
+
+/**
+ * The operator-facing ordinal of a debate round. Stored `round` numbers are
+ * absolute and a conclusion takes a round number of its own (3 × 2 room:
+ * statements 1, 2 → conclusion 3 → reopened statements 4), so every LABEL
+ * — the agent's "round N of M", the transcript tags, the console — counts
+ * debate rounds only: the ordinal of `round` among the distinct statement
+ * rounds below it, plus one (round 4 above is the 3rd debate round). A
+ * round with no statement yet gets the ordinal it will have once it lands.
+ * Mirrored in workforce/app/src/lib/rooms.ts.
+ */
+export function ordinalOfRound(turns: ReadonlyArray<Pick<RoomTurnRow, "kind" | "round">>, round: number): number {
+  const below = new Set<number>();
+  for (const t of turns) if (t.kind === "statement" && t.round < round) below.add(t.round);
+  return below.size + 1;
+}
+
+/** Absolute round → ordinal, for every distinct statement round. */
+export function debateRoundOrdinals(turns: ReadonlyArray<Pick<RoomTurnRow, "kind" | "round">>): Map<number, number> {
+  const rounds = [...new Set(turns.filter((t) => t.kind === "statement").map((t) => t.round))].sort((a, b) => a - b);
+  return new Map(rounds.map((r, i) => [r, i + 1]));
 }
 
 /** Highest round any agent has spoken in (statements AND conclusions); 0
@@ -407,7 +446,9 @@ const JA_RE = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9
 
 /** The question's language — 'ja' if it carries any kana or CJK ideograph,
  *  else 'en'. Same rule as the console (workforce/app/src/lib/rooms.ts), so
- *  the turns, the conclusion headings and the page chrome agree. */
+ *  the turns, the conclusion headings and the console's room-content labels
+ *  (round dividers, progress band — marked `lang` there; the chrome stays
+ *  English) agree. */
 export function questionLanguage(q: string): "ja" | "en" {
   return JA_RE.test(q) ? "ja" : "en";
 }
@@ -560,10 +601,32 @@ export async function resolveTurnBody(row: RoomTurnRow): Promise<string> {
   return await res.Body.transformToString();
 }
 
-async function hydrate(rows: RoomTurnRow[]): Promise<TurnView[]> {
-  const out: TurnView[] = [];
-  for (const row of rows) out.push(toTurnView(row, await resolveTurnBody(row)));
+/** S3 body reads in flight at once while hydrating a room. A room
+ *  reopened many times carries dozens of long turns; serial reads could
+ *  outlast the agents-api timeout, an unbounded fan-out would burst S3. */
+export const ROOM_BODY_FETCH_CONCURRENCY = 8;
+
+/** `Promise.all(items.map(fn))` with at most `limit` calls in flight;
+ *  results keep the input order, the first rejection rejects the whole. */
+export async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]!);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(Math.max(1, limit), items.length) }, worker));
   return out;
+}
+
+async function hydrate(rows: RoomTurnRow[]): Promise<TurnView[]> {
+  return mapWithConcurrency(rows, ROOM_BODY_FETCH_CONCURRENCY, async (row) => toTurnView(row, await resolveTurnBody(row)));
 }
 
 /** Every turn of a room, chronological, bodies resolved. */
@@ -674,6 +737,41 @@ export async function updateRoomMeta(
     }),
   );
   return (res.Attributes ?? {}) as RoomMetaRow;
+}
+
+/**
+ * Claim one scheduled turn before its Claude call: a conditional put of
+ * `ROOM#{room_id}` / `CLAIM#{run_id}#{round}#{kind}#{speaker}` that only
+ * succeeds if no copy of this step has claimed it. Async Lambda delivery
+ * is at-least-once, and two overlapping copies of one event would both
+ * pass a transcript check during the 10–90 s call — both would speak and
+ * both pass the baton, forking the run past participants × rounds + 1.
+ * Returns false when the slot was already claimed; any other failure
+ * throws.
+ */
+export async function claimTurnSlot(
+  step: { room_id: string; run_id: string; round: number; kind: RoomAgentTurnKind; speaker: string },
+  now: () => Date = () => new Date(),
+): Promise<boolean> {
+  try {
+    await conditionalPutItem(
+      {
+        pk: roomPk(step.room_id),
+        sk: claimSk(step.run_id, step.round, step.kind, step.speaker),
+        room_id: step.room_id,
+        run_id: step.run_id,
+        round: step.round,
+        kind: step.kind,
+        speaker: step.speaker,
+        claimed_at: now().toISOString(),
+      },
+      "attribute_not_exists(sk)",
+    );
+    return true;
+  } catch (err) {
+    if (isConditionalFailure(err)) return false;
+    throw err;
+  }
 }
 
 export interface CreateRoomInput extends RoomCreateInput {

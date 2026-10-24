@@ -26,6 +26,7 @@ import {
   ROOM_TITLE_MAX_CHARS,
   createRoom,
   fetchRooms,
+  questionLanguage,
   roomsWriteEnabled,
   summarizeQuestion,
   type RoomSummary,
@@ -280,6 +281,9 @@ function RoomListSkeleton() {
 
 function RoomCard({ room, rosterMap }: { room: RoomSummary; rosterMap: Map<string, WorkforceAgent> }) {
   const chair = rosterMap.get(room.chair);
+  // Only the room's own content carries its language; the card chrome
+  // (status, counts) stays English like the rest of the console.
+  const lang = questionLanguage(room.question);
   return (
     <Link
       to={`/rooms/${encodeURIComponent(room.room_id)}`}
@@ -288,16 +292,18 @@ function RoomCard({ room, rosterMap }: { room: RoomSummary; rosterMap: Map<strin
       }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 font-semibold text-sm text-wf-on-surface-variant truncate">{room.title}</div>
+        <div className="min-w-0 font-semibold text-sm text-wf-on-surface-variant truncate" lang={questionLanguage(room.title)}>
+          {room.title}
+        </div>
         <span className="shrink-0">
           <RoomStatusPill status={room.status} archived={room.archived} />
         </span>
       </div>
-      <p className="mt-1.5 font-headline font-bold text-base sm:text-lg leading-snug text-wf-on-surface line-clamp-2">
+      <p lang={lang} className="mt-1.5 font-headline font-bold text-base sm:text-lg leading-snug text-wf-on-surface line-clamp-2">
         {room.question}
       </p>
       {room.status === 'concluded' && room.conclusion_preview && (
-        <p className="mt-2 pl-3 border-l-2 border-wf-secondary text-[13px] text-wf-on-surface-variant leading-relaxed line-clamp-3">
+        <p lang={lang} className="mt-2 pl-3 border-l-2 border-wf-secondary text-[13px] text-wf-on-surface-variant leading-relaxed line-clamp-3">
           {previewText(room.conclusion_preview)}
         </p>
       )}

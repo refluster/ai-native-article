@@ -3,7 +3,8 @@
 // schedule, row shapes, conditional META patches) over an in-memory fake of
 // the single table + S3. Pins: create → META + opening turn + the first
 // dispatch payload carrying the full schedule; validation 400s; a steer
-// while debating is a transcript turn with no dispatch; a steer on a
+// while debating is a transcript turn with no dispatch, and once only the
+// chair's conclusion is left it is refused (409 room_concluding); a steer on a
 // concluded room reopens (new run, run_count + 1, one more round from the
 // next round, fresh conclusion) and dispatches; conclude re-dispatches only
 // the chair's conclusion; `?after` returns only newer turns; PATCH; the IAM
@@ -392,6 +393,60 @@ describe("POST /rooms/{id}/turns (steer)", () => {
     expect(steer).toMatchObject({ kind: "steer", round: 0, from: "operator", run_id: meta(id).run_id, turn_id: r.body.turn_id });
     expect(meta(id).turn_count).toBe(2);
     expect(dispatchTurn).not.toHaveBeenCalled();
+  });
+
+  it("still lands mid-debate — the last statement of the run has not landed yet", async () => {
+    const id = await createRoom(); // 3 × 2
+    let n = 0;
+    const tid = () => `01J9${String(++n).padStart(22, "0")}`;
+    for (const from of ["maya", "dario", "ren"]) agentTurn(id, tid(), { from, round: 1 });
+    for (const from of ["maya", "dario"]) agentTurn(id, tid(), { from, round: 2 });
+    const r = await call("POST /rooms/{id}/turns", { id, body: { body: "Ren, weigh the cost." } });
+    expect(r).toMatchObject({ statusCode: 201, body: { reopened: false } });
+  });
+
+  it("409 room_concluding once every statement of the run has landed — nothing stored, nothing dispatched", async () => {
+    const id = await createRoom(); // 3 × 2
+    let n = 0;
+    const tid = () => `01J9${String(++n).padStart(22, "0")}`;
+    for (const round of [1, 2]) for (const from of ["maya", "dario", "ren"]) agentTurn(id, tid(), { from, round });
+    // A statement of an older run does not count toward this one.
+    agentTurn(id, tid(), { from: "ren", round: 2, run_id: "01J00000000000000000000OLD" });
+    const before = turnRows(id).length;
+    const turnCount = meta(id).turn_count;
+    dispatchTurn.mockClear();
+
+    const r = await call("POST /rooms/{id}/turns", { id, body: { body: "Too late for the chair." } });
+
+    expect(r).toMatchObject({ statusCode: 409, body: { error: "room_concluding" } });
+    expect(turnRows(id)).toHaveLength(before);
+    expect(meta(id).turn_count).toBe(turnCount);
+    expect(dispatchTurn).not.toHaveBeenCalled();
+  });
+
+  it("409 room_concluding during a conclusion-only run (Conclude now: run_rounds 0)", async () => {
+    const id = await createRoom();
+    agentTurn(id, "01J90000000000000000000001", { from: "maya", round: 1 });
+    expect((await call("POST /rooms/{id}/conclude", { id })).statusCode).toBe(202);
+    expect(meta(id)).toMatchObject({ status: "debating", run_rounds: 0 });
+    const r = await call("POST /rooms/{id}/turns", { id, body: { body: "Wait." } });
+    expect(r).toMatchObject({ statusCode: 409, body: { error: "room_concluding" } });
+  });
+
+  it("a reopened run counts only its own round: 409 once the reopen's statements are in", async () => {
+    const id = await createRoom({ ...CREATE, rounds: 1 });
+    agentTurn(id, "01J90000000000000000000001", { from: "maya", round: 1 });
+    agentTurn(id, "01J90000000000000000000002", { from: "dario", round: 1 });
+    agentTurn(id, "01J90000000000000000000003", { from: "ren", round: 1 });
+    agentTurn(id, "01J90000000000000000000004", { from: "dario", round: 2, kind: "conclusion" });
+    table.get(key(`ROOM#${id}`, "META"))!.status = "concluded";
+    expect((await call("POST /rooms/{id}/turns", { id, body: { body: "Cost?" } })).body).toMatchObject({ reopened: true });
+    // Reopened at round 3: a steer is fine until all three have spoken there.
+    agentTurn(id, "01J90000000000000000000010", { from: "maya", round: 3 });
+    expect((await call("POST /rooms/{id}/turns", { id, body: { body: "And risk?" } })).statusCode).toBe(201);
+    agentTurn(id, "01J90000000000000000000011", { from: "dario", round: 3 });
+    agentTurn(id, "01J90000000000000000000012", { from: "ren", round: 3 });
+    expect((await call("POST /rooms/{id}/turns", { id, body: { body: "Late." } })).statusCode).toBe(409);
   });
 
   it("on a concluded room: reopens — new run, run_count + 1, one round from the next round, fresh conclusion", async () => {

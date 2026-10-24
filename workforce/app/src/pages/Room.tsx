@@ -27,13 +27,20 @@ import {
   groupTurnsByRound,
   isDeliberating,
   mergeTurns,
+  nextPollHealth,
   paragraphsOf,
   patchRoom,
   pollCursor,
+  pollErrorToShow,
+  progressCopy,
   questionLanguage,
   roomsWriteEnabled,
   roundProgress,
+  stallState,
+  steerLocked,
+  steerLockedCopy,
   steerRoom,
+  type PollHealth,
   type RoomDetail,
   type RoomView,
   type RoundProgress,
@@ -48,9 +55,7 @@ const CAN_WRITE = roomsWriteEnabled();
 
 /** Poll cadence while deliberating (a turn lands every ~10–40 s). */
 const POLL_MS = 4000;
-/** No new turn / room change for this long → show the stalled note. */
-const STALL_MS = 3 * 60_000;
-/** Once stalled, keep listening but back off — a late turn still lands. */
+/** Once stalled (lib/rooms stallState), keep listening but back off — a late turn still lands. */
 const STALLED_POLL_MS = 20_000;
 
 type Lang = 'ja' | 'en';
@@ -121,6 +126,9 @@ export default function Room() {
   const [concludeRunId, setConcludeRunId] = useState<string | null>(null);
   const [confirmConclude, setConfirmConclude] = useState(false);
   const [busy, setBusy] = useState<'conclude' | 'archive' | null>(null);
+  // Consecutive poll failures: after a few, the fetch error is shown, so a
+  // read fault is not mistaken for a stopped schedule (W-4).
+  const [pollHealth, setPollHealth] = useState<PollHealth>({ failures: 0 });
 
   const roomRef = useRef<RoomView | null>(null);
   const afterRef = useRef<string | undefined>(undefined);
@@ -193,7 +201,8 @@ export default function Room() {
   }, []);
 
   const deliberating = isDeliberating(room);
-  const stalled = deliberating && now - lastChangeAt >= STALL_MS;
+  const stalled = stallState(now, lastChangeAt, room) === 'stalled';
+  const pollError = pollErrorToShow(pollHealth);
 
   // The clock the stall check reads — ticks only while deliberating.
   useEffect(() => {
@@ -213,8 +222,11 @@ export default function Room() {
       try {
         const d = await fetchRoom(id, { after: afterRef.current });
         if (!cancelled && d) apply(d);
-      } catch {
-        /* transient — the next tick retries */
+        if (!cancelled) setPollHealth((h) => (h.failures === 0 ? h : nextPollHealth(h, { ok: true })));
+      } catch (err) {
+        // The next tick retries; a run of failures surfaces in the banner.
+        const error = err instanceof Error ? err.message : String(err);
+        if (!cancelled) setPollHealth((h) => nextPollHealth(h, { ok: false, error }));
       } finally {
         inflight = false;
       }
@@ -283,6 +295,7 @@ export default function Room() {
     () => (room ? roundProgress(room, turns, { concluding }) : null),
     [room, turns, concluding],
   );
+  const locked = steerLocked(room, progress);
 
   const nameOf = (slug: string) => {
     if (slug === ROOM_OPERATOR_ID) return OPERATOR.name;
@@ -313,7 +326,7 @@ export default function Room() {
 
   return (
     <WorkforceLayout>
-      <div className="max-w-[880px] mx-auto" lang={room ? lang : undefined}>
+      <div className="max-w-[880px] mx-auto">
         {back}
 
         {loadError && (
@@ -364,12 +377,14 @@ export default function Room() {
                 />
               )}
 
-              <div className="mt-4 font-semibold text-sm text-wf-on-surface-variant">{room.title}</div>
-              <h1 className="mt-1 font-headline font-black tracking-tight text-2xl sm:text-[2rem] leading-tight text-wf-on-surface whitespace-pre-wrap break-words">
+              <div className="mt-4 font-semibold text-sm text-wf-on-surface-variant" lang={questionLanguage(room.title)}>
+                {room.title}
+              </div>
+              <h1 lang={lang} className="mt-1 font-headline font-black tracking-tight text-2xl sm:text-[2rem] leading-tight text-wf-on-surface whitespace-pre-wrap break-words">
                 {room.question}
               </h1>
               {room.context && (
-                <p className="mt-3 text-sm text-wf-on-surface-variant leading-relaxed whitespace-pre-wrap max-w-prose">
+                <p lang={lang} className="mt-3 text-sm text-wf-on-surface-variant leading-relaxed whitespace-pre-wrap max-w-prose">
                   {room.context}
                 </p>
               )}
@@ -421,6 +436,17 @@ export default function Room() {
               firstNameOf={firstNameOf}
             />
 
+            {pollError && (
+              <div role="alert" className="mt-3 border border-wf-tertiary rounded-wf-md bg-wf-surface-container-lo p-3">
+                <div className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-tertiary">Can&apos;t reach the room</div>
+                <p className="mt-1 text-sm text-wf-on-surface break-words">{pollError}</p>
+                <p className="mt-1 text-[12px] text-wf-on-surface-variant">
+                  The last {pollHealth.failures} polls failed; the page keeps retrying. Until one succeeds, a stall here may be a
+                  read fault, not a stopped schedule.
+                </p>
+              </div>
+            )}
+
             {stalled && (
               <div className="mt-3 border border-wf-paused rounded-wf-md bg-wf-surface-container-lo p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <p className="text-sm text-wf-on-surface">
@@ -441,7 +467,7 @@ export default function Room() {
                 <SectionBlock key={s.key} section={s} room={room} roster={roster} nameOf={nameOf} lang={lang} />
               ))}
               {progress.nextSpeaker && deliberating && (
-                <div className="mt-4 flex items-center gap-3 text-[12px] text-wf-on-surface-variant font-wfmono">
+                <div lang={lang} className="mt-4 flex items-center gap-3 text-[12px] text-wf-on-surface-variant font-wfmono">
                   <span className="opacity-60">
                     <Sigil slug={progress.nextSpeaker} size={28} />
                   </span>
@@ -457,7 +483,7 @@ export default function Room() {
               )}
             </section>
 
-            <Composer room={room} onSteer={handleSteer} />
+            <Composer room={room} onSteer={handleSteer} locked={locked} lang={lang} />
           </>
         )}
       </div>
@@ -535,36 +561,6 @@ function ConcludeConfirm({
   );
 }
 
-function progressCopy(
-  room: RoomView,
-  p: RoundProgress,
-  lang: Lang,
-  concluding: boolean,
-  firstNameOf: (s: string) => string,
-): { line: string; drafting?: string } {
-  const n = room.participants.length;
-  const chair = firstNameOf(room.chair);
-  if (lang === 'ja') {
-    if (room.archived) return { line: 'アーカイブ済み · 閲覧のみ' };
-    if (p.phase === 'done') return { line: `結論済み · 第${p.round}回まで · ${room.turn_count}件の発言` };
-    if (p.phase === 'conclusion')
-      return { line: concluding ? '早期終了' : '全ラウンド終了', drafting: `議長の${chair}さんが結論を執筆中…` };
-    return {
-      line: `第${p.round}回 / 全${p.ofRounds}回 · ${n}人中${p.spoken.length}人が発言`,
-      drafting: p.nextSpeaker ? `${firstNameOf(p.nextSpeaker)}さんが執筆中…` : undefined,
-    };
-  }
-  if (room.archived) return { line: 'Archived · read-only' };
-  if (p.phase === 'done')
-    return { line: `Concluded after round ${p.round} · ${room.turn_count} turns` };
-  if (p.phase === 'conclusion')
-    return { line: concluding ? 'Concluding early' : 'All rounds done', drafting: `${chair} (chair) is writing the conclusion…` };
-  return {
-    line: `Round ${p.round} of ${p.ofRounds} · ${p.spoken.length}/${n} have spoken`,
-    drafting: p.nextSpeaker ? `${firstNameOf(p.nextSpeaker)} is drafting…` : undefined,
-  };
-}
-
 function ProgressBand({
   room,
   progress,
@@ -584,6 +580,7 @@ function ProgressBand({
   return (
     <div
       aria-live="polite"
+      lang={lang}
       className="mt-3 border border-wf-outline-variant bg-wf-surface-container rounded-wf-md px-3 sm:px-4 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
     >
       <div className="min-w-0">
@@ -611,9 +608,9 @@ function ProgressBand({
   );
 }
 
-function SectionDivider({ label }: { label: string }) {
+function SectionDivider({ label, lang }: { label: string; lang: Lang }) {
   return (
-    <div className="flex items-center gap-3 mt-7 mb-3" role="separator" aria-label={label}>
+    <div className="flex items-center gap-3 mt-7 mb-3" role="separator" aria-label={label} lang={lang}>
       <span className="h-px flex-1 bg-wf-outline-variant" aria-hidden />
       <span className="font-wfmono text-[10px] uppercase tracking-[0.18em] text-wf-on-surface-variant">{label}</span>
       <span className="h-px flex-1 bg-wf-outline-variant" aria-hidden />
@@ -636,7 +633,7 @@ function SectionBlock({
 }) {
   return (
     <div>
-      <SectionDivider label={section.label} />
+      <SectionDivider label={section.label} lang={lang} />
       <div className="space-y-3">
         {section.turns.map((t) =>
           t.kind === 'opening' ? (
@@ -646,7 +643,14 @@ function SectionBlock({
           ) : t.kind === 'conclusion' ? (
             <ConclusionCard key={t.turn_id} turn={t} nameOf={nameOf} lang={lang} />
           ) : (
-            <StatementCard key={t.turn_id} turn={t} agent={roster.get(t.from)} nameOf={nameOf} isChair={t.from === room.chair} />
+            <StatementCard
+              key={t.turn_id}
+              turn={t}
+              agent={roster.get(t.from)}
+              nameOf={nameOf}
+              isChair={t.from === room.chair}
+              lang={lang}
+            />
           ),
         )}
       </div>
@@ -659,7 +663,7 @@ function OpeningRow({ turn, room, lang }: { turn: TurnView; room: RoomView; lang
   // repeat it if it somehow differs.
   const differs = turn.body.trim() !== room.question.trim();
   return (
-    <div className="flex gap-3 items-start">
+    <div className="flex gap-3 items-start" lang={lang}>
       <OperatorAvatar size={32} />
       <div className="min-w-0">
         <div className="flex items-baseline gap-2 flex-wrap">
@@ -677,7 +681,7 @@ function OpeningRow({ turn, room, lang }: { turn: TurnView; room: RoomView; lang
 
 function OperatorTurn({ turn, lang }: { turn: TurnView; lang: Lang }) {
   return (
-    <div className="flex gap-3 items-start">
+    <div className="flex gap-3 items-start" lang={lang}>
       <OperatorAvatar size={40} />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2 flex-wrap">
@@ -698,15 +702,17 @@ function StatementCard({
   agent,
   nameOf,
   isChair,
+  lang,
 }: {
   turn: TurnView;
   agent?: WorkforceAgent;
   nameOf: (s: string) => string;
   isChair: boolean;
+  lang: Lang;
 }) {
   const paras = paragraphsOf(turn.body);
   return (
-    <article className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-4 sm:p-5">
+    <article lang={lang} className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-4 sm:p-5">
       <header className="flex items-start gap-3">
         <Sigil slug={turn.from} size={40} />
         <div className="min-w-0 flex-1">
@@ -736,7 +742,7 @@ function StatementCard({
 
 function ConclusionCard({ turn, nameOf, lang }: { turn: TurnView; nameOf: (s: string) => string; lang: Lang }) {
   return (
-    <article className="border border-wf-primary bg-wf-surface-container-lo rounded-wf-lg overflow-hidden">
+    <article lang={lang} className="border border-wf-primary bg-wf-surface-container-lo rounded-wf-lg overflow-hidden">
       <header className="bg-wf-primary text-wf-on-primary px-4 sm:px-5 py-2.5 flex items-center gap-3 flex-wrap">
         <span className="font-wfmono text-[11px] uppercase tracking-[0.18em]">{lang === 'ja' ? '結論' : 'Conclusion'}</span>
         <span className="text-[12px] opacity-90">
@@ -751,7 +757,18 @@ function ConclusionCard({ turn, nameOf, lang }: { turn: TurnView; nameOf: (s: st
   );
 }
 
-function Composer({ room, onSteer }: { room: RoomView; onSteer: (body: string) => Promise<void> }) {
+function Composer({
+  room,
+  onSteer,
+  locked,
+  lang,
+}: {
+  room: RoomView;
+  onSteer: (body: string) => Promise<void>;
+  /** Only the chair's conclusion is left — a steer now would go unread. */
+  locked: boolean;
+  lang: Lang;
+}) {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -778,7 +795,7 @@ function Composer({ room, onSteer }: { room: RoomView; onSteer: (body: string) =
   }
 
   const reopen = room.status === 'concluded';
-  const canSubmit = draft.trim().length > 0 && !sending;
+  const canSubmit = draft.trim().length > 0 && !sending && !locked;
 
   async function submit(): Promise<void> {
     if (!canSubmit) return;
@@ -806,20 +823,27 @@ function Composer({ room, onSteer }: { room: RoomView; onSteer: (body: string) =
       <label htmlFor="room-steer" className="block font-headline font-bold text-sm text-wf-on-surface">
         {reopen ? 'Reopen with a follow-up' : 'Steer the room'}
       </label>
-      <p className="mt-0.5 text-[12px] text-wf-on-surface-variant leading-relaxed">
-        {reopen
-          ? 'Each member speaks once more on your follow-up, then the chair writes a fresh conclusion.'
-          : 'A direction for the members still to speak — they read it before their turn.'}
-      </p>
+      {locked ? (
+        <p lang={lang} className="mt-0.5 text-[12px] text-wf-on-surface-variant leading-relaxed">
+          {steerLockedCopy(lang)}
+        </p>
+      ) : (
+        <p className="mt-0.5 text-[12px] text-wf-on-surface-variant leading-relaxed">
+          {reopen
+            ? 'Each member speaks once more on your follow-up, then the chair writes a fresh conclusion.'
+            : 'A direction for the members still to speak — they read it before their turn.'}
+        </p>
+      )}
       <textarea
         id="room-steer"
+        disabled={locked}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={onKeyDown}
         rows={3}
         maxLength={ROOM_TURN_HARD_MAX_CHARS}
         placeholder={reopen ? 'What should the room look at next?' : 'e.g. Focus on the cost side; assume the launch date is fixed.'}
-        className="mt-2 w-full resize-y px-3 py-2 rounded-wf-sm border border-wf-outline bg-wf-surface-container-lo text-sm text-wf-on-surface placeholder:text-wf-on-surface-variant focus:outline-none focus:border-wf-primary"
+        className="mt-2 w-full resize-y px-3 py-2 rounded-wf-sm border border-wf-outline bg-wf-surface-container-lo text-sm text-wf-on-surface placeholder:text-wf-on-surface-variant focus:outline-none focus:border-wf-primary disabled:opacity-50 disabled:cursor-not-allowed"
       />
       <div className="mt-2 flex items-center justify-between gap-3">
         <span className="hidden sm:inline font-wfmono text-[10px] text-wf-on-surface-variant">⌘/Ctrl+Enter to send</span>

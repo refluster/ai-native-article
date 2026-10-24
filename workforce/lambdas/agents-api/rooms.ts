@@ -3,7 +3,8 @@
 //   GET   /rooms                  newest-first list (GSI3 ROOMS)            (public read)
 //   GET   /rooms/{id}             room + every turn | ?after= poll tail      (public read)
 //   POST  /rooms                  create; dispatches the first turn          (AWS_IAM at GW)
-//   POST  /rooms/{id}/turns       operator steer; reopens a concluded room   (AWS_IAM at GW)
+//   POST  /rooms/{id}/turns       operator steer; reopens a concluded room;  (AWS_IAM at GW)
+//                                 409 room_concluding once only the chair is left
 //   POST  /rooms/{id}/conclude    re-dispatch only the chair's conclusion    (AWS_IAM at GW)
 //   PATCH /rooms/{id}             {archived?, title?}                        (AWS_IAM at GW)
 //
@@ -54,6 +55,7 @@ import {
   type RoomMetaRow,
   type RoomScheduleStep,
   type RoomTurnDispatch,
+  type RoomTurnRow,
 } from "../shared/room.js";
 
 export type { RoomTurnDispatch } from "../shared/room.js";
@@ -211,8 +213,31 @@ async function createRoomRoute(event: APIGatewayProxyEventV2, deps: RoomsDeps): 
 }
 
 /**
+ * True when no statement of the current run is left to start: every
+ * participant has a statement for every debate round of the run, or the
+ * run is conclusion-only (`run_rounds === 0`, "Conclude now"). Only the
+ * chair is left then, and it reads its transcript once, up front — a steer
+ * stored now would never be read.
+ */
+function onlyConclusionLeft(meta: RoomMetaRow, rows: readonly RoomTurnRow[]): boolean {
+  const start = meta.run_start_round ?? 1;
+  const rounds = meta.run_rounds ?? meta.rounds;
+  if (rounds === 0) return true;
+  const said = new Set(
+    rows.filter((t) => t.kind === "statement" && t.run_id === meta.run_id).map((t) => `${t.round}#${t.from}`),
+  );
+  for (let r = start; r < start + rounds; r++) {
+    if (meta.participants.some((p) => !said.has(`${r}#${p}`))) return false;
+  }
+  return true;
+}
+
+/**
  * Operator steer. While debating it is just a turn in the transcript — the
  * speakers still to come read it (no dispatch, the run is already moving).
+ * Once only the chair's conclusion is left there is nobody to read it, so
+ * it is refused (`409 room_concluding`, nothing stored): reopen with it once
+ * the conclusion lands.
  * On a concluded room it REOPENS: a new run of one more round each, from
  * the round after every earlier agent turn (the old conclusion included),
  * plus a fresh conclusion.
@@ -232,6 +257,12 @@ async function steerRoute(
   }
 
   if (meta.status !== "concluded") {
+    if (onlyConclusionLeft(meta, await listRoomTurnRows(meta.room_id))) {
+      return reply(409, {
+        error: "room_concluding",
+        detail: "the chair is writing the conclusion — reopen with this follow-up once it lands",
+      });
+    }
     const out = await appendTurn({
       room_id: meta.room_id,
       run_id: meta.run_id,

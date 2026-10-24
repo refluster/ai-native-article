@@ -69,10 +69,10 @@ All four are on the Room page. They map to two API routes.
 
 | You want to… | Do | What happens |
 |---|---|---|
-| Redirect a debate that is still running | **Steer the room** (composer, while debating) | Your text is stored as an operator `steer` turn. Nothing is re-dispatched and the schedule does not change: every speaker still to come reads your steer in the transcript and treats it as a direction to follow. Speakers who already spoke this round do not speak again. |
+| Redirect a debate that is still running | **Steer the room** (composer, while debating) | Your text is stored as an operator `steer` turn. Nothing is re-dispatched and the schedule does not change: every speaker still to come reads your steer in the transcript and treats it as a direction to follow. Speakers who already spoke this round do not speak again. Once every statement of the run has landed, only the chair is left and it has already read the transcript: the composer is disabled ("The chair is writing the conclusion — reopen with a follow-up once it lands") and the API answers `409 room_concluding` without storing anything. |
 | Ask a follow-up after the conclusion | **Reopen with a follow-up** (composer, once concluded) | Your text is stored, and the Room reopens: a new run with **one** more round (every participant once) and a fresh conclusion by the same chair. Status goes back to Deliberating; the old conclusion stays in the transcript. |
 | Stop the debate and get a conclusion now, or retry a failed conclusion | **Conclude now** | Dispatches only the chair's conclusion under a new run id. Any speaker still queued in the old run is dropped (`superseded`). A statement that was already being drafted when you clicked may still land just after the conclusion. On an already-concluded room this writes a fresh conclusion. |
-| Put the Room away | **Archive** | The Room is marked archived; steer and conclude answer `409 room_archived`; any turn still queued skips (`archived`) without calling Claude, the run stops, and a still-debating Room records that on its banner. Un-archive with `PATCH {"archived": false}` (below). |
+| Put the Room away | **Archive** | The Room is marked archived; steer and conclude answer `409 room_archived`; any turn still queued skips (`archived`) without calling Claude, the run stops, and a still-debating Room records that on its banner. Un-archive with the same button (or `PATCH {"archived": false}`, below). |
 
 Steer and reopen are the same button and the same route
 (`POST /rooms/{id}/turns`); the Room's status decides which one you get.
@@ -111,7 +111,9 @@ logs.
 | Progress band stuck on one speaker; after ~3 min the page says **stalled — Conclude now** | The hand-off to the next turn failed (`WfRoomHandoffFailed`) or a turn died before passing it on. No further turn is queued. | **Conclude now** re-dispatches only the conclusion. If you wanted the remaining statements, let it conclude and then reopen with a steer — that runs one more full round. |
 | Debating, every turn present, but no conclusion; banner names the chair | The conclusion turn threw (truncation, artefact, empty body). | **Conclude now** — it writes a fresh conclusion under a new run id. |
 | A queued speaker never speaks after you pressed Conclude now or reopened | By design: the old run is `superseded` (`WfRoomTurnSkipped{Reason=superseded}`) and its chain stopped. | Nothing. |
-| A turn skipped with `already_spoke` | AWS delivered the same turn twice (async retries are off, so it is never a retry). The copy that wrote the turn already passed the baton; the duplicate stops there so the run does not fork. | Nothing — it is the guard working. |
+| A turn skipped with `already_spoke` | AWS delivered the same turn twice (async retries are off, so it is never a retry). Before its Claude call each copy claims the turn's slot with a conditional put (`CLAIM#…` row); the copy that loses — or that finds the turn already in the transcript — stops there, so the run does not fork, even when both copies run at once. | Nothing — it is the guard working. |
+| Concluded, banner "a steer arrived while the chair was writing the conclusion…" (`WfRoomSteerDuringConclusion`) | A steer raced the last statement and was stored after the chair read its transcript, so the conclusion does not answer it. | **Reopen with a follow-up** — paste the steer; one more round and a fresh conclusion address it. |
+| Banner "Can't reach the room" under the progress band | Three polls in a row failed (the message is the fetch error). A stall shown next to it may be a read fault, not a stopped schedule. | Reload; check the agents-api logs before spending a **Conclude now**. |
 | An unarchived Room shows **Deliberating** and a banner "run stopped: the room was archived mid-run" | It was archived while its run was still going; the next queued turn skipped (`archived`) and the chain stopped. | **Conclude now**, or let it be — it stays as it was. |
 
 Metrics, namespace **`Workforce/Rooms`**:
@@ -123,6 +125,7 @@ Metrics, namespace **`Workforce/Rooms`**:
 | `WfRoomTurnThrow{Reason}` | a turn failed (the room continued) |
 | `WfRoomHandoffFailed` | the self-invoke to the next turn failed (the room stalls) |
 | `WfRoomConcluded` | a conclusion landed |
+| `WfRoomSteerDuringConclusion` | a steer landed after the chair read its transcript (the banner says to reopen) |
 | `WfRoomBudgetExceeded` | the per-room daily turn budget was hit |
 | `WfRoomPersonaMissing` | a member's META row lacks `model` / `system_prompt` |
 | `WfRoomDispatchFailed` | agents-api stored a write but could not dispatch the Lambda |
@@ -136,7 +139,9 @@ as the other reply Lambdas.
 - DynamoDB `wf-table-{stage}`: `ROOM#{room_id}` / `META` (question, members,
   chair, rounds, status, `run_id`, `run_count`, `last_error`, …) and
   `ROOM#{room_id}` / `TURN#{ulid}` (one per opening, statement, steer,
-  conclusion). The list is the GSI3 `ROOMS` partition, newest first. Full
+  conclusion), plus one `ROOM#{room_id}` /
+  `CLAIM#{run_id}#{round}#{kind}#{speaker}` per agent turn (the
+  duplicate-delivery claim). The list is the GSI3 `ROOMS` partition, newest first. Full
   shapes: [data-model.md §Room rows](../data-model.md).
 - S3: `rooms/{room_id}/{ulid}.md` for turn bodies over 320 characters.
 - Nothing goes to Notion, the feed, or agent memory (W-2, W-5).
@@ -154,7 +159,7 @@ SigV4 from an `aws-vault` / SSO shell.
 | `GET /rooms` | none (CORS gate) | `?page_size=` (≤ 100, default 25), `?cursor=` | `200 {rooms, cursor?}`, newest first |
 | `GET /rooms/{id}` | none (CORS gate) | `?after=<turn_id>` → only newer turns | `200 {room, turns}`, turns chronological; `room` is always returned |
 | `POST /rooms` | AWS_IAM | `{title, question, context?, participants[], chair?, rounds?}` | `201 {room_id}`; `400 invalid_*` on validation |
-| `POST /rooms/{id}/turns` | AWS_IAM | `{body}` (≤ 6000 chars) | `201 {turn_id, reopened}`; `409 room_archived` |
+| `POST /rooms/{id}/turns` | AWS_IAM | `{body}` (≤ 6000 chars) | `201 {turn_id, reopened}`; `409 room_archived`; `409 room_concluding` (debating, only the chair's conclusion left — nothing stored) |
 | `POST /rooms/{id}/conclude` | AWS_IAM | — | `202 {run_id}`; `409 room_archived` |
 | `PATCH /rooms/{id}` | AWS_IAM | `{archived?, title?}` | `200 {room}` |
 
@@ -195,4 +200,7 @@ on the per-agent `BUDGET#` ledger (that ledger charges orchestrator fires);
 they sit under the aggregate W-3 ceiling and the billing alarm
 ([governance.md §2](../governance.md)). Token counts are on every agent
 `TURN#` row (`tokens_in`, `tokens_out`) if you need to reconstruct a room's
-spend.
+spend. Each call's prompt is bounded too: the transcript it carries is the
+opening, the latest conclusion and the last 30 turns (earlier turns are
+elided with a count, each turn clipped to 1500 chars), so a room reopened
+many times does not cost more per call than a long single run.

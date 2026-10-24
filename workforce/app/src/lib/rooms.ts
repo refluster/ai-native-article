@@ -12,8 +12,9 @@
 // `signedFetch` (lib/sigv4.ts) — the same posture as lib/messages.ts. The
 // SPA never sends a `from`: the operator is the author at the gateway.
 //
-// The pure helpers at the bottom (merge, progress, grouping, language) are
-// what the pages derive their state from; lib/rooms.test.ts pins them.
+// The pure helpers at the bottom (merge, progress, grouping, language,
+// stall / poll health) are what the pages derive their state from;
+// lib/rooms.test.ts pins them.
 
 import { WORKFORCE_AGENTS_API_BASE } from '../config/api';
 import { SIGV4_IS_CONFIGURED } from '../config/auth';
@@ -284,6 +285,45 @@ export function isDeliberating(room: Pick<RoomSummary, 'status' | 'archived'> | 
   return !!room && room.status === 'debating' && room.archived !== true;
 }
 
+/** No new turn / room change for this long → the room reads as stalled. */
+export const STALL_MS = 3 * 60_000;
+
+/**
+ * The page's liveness verdict: `idle` when nothing is deliberating (no
+ * poll, no stall note), `stalled` once a deliberating room has not moved
+ * for STALL_MS (the note + "Conclude now", and a slower poll), else `live`.
+ */
+export function stallState(
+  now: number,
+  lastProgressAt: number,
+  room: Pick<RoomSummary, 'status' | 'archived'> | null | undefined,
+): 'idle' | 'live' | 'stalled' {
+  if (!isDeliberating(room)) return 'idle';
+  return now - lastProgressAt >= STALL_MS ? 'stalled' : 'live';
+}
+
+/** Consecutive poll failures before the page shows the fetch error. One
+ *  failed tick is noise; three in a row (≥ 12 s) is a read fault the
+ *  operator must see before reading the stall as a stopped schedule. */
+export const POLL_FAILURE_THRESHOLD = 3;
+
+export interface PollHealth {
+  /** Consecutive failed polls (0 after any success). */
+  failures: number;
+  /** The latest failure's message. */
+  error?: string;
+}
+
+/** Fold one poll outcome into the health count: a success resets it. */
+export function nextPollHealth(prev: PollHealth, outcome: { ok: true } | { ok: false; error: string }): PollHealth {
+  return outcome.ok ? { failures: 0 } : { failures: prev.failures + 1, error: outcome.error };
+}
+
+/** The fetch error to show, once POLL_FAILURE_THRESHOLD polls in a row failed. */
+export function pollErrorToShow(h: PollHealth): string | undefined {
+  return h.failures >= POLL_FAILURE_THRESHOLD ? h.error : undefined;
+}
+
 const JA_RE = /[぀-ヿ㐀-䶿一-鿿豈-﫿ｦ-ﾟ]/;
 
 /** The question's language — 'ja' if it carries any kana or CJK ideograph,
@@ -301,13 +341,39 @@ export function summarizeQuestion(q: string, n: number): string {
   return `${chars.slice(0, Math.max(0, n - 1)).join('').trimEnd()}…`;
 }
 
+/**
+ * The operator-facing ordinal of a debate round. Stored `round` numbers are
+ * absolute and a conclusion takes one of its own (3 × 2 room: statements
+ * 1, 2 → conclusion 3 → reopened statements 4 → conclusion 5), so every
+ * LABEL counts debate rounds only: the number of distinct statement rounds
+ * below `round`, plus one — stored round 4 above is "Round 3". A round
+ * with no statement yet gets the ordinal it will have once it lands. Same
+ * rule as the backend's prompt labels (lambdas/shared/room.ts).
+ */
+export function ordinalOfRound(turns: ReadonlyArray<Pick<TurnView, 'kind' | 'round'>>, round: number): number {
+  const below = new Set<number>();
+  for (const t of turns) if (t.kind === 'statement' && t.round < round) below.add(t.round);
+  return below.size + 1;
+}
+
+/** Absolute round → ordinal, for every distinct statement round. */
+export function debateRoundOrdinals(turns: ReadonlyArray<Pick<TurnView, 'kind' | 'round'>>): Map<number, number> {
+  const rounds = [...new Set(turns.filter((t) => t.kind === 'statement').map((t) => t.round))].sort((a, b) => a - b);
+  return new Map(rounds.map((r, i) => [r, i + 1]));
+}
+
 export type RoomPhase = 'debate' | 'conclusion' | 'done';
 
 export interface RoundProgress {
-  /** The debate round under way (or the last one, once concluded). */
+  /** The debate round under way (or the last one, once concluded) — the
+   *  stored, absolute round number. */
   round: number;
-  /** The last scheduled debate round of the current run. */
+  /** The last scheduled debate round of the current run (absolute). */
   ofRounds: number;
+  /** `round` / `ofRounds` as the operator reads them: ordinals among the
+   *  debate rounds (see ordinalOfRound). Every label uses these. */
+  roundOrdinal: number;
+  ofRoundsOrdinal: number;
   /** Participants who have spoken in `round`, in speaking order. */
   spoken: string[];
   /** Participants still to speak in `round`, in speaking order. */
@@ -328,14 +394,16 @@ export interface RoundProgress {
  * - Only turns of the current `room.run_id` count; steers / the opening
  *   (round 0) never do.
  * - The run's FIRST debate round = the lowest statement round in this run;
- *   if the run has no statement yet, (highest statement round of any
- *   earlier run) + 1, or 1 for a fresh room.
+ *   if the run has no statement yet, (highest agent round — statement or
+ *   conclusion — of any earlier run) + 1, or 1 for a fresh room.
  * - The run's LAST debate round (`ofRounds`): a first run (first round 1)
  *   schedules `room.rounds` rounds; a reopen (first round > 1) schedules
  *   exactly one more round, so `ofRounds = firstRound`.
  * A conclusion-only run (`run_rounds === 0`, or `opts.concluding` — the page
  * knows the run id "Conclude now" returned) schedules only the chair; its
- * band reports the last debate round that was reached.
+ * band reports the last debate round that was reached (the highest
+ * statement round — never `run_start_round - 1`, which can be the round of
+ * an earlier conclusion).
  *
  * `round` = the highest statement round in this run (or the first round if
  * none). When everyone has spoken in it and it is not the last round, the
@@ -353,7 +421,9 @@ export function roundProgress(
   const allStatements = turns.filter((t) => t.kind === 'statement');
   const run = turns.filter((t) => t.run_id === room.run_id);
   const statements = run.filter((t) => t.kind === 'statement');
-  const priorMax = allStatements.filter((t) => t.run_id !== room.run_id).reduce((m, t) => Math.max(m, t.round), 0);
+  const priorMax = turns
+    .filter((t) => t.run_id !== room.run_id && (t.kind === 'statement' || t.kind === 'conclusion'))
+    .reduce((m, t) => Math.max(m, t.round), 0);
   const planned = room.run_start_round !== undefined && room.run_rounds !== undefined;
   const conclusionOnly = opts.concluding === true || (planned && room.run_rounds === 0);
 
@@ -362,7 +432,7 @@ export function roundProgress(
   if (conclusionOnly) {
     // Nothing more is debated: report the last round that was reached.
     const reached = allStatements.reduce((m, t) => Math.max(m, t.round), 0);
-    firstRound = ofRounds = Math.max(1, planned ? (room.run_start_round as number) - 1 : reached);
+    firstRound = ofRounds = Math.max(1, reached);
   } else if (planned) {
     firstRound = Math.max(1, room.run_start_round as number);
     ofRounds = firstRound + Math.max(1, room.run_rounds as number) - 1;
@@ -387,13 +457,64 @@ export function roundProgress(
   }
   const spoken = participants.filter((p) => said.has(p));
   const pending = participants.filter((p) => !said.has(p));
+  // Rounds of one run are contiguous, so the ordinals step with them.
+  const roundOrdinal = ordinalOfRound(turns, round);
+  const base = { round, ofRounds, roundOrdinal, ofRoundsOrdinal: roundOrdinal + (ofRounds - round), spoken, pending };
 
   const concluded = room.status === 'concluded' || run.some((t) => t.kind === 'conclusion');
-  if (concluded) return { round, ofRounds, spoken, pending, phase: 'done' };
+  if (concluded) return { ...base, phase: 'done' };
   if (conclusionOnly || (pending.length === 0 && round >= ofRounds)) {
-    return { round, ofRounds, spoken, pending, nextSpeaker: room.chair, phase: 'conclusion' };
+    return { ...base, nextSpeaker: room.chair, phase: 'conclusion' };
   }
-  return { round, ofRounds, spoken, pending, nextSpeaker: pending[0], phase: 'debate' };
+  return { ...base, nextSpeaker: pending[0], phase: 'debate' };
+}
+
+/** True when the steer composer is closed: the room is deliberating but
+ *  only the chair's conclusion is left — the chair read its transcript
+ *  when it started, so a steer now would go unread (agents-api answers
+ *  `409 room_concluding`). Reopen with a follow-up once it lands. */
+export function steerLocked(
+  room: Pick<RoomSummary, 'status' | 'archived'> | null | undefined,
+  progress: Pick<RoundProgress, 'phase'> | null | undefined,
+): boolean {
+  return isDeliberating(room) && progress?.phase === 'conclusion';
+}
+
+/** The locked composer's note, in the question's language. */
+export function steerLockedCopy(lang: 'ja' | 'en'): string {
+  return lang === 'ja'
+    ? '議長が結論を執筆中です — 結論が出たら、フォローアップで再開してください'
+    : 'The chair is writing the conclusion — reopen with a follow-up once it lands';
+}
+
+/** The progress band's copy (round labels are ordinals, see ordinalOfRound). */
+export function progressCopy(
+  room: Pick<RoomView, 'participants' | 'chair' | 'archived' | 'turn_count'>,
+  p: RoundProgress,
+  lang: 'ja' | 'en',
+  concluding: boolean,
+  firstNameOf: (s: string) => string,
+): { line: string; drafting?: string } {
+  const n = room.participants.length;
+  const chair = firstNameOf(room.chair);
+  if (lang === 'ja') {
+    if (room.archived) return { line: 'アーカイブ済み · 閲覧のみ' };
+    if (p.phase === 'done') return { line: `結論が出ました · 第${p.roundOrdinal}ラウンドまで · ${room.turn_count}件の発言` };
+    if (p.phase === 'conclusion')
+      return { line: concluding ? '議論を打ち切って結論へ' : '全ラウンド終了', drafting: `議長の${chair}さんが結論を執筆中…` };
+    return {
+      line: `第${p.roundOrdinal}ラウンド / 全${p.ofRoundsOrdinal}ラウンド · ${n}人中${p.spoken.length}人が発言`,
+      drafting: p.nextSpeaker ? `${firstNameOf(p.nextSpeaker)}さんが執筆中…` : undefined,
+    };
+  }
+  if (room.archived) return { line: 'Archived · read-only' };
+  if (p.phase === 'done') return { line: `Concluded after round ${p.roundOrdinal} · ${room.turn_count} turns` };
+  if (p.phase === 'conclusion')
+    return { line: concluding ? 'Concluding early' : 'All rounds done', drafting: `${chair} (chair) is writing the conclusion…` };
+  return {
+    line: `Round ${p.roundOrdinal} of ${p.ofRoundsOrdinal} · ${p.spoken.length}/${n} have spoken`,
+    drafting: p.nextSpeaker ? `${firstNameOf(p.nextSpeaker)} is drafting…` : undefined,
+  };
 }
 
 export interface TurnSection {
@@ -401,14 +522,15 @@ export interface TurnSection {
   key: string;
   label: string;
   kind: 'opening' | 'operator' | 'round' | 'conclusion';
-  /** Debate round for `kind === 'round'`. */
+  /** Debate round for `kind === 'round'` — stored (absolute); the label
+   *  carries its ordinal. */
   round?: number;
   turns: TurnView[];
 }
 
 const SECTION_LABELS = {
   en: { opening: 'Opening', operator: 'Operator', round: (n: number) => `Round ${n}`, conclusion: 'Conclusion' },
-  ja: { opening: '論点', operator: 'オペレーター', round: (n: number) => `第${n}回`, conclusion: '結論' },
+  ja: { opening: '論点', operator: 'オペレーター', round: (n: number) => `第${n}ラウンド`, conclusion: '結論' },
 } as const;
 
 /** Section label for a debate round / phase in the given language. */
@@ -422,9 +544,11 @@ export function sectionLabel(kind: TurnSection['kind'], lang: 'ja' | 'en', round
  * by CONTIGUITY in chronological order, not a bucket per round: a steer
  * that lands mid-round sits where it happened (between that round's
  * statements), and a reopened room reads Conclusion → Operator → Round N+1
- * → Conclusion, top to bottom, the way it unfolded.
+ * → Conclusion, top to bottom, the way it unfolded. Round labels are
+ * ordinals (a reopened 3 × 2 room's stored round 4 reads "Round 3").
  */
 export function groupTurnsByRound(turns: ReadonlyArray<TurnView>, lang: 'ja' | 'en' = 'en'): TurnSection[] {
+  const ordinals = debateRoundOrdinals(turns);
   const sections: TurnSection[] = [];
   for (const t of [...turns].sort(compareTurns)) {
     const kind: TurnSection['kind'] =
@@ -437,7 +561,7 @@ export function groupTurnsByRound(turns: ReadonlyArray<TurnView>, lang: 'ja' | '
     }
     sections.push({
       key: `${id}@${t.turn_id}`,
-      label: sectionLabel(kind, lang, t.round),
+      label: sectionLabel(kind, lang, ordinals.get(t.round) ?? t.round),
       kind,
       ...(kind === 'round' ? { round: t.round } : {}),
       turns: [t],

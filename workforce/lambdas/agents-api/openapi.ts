@@ -1143,7 +1143,12 @@ paths:
         "400": { description: 'invalid_json / invalid_body' }
         "403": { description: forbidden }
         "404": { description: not_found }
-        "409": { description: room_archived }
+        "409":
+          description: >
+            room_archived; or room_concluding — the room is debating but every statement
+            of the current run has landed (or the run is conclusion-only), so only the
+            chair is left and nobody would read the steer. Nothing is stored; reopen with
+            the follow-up once the conclusion lands.
   /rooms/{id}/conclude:
     post:
       tags: [rooms]

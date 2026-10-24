@@ -1,8 +1,9 @@
 // Unit tests for shared/room.ts (Rooms v1, workforce/adr-0048 proposed) —
 // the pure helpers (the bounded schedule, create validation, POSITION
-// parsing, row → view) and the store's query / write shapes over a mocked
-// DDB + S3: the GSI3 `ROOMS` listing, the preview / body_ref split, the
-// conditional META patch and the conclusion's run guard. The routes and the
+// parsing, ordinal round labels, row → view) and the store's query / write
+// shapes over a mocked DDB + S3: the GSI3 `ROOMS` listing, the preview /
+// body_ref split, bounded-concurrency body hydration, the turn-slot claim,
+// the conditional META patch and the conclusion's run guard. The routes and the
 // Lambda exercise the same module end to end in their own tests.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,11 +11,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const send = vi.fn();
 const getItem = vi.fn();
 const putItem = vi.fn();
+const conditionalPutItem = vi.fn();
 const queryByGsiPaged = vi.fn();
 vi.mock("./ddb.js", () => ({
   ddb: { send: (...args: unknown[]) => send(...args) },
   getItem: (...args: unknown[]) => getItem(...args),
   putItem: (...args: unknown[]) => putItem(...args),
+  conditionalPutItem: (...args: unknown[]) => conditionalPutItem(...args),
   queryByGsiPaged: (...args: unknown[]) => queryByGsiPaged(...args),
 }));
 vi.mock("./task.js", () => {
@@ -50,15 +53,21 @@ vi.mock("@aws-sdk/client-s3", () => ({
 
 import {
   ROOM_AGENT_TURN_MAX_CHARS,
+  ROOM_BODY_FETCH_CONCURRENCY,
   ROOM_TURN_HARD_MAX_CHARS,
   ROOM_TURN_PREVIEW_MAX_CHARS,
   appendTurn,
   buildSchedule,
+  claimSk,
+  claimTurnSlot,
   countAgentTurnsSince,
   createRoom,
+  debateRoundOrdinals,
   listRoomTurns,
   listRooms,
+  mapWithConcurrency,
   maxAgentRound,
+  ordinalOfRound,
   parsePosition,
   questionLanguage,
   toDispatch,
@@ -108,6 +117,8 @@ beforeEach(() => {
   getItem.mockResolvedValue(meta());
   putItem.mockReset();
   putItem.mockResolvedValue(undefined);
+  conditionalPutItem.mockReset();
+  conditionalPutItem.mockResolvedValue(undefined);
   queryByGsiPaged.mockReset();
   queryByGsiPaged.mockResolvedValue({ items: [], cursor: undefined });
   s3Send.mockReset();
@@ -185,6 +196,66 @@ describe("buildSchedule", () => {
     expect(run2.at(-1)).toEqual({ speaker: "dario", round: 5, kind: "conclusion" });
     const run3 = buildSchedule(slugs, 0, "dario", maxAgentRound([...run1, ...run2]) + 1);
     expect(run3).toEqual([{ speaker: "dario", round: 6, kind: "conclusion" }]);
+  });
+});
+
+describe("ordinalOfRound / debateRoundOrdinals", () => {
+  // The backend's real numbering: a 3 × 2 room concludes at round 3, a
+  // reopen speaks at 4 and concludes at 5, a later conclude-now takes 6.
+  const turns = [
+    { kind: "opening" as const, round: 0 },
+    ...[1, 2].flatMap((round) => [0, 1, 2].map(() => ({ kind: "statement" as const, round }))),
+    { kind: "conclusion" as const, round: 3 },
+    { kind: "steer" as const, round: 0 },
+    ...[0, 1, 2].map(() => ({ kind: "statement" as const, round: 4 })),
+    { kind: "conclusion" as const, round: 5 },
+    { kind: "conclusion" as const, round: 6 },
+  ];
+
+  it("labels debate rounds 1, 2, 3 — the reopened stored round 4 is the third", () => {
+    expect([...debateRoundOrdinals(turns)]).toEqual([[1, 1], [2, 2], [4, 3]]);
+    expect(ordinalOfRound(turns, 1)).toBe(1);
+    expect(ordinalOfRound(turns, 2)).toBe(2);
+    expect(ordinalOfRound(turns, 4)).toBe(3);
+  });
+
+  it("a round with no statement yet gets the ordinal it will have", () => {
+    const beforeReopen = turns.slice(0, 9); // through the round-3 conclusion + steer
+    expect(ordinalOfRound(beforeReopen, 4)).toBe(3);
+    expect(ordinalOfRound([{ kind: "opening", round: 0 }], 1)).toBe(1);
+  });
+});
+
+describe("claimTurnSlot", () => {
+  const step = { room_id: ROOM, run_id: "01HRUN00000000000000000000", round: 2, kind: "statement" as const, speaker: "maya" };
+
+  it("puts ROOM#/CLAIM#{run}#{round}#{kind}#{speaker} conditionally on attribute_not_exists(sk)", async () => {
+    expect(claimSk(step.run_id, 2, "statement", "maya")).toBe("CLAIM#01HRUN00000000000000000000#2#statement#maya");
+    expect(await claimTurnSlot(step, () => new Date("2026-10-24T01:02:03.000Z"))).toBe(true);
+    expect(conditionalPutItem).toHaveBeenCalledWith(
+      {
+        pk: `ROOM#${ROOM}`,
+        sk: "CLAIM#01HRUN00000000000000000000#2#statement#maya",
+        room_id: ROOM,
+        run_id: step.run_id,
+        round: 2,
+        kind: "statement",
+        speaker: "maya",
+        claimed_at: "2026-10-24T01:02:03.000Z",
+      },
+      "attribute_not_exists(sk)",
+    );
+  });
+
+  it("returns false when the slot is already claimed; rethrows anything else", async () => {
+    conditionalPutItem.mockRejectedValueOnce(Object.assign(new Error("cond"), { name: "ConditionalCheckFailedException" }));
+    expect(await claimTurnSlot(step)).toBe(false);
+    conditionalPutItem.mockRejectedValueOnce(new Error("throttled"));
+    await expect(claimTurnSlot(step)).rejects.toThrow(/throttled/);
+  });
+
+  it("CLAIM rows sort below TURN#, outside every turn read's key range", () => {
+    expect(claimSk("01HRUN00000000000000000000", 1, "conclusion", "dario") < "TURN#").toBe(true);
   });
 });
 
@@ -366,6 +437,40 @@ describe("turn reads", () => {
     expect(q[0]!.input).toMatchObject({ ScanIndexForward: true, ConsistentRead: true });
     expect(q[1]!.input.ExclusiveStartKey).toEqual({ pk: `ROOM#${ROOM}`, sk: "TURN#01A" });
     expect((calls(s3Send)[0]!.input as { Key: string }).Key).toBe(`rooms/${ROOM}/01B.md`);
+  });
+
+  it("hydrates S3 bodies with bounded concurrency, keeping turn order", async () => {
+    const rows = Array.from({ length: 20 }, (_, i) => ({
+      turn_id: `01T${String(i).padStart(3, "0")}`, room_id: ROOM, run_id: "r", round: 1, kind: "statement", from: "maya",
+      at: "t", body_preview: "p", body_ref: `rooms/${ROOM}/${i}.md`,
+    }));
+    send.mockResolvedValueOnce({ Items: rows });
+    let inflight = 0;
+    let peak = 0;
+    s3Send.mockImplementation(async (cmd: { input: { Key: string } }) => {
+      inflight += 1;
+      peak = Math.max(peak, inflight);
+      await new Promise((r) => setTimeout(r, 1));
+      inflight -= 1;
+      return { Body: { transformToString: async () => `body of ${cmd.input.Key}` } };
+    });
+
+    const turns = await listRoomTurns(ROOM);
+
+    expect(turns.map((t) => t.body)).toEqual(rows.map((r) => `body of ${r.body_ref}`));
+    expect(peak).toBe(ROOM_BODY_FETCH_CONCURRENCY);
+    expect(ROOM_BODY_FETCH_CONCURRENCY).toBe(8);
+  });
+
+  it("mapWithConcurrency: order kept, limit honoured, first rejection rejects", async () => {
+    expect(await mapWithConcurrency([3, 1, 2], 2, async (n) => n * 10)).toEqual([30, 10, 20]);
+    expect(await mapWithConcurrency([], 8, async (n: number) => n)).toEqual([]);
+    await expect(
+      mapWithConcurrency([1, 2], 8, async (n) => {
+        if (n === 2) throw new Error("missing body");
+        return n;
+      }),
+    ).rejects.toThrow(/missing body/);
   });
 
   it("countAgentTurnsSince counts non-operator rows from the ULID lower bound", async () => {

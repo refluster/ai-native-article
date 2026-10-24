@@ -1,6 +1,12 @@
 // Unit tests for lib/rooms — the pure helpers the Room pages derive their
-// state from (merge, progress band, timeline grouping, language), plus the
-// read/write wire calls (plain fetch for reads, SigV4 for writes).
+// state from (merge, progress band + its copy, ordinal round labels,
+// timeline grouping, language, the steer lock, stall / poll health), plus
+// the read/write wire calls (plain fetch for reads, SigV4 for writes).
+//
+// Every fixture uses the backend's real round numbering (agents-api
+// maxAgentRound + 1): a 3 × 2 room's statements sit at rounds 1, 2, its
+// conclusion at 3, a reopen's statements at 4 and conclusion at 5, and a
+// later Conclude now at 6.
 //
 // sigv4 is mocked wholesale so these never touch AWS or read Cognito env.
 
@@ -21,20 +27,30 @@ vi.mock('../config/auth', () => ({
 
 import { signedFetch } from '../lib/sigv4';
 import {
+  POLL_FAILURE_THRESHOLD,
+  STALL_MS,
   concludeRoom,
   createRoom,
+  debateRoundOrdinals,
   fetchRoom,
   fetchRooms,
   groupTurnsByRound,
   isDeliberating,
   lastTurnId,
   mergeTurns,
+  nextPollHealth,
+  ordinalOfRound,
   paragraphsOf,
   patchRoom,
   pollCursor,
+  pollErrorToShow,
+  progressCopy,
   questionLanguage,
   roomsWriteEnabled,
   roundProgress,
+  stallState,
+  steerLocked,
+  steerLockedCopy,
   steerRoom,
   summarizeQuestion,
   type RoomView,
@@ -102,6 +118,19 @@ function opening(): TurnView {
 }
 function say(from: string, round: number, run_id = RUN1): TurnView {
   return turn({ kind: 'statement', from, round, run_id, position: `${from} holds a view` });
+}
+
+const RUN3 = '01RUN3';
+
+/** A 3 × 2 room through its first conclusion (round 3) and a reopening
+ *  steer on RUN2 — what the backend actually stores. */
+function concludedThenReopened(): TurnView[] {
+  return [
+    opening(),
+    ...[1, 2].flatMap((r) => MEMBERS.map((m) => say(m, r))),
+    turn({ kind: 'conclusion', from: 'nadia', round: 3 }),
+    turn({ kind: 'steer', from: 'operator', round: 0, run_id: RUN2 }),
+  ];
 }
 
 beforeEach(() => {
@@ -198,22 +227,46 @@ describe('roundProgress', () => {
     expect(p.nextSpeaker).toBeUndefined();
   });
 
-  it('after a reopen: one more round (3 of 3), counted only from the new run', () => {
-    const before = [
-      opening(),
-      ...[1, 2].flatMap((r) => MEMBERS.map((m) => say(m, r))),
-      turn({ kind: 'conclusion', from: 'nadia', round: 3 }),
-      turn({ kind: 'steer', from: 'operator', round: 0, run_id: RUN2 }),
-    ];
+  it('after a reopen: stored round 4 (after the round-3 conclusion) reads as round 3 of 3, counted only from the new run', () => {
+    const before = concludedThenReopened();
+    // Derived from the turns alone (no run plan on the view).
     const reopened = room({ run_id: RUN2, run_count: 2 });
     const fresh = roundProgress(reopened, before);
-    expect(fresh).toMatchObject({ round: 3, ofRounds: 3, spoken: [], pending: MEMBERS, nextSpeaker: 'nadia', phase: 'debate' });
+    expect(fresh).toMatchObject({
+      round: 4,
+      ofRounds: 4,
+      roundOrdinal: 3,
+      ofRoundsOrdinal: 3,
+      spoken: [],
+      pending: MEMBERS,
+      nextSpeaker: 'nadia',
+      phase: 'debate',
+    });
 
-    const mid = roundProgress(reopened, [...before, say('nadia', 3, RUN2)]);
-    expect(mid).toMatchObject({ round: 3, ofRounds: 3, spoken: ['nadia'], pending: ['dario', 'freya'], nextSpeaker: 'dario' });
+    const mid = roundProgress(reopened, [...before, say('nadia', 4, RUN2)]);
+    expect(mid).toMatchObject({ round: 4, roundOrdinal: 3, ofRoundsOrdinal: 3, spoken: ['nadia'], pending: ['dario', 'freya'], nextSpeaker: 'dario' });
 
-    // Same answer if the backend stores rounds=1 on META for the reopen.
-    expect(roundProgress({ ...reopened, rounds: 1 }, [...before, say('nadia', 3, RUN2)])).toMatchObject({ round: 3, ofRounds: 3 });
+    // Same answer from the API's run plan.
+    const planned = room({ run_id: RUN2, run_count: 2, run_start_round: 4, run_rounds: 1 });
+    expect(roundProgress(planned, [...before, say('nadia', 4, RUN2)])).toMatchObject({ round: 4, roundOrdinal: 3, ofRoundsOrdinal: 3 });
+    expect(progressCopy(planned, roundProgress(planned, before), 'en', false, (s) => s).line).toBe('Round 3 of 3 · 0/3 have spoken');
+  });
+
+  it('a later Conclude now (stored round 6) reports the last debate round reached — "Concluded after round 3"', () => {
+    const turns = [
+      ...concludedThenReopened(),
+      ...MEMBERS.map((m) => say(m, 4, RUN2)),
+      turn({ kind: 'conclusion', from: 'nadia', round: 5, run_id: RUN2 }),
+    ];
+    const concluding = room({ run_id: RUN3, run_count: 3, run_start_round: 6, run_rounds: 0 });
+    const p = roundProgress(concluding, turns);
+    expect(p).toMatchObject({ round: 4, roundOrdinal: 3, ofRoundsOrdinal: 3, spoken: MEMBERS, phase: 'conclusion', nextSpeaker: 'nadia' });
+    const done = [...turns, turn({ kind: 'conclusion', from: 'nadia', round: 6, run_id: RUN3 })];
+    const after = roundProgress({ ...concluding, status: 'concluded' }, done);
+    expect(after.phase).toBe('done');
+    expect(progressCopy({ ...concluding, turn_count: 18 }, after, 'en', true, (s) => s).line).toBe(
+      'Concluded after round 3 · 18 turns',
+    );
   });
 
   it('a "Conclude now" run goes straight to the chair', () => {
@@ -226,11 +279,128 @@ describe('roundProgress', () => {
   });
 
   it('prefers the API run plan (run_start_round / run_rounds) when present', () => {
-    const before = [opening(), ...[1, 2].flatMap((r) => MEMBERS.map((m) => say(m, r)))];
-    const reopened = room({ run_id: RUN2, run_count: 2, run_start_round: 3, run_rounds: 1 });
-    expect(roundProgress(reopened, before)).toMatchObject({ round: 3, ofRounds: 3, pending: MEMBERS, phase: 'debate' });
-    const first = room({ run_start_round: 1, run_rounds: 3 });
-    expect(roundProgress(first, [opening(), say('nadia', 1)])).toMatchObject({ round: 1, ofRounds: 3, spoken: ['nadia'] });
+    const reopened = room({ run_id: RUN2, run_count: 2, run_start_round: 4, run_rounds: 1 });
+    expect(roundProgress(reopened, concludedThenReopened())).toMatchObject({ round: 4, ofRounds: 4, pending: MEMBERS, phase: 'debate' });
+    const first = room({ rounds: 3, run_start_round: 1, run_rounds: 3 });
+    expect(roundProgress(first, [opening(), say('nadia', 1)])).toMatchObject({
+      round: 1,
+      ofRounds: 3,
+      roundOrdinal: 1,
+      ofRoundsOrdinal: 3,
+      spoken: ['nadia'],
+    });
+  });
+});
+
+// ── Ordinal round labels ────────────────────────────────────────────────
+
+describe('ordinalOfRound / debateRoundOrdinals', () => {
+  it('counts debate rounds only: stored 1, 2, 4 → 1, 2, 3 (the conclusions at 3, 5, 6 take no ordinal)', () => {
+    const turns = [
+      ...concludedThenReopened(),
+      ...MEMBERS.map((m) => say(m, 4, RUN2)),
+      turn({ kind: 'conclusion', from: 'nadia', round: 5, run_id: RUN2 }),
+      turn({ kind: 'conclusion', from: 'nadia', round: 6, run_id: RUN3 }),
+    ];
+    expect([...debateRoundOrdinals(turns)]).toEqual([
+      [1, 1],
+      [2, 2],
+      [4, 3],
+    ]);
+    expect(ordinalOfRound(turns, 4)).toBe(3);
+    // Before any round-4 statement lands, round 4 already reads as the 3rd.
+    expect(ordinalOfRound(concludedThenReopened(), 4)).toBe(3);
+  });
+});
+
+// ── progressCopy (band wording, EN + JA) ────────────────────────────────
+
+describe('progressCopy', () => {
+  const name = (s: string) => s;
+
+  it('EN: round of rounds, spoken count, drafting line', () => {
+    const p = roundProgress(room(), [opening(), say('nadia', 1), say('dario', 1), say('freya', 1), say('nadia', 2)]);
+    expect(progressCopy(room(), p, 'en', false, name)).toEqual({
+      line: 'Round 2 of 2 · 1/3 have spoken',
+      drafting: 'dario is drafting…',
+    });
+  });
+
+  it('JA uses ラウンド throughout — never 回', () => {
+    const r = room({ question: '値上げすべきか？' });
+    const mid = roundProgress(r, [opening(), say('nadia', 1), say('dario', 1), say('freya', 1), say('nadia', 2)]);
+    expect(progressCopy(r, mid, 'ja', false, name).line).toBe('第2ラウンド / 全2ラウンド · 3人中1人が発言');
+
+    const all = [opening(), ...[1, 2].flatMap((x) => MEMBERS.map((m) => say(m, x)))];
+    const done = roundProgress({ ...r, status: 'concluded' }, [...all, turn({ kind: 'conclusion', from: 'nadia', round: 3 })]);
+    expect(progressCopy({ ...r, turn_count: 8 }, done, 'ja', false, name).line).toBe('結論が出ました · 第2ラウンドまで · 8件の発言');
+
+    const early = roundProgress(room({ run_id: RUN2, run_start_round: 2, run_rounds: 0 }), [opening(), say('nadia', 1)]);
+    expect(progressCopy(r, early, 'ja', true, name).line).toBe('議論を打ち切って結論へ');
+    expect(progressCopy(r, roundProgress(r, all), 'ja', false, name).line).toBe('全ラウンド終了');
+
+    // The reopened 3 × 2 room: stored round 4 is 第3ラウンド / 全3ラウンド.
+    const reopened = room({ question: '値上げすべきか？', run_id: RUN2, run_count: 2, run_start_round: 4, run_rounds: 1 });
+    expect(progressCopy(reopened, roundProgress(reopened, concludedThenReopened()), 'ja', false, name).line).toBe(
+      '第3ラウンド / 全3ラウンド · 3人中0人が発言',
+    );
+  });
+});
+
+// ── steerLocked (the composer while the chair concludes) ────────────────
+
+describe('steerLocked', () => {
+  it('locks the composer in the conclusion phase only', () => {
+    const r = room();
+    const all = [opening(), ...[1, 2].flatMap((x) => MEMBERS.map((m) => say(m, x)))];
+    const concluding = roundProgress(r, all);
+    expect(concluding.phase).toBe('conclusion');
+    expect(steerLocked(r, concluding)).toBe(true);
+    // Mid-debate a steer still has readers.
+    const mid = roundProgress(r, all.slice(0, -1));
+    expect(mid.phase).toBe('debate');
+    expect(steerLocked(r, mid)).toBe(false);
+    // A Conclude-now run is the conclusion phase too.
+    const now = room({ run_id: RUN2, run_start_round: 2, run_rounds: 0 });
+    expect(steerLocked(now, roundProgress(now, [opening(), say('nadia', 1)]))).toBe(true);
+    // Concluded: the composer reopens instead.
+    const concluded = room({ status: 'concluded' });
+    expect(steerLocked(concluded, roundProgress(concluded, [...all, turn({ kind: 'conclusion', from: 'nadia', round: 3 })]))).toBe(false);
+    expect(steerLocked(null, null)).toBe(false);
+  });
+
+  it('says why, in the question language', () => {
+    expect(steerLockedCopy('en')).toBe('The chair is writing the conclusion — reopen with a follow-up once it lands');
+    expect(steerLockedCopy('ja')).toMatch(/議長が結論を執筆中/);
+  });
+});
+
+// ── stallState / poll health ────────────────────────────────────────────
+
+describe('stallState', () => {
+  it('is idle unless deliberating, stalled after STALL_MS without progress, else live', () => {
+    const t0 = Date.UTC(2026, 9, 24);
+    expect(stallState(t0 + STALL_MS - 1, t0, room())).toBe('live');
+    expect(stallState(t0 + STALL_MS, t0, room())).toBe('stalled');
+    expect(stallState(t0 + 10 * STALL_MS, t0, room({ status: 'concluded' }))).toBe('idle');
+    expect(stallState(t0 + 10 * STALL_MS, t0, room({ archived: true }))).toBe('idle');
+    expect(stallState(t0, t0, null)).toBe('idle');
+    expect(STALL_MS).toBe(180_000);
+  });
+});
+
+describe('poll health', () => {
+  it('shows the fetch error only after POLL_FAILURE_THRESHOLD consecutive failures; a success resets', () => {
+    expect(POLL_FAILURE_THRESHOLD).toBe(3);
+    let h = { failures: 0 };
+    h = nextPollHealth(h, { ok: false, error: 'agents-api 502' });
+    h = nextPollHealth(h, { ok: false, error: 'agents-api 504' });
+    expect(pollErrorToShow(h)).toBeUndefined();
+    h = nextPollHealth(h, { ok: false, error: 'Failed to fetch' });
+    expect(pollErrorToShow(h)).toBe('Failed to fetch');
+    h = nextPollHealth(h, { ok: true });
+    expect(h).toEqual({ failures: 0 });
+    expect(pollErrorToShow(h)).toBeUndefined();
   });
 });
 
@@ -292,9 +462,27 @@ describe('groupTurnsByRound', () => {
     expect(new Set(sections.map((s) => s.key)).size).toBe(sections.length);
   });
 
-  it('uses Japanese labels for a Japanese question', () => {
-    const turns = [opening(), turn({ kind: 'steer', from: 'operator', round: 0 }), say('nadia', 2), turn({ kind: 'conclusion', from: 'nadia', round: 3 })];
-    expect(groupTurnsByRound(turns, 'ja').map((s) => s.label)).toEqual(['論点', 'オペレーター', '第2回', '結論']);
+  it('a reopened 3 × 2 room reads Round 1, Round 2, Conclusion, Operator, Round 3, Conclusion (stored rounds 1, 2, 3, 0, 4, 5)', () => {
+    const turns = [
+      ...concludedThenReopened(),
+      ...MEMBERS.map((m) => say(m, 4, RUN2)),
+      turn({ kind: 'conclusion', from: 'nadia', round: 5, run_id: RUN2 }),
+    ];
+    const sections = groupTurnsByRound(turns);
+    expect(sections.map((s) => s.label)).toEqual(['Opening', 'Round 1', 'Round 2', 'Conclusion', 'Operator', 'Round 3', 'Conclusion']);
+    // The section keeps the stored round; only the label is the ordinal.
+    expect(sections[5]!.round).toBe(4);
+  });
+
+  it('uses Japanese labels (ラウンド, never 回) for a Japanese question', () => {
+    const turns = [
+      opening(),
+      say('nadia', 1),
+      turn({ kind: 'steer', from: 'operator', round: 0 }),
+      say('nadia', 2),
+      turn({ kind: 'conclusion', from: 'nadia', round: 3 }),
+    ];
+    expect(groupTurnsByRound(turns, 'ja').map((s) => s.label)).toEqual(['論点', '第1ラウンド', 'オペレーター', '第2ラウンド', '結論']);
   });
 });
 

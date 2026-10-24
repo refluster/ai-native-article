@@ -1334,6 +1334,10 @@ Resources:
       Policies:
         - Statement:
             - Sid: RoomDebateTableAccess
+              # Base table only: the turn reads the ROOM# / AGENT# partitions
+              # by key (GetItem, Query on pk), writes TURN# / CLAIM# rows and
+              # patches META. It never queries a GSI (the GSI3 ROOMS listing
+              # is agents-api's), so no index/* resource.
               Effect: Allow
               Action:
                 - dynamodb:GetItem
@@ -1342,7 +1346,6 @@ Resources:
                 - dynamodb:UpdateItem
               Resource:
                 - !GetAtt WfTable.Arn
-                - !Sub ${WfTable.Arn}/index/*
             - Sid: RoomDebateBodyReadWrite
               # Transcript hydration + storing long turns (>preview cap)
               # before the DDB TURN row. Scoped to rooms/*.

@@ -5,10 +5,13 @@
 // shared/room.ts appendTurn / updateRoomMeta over a mocked DDB, so the tests
 // see the exact TURN row and META patch a turn produces. They pin the run
 // guards (archived / superseded / already spoke / participant / budget /
-// chair-only), the hand-off (a superseded / archived / already-spoken turn
+// chair-only), the turn-slot claim (an overlapping duplicate delivery loses
+// the conditional put and stops), the hand-off (a superseded / archived /
+// already-spoken turn
 // stops the chain, every other outcome — including a throw — passes the
-// baton), the W-1 guards, POSITION parsing, the language line, and the
-// conclusion's META flip.
+// baton), the W-1 guards, POSITION parsing, the language line, ordinal
+// round labels, the bounded transcript window, the conclusion's META flip
+// and the steer-during-conclusion notice.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -68,23 +71,28 @@ vi.mock("../shared/memory.js", () => ({
 
 const getItem = vi.fn();
 const putItem = vi.fn();
+const conditionalPutItem = vi.fn();
 const ddbSend = vi.fn();
 vi.mock("../shared/ddb.js", () => ({
   ddb: { send: (cmd: unknown) => ddbSend(cmd) },
   getItem: (...args: unknown[]) => getItem(...args),
   putItem: (...args: unknown[]) => putItem(...args),
+  conditionalPutItem: (...args: unknown[]) => conditionalPutItem(...args),
   queryByGsiPaged: vi.fn(),
   updateOperational: vi.fn(),
 }));
 
-// Reads mocked; appendTurn / updateRoomMeta / parsePosition stay real.
+// Reads mocked; appendTurn / updateRoomMeta / claimTurnSlot / parsePosition
+// stay real.
 const listRoomTurns = vi.fn();
+const listRoomTurnRows = vi.fn();
 const countAgentTurnsSince = vi.fn();
 vi.mock("../shared/room.js", async (importOriginal) => {
   const real = await importOriginal<typeof import("../shared/room.js")>();
   return {
     ...real,
     listRoomTurns: (...args: unknown[]) => listRoomTurns(...args),
+    listRoomTurnRows: (...args: unknown[]) => listRoomTurnRows(...args),
     countAgentTurnsSince: (...args: unknown[]) => countAgentTurnsSince(...args),
   };
 });
@@ -170,10 +178,14 @@ beforeEach(() => {
   });
   putItem.mockReset();
   putItem.mockResolvedValue(undefined);
+  conditionalPutItem.mockReset();
+  conditionalPutItem.mockResolvedValue(undefined);
   ddbSend.mockReset();
   ddbSend.mockImplementation(async () => ({ Attributes: META }));
   listRoomTurns.mockReset();
   listRoomTurns.mockResolvedValue([turn({})]);
+  listRoomTurnRows.mockReset();
+  listRoomTurnRows.mockResolvedValue([]);
   countAgentTurnsSince.mockReset();
   countAgentTurnsSince.mockResolvedValue(0);
 });
@@ -277,6 +289,46 @@ describe("run guards", () => {
     expect(complete).not.toHaveBeenCalled();
     expect(lambdaSend).not.toHaveBeenCalled();
     expect(metrics).toContain("WfRoomTurnSkipped{Reason=already_spoke}");
+  });
+
+  it("claims the turn's slot exactly once, with a conditional put, before the Claude call", async () => {
+    complete.mockResolvedValueOnce(completion("POSITION: Ship.\nYes."));
+    await handler(EVENT);
+    expect(conditionalPutItem).toHaveBeenCalledTimes(1);
+    const [item, condition] = conditionalPutItem.mock.calls[0]! as [Record<string, unknown>, string];
+    expect(item).toMatchObject({
+      pk: `ROOM#${ROOM}`,
+      sk: `CLAIM#${RUN}#1#statement#maya`,
+      room_id: ROOM,
+      run_id: RUN,
+      round: 1,
+      kind: "statement",
+      speaker: "maya",
+    });
+    expect(typeof item.claimed_at).toBe("string");
+    expect(condition).toBe("attribute_not_exists(sk)");
+    expect(conditionalPutItem.mock.invocationCallOrder[0]!).toBeLessThan(complete.mock.invocationCallOrder[0]!);
+  });
+
+  it("an overlapping duplicate delivery (claim lost): no LLM call, no turn, no baton", async () => {
+    // Both copies passed the transcript check (the other one has not written
+    // its turn yet); only the conditional put tells them apart.
+    conditionalPutItem.mockRejectedValueOnce(
+      Object.assign(new Error("The conditional request failed"), { name: "ConditionalCheckFailedException" }),
+    );
+    const res = await handler(EVENT);
+    expect(res).toEqual({ status: "skipped", reason: "already_spoke" });
+    expect(complete).not.toHaveBeenCalled();
+    expect(putItem).not.toHaveBeenCalled();
+    expect(lambdaSend).not.toHaveBeenCalled();
+    expect(metrics).toContain("WfRoomTurnSkipped{Reason=already_spoke}");
+  });
+
+  it("a claim write that fails for another reason throws (W-4) and still hands off", async () => {
+    conditionalPutItem.mockRejectedValueOnce(new Error("ddb throttled"));
+    await expect(handler(EVENT)).rejects.toThrow(/ddb throttled/);
+    expect(complete).not.toHaveBeenCalled();
+    expect(lambdaSend).toHaveBeenCalledTimes(1);
   });
 
   it("the same speaker in another run or round is NOT already_spoke", async () => {
@@ -425,11 +477,43 @@ describe("conclusion (chair)", () => {
       ":conclusion_turn_id": row.turn_id,
       ":conclusion_preview": text,
     });
-    expect(complete.mock.calls[0]![0].maxTokens).toBe(2400);
+    expect(complete.mock.calls[0]![0].maxTokens).toBe(3200);
+    expect(complete.mock.calls[0]![0].reasoningBudgetTokens).toBe(2048);
+    expect(complete.mock.calls[0]![0].system).toContain("約1,500字");
     expect(complete.mock.calls[0]![0].system).toContain("## 結論");
     expect(complete.mock.calls[0]![0].system).toContain("The debate rounds are over");
     expect(lambdaSend).not.toHaveBeenCalled();
     expect(metrics).toContain("WfRoomConcluded");
+  });
+
+  it("a steer newer than the chair's transcript snapshot: last_error says to reopen (W-4) + WfRoomSteerDuringConclusion", async () => {
+    complete.mockResolvedValueOnce(completion("## Conclusion\nShip."));
+    // The chair read [opening]; the steer landed during its call.
+    listRoomTurnRows.mockResolvedValueOnce([
+      { turn_id: "01J00000000000000000000010", run_id: RUN, round: 0, kind: "opening", from: "operator" },
+      { turn_id: "01J00000000000000000000099", run_id: RUN, round: 0, kind: "steer", from: "operator" },
+    ]);
+    await handler(CONCLUDE);
+    // [0] is the conclusion's META flip; [1] the notice, guarded on the run.
+    const patch = metaUpdates()[1]!;
+    expect(patch.ExpressionAttributeValues).toMatchObject({ ":if_run_id": RUN });
+    expect(String((patch.ExpressionAttributeValues as Record<string, string>)[":last_error"])).toMatch(
+      /steer arrived while the chair was writing the conclusion.*reopen/,
+    );
+    expect(metrics).toContain("WfRoomSteerDuringConclusion");
+  });
+
+  it("no notice when every steer of the run was in the snapshot (or belongs to another run)", async () => {
+    listRoomTurns.mockResolvedValueOnce([turn({}), turn({ turn_id: "01J00000000000000000000011", kind: "steer", body: "Cost?" })]);
+    listRoomTurnRows.mockResolvedValueOnce([
+      { turn_id: "01J00000000000000000000010", run_id: RUN, round: 0, kind: "opening", from: "operator" },
+      { turn_id: "01J00000000000000000000011", run_id: RUN, round: 0, kind: "steer", from: "operator" },
+      { turn_id: "01J00000000000000000000099", run_id: "01J0000000000000000000NEWR", round: 0, kind: "steer", from: "operator" },
+    ]);
+    complete.mockResolvedValueOnce(completion("## Conclusion\nShip."));
+    await handler(CONCLUDE);
+    expect(metaUpdates()).toHaveLength(1);
+    expect(metrics).not.toContain("WfRoomSteerDuringConclusion");
   });
 
   it("drops a stray POSITION line from a conclusion", async () => {
@@ -489,12 +573,66 @@ describe("language + round lines", () => {
 });
 
 describe("reopened run", () => {
-  it("tells the speaker the operator reopened the room at the reopen round", async () => {
-    Object.assign(META, { run_start_round: 3, run_rounds: 1, run_count: 2 });
+  // The backend's real numbering for a 2 × 2 room: statements 1, 2 →
+  // conclusion 3 → the reopen speaks at stored round 4 (maxAgentRound + 1).
+  const RUN2 = "01J0000000000000000000RUN2";
+  const history = () => [
+    turn({}),
+    turn({ turn_id: "01J00000000000000000000011", from: "maya", round: 1, kind: "statement", body: "R1 maya." }),
+    turn({ turn_id: "01J00000000000000000000012", from: "dario", round: 1, kind: "statement", body: "R1 dario." }),
+    turn({ turn_id: "01J00000000000000000000013", from: "maya", round: 2, kind: "statement", body: "R2 maya." }),
+    turn({ turn_id: "01J00000000000000000000014", from: "dario", round: 2, kind: "statement", body: "R2 dario." }),
+    turn({ turn_id: "01J00000000000000000000015", from: "dario", round: 3, kind: "conclusion", body: "## Conclusion\nShip." }),
+    turn({ turn_id: "01J00000000000000000000016", from: "operator", round: 0, kind: "steer", run_id: RUN2, body: "And cost?" }),
+  ];
+
+  it("labels the stored round by its debate ordinal: stored round 4 is round 3 of 3", async () => {
+    Object.assign(META, { rounds: 2, run_id: RUN2, run_start_round: 4, run_rounds: 1, run_count: 2 });
+    listRoomTurns.mockResolvedValueOnce(history());
     complete.mockResolvedValueOnce(completion("POSITION: Cost changes nothing.\nStill ship."));
-    await handler({ ...EVENT, round: 3, then: [] });
-    const system = complete.mock.calls[0]![0].system as string;
-    expect(system).toContain("This is round 3 of 3.");
-    expect(system).toContain("reopened the room with a follow-up");
+    await handler({ ...EVENT, run_id: RUN2, round: 4, then: [] });
+    const call = complete.mock.calls[0]![0];
+    expect(call.system).toContain("This is round 3 of 3.");
+    expect(call.system).not.toContain("round 4");
+    expect(call.system).toContain("reopened the room with a follow-up");
+    expect(call.system).toContain("last round before the chair concludes");
+    // Transcript tags are ordinals too; the conclusion keeps its own tag.
+    expect(call.user).toContain("[Round 2] dario: R2 dario.");
+    expect(call.user).toContain("[Conclusion] dario: ## Conclusion");
+    expect(call.user).not.toContain("[Round 3]");
+    // The row keeps the absolute round.
+    expect(putItem.mock.calls[0]![0]).toMatchObject({ round: 4, run_id: RUN2 });
+  });
+});
+
+describe("transcript window (bounded prompt across reopens)", () => {
+  it("keeps the opening, the latest conclusion and the last 30 turns, eliding the rest with a count", async () => {
+    const id = (n: number) => `01J000000000000000000${String(n).padStart(5, "0")}`;
+    const turns = [turn({ turn_id: id(0) })];
+    for (let i = 1; i <= 10; i++) turns.push(turn({ turn_id: id(i), from: "dario", round: i, kind: "statement", body: `early ${i}` }));
+    turns.push(turn({ turn_id: id(11), from: "dario", round: 11, kind: "conclusion", body: "## Conclusion\nLatest answer." }));
+    for (let i = 12; i <= 50; i++) turns.push(turn({ turn_id: id(i), from: "dario", round: 12, kind: "statement", body: `late ${i}` }));
+    listRoomTurns.mockResolvedValueOnce(turns);
+    complete.mockResolvedValueOnce(completion("POSITION: Ship.\nYes."));
+
+    await handler({ ...EVENT, then: [] });
+
+    const user = complete.mock.calls[0]![0].user as string;
+    expect(user).toContain("Operator (opening the room with the question)");
+    expect(user).toContain("…(10 earlier turns omitted)");
+    expect(user).toContain("Latest answer.");
+    // 39 late turns → the first 9 fall before the 30-turn tail.
+    expect(user).toContain("…(9 earlier turns omitted)");
+    expect(user).not.toContain("early 10");
+    expect(user).not.toMatch(/late 20$/m);
+    expect(user).toContain("late 21");
+    expect(user).toContain("late 50");
+    expect(user.match(/\[Round \d+\] dario: late/g)).toHaveLength(30);
+  });
+
+  it("a short room is sent whole (no elision line)", async () => {
+    complete.mockResolvedValueOnce(completion("POSITION: Ship.\nYes."));
+    await handler({ ...EVENT, then: [] });
+    expect(complete.mock.calls[0]![0].user).not.toContain("omitted");
   });
 });
