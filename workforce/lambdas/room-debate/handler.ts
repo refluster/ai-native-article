@@ -2,7 +2,7 @@
 // proposed).
 //
 // Architecture: the Room twin of wf-messaging-reply (ADR-0006) — the same
-// narrow real-time execution surface, not a new one. The agents-api room
+// narrow real-time execution surface, not a new one. The wf-rooms-api room
 // writes (`POST /rooms`, a reopening steer, `POST /rooms/{id}/conclude`)
 // async-invoke this Lambda with the run's head turn and the rest of the
 // schedule in `then`. One invocation:
@@ -620,7 +620,7 @@ async function speakOnce(event: RoomDebateEvent): Promise<RoomDebateResult> {
 
 /**
  * A steer stored on this run after the chair read its transcript was never
- * read: the conclusion has landed without it. agents-api refuses a steer
+ * read: the conclusion has landed without it. wf-rooms-api refuses a steer
  * once every statement of the run is in (`409 room_concluding`), but one
  * that raced the last statement can still slip in. Say so on META (W-4:
  * visible, never silent) so the operator reopens to address it. Best-effort

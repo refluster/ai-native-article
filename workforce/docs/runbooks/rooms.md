@@ -105,7 +105,7 @@ logs.
 
 | Symptom | Cause | What to do |
 |---|---|---|
-| Banner right after creating, nobody speaks | The Room was stored but the first dispatch failed (`room_dispatch_failed`, `WfRoomDispatchFailed`). | **Conclude now** gets you a conclusion from the question alone; or create the Room again. If it repeats, check the agents-api logs and its `lambda:InvokeFunction` permission on `wf-room-debate-{stage}`. |
+| Banner right after creating, nobody speaks | The Room was stored but the first dispatch failed (`room_dispatch_failed`, `WfRoomDispatchFailed`). | **Conclude now** gets you a conclusion from the question alone; or create the Room again. If it repeats, check the `wf-rooms-api-{stage}` logs and its `lambda:InvokeFunction` permission on `wf-room-debate-{stage}`. |
 | One member's turn is missing, the rest carried on | That turn threw (`WfRoomTurnThrow{Reason}`); the baton was passed first, so the room continued. Usual reasons: `stop_reason=max_tokens` (W-1 truncation — nothing was written), an LLM-artefact head, an empty body, or `AGENT#{slug}/META lacks model/system_prompt` (`WfRoomPersonaMissing` — fix the row through agents-api, ADR-0007). | Nothing, if the debate still reads well. Otherwise steer after it concludes (reopen) so the member gets another turn. |
 | Banner names the budget (`WfRoomBudgetExceeded`) | The room has had 60 agent turns today. Every later turn in the run throws without calling Claude. | Wait for the next UTC day and reopen or Conclude now, or open a fresh Room. Raise `WF_ROOM_TURN_BUDGET` on the function only with a stated reason (same posture as `WF_MSG_REPLY_BUDGET`). |
 | Progress band stuck on one speaker; after ~3 min the page says **stalled — Conclude now** | The hand-off to the next turn failed (`WfRoomHandoffFailed`) or a turn died before passing it on. No further turn is queued. | **Conclude now** re-dispatches only the conclusion. If you wanted the remaining statements, let it conclude and then reopen with a steer — that runs one more full round. |
@@ -113,7 +113,7 @@ logs.
 | A queued speaker never speaks after you pressed Conclude now or reopened | By design: the old run is `superseded` (`WfRoomTurnSkipped{Reason=superseded}`) and its chain stopped. | Nothing. |
 | A turn skipped with `already_spoke` | AWS delivered the same turn twice (async retries are off, so it is never a retry). Before its Claude call each copy claims the turn's slot with a conditional put (`CLAIM#…` row); the copy that loses — or that finds the turn already in the transcript — stops there, so the run does not fork, even when both copies run at once. | Nothing — it is the guard working. |
 | Concluded, banner "a steer arrived while the chair was writing the conclusion…" (`WfRoomSteerDuringConclusion`) | A steer raced the last statement and was stored after the chair read its transcript, so the conclusion does not answer it. | **Reopen with a follow-up** — paste the steer; one more round and a fresh conclusion address it. |
-| Banner "Can't reach the room" under the progress band | Three polls in a row failed (the message is the fetch error). A stall shown next to it may be a read fault, not a stopped schedule. | Reload; check the agents-api logs before spending a **Conclude now**. |
+| Banner "Can't reach the room" under the progress band | Three polls in a row failed (the message is the fetch error). A stall shown next to it may be a read fault, not a stopped schedule. | Reload; check the `wf-rooms-api-{stage}` logs before spending a **Conclude now**. |
 | An unarchived Room shows **Deliberating** and a banner "run stopped: the room was archived mid-run" | It was archived while its run was still going; the next queued turn skipped (`archived`) and the chain stopped. | **Conclude now**, or let it be — it stays as it was. |
 
 Metrics, namespace **`Workforce/Rooms`**:
@@ -128,11 +128,21 @@ Metrics, namespace **`Workforce/Rooms`**:
 | `WfRoomSteerDuringConclusion` | a steer landed after the chair read its transcript (the banner says to reopen) |
 | `WfRoomBudgetExceeded` | the per-room daily turn budget was hit |
 | `WfRoomPersonaMissing` | a member's META row lacks `model` / `system_prompt` |
-| `WfRoomDispatchFailed` | agents-api stored a write but could not dispatch the Lambda |
+| `WfRoomDispatchFailed` | `wf-rooms-api` stored a write but could not dispatch the Lambda |
 
 Alarm: **`wf-room-debate-errors-alarm-{stage}`** — any `Errors` on
 `wf-room-debate-{stage}` over 5 minutes, published to the same alarm topic
 as the other reply Lambdas.
+
+The six `/rooms` routes are served by their own function,
+**`wf-rooms-api-{stage}`** (`workforce/lambdas/rooms-api/`), behind the same
+HTTP API and base URL as agents-api — not by `wf-agents-api`, which hit
+Lambda's 20 KB resource-policy cap when these routes were added (deploy run
+40126740456 rolled the stack back). Request handling, the IAM re-check and
+the dispatch to `wf-room-debate` (hence `WfRoomDispatchFailed`) all happen
+there; look in its logs for `room_dispatch_failed` and
+`rooms_api_unhandled`. Its alarm is **`wf-rooms-api-errors-alarm-{stage}`** —
+any `Errors` on `wf-rooms-api-{stage}` over 5 minutes, same alarm topic.
 
 ## Where the data lives
 
