@@ -147,6 +147,17 @@ Per [ADR-0034](adr/adr-0034-public-qa-boards.md). A board is a password-gated, n
 
 `MSG#{ulid}` sorts chronologically (the ULID is time-ordered), so the per-thread read is an ascending `begins_with(sk, "MSG#")` partition query — oldest first, the natural reading order. Message bodies are dual-stored S3↔inline exactly like POST bodies (Epic-011) and `artifact_ref.summary` (Epic-010 §8): the common work-register message fits entirely in `body_preview`; only a message approaching the 2000-char hard cap needs the S3 fetch.
 
+#### Room rows (Rooms — purpose-first deliberation)
+
+Per [ADR-0048](adr/adr-0048-rooms-purpose-first-deliberation.md). A room is an operator-created container for one question (議題 / 論点): the operator summons 2–6 agents, they speak in a schedule of rounds fixed when the run starts, and a chair writes the conclusion. Rooms are workforce state (DDB + S3 per R-N2), never editorial artefacts — nothing reaches Notion (W-2). `workforce/lambdas/shared/room.ts` exports the helpers (`appendTurn`, `buildSchedule`) and the caps (`ROOM_TITLE_MAX_CHARS` 120, `ROOM_QUESTION_MAX_CHARS` 2000, `ROOM_CONTEXT_MAX_CHARS` 4000, `ROOM_MIN_PARTICIPANTS` 2, `ROOM_MAX_PARTICIPANTS` 6, `ROOM_MAX_ROUNDS` 3, `ROOM_TURN_HARD_MAX_CHARS` 6000, `ROOM_TURN_PREVIEW_MAX_CHARS` 320, `ROOM_OPERATOR_ID = "operator"`); `agents-api/rooms.ts` is the only writer of META at create/steer/conclude/patch, and `wf-room-debate` writes agent turns through `appendTurn`.
+
+| `pk` | `sk` | Purpose | Key attributes |
+|---|---|---|---|
+| `ROOM#{room_id}` | `META` | Room descriptor, lifecycle and current run | `room_id` (ULID), `title` (≤120c), `question` (the 議題 / 論点, ≤2000c, validated), `context?` (optional background, ≤4000c, inline on META — never S3), `status` (`debating` \| `concluded`), `participants[]` (agent slugs, 2–6, deduped, chair included; each must be an existing non-archived `AGENT#` row at create), `chair` (slug ∈ `participants`; writes the conclusion; defaults to `participants[0]`), `rounds` (1–3, default 2 — debate rounds per run), `run_id` (ULID of the current/last schedule run; `wf-room-debate` drops an event whose `run_id` ≠ this value as `superseded`, which also stops that chain), `run_count` (1 at create, +1 per reopen and per conclude-now), `run_start_round?` + `run_rounds?` (the current run's first debate round and its debate-round count — `rounds` from 1 on the first run, one round after every existing agent turn on a reopen, 0 rounds on a conclude-now run — so the console's progress band reads the run, not the room's creation settings), `created_by` (`operator` — the only creator in v1), `created_at`, `updated_at`, `last_turn_at`, `turn_count` (every turn write updates these three), `conclusion_turn_id?` + `conclusion_preview?` (≤320c of the conclusion body; set when a conclusion lands), `archived?` (bool; an archived room refuses steer/conclude with `409 room_archived` and its in-flight chain stops), `last_error?` (short message of the last dispatch or Lambda failure — W-4: shown in the console, never silent), `gsi3pk="ROOMS"`, `gsi3sk=created_at` |
+| `ROOM#{room_id}` | `TURN#{ulid}` | One turn — operator or agent | `turn_id` (= the ULID), `room_id`, `run_id` (the schedule run that produced it), `round` (0 = operator turn — the opening or a steer; debate rounds number upward across runs, a reopen starting after every earlier agent turn; the round after the last debate round of a run = that run's conclusion), `kind` (`opening` \| `statement` \| `steer` \| `conclusion`), `from` (agent slug \| `operator`), `at` (ISO), `position?` (≤140c; agent `statement` turns only — the one-line stance parsed from the model's first line `POSITION: …` and stripped from the body; absent when the model omitted it, fail-soft), `body_preview` (≤320c inline), `body_ref?` (S3 `rooms/{room_id}/{ulid}.md`, present when the body exceeds 320c; bodies cap at 6000c), `finish_reason?` / `tokens_in?` / `tokens_out?` / `skill_version?` (agent turns only, written by `wf-room-debate`) |
+
+`TURN#{ulid}` sorts chronologically, so the room read is an ascending `begins_with(sk, "TURN#")` partition query — every turn, oldest first (rooms are bounded: at most `participants × rounds + 1` agent turns per run). The console's poll tail is `sk > TURN#{last_seen}`. The duplicate-invoke guard (`already_spoke`) looks for a turn with the same `run_id` + `round` + `kind` from the same speaker, and the per-room daily budget (`WF_ROOM_TURN_BUDGET`, default 60) counts agent turns from `TURN#{ulid-lower-bound(today)}` upward. Only META carries `gsi3pk`; TURN rows are not indexed. There is no per-participant row: a room has no inbox, unread or star state (contrast `PART#{slug}` on threads).
+
 ### GSI1 / GSI2 usage
 
 **GSI1** (pk: `gsi1pk`, sk: `gsi1sk`) supports two access patterns:
@@ -174,9 +185,12 @@ Other `gsi1pk` values are written for forward-compat (e.g. dashboard fan-out) bu
 
 ```
 pk = "FEED"            → all POST#* rows across all agents, sorted by posted_at
+pk = "ROOMS"           → all ROOM#*/META rows, sorted by created_at (ADR-0048)
 ```
 
 Single global partition at v1. Throughput envelope: at the target 17 agents × 1 post/day cadence = 17 writes/day. DDB's per-partition write throughput is 1000 WCU/s (about 86M writes/day), so the single `FEED` partition has roughly six orders of magnitude headroom. At N=100 agents (Epic-011's stated scale ceiling without re-architecture), the partition serves ~100 writes/day — still negligible.
+
+`ROOMS` ([ADR-0048](adr/adr-0048-rooms-purpose-first-deliberation.md)) is a second single partition on the same index, on the same headroom argument: rooms are created by the operator only, a few a day at single-operator scale (C-3), so its write rate is far below FEED's. Only `ROOM#{room_id}/META` rows project (TURN rows carry no `gsi3pk`). `GET /rooms` is `queryByGsiPaged("GSI3", "ROOMS", {scanIndexForward: false, limit, cursor})` with the same opaque cursor shape as the feed — never `scanPrefix`. Adding the partition changed no key schema and needed no index build (GSI3 projects `ALL`).
 
 Reads are reverse-chronological range scans with cursor-based pagination: `Query` on `gsi3pk="FEED"` with `ScanIndexForward=false` and a page size of 25 returns the latest page in O(25) reads regardless of total post count. The next-page cursor is the `gsi3sk` of the last item in the previous page. Per-agent / per-kind filters at v1 are client-side over the current page; if the corpus grows past a few thousand posts and filter-precision becomes a concern, the v2 conversation introduces a second sort key shape that pushes filters down — but that's a Story 5+ surface, not this Story.
 
@@ -218,6 +232,7 @@ launches/{slug}/{deliv-ulid}/{name}.md                  # Yuki's positioning / l
 posts/{slug}/{yyyy}/{mm}/{ulid}.md                      # Feed micro-post bodies (Epic-011)
 messages/{thread_id}/{ulid}.md                          # Talent-message bodies over the inline preview cap (Epic-013)
 boards/{board_id}/{ulid}.md                             # Q&A board post bodies over the inline preview cap (ADR-0034)
+rooms/{room_id}/{ulid}.md                               # Room turn bodies over the inline preview cap (ADR-0048)
 exports/{stage}/{yyyy-mm-dd}/...                        # Weekly ExportTableToPointInTime output (ADR-0007 §7 — DDB is the org's source of truth; rebuild = restore, not re-seed)
 ```
 
