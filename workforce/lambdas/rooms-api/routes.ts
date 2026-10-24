@@ -1,4 +1,4 @@
-// agents-api — Room routes (Rooms v1, workforce/adr-0048 proposed).
+// wf-rooms-api — Room routes (Rooms v1, workforce/adr-0048 proposed).
 //
 //   GET   /rooms                  newest-first list (GSI3 ROOMS)            (public read)
 //   GET   /rooms/{id}             room + every turn | ?after= poll tail      (public read)
@@ -8,9 +8,11 @@
 //   POST  /rooms/{id}/conclude    re-dispatch only the chair's conclusion    (AWS_IAM at GW)
 //   PATCH /rooms/{id}             {archived?, title?}                        (AWS_IAM at GW)
 //
-// Kept in its own module (the boards.ts pattern) so the route logic is
-// testable without the handler's mock surface: the handler passes the two
-// things this module cannot own — the async Lambda invoke and the IAM check.
+// Kept apart from ./handler.ts (the agents-api boards.ts pattern) so the
+// route logic is testable without the handler's AWS clients: the handler
+// passes the two things this module cannot own — the async Lambda invoke and
+// the IAM check. Moved here from agents-api/rooms.ts when the Rooms family
+// got its own function (see the handler.ts header for why).
 //
 // Auth model. Same posture as /threads: reads are public on the CORS gate,
 // writes carry the AWS_IAM authorizer at API Gateway (the console signs them

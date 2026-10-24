@@ -374,10 +374,6 @@ Resources:
           # ADR-0034: POST /boards/{id}/posts async-invokes the board reply
           # Lambda once per @-mentioned agent (same shape as MESSAGING_REPLY).
           BOARD_REPLY_FUNCTION: !Ref WfBoardReplyFunction
-          # adr-0048 (proposed): the room writes (create / reopening steer /
-          # conclude) async-invoke the room debate Lambda with the run's head
-          # turn; the Lambda hands the run on itself (ADR-0047 precedent).
-          ROOM_DEBATE_FUNCTION: !Ref WfRoomDebateFunction
       Policies:
         - Statement:
             - Sid: AgentsApiTableAccess
@@ -412,10 +408,6 @@ Resources:
                     # Epic-012 Story 4: GET /agents/{slug}/recall emits
                     # WfRecallLatencyMs / WfRecallVintageMismatch via recall().
                     - Workforce/Recall
-                    # adr-0048 (proposed): a failed wf-room-debate dispatch
-                    # emits WfRoomDispatchFailed (the room still lands with
-                    # META last_error set — W-4 visible, never silent).
-                    - Workforce/Rooms
             # Epic-011 Story 5 (#132) — `GET /feed/{post_id}` hydrates
             # post bodies from S3 (`posts/{slug}/{yyyy}/{mm}/{ulid}.md`).
             # No write needed — the feed-post skill (Story 1) writes; the
@@ -451,16 +443,6 @@ Resources:
                 - s3:PutObject
               Resource:
                 - !Sub ${WfBucket.Arn}/boards/*
-            # adr-0048 (proposed) — room routes hydrate + store long turn
-            # bodies (`rooms/{room_id}/{ulid}.md`), same dual-store split as
-            # messages/* and boards/*. Scoped to rooms/*.
-            - Sid: AgentsApiRoomBodyReadWrite
-              Effect: Allow
-              Action:
-                - s3:GetObject
-                - s3:PutObject
-              Resource:
-                - !Sub ${WfBucket.Arn}/rooms/*
             - Sid: AgentsApiPostBodyWrite
               # POST /feed writes the post body to posts/{slug}/{yyyy}/{mm}/{ulid}.md
               # before the DDB row (createPost ordering). Scoped to posts/*.
@@ -549,13 +531,6 @@ Resources:
               Action: lambda:InvokeFunction
               Resource:
                 - !GetAtt WfBoardReplyFunction.Arn
-            # adr-0048 (proposed) — the room writes async-invoke the room
-            # debate Lambda for a run's first turn. Scoped to that one function.
-            - Sid: AgentsApiInvokeRoomDebate
-              Effect: Allow
-              Action: lambda:InvokeFunction
-              Resource:
-                - !GetAtt WfRoomDebateFunction.Arn
             # adr-0025 — POST /dispatch hands one explicit (agent, binding_idx)
             # to the orchestrator for an immediate CCR fire. Scoped to that one
             # function; the API gains no Secrets Manager or CCR access of its
@@ -565,6 +540,17 @@ Resources:
               Action: lambda:InvokeFunction
               Resource:
                 - !GetAtt WfOrchestratorFunction.Arn
+      # ROUTE BUDGET. SAM turns every HttpApi event below into one
+      # AWS::Lambda::Permission, i.e. one statement (~370 B) in this
+      # function's resource-based policy, and Lambda caps that policy at
+      # 20 480 bytes. With 57 routes it reached 20 639: the six /rooms
+      # permissions failed and CloudFormation rolled the whole stack back
+      # (deploy-workforce-data-plane.yml run 40126740456, #847). The Rooms
+      # family moved to WfRoomsApiFunction behind this same API. This function
+      # is at the wall: a NEW route family goes on its own function, never
+      # here. Enforced by workforce/scripts/check-route-permission-budget.mjs:
+      # ≤ 48 HttpApi events per function, and this one ratcheted at its
+      # current 51 — the count may only go down.
       Events:
         ListAgents:
           Type: HttpApi
@@ -1007,10 +993,118 @@ Resources:
             Method: PATCH
             Auth:
               Authorizer: AWS_IAM
+        # adr-0025 — on-demand fire of an already-declared binding. Same
+        # posture as CreateFeedPost: no API GW authorizer, because the caller
+        # is a CCR session with no SigV4 creds; auth is the per-fire dispatch
+        # capability token, validated at the handler layer against the
+        # AUTH#DISPATCH rows the orchestrator minted.
+        DispatchBinding:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /dispatch
+            Method: POST
+      Tags:
+        workforce: !Ref Stage
+
+  # CloudWatch alarm: any Errors metric on the agents-api function
+  # publishes to the workforce alarm topic.
+  WfAgentsApiErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-agents-api-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-agents-api-${Stage} over 5 minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfAgentsApiFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  # --- Rooms API (adr-0048, proposed) ---------------------------------------
+  # The /rooms route family, on its own function behind the SAME HTTP API
+  # (WfAgentsHttpApi) and the same CORS + AWS_IAM posture. It exists because
+  # of a hard limit, not a design preference: SAM emits one
+  # AWS::Lambda::Permission per HttpApi event, Lambda caps a function's
+  # resource-based policy at 20 480 bytes, and wf-agents-api reached 20 639
+  # with these six routes on it — CloudFormation rolled the data-plane stack
+  # back (deploy-workforce-data-plane.yml run 40126740456, commit 65d0262).
+  # New route families follow this shape: their own function, the shared API.
+  # The spec stays one document (agents-api/openapi.ts, `rooms` tag).
+  WfRoomsApiFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-rooms-api-${Stage}
+      CodeUri: ../../lambdas/rooms-api
+      Handler: handler.handler
+      Description: Workforce Rooms API — purpose-first deliberation routes (adr-0048), behind the agents HTTP API.
+      MemorySize: 512
+      Timeout: 10
+      Environment:
+        # Merged with Globals.Function.Environment. The room writes (create /
+        # reopening steer / conclude) async-invoke the room debate Lambda with
+        # the run's head turn; the Lambda hands the run on itself (ADR-0047
+        # precedent).
+        Variables:
+          ROOM_DEBATE_FUNCTION: !Ref WfRoomDebateFunction
+      Policies:
+        - Statement:
+            - Sid: RoomsApiTableAccess
+              # ROOM# / AGENT# reads by key, META + opening-turn writes,
+              # conditional META patches; the GSI3 `ROOMS` partition is the
+              # GET /rooms listing, hence index/*. No Scan, no Delete.
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource:
+                - !GetAtt WfTable.Arn
+                - !Sub ${WfTable.Arn}/index/*
+            - Sid: RoomsApiRoomBodyReadWrite
+              # Room routes hydrate + store long turn bodies
+              # (`rooms/{room_id}/{ulid}.md`), same dual-store split as
+              # messages/* and boards/*. Scoped to rooms/*.
+              Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/rooms/*
+            - Sid: RoomsApiInvokeRoomDebate
+              # The room writes async-invoke the room debate Lambda for a
+              # run's first turn. Scoped to that one function.
+              Effect: Allow
+              Action: lambda:InvokeFunction
+              Resource:
+                - !GetAtt WfRoomDebateFunction.Arn
+            - Sid: RoomsApiMetrics
+              # A failed wf-room-debate dispatch emits WfRoomDispatchFailed
+              # (the room still lands with META last_error set — W-4
+              # visible, never silent).
+              Effect: Allow
+              Action: cloudwatch:PutMetricData
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace:
+                    - Workforce/Rooms
+      Events:
         # adr-0048 (proposed) — Rooms. Operator surface, same posture as the
         # thread routes: reads public on the CORS gate, every write behind
-        # AWS_IAM (the console signs with SigV4; rooms.ts re-checks the
+        # AWS_IAM (the console signs with SigV4; routes.ts re-checks the
         # principal as defence in depth). Not a public surface like boards.
+        # Same logical event names as when they sat on WfAgentsApiFunction.
         ListRooms:
           Type: HttpApi
           Properties:
@@ -1055,32 +1149,20 @@ Resources:
             Method: PATCH
             Auth:
               Authorizer: AWS_IAM
-        # adr-0025 — on-demand fire of an already-declared binding. Same
-        # posture as CreateFeedPost: no API GW authorizer, because the caller
-        # is a CCR session with no SigV4 creds; auth is the per-fire dispatch
-        # capability token, validated at the handler layer against the
-        # AUTH#DISPATCH rows the orchestrator minted.
-        DispatchBinding:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref WfAgentsHttpApi
-            Path: /dispatch
-            Method: POST
       Tags:
         workforce: !Ref Stage
 
-  # CloudWatch alarm: any Errors metric on the agents-api function
-  # publishes to the workforce alarm topic.
-  WfAgentsApiErrorsAlarm:
+  # Any Errors metric on the rooms API function publishes to the alarm topic.
+  WfRoomsApiErrorsAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub wf-agents-api-errors-alarm-${Stage}
-      AlarmDescription: !Sub Errors > 0 on wf-agents-api-${Stage} over 5 minutes.
+      AlarmName: !Sub wf-rooms-api-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-rooms-api-${Stage} over 5 minutes.
       Namespace: AWS/Lambda
       MetricName: Errors
       Dimensions:
         - Name: FunctionName
-          Value: !Ref WfAgentsApiFunction
+          Value: !Ref WfRoomsApiFunction
       Statistic: Sum
       Period: 300
       EvaluationPeriods: 1
@@ -1300,7 +1382,7 @@ Resources:
         - !Ref WfAlarmTopic
 
   # --- Room debate (adr-0048, proposed) -------------------------------------
-  # The Room twin of wf-messaging-reply: async-invoked by agents-api when the
+  # The Room twin of wf-messaging-reply: async-invoked by wf-rooms-api when the
   # operator opens, reopens or re-concludes a room. One invocation = one
   # speaker's turn = one Claude call (persona from AGENT#{slug}/META, the
   # debate or chair-conclusion contract, the transcript), W-1 guards, the TURN
@@ -1337,7 +1419,7 @@ Resources:
               # Base table only: the turn reads the ROOM# / AGENT# partitions
               # by key (GetItem, Query on pk), writes TURN# / CLAIM# rows and
               # patches META. It never queries a GSI (the GSI3 ROOMS listing
-              # is agents-api's), so no index/* resource.
+              # is wf-rooms-api's), so no index/* resource.
               Effect: Allow
               Action:
                 - dynamodb:GetItem
