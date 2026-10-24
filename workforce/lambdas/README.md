@@ -55,7 +55,7 @@ One directory per Lambda, each with a `handler.ts` (+ `Makefile` for `sam build`
 | `GET` | `/rooms` | public | Rooms, newest first (one GSI3 `ROOMS` partition query; `?page_size=` ≤100, `?cursor=`) → `{rooms, cursor?}`. adr-0048 (proposed). |
 | `GET` | `/rooms/{id}` | public | Room view + every turn, chronological, S3-hydrated; `?after={turn_id}` returns only newer turns (the console poll). |
 | `POST` | `/rooms` | AWS_IAM | Open a room: `{title, question, context?, participants[2..6], chair?, rounds?=2}` → `201 {room_id}`; writes META + the opening turn, async-invokes `wf-room-debate` with the full schedule. |
-| `POST` | `/rooms/{id}/turns` | AWS_IAM | Operator steer `{body}` → `201 {turn_id, reopened}`. Debating: a transcript turn, no dispatch. Concluded: reopens (new run, one more round each, fresh conclusion). `409 room_archived`. |
+| `POST` | `/rooms/{id}/turns` | AWS_IAM | Operator steer `{body}` → `201 {turn_id, reopened}`. Debating: a transcript turn, no dispatch. Concluded: reopens (new run, one more round each, fresh conclusion). `409 room_archived`; `409 room_concluding` once only the chair's conclusion is left in the run. |
 | `POST` | `/rooms/{id}/conclude` | AWS_IAM | Re-dispatch only the chair's conclusion under a new run → `202 {run_id}`. `409 room_archived`. |
 | `PATCH` | `/rooms/{id}` | AWS_IAM | `{archived?, title?}` → `200 {room}`. |
 

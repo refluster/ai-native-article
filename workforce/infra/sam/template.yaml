@@ -1318,8 +1318,8 @@ Resources:
       Handler: handler.handler
       Description: One agent turn in a purpose-first Room; hands the run to the next speaker (adr-0048).
       MemorySize: 512
-      # One Claude call (a conclusion is up to 2400 visible + 2048 reasoning
-      # tokens — 4448 on the wire, ~1.5 min at Opus speeds) plus a handful of
+      # One Claude call (a conclusion is up to 3200 visible + 2048 reasoning
+      # tokens — 5248 on the wire, ~1.5 min at Opus speeds) plus a handful of
       # DDB/S3 ops. The Globals 300 s, not 120: a Lambda timeout skips the
       # handler's `finally`, so it would stall the room with no `last_error`
       # and no hand-off. Billed per ms used, so the ceiling costs nothing.

@@ -45,7 +45,7 @@
 //   GET    /rooms                          purpose-first deliberation rooms, newest first (adr-0048 proposed; ?page_size=&cursor=)
 //   GET    /rooms/{id}                     room + every turn, S3-hydrated; ?after={turn_id} poll tail
 //   POST   /rooms                          create a room; async-invokes wf-room-debate for the first turn (AWS_IAM at GW)
-//   POST   /rooms/{id}/turns               operator steer; reopens a concluded room (AWS_IAM at GW)
+//   POST   /rooms/{id}/turns               operator steer; reopens a concluded room; 409 room_concluding while only the conclusion is left (AWS_IAM at GW)
 //   POST   /rooms/{id}/conclude            re-dispatch only the chair's conclusion under a new run (AWS_IAM at GW)
 //   PATCH  /rooms/{id}                     {archived?, title?} (AWS_IAM at GW)
 //
