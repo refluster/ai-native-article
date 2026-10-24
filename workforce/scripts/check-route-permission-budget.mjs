@@ -15,17 +15,21 @@
 // /rooms. The fix moved Rooms to its own function (WfRoomsApiFunction); this
 // check is what would have seen it coming.
 //
-// The arithmetic. One statement averages ≈ 362 B on that function
-// (20 639 / 57); the SourceArn carries the route path, so long paths cost
-// more. Budget at 370 B per route to be conservative:
-//     MAX_HTTP_ROUTES_PER_FUNCTION = 48  →  48 × 370 B ≈ 17 760 B,
-// ≈ 2.7 KB of headroom under the 20 480 B cap for longer paths and any
+// The arithmetic — MEASURED, not inferred (the first cut of this header
+// derived 362 B/statement from 20 639 / 57, which assumed all six Rooms
+// statements had been written; they had not, so it undercounted). The live
+// policy on wf-agents-api-prod after #850 is 19 628 B over 51 statements
+// (`aws lambda get-policy`), i.e. ≈ 385 B per statement, and the SourceArn
+// carries the route path, so long paths cost more. Budget at 385 B:
+//     MAX_HTTP_ROUTES_PER_FUNCTION = 48  →  48 × 385 B ≈ 18 480 B,
+// ≈ 2.0 KB of headroom under the 20 480 B cap for longer paths and any
 // non-HttpApi permission on the same function. Past 48, a new route family
 // goes on its own function behind the same HTTP API (the rooms-api shape).
 //
 // The one grandfathered function. wf-agents-api still carries 51 routes after
-// the Rooms move (≈ 18.5 KB at the observed 362 B average — it deployed at
-// that size before #847). Splitting another family off it is a separate
+// the Rooms move (19 628 B measured — two statements of headroom, which is
+// also why renaming or re-pathing an existing event on it is unsafe: a
+// Lambda::Permission is replaced create-before-delete). Splitting another family off it is a separate
 // change, so it is held by a RATCHET instead of the default: its ceiling is
 // its current count, a route added to it fails, and a route removed from it
 // fails too until the ceiling below is lowered to match — the ceiling only
@@ -56,7 +60,7 @@ export const GRANDFATHERED_ROUTE_CEILINGS = Object.freeze({ WfAgentsApiFunction:
 /** Lambda's resource-based policy cap, bytes (for the messages). */
 export const LAMBDA_POLICY_CAP_BYTES = 20480;
 /** Conservative per-route statement size, bytes (see the header). */
-export const BYTES_PER_ROUTE_ESTIMATE = 370;
+export const BYTES_PER_ROUTE_ESTIMATE = 385;
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE = join(HERE, "..", "infra", "sam", "template.yaml");
