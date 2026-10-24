@@ -123,7 +123,9 @@ threads (`MessagingReplyRoundHandoff`), with the same three properties:
   also written to META. An invocation whose `run_id` differs from META's
   skips with `superseded` **and stops the chain** (no hand-off). A
   duplicate invoke of a slot that already has a turn for this
-  `run_id` + `round` + `kind` skips with `already_spoke` and passes on.
+  `run_id` + `round` + `kind` skips with `already_spoke` and, like `superseded`, stops the chain — the
+  delivery that wrote the turn already passed the baton, so passing it again
+  would fork the run.
 - **No automatic retries.** The function sets `EventInvokeConfig:
   MaximumRetryAttempts: 0` (as `WfLessonDistillerFunction` does). Lambda's
   default two async retries would re-run the hand-off of every failed slot
@@ -152,7 +154,7 @@ needs its own ADR.
 `speakOnce` guards, in order, each a `{status: "skipped", reason}` with
 `WfRoomTurnSkipped{Reason}` unless it throws: META missing → throw;
 `archived` → skip (chain stops); `run_id` ≠ META → skip `superseded` (chain stops);
-`already_spoke` → skip; speaker ∉ participants → throw; the per-room daily
+`already_spoke` → skip (chain stops); speaker ∉ participants → throw; the per-room daily
 turn budget (`WF_ROOM_TURN_BUDGET`, default 60 agent turns per room per UTC
 day) reached → `WfRoomBudgetExceeded` + throw; a `conclusion` from anyone
 but the chair → throw.
