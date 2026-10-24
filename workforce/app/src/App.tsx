@@ -21,6 +21,8 @@ import Reports from './pages/Reports';
 import ReportView from './pages/ReportView';
 import Account from './pages/Account';
 import Messaging from './pages/Messaging';
+import Rooms from './pages/Rooms';
+import Room from './pages/Room';
 import Notifications from './pages/Notifications';
 import AuthCallback from './pages/AuthCallback';
 import Landing from './pages/Landing';
@@ -146,6 +148,11 @@ function ProtectedRoutes() {
             <Route path="/reports/:project/:slug" element={<ReportView />} />
             <Route path="/account" element={<Account />} />
             <Route path="/messaging" element={<Messaging />} />
+            {/* Rooms are purpose-first deliberation: a question first, then
+                the members summoned to settle it (threads are the
+                participant-first twin above). Operator-only, like /messaging. */}
+            <Route path="/rooms" element={<Rooms />} />
+            <Route path="/rooms/:id" element={<Room />} />
             <Route path="/notifications" element={<Notifications />} />
           </Routes>
         </main>
