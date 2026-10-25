@@ -113,6 +113,22 @@ fail-soft memory excerpt (latest summary, ≤1200 characters). No EXEC
 recall and no knowledge pack: a Room's grounding is its question, its
 context and its own transcript.
 
+**Amendment 2026-10-25 — the Room engine is a surface setting, not the
+persona's `model`.** A Room turn runs on one engine model at one effort
+for every member — `WF_ROOM_MODEL` / `WF_ROOM_EFFORT` on
+`wf-room-debate` (default `anthropic:claude-sonnet-5-5` at `medium`,
+operator direction 2026-10-25) — and the member's `AGENT#{slug}/META`
+supplies only the voice (`system_prompt`). This departs from the "persona's
+`model`" wording above, deliberately: a Room is a deliberation *surface*
+whose cost and quality must be predictable per run (W-3), and a panel of
+six members on six different models is neither. W-5 is untouched — no
+META row is written or read differently; the persona's `model` stays its
+identity for every other surface (`wf-messaging-reply` still speaks on
+it). The engine that produced a turn is recorded on the TURN row
+(`model`, `effort`; data-model.md) so a transcript stays auditable when
+the function's setting changes. The setting lives in the SAM template
+(a data-plane deploy with a stated reason), never in agents-api.
+
 **The schedule is fixed when the run starts.** `buildSchedule(participants,
 rounds, chair, startRound)` (pure, exported, unit-tested in
 `shared/room.ts`) returns, for each round, every participant in order as a
