@@ -247,6 +247,35 @@ export function mergeTurns(a: ReadonlyArray<TurnView>, b: ReadonlyArray<TurnView
   return [...byId.values()].sort(compareTurns);
 }
 
+/** The turns in `incoming` not yet on screen, oldest → newest — the
+ *  arrival set for the timeline (the animation class goes on every one,
+ *  the scroll target is the last). The poll tail re-reads an overlap window
+ *  (pollCursor), so "fresh" is decided by id, never by position; the order
+ *  is compareTurns, never the wire order. The caller skips the initial load
+ *  (Room.tsx's `prev` guard in `apply()`): with an empty seen set this
+ *  returns every turn, by design. */
+export function freshTurns(incoming: ReadonlyArray<TurnView>, seen: ReadonlySet<string>): TurnView[] {
+  return incoming.filter((t) => !seen.has(t.turn_id)).sort(compareTurns);
+}
+
+/** Typing in the composer = it has focus AND a non-empty draft. A steer
+ *  sent with ⌘/Ctrl+Enter leaves the (now empty) textarea focused — that
+ *  reader wants to watch the replies, not to be pinned. */
+export function typingInComposer(el: { id?: string; value?: string } | null | undefined, composerId = 'room-steer'): boolean {
+  return !!el && el.id === composerId && (el.value ?? '').trim() !== '';
+}
+
+/** Follow the tail or not — the viewport only moves when the reader is
+ *  already following the debate: within about one screen of the end of
+ *  the page, and not typing (typingInComposer). A reader who scrolled
+ *  back, or who has a steer half-written, keeps their place; the card's
+ *  arrival animation is the cue for them. */
+export function followTail(v: { scrollTop: number; viewportHeight: number; scrollHeight: number; composerFocused: boolean }): boolean {
+  if (v.composerFocused) return false;
+  const distanceFromBottom = v.scrollHeight - (v.scrollTop + v.viewportHeight);
+  return distanceFromBottom <= v.viewportHeight;
+}
+
 /** The newest turn id — the `?after=` cursor for the poll tail. ULIDs sort
  *  lexicographically in time order, so the max id is the newest turn. */
 export function lastTurnId(turns: ReadonlyArray<TurnView>): string | undefined {
