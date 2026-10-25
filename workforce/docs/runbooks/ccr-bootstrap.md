@@ -20,25 +20,6 @@ markdown); this runbook walks the operator from spec → live routine.
 4. **PR A merged** ([#100](https://github.com/refluster/ai-native-article/pull/100)) — the unified binding shape that these routines reference.
 5. **PR B merged** ([#101](https://github.com/refluster/ai-native-article/pull/101)) — Maya's `pdm-decompose` skill that produces the `wf:ready` issues these routines consume.
 
-## Labels — one-time setup on the GH repo
-
-Create these labels in the repo settings (Issues → Labels) if they don't exist yet. They drive the state machine:
-
-| Label | Color | Description |
-|---|---|---|
-| `wf:ready` | green | `pdm-decompose` adds this to child issues; `dario-implement` picks them up |
-| `wf:in-flight` | blue | `dario-implement` replaces `wf:ready` with this when it opens a PR |
-| `wf:needs-review-dario` | orange | `dario-implement` applies this on the PR; `dario-review` reacts and removes when done |
-| `wf:needs-review-aoi` | purple | Same pattern, design lens |
-| `role:engineering` | grey | `pdm-decompose` adds this for engineering-flavoured children |
-| `role:architecture` | grey | Architecture-flavoured children |
-| `role:design` | grey | Design-flavoured children |
-| `role:qa` | grey | QA-flavoured children |
-| `coordination_required:dario` | red | Surfaces architecture decisions that need human go/no-go before merge |
-| `epic:N-M` | grey | One per (Epic, Story) pair, e.g. `epic:10-1` for Epic-010 Story 1 |
-
-These labels are referenced by all three routine prompts. Without them, the routines will fail when trying to apply / remove labels.
-
 ## Routine 1 — `wf-dario-implement`
 
 See [routines/dario-implement.md](../routines/dario-implement.md) for the full spec.
