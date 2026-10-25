@@ -27,6 +27,8 @@ vi.mock('../config/auth', () => ({
 
 import { signedFetch } from '../lib/sigv4';
 import {
+  freshTurns,
+  followTail,
   POLL_FAILURE_THRESHOLD,
   STALL_MS,
   concludeRoom,
@@ -528,5 +530,36 @@ describe('wire calls', () => {
   it('surfaces the error body on a failed write', async () => {
     mockedSignedFetch.mockResolvedValueOnce(jsonResponse({ error: 'room_archived' }, 409));
     await expect(steerRoom('01ROOM', 'x')).rejects.toThrow('agents-api 409 · room_archived');
+  });
+});
+
+// ── freshTurns / followTail (the arrival rule, PR 854) ─────────────────────
+
+describe('freshTurns', () => {
+  it('returns only turns not yet seen, oldest → newest by compareTurns (never wire order)', () => {
+    const a = say('nadia', 1);
+    const b = say('dario', 1);
+    const c = say('freya', 1);
+    const seen = new Set([opening().turn_id, a.turn_id]);
+    // The poll tail re-reads an overlap window: `a` comes back but is not fresh.
+    expect(freshTurns([c, b, a], seen).map((t) => t.turn_id)).toEqual([b.turn_id, c.turn_id]);
+  });
+  it('is empty when everything in the tail is already on screen (overlap only)', () => {
+    const a = say('nadia', 1);
+    expect(freshTurns([a], new Set([a.turn_id]))).toEqual([]);
+  });
+});
+
+describe('followTail', () => {
+  const near = { scrollTop: 1000, viewportHeight: 800, scrollHeight: 2200, composerFocused: false }; // 400px from the end
+  it('follows when the reader is within a viewport of the end', () => {
+    expect(followTail(near)).toBe(true);
+    expect(followTail({ ...near, scrollTop: 600 })).toBe(true); // exactly one viewport
+  });
+  it('keeps the place of a reader who scrolled back', () => {
+    expect(followTail({ ...near, scrollTop: 0 })).toBe(false);
+  });
+  it('never moves the page while the composer has focus', () => {
+    expect(followTail({ ...near, composerFocused: true })).toBe(false);
   });
 });

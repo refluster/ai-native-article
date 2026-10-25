@@ -27,6 +27,8 @@ import {
   groupTurnsByRound,
   isDeliberating,
   mergeTurns,
+  freshTurns,
+  followTail,
   nextPollHealth,
   paragraphsOf,
   patchRoom,
@@ -135,6 +137,11 @@ export default function Room() {
   // steer's refresh) — the timeline scrolls to it so the debate visibly
   // moves on. Never set by the initial load, which opens at the top.
   const [arrivedTurnId, setArrivedTurnId] = useState<string | null>(null);
+  // Every turn that arrived while the page was open (the animation class),
+  // and whether the reader was following the tail when the last one did
+  // (decided before the new card renders, so the geometry is the reader's).
+  const [freshIds, setFreshIds] = useState<ReadonlySet<string>>(() => new Set());
+  const followRef = useRef(true);
 
   const roomRef = useRef<RoomView | null>(null);
   const afterRef = useRef<string | undefined>(undefined);
@@ -145,7 +152,7 @@ export default function Room() {
   // overlap window (pollCursor), so only turns not yet on screen count.
   const apply = useCallback((d: RoomDetail) => {
     const prev = roomRef.current;
-    const fresh = d.turns.filter((t) => !turnIdsRef.current.has(t.turn_id));
+    const fresh = freshTurns(d.turns, turnIdsRef.current);
     const moved =
       fresh.length > 0 ||
       !prev ||
@@ -158,7 +165,17 @@ export default function Room() {
     setRoom(d.room);
     if (d.turns.length > 0) setTurns((t) => mergeTurns(t, d.turns));
     if (moved && prev) setLastChangeAt(Date.now());
-    if (prev && fresh.length > 0) setArrivedTurnId(fresh[fresh.length - 1]!.turn_id);
+    if (prev && fresh.length > 0) {
+      const root = document.scrollingElement ?? document.documentElement;
+      followRef.current = followTail({
+        scrollTop: root.scrollTop,
+        viewportHeight: window.innerHeight,
+        scrollHeight: root.scrollHeight,
+        composerFocused: document.activeElement?.id === 'room-steer',
+      });
+      setFreshIds((s) => new Set([...s, ...fresh.map((t) => t.turn_id)]));
+      setArrivedTurnId(fresh[fresh.length - 1]!.turn_id);
+    }
     // Every successful read comes through here, so the poll-failure banner
     // clears even when the read that succeeded was not a poll tick (an
     // archive, a steer): otherwise it could outlive polling itself.
@@ -178,6 +195,8 @@ export default function Room() {
     roomRef.current = null;
     setRoom(null);
     setTurns([]);
+    setArrivedTurnId(null);
+    setFreshIds(new Set());
     setNotFound(false);
     setLoadError(null);
     fetchRoom(id)
@@ -216,14 +235,17 @@ export default function Room() {
   const stalled = stallState(now, lastChangeAt, room) === 'stalled';
   const pollError = pollErrorToShow(pollHealth);
 
-  // Bring the turn that just landed into view (smooth unless the OS asks for
-  // reduced motion); the card's own arrival animation does the rest.
+  // Bring the turn that just landed into view — only for a reader who was
+  // following the tail (followTail); smooth unless the OS asks for reduced
+  // motion. `block: 'start'` + the card's `scroll-mt-20` clears the sticky
+  // header so a long statement reads from its byline. The arrival animation
+  // is the cue for everyone else.
   useEffect(() => {
-    if (!arrivedTurnId) return;
+    if (!arrivedTurnId || !followRef.current) return;
     const el = document.getElementById(turnDomId(arrivedTurnId));
     if (!el || typeof el.scrollIntoView !== 'function') return;
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
   }, [arrivedTurnId]);
 
   // The clock the stall check reads — ticks only while deliberating.
@@ -492,7 +514,7 @@ export default function Room() {
                   roster={roster}
                   nameOf={nameOf}
                   lang={lang}
-                  arrivedTurnId={arrivedTurnId}
+                  freshIds={freshIds}
                 />
               ))}
               {progress.nextSpeaker && deliberating && (
@@ -655,14 +677,14 @@ function SectionBlock({
   roster,
   nameOf,
   lang,
-  arrivedTurnId,
+  freshIds,
 }: {
   section: TurnSection;
   room: RoomView;
   roster: Map<string, WorkforceAgent>;
   nameOf: (s: string) => string;
   lang: Lang;
-  arrivedTurnId: string | null;
+  freshIds: ReadonlySet<string>;
 }) {
   return (
     <div>
@@ -672,7 +694,7 @@ function SectionBlock({
           <div
             key={t.turn_id}
             id={turnDomId(t.turn_id)}
-            className={t.turn_id === arrivedTurnId ? 'wf-turn-arrive scroll-mt-20' : 'scroll-mt-20'}
+            className={freshIds.has(t.turn_id) ? 'wf-turn-arrive scroll-mt-20' : 'scroll-mt-20'}
           >
             {t.kind === 'opening' ? (
               <OpeningRow turn={t} room={room} lang={lang} />
