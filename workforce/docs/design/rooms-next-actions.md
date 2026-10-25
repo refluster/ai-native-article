@@ -1,6 +1,7 @@
-<!-- Status: design note (Zone B). Brainstorm record for the Rooms "conclusion → next action" layer; implements nothing. Governing ADR: adr-0048 (Rooms). -->
-
 # Rooms 結論 → ネクストアクション UI ブレスト (2026-10-25)
+
+- **Status**: Proposed 2026-10-25 (this PR). A design note, not an ADR; implements nothing. Governing ADR: [adr-0048](../adr/adr-0048-rooms-purpose-first-deliberation.md).
+- **Review (pr-autopilot cycle 1)**: `wf:dario` D1 ×4 · `wf:mateo` M1–M3 · `wf:freya` Y1 ×3 — all folded in below.
 
 参加: nadia (戦略・設計リード / ADR-0048 起案) · aoi (コンソール UI デザイナ) · ren (バックエンド)
 対象: `workforce/app/src/pages/Room.tsx` (`ConclusionCard`, L745) · `workforce/lambdas/rooms-api/` · `workforce/lambdas/room-debate/handler.ts`
@@ -8,8 +9,8 @@
 ## 0. 現状 (コードから確認済み)
 
 - chair のプロンプト (`room-debate/handler.ts` L173–174) は既に `## 推奨アクション / ## Recommended action` と `## 未解決の論点 / ## Open questions` を見出しとして要求している。ただし中身の形 (箇条書き・担当・宛先) は自由記述。
-- GitHub 書き込み経路は既にある: `workforce/lambdas/shared/github.ts` の `createIssue()` (POST /repos/{o}/{r}/issues, ADR-0007 の週次 config digest 用)、`dispatchEngineer()`、`findRecentPRs()`。トークンは Secrets Manager `wf/github` (PAT か App installation token) を `getSecret<GithubSecret>` で取得。`shared/external-pr.ts` は R-N1 例外経路 (外部 git は PR のみ)。
-- `rooms-api` は 6 ルート。SAM の resource policy 上限 (20 480 bytes) を避けるために agents-api から分離された経緯があるので、ルート追加は 1 本に抑えたい。
+- GitHub 書き込み経路は既にある: `workforce/lambdas/shared/github.ts` の `createIssue({owner, repo, title, body, labels?}) → {number, url}` (ADR-0007 の週次 config digest 用、失敗は throw)、`dispatchEngineer()`、`findRecentPRs()`。トークンは Secrets Manager `wf/github` (PAT か App installation token) を `getSecret<GithubSecret>` で取得 — **自リポジトリ用**。外部プロジェクトへの書き込みは `shared/external-pr.ts` が project ごとの sealed credential (R-N3) で行い、R-N9 (外部 git は PR のみ) の例外経路。
+- `rooms-api` は自前の関数 `WfRoomsApiFunction` 上に 6 ルート (予算 48、`check-route-permission-budget.mjs`)。20 480 B の resource-policy 上限は agents-api (51 で凍結) の話で、rooms-api にはルートの余裕がある。ルートを 1 本に抑える理由は上限ではなく、**新ルート = SAM テンプレ変更** (HttpApi イベント + `wf/github` への `secretsmanager:GetSecretValue` 付与。現在 `RoomsApi*` ポリシーにはない) を最小にするため。
 - ラベル規約 (`docs/issue-labeling.md`): `project:` (article|workforce) + `layer:` (L0–L3) + `type:` (bug|feature|chore|tracker|ops) が必須。
 
 ## 1. 議事
@@ -30,7 +31,7 @@
 | A6 | **ADR / 決定記録ドラフト** | 結論を ADR テンプレに流し込み、draft PR として出す (L1 なので必ず人間承認) | 結論カードメニュー「ADR 下書き」 | `dispatchEngineer()` で engineer routine に渡し PR 化 (R-N1: PR のみ) | L | nadia |
 | A7 | **フィード / スレッド投稿** | 結論要約を workforce のフィード or messaging thread に投稿 | 結論カードメニュー「共有」 | 既存 threads/feed 書き込み API | S–M | aoi |
 | A8 | **Notion L1 ソース行追加** | 議論中で引用された URL を Articles DB に L1 候補として登録 | 行の宛先「L1 source」(URL を含む項目のみ表示) | `wf-l1-source-register` Lambda を呼ぶ | M | ren |
-| A9 | **リマインダ / 定期チェックイン** | N 日後に「この推奨アクションどうなった？」を Room に自動ターンとして追加、または Issue の状態を見て再 conclude | 行の「⏰ 期限」 | EventBridge Scheduler 1 回起動 → `POST /rooms/{id}/turns` | M | ren |
+| A9 | **リマインダ / 定期チェックイン** | N 日後に「この推奨アクションどうなった？」を Room に自動ターンとして追加、または Issue の状態を見て再 conclude | 行の「⏰ 期限」 | スケジュール面なので R-N4: ある agent の `bindings[]` として宣言する (単発 Scheduler を直接張るなら governance.md の Zone A 改訂が要る) → `POST /rooms/{id}/turns`。W-3 の予算行とセット | M | ren |
 | A10 | **状態の逆同期** | 作成済み Issue の open/closed を行バッジに反映、全部 closed で Room を「解決済み」表示 | Actions 帯の各行のバッジ | `GET /rooms/{id}` 時に Issue 状態を取得 (キャッシュ) or Issue webhook | M | aoi |
 | A11 | **却下 / 保留マーク** | 採用しない項目に理由付きで「やらない」を記録 (意思決定ログ) | 行の宛先「Skip」 | `actions[]` の status 更新のみ | S | nadia |
 
@@ -47,10 +48,13 @@
 - [Q1] Issue の宛先リポジトリを Room ごとに選べるべきか — ask: operator
 ```
 
-- ID (`A1`, `Q1`) は Room 内で安定。再 conclude で同じ ID を再利用するよう指示し、既に送信済み行との対応を保つ。
+- 見出しは現行 chair プロンプト (`room-debate/handler.ts` L173) の `## 推奨アクション / ## Recommended action` (単数) をそのまま正とし、§3 の追記はその行を置き換える。パーサは `Recommended action(s)` / `Open question(s)` の単複どちらも受ける。
+
+- ID (`A1`, `Q1`) は Room 内で安定させるよう chair に指示するが、**プロンプト指示は保証ではない** (chair は前回結論を `transcriptWindow` 越しにしか見ない)。送信記録には項目テキスト (のハッシュ) を一緒に保存し、再 conclude 後の `[A1]` のテキストが送信済みのものと一致しなければ、その行は未送信として扱い「以前 #1234 として別の文面で送信済み」と注記する。バッジの流用も、新項目のブロックもしない。
 - メタは `key: value` を ` · ` 区切り。欠落は許容 (UI で補完)。
-- 英語見出し (`## Recommended actions` / `## Open questions`) も同じ文法。
-- パースは **サーバ側** (room-debate が conclusion turn を保存する時点) で行い、turn に `actions: RoomAction[]` / `open_questions: RoomQuestion[]` を保存。パース失敗時は空配列 + ログ (W-4: 黙って捏造しない。UI は「項目を抽出できませんでした — 手動で追加」を表示)。
+- 英語見出し (`## Recommended action` / `## Open questions`) も同じ文法。区切りは `:`/`：`、` · `/`・`/`|` を同値に扱う (日本語の結論は全角コロンと中黒 U+30FB を書きがち)。`parseConclusionActions()` の vitest に日本語フィクスチャを 1 つ入れる。
+- `owner:` メタは Issue 本文の「Suggested owner」に落とすだけで **ラベルにはしない** (`owner:<slug>` ラベルは `issue-stage-set.mjs` 専用、issue-labeling.md §1.3)。新規 Issue は `stage:proposed` で着地。
+- パースは **サーバ側** (room-debate が conclusion turn を保存する時点) で行い、turn に `actions: RoomAction[]` / `open_questions: RoomQuestion[]` を保存 (**パース結果のみ**。送信状態は持たない — §4 M1)。`[A1]` 形式が取れない行は、見出し下の箇条書き 1 行 = 1 項目としてサーバ側 ID (`A?1`, `A?2` …) を振って**劣化して残す**。見出し自体がない場合だけ空配列 + ログ + UI の「項目を抽出できませんでした」(W-4)。加えて v1 の body は `action_id` なしの自由文項目 (`{ kind: "github_issue", title, body }`) を受け付け、「手動で追加」が実際に動く経路にする。
 - 型 (案, `lib/rooms.ts` と共有):
 
 ```ts
@@ -59,10 +63,13 @@ type RoomAction = {
   text: string;
   owner?: string;          // agent_id or "operator"
   labels?: { project?: string; layer?: string; type?: string };
-  dispatch?: { kind: "github_issue" | "agent" | "room" | "skip";
-               ref?: string; // "owner/repo#123", room_id, engagement id
-               at: string; by: string; status?: "open" | "closed" };
 };
+
+// 送信状態は TURN ではなく専用行 (§4 M1):
+// ROOM#{room_id} / ACTION#{conclusion_turn_id}#{action_id}
+//   { kind: "github_issue" | "agent" | "room" | "skip", ref?: string /* owner/repo#123, room_id, engagement id */,
+//     text_hash: string, status?: "open" | "closed", at: string, by: string }
+// GET /rooms/{id} がこの行を actions[] に join して返す。
 ```
 
 ## 4. 推奨 v1 (三者合意)
@@ -80,25 +87,24 @@ type RoomAction = {
 **バックエンド**
 - 新ルートは 1 本: `POST /rooms/{id}/actions` (AWS_IAM, routes.ts で再チェック)。body `{ items: [{ action_id, kind: "github_issue"|"skip", repo?, labels?, title?, body? }] }`。
   - `github_issue` → `shared/github.ts#createIssue` (トークンは既存 `wf/github`、新規シークレット不要)。
-  - 冪等キー `ROOM#{id}/ACTION#{action_id}` で DDB 条件付き書き込みを先に行い、二重 Issue を防止。
-  - 結果を conclusion turn の `actions[].dispatch` に保存 (W-2: 状態は DDB/S3 のみ)。
+  - 送信記録は **1 か所だけ**: `ROOM#{id}` / `ACTION#{conclusion_turn_id}#{action_id}` 行 (`kind, ref, text_hash, status, at, by`) を `attribute_not_exists(sk)` で `createIssue` の**前**に書き、二重 Issue を防ぐ。TURN の `actions[]` はパース結果のみを持ち、`GET /rooms/{id}` が ACTION# 行を join して返す (W-2)。実装 PR で data-model.md の Room 表にこの行を足す。
 - A4 は既存 `POST /rooms` に `parent_room_id`, `seed_question_id` を追加するだけ (ルート増なし → resource policy 上限に影響しない)。
 - room-debate: chair プロンプトに §3 の契約を追記 + 保存時パーサ (`parseConclusionActions()`、純関数 + vitest)。
 
 **ガバナンス**
-- Zone: `Room.tsx` / `rooms-api` / `room-debate` のコードは Zone B。ただし chair プロンプト文言は品質に関わるので prompt 変更として PR で明示 (D-2)。SAM テンプレ / `samconfig.toml` に触れる場合は Zone A。
-- R-N1 (外部 git は PR のみ): Issue 作成は git 書き込みではないので抵触しないが、宛先リポジトリは **allowlist** (既定 `kohuehara/ai-native-article`、`workforce/projects/*/project.json` に repo があるもののみ) に限定。
+- Zone: `Room.tsx` / `rooms-api` / `room-debate` のコードは Zone B。chair プロンプト文言は品質に関わるので prompt 変更として PR で明示 (D-2)。v1 は **SAM テンプレ変更を必ず伴う** (ルートイベント + `wf/github` の scoped secret 付与)。`workforce/infra/sam/template.yaml` は governance.md §3 で Zone B (コスト・スケジュールを変えるときだけ §5 で escalate)、`samconfig.toml` のみ Zone A。
+- R-N9 (外部 git は PR のみ): Issue は git アーティファクトではなく PR でもないので R-N9 の対象外、ただし「エージェントが外部リポジトリに書く」面は同じなので宛先は **allowlist** に限定。v1 は自リポジトリ `refluster/ai-native-article` (`workforce/projects/agent-workforce/project.json` の `github.owner/repo`) のみ、`wf/github` で書く。外部プロジェクト (`workforce/projects/*/project.json` の `github.owner/repo`) への Issue は v2 で、`external-pr.ts` と同じく project ごとの sealed credential (R-N3) を使う。
 - ラベル: `docs/issue-labeling.md` の 3 系統必須を **サーバ側で検証** し、欠けたら 400 (C-4/W-4)。追加で `source:room` ラベルを提案 (`.github/labels.json` 編集 = 要 `sync-labels`)。
 - ADR-0048 を引用し、「結論 → 行動」節の追記は L1 なので別 PR で人間承認。pr-autopilot は L1 パスをマージしない (§4.4)。
 - W-3 コスト: Issue 作成は LLM 呼び出しゼロ、API 呼び出しのみ。chair プロンプトの出力が数十トークン増える程度で影響は無視できる。A3/A9 は bindings や Scheduler を増やすため v2 で予算行と一緒に。
 - `wf/github` の権限: 現在の PAT/App に `issues:write` があるかを要確認 (週次 digest で使っているので対象リポジトリにはあるはず)。
 
-**v2 以降**: A3 エージェント委任 (Track Record 連携) → A10 状態逆同期 → A2 トラッカー化 → A9 リマインダ → A6 ADR ドラフト → A7/A8。
+**v2 以降**: A3 エージェント委任 (Track Record 連携) → A10 状態逆同期 → A2 トラッカー化 → A9 リマインダ → A6 ADR ドラフト → A7/A8。A10 は `GET /rooms/{id}` 時に Issue 状態を読んでキャッシュ (新しい Scheduler は作らない) し、`wf/github` のレート上限 (5 000/h。config-digest と engineer dispatch と共用) を分け合う。A3 / A9 / A10 を配線するときは必ず予算行を添える。
 
 ## 5. オペレータへの確認事項 (5 つ)
 
 1. Issue の宛先リポジトリ: 既定は `ai-native-article` 固定で良いか、Room 作成時に project (asp-cloud, luckyhat …) を選ばせるか。
 2. Issue は「推奨アクション 1 件 = 1 Issue」か、「Room 1 つ = トラッカー Issue 1 つ + チェックリスト」か、既定はどちらが好みか。
 3. ラベル (`layer:` / `type:`) は chair の推定をそのまま使って良いか、毎回確認モーダルで人が確定するか。
-4. 作成者表記: Issue は `wf/github` のボット名義になる。本文に「Room 参加ペルソナ / 提案者」を明記するだけで良いか。
+4. 再 conclude のとき、Actions 帯は送信済み項目を引き継ぐか、新しい結論の項目だけで作り直すか (送信済みは「以前 #1234 として送信」の注記付きで残す案が既定)。作成者表記は `wf/github` のボット名義 + 本文に提案ペルソナを明記、で既定とする。
 5. v1 にエージェント委任 (A3) を入れたいか — 入れるなら W-3 の予算行をどこに積むか。
