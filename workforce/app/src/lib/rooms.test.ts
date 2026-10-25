@@ -29,6 +29,7 @@ import { signedFetch } from '../lib/sigv4';
 import {
   freshTurns,
   followTail,
+  typingInComposer,
   POLL_FAILURE_THRESHOLD,
   STALL_MS,
   concludeRoom,
@@ -547,6 +548,16 @@ describe('freshTurns', () => {
   it('is empty when everything in the tail is already on screen (overlap only)', () => {
     const a = say('nadia', 1);
     expect(freshTurns([a], new Set([a.turn_id]))).toEqual([]);
+  });
+});
+
+describe('typingInComposer', () => {
+  it('is typing only with focus AND a non-empty draft', () => {
+    expect(typingInComposer({ id: 'room-steer', value: 'Consider cost' })).toBe(true);
+    expect(typingInComposer({ id: 'room-steer', value: '  ' })).toBe(false); // sent with ⌘/Ctrl+Enter — keep following
+    expect(typingInComposer({ id: 'room-steer' })).toBe(false);
+    expect(typingInComposer({ id: 'search', value: 'x' })).toBe(false);
+    expect(typingInComposer(null)).toBe(false);
   });
 });
 

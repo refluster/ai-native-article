@@ -29,6 +29,7 @@ import {
   mergeTurns,
   freshTurns,
   followTail,
+  typingInComposer,
   nextPollHealth,
   paragraphsOf,
   patchRoom,
@@ -171,7 +172,7 @@ export default function Room() {
         scrollTop: root.scrollTop,
         viewportHeight: window.innerHeight,
         scrollHeight: root.scrollHeight,
-        composerFocused: document.activeElement?.id === 'room-steer',
+        composerFocused: typingInComposer(document.activeElement as { id?: string; value?: string } | null),
       });
       setFreshIds((s) => new Set([...s, ...fresh.map((t) => t.turn_id)]));
       setArrivedTurnId(fresh[fresh.length - 1]!.turn_id);
