@@ -1402,6 +1402,12 @@ Resources:
       Handler: handler.handler
       Description: One agent turn in a purpose-first Room; hands the run to the next speaker (adr-0048).
       MemorySize: 512
+      Environment:
+        Variables:
+          # Every Room turn runs on one model at one effort (the persona row
+          # supplies the voice only) — see room-debate/handler.ts ROOM_MODEL.
+          WF_ROOM_MODEL: anthropic:claude-sonnet-5-5
+          WF_ROOM_EFFORT: medium
       # One Claude call (a conclusion is up to 3200 visible + 2048 reasoning
       # tokens — 5248 on the wire, ~1.5 min at Opus speeds) plus a handful of
       # DDB/S3 ops. The Globals 300 s, not 120: a Lambda timeout skips the

@@ -246,7 +246,9 @@ describe("statement — happy path", () => {
     await handler({ ...EVENT, then: [] });
 
     const call = complete.mock.calls[0]![0];
-    expect(call.model).toBe("anthropic:claude-sonnet-4-6");
+    // The Room engine's model, not the persona's (its META row says sonnet-4-6).
+    expect(call.model).toBe("anthropic:claude-sonnet-5-5");
+    expect(call.effort).toBe("medium");
     expect(call.maxTokens).toBe(1600);
     expect(call.reasoningBudgetTokens).toBeGreaterThanOrEqual(1024);
     expect(call.system).toContain("You are Maya, the PM.");

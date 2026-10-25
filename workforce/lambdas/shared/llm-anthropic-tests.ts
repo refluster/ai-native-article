@@ -136,6 +136,32 @@ describe("complete — per-model wire shape (the Maya incident)", () => {
     vi.unstubAllGlobals();
   });
 
+  it("sonnet-5-5 + reasoning + effort → adaptive thinking, output_config.effort, NO temperature", async () => {
+    vi.stubGlobal("fetch", okFetch);
+    const out = await complete({ ...base, model: "anthropic:claude-sonnet-5-5", reasoningBudgetTokens: 2048, effort: "medium" });
+    expect(lastBody.thinking).toEqual({ type: "adaptive" });
+    expect(lastBody.output_config).toEqual({ effort: "medium" });
+    expect(lastBody).not.toHaveProperty("temperature");
+    expect(out.cost_usd).toBeCloseTo((10 * 2.0 + 5 * 10.0) / 1_000_000, 12); // 2/10 pricing present
+    vi.unstubAllGlobals();
+  });
+
+  it("sonnet-5-5 WITHOUT reasoning → still no temperature (sampling params are a 400 on the 5.x tier)", async () => {
+    vi.stubGlobal("fetch", okFetch);
+    await complete({ ...base, model: "anthropic:claude-sonnet-5-5" });
+    expect(lastBody).not.toHaveProperty("temperature");
+    expect(lastBody).not.toHaveProperty("output_config");
+    vi.unstubAllGlobals();
+  });
+
+  it("haiku-5-5 + reasoning → adaptive thinking (only Haiku 4.x lacks it)", async () => {
+    vi.stubGlobal("fetch", okFetch);
+    await complete({ ...base, model: "anthropic:claude-haiku-5-5", reasoningBudgetTokens: 2048 });
+    expect(lastBody.thinking).toEqual({ type: "adaptive" });
+    expect(lastBody).not.toHaveProperty("temperature");
+    vi.unstubAllGlobals();
+  });
+
   it("opus-4-7 WITHOUT reasoning → no thinking field and still no temperature", async () => {
     vi.stubGlobal("fetch", okFetch);
     await complete({ ...base, model: "anthropic:claude-opus-4-7" });

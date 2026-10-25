@@ -202,6 +202,12 @@ Room's question or context that you would not put in a thread.
 
 ## Cost (W-3)
 
+Every turn runs on one model at one effort regardless of the member's own
+`model` row — `WF_ROOM_MODEL` / `WF_ROOM_EFFORT` on `wf-room-debate`
+(default `anthropic:claude-sonnet-5-5` at `medium`); the member's row
+supplies the voice (`system_prompt`) only. Change them on the function
+with a stated reason.
+
 A Room costs Claude calls only when you act: create (≤ participants ×
 rounds + 1, at most 19), reopen (≤ participants + 1), conclude now (1).
 Nothing runs on a schedule and no agent can start or extend a Room. The
