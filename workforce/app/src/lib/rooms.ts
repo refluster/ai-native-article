@@ -480,33 +480,20 @@ export function steerLocked(
   return isDeliberating(room) && progress?.phase === 'conclusion';
 }
 
-/** The locked composer's note, in the question's language. */
-export function steerLockedCopy(lang: 'ja' | 'en'): string {
-  return lang === 'ja'
-    ? '議長が結論を執筆中です — 結論が出たら、フォローアップで再開してください'
-    : 'The chair is writing the conclusion — reopen with a follow-up once it lands';
+/** The locked composer's note (console chrome is English-only). */
+export function steerLockedCopy(): string {
+  return 'The chair is writing the conclusion — reopen with a follow-up once it lands';
 }
 
 /** The progress band's copy (round labels are ordinals, see ordinalOfRound). */
 export function progressCopy(
   room: Pick<RoomView, 'participants' | 'chair' | 'archived' | 'turn_count'>,
   p: RoundProgress,
-  lang: 'ja' | 'en',
   concluding: boolean,
   firstNameOf: (s: string) => string,
 ): { line: string; drafting?: string } {
   const n = room.participants.length;
   const chair = firstNameOf(room.chair);
-  if (lang === 'ja') {
-    if (room.archived) return { line: 'アーカイブ済み · 閲覧のみ' };
-    if (p.phase === 'done') return { line: `結論が出ました · 第${p.roundOrdinal}ラウンドまで · ${room.turn_count}件の発言` };
-    if (p.phase === 'conclusion')
-      return { line: concluding ? '議論を打ち切って結論へ' : '全ラウンド終了', drafting: `議長の${chair}さんが結論を執筆中…` };
-    return {
-      line: `第${p.roundOrdinal}ラウンド / 全${p.ofRoundsOrdinal}ラウンド · ${n}人中${p.spoken.length}人が発言`,
-      drafting: p.nextSpeaker ? `${firstNameOf(p.nextSpeaker)}さんが執筆中…` : undefined,
-    };
-  }
   if (room.archived) return { line: 'Archived · read-only' };
   if (p.phase === 'done') return { line: `Concluded after round ${p.roundOrdinal} · ${room.turn_count} turns` };
   if (p.phase === 'conclusion')
@@ -528,14 +515,11 @@ export interface TurnSection {
   turns: TurnView[];
 }
 
-const SECTION_LABELS = {
-  en: { opening: 'Opening', operator: 'Operator', round: (n: number) => `Round ${n}`, conclusion: 'Conclusion' },
-  ja: { opening: '論点', operator: 'オペレーター', round: (n: number) => `第${n}ラウンド`, conclusion: '結論' },
-} as const;
+const SECTION_LABELS = { opening: 'Opening', operator: 'Operator', round: (n: number) => `Round ${n}`, conclusion: 'Conclusion' } as const;
 
-/** Section label for a debate round / phase in the given language. */
-export function sectionLabel(kind: TurnSection['kind'], lang: 'ja' | 'en', round = 0): string {
-  const l = SECTION_LABELS[lang];
+/** Section label for a debate round / phase (English-only console chrome). */
+export function sectionLabel(kind: TurnSection['kind'], round = 0): string {
+  const l = SECTION_LABELS;
   return kind === 'round' ? l.round(round) : l[kind];
 }
 
@@ -547,7 +531,7 @@ export function sectionLabel(kind: TurnSection['kind'], lang: 'ja' | 'en', round
  * → Conclusion, top to bottom, the way it unfolded. Round labels are
  * ordinals (a reopened 3 × 2 room's stored round 4 reads "Round 3").
  */
-export function groupTurnsByRound(turns: ReadonlyArray<TurnView>, lang: 'ja' | 'en' = 'en'): TurnSection[] {
+export function groupTurnsByRound(turns: ReadonlyArray<TurnView>): TurnSection[] {
   const ordinals = debateRoundOrdinals(turns);
   const sections: TurnSection[] = [];
   for (const t of [...turns].sort(compareTurns)) {
@@ -561,7 +545,7 @@ export function groupTurnsByRound(turns: ReadonlyArray<TurnView>, lang: 'ja' | '
     }
     sections.push({
       key: `${id}@${t.turn_id}`,
-      label: sectionLabel(kind, lang, ordinals.get(t.round) ?? t.round),
+      label: sectionLabel(kind, ordinals.get(t.round) ?? t.round),
       kind,
       ...(kind === 'round' ? { round: t.round } : {}),
       turns: [t],
