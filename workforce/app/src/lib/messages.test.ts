@@ -33,6 +33,7 @@ import {
   fetchThreadSummaries,
   fetchThreadDetail,
   mergeMessages,
+  resolveDirectMessage,
   type ChatMessage,
   type Conversation,
 } from './messages';
@@ -310,5 +311,34 @@ describe('fetchThreadSummaries', () => {
         messages: [{ from: 'maya', at: '2026-06-02T09:10:00Z', body: 'hi' }],
       },
     ]);
+  });
+});
+
+describe('resolveDirectMessage', () => {
+  const conv = (id: string, participants: string[], group = false): Conversation => ({
+    id,
+    participants,
+    group,
+    starred: false,
+    unread: 0,
+    messages: [],
+  });
+  const roster = new Set(['tessa', 'maya', 'ren']);
+  const threads = [conv('g1', ['tessa', 'maya'], true), conv('t-maya', ['maya'])];
+
+  it('opens the existing 1:1 thread with the talent', () => {
+    expect(resolveDirectMessage('maya', threads, roster, false)).toEqual({ kind: 'thread', id: 't-maya' });
+  });
+
+  it('ignores group threads and pre-picks the talent in the composer', () => {
+    expect(resolveDirectMessage('tessa', threads, roster, true)).toEqual({ kind: 'compose', recipients: ['tessa'] });
+  });
+
+  it('returns null without a thread when composing is disabled', () => {
+    expect(resolveDirectMessage('tessa', threads, roster, false)).toBeNull();
+  });
+
+  it('returns null for a slug not on the roster', () => {
+    expect(resolveDirectMessage('nobody', threads, roster, true)).toBeNull();
   });
 });

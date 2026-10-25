@@ -5,7 +5,7 @@
 // the live messaging store lands.
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import WorkforceLayout from '../components/WorkforceLayout';
 import Sigil from '../components/Sigil';
 import { loadWorkforceManifest, fullName, apiConfigured } from '../lib/agents';
@@ -19,6 +19,7 @@ import {
   setThreadStar,
   mergeMessages,
   messagingWriteEnabled,
+  resolveDirectMessage,
   isAwaitingReply,
   isGroupRoundComplete,
   lastMessage,
@@ -147,6 +148,11 @@ export default function Messaging() {
   // Compose-to-new state: when true the centre pane shows the recipient
   // picker + first-message composer instead of an open thread.
   const [composing, setComposing] = useState(false);
+  // Talents pre-picked in the composer (the profile's Message deep link).
+  const [composeSeed, setComposeSeed] = useState<string[]>([]);
+  // `?to=<slug>` — set by the Message button on an agent profile.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const directTo = searchParams.get('to');
   // Mobile is single-pane: the list and the thread/compose pane can't sit
   // side-by-side on a phone. This flag drives which one is on screen below
   // the `md` breakpoint (false = list, true = thread/compose). It's inert on
@@ -197,10 +203,33 @@ export default function Messaging() {
     });
   }, [threads, query, filter, rosterMap]);
 
-  // Default-select the newest thread once data is in (unless composing).
+  // One-tap Message from an agent profile (/messaging?to=<slug>): once the
+  // roster and inbox are in, open the existing 1:1 thread or the composer
+  // with the talent pre-picked, then drop the param so a refresh or back-nav
+  // doesn't re-trigger it. An unresolvable slug falls through to the inbox.
+  const directReady = roster.length > 0 && (!LIVE || liveThreads !== null);
   useEffect(() => {
-    if (!composing && selectedId === null && threads.length > 0) setSelectedId(threads[0].id);
-  }, [threads, selectedId, composing]);
+    if (!directTo || !directReady) return;
+    const target = resolveDirectMessage(directTo, threads, new Set(rosterMap.keys()), CAN_WRITE);
+    if (target?.kind === 'thread') {
+      openThread(target.id);
+    } else if (target?.kind === 'compose') {
+      setComposeSeed(target.recipients);
+      setComposing(true);
+      setSelectedId(null);
+      setShowThreadMobile(true);
+    }
+    searchParams.delete('to');
+    setSearchParams(searchParams, { replace: true });
+    // threads/rosterMap are settled once directReady flips; resolve once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [directTo, directReady]);
+
+  // Default-select the newest thread once data is in (unless composing, or a
+  // ?to= deep link is still waiting to resolve).
+  useEffect(() => {
+    if (!composing && !directTo && selectedId === null && threads.length > 0) setSelectedId(threads[0].id);
+  }, [threads, selectedId, composing, directTo]);
 
   // Lazily hydrate the full transcript for the opened thread (live only —
   // the mock already carries every message inline).
@@ -410,6 +439,7 @@ export default function Messaging() {
                   disabled={!CAN_WRITE}
                   onClick={() => {
                     if (!CAN_WRITE) return;
+                    setComposeSeed([]);
                     setComposing(true);
                     setSelectedId(null);
                     setShowThreadMobile(true); // reveal the composer on mobile
@@ -527,6 +557,7 @@ export default function Messaging() {
             <div className={`${showThreadMobile ? 'flex' : 'hidden'} md:flex flex-1 md:flex-none flex-col min-h-0`}>
               {composing ? (
                 <Compose
+                  initialRecipients={composeSeed}
                   roster={roster}
                   rosterMap={rosterMap}
                   existing={threads}
@@ -835,6 +866,7 @@ function Thread({
 // Epic-024: multiple recipients create a group thread through the same
 // POST /threads contract (the backend derives `group` from the count).
 function Compose({
+  initialRecipients,
   roster,
   rosterMap,
   existing,
@@ -843,6 +875,7 @@ function Compose({
   onCreate,
   onOpenExisting,
 }: {
+  initialRecipients: string[];
   roster: WorkforceAgent[];
   rosterMap: Map<string, WorkforceAgent>;
   existing: Conversation[];
@@ -852,7 +885,7 @@ function Compose({
   onOpenExisting: (id: string) => void;
 }) {
   const [pickQuery, setPickQuery] = useState('');
-  const [recipients, setRecipients] = useState<string[]>([]);
+  const [recipients, setRecipients] = useState<string[]>(initialRecipients);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
