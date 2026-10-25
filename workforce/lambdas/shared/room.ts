@@ -175,6 +175,11 @@ export interface RoomTurnRow {
   tokens_in?: number;
   tokens_out?: number;
   skill_version?: string;
+  /** The engine that produced an agent turn (`provider:name`) and its
+   *  effort — set by wf-room-debate; the persona's META `model` is not
+   *  what speaks in a Room (ADR-0048 §2). */
+  model?: string;
+  effort?: string;
 }
 
 // --- API view types ------------------------------------------------------
@@ -860,6 +865,8 @@ export interface AppendTurnInput {
   tokens_in?: number;
   tokens_out?: number;
   skill_version?: string;
+  model?: string;
+  effort?: string;
   now?: () => Date;
   newUlid?: () => string;
 }
@@ -910,6 +917,8 @@ export async function appendTurn(input: AppendTurnInput): Promise<AppendedTurn> 
     ...(input.tokens_in !== undefined ? { tokens_in: input.tokens_in } : {}),
     ...(input.tokens_out !== undefined ? { tokens_out: input.tokens_out } : {}),
     ...(input.skill_version !== undefined ? { skill_version: input.skill_version } : {}),
+    ...(input.model !== undefined ? { model: input.model } : {}),
+    ...(input.effort !== undefined ? { effort: input.effort } : {}),
   };
   await putItem(row);
 

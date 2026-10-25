@@ -213,7 +213,10 @@ export async function complete(req: CompletionRequest): Promise<CompletionRespon
   if (useThinking) {
     body.thinking = { type: "adaptive" };
   }
-  if (req.effort) {
+  // `output_config.effort` exists on the models that have adaptive thinking;
+  // Haiku 4.x has neither, and would 400 on it — drop it there, as with the
+  // thinking field.
+  if (req.effort && !noThinking) {
     body.output_config = { effort: req.effort };
   }
   // Sampling: omitted whenever thinking is on (the API controls sampling

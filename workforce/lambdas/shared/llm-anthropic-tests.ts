@@ -162,6 +162,27 @@ describe("complete — per-model wire shape (the Maya incident)", () => {
     vi.unstubAllGlobals();
   });
 
+  it.each([
+    ["anthropic:claude-opus-5-5", (10 * 4.0 + 5 * 20.0) / 1_000_000],
+    ["anthropic:claude-haiku-5-5", (10 * 0.1 + 5 * 0.5) / 1_000_000],
+  ])("%s WITHOUT reasoning → still no temperature (5.x tier), and a pricing row", async (model, cost) => {
+    vi.stubGlobal("fetch", okFetch);
+    const out = await complete({ ...base, model });
+    expect(lastBody).not.toHaveProperty("thinking");
+    expect(lastBody).not.toHaveProperty("temperature");
+    expect(out.cost_usd).toBeCloseTo(cost, 12);
+    vi.unstubAllGlobals();
+  });
+
+  it("haiku-4-5 + effort → no output_config (no thinking, no effort on Haiku 4.x), sampling kept", async () => {
+    vi.stubGlobal("fetch", okFetch);
+    await complete({ ...base, model: "anthropic:claude-haiku-4-5", reasoningBudgetTokens: 2048, effort: "medium" });
+    expect(lastBody).not.toHaveProperty("thinking");
+    expect(lastBody).not.toHaveProperty("output_config");
+    expect(lastBody.temperature).toBe(0.7);
+    vi.unstubAllGlobals();
+  });
+
   it("opus-4-7 WITHOUT reasoning → no thinking field and still no temperature", async () => {
     vi.stubGlobal("fetch", okFetch);
     await complete({ ...base, model: "anthropic:claude-opus-4-7" });

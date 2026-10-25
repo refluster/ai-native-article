@@ -114,13 +114,22 @@ const REASONING_TOKENS = 2048;
 // but the debate engine is one model at one effort, so cost and quality are
 // predictable per run (W-3) — Sonnet 5.5 at `medium` (operator direction,
 // 2026-10-25). Override on the function with a stated reason.
-const ROOM_MODEL = process.env.WF_ROOM_MODEL ?? "anthropic:claude-sonnet-5-5";
+//
+// Both values are read per call (never at module scope — an init-time throw
+// with async retries off drops the event without touching META, a silent
+// stall) and validated before the CLAIM# slot is taken, under their own
+// throw reason (`room_config`, not `llm_error`). The model must be an
+// Anthropic Claude id in the S5 `provider:name` form (shared/agent-config.ts).
 const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 type Effort = (typeof EFFORTS)[number];
-function roomEffort(): Effort {
-  const e = process.env.WF_ROOM_EFFORT ?? "medium";
-  if (!(EFFORTS as readonly string[]).includes(e)) throw new Error(`room-debate: WF_ROOM_EFFORT=${e} is not one of ${EFFORTS.join("/")}`);
-  return e as Effort;
+const ROOM_MODEL_RE = /^anthropic:claude-[a-z0-9-]+$/;
+export function roomEngine(env: NodeJS.ProcessEnv = process.env): { model: string; effort: Effort } {
+  const model = env.WF_ROOM_MODEL ?? "anthropic:claude-sonnet-5-5";
+  const effort = env.WF_ROOM_EFFORT ?? "medium";
+  if (!ROOM_MODEL_RE.test(model)) guardThrow("room_config", `WF_ROOM_MODEL=${model} is not an anthropic:claude-* model id`);
+  if (!(EFFORTS as readonly string[]).includes(effort))
+    guardThrow("room_config", `WF_ROOM_EFFORT=${effort} is not one of ${EFFORTS.join("/")}`);
+  return { model, effort: effort as Effort };
 }
 
 /** Per-room agent turns per UTC day. A 6 × 3 room is 19 turns a run, so 60
@@ -568,6 +577,9 @@ async function speakOnce(event: RoomDebateEvent): Promise<RoomDebateResult> {
 
   // 7. Claim the slot before the Claude call (atomic — see the header): an
   //    overlapping duplicate of this event loses here and stops the chain.
+  // Engine config is checked before the slot is claimed: a misconfigured
+  // function fails every turn loudly on META (W-4) without burning a claim.
+  const engine = roomEngine();
   if (!(await claimTurnSlot({ room_id, run_id, round, kind, speaker }))) return skip("already_spoke");
 
   const { card, row } = await loadAgent(speaker);
@@ -580,8 +592,8 @@ async function speakOnce(event: RoomDebateEvent): Promise<RoomDebateResult> {
   let out;
   try {
     out = await complete({
-      model: ROOM_MODEL,
-      effort: roomEffort(),
+      model: engine.model,
+      effort: engine.effort,
       system: [card.systemMd, contract, roleBlock(event, meta, roster, turns), memory]
         .filter((s) => s.length > 0)
         .join("\n\n---\n\n"),
@@ -619,6 +631,10 @@ async function speakOnce(event: RoomDebateEvent): Promise<RoomDebateResult> {
     tokens_in: out.tokens_in,
     tokens_out: out.tokens_out,
     skill_version: SKILL_VERSION,
+    // The engine that produced the turn — the persona's META `model` is its
+    // voice's disclosed model, not what spoke here (ADR-0048 §2 amendment).
+    model: engine.model,
+    effort: engine.effort,
   });
 
   emitMetric("WfRoomTurn", { Slug: speaker });

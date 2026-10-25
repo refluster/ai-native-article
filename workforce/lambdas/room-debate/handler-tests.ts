@@ -249,6 +249,9 @@ describe("statement — happy path", () => {
     // The Room engine's model, not the persona's (its META row says sonnet-4-6).
     expect(call.model).toBe("anthropic:claude-sonnet-5-5");
     expect(call.effort).toBe("medium");
+    // …and the turn row records which engine spoke.
+    const turnPut = putItem.mock.calls.map((c) => c[0] as Record<string, unknown>).find((r) => String(r.sk).startsWith("TURN#"));
+    expect(turnPut).toMatchObject({ model: "anthropic:claude-sonnet-5-5", effort: "medium" });
     expect(call.maxTokens).toBe(1600);
     expect(call.reasoningBudgetTokens).toBeGreaterThanOrEqual(1024);
     expect(call.system).toContain("You are Maya, the PM.");
@@ -268,6 +271,34 @@ describe("statement — happy path", () => {
     await handler({ ...EVENT, then: [] });
     expect(putItem.mock.calls[0]![0].position).toBeUndefined();
     expect(putItem.mock.calls[0]![0].body_preview).toBe("I'd ship it, carefully.");
+  });
+});
+
+describe("engine config (WF_ROOM_MODEL / WF_ROOM_EFFORT)", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("honours the env override per call", async () => {
+    vi.stubEnv("WF_ROOM_MODEL", "anthropic:claude-opus-5-5");
+    vi.stubEnv("WF_ROOM_EFFORT", "high");
+    complete.mockResolvedValueOnce(completion("POSITION: Ship.\nFine."));
+    await handler({ ...EVENT, then: [] });
+    const call = complete.mock.calls[0]![0];
+    expect(call.model).toBe("anthropic:claude-opus-5-5");
+    expect(call.effort).toBe("high");
+  });
+
+  it("an invalid WF_ROOM_EFFORT throws under room_config BEFORE the claim and the Claude call (W-4), and still hands off", async () => {
+    vi.stubEnv("WF_ROOM_EFFORT", "extreme");
+    await expect(handler({ ...EVENT, then: [{ speaker: "dario", round: 1, kind: "statement" }] })).rejects.toThrow(/WF_ROOM_EFFORT=extreme/);
+    expect(conditionalPutItem).not.toHaveBeenCalled();
+    expect(complete).not.toHaveBeenCalled();
+    expect(lambdaSend).toHaveBeenCalledTimes(1); // the baton still passed
+  });
+
+  it("a non-Anthropic WF_ROOM_MODEL is refused the same way", async () => {
+    vi.stubEnv("WF_ROOM_MODEL", "azure:gpt-5");
+    await expect(handler({ ...EVENT, then: [] })).rejects.toThrow(/WF_ROOM_MODEL=azure:gpt-5/);
+    expect(complete).not.toHaveBeenCalled();
   });
 });
 

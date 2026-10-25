@@ -205,8 +205,11 @@ Room's question or context that you would not put in a thread.
 Every turn runs on one model at one effort regardless of the member's own
 `model` row — `WF_ROOM_MODEL` / `WF_ROOM_EFFORT` on `wf-room-debate`
 (default `anthropic:claude-sonnet-5-5` at `medium`); the member's row
-supplies the voice (`system_prompt`) only. Change them on the function
-with a stated reason.
+supplies the voice (`system_prompt`) only (ADR-0048 §2, as amended). This
+is a Rooms-only rule: `wf-messaging-reply` still speaks on the persona's
+META `model`, so one persona runs on two models across the two surfaces.
+Change the Room engine through the SAM template (a data-plane deploy),
+never through agents-api, and with a stated reason.
 
 A Room costs Claude calls only when you act: create (≤ participants ×
 rounds + 1, at most 19), reopen (≤ participants + 1), conclude now (1).
