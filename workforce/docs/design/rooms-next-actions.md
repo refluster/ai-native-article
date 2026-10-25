@@ -1,7 +1,7 @@
 # Rooms 結論 → ネクストアクション UI ブレスト (2026-10-25)
 
 - **Status**: Proposed 2026-10-25 (this PR). A design note, not an ADR; implements nothing. Governing ADR: [adr-0048](../adr/adr-0048-rooms-purpose-first-deliberation.md).
-- **Review (pr-autopilot)**: cycle 1 — `wf:dario` D1 ×4 · `wf:mateo` M1–M3 · `wf:freya` Y1 ×3; cycle 2 — `wf:dario` D3/D4 · `wf:mateo` M4 · `wf:freya` Y3/Y4 — all folded in below.
+- **Review (pr-autopilot)**: cycle 1 — `wf:dario` D1 ×4 · `wf:mateo` M1–M3 · `wf:freya` Y1 ×3; cycle 2 — `wf:dario` D3/D4 · `wf:mateo` M4 · `wf:freya` Y3/Y4; cycle 3 nits — `wf:dario` D5 · `wf:mateo` M5/M6 · `wf:freya` Y5 — all folded in below.
 
 参加: nadia (戦略・設計リード / ADR-0048 起案) · aoi (コンソール UI デザイナ) · ren (バックエンド)
 対象: `workforce/app/src/pages/Room.tsx` (`ConclusionCard`, L745) · `workforce/lambdas/rooms-api/` · `workforce/lambdas/room-debate/handler.ts`
@@ -51,7 +51,7 @@
 - 見出しは現行 chair プロンプト (`room-debate/handler.ts` L173) の `## 推奨アクション / ## Recommended action` (単数) をそのまま正とし、§3 の追記はその行を置き換える。パーサは `Recommended action(s)` / `Open question(s)` の単複どちらも受ける。
 
 - ID (`A1`, `Q1`) は Room 内で安定させるよう chair に指示するが、**プロンプト指示は保証ではない** (chair は前回結論を `transcriptWindow` 越しにしか見ない)。送信記録には項目テキスト (のハッシュ) を一緒に保存し、再 conclude 後の `[A1]` のテキストが送信済みのものと一致しなければ、その行は未送信として扱い「以前 #1234 として別の文面で送信済み」と注記する。バッジの流用も、新項目のブロックもしない。
-- メタ領域は **最後の ` — ` (全角ダッシュ) より後ろ** だけ。そこにある `key: value` 対だけを区切り文字で分割する (本文側の 設計・実装 / 全角コロン は触らない)。欠落は許容 (UI で補完)。自由文項目 (後述) にもサーバ側 ID (`M1`, `M2` …) を振り、ACTION# 行を持てるようにする。
+- メタ領域は **最後の ` — ` (em dash U+2014。U+2015 `―` も同値) より後ろ** だけ。`text_hash` = その手前の本文 (NFKC 正規化 + 空白圧縮後) の sha256 — メタ (`layer: L3→L2` など) を変えただけの再 conclude では変わらない。自由文項目 (`M*`) は `title` をハッシュする。そこにある `key: value` 対だけを区切り文字で分割する (本文側の 設計・実装 / 全角コロン は触らない)。欠落は許容 (UI で補完)。自由文項目 (後述) にもサーバ側 ID (`M1`, `M2` …) を振り、ACTION# 行を持てるようにする。
 - 英語見出し (`## Recommended action` / `## Open questions`) も同じ文法。区切りは `:`/`：`、` · `/`・`/`|` を同値に扱う (日本語の結論は全角コロンと中黒 U+30FB を書きがち)。`parseConclusionActions()` の vitest に日本語フィクスチャを 1 つ入れる。
 - `owner:` メタは Issue 本文の「Suggested owner」に落とすだけで **ラベルにはしない** (`owner:<slug>` ラベルは `issue-stage-set.mjs` 専用、issue-labeling.md §1.3)。新規 Issue は `stage:proposed` で着地。
 - パースは **サーバ側** (room-debate が conclusion turn を保存する時点) で行い、turn に `actions: RoomAction[]` / `open_questions: RoomQuestion[]` を保存 (**パース結果のみ**。送信状態は持たない — §4 M1)。`[A1]` 形式が取れない行は、見出し下の箇条書き 1 行 = 1 項目としてサーバ側 ID (`A?1`, `A?2` …) を振って**劣化して残す**。見出し自体がない場合だけ空配列 + ログ + UI の「項目を抽出できませんでした」(W-4)。加えて v1 の body は `action_id` なしの自由文項目 (`{ kind: "github_issue", title, body }`) を受け付け、「手動で追加」が実際に動く経路にする。
@@ -89,7 +89,7 @@ type RoomAction = {
 **バックエンド**
 - 新ルートは 1 本: `POST /rooms/{id}/actions` (AWS_IAM, routes.ts で再チェック)。body `{ items: [{ action_id, kind: "github_issue"|"skip", repo?, labels?, title?, body? }] }`。
   - `github_issue` → `shared/github.ts#createIssue` (トークンは既存 `wf/github`、新規シークレット不要)。
-  - 送信記録は **1 か所だけ**: `ROOM#{id}` / `ACTION#{conclusion_turn_id}#{action_id}` 行 (`kind, ref, text_hash, status, at, by`) を `attribute_not_exists(sk)` で `createIssue` の**前**に書く。再 conclude 後は同じ項目に新しい sk が付くので、その条件だけでは二重 Issue を防げない — **送信前に `begins_with(sk, "ACTION#")` で Room の全 ACTION# 行を読み、同じ `text_hash` の行があれば 409 で既存 `ref` を返す** (必要なら同一 TransactWrite で `ACTIONHASH#{text_hash}` 行を条件付きで併記)。TURN の `actions[]` はパース結果のみを持ち、`GET /rooms/{id}` が ACTION# 行を text_hash で join して返す (W-2)。この行の shape は **data-model.md (L1 / Zone A)** の変更なので、実装 PR には入れず、ADR-0048 の次の改訂 PR (operator merge) に載せ、コード PR はそれを引用する。
+  - 送信記録は **1 か所だけ**: `ROOM#{id}` / `ACTION#{conclusion_turn_id}#{action_id}` 行 (`kind, ref, text_hash, status, at, by`) を `attribute_not_exists(sk)` で `createIssue` の**前**に書く。再 conclude 後は同じ項目に新しい sk が付くので、その条件だけでは二重 Issue を防げない — 冪等性の本体は **同一 TransactWrite 内の `ACTIONHASH#{text_hash}` 行 (`attribute_not_exists(sk)`)**: 二重クリックや別タブの同時 POST でも原子的に 1 件に収まる (読んでから書く check-then-act にはしない)。`begins_with(sk, "ACTION#")` の Query (全ページ drain — `check-scan-drain` と同じバグ種) は 409 で返す既存 `ref` を引くためだけに使う。衝突とみなすのは `kind: "github_issue"` の行だけで、`skip` 行は後からの Issue 化を妨げない (skip は取り消せる)。TURN の `actions[]` はパース結果のみを持ち、`GET /rooms/{id}` が ACTION# 行を text_hash で join して返す (W-2)。この行 (と `ACTIONHASH#` 行) の shape は **data-model.md (L1 / Zone A)** の変更なので、実装 PR には入れず、ADR-0048 の次の改訂 PR (operator merge) に載せ、コード PR はそれを引用する。
 - A4 は既存 `POST /rooms` に `parent_room_id`, `seed_question_id` を追加するだけ (ルート増なし → SAM 変更なし)。
 - room-debate: chair プロンプトに §3 の契約を追記 + 保存時パーサ (`parseConclusionActions()`、純関数 + vitest)。
 
