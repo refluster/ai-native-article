@@ -102,12 +102,12 @@ describe('Doc', () => {
     const { container } = await mountLoaded('/docs/manifesto?lang=ja');
     const nav = screen.getByRole('navigation', { name: 'Breadcrumb' });
     const group = within(nav).getByRole('group', { name: 'Document edition' });
-    expect(within(group).getByRole('button', { name: 'JA' })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(within(group).getByRole('button', { name: 'EN' }));
+    expect(within(group).getByRole('button', { name: '日本語' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(within(group).getByRole('button', { name: 'English' }));
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/docs/manifesto?lang=en'));
     await waitFor(() => expect(container.querySelector('article')?.getAttribute('lang')).toBe('en'));
     expect(screen.getByText('Assemble the right professionals.')).toBeInTheDocument();
-    expect(within(group).getByRole('button', { name: 'EN' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(group).getByRole('button', { name: 'English' })).toHaveAttribute('aria-pressed', 'true');
     expect(window.localStorage.getItem(RESEARCH_LANGUAGE_STORAGE_KEY)).toBe('en');
   });
 
@@ -122,7 +122,7 @@ describe('Doc', () => {
     const intoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
     const scrollTo = vi.mocked(window.scrollTo);
     scrollTo.mockClear();
-    fireEvent.click(screen.getByRole('button', { name: 'JA' }));
+    fireEvent.click(screen.getByRole('button', { name: '日本語' }));
     await waitFor(() => expect(document.querySelector('article')?.getAttribute('lang')).toBe('ja'));
     // The Japanese body replaced the English one; the element with id s4 is new.
     expect(document.getElementById('s4')).not.toBe(s4);

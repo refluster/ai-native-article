@@ -2,7 +2,7 @@
 // what tells them apart, and Research's must stay "Article edition".
 
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import LanguageToggle from './LanguageToggle';
 
@@ -14,7 +14,17 @@ describe('LanguageToggle', () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole('group', { name: 'Article edition' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'JA' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '日本語' })).toHaveAttribute('aria-pressed', 'true');
+  });
+  it('names the buttons by edition, not by their JA / EN abbreviations', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <LanguageToggle value="ja" />
+      </MemoryRouter>,
+    );
+    const group = within(container);
+    expect(group.getByRole('button', { name: 'English' })).toHaveAttribute('aria-pressed', 'false');
+    expect(group.queryByRole('button', { name: 'EN' })).toBeNull();
   });
   it('takes the Docs surface name', () => {
     render(

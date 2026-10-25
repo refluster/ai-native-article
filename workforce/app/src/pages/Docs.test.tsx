@@ -67,8 +67,8 @@ describe('Docs index', () => {
     expect(screen.getByText('Documentation')).toBeInTheDocument();
     expect(screen.getByText(/Each is published in Japanese and English\./)).toBeInTheDocument();
     const group = screen.getByRole('group', { name: 'Document edition' });
-    expect(within(group).getByRole('button', { name: 'JA' })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(within(group).getByRole('button', { name: 'EN' }));
+    expect(within(group).getByRole('button', { name: '日本語' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(within(group).getByRole('button', { name: 'English' }));
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/docs?lang=en'));
     expect(screen.getByText('One human, 58 AIs')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Docs');

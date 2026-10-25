@@ -41,6 +41,8 @@ export default function LanguageToggle({ value, label = 'Article edition' }: Pro
           key={o.value}
           type="button"
           title={o.title}
+          aria-label={o.title}
+          lang={o.value}
           aria-pressed={o.value === value}
           onClick={() => choose(o.value)}
           className={`font-wfmono text-[11px] uppercase tracking-[0.14em] px-3 py-1 rounded-full transition-colors ${
