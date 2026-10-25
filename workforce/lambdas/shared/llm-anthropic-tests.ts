@@ -18,6 +18,7 @@ import {
   resolveAnthropicApiKey,
   extractApiKey,
   ANTHROPIC_MIN_THINKING_BUDGET_TOKENS,
+  pricingFor,
 } from "./llm-anthropic.js";
 
 function notFound(): Error {
@@ -171,6 +172,16 @@ describe("complete — per-model wire shape (the Maya incident)", () => {
     expect(lastBody).not.toHaveProperty("thinking");
     expect(lastBody).not.toHaveProperty("temperature");
     expect(out.cost_usd).toBeCloseTo(cost, 12);
+    vi.unstubAllGlobals();
+  });
+
+  it("a dated snapshot id resolves to its alias's pricing row (pricingFor), an unknown id to none", async () => {
+    expect(pricingFor("anthropic:claude-sonnet-5-5-20261001")).toEqual(pricingFor("claude-sonnet-5-5"));
+    expect(pricingFor("claude-sonnet-5-5")).toBeDefined();
+    expect(pricingFor("anthropic:claude-sonnet-9-9")).toBeUndefined();
+    vi.stubGlobal("fetch", okFetch);
+    const out = await complete({ ...base, model: "anthropic:claude-sonnet-5-5-20261001" });
+    expect(out.cost_usd).toBeCloseTo((10 * 2.0 + 5 * 10.0) / 1_000_000, 12);
     vi.unstubAllGlobals();
   });
 

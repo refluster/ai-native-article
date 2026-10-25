@@ -51,7 +51,7 @@ import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 
 import { type AgentMetaRow, agentPk } from "../shared/agent.js";
 import { getItem } from "../shared/ddb.js";
-import { complete } from "../shared/llm-anthropic.js";
+import { complete, pricingFor } from "../shared/llm-anthropic.js";
 import { readChunk, readIndex } from "../shared/memory.js";
 import {
   ROOM_OPERATOR_ID,
@@ -127,6 +127,9 @@ export function roomEngine(env: NodeJS.ProcessEnv = process.env): { model: strin
   const model = env.WF_ROOM_MODEL ?? "anthropic:claude-sonnet-5-5";
   const effort = env.WF_ROOM_EFFORT ?? "medium";
   if (!ROOM_MODEL_RE.test(model)) guardThrow("room_config", `WF_ROOM_MODEL=${model} is not an anthropic:claude-* model id`);
+  // On the price list (a dated snapshot resolves to its alias): an unpriced
+  // id would run every turn at cost_usd=0 and under-report W-3 silently.
+  if (!pricingFor(model)) guardThrow("room_config", `WF_ROOM_MODEL=${model} has no pricing row in shared/llm-anthropic.ts`);
   if (!(EFFORTS as readonly string[]).includes(effort))
     guardThrow("room_config", `WF_ROOM_EFFORT=${effort} is not one of ${EFFORTS.join("/")}`);
   return { model, effort: effort as Effort };

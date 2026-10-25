@@ -60,6 +60,9 @@ vi.mock("@aws-sdk/client-s3", () => ({
 const complete = vi.fn();
 vi.mock("../shared/llm-anthropic.js", () => ({
   complete: (...args: unknown[]) => complete(...args),
+  // The real price list's shape, minus the numbers: dated snapshots resolve.
+  pricingFor: (m: string) =>
+    /^(anthropic:)?claude-(sonnet-4-6|sonnet-5-5|opus-5-5|haiku-5-5|haiku-4-5)(-\d{8})?$/.test(m) ? { in: 1, out: 1 } : undefined,
 }));
 
 const readIndex = vi.fn();
@@ -290,15 +293,30 @@ describe("engine config (WF_ROOM_MODEL / WF_ROOM_EFFORT)", () => {
   it("an invalid WF_ROOM_EFFORT throws under room_config BEFORE the claim and the Claude call (W-4), and still hands off", async () => {
     vi.stubEnv("WF_ROOM_EFFORT", "extreme");
     await expect(handler({ ...EVENT, then: [{ speaker: "dario", round: 1, kind: "statement" }] })).rejects.toThrow(/WF_ROOM_EFFORT=extreme/);
+    expect(metrics).toContain("WfRoomTurnThrow{Reason=room_config}");
     expect(conditionalPutItem).not.toHaveBeenCalled();
     expect(complete).not.toHaveBeenCalled();
     expect(lambdaSend).toHaveBeenCalledTimes(1); // the baton still passed
+    // …and the failure is on META for the console (W-4), not just in the log.
+    expect(JSON.stringify(metaUpdates())).toContain("WF_ROOM_EFFORT=extreme");
   });
 
   it("a non-Anthropic WF_ROOM_MODEL is refused the same way", async () => {
     vi.stubEnv("WF_ROOM_MODEL", "azure:gpt-5");
     await expect(handler({ ...EVENT, then: [] })).rejects.toThrow(/WF_ROOM_MODEL=azure:gpt-5/);
+    expect(metrics).toContain("WfRoomTurnThrow{Reason=room_config}");
+    expect(conditionalPutItem).not.toHaveBeenCalled();
     expect(complete).not.toHaveBeenCalled();
+  });
+
+  it("an Anthropic id with no pricing row is refused too (W-3: never run at cost_usd=0), a dated snapshot is fine", async () => {
+    vi.stubEnv("WF_ROOM_MODEL", "anthropic:claude-sonnet-9-9");
+    await expect(handler({ ...EVENT, then: [] })).rejects.toThrow(/no pricing row/);
+    expect(complete).not.toHaveBeenCalled();
+    vi.stubEnv("WF_ROOM_MODEL", "anthropic:claude-sonnet-5-5-20261001");
+    complete.mockResolvedValueOnce(completion("POSITION: Ship.\nFine."));
+    await handler({ ...EVENT, then: [] });
+    expect(complete.mock.calls[0]![0].model).toBe("anthropic:claude-sonnet-5-5-20261001");
   });
 });
 

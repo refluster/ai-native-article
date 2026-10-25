@@ -74,6 +74,17 @@ const PRICING: Record<string, { in: number; out: number }> = {
   "claude-haiku-5-5": { in: 0.1, out: 0.5 },
 };
 
+/** The pricing row for a model id (with or without the `anthropic:` prefix),
+ *  a dated snapshot id (`…-20261001`) resolving to its alias's row.
+ *  Undefined → the model is not on the price list: `complete()` then
+ *  records cost_usd=0, so callers that set a model by configuration
+ *  (room-debate) refuse an unpriced id up front rather than under-report
+ *  W-3 silently. */
+export function pricingFor(model: string): { in: number; out: number } | undefined {
+  const key = model.replace(/^anthropic:/, "").replace(/-\d{8}$/, "");
+  return PRICING[key];
+}
+
 /** Anthropic's documented floor for the legacy `thinking.budget_tokens`
  *  param (the Epic-013 launch bug: messaging-reply shipped with budget
  *  1000 and every call 400'd, invisible from the operator's seat). The
@@ -264,7 +275,7 @@ export async function complete(req: CompletionRequest): Promise<CompletionRespon
     .map((c) => c.text!)
     .join("");
 
-  const price = PRICING[modelKey];
+  const price = pricingFor(modelKey);
   const cost_usd = price
     ? (data.usage.input_tokens * price.in + data.usage.output_tokens * price.out) / 1_000_000
     : 0;
