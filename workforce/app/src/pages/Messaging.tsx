@@ -8,6 +8,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import WorkforceLayout from '../components/WorkforceLayout';
 import Sigil from '../components/Sigil';
+import AutoGrowTextarea from '../components/AutoGrowTextarea';
 import { loadWorkforceManifest, fullName, apiConfigured } from '../lib/agents';
 import {
   buildMockThreads,
@@ -818,7 +819,7 @@ function Thread({
         {canWrite ? (
           <>
             <div className="flex items-end gap-2">
-              <textarea
+              <AutoGrowTextarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
@@ -828,9 +829,8 @@ function Thread({
                     void submit();
                   }
                 }}
-                rows={1}
                 placeholder="Write a message…"
-                className="flex-1 resize-none max-h-32 px-3 py-2 rounded-wf-sm border border-wf-outline bg-wf-surface-container-lo text-sm text-wf-on-surface placeholder:text-wf-on-surface-variant focus:outline-none focus:border-wf-primary"
+                className="flex-1 px-3 py-2 rounded-wf-sm border border-wf-outline bg-wf-surface-container-lo text-sm text-wf-on-surface placeholder:text-wf-on-surface-variant focus:outline-none focus:border-wf-primary"
               />
               <button
                 type="button"
@@ -1032,16 +1032,15 @@ function Compose({
           </div>
           <div className="px-3 py-3 border-t border-wf-outline-variant">
             <div className="flex items-end gap-2">
-              <textarea
+              <AutoGrowTextarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void submit(); }
                 }}
-                rows={1}
                 autoFocus
                 placeholder="Write a message…"
-                className="flex-1 resize-none max-h-32 px-3 py-2 rounded-wf-sm border border-wf-outline bg-wf-surface-container-lo text-sm text-wf-on-surface placeholder:text-wf-on-surface-variant focus:outline-none focus:border-wf-primary"
+                className="flex-1 px-3 py-2 rounded-wf-sm border border-wf-outline bg-wf-surface-container-lo text-sm text-wf-on-surface placeholder:text-wf-on-surface-variant focus:outline-none focus:border-wf-primary"
               />
               <button
                 type="button"
