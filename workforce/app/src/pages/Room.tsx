@@ -860,10 +860,16 @@ function Composer({
     if (!canSubmit) return;
     setSending(true);
     setError(null);
+    // Clear the draft before the request: the steer's own refresh runs
+    // `apply()` before this resolves, and a composer still holding the sent
+    // text would read as "typing" (typingInComposer) and keep the page from
+    // following the operator's own turn. Restored if the send fails.
+    const body = draft.trim();
+    setDraft('');
     try {
-      await onSteer(draft.trim());
-      setDraft('');
+      await onSteer(body);
     } catch (err) {
+      setDraft(body);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSending(false);
