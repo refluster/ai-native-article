@@ -58,6 +58,8 @@ const POLL_MS = 4000;
 /** Once stalled (lib/rooms stallState), keep listening but back off — a late turn still lands. */
 const STALLED_POLL_MS = 20_000;
 
+/** The CONTENT language (the question's) — used only for `lang=` on
+ *  content nodes. Console chrome is English-only. */
 type Lang = 'ja' | 'en';
 
 function fmtTime(iso: string): string {
@@ -292,7 +294,7 @@ export default function Room() {
   }
 
   const lang: Lang = room ? questionLanguage(room.question) : 'en';
-  const sections = useMemo(() => groupTurnsByRound(turns, lang), [turns, lang]);
+  const sections = useMemo(() => groupTurnsByRound(turns), [turns]);
   // A conclusion-only run: the API says so (run_rounds 0), or we started it.
   const concluding = !!room && (room.run_rounds === 0 || (!!concludeRunId && concludeRunId === room.run_id));
   const progress = useMemo(
@@ -435,7 +437,6 @@ export default function Room() {
             <ProgressBand
               room={room}
               progress={progress}
-              lang={lang}
               concluding={concluding}
               firstNameOf={firstNameOf}
             />
@@ -471,12 +472,12 @@ export default function Room() {
                 <SectionBlock key={s.key} section={s} room={room} roster={roster} nameOf={nameOf} lang={lang} />
               ))}
               {progress.nextSpeaker && deliberating && (
-                <div lang={lang} className="mt-4 flex items-center gap-3 text-[12px] text-wf-on-surface-variant font-wfmono">
+                <div className="mt-4 flex items-center gap-3 text-[12px] text-wf-on-surface-variant font-wfmono">
                   <span className="opacity-60">
                     <Sigil slug={progress.nextSpeaker} size={28} />
                   </span>
                   <span>
-                    {lang === 'ja' ? `${firstNameOf(progress.nextSpeaker)}さんが執筆中` : `${firstNameOf(progress.nextSpeaker)} is drafting`}
+                    {`${firstNameOf(progress.nextSpeaker)} is drafting`}
                   </span>
                   <span className="inline-flex gap-0.5" aria-hidden>
                     <span className="animate-bounce motion-reduce:animate-none [animation-delay:-0.3s]">·</span>
@@ -487,7 +488,7 @@ export default function Room() {
               )}
             </section>
 
-            <Composer room={room} onSteer={handleSteer} locked={locked} lang={lang} />
+            <Composer room={room} onSteer={handleSteer} locked={locked} />
           </>
         )}
       </div>
@@ -568,23 +569,20 @@ function ConcludeConfirm({
 function ProgressBand({
   room,
   progress,
-  lang,
   concluding,
   firstNameOf,
 }: {
   room: RoomView;
   progress: RoundProgress;
-  lang: Lang;
   concluding: boolean;
   firstNameOf: (s: string) => string;
 }) {
-  const copy = progressCopy(room, progress, lang, concluding, firstNameOf);
+  const copy = progressCopy(room, progress, concluding, firstNameOf);
   const live = isDeliberating(room);
   const spoken = new Set(progress.spoken);
   return (
     <div
       aria-live="polite"
-      lang={lang}
       className="mt-3 border border-wf-outline-variant bg-wf-surface-container rounded-wf-md px-3 sm:px-4 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
     >
       <div className="min-w-0">
@@ -612,9 +610,9 @@ function ProgressBand({
   );
 }
 
-function SectionDivider({ label, lang }: { label: string; lang: Lang }) {
+function SectionDivider({ label }: { label: string }) {
   return (
-    <div className="flex items-center gap-3 mt-7 mb-3" role="separator" aria-label={label} lang={lang}>
+    <div className="flex items-center gap-3 mt-7 mb-3" role="separator" aria-label={label}>
       <span className="h-px flex-1 bg-wf-outline-variant" aria-hidden />
       <span className="font-wfmono text-[10px] uppercase tracking-[0.18em] text-wf-on-surface-variant">{label}</span>
       <span className="h-px flex-1 bg-wf-outline-variant" aria-hidden />
@@ -637,7 +635,7 @@ function SectionBlock({
 }) {
   return (
     <div>
-      <SectionDivider label={section.label} lang={lang} />
+      <SectionDivider label={section.label} />
       <div className="space-y-3">
         {section.turns.map((t) =>
           t.kind === 'opening' ? (
@@ -667,17 +665,17 @@ function OpeningRow({ turn, room, lang }: { turn: TurnView; room: RoomView; lang
   // repeat it if it somehow differs.
   const differs = turn.body.trim() !== room.question.trim();
   return (
-    <div className="flex gap-3 items-start" lang={lang}>
+    <div className="flex gap-3 items-start">
       <OperatorAvatar size={32} />
       <div className="min-w-0">
         <div className="flex items-baseline gap-2 flex-wrap">
           <span className="font-semibold text-sm text-wf-on-surface">{OPERATOR.name}</span>
           <span className="text-[12px] text-wf-on-surface-variant">
-            {lang === 'ja' ? 'がこの論点でルームを開きました' : 'opened the room on this question'}
+            opened the room on this question
           </span>
           <span className="font-wfmono text-[10px] text-wf-on-surface-variant">{fmtTime(turn.at)}</span>
         </div>
-        {differs && <p className="mt-0.5 text-sm text-wf-on-surface leading-relaxed whitespace-pre-wrap">{turn.body}</p>}
+        {differs && <p lang={lang} className="mt-0.5 text-sm text-wf-on-surface leading-relaxed whitespace-pre-wrap">{turn.body}</p>}
       </div>
     </div>
   );
@@ -685,17 +683,17 @@ function OpeningRow({ turn, room, lang }: { turn: TurnView; room: RoomView; lang
 
 function OperatorTurn({ turn, lang }: { turn: TurnView; lang: Lang }) {
   return (
-    <div className="flex gap-3 items-start" lang={lang}>
+    <div className="flex gap-3 items-start">
       <OperatorAvatar size={40} />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2 flex-wrap">
           <span className="font-semibold text-sm text-wf-on-surface">{OPERATOR.name}</span>
           <span className="font-wfmono text-[10px] uppercase tracking-[0.12em] text-wf-on-surface-variant">
-            {lang === 'ja' ? '方向づけ' : 'Steer'}
+            Steer
           </span>
           <span className="font-wfmono text-[10px] text-wf-on-surface-variant">{fmtTime(turn.at)}</span>
         </div>
-        <p className="mt-0.5 text-sm text-wf-on-surface leading-relaxed whitespace-pre-wrap break-words">{turn.body}</p>
+        <p lang={lang} className="mt-0.5 text-sm text-wf-on-surface leading-relaxed whitespace-pre-wrap break-words">{turn.body}</p>
       </div>
     </div>
   );
@@ -716,7 +714,7 @@ function StatementCard({
 }) {
   const paras = paragraphsOf(turn.body);
   return (
-    <article lang={lang} className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-4 sm:p-5">
+    <article className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md p-4 sm:p-5">
       <header className="flex items-start gap-3">
         <Sigil slug={turn.from} size={40} />
         <div className="min-w-0 flex-1">
@@ -731,9 +729,9 @@ function StatementCard({
         </div>
       </header>
       {turn.position && (
-        <p className="mt-3 font-headline font-bold text-[15px] leading-snug text-wf-on-surface">{turn.position}</p>
+        <p lang={lang} className="mt-3 font-headline font-bold text-[15px] leading-snug text-wf-on-surface">{turn.position}</p>
       )}
-      <div className="mt-2 space-y-2.5 text-sm text-wf-on-surface leading-relaxed break-words">
+      <div lang={lang} className="mt-2 space-y-2.5 text-sm text-wf-on-surface leading-relaxed break-words">
         {paras.map((p, i) => (
           <p key={i} className="whitespace-pre-wrap">
             {p}
@@ -746,15 +744,15 @@ function StatementCard({
 
 function ConclusionCard({ turn, nameOf, lang }: { turn: TurnView; nameOf: (s: string) => string; lang: Lang }) {
   return (
-    <article lang={lang} className="border border-wf-primary bg-wf-surface-container-lo rounded-wf-lg overflow-hidden">
+    <article className="border border-wf-primary bg-wf-surface-container-lo rounded-wf-lg overflow-hidden">
       <header className="bg-wf-primary text-wf-on-primary px-4 sm:px-5 py-2.5 flex items-center gap-3 flex-wrap">
-        <span className="font-wfmono text-[11px] uppercase tracking-[0.18em]">{lang === 'ja' ? '結論' : 'Conclusion'}</span>
+        <span className="font-wfmono text-[11px] uppercase tracking-[0.18em]">Conclusion</span>
         <span className="text-[12px] opacity-90">
-          {nameOf(turn.from)} · {lang === 'ja' ? '議長' : 'chair'}
+          {nameOf(turn.from)} · chair
         </span>
         <span className="ml-auto font-wfmono text-[10px] opacity-80">{fmtTime(turn.at)}</span>
       </header>
-      <div className="px-4 sm:px-6 py-4 skill-md-body break-words">
+      <div lang={lang} className="px-4 sm:px-6 py-4 skill-md-body break-words">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{turn.body}</ReactMarkdown>
       </div>
     </article>
@@ -765,13 +763,11 @@ function Composer({
   room,
   onSteer,
   locked,
-  lang,
 }: {
   room: RoomView;
   onSteer: (body: string) => Promise<void>;
   /** Only the chair's conclusion is left — a steer now would go unread. */
   locked: boolean;
-  lang: Lang;
 }) {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -828,8 +824,8 @@ function Composer({
         {reopen ? 'Reopen with a follow-up' : 'Steer the room'}
       </label>
       {locked ? (
-        <p lang={lang} className="mt-0.5 text-[12px] text-wf-on-surface-variant leading-relaxed">
-          {steerLockedCopy(lang)}
+        <p className="mt-0.5 text-[12px] text-wf-on-surface-variant leading-relaxed">
+          {steerLockedCopy()}
         </p>
       ) : (
         <p className="mt-0.5 text-[12px] text-wf-on-surface-variant leading-relaxed">

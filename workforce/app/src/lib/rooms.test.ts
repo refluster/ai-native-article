@@ -249,7 +249,7 @@ describe('roundProgress', () => {
     // Same answer from the API's run plan.
     const planned = room({ run_id: RUN2, run_count: 2, run_start_round: 4, run_rounds: 1 });
     expect(roundProgress(planned, [...before, say('nadia', 4, RUN2)])).toMatchObject({ round: 4, roundOrdinal: 3, ofRoundsOrdinal: 3 });
-    expect(progressCopy(planned, roundProgress(planned, before), 'en', false, (s) => s).line).toBe('Round 3 of 3 · 0/3 have spoken');
+    expect(progressCopy(planned, roundProgress(planned, before), false, (s) => s).line).toBe('Round 3 of 3 · 0/3 have spoken');
   });
 
   it('a later Conclude now (stored round 6) reports the last debate round reached — "Concluded after round 3"', () => {
@@ -264,7 +264,7 @@ describe('roundProgress', () => {
     const done = [...turns, turn({ kind: 'conclusion', from: 'nadia', round: 6, run_id: RUN3 })];
     const after = roundProgress({ ...concluding, status: 'concluded' }, done);
     expect(after.phase).toBe('done');
-    expect(progressCopy({ ...concluding, turn_count: 18 }, after, 'en', true, (s) => s).line).toBe(
+    expect(progressCopy({ ...concluding, turn_count: 18 }, after, true, (s) => s).line).toBe(
       'Concluded after round 3 · 18 turns',
     );
   });
@@ -313,36 +313,36 @@ describe('ordinalOfRound / debateRoundOrdinals', () => {
   });
 });
 
-// ── progressCopy (band wording, EN + JA) ────────────────────────────────
+// ── progressCopy (band wording — console chrome is English-only) ────────────────────────────────
 
 describe('progressCopy', () => {
   const name = (s: string) => s;
 
   it('EN: round of rounds, spoken count, drafting line', () => {
     const p = roundProgress(room(), [opening(), say('nadia', 1), say('dario', 1), say('freya', 1), say('nadia', 2)]);
-    expect(progressCopy(room(), p, 'en', false, name)).toEqual({
+    expect(progressCopy(room(), p, false, name)).toEqual({
       line: 'Round 2 of 2 · 1/3 have spoken',
       drafting: 'dario is drafting…',
     });
   });
 
-  it('JA uses ラウンド throughout — never 回', () => {
+  it('stays English for a Japanese question (chrome is not localised; the body is)', () => {
     const r = room({ question: '値上げすべきか？' });
     const mid = roundProgress(r, [opening(), say('nadia', 1), say('dario', 1), say('freya', 1), say('nadia', 2)]);
-    expect(progressCopy(r, mid, 'ja', false, name).line).toBe('第2ラウンド / 全2ラウンド · 3人中1人が発言');
+    expect(progressCopy(r, mid, false, name).line).toBe('Round 2 of 2 · 1/3 have spoken');
 
     const all = [opening(), ...[1, 2].flatMap((x) => MEMBERS.map((m) => say(m, x)))];
     const done = roundProgress({ ...r, status: 'concluded' }, [...all, turn({ kind: 'conclusion', from: 'nadia', round: 3 })]);
-    expect(progressCopy({ ...r, turn_count: 8 }, done, 'ja', false, name).line).toBe('結論が出ました · 第2ラウンドまで · 8件の発言');
+    expect(progressCopy({ ...r, turn_count: 8 }, done, false, name).line).toBe('Concluded after round 2 · 8 turns');
 
     const early = roundProgress(room({ run_id: RUN2, run_start_round: 2, run_rounds: 0 }), [opening(), say('nadia', 1)]);
-    expect(progressCopy(r, early, 'ja', true, name).line).toBe('議論を打ち切って結論へ');
-    expect(progressCopy(r, roundProgress(r, all), 'ja', false, name).line).toBe('全ラウンド終了');
+    expect(progressCopy(r, early, true, name).line).toBe('Concluding early');
+    expect(progressCopy(r, roundProgress(r, all), false, name).line).toBe('All rounds done');
 
-    // The reopened 3 × 2 room: stored round 4 is 第3ラウンド / 全3ラウンド.
+    // The reopened 3 × 2 room: stored round 4 is Round 3 of 3.
     const reopened = room({ question: '値上げすべきか？', run_id: RUN2, run_count: 2, run_start_round: 4, run_rounds: 1 });
-    expect(progressCopy(reopened, roundProgress(reopened, concludedThenReopened()), 'ja', false, name).line).toBe(
-      '第3ラウンド / 全3ラウンド · 3人中0人が発言',
+    expect(progressCopy(reopened, roundProgress(reopened, concludedThenReopened()), false, name).line).toBe(
+      'Round 3 of 3 · 0/3 have spoken',
     );
   });
 });
@@ -369,9 +369,8 @@ describe('steerLocked', () => {
     expect(steerLocked(null, null)).toBe(false);
   });
 
-  it('says why, in the question language', () => {
-    expect(steerLockedCopy('en')).toBe('The chair is writing the conclusion — reopen with a follow-up once it lands');
-    expect(steerLockedCopy('ja')).toMatch(/議長が結論を執筆中/);
+  it('says why (English-only chrome)', () => {
+    expect(steerLockedCopy()).toBe('The chair is writing the conclusion — reopen with a follow-up once it lands');
   });
 });
 
@@ -474,16 +473,6 @@ describe('groupTurnsByRound', () => {
     expect(sections[5]!.round).toBe(4);
   });
 
-  it('uses Japanese labels (ラウンド, never 回) for a Japanese question', () => {
-    const turns = [
-      opening(),
-      say('nadia', 1),
-      turn({ kind: 'steer', from: 'operator', round: 0 }),
-      say('nadia', 2),
-      turn({ kind: 'conclusion', from: 'nadia', round: 3 }),
-    ];
-    expect(groupTurnsByRound(turns, 'ja').map((s) => s.label)).toEqual(['論点', '第1ラウンド', 'オペレーター', '第2ラウンド', '結論']);
-  });
 });
 
 // ── Wire calls ──────────────────────────────────────────────────────────

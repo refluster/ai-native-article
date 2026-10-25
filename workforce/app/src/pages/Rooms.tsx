@@ -448,7 +448,7 @@ function NewRoomPanel({
       <div className="space-y-4">
         <div>
           <label htmlFor="room-question" className={LABEL}>
-            Question · 議題 <span className="text-wf-tertiary">*</span>
+            Question <span className="text-wf-tertiary">*</span>
           </label>
           <textarea
             id="room-question"
