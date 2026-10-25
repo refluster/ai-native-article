@@ -89,6 +89,32 @@
   }
 }
 
+/* ── Room turn arrival ──────────────────────────────────────────────────
+   A turn that lands while /rooms/:id is open rises into place as the page
+   scrolls to it (pages/Room.tsx). Motion only — no colour — and opt-out
+   under the OS reduced-motion setting, where the card simply appears. */
+@keyframes wf-turn-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.wf-turn-arrive {
+  animation: wf-turn-arrive 640ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wf-turn-arrive {
+    animation: none;
+  }
+}
+
 /* ── Skeleton screens ───────────────────────────────────────────────────
    One shimmering placeholder surface, used by components/Skeleton.tsx.
    The base tone is the recessed `wf-surface-container` token; the sweep is

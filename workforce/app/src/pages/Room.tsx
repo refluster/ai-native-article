@@ -131,6 +131,10 @@ export default function Room() {
   // Consecutive poll failures: after a few, the fetch error is shown, so a
   // read fault is not mistaken for a stopped schedule (W-4).
   const [pollHealth, setPollHealth] = useState<PollHealth>({ failures: 0 });
+  // The newest turn that arrived while the page was open (a poll tail, a
+  // steer's refresh) — the timeline scrolls to it so the debate visibly
+  // moves on. Never set by the initial load, which opens at the top.
+  const [arrivedTurnId, setArrivedTurnId] = useState<string | null>(null);
 
   const roomRef = useRef<RoomView | null>(null);
   const afterRef = useRef<string | undefined>(undefined);
@@ -141,8 +145,9 @@ export default function Room() {
   // overlap window (pollCursor), so only turns not yet on screen count.
   const apply = useCallback((d: RoomDetail) => {
     const prev = roomRef.current;
+    const fresh = d.turns.filter((t) => !turnIdsRef.current.has(t.turn_id));
     const moved =
-      d.turns.some((t) => !turnIdsRef.current.has(t.turn_id)) ||
+      fresh.length > 0 ||
       !prev ||
       prev.status !== d.room.status ||
       prev.turn_count !== d.room.turn_count ||
@@ -153,6 +158,7 @@ export default function Room() {
     setRoom(d.room);
     if (d.turns.length > 0) setTurns((t) => mergeTurns(t, d.turns));
     if (moved && prev) setLastChangeAt(Date.now());
+    if (prev && fresh.length > 0) setArrivedTurnId(fresh[fresh.length - 1]!.turn_id);
     // Every successful read comes through here, so the poll-failure banner
     // clears even when the read that succeeded was not a poll tick (an
     // archive, a steer): otherwise it could outlive polling itself.
@@ -209,6 +215,16 @@ export default function Room() {
   const deliberating = isDeliberating(room);
   const stalled = stallState(now, lastChangeAt, room) === 'stalled';
   const pollError = pollErrorToShow(pollHealth);
+
+  // Bring the turn that just landed into view (smooth unless the OS asks for
+  // reduced motion); the card's own arrival animation does the rest.
+  useEffect(() => {
+    if (!arrivedTurnId) return;
+    const el = document.getElementById(turnDomId(arrivedTurnId));
+    if (!el || typeof el.scrollIntoView !== 'function') return;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+  }, [arrivedTurnId]);
 
   // The clock the stall check reads — ticks only while deliberating.
   useEffect(() => {
@@ -469,7 +485,15 @@ export default function Room() {
             {/* ── Deliberation record ── */}
             <section aria-label="Deliberation" className="mt-2">
               {sections.map((s) => (
-                <SectionBlock key={s.key} section={s} room={room} roster={roster} nameOf={nameOf} lang={lang} />
+                <SectionBlock
+                  key={s.key}
+                  section={s}
+                  room={room}
+                  roster={roster}
+                  nameOf={nameOf}
+                  lang={lang}
+                  arrivedTurnId={arrivedTurnId}
+                />
               ))}
               {progress.nextSpeaker && deliberating && (
                 <div className="mt-4 flex items-center gap-3 text-[12px] text-wf-on-surface-variant font-wfmono">
@@ -620,41 +644,53 @@ function SectionDivider({ label }: { label: string }) {
   );
 }
 
+/** DOM id of a turn's card — the scroll target when it arrives. */
+function turnDomId(turnId: string): string {
+  return `turn-${turnId}`;
+}
+
 function SectionBlock({
   section,
   room,
   roster,
   nameOf,
   lang,
+  arrivedTurnId,
 }: {
   section: TurnSection;
   room: RoomView;
   roster: Map<string, WorkforceAgent>;
   nameOf: (s: string) => string;
   lang: Lang;
+  arrivedTurnId: string | null;
 }) {
   return (
     <div>
       <SectionDivider label={section.label} />
       <div className="space-y-3">
-        {section.turns.map((t) =>
-          t.kind === 'opening' ? (
-            <OpeningRow key={t.turn_id} turn={t} room={room} lang={lang} />
-          ) : t.kind === 'steer' ? (
-            <OperatorTurn key={t.turn_id} turn={t} lang={lang} />
-          ) : t.kind === 'conclusion' ? (
-            <ConclusionCard key={t.turn_id} turn={t} nameOf={nameOf} lang={lang} />
-          ) : (
-            <StatementCard
-              key={t.turn_id}
-              turn={t}
-              agent={roster.get(t.from)}
-              nameOf={nameOf}
-              isChair={t.from === room.chair}
-              lang={lang}
-            />
-          ),
-        )}
+        {section.turns.map((t) => (
+          <div
+            key={t.turn_id}
+            id={turnDomId(t.turn_id)}
+            className={t.turn_id === arrivedTurnId ? 'wf-turn-arrive scroll-mt-20' : 'scroll-mt-20'}
+          >
+            {t.kind === 'opening' ? (
+              <OpeningRow turn={t} room={room} lang={lang} />
+            ) : t.kind === 'steer' ? (
+              <OperatorTurn turn={t} lang={lang} />
+            ) : t.kind === 'conclusion' ? (
+              <ConclusionCard turn={t} nameOf={nameOf} lang={lang} />
+            ) : (
+              <StatementCard
+                turn={t}
+                agent={roster.get(t.from)}
+                nameOf={nameOf}
+                isChair={t.from === room.chair}
+                lang={lang}
+              />
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
