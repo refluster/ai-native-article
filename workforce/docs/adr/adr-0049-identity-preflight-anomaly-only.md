@@ -20,18 +20,24 @@ credential the binding was supposed to bound the blast radius to (#777, comment
 2026-09-27T20:09:45Z). This defeats the per-project credential-scoping model
 every raw-fetching skill relies on: `pr-autopilot`, `pr-remediate`,
 `issue-triage`, `issue-implement`, `weekly-project-report`, `research-study`,
-and this `issue-design` lane itself.
+`regulatory-situation-report`, `legal-amendment-review-committee`,
+`ops-accountability-watch`, `podcast-publish`, and this `issue-design` lane
+itself.
 
 **How it was filed, and how it shipped.** #777 named the defect and proposed a
 `GET /user` preflight, and explicitly scoped it for **operator sign-off, not
 self-merge**: *"touching shared credential handling is a Zone A/B judgment
-call, not an autonomous L3 edit"* (quoting root `CLAUDE.md`'s action-authority
-matrix). `issue-implement` (Ren) read that line and handed the issue back
-uncoded for exactly that reason. A second issue, **#781**, was then filed the
+call, not an autonomous L3 edit"* — #777's own words, from its "Why not fixed
+in this issue" section, characterising root `CLAUDE.md`'s action-authority
+matrix (the matrix itself lists "touching Zone A files" and spend outside the
+envelope among the B — ask-first — actions; the sentence is #777's paraphrase
+of it, not a quotation from the file). `issue-implement` (Ren) read that line
+and handed the issue back uncoded for exactly that reason. A second issue, **#781**, was then filed the
 same day carrying the identical proposal as a checklist of acceptance criteria
 — but labelled `wf:lane:implement`, not `wf:lane:design` — and was implemented
-directly, landing in **PR #784 (merged 2026-09-29T04:35Z)**, roughly ninety
-minutes before this design-lane fire picked #777 back up. #777 itself is still
+directly, landing in **PR #784 (merged 2026-09-29T04:04Z)**, about 85 minutes
+before this design-lane fire (task `agent-runner-2026-09-29T05:29:57Z-dario-3`)
+picked #777 back up. #777 itself is still
 open: the router (Nadia) had already said, dispatching #777 to this lane, that
 *"once `wf:dario`'s design proposal lands as a PR, the normal review/sign-off
 path covers it"* — this ADR is that proposal, reviewing what actually shipped
@@ -72,8 +78,15 @@ separating because each needs a different fix:
    `research-study/publish-study.mjs` each build their own independent `gh()`
    client (`DEFAULT_API_URL` + a local `fetch` wrapper) and do not call
    `makeGh()` or `assertGithubIdentity()` at all — two of the six consumers
-   #781's acceptance criteria named are still unguarded. This is a mechanical
-   gap, not a design question.
+   #781's acceptance criteria named are still unguarded. Four more skills
+   outside #781's list share the same pattern and also write
+   (`regulatory-situation-report/publish-report.mjs`,
+   `legal-amendment-review-committee/post-review.mjs` — PR reviews,
+   `ops-accountability-watch/sync-issues.mjs` — issue POST/PATCH,
+   `podcast-publish/trigger-pipeline.mjs` — `workflow_dispatch`; inventory:
+   `grep -rl api.github.com workforce/skills` minus the `makeGh()` callers,
+   re-checked 2026-10-26), so the unguarded raw-write surface is six skill
+   files, not two. This is a mechanical gap, not a design question.
 2. **The MCP surface is untouched, and cannot be reached this way.**
    `issue-implement` and `issue-design` (this lane) write through the GitHub
    MCP connector's tools, not a deterministic write-script — and #777's own
@@ -115,15 +128,15 @@ separating because each needs a different fix:
    rollout (who provisions which bot account per project, the W-3 cost line,
    the credential-storage shape) as a follow-up proposal, not a same-PR flip.
 3. **Say the gap in writing where the law lives.** `workforce/docs/governance.md`
-   §2 (W-2 / R-N9's credential-scoping premise) should carry a line, next to
-   R-N9's text, stating plainly that CCR-session writes are not currently
+   §4, next to R-N9's text (the per-project credential-scoping premise R-N9
+   and its W-5 inheritance clause rest on), should carry a line stating plainly that CCR-session writes are not currently
    identity-isolated per project — the preflight added by #784 detects a
    *different* identity appearing, not a *wrong* one — until per-project bot
    identities exist. This is a documentation change to an L0/L1 file and is
    explicitly **not made in this PR** (see Implementation).
-4. **The two unwired `gh()` clients get wired to the same shared gate.**
-   `weekly-project-report/publish-report.mjs` and `research-study/publish-study.mjs`
-   should call `makeGh()` (or `assertGithubIdentity()` directly) the same way
+4. **The unwired `gh()` clients get wired to the same shared gate.**
+   `weekly-project-report/publish-report.mjs`, `research-study/publish-study.mjs`
+   and the four skills named in gap 1 should call `makeGh()` (or `assertGithubIdentity()` directly) the same way
    `pr-autopilot`/`pr-remediate`/`issue-triage` already do, closing #781's
    acceptance criteria for real rather than by omission. Mechanical,
    implement-shaped, **not done in this PR**.
@@ -163,8 +176,9 @@ separating because each needs a different fix:
   writes are not currently project-identity-isolated — a more honest but
   less comfortable claim than the credential-scoping language R-N9 currently
   implies stands unqualified.
-- `weekly-project-report` and `research-study` remain unguarded by the
-  preflight until their follow-up PR lands; they are no worse off than before
+- `weekly-project-report`, `research-study` and the four other raw-writing
+  skills named in gap 1 remain unguarded by the preflight until their
+  follow-up PR lands; they are no worse off than before
   #784, but #781's acceptance criteria should not be read as fully met until
   they are.
 - The MCP-call substitution stays an open, unmitigated risk with no proposed
@@ -187,8 +201,8 @@ is precisely the silent-absorption outcome it is trying to head off.
 
 ## Out of scope
 
-- Implementing the `weekly-project-report` / `research-study` wiring (a small,
-  implement-shaped follow-up per consumer).
+- Implementing the `weekly-project-report` / `research-study` wiring and the
+  four other skills in gap 1 (a small, implement-shaped follow-up per consumer).
 - Provisioning actual per-project bot GitHub identities/PATs — a Zone A
   cost/identity decision on its own, not decided by this ADR.
 - Fixing CCR's upstream identity-substitution defect, or building any
