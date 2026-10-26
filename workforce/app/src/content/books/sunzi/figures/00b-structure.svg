@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 718" role="img" aria-labelledby="f0s-title f0s-desc">
+<title id="f0s-title">図2 十三篇の構造</title>
+<desc id="f0s-desc">計篇から用間篇までの十三篇を順に並べ、戦う前・形と勢・運用・特殊の四つの群を括弧で示す。各篇に短い要約を添える。</desc>
+<style>
+.f0s-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+.f0s-boxa{fill:var(--book-panel);stroke:var(--book-accent);stroke-width:1.5}
+.f0s-ln{fill:none;stroke:var(--book-line);stroke-width:1.2}
+.f0s-ln2{fill:none;stroke:var(--book-ink-2);stroke-width:1.3}
+.f0s-dash{fill:none;stroke:var(--book-ink-2);stroke-width:1.2;stroke-dasharray:4 4}
+.f0s-acc{fill:none;stroke:var(--book-accent);stroke-width:1.6}
+.f0s-arr{fill:none;stroke:var(--book-ink-2);stroke-width:1.3;marker-end:url(#f0s-ah)}
+.f0s-arra{fill:none;stroke:var(--book-accent);stroke-width:1.6;marker-end:url(#f0s-aha)}
+.f0s-ahp{fill:var(--book-ink-2)}
+.f0s-ahap{fill:var(--book-accent)}
+.f0s-h{font-family:inherit;font-size:20px;font-weight:600;fill:var(--book-ink)}
+.f0s-t{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-ink)}
+.f0s-b{font-family:inherit;font-size:16px;fill:var(--book-ink)}
+.f0s-s{font-family:inherit;font-size:15px;fill:var(--book-ink-2)}
+.f0s-xs{font-family:inherit;font-size:14px;fill:var(--book-ink-2)}
+.f0s-k{font-family:inherit;font-size:14px;font-weight:600;fill:var(--book-accent);letter-spacing:.08em}
+.f0s-ta{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-accent)}
+.f0s-big{font-family:inherit;font-size:30px;font-weight:600;fill:var(--book-ink)}
+
+.f0s-dot{fill:var(--book-bg);stroke:var(--book-ink-2);stroke-width:1.2}
+.f0s-n{font-family:inherit;font-size:13px;fill:var(--book-ink)}
+.f0s-l{font-family:inherit;font-size:16px;fill:var(--book-ink-2)}
+.f0s-ga{font-family:inherit;font-size:20px;font-weight:600;fill:var(--book-accent)}
+</style>
+<defs><marker id="f0s-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f0s-ahp" d="M0 0L10 5L0 10z"/></marker><marker id="f0s-aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="f0s-ahap" d="M0 0L10 5L0 10z"/></marker></defs>
+<rect x="24" y="20" width="460" height="146" rx="6" class="f0s-box"/>
+<rect x="24" y="182" width="460" height="146" rx="6" class="f0s-box"/>
+<rect x="24" y="344" width="460" height="238" rx="6" class="f0s-box"/>
+<rect x="24" y="598" width="460" height="100" rx="6" class="f0s-box"/>
+<line x1="56" y1="47" x2="56" y2="671" class="f0s-ln2"/>
+<circle cx="56" cy="47" r="16" class="f0s-dot"/>
+<text x="56" y="52" class="f0s-n" text-anchor="middle">一</text>
+<text x="90" y="53" class="f0s-t">計篇</text>
+<text x="190" y="53" class="f0s-l">「数える」</text>
+<circle cx="56" cy="93" r="16" class="f0s-dot"/>
+<text x="56" y="98" class="f0s-n" text-anchor="middle">二</text>
+<text x="90" y="99" class="f0s-t">作戦篇</text>
+<text x="190" y="99" class="f0s-l">「戦争の費用」</text>
+<circle cx="56" cy="139" r="16" class="f0s-dot"/>
+<text x="56" y="144" class="f0s-n" text-anchor="middle">三</text>
+<text x="90" y="145" class="f0s-t">謀攻篇</text>
+<text x="190" y="145" class="f0s-l">「戦わずに勝つ」</text>
+<circle cx="56" cy="209" r="16" class="f0s-dot"/>
+<text x="56" y="214" class="f0s-n" text-anchor="middle">四</text>
+<text x="90" y="215" class="f0s-t">形篇</text>
+<text x="190" y="215" class="f0s-l">「負けない形」</text>
+<circle cx="56" cy="255" r="16" class="f0s-dot"/>
+<text x="56" y="260" class="f0s-n" text-anchor="middle">五</text>
+<text x="90" y="261" class="f0s-t">勢篇</text>
+<text x="190" y="261" class="f0s-l">「配置が生む力」</text>
+<circle cx="56" cy="301" r="16" class="f0s-dot"/>
+<text x="56" y="306" class="f0s-n" text-anchor="middle">六</text>
+<text x="90" y="307" class="f0s-t">虚実篇</text>
+<text x="190" y="307" class="f0s-l">「主導権」</text>
+<circle cx="56" cy="371" r="16" class="f0s-dot"/>
+<text x="56" y="376" class="f0s-n" text-anchor="middle">七</text>
+<text x="90" y="377" class="f0s-t">軍争篇</text>
+<text x="190" y="377" class="f0s-l">「迂直の計」</text>
+<circle cx="56" cy="417" r="16" class="f0s-dot"/>
+<text x="56" y="422" class="f0s-n" text-anchor="middle">八</text>
+<text x="90" y="423" class="f0s-t">九変篇</text>
+<text x="190" y="423" class="f0s-l">「原則の例外」</text>
+<circle cx="56" cy="463" r="16" class="f0s-dot"/>
+<text x="56" y="468" class="f0s-n" text-anchor="middle">九</text>
+<text x="90" y="469" class="f0s-t">行軍篇</text>
+<text x="190" y="469" class="f0s-l">「兆候を読む」</text>
+<circle cx="56" cy="509" r="16" class="f0s-dot"/>
+<text x="56" y="514" class="f0s-n" text-anchor="middle">十</text>
+<text x="90" y="515" class="f0s-t">地形篇</text>
+<text x="190" y="515" class="f0s-l">「地と将の責任」</text>
+<circle cx="56" cy="555" r="16" class="f0s-dot"/>
+<text x="56" y="560" class="f0s-n" text-anchor="middle">十一</text>
+<text x="90" y="561" class="f0s-t">九地篇</text>
+<text x="190" y="561" class="f0s-l">「状況が人を変える」</text>
+<circle cx="56" cy="625" r="16" class="f0s-dot"/>
+<text x="56" y="630" class="f0s-n" text-anchor="middle">十二</text>
+<text x="90" y="631" class="f0s-t">火攻篇</text>
+<text x="190" y="631" class="f0s-l">「道具と自制」</text>
+<circle cx="56" cy="671" r="16" class="f0s-dot"/>
+<text x="56" y="676" class="f0s-n" text-anchor="middle">十三</text>
+<text x="90" y="677" class="f0s-t">用間篇</text>
+<text x="190" y="677" class="f0s-l">「知ることへの投資」</text>
+<path d="M500 26 H510 V160 H500" class="f0s-acc"/>
+<text x="526" y="91" class="f0s-ga">戦う前</text>
+<text x="526" y="113" class="f0s-xs">第一〜三篇</text>
+<path d="M500 188 H510 V322 H500" class="f0s-acc"/>
+<text x="526" y="253" class="f0s-ga">形と勢</text>
+<text x="526" y="275" class="f0s-xs">第四〜六篇</text>
+<path d="M500 350 H510 V576 H500" class="f0s-acc"/>
+<text x="526" y="461" class="f0s-ga">運用</text>
+<text x="526" y="483" class="f0s-xs">第七〜十一篇</text>
+<path d="M500 604 H510 V692 H500" class="f0s-acc"/>
+<text x="526" y="646" class="f0s-ga">特殊</text>
+<text x="526" y="668" class="f0s-xs">第十二〜十三篇</text>
+</svg>

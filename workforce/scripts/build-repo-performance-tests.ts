@@ -6,11 +6,15 @@ import {
   buildDailyActivity,
   buildWeeklyChurn,
   fetchCodeFrequency,
+  fetchProjectActivity,
   isRateLimited,
+  perfRowInputs,
   searchAll,
   sumDailyActivity,
   sumWeeklyChurn,
+  unmeasuredRepoMetrics,
 } from "./build-repo-performance.mjs";
+import { assertProvenance, UnprovenanceError } from "./lib/perf-provenance.mjs";
 
 describe("bucketByDate", () => {
   it("buckets items by the UTC day of the given date field", () => {
@@ -285,5 +289,136 @@ describe("fetchCodeFrequency (rate-limited is not a cold cache)", () => {
     const r = await fetchCodeFrequency(gh, "o/r", { attempts: 6, delayMs: 0 });
     expect(r).toEqual({ weeks: [[1000, 5, -2]], partial: false });
     expect(calls).toBe(3);
+  });
+});
+
+// #505: turning this writer's own `degraded_signals` into the `unmeasured`
+// metric names the shared perf-provenance guard (workforce/scripts/lib/
+// perf-provenance.mjs) checks against `summary`.
+describe("unmeasuredRepoMetrics", () => {
+  it("returns nothing for a fully-measured row", () => {
+    expect(unmeasuredRepoMetrics([])).toEqual([]);
+    expect(unmeasuredRepoMetrics(undefined)).toEqual([]);
+  });
+
+  it("maps a single-signal degradation to its one metric", () => {
+    expect(unmeasuredRepoMetrics(["prs_opened"])).toEqual(["prs_opened"]);
+  });
+
+  it("expands code_churn to BOTH churn metrics (one partial flag, two fields)", () => {
+    expect(unmeasuredRepoMetrics(["code_churn"])).toEqual(["total_additions", "total_deletions"]);
+  });
+
+  it("de-duplicates and combines multiple degraded signals", () => {
+    expect(unmeasuredRepoMetrics(["issues_opened", "code_churn"]).sort()).toEqual(
+      ["issues_opened", "total_additions", "total_deletions"].sort(),
+    );
+  });
+});
+
+// #752 O1: the `unmeasuredRepoMetrics` tests above call it directly with a
+// hand-built `degraded_signals` array — they never exercise `perfRowInputs`,
+// so a bug in how the publish loop actually derives a row's `metrics`/
+// `unmeasured` from a project's `fetchProjectActivity`/`fetchCodeFrequency`
+// result (the `body.summary` / `body.degraded_signals` shape at
+// build-repo-performance.mjs:394-409) would pass untouched. This exercises
+// the guard from that realistic shape through `perfRowInputs`, not a
+// re-derived metrics object.
+describe("perfRowInputs -> assertProvenance wiring (#752 O1)", () => {
+  const quietButConfirmed = {
+    scope: "quiet-project",
+    window: { start: "2026-07-01", end: "2026-07-31" },
+    summary: { issues_opened: 0, issues_closed: 0, prs_opened: 0, prs_closed: 0, total_additions: 0, total_deletions: 0 },
+    // no degraded_signals — every zero above is a real, confirmed reading.
+  };
+  const coldChurnCache = {
+    // Mirrors fetchCodeFrequency hitting a cold GitHub stats cache (#503):
+    // issues/PRs came back real and quiet, but churn never resolved.
+    scope: "cold-cache-project",
+    window: { start: "2026-07-01", end: "2026-07-31" },
+    summary: { issues_opened: 0, issues_closed: 0, prs_opened: 0, prs_closed: 0, total_additions: 0, total_deletions: 0 },
+    degraded_signals: ["code_churn"],
+  };
+  const workforce = {
+    scope: "workforce",
+    window: quietButConfirmed.window,
+    summary: {
+      issues_opened: 0,
+      issues_closed: 0,
+      prs_opened: 0,
+      prs_closed: 0,
+      total_additions: 0,
+      total_deletions: 0,
+    },
+    degraded_signals: ["code_churn"],
+  };
+
+  it("a confirmed-quiet project's row publishes", () => {
+    const rows = perfRowInputs([quietButConfirmed], workforce);
+    const row = rows.find((r) => r.scope === "quiet-project");
+    expect(() => assertProvenance(row)).not.toThrow();
+  });
+
+  it("a project whose churn fetch hit a cold cache refuses (#503 shape, via the real assembly path)", () => {
+    const rows = perfRowInputs([coldChurnCache], workforce);
+    const row = rows.find((r) => r.scope === "cold-cache-project");
+    expect(row.unmeasured).toEqual(["total_additions", "total_deletions"]);
+    expect(() => assertProvenance(row)).toThrow(UnprovenanceError);
+  });
+
+  it("the workforce aggregate row inherits the same refusal when it rolls up a degraded project", () => {
+    const rows = perfRowInputs([coldChurnCache], workforce);
+    const row = rows.find((r) => r.scope === "workforce");
+    expect(() => assertProvenance(row)).toThrow(UnprovenanceError);
+  });
+});
+
+// #752 O1 (round 2): the tests above still hand-build the `results` shape
+// `perfRowInputs` expects — they never exercise `fetchProjectActivity`, the
+// function that actually derives `summary`/`degraded_signals` from `gh` calls
+// (searchAll x4 + fetchCodeFrequency). A bug in that assembly (e.g. a
+// degraded-signal label drifting, or churn totals miscomputed) would pass
+// every test above untouched. These drive a fake `gh` through the real
+// `fetchProjectActivity` -> `perfRowInputs` -> `assertProvenance` pipeline,
+// mirroring build-pr-metrics-github-tests.ts's fetchPrFacts wiring tests.
+describe("fetchProjectActivity -> perfRowInputs -> assertProvenance wiring (#752 O1, round 2)", () => {
+  const project = { id: "acme", owner: "o", repo: "r" };
+  const churnWeeks = [[1_700_000_000, 5, -2]];
+
+  it("a rate-limited issues-opened search degrades that one signal, and the guard refuses the all-zero row", async () => {
+    const gh = async (path) => {
+      if (path.includes("/search/issues") && path.includes("is%3Aissue") && path.includes("created%3A")) {
+        // A spent-quota 403 — searchAll marks this page partial and stops.
+        return { status: 403, json: { message: "API rate limit exceeded" }, rateLimit: { remaining: 0 } };
+      }
+      if (path.includes("/search/issues")) return { status: 200, json: { items: [] } };
+      if (path.includes("/stats/code_frequency")) return { status: 200, json: churnWeeks };
+      throw new Error(`unexpected path in test gh: ${path}`);
+    };
+
+    const activity = await fetchProjectActivity(project, { days: 30, gh, sleepMs: 0 });
+    expect(activity.degraded_signals).toEqual(["issues_opened"]);
+    expect(activity.summary.issues_opened).toBe(0);
+
+    const rows = perfRowInputs([activity], activity);
+    const row = rows.find((r) => r.scope === "acme");
+    expect(row.unmeasured).toEqual(["issues_opened"]);
+    expect(() => assertProvenance(row)).toThrow(UnprovenanceError);
+  });
+
+  it("a fully-served fetch (no degraded signal) produces a row the guard publishes", async () => {
+    const gh = async (path) => {
+      if (path.includes("/search/issues")) return { status: 200, json: { items: [] } };
+      if (path.includes("/stats/code_frequency")) return { status: 200, json: churnWeeks };
+      throw new Error(`unexpected path in test gh: ${path}`);
+    };
+
+    const activity = await fetchProjectActivity(project, { days: 30, gh, sleepMs: 0 });
+    expect(activity.degraded_signals ?? []).toEqual([]);
+
+    const rows = perfRowInputs([activity], activity);
+    const row = rows.find((r) => r.scope === "acme");
+    expect(row.unmeasured).toEqual([]);
+    expect(() => assertProvenance(row)).not.toThrow();
   });
 });

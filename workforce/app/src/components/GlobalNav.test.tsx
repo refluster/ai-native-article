@@ -32,6 +32,7 @@ const DESTINATIONS = [
   'Skills',
   'Reports',
   'Messaging',
+  'Rooms',
   'Notifications',
   'Performance',
 ]

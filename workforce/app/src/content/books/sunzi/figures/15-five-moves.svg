@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 440" role="img" aria-labelledby="f15-title f15-desc" class="f15">
+  <title id="f15-title">図17 五つの動作の循環 — 不確実性を減らす方法論</title>
+  <desc id="f15-desc">数える → 負けない形を作る → 配置とタイミング → 動かし動かされない → 知ることに投資 → 再び数える、の循環。変（裁量）と自制が、すべての動作を横に貫く二本の帯。</desc>
+  <style>
+    .f15 text{font-family:inherit}
+    .f15-t{font-size:17px;font-weight:700;fill:var(--book-ink)}
+    .f15-p{font-size:13px;fill:var(--book-ink-2)}
+    .f15-b{font-size:18px;font-weight:700;fill:var(--book-ink)}
+    .f15-c{font-size:15px;fill:var(--book-ink-2)}
+    .f15-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+    .f15-band{fill:var(--book-bg);stroke:var(--book-ink-2);stroke-width:1;stroke-dasharray:5 4}
+    .f15-arc{fill:none;stroke:var(--book-ink-2);stroke-width:1.5;marker-end:url(#fig15-ah)}
+    .f15-arca{fill:none;stroke:var(--book-accent);stroke-width:1.8;marker-end:url(#fig15-aha)}
+    .f15-ahp{fill:var(--book-ink-2)}
+    .f15-ahpa{fill:var(--book-accent)}
+  </style>
+  <defs>
+    <marker id="fig15-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="f15-ahp"/></marker>
+    <marker id="fig15-aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="f15-ahpa"/></marker>
+  </defs>
+
+  <g transform="translate(0,-60)">
+    <!-- cross-cutting bands (drawn first, behind the cycle) -->
+    <rect x="20" y="290" width="680" height="36" rx="18" class="f15-band"/>
+    <text x="360" y="314" text-anchor="middle" class="f15-b">変（裁量）</text>
+    <text x="684" y="313" text-anchor="end" class="f15-p">九変篇</text>
+    <rect x="20" y="340" width="680" height="36" rx="18" class="f15-band"/>
+    <text x="360" y="364" text-anchor="middle" class="f15-b">自制</text>
+    <text x="684" y="363" text-anchor="end" class="f15-p">火攻篇</text>
+
+    <text x="360" y="246" text-anchor="middle" class="f15-c">五つの動作</text>
+
+    <!-- cycle arcs on ellipse rx250 ry170 centred (360,300) -->
+    <path d="M463.7 145.3 A250 170 0 0 1 568.5 206.2" class="f15-arc"/>
+    <path d="M609.5 289.6 A250 170 0 0 1 566.0 396.3" class="f15-arc"/>
+    <path d="M403.4 467.4 A250 170 0 0 1 316.6 467.4" class="f15-arc"/>
+    <path d="M154.0 396.3 A250 170 0 0 1 110.5 289.6" class="f15-arc"/>
+    <path d="M151.5 206.2 A250 170 0 0 1 256.3 145.3" class="f15-arca"/>
+
+    <!-- nodes -->
+    <rect x="266" y="99" width="188" height="62" rx="6" class="f15-box"/>
+    <text x="360" y="129" text-anchor="middle" class="f15-t">数える</text>
+    <text x="360" y="149" text-anchor="middle" class="f15-p">計・作戦</text>
+
+    <rect x="504" y="217" width="188" height="62" rx="6" class="f15-box"/>
+    <text x="598" y="247" text-anchor="middle" class="f15-t">負けない形を作る</text>
+    <text x="598" y="267" text-anchor="middle" class="f15-p">形・謀攻</text>
+
+    <rect x="413" y="407" width="188" height="62" rx="6" class="f15-box"/>
+    <text x="507" y="437" text-anchor="middle" class="f15-t">配置とタイミング</text>
+    <text x="507" y="457" text-anchor="middle" class="f15-p">勢・節</text>
+
+    <rect x="119" y="407" width="188" height="62" rx="6" class="f15-box"/>
+    <text x="213" y="437" text-anchor="middle" class="f15-t">動かし動かされない</text>
+    <text x="213" y="457" text-anchor="middle" class="f15-p">虚実・軍争</text>
+
+    <rect x="28" y="217" width="188" height="62" rx="6" class="f15-box"/>
+    <text x="122" y="247" text-anchor="middle" class="f15-t">知ることに投資</text>
+    <text x="122" y="267" text-anchor="middle" class="f15-p">用間・行軍の兆候</text>
+  </g>
+</svg>

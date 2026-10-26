@@ -59,10 +59,12 @@ export function usePublicSession(): PublicSession {
   return { signedIn, enterConsole };
 }
 
-/** Public header destinations, in order. Both are router routes now that
- *  Docs is rendered by the SPA (pages/Docs.tsx, pages/Doc.tsx). */
+/** Public header destinations, in order. All are router routes now that
+ *  Docs is rendered by the SPA (pages/Docs.tsx, pages/Doc.tsx); Books is
+ *  the web-book shelf (pages/Books.tsx). */
 export const PUBLIC_NAV: { to: string; label: string }[] = [
   { to: '/docs', label: 'Docs' },
+  { to: '/books', label: 'Books' },
   { to: '/research', label: 'Research' },
 ];
 

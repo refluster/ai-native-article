@@ -227,6 +227,17 @@ export default function AgentProfile() {
               {agent.about}
             </p>
           )}
+          {/* One-tap DM: /messaging resolves ?to= to the existing 1:1 thread,
+              or the composer with this talent pre-picked. */}
+          <Link
+            to={`/messaging?to=${encodeURIComponent(agent.slug)}`}
+            className="mt-4 inline-flex items-center gap-2 h-10 px-5 rounded-full bg-wf-primary text-wf-on-primary font-wfmono text-[11px] uppercase tracking-[0.12em] hover:opacity-90"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+              <path d="M4 5h16v11H8l-4 4V5Z" strokeLinejoin="round" />
+            </svg>
+            Message
+          </Link>
         </div>
       </section>
 

@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 880" role="img" aria-labelledby="f0-title f0-desc">
+<title id="f0-title">図0 本書の地図</title>
+<desc id="f0-desc">前編の十三篇を四つの群（戦う前・形と勢・運用・特殊）に分けて縦に並べ、前編の総括を経て後編の五章と終章へつながる構図。</desc>
+<style>
+.f0-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+.f0-boxa{fill:var(--book-panel);stroke:var(--book-accent);stroke-width:1.5}
+.f0-ln{fill:none;stroke:var(--book-line);stroke-width:1.2}
+.f0-ln2{fill:none;stroke:var(--book-ink-2);stroke-width:1.3}
+.f0-dash{fill:none;stroke:var(--book-ink-2);stroke-width:1.2;stroke-dasharray:4 4}
+.f0-acc{fill:none;stroke:var(--book-accent);stroke-width:1.6}
+.f0-arr{fill:none;stroke:var(--book-ink-2);stroke-width:1.3;marker-end:url(#f0-ah)}
+.f0-arra{fill:none;stroke:var(--book-accent);stroke-width:1.6;marker-end:url(#f0-aha)}
+.f0-ahp{fill:var(--book-ink-2)}
+.f0-ahap{fill:var(--book-accent)}
+.f0-h{font-family:inherit;font-size:20px;font-weight:600;fill:var(--book-ink)}
+.f0-t{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-ink)}
+.f0-b{font-family:inherit;font-size:16px;fill:var(--book-ink)}
+.f0-s{font-family:inherit;font-size:15px;fill:var(--book-ink-2)}
+.f0-xs{font-family:inherit;font-size:14px;fill:var(--book-ink-2)}
+.f0-k{font-family:inherit;font-size:14px;font-weight:600;fill:var(--book-accent);letter-spacing:.08em}
+.f0-ta{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-accent)}
+.f0-big{font-family:inherit;font-size:30px;font-weight:600;fill:var(--book-ink)}
+
+.f0-chip{fill:var(--book-bg);stroke:var(--book-ink-2);stroke-width:1}
+.f0-c{font-family:inherit;font-size:18px;font-weight:600;fill:var(--book-ink)}
+.f0-rn{font-family:inherit;font-size:15px;font-weight:600;fill:var(--book-accent)}
+</style>
+<defs><marker id="f0-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f0-ahp" d="M0 0L10 5L0 10z"/></marker><marker id="f0-aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="f0-ahap" d="M0 0L10 5L0 10z"/></marker></defs>
+<text x="24" y="32" class="f0-k">前編　原文を読む</text>
+<rect x="20" y="46" width="640" height="72" rx="6" class="f0-box"/>
+<text x="40" y="80" class="f0-h">戦う前</text>
+<text x="40" y="102" class="f0-xs">第一〜三篇</text>
+<rect x="190" y="62" width="84" height="40" rx="4" class="f0-chip"/>
+<text x="232" y="88" class="f0-c" text-anchor="middle">計</text>
+<rect x="284" y="62" width="84" height="40" rx="4" class="f0-chip"/>
+<text x="326" y="88" class="f0-c" text-anchor="middle">作戦</text>
+<rect x="378" y="62" width="84" height="40" rx="4" class="f0-chip"/>
+<text x="420" y="88" class="f0-c" text-anchor="middle">謀攻</text>
+<line x1="80" y1="120" x2="80" y2="136" class="f0-arr"/>
+<rect x="20" y="138" width="640" height="72" rx="6" class="f0-box"/>
+<text x="40" y="172" class="f0-h">形と勢</text>
+<text x="40" y="194" class="f0-xs">第四〜六篇</text>
+<rect x="190" y="154" width="84" height="40" rx="4" class="f0-chip"/>
+<text x="232" y="180" class="f0-c" text-anchor="middle">形</text>
+<rect x="284" y="154" width="84" height="40" rx="4" class="f0-chip"/>
+<text x="326" y="180" class="f0-c" text-anchor="middle">勢</text>
+<rect x="378" y="154" width="84" height="40" rx="4" class="f0-chip"/>
+<text x="420" y="180" class="f0-c" text-anchor="middle">虚実</text>
+<line x1="80" y1="212" x2="80" y2="228" class="f0-arr"/>
+<rect x="20" y="230" width="640" height="72" rx="6" class="f0-box"/>
+<text x="40" y="264" class="f0-h">運用</text>
+<text x="40" y="286" class="f0-xs">第七〜十一篇</text>
+<rect x="190" y="246" width="84" height="40" rx="4" class="f0-chip"/>
+<text x="232" y="272" class="f0-c" text-anchor="middle">軍争</text>
+<rect x="284" y="246" width="84" height="40" rx="4" class="f0-chip"/>
+<text x="326" y="272" class="f0-c" text-anchor="middle">九変</text>
+<rect x="378" y="246" width="84" height="40" rx="4" class="f0-chip"/>
+<text x="420" y="272" class="f0-c" text-anchor="middle">行軍</text>
+<rect x="472" y="246" width="84" height="40" rx="4" class="f0-chip"/>
+<text x="514" y="272" class="f0-c" text-anchor="middle">地形</text>
+<rect x="566" y="246" width="84" height="40" rx="4" class="f0-chip"/>
+<text x="608" y="272" class="f0-c" text-anchor="middle">九地</text>
+<line x1="80" y1="304" x2="80" y2="320" class="f0-arr"/>
+<rect x="20" y="322" width="640" height="72" rx="6" class="f0-box"/>
+<text x="40" y="356" class="f0-h">特殊</text>
+<text x="40" y="378" class="f0-xs">第十二〜十三篇</text>
+<rect x="190" y="338" width="84" height="40" rx="4" class="f0-chip"/>
+<text x="232" y="364" class="f0-c" text-anchor="middle">火攻</text>
+<rect x="284" y="338" width="84" height="40" rx="4" class="f0-chip"/>
+<text x="326" y="364" class="f0-c" text-anchor="middle">用間</text>
+<line x1="340" y1="396" x2="340" y2="418" class="f0-arr"/>
+<rect x="170" y="420" width="340" height="46" rx="6" class="f0-boxa"/>
+<text x="340" y="449" class="f0-t" text-anchor="middle">前編を終えて　一本の線に</text>
+<line x1="340" y1="468" x2="340" y2="492" class="f0-arr"/>
+<text x="24" y="512" class="f0-k">後編　現代とプロジェクトへ</text>
+<rect x="20" y="522" width="640" height="262" rx="6" class="f0-box"/>
+<text x="44" y="559" class="f0-rn">I</text>
+<text x="84" y="559" class="f0-t">方法論</text>
+<text x="644" y="559" class="f0-s" text-anchor="end">← 十三篇の全体</text>
+<line x1="40" y1="578" x2="640" y2="578" class="f0-ln"/>
+<text x="44" y="609" class="f0-rn">II</text>
+<text x="84" y="609" class="f0-t">プロジェクトの計</text>
+<text x="644" y="609" class="f0-s" text-anchor="end">← 計篇・作戦篇</text>
+<line x1="40" y1="628" x2="640" y2="628" class="f0-ln"/>
+<text x="44" y="659" class="f0-rn">III</text>
+<text x="84" y="659" class="f0-t">形と勢をつくる</text>
+<text x="644" y="659" class="f0-s" text-anchor="end">← 形篇・勢篇</text>
+<line x1="40" y1="678" x2="640" y2="678" class="f0-ln"/>
+<text x="44" y="709" class="f0-rn">IV</text>
+<text x="84" y="709" class="f0-t">虚実と軍争</text>
+<text x="644" y="709" class="f0-s" text-anchor="end">← 虚実篇・軍争篇</text>
+<line x1="40" y1="728" x2="640" y2="728" class="f0-ln"/>
+<text x="44" y="759" class="f0-rn">V</text>
+<text x="84" y="759" class="f0-t">ワークフォース</text>
+<text x="644" y="759" class="f0-s" text-anchor="end">← 九地・用間ほか</text>
+<line x1="340" y1="786" x2="340" y2="808" class="f0-arr"/>
+<rect x="150" y="810" width="380" height="50" rx="6" class="f0-box"/>
+<text x="176" y="841" class="f0-s">終章</text>
+<text x="360" y="841" class="f0-t" text-anchor="middle">孫子が語らなかったこと</text>
+</svg>

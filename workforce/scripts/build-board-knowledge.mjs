@@ -310,7 +310,7 @@ export function buildKnowledgePack({ now = new Date() } = {}) {
     add("mvv", block.title, block.body, true);
   }
 
-  // The three public docs pages — HTML fragments the console SPA renders
+  // Three of the public docs pages — HTML fragments the console SPA renders
   // at /docs/:slug, with their metadata in the manifest beside them (the
   // same file the SPA's lib/docs.ts reads, so a document is registered in
   // one place). Manifesto + founding story are the thesis (pinned in
@@ -323,8 +323,12 @@ export function buildKnowledgePack({ now = new Date() } = {}) {
   ]) {
     const meta = docsManifest.find((d) => d.slug === source);
     if (!meta) throw new Error(`build-board-knowledge: ${source} missing from ${DOCS_DIR}/manifest.json`);
-    const text = htmlToText(read(join(DOCS_DIR, meta.file)));
-    const docTitle = meta.packTitle ?? source;
+    // Each document has a Japanese and an English edition (manifest
+    // `editions`); the pack reads the one the document was written in.
+    const edition = meta.editions?.[meta.original];
+    if (!edition) throw new Error(`build-board-knowledge: ${source} has no "${meta.original}" edition in ${DOCS_DIR}/manifest.json`);
+    const text = htmlToText(read(join(DOCS_DIR, edition.file)));
+    const docTitle = edition.packTitle ?? source;
     for (const block of splitSections(text, docTitle)) {
       add(source, `${docTitle} — ${block.title}`, block.body, pinned);
     }

@@ -12,7 +12,10 @@
 // `cannot-seat-panel` — never a quiet under-sized panel.
 import { describe, it, expect } from "vitest";
 import {
+  MAX_DIFF_CHARS,
   NOMINATION_SEAT_CAP,
+  boundDiff,
+  splitDiffByFile,
   countOpenSeats,
   applyNominationCap,
   alreadyRouted,
@@ -459,5 +462,59 @@ describe("selectCandidates — the discovery decision", () => {
       now: NOW,
     });
     expect(got.map((c) => c.pr.number)).toEqual([2, 3]);
+  });
+});
+
+// Router excerpt never drops a file (asp-cloud #1027: a 7-file, ~164 KB diff
+// head-sliced at 48K reached the panel with 3 files unseen).
+const fileDiff = (path, body) =>
+  `diff --git a/${path} b/${path}\nindex 1111111..2222222 100644\n--- a/${path}\n+++ b/${path}\n@@ -1,1 +1,1 @@\n${body}`;
+
+describe("splitDiffByFile", () => {
+  it("splits per file and counts only hunk lines", () => {
+    const d = fileDiff("a.json", "-old\n+new\n+more\n") + fileDiff("b.md", " ctx\n-gone\n");
+    const files = splitDiffByFile(d);
+    expect(files.map((f) => [f.path, f.additions, f.deletions])).toEqual([
+      ["a.json", 2, 1],
+      ["b.md", 0, 1],
+    ]);
+    expect(files.map((f) => f.text).join("")).toBe(d);
+  });
+});
+
+describe("boundDiff", () => {
+  it("returns a diff under the budget unchanged", () => {
+    const d = fileDiff("a.json", "+x\n");
+    const r = boundDiff(d, 10_000);
+    expect(r.truncated).toBe(false);
+    expect(r.excerpt).toBe(d);
+    expect(r.files).toHaveLength(1);
+  });
+
+  it("keeps every file visible when one huge file precedes the rest", () => {
+    const huge = fileDiff("huge.json", "+" + "x".repeat(200_000) + "\n");
+    const smalls = ["b.json", "c.json", "d.json"].map((p) => fileDiff(p, `-old ${p}\n+new ${p}\n`));
+    const d = huge + smalls.join("");
+    const r = boundDiff(d);
+    expect(r.truncated).toBe(true);
+    for (const p of ["huge.json", "b.json", "c.json", "d.json"]) expect(r.excerpt).toContain(`diff --git a/${p} b/${p}`);
+    for (const s of smalls) expect(r.excerpt).toContain(s);
+    expect(r.files.find((f) => f.path === "huge.json").truncated).toBe(true);
+    expect(r.files.filter((f) => f.truncated)).toHaveLength(1);
+    expect(r.excerpt.length).toBeLessThan(MAX_DIFF_CHARS + 500);
+  });
+
+  it("shares the budget across several large files", () => {
+    const d = ["a", "b", "c"].map((p) => fileDiff(`${p}.json`, "+" + "y".repeat(40_000) + "\n")).join("");
+    const r = boundDiff(d, 30_000);
+    expect(r.files.every((f) => f.truncated)).toBe(true);
+    for (const p of ["a", "b", "c"]) expect(r.excerpt).toContain(`+++ b/${p}.json`);
+    expect(r.excerpt.length).toBeLessThan(30_000 + 500);
+  });
+
+  it("head-slices a header-less diff instead of returning it whole", () => {
+    const r = boundDiff("z".repeat(100), 10);
+    expect(r.truncated).toBe(true);
+    expect(r.excerpt.startsWith("z".repeat(10) + "\n...")).toBe(true);
   });
 });

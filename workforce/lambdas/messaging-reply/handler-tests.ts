@@ -3,7 +3,8 @@
 // The shared messaging store, the Claude wrapper, the persona row read, and
 // CloudWatch are all mocked — these tests pin the handler's decision logic:
 // loop-safety skips, the per-thread budget, the W-1 guards (artefact / empty /
-// truncation), the __NO_REPLY_NEEDED__ sentinel, and the happy-path write.
+// truncation), the __NO_REPLY_NEEDED__ sentinel, the happy-path write, and
+// the group round hand-off (adr-0047).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,6 +16,20 @@ vi.mock("@aws-sdk/client-cloudwatch", () => ({
   },
   PutMetricDataCommand: class {
     constructor(public input: unknown) {}
+  },
+}));
+
+// Group rounds (adr-0047): the Lambda async-invokes itself for the next
+// member. Capture the payloads.
+const lambdaSend = vi.fn();
+vi.mock("@aws-sdk/client-lambda", () => ({
+  LambdaClient: class {
+    send(cmd: unknown) {
+      return lambdaSend(cmd);
+    }
+  },
+  InvokeCommand: class {
+    constructor(public input: { FunctionName: string; Payload: Uint8Array }) {}
   },
 }));
 
@@ -67,7 +82,7 @@ const NOW = new Date().toISOString();
 const TODAY = NOW.slice(0, 10);
 
 function thread(
-  messages: Array<{ from: string; body: string; at?: string }>,
+  messages: Array<{ from: string; body: string; at?: string; id?: string }>,
   participants = ["maya"],
 ) {
   return {
@@ -77,7 +92,7 @@ function thread(
     starred: false,
     created_by: "operator",
     created_at: NOW,
-    messages: messages.map((m) => ({ message_id: "m", from: m.from, at: m.at ?? NOW, body: m.body })),
+    messages: messages.map((m) => ({ message_id: m.id ?? "m", from: m.from, at: m.at ?? NOW, body: m.body })),
   };
 }
 
@@ -86,6 +101,9 @@ function completion(text: string, stop_reason = "end_turn") {
 }
 
 beforeEach(() => {
+  process.env.AWS_LAMBDA_FUNCTION_NAME = "wf-messaging-reply-test";
+  lambdaSend.mockReset();
+  lambdaSend.mockResolvedValue({});
   complete.mockReset();
   getThreadDetail.mockReset();
   sendMessage.mockReset();
@@ -121,7 +139,7 @@ describe("happy path", () => {
       finish_reason: "end_turn",
       tokens_in: 120,
       tokens_out: 18,
-      skill_version: "0.4.0",
+      skill_version: "0.5.0",
     });
     // The persona system prompt is fed into the LLM system prompt.
     expect(complete.mock.calls[0]![0].system).toContain("You are Maya");
@@ -302,5 +320,123 @@ describe("input validation", () => {
     await expect(handler({ thread_id: "01THREAD", addressed_slug: "maya" })).rejects.toThrow(
       /not a participant/,
     );
+  });
+});
+
+/** Decode the round hand-off payload of the n-th self-invoke. */
+function handoff(n = 0): Record<string, unknown> {
+  const cmd = lambdaSend.mock.calls[n]![0] as { input: { FunctionName: string; Payload: Uint8Array } };
+  expect(cmd.input.FunctionName).toBe("wf-messaging-reply-test");
+  return JSON.parse(Buffer.from(cmd.input.Payload).toString("utf8"));
+}
+
+describe("group rounds (adr-0047)", () => {
+  const GROUP = ["nadia", "dario", "maya"];
+  const ROUND = { thread_id: "01THREAD", trigger_message_id: "01B" };
+
+  it("replies, then hands the round to the next member with the rest of the list", async () => {
+    getThreadDetail.mockResolvedValueOnce(
+      thread([{ id: "01B", from: "operator", body: "Everyone, where are we?" }], GROUP),
+    );
+    complete.mockResolvedValueOnce(completion("Nadia here — sprint entry is blocked on the board."));
+
+    const res = await handler({ ...ROUND, addressed_slug: "nadia", then: ["dario", "maya"] });
+
+    expect(res.status).toBe("ok");
+    expect(handoff()).toEqual({ ...ROUND, addressed_slug: "dario", then: ["maya"] });
+  });
+
+  it("lets a later member read earlier replies and tells it to speak even in a group", async () => {
+    getThreadDetail.mockResolvedValueOnce(
+      thread(
+        [
+          { id: "01B", from: "operator", body: "Everyone, where are we?" },
+          { id: "01C", from: "nadia", body: "Dario, any architecture concern left?" },
+        ],
+        GROUP,
+      ),
+    );
+    complete.mockResolvedValueOnce(completion("One: the L0/L1 path match is prefix-based."));
+
+    await handler({ ...ROUND, addressed_slug: "dario", then: ["maya"] });
+
+    const call = complete.mock.calls[0]![0];
+    expect(call.user).toContain("nadia: Dario, any architecture concern left?");
+    expect(call.system).toContain("GROUP thread");
+    expect(call.system).toContain("`nadia`, `maya`");
+    // Recall keys on the operator's message, not the previous member's reply.
+    expect(buildRecallBlock.mock.calls[0]![0].brief).toBe("Everyone, where are we?");
+    expect(handoff()).toEqual({ ...ROUND, addressed_slug: "maya", then: [] });
+  });
+
+  it("the last member of the round hands off to no one", async () => {
+    getThreadDetail.mockResolvedValueOnce(
+      thread([{ id: "01B", from: "operator", body: "Everyone?" }], GROUP),
+    );
+    complete.mockResolvedValueOnce(completion("Maya: on it."));
+
+    await handler({ ...ROUND, addressed_slug: "maya", then: [] });
+
+    expect(lambdaSend).not.toHaveBeenCalled();
+  });
+
+  it("still hands off when this member's reply fails, then rethrows", async () => {
+    getThreadDetail.mockResolvedValueOnce(
+      thread([{ id: "01B", from: "operator", body: "Everyone?" }], GROUP),
+    );
+    complete.mockResolvedValueOnce(completion("As an AI, I cannot"));
+
+    await expect(handler({ ...ROUND, addressed_slug: "nadia", then: ["dario"] })).rejects.toThrow(
+      /llm_artefact/,
+    );
+    expect(handoff()).toMatchObject({ addressed_slug: "dario" });
+  });
+
+  it("skips a member who already answered this round (retried invoke) but keeps the round going", async () => {
+    getThreadDetail.mockResolvedValueOnce(
+      thread(
+        [
+          { id: "01B", from: "operator", body: "Everyone?" },
+          { id: "01C", from: "nadia", body: "Answered." },
+          { id: "01D", from: "dario", body: "Me too." },
+        ],
+        GROUP,
+      ),
+    );
+
+    const res = await handler({ ...ROUND, addressed_slug: "nadia", then: ["dario"] });
+
+    expect(res).toEqual({ status: "skipped", reason: "already_replied" });
+    expect(complete).not.toHaveBeenCalled();
+    expect(handoff()).toMatchObject({ addressed_slug: "dario" });
+  });
+
+  it("stops the round when the operator has written again (a newer round covers everyone)", async () => {
+    getThreadDetail.mockResolvedValueOnce(
+      thread(
+        [
+          { id: "01B", from: "operator", body: "Everyone?" },
+          { id: "01C", from: "nadia", body: "Answered." },
+          { id: "01D", from: "operator", body: "Actually, new question." },
+        ],
+        GROUP,
+      ),
+    );
+
+    const res = await handler({ ...ROUND, addressed_slug: "dario", then: ["maya"] });
+
+    expect(res).toEqual({ status: "skipped", reason: "superseded" });
+    expect(complete).not.toHaveBeenCalled();
+    expect(lambdaSend).not.toHaveBeenCalled();
+  });
+
+  it("a 1:1 thread gets no group instructions", async () => {
+    getThreadDetail.mockResolvedValueOnce(thread([{ id: "01B", from: "operator", body: "hi" }]));
+    complete.mockResolvedValueOnce(completion("Hi — the migration is done."));
+
+    await handler({ ...ROUND, addressed_slug: "maya" });
+
+    expect(complete.mock.calls[0]![0].system).not.toContain("GROUP thread");
+    expect(lambdaSend).not.toHaveBeenCalled();
   });
 });

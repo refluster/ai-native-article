@@ -2,11 +2,12 @@
 // dispatch-cadence.mjs — a CLI over `POST /dispatch` (adr-0025) for skill
 // bodies that have no write-script of their own.
 //
-// `issue-implement` and `issue-design` deliver a draft PR and then end. Before
-// adr-0038 that PR waited for `pr-autopilot`'s next 6-hourly tick — the last
-// unnecessary cron wait in the issue→merge loop, and the one that turned a
-// same-day chain into a next-day one. These cadences run as plain CCR sessions
-// with no bundled write-script to hang the call off, so the call gets a CLI.
+// `issue-execute` delivers a draft PR and then ends. Before adr-0038 that PR
+// waited for `pr-autopilot`'s next 6-hourly tick — the last unnecessary cron
+// wait in the issue→merge loop, and the one that turned a same-day chain into
+// a next-day one. The cadence runs as a plain CCR session with no bundled
+// write-script to hang the call off, so the call gets a CLI. (The stage
+// transitions dispatch from inside issue-stage-set.mjs and do not need it.)
 //
 // Best-effort by construction, exactly like every other dispatch call site: it
 // prints what happened and **always exits 0**. A hand-off must never fail

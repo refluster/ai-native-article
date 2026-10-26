@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "predev": "node ../../workforce/scripts/build-agent-manifest.mjs",
-    "prebuild": "node ../../workforce/scripts/build-agent-manifest.mjs",
+    "prebuild": "node ../../workforce/scripts/build-agent-manifest.mjs && node ../../workforce/scripts/check-book.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",

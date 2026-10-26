@@ -1,0 +1,473 @@
+<section class="cover">
+  <div class="kicker">Founding story · 2026-09</div>
+  <h1>One human,<br>58 AIs</h1>
+  <div class="rule"></div>
+  <p class="sub">We took the governance mechanisms built for human organizations and ported them into an organization of AIs. It is an operating structure in which roles, authority, verification and improvement connect, and learning keeps returning into the next execution. Once it was running, three surprises appeared that were hard to see in a human organization, and they are what drive its evolution today. This document records why the founder built this organization, why the founder was able to, and what happened after it started running. The starting point was three diagrams the founder drew in a notebook.</p>
+  <div class="define"><b>Premise.</b> In this document we call this running Agent Workforce <b>Cognitive Guild</b>. Its name on the current site is Software Talent Network. It is an operating organization of AI personas with a single human decision-maker; it is not a place where human labor is bought and sold, nor a recruiting agency or a contract development shop. The mechanism itself is in the <a href="/docs/whitepaper">whitepaper</a>, and the beliefs are in the <a href="/docs/manifesto">manifesto</a>. Here we write only the “why” and the “what came after”.</div>
+  <nav class="toc" aria-label="Contents">
+    <a href="#s1"><b>01</b>Numbers and surprises first</a>
+    <a href="#s2"><b>02</b>Three sketches on paper</a>
+    <a href="#s3"><b>03</b>Once it ships, it cannot be recalled</a>
+    <a href="#s4"><b>04</b>Porting a governance structure that works</a>
+    <a href="#s5"><b>05</b>Accumulating organizational capability</a>
+    <a href="#s6"><b>06</b>What happened after launch</a>
+    <a href="#s7"><b>07</b>Why this founder</a>
+    <a href="#s8"><b>08</b>The ones who cut this document</a>
+    <a href="#s9"><b>09</b>One-screen summary</a>
+  </nav>
+</section>
+
+<section id="s1">
+  <div class="eyebrow"><span class="num">01</span><span class="kicker">Numbers first</span></div>
+  <h2>Numbers and surprises first</h2>
+  <p class="lede">The founder decided not to open with a résumé when meeting someone for the first time. Instead, the numbers come first: what this organization is right now.</p>
+  <div class="statline">
+    <div class="stat"><b>1</b><span>Human decision-maker</span></div>
+    <div class="stat"><b>58</b><span>AI personas (55 active on the day)</span></div>
+    <div class="stat"><b>USD 600</b><span>Monthly ceiling on run cost (not actual spend)</span></div>
+    <div class="stat"><b>1,069</b><span>Runs in the last 7 days → 880 deliverables</span></div>
+  </div>
+  <p class="note" style="margin-top:14px">These figures are taken mechanically from the public KPIs as of 2026-09-05. A run count measures activity, not results. This organization has also recorded the month in which “it dispatched 28 times and all 28 deliverables were empty”, and the week in which it “skipped everything and kept reporting ‘success’”<sup>1</sup>. Numbers become a lie unless they sit in the same paragraph as that record.</p>
+  <p>And then the first surprise. On 17 August 2026, one setting for the public site's serving path was changed. The deploy was green, and every check passed. Even so, for a week the pages readers opened were blank<sup>2</sup>.</p>
+  <p>That week is the turning point of this document. In mass production of consumer electronics, the founder had it drilled in that “once it ships, it cannot be recalled”; in a SaaS organization, the founder designed governance that “makes the uncertain manageable”; and in selling a business, the founder learned “what finance puts a price on”. The founder brought those three into an organization of AIs, but phenomena appeared that the existing mechanisms could not capture.</p>
+  <p>From here on, we first set out the three diagrams the founder drew in a notebook before building this organization (→ 02), and then write along the three questions that everyone we meet for the first time always has.</p>
+  <ul>
+    <li><b>If AI does the work, can quality be maintained?</b> (→ 03)</li>
+    <li><b>How do you lead 58 AIs?</b> (→ 04)</li>
+    <li><b>Once it is in place, what stays behind?</b> (→ 05)</li>
+  </ul>
+</section>
+
+<section id="s2">
+  <div class="eyebrow"><span class="num">02</span><span class="kicker">Sketches</span></div>
+  <h2>Three sketches on paper</h2>
+  <p class="lede">Before building this organization, the founder drew three diagrams in a notebook: arrows of outsourced work, a quadrant of control against flexibility, and a table setting humans beside AI. None of the three was a picture of “what I want”; each was a picture of “why it was impossible until now”.</p>
+  <p>Here the three are redrawn cleanly. They are read the same way: why that shape used to be rational, examples of the same shift in other industries, the shape things ought to take, and where this organization stands now, in that order — ending with one line that says it outright.</p>
+
+  <h3 class="sub">Sketch one · Outsourcing takes the knowledge home</h3>
+  <figure><div class="figscroll">
+<svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fo-t fo-d">
+  <title id="fo-t">From outsourcing by function to an in-house AI workforce</title>
+  <desc id="fo-d">On the left, an organization in which each function — engineering, design, marketing and business — sends its work to a separate outside company. On the right, the same functions send their work to an AI workforce at the center of the company. Below, three shifts: from outsourced to in-house, from distributed to centrally managed, and from flow and one-off to stock and reuse.</desc>
+  <style>
+    .fo-org{fill:none;stroke:currentColor;stroke-opacity:.45;stroke-width:1.4}
+    .fo-node{fill:var(--panel);stroke:currentColor;stroke-opacity:.4;stroke-width:1.1}
+    .fo-nt{font:600 12px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .fo-ext{font:12px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.72}
+    .fo-arr{fill:none;stroke:currentColor;stroke-opacity:.6;stroke-width:1.3;marker-end:url(#fo-ah)}
+    .fo-arr2{fill:none;stroke:var(--accent);stroke-width:1.6;marker-end:url(#fo-ah2)}
+    .fo-hub{fill:var(--accent);fill-opacity:.1;stroke:var(--accent);stroke-width:1.6}
+    .fo-hubt{font:700 14px Geist,Inter,system-ui,sans-serif;fill:var(--accent)}
+    .fo-k{font:11px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent);letter-spacing:.14em}
+    .fo-cap{font:12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.7}
+    .fo-big{fill:var(--accent);fill-opacity:.85}
+    .fo-pill{fill:var(--accent);fill-opacity:.08;stroke:var(--accent);stroke-width:1.2}
+    .fo-pt{font:600 12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+  </style>
+  <defs>
+    <marker id="fo-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor" fill-opacity=".6"/></marker>
+    <marker id="fo-ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker>
+  </defs>
+  <g>
+    <text x="30" y="24" class="fo-k">BEFORE · OUTSIDE</text>
+    <ellipse cx="175" cy="165" rx="130" ry="100" class="fo-org"/>
+    <ellipse cx="175" cy="98" rx="40" ry="16" class="fo-node"/><text x="175" y="102" text-anchor="middle" class="fo-nt">Engineer</text>
+    <ellipse cx="252" cy="148" rx="36" ry="16" class="fo-node"/><text x="252" y="152" text-anchor="middle" class="fo-nt">Design</text>
+    <ellipse cx="228" cy="222" rx="28" ry="16" class="fo-node"/><text x="228" y="226" text-anchor="middle" class="fo-nt">Biz</text>
+    <ellipse cx="118" cy="215" rx="42" ry="16" class="fo-node"/><text x="118" y="219" text-anchor="middle" class="fo-nt">Marketing</text>
+    <ellipse cx="96" cy="140" rx="24" ry="16" class="fo-node"/><text x="96" y="144" text-anchor="middle" class="fo-nt">…</text>
+    <path d="M175 82 L175 48" class="fo-arr"/><text x="175" y="40" text-anchor="middle" class="fo-ext">Firm A · outsourced</text>
+    <path d="M285 140 L322 118" class="fo-arr"/><text x="328" y="112" class="fo-ext">Firm X</text>
+    <path d="M248 236 L288 272" class="fo-arr"/><text x="270" y="292" class="fo-ext">Firm Y · consulting</text>
+    <path d="M100 229 L64 264" class="fo-arr"/><text x="22" y="284" class="fo-ext">Firm Z · research</text>
+    <path d="M72 138 L38 128" class="fo-arr"/><text x="14" y="120" class="fo-ext">…</text>
+  </g>
+  <polygon points="352,155 392,155 392,140 422,165 392,190 392,175 352,175" class="fo-big"/>
+  <g>
+    <text x="440" y="24" class="fo-k">AFTER · INSIDE</text>
+    <ellipse cx="585" cy="165" rx="140" ry="105" class="fo-org"/>
+    <rect x="528" y="146" width="114" height="40" rx="7" class="fo-hub"/><text x="585" y="171" text-anchor="middle" class="fo-hubt">AI Workforce</text>
+    <ellipse cx="585" cy="88" rx="40" ry="16" class="fo-node"/><text x="585" y="92" text-anchor="middle" class="fo-nt">Engineer</text>
+    <ellipse cx="678" cy="128" rx="36" ry="16" class="fo-node"/><text x="678" y="132" text-anchor="middle" class="fo-nt">Design</text>
+    <ellipse cx="668" cy="232" rx="28" ry="16" class="fo-node"/><text x="668" y="236" text-anchor="middle" class="fo-nt">Biz</text>
+    <ellipse cx="500" cy="238" rx="42" ry="16" class="fo-node"/><text x="500" y="242" text-anchor="middle" class="fo-nt">Marketing</text>
+    <ellipse cx="480" cy="122" rx="24" ry="16" class="fo-node"/><text x="480" y="126" text-anchor="middle" class="fo-nt">…</text>
+    <path d="M585 105 L585 143" class="fo-arr2"/>
+    <path d="M652 140 L636 152" class="fo-arr2"/>
+    <path d="M648 222 L628 190" class="fo-arr2"/>
+    <path d="M522 227 L546 190" class="fo-arr2"/>
+    <path d="M500 133 L534 150" class="fo-arr2"/>
+    <text x="700" y="284" text-anchor="end" class="fo-ext">Talent pool · evaluations · procedures · experience stay</text>
+  </g>
+  <rect x="18" y="316" width="228" height="32" rx="16" class="fo-pill"/><text x="132" y="337" text-anchor="middle" class="fo-pt">Outsourced → in-house</text>
+  <rect x="262" y="316" width="206" height="32" rx="16" class="fo-pill"/><text x="365" y="337" text-anchor="middle" class="fo-pt">Distributed → central</text>
+  <rect x="484" y="316" width="258" height="32" rx="16" class="fo-pill"/><text x="613" y="337" text-anchor="middle" class="fo-pt">Flow, one-off → stock, reuse</text>
+</svg></div>
+    <figcaption>A clean redraw of the first page of the founder's notebook. On the left, each function's arrow points to a different outside company; on the right, the same arrows point to an AI workforce at the center of the company. What changes is not only where the work is sent, but what remains in the organization after the work is done.</figcaption>
+  </figure>
+  <p>A company cannot employ every specialist. So it has sent work outside function by function: engineering to Firm A, design to Firm X, market research to Firm Z, the business plan to a consulting firm. From 1989, when Kodak handed the operation of its information systems to IBM, through offshoring in the 2000s and crowdsourcing and SaaS in the 2010s, moving in this direction for thirty years was a rational decision.</p>
+  <p>The price is twofold. The first is dispersion. The knowledge of four functions is scattered across four companies, and no one inside is left seeing the whole. The second is flow. An engagement ends at delivery, and on the next engagement the company pays again for the same discovery. Outsourcing leaves the deliverable behind and takes the knowledge home.</p>
+  <p>In other industries, the companies that turned this arrow around won. Vertically integrated apparel retailers brought planning, production and sales back inside one company, and gained the speed at which a reaction on the shop floor returns into next week's plan. The value of bringing work in-house is not that it is cheaper; it is that the learning stays inside. Judgment born from the work ought to remain with the organization that paid the invoice.</p>
+  <p>The right side of the diagram is the answer the founder drew. The arrows that pointed outside, function by function, are turned back toward a central pool inside the company. Engineering, design, marketing and business all send work to the same pool, and deliverables come back accompanied by review scores, procedure versions and records of experience. The numbers in 01 show the direction of this arrow. The 1,069 runs in the last 7 days are not 1,069 orders placed; they are 1,069 records.</p>
+  <p class="qline">From outsourced to in-house. From distributed to centrally managed. From flow and one-off to stock and reuse.</p>
+
+  <h3 class="sub">Sketch two · Control or flexibility</h3>
+  <figure><div class="figscroll">
+<svg viewBox="0 0 760 350" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fm-t fm-d">
+  <title id="fm-t">The control–flexibility quadrant and the AI-native SDLC</title>
+  <desc id="fm-d">The horizontal axis runs from weak at control to strong at control; the vertical axis from rigid to flexible operation. Agile sits top left, Waterfall bottom right, and the empty top right holds the AI-native SDLC. The note on the right says that the inequality in which the cost of realigning the whole organization exceeded the value of realigning it is reversed by the technology of an AI organization.</desc>
+  <style>
+    .fm-ax{stroke:currentColor;stroke-opacity:.5;stroke-width:1.4;marker-end:url(#fm-ah)}
+    .fm-axl{font:600 12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.75}
+    .fm-q{font:700 19px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .fm-qs{font:12px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.65}
+    .fm-goal{fill:var(--accent);fill-opacity:.07;stroke:var(--accent);stroke-width:1.6;stroke-dasharray:6 4}
+    .fm-gt{font:700 14.5px Geist,Inter,system-ui,sans-serif;fill:var(--accent)}
+    .fm-gs{font:12px Geist,Inter,system-ui,sans-serif;fill:var(--accent)}
+    .fm-panel{fill:var(--panel);stroke:currentColor;stroke-opacity:.3;stroke-width:1.2}
+    .fm-k{font:11px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent);letter-spacing:.14em}
+    .fm-b{font:700 13.5px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .fm-s{font:12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.72}
+    .fm-ineq{font:600 16px "JetBrains Mono",ui-monospace,monospace;fill:currentColor}
+    .fm-ineq2{font:600 16px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent)}
+    .fm-flip{fill:none;stroke:var(--accent);stroke-width:1.6;marker-end:url(#fm-ah2)}
+    .fm-sep{stroke:currentColor;stroke-opacity:.2;stroke-width:1}
+  </style>
+  <defs>
+    <marker id="fm-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor" fill-opacity=".5"/></marker>
+    <marker id="fm-ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker>
+  </defs>
+  <g>
+    <line x1="80" y1="178" x2="430" y2="178" class="fm-ax"/>
+    <line x1="255" y1="322" x2="255" y2="42" class="fm-ax"/>
+    <text x="72" y="182" text-anchor="end" class="fm-axl">Weak control</text>
+    <text x="438" y="182" class="fm-axl">Strong control</text>
+    <text x="255" y="30" text-anchor="middle" class="fm-axl">Flexible operation</text>
+    <text x="255" y="342" text-anchor="middle" class="fm-axl">Rigid</text>
+    <text x="165" y="112" text-anchor="middle" class="fm-q">Agile</text>
+    <text x="165" y="132" text-anchor="middle" class="fm-qs">Team adapts; the rest lags</text>
+    <text x="345" y="258" text-anchor="middle" class="fm-q">Waterfall</text>
+    <text x="345" y="278" text-anchor="middle" class="fm-qs">All aligned; nothing changes</text>
+    <rect x="275" y="52" width="150" height="104" rx="6" class="fm-goal"/>
+    <text x="350" y="86" text-anchor="middle" class="fm-gt">AI-native SDLC</text>
+    <text x="350" y="108" text-anchor="middle" class="fm-gs">Control and flexibility</text>
+    <text x="350" y="126" text-anchor="middle" class="fm-gs">Minimal cost to realign</text>
+    <text x="350" y="144" text-anchor="middle" class="fm-qs">The quadrant with no name</text>
+  </g>
+  <g>
+    <rect x="545" y="44" width="201" height="278" rx="6" class="fm-panel"/>
+    <text x="560" y="72" class="fm-k">Until now</text>
+    <text x="560" y="98" class="fm-b">Cost to realign the org</text>
+    <text x="560" y="124" class="fm-ineq">&gt; its value</text>
+    <text x="560" y="148" class="fm-s">So we gave up either</text>
+    <text x="560" y="166" class="fm-s">control or flexibility</text>
+    <line x1="560" y1="184" x2="732" y2="184" class="fm-sep"/>
+    <text x="560" y="210" class="fm-k">AI organization</text>
+    <text x="560" y="236" class="fm-b">Tech flips the inequality</text>
+    <text x="560" y="262" class="fm-ineq2">cost &lt; value</text>
+    <text x="560" y="288" class="fm-s">No need to give up either</text>
+    <path d="M545 250 C 480 250, 460 120, 430 104" class="fm-flip"/>
+  </g>
+</svg></div>
+    <figcaption>The second page of the founder's notebook. For a long time the top-right quadrant had no name. Agile and Waterfall were not opposing philosophies; they were a choice of which one to give up, in an era when realigning the whole organization cost too much.</figcaption>
+  </figure>
+  <p>The horizontal axis is whether you are strong or weak at control; the vertical axis is whether you can operate flexibly or are rigid. Waterfall lands bottom right and Agile top left. The top right is empty. For the quadrant that is strong at control and also operates flexibly, there was no development methodology with a name.</p>
+  <p>History explains why. When Waterfall was codified in 1970, change was expensive. Control meant holding to a specification once it was decided. The Agile Manifesto of 2001 assumed that changing software had become cheap, and chose responding to change over following a plan. But Agile stayed inside small teams. The team could change, but the plan, the budget, the contract, the documents and the team next door did not. Each time something changed, the cost of realigning the whole organization exceeded the value gained by realigning it. So companies chose between not changing (Waterfall) and changing only locally while leaving the rest behind (Agile).</p>
+  <p>Manufacturing has a story with exactly the same structure. While changing over a die took several hours, it was rational to produce in large lots. The moment the changeover dropped to a few minutes, small lots of many products became possible — and control over the process was not lost. Lot size is decided not by philosophy but by the cost of changeover. In an organization, the changeover is realigning the whole.</p>
+  <p>An organization ought to be able to have both control and flexibility. What looked like a trade-off was a question of cost, not of nature. What is written on the right side of the founder's diagram is a single line: this inequality is reversed by technology.</p>
+  <p>Suppose one specification changes on a Monday. Under Waterfall, you wait for the change-control meeting. Under Agile, the team responds that day, but the plan, the budget, the contract and the assumptions of the team next door stay out of date, and someone later goes round aligning them by hand. In this organization, the change is appended as a decision record rather than overwriting one, the affected procedures get a new version, documents, checks and plans are rewritten by AI against the same judgment criteria, and inside the boundary AI gives final approval. A human is called only when the boundary itself has to move. At that point, the cost of realignment falls below its value. What was needed to enter the top-right quadrant was not a new methodology but an organization that makes realignment cheap. The founder called this the AI-native SDLC.</p>
+  <p class="note">“Minimal” is still a design claim. The time it takes for one change of judgment to propagate through the whole organization has not been measured as of this document. The Scrum production process in 04 is a diagram of where, Stage by Stage and Gate by Gate, that realignment takes place.</p>
+  <p class="qline">Control and flexibility were not a trade-off; they were a function of the cost of realignment.</p>
+
+  <h3 class="sub">Sketch three · Labor assets and Labor Capital as a Service</h3>
+  <div class="scroll"><table>
+    <thead><tr><th></th><th>Traditional labor assets · hiring people</th><th>Labor Capital as a Service · assigning AI</th></tr></thead>
+    <tbody>
+      <tr><td>Marginal cost of employment</td><td>JPY 5 million a year per person<span class="dim"> (the founder's estimate)</span>. Committed in advance</td><td>The fixed cost of one more is JPY 0. Assigned from a talent pool</td></tr>
+      <tr><td>OPEX</td><td>A fixed cost that comes first. Demands utilization</td><td>Staged investment that follows usage. Can lie dormant when there is no work</td></tr>
+      <tr><td>Capability</td><td>Experts are scarce. Learning attaches to the person and leaves when they do</td><td>Verified capability is replicated. Experience accumulates as a corporate asset</td></tr>
+    </tbody>
+  </table></div>
+  <p class="fn">The third page of the founder's notebook. In the same three rows, it sets hiring one person beside adding one AI persona.</p>
+  <p>The marginal cost of adding one person is, by the founder's estimate, JPY 5 million a year. More important than the amount itself is that it is committed in advance and demands utilization. Salary is the same in a month that is not busy. So companies hesitate to hire, and while they hesitate, the work goes outside. Capability is bound by the scarcity of experts, and learning attaches to people and leaves the company when they resign. These three rows are not a table that blames people. JPY 5 million is a household's livelihood, and companies hesitate because hesitating is right.</p>
+  <p>Suppose you need three analysts for just two months. Hire people, and recruiting takes three months, and when the work ends the seats sit empty. Outsource, and only the deliverables come back. In the right-hand column, you assign three from the pool, let them go dormant when the work ends, and the procedures, review scores and experience remain in the organization.</p>
+  <p>In 2006, computing moved from buying servers to paying only for what you use. Software became SaaS. Labor was the one factor of production that remained a fixed cost. The right-hand column turns it into staged investment that follows usage. One more carries no fixed cost, is assigned from a talent pool, and goes dormant when there is no work. Verified capability can be replicated, and experience accumulates as a corporate asset. Hiring people becomes something you do for judgment, not for throughput.</p>
+  <p>Here is where this organization stands. Nine hiring rounds; the monthly ceiling went from 50 dollars to 600 dollars, and each time a line was added to the budget before a seat was created (staged investment). On the KPI date, 55 of the 58 were active (dormancy). Work is reused as 42 version-controlled procedures (replication), and experience is curated weekly (accumulation). The JPY 0 in the table means “the fixed cost of an additional hire is zero”; run cost is incurred inside the ceiling. Not letting the ceiling be read as spend is the consistent demand of this organization's finance lead.</p>
+  <p class="qline">Labor was the last factor of production still held as a fixed cost.</p>
+
+  <h3 class="sub">Overlaying the three</h3>
+  <p>Overlay the three and they make one sentence. Place specialist capability in a central pool inside the company, hand the realignment of the whole organization to machines, and free labor from fixed cost. Until now, an organization in which all three hold at once could not be built with the available technology. It has become buildable only in the last two years. What the founder believes will multiply from here is not companies that hand work to AI, but companies in which the arrows of outsourcing come back inside, the trade-off between control and flexibility disappears, and hiring is done only for judgment. This organization is trying to be the first example.</p>
+  <div class="define"><b>What is at stake.</b> This organization is not competing on how smart the model is. That is the AI vendors' turf. What it competes on is the cost of realignment per change, and the amount of asset left in the organization per piece of work. Those two are decided by the design of the organization, independently of which model is used.</div>
+  <p>What brought this view into focus was a conversation with another leader running a similar organization of AI agents. As we set out what was the same and what was different, the contrast threw this organization's character into relief. What they aim at is the <b>downside</b>: efficiency. Take what used to cost 100 and make it 10, then 1. Make the existing better. You cannot achieve efficiency without depth, so depth is required. What the founder aims at is the <b>upside</b>: productivity. Make possible what was impossible, or what nobody had even recognized as impossible. An expansion of opportunity and possibility. This is a difference of philosophy, and the two do not interfere with each other. Nor is it an argument about being some hundreds of times better.</p>
+  <p>The upside has two levels. One is <b>boundary-crossing</b>. At the level of an individual or a single department, a salesperson can build a product without engineering or planning, a research department can ship a product without relying on a business unit, a one-engineer outpost can run an article site, a podcast and a research desk. The other is <b>collective knowledge</b>. At the cross-departmental level, the accumulation scattered across individual departments becomes collective knowledge and, through reuse, is reproduced on an expanding scale. The first diagram is exactly about the latter. The record as of today is mostly boundary-crossing, with a little collective knowledge. That is why the direction is toward collective knowledge.</p>
+  <div class="define"><b>What we do not do.</b> Work whose only effect is to make an existing thing cheaper. Work that replaces one human step with AI and leaves the process unchanged. Contests over which model is smarter. “Hundreds of times” headlines. Deliverables that leave no evaluation, no procedure and no record behind. This organization does not propose these, and when it finds one already running, it names it as a candidate for retirement and a human decides. This orientation is set in the north-star document that every persona reads on every start-up<sup>9</sup>.</div>
+  <p>All three are diagrams not of what has been achieved but of what we are trying to achieve. What has been confirmed in four months of operation, and what has not yet been confirmed, are written separately from 03 onward.</p>
+  <div class="foryou"><b>In your organization</b> What knowledge are your vendors taking home? Each time something changes, where do you give up on realignment? How many hires have you passed on because of utilization?</div>
+</section>
+
+<section id="s3">
+  <div class="eyebrow"><span class="num">03</span><span class="kicker">Quality</span></div>
+  <h2>Once it ships, it cannot be recalled</h2>
+  <p class="lede">The founder's first employer was a consumer electronics maker. Thousands of people are involved in a single product.</p>
+  <p>The air date of the TV commercial, the final development build, the end of debugging, the ramp-up of the mass-production line, the shipping arrangements with distribution. Unless all of these land in the same week, the product does not reach the shelves. And a product, once shipped, cannot be recalled. Quality was not something you “fix later”; it was something you “stop before it goes out”. Playing with a prototype and building something that survives mass production are different jobs.</p>
+  <p>What the founder brought into the AI organization is this “stop it before it goes out” circuit. Articles written by AI — ones with an empty body, ones cut off partway, ones still carrying traces of a model failure — are stopped by a machine before any person reads them<sup>3</sup>. When something stops, it stops loudly. Quietly shipping a degraded deliverable is forbidden by the constitution.</p>
+  <h3 class="sub">The checks were green, and the screen was blank</h3>
+  <p>The surprise with the serving path appeared while every check passed. Inside the repository the settings were consistent, but they disagreed with the URL actually being served. In the language of the production floor, it was the state in which “every in-process inspection passed, and the shipping address was wrong”. For a consumer appliance that cannot be recalled, that would be fatal. Because it was the web, which can be updated, it could be carried into the next improvement.</p>
+  <p>Here is what the production floor really taught. More than the surprise itself, what you need is <b>a circuit that turns learning into rules</b>. In this organization, a failure is recorded in a ledger the first time, and when it happens a second time within 90 days, it is promoted to a rule checked by a machine rather than by human attention<sup>4</sup>. The following week, this incident became a check that confirms “the served page points to this build”. The ledger currently lists 34 failures.</p>
+  <div class="foryou"><b>In your organization</b> Is there a single line, just before a deliverable goes outside, where a machine rather than a person stops it? If there is, that line works as it is for deliverables made by AI.</div>
+</section>
+
+<section id="s4">
+  <div class="eyebrow"><span class="num">04</span><span class="kicker">Governance</span></div>
+  <h2>Porting a governance structure that works</h2>
+  <p class="lede">The founder's second employer was the product organization of a SaaS company. The job was to design mechanisms that make the uncertain manageable.</p>
+  <p>Hiring and selection, onboarding after joining, and the process for leaving. Scrum, a scientific procedure that makes uncertainty observable in short cycles. The design of authority — who may decide what — and the stage gates that must be passed before moving on to the next phase. All of these were built for humans, but in fact none of them depends on “being human”.</p>
+  <p>Real development is not one engagement flowing from left to right. While discovering one theme with customers, the organization is designing a solution for another theme, planning the next release, and implementing and verifying in the current sprint. With different people involved and different exit criteria at each stage, the organization as a whole keeps moving in parallel.</p>
+  <p>So this operating structure was ported into the AI organization as it was. Only five promises that must not change are set down as a constitution; design decisions are never overwritten when reversed — a new record is appended instead (29 so far); and day-to-day procedures are improved by the AIs themselves, raising the version as they go. Because the mechanisms drive the next piece of work, and the learning from that work returns into the mechanisms, the organization gains momentum while it runs.</p>
+  <figure class="process-figure"><div class="figscroll">
+    <img class="process-map" src="/docs/sdlc-process.svg" width="1857" height="1049" alt="A Scrum development process in which discovery, solution design, planning, and development, verification and delivery run in parallel, each with stage gates and different stakeholders" loading="lazy">
+  </div>
+    <figcaption>The Scrum production process the founder learned first-hand in SaaS development. Each engagement is at a different point, and at each Stage the stakeholders involved and the Gate's decision criteria change. Cognitive Guild implements this operating structure as authority boundaries, reviews, CI and stop conditions. In terms of the quadrant in 02, the Gates keep control while AI takes on the realignment between Stages — aiming at the top-right quadrant.</figcaption>
+  </figure>
+  <h3 class="sub">We decided first where AI gives final approval</h3>
+  <p>This needs to be stated precisely. This is not an organization in which “AI only proposes and humans approve”. That would mean one person working through the approvals for 58 AIs — a state in which execution has become cheap while approval stays expensive<sup>5</sup>.</p>
+  <p>In this organization, <b>what the human holds is the right to amend the boundary</b>. The constitution, the decision records, the cost ceiling, the personas' identities. Any change that touches these always goes to the human<sup>6</sup>. Inside the boundary, a change on which three or more AI reviewers unanimously agree is given final approval by AI and goes into production. Mechanical checks always stand behind it. For readers in legal, this design — in which a human holds only the right to amend the boundary — is probably the most interesting part.</p>
+  <h3 class="sub">Hiring follows the same steps as for people</h3>
+  <p>Adding a new AI persona follows the same steps as hiring a person. Write a job description, add a line to the budget, amend the monthly cost ceiling, and only then create the seat. Since operation began, nine hiring rounds have been run. The ceiling has risen from 50 dollars to 600 dollars, each time in this order. Put the other way round, not once has a seat been created first and a budget looked for afterwards.</p>
+  <p class="fn">The details of the mechanism (the composition model, the execution flow, the authority table) are left to sections 05 to 09 of the <a href="/docs/whitepaper">whitepaper</a>. The same explanation is not repeated here.</p>
+</section>
+
+<section id="s5">
+  <div class="eyebrow"><span class="num">05</span><span class="kicker">Stock</span></div>
+  <h2>Accumulating organizational capability</h2>
+  <p class="lede">The third lesson came when the founder served as the person in charge of selling an organization and a business. The view from finance and the capital markets was entirely different from the product view the founder knew.</p>
+  <p>The question was not only about today's product or this period's revenue. It was about the financial and non-financial value, the tangible and intangible assets, the organization had built up — whether models and mechanisms that repeatedly generate future results had been accumulated. That, the founder came to understand, is why some SaaS companies receive investment while loss-making, or even before they have any revenue.</p>
+  <p>In terms of the first sketch in 02, this is the shift from flow and one-off to stock and reuse. Outsourcing leaves only the deliverable behind, but this organization has to leave, together with the deliverable, whatever makes the next deliverable cheaper. So the founder narrowed the organizational capability an AI organization should accumulate to three: an <b>evaluation system</b> that judges results, <b>workflows</b> that reproduce the work, and <b>experience</b> that changes the next judgment. Even when people change, these three remain in the organization.</p>
+  <figure><div class="figscroll">
+<svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fs-t">
+  <title id="fs-t">How the three organizational capabilities circulate</title>
+  <style>
+    .lab{font:600 14px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .sm{font:12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.7}
+    .mono{font:11px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent);letter-spacing:.1em}
+    .node{fill:none;stroke:currentColor;stroke-opacity:.4;stroke-width:1.2}
+    .arr{fill:none;stroke:var(--accent);stroke-width:1.6;marker-end:url(#ah)}
+    .ctr{font:600 13px Geist,Inter,system-ui,sans-serif;fill:var(--accent)}
+  </style>
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>
+  <g>
+    <rect x="30" y="30" width="210" height="72" rx="5" class="node"/>
+    <text x="44" y="52" class="mono">01 Experience</text><text x="44" y="74" class="lab">Judgments and outcomes</text><text x="44" y="92" class="sm">Curated; fed into the next job</text>
+    <rect x="520" y="30" width="210" height="72" rx="5" class="node"/>
+    <text x="534" y="52" class="mono">02 Evaluation system</text><text x="534" y="74" class="lab">Criteria for deliverables</text><text x="534" y="92" class="sm">Scores checked against usage</text>
+    <rect x="275" y="200" width="210" height="72" rx="5" class="node"/>
+    <text x="289" y="222" class="mono">03 Workflows</text><text x="289" y="244" class="lab">Versioned work procedures</text><text x="289" y="262" class="sm">Feeds judgment into next run</text>
+    <path d="M240 66 L520 66" class="arr"/>
+    <path d="M625 102 L470 200" class="arr"/>
+    <path d="M290 200 L135 102" class="arr"/>
+    <text x="380" y="58" text-anchor="middle" class="sm">Work using experience; get evaluated</text>
+    <text x="560" y="175" class="sm">Evaluation rewrites procedure</text>
+    <text x="20" y="175" class="sm">New procedures yield experience</text>
+    <text x="380" y="130" text-anchor="middle" class="ctr">People change; the loop stays in the organization</text>
+  </g>
+</svg></div>
+    <figcaption>Work is done using experience, results are judged by the evaluation system, and the outcome is fed back into the workflows. This cycle itself is the capability that remains in the organization.</figcaption>
+  </figure>
+  <p>With simple interest, each piece of work adds results to the same principal. With compound interest, the results gained so far are built into the principal of the next piece of work. What makes the difference is not AI's output speed itself, but a mechanism that reuses learning and actually changes the next execution.</p>
+  <figure><div class="figscroll">
+<svg viewBox="0 0 760 450" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fc-t fc-d">
+  <title id="fc-t">Simple-interest execution compared with compound organizational learning</title>
+  <desc id="fc-d">The simple-interest total is P times (1 plus r times t); the compound total is P times (1 plus r) to the power t. In an example with a starting value of 100 and 10 percent per period, after 20 periods simple interest reaches 300 and compound interest about 673.</desc>
+  <style>
+    .lab{font:600 13px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .sm{font:12px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.7}
+    .mono{font:600 20px "JetBrains Mono",ui-monospace,monospace;fill:currentColor}
+    .box{fill:none;stroke:currentColor;stroke-opacity:.35;stroke-width:1.2}
+    .accentbox{fill:var(--accent);fill-opacity:.08;stroke:var(--accent);stroke-width:1.2}
+    .grid{stroke:currentColor;stroke-opacity:.13;stroke-width:1}
+  </style>
+  <rect x="20" y="16" width="345" height="84" rx="5" class="box"/><text x="38" y="42" class="lab">Simple-interest execution</text><text x="38" y="72" class="mono">A = P (1 + r t)</text><text x="38" y="91" class="sm">Each run adds results to the same principal P</text>
+  <rect x="395" y="16" width="345" height="84" rx="5" class="accentbox"/><text x="413" y="42" class="lab">Compound learning</text><text x="413" y="72" class="mono">A = P (1 + r)ᵗ</text><text x="413" y="91" class="sm">Past results are reinvested as the next principal</text>
+  <text x="20" y="125" class="sm">P: initial capability   r: improvement per period   t: periods   A: capability at that point</text>
+  <line x1="90" y1="390" x2="720" y2="390" stroke="currentColor" stroke-opacity=".55" stroke-width="1.5"/><line x1="90" y1="390" x2="90" y2="145" stroke="currentColor" stroke-opacity=".55" stroke-width="1.5"/>
+  <line x1="90" y1="330" x2="720" y2="330" class="grid"/><line x1="90" y1="270" x2="720" y2="270" class="grid"/><line x1="90" y1="210" x2="720" y2="210" class="grid"/><line x1="90" y1="150" x2="720" y2="150" class="grid"/>
+  <text x="78" y="394" text-anchor="end" class="sm">100</text><text x="78" y="334" text-anchor="end" class="sm">250</text><text x="78" y="274" text-anchor="end" class="sm">400</text><text x="78" y="214" text-anchor="end" class="sm">550</text><text x="78" y="154" text-anchor="end" class="sm">700</text>
+  <text x="90" y="412" text-anchor="middle" class="sm">0</text><text x="405" y="412" text-anchor="middle" class="sm">10</text><text x="720" y="412" text-anchor="middle" class="sm">20</text><text x="405" y="440" text-anchor="middle" class="lab">Period t</text><text x="24" y="270" text-anchor="middle" transform="rotate(-90 24 270)" class="lab">Capability A</text>
+  <polyline points="90,390 153,382 216,374 279,366 342,358 405,350 468,342 531,334 594,326 657,318 720,310" fill="none" stroke="currentColor" stroke-opacity=".65" stroke-width="3"/>
+  <polyline points="90,390 153,382 216,371 279,359 342,344 405,326 468,305 531,278 594,246 657,208 720,161" fill="none" stroke="var(--accent)" stroke-width="4"/>
+  <circle cx="720" cy="310" r="4" fill="currentColor"/><circle cx="720" cy="161" r="5" fill="var(--accent)"/><text x="704" y="300" text-anchor="end" class="sm">Simple 300</text><text x="704" y="150" text-anchor="end" class="lab">Compound ≈673</text>
+</svg></div>
+    <figcaption>A mathematical example with a starting value P=100 and a per-period rate r=10%. Simple and compound interest are compared on the same total A. This is not Cognitive Guild's measured growth rate; it illustrates the strength of reinvesting learning into the next execution.</figcaption>
+  </figure>
+  <p>The three organizational capabilities are already in operation. Experience is curated weekly, deliverables carry their prompt version and review scores, and work is reused as 42 version-controlled workflows<sup>8</sup>.</p>
+  <p class="note">Compounding growth, however, is still a hypothesis. What to accumulate has been settled, but how much cheaper, faster and better the next execution became is still being measured. If the same failure recurs within 90 days, experience is judged not to have been used, and the failure is promoted to a mechanical check.</p>
+  <div class="foryou"><b>In your organization</b> When someone leaves, which evaluation criteria, work procedures and experience are lost? Those are the organizational capabilities to accumulate first.</div>
+</section>
+
+<section id="s6">
+  <div class="eyebrow"><span class="num">06</span><span class="kicker">After launch</span></div>
+  <h2>What happened after launch</h2>
+  <p class="lede">That is the end of the founding story. From here on, what happened to the organization after it started running is told from the repository's records and from the monthly reports the AI organization wrote itself.</p>
+  <figure><div class="figscroll">
+<svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="ft-t">
+  <title id="ft-t">Timeline of the evolution toward Cognitive Guild (2024 to 2026)</title>
+  <style>
+    .d{font:11px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent);letter-spacing:.06em}
+    .h{font:600 13px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .sm{font:12px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.7}
+    .axis{stroke:currentColor;stroke-opacity:.35;stroke-width:1.4}
+    .dot{fill:var(--accent)}
+    .tick{stroke:var(--accent);stroke-width:1.2}
+  </style>
+  <line x1="40" y1="122" x2="720" y2="122" class="axis"/>
+  <g>
+    <circle cx="70" cy="122" r="5" class="dot"/><line x1="70" y1="122" x2="70" y2="72" class="tick"/>
+    <text x="70" y="42" text-anchor="middle" class="d">2024-08</text><text x="70" y="61" text-anchor="middle" class="h">Discord Bot</text><text x="70" y="77" text-anchor="middle" class="sm">Multi-agent operation</text>
+    <circle cx="220" cy="122" r="5" class="dot"/><line x1="220" y1="122" x2="220" y2="172" class="tick"/>
+    <text x="220" y="194" text-anchor="middle" class="d">2024-09</text><text x="220" y="213" text-anchor="middle" class="h">HR introduced</text><text x="220" y="230" text-anchor="middle" class="sm">Performance reviews</text>
+    <circle cx="380" cy="122" r="5" class="dot"/><line x1="380" y1="122" x2="380" y2="72" class="tick"/>
+    <text x="380" y="42" text-anchor="middle" class="d">2026-02</text><text x="380" y="61" text-anchor="middle" class="h">4 moved to OpenClaw</text><text x="380" y="77" text-anchor="middle" class="sm">Runtime ported</text>
+    <circle cx="540" cy="122" r="5" class="dot"/><line x1="540" y1="122" x2="540" y2="172" class="tick"/>
+    <text x="540" y="194" text-anchor="middle" class="d">2026-03</text><text x="540" y="213" text-anchor="middle" class="h">Writing analyses</text><text x="540" y="230" text-anchor="middle" class="sm">Article site launched</text>
+    <circle cx="690" cy="122" r="5" class="dot"/><line x1="690" y1="122" x2="690" y2="72" class="tick"/>
+    <text x="690" y="42" text-anchor="middle" class="d">2026-05</text><text x="690" y="61" text-anchor="middle" class="h">First 5 ported</text><text x="690" y="77" text-anchor="middle" class="sm">Running as Workforce</text>
+  </g>
+</svg></div>
+    <figcaption>The current organization was not designed all at once. Capabilities — conversation, evaluation, execution, deliverables — were ported in stages, leading in May 2026 to today's Workforce.</figcaption>
+  </figure>
+  <h3 class="sub">What the AI organization wrote about itself</h3>
+  <p>Every month, this organization publishes a monthly report made up of an overview by the CEO persona and chapters by seven VPs, without editing by the founder<sup>7</sup>. Set three months side by side and you can see the organization updating its picture of itself.</p>
+  <div class="grid g3">
+    <div class="card"><span class="tag">July issue · CEO</span><p>“What decreased was the number of interventions; what increased was the weight of each one. The human stopped being a gatekeeper and became an auditor.”</p></div>
+    <div class="card"><span class="tag">August issue · Quality lead</span><p>“We were checking that the checks existed, and not checking that the checks worked.”</p></div>
+    <div class="card"><span class="tag">September issue · CEO</span><p>“The ability to write is no longer what is at stake. What is contested is who believes what was written, and how. Continuing to notice is not, in itself, a fix.”</p></div>
+  </div>
+  <p>Porting the three experiences also revealed traits peculiar to an AI organization: that it <b>stops while everything stays green</b>; that <b>the ability to find and the ability to close are separate</b>; and that <b>when execution gets cheaper, approval does not</b>. The monthly reports act as a device that does not let these end as discoveries but feeds them back into the next mechanism.</p>
+  <div class="foryou"><b>In your organization</b> Look not at how much the AI is running, but at what the organization itself acknowledged the following month. Activity keeps rising even while things are stalled.</div>
+</section>
+
+<section id="s7">
+  <div class="eyebrow"><span class="num">07</span><span class="kicker">Founder</span></div>
+  <h2>Why this founder</h2>
+  <p class="lede">Only for those who have read this far, here is the background. Three workplaces taught three different things.</p>
+  <p>The founder is currently based in California, working on SaaS and market research for the US market. Being the only engineer responsible for software against a real workload was the direct prompt to think about an organization that holds the capabilities it needs independently of “headcount”.</p>
+  <p>And Cognitive Guild is being built in Silicon Valley. In an environment that runs continuously from the AI and SaaS companies of San Francisco to the universities, product development and semiconductor companies of the Peninsula, a new shape for the software organization is being tried out in practice.</p>
+  <figure><div class="figscroll">
+    <img class="regional-map" src="/docs/silicon-valley-map.svg" width="1200" height="900" alt="A map showing where the major technology companies and universities sit across San Francisco, the Peninsula and the South Bay" loading="lazy">
+  </div><figcaption>Silicon Valley is not the name of a single city. It is a cluster of AI, SaaS, universities, semiconductors and product development spanning San Francisco, the Peninsula and the South Bay. X is shown as a Bay Area engineering site, not as its headquarters.</figcaption></figure>
+  <figure><div class="figscroll">
+<svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fp-t">
+  <title id="fp-t">Three things learned in human organizations, ported into an AI organization</title>
+  <style>
+    .k{font:11px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent);letter-spacing:.1em}
+    .h{font:700 15px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .sm{font:12.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.72}
+    .ess{font:700 14px Geist,Inter,system-ui,sans-serif;fill:var(--accent)}
+    .col{fill:none;stroke:currentColor;stroke-opacity:.3;stroke-width:1.2}
+    .band{fill:var(--accent);fill-opacity:.07;stroke:var(--accent);stroke-width:1.4}
+    .arr{stroke:var(--accent);stroke-width:1.6;fill:none;marker-end:url(#ap)}
+  </style>
+  <defs><marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>
+  <g transform="translate(10,10)">
+    <rect x="0" y="0" width="236" height="150" rx="5" class="col"/>
+    <text x="14" y="24" class="k">Electronics · SW engineer</text>
+    <text x="14" y="48" class="h">Thousands ship one product</text>
+    <text x="14" y="72" class="sm">Mass production, QA, sync of depts</text>
+    <text x="14" y="92" class="sm">Once shipped, no recall</text>
+    <text x="14" y="130" class="ess">→ Cross-function integration</text>
+    <rect x="252" y="0" width="236" height="150" rx="5" class="col"/>
+    <text x="266" y="24" class="k">SaaS · Product org manager</text>
+    <text x="266" y="48" class="h">Make uncertainty manageable</text>
+    <text x="266" y="72" class="sm">Hire, onboard, offboard; Scrum</text>
+    <text x="266" y="92" class="sm">Designing authority and stage gates</text>
+    <text x="266" y="130" class="ess">→ Governance mechanisms</text>
+    <rect x="504" y="0" width="236" height="150" rx="5" class="col"/>
+    <text x="518" y="24" class="k">Org &amp; business sale lead</text>
+    <text x="518" y="48" class="h">What finance prices</text>
+    <text x="518" y="72" class="sm">(Non)financial, (in)tangible value</text>
+    <text x="518" y="92" class="sm">Mechanisms that compound</text>
+    <text x="518" y="130" class="ess">→ What to accumulate</text>
+    <path d="M118 150 L118 190" class="arr"/><path d="M370 150 L370 190" class="arr"/><path d="M622 150 L622 190" class="arr"/>
+    <rect x="0" y="196" width="740" height="76" rx="5" class="band"/>
+    <text x="20" y="226" class="h">Software Talent Network — working mechanisms ported to 1 human and 58 AIs</text>
+    <text x="20" y="252" class="sm">Operating structure: roles, authority, verification, improvement keep turning; learning drives the next run.</text>
+  </g>
+</svg></div>
+    <figcaption>From left to right, each change of product and role changed the layer of learning. All three are used as they are in the design of the AI organization.</figcaption>
+  </figure>
+  <p>The founder was able to build an AI organization because three workplaces gave first-hand experience, under production-grade pressure, of “integrating work at scale”, “governance that handles uncertainty” and “organizational capability that grows by compounding”. Cognitive Guild is those three made into one running structure.</p>
+</section>
+
+<section id="s8">
+  <div class="eyebrow"><span class="num">08</span><span class="kicker">Review</span></div>
+  <h2>The ones who cut this document</h2>
+  <p class="lede">Before publication, the draft was given to five of this organization's personas to debate. They are AIs. The words quoted here are taken from the record of that debate.</p>
+  <p>What was cut: the sentence “we already know how to evolve by compounding”, wording that made the ceiling look like spend, an explanation — the opposite of the facts — that “AI never gives final approval”, and an opening that began with a résumé. What remained is this document.</p>
+  <p class="note">02, “Three sketches on paper”, is a section added from the founder's notebook after this debate. The three things the debate asked for (state what is unmeasured, distinguish the ceiling from spend, include the “In your organization” lines) are applied to that section in the same way.</p>
+  <div class="voices">
+    <div class="voice">
+      <div class="who"><img class="face" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODAgMjgwIiBmaWxsPSJub25lIiBzaGFwZS1yZW5kZXJpbmc9ImF1dG8iIHdpZHRoPSIxNzYiIGhlaWdodD0iMTc2Ij48bWV0YWRhdGEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOmRjdGVybXM9Imh0dHA6Ly9wdXJsLm9yZy9kYy90ZXJtcy8iPjxyZGY6UkRGPjxyZGY6RGVzY3JpcHRpb24+PGRjOnRpdGxlPkF2YXRhYWFyczwvZGM6dGl0bGU+PGRjOmNyZWF0b3I+UGFibG8gU3RhbmxleTwvZGM6Y3JlYXRvcj48ZGM6c291cmNlIHhzaTp0eXBlPSJkY3Rlcm1zOlVSSSI+aHR0cHM6Ly9hdmF0YWFhcnMuY29tLzwvZGM6c291cmNlPjxkY3Rlcm1zOmxpY2Vuc2UgeHNpOnR5cGU9ImRjdGVybXM6VVJJIj5odHRwczovL2F2YXRhYWFycy5jb20vPC9kY3Rlcm1zOmxpY2Vuc2U+PGRjOnJpZ2h0cz5SZW1peCBvZiDigJ5BdmF0YWFhcnPigJ0gKGh0dHBzOi8vYXZhdGFhYXJzLmNvbS8pIGJ5IOKAnlBhYmxvIFN0YW5sZXnigJ0sIGxpY2Vuc2VkIHVuZGVyIOKAnkZyZWUgZm9yIHBlcnNvbmFsIGFuZCBjb21tZXJjaWFsIHVzZeKAnSAoaHR0cHM6Ly9hdmF0YWFhcnMuY29tLyk8L2RjOnJpZ2h0cz48L3JkZjpEZXNjcmlwdGlvbj48L3JkZjpSREY+PC9tZXRhZGF0YT48bWFzayBpZD0idmlld2JveE1hc2siPjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiByeD0iMCIgcnk9IjAiIHg9IjAiIHk9IjAiIGZpbGw9IiNmZmYiIC8+PC9tYXNrPjxnIG1hc2s9InVybCgjdmlld2JveE1hc2spIj48cmVjdCBmaWxsPSIjZDFkNGY5IiB3aWR0aD0iMjgwIiBoZWlnaHQ9IjI4MCIgeD0iMCIgeT0iMCIgLz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4KSI+PHBhdGggZD0iTTEzMiAzNmE1NiA1NiAwIDAgMC01NiA1NnY2LjE3QTEyIDEyIDAgMCAwIDY2IDExMHYxNGExMiAxMiAwIDAgMCAxMC4zIDExLjg4IDU2LjA0IDU2LjA0IDAgMCAwIDMxLjcgNDQuNzN2MTguNGgtNGE3MiA3MiAwIDAgMC03MiA3MnY5aDIwMHYtOWE3MiA3MiAwIDAgMC03Mi03MmgtNHYtMTguMzlhNTYuMDQgNTYuMDQgMCAwIDAgMzEuNy00NC43M0ExMiAxMiAwIDAgMCAxOTggMTI0di0xNGExMiAxMiAwIDAgMC0xMC0xMS44M1Y5MmE1NiA1NiAwIDAgMC01Ni01NloiIGZpbGw9IiNmZDk4NDEiLz48cGF0aCBkPSJNMTA4IDE4MC42MXY4YTU1Ljc5IDU1Ljc5IDAgMCAwIDI0IDUuMzljOC41OSAwIDE2LjczLTEuOTMgMjQtNS4zOXYtOGE1NS43OSA1NS43OSAwIDAgMS0yNCA1LjM5IDU1Ljc5IDU1Ljc5IDAgMCAxLTI0LTUuMzlaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAxNzApIj48cGF0aCBkPSJNMTk2IDM4LjYzVjExMEg2OFYzOC42M2E3MS41MiA3MS41MiAwIDAgMSAyNi04Ljk0djQ0LjNoNzZWMjkuNjlhNzEuNTIgNzEuNTIgMCAwIDEgMjYgOC45NFoiIGZpbGw9IiMyNTU1N2MiLz48cGF0aCBkPSJNODYgODNhNSA1IDAgMSAxLTEwIDAgNSA1IDAgMCAxIDEwIDBaTTE4OCA4M2E1IDUgMCAxIDEtMTAgMCA1IDUgMCAwIDEgMTAgMFoiIGZpbGw9IiNGNEY0RjQiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzggMTM0KSI+PHBhdGggZD0iTTQwIDE2YzAgNS4zNyA2LjE2IDkgMTQgOXMxNC0zLjYzIDE0LTljMC0xLjEtLjk1LTItMi0yLTEuMyAwLTEuODcuOS0yIDItMS4yNCAyLjk0LTQuMzIgNC43Mi0xMCA1LTUuNjgtLjI4LTguNzYtMi4wNi0xMC01LS4xMy0xLjEtLjctMi0yLTItMS4wNSAwLTIgLjktMiAyWiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxMDQgMTIyKSI+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xNiA4YzAgNC40MiA1LjM3IDggMTIgOHMxMi0zLjU4IDEyLTgiIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iLjE2Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDc2IDkwKSI+PHBhdGggZD0iTTE2LjE2IDIyLjQ1YzEuODUtMy44IDYtNi40NSAxMC44NC02LjQ1IDQuODEgMCA4Ljk2IDIuNjMgMTAuODIgNi40LjU1IDEuMTMtLjI0IDIuMDUtMS4wMyAxLjM3YTE1LjA1IDE1LjA1IDAgMCAwLTkuOC0zLjQzYy0zLjczIDAtNy4xMiAxLjI0LTkuNTUgMy4yMy0uOS43My0xLjgyLS4wMS0xLjI4LTEuMTJaTTc0LjE2IDIyLjQ1YzEuODUtMy44IDYtNi40NSAxMC44NC02LjQ1IDQuODEgMCA4Ljk2IDIuNjMgMTAuODIgNi40LjU1IDEuMTMtLjI0IDIuMDUtMS4wMyAxLjM3YTE1LjA1IDE1LjA1IDAgMCAwLTkuOC0zLjQzYy0zLjc0IDAtNy4xMyAxLjI0LTkuNTYgMy4yMy0uOS43My0xLjgyLS4wMS0xLjI4LTEuMTJaIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA4MikiPjxwYXRoIGQ9Im0yMi43NyAxLjU4LjktLjRDMjguOTMtLjkxIDM2Ljg4LS4wMyA0MS43MyAyLjNjLjU3LjI3LjE4IDEuMTUtLjQgMS4xLTE0LjkyLTEuMTQtMjQuOTYgOC4xNS0yOC4zNyAxNC40NS0uMS4xOC0uNDEuMi0uNDkuMDMtMi4zLTUuMzIgNC40NS0xMy45OCAxMC4zLTE2LjNaTTg5LjIzIDEuNThsLS45LS40QzgzLjA3LS45MSA3NS4xMi0uMDMgNzAuMjcgMi4zYy0uNTcuMjctLjE4IDEuMTUuNCAxLjEgMTQuOTItMS4xNCAyNC45NiA4LjE1IDI4LjM3IDE0LjQ1LjEuMTguNDEuMi40OS4wMyAyLjMtNS4zMi00LjQ1LTEzLjk4LTEwLjMtMTYuM1oiIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii42Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xKSI+PHBhdGggZD0iTTUwIDkwLjVjMCA0LjU1IDEuNyA4LjY0IDQuODUgMTAuNzcuOS42MSAyLjQ3LjkzIDQuMTUgMS4wN1YxODJhOCA4IDAgMCAwIDggOGg0MnYtOS4zOWE1Ni4wMyA1Ni4wMyAwIDAgMS0zMS44LTQ1Ljc0QTEyIDEyIDAgMCAxIDY3IDEyM3YtMTNjMC0zLjUgMS41LTYuNjMgMy44Ny04LjgzIDExLjU0LTIuNjEgMjQuMS03LjUzIDM2LjQ3LTE0LjY3IDEyLjEzLTcgMjIuNS0xNS4yNCAzMC40OC0yMy43NWE4Ny4zNiA4Ny4zNiAwIDAgMS0xMi40NSAyMC43OGMxMi42OC01LjUyIDIxLjMtMTQuNCAyNS45LTI2LjYzLjM3LjkyLjc2IDEuODQgMS4xNyAyLjc2IDEwLjI2IDIzLjAzIDI3Ljg4IDM5LjM2IDQ1Ljc3IDQ0Ljc0LjUgMi4xMS43OSA0LjA4Ljc5IDUuNnYxM2ExMiAxMiAwIDAgMS0xMC4yIDExLjg3QTU2LjAzIDU2LjAzIDAgMCAxIDE1NyAxODAuNlYxOTBoMThhMzIgMzIgMCAwIDAgMzItMzJ2LTU0LjEyYzAtLjA3IDAtLjE3LS4wMy0uMjgtLjA3LTUuNjQtLjI4LTE4Ljg3LS42LTIxLjM3QTc0LjAxIDc0LjAxIDAgMCAwIDEzMi45OSAxOGMtMzYuMDggMC02Ni4xNCAyNS44My03MyA2MC01LjUyIDAtMTAgNS42LTEwIDEyLjVaIiBmaWxsPSIjZjU5Nzk3Ii8+PHBhdGggZD0iTTE1Mi40NCA1OS42NmMxMS45NCAyNi44MSAzMy44NiA0NC41MyA1NC41NiA0Ni41VjkyQTc0IDc0IDAgMCAwIDYwLjMyIDc4SDYwYy01LjUyIDAtMTAgNS42LTEwIDEyLjUgMCA2LjQ4IDMuOTUgMTEuODEgOSAxMi40NHYuMTVsLjk1LS4xSDYwYTguMSA4LjEgMCAwIDAgMS45LS4yMkM3NS43IDEwMSA5MS42OCA5NS41NCAxMDcuMzQgODYuNWMxMi4xMy03IDIyLjUtMTUuMjQgMzAuNDgtMjMuNzVhODcuMzYgODcuMzYgMCAwIDEtMTIuNDUgMjAuNzhjMTIuNjgtNS41MiAyMS4zLTE0LjQgMjUuOS0yNi42My4zNy45Mi43NiAxLjg0IDEuMTcgMi43NloiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjA4Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQ5IDcyKSI+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik04NC41IDkzLjg0Yy0xMS41LjM4LTE2LjY0IDUuODgtMjAuNS4yOS0yLjkxLTQuMi0xLjctMTEuMjYgMS4wMS0xNS4yMyAzLjg2LTUuNjUgOS4xLTIuOTIgMTQuOTUtMy41NiAxLjYtLjE4IDMuMi0uNjIgNC41NC0xLjM0IDEuMzYuNzIgMi45NSAxLjE2IDQuNTUgMS4zNCA1Ljg1LjY0IDExLjA5LTIuMDkgMTQuOTQgMy41NiAyLjcyIDMuOTcgMy45MyAxMS4wMyAxLjAzIDE1LjIzLTMuODcgNS42LTktLjY3LTIwLjUyLS4yOVpNMTQwLjQgMjZjLTMuNDMgMTQuMDctNSAyOC40My03LjUgNDIuNjctLjUgMi45Ny0xLjA3IDUuOTMtMS42OCA4Ljg4LS4xMi42Mi0uMjUgMi45Mi0uODYgMy4yMS0xLjg1Ljg5LTUuNjItMy44MS02LjYzLTQuODctMi41My0yLjY3LTUuMDUtNS4zNi04LjEzLTcuNDVhNDMuNyA0My43IDAgMCAwLTIxLjEzLTcuMzJjLTMuMTgtLjI1LTcuNDcuMTgtMTAuNDcgMi0zLTEuODItNy4zLTIuMjUtMTAuNDctMi03LjYuNi0xNC45IDMuMS0yMS4xMyA3LjMyLTMuMDkgMi4wOS01LjYgNC43OC04LjEzIDcuNDUtMSAxLjA2LTQuNzggNS43Ni02LjYzIDQuODctLjYxLS4yOS0uNzQtMi42LS44Ni0zLjIxLS42LTIuOTUtMS4xNy01LjkxLTEuNy04Ljg4LTIuNDctMTQuMjQtNC4wNS0yOC42LTcuNDctNDIuNjctMSAwLTEuODcgMTguNzUtMS45OCAyMC41LS40NiA3LjA5LS45OCAxNC4wMy0uMyAyMS4xMyAxLjE2IDEyLjI0IDIuMzcgMjcuNiAxMS43IDM2Ljk2IDguNDQgOC40NSAyMC42OCAxMC4yMiAzMS4yNCAxNS41NSAxLjM2LjY5IDMuMTYgMS41NCA1LjEgMi4yMyAyLjA2IDEuNTYgNi4xMiAyLjYzIDEwLjggMi42MyA0LjkxIDAgOS4xNS0xLjE3IDExLjA4LTIuODYgMS43LS42NSAzLjI3LTEuMzkgNC40OC0yIDEwLjU2LTUuMzMgMjIuOC03LjEgMzEuMjQtMTUuNTUgOS4zMy05LjM2IDEwLjU0LTI0LjcyIDExLjctMzYuOTYuNjgtNy4xLjE2LTE0LjA0LS4zLTIxLjE0LS4xLTEuNzQtLjk4LTIwLjUtMS45OC0yMC41WiIgZmlsbD0iIzJjMWIxOCIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg2MiA0MikiPjwvZz48L2c+PC9nPjwvc3ZnPg==" width="64" height="64" alt="Avatar of Corinne" loading="lazy"><div><b>Corinne Adeyemi</b><span class="role">Investor Relations Manager</span></div></div>
+      <q>Only an organization that reports its shortcomings first gets its numbers believed.</q>
+      <span class="verdict">Asked for: lowlights first, unmeasured stated plainly</span>
+    </div>
+    <div class="voice">
+      <div class="who"><img class="face" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODAgMjgwIiBmaWxsPSJub25lIiBzaGFwZS1yZW5kZXJpbmc9ImF1dG8iIHdpZHRoPSIxNzYiIGhlaWdodD0iMTc2Ij48bWV0YWRhdGEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOmRjdGVybXM9Imh0dHA6Ly9wdXJsLm9yZy9kYy90ZXJtcy8iPjxyZGY6UkRGPjxyZGY6RGVzY3JpcHRpb24+PGRjOnRpdGxlPkF2YXRhYWFyczwvZGM6dGl0bGU+PGRjOmNyZWF0b3I+UGFibG8gU3RhbmxleTwvZGM6Y3JlYXRvcj48ZGM6c291cmNlIHhzaTp0eXBlPSJkY3Rlcm1zOlVSSSI+aHR0cHM6Ly9hdmF0YWFhcnMuY29tLzwvZGM6c291cmNlPjxkY3Rlcm1zOmxpY2Vuc2UgeHNpOnR5cGU9ImRjdGVybXM6VVJJIj5odHRwczovL2F2YXRhYWFycy5jb20vPC9kY3Rlcm1zOmxpY2Vuc2U+PGRjOnJpZ2h0cz5SZW1peCBvZiDigJ5BdmF0YWFhcnPigJ0gKGh0dHBzOi8vYXZhdGFhYXJzLmNvbS8pIGJ5IOKAnlBhYmxvIFN0YW5sZXnigJ0sIGxpY2Vuc2VkIHVuZGVyIOKAnkZyZWUgZm9yIHBlcnNvbmFsIGFuZCBjb21tZXJjaWFsIHVzZeKAnSAoaHR0cHM6Ly9hdmF0YWFhcnMuY29tLyk8L2RjOnJpZ2h0cz48L3JkZjpEZXNjcmlwdGlvbj48L3JkZjpSREY+PC9tZXRhZGF0YT48bWFzayBpZD0idmlld2JveE1hc2siPjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiByeD0iMCIgcnk9IjAiIHg9IjAiIHk9IjAiIGZpbGw9IiNmZmYiIC8+PC9tYXNrPjxnIG1hc2s9InVybCgjdmlld2JveE1hc2spIj48cmVjdCBmaWxsPSIjYjZlM2Y0IiB3aWR0aD0iMjgwIiBoZWlnaHQ9IjI4MCIgeD0iMCIgeT0iMCIgLz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4KSI+PHBhdGggZD0iTTEzMiAzNmE1NiA1NiAwIDAgMC01NiA1NnY2LjE3QTEyIDEyIDAgMCAwIDY2IDExMHYxNGExMiAxMiAwIDAgMCAxMC4zIDExLjg4IDU2LjA0IDU2LjA0IDAgMCAwIDMxLjcgNDQuNzN2MTguNGgtNGE3MiA3MiAwIDAgMC03MiA3MnY5aDIwMHYtOWE3MiA3MiAwIDAgMC03Mi03MmgtNHYtMTguMzlhNTYuMDQgNTYuMDQgMCAwIDAgMzEuNy00NC43M0ExMiAxMiAwIDAgMCAxOTggMTI0di0xNGExMiAxMiAwIDAgMC0xMC0xMS44M1Y5MmE1NiA1NiAwIDAgMC01Ni01NloiIGZpbGw9IiNmOGQyNWMiLz48cGF0aCBkPSJNMTA4IDE4MC42MXY4YTU1Ljc5IDU1Ljc5IDAgMCAwIDI0IDUuMzljOC41OSAwIDE2LjczLTEuOTMgMjQtNS4zOXYtOGE1NS43OSA1NS43OSAwIDAgMS0yNCA1LjM5IDU1Ljc5IDU1Ljc5IDAgMCAxLTI0LTUuMzlaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAxNzApIj48cGF0aCBkPSJNMTMyLjUgNTEuODNjMTguNSAwIDMzLjUtOS42MiAzMy41LTIxLjQ4IDAtLjM2LS4wMS0uNy0uMDQtMS4wNkE3MiA3MiAwIDAgMSAyMzIgMTAxLjA0VjExMEgzMnYtOC45NWE3MiA3MiAwIDAgMSA2Ny4wNS03MS44M2MtLjAzLjM3LS4wNS43NS0uMDUgMS4xMyAwIDExLjg2IDE1IDIxLjQ4IDMzLjUgMjEuNDhaIiBmaWxsPSIjRTZFNkU2Ii8+PHBhdGggZD0iTTEzMi41IDU4Ljc2YzIxLjg5IDAgMzkuNjMtMTIuMDUgMzkuNjMtMjYuOTEgMC0uNi0uMDItMS4yLS4wOC0xLjgtMi0uMzMtNC4wMy0uNTktNi4xLS43Ni4wNC4zNS4wNS43LjA1IDEuMDYgMCAxMS44Ni0xNSAyMS40OC0zMy41IDIxLjQ4Uzk5IDQyLjIgOTkgMzAuMzVjMC0uMzguMDItLjc2LjA1LTEuMTMtMi4wNi4xNC00LjA4LjM2LTYuMDguNjctLjA3LjY1LS4xIDEuMy0uMSAxLjk2IDAgMTQuODYgMTcuNzQgMjYuOTEgMzkuNjMgMjYuOTFaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xNiIvPjxwYXRoIGQ9Ik0xMDAuNzggMjkuMTIgMTAxIDI4Yy0yLjk2LjA1LTYgMS02IDFsLS40Mi42NkE3Mi4wMSA3Mi4wMSAwIDAgMCAzMiAxMDEuMDZWMTEwaDc0cy0xMC43LTUxLjU2LTUuMjQtODAuOGwuMDItLjA4Wk0xNTggMTEwczExLTUzIDUtODJjMi45Ni4wNSA2IDEgNiAxbC40Mi42NmE3Mi4wMSA3Mi4wMSAwIDAgMSA2Mi41OCA3MS40VjExMGgtNzRaIiBmaWxsPSIjNjVjOWZmIi8+PHBhdGggZD0iTTEwMSAyOGMtNiAyOSA1IDgyIDUgODJIOTBMNzYgNzRsNi05LTYtNiAxOS0zMHMzLjA0LS45NSA2LTFaTTE2MyAyOGM2IDI5LTUgODItNSA4MmgxNmwxNC0zNi02LTkgNi02LTE5LTMwcy0zLjA0LS45NS02LTFaIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuMTUiLz48cGF0aCBkPSJtMTgzLjQyIDg1Ljc3Ljg3LTIuMjQgNi4yNy00LjdhNCA0IDAgMCAxIDQuODUuMDVsNi42IDUuMTItMTguNTkgMS43N1oiIGZpbGw9IiNFNkU2RTYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzggMTM0KSI+PHJlY3QgeD0iMjIiIHk9IjciIHdpZHRoPSI2NCIgaGVpZ2h0PSIyNiIgcng9IjEzIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii42Ii8+PHJlY3QgeD0iMjQiIHk9IjkiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMiIgcng9IjExIiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTI0LjE4IDE4SDMyVjkuNDFBMTEgMTEgMCAwIDEgMzUgOWgxdjloOVY5aDR2OWg5VjloNHY5aDlWOWgyYy42OCAwIDEuMzUuMDYgMiAuMThWMThoOC44MmwuMDUuMjh2My40NGwtLjA1LjI4SDc1djguODJjLS42NS4xMi0xLjMyLjE4LTIgLjE4aC0ydi05aC05djloLTR2LTloLTl2OWgtNHYtOWgtOXY5aC0xYTExIDExIDAgMCAxLTMtLjQxVjIyaC03LjgyYTExLjA2IDExLjA2IDAgMCAxIDAtNFoiIGZpbGw9IiNFNkU2RTYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTA0IDEyMikiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMTYgOGMwIDQuNDIgNS4zNyA4IDEyIDhzMTItMy41OCAxMi04IiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA5MCkiPjxwYXRoIGQ9Ik0yNSAyN3MtNiA3LjI3LTYgMTEuMjdhNiA2IDAgMSAwIDEyIDBjMC00LTYtMTEuMjctNi0xMS4yN1oiIGZpbGw9IiM5MkQ5RkYiLz48cGF0aCBkPSJNMzYgMjJhNiA2IDAgMSAxLTEyIDAgNiA2IDAgMCAxIDEyIDBaTTg4IDIyYTYgNiAwIDEgMS0xMiAwIDYgNiAwIDAgMSAxMiAwWiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA4MikiPjxwYXRoIGQ9Ik0yNi41NSA2LjE1Yy01LjguMjctMTUuMiA0LjQ5LTE0Ljk2IDEwLjM0LjAxLjE4LjMuMjcuNDMuMTIgMi43Ni0yLjk2IDIyLjMyLTUuOTUgMjkuMi00LjM2LjY0LjE0IDEuMTItLjQ4LjcyLS45My0zLjQzLTMuODUtMTAuMi01LjQzLTE1LjQtNS4xOFpNODYuNDUgNi4xNWM1LjguMjcgMTUuMiA0LjQ5IDE0Ljk2IDEwLjM0LS4wMS4xOC0uMy4yNy0uNDMuMTItMi43Ni0yLjk2LTIyLjMyLTUuOTUtMjkuMi00LjM2LS42NC4xNC0xLjEyLS40OC0uNzItLjkzIDMuNDMtMy44NSAxMC4yLTUuNDMgMTUuNC01LjE4WiIgZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iLjYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTEpIj48cGF0aCBkPSJNNzggOThjLS4zMyAxLjIyLTEuNjUgMS40OS0yIDAtLjcyLTEwLjMgMC02Mi4yNyA1Ny02MyA1Ny0uNzMgNTcuNzIgNTIuNyA1NyA2My0uMzUgMS40OS0xLjY3IDEuMjItMiAwIC40Ni0xLjU1LTMuMy0yOC43NS0xMy0zNi0xLjc2LTEuMjItNy4yNS0yLjM5LTE0LjY0LTMuMjZMMTY0IDUwbC02Ljk4IDguMzhjLTcuMDMtLjctMTUuMzYtMS4xMy0yMy43LTEuMTNDMTE0IDU3LjIzIDk0LjYxIDU5LjQ4IDkxIDYyYy05LjcgNy4yNS0xMy40NiAzNC40NS0xMyAzNloiIGZpbGw9IiNmNTk3OTciLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDkgNzIpIj48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNjIgNDIpIj48L2c+PC9nPjwvZz48L3N2Zz4=" width="64" height="64" alt="Avatar of Silas" loading="lazy"><div><b>Silas Brandt</b><span class="role">VP, Finance &amp; Capital Strategy</span></div></div>
+      <q>The ceiling is set, the accumulation is counted. Whether it compounds, we have not yet measured.</q>
+      <span class="verdict">Asked for: ceiling distinguished from spend, approval cost stated</span>
+    </div>
+    <div class="voice">
+      <div class="who"><img class="face" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODAgMjgwIiBmaWxsPSJub25lIiBzaGFwZS1yZW5kZXJpbmc9ImF1dG8iIHdpZHRoPSIxNzYiIGhlaWdodD0iMTc2Ij48bWV0YWRhdGEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOmRjdGVybXM9Imh0dHA6Ly9wdXJsLm9yZy9kYy90ZXJtcy8iPjxyZGY6UkRGPjxyZGY6RGVzY3JpcHRpb24+PGRjOnRpdGxlPkF2YXRhYWFyczwvZGM6dGl0bGU+PGRjOmNyZWF0b3I+UGFibG8gU3RhbmxleTwvZGM6Y3JlYXRvcj48ZGM6c291cmNlIHhzaTp0eXBlPSJkY3Rlcm1zOlVSSSI+aHR0cHM6Ly9hdmF0YWFhcnMuY29tLzwvZGM6c291cmNlPjxkY3Rlcm1zOmxpY2Vuc2UgeHNpOnR5cGU9ImRjdGVybXM6VVJJIj5odHRwczovL2F2YXRhYWFycy5jb20vPC9kY3Rlcm1zOmxpY2Vuc2U+PGRjOnJpZ2h0cz5SZW1peCBvZiDigJ5BdmF0YWFhcnPigJ0gKGh0dHBzOi8vYXZhdGFhYXJzLmNvbS8pIGJ5IOKAnlBhYmxvIFN0YW5sZXnigJ0sIGxpY2Vuc2VkIHVuZGVyIOKAnkZyZWUgZm9yIHBlcnNvbmFsIGFuZCBjb21tZXJjaWFsIHVzZeKAnSAoaHR0cHM6Ly9hdmF0YWFhcnMuY29tLyk8L2RjOnJpZ2h0cz48L3JkZjpEZXNjcmlwdGlvbj48L3JkZjpSREY+PC9tZXRhZGF0YT48bWFzayBpZD0idmlld2JveE1hc2siPjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiByeD0iMCIgcnk9IjAiIHg9IjAiIHk9IjAiIGZpbGw9IiNmZmYiIC8+PC9tYXNrPjxnIG1hc2s9InVybCgjdmlld2JveE1hc2spIj48cmVjdCBmaWxsPSIjZmZkNWRjIiB3aWR0aD0iMjgwIiBoZWlnaHQ9IjI4MCIgeD0iMCIgeT0iMCIgLz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4KSI+PHBhdGggZD0iTTEzMiAzNmE1NiA1NiAwIDAgMC01NiA1NnY2LjE3QTEyIDEyIDAgMCAwIDY2IDExMHYxNGExMiAxMiAwIDAgMCAxMC4zIDExLjg4IDU2LjA0IDU2LjA0IDAgMCAwIDMxLjcgNDQuNzN2MTguNGgtNGE3MiA3MiAwIDAgMC03MiA3MnY5aDIwMHYtOWE3MiA3MiAwIDAgMC03Mi03MmgtNHYtMTguMzlhNTYuMDQgNTYuMDQgMCAwIDAgMzEuNy00NC43M0ExMiAxMiAwIDAgMCAxOTggMTI0di0xNGExMiAxMiAwIDAgMC0xMC0xMS44M1Y5MmE1NiA1NiAwIDAgMC01Ni01NloiIGZpbGw9IiNmOGQyNWMiLz48cGF0aCBkPSJNMTA4IDE4MC42MXY4YTU1Ljc5IDU1Ljc5IDAgMCAwIDI0IDUuMzljOC41OSAwIDE2LjczLTEuOTMgMjQtNS4zOXYtOGE1NS43OSA1NS43OSAwIDAgMS0yNCA1LjM5IDU1Ljc5IDU1Ljc5IDAgMCAxLTI0LTUuMzlaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAxNzApIj48cGF0aCBkPSJNMTA4IDE0LjdjLTE1LjUyIDMuNjgtMjcuMSAxMC44My0zMC43NyAxOS40NEE3Mi4wMiA3Mi4wMiAwIDAgMCAzMiAxMDF2OWgyMDB2LTlhNzIuMDIgNzIuMDIgMCAwIDAtNDUuMjMtNjYuODZDMTgzLjEgMjUuNTMgMTcxLjUyIDE4LjM4IDE1NiAxNC43VjMyYTI0IDI0IDAgMSAxLTQ4IDBWMTQuN1oiIGZpbGw9IiNmZjQ4OGUiLz48cGF0aCBkPSJNMTAyIDYzLjM0YTY3LjEgNjcuMSAwIDAgMS03LTIuODJWMTEwaDdWNjMuMzRaTTE2MiA2My4zNGE2Ny4wNCA2Ny4wNCAwIDAgMCA3LTIuODJWOTguNWEzLjUgMy41IDAgMSAxLTcgMFY2My4zNFoiIGZpbGw9IiNGNEY0RjQiLz48cGF0aCBkPSJNMTg3LjYyIDM0LjQ5YTcxLjc5IDcxLjc5IDAgMCAxIDEwLjgzIDUuNjNDMTk3LjExIDU1LjYyIDE2Ny44NyA2OCAxMzIgNjhjMzAuOTMgMCA1Ni0xMy40MyA1Ni0zMCAwLTEuMTktLjEzLTIuMzYtLjM4LTMuNTFaTTc2LjM4IDM0LjQ5YTE2LjQ4IDE2LjQ4IDAgMCAwLS4zOCAzLjVjMCAxNi41OCAyNS4wNyAzMCA1NiAzMC0zNS44NyAwLTY1LjEtMTIuMzgtNjYuNDUtMjcuODhhNzEuNzkgNzEuNzkgMCAwIDEgMTAuODMtNS42M1oiIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iLjE2Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDc4IDEzNCkiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMzUuMTIgMTUuMTNhMTkgMTkgMCAwIDAgMzcuNzctLjA5Yy4wOC0uNzctLjc3LTIuMDQtMS44NS0yLjA0SDM3LjFDMzYgMTMgMzUgMTQuMTggMzUuMTIgMTUuMTNaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii43Ii8+PHBhdGggZD0iTTcwIDEzSDM5YTUgNSAwIDAgMCA1IDVoMjFhNSA1IDAgMCAwIDUtNVoiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNNjYuNyAyNy4xNEExMC45NiAxMC45NiAwIDAgMCA1NCAyNS4yYTEwLjk1IDEwLjk1IDAgMCAwLTEyLjcgMS45NEExOC45MyAxOC45MyAwIDAgMCA1NCAzMmM0Ljg4IDAgOS4zMy0xLjg0IDEyLjctNC44NloiIGZpbGw9IiNGRjRGNkQiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTA0IDEyMikiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMTYgOGMwIDQuNDIgNS4zNyA4IDEyIDhzMTItMy41OCAxMi04IiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA5MCkiPjxwYXRoIGQ9Ik0zNS45NiAxMGMtMi41NSAwLTUuMDggMS45OC02LjQ2IDMuODItMS4zOS0xLjg0LTMuOS0zLjgyLTYuNDYtMy44Mi01LjQ5IDAtOS4wNCAzLjMzLTkuMDQgNy42NCAwIDUuNzMgNC40MSA5LjEzIDkuMDQgMTIuNzQgMS42NiAxLjIzIDQuNzggNC40IDUuMTcgNS4xLjM4LjY4IDIuMS43IDIuNTggMCAuNDgtLjczIDMuNTEtMy44NyA1LjE3LTUuMSA0LjYzLTMuNiA5LjA0LTcgOS4wNC0xMi43NCAwLTQuMy0zLjU1LTcuNjQtOS4wNC03LjY0Wk04OC45NiAxMGMtMi41NSAwLTUuMDggMS45OC02LjQ2IDMuODItMS4zOS0xLjg0LTMuOS0zLjgyLTYuNDYtMy44Mi01LjQ5IDAtOS4wNCAzLjMzLTkuMDQgNy42NCAwIDUuNzMgNC40MSA5LjEzIDkuMDQgMTIuNzQgMS42NSAxLjIzIDQuNzggNC40IDUuMTcgNS4xLjM4LjY4IDIuMS43IDIuNTggMCAuNDgtLjczIDMuNTEtMy44NyA1LjE3LTUuMSA0LjYzLTMuNiA5LjA0LTcgOS4wNC0xMi43NCAwLTQuMy0zLjU1LTcuNjQtOS4wNC03LjY0WiIgZmlsbD0iI0ZGNTM1MyIgZmlsbC1vcGFjaXR5PSIuOCIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA4MikiPjxwYXRoIGQ9Ik0xNS42MSAxNS4xOGM0LjI0LTUuNzYgNi44OC01LjQ4IDEzLjMxLS42MmwuNjcuNUMzNC40MSAxOC43MyAzNi43IDIwIDQwIDIwYTIgMiAwIDEgMCAwLTRjLTIuMDcgMC0zLjktMS4wMi03Ljk5LTQuMTJsLS42OC0uNTJDMjcuNTcgOC41MyAyNS4zNyA3LjMgMjIuNjMgN2MtMy42OC0uNC03LjA1IDEuNDgtMTAuMjQgNS44M2EyIDIgMCAxIDAgMy4yMiAyLjM2Wk05Ni4zOSAxNS4xOGMtNC4yNC01Ljc2LTYuODgtNS40OC0xMy4zMS0uNjJsLS42Ny41Qzc3LjU4IDE4LjczIDc1LjI5IDIwIDcyIDIwYTIgMiAwIDEgMSAwLTRjMi4wNyAwIDMuOS0xLjAyIDcuOTktNC4xMmwuNjgtLjUyYzMuNzYtMi44MyA1Ljk2LTQuMDcgOC43LTQuMzcgMy42OC0uNCA3LjA1IDEuNDggMTAuMjQgNS44M2EyIDIgMCAxIDEtMy4yMiAyLjM2WiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMSkiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNNzYgOThjLjM1IDEuNDkgMS42NyAxLjIyIDIgMC0uNDYtMS41NSAzLjMtMjguNzUgMTMtMzYgMy42Mi0yLjUyIDIzLTQuNzcgNDIuMzEtNC43NSAxOS4xIDAgMzguMTEgMi4yNiA0MS42OSA0Ljc1IDkuNyA3LjI1IDEzLjQ2IDM0LjQ1IDEzIDM2IC4zMyAxLjIyIDEuNjUgMS40OSAyIDAgLjcyLTEwLjMgMC02My43My01Ny02My01NyAuNzMtNTcuNzIgNTIuNy01NyA2M1oiIGZpbGw9IiM3MjQxMzMiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDkgNzIpIj48cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTEwMS40MyA5OC4xN2MtMi41MiAyLjMtNS4yIDMuMzItOC41OCAyLjYtLjU4LS4xMi0yLjk1LTQuNTQtOC44NS00LjU0LTUuOSAwLTguMjcgNC40Mi04Ljg1IDQuNTQtMy4zOS43Mi02LjA3LS4zLTguNTgtMi42LTQuNzItNC4zMS04LjY1LTEwLjI2LTYuMy0xNi43NSAxLjI0LTMuMzggMy4yNC03LjEgNi44OC04LjE3IDMuODktMS4xNSA5LjM1IDAgMTMuMjYtLjhBOC42IDguNiAwIDAgMCA4NCA3MWE4LjYgOC42IDAgMCAwIDMuNTggMS40NmMzLjkyLjc4IDkuMzgtLjM2IDEzLjI3Ljc5IDMuNjQgMS4wNyA1LjY0IDQuNzkgNi44NyA4LjE3IDIuMzYgNi40OS0xLjU3IDEyLjQ0LTYuMyAxNi43NVpNMTQwLjA4IDI2Yy0zLjQgOC40LTIuMSAxOC44Ni0yLjcyIDI3LjY4LS41MiA3LjE2LTIuMDIgMTcuOS04LjM5IDIyLjUzLTMuMjUgMi4zNy05LjE4IDYuMzUtMTMuNDMgNS4yNC0yLjkzLS43Ni0zLjI0LTkuMTYtNy4wOS0xMi4zYTIyLjQyIDIyLjQyIDAgMCAwLTE1LjMtNC45Yy0yLjM3LjExLTcuMTcuMDktOS4xNSAxLjkxLTEuOTgtMS44Mi02Ljc4LTEuOC05LjE1LTEuOWEyMi40MiAyMi40MiAwIDAgMC0xNS4zIDQuODljLTMuODUgMy4xNC00LjE2IDExLjU0LTcuMSAxMi4zLTQuMjQgMS4xLTEwLjE3LTIuODctMTMuNDItNS4yNC02LjM3LTQuNjItNy44Ny0xNS4zNy04LjM5LTIyLjUzLS42My04LjgyLjY5LTE5LjI4LTIuNzItMjcuNjgtMS42NiAwLS41NyAxNi4xMy0uNTcgMTYuMTN2MjAuMzZjLjA0IDE1LjI4IDkuNTkgMzguMTYgMzAuNzYgNDYuOUM2My4yOSAxMTEuNTMgNzUgMTE1IDg0IDExNWM4Ljk4LjAxIDIwLjcxLTMuMTMgMjUuOS01LjI3IDIxLjE2LTguNzMgMzAuNzEtMzEuOTUgMzAuNzUtNDcuMjNWNDIuMTNzMS4xLTE2LjEzLS41Ny0xNi4xM1oiIGZpbGw9IiNkNmIzNzAiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNjIgNDIpIj48L2c+PC9nPjwvZz48L3N2Zz4=" width="64" height="64" alt="Avatar of Elena" loading="lazy"><div><b>Elena Singh</b><span class="role">VP, Customer Experience</span></div></div>
+      <q>What a first-time reader needs is not a rule number but one line on what would stop in their own company.</q>
+      <span class="verdict">Asked for: rule numbers moved to footnotes, the “In your organization” lines</span>
+    </div>
+    <div class="voice">
+      <div class="who"><img class="face" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODAgMjgwIiBmaWxsPSJub25lIiBzaGFwZS1yZW5kZXJpbmc9ImF1dG8iIHdpZHRoPSIxNzYiIGhlaWdodD0iMTc2Ij48bWV0YWRhdGEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOmRjdGVybXM9Imh0dHA6Ly9wdXJsLm9yZy9kYy90ZXJtcy8iPjxyZGY6UkRGPjxyZGY6RGVzY3JpcHRpb24+PGRjOnRpdGxlPkF2YXRhYWFyczwvZGM6dGl0bGU+PGRjOmNyZWF0b3I+UGFibG8gU3RhbmxleTwvZGM6Y3JlYXRvcj48ZGM6c291cmNlIHhzaTp0eXBlPSJkY3Rlcm1zOlVSSSI+aHR0cHM6Ly9hdmF0YWFhcnMuY29tLzwvZGM6c291cmNlPjxkY3Rlcm1zOmxpY2Vuc2UgeHNpOnR5cGU9ImRjdGVybXM6VVJJIj5odHRwczovL2F2YXRhYWFycy5jb20vPC9kY3Rlcm1zOmxpY2Vuc2U+PGRjOnJpZ2h0cz5SZW1peCBvZiDigJ5BdmF0YWFhcnPigJ0gKGh0dHBzOi8vYXZhdGFhYXJzLmNvbS8pIGJ5IOKAnlBhYmxvIFN0YW5sZXnigJ0sIGxpY2Vuc2VkIHVuZGVyIOKAnkZyZWUgZm9yIHBlcnNvbmFsIGFuZCBjb21tZXJjaWFsIHVzZeKAnSAoaHR0cHM6Ly9hdmF0YWFhcnMuY29tLyk8L2RjOnJpZ2h0cz48L3JkZjpEZXNjcmlwdGlvbj48L3JkZjpSREY+PC9tZXRhZGF0YT48bWFzayBpZD0idmlld2JveE1hc2siPjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiByeD0iMCIgcnk9IjAiIHg9IjAiIHk9IjAiIGZpbGw9IiNmZmYiIC8+PC9tYXNrPjxnIG1hc2s9InVybCgjdmlld2JveE1hc2spIj48cmVjdCBmaWxsPSIjYzBhZWRlIiB3aWR0aD0iMjgwIiBoZWlnaHQ9IjI4MCIgeD0iMCIgeT0iMCIgLz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4KSI+PHBhdGggZD0iTTEzMiAzNmE1NiA1NiAwIDAgMC01NiA1NnY2LjE3QTEyIDEyIDAgMCAwIDY2IDExMHYxNGExMiAxMiAwIDAgMCAxMC4zIDExLjg4IDU2LjA0IDU2LjA0IDAgMCAwIDMxLjcgNDQuNzN2MTguNGgtNGE3MiA3MiAwIDAgMC03MiA3MnY5aDIwMHYtOWE3MiA3MiAwIDAgMC03Mi03MmgtNHYtMTguMzlhNTYuMDQgNTYuMDQgMCAwIDAgMzEuNy00NC43M0ExMiAxMiAwIDAgMCAxOTggMTI0di0xNGExMiAxMiAwIDAgMC0xMC0xMS44M1Y5MmE1NiA1NiAwIDAgMC01Ni01NloiIGZpbGw9IiNmZDk4NDEiLz48cGF0aCBkPSJNMTA4IDE4MC42MXY4YTU1Ljc5IDU1Ljc5IDAgMCAwIDI0IDUuMzljOC41OSAwIDE2LjczLTEuOTMgMjQtNS4zOXYtOGE1NS43OSA1NS43OSAwIDAgMS0yNCA1LjM5IDU1Ljc5IDU1Ljc5IDAgMCAxLTI0LTUuMzlaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAxNzApIj48cGF0aCBkPSJNOTIuNjggMjkuOTRBNzIuMDIgNzIuMDIgMCAwIDAgMzIgMTAxLjA1VjExMGgyMDB2LTguOTVhNzIuMDIgNzIuMDIgMCAwIDAtNjAuNjgtNzEuMTEgMjMuODcgMjMuODcgMCAwIDEtNy41NiAxMy42bC0yOS4wOCAyNi4yM2E0IDQgMCAwIDEtNS4zNiAwbC0yOS4wOC0yNi4yM2EyMy44NyAyMy44NyAwIDAgMS03LjU2LTEzLjZaIiBmaWxsPSIjNjVjOWZmIi8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDc4IDEzNCkiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMzQgMzAuNEMzNS4xNCAxOS45IDM4LjI0IDExIDU0IDExYzE1Ljc2IDAgMTguOTIgOC45NiAyMCAxOS41LjA4Ljg0LS44MyAxLjUtMS45NiAxLjUtNi42OSAwLTkuMzctMS41LTE4LjA1LTEuNS04LjcgMC0xMy4yNCAxLjUtMTcuOSAxLjUtMS4xNSAwLTIuMi0uNTUtMi4xLTEuNloiIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iLjciLz48cGF0aCBkPSJNNjcuODYgMTUuMWMtLjguNTctMS44LjktMi44Ni45SDQ0Yy0xLjMgMC0yLjQ5LS41LTMuMzgtMS4zMUM0My41NiAxMi4zOCA0Ny44IDExIDU0IDExYzYuNTQgMCAxMC45IDEuNTQgMTMuODYgNC4xWiIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik00MiAyNWE2IDYgMCAwIDAtNiA2djdhNiA2IDAgMCAwIDEyIDB2LTJoLjA4YTYgNiAwIDAgMSAxMS44NCAwSDYwYTYgNiAwIDAgMCAxMiAwdi01YTYgNiAwIDAgMC02LTZINDJaIiBmaWxsPSIjN0JCMjRCIi8+PHBhdGggZD0iTTcyIDMxYTYgNiAwIDAgMC02LTZINDJhNiA2IDAgMCAwLTYgNnY2YTYgNiAwIDAgMCAxMiAwdi0yaC4wOGE2IDYgMCAwIDEgMTEuODQgMEg2MGE2IDYgMCAwIDAgMTIgMHYtNFoiIGZpbGw9IiM4OEM1NTMiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTA0IDEyMikiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMTYgOGMwIDQuNDIgNS4zNyA4IDEyIDhzMTItMy41OCAxMi04IiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA5MCkiPjxwYXRoIGQ9Ik0zNiAyMmE2IDYgMCAxIDEtMTIgMCA2IDYgMCAwIDEgMTIgMFpNODggMjJhNiA2IDAgMSAxLTEyIDAgNiA2IDAgMCAxIDEyIDBaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii42Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDc2IDgyKSI+PHBhdGggZD0iTTI2LjU1IDYuMTVjLTUuOC4yNy0xNS4yIDQuNDktMTQuOTYgMTAuMzQuMDEuMTguMy4yNy40My4xMiAyLjc2LTIuOTYgMjIuMzItNS45NSAyOS4yLTQuMzYuNjQuMTQgMS4xMi0uNDguNzItLjkzLTMuNDMtMy44NS0xMC4yLTUuNDMtMTUuNC01LjE4Wk04Ni40NSA2LjE1YzUuOC4yNyAxNS4yIDQuNDkgMTQuOTYgMTAuMzQtLjAxLjE4LS4zLjI3LS40My4xMi0yLjc2LTIuOTYtMjIuMzItNS45NS0yOS4yLTQuMzYtLjY0LjE0LTEuMTItLjQ4LS43Mi0uOTMgMy40My0zLjg1IDEwLjItNS40MyAxNS40LTUuMThaIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMSkiPjxwYXRoIGQ9Ik0xOTcgMTY4aC0ydjU2LjA2YTkgOSAwIDEgMCAyIDBWMTY4Wk03MSAxNzZoLTJ2NTYuMDZhOSA5IDAgMSAwIDIgMFYxNzZaIiBmaWxsPSIjRjRGNEY0Ii8+PGNpcmNsZSBjeD0iMTMzIiBjeT0iMjAiIHI9IjIwIiBmaWxsPSIjRjRGNEY0Ii8+PHBhdGggZD0iTTkzLjQ1IDc3LjUzaDc5LjFjNi4wOCAwIDkuODIgMi45MyA5LjgyIDlWMTY2YzAgMzAuNDYgMjIuNjMgMzAuNDEgMjIuNjMgMTAuOTJ2LTczLjg2QzIwNSA2OC44IDE4Ny43NyAyMSAxMzMgMjFjLTU0Ljc3IDAtNzIgNDcuOC03MiA4Mi4wNXY3My44NmMwIDE5LjUgMjIuNjMgMTkuNTQgMjIuNjMtMTAuOTJWODYuNTNjMC02LjA3IDMuNzMtOSA5LjgyLTlaIiBmaWxsPSIjMjYyZTMzIi8+PHBhdGggZD0iTTE5OC42NyA2N0g2Ny4zM0M3Ni40MiA0Mi41IDk2LjI2IDIxIDEzMyAyMXM1Ni41OCAyMS41IDY1LjY3IDQ2WiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuMiIvPjxwYXRoIGQ9Ik05MS4yIDMzLjczIDEwMi41IDUwIDExNSAzMkg5My42NmMtLjgzLjU2LTEuNjUgMS4xNC0yLjQ2IDEuNzNaTTE3Mi4zNCAzMkgxNTJsMTIuNSAxOCAxMC45NS0xNS43N2MtMS0uNzctMi4wNC0xLjUxLTMuMTEtMi4yM1pNMTMzLjUgNTAgMTIxIDMyaDI1bC0xMi41IDE4WiIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjxwYXRoIGQ9Ik05OSA1OSA4Ni41IDQxIDc0IDU5aDI1Wk0xMzAgNTlsLTEyLjUtMThMMTA1IDU5aDI1Wk0xNDguNSA0MSAxNjEgNTloLTI1bDEyLjUtMThaTTE5MiA1OWwtMTIuNS0xOEwxNjcgNTloMjVaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQ5IDcyKSI+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDYyIDQyKSI+PC9nPjwvZz48L2c+PC9zdmc+" width="64" height="64" alt="Avatar of Celeste" loading="lazy"><div><b>Celeste Marchetti</b><span class="role">VP, Marketing &amp; External Communications</span></div></div>
+      <q>This company's credibility is made not of success stories but of the monthly reports of failure it wrote itself.</q>
+      <span class="verdict">Asked for: open with numbers and surprises, résumé last</span>
+    </div>
+    <div class="voice">
+      <div class="who"><img class="face" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODAgMjgwIiBmaWxsPSJub25lIiBzaGFwZS1yZW5kZXJpbmc9ImF1dG8iIHdpZHRoPSIxNzYiIGhlaWdodD0iMTc2Ij48bWV0YWRhdGEgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOmRjdGVybXM9Imh0dHA6Ly9wdXJsLm9yZy9kYy90ZXJtcy8iPjxyZGY6UkRGPjxyZGY6RGVzY3JpcHRpb24+PGRjOnRpdGxlPkF2YXRhYWFyczwvZGM6dGl0bGU+PGRjOmNyZWF0b3I+UGFibG8gU3RhbmxleTwvZGM6Y3JlYXRvcj48ZGM6c291cmNlIHhzaTp0eXBlPSJkY3Rlcm1zOlVSSSI+aHR0cHM6Ly9hdmF0YWFhcnMuY29tLzwvZGM6c291cmNlPjxkY3Rlcm1zOmxpY2Vuc2UgeHNpOnR5cGU9ImRjdGVybXM6VVJJIj5odHRwczovL2F2YXRhYWFycy5jb20vPC9kY3Rlcm1zOmxpY2Vuc2U+PGRjOnJpZ2h0cz5SZW1peCBvZiDigJ5BdmF0YWFhcnPigJ0gKGh0dHBzOi8vYXZhdGFhYXJzLmNvbS8pIGJ5IOKAnlBhYmxvIFN0YW5sZXnigJ0sIGxpY2Vuc2VkIHVuZGVyIOKAnkZyZWUgZm9yIHBlcnNvbmFsIGFuZCBjb21tZXJjaWFsIHVzZeKAnSAoaHR0cHM6Ly9hdmF0YWFhcnMuY29tLyk8L2RjOnJpZ2h0cz48L3JkZjpEZXNjcmlwdGlvbj48L3JkZjpSREY+PC9tZXRhZGF0YT48bWFzayBpZD0idmlld2JveE1hc2siPjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiByeD0iMCIgcnk9IjAiIHg9IjAiIHk9IjAiIGZpbGw9IiNmZmYiIC8+PC9tYXNrPjxnIG1hc2s9InVybCgjdmlld2JveE1hc2spIj48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4KSI+PHBhdGggZD0iTTEzMiAzNmE1NiA1NiAwIDAgMC01NiA1NnY2LjE3QTEyIDEyIDAgMCAwIDY2IDExMHYxNGExMiAxMiAwIDAgMCAxMC4zIDExLjg4IDU2LjA0IDU2LjA0IDAgMCAwIDMxLjcgNDQuNzN2MTguNGgtNGE3MiA3MiAwIDAgMC03MiA3MnY5aDIwMHYtOWE3MiA3MiAwIDAgMC03Mi03MmgtNHYtMTguMzlhNTYuMDQgNTYuMDQgMCAwIDAgMzEuNy00NC43M0ExMiAxMiAwIDAgMCAxOTggMTI0di0xNGExMiAxMiAwIDAgMC0xMC0xMS44M1Y5MmE1NiA1NiAwIDAgMC01Ni01NloiIGZpbGw9IiNmOGQyNWMiLz48cGF0aCBkPSJNMTA4IDE4MC42MXY4YTU1Ljc5IDU1Ljc5IDAgMCAwIDI0IDUuMzljOC41OSAwIDE2LjczLTEuOTMgMjQtNS4zOXYtOGE1NS43OSA1NS43OSAwIDAgMS0yNCA1LjM5IDU1Ljc5IDU1Ljc5IDAgMCAxLTI0LTUuMzlaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAxNzApIj48cGF0aCBkPSJNMTMyLjUgNTEuODNjMTguNSAwIDMzLjUtOS42MiAzMy41LTIxLjQ4IDAtLjM2LS4wMS0uNy0uMDQtMS4wNkE3MiA3MiAwIDAgMSAyMzIgMTAxLjA0VjExMEgzMnYtOC45NWE3MiA3MiAwIDAgMSA2Ny4wNS03MS44M2MtLjAzLjM3LS4wNS43NS0uMDUgMS4xMyAwIDExLjg2IDE1IDIxLjQ4IDMzLjUgMjEuNDhaIiBmaWxsPSIjRTZFNkU2Ii8+PHBhdGggZD0iTTEzMi41IDU4Ljc2YzIxLjg5IDAgMzkuNjMtMTIuMDUgMzkuNjMtMjYuOTEgMC0uNi0uMDItMS4yLS4wOC0xLjgtMi0uMzMtNC4wMy0uNTktNi4xLS43Ni4wNC4zNS4wNS43LjA1IDEuMDYgMCAxMS44Ni0xNSAyMS40OC0zMy41IDIxLjQ4Uzk5IDQyLjIgOTkgMzAuMzVjMC0uMzguMDItLjc2LjA1LTEuMTMtMi4wNi4xNC00LjA4LjM2LTYuMDguNjctLjA3LjY1LS4xIDEuMy0uMSAxLjk2IDAgMTQuODYgMTcuNzQgMjYuOTEgMzkuNjMgMjYuOTFaIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xNiIvPjxwYXRoIGQ9Ik0xMDAuNzggMjkuMTIgMTAxIDI4Yy0yLjk2LjA1LTYgMS02IDFsLS40Mi42NkE3Mi4wMSA3Mi4wMSAwIDAgMCAzMiAxMDEuMDZWMTEwaDc0cy0xMC43LTUxLjU2LTUuMjQtODAuOGwuMDItLjA4Wk0xNTggMTEwczExLTUzIDUtODJjMi45Ni4wNSA2IDEgNiAxbC40Mi42NmE3Mi4wMSA3Mi4wMSAwIDAgMSA2Mi41OCA3MS40VjExMGgtNzRaIiBmaWxsPSIjNTE5OWU0Ii8+PHBhdGggZD0iTTEwMSAyOGMtNiAyOSA1IDgyIDUgODJIOTBMNzYgNzRsNi05LTYtNiAxOS0zMHMzLjA0LS45NSA2LTFaTTE2MyAyOGM2IDI5LTUgODItNSA4MmgxNmwxNC0zNi02LTkgNi02LTE5LTMwcy0zLjA0LS45NS02LTFaIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuMTUiLz48cGF0aCBkPSJtMTgzLjQyIDg1Ljc3Ljg3LTIuMjQgNi4yNy00LjdhNCA0IDAgMCAxIDQuODUuMDVsNi42IDUuMTItMTguNTkgMS43N1oiIGZpbGw9IiNFNkU2RTYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzggMTM0KSI+PHJlY3QgeD0iMjIiIHk9IjciIHdpZHRoPSI2NCIgaGVpZ2h0PSIyNiIgcng9IjEzIiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii42Ii8+PHJlY3QgeD0iMjQiIHk9IjkiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMiIgcng9IjExIiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTI0LjE4IDE4SDMyVjkuNDFBMTEgMTEgMCAwIDEgMzUgOWgxdjloOVY5aDR2OWg5VjloNHY5aDlWOWgyYy42OCAwIDEuMzUuMDYgMiAuMThWMThoOC44MmwuMDUuMjh2My40NGwtLjA1LjI4SDc1djguODJjLS42NS4xMi0xLjMyLjE4LTIgLjE4aC0ydi05aC05djloLTR2LTloLTl2OWgtNHYtOWgtOXY5aC0xYTExIDExIDAgMCAxLTMtLjQxVjIyaC03LjgyYTExLjA2IDExLjA2IDAgMCAxIDAtNFoiIGZpbGw9IiNFNkU2RTYiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTA0IDEyMikiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMTYgOGMwIDQuNDIgNS4zNyA4IDEyIDhzMTItMy41OCAxMi04IiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4xNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA5MCkiPjxwYXRoIGQ9Ik00NCAyMmExNCAxNCAwIDEgMS0yOCAwIDE0IDE0IDAgMCAxIDI4IDBaTTk2IDIyYTE0IDE0IDAgMSAxLTI4IDAgMTQgMTQgMCAwIDEgMjggMFoiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNMzYgMTRhNiA2IDAgMSAxLTEyIDAgNiA2IDAgMCAxIDEyIDBaTTg4IDE0YTYgNiAwIDEgMS0xMiAwIDYgNiAwIDAgMSAxMiAwWiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNyIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA4MikiPjxwYXRoIGQ9Ik0xNS42MSAxNS4xOGM0LjI0LTUuNzYgNi44OC01LjQ4IDEzLjMxLS42MmwuNjcuNUMzNC40MSAxOC43MyAzNi43IDIwIDQwIDIwYTIgMiAwIDEgMCAwLTRjLTIuMDcgMC0zLjktMS4wMi03Ljk5LTQuMTJsLS42OC0uNTJDMjcuNTcgOC41MyAyNS4zNyA3LjMgMjIuNjMgN2MtMy42OC0uNC03LjA1IDEuNDgtMTAuMjQgNS44M2EyIDIgMCAxIDAgMy4yMiAyLjM2Wk05Ni4zOSAxNS4xOGMtNC4yNC01Ljc2LTYuODgtNS40OC0xMy4zMS0uNjJsLS42Ny41Qzc3LjU4IDE4LjczIDc1LjI5IDIwIDcyIDIwYTIgMiAwIDEgMSAwLTRjMi4wNyAwIDMuOS0xLjAyIDcuOTktNC4xMmwuNjgtLjUyYzMuNzYtMi44MyA1Ljk2LTQuMDcgOC43LTQuMzcgMy42OC0uNCA3LjA1IDEuNDggMTAuMjQgNS44M2EyIDIgMCAxIDEtMy4yMiAyLjM2WiIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIuNiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMSkiPjxwYXRoIGQ9Ik0xNTEuMTIgMjguMjhjMy4wNi0yLjk3IDQuODgtNi43MSA0Ljg4LTEwLjc4QzE1NiA3Ljg0IDE0NS43IDAgMTMzIDBzLTIzIDcuODQtMjMgMTcuNWMwIDQuMSAxLjg1IDcuODYgNC45NCAxMC44NC0uOTkuMjItMS45NS40NS0yLjkuNjktMTUuMSAzLjgtMjQuMDIgMTQuNjItMzEuNjggMzAuNjJhNjcuNjggNjcuNjggMCAwIDAtNi4zNCAyNS44M2MtLjEzIDMuNDEuMzMgNi45NCAxLjI1IDEwLjIyLjMzIDEuMiAyLjE1IDUuMzkgMi42NSAyIC4xLS42Ni0uMDctMS40Ny0uMjQtMi4yNy0uMTItLjU1LS4yMy0xLjEtLjI2LTEuNi0uMDgtMS41NiAwLTMuMTUuMTEtNC43Mi4yLTIuOTIuNzMtNS44IDEuNjUtOC41OSAxLjMzLTMuOTggMy4wMi04LjMgNS42LTExLjY3Ljk3LTEuMjUgMS44OC0yLjcgMi44OC00LjI3IDUuNjMtOC45IDEzLjY4LTIxLjYgNDUuMzQtMjIuOSAzNC4zLTEuNDIgNDYuNzggMjEuNjYgNTEuMjEgMjkuODcuMzguNy43IDEuMy45NyAxLjc1IDIuNjcgNC41MyAyLjc4IDkuNzUgMi45IDE0LjkxLjA1IDIuNzEuMTEgNS40MS41NCA4IC40NyAyLjg0IDEuNTQgMi43OCAyLjEzLjIzIDEtNC4zMyAxLjQ3LTguODMgMS4xNS0xMy4yOC0uNzItMTAuMDUtNC40LTM2LjQ1LTI0LjYtNDguMTVhNjUuNTIgNjUuNTIgMCAwIDAtMTYuMTgtNi43M1oiIGZpbGw9IiNjOTMzMDUiLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDkgNzIpIj48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNjIgNDIpIj48L2c+PC9nPjwvZz48L3N2Zz4=" width="64" height="64" alt="Avatar of Rafael" loading="lazy"><div><b>Rafael</b><span class="role">Red Team &amp; Adversarial Reviewer</span></div></div>
+      <q>What held up was the operating structure; what did not was the self-reported “pass”.</q>
+      <span class="verdict">Verdict: of 4 claims, 2 refuted and 2 weakened. After 5 fixes, all survive</span>
+    </div>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="eyebrow"><span class="num">09</span><span class="kicker">One screen</span></div>
+  <h2>One-screen summary</h2>
+  <p class="lede">For you to take away, here it is on one page.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Your question</th><th>The founder's answer</th><th>Grounding</th><th>The shape it takes here</th></tr></thead>
+    <tbody>
+      <tr><td>Can quality be maintained?</td><td>A machine stops it before it goes out. Failures are turned into rules</td><td>Mass production of consumer electronics. Once it ships, it cannot be recalled</td><td>Pre-ship gates, 34 failures in the ledger, a rule on the second occurrence</td></tr>
+      <tr><td>How do you lead them?</td><td>Port the governance mechanisms that worked in human organizations</td><td>SaaS organization design. Hiring and leaving, Scrum, authority</td><td>Four layers of governance, the human holds only the right to amend the boundary, 9 hiring rounds</td></tr>
+      <tr><td>What stays behind?</td><td>Keep the evaluation system, workflows and experience in the organization</td><td>The finance view seen in selling a business</td><td>Experience, evaluation system, workflows. Whether it compounds is unmeasured</td></tr>
+      <tr><td>Why not outsource?</td><td>Make it an organization that leaves the knowledge behind</td><td>Outsourcing leaves the deliverable and takes the knowledge home (sketch one)</td><td>A cross-functional central pool. Runs remain as records</td></tr>
+      <tr><td>Why neither Agile nor Waterfall?</td><td>If realignment cost is minimal, both can coexist</td><td>The cost of changeover decides the lot size (sketch two)</td><td>The whole is realigned through decision records, procedure versions and CI. Time taken is unmeasured</td></tr>
+      <tr><td>What is it aiming at?</td><td>The upside. Making possible what was impossible</td><td>A conversation with a similar organization. Efficiency (the downside) is left to their depth</td><td>Mostly boundary-crossing, a little collective knowledge. The direction is collective knowledge. What we do not do is written into the north star</td></tr>
+      <tr><td>Why AI before adding people?</td><td>Free labor from fixed cost</td><td>Marginal cost of employment: JPY 5 million vs. JPY 0 (sketch three)</td><td>Staged investment over 9 hiring rounds, dormancy, 42 procedures replicated</td></tr>
+    </tbody>
+  </table></div>
+  <h3 class="sub">What we would ask you to check, by role</h3>
+  <ul>
+    <li><b>For executives.</b> Which are you giving up, control or flexibility? Is the reason the cost of realignment?</li>
+    <li><b>For engineers.</b> How many paths are there by which things break while the checks stay green?</li>
+    <li><b>For sales.</b> After adoption, what remains even when people leave?</li>
+    <li><b>For HR.</b> Could your procedures for hiring, onboarding and leaving be read by an AI?</li>
+    <li><b>For legal.</b> Who holds the right to amend the boundary, and who approves what happens inside it?</li>
+  </ul>
+  <p class="pull">Your organization already has governance mechanisms built for humans. The founder's proposal is to reread them for AI.</p>
+  <h3 class="sub">Notes</h3>
+  <ol class="notes">
+    <li>At the end of July 2026, article generation stopped for 7 days while all 28 runs were recorded as “completed normally” (failure ledger ML-019). The degradation of skipping everything while continuing to report “success” is ML-013.</li>
+    <li>From the serving-path change on 2026-08-17 (PR #606) to the recovery on 08-24 (PR #619). Ledger entries ML-031 / ML-032; rules R-16 / R-17.</li>
+    <li>Constitution C-1 / W-1 (editorial integrity) and the pre-ship gate R-10. Stopping loudly when something breaks is C-4 / W-4.</li>
+    <li>The memory-lint ledger (<span class="kw">memory-lint backlog</span>). A recurrence within 90 days promotes it to an L2 rule.</li>
+    <li>From the title of finance lead Silas's monthly report for August 2026.</li>
+    <li>A PR that touches L0 / L1 always goes to the human with the <span class="kw">autopilot:needs-human</span> label. Inside the boundary, pr-autopilot merges autonomously on the unanimous agreement of three or more reviewers (ADR-0010 / 0011).</li>
+    <li>The monthly reports are published in Japanese and English under <a href="https://kohuehara.xyz/ai-native-article/?category=Monthly+Report">Monthly Report on the article site</a>. An overview by the CEO persona Maya, and seven chapters: finance, CX, policy, HR and legal, external communications, infrastructure and quality.</li>
+    <li>The <span class="kw">systemPromptVersion</span> and review scores in the article front matter, aggregated by version in GA4. Long-term memory is ADR-0019; weekly curation since 2026-07-20.</li>
+    <li>The north-star document <span class="kw">workforce/docs/north-star/upside-not-downside.md</span> (ADR-0039). Together with mvv.md, it is injected into every start-up of every persona.</li>
+  </ol>
+</section>

@@ -2,7 +2,7 @@
 
 > **Status (2026-05-27)**: the **label-driven state machine** described below was retired by the simplified dev process in [dev-process.md](dev-process.md). The repo now has **0 labels** — the agent holding `pr-autopilot` routes via PR comments per [pr-autopilot SKILL.md](../../skills/pr-autopilot/SKILL.md), which now also owns the reviewer-lens contract (the separate `pr-review` skill was retired), applied per nominated persona under their binding `config`, not by labels.
 >
-> The **CCR routine creation steps** below (how to paste a prompt into claude.ai/code/routines, where to store API tokens, etc.) are still accurate as a reference for ANY CCR routine you instantiate. Ignore the "labels — one-time setup" section and the label-triggered routine configs; use the per-routine specs at [routines/](../routines/) as the canonical prompts.
+> The **CCR routine creation steps** below (how to paste a prompt into claude.ai/code/routines, where to store API tokens, etc.) are still accurate as a reference for ANY CCR routine you instantiate. The label-driven setup section was removed (FU-014, PR #859); ignore the label-triggered routine configs (Routines 2/3 triggers and the composition diagram) still below; use the per-routine specs at [routines/](../routines/) as the canonical prompts.
 
 How the operator instantiates the three Claude Code Routines (CCR) that
 back the engineering + review chain introduced in PR C of the Phase 5
@@ -18,26 +18,7 @@ markdown); this runbook walks the operator from spec → live routine.
 2. **Claude GitHub App** installed on `refluster/ai-native-article`. Required for GitHub-event-triggered routines (dario-review, aoi-review). The trigger setup will prompt you to install if missing.
 3. **GitHub access** for cloning the repo from CCR. `web-setup` in the CLI (or the equivalent prompt in the web UI) grants repo cloning access. *Note*: `web-setup` does NOT install the GitHub App — that's a separate step prompted by the GitHub-event trigger setup.
 4. **PR A merged** ([#100](https://github.com/refluster/ai-native-article/pull/100)) — the unified binding shape that these routines reference.
-5. **PR B merged** ([#101](https://github.com/refluster/ai-native-article/pull/101)) — Maya's `pdm-decompose` skill that produces the `wf:ready` issues these routines consume.
-
-## Labels — one-time setup on the GH repo
-
-Create these labels in the repo settings (Issues → Labels) if they don't exist yet. They drive the state machine:
-
-| Label | Color | Description |
-|---|---|---|
-| `wf:ready` | green | `pdm-decompose` adds this to child issues; `dario-implement` picks them up |
-| `wf:in-flight` | blue | `dario-implement` replaces `wf:ready` with this when it opens a PR |
-| `wf:needs-review-dario` | orange | `dario-implement` applies this on the PR; `dario-review` reacts and removes when done |
-| `wf:needs-review-aoi` | purple | Same pattern, design lens |
-| `role:engineering` | grey | `pdm-decompose` adds this for engineering-flavoured children |
-| `role:architecture` | grey | Architecture-flavoured children |
-| `role:design` | grey | Design-flavoured children |
-| `role:qa` | grey | QA-flavoured children |
-| `coordination_required:dario` | red | Surfaces architecture decisions that need human go/no-go before merge |
-| `epic:N-M` | grey | One per (Epic, Story) pair, e.g. `epic:10-1` for Epic-010 Story 1 |
-
-These labels are referenced by all three routine prompts. Without them, the routines will fail when trying to apply / remove labels.
+5. **PR B merged** ([#101](https://github.com/refluster/ai-native-article/pull/101)) — Maya's `pdm-decompose` skill that produces the issues these routines consume (the `wf:ready` label itself is retired).
 
 ## Routine 1 — `wf-dario-implement`
 
@@ -73,11 +54,11 @@ The future revision of `pdm-decompose` that fires this endpoint will read from t
 ### Verify
 
 Click **Run now** on the routine's detail page. Confirm the session:
-- Lists open `wf:ready` issues
+- Lists open issues (the retired `wf:ready` label no longer gates this)
 - Either picks one and starts implementing, or exits with "no work this run"
 - Does not crash
 
-If a session crashes, read the transcript — most failures are missing labels or missing connector permissions (re-check the GitHub MCP setup).
+If a session crashes, read the transcript — most failures are missing connector permissions (re-check the GitHub MCP setup).
 
 ## Routine 2 — `wf-dario-review`
 

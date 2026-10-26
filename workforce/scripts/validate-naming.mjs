@@ -122,6 +122,26 @@ for (const e of listDir(join(WORKFORCE_ROOT, "agents"))) {
   }
 }
 
+// Rule 7: test files must use *-tests.ts, not *.test.ts or *.spec.ts (FU-012).
+// Rule 3 already rejects these on the kebab-case shape, but this rule gives
+// the clearer, actionable error: "use -tests.ts, not .test.ts".
+const walkTestTs = (dir) => {
+  for (const e of listDir(dir)) {
+    if (e.stat.isDirectory()) {
+      if (e.name === "node_modules" || e.name === ".aws-sam") continue;
+      walkTestTs(e.full);
+    } else if (e.name.endsWith(".test.ts") || e.name.endsWith(".spec.ts")) {
+      report(
+        "R7-tests-suffix",
+        e.full,
+        `test file "${e.name}" must use the *-tests.ts suffix, not *.test.ts or *.spec.ts`,
+      );
+    }
+  }
+};
+walkTestTs(join(WORKFORCE_ROOT, "lambdas"));
+walkTestTs(join(WORKFORCE_ROOT, "skills"));
+
 if (violations.length === 0) {
   console.log("workforce/scripts/validate-naming.mjs: OK (0 violations)");
   process.exit(0);

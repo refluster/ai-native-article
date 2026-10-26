@@ -356,3 +356,38 @@ export function isAwaitingReply(
   const last = conv.messages[conv.messages.length - 1];
   return !!last && last.from === OPERATOR_ID;
 }
+
+/** Whether every member of a group thread has spoken since the operator's
+ *  last message — the end of a reply round (workforce/adr-0047: one operator
+ *  message → each member replies once, in turn). The page keeps polling until
+ *  this holds (or the awaiting window lapses), so the round's later replies
+ *  land without a refresh. A round narrowed by @-addresses never completes
+ *  here; it simply ends with the window. */
+export function isGroupRoundComplete(conv: Conversation): boolean {
+  const msgs = conv.messages;
+  let i = msgs.length - 1;
+  while (i >= 0 && msgs[i]!.from !== OPERATOR_ID) i--;
+  const spoken = new Set(msgs.slice(i + 1).map((m) => m.from));
+  return conv.participants.every((p) => spoken.has(p));
+}
+
+/** What `/messaging?to=<slug>` (the profile's one-tap Message button) should
+ *  open: the existing 1:1 thread with that talent if there is one, otherwise
+ *  the composer with the talent pre-picked — or nothing when the slug isn't on
+ *  the roster, or there's no thread and composing is disabled (mock origin). */
+export type DirectMessageTarget =
+  | { kind: 'thread'; id: string }
+  | { kind: 'compose'; recipients: string[] }
+  | null;
+
+export function resolveDirectMessage(
+  slug: string,
+  threads: Conversation[],
+  rosterSlugs: ReadonlySet<string>,
+  canWrite: boolean,
+): DirectMessageTarget {
+  if (!rosterSlugs.has(slug)) return null;
+  const existing = threads.find((c) => !c.group && c.participants.length === 1 && c.participants[0] === slug);
+  if (existing) return { kind: 'thread', id: existing.id };
+  return canWrite ? { kind: 'compose', recipients: [slug] } : null;
+}

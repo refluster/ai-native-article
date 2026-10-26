@@ -80,6 +80,12 @@ The scan lists every open PR updated within the window, caps at `--max`, and
 writes each candidate (title, body, diff, comments, `draft`/`is_bot` flags) to
 `--out`. **0 candidates → skip Steps 2–5, but still run the Step 6 sweep.**
 
+The candidate's `diff` is an excerpt sized for *your* context (~48K chars):
+when `diff_truncated` is true, every file still appears (its header plus a
+fair share of its hunks) and `diff_files` lists each file with its size. The
+**full** diff is always on disk at `diff_path` — that file, not the excerpt, is
+what each lens reviews (Step 4).
+
 A PR you already routed comes back **only when its head commit is newer than
 your last routing comment** — i.e. the author pushed the revision a 🟡 verdict
 asked for (Step 5). Each candidate carries the `cycle` to route it at: `1` for
@@ -198,7 +204,12 @@ implementation defects and suppresses premise questions.
 
 **Context isolation is the whole point — give each subagent exactly:**
 
-- the **unified diff** and the PR title/body;
+- the **full unified diff** — the candidate's `diff_path`, which the subagent
+  reads itself in its own context — and the PR title/body. Never hand a lens
+  only the scan's `diff` excerpt: a lens that reviewed part of a diff cannot
+  go green on it (asp-cloud #1027: 3 of 7 files unseen, so the panel could
+  only escalate). A lens names every file in `diff_files` it did not read; any
+  such file makes its review non-green;
 - that persona's **lens config** (fetched fresh from `GET /agents/{slug}`);
 - the **cycle number**, and on a re-route, that persona's *own* prior findings
   (so `[NEW]` vs "cites the cycle-1 finding-ID" still works).

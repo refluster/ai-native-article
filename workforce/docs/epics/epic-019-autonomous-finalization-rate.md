@@ -55,6 +55,56 @@ Three stories, strictly ordered: **measure → wire → judge**. This Epic **nev
 - ~~Q2 (flaky rerun vs C-4)~~ → **Resolved**: Farah's discipline adopted in Story 2(c) — evidenced+expiring allowlist, max 1, audited, auto-evict racy checks, editorial gates ineligible.
 - ~~Q3 (double-fire)~~ → **Dissolved**: the cron scan is idempotent; ADR-0013 already pins event = latency floor, cron = backstop. No ownership change needed.
 
+## Verdict on 仮説一 (Story 3, #451) — written 2026-10-07, proposed by `dario`, for the operator to accept
+
+**Verdict, in one line: not falsified, and the ≥20% eligible-share gate is passed on the pooled 2026-07-09 → 10-06 data (≈41–49%, pooled, with a declining trend: 56.0% → 38.6% → 32.5% across the last three windows, so the latest window is below the pooled figure); the count line is missed, not met.** The mixed result is the finding: the share rose after the wiring landed, and the data cannot apportion that rise between the wiring and anything else that changed in the same period; PR volume, not the predicate, caps the *count*. This is a proposed reading for the operator; nothing below changes the R-N10 predicate, a roster, or the Epic's status.
+
+**Two windows were missed and are named, not skipped.** The mandated 14-day interim funnel was due in the 2026-08 report and the 28-day verdict in the 2026-09 report (dated 2026-09-02); neither carried one ([#576](https://github.com/refluster/ai-native-article/issues/576), consolidated into #451). What follows is a **retroactive reconstruction from the live roll-up**, not the contemporaneous snapshot, and is labelled as such.
+
+**Source and its limits.** `GET /projects/agent-workforce/performance` (`PERF#agent-workforce/PR`, `pr_updated_at 2026-10-06T12:18Z`; `build-pr-metrics-github.mjs`). `pr_daily` gives merged PRs and autopilot-merged PRs per day, so per-window counts are exact for the roll-up's own definition. `escalation_reasons` is **one 180-day bucket, not per window**, so reasons cannot be split by window. The block carries `degraded_signals: ["pr_detail"]` (1 PR skipped; it is missing from the totals). Reason labels exist only from #465 (2026-07-08), so every reason count below is post-wiring by construction.
+
+### Funnel, rolling 28-day windows (merged PRs; autopilot = green consensus marker, no `autopilot:needs-human`)
+
+| Window | Merged PRs | Autopilot-merged | Overall share | Count vs baseline 6 |
+|---|---|---|---|---|
+| 2026-06-10 → 07-07 (pre-wiring, this builder's definition) | 148 | 14 | 9.5% | 2.3× |
+| 2026-07-09 → 08-05 (first full post-wiring window) | 65 | 21 | 32.3% | 3.5× |
+| 2026-08-06 → 09-02 | 75 | 42 | 56.0% | 7× |
+| 2026-09-03 → 09-30 | 83 | 32 | 38.6% | 5.3× |
+| 2026-09-09 → 10-06 (latest) | 80 | 26 | 32.5% | 4.3× |
+
+**Denominators and overlap.** Every share above is a census of merged PRs in its window, not a sample, so no confidence interval is attached; the denominators are the "Merged PRs" column (n = 148, 65, 75, 83, 80). The last two windows overlap (09-09 → 09-30, 22 of 28 days), so they are not independent readings. **L0/L1-adjusted latest window:** the 43 `l0l1-path` escalations are a 180-day bucket and cannot be split by window, so no per-window adjusted bound is computed here; the latest window's raw 32.5% is the only per-window figure and sits above the 20% gate only on the unadjusted denominator's own terms (a per-window label re-read would settle the adjusted bound).
+
+Reconstructed 14-day interim (the missing 2026-08 snapshot), 2026-07-09 → 07-22: **7 of 19 (36.8%)**. All of 2026-07-09 → 10-06: **100 of 246 (40.7%)**.
+
+**Baseline discrepancy, flagged rather than reconciled.** The Problem section's baseline is 6 of 218 (2.8%); this builder, for the pre-wiring window 06-10 → 07-07, gives 14 of 148 (9.5%). The two count PRs differently (the report's 218 is not the merged-PR denominator used here). The post-wiring windows are all measured with the same builder, so they compare with each other; the *multiple over baseline* is only as good as whichever baseline the operator takes as canonical. Against the report's 6, the best window is 7× and the weakest 3.5×; against 14, 3× and 1.5×.
+
+### Eligible share — the gate
+
+Escalations carrying `l0l1-path` over the roll-up: **43**. L0/L1-touching PRs cannot autopilot-merge, so the eligible (non-L0/L1) denominator over 2026-07-09 → 10-06 is at most 246 and at least 246 − 43 = 203 (the 43 includes some closed-unmerged PRs, so the true L0/L1 share of *merged* PRs is lower). Eligible share is therefore between **100/246 = 40.7% and 100/203 = 49.3%**, against the pre-committed gate of ≥20%. The gate passes on either bound; the uncertainty does not reach the threshold.
+
+### Count line — pre-committed regardless
+
+≥60 autopilot merges per 28 days (the honest 桁) was **not reached in any window** (peak 42, 2026-08-06 → 09-02). ≥30 autopilot merges (5× the report baseline of 6) was reached in two of the four post-wiring windows (42 and 32) and missed in the first and latest (21 and 26). **Low-PR-month caveat applies**: merged PRs per 28 days were 65–83, so ≥60 autopilot merges would have needed 72–92% share, above anything observed. Count alone fails because volume was low, not because the share did.
+
+### Falsification branch
+
+Falsified required eligible share in single digits **and** reasons concentrated in `no-reviewer-consensus` / `cannot-seat-panel`. Neither holds: eligible share is ≈41–49%, and those two codes are **6 of 124** escalated PRs (5 and 1). The 124 is the count of *labelled* escalations (merged and unmerged); it is not reconciled with the 146 non-autopilot merges (246 − 100) — the two overlap but differ, so 6/124 is a share of labelled escalations only, not of all non-autopilot PRs. Largest buckets over the roll-up: `l0l1-path` 43 (structural, the system working), `unspecified` 33, `other` 13, `author-stale` 8, `merge-engine-refusal` 7. Review-organisation design is **not** the bottleneck on this evidence; **no successor Epic is proposed.**
+
+### What this verdict does not establish
+
+- **ADR-0024 (2026-08-03) changes behaviour mid-measurement**, as the 2026-08-04 note above warned. Share before it (07-09 → 08-02) was 18 of 53 (34.0%); after it (08-03 → 10-06) 82 of 193 (42.5%). The step is in the direction ADR-0024 predicted but the windows are not comparable, this is a before/after comparison across a changed definition with no concurrent-change control, and one step is not a causal estimate.
+- **Reason coverage is not 100%.** `unspecified` is 33 of 124 escalations (27%), so Story 1's acceptance criterion (100% coverage in a sample week) is not demonstrated in aggregate. It may be pre-label history or a live gap; the roll-up cannot say which. A per-window re-read of PR labels would settle it.
+- **The `pr_detail` degraded signal** (1 PR dropped) puts the totals, and so every share above, in slight doubt.
+- **`flaky_reruns` is `{reran_prs: 0}`.** The Story 2(c) rerun path has never fired in the window, so it contributed nothing to the lift; flaky-check reruns can be ruled out as a contributor to the rise; the rise itself coincides with the author lane, event-driven dispatch, the isolated lenses and ADR-0024 landing, and the data cannot apportion it among them (assumes no other concurrent change).
+- **Autopilot share counts merged PRs only**; PRs closed unmerged are in the escalation buckets but not the denominator.
+
+### Proposed follow-ups (not done here)
+
+1. Operator: accept or amend this verdict, then set the Epic's status (this PR does not flip it).
+2. Next monthly report: carry the table above with its limits, and name the two missed windows.
+3. A per-window reason breakdown (store a per-day `escalation_reasons` in `PERF#{scope}/PR`) so the next funnel need not be reconstructed; Zone B script work, an `implement`-lane item, not drafted here.
+
 ## Out of scope
 
 - Any change to the R-N10 predicate, the L0/L1 path set, unanimous-consensus rule, or kill-switch semantics (all Zone A).

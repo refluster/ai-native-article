@@ -7,8 +7,8 @@
 // It queries the L1 source DB and the unified Articles DB (Type=explanation)
 // using the injected Notion integration token, then returns an L1 source whose
 // Source URL is not yet covered by an explanation. Same filters as
-// handleL2Batch: skip example.com fixtures, skip rows with `L2 Skip`=true,
-// oldest-first by created_time.
+// handleL2Batch: skip example.com fixtures, skip rows with `L2 Skip`=true;
+// ordered fewest-attempts-first, then oldest-first by created_time.
 //
 // A pick is only returned if its source body could actually be fetched
 // ---------------------------------------------------------------------
@@ -33,6 +33,22 @@
 // instead of blocking every successor forever. Nothing is ever silently
 // dropped: the attempt count, the last error and its timestamp are written
 // back to the L1 row (C-4), and the blocked count is reported on stderr.
+//
+// Hand-outs count too (scripts/lib/l1-queue.mjs has the full rule)
+// ----------------------------------------------------------------
+// A body that clears the fetch threshold can still be editorially empty — an
+// X post that is one headline, a wire item inside 40k chars of page chrome.
+// The cadence then (rightly) declines to publish, but that judgement wrote
+// nothing back, so the next fire re-picked the same row: 9 of 10 L2 fires
+// between 2026-10-14 and 10-18 skipped on two such rows while 11 groundable
+// rows waited. So the picker now also bumps `L2 Attempts` when it HANDS A ROW
+// OUT, and the queue is ordered fewest-attempts-first: a declined row drops
+// behind every untried row, and after MAX_ATTEMPTS hand-outs it blocks like
+// a dead URL. A published row is covered and leaves the queue, so the bump
+// costs a successful fire nothing.
+//
+// Blocked rows are retried once per L2_COOLDOWN_DAYS, up to L2_RETRY_CYCLES
+// extra tries — most "dead" sources were dead for an hour, not forever.
 //
 // The CCR session never reads Secrets Manager: NOTION_API_KEY arrives inline
 // from the task's `credentials["notion.integration_token"].apiKey` and is
@@ -71,6 +87,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { fetchSourceBody } from "../../../scripts/lib/source-fetch.mjs";
+import { planQueue } from "../../../scripts/lib/l1-queue.mjs";
 
 const NOTION_VERSION = "2022-06-28";
 const NOTION_API = "https://api.notion.com/v1";
@@ -100,6 +117,10 @@ const MAX_CANDIDATES = intEnv("L2_MAX_CANDIDATES", 6);
 // After this many failed fetches a row is considered blocked and leaves the
 // queue. Deliberately > 1: readers throttle, and hosts have bad days.
 const MAX_ATTEMPTS = intEnv("L2_MAX_ATTEMPTS", 5);
+// A blocked row gets one more try per cooldown, at most this many times, then
+// retires for good (until an operator clears `L2 Attempts`).
+const RETRY_CYCLES = intEnv("L2_RETRY_CYCLES", 2);
+const COOLDOWN_MS = intEnv("L2_COOLDOWN_DAYS", 7) * 86_400_000;
 // Hard wall-clock budget for the candidate walk. Worst case per candidate is
 // ~192s (45s direct + 3 reader legs at 45s + 12s backoff); six of those would
 // be ~19 minutes of a CCR session spent to return {skip:true}. The walk stops
@@ -166,6 +187,7 @@ function coveredUrls(unifiedPages) {
 }
 
 const attemptsOf = (page) => page.properties?.[P_ATTEMPTS]?.number ?? 0;
+const lastAttemptOf = (page) => page.properties?.[P_LAST_ATTEMPT]?.date?.start ?? null;
 
 /** Add the operational columns to the L1 DB if they are missing. Called once,
  *  lazily, the first time we need to record a failure — so a fresh database
@@ -202,10 +224,10 @@ async function ensureAttemptSchema() {
 // surfaced in the machine-readable {skip:true} reason.
 let bookkeepingBroken = null;
 
-/** Record a failed fetch on the L1 row. Best-effort: a bookkeeping failure
- *  must not abort the fire, but it is always reported on stderr and in the
- *  outcome payload. */
-async function recordFailure(page, reason) {
+/** Record an attempt (a failed fetch, or a hand-out) on the L1 row.
+ *  Best-effort: a bookkeeping failure must not abort the fire, but it is
+ *  always reported on stderr and in the outcome payload. */
+async function recordAttempt(page, reason, { handout = false } = {}) {
   try {
     await ensureAttemptSchema();
     const next = attemptsOf(page) + 1;
@@ -228,8 +250,9 @@ async function recordFailure(page, reason) {
       return;
     }
     console.error(
-      `pick-l1-source.mjs: attempt ${next}/${MAX_ATTEMPTS} failed for ${page.properties?.["Source URL"]?.url} — ${reason}` +
-        (next >= MAX_ATTEMPTS ? " [now blocked; leaves the queue]" : ""),
+      `pick-l1-source.mjs: attempt ${next}/${MAX_ATTEMPTS} ${handout ? "handed out" : "failed"} for ` +
+        `${page.properties?.["Source URL"]?.url} — ${reason}` +
+        (next >= MAX_ATTEMPTS ? " [blocked if still uncovered at the next fire; retried after cooldown]" : ""),
     );
   } catch (err) {
     bookkeepingBroken = err instanceof Error ? err.message : String(err);
@@ -250,16 +273,26 @@ try {
       if (/^https?:\/\/(www\.)?example\.com(\/|$)/i.test(u)) return false; // test fixtures
       if (p.properties?.["L2 Skip"]?.checkbox === true) return false; // operator skip
       return true;
-    })
-    .sort((a, b) => (a.created_time ?? "").localeCompare(b.created_time ?? "")); // oldest-first
+    }); // ordered by planQueue: fewest attempts, then oldest
 
-  const blocked = uncovered.filter((p) => attemptsOf(p) >= MAX_ATTEMPTS);
-  const pending = uncovered.filter((p) => attemptsOf(p) < MAX_ATTEMPTS);
+  const plan = planQueue(
+    uncovered.map((page) => ({
+      page,
+      attempts: attemptsOf(page),
+      lastAttempt: lastAttemptOf(page),
+      created: page.created_time ?? "",
+    })),
+    { now: Date.now(), maxAttempts: MAX_ATTEMPTS, retryCycles: RETRY_CYCLES, cooldownMs: COOLDOWN_MS },
+  );
+  const pending = plan.eligible.map((r) => r.page);
+  const blocked = [...plan.cooling, ...plan.retired].map((r) => r.page);
 
   if (blocked.length > 0) {
     console.error(
-      `pick-l1-source.mjs: ${blocked.length} row(s) blocked after ${MAX_ATTEMPTS} failed fetches ` +
-        `(clear "${P_ATTEMPTS}" in Notion to retry, or tick "L2 Skip" to retire):`,
+      `pick-l1-source.mjs: ${blocked.length} row(s) blocked after ${MAX_ATTEMPTS} attempts ` +
+        `(${plan.cooling.length} cooling down, retried every ${COOLDOWN_MS / 86_400_000}d; ` +
+        `${plan.retired.length} retired after ${RETRY_CYCLES} retries). ` +
+        `Clear "${P_ATTEMPTS}" in Notion to retry now, or tick "L2 Skip" to retire:`,
     );
     for (const p of blocked) {
       console.error(
@@ -274,7 +307,7 @@ try {
         skip: true,
         reason:
           blocked.length > 0
-            ? `no coverable L1 sources (${blocked.length} blocked after ${MAX_ATTEMPTS} failed fetches)`
+            ? `no coverable L1 sources (${blocked.length} blocked after ${MAX_ATTEMPTS} attempts)`
             : "no uncovered L1 sources",
       }),
     );
@@ -302,13 +335,22 @@ try {
           `pick-l1-source.mjs: transient failure for ${sourceUrl} (not counted toward ${MAX_ATTEMPTS}) — ${result.reason}`,
         );
       } else {
-        await recordFailure(page, result.reason);
+        await recordAttempt(page, result.reason);
       }
       continue;
     }
 
     const bodyFile = join(tmpdir(), `l2-source-${page.id.replace(/-/g, "")}.md`);
     writeFileSync(bodyFile, result.text);
+
+    // The hand-out bump (see header). Written BEFORE the pick is printed so a
+    // fire that dies mid-generation is counted too.
+    await recordAttempt(
+      page,
+      `handed out to a fire (${result.via}, ${result.chars} chars) — ` +
+        "still uncovered afterwards means that fire declined it as too thin or failed to publish",
+      { handout: true },
+    );
 
     console.log(
       JSON.stringify({

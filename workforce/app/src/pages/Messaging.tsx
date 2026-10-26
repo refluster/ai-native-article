@@ -5,9 +5,10 @@
 // the live messaging store lands.
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import WorkforceLayout from '../components/WorkforceLayout';
 import Sigil from '../components/Sigil';
+import AutoGrowTextarea from '../components/AutoGrowTextarea';
 import { loadWorkforceManifest, fullName, apiConfigured } from '../lib/agents';
 import {
   buildMockThreads,
@@ -19,7 +20,9 @@ import {
   setThreadStar,
   mergeMessages,
   messagingWriteEnabled,
+  resolveDirectMessage,
   isAwaitingReply,
+  isGroupRoundComplete,
   lastMessage,
   lastAt,
   OPERATOR_ID,
@@ -146,6 +149,11 @@ export default function Messaging() {
   // Compose-to-new state: when true the centre pane shows the recipient
   // picker + first-message composer instead of an open thread.
   const [composing, setComposing] = useState(false);
+  // Talents pre-picked in the composer (the profile's Message deep link).
+  const [composeSeed, setComposeSeed] = useState<string[]>([]);
+  // `?to=<slug>` — set by the Message button on an agent profile.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const directTo = searchParams.get('to');
   // Mobile is single-pane: the list and the thread/compose pane can't sit
   // side-by-side on a phone. This flag drives which one is on screen below
   // the `md` breakpoint (false = list, true = thread/compose). It's inert on
@@ -196,10 +204,33 @@ export default function Messaging() {
     });
   }, [threads, query, filter, rosterMap]);
 
-  // Default-select the newest thread once data is in (unless composing).
+  // One-tap Message from an agent profile (/messaging?to=<slug>): once the
+  // roster and inbox are in, open the existing 1:1 thread or the composer
+  // with the talent pre-picked, then drop the param so a refresh or back-nav
+  // doesn't re-trigger it. An unresolvable slug falls through to the inbox.
+  const directReady = roster.length > 0 && (!LIVE || liveThreads !== null);
   useEffect(() => {
-    if (!composing && selectedId === null && threads.length > 0) setSelectedId(threads[0].id);
-  }, [threads, selectedId, composing]);
+    if (!directTo || !directReady) return;
+    const target = resolveDirectMessage(directTo, threads, new Set(rosterMap.keys()), CAN_WRITE);
+    if (target?.kind === 'thread') {
+      openThread(target.id);
+    } else if (target?.kind === 'compose') {
+      setComposeSeed(target.recipients);
+      setComposing(true);
+      setSelectedId(null);
+      setShowThreadMobile(true);
+    }
+    searchParams.delete('to');
+    setSearchParams(searchParams, { replace: true });
+    // threads/rosterMap are settled once directReady flips; resolve once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [directTo, directReady]);
+
+  // Default-select the newest thread once data is in (unless composing, or a
+  // ?to= deep link is still waiting to resolve).
+  useEffect(() => {
+    if (!composing && !directTo && selectedId === null && threads.length > 0) setSelectedId(threads[0].id);
+  }, [threads, selectedId, composing, directTo]);
 
   // Lazily hydrate the full transcript for the opened thread (live only —
   // the mock already carries every message inline).
@@ -220,7 +251,7 @@ export default function Messaging() {
   // Poll the open thread while an awaiting-reply window is active, so the
   // talent's async reply lands without a refresh. Bounded: runs only between a
   // send and `until`, pauses when the tab is hidden, and stops the moment a
-  // non-operator message arrives. Single-operator scale (C-3) → trivial load.
+  // non-operator message arrives (in a group: once every member has spoken). Single-operator scale (C-3) → trivial load.
   const awaitingUntil = selectedId ? pendingReplyUntil[selectedId] : undefined;
   useEffect(() => {
     if (!LIVE || !selectedId || !awaitingUntil || awaitingUntil <= Date.now()) return;
@@ -243,6 +274,12 @@ export default function Messaging() {
       refreshSummaries();
       const last = conv.messages[conv.messages.length - 1];
       if (last && last.from !== OPERATOR_ID) {
+        if (conv.group && !isGroupRoundComplete(conv)) {
+          // A group round is still under way (adr-0047): the next member
+          // speaks after this one — give them a fresh window.
+          armPendingReply(tid);
+          return;
+        }
         // The reply landed — disarm (stops this poll, hides "drafting…").
         setPendingReplyUntil((p) => {
           const { [tid]: _done, ...rest } = p;
@@ -403,6 +440,7 @@ export default function Messaging() {
                   disabled={!CAN_WRITE}
                   onClick={() => {
                     if (!CAN_WRITE) return;
+                    setComposeSeed([]);
                     setComposing(true);
                     setSelectedId(null);
                     setShowThreadMobile(true); // reveal the composer on mobile
@@ -520,6 +558,7 @@ export default function Messaging() {
             <div className={`${showThreadMobile ? 'flex' : 'hidden'} md:flex flex-1 md:flex-none flex-col min-h-0`}>
               {composing ? (
                 <Compose
+                  initialRecipients={composeSeed}
                   roster={roster}
                   rosterMap={rosterMap}
                   existing={threads}
@@ -780,7 +819,7 @@ function Thread({
         {canWrite ? (
           <>
             <div className="flex items-end gap-2">
-              <textarea
+              <AutoGrowTextarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
@@ -790,9 +829,8 @@ function Thread({
                     void submit();
                   }
                 }}
-                rows={1}
                 placeholder="Write a message…"
-                className="flex-1 resize-none max-h-32 px-3 py-2 rounded-wf-sm border border-wf-outline bg-wf-surface-container-lo text-sm text-wf-on-surface placeholder:text-wf-on-surface-variant focus:outline-none focus:border-wf-primary"
+                className="flex-1 px-3 py-2 rounded-wf-sm border border-wf-outline bg-wf-surface-container-lo text-sm text-wf-on-surface placeholder:text-wf-on-surface-variant focus:outline-none focus:border-wf-primary"
               />
               <button
                 type="button"
@@ -828,6 +866,7 @@ function Thread({
 // Epic-024: multiple recipients create a group thread through the same
 // POST /threads contract (the backend derives `group` from the count).
 function Compose({
+  initialRecipients,
   roster,
   rosterMap,
   existing,
@@ -836,6 +875,7 @@ function Compose({
   onCreate,
   onOpenExisting,
 }: {
+  initialRecipients: string[];
   roster: WorkforceAgent[];
   rosterMap: Map<string, WorkforceAgent>;
   existing: Conversation[];
@@ -845,7 +885,7 @@ function Compose({
   onOpenExisting: (id: string) => void;
 }) {
   const [pickQuery, setPickQuery] = useState('');
-  const [recipients, setRecipients] = useState<string[]>([]);
+  const [recipients, setRecipients] = useState<string[]>(initialRecipients);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -992,16 +1032,15 @@ function Compose({
           </div>
           <div className="px-3 py-3 border-t border-wf-outline-variant">
             <div className="flex items-end gap-2">
-              <textarea
+              <AutoGrowTextarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void submit(); }
                 }}
-                rows={1}
                 autoFocus
                 placeholder="Write a message…"
-                className="flex-1 resize-none max-h-32 px-3 py-2 rounded-wf-sm border border-wf-outline bg-wf-surface-container-lo text-sm text-wf-on-surface placeholder:text-wf-on-surface-variant focus:outline-none focus:border-wf-primary"
+                className="flex-1 px-3 py-2 rounded-wf-sm border border-wf-outline bg-wf-surface-container-lo text-sm text-wf-on-surface placeholder:text-wf-on-surface-variant focus:outline-none focus:border-wf-primary"
               />
               <button
                 type="button"

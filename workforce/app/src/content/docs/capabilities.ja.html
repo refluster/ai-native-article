@@ -1,0 +1,553 @@
+<section class="cover">
+  <div class="kicker">ケイパビリティ · v1.0 · 2026-09</div>
+  <h1>ワークフォースが<br>届けるもの</h1>
+  <div class="rule"></div>
+  <p class="sub">四つの仕事の成果と、それを生んだレーン、そして人が一件ずつ仕事を起票しなくても回り続けるための統治をまとめました。仕事がたまたまどの業界で行われたかではなく、組織が保有できるケイパビリティとして書いています。</p>
+  <div class="define"><b>読み方。</b>以下の成果はどれも実際の案件です。顧客名と、論点を変えない業界固有の細部は除いています。数字は当時記録されたものです。比較をしている箇所は、オペレーターが評価した一件の案件であり、統制されたベンチマークではありません。全体を支える仕組みは<a href="/docs/whitepaper">技術ホワイトペーパー</a>に、この組織が存在する理由は<a href="/docs/manifesto">マニフェスト</a>にあります。</div>
+  <nav class="toc" aria-label="目次">
+    <a href="#s1"><b>01</b>一枚の地図</a>
+    <a href="#s2"><b>02</b>成果の一覧</a>
+    <a href="#s3"><b>03</b>ソフトウェア製品を作り、正直に保つ</a>
+    <a href="#s4"><b>04</b>反復を前提に組んだ分析</a>
+    <a href="#s5"><b>05</b>意思決定リサーチの直接比較</a>
+    <a href="#s6"><b>06</b>常設のチャネル</a>
+    <a href="#s7"><b>07</b>ワークフローのレーン</a>
+    <a href="#s8"><b>08</b>統治の基盤</a>
+    <a href="#s9"><b>09</b>示せたこと、示せていないこと</a>
+  </nav>
+</section>
+
+<section id="s1">
+  <div class="eyebrow"><span class="num">01</span><span class="kicker">The map</span></div>
+  <h2>上に成果、中にレーン、下に法</h2>
+  <p class="lede">ワークフォースは、三つの層で捉えると最もわかりやすくなります。組織の外へ出ていくものが上の層です。それを生むレーンが中段で並行して動き、スケジュールと互いの引き継ぎによって起動されます。下の層には、どのレーンが自分の判断だけで何をしてよいかを決める統治があります。</p>
+  <figure><div class="figscroll">
+<svg viewBox="0 0 1000 872" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="cm-t cm-d">
+  <title id="cm-t">一枚で見るワークフォース：成果、ワークフローのレーン、統治の基盤</title>
+  <desc id="cm-d">三つの層。上の層では、五種類の成果が組織の外へ出ていきます。ソフトウェア製品、分析パイプライン、意思決定リサーチ、メディアチャネル、経営ダッシュボードです。中段では、12 本のワークフローのレーンが三つのグループに分かれて並行して動きます。構築と統治、学習と創作、運営と拡張です。最下層は統治の基盤です。憲法、法令と意思決定記録、機械的な規則、ランブック、再発ラチェットがあり、それらは方向性、優先順位、予算、そして一人の人間の意思決定者との権限分担の上に載っています。</desc>
+  <style>
+    .cm-h{font:700 13px Geist,Inter,system-ui,sans-serif;fill:currentColor;letter-spacing:.14em}
+    .cm-t{font:700 14.5px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .cm-l{font:600 13.5px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .cm-s{font:12px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.72}
+    .cm-m{font:500 10.5px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent);letter-spacing:.12em}
+    .cm-band{fill:currentColor;fill-opacity:.045}
+    .cm-box{fill:var(--panel);stroke:var(--line);stroke-width:1.2}
+    .cm-lane{fill:var(--accent);fill-opacity:.08;stroke:var(--accent);stroke-width:1.2}
+    .cm-law{fill:var(--panel);stroke:var(--accent);stroke-width:1.4}
+    .cm-arr{fill:none;stroke:var(--accent);stroke-width:1.5;marker-end:url(#cm-ah)}
+    .cm-up{fill:none;stroke:currentColor;stroke-opacity:.45;stroke-width:1.4;marker-end:url(#cm-ahg)}
+  </style>
+  <defs><marker id="cm-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker><marker id="cm-ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor" fill-opacity=".45"/></marker></defs>
+  <rect x="0" y="0" width="1000" height="176" rx="8" class="cm-band"/>
+  <text x="20" y="28" class="cm-h">成果 — 組織の外へ出ていくもの</text>
+  <rect x="20" y="44" width="182" height="116" rx="6" class="cm-box"/>
+  <text x="34" y="68" class="cm-m">ソフトウェア</text>
+  <text x="34" y="93" class="cm-t">ソフトウェア製品</text>
+  <text x="34" y="118" class="cm-s">設計 · 構築 · レビュー</text>
+  <text x="34" y="137" class="cm-s">監査 · 運用</text>
+  <rect x="214" y="44" width="182" height="116" rx="6" class="cm-box"/>
+  <text x="228" y="68" class="cm-m">データ</text>
+  <text x="228" y="93" class="cm-t">分析パイプライン</text>
+  <text x="228" y="118" class="cm-s">仮説 · 示唆</text>
+  <text x="228" y="137" class="cm-s">顧客に渡せる報告書</text>
+  <rect x="409" y="44" width="182" height="116" rx="6" class="cm-box"/>
+  <text x="423" y="68" class="cm-m">リサーチ</text>
+  <text x="423" y="93" class="cm-t">意思決定リサーチ</text>
+  <text x="423" y="118" class="cm-s">市場と政策の調査</text>
+  <text x="423" y="137" class="cm-s">ブリーフ · ナレッジベース</text>
+  <rect x="604" y="44" width="182" height="116" rx="6" class="cm-box"/>
+  <text x="618" y="68" class="cm-m">メディア</text>
+  <text x="618" y="93" class="cm-t">メディアチャネル</text>
+  <text x="618" y="118" class="cm-s">日英二言語の記事</text>
+  <text x="618" y="137" class="cm-s">ポッドキャスト · 交流の場</text>
+  <rect x="798" y="44" width="182" height="116" rx="6" class="cm-box"/>
+  <text x="812" y="68" class="cm-m">インテリジェンス</text>
+  <text x="812" y="93" class="cm-t">ダッシュボード</text>
+  <text x="812" y="118" class="cm-s">KPI · 運営</text>
+  <text x="812" y="137" class="cm-s">品質 · リスク</text>
+  <path d="M180 212 L180 182" class="cm-up"/>
+  <path d="M500 212 L500 182" class="cm-up"/>
+  <path d="M820 212 L820 182" class="cm-up"/>
+  <text x="192" y="202" class="cm-s">成果物</text>
+  <rect x="0" y="218" width="1000" height="392" rx="8" class="cm-band"/>
+  <text x="20" y="246" class="cm-h">ワークフローのレーン — スケジュールとイベントで並行稼働</text>
+  <rect x="20" y="262" width="312" height="36" rx="6" class="cm-lane"/>
+  <text x="176" y="285" text-anchor="middle" class="cm-t">構築と統治</text>
+  <rect x="20" y="308" width="312" height="64" rx="6" class="cm-box"/>
+  <text x="36" y="334" class="cm-l">ソフトウェア開発</text>
+  <text x="36" y="355" class="cm-s">受付 → 設計 → 構築 → レビュー → マージ</text>
+  <rect x="20" y="382" width="312" height="64" rx="6" class="cm-box"/>
+  <text x="36" y="408" class="cm-l">保証と監査</text>
+  <text x="36" y="429" class="cm-s">敵対的レビュー · 検証スイープ</text>
+  <rect x="20" y="456" width="312" height="64" rx="6" class="cm-box"/>
+  <text x="36" y="482" class="cm-l">運用とインシデント</text>
+  <text x="36" y="503" class="cm-s">異常 → 担当者を指名 → ポストモーテム</text>
+  <rect x="20" y="530" width="312" height="64" rx="6" class="cm-box"/>
+  <text x="36" y="556" class="cm-l">合議</text>
+  <text x="36" y="577" class="cm-s">改正委員会 · ブレインストーミング</text>
+  <rect x="344" y="262" width="312" height="36" rx="6" class="cm-lane"/>
+  <text x="500" y="285" text-anchor="middle" class="cm-t">学習と創作</text>
+  <rect x="344" y="308" width="312" height="64" rx="6" class="cm-box"/>
+  <text x="360" y="334" class="cm-l">日次リサーチ</text>
+  <text x="360" y="355" class="cm-s">デスク横断の走査 · 政策 · 技術</text>
+  <rect x="344" y="382" width="312" height="64" rx="6" class="cm-box"/>
+  <text x="360" y="408" class="cm-l">調査研究と分析</text>
+  <text x="360" y="429" class="cm-s">ブリーフ → 仮説 → 根拠 → 報告書</text>
+  <rect x="344" y="456" width="312" height="64" rx="6" class="cm-box"/>
+  <text x="360" y="482" class="cm-l">記事</text>
+  <text x="360" y="503" class="cm-s">解説 → 統合分析 → レビュー</text>
+  <rect x="344" y="530" width="312" height="64" rx="6" class="cm-box"/>
+  <text x="360" y="556" class="cm-l">ポッドキャストとコミュニティ</text>
+  <text x="360" y="577" class="cm-s">台本 → 音声 → 権利確認 → 公開</text>
+  <rect x="668" y="262" width="312" height="36" rx="6" class="cm-lane"/>
+  <text x="824" y="285" text-anchor="middle" class="cm-t">運営と拡張</text>
+  <rect x="668" y="308" width="312" height="64" rx="6" class="cm-box"/>
+  <text x="684" y="334" class="cm-l">採用ラウンド</text>
+  <text x="684" y="355" class="cm-s">ギャップ分析 → 候補者 → コスト</text>
+  <rect x="668" y="382" width="312" height="64" rx="6" class="cm-box"/>
+  <text x="684" y="408" class="cm-l">報告</text>
+  <text x="684" y="429" class="cm-s">月次レター · 週次状況 · 下書き</text>
+  <rect x="668" y="456" width="312" height="64" rx="6" class="cm-box"/>
+  <text x="684" y="482" class="cm-l">組織の手入れ</text>
+  <text x="684" y="503" class="cm-s">記憶 · 教訓 · 矛盾</text>
+  <rect x="668" y="530" width="312" height="64" rx="6" class="cm-box"/>
+  <text x="684" y="556" class="cm-l">実績</text>
+  <text x="684" y="577" class="cm-s">全実行を記録 · スキルの成熟度</text>
+  <path d="M180 656 L180 616" class="cm-up"/>
+  <path d="M500 656 L500 616" class="cm-up"/>
+  <path d="M820 656 L820 616" class="cm-up"/>
+  <text x="192" y="642" class="cm-s">権限 · ゲート · 予算</text>
+  <rect x="0" y="662" width="1000" height="210" rx="8" class="cm-band"/>
+  <text x="20" y="690" class="cm-h">統治の基盤</text>
+  <rect x="20" y="704" width="176" height="56" rx="6" class="cm-law"/>
+  <text x="34" y="724" class="cm-m">L0</text>
+  <text x="34" y="746" class="cm-l">憲法</text>
+  <path d="M198 732 L218 732" class="cm-arr"/>
+  <rect x="220" y="704" width="176" height="56" rx="6" class="cm-law"/>
+  <text x="234" y="724" class="cm-m">L1</text>
+  <text x="234" y="746" class="cm-l">法令と ADR</text>
+  <path d="M398 732 L418 732" class="cm-arr"/>
+  <rect x="420" y="704" width="176" height="56" rx="6" class="cm-law"/>
+  <text x="434" y="724" class="cm-m">L2</text>
+  <text x="434" y="746" class="cm-l">規則</text>
+  <path d="M598 732 L618 732" class="cm-arr"/>
+  <rect x="620" y="704" width="176" height="56" rx="6" class="cm-law"/>
+  <text x="634" y="724" class="cm-m">L3</text>
+  <text x="634" y="746" class="cm-l">ランブック</text>
+  <rect x="820" y="704" width="160" height="56" rx="6" class="cm-lane"/>
+  <text x="834" y="724" class="cm-m">再発</text>
+  <text x="834" y="746" class="cm-l">ラチェット</text>
+  <text x="496" y="792" text-anchor="end" class="cm-s">90 日以内の二度目はゲートになる</text>
+  <path d="M880 762 C 860 792, 530 792, 508 764" class="cm-arr"/>
+  <rect x="20" y="802" width="224" height="56" rx="6" class="cm-box"/>
+  <text x="34" y="824" class="cm-l">方向性</text>
+  <text x="34" y="844" class="cm-s">MVV · 守りより攻め</text>
+  <rect x="265" y="802" width="224" height="56" rx="6" class="cm-box"/>
+  <text x="279" y="824" class="cm-l">優先順位</text>
+  <text x="279" y="844" class="cm-s">ロードマップ · エピック · バックログ</text>
+  <rect x="511" y="802" width="224" height="56" rx="6" class="cm-box"/>
+  <text x="525" y="824" class="cm-l">予算</text>
+  <text x="525" y="844" class="cm-s">総額上限 USD 600/月</text>
+  <rect x="756" y="802" width="224" height="56" rx="6" class="cm-box"/>
+  <text x="770" y="824" class="cm-l">権限</text>
+  <text x="770" y="844" class="cm-s">人間一人：法・支出・最終判断</text>
+</svg>
+  </div><figcaption>成果の層は、チャネルではなくケイパビリティで名付けています。顧客のためにソフトウェアを出荷するのと同じレーンが組織自身の出版物も回し、同じ統治が両方を縛ります。7 月版のこの地図から、三つのことが変わりました。外部顧客の仕事が上の層の常設の一部になったこと、調査研究とデータ分析が独立したレーンになったこと、そして運用とインシデント対応が片手間の務めから「構築と統治」の列へ移ったことです。</figcaption>
+  </figure>
+  <p>三つの層をつなぎ留めているものが二つあります。一つは、どのレーンも結果を人が確かめられる場所に書き出すことです。PR、リポジトリ内の報告書、記事、エピソード、実行台帳の一行がそれにあたります。もう一つは、どのレーンも失敗を下の層へ送ることです。監査やポストモーテムの指摘はチケットになり、繰り返す失敗は規則になります。この組織が良くなっていくのは、間違いに行き場があるからです。</p>
+</section>
+
+<section id="s2">
+  <div class="eyebrow"><span class="num">02</span><span class="kicker">Outcomes</span></div>
+  <h2>四つの仕事と、それぞれが証明するケイパビリティ</h2>
+  <p class="lede">以下の案件は、それぞれが異なる組織能力を試すものとして選びました。たまたまどの業界だったかは本質ではありません。次の顧客へ持ち越せるのは、ケイパビリティのほうです。</p>
+  <div class="statline">
+    <div class="stat"><b>1</b><span>人間の意思決定者</span></div>
+    <div class="stat"><b>58</b><span>在籍する AI の専門家</span></div>
+    <div class="stat"><b>42</b><span>稼働中の版管理されたワークフロー</span></div>
+    <div class="stat"><b>1,069</b><span>7 日間の実行回数 → 成果物 880</span></div>
+  </div>
+  <p class="note" style="margin-top:14px"><span class="st count">機械的に数えた値</span> レジストリと公開 KPI から 2026-09-05 に取得。実行回数は活動量であって成果ではありません。成果は以下の四つの仕事です。</p>
+  <div class="grid g2" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr))">
+    <div class="card"><span class="tag">プロダクト開発と保証</span><h3>ソフトウェア製品を作り、正直に保つ</h3><p>パイロットプログラム向けの本番製品です。要件、設計判断、実装、複数レンズのコードレビュー、監査、テストなしで出荷されたものの検証、インシデント対応。これらを一つのループとして毎日回し、どの変更にも終着点を二つだけ用意しています。</p></div>
+    <div class="card"><span class="tag">大規模データサイエンス</span><h3>反復を前提に組んだ分析</h3><p>28,000 世帯の 3 年分の高頻度データ、生 CSV で約 200 GB を、層状のパイプラインに組み上げました。顧客との各ラウンド（新しい仮説、検証、示唆、報告書の一節）にかかるのは、作り直しではなく再実行のコストです。</p></div>
+    <div class="card"><span class="tag">戦略リサーチ</span><h3>意思決定リサーチの直接比較</h3><p>ある企業の戦略チームがコンサルティング会社に発注していた市場調査に、ワークフォースが並行して答えました。コンサル側は約 300 万円と 2 か月。ワークフォースは数百円の計算資源と 2 時間足らず。そしてオペレーターの読みでは、より鋭い報告書でした。</p></div>
+    <div class="card"><span class="tag">メディアと社内インテリジェンス</span><h3>常設のチャネル</h3><p>外に向けては、日英二言語の出版物、ポッドキャスト、コミュニティチャネル、公開 Q&amp;A ボード。内に向けては、経営と技術の意思決定が実際に依拠しているダッシュボードとレターです。</p></div>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="eyebrow"><span class="num">03</span><span class="kicker">Product engineering &amp; assurance</span></div>
+  <h2>ソフトウェア製品を作り、正直に保つ</h2>
+  <p class="lede">最初の外部顧客は、パイロットプログラム向けの本番ソフトウェア基盤で、顧客側には人間の技術責任者がいました。ワークフォースは、ベンダーのようにコードを納めるわけではありません。コードの周りにある開発ループ全体を回し、その横で、最初のループが見落としたものを見つけることだけを仕事とする二つ目のループを回します。</p>
+  <figure><div class="figscroll">
+<svg viewBox="0 0 1000 508" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="sd-t sd-d">
+  <title id="sd-t">ソフトウェア開発ループと、それを囲む保証ループ</title>
+  <desc id="sd-d">上段：チケットはトリアージでレーンに振り分けられ、設計または実装され、ドラフト PR として開かれ、互いに隔離された 3 名以上のレンズ別レビュー担当がレビューします。判定の結果は三つです。委任され、機械で検査される条件のもとでのマージ。試行回数と時間に上限を設けたうえで、エージェントの作成者へ差し戻して修正させること。人間へのエスカレーション。下段：保証は開発の横で回ります。テストのない変更を探す週次の検証スイープ、週次の敵対的監査、あらゆる失敗を指名された担当者へ回す日次の異常検知、そしてインシデントのポストモーテムです。すべての指摘はチケットとして開発へ戻り、繰り返す失敗は機械的なゲートになります。</desc>
+  <style>
+    .sd-h{font:700 13px Geist,Inter,system-ui,sans-serif;fill:currentColor;letter-spacing:.14em}
+    .sd-l{font:600 13.5px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .sd-s{font:11.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.72}
+    .sd-m{font:500 10.5px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent);letter-spacing:.1em}
+    .sd-box{fill:var(--panel);stroke:var(--line);stroke-width:1.2}
+    .sd-acc{fill:var(--accent);fill-opacity:.08;stroke:var(--accent);stroke-width:1.2}
+    .sd-ok{fill:var(--signal);fill-opacity:.08;stroke:var(--signal);stroke-width:1.2}
+    .sd-band{fill:currentColor;fill-opacity:.045}
+    .sd-arr{fill:none;stroke:var(--accent);stroke-width:1.4;marker-end:url(#sd-ah)}
+    .sd-dash{fill:none;stroke:var(--accent);stroke-width:1.4;stroke-dasharray:5 4;marker-end:url(#sd-ah)}
+  </style>
+  <defs><marker id="sd-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>
+  <rect x="0" y="0" width="1000" height="274" rx="8" class="sd-band"/>
+  <text x="20" y="28" class="sd-h">開発 — チケットからマージまで、人が一手ずつ起票せずに</text>
+  <rect x="20" y="46" width="150" height="96" rx="6" class="sd-box"/>
+  <text x="32" y="66" class="sd-m">01 トリアージ</text>
+  <text x="32" y="87" class="sd-l">受付</text>
+  <text x="32" y="106" class="sd-s">どのチケットにも</text>
+  <text x="32" y="122" class="sd-s">レーンと担当者を一つ</text>
+  <rect x="190" y="46" width="150" height="96" rx="6" class="sd-box"/>
+  <text x="202" y="66" class="sd-m">02 設計</text>
+  <text x="202" y="87" class="sd-l">決める</text>
+  <text x="202" y="106" class="sd-s">設計ノートと</text>
+  <text x="202" y="122" class="sd-s">意思決定記録</text>
+  <rect x="360" y="46" width="150" height="96" rx="6" class="sd-box"/>
+  <text x="372" y="66" class="sd-m">03 構築</text>
+  <text x="372" y="87" class="sd-l">実装</text>
+  <text x="372" y="106" class="sd-s">ドラフト PR のみ。</text>
+  <text x="372" y="122" class="sd-s">直接 push はしない</text>
+  <rect x="530" y="46" width="170" height="96" rx="6" class="sd-acc"/>
+  <text x="542" y="66" class="sd-m">04 レビュー</text>
+  <text x="542" y="87" class="sd-l">レンズ別パネル</text>
+  <text x="542" y="106" class="sd-s">3 件以上の隔離レビュー：</text>
+  <text x="542" y="122" class="sd-s">製品 · 設計 · コード · QA</text>
+  <path d="M171 94 L189 94" class="sd-arr"/>
+  <path d="M341 94 L359 94" class="sd-arr"/>
+  <path d="M511 94 L529 94" class="sd-arr"/>
+  <path d="M190 70 L172 70" class="sd-arr"/>
+  <rect x="760" y="38" width="220" height="70" rx="6" class="sd-ok"/>
+  <text x="772" y="58" class="sd-m">判定 A</text>
+  <text x="772" y="79" class="sd-l">マージ</text>
+  <text x="772" y="98" class="sd-s">委任による。基本法には触れない</text>
+  <rect x="760" y="114" width="220" height="70" rx="6" class="sd-box"/>
+  <text x="772" y="134" class="sd-m">判定 B</text>
+  <text x="772" y="155" class="sd-l">作成者が修正</text>
+  <text x="772" y="174" class="sd-s">3 回か 36 時間まで、以後は人へ</text>
+  <rect x="760" y="190" width="220" height="70" rx="6" class="sd-acc"/>
+  <text x="772" y="210" class="sd-m">判定 C</text>
+  <text x="772" y="231" class="sd-l">人間が決める</text>
+  <text x="772" y="250" class="sd-s">必要な行為をチケットに明記</text>
+  <path d="M701 80 L758 72" class="sd-arr"/>
+  <path d="M701 94 L758 148" class="sd-arr"/>
+  <path d="M701 110 L758 222" class="sd-arr"/>
+  <path d="M760 160 C 720 185, 640 185, 615 145" class="sd-dash"/>
+  <text x="20" y="186" class="sd-s">差し戻されたチケットは数秒でトリアージへ戻ります。引き継ぎは、そのまま次の起動でもあります。</text>
+  <text x="20" y="204" class="sd-s">途中の状態にはすべて、名前の付いた担当と機械的な上限があるため、「処理中」が黙って「放置」に変わることはありません。</text>
+  <text x="20" y="228" class="sd-s">終着点は二つだけです。マージされるか、必要な人の行為を明記してエスカレーションされるか。</text>
+  <rect x="0" y="288" width="1000" height="218" rx="8" class="sd-band"/>
+  <text x="20" y="316" class="sd-h">保証 — 仕事を生んだラインの外側から</text>
+  <rect x="20" y="332" width="224" height="96" rx="6" class="sd-box"/>
+  <text x="32" y="352" class="sd-m">毎週</text>
+  <text x="32" y="373" class="sd-l">検証スイープ</text>
+  <text x="32" y="392" class="sd-s">マージ済みで最もリスクが高く、</text>
+  <text x="32" y="408" class="sd-s">テストの裏付けがない変更</text>
+  <rect x="265" y="332" width="224" height="96" rx="6" class="sd-box"/>
+  <text x="277" y="352" class="sd-m">毎週</text>
+  <text x="277" y="373" class="sd-l">敵対的監査</text>
+  <text x="277" y="392" class="sd-s">あえて難しい成果物を一つ選び、</text>
+  <text x="277" y="408" class="sd-s">意図して攻撃する</text>
+  <rect x="511" y="332" width="224" height="96" rx="6" class="sd-box"/>
+  <text x="523" y="352" class="sd-m">毎日</text>
+  <text x="523" y="373" class="sd-l">異常監視</text>
+  <text x="523" y="392" class="sd-s">失敗した自動処理はすべて</text>
+  <text x="523" y="408" class="sd-s">指名された担当者へ回す</text>
+  <rect x="756" y="332" width="224" height="96" rx="6" class="sd-box"/>
+  <text x="768" y="352" class="sd-m">発生時</text>
+  <text x="768" y="373" class="sd-l">インシデントとポストモーテム</text>
+  <text x="768" y="392" class="sd-s">経過、原因、修正。</text>
+  <text x="768" y="408" class="sd-s">欠けていたゲートも特定する</text>
+  <path d="M864 429 L864 458 L10 458 L10 110 L18 110" class="sd-dash"/>
+  <path d="M132 429 L132 458" fill="none" stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="5 4"/>
+  <path d="M376 429 L376 458" fill="none" stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="5 4"/>
+  <path d="M620 429 L620 458" fill="none" stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="5 4"/>
+  <text x="20" y="480" class="sd-s">すべての指摘はチケットとして開発へ戻る</text>
+  <text x="980" y="480" text-anchor="end" class="sd-s">90 日以内に再発した失敗は CI ゲートになる</text>
+</svg>
+  </div><figcaption>開発ループと保証ループには、意図して別々の役割を配置しています。レビュー担当は互いからも作成者からも隔離され、監査担当は開発ラインの完全に外側にいます。振り分け役が自分の票を数えることはありません。</figcaption>
+  </figure>
+  <div class="grid g3" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))">
+    <div class="card"><h3>要件と設計</h3><p>プロダクトオーナーが、すべてのチケットをちょうど一つのレーンと一人の担当者に振り分けます。まだコードになっていない判断（インターフェース、トレードオフ、UI の変更）は設計レーンへ回り、実装が始まる前にレビュー可能な設計ノートが書かれます。</p></div>
+    <div class="card"><h3>実装</h3><p>エンジニアリングの役割が実装可能なチケットを毎日引き受け、ドラフト PR を開きます。顧客のデフォルトブランチには、PR を経由しない限り何も入りません。直接 push は規則で禁じられており、認証情報も PR 用の権限に絞られています。</p></div>
+    <div class="card"><h3>レビューパネル</h3><p>3 名以上のレビュー担当が、製品、アーキテクチャ、コード、テストカバレッジという異なるレンズで、互いに隔離された状態で各変更を読みます。拒否権が行使されると、変更は指摘を添えて作成者へ差し戻されます。マージには全員一致が必要です。</p></div>
+    <div class="card"><h3>監査</h3><p>週に一度、敵対的監査の担当が最近の成果物を一つ、易しいものではなく難しいものを選んで、壊しにかかります。週に一度、検証スイープが、テストの裏付けのないマージ済み変更のうち最も影響の大きいものを名指しし、テストを書くべきエンジニアに要点を伝えます。</p></div>
+    <div class="card"><h3>インシデント管理</h3><p>信頼性の役割が毎日自動処理の結果を見回り、失敗を一件ずつ追跡用の Issue として指名された担当者へ回します。通知は細切れに送らず、見回り一回につき一通にまとめます。インシデントは、どの層（文書、検査、ランブック）が捉えるべきだったかを問い、その層を変えることで閉じます。</p></div>
+    <div class="card"><h3>上限のあるマージ権限</h3><p>ワークフォースが顧客のリポジトリでマージするのは、顧客自身の統治がそれを委任したからにすぎず、対象も統治ファイルに触れない変更に限られます。触れる変更、そしてエージェントが 3 回の試行か 36 時間以内に直せないものはすべて、必要な行為を明記したうえで人間に回ります。</p></div>
+  </div>
+  <p class="note">顧客の手元に残るのはコードだけではありません。すべてのレビュー、すべての監査指摘、すべてのポストモーテムが顧客自身のリポジトリに記録として残ります。そしてそれらを生んだ手順は、次の実行で改善される版管理されたスキルです。</p>
+</section>
+
+<section id="s4">
+  <div class="eyebrow"><span class="num">04</span><span class="kicker">Data science at scale</span></div>
+  <h2>反復を前提に組んだ分析</h2>
+  <p class="lede">ある公的研究機関が業界のパートナーと組み、大規模な世帯データの分析を必要としていました。28,000 世帯、3 年分、生 CSV で約 200 GB です。この種の仕事で難しいのは、最初の分析であることはまれです。難しいのは 10 回目、つまり顧客が最初の 9 回を見たうえで、より鋭い問いを投げてくるときです。</p>
+  <figure><div class="figscroll">
+<svg viewBox="0 0 1000 410" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="da-t da-d">
+  <title id="da-t">顧客との何度ものラウンドを前提に設計した分析パイプライン</title>
+  <desc id="da-d">左：28,000 世帯の 3 年分、約 200 ギガバイトの生 CSV が、層状で再現可能なパイプラインに入ります。層は生データ、ステージング、ファクト、メトリクスです。右：その上でループが回ります。ボード上の仮説が検証され、判定は示唆になり、示唆は報告書の節になり、顧客がそれをレビューして新しい問いを返し、その問いが新しい仮説になります。パイプラインが層状で再現可能なため、新しい問いにかかるのは上位層の再実行であって、作り直しではありません。</desc>
+  <style>
+    .da-h{font:700 13px Geist,Inter,system-ui,sans-serif;fill:currentColor;letter-spacing:.14em}
+    .da-l{font:600 13.5px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .da-s{font:11.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.72}
+    .da-m{font:500 10.5px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent);letter-spacing:.1em}
+    .da-big{font:700 22px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .da-box{fill:var(--panel);stroke:var(--line);stroke-width:1.2}
+    .da-acc{fill:var(--accent);fill-opacity:.08;stroke:var(--accent);stroke-width:1.2}
+    .da-band{fill:currentColor;fill-opacity:.045}
+    .da-arr{fill:none;stroke:var(--accent);stroke-width:1.4;marker-end:url(#da-ah)}
+    .da-loop{fill:none;stroke:var(--accent);stroke-width:1.6;stroke-dasharray:6 4;marker-end:url(#da-ah)}
+  </style>
+  <defs><marker id="da-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>
+  <rect x="0" y="0" width="330" height="410" rx="8" class="da-band"/>
+  <text x="20" y="28" class="da-h">一度だけ構築する</text>
+  <text x="20" y="66" class="da-big">約 200 GB の CSV</text>
+  <text x="20" y="88" class="da-s">28,000 世帯 · 3 年 · 高頻度</text>
+  <rect x="20" y="108" width="290" height="52" rx="6" class="da-box"/>
+  <text x="34" y="129" class="da-m">生データ</text>
+  <text x="34" y="148" class="da-s">受け取ったまま、編集しない</text>
+  <path d="M165 161 L165 173" class="da-arr"/>
+  <rect x="20" y="174" width="290" height="52" rx="6" class="da-box"/>
+  <text x="34" y="195" class="da-m">ステージング</text>
+  <text x="34" y="214" class="da-s">型付け、重複除去、欠損に印</text>
+  <path d="M165 227 L165 239" class="da-arr"/>
+  <rect x="20" y="240" width="290" height="52" rx="6" class="da-box"/>
+  <text x="34" y="261" class="da-m">ファクト</text>
+  <text x="34" y="280" class="da-s">世帯 × 時間区間ごとに 1 行</text>
+  <path d="M165 293 L165 305" class="da-arr"/>
+  <rect x="20" y="306" width="290" height="52" rx="6" class="da-box"/>
+  <text x="34" y="327" class="da-m">メトリクス</text>
+  <text x="34" y="346" class="da-s">名前とテストのある定義</text>
+  <text x="20" y="378" class="da-s">端から端まで再現可能。報告書の数字は</text>
+  <text x="20" y="394" class="da-s">すべて生データから導き直せる。</text>
+  <rect x="346" y="0" width="654" height="410" rx="8" class="da-band"/>
+  <text x="366" y="28" class="da-h">何度も回す — 顧客との対話ごとに 1 ラウンド</text>
+  <rect x="380" y="52" width="190" height="78" rx="6" class="da-acc"/>
+  <text x="394" y="74" class="da-m">01</text>
+  <text x="394" y="96" class="da-l">仮説ボード</text>
+  <text x="394" y="115" class="da-s">反証可能で、状態つき</text>
+  <rect x="600" y="52" width="170" height="78" rx="6" class="da-box"/>
+  <text x="614" y="74" class="da-m">02</text>
+  <text x="614" y="96" class="da-l">検証</text>
+  <text x="614" y="115" class="da-s">メトリクス層に当てる</text>
+  <rect x="800" y="52" width="180" height="78" rx="6" class="da-box"/>
+  <text x="814" y="74" class="da-m">03</text>
+  <text x="814" y="96" class="da-l">判定</text>
+  <text x="814" y="115" class="da-s">支持・一部支持・棄却</text>
+  <rect x="800" y="236" width="180" height="78" rx="6" class="da-box"/>
+  <text x="814" y="258" class="da-m">04</text>
+  <text x="814" y="280" class="da-l">示唆</text>
+  <text x="814" y="299" class="da-s">意味と、その限界</text>
+  <rect x="600" y="236" width="170" height="78" rx="6" class="da-box"/>
+  <text x="614" y="258" class="da-m">05</text>
+  <text x="614" y="280" class="da-l">報告書の節</text>
+  <text x="614" y="299" class="da-s">執筆・出典・図表</text>
+  <rect x="380" y="236" width="190" height="78" rx="6" class="da-acc"/>
+  <text x="394" y="258" class="da-m">06</text>
+  <text x="394" y="280" class="da-l">顧客レビュー</text>
+  <text x="394" y="299" class="da-s">新しい問い、より鋭い要望</text>
+  <path d="M571 91 L598 91" class="da-arr"/>
+  <path d="M771 91 L798 91" class="da-arr"/>
+  <path d="M890 131 L890 234" class="da-arr"/>
+  <path d="M799 275 L772 275" class="da-arr"/>
+  <path d="M599 275 L572 275" class="da-arr"/>
+  <path d="M475 235 L475 132" class="da-loop"/>
+  <text x="488" y="190" class="da-s">次のラウンド</text>
+  <path d="M311 332 C 350 332, 340 110, 378 100" class="da-arr"/>
+  <text x="366" y="352" class="da-s">顧客からの新しい切り口にかかるのは、作り直しではなく上位層の再実行です。パイプラインは</text>
+  <text x="366" y="370" class="da-s">1 回目ではなく 10 回目のために設計しました。目標は、意思決定までを日ではなく時間の単位にすることです。</text>
+</svg>
+  </div><figcaption>左のパイプラインは一度だけ構築し、再現可能な状態に保ちます。右のループは顧客との対話ごとに一度回ります。仮説はボード上で状態を持つため、各ラウンドの報告書は、どの主張が支持され、どれが棄却され、どれが未決のままかを示せます。</figcaption>
+  </figure>
+  <p>ワークフォースは最初から何度ものラウンドを想定するよう求められ、それに合わせて組み立てました。</p>
+  <ul>
+    <li><b>層状で再現可能なパイプライン。</b>生データは受け取ったまま保管します。その上に、型付けと整形を済ませたステージング、ファクトテーブル、名前の付いたメトリクス定義が載ります。顧客からの新しい切り口が触れるのは上位層だけです。</li>
+    <li><b>仮説が先。</b>各ラウンドはグラフからではなく、反証可能な言明から始まります。仮説はメトリクス層に当てて検証され、支持・一部支持・棄却のいずれかの判定を受けます。データの限界もあわせて明記します。</li>
+    <li><b>示唆の抽出。</b>判定を、顧客の問いにとって何を意味するかへ変換します。排除しきれなかった別の説明も含めます。</li>
+    <li><b>報告書の執筆。</b>各ラウンドで、顧客がそのまま読める報告書の節を作ります。出典があり、図表があり、検証していないことについて正直です。</li>
+    <li><b>顧客との反復。</b>顧客のレビューが次のラウンドの仮説になります。ここでの組織の物差しは意思決定までの時間、つまり新しい問いから擁護できる答えまでの時間で、日単位ではなく時間単位を目指します。</li>
+  </ul>
+  <p class="note">データは、この案件自身のプロジェクト境界の内側にとどまります。認証情報、リポジトリ、実行台帳は、ワークフォースが担う他のどのプロジェクトとも分離されています。</p>
+</section>
+
+<section id="s5">
+  <div class="eyebrow"><span class="num">05</span><span class="kicker">Strategic research</span></div>
+  <h2>意思決定リサーチの直接比較</h2>
+  <p class="lede">ある企業の戦略部門が、海外市場の調査をコンサルティング会社に発注していました。オペレーターがそれを聞いたとき、ワークフォースにも同じブリーフを渡して並行して走らせました。狙いはベンダーを置き換えることではありません。この規模の問いが調達案件でなくなったとき、何が変わるのかを確かめることでした。</p>
+  <figure><div class="figscroll">
+<svg viewBox="0 0 1000 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="hh-t hh-d">
+  <title id="hh-t">一つのリサーチブリーフに、二通りで答える</title>
+  <desc id="hh-d">同じブリーフが、外部のコンサルティング会社とワークフォースに渡りました。コンサル側の経路は、提案、契約、実地調査、最終報告書と進み、約 2 か月、約 300 万円かかります。ワークフォース側の経路は、一つのセッションの中で、ゲート付きの 12 のステージを進みます。受付、反証可能な仮説を備えた論点ツリー、作業計画、並行する 6 つのファクトパック、仮説の判定、ストーリーライン、草稿、独立したファクトチェック、レッドチームを含む複数レンズのパネル、改訂、ビルド、納品です。所要は 2 時間足らず、計算資源は数百円で、手法は版管理されたスキルとして残ります。</desc>
+  <style>
+    .hh-h{font:700 13px Geist,Inter,system-ui,sans-serif;fill:currentColor;letter-spacing:.14em}
+    .hh-l{font:600 13px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .hh-s{font:11.5px Geist,Inter,system-ui,sans-serif;fill:currentColor;opacity:.72}
+    .hh-m{font:500 10.5px "JetBrains Mono",ui-monospace,monospace;fill:var(--accent);letter-spacing:.1em}
+    .hh-big{font:700 18px Geist,Inter,system-ui,sans-serif;fill:currentColor}
+    .hh-box{fill:var(--panel);stroke:var(--line);stroke-width:1.2}
+    .hh-gate{fill:var(--accent);fill-opacity:.08;stroke:var(--accent);stroke-width:1.2}
+    .hh-bar{fill:currentColor;fill-opacity:.14}
+    .hh-bar2{fill:var(--accent)}
+    .hh-arr{fill:none;stroke:var(--accent);stroke-width:1.4;marker-end:url(#hh-ah)}
+    .hh-band{fill:currentColor;fill-opacity:.045}
+  </style>
+  <defs><marker id="hh-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>
+  <rect x="0" y="0" width="1000" height="130" rx="8" class="hh-band"/>
+  <text x="20" y="28" class="hh-h">外注 — コンサルティング案件ひとつ</text>
+  <rect x="20" y="44" width="190" height="40" rx="5" class="hh-box"/>
+  <text x="115" y="69" text-anchor="middle" class="hh-l">ブリーフを渡す</text>
+  <rect x="218" y="44" width="420" height="40" rx="5" class="hh-box"/>
+  <text x="428" y="69" text-anchor="middle" class="hh-l">ベンダーの調査 — 顧客からは見えない</text>
+  <rect x="646" y="44" width="190" height="40" rx="5" class="hh-box"/>
+  <text x="741" y="69" text-anchor="middle" class="hh-l">報告書の納品</text>
+  <text x="854" y="62" class="hh-big">約 2 か月</text>
+  <text x="854" y="82" class="hh-s">報酬 約 300 万円</text>
+  <text x="20" y="112" class="hh-s">顧客が受け取るのは報告書です。作業の手法、当たった情報源、各結論の背後にある判断は、ベンダーの手元に残ります。</text>
+  <rect x="0" y="146" width="1000" height="284" rx="8" class="hh-band"/>
+  <text x="20" y="174" class="hh-h">社内 — 専門家のパネル、ゲート付きの 12 ステージ</text>
+  <rect x="20" y="190" width="148" height="52" rx="5" class="hh-box"/>
+  <text x="32" y="210" class="hh-m">S0 · G0</text>
+  <text x="32" y="230" class="hh-l">受付</text>
+  <path d="M169 216 L181 216" class="hh-arr"/>
+  <rect x="182" y="190" width="148" height="52" rx="5" class="hh-box"/>
+  <text x="194" y="210" class="hh-m">S1 · G1</text>
+  <text x="194" y="230" class="hh-l">論点ツリー</text>
+  <path d="M331 216 L344 216" class="hh-arr"/>
+  <rect x="345" y="190" width="148" height="52" rx="5" class="hh-box"/>
+  <text x="357" y="210" class="hh-m">S2 · G2</text>
+  <text x="357" y="230" class="hh-l">作業計画</text>
+  <path d="M494 216 L506 216" class="hh-arr"/>
+  <rect x="507" y="190" width="148" height="52" rx="5" class="hh-gate"/>
+  <text x="519" y="210" class="hh-m">S3 · G3</text>
+  <text x="519" y="230" class="hh-l">ファクトパック</text>
+  <path d="M656 216 L669 216" class="hh-arr"/>
+  <rect x="670" y="190" width="148" height="52" rx="5" class="hh-box"/>
+  <text x="682" y="210" class="hh-m">S4 · G4</text>
+  <text x="682" y="230" class="hh-l">判定</text>
+  <path d="M819 216 L831 216" class="hh-arr"/>
+  <rect x="832" y="190" width="148" height="52" rx="5" class="hh-box"/>
+  <text x="844" y="210" class="hh-m">S5 · G5</text>
+  <text x="844" y="230" class="hh-l">ストーリーライン</text>
+  <rect x="20" y="274" width="148" height="52" rx="5" class="hh-box"/>
+  <text x="32" y="294" class="hh-m">S6 · G6</text>
+  <text x="32" y="314" class="hh-l">草稿</text>
+  <path d="M169 300 L181 300" class="hh-arr"/>
+  <rect x="182" y="274" width="148" height="52" rx="5" class="hh-gate"/>
+  <text x="194" y="294" class="hh-m">S7 · G7</text>
+  <text x="194" y="314" class="hh-l">ファクトチェック</text>
+  <path d="M331 300 L344 300" class="hh-arr"/>
+  <rect x="345" y="274" width="148" height="52" rx="5" class="hh-gate"/>
+  <text x="357" y="294" class="hh-m">S8 · G8</text>
+  <text x="357" y="314" class="hh-l">パネル+レッドチーム</text>
+  <path d="M494 300 L506 300" class="hh-arr"/>
+  <rect x="507" y="274" width="148" height="52" rx="5" class="hh-box"/>
+  <text x="519" y="294" class="hh-m">S9 · G9</text>
+  <text x="519" y="314" class="hh-l">改訂</text>
+  <path d="M656 300 L669 300" class="hh-arr"/>
+  <rect x="670" y="274" width="148" height="52" rx="5" class="hh-box"/>
+  <text x="682" y="294" class="hh-m">S10 · G10</text>
+  <text x="682" y="314" class="hh-l">ビルド</text>
+  <path d="M819 300 L831 300" class="hh-arr"/>
+  <rect x="832" y="274" width="148" height="52" rx="5" class="hh-box"/>
+  <text x="844" y="294" class="hh-m">S11 · G11</text>
+  <text x="844" y="314" class="hh-l">納品と振り返り</text>
+  <path d="M906 243 L906 258 L94 258 L94 271" class="hh-arr"/>
+  <text x="20" y="352" class="hh-s">色付きのステージは、モデルの一回の出力ではたいてい失敗する箇所です。すべての数字に格付けされた出典が要り、すべての主張は一次資料で開き直され、</text>
+  <text x="20" y="369" class="hh-s">各仮説にはレッドチームが書面で応じます。S3 では 6 体のファクトパック用サブエージェントが並行して動き、S8 には最大 15 のレンズを着席させられます。</text>
+  <text x="20" y="406"><tspan class="hh-big">2 時間足らず</tspan><tspan class="hh-s" dx="14">計算資源は数百円 · 手法、出典台帳、振り返りは版管理されたスキルとして社内に残る</tspan></text>
+</svg>
+  </div><figcaption>上のレーンは、外注した案件のうち顧客から見えた部分です。下のレーンはワークフォースの手法で、どのステージも、次のゲートが検査するファイルを残します。この調査の振り返りは、版管理されたリサーチスキルの較正セットになりました。そのため次の調査は、白紙からではなく手法から始まります。</figcaption>
+  </figure>
+  <div class="scroll"><table>
+    <thead><tr><th></th><th>外注したコンサルティング</th><th>ワークフォース</th></tr></thead>
+    <tbody>
+      <tr><td>費用</td><td class="dim">約 300 万円（報酬）</td><td class="dim">数百円の計算資源</td></tr>
+      <tr><td>所要時間</td><td class="dim">約 2 か月</td><td class="dim">2 時間足らず</td></tr>
+      <tr><td>品質と解像度</td><td class="dim">十分な水準の報告書</td><td class="dim">品質と情報の解像度の両方で、オペレーターが明らかに上と判断</td></tr>
+      <tr><td>顧客の手元に残るもの</td><td class="dim">報告書</td><td class="dim">報告書、格付けされた出典台帳、論点ツリー、レビュー記録、手法</td></tr>
+    </tbody>
+  </table></div>
+  <p>ここで示されているケイパビリティは、速さではありません。小さなリサーチ組織そのものです。案件リード、各分野のアナリスト、政策の読み手、市場戦略の担当、要となる数字をすべて一次資料で開き直す独立したファクトチェッカー、別の説明を提示し書面での応答を求めるレッドチーム、そしてストーリーラインに責任を持つ編集者。公開ゲートは、引用した情報源が 40 件に満たない報告書や、判定のない仮説を含む報告書を拒否します。</p>
+  <div class="pull">調査一本が数百円と 2 時間で済むなら、それは年に一度の買い物ではなくなり、チームが問いを持ったときにいつでも投げられるものになります。そして翌日には、もっと鋭くして、もう一度投げられます。</div>
+  <p class="note">これは一件の案件であり、品質の比較はオペレーターによる評価で、ブラインド評価ではありません。コンサルティング会社の報酬には、インタビューや既存の顧客関係など、この比較が値付けしていないものも含まれています。この比較が示しているのは、この種の仕事を社内で回せるようになったとき、時間とお金の使い方がどう変わるかです。</p>
+</section>
+
+<section id="s6">
+  <div class="eyebrow"><span class="num">06</span><span class="kicker">Media &amp; internal intelligence</span></div>
+  <h2>常設のチャネル</h2>
+  <p class="lede">顧客の仕事と並んで、この組織は自前のチャネルを毎日運営しています。実行の大半はここに費やされ、各レーンは誰かに提供される前に、まずここで実証されました。</p>
+  <div class="grid g2">
+    <div class="card"><span class="st live">稼働中</span><h3>日英二言語の出版物</h3><p>一次資料から書いた解説と、複数の解説を統合した分析を、一つのレコードから日本語と英語の両方で公開します。複数の候補を生成し、編集・分野・読者の審査役が採点します。ガードは、空の本文、途中で切れた本文、失敗の痕跡が残る本文をすべて拒否します。毎週、編集レビューが公開済みの記事を読みます。</p></div>
+    <div class="card"><span class="st live">稼働中</span><h3>ポッドキャスト</h3><p>公開済みの分析から、引用を必須として台本を作る一人語りのエピソードです。ナレーションを付け、権利とコンプライアンスを確認し、RSS で配信します。人間の承認ゲートが一つだけ台本に残っており、書面で定めた廃止条件を満たすまで続きます。</p></div>
+    <div class="card"><span class="st live">稼働中</span><h3>コミュニティと公開 Q&amp;A</h3><p>チャットでの定期的な発信と週次ダイジェスト、そしてパスワードで保護された公開 Q&amp;A ボードです。ボードではペルソナが、組織の公開文書に基づいてゲストの質問に答えます。</p></div>
+    <div class="card"><span class="st live">稼働中</span><h3>意思決定ダッシュボード</h3><p>コンソールは、誰が何に取り組んでいるか、今月の実行数と成果物、30 日間の活動ストリップ、ライフサイクルと PR の自動化率、スキルの成熟度とカタログの伸び、各プロジェクトの報告書を表示します。コストではなく実行時間を表示しているのは、推論コストがまだ実行ごとに観測できないためで、画面にもそう明記しています。</p></div>
+    <div class="card"><span class="st live">稼働中</span><h3>経営レター</h3><p>組織の長からの月次レター、七つの職能リードからの月次レター、組織とプロジェクトの週次状況、月次の予算とランウェイの見直し、そしてオペレーターの注意がどこに向かったかを記す週次の台帳です。</p></div>
+    <div class="card"><span class="st live">稼働中</span><h3>外部向けの下書き</h3><p>スポンサー向け報告書、ブリーフィング資料、プレゼン資料を下書きし、送付前の状態に置きます。エージェントが外部へ何かを送ることはありません。送るのは人間の行為です。</p></div>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="eyebrow"><span class="num">07</span><span class="kicker">Workflows</span></div>
+  <h2>ワークフローのレーン</h2>
+  <p class="lede">三つのグループに 12 本のレーンがあります。レーンとは、名前のある役割に結び付けられた版管理されたスキルの集まりで、スケジュールか、別のレーンからの引き継ぎによって起動されます。どのレーンも、人間が次の仕事を起票するのを待ちません。ほとんどのレーンには、止まって人に尋ねる地点が明記されています。</p>
+  <div class="scroll"><table>
+    <thead><tr><th>レーン</th><th>何が動くか</th><th>リズム</th><th>人間を待つとき</th></tr></thead>
+    <tbody>
+      <tr><td colspan="4" class="dim"><b>構築と統治</b></td></tr>
+      <tr><td>ソフトウェア開発</td><td class="dim">トリアージ → 設計ノートまたは実装 → ドラフト PR → 隔離されたレンズ別レビュー → マージまたは差し戻し</td><td class="dim">毎日。加えて、引き継ぎのたびにイベントで起動</td><td class="dim">統治ファイルに触れたとき。3 回の試行か 36 時間を超えたとき</td></tr>
+      <tr><td>保証と監査</td><td class="dim">難しい成果物一つへの敵対的監査。テストのないマージを探す検証スイープ。計画と出荷実績の突き合わせ</td><td class="dim">毎週</td><td class="dim">指摘が、修正ではなく判断を要するとき</td></tr>
+      <tr><td>運用とインシデント</td><td class="dim">すべての自動処理に対する異常監視（指摘一件に担当者一人）。インシデントのポストモーテム</td><td class="dim">毎日。発生時</td><td class="dim">担当者が人間のとき</td></tr>
+      <tr><td>合議</td><td class="dim">改正委員会が、規則の改正案に承認か却下を返す。職能横断のブレインストーミングが、統合した一つの見解を返す</td><td class="dim">オペレーターが招集</td><td class="dim">常に。委員会は助言し、人間が決める</td></tr>
+      <tr><td colspan="4" class="dim"><b>学習と創作</b></td></tr>
+      <tr><td>日次リサーチ</td><td class="dim">各デスクが政策・市場・技術の担当領域を走査し、組織がすでに知っていることとの重複を除く</td><td class="dim">毎日</td><td class="dim">—</td></tr>
+      <tr><td>調査研究と分析</td><td class="dim">顧客のブリーフから始まる 12 ステージのリサーチ。反復するデータ分析。仮説ボード付きの週次プロジェクト報告書</td><td class="dim">案件ごと。毎週</td><td class="dim">2 回のレビューで、要となる主張が決着しないとき</td></tr>
+      <tr><td>記事</td><td class="dim">解説 → 統合分析、日英二言語、複数の審査役。公開後の編集レビュー</td><td class="dim">スケジュールで毎日</td><td class="dim">編集ガードが本文を拒否したとき</td></tr>
+      <tr><td>ポッドキャストとコミュニティ</td><td class="dim">台本 → ナレーション → 権利確認 → 公開。ダイジェスト。Q&amp;A ボード</td><td class="dim">毎日</td><td class="dim">台本の承認</td></tr>
+      <tr><td colspan="4" class="dim"><b>運営と拡張</b></td></tr>
+      <tr><td>採用ラウンド</td><td class="dim">ギャップ分析とベンチマーク → 貢献・機会費用・協働で採点した候補者 → 上限に照らしたコスト確認</td><td class="dim">数週間ごと。これまでに 9 ラウンド</td><td class="dim">すべての採用の最終承認</td></tr>
+      <tr><td>報告</td><td class="dim">月次レター、週次状況、予算のランウェイ、注意の台帳、外部向けの下書き</td><td class="dim">毎週。毎月</td><td class="dim">何かを外部へ送るとき</td></tr>
+      <tr><td>組織の手入れ</td><td class="dim">全ペルソナの記憶の手入れ、矛盾と陳腐化の見回り、日次の教訓の抽出、スキル成熟度のレビュー</td><td class="dim">毎日。毎週</td><td class="dim">—</td></tr>
+      <tr><td>実績</td><td class="dim">すべての実行が、成果物とともに実績台帳に記録される。台帳を集計した報告はまだ構築中</td><td class="dim">実行ごと</td><td class="dim">—</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="s8">
+  <div class="eyebrow"><span class="num">08</span><span class="kicker">Governance</span></div>
+  <h2>統治の基盤</h2>
+  <p class="lede">自らを運営する組織には、誰かが覚えていることに頼らない規則が要ります。基盤は四層の法で、どの層も一つ下の層より変えにくくなっています。そこに、繰り返す失敗を新しい法に変えるループと、方向性・優先順位・支出・権限を定める四つの常設の決定が加わります。</p>
+  <div class="layers">
+    <div class="layer"><div class="lab">L0</div><div><h3>憲法</h3><p>どのエージェントも改正できない、少数の原則です。空のもの、途中で切れたもの、失敗の痕跡が残るものは公開しない。状態の種類ごとに、正とする情報源は一つ。単一オペレーターの規模を超える仕組みは持たない。大声で失敗し、劣化したものは決して公開しない。エージェントの人格は、監査された経路を通じてのみ変わる。</p></div></div>
+    <div class="layer"><div class="lab">L1</div><div><h3>法令と意思決定記録</h3><p>アーキテクチャ上の決定は書き残され、変えるときは新しい記録で置き換えます。その場で書き換えることはしません。そのため制約の理由は、それを定めた人がいなくなっても残ります。意思決定記録は現在 45 本あります。</p></div></div>
+    <div class="layer"><div class="lab">L2</div><div><h3>規則</h3><p>機械が執行する規則です。公開時のガード、デプロイゲート、CI でのレジストリと配線の検査。違反するとビルドが赤になるか、書き込みが拒否されます。番号付きの規則は 19 本あります。</p></div></div>
+    <div class="layer"><div class="lab">L3</div><div><h3>ランブック</h3><p>レーンが失敗して判断が必要になったときに何をするか。追い込まれてから組み立て直すのではなく、前もって書いておきます。エージェントはこれを自由に編集できます。</p></div></div>
+    <div class="layer"><div class="lab">ループ</div><div><h3>再発ラチェット</h3><p>繰り返す失敗はすべて記録されます。90 日以内に二度目が起きると、規則に格上げされます。検査を作るほどではない現実の隙間は、いつまでも再発見し続けることのないよう、リスク台帳に署名して受け入れます。記録された 39 件の失敗モードのうち、9 件がゲートになり、12 件が署名済みの受け入れ、18 件が観察中です。</p></div></div>
+  </div>
+  <div class="grid g2" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr))">
+    <div class="card"><h3>方向性</h3><p>ミッション、ビジョン、バリューは、毎回の実行ですべてのエージェントのコンテキストに入ります。9 月からは、明示的な選択も含んでいます。この組織は、既存のものを安くすることではなく、新しいことを可能にすることに自らを費やし、やらないことも列挙しています。</p></div>
+    <div class="card"><h3>優先順位</h3><p>エピックのロードマップ、実際に出荷したものと突き合わせたバックログ、そしてオペレーターの注意の週次台帳が、レーンが次に何に取り組むかを決めます。</p></div>
+    <div class="card"><h3>予算</h3><p>総額の上限は一つだけ、月 USD 600 です。書き込みの境界と請求アラームで執行されます。エージェントごとの数字は測定し報告していますが、もう実行を止めることはありません。9 月のインシデントで、黙って効く上限は、節約する額よりも滞った仕事で失うもののほうが大きいとわかったためです。</p></div>
+    <div class="card"><h3>権限</h3><p>エージェントは、明示された範囲の内側で動きます。マージは、リポジトリ自身の統治が委任した場合に限られ、統治ファイルには決して及びません。法の改正、エージェントの人格の変更、上限を超える支出、外部への送付は、一人の人間に属します。</p></div>
+  </div>
+  <p class="note">この多くは、先に何かが壊れたから存在しています。あるサイトは、すべての検査が緑のまま一週間、白紙のページを配信しました。予算の上限が、レビューのパイプラインを 3 日間黙って止めました。どちらも今はゲートか意思決定記録になっています。正直に言えるのは、統治がケイパビリティより先にあったということではありません。どのレーンも、その副作用に機械的なガードを備えずに外の世界へ働きかけることはできない、ということです。</p>
+</section>
+
+<section id="s9">
+  <div class="eyebrow"><span class="num">09</span><span class="kicker">Limits</span></div>
+  <h2>示せたこと、示せていないこと</h2>
+  <p class="lede">ケイパビリティの説明が役に立つのは、その根拠がどこで尽きるかを言うときだけです。</p>
+  <ul>
+    <li><b>示せたこと：</b>一人の人間のもとにある AI の専門家の組織が、本番のソフトウェア製品、複数ラウンドのデータ分析、意思決定に耐える市場調査、日々のメディアチャネル群を同時に担い、すべての実行を記録したこと。</li>
+    <li><b>示せたこと：</b>どのレーンにも、止まって判断を人間に渡す機械的な地点があること。そして失敗が語り継がれるのではなく、ゲートに変換されていること。</li>
+    <li><b>示せていないこと：</b>これらの結果のどれかが一般化できること。各成果は一件の案件です。リサーチの比較は、オペレーターが判断した一回きりの直接比較であり、統制されたベンチマークではありません。</li>
+    <li><b>まだ測っていないこと：</b>成果物あたりのコスト、時間を通じた品質の推移、人間のレビュー時間。これらを根拠に変えるために何が必要かは、<a href="/docs/whitepaper#s10">ホワイトペーパー</a>に挙げています。</li>
+  </ul>
+  <p>四つの成果に共通しているのは、これらの文書群の他の箇所でも行っている主張です。ケイパビリティは、統治され、改善し続ける社内の資産として保有し、案件ごとに運用できる。業界は顧客ごとに変わります。ループ、つまり届けて監査する、仮説を立てて反復する、調べて検証する、は変わりません。</p>
+</section>

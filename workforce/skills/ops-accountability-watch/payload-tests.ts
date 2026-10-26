@@ -2,7 +2,7 @@
 // ESM script, not TS; vitest/esbuild imports it fine at runtime. Discovered
 // by workforce/lambdas/vitest.config.mjs (`include: ["../skills/**/*-tests.ts"]`).
 import { describe, it, expect } from "vitest";
-import { buildIssueSpec, buildNotificationPayload, toDiscordWebhookBody, ISSUE_TITLE_PREFIX } from "./payload.mjs";
+import { buildIssueSpec, labelsForCreate, labelsForUpdate, buildNotificationPayload, toDiscordWebhookBody, ISSUE_TITLE_PREFIX } from "./payload.mjs";
 
 function finding(overrides) {
   return {
@@ -25,16 +25,48 @@ describe("buildIssueSpec", () => {
     expect(spec.title).toBe(`${ISSUE_TITLE_PREFIX} deploy-article-site.yml — failure`);
   });
 
-  it("always carries type:ops + layer:L3 + a project: label + an owner: label", () => {
+  it("carries type:ops + layer:L3 + a project: label and never an owner: label", () => {
     const spec = buildIssueSpec(finding());
-    expect(spec.labels).toEqual(expect.arrayContaining(["type:ops", "layer:L3", "project:article", "owner:elena"]));
+    expect(spec.labels).toEqual(["type:ops", "layer:L3", "project:article"]);
+    expect(spec.createLabels.some((l) => l.startsWith("owner:"))).toBe(false);
+  });
+
+  it("files new issues as stage:proposed, but re-fires never re-stamp the stage", () => {
+    const spec = buildIssueSpec(finding());
+    expect(spec.createLabels).toEqual(["type:ops", "layer:L3", "project:article", "stage:proposed"]);
+    expect(spec.labels).not.toContain("stage:proposed");
   });
 
   it("embeds the owner, the reason, and the close condition in the body", () => {
     const spec = buildIssueSpec(finding());
-    expect(spec.body).toContain("`elena`");
+    expect(spec.body).toContain("**Suggested owner**: `elena`");
     expect(spec.body).toContain("article publish/content pipeline");
     expect(spec.body).toContain("Close when the next run succeeds.");
+  });
+
+  it("pins the `**Suggested owner**: `<slug>`` line format the router parses", () => {
+    const spec = buildIssueSpec(finding({ owner: "petra" }));
+    expect(spec.body.split("\n")).toContain(
+      "**Suggested owner**: `petra` — article publish/content pipeline (per owner-routing.mjs)",
+    );
+  });
+
+  it("every update label is also a create label (labels ⊆ createLabels, so ensureLabelExists covers both)", () => {
+    const spec = buildIssueSpec(finding());
+    for (const l of spec.labels) expect(spec.createLabels).toContain(l);
+  });
+
+  it("create sends stage:proposed; the update path never does", () => {
+    const spec = buildIssueSpec(finding());
+    expect(labelsForCreate(spec)).toContain("stage:proposed");
+    expect(labelsForUpdate([{ name: "type:ops" }], spec)).not.toContain("stage:proposed");
+  });
+
+  it("update keeps legacy owner:<slug> and a router-set stage label (legacy-label tolerance; mixed population until legacy issues close)", () => {
+    const spec = buildIssueSpec(finding());
+    const merged = labelsForUpdate([{ name: "owner:elena" }, "stage:assigned", { name: "type:ops" }], spec);
+    expect(merged).toEqual(expect.arrayContaining(["owner:elena", "stage:assigned", "type:ops", "layer:L3", "project:article"]));
+    expect(merged).not.toContain("stage:proposed");
   });
 
   it("throws rather than silently omitting a required field", () => {

@@ -1,0 +1,60 @@
+{
+  "slug": "sunzi",
+  "title": "孫子の兵法",
+  "subtitle": "不確実性を減らし、勝算を高める古典を、原文から読む",
+  "lang": "ja",
+  "kicker": "Web book · 日本語",
+  "description": "二千数百年前の兵法書を、十三篇の順に原文・訓読・現代語訳で読み、意思決定分析や安全工学、流体や情報セキュリティなど別の分野と同じ形で結び直す前編。孫子の方法論を現代のプロジェクトとチーム、そして AI エージェントの会社に置いてみる後編。文庫本一冊の分量で、途中から続きを読める。",
+  "authors": ["ingrid", "sora", "rhys", "bruno", "tomas", "clara", "linnea", "beatriz", "nadia", "maya", "rafael", "aoi"],
+  "version": "1.0.0",
+  "updated": "2026-10-05",
+  "parts": [
+    {
+      "id": "front",
+      "title": "はじめに",
+      "chapters": [
+        { "id": "preface", "file": "chapters/00-preface.md", "title": "序 — なぜ、いま孫子を原文で読むのか", "kicker": "序" },
+        { "id": "intro", "file": "chapters/00b-intro.md", "title": "孫子とは何か — 人・本・時代", "kicker": "導入" }
+      ]
+    },
+    {
+      "id": "part-1",
+      "title": "前編 原文を読む",
+      "chapters": [
+        { "id": "01-ji", "file": "chapters/01-ji.md", "title": "計篇 — 戦う前に、数える", "kicker": "第一篇" },
+        { "id": "02-zuozhan", "file": "chapters/02-zuozhan.md", "title": "作戦篇 — 戦争は高い", "kicker": "第二篇" },
+        { "id": "03-mougong", "file": "chapters/03-mougong.md", "title": "謀攻篇 — 戦わずに勝つ", "kicker": "第三篇" },
+        { "id": "04-xing", "file": "chapters/04-xing.md", "title": "形篇 — 勝ってから戦う", "kicker": "第四篇" },
+        { "id": "05-shi", "file": "chapters/05-shi.md", "title": "勢篇 — 勢いをつくる", "kicker": "第五篇" },
+        { "id": "06-xushi", "file": "chapters/06-xushi.md", "title": "虚実篇 — 動かし、動かされない", "kicker": "第六篇" },
+        { "id": "07-junzheng", "file": "chapters/07-junzheng.md", "title": "軍争篇 — 迂直の計", "kicker": "第七篇" },
+        { "id": "08-jiubian", "file": "chapters/08-jiubian.md", "title": "九変篇 — 原則を破る原則", "kicker": "第八篇" },
+        { "id": "09-xingjun", "file": "chapters/09-xingjun.md", "title": "行軍篇 — 地を読み、兆候を読む", "kicker": "第九篇" },
+        { "id": "10-dixing", "file": "chapters/10-dixing.md", "title": "地形篇 — 地と将の責任", "kicker": "第十篇" },
+        { "id": "11-jiudi", "file": "chapters/11-jiudi.md", "title": "九地篇 — 状況が人を変える", "kicker": "第十一篇" },
+        { "id": "12-huogong", "file": "chapters/12-huogong.md", "title": "火攻篇 — 道具と自制", "kicker": "第十二篇" },
+        { "id": "13-yongjian", "file": "chapters/13-yongjian.md", "title": "用間篇 — 知ることに金を払う", "kicker": "第十三篇" },
+        { "id": "part1-summary", "file": "chapters/14-part1-summary.md", "title": "前編を終えて — 十三篇を一本の線に", "kicker": "前編まとめ" }
+      ]
+    },
+    {
+      "id": "part-2",
+      "title": "後編 現代とプロジェクトへ",
+      "chapters": [
+        { "id": "15-method", "file": "chapters/15-method.md", "title": "孫子の方法論 — 不確実性を減らす五つの動作", "kicker": "後編 I" },
+        { "id": "16-project-ji", "file": "chapters/16-project-ji.md", "title": "プロジェクトの「計」— 始める前に勝算を数える", "kicker": "後編 II" },
+        { "id": "17-xing-shi-team", "file": "chapters/17-xing-shi-team.md", "title": "「形」と「勢」をつくる — 勝ってから着手するチーム", "kicker": "後編 III" },
+        { "id": "18-where-to-play", "file": "chapters/18-where-to-play.md", "title": "虚実と軍争 — 価値のある場所を選び、迂路を取る", "kicker": "後編 IV" },
+        { "id": "19-workforce", "file": "chapters/19-workforce.md", "title": "メンバーが集って価値を高める — AI エージェントの会社に孫子を置く", "kicker": "後編 V" }
+      ]
+    },
+    {
+      "id": "back",
+      "title": "おわりに",
+      "chapters": [
+        { "id": "epilogue", "file": "chapters/20-epilogue.md", "title": "終章 — 孫子が語らなかったこと", "kicker": "終章" },
+        { "id": "quotes", "file": "chapters/99-quotes.md", "title": "付録 名言集 — 十三篇の原文と訓読", "kicker": "付録", "short": true, "generated": "quotes" }
+      ]
+    }
+  ]
+}

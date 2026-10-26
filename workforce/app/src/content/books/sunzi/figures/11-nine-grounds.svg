@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 800" role="img" aria-labelledby="f11-title f11-desc" class="f11">
+  <title id="f11-title">図13 九地と率然 — 状況が人を変える</title>
+  <desc id="f11-desc">九地篇の九つの地を、自国内の散地から退路のない死地まで、深く入るほど濃くなる帯として並べ、それぞれの対処を添える。下段は常山の蛇「率然」：首を撃てば尾が、尾を撃てば首が、中を撃てば首尾がともに応じる。</desc>
+  <style>
+    .f11 text{font-family:inherit}
+    .f11-h{font-size:14px;fill:var(--book-ink-2);letter-spacing:.08em}
+    .f11-n{font-size:18px;font-weight:700;fill:var(--book-ink)}
+    .f11-s{font-size:15px;fill:var(--book-ink-2)}
+    .f11-a{font-size:15px;font-weight:600;fill:var(--book-ink)}
+    .f11-ax{font-size:13px;fill:var(--book-ink-2)}
+    .f11-st{font-size:16px;font-weight:700;fill:var(--book-ink)}
+    .f11-o{font-size:13px;fill:var(--book-ink-2)}
+    .f11-lb{font-size:16px;font-weight:700;fill:var(--book-ink-2)}
+    .f11-c{font-size:14px;fill:var(--book-ink)}
+    .f11-row{fill:var(--book-accent);stroke:var(--book-line);stroke-width:1}
+    .f11-r0{fill-opacity:.03}.f11-r1{fill-opacity:.06}.f11-r2{fill-opacity:.09}
+    .f11-r3{fill-opacity:.12}.f11-r4{fill-opacity:.15}.f11-r5{fill-opacity:.18}
+    .f11-r6{fill-opacity:.21}.f11-r7{fill-opacity:.25}.f11-r8{fill-opacity:.30}
+    .f11-axis{fill:none;stroke:var(--book-accent);stroke-width:1.5;marker-end:url(#fig11-aha)}
+    .f11-ahpa{fill:var(--book-accent)}
+    .f11-panel{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+    .f11-body{fill:none;stroke:var(--book-ink-2);stroke-width:7;stroke-linecap:round;stroke-linejoin:round}
+    .f11-head{fill:var(--book-ink-2)}
+    .f11-eye{fill:var(--book-bg)}
+    .f11-hit{fill:none;stroke:var(--book-accent);stroke-width:2;stroke-linecap:round}
+    .f11-resp{fill:none;stroke:var(--book-accent);stroke-width:1.5;stroke-dasharray:5 4;marker-end:url(#fig11-aha)}
+    .f11-rule{fill:none;stroke:var(--book-line);stroke-width:1}
+  </style>
+  <defs>
+    <marker id="fig11-aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="f11-ahpa"/></marker>
+  </defs>
+
+  <!-- headers -->
+  <text x="50" y="40" text-anchor="middle" class="f11-ax">自国内</text>
+  <text x="128" y="40" text-anchor="middle" class="f11-h">九地</text>
+  <text x="190" y="40" class="f11-h">どんな地か</text>
+  <text x="500" y="40" class="f11-h">どうするか</text>
+
+  <!-- depth axis -->
+  <path d="M50 58 L50 462" class="f11-axis"/>
+  <text x="50" y="488" text-anchor="middle" class="f11-ax">退路なし</text>
+
+  <!-- nine grounds -->
+  <rect x="90" y="56" width="600" height="40" rx="4" class="f11-row f11-r0"/>
+  <text x="108" y="82" class="f11-n">散地</text>
+  <text x="190" y="82" class="f11-s">自国の中で戦う</text>
+  <text x="500" y="82" class="f11-a">戦わない</text>
+
+  <rect x="90" y="102" width="600" height="40" rx="4" class="f11-row f11-r1"/>
+  <text x="108" y="128" class="f11-n">軽地</text>
+  <text x="190" y="128" class="f11-s">敵地に浅く入る</text>
+  <text x="500" y="128" class="f11-a">止まらない</text>
+
+  <rect x="90" y="148" width="600" height="40" rx="4" class="f11-row f11-r2"/>
+  <text x="108" y="174" class="f11-n">争地</text>
+  <text x="190" y="174" class="f11-s">得た方が利を得る</text>
+  <text x="500" y="174" class="f11-a">攻めない</text>
+
+  <rect x="90" y="194" width="600" height="40" rx="4" class="f11-row f11-r3"/>
+  <text x="108" y="220" class="f11-n">交地</text>
+  <text x="190" y="220" class="f11-s">彼我とも往来できる</text>
+  <text x="500" y="220" class="f11-a">連絡を絶たない</text>
+
+  <rect x="90" y="240" width="600" height="40" rx="4" class="f11-row f11-r4"/>
+  <text x="108" y="266" class="f11-n">衢地</text>
+  <text x="190" y="266" class="f11-s">三国に通じる要地</text>
+  <text x="500" y="266" class="f11-a">外交を結ぶ</text>
+
+  <rect x="90" y="286" width="600" height="40" rx="4" class="f11-row f11-r5"/>
+  <text x="108" y="312" class="f11-n">重地</text>
+  <text x="190" y="312" class="f11-s">敵地に深く入る</text>
+  <text x="500" y="312" class="f11-a">現地で糧を得る</text>
+
+  <rect x="90" y="332" width="600" height="40" rx="4" class="f11-row f11-r6"/>
+  <text x="108" y="358" class="f11-n">圮地</text>
+  <text x="190" y="358" class="f11-s">山林・沼沢の難路</text>
+  <text x="500" y="358" class="f11-a">速く通り過ぎる</text>
+
+  <rect x="90" y="378" width="600" height="40" rx="4" class="f11-row f11-r7"/>
+  <text x="108" y="404" class="f11-n">囲地</text>
+  <text x="190" y="404" class="f11-s">入口狭く帰路は迂回</text>
+  <text x="500" y="404" class="f11-a">謀で抜ける</text>
+
+  <rect x="90" y="424" width="600" height="40" rx="4" class="f11-row f11-r8"/>
+  <text x="108" y="450" class="f11-n">死地</text>
+  <text x="190" y="450" class="f11-s">速く戦わねば亡ぶ</text>
+  <text x="500" y="450" class="f11-a">戦う</text>
+
+  <!-- 率然 -->
+  <rect x="30" y="506" width="660" height="272" rx="6" class="f11-panel"/>
+  <text x="50" y="536" class="f11-st">率然 — 常山の蛇</text>
+  <text x="670" y="536" text-anchor="end" class="f11-o">攜手若使一人</text>
+
+  <path d="M150 640 C230 540 500 540 580 610" class="f11-resp"/>
+  <text x="365" y="550" text-anchor="middle" class="f11-c">尾が応じて至る</text>
+
+  <path d="M140 662 C200 610 260 610 320 650 S440 700 500 652 S560 628 582 636" class="f11-body"/>
+  <ellipse cx="598" cy="636" rx="18" ry="12" class="f11-head"/>
+  <circle cx="605" cy="632" r="2.2" class="f11-eye"/>
+
+  <path d="M622 620 L636 606" class="f11-hit"/>
+  <path d="M628 630 L648 626" class="f11-hit"/>
+  <path d="M612 614 L616 596" class="f11-hit"/>
+  <text x="642" y="604" class="f11-c">撃つ</text>
+
+  <text x="598" y="674" text-anchor="middle" class="f11-lb">首</text>
+  <text x="410" y="724" text-anchor="middle" class="f11-lb">中</text>
+  <text x="140" y="694" text-anchor="middle" class="f11-lb">尾</text>
+
+  <path d="M50 734 L670 734" class="f11-rule"/>
+  <text x="140" y="760" text-anchor="middle" class="f11-c">首を撃てば尾</text>
+  <text x="360" y="760" text-anchor="middle" class="f11-c">尾を撃てば首</text>
+  <text x="580" y="760" text-anchor="middle" class="f11-c">中を撃てば首尾</text>
+</svg>

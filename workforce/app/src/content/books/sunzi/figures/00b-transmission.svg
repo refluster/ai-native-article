@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 660" role="img" aria-labelledby="f0t-title f0t-desc">
+<title id="f0t-title">図1 テキストの伝来</title>
+<desc id="f0t-desc">前漢の竹簡、曹操の魏武注、十一家注と武経七書を経て、日本（760年の記録、1606年の伏見版、江戸の注釈）と西洋（1772年の仏訳、1905年・1910年の英訳）へ分かれる系統図。</desc>
+<style>
+.f0t-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+.f0t-boxa{fill:var(--book-panel);stroke:var(--book-accent);stroke-width:1.5}
+.f0t-ln{fill:none;stroke:var(--book-line);stroke-width:1.2}
+.f0t-ln2{fill:none;stroke:var(--book-ink-2);stroke-width:1.3}
+.f0t-dash{fill:none;stroke:var(--book-ink-2);stroke-width:1.2;stroke-dasharray:4 4}
+.f0t-acc{fill:none;stroke:var(--book-accent);stroke-width:1.6}
+.f0t-arr{fill:none;stroke:var(--book-ink-2);stroke-width:1.3;marker-end:url(#f0t-ah)}
+.f0t-arra{fill:none;stroke:var(--book-accent);stroke-width:1.6;marker-end:url(#f0t-aha)}
+.f0t-ahp{fill:var(--book-ink-2)}
+.f0t-ahap{fill:var(--book-accent)}
+.f0t-h{font-family:inherit;font-size:20px;font-weight:600;fill:var(--book-ink)}
+.f0t-t{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-ink)}
+.f0t-b{font-family:inherit;font-size:16px;fill:var(--book-ink)}
+.f0t-s{font-family:inherit;font-size:15px;fill:var(--book-ink-2)}
+.f0t-xs{font-family:inherit;font-size:14px;fill:var(--book-ink-2)}
+.f0t-k{font-family:inherit;font-size:14px;font-weight:600;fill:var(--book-accent);letter-spacing:.08em}
+.f0t-ta{font-family:inherit;font-size:17px;font-weight:600;fill:var(--book-accent)}
+.f0t-big{font-family:inherit;font-size:30px;font-weight:600;fill:var(--book-ink)}
+
+.f0t-arrd{fill:none;stroke:var(--book-ink-2);stroke-width:1.2;stroke-dasharray:4 4;marker-end:url(#f0t-ah)}
+.f0t-ga{font-family:inherit;font-size:20px;font-weight:600;fill:var(--book-accent)}
+.f0t-pt{fill:var(--book-ink-2)}
+.f0t-era{font-family:inherit;font-size:13px;font-weight:600;fill:var(--book-ink-2);letter-spacing:.06em}
+</style>
+<defs><marker id="f0t-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f0t-ahp" d="M0 0L10 5L0 10z"/></marker><marker id="f0t-aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="f0t-ahap" d="M0 0L10 5L0 10z"/></marker></defs>
+<rect x="180" y="30" width="360" height="80" rx="6" class="f0t-boxa"/>
+<text x="360" y="54" class="f0t-era" text-anchor="middle">前漢の写本</text>
+<text x="360" y="78" class="f0t-t" text-anchor="middle">竹簡孫子</text>
+<text x="360" y="98" class="f0t-s" text-anchor="middle">1972年 銀雀山で出土</text>
+<line x1="360" y1="112" x2="360" y2="138" class="f0t-arr"/>
+<rect x="180" y="140" width="360" height="80" rx="6" class="f0t-box"/>
+<text x="360" y="164" class="f0t-era" text-anchor="middle">後漢末・200年頃</text>
+<text x="360" y="188" class="f0t-t" text-anchor="middle">魏武注（曹操）</text>
+<text x="360" y="208" class="f0t-s" text-anchor="middle">今の十三篇の基になる</text>
+<path d="M360 222 V246 M195 246 H525" class="f0t-ln2"/>
+<line x1="195" y1="246" x2="195" y2="268" class="f0t-arr"/>
+<line x1="525" y1="246" x2="525" y2="268" class="f0t-arr"/>
+<rect x="40" y="270" width="310" height="80" rx="6" class="f0t-box"/>
+<text x="195" y="294" class="f0t-era" text-anchor="middle">唐〜宋</text>
+<text x="195" y="318" class="f0t-t" text-anchor="middle">十一家注</text>
+<text x="195" y="338" class="f0t-s" text-anchor="middle">歴代の注を集める</text>
+<rect x="370" y="270" width="310" height="80" rx="6" class="f0t-box"/>
+<text x="525" y="294" class="f0t-era" text-anchor="middle">北宋・1083年頃</text>
+<text x="525" y="318" class="f0t-t" text-anchor="middle">武経七書</text>
+<text x="525" y="338" class="f0t-s" text-anchor="middle">七つの兵書を校訂</text>
+<path d="M195 352 V378 M525 352 V378 M195 378 H525" class="f0t-ln2"/>
+<line x1="195" y1="378" x2="195" y2="418" class="f0t-arr"/>
+<line x1="525" y1="378" x2="525" y2="418" class="f0t-arr"/>
+<text x="205" y="404" class="f0t-xs">江戸の版本へ</text>
+<text x="535" y="404" class="f0t-xs">満洲語訳を経て</text>
+<path d="M180 180 H24 V452 H36" class="f0t-arrd"/>
+<text x="34" y="170" class="f0t-xs">唐代に伝来</text>
+<rect x="40" y="420" width="310" height="218" rx="6" class="f0t-box"/>
+<text x="64" y="454" class="f0t-ga">日本</text>
+<line x1="72" y1="482" x2="72" y2="606" class="f0t-ln"/>
+<circle cx="72" cy="485" r="5" class="f0t-pt"/>
+<text x="90" y="490" class="f0t-t">760年</text>
+<text x="90" y="511" class="f0t-s">最古の記録（続日本紀）</text>
+<circle cx="72" cy="539" r="5" class="f0t-pt"/>
+<text x="90" y="544" class="f0t-t">1606年</text>
+<text x="90" y="565" class="f0t-s">伏見版で初めて印刷</text>
+<circle cx="72" cy="593" r="5" class="f0t-pt"/>
+<text x="90" y="598" class="f0t-t">江戸時代</text>
+<text x="90" y="619" class="f0t-s">注釈書が50種を超える</text>
+<rect x="370" y="420" width="310" height="218" rx="6" class="f0t-box"/>
+<text x="394" y="454" class="f0t-ga">西洋</text>
+<line x1="402" y1="482" x2="402" y2="606" class="f0t-ln"/>
+<circle cx="402" cy="485" r="5" class="f0t-pt"/>
+<text x="420" y="490" class="f0t-t">1772年</text>
+<text x="420" y="511" class="f0t-s">仏訳（アミオ）</text>
+<circle cx="402" cy="539" r="5" class="f0t-pt"/>
+<text x="420" y="544" class="f0t-t">1905年</text>
+<text x="420" y="565" class="f0t-s">初の英訳</text>
+<circle cx="402" cy="593" r="5" class="f0t-pt"/>
+<text x="420" y="598" class="f0t-t">1910年</text>
+<text x="420" y="619" class="f0t-s">ジャイルズの英訳</text>
+</svg>

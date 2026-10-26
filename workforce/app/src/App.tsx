@@ -21,6 +21,8 @@ import Reports from './pages/Reports';
 import ReportView from './pages/ReportView';
 import Account from './pages/Account';
 import Messaging from './pages/Messaging';
+import Rooms from './pages/Rooms';
+import Room from './pages/Room';
 import Notifications from './pages/Notifications';
 import AuthCallback from './pages/AuthCallback';
 import Landing from './pages/Landing';
@@ -28,16 +30,22 @@ import Board from './pages/Board';
 import Research from './pages/Research';
 import ResearchArticle from './pages/ResearchArticle';
 import Docs from './pages/Docs';
+import Books from './pages/Books';
+import Book from './pages/Book';
 import AuthBoundary from './components/AuthBoundary';
 import PublicShell from './components/PublicShell';
 import { SkeletonText } from './components/Skeleton';
 import { routerBaseName } from './lib/paths';
 import { trackPageView } from '@kohuehara/shared/analytics';
 
-/** The document page carries the three documents' bodies (~170 KB of
- *  HTML, lib/docs-bodies.ts). Lazy so the console's main bundle — which
- *  every signed-in page load pays for — does not. */
+/** The document page is lazy, and each edition's body is its own chunk
+ *  loaded on demand (lib/docs-bodies.ts), so the console's main bundle —
+ *  which every signed-in page load pays for — carries neither. */
 const Doc = lazy(() => import('./pages/Doc'));
+
+/** The reading view carries react-markdown's book components and its own
+ *  chrome; the chapter bodies are separate lazy chunks (lib/books.ts). */
+const BookChapter = lazy(() => import('./pages/BookChapter'));
 
 function DocLoading() {
   return (
@@ -140,6 +148,11 @@ function ProtectedRoutes() {
             <Route path="/reports/:project/:slug" element={<ReportView />} />
             <Route path="/account" element={<Account />} />
             <Route path="/messaging" element={<Messaging />} />
+            {/* Rooms are purpose-first deliberation: a question first, then
+                the members summoned to settle it (threads are the
+                participant-first twin above). Operator-only, like /messaging. */}
+            <Route path="/rooms" element={<Rooms />} />
+            <Route path="/rooms/:id" element={<Room />} />
             <Route path="/notifications" element={<Notifications />} />
           </Routes>
         </main>
@@ -172,6 +185,21 @@ export default function App() {
           element={
             <Suspense fallback={<DocLoading />}>
               <Doc />
+            </Suspense>
+          }
+        />
+        {/* Web books: the shelf and a book's cover in PublicShell; the
+            chapter reader in its own chrome (components/book/BookShell),
+            lazy so the console bundle does not carry it. The fallback is
+            blank on purpose — the reader paints its own skeleton within a
+            frame, and a PublicShell flash would be the wrong chrome. */}
+        <Route path="/books" element={<Books />} />
+        <Route path="/books/:slug" element={<Book />} />
+        <Route
+          path="/books/:slug/:chapterId"
+          element={
+            <Suspense fallback={<div className="min-h-screen" aria-busy />}>
+              <BookChapter />
             </Suspense>
           }
         />

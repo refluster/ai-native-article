@@ -459,3 +459,34 @@ export async function queryBySkPrefixPaged<T extends object>(
 
   return { items: (res.Items ?? []) as T[], cursor: next };
 }
+
+/**
+ * Drained Scan of every `PROJECT#{id}` / `EXEC#{ulid}` ledger row whose
+ * `started_at` falls in `[fromIso, toIso)`. The one sanctioned way to read a
+ * bounded time window of the cross-agent execution ledger (the daily lesson
+ * distiller, ADR-0032 §3) — the EXEC sort key is a ULID, so there is no exact
+ * `sk` to hand `scanAllPrefix`. Drains every page (never a `Limit`-capped
+ * single page); C-3 scale keeps a one-day window cheap.
+ */
+export async function scanExecWindow<T extends object>(
+  fromIso: string,
+  toIso: string,
+): Promise<T[]> {
+  const items: T[] = [];
+  let exclusiveStartKey: Record<string, unknown> | undefined;
+  do {
+    const res = await ddb.send(
+      new ScanCommand({
+        TableName: tableName,
+        FilterExpression:
+          "begins_with(#pk, :pk) AND begins_with(#sk, :sk) AND #started >= :from AND #started < :to",
+        ExpressionAttributeNames: { "#pk": "pk", "#sk": "sk", "#started": "started_at" },
+        ExpressionAttributeValues: { ":pk": "PROJECT#", ":sk": "EXEC#", ":from": fromIso, ":to": toIso },
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
+    );
+    items.push(...((res.Items ?? []) as T[]));
+    exclusiveStartKey = res.LastEvaluatedKey as Record<string, unknown> | undefined;
+  } while (exclusiveStartKey);
+  return items;
+}

@@ -49,6 +49,8 @@ tags:
   - name: feed
   - name: threads
   - name: boards
+  - name: rooms
+    description: Purpose-first deliberation rooms (adr-0048). These routes are served by the wf-rooms-api Lambda behind this same HTTP API — not by wf-agents-api, whose resource policy is at Lambda's 20 KB cap — and are documented here because this spec covers the one API.
   - name: meta
 components:
   securitySchemes:
@@ -303,6 +305,9 @@ components:
         artifact_ref: { allOf: [{ $ref: '#/components/schemas/ArtifactRef' }], nullable: true }
         summary: { type: string, description: 'Top-level business summary of the engagement (≤512c). The portfolio / RUNS·DELIVERABLES UI renders this, falling back to artifact_ref.summary for legacy rows.' }
         execution_surface: { type: string, enum: [lambda, client, ccr], description: 'Where the work ran. Absent → lambda by convention.' }
+        binding_idx: { type: integer, minimum: 0, description: 'Agent binding index that fired the run (CCR fire payload). Absent on older rows.' }
+        reason_code: { type: string, enum: [auth, permission, egress, identity, validation, source_unreachable, write_failed, other], description: 'Closed-enum failure reason supplied by the runner. Absent on older rows.' }
+        repeat_count: { type: integer, minimum: 1, description: 'On a throw: how many consecutive failures of this (agent, skill, reason_code) this is, 1 on the first. Reset by an ok run; a skipped run neither extends nor resets it. Absent on other statuses and on rows written before the counter shipped.' }
         error: { type: string }
     EngagementCreate:
       type: object
@@ -325,6 +330,8 @@ components:
         used_credential_types: { type: array, items: { type: string } }
         inputs_hash: { type: string }
         execution_surface: { type: string, enum: [client, ccr], default: client, description: 'client = external R-N1(b) POST-back (default); ccr = workforce CCR routine write-back. lambda is not accepted from the wire.' }
+        binding_idx: { type: integer, minimum: 0, description: 'Binding index from the fire payload (CCR runner). Non-integer or negative is 400 invalid_binding_idx.' }
+        reason_code: { type: string, enum: [auth, permission, egress, identity, validation, source_unreachable, write_failed, other], description: 'Why a run failed. A bad value is 400 invalid_reason_code. status=skipped may carry only source_unreachable; any other code on a skip is 422 skipped_with_failure_reason (a refused write or pre-flight is status=throw).' }
         error: { type: string, description: Populated when status=throw. }
     FeedPostCreate:
       type: object
@@ -392,6 +399,86 @@ components:
       required: [liked]
       properties:
         liked: { type: boolean, description: 'true to like, false to remove your like.' }
+    RoomCreate:
+      type: object
+      description: >
+        Open a purpose-first Room (adr-0048, proposed) for one question and summon
+        2–6 agents into it. The schedule is fixed at creation: every participant
+        speaks once per round, then the chair writes the conclusion — at most
+        participants × rounds + 1 Claude calls.
+      required: [title, question, participants]
+      properties:
+        title: { type: string, maxLength: 120 }
+        question: { type: string, maxLength: 2000, description: 'The 議題 / 論点 — the purpose of the room. Also stored as the opening turn.' }
+        context: { type: string, maxLength: 4000, description: Optional background shown to every speaker. }
+        participants: { type: array, minItems: 2, maxItems: 6, items: { type: string }, description: 'Agent slugs — existing, non-archived; deduplicated in order.' }
+        chair: { type: string, description: 'Writes the conclusion; must be a participant. Defaults to participants[0].' }
+        rounds: { type: integer, minimum: 1, maximum: 3, default: 2, description: Debate rounds before the conclusion. }
+    RoomSteer:
+      type: object
+      description: >
+        Operator steer. While the room is debating it joins the transcript (the
+        speakers still to come read it; nothing is dispatched). On a concluded
+        room it reopens: one more round each from the next round, then a fresh
+        conclusion, under a new run_id.
+      required: [body]
+      properties:
+        body: { type: string, maxLength: 6000 }
+    RoomPatch:
+      type: object
+      properties:
+        archived: { type: boolean, description: 'Archived rooms stay readable; steer/conclude 409 room_archived.' }
+        title: { type: string, maxLength: 120 }
+    RoomSummary:
+      type: object
+      description: One room in GET /rooms (newest first).
+      required: [room_id, title, question, status, participants, chair, rounds, run_count, created_at, last_turn_at, turn_count]
+      properties:
+        room_id: { type: string, description: ULID. }
+        title: { type: string }
+        question: { type: string }
+        status: { type: string, enum: [debating, concluded], description: 'debating while any run is in flight (including a conclude-now run); concluded once the chair''s conclusion for the current run lands.' }
+        participants: { type: array, items: { type: string } }
+        chair: { type: string }
+        rounds: { type: integer, description: Debate rounds per run as chosen at creation (1..3). The current run's shape is run_start_round / run_rounds. }
+        run_count: { type: integer, description: 'Number of schedule runs: 1 at creation, +1 per reopen (a steer on a concluded room) and per conclude-now.' }
+        created_at: { type: string }
+        last_turn_at: { type: string }
+        turn_count: { type: integer, description: All turns, operator turns included. }
+        conclusion_preview: { type: string, description: 'First 320 chars of the latest conclusion.' }
+        archived: { type: boolean }
+    RoomView:
+      description: GET /rooms/{id} and PATCH /rooms/{id} — the summary plus the current run.
+      allOf:
+        - { $ref: '#/components/schemas/RoomSummary' }
+        - type: object
+          required: [run_id]
+          properties:
+            context: { type: string }
+            run_id: { type: string, description: 'ULID of the current/last run; turns of older runs carry their own run_id.' }
+            run_start_round:
+              type: integer
+              description: >
+                First round of the current run: 1 on the first run; on a reopen or
+                conclude-now, the round after every earlier agent turn (statements and
+                conclusions), so round numbers never repeat across runs. For a
+                conclude-only run it is the conclusion's round.
+            run_rounds: { type: integer, description: 'Debate rounds in the current run: rounds on the first run, 1 on a reopen, 0 on a conclude-now (conclusion only). The run''s conclusion is at run_start_round + run_rounds.' }
+            conclusion_turn_id: { type: string }
+            last_error: { type: string, description: 'Last dispatch / turn / hand-off failure of the current run (W-4: shown as a banner; cleared when a new run starts).' }
+    TurnView:
+      type: object
+      required: [turn_id, room_id, run_id, round, kind, from, at, body]
+      properties:
+        turn_id: { type: string, description: ULID (time-ordered). }
+        room_id: { type: string }
+        run_id: { type: string }
+        round: { type: integer, description: '0 = operator (opening / steer); statements and conclusions are numbered across runs without reuse.' }
+        kind: { type: string, enum: [opening, statement, steer, conclusion] }
+        from: { type: string, description: 'Agent slug, or "operator".' }
+        at: { type: string }
+        position: { type: string, maxLength: 140, description: 'Statements only — the one-line stance from the model''s POSITION line (absent when not emitted).' }
+        body: { type: string, description: Full body (S3-hydrated when long). Conclusions are Markdown. }
     FeedPost:
       type: object
       properties:
@@ -538,6 +625,34 @@ paths:
         "401": { description: bad or missing bearer }
         "404": { description: agent_not_found (unknown or archived slug) }
         "422": { description: 'memory_rejected — ADR-0019 content-contract violation or undeclared shrink' }
+  /agents/{slug}/open-external-pr:
+    post:
+      tags: [agents]
+      summary: Open a pull request on an external project's repo (Phase 7 PR6 / R-N9)
+      description: 'CCR write-script endpoint. The agent-runner calls this after the LLM generates the PR body; this Lambda resolves the project github.token from Secrets Manager and calls openExternalPr (R-N9 compliant). Auth: engagement-write bearer token.'
+      security: [{ bearer: [] }]
+      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_id, skill_name, run_id, path, body]
+              properties:
+                project_id: { type: string, description: 'Workforce project id whose github.token credential to use' }
+                skill_name: { type: string, description: 'Skill name that produced the deliverable (for the PR body)' }
+                run_id: { type: string, description: 'Execution ULID/UUID — used to compute the branch name' }
+                path: { type: string, description: 'Repo-relative file path to create/replace in the external repo' }
+                body: { type: string, description: 'UTF-8 PR body content (the skill deliverable)' }
+      responses:
+        "201": { description: 'Created — { pr_url, pr_number, branch_name }', content: { application/json: { schema: { type: object, properties: { pr_url: { type: string }, pr_number: { type: integer }, branch_name: { type: string } } } } } }
+        "400": { description: 'missing_body / invalid_json / missing_field' }
+        "401": { description: bad or missing bearer }
+        "404": { description: project_not_found }
+        "422": { description: 'project_missing_repo — project lacks github_owner or github_repo' }
+        "424": { description: 'credential_not_provisioned or credential_malformed — github.token not yet provisioned for the project' }
+        "502": { description: 'github_api_error — GitHub REST API returned a non-2xx response' }
   /agents/{slug}/recall:
     get:
       tags: [agents]
@@ -935,6 +1050,122 @@ paths:
         "200": { description: OK }
         "400": { description: invalid_hidden }
         "404": { description: not_found }
+  /rooms:
+    get:
+      tags: [rooms]
+      summary: Rooms, newest first (one GSI3 ROOMS partition query)
+      parameters:
+        - { $ref: '#/components/parameters/pageSize' }
+        - { name: cursor, in: query, required: false, schema: { type: string }, description: 'Opaque cursor from the previous page''s cursor.' }
+      responses:
+        "200":
+          description: 'OK — { rooms: RoomSummary[], cursor? }'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rooms: { type: array, items: { $ref: '#/components/schemas/RoomSummary' } }
+                  cursor: { type: string }
+        "400": { description: invalid_cursor }
+    post:
+      tags: [rooms]
+      summary: Open a room for a question and summon agents (dispatches the first turn)
+      description: >
+        Writes the room META (status debating, run 1) and the operator's opening
+        turn (round 0, body = the question), then async-invokes wf-room-debate for
+        the first scheduled turn with the rest of the schedule attached; the
+        Lambda hands each turn on to the next. Dispatch is best-effort — when it
+        fails the room still lands with last_error set.
+      security: [{ sigv4: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomCreate' }
+      responses:
+        "201": { description: 'Created — { room_id }' }
+        "400": { description: 'invalid_json / invalid_title / invalid_question / invalid_context / invalid_participants / invalid_chair / invalid_rounds' }
+        "403": { description: forbidden }
+  /rooms/{id}:
+    get:
+      tags: [rooms]
+      summary: One room + every turn (chronological, S3-hydrated), or the poll tail
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: after, in: query, required: false, schema: { type: string }, description: 'Return only turns newer than this turn id (the console poll). The room is still returned.' }
+      responses:
+        "200":
+          description: 'OK — { room: RoomView, turns: TurnView[] } (turns chronological)'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  room: { $ref: '#/components/schemas/RoomView' }
+                  turns: { type: array, items: { $ref: '#/components/schemas/TurnView' } }
+        "400": { description: 'invalid_room_id / invalid_after' }
+        "404": { description: not_found }
+    patch:
+      tags: [rooms]
+      summary: Archive / unarchive or rename a room
+      security: [{ sigv4: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomPatch' }
+      responses:
+        "200":
+          description: 'OK — { room: RoomView }'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  room: { $ref: '#/components/schemas/RoomView' }
+        "400": { description: 'invalid_json / invalid_archived / invalid_title / invalid_patch' }
+        "403": { description: forbidden }
+        "404": { description: not_found }
+  /rooms/{id}/turns:
+    post:
+      tags: [rooms]
+      summary: Operator steer — joins a debating room, reopens a concluded one
+      security: [{ sigv4: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomSteer' }
+      responses:
+        "201": { description: 'Created — { turn_id, reopened, landed_after_conclusion? } (the last flag: the room concluded between the read and the write; last_error is set — reopen with a follow-up)' }
+        "400": { description: 'invalid_json / invalid_body' }
+        "403": { description: forbidden }
+        "404": { description: not_found }
+        "409":
+          description: >
+            room_archived; or room_concluding — the room is debating but every statement
+            of the current run has landed (or the run is conclusion-only), so only the
+            chair is left and nobody would read the steer. Nothing is stored; reopen with
+            the follow-up once the conclusion lands.
+  /rooms/{id}/conclude:
+    post:
+      tags: [rooms]
+      summary: Re-dispatch only the chair's conclusion under a new run (no request body)
+      description: >
+        For a conclusion that failed, a stalled run, to cut a debate short, or to
+        rewrite an existing conclusion. Starts a new run (run_count +1, run_rounds 0,
+        run_start_round = the round after every earlier agent turn) that supersedes
+        any turns still in flight.
+      security: [{ sigv4: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "202": { description: 'Accepted — { run_id }' }
+        "403": { description: forbidden }
+        "404": { description: not_found }
+        "409": { description: room_archived }
   /dispatch:
     post:
       tags: [agents]

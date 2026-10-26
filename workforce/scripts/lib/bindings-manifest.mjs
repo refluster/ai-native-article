@@ -1,68 +1,55 @@
 // bindings-manifest.mjs — the issue→merge loop's bindings, declared as data
-// (adr-0038).
+// (adr-0038 §2, re-shaped by adr-0046).
 //
 // WHY THIS FILE EXISTS. Every binding used to be a hand-copied
-// `wire-<skill>-<agent>-<project>.mjs`: ~140 lines of identical curl/sigv4/
-// reconcile boilerplate wrapped around one `BINDING` literal. Adding a cadence
-// to a project meant remembering to write another copy — and three times in a
-// row nobody did:
-//
-//   - `pr-remediate` was wired for `agent-workforce` only, so PSVL/asp-cloud's
-//     author lane had no worker; PRs #692/#693 aged 36h and escalated
-//     `author-stale` (adr-0025 Context).
-//   - `wire-pr-remediate-ren-asp-cloud.mjs` was then written but never run —
-//     OP-016, still unwired five weeks later.
-//   - `issue-triage` and `issue-design` were wired for `agent-workforce` only
-//     and no asp-cloud counterpart script was ever written, so asp-cloud ran
-//     the pre-adr-0022 world: `issue-implement` as the tracker's only consumer,
-//     and 18 issues absorbed into `issue-implement:needs-human` with no
-//     re-queue worker bound to release them.
-//
-// The common shape is not "someone forgot". It is that **a cadence which
-// produces a queue was bindable independently of the cadence that consumes it**,
-// and nothing could see the pair. A copied script cannot check a relationship it
-// is only one half of. A list can — which is what `QUEUES` + R-N11
+// `wire-<skill>-<agent>-<project>.mjs`, and three times in a row a cadence
+// that FILLS a queue was wired for a project whose DRAINING cadence was not
+// (`pr-remediate` on asp-cloud, OP-016, the router on asp-cloud — see
+// adr-0038 §Context). A copied script cannot check a relationship it is only
+// one half of. A list can — which is what `QUEUES` + R-N11
 // (`check-binding-queues.mjs`) are.
 //
-// SCOPE. This manifest owns the four boilerplate loop cadences. `pr-autopilot`
-// appears as an UNMANAGED entry: its per-project `config` (nomination rules,
-// skip lists) is genuinely bespoke and stays in its own wire script, but the
-// loop's invariant has to know it is bound, because it is the producer of the
-// author-lane queue. Everything outside the loop (feed-post, daily-research,
-// the report cadences) keeps its own script and is none of this file's
-// business.
+// THE LOOP (adr-0046). Four stages on every project — Proposed → Verified →
+// Assigned → Closed — and three cadences:
+//
+//   backlog-reconcile (nadia)  Proposed  → Verified | Closed      fills stage:verified
+//   issue-triage      (nadia)  Verified  → Assigned + owner:<x>   fills stage:assigned
+//   issue-execute     (ren, dario, …)  Assigned → draft PR | hand-back (Verified again)
+//   pr-autopilot      (nadia)  reviews the PR; parks agent-fixable ones in autopilot:needs-author
+//   pr-remediate      (ren)    drains autopilot:needs-author
+//
+// `issue-execute` is bound once per (member × project): a member is a valid
+// `owner:<slug>` on a project iff that binding is live there (the router reads
+// the roster from the agents-api; this file is intent, the roster is fact).
+//
+// SCOPE. This manifest owns the loop's five boilerplate cadences.
+// `pr-autopilot` appears UNMANAGED: its per-project `config` (nomination
+// rules, skip lists) is bespoke and stays in its own wire script, but the
+// loop's invariant has to know it is bound. Everything outside the loop keeps
+// its own script and is none of this file's business.
 
 export const ROUTINE_SPEC = "workforce/docs/routines/agent-runner.md";
 
-/** The queue relationships the loop depends on. Read by
- *  `check-binding-queues.mjs` (R-N11): for every project where `producer` is
- *  bound, `consumer` MUST be bound too, or the producer fills a queue nobody
- *  drains — which is invisible, because an unworked queue and a slow worker
- *  emit the same signal (adr-0025). */
+/** The queues the loop's cadences fill for one another. R-N11: a producer may
+ *  not be bound for a project unless its consumer is bound there too. */
 export const QUEUES = Object.freeze([
   {
-    queue: "wf:lane:implement",
-    producer: "issue-triage",
-    consumer: "issue-implement",
-    why: "the router lanes implementable issues; without the engineer cadence they sit laned and unworked",
-  },
-  {
-    queue: "wf:lane:design",
-    producer: "issue-triage",
-    consumer: "issue-design",
-    why: "the design lane is the one that unlocks the L0/L1 tail; with no worker the tail simply ages in a different label",
-  },
-  {
-    queue: "wf:handback",
-    producer: "issue-implement",
+    queue: "stage:verified",
+    producer: "backlog-reconcile",
     consumer: "issue-triage",
-    why: "a worker that declines hands back to the router — with no router bound, the hand-back is an absorbing state (the asp-cloud 18-issue backlog)",
+    why: "the reconcile verifies issues for the router; without the router bound they sit verified and unowned",
   },
   {
-    queue: "wf:handback",
-    producer: "issue-design",
+    queue: "stage:assigned + owner:<slug>",
+    producer: "issue-triage",
+    consumer: "issue-execute",
+    why: "the router assigns issues to members; with no executor bound on the project there is nobody to assign them to and every issue ends at the operator",
+  },
+  {
+    queue: "stage:verified (hand-back)",
+    producer: "issue-execute",
     consumer: "issue-triage",
-    why: "same hand-back path from the design lane",
+    why: "an owner that cannot finish hands back to Verified — with no router bound, the hand-back is an absorbing state (the asp-cloud 18-issue backlog)",
   },
   {
     queue: "autopilot:needs-author",
@@ -80,143 +67,117 @@ const trigger = (cron) => ({
 });
 
 /**
- * The loop's bindings. `managed: false` means "this binding participates in the
- * QUEUES relation but is written by its own wire script" — `wire-bindings.mjs`
+ * The loop's bindings. `managed: false` means "participates in the QUEUES
+ * relation but is written by its own wire script" — `wire-bindings.mjs`
  * reports it and never PATCHes it.
  *
- * Cron slots are the COMPLETENESS FLOOR, not the latency budget: under
- * adr-0025/adr-0038 each hand-off dispatches the next cadence directly, so a
- * normal fire starts seconds after the label, not at the next cron. The stagger
- * still matters for the cold-start case (nothing dispatched, the whole loop
- * walks forward once a day), so each consumer sits after its producer.
+ * Cron slots are the COMPLETENESS FLOOR, not the latency budget: each
+ * transition dispatches the next cadence directly (adr-0025), so a normal
+ * fire starts seconds after the label. The stagger still matters for the
+ * cold-start case, so on each project: pr-autopilot tick → reconcile → router
+ * → executors → pr-remediate.
  */
 export const BINDINGS = Object.freeze([
-  // ── the router ───────────────────────────────────────────────────────────
+  // ── the gate: Proposed → Verified | Closed ─────────────────────────────
+  {
+    agent: "nadia",
+    skill: "backlog-reconcile",
+    project_id: "agent-workforce",
+    executor: "claude-code-routine",
+    trigger: trigger("cron(41 2 ? * * *)"),
+    config: { sign_off_persona: "nadia", max_issues_per_run: 15, max_closes_per_run: 10, stale_days: 30 },
+    note:
+      "Nadia's daily backlog-reconcile on refluster/ai-native-article (project agent-workforce), adr-0046. Moves every Proposed issue to Verified (labelled, with checkable acceptance) or Closed with evidence (completed → merged PR; duplicate → open survivor; not_planned → reason), re-checks Verified/Assigned issues idle 30 days, strips retired lane/handback labels. Comment + label + evidenced close only (R-N9); ≤10 closes per run. Fires 02:41 UTC, ahead of the 03:23 router.",
+  },
+  {
+    agent: "nadia",
+    skill: "backlog-reconcile",
+    project_id: "asp-cloud",
+    executor: "claude-code-routine",
+    trigger: trigger("cron(5 2 ? * * *)"),
+    config: { sign_off_persona: "nadia", max_issues_per_run: 15, max_closes_per_run: 10, stale_days: 30 },
+    note:
+      "Nadia's daily backlog-reconcile on PSVL/asp-cloud (project asp-cloud), adr-0046 / asp-cloud issue_lifecycle.md §4. The project side filed its lifecycle first (PSVL/asp-cloud#996); this is the cadence that operates it: Proposed → Verified or Closed with evidence, 30-day re-check of idle issues, required labels per issue_labeling.md §3.1 (one type, ≥1 area, one priority). Fires 02:05 UTC, 20 min after the 01:45 pr-autopilot tick and ahead of the 02:55 router.",
+  },
+
+  // ── the router: Verified → Assigned + owner ────────────────────────────
   {
     agent: "nadia",
     skill: "issue-triage",
     project_id: "agent-workforce",
     executor: "claude-code-routine",
-    trigger: trigger("cron(23 2 ? * * *)"),
+    trigger: trigger("cron(23 3 ? * * *)"),
     config: {
       sign_off_persona: "nadia",
-      max_issues_per_run: 10,
-      requeue_days: 14,
-      lane_owners: { implement: "ren", design: "dario", operator: "maya" },
+      max_issues_per_run: 15,
+      routing_hints: [
+        "code / config / CI / tests / scripts / Lambdas → ren",
+        "ADRs, design notes, epic decompositions, governance amendment proposals → dario",
+        "ratification, legal, product calls, AWS console / credentials / spend → operator",
+      ],
     },
     note:
-      "Nadia's daily issue-triage on refluster/ai-native-article (project agent-workforce), adr-0022/adr-0038. Assigns every open issue to exactly one lane — wf:lane:implement (ren), wf:lane:design (dario), wf:lane:operator (a human, with the wf:human:<role> act named) — as machine-readable labels plus a stated dispatch comment, answers wf:handback immediately, and re-examines legacy *:needs-human parks after 14d so no state is absorbing. Comment+label only (R-N9). Fires 02:23 UTC ahead of Ren's 04:11 issue-implement; under adr-0038 the lane label also dispatches the lane's worker directly, so the cron is the floor rather than the latency.",
+      "Nadia's daily issue-triage on refluster/ai-native-article (project agent-workforce), adr-0046. Assigns every Verified issue to exactly one owner — a member whose issue-execute is bound here (ren, dario) or the operator — as stage:assigned + owner:<slug> plus one comment, and re-assigns any Assigned issue whose owner is unbound. Comment + label only (R-N9). Fires 03:23 UTC after the 02:41 reconcile; also dispatched on every verify / hand-back.",
   },
   {
     agent: "nadia",
     skill: "issue-triage",
     project_id: "asp-cloud",
     executor: "claude-code-routine",
-    trigger: trigger("cron(5 2 ? * * *)"),
+    trigger: trigger("cron(55 2 ? * * *)"),
     config: {
       sign_off_persona: "nadia",
-      // Raised above the agent-workforce default for the first fires: this
-      // project starts with a 18-issue parked backlog (the oldest untouched
-      // since 2026-06-16) plus whatever is untriaged, and the scan is
-      // oldest-first, so a larger batch drains the tail rather than
-      // re-examining the same head every day. Drop it back to 10 once the
-      // parked queue is empty.
       max_issues_per_run: 15,
-      requeue_days: 14,
-      lane_owners: { implement: "ren", design: "dario", operator: "maya" },
+      routing_hints: [
+        "code / tests / CI / runbooks / reports needing no new human decision → ren",
+        "ADR amendments to draft, design records, decomposition → dario",
+        "Architect ratification, RAL / threat-model signatures, legal, field / on-site work, secrets and IAM → operator",
+      ],
     },
     note:
-      "Nadia's daily issue-triage on PSVL/asp-cloud (project asp-cloud), adr-0038. THE BINDING THIS PROJECT NEVER HAD: asp-cloud has run issue-implement since 2026-05 with no router and no design lane, so the tracker had exactly one consumer (an engineer cadence that correctly declines architecture/legal/product work) and every decline landed in issue-implement:needs-human with nothing bound to release it — 18 open issues at the time of wiring. Fires 02:05 UTC, 20 min after the 01:45 pr-autopilot tick and ahead of Ren's 03:17 issue-implement, so a cold-start loop still walks forward in one day.",
+      "Nadia's daily issue-triage on PSVL/asp-cloud (project asp-cloud), adr-0046 / asp-cloud issue_lifecycle.md §5. THE BINDING THIS PROJECT NEVER HAD: asp-cloud ran issue-implement since 2026-05 with no router, so the engineer cadence patrolled the whole tracker and declined what it could not take. Assigns Verified issues to ren / dario / operator per the runbook's routing table. Fires 02:55 UTC, after the 02:05 reconcile and ahead of the 03:17 executor.",
   },
 
-  // ── the design lane's worker ────────────────────────────────────────────
+  // ── the executors: Assigned → draft PR | hand-back ─────────────────────
+  {
+    agent: "ren",
+    skill: "issue-execute",
+    project_id: "agent-workforce",
+    executor: "claude-code-routine",
+    trigger: trigger("cron(11 4 ? * * *)"),
+    config: { sign_off_persona: "ren", max_issues_per_run: 3 },
+    note:
+      "Ren's daily issue-execute on refluster/ai-native-article (project agent-workforce), adr-0046. Works only `is:open label:stage:assigned label:owner:ren`: catches up on the issue's epic and this repo's governance, delivers the change (or, for a decision, the document) as a DRAFT PR per issue, hands back to Verified when it is not his. Never merges (external-pr), never comments on an issue he does not own. Replaces issue-implement (archived). Fires 04:11 UTC after the 03:23 router; also dispatched on assignment.",
+  },
+  {
+    agent: "ren",
+    skill: "issue-execute",
+    project_id: "asp-cloud",
+    executor: "claude-code-routine",
+    trigger: trigger("cron(17 3 ? * * *)"),
+    config: { sign_off_persona: "ren", max_issues_per_run: 3 },
+    note:
+      "Ren's daily issue-execute on PSVL/asp-cloud (project asp-cloud), adr-0046 / asp-cloud issue_lifecycle.md §6. Works only `is:open label:stage:assigned label:owner:ren` (operator directive: 3 issues per fire). Verifies with the repo's own gate (yarn typecheck && yarn lint, ruff / pytest), opens a DRAFT PR per issue (Closes #N), never merges. The patrol it replaces (issue-implement selecting every open issue and declining in comments) is archived. Fires 03:17 UTC after the 02:55 router; also dispatched on assignment.",
+  },
   {
     agent: "dario",
-    skill: "issue-design",
+    skill: "issue-execute",
     project_id: "agent-workforce",
     executor: "claude-code-routine",
     trigger: trigger("cron(47 4 ? * * *)"),
     config: { sign_off_persona: "dario", max_issues_per_run: 2 },
     note:
-      "Dario's daily issue-design on refluster/ai-native-article (project agent-workforce), adr-0022. Works the wf:lane:design issues — architecture / product / L0-L1 items whose deliverable is a decision or document, which issue-implement structurally cannot take — into a DRAFT PR carrying an ADR, an epic decomposition, a statute-amendment proposal, or a design record. Never implements the decision it proposes and never merges (external-pr); an L0/L1 artefact still escalates to the operator by the existing predicate, arriving as a reviewable diff instead of an untouched issue. 2 issues/fire (design work is dearer per item). Fires 04:47 UTC, after triage (02:23) has laned the backlog.",
+      "Dario's daily issue-execute on refluster/ai-native-article (project agent-workforce), adr-0046. Works only `is:open label:stage:assigned label:owner:dario` — the architecture / governance lens: ADRs (numbered against open PRs too), design notes, epic decompositions, statute-amendment proposals, as DRAFT PRs; never implements the decision it proposes, never merges. Replaces issue-design (archived). 2 issues per fire. Fires 04:47 UTC; also dispatched on assignment.",
   },
   {
     agent: "dario",
-    skill: "issue-design",
+    skill: "issue-execute",
     project_id: "asp-cloud",
     executor: "claude-code-routine",
     trigger: trigger("cron(5 4 ? * * *)"),
     config: { sign_off_persona: "dario", max_issues_per_run: 2 },
     note:
-      "Dario's daily issue-design on PSVL/asp-cloud (project asp-cloud), adr-0038. The design lane's worker for the project whose parked backlog is mostly design work wearing an engineering label: draft ADR amendments awaiting Architect ratification (#838, #835, #755, #620, #601, #598), RAL rows (#836), compliance self-assessments (#660, #599). Each of those has a draftable document and a human residue; this cadence produces the document so the human's act is a signature rather than an investigation (adr-0038 §the split rule). Never implements the decision it proposes, never merges (external-pr). Fires 04:05 UTC, after triage at 02:05.",
-  },
-
-  // ── the implement lane's worker ─────────────────────────────────────────
-  {
-    agent: "ren",
-    skill: "issue-implement",
-    project_id: "agent-workforce",
-    executor: "claude-code-routine",
-    trigger: trigger("cron(11 4 ? * * *)"),
-    config: {
-      sign_off_persona: "ren",
-      max_issues_per_run: 3,
-      issue_selection: {
-        deny_labels: [
-          "blocked",
-          "needs-design",
-          "discussion",
-          "duplicate",
-          "wontfix",
-          "question",
-          "wf:blocked",
-          "layer:L0",
-          "layer:L1",
-          "type:tracker",
-        ],
-      },
-    },
-    note:
-      "Ren's daily issue-implement on the workforce's own repo refluster/ai-native-article (project agent-workforce). Fires once a day; picks up to 3 eligible open issues, catches up on each issue's referenced epic/design doc plus this repo's governance (CLAUDE.md, AGENTS.md, docs/governance.md, workforce/docs/governance.md and both ADR trees) and the surrounding code, implements the change, verifies with the repo's own gate (npm run lint / test / validate-*), and opens a DRAFT PR per issue (Closes #N, R-N9 citation of run_id + agent). Never merges (deliverable.type=external-pr) and never pushes main — the R-N10 merge grant of adr-0011 belongs to Nadia's pr-autopilot on this same project, which is the review path that picks these drafts up (adr-0010). Operator-owned surface is excluded by deny_labels (layer:L0, layer:L1 — the L0 invariants, L1 statute docs/ADRs and Zone-A files) plus type:tracker epics; anything the labels miss still hands back to the router (wf:handback), never guessed at.",
-  },
-  {
-    agent: "ren",
-    skill: "issue-implement",
-    project_id: "asp-cloud",
-    executor: "claude-code-routine",
-    trigger: trigger("cron(17 3 ? * * *)"),
-    config: {
-      sign_off_persona: "ren",
-      // Hard cap per fire (operator directive: "1回で対応するissueの数は3件まで").
-      // The daily cadence, not a single run, works down the backlog.
-      max_issues_per_run: 3,
-      issue_selection: {
-        // adr-0038: layer:L0 / layer:L1 / type:tracker / wf:blocked were present
-        // on the agent-workforce binding and absent here, so on asp-cloud the
-        // engineer cadence was offered exactly the governance, architecture and
-        // epic issues it structurally cannot take — and declined each one
-        // individually, forever. The deny list is now the same on both projects.
-        deny_labels: [
-          "blocked",
-          "needs-design",
-          "discussion",
-          "duplicate",
-          "wontfix",
-          "question",
-          "wf:blocked",
-          "layer:L0",
-          "layer:L1",
-          "type:tracker",
-        ],
-        // NOT allow_labels: ["wf:lane:implement"] — deliberately. Narrowing the
-        // cadence to the lane is the operator's separate step, taken only once
-        // triage has demonstrably laned this backlog (issue-to-merge-flow.md
-        // "Order matters" §3). Doing it in the same change would stop the
-        // engineer cadence dead for a cycle.
-      },
-    },
-    note:
-      "Ren's daily issue-implement on PSVL/asp-cloud (project asp-cloud). Fires once a day; picks up to 3 eligible open issues, catches up on each issue's referenced epic/design doc plus the repo's own governance (AGENTS.md + whatever ADR/CONTRIBUTING surface it discovers) and the surrounding code, implements the change, verifies with the repo's own gate, and opens a DRAFT PR per issue (Closes #N, R-N9 citation of run_id + agent). Never merges (deliverable.type=external-pr) and never pushes the default branch. Ambiguous or governance-conflicting issues hand back to the router (wf:handback) rather than asserting a human is needed, per adr-0038.",
+      "Dario's daily issue-execute on PSVL/asp-cloud (project asp-cloud), adr-0046 / asp-cloud issue_lifecycle.md §5 (the owner:dario row). Works only `is:open label:stage:assigned label:owner:dario`: drafts the ADR amendments, design records and RAL rows the Architect then signs (#620, #863 and their kind), as DRAFT PRs; never ratifies, never merges. 2 issues per fire. Fires 04:05 UTC; also dispatched on assignment.",
   },
 
   // ── the PR author lane's worker ─────────────────────────────────────────
@@ -228,7 +189,7 @@ export const BINDINGS = Object.freeze([
     trigger: trigger("cron(29 6,18 ? * * *)"),
     config: { sign_off_persona: "ren", max_prs_per_run: 3 },
     note:
-      "Ren's twice-daily pr-remediate on refluster/ai-native-article (project agent-workforce), adr-0022. Works the autopilot:needs-author queue — base conflicts (the #517 shape: main moved under the branch), behind branches, and open blocking lens findings — resolving semantically, verifying with the repo's own gate, pushing to the PR's HEAD branch (never main), and clearing the label so pr-autopilot re-routes at cycle N+1. Never merges (external-pr). Bounded: 3 attempts per PR, plus the sweep's 36h author-stale escalation, so the lane can never absorb a PR. Fires 06:29 and 18:29 UTC — each 6 min after a pr-autopilot tick (23 0,6,12,18) so it picks up that tick's labels; 06:29 also clears Ren's 04:11 issue-implement. Author lane bound to Ren, not to the reviewer persona: adr-0022 rejects collapsing author into reviewer, which is what keeps the adr-0011 R-N10 delegated merge trustworthy.",
+      "Ren's twice-daily pr-remediate on refluster/ai-native-article (project agent-workforce), adr-0022. Works the autopilot:needs-author queue — base conflicts, behind branches, open blocking lens findings — resolving semantically, verifying with the repo's own gate, pushing to the PR's HEAD branch (never main), and clearing the label so pr-autopilot re-routes at cycle N+1. Never merges (external-pr). Bounded: 3 attempts per PR plus the sweep's 36h author-stale escalation. Fires 06:29 and 18:29 UTC, each 6 min after a pr-autopilot tick (23 0,6,12,18).",
   },
   {
     agent: "ren",
@@ -238,13 +199,10 @@ export const BINDINGS = Object.freeze([
     trigger: trigger("cron(51 7,19 ? * * *)"),
     config: { sign_off_persona: "ren", max_prs_per_run: 3 },
     note:
-      "Ren's twice-daily pr-remediate on PSVL/asp-cloud (project asp-cloud), adr-0022. Closes the gap that stranded #692/#693: pr-autopilot has routed agent-fixable PRs into autopilot:needs-author on this repo since the lane shipped, with no worker bound to that queue for this project — every one aged 36h and escalated author-stale. Declared by wire-pr-remediate-ren-asp-cloud.mjs on 2026-08-11 (adr-0025) and never run — OP-016; this manifest is where it stops being one script's private business. Works the queue — base conflicts, behind branches, and open blocking lens findings from the panel's remediation brief — resolving semantically, verifying with the repo's own gate (yarn typecheck && yarn lint, per its CLAUDE.md), pushing to the PR's HEAD branch (never main), and clearing the label so pr-autopilot re-routes at cycle N+1. Never merges (external-pr). Fires 07:51 and 19:51 UTC, each 6 min after a pr-autopilot tick (45 1/6), clear of Ren's 03:17 issue-implement here.",
+      "Ren's twice-daily pr-remediate on PSVL/asp-cloud (project asp-cloud), adr-0022. Closes the gap that stranded #692/#693 and, on 2026-10-01, #981: pr-autopilot routes agent-fixable PRs into autopilot:needs-author on this repo with no worker bound, so every one ages 36h and escalates author-stale. Declared 2026-08-11 (OP-016) and never run until adr-0046's wiring. Pushes to the PR's HEAD branch only, never merges (external-pr). Fires 07:51 and 19:51 UTC, each 6 min after a pr-autopilot tick (45 1/6).",
   },
 
   // ── unmanaged: the author lane's PRODUCER ───────────────────────────────
-  // Declared so R-N11 can see the pair; written by
-  // wire-pr-autopilot-*.mjs, whose per-project nomination_rules / skip_list are
-  // genuinely bespoke and do not belong in a shared manifest.
   {
     agent: "nadia",
     skill: "pr-autopilot",
@@ -262,30 +220,47 @@ export const BINDINGS = Object.freeze([
 ]);
 
 /**
- * The identity of a binding is `(skill, project_id, lane)`, NOT `(skill,
- * project_id)` — and getting that wrong silently destroys a binding.
+ * Bindings the loop no longer has. `wire-bindings.mjs` REMOVES a live binding
+ * matching one of these from the agent's `bindings[]` (and `--live` reports
+ * one that is still there). adr-0041's in-place `retired_at` marker is still
+ * Proposed and unimplemented on `AgentBinding`, so deletion is the only
+ * retirement the API offers today; this list is the record of what was
+ * removed and why, and the agents-api AUDIT# trail keeps the diff.
+ */
+export const RETIRED_BINDINGS = Object.freeze([
+  { skill: "issue-implement", project_id: "agent-workforce", retired_on: "2026-10-05", reason: "replaced by issue-execute (adr-0046); the skill is archived" },
+  { skill: "issue-implement", project_id: "asp-cloud", retired_on: "2026-10-05", reason: "replaced by issue-execute (adr-0046); this binding was the patrol that commented on every issue it declined" },
+  { skill: "issue-design", project_id: "agent-workforce", retired_on: "2026-10-05", reason: "replaced by issue-execute (adr-0046); the skill is archived" },
+  { skill: "issue-design", project_id: "asp-cloud", retired_on: "2026-10-05", reason: "never live; declared in the previous manifest only" },
+]);
+
+/**
+ * The identity of a binding WITHIN ONE AGENT is `(skill, project_id, lane)`,
+ * NOT `(skill, project_id)` — and getting that wrong silently destroys a
+ * binding. adr-0030 gave `pr-remediate` a second lane: Ren carries BOTH an
+ * author-lane binding and a groom-lane one (`config.lane: "groom"`) for the
+ * SAME skill on the SAME project. A driver reconciling on the coarse key would
+ * match the groom slot and overwrite it. An absent `config.lane` means the
+ * author lane.
  *
- * adr-0030 gave `pr-remediate` a second lane: Ren carries BOTH an author-lane
- * binding (`autopilot:needs-author`, twice daily) and a groom-lane one
- * (`autopilot:needs-human`, daily, `config.lane: "groom"`) for the SAME skill
- * on the SAME project. `wire-pr-remediate-groom-ren-agent-workforce.mjs`
- * already keys on the finer tuple for exactly this reason, and flags it as its
- * sharp edge. A generic driver reconciling on the coarse key would match the
- * groom binding and overwrite it with the author lane's config.
- *
- * An absent `config.lane` means the author lane, which is the convention the
- * groom script established and the reason no manifest entry sets it: adding
- * the field explicitly would read as drift against every live binding.
+ * Across agents the same (skill, project_id) legitimately repeats: ren and
+ * dario both carry `issue-execute @ asp-cloud`. The matcher is applied to one
+ * agent's `bindings[]` at a time, so that is never a collision.
  */
 export function laneKeyOf(binding) {
   return String(binding?.config?.lane ?? "author");
 }
 
 /** The reconciliation key a driver must use to find the slot a manifest entry
- *  targets. */
+ *  targets, inside one agent's bindings[]. */
 export function bindingMatcher(desired) {
   const lane = laneKeyOf(desired);
   return (b) => b.skill === desired.skill && b.project_id === desired.project_id && laneKeyOf(b) === lane;
+}
+
+/** True for a live binding that `RETIRED_BINDINGS` says must go. */
+export function isRetired(binding, retired = RETIRED_BINDINGS) {
+  return retired.some((r) => r.skill === binding?.skill && r.project_id === binding?.project_id);
 }
 
 /** The bindings `wire-bindings.mjs` may write. */
@@ -298,12 +273,15 @@ export function isBound(list, skill, projectId) {
   return list.some((b) => b.skill === skill && b.project_id === projectId);
 }
 
+/** The agents bound to `skill` on `projectId` in a binding list (the manifest's
+ *  intent for the roster the router reads live). */
+export function boundAgents(list, skill, projectId) {
+  return [...new Set(list.filter((b) => b.skill === skill && b.project_id === projectId).map((b) => b.agent))].sort();
+}
+
 /**
  * R-N11, as a pure function: every project that binds a producer must bind its
  * consumer. Returns a list of violations (empty = compliant).
- *
- * @param {ReadonlyArray<{skill: string, project_id: string}>} list
- * @returns {{queue: string, producer: string, consumer: string, project_id: string, why: string}[]}
  */
 export function queueViolations(list = BINDINGS, queues = QUEUES) {
   const out = [];

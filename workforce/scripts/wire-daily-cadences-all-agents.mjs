@@ -54,6 +54,11 @@
 //   node workforce/scripts/wire-daily-cadences-all-agents.mjs --dry-run
 //   aws-vault exec <profile> -- \
 //     node workforce/scripts/wire-daily-cadences-all-agents.mjs
+//
+// --only=slug1,slug2,...  restrict the write set to the named agents (e.g. a
+//   newly registered hire round) while still seeding the global taken-set from
+//   the WHOLE roster, so the new minutes stay collision-free. A named slug that
+//   is not an active agent fails loud (C-4) instead of being silently skipped.
 
 import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
 ensureProxyAwareEntry(import.meta.url);
@@ -66,6 +71,10 @@ const API_BASE = (
 ).replace(/\/+$/, "");
 const REGION = process.env.AWS_REGION ?? "us-west-2";
 const DRY_RUN = process.argv.includes("--dry-run");
+const ONLY_ARG = process.argv.find((a) => a.startsWith("--only="));
+const ONLY = ONLY_ARG
+  ? new Set(ONLY_ARG.slice("--only=".length).split(",").map((x) => x.trim()).filter(Boolean))
+  : null;
 
 const ROUTINE_SPEC = "workforce/docs/routines/agent-runner.md";
 const PROJECT_ID = "agent-workforce";
@@ -145,6 +154,13 @@ const list = await (await fetch(`${API_BASE}/agents`)).json();
 const items = (list.items ?? []).filter((a) => !a.archived && !a.paused);
 if (items.length === 0) throw new Error("GET /agents returned no active agents");
 const roster = items.map((a) => a.slug).sort();
+if (ONLY) {
+  const unknown = [...ONLY].filter((x) => !roster.includes(x));
+  if (unknown.length > 0) throw new Error(`--only names agents that are not active: ${unknown.join(", ")}`);
+}
+// The write set: the whole roster, or only the --only agents. The taken-set
+// below is always seeded from the whole roster.
+const targets = ONLY ? roster.filter((x) => ONLY.has(x)) : roster;
 
 // Does this agent already carry (skill @ agent-workforce)?
 const hasBinding = (agent, skill) =>
@@ -186,20 +202,20 @@ const claim = (base, mod) => {
 // Build the plan. feed-post first (0..539 window), then daily-research (0..1439),
 // both drawing from the same global taken-set. Alphabetical roster order makes the
 // forward-walk deterministic.
-const additions = new Map(roster.map((s) => [s, []]));
-for (const s of roster) {
+const additions = new Map(targets.map((s) => [s, []]));
+for (const s of targets) {
   if (hasBinding(bySlug.get(s), "feed-post")) continue;
   additions.get(s).push(feedPostBinding(s, minuteToCron(claim(djb2(s), 540))));
 }
-for (const s of roster) {
+for (const s of targets) {
   if (hasBinding(bySlug.get(s), "daily-research")) continue;
   additions.get(s).push(dailyResearchBinding(s, minuteToCron(claim(djb2(s + "#daily-research"), 1440))));
 }
 
-const plan = roster.filter((s) => additions.get(s).length > 0);
+const plan = targets.filter((s) => additions.get(s).length > 0);
 const totalNew = plan.reduce((n, s) => n + additions.get(s).length, 0);
 console.log(
-  `Roster: ${roster.length} active agents. New bindings to add: ${totalNew} ` +
+  `Roster: ${roster.length} active agents${ONLY ? ` (write set: ${targets.length} via --only)` : ""}. New bindings to add: ${totalNew} ` +
     `(${plan.reduce((n, s) => n + additions.get(s).filter((b) => b.skill === "feed-post").length, 0)} feed-post, ` +
     `${plan.reduce((n, s) => n + additions.get(s).filter((b) => b.skill === "daily-research").length, 0)} daily-research).`,
 );

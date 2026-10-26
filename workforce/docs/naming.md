@@ -24,6 +24,7 @@ The point of R-N7 isn't aesthetics — it's that a single naming convention make
 | EventBridge rule CFN Logical ID | `PascalCase` — `Wf{Agent}{Cadence}Rule` | `WfSoraWeeklyRule`, `WfEngineerPollRule` |
 | Secrets Manager secret name | `wf/{provider}` — slash separator, lowercase. Webhook-class skills append a `-{purpose}-{stage}` suffix so per-channel rotation doesn't require IAM changes. | `wf/anthropic`, `wf/azure-openai`, `wf/notion`, `wf/github`, `wf/discord-pulse-dev` |
 | Lambda TS source file | `kebab-case.ts` | `agent-runner.ts`, `llm-anthropic.ts`, `notion.ts` |
+| Lambda TS test file | `kebab-case-tests.ts` (`*-tests.ts` suffix) | `handler-tests.ts`, `skill-maturity-report-tests.ts` |
 | Frontend React component file | `PascalCase.tsx` | `AuthorChip.tsx`, `AgentDirectory.tsx` |
 | Type / interface / class | `PascalCase` | `AgentMeta`, `TaskRow`, `DelivRow` |
 | Variable / function | `camelCase` | `loadAgentMeta()`, `pendingTaskCount` |
@@ -48,6 +49,7 @@ The script runs in CI as `npm run workforce:naming` and exits non-zero on violat
 4. **Markdown files under `workforce/docs/`** must be `kebab-case.md`.
 5. **SAM template (`workforce/infra/sam/template.yaml`)** — when present, deployed resource names referenced via `FunctionName`, `TableName`, `BucketName`, `RuleName`, `TopicName`, `QueueName`, and similar `*Name` properties must start with `wf-` and end with `-{stage}` (or `-${Stage}` / `${WorkforceStage}` token references).
 6. *(retired with ADR-0007)* `agents/{slug}/agent.json:slug` equalling the directory name — no such tree exists any more.
+7. **Test files** must use the `*-tests.ts` suffix, not `*.test.ts` or `*.spec.ts`. Vitest's include pattern (`**/*-tests.ts`) is the enforcement boundary; the naming convention is why. This is formalised from `workforce/lambdas/vitest.config.mjs` (FU-012).
 
 Rules that depend on a file or directory that doesn't yet exist are no-ops — the linter degrades gracefully as the subsystem grows, and PR1 (which adds only this doc + the linter) passes without any agent or Lambda files in place.
 

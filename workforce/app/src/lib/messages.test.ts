@@ -25,6 +25,7 @@ import { signedFetch, assertSigv4Configured } from '../lib/sigv4';
 import {
   messagingWriteEnabled,
   isAwaitingReply,
+  isGroupRoundComplete,
   createThread,
   sendMessage,
   markThreadRead,
@@ -32,6 +33,7 @@ import {
   fetchThreadSummaries,
   fetchThreadDetail,
   mergeMessages,
+  resolveDirectMessage,
   type ChatMessage,
   type Conversation,
 } from './messages';
@@ -59,6 +61,32 @@ afterEach(() => {
 describe('messagingWriteEnabled', () => {
   it('is true when the API base is set AND SigV4 is configured', () => {
     expect(messagingWriteEnabled()).toBe(true);
+  });
+});
+
+describe('isGroupRoundComplete', () => {
+  const group = (messages: Conversation['messages']): Conversation => ({
+    id: '01THREAD',
+    participants: ['nadia', 'dario'],
+    group: true,
+    starred: false,
+    unread: 0,
+    messages,
+  });
+  const m = (from: string) => ({ from, at: 'x', body: '…' });
+
+  it('is false while a member has not spoken since the operator', () => {
+    expect(isGroupRoundComplete(group([m('operator'), m('nadia')]))).toBe(false);
+  });
+
+  it('is true once every member has spoken since the operator', () => {
+    expect(isGroupRoundComplete(group([m('operator'), m('nadia'), m('dario')]))).toBe(true);
+  });
+
+  it('only counts replies after the latest operator message', () => {
+    expect(
+      isGroupRoundComplete(group([m('operator'), m('nadia'), m('dario'), m('operator'), m('nadia')])),
+    ).toBe(false);
   });
 });
 
@@ -283,5 +311,34 @@ describe('fetchThreadSummaries', () => {
         messages: [{ from: 'maya', at: '2026-06-02T09:10:00Z', body: 'hi' }],
       },
     ]);
+  });
+});
+
+describe('resolveDirectMessage', () => {
+  const conv = (id: string, participants: string[], group = false): Conversation => ({
+    id,
+    participants,
+    group,
+    starred: false,
+    unread: 0,
+    messages: [],
+  });
+  const roster = new Set(['tessa', 'maya', 'ren']);
+  const threads = [conv('g1', ['tessa', 'maya'], true), conv('t-maya', ['maya'])];
+
+  it('opens the existing 1:1 thread with the talent', () => {
+    expect(resolveDirectMessage('maya', threads, roster, false)).toEqual({ kind: 'thread', id: 't-maya' });
+  });
+
+  it('ignores group threads and pre-picks the talent in the composer', () => {
+    expect(resolveDirectMessage('tessa', threads, roster, true)).toEqual({ kind: 'compose', recipients: ['tessa'] });
+  });
+
+  it('returns null without a thread when composing is disabled', () => {
+    expect(resolveDirectMessage('tessa', threads, roster, false)).toBeNull();
+  });
+
+  it('returns null for a slug not on the roster', () => {
+    expect(resolveDirectMessage('nobody', threads, roster, true)).toBeNull();
   });
 });

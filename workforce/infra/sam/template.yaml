@@ -540,6 +540,19 @@ Resources:
               Action: lambda:InvokeFunction
               Resource:
                 - !GetAtt WfOrchestratorFunction.Arn
+      # ROUTE BUDGET. SAM turns every HttpApi event below into one
+      # AWS::Lambda::Permission, i.e. one statement (≈385 B measured) in this
+      # function's resource-based policy, and Lambda caps that policy at
+      # 20 480 bytes. With 57 routes it reached 20 639: the six /rooms
+      # permissions failed and CloudFormation rolled the whole stack back
+      # (deploy-workforce-data-plane.yml run 40126740456, #847). The Rooms
+      # family moved to WfRoomsApiFunction behind this same API. This function
+      # is at the wall (19 628 B of 20 480 after #850 — two statements of
+      # headroom, so do not rename or re-path an event here either: a
+      # Permission is replaced create-before-delete): a NEW route family goes
+      # on its own function, never here. Enforced by workforce/scripts/check-route-permission-budget.mjs:
+      # ≤ 48 HttpApi events per function, and this one ratcheted at its
+      # current 51 — the count may only go down.
       Events:
         ListAgents:
           Type: HttpApi
@@ -760,6 +773,17 @@ Resources:
           Properties:
             ApiId: !Ref WfAgentsHttpApi
             Path: /agents/{slug}/memory
+            Method: POST
+        # Phase 7 PR6 / R-N9 — CCR write-scripts open external PRs
+        # server-side via this endpoint. Same bearer-token-at-handler
+        # posture as CreateEngagement / UpdateAgentMemory (no SigV4
+        # creds in a CCR session). Lambda resolves the project's
+        # github.token from Secrets Manager and calls openExternalPr.
+        OpenExternalPr:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /agents/{slug}/open-external-pr
             Method: POST
         ListProjects:
           Type: HttpApi
@@ -1006,6 +1030,150 @@ Resources:
       AlarmActions:
         - !Ref WfAlarmTopic
 
+  # --- Rooms API (adr-0048, proposed) ---------------------------------------
+  # The /rooms route family, on its own function behind the SAME HTTP API
+  # (WfAgentsHttpApi) and the same CORS + AWS_IAM posture. It exists because
+  # of a hard limit, not a design preference: SAM emits one
+  # AWS::Lambda::Permission per HttpApi event, Lambda caps a function's
+  # resource-based policy at 20 480 bytes, and wf-agents-api reached 20 639
+  # with these six routes on it — CloudFormation rolled the data-plane stack
+  # back (deploy-workforce-data-plane.yml run 40126740456, commit 65d0262).
+  # New route families follow this shape: their own function, the shared API.
+  # The spec stays one document (agents-api/openapi.ts, `rooms` tag).
+  WfRoomsApiFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-rooms-api-${Stage}
+      CodeUri: ../../lambdas/rooms-api
+      Handler: handler.handler
+      Description: Workforce Rooms API — purpose-first deliberation routes (adr-0048), behind the agents HTTP API.
+      MemorySize: 512
+      Timeout: 10
+      Environment:
+        # Merged with Globals.Function.Environment. The room writes (create /
+        # reopening steer / conclude) async-invoke the room debate Lambda with
+        # the run's head turn; the Lambda hands the run on itself (ADR-0047
+        # precedent).
+        Variables:
+          ROOM_DEBATE_FUNCTION: !Ref WfRoomDebateFunction
+      Policies:
+        - Statement:
+            - Sid: RoomsApiTableAccess
+              # ROOM# / AGENT# reads by key, META + opening-turn writes,
+              # conditional META patches; the GSI3 `ROOMS` partition is the
+              # GET /rooms listing, hence index/*. No Scan, no Delete.
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource:
+                - !GetAtt WfTable.Arn
+                - !Sub ${WfTable.Arn}/index/*
+            - Sid: RoomsApiRoomBodyReadWrite
+              # Room routes hydrate + store long turn bodies
+              # (`rooms/{room_id}/{ulid}.md`), same dual-store split as
+              # messages/* and boards/*. Scoped to rooms/*.
+              Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/rooms/*
+            - Sid: RoomsApiInvokeRoomDebate
+              # The room writes async-invoke the room debate Lambda for a
+              # run's first turn. Scoped to that one function.
+              Effect: Allow
+              Action: lambda:InvokeFunction
+              Resource:
+                - !GetAtt WfRoomDebateFunction.Arn
+            - Sid: RoomsApiMetrics
+              # A failed wf-room-debate dispatch emits WfRoomDispatchFailed
+              # (the room still lands with META last_error set — W-4
+              # visible, never silent).
+              Effect: Allow
+              Action: cloudwatch:PutMetricData
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace:
+                    - Workforce/Rooms
+      Events:
+        # adr-0048 (proposed) — Rooms. Operator surface, same posture as the
+        # thread routes: reads public on the CORS gate, every write behind
+        # AWS_IAM (the console signs with SigV4; routes.ts re-checks the
+        # principal as defence in depth). Not a public surface like boards.
+        # Same logical event names as when they sat on WfAgentsApiFunction.
+        ListRooms:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /rooms
+            Method: GET
+        GetRoom:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /rooms/{id}
+            Method: GET
+        CreateRoom:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /rooms
+            Method: POST
+            Auth:
+              Authorizer: AWS_IAM
+        SteerRoom:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /rooms/{id}/turns
+            Method: POST
+            Auth:
+              Authorizer: AWS_IAM
+        ConcludeRoom:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /rooms/{id}/conclude
+            Method: POST
+            Auth:
+              Authorizer: AWS_IAM
+        PatchRoom:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /rooms/{id}
+            Method: PATCH
+            Auth:
+              Authorizer: AWS_IAM
+      Tags:
+        workforce: !Ref Stage
+
+  # Any Errors metric on the rooms API function publishes to the alarm topic.
+  WfRoomsApiErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-rooms-api-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-rooms-api-${Stage} over 5 minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfRoomsApiFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
   # --- Messaging reply Lambda (Epic-013 Story 3, ADR-0006) -------------------
   # The real-time talent-reply path. Async-invoked by the agents-api operator
   # write routes after an operator message persists. Loads the thread, composes
@@ -1023,7 +1191,7 @@ Resources:
       FunctionName: !Sub wf-messaging-reply-${Stage}
       CodeUri: ../../lambdas/messaging-reply
       Handler: handler.handler
-      Description: Real-time talent reply to operator messages (Epic-013 Story 3).
+      Description: Real-time talent reply to operator messages (Epic-013 Story 3; group rounds adr-0047).
       MemorySize: 512
       # One Claude call + a handful of DDB/S3 ops. Generous ceiling; replies
       # land in seconds in the normal case.
@@ -1083,6 +1251,15 @@ Resources:
               Resource:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/_default/anthropic.api_key-*
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/anthropic-*
+            - Sid: MessagingReplyRoundHandoff
+              # Group rounds (adr-0047): after one member replies, the Lambda
+              # async-invokes itself for the next member of the round. Built
+              # from the function name, not !GetAtt, so the policy does not
+              # depend on the function it belongs to.
+              Effect: Allow
+              Action: lambda:InvokeFunction
+              Resource:
+                - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:wf-messaging-reply-${Stage}
             - Sid: MessagingReplyMetrics
               Effect: Allow
               Action: cloudwatch:PutMetricData
@@ -1197,6 +1374,126 @@ Resources:
       Dimensions:
         - Name: FunctionName
           Value: !Ref WfBoardReplyFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  # --- Room debate (adr-0048, proposed) -------------------------------------
+  # The Room twin of wf-messaging-reply: async-invoked by wf-rooms-api when the
+  # operator opens, reopens or re-concludes a room. One invocation = one
+  # speaker's turn = one Claude call (persona from AGENT#{slug}/META, the
+  # debate or chair-conclusion contract, the transcript), W-1 guards, the TURN
+  # row via shared/room.ts. It then invokes itself for the next scheduled turn
+  # — the ADR-0047 round hand-off, declared in adr-0048 as its Room twin: the
+  # schedule is fixed when the run starts and `then` only shrinks, so a run is
+  # at most participants × rounds + 1 calls and ends by construction.
+  WfRoomDebateFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-room-debate-${Stage}
+      CodeUri: ../../lambdas/room-debate
+      Handler: handler.handler
+      Description: One agent turn in a purpose-first Room; hands the run to the next speaker (adr-0048).
+      MemorySize: 512
+      Environment:
+        Variables:
+          # Every Room turn runs on one model at one effort (the persona row
+          # supplies the voice only) — see room-debate/handler.ts ROOM_MODEL.
+          WF_ROOM_MODEL: anthropic:claude-sonnet-5-5
+          WF_ROOM_EFFORT: medium
+      # One Claude call (a conclusion is up to 3200 visible + 2048 reasoning
+      # tokens — 5248 on the wire, ~1.5 min at Opus speeds) plus a handful of
+      # DDB/S3 ops. The Globals 300 s, not 120: a Lambda timeout skips the
+      # handler's `finally`, so it would stall the room with no `last_error`
+      # and no hand-off. Billed per ms used, so the ceiling costs nothing.
+      Timeout: 300
+      # No async retries. Every invocation passes the baton in its `finally`,
+      # so a retried throw would hand the run on a second (and third) time and
+      # fork the chain down the rest of the schedule — and re-charge the Claude
+      # call. Fail once, loudly (WfRoomDebateErrorsAlarm + META last_error);
+      # the operator recovers a stalled room with "Conclude now".
+      EventInvokeConfig:
+        MaximumRetryAttempts: 0
+      Policies:
+        - Statement:
+            - Sid: RoomDebateTableAccess
+              # Base table only: the turn reads the ROOM# / AGENT# partitions
+              # by key (GetItem, Query on pk), writes TURN# / CLAIM# rows and
+              # patches META. It never queries a GSI (the GSI3 ROOMS listing
+              # is wf-rooms-api's), so no index/* resource.
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource:
+                - !GetAtt WfTable.Arn
+            - Sid: RoomDebateBodyReadWrite
+              # Transcript hydration + storing long turns (>preview cap)
+              # before the DDB TURN row. Scoped to rooms/*.
+              Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/rooms/*
+            - Sid: RoomDebateMemoryRead
+              # The speaker's latest rolling memory summary grounds the turn.
+              # Read-only on memory/*; chunks are written by the compactor.
+              Effect: Allow
+              Action: s3:GetObject
+              Resource:
+                - !Sub ${WfBucket.Arn}/memory/*
+            - Sid: RoomDebateAnthropicKey
+              # Same key resolution as messaging-reply (llm-anthropic.ts):
+              # typed-first, legacy bare wf/anthropic fallback. Both granted.
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/_default/anthropic.api_key-*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/anthropic-*
+            - Sid: RoomDebateTurnHandoff
+              # adr-0048 (proposed), after the adr-0047 MessagingReplyRoundHandoff:
+              # after one speaker's turn the Lambda async-invokes itself for
+              # the next turn of the run. Built from the function name, not
+              # !GetAtt, so the policy does not depend on the function it
+              # belongs to.
+              Effect: Allow
+              Action: lambda:InvokeFunction
+              Resource:
+                - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:wf-room-debate-${Stage}
+            - Sid: RoomDebateMetrics
+              Effect: Allow
+              Action: cloudwatch:PutMetricData
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace:
+                    - Workforce/Rooms
+      Tags:
+        workforce: !Ref Stage
+
+  # Any Errors metric on the room debate function publishes to the alarm topic
+  # — a thrown W-1 guard, a missing persona row, the daily turn budget, or a
+  # failed hand-off.
+  WfRoomDebateErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-room-debate-errors-alarm-${Stage}
+      AlarmDescription: !Sub Errors > 0 on wf-room-debate-${Stage} over 5 minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfRoomDebateFunction
       Statistic: Sum
       Period: 300
       EvaluationPeriods: 1
@@ -2165,6 +2462,114 @@ Resources:
       Tags:
         workforce: !Ref Stage
 
+  # --- Epic-022 Story 1: daily lesson distiller (ADR-0032 §3, #739) ----------
+  # One bounded cheap-model pass over the previous UTC day of EXEC rows ->
+  # LESSON candidates. System-scoped daily budget row, throwing ceiling.
+  # Schedule lands DISABLED (new-schedule-enable is Authority B): the operator
+  # flips Enabled after reviewing the PR.
+  WfLessonDistillerFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-lesson-distiller-${Stage}
+      CodeUri: ../../lambdas/lesson-distiller
+      Handler: handler.handler
+      Description: Daily lesson distiller — LESSON candidates from the previous day's EXEC ledger. Epic-022 Story 1.
+      MemorySize: 512
+      Timeout: 300
+      # A retry after a post-LLM throw would re-charge tokens; fail once, loudly
+      # (WfLessonDistillerErrorsAlarm), and let the next day's run proceed.
+      EventInvokeConfig:
+        MaximumRetryAttempts: 0
+      Policies:
+        - Statement:
+            # Scan cannot carry a LeadingKeys condition, so the table-wide read
+            # is its own statement; every write/point-read is confined to the
+            # LESSON partition and the daily BUDGET# rows.
+            - Sid: DistillerTableScan
+              Effect: Allow
+              Action: dynamodb:Scan
+              Resource: !GetAtt WfTable.Arn
+            - Sid: DistillerTableRw
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt WfTable.Arn
+              Condition:
+                ForAllValues:StringLike:
+                  dynamodb:LeadingKeys:
+                    - LESSON
+                    - "BUDGET#*"
+            - Sid: DistillerAnthropicRead
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/_default/anthropic.api_key-*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/anthropic-*
+            - Sid: DistillerPutMetric
+              Effect: Allow
+              Action: cloudwatch:PutMetricData
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace: Workforce/Lessons
+      Events:
+        DailyTick:
+          Type: Schedule
+          Properties:
+            Name: !Sub wf-lesson-distiller-tick-${Stage}
+            Description: Drives the daily lesson distillation pass.
+            Schedule: cron(30 1 * * ? *)
+            Enabled: false
+      Tags:
+        workforce: !Ref Stage
+
+  WfLessonDistillerErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-lesson-distiller-errors-alarm-${Stage}
+      AlarmDescription: !Sub The wf-lesson-distiller-${Stage} Lambda threw (budget ceiling, malformed model reply, or a write error).
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WfLessonDistillerFunction
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
+  # Absence must not read green: the handler emits Runs=1 on every invocation
+  # (skipped days included, with a separate Skipped metric), so no datapoint in
+  # a day means the schedule never fired. Actions stay off while the schedule is
+  # DISABLED (it ships disabled); flip ActionsEnabled with the schedule.
+  WfLessonDistillerMissedRunAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub wf-lesson-distiller-missed-run-alarm-${Stage}
+      AlarmDescription: !Sub wf-lesson-distiller-${Stage} emitted no Runs datapoint in 24h (schedule did not fire or the Lambda died before emitting).
+      ActionsEnabled: false
+      Namespace: Workforce/Lessons
+      MetricName: WfLessonDistillerRuns
+      Dimensions:
+        - Name: Stage
+          Value: !Ref Stage
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions:
+        - !Ref WfAlarmTopic
+
   WfMemoryCompactorErrorsAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -2225,7 +2630,8 @@ Resources:
   #                                                            dual-write
   #                                                            integrity).
   #
-  #   Workforce/AgentsApi    WfMalformedProjectMeta           (FU-NEW-D —
+  #   Workforce/AgentsApi    WfMalformedRow{RowType=project|agent|skill}  (FU-NEW-D /
+  #                                                            FU-NEW-E —
   #                                                            listProjects
   #                                                            skip count;
   #                                                            target 0).
@@ -2244,7 +2650,7 @@ Resources:
               "type": "text",
               "x": 0, "y": 0, "width": 24, "height": 2,
               "properties": {
-                "markdown": "# Workforce / Epic-010 (${Stage})\n\nSurfaces every metric Epic-010 introduced. **Target state**: `WfLegacyCredentialReads{Reason=fallback_bare}` and `WfMalformedProjectMeta` graph to zero. `WfExecDualWriteFailed` stays at zero. `WfExecEmbeddingFailed` reflects pending retry-queue depth."
+                "markdown": "# Workforce / Epic-010 (${Stage})\n\nSurfaces every metric Epic-010 introduced. **Target state**: `WfLegacyCredentialReads{Reason=fallback_bare}` and `WfMalformedRow{RowType=project|agent|skill}` graph to zero. `WfExecDualWriteFailed` stays at zero. `WfExecEmbeddingFailed` reflects pending retry-queue depth."
               }
             },
             {
@@ -2273,13 +2679,15 @@ Resources:
               "type": "metric",
               "x": 12, "y": 2, "width": 12, "height": 6,
               "properties": {
-                "title": "Workforce/AgentsApi — WfMalformedProjectMeta",
+                "title": "Workforce/AgentsApi — WfMalformedRow{RowType=project|agent|skill}",
                 "view": "timeSeries",
                 "region": "${AWS::Region}",
                 "period": 300,
                 "stat": "Sum",
                 "metrics": [
-                  [ "Workforce/AgentsApi", "WfMalformedProjectMeta", "Stage", "${Stage}", { "color": "#d62728" } ]
+                  [ "Workforce/AgentsApi", "WfMalformedRow", "Stage", "${Stage}", "RowType", "project", { "color": "#d62728" } ],
+                  [ "...", "agent", { "color": "#ff7f0e" } ],
+                  [ "...", "skill", { "color": "#9467bd" } ]
                 ],
                 "yAxis": { "left": { "min": 0 } },
                 "annotations": {

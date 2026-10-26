@@ -1,7 +1,7 @@
 {
   "name": "issue-design",
-  "version": "0.3.0",
-  "status": "active",
+  "version": "0.4.0",
+  "status": "archived",
   "cost_class": "large",
   "owners": [
     "dario",

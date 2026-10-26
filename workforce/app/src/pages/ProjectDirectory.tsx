@@ -96,7 +96,21 @@ export default function ProjectDirectory() {
   return (
     <WorkforceLayout>
       <section className="mb-6 sm:mb-8">
-        <Typeplate label="PROJECTS" value={`PROJECTS · ${rows?.length ?? '—'} REGISTERED`} className="mb-3" />
+        {/* The count must describe the list below it: "7 REGISTERED" over a
+            six-row ACTIVE list read as a missing project when the 7th was an
+            archived row the default filter hides. Show what is listed, and
+            the registered total only when the two differ. */}
+        <Typeplate
+          label="PROJECTS"
+          value={
+            rows === null
+              ? 'PROJECTS · — REGISTERED'
+              : filtered.length === rows.length
+                ? `PROJECTS · ${rows.length} REGISTERED`
+                : `PROJECTS · ${filtered.length} ${filter === 'all' ? 'SHOWN' : filter.toUpperCase()} · ${rows.length} REGISTERED`
+          }
+          className="mb-3"
+        />
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
             <h1 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-[1.04] text-wf-on-surface">

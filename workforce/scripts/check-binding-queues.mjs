@@ -9,10 +9,13 @@
 //      #692/#693 were parked in `autopilot:needs-author` with no worker and
 //      escalated `author-stale` 36h later (adr-0025 Context).
 //   2. `wire-pr-remediate-ren-asp-cloud.mjs` written but never run — OP-016.
-//   3. `issue-triage` + `issue-design` bound for `agent-workforce` only →
-//      asp-cloud ran the pre-adr-0022 world, with `issue-implement` as the
-//      tracker's sole consumer and 18 issues absorbed into
-//      `issue-implement:needs-human` with no re-queue worker to release them.
+//   3. the router bound for `agent-workforce` only → asp-cloud ran with an
+//      engineer cadence as the tracker's sole consumer and 18 issues absorbed
+//      into a parked label with no re-queue worker to release them.
+//
+// The queues themselves changed shape with adr-0046 (stage:verified,
+// stage:assigned + owner, the hand-back, autopilot:needs-author); the rule did
+// not.
 //
 // Each time, the diagnosis took a human reading two config surfaces side by
 // side, because **an unworked queue and a slow worker emit the same signal**.

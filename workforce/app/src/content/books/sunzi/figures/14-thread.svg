@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 600" role="img" aria-labelledby="f14-title f14-desc" class="f14">
+  <title id="f14-title">図16 十三篇の論理の流れ — 数えることから知ることへ、そして再び計へ</title>
+  <desc id="f14-desc">数える（計・作戦）→ 負けない形（謀攻・形）→ 主導権（勢・虚実）→ 運用（軍争・九変・行軍・地形・九地）→ 自制（火攻）→ 知る（用間）。知ったことが次の計に戻り、一本の線は輪になる。</desc>
+  <style>
+    .f14 text{font-family:inherit}
+    .f14-t{font-size:20px;font-weight:700;fill:var(--book-ink)}
+    .f14-p{font-size:15px;fill:var(--book-ink-2)}
+    .f14-i{font-size:13px;font-weight:600;fill:var(--book-ink-2)}
+    .f14-r{font-size:15px;font-weight:600;fill:var(--book-ink)}
+    .f14-box{fill:var(--book-panel);stroke:var(--book-line);stroke-width:1.2}
+    .f14-idx{fill:var(--book-bg);stroke:var(--book-line);stroke-width:1.2}
+    .f14-spine{fill:none;stroke:var(--book-ink-2);stroke-width:1.4;marker-end:url(#fig14-ah)}
+    .f14-loop{fill:none;stroke:var(--book-accent);stroke-width:1.6;stroke-linejoin:round;marker-end:url(#fig14-aha)}
+    .f14-ahp{fill:var(--book-ink-2)}
+    .f14-ahpa{fill:var(--book-accent)}
+  </style>
+  <defs>
+    <marker id="fig14-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="f14-ahp"/></marker>
+    <marker id="fig14-aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="f14-ahpa"/></marker>
+  </defs>
+
+  <!-- spine -->
+  <path d="M340 114 L340 136" class="f14-spine"/>
+  <path d="M340 204 L340 226" class="f14-spine"/>
+  <path d="M340 294 L340 316" class="f14-spine"/>
+  <path d="M340 384 L340 406" class="f14-spine"/>
+  <path d="M340 474 L340 496" class="f14-spine"/>
+
+  <!-- 1 -->
+  <rect x="120" y="50" width="440" height="60" rx="6" class="f14-box"/>
+  <circle cx="152" cy="80" r="14" class="f14-idx"/>
+  <text x="152" y="85" text-anchor="middle" class="f14-i">1</text>
+  <text x="180" y="87" class="f14-t">数える</text>
+  <text x="540" y="86" text-anchor="end" class="f14-p">計・作戦</text>
+
+  <!-- 2 -->
+  <rect x="120" y="140" width="440" height="60" rx="6" class="f14-box"/>
+  <circle cx="152" cy="170" r="14" class="f14-idx"/>
+  <text x="152" y="175" text-anchor="middle" class="f14-i">2</text>
+  <text x="180" y="177" class="f14-t">負けない形</text>
+  <text x="540" y="176" text-anchor="end" class="f14-p">謀攻・形</text>
+
+  <!-- 3 -->
+  <rect x="120" y="230" width="440" height="60" rx="6" class="f14-box"/>
+  <circle cx="152" cy="260" r="14" class="f14-idx"/>
+  <text x="152" y="265" text-anchor="middle" class="f14-i">3</text>
+  <text x="180" y="267" class="f14-t">主導権</text>
+  <text x="540" y="266" text-anchor="end" class="f14-p">勢・虚実</text>
+
+  <!-- 4 -->
+  <rect x="120" y="320" width="440" height="60" rx="6" class="f14-box"/>
+  <circle cx="152" cy="350" r="14" class="f14-idx"/>
+  <text x="152" y="355" text-anchor="middle" class="f14-i">4</text>
+  <text x="180" y="357" class="f14-t">運用</text>
+  <text x="540" y="345" text-anchor="end" class="f14-p">軍争・九変・行軍</text>
+  <text x="540" y="367" text-anchor="end" class="f14-p">地形・九地</text>
+
+  <!-- 5 -->
+  <rect x="120" y="410" width="440" height="60" rx="6" class="f14-box"/>
+  <circle cx="152" cy="440" r="14" class="f14-idx"/>
+  <text x="152" y="445" text-anchor="middle" class="f14-i">5</text>
+  <text x="180" y="447" class="f14-t">自制</text>
+  <text x="540" y="446" text-anchor="end" class="f14-p">火攻</text>
+
+  <!-- 6 -->
+  <rect x="120" y="500" width="440" height="60" rx="6" class="f14-box"/>
+  <circle cx="152" cy="530" r="14" class="f14-idx"/>
+  <text x="152" y="535" text-anchor="middle" class="f14-i">6</text>
+  <text x="180" y="537" class="f14-t">知る</text>
+  <text x="540" y="536" text-anchor="end" class="f14-p">用間</text>
+
+  <!-- loop back to 計 -->
+  <path d="M560 530 L630 530 L630 80 L566 80" class="f14-loop"/>
+  <text x="642" y="296" class="f14-r">再び</text>
+  <text x="642" y="318" class="f14-r">計へ</text>
+</svg>

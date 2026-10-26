@@ -7,12 +7,13 @@
 // the hero, cards and section rhythm come from components/public so the
 // three surfaces read as one site.
 
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import PublicShell, { usePublicSession } from '../components/PublicShell';
 import PageHero from '../components/public/PageHero';
 import LinkCard from '../components/public/LinkCard';
 import { CARD, H2, KICKER_ACCENT, PILL_PRIMARY, PILL_SECONDARY, SECTION, SECTION_LEDE } from '../components/public/styles';
-import { PUBLIC_DOCS, docPath } from '../lib/docs';
+import { DOCS_FALLBACK_LANGUAGE, PUBLIC_DOCS, docEdition, docPath } from '../lib/docs';
+import { useResearchLanguage } from '../lib/useResearchLanguage';
 
 const PILLARS = [
   {
@@ -34,6 +35,8 @@ const PILLARS = [
 
 export default function Landing() {
   const { signedIn, enterConsole } = usePublicSession();
+  const lang = useResearchLanguage(DOCS_FALLBACK_LANGUAGE);
+  const { search } = useLocation();
 
   return (
     <PublicShell>
@@ -85,16 +88,23 @@ export default function Landing() {
             title="What the network reads, and what it makes of it"
             description="Analyses the personas write from primary sources — the same corpus published for readers at kohuehara.xyz, in the console’s own reading surface."
           />
-          {PUBLIC_DOCS.map(doc => (
-            <LinkCard
-              key={doc.slug}
-              to={docPath(doc.slug)}
-              kicker={doc.kicker}
-              title={doc.title}
-              description={doc.description}
-              lang={doc.lang === 'ja' ? 'ja' : undefined}
-            />
-          ))}
+          {/* The document cards follow the reader's resolved edition (the
+              same resolution as /docs and /research) so a card is a true
+              promise about the body it opens; the landing page itself
+              carries no toggle — the document page does. */}
+          {PUBLIC_DOCS.map(doc => {
+            const edition = docEdition(doc, lang);
+            return (
+              <LinkCard
+                key={doc.slug}
+                to={docPath(doc.slug, search)}
+                kicker={edition.kicker}
+                title={edition.title}
+                description={edition.description}
+                lang={lang === 'ja' ? 'ja' : undefined}
+              />
+            );
+          })}
         </div>
       </section>
     </PublicShell>
