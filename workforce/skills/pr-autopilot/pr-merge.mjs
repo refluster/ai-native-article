@@ -220,7 +220,7 @@ export function globToRegExp(glob) {
       if (glob[i + 1] === "*") { re += ".*"; i++; if (glob[i + 1] === "/") i++; }
       else re += "[^/]*";
     } else if (c === "?") re += "[^/]";
-    else if ("\\^$.|+()[]{}".includes(c)) re += "\\" + c;
+    else if ("\\^$.|+()[]{}" .includes(c)) re += "\\" + c;
     else re += c;
   }
   return new RegExp(`(^|/)${re}$`, "i");
@@ -381,7 +381,7 @@ export async function emitRefusalReason(gh, repo, pr, why) {
       ? "Agent-fixable — handing to the **author lane** (`autopilot:needs-author`). The `pr-remediate` cadence picks this up, pushes the fix to the head branch, and the next autopilot tick re-verdicts. If it cannot (attempt cap, or a resolution only a human should make) it escalates to `autopilot:needs-human` with its own reason."
       : "(Epic-019 escalation-reason telemetry — wiring, not reviewer performance; see workforce/docs/pr-escalation-reasons.md.)",
     "",
-    reasonMarker(code, code === "other" ? why : ""),
+    reasonMarker(code, (code === "other" || code === "no-reviewer-consensus") ? why : ""),
     ...(authorLane ? [AUTHOR_MARKER] : []),
   ].join("\n");
   await ensureLabels(gh, repo, labels);
