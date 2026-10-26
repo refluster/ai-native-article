@@ -106,7 +106,7 @@ logs.
 | Symptom | Cause | What to do |
 |---|---|---|
 | Banner right after creating, nobody speaks | The Room was stored but the first dispatch failed (`room_dispatch_failed`, `WfRoomDispatchFailed`). | **Conclude now** gets you a conclusion from the question alone; or create the Room again. If it repeats, check the `wf-rooms-api-{stage}` logs and its `lambda:InvokeFunction` permission on `wf-room-debate-{stage}`. |
-| One member's turn is missing, the rest carried on | That turn threw (`WfRoomTurnThrow{Reason}`); the baton was passed first, so the room continued. Usual reasons: `stop_reason=max_tokens` (W-1 truncation — nothing was written), an LLM-artefact head, an empty body, or `AGENT#{slug}/META lacks model/system_prompt` (`WfRoomPersonaMissing` — fix the row through agents-api, ADR-0007). | Nothing, if the debate still reads well. Otherwise steer after it concludes (reopen) so the member gets another turn. |
+| One member's turn is missing, the rest carried on | That turn threw (`WfRoomTurnThrow{Reason}`); the baton was passed first, so the room continued. Usual reasons: `stop_reason=max_tokens` (W-1 truncation — nothing was written), an LLM-artefact head, an empty body, `AGENT#{slug}/META lacks model/system_prompt` (`WfRoomPersonaMissing` — fix the row through agents-api, ADR-0007), or `Reason=room_config` — `WF_ROOM_MODEL` / `WF_ROOM_EFFORT` on the function is not a priced `anthropic:claude-*` id or a known effort (every turn of the run fails this way, none calls Claude; fix the SAM env var and redeploy). | Nothing, if the debate still reads well. Otherwise steer after it concludes (reopen) so the member gets another turn. |
 | Banner names the budget (`WfRoomBudgetExceeded`) | The room has had 60 agent turns today. Every later turn in the run throws without calling Claude. | Wait for the next UTC day and reopen or Conclude now, or open a fresh Room. Raise `WF_ROOM_TURN_BUDGET` on the function only with a stated reason (same posture as `WF_MSG_REPLY_BUDGET`). |
 | Progress band stuck on one speaker; after ~3 min the page says **stalled — Conclude now** | The hand-off to the next turn failed (`WfRoomHandoffFailed`) or a turn died before passing it on. No further turn is queued. | **Conclude now** re-dispatches only the conclusion. If you wanted the remaining statements, let it conclude and then reopen with a steer — that runs one more full round. |
 | Debating, every turn present, but no conclusion; banner names the chair | The conclusion turn threw (truncation, artefact, empty body). | **Conclude now** — it writes a fresh conclusion under a new run id. |
@@ -201,6 +201,15 @@ Because reads are unauthenticated at the gateway, do not put anything in a
 Room's question or context that you would not put in a thread.
 
 ## Cost (W-3)
+
+Every turn runs on one model at one effort regardless of the member's own
+`model` row — `WF_ROOM_MODEL` / `WF_ROOM_EFFORT` on `wf-room-debate`
+(default `anthropic:claude-sonnet-5-5` at `medium`); the member's row
+supplies the voice (`system_prompt`) only (ADR-0048 §2, as amended). This
+is a Rooms-only rule: `wf-messaging-reply` still speaks on the persona's
+META `model`, so one persona runs on two models across the two surfaces.
+Change the Room engine through the SAM template (a data-plane deploy),
+never through agents-api, and with a stated reason.
 
 A Room costs Claude calls only when you act: create (≤ participants ×
 rounds + 1, at most 19), reopen (≤ participants + 1), conclude now (1).

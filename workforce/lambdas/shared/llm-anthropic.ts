@@ -27,6 +27,10 @@ export interface CompletionRequest {
    *  removed sampling params (Opus 4.7+ / Fable tier — a sent temperature
    *  is a 400 there). */
   temperature?: number;
+  /** `output_config.effort` — reasoning depth on the Claude 4.7+ tier
+   *  (GA, no beta header). Omitted → the model's own default (`high` on
+   *  Sonnet 5.5, `medium` on Opus 5.5). */
+  effort?: "low" | "medium" | "high" | "xhigh" | "max";
   /**
    * Reasoning on-switch + headroom. When set (>0), the wrapper enables
    * Anthropic's ADAPTIVE thinking (`thinking: {type: "adaptive"}` — the
@@ -64,7 +68,22 @@ const PRICING: Record<string, { in: number; out: number }> = {
   "claude-opus-4-8": { in: 5.0, out: 25.0 },
   "claude-haiku-4-5-20251001": { in: 1.0, out: 5.0 },
   "claude-haiku-4-5": { in: 1.0, out: 5.0 },
+  // Claude 5.5 tier (2026-10): Sonnet/Opus/Haiku — https://www.anthropic.com/pricing
+  "claude-sonnet-5-5": { in: 2.0, out: 10.0 },
+  "claude-opus-5-5": { in: 4.0, out: 20.0 },
+  "claude-haiku-5-5": { in: 0.1, out: 0.5 },
 };
+
+/** The pricing row for a model id (with or without the `anthropic:` prefix),
+ *  a dated snapshot id (`…-20261001`) resolving to its alias's row.
+ *  Undefined → the model is not on the price list: `complete()` then
+ *  records cost_usd=0, so callers that set a model by configuration
+ *  (room-debate) refuse an unpriced id up front rather than under-report
+ *  W-3 silently. */
+export function pricingFor(model: string): { in: number; out: number } | undefined {
+  const key = model.replace(/^anthropic:/, "").replace(/-\d{8}$/, "");
+  return PRICING[key];
+}
 
 /** Anthropic's documented floor for the legacy `thinking.budget_tokens`
  *  param (the Epic-013 launch bug: messaging-reply shipped with budget
@@ -179,8 +198,11 @@ export async function complete(req: CompletionRequest): Promise<CompletionRespon
   // functional there). Adaptive thinking is the supported replacement on
   // every current non-Haiku model; Haiku has no extended thinking at all,
   // so it must not receive a `thinking` field.
-  const adaptiveOnly = /^claude-(opus-4-[789]|fable|mythos)/.test(modelKey);
-  const noThinking = /^claude-haiku/.test(modelKey);
+  // The Claude 5 tier (Sonnet/Opus/Haiku 5.x) is adaptive-only too: thinking
+  // is on by default and non-default sampling params are a 400.
+  const adaptiveOnly = /^claude-(opus-4-[789]|opus-5|sonnet-5|haiku-5|fable|mythos)/.test(modelKey);
+  // Only the Haiku 4.x line has no extended thinking; Haiku 5.5 is adaptive.
+  const noThinking = /^claude-haiku-4/.test(modelKey);
 
   // Reasoning wiring. `reasoningBudgetTokens` is the on-switch plus the
   // max_tokens headroom reserved for thinking: with adaptive thinking the
@@ -201,6 +223,12 @@ export async function complete(req: CompletionRequest): Promise<CompletionRespon
   };
   if (useThinking) {
     body.thinking = { type: "adaptive" };
+  }
+  // `output_config.effort` exists on the models that have adaptive thinking;
+  // Haiku 4.x has neither, and would 400 on it — drop it there, as with the
+  // thinking field.
+  if (req.effort && !noThinking) {
+    body.output_config = { effort: req.effort };
   }
   // Sampling: omitted whenever thinking is on (the API controls sampling
   // under thinking), and omitted entirely on adaptive-only models where
@@ -247,7 +275,7 @@ export async function complete(req: CompletionRequest): Promise<CompletionRespon
     .map((c) => c.text!)
     .join("");
 
-  const price = PRICING[modelKey];
+  const price = pricingFor(modelKey);
   const cost_usd = price
     ? (data.usage.input_tokens * price.in + data.usage.output_tokens * price.out) / 1_000_000
     : 0;

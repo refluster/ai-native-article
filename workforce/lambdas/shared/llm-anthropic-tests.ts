@@ -18,6 +18,7 @@ import {
   resolveAnthropicApiKey,
   extractApiKey,
   ANTHROPIC_MIN_THINKING_BUDGET_TOKENS,
+  pricingFor,
 } from "./llm-anthropic.js";
 
 function notFound(): Error {
@@ -133,6 +134,63 @@ describe("complete — per-model wire shape (the Maya incident)", () => {
     expect(JSON.stringify(lastBody)).not.toContain("budget_tokens");
     expect(lastBody.max_tokens).toBe(400 + 2048);
     expect(out.cost_usd).toBeGreaterThan(0); // opus-4-7 pricing present (5/25)
+    vi.unstubAllGlobals();
+  });
+
+  it("sonnet-5-5 + reasoning + effort → adaptive thinking, output_config.effort, NO temperature", async () => {
+    vi.stubGlobal("fetch", okFetch);
+    const out = await complete({ ...base, model: "anthropic:claude-sonnet-5-5", reasoningBudgetTokens: 2048, effort: "medium" });
+    expect(lastBody.thinking).toEqual({ type: "adaptive" });
+    expect(lastBody.output_config).toEqual({ effort: "medium" });
+    expect(lastBody).not.toHaveProperty("temperature");
+    expect(out.cost_usd).toBeCloseTo((10 * 2.0 + 5 * 10.0) / 1_000_000, 12); // 2/10 pricing present
+    vi.unstubAllGlobals();
+  });
+
+  it("sonnet-5-5 WITHOUT reasoning → still no temperature (sampling params are a 400 on the 5.x tier)", async () => {
+    vi.stubGlobal("fetch", okFetch);
+    await complete({ ...base, model: "anthropic:claude-sonnet-5-5" });
+    expect(lastBody).not.toHaveProperty("temperature");
+    expect(lastBody).not.toHaveProperty("output_config");
+    vi.unstubAllGlobals();
+  });
+
+  it("haiku-5-5 + reasoning → adaptive thinking (only Haiku 4.x lacks it)", async () => {
+    vi.stubGlobal("fetch", okFetch);
+    await complete({ ...base, model: "anthropic:claude-haiku-5-5", reasoningBudgetTokens: 2048 });
+    expect(lastBody.thinking).toEqual({ type: "adaptive" });
+    expect(lastBody).not.toHaveProperty("temperature");
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    ["anthropic:claude-opus-5-5", (10 * 4.0 + 5 * 20.0) / 1_000_000],
+    ["anthropic:claude-haiku-5-5", (10 * 0.1 + 5 * 0.5) / 1_000_000],
+  ])("%s WITHOUT reasoning → still no temperature (5.x tier), and a pricing row", async (model, cost) => {
+    vi.stubGlobal("fetch", okFetch);
+    const out = await complete({ ...base, model });
+    expect(lastBody).not.toHaveProperty("thinking");
+    expect(lastBody).not.toHaveProperty("temperature");
+    expect(out.cost_usd).toBeCloseTo(cost, 12);
+    vi.unstubAllGlobals();
+  });
+
+  it("a dated snapshot id resolves to its alias's pricing row (pricingFor), an unknown id to none", async () => {
+    expect(pricingFor("anthropic:claude-sonnet-5-5-20261001")).toEqual(pricingFor("claude-sonnet-5-5"));
+    expect(pricingFor("claude-sonnet-5-5")).toBeDefined();
+    expect(pricingFor("anthropic:claude-sonnet-9-9")).toBeUndefined();
+    vi.stubGlobal("fetch", okFetch);
+    const out = await complete({ ...base, model: "anthropic:claude-sonnet-5-5-20261001" });
+    expect(out.cost_usd).toBeCloseTo((10 * 2.0 + 5 * 10.0) / 1_000_000, 12);
+    vi.unstubAllGlobals();
+  });
+
+  it("haiku-4-5 + effort → no output_config (no thinking, no effort on Haiku 4.x), sampling kept", async () => {
+    vi.stubGlobal("fetch", okFetch);
+    await complete({ ...base, model: "anthropic:claude-haiku-4-5", reasoningBudgetTokens: 2048, effort: "medium" });
+    expect(lastBody).not.toHaveProperty("thinking");
+    expect(lastBody).not.toHaveProperty("output_config");
+    expect(lastBody.temperature).toBe(0.7);
     vi.unstubAllGlobals();
   });
 
