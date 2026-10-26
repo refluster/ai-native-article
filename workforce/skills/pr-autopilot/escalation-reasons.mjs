@@ -152,7 +152,10 @@ export function reasonMarker(code, freeText = "") {
 const REASON_MARKER_RE = /<!--\s*autopilot:reason:([a-z0-9-]+)([^>]*?)\s*-->/g;
 
 /** Parse every reason marker in a comment body → [{ code, text }]. Throws
- *  (C-4) on an unknown code or a mandatory-free-text marker missing its free text. */
+ *  (C-4) on an unknown code or an `other` marker missing its free text. A bare
+ *  `no-reviewer-consensus` marker is tolerated here: PR comments written before
+ *  taxonomy v3.2 carry it, and this is the read path over them (reasonCodesFrom).
+ *  The free-text requirement for that code is enforced on emit (reasonMarker). */
 export function findReasonMarkers(body) {
   const found = [];
   const re = new RegExp(REASON_MARKER_RE.source, "g");
@@ -160,10 +163,8 @@ export function findReasonMarkers(body) {
   while ((m = re.exec(String(body ?? ""))) !== null) {
     const code = assertReasonCode(m[1].toLowerCase());
     const text = m[2].trim();
-    if (MANDATORY_FREE_TEXT_CODES.has(code) && !text) {
-      throw new Error(
-        `marker <!-- autopilot:reason:${code} --> is missing its mandatory free text (taxonomy v3.2)`
-      );
+    if (code === "other" && !text) {
+      throw new Error(`marker <!-- autopilot:reason:other --> is missing its mandatory free text (taxonomy v3.1)`);
     }
     found.push({ code, text });
   }

@@ -220,7 +220,7 @@ export function globToRegExp(glob) {
       if (glob[i + 1] === "*") { re += ".*"; i++; if (glob[i + 1] === "/") i++; }
       else re += "[^/]*";
     } else if (c === "?") re += "[^/]";
-    else if ("\\^$.|+()[]{}" .includes(c)) re += "\\" + c;
+    else if ("\\^$.|+()[]{}".includes(c)) re += "\\" + c;
     else re += c;
   }
   return new RegExp(`(^|/)${re}$`, "i");
@@ -565,8 +565,11 @@ export async function applyDecisions(gh, repo, decisions) {
       // code throws via assertReasonCode) and carried as label + hidden marker.
       if (d.reason_code) {
         assertReasonCode(d.reason_code);
+        // Build the marker first: it throws on missing mandatory free text
+        // (`other`, `no-reviewer-consensus`) before any label is touched.
+        const marker = reasonMarker(d.reason_code, d.reason_text || "");
         labels.push(reasonLabel(d.reason_code));
-        body = `${body.trimEnd()}\n\n${reasonMarker(d.reason_code, d.reason_text || "")}`;
+        body = `${body.trimEnd()}\n\n${marker}`;
       }
       await ensureLabels(gh, repo, labels);
       const { status, json } = await gh("POST", `/repos/${repo}/issues`, { title, body, labels });

@@ -89,10 +89,10 @@ describe("findReasonMarkers — parsing what emitters wrote", () => {
   it("throws on a bare `other` marker", () => {
     expect(() => findReasonMarkers("<!-- autopilot:reason:other -->")).toThrow(/free text/);
   });
-  it("throws on a bare `no-reviewer-consensus` marker (FU-036: free text mandatory)", () => {
-    expect(() =>
-      findReasonMarkers("<!-- autopilot:reason:no-reviewer-consensus -->")
-    ).toThrow(/mandatory free text/);
+  it("tolerates a legacy bare `no-reviewer-consensus` marker on the read path (pre-v3.2 comments)", () => {
+    expect(findReasonMarkers("<!-- autopilot:reason:no-reviewer-consensus -->")).toEqual([
+      { code: "no-reviewer-consensus", text: "" },
+    ]);
   });
   it("parses a `no-reviewer-consensus` marker carrying free text", () => {
     expect(

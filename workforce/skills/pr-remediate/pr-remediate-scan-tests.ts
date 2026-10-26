@@ -13,6 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { classifyRemediation, latestBrief, reasonCodesFrom, discoveryRequest } from "./pr-remediate-scan.mjs";
 import { labelsToClearOnResolve, assertBlockedReason, claimBody } from "./pr-remediate-post.mjs";
+import { reasonMarker } from "../pr-autopilot/escalation-reasons.mjs";
 import { AUTHOR_LABEL, ESCALATION_LABEL, REMEDIATION_CAP, countRemediationAttempts } from "../pr-autopilot/pr-merge.mjs";
 
 const inLane = (over = {}) => ({ labels: [AUTHOR_LABEL], mergeable: true, mergeableState: "clean", reasons: [], attempts: 0, ...over });
@@ -125,6 +126,11 @@ describe("reasonCodesFrom — the hand-off's own words", () => {
 
   it("an unknown code throws (C-4) rather than being read as a new bucket", () => {
     expect(() => reasonCodesFrom(["<!-- autopilot:reason:made-up -->"])).toThrow(/unknown/);
+  });
+
+  it("returns a pre-v3.2 bare `no-reviewer-consensus` marker without throwing, while emit stays strict", () => {
+    expect(reasonCodesFrom(["<!-- autopilot:reason:no-reviewer-consensus -->"])).toEqual(["no-reviewer-consensus"]);
+    expect(() => reasonMarker("no-reviewer-consensus")).toThrow(/requires free text/);
   });
 });
 
