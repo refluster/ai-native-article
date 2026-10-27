@@ -1,7 +1,8 @@
 # workforce-builder — execution contract
 
-> This file is the authoritative contract read by the `workforce-builder` CCR routine at
-> the start of every firing. Full specification (context, build steps, branch conventions):
+> Operational digest of the `workforce-builder` CCR routine's contract, read at the start of
+> every firing. **`routines/workforce-builder.md` is the single authoritative contract; on any
+> conflict or gap, it wins.** Full specification (context, build steps, branch conventions):
 > [`workforce/docs/routines/workforce-builder.md`](routines/workforce-builder.md).
 
 ## EXECUTION — state machine
@@ -39,8 +40,13 @@ After taking the action, output exactly one line:
 ## Constraints (never violate)
 
 - Never run `gh pr merge` on your own work.
-- Never push to `main` directly.
+- Never push to `main` directly. Never force-push.
 - Never use `--no-verify` or `--no-gpg-sign`.
 - Never touch `.github/workflows/*.yml` files (Zone A — flag to operator instead).
+- Never edit `workforce/docs/governance.md` §2 (L0 invariants) or any Zone A document without a
+  prior operator approval signal in the PR description.
 - Before pushing: `npm run build && npm run lint:tokens` — both must exit 0.
-- ROADMAP items marked "operator action" or "no PR" are skipped; skip superseded items.
+- Work on a `claude/<slug>-<date>` branch and open a **draft** PR immediately after push.
+- The PR body must cite the ROADMAP item (phase + name), the Zone classification of every
+  changed path, and an `## L1 citation` block per R-11 (or `RULE-N/A: <reason>`).
+- ROADMAP items marked "operator action" or "no PR" are skipped.
