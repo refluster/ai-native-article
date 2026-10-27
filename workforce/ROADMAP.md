@@ -65,7 +65,7 @@ Three-PR series that builds the autonomous flow from Epic → epic tracker → c
 ## Phase 6 — Dev process codification (post Epic-010 Story 1 retrospective)
 
 - [x] **Codify dev process + persona-agnostic reviewer skills** (PR #112) — Authored `workforce/docs/runbooks/dev-process.md` (canonical seven-phase loop). Added 3 generic, persona-agnostic routine specs (`pr-review.md`, `pr-autopilot.md`, `pr-implement.md`) — persona overlay lives in each agent's `agent.json:bindings[*].config`. Bound Dario / Ren / Aoi / Maya to the generic skills. Marked `pdm-decompose.md` + `ccr-bootstrap.md` label-state-machine sections as superseded. Added `workforce/docs/follow-ups.md` index. *(Zone B docs + bindings)*
-- [ ] **Follow-up items from retrospective** — Tracked in [follow-ups.md](docs/follow-ups.md): cycle counter lint ✅ (FU-004, PR #446), `aws-sdk-client-mock` standardisation ✅ (FU-008, this PR), scope-creep enforcement (FU-005), cross-PR audit (FU-006), etc.
+- [ ] **Follow-up items from retrospective** — Tracked in [follow-ups.md](docs/follow-ups.md): cycle counter lint ✅ (FU-004, PR #446), `aws-sdk-client-mock` standardisation ✅ (FU-008, this PR), scope-creep enforcement (FU-005), cross-PR audit (FU-006), `no-reviewer-consensus` verdict-path guard — part (a) ✅ (FU-036, PR #861; part (b) de-escalation still open), etc.
 
 ## RFC-010 rollout
 

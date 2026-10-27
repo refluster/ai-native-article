@@ -20,7 +20,7 @@
 
 export const REASON_LABEL_PREFIX = "autopilot:reason:";
 
-// Taxonomy v3.1 (2026-08-05; v3 2026-08-02; v2 2026-07-29). The terminal-state sweep's kind strings are
+// Taxonomy v3.2 (2026-10-26; v3.1 2026-08-05; v3 2026-08-02; v2 2026-07-29). The terminal-state sweep's kind strings are
 // reused VERBATIM as codes (never flattened); the merge-engine clauses map via
 // refusalReasonCode() below. Adding/renaming a code = a version bump of the
 // prose twin in the same PR.
@@ -114,7 +114,7 @@ export function assertReasonCode(code) {
   if (!CODE_SET.has(code)) {
     throw new Error(
       `unknown escalation-reason code "${code}" — must be one of: ${REASON_CODES.join(", ")} ` +
-        `(taxonomy v3.1, workforce/docs/pr-escalation-reasons.md; C-4: never invent a bucket)`,
+        `(taxonomy v3.2, workforce/docs/pr-escalation-reasons.md; C-4: never invent a bucket)`,
     );
   }
   return code;
@@ -125,14 +125,26 @@ export function reasonLabel(code) {
   return `${REASON_LABEL_PREFIX}${assertReasonCode(code)}`;
 }
 
+// v3.2 (FU-036): codes that require mandatory free text on the verdict path.
+// `other` — the unanticipated cause IS the finding; a bare `other` launders missing coverage.
+// `no-reviewer-consensus` — the router must name which lenses contradicted; a bare code is
+//   irreversible and unsearchable. The pr-merge.mjs refusal leg is exempt: it passes the
+//   engine's `why` string, which already carries reviewer-level detail.
+const MANDATORY_FREE_TEXT_CODES = new Set(["other", "no-reviewer-consensus"]);
+
 /** The hidden-marker carrier: `<!-- autopilot:reason:<code> [free text] -->`.
- *  Free text is optional for every code except `other`, where it is mandatory. */
+ *  Free text is mandatory for `other` and `no-reviewer-consensus`; optional for every other code. */
 export function reasonMarker(code, freeText = "") {
   assertReasonCode(code);
   // "--\x3e" inside the text would close the HTML comment early; neutralise it.
   const text = String(freeText || "").trim().replace(/-->/g, "→");
-  if (code === "other" && !text) {
-    throw new Error(`escalation reason "other" requires free text — the unanticipated cause IS the finding (taxonomy v3.1)`);
+  if (MANDATORY_FREE_TEXT_CODES.has(code) && !text) {
+    throw new Error(
+      `escalation reason "${code}" requires free text — ` +
+        (code === "other"
+          ? `the unanticipated cause IS the finding (taxonomy v3.2)`
+          : `name which lenses contradicted so the audit trail is searchable (taxonomy v3.2; FU-036)`)
+    );
   }
   return text ? `<!-- autopilot:reason:${code} ${text} -->` : `<!-- autopilot:reason:${code} -->`;
 }
@@ -140,7 +152,10 @@ export function reasonMarker(code, freeText = "") {
 const REASON_MARKER_RE = /<!--\s*autopilot:reason:([a-z0-9-]+)([^>]*?)\s*-->/g;
 
 /** Parse every reason marker in a comment body → [{ code, text }]. Throws
- *  (C-4) on an unknown code or an `other` marker missing its free text. */
+ *  (C-4) on an unknown code or an `other` marker missing its free text. A bare
+ *  `no-reviewer-consensus` marker is tolerated here: PR comments written before
+ *  taxonomy v3.2 carry it, and this is the read path over them (reasonCodesFrom).
+ *  The free-text requirement for that code is enforced on emit (reasonMarker). */
 export function findReasonMarkers(body) {
   const found = [];
   const re = new RegExp(REASON_MARKER_RE.source, "g");
@@ -149,7 +164,7 @@ export function findReasonMarkers(body) {
     const code = assertReasonCode(m[1].toLowerCase());
     const text = m[2].trim();
     if (code === "other" && !text) {
-      throw new Error(`marker <!-- autopilot:reason:other --> is missing its mandatory free text (taxonomy v3.1)`);
+      throw new Error(`marker <!-- autopilot:reason:other --> is missing its mandatory free text (taxonomy v3.2)`);
     }
     found.push({ code, text });
   }

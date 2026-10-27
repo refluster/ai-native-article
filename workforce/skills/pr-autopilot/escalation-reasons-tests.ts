@@ -56,6 +56,14 @@ describe("reasonMarker — the hidden-comment carrier", () => {
     expect(() => reasonMarker("other")).toThrow(/requires free text/);
     expect(() => reasonMarker("other", "   ")).toThrow(/requires free text/);
   });
+  it("throws on `no-reviewer-consensus` without free text (FU-036: verdict path must name which lenses contradicted)", () => {
+    expect(() => reasonMarker("no-reviewer-consensus")).toThrow(/requires free text/);
+    expect(() => reasonMarker("no-reviewer-consensus", "   ")).toThrow(/requires free text/);
+  });
+  it("accepts `no-reviewer-consensus` with free text", () =>
+    expect(reasonMarker("no-reviewer-consensus", "ren 🟢 / dario 🔴")).toBe(
+      "<!-- autopilot:reason:no-reviewer-consensus ren 🟢 / dario 🔴 -->"
+    ));
   it("throws on an unknown code", () => expect(() => reasonMarker("nope")).toThrow(/unknown/));
   it("neutralises a comment-closing --> inside the free text", () =>
     expect(reasonMarker("other", "weird --> text")).not.toMatch(/--> text/));
@@ -80,6 +88,16 @@ describe("findReasonMarkers — parsing what emitters wrote", () => {
   });
   it("throws on a bare `other` marker", () => {
     expect(() => findReasonMarkers("<!-- autopilot:reason:other -->")).toThrow(/free text/);
+  });
+  it("tolerates a legacy bare `no-reviewer-consensus` marker on the read path (pre-v3.2 comments)", () => {
+    expect(findReasonMarkers("<!-- autopilot:reason:no-reviewer-consensus -->")).toEqual([
+      { code: "no-reviewer-consensus", text: "" },
+    ]);
+  });
+  it("parses a `no-reviewer-consensus` marker carrying free text", () => {
+    expect(
+      findReasonMarkers("<!-- autopilot:reason:no-reviewer-consensus ren 🟢 / dario 🔴 -->")
+    ).toEqual([{ code: "no-reviewer-consensus", text: "ren 🟢 / dario 🔴" }]);
   });
 });
 

@@ -381,7 +381,7 @@ export async function emitRefusalReason(gh, repo, pr, why) {
       ? "Agent-fixable — handing to the **author lane** (`autopilot:needs-author`). The `pr-remediate` cadence picks this up, pushes the fix to the head branch, and the next autopilot tick re-verdicts. If it cannot (attempt cap, or a resolution only a human should make) it escalates to `autopilot:needs-human` with its own reason."
       : "(Epic-019 escalation-reason telemetry — wiring, not reviewer performance; see workforce/docs/pr-escalation-reasons.md.)",
     "",
-    reasonMarker(code, code === "other" ? why : ""),
+    reasonMarker(code, (code === "other" || code === "no-reviewer-consensus") ? why : ""),
     ...(authorLane ? [AUTHOR_MARKER] : []),
   ].join("\n");
   await ensureLabels(gh, repo, labels);
@@ -565,8 +565,11 @@ export async function applyDecisions(gh, repo, decisions) {
       // code throws via assertReasonCode) and carried as label + hidden marker.
       if (d.reason_code) {
         assertReasonCode(d.reason_code);
+        // Build the marker first: it throws on missing mandatory free text
+        // (`other`, `no-reviewer-consensus`) before any label is touched.
+        const marker = reasonMarker(d.reason_code, d.reason_text || "");
         labels.push(reasonLabel(d.reason_code));
-        body = `${body.trimEnd()}\n\n${reasonMarker(d.reason_code, d.reason_text || "")}`;
+        body = `${body.trimEnd()}\n\n${marker}`;
       }
       await ensureLabels(gh, repo, labels);
       const { status, json } = await gh("POST", `/repos/${repo}/issues`, { title, body, labels });

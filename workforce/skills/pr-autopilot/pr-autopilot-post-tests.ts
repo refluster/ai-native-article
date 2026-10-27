@@ -108,7 +108,7 @@ describe("resolveReasons — escalation always carries a reason (Epic-019)", () 
   });
 
   it("a marker already embedded in the body satisfies the requirement (nothing appended)", () => {
-    const body = `verdict\n${NEEDS_HUMAN_MARKER}\n<!-- autopilot:reason:no-reviewer-consensus -->`;
+    const body = `verdict\n${NEEDS_HUMAN_MARKER}\n<!-- autopilot:reason:no-reviewer-consensus ren 🟢 / dario 🔴 -->`;
     const r = resolveReasons({ body, escalating: true });
     expect(r.labels).toEqual(["autopilot:reason:no-reviewer-consensus"]);
     expect(r.appendMarker).toBeNull();
@@ -131,6 +131,20 @@ describe("resolveReasons — escalation always carries a reason (Epic-019)", () 
     const r = resolveReasons({ body: "v", escalating: true, reason: "other", reasonText: "repo archived" });
     expect(r.labels).toEqual(["autopilot:reason:other"]);
     expect(r.appendMarker).toBe("<!-- autopilot:reason:other repo archived -->");
+  });
+
+  it("`no-reviewer-consensus` requires free text (FU-036)", () => {
+    expect(() =>
+      resolveReasons({ body: "v", escalating: true, reason: "no-reviewer-consensus" })
+    ).toThrow(/free text/);
+    const r = resolveReasons({
+      body: "v",
+      escalating: true,
+      reason: "no-reviewer-consensus",
+      reasonText: "ren 🟢 / dario 🔴",
+    });
+    expect(r.labels).toEqual(["autopilot:reason:no-reviewer-consensus"]);
+    expect(r.appendMarker).toBe("<!-- autopilot:reason:no-reviewer-consensus ren 🟢 / dario 🔴 -->");
   });
 
   it("a non-escalating routing comment needs no reason", () => {

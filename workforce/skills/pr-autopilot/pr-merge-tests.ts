@@ -387,6 +387,16 @@ describe("applyDecisions (escalation labelling)", () => {
     expect(issueCall.body.body).toContain("<!-- autopilot:reason:l0l1-path -->");
   });
 
+  it("a `no-reviewer-consensus` escalation without reason_text throws before any label is touched", async () => {
+    const gh = mockGh([]);
+    await expect(
+      applyDecisions(gh, "o/r", [
+        { pr: 9, action: "escalate", issue_title: "t", issue_body: "b", reason_code: "no-reviewer-consensus" },
+      ]),
+    ).rejects.toThrow(/requires free text/);
+    expect(gh.calls.length).toBe(0);
+  });
+
   it("an unknown reason_code throws (C-4) — never a quiet new bucket", async () => {
     await expect(
       applyDecisions(mockGh([]), "o/r", [
