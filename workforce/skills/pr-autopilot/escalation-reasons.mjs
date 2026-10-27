@@ -114,7 +114,7 @@ export function assertReasonCode(code) {
   if (!CODE_SET.has(code)) {
     throw new Error(
       `unknown escalation-reason code "${code}" — must be one of: ${REASON_CODES.join(", ")} ` +
-        `(taxonomy v3.1, workforce/docs/pr-escalation-reasons.md; C-4: never invent a bucket)`,
+        `(taxonomy v3.2, workforce/docs/pr-escalation-reasons.md; C-4: never invent a bucket)`,
     );
   }
   return code;
@@ -164,7 +164,7 @@ export function findReasonMarkers(body) {
     const code = assertReasonCode(m[1].toLowerCase());
     const text = m[2].trim();
     if (code === "other" && !text) {
-      throw new Error(`marker <!-- autopilot:reason:other --> is missing its mandatory free text (taxonomy v3.1)`);
+      throw new Error(`marker <!-- autopilot:reason:other --> is missing its mandatory free text (taxonomy v3.2)`);
     }
     found.push({ code, text });
   }
