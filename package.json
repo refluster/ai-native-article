@@ -57,6 +57,7 @@
     "workforce:binding-queues": "node workforce/scripts/check-binding-queues.mjs",
     "workforce:cycle-count": "node workforce/scripts/check-cycle-count.mjs",
     "workforce:scope-creep": "node workforce/scripts/check-scope-creep.mjs",
+    "workforce:router-nominates": "node workforce/scripts/check-router-nominates.mjs",
     "workforce:pr-sweep": "node workforce/skills/pr-autopilot/pr-autopilot-sweep.mjs",
     "workforce:pr-metrics": "node workforce/scripts/build-pr-metrics.mjs",
     "workforce:pr-metrics-gh": "node workforce/scripts/build-pr-metrics-github.mjs",
