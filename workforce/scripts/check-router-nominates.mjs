@@ -23,6 +23,7 @@ import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
 ensureProxyAwareEntry(import.meta.url);
 
 import { ROUTING_CYCLE_RE } from "../skills/pr-autopilot/pr-merge.mjs";
+import { drainPages } from "./check-scope-creep.mjs";
 
 /**
  * True when the PR's changed-file list includes at least one file under the
@@ -80,7 +81,7 @@ function arg(name) {
   return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : undefined;
 }
 
-async function main() {
+export async function main() {
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
   const repo = arg("repo");
   const slug = arg("slug") ?? "ren";
@@ -117,6 +118,11 @@ async function main() {
     return { status: res.status, json, link: res.headers.get("link") };
   };
 
+  // Follow `Link: rel="next"` and throw on any non-200 page, so a 403/429/5xx
+  // or a PR with >100 files can never read as "clean" (W-4/C-4; A1/A2). The
+  // outer try/catch turns the throw into exit 3.
+  const ghAll = async (path) => ({ status: 200, json: await drainPages(gh, path) });
+
   let prs;
   try {
     const r = await gh(`/repos/${repo}/pulls?state=open&per_page=100`);
@@ -137,9 +143,9 @@ async function main() {
     let files, bodies;
     try {
       const [fr, cr, rvr] = await Promise.all([
-        gh(`/repos/${repo}/pulls/${pr.number}/files?per_page=100`),
-        gh(`/repos/${repo}/issues/${pr.number}/comments?per_page=100`),
-        gh(`/repos/${repo}/pulls/${pr.number}/reviews?per_page=100`),
+        ghAll(`/repos/${repo}/pulls/${pr.number}/files?per_page=100`),
+        ghAll(`/repos/${repo}/issues/${pr.number}/comments?per_page=100`),
+        ghAll(`/repos/${repo}/pulls/${pr.number}/reviews?per_page=100`),
       ]);
 
       files = Array.isArray(fr.json) ? fr.json : [];

@@ -2,11 +2,12 @@
 // The network loop requires a token; the three pure functions are tested here.
 
 // @ts-nocheck — the script under test is dependency-free ESM, not TS.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   touchesPath,
   findRoutingBody,
   isNominated,
+  main,
 } from "./check-router-nominates.mjs";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -156,5 +157,119 @@ describe("isNominated", () => {
     // wf:ren-advisor contains wf:ren as a prefix, so the tag `wf:ren`
     // does NOT appear standalone — this tests the tag literal match
     expect(isNominated(body)).toBe(false);
+  });
+});
+
+describe("isNominated: bare mentions", () => {
+  it("counts a bare mention in prose as a nomination (documented, pinned)", () => {
+    // The guard is a cheap text lint: any non-"Skipping" line containing
+    // `wf:ren` nominates. "considered wf:ren but out of scope" therefore
+    // PASSES the lint. Routers must use the "Skipping `wf:ren` — ..." form to
+    // decline; this test pins that contract.
+    expect(isNominated("considered `wf:ren` but out of scope")).toBe(true);
+    expect(isNominated("Skipping `wf:ren` — out of scope")).toBe(false);
+  });
+});
+
+// ── main() with stubbed fetch ────────────────────────────────────────────────
+
+type Route = { status?: number; json?: unknown; link?: string };
+
+function stubFetch(routes: Record<string, Route>) {
+  const calls: string[] = [];
+  vi.stubGlobal("fetch", async (url: string) => {
+    const u = String(url);
+    calls.push(u);
+    const key = Object.keys(routes).find((k) => u.includes(k));
+    const r = key ? routes[key] : { status: 404, json: {} };
+    return {
+      status: r.status ?? 200,
+      text: async () => JSON.stringify(r.json ?? []),
+      headers: { get: (h: string) => (h.toLowerCase() === "link" ? (r.link ?? null) : null) },
+    };
+  });
+  return calls;
+}
+
+async function runMain(): Promise<number> {
+  const savedArgv = process.argv;
+  const savedTok = process.env.GITHUB_TOKEN;
+  process.argv = ["node", "check-router-nominates.mjs", "--repo", "o/r"];
+  process.env.GITHUB_TOKEN = "test-token";
+  const err = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    return await main();
+  } finally {
+    err.mockRestore();
+    process.argv = savedArgv;
+    if (savedTok === undefined) delete process.env.GITHUB_TOKEN;
+    else process.env.GITHUB_TOKEN = savedTok;
+  }
+}
+
+const PR = [{ number: 7, title: "t", html_url: "u" }];
+const LAMBDA_FILE = [{ filename: "workforce/lambdas/x/handler.ts" }];
+const comment = (body: string) => [{ body, created_at: "2026-01-01T00:00:00Z" }];
+
+describe("main (stubbed fetch)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("exits 2 when a routed lambdas PR does not nominate wf:ren", async () => {
+    stubFetch({
+      "/pulls?state=open": { json: PR },
+      "/pulls/7/files": { json: LAMBDA_FILE },
+      "/issues/7/comments": { json: comment(routingBody(1, ["dario", "mateo", "aoi"])) },
+      "/pulls/7/reviews": { json: [] },
+    });
+    expect(await runMain()).toBe(2);
+  });
+
+  it("exits 0 when the lambdas PR is not yet routed", async () => {
+    stubFetch({
+      "/pulls?state=open": { json: PR },
+      "/pulls/7/files": { json: LAMBDA_FILE },
+      "/issues/7/comments": { json: [] },
+      "/pulls/7/reviews": { json: [] },
+    });
+    expect(await runMain()).toBe(0);
+  });
+
+  it("exits 0 when wf:ren is nominated", async () => {
+    stubFetch({
+      "/pulls?state=open": { json: PR },
+      "/pulls/7/files": { json: LAMBDA_FILE },
+      "/issues/7/comments": { json: comment(routingBody(1)) },
+      "/pulls/7/reviews": { json: [] },
+    });
+    expect(await runMain()).toBe(0);
+  });
+
+  for (const which of ["/pulls/7/files", "/issues/7/comments", "/pulls/7/reviews"]) {
+    for (const status of [403, 500]) {
+      it(`exits 3 on HTTP ${status} from ${which}`, async () => {
+        stubFetch({
+          "/pulls?state=open": { json: PR },
+          "/pulls/7/files": { json: LAMBDA_FILE },
+          "/issues/7/comments": { json: comment(routingBody(1, ["dario", "mateo", "aoi"])) },
+          "/pulls/7/reviews": { json: [] },
+          [which]: { status, json: { message: "nope" } },
+        });
+        expect(await runMain()).toBe(3);
+      });
+    }
+  }
+
+  it("follows Link rel=next: a lambdas file on page 2 is flagged", async () => {
+    stubFetch({
+      "/pulls?state=open": { json: PR },
+      "page=2": { json: LAMBDA_FILE },
+      "/pulls/7/files": {
+        json: [{ filename: "README.md" }],
+        link: '<https://api.github.com/repos/o/r/pulls/7/files?per_page=100&page=2>; rel="next"',
+      },
+      "/issues/7/comments": { json: comment(routingBody(1, ["dario", "mateo", "aoi"])) },
+      "/pulls/7/reviews": { json: [] },
+    });
+    expect(await runMain()).toBe(2);
   });
 });
