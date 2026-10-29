@@ -16,6 +16,8 @@
 //        b) every URL named in the citations text actually resolves
 //           (scripts/lib/citation-urls.mjs) — added by issue #673, which
 //           found the (a)-only guard passes on a single stray character.
+//        c) the script does not copy a verbatim run of >= 80 chars from a cited
+//           source (scripts/lib/source-overlap.mjs, front 1; issue #673 slice 2).
 //      What this guard does NOT verify, mechanically or otherwise (issue
 //      #673 item 2 — a green verdict should name its own scope): that a
 //      citation *supports* the claim it is attached to (a semantic call,
@@ -59,6 +61,8 @@ ensureProxyAwareEntry(import.meta.url);
 import { readFileSync } from "node:fs";
 import { isTruncatedMarkdown, lastNonEmptyLine } from "../../../scripts/lib/truncation.mjs";
 import { verifyCitationsResolve } from "../../../scripts/lib/citation-urls.mjs";
+import { fetchSourceBody } from "../../../scripts/lib/source-fetch.mjs";
+import { OVERLAP_MIN_CHARS, checkSourceOverlap, overlapFrontReport } from "../../../scripts/lib/source-overlap.mjs";
 import { assembleFrontStates, citationFrontReport, llmFrontReport, scopedVerdict } from "../../../scripts/lib/rights-scope.mjs";
 
 const NOTION_VERSION = "2022-06-28";
@@ -123,6 +127,28 @@ if (!citationCheck.ok) {
   process.exit(2);
 }
 
+// Issue #673 slice 2 (front 1, reproduction): compare the script to the text of
+// each cited source. A verbatim run of >= minChars characters is a rights
+// failure -> exit 2. A source that cannot be fetched (bot wall, PDF too thin)
+// is NOT treated as clean: it is reported as not compared, which keeps front 1
+// out of the "fully machine-examined" count.
+const overlapMinChars = Number(process.env.WF_OVERLAP_MIN_CHARS ?? OVERLAP_MIN_CHARS);
+if (!Number.isInteger(overlapMinChars) || overlapMinChars < 1) {
+  console.error(`publish-notion.mjs: WF_OVERLAP_MIN_CHARS must be a positive integer (got "${process.env.WF_OVERLAP_MIN_CHARS}")`);
+  process.exit(1);
+}
+const fetchedSources = await Promise.all(
+  citationCheck.checked.map(async ({ url }) => {
+    const body = await fetchSourceBody(url).catch(() => ({ ok: false }));
+    return { url, text: body.ok ? body.text : null };
+  }),
+);
+const overlapCheck = checkSourceOverlap(script, fetchedSources, { minChars: overlapMinChars });
+if (!overlapCheck.ok) {
+  console.error(`publish-notion.mjs: source-overlap guard failed — ${overlapCheck.reason} (front 1 reproduction, issue #673). exit 2`);
+  process.exit(2);
+}
+
 // ── W-1 editorial guards on the script (fail loud, do not attach) ───────────
 const trimmed = script.trim();
 if (trimmed.length < MIN_SCRIPT_CHARS) {
@@ -180,7 +206,11 @@ if (complianceFile) {
 // passed, so reaching here means it ran and held. Front 1 is only reported when
 // an LLM verdict exists. Every other front has no check and stays not-examined.
 const frontReports = { 4: citationFrontReport(citationCheck.checked.length) };
-if (llmVerdict) frontReports[1] = llmFrontReport();
+// Front 1: the script-vs-source comparison when it ran on any source; otherwise
+// (nothing fetchable) fall back to the LLM's self-attested verdict, uncounted.
+const overlapReport = overlapFrontReport(overlapCheck, overlapMinChars);
+if (overlapReport) frontReports[1] = overlapReport;
+else if (llmVerdict) frontReports[1] = llmFrontReport();
 properties.complianceVerdict = {
   rich_text: richTextChunks(
     scopedVerdict(llmVerdict, assembleFrontStates(frontReports)),
