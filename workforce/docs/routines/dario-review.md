@@ -88,7 +88,7 @@ the referenced issue, the relevant design docs, and the repo's governance before
 3. **Failure mode** — are error paths named explicitly (throw, DLQ, timeout)? Flag silent
    degradation (a catch-and-log that produces no observable signal) as a C-4 / W-4 violation.
 4. **Cost shape** — does the diff add a recurring API call or new AWS resource? If so, is the
-   monthly estimate in the PR body? Flag > USD 10/mo without `coordination_required:dario`.
+   monthly estimate in the PR body? Flag > USD 10/mo if the monthly estimate is absent from the PR body.
 5. **Layer discipline** — does the PR mix L0/L1/L2/L3 changes? A single PR should not bundle
    a governance amendment with a Lambda change — flag if it does.
 6. **Test coverage** — is the new or changed logic covered by tests that would catch a

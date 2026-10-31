@@ -73,36 +73,46 @@ See [routines/dario-review.md](../routines/dario-review.md) for the full spec.
 5. **Repository**: `refluster/ai-native-article`, branch push setting **default** (review-only, no push)
 6. **Environment**: Default cloud env, Trusted network
 7. **Connectors**: GitHub MCP only
-8. **Triggers**: GitHub event → `Pull request` → action `labeled` → filter: Labels **is one of** `wf:needs-review-dario`. **No schedule trigger.**
-
-The Claude GitHub App must already be installed on `refluster/ai-native-article` for the GitHub event trigger to receive webhooks. The setup wizard prompts the install.
+8. **Triggers**: No automated trigger. Operator fires on demand from [claude.ai/code/routines](https://claude.ai/code/routines) with the target PR number in the session context. (The label-triggered model — `wf:needs-review-dario` — was retired 2026-05-27.)
 
 ### Verify
 
-Manually add the `wf:needs-review-dario` label to any open PR. Within ~30 seconds, the routine fires; check the session transcript at [claude.ai/code](https://claude.ai/code).
+Fire the routine from [claude.ai/code/routines](https://claude.ai/code/routines) with a target PR number in the session context. Confirm a review comment appears on the PR within a few minutes.
 
 ## Routine 3 — `wf-aoi-review`
 
-See [routines/aoi-review.md](../routines/aoi-review.md) for the full spec. Steps mirror routine 2 with label filter `wf:needs-review-aoi`.
+See [routines/aoi-review.md](../routines/aoi-review.md) for the full spec. Steps mirror Routine 2 with `wf-aoi-review` as the name and the aoi-review.md spec as the prompt. No automated trigger; operator-fired on demand. (The label-triggered model — `wf:needs-review-aoi` — was retired 2026-05-27.)
 
 ## How the three routines compose
 
+> The label-driven state machine (`wf:ready` / `wf:in-flight` / `wf:needs-review-*`) was retired
+> 2026-05-27. The current flow uses PR comments for coordination; no labels are required.
+
 ```
-[Maya's pdm-decompose creates a child issue with wf:ready + role:* + reviewer:*]
+[New issue eligible per dario-implement Step 1 (no active PR, no operator/L0/L1 tag)]
                           │
                           ▼
-[wf-dario-implement (hourly schedule)]
-   - reads issue, implements in worktree
-   - opens draft PR with wf:in-flight + wf:needs-review-dario [+ wf:needs-review-aoi]
+[wf-dario-implement (hourly schedule or manual fire)]
+   - reads issue, implements on claude/<slug>-<date> branch
+   - opens draft PR
+                          │
+                          ▼
+[pr-autopilot (github_event: pull_request, or manual sweep)]
+   - routes: nominates reviewer personas via PR comment
                           │
               ┌───────────┴───────────┐
               ▼                       ▼
-[wf-dario-review fires]    [wf-aoi-review fires]
-   - posts review comments    - posts review comments
-   - removes wf:needs-review-dario   - removes wf:needs-review-aoi
+[wf-dario-review]         [wf-aoi-review]
+(operator-fired or        (operator-fired or
+ pr-autopilot fire)        pr-autopilot fire)
+   - posts architecture/     - posts design-lens
+     lens review comment       review comment
                           │
                           ▼
-[Operator reviews + merges]
+[pr-autopilot sweep (Step 6): 🟢 → pr-merge; 🔴/🟡 → escalate]
+                          │
+                          ▼
+[Operator reviews + merges if not autopilot-eligible]
 ```
 
 ## Cost notes

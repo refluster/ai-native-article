@@ -46,7 +46,7 @@ Each cycle = (revise → re-review → verdict). Hard cap at **7 cycles** before
    - R-N\* compliance — any new state store / scheduler / secret store / observability stack / executor surface? If yes, Zone A governance amendment must accompany.
    - Audit surface — every persistent action addressable by `(pk, sk)` in DDB or S3 prefix?
    - Failure mode named — what happens when this throws / times out / hits a rate limit?
-   - Cost shape — any new recurring API call? Monthly estimate in PR body; > USD 10/mo flags `coordination_required:dario`.
+   - Cost shape — any new recurring API call? Monthly estimate in PR body; > USD 10/mo requires operator approval (note in PR body).
    - One layer per change — L0 invariants / L1 framework / L2 mechanical / L3 operational not confused.
 5. Run validators locally: `npm run workforce:naming && npm run workforce:agents && npm run workforce:skills && (cd workforce/lambdas && npm run typecheck && npm test)`. **Green before push, non-negotiable.**
 6. PR body MUST include: Summary, Closes #N, Acceptance criteria with checkboxes, Architecture self-check pass/fail, Reviewer persona suggestions (informational; Maya routes), Cost impact, Test plan, Sequencing notes.
