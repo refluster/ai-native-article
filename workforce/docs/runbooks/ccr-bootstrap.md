@@ -15,7 +15,7 @@ markdown); this runbook walks the operator from spec → live routine.
 ## Pre-flight
 
 1. **Claude subscription**. CCR requires Pro / Max / Team / Enterprise. Free won't see the routines surface at [claude.ai/code/routines](https://claude.ai/code/routines).
-2. **Claude GitHub App** installed on `refluster/ai-native-article`. Required for GitHub-event-triggered routines (dario-review, aoi-review). The trigger setup will prompt you to install if missing.
+2. **Claude GitHub App** installed on `refluster/ai-native-article`. Required only for a routine that uses a GitHub-event trigger (e.g. a `pr-autopilot` `pull_request` binding, adr-0013); the label-triggered dario-review / aoi-review routines are retired. The trigger setup will prompt you to install if missing.
 3. **GitHub access** for cloning the repo from CCR. `web-setup` in the CLI (or the equivalent prompt in the web UI) grants repo cloning access. *Note*: `web-setup` does NOT install the GitHub App — that's a separate step prompted by the GitHub-event trigger setup.
 4. **PR A merged** ([#100](https://github.com/refluster/ai-native-article/pull/100)) — the unified binding shape that these routines reference.
 5. **PR B merged** ([#101](https://github.com/refluster/ai-native-article/pull/101)) — Maya's `pdm-decompose` skill that produces the issues these routines consume (the `wf:ready` label itself is retired).
@@ -122,7 +122,7 @@ W-3 envelope. The operator's daily-run cap is shared across all three
 routines. Estimated runs:
 
 - `dario-implement`: up to 24/day (hourly schedule). Most exit early with "no work" (~5 sec session). Real implementations: ~30 min × ~5/day = ~2.5 hrs of work
-- `dario-review`: ~5/day at steady state (one per PR labelled)
+- `dario-review`: ~5/day at steady state (one per PR routed to it)
 - `aoi-review`: ~5/day at steady state
 
 Daily-run consumption: ~35-40 sessions. Verify your remaining quota at
