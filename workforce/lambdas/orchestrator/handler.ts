@@ -386,6 +386,40 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
           reason: `ccr_batch_error[${routineId}]: ${reason.slice(0, 180)}`,
         });
       }
+      // C-4 / FU-031 class A: a CCR batch POST failure is a dispatch-level
+      // event invisible to the EXEC ledger without an explicit write — only
+      // CloudWatch sees it otherwise. Write best-effort EXEC rows (status
+      // "throw") for every task in the failed batch, mirroring the
+      // ccr_prep_error path added in PR #650.
+      const batchErrAt = new Date().toISOString();
+      for (let i = 0; i < slot.items.length; i++) {
+        const item = slot.items[i]!;
+        const held = slot.held[i];
+        // sentinel "-" means the binding had no explicit project_id — fall
+        // back to self/{slug} (same logic as ccrPrepErrorProjectId).
+        const heldProject = held?.project !== "-" ? held?.project : undefined;
+        try {
+          await appendExecution({
+            project_id: ccrPrepErrorProjectId(item.slug, heldProject),
+            agent_slug: item.slug,
+            exec_ulid: newUlid(),
+            skill_name: item.skill,
+            skill_version: "unknown",
+            started_at: tickedAt,
+            ended_at: batchErrAt,
+            status: "throw",
+            used_credential_types: [],
+            error: `ccr_batch_error[${routineId}]: ${reason.slice(0, 1000)}`,
+          });
+        } catch (ledgerErr) {
+          console.error(JSON.stringify({
+            event: "ccr-batch-error-ledger-write-failed",
+            slug: item.slug,
+            skill: item.skill,
+            reason: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
+          }));
+        }
+      }
     }
   }
 
@@ -508,6 +542,30 @@ async function handleDispatch(event: OrchestratorDispatchEvent, tickedAt: string
     // path becomes visible. The cron backstop still owns the queue.
     const why = err instanceof Error ? err.message : String(err);
     console.error(JSON.stringify({ event: "ccr-dispatch-error", slug: agent_slug, skill: binding.skill, reason: why }));
+    // FU-031 class A: on-demand dispatch failures also need a ledger row so
+    // the audit sweep can see them. Best-effort, matching the ccr_prep_error
+    // pattern.
+    try {
+      await appendExecution({
+        project_id: ccrPrepErrorProjectId(agent_slug, binding.project_id),
+        agent_slug,
+        exec_ulid: newUlid(),
+        skill_name: binding.skill,
+        skill_version: "unknown",
+        started_at: tickedAt,
+        ended_at: new Date().toISOString(),
+        status: "throw",
+        used_credential_types: [],
+        error: why.slice(0, 1000),
+      });
+    } catch (ledgerErr) {
+      console.error(JSON.stringify({
+        event: "ccr-dispatch-error-ledger-write-failed",
+        slug: agent_slug,
+        skill: binding.skill,
+        reason: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
+      }));
+    }
     throw err;
   }
 }
