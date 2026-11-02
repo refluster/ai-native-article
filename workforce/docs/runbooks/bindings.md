@@ -14,7 +14,7 @@ See also [governance.md §4 R-N4](../governance.md#4-r-n-design-rules-basic-desi
     "scheduler": "eventbridge" | "claude-code-routine" | "gha" | "external" | "manual",
     "cron": "cron(...)",                  // when scheduler is cron-driven
     "github_event": "pull_request.labeled", // when scheduler reacts to GH events
-    "filter": { "label": "wf:needs-review-dario" },
+    "filter": { "label": "wf:needs-review-dario" }, // illustrative filter value only — the wf:needs-review-* labels are retired (dev-process.md)
     "invoked_by": "api" | "repository_dispatch" | "manual", // for scheduler=external
     "fired_from": "agents/maya/skills/pdm-decompose"          // audit trail for external
   },
@@ -124,7 +124,7 @@ CCR can be **schedule-triggered**, **GitHub-event-triggered**, or **API-triggere
   "trigger": {
     "scheduler": "claude-code-routine",
     "github_event": "pull_request.labeled",
-    "filter": { "label": "wf:needs-review-dario" }
+    "filter": { "label": "wf:needs-review-dario" } // retired label-era example; PRs now route via pr-autopilot comments (dev-process.md)
   },
   "routine_spec": "workforce/docs/routines/dario-review.md"
 }

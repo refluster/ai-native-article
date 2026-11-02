@@ -112,8 +112,8 @@ Answer these four questions in the PR body under `## Architecture self-check`:
 3. **Failure mode** — what happens when this code throws, times out, or hits a rate limit?
    Name the outcome explicitly. "It will fail" is not an answer.
 4. **Cost shape** — does this diff add a recurring API call or new AWS resource?
-   If yes, give the monthly estimate. > USD 10/mo requires `coordination_required:dario` label
-   and operator approval before merge.
+   If yes, give the monthly estimate. > USD 10/mo requires a cost note in the PR body and
+   operator approval before merge.
 
 If any question cannot be answered satisfactorily, do **not** push. Comment on the issue with
 what's missing and stop.
