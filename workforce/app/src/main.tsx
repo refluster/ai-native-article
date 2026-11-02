@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
 import { initAnalytics } from '@kohuehara/shared/analytics';
+import { installPreloadErrorReload } from './lib/preloadReload';
+
+installPreloadErrorReload();
 
 // Same GA4 property as the article SPA — workforce.kohuehara.xyz is reported
 // under the kohuehara.xyz account. VITE_GA_ID still wins when set (e.g. a
