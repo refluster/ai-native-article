@@ -1,6 +1,6 @@
 // A console deploy syncs `assets/` with --delete, so a tab opened before the
 // deploy fails its next dynamic import with "Failed to fetch dynamically
-// imported module" (#844 / mateo M4). Vite surfaces that as a
+// imported module" (issue 844, mateo M4). Vite surfaces that as a
 // `vite:preloadError` window event; reloading once fetches the new index and
 // its chunk names. One reload per tab session, guarded by sessionStorage, so a
 // genuinely missing chunk cannot loop — the page's own error card then shows
