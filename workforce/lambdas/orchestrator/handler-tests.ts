@@ -3,12 +3,9 @@
 // ledger read can find it — the binding's own project when valid, else
 // the agent's reserved self/{slug} observability project.
 //
-// Only this pure helper is exercised. The full handler() (DDB scan +
-// per-routine CCR batch POST) has no test harness in this repo yet — a
-// realistic one would mean mocking shared/ddb.js, shared/ccr-fire.js,
-// shared/github.js, and every credential-minting module together, which
-// is a bigger lift than this fix and out of scope for it (Ren: smallest
-// reversible step). asProjectId/selfProjectId themselves are pure string
+// This file exercises the pure helpers only. The handler() call sites
+// (batch-error loop, handleDispatch catch) are driven with the shared modules
+// mocked in handler-callsites-tests.ts. asProjectId/selfProjectId themselves are pure string
 // transforms with no DDB/env dependency, so the real shared/project.js
 // is used unmocked below rather than re-implementing its validation
 // rules in a mock.
@@ -45,7 +42,7 @@ describe("ccrPrepErrorProjectId", () => {
 // helper behind both new ledger writes (batch-error loop + handleDispatch
 // catch). Testing it directly pins the row shape, the "-" sentinel remap,
 // and the swallow-on-failure guarantee that keeps the original error alive.
-import { vi, beforeEach } from "vitest";
+import { vi, beforeEach, afterEach } from "vitest";
 const project = await import("../shared/project.js");
 
 const { writeDispatchThrowRow } = await import("./handler.js");
@@ -62,6 +59,9 @@ describe("writeDispatchThrowRow", () => {
   let spy: any;
   beforeEach(() => {
     spy = vi.spyOn(project, "appendExecution").mockResolvedValue(undefined as never);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("writes one throw row with the declared project and the error", async () => {
@@ -94,6 +94,5 @@ describe("writeDispatchThrowRow", () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(writeDispatchThrowRow({ ...base, declaredProject: "luckyhat" })).resolves.toBeUndefined();
     expect(log).toHaveBeenCalledWith(expect.stringContaining("test-ledger-write-failed"));
-    log.mockRestore();
   });
 });

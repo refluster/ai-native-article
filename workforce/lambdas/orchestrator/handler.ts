@@ -101,7 +101,7 @@ export interface OrchestratorResult {
  *  /fire URL + token in wf/ccr/{routineId}. */
 type CcrBatchSlot = {
   tasks: CcrFireTask[];
-  items: Array<{ slug: string; binding_idx: number; skill: string }>;
+  items: Array<{ slug: string; binding_idx: number; skill: string; project: string }>;
   /** Parallel to `items`: the slot each one claimed, given back if the batch POST fails. */
   held: HeldSlot[];
 };
@@ -298,7 +298,7 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
           const task = await prepareCcrTask(agent.slug, i, binding, tickedAt, fireEngagementToken);
           const slot = ccrBatchByRoutine.get(routineId) ?? { tasks: [], items: [], held: [] };
           slot.tasks.push(task);
-          slot.items.push({ slug: agent.slug, binding_idx: i, skill: binding.skill });
+          slot.items.push({ slug: agent.slug, binding_idx: i, skill: binding.skill, project: held.project });
           slot.held.push(held);
           ccrBatchByRoutine.set(routineId, slot);
         } catch (err) {
@@ -350,7 +350,7 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
     if (slot.tasks.length === 0) continue;
     try {
       const fired = await fireCcrRoutine(routineId, { tasks: slot.tasks });
-      for (const item of slot.items) dispatched.push(item);
+      for (const item of slot.items) dispatched.push({ slug: item.slug, binding_idx: item.binding_idx, skill: item.skill });
       // #661: charge the modelled cost only for fires that actually happened.
       // Best-effort — a ledger write failure must not turn a successful batch
       // into a reported failure, but it must be loud, because an unrecorded
@@ -398,7 +398,7 @@ export async function handler(_event: unknown, _context: Context): Promise<Orche
         await writeDispatchThrowRow({
           slug: item.slug,
           skill: item.skill,
-          declaredProject: slot.held[i]?.project,
+          declaredProject: item.project,
           startedAt: tickedAt,
           endedAt: batchErrAt,
           error: `ccr_batch_error[${routineId}]: ${reason.slice(0, 1000)}`,
