@@ -40,3 +40,60 @@ describe("ccrPrepErrorProjectId", () => {
   });
 });
 
+
+// FU-031 class A (PR #870 review A1/A2): writeDispatchThrowRow is the single
+// helper behind both new ledger writes (batch-error loop + handleDispatch
+// catch). Testing it directly pins the row shape, the "-" sentinel remap,
+// and the swallow-on-failure guarantee that keeps the original error alive.
+import { vi, beforeEach } from "vitest";
+const project = await import("../shared/project.js");
+
+const { writeDispatchThrowRow } = await import("./handler.js");
+
+describe("writeDispatchThrowRow", () => {
+  const base = {
+    slug: "nobita",
+    skill: "feed-post",
+    startedAt: "2026-11-03T00:00:00.000Z",
+    endedAt: "2026-11-03T00:00:01.000Z",
+    error: "ccr_batch_error[r1]: boom",
+    ledgerFailureEvent: "test-ledger-write-failed",
+  };
+  let spy: any;
+  beforeEach(() => {
+    spy = vi.spyOn(project, "appendExecution").mockResolvedValue(undefined as never);
+  });
+
+  it("writes one throw row with the declared project and the error", async () => {
+    await writeDispatchThrowRow({ ...base, declaredProject: "luckyhat" });
+    expect(spy).toHaveBeenCalledTimes(1);
+    const row = spy.mock.calls[0]![0] as Record<string, unknown>;
+    expect(row).toMatchObject({
+      project_id: "luckyhat",
+      agent_slug: "nobita",
+      skill_name: "feed-post",
+      skill_version: "unknown",
+      status: "throw",
+      used_credential_types: [],
+      error: "ccr_batch_error[r1]: boom",
+    });
+  });
+
+  it('maps the "-" held-slot sentinel to self/{slug} (catches: sentinel leaking as a project id)', async () => {
+    await writeDispatchThrowRow({ ...base, declaredProject: "-" });
+    expect((spy.mock.calls[0]![0] as { project_id: string }).project_id).toBe("self/nobita");
+  });
+
+  it("falls back to self/{slug} when no project is declared", async () => {
+    await writeDispatchThrowRow({ ...base, declaredProject: undefined });
+    expect((spy.mock.calls[0]![0] as { project_id: string }).project_id).toBe("self/nobita");
+  });
+
+  it("swallows an appendExecution rejection and logs it (catches: ledger failure masking the dispatch error)", async () => {
+    spy.mockRejectedValueOnce(new Error("ddb down"));
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(writeDispatchThrowRow({ ...base, declaredProject: "luckyhat" })).resolves.toBeUndefined();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("test-ledger-write-failed"));
+    log.mockRestore();
+  });
+});
