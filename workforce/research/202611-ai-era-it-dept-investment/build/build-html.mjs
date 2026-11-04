@@ -27,16 +27,21 @@ const md = readFileSync(join(DIR, "report.md"), "utf8");
 const css = readFileSync(join(HERE, "report.css"), "utf8");
 
 // ---- extract figures ----
-const figRe = /<!--\s*FIG\s+id="([^"]+)"\s+type="([^"]+)"\s*-->\s*\n([\s\S]*?)\n<!--\s*DATA\s*\n?([\s\S]*?)-->/g;
+// optional trailing group: a markdown table right after the block, consumed when DATA says
+// {"table":"following-markdown"} so it renders inside the figure (with its table twin/note).
+const figRe = /<!--\s*FIG\s+id="([^"]+)"\s+type="([^"]+)"\s*-->\s*\n([\s\S]*?)\n<!--\s*DATA\s*\n?([\s\S]*?)-->(\n[ \t]*\n((?:\|[^\n]*(?:\n|$))+))?/g;
+const splitRow = (l) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+const parseMdTable = (t) => { const ls = t.trim().split("\n").filter((l) => !/^\|?\s*:?-{3,}/.test(l.trim())); return { columns: splitRow(ls[0]).map((c) => marked.parseInline(c)), rows: ls.slice(1).map((l) => splitRow(l).map((c) => marked.parseInline(c))) }; };
 const figures = [];
-let body = md.replace(figRe, (_, id, type, captionMd, json) => {
+let body = md.replace(figRe, (_, id, type, captionMd, json, tblBlock, tblMd) => {
   let data = {};
   try { data = JSON.parse(json.trim()); } catch (e) { console.error(`FIG ${id}: DATA JSON parse error — ${e.message}`); data = { parseError: e.message }; }
   figures.push({ id, type, data });
   const caption = captionMd.trim().replace(/^\*\*(.+?)\*\*/, "$1");
   let inner;
-  try { inner = renderFigure(type, data); } catch (e) { console.error(`FIG ${id}: render error — ${e.message}`); inner = `<p class="fig-note">描画エラー: ${e.message}</p>`; }
-  return `\n<figure class="fig" id="fig-${id}">\n<figcaption>${marked.parseInline(caption)}</figcaption>\n<div class="fig-body">${inner}</div>\n</figure>\n`;
+  const consume = tblMd && data.table === "following-markdown";
+  try { inner = renderFigure(type, data, { md, id, table: consume ? parseMdTable(tblMd) : null }); } catch (e) { console.error(`FIG ${id}: render error — ${e.message}`); inner = `<p class="fig-note">描画エラー: ${e.message}</p>`; }
+  return `\n<figure class="fig" id="fig-${id}">\n<figcaption>${marked.parseInline(caption)}</figcaption>\n<div class="fig-body">${inner}</div>\n</figure>\n` + (tblBlock && !consume ? tblBlock : "");
 });
 
 // ---- metadata & title ----
