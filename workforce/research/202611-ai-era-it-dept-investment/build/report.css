@@ -206,3 +206,4 @@ svg .tree-link { fill: none; stroke: var(--baseline); stroke-width: 1.5; } svg .
 @media (max-width: 600px) { .map { grid-template-columns: minmax(0, 1fr) 10px minmax(0, 1.2fr) 10px minmax(0, 1fr); font-size: 12px; } .map-c { padding: 5px 6px; } .map-gaps { grid-column: 1 / 6; } }
 svg .hollow { fill: var(--surface-1); stroke: var(--text-muted); stroke-width: 1.5; }
 .swatch.hollow-sw { background: transparent; border: 1.5px solid var(--text-muted); border-radius: 50%; }
+.nowrap { white-space: nowrap; }

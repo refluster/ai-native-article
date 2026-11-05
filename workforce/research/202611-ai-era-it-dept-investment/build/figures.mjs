@@ -148,7 +148,7 @@ function groupedBars(d) {
   const max = d.max ?? (vmax <= 100 && /%/.test(d.unit || "") ? Math.max(vmax * 1.1, 100) : vmax * 1.12);
   const W = 720, H = 300, left = 44, right = 12, top = 18, bottom = 44;
   const plotW = W - left - right, plotH = H - top - bottom;
-  const gW = plotW / cats.length, sgap = 4, bw = Math.min(28, (gW - 24) / series.length - sgap);
+  const gW = plotW / cats.length, sgap = 6, bw = Math.min(28, (gW - 24) / series.length - sgap);
   let svg = svgOpen(W, H, d.aria || "グループ棒グラフ");
   const step = max > 60 ? 25 : max > 20 ? 10 : 5;
   const ticks = d.ticks || Array.from({ length: Math.floor(max / step) + 1 }, (_, i) => i * step);
@@ -159,7 +159,7 @@ function groupedBars(d) {
     series.forEach((s, si) => {
       const v = +s.values[ci] || 0, h = (v / max) * plotH, x = x0 + si * (bw + sgap), y = top + plotH - h;
       svg += `<path d="M${x},${top + plotH} v-${Math.max(h - 4, 0)} a4,4 0 0 1 4,-4 h${bw - 8} a4,4 0 0 1 4,4 v${Math.max(h - 4, 0)} z" fill="${SER(si)}"><title>${esc(c)} · ${esc(s.name)}: ${fmt(v, suffix)}</title></path>`;
-      if (d.labels !== false && marks <= 8) svg += `<text x="${x + bw / 2}" y="${y - 5}" text-anchor="middle" class="value-label small">${fmt(v, suffix)}</text>`;
+      if (d.labels !== false && marks <= 8) svg += `<text x="${x + bw / 2}" y="${y - 5}" text-anchor="middle" class="value-label small">${fmt(v, suffix === "%" ? "" : suffix)}</text>`;
     });
     svg += `<text x="${left + ci * gW + gW / 2}" y="${H - bottom + 20}" text-anchor="middle" class="axis-label">${esc(c)}</text>`;
   });
@@ -314,7 +314,8 @@ function timeline(d) {
     if (m) { e.label = e.label.replace(m[0], ""); links.push({ from: m[1], to: e }); }
   });
   for (const s of d.superseded || []) if (!links.some((l) => l.from === s)) ev.push({ date: s, label: "改正前の適用日", kind: "old", full: "改正前の適用日" });
-  (d.jp_guideline_versions || []).forEach((v, i) => ev.push({ date: v, label: i === 0 ? "AI事業者GL 公表" : "AI事業者GL 改訂", kind: "jp", full: i === 0 ? "AI事業者ガイドライン 公表" : "AI事業者ガイドライン 改訂" }));
+  // jp_guideline_versions: ["YYYY-MM-DD", …] or [["YYYY-MM-DD", "第1.0版"], …]
+  (d.jp_guideline_versions || []).forEach((v, i) => { const [date, ver] = Array.isArray(v) ? v : [v, ""]; const what = ver ? `AI事業者GL ${ver}` : i === 0 ? "AI事業者GL 公表" : "AI事業者GL 改訂"; ev.push({ date, label: what, kind: "jp", full: what }); });
   const kn = { main: d.kindNames?.main || (links.length || d.superseded ? "適用日 (改正後)" : "現行"), old: d.kindNames?.old || "改正前の適用日", jp: d.kindNames?.jp || "日本 AI事業者GL", ref: d.kindNames?.ref || "参照" };
   const kcol = (k) => (k === "old" ? "var(--de-emphasis)" : k === "jp" ? SER(2) : k === "ref" ? SER(1) : SER(0));
   const order = ["main", "old", "jp", "ref"];
@@ -400,7 +401,7 @@ function table(d, ctx = {}) {
     if (!cols.length) cols = keys.map((k) => COL_NAMES[k] || k);
     rows = rows.map((r) => keys.map((k) => r[k] ?? ""));
   }
-  const cell = (c) => { const s = raw ? String(c) : esc(c); return /^NOT FOUND/.test(String(c)) ? `<span class="nf">${s}</span>` : s; };
+  const cell = (c) => { const s = raw ? String(c) : esc(c); return /^NOT FOUND/.test(String(c)) ? `<span class="nf">${s}</span>` : /^\d{4}-\d{2}(-\d{2})?$/.test(String(c)) ? `<span class="nowrap">${s}</span>` : s; };
   return `<div class="table-wrap"><table class="data"><thead><tr>${cols.map((c) => `<th>${raw ? c : esc(c)}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c, i) => `<t${i === 0 ? 'h scope="row"' : "d"}>${cell(c)}</t${i === 0 ? "h" : "d"}>`).join("")}</tr>`).join("")}</tbody></table></div>` + note(d);
 }
 
