@@ -245,7 +245,7 @@ function line(d) {
   const xs = d.x || [...new Set(series.flatMap((s) => s.points.map((p) => p.x)))];
   const max = d.max ?? Math.max(...series.flatMap((s) => s.points.map((p) => +p.y))) * 1.12, min = d.min ?? 0;
   const endLab = series.map((s) => `${s.name} ${fmt(s.points[s.points.length - 1].y, suffix)}`);
-  const W = 720, H = 280, left = 64, right = Math.min(260, linesW(endLab, 12.5) + 24), top = 16, bottom = 40, plotW = W - left - right, plotH = H - top - bottom;
+  const W = 720, H = 280, left = 64, right = Math.min(280, linesW(endLab, 12.5) + 40), top = 16, bottom = 40, plotW = W - left - right, plotH = H - top - bottom;
   // optional proportional time axis (xDates: ISO dates aligned with xs) and log y axis (log: true, min > 0)
   const tms = d.xDates ? d.xDates.map((v) => new Date(v).getTime()) : null;
   const X = tms ? (x) => { const i = xs.indexOf(x); return left + ((tms[i] - tms[0]) / Math.max(tms[tms.length - 1] - tms[0], 1)) * plotW; } : (x) => left + (xs.indexOf(x) / Math.max(xs.length - 1, 1)) * plotW;
