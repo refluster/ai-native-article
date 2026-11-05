@@ -1,7 +1,7 @@
 # 情報源台帳 (S3 統合 register) — 第 2 報
 
 - 生成: 2026-11-05、各 `sources/wsN.md` の台帳行を機械的に統合 (同じ S-ID が複数 WS に現れる場合は最初の行を採用)。
-- 件数: 156 行 (外部 127 / 第 1 報からの内部引用 S-0.x と本ワークフォース内部 S-9.x を含む)。区分: {"一次":83,"準一次":14,"内部":34,"二次":25}
+- 件数: 156 行 (外部 122 / 内部 34 = 第 1 報からの内部引用 S-0.x と本ワークフォース内部 S-9.x・S-4.29〜S-4.32; S7 M-11 で再集計)。区分: {"一次":83,"準一次":14,"内部":34,"二次":25}
 
 | S-ID | 区分 | 題名 | 発行者 | 日付 | URL | 検証メモ |
 |---|---|---|---|---|---|---|
@@ -86,7 +86,7 @@
 | S-9.9 | 内部 | workforce/docs/mvv.md | 本ワークフォース | 2026-06-14 更新 | workforce/docs/mvv.md | Mission / Vision の文言 |
 | S-9.10 | 内部 | workforce/docs/adr/README.md | 本ワークフォース | 2026-11-05 時点 | workforce/docs/adr/README.md | ADR 索引 (0019/0021 記憶、0037 予算) で採否状態を確認 |
 | S-4.1 | 一次 | Generative Agent Simulations of 1,000 People (v1) | Park, Zou, Kamphorst, Egan, Shaw, Hill, Cai, Morris, Liang, Willer, Bernstein (arXiv 2411.10109v1) | 2024-11-15 | https://arxiv.org/abs/2411.10109v1 | v1 の抄録ページで「85% as accurately as participants replicate their own answers two weeks later」を確認 |
-| S-4.2 | 一次 | Generative Agent Simulations of 1,000 People (v3) | 同上 (arXiv 2411.10109v3) | v3 改訂 2026-06-28 | https://arxiv.org/abs/2411.10109 | arXiv API で現行の抄録を取得。83/82/86/74%、1,052 人、「modest」を確認 |
+| S-4.2 | 一次 | LLM Agents Grounded in Self-Reports Enable General-Purpose Simulation of Individuals (arXiv 2411.10109v3; v1 の題は Generative Agent Simulations of 1,000 People) | 同上 (arXiv 2411.10109v3) | v3 改訂 2026-06-28 | https://arxiv.org/abs/2411.10109 | arXiv API で現行の抄録を取得。83/82/86/74%、1,052 人、「modest」を確認 |
 | S-4.3 | 一次 | Large Language Monkeys: Scaling Inference Compute with Repeated Sampling | Brown, Juravsky, Ehrlich, Clark, Le, Ré, Mirhoseini (arXiv 2407.21787) | 2024-07-31 (v3 2024-12-30) | https://arxiv.org/abs/2407.21787 | arXiv API で抄録の全文を取得。15.9%→56% (250 サンプル)、43%、plateau の文を確認 |
 | S-4.4 | 一次 | The AI Scientist: Towards Fully Automated Open-Ended Scientific Discovery | Lu, Lu, Lange, Foerster, Clune, Ha (arXiv 2408.06292) | 2024-08-12 | https://arxiv.org/abs/2408.06292 | 抄録で「less than $15 per paper」と、自動査読による閾値超えの主張を確認 |
 | S-4.5 | 一次 | The AI Scientist-v2: Workshop-Level Automated Scientific Discovery via Agentic Tree Search | Sakana AI ほか (arXiv 2504.08066。著者名は未照合) | 2025-04-10 | https://arxiv.org/abs/2504.08066 | arXiv API で抄録の全文を取得。3 本投稿、1 本が閾値超えを確認 |
