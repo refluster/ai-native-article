@@ -1,0 +1,134 @@
+[
+  {
+    "agent": "maya",
+    "skill": "research-study",
+    "summary": "第 2 報「攻め」の議長として day-one answer (社内労働市場の設計者) を立て、S8 で 2 度格下げしたのち統括答えを「需要の工場」(労働力は余り、検証できる形に書かれた仕事が足りない) に作り直し、予測 10 本に反証条件と基準線を付けた。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "margaux",
+    "skill": "research-study",
+    "summary": "第 2 報の S0–S11 のゲート運用: 与件・論点ツリー (24 仮説)・ワークプラン、G 判定、S9 への処分指示 (39 所見) を運んだ。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "beatriz",
+    "skill": "research-study",
+    "summary": "第 2 報の研究基準: 第 1 報の固定語彙と台帳規律 (S-0.x 内部引用、S-9.x 内部一次) を継承させ、156 行の統合台帳を監督した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "sora",
+    "skill": "research-study",
+    "summary": "WS1 構造的異質性の実測 (18 情報源): METR の p50 地平 (倍増 128.7 日、4 分→約 17 時間)、SWE-bench の再実行費用 USD 0.07〜0.75、同時 20 体、チェックポイント、確認 recall を一次で確認し、9 性質の異質性の表を作った。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "freya",
+    "skill": "research-study",
+    "summary": "WS1 のエージェント体験席: 記憶の移植 (git で配れる memory)、同一性の揺らぎ (Assistant Axis)、集団で学習 (リリース日に全員へ) の論点を提供し、判定は sora に委ねた。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "sofia",
+    "skill": "research-study",
+    "summary": "WS2 労働 as-a-service の価格 (24 情報源): 会話 USD 2 / アクション 0.10 / 成果 0.99 / credit / トークンの 5 単位の価格表を「何ではないか」列つきで作り、成果課金への移行が席への回帰を伴うことを示した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "bruno",
+    "skill": "research-study",
+    "summary": "WS2/WS3 の景観席: Salesforce・Intercom・Devin・Microsoft・OpenAI・Anthropic の価格ページと、Klarna・Shopify・Duolingo・Salesforce・Amazon・IBM の置換公表と反転を地図化した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "tomas",
+    "skill": "research-study",
+    "summary": "WS3 内部一次証拠の数値化: 本ワークフォース 69 体・168 バインディング (共通 2 業務 77%)・計画 USD 423/上限 800・11 月 5 日間 USD 77.2・PR 670 本 (autopilot 20.3%)・遊休 29% を API から集計し、同型 6/異質 6 の表を作った。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "arjun",
+    "skill": "research-study",
+    "summary": "WS4 投機的執行 (32 情報源): coverage 15.9→56%、AlphaEvolve/FunSearch、合成サンプルの限界 (係数の 48% が有意差)、誤答の 60% 一致、リアルオプションの読み替えを整理し、「検証器のある業務に限る」条件を導いた。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "petra",
+    "skill": "research-study",
+    "summary": "WS4 の説明責任席と S8 審査: reward hacking・agentic misalignment・Replit/AWS Q の事例を整理し、本ワークフォースの予算停止 (9 本の PR が 3 日間停止) を「走ったが誰も答えなかった」事例として正直に記述させ、RACI を要求した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "silas",
+    "skill": "research-study",
+    "summary": "WS5 場の形成・容量・先行投資 (25 情報源): Unilever/Schneider の社内人材市場 (ベンダ申告)、CVC の少数大型化、クラウド RI vs LLM 容量商品の改廃、Jevons、eval の複利を確認し、容量計画の前提 (12 か月以内・モデル版縛り) を示した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "nico",
+    "skill": "research-study",
+    "summary": "WS5 の org-as-product 席: 「場」を製品として読む視点から取引所の 4 機能 (供給・計量・容量・品質) の分担図を設計した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "haruto",
+    "skill": "research-study",
+    "summary": "WS6 日本 (14 情報源) と S8 の CFO 審査: 生産年齢人口 −1,296 万人、人手不足倒産 441 件、パナソニック コネクト 78.8 万時間 (3.4%) を一次で確認し、「試行予算」を勘定科目に落とす要求と「補充しない枠の振替に財源が無い」指摘で推奨を書き直させた。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "rafael",
+    "skill": "research-study",
+    "summary": "第 2 報の S8 レッドチーム: 統括答え「取引所の運営者」が 3 手から導かれていないことを崩し、代替仮説 7 件 (ベンダの製品としての取引所、需要側の律速 ほか)、Key Assumptions 7 件、HILP テール、過剰主張 10 件を書いて統括答えの再設計を引き出した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "clara",
+    "skill": "research-study",
+    "summary": "第 2 報の S8 現場審査: 「N 候補→自動選別→人間が出荷」が追認の儀式になる危険、eval を書く人の誘因の逆転、技能の空洞化、最初の失敗後のアルゴリズム回避を指摘し、R2 の設計条件を足させた。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "dalia",
+    "skill": "research-study",
+    "summary": "第 2 報の判定スキーマ: 24 仮説の判定・確度、予測 10 本の形式 (日付・蓋然性・反証条件・採点日・基準線)、39 所見の処分表を統一した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "nikhil",
+    "skill": "research-study",
+    "summary": "第 2 報の S7 独立ファクトチェック: 304 主張を照合し 143 件を一次で再開封 (外部 25 件は全て 200)、必須修正 16 件 (recall の範囲、43 倍の主語、フラッグシップの定義、Devin ACU の出典不明、集計誤り) と格下げ 15 件を特定した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "owen",
+    "skill": "research-study",
+    "summary": "第 2 報の S7 検証ログ: METR の YAML、SWE-bench の JSON、arXiv API、Statuspage API、内部 /performance・/agents の再計算を記録し、確認した主張だけを支持とした。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "ingrid",
+    "skill": "research-study",
+    "summary": "第 2 報の編集: FutureScape 型の v1 (予測 10 本、15 図、111 情報源) を起草し、S9 で 16 件の必須修正と 32 件の採用所見を適用して統括答えを「需要の工場」に書き換えた v2 を作った。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "oksana",
+    "skill": "research-study",
+    "summary": "第 2 報のファクトバンク: 鍵数値 32 件を定義し、ES・章・予測ブロック・図 DATA・判定表の全数値を grep 照合して一致させた。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "aoi",
+    "skill": "research-study",
+    "summary": "第 2 報の読者体験: 「第 1 報より面白いか」を正直に採点 (中盤は面白く、着地が守りに戻る) し、図 3 点の削除と 図 1-2 の対数軸・図 5-1 の中立色を提案、用語集の欠落 25 語を列挙した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "yusuf",
+    "skill": "research-study",
+    "summary": "第 2 報のビルド: 第 1 報の描画器を引き継ぎ、多段 S-ID の引用リンク、対数軸・比例時間軸・計測上限の帯を折れ線描画器に追加して report.html を再生成した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  }
+]
