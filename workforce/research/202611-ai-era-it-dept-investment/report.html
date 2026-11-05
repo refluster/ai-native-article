@@ -41,7 +41,30 @@
 html { background: var(--page); }
 body { margin: 0; background: var(--page); color: var(--text-primary); font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif; font-size: 16px; line-height: 1.85; -webkit-font-smoothing: antialiased; }
 .skip { position: absolute; left: -999px; } .skip:focus { left: 16px; top: 8px; background: var(--surface-1); padding: 4px 8px; }
-.report { max-width: 860px; margin: 0 auto; padding: 32px 16px 96px; }
+.report { max-width: 860px; margin: 0 auto; padding: 32px 16px 96px; min-width: 0; }
+h1, h2, h3, figure.fig, [id^="src-"] { scroll-margin-top: 16px; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+/* side TOC */
+.layout { display: block; }
+.side-toc { display: none; }
+.toc-toggle { position: fixed; top: 10px; left: 10px; z-index: 6; background: var(--surface-1); color: var(--text-secondary); border: 1px solid var(--border); border-radius: 6px; height: 28px; padding: 0 10px; font-size: 13px; cursor: pointer; }
+.side-toc { position: fixed; top: 0; left: 0; bottom: 0; width: min(320px, 86vw); overflow-y: auto; background: var(--surface-1); border-right: 1px solid var(--border); padding: 48px 14px 24px; z-index: 5; font-size: 13.5px; line-height: 1.5; transform: translateX(-100%); transition: transform .2s ease; }
+body.toc-open .side-toc { display: block; transform: none; box-shadow: 0 0 0 100vmax rgba(0,0,0,0.25); }
+.side-toc-head { font-size: 11.5px; letter-spacing: .06em; color: var(--text-muted); margin: 10px 0 6px; text-transform: uppercase; }
+.side-toc ol { list-style: none; margin: 0; padding: 0; }
+.side-toc li { margin: 0; }
+.side-toc a { display: block; padding: 4px 8px; border-radius: 5px; color: var(--text-secondary); text-decoration: none; border-left: 2px solid transparent; }
+.side-toc a:hover { background: var(--surface-2); color: var(--text-primary); text-decoration: none; }
+.side-toc a.active { color: var(--text-primary); border-left-color: var(--accent); background: var(--surface-2); font-weight: 600; }
+.side-toc .side-figs a { font-size: 12.5px; color: var(--text-muted); }
+.side-toc .side-figs a.active { color: var(--text-primary); }
+@media (min-width: 1100px) {
+  .toc-toggle { display: none; }
+  .layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 0 24px; max-width: 1240px; margin: 0 auto; }
+  .side-toc { display: block; position: sticky; top: 0; align-self: start; height: 100vh; width: auto; transform: none; border-right: 1px solid var(--grid); background: transparent; padding: 28px 8px 24px 16px; z-index: 1; transition: none; }
+  .report { margin: 0; }
+}
 .meta-line { color: var(--text-muted); font-size: 13px; margin: 0 0 8px; }
 h1 { font-size: 30px; line-height: 1.35; margin: 8px 0 20px; letter-spacing: -0.01em; }
 h2 { font-size: 23px; line-height: 1.4; margin: 64px 0 16px; padding-top: 16px; border-top: 1px solid var(--grid); }
@@ -118,7 +141,7 @@ table.verdicts td.small { font-size: 12.5px; color: var(--text-secondary); }
 /* theme toggle */
 .theme-toggle { position: fixed; top: 10px; right: 10px; display: flex; gap: 4px; z-index: 5; }
 .theme-toggle button { background: var(--surface-1); color: var(--text-secondary); border: 1px solid var(--border); border-radius: 6px; width: 32px; height: 28px; cursor: pointer; font-size: 13px; }
-@media print { .theme-toggle, details.fig-table summary { display: none; } figure.fig { break-inside: avoid; } h2 { break-after: avoid; } }
+@media print { .theme-toggle, .toc-toggle, .side-toc, details.fig-table summary { display: none; } figure.fig { break-inside: avoid; } h2 { break-after: avoid; } }
 /* ---- figure extensions (figures.mjs v2) ---- */
 .fig-body svg.chart:not(.panel) { min-width: 560px; }
 .hscroll { overflow-x: auto; }
@@ -220,6 +243,9 @@ svg .hollow { fill: var(--surface-1); stroke: var(--text-muted); stroke-width: 1
 <body>
 <a class="skip" href="#main">本文へ</a>
 <div class="theme-toggle"><button type="button" data-theme-set="light" aria-label="ライト">☀</button><button type="button" data-theme-set="dark" aria-label="ダーク">☾</button><button type="button" data-theme-set="" aria-label="自動">A</button></div>
+<button type="button" class="toc-toggle" aria-controls="side-toc" aria-expanded="false" aria-label="目次を開く">目次</button>
+<div class="layout">
+<nav class="side-toc" id="side-toc" aria-label="サイド目次"><div class="side-toc-head">目次</div><ol><li><a href="#エグゼクティブ-サマリ" data-target="エグゼクティブ-サマリ">エグゼクティブ・サマリ</a></li><li><a href="#1-熟議の到達点はすべて実測のない仮説だった-与件と方法" data-target="1-熟議の到達点はすべて実測のない仮説だった-与件と方法">1. 熟議の到達点はすべて実測のない仮説だった — 与件と方法</a></li><li><a href="#2-it-部門の役割は-境界線と接続面の設計者-へ移るが-作らない-ではない" data-target="2-it-部門の役割は-境界線と接続面の設計者-へ移るが-作らない-ではない">2. IT 部門の役割は「境界線と接続面の設計者」へ移るが、「作らない」ではない</a></li><li><a href="#3-シャドー-ai-の露出は実在し第三者が観測できるが-迂回の手間と金額はまだ誰も数えていない" data-target="3-シャドー-ai-の露出は実在し第三者が観測できるが-迂回の手間と金額はまだ誰も数えていない">3. シャドー AI の露出は実在し第三者が観測できるが、迂回の手間と金額はまだ誰も数えていない</a></li><li><a href="#4-土台-4-点の大半は制度か製品がすでに求めており-ai-固有の差分は行動ログ-ツール権限-エージェント経路にある" data-target="4-土台-4-点の大半は制度か製品がすでに求めており-ai-固有の差分は行動ログ-ツール権限-エージェント経路にある">4. 土台 4 点の大半は制度か製品がすでに求めており、AI 固有の差分は行動ログ・ツール権限・エージェント経路にある</a></li><li><a href="#5-深い線は一チームの一作業と同時に敷き-承認は数ではなく信号対雑音比で設計する" data-target="5-深い線は一チームの一作業と同時に敷き-承認は数ではなく信号対雑音比で設計する">5. 深い線は一チームの一作業と同時に敷き、承認は数ではなく信号対雑音比で設計する</a></li><li><a href="#6-横展開-育成-資産開放は-第三者が数えてからの後段に置く" data-target="6-横展開-育成-資産開放は-第三者が数えてからの後段に置く">6. 横展開・育成・資産開放は、第三者が数えてからの後段に置く</a></li><li><a href="#7-日本企業では決裁権限規程と-it-資産管理規程が-現場部門長の先払いを妨げる" data-target="7-日本企業では決裁権限規程と-it-資産管理規程が-現場部門長の先払いを妨げる">7. 日本企業では決裁権限規程と IT 資産管理規程が、現場部門長の先払いを妨げる</a></li><li><a href="#8-来年度は全社の最小線と一作業から始め-四半期ごとに第三者の数字で止めるか進めるかを決める" data-target="8-来年度は全社の最小線と一作業から始め-四半期ごとに第三者の数字で止めるか進めるかを決める">8. 来年度は全社の最小線と一作業から始め、四半期ごとに第三者の数字で止めるか進めるかを決める</a></li><li><a href="#限界" data-target="限界">限界</a></li><li><a href="#用語集" data-target="用語集">用語集</a></li><li><a href="#判定表" data-target="判定表">判定表</a></li><li><a href="#読者別参照" data-target="読者別参照">読者別参照</a></li><li><a href="#情報源一覧" data-target="情報源一覧">情報源一覧</a></li><li><a href="#付録-a-方法" data-target="付録-a-方法">付録 A 方法</a></li><li><a href="#付録-b-cio-が経営会議へ持っていく-1-枚-骨子" data-target="付録-b-cio-が経営会議へ持っていく-1-枚-骨子">付録 B CIO が経営会議へ持っていく 1 枚 (骨子)</a></li></ol><div class="side-toc-head">図表</div><ol class="side-figs"><li><a href="#fig-0-1" data-target="fig-0-1">図 0-1 投資の順序 — 全社の最小線と一チームの深い線 → 第三者測定 → 後段 3 項目 (図 8-1 から導出)</a></li><li><a href="#fig-0-2" data-target="fig-0-2">図 0-2 熟議の到達点 D1–D9 の判定と確度</a></li><li><a href="#fig-2-1" data-target="fig-2-1">図 2-1 AI 機能別の集中度 — 統制は中央、導入は現場寄り</a></li><li><a href="#fig-3-1" data-target="fig-3-1">図 3-1 シャドー AI の 4 系統 — 単位が違うので並べるが合算しない</a></li><li><a href="#fig-3-3" data-target="fig-3-3">図 3-3 何を・誰が・どのログで測れるか</a></li><li><a href="#fig-4-1" data-target="fig-4-1">図 4-1 制度 × 要件マトリクス — 拘束 / 任意 / 製品</a></li><li><a href="#fig-4-2" data-target="fig-4-2">図 4-2 EU AI Act の適用日 (改正後) と GDPR・日本ガイドライン</a></li><li><a href="#fig-4-3" data-target="fig-4-3">図 4-3 熟議の三段階 ↔ Purview usage rights ↔ PPC 注意喚起 (入力時の判断)</a></li><li><a href="#fig-5-3" data-target="fig-5-3">図 5-3 承認の線の設計 — 境界を先に、人の承認は高影響へ (DORA 2019: 重い外部承認 → 低パフォーマーの可能性 2.6 倍、明確な変更プロセス → elite の可能性 1.8 倍)</a></li><li><a href="#fig-6-1" data-target="fig-6-1">図 6-1 再利用の単位は二層 — 手順の束とエージェント構成</a></li><li><a href="#fig-6-5" data-target="fig-6-5">図 6-5 公開 vs 固有の比較実験の設計 (費用見積もりを条件とする四半期 4 以降の選択肢)</a></li><li><a href="#fig-7-3" data-target="fig-7-3">図 7-3 日本の生成 AI による業務変革の組織的取組 (参照: 米国の全社横断 35.6%)</a></li><li><a href="#fig-8-1" data-target="fig-8-1">図 8-1 ゲート付きロードマップ — 四半期 0〜4 (時間軸の正本)</a></li><li><a href="#fig-8-2" data-target="fig-8-2">図 8-2 反証条件レジスタ</a></li><li><a href="#fig-8-3" data-target="fig-8-3">図 8-3 予測レジスタ</a></li><li><a href="#fig-10-1" data-target="fig-10-1">図 10-1 読者別参照</a></li><li><a href="#fig-1-1" data-target="fig-1-1">図 1-1 12 段階のゲート付き調査プロセス</a></li><li><a href="#fig-1-3" data-target="fig-1-3">図 1-3 情報源の構成</a></li></ol></nav>
 <main id="main" class="report">
 <p class="meta-line">読了時間 約 94 分 · 本文 56,681 字 · 図表 18 点 · ビルド 2026-11-05</p>
 <h1 id="ai-時代の企業-it-部門の先行投資-熟議の-9-到達点の外部検証">AI 時代の企業 IT 部門の先行投資 — 熟議の 9 到達点の外部検証</h1>
@@ -494,9 +520,17 @@ svg .hollow { fill: var(--surface-1); stroke: var(--text-muted); stroke-width: 1
 <p>この 1 枚の各欄は、第 8 章の稟議表と図 8-1 に対応している。</p>
 
 </main>
+</div>
 <script>
 (function(){var r=document.documentElement;try{var t=localStorage.getItem("theme");if(t)r.setAttribute("data-theme",t);}catch(e){}
-document.querySelectorAll("[data-theme-set]").forEach(function(b){b.addEventListener("click",function(){var v=b.getAttribute("data-theme-set");if(v)r.setAttribute("data-theme",v);else r.removeAttribute("data-theme");try{v?localStorage.setItem("theme",v):localStorage.removeItem("theme");}catch(e){}});});})();
+document.querySelectorAll("[data-theme-set]").forEach(function(b){b.addEventListener("click",function(){var v=b.getAttribute("data-theme-set");if(v)r.setAttribute("data-theme",v);else r.removeAttribute("data-theme");try{v?localStorage.setItem("theme",v):localStorage.removeItem("theme");}catch(e){}});});
+var toc=document.getElementById("side-toc"),tg=document.querySelector(".toc-toggle");
+if(tg){tg.addEventListener("click",function(){var o=document.body.classList.toggle("toc-open");tg.setAttribute("aria-expanded",o?"true":"false");});toc.addEventListener("click",function(e){if(e.target.tagName==="A"&&window.innerWidth<1100){document.body.classList.remove("toc-open");tg.setAttribute("aria-expanded","false");}});}
+var links={};toc.querySelectorAll("a[data-target]").forEach(function(a){links[a.getAttribute("data-target")]=a;});
+var targets=Object.keys(links).map(function(id){return document.getElementById(id);}).filter(Boolean);
+var cur=null;function setActive(id){if(cur===id)return;if(cur&&links[cur])links[cur].classList.remove("active");cur=id;if(links[id]){links[id].classList.add("active");var r=links[id].getBoundingClientRect(),tr=toc.getBoundingClientRect();if(r.top<tr.top||r.bottom>tr.bottom)links[id].scrollIntoView({block:"nearest"});}}
+if("IntersectionObserver" in window){var vis={};var io=new IntersectionObserver(function(es){es.forEach(function(e){vis[e.target.id]=e.isIntersecting;});var first=targets.find(function(t){return vis[t.id];});if(first)setActive(first.id);},{rootMargin:"-10% 0px -70% 0px",threshold:0});targets.forEach(function(t){io.observe(t);});}
+})();
 </script>
 </body>
 </html>

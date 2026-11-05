@@ -77,6 +77,10 @@ html = html.replace(/<th scope="row">(S-\d+\.\d+)<\/th>/g, (m, id) => `<th scope
 const toc = `<nav class="toc" aria-label="目次"><ol>${headings.filter((h) => h.text !== "目次").map((h) => `<li><a href="#${h.id}">${h.text}</a></li>`).join("")}</ol></nav>`;
 html = html.replace(/(<h2 id="[^"]*">目次<\/h2>\n)([\s\S]*?)(?=<h2 )/, `$1${toc}\n`);
 
+// figure captions for the side TOC
+const figLinks = [...html.matchAll(/<figure class="fig" id="(fig-[^"]+)">\s*<figcaption>([\s\S]*?)<\/figcaption>/g)].map((m) => ({ id: m[1], text: m[2].replace(/<[^>]+>/g, "").replace(/\s*\(出典:.*$/, "").trim() }));
+const sideToc = `<nav class="side-toc" id="side-toc" aria-label="サイド目次"><div class="side-toc-head">目次</div><ol>${headings.filter((h) => h.text !== "目次").map((h) => `<li><a href="#${h.id}" data-target="${h.id}">${h.text}</a></li>`).join("")}</ol><div class="side-toc-head">図表</div><ol class="side-figs">${figLinks.map((f) => `<li><a href="#${f.id}" data-target="${f.id}">${f.text}</a></li>`).join("")}</ol></nav>`;
+
 const chars = md.replace(/```[\s\S]*?```/g, "").replace(/<!--[\s\S]*?-->/g, "").replace(/\s/g, "").length;
 const readMin = Math.round(chars / 600);
 
@@ -92,13 +96,24 @@ const page = `<!doctype html>
 <body>
 <a class="skip" href="#main">本文へ</a>
 <div class="theme-toggle"><button type="button" data-theme-set="light" aria-label="ライト">☀</button><button type="button" data-theme-set="dark" aria-label="ダーク">☾</button><button type="button" data-theme-set="" aria-label="自動">A</button></div>
+<button type="button" class="toc-toggle" aria-controls="side-toc" aria-expanded="false" aria-label="目次を開く">目次</button>
+<div class="layout">
+${sideToc}
 <main id="main" class="report">
 <p class="meta-line">読了時間 約 ${readMin} 分 · 本文 ${chars.toLocaleString("ja-JP")} 字 · 図表 ${figures.length} 点 · ビルド ${new Date().toISOString().slice(0, 10)}</p>
 ${html}
 </main>
+</div>
 <script>
 (function(){var r=document.documentElement;try{var t=localStorage.getItem("theme");if(t)r.setAttribute("data-theme",t);}catch(e){}
-document.querySelectorAll("[data-theme-set]").forEach(function(b){b.addEventListener("click",function(){var v=b.getAttribute("data-theme-set");if(v)r.setAttribute("data-theme",v);else r.removeAttribute("data-theme");try{v?localStorage.setItem("theme",v):localStorage.removeItem("theme");}catch(e){}});});})();
+document.querySelectorAll("[data-theme-set]").forEach(function(b){b.addEventListener("click",function(){var v=b.getAttribute("data-theme-set");if(v)r.setAttribute("data-theme",v);else r.removeAttribute("data-theme");try{v?localStorage.setItem("theme",v):localStorage.removeItem("theme");}catch(e){}});});
+var toc=document.getElementById("side-toc"),tg=document.querySelector(".toc-toggle");
+if(tg){tg.addEventListener("click",function(){var o=document.body.classList.toggle("toc-open");tg.setAttribute("aria-expanded",o?"true":"false");});toc.addEventListener("click",function(e){if(e.target.tagName==="A"&&window.innerWidth<1100){document.body.classList.remove("toc-open");tg.setAttribute("aria-expanded","false");}});}
+var links={};toc.querySelectorAll("a[data-target]").forEach(function(a){links[a.getAttribute("data-target")]=a;});
+var targets=Object.keys(links).map(function(id){return document.getElementById(id);}).filter(Boolean);
+var cur=null;function setActive(id){if(cur===id)return;if(cur&&links[cur])links[cur].classList.remove("active");cur=id;if(links[id]){links[id].classList.add("active");var r=links[id].getBoundingClientRect(),tr=toc.getBoundingClientRect();if(r.top<tr.top||r.bottom>tr.bottom)links[id].scrollIntoView({block:"nearest"});}}
+if("IntersectionObserver" in window){var vis={};var io=new IntersectionObserver(function(es){es.forEach(function(e){vis[e.target.id]=e.isIntersecting;});var first=targets.find(function(t){return vis[t.id];});if(first)setActive(first.id);},{rootMargin:"-10% 0px -70% 0px",threshold:0});targets.forEach(function(t){io.observe(t);});}
+})();
 </script>
 </body>
 </html>
