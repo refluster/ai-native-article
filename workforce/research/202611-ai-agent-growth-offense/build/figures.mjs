@@ -246,11 +246,16 @@ function line(d) {
   const max = d.max ?? Math.max(...series.flatMap((s) => s.points.map((p) => +p.y))) * 1.12, min = d.min ?? 0;
   const endLab = series.map((s) => `${s.name} ${fmt(s.points[s.points.length - 1].y, suffix)}`);
   const W = 720, H = 280, left = 64, right = Math.min(260, linesW(endLab, 12.5) + 24), top = 16, bottom = 40, plotW = W - left - right, plotH = H - top - bottom;
-  const X = (x) => left + (xs.indexOf(x) / Math.max(xs.length - 1, 1)) * plotW, Y = (y) => top + plotH - ((+y - min) / (max - min)) * plotH;
+  // optional proportional time axis (xDates: ISO dates aligned with xs) and log y axis (log: true, min > 0)
+  const tms = d.xDates ? d.xDates.map((v) => new Date(v).getTime()) : null;
+  const X = tms ? (x) => { const i = xs.indexOf(x); return left + ((tms[i] - tms[0]) / Math.max(tms[tms.length - 1] - tms[0], 1)) * plotW; } : (x) => left + (xs.indexOf(x) / Math.max(xs.length - 1, 1)) * plotW;
+  const lmin = d.log ? Math.max(min, d.min ?? 1) : min;
+  const Y = d.log ? (y) => top + plotH - ((Math.log10(Math.max(+y, lmin)) - Math.log10(lmin)) / (Math.log10(max) - Math.log10(lmin))) * plotH : (y) => top + plotH - ((+y - min) / (max - min)) * plotH;
   let svg = svgOpen(W, H, d.aria || "折れ線グラフ");
-  const ticks = d.ticks || [0, 25, 50, 75, 100].filter((t) => t <= max && t >= min);
+  if (d.capAt) { svg += `<rect x="${left}" y="${top}" width="${plotW}" height="${Math.max(0, Y(d.capAt) - top)}" fill="var(--surface-2)"/><text x="${left + 6}" y="${top + 14}" class="axis-label small muted">${esc(d.capLabel || "計測上限")}</text>`; }
+  const ticks = d.ticks || (d.log ? [1, 10, 100, 1000, 10000].filter((t) => t >= lmin && t <= max) : [0, 25, 50, 75, 100].filter((t) => t <= max && t >= min));
   for (const t of ticks) svg += `<line x1="${left}" x2="${W - right}" y1="${Y(t)}" y2="${Y(t)}" class="grid"/><text x="${left - 6}" y="${Y(t) + 4}" text-anchor="end" class="axis-label tick">${fmt(t, suffix)}</text>`;
-  xs.forEach((x) => (svg += `<text x="${X(x)}" y="${H - bottom + 18}" text-anchor="middle" class="axis-label">${esc(x)}</text>`));
+  xs.forEach((x, i) => { if (tms && xs.length > 7 && i % 2 === 1 && i !== xs.length - 1) return; svg += `<text x="${X(x)}" y="${H - bottom + 18}" text-anchor="middle" class="axis-label${tms ? " small" : ""}">${esc(x)}</text>`; });
   series.forEach((s, si) => {
     const pts = s.points.map((p) => `${X(p.x)},${Y(p.y)}`).join(" ");
     svg += `<polyline points="${pts}" fill="none" stroke="${SER(si)}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"${s.dashed ? ' stroke-dasharray="4 4"' : ""}/>`;
