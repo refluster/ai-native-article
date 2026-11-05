@@ -165,7 +165,8 @@ svg .tree-link { fill: none; stroke: var(--baseline); stroke-width: 1.5; } svg .
 .p-rev-key { font-size: 11px; margin-right: 2px; }
 @media (max-width: 600px) { .proc { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 /* stage cards (roadmap, editor shape) */
-.stages { display: grid; grid-template-columns: minmax(0, 1fr) 96px minmax(0, 1fr) 96px minmax(0, 1fr); margin: 4px 0 8px; }
+.stages { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr) 84px); margin: 4px 0 8px; }
+.stages > .stage:last-child { grid-column: span 2; }
 .stage { background: var(--surface-2); border-radius: 8px; border-top: 4px solid var(--stage-c, var(--series-1)); padding: 8px 10px 10px; font-size: 13px; line-height: 1.5; }
 .stage-head { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .stage-id { font-weight: 700; color: var(--text-secondary); }
@@ -174,7 +175,7 @@ svg .tree-link { fill: none; stroke: var(--baseline); stroke-width: 1.5; } svg .
 .stage ul { margin: 6px 0 0; padding-left: 1.1em; color: var(--text-secondary); font-size: 12.5px; } .stage li { margin: 2px 0; }
 .gate-col { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 0 8px; text-align: center; font-size: 11.5px; color: var(--text-secondary); line-height: 1.45; overflow-wrap: anywhere; }
 .gate-col .arrow { color: var(--text-muted); font-size: 18px; }
-@media (max-width: 600px) { .stages { grid-template-columns: 1fr; } .gate-col { flex-direction: row; justify-content: flex-start; text-align: left; padding: 10px 8px; } }
+@media (max-width: 600px) { .stages { grid-template-columns: 1fr; } .stages > .stage:last-child { grid-column: auto; } .gate-col { flex-direction: row; justify-content: flex-start; text-align: left; padding: 10px 8px; } }
 /* gated roadmap */
 .groad-wrap { overflow-x: auto; }
 .groad { display: grid; grid-template-columns: 52px repeat(var(--n), minmax(0, 1fr)); grid-template-rows: auto auto auto auto; column-gap: 10px; font-size: 12.5px; line-height: 1.45; }
