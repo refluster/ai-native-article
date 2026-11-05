@@ -245,7 +245,7 @@ function line(d) {
   const xs = d.x || [...new Set(series.flatMap((s) => s.points.map((p) => p.x)))];
   const max = d.max ?? Math.max(...series.flatMap((s) => s.points.map((p) => +p.y))) * 1.12, min = d.min ?? 0;
   const endLab = series.map((s) => `${s.name} ${fmt(s.points[s.points.length - 1].y, suffix)}`);
-  const W = 720, H = 280, left = 48, right = Math.min(220, linesW(endLab, 12.5) + 20), top = 16, bottom = 40, plotW = W - left - right, plotH = H - top - bottom;
+  const W = 720, H = 280, left = 64, right = Math.min(260, linesW(endLab, 12.5) + 24), top = 16, bottom = 40, plotW = W - left - right, plotH = H - top - bottom;
   const X = (x) => left + (xs.indexOf(x) / Math.max(xs.length - 1, 1)) * plotW, Y = (y) => top + plotH - ((+y - min) / (max - min)) * plotH;
   let svg = svgOpen(W, H, d.aria || "折れ線グラフ");
   const ticks = d.ticks || [0, 25, 50, 75, 100].filter((t) => t <= max && t >= min);

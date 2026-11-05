@@ -69,10 +69,10 @@ renderer.table = ({ header, rows }) => {
 marked.use({ renderer, gfm: true });
 
 // citation chips [S-x.y] → links to the register
-body = body.replace(/\[(S-\d+\.\d+)\]/g, (m, id) => `<a class="cite" href="#src-${id}">${id}</a>`);
+body = body.replace(/\[(S-\d+(?:\.\d+)+)\]/g, (m, id) => `<a class="cite" href="#src-${id}">${id}</a>`);
 let html = marked.parse(body);
 // anchor register rows
-html = html.replace(/<th scope="row">(S-\d+\.\d+)<\/th>/g, (m, id) => `<th scope="row" id="src-${id}">${id}</th>`);
+html = html.replace(/<th scope="row">(S-\d+(?:\.\d+)+)<\/th>/g, (m, id) => `<th scope="row" id="src-${id}">${id}</th>`);
 // drop the markdown TOC body if any (we render our own) — keep heading
 const toc = `<nav class="toc" aria-label="目次"><ol>${headings.filter((h) => h.text !== "目次").map((h) => `<li><a href="#${h.id}">${h.text}</a></li>`).join("")}</ol></nav>`;
 html = html.replace(/(<h2 id="[^"]*">目次<\/h2>\n)([\s\S]*?)(?=<h2 )/, `$1${toc}\n`);
