@@ -1,7 +1,7 @@
 # 情報源台帳 (S3 統合 register) — 第 2 報
 
-- 生成: 2026-11-05、各 `sources/wsN.md` の台帳行を機械的に統合 (同じ S-ID が複数 WS に現れる場合は最初の行を採用)。
-- 件数: 156 行 (外部 122 / 内部 34 = 第 1 報からの内部引用 S-0.x と本ワークフォース内部 S-9.x・S-4.29〜S-4.32; S7 M-11 で再集計)。区分: {"一次":83,"準一次":14,"内部":34,"二次":25}
+- 生成: 2026-11-05、各 `sources/wsN.md` (WS1–7) の台帳行を機械的に統合 (同じ S-ID が複数 WS に現れる場合は最初の行を採用)。
+- 件数: 174 行 (外部 135 / 内部 39 = 第 1 報からの内部引用 S-0.x、本ワークフォース内部 S-9.x・S-4.29〜S-4.32、operator 提供 S-10.1)。区分: {"一次":91,"準一次":16,"内部":39,"二次":28}
 
 | S-ID | 区分 | 題名 | 発行者 | 日付 | URL | 検証メモ |
 |---|---|---|---|---|---|---|
@@ -86,7 +86,7 @@
 | S-9.9 | 内部 | workforce/docs/mvv.md | 本ワークフォース | 2026-06-14 更新 | workforce/docs/mvv.md | Mission / Vision の文言 |
 | S-9.10 | 内部 | workforce/docs/adr/README.md | 本ワークフォース | 2026-11-05 時点 | workforce/docs/adr/README.md | ADR 索引 (0019/0021 記憶、0037 予算) で採否状態を確認 |
 | S-4.1 | 一次 | Generative Agent Simulations of 1,000 People (v1) | Park, Zou, Kamphorst, Egan, Shaw, Hill, Cai, Morris, Liang, Willer, Bernstein (arXiv 2411.10109v1) | 2024-11-15 | https://arxiv.org/abs/2411.10109v1 | v1 の抄録ページで「85% as accurately as participants replicate their own answers two weeks later」を確認 |
-| S-4.2 | 一次 | LLM Agents Grounded in Self-Reports Enable General-Purpose Simulation of Individuals (arXiv 2411.10109v3; v1 の題は Generative Agent Simulations of 1,000 People) | 同上 (arXiv 2411.10109v3) | v3 改訂 2026-06-28 | https://arxiv.org/abs/2411.10109 | arXiv API で現行の抄録を取得。83/82/86/74%、1,052 人、「modest」を確認 |
+| S-4.2 | 一次 | Generative Agent Simulations of 1,000 People (v3) | 同上 (arXiv 2411.10109v3) | v3 改訂 2026-06-28 | https://arxiv.org/abs/2411.10109 | arXiv API で現行の抄録を取得。83/82/86/74%、1,052 人、「modest」を確認 |
 | S-4.3 | 一次 | Large Language Monkeys: Scaling Inference Compute with Repeated Sampling | Brown, Juravsky, Ehrlich, Clark, Le, Ré, Mirhoseini (arXiv 2407.21787) | 2024-07-31 (v3 2024-12-30) | https://arxiv.org/abs/2407.21787 | arXiv API で抄録の全文を取得。15.9%→56% (250 サンプル)、43%、plateau の文を確認 |
 | S-4.4 | 一次 | The AI Scientist: Towards Fully Automated Open-Ended Scientific Discovery | Lu, Lu, Lange, Foerster, Clune, Ha (arXiv 2408.06292) | 2024-08-12 | https://arxiv.org/abs/2408.06292 | 抄録で「less than $15 per paper」と、自動査読による閾値超えの主張を確認 |
 | S-4.5 | 一次 | The AI Scientist-v2: Workshop-Level Automated Scientific Discovery via Agentic Tree Search | Sakana AI ほか (arXiv 2504.08066。著者名は未照合) | 2025-04-10 | https://arxiv.org/abs/2504.08066 | arXiv API で抄録の全文を取得。3 本投稿、1 本が閾値超えを確認 |
@@ -161,3 +161,21 @@
 | S-6.14 | 一次 | 「J-Startup×経団連懇談会」を開催 (週刊 経団連タイムス No.3388) | 一般社団法人 日本経済団体連合会 | 2018-12-06 | https://www.keidanren.or.jp/journal/times/2018/1206_02.html | ページを取得し、中西会長の「出島」発言と凸版印刷副社長の発言を確認 |
 | S-0.8.2 | 内部 | 企業IT動向調査2026（2025年度調査）報告発表資料 (第 1 報 S-8.2) | JUAS | 2026-04-10 | https://juas.or.jp/cms/media/2026/04/JUAS_IT2026summary.pdf | 第 1 報で A。本 WS では再取得していない |
 | S-0.8.3 | 内部 | DX動向2025 (本編) (第 1 報 S-8.3) | IPA | 2025-06-26 | https://www.ipa.go.jp/digital/chousa/dx-trend/tbl5kb0000001mn2-att/dx-trend-2025.pdf | 第 1 報で A。本 WS では再取得していない |
+| S-7.1 | 一次 | Cybersecurity Risk Management, Strategy, Governance, and Incident Disclosure (Release No. 33-11216) | U.S. SEC | 2023-07-26 (発効 2023-09-05) | https://www.sec.gov/files/rules/final/2023/33-11216.pdf | PDF をテキスト化した。Item 1.05、Item 106(c) の規則本文、407(j) を採用しなかった理由の段落、発効日を逐語で確認 |
+| S-7.2 | 一次 | Director's Handbook on Cyber-Risk Oversight (Fifth Edition) | NACD / Internet Security Alliance | © 2026 (2026-04 の公表と報道) | https://www.nacdonline.org/globalassets/public-pdfs/2026_directors-handbook-cyber-risk_print.pdf | PDF (26 ページ) をテキスト化した。6 原則の題、原則 2・3・5 の項目、Tool J、AI の用語集と問い、CISA の序文、調査値 37/40% を確認。2023 年版は未取得 |
+| S-7.3 | 二次 | SEC and SolarWinds Litigation Dismissed Following Joint Stipulation | Winston & Strawn | 2025-11 | https://www.winston.com/en/blogs-and-podcasts/capital-markets-and-securities-law-watch/sec-and-solarwinds-litigation-dismissed-following-joint-stipulation | 検索の要約で、2025-11-20、with prejudice、違法行為の不認定を確認。裁判所の記録 (一次) は未取得 |
+| S-7.4 | 一次 (ベンダ) | Disrupting the first reported AI-orchestrated cyber espionage campaign | Anthropic | 2025-11-13 | https://www.anthropic.com/news/disrupting-AI-espionage | ページで 80-90%、4-6、thousands of requests、約 30、small number を確認 |
+| S-7.5 | 二次 | "Must act now" to counter AI-borne cyber attacks, 'Five Eyes' says | iTnews (Juha Saarinen) | 2026-06-23 | https://www.itnews.com.au/news/must-act-now-to-counter-ai-borne-cyber-attacks-five-eyes-says-626815 | 記事で発出機関と 2 つの引用を確認。声明の一次資料へのリンクは記事に無く、検索でも NOT FOUND |
+| S-7.6 | 一次 | サイバーセキュリティ経営ガイドライン — 実践のプラクティス・ナビ (はじめに) | IPA | 2026-04-28 公開 | https://www.ipa.go.jp/security/economics/practices_navi/intro.html | 重要 10 項目の見出しと CISO の定義を確認。GL Ver3.0 の本文 (経産省) は未取得 |
+| S-7.7 | 準一次 | 情報セキュリティ実態調査 2022 (ニュースリリース) | NRI セキュアテクノロジーズ / 野村総合研究所 | 2022-12-13 | https://www.nri.com/jp/news/newsrelease/20221213_2.html | 39.4 / 96.2 / 96.0%、65.3%、2,877 社、調査期間を確認。取締役会への報告の値は無い |
+| S-7.8 | 一次 | サイバー攻撃被害の再発防止策とガバナンス体制の強化について | アサヒグループホールディングス | 2026-02-18 | https://www.asahigroup-holdings.com/en/newsroom/detail/20260218-0101.html | 本文 (日本語) で、約 10 日前、管理者権限、ガバナンスの 4 施策、漏えい件数を確認。取締役会への報告時期の記載は無い |
+| S-7.9 | 準一次 | ランサムウェア攻撃の影響調査結果および安全性強化に向けた取り組みのご報告 (第 13 報) | アスクル (PR TIMES 配信、ネットショップ担当者フォーラムに転載) | 2025-12-12 | https://netshop.impress.co.jp/r/prtimes/items/000000500.000021550 | ミラーで 10-19、認証情報の推定、EDR の無効化、ガバナンス体制の再構築を確認。件数は画像のため読めず。原本は https://prtimes.jp/main/html/rd/p/000000500.000021550.html |
+| S-7.10 | 二次 | アスクル、個人情報 74 万件漏えい 攻撃手法や初動対応を時系列順にまとめたレポートも公開 | ITmedia NEWS | 2025-12-12 | https://www.itmedia.co.jp/news/article/2512/12/1251212106/ | 検索結果の要約だけ (74 万件、委託先の認証情報)。記事は未取得 |
+| S-7.11 | 一次 | コーポレートガバナンス・コードの改訂 (2026 年) の概要 | 金融庁 | 2026-07-21 | https://www.fsa.go.jp/news/r7/singi/20260721/04.pdf | 1 ページの PDF をテキスト化し、サイバーの「解釈指針に追記」と、補充原則から解釈指針への再編を確認 |
+| S-7.12 | 一次 | コーポレートガバナンス・コード (2026 年 7 月 21 日) | 東京証券取引所 | 2026-07-21 | https://www.jpx.co.jp/equities/listing/cg/tvdivq0000008jdy-att/nlsgeu000005lnul.pdf | PDF をテキスト化し、原則 4-4 の解釈指針 (サイバー)、4-13 (スキル・マトリックス)、4-14 (内部監査の直接報告) を逐語で確認。旧版と同じ URL に 2026 年版が置かれていた |
+| S-7.13 | 一次 | サイバーリスクハンドブック 取締役向けハンドブック (日本版) | 日本経済団体連合会 / Internet Security Alliance | 2019 (本文の参照日 2019-09 から推定) | https://www.keidanren.or.jp/policy/cybersecurity/CyberRiskHandbook.pdf | PDF をテキスト化し、5 原則の採用文を逐語で確認。発行日は奥付から取れず推定 |
+| S-7.14 | 内部 | PR escalation-reason taxonomy v3.2 | 本ワークフォース workforce/docs/pr-escalation-reasons.md | 2026-10-26 | workforce/docs/pr-escalation-reasons.md | 理由コードの必須化 (emit で exit 1)、`unspecified` の受け皿、作者レーンは件数外、「inadmissible」、2026-08-05 の系列の境界を確認 |
+| S-7.15 | 内部 | Governance mechanisms (R-13 terminal-state sweep) | 本リポジトリ docs/governance-mechanisms.md | 2026-11-05 時点 | docs/governance-mechanisms.md | 日次スイープの対象 (stale / never-routed / 未ラベルの引き渡し) を確認。同文書は content-insights を「inert」と書いたままで、RAL-002 の解消を反映していない |
+| S-7.16 | 内部 | Epic-020 human leverage metric | 本ワークフォース workforce/docs/epics/epic-020-human-leverage-metric.md | 2026-11-05 時点 | workforce/docs/epics/epic-020-human-leverage-metric.md | 「Today no surface counts human interventions at all」(起票時点) と、digest を 1 接点と数える罠を確認 |
+| S-7.17 | 内部 | Risk-acceptance ledger RAL-002 | 本リポジトリ docs/risk-acceptance-ledger.md | 2026-06-22 解消 | docs/risk-acceptance-ledger.md | 「fail-soft, not fail-loud, because it is advisory」と解消日を確認 |
+| S-10.1 | 内部 | operator が共有した経営者のポスト (米国の取締役会向け会合の所感) | 匿名 (operator 提供) | 2026-11-05 共有 | (URL なし) | マシンのスピードの攻撃に取締役会はどう監督するか、平時との分離、報告されないもの、責任者・直通パス・直接聴取の基準、「成長のために設計されたガバナンス」を問う所感。brief.md「追加の与件」に要旨 |
