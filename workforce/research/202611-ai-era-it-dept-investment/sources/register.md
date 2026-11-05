@@ -2,7 +2,7 @@
 
 - 生成: 2026-11-04、各 `sources/wsN.md` の台帳行を機械的に統合 (G3: 「same as」参照なし、全 S-ID が一意)。
 - 内部資料 S-0.x は lead が追加。区分: 一次 / 準一次 / 二次 / 内部。確度 A/B/C は各 WS の所見表に付く。
-- 件数: 135 行 (外部 133 + 内部 2)。重複 ID: なし
+- 件数: 136 行 (外部 134 + 内部 2)。重複 ID: なし
 
 | S-ID | 区分 | 題名 | 発行者 | 日付 | URL | 検証メモ |
 |---|---|---|---|---|---|---|
@@ -114,6 +114,7 @@
 | S-6.14 | 一次 | AI事業者ガイドライン (第1.2版) 本編 | 総務省・経済産業省 | 2026-03-31 | https://www.soumu.go.jp/main_content/001064279.pdf | 表紙の日付、AI エージェントの定義、ログの記録・保存、人間の判断の介在、アクセス制御の記述を PDF で確認した |
 | S-6.15 | 一次 | AI事業者ガイドラインの令和7年度更新内容 | 総務省・経済産業省 | 2026-03-31 | https://www.soumu.go.jp/main_content/001064301.pdf | 「人間の判断を介在させる仕組みの構築や最小権限設定」と、エージェントの「適切な権限設定が重要」を確認した |
 | S-6.16 | 一次 | 生成AIサービスの利用に関する注意喚起等 (別添1) | 個人情報保護委員会 | 2023-06-02 | https://www.ppc.go.jp/files/pdf/230602_alert_generative_AI_service.pdf | 日付と、(1)①②・(2)① の文言を PDF で確認した |
+| S-6.17 | 一次 | 個人情報の保護に関する法律 (平成十五年法律第五十七号) | e-Gov 法令検索 (デジタル庁) | 現行版 (最終改正の公布 2026-07-17 / 施行 2026-11-02) | https://laws.e-gov.go.jp/law/415AC0000000057 | API /api/2/law_data/415AC0000000057 で第 18・23・26・27・28 条の見出しと本文を確認した (S7 ラウンド 2、W4) |
 | S-7.1 | 一次 | Accelerate: State of DevOps 2019 | DORA / Google Cloud | 2019 | https://services.google.com/fh/files/misc/state-of-devops-2019.pdf | PDF を取得して全文テキスト化。Change Management 節 (pp.48–51) で 2.6 倍、変更失敗率で "no evidence"、明確なプロセスで 1.8 倍、shift-left の推奨を逐語確認。回答者ほぼ1,000人を確認。2014年報告の引用を確認。 |
 | S-7.2 | 準一次 | Overriding of Drug Safety Alerts in Computerized Physician Order Entry (van der Sijs, Aarts, Vulto, Berg), JAMIA 13(2):138–147 | JAMIA / PMC | 2006 | https://pmc.ncbi.nlm.nih.gov/articles/PMC1447540 | PMC 全文で抄録 (17論文、49%–96%)、本文の "alert fatigue caused by poor signal-to-noise ratio"、Discussion の「8研究で 49–96%」を確認。 |
 | S-7.3 | 準一次 | Effects of workload, work complexity, and repeated alerts on alert fatigue in a clinical decision support system (Ancker et al.), BMC Med Inform Decis Mak, doi:10.1186/s12911-017-0430-8 | BMC / Europe PMC (PMID 28395667) | 2017-04 | https://europepmc.org/article/MED/28395667 | Europe PMC REST API で抄録全文を取得。n=112、2010-01〜2013-06、30%/10% 低下、仕事量と無関係、脱感作なしを確認。 |
