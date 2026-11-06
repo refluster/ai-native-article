@@ -1,0 +1,158 @@
+[
+  {
+    "agent": "margaux",
+    "skill": "research-study",
+    "summary": "研究リードとして熟議の 9 到達点を外部検証する調査 (S0–S11) を運び、二層の統括答えに改訂して report v2.1 を draft PR #871 に納品した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "beatriz",
+    "skill": "research-study",
+    "summary": "研究基準の監督: 引用 ID・確度語・証拠階層を S0 で凍結し、136 件の情報源台帳と PRISMA 流の採否記録を監督した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "nadia",
+    "skill": "research-study",
+    "summary": "各鍵メッセージの so-what に署名し、エグゼクティブ・サマリを『CIO が来四半期に決める 3 点』の決定囲みから始める形に定めた。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "haruto",
+    "skill": "research-study",
+    "summary": "懐疑的 CFO / 稟議の視点で S8 を審査し、支払者の矛盾 (R1/R7) と予算科目・決裁権限規程の論点を正して CIO 向け 1 枚 (付録 B) の骨子を書いた。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "sora",
+    "skill": "research-study",
+    "summary": "WS1 基盤・セキュリティ・権限のファクトパック (24 情報源): EchoLeak / GitHub MCP / mcp-remote の一次アドバイザリ、MCP 認可仕様、NIST AI RMF、Purview を確認した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "bruno",
+    "skill": "research-study",
+    "summary": "WS2 アドバイザリ・市場景観のファクトパック (16 情報源): Gartner / Forrester / IDC / McKinsey / Deloitte の提言と Stanford AI Index のコモディティ化データを地図化した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "pranav",
+    "skill": "research-study",
+    "summary": "WS3 迂回コスト・経済性 (17 情報源): シャドー AI の 4 系統の実測値を単位・母数つきで抽出し、FinOps の showback / chargeback の記述を一次で確認した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "silas",
+    "skill": "research-study",
+    "summary": "WS3 の財務席: AI 支出の管理対象化 31→63→98% と Gartner の GenAI 支出予測を確認し、費用負担モデルの根拠不足を NOT FOUND として明記した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "sana",
+    "skill": "research-study",
+    "summary": "WS4 スキル再利用・記憶 (22 情報源): 4 社のエージェントカタログの再利用単位を二層と判定し、記憶圧縮後の同一性ベンチマークの不在を確認した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "freya",
+    "skill": "research-study",
+    "summary": "熟議の提出者として WS4 / 体験側の仮説を擁護し、判定は sana に委ねた。リコールパケットと同一性 eval の論点を第 6 章の推奨 R5 に残した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "tobias",
+    "skill": "research-study",
+    "summary": "WS5 データ資産 (11 情報源): BloombergGPT vs GPT-4、RAG vs fine-tuning、Menlo の採用率を一次論文の表から抽出した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "tariq",
+    "skill": "research-study",
+    "summary": "WS5 の知識体系席: 4 つの現場実験 (Dell'Acqua / Brynjolfsson / Noy–Zhang / Dillon) の設計と効果量を版ごとに整理し、公開 vs 固有の比較実験の雛形を示した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "linnea",
+    "skill": "research-study",
+    "summary": "WS5 の交絡席: BloombergGPT 比較の規模交絡、Ovadia の教師なし FT 限定、Brynjolfsson の固有ログ訓練など 8 件の交絡と定数のずれを命名した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "levi",
+    "skill": "research-study",
+    "summary": "WS6 制度・規制 (16 情報源) と S8 の法務審査: EU AI Act Art.9/12/14/26/113 と Omnibus 2026/1744 を正文で確認し、高リスク限定・provider/deployer・個人情報保護法の欠落を指摘した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "tessa",
+    "skill": "research-study",
+    "summary": "WS6 の政策席: AI 推進法 (e-Gov API)、AI 事業者ガイドライン第 1.2 版、PPC 注意喚起を一次 PDF で確認し、日本の soft law 構成を整理した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "yuki",
+    "skill": "research-study",
+    "summary": "熟議の提出者として『一チーム・現場の言葉』仮説を WS7 で擁護し、判定は clara に委ねた。BCG / Gallup / WTI の現場利用データを提供した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "clara",
+    "skill": "research-study",
+    "summary": "WS7 行動科学 (17 情報源) と S8 の現場審査: DORA 2.6 倍、Ancker の用量反応、Vaccaro のメタ分析を一次で確認し、置換指標 (rubber-stamp 率 等) の妥当性と回避行動を指摘した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "oksana",
+    "skill": "research-study",
+    "summary": "ファクトバンクの表記統一: analysis §5 の鍵数値 25 件を定義し、S9 で ES・章・図 DATA・判定表・用語集の全数値を grep 照合して一致させた。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "nikhil",
+    "skill": "research-study",
+    "summary": "S7 独立ファクトチェック: 236 主張を照合し 94 件を一次で再開封、必須修正 17 件 (集計誤り、制度の適用範囲、単位) を特定。ラウンド 2 で v2 差分 44 主張を再照合し 10 件を正した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "owen",
+    "skill": "research-study",
+    "summary": "S7 の検証ログ: 取得した一次資料 (NVD JSON、MCP 仕様、NIST PDF、BOE 官報 PDF、白書 PDF、e-Gov 法令 API) のフェッチ記録を残し、『確認した』主張だけを支持とした。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "rafael",
+    "skill": "research-study",
+    "summary": "S8 レッドチーム: 統括答えへの悪魔の代弁、代替仮説 6 件、Key Assumptions 再確認、HILP テール T-1 を書き、『必要性は耐えたが順序は証拠が無い』として統括答えの二層化を引き出した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "dalia",
+    "skill": "research-study",
+    "summary": "判定スキーマ: 支持 / 一部支持 / 不支持 / 未検証 × 高 / 中 / 低 の固定語彙と、44 所見の処分表 (採用 / 保留 / 却下) の形式を定めた。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "ingrid",
+    "skill": "research-study",
+    "summary": "編集: report v1 (39.9k 字) を起草し、S9 で 17 件の必須修正と 40 件のパネル所見を適用して v2 (統括答えの二層化、図 30→18)、ラウンド 2 で v2.1 に改訂した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "aoi",
+    "skill": "research-study",
+    "summary": "読者体験: 5 読者類型の読み筋を審査し図 12 点の削除・統合を提案。S10 で描画器のスマホ幅レイアウトと両テーマの可読性を検証した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "yusuf",
+    "skill": "research-study",
+    "summary": "ビルド: report.md → 自己完結 report.html の変換器と 18 種の図描画器 (SVG、デザイントークンのみ) を実装し、90 枚のスクリーンショットで検査した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  },
+  {
+    "agent": "ines",
+    "skill": "research-study",
+    "summary": "operator にしか閉じられない 5 つの問い (最初のチーム、反証条件の期限と判定者、支払者案 B、実績登録、公開先) を retro.md に一頁で整理した。",
+    "uri": "https://github.com/refluster/ai-native-article/pull/871"
+  }
+]
