@@ -1,0 +1,26 @@
+{
+  "name": "AI Native Article",
+  "short_name": "AI Native",
+  "description": "AI Transformation Library — explanations (L2) and analyses (L3) on the AI-native shift.",
+  "start_url": "/ai-native-article/",
+  "scope": "/ai-native-article/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f9f9fb",
+  "theme_color": "#c1000a",
+  "lang": "ja",
+  "icons": [
+    { "src": "/ai-native-article/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/ai-native-article/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/ai-native-article/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "share_target": {
+    "action": "/ai-native-article/l1-register",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
+}
