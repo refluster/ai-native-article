@@ -52,6 +52,7 @@ import {
   queryBySkPrefix,
 } from "./ddb.js";
 import { getSecret } from "./secrets.js";
+import { isIsoTimestamp } from "./timestamp.js";
 import type { AgentSlug } from "./agent.js";
 
 const STAGE = process.env.STAGE ?? "dev";
@@ -519,6 +520,15 @@ export interface AppendExecutionInput {
  * (the retry path, tests) call `appendExecution` directly.
  */
 export async function appendExecution(input: AppendExecutionInput): Promise<ExecutionRow> {
+  // started_at is the GSI1/GSI2 sort key and every reader treats it as an
+  // ISO instant; a garbage value poisons every time-window read (see
+  // shared/timestamp.ts). Fail loud at the single write chokepoint (W-4).
+  if (!isIsoTimestamp(input.started_at)) {
+    throw new Error(`appendExecution: invalid started_at ${JSON.stringify(input.started_at)} (expected ISO-8601)`);
+  }
+  if (!isIsoTimestamp(input.ended_at)) {
+    throw new Error(`appendExecution: invalid ended_at ${JSON.stringify(input.ended_at)} (expected ISO-8601)`);
+  }
   // Validate the embedding-sidecar co-set. The three byte/model/dim
   // fields MUST be all-present or all-absent; `embedding_status='ok'`
   // requires all three to be present.

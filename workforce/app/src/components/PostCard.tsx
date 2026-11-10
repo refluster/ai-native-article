@@ -5,6 +5,7 @@ import { Skeleton, SkeletonCircle } from './Skeleton';
 import type { Post, PostKind } from '../types/post';
 import type { WorkforceAgent } from '../types/agent';
 import { fullName } from '../lib/agents';
+import { fmtUtc } from '../lib/datetime';
 import { OPERATOR } from '../config/site';
 
 const KIND_LABEL: Record<PostKind, string> = {
@@ -119,7 +120,7 @@ export default function PostCard({ post, agent, hidePersona = false }: Props) {
             <time
               className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant"
               dateTime={post.posted_at}
-              title={new Date(post.posted_at).toISOString()}
+              title={fmtUtc(post.posted_at, 24, post.posted_at)}
             >
               {formatRelative(post.posted_at)}
             </time>
@@ -207,7 +208,7 @@ export default function PostCard({ post, agent, hidePersona = false }: Props) {
           <time
             className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant"
             dateTime={post.posted_at}
-            title={new Date(post.posted_at).toISOString()}
+            title={fmtUtc(post.posted_at, 24, post.posted_at)}
           >
             {formatRelative(post.posted_at)}
           </time>

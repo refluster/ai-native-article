@@ -60,6 +60,7 @@ import {
   computeSkillCatalogueGrowth,
 } from '../lib/skillGrowth';
 import { fmtDuration, fmtCompute } from '../lib/duration';
+import { fmtUtc } from '../lib/datetime';
 import { SITE_DISPLAY_NAME } from '../config/site';
 import type { WorkforceAgentManifest } from '../types/agent';
 import type { AgentMockStats, WorkforceMockStats } from '../types/stats';
@@ -388,7 +389,7 @@ export default function Dashboard() {
 
       {manifest && stats ? (
         <p className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-          manifest @ {new Date(manifest.generated_at).toISOString().slice(0, 16)}Z · stats @ {new Date(stats.generated_at).toISOString().slice(0, 16)}Z
+          manifest @ {fmtUtc(manifest.generated_at)}Z · stats @ {fmtUtc(stats.generated_at)}Z
         </p>
       ) : (
         <Skeleton className="h-3 w-72 max-w-full" />

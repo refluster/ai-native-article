@@ -119,6 +119,7 @@ import {
 // shape (the roster roll-up on the wire, mirrored client-side). Row in,
 // block out — they are not two spellings of one thing.
 import { budgetMonthKey, summariseBudgetRows, type BudgetRow } from "../shared/budget-schema.js";
+import { isIsoTimestamp } from "../shared/timestamp.js";
 import {
   appendExecution,
   archive as archiveProject,
@@ -589,13 +590,17 @@ async function listStats(
     const slug = meta.slug;
     // Archived agents stay on the roster (an all-zero heat row the operator
     // can see) but we skip the ledger read — they're retired, not idle.
-    const rows = meta.archived
+    const rawRows = meta.archived
       ? []
       : await listExecutions({
           agent_slug: slug,
           from: queryFromIso,
           limit: STATS_PER_AGENT_EXEC_LIMIT,
         });
+    // Legacy rows written before the write-path ISO guard may carry a
+    // non-timestamp started_at; it would sort above every real run and be
+    // reported as last_run_at. Drop (and log) them instead (W-4).
+    const rows = dropInvalidStartedAt(rawRows, slug, "stats");
     // Don't depend on the caller's ordering for the "last run" pick — sort
     // newest-first explicitly (the live path already does, but the unit
     // mock doesn't, and the cost is trivial).
@@ -646,7 +651,7 @@ async function listStats(
     agents[slug] = {
       paused: meta.paused,
       archived: meta.archived,
-      last_run_at: lastRow?.started_at ?? meta.last_run_at ?? "",
+      last_run_at: lastRow?.started_at ?? (isIsoTimestamp(meta.last_run_at) ? meta.last_run_at : ""),
       last_run_status: lastRunStatus,
       runs_this_month: runsThisMonth,
       deliv_this_month: delivThisMonth,
@@ -735,6 +740,25 @@ interface PublicSummaryWindow {
   deliverables: number;
   agents_active: number;
   compute_hours: number;
+}
+
+/**
+ * Filter out EXEC rows whose `started_at` is not an ISO instant, logging each
+ * one so the bad row stays visible for cleanup. Aggregates must not let one
+ * malformed legacy row poison "last run" / recent-runs for the whole page.
+ */
+function dropInvalidStartedAt<T extends { started_at: string; sk?: string }>(
+  rows: T[],
+  slug: string,
+  surface: string,
+): T[] {
+  return rows.filter((r) => {
+    if (isIsoTimestamp(r.started_at)) return true;
+    console.warn(
+      JSON.stringify({ evt: "exec-invalid-started-at", surface, agent_slug: slug, sk: r.sk, started_at: r.started_at }),
+    );
+    return false;
+  });
 }
 
 interface PublicSummary {
@@ -837,11 +861,15 @@ async function computePublicSummary(now: Date): Promise<PublicSummary> {
     if (meta.archived) continue;
     agentsTotal += 1;
     const slug = meta.slug;
-    const rows = await listExecutions({
-      agent_slug: slug,
-      from: queryFromIso,
-      limit: STATS_PER_AGENT_EXEC_LIMIT,
-    });
+    const rows = dropInvalidStartedAt(
+      await listExecutions({
+        agent_slug: slug,
+        from: queryFromIso,
+        limit: STATS_PER_AGENT_EXEC_LIMIT,
+      }),
+      slug,
+      "public-summary",
+    );
 
     for (const r of rows) {
       const tsMs = Date.parse(r.started_at);
@@ -3000,6 +3028,19 @@ async function createEngagementRoute(
   if (typeof projectId !== "string") {
     return reply(400, { error: "invalid_project_id" });
   }
+  // Timestamps are client-supplied but must be real ISO-8601 instants:
+  // started_at is the ledger's sort key, and a garbage value ("x") sorts above
+  // every real timestamp — it then wins every "last run" pick and blanked the
+  // console /agents page (2026-11-10). Reject, and normalise to UTC `Z` form so
+  // lexicographic window compares stay correct.
+  if (!isIsoTimestamp(parsed.started_at) || !isIsoTimestamp(parsed.ended_at)) {
+    return reply(400, {
+      error: "invalid_timestamp",
+      detail: "started_at and ended_at must be ISO-8601 date-times with a zone (e.g. 2026-11-10T09:00:00Z)",
+    });
+  }
+  parsed.started_at = new Date(parsed.started_at).toISOString();
+  parsed.ended_at = new Date(parsed.ended_at).toISOString();
   const status = parsed.status;
   if (status !== "ok" && status !== "throw" && status !== "skipped" && status !== "failed_artefact_redaction") {
     return reply(400, { error: "invalid_status", detail: "status must be one of ok|throw|skipped|failed_artefact_redaction" });

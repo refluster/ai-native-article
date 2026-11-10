@@ -15,6 +15,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import Typeplate from './Typeplate';
 import StackedBarChart, { type BarSeries } from './StackedBarChart';
 import { loadRepoActivity, type RepoActivityResult } from '../lib/repoActivity';
+import { fmtUtc } from '../lib/datetime';
 
 const ISSUE_SERIES: BarSeries[] = [
   { key: 'opened', label: 'opened', fill: 'var(--wf-svg-primary)' },
@@ -68,7 +69,7 @@ export default function RepoPerformancePanel() {
 
   const w = result.workforce;
   const projectIds = result.repos;
-  const stampedAt = new Date(result.generatedAt).toISOString().slice(0, 16);
+  const stampedAt = fmtUtc(result.generatedAt);
   const ageHours = (Date.now() - Date.parse(result.generatedAt)) / 3_600_000;
   const isStale = result.source === 'live' && ageHours > STALE_HOURS;
   const degraded = w.degraded_signals ?? [];

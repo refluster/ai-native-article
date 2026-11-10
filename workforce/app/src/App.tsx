@@ -34,6 +34,7 @@ import Books from './pages/Books';
 import Book from './pages/Book';
 import AuthBoundary from './components/AuthBoundary';
 import PublicShell from './components/PublicShell';
+import RouteErrorBoundary from './components/RouteErrorBoundary';
 import { SkeletonText } from './components/Skeleton';
 import { routerBaseName } from './lib/paths';
 import { trackPageView } from '@kohuehara/shared/analytics';
@@ -165,6 +166,7 @@ export default function App() {
   return (
     <BrowserRouter basename={routerBaseName()}>
       <RouteTracker />
+      <RouteErrorBoundary>
       <Routes>
         <Route path="/auth/callback" element={<AuthCallback />} />
         {/* Public surfaces — one SPA, one shell (PublicShell). The apex is
@@ -210,6 +212,7 @@ export default function App() {
         <Route path="/messaging/boards/:id" element={<MessagingBoardRedirect />} />
         <Route path="*" element={<ProtectedRoutes />} />
       </Routes>
+      </RouteErrorBoundary>
     </BrowserRouter>
   );
 }
