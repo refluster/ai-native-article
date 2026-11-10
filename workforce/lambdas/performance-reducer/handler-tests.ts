@@ -173,7 +173,7 @@ describe("performance-reducer handler", () => {
   // COMMONS_SKILLS binding, and the row a digest will read next PR.
   //
   // Note: shared/skill-registry-generated.js is deliberately NOT mocked, so
-  // these run against the real commons set (feed-post + daily-research).
+  // these run against the real commons set (feed-post + daily-research + feed-view).
 
   const idleRow = () =>
     putItem.mock.calls
@@ -190,7 +190,7 @@ describe("performance-reducer handler", () => {
     expect(row).toBeDefined();
     expect(row!.window.days).toBe(30);
     expect(row!.cohort).toBe(3);
-    expect(row!.commons_skills).toEqual(["daily-research", "feed-post"]);
+    expect(row!.commons_skills).toEqual(["daily-research", "feed-post", "feed-view"]);
     expect(row!.probe_truncated).toEqual([]);
     expect(res.idle).toBe(row!.idle.length);
   });
