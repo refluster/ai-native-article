@@ -28,6 +28,7 @@
 // cannot substantiate — the failure this panel exists to stop.
 
 import { useEffect, useState } from 'react';
+import { fmtUtc } from '../lib/datetime';
 import AgentLifecyclePanel from './AgentLifecyclePanel';
 import PrAutomationPanel from './PrAutomationPanel';
 import { loadPerformance, type PerformanceScope } from '../lib/performance';
@@ -108,7 +109,7 @@ export default function PerformancePanels({ scope }: { scope: PerformanceScope }
     Boolean,
   ) as string[];
   const prStamp = series.pr_updated_at
-    ? `${new Date(series.pr_updated_at).toISOString().slice(0, 16)}Z`
+    ? `${fmtUtc(series.pr_updated_at)}Z`
     : 'never published';
 
   return (

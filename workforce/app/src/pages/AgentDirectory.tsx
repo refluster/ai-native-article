@@ -26,6 +26,7 @@ import { Skeleton, SkeletonRosterRows } from '../components/Skeleton';
 import { loadWorkforceManifest, loadWorkforceStats, fullName } from '../lib/agents';
 import { useAsync } from '../lib/useAsync';
 import { fmtDuration } from '../lib/duration';
+import { fmtUtc } from '../lib/datetime';
 import type { WorkforceAgent } from '../types/agent';
 import type { AgentMockStats } from '../types/stats';
 
@@ -103,8 +104,9 @@ export default function AgentDirectory() {
       .sort((a, b) => {
         const depth = a.agent.depth - b.agent.depth;
         if (depth !== 0) return depth;
-        const at = a.stats?.last_run_at ? new Date(a.stats.last_run_at).getTime() : 0;
-        const bt = b.stats?.last_run_at ? new Date(b.stats.last_run_at).getTime() : 0;
+        // Date.parse → NaN for a malformed value; treat it as "never ran".
+        const at = (a.stats?.last_run_at && Date.parse(a.stats.last_run_at)) || 0;
+        const bt = (b.stats?.last_run_at && Date.parse(b.stats.last_run_at)) || 0;
         return bt - at;
       });
   }, [roster.data, stats.data, filter, query]);
@@ -253,9 +255,7 @@ export default function AgentDirectory() {
                     </div>
                     <div className="col-span-2 text-right font-wfmono text-xs text-wf-on-surface-variant">
                       {s
-                        ? s.last_run_at
-                          ? new Date(s.last_run_at).toISOString().slice(0, 16).replace('T', ' ')
-                          : '—'
+                        ? fmtUtc(s.last_run_at).replace('T', ' ')
                         : <Skeleton className="h-3 w-24 ml-auto" />}
                     </div>
                   </Link>

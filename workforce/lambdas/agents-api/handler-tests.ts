@@ -1650,6 +1650,37 @@ describe("POST /agents/{slug}/engagements (Engagements API — createEngagement)
     );
   });
 
+  it.each([
+    ["started_at", "x"],
+    ["started_at", "2026-05-30"],
+    ["started_at", "2026-13-45T10:00:00Z"],
+    ["ended_at", "yesterday"],
+  ])("400s on a non-ISO %s (%s) and writes nothing", async (field, value) => {
+    membershipSet.add("asp-cloud|nadia");
+    rows.clear();
+    const res = await handler(
+      postEvt("nadia", { authorization: `Bearer ${TOKEN}` }, validBody({ [field]: value })),
+    );
+    expect(statusOf(res)).toBe(400);
+    expect((bodyOf(res) as { error: string }).error).toBe("invalid_timestamp");
+    expect([...rows.keys()].some((k) => k.includes("EXEC#"))).toBe(false);
+  });
+
+  it("normalises an offset timestamp to UTC Z form", async () => {
+    membershipSet.add("asp-cloud|nadia");
+    const res = await handler(
+      postEvt(
+        "nadia",
+        { authorization: `Bearer ${TOKEN}` },
+        validBody({ started_at: "2026-05-30T19:00:00+09:00", ended_at: "2026-05-30T19:02:30+09:00" }),
+      ),
+    );
+    expect(statusOf(res)).toBe(201);
+    const exec = [...rows.values()].find((r) => String(r.sk).startsWith("EXEC#")) as unknown as { started_at: string; ended_at: string };
+    expect(exec.started_at).toBe("2026-05-30T10:00:00.000Z");
+    expect(exec.ended_at).toBe("2026-05-30T10:02:30.000Z");
+  });
+
   it("400s on invalid status", async () => {
     membershipSet.add("asp-cloud|nadia");
     const res = await handler(
@@ -2175,6 +2206,34 @@ describe("GET /stats (listStats)", () => {
     expect(body.recent_runs[0]!.slug).toBe("ren");
     expect(body.recent_runs[0]!.skill).toBe("code-task-brief");
     expect(body.recent_runs[1]!.slug).toBe("maya");
+  });
+
+  // Regression (2026-11-10): a legacy EXEC row with started_at "x" sorted
+  // above every real run, became sofia's last_run_at, and the console's
+  // /agents page crashed on `new Date("x").toISOString()`.
+  it("ignores EXEC rows whose started_at is not an ISO timestamp", async () => {
+    seedAgent("sofia");
+    seedExec("sofia", { ulid: "01A", startedAt: todayAt(1), durationS: 100 });
+    rows.set(key("PROJECT#self/sofia", "EXEC#01BAD"), {
+      pk: "PROJECT#self/sofia",
+      sk: "EXEC#01BAD",
+      project_id: "self/sofia",
+      agent_slug: "sofia",
+      skill_name: "feed-post",
+      skill_version: "1.0.0",
+      started_at: "x",
+      ended_at: "x",
+      status: "ok",
+      gsi1pk: "AGENT#sofia",
+      gsi1sk: "x",
+    });
+
+    const body = bodyOf(await handler(evt("GET /stats"))) as StatsBody & {
+      agents: Record<string, { last_run_at: string }>;
+    };
+    expect(body.agents.sofia!.last_run_at).toBe(todayAt(1));
+    expect(body.agents.sofia!.runs_this_month).toBe(1);
+    expect(body.recent_runs.map((r) => r.started_at)).toEqual([todayAt(1)]);
   });
 
   it("returns an empty-but-valid payload on an empty roster", async () => {
