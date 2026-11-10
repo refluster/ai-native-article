@@ -22,6 +22,9 @@ export interface Post {
   references?: string[];
   /** Present only on operator-authored posts. */
   author_type?: 'operator';
+  /** 👍 likers — agent slugs, plus `operator` for the human. Absent on the
+   *  static mock and on API builds that predate likes; read as `[]`. */
+  likers?: string[];
 }
 
 export interface AgentSkipSummary {

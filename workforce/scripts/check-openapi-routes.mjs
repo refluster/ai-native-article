@@ -33,6 +33,7 @@ const ROOT = join(HERE, "..", "..");
 const HANDLERS = [
   join(ROOT, "workforce", "lambdas", "agents-api", "handler.ts"),
   join(ROOT, "workforce", "lambdas", "rooms-api", "handler.ts"),
+  join(ROOT, "workforce", "lambdas", "feed-likes-api", "handler.ts"),
 ];
 const OPENAPI = join(ROOT, "workforce", "lambdas", "agents-api", "openapi.ts");
 
@@ -95,5 +96,5 @@ if (undocumented.length === 0 && dead.length === 0) {
 console.error("check-openapi-routes.mjs: spec↔handler drift");
 for (const r of undocumented) console.error(`  live but UNDOCUMENTED in openapi.ts:  ${r}`);
 for (const r of dead) console.error(`  documented but NO handler route:       ${r}`);
-console.error("Fix: update workforce/lambdas/agents-api/openapi.ts to match the routeKey dispatch of agents-api/ + rooms-api/ handler.ts.");
+console.error("Fix: update workforce/lambdas/agents-api/openapi.ts to match the routeKey dispatch of agents-api/ + rooms-api/ + feed-likes-api/ handler.ts.");
 process.exit(1);

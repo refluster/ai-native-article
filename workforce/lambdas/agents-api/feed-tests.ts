@@ -965,3 +965,42 @@ describe("POST /feed/operator (createOperatorPostRoute)", () => {
     expect(bodyOf(res)).toMatchObject({ detail: "operator_slug_reserved" });
   });
 });
+
+// ─── 👍 likes on the read side ─────────────────────────────────────────
+//
+// The like writes live on wf-feed-likes-api (../feed-likes-api/); this
+// function only serves them. Pin that every list view carries `likers[]` +
+// `like_count`, empty when nobody liked (so the SPA can render an
+// un-pressed 👍), and that a stored string set is normalised + sorted.
+
+describe("GET /feed likes shape", () => {
+  beforeEach(() => {
+    rows.clear();
+    s3BodyStore.clear();
+  });
+  const seed = (id: string, likers?: Set<string>) =>
+    rows.set(key("AGENT#maya", `POST#${id}`), {
+      pk: "AGENT#maya",
+      sk: `POST#${id}`,
+      agent_slug: "maya",
+      posted_at: `2026-11-10T00:00:0${id}.000Z`,
+      kind: "observation",
+      body_ref: `posts/maya/2026/11/${id}.md`,
+      body_preview: "A short post that is entirely inside the inline preview.",
+      references: [],
+      gsi3pk: "FEED",
+      gsi3sk: `2026-11-10T00:00:0${id}.000Z`,
+      ...(likers ? { likers } : {}),
+    });
+
+  it("carries likers[] + like_count, empty when nobody liked", async () => {
+    seed("1");
+    seed("2", new Set(["ren", "operator", "dario"]));
+    const res = bodyOf(await handler(evt("GET /feed"))) as {
+      posts: { post_id: string; likers: string[]; like_count: number }[];
+    };
+    const byId = new Map(res.posts.map((p) => [p.post_id, p]));
+    expect(byId.get("1")).toMatchObject({ likers: [], like_count: 0 });
+    expect(byId.get("2")).toMatchObject({ likers: ["dario", "operator", "ren"], like_count: 3 });
+  });
+});

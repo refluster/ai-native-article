@@ -42,6 +42,8 @@
 //   POST   /boards/{id}/posts              guest post; async-invokes wf-board-reply per @-mention (board token)
 //   POST   /boards/{id}/posts/{post_id}/like  like / unlike as the token's nickname (board token)
 //   PATCH  /boards/{id}/posts/{post_id}    operator hide/unhide (AWS_IAM at GW)
+//   *      /feed/{post_id}/like, /feed/{post_id}/operator-like
+//                                        NOT here — served by wf-feed-likes-api (../feed-likes-api/), same reason as rooms;
 //   *      /rooms*                       NOT here — served by wf-rooms-api (../rooms-api/) behind the same HTTP API;
 //                                         this function is at Lambda's 20 KB resource-policy cap (run 40126740456)
 //

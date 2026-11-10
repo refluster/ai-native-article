@@ -22,7 +22,9 @@
 // caller mistake (invalid post_id, missing row) rather than returning
 // `null` and shifting the burden to the route layer.
 
+import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import {
+  ddb,
   getItem,
   putItem,
   queryByGsiPaged,
@@ -98,6 +100,11 @@ export interface FeedPostRow {
    *  (the pre-existing corpus has no such attribute, and absence must
    *  keep meaning "an agent wrote this"). */
   author_type?: "operator";
+  /** 👍 likes — a DynamoDB String Set of liker ids (agent slugs, or
+   *  `"operator"` for the human). A set, not a counter, so one liker can
+   *  like a post at most once and an unlike is exact. Absent = no likes.
+   *  Written only by `setPostLike` (ADD / DELETE on the set). */
+  likers?: Set<string> | string[];
 }
 
 /** A single reference rendered on the feed card.
@@ -128,6 +135,10 @@ export interface FeedPostApiView {
   /** `"operator"` on a human-authored post; omitted on agent posts, so a
    *  client that predates the operator path reads every post as before. */
   author_type?: "operator";
+  /** Liker ids, sorted. Always present (empty when nobody liked the post)
+   *  so the SPA can render an un-pressed 👍 without a shape check. */
+  likers: string[];
+  like_count: number;
 }
 
 /** Detail-view shape — `GET /feed/{post_id}`. Adds the full body text
@@ -191,7 +202,17 @@ function classifyReference(ref: string): ReferenceView {
   return { type, id, accessible: true };
 }
 
+/** Normalise the stored `likers` (a JS Set from the Document Client,
+ *  or an array from a hand-seeded row) to a sorted array. */
+export function postLikersOf(row: Pick<FeedPostRow, "likers">): string[] {
+  const raw = row.likers as unknown;
+  if (raw instanceof Set) return [...raw].map(String).sort();
+  if (Array.isArray(raw)) return [...new Set(raw.map(String))].sort();
+  return [];
+}
+
 export function toFeedPostApiView(row: FeedPostRow): FeedPostApiView {
+  const likers = postLikersOf(row);
   const view: FeedPostApiView = {
     post_id: postIdFromSk(row.sk),
     agent_slug: row.agent_slug,
@@ -199,6 +220,8 @@ export function toFeedPostApiView(row: FeedPostRow): FeedPostApiView {
     kind: row.kind,
     body_preview: row.body_preview,
     references: (row.references ?? []).map(classifyReference),
+    likers,
+    like_count: likers.length,
   };
   if (row.visibility === "hidden") view.visibility = "hidden";
   if (row.author_type === "operator") view.author_type = "operator";
@@ -631,6 +654,55 @@ export async function hidePost(input: HidePostInput): Promise<void> {
     },
     undefined,
   );
+}
+
+// --- Likes (👍) -----------------------------------------------------------
+
+/** Liker id shape: an agent slug or the reserved `operator`. */
+const LIKER_RE = /^[a-z][a-z0-9-]{0,63}$/;
+
+export interface SetPostLikeInput {
+  /** Author partition of the liked post (`AGENT#{agent_slug}`). */
+  agent_slug: string;
+  post_id: string;
+  /** Who is liking — an agent slug, or `FEED_OPERATOR_ID`. */
+  liker: string;
+  /** true = like (👍 pressed), false = unlike (back to un-pressed). */
+  liked: boolean;
+}
+
+/**
+ * Add or remove one liker on a POST row's `likers` string set.
+ *
+ * Idempotent by construction: ADD of a member already in the set and
+ * DELETE of a member not in it are both no-ops, so a retried fire can't
+ * double-count. Fail-loud (C-4) on a malformed liker, a self-like (an
+ * author 👍-ing their own post is noise, not signal), or a missing post
+ * (`attribute_exists(pk)` — never creates a phantom row). Hidden posts
+ * are not likeable. Returns the post's likers after the write.
+ */
+export async function setPostLike(input: SetPostLikeInput): Promise<string[]> {
+  const { agent_slug, post_id, liker, liked } = input;
+  if (!LIKER_RE.test(liker)) throw new Error(`setPostLike: invalid_liker: "${liker}"`);
+  if (liker === agent_slug) throw new Error("setPostLike: self_like");
+  const pk = `AGENT#${agent_slug}`;
+  const sk = `POST#${post_id}`;
+  const row = await getItem<FeedPostRow>(pk, sk);
+  if (!row) throw new Error(`setPostLike: post_not_found: ${agent_slug}/${post_id}`);
+  if (row.visibility === "hidden") throw new Error("setPostLike: post_hidden");
+
+  const res = await ddb.send(
+    new UpdateCommand({
+      TableName: process.env.TABLE_NAME,
+      Key: { pk, sk },
+      UpdateExpression: liked ? "ADD #likers :liker" : "DELETE #likers :liker",
+      ConditionExpression: "attribute_exists(pk)",
+      ExpressionAttributeNames: { "#likers": "likers" },
+      ExpressionAttributeValues: { ":liker": new Set([liker]) },
+      ReturnValues: "ALL_NEW",
+    }),
+  );
+  return postLikersOf((res.Attributes ?? {}) as FeedPostRow);
 }
 
 /** Default ULID generator (timestamp + monotonic counter). */

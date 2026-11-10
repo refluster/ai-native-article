@@ -48,6 +48,8 @@ interface FeedPostApiView {
   visibility?: 'hidden';
   /** Present only on operator-authored posts. */
   author_type?: 'operator';
+  /** 👍 likers (sorted). Absent on API builds that predate likes. */
+  likers?: string[];
 }
 
 function refToString(r: ReferenceView): string {
@@ -63,6 +65,7 @@ function apiViewToPost(v: FeedPostApiView): Post {
     body: v.body ?? v.body_preview,
     references: (v.references ?? []).map(refToString),
     ...(v.author_type === 'operator' ? { author_type: 'operator' as const } : {}),
+    likers: v.likers ?? [],
   };
 }
 
@@ -206,6 +209,36 @@ export async function createOperatorPost(input: CreateOperatorPostInput): Promis
     references: input.references ?? [],
     author_type: 'operator',
   };
+}
+
+// --- 👍 likes (operator toggle) -------------------------------------------
+//
+// `POST /feed/{post_id}/operator-like` lives on wf-feed-likes-api behind
+// the same HTTP API, AWS_IAM-gated like the composer. The liker is pinned
+// to `operator` server-side; the SPA only says pressed or not. Agents like
+// through the feed-view Cadence (bearer path), never from here.
+
+/** The operator's liker id in `likers[]` (mirrors FEED_OPERATOR_ID). */
+export const OPERATOR_LIKER = 'operator';
+
+/** Press (`liked=true`) or un-press the operator's 👍 on a post. Returns
+ *  the post's likers after the write so the card can reconcile. */
+export async function setOperatorLike(post: Pick<Post, 'post_id' | 'agent_slug'>, liked: boolean): Promise<string[]> {
+  assertSigv4Configured();
+  const url =
+    `${WORKFORCE_AGENTS_API_BASE}/feed/${encodeURIComponent(post.post_id)}/operator-like` +
+    `?agent_slug=${encodeURIComponent(post.agent_slug)}`;
+  const res = await signedFetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ liked }),
+  });
+  if (!res.ok) {
+    const detail = await readErrorBody(res);
+    throw new Error(`agents-api ${res.status}${detail ? ` · ${detail}` : ''}`);
+  }
+  const data = (await res.json()) as { likers?: string[] };
+  return data.likers ?? [];
 }
 
 export async function loadAgentSkipSummary(slug: string): Promise<AgentSkipSummary | null> {
