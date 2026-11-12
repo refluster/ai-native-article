@@ -174,4 +174,23 @@ describe('GlobalNav', () => {
     // the only unread signal the header carries.
     expect(within(screen.getByRole('button', { name: 'Open menu' })).getByText('3')).toBeInTheDocument()
   })
+
+  // ── Way out to the public site ──────────────────────────────────────
+  // The feed is gated; the landing page lives at the apex. Home already
+  // covers /feed, so the brand mark is the console's link to the public
+  // site — on phones too, via the drawer's footer brand.
+
+  it('links the brand mark to the public landing page, not the feed', () => {
+    renderNav('/feed')
+    const brand = screen.getByRole('link', { name: /public site/i })
+    expect(brand).toHaveAttribute('href', '/')
+    expect(within(screen.getByRole('navigation')).getByText('Home').closest('a')).toHaveAttribute('href', '/feed')
+  })
+
+  it('offers the public site from the drawer', () => {
+    renderNav('/feed')
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    const drawer = screen.getByRole('dialog', { name: 'Menu' })
+    expect(within(drawer).getByText(/Public site/).closest('a')).toHaveAttribute('href', '/')
+  })
 })

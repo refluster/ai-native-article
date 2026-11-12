@@ -5,7 +5,8 @@
 // left, then a row of icon/label destinations on the right. The route
 // map applies that IA to the existing pages without renaming any URL:
 //
-//   Home          → /            (the public feed — the network's index)
+//   (brand mark)  → /            (the public landing page — the site's top)
+//   Home          → /feed        (the feed — the console's index)
 //   My Network    → /agents      (the Crew roster)
 //   Projects      → /projects    (the project directory)
 //   Skills        → /skills      (the capability library)
@@ -154,6 +155,9 @@ const NAV: NavItem[] = [
   { to: '/notifications', label: 'Notifications', icon: BellIcon, badge: '3' },
 ];
 
+/** The public landing page at the apex — outside AuthBoundary. */
+const PUBLIC_HOME = '/';
+
 const PERFORMANCE: NavItem = { to: '/performance', label: 'Performance', icon: PerformanceIcon, end: true };
 
 // The drawer's vertical grouping. Same items, same order as the desktop
@@ -239,8 +243,16 @@ export default function GlobalNav({ right }: Props) {
     <>
       <header className="sticky top-0 z-30 bg-wf-surface/90 backdrop-blur border-b border-wf-outline-variant">
         <div className="max-w-[1440px] mx-auto px-3 sm:px-6 md:px-12 h-14 flex items-center gap-3 sm:gap-4">
-        {/* Brand + search */}
-        <Link to="/feed" className="flex items-center gap-2 shrink-0 group" aria-label={SITE_DISPLAY_NAME}>
+        {/* Brand + search. The brand mark leads to the public landing page
+            at the apex (workforce.kohuehara.xyz/), the "logo = site top"
+            convention; the console's own index is the Home destination,
+            so the mark no longer duplicates it. */}
+        <Link
+          to={PUBLIC_HOME}
+          className="flex items-center gap-2 shrink-0 group"
+          aria-label={`${SITE_DISPLAY_NAME} — public site`}
+          title="Public site"
+        >
           <BrandMark size={32} />
           <span className="hidden lg:block font-headline font-black tracking-tight text-[15px] leading-none text-wf-on-surface group-hover:text-wf-primary">
             Software Talent<br />Network
@@ -430,15 +442,23 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
           ))}
         </nav>
 
-        <div className="border-t border-wf-outline-variant p-4 flex items-center gap-2.5">
+        {/* Footer brand — the drawer's way out to the public site, the
+            same destination as the header's brand mark. */}
+        <Link
+          to={PUBLIC_HOME}
+          className="border-t border-wf-outline-variant p-4 flex items-center gap-2.5 group hover:bg-wf-surface-container"
+        >
           <BrandMark size={28} />
-          <span className="min-w-0">
-            <span className="block text-xs font-semibold text-wf-on-surface truncate">
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-semibold text-wf-on-surface truncate group-hover:text-wf-primary">
               {SITE_DISPLAY_NAME}
             </span>
             <span className="block text-[10px] text-wf-on-surface-variant truncate">{SITE_TAGLINE}</span>
           </span>
-        </div>
+          <span className="shrink-0 font-wfmono text-[9px] uppercase tracking-[0.16em] text-wf-on-surface-variant group-hover:text-wf-on-surface">
+            Public site →
+          </span>
+        </Link>
       </div>
     </div>
   );
