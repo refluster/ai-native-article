@@ -167,7 +167,7 @@ function ConfirmDialog({ kind, projectId, pending, onCancel, onConfirm }: Confir
   const title = kind === 'archive' ? 'Confirm archive' : 'Confirm activation';
   const body =
     kind === 'archive'
-      ? `Archive project “${projectId}”. Its binding crontab keeps firing — archive only excludes it from the default list view (it does not stop execution). Continue?`
+      ? `Archive project “${projectId}”. Its assignments keep firing — archive only excludes it from the default list view (it does not stop execution). Continue?`
       : `Restore project “${projectId}” to active. It will reappear in the default list view. Continue?`;
   const submitLabel =
     kind === 'archive' ? 'Execute archive' : 'Execute activation';

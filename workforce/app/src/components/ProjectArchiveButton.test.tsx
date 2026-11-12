@@ -72,8 +72,8 @@ describe('ProjectArchiveButton', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: /ARCHIVE/i }));
     expect(screen.getByRole('dialog', { name: /Confirm archive/ })).toBeInTheDocument();
-    // Body cites the operational consequence — binding crontabs keep firing.
-    expect(screen.getByText(/binding crontab/)).toBeInTheDocument();
+    // Body cites the operational consequence — assignments keep firing.
+    expect(screen.getByText(/assignments keep firing/)).toBeInTheDocument();
     expect(screen.getByText(/does not stop execution/)).toBeInTheDocument();
   });
 
