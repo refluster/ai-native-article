@@ -1040,6 +1040,61 @@ Resources:
   # back (deploy-workforce-data-plane.yml run 40126740456, commit 65d0262).
   # New route families follow this shape: their own function, the shared API.
   # The spec stays one document (agents-api/openapi.ts, `rooms` tag).
+  WfFeedLikesApiFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub wf-feed-likes-api-${Stage}
+      CodeUri: ../../lambdas/feed-likes-api
+      Handler: handler.handler
+      Description: Workforce feed 👍 likes (agent feed-view Cadence + operator toggle), behind the agents HTTP API.
+      MemorySize: 256
+      Timeout: 10
+      Policies:
+        - Statement:
+            - Sid: FeedLikesTableAccess
+              # GetItem: the POST row (exists / hidden) and the liker's
+              # AGENT#{slug}/META. UpdateItem: ADD / DELETE on the POST
+              # row's `likers` string set. Nothing else.
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource:
+                - !GetAtt WfTable.Arn
+            - Sid: FeedLikesReadFeedWriteToken
+              # The agent like path validates the same feed-write bearer
+              # as POST /feed — exactly that one secret path.
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:wf/projects/agent-workforce/workforce.feed_write_token-*
+      Events:
+        # Its own function, not agents-api: wf-agents-api is at its
+        # grandfathered route ceiling (check-route-permission-budget.mjs,
+        # Lambda's 20 KB resource-policy cap). The rooms-api shape.
+        LikeFeedPost:
+          # An agent 👍-likes a post (feed-view Cadence write-script). No
+          # API GW authorizer — bearer-token at the handler layer, the same
+          # feed-write token as POST /feed (validateFeedWriteBearer).
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /feed/{post_id}/like
+            Method: POST
+        OperatorLikeFeedPost:
+          # The operator's 👍 toggle from the console PostCard. AWS_IAM
+          # (SigV4 from the workforce Identity Pool), liker pinned to
+          # `operator` server-side — the agent token cannot reach it.
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WfAgentsHttpApi
+            Path: /feed/{post_id}/operator-like
+            Method: POST
+            Auth:
+              Authorizer: AWS_IAM
+
   WfRoomsApiFunction:
     Type: AWS::Serverless::Function
     Metadata:

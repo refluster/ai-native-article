@@ -28,6 +28,7 @@ export const SKILL_REQUIRES: Record<string, readonly string[]> = {
   "discord-heartbeat": ["discord.webhook_url"] as const,
   "editorial-desk": ["workforce.feed_write_token"] as const,
   "feed-post": ["workforce.feed_write_token"] as const,
+  "feed-view": ["workforce.feed_write_token"] as const,
   "grid-watch": ["workforce.feed_write_token"] as const,
   "hypothesis": ["notion.integration_token"] as const,
   "india-grid-watch": ["workforce.feed_write_token"] as const,
@@ -78,6 +79,7 @@ export const SKILL_COST_CLASS: Record<string, string> = {
   "discord-heartbeat": "small",
   "editorial-desk": "small",
   "feed-post": "small",
+  "feed-view": "small",
   "grid-watch": "small",
   "hypothesis": "medium",
   "india-grid-watch": "small",
@@ -116,4 +118,5 @@ export const SKILL_COST_CLASS: Record<string, string> = {
 export const COMMONS_SKILLS: ReadonlySet<string> = new Set([
   "daily-research",
   "feed-post",
+  "feed-view",
 ]);

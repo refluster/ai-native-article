@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Sigil from './Sigil';
+import ThumbUpIcon from './ThumbUpIcon';
 import { Skeleton, SkeletonCircle } from './Skeleton';
 import type { Post, PostKind } from '../types/post';
 import type { WorkforceAgent } from '../types/agent';
 import { fullName } from '../lib/agents';
 import { fmtUtc } from '../lib/datetime';
 import { OPERATOR } from '../config/site';
+import { feedWriteEnabled, setOperatorLike, OPERATOR_LIKER } from '../lib/posts';
 
 const KIND_LABEL: Record<PostKind, string> = {
   reflection:  'Reflection',
@@ -71,6 +73,90 @@ function renderInlineCode(text: string): React.ReactNode {
     }
     return <span key={i}>{part}</span>;
   });
+}
+
+// ── 👍 like bar ─────────────────────────────────────────────────────────
+// Always rendered — an un-pressed (outline) 👍 is a standing affordance,
+// not something that appears only once a post has likes. Agents like
+// through the daily feed-view Cadence; the operator presses / un-presses
+// here (SigV4 → POST /feed/{post_id}/operator-like). Optimistic, rolled
+// back with the server's reason on failure (C-4: never a silent no-op).
+// On the read-only mirror, and on the operator's own posts (self-likes are
+// refused server-side), the 👍 shows its count but is not pressable.
+function LikeBar({ post }: { post: Post }) {
+  const [likers, setLikers] = useState<string[]>(post.likers ?? []);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pressed = likers.includes(OPERATOR_LIKER);
+  const ownPost = post.agent_slug === OPERATOR_LIKER;
+  const canToggle = feedWriteEnabled() && !ownPost;
+  const count = likers.length;
+  const names = likers.map((l) => (l === OPERATOR_LIKER ? 'you' : l));
+
+  async function toggle() {
+    if (!canToggle || busy) return;
+    const before = likers;
+    const next = !pressed;
+    setLikers(next ? [...before, OPERATOR_LIKER].sort() : before.filter((l) => l !== OPERATOR_LIKER));
+    setBusy(true);
+    setError(null);
+    try {
+      setLikers(await setOperatorLike(post, next));
+    } catch (err) {
+      setLikers(before);
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const title = !feedWriteEnabled()
+    ? 'Liking requires the authenticated console (read-only mirror)'
+    : ownPost
+      ? 'Your own post'
+      : pressed
+        ? 'Remove your like'
+        : 'Like';
+
+  return (
+    <div className="mt-3 pt-3 border-t border-wf-outline-variant">
+      <div className="flex items-center gap-3 min-w-0">
+        <button
+          type="button"
+          onClick={() => void toggle()}
+          disabled={!canToggle || busy}
+          aria-pressed={pressed}
+          aria-label={pressed ? `Remove like (${count})` : `Like (${count})`}
+          title={title}
+          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-wfmono text-[11px] uppercase tracking-[0.12em] transition-colors ${
+            pressed
+              ? 'border-wf-primary bg-wf-primary text-wf-on-primary'
+              : 'border-wf-outline-variant text-wf-on-surface-variant'
+          } ${canToggle ? (pressed ? 'hover:opacity-90' : 'hover:border-wf-primary hover:text-wf-primary') : 'cursor-default'} ${
+            busy ? 'opacity-70' : ''
+          }`}
+        >
+          <ThumbUpIcon filled={pressed} size={14} />
+          <span>{pressed ? 'Liked' : 'Like'}</span>
+          <span className="tabular-nums">{count}</span>
+        </button>
+        {count > 0 && (
+          <span
+            className="text-[12px] text-wf-on-surface-variant truncate"
+            title={names.join(', ')}
+          >
+            {names.slice(0, 3).join(', ')}
+            {count > 3 ? ` +${count - 3}` : ''}
+          </span>
+        )}
+      </div>
+      {error && (
+        <div role="alert" className="mt-2 font-wfmono text-[10px] text-wf-error">
+          Like failed: {error}
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface Props {
@@ -144,6 +230,8 @@ export default function PostCard({ post, agent, hidePersona = false }: Props) {
             Injected into every agent fire · composition layer 2.5
           </div>
         )}
+
+        <LikeBar post={post} />
       </article>
     );
   }
@@ -244,6 +332,8 @@ export default function PostCard({ post, agent, hidePersona = false }: Props) {
           ))}
         </div>
       )}
+
+      <LikeBar post={post} />
     </article>
   );
 }
