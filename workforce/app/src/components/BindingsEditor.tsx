@@ -60,7 +60,7 @@ function newCcrBinding(skill: string, cron: string, projectId: string): AgentBin
     },
     routine_spec: 'workforce/docs/routines/agent-runner.md',
     project_id: projectId,
-    note: `Bound from the console on ${new Date().toISOString().slice(0, 10)}.`,
+    note: `Assigned from the console on ${new Date().toISOString().slice(0, 10)}.`,
     // Epic-021 Story 4 follow-up (issue 574): this is the console's
     // "bind a new skill" path — always an append (line below), never a
     // replace — so stamping bound_at here is exact.
@@ -106,12 +106,12 @@ function UnbindDialog({
         className="max-w-md w-full bg-wf-surface border border-wf-outline-variant rounded-wf-md p-6"
       >
         <h2 id={titleId} className="font-wfmono text-xs uppercase tracking-[0.14em] text-wf-on-surface-variant mb-3">
-          Confirm unbind
+          Confirm unassign
         </h2>
         <p className="text-sm text-wf-on-surface leading-relaxed mb-6">
-          Unbind <span className="font-wfmono">{skill}</span> from this agent. Its scheduled runs
-          stop on the next orchestrator tick; the agent’s other bindings keep firing. You can
-          re-bind it later from this panel. Continue?
+          Unassign <span className="font-wfmono">{skill}</span> from this agent. Its scheduled runs
+          stop on the next orchestrator tick; the agent’s other assignments keep firing. You can
+          re-assign it later from this panel. Continue?
         </p>
         <div className="flex items-center justify-end gap-3">
           <button
@@ -129,7 +129,7 @@ function UnbindDialog({
             disabled={pending}
             className="font-wfmono text-[10px] uppercase tracking-[0.14em] px-3 py-2 border rounded-wf-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-wf-error/60 text-wf-error hover:bg-wf-error hover:text-wf-surface"
           >
-            Execute unbind
+            Execute unassign
           </button>
         </div>
       </div>
@@ -182,7 +182,7 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
       .catch((err) => {
         if (cancelled) return;
         setBindableSkills('error');
-        setError(`could not load bindable skills: ${err instanceof Error ? err.message : String(err)}`);
+        setError(`could not load assignable skills: ${err instanceof Error ? err.message : String(err)}`);
       });
     return () => {
       cancelled = true;
@@ -258,7 +258,7 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
 
   function unbind(idx: number) {
     const next = bindings.filter((_, i) => i !== idx);
-    void write(next, `${bindings[idx]!.skill} unbound`);
+    void write(next, `${bindings[idx]!.skill} unassigned`);
   }
 
   function addBinding() {
@@ -273,7 +273,7 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
     }
     void write(
       [...bindings, newCcrBinding(addSkill, cron, addProject.trim() || selfProjectId(slug))],
-      `${addSkill} bound — next orchestrator tick picks it up`,
+      `${addSkill} assigned — next orchestrator tick picks it up`,
     );
   }
 
@@ -287,7 +287,7 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
     <section className="border border-wf-outline-variant bg-wf-surface-container-lo rounded-wf-md">
       <div className="border-b border-wf-outline-variant px-4 py-3 flex items-center justify-between gap-3">
         <span className="font-wfmono text-[10px] uppercase tracking-[0.14em] text-wf-on-surface-variant">
-          BINDINGS <span className="text-wf-on-surface">{bindings.length} cron×skill</span>
+          ASSIGNMENTS <span className="text-wf-on-surface">{bindings.length} cron×skill</span>
         </span>
         {SIGV4_IS_CONFIGURED && (
           <button
@@ -296,7 +296,7 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
             onClick={() => { setAdding((v) => !v); setError(null); }}
             className={`${btnCls} border-wf-outline-variant text-wf-on-surface hover:border-wf-on-surface-variant`}
           >
-            {adding ? 'CANCEL' : '+ BIND SKILL'}
+            {adding ? 'CANCEL' : '+ ASSIGN SKILL'}
           </button>
         )}
       </div>
@@ -386,7 +386,7 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
                     onClick={() => { setConfirmUnbind(idx); setError(null); }}
                     className={`${btnCls} border-wf-outline-variant text-wf-on-surface-variant hover:border-wf-error hover:text-wf-error`}
                   >
-                    UNBIND
+                    UNASSIGN
                   </button>
                 </span>
               )}
@@ -394,7 +394,7 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
           );
         })}
         {bindings.length === 0 && (
-          <li className="px-4 py-3 text-sm text-wf-on-surface-variant">No bindings — this agent has no scheduled cadence.</li>
+          <li className="px-4 py-3 text-sm text-wf-on-surface-variant">No assignments — this agent has no scheduled work.</li>
         )}
       </ul>
 
@@ -412,7 +412,7 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
                 value={addSkill}
                 onChange={(e) => setAddSkill(e.target.value)}
                 disabled={bindableSkills === null || skillList.length === 0}
-                aria-label="skill to bind"
+                aria-label="skill to assign"
               >
                 {bindableSkills === null && <option value="">loading…</option>}
                 {Array.isArray(bindableSkills) && skillList.length === 0 && (
@@ -453,7 +453,7 @@ export default function BindingsEditor({ slug, bindings, onUpdated }: Props) {
                 placeholder={selfProjectId(slug)}
               />
             )}
-            <button type="button" disabled={pending || !addSkill} onClick={addBinding} className={`${btnCls} border-wf-tertiary text-wf-tertiary`}>BIND</button>
+            <button type="button" disabled={pending || !addSkill} onClick={addBinding} className={`${btnCls} border-wf-tertiary text-wf-tertiary`}>ASSIGN</button>
           </div>
           <span className="text-[10px] text-wf-on-surface-variant">{CRON_HINT}</span>
         </div>

@@ -71,19 +71,19 @@ describe('archiveConfirmMessage', () => {
   it('warns with the bound-agent count and slugs when agents are still bound', () => {
     const msg = archiveConfirmMessage('feed-post', ['elena', 'dario']);
     expect(msg).toContain('Archive skill "feed-post"?');
-    expect(msg).toContain('Still bound to 2 agents (elena, dario)');
+    expect(msg).toContain('Still assigned to 2 agents (elena, dario)');
     expect(msg).toContain('archiving does NOT stop execution');
-    expect(msg).toContain('Unbind to stop the runs.');
+    expect(msg).toContain('Unassign to stop the runs.');
   });
 
   it('uses the singular form for one bound agent', () => {
     const msg = archiveConfirmMessage('pr-autopilot', ['nadia']);
-    expect(msg).toContain('Still bound to 1 agent (nadia)');
+    expect(msg).toContain('Still assigned to 1 agent (nadia)');
   });
 
   it('states explicitly when nothing is bound', () => {
     const msg = archiveConfirmMessage('orphan-skill', []);
-    expect(msg).toContain('No agents are currently bound to this skill.');
-    expect(msg).not.toContain('Still bound');
+    expect(msg).toContain('No agents are currently assigned this skill.');
+    expect(msg).not.toContain('Still assigned');
   });
 });

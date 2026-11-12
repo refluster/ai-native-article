@@ -74,9 +74,11 @@ const ACTIVITY_LIMIT = 30;
 
 // The profile splits into meaning-level tabs (operator direction 2026-07-03,
 // LinkedIn-style IA): identity reads in OVERVIEW, the run/deliverable record
-// in ACTIVITY, the voice in POSTS, the wiring in BINDINGS. The active tab
+// in ACTIVITY, the voice in POSTS, the work an agent is assigned in ASSIGNMENTS. The active tab
 // lives in the URL (?tab=) so deep links and refreshes keep their place.
-const TABS = ['overview', 'activity', 'posts', 'bindings'] as const;
+// The tab was BINDINGS until workforce/adr-0050 (2026-11-12) made
+// "assignment" the canonical term; old `?tab=bindings` links still land on it.
+const TABS = ['overview', 'activity', 'posts', 'assignments'] as const;
 type Tab = (typeof TABS)[number];
 
 function formatRelative(iso: string): string {
@@ -94,7 +96,8 @@ export default function AgentProfile() {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get('tab');
-  const tab: Tab = (TABS as readonly string[]).includes(rawTab ?? '') ? (rawTab as Tab) : 'overview';
+  const normTab = rawTab === 'bindings' ? 'assignments' : rawTab;
+  const tab: Tab = (TABS as readonly string[]).includes(normTab ?? '') ? (normTab as Tab) : 'overview';
   const setTab = (next: Tab) => {
     if (next === 'overview') searchParams.delete('tab');
     else searchParams.set('tab', next);
@@ -408,7 +411,7 @@ export default function AgentProfile() {
 
       {tab === 'posts' && slug && <RecentPostsSection slug={slug} />}
 
-      {tab === 'bindings' && (
+      {tab === 'assignments' && (
         <div className="space-y-6">
           <BindingsEditor
             slug={agent.slug}

@@ -445,9 +445,9 @@ function SkillFileView({ file }: { file: SkillFile }) {
 export function archiveConfirmMessage(name: string, boundAgents: string[]): string {
   const bindingWarning =
     boundAgents.length > 0
-      ? `⚠ Still bound to ${boundAgents.length} agent${boundAgents.length === 1 ? '' : 's'} (${boundAgents.join(', ')}) — archiving does NOT stop execution. Unbind to stop the runs.`
-      : 'No agents are currently bound to this skill.'
-  return `Archive skill "${name}"? It disappears from the default list and new bindings are rejected; its run/deliverable history stays intact.\n\n${bindingWarning}`
+      ? `⚠ Still assigned to ${boundAgents.length} agent${boundAgents.length === 1 ? '' : 's'} (${boundAgents.join(', ')}) — archiving does NOT stop execution. Unassign to stop the runs.`
+      : 'No agents are currently assigned this skill.'
+  return `Archive skill "${name}"? It disappears from the default list and new assignments are rejected; its run/deliverable history stays intact.\n\n${bindingWarning}`
 }
 
 // ─── Lifecycle controls: rename display label + archive/unarchive ─────────

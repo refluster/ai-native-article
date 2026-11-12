@@ -65,7 +65,7 @@ afterEach(() => {
 });
 
 function openAddForm() {
-  fireEvent.click(screen.getByRole('button', { name: /BIND SKILL/i }));
+  fireEvent.click(screen.getByRole('button', { name: /ASSIGN SKILL/i }));
 }
 
 describe('BindingsEditor — add-binding project_id (issue GH-736)', () => {
@@ -107,11 +107,11 @@ describe('BindingsEditor — add-binding project_id (issue GH-736)', () => {
 
     // Skill select is populated from fetchBindableSkills.
     await waitFor(() =>
-      expect(screen.getByRole('combobox', { name: /skill to bind/i })).toBeInTheDocument(),
+      expect(screen.getByRole('combobox', { name: /skill to assign/i })).toBeInTheDocument(),
     );
     await screen.findByRole('combobox', { name: /project id/i });
 
-    fireEvent.click(screen.getByRole('button', { name: /^BIND$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ASSIGN$/i }));
 
     await waitFor(() => expect(patchAgentBindingsMock).toHaveBeenCalledTimes(1));
     const [, sentBindings] = patchAgentBindingsMock.mock.calls[0] as [string, AgentBinding[]];
@@ -127,10 +127,10 @@ describe('BindingsEditor — add-binding project_id (issue GH-736)', () => {
     const projectSelect = await screen.findByRole('combobox', { name: /project id/i });
     fireEvent.change(projectSelect, { target: { value: 'asp-cloud' } });
     await waitFor(() =>
-      expect(screen.getByRole('combobox', { name: /skill to bind/i })).toBeInTheDocument(),
+      expect(screen.getByRole('combobox', { name: /skill to assign/i })).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /^BIND$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ASSIGN$/i }));
 
     await waitFor(() => expect(patchAgentBindingsMock).toHaveBeenCalledTimes(1));
     const [, sentBindings] = patchAgentBindingsMock.mock.calls[0] as [string, AgentBinding[]];
