@@ -2,9 +2,11 @@
 //
 // Pins: window filtering of AUDIT items, grouped markdown rendering
 // (including legible digested system_prompt diffs), the quiet-week shape
-// (no issue, export still runs), and the fail-loud delivery contract.
+// (no issue, export still runs), the fail-loud delivery contract, and
+// org-graph validation (FU-022: cycle + dangling edge detection).
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AgentMetaRow } from "../shared/agent.js";
 
 process.env.STAGE = "test";
 process.env.TABLE_ARN = "arn:aws:dynamodb:us-west-2:123456789012:table/wf-table-test";
@@ -47,7 +49,7 @@ vi.mock("../shared/github.js", () => ({
   createIssue: (...args: unknown[]) => createIssue(...args),
 }));
 
-const { handler } = await import("./handler.js");
+const { handler, checkOrgGraph } = await import("./handler.js");
 
 const NOW = Date.now();
 const daysAgo = (d: number) => new Date(NOW - d * 24 * 60 * 60 * 1000).toISOString();
@@ -198,5 +200,154 @@ describe("wf-config-digest", () => {
       ExportFormat: "DYNAMODB_JSON",
     });
     expect((exportCalls[0] as { S3Prefix: string }).S3Prefix).toMatch(/^exports\/test\/\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("org_violations=0 on a clean roster (quiet week)", async () => {
+    seedAgent("alice");
+    rows.find((r) => r.pk === "AGENT#alice")!.reports_to = [];
+    const res = await handler();
+    expect(res.status).toBe("empty");
+    expect(res.org_violations).toBe(0);
+  });
+});
+
+// ── checkOrgGraph unit tests (FU-022) ────────────────────────────────────
+
+function makeAgents(defs: Array<{ slug: string; reports_to?: string[]; lateral?: string[] }>): ReadonlyMap<string, AgentMetaRow> {
+  const m = new Map<string, AgentMetaRow>();
+  for (const d of defs) {
+    m.set(d.slug, {
+      pk: `AGENT#${d.slug}`,
+      sk: "META",
+      slug: d.slug,
+      paused: false,
+      archived: false,
+      created_at: "2026-01-01T00:00:00.000Z",
+      reports_to: d.reports_to ?? [],
+      lateral: d.lateral ?? [],
+    } as AgentMetaRow);
+  }
+  return m;
+}
+
+describe("checkOrgGraph", () => {
+  it("returns empty on a clean roster", () => {
+    const agents = makeAgents([
+      { slug: "alice", reports_to: ["bob"] },
+      { slug: "bob", reports_to: [] },
+      { slug: "cara", reports_to: ["bob"], lateral: ["alice"] },
+    ]);
+    expect(checkOrgGraph(agents)).toEqual([]);
+  });
+
+  it("detects a dangling reports_to edge", () => {
+    const agents = makeAgents([
+      { slug: "alice", reports_to: ["ghost"] }, // ghost not in roster
+    ]);
+    const v = checkOrgGraph(agents);
+    expect(v).toHaveLength(1);
+    expect(v[0]).toMatchObject({ kind: "dangling", slug: "alice", field: "reports_to", edge: "ghost" });
+  });
+
+  it("detects a dangling lateral edge", () => {
+    const agents = makeAgents([
+      { slug: "alice", lateral: ["nobody"] },
+    ]);
+    const v = checkOrgGraph(agents);
+    expect(v).toHaveLength(1);
+    expect(v[0]).toMatchObject({ kind: "dangling", slug: "alice", field: "lateral", edge: "nobody" });
+  });
+
+  it("detects a two-node cycle in reports_to", () => {
+    const agents = makeAgents([
+      { slug: "alice", reports_to: ["bob"] },
+      { slug: "bob", reports_to: ["alice"] },
+    ]);
+    const v = checkOrgGraph(agents);
+    const cycles = v.filter((x) => x.kind === "cycle");
+    expect(cycles.length).toBeGreaterThanOrEqual(1);
+    const path = cycles[0]!.cycle_path!;
+    expect(path[0]).toBe(path[path.length - 1]); // closed path
+  });
+
+  it("detects a three-node cycle in reports_to", () => {
+    const agents = makeAgents([
+      { slug: "a", reports_to: ["b"] },
+      { slug: "b", reports_to: ["c"] },
+      { slug: "c", reports_to: ["a"] },
+    ]);
+    const v = checkOrgGraph(agents);
+    const cycles = v.filter((x) => x.kind === "cycle");
+    expect(cycles.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("does NOT flag a cycle in lateral edges (bidirectional by design)", () => {
+    const agents = makeAgents([
+      { slug: "alice", lateral: ["bob"] },
+      { slug: "bob", lateral: ["alice"] },
+    ]);
+    const v = checkOrgGraph(agents);
+    expect(v.filter((x) => x.kind === "cycle")).toHaveLength(0);
+  });
+
+  it("reports both dangling and cycle in the same roster", () => {
+    const agents = makeAgents([
+      { slug: "alice", reports_to: ["bob"], lateral: ["ghost"] },
+      { slug: "bob", reports_to: ["alice"] }, // alice ↔ bob cycle
+    ]);
+    const v = checkOrgGraph(agents);
+    expect(v.some((x) => x.kind === "dangling" && x.edge === "ghost")).toBe(true);
+    expect(v.some((x) => x.kind === "cycle")).toBe(true);
+  });
+});
+
+describe("wf-config-digest — org-graph integration (FU-022)", () => {
+  beforeEach(() => {
+    rows.length = 0;
+    exportCalls.length = 0;
+    createIssue.mockReset();
+    createIssue.mockResolvedValue({ number: 43, url: "https://github.com/x/y/issues/43" });
+  });
+
+  it("quiet week with dangling edge: creates issue even with zero mutations", async () => {
+    rows.push({ pk: "AGENT#alice", sk: "META", slug: "alice", reports_to: ["ghost"], lateral: [], paused: false, archived: false, created_at: "2026-01-01T00:00:00.000Z" });
+
+    const res = await handler();
+
+    expect(res.status).toBe("delivered");
+    expect(res.mutations).toBe(0);
+    expect(res.org_violations).toBe(1);
+    expect(createIssue).toHaveBeenCalledTimes(1);
+    const { title, body } = createIssue.mock.calls[0]![0] as { title: string; body: string };
+    expect(title).toContain("⚠️");
+    expect(body).toContain("dangling");
+    expect(body).toContain("alice.reports_to");
+    expect(body).toContain("ghost");
+  });
+
+  it("mutations week with violations: title has ⚠️ and body has violations section before mutation sections", async () => {
+    rows.push({ pk: "AGENT#alice", sk: "META", slug: "alice", reports_to: ["bob"], lateral: [], paused: false, archived: false, created_at: "2026-01-01T00:00:00.000Z" });
+    // bob not in roster → dangling
+    seedAudit("alice", daysAgo(1), [{ field: "paused", before: false, after: true }]);
+
+    const res = await handler();
+
+    expect(res.org_violations).toBe(1);
+    const body = (createIssue.mock.calls[0]![0] as { body: string }).body;
+    const violationsIdx = body.indexOf("## ⚠️ Org-graph violations");
+    const mutationsIdx = body.indexOf("## alice —");
+    expect(violationsIdx).toBeGreaterThan(-1);
+    expect(mutationsIdx).toBeGreaterThan(-1);
+    expect(violationsIdx).toBeLessThan(mutationsIdx); // violations section comes first
+  });
+
+  it("clean quiet week: no issue, org_violations=0", async () => {
+    rows.push({ pk: "AGENT#alice", sk: "META", slug: "alice", reports_to: [], lateral: [], paused: false, archived: false, created_at: "2026-01-01T00:00:00.000Z" });
+
+    const res = await handler();
+
+    expect(res.status).toBe("empty");
+    expect(res.org_violations).toBe(0);
+    expect(createIssue).not.toHaveBeenCalled();
   });
 });
