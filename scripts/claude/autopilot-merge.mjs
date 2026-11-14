@@ -1,237 +1,80 @@
 #!/usr/bin/env node
 // The merge gate for the session-run pr-autopilot lane
 // (docs/adr/adr-0009-session-run-autopilot-lane.md; governance.md §4.4).
-//
-// The only path by which a Claude Code session merges a PR. It decides
-// nothing itself: it hands one `merge` decision to the workforce's fail-closed
-// engine `workforce/skills/pr-autopilot/pr-merge.mjs` (the cron lane's engine),
-// which re-reads the live PR and refuses unless the §4.4 / R-N10 predicate
-// holds. Before that the gate adds the two checks the session lane needs and
-// the engine does not make:
-//   - R-N10 clause 3: the nadia × pr-autopilot × agent-workforce binding is
-//     armed (agents-api; unreadable → refuse);
-//   - head-pinned panel: each reviewer's latest review is 🟢 on the PR's
-//     current head commit (the engine counts green markers from any cycle).
-// After a merge it removes stale `autopilot:reason:*` labels and records the
-// engagement (R-N10 clause 4).
+// The only path by which a Claude Code session merges a PR.
 //
 //   node scripts/claude/autopilot-merge.mjs 1234 --reviewers dario,ren,farah
 //   node scripts/claude/autopilot-merge.mjs 1234 --reviewers dario,ren,farah --dry-run
 //
-// Gate and engine both run from `origin/main`: the gate fetches main into a
-// throw-away repo (the caller's clone is not touched) and, when main carries a
-// different copy of this file, re-executes that copy. A PR cannot change the
-// code that judges it.
-// Credential: the workforce project PAT from AWS Secrets Manager
-// (`wf/projects/agent-workforce/github.token`), passed to children through the
-// environment only; never printed.
+// This file is a launcher and deliberately imports nothing from the working
+// tree (only node: built-ins): the working tree is usually the PR's own
+// branch. It fetches origin/main into a throw-away repo — the caller's clone
+// is not touched — extracts the gate core, its ../lib and the workforce
+// engine, and runs main's `scripts/claude/autopilot-gate-core.mjs`. All the
+// checks live there, so a PR cannot change the code that judges it.
 //
-// Exit: 0 merged (or dry-run eligible) · 2 refused by the engine or a gate
-// check (no merge made) · 1 setup / infrastructure error.
-import { ensureProxyAwareEntry } from "../lib/proxy-bootstrap.mjs";
-ensureProxyAwareEntry(import.meta.url);
+// Before ADR-0009 is on main there is no core to run: the launcher refuses a
+// live merge and allows only `--dry-run` against the local core.
+//
+// Exit: the core's (0 merged / eligible · 2 refused · 1 setup error);
+// 1 when main cannot be fetched.
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { MIN_REVIEWERS, REPO, gateExitFor, headPinnedPanel, killSwitchArmed, parseReviewers, tokenFromSecretString } from "../lib/autopilot-session.mjs";
 
-const SELF = fileURLToPath(import.meta.url);
-const REPO_ROOT = resolve(dirname(SELF), "..", "..");
-const SECRET_ID = process.env.WF_GITHUB_SECRET_ID || "wf/projects/agent-workforce/github.token";
-const REGION = process.env.WF_AWS_REGION || "us-west-2";
-const WF_API = (process.env.WF_API_BASE || "https://workforce-api.kohuehara.xyz").replace(/\/$/, "");
-const ENGINE_PATHS = ["workforce/skills/pr-autopilot", "workforce/scripts/lib", "workforce/scripts/record-engagement.mjs",
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const CORE = "scripts/claude/autopilot-gate-core.mjs";
+const PATHS = ["workforce/skills/pr-autopilot", "workforce/scripts/lib", "workforce/scripts/record-engagement.mjs",
   "workforce/projects", "scripts/lib", "scripts/claude"];
-const ENGINE = "workforce/skills/pr-autopilot/pr-merge.mjs";
-const FROM_MAIN = "AUTOPILOT_GATE_FROM_MAIN";
 
-class GateError extends Error {
-  constructor(msg, code = 1) { super(msg); this.code = code; }
-}
-const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { encoding: "utf8", maxBuffer: 64 << 20, ...opts });
-const tail = (s, n = 200) => String(s ?? "").trim().split("\n").pop()?.slice(0, n) ?? "";
+const run = (cmd, args) => spawnSync(cmd, args, { encoding: "utf8", maxBuffer: 64 << 20 });
+const tail = (s) => String(s ?? "").trim().split("\n").pop()?.slice(0, 200) ?? "";
+const prArg = process.argv.slice(2).find((a) => /^\d+$/.test(a)) ?? "?";
+const say = (msg) => console.log(`#${prArg} ✋ gate: ${msg}`);
 
-function parseArgs(argv) {
-  const out = { pr: null, reviewers: null, dryRun: false };
-  for (let i = 2; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--reviewers") out.reviewers = argv[++i] ?? "";
-    else if (a === "--dry-run") out.dryRun = true;
-    else if (/^\d+$/.test(a) && out.pr === null) out.pr = Number(a);
-    else throw new GateError(`unknown argument "${a}"`); // a typo must never mean "live merge"
-  }
-  if (!out.pr || out.reviewers === null) throw new GateError("usage: autopilot-merge.mjs <PR> --reviewers a,b,c [--dry-run]");
-  return out;
-}
-
-// main → a fresh throw-away repo, then the engine paths extracted into `dest`.
 function fetchMain(dest) {
   const origin = run("git", ["-C", REPO_ROOT, "remote", "get-url", "origin"]).stdout.trim();
-  if (!origin) throw new GateError("cannot resolve the origin remote");
+  if (!origin) return "cannot resolve the origin remote";
   const git = join(dest, "main.git");
   for (const step of [["init", "-q", "--bare", git], ["-C", git, "fetch", "-q", "--depth=1", origin, "main"]]) {
     const r = run("git", step);
-    if (r.status !== 0) throw new GateError(`git ${step.includes("fetch") ? "fetch of main" : "init"} failed: ${tail(r.stderr)}`);
+    if (r.status !== 0) return `git ${step[0] === "init" ? "init" : "fetch of main"} failed: ${tail(r.stderr)}`;
   }
-  const tar = join(dest, "engine.tar");
-  const a = run("git", ["-C", git, "archive", "-o", tar, "FETCH_HEAD", ...ENGINE_PATHS]);
-  if (a.status !== 0) {
-    // scripts/claude is absent on main until ADR-0009 lands; everything else must exist.
-    const b = run("git", ["-C", git, "archive", "-o", tar, "FETCH_HEAD", ...ENGINE_PATHS.filter((p) => p !== "scripts/claude")]);
-    if (b.status !== 0) throw new GateError(`git archive failed: ${tail(b.stderr)}`);
-  }
+  const tar = join(dest, "main.tar");
+  let a = run("git", ["-C", git, "archive", "-o", tar, "FETCH_HEAD", ...PATHS]);
+  if (a.status !== 0) a = run("git", ["-C", git, "archive", "-o", tar, "FETCH_HEAD", ...PATHS.filter((p) => p !== "scripts/claude")]);
+  if (a.status !== 0) return `git archive failed: ${tail(a.stderr)}`;
   const x = run("tar", ["-xf", tar, "-C", dest]);
-  if (x.status !== 0) throw new GateError(`tar failed: ${tail(x.stderr)}`);
+  return x.status === 0 ? null : `tar failed: ${tail(x.stderr)}`;
 }
 
-function resolveToken() {
-  const r = run("aws", ["secretsmanager", "get-secret-value", "--region", REGION, "--secret-id", SECRET_ID,
-    "--query", "SecretString", "--output", "text"]);
-  if (r.status !== 0) throw new GateError(`cannot read ${SECRET_ID} from Secrets Manager (${tail(r.stderr, 160)})`);
-  const token = tokenFromSecretString(r.stdout.trim());
-  if (!token) throw new GateError(`${SECRET_ID} has no "token" field`);
-  return token;
-}
-
-// Run a snippet against the engine module. argv[1] is a placeholder so the
-// engine's "am I the entry point?" check (argv[1] === its path) stays false;
-// the snippet reads argv[2] = engine path, argv[3..] = its arguments.
-function engineSnippet(env, engine, code, ...rest) {
-  return run(process.execPath, ["--disable-warning=UNDICI-EHPA", "--input-type=module", "-e", code, "--", "_", engine, ...rest], { env });
-}
-function lastJson(stdout) {
-  try { return JSON.parse(String(stdout).trim().split("\n").pop()); } catch { return null; }
-}
-
-const READ_PR = `
-  const m = await import(process.argv[2]);
-  const gh = m.makeGh({ token: process.env.TOKEN, userAgent: "session-merge-gate" });
-  const repo = process.argv[3], n = process.argv[4];
-  let p = {};
-  for (let i = 0; i < 12; i++) {           // mergeability is computed lazily: settle ≤ ~60 s
-    const r = await gh("GET", "/repos/" + repo + "/pulls/" + n);
-    if (r.status !== 200) { console.log(JSON.stringify({ error: "GET pull HTTP " + r.status })); process.exit(0); }
-    p = r.json;
-    if (p.mergeable !== null) break;
-    await new Promise((s) => setTimeout(s, 5000));
-  }
-  const comments = [];
-  for (let page = 1; page <= 20; page++) {
-    const r = await gh("GET", "/repos/" + repo + "/issues/" + n + "/comments?per_page=100&page=" + page);
-    if (r.status !== 200) { console.log(JSON.stringify({ error: "GET comments HTTP " + r.status })); process.exit(0); }
-    comments.push(...r.json.map((c) => ({ body: c.body, created_at: c.created_at })));
-    if (r.json.length < 100) break;
-  }
-  console.log(JSON.stringify({ title: p.title, state: p.state, draft: p.draft, head: p.head?.sha, comments }));`;
-
-const AFTER_MERGE = `
-  const m = await import(process.argv[2]);
-  const gh = m.makeGh({ token: process.env.TOKEN, userAgent: "session-merge-gate" });
-  const repo = process.argv[3], n = process.argv[4];
-  const r = await gh("GET", "/repos/" + repo + "/issues/" + n + "/labels");
-  const stale = (r.json || []).map((l) => l.name).filter((x) => x.startsWith("autopilot:reason:") || x === "autopilot:needs-author");
-  for (const name of stale) await gh("DELETE", "/repos/" + repo + "/issues/" + n + "/labels/" + encodeURIComponent(name));
-  await m.ensureLabels(gh, repo, ["autopilot:merged"]);
-  const a = await gh("POST", "/repos/" + repo + "/issues/" + n + "/labels", { labels: ["autopilot:merged"] });
-  console.log(JSON.stringify({ removed: stale, labelled: a.status === 200 }));`;
-
-async function gate({ pr, reviewers, dryRun }, tmp) {
-  if (reviewers.length < MIN_REVIEWERS) throw new GateError(`${reviewers.length} reviewer(s) given; the panel needs ≥ ${MIN_REVIEWERS}`);
-
-  const engineDir = process.env[FROM_MAIN] || tmp;
-  if (!process.env[FROM_MAIN]) {
-    fetchMain(tmp);
-    // Run main's copy of this gate when it differs from ours (a PR cannot edit its own judge).
-    const mainGate = join(tmp, "scripts/claude/autopilot-merge.mjs");
-    if (existsSync(mainGate) && readFileSync(mainGate, "utf8") !== readFileSync(SELF, "utf8")) {
-      const r = spawnSync(process.execPath, [mainGate, ...process.argv.slice(2)],
-        { stdio: "inherit", env: { ...process.env, [FROM_MAIN]: tmp }, cwd: REPO_ROOT });
-      return r.status ?? 1;
+const tmp = mkdtempSync(join(tmpdir(), "wf-gate-"));
+let code = 1;
+try {
+  const err = fetchMain(tmp);
+  if (err) {
+    say(err);
+  } else {
+    let core = join(tmp, CORE);
+    if (!existsSync(core)) {
+      // Bootstrap: main does not carry the lane yet (ADR-0009 unmerged).
+      if (!process.argv.includes("--dry-run")) {
+        say("main does not carry the gate yet (ADR-0009 not merged); only --dry-run is allowed");
+        core = null;
+      } else {
+        core = join(REPO_ROOT, CORE);
+        console.log(`#${prArg} ℹ bootstrap: main has no gate core yet — dry-run uses the local one`);
+      }
+    }
+    if (core) {
+      const r = spawnSync(process.execPath, [core, ...process.argv.slice(2)],
+        { stdio: "inherit", env: { ...process.env, AUTOPILOT_GATE_FROM_MAIN: tmp }, cwd: REPO_ROOT });
+      code = r.status ?? 1;
     }
   }
-
-  // R-N10 clause 3: the per-binding kill-switch.
-  let agent = null;
-  try {
-    const res = await fetch(`${WF_API}/agents/nadia`, { signal: AbortSignal.timeout(15000) });
-    if (res.ok) agent = await res.json();
-  } catch { /* unreadable → fail closed below */ }
-  const ks = killSwitchArmed(agent);
-  if (!ks.ok) throw new GateError(`kill-switch off (R-N10 clause 3): ${ks.why}`, agent ? 2 : 1);
-
-  const token = resolveToken();
-  const engine = join(engineDir, ENGINE);
-  const env = { ...process.env, TOKEN: token, GITHUB_TOKEN: token };
-  if (env.HTTPS_PROXY || env.https_proxy) env.NODE_USE_ENV_PROXY = "1"; // R-14 for the children
-
-  const live = lastJson(engineSnippet(env, engine, READ_PR, REPO, String(pr)).stdout);
-  if (!live || live.error || !live.title) throw new GateError(`cannot read the PR (${live?.error ?? "engine error"})`);
-  if (live.state !== "open") throw new GateError(`PR is ${live.state}`, 2);
-
-  const panel = headPinnedPanel(live.comments, reviewers, live.head);
-  if (!panel.ok) {
-    console.log(`#${pr} ⛔ gate refused (head-pinned panel): ${panel.why}`);
-    return 2;
-  }
-
-  if (dryRun) {
-    const v = lastJson(engineSnippet(env, engine, `
-      const m = await import(process.argv[2]);
-      const gh = m.makeGh({ token: process.env.TOKEN, userAgent: "session-merge-gate" });
-      const v = await m.verifyMergeable(gh, process.argv[3], Number(process.argv[4]), { reviewers: process.argv[5].split(",") });
-      console.log(JSON.stringify(v));`, REPO, String(pr), reviewers.join(",")).stdout);
-    if (!v) throw new GateError("engine error during dry-run");
-    const draft = v.ok && live.draft ? " (draft: the real run must un-draft it first, which can fail)" : "";
-    console.log(`#${pr} ${v.ok ? "✅ eligible" : "⛔ not eligible"}: ${v.why}${draft}`);
-    return v.ok ? 0 : 2;
-  }
-
-  const list = reviewers.map((r) => "`wf:" + r + "`").join(", ");
-  const dfile = join(tmp, "decisions.json");
-  writeFileSync(dfile, JSON.stringify({ decisions: [{
-    pr, action: "merge", reviewers,
-    comment: `Autopilot merge (session-run lane, docs/adr/adr-0009): unanimous green from ${list} on head ` +
-      `\`${live.head.slice(0, 7)}\`; no L0/L1 surface; the predicate was re-verified by the workforce engine ` +
-      "`pr-merge.mjs` (origin/main) immediately before this merge.",
-    squash_subject: `${live.title} (#${pr})`,
-    squash_body: `Unanimous reviewer sign-off (${reviewers.join(", ")}). No L0/L1 surface. Session-run lane (ADR-0009).`,
-  }] }));
-  const r = run(process.execPath, ["--disable-warning=UNDICI-EHPA", engine, "--repo", REPO, "--decisions", dfile], { env });
-  const result = lastJson(r.stdout) || {};
-  const code = gateExitFor(r.status, result.merged === 1);
-  if (code === 2) {
-    const why = (r.stderr || "").split("\n").find((l) => /REFUSE|REJECTED/.test(l)) || tail(r.stderr, 300);
-    console.log(`#${pr} ⛔ engine refused: ${why}`);
-    return 2;
-  }
-  if (code === 1) throw new GateError(`engine failed (exit ${r.status ?? "signal"}): ${tail(r.stderr, 300)}`);
-
-  console.log(`#${pr} ✅ merged by the engine (reviewers: ${reviewers.join(", ")})`);
-  const after = lastJson(engineSnippet(env, engine, AFTER_MERGE, REPO, String(pr)).stdout);
-  if (!after?.labelled) console.log(`#${pr} ⚠ merged, but the autopilot:merged label was not applied`);
-  const eng = run(process.execPath, [join(engineDir, "workforce/scripts/record-engagement.mjs"),
-    "--agent", "nadia", "--skill", "pr-autopilot", "--project", "agent-workforce", "--status", "ok",
-    "--summary", `Session-run lane merged #${pr} (external-pr-merge) after unanimous green from ${reviewers.join(", ")}.`,
-    "--uri", `https://github.com/${REPO}/pull/${pr}`], { env: process.env });
-  if (eng.status !== 0) console.log(`#${pr} ⚠ merged, but the engagement was not recorded: ${tail(eng.stderr)}`);
-  return 0;
-}
-
-let exitCode = 1;
-let tmp = null;
-let pr = "?";
-try {
-  const a = parseArgs(process.argv);
-  pr = a.pr;
-  tmp = process.env[FROM_MAIN] ? null : mkdtempSync(join(tmpdir(), "wf-engine-"));
-  exitCode = await gate({ ...a, reviewers: parseReviewers(a.reviewers) }, tmp ?? process.env[FROM_MAIN]);
-} catch (e) {
-  if (!(e instanceof GateError)) throw e;
-  console.log(`#${pr} ✋ gate: ${e.message}`);
-  exitCode = e.code;
 } finally {
-  if (tmp) rmSync(tmp, { recursive: true, force: true });
+  rmSync(tmp, { recursive: true, force: true });
 }
-process.exit(exitCode);
+process.exit(code);

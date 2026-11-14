@@ -37,7 +37,7 @@ workforce/seed/         bootstrap data for hire groups and personas
 workforce/client/       drop-in package for external repos that outsource to the workforce
 .claude/skills/         session skills: article-health · cadence-forge · ship-pr · pr-autopilot-session · log-workforce-engagements · outsource-to-workforce
 .claude/settings.json   PostToolUse hook → pr-autopilot-session; direct-merge tools denied (ADR-0009)
-scripts/claude/         session hook + merge gate (post-pr-create.mjs, autopilot-merge.mjs)
+scripts/claude/         session hook + merge gate (post-pr-create.mjs; autopilot-merge.mjs launcher → main's autopilot-gate-core.mjs)
 ```
 
 `npm run` targets you will actually use: `build`, `dev` / `dev:workforce`, `test:scripts`, `lint:tokens`, `check-truncation`, `check-base-path`, `check-l1-citation`, `workforce:skills`, `workforce:naming`, `workforce:skill-registry:check`. CI runs all of them (see `.github/workflows/ci.yml`); the Lambdas have their own `npm run typecheck && npm test` under `workforce/lambdas/`.

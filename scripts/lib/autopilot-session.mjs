@@ -108,9 +108,10 @@ export function headPinnedPanel(comments, reviewers, headSha) {
   const head = String(headSha ?? "").toLowerCase();
   if (!/^[0-9a-f]{40}$/.test(head)) return { ok: false, why: "head commit unknown" };
   const bad = [];
+  let newestReviewAt = 0;
   for (const slug of reviewers) {
     const esc = slug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp(`^(🟢|🔴) \\*\\*${esc} — [^\\n]*?cycle \\d+ @ ([0-9a-f]{7,40})\\.\\*\\*`, "imu");
+    const re = new RegExp(`^(🟢|🔴) \\*\\*${esc} — [^\\n]*?cycle \\d+ @ ([0-9a-f]{7,40})\\.\\*\\*`, "iu"); // first line only
     let latest = null;
     for (const c of comments ?? []) {
       const m = re.exec(String(c?.body ?? ""));
@@ -118,19 +119,26 @@ export function headPinnedPanel(comments, reviewers, headSha) {
       const at = Date.parse(c?.created_at ?? "") || 0;
       if (!latest || at >= latest.at) latest = { at, emoji: m[1], sha: m[2].toLowerCase(), body: String(c.body) };
     }
+    if (latest) newestReviewAt = Math.max(newestReviewAt, latest.at);
     if (!latest) bad.push(`${slug}: no head-pinned review`);
     else if (latest.emoji !== "🟢") bad.push(`${slug}: latest review is 🔴`);
     else if (!latest.body.includes(`<!-- autopilot:review:${slug}:green -->`)) bad.push(`${slug}: latest review lacks the green marker`);
     else if (!head.startsWith(latest.sha)) bad.push(`${slug}: reviewed ${latest.sha.slice(0, 7)}, head is ${head.slice(0, 7)}`);
   }
-  return bad.length ? { ok: false, why: bad.join("; ") } : { ok: true, why: `head ${head.slice(0, 7)} reviewed green by ${reviewers.join(", ")}` };
+  if (bad.length) return { ok: false, why: bad.join("; ") };
+  return { ok: true, why: `head ${head.slice(0, 7)} reviewed green by ${reviewers.join(", ")}`, newestReviewAt };
 }
 
 /**
  * Workforce R-N10 clause 3 (per-binding kill-switch), read from agents-api
- * `GET /agents/nadia`: the routing agent is neither paused nor archived and
- * still holds the pr-autopilot binding for this repo's project. Anything
- * else — including an unreadable response — is "off" (fail closed).
+ * `GET /agents/nadia`. "Armed" means exactly what makes the cron lane fire:
+ * the agent is neither paused nor archived, and its pr-autopilot binding for
+ * this repo's project is orchestrator-owned (`isOrchestratorOwnedCcr` in
+ * workforce/lambdas/shared/agent.ts: executor claude-code-routine, trigger
+ * scheduler `external` + invoked_by `api`) with a cron. The operator's
+ * documented pause — `trigger.scheduler = "manual"` (runbooks/bindings.md) —
+ * or removing the binding therefore stops both lanes. Anything else,
+ * including an unreadable response, is "off" (fail closed).
  */
 export function killSwitchArmed(agent, { skill = "pr-autopilot", project = "agent-workforce" } = {}) {
   if (!agent || typeof agent !== "object") return { ok: false, why: "agents-api returned no agent" };
@@ -138,8 +146,25 @@ export function killSwitchArmed(agent, { skill = "pr-autopilot", project = "agen
   if (agent.archived) return { ok: false, why: "routing agent is archived" };
   const b = (agent.bindings ?? []).find((x) => x?.skill === skill && x?.project_id === project);
   if (!b) return { ok: false, why: `no ${skill} × ${project} binding` };
-  if (b.enabled === false || b.paused === true) return { ok: false, why: `${skill} × ${project} binding is disabled` };
+  const owned = b.executor === "claude-code-routine" && b.trigger?.scheduler === "external" && b.trigger?.invoked_by === "api";
+  if (!owned || !b.trigger?.cron) {
+    return { ok: false, why: `${skill} × ${project} binding is not orchestrator-fired (scheduler=${b.trigger?.scheduler ?? "?"})` };
+  }
   return { ok: true, why: "binding armed" };
+}
+
+/**
+ * The verdict step ran on the current panel: a `**Nadia — verdict, … 🟢 …**`
+ * comment carrying `<!-- autopilot:panel:isolated -->`, posted no earlier
+ * than the newest of the reviewers' latest reviews.
+ */
+export function greenVerdictAfter(comments, sinceMs) {
+  return (comments ?? []).some((c) => {
+    const body = String(c?.body ?? "");
+    return /^\*\*Nadia — verdict, cycle \d+ of[^\n]*🟢/u.test(body) &&
+      body.includes("<!-- autopilot:panel:isolated -->") &&
+      (Date.parse(c?.created_at ?? "") || 0) >= sinceMs;
+  });
 }
 
 /** Map the engine's exit status to the gate's: only a real refusal (2) is 2. */

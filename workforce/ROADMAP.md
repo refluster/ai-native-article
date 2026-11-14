@@ -5,7 +5,7 @@ Checklist of implementation milestones. Items are picked up one PR at a time by 
 **Rules:**
 - One `[ ]` item per PR. Mark `[x]` only after the PR merges to `main`.
 - Each item briefly states what to build, the acceptance criterion, and the Zone classification of the affected files.
-- No routine self-merges PRs; humans merge.
+- Merging follows root [governance.md §4.4](../docs/governance.md#44-autopilot-pr-merge--workforce-r-n10-delegation--l0l1-off-limits) (ADR-0009).
 
 ---
 

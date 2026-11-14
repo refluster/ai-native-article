@@ -98,7 +98,8 @@ After cycle 7, label `autopilot:needs-human` +
   node scripts/claude/autopilot-merge.mjs <PR> --reviewers <slug1>,<slug2>,<slug3>
   ```
 
-  The gate runs from `origin/main` (itself and the engine), checks the
+  The launcher runs *main's* gate core and engine (never the PR branch's),
+  which checks the
   binding kill-switch (R-N10 clause 3) and the head-pinned panel, reads the
   workforce PAT from Secrets Manager, and hands the merge to `pr-merge.mjs`,
   which re-verifies §4.4 against the live PR and refuses fail-closed. After a
@@ -109,6 +110,8 @@ After cycle 7, label `autopilot:needs-human` +
 - Exit 2 `⛔ engine refused`: the engine has stamped the reason label. If the
   reason is transient (`mergeable=null`, checks pending), wait and retry once;
   otherwise report the line and stop.
+- Exit 1 `✋ gate: agents-api unreachable`: if `WF_API_BASE` can point at a
+  reachable base (see `log-workforce-engagements`), retry once with it.
 - Exit 1 `✋ gate:` (setup or infrastructure): the PR must still end in a
   terminal state — label `autopilot:needs-human` +
   `autopilot:reason:merge-engine-refusal`, post the `✋` line as a comment,

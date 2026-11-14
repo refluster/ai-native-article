@@ -27,7 +27,7 @@ each query prefixed `repo:refluster/ai-native-article is:pr is:merged merged:>=2
 
 So agents already merge most PRs here, through one engine, under
 [governance.md §4.4](../governance.md#44-autopilot-pr-merge--workforce-r-n10-delegation--l0l1-off-limits).
-But four other texts still say an agent never merges, or restate a different
+But five other texts still say an agent never merges, or restate a different
 merge bar:
 
 1. `governance.md` §8.1 B — "Merging any PR, including the agent's own. Agent never self-merges."
@@ -39,6 +39,7 @@ merge bar:
 4. `.claude/skills/outsource-to-workforce` — "C-3 never self-merge … the merge
    is the human's act". C-3 is the single-operator-scale invariant; the label
    is wrong as well as the rule.
+5. `workforce/ROADMAP.md` rules — "No routine self-merges PRs; humans merge."
 
 None of these copies has ever stopped a merge the engine would have made; they
 only make the session lane look illegal and make every reader reconcile five
@@ -56,6 +57,7 @@ texts.
 - **R3.** CLAUDE.md's restatement is reduced to one pointer to §4.4.
 - **R4.** The outsource-to-workforce "C-3 never self-merge" line becomes a
   pointer to §4.4; its secret-read rule names the one exception below.
+- **R5.** The ROADMAP "humans merge" rule becomes a pointer to §4.4.
 
 **Add only what the removals need.**
 
@@ -67,15 +69,21 @@ texts.
   run under nadia's routing identity from a session; reviewers are isolated
   (one subagent per persona, ≥ 3).
 - **A2. One merge gate.** `scripts/claude/autopilot-merge.mjs` is the only
-  path by which a session merges. Gate and engine both run from `origin/main`
-  (fetched into a throw-away repo), never from the PR branch. Before handing
-  the decision to `pr-merge.mjs` the gate checks the two things the session
-  lane needs and the engine does not:
-  - **R-N10 clause 3**: the nadia × pr-autopilot × agent-workforce binding is
-    armed (agents-api; paused, archived, missing or unreadable → refuse), so
-    the workforce-side kill-switch stops both lanes;
+  path by which a session merges. It is a launcher that imports nothing from
+  the working tree: it fetches `origin/main` into a throw-away repo and runs
+  *main's* gate core (`scripts/claude/autopilot-gate-core.mjs`), whose
+  `../lib` imports and engine come from the same extract — so no PR, L0/L1 or
+  not, changes the code that judges it. Before handing the decision to
+  `pr-merge.mjs` the core checks what the session lane needs and the engine
+  does not:
+  - **R-N10 clause 3**: nadia's pr-autopilot × agent-workforce binding is
+    exactly what the cron fires (`isOrchestratorOwnedCcr` + a cron) and the
+    agent is neither paused nor archived. The operator's documented pause —
+    `trigger.scheduler = "manual"` — or removing the binding stops both lanes;
+    an unreadable agents-api refuses;
   - **head-pinned panel**: each reviewer's latest review is 🟢 *on the current
-    head commit*, so a push after a verdict always means a new cycle.
+    head commit*, followed by a 🟢 isolated-panel verdict, so a push after a
+    verdict always means a new cycle.
   After a merge it records the engagement (R-N10 clause 4) and stamps
   `autopilot:merged`.
 - **A3. Credential.** The gate reads the workforce's project PAT
@@ -96,14 +104,14 @@ engagement (clause 4).
 `.claude/skills/pr-autopilot-session/**`), so the lane can never merge a change
 to its own gate — the same reason §4.4 sits inside `docs/governance.md`.
 
-Net: **4 removals, 3 additions.** The merge rule has one text (§4.4) and one
+Net: **5 removals, 3 additions.** The merge rule has one text (§4.4) and one
 executor (`pr-merge.mjs`).
 
 ## Alternatives considered
 
 - **Review in the session, leave the merge to the cron.** Keeps every old
   text, but the PR still waits up to 6 h for a merge the engine would make
-  anyway, and the four contradictory copies stay.
+  anyway, and the five contradictory copies stay.
 - **Copy asp-cloud verbatim.** Its hook matches only `gh pr create`; in this
   repo's cloud sessions PRs are opened through the GitHub MCP, so it would
   never fire. Its gate reads the token from a local `gh` login that cloud
@@ -131,6 +139,14 @@ executor (`pr-merge.mjs`).
   PAT could still call the REST merge endpoint. The control is the gate plus
   the skill text, and the audit trail: every lane merge carries the engine's
   comment.
+- **Residual, engine-side gaps** (tracked in a follow-up issue, not fixed here
+  because they change the shared engine): the engine merges its own read of
+  the head, so a push in the seconds between the gate's read and the engine's
+  is not caught (an `expected_sha` in the decision closes it); neither the
+  engine nor the gate filters review comments by author; and `pr-merge.mjs`
+  itself is outside the L0/L1 block.
+- **Remote sessions** reach agents-api only where the custom domain is allowed;
+  elsewhere set `WF_API_BASE` to a reachable base, or the gate exits 1.
 - **When the gate cannot run** (exit 1: no AWS access, agents-api or GitHub
   unreachable) the cron does *not* pick the PR up — it is already routed. The
   skill therefore labels it `autopilot:needs-human` +

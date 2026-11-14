@@ -62,7 +62,7 @@ test("token parsing from the Secrets Manager shape", () => {
   assert.equal(tokenFromSecretString('{"other":1}'), null);
 });
 
-import { gateExitFor, headPinnedPanel, killSwitchArmed } from "./autopilot-session.mjs";
+import { gateExitFor, greenVerdictAfter, headPinnedPanel, killSwitchArmed } from "./autopilot-session.mjs";
 
 test("Bash: a compound command listing other PRs is ambiguous → null; a lone URL line wins", () => {
   const amb = { tool_name: "Bash", tool_input: { command: "gh pr create -f; gh pr list" },
@@ -108,14 +108,35 @@ test("head-pinned panel: a green heading without the marker fails; unknown head 
   assert.equal(headPinnedPanel([], ["ren"], "").ok, false);
 });
 
-test("kill-switch: armed only with the binding present and the agent active", () => {
-  const b = [{ skill: "pr-autopilot", project_id: "agent-workforce" }];
-  assert.equal(killSwitchArmed({ bindings: b }).ok, true);
-  assert.equal(killSwitchArmed({ bindings: b, paused: true }).ok, false);
-  assert.equal(killSwitchArmed({ bindings: b, archived: true }).ok, false);
-  assert.equal(killSwitchArmed({ bindings: [{ ...b[0], enabled: false }] }).ok, false);
-  assert.equal(killSwitchArmed({ bindings: [] }).ok, false);
+test("kill-switch: armed only for the orchestrator-owned live binding shape", () => {
+  const live = { skill: "pr-autopilot", project_id: "agent-workforce", executor: "claude-code-routine",
+    trigger: { cron: "cron(23 0,6,12,18 ? * * *)", scheduler: "external", invoked_by: "api" } };
+  assert.equal(killSwitchArmed({ bindings: [live] }).ok, true);
+  assert.equal(killSwitchArmed({ bindings: [live], paused: true }).ok, false);
+  assert.equal(killSwitchArmed({ bindings: [live], archived: true }).ok, false);
+  // the documented operator pause (runbooks/bindings.md)
+  assert.equal(killSwitchArmed({ bindings: [{ ...live, trigger: { ...live.trigger, scheduler: "manual" } }] }).ok, false);
+  assert.equal(killSwitchArmed({ bindings: [{ ...live, trigger: { ...live.trigger, invoked_by: undefined } }] }).ok, false);
+  assert.equal(killSwitchArmed({ bindings: [{ ...live, trigger: { ...live.trigger, cron: "" } }] }).ok, false);
+  assert.equal(killSwitchArmed({ bindings: [{ ...live, project_id: "asp-cloud" }] }).ok, false);
   assert.equal(killSwitchArmed(null).ok, false);
+});
+
+test("head-pinned panel: a heading quoted later in another comment does not count", () => {
+  const quoted = { created_at: "2026-11-14T11:00:00Z",
+    body: `**Nadia — summary.**\n🔴 **ren — x lens, cycle 2 @ ${HEAD.slice(0, 7)}.**` };
+  const c = [review("ren", "🟢", HEAD.slice(0, 7), "2026-11-14T10:00:00Z"), quoted];
+  assert.equal(headPinnedPanel(c, ["ren"], HEAD).ok, true);
+});
+
+test("green verdict must exist and follow the newest review", () => {
+  const v = (at, emoji = "🟢", marker = true) => ({ created_at: at,
+    body: `**Nadia — verdict, cycle 2 of ≤ 7. ${emoji} unanimous-green.**\n${marker ? "<!-- autopilot:panel:isolated -->" : ""}` });
+  const since = Date.parse("2026-11-14T10:00:00Z");
+  assert.equal(greenVerdictAfter([v("2026-11-14T10:05:00Z")], since), true);
+  assert.equal(greenVerdictAfter([v("2026-11-14T09:00:00Z")], since), false);
+  assert.equal(greenVerdictAfter([v("2026-11-14T10:05:00Z", "🔴")], since), false);
+  assert.equal(greenVerdictAfter([v("2026-11-14T10:05:00Z", "🟢", false)], since), false);
 });
 
 test("gate exit mapping: only an engine refusal is 2", () => {

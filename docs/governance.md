@@ -160,7 +160,7 @@ This repository **delegates** bounded autonomous merge to the agent-workforce's 
 - scripts/lib/autopilot-session.mjs
 <!-- /autopilot:l0l1-paths -->
 
-**Two lanes, one engine ([ADR-0009](adr/adr-0009-session-run-autopilot-lane.md)).** The workforce cron and the Claude Code session that opened a PR (`.claude/skills/pr-autopilot-session`) run the same lane; a session merges only through `scripts/claude/autopilot-merge.mjs`, which runs `pr-merge.mjs` from `origin/main`. This section is the only statement of the merge rule; other documents point here.
+**Two lanes, one engine ([ADR-0009](adr/adr-0009-session-run-autopilot-lane.md)).** The workforce cron and the Claude Code session that opened a PR (`.claude/skills/pr-autopilot-session`) run the same lane; a session merges only through `scripts/claude/autopilot-merge.mjs`, which runs main's gate core and `pr-merge.mjs` from `origin/main`. This section is the only statement of the merge rule; other documents point here.
 
 (Per-PR pause: an `autopilot:off` label. This §4.4 block sits inside `docs/governance.md`, which is itself L0/L1 — so the autopilot can never edit its own boundary, nor widen what it may merge.)
 
