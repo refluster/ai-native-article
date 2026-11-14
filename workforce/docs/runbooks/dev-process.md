@@ -11,7 +11,7 @@ development loop: the Epic-010 "Project trust boundary" run, 2026-05-24 to 2026-
 [`epics/epic-010-project-trust-boundary.md`](../epics/epic-010-project-trust-boundary.md)). That manual
 run surfaced several failure modes — missing scenario walkthroughs, silent follow-up drops, over-scoped
 revise commits, reviewers approving informally in the summary — that the anti-patterns documented in each
-phase above encode. The improvements from that retrospective are recorded as FU-001..FU-006 in
+phase below encode. The improvements from that retrospective are recorded as FU-001..FU-006 in
 [`follow-ups.md`](../follow-ups.md).
 
 ## At a glance
