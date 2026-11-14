@@ -28,7 +28,7 @@ ensureProxyAwareEntry(import.meta.url);
 import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { MIN_REVIEWERS, REPO, gateExitFor, greenVerdictAfter, headPinnedPanel, killSwitchArmed, parseReviewers, tokenFromSecretString } from "../lib/autopilot-session.mjs";
+import { MIN_REVIEWERS, REPO, gateExitFor, greenVerdictAfter, headPinnedPanel, redOnHead, killSwitchArmed, parseReviewers, tokenFromSecretString } from "../lib/autopilot-session.mjs";
 
 const SECRET_ID = process.env.WF_GITHUB_SECRET_ID || "wf/projects/agent-workforce/github.token";
 const REGION = process.env.WF_AWS_REGION || "us-west-2";
@@ -119,20 +119,33 @@ async function gate({ pr, reviewers, dryRun }, engineDir) {
     throw new GateError(`agents-api unreachable at ${WF_API} (${e?.message || e}); set WF_API_BASE to a reachable base`);
   }
   const ks = killSwitchArmed(agent);
-  if (!ks.ok) throw new GateError(`kill-switch off (R-N10 clause 3): ${ks.why}`, 2);
+  if (!ks.ok) {
+    console.log(`#${pr} ⛔ gate refused (kill-switch, R-N10 clause 3): ${ks.why}`);
+    return 2;
+  }
 
   const token = resolveToken();
   const engine = join(engineDir, ENGINE);
   const env = { ...process.env, TOKEN: token, GITHUB_TOKEN: token };
   if (env.HTTPS_PROXY || env.https_proxy) env.NODE_USE_ENV_PROXY = "1"; // R-14 for the children
 
-  const live = lastJson(engineSnippet(env, engine, READ_PR, REPO, String(pr)).stdout);
-  if (!live || live.error || !live.title) throw new GateError(`cannot read the PR (${live?.error ?? "engine error"})`);
-  if (live.state !== "open") throw new GateError(`PR is ${live.state}`, 2);
+  const read = engineSnippet(env, engine, READ_PR, REPO, String(pr));
+  const live = lastJson(read.stdout);
+  if (!live || live.error || !live.title) throw new GateError(`cannot read the PR (${live?.error ?? tail(read.stderr) ?? "engine error"})`);
+  if (!/^[0-9a-f]{40}$/.test(String(live.head ?? ""))) throw new GateError("cannot read the PR's head commit");
+  if (live.state !== "open") {
+    console.log(`#${pr} ⛔ gate refused: PR is ${live.state}`);
+    return 2;
+  }
 
   const panel = headPinnedPanel(live.comments, reviewers, live.head);
   if (!panel.ok) {
     console.log(`#${pr} ⛔ gate refused (head-pinned panel): ${panel.why}`);
+    return 2;
+  }
+  const red = redOnHead(live.comments, live.head);
+  if (red.length) {
+    console.log(`#${pr} ⛔ gate refused (head-pinned panel): 🔴 on the current head from ${red.join(", ")}`);
     return 2;
   }
   if (!greenVerdictAfter(live.comments, panel.newestReviewAt)) {
@@ -165,11 +178,12 @@ async function gate({ pr, reviewers, dryRun }, engineDir) {
   const r = run(process.execPath, ["--disable-warning=UNDICI-EHPA", engine, "--repo", REPO, "--decisions", dfile], { env });
   const result = lastJson(r.stdout) || {};
   const code = gateExitFor(r.status, result.merged === 1);
-  if (code === 2) {
-    const why = (r.stderr || "").split("\n").find((l) => /REFUSE|REJECTED/.test(l)) || tail(r.stderr, 300);
-    console.log(`#${pr} ⛔ engine refused: ${why}`);
+  const refusal = (r.stderr || "").split("\n").find((l) => /REFUSE|REJECTED/.test(l));
+  if (code === 2 && refusal) {
+    console.log(`#${pr} ⛔ engine refused: ${refusal}`);
     return 2;
   }
+  if (code === 2) throw new GateError(`engine exited 2 without a refusal line: ${tail(r.stderr, 300)}`);
   if (code === 1) throw new GateError(`engine failed (exit ${r.status ?? "signal"}): ${tail(r.stderr, 300)}`);
 
   console.log(`#${pr} ✅ merged by the engine (reviewers: ${reviewers.join(", ")})`);

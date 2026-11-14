@@ -92,32 +92,38 @@ After cycle 7, label `autopilot:needs-human` +
 - **L0/L1 PR** → label `autopilot:needs-human` + `autopilot:reason:l0l1-path`,
   report one line, stop. The operator merges.
 - **Otherwise** wait for CI (`get_check_runs`). If CI needs a fix, that push is
-  a new cycle (step 4). Then:
+  a new cycle (step 4). If the PR is a draft, mark it ready with the GitHub MCP
+  (`update_pull_request`, `draft: false`) — the engine's own un-draft uses
+  GraphQL, which the CCR proxy does not serve. Then:
 
   ```bash
   node scripts/claude/autopilot-merge.mjs <PR> --reviewers <slug1>,<slug2>,<slug3>
   ```
 
-  The launcher runs *main's* gate core and engine (never the PR branch's),
-  which checks the
-  binding kill-switch (R-N10 clause 3) and the head-pinned panel, reads the
-  workforce PAT from Secrets Manager, and hands the merge to `pr-merge.mjs`,
-  which re-verifies §4.4 against the live PR and refuses fail-closed. After a
-  merge it clears stale reason labels, stamps `autopilot:merged` and records
-  the engagement. `--dry-run` checks eligibility without writing.
-- Exit 2 `⛔ gate refused (head-pinned panel)`: the panel is stale — run a new
-  cycle (step 4 without a fix).
-- Exit 2 `⛔ engine refused`: the engine has stamped the reason label. If the
-  reason is transient (`mergeable=null`, checks pending), wait and retry once;
-  otherwise report the line and stop.
-- Exit 1 `✋ gate: agents-api unreachable`: if `WF_API_BASE` can point at a
-  reachable base (see `log-workforce-engagements`), retry once with it.
-- Exit 1 `✋ gate:` (setup or infrastructure): the PR must still end in a
-  terminal state — label `autopilot:needs-human` +
-  `autopilot:reason:merge-engine-refusal`, post the `✋` line as a comment,
-  report it, and stop. Do not look for another way to merge.
+  The launcher runs *main's* gate core and engine (never the PR branch's).
+  The core checks the binding kill-switch (R-N10 clause 3) and the head-pinned
+  panel, reads the workforce PAT from Secrets Manager, and hands the merge to
+  `pr-merge.mjs`, which re-verifies §4.4 against the live PR and refuses
+  fail-closed. After a merge it clears stale reason labels, stamps
+  `autopilot:merged` and records the engagement. `--dry-run` checks
+  eligibility without writing.
+
+  Branch on the line the gate prints:
+
+  | Line | Do |
+  |---|---|
+  | `✅ merged` | step 6; carry any `⚠` line into the report |
+  | `⛔ gate refused (head-pinned panel)` | the panel is stale — new cycle (step 4, no fix) |
+  | `⛔ gate refused (kill-switch …)` | label `autopilot:needs-human` + `autopilot:reason:kill-switch-off`, stop |
+  | `⛔ gate refused: PR is closed` | stop |
+  | `⛔ engine refused` | the engine stamped the reason; if transient (`mergeable=null`, checks pending) wait and retry once, else stop |
+  | `✋ gate: agents-api unreachable` | retry once with `WF_API_BASE` set to a reachable base (see `log-workforce-engagements`) |
+  | any other `✋ gate:` | label `autopilot:needs-human` + `autopilot:reason:merge-engine-refusal`, post the line as a comment, stop |
+
+  Never look for another way to merge.
 
 ## 6 · Report
 
 One final line: PR number, terminal state (merged / needs-human), panel, and
-the gate's line if it ran.
+the gate's line if it ran — plus every `⚠` line (a missing `autopilot:merged`
+label or engagement record is an R-N10 clause-4 gap the operator must see).

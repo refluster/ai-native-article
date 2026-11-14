@@ -8,7 +8,7 @@
 
 ## Context
 
-`workforce/ROADMAP.md` is the single, ordered list of implementation milestones for the workforce subsystem. Items are picked up one PR at a time. Humans merge; this routine authors.
+`workforce/ROADMAP.md` is the single, ordered list of implementation milestones for the workforce subsystem. Items are picked up one PR at a time. This routine authors; merging follows root [governance.md §4.4](../../../docs/governance.md#44-autopilot-pr-merge--workforce-r-n10-delegation--l0l1-off-limits).
 
 The routine was originally implemented as a GHA running on `claude-code-action@beta`. That version was retired 2026-07-05 (the secret was unset, every run failed silently). This CCR version supersedes it.
 

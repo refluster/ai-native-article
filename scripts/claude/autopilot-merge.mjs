@@ -13,8 +13,9 @@
 // engine, and runs main's `scripts/claude/autopilot-gate-core.mjs`. All the
 // checks live there, so a PR cannot change the code that judges it.
 //
-// Before ADR-0009 is on main there is no core to run: the launcher refuses a
-// live merge and allows only `--dry-run` against the local core.
+// Before ADR-0009 is on main there is no core to run, and the launcher
+// refuses (it never runs the working tree's core: that would hand the
+// merge-capable credential to branch code).
 //
 // Exit: the core's (0 merged / eligible · 2 refused · 1 setup error);
 // 1 when main cannot be fetched.
@@ -57,18 +58,10 @@ try {
   if (err) {
     say(err);
   } else {
-    let core = join(tmp, CORE);
+    const core = join(tmp, CORE);
     if (!existsSync(core)) {
-      // Bootstrap: main does not carry the lane yet (ADR-0009 unmerged).
-      if (!process.argv.includes("--dry-run")) {
-        say("main does not carry the gate yet (ADR-0009 not merged); only --dry-run is allowed");
-        core = null;
-      } else {
-        core = join(REPO_ROOT, CORE);
-        console.log(`#${prArg} ℹ bootstrap: main has no gate core yet — dry-run uses the local one`);
-      }
-    }
-    if (core) {
+      say("main does not carry the gate yet (ADR-0009 not merged)");
+    } else {
       const r = spawnSync(process.execPath, [core, ...process.argv.slice(2)],
         { stdio: "inherit", env: { ...process.env, AUTOPILOT_GATE_FROM_MAIN: tmp }, cwd: REPO_ROOT });
       code = r.status ?? 1;

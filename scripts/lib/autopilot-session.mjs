@@ -159,12 +159,32 @@ export function killSwitchArmed(agent, { skill = "pr-autopilot", project = "agen
  * than the newest of the reviewers' latest reviews.
  */
 export function greenVerdictAfter(comments, sinceMs) {
-  return (comments ?? []).some((c) => {
+  let latest = null;
+  for (const c of comments ?? []) {
     const body = String(c?.body ?? "");
-    return /^\*\*Nadia — verdict, cycle \d+ of[^\n]*🟢/u.test(body) &&
-      body.includes("<!-- autopilot:panel:isolated -->") &&
-      (Date.parse(c?.created_at ?? "") || 0) >= sinceMs;
-  });
+    if (!/^\*\*Nadia — verdict, cycle \d+ of/u.test(body)) continue;
+    const at = Date.parse(c?.created_at ?? "") || 0;
+    if (!latest || at >= latest.at) latest = { at, body };
+  }
+  if (!latest) return false;
+  const firstLine = latest.body.split("\n")[0];
+  return firstLine.includes("🟢") && latest.body.includes("<!-- autopilot:panel:isolated -->") && latest.at >= sinceMs;
+}
+
+/** Any reviewer — listed in --reviewers or not — whose latest head-pinned
+ *  review on the current head is 🔴. A seated reviewer left off the list
+ *  must still be able to block. */
+export function redOnHead(comments, headSha) {
+  const head = String(headSha ?? "").toLowerCase();
+  const latest = new Map();
+  for (const c of comments ?? []) {
+    const m = /^(🟢|🔴) \*\*([\w-]+) — [^\n]*?cycle \d+ @ ([0-9a-f]{7,40})\.\*\*/u.exec(String(c?.body ?? ""));
+    if (!m || !head.startsWith(m[3].toLowerCase())) continue;
+    const at = Date.parse(c?.created_at ?? "") || 0;
+    const prev = latest.get(m[2].toLowerCase());
+    if (!prev || at >= prev.at) latest.set(m[2].toLowerCase(), { at, emoji: m[1] });
+  }
+  return [...latest].filter(([, v]) => v.emoji === "🔴").map(([slug]) => slug).sort();
 }
 
 /** Map the engine's exit status to the gate's: only a real refusal (2) is 2. */

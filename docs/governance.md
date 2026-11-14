@@ -158,6 +158,7 @@ This repository **delegates** bounded autonomous merge to the agent-workforce's 
 - .claude/skills/pr-autopilot-session/**
 - scripts/claude/**
 - scripts/lib/autopilot-session.mjs
+- docs/risk-acceptance-ledger.md
 <!-- /autopilot:l0l1-paths -->
 
 **Two lanes, one engine ([ADR-0009](adr/adr-0009-session-run-autopilot-lane.md)).** The workforce cron and the Claude Code session that opened a PR (`.claude/skills/pr-autopilot-session`) run the same lane; a session merges only through `scripts/claude/autopilot-merge.mjs`, which runs main's gate core and `pr-merge.mjs` from `origin/main`. This section is the only statement of the merge rule; other documents point here.
@@ -206,7 +207,7 @@ one-off lint without a backlog row — the row is the provenance for "why does t
 
 A finding that is real but **not** worth a machine check goes to
 [risk-acceptance-ledger.md](risk-acceptance-ledger.md) — an agent drafts the row, the operator
-"signs" it by merging (the only merge authority, §8.1 B). A signed row **suppresses re-filing**: a
+"signs" it by merging — the ledger is in the §4.4 L0/L1 block, so no lane can merge a row for them. A signed row **suppresses re-filing**: a
 later retrospective that rediscovers the gap checks the `Re-eval` date instead of opening a new
 finding. The signed ledger is what stops the audit loop from re-litigating
 the same accepted trade-offs forever. Both registries are kept well-formed by R-12.

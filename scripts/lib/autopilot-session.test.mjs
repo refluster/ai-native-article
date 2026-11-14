@@ -62,7 +62,7 @@ test("token parsing from the Secrets Manager shape", () => {
   assert.equal(tokenFromSecretString('{"other":1}'), null);
 });
 
-import { gateExitFor, greenVerdictAfter, headPinnedPanel, killSwitchArmed } from "./autopilot-session.mjs";
+import { gateExitFor, greenVerdictAfter, headPinnedPanel, killSwitchArmed, redOnHead } from "./autopilot-session.mjs";
 
 test("Bash: a compound command listing other PRs is ambiguous → null; a lone URL line wins", () => {
   const amb = { tool_name: "Bash", tool_input: { command: "gh pr create -f; gh pr list" },
@@ -137,6 +137,17 @@ test("green verdict must exist and follow the newest review", () => {
   assert.equal(greenVerdictAfter([v("2026-11-14T09:00:00Z")], since), false);
   assert.equal(greenVerdictAfter([v("2026-11-14T10:05:00Z", "🔴")], since), false);
   assert.equal(greenVerdictAfter([v("2026-11-14T10:05:00Z", "🟢", false)], since), false);
+  // a later 🔴 verdict overrides an earlier 🟢 one
+  assert.equal(greenVerdictAfter([v("2026-11-14T10:05:00Z"), v("2026-11-14T10:06:00Z", "🔴")], since), false);
+});
+
+test("redOnHead: a 🔴 on the current head blocks even when the slug is not listed", () => {
+  const c = [review("ren", "🟢", HEAD.slice(0, 7), "2026-11-14T10:00:00Z"),
+    review("aoi", "🔴", HEAD.slice(0, 7), "2026-11-14T10:01:00Z"),
+    review("dario", "🔴", "1111111", "2026-11-14T10:01:00Z"),
+    review("farah", "🔴", HEAD.slice(0, 7), "2026-11-14T10:00:00Z"),
+    review("farah", "🟢", HEAD.slice(0, 7), "2026-11-14T10:02:00Z")];
+  assert.deepEqual(redOnHead(c, HEAD), ["aoi"]);
 });
 
 test("gate exit mapping: only an engine refusal is 2", () => {

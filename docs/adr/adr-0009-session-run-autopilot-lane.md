@@ -57,7 +57,11 @@ texts.
 - **R3.** CLAUDE.md's restatement is reduced to one pointer to §4.4.
 - **R4.** The outsource-to-workforce "C-3 never self-merge" line becomes a
   pointer to §4.4; its secret-read rule names the one exception below.
-- **R5.** The ROADMAP "humans merge" rule becomes a pointer to §4.4.
+- **R5.** The ROADMAP "humans merge" rule, and the same line in
+  `workforce/docs/routines/workforce-builder.md`, become pointers to §4.4.
+- **R6.** governance.md §6.2's "the only merge authority, §8.1 B" (which R1
+  leaves dangling) becomes "the ledger is in the L0/L1 block" — the block
+  gains `docs/risk-acceptance-ledger.md`, which keeps what §6.2 always meant.
 
 **Add only what the removals need.**
 
@@ -65,15 +69,18 @@ texts.
   repo runs the `pr-autopilot` lane on it immediately: the project skill
   `.claude/skills/pr-autopilot-session`, started by the PostToolUse hook
   `scripts/claude/post-pr-create.mjs` (fires on `gh pr create` and on the
-  GitHub MCP `create_pull_request`). It is the workforce `pr-autopilot` lane
-  run under nadia's routing identity from a session; reviewers are isolated
+  GitHub MCP `create_pull_request`). It is not a second R-N10 consumer: it
+  is the workforce `pr-autopilot` consumer, run from a session under nadia's
+  routing identity and credited to `pr-autopilot`; reviewers are isolated
   (one subagent per persona, ≥ 3).
 - **A2. One merge gate.** `scripts/claude/autopilot-merge.mjs` is the only
   path by which a session merges. It is a launcher that imports nothing from
   the working tree: it fetches `origin/main` into a throw-away repo and runs
   *main's* gate core (`scripts/claude/autopilot-gate-core.mjs`), whose
   `../lib` imports and engine come from the same extract — so no PR, L0/L1 or
-  not, changes the code that judges it. Before handing the decision to
+  not, changes the code that judges it. The launcher itself runs from the
+  working tree; it is trusted because it is reviewed (`scripts/claude/**` is
+  L0/L1) and holds no logic beyond "fetch main, run its core". Before handing the decision to
   `pr-merge.mjs` the core checks what the session lane needs and the engine
   does not:
   - **R-N10 clause 3**: nadia's pr-autopilot × agent-workforce binding is
@@ -104,8 +111,12 @@ engagement (clause 4).
 `.claude/skills/pr-autopilot-session/**`), so the lane can never merge a change
 to its own gate — the same reason §4.4 sits inside `docs/governance.md`.
 
-Net: **5 removals, 3 additions.** The merge rule has one text (§4.4) and one
-executor (`pr-merge.mjs`).
+Net: **6 removals, 3 additions.** The merge rule has one text (§4.4) and one
+executor (`pr-merge.mjs`), with one known exception that predates this ADR:
+the Zone A lines in AGENTS.md ("may NOT merge without a human") and CLAUDE.md
+(rubric/roster "never self-merge") state a stricter bar for the Zone A files
+that sit outside the L0/L1 block (see Alternatives). The cron lane has the same
+gap; it is left for its own decision rather than resolved here.
 
 ## Alternatives considered
 
@@ -156,7 +167,9 @@ executor (`pr-merge.mjs`).
   comment; cron merges do not. The weekly count of
   `"Autopilot merge" "session-run lane"` against `"Autopilot merge"` and the
   open-to-merge time of each shows whether the lane delivers the latency it
-  claims. If it does not within four weeks, remove the lane (rule: subtract).
+  claims. Checkpoint **2026-12-12** (four weeks after acceptance): the
+  operator runs both queries and records the result on this ADR's PR; if the
+  lane has not delivered, remove it (rule: subtract).
 
 ## Related
 
