@@ -154,6 +154,10 @@ This repository **delegates** bounded autonomous merge to the agent-workforce's 
 - workforce/docs/mvv.md
 - workforce/docs/north-star/**
 - workforce/infra/sam/samconfig.toml
+- .claude/settings.json
+- .claude/skills/pr-autopilot-session/**
+- scripts/claude/**
+- scripts/lib/autopilot-session.mjs
 <!-- /autopilot:l0l1-paths -->
 
 **Two lanes, one engine ([ADR-0009](adr/adr-0009-session-run-autopilot-lane.md)).** The workforce cron and the Claude Code session that opened a PR (`.claude/skills/pr-autopilot-session`) run the same lane; a session merges only through `scripts/claude/autopilot-merge.mjs`, which runs `pr-merge.mjs` from `origin/main`. This section is the only statement of the merge rule; other documents point here.

@@ -101,7 +101,7 @@ Default **A (do it)**: read-only inspection, local build/test, L3 edits (runbook
 
 Default **B (ask, wait for an explicit yes)**: merging other than through §4.4 (below), pushing to `main`, force-push / history rewrite, editing L0 text, merging an L1 doc or ADR, loosening an R-rule (incl. W-1 and R-10), touching Zone A files (design tokens, `site.ts`, workflows, CODEOWNERS, rubric/roster/model registry, `SKILL.md` bodies, `samconfig.toml`), repo settings/secrets, destructive Notion mutations, spend outside the existing envelope or above W-3.
 
-Merging: [governance.md §4.4](docs/governance.md#44-autopilot-pr-merge--workforce-r-n10-delegation--l0l1-off-limits) is the rule. A PR you open is picked up by the `pr-autopilot-session` skill (PostToolUse hook) and merges only via `scripts/claude/autopilot-merge.mjs` ([ADR-0009](docs/adr/adr-0009-session-run-autopilot-lane.md)); `autopilot:off` holds it back.
+Merging: [governance.md §4.4](docs/governance.md#44-autopilot-pr-merge--workforce-r-n10-delegation--l0l1-off-limits) is the rule. A PR you open is picked up by the `pr-autopilot-session` skill (PostToolUse hook) and merges only via `scripts/claude/autopilot-merge.mjs` ([ADR-0009](docs/adr/adr-0009-session-run-autopilot-lane.md)). Drafts merge too; add `autopilot:off` when opening a PR you want a human to read first.
 
 ## Workflow expectations
 

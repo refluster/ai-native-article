@@ -17,8 +17,13 @@ here at once instead of waiting up to 6 h for the tick. Statute:
 [governance.md §4.4](../../../docs/governance.md#44-autopilot-pr-merge--workforce-r-n10-delegation--l0l1-off-limits)
 — this file cites them, it does not restate the merge rule.
 
-The cron lane treats a PR carrying `**Nadia — cycle N of` as already routed,
-so once this skill posts cycle 1 the two lanes never both drive one PR.
+The cron lane treats a PR carrying `**Nadia — cycle N of` as already routed
+unless its head moved after that comment — so in the fix loop **post the next
+cycle's routing comment before you push** (step 4), or a cron tick may route
+the same PR in between.
+
+**A draft is merge-eligible too** (workforce adr-0014). To keep a PR for human
+review, add `autopilot:off` when you open it; the hook still fires, step 0 stops.
 
 **Output to the user: one line per state change** (e.g.
 `#912 🟢 panel green (dario, ren, farah) → CI pending`). Reviewer comment
@@ -59,9 +64,12 @@ number, and the instruction to read the **full diff** itself and return
 or your own opinion: lenses that share a context converge.
 
 Post each review as its own comment. First line
-`🟢 **<slug> — <lens> lens, cycle N.**` (or 🔴), findings as `file:line`
-bullets, and — **only when green** — the marker
-`<!-- autopilot:review:<slug>:green -->`. The engine counts exactly these markers.
+`🟢 **<slug> — <lens> lens, cycle N @ <head-sha7>.**` (or 🔴), where
+`<head-sha7>` is the commit the reviewer read; findings as `file:line`
+bullets; and — **only when green** — the marker
+`<!-- autopilot:review:<slug>:green -->`. The engine counts the markers; the
+gate additionally requires each reviewer's *latest* review to be 🟢 on the
+*current* head, so a green from an earlier cycle or commit never counts.
 
 ## 3 · Verdict
 
@@ -72,28 +80,39 @@ follow-up issue linked from the verdict.
 
 ## 4 · 🔴 → fix loop (you are the author)
 
-Fix the blocking findings on the PR branch, push, and re-run steps 1–3 as cycle
-N+1 (`**Nadia — cycle N+1 of ≤ 7.**`). After cycle 7, label
-`autopilot:needs-human` + `autopilot:reason:no-reviewer-consensus` and stop.
+Fix the blocking findings on the PR branch. Post the routing comment
+`**Nadia — cycle N+1 of ≤ 7.**` **first**, then push, then run steps 2–3 on
+the new head. **Any push after a verdict — including a CI fix in step 5 —
+starts a new cycle**: the panel's reviews are pinned to the commit they read.
+After cycle 7, label `autopilot:needs-human` +
+`autopilot:reason:no-reviewer-consensus` and stop.
 
 ## 5 · Merge — only through the gate
 
 - **L0/L1 PR** → label `autopilot:needs-human` + `autopilot:reason:l0l1-path`,
   report one line, stop. The operator merges.
-- **Otherwise** wait for CI with the `ship-pr` loop (it also flips a draft to
-  Ready), then:
+- **Otherwise** wait for CI (`get_check_runs`). If CI needs a fix, that push is
+  a new cycle (step 4). Then:
 
   ```bash
   node scripts/claude/autopilot-merge.mjs <PR> --reviewers <slug1>,<slug2>,<slug3>
   ```
 
-  The gate fetches the workforce PAT from Secrets Manager and runs
-  `pr-merge.mjs` from `origin/main`, which re-verifies §4.4 against the live PR
-  and refuses fail-closed. `--dry-run` checks eligibility without writing.
-- Exit 2 (refused): if the reason is transient (`mergeable=null`, checks
-  pending), wait and retry once; otherwise report the refusal line and stop —
-  the engine has already stamped the reason label.
-- Exit 1 (setup): report the `✋ gate:` line. Do not look for another way to merge.
+  The gate runs from `origin/main` (itself and the engine), checks the
+  binding kill-switch (R-N10 clause 3) and the head-pinned panel, reads the
+  workforce PAT from Secrets Manager, and hands the merge to `pr-merge.mjs`,
+  which re-verifies §4.4 against the live PR and refuses fail-closed. After a
+  merge it clears stale reason labels, stamps `autopilot:merged` and records
+  the engagement. `--dry-run` checks eligibility without writing.
+- Exit 2 `⛔ gate refused (head-pinned panel)`: the panel is stale — run a new
+  cycle (step 4 without a fix).
+- Exit 2 `⛔ engine refused`: the engine has stamped the reason label. If the
+  reason is transient (`mergeable=null`, checks pending), wait and retry once;
+  otherwise report the line and stop.
+- Exit 1 `✋ gate:` (setup or infrastructure): the PR must still end in a
+  terminal state — label `autopilot:needs-human` +
+  `autopilot:reason:merge-engine-refusal`, post the `✋` line as a comment,
+  report it, and stop. Do not look for another way to merge.
 
 ## 6 · Report
 

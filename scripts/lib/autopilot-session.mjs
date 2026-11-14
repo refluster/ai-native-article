@@ -14,9 +14,9 @@ export const MIN_REVIEWERS = 3;
 const GH_PR_CREATE = /(?:^|[\n;&|(]|\$\()\s*gh\s+pr\s+create\b/;
 const MCP_CREATE_PR = "mcp__github__create_pull_request";
 
-function prUrlRe(repo) {
+function prUrlRe(repo, flags = "i") {
   const esc = repo.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
-  return new RegExp(`https://github\\.com/${esc}/pull/(\\d+)`, "i");
+  return new RegExp(`https://github\\.com/${esc}/pull/(\\d+)`, flags);
 }
 
 function stringify(v) {
@@ -24,25 +24,51 @@ function stringify(v) {
   try { return JSON.stringify(v ?? ""); } catch { return String(v ?? ""); }
 }
 
+// MCP results arrive as [{type:"text", text:"<json>"}] or as the object itself.
+function mcpObjects(resp) {
+  const out = [];
+  const visit = (v) => {
+    if (typeof v === "string") { try { visit(JSON.parse(v)); } catch { /* not json */ } return; }
+    if (Array.isArray(v)) { v.forEach(visit); return; }
+    if (v && typeof v === "object") { out.push(v); if (typeof v.text === "string") visit(v.text); }
+  };
+  visit(resp);
+  return out;
+}
+
 /**
  * The PR number a PostToolUse payload just created in `repo`, or null.
  * Covers both creation paths: the `gh` CLI (Bash) and the GitHub MCP tool
  * that cloud sessions use (the `gh` CLI there is search-only).
+ *   - MCP: the structured `html_url` / `url` field of the result.
+ *   - Bash: the line of stdout that is exactly a PR URL (what `gh pr create`
+ *     prints), never a URL embedded in other output (`gh pr list`, …).
  */
 export function prFromHookPayload(payload, repo = REPO) {
   if (!payload || typeof payload !== "object") return null;
   const tool = payload.tool_name;
   const input = payload.tool_input ?? {};
+  const exact = new RegExp(`^${prUrlRe(repo).source}/?$`, "i");
   if (tool === "Bash") {
     if (typeof input.command !== "string" || !GH_PR_CREATE.test(input.command)) return null;
-  } else if (tool === MCP_CREATE_PR) {
+    const resp = payload.tool_response;
+    const stdout = typeof resp === "object" && resp ? String(resp.stdout ?? "") : stringify(resp);
+    const lines = stdout.split(/\r?\n/).map((l) => l.trim()).filter((l) => exact.test(l));
+    if (lines.length !== 1) return null; // none, or ambiguous
+    return Number(exact.exec(lines[0])[1]);
+  }
+  if (tool === MCP_CREATE_PR) {
     const target = `${input.owner ?? ""}/${input.repo ?? ""}`.toLowerCase();
     if (target !== repo.toLowerCase()) return null;
-  } else {
+    for (const o of mcpObjects(payload.tool_response)) {
+      for (const k of ["html_url", "url"]) {
+        const m = typeof o[k] === "string" ? exact.exec(o[k].trim()) : null;
+        if (m) return Number(m[1]);
+      }
+    }
     return null;
   }
-  const m = prUrlRe(repo).exec(stringify(payload.tool_response));
-  return m ? Number(m[1]) : null;
+  return null;
 }
 
 /** The hook's stdout for a just-opened PR (Claude Code hook JSON contract). */
@@ -68,4 +94,57 @@ export function tokenFromSecretString(secretString) {
   let parsed;
   try { parsed = JSON.parse(String(secretString ?? "")); } catch { return null; }
   return typeof parsed?.token === "string" && parsed.token ? parsed.token : null;
+}
+
+/**
+ * Head-pinned panel check (PR #886 cycle 1, ren). The engine counts a
+ * reviewer's green marker anywhere on the PR, so a marker from an earlier
+ * cycle — or from before a later push — would still count. The gate therefore
+ * requires, per reviewer, that the reviewer's LATEST review comment
+ * (`🟢|🔴 **<slug> — … cycle N @ <sha>.**`) is 🟢, carries the marker, and
+ * names the PR's current head commit.
+ */
+export function headPinnedPanel(comments, reviewers, headSha) {
+  const head = String(headSha ?? "").toLowerCase();
+  if (!/^[0-9a-f]{40}$/.test(head)) return { ok: false, why: "head commit unknown" };
+  const bad = [];
+  for (const slug of reviewers) {
+    const esc = slug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`^(🟢|🔴) \\*\\*${esc} — [^\\n]*?cycle \\d+ @ ([0-9a-f]{7,40})\\.\\*\\*`, "imu");
+    let latest = null;
+    for (const c of comments ?? []) {
+      const m = re.exec(String(c?.body ?? ""));
+      if (!m) continue;
+      const at = Date.parse(c?.created_at ?? "") || 0;
+      if (!latest || at >= latest.at) latest = { at, emoji: m[1], sha: m[2].toLowerCase(), body: String(c.body) };
+    }
+    if (!latest) bad.push(`${slug}: no head-pinned review`);
+    else if (latest.emoji !== "🟢") bad.push(`${slug}: latest review is 🔴`);
+    else if (!latest.body.includes(`<!-- autopilot:review:${slug}:green -->`)) bad.push(`${slug}: latest review lacks the green marker`);
+    else if (!head.startsWith(latest.sha)) bad.push(`${slug}: reviewed ${latest.sha.slice(0, 7)}, head is ${head.slice(0, 7)}`);
+  }
+  return bad.length ? { ok: false, why: bad.join("; ") } : { ok: true, why: `head ${head.slice(0, 7)} reviewed green by ${reviewers.join(", ")}` };
+}
+
+/**
+ * Workforce R-N10 clause 3 (per-binding kill-switch), read from agents-api
+ * `GET /agents/nadia`: the routing agent is neither paused nor archived and
+ * still holds the pr-autopilot binding for this repo's project. Anything
+ * else — including an unreadable response — is "off" (fail closed).
+ */
+export function killSwitchArmed(agent, { skill = "pr-autopilot", project = "agent-workforce" } = {}) {
+  if (!agent || typeof agent !== "object") return { ok: false, why: "agents-api returned no agent" };
+  if (agent.paused) return { ok: false, why: "routing agent is paused" };
+  if (agent.archived) return { ok: false, why: "routing agent is archived" };
+  const b = (agent.bindings ?? []).find((x) => x?.skill === skill && x?.project_id === project);
+  if (!b) return { ok: false, why: `no ${skill} × ${project} binding` };
+  if (b.enabled === false || b.paused === true) return { ok: false, why: `${skill} × ${project} binding is disabled` };
+  return { ok: true, why: "binding armed" };
+}
+
+/** Map the engine's exit status to the gate's: only a real refusal (2) is 2. */
+export function gateExitFor(engineStatus, merged) {
+  if (engineStatus === 0 && merged) return 0;
+  if (engineStatus === 2) return 2;
+  return 1;
 }
