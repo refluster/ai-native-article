@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hookOutput, parseReviewers, prFromHookPayload, tokenFromSecretString } from "./autopilot-session.mjs";
+import { gateExitFor, greenVerdictAfter, headPinnedPanel, hookOutput, isCadenceAuthored, killSwitchArmed, parseReviewers,
+  prFromHookPayload, redOnHead, tokenFromSecretString } from "./autopilot-session.mjs";
 
 const URL = "https://github.com/refluster/ai-native-article/pull/1234";
 
@@ -62,7 +63,6 @@ test("token parsing from the Secrets Manager shape", () => {
   assert.equal(tokenFromSecretString('{"other":1}'), null);
 });
 
-import { gateExitFor, greenVerdictAfter, headPinnedPanel, killSwitchArmed, redOnHead } from "./autopilot-session.mjs";
 
 test("Bash: a compound command listing other PRs is ambiguous → null; a lone URL line wins", () => {
   const amb = { tool_name: "Bash", tool_input: { command: "gh pr create -f; gh pr list" },
@@ -157,4 +157,13 @@ test("gate exit mapping: only an engine refusal is 2", () => {
   assert.equal(gateExitFor(1, false), 1);
   assert.equal(gateExitFor(3, false), 1);
   assert.equal(gateExitFor(null, false), 1);
+});
+
+test("cadence-authored PRs (wf-task-id footer) never enter the session lane", () => {
+  const body = "Fixes #1\n\n---\nwf-task-id: run_123\nwf-agent: ren\n";
+  assert.equal(isCadenceAuthored(body), true);
+  assert.equal(isCadenceAuthored("mentions wf-task-id: inline only"), false);
+  const p = { tool_name: "mcp__github__create_pull_request", tool_input: { owner: "refluster", repo: "ai-native-article", body },
+    tool_response: [{ type: "text", text: JSON.stringify({ html_url: URL }) }] };
+  assert.equal(prFromHookPayload(p), null);
 });

@@ -20,7 +20,7 @@
 // Exit: the core's (0 merged / eligible · 2 refused · 1 setup error);
 // 1 when main cannot be fetched.
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -51,7 +51,9 @@ function fetchMain(dest) {
   return x.status === 0 ? null : `tar failed: ${tail(x.stderr)}`;
 }
 
-const tmp = mkdtempSync(join(tmpdir(), "wf-gate-"));
+// realpath: the engine's entry check compares argv[1] with its realpath'd URL
+// (macOS tmpdir is a symlink).
+const tmp = realpathSync(mkdtempSync(join(tmpdir(), "wf-gate-")));
 let code = 1;
 try {
   const err = fetchMain(tmp);

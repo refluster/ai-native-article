@@ -149,7 +149,13 @@ gap; it is left for its own decision rather than resolved here.
   denies the MCP merge, auto-merge and `gh pr merge`, but a session holding the
   PAT could still call the REST merge endpoint. The control is the gate plus
   the skill text, and the audit trail: every lane merge carries the engine's
-  comment.
+  comment. The same holds for the clause-3 oracle: `WF_API_BASE` is
+  overridable by the session it gates, so the kill-switch binds an honest
+  session, not a hostile one.
+- **Scope: operator-driven sessions only.** A workforce cadence run (author-only
+  under R-N9; its PR body carries `wf-task-id:`) never enters this lane: the
+  hook skips it, and main's gate core refuses it, so its PR stays on the cron
+  lane.
 - **Residual, engine-side gaps** (tracked in a follow-up issue, not fixed here
   because they change the shared engine): the engine merges its own read of
   the head, so a push in the seconds between the gate's read and the engine's

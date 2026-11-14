@@ -51,6 +51,7 @@ export function prFromHookPayload(payload, repo = REPO) {
   const exact = new RegExp(`^${prUrlRe(repo).source}/?$`, "i");
   if (tool === "Bash") {
     if (typeof input.command !== "string" || !GH_PR_CREATE.test(input.command)) return null;
+    if (isCadenceAuthored(input.command.replace(/\\n/g, "\n"))) return null; // inline --body footer
     const resp = payload.tool_response;
     const stdout = typeof resp === "object" && resp ? String(resp.stdout ?? "") : stringify(resp);
     const lines = stdout.split(/\r?\n/).map((l) => l.trim()).filter((l) => exact.test(l));
@@ -60,6 +61,7 @@ export function prFromHookPayload(payload, repo = REPO) {
   if (tool === MCP_CREATE_PR) {
     const target = `${input.owner ?? ""}/${input.repo ?? ""}`.toLowerCase();
     if (target !== repo.toLowerCase()) return null;
+    if (isCadenceAuthored(input.body)) return null; // cadence PR: cron lane
     for (const o of mcpObjects(payload.tool_response)) {
       for (const k of ["html_url", "url"]) {
         const m = typeof o[k] === "string" ? exact.exec(o[k].trim()) : null;
@@ -69,6 +71,14 @@ export function prFromHookPayload(payload, repo = REPO) {
     return null;
   }
   return null;
+}
+
+/** A PR body authored by a workforce cadence run carries the footer
+ *  `wf-task-id: <run_id>` (issue-execute / issue-implement / issue-design).
+ *  Those runs are author-only (workforce R-N9): their PRs stay on the cron
+ *  lane, never the session-run lane. */
+export function isCadenceAuthored(body) {
+  return /^wf-task-id:\s*\S+/mu.test(String(body ?? ""));
 }
 
 /** The hook's stdout for a just-opened PR (Claude Code hook JSON contract). */

@@ -2,7 +2,7 @@
 
 **Kind**: scheduled CCR routine (successor to the retired 2026-07-05 GHA-based `wf-builder`).
 **Trigger**: daily schedule via claude.ai/code/routines.
-**Purpose**: keep the workforce ROADMAP moving — one PR per run, CI green before push, never self-merge.
+**Purpose**: keep the workforce ROADMAP moving — one PR per run, CI green before push; merging per root governance §4.4.
 
 > **Authoritative contract.** The full execution logic lives here. The claude.ai routine prompt is a one-line pointer to this file; do not embed logic there.
 

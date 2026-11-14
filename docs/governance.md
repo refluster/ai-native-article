@@ -161,7 +161,7 @@ This repository **delegates** bounded autonomous merge to the agent-workforce's 
 - docs/risk-acceptance-ledger.md
 <!-- /autopilot:l0l1-paths -->
 
-**Two lanes, one engine ([ADR-0009](adr/adr-0009-session-run-autopilot-lane.md)).** The workforce cron and the Claude Code session that opened a PR (`.claude/skills/pr-autopilot-session`) run the same lane; a session merges only through `scripts/claude/autopilot-merge.mjs`, which runs main's gate core and `pr-merge.mjs` from `origin/main`. This section is the only statement of the merge rule; other documents point here.
+**Two lanes, one engine ([ADR-0009](adr/adr-0009-session-run-autopilot-lane.md)).** The workforce cron and the Claude Code session that opened a PR (`.claude/skills/pr-autopilot-session`) run the same lane; a session merges only through `scripts/claude/autopilot-merge.mjs`, which runs main's gate core and `pr-merge.mjs` from `origin/main`. This section is the only statement of the agent merge predicate; other documents point here. Cadence-authored PRs (`wf-task-id:` footer) stay on the cron lane: the gate refuses them, so author-only cadences (workforce R-N9) never self-merge.
 
 (Per-PR pause: an `autopilot:off` label. This §4.4 block sits inside `docs/governance.md`, which is itself L0/L1 — so the autopilot can never edit its own boundary, nor widen what it may merge.)
 
@@ -268,6 +268,7 @@ This pins which actions are auto-executed (**A**) and which require operator app
 - **L2 loosening or disabling** (e.g. removing the W-1 `publish-notion.mjs` guard, disabling `check-corpus-truncation`). Always B.
 - **Changing GitHub repo settings, branch protection, secrets, deploy-key/PAT scopes.**
 - **Issuing destructive Notion mutations** (deleting pages, changing DB schema, archiving in bulk). The current handlers don't do this; if a future handler does, the trigger requires operator approval.
+- **Merging other than through §4.4's engine** (cron lane or session gate).
 - **Spending money** that isn't already implicitly approved by the existing pipeline (e.g. switching to a more expensive model, raising LLM call rates).
 
 A B action surfaces in chat with a one-line ask. Operator says "yes" → agent proceeds. Operator says "no" or doesn't reply → agent stops.

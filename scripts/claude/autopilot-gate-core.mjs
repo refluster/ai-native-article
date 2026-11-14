@@ -28,7 +28,7 @@ ensureProxyAwareEntry(import.meta.url);
 import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { MIN_REVIEWERS, REPO, gateExitFor, greenVerdictAfter, headPinnedPanel, redOnHead, killSwitchArmed, parseReviewers, tokenFromSecretString } from "../lib/autopilot-session.mjs";
+import { MIN_REVIEWERS, REPO, gateExitFor, greenVerdictAfter, headPinnedPanel, isCadenceAuthored, redOnHead, killSwitchArmed, parseReviewers, tokenFromSecretString } from "../lib/autopilot-session.mjs";
 
 const SECRET_ID = process.env.WF_GITHUB_SECRET_ID || "wf/projects/agent-workforce/github.token";
 const REGION = process.env.WF_AWS_REGION || "us-west-2";
@@ -87,13 +87,14 @@ const READ_PR = `
     await new Promise((s) => setTimeout(s, 5000));
   }
   const comments = [];
-  for (let page = 1; page <= 20; page++) {
+  for (let page = 1; ; page++) {
+    if (page > 20) { console.log(JSON.stringify({ error: "more than 2000 comments; refusing to judge a partial list" })); process.exit(0); }
     const r = await gh("GET", "/repos/" + repo + "/issues/" + n + "/comments?per_page=100&page=" + page);
     if (r.status !== 200) { console.log(JSON.stringify({ error: "GET comments HTTP " + r.status })); process.exit(0); }
     comments.push(...r.json.map((c) => ({ body: c.body, created_at: c.created_at })));
     if (r.json.length < 100) break;
   }
-  console.log(JSON.stringify({ title: p.title, state: p.state, draft: p.draft, head: p.head?.sha, comments }));`;
+  console.log(JSON.stringify({ title: p.title, state: p.state, draft: p.draft, head: p.head?.sha, body: p.body, comments }));`;
 
 const AFTER_MERGE = `
   const m = await import(process.argv[2]);
@@ -101,10 +102,14 @@ const AFTER_MERGE = `
   const repo = process.argv[3], n = process.argv[4];
   const r = await gh("GET", "/repos/" + repo + "/issues/" + n + "/labels");
   const stale = (r.json || []).map((l) => l.name).filter((x) => x.startsWith("autopilot:reason:") || x === "autopilot:needs-author");
-  for (const name of stale) await gh("DELETE", "/repos/" + repo + "/issues/" + n + "/labels/" + encodeURIComponent(name));
+  const failed = [];
+  for (const name of stale) {
+    const d = await gh("DELETE", "/repos/" + repo + "/issues/" + n + "/labels/" + encodeURIComponent(name));
+    if (d.status !== 200 && d.status !== 404) failed.push(name);
+  }
   await m.ensureLabels(gh, repo, ["autopilot:merged"]);
   const a = await gh("POST", "/repos/" + repo + "/issues/" + n + "/labels", { labels: ["autopilot:merged"] });
-  console.log(JSON.stringify({ removed: stale, labelled: a.status === 200 }));`;
+  console.log(JSON.stringify({ removed: stale.filter((x) => !failed.includes(x)), failed, labelled: a.status === 200 }));`;
 
 async function gate({ pr, reviewers, dryRun }, engineDir) {
   if (reviewers.length < MIN_REVIEWERS) throw new GateError(`${reviewers.length} reviewer(s) given; the panel needs ≥ ${MIN_REVIEWERS}`);
@@ -131,8 +136,12 @@ async function gate({ pr, reviewers, dryRun }, engineDir) {
 
   const read = engineSnippet(env, engine, READ_PR, REPO, String(pr));
   const live = lastJson(read.stdout);
-  if (!live || live.error || !live.title) throw new GateError(`cannot read the PR (${live?.error ?? tail(read.stderr) ?? "engine error"})`);
+  if (!live || live.error || !live.title) throw new GateError(`cannot read the PR (${live?.error || tail(read.stderr) || "engine error"})`);
   if (!/^[0-9a-f]{40}$/.test(String(live.head ?? ""))) throw new GateError("cannot read the PR's head commit");
+  if (isCadenceAuthored(live.body)) {
+    console.log(`#${pr} ⛔ gate refused: cadence-authored PR (wf-task-id footer) — it stays on the cron lane (R-N9)`);
+    return 2;
+  }
   if (live.state !== "open") {
     console.log(`#${pr} ⛔ gate refused: PR is ${live.state}`);
     return 2;
@@ -177,7 +186,10 @@ async function gate({ pr, reviewers, dryRun }, engineDir) {
   }] }));
   const r = run(process.execPath, ["--disable-warning=UNDICI-EHPA", engine, "--repo", REPO, "--decisions", dfile], { env });
   const result = lastJson(r.stdout) || {};
-  const code = gateExitFor(r.status, result.merged === 1);
+  // Two signals for "merged": the JSON result line, and the engine's own
+  // `pr-merge: MERGED #N` stderr line (pr-merge.mjs applyDecisions).
+  const mergedLine = new RegExp(`^pr-merge: MERGED #${pr}\\b`, "m").test(r.stderr || "");
+  const code = gateExitFor(r.status, result.merged === 1 || (r.status === 0 && mergedLine));
   const refusal = (r.stderr || "").split("\n").find((l) => /REFUSE|REJECTED/.test(l));
   if (code === 2 && refusal) {
     console.log(`#${pr} ⛔ engine refused: ${refusal}`);
@@ -189,6 +201,7 @@ async function gate({ pr, reviewers, dryRun }, engineDir) {
   console.log(`#${pr} ✅ merged by the engine (reviewers: ${reviewers.join(", ")})`);
   const after = lastJson(engineSnippet(env, engine, AFTER_MERGE, REPO, String(pr)).stdout);
   if (!after?.labelled) console.log(`#${pr} ⚠ merged, but the autopilot:merged label was not applied`);
+  if (after?.failed?.length) console.log(`#${pr} ⚠ merged, but stale labels could not be removed: ${after.failed.join(", ")}`);
   const eng = run(process.execPath, [join(engineDir, "workforce/scripts/record-engagement.mjs"),
     "--agent", "nadia", "--skill", "pr-autopilot", "--project", "agent-workforce", "--status", "ok",
     "--summary", `Session-run lane merged #${pr} (external-pr-merge) after unanimous green from ${reviewers.join(", ")}.`,
