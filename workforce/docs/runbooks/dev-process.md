@@ -4,6 +4,16 @@ The seven-phase loop that drives every change to the workforce. Codified from th
 
 The loop is operator-driven today. Each phase has automation hooks that can be plugged in over time without changing the shape.
 
+## Where this came from
+
+The seven-phase shape (A → G) was distilled from the first real end-to-end execution of the workforce
+development loop: the Epic-010 "Project trust boundary" run, 2026-05-24 to 2026-05-26 (see
+[`epics/epic-010-project-trust-boundary.md`](../epics/epic-010-project-trust-boundary.md)). That manual
+run surfaced several failure modes — missing scenario walkthroughs, silent follow-up drops, over-scoped
+revise commits, reviewers approving informally in the summary — that the anti-patterns documented in each
+phase above encode. The improvements from that retrospective are recorded as FU-001..FU-006 in
+[`follow-ups.md`](../follow-ups.md).
+
 ## At a glance
 
 ```
