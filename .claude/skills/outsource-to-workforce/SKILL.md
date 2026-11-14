@@ -52,7 +52,7 @@ Never imply an agent ran by itself. The work is still credited to `pr-autopilot`
 - **Merging** follows [governance.md §4.4](../../../docs/governance.md#44-autopilot-pr-merge--workforce-r-n10-delegation--l0l1-off-limits):
   never `gh pr merge`; on this repo a merge goes only through
   `scripts/claude/autopilot-merge.mjs` (ADR-0009).
-- **C-4 no decrypted-secret reads without approval.** The Bearer token is
+- **No decrypted-secret reads without approval** (AGENTS.md rule 8). The Bearer token is
   provisioned by the operator into `.env`; read it from there, **never** run
   `aws secretsmanager get-secret-value` yourself without explicit approval (the
   one standing exception is the ADR-0009 merge gate's own read), and

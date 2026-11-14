@@ -26,7 +26,7 @@ To find it: call `list_pull_requests(state=open)`, filter to PRs whose head bran
 
 | Condition | Action |
 |---|---|
-| **(A) Previous PR open, CI green** | Post one-line comment: `no-op — PR #N still open, awaiting human merge`. Exit. |
+| **(A) Previous PR open, CI green** | Post one-line comment: `no-op — PR #N still open, awaiting merge`. Exit. |
 | **(B) Previous PR open, CI failing** | Classify the failure. Fix it in up to 3 turns. Push the fix to the same branch. Exit. |
 | **(C) No previous PR, or previous PR is merged** | Implement the next unchecked PR from ROADMAP.md. See §"Implementing a ROADMAP item" below. |
 
@@ -35,7 +35,7 @@ CI status is the `get_check_runs` result on the PR's head commit. A single `succ
 ### Step 3 — Exit
 
 After taking the action, output exactly one line:
-- State A/B: `` no-op — PR #N still open, awaiting human merge ``
+- State A/B: `` no-op — PR #N still open, awaiting merge ``
 - State C (PR opened): the new PR URL
 
 ---

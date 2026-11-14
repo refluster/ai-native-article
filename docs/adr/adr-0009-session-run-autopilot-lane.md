@@ -39,7 +39,10 @@ merge bar:
 4. `.claude/skills/outsource-to-workforce` — "C-3 never self-merge … the merge
    is the human's act". C-3 is the single-operator-scale invariant; the label
    is wrong as well as the rule.
-5. `workforce/ROADMAP.md` rules — "No routine self-merges PRs; humans merge."
+5. `workforce/ROADMAP.md` rules — "No routine self-merges PRs; humans merge." —
+   and its echoes in `workforce/docs/routines/workforce-builder.md`,
+   `runbooks/dev-process.md` ("Per W-5: agents never merge") and
+   `runbooks/podcast-pipeline.md`.
 
 None of these copies has ever stopped a merge the engine would have made; they
 only make the session lane look illegal and make every reader reconcile five
@@ -57,8 +60,8 @@ texts.
 - **R3.** CLAUDE.md's restatement is reduced to one pointer to §4.4.
 - **R4.** The outsource-to-workforce "C-3 never self-merge" line becomes a
   pointer to §4.4; its secret-read rule names the one exception below.
-- **R5.** The ROADMAP "humans merge" rule, and the same line in
-  `workforce/docs/routines/workforce-builder.md`, become pointers to §4.4.
+- **R5.** The ROADMAP "humans merge" rule and its echoes (workforce-builder,
+  dev-process, podcast-pipeline) become pointers to §4.4.
 - **R6.** governance.md §6.2's "the only merge authority, §8.1 B" (which R1
   leaves dangling) becomes "the ledger is in the L0/L1 block" — the block
   gains `docs/risk-acceptance-ledger.md`, which keeps what §6.2 always meant.
@@ -151,11 +154,16 @@ gap; it is left for its own decision rather than resolved here.
   the skill text, and the audit trail: every lane merge carries the engine's
   comment. The same holds for the clause-3 oracle: `WF_API_BASE` is
   overridable by the session it gates, so the kill-switch binds an honest
-  session, not a hostile one.
-- **Scope: operator-driven sessions only.** A workforce cadence run (author-only
-  under R-N9; its PR body carries `wf-task-id:`) never enters this lane: the
-  hook skips it, and main's gate core refuses it, so its PR stays on the cron
-  lane.
+  session, not a hostile one. (The secret id and region are pinned in the
+  core, and `GOVERNANCE_PATH` is stripped before the engine runs.)
+- **Scope: operator-driven sessions only, identified positively.** The lane
+  runs only in a local Claude Code session or a cloud session a person is
+  attending (`CLAUDE_CODE_SESSION_ATTENDED=1`). Scheduled CCR routines and
+  cadence runs (workforce-builder, dario-implement, issue-*; author-only under
+  R-N9) are neither, so the hook stays silent and main's gate core refuses
+  them; a PR body with the `wf-task-id:` cadence footer is refused as well.
+  Their PRs stay on the cron lane. Like the other session-side checks, this
+  binds an honest session.
 - **Residual, engine-side gaps** (tracked in a follow-up issue, not fixed here
   because they change the shared engine): the engine merges its own read of
   the head, so a push in the seconds between the gate's read and the engine's

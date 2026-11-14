@@ -81,6 +81,18 @@ export function isCadenceAuthored(body) {
   return /^wf-task-id:\s*\S+/mu.test(String(body ?? ""));
 }
 
+/**
+ * Positive identification of an operator-driven session (PR #886 cycle 5):
+ * a local Claude Code run (no CLAUDE_CODE_REMOTE), or a cloud session a person
+ * is attending (CLAUDE_CODE_SESSION_ATTENDED=1). Scheduled CCR routines and
+ * cadence runs are neither, so the lane — and the gate — stay off for them
+ * even when their PR carries no footer (workforce-builder, dario-implement).
+ */
+export function isOperatorSession(env = process.env) {
+  if (!env.CLAUDE_CODE_REMOTE) return true;
+  return env.CLAUDE_CODE_SESSION_ATTENDED === "1";
+}
+
 /** The hook's stdout for a just-opened PR (Claude Code hook JSON contract). */
 export function hookOutput(pr) {
   const context =

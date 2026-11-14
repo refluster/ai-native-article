@@ -28,10 +28,11 @@ ensureProxyAwareEntry(import.meta.url);
 import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { MIN_REVIEWERS, REPO, gateExitFor, greenVerdictAfter, headPinnedPanel, isCadenceAuthored, redOnHead, killSwitchArmed, parseReviewers, tokenFromSecretString } from "../lib/autopilot-session.mjs";
+import { MIN_REVIEWERS, REPO, gateExitFor, greenVerdictAfter, headPinnedPanel, isCadenceAuthored, isOperatorSession, redOnHead, killSwitchArmed, parseReviewers, tokenFromSecretString } from "../lib/autopilot-session.mjs";
 
-const SECRET_ID = process.env.WF_GITHUB_SECRET_ID || "wf/projects/agent-workforce/github.token";
-const REGION = process.env.WF_AWS_REGION || "us-west-2";
+// Pinned, not overridable by the session the gate judges.
+const SECRET_ID = "wf/projects/agent-workforce/github.token";
+const REGION = "us-west-2";
 const WF_API = (process.env.WF_API_BASE || "https://workforce-api.kohuehara.xyz").replace(/\/$/, "");
 const ENGINE = "workforce/skills/pr-autopilot/pr-merge.mjs";
 const FROM_MAIN = "AUTOPILOT_GATE_FROM_MAIN";
@@ -94,14 +95,18 @@ const READ_PR = `
     comments.push(...r.json.map((c) => ({ body: c.body, created_at: c.created_at })));
     if (r.json.length < 100) break;
   }
-  console.log(JSON.stringify({ title: p.title, state: p.state, draft: p.draft, head: p.head?.sha, body: p.body, comments }));`;
+  console.log(JSON.stringify({ title: p.title, state: p.state, draft: p.draft, head: p.head?.sha, body: p.body, mergeable: p.mergeable, comments }));`;
 
 const AFTER_MERGE = `
   const m = await import(process.argv[2]);
   const gh = m.makeGh({ token: process.env.TOKEN, userAgent: "session-merge-gate" });
   const repo = process.argv[3], n = process.argv[4];
   const r = await gh("GET", "/repos/" + repo + "/issues/" + n + "/labels");
-  const stale = (r.json || []).map((l) => l.name).filter((x) => x.startsWith("autopilot:reason:") || x === "autopilot:needs-author");
+  if (r.status !== 200 || !Array.isArray(r.json)) {
+    console.log(JSON.stringify({ readFailed: "GET labels HTTP " + r.status, failed: [], labelled: false }));
+    process.exit(0);
+  }
+  const stale = r.json.map((l) => l.name).filter((x) => x.startsWith("autopilot:reason:") || x === "autopilot:needs-author");
   const failed = [];
   for (const name of stale) {
     const d = await gh("DELETE", "/repos/" + repo + "/issues/" + n + "/labels/" + encodeURIComponent(name));
@@ -113,6 +118,10 @@ const AFTER_MERGE = `
 
 async function gate({ pr, reviewers, dryRun }, engineDir) {
   if (reviewers.length < MIN_REVIEWERS) throw new GateError(`${reviewers.length} reviewer(s) given; the panel needs ≥ ${MIN_REVIEWERS}`);
+  if (!isOperatorSession()) {
+    console.log(`#${pr} ⛔ gate refused: not an operator-attended session — scheduled routines and cadences stay on the cron lane`);
+    return 2;
+  }
 
   // R-N10 clause 3: the per-binding kill-switch. Unreadable → fail closed (exit 1).
   let agent = null;
@@ -132,6 +141,8 @@ async function gate({ pr, reviewers, dryRun }, engineDir) {
   const token = resolveToken();
   const engine = join(engineDir, ENGINE);
   const env = { ...process.env, TOKEN: token, GITHUB_TOKEN: token };
+  // The engine reads its L0/L1 block from GOVERNANCE_PATH; the session must not choose it.
+  delete env.GOVERNANCE_PATH;
   if (env.HTTPS_PROXY || env.https_proxy) env.NODE_USE_ENV_PROXY = "1"; // R-14 for the children
 
   const read = engineSnippet(env, engine, READ_PR, REPO, String(pr));
@@ -159,6 +170,12 @@ async function gate({ pr, reviewers, dryRun }, engineDir) {
   }
   if (!greenVerdictAfter(live.comments, panel.newestReviewAt)) {
     console.log(`#${pr} ⛔ gate refused (head-pinned panel): no 🟢 isolated-panel verdict after the latest reviews`);
+    return 2;
+  }
+
+  if (live.mergeable === null || live.mergeable === undefined) {
+    // Transient: do not let the engine stamp a refusal label for it.
+    console.log(`#${pr} ⛔ gate refused: mergeability not settled yet — retry in a minute`);
     return 2;
   }
 
@@ -200,7 +217,8 @@ async function gate({ pr, reviewers, dryRun }, engineDir) {
 
   console.log(`#${pr} ✅ merged by the engine (reviewers: ${reviewers.join(", ")})`);
   const after = lastJson(engineSnippet(env, engine, AFTER_MERGE, REPO, String(pr)).stdout);
-  if (!after?.labelled) console.log(`#${pr} ⚠ merged, but the autopilot:merged label was not applied`);
+  if (after?.readFailed) console.log(`#${pr} ⚠ merged, but the labels could not be read (${after.readFailed}); stale reason labels and autopilot:merged were not updated`);
+  else if (!after?.labelled) console.log(`#${pr} ⚠ merged, but the autopilot:merged label was not applied`);
   if (after?.failed?.length) console.log(`#${pr} ⚠ merged, but stale labels could not be removed: ${after.failed.join(", ")}`);
   const eng = run(process.execPath, [join(engineDir, "workforce/scripts/record-engagement.mjs"),
     "--agent", "nadia", "--skill", "pr-autopilot", "--project", "agent-workforce", "--status", "ok",

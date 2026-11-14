@@ -37,7 +37,8 @@ GitHub writes (comments, labels) go through the GitHub MCP tools
 ## 0 · Preconditions — stop with one line if any fails
 
 - The PR is open in `refluster/ai-native-article` and has no `autopilot:off` label.
-- The PR body has no `wf-task-id:` footer. A cadence-authored PR (workforce
+- This is an operator session (local, or `CLAUDE_CODE_SESSION_ATTENDED=1` in the
+  cloud) and the PR body has no `wf-task-id:` footer. A cadence-authored PR (workforce
   R-N9, author-only) stays on the cron lane; the gate refuses it anyway.
 - No routing comment (`— cycle N of ≤ 7`) from another run in the last 7 days.
   If there is one, the PR is already in a lane: report that and stop.
@@ -118,6 +119,8 @@ After cycle 7, label `autopilot:needs-human` +
   | `⛔ gate refused (head-pinned panel)` | the panel is stale — new cycle (step 4, no fix) |
   | `⛔ gate refused (kill-switch …)` | label `autopilot:needs-human` + `autopilot:reason:kill-switch-off`, stop |
   | `⛔ gate refused: PR is closed` / `cadence-authored PR` | stop |
+| `⛔ gate refused: not an operator-attended session` | stop — this session is a routine/cadence; the cron lane owns the PR |
+| `⛔ gate refused: mergeability not settled` | wait a minute, retry (no label was stamped) |
   | `⛔ engine refused` | the engine stamped the reason; if transient (`mergeable=null`, checks pending) wait and retry once, else stop |
   | `✋ gate: agents-api unreachable` | retry once with `WF_API_BASE` set to a reachable base (see `log-workforce-engagements`) |
   | any other `✋ gate:` | label `autopilot:needs-human` + `autopilot:reason:merge-engine-refusal`, post the line as a comment, stop |

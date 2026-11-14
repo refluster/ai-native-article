@@ -13,7 +13,7 @@
 // engine, and runs main's `scripts/claude/autopilot-gate-core.mjs`. All the
 // checks live there, so a PR cannot change the code that judges it.
 //
-// Before ADR-0009 is on main there is no core to run, and the launcher
+// Before ADR-0009 is on main the archive has no gate core, and the launcher
 // refuses (it never runs the working tree's core: that would hand the
 // merge-capable credential to branch code).
 //
@@ -44,9 +44,8 @@ function fetchMain(dest) {
     if (r.status !== 0) return `git ${step[0] === "init" ? "init" : "fetch of main"} failed: ${tail(r.stderr)}`;
   }
   const tar = join(dest, "main.tar");
-  let a = run("git", ["-C", git, "archive", "-o", tar, "FETCH_HEAD", ...PATHS]);
-  if (a.status !== 0) a = run("git", ["-C", git, "archive", "-o", tar, "FETCH_HEAD", ...PATHS.filter((p) => p !== "scripts/claude")]);
-  if (a.status !== 0) return `git archive failed: ${tail(a.stderr)}`;
+  const a = run("git", ["-C", git, "archive", "-o", tar, "FETCH_HEAD", ...PATHS]);
+  if (a.status !== 0) return `git archive of main failed (is ADR-0009 on main?): ${tail(a.stderr)}`;
   const x = run("tar", ["-xf", tar, "-C", dest]);
   return x.status === 0 ? null : `tar failed: ${tail(x.stderr)}`;
 }
@@ -66,7 +65,7 @@ try {
     } else {
       const r = spawnSync(process.execPath, [core, ...process.argv.slice(2)],
         { stdio: "inherit", env: { ...process.env, AUTOPILOT_GATE_FROM_MAIN: tmp }, cwd: REPO_ROOT });
-      code = r.status ?? 1;
+      code = r.status === 0 || r.status === 2 ? r.status : 1; // exact 0/2/1 contract
     }
   }
 } finally {

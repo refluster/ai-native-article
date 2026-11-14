@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { gateExitFor, greenVerdictAfter, headPinnedPanel, hookOutput, isCadenceAuthored, killSwitchArmed, parseReviewers,
+import { gateExitFor, greenVerdictAfter, headPinnedPanel, hookOutput, isCadenceAuthored, isOperatorSession, killSwitchArmed, parseReviewers,
   prFromHookPayload, redOnHead, tokenFromSecretString } from "./autopilot-session.mjs";
 
 const URL = "https://github.com/refluster/ai-native-article/pull/1234";
@@ -166,4 +166,11 @@ test("cadence-authored PRs (wf-task-id footer) never enter the session lane", ()
   const p = { tool_name: "mcp__github__create_pull_request", tool_input: { owner: "refluster", repo: "ai-native-article", body },
     tool_response: [{ type: "text", text: JSON.stringify({ html_url: URL }) }] };
   assert.equal(prFromHookPayload(p), null);
+});
+
+test("operator session: local runs and attended cloud sessions only", () => {
+  assert.equal(isOperatorSession({}), true);
+  assert.equal(isOperatorSession({ CLAUDE_CODE_REMOTE: "true", CLAUDE_CODE_SESSION_ATTENDED: "1" }), true);
+  assert.equal(isOperatorSession({ CLAUDE_CODE_REMOTE: "true" }), false);
+  assert.equal(isOperatorSession({ CLAUDE_CODE_REMOTE: "true", CLAUDE_CODE_SESSION_ATTENDED: "0" }), false);
 });
