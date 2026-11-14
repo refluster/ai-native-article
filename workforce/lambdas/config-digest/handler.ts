@@ -54,11 +54,22 @@ export interface OrgViolation {
  * - dangling edges in `reports_to` or `lateral` (target slug not in roster)
  * - cycles in `reports_to` (would cause computeDepths to throw at deploy time)
  *
+ * The roster is the NON-ARCHIVED agents only — the same set the deploy gate
+ * sees (`GET /agents` filters `archived`; agents-api/handler.ts). An active
+ * agent whose edge names an archived agent is therefore `dangling`, exactly
+ * as `build-agent-manifest.mjs` will treat it; archived agents' own edges are
+ * not checked because they never reach the manifest.
+ *
  * Surfacing these in the weekly digest catches broken graphs before
  * deploy-article-site.yml trips on them (see FU-022).
  */
 export function checkOrgGraph(agents: ReadonlyMap<string, AgentMetaRow>): OrgViolation[] {
   const violations: OrgViolation[] = [];
+  const active = new Map<string, AgentMetaRow>();
+  for (const [slug, meta] of agents) {
+    if (!meta.archived) active.set(slug, meta);
+  }
+  agents = active;
   const slugs = new Set(agents.keys());
 
   // ── dangling edges ───────────────────────────────────────────────────────
@@ -316,27 +327,42 @@ function renderChange(c: AgentAuditChange): string {
 }
 
 function renderOrgViolations(violations: readonly OrgViolation[]): string {
-  const lines: string[] = [
-    "## ⚠️ Org-graph violations",
-    "",
-    "The following `reports_to` / `lateral` edges are inconsistent with the",
-    "live agent roster. `deploy-article-site.yml` will reject the manifest",
-    "until these are corrected via `PATCH /agents/{slug}` through agents-api.",
-    "",
-  ];
-  for (const v of violations) {
-    if (v.kind === "dangling") {
-      lines.push(
-        `- **dangling** \`${v.slug}.${v.field}\` → \`${v.edge}\` ` +
-          `(target slug does not exist in the roster)`,
-      );
-    } else {
-      const path = v.cycle_path ? v.cycle_path.join(" → ") : `${v.slug} → ${v.edge}`;
-      lines.push(`- **cycle** in \`reports_to\`: ${path}`);
-    }
+  const blocking = violations.filter((v) => v.field === "reports_to");
+  const advisory = violations.filter((v) => v.field === "lateral");
+  const lines: string[] = ["## ⚠️ Org-graph violations", ""];
+  if (blocking.length > 0) {
+    lines.push(
+      "The following `reports_to` edges are inconsistent with the live",
+      "(non-archived) agent roster. `deploy-article-site.yml` will reject the",
+      "manifest until these are corrected via `PATCH /agents/{slug}` through",
+      "agents-api.",
+      "",
+    );
+    for (const v of blocking) lines.push(renderViolationLine(v));
+    lines.push("");
   }
-  lines.push("");
+  if (advisory.length > 0) {
+    lines.push(
+      "Advisory — `lateral` edges that name a slug missing from the roster.",
+      "These do not by themselves fail the deploy gate; fix them to keep the",
+      "org graph honest.",
+      "",
+    );
+    for (const v of advisory) lines.push(renderViolationLine(v));
+    lines.push("");
+  }
   return lines.join("\n");
+}
+
+function renderViolationLine(v: OrgViolation): string {
+  if (v.kind === "dangling") {
+    return (
+      `- **dangling** \`${v.slug}.${v.field}\` → \`${v.edge}\` ` +
+      `(target is not an active agent in the roster)`
+    );
+  }
+  const path = v.cycle_path ? v.cycle_path.join(" → ") : `${v.slug} → ${v.edge}`;
+  return `- **cycle** in \`reports_to\`: ${path}`;
 }
 
 export function renderDigest(

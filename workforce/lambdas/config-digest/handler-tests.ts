@@ -213,7 +213,7 @@ describe("wf-config-digest", () => {
 
 // ── checkOrgGraph unit tests (FU-022) ────────────────────────────────────
 
-function makeAgents(defs: Array<{ slug: string; reports_to?: string[]; lateral?: string[] }>): ReadonlyMap<string, AgentMetaRow> {
+function makeAgents(defs: Array<{ slug: string; reports_to?: string[]; lateral?: string[]; archived?: boolean }>): ReadonlyMap<string, AgentMetaRow> {
   const m = new Map<string, AgentMetaRow>();
   for (const d of defs) {
     m.set(d.slug, {
@@ -221,7 +221,7 @@ function makeAgents(defs: Array<{ slug: string; reports_to?: string[]; lateral?:
       sk: "META",
       slug: d.slug,
       paused: false,
-      archived: false,
+      archived: d.archived ?? false,
       created_at: "2026-01-01T00:00:00.000Z",
       reports_to: d.reports_to ?? [],
       lateral: d.lateral ?? [],
@@ -268,6 +268,8 @@ describe("checkOrgGraph", () => {
     expect(cycles.length).toBeGreaterThanOrEqual(1);
     const path = cycles[0]!.cycle_path!;
     expect(path[0]).toBe(path[path.length - 1]); // closed path
+    expect(cycles).toHaveLength(1);
+    expect(path).toEqual(["alice", "bob", "alice"]);
   });
 
   it("detects a three-node cycle in reports_to", () => {
@@ -278,7 +280,33 @@ describe("checkOrgGraph", () => {
     ]);
     const v = checkOrgGraph(agents);
     const cycles = v.filter((x) => x.kind === "cycle");
-    expect(cycles.length).toBeGreaterThanOrEqual(1);
+    expect(cycles).toHaveLength(1);
+    expect(cycles[0]!.cycle_path).toEqual(["a", "b", "c", "a"]);
+  });
+
+  it("detects a self-loop in reports_to", () => {
+    const agents = makeAgents([{ slug: "solo", reports_to: ["solo"] }]);
+    const v = checkOrgGraph(agents);
+    expect(v).toHaveLength(1);
+    expect(v[0]).toMatchObject({ kind: "cycle", slug: "solo", field: "reports_to", cycle_path: ["solo", "solo"] });
+  });
+
+  it("an active agent reporting to an archived agent is dangling (A1: deploy-gate roster)", () => {
+    const agents = makeAgents([
+      { slug: "alice", reports_to: ["old"] },
+      { slug: "old", archived: true },
+    ]);
+    const v = checkOrgGraph(agents);
+    expect(v).toEqual([{ kind: "dangling", slug: "alice", field: "reports_to", edge: "old" }]);
+  });
+
+  it("archived agents' own edges are not checked and cannot form a cycle", () => {
+    const agents = makeAgents([
+      { slug: "x", reports_to: ["y"], archived: true },
+      { slug: "y", reports_to: ["x"], archived: true },
+      { slug: "live" },
+    ]);
+    expect(checkOrgGraph(agents)).toEqual([]);
   });
 
   it("does NOT flag a cycle in lateral edges (bidirectional by design)", () => {
@@ -339,6 +367,58 @@ describe("wf-config-digest — org-graph integration (FU-022)", () => {
     expect(violationsIdx).toBeGreaterThan(-1);
     expect(mutationsIdx).toBeGreaterThan(-1);
     expect(violationsIdx).toBeLessThan(mutationsIdx); // violations section comes first
+  });
+
+  it("handler: a 2-cycle a → b → a is reported once with its exact path", async () => {
+    rows.push({ pk: "AGENT#a", sk: "META", slug: "a", reports_to: ["b"], lateral: [], paused: false, archived: false, created_at: "2026-01-01T00:00:00.000Z" });
+    rows.push({ pk: "AGENT#b", sk: "META", slug: "b", reports_to: ["a"], lateral: [], paused: false, archived: false, created_at: "2026-01-01T00:00:00.000Z" });
+
+    const res = await handler();
+
+    expect(res.org_violations).toBe(1);
+    const body = (createIssue.mock.calls[0]![0] as { body: string }).body;
+    expect(body).toContain("a → b → a");
+  });
+
+  it("handler: a self-loop is reported as a cycle", async () => {
+    rows.push({ pk: "AGENT#solo", sk: "META", slug: "solo", reports_to: ["solo"], lateral: [], paused: false, archived: false, created_at: "2026-01-01T00:00:00.000Z" });
+
+    const res = await handler();
+
+    expect(res.org_violations).toBe(1);
+    const body = (createIssue.mock.calls[0]![0] as { body: string }).body;
+    expect(body).toContain("solo → solo");
+  });
+
+  it("handler: an active agent reporting to an archived agent is flagged (A1)", async () => {
+    rows.push({ pk: "AGENT#alice", sk: "META", slug: "alice", reports_to: ["old"], lateral: [], paused: false, archived: false, created_at: "2026-01-01T00:00:00.000Z" });
+    rows.push({ pk: "AGENT#old", sk: "META", slug: "old", reports_to: [], lateral: [], paused: true, archived: true, created_at: "2026-01-01T00:00:00.000Z" });
+
+    const res = await handler();
+
+    expect(res.org_violations).toBe(1);
+    const body = (createIssue.mock.calls[0]![0] as { body: string }).body;
+    expect(body).toContain("alice.reports_to");
+  });
+
+  it("A3: lateral-only violations never claim the deploy will reject", async () => {
+    rows.push({ pk: "AGENT#alice", sk: "META", slug: "alice", reports_to: [], lateral: ["ghost"], paused: false, archived: false, created_at: "2026-01-01T00:00:00.000Z" });
+
+    await handler();
+
+    const body = (createIssue.mock.calls[0]![0] as { body: string }).body;
+    expect(body).toContain("alice.lateral");
+    expect(body).toContain("Advisory");
+    expect(body).not.toContain("will reject");
+  });
+
+  it("A3: reports_to violations keep the deploy-rejection warning", async () => {
+    rows.push({ pk: "AGENT#alice", sk: "META", slug: "alice", reports_to: ["ghost"], lateral: [], paused: false, archived: false, created_at: "2026-01-01T00:00:00.000Z" });
+
+    await handler();
+
+    const body = (createIssue.mock.calls[0]![0] as { body: string }).body;
+    expect(body).toContain("will reject");
   });
 
   it("clean quiet week: no issue, org_violations=0", async () => {
