@@ -35,7 +35,9 @@ workforce/scripts/      validators + registry builders wired as `npm run workfor
 workforce/pipeline/     knowledge-backup (Discord + Notion → per-project git store; ADR-0026/0028)
 workforce/seed/         bootstrap data for hire groups and personas
 workforce/client/       drop-in package for external repos that outsource to the workforce
-.claude/skills/         session skills: article-health · cadence-forge · ship-pr · log-workforce-engagements · outsource-to-workforce (hand work to the workforce, record engagements)
+.claude/skills/         session skills: article-health · cadence-forge · ship-pr · pr-autopilot-session · log-workforce-engagements · outsource-to-workforce
+.claude/settings.json   PostToolUse hook → pr-autopilot-session; direct-merge tools denied (ADR-0009)
+scripts/claude/         session hook + merge gate (post-pr-create.mjs, autopilot-merge.mjs)
 ```
 
 `npm run` targets you will actually use: `build`, `dev` / `dev:workforce`, `test:scripts`, `lint:tokens`, `check-truncation`, `check-base-path`, `check-l1-citation`, `workforce:skills`, `workforce:naming`, `workforce:skill-registry:check`. CI runs all of them (see `.github/workflows/ci.yml`); the Lambdas have their own `npm run typecheck && npm test` under `workforce/lambdas/`.
@@ -97,9 +99,9 @@ L2/L3 generation is a **multi-candidate, multi-judge** model (GROWTH.md §2–§
 
 Default **A (do it)**: read-only inspection, local build/test, L3 edits (runbooks, skills), L2 tightening, git on your own branch, opening draft PRs and issues, `article-health` sweeps, editing a `newsletter/pipeline/` script or a workforce cadence to fix a bug, adding an L1 source row in Notion, `gh workflow run deploy-article-site.yml`.
 
-Default **B (ask, wait for an explicit yes)**: merging any PR yourself, pushing to `main`, force-push / history rewrite, editing L0 text, merging an L1 doc or ADR, loosening an R-rule (incl. W-1 and R-10), touching Zone A files (design tokens, `site.ts`, workflows, CODEOWNERS, rubric/roster/model registry, `SKILL.md` bodies, `samconfig.toml`), repo settings/secrets, destructive Notion mutations, spend outside the existing envelope or above W-3.
+Default **B (ask, wait for an explicit yes)**: merging other than through §4.4 (below), pushing to `main`, force-push / history rewrite, editing L0 text, merging an L1 doc or ADR, loosening an R-rule (incl. W-1 and R-10), touching Zone A files (design tokens, `site.ts`, workflows, CODEOWNERS, rubric/roster/model registry, `SKILL.md` bodies, `samconfig.toml`), repo settings/secrets, destructive Notion mutations, spend outside the existing envelope or above W-3.
 
-Note the merge rule precisely: *you* do not merge, but the workforce's `pr-autopilot` **does** autonomously merge a consensus-green PR that touches no L0/L1 path listed in [governance.md §4.4](docs/governance.md#44-autopilot-pr-merge--workforce-r-n10-delegation--l0l1-off-limits) (that list includes this file). Add the `autopilot:off` label to hold a PR back.
+Merging: [governance.md §4.4](docs/governance.md#44-autopilot-pr-merge--workforce-r-n10-delegation--l0l1-off-limits) is the rule. A PR you open is picked up by the `pr-autopilot-session` skill (PostToolUse hook) and merges only via `scripts/claude/autopilot-merge.mjs` ([ADR-0009](docs/adr/adr-0009-session-run-autopilot-lane.md)); `autopilot:off` holds it back.
 
 ## Workflow expectations
 

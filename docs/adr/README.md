@@ -55,5 +55,6 @@ headers:
 | [0006](adr-0006-publication-disclosure-posture.md) | Publication disclosure: comply with the strictest reading instead of classifying ourselves | Proposed |
 | [0007](adr-0007-registry-state-owner-and-scheduled-trigger.md) | Registries record current state, not just events: owner + scheduled trigger on every dated commitment | Proposed |
 | [0008](adr-0008-egress-allowlist-named-l1-control.md) | The agent-egress allowlist becomes a named, owned, change-logged L1 control | Proposed |
+| [0009](adr-0009-session-run-autopilot-lane.md) | Session-run autopilot lane; the merge rule lives in one place (§4.4) | Proposed |
 
 Keep this table in sync when an ADR is added or its Status flips.

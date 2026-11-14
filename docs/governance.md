@@ -156,6 +156,8 @@ This repository **delegates** bounded autonomous merge to the agent-workforce's 
 - workforce/infra/sam/samconfig.toml
 <!-- /autopilot:l0l1-paths -->
 
+**Two lanes, one engine ([ADR-0009](adr/adr-0009-session-run-autopilot-lane.md)).** The workforce cron and the Claude Code session that opened a PR (`.claude/skills/pr-autopilot-session`) run the same lane; a session merges only through `scripts/claude/autopilot-merge.mjs`, which runs `pr-merge.mjs` from `origin/main`. This section is the only statement of the merge rule; other documents point here.
+
 (Per-PR pause: an `autopilot:off` label. This §4.4 block sits inside `docs/governance.md`, which is itself L0/L1 — so the autopilot can never edit its own boundary, nor widen what it may merge.)
 
 ---
@@ -237,7 +239,7 @@ When an agent is spawned against this repository:
 
 ### 8.1 Action authority matrix
 
-This pins which actions are auto-executed (**A**) and which require operator approval (**B**). The principle: an action is **B** when (a) it's an L0/L1 amendment, (b) it modifies live state outside the agent's branch (push to `main`, merge PRs, GitHub releases, repo settings), (c) it's irreversible (force-push, history rewrite of a published branch, content deletion), or (d) it changes external services in a way that can't be undone by reverting (production AWS writes, secret rotations).
+This pins which actions are auto-executed (**A**) and which require operator approval (**B**). The principle: an action is **B** when (a) it's an L0/L1 amendment, (b) it modifies live state outside the agent's branch (push to `main`, GitHub releases, repo settings), (c) it's irreversible (force-push, history rewrite of a published branch, content deletion), or (d) it changes external services in a way that can't be undone by reverting (production AWS writes, secret rotations).
 
 #### A — auto-execute
 
@@ -250,10 +252,10 @@ This pins which actions are auto-executed (**A**) and which require operator app
 - **GitHub author-side.** `gh pr create`, `gh pr edit` (description), `gh issue create`, `gh pr ready`.
 - **Drafting an L1 doc change.** The agent may open a PR that edits an L1 doc — but must NOT merge it (B).
 - **Article-health sweep.** Idempotent and fix-forward.
+- **Merging under §4.4** — through its engine, from the cron lane or the session gate ([ADR-0009](adr/adr-0009-session-run-autopilot-lane.md)). Any other merge is B.
 
 #### B — escalate to operator
 
-- **Merging any PR**, including the agent's own. Agent never self-merges.
 - **Push to `main` directly** (vs. via PR). Always B.
 - **Force-push, history rewrite, branch deletion of a published branch**, `git reset --hard` on `main`/`gh-pages`.
 - **L0 amendment** (this doc §2). Always B.

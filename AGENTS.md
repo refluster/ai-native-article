@@ -27,7 +27,7 @@ Rationale: these files encode the brand, the typography, the deployment surface,
 
 ### Zone B — Agent-assisted (product code)
 
-Agents may author and merge, subject to CI passing and one human review *unless* the diff is smaller than 30 lines and touches no Zone A files.
+Agents may author and merge; the merge rule is [governance.md §4.4](docs/governance.md#44-autopilot-pr-merge--workforce-r-n10-delegation--l0l1-off-limits).
 
 - `newsletter/app/src/components/**`
 - `newsletter/app/src/pages/**`
