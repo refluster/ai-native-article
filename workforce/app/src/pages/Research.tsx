@@ -35,11 +35,16 @@ const READER_SITE = 'https://kohuehara.xyz/ai-native-article/';
 const PAGE_BUTTON =
   'font-wfmono text-[11px] uppercase tracking-[0.14em] px-4 py-2 rounded-full border border-wf-outline text-wf-on-surface hover:border-wf-primary hover:text-wf-primary transition-colors disabled:opacity-40 disabled:hover:border-wf-outline disabled:hover:text-wf-on-surface';
 
+// Stories are separated by whitespace first; the hairline between them is
+// the faintest rule the token set allows, and there is none above the
+// first story or below the last.
+const LIST = 'divide-y divide-wf-outline-variant/50';
+
 function SkeletonCards({ cards = 4 }: { cards?: number }) {
   return (
-    <ul className="space-y-3" aria-hidden>
+    <ul className={LIST} aria-hidden>
       {Array.from({ length: cards }, (_, i) => (
-        <li key={i} className={`${CARD} p-5`}>
+        <li key={i} className="py-6">
           <Skeleton className="h-3 w-40" />
           <Skeleton className="mt-3 h-5 w-3/4" />
           <SkeletonText lines={2} className="mt-3" />
@@ -102,6 +107,8 @@ export default function Research() {
   const safePage = Math.min(page, totalPages);
   const pageItems = filtered.slice((safePage - 1) * RESEARCH_PAGE_SIZE, safePage * RESEARCH_PAGE_SIZE);
   const visibleTags = showAllTags ? tags : tags.slice(0, RESEARCH_TOP_TAGS);
+  // The unfiltered first page opens with a lead story, front-page style.
+  const showLead = safePage === 1 && !activeTag && !q;
   const englishCount = analyses.filter(a => a.hasEn).length;
 
   function patchParams(changes: Record<string, string | null>) {
@@ -186,7 +193,7 @@ export default function Research() {
             </label>
           </div>
 
-          <div className="mt-6">
+          <div className="mt-4">
             {manifest.error && (
               <div className={`${CARD} p-4 text-sm text-wf-throwing`}>
                 The research corpus could not be loaded ({manifest.error}). It is served from {READER_SITE};
@@ -198,10 +205,16 @@ export default function Research() {
               <div className="text-sm text-wf-on-surface-variant py-8">No analyses match.</div>
             )}
             {pageItems.length > 0 && (
-              <ul className="space-y-3">
-                {pageItems.map((a: ResearchArticleMeta) => (
+              <ul className={LIST}>
+                {pageItems.map((a: ResearchArticleMeta, i) => (
                   <li key={a.slug}>
-                    <ResearchCard article={a} lang={lang} onTagClick={onTagClick} activeTag={activeTag} />
+                    <ResearchCard
+                      article={a}
+                      lang={lang}
+                      onTagClick={onTagClick}
+                      activeTag={activeTag}
+                      variant={showLead && i === 0 ? 'lead' : 'row'}
+                    />
                   </li>
                 ))}
               </ul>
@@ -209,7 +222,7 @@ export default function Research() {
           </div>
 
           {totalPages > 1 && (
-            <nav className="mt-8 flex items-center justify-between font-wfmono text-[11px] uppercase tracking-[0.14em]" aria-label="Pagination">
+            <nav className="mt-10 pt-8 border-t border-wf-outline-variant/50 flex items-center justify-between font-wfmono text-[11px] uppercase tracking-[0.14em]" aria-label="Pagination">
               <button type="button" onClick={() => goToPage(safePage - 1)} disabled={safePage === 1} className={PAGE_BUTTON}>
                 ← Newer
               </button>
@@ -250,10 +263,8 @@ export default function Research() {
             )}
           </section>
 
-          <section className={`${CARD} p-4`}>
-            <h2 className="font-wfmono text-[11px] font-semibold uppercase tracking-[0.14em] text-wf-primary">
-              About this corpus
-            </h2>
+          <section className="pt-6 border-t border-wf-outline-variant/50">
+            <h2 className={KICKER}>About this corpus</h2>
             <dl className="mt-3 space-y-2 text-[13px] text-wf-on-surface-variant">
               <div className="flex justify-between gap-3">
                 <dt>Analyses</dt>
