@@ -116,13 +116,14 @@ After cycle 7, label `autopilot:needs-human` +
   | Line | Do |
   |---|---|
   | `✅ merged` | step 6; carry any `⚠` line into the report |
-  | `⛔ gate refused (head-pinned panel)` | the panel is stale — new cycle (step 4, no fix) |
+  | `⛔ gate refused (head-pinned panel): 🔴 on the current head …` | a reviewer vetoed this head — fix (step 4) |
+  | other `⛔ gate refused (head-pinned panel)` | the panel is stale — new cycle (step 4, no fix) |
   | `⛔ gate refused (kill-switch …)` | label `autopilot:needs-human` + `autopilot:reason:kill-switch-off`, stop |
   | `⛔ gate refused: PR is closed` / `cadence-authored PR` | stop |
-| `⛔ gate refused: not an operator-attended session` | stop — this session is a routine/cadence; the cron lane owns the PR |
-| `⛔ gate refused: mergeability not settled` | wait a minute, retry (no label was stamped) |
+  | `⛔ gate refused: not an operator-attended session` | stop — this session is a routine/cadence; the cron lane owns the PR |
+  | `⛔ gate refused: mergeability not settled` | wait a minute, retry (no label was stamped) |
   | `⛔ engine refused` | the engine stamped the reason; if transient (`mergeable=null`, checks pending) wait and retry once, else stop |
-  | `✋ gate: agents-api unreachable` | retry once with `WF_API_BASE` set to a reachable base (see `log-workforce-engagements`) |
+  | `✋ gate: agents-api unreachable` | retry once with `WF_API_BASE` set to a reachable base (see `log-workforce-engagements`); if it fails again, the next row |
   | any other `✋ gate:` | label `autopilot:needs-human` + `autopilot:reason:merge-engine-refusal`, post the line as a comment, stop |
 
   Never look for another way to merge.

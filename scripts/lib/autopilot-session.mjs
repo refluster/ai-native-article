@@ -185,10 +185,11 @@ export function greenVerdictAfter(comments, sinceMs) {
   for (const c of comments ?? []) {
     const body = String(c?.body ?? "");
     if (!/^\*\*Nadia — verdict, cycle \d+ of/u.test(body)) continue;
-    const at = Date.parse(c?.created_at ?? "") || 0;
+    const at = Date.parse(c?.created_at ?? "");
+    if (!Number.isFinite(at)) return false; // unparseable timestamp → no ordering claim (fail closed)
     if (!latest || at >= latest.at) latest = { at, body };
   }
-  if (!latest) return false;
+  if (!latest || !(sinceMs > 0)) return false;
   const firstLine = latest.body.split("\n")[0];
   return firstLine.includes("🟢") && latest.body.includes("<!-- autopilot:panel:isolated -->") && latest.at >= sinceMs;
 }

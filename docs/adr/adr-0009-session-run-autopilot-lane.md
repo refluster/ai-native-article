@@ -27,7 +27,7 @@ each query prefixed `repo:refluster/ai-native-article is:pr is:merged merged:>=2
 
 So agents already merge most PRs here, through one engine, under
 [governance.md §4.4](../governance.md#44-autopilot-pr-merge--workforce-r-n10-delegation--l0l1-off-limits).
-But five other texts still say an agent never merges, or restate a different
+But six other texts still say an agent never merges, or restate a different
 merge bar:
 
 1. `governance.md` §8.1 B — "Merging any PR, including the agent's own. Agent never self-merges."
@@ -43,9 +43,12 @@ merge bar:
    and its echoes in `workforce/docs/routines/workforce-builder.md`,
    `runbooks/dev-process.md` ("Per W-5: agents never merge") and
    `runbooks/podcast-pipeline.md`.
+6. `docs/design-policy.md` authority table — "Merging any PR (including own) | B |
+   governance C-3 / §8.1 explicit" (C-3 mislabelled again), and "merge PRs" in
+   its principle line.
 
 None of these copies has ever stopped a merge the engine would have made; they
-only make the session lane look illegal and make every reader reconcile five
+only make the session lane look illegal and make every reader reconcile seven
 texts.
 
 ## Decision
@@ -65,6 +68,7 @@ texts.
 - **R6.** governance.md §6.2's "the only merge authority, §8.1 B" (which R1
   leaves dangling) becomes "the ledger is in the L0/L1 block" — the block
   gains `docs/risk-acceptance-ledger.md`, which keeps what §6.2 always meant.
+- **R7.** design-policy.md's authority row and principle line point to §4.4.
 
 **Add only what the removals need.**
 
@@ -114,7 +118,7 @@ engagement (clause 4).
 `.claude/skills/pr-autopilot-session/**`), so the lane can never merge a change
 to its own gate — the same reason §4.4 sits inside `docs/governance.md`.
 
-Net: **6 removals, 3 additions.** The merge rule has one text (§4.4) and one
+Net: **7 removals, 3 additions.** The merge rule has one text (§4.4) and one
 executor (`pr-merge.mjs`), with one known exception that predates this ADR:
 the Zone A lines in AGENTS.md ("may NOT merge without a human") and CLAUDE.md
 (rubric/roster "never self-merge") state a stricter bar for the Zone A files
@@ -169,7 +173,11 @@ gap; it is left for its own decision rather than resolved here.
   the head, so a push in the seconds between the gate's read and the engine's
   is not caught (an `expected_sha` in the decision closes it); neither the
   engine nor the gate filters review comments by author; and `pr-merge.mjs`
-  itself is outside the L0/L1 block.
+  itself is outside the L0/L1 block — as are the other files the launcher
+  extracts from main and runs with the PAT (`scripts/lib/proxy-bootstrap.mjs`,
+  `workforce/scripts/lib/**`, `workforce/projects/**`). "No PR changes the
+  code that judges it" holds per merge; a merged non-L0/L1 change to those
+  files judges later PRs.
 - **Remote sessions** reach agents-api only where the custom domain is allowed;
   elsewhere set `WF_API_BASE` to a reachable base, or the gate exits 1.
 - **When the gate cannot run** (exit 1: no AWS access, agents-api or GitHub

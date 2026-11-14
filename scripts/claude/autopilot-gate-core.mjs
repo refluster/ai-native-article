@@ -216,9 +216,11 @@ async function gate({ pr, reviewers, dryRun }, engineDir) {
   if (code === 1) throw new GateError(`engine failed (exit ${r.status ?? "signal"}): ${tail(r.stderr, 300)}`);
 
   console.log(`#${pr} ✅ merged by the engine (reviewers: ${reviewers.join(", ")})`);
-  const after = lastJson(engineSnippet(env, engine, AFTER_MERGE, REPO, String(pr)).stdout);
-  if (after?.readFailed) console.log(`#${pr} ⚠ merged, but the labels could not be read (${after.readFailed}); stale reason labels and autopilot:merged were not updated`);
-  else if (!after?.labelled) console.log(`#${pr} ⚠ merged, but the autopilot:merged label was not applied`);
+  const afterRun = engineSnippet(env, engine, AFTER_MERGE, REPO, String(pr));
+  const after = lastJson(afterRun.stdout);
+  if (!after) console.log(`#${pr} ⚠ merged, but the post-merge step failed as a whole (labels untouched): ${tail(afterRun.stderr)}`);
+  else if (after.readFailed) console.log(`#${pr} ⚠ merged, but the labels could not be read (${after.readFailed}); stale reason labels and autopilot:merged were not updated`);
+  else if (!after.labelled) console.log(`#${pr} ⚠ merged, but the autopilot:merged label was not applied`);
   if (after?.failed?.length) console.log(`#${pr} ⚠ merged, but stale labels could not be removed: ${after.failed.join(", ")}`);
   const eng = run(process.execPath, [join(engineDir, "workforce/scripts/record-engagement.mjs"),
     "--agent", "nadia", "--skill", "pr-autopilot", "--project", "agent-workforce", "--status", "ok",
