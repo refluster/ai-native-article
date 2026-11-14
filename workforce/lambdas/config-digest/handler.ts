@@ -38,6 +38,91 @@ import { type SkillAuditRow } from "../shared/skill-audit.js";
 import { queryBySkPrefix, scanPrefix } from "../shared/ddb.js";
 import { createIssue } from "../shared/github.js";
 
+// ── org-graph validation (FU-022) ─────────────────────────────────────────
+
+export interface OrgViolation {
+  kind: "cycle" | "dangling";
+  slug: string;
+  field: "reports_to" | "lateral";
+  edge: string;
+  /** Closed path for cycle violations: [a, b, …, a]. */
+  cycle_path?: readonly string[];
+}
+
+/**
+ * Checks the live agent roster for org-graph inconsistencies:
+ * - dangling edges in `reports_to` or `lateral` (target slug not in roster)
+ * - cycles in `reports_to` (would cause computeDepths to throw at deploy time)
+ *
+ * The roster is the NON-ARCHIVED agents only — the same set the deploy gate
+ * sees (`GET /agents` filters `archived`; agents-api/handler.ts). An active
+ * agent whose edge names an archived agent is therefore `dangling`, exactly
+ * as `build-agent-manifest.mjs` will treat it; archived agents' own edges are
+ * not checked because they never reach the manifest.
+ *
+ * Surfacing these in the weekly digest catches broken graphs before
+ * deploy-article-site.yml trips on them (see FU-022).
+ */
+export function checkOrgGraph(agents: ReadonlyMap<string, AgentMetaRow>): OrgViolation[] {
+  const violations: OrgViolation[] = [];
+  const active = new Map<string, AgentMetaRow>();
+  for (const [slug, meta] of agents) {
+    if (!meta.archived) active.set(slug, meta);
+  }
+  agents = active;
+  const slugs = new Set(agents.keys());
+
+  // ── dangling edges ───────────────────────────────────────────────────────
+  for (const [slug, meta] of agents) {
+    for (const target of meta.reports_to ?? []) {
+      if (!slugs.has(target)) {
+        violations.push({ kind: "dangling", slug, field: "reports_to", edge: target });
+      }
+    }
+    for (const target of meta.lateral ?? []) {
+      if (!slugs.has(target)) {
+        violations.push({ kind: "dangling", slug, field: "lateral", edge: target });
+      }
+    }
+  }
+
+  // ── cycles in reports_to ─────────────────────────────────────────────────
+  // Standard DFS coloring. Only reports_to is a directed hierarchy; lateral
+  // edges are intentionally bidirectional and not checked for cycles.
+  const WHITE = 0, GRAY = 1, BLACK = 2;
+  const color = new Map<string, number>();
+  for (const s of slugs) color.set(s, WHITE);
+  const reported = new Set<string>();
+  const pathStack: string[] = [];
+
+  function visit(slug: string): void {
+    color.set(slug, GRAY);
+    pathStack.push(slug);
+    for (const target of agents.get(slug)?.reports_to ?? []) {
+      if (!slugs.has(target)) continue; // dangling already reported above
+      if (color.get(target) === GRAY) {
+        const cycleStart = pathStack.indexOf(target);
+        const path = [...pathStack.slice(cycleStart), target];
+        const id = [...path].sort().join("\0");
+        if (!reported.has(id)) {
+          reported.add(id);
+          violations.push({ kind: "cycle", slug, field: "reports_to", edge: target, cycle_path: path });
+        }
+      } else if (color.get(target) === WHITE) {
+        visit(target);
+      }
+    }
+    pathStack.pop();
+    color.set(slug, BLACK);
+  }
+
+  for (const s of slugs) {
+    if (color.get(s) === WHITE) visit(s);
+  }
+
+  return violations;
+}
+
 const STAGE = process.env.STAGE ?? "dev";
 const WINDOW_DAYS = 7;
 // Per-partition read ceiling. The audit partition gains a handful of items
@@ -60,6 +145,7 @@ export interface ConfigDigestResult {
   agents_changed: number;
   skills_changed: number;
   mutations: number;
+  org_violations: number;
   issue_url?: string;
   export_arn?: string;
 }
@@ -71,11 +157,14 @@ export async function handler(): Promise<ConfigDigestResult> {
   const toIso = to.toISOString();
 
   // ── 1. collect the week's audit items, grouped by agent ───────────────
+  // Also capture the full AgentMetaRow for org-graph validation (FU-022).
   const byAgent = new Map<string, AgentAuditRow[]>();
+  const allAgentMetas = new Map<string, AgentMetaRow>();
   let cursor: string | undefined;
   do {
     const page = await scanPrefix<AgentMetaRow>("AGENT#", "META", 100, cursor);
     for (const meta of page.items) {
+      allAgentMetas.set(meta.slug, meta);
       const audits = await queryBySkPrefix<AgentAuditRow>(
         agentPk(meta.slug),
         AUDIT_SK_PREFIX,
@@ -129,11 +218,14 @@ export async function handler(): Promise<ConfigDigestResult> {
     [...byAgent.values()].reduce((n, rows) => n + rows.length, 0) +
     [...bySkill.values()].reduce((n, rows) => n + rows.length, 0);
 
+  // ── 1c. org-graph validation (FU-022) ─────────────────────────────────
+  const orgViolations = checkOrgGraph(allAgentMetas);
+
   // ── 2. durability export (Decision §7) — runs on quiet weeks too ──────
   const exportArn = await exportTable(toIso);
 
   // ── 3. deliver ─────────────────────────────────────────────────────────
-  if (mutations === 0) {
+  if (mutations === 0 && orgViolations.length === 0) {
     console.log(
       JSON.stringify({ event: "config_digest_empty", from: fromIso, to: toIso, export_arn: exportArn }),
     );
@@ -144,12 +236,16 @@ export async function handler(): Promise<ConfigDigestResult> {
       agents_changed: 0,
       skills_changed: 0,
       mutations: 0,
+      org_violations: 0,
       export_arn: exportArn,
     };
   }
 
-  const title = `Weekly config digest — ${fromIso.slice(0, 10)} → ${toIso.slice(0, 10)}`;
-  const body = renderDigest(byAgent, bySkill, fromIso, toIso, exportArn);
+  // Prepend ⚠️ when org violations are present so the issue stands out in
+  // the GitHub issues list (the operator should fix these before next deploy).
+  const violationPrefix = orgViolations.length > 0 ? "⚠️ " : "";
+  const title = `${violationPrefix}Weekly config digest — ${fromIso.slice(0, 10)} → ${toIso.slice(0, 10)}`;
+  const body = renderDigest(byAgent, bySkill, fromIso, toIso, exportArn, orgViolations);
   const issue = await createIssue({
     owner: GITHUB_OWNER,
     repo: GITHUB_REPO,
@@ -166,6 +262,7 @@ export async function handler(): Promise<ConfigDigestResult> {
       agents_changed: byAgent.size,
       skills_changed: bySkill.size,
       mutations,
+      org_violations: orgViolations.length,
       issue_url: issue.url,
     }),
   );
@@ -176,6 +273,7 @@ export async function handler(): Promise<ConfigDigestResult> {
     agents_changed: byAgent.size,
     skills_changed: bySkill.size,
     mutations,
+    org_violations: orgViolations.length,
     issue_url: issue.url,
     export_arn: exportArn,
   };
@@ -228,12 +326,52 @@ function renderChange(c: AgentAuditChange): string {
   return `  - **${c.field}**: ${renderValue(c.before)} → ${renderValue(c.after)}`;
 }
 
+function renderOrgViolations(violations: readonly OrgViolation[]): string {
+  const blocking = violations.filter((v) => v.field === "reports_to");
+  const advisory = violations.filter((v) => v.field === "lateral");
+  const lines: string[] = ["## ⚠️ Org-graph violations", ""];
+  if (blocking.length > 0) {
+    lines.push(
+      "The following `reports_to` edges are inconsistent with the live",
+      "(non-archived) agent roster. `deploy-article-site.yml` will reject the",
+      "manifest until these are corrected via `PATCH /agents/{slug}` through",
+      "agents-api.",
+      "",
+    );
+    for (const v of blocking) lines.push(renderViolationLine(v));
+    lines.push("");
+  }
+  if (advisory.length > 0) {
+    lines.push(
+      "Advisory — `lateral` edges that name a slug missing from the roster.",
+      "These do not by themselves fail the deploy gate; fix them to keep the",
+      "org graph honest.",
+      "",
+    );
+    for (const v of advisory) lines.push(renderViolationLine(v));
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+function renderViolationLine(v: OrgViolation): string {
+  if (v.kind === "dangling") {
+    return (
+      `- **dangling** \`${v.slug}.${v.field}\` → \`${v.edge}\` ` +
+      `(target is not an active agent in the roster)`
+    );
+  }
+  const path = v.cycle_path ? v.cycle_path.join(" → ") : `${v.slug} → ${v.edge}`;
+  return `- **cycle** in \`reports_to\`: ${path}`;
+}
+
 export function renderDigest(
   byAgent: ReadonlyMap<string, readonly AgentAuditRow[]>,
   bySkill: ReadonlyMap<string, readonly SkillAuditRow[]>,
   fromIso: string,
   toIso: string,
   exportArn: string,
+  orgViolations: readonly OrgViolation[] = [],
 ): string {
   const lines: string[] = [
     `Weekly config review (agents: ADR-0007 §5; skills: ADR-0008 §4). Window: \`${fromIso}\` → \`${toIso}\`.`,
@@ -244,6 +382,9 @@ export function renderDigest(
     "wrong — closing it records the review as done.",
     "",
   ];
+  if (orgViolations.length > 0) {
+    lines.push(renderOrgViolations(orgViolations));
+  }
   const slugs = [...byAgent.keys()].sort();
   for (const slug of slugs) {
     const rows = byAgent.get(slug)!;
