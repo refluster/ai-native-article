@@ -40,7 +40,15 @@ const FROM_MAIN = "AUTOPILOT_GATE_FROM_MAIN";
 class GateError extends Error {
   constructor(msg, code = 1) { super(msg); this.code = code; }
 }
-const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { encoding: "utf8", maxBuffer: 64 << 20, ...opts });
+// Every child is bounded (#888): a hung GitHub/AWS connection becomes a loud
+// timeout, never a gate that waits forever. AUTOPILOT_GATE_TIMEOUT_MS exists
+// for the test harness.
+const TIMEOUT_MS = Number(process.env.AUTOPILOT_GATE_TIMEOUT_MS) || 180_000;
+const run = (cmd, args, opts = {}) => {
+  const r = spawnSync(cmd, args, { encoding: "utf8", maxBuffer: 64 << 20, timeout: TIMEOUT_MS, ...opts });
+  if (r.error?.code === "ETIMEDOUT") r.timedOut = true;
+  return r;
+};
 const tail = (s, n = 200) => String(s ?? "").trim().split("\n").pop()?.slice(0, n) ?? "";
 
 function parseArgs(argv) {
@@ -85,7 +93,7 @@ const READ_PR = `
     if (r.status !== 200) { console.log(JSON.stringify({ error: "GET pull HTTP " + r.status })); process.exit(0); }
     p = r.json;
     if (p.mergeable !== null) break;
-    await new Promise((s) => setTimeout(s, 5000));
+    await new Promise((s) => setTimeout(s, Number(process.env.AUTOPILOT_GATE_SETTLE_MS) || 5000)); // knob for the test harness
   }
   const comments = [];
   for (let page = 1; ; page++) {
@@ -147,6 +155,7 @@ async function gate({ pr, reviewers, dryRun }, engineDir) {
 
   const read = engineSnippet(env, engine, READ_PR, REPO, String(pr));
   const live = lastJson(read.stdout);
+  if (read.timedOut) throw new GateError(`reading the PR timed out after ${TIMEOUT_MS} ms`);
   if (!live || live.error || !live.title) throw new GateError(`cannot read the PR (${live?.error || tail(read.stderr) || "engine error"})`);
   if (!/^[0-9a-f]{40}$/.test(String(live.head ?? ""))) throw new GateError("cannot read the PR's head commit");
   if (isCadenceAuthored(live.body)) {
@@ -183,8 +192,8 @@ async function gate({ pr, reviewers, dryRun }, engineDir) {
     const v = lastJson(engineSnippet(env, engine, `
       const m = await import(process.argv[2]);
       const gh = m.makeGh({ token: process.env.TOKEN, userAgent: "session-merge-gate" });
-      const v = await m.verifyMergeable(gh, process.argv[3], Number(process.argv[4]), { reviewers: process.argv[5].split(",") });
-      console.log(JSON.stringify(v));`, REPO, String(pr), reviewers.join(",")).stdout);
+      const v = await m.verifyMergeable(gh, process.argv[3], Number(process.argv[4]), { reviewers: process.argv[5].split(","), expected_sha: process.argv[6] });
+      console.log(JSON.stringify(v));`, REPO, String(pr), reviewers.join(","), live.head).stdout);
     if (!v) throw new GateError("engine error during dry-run");
     const draft = v.ok && live.draft ? " (draft: the real run must un-draft it first, which can fail)" : "";
     console.log(`#${pr} ${v.ok ? "✅ eligible" : "⛔ not eligible"}: ${v.why}${draft}`);
@@ -195,6 +204,7 @@ async function gate({ pr, reviewers, dryRun }, engineDir) {
   const dfile = join(engineDir, "decisions.json");
   writeFileSync(dfile, JSON.stringify({ decisions: [{
     pr, action: "merge", reviewers,
+    expected_sha: live.head, // the engine refuses if the head moved after this read (#887)
     comment: `Autopilot merge (session-run lane, docs/adr/adr-0009): unanimous green from ${list} on head ` +
       `\`${live.head.slice(0, 7)}\`; no L0/L1 surface; the predicate was re-verified by the workforce engine ` +
       "`pr-merge.mjs` (origin/main) immediately before this merge.",
@@ -203,17 +213,28 @@ async function gate({ pr, reviewers, dryRun }, engineDir) {
   }] }));
   const r = run(process.execPath, ["--disable-warning=UNDICI-EHPA", engine, "--repo", REPO, "--decisions", dfile], { env });
   const result = lastJson(r.stdout) || {};
-  // Two signals for "merged": the JSON result line, and the engine's own
-  // `pr-merge: MERGED #N` stderr line (pr-merge.mjs applyDecisions).
+  // "Merged" is a fact about the PR, not about the engine's exit (#888): the
+  // JSON result, the engine's own `pr-merge: MERGED #N` line, or — when the
+  // engine died or timed out without either — a fresh read of the PR.
   const mergedLine = new RegExp(`^pr-merge: MERGED #${pr}\\b`, "m").test(r.stderr || "");
-  const code = gateExitFor(r.status, result.merged === 1 || (r.status === 0 && mergedLine));
+  let merged = result.merged === 1 || mergedLine;
+  if (!merged && r.status !== 0 && r.status !== 2) {
+    const check = lastJson(engineSnippet(env, engine, `
+      const m = await import(process.argv[2]);
+      const gh = m.makeGh({ token: process.env.TOKEN, userAgent: "session-merge-gate" });
+      const r = await gh("GET", "/repos/" + process.argv[3] + "/pulls/" + process.argv[4]);
+      console.log(JSON.stringify({ merged: r.status === 200 && r.json?.merged === true }));`, REPO, String(pr)).stdout);
+    merged = check?.merged === true;
+  }
+  if (merged && r.status !== 0) console.log(`#${pr} ⚠ the engine exited ${r.timedOut ? "on timeout" : r.status ?? "on a signal"} after merging`);
+  const code = merged ? 0 : gateExitFor(r.status, false);
   const refusal = (r.stderr || "").split("\n").find((l) => /REFUSE|REJECTED/.test(l));
   if (code === 2 && refusal) {
     console.log(`#${pr} ⛔ engine refused: ${refusal}`);
     return 2;
   }
   if (code === 2) throw new GateError(`engine exited 2 without a refusal line: ${tail(r.stderr, 300)}`);
-  if (code === 1) throw new GateError(`engine failed (exit ${r.status ?? "signal"}): ${tail(r.stderr, 300)}`);
+  if (code === 1) throw new GateError(`engine failed (${r.timedOut ? `timeout after ${TIMEOUT_MS} ms` : `exit ${r.status ?? "signal"}`}): ${tail(r.stderr, 300)}`);
 
   console.log(`#${pr} ✅ merged by the engine (reviewers: ${reviewers.join(", ")})`);
   const afterRun = engineSnippet(env, engine, AFTER_MERGE, REPO, String(pr));

@@ -11,7 +11,7 @@ export const REPO = "refluster/ai-native-article";
 export const MIN_REVIEWERS = 3;
 
 // `gh pr create` anywhere in a (possibly compound) shell command.
-const GH_PR_CREATE = /(?:^|[\n;&|(]|\$\()\s*gh\s+pr\s+create\b/;
+export const GH_PR_CREATE = /(?:^|[\n;&|(]|\$\()\s*gh\s+pr\s+create\b/;
 const MCP_CREATE_PR = "mcp__github__create_pull_request";
 
 function prUrlRe(repo, flags = "i") {
@@ -93,6 +93,26 @@ export function isOperatorSession(env = process.env) {
   return env.CLAUDE_CODE_SESSION_ATTENDED === "1";
 }
 
+/**
+ * The hook's fallback (#888): a create on this repo whose PR number could not
+ * be read — still worth telling the session about, unless it is a cadence
+ * PR. Uses the same create grammar as prFromHookPayload; for Bash the cadence
+ * footer is looked for in the command (`--body`), for MCP in `body`.
+ */
+export function hookFallbackApplies(payload, repo = REPO) {
+  const input = payload?.tool_input ?? {};
+  const urlRe = prUrlRe(repo);
+  if (payload?.tool_name === MCP_CREATE_PR) {
+    return `${input.owner ?? ""}/${input.repo ?? ""}`.toLowerCase() === repo.toLowerCase() && !isCadenceAuthored(input.body);
+  }
+  if (payload?.tool_name === "Bash") {
+    const cmd = String(input.command ?? "");
+    return GH_PR_CREATE.test(cmd) && !isCadenceAuthored(cmd.replace(/\\n/g, "\n")) &&
+      urlRe.test(stringify(payload.tool_response));
+  }
+  return false;
+}
+
 /** The hook's stdout for a just-opened PR (Claude Code hook JSON contract). */
 export function hookOutput(pr) {
   const context =
@@ -135,14 +155,17 @@ export function headPinnedPanel(comments, reviewers, headSha) {
     const esc = slug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const re = new RegExp(`^(🟢|🔴) \\*\\*${esc} — [^\\n]*?cycle \\d+ @ ([0-9a-f]{7,40})\\.\\*\\*`, "iu"); // first line only
     let latest = null;
+    let unordered = false;
     for (const c of comments ?? []) {
       const m = re.exec(String(c?.body ?? ""));
       if (!m) continue;
-      const at = Date.parse(c?.created_at ?? "") || 0;
+      const at = Date.parse(c?.created_at ?? "");
+      if (!Number.isFinite(at)) { unordered = true; continue; } // cannot tell which is latest
       if (!latest || at >= latest.at) latest = { at, emoji: m[1], sha: m[2].toLowerCase(), body: String(c.body) };
     }
     if (latest) newestReviewAt = Math.max(newestReviewAt, latest.at);
-    if (!latest) bad.push(`${slug}: no head-pinned review`);
+    if (unordered) bad.push(`${slug}: a review has an unparseable timestamp`);
+    else if (!latest) bad.push(`${slug}: no head-pinned review`);
     else if (latest.emoji !== "🟢") bad.push(`${slug}: latest review is 🔴`);
     else if (!latest.body.includes(`<!-- autopilot:review:${slug}:green -->`)) bad.push(`${slug}: latest review lacks the green marker`);
     else if (!head.startsWith(latest.sha)) bad.push(`${slug}: reviewed ${latest.sha.slice(0, 7)}, head is ${head.slice(0, 7)}`);
@@ -201,9 +224,12 @@ export function redOnHead(comments, headSha) {
   const head = String(headSha ?? "").toLowerCase();
   const latest = new Map();
   for (const c of comments ?? []) {
-    const m = /^(🟢|🔴) \*\*([\w-]+) — [^\n]*?cycle \d+ @ ([0-9a-f]{7,40})\.\*\*/u.exec(String(c?.body ?? ""));
+    // Same heading grammar (and flags) as headPinnedPanel, so the two agree.
+    const m = /^(🟢|🔴) \*\*([\w-]+) — [^\n]*?cycle \d+ @ ([0-9a-f]{7,40})\.\*\*/iu.exec(String(c?.body ?? ""));
     if (!m || !head.startsWith(m[3].toLowerCase())) continue;
-    const at = Date.parse(c?.created_at ?? "") || 0;
+    const parsed = Date.parse(c?.created_at ?? "");
+    // An unparseable timestamp on a 🔴 must still block: order it last.
+    const at = Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
     const prev = latest.get(m[2].toLowerCase());
     if (!prev || at >= prev.at) latest.set(m[2].toLowerCase(), { at, emoji: m[1] });
   }

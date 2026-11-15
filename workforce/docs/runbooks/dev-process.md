@@ -124,7 +124,7 @@ Common contract for every reviewer:
 2. Per cycle-1 finding: confirms address-location, confirms tests lock it.
 3. Audit deferred items are named follow-ups (issue links or PR description sections).
 4. Post the verdict comment:
-   - **🟢 sign-off**: table of cycle-1 → cycle-2 audit, deferred items list, CI/test state, hand-off note. Operator decides on merge per W-5.
+   - **🟢 sign-off**: table of cycle-1 → cycle-2 audit, deferred items list, CI/test state, hand-off note. The merge follows root governance §4.4.
    - **🟡 still open**: which findings are NOT addressed yet; back to Phase E.
    - **🔴 escalate**: cycle cap hit OR the PR ran into something Maya can't decide (L0 amendment, R-N\* loosening, > USD 10/mo without alternative). Operator decides next.
 
@@ -132,7 +132,7 @@ Common contract for every reviewer:
 
 ## Phase G — Operator merge
 
-**Owner**: operator.
+**Owner**: the §4.4 engine for a non-L0/L1 PR (cron or session lane); the operator for an L0/L1 PR.
 **Outputs**: merge.
 
 Merging follows root [governance.md §4.4](../../../docs/governance.md#44-autopilot-pr-merge--workforce-r-n10-delegation--l0l1-off-limits) (agents merge only through its engine; L0/L1 PRs end at the operator). Squash-merge preferred (keeps `main` history linear; revise commits get folded into a clean record).

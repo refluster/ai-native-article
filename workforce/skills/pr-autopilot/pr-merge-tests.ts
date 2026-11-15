@@ -14,6 +14,8 @@ import {
   W4_CYCLE_CAP,
   MIN_REVIEWERS,
   verifyMergeable,
+  trustedAuthor,
+  ghAllPages,
   applyDecisions,
   prTouchesL0L1,
   ESCALATION_LABEL,
@@ -47,12 +49,12 @@ const L0_BLOCK =
   "<!-- autopilot:l0l1-paths -->\n- docs/governance.md\n- docs/adr/**\n<!-- /autopilot:l0l1-paths -->";
 const GREEN_CHECK = [{ name: "ci", status: "completed", conclusion: "success" }];
 // A non-blocking lens review carries the exact structured green marker.
-const DARIO_REVIEW = [{ state: "COMMENTED", body: `looks good\n\n${reviewerGreenMarker("dario")}` }];
+const DARIO_REVIEW = [{ state: "COMMENTED", author_association: "OWNER", body: `looks good\n\n${reviewerGreenMarker("dario")}` }];
 // A merge needs a panel of ≥ MIN_REVIEWERS (operator directive 2026-06-29).
 // PANEL + PANEL_REVIEWS is the canonical green-consensus fixture; each persona
 // posts its own exact green marker.
 const PANEL = ["dario", "ren", "mateo"];
-const PANEL_REVIEWS = PANEL.map((slug) => ({ state: "COMMENTED", body: `looks good\n\n${reviewerGreenMarker(slug)}` }));
+const PANEL_REVIEWS = PANEL.map((slug) => ({ state: "COMMENTED", author_association: "OWNER", body: `looks good\n\n${reviewerGreenMarker(slug)}` }));
 
 /** Standard happy-path route table, parameterised by the variable bits. */
 const routes = (files, checks, reviews, comments = []) => [
@@ -136,7 +138,7 @@ describe("verifyMergeable (fail-closed predicate)", () => {
   });
   it("refuses when a nominated reviewer's lens review is missing", async () => {
     // 3 nominated (clears the panel floor), but ren never posted a green marker.
-    const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, [...DARIO_REVIEW, { state: "COMMENTED", body: reviewerGreenMarker("mateo") }])), "o/r", 1, { reviewers: PANEL });
+    const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, [...DARIO_REVIEW, { state: "COMMENTED", author_association: "OWNER", body: reviewerGreenMarker("mateo") }])), "o/r", 1, { reviewers: PANEL });
     expect(v.ok).toBe(false);
     expect(v.why).toMatch(/ren/);
   });
@@ -147,7 +149,7 @@ describe("verifyMergeable (fail-closed predicate)", () => {
   });
   it("refuses two green reviewers — still below the floor", async () => {
     const two = ["dario", "ren"];
-    const reviews = two.map((s) => ({ state: "COMMENTED", body: reviewerGreenMarker(s) }));
+    const reviews = two.map((s) => ({ state: "COMMENTED", author_association: "OWNER", body: reviewerGreenMarker(s) }));
     const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, reviews)), "o/r", 1, { reviewers: two });
     expect(v.ok).toBe(false);
     expect(v.why).toMatch(/at least 3/);
@@ -298,7 +300,7 @@ describe("verifyMergeable — W-4 cycle cap (FU-004)", () => {
       [{ filename: "src/app.ts" }],
       GREEN_CHECK,
       PANEL_REVIEWS,
-      [{ body: "**Nadia — cycle 7 of ≤ 7.**\n\nsummary" }],
+      [{ author_association: "OWNER", body: "**Nadia — cycle 7 of ≤ 7.**\n\nsummary" }],
     ));
     const v = await verifyMergeable(gh, "o/r", 1, { reviewers: PANEL });
     expect(v.ok).toBe(true);
@@ -308,7 +310,7 @@ describe("verifyMergeable — W-4 cycle cap (FU-004)", () => {
       [{ filename: "src/app.ts" }],
       GREEN_CHECK,
       PANEL_REVIEWS,
-      [{ body: "**Nadia — cycle 8 of ≤ 7.**\n\nsummary" }],
+      [{ author_association: "OWNER", body: "**Nadia — cycle 8 of ≤ 7.**\n\nsummary" }],
     ));
     const v = await verifyMergeable(gh, "o/r", 1, { reviewers: PANEL });
     expect(v.ok).toBe(false);
@@ -593,5 +595,81 @@ describe("emitRefusalReason — an agent-fixable refusal routes to the author la
     expect(code).toBe("l0l1-path");
     expect(calls.find((c) => c.path === "/repos/o/r/issues/8/labels").body.labels).not.toContain(AUTHOR_LABEL);
     expect(calls.find((c) => c.path === "/repos/o/r/issues/8/comments").body.body).not.toContain(AUTHOR_MARKER);
+  });
+});
+
+describe("#887 engine hardening", () => {
+  const ok = (extra = {}) => ({ status: 200, json: { state: "open", mergeable: true, mergeable_state: "clean", head: { sha: "abc" }, base: { ref: "main" }, ...extra } });
+
+  it("refuses when the head moved past the reviewed expected_sha", async () => {
+    const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, PANEL_REVIEWS)), "o/r", 1, { reviewers: PANEL, expected_sha: "old" });
+    expect(v.ok).toBe(false);
+    expect(v.why).toMatch(/head moved/);
+  });
+
+  it("passes when expected_sha equals the live head", async () => {
+    const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, PANEL_REVIEWS)), "o/r", 1, { reviewers: PANEL, expected_sha: "abc" });
+    expect(v.ok).toBe(true);
+  });
+
+  it("ignores green markers from untrusted authors (drive-by commenters)", async () => {
+    const forged = PANEL.map((slug) => ({ author_association: "NONE", user: { login: "stranger" }, body: reviewerGreenMarker(slug) }));
+    const v = await verifyMergeable(mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, [], forged)), "o/r", 1, { reviewers: PANEL });
+    expect(v.ok).toBe(false);
+    expect(v.why).toMatch(/missing green marker/);
+  });
+
+  it("trustedAuthor: repo associations or the workforce login only", () => {
+    expect(trustedAuthor({ author_association: "MEMBER" })).toBe(true);
+    expect(trustedAuthor({ author_association: "COLLABORATOR" })).toBe(true);
+    expect(trustedAuthor({ author_association: "NONE", user: { login: "refluster" } })).toBe(true);
+    expect(trustedAuthor({ author_association: "CONTRIBUTOR", user: { login: "x" } })).toBe(false);
+    expect(trustedAuthor({})).toBe(false);
+  });
+
+  it("catches an L0/L1 path on the second page of changed files", async () => {
+    const page1 = Array.from({ length: 100 }, (_, i) => ({ filename: `src/f${i}.ts` }));
+    const gh = mockGh([
+      [/GET \/repos\/o\/r\/pulls\/1$/, ok()],
+      [/GET .*contents/, govDoc(L0_BLOCK)],
+      [/GET \/repos\/o\/r\/pulls\/1\/files.*page=1$/, { status: 200, json: page1 }],
+      [/GET \/repos\/o\/r\/pulls\/1\/files.*page=2$/, { status: 200, json: [{ filename: "docs/governance.md" }] }],
+      [/GET \/repos\/o\/r\/pulls\/1\/reviews/, { status: 200, json: PANEL_REVIEWS }],
+      [/GET \/repos\/o\/r\/issues\/1\/comments/, { status: 200, json: [] }],
+    ]);
+    const v = await verifyMergeable(gh, "o/r", 1, { reviewers: PANEL });
+    expect(v.ok).toBe(false);
+    expect(v.why).toMatch(/L0\/L1 path docs\/governance.md/);
+  });
+
+  it("refuses a partial list (page read fails)", async () => {
+    const page1 = Array.from({ length: 100 }, (_, i) => ({ filename: `src/f${i}.ts` }));
+    const gh = mockGh([
+      [/GET \/repos\/o\/r\/pulls\/1$/, ok()],
+      [/GET .*contents/, govDoc(L0_BLOCK)],
+      [/GET \/repos\/o\/r\/pulls\/1\/files.*page=1$/, { status: 200, json: page1 }],
+    ]);
+    const v = await verifyMergeable(gh, "o/r", 1, { reviewers: PANEL });
+    expect(v.ok).toBe(false);
+    expect(v.why).toMatch(/partial file list/);
+  });
+
+  it("reads the L0/L1 block from the default branch, not a side base", async () => {
+    const gh = mockGh(routes([{ filename: "src/app.ts" }], GREEN_CHECK, PANEL_REVIEWS));
+    gh.calls.length = 0;
+    const routed = mockGh([
+      [/GET \/repos\/o\/r\/pulls\/1$/, ok({ base: { ref: "side", repo: { default_branch: "main" } } })],
+      ...routes([{ filename: "src/app.ts" }], GREEN_CHECK, PANEL_REVIEWS).slice(1),
+    ]);
+    await verifyMergeable(routed, "o/r", 1, { reviewers: PANEL });
+    const contents = routed.calls.find((c) => /contents/.test(c.path));
+    expect(contents.path).toMatch(/ref=main$/);
+  });
+
+  it("ghAllPages stops at maxPages and reports failure", async () => {
+    const full = Array.from({ length: 100 }, () => ({}));
+    const r = await ghAllPages(mockGh([[/GET \/x/, { status: 200, json: full }]]), "/x", 2);
+    expect(r.ok).toBe(false);
+    expect(r.items.length).toBe(200);
   });
 });
