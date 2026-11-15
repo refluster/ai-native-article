@@ -201,3 +201,8 @@ test("#888: hook fallback — same create grammar, cadence footer checked on bot
   assert.equal(hookFallbackApplies({ tool_name: "mcp__github__create_pull_request",
     tool_input: { owner: "refluster", repo: "ai-native-article", body: "x\nwf-task-id: r" }, tool_response: "?" }), false);
 });
+
+test("#890: a 🟢 with an unparseable timestamp cannot hide an earlier 🔴 in redOnHead", () => {
+  const c = [review("aoi", "🔴", HEAD.slice(0, 7), "2026-11-14T10:00:00Z"), review("aoi", "🟢", HEAD.slice(0, 7), "bad")];
+  assert.deepEqual(redOnHead(c, HEAD), ["aoi"]);
+});

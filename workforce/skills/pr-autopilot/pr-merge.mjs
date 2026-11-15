@@ -552,6 +552,9 @@ export async function verifyMergeable(gh, repo, pr, decision) {
   const reviewsRead = await ghAllPages(gh, `/repos/${repo}/pulls/${pr}/reviews`);
   if (!reviewsRead.ok) return { ok: false, why: `GET reviews -> ${reviewsRead.status}` };
   const reviews = reviewsRead.items;
+  // Deliberate asymmetry (#887): a CHANGES_REQUESTED veto counts from ANY
+  // author, while green votes count only from trusted ones — an outsider can
+  // stall a merge (fail closed), never cause one.
   if (reviews.some((r) => r.state === "CHANGES_REQUESTED")) return { ok: false, why: `a reviewer has CHANGES_REQUESTED — not consensus-green` };
   // Distinct reviewer slugs (case-folded, de-duped) — listing the same persona
   // three times is one reviewer, not a panel of three.

@@ -203,8 +203,11 @@ No rule is added; the engine now enforces what the Decision already claimed.
   refuses when the head moved after the gate's read. (The cron lane may pass it
   too; without it, behaviour is unchanged.)
 - **Only trusted authors vote.** A green marker counts only from an `OWNER` /
-  `MEMBER` / `COLLABORATOR` or the workforce login — in the engine and so in
-  both lanes.
+  `MEMBER` / `COLLABORATOR` or the workforce login, in the engine; the session
+  gate applies the same rule (the engine's `trustedAuthor`) before its
+  head-pinned checks, and scrubs `WF_GITHUB_EXPECTED_LOGINS` so the session
+  cannot widen the voter set. A `CHANGES_REQUESTED` veto still counts from
+  anyone: an outsider can stall a merge, never cause one.
 - **No partial lists.** Changed files, reviews and comments are read to the
   last page; a partial read refuses. (An L0/L1 path on file page 2 used to be
   invisible.)
@@ -214,7 +217,9 @@ No rule is added; the engine now enforces what the Decision already claimed.
   `github-identity.mjs` and `scripts/lib/proxy-bootstrap.mjs` — the code on the
   merge-judgement path that runs holding the PAT — join the §4.4 block, so no
   lane can merge a change to its own judge. Helpers loaded only after a
-  refusal (the author-lane doorbell) decide nothing and stay outside.
+  refusal (the author-lane doorbell: `pr-autopilot-scan.mjs`,
+  `request-dispatch.mjs`) decide nothing and stay outside — if either ever
+  moves ahead of the verdict, it joins the block.
 - R-N10's Consumer paragraph now says where clause 3 is checked, and the
   workforce §5 merge row points to §4.4 instead of the unrelated AGENTS.md R-6.
 

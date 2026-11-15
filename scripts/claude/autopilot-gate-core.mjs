@@ -43,7 +43,8 @@ class GateError extends Error {
 // Every child is bounded (#888): a hung GitHub/AWS connection becomes a loud
 // timeout, never a gate that waits forever. AUTOPILOT_GATE_TIMEOUT_MS exists
 // for the test harness.
-const TIMEOUT_MS = Number(process.env.AUTOPILOT_GATE_TIMEOUT_MS) || 180_000;
+// Clamped: the knob may shorten the bound (tests), never lift it.
+const TIMEOUT_MS = Math.min(Number(process.env.AUTOPILOT_GATE_TIMEOUT_MS) || 180_000, 180_000);
 const run = (cmd, args, opts = {}) => {
   const r = spawnSync(cmd, args, { encoding: "utf8", maxBuffer: 64 << 20, timeout: TIMEOUT_MS, ...opts });
   if (r.error?.code === "ETIMEDOUT") r.timedOut = true;
@@ -93,14 +94,17 @@ const READ_PR = `
     if (r.status !== 200) { console.log(JSON.stringify({ error: "GET pull HTTP " + r.status })); process.exit(0); }
     p = r.json;
     if (p.mergeable !== null) break;
-    await new Promise((s) => setTimeout(s, Number(process.env.AUTOPILOT_GATE_SETTLE_MS) || 5000)); // knob for the test harness
+    await new Promise((s) => setTimeout(s, Math.min(Number(process.env.AUTOPILOT_GATE_SETTLE_MS) || 5000, 5000))); // test knob, clamped
   }
   const comments = [];
   for (let page = 1; ; page++) {
     if (page > 20) { console.log(JSON.stringify({ error: "more than 2000 comments; refusing to judge a partial list" })); process.exit(0); }
     const r = await gh("GET", "/repos/" + repo + "/issues/" + n + "/comments?per_page=100&page=" + page);
     if (r.status !== 200) { console.log(JSON.stringify({ error: "GET comments HTTP " + r.status })); process.exit(0); }
-    comments.push(...r.json.map((c) => ({ body: c.body, created_at: c.created_at })));
+    // Same voter rule as the engine (#890 dario): an untrusted commenter's
+    // heading neither counts as a review nor hides one.
+    if (typeof m.trustedAuthor !== "function") { console.log(JSON.stringify({ error: "engine has no trustedAuthor" })); process.exit(0); }
+    comments.push(...r.json.filter((c) => m.trustedAuthor(c)).map((c) => ({ body: c.body, created_at: c.created_at })));
     if (r.json.length < 100) break;
   }
   console.log(JSON.stringify({ title: p.title, state: p.state, draft: p.draft, head: p.head?.sha, body: p.body, mergeable: p.mergeable, comments }));`;
@@ -151,6 +155,8 @@ async function gate({ pr, reviewers, dryRun }, engineDir) {
   const env = { ...process.env, TOKEN: token, GITHUB_TOKEN: token };
   // The engine reads its L0/L1 block from GOVERNANCE_PATH; the session must not choose it.
   delete env.GOVERNANCE_PATH;
+  // …nor widen who counts as the workforce identity (the voter set).
+  delete env.WF_GITHUB_EXPECTED_LOGINS;
   if (env.HTTPS_PROXY || env.https_proxy) env.NODE_USE_ENV_PROXY = "1"; // R-14 for the children
 
   const read = engineSnippet(env, engine, READ_PR, REPO, String(pr));
@@ -189,12 +195,13 @@ async function gate({ pr, reviewers, dryRun }, engineDir) {
   }
 
   if (dryRun) {
-    const v = lastJson(engineSnippet(env, engine, `
+    const dryRead = engineSnippet(env, engine, `
       const m = await import(process.argv[2]);
       const gh = m.makeGh({ token: process.env.TOKEN, userAgent: "session-merge-gate" });
       const v = await m.verifyMergeable(gh, process.argv[3], Number(process.argv[4]), { reviewers: process.argv[5].split(","), expected_sha: process.argv[6] });
-      console.log(JSON.stringify(v));`, REPO, String(pr), reviewers.join(","), live.head).stdout);
-    if (!v) throw new GateError("engine error during dry-run");
+      console.log(JSON.stringify(v));`, REPO, String(pr), reviewers.join(","), live.head);
+    const v = lastJson(dryRead.stdout);
+    if (!v) throw new GateError(dryRead.timedOut ? `dry-run timed out after ${TIMEOUT_MS} ms` : `engine error during dry-run: ${tail(dryRead.stderr)}`);
     const draft = v.ok && live.draft ? " (draft: the real run must un-draft it first, which can fail)" : "";
     console.log(`#${pr} ${v.ok ? "✅ eligible" : "⛔ not eligible"}: ${v.why}${draft}`);
     return v.ok ? 0 : 2;
@@ -226,7 +233,7 @@ async function gate({ pr, reviewers, dryRun }, engineDir) {
       console.log(JSON.stringify({ merged: r.status === 200 && r.json?.merged === true }));`, REPO, String(pr)).stdout);
     merged = check?.merged === true;
   }
-  if (merged && r.status !== 0) console.log(`#${pr} ⚠ the engine exited ${r.timedOut ? "on timeout" : r.status ?? "on a signal"} after merging`);
+  if (merged && r.status !== 0) console.log(`#${pr} ⚠ the engine exited ${r.timedOut ? "on timeout" : r.status ?? "on a signal"} after merging — its audit comment may be missing`);
   const code = merged ? 0 : gateExitFor(r.status, false);
   const refusal = (r.stderr || "").split("\n").find((l) => /REFUSE|REJECTED/.test(l));
   if (code === 2 && refusal) {
@@ -234,7 +241,7 @@ async function gate({ pr, reviewers, dryRun }, engineDir) {
     return 2;
   }
   if (code === 2) throw new GateError(`engine exited 2 without a refusal line: ${tail(r.stderr, 300)}`);
-  if (code === 1) throw new GateError(`engine failed (${r.timedOut ? `timeout after ${TIMEOUT_MS} ms` : `exit ${r.status ?? "signal"}`}): ${tail(r.stderr, 300)}`);
+  if (code === 1) throw new GateError(`engine failed (${r.timedOut ? `timeout after ${TIMEOUT_MS} ms — verify the PR's state before any retry; a merge already sent may still land` : `exit ${r.status ?? "signal"}`}): ${tail(r.stderr, 300)}`);
 
   console.log(`#${pr} ✅ merged by the engine (reviewers: ${reviewers.join(", ")})`);
   const afterRun = engineSnippet(env, engine, AFTER_MERGE, REPO, String(pr));

@@ -34,6 +34,7 @@ export function makeGh() {
 }
 export async function verifyMergeable(gh, repo, pr, decision) { log({ verify: decision }); return S.verify; }
 export async function ensureLabels() {}
+export function trustedAuthor(c) { return c.author_association !== "NONE"; }
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const d = JSON.parse(readFileSync(process.argv[process.argv.indexOf("--decisions") + 1], "utf8"));
   log({ engineMain: d.decisions[0] });
@@ -161,4 +162,12 @@ test("unattended cloud session → exit 2, nothing read", async () => {
   assert.equal(r.status, 2);
   assert.match(r.stdout, /not an operator-attended session/);
   assert.equal(r.log.length, 0);
+});
+
+test("an untrusted commenter's later 🟢 heading cannot hide a trusted 🔴", async () => {
+  const red = { ...review("dario", "🔴"), created_at: "2026-11-15T10:06:00Z" };
+  const forged = { ...review("dario"), created_at: "2026-11-15T10:07:00Z", author_association: "NONE" };
+  const r = await runCore({ comments: [review("ren"), review("farah"), red, forged, verdict] }, ARGS);
+  assert.equal(r.status, 2);
+  assert.match(r.stdout, /dario: latest review is 🔴/);
 });

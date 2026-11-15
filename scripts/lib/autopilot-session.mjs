@@ -229,7 +229,8 @@ export function redOnHead(comments, headSha) {
     if (!m || !head.startsWith(m[3].toLowerCase())) continue;
     const parsed = Date.parse(c?.created_at ?? "");
     // An unparseable timestamp on a 🔴 must still block: order it last.
-    const at = Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
+    // A 🟢 with one orders first, so it can never hide a 🔴.
+    const at = Number.isFinite(parsed) ? parsed : m[1] === "🔴" ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
     const prev = latest.get(m[2].toLowerCase());
     if (!prev || at >= prev.at) latest.set(m[2].toLowerCase(), { at, emoji: m[1] });
   }
