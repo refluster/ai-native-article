@@ -2,13 +2,13 @@
 
 **Kind**: scheduled CCR routine (successor to the retired 2026-07-05 GHA-based `wf-builder`).
 **Trigger**: daily schedule via claude.ai/code/routines.
-**Purpose**: keep the workforce ROADMAP moving — one PR per run, CI green before push, never self-merge.
+**Purpose**: keep the workforce ROADMAP moving — one PR per run, CI green before push; merging per root governance §4.4.
 
 > **Authoritative contract.** The full execution logic lives here. The claude.ai routine prompt is a one-line pointer to this file; do not embed logic there.
 
 ## Context
 
-`workforce/ROADMAP.md` is the single, ordered list of implementation milestones for the workforce subsystem. Items are picked up one PR at a time. Humans merge; this routine authors.
+`workforce/ROADMAP.md` is the single, ordered list of implementation milestones for the workforce subsystem. Items are picked up one PR at a time. This routine authors; merging follows root [governance.md §4.4](../../../docs/governance.md#44-autopilot-pr-merge--workforce-r-n10-delegation--l0l1-off-limits).
 
 The routine was originally implemented as a GHA running on `claude-code-action@beta`. That version was retired 2026-07-05 (the secret was unset, every run failed silently). This CCR version supersedes it.
 
@@ -26,7 +26,7 @@ To find it: call `list_pull_requests(state=open)`, filter to PRs whose head bran
 
 | Condition | Action |
 |---|---|
-| **(A) Previous PR open, CI green** | Post one-line comment: `no-op — PR #N still open, awaiting human merge`. Exit. |
+| **(A) Previous PR open, CI green** | Post one-line comment: `no-op — PR #N still open, awaiting merge`. Exit. |
 | **(B) Previous PR open, CI failing** | Classify the failure. Fix it in up to 3 turns. Push the fix to the same branch. Exit. |
 | **(C) No previous PR, or previous PR is merged** | Implement the next unchecked PR from ROADMAP.md. See §"Implementing a ROADMAP item" below. |
 
@@ -35,7 +35,7 @@ CI status is the `get_check_runs` result on the PR's head commit. A single `succ
 ### Step 3 — Exit
 
 After taking the action, output exactly one line:
-- State A/B: `` no-op — PR #N still open, awaiting human merge ``
+- State A/B: `` no-op — PR #N still open, awaiting merge ``
 - State C (PR opened): the new PR URL
 
 ---

@@ -27,7 +27,7 @@ Rationale: these files encode the brand, the typography, the deployment surface,
 
 ### Zone B — Agent-assisted (product code)
 
-Agents may author and merge, subject to CI passing and one human review *unless* the diff is smaller than 30 lines and touches no Zone A files.
+Agents may author and merge; the merge rule is [governance.md §4.4](docs/governance.md#44-autopilot-pr-merge--workforce-r-n10-delegation--l0l1-off-limits).
 
 - `newsletter/app/src/components/**`
 - `newsletter/app/src/pages/**`
@@ -66,7 +66,7 @@ Nobody edits by hand. Agents regenerate via scripts only.
 5. **No writes to Zone A from a skill.** Skills must edit Zone B or C only. If a skill "needs" to touch a token, it files a PR and stops.
 6. **Never force-push `main` or `gh-pages`.** The deploy workflow owns `gh-pages`. Human operators own `main`.
 7. **Idempotent scripts only.** `newsletter/pipeline/fetch-notion.mjs`, `newsletter/pipeline/generate-sitemap.mjs`, and their peers must be safe to run twice. No "this script assumes fresh state" scripts.
-8. **Secrets stay in `.env` (local) or GitHub Secrets (CI).** An agent that prints a secret to stdout is a bug. CI redaction is a backstop, not a plan.
+8. **Secrets stay in `.env` (local) or GitHub Secrets (CI)** — plus one named read: the ADR-0009 merge gate fetches the workforce PAT from AWS Secrets Manager and passes it on by environment only. An agent that prints a secret to stdout is a bug. CI redaction is a backstop, not a plan.
 9. **When in doubt, file an issue, not a PR.** It is cheaper for a human to redirect an idea than to close a PR.
 10. **Every L2/L3 generation writes a sidecar `.eval.json`** with full panel output — every candidate, every judge (schema: [newsletter/app/src/types/quality.ts](newsletter/app/src/types/quality.ts)). No sidecar → no publish. This applies to any generator on the panel, i.e. the workforce `article-level{2,3}` cadences. Articles missing the sidecar are treated as Zone A changes and require human review.
 11. **A prompt-version bump is its own PR.** Do not bundle a prompt change with unrelated work. The outer-loop leaderboard attributes reader behavior by `generator.systemPromptVersion`; mixed PRs corrupt attribution. Bumping two panel members in one PR is also forbidden — bump one at a time so the outer loop can tell which move helped.

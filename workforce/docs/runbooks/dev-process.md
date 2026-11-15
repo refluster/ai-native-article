@@ -125,7 +125,7 @@ Common contract for every reviewer:
 **Owner**: operator.
 **Outputs**: merge.
 
-Per W-5: agents never merge, even their own PRs. The operator is the final safety check. Squash-merge preferred (keeps `main` history linear; revise commits get folded into a clean record).
+Merging follows root [governance.md §4.4](../../../docs/governance.md#44-autopilot-pr-merge--workforce-r-n10-delegation--l0l1-off-limits) (agents merge only through its engine; L0/L1 PRs end at the operator). Squash-merge preferred (keeps `main` history linear; revise commits get folded into a clean record).
 
 After merge:
 

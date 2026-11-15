@@ -239,7 +239,7 @@ Applied 2026-09-27 (88/88).
 | Step | Authority | Why |
 |---|---|---|
 | Create the 5 Notion properties | **B** | Notion schema is operator-managed (C-2). |
-| Merge the Epic-017 PR | **B** | Agents never merge. |
+| Merge the Epic-017 PR | per root governance §4.4 | — |
 | Run `register.mjs` (persona existence) | **B** | priya/operator; gated by the W-3 raise. |
 | `sam deploy` (Polly = new AWS service) | **B** | §5 new-AWS-service row. |
 | Gemini key + CI `lambda:InvokeFunction` grant (§3a) | **B** | New external egress/credential + IAM (ADR-0043). |
