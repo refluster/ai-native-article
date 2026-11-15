@@ -68,7 +68,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { assertReasonCode, isAuthorLaneCode, reasonLabel, reasonMarker, refusalReasonCode } from "./escalation-reasons.mjs";
-import { DEFAULT_EXPECTED_GITHUB_LOGINS, assertGithubIdentity, identityCheckRequired } from "../../scripts/lib/github-identity.mjs";
+import { assertGithubIdentity, expectedLogins, identityCheckRequired } from "../../scripts/lib/github-identity.mjs";
 
 // Repo root, for the project.json lookup the author-lane dispatch needs
 // (workforce/skills/pr-autopilot → repo root).
@@ -333,10 +333,11 @@ export function reviewerGreenMarker(slug) {
 // Who may cast a review vote (#887 item 2). A green marker is only as strong as
 // the account that posted it: on a public repo anyone can comment, so a marker
 // counts only when its author is the repo's own (OWNER / MEMBER / COLLABORATOR)
-// or the workforce identity itself. Items without author data (none from the
+// or the workforce identity itself (the same login set the identity
+// preflight expects, WF_GITHUB_EXPECTED_LOGINS-overridable). Items without author data (none from the
 // real API) do not count — fail closed.
 const TRUSTED_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
-export function trustedAuthor(item, logins = DEFAULT_EXPECTED_GITHUB_LOGINS) {
+export function trustedAuthor(item, logins = expectedLogins()) {
   if (TRUSTED_ASSOCIATIONS.has(String(item?.author_association || "").toUpperCase())) return true;
   const login = String(item?.user?.login || "").toLowerCase();
   return !!login && logins.map((l) => String(l).toLowerCase()).includes(login);
