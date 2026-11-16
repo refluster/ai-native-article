@@ -1,6 +1,6 @@
 # ADR-0009 — Session-run autopilot lane; the merge rule lives in one place
 
-- **Status**: Proposed (Accepted when the operator merges the PR that adds it)
+- **Status**: Accepted (merged in #886, 2026-11-15); amended 2026-11-15 — see *Amendment 1*
 - **Date**: 2026-11-14
 - **Deciders**: operator (direction 2026-11-14: "port the asp-cloud session lane; subtract obsolete rules first"), Claude Code session (draft), panel ren · dario · farah (PR #886)
 
@@ -129,7 +129,7 @@ gap; it is left for its own decision rather than resolved here.
 
 - **Review in the session, leave the merge to the cron.** Keeps every old
   text, but the PR still waits up to 6 h for a merge the engine would make
-  anyway, and the five contradictory copies stay.
+  anyway, and the six contradictory copies stay.
 - **Copy asp-cloud verbatim.** Its hook matches only `gh pr create`; in this
   repo's cloud sessions PRs are opened through the GitHub MCP, so it would
   never fire. Its gate reads the token from a local `gh` login that cloud
@@ -168,8 +168,8 @@ gap; it is left for its own decision rather than resolved here.
   them; a PR body with the `wf-task-id:` cadence footer is refused as well.
   Their PRs stay on the cron lane. Like the other session-side checks, this
   binds an honest session.
-- **Residual, engine-side gaps** (tracked in a follow-up issue, not fixed here
-  because they change the shared engine): the engine merges its own read of
+- **Residual, engine-side gaps** — closed by *Amendment 1* below (#887). As
+  first accepted: the engine merges its own read of
   the head, so a push in the seconds between the gate's read and the engine's
   is not caught (an `expected_sha` in the decision closes it); neither the
   engine nor the gate filters review comments by author; and `pr-merge.mjs`
@@ -189,9 +189,39 @@ gap; it is left for its own decision rather than resolved here.
   comment; cron merges do not. The weekly count of
   `"Autopilot merge" "session-run lane"` against `"Autopilot merge"` and the
   open-to-merge time of each shows whether the lane delivers the latency it
-  claims. Checkpoint **2026-12-12** (four weeks after acceptance): the
+  claims. **Success threshold:** the median open-to-merge time of session-lane
+  merges (non-L0/L1) is **≤ 2 h**, against the cron lane's tick spacing of up
+  to 6 h. Checkpoint **2026-12-12** (four weeks after acceptance): the
   operator runs both queries and records the result on this ADR's PR; if the
-  lane has not delivered, remove it (rule: subtract).
+  threshold is missed, remove the lane (rule: subtract).
+
+## Amendment 1 (2026-11-15) — the engine-side gaps closed (#887, #888)
+
+No rule is added; the engine now enforces what the Decision already claimed.
+
+- **Head pin end to end.** The decision carries `expected_sha`; `pr-merge.mjs`
+  refuses when the head moved after the gate's read. (The cron lane may pass it
+  too; without it, behaviour is unchanged.)
+- **Only trusted authors vote.** A green marker counts only from an `OWNER` /
+  `MEMBER` / `COLLABORATOR` or the workforce login, in the engine; the session
+  gate applies the same rule (the engine's `trustedAuthor`) before its
+  head-pinned checks, and scrubs `WF_GITHUB_EXPECTED_LOGINS` so the session
+  cannot widen the voter set. A `CHANGES_REQUESTED` veto still counts from
+  anyone: an outsider can stall a merge, never cause one.
+- **No partial lists.** Changed files, reviews and comments are read to the
+  last page; a partial read refuses. (An L0/L1 path on file page 2 used to be
+  invisible.)
+- **The L0/L1 block is read from the default branch**, never from a side base
+  a PR could have weakened.
+- **The judge is L0/L1.** `pr-merge.mjs`, `escalation-reasons.mjs`,
+  `github-identity.mjs` and `scripts/lib/proxy-bootstrap.mjs` — the code on the
+  merge-judgement path that runs holding the PAT — join the §4.4 block, so no
+  lane can merge a change to its own judge. Helpers loaded only after a
+  refusal (the author-lane doorbell: `pr-autopilot-scan.mjs`,
+  `request-dispatch.mjs`) decide nothing and stay outside — if either ever
+  moves ahead of the verdict, it joins the block.
+- R-N10's Consumer paragraph now says where clause 3 is checked, and the
+  workforce §5 merge row points to §4.4 instead of the unrelated AGENTS.md R-6.
 
 ## Related
 

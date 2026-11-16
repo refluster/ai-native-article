@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { gateExitFor, greenVerdictAfter, headPinnedPanel, hookOutput, isCadenceAuthored, isOperatorSession, killSwitchArmed, parseReviewers,
+import { gateExitFor, greenVerdictAfter, headPinnedPanel, hookFallbackApplies, hookOutput, isCadenceAuthored, isOperatorSession, killSwitchArmed, parseReviewers,
   prFromHookPayload, redOnHead, tokenFromSecretString } from "./autopilot-session.mjs";
 
 const URL = "https://github.com/refluster/ai-native-article/pull/1234";
@@ -173,4 +173,36 @@ test("operator session: local runs and attended cloud sessions only", () => {
   assert.equal(isOperatorSession({ CLAUDE_CODE_REMOTE: "true", CLAUDE_CODE_SESSION_ATTENDED: "1" }), true);
   assert.equal(isOperatorSession({ CLAUDE_CODE_REMOTE: "true" }), false);
   assert.equal(isOperatorSession({ CLAUDE_CODE_REMOTE: "true", CLAUDE_CODE_SESSION_ATTENDED: "0" }), false);
+});
+
+test("#888: redOnHead and headPinnedPanel agree on an upper-case SHA", () => {
+  const up = review("aoi", "🔴", HEAD.slice(0, 7).toUpperCase(), "2026-11-14T10:01:00Z");
+  assert.deepEqual(redOnHead([up], HEAD), ["aoi"]);
+  assert.equal(headPinnedPanel([up], ["aoi"], HEAD).ok, false);
+});
+
+test("#888: an unparseable review timestamp fails closed in both parsers", () => {
+  const bad = review("ren", "🟢", HEAD.slice(0, 7), "not-a-date");
+  const v = headPinnedPanel([review("ren", "🟢", HEAD.slice(0, 7), "2026-11-14T10:00:00Z"), bad], ["ren"], HEAD);
+  assert.equal(v.ok, false);
+  assert.match(v.why, /unparseable timestamp/);
+  const red = review("ren", "🔴", HEAD.slice(0, 7), "not-a-date");
+  assert.deepEqual(redOnHead([review("ren", "🟢", HEAD.slice(0, 7), "2026-11-14T10:00:00Z"), red], HEAD), ["ren"]);
+});
+
+test("#888: hook fallback — same create grammar, cadence footer checked on both paths", () => {
+  const urlOut = { stdout: "Creating pull request…\nsee https://github.com/refluster/ai-native-article/pull/5 maybe\n" };
+  assert.equal(hookFallbackApplies({ tool_name: "Bash", tool_input: { command: "gh pr create -f" }, tool_response: urlOut }), true);
+  assert.equal(hookFallbackApplies({ tool_name: "Bash", tool_input: { command: "echo gh pr create" }, tool_response: urlOut }), false);
+  assert.equal(hookFallbackApplies({ tool_name: "Bash",
+    tool_input: { command: "gh pr create --body 'x\\nwf-task-id: run_1'" }, tool_response: urlOut }), false);
+  assert.equal(hookFallbackApplies({ tool_name: "mcp__github__create_pull_request",
+    tool_input: { owner: "refluster", repo: "ai-native-article", body: "x" }, tool_response: "?" }), true);
+  assert.equal(hookFallbackApplies({ tool_name: "mcp__github__create_pull_request",
+    tool_input: { owner: "refluster", repo: "ai-native-article", body: "x\nwf-task-id: r" }, tool_response: "?" }), false);
+});
+
+test("#890: a 🟢 with an unparseable timestamp cannot hide an earlier 🔴 in redOnHead", () => {
+  const c = [review("aoi", "🔴", HEAD.slice(0, 7), "2026-11-14T10:00:00Z"), review("aoi", "🟢", HEAD.slice(0, 7), "bad")];
+  assert.deepEqual(redOnHead(c, HEAD), ["aoi"]);
 });

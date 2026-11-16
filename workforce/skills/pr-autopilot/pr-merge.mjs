@@ -68,7 +68,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { assertReasonCode, isAuthorLaneCode, reasonLabel, reasonMarker, refusalReasonCode } from "./escalation-reasons.mjs";
-import { assertGithubIdentity, identityCheckRequired } from "../../scripts/lib/github-identity.mjs";
+import { assertGithubIdentity, expectedLogins, identityCheckRequired } from "../../scripts/lib/github-identity.mjs";
 
 // Repo root, for the project.json lookup the author-lane dispatch needs
 // (workforce/skills/pr-autopilot → repo root).
@@ -330,6 +330,33 @@ export function countRouterCycles(bodies) {
 export function reviewerGreenMarker(slug) {
   return `<!-- autopilot:review:${String(slug).toLowerCase()}:green -->`;
 }
+// Who may cast a review vote (#887 item 2). A green marker is only as strong as
+// the account that posted it: on a public repo anyone can comment, so a marker
+// counts only when its author is the repo's own (OWNER / MEMBER / COLLABORATOR)
+// or the workforce identity itself (the same login set the identity
+// preflight expects, WF_GITHUB_EXPECTED_LOGINS-overridable). Items without author data (none from the
+// real API) do not count — fail closed.
+const TRUSTED_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+export function trustedAuthor(item, logins = expectedLogins()) {
+  if (TRUSTED_ASSOCIATIONS.has(String(item?.author_association || "").toUpperCase())) return true;
+  const login = String(item?.user?.login || "").toLowerCase();
+  return !!login && logins.map((l) => String(l).toLowerCase()).includes(login);
+}
+
+// Read every page of a list endpoint (#887 items 4–5). A partial list is never
+// judged: past `maxPages` the read fails, and the caller refuses.
+export async function ghAllPages(gh, path, maxPages = 30) {
+  const out = [];
+  const sep = path.includes("?") ? "&" : "?";
+  for (let page = 1; page <= maxPages; page++) {
+    const { status, json } = await gh("GET", `${path}${sep}per_page=100&page=${page}`);
+    if (status !== 200 || !Array.isArray(json)) return { ok: false, status, items: out };
+    out.push(...json);
+    if (json.length < 100) return { ok: true, status, items: out };
+  }
+  return { ok: false, status: "too-many-pages", items: out };
+}
+
 export function reviewerSignedOff(slug, reviewBodies) {
   const marker = reviewerGreenMarker(slug);
   return reviewBodies.some((b) => (b || "").toLowerCase().includes(marker));
@@ -424,6 +451,11 @@ export async function verifyMergeable(gh, repo, pr, decision) {
   const { status, json: p } = await gh("GET", `/repos/${repo}/pulls/${pr}`);
   if (status !== 200) return { ok: false, why: `GET pull ${pr} -> HTTP ${status}` };
   if (p.state !== "open") return { ok: false, why: `PR #${pr} is ${p.state}` };
+  // #887 item 1: the caller may pin the head it reviewed. A push between that
+  // read and this one must not merge on reviews of the previous commit.
+  if (decision?.expected_sha && decision.expected_sha !== p.head?.sha) {
+    return { ok: false, why: `head moved: reviewed ${String(decision.expected_sha).slice(0, 7)}, now ${String(p.head?.sha).slice(0, 7)} — re-review` };
+  }
   // No own-repo special case (adr-0011): the workforce's own repo is a normal
   // delegated target. The single boundary is the L0/L1 path set below — read
   // from the TARGET repo's own governance — so a governance/identity change
@@ -442,12 +474,14 @@ export async function verifyMergeable(gh, repo, pr, decision) {
   // is out.
   if (p.mergeable !== true || !["clean", "draft"].includes(p.mergeable_state)) return { ok: false, why: `not mergeable (mergeable=${p.mergeable}, state=${p.mergeable_state})` };
 
-  // L0/L1 guard — sourced from the TARGET repo's own governance (adr-0010).
-  const l0l1 = await resolveL0L1Paths(gh, repo, p.base?.ref);
+  // L0/L1 guard — sourced from the TARGET repo's own governance (adr-0010),
+  // read from its DEFAULT branch (#887): a PR based on a side branch must not
+  // be judged by a block that branch was able to weaken.
+  const l0l1 = await resolveL0L1Paths(gh, repo, p.base?.repo?.default_branch || p.base?.ref);
   if (!l0l1.ok) return { ok: false, why: l0l1.why };
-  const { status: fs, json: files } = await gh("GET", `/repos/${repo}/pulls/${pr}/files?per_page=100`);
-  if (fs !== 200 || !Array.isArray(files)) return { ok: false, why: `GET files -> HTTP ${fs}` };
-  for (const f of files) {
+  const filesRead = await ghAllPages(gh, `/repos/${repo}/pulls/${pr}/files`);
+  if (!filesRead.ok) return { ok: false, why: `GET files -> ${filesRead.status} (partial file list is never judged)` };
+  for (const f of filesRead.items) {
     if (l0l1.patterns.some((re) => re.test(f.filename))) {
       return { ok: false, why: `touches L0/L1 path ${f.filename} — escalate to human (operator's final call)` };
     }
@@ -515,19 +549,22 @@ export async function verifyMergeable(gh, repo, pr, decision) {
 
   // Unanimous-green consensus: no human CHANGES_REQUESTED, and every nominated
   // reviewer has posted their lens review.
-  const { status: rs, json: reviews } = await gh("GET", `/repos/${repo}/pulls/${pr}/reviews?per_page=100`);
-  if (rs !== 200 || !Array.isArray(reviews)) return { ok: false, why: `GET reviews -> HTTP ${rs}` };
+  const reviewsRead = await ghAllPages(gh, `/repos/${repo}/pulls/${pr}/reviews`);
+  if (!reviewsRead.ok) return { ok: false, why: `GET reviews -> ${reviewsRead.status}` };
+  const reviews = reviewsRead.items;
+  // Deliberate asymmetry (#887): a CHANGES_REQUESTED veto counts from ANY
+  // author, while green votes count only from trusted ones — an outsider can
+  // stall a merge (fail closed), never cause one.
   if (reviews.some((r) => r.state === "CHANGES_REQUESTED")) return { ok: false, why: `a reviewer has CHANGES_REQUESTED — not consensus-green` };
   // Distinct reviewer slugs (case-folded, de-duped) — listing the same persona
   // three times is one reviewer, not a panel of three.
   const reviewers = Array.isArray(decision?.reviewers)
     ? [...new Set(decision.reviewers.filter((s) => typeof s === "string" && s).map((s) => s.trim().toLowerCase()).filter(Boolean))]
     : [];
-  const { status: ics, json: comments } = await gh("GET", `/repos/${repo}/issues/${pr}/comments?per_page=100`);
-  const bodies = [
-    ...reviews.map((r) => r.body),
-    ...(ics === 200 && Array.isArray(comments) ? comments.map((c) => c.body) : []),
-  ];
+  const commentsRead = await ghAllPages(gh, `/repos/${repo}/issues/${pr}/comments`);
+  if (!commentsRead.ok) return { ok: false, why: `GET comments -> ${commentsRead.status} (partial comment list is never judged)` };
+  // Only trusted authors' bodies count as votes (#887 item 2).
+  const bodies = [...reviews, ...commentsRead.items].filter((x) => trustedAuthor(x)).map((x) => x.body);
   // FU-004: W-4 hard cycle cap — a PR that has reached cycle > W4_CYCLE_CAP is
   // a process breakdown; refuse the merge and hand off to a human.
   const cycle = countRouterCycles(bodies);

@@ -159,6 +159,10 @@ This repository **delegates** bounded autonomous merge to the agent-workforce's 
 - scripts/claude/**
 - scripts/lib/autopilot-session.mjs
 - docs/risk-acceptance-ledger.md
+- workforce/skills/pr-autopilot/pr-merge.mjs
+- workforce/skills/pr-autopilot/escalation-reasons.mjs
+- workforce/scripts/lib/github-identity.mjs
+- scripts/lib/proxy-bootstrap.mjs
 <!-- /autopilot:l0l1-paths -->
 
 **Two lanes, one engine ([ADR-0009](adr/adr-0009-session-run-autopilot-lane.md)).** The workforce cron and the Claude Code session that opened a PR (`.claude/skills/pr-autopilot-session`) run the same lane; a session merges only through `scripts/claude/autopilot-merge.mjs`, which runs main's gate core and `pr-merge.mjs` from `origin/main`. This section is the only statement of the agent merge predicate; other documents point here. The session lane runs only in operator-attended sessions; scheduled routines and cadences stay on the cron lane — the gate refuses them (ADR-0009 scope).
