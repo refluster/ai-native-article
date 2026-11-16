@@ -625,10 +625,12 @@ async function buildRss(): Promise<ProxyResult> {
     }
     const audioUrl = propText(p.properties?.audioUrl);
     let byteLength = 0;
+    let audioCreatedAt = "";
     try {
       const key = audioUrl.startsWith(PUBLIC_BASE) ? audioUrl.slice(PUBLIC_BASE.length + 1) : `${PREFIX_AUDIO}/${pageSlug(p)}.mp3`;
       const head = await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
       byteLength = head.ContentLength ?? 0;
+      audioCreatedAt = head.LastModified ? new Date(head.LastModified).toISOString() : "";
     } catch { /* length is optional in the enclosure; 0 is tolerated by readers */ }
     // Celeste's stage: an optional `podcastShowNotes` framing leads the
     // <description>; the mandatory citations always follow it.
@@ -638,11 +640,15 @@ async function buildRss(): Promise<ProxyResult> {
       title: propText(p.properties?.Title) || pageSlug(p),
       description: showNotes ? `${showNotes}\n\n${citations}` : citations,
       audioUrl,
-      // pubDate source is the Notion `PublishedAt` property — the publish date of
-      // the source article this episode is derived from, which we treat as the
-      // episode's own publish date too. Fall back to Notion's created_time so an
-      // undated row still carries a valid date rather than an empty <pubDate>.
-      pubDate: (propText(p.properties?.PublishedAt) || (p.created_time ?? "")).slice(0, 10),
+      // pubDate is when the episode's audio came into existence — the MP3's S3
+      // LastModified (both engines write the public key once, at finalize). Not
+      // the source article's `PublishedAt`: podcast-script works the back
+      // catalogue oldest-first, so an episode cast today is usually for an
+      // article from days ago, and dating it by the article buried every new
+      // episode mid-feed — Spotify's newest stayed frozen while audio kept
+      // shipping. Fall back to PublishedAt → created_time only when the object
+      // can't be read, so an item never carries an empty <pubDate>.
+      pubDate: audioCreatedAt || (propText(p.properties?.PublishedAt) || (p.created_time ?? "")).slice(0, 10),
       byteLength,
     });
   }

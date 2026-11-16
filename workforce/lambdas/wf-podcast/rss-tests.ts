@@ -25,6 +25,11 @@ describe("rss builder", () => {
     expect(toRfc822("2026-06-28")).toMatch(/^[A-Z][a-z]{2}, 28 Jun 2026/);
   });
 
+  it("keeps the time of a full ISO timestamp", () => {
+    expect(toRfc822("2026-11-13T23:49:08.000Z")).toBe("Fri, 13 Nov 2026 23:49:08 GMT");
+    expect(toRfc822("2026-06-28")).toBe("Sun, 28 Jun 2026 09:00:00 GMT");
+  });
+
   it("emits one <item> per episode with enclosure, guid, and citations in description", () => {
     const xml = buildPodcastRss(channel, [
       {

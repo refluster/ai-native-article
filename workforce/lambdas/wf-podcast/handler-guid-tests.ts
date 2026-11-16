@@ -18,6 +18,7 @@ const smMock = mockClient(SecretsManagerClient);
 
 let pages: any[] = [];
 let heads: Record<string, Record<string, string>> = {};
+let modified: Record<string, Date> = {};
 let feed = "";
 let notionPatches: any[] = [];
 
@@ -51,6 +52,7 @@ beforeAll(async () => {
 beforeEach(() => {
   pages = [];
   heads = {};
+  modified = {};
   feed = "";
   notionPatches = [];
   s3Mock.reset();
@@ -64,7 +66,7 @@ beforeEach(() => {
   }));
   s3Mock.on(HeadObjectCommand).callsFake(async (i: any) => {
     if (!(i.Key in heads)) throw Object.assign(new Error("Forbidden"), { name: "Forbidden", $metadata: { httpStatusCode: 403 } });
-    return { Metadata: heads[i.Key], ContentLength: 1000 };
+    return { Metadata: heads[i.Key], ContentLength: 1000, LastModified: modified[i.Key] };
   });
   s3Mock.on(PutObjectCommand).callsFake(async (i: any) => { if (i.Key === "podcast/feed.xml") feed = String(i.Body); return {}; });
   s3Mock.on(CopyObjectCommand).callsFake(async (i: any) => { heads[i.Key] = i.Metadata ?? {}; return {}; });
@@ -107,6 +109,30 @@ describe("wf-podcast slug + GUID", () => {
     const bad = await post("/podcast/rss");
     expect(bad.status).toBe(500);
     expect(bad.json.error).toMatch(/duplicate episode GUID b2b2b2b2b2b2/);
+  });
+});
+
+describe("wf-podcast feed pubDate", () => {
+  it("dates an episode by when its MP3 was made, so a back-catalogue episode cast today tops the feed", async () => {
+    // Article published 11-03 but cast 11-13; article published 11-10, cast 11-11.
+    pages = [
+      page("p-old-article", { ...status("published"), ...audio("https://cdn.example/podcast/audio/aaaaaaaaaaaa.mp3"), PublishedAt: { type: "date", date: { start: "2026-11-03" } } }),
+      page("p-new-article", { ...status("published"), ...audio("https://cdn.example/podcast/audio/bbbbbbbbbbbb.mp3"), PublishedAt: { type: "date", date: { start: "2026-11-10" } } }),
+    ];
+    heads["podcast/audio/aaaaaaaaaaaa.mp3"] = {};
+    heads["podcast/audio/bbbbbbbbbbbb.mp3"] = {};
+    modified["podcast/audio/aaaaaaaaaaaa.mp3"] = new Date("2026-11-13T23:49:08Z");
+    modified["podcast/audio/bbbbbbbbbbbb.mp3"] = new Date("2026-11-11T01:00:00Z");
+    expect((await post("/podcast/rss")).status).toBe(200);
+    expect(feed).toContain("<pubDate>Fri, 13 Nov 2026 23:49:08 GMT</pubDate>");
+    expect(feed).toContain("<pubDate>Wed, 11 Nov 2026 01:00:00 GMT</pubDate>");
+    expect(feed.indexOf("aaaaaaaaaaaa</guid>")).toBeLessThan(feed.indexOf("bbbbbbbbbbbb</guid>"));
+  });
+
+  it("falls back to PublishedAt when the MP3 can't be read", async () => {
+    pages = [page("p1", { ...status("published"), ...audio("https://cdn.example/podcast/audio/cccccccccccc.mp3") })];
+    expect((await post("/podcast/rss")).status).toBe(200);
+    expect(feed).toContain("<pubDate>Tue, 22 Sep 2026 09:00:00 GMT</pubDate>");
   });
 });
 
