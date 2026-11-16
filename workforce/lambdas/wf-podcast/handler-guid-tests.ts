@@ -4,7 +4,7 @@
 // dropped every duplicated GUID. These pin the fix.
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { mockClient } from "aws-sdk-client-mock";
-import { S3Client, PutObjectCommand, HeadObjectCommand, CopyObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, HeadObjectCommand, CopyObjectCommand, DeleteObjectCommand, ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
 import {
   PollyClient,
   StartSpeechSynthesisTaskCommand,
@@ -18,7 +18,6 @@ const smMock = mockClient(SecretsManagerClient);
 
 let pages: any[] = [];
 let heads: Record<string, Record<string, string>> = {};
-let modified: Record<string, Date> = {};
 let feed = "";
 let notionPatches: any[] = [];
 
@@ -52,7 +51,6 @@ beforeAll(async () => {
 beforeEach(() => {
   pages = [];
   heads = {};
-  modified = {};
   feed = "";
   notionPatches = [];
   s3Mock.reset();
@@ -66,7 +64,7 @@ beforeEach(() => {
   }));
   s3Mock.on(HeadObjectCommand).callsFake(async (i: any) => {
     if (!(i.Key in heads)) throw Object.assign(new Error("Forbidden"), { name: "Forbidden", $metadata: { httpStatusCode: 403 } });
-    return { Metadata: heads[i.Key], ContentLength: 1000, LastModified: modified[i.Key] };
+    return { Metadata: heads[i.Key], ContentLength: 1000 };
   });
   s3Mock.on(PutObjectCommand).callsFake(async (i: any) => { if (i.Key === "podcast/feed.xml") feed = String(i.Body); return {}; });
   s3Mock.on(CopyObjectCommand).callsFake(async (i: any) => { heads[i.Key] = i.Metadata ?? {}; return {}; });
@@ -113,26 +111,68 @@ describe("wf-podcast slug + GUID", () => {
 });
 
 describe("wf-podcast feed pubDate", () => {
-  it("dates an episode by when its MP3 was made, so a back-catalogue episode cast today tops the feed", async () => {
-    // Article published 11-03 but cast 11-13; article published 11-10, cast 11-11.
-    pages = [
-      page("p-old-article", { ...status("published"), ...audio("https://cdn.example/podcast/audio/aaaaaaaaaaaa.mp3"), PublishedAt: { type: "date", date: { start: "2026-11-03" } } }),
-      page("p-new-article", { ...status("published"), ...audio("https://cdn.example/podcast/audio/bbbbbbbbbbbb.mp3"), PublishedAt: { type: "date", date: { start: "2026-11-10" } } }),
-    ];
-    heads["podcast/audio/aaaaaaaaaaaa.mp3"] = {};
-    heads["podcast/audio/bbbbbbbbbbbb.mp3"] = {};
-    modified["podcast/audio/aaaaaaaaaaaa.mp3"] = new Date("2026-11-13T23:49:08Z");
-    modified["podcast/audio/bbbbbbbbbbbb.mp3"] = new Date("2026-11-11T01:00:00Z");
+  const ep = (id: string, guid: string, publishedAt: string) =>
+    page(id, { ...status("published"), ...audio(`https://cdn.example/podcast/audio/${guid}.mp3`), PublishedAt: { type: "date", date: { start: publishedAt } } });
+  const pubDateOf = (xml: string, guid: string) =>
+    new RegExp(`${guid}</guid>\\s*<pubDate>([^<]*)</pubDate>`).exec(xml)?.[1];
+  // Persist the feed the way S3 would, so the next rebuild can read it back.
+  const persistFeed = () => {
+    s3Mock.on(PutObjectCommand).callsFake(async (i: any) => {
+      if (i.Key === "podcast/feed.xml") { feed = String(i.Body); heads["podcast/feed.xml"] = {}; }
+      return {};
+    });
+    s3Mock.on(GetObjectCommand).callsFake(async (i: any) => {
+      if (i.Key !== "podcast/feed.xml" || !("podcast/feed.xml" in heads)) throw new Error("NoSuchKey");
+      const body = feed;
+      return { Body: { transformToString: async () => body } };
+    });
+  };
+
+  it("first build (no prior feed) keeps the PublishedAt dates", async () => {
+    pages = [ep("p1", "aaaaaaaaaaaa", "2026-11-03")];
     expect((await post("/podcast/rss")).status).toBe(200);
-    expect(feed).toContain("<pubDate>Fri, 13 Nov 2026 23:49:08 GMT</pubDate>");
-    expect(feed).toContain("<pubDate>Wed, 11 Nov 2026 01:00:00 GMT</pubDate>");
-    expect(feed.indexOf("aaaaaaaaaaaa</guid>")).toBeLessThan(feed.indexOf("bbbbbbbbbbbb</guid>"));
+    expect(pubDateOf(feed, "aaaaaaaaaaaa")).toBe("Tue, 03 Nov 2026 09:00:00 GMT");
   });
 
-  it("falls back to PublishedAt when the MP3 can't be read", async () => {
-    pages = [page("p1", { ...status("published"), ...audio("https://cdn.example/podcast/audio/cccccccccccc.mp3") })];
+  it("puts a back-catalogue episode cast today at the top, and keeps every existing date", async () => {
+    persistFeed();
+    pages = [ep("p1", "aaaaaaaaaaaa", "2026-11-10"), ep("p2", "bbbbbbbbbbbb", "2026-11-12")];
+    expect((await post("/podcast/rss")).status).toBe(200); // seeds the feed
+    const before = feed;
+
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-16T18:40:00Z"));
+    try {
+      // A new episode for an article published 11-03 (older than both).
+      pages.push(ep("p3", "cccccccccccc", "2026-11-03"));
+      expect((await post("/podcast/rss")).status).toBe(200);
+    } finally { vi.useRealTimers(); }
+
+    expect(pubDateOf(feed, "cccccccccccc")).toBe("Mon, 16 Nov 2026 18:40:00 GMT");
+    expect(feed.indexOf("cccccccccccc</guid>")).toBeLessThan(feed.indexOf("bbbbbbbbbbbb</guid>"));
+    expect(pubDateOf(feed, "aaaaaaaaaaaa")).toBe(pubDateOf(before, "aaaaaaaaaaaa"));
+    expect(pubDateOf(feed, "bbbbbbbbbbbb")).toBe(pubDateOf(before, "bbbbbbbbbbbb"));
+  });
+
+  it("does not re-date an episode whose MP3 key is rewritten", async () => {
+    persistFeed();
+    pages = [ep("p1", "aaaaaaaaaaaa", "2026-05-01"), ep("p2", "bbbbbbbbbbbb", "2026-09-01")];
     expect((await post("/podcast/rss")).status).toBe(200);
-    expect(feed).toContain("<pubDate>Tue, 22 Sep 2026 09:00:00 GMT</pubDate>");
+    const before = feed;
+    // e.g. the collided-audio restore or a re-finalize rewrites the public key.
+    heads["podcast/audio/aaaaaaaaaaaa.mp3"] = { "page-id": "p1" };
+    expect((await post("/podcast/rss")).status).toBe(200);
+    expect(pubDateOf(feed, "aaaaaaaaaaaa")).toBe("Fri, 01 May 2026 09:00:00 GMT");
+    expect(pubDateOf(feed, "bbbbbbbbbbbb")).toBe(pubDateOf(before, "bbbbbbbbbbbb"));
+    expect(feed.indexOf("bbbbbbbbbbbb</guid>")).toBeLessThan(feed.indexOf("aaaaaaaaaaaa</guid>"));
+  });
+
+  it("fails loud when the prior feed exists but cannot be read", async () => {
+    heads["podcast/feed.xml"] = {};
+    s3Mock.on(GetObjectCommand).rejects(Object.assign(new Error("AccessDenied"), { name: "AccessDenied" }));
+    pages = [ep("p1", "aaaaaaaaaaaa", "2026-11-03")];
+    const r = await post("/podcast/rss");
+    expect(r.status).toBe(500);
   });
 });
 
