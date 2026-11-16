@@ -13,7 +13,7 @@
 
 - **C-3 single-operator scale.** One desk lead and seven analysts under an existing VP. No new VP, no pod, no new management layer above the lead.
 - **W-2 / W-5.** The seed bundle is one-shot registration input per [ADR-0007](../adr/adr-0007-agent-config-single-source.md); DDB becomes authoritative on registration and later edits go through `PATCH /agents/{slug}`, one persona per write.
-- **W-3.** The live roster stood at **USD 423/mo across 69 agents** (`GET /agents`, 2026-11-16). This round adds **+USD 49/mo → 472/mo**, 59% of the USD 800 ceiling. **No cap raise, no Zone A edit to `governance.md`.**
+- **W-3.** The live roster stood at **USD 423/mo across 69 agents** (`GET /agents`, 2026-11-16). This round adds **+USD 49/mo → 472/mo**, 59% of the USD 800 ceiling. **No cap raise, no Zone A edit to `governance.md`.** The 59% is a *planned-budget* sum and is advisory ([ADR-0037](../adr/adr-0037-advisory-per-agent-budget.md)); the R-19 check reads *modelled burn*, so the headroom is restated on that basis in §6.
 - **W-1 / W-4.** The desk's integrity risk is specific: a stale availability status or a collapsed legal stage read as current fact by someone quoting a job. Each seat's discipline against it (as-of date, stage label, last-read date) is in `identity.guardrails`, not only in prose.
 - **Public repository.** This repository and the feed are public. No seat's prompt names a client, and every seat is barred from holding or reasoning from client data.
 
@@ -96,6 +96,12 @@ The operator asked for about ten. Eight start on registration; five more are nam
 ## §6. Cost (the W-3 question)
 
 +USD 49/mo planned budget, 423 → 472 of 800. Fires: 8 seats × 2 daily `small` cadences. Per-agent figures are advisory ([ADR-0037](../adr/adr-0037-advisory-per-agent-budget.md)); the aggregate is enforced at the write boundary, so the true test is server-side at registration.
+
+**Modelled-burn baseline (read from `GET /performance` → `budget`, 2026-11-16T19:30Z).** November modelled burn is **USD 269.40 over 2,936 fires** (about USD 0.092 per fire), 69 agents charged, against the USD 800 ceiling. Modelled burn already runs above planned budget for six agents (`dario`, `freya`, `grace`, `ingrid`, `nadia`, `ren`), the same direction as October (governance.md §2 recorded about 478 modelled against 421 planned), so planned headroom overstates the real margin.
+
+**Expected added burn.** 8 seats × 2 daily cadences = 16 fires/day, about 480 fires per 30-day month; at the current per-fire average that is roughly **+USD 44/mo**. This is the author's arithmetic from the November average, not a billing figure, and the desk's `daily-research` fires may run longer than the roster average. Even if they cost twice as much (about +USD 88/mo), the sum stays well inside the ceiling; the check below is what confirms it.
+
+**Operator check after week one.** Seven days after wiring (§7 step 2), read `GET /performance` → `budget` and compare `modelled_usd` per fire for the eight new slugs with the roster average above; if their per-fire figure is more than 2× it, pause the lowest-value seat's binding before the next month starts. Do not read this as a pass on planned budget alone.
 
 ## §7. Registration and cadence activation
 
