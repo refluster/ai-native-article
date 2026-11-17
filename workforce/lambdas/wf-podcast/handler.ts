@@ -129,7 +129,20 @@ const GEMINI_VOICE_MAP: Record<string, string> = JSON.parse(
 
 // Per-run batch cap (operator: "1回の実施で5記事/podcastを上限"). synthesize and
 // publish each process at most this many episodes per call.
-const BATCH_LIMIT = Number(process.env.PODCAST_BATCH_LIMIT ?? "5");
+// A malformed numeric env var fails the cold start loudly (C-4) instead of
+// becoming NaN, which compares false with every number and would silently
+// turn off any limit built from it.
+export function envInt(name: string, fallback: number, min: number): number {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  // Digits only: Number() would also accept "1e3", "0x10" and "0b11".
+  const n = /^\d+$/.test(raw.trim()) ? Number(raw.trim()) : NaN;
+  if (!Number.isInteger(n) || n < min) {
+    throw new Error(`${name}=${JSON.stringify(raw)} is not an integer >= ${min}`);
+  }
+  return n;
+}
+const BATCH_LIMIT = envInt("PODCAST_BATCH_LIMIT", 5, 1);
 
 // Show-level Spotify metadata. Cover art + an owner email are required for a
 // publishable show; defaults point at the CloudFront-served cover.
@@ -621,21 +634,44 @@ async function publish(): Promise<ProxyResult> {
 //
 // If no previous feed exists (first build), pubDate falls back to
 // PublishedAt → created_time, the original rule.
-export function parseFeedPubDates(xml: string): Map<string, string> {
-  const out = new Map<string, string>();
+//
+// Because the previous feed is the only copy of these dates, a rebuild that
+// would stamp more than MAX_NEW_PER_REBUILD episodes as new fails loud
+// instead (C-4). That covers a prior feed that is empty or unparseable while
+// episodes are ready, which would otherwise re-date the whole back catalogue
+// to one instant. A deliberate bulk add is allowed by raising the
+// PODCAST_MAX_NEW_PER_REBUILD Lambda env var for that run.
+const MAX_NEW_PER_REBUILD = envInt("PODCAST_MAX_NEW_PER_REBUILD", BATCH_LIMIT * 2, 0);
+
+// Inverse of rss.ts xmlEscape, so a GUID read back matches the raw GUID.
+function xmlUnescape(s: string): string {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
+export type FeedPubDates = { dates: Map<string, string>; unparsable: number };
+
+export function parseFeedPubDates(xml: string): FeedPubDates {
+  const dates = new Map<string, string>();
+  let unparsable = 0;
   for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
-    const guid = /<guid[^>]*>([^<]*)<\/guid>/.exec(m[1]!)?.[1]?.trim();
+    const guidRaw = /<guid[^>]*>([^<]*)<\/guid>/.exec(m[1]!)?.[1]?.trim();
     const raw = /<pubDate>([^<]*)<\/pubDate>/.exec(m[1]!)?.[1]?.trim();
-    if (!guid || !raw) continue;
-    const t = new Date(raw);
-    if (!Number.isNaN(t.getTime())) out.set(guid, t.toISOString());
+    if (!guidRaw) { unparsable++; continue; }
+    const t = raw ? new Date(raw) : new Date(NaN);
+    if (Number.isNaN(t.getTime())) { unparsable++; continue; }
+    dates.set(xmlUnescape(guidRaw), t.toISOString());
   }
-  return out;
+  return { dates, unparsable };
 }
 
 // Return null when there is no feed yet. Throw on any other failure (C-4):
 // silently losing the previous dates would re-date the whole feed.
-async function previousFeedPubDates(): Promise<Map<string, string> | null> {
+async function previousFeedPubDates(): Promise<FeedPubDates | null> {
   const listed = await s3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: FEED_KEY, MaxKeys: 10 }));
   if (!(listed.Contents ?? []).some((o) => o.Key === FEED_KEY)) return null;
   const obj = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: FEED_KEY }));
@@ -655,17 +691,30 @@ async function buildRss(): Promise<ProxyResult> {
     return (status === "audio-ready" || status === "published") && !!audioUrl;
   });
 
-  const previous = await previousFeedPubDates();
-  const rebuiltAt = new Date().toISOString();
-  let kept = 0;
-  let added = 0;
+  const prior = await previousFeedPubDates();
+  const previous = prior?.dates ?? null;
+  const legacyDate = (p: NotionPage) => (propText(p.properties?.PublishedAt) || (p.created_time ?? "")).slice(0, 10);
+  const guidOf = (p: NotionPage) => episodeGuid(propText(p.properties?.audioUrl), pageSlug(p));
 
-  const datedFor = (guid: string, p: NotionPage): string => {
-    const prior = previous?.get(guid);
-    if (prior) { kept++; return prior; }
-    if (previous) { added++; return rebuiltAt; }
-    return (propText(p.properties?.PublishedAt) || (p.created_time ?? "")).slice(0, 10);
-  };
+  // GUIDs new to the feed share this rebuild's instant, spaced one second
+  // apart in source-article order (oldest first). That keeps their order
+  // deterministic and visible at RFC-822's one-second resolution.
+  const newcomers = previous
+    ? ready.filter((p) => !previous.has(guidOf(p)))
+        .sort((a, b) => legacyDate(a).localeCompare(legacyDate(b)) || guidOf(a).localeCompare(guidOf(b)))
+    : [];
+  if (newcomers.length > MAX_NEW_PER_REBUILD) {
+    throw new Error(
+      `${newcomers.length} episodes are new to ${FEED_KEY} (prior feed: ${previous!.size} dated items, ${prior!.unparsable} unparsable; limit ${MAX_NEW_PER_REBUILD}) — ` +
+      `refusing to re-date them all to this rebuild. If the prior feed is intact and this is a deliberate bulk add, raise PODCAST_MAX_NEW_PER_REBUILD for one run.`,
+    );
+  }
+  const rebuiltMs = Date.now();
+  const stamped = new Map(newcomers.map((p, i) => [guidOf(p), new Date(rebuiltMs - (newcomers.length - 1 - i) * 1000).toISOString()]));
+  const kept = previous ? ready.length - newcomers.length : 0;
+
+  const datedFor = (guid: string, p: NotionPage): string =>
+    previous?.get(guid) ?? stamped.get(guid) ?? legacyDate(p);
 
   const episodes: PodcastEpisode[] = [];
   for (const p of ready) {
@@ -704,7 +753,14 @@ async function buildRss(): Promise<ProxyResult> {
     return Number.isNaN(t) ? 0 : t;
   };
   episodes.sort((a, b) => epoch(b.pubDate) - epoch(a.pubDate));
-  console.log(JSON.stringify({ event: "wf_podcast_rss_dates", priorFeed: !!previous, kept, added, fallback: previous ? 0 : episodes.length }));
+  console.log(JSON.stringify({
+    event: "wf_podcast_rss_dates",
+    priorFeed: !!previous,
+    kept,
+    added: newcomers.length,
+    fallback: previous ? 0 : episodes.length,
+    priorUnparsable: prior?.unparsable ?? 0,
+  }));
 
   const feedSelfUrl = `${PUBLIC_BASE}/${FEED_KEY}`;
   const xml = buildPodcastRss(

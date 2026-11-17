@@ -173,6 +173,127 @@ describe("wf-podcast feed pubDate", () => {
     pages = [ep("p1", "aaaaaaaaaaaa", "2026-11-03")];
     const r = await post("/podcast/rss");
     expect(r.status).toBe(500);
+    expect(feed).toBe(""); // no degraded feed was written
+  });
+
+  // Seed a prior feed holding `n` dated items, then serve it from S3.
+  const seedPriorFeed = async (n: number) => {
+    persistFeed();
+    pages = Array.from({ length: n }, (_, i) => ep(`s${i}`, `seed${String(i).padStart(8, "0")}`, "2026-06-01"));
+    expect((await post("/podcast/rss")).status).toBe(200);
+  };
+
+  it("refuses to re-date the catalogue when the prior feed is readable but empty", async () => {
+    persistFeed();
+    pages = [];
+    expect((await post("/podcast/rss")).status).toBe(200); // an empty feed is written
+    pages = Array.from({ length: 12 }, (_, i) => ep(`p${i}`, `ep${String(i).padStart(10, "0")}`, "2026-06-01"));
+    const empty = feed;
+    const r = await post("/podcast/rss");
+    expect(r.status).toBe(500);
+    expect(r.json.error).toMatch(/12 episodes are new to podcast\/feed\.xml/);
+    expect(feed).toBe(empty); // the empty feed was not overwritten with 12 re-dated items
+  });
+
+  it("refuses when the prior feed's pubDates are unparsable", async () => {
+    await seedPriorFeed(12);
+    feed = feed.replace(/<pubDate>[^<]*<\/pubDate>/g, "<pubDate>garbage</pubDate>");
+    const r = await post("/podcast/rss");
+    expect(r.status).toBe(500);
+    expect(r.json.error).toMatch(/12 unparsable/);
+  });
+
+  it("allows exactly the limit (10) of new episodes and refuses one more", async () => {
+    await seedPriorFeed(1);
+    const base = [...pages];
+    pages = [...base, ...Array.from({ length: 10 }, (_, i) => ep(`m${i}`, `max${String(i).padStart(9, "0")}`, "2026-11-01"))];
+    expect((await post("/podcast/rss")).status).toBe(200);
+    pages = [...pages, ...Array.from({ length: 11 }, (_, i) => ep(`o${i}`, `over${String(i).padStart(8, "0")}`, "2026-11-02"))];
+    const r = await post("/podcast/rss");
+    expect(r.status).toBe(500);
+    expect(r.json.error).toMatch(/11 episodes are new .* limit 10/);
+  });
+
+  it("lets a deliberate bulk add through when PODCAST_MAX_NEW_PER_REBUILD is raised", async () => {
+    await seedPriorFeed(1);
+    pages.push(...Array.from({ length: 12 }, (_, i) => ep(`b${i}`, `bulk${String(i).padStart(8, "0")}`, "2026-11-01")));
+    vi.stubEnv("PODCAST_MAX_NEW_PER_REBUILD", "50");
+    vi.resetModules();
+    try {
+      const fresh = (await import("./handler.js")).handler;
+      const res = await fresh({ rawPath: "/podcast/rss", body: "{}" });
+      expect(res.statusCode).toBe(200);
+      expect(feed).toContain("bulk00000011</guid>");
+    } finally { vi.unstubAllEnvs(); vi.resetModules(); }
+  });
+
+  it("exempts the first build (no prior feed) from the guard and uses article dates", async () => {
+    persistFeed();
+    pages = Array.from({ length: 25 }, (_, i) => ep(`f${i}`, `first${String(i).padStart(7, "0")}`, "2026-06-01"));
+    expect((await post("/podcast/rss")).status).toBe(200);
+    expect(pubDateOf(feed, "first0000000")).toBe("Mon, 01 Jun 2026 09:00:00 GMT");
+  });
+
+  it("counts a prior item with no GUID as unparsable", async () => {
+    const { parseFeedPubDates } = await import("./handler.js");
+    const r = parseFeedPubDates("<item><pubDate>Tue, 03 Nov 2026 09:00:00 GMT</pubDate></item><item><guid>a</guid><pubDate>x</pubDate></item>");
+    expect(r).toEqual({ dates: new Map(), unparsable: 2 });
+  });
+
+  it("allows a normal batch of new episodes", async () => {
+    await seedPriorFeed(3);
+    pages.push(...Array.from({ length: 5 }, (_, i) => ep(`n${i}`, `new${String(i).padStart(9, "0")}`, "2026-11-01")));
+    expect((await post("/podcast/rss")).status).toBe(200);
+  });
+
+  it("orders two episodes new in the same rebuild by their article date, one second apart", async () => {
+    persistFeed();
+    pages = [ep("p1", "aaaaaaaaaaaa", "2026-11-01")];
+    expect((await post("/podcast/rss")).status).toBe(200);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-17T18:40:00Z"));
+    try {
+      // Notion returns the newer article first; the feed must not depend on that.
+      pages.push(ep("p3", "cccccccccccc", "2026-11-05"), ep("p2", "bbbbbbbbbbbb", "2026-11-03"));
+      expect((await post("/podcast/rss")).status).toBe(200);
+    } finally { vi.useRealTimers(); }
+    expect(pubDateOf(feed, "cccccccccccc")).toBe("Tue, 17 Nov 2026 18:40:00 GMT");
+    expect(pubDateOf(feed, "bbbbbbbbbbbb")).toBe("Tue, 17 Nov 2026 18:39:59 GMT");
+    expect(feed.indexOf("cccccccccccc</guid>")).toBeLessThan(feed.indexOf("bbbbbbbbbbbb</guid>"));
+  });
+
+  it("matches an XML-escaped GUID back to its episode", async () => {
+    persistFeed();
+    pages = [ep("p1", "it's&co", "2026-05-01")];
+    expect((await post("/podcast/rss")).status).toBe(200);
+    expect(feed).toContain("it&apos;s&amp;co</guid>");
+    const before = pubDateOf(feed, "it&apos;s&amp;co");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-17T18:40:00Z"));
+    try { expect((await post("/podcast/rss")).status).toBe(200); } finally { vi.useRealTimers(); }
+    expect(pubDateOf(feed, "it&apos;s&amp;co")).toBe(before);
+  });
+});
+
+describe("wf-podcast numeric env vars", () => {
+  it("rejects a malformed value instead of turning it into NaN", async () => {
+    const { envInt } = await import("./handler.js");
+    for (const bad of ["abc", "", " ", "1.5", "-1", "10x", "1e3", "0x10", "0b11"]) {
+      vi.stubEnv("PODCAST_TEST_INT", bad);
+      expect(() => envInt("PODCAST_TEST_INT", 10, 0)).toThrow(/is not an integer >= 0/);
+    }
+    vi.stubEnv("PODCAST_TEST_INT", " 25 ");
+    expect(envInt("PODCAST_TEST_INT", 10, 0)).toBe(25);
+    vi.unstubAllEnvs();
+    expect(envInt("PODCAST_TEST_INT", 10, 0)).toBe(10);
+  });
+
+  it("fails the module load (every route) on a malformed limit", async () => {
+    vi.stubEnv("PODCAST_MAX_NEW_PER_REBUILD", "1e3");
+    vi.resetModules();
+    try {
+      await expect(import("./handler.js")).rejects.toThrow(/PODCAST_MAX_NEW_PER_REBUILD="1e3" is not an integer >= 0/);
+    } finally { vi.unstubAllEnvs(); vi.resetModules(); }
   });
 });
 
