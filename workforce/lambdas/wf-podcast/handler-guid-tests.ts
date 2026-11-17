@@ -173,6 +173,68 @@ describe("wf-podcast feed pubDate", () => {
     pages = [ep("p1", "aaaaaaaaaaaa", "2026-11-03")];
     const r = await post("/podcast/rss");
     expect(r.status).toBe(500);
+    expect(feed).toBe(""); // no degraded feed was written
+  });
+
+  // Seed a prior feed holding `n` dated items, then serve it from S3.
+  const seedPriorFeed = async (n: number) => {
+    persistFeed();
+    pages = Array.from({ length: n }, (_, i) => ep(`s${i}`, `seed${String(i).padStart(8, "0")}`, "2026-06-01"));
+    expect((await post("/podcast/rss")).status).toBe(200);
+  };
+
+  it("refuses to re-date the catalogue when the prior feed is readable but empty", async () => {
+    persistFeed();
+    pages = [];
+    expect((await post("/podcast/rss")).status).toBe(200); // an empty feed is written
+    pages = Array.from({ length: 12 }, (_, i) => ep(`p${i}`, `ep${String(i).padStart(10, "0")}`, "2026-06-01"));
+    const empty = feed;
+    const r = await post("/podcast/rss");
+    expect(r.status).toBe(500);
+    expect(r.json.error).toMatch(/12 episodes are new to podcast\/feed\.xml/);
+    expect(feed).toBe(empty); // the empty feed was not overwritten with 12 re-dated items
+  });
+
+  it("refuses when the prior feed's pubDates are unparsable", async () => {
+    await seedPriorFeed(12);
+    feed = feed.replace(/<pubDate>[^<]*<\/pubDate>/g, "<pubDate>garbage</pubDate>");
+    const r = await post("/podcast/rss");
+    expect(r.status).toBe(500);
+    expect(r.json.error).toMatch(/12 unparsable/);
+  });
+
+  it("allows a normal batch of new episodes", async () => {
+    await seedPriorFeed(3);
+    pages.push(...Array.from({ length: 5 }, (_, i) => ep(`n${i}`, `new${String(i).padStart(9, "0")}`, "2026-11-01")));
+    expect((await post("/podcast/rss")).status).toBe(200);
+  });
+
+  it("orders two episodes new in the same rebuild by their article date, one second apart", async () => {
+    persistFeed();
+    pages = [ep("p1", "aaaaaaaaaaaa", "2026-11-01")];
+    expect((await post("/podcast/rss")).status).toBe(200);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-17T18:40:00Z"));
+    try {
+      // Notion returns the newer article first; the feed must not depend on that.
+      pages.push(ep("p3", "cccccccccccc", "2026-11-05"), ep("p2", "bbbbbbbbbbbb", "2026-11-03"));
+      expect((await post("/podcast/rss")).status).toBe(200);
+    } finally { vi.useRealTimers(); }
+    expect(pubDateOf(feed, "cccccccccccc")).toBe("Tue, 17 Nov 2026 18:40:00 GMT");
+    expect(pubDateOf(feed, "bbbbbbbbbbbb")).toBe("Tue, 17 Nov 2026 18:39:59 GMT");
+    expect(feed.indexOf("cccccccccccc</guid>")).toBeLessThan(feed.indexOf("bbbbbbbbbbbb</guid>"));
+  });
+
+  it("matches an XML-escaped GUID back to its episode", async () => {
+    persistFeed();
+    pages = [ep("p1", "it's&co", "2026-05-01")];
+    expect((await post("/podcast/rss")).status).toBe(200);
+    expect(feed).toContain("it&apos;s&amp;co</guid>");
+    const before = pubDateOf(feed, "it&apos;s&amp;co");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-17T18:40:00Z"));
+    try { expect((await post("/podcast/rss")).status).toBe(200); } finally { vi.useRealTimers(); }
+    expect(pubDateOf(feed, "it&apos;s&amp;co")).toBe(before);
   });
 });
 

@@ -196,6 +196,20 @@ Once an article is `approved` (and `podcast-publish` has set its voice/notes):
    the feed exists but can't be read, the build fails loud. **Don't delete
    `feed.xml` to "reset" it:** that re-dates every episode to its article's
    date.
+   - Episodes that are new in the same rebuild are spaced one second apart, in
+     source-article order (oldest first).
+   - **The date lives only in the feed.** An episode that leaves the feed and
+     later comes back gets a new date and returns to the top. That happens
+     when `podcastStatus` moves off `audio-ready`/`published` (e.g. a
+     re-script to `script-ready`) or `audioUrl` is cleared. The GUID doesn't
+     change, so apps don't duplicate it.
+   - **Mass re-date guard:** a rebuild that would stamp more than
+     `PODCAST_MAX_NEW_PER_REBUILD` episodes (default 2 × `PODCAST_BATCH_LIMIT`
+     = 10) as new fails loud and doesn't write the feed. That guards against a
+     prior feed that is empty or unparseable while episodes are ready. Check
+     the `wf_podcast_rss_dates` log line (`kept` / `added` / `priorUnparsable`)
+     and the S3 `feed.xml` first. Raise the env var for one run only for a
+     deliberate bulk add.
 3. The daily `.github/workflows/podcast-pipeline.yml` runs steps 1–2 in CI (AWS
    OIDC). Validate the feed against a podcast-feed checker (e.g. Cast Feed
    Validator, Podba.se) before the first Spotify submission.
