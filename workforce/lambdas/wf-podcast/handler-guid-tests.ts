@@ -203,6 +203,30 @@ describe("wf-podcast feed pubDate", () => {
     expect(r.json.error).toMatch(/12 unparsable/);
   });
 
+  it("allows exactly the limit (10) of new episodes and refuses one more", async () => {
+    await seedPriorFeed(1);
+    const base = [...pages];
+    pages = [...base, ...Array.from({ length: 10 }, (_, i) => ep(`m${i}`, `max${String(i).padStart(9, "0")}`, "2026-11-01"))];
+    expect((await post("/podcast/rss")).status).toBe(200);
+    pages = [...pages, ...Array.from({ length: 11 }, (_, i) => ep(`o${i}`, `over${String(i).padStart(8, "0")}`, "2026-11-02"))];
+    const r = await post("/podcast/rss");
+    expect(r.status).toBe(500);
+    expect(r.json.error).toMatch(/11 episodes are new .* limit 10/);
+  });
+
+  it("lets a deliberate bulk add through when PODCAST_MAX_NEW_PER_REBUILD is raised", async () => {
+    await seedPriorFeed(1);
+    pages.push(...Array.from({ length: 12 }, (_, i) => ep(`b${i}`, `bulk${String(i).padStart(8, "0")}`, "2026-11-01")));
+    vi.stubEnv("PODCAST_MAX_NEW_PER_REBUILD", "50");
+    vi.resetModules();
+    try {
+      const fresh = (await import("./handler.js")).handler;
+      const res = await fresh({ rawPath: "/podcast/rss", body: "{}" });
+      expect(res.statusCode).toBe(200);
+      expect(feed).toContain("bulk00000011</guid>");
+    } finally { vi.unstubAllEnvs(); vi.resetModules(); }
+  });
+
   it("allows a normal batch of new episodes", async () => {
     await seedPriorFeed(3);
     pages.push(...Array.from({ length: 5 }, (_, i) => ep(`n${i}`, `new${String(i).padStart(9, "0")}`, "2026-11-01")));
@@ -235,6 +259,20 @@ describe("wf-podcast feed pubDate", () => {
     vi.setSystemTime(new Date("2026-11-17T18:40:00Z"));
     try { expect((await post("/podcast/rss")).status).toBe(200); } finally { vi.useRealTimers(); }
     expect(pubDateOf(feed, "it&apos;s&amp;co")).toBe(before);
+  });
+});
+
+describe("wf-podcast numeric env vars", () => {
+  it("rejects a malformed value instead of turning it into NaN", async () => {
+    const { envInt } = await import("./handler.js");
+    for (const bad of ["abc", "", " ", "1.5", "-1", "10x"]) {
+      vi.stubEnv("PODCAST_TEST_INT", bad);
+      expect(() => envInt("PODCAST_TEST_INT", 10, 0)).toThrow(/is not an integer >= 0/);
+    }
+    vi.stubEnv("PODCAST_TEST_INT", " 25 ");
+    expect(envInt("PODCAST_TEST_INT", 10, 0)).toBe(25);
+    vi.unstubAllEnvs();
+    expect(envInt("PODCAST_TEST_INT", 10, 0)).toBe(10);
   });
 });
 

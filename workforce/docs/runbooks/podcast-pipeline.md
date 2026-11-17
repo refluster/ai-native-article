@@ -210,6 +210,29 @@ Once an article is `approved` (and `podcast-publish` has set its voice/notes):
      the `wf_podcast_rss_dates` log line (`kept` / `added` / `priorUnparsable`)
      and the S3 `feed.xml` first. Raise the env var for one run only for a
      deliberate bulk add.
+   - **Once tripped, the guard stays tripped.** Each daily run synthesizes up
+     to 5 more episodes, so the margin is about 2 missed rebuilds (e.g. a
+     Notion outage or a citation-guard throw). While it is tripped, `publish`
+     has already flipped those rows to `published` in Notion, but they are not
+     in the feed yet. Nothing is lost: the next successful rebuild includes
+     them.
+   - **Override (recovery).** `update-function-configuration --environment`
+     **replaces the whole Variables map**, so always merge the key in. Never
+     pass a single `Variables={…}`, which would wipe
+     `PODCAST_PUBLIC_BASE_URL` and the rest:
+
+     ```bash
+     FN=wf-podcast-prod
+     aws lambda get-function-configuration --function-name "$FN" --query 'Environment' > env.json
+     jq '.Variables.PODCAST_MAX_NEW_PER_REBUILD = "50"' env.json > env-raised.json
+     aws lambda update-function-configuration --function-name "$FN" --environment file://env-raised.json
+     gh workflow run podcast-pipeline.yml                 # one rebuild with the raised limit
+     aws lambda update-function-configuration --function-name "$FN" --environment file://env.json   # restore
+     ```
+
+     The next SAM deploy also drops the override, because the variable isn't
+     in the template. That is intended. A non-integer value fails the Lambda's
+     cold start, so a typo can't silently disable the guard.
 3. The daily `.github/workflows/podcast-pipeline.yml` runs steps 1–2 in CI (AWS
    OIDC). Validate the feed against a podcast-feed checker (e.g. Cast Feed
    Validator, Podba.se) before the first Spotify submission.

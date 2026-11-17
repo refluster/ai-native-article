@@ -129,7 +129,19 @@ const GEMINI_VOICE_MAP: Record<string, string> = JSON.parse(
 
 // Per-run batch cap (operator: "1回の実施で5記事/podcastを上限"). synthesize and
 // publish each process at most this many episodes per call.
-const BATCH_LIMIT = Number(process.env.PODCAST_BATCH_LIMIT ?? "5");
+// A malformed numeric env var fails the cold start loudly (C-4) instead of
+// becoming NaN, which compares false with every number and would silently
+// turn off any limit built from it.
+export function envInt(name: string, fallback: number, min: number): number {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const n = Number(raw.trim());
+  if (raw.trim() === "" || !Number.isInteger(n) || n < min) {
+    throw new Error(`${name}=${JSON.stringify(raw)} is not an integer >= ${min}`);
+  }
+  return n;
+}
+const BATCH_LIMIT = envInt("PODCAST_BATCH_LIMIT", 5, 1);
 
 // Show-level Spotify metadata. Cover art + an owner email are required for a
 // publishable show; defaults point at the CloudFront-served cover.
@@ -628,7 +640,7 @@ async function publish(): Promise<ProxyResult> {
 // episodes are ready, which would otherwise re-date the whole back catalogue
 // to one instant. A deliberate bulk add is allowed by raising the
 // PODCAST_MAX_NEW_PER_REBUILD Lambda env var for that run.
-const MAX_NEW_PER_REBUILD = Number(process.env.PODCAST_MAX_NEW_PER_REBUILD ?? String(BATCH_LIMIT * 2));
+const MAX_NEW_PER_REBUILD = envInt("PODCAST_MAX_NEW_PER_REBUILD", BATCH_LIMIT * 2, 0);
 
 // Inverse of rss.ts xmlEscape, so a GUID read back matches the raw GUID.
 function xmlUnescape(s: string): string {
