@@ -227,6 +227,19 @@ describe("wf-podcast feed pubDate", () => {
     } finally { vi.unstubAllEnvs(); vi.resetModules(); }
   });
 
+  it("exempts the first build (no prior feed) from the guard and uses article dates", async () => {
+    persistFeed();
+    pages = Array.from({ length: 25 }, (_, i) => ep(`f${i}`, `first${String(i).padStart(7, "0")}`, "2026-06-01"));
+    expect((await post("/podcast/rss")).status).toBe(200);
+    expect(pubDateOf(feed, "first0000000")).toBe("Mon, 01 Jun 2026 09:00:00 GMT");
+  });
+
+  it("counts a prior item with no GUID as unparsable", async () => {
+    const { parseFeedPubDates } = await import("./handler.js");
+    const r = parseFeedPubDates("<item><pubDate>Tue, 03 Nov 2026 09:00:00 GMT</pubDate></item><item><guid>a</guid><pubDate>x</pubDate></item>");
+    expect(r).toEqual({ dates: new Map(), unparsable: 2 });
+  });
+
   it("allows a normal batch of new episodes", async () => {
     await seedPriorFeed(3);
     pages.push(...Array.from({ length: 5 }, (_, i) => ep(`n${i}`, `new${String(i).padStart(9, "0")}`, "2026-11-01")));
@@ -265,7 +278,7 @@ describe("wf-podcast feed pubDate", () => {
 describe("wf-podcast numeric env vars", () => {
   it("rejects a malformed value instead of turning it into NaN", async () => {
     const { envInt } = await import("./handler.js");
-    for (const bad of ["abc", "", " ", "1.5", "-1", "10x"]) {
+    for (const bad of ["abc", "", " ", "1.5", "-1", "10x", "1e3", "0x10", "0b11"]) {
       vi.stubEnv("PODCAST_TEST_INT", bad);
       expect(() => envInt("PODCAST_TEST_INT", 10, 0)).toThrow(/is not an integer >= 0/);
     }
@@ -273,6 +286,14 @@ describe("wf-podcast numeric env vars", () => {
     expect(envInt("PODCAST_TEST_INT", 10, 0)).toBe(25);
     vi.unstubAllEnvs();
     expect(envInt("PODCAST_TEST_INT", 10, 0)).toBe(10);
+  });
+
+  it("fails the module load (every route) on a malformed limit", async () => {
+    vi.stubEnv("PODCAST_MAX_NEW_PER_REBUILD", "1e3");
+    vi.resetModules();
+    try {
+      await expect(import("./handler.js")).rejects.toThrow(/PODCAST_MAX_NEW_PER_REBUILD="1e3" is not an integer >= 0/);
+    } finally { vi.unstubAllEnvs(); vi.resetModules(); }
   });
 });
 

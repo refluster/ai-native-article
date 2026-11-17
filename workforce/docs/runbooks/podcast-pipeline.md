@@ -210,29 +210,55 @@ Once an article is `approved` (and `podcast-publish` has set its voice/notes):
      the `wf_podcast_rss_dates` log line (`kept` / `added` / `priorUnparsable`)
      and the S3 `feed.xml` first. Raise the env var for one run only for a
      deliberate bulk add.
-   - **Once tripped, the guard stays tripped.** Each daily run synthesizes up
-     to 5 more episodes, so the margin is about 2 missed rebuilds (e.g. a
-     Notion outage or a citation-guard throw). While it is tripped, `publish`
-     has already flipped those rows to `published` in Notion, but they are not
-     in the feed yet. Nothing is lost: the next successful rebuild includes
-     them.
-   - **Override (recovery).** `update-function-configuration --environment`
-     **replaces the whole Variables map**, so always merge the key in. Never
-     pass a single `Variables={…}`, which would wipe
-     `PODCAST_PUBLIC_BASE_URL` and the rest:
+   - **Once tripped, the guard stays tripped.** Each daily run adds up to 5
+     new episodes and the limit is 10 (strictly greater-than). One missed
+     rebuild still passes; **the 2nd consecutive missed rebuild trips it**
+     (e.g. a Notion outage or a citation-guard throw). The only signal is a
+     red `podcast-pipeline.yml` run whose error contains `episodes are new to
+     podcast/feed.xml`. While it is tripped, `publish` has already flipped
+     those rows to `published` in Notion, but they are not in the feed yet.
+     Nothing is lost: the next successful rebuild includes them.
+   - **Override (recovery) — operator only (B), never from a cadence.** First
+     confirm the prior `feed.xml` is intact. Then run this as one script from
+     an operator shell with AWS credentials.
+     - `update-function-configuration --environment` **replaces the whole
+       Variables map**, so the script merges the key into a snapshot.
+     - Updates are asynchronous, so it waits for each one.
+     - It rebuilds through the synchronous `/podcast/rss` route
+       (`build-rss.mjs`, which flips no status and synthesizes nothing), not
+       by dispatching the workflow. `gh workflow run` returns immediately,
+       before the rebuild runs.
+     - The `trap` restores the snapshot even if the rebuild fails.
 
      ```bash
+     set -euo pipefail
      FN=wf-podcast-prod
-     aws lambda get-function-configuration --function-name "$FN" --query 'Environment' > env.json
-     jq '.Variables.PODCAST_MAX_NEW_PER_REBUILD = "50"' env.json > env-raised.json
-     aws lambda update-function-configuration --function-name "$FN" --environment file://env-raised.json
-     gh workflow run podcast-pipeline.yml                 # one rebuild with the raised limit
-     aws lambda update-function-configuration --function-name "$FN" --environment file://env.json   # restore
+     TMP=$(mktemp -d)   # keep the snapshot out of the repo (it holds the owner email)
+     aws lambda get-function-configuration --function-name "$FN" --output json \
+       --query '{Variables: Environment.Variables}' > "$TMP/env.json"
+     restore() {
+       aws lambda update-function-configuration --function-name "$FN" \
+         --environment "file://$TMP/env.json" --output json > /dev/null
+       aws lambda wait function-updated --function-name "$FN"
+       test "$(aws lambda get-function-configuration --function-name "$FN" --output text \
+         --query 'Environment.Variables.PODCAST_MAX_NEW_PER_REBUILD')" = "None" \
+         && echo "override removed" || { echo "OVERRIDE STILL SET on $FN — restore by hand from $TMP/env.json" >&2; exit 1; }
+     }
+     trap restore EXIT
+     jq '.Variables.PODCAST_MAX_NEW_PER_REBUILD = "50"' "$TMP/env.json" > "$TMP/env-raised.json"
+     aws lambda update-function-configuration --function-name "$FN" \
+       --environment "file://$TMP/env-raised.json" --output json > /dev/null
+     aws lambda wait function-updated --function-name "$FN"
+     node workforce/skills/podcast-publish/build-rss.mjs   # synchronous; exit 0 = feed rebuilt
      ```
 
-     The next SAM deploy also drops the override, because the variable isn't
-     in the template. That is intended. A non-integer value fails the Lambda's
-     cold start, so a typo can't silently disable the guard.
+     The last line `override removed` confirms the restore. The next SAM
+     deploy would drop the override anyway, because the variable isn't in the
+     template. **Blast radius of a bad value:** a non-integer, empty or
+     negative `PODCAST_MAX_NEW_PER_REBUILD` or `PODCAST_BATCH_LIMIT` fails the
+     Lambda's cold start. That takes down every wf-podcast route
+     (synthesize, Gemini finalize, publish, rss), not only the feed rebuild.
+     The `trap` restore is the fix.
 3. The daily `.github/workflows/podcast-pipeline.yml` runs steps 1–2 in CI (AWS
    OIDC). Validate the feed against a podcast-feed checker (e.g. Cast Feed
    Validator, Podba.se) before the first Spotify submission.

@@ -135,8 +135,9 @@ const GEMINI_VOICE_MAP: Record<string, string> = JSON.parse(
 export function envInt(name: string, fallback: number, min: number): number {
   const raw = process.env[name];
   if (raw === undefined) return fallback;
-  const n = Number(raw.trim());
-  if (raw.trim() === "" || !Number.isInteger(n) || n < min) {
+  // Digits only: Number() would also accept "1e3", "0x10" and "0b11".
+  const n = /^\d+$/.test(raw.trim()) ? Number(raw.trim()) : NaN;
+  if (!Number.isInteger(n) || n < min) {
     throw new Error(`${name}=${JSON.stringify(raw)} is not an integer >= ${min}`);
   }
   return n;
@@ -660,7 +661,7 @@ export function parseFeedPubDates(xml: string): FeedPubDates {
   for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
     const guidRaw = /<guid[^>]*>([^<]*)<\/guid>/.exec(m[1]!)?.[1]?.trim();
     const raw = /<pubDate>([^<]*)<\/pubDate>/.exec(m[1]!)?.[1]?.trim();
-    if (!guidRaw) continue;
+    if (!guidRaw) { unparsable++; continue; }
     const t = raw ? new Date(raw) : new Date(NaN);
     if (Number.isNaN(t.getTime())) { unparsable++; continue; }
     dates.set(xmlUnescape(guidRaw), t.toISOString());
