@@ -186,6 +186,16 @@ Once an article is `approved` (and `podcast-publish` has set its voice/notes):
    `podcast/feed.xml`. The build fails loud on a duplicated GUID or enclosure —
    Spotify silently drops every item whose GUID repeats. (For a standalone
    feed refresh without flipping status: `build-rss.mjs`.)
+   **`<pubDate>` is fixed the first time an episode enters the feed.** Each
+   rebuild reads the previous `podcast/feed.xml` and keeps every GUID's
+   existing pubDate. A GUID new to the feed is stamped with the rebuild time,
+   so it goes to the top. Two rules were tried and dropped. The source
+   article's `PublishedAt` buried back-catalogue episodes mid-feed. The MP3's
+   S3 LastModified moved whenever the key was rewritten. Only when no feed
+   exists yet does pubDate fall back to `PublishedAt` → `created_time`. If
+   the feed exists but can't be read, the build fails loud. **Don't delete
+   `feed.xml` to "reset" it:** that re-dates every episode to its article's
+   date.
 3. The daily `.github/workflows/podcast-pipeline.yml` runs steps 1–2 in CI (AWS
    OIDC). Validate the feed against a podcast-feed checker (e.g. Cast Feed
    Validator, Podba.se) before the first Spotify submission.
@@ -239,7 +249,7 @@ Applied 2026-09-27 (88/88).
 | Step | Authority | Why |
 |---|---|---|
 | Create the 5 Notion properties | **B** | Notion schema is operator-managed (C-2). |
-| Merge the Epic-017 PR | **B** | Agents never merge. |
+| Merge the Epic-017 PR | per root governance §4.4 | — |
 | Run `register.mjs` (persona existence) | **B** | priya/operator; gated by the W-3 raise. |
 | `sam deploy` (Polly = new AWS service) | **B** | §5 new-AWS-service row. |
 | Gemini key + CI `lambda:InvokeFunction` grant (§3a) | **B** | New external egress/credential + IAM (ADR-0043). |

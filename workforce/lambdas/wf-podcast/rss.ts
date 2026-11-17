@@ -31,7 +31,7 @@ export interface PodcastEpisode {
   title: string;
   description: string; // the source citations (mandatory)
   audioUrl: string; // the public MP3 enclosure (CDN)
-  pubDate: string; // ISO date "YYYY-MM-DD" or RFC-822; normalised below
+  pubDate: string; // ISO date "YYYY-MM-DD", full ISO timestamp, or RFC-822; normalised below
   durationSec?: number;
   byteLength?: number;
 }
@@ -48,7 +48,13 @@ export function xmlEscape(s: string): string {
 
 /** Best-effort RFC-822 date (what RSS readers expect) from an ISO date. */
 export function toRfc822(date: string): string {
-  // Accept "YYYY-MM-DD" or a full ISO timestamp; fall back to the raw string.
+  // A full ISO timestamp keeps its time, so same-day episodes order by when
+  // they were made. A bare "YYYY-MM-DD" is pinned to 09:00Z. Anything else is
+  // passed through as-is.
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(date)) {
+    const t = new Date(date);
+    if (!Number.isNaN(t.getTime())) return t.toUTCString();
+  }
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(date);
   if (!m) return date;
   const d = new Date(`${m[1]}-${m[2]}-${m[3]}T09:00:00Z`);

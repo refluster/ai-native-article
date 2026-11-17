@@ -4,7 +4,7 @@
 // dropped every duplicated GUID. These pin the fix.
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { mockClient } from "aws-sdk-client-mock";
-import { S3Client, PutObjectCommand, HeadObjectCommand, CopyObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, HeadObjectCommand, CopyObjectCommand, DeleteObjectCommand, ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
 import {
   PollyClient,
   StartSpeechSynthesisTaskCommand,
@@ -107,6 +107,72 @@ describe("wf-podcast slug + GUID", () => {
     const bad = await post("/podcast/rss");
     expect(bad.status).toBe(500);
     expect(bad.json.error).toMatch(/duplicate episode GUID b2b2b2b2b2b2/);
+  });
+});
+
+describe("wf-podcast feed pubDate", () => {
+  const ep = (id: string, guid: string, publishedAt: string) =>
+    page(id, { ...status("published"), ...audio(`https://cdn.example/podcast/audio/${guid}.mp3`), PublishedAt: { type: "date", date: { start: publishedAt } } });
+  const pubDateOf = (xml: string, guid: string) =>
+    new RegExp(`${guid}</guid>\\s*<pubDate>([^<]*)</pubDate>`).exec(xml)?.[1];
+  // Persist the feed the way S3 would, so the next rebuild can read it back.
+  const persistFeed = () => {
+    s3Mock.on(PutObjectCommand).callsFake(async (i: any) => {
+      if (i.Key === "podcast/feed.xml") { feed = String(i.Body); heads["podcast/feed.xml"] = {}; }
+      return {};
+    });
+    s3Mock.on(GetObjectCommand).callsFake(async (i: any) => {
+      if (i.Key !== "podcast/feed.xml" || !("podcast/feed.xml" in heads)) throw new Error("NoSuchKey");
+      const body = feed;
+      return { Body: { transformToString: async () => body } };
+    });
+  };
+
+  it("first build (no prior feed) keeps the PublishedAt dates", async () => {
+    pages = [ep("p1", "aaaaaaaaaaaa", "2026-11-03")];
+    expect((await post("/podcast/rss")).status).toBe(200);
+    expect(pubDateOf(feed, "aaaaaaaaaaaa")).toBe("Tue, 03 Nov 2026 09:00:00 GMT");
+  });
+
+  it("puts a back-catalogue episode cast today at the top, and keeps every existing date", async () => {
+    persistFeed();
+    pages = [ep("p1", "aaaaaaaaaaaa", "2026-11-10"), ep("p2", "bbbbbbbbbbbb", "2026-11-12")];
+    expect((await post("/podcast/rss")).status).toBe(200); // seeds the feed
+    const before = feed;
+
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-16T18:40:00Z"));
+    try {
+      // A new episode for an article published 11-03 (older than both).
+      pages.push(ep("p3", "cccccccccccc", "2026-11-03"));
+      expect((await post("/podcast/rss")).status).toBe(200);
+    } finally { vi.useRealTimers(); }
+
+    expect(pubDateOf(feed, "cccccccccccc")).toBe("Mon, 16 Nov 2026 18:40:00 GMT");
+    expect(feed.indexOf("cccccccccccc</guid>")).toBeLessThan(feed.indexOf("bbbbbbbbbbbb</guid>"));
+    expect(pubDateOf(feed, "aaaaaaaaaaaa")).toBe(pubDateOf(before, "aaaaaaaaaaaa"));
+    expect(pubDateOf(feed, "bbbbbbbbbbbb")).toBe(pubDateOf(before, "bbbbbbbbbbbb"));
+  });
+
+  it("does not re-date an episode whose MP3 key is rewritten", async () => {
+    persistFeed();
+    pages = [ep("p1", "aaaaaaaaaaaa", "2026-05-01"), ep("p2", "bbbbbbbbbbbb", "2026-09-01")];
+    expect((await post("/podcast/rss")).status).toBe(200);
+    const before = feed;
+    // e.g. the collided-audio restore or a re-finalize rewrites the public key.
+    heads["podcast/audio/aaaaaaaaaaaa.mp3"] = { "page-id": "p1" };
+    expect((await post("/podcast/rss")).status).toBe(200);
+    expect(pubDateOf(feed, "aaaaaaaaaaaa")).toBe("Fri, 01 May 2026 09:00:00 GMT");
+    expect(pubDateOf(feed, "bbbbbbbbbbbb")).toBe(pubDateOf(before, "bbbbbbbbbbbb"));
+    expect(feed.indexOf("bbbbbbbbbbbb</guid>")).toBeLessThan(feed.indexOf("aaaaaaaaaaaa</guid>"));
+  });
+
+  it("fails loud when the prior feed exists but cannot be read", async () => {
+    heads["podcast/feed.xml"] = {};
+    s3Mock.on(GetObjectCommand).rejects(Object.assign(new Error("AccessDenied"), { name: "AccessDenied" }));
+    pages = [ep("p1", "aaaaaaaaaaaa", "2026-11-03")];
+    const r = await post("/podcast/rss");
+    expect(r.status).toBe(500);
   });
 });
 

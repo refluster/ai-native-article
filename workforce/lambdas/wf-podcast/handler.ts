@@ -603,6 +603,46 @@ async function publish(): Promise<ProxyResult> {
 }
 
 // ── Story 6: build RSS ───────────────────────────────────────────────────────
+
+// An episode's pubDate is fixed the first time it enters the feed, and the
+// feed already on S3 is where that date is kept. Every rebuild reads the
+// previous feed.xml and gives each GUID the pubDate it already has there. A
+// GUID that is new to the feed gets the rebuild time, so it goes to the top of
+// the feed.
+//
+// Two dates were tried and rejected:
+//  - The source article's `PublishedAt`. podcast-script casts the back
+//    catalogue oldest-first, so a new episode was dated days back and landed
+//    mid-feed. The feed's newest date stayed at 2026-11-03 while new audio
+//    kept shipping.
+//  - The MP3's S3 LastModified. It changes whenever the key is rewritten
+//    (re-finalize, a Gemini re-stitch, the collided-audio restore). 89 live
+//    enclosures share 2026-09-27 for this reason.
+//
+// If no previous feed exists (first build), pubDate falls back to
+// PublishedAt → created_time, the original rule.
+export function parseFeedPubDates(xml: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+    const guid = /<guid[^>]*>([^<]*)<\/guid>/.exec(m[1]!)?.[1]?.trim();
+    const raw = /<pubDate>([^<]*)<\/pubDate>/.exec(m[1]!)?.[1]?.trim();
+    if (!guid || !raw) continue;
+    const t = new Date(raw);
+    if (!Number.isNaN(t.getTime())) out.set(guid, t.toISOString());
+  }
+  return out;
+}
+
+// Return null when there is no feed yet. Throw on any other failure (C-4):
+// silently losing the previous dates would re-date the whole feed.
+async function previousFeedPubDates(): Promise<Map<string, string> | null> {
+  const listed = await s3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: FEED_KEY, MaxKeys: 10 }));
+  if (!(listed.Contents ?? []).some((o) => o.Key === FEED_KEY)) return null;
+  const obj = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: FEED_KEY }));
+  if (!obj.Body) throw new Error(`${FEED_KEY} exists but has no body — refusing to rebuild without its episode dates`);
+  return parseFeedPubDates(await obj.Body.transformToString());
+}
+
 async function buildRss(): Promise<ProxyResult> {
   if (!BUCKET) throw new Error("BUCKET_NAME env var is required");
   if (!PUBLIC_BASE) throw new Error("PODCAST_PUBLIC_BASE_URL env var is required");
@@ -614,6 +654,18 @@ async function buildRss(): Promise<ProxyResult> {
     const audioUrl = propText(p.properties?.audioUrl);
     return (status === "audio-ready" || status === "published") && !!audioUrl;
   });
+
+  const previous = await previousFeedPubDates();
+  const rebuiltAt = new Date().toISOString();
+  let kept = 0;
+  let added = 0;
+
+  const datedFor = (guid: string, p: NotionPage): string => {
+    const prior = previous?.get(guid);
+    if (prior) { kept++; return prior; }
+    if (previous) { added++; return rebuiltAt; }
+    return (propText(p.properties?.PublishedAt) || (p.created_time ?? "")).slice(0, 10);
+  };
 
   const episodes: PodcastEpisode[] = [];
   for (const p of ready) {
@@ -638,15 +690,21 @@ async function buildRss(): Promise<ProxyResult> {
       title: propText(p.properties?.Title) || pageSlug(p),
       description: showNotes ? `${showNotes}\n\n${citations}` : citations,
       audioUrl,
-      // pubDate source is the Notion `PublishedAt` property — the publish date of
-      // the source article this episode is derived from, which we treat as the
-      // episode's own publish date too. Fall back to Notion's created_time so an
-      // undated row still carries a valid date rather than an empty <pubDate>.
-      pubDate: (propText(p.properties?.PublishedAt) || (p.created_time ?? "")).slice(0, 10),
+      // See previousFeedPubDates: keep the date already in the feed, else stamp
+      // the rebuild time; with no prior feed, fall back to PublishedAt →
+      // created_time.
+      pubDate: datedFor(episodeGuid(audioUrl, pageSlug(p)), p),
       byteLength,
     });
   }
-  episodes.sort((a, b) => (b.pubDate || "").localeCompare(a.pubDate || ""));
+  // Sort on the parsed instant, not the string: a bare "YYYY-MM-DD" renders
+  // as 09:00Z (toRfc822) and must order with the full timestamps on that day.
+  const epoch = (d: string) => {
+    const t = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d}T09:00:00Z` : d);
+    return Number.isNaN(t) ? 0 : t;
+  };
+  episodes.sort((a, b) => epoch(b.pubDate) - epoch(a.pubDate));
+  console.log(JSON.stringify({ event: "wf_podcast_rss_dates", priorFeed: !!previous, kept, added, fallback: previous ? 0 : episodes.length }));
 
   const feedSelfUrl = `${PUBLIC_BASE}/${FEED_KEY}`;
   const xml = buildPodcastRss(

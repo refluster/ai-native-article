@@ -200,9 +200,9 @@ The default decision tree for an agent:
 | Promoting a shadow substrate to primary | **B** | matches governance §8.1 B "spending money outside the existing envelope" |
 | Rewriting >50% of an existing L2/L3 prompt in one diff | **B** | operator should eyeball 2-3 sample outputs before commit |
 | Removing or weakening an R-rule | **B** | governance §8.1 explicit |
-| Merging any PR (including own) | **B** | governance C-3 / §8.1 explicit |
+| Merging a PR | **A** through the governance §4.4 engine; **B** otherwise | governance §4.4 / §8.1 (ADR-0009) |
 
-The principle behind the table: **default to A; escalate only when an action is (a) irreversible, (b) outside the agent's branch (push to `main`, merge PRs, external services), (c) about money, or (d) explicitly named B by governance.** Everything else is A.
+The principle behind the table: **default to A; escalate only when an action is (a) irreversible, (b) outside the agent's branch (push to `main`, external services; merging is governed by §4.4), (c) about money, or (d) explicitly named B by governance.** Everything else is A.
 
 Symptoms that you have drifted from D-1:
 

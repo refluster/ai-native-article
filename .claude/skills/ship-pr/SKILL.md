@@ -131,7 +131,7 @@ Optionally one line per non-trivial fix that was applied during the loop. Nothin
 
 ## Out of scope
 
-- **Merging.** Agents never merge (workforce governance §5; root AGENTS.md R-6). ship-pr stops at "ready for review".
+- **Merging.** ship-pr stops at "ready for review"; merging follows root governance §4.4 (the `pr-autopilot-session` lane, ADR-0009).
 - **Asking for reviewers.** Reviewer assignment is the operator's call.
 - **PR description quality.** ship-pr does not rewrite the PR body; that's the create_pull_request call's job.
 - **Cross-PR dependency resolution.** If PR-B depends on PR-A landing first, surface it; don't try to chain.

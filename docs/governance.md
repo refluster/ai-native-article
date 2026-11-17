@@ -154,7 +154,18 @@ This repository **delegates** bounded autonomous merge to the agent-workforce's 
 - workforce/docs/mvv.md
 - workforce/docs/north-star/**
 - workforce/infra/sam/samconfig.toml
+- .claude/settings.json
+- .claude/skills/pr-autopilot-session/**
+- scripts/claude/**
+- scripts/lib/autopilot-session.mjs
+- docs/risk-acceptance-ledger.md
+- workforce/skills/pr-autopilot/pr-merge.mjs
+- workforce/skills/pr-autopilot/escalation-reasons.mjs
+- workforce/scripts/lib/github-identity.mjs
+- scripts/lib/proxy-bootstrap.mjs
 <!-- /autopilot:l0l1-paths -->
+
+**Two lanes, one engine ([ADR-0009](adr/adr-0009-session-run-autopilot-lane.md)).** The workforce cron and the Claude Code session that opened a PR (`.claude/skills/pr-autopilot-session`) run the same lane; a session merges only through `scripts/claude/autopilot-merge.mjs`, which runs main's gate core and `pr-merge.mjs` from `origin/main`. This section is the only statement of the agent merge predicate; other documents point here. The session lane runs only in operator-attended sessions; scheduled routines and cadences stay on the cron lane — the gate refuses them (ADR-0009 scope).
 
 (Per-PR pause: an `autopilot:off` label. This §4.4 block sits inside `docs/governance.md`, which is itself L0/L1 — so the autopilot can never edit its own boundary, nor widen what it may merge.)
 
@@ -200,7 +211,7 @@ one-off lint without a backlog row — the row is the provenance for "why does t
 
 A finding that is real but **not** worth a machine check goes to
 [risk-acceptance-ledger.md](risk-acceptance-ledger.md) — an agent drafts the row, the operator
-"signs" it by merging (the only merge authority, §8.1 B). A signed row **suppresses re-filing**: a
+"signs" it by merging — the ledger is in the §4.4 L0/L1 block, so no lane can merge a row for them. A signed row **suppresses re-filing**: a
 later retrospective that rediscovers the gap checks the `Re-eval` date instead of opening a new
 finding. The signed ledger is what stops the audit loop from re-litigating
 the same accepted trade-offs forever. Both registries are kept well-formed by R-12.
@@ -237,7 +248,7 @@ When an agent is spawned against this repository:
 
 ### 8.1 Action authority matrix
 
-This pins which actions are auto-executed (**A**) and which require operator approval (**B**). The principle: an action is **B** when (a) it's an L0/L1 amendment, (b) it modifies live state outside the agent's branch (push to `main`, merge PRs, GitHub releases, repo settings), (c) it's irreversible (force-push, history rewrite of a published branch, content deletion), or (d) it changes external services in a way that can't be undone by reverting (production AWS writes, secret rotations).
+This pins which actions are auto-executed (**A**) and which require operator approval (**B**). The principle: an action is **B** when (a) it's an L0/L1 amendment, (b) it modifies live state outside the agent's branch (push to `main`, GitHub releases, repo settings), (c) it's irreversible (force-push, history rewrite of a published branch, content deletion), or (d) it changes external services in a way that can't be undone by reverting (production AWS writes, secret rotations).
 
 #### A — auto-execute
 
@@ -250,10 +261,10 @@ This pins which actions are auto-executed (**A**) and which require operator app
 - **GitHub author-side.** `gh pr create`, `gh pr edit` (description), `gh issue create`, `gh pr ready`.
 - **Drafting an L1 doc change.** The agent may open a PR that edits an L1 doc — but must NOT merge it (B).
 - **Article-health sweep.** Idempotent and fix-forward.
+- **Merging under §4.4** — through its engine, from the cron lane or the session gate ([ADR-0009](adr/adr-0009-session-run-autopilot-lane.md)). Any other merge is B.
 
 #### B — escalate to operator
 
-- **Merging any PR**, including the agent's own. Agent never self-merges.
 - **Push to `main` directly** (vs. via PR). Always B.
 - **Force-push, history rewrite, branch deletion of a published branch**, `git reset --hard` on `main`/`gh-pages`.
 - **L0 amendment** (this doc §2). Always B.
@@ -261,6 +272,7 @@ This pins which actions are auto-executed (**A**) and which require operator app
 - **L2 loosening or disabling** (e.g. removing the W-1 `publish-notion.mjs` guard, disabling `check-corpus-truncation`). Always B.
 - **Changing GitHub repo settings, branch protection, secrets, deploy-key/PAT scopes.**
 - **Issuing destructive Notion mutations** (deleting pages, changing DB schema, archiving in bulk). The current handlers don't do this; if a future handler does, the trigger requires operator approval.
+- **Merging other than through §4.4's engine** (cron lane or session gate).
 - **Spending money** that isn't already implicitly approved by the existing pipeline (e.g. switching to a more expensive model, raising LLM call rates).
 
 A B action surfaces in chat with a one-line ask. Operator says "yes" → agent proceeds. Operator says "no" or doesn't reply → agent stops.
