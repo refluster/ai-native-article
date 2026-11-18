@@ -77,6 +77,11 @@ const RERUN_MARKER_RE = /<!--\s*autopilot:rerun:\d+\s+checks=([^>]*?)\s*-->/g;
 // A check that passed-on-rerun this many times in the window is racy, not
 // flaky — the allowlist entry should be evicted and an issue opened.
 const RERUN_PASS_WARN_THRESHOLD = 3;
+// FU-029 / adr-0022: the author lane. PRs the autopilot parked here because
+// they need author attention (merge conflict, review findings, branch behind).
+// A separate label from needs-human: a needs-author PR is agent-fixable in
+// principle; a needs-human PR needs a human decision.
+const NEEDS_AUTHOR_LABEL = "autopilot:needs-author";
 
 // ── pure aggregation (unit-tested) ───────────────────────────────────────────
 
@@ -310,6 +315,61 @@ export function aggregateReruns(items, { warnThreshold = RERUN_PASS_WARN_THRESHO
   return { reran_prs, per_check, warn };
 }
 
+/** FU-029 / adr-0022: aggregate author-lane entries, exits, and dwell from the
+ *  `autopilot:needs-author` search result.
+ *  items = [{ state, created_at, closed_at, merged_at, labels }].
+ *  Exits are classified by their `autopilot:reason:*` labels; in_flight =
+ *  still-open items. Dwell is approximated as PR lifetime (created_at → close
+ *  event) — the exact label-add timestamp is not available without the Events
+ *  API. Closed PRs with no matching reason label fall into `blocked` so the
+ *  sum (entries = in_flight + all exits) always holds. */
+export function aggregateAuthorLane(items) {
+  let entries = 0;
+  let in_flight = 0;
+  const exits = { resolved: 0, cap_exceeded: 0, author_stale: 0, blocked: 0 };
+  const dwell_ms = [];
+
+  for (const it of items) {
+    entries++;
+    const labels = (it.labels || []).map((l) => String(l || "").toLowerCase());
+    const reasons = labels
+      .filter((l) => l.startsWith(REASON_LABEL_PREFIX))
+      .map((l) => l.slice(REASON_LABEL_PREFIX.length));
+    const isMerged = Boolean(it.merged_at);
+    const isClosed = it.state === "closed";
+
+    if (!isClosed) {
+      in_flight++;
+      continue;
+    }
+
+    if (isMerged) {
+      exits.resolved++;
+      if (it.created_at && it.merged_at)
+        dwell_ms.push(new Date(it.merged_at) - new Date(it.created_at));
+    } else {
+      if (reasons.includes("author-stale")) {
+        exits.author_stale++;
+      } else if (reasons.some((r) => r === "cycle-cap-exceeded" || r === "remediation-cap-exceeded")) {
+        exits.cap_exceeded++;
+      } else if (reasons.includes("remediation-blocked")) {
+        exits.blocked++;
+      } else {
+        exits.blocked++;
+      }
+      if (it.created_at && it.closed_at)
+        dwell_ms.push(new Date(it.closed_at) - new Date(it.created_at));
+    }
+  }
+
+  const mean_dwell_hours =
+    dwell_ms.length > 0
+      ? +(dwell_ms.reduce((a, b) => a + b, 0) / dwell_ms.length / 3_600_000).toFixed(1)
+      : null;
+
+  return { entries, in_flight, exits, mean_dwell_hours };
+}
+
 // ── CLI / IO ─────────────────────────────────────────────────────────────────
 
 function arg(name, fallback) {
@@ -441,6 +501,28 @@ async function main() {
     );
   }
 
+  // 1d. author-lane PRs in the window (FU-029 / adr-0022): every PR — open or
+  // closed — carrying the needs-author label and updated in the window. Reason
+  // labels ride on the Search items (no per-PR GETs needed).
+  const authorLaneItems = [];
+  for (let page = 1; page <= 10; page++) {
+    const q = encodeURIComponent(`repo:${repo} is:pr label:"${NEEDS_AUTHOR_LABEL}" updated:>=${sinceIso}`);
+    const r = await gh(`/search/issues?q=${q}&per_page=100&page=${page}`);
+    if (r.status !== 200) { console.error(`author-lane search -> HTTP ${r.status} ${JSON.stringify(r.json).slice(0, 200)}`); return 3; }
+    const items = r.json.items ?? [];
+    authorLaneItems.push(...items);
+    if (items.length < 100) break;
+  }
+  const authorLane = aggregateAuthorLane(
+    authorLaneItems.map((it) => ({
+      state: it.state,
+      created_at: it.created_at,
+      closed_at: it.closed_at,
+      merged_at: it.pull_request?.merged_at,
+      labels: Array.isArray(it.labels) ? it.labels.map((l) => l?.name) : [],
+    })),
+  );
+
   // 2. per PR: churn + merged_at + author + the autopilot signal.
   const { prs, skipped, quotaExhausted } = await fetchPrFacts(gh, repo, merged);
 
@@ -449,6 +531,7 @@ async function main() {
   // item (R-N2: no new store), inside pr_summary — as does the Story-2c
   // flaky-rerun roll-up (warn is print-only, not stored).
   Object.assign(block.pr_summary, escalations, {
+    author_lane: authorLane,
     flaky_reruns: { reran_prs: reruns.reran_prs, per_check: reruns.per_check },
     // Omitted when nothing was dropped, so "nothing missing" stays distinguishable
     // from "this writer does not report what it dropped".
@@ -465,7 +548,8 @@ async function main() {
     `${repo} (scope ${scope}): ${block.pr_summary.total_prs} merged PR(s) over ${DAYS}d ` +
       `(${block.window.start}→${block.window.end}); autopilot ${Math.round(block.pr_summary.autopilot_share * 100)}% ` +
       `(${block.pr_summary.autopilot_merged}/${block.pr_summary.total_prs}); escalated ${escalations.escalated_prs} ` +
-      `(eligible ${escalations.eligible_escalations}); reviewers: ` +
+      `(eligible ${escalations.eligible_escalations}); author-lane entries ${authorLane.entries} ` +
+      `(in-flight ${authorLane.in_flight}); reviewers: ` +
       block.pr_contributors.filter((c) => c.kind === "agent").map((c) => `${c.handle}:${c.prs}`).join(", "),
   );
 

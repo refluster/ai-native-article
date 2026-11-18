@@ -5,6 +5,7 @@ import {
   classifyPr,
   aggregate,
   aggregateEscalations,
+  aggregateAuthorLane,
   aggregateReruns,
   fetchPrFacts,
   fetchWithRetry,
@@ -85,6 +86,104 @@ describe("aggregateEscalations", () => {
 
   it("empty input yields an empty funnel", () => {
     expect(aggregateEscalations([])).toEqual({ escalated_prs: 0, eligible_escalations: 0, escalation_reasons: {} });
+  });
+});
+
+// FU-029 / adr-0022: author-lane entries, exits, dwell. PRs the autopilot
+// parked in the needs-author lane, bucketed by exit type so the ops dashboard
+// can track how often agents fix vs. stale vs. blocked.
+describe("aggregateAuthorLane", () => {
+  const open = (labels = []) => ({ state: "open", created_at: "2026-10-01T00:00:00Z", closed_at: null, merged_at: null, labels });
+  const merged = (labels = []) => ({ state: "closed", created_at: "2026-10-01T00:00:00Z", closed_at: "2026-10-02T12:00:00Z", merged_at: "2026-10-02T12:00:00Z", labels });
+  const closed = (reason: string | null, labels: string[] = []) => ({
+    state: "closed",
+    created_at: "2026-10-01T00:00:00Z",
+    closed_at: "2026-10-04T00:00:00Z",
+    merged_at: null,
+    labels: reason ? [`autopilot:reason:${reason}`, ...labels] : labels,
+  });
+
+  it("empty input yields an all-zero result with null dwell", () => {
+    expect(aggregateAuthorLane([])).toEqual({
+      entries: 0,
+      in_flight: 0,
+      exits: { resolved: 0, cap_exceeded: 0, author_stale: 0, blocked: 0 },
+      mean_dwell_hours: null,
+    });
+  });
+
+  it("open PRs count as in_flight, not as exits", () => {
+    const r = aggregateAuthorLane([open(), open()]);
+    expect(r.entries).toBe(2);
+    expect(r.in_flight).toBe(2);
+    expect(r.exits).toEqual({ resolved: 0, cap_exceeded: 0, author_stale: 0, blocked: 0 });
+  });
+
+  it("merged PR counts as resolved exit", () => {
+    const r = aggregateAuthorLane([merged()]);
+    expect(r.entries).toBe(1);
+    expect(r.in_flight).toBe(0);
+    expect(r.exits.resolved).toBe(1);
+    expect(r.exits.cap_exceeded).toBe(0);
+  });
+
+  it("closed with author-stale counts as author_stale exit", () => {
+    const r = aggregateAuthorLane([closed("author-stale")]);
+    expect(r.exits.author_stale).toBe(1);
+    expect(r.exits.resolved).toBe(0);
+  });
+
+  it("closed with cycle-cap-exceeded or remediation-cap-exceeded counts as cap_exceeded", () => {
+    const r = aggregateAuthorLane([closed("cycle-cap-exceeded"), closed("remediation-cap-exceeded")]);
+    expect(r.exits.cap_exceeded).toBe(2);
+  });
+
+  it("closed with remediation-blocked counts as blocked", () => {
+    const r = aggregateAuthorLane([closed("remediation-blocked")]);
+    expect(r.exits.blocked).toBe(1);
+  });
+
+  it("closed with no matching reason label also counts as blocked (sum stays consistent)", () => {
+    const r = aggregateAuthorLane([closed(null)]);
+    expect(r.exits.blocked).toBe(1);
+    expect(r.entries).toBe(r.in_flight + r.exits.resolved + r.exits.cap_exceeded + r.exits.author_stale + r.exits.blocked);
+  });
+
+  it("entries always equals in_flight + all exits (mixed window)", () => {
+    const items = [
+      open(), open(),
+      merged(), merged(["autopilot:reason:merge-conflict"]),
+      closed("author-stale"),
+      closed("cycle-cap-exceeded"),
+      closed("remediation-blocked"),
+      closed(null),
+    ];
+    const r = aggregateAuthorLane(items);
+    expect(r.entries).toBe(items.length);
+    const exitSum = r.exits.resolved + r.exits.cap_exceeded + r.exits.author_stale + r.exits.blocked;
+    expect(r.entries).toBe(r.in_flight + exitSum);
+  });
+
+  it("mean_dwell_hours is the average lifetime of closed PRs in hours", () => {
+    // merged() lifetime: created 2026-10-01 → merged 2026-10-02T12 = 36h
+    // closed("author-stale") lifetime: created 2026-10-01 → closed 2026-10-04 = 72h
+    const r = aggregateAuthorLane([merged(), closed("author-stale")]);
+    expect(r.mean_dwell_hours).toBe(54.0); // (36 + 72) / 2
+  });
+
+  it("mean_dwell_hours is null when all items are open (no dwell data)", () => {
+    expect(aggregateAuthorLane([open()]).mean_dwell_hours).toBeNull();
+  });
+
+  it("reason labels are case-normalised (GitHub preserves label case)", () => {
+    const r = aggregateAuthorLane([{
+      state: "closed",
+      created_at: "2026-10-01T00:00:00Z",
+      closed_at: "2026-10-02T00:00:00Z",
+      merged_at: null,
+      labels: ["Autopilot:Reason:Author-Stale"],
+    }]);
+    expect(r.exits.author_stale).toBe(1);
   });
 });
 
