@@ -12,6 +12,17 @@ ledger is the `workflow-foundry` incentive ledger. It is job 9 in
 ledger's worklist is filtered per desk (`?agent=<slug>`), and its attestation
 allowlist must name both.
 
+**Trust limit (FU-042).** The attestation is a feed receipt, and the feed
+accepts it from any holder of the team-shared `workforce.feed_write_token`,
+taking `agent_slug` from the request body. The receipt therefore proves that
+*someone with the shared capability* posted under a desk's slug, not that the
+desk did. The ledger's auto-applied types (`verified_no_change`, `note`,
+`budget_signal`) rest on that alone, and the slug allowlist is not an identity
+control until the receipt is bound to the caller (per-desk token, or the feed
+recording the token principal). Until FU-042 lands, the ledger side should
+treat `verified_no_change` as time-boxed or review-queued, and an operator
+auditing a suspicious reset should check the feed post's origin, not the slug.
+
 ## Prerequisites
 
 1. **The skill PR is merged and the data plane is deployed.** The deploy's

@@ -1,6 +1,6 @@
 ---
 name: ledger-watch
-description: Ledger re-verification cadence for an external project's public incentive ledger. Once per period, read the ledger's public worklist for your desk, re-read each due program's primary pages live, classify what each page shows into one structured observation (verified_no_change, status/amount/deadline/requirements change, budget signal, new program, note) with verbatim evidence, run one bounded discovery pass in your lane, then post a short receipt on the feed and submit the observations to the ledger through post.mjs. The ledger never changes on your word: material changes wait for a human reviewer. Skips only when the worklist is empty and discovery found nothing.
+description: Ledger re-verification cadence for an external project's public incentive ledger. Once per period, read the ledger's public worklist for your desk, re-read each due program's primary pages live, classify what each page shows into one structured observation (verified_no_change, status/amount/deadline/requirements change, budget signal, new program, note) with verbatim evidence, run one bounded discovery pass in your lane, then post a short receipt on the feed and submit the observations to the ledger through post.mjs. Material changes wait for a human reviewer; the routine types (verified_no_change, note, budget_signal) are applied by the ledger on a feed receipt that proves only that a holder of the shared feed token posted under your slug (FU-042). Skips only when the worklist is empty and discovery found nothing.
 ---
 
 # ledger-watch
@@ -20,6 +20,17 @@ ledger's rows against the pages they cite and report what the pages say
 today, as **observations**. The ledger applies the routine ones itself; a
 human approves every material change in the ledger's own UI. **You never
 decide a ledger value.** Your job is a faithful, dated, quoted reading.
+
+**What the receipt does and does not prove (FU-042).** The feed receipt
+attests that *some holder of the team-shared `workforce.feed_write_token`*
+posted under your `agent_slug` (the feed takes the slug from the request
+body). It is a shared capability, not a per-desk identity. So the auto-applied
+types (`verified_no_change`, `note`, `budget_signal`) are attested by that
+shared capability alone, and the ledger-side slug allowlist is not an
+identity control while the slug is self-asserted. Binding the receipt to the
+caller is tracked as FU-042; until then, report only what you read this fire,
+and treat a `verified_no_change` as a claim a reviewer may re-check, never as
+proof.
 
 The lane (which programs, which territory, which sources) is on **you**: your
 `system.md` defines it, and the ledger's worklist is already filtered to your
@@ -200,7 +211,7 @@ path lets a sibling task's file be posted under your slug (ML-028).
 FEED_WRITE_TOKEN="<credentials['workforce.feed_write_token'] from your task>" \
   node workforce/skills/ledger-watch/post.mjs \
     --agent "<agent_slug>" \
-    --skill-version "0.1.0" \
+    --skill-version "0.1.1" \
     --payload-file /tmp/ledger-watch-<agent_slug>-<suffix>.json \
     --summary-file /tmp/ledger-watch-<agent_slug>-<suffix>.md \
     --ledger-url "<config.ledger_api_url>"
