@@ -21,6 +21,7 @@ import { validatePayload, validateSummary } from "./ledger-payload.mjs";
 const SCRIPT = join(__dirname, "post.mjs");
 const dir = mkdtempSync(join(tmpdir(), "ledger-watch-"));
 const TODAY = new Date().toISOString().slice(0, 10);
+const KNOWN = ["example_hpwh_rebate", "example_new_program"];
 
 // ── stub server ──────────────────────────────────────────────────────────────
 interface Req { method: string; path: string; headers: IncomingMessage["headers"]; body: string }
@@ -31,9 +32,10 @@ interface Stub {
   tamperReadBack: boolean;            // serve a different body on read-back
   ledgerPlan: Array<number | "drop">; // per-attempt ledger status (last repeats)
   ledgerDispositions: string[] | null;
+  knownCodes: string[] | null;        // null → worklist answers 503
 }
 const stub: Stub = {
-  requests: [], posts: new Map(), feedStatus: null, tamperReadBack: false, ledgerPlan: [200], ledgerDispositions: null,
+  requests: [], posts: new Map(), feedStatus: null, tamperReadBack: false, ledgerPlan: [200], ledgerDispositions: null, knownCodes: KNOWN,
 };
 let server: Server;
 let base = "";
@@ -66,6 +68,11 @@ beforeAll(async () => {
         return send(res, 200, { ...p, body: stub.tamperReadBack ? "someone else's prose" : p.body });
       }
       // ledger
+      if (req.method === "GET" && url.pathname === "/v1/worklist") {
+        if (!stub.knownCodes) return send(res, 503, { error: { code: "down", message: "x" } });
+        return send(res, 200, { agent: url.searchParams.get("agent"), items: [], count: 0,
+          discovery: { territory: "t", equipment: [], known_codes: stub.knownCodes }, server_time: new Date().toISOString() });
+      }
       if (req.method === "POST" && url.pathname === "/v1/observations") {
         const n = stub.requests.filter((r) => r.path === "/v1/observations").length;
         const plan = stub.ledgerPlan[Math.min(n - 1, stub.ledgerPlan.length - 1)];
@@ -89,7 +96,7 @@ beforeAll(async () => {
 });
 afterAll(() => new Promise<void>((r) => server.close(() => r())));
 beforeEach(() => {
-  Object.assign(stub, { requests: [], feedStatus: null, tamperReadBack: false, ledgerPlan: [200], ledgerDispositions: null });
+  Object.assign(stub, { requests: [], feedStatus: null, tamperReadBack: false, ledgerPlan: [200], ledgerDispositions: null, knownCodes: KNOWN });
   stub.posts.clear();
 });
 
@@ -107,7 +114,7 @@ function observation(over: Record<string, unknown> = {}) {
 }
 function payload(over: Record<string, unknown> = {}, obs: unknown[] = [observation()]) {
   return {
-    run: { agent_slug: "soledad", started_at: `${TODAY}T15:30:00Z`, checked_programs: ["example_hpwh_rebate"], fetch_failures: [], discovery_queries: [], ...over },
+    run: { agent_slug: "soledad", started_at: new Date(Date.now() - 3_600_000).toISOString(), checked_programs: ["example_hpwh_rebate"], fetch_failures: [], discovery_queries: [], ...over },
     observations: obs,
   };
 }
@@ -269,18 +276,98 @@ describe("ledger-watch/post.mjs", () => {
   });
 });
 
+describe("ledger-watch/post.mjs — known codes", () => {
+  it("an observation on a code the ledger does not hold fails before the receipt", async () => {
+    const r = await run(payload({}, [observation({ program_code: "not_in_ledger" })]));
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain("not_in_ledger");
+    expect(feedPosts()).toHaveLength(0);
+    expect(stub.requests.map((q) => q.path)).toEqual(["/v1/worklist"]);
+  });
+
+  it("an unreachable worklist exits 3 before the receipt", async () => {
+    stub.knownCodes = null;
+    const r = await run(payload());
+    expect(r.status).toBe(3);
+    expect(feedPosts()).toHaveLength(0);
+    expect(r.json?.orphan_receipt).toBeUndefined();
+  });
+
+  it("a new_program code need not be known", async () => {
+    const np = observation({
+      program_code: "example_brand_new",
+      change_type: "new_program",
+      proposed: { name: "Example new rebate", status: "open", equipment: ["hpwh"] },
+    });
+    const r = await run(payload({}, [np]));
+    expect(r.status, r.stderr).toBe(0);
+  });
+});
+
 describe("ledger-payload.mjs", () => {
+  const CTX = { agent: "soledad", skillVersion: "0.1.0", now: new Date() };
+  const errs = (o: unknown) => validatePayload(payload({}, [o]), CTX).errors.join("\n");
+
+  it("proposed must be absent on verified_no_change and note", () => {
+    expect(errs(observation({ proposed: { status: "open" } }))).toMatch(/proposed: must be absent/);
+    expect(errs(observation({ change_type: "note", proposed: {} }))).toMatch(/proposed: must be absent/);
+    expect(errs(observation({ change_type: "note", proposed: null }))).toBe(""); // the ledger reads null as absent
+  });
+
+  it("new_program needs a status and a name", () => {
+    const np = (proposed: unknown) => observation({ program_code: "example_brand_new", change_type: "new_program", proposed });
+    expect(errs(np({ name: "X rebate" }))).toMatch(/proposed\.status: is required/);
+    expect(errs(np({ status: "open" }))).toMatch(/name, name_ja or reference/);
+    expect(errs(np({ status: "open", reference: "Utility X rebate page" }))).toBe("");
+  });
+
+  it("proposed keys, nested keys, enums and dates are checked like the ledger", () => {
+    const sc = (proposed: unknown) => observation({ change_type: "requirements_changed", proposed });
+    expect(errs(sc({ eligibility: true }))).toMatch(/not a known program field/);
+    expect(errs(sc({ process: { install_by: "2026-12-31", apply_within_days: 90 } }))).toMatch(/process\.apply_within_days/);
+    expect(errs(sc({ jurisdiction: { utilities: [{ type: "propane", id: "x" }] } }))).toMatch(/utilities\[0\]\.type/);
+    expect(errs(sc({ budget: { remaining_usd: -1 } }))).toMatch(/budget\.remaining_usd/);
+    expect(errs(sc({ form: { pdf: "https://x.example" } }))).toMatch(/form\.pdf/);
+    expect(errs(sc({ equipment: ["tankless"] }))).toMatch(/equipment\[0\]/);
+    expect(errs(sc({ customer_segments: ["renter"] }))).toMatch(/customer_segments\[0\]/);
+    expect(errs(sc({ owner_desk: "naomi" }))).toMatch(/owner_desk/);
+    expect(errs(observation({ change_type: "status_changed", proposed: { status: "candidate" } }))).toMatch(/proposed\.status/);
+    expect(errs(observation({ change_type: "deadline_changed", proposed: { deadline: "2026-02-30" } }))).toMatch(/deadline/);
+    expect(errs(sc({ last_verified_at: "2026-11-19" }))).toMatch(/last_verified_at/);
+    expect(errs(sc({ process: { install_by: "2026-12-31", payee_options: ["contractor"] }, equipment: ["hpwh"] }))).toBe("");
+  });
+
+  it("forbidden fields include attention, created_*, verify_interval_effective", () => {
+    for (const k of ["attention", "created_at", "created_by", "verify_interval_effective", "version", "code"]) {
+      expect(errs(observation({ change_type: "status_changed", proposed: { status: "open", [k]: 1 } }))).toMatch(new RegExp(`proposed\\.${k}: is not writable`));
+    }
+  });
+
+  it("evidence and next_actions reject unknown keys; null detail/due are fine", () => {
+    expect(errs(observation({ evidence: [{ url: "https://x.example", quote: "q", primary_source: true, title: "t" }] }))).toMatch(/evidence\[0\]\.title/);
+    expect(errs(observation({ next_actions: [{ type: "recheck", owner: "me" }] }))).toMatch(/next_actions\[0\]\.owner/);
+    expect(errs(observation({ next_actions: [{ type: "recheck", detail: null, due: null }] }))).toBe("");
+  });
+
+  it("observed_at tolerates the ledger's +14h window but not more", () => {
+    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+    const late = new Date(Date.UTC(2026, 10, 19, 23, 0));
+    const at = (d: string) => validatePayload(payload({ started_at: "2026-11-19T20:00:00Z" }, [observation({ observed_at: d })]), { ...CTX, now: late }).errors.join("\n");
+    expect(at("2026-11-20")).toBe("");
+    expect(at("2026-11-21")).toMatch(/observed_at/);
+    expect(tomorrow > TODAY).toBe(true);
+  });
+
   it("accepts an empty run (programs checked, nothing to report)", () => {
-    const { errors } = validatePayload(payload({}, []), { agent: "soledad", skillVersion: "0.1.0", today: TODAY });
+    const { errors } = validatePayload(payload({}, []), CTX);
     expect(errors).toEqual([]);
   });
 
   it("rejects proposed fields the ledger never accepts from an observation", () => {
     const { errors } = validatePayload(
       payload({}, [observation({ change_type: "new_program", program_code: "x_new", proposed: { status: "candidate", version: 2 } })]),
-      { agent: "soledad", today: TODAY },
+      CTX,
     );
-    expect(errors.join("\n")).toMatch(/proposed\.version/);
     expect(errors.join("\n")).toMatch(/proposed\.status/);
   });
 

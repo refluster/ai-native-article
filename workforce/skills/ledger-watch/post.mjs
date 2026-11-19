@@ -5,9 +5,10 @@
 // observation payload and (b) a short human-readable status line. The LLM owns
 // the judgment; this script owns the two writes and their order:
 //
-//   1. validate the payload locally against the ledger contract (API v1
-//      §2.2–§4, mirrored in ./ledger-payload.mjs) — before any network call,
-//      so a malformed run never spends a feed receipt;
+//   1. validate the payload locally against the ledger's own validation
+//      (mirrored in ./ledger-payload.mjs) — before any network call — then
+//      read the ledger's known program codes from its public worklist, so a
+//      run the ledger would refuse or mark `rejected` never spends a receipt;
 //   2. serialise the payload ONCE and hash those exact bytes (sha256);
 //   3. POST /feed a kind:"observation" post whose body is the status line
 //      plus the line `ledger-receipt: sha256:<hex>`;
@@ -122,12 +123,13 @@ async function verifyReadBack(createdText, sentBody, feedUrl, slug) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function postLedger(url, requestBody, { attempts, baseMs }) {
+// One ledger call with bounded retry on network errors / 5xx only.
+async function callLedger(url, requestBody, { attempts, baseMs }) {
   let last = "";
   for (let i = 1; i <= attempts; i++) {
     try {
       const res = await fetch(url, {
-        method: "POST",
+        method: requestBody === undefined ? "GET" : "POST",
         headers: { "content-type": "application/json", accept: "application/json" },
         body: requestBody,
         signal: AbortSignal.timeout(30_000),
@@ -154,7 +156,7 @@ function resolveLedgerUrl(raw) {
   const loopback = u.hostname === "127.0.0.1" || u.hostname === "localhost";
   if (u.protocol !== "https:" && !(u.protocol === "http:" && loopback)) return null;
   if (u.search || u.hash) return null;
-  return `${u.origin}${u.pathname.replace(/\/+$/, "")}/v1/observations`;
+  return `${u.origin}${u.pathname.replace(/\/+$/, "")}`;
 }
 
 // ── 0. args / env / files ────────────────────────────────────────────────────
@@ -175,8 +177,9 @@ if (!summaryFile) fail(1, "--summary-file <path> is required");
 if (!ledgerRaw) {
   fail(1, "--ledger-url is required (binding.config.ledger_api_url). Not guessing a ledger host — fix the binding config.");
 }
-const ledgerUrl = resolveLedgerUrl(ledgerRaw);
-if (!ledgerUrl) fail(1, `--ledger-url "${ledgerRaw}" must be an https:// base URL with no query or fragment`);
+const ledgerBase = resolveLedgerUrl(ledgerRaw);
+if (!ledgerBase) fail(1, `--ledger-url "${ledgerRaw}" must be an https:// base URL with no query or fragment`);
+const ledgerUrl = `${ledgerBase}/v1/observations`;
 result.ledger = ledgerUrl;
 
 let rawPayloadText;
@@ -200,13 +203,34 @@ try {
 
 // ── 1. local validation — nothing has touched the network yet ───────────────
 result.stage = "validate";
-const today = new Date().toISOString().slice(0, 10);
-const { errors, payload } = validatePayload(parsed, { agent, skillVersion, today });
+const { errors, payload } = validatePayload(parsed, { agent, skillVersion, now: new Date() });
 const summaryErrors = validateSummary(summary);
 const allErrors = [...errors, ...summaryErrors];
 if (allErrors.length > 0) {
   for (const e of allErrors) console.error(`post.mjs: invalid ${e}`);
   fail(2, `${allErrors.length} validation error(s); nothing was posted`, { validation_errors: allErrors });
+}
+
+// ── 1b. known program codes (public worklist) ───────────────────────────────
+// The ledger rejects an observation on a code it does not hold (unless it is
+// a new_program). Read the codes it holds before spending the receipt.
+const attempts = Math.max(1, Number(process.env["LEDGER_RETRY_ATTEMPTS"] || 3));
+const baseMs = Math.max(0, Number(process.env["LEDGER_RETRY_BASE_MS"] ?? 2000));
+{
+  const wl = await callLedger(`${ledgerBase}/v1/worklist?agent=${encodeURIComponent(agent)}&limit=1`, undefined, { attempts, baseMs });
+  let known = null;
+  if (wl.status === 200) {
+    try {
+      const codes = JSON.parse(wl.text)?.discovery?.known_codes;
+      if (Array.isArray(codes)) known = new Set(codes);
+    } catch { /* handled below */ }
+  }
+  if (!known) fail(3, `could not read the ledger's known program codes from GET /v1/worklist (${wl.status ?? "network"}: ${String(wl.text).slice(0, 200)}); nothing was posted`);
+  const { errors: codeErrors } = validatePayload(payload, { agent, skillVersion, now: new Date(), knownCodes: known });
+  if (codeErrors.length > 0) {
+    for (const e of codeErrors) console.error(`post.mjs: invalid ${e}`);
+    fail(2, `${codeErrors.length} validation error(s) against the ledger's program codes; nothing was posted`, { validation_errors: codeErrors });
+  }
 }
 
 // ── 2. serialise once; hash exactly what will be sent ───────────────────────
@@ -251,10 +275,8 @@ const postId = rb.postId;
 // ── 5. ledger ────────────────────────────────────────────────────────────────
 result.stage = "ledger";
 const orphan = (reason) => ({ orphan_receipt: { post_id: postId, reason } });
-const attempts = Math.max(1, Number(process.env["LEDGER_RETRY_ATTEMPTS"] || 3));
-const baseMs = Math.max(0, Number(process.env["LEDGER_RETRY_BASE_MS"] ?? 2000));
 console.error(`post.mjs: POST ${ledgerUrl} (attestation post ${postId}, ${payload.observations.length} observation(s))`);
-const lr = await postLedger(
+const lr = await callLedger(
   ledgerUrl,
   JSON.stringify({ attestation: { agent_slug: agent, post_id: postId }, payload: payloadString }),
   { attempts, baseMs },

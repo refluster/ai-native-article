@@ -59,14 +59,14 @@ Then classify what you read into exactly one `change_type` per finding:
 
 | `change_type` | When | `proposed` |
 | --- | --- | --- |
-| `verified_no_change` | The page still supports the row as it stands | none |
+| `verified_no_change` | The page still supports the row as it stands | omit `proposed` |
 | `status_changed` | open / suspended / closed / pending_reopen moved | `status`, `status_since`, `status_note_ja` if the page supports them |
 | `amount_changed` | The amount or its basis changed | `amount` (only the keys the page supports) |
 | `deadline_changed` | An install-by or apply-by date changed or appeared | `deadline` and/or `process.install_by` / `process.apply_by` |
 | `requirements_changed` | Eligibility, documents, enrollment, pre-approval or permit-number rules changed | the specific `process.*` / `customer_segments` / `equipment` keys |
 | `form_changed` / `source_changed` | The application form moved or changed, or the page URL moved | `form` / `sources` |
 | `budget_signal` | Funding language changed ("limited funds", "waitlist", a remaining-budget figure) | `budget` only, optional |
-| `note` | Something worth keeping that is none of the above, including a co-flag | none |
+| `note` | Something worth keeping that is none of the above, including a co-flag | omit `proposed` |
 
 Rules. Each one exists because a downstream person quotes a job off this row.
 
@@ -105,7 +105,9 @@ Rules. Each one exists because a downstream person quotes a job off this row.
 `system.md` trusts. A program that is not in `known_codes` and has a live
 primary page becomes a `new_program`. Give it a proposed snake_case code
 (`^[a-z][a-z0-9_]{2,48}$`), at least one `primary_source: true` evidence
-entry, and only the fields the page states. Record the queries in
+entry, and a `proposed` block with its `status` (one of open / suspended /
+closed / pending_reopen, never `candidate`), its `name` as the page gives it,
+and only the other fields the page states. Record the queries in
 `run.discovery_queries`.
 
 **Lane rule.** State and federal rules belong to one desk. Utility, regional
@@ -180,9 +182,12 @@ https://…"*.
 
 `run.agent_slug` must be you. `run.skill_version` is filled in by the script.
 `observed_at` is the day you read the page (UTC, never in the future). Every
-evidence URL is `https://`. The full contract is the project ledger's API
-document. `post.mjs` mirrors it and refuses a malformed payload before
-anything is posted.
+evidence URL is `https://`. `proposed` takes only the ledger's program
+fields, with their enum values (for example `equipment`: gas_tankless,
+gas_storage, hpwh, hp_hvac, other). `post.mjs` mirrors the ledger's own
+validation. It also checks every non-`new_program` code against the ledger's
+`known_codes`, and refuses a payload the ledger would reject before anything
+is posted. Fix what stderr names and rerun.
 
 ## 6. Write — run the script, never call the ledger yourself
 
