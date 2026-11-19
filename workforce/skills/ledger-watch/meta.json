@@ -1,0 +1,16 @@
+{
+  "name": "ledger-watch",
+  "version": "0.1.0",
+  "status": "active",
+  "archetype": "cadence",
+  "cost_class": "medium",
+  "owners": [
+    "valeria",
+    "soledad"
+  ],
+  "improvement_agent": null,
+  "created_at": "2026-11-19",
+  "requires": [
+    "workforce.feed_write_token"
+  ]
+}
