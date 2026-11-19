@@ -89,100 +89,95 @@ describe("aggregateEscalations", () => {
   });
 });
 
-// FU-029 / adr-0022: author-lane entries, exits, dwell. PRs the autopilot
-// parked in the needs-author lane, bucketed by exit type so the ops dashboard
-// can track how often agents fix vs. stale vs. blocked.
+// FU-029 / adr-0022: author-lane volume + exits. Both exit paths remove the
+// needs-author label, so exits are read from the surviving reason labels.
 describe("aggregateAuthorLane", () => {
-  const open = (labels = []) => ({ state: "open", created_at: "2026-10-01T00:00:00Z", closed_at: null, merged_at: null, labels });
-  const merged = (labels = []) => ({ state: "closed", created_at: "2026-10-01T00:00:00Z", closed_at: "2026-10-02T12:00:00Z", merged_at: "2026-10-02T12:00:00Z", labels });
+  const T0 = "2026-10-01T00:00:00Z";
+  const open = (labels: string[] = []) => ({ state: "open", created_at: T0, closed_at: null, merged_at: null, labels });
+  const merged = (labels: string[] = []) => ({ state: "closed", created_at: T0, closed_at: "2026-10-02T12:00:00Z", merged_at: "2026-10-02T12:00:00Z", labels });
   const closed = (reason: string | null, labels: string[] = []) => ({
-    state: "closed",
-    created_at: "2026-10-01T00:00:00Z",
-    closed_at: "2026-10-04T00:00:00Z",
-    merged_at: null,
+    state: "closed", created_at: T0, closed_at: "2026-10-04T00:00:00Z", merged_at: null,
     labels: reason ? [`autopilot:reason:${reason}`, ...labels] : labels,
   });
+  const zero = { resolved: 0, cap_exceeded: 0, author_stale: 0, blocked: 0, unclassified: 0 };
+  const invariant = (r: ReturnType<typeof aggregateAuthorLane>) =>
+    expect(r.lane_prs).toBe(r.in_flight + Object.values(r.exits).reduce((a: number, b: number) => a + b, 0));
 
-  it("empty input yields an all-zero result with null dwell", () => {
-    expect(aggregateAuthorLane([])).toEqual({
-      entries: 0,
-      in_flight: 0,
-      exits: { resolved: 0, cap_exceeded: 0, author_stale: 0, blocked: 0 },
-      mean_dwell_hours: null,
-    });
+  it("empty input yields an all-zero result with null lifetime", () => {
+    expect(aggregateAuthorLane([])).toEqual({ lane_prs: 0, in_flight: 0, exits: zero, mean_lifetime_hours: null });
   });
 
-  it("open PRs count as in_flight, not as exits", () => {
-    const r = aggregateAuthorLane([open(), open()]);
-    expect(r.entries).toBe(2);
+  it("open PRs with no reason label are in_flight, not exits", () => {
+    const r = aggregateAuthorLane([open(["autopilot:needs-author"]), open()]);
     expect(r.in_flight).toBe(2);
-    expect(r.exits).toEqual({ resolved: 0, cap_exceeded: 0, author_stale: 0, blocked: 0 });
+    expect(r.exits).toEqual(zero);
   });
 
-  it("merged PR counts as resolved exit", () => {
-    const r = aggregateAuthorLane([merged()]);
-    expect(r.entries).toBe(1);
+  it("A1: an escalated ex-lane PR (needs-author removed, reason present) is an exit, even while still open", () => {
+    const r = aggregateAuthorLane([open(["autopilot:needs-human", "autopilot:reason:remediation-blocked"])]);
     expect(r.in_flight).toBe(0);
+    expect(r.exits.blocked).toBe(1);
+  });
+
+  it("merged PR with no escalation reason is resolved", () => {
+    const r = aggregateAuthorLane([merged()]);
     expect(r.exits.resolved).toBe(1);
-    expect(r.exits.cap_exceeded).toBe(0);
   });
 
-  it("closed with author-stale counts as author_stale exit", () => {
-    const r = aggregateAuthorLane([closed("author-stale")]);
-    expect(r.exits.author_stale).toBe(1);
-    expect(r.exits.resolved).toBe(0);
+  it("closed with author-stale is author_stale", () => {
+    expect(aggregateAuthorLane([closed("author-stale")]).exits.author_stale).toBe(1);
   });
 
-  it("closed with cycle-cap-exceeded or remediation-cap-exceeded counts as cap_exceeded", () => {
-    const r = aggregateAuthorLane([closed("cycle-cap-exceeded"), closed("remediation-cap-exceeded")]);
-    expect(r.exits.cap_exceeded).toBe(2);
+  it("cycle-cap-exceeded and remediation-cap-exceeded are cap_exceeded", () => {
+    expect(aggregateAuthorLane([closed("cycle-cap-exceeded"), closed("remediation-cap-exceeded")]).exits.cap_exceeded).toBe(2);
   });
 
-  it("closed with remediation-blocked counts as blocked", () => {
-    const r = aggregateAuthorLane([closed("remediation-blocked")]);
-    expect(r.exits.blocked).toBe(1);
+  it("remediation-blocked is blocked", () => {
+    expect(aggregateAuthorLane([closed("remediation-blocked")]).exits.blocked).toBe(1);
   });
 
-  it("closed with no matching reason label also counts as blocked (sum stays consistent)", () => {
+  it("A2: closed-unmerged with no lane reason is unclassified, not blocked", () => {
     const r = aggregateAuthorLane([closed(null)]);
-    expect(r.exits.blocked).toBe(1);
-    expect(r.entries).toBe(r.in_flight + r.exits.resolved + r.exits.cap_exceeded + r.exits.author_stale + r.exits.blocked);
+    expect(r.exits.unclassified).toBe(1);
+    expect(r.exits.blocked).toBe(0);
   });
 
-  it("entries always equals in_flight + all exits (mixed window)", () => {
+  it("A2: a merged PR carrying an escalation reason is NOT resolved", () => {
+    const r = aggregateAuthorLane([merged(["autopilot:reason:merge-conflict", "autopilot:reason:remediation-cap-exceeded"])]);
+    expect(r.exits.resolved).toBe(0);
+    expect(r.exits.cap_exceeded).toBe(1);
+  });
+
+  it("A2: multi-reason precedence is author_stale > cap_exceeded > blocked, counted once", () => {
+    const all = closed("remediation-blocked", ["autopilot:reason:remediation-cap-exceeded", "autopilot:reason:author-stale"]);
+    const r = aggregateAuthorLane([all]);
+    expect(r.exits).toEqual({ ...zero, author_stale: 1 });
+    const two = closed("remediation-blocked", ["autopilot:reason:cycle-cap-exceeded"]);
+    expect(aggregateAuthorLane([two]).exits).toEqual({ ...zero, cap_exceeded: 1 });
+  });
+
+  it("lane_prs always equals in_flight + all exits (mixed window)", () => {
     const items = [
-      open(), open(),
-      merged(), merged(["autopilot:reason:merge-conflict"]),
-      closed("author-stale"),
-      closed("cycle-cap-exceeded"),
-      closed("remediation-blocked"),
-      closed(null),
+      open(), open(["autopilot:needs-author"]), merged(), merged(["autopilot:reason:remediation-blocked"]),
+      closed("author-stale"), closed("cycle-cap-exceeded"), closed("remediation-blocked"), closed(null),
+      open(["autopilot:reason:author-stale"]),
     ];
     const r = aggregateAuthorLane(items);
-    expect(r.entries).toBe(items.length);
-    const exitSum = r.exits.resolved + r.exits.cap_exceeded + r.exits.author_stale + r.exits.blocked;
-    expect(r.entries).toBe(r.in_flight + exitSum);
+    expect(r.lane_prs).toBe(items.length);
+    invariant(r);
   });
 
-  it("mean_dwell_hours is the average lifetime of closed PRs in hours", () => {
-    // merged() lifetime: created 2026-10-01 → merged 2026-10-02T12 = 36h
-    // closed("author-stale") lifetime: created 2026-10-01 → closed 2026-10-04 = 72h
-    const r = aggregateAuthorLane([merged(), closed("author-stale")]);
-    expect(r.mean_dwell_hours).toBe(54.0); // (36 + 72) / 2
+  it("A3: mean_lifetime_hours is mean whole-PR lifetime of exited PRs", () => {
+    // merged: 36h, author-stale: 72h
+    expect(aggregateAuthorLane([merged(), closed("author-stale")]).mean_lifetime_hours).toBe(54.0);
   });
 
-  it("mean_dwell_hours is null when all items are open (no dwell data)", () => {
-    expect(aggregateAuthorLane([open()]).mean_dwell_hours).toBeNull();
+  it("mean_lifetime_hours is null when nothing has exited", () => {
+    expect(aggregateAuthorLane([open()]).mean_lifetime_hours).toBeNull();
   });
 
-  it("reason labels are case-normalised (GitHub preserves label case)", () => {
-    const r = aggregateAuthorLane([{
-      state: "closed",
-      created_at: "2026-10-01T00:00:00Z",
-      closed_at: "2026-10-02T00:00:00Z",
-      merged_at: null,
-      labels: ["Autopilot:Reason:Author-Stale"],
-    }]);
+  it("reason labels are case-normalised", () => {
+    const r = aggregateAuthorLane([{ state: "closed", created_at: T0, closed_at: "2026-10-02T00:00:00Z", merged_at: null, labels: ["Autopilot:Reason:Author-Stale"] }]);
     expect(r.exits.author_stale).toBe(1);
   });
 });

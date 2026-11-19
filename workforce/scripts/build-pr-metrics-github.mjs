@@ -82,6 +82,13 @@ const RERUN_PASS_WARN_THRESHOLD = 3;
 // A separate label from needs-human: a needs-author PR is agent-fixable in
 // principle; a needs-human PR needs a human decision.
 const NEEDS_AUTHOR_LABEL = "autopilot:needs-author";
+// Reason labels that survive a lane exit (needs-author itself is removed).
+const LANE_EXIT_REASON_LABELS = [
+  "autopilot:reason:author-stale",
+  "autopilot:reason:cycle-cap-exceeded",
+  "autopilot:reason:remediation-cap-exceeded",
+  "autopilot:reason:remediation-blocked",
+];
 
 // ── pure aggregation (unit-tested) ───────────────────────────────────────────
 
@@ -315,59 +322,56 @@ export function aggregateReruns(items, { warnThreshold = RERUN_PASS_WARN_THRESHO
   return { reran_prs, per_check, warn };
 }
 
-/** FU-029 / adr-0022: aggregate author-lane entries, exits, and dwell from the
- *  `autopilot:needs-author` search result.
- *  items = [{ state, created_at, closed_at, merged_at, labels }].
- *  Exits are classified by their `autopilot:reason:*` labels; in_flight =
- *  still-open items. Dwell is approximated as PR lifetime (created_at → close
- *  event) — the exact label-add timestamp is not available without the Events
- *  API. Closed PRs with no matching reason label fall into `blocked` so the
- *  sum (entries = in_flight + all exits) always holds. */
+/** FU-029 / adr-0022: aggregate author-lane volume and exits.
+ *  items = [{ state, created_at, closed_at, merged_at, labels }], the union of
+ *  PRs that carry `autopilot:needs-author` and PRs that carry a lane-exit
+ *  reason label (both exit paths REMOVE needs-author, so the live label alone
+ *  would miss every PR that already left — A1).
+ *
+ *  Semantics (A3 — the names say what is measured):
+ *   - `lane_prs`      = lane PRs UPDATED in the window (not "entered").
+ *   - `mean_lifetime_hours` = mean whole-PR lifetime (created → merged/closed)
+ *     of closed lane PRs, not time spent in the lane; label timestamps need the
+ *     Events API.
+ *  Exit classification, by precedence author_stale > cap_exceeded > blocked
+ *  (a PR carrying several reasons is counted once): an escalation reason wins
+ *  even on a merged PR. `resolved` = merged with NO escalation reason.
+ *  Closed-unmerged with no lane reason is `unclassified` (A2), never `blocked`.
+ *  Invariant: lane_prs = in_flight + sum(exits). */
 export function aggregateAuthorLane(items) {
-  let entries = 0;
+  let lane_prs = 0;
   let in_flight = 0;
-  const exits = { resolved: 0, cap_exceeded: 0, author_stale: 0, blocked: 0 };
-  const dwell_ms = [];
+  const exits = { resolved: 0, cap_exceeded: 0, author_stale: 0, blocked: 0, unclassified: 0 };
+  const life_ms = [];
 
   for (const it of items) {
-    entries++;
-    const labels = (it.labels || []).map((l) => String(l || "").toLowerCase());
-    const reasons = labels
+    lane_prs++;
+    const reasons = (it.labels || [])
+      .map((l) => String(l || "").toLowerCase())
       .filter((l) => l.startsWith(REASON_LABEL_PREFIX))
       .map((l) => l.slice(REASON_LABEL_PREFIX.length));
     const isMerged = Boolean(it.merged_at);
     const isClosed = it.state === "closed";
 
-    if (!isClosed) {
-      in_flight++;
-      continue;
-    }
+    let exit = null;
+    if (reasons.includes("author-stale")) exit = "author_stale";
+    else if (reasons.some((r) => r === "cycle-cap-exceeded" || r === "remediation-cap-exceeded")) exit = "cap_exceeded";
+    else if (reasons.includes("remediation-blocked")) exit = "blocked";
+    else if (isMerged) exit = "resolved";
+    else if (isClosed) exit = "unclassified";
 
-    if (isMerged) {
-      exits.resolved++;
-      if (it.created_at && it.merged_at)
-        dwell_ms.push(new Date(it.merged_at) - new Date(it.created_at));
-    } else {
-      if (reasons.includes("author-stale")) {
-        exits.author_stale++;
-      } else if (reasons.some((r) => r === "cycle-cap-exceeded" || r === "remediation-cap-exceeded")) {
-        exits.cap_exceeded++;
-      } else if (reasons.includes("remediation-blocked")) {
-        exits.blocked++;
-      } else {
-        exits.blocked++;
-      }
-      if (it.created_at && it.closed_at)
-        dwell_ms.push(new Date(it.closed_at) - new Date(it.created_at));
-    }
+    if (exit === null) { in_flight++; continue; }
+    exits[exit]++;
+    const end = isMerged ? it.merged_at : isClosed ? it.closed_at : null;
+    if (end && it.created_at) life_ms.push(new Date(end) - new Date(it.created_at));
   }
 
-  const mean_dwell_hours =
-    dwell_ms.length > 0
-      ? +(dwell_ms.reduce((a, b) => a + b, 0) / dwell_ms.length / 3_600_000).toFixed(1)
+  const mean_lifetime_hours =
+    life_ms.length > 0
+      ? +(life_ms.reduce((a, b) => a + b, 0) / life_ms.length / 3_600_000).toFixed(1)
       : null;
 
-  return { entries, in_flight, exits, mean_dwell_hours };
+  return { lane_prs, in_flight, exits, mean_lifetime_hours };
 }
 
 // ── CLI / IO ─────────────────────────────────────────────────────────────────
@@ -501,20 +505,29 @@ async function main() {
     );
   }
 
-  // 1d. author-lane PRs in the window (FU-029 / adr-0022): every PR — open or
-  // closed — carrying the needs-author label and updated in the window. Reason
-  // labels ride on the Search items (no per-PR GETs needed).
-  const authorLaneItems = [];
-  for (let page = 1; page <= 10; page++) {
-    const q = encodeURIComponent(`repo:${repo} is:pr label:"${NEEDS_AUTHOR_LABEL}" updated:>=${sinceIso}`);
-    const r = await gh(`/search/issues?q=${q}&per_page=100&page=${page}`);
-    if (r.status !== 200) { console.error(`author-lane search -> HTTP ${r.status} ${JSON.stringify(r.json).slice(0, 200)}`); return 3; }
-    const items = r.json.items ?? [];
-    authorLaneItems.push(...items);
-    if (items.length < 100) break;
+  // 1d. author-lane PRs in the window (FU-029 / adr-0022). Both exit paths
+  // remove `needs-author`, so search the live label AND each lane-exit reason
+  // label, de-duplicated by PR number (A1). cycle-cap-exceeded can also come
+  // from the main autopilot loop outside the lane — it is searched because the
+  // brief names it, so `cap_exceeded` may slightly over-count.
+  const PAGE_CAP = 10;
+  const authorLaneByNum = new Map();
+  for (const label of [NEEDS_AUTHOR_LABEL, ...LANE_EXIT_REASON_LABELS]) {
+    for (let page = 1; page <= PAGE_CAP; page++) {
+      const q = encodeURIComponent(`repo:${repo} is:pr label:"${label}" updated:>=${sinceIso}`);
+      const r = await gh(`/search/issues?q=${q}&per_page=100&page=${page}`);
+      if (r.status !== 200) { console.error(`author-lane search (${label}) -> HTTP ${r.status} ${JSON.stringify(r.json).slice(0, 200)}`); return 3; }
+      const items = r.json.items ?? [];
+      for (const it of items) authorLaneByNum.set(it.number, it);
+      if (items.length < 100) break;
+      if (page === PAGE_CAP) {
+        // A3: a capped search silently under-counts — be loud.
+        console.error(`WARN author-lane search (${label}) hit the ${PAGE_CAP}-page cap; lane counts are a floor`);
+      }
+    }
   }
   const authorLane = aggregateAuthorLane(
-    authorLaneItems.map((it) => ({
+    [...authorLaneByNum.values()].map((it) => ({
       state: it.state,
       created_at: it.created_at,
       closed_at: it.closed_at,
@@ -548,7 +561,7 @@ async function main() {
     `${repo} (scope ${scope}): ${block.pr_summary.total_prs} merged PR(s) over ${DAYS}d ` +
       `(${block.window.start}→${block.window.end}); autopilot ${Math.round(block.pr_summary.autopilot_share * 100)}% ` +
       `(${block.pr_summary.autopilot_merged}/${block.pr_summary.total_prs}); escalated ${escalations.escalated_prs} ` +
-      `(eligible ${escalations.eligible_escalations}); author-lane entries ${authorLane.entries} ` +
+      `(eligible ${escalations.eligible_escalations}); author-lane PRs updated ${authorLane.lane_prs} ` +
       `(in-flight ${authorLane.in_flight}); reviewers: ` +
       block.pr_contributors.filter((c) => c.kind === "agent").map((c) => `${c.handle}:${c.prs}`).join(", "),
   );
