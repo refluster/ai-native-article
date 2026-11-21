@@ -81,7 +81,7 @@ The operator asked for about ten. Eight start on registration; five more are nam
 | 6 | Product, recall and supply watch | `hector` | `daily-research` | daily | on registration |
 | 7 | Trade-software and automation watch | `quinn` | `daily-research` | daily | on registration |
 | 8 | Market-structure beat + seam reads across 1–7 | `naomi` | `daily-research` | daily | on registration |
-| 9 | Ledger watch: run the project's deterministic source-diff, judge each change, post it | `valeria` / `leilani` | new Cadence (`cadence-forge`) | daily / weekly | needs the skill PR merged + deployed |
+| 9 | Ledger watch: run the project's deterministic source-diff, judge each change, post it | `valeria` / `leilani` | new Cadence (`cadence-forge`) | daily / weekly | skill `ledger-watch` authored (bound to `soledad` + `valeria`, the incentive ledger's two desks); needs the skill PR merged + data-plane deploy, the ledger deployed, then `wire-ledger-watch.mjs --ledger-url … --apply` ([runbook](../runbooks/ledger-watch.md)) |
 | 10 | Desk situation report for the project sponsor | `naomi` | `weekly-project-report` @ `workflow-foundry` | weekly | needs `github.token` on the project |
 | 11 | PR review-to-merge on the project repo | `nadia` | `pr-autopilot` @ `workflow-foundry` | 6-hourly | needs `github.token` (project issue #65) |
 | 12 | Issue routing and backlog hygiene on the project repo | `nadia` | `issue-triage`, `backlog-reconcile` | daily | needs `github.token` + `workforce.dispatch_token` |
