@@ -16,7 +16,10 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { LEDGER_CONTRACT_MAJOR, ledgerContract, usesContractV11, validatePayload, validateSummary } from "./ledger-payload.mjs";
+import {
+  LEDGER_CONTRACT_MAJOR, checkBlockedAttempts, ledgerContract, normalizeUrl, usesContractV11, usesContractV13,
+  validatePayload, validateSummary,
+} from "./ledger-payload.mjs";
 
 const SCRIPT = join(__dirname, "post.mjs");
 const META_VERSION = JSON.parse(readFileSync(join(__dirname, "meta.json"), "utf8")).version as string;
@@ -25,7 +28,7 @@ const TODAY = new Date().toISOString().slice(0, 10);
 const KNOWN = ["example_hpwh_rebate", "example_new_program"];
 
 // ── stub server ──────────────────────────────────────────────────────────────
-interface Req { method: string; path: string; headers: IncomingMessage["headers"]; body: string }
+interface Req { method: string; path: string; search: string; headers: IncomingMessage["headers"]; body: string }
 interface Stub {
   requests: Req[];
   posts: Map<string, { agent_slug: string; body: string }>;
@@ -37,10 +40,11 @@ interface Stub {
   contractVersion: unknown;           // undefined → the worklist carries no contract_version
   seedUrls: boolean;                  // the v1.1 worklist field discovery.seed_urls
   feedFault: "drop" | "hang" | null;  // store the post, then drop the socket / never answer
+  items: unknown[];                   // worklist items (v1.3: sources with access / attempt_once)
 }
 const DEFAULTS = {
   feedStatus: null, tamperReadBack: false, ledgerPlan: [200], ledgerDispositions: null, knownCodes: KNOWN,
-  contractVersion: undefined, seedUrls: true, feedFault: null,
+  contractVersion: undefined, seedUrls: true, feedFault: null, items: [],
 };
 const stub: Stub = { requests: [], posts: new Map(), ...DEFAULTS } as Stub;
 let server: Server;
@@ -57,7 +61,7 @@ beforeAll(async () => {
     req.on("data", (c) => (data += c));
     req.on("end", () => {
       const url = new URL(req.url ?? "/", "http://stub");
-      stub.requests.push({ method: req.method ?? "", path: url.pathname, headers: req.headers, body: data });
+      stub.requests.push({ method: req.method ?? "", path: url.pathname, search: url.search, headers: req.headers, body: data });
       // feed
       if (req.method === "POST" && url.pathname === "/prod/feed") {
         if (stub.feedStatus) return send(res, stub.feedStatus, { error: "forced" });
@@ -79,7 +83,7 @@ beforeAll(async () => {
       if (req.method === "GET" && url.pathname === "/v1/worklist") {
         if (!stub.knownCodes) return send(res, 503, { error: { code: "down", message: "x" } });
         return send(res, 200, {
-          agent: url.searchParams.get("agent"), items: [], count: 0,
+          agent: url.searchParams.get("agent"), items: stub.items, count: stub.items.length,
           discovery: { territory: "t", equipment: [], known_codes: stub.knownCodes,
             ...(stub.seedUrls ? { seed_urls: [{ url: "https://example.org/rebates", look_for: "program list" }] } : {}) },
           server_time: new Date().toISOString(),
@@ -483,7 +487,8 @@ describe("ledger-payload.mjs", () => {
 
   it("forbidden fields include attention, created_*, verify_interval_effective and the v1.1 operational marks", () => {
     for (const k of ["attention", "created_at", "created_by", "verify_interval_effective", "version", "code",
-      "needs_human", "fetch_fail_streak", "fetch_fail_run"]) {
+      "needs_human", "fetch_fail_streak", "fetch_fail_run",
+      "secondary_verified_at", "secondary_checked_by", "human_verified_at", "applied_patches", "watch_mode", "human_check_due_at"]) {
       expect(errs(observation({ change_type: "status_changed", proposed: { status: "open", [k]: 1 } }))).toMatch(new RegExp(`proposed\\.${k}: is not writable`));
     }
   });
@@ -582,5 +587,206 @@ describe("ledger-payload.mjs", () => {
     expect(ledgerContract({ contract_version: "2.0" }).error).toMatch(/contract v2\.0/);
     expect(ledgerContract({ contract_version: "1.x" }).error).toMatch(/unreadable/);
     expect(ledgerContract({ contract_version: 1.5 }).error).toMatch(/unreadable/);
+  });
+});
+
+// ── 0.3.0: contract v1.3 (secondary_watch, secondary_no_change, attempt_once) ──
+const BLOCKED = "https://www.example-city.gov/rebates/hpwh";
+const LISTING = "https://www.example-rebate-finder.org/city/hpwh";
+function watchItem(over: Record<string, unknown> = {}) {
+  return {
+    code: "example_hpwh_rebate", reference: "Example city HPWH rebate", status: "open", mode: "secondary_watch",
+    sources: [
+      { url: BLOCKED, watch: ["status"], look_for_ja: "x", primary_source: true, access: "blocked", attempt_once: true },
+      { url: LISTING, watch: ["amount"], look_for_ja: "x", primary_source: false, access: "ok" },
+    ],
+    ...over,
+  };
+}
+const secondaryObs = (over: Record<string, unknown> = {}) => observation({
+  change_type: "secondary_no_change", confidence: "medium",
+  summary: "Primary page blocked; the listing still shows the $400 rebate as available.",
+  evidence: [{ url: LISTING, quote: "Heat Pump Water Heater – $400 – Available", page_date: null, primary_source: false }],
+  ...over,
+});
+const blockedFailure = (over: Record<string, unknown> = {}) => ({ url: BLOCKED, reason: "HTTP 403", program_code: "example_hpwh_rebate", ...over });
+
+describe("ledger-payload.mjs — v1.3 validation", () => {
+  const CTX = { agent: "soledad", skillVersion: "0.1.0", now: new Date() };
+  const errs = (o: unknown, run: Record<string, unknown> = {}) => validatePayload(payload(run, [o]), CTX).errors.join("\n");
+
+  it("secondary_no_change: all-secondary evidence, no proposed, not citing a failed page", () => {
+    expect(errs(secondaryObs())).toBe("");
+    expect(errs(secondaryObs({ proposed: { status: "open" } }))).toMatch(/proposed: must be absent for secondary_no_change/);
+    const mixed = secondaryObs({ evidence: [
+      { url: LISTING, quote: "q", primary_source: false },
+      { url: "https://example.org/rebate", quote: "q", primary_source: true },
+    ] });
+    expect(errs(mixed)).toMatch(/secondary_no_change takes only primary_source: false/);
+    expect(errs(secondaryObs({ evidence: [] }))).toMatch(/evidence: at least one/);
+    expect(errs(secondaryObs(), { fetch_failures: [{ url: LISTING, reason: "HTTP 403" }] })).toMatch(/could not be read/);
+    // the blocked primary in fetch_failures beside a secondary_no_change is the expected shape
+    expect(errs(secondaryObs(), { fetch_failures: [blockedFailure()] })).toBe("");
+  });
+
+  it("verified_no_change without any primary evidence is refused and points to secondary_no_change", () => {
+    const v = observation({ evidence: [{ url: LISTING, quote: "q", primary_source: false }] });
+    expect(errs(v)).toMatch(/verified_no_change needs at least one primary_source: true.*secondary_no_change/);
+    const both = observation({ evidence: [
+      { url: LISTING, quote: "q", primary_source: false },
+      { url: "https://example.org/rebate", quote: "q", primary_source: true },
+    ] });
+    expect(errs(both)).toBe("");
+  });
+
+  it("a *_changed resting on a secondary listing alone is refused", () => {
+    for (const [ct, proposed] of [["amount_changed", { amount: { display: "$300" } }], ["status_changed", { status: "closed" }]] as const) {
+      const o = observation({ change_type: ct, proposed, evidence: [{ url: LISTING, quote: "q", primary_source: false }] });
+      expect(errs(o)).toMatch(new RegExp(`${ct} needs at least one primary_source: true`));
+    }
+  });
+
+  it("unconfirmed with all-secondary evidence (the tripwire) is accepted", () => {
+    const u = observation({
+      change_type: "unconfirmed", summary: "The listing now shows $300, the row says $400.",
+      evidence: [{ url: LISTING, quote: "Heat Pump Water Heater – $300", primary_source: false }],
+    });
+    expect(errs(u, { fetch_failures: [blockedFailure()] })).toBe("");
+  });
+
+  it("usesContractV13 flags secondary_no_change only", () => {
+    expect(usesContractV13(payload())).toBe(false);
+    expect(usesContractV13(payload({}, [observation({ change_type: "unconfirmed" })]))).toBe(false);
+    expect(usesContractV13(payload({}, [secondaryObs()]))).toBe(true);
+  });
+
+  it("ledgerContract: v13 needs contract_version ≥ 1.3", () => {
+    expect(ledgerContract({ discovery: { seed_urls: [] } })).toMatchObject({ v11: true, v13: false });
+    expect(ledgerContract({ contract_version: "1.2" })).toMatchObject({ v11: true, v13: false });
+    expect(ledgerContract({ contract_version: "1.3" })).toMatchObject({ v11: true, v13: true });
+    expect(ledgerContract({ contract_version: "1.10" })).toMatchObject({ v13: true });
+    expect(ledgerContract({ contract_version: "2.3" })).toMatchObject({ v13: false, error: expect.any(String) });
+  });
+
+  it("normalizeUrl matches the ledger's normalize_url", () => {
+    expect(normalizeUrl(" HTTPS://WWW.Example.GOV/Rebates/HPWH/#top ")).toBe("https://www.example.gov/Rebates/HPWH");
+    expect(normalizeUrl("https://x.example/")).toBe("https://x.example");
+    expect(normalizeUrl("   ")).toBeNull();
+    expect(normalizeUrl(1)).toBeNull();
+  });
+
+  it("checkBlockedAttempts: each attempt_once source needs a failure for that code or a citing observation", () => {
+    const wl = { items: [watchItem()] };
+    expect(checkBlockedAttempts(payload({}, []), wl).join("\n")).toMatch(/the attempt on the blocked source was not recorded/);
+    expect(checkBlockedAttempts(payload({ fetch_failures: [blockedFailure()] }, []), wl)).toEqual([]);
+    expect(checkBlockedAttempts(payload({ fetch_failures: [blockedFailure({ url: "https://WWW.Example-City.gov/REBATES/hpwh" })] }, []), wl)).not.toEqual([]); // path case matters
+    expect(checkBlockedAttempts(payload({ fetch_failures: [blockedFailure({ url: "HTTPS://WWW.Example-City.GOV/rebates/hpwh/#x" })] }, []), wl)).toEqual([]);
+    expect(checkBlockedAttempts(payload({ fetch_failures: [blockedFailure({ program_code: "example_new_program" })] }, []), wl)).toHaveLength(1);
+    expect(checkBlockedAttempts(payload({ fetch_failures: [blockedFailure({ program_code: undefined })] }, []), wl)).toHaveLength(1);
+    // the page loaded after all: an observation citing it is the record
+    const read = observation({ evidence: [{ url: BLOCKED, quote: "Rebates are available.", primary_source: true }] });
+    expect(checkBlockedAttempts(payload({}, [read]), wl)).toEqual([]);
+    // an item without attempt_once, or no items, asks for nothing
+    expect(checkBlockedAttempts(payload({}, []), { items: [watchItem({ sources: [{ url: BLOCKED, access: "blocked" }] })] })).toEqual([]);
+    expect(checkBlockedAttempts(payload({}, []), {})).toEqual([]);
+    // two blocked sources → two errors when neither is recorded
+    const two = { items: [watchItem({ sources: [
+      { url: BLOCKED, primary_source: true, access: "blocked", attempt_once: true },
+      { url: `${BLOCKED}.pdf`, primary_source: true, access: "blocked", attempt_once: true },
+    ] })] };
+    expect(checkBlockedAttempts(payload({ fetch_failures: [blockedFailure()] }, []), two)).toHaveLength(1);
+  });
+
+  it("checkBlockedAttempts: a URL the ledger lists as secondary may not be claimed as primary evidence", () => {
+    const wl = { items: [watchItem()] };
+    const claimed = observation({ evidence: [{ url: `${LISTING}/`, quote: "q", primary_source: true }] });
+    expect(checkBlockedAttempts(payload({ fetch_failures: [blockedFailure()] }, [claimed]), wl).join("\n"))
+      .toMatch(/evidence\[0\]\.primary_source: .* is a secondary source of example_hpwh_rebate/);
+    expect(checkBlockedAttempts(payload({ fetch_failures: [blockedFailure()] }, [secondaryObs()]), wl)).toEqual([]);
+  });
+
+  it("checkBlockedAttempts: secondary_no_change needs a blocked worklist item and may not cite its primary page", () => {
+    const wl = { items: [watchItem()] };
+    const onPrimary = secondaryObs({ evidence: [{ url: BLOCKED, quote: "q", primary_source: false }] });
+    expect(checkBlockedAttempts(payload({}, [onPrimary]), wl).join("\n")).toMatch(/is a primary source of example_hpwh_rebate/);
+    // not on the worklist, or on it without a blocked source → refused
+    expect(checkBlockedAttempts(payload({}, [secondaryObs()]), { items: [] }).join("\n")).toMatch(/only for a worklist item with a blocked primary source/);
+    const plain = { items: [watchItem({ mode: undefined, sources: [{ url: BLOCKED, primary_source: true, access: "ok", attempt_once: false }, { url: LISTING, primary_source: false, access: "ok" }] })] };
+    expect(checkBlockedAttempts(payload({}, [secondaryObs()]), plain).join("\n")).toMatch(/has none on this worklist/);
+    // a listing URL the ledger does not hold is the desk's word (false), as in the ledger
+    const other = secondaryObs({ evidence: [{ url: "https://another-finder.example/apu", quote: "q", primary_source: false }] });
+    expect(checkBlockedAttempts(payload({ fetch_failures: [blockedFailure()] }, [other]), wl)).toEqual([]);
+  });
+
+  it("a proposed source may not carry the ledger's per-source access record", () => {
+    const o = observation({ change_type: "source_changed", proposed: { sources: [{ url: "https://x.example", primary_source: true, access: "ok" }] } });
+    expect(errs(o)).toMatch(/sources\[0\]\.access: is not a writable field/);
+  });
+});
+
+describe("ledger-watch/post.mjs — v1.3 (secondary_watch)", () => {
+  it("reads the worklist once, at the ledger's default page size (not limit=1)", async () => {
+    const r = await run(payload());
+    expect(r.status, r.stderr).toBe(0);
+    const wl = stub.requests.filter((q) => q.path === "/v1/worklist");
+    expect(wl).toHaveLength(1);
+    expect(wl[0]!.search).toBe("?agent=soledad");
+  });
+
+  it("secondary_no_change to a ledger below v1.3 exits 3 before the receipt", async () => {
+    for (const cv of [undefined, "1.2"]) {
+      Object.assign(stub, { requests: [], contractVersion: cv });
+      const r = await run(payload({ fetch_failures: [blockedFailure()] }, [secondaryObs()]));
+      expect(r.status, String(cv)).toBe(3);
+      expect(r.json?.stage).toBe("contract");
+      expect(r.stderr).toContain("v1.3 (secondary_no_change)");
+      expect(feedPosts()).toHaveLength(0);
+      expect(ledgerCalls()).toHaveLength(0);
+    }
+  });
+
+  it("a secondary_watch fire (failure recorded + secondary_no_change) goes through to a v1.3 ledger", async () => {
+    stub.contractVersion = "1.3";
+    stub.items = [watchItem()];
+    const r = await run(payload({ fetch_failures: [blockedFailure()] }, [secondaryObs()]));
+    expect(r.status, r.stderr).toBe(0);
+    const sent = JSON.parse(JSON.parse(ledgerCalls()[0]!.body).payload);
+    expect(sent.observations[0].change_type).toBe("secondary_no_change");
+    expect(sent.run.fetch_failures[0]).toEqual(blockedFailure());
+  });
+
+  it("an attempt_once source left unrecorded exits 2 before the receipt", async () => {
+    stub.contractVersion = "1.3";
+    stub.items = [watchItem()];
+    const r = await run(payload({}, [secondaryObs()]));
+    expect(r.status).toBe(2);
+    expect(r.json?.stage).toBe("validate");
+    expect(r.stderr).toContain("the attempt on the blocked source was not recorded");
+    expect(r.stderr).toContain(BLOCKED);
+    expect(feedPosts()).toHaveLength(0);
+    expect(stub.requests.map((q) => q.path)).toEqual(["/v1/worklist"]);
+  });
+
+  it("secondary_no_change on a program not on the worklist exits 2 before the receipt", async () => {
+    stub.contractVersion = "1.3";
+    const r = await run(payload({}, [secondaryObs()]));
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain("only for a worklist item with a blocked primary source");
+    expect(feedPosts()).toHaveLength(0);
+  });
+
+  it("a failure-only fire on a blocked row (no observation) still records and posts", async () => {
+    stub.contractVersion = "1.3";
+    stub.items = [watchItem()];
+    const r = await run(payload({ fetch_failures: [blockedFailure()] }, []));
+    expect(r.status, r.stderr).toBe(0);
+  });
+
+  it("verified_no_change on secondary evidence alone exits 2 and touches no network", async () => {
+    const v = observation({ evidence: [{ url: LISTING, quote: "q", primary_source: false }] });
+    const r = await run(payload({}, [v]));
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain("secondary_no_change");
+    expect(stub.requests).toHaveLength(0);
   });
 });
