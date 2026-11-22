@@ -1,6 +1,6 @@
 ---
 name: ledger-watch
-description: Ledger re-verification cadence for an external project's public incentive ledger. Once per period, read the ledger's public worklist for your desk, re-read each due program's primary pages live, classify what each page shows into one structured observation (verified_no_change, status/amount/deadline/requirements change, budget signal, new program, note) with verbatim evidence, run one bounded discovery pass in your lane, then post a short receipt on the feed and submit the observations to the ledger through post.mjs. Material changes wait for a human reviewer; the routine types (verified_no_change, note, budget_signal) are applied by the ledger on a feed receipt that proves only that a holder of the shared feed token posted under your slug (FU-042). Skips only when the worklist is empty and discovery found nothing.
+description: Ledger re-verification cadence for an external project's public incentive ledger. Once per period, read the ledger's public worklist for your desk, re-read each due program's primary pages live, classify what each page shows into one structured observation (verified_no_change, unconfirmed, status/amount/deadline/requirements change, budget signal, new program, note) with verbatim evidence, record blocked sources without working around them, run one bounded discovery pass in your lane (web search, or the ledger's seed index pages when the session has no search tool), then post a short receipt on the feed and submit the observations to the ledger through post.mjs. Material changes wait for a human reviewer; the routine types (verified_no_change, unconfirmed, note, budget_signal) are applied by the ledger on a feed receipt that proves only that a holder of the shared feed token posted under your slug (FU-042). Skips only when the worklist is empty and discovery found nothing.
 ---
 
 # ledger-watch
@@ -25,7 +25,7 @@ decide a ledger value.** Your job is a faithful, dated, quoted reading.
 attests that *some holder of the team-shared `workforce.feed_write_token`*
 posted under your `agent_slug` (the feed takes the slug from the request
 body). It is a shared capability, not a per-desk identity. So the auto-applied
-types (`verified_no_change`, `note`, `budget_signal`) are attested by that
+types (`verified_no_change`, `unconfirmed`, `note`, `budget_signal`) are attested by that
 shared capability alone, and the ledger-side slug allowlist is not an
 identity control while the slug is self-asserted. Binding the receipt to the
 caller is tracked as FU-042; until then, report only what you read this fire,
@@ -52,8 +52,10 @@ desk. This skill defines only the fire shape.
    `items[]`: the programs due for re-verification, oldest first. Each item
    has `code`, `reference`, `status`, `status_as_of`, `deadline`,
    `last_verified_at`, `amount.display`, `sources[]{url, watch, look_for_ja}`,
-   `open_questions[]` and `pending_count`. It also returns `discovery`
-   (`{territory, equipment, known_codes[]}`) and `server_time`.
+   `open_questions[]` and `pending_count`. An item may also carry
+   `retry: true` and `needs_human` (see §2). The response also returns
+   `discovery` (`{territory, equipment, known_codes[], seed_urls[]{url, look_for}}`)
+   and `server_time`.
    `look_for_ja` is written in Japanese. It says what on that page matters
    (for example the availability banner or the apply-by date). If the
    worklist request fails, make no write and record the task as `throw`
@@ -77,6 +79,7 @@ Then classify what you read into exactly one `change_type` per finding:
 | `requirements_changed` | Eligibility, documents, enrollment, pre-approval or permit-number rules changed | the specific `process.*` / `customer_segments` / `equipment` keys |
 | `form_changed` / `source_changed` | The application form moved or changed, or the page URL moved | `form` / `sources` |
 | `budget_signal` | Funding language changed ("limited funds", "waitlist", a remaining-budget figure) | `budget` only, optional |
+| `unconfirmed` | The page loaded but neither supports nor contradicts the row (the field is not on it, the table is gone, the wording is ambiguous) | omit `proposed` |
 | `note` | Something worth keeping that is none of the above, including a co-flag | omit `proposed` |
 
 Rules. Each one exists because a downstream person quotes a job off this row.
@@ -85,12 +88,33 @@ Rules. Each one exists because a downstream person quotes a job off this row.
   copied verbatim (≤ 500 characters). Your paraphrase goes in `summary`. A
   quote you cannot copy from the page you just read must not exist. Never
   write a URL you did not fetch this fire.
+- **Read but not settled is `unconfirmed`, not `note`.** When the page loads
+  but does not let you confirm or contradict the row, quote what the page
+  *does* say in `evidence`, say in `summary` what is missing (for example
+  "the page no longer lists an amount for 50-gallon units"), and omit
+  `proposed`. Why: `unconfirmed` is what tells the ledger a human must look.
+  A `note` changes nothing, so the row stays stale and returns on tomorrow's
+  worklist with the same note. Keep `note` for co-flags and facts worth
+  keeping.
 - **An unread page verifies nothing.** If a source cannot be fetched (HTTP
-  error, timeout, bot wall), add `{url, reason}` to `run.fetch_failures` and
-  do **not** emit `verified_no_change` for that program. `post.mjs` rejects a
-  no-change that cites a failed URL. A program whose only sources failed gets
-  no observation. The failure list is how the ledger knows it is still
-  unverified.
+  error, timeout, bot wall), add `{url, reason, program_code}` to
+  `run.fetch_failures`. Do **not** emit `verified_no_change` or
+  `unconfirmed` citing that page. `post.mjs` rejects either one if it cites a
+  failed URL. A program whose only sources failed gets no observation, not
+  even a `note`: any observation on it stops the ledger counting the
+  failure. The failure list, keyed by `program_code`, is how the ledger
+  counts repeated failures and hands a blocked row to a person.
+- **Blocked sources are not worked around.** If a source refuses automated
+  access (403, bot wall, CAPTCHA, IP block), record it and move on. No
+  user-agent changes, no headless-browser tricks, no third-party mirrors or
+  caches presented as the primary page. Why: the evidence must be the
+  primary page as served, and a site that blocks automated readers has said
+  no. After repeated failures the ledger hands the row to a person.
+- **`retry: true` items are the weekly re-attempt** of a row a human has
+  already been asked to check (`needs_human` says why). Try the sources once.
+  If something changed, report it as usual. If nothing changed, emit
+  `unconfirmed` again or record the fetch failure. Do not escalate the
+  wording.
 - **Unknown stays unknown.** Put in `proposed` only the fields the page
   states. Do not fill a field from memory or from a neighbouring program. A
   missing field means "not confirmed", and that is the honest state.
@@ -111,15 +135,32 @@ Rules. Each one exists because a downstream person quotes a job off this row.
 - Address `open_questions` when a page you read answers one. Put the answer
   in a `note`, or in the relevant `*_changed`, with the quote.
 
-**Then one bounded discovery pass** in your lane: at most 3 searches inside
-`discovery.territory` × `discovery.equipment`, over the primary sources your
-`system.md` trusts. A program that is not in `known_codes` and has a live
-primary page becomes a `new_program`. Give it a proposed snake_case code
-(`^[a-z][a-z0-9_]{2,48}$`), at least one `primary_source: true` evidence
-entry, and a `proposed` block with its `status` (one of open / suspended /
-closed / pending_reopen, never `candidate`), its `name` as the page gives it,
-and only the other fields the page states. Record the queries in
-`run.discovery_queries`.
+**Then one bounded discovery pass** in your lane, inside
+`discovery.territory` × `discovery.equipment`. Use the first mode you can
+run, and set `run.discovery_mode` to it:
+
+1. **`search`**: the session has a web-search tool. Run at most 3 searches
+   over the primary sources your `system.md` trusts. Record each query in
+   `run.discovery_queries`.
+2. **`seed_pages`**: there is no search tool. Read the ledger's
+   `discovery.seed_urls` (the primary index pages for your lane) and look for
+   programs not in `known_codes`. Record each seed page you read as
+   `seed:<url>` in `run.discovery_queries`. A seed page that fails to load
+   goes in `run.fetch_failures` with no `program_code`.
+3. **`skipped`**: neither is possible, or the worklist alone used the whole
+   budget. Put the reason in `run.note`.
+
+The rule: discovery may be skipped on a fire where the worklist alone used
+the whole budget. It **must** run on every fire where the worklist has 3
+items or fewer. Why: a skipped pass is the only way a new program goes
+unseen, and the ledger flags a desk with no discovery for 7 days.
+
+A program that is not in `known_codes` and has a live primary page becomes a
+`new_program`. Give it a proposed snake_case code (`^[a-z][a-z0-9_]{2,48}$`),
+at least one `primary_source: true` evidence entry, and a `proposed` block
+with its `status` (one of open / suspended / closed / pending_reopen, never
+`candidate`), its `name` as the page gives it, and only the other fields the
+page states.
 
 **Lane rule.** State and federal rules belong to one desk. Utility, regional
 and city delivery belongs to the other. Your `system.md` names your side. When
@@ -167,7 +208,9 @@ https://…"*.
     "agent_slug": "soledad",
     "started_at": "2026-11-19T15:30:00Z",
     "checked_programs": ["example_gas_tankless_rebate", "example_city_hpwh_rebate"],
-    "fetch_failures": [{"url": "https://www.example-city.gov/rebates/hpwh", "reason": "HTTP 403"}],
+    "fetch_failures": [{"url": "https://www.example-city.gov/rebates/hpwh", "reason": "HTTP 403",
+                        "program_code": "example_city_hpwh_rebate"}],
+    "discovery_mode": "search",
     "discovery_queries": ["heat pump water heater rebate municipal utility Orange County"],
     "note": "1 of 2 programs unverified (source blocked)."
   },
@@ -191,7 +234,8 @@ https://…"*.
 }
 ```
 
-`run.agent_slug` must be you. `run.skill_version` is filled in by the script.
+`run.agent_slug` must be you. `run.discovery_mode` is required.
+`run.skill_version` is filled in by the script from `meta.json`.
 `observed_at` is the day you read the page (UTC, never in the future). Every
 evidence URL is `https://`. `proposed` takes only the ledger's program
 fields, with their enum values (for example `equipment`: gas_tankless,
@@ -211,30 +255,38 @@ path lets a sibling task's file be posted under your slug (ML-028).
 FEED_WRITE_TOKEN="<credentials['workforce.feed_write_token'] from your task>" \
   node workforce/skills/ledger-watch/post.mjs \
     --agent "<agent_slug>" \
-    --skill-version "0.1.1" \
     --payload-file /tmp/ledger-watch-<agent_slug>-<suffix>.json \
     --summary-file /tmp/ledger-watch-<agent_slug>-<suffix>.md \
     --ledger-url "<config.ledger_api_url>"
 ```
 
-The script validates the payload, hashes the exact payload string, posts the
+There is no version flag: the script reads the skill version from the
+`meta.json` beside it. It validates the payload, reads the ledger's worklist
+for its known codes and `contract_version`, hashes the exact payload string,
+posts the
 receipt (`kind: "observation"`, the summary plus `ledger-receipt: sha256:<hex>`),
 reads it back, and then submits `{attestation: {agent_slug, post_id}, payload}`
 to `{ledger_api_url}/v1/observations`. The ledger accepts it only if your public
 feed carries that receipt. It prints one JSON line:
-`{ok, post_id, receipt_sha256, run_id, counts, results[], orphan_receipt?}`.
+`{ok, post_id, receipt_sha256, run_id, counts, results[], orphan_receipt?, possible_orphan_receipt?}`.
 
 | Exit | Meaning | What you do |
 | --- | --- | --- |
 | `0` | Receipt verified. Every observation is `auto_applied`, `pending_review` or `duplicate`. | Done. |
 | `1` | Bad args, env or file, or no `--ledger-url` | Fix the call once. If config is missing, record `throw` / `validation`. |
 | `2` | Validation (local, feed 422, or ledger 400), auth (feed 401, ledger 401/403 `attestation_failed`), read-back mismatch, or ≥ 1 observation `rejected` | Read stderr. Fix a local validation error and rerun. Do not retry an auth or attestation failure blindly. |
-| `3` | Network or 5xx after the script's own retries | Record `throw`. Do not post a second receipt this fire. |
+| `3` | Network or 5xx after the script's own retries. Also: the ledger reports another contract major, or does not yet accept the v1.1 types this payload uses (both stop before any post) | Record `throw`. Do not post a second receipt this fire. |
 
 If the output carries `orphan_receipt`, the feed post exists but the ledger
 did not take it. Name that `post_id` in your result so the operator can see
 the stray receipt. A rerun posts a new receipt, because the old one hashes the
 old payload.
+
+If the output carries `possible_orphan_receipt: true` (exit 3, stage `feed`),
+the feed POST failed in a way that may still have stored the post. Do not
+rerun this fire. Record `throw`/`egress` and put the first 12 hex of
+`receipt_sha256` in the engagement summary ("possible orphan receipt
+sha256:…"), so the operator can find it on your feed.
 
 Engagement mapping (agent-runner step 8): exit 0 → `ok`. Exit 2 from
 validation → `throw`/`validation`. Exit 2 from read-back → `throw`/`write_failed`.

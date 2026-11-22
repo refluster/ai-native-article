@@ -10,15 +10,16 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { validatePayload, validateSummary } from "./ledger-payload.mjs";
+import { LEDGER_CONTRACT_MAJOR, ledgerContract, usesContractV11, validatePayload, validateSummary } from "./ledger-payload.mjs";
 
 const SCRIPT = join(__dirname, "post.mjs");
+const META_VERSION = JSON.parse(readFileSync(join(__dirname, "meta.json"), "utf8")).version as string;
 const dir = mkdtempSync(join(tmpdir(), "ledger-watch-"));
 const TODAY = new Date().toISOString().slice(0, 10);
 const KNOWN = ["example_hpwh_rebate", "example_new_program"];
@@ -33,10 +34,15 @@ interface Stub {
   ledgerPlan: Array<number | "drop">; // per-attempt ledger status (last repeats)
   ledgerDispositions: string[] | null;
   knownCodes: string[] | null;        // null → worklist answers 503
+  contractVersion: unknown;           // undefined → the worklist carries no contract_version
+  seedUrls: boolean;                  // the v1.1 worklist field discovery.seed_urls
+  feedFault: "drop" | "hang" | null;  // store the post, then drop the socket / never answer
 }
-const stub: Stub = {
-  requests: [], posts: new Map(), feedStatus: null, tamperReadBack: false, ledgerPlan: [200], ledgerDispositions: null, knownCodes: KNOWN,
+const DEFAULTS = {
+  feedStatus: null, tamperReadBack: false, ledgerPlan: [200], ledgerDispositions: null, knownCodes: KNOWN,
+  contractVersion: undefined, seedUrls: true, feedFault: null,
 };
+const stub: Stub = { requests: [], posts: new Map(), ...DEFAULTS } as Stub;
 let server: Server;
 let base = "";
 
@@ -59,6 +65,8 @@ beforeAll(async () => {
         const j = JSON.parse(data);
         const id = `00TEST${String(stub.posts.size).padStart(20, "0")}`;
         stub.posts.set(id, { agent_slug: j.agent_slug, body: j.body.trim() });
+        if (stub.feedFault === "drop") return req.socket.destroy(); // stored, but the client never hears
+        if (stub.feedFault === "hang") return;                       // stored, never answered
         return send(res, 201, { post_id: id, agent_slug: j.agent_slug, kind: j.kind });
       }
       const m = /^\/prod\/feed\/([^/]+)$/.exec(url.pathname);
@@ -70,8 +78,13 @@ beforeAll(async () => {
       // ledger
       if (req.method === "GET" && url.pathname === "/v1/worklist") {
         if (!stub.knownCodes) return send(res, 503, { error: { code: "down", message: "x" } });
-        return send(res, 200, { agent: url.searchParams.get("agent"), items: [], count: 0,
-          discovery: { territory: "t", equipment: [], known_codes: stub.knownCodes }, server_time: new Date().toISOString() });
+        return send(res, 200, {
+          agent: url.searchParams.get("agent"), items: [], count: 0,
+          discovery: { territory: "t", equipment: [], known_codes: stub.knownCodes,
+            ...(stub.seedUrls ? { seed_urls: [{ url: "https://example.org/rebates", look_for: "program list" }] } : {}) },
+          server_time: new Date().toISOString(),
+          ...(stub.contractVersion !== undefined ? { contract_version: stub.contractVersion } : {}),
+        });
       }
       if (req.method === "POST" && url.pathname === "/v1/observations") {
         const n = stub.requests.filter((r) => r.path === "/v1/observations").length;
@@ -94,9 +107,9 @@ beforeAll(async () => {
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
-afterAll(() => new Promise<void>((r) => server.close(() => r())));
+afterAll(() => new Promise<void>((r) => { server.closeAllConnections?.(); server.close(() => r()); }));
 beforeEach(() => {
-  Object.assign(stub, { requests: [], feedStatus: null, tamperReadBack: false, ledgerPlan: [200], ledgerDispositions: null, knownCodes: KNOWN });
+  Object.assign(stub, { requests: [], ...DEFAULTS });
   stub.posts.clear();
 });
 
@@ -114,7 +127,10 @@ function observation(over: Record<string, unknown> = {}) {
 }
 function payload(over: Record<string, unknown> = {}, obs: unknown[] = [observation()]) {
   return {
-    run: { agent_slug: "soledad", started_at: new Date(Date.now() - 3_600_000).toISOString(), checked_programs: ["example_hpwh_rebate"], fetch_failures: [], discovery_queries: [], ...over },
+    run: {
+      agent_slug: "soledad", started_at: new Date(Date.now() - 3_600_000).toISOString(), checked_programs: ["example_hpwh_rebate"],
+      fetch_failures: [], discovery_queries: ["heat pump water heater rebate"], discovery_mode: "search", ...over,
+    },
     observations: obs,
   };
 }
@@ -134,10 +150,12 @@ function files(p: unknown, summary = SUMMARY) {
 interface Run { status: number | null; stdout: string; stderr: string; json: Record<string, any> | null }
 function run(
   p: unknown,
-  { summary = SUMMARY, ledger = "default", env = {} }: { summary?: string; ledger?: string | null; env?: Record<string, string | undefined> } = {},
+  { summary = SUMMARY, ledger = "default", env = {}, skillVersion }:
+    { summary?: string; ledger?: string | null; env?: Record<string, string | undefined>; skillVersion?: string } = {},
 ): Promise<Run> {
   const { pf, sf } = files(p, summary);
-  const args = [SCRIPT, "--agent", "soledad", "--skill-version", "0.1.0", "--payload-file", pf, "--summary-file", sf];
+  const args = [SCRIPT, "--agent", "soledad", "--payload-file", pf, "--summary-file", sf];
+  if (skillVersion !== undefined) args.push("--skill-version", skillVersion);
   if (ledger !== null) args.push("--ledger-url", ledger === "default" ? base : ledger);
   return new Promise((resolve) => {
     const child = spawn(process.execPath, args, {
@@ -190,8 +208,9 @@ describe("ledger-watch/post.mjs", () => {
     const feedBody = JSON.parse(feedPosts()[0]!.body).body as string;
     expect(feedBody.endsWith(`\n\nledger-receipt: sha256:${hex}`)).toBe(true);
     expect(JSON.parse(feedPosts()[0]!.body).kind).toBe("observation");
-    // skill_version is filled into the run from --skill-version before hashing
-    expect(JSON.parse(sent.payload).run.skill_version).toBe("0.1.0");
+    // skill_version is filled into the run from meta.json before hashing
+    expect(JSON.parse(sent.payload).run.skill_version).toBe(META_VERSION);
+    expect(JSON.parse(feedPosts()[0]!.body).skill_version).toBe(META_VERSION);
   });
 
   it("local validation failures exit 2 and touch no network", async () => {
@@ -285,6 +304,13 @@ describe("ledger-watch/post.mjs — known codes", () => {
     expect(stub.requests.map((q) => q.path)).toEqual(["/v1/worklist"]);
   });
 
+  it("an unknown fetch_failures[].program_code fails before the receipt", async () => {
+    const r = await run(payload({ fetch_failures: [{ url: "https://example.org/other", reason: "HTTP 403", program_code: "not_in_ledger" }] }));
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain("fetch_failures[0].program_code");
+    expect(feedPosts()).toHaveLength(0);
+  });
+
   it("an unreachable worklist exits 3 before the receipt", async () => {
     stub.knownCodes = null;
     const r = await run(payload());
@@ -301,6 +327,124 @@ describe("ledger-watch/post.mjs — known codes", () => {
     });
     const r = await run(payload({}, [np]));
     expect(r.status, r.stderr).toBe(0);
+  });
+});
+
+describe("ledger-watch/post.mjs — skill version (A3)", () => {
+  it("reads the version from meta.json when --skill-version is omitted", async () => {
+    const r = await run(payload());
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.json?.skill_version).toBe(META_VERSION);
+  });
+
+  it("accepts a --skill-version equal to meta.json", async () => {
+    const r = await run(payload(), { skillVersion: META_VERSION });
+    expect(r.status, r.stderr).toBe(0);
+  });
+
+  it("a --skill-version that differs from meta.json exits 1 before any network call", async () => {
+    const r = await run(payload(), { skillVersion: "0.0.1" });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain(`differs from meta.json "${META_VERSION}"`);
+    expect(stub.requests).toHaveLength(0);
+  });
+
+  it("a payload whose run.skill_version differs from meta.json is a validation error", async () => {
+    const r = await run(payload({ skill_version: "0.0.1" }));
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain("run.skill_version");
+    expect(stub.requests).toHaveLength(0);
+  });
+});
+
+describe("ledger-watch/post.mjs — contract handshake (A2)", () => {
+  it("no contract_version: proceeds with one stderr warning", async () => {
+    const r = await run(payload());
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stderr.split("\n").filter((l) => l.includes("contract_version"))).toHaveLength(1);
+  });
+
+  it("a matching major proceeds without the warning", async () => {
+    stub.contractVersion = `${LEDGER_CONTRACT_MAJOR}.1`;
+    const r = await run(payload());
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stderr).not.toContain("warning");
+    expect(r.json?.ledger_contract).toBe(`${LEDGER_CONTRACT_MAJOR}.1`);
+  });
+
+  it("a different major exits 3 before the receipt", async () => {
+    stub.contractVersion = `${LEDGER_CONTRACT_MAJOR + 1}.0`;
+    const r = await run(payload());
+    expect(r.status).toBe(3);
+    expect(r.json?.stage).toBe("contract");
+    expect(r.stderr).toContain(`contract v${LEDGER_CONTRACT_MAJOR + 1}.0`);
+    expect(feedPosts()).toHaveLength(0);
+    expect(ledgerCalls()).toHaveLength(0);
+  });
+
+  it("an unreadable contract_version exits 3 before the receipt", async () => {
+    stub.contractVersion = "v-next";
+    const r = await run(payload());
+    expect(r.status).toBe(3);
+    expect(feedPosts()).toHaveLength(0);
+  });
+
+  it("a v1.1 payload to a ledger that does not advertise v1.1 exits 3 before the receipt", async () => {
+    stub.seedUrls = false; // a v1.0 worklist, no contract_version
+    const unconfirmed = observation({ change_type: "unconfirmed", summary: "The page does not state the current amount." });
+    const r = await run(payload({}, [unconfirmed]));
+    expect(r.status).toBe(3);
+    expect(r.stderr).toContain("deploy the ledger first");
+    expect(feedPosts()).toHaveLength(0);
+    // … while a 0.1.x-shaped payload still goes through to the same ledger
+    const ok = await run(payload());
+    expect(ok.status, ok.stderr).toBe(0);
+  });
+
+  it("unconfirmed + fetch_failures[].program_code go through to a v1.1 ledger", async () => {
+    const unconfirmed = observation({ change_type: "unconfirmed", summary: "The page does not state the current amount." });
+    const r = await run(payload({ fetch_failures: [{ url: "https://example.org/other", reason: "HTTP 403", program_code: "example_new_program" }] }, [unconfirmed]));
+    expect(r.status, r.stderr).toBe(0);
+    const sent = JSON.parse(JSON.parse(ledgerCalls()[0]!.body).payload);
+    expect(sent.observations[0].change_type).toBe("unconfirmed");
+    expect(sent.run.fetch_failures[0].program_code).toBe("example_new_program");
+    expect(sent.run.discovery_mode).toBe("search");
+  });
+});
+
+describe("ledger-watch/post.mjs — feed-stage failures (possible orphan receipt)", () => {
+  const hex = (r: Run) => r.json?.receipt_sha256 as string;
+
+  it("a dropped connection after the feed stored the post reports a possible orphan and exits 3", async () => {
+    stub.feedFault = "drop";
+    const r = await run(payload());
+    expect(r.status).toBe(3);
+    expect(r.json).toMatchObject({ ok: false, stage: "feed", possible_orphan_receipt: true });
+    expect(hex(r)).toMatch(/^[0-9a-f]{64}$/);
+    expect(r.stderr).toContain(`ledger-receipt: sha256:${hex(r)}`);
+    // the post really exists and carries that hash; the ledger was never called
+    expect([...stub.posts.values()][0]!.body.endsWith(`ledger-receipt: sha256:${hex(r)}`)).toBe(true);
+    expect(ledgerCalls()).toHaveLength(0);
+    expect(feedPosts()).toHaveLength(1); // no second receipt
+  });
+
+  it("a feed timeout reports a possible orphan and exits 3", async () => {
+    stub.feedFault = "hang";
+    const r = await run(payload(), { env: { FEED_TIMEOUT_MS: "300" } });
+    expect(r.status).toBe(3);
+    expect(r.json?.possible_orphan_receipt).toBe(true);
+    expect(ledgerCalls()).toHaveLength(0);
+  });
+
+  it("a feed 5xx reports a possible orphan; a feed 401 does not", async () => {
+    stub.feedStatus = 502;
+    const r = await run(payload());
+    expect(r.status).toBe(3);
+    expect(r.json?.possible_orphan_receipt).toBe(true);
+    stub.feedStatus = null;
+    const unauth = await run(payload(), { env: { FEED_WRITE_TOKEN: "wrong" } });
+    expect(unauth.status).toBe(2);
+    expect(unauth.json?.possible_orphan_receipt).toBeUndefined();
   });
 });
 
@@ -337,8 +481,9 @@ describe("ledger-payload.mjs", () => {
     expect(errs(sc({ process: { install_by: "2026-12-31", payee_options: ["contractor"] }, equipment: ["hpwh"] }))).toBe("");
   });
 
-  it("forbidden fields include attention, created_*, verify_interval_effective", () => {
-    for (const k of ["attention", "created_at", "created_by", "verify_interval_effective", "version", "code"]) {
+  it("forbidden fields include attention, created_*, verify_interval_effective and the v1.1 operational marks", () => {
+    for (const k of ["attention", "created_at", "created_by", "verify_interval_effective", "version", "code",
+      "needs_human", "fetch_fail_streak", "fetch_fail_run"]) {
       expect(errs(observation({ change_type: "status_changed", proposed: { status: "open", [k]: 1 } }))).toMatch(new RegExp(`proposed\\.${k}: is not writable`));
     }
   });
@@ -347,6 +492,15 @@ describe("ledger-payload.mjs", () => {
     expect(errs(observation({ evidence: [{ url: "https://x.example", quote: "q", primary_source: true, title: "t" }] }))).toMatch(/evidence\[0\]\.title/);
     expect(errs(observation({ next_actions: [{ type: "recheck", owner: "me" }] }))).toMatch(/next_actions\[0\]\.owner/);
     expect(errs(observation({ next_actions: [{ type: "recheck", detail: null, due: null }] }))).toBe("");
+  });
+
+  it("date-times are checked field by field, as Python's fromisoformat does", () => {
+    const at = (s: string) => validatePayload(payload({ started_at: s }, []), CTX).errors.join("\n");
+    expect(at("2026-11-19T10:00:00Z")).toBe("");
+    expect(at("2026-11-19T10:00:00+09:00")).toBe("");
+    for (const bad of ["2026-02-30T00:00:00Z", "2026-11-19T24:00:00Z", "2026-11-19T23:60:00Z", "2026-11-19T23:59:60Z", "2026-11-19T10:00:00+24:00", "2026-11-19T10:00:00"]) {
+      expect(at(bad), bad).toMatch(/run\.started_at/);
+    }
   });
 
   it("observed_at tolerates the ledger's +14h window but not more", () => {
@@ -376,5 +530,57 @@ describe("ledger-payload.mjs", () => {
     expect(validateSummary(`${SUMMARY}\nledger-receipt: sha256:abc`)).not.toEqual([]);
     expect(validateSummary("No change across all programs checked today, nothing else to add.")).not.toEqual([]);
     expect(validateSummary(SUMMARY)).toEqual([]);
+  });
+
+  it("unconfirmed: evidence required, proposed refused, may not cite a failed page", () => {
+    const u = (over: Record<string, unknown> = {}) => observation({ change_type: "unconfirmed", summary: "Page loads but gives no amount.", ...over });
+    expect(errs(u())).toBe("");
+    expect(errs(u({ proposed: { status: "open" } }))).toMatch(/proposed: must be absent for unconfirmed/);
+    expect(errs(u({ evidence: [] }))).toMatch(/evidence: at least one/);
+    const failed = validatePayload(
+      payload({ fetch_failures: [{ url: "https://example.org/rebate", reason: "HTTP 403" }] }, [u()]), CTX,
+    ).errors.join("\n");
+    expect(failed).toMatch(/unconfirmed cites https:\/\/example\.org\/rebate/);
+  });
+
+  it("fetch_failures[].program_code is optional, nullable, a code, and known when codes are given", () => {
+    const f = (ff: unknown, knownCodes?: Set<string>) =>
+      validatePayload(payload({ fetch_failures: [ff] }, []), { ...CTX, knownCodes }).errors.join("\n");
+    expect(f({ url: "https://x.example/a", reason: "HTTP 403" })).toBe("");
+    expect(f({ url: "https://x.example/a", reason: "HTTP 403", program_code: null })).toBe("");
+    expect(f({ url: "https://x.example/a", reason: "HTTP 403", program_code: "Bad-Code" })).toMatch(/fetch_failures\[0\]\.program_code/);
+    expect(f({ url: "https://x.example/a", reason: "HTTP 403", program_code: "example_hpwh_rebate" }, new Set(KNOWN))).toBe("");
+    expect(f({ url: "https://x.example/a", reason: "HTTP 403", program_code: "nope_code" }, new Set(KNOWN))).toMatch(/not in the ledger/);
+    expect(f({ url: "https://x.example/a", reason: "HTTP 403", status: 403 })).toMatch(/fetch_failures\[0\]\.status/);
+  });
+
+  it("discovery_mode: required, enumerated, and consistent with the record", () => {
+    const r = (over: Record<string, unknown>) => validatePayload(payload(over, []), CTX).errors.join("\n");
+    expect(r({ discovery_mode: undefined })).toMatch(/run\.discovery_mode: required/);
+    expect(r({ discovery_mode: "guessed" })).toMatch(/run\.discovery_mode: must be one of/);
+    expect(r({ discovery_mode: "skipped", discovery_queries: [] })).toMatch(/run\.note/);
+    expect(r({ discovery_mode: "skipped", discovery_queries: [], note: "no search tool; seed_urls empty" })).toBe("");
+    expect(r({ discovery_mode: "seed_pages", discovery_queries: [] })).toMatch(/seed:<url>/);
+    expect(r({ discovery_mode: "seed_pages", discovery_queries: ["seed:http://x.example/list"] })).toMatch(/seed:https/);
+    expect(r({ discovery_mode: "seed_pages", discovery_queries: ["seed:https://x.example/list"] })).toBe("");
+    expect(r({ discovery_mode: "search", discovery_queries: [] })).toMatch(/search queries/);
+    expect(r({ discovery_mode: "search", discovery_queries: ["seed:https://x.example/list"] })).toMatch(/search queries/);
+  });
+
+  it("usesContractV11 flags only what a v1.0 ledger rejects", () => {
+    expect(usesContractV11(payload())).toBe(false); // discovery_mode alone is ignored by a v1.0 ledger
+    expect(usesContractV11(payload({}, [observation({ change_type: "unconfirmed" })]))).toBe(true);
+    expect(usesContractV11(payload({ fetch_failures: [{ url: "https://x.example", reason: "r", program_code: null }] }))).toBe(true);
+  });
+
+  it("ledgerContract: absent warns, same major passes, other major or junk fails", () => {
+    expect(ledgerContract({ discovery: {} })).toMatchObject({ version: null, v11: false, warning: expect.any(String) });
+    expect(ledgerContract({ discovery: { seed_urls: [] } })).toMatchObject({ v11: true });
+    expect(ledgerContract({ contract_version: "1.1" })).toMatchObject({ major: 1, v11: true });
+    expect(ledgerContract({ contract_version: "1.0" })).toMatchObject({ major: 1, v11: false });
+    expect(ledgerContract({ contract_version: 1 }).error).toBeUndefined();
+    expect(ledgerContract({ contract_version: "2.0" }).error).toMatch(/contract v2\.0/);
+    expect(ledgerContract({ contract_version: "1.x" }).error).toMatch(/unreadable/);
+    expect(ledgerContract({ contract_version: 1.5 }).error).toMatch(/unreadable/);
   });
 });

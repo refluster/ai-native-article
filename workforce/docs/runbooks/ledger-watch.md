@@ -16,8 +16,8 @@ allowlist must name both.
 accepts it from any holder of the team-shared `workforce.feed_write_token`,
 taking `agent_slug` from the request body. The receipt therefore proves that
 *someone with the shared capability* posted under a desk's slug, not that the
-desk did. The ledger's auto-applied types (`verified_no_change`, `note`,
-`budget_signal`) rest on that alone, and the slug allowlist is not an identity
+desk did. The ledger's auto-applied types (`verified_no_change`,
+`unconfirmed`, `note`, `budget_signal`) rest on that alone, and the slug allowlist is not an identity
 control until the receipt is bound to the caller (per-desk token, or the feed
 recording the token principal). Until FU-042 lands, the ledger side should
 treat `verified_no_change` as time-boxed or review-queued, and an operator
@@ -40,12 +40,105 @@ auditing a suspicious reset should check the feed post's origin, not the slug.
    use the execute-api URL.
 3. **The feed-write token resolves for `workflow-foundry`.** The binding's
    `project_id` is `workflow-foundry`, so the orchestrator injects
-   credentials from that project. Today `workforce/projects/workflow-foundry/project.json`
-   lists only `github.token`. Either provision
-   `wf/projects/workflow-foundry/workforce.feed_write_token`, or confirm that
-   the `_default` fallback holds it. Then add the type to the project's
-   `credential_types`. This step is operator-only. If you skip it, every fire
-   arrives with an empty credential bag and the task fails loud.
+   credentials from that project. `getCredential`
+   (`workforce/lambdas/shared/project.ts`) resolves a type in this order, and
+   only a not-found falls through to the next tier:
+   1. `wf/projects/workflow-foundry/workforce.feed_write_token` (canonical),
+   2. `wf/projects/_default/workforce.feed_write_token` (shared fallback;
+      logs `legacy_credential_read` and counts `WfLegacyCredentialReads`),
+   3. `wf/workforce.feed_write_token` (legacy bare path, same metric).
+
+   The project-scoped secret at tier 1 is the prerequisite. A fire that
+   resolves through tier 2 or 3 still works, but it shows up in the legacy
+   metric and should be moved. Today `workforce/projects/workflow-foundry/project.json`
+   lists only `github.token` in `credential_types`; add
+   `workforce.feed_write_token` there. This step is operator-only. If no tier
+   holds the token, the credential bag arrives empty and the task fails loud.
+
+## Deploy order for contract v1.1 (skill 0.2.0)
+
+Skill 0.2.0 uses the ledger contract v1.1 (the ledger's `API.md` §5):
+change type `unconfirmed`, `run.fetch_failures[].program_code`,
+`run.discovery_mode`, and the worklist's `retry` / `needs_human` items and
+`discovery.seed_urls`. **Deploy the ledger first, then merge this skill.**
+
+- A v1.0 ledger rejects `unconfirmed` and an unknown `fetch_failures` key.
+  `post.mjs` refuses to post a payload that uses either one to a ledger that
+  does not advertise v1.1 (exit 3, before any feed post). It treats the
+  ledger as v1.1 when the worklist carries `contract_version` ≥ 1.1 or, until
+  the ledger sends a version, `discovery.seed_urls`. So the wrong order costs
+  a day of `throw` engagements, not orphan receipts.
+- A 0.1.x payload is accepted by a v1.1 ledger (API.md §5.5), so the ledger
+  can go first with no gap.
+- **Contract handshake.** `post.mjs` reads `contract_version` from the
+  worklist. If it is absent, the script prints one warning line and goes on.
+  If its major differs from `LEDGER_CONTRACT_MAJOR` in
+  `ledger-payload.mjs`, the run stops with exit 3 before any feed post. The
+  check only bites once the deployed ledger returns `contract_version` (its
+  v1.1 change returns `"1.1"` from `/v1/worklist` and `/v1/health`). After
+  the ledger deploy, confirm with
+  `curl -sS "<ledger_url>/v1/worklist?agent=soledad&limit=1"`: the answer
+  should carry `contract_version` and `discovery.seed_urls`. The ledger
+  raises the major only for a change that invalidates current payloads. When
+  that happens, change `ledger-payload.mjs` and `LEDGER_CONTRACT_MAJOR` in a
+  skill PR merged right after the ledger deploy.
+
+## `needs_human` and `retry` (what the operator sees)
+
+- The ledger sets `needs_human` on a program when a desk reported it
+  `unconfirmed` (the page loaded but did not settle the row), or when its
+  sources failed on 2 fires in a row (`source_blocked`). The desks do not
+  work around a blocked site, so these rows wait for a person.
+- While `needs_human` is set, the program leaves the daily worklist. It
+  comes back once every 7 days (`NEEDS_HUMAN_RETRY_DAYS`) marked
+  `retry: true`. The desk tries once and reports `unconfirmed` again or the
+  fetch failure. Repeats of the same wording are expected, not a fault.
+- To clear one: open the page yourself and post a reviewer
+  `verified_no_change` with the URL and the words you read (ledger API §5.3),
+  approve a pending change, or hand-edit the program with
+  `clear_needs_human: true`. The list is in the ledger's summary
+  (`counts.needs_human`, `needs_human[]`) and `GET /v1/programs?needs_human=true`.
+- Discovery: `GET /v1/summary` shows each desk's `last_discovery`. A desk
+  with none for 7 days means discovery keeps being skipped. Read the
+  `run.note` of its recent runs for the reason.
+
+## Fire one binding on demand (for a check)
+
+The orchestrator Lambda (`wf-orchestrator-prod`, `WfOrchestratorFunction`
+in `workforce/infra/sam/template.yaml`) accepts an explicit single-binding
+event (adr-0025, `handleDispatch` in `workforce/lambdas/orchestrator/handler.ts`).
+It skips the cron scan and fires that one binding through the normal CCR
+path, with the binding's project credentials attached by the orchestrator:
+
+```sh
+# B-authority: operator credentials. Find binding_idx in GET /agents/<slug>
+# (the ledger-watch binding was index 3 for both desks on 2026-11-22).
+aws-vault exec <profile> -- aws lambda invoke --region us-west-2 \
+  --function-name wf-orchestrator-prod --invocation-type Event \
+  --cli-binary-format raw-in-base64-out \
+  --payload '{"dispatch":{"agent_slug":"soledad","binding_idx":3,"reason":"ledger-watch 0.2.0 check","requested_by":"operator"}}' \
+  /dev/stdout
+```
+
+- The payload shape is `OrchestratorDispatchEvent` (`shared/dispatch.ts`):
+  `agent_slug` (non-empty) and `binding_idx` (integer ≥ 0) are required;
+  `reason` and `requested_by` are audit-only. It is the same body agents-api's
+  `POST /dispatch` (`dispatchBindingRoute`) sends after its own checks.
+- The orchestrator re-reads the binding and refuses (logs `dispatch-refused`,
+  fires nothing) when the agent is archived or paused, the index is out of
+  range, or the binding is not orchestrator-owned CCR (`scheduler: external`,
+  `invoked_by: api`). A binding paused to `scheduler: "manual"` cannot be
+  fired this way.
+- The tick's dedup window is not applied, so this can fire a binding that
+  already ran today. Each fire spends one feed receipt and one medium fire
+  (USD 0.20 modelled).
+- Look for `ccr-dispatch-fired` (with `session_url`) or `ccr-dispatch-error`
+  in `/aws/lambda/wf-orchestrator-prod`, then verify as below.
+- **Pasting this JSON into a runner session does nothing useful.** The
+  session has no AWS access, and the task's credentials (the feed-write
+  token) are attached by the orchestrator when it prepares the task. A
+  session that "runs" the binding by hand has no token and no ledger URL
+  from the binding config.
 
 ## Wire
 
@@ -98,7 +191,14 @@ thin the cadence.
 4. If the engagement is `throw`, read its summary. `orphan_receipt` names a
    feed post that the ledger did not accept. The usual causes are an
    attestation allowlist that omits the desk (403) or a ledger URL that is
-   unreachable from the session (exit 3).
+   unreachable from the session (exit 3). A "possible orphan receipt
+   sha256:…" means the feed POST failed in a way that may have stored the
+   post (network error, timeout or 5xx). Search
+   `GET /agents/<slug>/posts?page_size=10` for a body ending in
+   `ledger-receipt: sha256:<that hash>`. If it is there, it is a stray
+   receipt the ledger never saw.
+5. From 0.2.0, the run in `GET /v1/runs` carries `discovery_mode`
+   (`search`, `seed_pages` or `skipped` with the reason in `note`).
 
 ## Pause or stop
 
