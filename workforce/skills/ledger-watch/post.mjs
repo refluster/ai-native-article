@@ -7,8 +7,9 @@
 //
 //   1. validate the payload locally against the ledger's own validation
 //      (mirrored in ./ledger-payload.mjs) — before any network call — then
-//      read the ledger's known program codes from its public worklist, so a
-//      run the ledger would refuse or mark `rejected` never spends a receipt;
+//      read the ledger's public worklist for its contract version (a
+//      different major stops here) and its known program codes, so a run the
+//      ledger would refuse or mark `rejected` never spends a receipt;
 //   2. serialise the payload ONCE and hash those exact bytes (sha256);
 //   3. POST /feed a kind:"observation" post whose body is the status line
 //      plus the line `ledger-receipt: sha256:<hex>`;
@@ -33,24 +34,35 @@
 // Usage:
 //   FEED_WRITE_TOKEN=<credentials['workforce.feed_write_token']> \
 //     node workforce/skills/ledger-watch/post.mjs \
-//       --agent <slug> --skill-version 0.1.0 \
+//       --agent <slug> \
 //       --payload-file /tmp/ledger-watch-<slug>-<suffix>.json \
 //       --summary-file /tmp/ledger-watch-<slug>-<suffix>.md \
 //       --ledger-url https://<id>.execute-api.<region>.amazonaws.com
 //
 // Env (dev / tests only): FEED_WRITE_TOKEN_API_URL overrides the feed URL;
 // LEDGER_API_URL is used when --ledger-url is absent; LEDGER_RETRY_ATTEMPTS
-// (default 3) and LEDGER_RETRY_BASE_MS (default 2000) shape the retry.
+// (default 3) and LEDGER_RETRY_BASE_MS (default 2000) shape the retry;
+// FEED_TIMEOUT_MS (default 30000) bounds the feed POST.
+//
+// The skill version comes from ./meta.json (the file the ADR-0018 body-version
+// gate bumps), so it cannot drift from the body. `--skill-version` is optional
+// and, when given, must equal meta.json's version (exit 1 otherwise).
 //
 // Exit codes:
 //   0  — feed receipt verified + ledger accepted every observation
 //        (auto_applied / pending_review / duplicate)
-//   1  — bad args / env / unreadable file / payload not JSON / no ledger URL
+//   1  — bad args / env / unreadable file / payload not JSON / no ledger URL /
+//        unreadable meta.json / --skill-version differs from meta.json
 //   2  — validation or auth: local payload/summary validation, feed 401/422,
 //        read-back mismatch, ledger 400/401/403/413, or any observation the
 //        ledger returned as `rejected`
-//   3  — network / 5xx after retries / unexpected response
+//   3  — network / 5xx after retries / unexpected response / the ledger's
+//        contract_version has another major, or the payload uses contract
+//        v1.1 and the ledger does not advertise it (both before any post)
 // Any non-zero exit after step 3 reports `orphan_receipt` with the post_id.
+// A feed POST that dies with a network error, a timeout or a 5xx may still
+// have created the post: the result then carries `possible_orphan_receipt:
+// true` and `receipt_sha256` (search the slug's feed for that hash).
 
 import { ensureProxyAwareEntry } from "../../../scripts/lib/proxy-bootstrap.mjs";
 ensureProxyAwareEntry(import.meta.url);
@@ -58,9 +70,12 @@ ensureProxyAwareEntry(import.meta.url);
 import { readFileSync } from "node:fs";
 import {
   DISPOSITIONS,
+  LEDGER_CONTRACT_VERSION,
   MAX_REQUEST_BYTES,
   composeReceiptBody,
+  ledgerContract,
   sha256Hex,
+  usesContractV11,
   validatePayload,
   validateSummary,
 } from "./ledger-payload.mjs";
@@ -163,7 +178,7 @@ function resolveLedgerUrl(raw) {
 const feedUrl = process.env["FEED_WRITE_TOKEN_API_URL"] || DEFAULT_API_URL;
 const token = process.env["FEED_WRITE_TOKEN"];
 const agent = arg("agent");
-const skillVersion = arg("skill-version");
+const skillVersionFlag = arg("skill-version");
 const payloadFile = arg("payload-file");
 const summaryFile = arg("summary-file");
 const ledgerRaw = arg("ledger-url") || process.env["LEDGER_API_URL"];
@@ -171,7 +186,19 @@ result.agent = agent;
 
 if (!token) fail(1, "FEED_WRITE_TOKEN env var is required (from credentials['workforce.feed_write_token'])");
 if (!agent || !/^[a-z]+$/.test(agent)) fail(1, "--agent <slug> is required (^[a-z]+$)");
-if (!skillVersion || !/^\d+\.\d+\.\d+$/.test(skillVersion)) fail(1, "--skill-version <semver> is required");
+let skillVersion;
+try {
+  skillVersion = JSON.parse(readFileSync(new URL("./meta.json", import.meta.url), "utf8")).version;
+} catch (err) {
+  fail(1, `cannot read the skill version from meta.json beside post.mjs: ${err instanceof Error ? err.message : String(err)}`);
+}
+if (typeof skillVersion !== "string" || !/^\d+\.\d+\.\d+$/.test(skillVersion)) {
+  fail(1, `meta.json beside post.mjs carries no semver version (${JSON.stringify(skillVersion)})`);
+}
+if (skillVersionFlag !== undefined && skillVersionFlag !== skillVersion) {
+  fail(1, `--skill-version "${skillVersionFlag}" differs from meta.json "${skillVersion}". Drop the flag (meta.json is the source) or fix the call.`);
+}
+result.skill_version = skillVersion;
 if (!payloadFile) fail(1, "--payload-file <path> is required");
 if (!summaryFile) fail(1, "--summary-file <path> is required");
 if (!ledgerRaw) {
@@ -211,21 +238,32 @@ if (allErrors.length > 0) {
   fail(2, `${allErrors.length} validation error(s); nothing was posted`, { validation_errors: allErrors });
 }
 
-// ── 1b. known program codes (public worklist) ───────────────────────────────
+// ── 1b. contract handshake + known program codes (public worklist) ──────────
 // The ledger rejects an observation on a code it does not hold (unless it is
-// a new_program). Read the codes it holds before spending the receipt.
+// a new_program). Read the codes it holds before spending the receipt. The
+// same response carries the ledger's contract_version (A2 drift check): a
+// different major means this file no longer mirrors the ledger, so stop here.
 const attempts = Math.max(1, Number(process.env["LEDGER_RETRY_ATTEMPTS"] || 3));
 const baseMs = Math.max(0, Number(process.env["LEDGER_RETRY_BASE_MS"] ?? 2000));
 {
+  result.stage = "contract";
   const wl = await callLedger(`${ledgerBase}/v1/worklist?agent=${encodeURIComponent(agent)}&limit=1`, undefined, { attempts, baseMs });
-  let known = null;
+  let doc = null;
   if (wl.status === 200) {
-    try {
-      const codes = JSON.parse(wl.text)?.discovery?.known_codes;
-      if (Array.isArray(codes)) known = new Set(codes);
-    } catch { /* handled below */ }
+    try { doc = JSON.parse(wl.text); } catch { /* handled below */ }
   }
-  if (!known) fail(3, `could not read the ledger's known program codes from GET /v1/worklist (${wl.status ?? "network"}: ${String(wl.text).slice(0, 200)}); nothing was posted`);
+  const codes = doc?.discovery?.known_codes;
+  if (!Array.isArray(codes)) fail(3, `could not read the ledger's known program codes from GET /v1/worklist (${wl.status ?? "network"}: ${String(wl.text).slice(0, 200)}); nothing was posted`);
+  const known = new Set(codes);
+
+  const contract = ledgerContract(doc);
+  result.ledger_contract = contract.version;
+  if (contract.error) fail(3, `${contract.error}; nothing was posted`);
+  if (contract.warning) console.error(`post.mjs: warning: ${contract.warning}`);
+  if (usesContractV11(payload) && !contract.v11) {
+    fail(3, `the payload uses contract v${LEDGER_CONTRACT_VERSION} (unconfirmed / fetch_failures[].program_code) but the ledger does not advertise it — deploy the ledger first; nothing was posted`);
+  }
+  result.stage = "validate";
   const { errors: codeErrors } = validatePayload(payload, { agent, skillVersion, now: new Date(), knownCodes: known });
   if (codeErrors.length > 0) {
     for (const e of codeErrors) console.error(`post.mjs: invalid ${e}`);
@@ -247,19 +285,32 @@ result.observations = payload.observations.length;
 // ── 3. feed receipt ──────────────────────────────────────────────────────────
 result.stage = "feed";
 console.error(`post.mjs: POST ${feedUrl} (receipt sha256:${receiptHex.slice(0, 12)}…)`);
+// A network error, timeout or 5xx can arrive AFTER the feed stored the post:
+// the receipt may exist with no ledger submission behind it. Say so, with the
+// hash an operator searches the slug's feed for, and never post a second one.
+const possibleOrphan = (why) =>
+  fail(3, `feed POST ${why}. A receipt may exist: look for "ledger-receipt: sha256:${receiptHex}" in GET /agents/${agent}/posts before any rerun.`, {
+    possible_orphan_receipt: true,
+  });
+const feedTimeoutMs = Math.max(1, Number(process.env["FEED_TIMEOUT_MS"] || 30_000));
 let created;
+let feedRes;
 try {
-  const res = await fetch(feedUrl, {
+  feedRes = await fetch(feedUrl, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
     body: JSON.stringify({ agent_slug: agent, kind: "observation", body, skill_version: skillVersion }),
+    signal: AbortSignal.timeout(feedTimeoutMs),
   });
-  const text = await res.text().catch(() => "");
-  if (res.status === 401 || res.status === 422) fail(2, `feed rejected the receipt (HTTP ${res.status}): ${text.slice(0, 300)}`);
-  if (res.status < 200 || res.status >= 300) fail(3, `feed returned unexpected HTTP ${res.status}: ${text.slice(0, 300)}`);
-  created = text;
 } catch (err) {
-  fail(3, `feed POST failed: ${err instanceof Error ? err.message : String(err)}`);
+  possibleOrphan(`failed (${err instanceof Error ? err.message : String(err)})`);
+}
+{
+  const text = await feedRes.text().catch(() => "");
+  if (feedRes.status === 401 || feedRes.status === 422) fail(2, `feed rejected the receipt (HTTP ${feedRes.status}): ${text.slice(0, 300)}`);
+  if (feedRes.status >= 500) possibleOrphan(`returned HTTP ${feedRes.status}: ${text.slice(0, 300)}`);
+  if (feedRes.status < 200 || feedRes.status >= 300) fail(3, `feed returned unexpected HTTP ${feedRes.status}: ${text.slice(0, 300)}`);
+  created = text;
 }
 
 // ── 4. read-back ─────────────────────────────────────────────────────────────
