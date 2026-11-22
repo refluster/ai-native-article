@@ -102,6 +102,36 @@ change type `unconfirmed`, `run.fetch_failures[].program_code`,
   with none for 7 days means discovery keeps being skipped. Read the
   `run.note` of its recent runs for the reason.
 
+## `secondary_watch` rows (contract v1.3, skill 0.3.0)
+
+Some primary pages refuse every request from cloud IPs at the network edge
+(even `robots.txt` returns 403, and a plain headless browser gets the same
+block page). The desks do not work around that. From contract v1.3 (the
+ledger's `API.md` §5.8) the ledger marks such a source `access: "blocked"`
+with `attempt_once: true`, and an item whose primary sources are all blocked
+and that has a secondary (non-primary) source comes with
+`mode: "secondary_watch"`.
+
+- **What the desk does each fire.** One plain attempt on each blocked
+  primary page, recorded in `run.fetch_failures` with the `program_code`
+  (`post.mjs` refuses a payload that leaves one out). Then it reads the
+  secondary listing: still consistent → `secondary_no_change`; different, or
+  no longer listed → `unconfirmed` with the listing's words.
+- **What the operator sees.** The run carries one fetch failure per blocked
+  source on every fire: that is the "still unreadable as of today" alert,
+  kept on purpose. `secondary_no_change` is auto-applied and never moves
+  `last_verified_at`, so the row stays due for a person: the ledger asks
+  someone to open the primary page about every 30 days and record what it
+  says (reviewer `verified_no_change`). An `unconfirmed` on secondary
+  evidence means the tripwire fired and raises a human check now.
+- **Deploy order: ledger first, then this skill.** A ledger below v1.3
+  rejects `secondary_no_change`. `post.mjs` refuses to post it unless the
+  worklist's `contract_version` is ≥ 1.3 (exit 3 before any feed post), so
+  the wrong order costs a failed fire, not a stray receipt.
+- **Cost.** `post.mjs` now reads the worklist at the ledger's default page
+  size (the page the desk read) instead of `limit=1`, still one call per
+  fire, to see the `attempt_once` sources.
+
 ## Fire one binding on demand (for a check)
 
 The orchestrator Lambda (`wf-orchestrator-prod`, `WfOrchestratorFunction`

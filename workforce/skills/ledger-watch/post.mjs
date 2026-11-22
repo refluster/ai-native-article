@@ -7,9 +7,11 @@
 //
 //   1. validate the payload locally against the ledger's own validation
 //      (mirrored in ./ledger-payload.mjs) — before any network call — then
-//      read the ledger's public worklist for its contract version (a
-//      different major stops here) and its known program codes, so a run the
-//      ledger would refuse or mark `rejected` never spends a receipt;
+//      read the ledger's public worklist (the same default page the desk
+//      read) for its contract version (a different major stops here), its
+//      known program codes and its `attempt_once` sources (each must be
+//      recorded in the payload), so a run the ledger would refuse or mark
+//      `rejected` never spends a receipt;
 //   2. serialise the payload ONCE and hash those exact bytes (sha256);
 //   3. POST /feed a kind:"observation" post whose body is the status line
 //      plus the line `ledger-receipt: sha256:<hex>`;
@@ -58,7 +60,7 @@
 //        ledger returned as `rejected`
 //   3  — network / 5xx after retries / unexpected response / the ledger's
 //        contract_version has another major, or the payload uses contract
-//        v1.1 and the ledger does not advertise it (both before any post)
+//        v1.1 (or v1.3) and the ledger does not advertise it (all before any post)
 // Any non-zero exit after step 3 reports `orphan_receipt` with the post_id.
 // A feed POST that dies with a network error, a timeout or a 5xx may still
 // have created the post: the result then carries `possible_orphan_receipt:
@@ -70,12 +72,13 @@ ensureProxyAwareEntry(import.meta.url);
 import { readFileSync } from "node:fs";
 import {
   DISPOSITIONS,
-  LEDGER_CONTRACT_VERSION,
   MAX_REQUEST_BYTES,
+  checkBlockedAttempts,
   composeReceiptBody,
   ledgerContract,
   sha256Hex,
   usesContractV11,
+  usesContractV13,
   validatePayload,
   validateSummary,
 } from "./ledger-payload.mjs";
@@ -243,11 +246,14 @@ if (allErrors.length > 0) {
 // a new_program). Read the codes it holds before spending the receipt. The
 // same response carries the ledger's contract_version (A2 drift check): a
 // different major means this file no longer mirrors the ledger, so stop here.
+// It also carries the items the desk was handed: the request uses the
+// ledger's default page size, as SKILL.md §1 does, so the blocked sources
+// marked `attempt_once` are the ones the desk saw (one call, no second read).
 const attempts = Math.max(1, Number(process.env["LEDGER_RETRY_ATTEMPTS"] || 3));
 const baseMs = Math.max(0, Number(process.env["LEDGER_RETRY_BASE_MS"] ?? 2000));
 {
   result.stage = "contract";
-  const wl = await callLedger(`${ledgerBase}/v1/worklist?agent=${encodeURIComponent(agent)}&limit=1`, undefined, { attempts, baseMs });
+  const wl = await callLedger(`${ledgerBase}/v1/worklist?agent=${encodeURIComponent(agent)}`, undefined, { attempts, baseMs });
   let doc = null;
   if (wl.status === 200) {
     try { doc = JSON.parse(wl.text); } catch { /* handled below */ }
@@ -261,13 +267,17 @@ const baseMs = Math.max(0, Number(process.env["LEDGER_RETRY_BASE_MS"] ?? 2000));
   if (contract.error) fail(3, `${contract.error}; nothing was posted`);
   if (contract.warning) console.error(`post.mjs: warning: ${contract.warning}`);
   if (usesContractV11(payload) && !contract.v11) {
-    fail(3, `the payload uses contract v${LEDGER_CONTRACT_VERSION} (unconfirmed / fetch_failures[].program_code) but the ledger does not advertise it — deploy the ledger first; nothing was posted`);
+    fail(3, "the payload uses contract v1.1 (unconfirmed / fetch_failures[].program_code) but the ledger does not advertise it — deploy the ledger first; nothing was posted");
+  }
+  if (usesContractV13(payload) && !contract.v13) {
+    fail(3, `the payload uses contract v1.3 (secondary_no_change) but the ledger advertises ${contract.version ? `v${contract.version}` : "no contract_version"} — deploy the ledger first; nothing was posted`);
   }
   result.stage = "validate";
-  const { errors: codeErrors } = validatePayload(payload, { agent, skillVersion, now: new Date(), knownCodes: known });
+  const { errors: valErrors } = validatePayload(payload, { agent, skillVersion, now: new Date(), knownCodes: known });
+  const codeErrors = [...valErrors, ...checkBlockedAttempts(payload, doc)];
   if (codeErrors.length > 0) {
     for (const e of codeErrors) console.error(`post.mjs: invalid ${e}`);
-    fail(2, `${codeErrors.length} validation error(s) against the ledger's program codes; nothing was posted`, { validation_errors: codeErrors });
+    fail(2, `${codeErrors.length} validation error(s) against the ledger's worklist; nothing was posted`, { validation_errors: codeErrors });
   }
 }
 

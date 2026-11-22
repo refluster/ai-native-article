@@ -1,6 +1,6 @@
 ---
 name: ledger-watch
-description: Ledger re-verification cadence for an external project's public incentive ledger. Once per period, read the ledger's public worklist for your desk, re-read each due program's primary pages live, classify what each page shows into one structured observation (verified_no_change, unconfirmed, status/amount/deadline/requirements change, budget signal, new program, note) with verbatim evidence, record blocked sources without working around them, run one bounded discovery pass in your lane (web search, or the ledger's seed index pages when the session has no search tool), then post a short receipt on the feed and submit the observations to the ledger through post.mjs. Material changes wait for a human reviewer; the routine types (verified_no_change, unconfirmed, note, budget_signal) are applied by the ledger on a feed receipt that proves only that a holder of the shared feed token posted under your slug (FU-042). Skips only when the worklist is empty and discovery found nothing.
+description: Ledger re-verification cadence for an external project's public incentive ledger. Each fire, read the ledger's public worklist for your desk, re-read each due program's primary pages live, classify what each page shows into one structured observation (verified_no_change, unconfirmed, status/amount/deadline/requirements change, budget signal, new program, note) with verbatim evidence, record blocked sources without working around them (one plain attempt per fire; a secondary listing is only a tripwire), run one bounded discovery pass in your lane (web search, or the ledger's seed index pages without a search tool), then post a short receipt on the feed and submit the observations to the ledger through post.mjs. Material changes wait for a human reviewer; the routine types (no-change, unconfirmed, note, budget_signal) are applied by the ledger on a feed receipt that proves only that a shared-token holder posted under your slug (FU-042). Skips only when the worklist is empty and discovery found nothing.
 ---
 
 # ledger-watch
@@ -25,7 +25,7 @@ decide a ledger value.** Your job is a faithful, dated, quoted reading.
 attests that *some holder of the team-shared `workforce.feed_write_token`*
 posted under your `agent_slug` (the feed takes the slug from the request
 body). It is a shared capability, not a per-desk identity. So the auto-applied
-types (`verified_no_change`, `unconfirmed`, `note`, `budget_signal`) are attested by that
+types (`verified_no_change`, `unconfirmed`, `secondary_no_change`, `note`, `budget_signal`) are attested by that
 shared capability alone, and the ledger-side slug allowlist is not an
 identity control while the slug is self-asserted. Binding the receipt to the
 caller is tracked as FU-042; until then, report only what you read this fire,
@@ -51,9 +51,12 @@ desk. This skill defines only the fire shape.
 1. `GET {ledger_api_url}/v1/worklist?agent={agent_slug}` (no auth). It returns
    `items[]`: the programs due for re-verification, oldest first. Each item
    has `code`, `reference`, `status`, `status_as_of`, `deadline`,
-   `last_verified_at`, `amount.display`, `sources[]{url, watch, look_for_ja}`,
+   `last_verified_at`, `amount.display`,
+   `sources[]{url, watch, look_for_ja, primary_source, access}`,
    `open_questions[]` and `pending_count`. An item may also carry
-   `retry: true` and `needs_human` (see §2). The response also returns
+   `retry: true` and `needs_human` (see §2), and `mode: "secondary_watch"`;
+   a source with `access: "blocked"` carries `attempt_once: true` (see
+   "Blocked primary pages" in §2). The response also returns
    `discovery` (`{territory, equipment, known_codes[], seed_urls[]{url, look_for}}`)
    and `server_time`.
    `look_for_ja` is written in Japanese. It says what on that page matters
@@ -79,7 +82,8 @@ Then classify what you read into exactly one `change_type` per finding:
 | `requirements_changed` | Eligibility, documents, enrollment, pre-approval or permit-number rules changed | the specific `process.*` / `customer_segments` / `equipment` keys |
 | `form_changed` / `source_changed` | The application form moved or changed, or the page URL moved | `form` / `sources` |
 | `budget_signal` | Funding language changed ("limited funds", "waitlist", a remaining-budget figure) | `budget` only, optional |
-| `unconfirmed` | The page loaded but neither supports nor contradicts the row (the field is not on it, the table is gone, the wording is ambiguous) | omit `proposed` |
+| `unconfirmed` | The page loaded but neither supports nor contradicts the row (the field is not on it, the table is gone, the wording is ambiguous); or a secondary listing differs from the row (see below) | omit `proposed` |
+| `secondary_no_change` | Only for blocked primary pages: the secondary listing still matches the row. All evidence `primary_source: false`. Never a verification | omit `proposed` |
 | `note` | Something worth keeping that is none of the above, including a co-flag | omit `proposed` |
 
 Rules. Each one exists because a downstream person quotes a job off this row.
@@ -100,16 +104,45 @@ Rules. Each one exists because a downstream person quotes a job off this row.
   error, timeout, bot wall), add `{url, reason, program_code}` to
   `run.fetch_failures`. Do **not** emit `verified_no_change` or
   `unconfirmed` citing that page. `post.mjs` rejects either one if it cites a
-  failed URL. A program whose only sources failed gets no observation, not
-  even a `note`: any observation on it stops the ledger counting the
-  failure. The failure list, keyed by `program_code`, is how the ledger
-  counts repeated failures and hands a blocked row to a person.
+  failed URL. A program whose sources all failed gets no observation, not
+  even a `note`: you read nothing to report. The failure list, keyed by
+  `program_code`, is how the ledger counts repeated failures per source
+  (even beside an observation on the same row), marks a source blocked and
+  hands the row to a person.
 - **Blocked sources are not worked around.** If a source refuses automated
   access (403, bot wall, CAPTCHA, IP block), record it and move on. No
   user-agent changes, no headless-browser tricks, no third-party mirrors or
   caches presented as the primary page. Why: the evidence must be the
   primary page as served, and a site that blocks automated readers has said
-  no. After repeated failures the ledger hands the row to a person.
+  no. After repeated failures the ledger hands the row to a person, and
+  marks the source `access: "blocked"` (next section).
+- **Blocked primary pages (`access: "blocked"`, `mode: "secondary_watch"`).**
+  Once the ledger marks a primary source blocked, the row no longer waits on
+  it: a person reads that page about every 30 days, and you keep two
+  records in between.
+  1. **One plain attempt** on each source with `attempt_once: true`, fetched
+     the same way as any other page: no retry with other headers, no
+     headless tricks, no mirror or cache. If it fails (the expected case),
+     add `{url, reason, program_code}` to `run.fetch_failures` with the
+     status you saw, even when you also send an observation for the row.
+     Why: the ledger's "still unreadable as of today" is the alert the
+     operator asked to keep. `post.mjs` refuses a payload that leaves an
+     `attempt_once` source unrecorded. If the page loads after all, read it
+     as a normal primary source and say so in `summary`.
+  2. **Then read the secondary sources** (the item's `primary_source: false` ones) and
+     compare them with the row. Still consistent → one `secondary_no_change`
+     quoting the listing. A different amount or terms, or the program no
+     longer listed → `unconfirmed` with the secondary quote(s) and a
+     `summary` that says exactly what differs. Secondary sources that
+     disagree with each other → `unconfirmed`, quoting both.
+  3. **A secondary source settles nothing.** It never gets
+     `primary_source: true`, and it is never the only evidence for
+     `verified_no_change` or a `*_changed`. Why: an aggregator can be stale
+     or wrong; only the program's own page settles a row. `post.mjs`
+     refuses a `verified_no_change` without primary evidence and points you
+     to `secondary_no_change`, which in turn is only for an item with a
+     blocked source. A `retry`/`needs_human` on such an item is the
+     ledger asking a person; it changes nothing in these steps.
 - **`retry: true` items are the weekly re-attempt** of a row a human has
   already been asked to check (`needs_human` says why). Try the sources once.
   If something changed, report it as usual. If nothing changed, emit
@@ -212,7 +245,7 @@ https://…"*.
                         "program_code": "example_city_hpwh_rebate"}],
     "discovery_mode": "search",
     "discovery_queries": ["heat pump water heater rebate municipal utility Orange County"],
-    "note": "1 of 2 programs unverified (source blocked)."
+    "note": "1 of 2 programs on secondary watch (primary blocked; listing unchanged)."
   },
   "observations": [
     {
@@ -229,6 +262,17 @@ https://…"*.
       "confidence": "high",
       "next_actions": [{"type": "requote_open_estimates", "detail": "Estimates that assumed this rebate need review.", "due": null}],
       "affects": {"gas_utility": "example_utility", "equipment": ["gas_tankless"], "stage": ["quoted", "contracted_not_installed"]}
+    },
+    {
+      "program_code": "example_city_hpwh_rebate",
+      "change_type": "secondary_no_change",
+      "observed_at": "2026-11-19",
+      "summary": "Primary page still blocked (HTTP 403). The regional rebate listing still shows the $400 HPWH rebate as available.",
+      "evidence": [
+        {"url": "https://www.example-rebate-finder.org/city/hpwh",
+         "quote": "Heat Pump Water Heater – $400 – Available", "page_date": null, "primary_source": false}
+      ],
+      "confidence": "medium"
     }
   ]
 }
@@ -241,8 +285,9 @@ evidence URL is `https://`. `proposed` takes only the ledger's program
 fields, with their enum values (for example `equipment`: gas_tankless,
 gas_storage, hpwh, hp_hvac, other). `post.mjs` mirrors the ledger's own
 validation. It also checks every non-`new_program` code against the ledger's
-`known_codes`, and refuses a payload the ledger would reject before anything
-is posted. Fix what stderr names and rerun.
+`known_codes`, checks that each `attempt_once` source on the worklist is
+recorded, and refuses a payload the ledger would reject before anything is
+posted. Fix what stderr names and rerun.
 
 ## 6. Write — run the script, never call the ledger yourself
 
@@ -275,7 +320,7 @@ feed carries that receipt. It prints one JSON line:
 | `0` | Receipt verified. Every observation is `auto_applied`, `pending_review` or `duplicate`. | Done. |
 | `1` | Bad args, env or file, or no `--ledger-url` | Fix the call once. If config is missing, record `throw` / `validation`. |
 | `2` | Validation (local, feed 422, or ledger 400), auth (feed 401, ledger 401/403 `attestation_failed`), read-back mismatch, or ≥ 1 observation `rejected` | Read stderr. Fix a local validation error and rerun. Do not retry an auth or attestation failure blindly. |
-| `3` | Network or 5xx after the script's own retries. Also: the ledger reports another contract major, or does not yet accept the v1.1 types this payload uses (both stop before any post) | Record `throw`. Do not post a second receipt this fire. |
+| `3` | Network or 5xx after the script's own retries. Also: the ledger reports another contract major, or does not yet accept the v1.1 / v1.3 types this payload uses (all stop before any post) | Record `throw`. Do not post a second receipt this fire. |
 
 If the output carries `orphan_receipt`, the feed post exists but the ledger
 did not take it. Name that `post_id` in your result so the operator can see

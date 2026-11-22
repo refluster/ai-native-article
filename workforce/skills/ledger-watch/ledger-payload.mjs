@@ -24,6 +24,15 @@
 // that uses them to a ledger that does not advertise v1.1 (see
 // `ledgerContract` below) — the deploy order is ledger first, then this skill.
 //
+// Contract v1.3 (API.md §5.8): change_type `secondary_no_change` (every
+// evidence entry `primary_source: false`, no `proposed`), worklist sources
+// with `access` / `primary_source` / `attempt_once`, and items in
+// `mode: "secondary_watch"`. A ledger below v1.3 rejects the new type, so
+// post.mjs refuses to post it unless the worklist advertises ≥ 1.3. The
+// ledger downgrades a `verified_no_change` with no primary evidence; this
+// file refuses it instead (skill rule), and refuses a payload that leaves a
+// worklist source marked `attempt_once` unrecorded (`checkBlockedAttempts`).
+//
 // Lengths are counted in code points, as Python's len() does.
 // Nothing in this file touches the network or the filesystem; post.mjs owns
 // the I/O. Exported for post-tests.ts.
@@ -35,20 +44,23 @@ export const MAX_OBSERVATIONS = 20;
 /** The ledger contract major this file mirrors. A worklist that reports a
  *  different major in `contract_version` stops the run before any feed post. */
 export const LEDGER_CONTRACT_MAJOR = 1;
-/** The contract version this file implements (API.md §5 = v1.1). */
-export const LEDGER_CONTRACT_VERSION = "1.1";
+/** The contract version this file implements (API.md §5, v1.3 = §5.8). */
+export const LEDGER_CONTRACT_VERSION = "1.3";
 export const MAX_REQUEST_BYTES = 256 * 1024;
 
 // ── enums (service.py constants) ─────────────────────────────────────────────
 export const STATUSES = ["open", "suspended", "closed", "pending_reopen"]; // `candidate` is never writable
-const AUTO_TYPES = ["verified_no_change", "note", "budget_signal", "unconfirmed"]; // unconfirmed: v1.1 §5.1
+const AUTO_TYPES = ["verified_no_change", "note", "budget_signal", "unconfirmed", // unconfirmed: v1.1 §5.1
+  "secondary_no_change"]; // v1.3 §5.8
 const REVIEW_TYPES = ["status_changed", "amount_changed", "deadline_changed", "requirements_changed",
   "form_changed", "source_changed", "new_program"];
 export const CHANGE_TYPES = Object.freeze([...AUTO_TYPES, ...REVIEW_TYPES]);
 export const PROPOSED_REQUIRED = new Set(REVIEW_TYPES);
 /** Types that say "I read this page this fire" — they may not cite a URL the
  *  run lists as failed to load. */
-const READ_TYPES = new Set(["verified_no_change", "unconfirmed"]);
+const READ_TYPES = new Set(["verified_no_change", "unconfirmed", "secondary_no_change"]);
+/** Types that settle or change a row: a secondary source alone is never enough (skill rule). */
+const PRIMARY_REQUIRED = new Set(["verified_no_change", ...REVIEW_TYPES]);
 export const DISCOVERY_MODES = ["search", "seed_pages", "skipped"]; // v1.1 §5.4; absent = skipped
 export const SEED_QUERY_PREFIX = "seed:";
 const CONFIDENCE = ["high", "medium", "low"];
@@ -75,7 +87,12 @@ const STARTED_AT_TOLERANCE_MS = 10 * 60_000;
 export const PROPOSED_FORBIDDEN = new Set(["code", "version", "updated_at", "updated_by", "status_history",
   "created_at", "created_by",
   "attention", "needs_human", "fetch_fail_streak", "fetch_fail_run", // OPERATIONAL (v1.1 adds the last three)
-  "stale", "days_to_deadline", "pending_count", "verify_interval_effective"]);
+  "secondary_verified_at", "secondary_checked_by", "human_verified_at", "applied_patches", // OPERATIONAL, v1.3
+  "stale", "days_to_deadline", "pending_count", "verify_interval_effective",
+  "watch_mode", "human_check_due_at"]); // COMPUTED (v1.3 adds the last two)
+// The per-source access record (access, fail_count, fail_streak, …; v1.3
+// SOURCE_OPERATIONAL) is not in SOURCE_FIELDS, so a proposed `sources[]`
+// carrying it already fails as "not a writable field", as in the ledger.
 
 // ── primitives (v_str, v_date, … in service.py) ──────────────────────────────
 class Invalid extends Error {}
@@ -320,13 +337,22 @@ function validateObservation(o, p, { now, failedUrls, knownCodes }) {
   if (knownCodes && ct !== "new_program" && !knownCodes.has(o.program_code)) {
     fail(`${p}.program_code`, `"${o.program_code}" is not in the ledger (use new_program for a new one)`);
   }
+  // v1.3 §5.8: the secondary tripwire carries only secondary evidence.
+  if (ct === "secondary_no_change" && o.evidence.some((e) => e.primary_source !== false)) {
+    fail(`${p}.evidence`, "secondary_no_change takes only primary_source: false evidence (a primary page that loaded is a normal read: verified_no_change or a *_changed)");
+  }
   // skill rules
   if (READ_TYPES.has(ct)) {
     const bad = o.evidence.filter((e) => failedUrls.has(e.url)).map((e) => e.url);
     if (bad.length) fail(`${p}.evidence`, `${ct} cites ${bad.join(", ")}, which run.fetch_failures says could not be read`);
   }
-  if (ct === "new_program" && !o.evidence.some((e) => e.primary_source === true)) {
-    fail(`${p}.evidence`, "new_program needs at least one primary_source: true entry");
+  // skill rule: only the program's own page settles or changes a row. The
+  // ledger downgrades a verified_no_change without primary evidence (§5.8);
+  // refusing it here keeps the receipt honest about what was read.
+  if (PRIMARY_REQUIRED.has(ct) && !o.evidence.some((e) => e.primary_source === true)) {
+    fail(`${p}.evidence`, ct === "verified_no_change"
+      ? "verified_no_change needs at least one primary_source: true entry; a secondary listing that still matches the row is secondary_no_change"
+      : `${ct} needs at least one primary_source: true entry (a secondary listing alone is unconfirmed)`);
   }
 }
 
@@ -385,6 +411,12 @@ function validateRun(run, { agent, now, knownCodes }) {
   }
 }
 
+/** True when the payload uses a construct a ledger below v1.3 rejects (API.md §5.8). */
+export function usesContractV13(payload) {
+  const obs = Array.isArray(payload?.observations) ? payload.observations : [];
+  return obs.some((o) => o?.change_type === "secondary_no_change");
+}
+
 /** True when the payload uses a construct a v1.0 ledger rejects (API.md §5). */
 export function usesContractV11(payload) {
   const obs = Array.isArray(payload?.observations) ? payload.observations : [];
@@ -394,35 +426,127 @@ export function usesContractV11(payload) {
 
 /**
  * Read the contract handshake from a parsed worklist response.
- * Returns `{ major, version, v11, warning?, error? }`:
+ * Returns `{ major, version, v11, v13, warning?, error? }`:
  *  - `contract_version` absent → `warning` (proceed; the ledger cannot be checked);
  *  - present but not "MAJOR[.MINOR…]" (string or integer) → `error`;
  *  - present with a major other than LEDGER_CONTRACT_MAJOR → `error`.
  * `v11` is true when the ledger advertises v1.1 by version (≥ 1.1) or, while
  * it does not send a version yet, by the v1.1 worklist field
- * `discovery.seed_urls` (API.md §5.4).
+ * `discovery.seed_urls` (API.md §5.4). `v13` needs the version itself
+ * (≥ 1.3): there is no field to infer it from.
  */
 export function ledgerContract(worklist) {
   const seedUrls = Array.isArray(worklist?.discovery?.seed_urls);
   const raw = worklist?.contract_version;
   if (raw === undefined || raw === null) {
     return {
-      major: null, version: null, v11: seedUrls,
+      major: null, version: null, v11: seedUrls, v13: false,
       warning: `the ledger's worklist carries no contract_version; cannot confirm it speaks contract v${LEDGER_CONTRACT_MAJOR}.x (proceeding)`,
     };
   }
   const text = typeof raw === "number" && Number.isInteger(raw) ? String(raw) : raw;
   if (typeof text !== "string" || !/^\d+(\.\d+)*$/.test(text)) {
-    return { major: null, version: raw, v11: false, error: `the ledger reports an unreadable contract_version ${JSON.stringify(raw)}` };
+    return { major: null, version: raw, v11: false, v13: false, error: `the ledger reports an unreadable contract_version ${JSON.stringify(raw)}` };
   }
   const [major, minor = 0] = text.split(".").map(Number);
   if (major !== LEDGER_CONTRACT_MAJOR) {
     return {
-      major, version: text, v11: false,
+      major, version: text, v11: false, v13: false,
       error: `the ledger speaks contract v${text}; this skill implements v${LEDGER_CONTRACT_VERSION} (major ${LEDGER_CONTRACT_MAJOR}). Update ledger-payload.mjs to the new contract before posting`,
     };
   }
-  return { major, version: text, v11: minor >= 1 || seedUrls };
+  return { major, version: text, v11: minor >= 1 || seedUrls, v13: minor >= 3 };
+}
+
+/** The ledger's URL matching (service.py normalize_url): trim, drop the
+ *  fragment and a trailing "/", lowercase scheme and host. */
+export function normalizeUrl(url) {
+  if (typeof url !== "string" || !url.trim()) return null;
+  let u = url.trim().split("#")[0];
+  const i = u.indexOf("://");
+  if (i >= 0) {
+    const rest = u.slice(i + 3);
+    const j = rest.indexOf("/");
+    const host = j >= 0 ? rest.slice(0, j) : rest;
+    u = `${u.slice(0, i).toLowerCase()}://${host.toLowerCase()}${j >= 0 ? rest.slice(j) : ""}`;
+  }
+  return u.replace(/\/+$/, "") || null;
+}
+
+/**
+ * Skill rule (0.3.0): every worklist source marked `attempt_once` (a blocked
+ * primary page, API.md §5.8) must show up in the payload, either as a
+ * `run.fetch_failures` entry for that URL with that item's `program_code`, or
+ * as evidence of an observation on that program (the page loaded after all).
+ * The ledger's record of "still unreadable as of today" is the alert the
+ * operator keeps, so a fire that skips the attempt is refused before the
+ * receipt. Returns error strings.
+ *
+ * @param {unknown} payload  the normalised payload
+ * @param {unknown} worklist the parsed GET /v1/worklist response post.mjs read
+ */
+export function checkBlockedAttempts(payload, worklist) {
+  return [...blockedAttemptErrors(payload, worklist), ...evidenceRoleErrors(payload, worklist)];
+}
+
+/**
+ * The ledger decides an evidence entry's role from its own source list
+ * (service.py evidence_is_primary), after the receipt. So, against the
+ * worklist the desk read (skill rules, 0.3.0):
+ *  - a URL the ledger lists as secondary may not be claimed as primary (the
+ *    ledger would quietly turn a verified_no_change into a secondary_no_change);
+ *  - a `secondary_no_change` is only for a worklist item with a blocked
+ *    source (`attempt_once`), and may not cite one of that item's primary
+ *    pages (the ledger answers `rejected`, a stray receipt). Requiring the
+ *    item also means its full source list is in hand for the check.
+ */
+function evidenceRoleErrors(payload, worklist) {
+  const items = Array.isArray(worklist?.items) ? worklist.items : [];
+  const obs = Array.isArray(payload?.observations) ? payload.observations : [];
+  const errors = [];
+  obs.forEach((o, i) => {
+    if (!isObj(o) || !Array.isArray(o.evidence)) return;
+    const item = items.find((it) => isObj(it) && it.code === o.program_code);
+    const sources = Array.isArray(item?.sources) ? item.sources.filter(isObj) : [];
+    if (o.change_type === "secondary_no_change" && !sources.some((s) => s.attempt_once === true)) {
+      errors.push(`observations[${i}]: secondary_no_change is only for a worklist item with a blocked primary source (attempt_once); ${o.program_code} has none on this worklist`);
+      return;
+    }
+    o.evidence.forEach((e, j) => {
+      if (!isObj(e)) return;
+      const src = sources.find((s) => normalizeUrl(s.url) === normalizeUrl(e.url));
+      if (!src) return;
+      if (e.primary_source === true && src.primary_source === false) {
+        errors.push(`observations[${i}].evidence[${j}].primary_source: ${e.url} is a secondary source of ${o.program_code} in the ledger; it is never primary evidence`);
+      }
+      if (o.change_type === "secondary_no_change" && src.primary_source !== false) {
+        errors.push(`observations[${i}].evidence[${j}]: ${e.url} is a primary source of ${o.program_code} in the ledger; secondary_no_change cites only its secondary listings`);
+      }
+    });
+  });
+  return errors;
+}
+
+function blockedAttemptErrors(payload, worklist) {
+  const items = Array.isArray(worklist?.items) ? worklist.items : [];
+  const failures = Array.isArray(payload?.run?.fetch_failures) ? payload.run.fetch_failures.filter(isObj) : [];
+  const obs = Array.isArray(payload?.observations) ? payload.observations.filter(isObj) : [];
+  const errors = [];
+  for (const item of items) {
+    if (!isObj(item) || typeof item.code !== "string") continue;
+    for (const s of Array.isArray(item.sources) ? item.sources : []) {
+      if (!isObj(s) || s.attempt_once !== true || typeof s.url !== "string") continue;
+      const u = normalizeUrl(s.url);
+      const failed = failures.some((f) => f.program_code === item.code && normalizeUrl(f.url) === u);
+      const cited = obs.some((o) => o.program_code === item.code
+        && Array.isArray(o.evidence) && o.evidence.some((e) => isObj(e) && normalizeUrl(e.url) === u));
+      if (!failed && !cited) {
+        errors.push(`run.fetch_failures: the attempt on the blocked source was not recorded: ${s.url} (${item.code}). ` +
+          `Make one plain attempt and add {url, reason, program_code: "${item.code}"}, or cite the page if it loaded`);
+      }
+    }
+  }
+  return errors;
 }
 
 /**
