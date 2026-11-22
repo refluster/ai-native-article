@@ -177,6 +177,66 @@ with the roster average. If ledger-watch fires run more than 2× the medium
 figure, move the skill to `large` (a `meta.json` change in its own PR) or
 thin the cadence.
 
+## Temporary 4× cadence
+
+Operator direction 2026-11-22: for a two-week experiment, both desks fire
+`ledger-watch` 4 times a day instead of once. `--fires-per-day <n>`
+(n ∈ 1, 2, 3, 4, 6) changes only the existing binding's `trigger.cron`, in
+place. The binding keeps its index (3 on both desks), its `config`, its
+`bound_at` and every other field, and the other bindings are left alone. The
+cron keeps the binding's minute and its base hour and adds an hour list spread
+evenly over 24 h. soledad goes from `cron(19 22 ? * * *)` to
+`cron(19 4,10,16,22 ? * * *)`, and valeria from `cron(43 2 ? * * *)` to
+`cron(43 2,8,14,20 ? * * *)`. The orchestrator matcher (`cron-match.ts`), the
+write-time validator (G1 wants a single literal minute only) and the R-19
+counter all accept this form. One dated line is appended to `note`, giving the
+change, the reason and a `[base cron(…)]` marker. A later run reads the base
+hour from that marker. The same PATCH moves `budget_monthly_usd_default` by
+the change in modelled burn. Re-running with the same n is a no-op. A
+different `ledger_api_url` is still refused.
+
+```sh
+# dry run (default): planned crons, note line and budget arithmetic per desk
+node workforce/scripts/wire-ledger-watch.mjs \
+  --ledger-url https://<id>.execute-api.<region>.amazonaws.com \
+  --fires-per-day 4 --reason "two-week 4x experiment (operator direction 2026-11-22)"
+
+# write (B-authority: operator only), then read-back verification
+aws-vault exec <profile> -- node workforce/scripts/wire-ledger-watch.mjs \
+  --ledger-url https://<id>.execute-api.<region>.amazonaws.com \
+  --fires-per-day 4 --reason "two-week 4x experiment (operator direction 2026-11-22)" --apply
+```
+
+**Budget, from the cost model (an estimate, not billing).** ledger-watch
+goes from 2 desks × 1 × 30 × USD 0.20 = USD 12/mo to
+2 desks × 4 × 30 × USD 0.20 = **USD 48/mo**, so it adds USD 36/mo. Per desk,
+modelled burn goes from USD 10.5 to 28.5/mo, and `budget_monthly_usd_default`
+goes from 11 to 29. The dry run on 2026-11-22 showed the roster's planned sum
+going from USD 482 to 518 and its modelled burn from USD 576.9 to 612.9/mo,
+against the USD 800 cap.
+
+**Tell the ledger too.** The desks only re-check what `/v1/worklist` hands
+them. If the ledger still releases a day's work once a day, fires 2 to 4 find
+an empty worklist. They still spend a feed receipt and a medium fire each and
+produce nothing. Set the ledger's cadence to match (the ledger reports it as
+`cadence_speedup` on `/v1/health`), and confirm it before `--apply`:
+`curl -sS <ledger_url>/v1/health` should show `cadence_speedup` of 4. On
+2026-11-22 the deployed ledger returned only `ok`, `time` and
+`contract_version` with no `cadence_speedup`. Deploy the ledger change
+first, or the extra fires find nothing to do.
+
+**Back to daily** when the two weeks end (the same commands with
+`--fires-per-day 1`; the dry run shows `cron(19 22 ? * * *)` and
+`cron(43 2 ? * * *)` again, with the budget back from 29 to 11). Reset the
+ledger's `cadence_speedup` at the same time.
+
+The orchestrator ticks every 2 hours and sees each binding at most once per
+tick window. With n ≤ 6 the fires are at least 4 h apart, so none collapse.
+The tick's dedup window for ledger-watch is the 60-minute default, so it
+cannot suppress the later fires of the day. An on-demand `POST /dispatch`
+stamps the same slot, so a scheduled fire within 60 min after one is skipped.
+The daily cadence has the same behaviour.
+
 ## Verify the first fire
 
 1. After the first scheduled minute, `GET /agents/soledad/posts?page_size=3`
