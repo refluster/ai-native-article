@@ -29,6 +29,7 @@
 import { ensureProxyAwareEntry } from "../../scripts/lib/proxy-bootstrap.mjs";
 ensureProxyAwareEntry(import.meta.url);
 
+import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -391,28 +392,79 @@ function optArg(name) {
   return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : undefined;
 }
 
+/** FU-038 leg (b): read the committed (git HEAD) content of a repo-relative
+ *  path. Returns null on any git failure; the caller decides whether that is
+ *  fatal (inside the repo: yes, C-4) or a legitimate fallback (outside). No
+ *  shell: argv only, cwd pinned to the repo root. */
+function readGitHead(relPath, gitRoot) {
+  try {
+    return execFileSync("git", ["show", `HEAD:${relPath}`], {
+      encoding: "utf8",
+      cwd: gitRoot,
+      maxBuffer: 64 * 1024 * 1024, // the manifest exceeds execFileSync's 1 MB default (ENOBUFS)
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+  } catch {
+    return null;
+  }
+}
+
 function checkSkillsManifest() {
   const skillsDir = optArg("skills-dir") ?? SKILLS_DIR;
   const manifestPath = optArg("manifest") ?? SKILLS_OUT_PATH;
-  const rel = manifestPath.replace(REPO_ROOT + "/", "");
+  const gitRoot = optArg("git-root") ?? REPO_ROOT;
+  const inRepo = manifestPath.startsWith(gitRoot + "/");
+  const rel = inRepo ? manifestPath.slice(gitRoot.length + 1) : manifestPath;
   const fresh = buildSkills(skillsDir);
 
-  if (!existsSync(manifestPath)) {
+  // FU-038 leg (b): prefer the committed (git HEAD) version over the working
+  // tree. `npm run build` regenerates the file on disk before this check runs
+  // in CI, so a readFileSync call always compares a fresh-generated file
+  // against a fresh-generated file — it can never detect drift. Reading from
+  // git HEAD compares the last-committed state against what the current skill
+  // tree would produce, which is the invariant we actually want.
+  //
+  // C-4: for a manifest path INSIDE the repo a failed `git show` (shallow
+  // clone, missing path, git absent) is fatal — falling back to the working
+  // file there is exactly the inert fresh-vs-fresh compare. The working-file
+  // fallback survives only for manifest paths outside the repo (/tmp fixtures).
+  const committedSource = inRepo ? readGitHead(rel, gitRoot) : null;
+  if (inRepo && committedSource === null) {
     console.error(
-      `build-agent-manifest: ${rel} is missing. Run \`npm run build:agents\` and commit the result.`,
+      `build-agent-manifest: cannot read committed ${rel} via \`git show HEAD:${rel}\` ` +
+        "(shallow clone, uncommitted path or git unavailable); refusing to compare against the working file.",
     );
     process.exit(1);
   }
 
   let committed;
-  try {
-    committed = JSON.parse(readFileSync(manifestPath, "utf8")).skills;
-  } catch (err) {
-    console.error(
-      `build-agent-manifest: ${rel} is not readable as JSON (${err instanceof Error ? err.message : String(err)}). ` +
-        "Run `npm run build:agents` and commit the result.",
-    );
-    process.exit(1);
+  if (committedSource !== null) {
+    try {
+      committed = JSON.parse(committedSource).skills;
+    } catch (err) {
+      console.error(
+        `build-agent-manifest: committed ${rel} is not readable as JSON ` +
+          `(${err instanceof Error ? err.message : String(err)}). ` +
+          "Run `npm run build:agents` and commit the result.",
+      );
+      process.exit(1);
+    }
+  } else {
+    if (!existsSync(manifestPath)) {
+      console.error(
+        `build-agent-manifest: ${rel} is missing. Run \`npm run build:agents\` and commit the result.`,
+      );
+      process.exit(1);
+    }
+    try {
+      committed = JSON.parse(readFileSync(manifestPath, "utf8")).skills;
+    } catch (err) {
+      console.error(
+        `build-agent-manifest: ${rel} is not readable as JSON (${err instanceof Error ? err.message : String(err)}). ` +
+          "Run `npm run build:agents` and commit the result.",
+      );
+      process.exit(1);
+    }
   }
   if (!Array.isArray(committed)) {
     console.error(

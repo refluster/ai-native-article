@@ -8,12 +8,14 @@
 // top-level agents-api fetch out of the test process.
 
 import { describe, expect, it } from "vitest";
-import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { copyFileSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const SCRIPT = join(__dirname, "build-agent-manifest.mjs");
+// Two levels up: workforce/scripts/ -> workforce/ -> repo root
+const REPO_ROOT = join(__dirname, "..", "..");
 
 const META = (name: string, version = "0.1.0") =>
   JSON.stringify({
@@ -145,5 +147,71 @@ describe("build-agent-manifest.mjs --check-skills", () => {
     const r = check(tree, bad);
     expect(r.status).toBe(1);
     expect(r.stderr).toContain("no `skills` array");
+  });
+});
+
+describe("build-agent-manifest.mjs --check-skills (git-HEAD path, FU-038 leg b)", () => {
+  it("reads the committed manifest from git HEAD (FU-038: inert gate fix)", () => {
+    // FU-038 symptom: in CI `npm run build` writes a fresh manifest to disk
+    // before `workforce:skill-manifest:check` runs — so a readFileSync-based
+    // check always compares a freshly-generated file against freshly-generated
+    // and can never detect drift. The fix (this PR) uses `git show HEAD:` to
+    // read the committed version regardless of what the working file contains.
+    //
+    // This test runs the check with NO --manifest override, so the script
+    // resolves SKILLS_OUT_PATH = workforce/app/public/workforce-skills.json
+    // and reads it from git HEAD. If the committed manifest matches the current
+    // skills tree (which it must after this PR regenerates it), the check
+    // exits 0. If a future PR changes a skill without regenerating the manifest
+    // and commits the stale file, this test fails CI — which is exactly the
+    // regression FU-038 wanted to catch.
+    const r = spawnSync("node", [SCRIPT, "--check-skills"], { encoding: "utf8", cwd: REPO_ROOT });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("OK (");
+  });
+});
+
+describe("build-agent-manifest.mjs --check-skills (stale committed manifest, FU-038 leg b)", () => {
+  const git = (cwd: string, ...args: string[]) =>
+    execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { cwd, encoding: "utf8" });
+
+  /** Temp git repo whose HEAD holds `committed` while the working file holds `working`. */
+  function repoWith(committed: string, working: string): { root: string; manifest: string } {
+    const root = mkdtempSync(join(tmpdir(), "wf-gitroot-"));
+    git(root, "init", "-q");
+    const manifest = join(root, "workforce-skills.json");
+    copyFileSync(committed, manifest);
+    git(root, "add", "workforce-skills.json");
+    git(root, "commit", "-q", "-m", "stale manifest");
+    copyFileSync(working, manifest); // what `npm run build` does after checkout
+    return { root, manifest };
+  }
+
+  it("exits 1 'out of date' when HEAD is stale but the working file is fresh (reverting to readFileSync would pass)", () => {
+    const stale = skillsTree([{ name: "alpha", version: "0.1.0" }]);
+    const fresh = skillsTree([{ name: "alpha", version: "0.2.0" }]);
+    const { root, manifest } = repoWith(manifestFor(stale), manifestFor(fresh));
+    const r = spawnSync(
+      "node",
+      [SCRIPT, "--check-skills", "--skills-dir", fresh, "--manifest", manifest, "--git-root", root],
+      { encoding: "utf8" },
+    );
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("out of date");
+  });
+
+  it("exits 1 loudly when the in-repo manifest was never committed (no silent fallback)", () => {
+    const fresh = skillsTree([{ name: "alpha" }]);
+    const root = mkdtempSync(join(tmpdir(), "wf-gitroot-"));
+    git(root, "init", "-q");
+    const manifest = join(root, "workforce-skills.json");
+    copyFileSync(manifestFor(fresh), manifest);
+    const r = spawnSync(
+      "node",
+      [SCRIPT, "--check-skills", "--skills-dir", fresh, "--manifest", manifest, "--git-root", root],
+      { encoding: "utf8" },
+    );
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("git show HEAD");
   });
 });
