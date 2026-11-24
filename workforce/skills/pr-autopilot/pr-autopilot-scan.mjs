@@ -618,6 +618,13 @@ async function main() {
       is_bot: pr.user?.type === "Bot" || /\[bot\]$/.test(pr.user?.login ?? ""),
       base: pr.base?.ref ?? "",
       head: pr.head?.ref ?? "",
+      // FU-030: SKILL.md Step 4 references candidate.head_sha for the CCR
+      // session to verify git HEAD before running lens subagents; without
+      // this field that check is impossible.
+      head_sha: pr.head?.sha ?? "",
+      head_checkout_cmd: pr.head?.sha
+        ? `git fetch origin pull/${pr.number}/head && git checkout FETCH_HEAD`
+        : "",
       html_url: pr.html_url,
       updated_at: pr.updated_at,
       comments: comments
