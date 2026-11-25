@@ -19,6 +19,7 @@ import {
   countOpenSeats,
   applyNominationCap,
   alreadyRouted,
+  headCheckout,
   headCommitDate,
   isTerminal,
   lastRemediationOutcomeAt,
@@ -516,5 +517,23 @@ describe("boundDiff", () => {
     const r = boundDiff("z".repeat(100), 10);
     expect(r.truncated).toBe(true);
     expect(r.excerpt.startsWith("z".repeat(10) + "\n...")).toBe(true);
+  });
+});
+
+describe("headCheckout (FU-030)", () => {
+  const sha = "7455a5646143e1435342ac3823b42d1aa3ac3bb1";
+  it("returns the scanned head sha and a command pinned to that sha", () => {
+    const r = headCheckout({ number: 913, head: { sha } });
+    expect(r.head_sha).toBe(sha);
+    expect(r.head_checkout_cmd).toBe(`git fetch origin pull/913/head && git checkout --detach ${sha}`);
+    expect(r.head_checkout_cmd).not.toContain("FETCH_HEAD");
+  });
+  it("returns an empty sha and empty command when the head sha is absent", () => {
+    for (const pr of [{ number: 1, head: {} }, { number: 1 }, { number: 1, head: { sha: null } }, undefined]) {
+      expect(headCheckout(pr)).toEqual({ head_sha: "", head_checkout_cmd: "" });
+    }
+  });
+  it("never emits a half-formed command when the PR number is missing", () => {
+    expect(headCheckout({ head: { sha } })).toEqual({ head_sha: sha, head_checkout_cmd: "" });
   });
 });

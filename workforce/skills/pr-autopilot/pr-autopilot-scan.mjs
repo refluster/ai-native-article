@@ -283,6 +283,25 @@ export function headCommitDate(commitJson) {
 }
 
 /**
+ * FU-030: the head commit the scan saw for a PR, plus a checkout command pinned
+ * to it. The command fetches the PR head and checks out `head_sha` itself
+ * (detached), not FETCH_HEAD: if the PR is pushed to between this scan and the
+ * fetch, the scanned commit is still checked out when it is reachable from the
+ * fetched head, and the checkout fails loudly when it is not, rather than
+ * silently landing on a different commit. The caller still asserts
+ * `git rev-parse HEAD` equals `head_sha` (SKILL.md Step 4). An absent sha or
+ * number yields an empty command, never a half-formed one.
+ */
+export function headCheckout(pr) {
+  const sha = typeof pr?.head?.sha === "string" ? pr.head.sha : "";
+  const n = Number.isInteger(pr?.number) ? pr.number : null;
+  return {
+    head_sha: sha,
+    head_checkout_cmd: sha && n !== null ? `git fetch origin pull/${n}/head && git checkout --detach ${sha}` : "",
+  };
+}
+
+/**
  * The whole discovery decision, as one pure function: which open PRs are
  * candidates this tick, and at which cycle.
  *
@@ -618,6 +637,10 @@ async function main() {
       is_bot: pr.user?.type === "Bot" || /\[bot\]$/.test(pr.user?.login ?? ""),
       base: pr.base?.ref ?? "",
       head: pr.head?.ref ?? "",
+      // FU-030: the PR head's commit (and a checkout pinned to it), added as
+      // data for SKILL.md Step 4's head-verification step to consume. Nothing
+      // in SKILL.md reads these fields yet (a Zone A body edit).
+      ...headCheckout(pr),
       html_url: pr.html_url,
       updated_at: pr.updated_at,
       comments: comments
