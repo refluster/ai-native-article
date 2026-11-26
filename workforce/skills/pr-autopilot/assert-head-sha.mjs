@@ -22,10 +22,10 @@
 //   0 — HEAD equals expected sha; safe to run lenses
 //   1 — HEAD mismatch; abort lens — wrong working tree
 //   2 — git failure (not a repo, HEAD missing, git not on PATH)
-//   3 — bad arguments (empty or malformed --expected-sha)
+//   3 — bad arguments (empty or not exactly 40 hex chars in --expected-sha)
 
 import { execFileSync } from "node:child_process";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 
 function arg(name, fallback = undefined) {
   const i = process.argv.indexOf(`--${name}`);
@@ -35,7 +35,7 @@ function arg(name, fallback = undefined) {
 /**
  * Assert that HEAD in the given working directory equals expectedSha.
  *
- * @param {string} expectedSha  The 40-hex (or 7+-hex short) SHA the scan committed to.
+ * @param {string} expectedSha  The full 40-hex SHA the scan committed to (`head_sha`); `git rev-parse HEAD` always returns 40 chars, so a short SHA can never match and is rejected as bad args.
  * @param {object} [options]
  * @param {string} [options.cwd]      Working directory for the git call (default: process.cwd()).
  * @param {() => string} [options.getHead]  Injectable getter for testing; skips execFileSync.
@@ -47,12 +47,12 @@ export function assertHeadSha(expectedSha, options = {}) {
   if (
     !expectedSha ||
     typeof expectedSha !== "string" ||
-    !/^[0-9a-f]{7,40}$/i.test(expectedSha)
+    !/^[0-9a-f]{40}$/i.test(expectedSha)
   ) {
     return {
       ok: false,
       code: 3,
-      message: `assert-head-sha: bad --expected-sha: ${JSON.stringify(expectedSha)} (must be 7–40 hex chars)`,
+      message: `assert-head-sha: bad --expected-sha: ${JSON.stringify(expectedSha)} (must be exactly 40 hex chars)`,
     };
   }
 
